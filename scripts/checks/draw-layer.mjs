@@ -92,12 +92,16 @@ export function nestedVariantFindings(html, { label = 'the render' } = {}) {
     const region = ancestorsOf(button).find((a) => walkElements(a).some((d) => FIELD_CONTROLS.includes(componentOf(d.attrs))));
     if (!region || surfaceAncestor(button) || isSurface({ component: componentOf(region.attrs), attrs: region.attrs ?? {}, classes: classesOf(region) })) continue;
     const fields = walkElements(region).filter((d) => FIELD_CONTROLS.includes(componentOf(d.attrs)));
-    // A field already standing on a surface is reported (or passed) as a nested control, never again as a loose form.
-    if (fields.some((d) => surfaceAncestor(d))) continue;
-    if (!loose.some((l) => l.region === region)) loose.push({ region, fields });
+    // A form is one unit: fields on a surface with the submit on the Background is a split form; a field on a surface
+    // is otherwise judged as a nested control only, never also as a loose form.
+    const split = fields.some((d) => surfaceAncestor(d));
+    if (!loose.some((l) => l.region === region)) loose.push({ region, fields, split });
   }
-  for (const { fields } of loose) out.push({ code: DRAW_NESTED_VARIANT, kind: 'form on the page background', count: 1,
-    detail: `${label}: a form region (${fields.slice(0, 4).map(describe).join(', ')} and its primary submit) stands directly on the page Background - it belongs in a Surface (SurfaceCard), its controls nested in variant="secondary" (ANATOMY-2 case-3)` });
+  for (const { fields, split } of loose) out.push(split
+    ? { code: DRAW_NESTED_VARIANT, kind: 'form-split-across-layers', count: 1,
+      detail: `${label}: form-split-across-layers - ${fields.slice(0, 4).map(describe).join(', ')} stand(s) on a Surface while the form's primary submit sits on the page Background; a form is one unit, its fields and its submit/actions belong in the same Surface (ANATOMY-2 case-3)` }
+    : { code: DRAW_NESTED_VARIANT, kind: 'form on the page background', count: 1,
+      detail: `${label}: a form region (${fields.slice(0, 4).map(describe).join(', ')} and its primary submit) stands directly on the page Background - it belongs in a Surface (SurfaceCard), its controls nested in variant="secondary" (ANATOMY-2 case-3)` });
   return out;
 }
 

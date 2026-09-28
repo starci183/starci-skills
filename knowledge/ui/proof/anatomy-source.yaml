@@ -85,8 +85,10 @@ rules:
           The layer chain holds: the page Background -> a Surface (SurfaceCard) -> the controls nested
           on it in `secondary`. Grouped content and its controls stand in a Surface, never directly on
           the Background; only page-level marks (a brand lockup, the page heading) sit on the Background
-          itself. Fields laid straight on the page background, or a control on the Background that
-          borrows the nested `secondary` fill, falsifies
+          itself. A form is one unit: its fields AND its submit/actions stand in the same Surface.
+          Fields laid straight on the page background, a form split across layers (fields on a
+          Surface, its submit on the Background), or a control on the Background that borrows the
+          nested `secondary` fill, falsifies
         elements: [page]
   - id: ANATOMY-3
     title: Composition is the only place direction invents
