@@ -41,25 +41,18 @@ const FRAMEWORK_EXCEPTIONS = new Set([
   "GatewayTimeoutException",
 ])
 
-/** Where every exception is declared. */
-const ERRORS_FOLDER = /\/exceptions\/errors\//
+/** A capability owns its own errors, including nested error groups. */
+const ERRORS_FOLDER = /\/src\/modules\/(?:domain|platform|integrations)\/[^/]+\/(?:[^/]+\/)*errors\//
 
 /**
- * True when a file sits in an exceptions folder - ANY of them.
- *
- * THE PATH USED TO BE `/platform/exceptions/errors/`, WHICH WAS ONE REPOSITORY'S LAYOUT WRITTEN
- * INTO A LAW. EXCEPTION-4 asks for one place per APPLICATION to look, not for one literal path: a
- * repository with several apps has `apps/<name>/src/exceptions/errors/` per app and still satisfies
- * it, because "what can this application throw" still has a single answer.
- *
- * Measured before changing: the narrow path reported 83 findings in a second back end, and the top
- * offenders were files already sitting in an `exceptions/errors/` folder - just not that one. A rule
- * that fires on correct code is worse than no rule, because the next author learns to scroll past it.
+ * HFS puts domain failures with their domain capability and provider failures with their integration.
+ * A central platform exceptions capability can still own its own generic errors.
  */
 const isInErrorsFolder = (filename) => ERRORS_FOLDER.test(normalizePath(filename))
 
 /** The base class's own file, which is the one class allowed to extend something else. */
-const isExceptionBaseFile = (filename) => /exceptions\/errors\/abstract\.ts$/.test(normalizePath(filename))
+const isExceptionBaseFile = (filename) =>
+  /\/src\/modules\/(?:domain|platform|integrations)\/[^/]+\/(?:errors\/)?abstract\.ts$/.test(normalizePath(filename))
 
 /**
  * The test lanes, where `throw new Error` is a test-runner assertion rather than a domain failure.
@@ -197,10 +190,11 @@ export const exceptionExtendsAbstract = {
     },
   },
   create(context) {
-    if (isExceptionBaseFile(context.filename || context.getFilename())) return {}
+    const baseFile = isExceptionBaseFile(context.filename || context.getFilename())
     return {
       ClassDeclaration(node) {
         if (!node.id || !EXCEPTION_NAME.test(node.id.name)) return
+        if (baseFile && node.id.name === EXCEPTION_BASE) return
         const parent = node.superClass
         if (!parent || parent.type !== "Identifier" || parent.name === EXCEPTION_BASE) return
         context.report({
@@ -215,22 +209,25 @@ export const exceptionExtendsAbstract = {
 
 // -- EXCEPTION-4 -----------------------------------------------------------------------------------
 
-/** Every exception is declared in one folder, so the set of failures is readable in one place. */
+/** Each capability declares its failures in its own errors folder. */
 export const exceptionInErrorsFolder = {
   meta: {
     type: "problem",
-    docs: { description: "An `*Exception` class is declared under the exceptions folder." },
+    docs: { description: "An `*Exception` class is declared under its owning capability's errors folder." },
     schema: [],
     messages: {
       place:
-        "`{{name}}` is declared outside the exceptions folder. They all live in one place so \"what can this application throw?\" has one answer, and so a reviewer sees a new failure mode ARRIVE in a diff rather than discovering it in production.",
+        "`{{name}}` is declared outside its owning capability's errors folder. Put domain failures under their domain owner and provider failures under their integration owner.",
     },
   },
   create(context) {
-    if (isInErrorsFolder(context.filename || context.getFilename())) return {}
+    const filename = context.filename || context.getFilename()
+    if (isInErrorsFolder(filename)) return {}
+    const baseFile = isExceptionBaseFile(filename)
     return {
       ClassDeclaration(node) {
         if (!node.id || !EXCEPTION_NAME.test(node.id.name)) return
+        if (baseFile && node.id.name === EXCEPTION_BASE) return
         // an undecorated class with no base is a shape, not an exception - the declaration this
         // rule is after always extends something
         if (!node.superClass) return

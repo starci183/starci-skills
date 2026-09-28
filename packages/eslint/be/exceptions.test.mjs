@@ -28,9 +28,9 @@ const tester = new RuleTester({
   },
 })
 
-const ERRORS = "D:/repo/src/modules/platform/exceptions/errors/courses/course-not-found.ts"
-const BASE = "D:/repo/src/modules/platform/exceptions/errors/abstract.ts"
-const HANDLER = "D:/repo/src/features/api/core/graphql/mutations/courses/add-to-cart/add-to-cart.handler.ts"
+const ERRORS = "D:/repo/src/modules/domain/courses/errors/course-not-found.ts"
+const BASE = "D:/repo/src/modules/platform/exceptions/abstract.ts"
+const HANDLER = "D:/repo/src/features/courses/application/add-to-cart.use-case.ts"
 
 test("every rule this law declares is exported under its published name", () => {
   for (const [name, rule] of Object.entries(rules)) {
@@ -135,7 +135,7 @@ test("EXCEPTION-3: a framework base hidden behind a house name is caught at the 
     ],
     invalid: [
       {
-        filename: ERRORS,
+        filename: BASE,
         code: "export class CourseAlreadyEnrolledException extends ConflictException {}",
         errors: [{ messageId: "base" }],
       },
@@ -143,7 +143,7 @@ test("EXCEPTION-3: a framework base hidden behind a house name is caught at the 
   })
 })
 
-test("EXCEPTION-4: exceptions are declared in one folder", () => {
+test("EXCEPTION-4: exceptions stay in their owning capability's errors folder", () => {
   tester.run("exception-in-errors-folder", exceptionInErrorsFolder, {
     valid: [
       { filename: ERRORS, code: "export class CourseNotFoundException extends AbstractException {}" },
@@ -151,21 +151,16 @@ test("EXCEPTION-4: exceptions are declared in one folder", () => {
       { filename: HANDLER, code: "class LocalException {}" },
       { filename: HANDLER, code: "export class AddToCartHandler extends ICQRSHandler {}" },
       /*
-       * ANY exceptions folder, not one repository's path.
-       *
-       * The rule used to require `/platform/exceptions/errors/`, which was one layout written into
-       * a law. EXCEPTION-4 asks for one place per APPLICATION to look, and a repository with
-       * several apps satisfies that with one folder each - a fact measured the hard way, when the
-       * narrow path reported 83 findings in a second back end whose top offenders were already
-       * sitting in an `exceptions/errors/` folder.
+       * The shared base may sit at the platform capability root. Concrete domain and provider
+       * failures live in their respective capability's errors folder.
        */
       {
-        filename: "/repo/apps/agentos-cli/src/exceptions/errors/provision-failed.ts",
-        code: "export class ProvisionFailedException extends AbstractException {}",
+        filename: BASE,
+        code: "export class AbstractException extends Error {}",
       },
       {
-        filename: "/repo/src/modules/expert/exceptions/errors/affiliate/affiliate-not-found.ts",
-        code: "export class AffiliateNotFoundException extends AbstractException {}",
+        filename: "/repo/src/modules/integrations/storage/errors/upload-failed.ts",
+        code: "export class UploadFailedException extends AbstractException {}",
       },
     ],
     invalid: [

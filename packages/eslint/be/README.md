@@ -36,9 +36,9 @@ A sample, not the list:
 
 | Area | What the rules hold |
 |---|---|
-| **Exceptions** | Every failure throws a domain exception carrying its own identity and metadata — never a bare `Error`, never a framework built-in, never an exception declared outside the exceptions folder |
+| **Exceptions** | Every failure carries its own identity and metadata. Concrete exceptions live in their owning capability's `errors/` folder; the shared abstract base may live at the capability root. |
 | **CQRS** | A handler does not assemble an aggregate inline; reads and writes do not share one path |
-| **Module layering** | An import that climbs a layer it was not given is a build failure, not a review comment |
+| **Module layering** | Cross-capability imports may use an explicit public `index.ts`; self-aliases, tier-only aliases, folder re-exports, and export-star public entries are refused. |
 | **Data access** | Queries stay where the layer says they may be built |
 | **Transport** | The wire shape is declared, not inferred from whatever a handler happened to return |
 | **Observability** | A failure is logged as a typed exception, so a log line can be traced to the law that names it |

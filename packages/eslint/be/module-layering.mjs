@@ -22,10 +22,9 @@
  * that option through at every level of legitimate nesting, and only the module graph can tell a
  * nested child from a foreign capability.
  *
- * THE META-ROOT IS THE TRAP IN MOST OF THESE. Some capabilities sit behind a category folder
- * (`platform/`, `lib/`, `integrations/`), so the capability name is the SECOND segment there and
- * the first everywhere else. Get that wrong and `@modules/platform/exceptions` reads as a
- * capability-with-file rather than as a barrel.
+ * Module tiers (`domain/`, `platform/`, `integrations/`) contain capabilities. Their name is the
+ * second segment; an alias ending there names its explicit index.ts public entry. The first segment
+ * alone names a tier, not a capability.
  */
 
 import { normalizePath } from "./lib/path.mjs"
@@ -33,10 +32,10 @@ import { normalizePath } from "./lib/path.mjs"
 /**
  * Category folders that hold capabilities rather than being one.
  *
- * Under these the capability name is the second segment: `@modules/platform/exceptions` names a
- * capability and no file, so it is a barrel -- while `@modules/ai` names a capability directly.
+ * Under these the capability name is the second segment. `lib` remains recognized while older
+ * sources transition to the HFS tiers; the architecture check rejects it as a new tier.
  */
-const META_ROOTS = new Set(["platform", "lib", "integrations"])
+const META_ROOTS = new Set(["domain", "platform", "integrations", "lib"])
 
 /** The aliases a capability is reachable through. */
 const ALIASES = [
@@ -44,30 +43,33 @@ const ALIASES = [
     prefix: "@modules/",
     root: "/src/modules/",
     metaAware: true,
+    publicEntry: true,
   },
   {
     prefix: "@features/",
     root: "/src/features/",
     metaAware: false,
+    publicEntry: true,
   },
   {
     prefix: "@tests/",
     root: "/src/tests/",
     metaAware: false,
+    publicEntry: false,
   },
 ]
 
 // -- LAYERING-1 ------------------------------------------------------------------------------------
 
-/** An import names the declaring file, never a folder that re-exports one. */
+/** An import names a capability's explicit public entry or a file, never a root or tier. */
 export const mustDeepModuleImport = {
   meta: {
     type: "problem",
-    docs: { description: "Import the declaring file, never a capability barrel." },
+    docs: { description: "Import a capability public entry or a file, never an alias root or tier." },
     schema: [],
     messages: {
       barrel:
-        "`{{specifier}}` names a capability and no file. A barrel pulls the whole folder's import graph in to get one symbol - which is how a unit spec ends up booting a database driver, and how two capabilities that never reference each other end up in a cycle through a third. Name the file that declares the symbol.",
+        "`{{specifier}}` stops before a capability public entry or file. Import an explicit capability index.ts API or the declaring file.",
     },
   },
   create(context) {
@@ -85,7 +87,7 @@ export const mustDeepModuleImport = {
       const barrelDepth = alias.metaAware && META_ROOTS.has(parts[0])
         ? 2
         : 1
-      if (parts.length <= barrelDepth) {
+      if (parts.length < barrelDepth || (!alias.publicEntry && parts.length === barrelDepth)) {
         context.report({ node, messageId: "barrel", data: { specifier } })
       }
     }
@@ -114,7 +116,7 @@ const selfAliases = (filename) => {
     const parts = file.slice(at + alias.root.length).split("/")
     if (!parts[0]) continue
     if (alias.metaAware && META_ROOTS.has(parts[0]) && parts.length >= 2) {
-      // reachable long (`platform/exceptions`) and short (`exceptions`), so both are self
+      // reachable long (`domain/task`) and short (`task`), so both are self
       return {
         prefix: alias.prefix,
         keys: [`${parts[0]}/${parts[1]}`, parts[1]],
@@ -213,8 +215,8 @@ const isBareFolderSpecifier = (specifier) =>
  * Two certain signs, neither needing a disk lookup:
  *  - a bare-dot or trailing-slash specifier names a directory by construction -- no file path ever
  *    looks like that, aliased or relative, so there is nothing to guess;
- *  - a file literally named `index.*` whose entire top-level body is re-export statements is the
- *    exact shape the law's own Anchor measures ("Zero index.ts files in the entire source tree").
+ *  - an export-star in an `index.*` public entry hides the capability's API rather than listing
+ *    its exports explicitly, even when other named exports appear beside it.
  *
  * What this deliberately does NOT flag: a single bridging re-export naming a real file
  * (`export { AiInvokeService } from '@modules/ai/ai-invoke.service'`), which LAYERING-1's own
@@ -229,14 +231,14 @@ export const noFolderReexport = {
     type: "problem",
     docs: {
       description:
-        "LAYERING-5 / module-layering.md Law 7: no file re-exports a folder -- a bare-directory specifier or an index barrel turns a capability's surface into a list nobody reads.",
+        "LAYERING-5 / HFS: no file re-exports a folder, and public index files list named exports.",
     },
     schema: [],
     messages: {
       bareSpecifier:
         "`{{specifier}}` names a directory, not a file. LAYERING-5: a capability's public surface is the files call sites actually import -- re-exporting a whole folder makes that surface a list nobody reads instead. Export the specific file.",
       indexBarrel:
-        "This file is named `{{name}}` and its entire content is re-export statements -- the exact shape of an index barrel. LAYERING-5: this repository keeps zero `index.*` files so a barrel specifier never has anything to resolve to. Delete it and have callers import the real files directly.",
+        "`{{name}}` is a public entry and must list explicit named exports. Replace export-star with the symbols this capability exposes.",
     },
   },
   create(context) {
@@ -258,20 +260,13 @@ export const noFolderReexport = {
       },
       ExportAllDeclaration(node) {
         if (node.source) checkSpecifier(node.source, node.source.value)
-      },
-      "Program:exit"(node) {
-        if (!INDEX_FILE_RE.test(filename)) return
-        const body = node.body
-        const reexports = body.filter(
-          (stmt) =>
-            (stmt.type === "ExportNamedDeclaration" && stmt.source) || stmt.type === "ExportAllDeclaration",
-        )
-        if (reexports.length === 0 || reexports.length !== body.length) return
-        context.report({
-          node,
-          messageId: "indexBarrel",
-          data: { name: filename.slice(filename.lastIndexOf("/") + 1) },
-        })
+        if (INDEX_FILE_RE.test(filename) && !isBareFolderSpecifier(node.source?.value)) {
+          context.report({
+            node,
+            messageId: "indexBarrel",
+            data: { name: filename.slice(filename.lastIndexOf("/") + 1) },
+          })
+        }
       },
     }
   },
