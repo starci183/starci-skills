@@ -56,6 +56,7 @@ import { scanRange } from './push-mains.mjs';
 import { safeRemoveTree } from '../lib/safe-remove.mjs';
 import { sleepSync } from '../lib/sleep-sync.mjs';
 import { hostThrottle } from '../lib/ram-throttle.mjs';
+import { grammarDistStatus } from '../checks/grammar-dist.mjs';
 import { CONTRACT_CHANGES_FILE, CONTRACT_CHANGES_DIR, isContractChangesPath, readContractChangesDocAt } from '../kernel/contract-changes-store.mjs';
 import { SKILL_ROOT, SUPERVISOR_ID, landRoot, openSupervisorLedger, supervisorEvent, supervisorSettings, supervisorLog } from './home.mjs';
 
@@ -376,6 +377,29 @@ export function fastForwardLive({ root, base, head, rows }) {
   }
 }
 
+/** Refresh untracked dist only after main has advanced. Knowledge snapshots are tracked contract files, so drift is owed to a lane. */
+export function rebuildLandedGrammar({ root = SKILL_ROOT, changed = [] } = {}) {
+  if (!changed.map(normPath).some((file) => file.startsWith('packages/grammar/src/') || file === 'packages/grammar/package.json')) return null;
+  const packageRoot = path.join(root, 'packages', 'grammar');
+  const fail = (step, detail) => ({ ok: false, step, detail, owed: ['grammar-dist-rebuild'] });
+  try {
+    const npmCli = path.join(path.dirname(process.execPath), 'node_modules', 'npm', 'bin', 'npm-cli.js');
+    const npm = process.platform === 'win32' ? (fs.existsSync(npmCli) ? { file: process.execPath, prefix: [npmCli] } : null) : { file: 'npm', prefix: [] };
+    if (!npm) return fail('npm ci', `npm CLI is missing at ${npmCli}`);
+    const modules = path.join(packageRoot, 'node_modules');
+    if (!unlinkNodeModulesLink(packageRoot)) return fail('npm ci', `cannot unlink ${modules} junction`);
+    const install = run(npm.file, [...npm.prefix, 'ci'], { cwd: packageRoot, timeout: 900_000 });
+    if (!install.ok) return fail('npm ci', `exit ${install.status ?? 'unknown'}${install.error ? ` (${install.error})` : ''}`);
+    const build = run(npm.file, [...npm.prefix, 'run', 'build'], { cwd: packageRoot, timeout: 900_000 });
+    if (!build.ok) return fail('npm run build', `exit ${build.status ?? 'unknown'}${build.error ? ` (${build.error})` : ''}`);
+    const dist = grammarDistStatus(packageRoot);
+    if (!dist.ok || dist.state !== 'fresh') return fail('grammar-dist', dist.detail);
+    const knowledge = run(process.execPath, [path.join(root, 'scripts', 'checks', 'grammar-knowledge.mjs')], { cwd: root, timeout: 180_000 });
+    return { ok: true, state: dist.state, knowledge: knowledge.ok ? 'fresh' : 'owed',
+      owed: knowledge.ok ? [] : ['grammar-knowledge-snapshots'], ...(knowledge.ok ? {} : { knowledgeDetail: `exit ${knowledge.status ?? 'unknown'}` }) };
+  } catch (error) { return fail('exception', String(error?.message ?? error)); }
+}
+
 /* ------------------------------------------------------------ the gate */
 
 /**
@@ -421,6 +445,11 @@ export function landCommits({ commits, specs = [], specMode = 'touching', root =
         return { ...result, base, head, reason: ff.reason, detail: ff.detail ?? null, dirty: ff.dirty ?? null, checks: checked.checks };
       }
       const landed = { ...result, ok: true, landed: head, base, head, checks: checked.checks, changed: checked.changed };
+      const grammarPaths = [...(checked.changed ?? []), ...(checked.rows ?? []).flatMap((row) => row.slice(1))].map(normPath);
+      if (grammarPaths.some((file) => file.startsWith('packages/grammar/src/') || file === 'packages/grammar/package.json')) {
+        try { landed.grammarRebuild = (deps.rebuildGrammar ?? rebuildLandedGrammar)({ root, changed: grammarPaths }); }
+        catch (error) { landed.grammarRebuild = { ok: false, step: 'exception', detail: String(error?.message ?? error), owed: ['grammar-dist-rebuild'] }; }
+      }
       if (push) landed.push = (deps.push ?? pushLive)({ root });
       return landed;
     } finally { removeScratch(scratch.dir, { root }); }
@@ -554,6 +583,9 @@ export async function land({ jobId = null, commits = null, specs = [], lane = nu
       w.transaction(() => supervisorEvent(w, { entityType: 'land', entityId: jobId ?? commits[commits.length - 1], kind: result.ok ? 'land-passed' : 'land-failed',
         payload: { jobId, lane, commits, landed: result.landed ?? null, base: result.base ?? null, reason: result.reason ?? null, detail: result.detail ?? null,
           push: result.push ?? null, specMode: plan.mode, ...(result.conflicts ? { conflicts: result.conflicts.map((c) => c.file) } : {}), failed: (result.checks ?? []).filter((c) => !c.ok).map((c) => c.name), startedAt } }));
+      if (result.grammarRebuild) w.transaction(() => supervisorEvent(w, { entityType: 'land', entityId: jobId ?? commits[commits.length - 1],
+        kind: result.grammarRebuild.ok ? 'land-grammar-rebuilt' : 'land-grammar-rebuild-failed',
+        payload: { jobId, lane, landed: result.landed, changed: result.changed, ...result.grammarRebuild, startedAt } }));
       if (result.ok && job) result.finished = finishLanded(w, { jobId, landedSha: result.landed ?? result.alreadyLanded, root, env });
       // --commit of a self checkout's commits closes that self job as --job would: succeeded, leases released,
       // checkout and branch removed. Left open, it kept its file leases and blocked every worker needing them.
@@ -564,7 +596,7 @@ export async function land({ jobId = null, commits = null, specs = [], lane = nu
       }
       if (!result.ok && job) w.db.prepare('UPDATE jobs SET result_json=?, updated_at=? WHERE job_id=?').run(JSON.stringify({ landFailed: result.reason, at: startedAt }), Date.now(), jobId);
     } finally { w.close(); }
-    if (notify) {
+    if (notify || result.grammarRebuild?.ok === false) {
       try {
         const { appendInbox } = await import('../connectors/telegram-bridge.mjs');
         appendInbox(SUPERVISOR_ID, { chatId: null, messageId: null, from: 'land-gate', text: describe(result, { jobId }) }, { env });
@@ -586,7 +618,7 @@ export function landStatus({ env = process.env } = {}) {
 export function describe(r, { jobId = null } = {}) {
   const who = jobId ?? (r.commits ?? []).map((c) => String(c).slice(0, 9)).join(',');
   if (r.ok && r.alreadyLanded) return `LAND already-landed ${who}: main has it at ${String(r.alreadyLanded).slice(0, 9)}, nothing moved`;
-  if (r.ok) return `LAND passed ${who}: main -> ${String(r.landed).slice(0, 9)}${r.push ? ` (push ${r.push.pushed ? 'ok' : r.push.skipped ?? r.push.refused ?? r.push.error})` : ''}`;
+  if (r.ok) return `LAND passed ${who}: main -> ${String(r.landed).slice(0, 9)}${r.push ? ` (push ${r.push.pushed ? 'ok' : r.push.skipped ?? r.push.refused ?? r.push.error})` : ''}${r.grammarRebuild ? `; grammar rebuild ${r.grammarRebuild.ok ? 'ok' : `FAILED at ${r.grammarRebuild.step}: ${r.grammarRebuild.detail}`}${r.grammarRebuild.owed?.length ? `; owed ${r.grammarRebuild.owed.join(', ')}` : ''}` : ''}`;
   const red = (r.checks ?? []).filter((c) => !c.ok).map((c) => `${c.name}${c.output ? `: ${String(c.output).split(/\r?\n/).slice(-3).join(' / ').slice(0, 300)}` : ''}`);
   const conflicts = (r.conflicts ?? []).map((c) => `CONFLICT ${c.file}${c.hunks?.length ? `\n${c.hunks.map((h) => `    @ line ${h.line}\n${h.text.split('\n').map((l) => `      ${l}`).join('\n')}`).join('\n')}` : ''}`);
   return `LAND FAILED ${who}: ${r.reason}${r.preflight ? ' (preflight, before the queue)' : ''}${r.detail ? ` (${String(r.detail).slice(0, 300)})` : ''}${r.dirty ? ` dirty: ${r.dirty.join(', ')}` : ''}${red.length ? `\n  ${red.join('\n  ')}` : ''}${conflicts.length ? `\n  ${conflicts.join('\n  ')}` : ''}${r.hint ? `\n  next: ${r.hint}` : ''}`;

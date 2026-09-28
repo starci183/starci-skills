@@ -61,6 +61,7 @@ import { ACCENT_EXEMPT_SELECTOR } from '../checks/draw-taste.mjs';
 import { LAYER_PROBE, measureLayer } from '../checks/draw-layer.mjs';
 import { MEASURE_SCHEMA, REDLINE_ATTR, REDLINE_LEAF_COMPONENTS, WHY_ATTR, drawRedlines, loadRationale, measureRationale, rationaleFileOf, redlineLabelsOf } from '../checks/draw-rationale.mjs';
 import { DRAW_SOURCE_SUFFIX, GRAMMAR_PACKAGE, LAYOUT_ATTR, markLayoutElements, rationaleFileFor, typecheckFindings } from '../checks/draw-source.mjs';
+import { grammarDistStatus, grammarDistMessage } from '../checks/grammar-dist.mjs';
 import { PREFERENCES, grammarEntry, resolveDrawGrammar } from './draw-grammar.mjs';
 
 export const RECORD_SCHEMA = 'starci/draw-render@1';
@@ -82,6 +83,12 @@ const GENERIC_FAMILIES = Object.freeze(['serif', 'sans-serif', 'monospace', 'cur
 const PLATFORM_ALIASES = Object.freeze(['-apple-system', 'blinkmacsystemfont']);
 
 export class UsageError extends Error {}
+/** Refuse a pinned or selected runtime dist before its JS or CSS can enter a draw bundle. */
+export function preflightDrawGrammarDist(packageRoot) {
+  const status = grammarDistStatus(packageRoot);
+  if (!status.ok) throw new RedError(grammarDistMessage(status), 'DRAW_GRAMMAR_DIST_STALE');
+  return status;
+}
 /** A red result before any capture (a draw file that does not type-check): exit 1, with its finding code. */
 export class RedError extends Error { constructor(message, code) { super(message); this.code = code; } }
 
@@ -644,7 +651,9 @@ export async function run(argv, { cwd = process.cwd() } = {}) {
   if (drawing && !productDir) throw new UsageError(`${o.component}: give --product <app dir> (no package.json depending on ${GRAMMAR_PACKAGE} above it or above a --css file)`);
   let grammar = null;
   if (drawing) {
+    if (o.grammarDist) preflightDrawGrammarDist(o.grammarDist);
     grammar = resolveDrawGrammar({ file: o.component, productDir, prefer: o.grammar ?? 'auto', grammarDist: o.grammarDist ?? null });
+    if (grammar.pick?.source === 'claude-dist') preflightDrawGrammarDist(grammar.pick.root);
     if (!grammar.ok) throw new RedError(typecheckFindings(grammar.attempts.at(-1) ?? { ok: false, errors: [{ message: grammar.error }] }, { label: path.basename(o.component) })[0]?.detail ?? grammar.error, 'DRAW_TYPECHECK_FAILED');
   }
   const workDir = fs.mkdtempSync(path.join(os.tmpdir(), 'starci-draw-render-'));
