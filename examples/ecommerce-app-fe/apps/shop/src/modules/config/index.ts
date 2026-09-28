@@ -1,5 +1,5 @@
 import "server-only"
-import { readProjectedPorts } from "./projection"
+import { readProjectedPorts } from "@shared/config/projection"
 
 /**
  * Backend endpoints the shop talks to, read once.

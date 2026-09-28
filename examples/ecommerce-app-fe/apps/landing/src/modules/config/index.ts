@@ -1,5 +1,5 @@
 import "server-only"
-import { readProjectedPorts } from "./projection"
+import { readProjectedPorts } from "@shared/config/projection"
 
 /**
  * Deployment facts the landing site reads but does not decide, mirroring `apps/shop`'s config module and

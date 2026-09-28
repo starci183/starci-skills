@@ -29,8 +29,8 @@ and its own README states the FE lane's ports are "declared here, consumed there
 in this repository:
 
 - `scripts/serve.mjs` resolves the listener port and spawns `next dev`/`next start -p` per app.
-- Each app's `src/modules/config/projection.ts` resolves the same file for the service base URLs — the
-  per-app reader copies mirror the BE's own per-service `AppConfigService` convention.
+- `packages/shared/src/config/projection.ts` resolves the file for both apps' service base URLs;
+  each app's `src/modules/config` module applies its own environment overrides.
 - Resolution order (same shape as the BE's `findMetadataFile`): `ECOMMERCE_APP_BE_METADATA` names the
   file outright, else the walk searches each ancestor for `ecommerce-app-be/metadata.json`.
 - Env overrides keep the BE's precedence — `NEXT_PUBLIC_ORDER_API_URL`, `NEXT_PUBLIC_IDENTITY_API_URL`,
