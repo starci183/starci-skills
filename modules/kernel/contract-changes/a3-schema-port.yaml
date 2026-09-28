@@ -9,4 +9,5 @@ reach: new-legs
 paths:
   - modules/kernel/api-commands/settle.yaml
   - modules/kernel/api-commands/reconcile.yaml
+  - modules/kernel/api-commands/provider-backoff.yaml
   - modules/kernel/contract-changes/a3-schema-port.yaml

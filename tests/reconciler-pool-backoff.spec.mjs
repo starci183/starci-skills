@@ -7,7 +7,6 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { createRequire } from 'node:module';
 import { parseYaml } from '../engine/yaml.mjs';
 import { aimdStep, backoffPersists, capsOf, poolRowOf, entriesOfRows } from '../scripts/lib/pool-backoff.mjs';
 import { readMachine, withMachine } from '../engine/machine-db.mjs';
@@ -115,19 +114,23 @@ test('resource:pools in active: publishes poolBackoff; a limit persisting at the
   assert.equal(s.backoff()['devin-agent'].cap, 3);
 });
 
-test('api provider-backoff opens the provider circuit once (idempotent)', async () => {
-  const { DatabaseSync } = createRequire(import.meta.url)('node:sqlite');
-  const db = new DatabaseSync(':memory:');
-  db.exec('CREATE TABLE signals(scope TEXT NOT NULL, key TEXT NOT NULL, holder_pid INTEGER, token TEXT, value_json TEXT, at INTEGER NOT NULL, expires_at INTEGER, PRIMARY KEY(scope,key))');
+test('api provider-backoff opens the provider circuit once (idempotent)', async (t) => {
+  // The circuit is a machine.sqlite provider_health row: a scratch machine store, injected into the verb.
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'starci-provider-backoff-'));
+  const env = { ...process.env, STARCI_TEST_MACHINE_FILE: path.join(dir, 'machine.sqlite') };
+  t.after(() => fs.rmSync(dir, { recursive: true, force: true, maxRetries: 20, retryDelay: 25 }));
   const verb = (await import('../scripts/kernel/api-verbs/provider-backoff.mjs')).default;
   const outs = [];
-  const run = () => verb.run({ ledger: { db }, args: { provider: 'devin-agent', 'open-circuit': true, reason: 'held at 2/10', by: 'reconciler/resource' }, emit: (o) => outs.push(o) });
-  run(); run();
+  withMachine((machine) => {
+    const run = () => verb.run({ ledger: null, machine, args: { provider: 'devin-agent', 'open-circuit': true, reason: 'held at 2/10', by: 'reconciler/resource' }, emit: (o) => outs.push(o) });
+    run(); run();
+  }, { env });
   assert.equal(outs[0].opened, true);
   assert.equal(outs[1].alreadyOpen, true);
-  const row = JSON.parse(db.prepare("SELECT value_json FROM signals WHERE scope='provider-health' AND key='devin'").get().value_json);
+  const row = readMachine((m) => m.providerHealth().find((r) => r.provider === 'devin'), null, { env });
   assert.equal(row.status, 'unavailable');
-  assert.equal(row.failureKind, 'quota');
+  assert.equal(row.failure_kind, 'quota');
+  assert.equal(readMachine((m) => m.db.prepare("SELECT count(*) n FROM provider_health_events WHERE provider='devin'").get().n, null, { env }), 1);
 });
 
 test('resource:pools reads the Job controller reconciler.provider-rate-limited log rows (lane B worker-health probe)', async () => {
