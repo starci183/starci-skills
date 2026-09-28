@@ -78,6 +78,14 @@ try {
   db.write.createUnit({ workflowId: 'wf-stuck', unitId: 'unit-blocked', opId: 'interface.implement', subjectKey: 'screen-b', goalRevision: 1, title: 'Blocked screen', createdAt: fixedNow - 3400000 });
   db.write.addUnitEdge({ workflowId: 'wf-stuck', fromUnit: 'unit-failed', toUnit: 'unit-blocked', kind: 'after', source: 'seed', createdAt: fixedNow - 3300000 });
   db.write.createUnit({ workflowId: 'wf-under-dispatched', unitId: 'unit-ready', opId: 'code.refactor', subjectKey: 'ready', goalRevision: 1, title: 'Ready to dispatch', createdAt: fixedNow - 3300000 });
+  db.write.enqueueJob({ jobId: 'job-ready', workflowId: 'wf-under-dispatched', unitId: 'unit-ready', opId: 'code.refactor', createdAt: fixedNow - 3200000 });
+  db.write.setJobStatus({ jobId: 'job-ready', to: 'ready', at: fixedNow - 3100000 });
+  db.write.createUnit({ workflowId: 'wf-under-dispatched', unitId: 'unit-active', opId: 'code.refactor', subjectKey: 'active', goalRevision: 1, title: 'Active dispatch', createdAt: fixedNow - 3300000 });
+  db.write.enqueueJob({ jobId: 'job-active', workflowId: 'wf-under-dispatched', unitId: 'unit-active', opId: 'code.refactor', createdAt: fixedNow - 3200000 });
+  db.write.setJobStatus({ jobId: 'job-active', to: 'ready', at: fixedNow - 3100000 });
+  db.write.setJobStatus({ jobId: 'job-active', to: 'leased', leaseToken: 'seed-active-lease', at: fixedNow - 3000000 });
+  db.write.setJobStatus({ jobId: 'job-active', to: 'running', at: fixedNow - 2900000 });
+  db.write.setUnitState({ workflowId: 'wf-under-dispatched', unitId: 'unit-active', to: 'running', at: fixedNow - 2900000 });
   db.write.enqueueJob({ jobId: 'job-failed', workflowId: 'wf-stuck', unitId: 'unit-failed', opId: 'code.refactor', createdAt: fixedNow - 3200000 });
   db.write.setJobStatus({ jobId: 'job-failed', to: 'ready', at: fixedNow - 3100000 });
   db.write.setJobStatus({ jobId: 'job-failed', to: 'leased', leaseToken: 'seed-lease', at: fixedNow - 3000000 });
