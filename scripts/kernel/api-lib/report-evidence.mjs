@@ -41,6 +41,8 @@ const resolveFile = (given, { repo, scratch }) => {
   const candidates = path.isAbsolute(given) ? [path.resolve(given)] : [scratch && path.resolve(scratch, given), path.resolve(repo, given), path.resolve(given)].filter(Boolean);
   const file = candidates.find((p) => { try { return fs.statSync(p).isFile(); } catch { return false; } });
   if (!file) throw refuse(`report attachment missing or unreadable: ${given}`, 'report-attachment-missing');
+  if (scratch && !inside(fs.realpathSync(scratch), fs.realpathSync(file)))
+    throw refuse(`report attachment is outside STARCI_JOB_SCRATCH: ${given}`, 'report-attachment-outside-scratch');
   return file;
 };
 
