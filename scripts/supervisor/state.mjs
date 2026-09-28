@@ -13,7 +13,7 @@
 //   digest      events supervisor-owner-digest
 // The typed rows are in the same ledger's `logs` table (sup-log.mjs; /api/supervisor/logs).
 import { parseJsonOr } from '../lib/json.mjs';
-import { redactText } from '../kernel/typed-logs.mjs';
+import { redactText } from '../lib/redact.mjs';
 import { readInbox, readOutbox } from '../connectors/telegram-bridge.mjs';
 import { SUPERVISOR_ID, SUPERVISOR_WF, enabledOf, seatOf, supervisorSettings, withSupervisorRead } from './home.mjs';
 import { ACTION_KIND, DIGEST_KIND, NOTICE_KIND, OWED_ACTIONS_KIND } from './actions.mjs';
