@@ -24,7 +24,8 @@
 //              and the next flushOutbox (the land gate) applies it. Only idempotent writers are deferrable (DEFERRABLE).
 //   reader   : readOnly, query_only=ON, busy_timeout=15000
 //   startup  : sqlite_version, node_version, journal_mode and user_version are recorded in machine_meta; an old-schema file
-//              (anything that is not 'starci/machine@1') is refused with a pointer to the comeback, never migrated.
+//              (anything that is not 'starci/machine@1') is refused, never migrated — a fresh machine.sqlite is
+//              created by openMachine on first use.
 // Nothing outside engine/ opens machine.sqlite with `new DatabaseSync`: callers use openMachine / openMachineReader /
 // withMachine / readMachine and the typed functions on the handle.
 import fs from 'node:fs';
@@ -43,7 +44,6 @@ export const MACHINE_VERSION = 1;
 export const MACHINE_BUSY_TIMEOUT_MS = 15000;
 export const INIT_SQL_FILE = path.join(ENGINE_DIR, 'migrations', 'machine', '0001-init.sql');
 export const CONTROLLERS = Object.freeze(['job', 'workflow', 'resource', 'host', 'gc', 'fleet', 'learning']);
-export const COMEBACK_HINT = 'run the comeback (scripts/supervisor/comeback.mjs) to archive the old store and create machine.sqlite from 0001-init';
 
 // ---------------------------------------------------------------------------------------------------------------------
 // Paths
@@ -52,8 +52,7 @@ export const COMEBACK_HINT = 'run the comeback (scripts/supervisor/comeback.mjs)
 export const starciLocalRoot = (env = process.env) => path.join(env.LOCALAPPDATA || path.join(os.homedir(), '.local', 'state'), 'StarCi');
 /**
  * <local root>/runtime: the OLD store directory (the pre-alpha.3 machine.sqlite, journal.sqlite, reconciler.log,
- * ram-throttle.json, connectors/, env-servers/, uat-slots/, watchdog-logs/). Nothing new is written there; the comeback
- * archives it whole.
+ * ram-throttle.json, connectors/, env-servers/, uat-slots/, watchdog-logs/). Nothing new is written there.
  */
 export const runtimeRootFor = (env = process.env) => path.join(starciLocalRoot(env), 'runtime');
 /** <local root>/projects: one directory per ledger (decision Q1). */
@@ -230,9 +229,9 @@ export function runtimeRev() {
 /** Order of two runtime revs: <0 when a is older than b (time prefix; anything unparsable is oldest). */
 export const compareRevs = (a, b) => { const t = (r) => (/^\d{13}:/.test(String(r ?? '')) ? Number(String(r).slice(0, 13)) : -1); return t(a) - t(b); };
 
-/** An old or foreign store: refuse with a pointer to the comeback. */
+/** An old or foreign store: refuse it; a fresh store is created by openMachine on first use. */
 function refuseOld(file, why) {
-  throw Object.assign(Error(`machine-schema-old: ${path.resolve(file)} ${why}; this runtime opens only '${MACHINE_SCHEMA}' (user_version ${MACHINE_VERSION}) — ${COMEBACK_HINT}`),
+  throw Object.assign(Error(`machine-schema-old: ${path.resolve(file)} ${why}; this runtime opens only '${MACHINE_SCHEMA}' (user_version ${MACHINE_VERSION}) — move the refused file aside and openMachine creates a fresh machine.sqlite on first use`),
     { code: 'STARCI_MACHINE_SCHEMA_OLD' });
 }
 
@@ -1410,7 +1409,7 @@ const API = {
   log, logs, pruneLogs, recordMetrics, latestMetrics, recordNotification, notificationSent, markNotificationSent, recordArchive, projectCatalog,
 };
 
-/** Every typed function at module level too: fn(handle, ...args) — blob-gc, comeback and callers holding a handle. */
+/** Every typed function at module level too: fn(handle, ...args) — blob-gc and callers holding a handle. */
 export {
   putBlob, jsonOrBlob, meta, checkpoint, registerLedger, resolveLedger, listLedgers, touchLedger, setLedgerState, upsertRepository, forEachLedger, attachFleet, supEvent, supEvents, newestSupEvent, upsertSupJob, setSupJobStatus, supJob, listSupJobs, acquireSupLeases, releaseSupLeases, supLeases, startSupAttempt, updateSupAttempt, latestSupAttempt, recordSupReport, supReports, consumeSupReport, openSupDecision, setSupDecision, markSupDecisionDelivered, listSupDecisions, openOwed, ackOwed, closeOwed, listOwed, upsertLearning, listLearning, recordOwnerRuling, upsertBridge, recordSupMessage, supMessages, markSupMessagesRead, setSupSignal, supSignal, clearSupSignal, recordLlmUsage, startProcessRun, heartbeatProcessRun, endProcessRun, openProcessRuns, processRuns, leaderOf, acquireLeader, renewLeader, releaseLeader, leaderHistory, cursorOf, setCursor, cursors, enqueue, dueQueue, queueRows, dequeue, requeue, ensureSchedule, claimSchedule, finishSchedule, schedules, actionIntent, actionRunning, actionFinish, markStaleActionsUnknown, actionOf, actions, actionStep, controllerModes, setControllerMode, modeChanges, openSlaEpisode, markSlaViolated, markSlaReported, clearSla, openSla, recordViolation, clearViolation, setService, recordProbe, services, serviceEvents, upsertSeat, seatOf, seats, recordDelivery, recordSeatInput, startSeatTurn, endSeatTurn, seatTranscriptSnapshot, upsertTerminal, closeTerminal, openTerminals, acquireHostLock, renewHostLock, releaseHostLock, hostLock, hostLocks, claimResource, releaseClaim, sweptClaim, liveClaims, upsertAgentSession, inventorySnapshot, throttleState, setThrottle, throttleEvents, recordThrottleDecision, releaseThrottleDecision, recordHostSample, hostSamples, setProviderHealth, providerHealth, poolBackoff, setPoolBackoff, clearPoolBackoff, setQuota, quotas, upsertGuardJob, guardJob, releaseGuardJob, recordGuardRefusal, releaseHostLeases, hostLeases, setBudget, reserveBudget, settleBudget, budgets, startGcRun, finishGcRun, recordGcItem, updateGcItem, gcItems, gcMark, gcRuns, markBlobArchived, pruneSeatSnapshots, upsertLane, setLaneState, laneOf, lanes, enqueueLand, claimLandGate, finishLandTicket, landQueue, recordLandRun, recordLandOutcome, landRuns, recordPush, pushes, flushOutbox, upsertWorktree, removedWorktree, upsertEnvServer, envServer, envServers, upsertUatSlot, uatSlots, releaseUatSlot, upsertConnector, connectorOf, upsertAsk, log, logs, pruneLogs, recordMetrics, latestMetrics, recordNotification, notificationSent, markNotificationSent, recordArchive, projectCatalog,
 };

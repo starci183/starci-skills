@@ -16,10 +16,11 @@ decisions and the invariants; when it disagrees with the SQL files, the SQL wins
 
 - A project ledger is found through `machine.ledgers` (`ledger_id → file`), never by walking a
   repository. `meta.ledger_id` is minted at create and moves with the bytes.
-- There is no other store. No JSON state file, no JSONL inbox, no text log, no second SQLite file:
-  the retired stores were archived and deleted by the comeback (`scripts/supervisor/comeback.mjs`).
-- The runtime opens only these schemas. A file with an older schema name is refused with an error
-  that points at the comeback; there is no migrator, no backfill and no read fallback.
+- There is no other store. No JSON state file, no JSONL inbox, no text log, no second SQLite file.
+- The runtime opens only these schemas. A file with an older schema name is refused; there is no migrator,
+  no backfill and no read fallback. A fresh store is created on first use — a project ledger by `openLedger`
+  at the file `ledgerFileFor(<repo root>)` resolves, the host store by `openMachine` at `machineFileFor` —
+  once the refused file is moved aside.
 
 ## 2. One writer per database
 

@@ -1,7 +1,7 @@
 // home.mjs — the Supervisor's durable state, in machine.sqlite (engine/machine-db.mjs, DBTREE.sql B1; decision Q3).
 //
-// There is no supervisor ledger any more (the old <supervisor home>/.starciwork/runtime.sqlite is archived by the
-// comeback). Where each part lives:
+// There is no supervisor ledger any more (the pre-alpha.3 <supervisor home>/.starciwork/runtime.sqlite is retired).
+// Where each part lives:
 //   seat      seats row 'supervisor' (role supervisor): state booting while a launcher holds the startup reservation
 //             (detail_json.expiresAt), live once spawned; terminal_handle/agent/model/pid; detail_json {token, value}
 //   enabled   sup_signals scope 'supervisor-enabled' key 'main' {enabled, by, at}
@@ -38,7 +38,7 @@ export const DEFAULTS = Object.freeze({
 
 /**
  * The supervisor home: STARCI_SUPERVISOR_HOME, else ~/.starci/supervisor. Nothing new is written there (the state is in
- * machine.sqlite); it remains only as the place the comeback archives the pre-alpha.3 supervisor files from.
+ * machine.sqlite); it remains only as the historical location of the pre-alpha.3 supervisor files.
  */
 export const supervisorHome = (env = process.env) => path.resolve(env.STARCI_SUPERVISOR_HOME || path.join(os.homedir(), '.starci', 'supervisor'));
 // The worktrees live under the one lanes root (scripts/lib/hk-lanes.mjs: runtimes.yaml

@@ -96,10 +96,10 @@ CREATE TABLE IF NOT EXISTS blobs(
   created_at INTEGER NOT NULL, pinned INTEGER NOT NULL DEFAULT 0 CHECK(pinned IN (0,1)),
   archived_at INTEGER, archive_ref TEXT) STRICT;
 
--- archives: mọi zip/bản sao ở D:/starci-archive (purge, comeback, backup DB, retention blob, lane logs) đã kiểm chứng.
+-- archives: mọi zip/bản sao ở D:/starci-archive (purge, backup DB, retention blob, lane logs) đã kiểm chứng.
 CREATE TABLE IF NOT EXISTS archives(
   archive_path    TEXT PRIMARY KEY,
-  kind            TEXT NOT NULL CHECK(kind IN ('workflow-purge','comeback','db-backup','blob-retention','lane-logs','agent-sessions')),
+  kind            TEXT NOT NULL CHECK(kind IN ('workflow-purge','db-backup','blob-retention','lane-logs','agent-sessions')),
   subject         TEXT,
   bytes           INTEGER NOT NULL, sha256 TEXT NOT NULL, manifest_sha256 TEXT, entries INTEGER,
   integrity       TEXT,                          -- 'ok' từ integrity_check (db-backup) / 'sha-verified' (zip)

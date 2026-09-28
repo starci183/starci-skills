@@ -114,8 +114,8 @@ shape:
     - "Agent output is never product content. It lives in the project ledger (reports, check_runs, job_artifacts,
       logs, interface_audits, ask_requests) and in the content-addressed blob store outside every repository,
       and a product record cites it by artifact id + sha256 (ARCHITECTURE-DB §5.2, §5.3). The categories below
-      are scripts/lib/starciwork-boundary.mjs agentDataCategory; scripts/supervisor/comeback.mjs archives and
-      removes them, and shape.starciworkIgnore keeps them out of git."
+      are scripts/lib/starciwork-boundary.mjs agentDataCategory, which scripts/checks/check-example-work.mjs
+      refuses in a .starciwork tree [STARCIWORK_AGENT_DATA], and shape.starciworkIgnore keeps them out of git."
     - kernel-evidence/**, kernel-strays/**, kernel-approvals/** (retired custody)
     - evidence/<workflow>.<mode>/** and any <node>/evidence/<id>/** bundle
     - any E/** capture, impl/<repository>/<name>/assets/** capture, shell/assets/** layout capture
@@ -129,9 +129,9 @@ shape:
       shell/index.yaml cites {name, sha256}. Every reader resolves them through scripts/lib/blob-lookup.mjs. The final
       directions the owner accepts stay product content under ui/<screen>/assets (decision Q2)."
   starciworkIgnore:
-    - "The .starciwork/.gitignore the runtime installs in a backend repository (starciwork-boundary.mjs
-      STARCIWORK_GITIGNORE, written by the comeback): deny the root, re-admit the productPaths roots, deny agent
-      output inside them. A frontend repository has no .starciwork."
+    - "The .starciwork/.gitignore of a backend repository (starciwork-boundary.mjs
+      STARCIWORK_GITIGNORE, written by scripts/example/work-example.mjs for the example trees): deny the root,
+      re-admit the productPaths roots, deny agent output inside them. A frontend repository has no .starciwork."
     - "/*"
     - "!/.gitignore !/.gitattributes !/workspace.yaml !/index.yaml"
     - "!/brand/ !/shell/ !/_resources/ !/_derived/ !/features/"

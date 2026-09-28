@@ -2,8 +2,8 @@
 // modules/schemas/work-layout.yaml shape.productPaths). A repository's .starciwork holds product content only:
 // the explicit path list below. Every other path is agent data (reports, checks, captures, draw rounds, UAT runs,
 // logs, caches, ledgers, worktrees), which lives in runtime.sqlite rows and content-addressed blobs outside
-// every repository. scripts/supervisor/comeback.mjs archives and removes whatever sits outside the list, and
-// STARCIWORK_GITIGNORE is the .starciwork/.gitignore the runtime installs in product repositories.
+// every repository. STARCIWORK_GITIGNORE is the .starciwork/.gitignore content of a product repository (the
+// example trees write it through scripts/example/work-example.mjs).
 //
 // Paths are relative to the .starciwork root, '/'-separated.
 
@@ -88,12 +88,12 @@ const ROOT_CACHE_DIRS = new Set(['settle-parity', 'settle-tail', 'runtime', 'can
 const ROOT_CACHE_FILE = /^(.*\.tmp\.json|tmp-.*\.json|scan-i18n.*\.json|runtime-budget\.json|ledger-anchor\.json|supervisor-precheck\.mjs)$/;
 
 /**
- * The §5.2 category of a KNOWN agent-data path, or null when the path is not one. Known agent data is what the
- * comeback archives and removes: ledger, logs-db, worktrees, kernel-evidence, kernel-strays, evidence-bundle,
- * capture (E/ and impl captures), layout-capture (shell/assets), uat-run, draw-round, interface-audit
- * (features/<f>/operations/), stray-report, cache, legacy-import (root import-cv-*). A path that is neither known
- * agent data nor on the §5.1 list (isProductPath) is drift: product records in a legacy layout, kept and reported,
- * never removed by a script.
+ * The §5.2 category of a KNOWN agent-data path, or null when the path is not one. Known agent data — the
+ * categories scripts/checks/check-example-work.mjs refuses in a .starciwork tree [STARCIWORK_AGENT_DATA]:
+ * ledger, logs-db, worktrees, kernel-evidence, kernel-strays, evidence-bundle, capture (E/ and impl captures),
+ * layout-capture (shell/assets), uat-run, draw-round, interface-audit (features/<f>/operations/), stray-report,
+ * cache, legacy-import (root import-cv-*). A path that is neither known agent data nor on the §5.1 list
+ * (isProductPath) is drift: product records in a legacy layout, kept and reported, never removed by a script.
  */
 export function agentDataCategory(rel, { dir = false } = {}) {
   const parts = segs(rel);
@@ -122,9 +122,9 @@ export function agentDataCategory(rel, { dir = false } = {}) {
 }
 
 /**
- * The .starciwork/.gitignore the runtime installs in a product repository: deny everything at the root, re-admit
- * the §5.1 roots, then deny agent output inside them. Tracked files are not affected by an ignore rule; the
- * comeback removes the tracked agent files it archived.
+ * The .starciwork/.gitignore of a product repository: deny everything at the root, re-admit
+ * the §5.1 roots, then deny agent output inside them. Tracked files are not affected by an ignore rule; a tracked
+ * agent file is removed by the change that drops it, not by this ignore.
  */
 export const STARCIWORK_GITIGNORE = Object.freeze([
   '# StarCi .starciwork: product content only (ARCHITECTURE-DB §5.1, work-layout.yaml shape.productPaths).',

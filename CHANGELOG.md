@@ -5,6 +5,17 @@ All notable changes to StarCi are documented here. The project is pre-publicatio
 `.experiments/OPENSOURCE-GOAL.md` holds with fresh evidence, then `1.0.0` freezes them.
 `package.json` `version` is the only version authority.
 
+## [1.0.0-alpha.4] — in preparation
+
+- The comeback concept is removed: `scripts/supervisor/comeback.mjs` is deleted and listed in
+  `modules/kernel/retired-paths.yaml`; `COMEBACK_HINT` and every comeback pointer are gone from
+  `engine/ledger-db.mjs`, `engine/machine-db.mjs`, the reconciler schedules, the supervisor home, the
+  `.starciwork` boundary, `modules/schemas/work-layout.yaml` and `docs/ledger-db.md`. An old-schema store is
+  still refused — a fresh `runtime.sqlite` is created by `openLedger` at the file
+  `ledgerFileFor(<repo root>)` resolves (the host store by `openMachine`), each on first use once the refused
+  file is moved aside; archiving an old store is a manual owner act. `archives.kind` drops `'comeback'` for
+  new stores. Contract change `comeback-removed`.
+
 ## [1.0.0-alpha.3] — 2026-09-28, base `7b2737d2e`
 
 Theme: one storage architecture that is easy to query and hard to corrupt. All state lives in two

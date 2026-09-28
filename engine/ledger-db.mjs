@@ -16,8 +16,9 @@ const require=createRequire(import.meta.url);
  * runtime.sqlite — the ONE writer (and the reader opener) of a project's runtime ledger (DBTREE.sql PHẦN A,
  * ARCHITECTURE-DB §4, RESEARCH-STORAGE §3). The DDL is engine/migrations/runtime/0001-init.sql, executed as is:
  * STRICT tables, state machines, append-only guards and views live IN the database, so an invalid write is refused
- * at the write whatever code issued it. Clean slate (alpha.3): a file that is not 'starci/runtime@1' is refused
- * with a pointer to the comeback; there is no migrator, no backfill and no legacy table.
+ * at the write whatever code issued it. Clean slate (alpha.3): a file that is not 'starci/runtime@1' is refused;
+ * there is no migrator, no backfill and no legacy table. A fresh ledger is created by openLedger on first use at
+ * the file ledgerFileFor(<repo root>) resolves.
  *
  * Every write to runtime.sqlite goes through the typed functions below (`write.*` on the handle, or the exported
  * functions taking a db inside a transaction). Each state change appends exactly one events row in the same
@@ -56,8 +57,6 @@ export const JOB_ARTIFACT_ROLES=Object.freeze(['check-output','check-stdout','ch
 
 export const LEDGER_SCHEMA='starci/runtime@1';
 export const LEDGER_VERSION=1;
-/** Where the comeback lives: every refusal of an old ledger names it. */
-export const COMEBACK_HINT='run the alpha.3 comeback (node scripts/supervisor/comeback.mjs) to archive the old runtime state and create a fresh runtime.sqlite';
 
 const need=(ok,message,code)=>{if(!ok)throw Object.assign(Error(message),code?{code}:{});};
 const json=value=>value===undefined||value===null?null:JSON.stringify(value);
@@ -218,7 +217,7 @@ function verifyLedger(db,{file,sqliteVersion}){
   const version=userVersion(db);
   const legacy=hasTable(db,'meta')?metaOf(db).schema:(hasTable(db,'jobs')||hasTable(db,'events')?'pre-meta':null);
   need(version===LEDGER_VERSION&&legacy===LEDGER_SCHEMA,
-    `ledger-schema-refused: ${file} is ${legacy??'not a StarCi ledger'} at user_version ${version}, this runtime opens only ${LEDGER_SCHEMA} at user_version ${LEDGER_VERSION}; ${COMEBACK_HINT}`,'STARCI_LEDGER_SCHEMA_REFUSED');
+    `ledger-schema-refused: ${file} is ${legacy??'not a StarCi ledger'} at user_version ${version}, this runtime opens only ${LEDGER_SCHEMA} at user_version ${LEDGER_VERSION}; a fresh runtime.sqlite is created by openLedger on first use at the file ledgerFileFor(<repo root>) resolves — move the refused file aside to let one be created`,'STARCI_LEDGER_SCHEMA_REFUSED');
   const recorded=metaOf(db).sqlite_version;
   need(!recorded||!olderThan(sqliteVersion,recorded),`ledger-sqlite-downgrade: ${file} was last opened by SQLite ${recorded}, this process runs ${sqliteVersion}`,'STARCI_LEDGER_SQLITE_DOWNGRADE');
 }

@@ -14,7 +14,7 @@ import {TEST_REGISTRY_ENV,isUnderTempDir,machineFileFor,openMachine,runtimeRootF
  * path that reserves, enrolled its temp-folder ledger on the live registry, and the rows outlived the specs
  * in every lease sweep and allocation scan. Two layers keep that from coming back, and each is held here:
  * the test run gets its own registry (preload + node --test fallback), and the live registry refuses a
- * temp-directory ledger. The old registry itself is archived whole by the comeback (alpha.3 clean slate).
+ * temp-directory ledger. The pre-alpha.3 stores are retired, never migrated (alpha.3 clean slate).
  */
 const runtimeRoot=path.resolve(path.dirname(fileURLToPath(import.meta.url)),'..');
 const machineDb=pathToFileURL(path.join(runtimeRoot,'engine','machine-db.mjs')).href;

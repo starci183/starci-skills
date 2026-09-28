@@ -137,7 +137,7 @@ CREATE TABLE IF NOT EXISTS lifecycle_changes(
   change_id   INTEGER PRIMARY KEY AUTOINCREMENT,
   workflow_id TEXT NOT NULL REFERENCES workflows(workflow_id) ON DELETE CASCADE,
   from_phase  TEXT, to_phase TEXT NOT NULL,
-  by          TEXT NOT NULL,                     -- owner | kernel:<wf> | supervisor | comeback
+  by          TEXT NOT NULL,                     -- owner | kernel:<wf> | supervisor
   reason      TEXT NOT NULL,
   at          INTEGER NOT NULL) STRICT;
 CREATE TRIGGER IF NOT EXISTS lifecycle_changes_append_only BEFORE UPDATE ON lifecycle_changes BEGIN
@@ -159,7 +159,7 @@ CREATE TABLE IF NOT EXISTS goals(
   workflow_id    TEXT NOT NULL REFERENCES workflows(workflow_id) ON DELETE CASCADE,
   revision       INTEGER NOT NULL,
   goal_identity  TEXT NOT NULL,
-  markdown       TEXT NOT NULL,                  -- goal text thầy duyệt (nguồn relaunch khi comeback)
+  markdown       TEXT NOT NULL,                  -- goal text thầy duyệt (nguồn relaunch)
   json           TEXT NOT NULL CHECK(json_valid(json)),   -- op chain đã derive
   amendment_json TEXT CHECK(amendment_json IS NULL OR json_valid(amendment_json)),
   approved_by    TEXT, approval_ref TEXT,

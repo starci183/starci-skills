@@ -16,8 +16,8 @@
 //   listSchedules(ctx) -> the rows.
 //
 // `ctx` is the controller's ctx: an engine ctx (it has stateDb) uses machine.sqlite (ctx.env picks the file); a spec's
-// fake ctx (no stateDb) keeps the same rules in memory, per ctx object. A store that cannot be opened (the old-schema
-// file before the comeback) makes nothing due: a duty never runs on a guess.
+// fake ctx (no stateDb) keeps the same rules in memory, per ctx object. A store that cannot be opened (an old-schema
+// file) makes nothing due: a duty never runs on a guess.
 import { withMachine, readMachine, pidAlive } from '../../engine/machine-db.mjs';
 
 export const SCHEDULE_CONTROLLERS = Object.freeze(['job', 'workflow', 'resource', 'host', 'gc', 'fleet', 'learning', 'sla']);
