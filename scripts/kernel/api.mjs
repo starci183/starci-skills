@@ -1262,6 +1262,17 @@ const agentHierarchyOf = (db, workflowId) => {
   return { schema: AGENT_HIERARCHY_SCHEMA, workflow: root, nodes, edges };
 };
 
+const staleInputProjection = (db, wf, repo = null) => {
+  if (wf.phase === 'finished') return { staleInput: [], sourceDrift: [], peerDrift: [] };
+  try {
+    const drift = inputDrift(db, wf.workflow_id, { root: skillRoot, repo, workDir: repo ? workDirOf(repo) : '.starciwork', registry: loadContractChanges(skillRoot) });
+    return { staleInput: drift.stale, sourceDrift: drift.sourceDrift, peerDrift: drift.peerDrift };
+  } catch (e) { return { staleInput: [], sourceDrift: [], peerDrift: [], staleInputError: String(e?.message ?? e) }; }
+};
+const peerDriftLines = (summary, indent = '') => (summary ? summary.records.map((entry) => `${indent}peer-drift (advisory, not stale): ${entry.file} (owner ${entry.owner ?? '-'} by ${entry.ownerBy}) changed after ${entry.jobs} settled job(s) read it${entry.writers.length ? ` — written by ${entry.writers.join(', ')}` : ''}${entry.foreignWrite ? ' (a peer wrote a record this workflow owns: review it, redo nothing)' : ''}${entry.breakingIgnored === 'written-by-non-owner' ? ' — its breaking change note was written by a non-owner and binds nothing' : ''}; nothing to redo unless its owner declares the change breaking`) : []);
+const staleOperationLine = (item) => `${item.followUp ? 'breaking-follow-up' : 'stale-input'}: ${staleLabel(item)} — ${item.paths.join(', ')}${item.breakingBy ? ` (breaking change declared by owner ${item.breakingBy.join(', ')}${item.followUp ? '; ONE follow-up leg' : ''})` : ''}`;
+const sourceDriftLines = (summary, indent = '') => (summary ? summary.paths.map((entry) => `${indent}source-drift (advisory, not stale): ${entry.path} edited after ${entry.jobs} settled job(s) were admitted${entry.changes.length ? ` — registered ${entry.changes.join(', ')}` : ' — UNREGISTERED in modules/kernel/contract-changes.yaml'}${entry.followUp.length ? `; follow-up via contractFollowUps (${entry.followUp.join(', ')})` : '; nothing to redo'}`) : []);
+const staleLabel = (item) => `${item.jobId} (${item.op} a${item.attempt}${item.cut ? ` cut ${item.cut.id} ${item.cut.ordinal}/${item.cut.total}` : ''})`;
 /* ---------------------------------------------------------------- status */
 /**
  * Whether the serve-ask form an ask-serving event names still answers: its
@@ -7468,171 +7479,6 @@ function closeOperationTask(db, job, payload, kernelHandle) {
 }
 
 /* -------------------------------------------------------------- incident */
-function cmdIncident(ledger, args) {
-  const db = ledger.db, workflowId = args.workflow, now = Date.now();
-  if (!getWorkflow(db, workflowId)) throw Object.assign(new Error(`unknown workflow ${workflowId}`), { code: 'workflow-unknown' });
-  if (args.resolve) {
-    const row = db.prepare('SELECT incident_id,status,last_progress FROM incidents WHERE incident_id=? AND workflow_id=?').get(args.resolve, workflowId);
-    if (!row) throw Object.assign(new Error(`incident ${args.resolve} is not on ${workflowId}`), { code: 'incident-unknown' });
-    // Who resolves it, and the owner answer any owner claim rests on (scripts/kernel/owner-claim.mjs):
-    // free text saying "Owner confirmed" is no owner answer (nivo inc-2474f6593dfe, inc-f19d118298f1).
-    const by = typeof args.by === 'string' && args.by.trim() ? args.by.trim() : null;
-    if (by && !RESOLVERS.includes(by)) throw Object.assign(new Error(`--by ${by}: a resolution is by ${RESOLVERS.join(', ')}`), { code: 'resolver-invalid' });
-    const ownerCheck = resolutionOwnerCheck(db, { kind: incidentKindOf(row.last_progress), detail: args.detail ?? '', by, ownerAnswer: csvList(args['owner-answer']) });
-    const changed = row.status === 'open';
-    if (changed && ownerCheck.needs && !ownerCheck.proven) {
-      const tried = ownerCheck.tried.map((t) => t.reason).join('; ');
-      throw Object.assign(new Error(`incident ${row.incident_id} not resolved: ${ownerCheck.why}, but no verified owner answer backs it${tried ? ` (${tried})` : ''}. Name the ask the owner answered with --owner-answer <dispatchId> (its ask-answered event and receipt must both say answeredBy owner). No such answer: keep the incident open and raise or keep an owner ask (the owner answers it); resolved by the Kernel or the supervisor without the owner, say --by kernel|supervisor and state what landed, never that the owner decided`), { code: OWNER_CLAIM_UNPROVEN });
-    }
-    if (changed) {
-      ledger.transaction(() => {
-        db.prepare("UPDATE incidents SET status='resolved',updated_at=? WHERE incident_id=?").run(now, row.incident_id);
-        ledger.appendEvent({
-          workflowId, entityType: 'incident', entityId: row.incident_id,
-          kind: 'incident-resolved', payload: { detail: args.detail ?? null, by: ownerCheck.by,
-            ...(ownerCheck.proof ? { ownerAnswer: { dispatchId: ownerCheck.proof.dispatchId, workflowId: ownerCheck.proof.workflowId, receiptPath: ownerCheck.proof.receiptPath } } : {}) },
-        });
-      });
-    }
-    const out = { ok: true, incidentId: row.incident_id, workflowId, status: 'resolved', changed, ...(changed ? { by: ownerCheck.by, ...(ownerCheck.proof ? { ownerAnswer: ownerCheck.proof.dispatchId } : {}) } : {}) };
-    emit(out, `incident ${row.incident_id} ${changed ? 'resolved' : 'was already ' + row.status} on ${workflowId}`, args.json);
-    return;
-  }
-  // Typed release conditions (scripts/kernel/gate-conditions.mjs): stored on the incident and checked
-  // by the runtime, which resolves it once every one holds. Opt-in: an incident without them keeps
-  // its free-text behaviour. --attach types an incident that is already open.
-  const until = parseConditions(db, args.until, { workflowId });
-  const typedRepo = path.resolve(args.repo ?? process.cwd());
-  if (args.attach) {
-    const row = db.prepare('SELECT incident_id,status FROM incidents WHERE incident_id=? AND workflow_id=?').get(args.attach, workflowId);
-    if (!row) throw Object.assign(new Error(`incident ${args.attach} is not on ${workflowId}`), { code: 'incident-unknown' });
-    if (row.status !== 'open') throw Object.assign(new Error(`incident ${args.attach} is ${row.status}; only an open incident takes release conditions`), { code: 'incident-not-open' });
-    if (!until.length) throw Object.assign(new Error('--attach needs at least one --until-<type> condition'), { code: 'until-missing' });
-    ledger.transaction(() => {
-      ledger.appendEvent({ workflowId, entityType: 'incident', entityId: row.incident_id, kind: CONDITIONS_ATTACHED_EVENT,
-        payload: { until, detail: args.detail ?? null } });
-      // A wait typed on a shared foundation makes its workflow a dependent, so the landing notifies it.
-      for (const cond of until.filter((item) => item.type === 'foundation')) {
-        const foundation = readFoundation(db, cond.name);
-        if (!foundation || (foundation.dependents ?? []).some((d) => d.workflowId === workflowId) || foundation.owner?.workflowId === workflowId) continue;
-        writeFoundation(db, declareDependent(foundation, { name: cond.name, workflowId, detail: args.detail ?? null, now }).record, now);
-        ledger.appendEvent({ workflowId, entityType: 'foundation', entityId: cond.name, kind: 'foundation-dependent-declared', payload: { name: cond.name, via: row.incident_id } });
-      }
-    });
-    const released = releaseTypedWaits(ledger, { repo: typedRepo, workflowId }).resolved.find((r) => r.incidentId === row.incident_id) ?? null;
-    const out = { ok: true, incidentId: row.incident_id, workflowId, status: released ? 'resolved' : 'open', until, ...(released ? { autoResolved: released } : {}) };
-    emit(out, `incident ${row.incident_id} on ${workflowId} now releases on ${until.map(conditionLabel).join(' AND ')}${released ? ` — already met, resolved: ${released.evidence.join('; ')}` : ''}`, args.json);
-    return;
-  }
-  const holds = String(args.holds ?? '').split(',').map((item) => item.trim()).filter(Boolean);
-  // A peer-wait names the peer workflow it waits on (openPeerWaits): only a running peer of this
-  // workflow can land the thing and send the message that wakes it.
-  let peerWait = null, foundationWait = null;
-  const foundationCond = until.find((cond) => cond.type === 'foundation') ?? null;
-  if (args.kind === PEER_WAIT) {
-    let peer = typeof args.peer === 'string' ? args.peer.trim() : '';
-    // --until-foundation <name>: a typed wait released when that shared foundation lands (a
-    // gate-conditions.mjs condition; api foundation --land resolves it and wakes this Kernel). Its
-    // peer is the foundation's owner.
-    if (foundationCond) {
-      const name = foundationCond.name;
-      const foundation = readFoundation(db, name);
-      if (!foundation) throw Object.assign(new Error(`no shared foundation ${name} is registered; its owner claims it (api foundation --claim ${name}) or you declare the need (api foundation --declare-dependent ${name}) first`), { code: 'foundation-unknown' });
-      if (foundation.state === 'landed') throw Object.assign(new Error(`foundation ${name} already landed (${foundation.version ?? 'no version'}: ${foundation.landed?.proof ?? '-'}); there is nothing to wait for`), { code: 'foundation-landed' });
-      if (!foundation.owner) throw Object.assign(new Error(`foundation ${name} has no owner yet, so nothing would land it; agree its owner with your peers (api notify) and have it claimed first`), { code: 'foundation-unowned' });
-      if (peer && peer !== foundation.owner.workflowId) throw Object.assign(new Error(`foundation ${name} is owned by ${foundation.owner.workflowId}, not ${peer}`), { code: 'foundation-peer-mismatch' });
-      peer = foundation.owner.workflowId;
-      foundationWait = { name, foundation };
-    }
-    if (!peer) throw Object.assign(new Error('a peer-wait names the workflow it waits on: --peer <workflowId>'), { code: 'peer-wait-peer-missing' });
-    const refusal = peerRefusalOf(db, getWorkflow(db, workflowId), peer);
-    if (refusal) throw Object.assign(new Error(`peer-wait on ${peer} refused: ${refusal.detail}`), { code: refusal.code });
-    peerWait = { peer, untilMessage: args['until-message'] === true, refs: csvList(args.refs),
-      ...(foundationWait ? { untilFoundation: foundationWait.name } : {}) };
-  } else if (args.peer || args['until-message'] || foundationCond) {
-    // A peer's foundation is waited on as a peer-wait, never an owner-gate (driver-loop.yaml foundations.depend).
-    throw Object.assign(new Error('--peer, a bare --until-message and --until-foundation go with --kind peer-wait (an open incident is typed with --attach)'), { code: 'peer-wait-kind-mismatch' });
-  }
-  const incidentId = `inc-${newToken().slice(0, 12)}`;
-  // Autopilot (owner ruling 2026-09-28 autopilot-run-to-finish): nothing waits on the owner mid-flow - an owner gate
-  // the Kernel raises is a runtime/process wait and is recorded as the Supervisor's (supervisor-gate). An owner-only
-  // need is an ask the runtime defers to handover (api autopilot --defer-to-handover), never a gate.
-  const rerouted = OWNER_GATE_KINDS.includes(args.kind) && autopilotOn(db, workflowId) ? { from: args.kind, to: SUPERVISOR_GATE } : null;
-  if (rerouted) args = { ...args, kind: SUPERVISOR_GATE };
-  ledger.transaction(() => {
-    db.prepare(
-      "INSERT INTO incidents(incident_id,workflow_id,op_id,attempts,model_calls,tokens,elapsed_ms,last_progress,status,updated_at) VALUES(?,?,?,0,0,0,0,?,'open',?)"
-    ).run(incidentId, workflowId, args.op ?? null, `[${args.kind}] ${args.detail}`, now);
-    ledger.appendEvent({
-      workflowId, entityType: 'incident', entityId: incidentId,
-      kind: 'incident-raised', payload: { kind: args.kind, ...(rerouted ? { rerouted, by: AUTOPILOT_BY } : {}), detail: args.detail, opId: args.op ?? null, ...(holds.length ? { holds } : {}), ...(peerWait ?? {}), ...(until.length ? { until } : {}) },
-    });
-    // A wait on a foundation makes the waiter its dependent, so the landing notifies it.
-    if (foundationWait && !(foundationWait.foundation.dependents ?? []).some((d) => d.workflowId === workflowId)) {
-      writeFoundation(db, declareDependent(foundationWait.foundation, { name: foundationWait.name, workflowId, detail: args.detail, now }).record, now);
-      ledger.appendEvent({ workflowId, entityType: 'foundation', entityId: foundationWait.name, kind: 'foundation-dependent-declared', payload: { name: foundationWait.name, via: incidentId } });
-    }
-  });
-  // A condition that already holds resolves the wait now rather than at the next status.
-  const released = until.length ? releaseTypedWaits(ledger, { repo: typedRepo, workflowId }).resolved.find((r) => r.incidentId === incidentId) ?? null : null;
-  const sharedBlocker = args.kind === SHARED_BLOCKER ? routeSharedBlocker(ledger, { workflowId, incidentId, args, repo: typedRepo }) : null;
-  const out = { ok: true, incidentId, workflowId, kind: args.kind, status: released ? 'resolved' : 'open', ...(holds.length ? { holds } : {}), ...(peerWait ?? {}), ...(until.length ? { until } : {}), ...(released ? { autoResolved: released } : {}), ...(sharedBlocker ? { sharedBlocker } : {}) };
-  emit(out, `incident ${incidentId} open on ${workflowId} — ${args.kind}${peerWait ? ` on ${peerWait.peer}${peerWait.untilMessage ? ' (until its next message)' : ''}${peerWait.untilFoundation ? ` (until foundation ${peerWait.untilFoundation} lands)` : ''}` : ''}: ${args.detail}`, args.json);
-  if (until.length && !args.json) console.log(`  typed release: ${until.map(conditionLabel).join(' AND ')}${released ? ` — already met, resolved: ${released.evidence.join('; ')}` : ''}`);
-  if (sharedBlocker && !args.json) console.log(sharedBlocker.routed
-    ? `  shared blocker routed to ${sharedBlocker.to} as follow-up ${sharedBlocker.key} (introduced by ${sharedBlocker.introducedBy ?? sharedBlocker.to}, via ${sharedBlocker.via})`
-    : `  shared blocker NOT routed: ${sharedBlocker.why}`);
-}
-
-// A shared blocker goes to the workflow whose code introduced it, as a typed
-// follow-up peer message (scripts/kernel/introducer.mjs; modules/kernel/api.yaml
-// commands.incident sharedBlocker). Unresolved or self-introduced, it stays with
-// the reporter and the answer says why - the supervisor assigns an owner.
-const SHARED_BLOCKER = 'shared-blocker';
-function routeSharedBlocker(ledger, { workflowId, incidentId, args, repo }) {
-  const db = ledger.db;
-  const self = getWorkflow(db, workflowId);
-  const commits = csvList(args['introduced-by']);
-  const explicit = typeof args.introducer === 'string' && args.introducer.trim() ? args.introducer.trim() : null;
-  if (!commits.length && !explicit) return { routed: false, why: 'no --introduced-by commit or --introducer workflow named' };
-  const roots = [...new Set([repo, ...db.prepare('SELECT source_roots_json FROM workflows').all()
-    .flatMap((row) => parseJson(row.source_roots_json, []) ?? [])].filter(Boolean).map((r) => path.resolve(r)))];
-  const found = resolveIntroducer(db, { commits, roots, explicit });
-  const record = (routing) => ledger.transaction(() => ledger.appendEvent({ workflowId, entityType: 'incident', entityId: incidentId,
-    kind: 'shared-blocker-routed', payload: routing }));
-  if (found.unresolved) { const routing = { routed: false, why: found.why, commit: found.commit ?? null, introducedBy: found.introducedBy ?? null }; record(routing); return routing; }
-  if (found.workflowId === workflowId) {
-    const routing = { routed: false, why: 'this workflow introduced it: repair it as your own defect', to: workflowId, via: found.via, commit: found.commit };
-    record(routing); return routing;
-  }
-  const refusal = peerRefusalOf(db, self, found.workflowId);
-  if (refusal) { const routing = { routed: false, why: refusal.detail, to: found.workflowId, via: found.via, commit: found.commit }; record(routing); return routing; }
-  const { subject, body } = followUpMessage({ incidentId, reporter: workflowId, detail: String(args.detail ?? ''), commit: found.commit, via: found.via,
-    fix: typeof args.fix === 'string' && args.fix.trim() ? args.fix.trim() : null });
-  // The reporter's incident becomes a typed wait on the introducer's repair (gate-conditions.mjs
-  // sharedBlockerUntil): the runtime releases it, and it is never OWED on the supervisor.
-  const raisedAt = db.prepare("SELECT created_at FROM events WHERE workflow_id=? AND entity_type='incident' AND entity_id=? AND kind='incident-raised'").get(workflowId, incidentId)?.created_at ?? Date.now();
-  const typed = Array.isArray(args.until) && args.until.length ? null
-    : sharedBlockerUntil(db, { to: found.workflowId, text: `${args.detail ?? ''} ${args.fix ?? ''}`, since: raisedAt,
-      ownerJobs: commitOwnerJobs(db, { workflowId: found.workflowId, commits: [...new Set([found.commit, ...commits].filter(Boolean))], roots }) });
-  let sent;
-  ledger.transaction(() => {
-    const now = Date.now();
-    sent = writePeerMessage(ledger, { from: self, to: found.workflowId, kind: 'follow-up', subject, body,
-      refs: [incidentId, ...(found.commit ? [found.commit] : [])], extra: { followUp: { incidentId, commit: found.commit, via: found.via, introducedBy: found.introducedBy } }, now });
-    ledger.appendEvent({ workflowId, entityType: 'incident', entityId: incidentId, kind: 'shared-blocker-routed',
-      payload: { routed: true, to: found.workflowId, key: sent.key, via: found.via, commit: found.commit, introducedBy: found.introducedBy, ...(found.successorOf ? { successorOf: found.successorOf } : {}), ...(typed ? { until: typed } : {}) } });
-  });
-  let wake = null;
-  try {
-    wake = wakeKernelForTransition(ledger, { workflowId: found.workflowId, transition: 'follow-up-received', lines: [
-      `${workflowId} routed follow-up ${sent.key} (incident ${incidentId}) to you.`,
-      'Re-read canonical api status and api inbox now; act on the follow-up in your scope, then ack it.',
-    ] });
-  } catch { wake = null; }
-  return { routed: true, to: found.workflowId, key: sent.key, via: found.via, commit: found.commit, introducedBy: found.introducedBy, ...(found.successorOf ? { successorOf: found.successorOf } : {}), ...(typed ? { until: typed } : {}), ...(wake ? { wake } : {}) };
-}
-
 /* ---------------------------------------------------------------- finish */
 // Inside the caller's transaction: the singleton signal is deleted and the Kernel job settles as
 // `status` with `result`, its terminal binding cleared and `stamp` merged into its payload.
@@ -8239,80 +8085,6 @@ function renewLiveWorkerLeases(ledger, workers, now) {
 /* -------------------------------------------------------------- autopilot */
 // The autopilot surface (scripts/kernel/autopilot.mjs; owner ruling 2026-09-28 autopilot-run-to-finish). Every write
 // is an autopilot-* event by autopilot or by the supervisor; nothing here records an owner answer.
-function cmdAutopilot(ledger, args, repo) {
-  const db = ledger.db, workflowId = args.workflow;
-  const wf = getWorkflow(db, workflowId);
-  if (!wf) throw Object.assign(new Error(`unknown workflow ${workflowId}`), { code: 'workflow-unknown' });
-  const reason = typeof args.reason === 'string' && args.reason.trim() ? args.reason.trim() : null;
-  const by = typeof args.by === 'string' && ['supervisor', 'kernel', AUTOPILOT_BY].includes(args.by.trim()) ? args.by.trim() : 'supervisor';
-  const needReason = (flag) => { if (!reason) throw Object.assign(new Error(`autopilot ${flag} needs --reason <text>`), { code: 'reason-missing' }); };
-  const append = (kind, payload, entityType = 'workflow', entityId = workflowId) => ledger.transaction(() => ledger.appendEvent({ workflowId, entityType, entityId, kind, payload }));
-  const wake = (l, o) => wakeKernelForTransition(l, { workflowId: o.workflowId, transition: 'ask-answered', ids: { dispatchId: o.dispatchId }, lines: [
-    `autopilot answered ask ${o.dispatchId} (answeredBy autopilot); receipt ${o.receiptPath}.`, 'Re-read api status and run nextActions.'] });
-  if (args.set != null) {
-    const on = String(args.set).trim().toLowerCase();
-    if (!['on', 'off'].includes(on)) throw Object.assign(new Error('autopilot --set takes on|off'), { code: 'set-invalid' });
-    needReason('--set');
-    append(AUTOPILOT_EVENTS.configured, { on: on === 'on', by, reason });
-    const out = { ok: true, workflowId, autopilot: autopilotOf(db, workflowId) };
-    emit(out, `autopilot ${on} for ${workflowId} (${reason})`, args.json);
-    return;
-  }
-  if (args.sweep) {
-    const out = { ok: true, workflowId, ...autopilotSweep({ ledger, repo, workflowId, wake }) };
-    emit(out, `autopilot sweep ${workflowId}: answered ${out.answered.length}, deferred ${out.deferred.length}, rerouted ${out.rerouted.length}, timed out ${out.timedOut.length}, supplied ${out.supplied.length}${out.errors.length ? `, errors ${out.errors.length}` : ''}`, args.json);
-    return;
-  }
-  if (args.bundle) { const out = { ok: true, ...autopilotBundle(db, workflowId) }; emit(out, `sổ chờ thầy xem lại ${workflowId}: ${JSON.stringify(out.counts)}`, args.json); return; }
-  if (args.checklist) { const out = { ok: true, workflowId, ...credentialChecklist(db, workflowId, { lang: args.lang ?? 'vi' }) }; emit(out, out.question.text, args.json); return; }
-  if (args['defer-to-handover']) {
-    const cls = String(args.class ?? '').trim();
-    if (!['credential', 'real-money', 'shared-system', 'owner-decision'].includes(cls)) throw Object.assign(new Error('--defer-to-handover needs --class credential|real-money|shared-system|owner-decision'), { code: 'class-invalid' });
-    if (!args.op || !args.detail) throw Object.assign(new Error('--defer-to-handover needs --op <asking op> and --detail <what is owed>'), { code: 'defer-incomplete' });
-    const fields = csvList(args.fields);
-    const isFile = (f) => /\.[a-z0-9]+$/i.test(f);
-    const payload = { key: `need:${args.op}:${createHash('sha256').update(`${cls}|${args.detail}`).digest('hex').slice(0, 10)}`, opId: args.op, jobId: args.job ?? null, by, deferClass: cls, classes: [cls],
-      fields: { files: fields.filter(isFile), vars: fields.filter((f) => !isFile(f)) },
-      stubPath: typeof args.stub === 'string' && args.stub.trim() ? args.stub.trim() : null, owed: String(args.detail), question: String(args.detail).slice(0, 600) };
-    append(AUTOPILOT_EVENTS.deferredToHandover, payload);
-    emit({ ok: true, workflowId, ...payload }, `deferred to handover: ${cls} for ${args.op} (${payload.key})`, args.json);
-    return;
-  }
-  if (args.release != null) {
-    needReason('--release');
-    const key = String(args.release).trim();
-    const item = deferredToHandoverOf(db, workflowId).find((i) => i.dispatchId === key || i.key === key);
-    if (!item) throw Object.assign(new Error(`${key} is no open deferred-to-handover item of ${workflowId}`), { code: 'deferral-unknown' });
-    append(AUTOPILOT_EVENTS.released, { dispatchId: item.dispatchId, key: item.key, by, reason }, 'report', item.dispatchId ?? item.key);
-    emit({ ok: true, workflowId, released: item.key, dispatchId: item.dispatchId }, `released ${item.key}: it waits on the owner again${item.dispatchId ? ` - park it with api serve-ask --dispatch ${item.dispatchId}` : ''}`, args.json);
-    return;
-  }
-  if (args['defer-leg'] != null) {
-    needReason('--defer-leg');
-    const job = db.prepare('SELECT job_id,op_id,workflow_id FROM jobs WHERE job_id=?').get(String(args['defer-leg']));
-    if (!job || job.workflow_id !== workflowId) throw Object.assign(new Error(`${args['defer-leg']} is no job of ${workflowId}`), { code: 'job-unknown' });
-    append(AUTOPILOT_EVENTS.deferred, { jobId: job.job_id, jobIds: [job.job_id], opId: job.op_id, by, reason }, 'job', job.job_id);
-    emit({ ok: true, workflowId, deferred: job.job_id }, `deferred ${job.job_id} (${job.op_id}) to the final review: ${reason}`, args.json);
-    return;
-  }
-  if (args.reopen != null) {
-    if (!args['handover-answer']) throw Object.assign(new Error('--reopen needs --handover-answer <the owner-answered handover dispatch>'), { code: 'handover-answer-missing' });
-    const payload = reopenProvisional(ledger, { workflowId, dispatchId: String(args.reopen), handoverDispatchId: String(args['handover-answer']), note: args.note ?? null });
-    emit({ ok: true, workflowId, ...payload }, `re-opened provisional ${payload.record ?? payload.dispatchId} from the owner's handover answer ${payload.handoverDispatchId}: ${payload.opId} re-runs`, args.json);
-    return;
-  }
-  if (args['extend-budget'] != null) {
-    needReason('--extend-budget');
-    const add = Object.fromEntries(csvList(args['extend-budget']).map((pair) => pair.split('=')).filter(([k, v]) => ['attempts', 'tokens', 'wallMs'].includes(k) && Number.isFinite(Number(v))).map(([k, v]) => [k, Number(v)]));
-    if (!Object.keys(add).length) throw Object.assign(new Error('--extend-budget takes attempts=<n>,tokens=<n>,wallMs=<n>'), { code: 'budget-invalid' });
-    append(AUTOPILOT_EVENTS.budgetExtended, { ...add, by, reason });
-    emit({ ok: true, workflowId, extended: add }, `autopilot budget of ${workflowId} extended by ${JSON.stringify(add)} (${reason}); resolve the budget supervisor-gate --by supervisor`, args.json);
-    return;
-  }
-  const out = { ok: true, workflowId, ...autopilotProjection(db, workflowId) };
-  emit(out, `autopilot ${out.on ? 'ON' : 'off'} (${out.source}) ${workflowId}: provisional ${out.provisional.length}, deferred ${out.deferred.length}, deferred-to-handover ${out.deferredToHandover.length}`, args.json);
-}
-
 /* ------------------------------------------------------ caller boundary */
 // An op worker ran node:sqlite against .starciwork/runtime.sqlite to inspect
 // jobs (inc-360891316369). The op contract already forbade it; the owner wants
@@ -8350,7 +8122,7 @@ const opGuardLaunch = ({ job, jobId, repo, placements, workerCwd, shims = true }
   }
 };
 const KERNEL_ONLY_VERBS = new Set(['enqueue', 'route', 'dispatch', 'reconcile', 'nudge', 'observe',
-   'settle', 'check', 'incident', 'provider-health', 'finish', 'archive', 'autopilot']);
+   'settle', 'check', 'provider-health', 'finish', 'archive']);
 /* ------------------------------------------------------------------ extensions */
 // New verbs, boolean flags and status fields are files, not edits of the shared lines above
 // (scripts/kernel/api-extensions.mjs; lane land-throughput 2026-09-28).
@@ -8359,7 +8131,7 @@ const API_EXT = await loadApiExtensions();
 const API_INTERNALS = Object.freeze({
   runSettleTail, ownerRoot, agentHierarchyOf, SETTLED, bindRunToKernel, foundationDutyOf,
   FINAL_SETTLED, staleInputProjection, staleOperationLine, sourceDriftLines, peerDriftLines,
-  resolveJob, parseAttempt, reportDispatchIdOf,
+  resolveJob, parseAttempt, reportDispatchIdOf, OWNER_GATE_KINDS,
   // Verbs split out of this file (lane slim-04) still call these shared helpers.
   skillRoot, getWorkflow,
 });
@@ -8400,11 +8172,9 @@ async function main() {
     reconcile: [], nudge: ['job'], observe: ['job'],
     settle: ['job', 'verdict'],
     report: ['job', 'report'], check: ['job'],
-    incident: [],
     'provider-health': args['quota-probe'] ? [] : ['provider'],
     finish: ['workflow'],
     archive: ['workflow', 'reason'],
-    autopilot: ['workflow'],
   };
   if (!required[cmd]) usage(2);
   for (const k of required[cmd]) need(args[k], `${cmd} needs --${k}`);
@@ -8414,10 +8184,6 @@ async function main() {
   if (cmd === 'check') need(args.checks != null || args['checks-file'], 'check needs --checks <json> or --checks-file <path>');
   if (cmd === 'provider-health' && args.recover) need(typeof args.reason === 'string' && args.reason.trim(), 'provider-health --recover needs --reason <text>');
   if (cmd === 'provider-health' && args.probe) need(args.recover, 'provider-health --probe goes with --recover');
-  if (cmd === 'incident') {
-    need(args.workflow, 'incident needs --workflow');
-    if (!args.resolve && !args.attach) { need(args.kind, 'incident needs --kind (or --resolve <incidentId>)'); need(args.detail, 'incident needs --detail'); }
-  }
 
   let ledger;
   try {
@@ -8449,11 +8215,9 @@ async function main() {
       case 'settle': return await cmdSettle(ledger, args, repo);
       case 'report': return cmdReport(ledger, args, repo);
       case 'check': return cmdCheck(ledger, args, repo);
-      case 'incident': return cmdIncident(ledger, args);
       case 'provider-health': return await cmdProviderHealth(ledger, args);
       case 'finish': return cmdFinish(ledger, args);
       case 'archive': return await cmdArchive(ledger, args, repo);
-      case 'autopilot': return cmdAutopilot(ledger, args, repo);
     }
   } catch (error) {
     console.error(JSON.stringify({ ok: false, error: String(error?.message ?? error), code: error?.code }));
