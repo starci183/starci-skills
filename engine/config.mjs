@@ -6,11 +6,13 @@ import {parseYaml} from './yaml.mjs';
 import {isPlainObject as plain} from './plain-object.mjs';
 
 export const configRoot=skillRoot;
-export const NON_OPERATION_ROLES={planner:'plan',kernelManager:'decide',validator:'verify'};
+const NON_OPERATION_ROLES={planner:'plan',kernelManager:'decide',validator:'verify'};
 export const DEFAULT_MODEL_POOLS={'sol-opus':['claude-agent','codex-agent']};
-export const ADAPTIVE_ALLOCATION_MODE='adaptive';
+const ADAPTIVE_ALLOCATION_MODE='adaptive';
 /** The effort vocabulary, ordered weakest to strongest — the only list of it. */
-export const EFFORT_LEVELS=['none','minimal','low','medium','high','xhigh','max','ultra'];
+const EFFORT_LEVELS=['none','minimal','low','medium','high','xhigh','max','ultra'];
+/** The one `Invalid config.yaml:` raiser every section validator shares: bad('<rest>') throws it. */
+const invalid=section=>message=>{throw Error(`Invalid config.yaml: ${section}${message}`);};
 // Parsed once per file version (mtime + size) per process; each caller gets its own copy.
 // The one runtimes.yaml loader: it throws on a missing or unparsable file, so no caller ever
 // reasons on a silent empty document.
@@ -59,7 +61,7 @@ export function parallelGear(config=loadConfig()){
  * (or `<NAME>_FILE` pointing at a custody file); a value that is not an env var name is refused, so a
  * pasted token fails closed instead of landing in a plain-text file.
  */
-export const CLOUDFLARE_MODES=['off','quick','named'];
+const CLOUDFLARE_MODES=['off','quick','named'];
 /** The serve-ask port band, both ends included (scripts/kernel/serve-ask.mjs scans [first..last]); the gateway stays outside it. */
 export const ASK_PORT_BAND=[6969,7069];
 export const CONNECTOR_DEFAULTS=Object.freeze({
@@ -76,7 +78,7 @@ const CHAT_ID=/^(?:-?\d{1,20}|@[A-Za-z][A-Za-z0-9_]{4,31})$/;
 const SECRET_KEYS=['token','tunnelToken','botToken','secret','apiToken','password'];
 function validateConnectors(connectors){
   if(connectors===null)return;
-  const bad=message=>{throw Error(`Invalid config.yaml: connectors${message}`);};
+  const bad=invalid('connectors');
   if(!plain(connectors))bad(' must be {secretsFile?, repos?, gateway?, cloudflare?, telegram?} or null.');
   const closed=(node,where,keys)=>{
     if(!plain(node))bad(`.${where} must be a mapping.`);
@@ -139,7 +141,7 @@ export function readDotenv(file){
   return out;
 }
 /** The dotenv file connectors.secretsFile names, resolved against the skill root; null when unset. */
-export const connectorSecretsFile=(config,root=configRoot)=>{const file=config?.connectors?.secretsFile;return typeof file==='string'&&file.trim()?path.resolve(root,file):null;};
+const connectorSecretsFile=(config,root=configRoot)=>{const file=config?.connectors?.secretsFile;return typeof file==='string'&&file.trim()?path.resolve(root,file):null;};
 /**
  * The environment the connectors resolve secrets from: connectors.secretsFile's values under the process
  * environment (a real env var wins). It holds secrets — hand it to connectorSecret, never print it.
@@ -188,11 +190,11 @@ export function connectorsConfig(config=loadConfig(),env=process.env,root=config
  * accepted without the owner) and any ask kind of modules/ops/ops/provision.ask.yaml.
  */
 export const ASK_KINDS=Object.freeze(['information','credential','account','access','consent','authority','business-decision','irreversible-confirmation']);
-export const ASK_EXCLUDE_CLASSES=Object.freeze([...ASK_KINDS,'handover','draw-review']);
+const ASK_EXCLUDE_CLASSES=Object.freeze([...ASK_KINDS,'handover','draw-review']);
 export const ASKS_DEFAULTS=Object.freeze({autoAcceptRecommended:false,excludes:Object.freeze(['credential','irreversible-confirmation','handover'])});
 function validateAsks(asks){
   if(asks===null)return;
-  const bad=message=>{throw Error(`Invalid config.yaml: asks${message}`);};
+  const bad=invalid('asks');
   if(!plain(asks))bad(' must be {autoAcceptRecommended?, excludes?} or null.');
   for(const key of Object.keys(asks))if(!['autoAcceptRecommended','excludes'].includes(key))bad(` has unknown key ${key} (allowed: autoAcceptRecommended, excludes).`);
   if(asks.autoAcceptRecommended!==undefined&&typeof asks.autoAcceptRecommended!=='boolean')bad('.autoAcceptRecommended must be true or false.');
@@ -210,7 +212,7 @@ function validateAsks(asks){
 export const UAT_DEFAULTS=Object.freeze({maxConcurrent:10});
 function validateUat(uat){
   if(uat===null)return;
-  const bad=message=>{throw Error(`Invalid config.yaml: uat${message}`);};
+  const bad=invalid('uat');
   if(!plain(uat))bad(' must be {maxConcurrent?} or null.');
   for(const key of Object.keys(uat))if(key!=='maxConcurrent')bad(` has unknown key ${key} (allowed: maxConcurrent).`);
   if(uat.maxConcurrent!==undefined&&uat.maxConcurrent!==null&&!(Number.isInteger(uat.maxConcurrent)&&uat.maxConcurrent>=1))bad('.maxConcurrent must be a positive integer (default 10) or null.');
@@ -232,7 +234,7 @@ export function uatSettings(config=loadConfig()){
  *     a capacityAuthority explicit-workflow-quota pool (Devin) for those roles up to <slots> running jobs.
  */
 export const ALLOCATION_POLICIES=Object.freeze(['prefer-then-overflow','balanced']);
-export const ALLOCATION_KEYS=Object.freeze(['mode','preferredProvider','policy','shares','windowHours','grants']);
+const ALLOCATION_KEYS=Object.freeze(['mode','preferredProvider','policy','shares','windowHours','grants']);
 export const DEFAULT_ALLOCATION_WINDOW_HOURS=24;
 const GRANT=/^([a-z0-9][a-z0-9.-]*)=(\d+)@([a-z]+(?:\+[a-z]+)*)$/;
 /** One grant string `<pool>=<slots>@<role>+<role>` as {pool, slots, roles}, or null when it is not that shape. */
@@ -241,7 +243,7 @@ export function parseAllocationGrant(text){
   return m?{pool:m[1],slots:Number(m[2]),roles:m[3].split('+')}:null;
 }
 function validateAllocationBalance(allocation,runtimes){
-  const bad=message=>{throw Error(`Invalid config.yaml: allocation.${message}`);};
+  const bad=invalid('allocation.');
   if(allocation.policy!==undefined&&allocation.policy!==null&&!ALLOCATION_POLICIES.includes(allocation.policy))
     bad(`policy must be one of ${ALLOCATION_POLICIES.join(' | ')}.`);
   if(allocation.shares!==undefined&&allocation.shares!==null){
@@ -400,18 +402,16 @@ export function configuredAllocationPolicy(config=loadConfig()){
   };
 }
 export const nonOperationModels=(role,config=loadConfig())=>{if(!Object.hasOwn(NON_OPERATION_ROLES,role))throw Error(`Unknown non-operation model role ${role}`);return effectiveNonOperationModels(config)[role].runtimes;};
-function readExample(root=configRoot){const yaml=path.join(root,'config.example.yaml');if(fs.existsSync(yaml))return validateConfig(parseYaml(fs.readFileSync(yaml,'utf8')));throw Error('Missing config.example.yaml');}
+/** The validated config one yaml file holds, or null when the file is absent. */
+const readYamlConfig=(root,name)=>{const yaml=path.join(root,name);return fs.existsSync(yaml)?validateConfig(parseYaml(fs.readFileSync(yaml,'utf8'))):null;};
+function readExample(root=configRoot){const example=readYamlConfig(root,'config.example.yaml');if(example!==null)return example;throw Error('Missing config.example.yaml');}
 /**
  * The owner config reader: `config.yaml` is the per-project file (gitignored,
  * seeded verbatim from `config.example.yaml` by the installer — comments and
  * all). Returns the validated owner config, or null when that file does not
  * exist; falling back to the example's defaults is `loadConfig`.
  */
-export function readOwnerConfig(root=configRoot){
-  const yaml=path.join(root,'config.yaml');
-  if(fs.existsSync(yaml))return validateConfig(parseYaml(fs.readFileSync(yaml,'utf8')));
-  return null;
-}
+function readOwnerConfig(root=configRoot){return readYamlConfig(root,'config.yaml');}
 /**
  * The tolerant read the kernel boot and the router share: an owner file that is absent, unparsable or
  * short of the closed schema must never stop a workflow from routing. Returns
@@ -435,7 +435,7 @@ export function inspectOwnerConfig(root=configRoot){
  *   unit, e2e - product unit and e2e tests in workflows.
  * An absent, null or unreadable owner file reads as all on.
  */
-export const SPEC_FAMILIES=Object.freeze(['harness','unit','e2e']);
+const SPEC_FAMILIES=Object.freeze(['harness','unit','e2e']);
 export function specsSettings(config){const specs=plain(config?.specs)?config.specs:{};return Object.fromEntries(SPEC_FAMILIES.map(key=>[key,specs[key]!==false]));}
 /** specs.harness of the owner file under `root` (tolerant read: inspectOwnerConfig). */
 export function harnessSpecsEnabled(root=configRoot){return specsSettings(inspectOwnerConfig(root).config).harness;}
