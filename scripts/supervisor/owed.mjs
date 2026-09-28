@@ -49,8 +49,8 @@
 // fixed used to re-alert every hour: mia wf-miamia-work-and-stacks-mud7kjun brand.decide a1-a8 failed, fixed by
 // 5069309f2, 7893dcbb0, 7535339ca and 69348e272, then queued behind an owner review ask - four items
 // remaining OWED until the next success. Two ways out:
-//   ack      the supervisor's disposition (`ack --item <key> --commits <csv> --reason <t>`), kept in the
-//            supervisor ledger (signals scope owed-ack, an owed-acked event): the item is quiet in
+//   ack      the supervisor's disposition (`ack --item <key> --commits <csv> --reason <t>`), kept in
+//            machine.sqlite (a sup_owed row in state acked, an owed-acked sup_events row): the item is quiet in
 //            the poll OWED lines until a failure NEWER than the ack lands on its lineage,
 //            which re-opens it (ack-reopened);
 //   waiting  a retry-loop/repeat-check lineage whose newest job is queued behind an open owner gate or
@@ -69,7 +69,7 @@ import {
   GATE_GRACE_MS, ownerGates, peerWaits, judgeGate, judgePeerWait,
   openAskDispatches, runningWorkflows, namedWorkflows, heldBy, ledgerLookup, peerBusyProbe, verdictKey, stallMinutesOf, apiFrontier,
 } from './stall.mjs';
-import { withSupervisorRead, withSupervisorLedger, supervisorEvent } from './home.mjs';
+import { readSupervisor, supervisorEvent, withSupervisor } from './home.mjs';
 import { guardReceiptErrors } from '../guards/install.mjs';
 import { clipLine } from '../lib/clip.mjs';
 import { parseJsonOr, withPayload } from '../lib/json.mjs';
@@ -553,7 +553,6 @@ export const owedLine = (i) => `OWED ${i.workflowId} ${i.incidentId ?? i.key} [$
 
 /* ------------------------------------------------------------ the supervisor's disposition: ack */
 
-export const OWED_ACK_SCOPE = 'owed-ack';
 /**
  * When an item last got worse: a pattern's newest failure on its lineage (lastFailureAt), an incident's
  * last update, else when it was raised. A value newer than an ack re-opens the item.
@@ -562,28 +561,35 @@ export const lastWorseAt = (item) => item.lastFailureAt ?? item.updatedAt ?? ite
 /** True while ack still holds item quiet: nothing on its lineage got worse after the ack. */
 export const ackHolds = (item, ack) => Boolean(ack) && lastWorseAt(item) <= ack.at;
 
-/** Every stored ack: Map<key, {key, commits, reason, at, by, workflowId, summary}> ({} when there is no supervisor ledger). */
+/** The sup_owed kind of an item key: 'incident' | 'pattern:<name>' | the key's first part. Pure. */
+const owedKindOf = (key, item) => item?.kind ?? (String(key).startsWith('pattern:') ? String(key).split(':').slice(0, 2).join(':') : String(key).split(':')[0] || 'owed');
+
+/**
+ * Every stored ack (machine.sqlite sup_owed rows in state acked; detail_json is the ack):
+ * Map<key, {key, commits, reason, at, by, workflowId, summary}> (empty when machine.sqlite does not exist yet).
+ */
 export function readOwedAcks({ env = process.env } = {}) {
-  return withSupervisorRead((db) => new Map(db.prepare('SELECT key, value_json, at FROM signals WHERE scope=?').all(OWED_ACK_SCOPE)
-    .map((r) => { const v = parse(r.value_json); return [r.key, { ...v, key: r.key, at: Number(v.at ?? r.at) }]; })), new Map(), { env });
+  return readSupervisor((m) => new Map(m.db.prepare("SELECT owed_id, detail_json, acked_at FROM sup_owed WHERE state='acked' ORDER BY acked_at").all()
+    .map((r) => { const v = parse(r.detail_json) ?? {}; return [r.owed_id, { ...v, key: r.owed_id, at: Number(v.at ?? r.acked_at) }]; })), new Map(), { env });
 }
 
-/** Store (or replace) the ack of key in the supervisor ledger, with its audit event. Returns the ack. */
+/** Store (or replace) the ack of key as its sup_owed row (state acked), with its owed-acked audit event. Returns the ack. */
 export function ackOwed({ key, commits, reason, item = null, by = 'cli', now = Date.now(), env = process.env }) {
   const ack = { key, commits, reason, at: now, by, workflowId: item?.workflowId ?? null, summary: item?.summary ?? null };
-  withSupervisorLedger((ledger) => ledger.transaction(() => {
-    ledger.db.prepare('INSERT INTO signals(scope,key,holder_pid,token,value_json,at,expires_at) VALUES(?,?,?,?,?,?,NULL) ON CONFLICT(scope,key) DO UPDATE SET value_json=excluded.value_json,at=excluded.at,holder_pid=excluded.holder_pid')
-      .run(OWED_ACK_SCOPE, key, process.pid, null, JSON.stringify(ack), now);
-    supervisorEvent(ledger, { entityType: 'owed-item', entityId: key, kind: 'owed-acked', payload: ack, now });
+  withSupervisor((m) => m.transaction(() => {
+    const opened = m.db.prepare('SELECT opened_at FROM sup_owed WHERE owed_id=?').get(key)?.opened_at ?? item?.raisedAt ?? now;
+    m.upsert('sup_owed', { owed_id: key, kind: owedKindOf(key, item), subject: item?.workflowId ?? key, cluster: null, state: 'acked', opened_at: opened,
+      acked_at: now, acked_by: by, closed_at: null, detail_json: ack }, ['owed_id']);
+    supervisorEvent(m, { entityType: 'owed-item', entityId: key, kind: 'owed-acked', payload: ack, now });
   }), { env });
   return ack;
 }
 
-/** Drop the ack of `key`; true when there was one. */
+/** Drop the ack of `key` (its sup_owed row closes), with an owed-unacked audit event; true when there was one. */
 export function unackOwed({ key, now = Date.now(), env = process.env }) {
-  return withSupervisorLedger((ledger) => ledger.transaction(() => {
-    const had = ledger.db.prepare('DELETE FROM signals WHERE scope=? AND key=?').run(OWED_ACK_SCOPE, key).changes > 0;
-    if (had) supervisorEvent(ledger, { entityType: 'owed-item', entityId: key, kind: 'owed-unacked', payload: { key }, now });
+  return withSupervisor((m) => m.transaction(() => {
+    const had = m.db.prepare("UPDATE sup_owed SET state='closed', closed_at=? WHERE owed_id=? AND state='acked'").run(now, key).changes > 0;
+    if (had) supervisorEvent(m, { entityType: 'owed-item', entityId: key, kind: 'owed-unacked', payload: { key }, now });
     return had;
   }), { env });
 }
@@ -592,7 +598,7 @@ export function unackOwed({ key, now = Date.now(), env = process.env }) {
  * Every classified item of one ledger plus the OWED ones linked to their likely fix:
  * {items, owed}. Each OWED item carries {key, status: 'open'|'fixed-by', fixedBy, action, line}; an item the
  * supervisor acked (readOwedAcks) and nothing newer failed on is status 'acked' and left out of `owed`.
- * `commitsOf(since)` replaces `git log` (specs); `acks` (a Map) replaces the supervisor ledger's.
+ * `commitsOf(since)` replaces `git log` (specs); `acks` (a Map) replaces the stored ones (machine.sqlite sup_owed).
  */
 export function owedFindings(db, { repo = null, ledgers = [], now = Date.now(), wanted = new Set(), graceMs = GATE_GRACE_MS, root = SKILL_ROOT,
   commitsOf = (since) => gitCommits({ root, since, now }), staleOf = staleInputs, patterns = true, acks = undefined,

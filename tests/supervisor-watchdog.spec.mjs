@@ -11,7 +11,7 @@ import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 
 import { launchSupervisor } from '../scripts/supervisor/start-supervisor.mjs';
-import { withSupervisorRead, supervisorSettings, SUPERVISOR_ID, SUPERVISOR_WF } from '../scripts/supervisor/home.mjs';
+import { readSupervisor, supervisorSettings, SUPERVISOR_ID } from '../scripts/supervisor/home.mjs';
 import { appendInbox, registerSupervisor } from '../scripts/connectors/telegram-bridge.mjs';
 import { watchdogPass, busyScreen, busySignature, frozenBusyFrame, SUBAGENT_INPUT } from '../scripts/supervisor/watchdog.mjs';
 
@@ -72,9 +72,7 @@ function seatDeps({ state = 'turn-idle', frame = '❯ ', outputAge = null, wakeR
   return { seat, d };
 }
 
-const eventsOf = (env, kind) => withSupervisorRead(
-  (db) => db.prepare('SELECT payload_json FROM events WHERE workflow_id=? AND kind=? ORDER BY seq').all(SUPERVISOR_WF, kind).map((e) => JSON.parse(e.payload_json)),
-  [], { env });
+const eventsOf = (env, kind) => readSupervisor((m) => m.supEvents({ kind, order: 'asc', limit: -1 }).map((e) => e.payload), [], { env });
 
 const pane = (timer) => [
   '❯ Message @general-purpose…',

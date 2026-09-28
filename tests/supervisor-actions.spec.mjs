@@ -9,15 +9,14 @@ import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { owedActions, withSla, actedOf, recordAction, latestOwedActions, digestText, ownerDigest, pushClass, CLASSES, actionLine } from '../scripts/supervisor/actions.mjs';
-import { withSupervisorRead } from '../scripts/supervisor/home.mjs';
-import { readInbox } from '../scripts/connectors/telegram-bridge.mjs';
+import { readSupervisor } from '../scripts/supervisor/home.mjs';
 import { parseYaml } from '../engine/yaml.mjs';
 
 const NOW = Date.parse('2026-09-28T12:00:00Z');
 const envOf = (t) => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'starci-sup-actions-'));
   t.after(() => fs.rmSync(root, { recursive: true, force: true, maxRetries: 20, retryDelay: 50 }));
-  return { ...process.env, LOCALAPPDATA: path.join(root, 'la'), STARCI_SUPERVISOR_HOME: path.join(root, 'home'), STARCI_CONNECTORS_OFF: '1' };
+  return { ...process.env, LOCALAPPDATA: path.join(root, 'la'), STARCI_TEST_MACHINE_FILE: path.join(root, 'machine.sqlite'), STARCI_CONNECTORS_OFF: '1' };
 };
 
 test('owed actions: each stuck item gets one class and one action; an incident a cluster carries is not listed twice', () => {
@@ -77,7 +76,7 @@ test('SLA: a stuck item breaches only when no action touched it for actionSlaMs;
   assert.ok(first.items.every((i) => !i.breach && i.ageMin === 0), 'a first sighting never breaches');
   recordAction({ item: 'owed|x', action: 'worker-job', reason: 'job sup-1 spawned for the cluster', env, now: NOW + 10 * 60_000 });
   assert.throws(() => recordAction({ item: 'owed|x', action: 'x', reason: ' ', env }), /--reason/);
-  const acted = withSupervisorRead((db) => actedOf(db), null, { env });
+  const acted = readSupervisor((m) => actedOf(m), null, { env });
   assert.equal(acted.byKey['owed|x'].action, 'worker-job');
   const later = withSla(items, { seen: first.seen, acted: { ...acted, byWorkflow: { 'wf-c': NOW + 5 * 60_000 } }, now: NOW + 31 * 60_000, slaMs });
   const breach = Object.fromEntries(later.items.map((i) => [i.key, i.breach]));
@@ -98,7 +97,7 @@ test('SLA: an action recorded --until holds its item out of SLA-BREACH until the
   assert.throws(() => recordAction({ item: 'owed|held', action: 'x', reason: 'r', env, now: NOW, until: NOW - 1 }), /after now/);
   const capped = recordAction({ item: 'owed|other', action: 'x', reason: 'r', env, now: NOW, until: NOW + 48 * 3_600_000 });
   assert.equal(capped.until, NOW + 12 * 3_600_000, 'a hold is capped at 12 h');
-  const acted = withSupervisorRead((db) => actedOf(db), null, { env });
+  const acted = readSupervisor((m) => actedOf(m), null, { env });
   const at2h = withSla(items, { seen: first.seen, acted, now: NOW + 2 * 3_600_000, slaMs });
   const byKey = Object.fromEntries(at2h.items.map((i) => [i.key, i]));
   assert.equal(byKey['owed|held'].breach, false, 'held until 4 h: no breach at 2 h');
@@ -121,7 +120,7 @@ test('the owner digest preview includes actions and waits but never sends', asyn
   assert.match(one.text, /resolve gate\|wf-a\|inc-1/);
   const two = await ownerDigest({ env, now: NOW + 60_000, language: 'en' });
   assert.equal(two.sent, false);
-  assert.equal(withSupervisorRead((db) => db.prepare('SELECT COUNT(*) n FROM events WHERE kind=?').get('supervisor-owner-digest').n, undefined, { env }), 0);
+  assert.equal(readSupervisor((m) => m.supEvents({ kind: 'supervisor-owner-digest' }).length, undefined, { env }), 0);
 });
 
 test('the retired digest send flag is refused before any delivery', () => {

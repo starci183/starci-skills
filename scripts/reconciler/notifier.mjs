@@ -9,8 +9,8 @@
 //            scripts/supervisor/actions.mjs digestText; sent with scripts/supervisor/stall-alert.mjs ownerPush.
 //   urgent   key-deduped, at most once per URGENT_KEY_MS (6 h) per key, only for URGENT_CLASSES (DESIGN §19): an owner
 //            service quarantined, a crash loop, RAM critical, a corrupt ledger, a Supervisor DI overdue x3.
-// Each send is one event on the supervisor ledger (notifier-digest-sent | notifier-urgent-sent), which is also the
-// dedupe state. Language: config.yaml language.
+// Each send is one machine.sqlite sup_events row (notifier-digest-sent | notifier-urgent-sent), which is also the
+// dedupe state; the AUTO lands are the land_runs rows. Language: config.yaml language.
 //
 //   node scripts/reconciler/notifier.mjs judge --text "<one line>" [--json]
 //   node scripts/reconciler/notifier.mjs digest [--send] [--force] [--json]
@@ -85,32 +85,33 @@ export function composeDigest({ digestText, progress = [], actions = [], owed = 
   return lines.join('\n');
 }
 
-/* ------------------------------------------------------------ reads (supervisor ledger) */
+/* ------------------------------------------------------------ reads (machine.sqlite) */
 
 async function supervisorRead(fn, fallback, env) {
-  const { withSupervisorRead } = await import('../supervisor/home.mjs');
-  return withSupervisorRead(fn, fallback, { env });
+  const { readSupervisor } = await import('../supervisor/home.mjs');
+  return readSupervisor(fn, fallback, { env });
 }
+
+/** The land_runs of the last day as the digest's lands: [{kind: land-passed|land-failed, id, at}], newest first. Pure over `m`. */
+export const landsOf = (m, { now = Date.now(), limit = 60 } = {}) => m.landRuns({ limit })
+  .map((r) => ({ kind: r.result === 'passed' ? 'land-passed' : 'land-failed', id: r.lane ?? r.commit_sha, at: Number(r.finished_at ?? r.started_at) }))
+  .filter((l) => l.at >= now - DAY);
 
 /** {lastDigestAt, urgentSent: {key: at}, judgements: [{text, at}], lands: [{kind, id, at}]} since `sinceMs`. */
 export async function notifierState({ env = process.env, now = Date.now(), sinceMs = DAY } = {}) {
-  const { SUPERVISOR_WF } = await import('../supervisor/home.mjs');
-  return supervisorRead((db) => {
-    const lastDigestAt = db.prepare('SELECT created_at FROM events WHERE workflow_id=? AND kind=? ORDER BY seq DESC LIMIT 1').get(SUPERVISOR_WF, DIGEST_SENT_KIND)?.created_at ?? null;
+  return supervisorRead((m) => {
+    const lastDigestAt = m.db.prepare('SELECT created_at FROM sup_events WHERE kind=? ORDER BY seq DESC LIMIT 1').get(DIGEST_SENT_KIND)?.created_at ?? null;
     const urgentSent = {};
-    for (const r of db.prepare('SELECT entity_id, created_at FROM events WHERE workflow_id=? AND kind=? AND created_at>=? ORDER BY seq').all(SUPERVISOR_WF, URGENT_SENT_KIND, now - URGENT_KEY_MS)) urgentSent[r.entity_id] = Number(r.created_at);
-    const judgements = db.prepare('SELECT payload_json, created_at FROM events WHERE workflow_id=? AND kind=? AND created_at>=? ORDER BY seq').all(SUPERVISOR_WF, JUDGEMENT_KIND, lastDigestAt ?? now - sinceMs)
+    for (const r of m.db.prepare('SELECT entity_id, created_at FROM sup_events WHERE kind=? AND created_at>=? ORDER BY seq').all(URGENT_SENT_KIND, now - URGENT_KEY_MS)) urgentSent[r.entity_id] = Number(r.created_at);
+    const judgements = m.db.prepare('SELECT payload_json, created_at FROM sup_events WHERE kind=? AND created_at>=? ORDER BY seq').all(JUDGEMENT_KIND, lastDigestAt ?? now - sinceMs)
       .map((r) => ({ text: parseJsonOr(r.payload_json, {})?.text ?? '', at: Number(r.created_at) })).filter((j) => j.text);
-    const lands = db.prepare("SELECT kind, entity_id, created_at FROM events WHERE workflow_id=? AND kind IN ('land-passed','land-failed') AND created_at>=? ORDER BY seq DESC LIMIT 60").all(SUPERVISOR_WF, now - DAY)
-      .map((r) => ({ kind: r.kind, id: r.entity_id, at: Number(r.created_at) }));
-    return { lastDigestAt: lastDigestAt == null ? null : Number(lastDigestAt), urgentSent, judgements, lands };
+    return { lastDigestAt: lastDigestAt == null ? null : Number(lastDigestAt), urgentSent, judgements, lands: landsOf(m, { now }) };
   }, { lastDigestAt: null, urgentSent: {}, judgements: [], lands: [] }, env);
 }
 
 async function record(kind, entityId, payload, { env, now }) {
-  const { openSupervisorLedger, supervisorEvent } = await import('../supervisor/home.mjs');
-  const w = openSupervisorLedger({ env });
-  try { w.transaction(() => supervisorEvent(w, { entityType: 'notifier', entityId, kind, payload, now })); } finally { w.close(); }
+  const { withSupervisor, supervisorEvent } = await import('../supervisor/home.mjs');
+  withSupervisor((m) => supervisorEvent(m, { entityType: 'notifier', entityId, kind, payload, now }), { env });
 }
 
 /** The Supervisor's one-line judgement for the next digest (DESIGN §17.2). */
@@ -154,7 +155,7 @@ export async function digestInputs({ env = process.env, now = Date.now() } = {})
   }
   let violations = [];
   try { const { openViolations } = await import('./sla.mjs'); violations = openViolations({ env }); } catch { violations = []; }
-  const gc = await supervisorRead((db) => db.prepare("SELECT msg FROM logs WHERE kind='gc.summary' ORDER BY seq DESC LIMIT 1").get()?.msg ?? null, null, env);
+  const gc = await supervisorRead((m) => m.db.prepare("SELECT msg FROM machine_logs WHERE actor='gc' AND kind='gc.summary' ORDER BY seq DESC LIMIT 1").get()?.msg ?? null, null, env);
   let actions = [], owed = null;
   try { const a = await import('../supervisor/actions.mjs'); owed = a.latestOwedActions({ env }); } catch { owed = null; }
   // The op-health trend: the Fleet controller's supervisor-op-metrics snapshots (op-metrics.mjs currentTrend).

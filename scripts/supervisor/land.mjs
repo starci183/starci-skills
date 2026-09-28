@@ -51,7 +51,7 @@ import { lowerOwnPriority } from '../lib/low-priority.mjs';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { parseYaml } from '../../engine/yaml.mjs';
 import { allocationMs, allocationSettings, harnessSpecsEnabled } from '../../engine/config.mjs';
-import { git, normPath, unlinkNodeModulesLink } from './workers.mjs';
+import { git, normPath, unlinkNodeModulesLink, finishLanded, selfJobsLandedBy, recordLandFailed } from './workers.mjs';
 import { withMachine, readMachine } from '../../engine/machine-db.mjs';
 import { lanesRoot } from '../lib/hk-lanes.mjs';
 import { scanRange, scanHint } from './push-mains.mjs';
@@ -499,7 +499,7 @@ const landResultOf = (r) => (r.ok ? 'passed' : r.reason === 'conflict' ? 'confli
 /** MB-12: a land that moved main but whose push did not happen (refused or failed, not skipped). */
 export const pushOwedOf = (r) => Boolean(r?.ok && r.landed && r.push && !r.push.pushed && !r.push.skipped);
 /** The machine records of one land: the push row, the land_runs row (full result as the stdout blob) and a log line. */
-function recordLand(m, { result, root = SKILL_ROOT, ticketId = null, lane = null, commits, jobId = null, specMode = null, startedAt }) {
+function recordLand(m, { result, root = SKILL_ROOT, env = process.env, ticketId = null, lane = null, commits, jobId = null, specMode = null, startedAt }) {
   let pushId = null;
   if (result.push) {
     const p = result.push;
@@ -508,11 +508,22 @@ function recordLand(m, { result, root = SKILL_ROOT, ticketId = null, lane = null
       failureSignature: p.pushed || p.skipped ? null : p.refused ? `secret-scan:${(p.findings ?? []).map((x) => x.rule ?? x.id ?? 'finding')[0] ?? 'finding'}` : 'push:error',
       scan: p.findings ? { findings: p.findings } : null, stderr: p.error ?? null });
   }
-  const runId = m.recordLandRun({ ticketId, lane, commitSha: commits[commits.length - 1], landedSha: result.landed ?? result.alreadyLanded ?? null, result: landResultOf(result),
-    reason: result.reason ?? null, pushId, specs: { mode: specMode, failed: (result.checks ?? []).filter((c) => !c.ok).map((c) => c.name) },
+  const runId = m.recordLandRun({ ticketId, lane, commitSha: commits[commits.length - 1], commits, landedSha: result.landed ?? null, result: landResultOf(result),
+    // an already-landed pick moved nothing: no landed_sha (direct-commit detection keys on the mains the gate produced)
+    reason: result.reason ?? (result.alreadyLanded ? `already-landed ${result.alreadyLanded}` : null), pushId, specs: { mode: specMode, failed: (result.checks ?? []).filter((c) => !c.ok).map((c) => c.name) },
     stdout: JSON.stringify(result, null, 2), stderr: (result.checks ?? []).filter((c) => !c.ok).map((c) => `## ${c.name}\n${c.output ?? ''}`).join('\n') || null, startedAt });
   if (result.ok && lane && (result.landed ?? result.alreadyLanded)) m.update('lanes', { head_sha: result.landed ?? result.alreadyLanded }, { name: lane });
-  if (result.ok && jobId && m.supJob(jobId)) { m.setSupJobStatus(jobId, 'succeeded'); m.releaseSupLeases(jobId); }
+  // A landed job is succeeded, its leases released, its checkout, branch and [Worker] terminal gone (finishLanded).
+  // --commit of a self checkout's commits closes that self job as --job would: left open, it kept its file leases
+  // and blocked every worker needing them. A red gate keeps the failure on the job.
+  const landedSha = result.landed ?? result.alreadyLanded ?? null;
+  if (result.ok && jobId && m.supJob(jobId)) result.finished = finishLanded(m, { jobId, landedSha, root, env });
+  if (result.ok && !jobId) {
+    const self = selfJobsLandedBy(m, commits, { root });
+    if (self.done.length) result.finished = self.done.map((id) => finishLanded(m, { jobId: id, landedSha, root, env }));
+    if (self.partial.length) result.selfPending = self.partial;
+  }
+  if (!result.ok && jobId) recordLandFailed(m, { jobId, reason: result.reason ?? null, startedAt });
   // MB-12: main moved but GitHub did not: its own outcome and ONE Supervisor DI per landed head (the fleet push retries).
   if (pushOwedOf(result)) {
     const why = result.push.refused ?? result.push.error ?? 'push failed';
@@ -557,7 +568,7 @@ export async function land({ jobId = null, commits = null, specs = [], lane = nu
     if (!pre.ok) {
       const result = { ok: false, commits, reason: 'conflict', preflight: true, base: pre.onto ?? null, conflicts: pre.conflicts, hint: conflictHint(pre.conflicts, pre.conflicts[0]?.commit),
         detail: `does not apply on main ${String(pre.onto ?? '').slice(0, 9)}: ${pre.conflicts.map((c) => c.file).join(', ')}` };
-      withMachine((m) => recordLand(m, { result, root, lane, commits, jobId, startedAt }), { env });
+      withMachine((m) => recordLand(m, { result, root, env, lane, commits, jobId, startedAt }), { env });
       return result;
     }
   }
@@ -585,7 +596,9 @@ export async function land({ jobId = null, commits = null, specs = [], lane = nu
     const result = { ...landCommits({ commits, specs: plan.named, specMode: plan.mode, root, env, push: doPush, deps }), specMode: plan.mode };
     if (pushOwedOf(result)) result.outcome = 'landed-push-owed';
     state = result.ok ? 'passed' : 'failed';
-    result.landRun = withMachine((m) => recordLand(m, { result, root, ticketId: lock.ticketId, lane, commits, jobId, specMode: plan.mode, startedAt }), { env });
+    // main already moved: a failed record never turns a landed change into a failed land; it is reported instead.
+    try { result.landRun = withMachine((m) => recordLand(m, { result, root, env, ticketId: lock.ticketId, lane, commits, jobId, specMode: plan.mode, startedAt }), { env }); }
+    catch (error) { result.recordError = String(error?.message ?? error); }
     if (notify || result.grammarRebuild?.ok === false) {
       try { withMachine((m) => m.recordSupMessage({ direction: 'in', channel: 'tell', from: 'land-gate', text: describe(result, { jobId }) }), { env }); } catch { /* the land_runs row is the record */ }
     }

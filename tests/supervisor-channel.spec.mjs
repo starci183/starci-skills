@@ -7,16 +7,18 @@ import path from 'node:path';
 import { spawn, spawnSync } from 'node:child_process';
 import { appendInbox, readInbox, registerSupervisor, takeInbox } from '../scripts/connectors/telegram-bridge.mjs';
 import { replyToOwner, splitText, waitForInbox, waitLine, drainRefusal, WAIT_TIMEOUT_EXIT } from '../scripts/supervisor/channel.mjs';
-import { openSupervisorLedger } from '../scripts/supervisor/home.mjs';
+import { withSupervisor, writeSeat } from '../scripts/supervisor/home.mjs';
 
 // scripts/supervisor/channel.mjs is the supervisor's side of the Telegram command bridge: register /
-// heartbeat, read the inbox the bridge fills, reply through the bot, and a `wait` a Monitor can run.
+// heartbeat, read the inbox the bridge fills, reply through the bot, and a `wait` a Monitor can run. The registry, the
+// inbox and the replies live in machine.sqlite: every case has its own (STARCI_TEST_MACHINE_FILE under its temp home).
 
 const ROOT = path.resolve(import.meta.dirname, '..');
 const CHANNEL = path.join(ROOT, 'scripts', 'supervisor', 'channel.mjs');
 const TOKEN = '123456789:AAFakeTokenForSpecsOnly_abcdefghijklmnop';
 const tmp = (t, prefix) => { const dir = fs.mkdtempSync(path.join(os.tmpdir(), prefix)); t.after(() => fs.rmSync(dir, { recursive: true, force: true, maxRetries: 20, retryDelay: 25 })); return dir; };
-const cliEnv = (home) => ({ ...process.env, LOCALAPPDATA: home, STARCI_CONNECTORS_OFF: '1' });
+const envOf = (home, extra = {}) => ({ LOCALAPPDATA: home, STARCI_TEST_MACHINE_FILE: path.join(home, 'machine.sqlite'), ...extra });
+const cliEnv = (home) => ({ ...process.env, ...envOf(home), STARCI_CONNECTORS_OFF: '1' });
 const cli = (home, args) => spawnSync(process.execPath, [CHANNEL, ...args], { cwd: ROOT, env: cliEnv(home), encoding: 'utf8', windowsHide: true, timeout: 30000 });
 const SETTINGS = { ready: true, token: TOKEN, chatId: '4242', language: 'vi' };
 
@@ -52,7 +54,7 @@ test('register and heartbeat record the supervisor and report the bridge; inbox 
   assert.equal(cli(home, ['heartbeat', '--id', 'nobody']).status, 1, 'an unregistered heartbeat fails');
   assert.equal(cli(home, ['inbox', '--id', '../x']).status, 2, 'a bad id is refused');
 
-  const env = { LOCALAPPDATA: home };
+  const env = envOf(home);
   appendInbox('sup-a', { chatId: '4242', messageId: 11, text: 'first ask' }, { env });
   appendInbox('sup-a', { chatId: '4242', messageId: 12, text: 'second\nline' }, { env });
   const peek = JSON.parse(cli(home, ['inbox', '--id', 'sup-a', '--json', '--peek']).stdout);
@@ -68,7 +70,7 @@ test('register and heartbeat record the supervisor and report the bridge; inbox 
 
 test('reply prefixes the label, answers the inbox message it names, splits long text, and never leaks the token', async (t) => {
   const home = tmp(t, 'starci-channel-reply-');
-  const env = { LOCALAPPDATA: home };
+  const env = envOf(home);
   registerSupervisor({ id: 'sup-a', label: 'Alpha' }, { env });
   const item = appendInbox('sup-a', { chatId: '4242', messageId: 31, text: 'status of auth?' }, { env });
   const bot = await fakeBot(t);
@@ -106,7 +108,7 @@ test('splitText keeps every character and prefers line breaks', () => {
 
 test('wait blocks until a message arrives, prints one TELEGRAM line per unread message and exits 0; it times out with 124', async (t) => {
   const home = tmp(t, 'starci-channel-wait-');
-  const env = { LOCALAPPDATA: home };
+  const env = envOf(home);
   registerSupervisor({ id: 'sup-w', label: 'W' }, { env });
   const child = spawn(process.execPath, [CHANNEL, 'wait', '--id', 'sup-w', '--timeout-ms', '20000'], { cwd: ROOT, env: cliEnv(home), windowsHide: true, stdio: ['ignore', 'pipe', 'pipe'] });
   t.after(() => { try { child.kill(); } catch { /* gone */ } });
@@ -130,7 +132,7 @@ test('wait blocks until a message arrives, prints one TELEGRAM line per unread m
 
 test('waitForInbox resolves from the interval fallback too, and waitLine flattens the text', async (t) => {
   const home = tmp(t, 'starci-channel-waitfn-');
-  const env = { LOCALAPPDATA: home };
+  const env = envOf(home);
   const pending = waitForInbox('sup-x', { env, intervalMs: 20, timeoutMs: 5000 });
   setTimeout(() => appendInbox('sup-x', { chatId: '1', messageId: 1, text: 'a\n b' }, { env }), 50);
   const items = await pending;
@@ -142,8 +144,8 @@ test('waitForInbox resolves from the interval fallback too, and waitLine flatten
 test("kernel mode: inbox for 'main' drains only from the seat terminal; --peek and other ids stay open", (t) => {
   const home = tmp(t, 'starci-channel-seat-');
   const supHome = path.join(home, 'suphome');
-  const env = { LOCALAPPDATA: home, STARCI_SUPERVISOR_HOME: supHome, STARCI_SUPERVISOR_MODE: 'kernel' };
-  // The channel record knows the terminal it was registered from; the ledger seat wins when set.
+  const env = envOf(home, { STARCI_SUPERVISOR_HOME: supHome, STARCI_SUPERVISOR_MODE: 'kernel' });
+  // The channel record knows the terminal it was registered from; the seat (machine.sqlite seats) wins when set.
   registerSupervisor({ id: 'main', label: 'Supervisor', terminal: 'term_seat' }, { env });
   appendInbox('main', { chatId: '4242', messageId: 7, text: 'owner ask' }, { env });
   const cliMain = (args, terminal = null) => spawnSync(process.execPath, [CHANNEL, ...args], {
@@ -168,10 +170,7 @@ test("kernel mode: inbox for 'main' drains only from the seat terminal; --peek a
   assert.equal(readInbox('main', env).filter((m) => !m.read).length, 1, '--peek never marks read');
 
   // While the seat names a different terminal, the seat's terminal wins over the registered one.
-  const ledger = openSupervisorLedger({ env });
-  ledger.db.prepare("INSERT INTO signals(scope,key,holder_pid,token,value_json,at,expires_at) VALUES('supervisor-seat','main',?,?,?,?,NULL)")
-    .run(process.pid, 'tok', JSON.stringify({ terminal: 'term_real_seat' }), Date.now());
-  ledger.close();
+  withSupervisor((m) => writeSeat(m, { token: 'tok', value: { terminal: 'term_real_seat' } }), { env });
   assert.equal(cliMain(['inbox', '--id', 'main'], 'term_seat').status, 1, 'a stale registered terminal no longer drains');
   const drained = cliMain(['inbox', '--id', 'main', '--json'], 'term_real_seat');
   assert.equal(drained.status, 0, drained.stderr);
@@ -187,7 +186,7 @@ test("kernel mode: inbox for 'main' drains only from the seat terminal; --peek a
 
 test('unknown flags are an error for every verb — a stray --help never consumes the inbox', (t) => {
   const home = tmp(t, 'starci-channel-flags-');
-  const env = { LOCALAPPDATA: home };
+  const env = envOf(home);
   registerSupervisor({ id: 'sup-f', label: 'F' }, { env });
   appendInbox('sup-f', { chatId: '4242', messageId: 3, text: 'still unread' }, { env });
   const bad = cli(home, ['inbox', '--id', 'sup-f', '--help']);

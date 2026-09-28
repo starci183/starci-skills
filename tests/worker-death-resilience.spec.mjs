@@ -139,13 +139,3 @@ test('watchdog: three wake misses on one terminal over 10+ minutes with no outpu
   assert.ok(WAKE_FAIL_WINDOW_MS >= 10 * 60_000);
 });
 
-test('connector state writes retry a rename Windows refuses EPERM, and give up on anything else', async () => {
-  const { renameRetrying } = await import('../scripts/connectors/lib.mjs');
-  let calls = 0;
-  renameRetrying('a', 'b', { sleep: () => {}, rename: () => { calls += 1; if (calls < 3) throw Object.assign(new Error('busy'), { code: 'EPERM' }); } });
-  assert.equal(calls, 3);
-  assert.throws(() => renameRetrying('a', 'b', { sleep: () => {}, rename: () => { throw Object.assign(new Error('gone'), { code: 'ENOENT' }); } }), /gone/);
-  let tries = 0;
-  assert.throws(() => renameRetrying('a', 'b', { attempts: 4, sleep: () => {}, rename: () => { tries += 1; throw Object.assign(new Error('locked'), { code: 'EACCES' }); } }), /locked/);
-  assert.equal(tries, 4);
-});

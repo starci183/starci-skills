@@ -11,14 +11,14 @@
 // A busy Kernel is no longer a failure: the DI waits in the ledger and the answer is `queued` (delivered: true); the
 // doorbell rings when the seat turns idle. --item names the owed action (scripts/supervisor/actions.mjs) the notice acts
 // on: a delivered notice stops that item's SLA clock (recordAction). Every notice is also a supervisor-notice event in
-// the supervisor ledger.
+// machine.sqlite sup_events.
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { openLedger, ledgerFileFor } from '../../engine/ledger-db.mjs';
 import { openDecision, ringDoorbellWith } from '../reconciler/decisions.mjs';
 import { wakeKernel } from '../kernel/wake-delivery.mjs';
-import { openSupervisorLedger, supervisorEvent, supervisorLog } from './home.mjs';
+import { supervisorEvent, supervisorLog, withSupervisor } from './home.mjs';
 import { recordAction } from './actions.mjs';
 import { actionRow, supLog } from './sup-log.mjs';
 
@@ -54,9 +54,7 @@ export function notifyKernel({ repo, workflowId, text, item = null, entity = nul
       superseded: opened.json.superseded ?? [], existing: opened.json.existing === true, ring: rang?.action ?? null, ...(rang?.wake ? { state: rang.wake } : {}) };
   }
   try {
-    const ledger = openSupervisorLedger({ env });
-    try { ledger.transaction(() => supervisorEvent(ledger, { entityType: 'notice', entityId: workflowId, kind: 'supervisor-notice', payload: { repo, workflowId, action: result.action, delivered: result.delivered === true, chars: body.length, decision: result.decision ?? null, ...(item ? { item } : {}) } })); }
-    finally { ledger.close(); }
+    withSupervisor((m) => supervisorEvent(m, { entityType: 'notice', entityId: workflowId, kind: 'supervisor-notice', payload: { repo, workflowId, action: result.action, delivered: result.delivered === true, chars: body.length, decision: result.decision ?? null, ...(item ? { item } : {}) } }), { env });
   } catch { /* the record is best effort */ }
   if (item && result.delivered) {
     try { recordAction({ item, action: 'notify', reason: body, workflowId, refs: [result.decision].filter(Boolean), env }); } catch { /* the notice event stands */ }

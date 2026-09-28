@@ -42,6 +42,7 @@
 //   node scripts/supervisor/op-metrics.mjs --trend [--json]      the newest snapshots and the trend line
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { fullJson } from '../../engine/machine-db.mjs';
 import { allocationSettings } from '../../engine/config.mjs';
 import { parseJsonOr } from '../lib/json.mjs';
 import { fmtMs } from '../lib/time.mjs';
@@ -49,6 +50,8 @@ import { clipLine } from '../lib/clip.mjs';
 
 const selfFile = fileURLToPath(import.meta.url);
 export const SNAPSHOT_KIND = 'supervisor-op-metrics';
+/** metrics_snapshots.kind of these snapshots (DBTREE B6). */
+export const METRICS_KIND = 'op-health';
 export const WAIT_KINDS = Object.freeze(['owner-gate', 'peer-wait', 'dependency', 'retry-cap', 'deferred-settle', 'queued-ready', 'throttled']);
 export const SEVERITIES = Object.freeze(['ok', 'warn', 'critical']);
 /** queuedBecause values that are the runtime's capacity, not the workflow's own order. */
@@ -436,10 +439,11 @@ const slim = (r) => ({ key: r.key, jobs: r.jobs, succeeded: r.succeeded, failed:
 export const snapshotPayload = (metrics, stuck = []) => ({ schema: 'starci/op-metrics-snapshot@1', windowMs: metrics.windowMs,
   totals: slim(metrics.totals), ops: metrics.ops.map(slim), stuck: stuckCounts(stuck) });
 
-/** The newest `limit` snapshots on the supervisor ledger `db`, oldest first: [{at, ...payload}]. */
-export const readSnapshots = (db, { limit = 96, workflowId = 'wf-supervisor' } = {}) => db.prepare(
-  'SELECT created_at, payload_json FROM events WHERE workflow_id=? AND kind=? ORDER BY seq DESC LIMIT ?').all(workflowId, SNAPSHOT_KIND, limit)
-  .reverse().map((r) => ({ at: Number(r.created_at), ...parseJsonOr(r.payload_json, {}) }));
+/** Record one snapshot: a machine.sqlite metrics_snapshots row (kind 'op-health', fleet-wide). Returns snap_id. */
+export const recordSnapshot = (m, payload) => m.recordMetrics({ kind: METRICS_KIND, windowMs: payload?.windowMs ?? null, subject: SNAPSHOT_KIND, data: payload });
+/** The newest `limit` snapshots (machine.sqlite metrics_snapshots over the machine handle `m`), oldest first: [{at, ...payload}]. */
+export const readSnapshots = (m, { limit = 96 } = {}) => m.db.prepare('SELECT at, data_json, data_sha FROM metrics_snapshots WHERE kind=? AND ledger_id IS NULL ORDER BY snap_id DESC LIMIT ?')
+  .all(METRICS_KIND, limit).reverse().map((r) => ({ at: Number(r.at), ...(fullJson(JSON.parse(r.data_json ?? 'null')) ?? {}) }));
 
 const TREND_TEXT = {
   en: (d) => `Op health ${fmtMs(d.windowMs)}: success ${d.rate}${d.rateDelta}, median wait ${d.wait}${d.waitDelta}, stuck ${d.stuck} (${d.critical} critical)${d.stuckDelta}${d.top ? `; top failure ${d.top}` : ''}${d.vs ? ` [vs ${d.vs} ago]` : ''}`,
@@ -468,12 +472,12 @@ export function trendLine(snaps, { trendMs, language = 'en' } = {}) {
   return (TREND_TEXT[language] ?? TREND_TEXT.en)(d);
 }
 
-/** The trend line from the supervisor ledger (home.mjs withSupervisorRead), or null. Never throws. */
+/** The trend line from machine.sqlite (home.mjs readSupervisor), or null. Never throws. */
 export async function currentTrend({ env = process.env, language = 'en', settings = null } = {}) {
   try {
-    const { withSupervisorRead } = await import('./home.mjs');
+    const { readSupervisor } = await import('./home.mjs');
     const s = settings ?? telemetrySettings();
-    const snaps = withSupervisorRead((db) => readSnapshots(db), [], { env });
+    const snaps = readSupervisor((m) => readSnapshots(m), [], { env });
     return trendLine(snaps, { trendMs: s.trendMs, language });
   } catch { return null; }
 }
@@ -502,7 +506,7 @@ if (process.argv[1] && path.resolve(process.argv[1]) === selfFile) {
   const home = await import('./home.mjs');
   const settings = telemetrySettings();
   if (argv.includes('--trend')) {
-    const snaps = home.withSupervisorRead((db) => readSnapshots(db), []);
+    const snaps = home.readSupervisor((m) => readSnapshots(m), []);
     const line = trendLine(snaps, { trendMs: settings.trendMs });
     console.log(asJson ? JSON.stringify({ ok: true, snapshots: snaps, trend: line }) : [line ?? 'no op-metrics snapshot yet', ...snaps.slice(-12).map((s) => `  ${new Date(s.at).toISOString()} ok ${pct(s.totals?.successRate)} wait ${fmtMs(s.totals?.queueWaitP50)} stuck ${(s.stuck?.warn ?? 0) + (s.stuck?.critical ?? 0)} (${s.stuck?.critical ?? 0} critical)`)].join('\n'));
     process.exit(0);

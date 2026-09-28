@@ -2,6 +2,7 @@
 // the epoch fence, the shadow gate of ctx.api, event routing, isolation of a throwing controller, and --once.
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 import { createRequire } from 'node:module';
@@ -10,7 +11,7 @@ import { fileURLToPath } from 'node:url';
 import { Engine, discoverControllers } from '../scripts/reconciler/engine.mjs';
 import { createCtx } from '../scripts/reconciler/ctx.mjs';
 import { pollLedger, routeEvent } from '../scripts/reconciler/sources.mjs';
-import { WorkQueue } from '../scripts/reconciler/workqueue.mjs';
+import { WorkQueue, machineRows } from '../scripts/reconciler/workqueue.mjs';
 import { tempState, fakeCtx } from '../scripts/reconciler/testing.mjs';
 import { validateLogData } from '../scripts/kernel/typed-logs.mjs';
 
@@ -26,13 +27,18 @@ function eventsLedger(dir, name = 'ledger.sqlite') {
   const db = new DatabaseSync(file);
   db.exec(`CREATE TABLE events(seq INTEGER PRIMARY KEY AUTOINCREMENT, event_id TEXT NOT NULL UNIQUE, workflow_id TEXT NOT NULL, generation INTEGER NOT NULL DEFAULT 0,
     entity_type TEXT NOT NULL, entity_id TEXT NOT NULL, kind TEXT NOT NULL, payload_json TEXT, prev_digest TEXT, digest TEXT NOT NULL DEFAULT '', created_at INTEGER NOT NULL)`);
+  const ledgerId = crypto.randomUUID();
+  db.exec('CREATE TABLE meta(key TEXT PRIMARY KEY, value TEXT)');
+  db.prepare("INSERT INTO meta(key,value) VALUES('ledger_id',?)").run(ledgerId);
   let n = 0;
   const append = (kind, entityId, workflowId = 'wf-a', entityType = 'job') => {
     n += 1;
     db.prepare('INSERT INTO events(event_id,workflow_id,entity_type,entity_id,kind,created_at) VALUES(?,?,?,?,?,?)').run(`ev-${name}-${n}`, workflowId, entityType, entityId, kind, Date.now());
   };
-  return { file, append, close: () => db.close() };
+  return { file, ledgerId, append, close: () => db.close() };
 }
+/** The fixture ledger is no starci/runtime@1 file: read it without the ledger-db verification. */
+const fixtureReader = (file) => new DatabaseSync(file, { readOnly: true });
 
 test('two engines: one leader; the standby takes over after the lease with epoch + 1 and the old leader is fenced', (t) => {
   const st = tempState();
@@ -61,9 +67,11 @@ test('two engines: one leader; the standby takes over after the lease with epoch
   assert.equal(a.renew(), false, 'the old leader sees it lost the row');
   assert.equal(a.lost, true);
   assert.equal(b.isCurrentEpoch(), true);
-  const modes = Object.fromEntries(st.db.prepare('SELECT controller, mode FROM modes').all().map((r) => [r.controller, r.mode]));
+  const modes = st.m.controllerModes();
   assert.equal(modes.job, 'shadow');
   assert.equal(modes.gc, 'off', 'an unnamed controller is off');
+  assert.ok(st.m.modeChanges().some((c) => c.controller === 'gc' && c.to_mode === 'off' && /^engine:/.test(c.by)), 'a mode change says who and why');
+  assert.deepEqual(st.m.leaderHistory().map((h) => [h.epoch, h.acquired_how, h.release_reason]), [[2, 'takeover-stale', null], [1, 'fresh', 'lost']], 'every epoch is history');
 });
 
 test('safe mode and --once without --apply run an active controller as shadow', (t) => {
@@ -110,32 +118,36 @@ test('a shadow controller\'s ctx.api spawns nothing and writes one reconciler.wo
   assert.equal(spawned[0].env.STARCI_ACTOR, 'reconciler/job');
   assert.equal(spawned[0].env.STARCI_RECONCILER_EPOCH, '3');
   assert.deepEqual(spawned[0].args.slice(1, 4), ['settle', '--repo', 'D:/Repositories/nivo-backend']);
-  const journal = st.db.prepare('SELECT state, epoch, verb FROM actions ORDER BY started_at').all();
+  const journal = st.db.db.prepare('SELECT state, epoch, verb FROM engine_actions ORDER BY started_at').all();
   assert.deepEqual(journal.map((a) => [a.state, a.epoch, a.verb]), [['done', 3, 'api settle']]);
   current = false;
   const fenced = await active.api('nivo', 'settle', ['--job', 'j2']);
   assert.equal(fenced.fenced, true, 'a lost epoch runs nothing');
   assert.equal(spawned.length, 1);
+  assert.equal(st.db.db.prepare("SELECT COUNT(*) AS n FROM engine_actions WHERE state='fenced'").get().n, 1, 'the fenced action is journaled as fenced');
   assert.equal(active.owns('job.settle'), true);
 });
 
-test('ctx.clock / ctx.clear keep one clock per (entity, state); re-entering after a clear restarts it', (t) => {
+test('ctx.clock / ctx.clear keep one open episode per (entity, state); re-entering after a clear opens a new one', (t) => {
   const st = tempState();
   t.after(() => st.close());
   let clock = 1000;
-  const ctx = createCtx({ controller: 'job', state: st.db, now: () => clock, writeLog: () => {} });
+  const ctx = createCtx({ controller: 'job', state: st.m, now: () => clock, writeLog: () => {} });
   ctx.clock('job:j1', 'reported', 180000, { ledgerId: 'nivo' });
   clock = 5000;
   ctx.clock('job:j1', 'reported', 180000);
-  let row = st.db.prepare('SELECT * FROM sla_clocks').get();
-  assert.equal(row.entered_at, 1000, 'a clock already running keeps its start');
-  assert.equal(row.ledger_id, 'nivo');
+  let rows = st.m.openSla();
+  assert.equal(rows.length, 1);
+  assert.equal(rows[0].entered_at, 1000, 'a clock already running keeps its start');
+  assert.equal(rows[0].ledger_id, 'nivo');
   assert.equal(ctx.clear('job:j1', 'reported'), true);
   clock = 9000;
   ctx.clock('job:j1', 'reported', 180000);
-  row = st.db.prepare('SELECT * FROM sla_clocks').get();
-  assert.equal(row.entered_at, 9000);
-  assert.equal(row.cleared_at, null);
+  rows = st.m.openSla();
+  assert.equal(rows.length, 1);
+  assert.equal(rows[0].entered_at, 9000);
+  const all = st.m.db.prepare('SELECT entered_at, cleared_at, clear_reason FROM sla_episodes ORDER BY episode_id').all();
+  assert.deepEqual(all.map((r) => [r.entered_at, r.cleared_at != null, r.clear_reason]), [[1000, true, 'resolved'], [9000, false, null]], 'episodes are append-only history');
 });
 
 test('an event routes to its key: the first poll starts at MAX(seq), later events route through every controller', (t) => {
@@ -145,13 +157,14 @@ test('an event routes to its key: the first poll starts at MAX(seq), later event
   st.own(led);
   led.append('op-reported', 'op-old'); // before the engine: never replayed
   const ledger = { ledgerId: 'nivo', repo: st.dir, file: led.file };
-  const first = pollLedger(st.db, ledger);
+  st.m.registerLedger({ ledgerId: led.ledgerId, name: 'nivo', repoRoot: st.dir, file: led.file }); // its cursor is engine_cursors[ledger_id]
+  const first = pollLedger(st.db, ledger, { reader: fixtureReader });
   assert.equal(first.first, true);
   assert.equal(first.events.length, 0, 'no replay');
   led.append('op-reported', 'op-1');
   led.append('land-succeeded', 'land-1', 'wf-supervisor', 'land');
   led.append('op-unrouted', 'op-2');
-  const p = pollLedger(st.db, ledger);
+  const p = pollLedger(st.db, ledger, { reader: fixtureReader });
   assert.deepEqual(p.events.map((e) => e.kind), ['op-reported', 'land-succeeded', 'op-unrouted']);
   const controllers = [
     { name: 'job', routes: { 'op-reported': (ev) => `job:${ev.ledgerId}:${ev.entityId}` } },
@@ -159,15 +172,16 @@ test('an event routes to its key: the first poll starts at MAX(seq), later event
   ];
   const routed = p.events.flatMap((ev) => routeEvent(ev, controllers));
   assert.deepEqual(routed.map((r) => [r.controller, r.key]), [['job', 'job:nivo:op-1'], ['fleet', 'fleet:land']]);
-  assert.equal(pollLedger(st.db, ledger).events.length, 0, 'the cursor moved');
+  assert.equal(pollLedger(st.db, ledger, { reader: fixtureReader }).events.length, 0, 'the cursor moved');
+  assert.equal(st.m.cursorOf(led.ledgerId), 4, 'the cursor is keyed by the ledger id');
 
-  const e = new Engine({ env: st.env, numbers: NUMBERS, config: allShadow, ledgers: [ledger], stateOptions: { file: st.file }, claimLock: noLock,
+  const e = new Engine({ env: st.env, numbers: NUMBERS, config: allShadow, ledgers: [ledger], stateOptions: { file: st.file }, claimLock: noLock, reader: fixtureReader,
     controllers: [{ name: 'job', module: { name: 'job', routes: controllers[0].routes, reconcile: async () => {} } }], writeLog: () => {}, print: () => {} });
   st.own(e);
   return e.load().then(() => {
     led.append('op-reported', 'op-9');
     e.pollSources();
-    const q = st.db.prepare('SELECT controller, key, reason FROM queue').all();
+    const q = st.m.db.prepare('SELECT controller, key, reason FROM engine_queue').all();
     assert.deepEqual(q.map((r) => [r.controller, r.key]), [['job', 'job:nivo:op-9']]);
     assert.match(q[0].reason, /^event:op-reported:nivo:\d+$/);
   });
@@ -177,7 +191,7 @@ test('the workqueue dedupes, keeps one in flight per key, reruns a key added whi
   const st = tempState();
   t.after(() => st.close());
   let clock = 0;
-  const q = new WorkQueue({ db: st.db, now: () => clock, backoff: { minMs: 1000, maxMs: 4000 } });
+  const q = new WorkQueue({ rows: machineRows(st.m), now: () => clock, backoff: { minMs: 1000, maxMs: 4000 } });
   q.add('job', 'k1'); q.add('job', 'k1'); q.add('job', 'k2');
   const first = q.take('job', 1);
   assert.equal(first.length, 1);
@@ -212,8 +226,8 @@ test('a throwing controller never stops the others; a broken module is skipped a
   e.dispatch(); await e.drain();
   e.dispatch(); await e.drain();
   assert.deepEqual(ran.sort(), ['host:a', 'host:b']);
-  const failing = st.db.prepare("SELECT attempts, last_error FROM queue WHERE controller='job'").get();
-  assert.equal(failing.attempts, 1);
+  const failing = st.m.db.prepare("SELECT tries, last_error FROM engine_queue WHERE controller='job'").get();
+  assert.equal(failing.tries, 1);
   assert.match(failing.last_error, /boom/);
   assert.ok(logged.some((r) => r.kind === 'reconciler.error' && r.data.kind === 'reconciler.reconcile-failed'));
   assert.ok(logged.every((r) => validateLogData(r.kind, r.data).length === 0), 'every engine row fits its typed-log kind');
@@ -244,7 +258,7 @@ test('--once lists and reconciles every non-off controller once, in shadow unles
   assert.equal(r.ok, true);
   assert.deepEqual(r.controllers.map((c) => [c.name, c.mode, c.keys, c.ok]), [['job', 'shadow', 3, 3]]);
   assert.deepEqual(seen.map(([k, m]) => m), ['shadow', 'shadow', 'shadow']);
-  assert.equal(st.db.prepare('SELECT COUNT(*) AS n FROM queue').get().n, 0, 'a --once pass never touches the persisted queue');
+  assert.equal(st.m.db.prepare('SELECT COUNT(*) AS n FROM engine_queue').get().n, 0, 'a --once pass never touches the persisted queue');
   const one = await e.once({ controller: 'gc', key: 'gc:x' });
   assert.deepEqual(one.controllers.map((c) => [c.name, c.keys, c.ok]), [['gc', 1, 1]], 'a named controller runs even when off');
 
@@ -282,8 +296,9 @@ test('one ctx per (controller, mode) whose key is the running reconcile; retryAf
   e.dispatch(); await e.drain();
   assert.deepEqual(seen.map((x) => [x.key, x.ctxKey]).sort(), [['gc:a', 'gc:a'], ['gc:b', 'gc:b']], 'ctx.key is the key of the reconcile in flight');
   assert.equal(seen[0].ctx, seen[1].ctx, 'one ctx object serves every reconcile of the controller');
-  assert.ok(seen[0].db && typeof seen[0].db.prepare === 'function', 'ctx.stateDb is the engine handle');
-  const row = st.db.prepare("SELECT due_at, attempts FROM queue WHERE controller='gc' AND key='gc:b'").get();
+  assert.ok(seen[0].db && typeof seen[0].db.prepare === 'function', 'ctx.stateDb is the engine connection');
+  assert.equal(seen[0].ctx.machine, e.state, 'ctx.machine is the engine handle');
+  const row = st.m.db.prepare("SELECT due_at, tries FROM engine_queue WHERE controller='gc' AND key='gc:b'").get();
   assert.equal(row.due_at, clock + 120_000, 'retryAfterMs overrides the exponential backoff');
 });
 
@@ -293,9 +308,9 @@ test('events carry their parsed payload; ctx.log keeps the known kinds and files
   const led = eventsLedger(st.dir);
   st.own(led);
   const ledger = { ledgerId: 'nivo', repo: st.dir, file: led.file };
-  pollLedger(st.db, ledger);
+  pollLedger(st.db, ledger, { reader: fixtureReader });
   led.append('worker-released-on-report', 'op-7');
-  const [ev] = pollLedger(st.db, ledger).events;
+  const [ev] = pollLedger(st.db, ledger, { reader: fixtureReader }).events;
   assert.equal(ev.jobId, 'op-7');
   assert.deepEqual(ev.payload, {});
   const rows = [];
@@ -322,8 +337,10 @@ test('a failed action is classified by exit and JSON ok, never by stderr; result
     spawnChild: async (cmd, args, opts) => { envSeen = opts.env; return answers.shift(); } });
   await ctx.run('node', ['a.mjs']); await ctx.run('node', ['b.mjs']); await ctx.run('node', ['c.mjs']);
   assert.equal(envSeen.NODE_NO_WARNINGS, '1', 'children run without node warnings');
-  const rows = st.db.prepare('SELECT state, result_json FROM actions ORDER BY rowid').all();
+  const rows = st.m.db.prepare('SELECT state, result_json, result_sha, stderr_sha FROM engine_actions ORDER BY rowid').all();
   assert.deepEqual(rows.map((r) => r.state), ['done', 'failed', 'failed'], 'a warning on stderr is no failure');
   const errs = rows.map((r) => JSON.parse(r.result_json).error ?? null);
   assert.deepEqual(errs, [null, 'ReferenceError: staleInputProjection is not defined', 'nivo-backend: push scan: 2 finding(s)']);
+  assert.ok(rows.every((r) => r.result_sha), 'the full result is a blob (MB-03)');
+  assert.ok(rows[1].stderr_sha, 'the full stderr is a blob');
 });

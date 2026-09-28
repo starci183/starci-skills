@@ -16,7 +16,7 @@ const LIMIT_MS=20000;
 const tempSlots=t=>{
   const dir=fs.mkdtempSync(path.join(os.tmpdir(),'starci-uat-cycle-spec-'));
   t.after(()=>fs.rmSync(dir,{recursive:true,force:true,maxRetries:20,retryDelay:25}));
-  return {...process.env,STARCI_UAT_SLOTS_DIR:dir};
+  return {...process.env,STARCI_TEST_MACHINE_FILE:path.join(dir,'machine.sqlite')};
 };
 // Run node with args; resolve {code, stdout, stderr, timedOut} — a hang is killed at LIMIT_MS, never waited out.
 const runNode=(args,env=process.env)=>new Promise(resolve=>{

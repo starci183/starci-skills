@@ -9,6 +9,7 @@ import path from 'node:path';
 import { openLedger, ledgerFileFor } from '../engine/ledger-db.mjs';
 import { RING_MIN_GAP_MS, openDecisionRow, planRing, ringDoorbellWith } from '../scripts/reconciler/decisions.mjs';
 import { notifyKernel } from '../scripts/supervisor/notify.mjs';
+import { readMachine } from '../engine/machine-db.mjs';
 
 const WF = 'wf-bell';
 const temp = (t, prefix) => fs.mkdtempSync(path.join(os.tmpdir(), prefix));
@@ -67,7 +68,7 @@ test('nothing open: no ring', (t) => {
 test('notify.mjs opens a supervisor-ruling DI and rings; a busy Kernel is queued and delivered', (t) => {
   const home = temp(t, 'starci-bell-sup-');
   cleanup(t, home, null);
-  const env = { ...process.env, STARCI_SUPERVISOR_HOME: home };
+  const env = { ...process.env, STARCI_TEST_MACHINE_FILE: path.join(home, 'machine.sqlite') };
   const opened = [];
   const open = (repo, di) => { opened.push(di); return { ok: true, json: { ok: true, decision: { id: 'di-0000beef' }, superseded: ['di-0000cafe'] } }; };
   const busy = notifyKernel({ repo: 'D:/fixture', workflowId: WF, text: 'fixed by .claude abc123: resolve inc-1', item: `gate|${WF}|inc-1`, env, open, ring: () => ({ action: 'deferred', wake: 'kernel-busy' }) });
@@ -83,10 +84,7 @@ test('notify.mjs opens a supervisor-ruling DI and rings; a busy Kernel is queued
   const failed = notifyKernel({ repo: 'D:/fixture', workflowId: WF, text: 'third', env, open: () => ({ ok: false, json: { ok: false, error: 'ledger-missing', code: 'ledger-missing' } }), ring: () => { throw new Error('never rung'); } });
   assert.equal(failed.action, 'decision-open-failed');
   assert.equal(failed.delivered, false);
-  const sup = openLedger({ file: ledgerFileFor(home) });
-  try {
-    const acted = sup.db.prepare("SELECT payload_json FROM events WHERE kind='supervisor-action'").all().map((r) => JSON.parse(r.payload_json));
-    assert.deepEqual(acted.map((a) => a.item), [`gate|${WF}|inc-1`], '--item stops the owed-action SLA (recordAction)');
-    assert.equal(sup.db.prepare("SELECT count(*) n FROM events WHERE kind='supervisor-notice' AND json_extract(payload_json,'$.delivered')=1").get().n, 2);
-  } finally { sup.close(); }
+  const events = readMachine((m) => m.supEvents({ kinds: ['supervisor-action', 'supervisor-notice'], order: 'asc' }), [], { env });
+  assert.deepEqual(events.filter((e) => e.kind === 'supervisor-action').map((e) => e.payload.item), [`gate|${WF}|inc-1`], '--item stops the owed-action SLA (recordAction)');
+  assert.equal(events.filter((e) => e.kind === 'supervisor-notice' && e.payload.delivered === true).length, 2);
 });

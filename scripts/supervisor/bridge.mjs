@@ -28,7 +28,7 @@
 //
 // Every action is recorded with its reason: a starci/supervisor-bridge@1 record in the product ledger's
 // signals (scope supervisor-bridge), a supervisor-bridge-* event on each workflow it touches, and a
-// supervisor-action event in the supervisor ledger (scripts/supervisor/actions.mjs reads it for the SLA).
+// supervisor-action event in machine.sqlite sup_events (scripts/supervisor/actions.mjs reads it for the SLA).
 // Under autopilot (runtimes.yaml allocation.autopilot.enabled, default on) no owner approval is asked and
 // the record says provisional:true, approvedBy supervisor-autopilot; with autopilot off a write verb needs
 // --owner-ok (the owner said ok in the Supervisor's channel). Writes go only through this landed CLI,
@@ -47,7 +47,7 @@ import {
   FOUNDATION_KINDS, claimFoundation, declareDependent, normalizeFoundationName, readDeclaration, readFoundation, writeDeclaration, writeFoundation,
 } from '../kernel/foundations.mjs';
 import { TRANSFER_SCHEMA, createOwnership, normWork } from '../kernel/work-ownership.mjs';
-import { SKILL_ROOT, openSupervisorLedger, productRepos, supervisorEvent, supervisorSettings } from './home.mjs';
+import { SKILL_ROOT, productRepos, supervisorEvent, supervisorSettings, withSupervisor } from './home.mjs';
 
 const selfFile = fileURLToPath(import.meta.url);
 const API = path.join(SKILL_ROOT, 'scripts', 'kernel', 'api.mjs');
@@ -105,12 +105,10 @@ const raisedOf = (db, workflowId, incidentId) => {
   return row ? { ...row, payload: parseJson(ev?.payload_json, {}) ?? {} } : null;
 };
 
-/** Record the action in the supervisor ledger (best effort: the product ledger record is the durable one). */
+/** Record the action as a Supervisor audit event (best effort: the product ledger record is the durable one). */
 function supervisorAction({ item, action, reason, workflowId = null, refs = [], env = process.env }) {
   try {
-    const ledger = openSupervisorLedger({ env });
-    try { ledger.transaction(() => supervisorEvent(ledger, { entityType: 'action', entityId: item, kind: ACTION_KIND, payload: { item, action, reason: clip(reason, 600), workflowId, refs, by: 'supervisor' } })); }
-    finally { ledger.close(); }
+    withSupervisor((m) => supervisorEvent(m, { entityType: 'action', entityId: item, kind: ACTION_KIND, payload: { item, action, reason: clip(reason, 600), workflowId, refs, by: 'supervisor' } }), { env });
     return true;
   } catch { return false; }
 }

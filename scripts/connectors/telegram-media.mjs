@@ -16,8 +16,8 @@
 // The one send point is the KERNEL's settle: scripts/kernel/api.mjs cmdSettle
 // calls queueSettleMedia(), which launches this file detached (`settle` verb),
 // so an upload never slows or fails the settle. The sender's stderr goes to
-// <state>/connectors/telegram-media.log. One send per workflow|job|attempt
-// (deduped in <state>/connectors/telegram-media-sent.json). The ledger is read
+// machine_logs (actor connector, kind telegram-media.*). One send per workflow|job|attempt
+// (deduped by a machine.sqlite notifications row, kind media). The ledger is read
 // read-only, the bot token is never printed and is scrubbed from every error.
 // STARCI_TELEGRAM_API_BASE replaces https://api.telegram.org for tests.
 //
@@ -31,9 +31,10 @@ import { inspectLedger } from '../../engine/ledger-db.mjs';
 import { configRoot } from '../../engine/config.mjs';
 import { DEFAULT_API_BASE, botCall, redact, telegramSettings, TEXT_MAX } from './telegram.mjs';
 import { clip, clipLine } from '../lib/clip.mjs';
-import { argsOf, ownerConfig, readJson, stateFile, writeJson } from './lib.mjs';
+import { readMachine, withMachine } from '../../engine/machine-db.mjs';
+import { argsOf, connectorLog, ownerConfig } from './lib.mjs';
 import { drawImageRefs, partOf } from '../work/direction-part.mjs';
-import { parseJson } from '../lib/json.mjs';
+import { parseJson, readJsonFile } from '../lib/json.mjs';
 import { list as arr } from '../lib/list.mjs';
 import { sleep } from '../lib/sleep.mjs';
 import { pathKey, slash } from '../lib/path-key.mjs';
@@ -46,7 +47,6 @@ export const LIMITS = {
   photoBytes: 10 * 1024 * 1024, videoBytes: 50 * 1024 * 1024, album: 10, caption: 1024, text: TEXT_MAX,
   screenshots: 20, walkFiles: 2000, walkDepth: 6,
 };
-const KEEP_MS = 30 * 24 * 60 * 60 * 1000;
 const MIME = { '.png': 'image/png', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.webp': 'image/webp', '.webm': 'video/webm', '.mp4': 'video/mp4' };
 const IMAGE = new Set(['.png', '.jpg', '.jpeg', '.webp']);
 const VIDEO = new Set(['.webm', '.mp4']);
@@ -339,7 +339,7 @@ function flowOf(file, { records, repo }) {
 function runFlowsOf(file) {
   let dir = path.dirname(file);
   for (let i = 0; i < 3; i++) {
-    const order = arr(readJson(path.join(dir, 'flows.json'))?.order);
+    const order = arr(readJsonFile(path.join(dir, 'flows.json'))?.order);
     if (order.length) return order.map(String);
     dir = path.dirname(dir);
   }
@@ -445,28 +445,22 @@ const chunk = (list, n) => { const out = []; for (let i = 0; i < list.length; i 
 
 /* ------------------------------------------------------------ dedupe store */
 
-export const mediaSentFile = (env = process.env) => stateFile('telegram-media-sent.json', env);
-
-async function withStore(file, fn, { waitMs = 5000 } = {}) {
-  const lock = `${file}.lock`;
-  fs.mkdirSync(path.dirname(lock), { recursive: true });
-  const end = Date.now() + waitMs;
-  let fd = null;
-  while (fd === null) {
-    try { fd = fs.openSync(lock, 'wx'); } catch {
-      try { if (Date.now() - fs.statSync(lock).mtimeMs > 60000) fs.rmSync(lock, { force: true }); } catch { /* gone */ }
-      if (Date.now() > end) throw new Error('media dedupe store is locked');
-      await sleep(100);
-    }
-  }
-  try {
-    const store = readJson(file, null) ?? { schema: 'starci/telegram-media-sent@1', jobs: {} };
-    store.jobs ??= {};
-    const result = await fn(store);
-    writeJson(file, store);
-    return result;
-  } finally { try { fs.closeSync(fd); fs.rmSync(lock, { force: true }); } catch { /* best effort */ } }
-}
+// One send per workflow|job|attempt: a machine.sqlite notifications row (kind 'media', dedupe_key
+// `media|<workflow>|<job>|<attempt>`) claimed before the upload (delivery 'sending') and settled after it
+// (sent | partial, ref {op, verdict, sent, failed}); a send that delivered nothing gives its claim up.
+export const mediaDedupeKey = (workflowId, jobId, attempt) => `media|${workflowId}|${jobId}|${attempt}`;
+/** The dedupe row of one settle ({delivery, sent_at, ref: {...}}), or null. */
+export const mediaSent = (key, env = process.env) => readMachine((m) => {
+  const row = m.db.prepare("SELECT delivery, sent_at, ref FROM notifications WHERE dedupe_key=? AND kind='media'").get(key);
+  return row ? { ...row, ref: parse(row.ref, null) } : null;
+}, null, { env });
+/** Claim `key` for this send: false when a row exists already (sent, or another sender is on it). */
+const claimMedia = (key, { op, verdict, env }) => withMachine((m) => m.insert('notifications', { channel: 'telegram', kind: 'media', text: `${op} ${verdict}`, delivery: 'sending',
+  ref: JSON.stringify({ op, verdict }), dedupe_key: key }, { orIgnore: true }).changes > 0, { env });
+/** Settle a claim: the outcome of the upload, or — nothing delivered — the claim given up (a later run tries again). */
+const settleMedia = (key, { op, verdict, sent, failed, env }) => withMachine((m) => (sent
+  ? m.update('notifications', { delivery: failed ? 'partial' : 'sent', sent_at: m.now(), ref: JSON.stringify({ op, verdict, sent, failed }) }, { dedupe_key: key })
+  : m.update('notifications', { delivery: 'failed', dedupe_key: `${key}#failed-${m.now()}` }, { dedupe_key: key })), { env });
 
 /* ------------------------------------------------------------ the settle */
 
@@ -545,14 +539,8 @@ export async function sendSettleMedia({ ledgerFile, repo, workflowId, jobId, att
     try { read = readSettle(ledgerFile, { workflowId, op, attempt, dispatchId }); } catch (error) { warn(`telegram-media: ledger unreadable (${error.message})`); return { ok: false, error: 'ledger unreadable' }; }
     const plan = planSettleMedia({ op, verdict, report: read.report, workflow: read.workflow, repo: path.resolve(repo ?? path.dirname(path.dirname(ledgerFile))), language: settings.language });
     if (plan.skip) return { ok: true, skipped: plan.skip };
-    const file = mediaSentFile(env), key = `${workflowId}|${jobId}|${attempt}`;
-    const claimed = await withStore(file, (store) => {
-      for (const [k, v] of Object.entries(store.jobs)) if (now - (v?.at ?? 0) > KEEP_MS) delete store.jobs[k];
-      if (store.jobs[key]) return false;
-      store.jobs[key] = { at: now, op, verdict, state: 'sending' };
-      return true;
-    });
-    if (!claimed) return { ok: true, skipped: 'already sent', key };
+    const key = mediaDedupeKey(workflowId, jobId, attempt);
+    if (!claimMedia(key, { op, verdict, env })) return { ok: true, skipped: 'already sent', key };
     const call = { token: settings.token, apiBase, fetchImpl, sleepImpl };
     let sent = 0, failed = 0;
     for (const item of plan.sends) {
@@ -561,10 +549,7 @@ export async function sendSettleMedia({ ledgerFile, repo, workflowId, jobId, att
           : await sendNote(call, settings.chatId, item.text);
       if (r?.ok) sent++; else { failed++; warn(`telegram-media: ${op} ${jobId} ${item.type} not sent: ${redact(r?.error ?? 'unknown error', settings.token)}`); }
     }
-    await withStore(file, (store) => {
-      if (!sent) delete store.jobs[key];
-      else store.jobs[key] = { at: now, op, verdict, state: failed ? 'partial' : 'sent', sent, failed };
-    });
+    settleMedia(key, { op, verdict, sent, failed, env });
     return { ok: failed === 0, kind: plan.kind, sent, failed, key };
   } catch (error) {
     const line = `telegram-media: send failed: ${redact(error?.message ?? error)}`;
@@ -591,16 +576,8 @@ export function queueSettleMedia(job, { env = process.env, config = undefined, s
     if (!settings.ready) return { queued: false, skipped: 'telegram off' };
     const args = [script, 'settle', '--ledger', job.ledgerFile, '--repo', job.repo, '--workflow', job.workflowId, '--job', job.jobId,
       '--attempt', String(job.attempt), '--op', job.op, '--verdict', job.verdict, ...(job.dispatchId ? ['--dispatch', String(job.dispatchId)] : [])];
-    let log = 'ignore';
-    try {
-      const logFile = stateFile('telegram-media.log', env);
-      fs.mkdirSync(path.dirname(logFile), { recursive: true });
-      if (sizeOf(logFile) > 1024 * 1024) fs.renameSync(logFile, `${logFile}.1`);
-      log = fs.openSync(logFile, 'a');
-    } catch { log = 'ignore'; }
-    let child;
-    try { child = spawnImpl(process.execPath, args, { detached: true, stdio: ['ignore', 'ignore', log], windowsHide: true, env }); }
-    finally { if (typeof log === 'number') try { fs.closeSync(log); } catch { /* closed */ } }
+    // The sender logs to machine_logs itself (actor connector, kind telegram-media.*): no output is kept.
+    const child = spawnImpl(process.execPath, args, { detached: true, stdio: 'ignore', windowsHide: true, env });
     child?.on?.('error', (error) => { try { process.stderr.write(`telegram-media: sender not started: ${redact(error?.message ?? error)}\n`); } catch { /* nothing */ } });
     child?.unref?.();
     return { queued: true, pid: child?.pid ?? null };
@@ -618,10 +595,10 @@ async function main() {
     process.exit(2);
   }
   for (const k of ['ledger', 'workflow', 'job', 'op', 'verdict']) if (typeof args[k] !== 'string') { out({ ok: false, error: `settle needs --${k}` }); process.exit(2); }
-  const warn = (line) => process.stderr.write(`${new Date().toISOString()} ${line}\n`);
+  const warn = (line) => connectorLog('telegram-media', line, { kind: 'settle', level: 'warn' });
   const result = await sendSettleMedia({ ledgerFile: args.ledger, repo: typeof args.repo === 'string' ? args.repo : null, workflowId: args.workflow, jobId: args.job,
     attempt: args.attempt ?? '1', op: args.op, verdict: args.verdict, dispatchId: typeof args.dispatch === 'string' ? args.dispatch : null }, { warn });
-  if (!result.ok || result.sent) warn(`telegram-media: ${args.op} ${args.job} ${JSON.stringify(result)}`);
+  if (!result.ok || result.sent) connectorLog('telegram-media', `${args.op} ${args.job}: ${result.ok ? `sent ${result.sent}` : result.error ?? `${result.failed} failed`}`, { kind: 'settle', level: result.ok ? 'info' : 'warn', data: result });
   out(result);
   if (!result.ok) process.exitCode = 1;
 }

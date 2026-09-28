@@ -2,7 +2,6 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {withLedger,seedWorkflow} from './_ledger-fixture.mjs';
 import {owedFindings,classifyIncidents,patternFindings,linkFix,fixTokens,labelsOf,CLASSES} from '../scripts/supervisor/owed.mjs';
-import {readInbox} from '../scripts/connectors/telegram-bridge.mjs';
 import {stallFindings} from '../scripts/supervisor/stall.mjs';
 
 // Owner, 2026-09-24: "supervisor phải xử lý các conflict, chỉnh grammar, sửa lint, xác định vấn đề out

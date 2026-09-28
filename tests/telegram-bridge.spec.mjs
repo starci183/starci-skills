@@ -8,7 +8,7 @@ import {
   createBridge, ensureTelegramBridge, registerSupervisor, heartbeatSupervisor, listSupervisors, readInbox, chatRoute,
   bridgeState, bridgeText, bridgeReloadFiles, BRIDGE_NAME, ONLINE_MS,
 } from '../scripts/connectors/telegram-bridge.mjs';
-import { claimManager, stateDir } from '../scripts/connectors/lib.mjs';
+import { claimManager, writeConnectorState } from '../scripts/connectors/lib.mjs';
 import { askKeyOf, readSentStore } from '../scripts/connectors/telegram.mjs';
 import { ledgerResolver } from '../scripts/connectors/ask-gateway.mjs';
 import { withLedger, seedWorkflow } from './_ledger-fixture.mjs';
@@ -16,7 +16,8 @@ import { collectProgress, progressMessages } from '../scripts/supervisor/progres
 import { parseYaml } from '../engine/yaml.mjs';
 
 // The owner commands a supervisor by chatting with the Telegram bot (docs/connectors.md "Command
-// bridge"). Every spec runs on a fake Bot API server and a temp state dir: no network, no real bot.
+// bridge"). Every spec runs on a fake Bot API server and a temp home whose machine.sqlite holds the bridge's
+// state: no network, no real bot.
 
 const TOKEN = '123456789:AAFakeTokenForSpecsOnly_abcdefghijklmnop';
 const OWNER = 4242;
@@ -205,7 +206,7 @@ test('/status answers from the bridge itself with the progress report, with no s
   assert.equal(bot.sent().at(-1).text, vi.statusFailed);
 });
 
-test('the token never appears in a log line, an error or a state file', async (t) => {
+test('the token never appears in a log line, an error or a stored file (machine.sqlite included)', async (t) => {
   const bot = await fakeBot(t, { failGetUpdates: { status: 502, json: { ok: false, description: `Bad Gateway for /bot${TOKEN}/getUpdates` } } });
   const { home, logs, bridge } = setup(t, bot);
   const failed = await bridge.pollOnce();
@@ -288,9 +289,10 @@ test('the registry heartbeats, validates ids, and ignores files that are not sup
   assert.equal(heartbeatSupervisor('nobody', { env }), null);
   assert.throws(() => registerSupervisor({ id: '../evil', label: 'x' }, { env }), /supervisor id/);
   assert.throws(() => registerSupervisor({ id: 'x'.repeat(61), label: 'x' }, { env }), /supervisor id/);
-  const dir = path.join(stateDir(env), 'supervisors');
-  fs.writeFileSync(path.join(dir, 'broken.json'), '{nope');
-  fs.writeFileSync(path.join(dir, 'sup-a.inbox.jsonl'), '');
+  // A channel row that does not name its own id, one with a bad id, and a row that is no channel are not supervisors.
+  writeConnectorState('supervisor-channel:broken', { config: { nope: true } }, env);
+  writeConnectorState('supervisor-channel:../x', { config: { id: '../x', label: 'x' } }, env);
+  writeConnectorState('telegram-route', { cursor: { chats: {} } }, env);
   assert.deepEqual(listSupervisors({ env }).map((s) => s.id), ['sup-a']);
 });
 

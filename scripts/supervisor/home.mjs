@@ -1,30 +1,26 @@
-// home.mjs — the one [Supervisor] kernel's durable state (modules/supervisor/supervise.yaml kernelSeat).
+// home.mjs — the Supervisor's durable state, in machine.sqlite (engine/machine-db.mjs, DBTREE.sql B1; decision Q3).
 //
-// The Supervisor reuses the kernel ledger machinery instead of a second store: one ledger file under
-// the supervisor home (default ~/.starci/supervisor, STARCI_SUPERVISOR_HOME overrides it; outside
-// every repository, so nothing there is ever committed) holding one workflow row SUPERVISOR_WF:
-//   signals  scope 'supervisor-seat'    key 'main'  the singleton seat {terminal, agent, model, ...}
-//                                                   ({state:'starting'} with an expiry while it boots)
-//            scope 'supervisor-enabled' key 'main'  {enabled} - resume-all keeps a disabled seat down
-//   jobs     kind 'runtime.fix'                     one [Worker] fix job per root-cause cluster
-//   leases   resource 'file:<path>'                 the explicit file leases a worker holds
-//   reports  dispatch_id = job id                  the worker's report (commit, incidents, specs)
-//   events   supervisor-*, worker-*, land-*, push-*  the audit trail /status and tick.mjs read
+// There is no supervisor ledger any more (the old <supervisor home>/.starciwork/runtime.sqlite is archived by the
+// comeback). Where each part lives:
+//   seat      seats row 'supervisor' (role supervisor): state booting while a launcher holds the startup reservation
+//             (detail_json.expiresAt), live once spawned; terminal_handle/agent/model/pid; detail_json {token, value}
+//   enabled   sup_signals scope 'supervisor-enabled' key 'main' {enabled, by, at}
+//   jobs      sup_jobs (runtime.fix [Worker] jobs), sup_leases (file leases), sup_attempts, sup_reports
+//   audit     sup_events (the digest-chained audit trail; kinds as before: supervisor-*, worker-*, owed-*, ...)
+//   learning  sup_learning; owed items and their acks sup_owed; owner rulings sup_owner_rulings; messages sup_messages
+//   logs      machine_logs actor 'supervisor' (supervisorLog; no text logs under the supervisor home)
 // Product ledgers are only ever read from here.
-import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { openLedger, inspectLedger, ledgerFileFor } from '../../engine/ledger-db.mjs';
 import { loadConfig } from '../../engine/config.mjs';
+import { machineLog, readMachine, withMachine } from '../../engine/machine-db.mjs';
 import { lanesRoot } from '../lib/hk-lanes.mjs';
-import { rotateLog } from '../lib/self-reload.mjs';
-import { parseJsonOr } from '../lib/json.mjs';
 
 export const SKILL_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 export const SUPERVISOR_ID = 'main';
-export const SUPERVISOR_WF = 'wf-supervisor';
-export const SEAT_SCOPE = 'supervisor-seat';
+/** The seats row of the one Supervisor seat. */
+export const SEAT_ID = 'supervisor';
 export const ENABLED_SCOPE = 'supervisor-enabled';
 export const SUPERVISOR_TITLE = `[Supervisor] ${SUPERVISOR_ID}`;
 export const WORKER_TITLE_PREFIX = '[Worker]';
@@ -40,69 +36,69 @@ export const DEFAULTS = Object.freeze({
   pollIntervalMs: 600_000,
 });
 
-/** The supervisor home: STARCI_SUPERVISOR_HOME, else ~/.starci/supervisor. */
+/**
+ * The supervisor home: STARCI_SUPERVISOR_HOME, else ~/.starci/supervisor. Nothing new is written there (the state is in
+ * machine.sqlite); it remains only as the place the comeback archives the pre-alpha.3 supervisor files from.
+ */
 export const supervisorHome = (env = process.env) => path.resolve(env.STARCI_SUPERVISOR_HOME || path.join(os.homedir(), '.starci', 'supervisor'));
-export const supervisorLedgerFile = (env = process.env) => ledgerFileFor(supervisorHome(env));
 // The worktrees live under the one lanes root (scripts/lib/hk-lanes.mjs: runtimes.yaml
-// allocation.housekeeping.lanesRoot, STARCI_LANES_ROOT, default D:/starci-lanes), never on C:
-// the supervisor home keeps only the ledger and logs.
+// allocation.housekeeping.lanesRoot, STARCI_LANES_ROOT, default D:/starci-lanes), never on C:.
 export const stagingRoot = (env = process.env) => path.join(lanesRoot({ env }), 'staging');
 export const landRoot = (env = process.env) => path.join(lanesRoot({ env }), 'land');
-export const logsRoot = (env = process.env) => path.join(supervisorHome(env), 'logs');
 
-/** Open (creating) the supervisor ledger with its one workflow row, phase running. */
-export function openSupervisorLedger({ env = process.env } = {}) {
-  const file = supervisorLedgerFile(env);
-  fs.mkdirSync(path.dirname(file), { recursive: true });
-  const ledger = openLedger({ file });
-  ledger.transaction(() => {
-    ledger.ensureWorkflow({ workflowId: SUPERVISOR_WF, title: 'StarCi runtime supervisor' });
-    ledger.db.prepare("UPDATE workflows SET phase='running' WHERE workflow_id=? AND phase IS NULL").run(SUPERVISOR_WF);
-  });
-  return ledger;
+/** fn(machine handle) over a writer, closed afterwards. */
+export const withSupervisor = (fn, { env = process.env } = {}) => withMachine(fn, { env });
+/** fn(machine handle) over a read-only handle; `fallback` when machine.sqlite does not exist or cannot be read. */
+export const readSupervisor = (fn, fallback = null, { env = process.env } = {}) => readMachine(fn, fallback, { env });
+
+/**
+ * The seat: {token, value, at, expiresAt, pid, expired, starting} or null (no seat, or an empty one). `value` is what
+ * the launcher wrote ({terminal, agent, model, ...} or {state:'starting', attempt}).
+ */
+export function seatOf(m, now = Date.now()) {
+  const row = m.seatOf(SEAT_ID);
+  if (!row || row.state === 'empty') return null;
+  const detail = row.detail ?? {};
+  const expiresAt = detail.expiresAt ?? null;
+  const expired = expiresAt != null && expiresAt <= now;
+  const value = detail.value ?? {};
+  return { token: detail.token ?? null, value, at: row.booted_at ?? row.last_seen_at ?? null, expiresAt, pid: row.pid ?? null, expired, starting: value.state === 'starting' && !expired, state: row.state };
+}
+/** Write the seat (replacing it): a {state:'starting'} value is the startup reservation (state booting, with expiry). */
+export function writeSeat(m, { token, value, expiresAt = null, now = Date.now() }) {
+  const starting = value?.state === 'starting';
+  return m.upsertSeat({ seatId: SEAT_ID, role: 'supervisor', state: starting ? 'booting' : 'live', parkedReason: null,
+    terminalHandle: value?.terminal ?? null, agent: value?.agent ?? null, model: value?.model ?? null, pid: process.pid,
+    bootedAt: now, lastSeenAt: now, detailJson: { token, value, expiresAt } });
+}
+/** Empty the seat (only the holder of `token` when given). True when it was cleared. */
+export function clearSeat(m, { token = null } = {}) {
+  const cur = seatOf(m);
+  if (!cur || (token && cur.token !== token)) return false;
+  m.upsertSeat({ seatId: SEAT_ID, role: 'supervisor', state: 'empty', terminalHandle: null, pid: null, detailJson: null });
+  return true;
 }
 
-/** Run `fn(db)` over a read-only handle of the supervisor ledger; `fallback` when it does not exist yet. */
-export function withSupervisorRead(fn, fallback = null, { env = process.env } = {}) {
-  const file = supervisorLedgerFile(env);
-  if (!fs.existsSync(file)) return fallback;
-  let handle = null;
-  try { handle = inspectLedger({ file }); return fn(handle.db); } catch { return fallback; } finally { try { handle?.close(); } catch { /* closed */ } }
+/** Whether the owner enabled the seat: true / false, or null when never set. */
+export function enabledOf(m) {
+  const row = m.supSignal(ENABLED_SCOPE, SUPERVISOR_ID);
+  return row ? row.value?.enabled === true : null;
 }
-
-/** Run `fn(ledger)` over a write handle, closed afterwards. */
-export function withSupervisorLedger(fn, { env = process.env } = {}) {
-  const ledger = openSupervisorLedger({ env });
-  try { return fn(ledger); } finally { ledger.close(); }
-}
-
-const parse = parseJsonOr;
-
-/** The seat row: {token, value, at, expiresAt, pid} or null. */
-export function seatOf(db, now = Date.now()) {
-  const row = db.prepare('SELECT * FROM signals WHERE scope=? AND key=?').get(SEAT_SCOPE, SUPERVISOR_ID);
-  if (!row) return null;
-  const value = parse(row.value_json);
-  const expired = row.expires_at != null && row.expires_at <= now;
-  return { token: row.token, value, at: row.at, expiresAt: row.expires_at, pid: row.holder_pid, expired, starting: value.state === 'starting' && !expired };
-}
-
-export function enabledOf(db) {
-  const row = db.prepare('SELECT value_json FROM signals WHERE scope=? AND key=?').get(ENABLED_SCOPE, SUPERVISOR_ID);
-  return row ? parse(row.value_json).enabled === true : null;
-}
-
-export function setEnabled(ledger, enabled, { by = 'cli', now = Date.now() } = {}) {
-  ledger.transaction(() => {
-    ledger.db.prepare('INSERT INTO signals(scope,key,holder_pid,token,value_json,at,expires_at) VALUES(?,?,?,?,?,?,NULL) ON CONFLICT(scope,key) DO UPDATE SET value_json=excluded.value_json,at=excluded.at,holder_pid=excluded.holder_pid')
-      .run(ENABLED_SCOPE, SUPERVISOR_ID, process.pid, null, JSON.stringify({ enabled, by, at: new Date(now).toISOString() }), now);
-    ledger.appendEvent({ workflowId: SUPERVISOR_WF, entityType: 'supervisor', entityId: SUPERVISOR_ID, kind: enabled ? 'supervisor-enabled' : 'supervisor-disabled', payload: { by }, createdAt: now });
+export function setEnabled(m, enabled, { by = 'cli', now = Date.now() } = {}) {
+  m.transaction(() => {
+    m.setSupSignal({ scope: ENABLED_SCOPE, key: SUPERVISOR_ID, value: { enabled, by, at: new Date(now).toISOString() } });
+    supervisorEvent(m, { kind: enabled ? 'supervisor-enabled' : 'supervisor-disabled', payload: { by }, now });
   });
 }
 
-/** Append one audit event on the supervisor workflow. */
-export function supervisorEvent(ledger, { entityType = 'supervisor', entityId = SUPERVISOR_ID, kind, payload = null, now = Date.now() }) {
-  return ledger.appendEvent({ workflowId: SUPERVISOR_WF, entityType, entityId, kind, payload, createdAt: now });
+/** Append one audit event (sup_events). */
+export function supervisorEvent(m, { entityType = 'supervisor', entityId = SUPERVISOR_ID, kind, payload = null, now = Date.now() }) {
+  return m.supEvent({ entityType, entityId, kind, payload, at: now });
+}
+/** The newest event of `kind` as {at, ...payload}, or null. */
+export function newestEvent(m, kind) {
+  const row = m.newestSupEvent(kind);
+  return row ? { at: row.created_at, ...(row.payload ?? {}) } : null;
 }
 
 /**
@@ -152,16 +148,12 @@ export function supervisorSettings({ config = undefined } = {}) {
 export const productRepos = (settings = supervisorSettings(), { sourceRoot = path.dirname(SKILL_ROOT) } = {}) =>
   settings.repos.map((repo) => path.resolve(sourceRoot, repo));
 
-/** A db-shaped shim that answers wakeKernel's one signal read with `terminal` (scripts/kernel/wake-delivery.mjs wakeKernel). */
+/** A db-shaped adapter that answers wakeKernel's one signal read with `terminal` (scripts/kernel/wake-delivery.mjs wakeKernel). */
 export const terminalSignalDb = (terminal) => ({
   prepare: () => ({ get: () => ({ value_json: JSON.stringify({ terminal }) }) }),
 });
 
-/** Append one line to a supervisor log file (logs/<name>.log), 5 MB rotated. Never throws. */
-export function supervisorLog(name, line, { env = process.env, now = new Date() } = {}) {
-  try {
-    const file = rotateLog(path.join(logsRoot(env), `${name}.log`));
-    fs.appendFileSync(file, `[${now.toISOString()}] ${line}\n`);
-    return file;
-  } catch { return null; }
+/** One Supervisor log line in machine_logs (actor supervisor, kind supervisor.<name>). Never throws. */
+export function supervisorLog(name, line, { env = process.env, now = new Date(), level = 'info', data = null } = {}) {
+  return machineLog({ actor: 'supervisor', kind: `supervisor.${name}`, msg: String(line), level, data, at: now.getTime() }, { env });
 }

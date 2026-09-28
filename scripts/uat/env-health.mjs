@@ -23,13 +23,13 @@
 //        wrong-status   an answer that is neither the expectation nor a discoverable health endpoint
 //        port-conflict  hung/wrong and the listener is not a server of this workspace
 //      With --restart a down/hung service is (re)started when the runtime knows how: a server it
-//      started itself through `serve` (the registry below) or the resource's configuration.start.
+//      started itself through `serve` (the registry below: machine.sqlite env_servers) or the resource's configuration.start.
 //      A hung listener is killed only when it is that registered server or its command line runs
 //      inside one of the workspace's repository roots - never a foreign process.
 //      Exit 0 every service ready (probe-drift included), 3 not ready, 2 bad arguments.
 //   serve  --env <id> --service <name> --cwd <dir> [--repo <ledger repo>] [--url <probe url>] -- <command...>
-//      Starts one server detached, records it in the registry (<runtime>/env-servers, or
-//      STARCI_ENV_SERVERS_DIR) and waits for its probe. A later `check --restart` restarts it.
+//      Starts one server detached, records it in the registry (machine.sqlite env_servers; its output
+//      kept as a blob, log_sha) and waits for its probe. A later `check --restart` restarts it.
 //   status  prints the registry.
 //
 // The JSON is starci/env-health@1: {ready, class: ready|environment, hardBlock, environments[{id,
@@ -37,13 +37,14 @@
 // remedies[]}. It is never a product verdict: a red walk on a ready environment is.
 import '../lib/hide-child-windows.mjs';
 import fs from 'node:fs';
+import os from 'node:os';
 import http from 'node:http';
 import https from 'node:https';
 import path from 'node:path';
 import { spawn, spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { parseYaml } from '../../engine/yaml.mjs';
-import { runtimeRootFor } from '../../engine/ledger-db.mjs';
+import { readMachine, withMachine } from '../../engine/machine-db.mjs';
 import { launchFor } from './launch.mjs';
 import { killProcessTree } from '../lib/kill-tree.mjs';
 
@@ -138,29 +139,47 @@ const norm = (p) => String(p ?? '').replace(/\\/g, '/').replace(/\/+$/, '').toLo
 /** Whether a listener is one of this workspace's servers: its command line runs inside a repository root. */
 export const ownedByWorkspace = (commandLine, roots) => Boolean(commandLine) && roots.some((root) => root && norm(commandLine).includes(norm(root)));
 
-/* ------------------------------------------------------------------------ registry */
+/* ------------------------------------------------------------------------ registry (machine.sqlite env_servers) */
 
-export const registryDir = (env = process.env) => (env.STARCI_ENV_SERVERS_DIR ? path.resolve(env.STARCI_ENV_SERVERS_DIR) : path.join(runtimeRootFor(env), 'env-servers'));
-const registryFile = (envId, service, env) => path.join(registryDir(env), `${envId}__${service}.json`.replace(/[^A-Za-z0-9._-]/g, '_'));
+// One env_servers row per <environment>__<service>. The server's output goes to a scratch file under the OS temp
+// directory while it runs; the registry keeps it as a blob (log_sha), captured when a start is judged.
+export const serverIdOf = (envId, service) => `${envId}__${service}`;
+const serverLogFile = (serverId) => path.join(os.tmpdir(), 'starci-env-servers', `${serverId.replace(/[^A-Za-z0-9._@-]/g, '_')}.log`);
+const commandOf = (text) => { try { const v = JSON.parse(text ?? 'null'); return Array.isArray(v) ? v.map(String) : null; } catch { return null; } };
+const recordOf = (row) => (row ? { env: row.env, service: row.service, port: row.port ?? null, url: row.url ?? null, command: commandOf(row.command), cwd: row.cwd ?? null,
+  pid: row.pid ?? null, state: row.state, startedAt: row.started_at != null ? new Date(row.started_at).toISOString() : null, logSha: row.log_sha ?? null,
+  log: serverLogFile(row.server_id) } : null);
 export function readRegistered(envId, service, env = process.env) {
-  try { return JSON.parse(fs.readFileSync(registryFile(envId, service, env), 'utf8')); } catch { return null; }
+  return readMachine((m) => recordOf(m.envServer(serverIdOf(envId, service))), null, { env });
 }
+/** Write one registry row: {env, service, port, url, command, cwd, pid, state, startedAt?, repo?}. */
 function writeRegistered(record, env = process.env) {
-  fs.mkdirSync(registryDir(env), { recursive: true });
-  fs.writeFileSync(registryFile(record.env, record.service, env), `${JSON.stringify(record, null, 2)}\n`);
+  withMachine((m) => m.upsertEnvServer({ serverId: serverIdOf(record.env, record.service), env: record.env, service: record.service, repoRoot: record.repo ?? undefined,
+    command: record.command ? JSON.stringify(record.command) : null, cwd: record.cwd ?? null, port: record.port ?? null, pid: record.pid ?? null, url: record.url ?? null,
+    state: record.state, startedAt: record.startedAt ?? undefined, stoppedAt: record.state === 'stopped' || record.state === 'failed' ? m.now() : null }), { env });
+}
+/** Keep a server's output so far as a blob (log_sha of its row); the sha, or null when it wrote nothing. */
+export function captureServerLog(envId, service, env = process.env) {
+  const serverId = serverIdOf(envId, service);
+  let text = '';
+  try { text = fs.readFileSync(serverLogFile(serverId), 'utf8'); } catch { return null; }
+  if (!text) return null;
+  return withMachine((m) => { const sha = m.putBlob(text, { mediaType: 'text/plain' }); m.update('env_servers', { log_sha: sha }, { server_id: serverId }); return sha; }, { env });
+}
+/** A started server judged: its row ready or failed, its output so far kept as a blob. Returns the log sha. */
+function judgeServer(envId, service, ready, env) {
+  try { withMachine((m) => m.update('env_servers', { state: ready ? 'ready' : 'failed', stopped_at: ready ? null : m.now() }, { server_id: serverIdOf(envId, service) }), { env }); } catch { /* the store is gone */ }
+  try { return captureServerLog(envId, service, env); } catch { return null; }
 }
 export function listRegistered(env = process.env) {
-  try {
-    return fs.readdirSync(registryDir(env)).filter((f) => f.endsWith('.json'))
-      .map((f) => { try { return JSON.parse(fs.readFileSync(path.join(registryDir(env), f), 'utf8')); } catch { return null; } }).filter(Boolean);
-  } catch { return []; }
+  return readMachine((m) => m.envServers().map(recordOf), [], { env });
 }
 
-/** Start one server detached with its output in the registry dir; returns its pid. */
+/** Start one server detached with its output in its scratch log; returns its pid. */
 export function startServer({ command, cwd, envId, service, env = process.env }) {
-  fs.mkdirSync(registryDir(env), { recursive: true });
-  const log = path.join(registryDir(env), `${envId}__${service}.log`.replace(/[^A-Za-z0-9._-]/g, '_'));
-  const fd = fs.openSync(log, 'a');
+  const log = serverLogFile(serverIdOf(envId, service));
+  fs.mkdirSync(path.dirname(log), { recursive: true });
+  const fd = fs.openSync(log, 'w');
   const { file, args } = launchFor(command);
   const child = spawn(file, args, { cwd, detached: true, stdio: ['ignore', fd, fd], windowsHide: true, env });
   child.unref();
@@ -324,11 +343,13 @@ export async function checkEnvironment(doc, { restart = false, roots = [], probe
       : doc?.configuration?.start?.[name] ? { command: splitCommand(doc.configuration.start[name].command), cwd: path.resolve(repo ?? '.', doc.configuration.start[name].cwd ?? '.'), from: 'resource', env: doc.configuration.start[name].env ?? null } : null;
     if (restart && state === 'down' && start?.command?.length) {
       const started = startServer({ command: start.command, cwd: start.cwd, envId: doc.id, service: name, env: start.env ? { ...env, ...start.env } : env });
-      writeRegistered({ env: doc.id, service: name, port, url, command: start.command, cwd: start.cwd, pid: started.pid, log: started.log, startedAt: new Date().toISOString(), by: 'env-health check --restart' }, env);
+      writeRegistered({ env: doc.id, service: name, repo, port, url, command: start.command, cwd: start.cwd, pid: started.pid, state: 'starting', startedAt: Date.now() }, env);
       actions.push(`started ${name} (${start.from}) as PID ${started.pid}`);
       const waited = await waitReady(url, expect, { readyTimeoutMs, probeTimeoutMs });
+      const logSha = judgeServer(doc.id, name, waited.ready, env);
       if (waited.ready) { services.push({ ...row, state: 'restarted', ready: true, status: waited.last.status, action: actions.join('; '), ...(listener ? { listener } : {}) }); continue; }
-      services.push({ ...row, state: 'restart-failed', ready: false, action: actions.join('; '), last: waited.last, remedy: `${name} did not answer ${url} within ${readyTimeoutMs}ms after a restart; read ${started.log}` });
+      services.push({ ...row, state: 'restart-failed', ready: false, action: actions.join('; '), last: waited.last, ...(logSha ? { logSha } : {}),
+        remedy: `${name} did not answer ${url} within ${readyTimeoutMs}ms after a restart; read its output: blob ${logSha ?? '(none written)'} (env_servers ${serverIdOf(doc.id, name)} log_sha)` });
       continue;
     }
     const how = start ? `node ${fileURLToPath(import.meta.url)} check --restart ...` : `node ${fileURLToPath(import.meta.url)} serve --env ${doc.id} --service ${name} --cwd <checkout> --url ${url} -- <start command>`;
@@ -404,7 +425,7 @@ export async function envHealthMain(argv, { write = (s) => process.stdout.write(
     if (listener && ((prior && prior.pid === listener.pid) || ownedByWorkspace(listener.commandLine, [path.resolve(args.cwd), ...(args.repo ? workspaceRoots(repo) : [])]))) {
       const answered = url ? await probeHttp(url, { timeoutMs: 8000 }) : null;
       if (answered?.state === 'answered' && answered.status < 500) {
-        writeRegistered({ env: args.env, service: args.service, port, url, command: args.command, cwd: path.resolve(args.cwd), pid: listener.pid, startedAt: prior?.startedAt ?? null, adoptedAt: new Date().toISOString(), by: 'env-health serve (adopted a live listener)' }, env);
+        writeRegistered({ env: args.env, service: args.service, ...(args.repo ? { repo } : {}), port, url, command: args.command, cwd: path.resolve(args.cwd), pid: listener.pid, state: 'ready' }, env);
         return emit({ schema: ENV_HEALTH_SCHEMA, ok: true, ready: true, adopted: true, pid: listener.pid, url }, EXIT_READY);
       }
       if (killTree(listener.pid)) actions.push(`killed stale own listener PID ${listener.pid}`);
@@ -412,11 +433,12 @@ export async function envHealthMain(argv, { write = (s) => process.stdout.write(
       return emit({ schema: ENV_HEALTH_SCHEMA, ok: false, ready: false, state: 'port-conflict', listener, remedy: `port ${port} is held by a process that is not this workspace's server` }, EXIT_NOT_READY);
     }
     const started = startServer({ command: args.command, cwd: path.resolve(args.cwd), envId: args.env, service: args.service, env });
-    writeRegistered({ env: args.env, service: args.service, port, url, command: args.command, cwd: path.resolve(args.cwd), pid: started.pid, log: started.log, startedAt: new Date().toISOString(), by: 'env-health serve' }, env);
+    writeRegistered({ env: args.env, service: args.service, ...(args.repo ? { repo } : {}), port, url, command: args.command, cwd: path.resolve(args.cwd), pid: started.pid, state: 'starting', startedAt: Date.now() }, env);
     actions.push(`started PID ${started.pid}`);
     if (!url) return emit({ schema: ENV_HEALTH_SCHEMA, ok: true, ready: null, pid: started.pid, log: started.log, actions, note: 'no probe url: readiness not awaited' }, EXIT_READY);
     const waited = await waitReady(url, 200, { readyTimeoutMs: Number(args['ready-timeout-ms']) || DEFAULT_READY_TIMEOUT_MS, probeTimeoutMs: DEFAULT_PROBE_TIMEOUT_MS });
-    return emit({ schema: ENV_HEALTH_SCHEMA, ok: waited.ready, ready: waited.ready, pid: started.pid, log: started.log, url, actions, last: waited.last }, waited.ready ? EXIT_READY : EXIT_NOT_READY);
+    const logSha = judgeServer(args.env, args.service, waited.ready, env);
+    return emit({ schema: ENV_HEALTH_SCHEMA, ok: waited.ready, ready: waited.ready, pid: started.pid, log: started.log, logSha, url, actions, last: waited.last }, waited.ready ? EXIT_READY : EXIT_NOT_READY);
   }
   return emit({ ok: false, error: 'usage: env-health.mjs check|serve|status (see header)' }, EXIT_USAGE);
 }

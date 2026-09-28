@@ -12,28 +12,27 @@
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { git } from './workers.mjs';
-import { SKILL_ROOT, SUPERVISOR_WF, withSupervisorRead } from './home.mjs';
-import { parseJson } from '../lib/json.mjs';
+import { SKILL_ROOT, readSupervisor } from './home.mjs';
 
 const selfFile = fileURLToPath(import.meta.url);
 
-/** Every sha a `land-passed` event moved main to, oldest first. */
-export function gateLandedShas(db, { workflowId = SUPERVISOR_WF } = {}) {
-  return db.prepare("SELECT payload_json FROM events WHERE workflow_id=? AND kind='land-passed' ORDER BY seq").all(workflowId)
-    .map((e) => parseJson(e.payload_json)?.landed)
-    .filter((s) => typeof s === 'string' && s.trim());
+/** Every sha a `land-passed` event (machine.sqlite sup_events) moved main to, oldest first. `m` is a machine handle. */
+export function gateLandedShas(m) {
+  // land.mjs records every gate run as a land_runs row; a passed run's landed_sha is the main it produced.
+  return m.db.prepare("SELECT landed_sha FROM land_runs WHERE result='passed' AND landed_sha IS NOT NULL ORDER BY run_id").all()
+    .map((r) => r.landed_sha).filter((s) => typeof s === 'string' && s.trim());
 }
 
 const onMain = (sha, root) => git(['merge-base', '--is-ancestor', sha, 'main'], { cwd: root }).ok;
 
 /**
  * The direct commits of `root`: first-parent commits on main after the newest gate-landed sha still on
- * main that no land-passed event produced, oldest first — [{sha, subject}]. [] when the gate has never
- * landed (there is no boundary to compare against) or `root` has no main. `db` reads an already-open
- * supervisor ledger; otherwise `env` locates it (STARCI_SUPERVISOR_HOME).
+ * main that no passed land_runs row produced, oldest first — [{sha, subject}]. [] when the gate has never
+ * landed (there is no boundary to compare against) or `root` has no main. `m` reads an already-open
+ * machine handle; otherwise `env` locates machine.sqlite.
  */
-export function directCommits({ root = SKILL_ROOT, env = process.env, db = null } = {}) {
-  const landed = db ? gateLandedShas(db) : withSupervisorRead((d) => gateLandedShas(d), [], { env });
+export function directCommits({ root = SKILL_ROOT, env = process.env, m = null } = {}) {
+  const landed = m ? gateLandedShas(m) : readSupervisor((h) => gateLandedShas(h), [], { env });
   if (!landed.length || !git(['rev-parse', '--verify', '--quiet', 'refs/heads/main'], { cwd: root }).ok) return [];
   let boundary = null;
   for (let i = landed.length - 1; i >= 0; i -= 1) if (onMain(landed[i], root)) { boundary = landed[i]; break; }

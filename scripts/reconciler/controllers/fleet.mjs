@@ -244,10 +244,12 @@ async function openAll(ctx, decisions) {
   return { opened, failed };
 }
 
-async function supervisorEvents(ctx, sql, args) {
+/** The land gate's runs of the last day (machine.sqlite land_runs) as [{kind: land-passed|land-failed, id, at}], newest first. */
+async function landEventsOf(ctx, now) {
   try {
-    const { withSupervisorRead, SUPERVISOR_WF } = await import('../../supervisor/home.mjs');
-    return withSupervisorRead((db) => db.prepare(sql).all(SUPERVISOR_WF, ...args), [], { env: ctx.env ?? process.env });
+    const { readSupervisor } = await import('../../supervisor/home.mjs');
+    return readSupervisor((m) => m.landRuns({ limit: 20 }).map((r) => ({ kind: r.result === 'passed' ? 'land-passed' : 'land-failed', id: r.lane ?? r.commit_sha, at: Number(r.finished_at ?? r.started_at) }))
+      .filter((e) => e.at >= now - 86_400_000), [], { env: ctx.env ?? process.env });
   } catch { return []; }
 }
 
@@ -277,8 +279,7 @@ export async function reconcileFleet(key, ctx, { settings = fleetSettings(), dep
   }
   if (key === KEYS.land) {
     const land = deps.landStatus ? deps.landStatus() : (await import('../../supervisor/land.mjs')).landStatus({ env: ctx.env ?? process.env });
-    const events = deps.landEvents ?? (await supervisorEvents(ctx, "SELECT kind, entity_id, created_at FROM events WHERE workflow_id=? AND kind IN ('land-passed','land-failed') AND created_at>=? ORDER BY seq DESC LIMIT 20", [now - 86_400_000]))
-      .map((r) => ({ kind: r.kind, id: r.entity_id, at: Number(r.created_at) }));
+    const events = deps.landEvents ?? await landEventsOf(ctx, now);
     let dist = deps.dist ?? null;
     if (!dist && !deps.landStatus) { try { dist = (await import('../../checks/grammar-dist.mjs')).grammarDistStatus(); } catch { dist = null; } }
     const plan = planLand({ land, events, dist, now, settings });
@@ -312,9 +313,8 @@ export async function reconcileFleet(key, ctx, { settings = fleetSettings(), dep
     for (const w of running) { try { const st = await ctx.status(w.ledgerId, w.workflowId); if (Array.isArray(st?.stuck)) stuck.push(...st.stuck); } catch { /* unreadable */ } }
     const payload = om.snapshotPayload(om.aggregate(records, { now, windowMs }), stuck);
     const record = deps.recordSnapshot ?? (async (p) => {
-      const { openSupervisorLedger, supervisorEvent } = await import('../../supervisor/home.mjs');
-      const w = openSupervisorLedger({ env: ctx.env ?? process.env });
-      try { w.transaction(() => supervisorEvent(w, { entityType: 'metrics', entityId: 'op-health', kind: om.SNAPSHOT_KIND, payload: p, now })); } finally { w.close(); }
+      const { withSupervisor, supervisorEvent } = await import('../../supervisor/home.mjs');
+      withSupervisor((m) => om.recordSnapshot(m, p), { env: ctx.env ?? process.env });
     });
     await record(payload);
     return { ok: true, key, jobs: payload.totals.jobs, stuck: payload.stuck };
@@ -332,9 +332,9 @@ export async function reconcileFleet(key, ctx, { settings = fleetSettings(), dep
     const digest = await ctx.run('node', ['scripts/reconciler/notifier.mjs', 'digest', '--send', '--json'], { timeoutMs: 180_000 });
     let urgentItems = [];
     try {
-      // Read-only: the Supervisor's DIs through withSupervisorRead (decisions.mjs listDecisions over that handle).
-      const [{ listDecisions, SUPERVISOR_WF }, { withSupervisorRead }] = await Promise.all([import('../decisions.mjs'), import('../../supervisor/home.mjs')]);
-      const dis = withSupervisorRead((db) => listDecisions(db, { workflowId: SUPERVISOR_WF, now }), [], { env: ctx.env ?? process.env });
+      // Read-only: the Supervisor's DIs (machine.sqlite sup_decision_items, decisions.mjs supervisorDecisions).
+      const [{ supervisorDecisions }, { readSupervisor }] = await Promise.all([import('../decisions.mjs'), import('../../supervisor/home.mjs')]);
+      const dis = readSupervisor((m) => supervisorDecisions(m, { now }), [], { env: ctx.env ?? process.env });
       urgentItems = overdueUrgent(dis, { now, min: settings.urgentOverdueEscalations });
     } catch { urgentItems = []; }
     const urgent = [];

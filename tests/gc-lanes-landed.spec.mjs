@@ -5,7 +5,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { collectLanes } from '../scripts/supervisor/gc.mjs';
-import { openSupervisorLedger, supervisorEvent } from '../scripts/supervisor/home.mjs';
+import { withMachine } from '../engine/machine-db.mjs';
 
 function git(cwd, ...args) {
   const extraEnv = typeof args[0] === 'object' ? args.shift() : {};
@@ -26,7 +26,7 @@ function fixture(t) {
   git(root, 'add', '.');
   git(root, 'commit', '-qm', 'base');
   git(root, 'worktree', 'add', '-q', '-b', 'lane/one', lane, 'main');
-  const env = { STARCI_LANES_ROOT: path.join(dir, 'lanes'), STARCI_SUPERVISOR_HOME: path.join(dir, 'supervisor') };
+  const env = { STARCI_LANES_ROOT: path.join(dir, 'lanes'), STARCI_SUPERVISOR_HOME: path.join(dir, 'supervisor'), STARCI_TEST_MACHINE_FILE: path.join(dir, 'machine.sqlite') };
   const run = (apply = false, options = {}) => collectLanes({ apply, root, env, now: Date.now() + 60_000, settings: { laneGraceMs: 1 }, sup: { jobs: [] }, ...options });
   return { root, lane, env, run };
 }
@@ -89,7 +89,7 @@ test('refuses a dirty lane even when its commit content is landed', (t) => {
   assert.equal(fs.existsSync(lane), true);
 });
 
-test('accepts a land-passed ledger record covering every lane commit', (t) => {
+test('accepts passed land_runs covering every lane commit', (t) => {
   const { root, lane, env, run } = fixture(t);
   fs.writeFileSync(path.join(lane, 'work.txt'), 'resolved differently\n');
   git(lane, 'add', '.');
@@ -100,13 +100,12 @@ test('accepts a land-passed ledger record covering every lane commit', (t) => {
   git(lane, 'commit', '-qm', 'second lane change');
   const second = git(root, 'rev-parse', 'lane/one');
   assert.equal(run().items.find((i) => i.branch === 'lane/one')?.verdict, 'keep');
-  const ledger = openSupervisorLedger({ env });
-  try {
-    ledger.transaction(() => supervisorEvent(ledger, { entityType: 'land', kind: 'land-passed', payload: { lane: 'lane/one', commits: [first] } }));
-    assert.equal(run().items.find((i) => i.branch === 'lane/one')?.verdict, 'keep');
-    ledger.transaction(() => supervisorEvent(ledger, { entityType: 'land', kind: 'land-passed', payload: { lane: 'lane/one', commits: [second] } }));
-    assert.equal(run().items.find((i) => i.branch === 'lane/one')?.verdict, 'collect');
-  } finally { ledger.close(); }
+  // The land gate's record: a machine.sqlite land_runs row per passed land (land.mjs recordLand).
+  const passed = (sha) => withMachine((m) => m.recordLandRun({ lane: 'lane/one', commitSha: sha, landedSha: sha, result: 'passed' }), { env });
+  passed(first);
+  assert.equal(run().items.find((i) => i.branch === 'lane/one')?.verdict, 'keep');
+  passed(second);
+  assert.equal(run().items.find((i) => i.branch === 'lane/one')?.verdict, 'collect');
 });
 
 test('accepts a file that main changed after the lane commit', (t) => {

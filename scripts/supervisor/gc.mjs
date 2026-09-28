@@ -39,7 +39,7 @@
 //             approved zip-then-purge on 2026-09-28).
 //   tmp       %TEMP% entries with a runtime prefix past tmpMaxAgeMs (hk-tmp.mjs sweepTmp).
 //   tasks     Orca Tasks of settled jobs whose close was refused: closed again (task-update completed).
-//   leases    lease rows (product ledgers and the supervisor ledger) of a settled job, a job the ledger no longer
+//   leases    lease rows (product ledgers and machine.sqlite sup_leases) of a settled job, a job the ledger no longer
 //             has, or an ended workflow, older than leaseMinAgeMs (DESIGN §15.2, LEASE_LEAK). No api path deletes
 //             the lease of an already-settled job, so this collector REPORTS them (verdict refuse, reportOnly) and
 //             never deletes; the reconciler GC controller opens a runtime-defect Decision Item for the Supervisor.
@@ -47,7 +47,7 @@
 //             moved to <archiveRoot>/lane-logs/; archived lane logs older than laneLogRetentionMs (14 days, by
 //             their last write) are deleted. Subdirectories (the lane worktrees) are never touched.
 //
-// Host lock `gc` (reconciler lane rc-gc-resource): a live --apply run holds <supervisorHome>/gc.lock, so the tick, a
+// Host lock `gc` (reconciler lane rc-gc-resource): a live --apply run holds machine.sqlite host_locks 'gc', so the tick, a
 // hand-run gc.mjs and the reconciler GC controller never overlap; a busy lock returns ok:false, busy:true untouched.
 //
 // Output: the report {schema, apply, ok, counts, freedBytes, ramFreedBytes, items: [{class, action, target, ...}],
@@ -69,13 +69,14 @@ import { killProcessTree } from '../lib/kill-tree.mjs';
 import { lanesRoot, parseWorktreeList, laneActivity, treeBytes } from '../lib/hk-lanes.mjs';
 import { safeRemoveWorktree } from '../lib/safe-remove.mjs';
 import { pathKey } from '../lib/path-key.mjs';
-import { parseJson, parseJsonOr, readJsonFile } from '../lib/json.mjs';
+import { parseJson } from '../lib/json.mjs';
 import { fmtGb } from '../lib/time.mjs';
 import { workflowNameOf } from '../lib/display-names.mjs';
 import { jobTerminalHandles, ledgerJobs, kernelSignalRows, pathUnder } from '../lib/terminal-ledger.mjs';
-import { SKILL_ROOT, SUPERVISOR_WF, FIX_KIND, landRoot, productRepos, seatOf, stagingRoot, supervisorHome, withSupervisorRead } from './home.mjs';
-import { removeStaging, unlinkNodeModulesLink } from './workers.mjs';
-import { acquireDepsLock } from '../guards/deps-guard.mjs';
+import { SKILL_ROOT, landRoot, productRepos, seatOf, stagingRoot, readSupervisor, withSupervisor } from './home.mjs';
+import { jobsOf, removeStaging, unlinkNodeModulesLink } from './workers.mjs';
+import { sleepSync } from '../lib/sleep-sync.mjs';
+import { pidAlive } from '../../engine/machine-db.mjs';
 import { LANE_IDLE_MS, laneOwnerOf, tabTitles } from '../lib/lane-owner.mjs';
 
 const selfFile = fileURLToPath(import.meta.url);
@@ -95,7 +96,7 @@ const LANE_LOG = /\.(err|json|log)$/i;
 export const APPROVAL = Object.freeze({ by: 'owner', ref: 'owner chat 2026-09-28: zip-then-purge approved for finished/archived workflow evidence past retention (gc.mjs)' });
 const LIVE_JOB = new Set(['queued', 'leased', 'running', 'answering', 'effect_unknown']);
 const HOLDING_JOB = new Set(['running', 'answering']);
-const SUP_LIVE = new Set(['queued', 'leased', 'running', 'reported']);
+const SUP_LIVE = new Set(['queued', 'spawning', 'running', 'reported']);
 const SUP_FINAL = new Set(['succeeded', 'failed', 'cancelled']);
 const ORCA_DAEMON = /[\\/]daemon-host[\\/]/i;
 const SHELL_TITLE = /^Terminal \d+$/;
@@ -120,13 +121,33 @@ export function gcSettings(allocation = allocationSettings()) {
 
 /* ------------------------------------------------------------ host lock: one GC apply at a time */
 
-export const gcLockFile = (env = process.env) => path.join(supervisorHome(env), 'gc.lock');
+export const GC_LOCK = 'gc';
 /**
- * The host lock `gc`: an apply run (the tick, a hand-run `gc.mjs --apply`, the reconciler GC controller) holds it so
- * two never overlap. {ok, release()} | {ok:false, holder}. A lock whose holder process is gone is taken over.
+ * The host lock `gc` (machine.sqlite host_locks, ttl staleMs): an apply run (the tick, a hand-run `gc.mjs --apply`,
+ * blob-gc, the reconciler GC controller) holds it so two never overlap. {ok, release()} | {ok:false, holder: {holder,
+ * pid, at}}. A lock past its ttl, or whose holder process is gone, is taken over; a busy one is polled for waitMs.
  */
 export function acquireGcLock({ env = process.env, holder = 'gc', waitMs = 0, staleMs = 3_600_000, pollMs = 250 } = {}) {
-  return acquireDepsLock({ lockFile: gcLockFile(env), holder: { holder }, waitMs, staleMs, pollMs });
+  const started = Date.now();
+  for (;;) {
+    const r = withSupervisor((m) => {
+      const got = m.acquireHostLock({ name: GC_LOCK, holder, ttlMs: staleMs });
+      if (got.ok || pidAlive(got.holder?.holder_pid)) return got;
+      m.releaseHostLock({ name: GC_LOCK, force: true });
+      return m.acquireHostLock({ name: GC_LOCK, holder, ttlMs: staleMs });
+    }, { env });
+    if (r.ok) {
+      let released = false;
+      const release = () => {
+        if (released) return;
+        released = true;
+        try { withSupervisor((m) => m.releaseHostLock({ name: GC_LOCK }), { env }); } catch { /* expires by its ttl */ }
+      };
+      return { ok: true, release };
+    }
+    if (Date.now() - started >= waitMs) return { ok: false, holder: { holder: r.holder?.holder ?? null, pid: r.holder?.holder_pid ?? null, at: r.holder?.started_at ? new Date(r.holder.started_at).toISOString() : null } };
+    sleepSync(pollMs);
+  }
 }
 
 /**
@@ -134,19 +155,47 @@ export function acquireGcLock({ env = process.env, holder = 'gc', waitMs = 0, st
  * checks): true when no supervisor-gc event is younger than sweepMs. {due, lastAt, nextAt}.
  */
 export function sweepDue({ env = process.env, now = Date.now(), sweepMs = DEFAULTS.sweepMs } = {}) {
-  const lastAt = withSupervisorRead((db) => db.prepare('SELECT created_at FROM events WHERE workflow_id=? AND kind=? ORDER BY seq DESC LIMIT 1').get(SUPERVISOR_WF, GC_EVENT_KIND)?.created_at ?? null, null, { env });
+  const lastAt = readSupervisor((m) => m.newestSupEvent(GC_EVENT_KIND)?.created_at ?? null, null, { env });
   return { due: lastAt == null || now - lastAt >= sweepMs, lastAt, nextAt: lastAt == null ? now : lastAt + sweepMs };
 }
 
-/* ------------------------------------------------------------ state: when a candidate was first seen */
+/* ------------------------------------------------------------ state: when a candidate was first seen (machine.sqlite) */
 
-export const stateFile = (env = process.env) => path.join(supervisorHome(env), 'gc-state.json');
+/** {seen: {handle: firstSeenMs}}: the open terminals rows' opened_at (the first sighting of a GC candidate). */
 export function readState(env = process.env) {
-  const s = readJsonFile(stateFile(env));
-  return { seen: s?.seen && typeof s.seen === 'object' ? s.seen : {} };
+  return { seen: readSupervisor((m) => Object.fromEntries(m.db.prepare('SELECT handle, opened_at FROM terminals WHERE closed_at IS NULL AND opened_at IS NOT NULL').all()
+    .map((r) => [r.handle, Number(r.opened_at)])), {}, { env }) };
 }
-export function writeState(state, env = process.env) {
-  try { fs.mkdirSync(path.dirname(stateFile(env)), { recursive: true }); fs.writeFileSync(stateFile(env), JSON.stringify(state)); } catch { /* next run re-learns */ }
+
+const TERMINAL_ROLES = new Set(['op', 'kernel', 'worker', 'supervisor', 'shell']);
+/** The GC collector of a report item's class (gc_items.collector). */
+const collectorOf = (klass) => ({ 'idle-shell': 'shells', lane: 'lanes', evidence: 'evidence', tmp: 'tmp', task: 'tasks', lease: 'leases', 'lane-log': 'lanelogs', process: 'processes' }[klass] ?? 'agents');
+
+/**
+ * The run's machine records: a candidate terminal's first sighting (terminals.opened_at, a row created when absent),
+ * a closed terminal (terminals.closed_at, verified), and - for an apply run - one gc_runs row with one gc_items row per
+ * collected / refused / kept item and its final outcome (done | dropped | gave-up). Returns the gc_runs id or null.
+ */
+export function writeState({ seen = {}, closed = [], report = null, trigger = 'sweep', startedAt = Date.now() } = {}, env = process.env) {
+  try {
+    return withSupervisor((m) => m.transaction(() => {
+      for (const [handle, s] of Object.entries(seen)) {
+        const row = m.db.prepare('SELECT opened_at FROM terminals WHERE handle=?').get(handle);
+        if (!row) m.upsertTerminal({ handle, title: s.title ?? null, role: TERMINAL_ROLES.has(s.role) ? s.role : 'other', openedAt: s.at });
+        else if (row.opened_at == null) m.update('terminals', { opened_at: s.at }, { handle });
+      }
+      for (const handle of closed) m.closeTerminal(handle, { by: 'gc', verified: true });
+      if (!report?.apply) return null;
+      const runId = m.startGcRun({ trigger, startedAt, collectors: [...new Set(report.items.map((i) => collectorOf(i.class)))] });
+      for (const i of report.items) {
+        m.recordGcItem({ runId, collector: collectorOf(i.class), kind: i.action ?? i.class, target: String(i.target), ownerRef: i.owner ? String(i.owner) : null,
+          action: i.ok === false ? 'failed' : i.verdict ?? 'keep', reason: String(i.reason ?? '').slice(0, 2000), bytes: i.bytes ?? i.ramBytes ?? null,
+          lastError: i.error ? String(i.error).slice(0, 2000) : null, outcome: i.ok === true ? 'done' : i.ok === false ? 'gave-up' : 'dropped', verifiedGoneAt: i.ok === true ? m.now() : null });
+      }
+      m.finishGcRun(runId, { freedBytes: report.counts.freedBytes, counts: report.counts, errors: report.errors, report });
+      return runId;
+    }), { env });
+  } catch { return null; /* the next run re-learns the first sightings */ }
 }
 
 /* ------------------------------------------------------------ pure classification */
@@ -188,18 +237,22 @@ export function workflowsNamed(title, workflows) {
 
 /* ------------------------------------------------------------ registry: what the ledgers own */
 
-/** The supervisor ledger's view: {seat, jobs: [{jobId, status, cluster, handle, stagingPath, branch, base}]}. */
+/** The Supervisor's view (machine.sqlite): {seat, jobs: [{jobId, status, cluster, handle, stagingPath, branch, base}], leases}. */
 export function supervisorView({ env = process.env, now = Date.now() } = {}) {
-  return withSupervisorRead((db) => {
-    const seat = seatOf(db, now);
-    const jobs = db.prepare('SELECT job_id, status, worker_id, payload_json, updated_at FROM jobs WHERE workflow_id=? AND kind=?').all(SUPERVISOR_WF, FIX_KIND).map((r) => {
-      const p = parseJsonOr(r.payload_json);
+  return readSupervisor((m) => {
+    const seat = seatOf(m, now);
+    const jobs = jobsOf(m).map((r) => {
+      const p = r.payload ?? {};
       return { jobId: r.job_id, status: r.status, cluster: p.cluster ?? null, handle: r.worker_id ?? null, self: p.self === true,
         stagingPath: p.staging?.path ?? null, branch: p.staging?.branch ?? null, base: p.staging?.base ?? null, updatedAt: r.updated_at };
     });
-    return { seat: seat ? { handle: seat.value?.terminal ?? null, live: !seat.expired && !seat.starting } : null, jobs, leases: leaseRowsOf(db) };
+    return { seat: seat ? { handle: seat.value?.terminal ?? null, live: !seat.expired && !seat.starting } : null, jobs, leases: supLeaseRowsOf(m) };
   }, { seat: null, jobs: [], leases: [] }, { env });
 }
+
+/** The sup_leases rows in leaseRowsOf's shape (resourceKey file:<path>; no workflow). */
+const supLeaseRowsOf = (m) => m.db.prepare(`SELECT 'file:' || l.path resourceKey, l.job_id jobId, NULL workflowId, l.acquired_at acquiredAt, l.expires_at expiresAt,
+    j.status jobStatus, j.updated_at jobUpdatedAt, NULL phase, NULL archivedAt, NULL workflowUpdatedAt FROM sup_leases l LEFT JOIN sup_jobs j ON j.job_id=l.job_id`).all();
 
 /** One product ledger's view: {repo, workflows: [{workflowId, name, ended, endedAt, kernelHandle}], jobs: [{jobId, workflowId, kind, status, handles}]}. */
 export function ledgerView(repo) {
@@ -469,14 +522,14 @@ export function orphanProcesses({ table, now = Date.now(), minAgeMs = DEFAULTS.g
 
 /* ------------------------------------------------------------ lanes */
 
+/** The commits the land gate landed for `branch`: every commit of its passed land_runs (commit_sha and commits_json). */
 function landedCommitsForLane(branch, env) {
-  return withSupervisorRead((db) => {
+  return readSupervisor((m) => {
     const landed = new Set();
-    const rows = db.prepare("SELECT payload_json FROM events WHERE workflow_id=? AND kind='land-passed' AND json_extract(payload_json,'$.lane')=?").all(SUPERVISOR_WF, branch);
-    for (const row of rows) {
-      const payload = parseJson(row.payload_json);
-      if (payload === null) continue;
-      if (Array.isArray(payload.commits)) for (const sha of payload.commits) if (typeof sha === 'string') landed.add(sha);
+    for (const r of m.db.prepare("SELECT commit_sha, commits_json FROM land_runs WHERE lane=? AND result='passed'").all(branch)) {
+      landed.add(r.commit_sha);
+      const commits = parseJson(r.commits_json);
+      if (Array.isArray(commits)) for (const sha of commits) if (typeof sha === 'string') landed.add(sha);
     }
     return landed;
   }, new Set(), { env });
@@ -615,7 +668,7 @@ export function gcLine(counts, { language = 'vi', apply = true } = {}) {
  * One GC run. `only` restricts the collectors; `deps` replaces the host seams (list, read, close, procs, ledgers, sup,
  * git, purge, sweepTmp, taskUpdate, log, lesson, freemem). Returns the report (see the header).
  */
-export async function runGc({ apply = false, only = null, env = process.env, now = Date.now(), deps = {}, allocation = null, language = null } = {}) {
+export async function runGc({ apply = false, only = null, env = process.env, now = Date.now(), deps = {}, allocation = null, language = null, trigger = 'sweep' } = {}) {
   const started = Date.now();
   const settings = gcSettings(allocation ?? allocationSettings());
   const want = new Set(only ?? COLLECTORS);
@@ -635,7 +688,7 @@ export async function runGc({ apply = false, only = null, env = process.env, now
   }
   try {
   const state = (deps.readState ?? readState)(env);
-  const seenNow = {};
+  const seenNow = {}, closedNow = [];
   const sup = (deps.sup ?? supervisorView)({ env, now });
   const repos = deps.repos ?? productRepos();
   const ledgers = (deps.ledgers ?? (() => repos.map((r) => { try { return ledgerView(r); } catch { return null; } }).filter(Boolean)))();
@@ -658,7 +711,7 @@ export async function runGc({ apply = false, only = null, env = process.env, now
       for (const d of decided) {
         const isShell = d.klass === 'idle-shell';
         if (isShell ? !want.has('shells') : !want.has('agents')) continue;
-        if (d.verdict !== 'keep') seenNow[d.handle] = state.seen[d.handle] ?? now;
+        if (d.verdict !== 'keep') seenNow[d.handle] = { at: state.seen[d.handle] ?? now, role: d.role ?? null, title: d.title ?? null };
         if (d.verdict === 'keep') {
           // Not the runtime's: named in the report (never touched) so the owner sees what was left alone and why.
           if (d.klass === 'unknown') report.items.push({ class: 'unknown', action: 'none', target: d.handle, title: d.title, reason: d.reason, verdict: 'keep' });
@@ -673,6 +726,7 @@ export async function runGc({ apply = false, only = null, env = process.env, now
           report.items.push({ ...it, ok: r?.ok === true, proof: r?.proof ?? null, ...(r?.ok ? {} : { error: r?.reason ?? r?.error ?? 'close failed' }) });
           if (!r?.ok) { report.errors.push(`close ${d.handle} (${d.klass}): ${r?.reason ?? r?.error ?? 'failed'}`); continue; }
           delete seenNow[d.handle];
+          closedNow.push(d.handle);
         }
         if (isShell) report.counts.terminals += 1; else report.counts.agents += 1;
         if (!isShell) report.counts.leftovers += 1;
@@ -797,7 +851,6 @@ export async function runGc({ apply = false, only = null, env = process.env, now
     } catch (error) { report.errors.push(`lanelogs: ${String(error?.message ?? error).slice(0, 200)}`); }
   }
 
-  (deps.writeState ?? writeState)({ seen: seenNow }, env);
   if (apply && (report.counts.agents || report.counts.terminals)) {
     // Orca stops the PTY trees on close; give the OS a moment before reading free RAM back.
     await new Promise((r) => setTimeout(r, deps.settleMs ?? 3000));
@@ -818,7 +871,9 @@ export async function runGc({ apply = false, only = null, env = process.env, now
     data: { agents: report.counts.agents, terminals: report.counts.terminals, worktrees: report.counts.worktrees, freedBytes: report.counts.freedBytes,
       apply, ramFreedBytes: report.counts.ramFreedBytes, refused: report.counts.refused, errors: report.errors.length, leftovers: report.counts.leftovers,
       evidence: report.counts.evidence, tmp: report.counts.tmp, tasks: report.counts.tasks, leases: report.counts.leases, laneLogs: report.counts.laneLogs, line: report.line } });
-  try { (deps.log ?? (await import('./sup-log.mjs')).supLogRows)(rows, { env }); } catch { /* best effort */ }
+  try { if (deps.log) deps.log(rows, { env }); else withSupervisor((m) => m.log(rows.map((r) => ({ actor: 'gc', ...r }))), { env }); } catch { /* best effort */ }
+  // The run's machine records (first sightings, closed terminals, gc_runs + gc_items of an apply run).
+  report.runId = (deps.writeState ?? writeState)({ seen: seenNow, closed: closedNow, report, trigger, startedAt: now }, env);
 
   // A leftover is a bug in its owner step: one lesson per class (lessons.mjs recordLeftover, deduped per day).
   if (apply) {
@@ -867,7 +922,7 @@ if (process.argv[1] && path.resolve(process.argv[1]) === selfFile) {
   if (!args.ok) { console.error(`use: gc.mjs [--dry-run|--apply] [--only ${COLLECTORS.join(',')}] [--json] (${args.error})`); process.exit(2); }
   let language = 'vi';
   try { language = (await import('./home.mjs')).supervisorSettings().language ?? 'vi'; } catch { /* vi */ }
-  const report = await runGc({ apply: args.apply, only: args.only, language });
+  const report = await runGc({ apply: args.apply, only: args.only, language, trigger: 'manual' });
   console.log(args.json ? JSON.stringify(report, null, 2) : describe(report));
   process.exit(report.ok ? 0 : 1);
 }

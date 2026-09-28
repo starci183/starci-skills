@@ -7,8 +7,9 @@
 //   node scripts/connectors/telegram-bridge.mjs run      run in the foreground
 //   node scripts/connectors/telegram-bridge.mjs status | stop
 //
-// One bridge per host (claimManager('telegram-bridge'), state record
-// <state>/telegram-bridge.json {pid, startedAt, offset}). It long-polls
+// One bridge per host (claimManager('telegram-bridge'): a machine.sqlite host
+// lock; its record is the connectors row 'telegram-bridge' {pid, startedAt},
+// the update offset in its cursor_json). It long-polls
 // getUpdates (message + callback_query) and persists the update offset BEFORE
 // handling an update, so a restart never delivers the same message twice.
 // Between poll rounds it reloads itself when the runtime changes
@@ -27,8 +28,8 @@
 // own "Generate URL" button; /creds lists every open credential ask in ONE
 // message with one button each (serve-ask.mjs askClassOf: the two kinds never
 // share a list or a message); /help. Any
-// other text goes to the chat's routed supervisor: appended to
-// <state>/supervisors/<id>.inbox.jsonl and acknowledged as a reply. A message
+// other text goes to the chat's routed supervisor: filed in machine.sqlite
+// sup_messages (direction in, to_ref <id>) and acknowledged as a reply. A message
 // with no route auto-routes when exactly one supervisor is registered, else it
 // is held and delivered once the owner picks one. Replies follow config.yaml
 // `language` (vi, else en). The supervisor side is scripts/supervisor/channel.mjs.
@@ -51,10 +52,13 @@
 // serve-ask.mjs answerDrawReviewByReply: "ok" / "duyệt" accepts, anything else is feedback (a note per line, or a
 // note on the replied image) and the drawing is redrawn (scripts/work/draw-feedback.mjs).
 //
-// Registry: <state>/supervisors/<id>.json {id, label, repos, registeredAt,
-// heartbeatAt}; a supervisor is online while its heartbeat is younger than
-// ONLINE_MS (STARCI_SUPERVISOR_ONLINE_MS overrides it). Logs go to
-// <state>/telegram-bridge.log. STARCI_TELEGRAM_API_BASE replaces the Bot API
+// Registry: the connectors row 'supervisor-channel:<id>' (config_json {id, label,
+// repos, registeredAt, heartbeatAt, terminal?, session?}); a supervisor is online
+// while its heartbeat is younger than ONLINE_MS (STARCI_SUPERVISOR_ONLINE_MS
+// overrides it). The chat routes are the connectors row 'telegram-route'
+// (cursor_json {chats}). The supervisors' replies are sup_messages (direction
+// out, from_ref <id>). Logs go to machine_logs (actor connector, kind
+// telegram-bridge.log). STARCI_TELEGRAM_API_BASE replaces the Bot API
 // host for tests. The token is never printed and is scrubbed from every error.
 import '../lib/hide-child-windows.mjs';
 import crypto from 'node:crypto';
@@ -63,7 +67,11 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { configRoot, connectorsConfig } from '../../engine/config.mjs';
 import { inspectLedger, ledgerFileFor } from '../../engine/ledger-db.mjs';
-import { argsOf, askRepos, askState, claimManager, claimOrTakeOver, lockHolder, notifiedRepos, openAskList, ownerConfig, pidAlive, readJson, recordAlive, sourceRootOf, spawnDetached, stateFile, withLedgerRead, writeJson } from './lib.mjs';
+import { readMachine, withMachine } from '../../engine/machine-db.mjs';
+import {
+  argsOf, askRepos, askState, claimManager, claimOrTakeOver, connectorLog, connectorState, connectorStates, lockHolder, notifiedRepos, openAskList, ownerConfig, pidAlive,
+  recordAlive, sourceRootOf, spawnDetached, withLedgerRead, writeConnectorState,
+} from './lib.mjs';
 import {
   ASK_CALLBACK, askButton, askEntryByKey, askKeyOf, askMessage, botCall, DEFAULT_API_BASE, drawReviewEntryByMessage, linkFor, recordAskMessage, redact,
   removeAskMessage, sweepAskMessages, telegramSettings, TEXT_MAX, textFor,
@@ -71,10 +79,8 @@ import {
 import { ensureAskConnectors, publicBase } from './tunnel.mjs';
 import { collectProgress, progressMessages, reportRepos } from '../supervisor/progress-report.mjs';
 import { answerDrawReviewByReply, askClassOf } from '../kernel/serve-ask.mjs';
-import { createReloadWatch, reexecSelf, rotateLog, RELOAD_ENV } from '../lib/self-reload.mjs';
+import { createReloadWatch, reexecSelf, RELOAD_ENV } from '../lib/self-reload.mjs';
 import { clipLine } from '../lib/clip.mjs';
-import { RENAME_BUSY, renameOver } from '../lib/rename-over.mjs';
-import { sleepSync } from '../lib/sleep-sync.mjs';
 import { sleep } from '../lib/sleep.mjs';
 
 export const SERVE_ASK_FILE = fileURLToPath(new URL('../kernel/serve-ask.mjs', import.meta.url));
@@ -153,50 +159,23 @@ export const bridgeText = (language) => TEXT[language] ?? TEXT.en;
 
 const numericId = (v) => (Number.isSafeInteger(Number(v)) && String(v).trim() !== '' ? String(Number(v)) : '?');
 
-/* ------------------------------------------------------------ state files */
+/* ------------------------------------------------------------ state (machine.sqlite) */
 
-export const bridgeStateFile = (env = process.env) => stateFile('telegram-bridge.json', env);
-export const bridgeState = (env = process.env) => readJson(bridgeStateFile(env));
-export const bridgeLogFile = (env = process.env) => stateFile('telegram-bridge.log', env);
-export const routeFile = (env = process.env) => stateFile('telegram-route.json', env);
-export const supervisorsDir = (env = process.env) => stateFile('supervisors', env);
+/** The bridge's connectors row: {pid, startedAt, offset, ...}, or null. The update offset is the row's cursor. */
+export const bridgeState = (env = process.env) => {
+  const record = connectorState(BRIDGE_NAME, env);
+  return record ? { ...record, offset: Number.isSafeInteger(record.cursor?.offset) ? record.cursor.offset : null } : null;
+};
+const ROUTE_ROW = 'telegram-route';
+const CHANNEL_PREFIX = 'supervisor-channel:';
 export const validSupervisorId = (id) => typeof id === 'string' && ID.test(id);
 const needId = (id) => { if (!validSupervisorId(id)) throw Error(`supervisor id must match ${ID} (got ${JSON.stringify(String(id ?? ''))})`); return id; };
-export const supervisorFile = (id, env = process.env) => path.join(supervisorsDir(env), `${needId(id)}.json`);
-export const inboxFile = (id, env = process.env) => path.join(supervisorsDir(env), `${needId(id)}.inbox.jsonl`);
+const channelRow = (id) => `${CHANNEL_PREFIX}${needId(id)}`;
 
-/** A live bridge: telegram-bridge.json names a live process of this boot, or a bridge holds the lock. */
+/** A live bridge: its connectors row names a live process of this boot, or a bridge holds the lock. */
 export const bridgeAlive = (env = process.env) => {
   const state = bridgeState(env);
   return recordAlive(state) ? state : lockHolder(BRIDGE_NAME, env);
-};
-
-/** Run `fn` holding `<file>.lock` (exclusive create); a lock older than 30 s is stale. Synchronous. */
-export function withFileLock(file, fn, { waitMs = 5000 } = {}) {
-  const lock = `${file}.lock`;
-  fs.mkdirSync(path.dirname(lock), { recursive: true });
-  const end = Date.now() + waitMs;
-  let fd = null;
-  while (fd === null) {
-    try { fd = fs.openSync(lock, 'wx'); } catch (error) {
-      if (!['EEXIST', 'EPERM', 'EBUSY', 'EACCES'].includes(error?.code)) throw error;
-      try { if (Date.now() - fs.statSync(lock).mtimeMs > 30000) fs.rmSync(lock, { force: true }); } catch { /* gone */ }
-      if (Date.now() > end) throw Error(`${path.basename(file)} is locked`);
-      sleepSync(15);
-    }
-  }
-  try { return fn(); } finally { try { fs.closeSync(fd); } catch { /* closed */ } try { fs.rmSync(lock, { force: true }); } catch { /* best effort */ } }
-}
-
-// Replace a file's content through a temp file; a rename that Windows refuses while a reader holds
-// the file is retried, then falls back to an in-place write.
-const replaceFile = (file, text) => {
-  const tmp = `${file}.${process.pid}.${Date.now()}.tmp`;
-  fs.writeFileSync(tmp, text, { mode: 0o600 });
-  try { renameOver(tmp, file); } catch (error) {
-    if (!RENAME_BUSY.includes(error?.code)) throw error;
-    fs.writeFileSync(file, text, { mode: 0o600 });
-  }
 };
 
 /* ------------------------------------------------------------ supervisor registry */
@@ -212,9 +191,11 @@ export const supervisorOnline = (sup, { now = Date.now(), env = process.env, onl
   return Number.isFinite(beat) && now - beat <= onlineWindow(env, onlineMs);
 };
 
+const writeChannel = (record, env) => writeConnectorState(channelRow(record.id), { kind: 'supervisor-channel', state: 'registered', config: record }, env);
+
 /** Register (or re-register) one supervisor; its heartbeat is now. */
 export function registerSupervisor({ id, label, repos = [], terminal = null, session = null }, { env = process.env, now = Date.now() } = {}) {
-  const file = supervisorFile(id, env);
+  needId(id);
   const at = new Date(now).toISOString();
   const record = {
     schema: 'starci/supervisor-channel@1', id, label: String(label ?? '').trim() || id,
@@ -224,112 +205,99 @@ export function registerSupervisor({ id, label, repos = [], terminal = null, ses
     // The chat session that registered with no terminal (supervisor.mode chat): the one that drains id 'main'.
     ...(!terminal && session ? { session: String(session) } : {}),
   };
-  writeJson(file, record);
-  return record;
-}
-
-/** Refresh one registered supervisor's heartbeat; null when it is not registered. */
-export function heartbeatSupervisor(id, { env = process.env, now = Date.now() } = {}) {
-  const file = supervisorFile(id, env);
-  const record = readJson(file);
-  if (!record || record.id !== id) return null;
-  record.heartbeatAt = new Date(now).toISOString();
-  writeJson(file, record);
+  writeChannel(record, env);
   return record;
 }
 
 export function getSupervisor(id, env = process.env) {
   if (!validSupervisorId(id)) return null;
-  const record = readJson(supervisorFile(id, env));
+  const record = readMachine((m) => m.connectorOf(channelRow(id))?.config ?? null, null, { env });
   return record && record.id === id ? record : null;
+}
+
+/** Refresh one registered supervisor's heartbeat; null when it is not registered. */
+export function heartbeatSupervisor(id, { env = process.env, now = Date.now() } = {}) {
+  const record = getSupervisor(id, env);
+  if (!record) return null;
+  record.heartbeatAt = new Date(now).toISOString();
+  writeChannel(record, env);
+  return record;
 }
 
 /** Every registered supervisor, online ones first, then by label. */
 export function listSupervisors({ env = process.env, now = Date.now(), onlineMs } = {}) {
-  let names = [];
-  try { names = fs.readdirSync(supervisorsDir(env)); } catch { return []; }
-  return names
-    .filter((name) => name.endsWith('.json') && validSupervisorId(name.slice(0, -5)))
-    .map((name) => getSupervisor(name.slice(0, -5), env))
+  return connectorStates(CHANNEL_PREFIX, env)
+    .map((row) => getSupervisor(row.name.slice(CHANNEL_PREFIX.length), env))
     .filter(Boolean)
     .map((sup) => ({ ...sup, online: supervisorOnline(sup, { now, env, onlineMs }) }))
     .sort((a, b) => Number(b.online) - Number(a.online) || String(a.label).localeCompare(String(b.label)) || a.id.localeCompare(b.id));
 }
 
-/* ------------------------------------------------------------ inbox */
+/* ------------------------------------------------------------ inbox and outbox (machine.sqlite sup_messages) */
 
-const parseLines = (text) => String(text ?? '').split(/\r?\n/).filter(Boolean).flatMap((line) => {
-  try { const item = JSON.parse(line); return item && typeof item === 'object' ? [item] : []; } catch { return []; }
-});
+// The newest rows a read returns (the history before them stays in the table).
+const READ_LIMIT = 1000;
+const iso = (ms) => (ms == null ? null : new Date(ms).toISOString());
+const msOf = (at) => { const ms = typeof at === 'number' ? at : Date.parse(at ?? ''); return Number.isFinite(ms) ? ms : Date.now(); };
+const idText = (v) => (v == null || v === '' ? null : String(v));
+const idValue = (v) => (v == null ? null : /^-?\d{1,15}$/.test(v) ? Number(v) : v);
+const inboxItem = (row) => ({ id: row.msg_id, at: iso(row.at), chatId: row.chat_id ?? null, messageId: idValue(row.message_id), text: row.text, read: row.read_at != null,
+  ...(row.read_at != null ? { readAt: iso(row.read_at) } : {}), ...(row.from_ref ? { from: row.from_ref } : {}) });
+const outboxItem = (row) => ({ id: row.msg_id, at: iso(row.at), to: row.to_ref ?? null, via: row.via ?? null, ok: row.ok !== 0, text: row.text });
+const newest = (m, direction, refColumn, id) => m.db.prepare(`SELECT * FROM (SELECT rowid AS rid, * FROM sup_messages WHERE direction=? AND ${refColumn}=? ORDER BY rowid DESC LIMIT ?) ORDER BY rid`)
+  .all(direction, id, READ_LIMIT);
 
-export const readInbox = (id, env = process.env) => {
-  try { return parseLines(fs.readFileSync(inboxFile(id, env), 'utf8')); } catch { return []; }
-};
+/** One supervisor's inbox, oldest first: [{id, at, chatId, messageId, text, read, readAt?, from?}]. */
+export const readInbox = (id, env = process.env) => readMachine((m) => newest(m, 'in', 'to_ref', needId(id)).map(inboxItem), [], { env });
 
 /**
- * Append one message to a supervisor's inbox: {id, at, chatId, messageId, text, read:false, from?}. `from` names a
- * non-Telegram source: 'desktop' (scripts/supervisor/tell.mjs - the reply stays local), 'stall-alert', 'land-gate'.
+ * File one message in a supervisor's inbox: {id, at, chatId, messageId, text, read:false, from?}. `from` names a
+ * non-Telegram source: 'desktop' (scripts/supervisor/tell.mjs - the reply stays local), 'stall-alert', 'land-gate',
+ * 'kernel:<wf>'; such a message is channel 'tell', a Telegram one channel 'telegram'.
  */
 export function appendInbox(id, { chatId, messageId, text, from = null, at = new Date().toISOString() }, { env = process.env } = {}) {
-  const file = inboxFile(id, env);
-  const item = { id: crypto.randomUUID(), at, chatId, messageId: messageId ?? null, text: String(text ?? ''), read: false, ...(from ? { from } : {}) };
-  withFileLock(file, () => fs.appendFileSync(file, `${JSON.stringify(item)}\n`, { mode: 0o600 }));
-  return item;
+  needId(id);
+  const msgId = crypto.randomUUID(), atMs = msOf(at);
+  withMachine((m) => m.recordSupMessage({ msgId, direction: 'in', channel: from ? 'tell' : 'telegram', chatId: idText(chatId), messageId: idText(messageId),
+    from: from ?? null, to: id, text: String(text ?? ''), at: atMs }), { env });
+  return { id: msgId, at: iso(atMs), chatId: chatId ?? null, messageId: messageId ?? null, text: String(text ?? ''), read: false, ...(from ? { from } : {}) };
 }
 
-/* ------------------------------------------------------------ outbox (the supervisor's replies, all of them) */
-
-export const outboxFile = (id, env = process.env) => path.join(supervisorsDir(env), `${needId(id)}.outbox.jsonl`);
-/** Record one reply: {id, at, to, text, via:'telegram'|'desktop'|'none', ok}. The newest 1000 are kept. */
-export function appendOutbox(id, { to = null, text, via, ok = true, error = null, at = new Date().toISOString() }, { env = process.env } = {}) {
-  const file = outboxFile(id, env);
-  const entry = { id: crypto.randomUUID(), at, to, via, ok, text: String(text ?? ''), ...(error ? { error: String(error).slice(0, 300) } : {}) };
-  withFileLock(file, () => {
-    fs.mkdirSync(path.dirname(file), { recursive: true });
-    fs.appendFileSync(file, `${JSON.stringify(entry)}\n`, { mode: 0o600 });
-    try {
-      const lines = fs.readFileSync(file, 'utf8').split(/\r?\n/).filter(Boolean);
-      if (lines.length > 1200) replaceFile(file, `${lines.slice(-1000).join('\n')}\n`);
-    } catch { /* trimming is best effort */ }
-  });
-  return entry;
+/** Record one reply: {id, at, to, text, via:'telegram'|'desktop'|'local'|'none', ok}. */
+export function appendOutbox(id, { to = null, text, via, ok = true, at = new Date().toISOString() }, { env = process.env } = {}) {
+  needId(id);
+  const msgId = crypto.randomUUID(), atMs = msOf(at);
+  withMachine((m) => m.recordSupMessage({ msgId, direction: 'out', channel: via === 'telegram' ? 'telegram' : 'tell', from: id, to: to ?? null, via: via ?? null,
+    text: String(text ?? ''), ok: ok !== false, at: atMs }), { env });
+  return { id: msgId, at: iso(atMs), to, via, ok: ok !== false, text: String(text ?? '') };
 }
-export const readOutbox = (id, env = process.env) => {
-  try { return parseLines(fs.readFileSync(outboxFile(id, env), 'utf8')); } catch { return []; }
-};
+/** One supervisor's replies, oldest first. */
+export const readOutbox = (id, env = process.env) => readMachine((m) => newest(m, 'out', 'from_ref', needId(id)).map(outboxItem), [], { env });
 
 /**
  * The unread inbox items of one supervisor; unless `peek`, they (or only those named in `ids`) are
- * marked read in the same locked pass, so two readers never both take one message.
+ * marked read in the same transaction, so two readers never both take one message.
  */
 export function takeInbox(id, { env = process.env, peek = false, ids = null, now = Date.now() } = {}) {
-  const file = inboxFile(id, env);
-  const run = () => {
-    const items = readInbox(id, env);
-    const wanted = ids ? new Set(ids) : null;
-    const unread = items.filter((item) => !item.read && (!wanted || wanted.has(item.id)));
-    if (peek || !unread.length) return unread;
-    const readAt = new Date(now).toISOString();
-    const taken = new Set(unread.map((item) => item.id));
-    const kept = items.map((item) => (taken.has(item.id) ? { ...item, read: true, readAt } : item));
-    // Read messages are history: keep the newest 500 of them.
-    const readOnes = kept.filter((item) => item.read);
-    const drop = new Set(readOnes.slice(0, Math.max(0, readOnes.length - 500)).map((item) => item.id));
-    replaceFile(file, kept.filter((item) => !drop.has(item.id)).map((item) => `${JSON.stringify(item)}\n`).join(''));
-    return unread;
-  };
-  if (peek) return run();
-  if (!fs.existsSync(file)) return [];
-  return withFileLock(file, run);
+  needId(id);
+  const wanted = ids ? new Set(ids) : null;
+  const unreadOf = (m) => m.db.prepare("SELECT * FROM sup_messages WHERE direction='in' AND to_ref=? AND read_at IS NULL ORDER BY rowid").all(id)
+    .filter((row) => !wanted || wanted.has(row.msg_id));
+  if (peek) return readMachine((m) => unreadOf(m).map(inboxItem), [], { env });
+  return withMachine((m) => m.transaction(() => {
+    const rows = unreadOf(m);
+    for (const row of rows) m.update('sup_messages', { read_at: now }, { msg_id: row.msg_id, read_at: null });
+    return rows.map(inboxItem);
+  }), { env });
 }
 
 /* ------------------------------------------------------------ routes */
 
 const readRoutes = (env) => {
-  const doc = readJson(routeFile(env), null);
+  const doc = connectorState(ROUTE_ROW, env)?.cursor;
   return doc && typeof doc === 'object' && doc.chats && typeof doc.chats === 'object' ? doc : { schema: 'starci/telegram-route@1', chats: {} };
 };
-const writeRoutes = (env, doc) => writeJson(routeFile(env), doc);
+const writeRoutes = (env, doc) => writeConnectorState(ROUTE_ROW, { kind: 'telegram-route', cursor: doc }, env);
 export const chatRoute = (chatId, env = process.env) => readRoutes(env).chats[String(chatId)] ?? null;
 
 /* ------------------------------------------------------------ Bot API */
@@ -700,10 +668,7 @@ export function createBridge({
     }
   };
 
-  const saveOffset = (offset) => {
-    const state = bridgeState(env) ?? {};
-    writeJson(bridgeStateFile(env), { ...state, schema: 'starci/telegram-bridge@1', offset, updatedAt: new Date(now()).toISOString() });
-  };
+  const saveOffset = (offset) => writeConnectorState(BRIDGE_NAME, { kind: 'telegram-bridge', cursor: { offset, at: new Date(now()).toISOString() } }, env);
 
   // MB-11: config.yaml read while it is being rewritten is not "telegram off": the last good settings carry on (the
   // bridge stopped 4 times for 1-6 min on exactly that), and a real change of settings is picked up on the next read.
@@ -808,17 +773,15 @@ export const bridgeReloadFiles = (root = configRoot) => [
   'scripts/supervisor/progress-report.mjs', 'scripts/kernel/serve-ask.mjs', 'scripts/lib/self-reload.mjs', 'engine/config.mjs',
 ].map((rel) => path.join(root, ...rel.split('/')));
 
-const fileLog = (env, echo) => (line) => {
-  const text = `[${new Date().toISOString()}] ${line}\n`;
-  try {
-    fs.appendFileSync(rotateLog(bridgeLogFile(env)), text);
-  } catch { /* logging is best effort */ }
-  if (echo) process.stderr.write(text);
+// The bridge log: machine_logs (actor connector, kind telegram-bridge.log); echoed to a terminal when there is one.
+const bridgeLog = (env, echo) => (line) => {
+  connectorLog(BRIDGE_NAME, line, { env });
+  if (echo) process.stderr.write(`[${new Date().toISOString()}] ${line}\n`);
 };
 
 async function runMain() {
   const env = process.env;
-  const log = fileLog(env, process.stderr.isTTY === true);
+  const log = bridgeLog(env, process.stderr.isTTY === true);
   // A spec run (node --test sets NODE_TEST_CONTEXT, which spawned children inherit) never polls the real bot.
   if (env.NODE_TEST_CONTEXT && !env.STARCI_TELEGRAM_API_BASE) { console.log(JSON.stringify({ ok: true, skipped: 'test context' })); return; }
   const first = telegramSettings({ env });
@@ -831,12 +794,12 @@ async function runMain() {
   const claim = handoverFrom ? claimOrTakeOver(BRIDGE_NAME, { from: handoverFrom, env }) : claimManager(BRIDGE_NAME, { current: bridgeState(env), env });
   if (!claim.ok) { console.log(JSON.stringify({ ok: false, already: true, pid: claim.holder?.pid ?? null })); process.exitCode = 1; return; }
   process.on('exit', claim.release);
-  const prior = bridgeState(env) ?? {};
-  writeJson(bridgeStateFile(env), { schema: 'starci/telegram-bridge@1', pid: process.pid, startedAt: new Date().toISOString(), offset: Number.isSafeInteger(prior.offset) ? prior.offset : null, updatedAt: new Date().toISOString() });
+  // The offset (the row's cursor) survives the restart: only the record of who runs is replaced.
+  writeConnectorState(BRIDGE_NAME, { kind: 'telegram-bridge', state: 'running', pid: process.pid, config: { schema: 'starci/telegram-bridge@1', pid: process.pid, startedAt: new Date().toISOString() } }, env);
   const controller = new AbortController();
   const stop = () => { controller.abort(); claim.release(); process.exit(0); };
   process.on('SIGINT', stop); process.on('SIGTERM', stop);
-  console.log(JSON.stringify({ ok: true, pid: process.pid, log: bridgeLogFile(env) }));
+  console.log(JSON.stringify({ ok: true, pid: process.pid, log: 'machine_logs actor connector kind telegram-bridge.log' }));
   log(`bridge ${process.pid} started${claim.takenOver ? ` (took over from ${handoverFrom})` : ''}`);
   const bridge = createBridge({ env, log, settings: () => telegramSettings({ env }) });
   const watch = createReloadWatch({ root: configRoot, files: bridgeReloadFiles(), lastReloadAt: reloadedAt, headPaths: BRIDGE_HEAD_PATHS });
@@ -844,7 +807,7 @@ async function runMain() {
     const check = watch.check();
     if (!check.reload) return null;
     watch.markAttempt();
-    const handed = await reexecSelf({ script: BRIDGE_FILE, args: ['run'], logFile: bridgeLogFile(env), lockName: BRIDGE_NAME, env, cwd: configRoot });
+    const handed = await reexecSelf({ script: BRIDGE_FILE, args: ['run'], lockName: BRIDGE_NAME, env, cwd: configRoot, actor: 'connector' });
     log(handed.ok ? `bridge ${process.pid} reloading (${check.reason})` : `bridge ${process.pid} reload failed: ${handed.error}`);
     return handed.ok ? handed.pid : null;
   };

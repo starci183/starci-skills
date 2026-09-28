@@ -1,17 +1,15 @@
 // sup-log.mjs — the Supervisor's typed log rows: "log gốc của machine" (owner, 2026-09-28). Every observation,
-// decision, action, message and experiment of the Supervisor is one typed row (scripts/kernel/typed-logs.mjs) in the
-// `logs` table of the SUPERVISOR ledger (<supervisor home>/.starciwork/runtime.sqlite, the machine-wide ledger), on its
-// one workflow wf-supervisor, actor `runtime` (the schema's actor set; the ledger holds nothing but the Supervisor).
-// Kinds: supervisor.action (an owed-action act: item, action, reason, class), decision, narration, cmd.run,
-// check.result, warning, error. The product workflow / job / repo / commit a row concerns rides in `refs`
-// (`workflow:<id>`, `job:<id>`, `repo:<path>`, `commit:<sha>`, `item:<owed-action key>`, `experiment:<id>`) and in
-// data.workflowId. The ui serves them read-only at /api/supervisor/logs (ui/CONTRACT.md).
+// decision, action, message and experiment of the Supervisor is one row of machine.sqlite `machine_logs`
+// (engine/machine-db.mjs log), actor `supervisor`. Kinds: supervisor.action (an owed-action act: item, action, reason,
+// class), decision, narration, cmd.run, check.result, warning, error. The product workflow / job / repo / commit a row
+// concerns rides in `refs` (refs_json: `workflow:<id>`, `job:<id>`, `repo:<path>`, `commit:<sha>`, `item:<owed-action
+// key>`, `experiment:<id>`) and in data.workflowId (data_json).
 // Best effort: a log write never fails the Supervisor's own step.
-import { appendLog, openLogs } from '../kernel/typed-logs.mjs';
-import { SUPERVISOR_WF, openSupervisorLedger, supervisorHome } from './home.mjs';
+import { withMachine } from '../../engine/machine-db.mjs';
 import { slash } from '../lib/path-key.mjs';
 
-export const SUP_ACTOR = 'runtime';
+export const SUP_ACTOR = 'supervisor';
+const LEVELS = new Set(['debug', 'info', 'warn', 'error']);
 
 /** refs for a row: workflow/job/repo/commit/item/experiment, deduped, strings only. Pure. */
 export function refsOf({ workflowId = null, jobId = null, repo = null, commits = [], item = null, experiment = null, extra = [] } = {}) {
@@ -26,25 +24,29 @@ export function refsOf({ workflowId = null, jobId = null, repo = null, commits =
   return [...new Set(out)];
 }
 
+/** One typed row ({kind, msg, data?, refs?, level?, at?}) as a machine_logs row of actor supervisor. Pure. */
+export const machineRow = (r) => ({
+  actor: SUP_ACTOR, kind: String(r.kind), msg: String(r.msg ?? '').slice(0, 4000), level: LEVELS.has(r.level) ? r.level : 'info',
+  data: r.data ?? null, refs: Array.isArray(r.refs) && r.refs.length ? r.refs.map(String) : null, at: Number.isFinite(r.at) ? r.at : Date.now(),
+  workflowId: r.data?.workflowId && !String(r.data.workflowId).includes(',') ? String(r.data.workflowId) : null,
+});
+
 /**
- * Append rows ({kind, msg, data?, refs?, level?, at?}) to the supervisor ledger's logs. Returns {ok, written} or
- * {ok: false, error}; never throws.
+ * Append rows ({kind, msg, data?, refs?, level?, at?}) to machine_logs. Returns {ok, written} or {ok: false, error};
+ * never throws. One bad row never blocks the rest.
  */
 export function supLogRows(rows, { env = process.env } = {}) {
-  const list = (Array.isArray(rows) ? rows : [rows]).filter(Boolean);
+  const list = (Array.isArray(rows) ? rows : [rows]).filter((r) => r && r.kind);
   if (!list.length) return { ok: true, written: 0 };
-  let logs = null;
   try {
-    openSupervisorLedger({ env }).close(); // the ledger, its schema (logs) and wf-supervisor exist
-    logs = openLogs(supervisorHome(env));
-    let written = 0;
-    for (const r of list) {
-      try { appendLog(logs, { workflowId: SUPERVISOR_WF, actor: SUP_ACTOR, ...r }, { clip: true }); written += 1; } catch { /* one bad row never blocks the rest */ }
-    }
-    return { ok: true, written };
+    return withMachine((m) => {
+      let written = 0;
+      for (const r of list) { try { written += m.log(machineRow(r)); } catch { /* skipped */ } }
+      return { ok: true, written };
+    }, { env });
   } catch (error) {
     return { ok: false, error: String(error?.message ?? error).slice(0, 200) };
-  } finally { try { logs?.close(); } catch { /* closed */ } }
+  }
 }
 export const supLog = (row, options) => supLogRows([row], options);
 

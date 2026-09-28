@@ -2,17 +2,16 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
-import { createRequire } from 'node:module';
 import { withLedger, seedWorkflow } from './_ledger-fixture.mjs';
 import controller, { reconcileWorkflow, listWorkflows, planWorkflow, workflowSettings, keyOf } from '../scripts/reconciler/controllers/workflow.mjs';
-import { slaPass, clocksOf, SLA_CLOCKS_DDL } from '../scripts/reconciler/sla.mjs';
+import { slaPass, clocksOf } from '../scripts/reconciler/sla.mjs';
+import { TEST_REGISTRY_ENV } from '../engine/machine-db.mjs';
 
 // Lane rc-sla-workflow, the Workflow controller (DESIGN.md §8.2, §9.2, §17.1). Fixture: the nivo Collab incident the
 // stall specs use (tests/supervisor-stall.spec.mjs) - an owner gate naming a record that has since landed, a workflow
 // idle 120 minutes. The ctx is the smallest one the engine contract describes (LANES.md "Shared contract"): shadow
-// mode, api / openDecision / log recorded, a temp reconciler.sqlite for the SLA clocks.
+// mode, api / openDecision / log recorded, a temp machine.sqlite for the SLA clocks (sla_episodes).
 
-const require = createRequire(import.meta.url);
 const MIN = 60_000;
 const NOW = Date.now();
 const WF = 'wf-nivo-collab-group-chat-mudqjp5g';
@@ -43,13 +42,12 @@ const writeShell = (repoRoot) => {
 const status = ({ frontier = {}, ...over } = {}) => ({ ok: true, phase: 'running', workers: [], progress: null, rca: null, stuck: [], ...over,
   frontier: { state: 'engaged', actionable: false, queued: [], queuedCauses: { 'owner-gate': 3 }, reason: null, ...frontier } });
 
-/** The shadow ctx: every action recorded; clocks in a temp reconciler.sqlite through sla.mjs (no ctx.clock). */
+/** The shadow ctx: every action recorded; clocks in a temp machine.sqlite through sla.mjs (no ctx.clock, no ctx.machine). */
 function fakeCtx({ repoRoot, ledgerFile, statusOf = () => status(), now = NOW }) {
-  const stateFile = path.join(path.dirname(repoRoot), 'reconciler.sqlite');
-  if (!fs.existsSync(stateFile)) { const { DatabaseSync } = require('node:sqlite'); const db = new DatabaseSync(stateFile); db.exec(SLA_CLOCKS_DDL); db.close(); }
+  const stateFile = path.join(path.dirname(repoRoot), 'machine.sqlite');
   const rec = { api: [], run: [], decisions: [], logs: [] };
   const ctx = {
-    mode: 'shadow', now: () => now, stateFile, env: { ...process.env, STARCI_SUPERVISOR_HOME: path.join(path.dirname(repoRoot), 'sup') },
+    mode: 'shadow', now: () => now, stateFile, env: { ...process.env, STARCI_SUPERVISOR_HOME: path.join(path.dirname(repoRoot), 'sup'), [TEST_REGISTRY_ENV]: stateFile },
     ledgers: [{ ledgerId: LEDGER, repo: repoRoot, file: ledgerFile }, { ledgerId: 'supervisor', repo: null, file: path.join(path.dirname(repoRoot), 'nope.sqlite') }],
     status: async (_ledgerId, wf) => statusOf(wf),
     api: async (ledgerId, verb, argv) => { rec.api.push({ ledgerId, verb, argv }); return { ok: true, shadow: true }; },

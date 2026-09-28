@@ -5,9 +5,8 @@ import os from 'node:os';
 import path from 'node:path';
 import {spawnSync} from 'node:child_process';
 import {withLedger,seedWorkflow} from './_ledger-fixture.mjs';
-import {owedFindings,patternFindings,ackOwed,unackOwed,readOwedAcks,ackHolds,CLASSES,OWED_ACK_SCOPE} from '../scripts/supervisor/owed.mjs';
-import {readInbox} from '../scripts/connectors/telegram-bridge.mjs';
-import {inspectLedger,ledgerFileFor} from '../engine/ledger-db.mjs';
+import {owedFindings,patternFindings,ackOwed,unackOwed,readOwedAcks,ackHolds,CLASSES} from '../scripts/supervisor/owed.mjs';
+import {readMachine} from '../engine/machine-db.mjs';
 
 // A retry-loop / repeat-check stays OWED until a success breaks its streak, so a lineage whose causes
 // were already fixed re-alerted every hour: mia wf-miamia-work-and-stacks-mud7kjun brand.decide a1-a8
@@ -95,29 +94,28 @@ test('an owner ask filed by a job the tail waits --after is the owner\'s too; a 
   assert.equal(findings(ledger.db,repoRoot).owed.some(i=>i.key===LOOP),true,'answered: the lineage is OWED again');
 }));
 
-test('ack, acks and unack keep the disposition in the supervisor ledger with its audit event',t=>{
+test('ack, acks and unack keep the disposition in machine.sqlite sup_owed with its audit event',t=>{
   const home=fs.mkdtempSync(path.join(os.tmpdir(),'starci-owed-ack-'));
   t.after(()=>fs.rmSync(home,{recursive:true,force:true,maxRetries:20,retryDelay:25}));
-  const env={...process.env,STARCI_SUPERVISOR_HOME:home};
-  assert.equal(readOwedAcks({env}).size,0,'no supervisor ledger yet: no acks');
+  const env={...process.env,STARCI_TEST_MACHINE_FILE:path.join(home,'machine.sqlite')};
+  assert.equal(readOwedAcks({env}).size,0,'no machine.sqlite yet: no acks');
   ackOwed({key:LOOP,commits:['a'.repeat(40)],reason:'fixed by the four commits',item:{workflowId:WF,summary:'brand.decide loop'},now:NOW,env});
   const acks=readOwedAcks({env});
   assert.deepEqual({...acks.get(LOOP)},{key:LOOP,commits:['a'.repeat(40)],reason:'fixed by the four commits',at:NOW,by:'cli',workflowId:WF,summary:'brand.decide loop'});
-  const l=inspectLedger({file:ledgerFileFor(home)});
-  try{
-    assert.equal(l.db.prepare('SELECT COUNT(*) n FROM signals WHERE scope=?').get(OWED_ACK_SCOPE).n,1);
-    assert.equal(l.db.prepare("SELECT COUNT(*) n FROM events WHERE kind='owed-acked' AND entity_id=?").get(LOOP).n,1);
-  }finally{l.close();}
+  const counts=()=>readMachine(m=>({acked:m.db.prepare("SELECT COUNT(*) n FROM sup_owed WHERE owed_id=? AND state='acked'").get(LOOP).n,
+    events:m.supEvents({kinds:['owed-acked','owed-unacked'],entityId:LOOP}).map(e=>e.kind)}),null,{env});
+  assert.deepEqual(counts(),{acked:1,events:['owed-acked']});
   assert.equal(unackOwed({key:LOOP,env}),true);
   assert.equal(unackOwed({key:LOOP,env}),false);
   assert.equal(readOwedAcks({env}).size,0);
+  assert.deepEqual(counts(),{acked:0,events:['owed-unacked','owed-acked']});
 });
 
 test('owed.mjs ack refuses a missing reason, a sha that is no commit and an item that is not OWED (unless --force)',t=>{
   const home=fs.mkdtempSync(path.join(os.tmpdir(),'starci-owed-ack-cli-'));
   t.after(()=>fs.rmSync(home,{recursive:true,force:true,maxRetries:20,retryDelay:25}));
   const repo=path.join(home,'repo');fs.mkdirSync(repo,{recursive:true});
-  const run=args=>{const r=spawnSync(process.execPath,[OWED_CLI,...args,'--repo',repo,'--json'],{cwd:ROOT,encoding:'utf8',windowsHide:true,timeout:120000,env:{...process.env,STARCI_SUPERVISOR_HOME:home}});
+  const run=args=>{const r=spawnSync(process.execPath,[OWED_CLI,...args,'--repo',repo,'--json'],{cwd:ROOT,encoding:'utf8',windowsHide:true,timeout:120000,env:{...process.env,STARCI_TEST_MACHINE_FILE:path.join(home,'machine.sqlite')}});
     return {status:r.status,out:JSON.parse(r.stdout.trim().split('\n').pop())};};
   const head=spawnSync('git',['-C',ROOT,'rev-parse','HEAD'],{encoding:'utf8'}).stdout.trim();
   assert.match(run(['ack','--item',LOOP,'--commits',head]).out.error,/needs --item, --commits and --reason|needs --item <key>, --commits/);

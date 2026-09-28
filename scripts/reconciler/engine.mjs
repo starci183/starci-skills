@@ -2,11 +2,16 @@
 //
 // It runs the file-discovered controllers (scripts/reconciler/controllers/*.mjs, discovered like the api verbs of
 // scripts/kernel/api-extensions.mjs) level-triggered and idempotently:
-//   - leader: the host lock claimManager('reconciler') (scripts/connectors/lib.mjs) AND the reconciler.sqlite `leader`
-//     row with an incrementing epoch, renewed every allocation.reconciler.renewMs, lost after leaseMs. A second
-//     engine stands by read-only and takes over (epoch + 1) once the row expires. Every mutation is fenced on the
-//     epoch (ctx.mjs); a leader that loses the row stops and exits (DESIGN §7.5, §12.3);
-//   - heartbeat: the leader row and the file reconciler.heartbeat, every renewMs (owns.mjs, boot.mjs ensure);
+//   - leader: the host lock claimManager('reconciler') (scripts/connectors/lib.mjs) AND the machine.sqlite
+//     `engine_leader` row with an incrementing epoch (every epoch a leader_history row: how it was acquired, why it was
+//     released), renewed every allocation.reconciler.renewMs, lost after leaseMs. A second engine stands by and takes
+//     over (epoch + 1) once the row expires. Every mutation is fenced on the epoch (ctx.mjs); a leader that loses the
+//     row stops and exits (DESIGN §7.5, §12.3);
+//   - heartbeat: engine_leader.heartbeat_at (+ draining) and this process's process_runs.last_heartbeat_at, every
+//     renewMs (owns.mjs, boot.mjs ensure). Every start and exit of the engine is a process_runs row (role engine:
+//     start_reason, exit_reason, heartbeat age at the end; MB-04, G1); its log lines are machine_logs actor
+//     'reconciler'. Its ONE machine.sqlite connection is the WAL checkpointer (openMachine checkpointer, checkpoint()
+//     every CHECKPOINT_MS);
 //   - self-reload (scripts/lib/self-reload.mjs): a new runtime HEAD that changed a file under RELOAD_HEAD_PATHS, or a
 //     changed engine file, re-execs the engine and hands the lock and the leader row over. While it drains for the
 //     reload, a timer keeps renewing the lease and the heartbeat says `draining`, so boot.mjs ensure leaves it alone
@@ -34,23 +39,19 @@ import { AsyncLocalStorage } from 'node:async_hooks';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { createRequire } from 'node:module';
 import { fileURLToPath, pathToFileURL } from 'node:url';
+import { CONTROLLERS as MACHINE_CONTROLLERS, openMachine } from '../../engine/machine-db.mjs';
 import { claimOrTakeOver } from '../connectors/lib.mjs';
 import { createReloadWatch, reexecSelf, RELOAD_ENV, runtimeHead } from '../lib/self-reload.mjs';
 import { lowerOwnPriority } from '../lib/low-priority.mjs';
-import { supLog } from '../supervisor/sup-log.mjs';
-import { DECISIONS_FILE, createCtx, logRowOf, spawnJson } from './ctx.mjs';
+import { DECISIONS_FILE, createCtx, logRowOf, reconcilerLog, spawnJson } from './ctx.mjs';
 import { ledgersOf, pollAll } from './sources.mjs';
 import { CONCERN_OWNER } from './owns.mjs';
 import {
-  CONTROLLER_NAMES, LEADER_NAME, MODES, SCHEMA_SQL, SKILL_ROOT, configuredMode, controllerModule, heartbeatFile, leaderOf, openState,
-  reconcilerConfig, reconcilerLogFile, reconcilerNumbers, reconcilerStateFile, tx,
+  CONTROLLER_NAMES, LEADER_NAME, MODES, SKILL_ROOT, START_REASON_ENV, configuredMode, controllerModule, reconcilerConfig, reconcilerNumbers,
 } from './state.mjs';
-import { WorkQueue } from './workqueue.mjs';
+import { WorkQueue, machineRows, memoryRows } from './workqueue.mjs';
 
-// node:sqlite is loaded on first use (like engine/ledger-db.mjs), so importing this module prints no ExperimentalWarning.
-const sqlite = () => createRequire(import.meta.url)('node:sqlite');
 export const CONTROLLERS_DIR = path.join(SKILL_ROOT, 'scripts', 'reconciler', 'controllers');
 export const SLA_FILE = path.join(SKILL_ROOT, 'scripts', 'reconciler', 'sla.mjs');
 export const LOCK_NAME = 'reconciler';
@@ -62,6 +63,8 @@ export const RELOAD_CHECK_MS = 60_000;
 export const DEFAULTS = Object.freeze({ resyncMs: 60_000, concurrency: 1, timeoutMs: 300_000 });
 /** An intent/running action older than this, from an earlier epoch, is `unknown` (DESIGN §7.6). */
 export const STALE_ACTION_MS = 150_000;
+/** The engine's connection checkpoints machine.sqlite's WAL this often (PASSIVE; it is the one checkpointer). */
+export const CHECKPOINT_MS = 60_000;
 
 const selfFile = fileURLToPath(import.meta.url);
 const posInt = (v, d) => (Number.isFinite(Number(v)) && Number(v) > 0 ? Number(v) : d);
@@ -93,8 +96,8 @@ export class Engine {
     env = process.env, now = Date.now, controllersDir = CONTROLLERS_DIR, controllers = null, safe = false, apply = true,
     numbers = null, config = null, ledgers = null, state = null, stateOptions = {}, holder = null,
     claimLock = (from) => claimOrTakeOver(LOCK_NAME, { from, env }), handoverFrom = null,
-    spawnChild = spawnJson, writeLog = (row) => supLog(row, { env }), reader = undefined, slaModule = undefined, print = (line) => console.log(line),
-    rev = null, loadDecisions = undefined, memoryQueue = false,
+    spawnChild = spawnJson, writeLog = (row) => reconcilerLog(this.state, row, { env }), reader = undefined, slaModule = undefined, print = (line) => console.log(line),
+    rev = null, loadDecisions = undefined, memoryQueue = false, processRunId = null, echo = false,
   } = {}) {
     this.env = env;
     this.now = now;
@@ -105,9 +108,12 @@ export class Engine {
     this.numbers = numbers ?? reconcilerNumbers();
     this.configFn = typeof config === 'function' ? config : () => (config ?? reconcilerConfig());
     this.ledgersFn = typeof ledgers === 'function' ? ledgers : () => ledgers ?? ledgersOf({ env });
-    this.state = state ?? openState({ env, ...stateOptions });
-    this.stateFile = stateOptions.file ?? (state ? null : reconcilerStateFile(env));
+    // The engine's ONE machine.sqlite connection, the WAL checkpointer (engine/machine-db.mjs openMachine).
+    this.state = state ?? openMachine({ env, now, checkpointer: true, ...stateOptions });
+    this.stateFile = this.state.file ?? null;
     this.ownsState = !state;
+    this.processRunId = processRunId;
+    this.echo = echo;
     this.holder = holder ?? `${os.hostname()}:${process.pid}:${crypto.randomBytes(4).toString('hex')}`;
     this.claimLock = claimLock;
     this.handoverFrom = handoverFrom;
@@ -119,8 +125,7 @@ export class Engine {
     this.print = print;
     this.rev = rev;
     // --once keeps its queue in memory, so a debugging pass never takes a live engine's queued keys.
-    this.queueDb = memoryQueue ? (() => { const db = new (sqlite().DatabaseSync)(':memory:'); db.exec(SCHEMA_SQL); return db; })() : this.state;
-    this.queue = new WorkQueue({ db: this.queueDb, now, backoff: this.numbers.backoff });
+    this.queue = new WorkQueue({ rows: memoryQueue ? memoryRows() : machineRows(this.state), now, backoff: this.numbers.backoff });
     this.shared = { statusCache: new Map(), wouldSeen: new Map() };
     this.controllers = []; // [{name, module, mode, resyncMs, concurrency, timeoutMs, lastResyncAt}]
     this.loadErrors = [];
@@ -132,15 +137,17 @@ export class Engine {
     this.lost = false;
     this.draining = false;
     this.running = new Set();
-    this.timers = { renewAt: 0, pollAt: 0, configAt: 0, slaAt: 0, staleAt: 0, escalateAt: 0 };
+    this.timers = { renewAt: 0, pollAt: 0, configAt: 0, slaAt: 0, staleAt: 0, escalateAt: 0, checkpointAt: 0 };
     this.als = new AsyncLocalStorage();
     this.ctxCache = new Map();
     this.ledgers = [];
   }
 
+  /** One machine_logs row (actor reconciler); printed only when --once echoes or the row could not be written. */
   log(kind, msg, data = {}) {
-    this.print(`[reconciler ${new Date(this.now()).toISOString()}] ${msg}`);
-    try { this.writeLog(logRowOf('engine', kind, msg, data)); } catch { /* best effort */ }
+    let written = false;
+    try { written = this.writeLog(logRowOf('engine', kind, msg, data)) !== false; } catch { written = false; }
+    if (this.echo || !written) this.print(`[reconciler ${new Date(this.now()).toISOString()}] ${msg}`);
   }
 
   /** Discover (or take the injected) controllers and apply config modes and module numbers. */
@@ -181,14 +188,21 @@ export class Engine {
     if (this.leader) this.writeModes();
   }
 
+  /**
+   * Record the EFFECTIVE mode of each controller in controller_modes; a change is a mode_changes row first (who and why,
+   * G6). The engine never chooses a mode: it records what config.yaml (and --safe / --once) make effective.
+   */
   writeModes() {
-    const at = this.now();
     try {
-      tx(this.state, (db) => {
-        const put = db.prepare('INSERT INTO modes(controller,mode,set_at) VALUES(?,?,?) ON CONFLICT(controller) DO UPDATE SET mode=excluded.mode, set_at=CASE WHEN modes.mode=excluded.mode THEN modes.set_at ELSE excluded.set_at END');
-        for (const [name, mode] of Object.entries(this.modes)) put.run(name, mode, at);
+      this.state.transaction(() => {
+        for (const [name, mode] of Object.entries(this.modes)) {
+          if (!MACHINE_CONTROLLERS.includes(name)) continue;
+          const configured = configuredMode(name, (() => { try { return this.configFn(); } catch { return { enabled: false, controllers: {} }; } })());
+          const reason = mode !== configured ? `${this.safe ? 'safe mode' : 'no --apply'}: configured ${configured} runs ${mode}` : `config.yaml reconciler.controllers.${name}.mode`;
+          this.state.setControllerMode({ controller: name, mode, by: `engine:${this.holder}`, reason });
+        }
       });
-    } catch (error) { this.print(`[reconciler] modes write failed: ${error?.message ?? error}`); }
+    } catch (error) { this.log('reconciler.error', `modes write failed: ${String(error?.message ?? error).slice(0, 300)}`, { kind: 'reconciler.modes-write-failed' }); }
   }
 
   /** Try to become the leader. {ok, epoch} or {ok:false, standby: reason}. */
@@ -201,17 +215,15 @@ export class Engine {
     }
     const now = this.now();
     const { leaseMs } = this.numbers;
-    const handover = Number(this.handoverFrom) || null;
-    const out = tx(this.state, (db) => {
-      const row = leaderOf(db);
-      const mine = row?.holder === this.holder;
-      const free = !row || mine || row.expires_at <= now || (handover && row.pid === handover);
-      if (!free) return { ok: false, standby: `leader ${row.holder} epoch ${row.epoch} until ${new Date(row.expires_at).toISOString()}` };
-      const epoch = mine ? Number(row.epoch) : (Number(row?.epoch) || 0) + 1;
-      db.prepare(`INSERT INTO leader(name,holder,pid,epoch,heartbeat_at,expires_at,rev) VALUES(?,?,?,?,?,?,?)
-        ON CONFLICT(name) DO UPDATE SET holder=excluded.holder,pid=excluded.pid,epoch=excluded.epoch,heartbeat_at=excluded.heartbeat_at,expires_at=excluded.expires_at,rev=excluded.rev`)
-        .run(LEADER_NAME, this.holder, process.pid, epoch, now, now + leaseMs, this.rev);
-      return { ok: true, epoch, tookOver: !mine && Boolean(row) };
+    const handoverPid = Number(this.handoverFrom) || null;
+    // acquireLeader: a fresh or expired lease is taken with epoch + 1 and a leader_history row (fresh | takeover-stale |
+    // handover; the previous epoch's row is closed as reload | lost); the holder's own row is renewed.
+    const out = this.state.transaction(() => {
+      const row = this.state.leaderOf(LEADER_NAME);
+      const handover = Boolean(handoverPid && row && row.pid === handoverPid && row.holder !== this.holder);
+      const r = this.state.acquireLeader({ name: LEADER_NAME, holder: this.holder, pid: process.pid, leaseMs, rev: this.rev ?? undefined, processRunId: this.processRunId, handover });
+      if (!r.leader) return { ok: false, standby: `leader ${row?.holder ?? r.holder} epoch ${r.epoch} until ${row ? new Date(row.expires_at).toISOString() : '?'}` };
+      return { ok: true, epoch: Number(r.epoch), tookOver: !r.renewed && Boolean(row) };
     });
     if (out.ok) {
       const first = !this.leader;
@@ -222,7 +234,7 @@ export class Engine {
       if (first) {
         this.markStaleActions({ all: true });
         this.writeModes();
-        this.writeHeartbeatFile();
+        this.heartbeat();
         this.log('reconciler.event', `leader ${this.holder} epoch ${out.epoch}${out.tookOver ? ' (took over)' : ''}${this.safe ? ' SAFE MODE' : ''}`, { kind: 'reconciler.leader-acquired', epoch: out.epoch, safe: this.safe });
       }
     }
@@ -234,8 +246,8 @@ export class Engine {
     const now = this.now();
     let changes = 0;
     try {
-      changes = this.state.prepare('UPDATE leader SET heartbeat_at=?, expires_at=?, rev=? WHERE name=? AND holder=? AND epoch=?')
-        .run(now, now + this.numbers.leaseMs, this.rev, LEADER_NAME, this.holder, this.epoch).changes;
+      const row = this.state.leaderOf(LEADER_NAME);
+      changes = row?.holder === this.holder && this.state.renewLeader({ name: LEADER_NAME, epoch: this.epoch, leaseMs: this.numbers.leaseMs, draining: this.draining }) ? 1 : 0;
     } catch (error) { this.print(`[reconciler] renew failed: ${error?.message ?? error}`); return true; } // busy: retry next tick
     if (!changes) {
       this.leader = false;
@@ -244,14 +256,14 @@ export class Engine {
       return false;
     }
     this.timers.renewAt = now + this.numbers.renewMs;
-    this.writeHeartbeatFile();
+    this.heartbeat();
     return true;
   }
 
   /** The fence: this engine's epoch is still the leader's, and the lease has not run out. */
   isCurrentEpoch() {
     try {
-      const row = leaderOf(this.state);
+      const row = this.state.leaderOf(LEADER_NAME);
       if (!row || row.holder !== this.holder || Number(row.epoch) !== this.epoch) return false;
       if (row.expires_at > this.now()) return true;
       // MB-04: the row still names this engine at this epoch, so nobody took over; an expired lease of its own never
@@ -260,12 +272,9 @@ export class Engine {
     } catch { return false; }
   }
 
-  writeHeartbeatFile() {
-    try {
-      const file = heartbeatFile(this.env);
-      fs.mkdirSync(path.dirname(file), { recursive: true });
-      fs.writeFileSync(file, `${JSON.stringify({ schema: 'starci/reconciler-heartbeat@1', holder: this.holder, pid: process.pid, epoch: this.epoch, at: this.now(), draining: this.draining, safe: this.safe, modes: this.modes, rev: this.rev })}\n`);
-    } catch { /* best effort */ }
+  /** This process's process_runs heartbeat (+ draining_since while it drains); engine_leader.heartbeat_at is renew()'s. */
+  heartbeat() {
+    try { if (this.processRunId != null) this.state.heartbeatProcessRun(this.processRunId, { draining: this.draining }); } catch { /* best effort */ }
   }
 
   /** intent/running actions of an earlier epoch (or, at acquire, of any other process) past STALE_ACTION_MS -> unknown. */
@@ -273,17 +282,18 @@ export class Engine {
     try {
       const cutoff = this.now() - STALE_ACTION_MS;
       const n = all
-        ? this.state.prepare("UPDATE actions SET state='unknown', finished_at=? WHERE state IN ('intent','running') AND (epoch IS NULL OR epoch<? OR started_at<?)").run(this.now(), this.epoch, cutoff).changes
-        : this.state.prepare("UPDATE actions SET state='unknown', finished_at=? WHERE state IN ('intent','running') AND epoch<? AND started_at<?").run(this.now(), this.epoch, cutoff).changes;
+        ? this.state.db.prepare("UPDATE engine_actions SET state='unknown', finished_at=? WHERE state IN ('intent','running') AND (epoch IS NULL OR epoch<? OR COALESCE(started_at,0)<?)").run(this.now(), this.epoch, cutoff).changes
+        : this.state.db.prepare("UPDATE engine_actions SET state='unknown', finished_at=? WHERE state IN ('intent','running') AND epoch<? AND COALESCE(started_at,0)<?").run(this.now(), this.epoch, cutoff).changes;
       if (n) this.log('reconciler.event', `${n} stale action(s) marked unknown (re-evaluated from the ledger, never replayed)`, { kind: 'reconciler.actions-unknown', count: n });
       return n;
     } catch { return 0; }
   }
 
-  /** Release the leader row on a clean stop (the heartbeat goes stale at once, so the old loops take their duties back). */
-  release() {
+  /** Release the leader row (leader_history closes with `reason`: stop | crash | killed | ...); the next engine takes a fresh lease. */
+  release({ reason = 'stop' } = {}) {
     try {
-      this.state.prepare('UPDATE leader SET heartbeat_at=0, expires_at=? WHERE name=? AND holder=? AND epoch=?').run(this.now(), LEADER_NAME, this.holder, this.epoch);
+      const row = this.state.leaderOf(LEADER_NAME);
+      if (row?.holder === this.holder && Number(row.epoch) === this.epoch) this.state.releaseLeader({ name: LEADER_NAME, epoch: this.epoch, reason });
     } catch { /* best effort */ }
     this.leader = false;
     try { this.lock?.release?.(); } catch { /* best effort */ }
@@ -308,7 +318,7 @@ export class Engine {
   /** Poll the events of every ledger and queue the routed keys (non-off controllers only). */
   pollSources() {
     const on = this.controllers.filter((c) => c.mode !== 'off').map((c) => ({ name: c.name, routes: c.module.routes }));
-    const out = pollAll(this.state, this.ledgers, on, { now: this.now() });
+    const out = pollAll(this.state, this.ledgers, on, { now: this.now(), ...(this.reader ? { reader: this.reader } : {}) });
     for (const r of out.routed) this.queue.add(r.controller, r.key, { reason: r.reason });
     return out;
   }
@@ -430,15 +440,19 @@ export class Engine {
     this.dispatch();
     if (now >= this.timers.slaAt) { this.timers.slaAt = now + SLA_PASS_MS; await this.slaPass(); }
     if (now >= this.timers.escalateAt) { this.timers.escalateAt = now + ESCALATE_MS; await this.escalatePass(); }
+    if (now >= this.timers.checkpointAt) {
+      this.timers.checkpointAt = now + CHECKPOINT_MS;
+      try { this.state.checkpoint(); } catch (error) { this.log('reconciler.error', `checkpoint failed: ${String(error?.message ?? error).slice(0, 300)}`, { kind: 'reconciler.checkpoint-failed' }); }
+    }
     return { leader: true };
   }
 
   /** Wait for every running reconcile; the heartbeat says `draining` meanwhile (boot.mjs ensure leaves it alone). */
   async drain() {
     this.draining = true;
-    if (this.leader) { this.renew(); this.writeHeartbeatFile(); }
+    if (this.leader) this.renew();
     try { while (this.running.size) await Promise.allSettled([...this.running]); }
-    finally { this.draining = false; if (this.leader) this.writeHeartbeatFile(); }
+    finally { this.draining = false; if (this.leader) this.renew(); }
   }
 
   /** The long-lived loop: until stop(), a lost lead, or a reload handed over. */
@@ -452,7 +466,7 @@ export class Engine {
     try {
       while (!this.stopped) {
         let r;
-        try { r = await this.step(); } catch (error) { this.print(`[reconciler] step failed: ${error?.stack ?? error}`); r = { leader: this.leader }; }
+        try { r = await this.step(); } catch (error) { this.log('reconciler.error', `step failed: ${String(error?.message ?? error).slice(0, 300)}`, { kind: 'reconciler.step-failed', detail: String(error?.stack ?? error).slice(0, 2000) }); r = { leader: this.leader }; }
         if (r.lost) { await this.drain(); return { exitCode: 0, lost: true }; }
         if (watch && reload && this.now() >= reloadCheckAt) {
           reloadCheckAt = this.now() + RELOAD_CHECK_MS;
@@ -474,10 +488,9 @@ export class Engine {
 
   stop() { this.stopped = true; }
 
-  close({ releaseLead = true } = {}) {
-    if (releaseLead && this.leader) this.release();
+  close({ releaseLead = true, reason = 'stop' } = {}) {
+    if (releaseLead && this.leader) this.release({ reason });
     else { try { this.lock?.release?.(); } catch { /* best effort */ } }
-    if (this.queueDb !== this.state) { try { this.queueDb.close(); } catch { /* closed */ } }
     if (this.ownsState) { try { this.state.close(); } catch { /* closed */ } }
   }
 
@@ -537,7 +550,9 @@ async function main(argv = process.argv.slice(2)) {
   const json = argv.includes('--json');
   if (argv.includes('--once')) {
     const apply = argv.includes('--apply');
-    const engine = new Engine({ apply, memoryQueue: true, safe: argv.includes('--safe'), rev: runtimeHead({ root: SKILL_ROOT }), print: json ? () => {} : (l) => console.log(l) });
+    const engine = new Engine({ apply, memoryQueue: true, safe: argv.includes('--safe'), rev: runtimeHead({ root: SKILL_ROOT }), print: json ? () => {} : (l) => console.log(l), echo: !json,
+    // a debugging pass is not the checkpointer (the long-lived engine's connection is)
+    stateOptions: { checkpointer: false } });
     let result;
     try {
       await engine.load();
@@ -556,17 +571,33 @@ async function main(argv = process.argv.slice(2)) {
   delete process.env[RELOAD_ENV.handoverFrom];
   delete process.env[RELOAD_ENV.reloadedAt];
   const safe = argv.includes('--safe');
-  const engine = new Engine({ safe, handoverFrom, rev: runtimeHead({ root: SKILL_ROOT }) });
+  const startReason = handoverFrom ? 'self-reload' : process.env[START_REASON_ENV] || 'manual';
+  delete process.env[START_REASON_ENV];
+  // Before machine.sqlite opens, stdout is the only place a crash can go (boot.mjs spawns the engine with no log file).
+  const rev = runtimeHead({ root: SKILL_ROOT });
+  const engine = new Engine({ safe, handoverFrom, rev, print: (l) => console.log(l) });
+  // MB-04, G1: this start is a process_runs row; its end says why (clean | reload-handover | lost-lease | stopped | crash).
+  try { engine.processRunId = engine.state.startProcessRun({ role: 'engine', rev: rev ?? undefined, startReason }); } catch (error) { console.error(`[reconciler] process run not recorded: ${error?.message ?? error}`); }
+  let stopSignal = null;
+  const endRun = (fields) => { try { if (engine.processRunId != null) engine.state.endProcessRun(engine.processRunId, fields); } catch { /* best effort */ } };
+  const onCrash = (error) => {
+    try { engine.log('reconciler.error', `engine crashed: ${String(error?.message ?? error).slice(0, 300)}`, { kind: 'reconciler.crash', detail: String(error?.stack ?? error).slice(0, 4000) }); } catch { console.error(error); }
+    endRun({ exitCode: 1, exitReason: 'crash' });
+    try { engine.close({ reason: 'crash' }); } catch { /* closing */ }
+    process.exit(1);
+  };
+  process.on('uncaughtException', onCrash);
+  process.on('unhandledRejection', onCrash);
   await engine.load();
   const first = engine.acquire();
-  if (!first.ok) engine.print(`[reconciler] standby: ${first.standby}`);
-  const onSignal = () => { engine.stop(); };
+  if (!first.ok) engine.log('reconciler.event', `standby: ${first.standby}`, { kind: 'reconciler.standby' });
+  const onSignal = (sig) => { stopSignal = sig; engine.stop(); };
   for (const sig of ['SIGINT', 'SIGTERM']) process.on(sig, onSignal);
-  const logFile = reconcilerLogFile();
-  const watch = createReloadWatch({ root: SKILL_ROOT, files: reloadWatchedFiles(), lastReloadAt: reloadedAt, logFile, headPaths: RELOAD_HEAD_PATHS });
-  const reload = () => reexecSelf({ script: selfFile, args: argv, logFile, lockName: LOCK_NAME, cwd: SKILL_ROOT });
+  const watch = createReloadWatch({ root: SKILL_ROOT, files: reloadWatchedFiles(), lastReloadAt: reloadedAt, headPaths: RELOAD_HEAD_PATHS });
+  const reload = () => reexecSelf({ script: selfFile, args: argv, logFile: null, lockName: LOCK_NAME, cwd: SKILL_ROOT, env: { ...process.env, [START_REASON_ENV]: 'self-reload' } });
   const r = await engine.run({ watch, reload });
-  engine.close({ releaseLead: !r.reloaded });
+  endRun({ exitCode: r.exitCode ?? 0, exitReason: r.reloaded ? 'reload-handover' : r.lost ? 'lost-lease' : stopSignal ? 'stopped' : 'clean', killedBy: stopSignal ? `signal:${stopSignal}` : null });
+  engine.close({ releaseLead: !r.reloaded && !r.lost, reason: 'stop' });
   process.exit(r.exitCode ?? 0);
 }
 

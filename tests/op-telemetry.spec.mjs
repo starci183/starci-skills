@@ -9,7 +9,6 @@ import {
   telemetrySettings, trendLine, WAIT_KINDS, SNAPSHOT_KIND,
 } from '../scripts/supervisor/op-metrics.mjs';
 import { digestText } from '../scripts/supervisor/actions.mjs';
-import { withSupervisorRead } from '../scripts/supervisor/home.mjs';
 
 // Op health and the stuck SLA (scripts/supervisor/op-metrics.mjs; owner 2026-09-28 "upgrade supervisor to track
 // properly"): per-op metrics from ledger rows, every wait aged against runtimes.yaml, the tick's snapshot and trend.

@@ -25,9 +25,9 @@
 //       answered on Telegram: one the runtime filed (from: 'desktop' through scripts/supervisor/tell.mjs, or
 //       'stall-alert', 'land-gate') is answered locally - the reply is only recorded and the item marked read.
 //       A reply with no --to always goes to Telegram (how an escalation reaches the owner).
-//       Every reply is recorded in <state>/supervisors/<id>.outbox.jsonl (tell.mjs --read shows it).
+//       Every reply is recorded in machine.sqlite sup_messages (direction out; tell.mjs --read shows it).
 //   node scripts/supervisor/channel.mjs wait --id <id> [--timeout-ms <n>]
-//       blocks until an unread message exists, prints one line per unread message
+//       blocks until an unread message exists (sup_messages, polled), prints one line per unread message
 //       ("TELEGRAM <inboxId>: <first 200 chars>") and exits 0; exits 124 on timeout.
 //       Run it under a Monitor so the supervisor wakes the moment the owner writes.
 import fs from 'node:fs';
@@ -36,9 +36,9 @@ import { fileURLToPath } from 'node:url';
 import { argsOf } from '../connectors/lib.mjs';
 import { botCall, DEFAULT_API_BASE, redact, telegramSettings, TEXT_MAX } from '../connectors/telegram.mjs';
 import {
-  appendOutbox, ensureTelegramBridge, getSupervisor, heartbeatSupervisor, inboxFile, readInbox, registerSupervisor, supervisorsDir, takeInbox, validSupervisorId,
+  appendOutbox, ensureTelegramBridge, getSupervisor, heartbeatSupervisor, readInbox, registerSupervisor, takeInbox, validSupervisorId,
 } from '../connectors/telegram-bridge.mjs';
-import { SUPERVISOR_ID, seatOf, supervisorMode, withSupervisorRead } from './home.mjs';
+import { readSupervisor, SUPERVISOR_ID, seatOf, supervisorMode } from './home.mjs';
 
 export const WAIT_TIMEOUT_EXIT = 124;
 
@@ -124,7 +124,7 @@ export function registrationRefusal({ id, terminal, force = false, seatTerminal 
     return null;
   }
   if (!terminal) return `channel '${SUPERVISOR_ID}' belongs to the [Supervisor] kernel: register it from its Orca terminal (an external chat relays with scripts/supervisor/tell.mjs)`;
-  const seat = seatTerminal !== undefined ? seatTerminal : withSupervisorRead((db) => seatOf(db)?.value?.terminal ?? null, null, { env });
+  const seat = seatTerminal !== undefined ? seatTerminal : readSupervisor((m) => seatOf(m)?.value?.terminal ?? null, null, { env });
   if (seat && seat !== terminal) return `channel '${SUPERVISOR_ID}' belongs to the [Supervisor] seat ${seat}, not ${terminal} (--force overrides)`;
   return null;
 }
@@ -153,7 +153,7 @@ export function drainRefusal({ id, terminal = null, session = undefined, seatTer
     if (record.session && caller !== record.session) return `channel '${SUPERVISOR_ID}' is drained by the chat session ${record.session} only, not ${caller ?? 'a session with no CLAUDE_CODE_SESSION_ID'} (re-register from this chat to take it over) ${peek}`;
     return null;
   }
-  const seat = seatTerminal !== undefined ? seatTerminal : withSupervisorRead((db) => seatOf(db)?.value?.terminal ?? null, null, { env });
+  const seat = seatTerminal !== undefined ? seatTerminal : readSupervisor((m) => seatOf(m)?.value?.terminal ?? null, null, { env });
   const registeredAt = registeredTerminal !== undefined ? registeredTerminal
     : (registered !== undefined ? registered : getSupervisor(id, env))?.terminal ?? null;
   const owner = seat ?? registeredAt;
@@ -166,29 +166,22 @@ export const waitLine = (item) => `TELEGRAM ${item.id}: ${String(item.text ?? ''
 
 /**
  * Resolve with the unread inbox items of `id` as soon as there is at least one (they stay unread),
- * or with null after `timeoutMs`. Watches the supervisors directory, with an interval fallback.
+ * or with null after `timeoutMs`. Polls sup_messages every `intervalMs` (one indexed read).
  */
 export function waitForInbox(id, { env = process.env, timeoutMs = Infinity, intervalMs = 1000 } = {}) {
   return new Promise((resolve) => {
-    let done = false, watcher = null, timer = null, deadline = null;
+    let done = false, timer = null, deadline = null;
     const finish = (value) => {
       if (done) return;
       done = true;
-      try { watcher?.close(); } catch { /* closed */ }
       clearInterval(timer); clearTimeout(deadline);
       resolve(value);
     };
     const check = () => {
       if (done) return;
-      const unread = readInbox(id, env).filter((item) => !item.read);
+      const unread = takeInbox(id, { env, peek: true });
       if (unread.length) finish(unread);
     };
-    const dir = supervisorsDir(env), name = path.basename(inboxFile(id, env));
-    try {
-      fs.mkdirSync(dir, { recursive: true });
-      watcher = fs.watch(dir, (event, file) => { if (!file || String(file).startsWith(name)) check(); });
-      watcher.on('error', () => { try { watcher.close(); } catch { /* closed */ } watcher = null; });
-    } catch { watcher = null; }
     timer = setInterval(check, intervalMs);
     if (Number.isFinite(timeoutMs) && timeoutMs >= 0) deadline = setTimeout(() => finish(null), timeoutMs);
     check();

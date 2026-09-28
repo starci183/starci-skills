@@ -308,8 +308,8 @@ export function drySweep(deps, would) {
     closeExited: (handle) => { would.push({ act: 'close-exited', handle }); return { ok: false, shadow: true }; },
   };
 }
-/** A ledger whose transactions record instead of writing (the shadow sweep reads the live rows). */
-export const dryLedger = (db, would) => ({ db, transaction: () => { would.push({ act: 'ledger-write' }); } });
+/** A machine handle whose transactions record instead of writing (the shadow sweep reads the live rows). */
+export const dryLedger = (m, would) => ({ ...m, transaction: () => { would.push({ act: 'ledger-write' }); } });
 
 /* ------------------------------------------------------------------------------------------------ the controller */
 
@@ -422,17 +422,17 @@ async function reconcileWorkers(ctx, settings) {
   const deps = await workerSweepDeps();
   if (ctx.mode !== 'active') {
     const would = [];
-    const out = ctx.read(SUPERVISOR_LEDGER, (db) => sweepWorkers(dryLedger(db, would), drySweep(deps, would), { now: ctx.now() })) ?? { deaths: [], closed: [] };
+    const { readSupervisor } = await import('../../supervisor/home.mjs');
+    const out = readSupervisor((m) => sweepWorkers(dryLedger(m, would), drySweep(deps, would), { now: ctx.now() }), null, { env: ctx.env ?? process.env }) ?? { deaths: [], closed: [] };
     if (out.deaths.length || would.some((w) => w.act !== 'ledger-write')) ctx.log('reconciler.would', `job would sweep [Worker] jobs: ${out.deaths.length} death(s), ${would.filter((w) => w.act !== 'ledger-write').length} close(s)`, { deaths: out.deaths, would: would.slice(0, 20) });
     return { ok: true, action: 'workers', shadow: true, deaths: out.deaths.length };
   }
-  const { openSupervisorLedger } = await import('../../supervisor/home.mjs');
-  const ledger = openSupervisorLedger({ env: ctx.env });
-  try {
-    const out = sweepWorkers(ledger, deps, { now: ctx.now() });
+  const { withSupervisor } = await import('../../supervisor/home.mjs');
+  return withSupervisor((m) => {
+    const out = sweepWorkers(m, deps, { now: ctx.now() });
     if (out.deaths?.length || out.closed?.length) ctx.log('reconciler.act', `job swept [Worker] jobs: ${out.deaths.length} death(s), ${out.closed.length} closed`, out);
     return { ok: true, action: 'workers', ...out };
-  } finally { ledger.close(); }
+  }, { env: ctx.env ?? process.env });
 }
 
 /* ------------------------------------------------------------------------------------------------ worker health */
@@ -522,12 +522,11 @@ export default {
   async list(ctx) {
     const settings = jobSettings();
     const keys = [];
+    // The [Worker] jobs are machine.sqlite sup_jobs (no supervisor ledger).
+    const { readSupervisor } = await import('../../supervisor/home.mjs');
+    if (readSupervisor((m) => m.db.prepare("SELECT COUNT(*) n FROM sup_jobs WHERE status IN ('running','reported')").get()?.n ?? 0, 0, { env: ctx.env ?? process.env })) keys.push(WORKERS_KEY);
     for (const l of ctx.ledgers ?? []) {
-      if (l.ledgerId === SUPERVISOR_LEDGER) {
-        const n = ctx.read(l.ledgerId, (db) => db.prepare("SELECT COUNT(*) n FROM jobs WHERE status IN ('running','reported')").get()?.n ?? 0) ?? 0;
-        if (n) keys.push(WORKERS_KEY);
-        continue;
-      }
+      if (l.ledgerId === SUPERVISOR_LEDGER) continue;
       if (!keys.includes(HEALTH_KEY)) keys.push(HEALTH_KEY);
       // Every job with an open clock is listed too: a job that left the settled window still gets the pass that clears it.
       let openClockJobs = [];

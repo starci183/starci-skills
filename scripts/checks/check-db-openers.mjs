@@ -16,8 +16,6 @@ import { fileURLToPath } from 'node:url';
 
 export const DB_MODULES = Object.freeze(['engine/ledger-db.mjs', 'engine/machine-db.mjs']);
 export const PENDING = Object.freeze({
-  'scripts/reconciler/services.mjs': 'a3-2-machine-db: reconciler.sqlite moves into machine.sqlite',
-  'scripts/reconciler/sla.mjs': 'a3-2-machine-db: reconciler state moves into machine.sqlite',
   'ui/reconciler.mjs': 'ui (owner Codex): reads reconciler state through the machine-db reader',
 });
 const OPENER = /\bnew\s+DatabaseSync\s*\(/;

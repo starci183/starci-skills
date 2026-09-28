@@ -1,7 +1,7 @@
 // git-index-lock: a stale shared .git/index.lock (starci-next sn-subscription backend.implement a20: a 403 KB lock
 // from 01:01:34, no git process alive, every commit in the checkout refused) is recovered by the runtime, only when
 // it is older than allocation.housekeeping.gitIndexLockStaleMs and no git process may be working on that repository;
-// each removal is a supervisor-ledger event. The op worker's git shim and the housekeeping area gitlocks run it.
+// each removal is a Supervisor audit event (machine.sqlite sup_events). The op worker's git shim and the housekeeping area gitlocks run it.
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -13,8 +13,7 @@ import { recoverStaleIndexLock, preflightIndexLock, processOnRepo, reposNamed, g
 import { sweepGitLocks } from '../scripts/lib/hk-git-locks.mjs';
 import { AREAS } from '../scripts/supervisor/housekeeping.mjs';
 import { allocationSettings } from '../engine/config.mjs';
-import { inspectLedger } from '../engine/ledger-db.mjs';
-import { supervisorLedgerFile } from '../scripts/supervisor/home.mjs';
+import { readMachine } from '../engine/machine-db.mjs';
 
 const MIN = 60_000;
 const STALE = 5 * MIN;
@@ -98,21 +97,18 @@ test('a linked worktree resolves its gitdir; the checkout of a nested cwd is fou
   assert.equal(checkoutOf(path.join(dir, 'w', 'a')), path.join(dir, 'w'));
 });
 
-test('the shim pre-flight removes a stale lock and records git-index-lock-removed in the supervisor ledger', async (t) => {
+test('the shim pre-flight removes a stale lock and records git-index-lock-removed in machine.sqlite', async (t) => {
   const { repo, lock } = repoWithLock(t, 9);
-  const env = { ...process.env, STARCI_SUPERVISOR_HOME: path.join(tmp(t), 'sup') };
+  const env = { ...process.env, STARCI_TEST_MACHINE_FILE: path.join(tmp(t), 'machine.sqlite') };
   const said = [];
   const r = await preflightIndexLock({ cwd: path.join(repo, 'src', 'deep'), guard: { jobId: 'op-backend.implement-aaaaaaaaaa', workflowId: 'wf-x' }, env, say: (l) => said.push(l), list: () => [] });
   assert.equal(r.state, 'removed');
   assert.equal(fs.existsSync(lock), false);
   assert.match(said.join('\n'), /removed a stale .*index\.lock/);
-  const h = inspectLedger({ file: supervisorLedgerFile(env) });
-  try {
-    const rows = h.db.prepare('SELECT entity_id, payload_json FROM events WHERE kind=?').all(LOCK_EVENT);
-    assert.equal(rows.length, 1);
-    assert.equal(JSON.parse(rows[0].payload_json).jobId, 'op-backend.implement-aaaaaaaaaa');
-    assert.equal(JSON.parse(rows[0].payload_json).by, 'git-shim');
-  } finally { h.close(); }
+  const rows = readMachine((m) => m.supEvents({ kind: LOCK_EVENT }), [], { env });
+  assert.equal(rows.length, 1);
+  assert.equal(rows[0].payload.jobId, 'op-backend.implement-aaaaaaaaaa');
+  assert.equal(rows[0].payload.by, 'git-shim');
   assert.equal(await preflightIndexLock({ cwd: repo, env, list: () => [] }), null, 'no lock: one stat, nothing else');
 });
 
@@ -120,14 +116,14 @@ test('the op worker\'s git shim runs the pre-flight before git and says why a lo
   const { repo, lock } = repoWithLock(t, 9);
   spawnSync('git', ['init', '-q'], { cwd: repo, windowsHide: true });
   const r = spawnSync(process.execPath, [path.join(root, 'scripts', 'guards', 'shim.mjs'), 'git', 'status', '--porcelain'], { cwd: repo, encoding: 'utf8', windowsHide: true,
-    env: { ...process.env, STARCI_SUPERVISOR_HOME: path.join(tmp(t), 'sup'), STARCI_GUARD_FILE: '' } });
+    env: { ...process.env, STARCI_TEST_MACHINE_FILE: path.join(tmp(t), 'machine.sqlite'), STARCI_GUARD_FILE: '' } });
   assert.match(r.stderr, /index\.lock is \d+ min old and was left in place \(probe-failed/, 'a spec child never reads the host table, and says so');
   assert.ok(fs.existsSync(lock));
 });
 
 test('housekeeping gitlocks sweeps each product checkout: dry run reports, apply removes', async (t) => {
   const a = repoWithLock(t, 9), b = repoWithLock(t, 1);
-  const env = { ...process.env, STARCI_SUPERVISOR_HOME: path.join(tmp(t), 'sup') };
+  const env = { ...process.env, STARCI_TEST_MACHINE_FILE: path.join(tmp(t), 'machine.sqlite') };
   const allocation = { housekeeping: { gitIndexLockStaleMs: STALE } };
   const dry = await sweepGitLocks({ apply: false, env, allocation, repos: [a.repo, b.repo], list: () => [] });
   assert.equal(dry.ok, true);

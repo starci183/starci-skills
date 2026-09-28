@@ -70,9 +70,9 @@ export async function reconcileLearning(key, ctx, { settings = learningControlle
   let violations = deps.violations;
   if (!violations) {
     try {
-      const { withSupervisorRead, SUPERVISOR_WF } = await import('../../supervisor/home.mjs');
-      violations = withSupervisorRead((db) => db.prepare("SELECT entity_id, payload_json, created_at FROM events WHERE workflow_id=? AND kind='runtime-invariant-violated' AND created_at>=? ORDER BY seq").all(SUPERVISOR_WF, now - settings.windowMs)
-        .map((r) => { let p = {}; try { p = JSON.parse(r.payload_json) ?? {}; } catch { p = {}; } return { code: p.code ?? String(r.entity_id).split('|')[0], dedupeKey: r.entity_id, at: Number(r.created_at) }; }), [], { env: ctx.env ?? process.env });
+      const { readSupervisor } = await import('../../supervisor/home.mjs');
+      violations = readSupervisor((m) => m.db.prepare('SELECT code, entity, violated_at FROM invariant_violations WHERE violated_at>=? ORDER BY violation_id').all(now - settings.windowMs)
+        .map((r) => ({ code: r.code, dedupeKey: `${r.code}|${r.entity}`, at: Number(r.violated_at) })), [], { env: ctx.env ?? process.env });
     } catch { violations = []; }
   }
   const items = violationItems(violations, { now, windowMs: settings.windowMs });

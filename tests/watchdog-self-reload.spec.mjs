@@ -9,7 +9,8 @@ import { pathToFileURL, fileURLToPath } from 'node:url';
 import {
   createReloadWatch, reexecSelf, runtimeHead, moduleStamps, rotateLog, RELOAD_ENV, RELOAD_MIN_INTERVAL_MS, LOG_CAP_BYTES,
 } from '../scripts/lib/self-reload.mjs';
-import { claimOrTakeOver, claimManager, lockHolder, stateFile } from '../scripts/connectors/lib.mjs';
+import { claimOrTakeOver, claimManager, lockHolder } from '../scripts/connectors/lib.mjs';
+import { readMachine, withMachine } from '../engine/machine-db.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const SHA_A = 'a'.repeat(40), SHA_B = 'b'.repeat(40), SHA_C = 'c'.repeat(40);
@@ -105,34 +106,38 @@ test('runtimeHead reads `git -C <root> rev-parse HEAD` and refuses anything but 
   assert.deepEqual(moduleStamps(['x', 'y'], { stat: (f) => { if (f === 'y') throw new Error('gone'); return { mtimeMs: 7 }; } }), { x: 7, y: null });
 });
 
-test('reexecSelf spawns the same argv into the same log, then returns once the replacement holds the lock', async () => {
+test('reexecSelf spawns the same argv, returns once the replacement holds the lock, and logs the handover', async () => {
   const f = fakes();
-  const spawned = [];
+  const spawned = [], logged = [];
   let reads = 0;
   const r = await reexecSelf({
-    script: '/rt/scripts/kernel/watchdog.mjs', args: ['--repo', 'D:/p', '--workflow', 'wf-1', '--repair'], logFile: '/logs/wf-1.log',
+    script: '/rt/scripts/kernel/watchdog.mjs', args: ['--repo', 'D:/p', '--workflow', 'wf-1', '--repair'], actor: 'watchdog',
     lockName: 'kernel-watchdog-wf-1', env: { KEEP: '1' }, cwd: '/rt', now: f.now, selfPid: 4242,
     sleep: async (ms) => { f.clock.t += ms; },
     spawnChild: (spec) => { spawned.push(spec); return { pid: 5151, exited: () => false }; },
     holder: () => { reads += 1; return { pid: reads < 3 ? 4242 : 5151 }; },
     kill: () => assert.fail('a replacement that took over is never killed'),
+    log: (row) => logged.push(row),
   });
   assert.deepEqual(r, { ok: true, pid: 5151 });
   assert.equal(spawned.length, 1);
   assert.equal(spawned[0].script, '/rt/scripts/kernel/watchdog.mjs');
   assert.deepEqual(spawned[0].args, ['--repo', 'D:/p', '--workflow', 'wf-1', '--repair'], 'the same argv, never --once');
-  assert.equal(spawned[0].logFile, '/logs/wf-1.log');
+  assert.equal(spawned[0].logFile, undefined, 'no text log: the loop logs to machine_logs itself');
   assert.equal(spawned[0].env.KEEP, '1');
   assert.equal(spawned[0].env[RELOAD_ENV.handoverFrom], '4242');
   assert.equal(spawned[0].env[RELOAD_ENV.reloadedAt], String(1_000_000));
+  assert.equal(logged.length, 1);
+  assert.deepEqual([logged[0].actor, logged[0].kind, logged[0].level, logged[0].data.lockName, logged[0].data.pid], ['watchdog', 'self-reload.handover', 'info', 'kernel-watchdog-wf-1', 5151]);
 });
 
 test('a replacement that never takes the lock is stopped and the lock stays with the running loop', async () => {
   const f = fakes();
-  const killed = [], reclaimed = [];
+  const killed = [], reclaimed = [], logged = [];
+  const log = (row) => logged.push(row);
   let lock = { pid: 4242 };
   const r = await reexecSelf({
-    script: 's', lockName: 'L', now: f.now, selfPid: 4242, waitMs: 30_000,
+    script: 's', lockName: 'L', now: f.now, selfPid: 4242, waitMs: 30_000, log,
     sleep: async (ms) => { f.clock.t += ms; },
     spawnChild: () => ({ pid: 5151, exited: () => false }),
     holder: () => lock,
@@ -143,12 +148,13 @@ test('a replacement that never takes the lock is stopped and the lock stays with
   assert.match(r.error, /did not take the lock L within 30000ms/);
   assert.deepEqual(killed, [5151]);
   assert.deepEqual(reclaimed, [], 'the lock still names this loop: nothing to take back');
+  assert.equal(logged.at(-1).level, 'warn');
 
   // The replacement took the lock just as the wait ran out: it is killed and the lock is taken back.
   lock = { pid: 4242 };
   let reads = 0;
   const late = await reexecSelf({
-    script: 's', lockName: 'L', now: f.now, selfPid: 4242, waitMs: 1_000, pollMs: 500,
+    script: 's', lockName: 'L', now: f.now, selfPid: 4242, waitMs: 1_000, pollMs: 500, log,
     sleep: async (ms) => { f.clock.t += ms; },
     spawnChild: () => ({ pid: 6161, exited: () => false }),
     holder: () => { reads += 1; return reads <= 3 ? { pid: 4242 } : { pid: 6161 }; },
@@ -161,89 +167,72 @@ test('a replacement that never takes the lock is stopped and the lock stays with
   // A replacement that dies at once fails fast, without waiting out the handover window.
   const t0 = f.clock.t;
   const dead = await reexecSelf({
-    script: 's', lockName: 'L', now: f.now, selfPid: 4242,
+    script: 's', lockName: 'L', now: f.now, selfPid: 4242, log,
     sleep: async (ms) => { f.clock.t += ms; },
     spawnChild: () => ({ pid: 7171, exited: () => true }),
     holder: () => ({ pid: 4242 }), kill: () => {}, reclaim: () => {},
   });
   assert.match(dead.error, /exited before taking the lock/);
   assert.equal(f.clock.t, t0);
-  assert.equal((await reexecSelf({ script: 's', lockName: 'L', spawnChild: () => { throw new Error('EPERM'); } })).ok, false);
+  assert.equal((await reexecSelf({ script: 's', lockName: 'L', log, spawnChild: () => { throw new Error('EPERM'); } })).ok, false);
 });
 
-test('the singleton lock is handed over, never freed: only the named predecessor\'s lock can be taken over', (t) => {
+test('the singleton host lock is handed over, never freed: only the named predecessor\'s lock can be taken over', (t) => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'starci-reload-lock-'));
-  t.after(() => fs.rmSync(dir, { recursive: true, force: true }));
-  const env = { LOCALAPPDATA: dir };
+  t.after(() => fs.rmSync(dir, { recursive: true, force: true, maxRetries: 20, retryDelay: 25 }));
+  const env = { LOCALAPPDATA: dir, STARCI_TEST_MACHINE_FILE: path.join(dir, 'machine.sqlite') };
   const name = 'kernel-watchdog-wf-handover';
-  const file = stateFile(`${name}.lock`, env);
-  fs.mkdirSync(path.dirname(file), { recursive: true });
   // The running loop: a live process (this test's parent) holds the lock.
-  const predecessor = process.ppid;
-  fs.writeFileSync(file, JSON.stringify({ pid: predecessor, startedAt: new Date().toISOString() }));
+  const predecessor = process.ppid, at = Date.now();
+  withMachine((m) => m.upsert('host_locks', { name, holder_pid: predecessor, holder: 'watchdog.mjs', started_at: at, heartbeat_at: at, expires_at: at + 600_000, state: 'held' }, ['name']), { env });
   assert.equal(claimManager(name, { env }).ok, false, 'a plain claim is refused while the loop lives');
   assert.equal(claimOrTakeOver(name, { from: 999_999_999, env }).ok, false, 'a replacement of another loop is refused');
   assert.equal(claimOrTakeOver(name, { from: null, env }).ok, false);
   const took = claimOrTakeOver(name, { from: String(predecessor), env });
   assert.equal(took.ok, true);
   assert.equal(took.takenOver, true);
-  const record = JSON.parse(fs.readFileSync(file, 'utf8'));
-  assert.equal(record.pid, process.pid);
-  assert.equal(record.handedOverFrom, predecessor);
+  const row = withMachine((m) => m.hostLock(name), { env });
+  assert.deepEqual([row.holder_pid, row.handed_over_from, row.state], [process.pid, predecessor, 'held']);
   assert.equal(lockHolder(name, env).pid, process.pid);
   took.release();
-  assert.equal(fs.existsSync(file), false, 'the new holder releases it normally');
+  assert.equal(withMachine((m) => m.hostLock(name), { env }).state, 'released', 'the new holder releases it normally');
 });
 
-test('a real re-exec: the replacement appends to the same log and takes the lock over from the spawning loop', async (t) => {
+test('a real re-exec: the replacement takes the host lock over from the spawning loop, and the handover is logged', async (t) => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'starci-reload-e2e-'));
-  const env = { ...process.env, LOCALAPPDATA: dir };
+  const env = { ...process.env, LOCALAPPDATA: dir, STARCI_TEST_MACHINE_FILE: path.join(dir, 'machine.sqlite') };
   delete env.NODE_TEST_CONTEXT;
   const name = 'kernel-watchdog-wf-e2e';
   const held = claimManager(name, { env });
   assert.equal(held.ok, true);
-  const script = path.join(dir, 'fake-loop.mjs');
+  const script = path.join(dir, 'fake-loop.mjs'), out = path.join(dir, 'replacement.txt');
   const lib = pathToFileURL(path.join(ROOT, 'scripts', 'connectors', 'lib.mjs')).href;
-  fs.writeFileSync(script, `import { claimOrTakeOver } from ${JSON.stringify(lib)};
+  fs.writeFileSync(script, `import fs from 'node:fs';
+import { claimOrTakeOver } from ${JSON.stringify(lib)};
 const held = claimOrTakeOver(${JSON.stringify(name)}, { from: process.env.${RELOAD_ENV.handoverFrom} });
-console.log('replacement ' + process.pid + ' args=' + process.argv.slice(2).join(' ') + ' took=' + held.ok);
+fs.appendFileSync(${JSON.stringify(out)}, 'replacement ' + process.pid + ' args=' + process.argv.slice(2).join(' ') + ' took=' + held.ok + '\\n');
 setTimeout(() => { held.release?.(); process.exit(0); }, held.ok ? 20000 : 0);
 `);
-  const log = path.join(dir, 'wf-e2e.log');
-  fs.writeFileSync(log, 'first generation line\n');
-  const r = await reexecSelf({ script, args: ['--workflow', 'wf-e2e', '--repair'], logFile: log, lockName: name, env, cwd: os.tmpdir(), waitMs: 20_000 });
-  t.after(() => { try { process.kill(r.pid); } catch { /* gone */ } try { fs.rmSync(dir, { recursive: true, force: true, maxRetries: 20, retryDelay: 100 }); } catch { /* the killed child's log handle closes late on Windows */ } });
+  const r = await reexecSelf({ script, args: ['--workflow', 'wf-e2e', '--repair'], lockName: name, env, cwd: os.tmpdir(), waitMs: 20_000, actor: 'watchdog' });
+  t.after(() => { try { process.kill(r.pid); } catch { /* gone */ } try { fs.rmSync(dir, { recursive: true, force: true, maxRetries: 20, retryDelay: 100 }); } catch { /* the killed child's handle closes late on Windows */ } });
   assert.equal(r.ok, true, r.error);
   assert.equal(lockHolder(name, env).pid, r.pid);
   held.release();
   assert.equal(lockHolder(name, env).pid, r.pid, 'the old loop\'s release never frees a lock it handed over');
-  for (let i = 0; i < 50 && !/replacement/.test(fs.readFileSync(log, 'utf8')); i += 1) await new Promise((res) => setTimeout(res, 100));
-  const text = fs.readFileSync(log, 'utf8');
-  assert.match(text, /^first generation line\n/, 'the log is appended, not truncated');
-  assert.match(text, new RegExp(`replacement ${r.pid} args=--workflow wf-e2e --repair took=true`));
+  for (let i = 0; i < 50 && !fs.existsSync(out); i += 1) await new Promise((res) => setTimeout(res, 100));
+  assert.match(fs.readFileSync(out, 'utf8'), new RegExp(`replacement ${r.pid} args=--workflow wf-e2e --repair took=true`));
+  const [row] = readMachine((m) => m.logs({ actor: 'watchdog', kind: 'self-reload.handover' }), [], { env });
+  assert.equal(row?.data?.pid, r.pid);
+  assert.equal(row?.data?.lockName, name);
 });
 
-test('a loop log past its cap reloads the loop, and the re-exec starts the replacement on a rotated log (LC-12)', async (t) => {
-  const f = fakes();
-  let size = 10;
-  const watch = createReloadWatch({ head: f.head, stamps: f.stamps, now: f.now, logFile: '/logs/wf-1.log', logSize: () => size });
-  assert.equal(watch.check().reload, false, 'a log under the cap is no change');
-  size = LOG_CAP_BYTES + 1;
-  const full = watch.check();
-  assert.equal(full.reload, true);
-  assert.deepEqual(full.changes, [{ kind: 'log', file: '/logs/wf-1.log', size: LOG_CAP_BYTES + 1 }]);
-  assert.match(full.reason, /\/logs\/wf-1\.log past \d+ bytes/);
-
+test('rotateLog moves a text log past its cap to <log>.1 and leaves a smaller one', (t) => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'starci-reload-rotate-'));
   t.after(() => fs.rmSync(dir, { recursive: true, force: true }));
   const log = path.join(dir, 'wf-1.log');
   fs.writeFileSync(log, Buffer.alloc(LOG_CAP_BYTES + 1, 'x'));
-  let seen = null;
-  const r = await reexecSelf({ script: 's', logFile: log, lockName: 'L', selfPid: 1, sleep: async () => {},
-    spawnChild: ({ logFile }) => { seen = fs.existsSync(logFile) ? fs.statSync(logFile).size : 0; return { pid: 2, exited: () => false }; },
-    holder: () => ({ pid: 2 }) });
-  assert.equal(r.ok, true);
-  assert.equal(seen, 0, 'the replacement opens a fresh log');
+  assert.equal(rotateLog(log), log);
+  assert.equal(fs.existsSync(log), false);
   assert.equal(fs.statSync(`${log}.1`).size, LOG_CAP_BYTES + 1, 'the full log moved to <log>.1');
   const small = path.join(dir, 'small.log');
   fs.writeFileSync(small, 'keep\n');

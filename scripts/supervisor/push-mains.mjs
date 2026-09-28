@@ -39,13 +39,13 @@ import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { safeRemoveTree } from '../lib/safe-remove.mjs';
-import { putBlob } from '../lib/artifact-store.mjs';
+import { getBlob, putBlob } from '../lib/artifact-store.mjs';
 import { redactText } from '../lib/redact.mjs';
 import { sha256 } from '../../engine/index.mjs';
 import { parseYaml } from '../../engine/yaml.mjs';
 import { git } from './workers.mjs';
 import { projectBinding, sourceRootOf } from '../kernel/target-repo.mjs';
-import { SKILL_ROOT, openSupervisorLedger, supervisorEvent, supervisorSettings, productRepos, supervisorLog } from './home.mjs';
+import { SKILL_ROOT, readSupervisor, withSupervisor, supervisorSettings, productRepos, supervisorLog } from './home.mjs';
 
 const selfFile = fileURLToPath(import.meta.url);
 
@@ -287,12 +287,17 @@ export function storeOutput(text, { put = null } = {}) {
   } catch { return null; }
 }
 
-/** A failed push/hook result's fields: the summary line, the stable signature and the full output blob. */
+/**
+ * A failed push/hook result's fields: the summary line, the stable signature, the full output blob and (MB-03, the
+ * pushes row) the full stdout and stderr blobs.
+ */
 const failureOf = (r, { store = storeOutput } = {}) => {
   const text = outputOf(r);
   const blob = store(text);
+  const stdout = store(r?.stdout), stderr = store([r?.stderr, r?.error].filter(Boolean).join('\n'));
   return { error: r?.timedOut ? `timed out after ${Math.round((Number(r.timeoutMs) || PUSH_TIMEOUT_MS) / 1000)}s: ${failureSummary(text)}` : failureSummary(text),
-    signature: failureSignature(r, text), ...(blob ? { outputSha: blob.sha, outputBytes: blob.bytes } : {}) };
+    signature: failureSignature(r, text), ...(blob ? { outputSha: blob.sha, outputBytes: blob.bytes } : {}),
+    ...(stdout ? { stdoutSha: stdout.sha } : {}), ...(stderr ? { stderrSha: stderr.sha } : {}) };
 };
 
 /**
@@ -515,34 +520,41 @@ export function defaultPushRepos(settings = supervisorSettings(), { sourceRoot =
 export function lastRefusals({ env = process.env } = {}) {
   const out = new Map();
   try {
-    const ledger = openSupervisorLedger({ env });
-    try {
-      const rows = ledger.db.prepare("SELECT entity_id, kind, payload_json, created_at FROM events WHERE entity_type='push' AND kind IN ('push-main','push-refused') ORDER BY seq DESC LIMIT 400").all();
-      const seen = new Set();
-      for (const r of rows) {
-        const key = repoKey(r.entity_id);
-        if (seen.has(key)) continue;
-        seen.add(key);
-        if (r.kind !== 'push-refused') continue;
-        let p = null;
-        try { p = JSON.parse(r.payload_json); } catch { p = null; }
-        if (p?.head && p?.signature) out.set(key, { head: p.head, signature: p.signature, at: Number(r.created_at), repeat: Number(p.repeat) || 1 });
-      }
-    } finally { ledger.close(); }
+    // machine.sqlite pushes: a held (skipped) attempt is not an attempt; repeat = the consecutive refusals at that head.
+    const rows = readSupervisor((m) => m.db.prepare("SELECT repo_root, head, result, failure_signature, at FROM pushes WHERE result IN ('pushed','refused','failed') ORDER BY push_id DESC LIMIT 400").all(), [], { env })
+      .map((r) => ({ ...r, key: repoKey(r.repo_root) }));
+    const seen = new Set();
+    for (const r of rows) {
+      if (seen.has(r.key)) continue;
+      seen.add(r.key);
+      if (r.result === 'pushed' || !r.head || !r.failure_signature) continue;
+      let repeat = 0;
+      for (const x of rows.filter((y) => y.key === r.key)) { if (x.result === 'pushed' || x.head !== r.head || x.failure_signature !== r.failure_signature) break; repeat += 1; }
+      out.set(r.key, { head: r.head, signature: r.failure_signature, at: Number(r.at), repeat: repeat || 1 });
+    }
   } catch { /* no history: every push runs */ }
   return out;
 }
 
-/** Push every listed main and record one push event per repository in the supervisor ledger. */
+/** The pushes.result of one pushMain result. */
+const pushResultOf = (r) => (r.pushed ? 'pushed' : r.skipped || r.deferred ? 'skipped' : r.refused ? 'refused' : 'failed');
+const blobText = (sha) => { if (!sha) return null; try { return getBlob(sha).toString('utf8'); } catch { return null; } };
+
+/** Push every listed main and record one pushes row per repository in machine.sqlite (MB-03: full stdout/stderr blobs). */
 export function pushMains({ repos = null, dryRun = false, hooksOnly = false, env = process.env, record = true, settings = null, sourceRoot = sourceRootOf() } = {}) {
   const list = repos ?? defaultPushRepos(settings ?? supervisorSettings(), { sourceRoot });
   const priors = record && !dryRun && !hooksOnly ? lastRefusals({ env }) : new Map();
   const results = list.map((repo) => pushMain(path.resolve(repo), { dryRun, hooksOnly, prior: priors.get(repoKey(path.resolve(repo))) ?? null }));
   if (record && !dryRun && !hooksOnly) {
     try {
-      const ledger = openSupervisorLedger({ env });
-      try { ledger.transaction(() => { for (const r of results) supervisorEvent(ledger, { entityType: 'push', entityId: r.repo, kind: r.pushed ? 'push-main' : r.deferred ? 'push-deferred' : r.skipped ? 'push-skipped' : 'push-refused', payload: { ...r, scan: r.scan ? { ok: r.scan.ok, files: r.scan.files, findings: r.scan.findings.length } : undefined } }); }); }
-      finally { ledger.close(); }
+      withSupervisor((m) => m.transaction(() => {
+        for (const r of results) {
+          const result = pushResultOf(r);
+          m.recordPush({ repoRoot: r.repo, branch: r.branch ?? null, head: r.head ?? 'unknown', result, reason: r.refused ?? r.error ?? r.skipped ?? (r.deferred ? `deferred: ${r.deferred}` : null),
+            failureSignature: r.signature ?? (result === 'refused' || result === 'failed' ? 'push:error' : null), scan: r.scan ?? null,
+            stdout: blobText(r.stdoutSha), stderr: blobText(r.stderrSha) });
+        }
+      }), { env });
     } catch { /* recording is best effort */ }
   }
   return results;

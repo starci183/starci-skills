@@ -87,7 +87,7 @@ test('diffRefOf points at the unit\'s newest stored patch, null without one', ()
 test('reconcilerState attributes an engine reconcile-failed row to the controller it names; engine/sla rows are others', (t) => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'starci-status-units-'));
   t.after(() => fs.rmSync(root, { recursive: true, force: true, maxRetries: 30, retryDelay: 50 }));
-  const env = { ...process.env, STARCI_SUPERVISOR_HOME: path.join(root, 'home'), LOCALAPPDATA: path.join(root, 'la') };
+  const env = { ...process.env, STARCI_TEST_MACHINE_FILE: path.join(root, 'machine.sqlite'), LOCALAPPDATA: path.join(root, 'la') };
   const now = Date.now();
   const rows = [
     logRowOf('gc', 'reconciler.act', 'gc closed a leftover', { verb: 'close' }),

@@ -6,9 +6,10 @@
 //
 // Roots:
 //   <LOCALAPPDATA>/StarCi     (runtimeRootFor's parent: runtime/, archive/, runtime-v6/)
-//   <USERPROFILE>/.starci     (supervisor home, redundancy handoffs, backups; lanes/ and
-//                             supervisor staging/land are git worktrees — skipped on the
-//                             .git marker, the lanes lane owns them)
+//   <USERPROFILE>/.starci     (redundancy handoffs, backups; lanes/ and supervisor staging/land
+//                             are git worktrees — skipped on the .git marker, the lanes lane
+//                             owns them). The Supervisor writes no text logs: its log rows are
+//                             machine.sqlite machine_logs (actor supervisor), pruned by retention.
 //   <APPDATA>/orca            terminal-history/ and logs/ capped by age; orchestration.db
 //                             is REPORTED ONLY — Orca owns it, never opened/touched.
 //
@@ -19,7 +20,6 @@
 //   runtime/connectors/{telegram-bridge,telegram-media,cloudflared,stall-alert}.log(.N)
 //                                     each writer self-rotates (self-reload rotateLog 5 MB;
 //                                     telegram-media.mjs 1 MB; tunnel.mjs 5 MB; stall-alert.mjs 2 MB)
-//   ~/.starci/supervisor/logs/*.log(.N)  supervisorLog rotates through rotateLog (home.mjs)
 //
 // Cap for the rest: a covered *.log/*.jsonl (and their .N siblings) older than
 // allocation.housekeeping.logMaxAgeMs is deleted; a younger one past logCapBytes is
@@ -28,8 +28,6 @@
 // the .1 it makes becomes age-deletable on a later sweep). A file a process still holds
 // (EBUSY/EPERM/EACCES) or that vanished mid-sweep is skipped, never an error.
 //
-// Not logs, never touched: *.inbox.jsonl / *.outbox.jsonl — the supervisor Telegram
-// channel's message queues (scripts/supervisor/channel.mjs); deleting one drops owner asks.
 // Orca CLI 1.4.209 exposes no retention/prune command for orchestration.db, logs or
 // terminal-history (`orchestration reset` exists but wipes state — not a retention tool).
 import fs from 'node:fs';
@@ -49,7 +47,6 @@ export const DEFAULT_LOG_CAP_BYTES = LOG_CAP_BYTES;
 
 const COVERED = /\.(log|jsonl)(\.\d+)?$/i;       // *.log, *.jsonl and their .N rotated siblings
 const BASE = /\.(log|jsonl)$/i;                 // a cap-rotate target: never a .N sibling
-const CHANNEL_QUEUE = /\.(inbox|outbox)\.jsonl$/i;
 const BUSY = new Set(['EBUSY', 'EPERM', 'EACCES']);
 const SKIP_DIRS = new Set(['.git', 'node_modules']);
 const LIST_MAX = 500;
@@ -58,13 +55,11 @@ const realOf = (p) => { try { return fs.realpathSync.native(p); } catch { return
 const sizeOf = (p) => { try { return fs.statSync(p).size; } catch { return null; } };
 
 /** The directories whose *.log the runtime already rotates (see header); each entry also owns the .N siblings. */
-export const rotatedLogFamilies = (starciRoot, starciHome) => [
+export const rotatedLogFamilies = (starciRoot) => [
   { name: 'watchdog-logs', dir: path.join(starciRoot, 'runtime', 'watchdog-logs'), match: /\.log(\.\d+)?$/i,
     why: 'rotated by rotateLog on self-reload (scripts/lib/self-reload.mjs reexecSelf); the per-workflow watchdog loops that wrote them are retired' },
   { name: 'connector-logs', dir: path.join(starciRoot, 'runtime', 'connectors'), match: /^(telegram-bridge|telegram-media|cloudflared|stall-alert)\.log(\.\d+)?$/i,
     why: 'self-rotated by their writers (telegram-bridge rotateLog 5 MB; telegram-media.mjs 1 MB; tunnel.mjs cloudflared 5 MB; stall-alert.mjs 2 MB)' },
-  { name: 'supervisor-logs', dir: path.join(starciHome, 'supervisor', 'logs'), match: /\.log(\.\d+)?$/i,
-    why: 'rotated by supervisorLog through rotateLog at LOG_CAP_BYTES (scripts/supervisor/home.mjs)' },
 ];
 
 /**
@@ -136,13 +131,12 @@ export async function sweepStarciLogs({ apply = false, now = Date.now(), env = p
     walk(resolved, realOf(resolved) ?? resolved, onFile, dirs);
   };
 
-  const families = rotatedLogFamilies(starciRoot, starciHome).map((f) => ({ ...f, dirKey: pathKey(f.dir) }));
+  const families = rotatedLogFamilies(starciRoot).map((f) => ({ ...f, dirKey: pathKey(f.dir) }));
   out.report.rotatedFamilies = families.map(({ name, dir, why }) => ({ name, dir, why }));
   const starciFile = (p, st) => {
     const name = path.basename(p);
     if (st.isSymbolicLink()) { skip(p, 'link'); return; }
     if (!COVERED.test(name)) return;
-    if (CHANNEL_QUEUE.test(name)) { skip(p, 'channel-queue'); return; }
     const dirKey = pathKey(path.dirname(p));
     const family = families.find((f) => f.dirKey === dirKey);
     if (family && family.match.test(name)) { skip(p, `rotated:${family.name}`); return; }
@@ -175,7 +169,6 @@ export async function sweepStarciLogs({ apply = false, now = Date.now(), env = p
   out.report.notes = [
     'orchestration.db is Orca-owned: size reported only, never opened/edited/vacuumed; orca CLI 1.4.209 has no retention or prune command (`orchestration reset` wipes state — not used).',
     'cap mechanism: rename to <file>.1 through rotateLog (the codebase\'s one cap convention); keep-tail truncation exists nowhere here; the .1 sibling is age-deleted on a later sweep.',
-    '*.inbox.jsonl/*.outbox.jsonl are the supervisor channel\'s message queues (data, not logs): never touched.',
     'gap: append-only runtime jsonl under <skillRoot>/runtime/guards/ (refusals.jsonl, footprint.jsonl) lives in the checkout, outside these roots — uncapped by this sweep.',
   ];
   if (Object.values(overflow).some((n) => n)) out.report.overflow = overflow;

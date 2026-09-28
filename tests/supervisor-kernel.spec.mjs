@@ -10,7 +10,7 @@ import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 
 import { launchSupervisor, stopSupervisor, planSupervisorDedupe, doctrineOf, seatCommand, supervisorTerminals } from '../scripts/supervisor/start-supervisor.mjs';
-import { openSupervisorLedger, seatOf, enabledOf, setEnabled, supervisorEvent, withSupervisorRead, SUPERVISOR_ID, SUPERVISOR_WF, SKILL_ROOT } from '../scripts/supervisor/home.mjs';
+import { withSupervisor, readSupervisor, seatOf, enabledOf, writeSeat, supervisorEvent, SUPERVISOR_ID, SKILL_ROOT } from '../scripts/supervisor/home.mjs';
 import {
   adaptiveCap, createJob, spawnWorkers, createStaging, removeStaging, fileReport, jobOf, stagingPathOf, leaseConflicts, pickWorkerPool, cancelJob, ackReport,
   stageSelf, workerLaunchCommand, READINESS_FAILS_PER_HOUR, openWorkerHandles,
@@ -28,8 +28,7 @@ import { withLedger } from './_ledger-fixture.mjs';
 import { clusterOwed } from '../scripts/supervisor/cluster.mjs';
 import { renderSupervisorBlock, supervisorSnapshot } from '../scripts/supervisor/status-block.mjs';
 import { parseYaml } from '../engine/yaml.mjs';
-import { stateFile } from '../scripts/connectors/lib.mjs';
-import { withMachine } from '../engine/machine-db.mjs';
+import { withMachine, openMachine } from '../engine/machine-db.mjs';
 
 // Specs here hold ledger handles a later t.after closes; the per-test rm below can run ahead of them and
 // EPERM on the open sqlite. A file-level after() runs after every hook, so anything a swallowed EPERM left
@@ -43,6 +42,8 @@ const tmp = (t, prefix) => {
   return dir;
 };
 // These specs exercise the optional [Supervisor] kernel: config.yaml supervisor.mode kernel (the default is chat).
+/** A machine.sqlite writer handle (the Supervisor's store) on the spec's own file, closed after the test. */
+const machineOf = (t, env) => { const m = openMachine({ env }); t.after(() => m.close()); return m; };
 const envOf = (t) => { const root = tmp(t, 'sup-k-'); return { LOCALAPPDATA: path.join(root, 'la'), STARCI_SUPERVISOR_HOME: path.join(root, 'home'), STARCI_LANES_ROOT: path.join(root, 'lanes'), STARCI_SUPERVISOR_MODE: 'kernel', STARCI_TEST_MACHINE_FILE: path.join(root, 'machine.sqlite') }; };
 
 /* ------------------------------------------------------------ fake Orca */
@@ -79,16 +80,13 @@ test('singleton: one launch boots the seat; a second start with the seat live la
   const again = await launch(env, host);
   assert.equal(again.action, 'already-live');
   assert.equal(host.calls.spawn.length, 1, 'never a second [Supervisor]');
-  assert.equal(withSupervisorRead((db) => seatOf(db).value.terminal, null, { env }), first.terminal);
-  assert.equal(withSupervisorRead((db) => enabledOf(db), null, { env }), true);
+  assert.equal(readSupervisor((m) => seatOf(m).value.terminal, null, { env }), first.terminal);
+  assert.equal(readSupervisor((m) => enabledOf(m), null, { env }), true);
 });
 
 test('singleton: a live startup reservation, a host outage and a disabled seat all launch nothing', async (t) => {
   const env = envOf(t);
-  const ledger = openSupervisorLedger({ env });
-  ledger.db.prepare("INSERT INTO signals(scope,key,holder_pid,token,value_json,at,expires_at) VALUES('supervisor-seat','main',1,'tok',?,?,?)")
-    .run(JSON.stringify({ state: 'starting' }), Date.now(), Date.now() + 60_000);
-  ledger.close();
+  withMachine((m) => writeSeat(m, { token: 'tok', value: { state: 'starting' }, expiresAt: Date.now() + 60_000 }), { env });
   const host = fakeHost();
   assert.equal((await launch(env, host)).action, 'starting');
   const down = fakeHost({ hostDown: true });
@@ -149,13 +147,12 @@ test('worker cap: adaptive with the queue, halved under load, never above 10', (
 
 test('workers: one job per cluster, launches stop at the cap, a leased file waits', async (t) => {
   const env = envOf(t);
-  const ledger = openSupervisorLedger({ env });
-  t.after(() => ledger.close());
-  const a = createJob(ledger, { cluster: 'c1', files: ['scripts/a.mjs'] });
-  assert.equal(createJob(ledger, { cluster: 'c1', files: ['scripts/z.mjs'] }).created, false, 'one worker per cluster');
-  createJob(ledger, { cluster: 'c2', files: ['scripts/a.mjs'] });
-  createJob(ledger, { cluster: 'c3', files: ['scripts/b.mjs'] });
-  createJob(ledger, { cluster: 'c4', files: ['scripts/c.mjs'] });
+  const m = machineOf(t, env);
+  const a = createJob(m, { cluster: 'c1', files: ['scripts/a.mjs'] });
+  assert.equal(createJob(m, { cluster: 'c1', files: ['scripts/z.mjs'] }).created, false, 'one worker per cluster');
+  createJob(m, { cluster: 'c2', files: ['scripts/a.mjs'] });
+  createJob(m, { cluster: 'c3', files: ['scripts/b.mjs'] });
+  createJob(m, { cluster: 'c4', files: ['scripts/c.mjs'] });
   const spawned = [];
   const deps = {
     load: () => ({ cpuBusy: 0.99, freeMem: 0.5 }),
@@ -164,18 +161,21 @@ test('workers: one job per cluster, launches stop at the cap, a leased file wait
     unstage: () => ({}),
     spawn: (opts) => { spawned.push(opts); return { ok: true, terminal: `term_${spawned.length}` }; },
   };
-  const r = await spawnWorkers(ledger, { settings, deps, env });
+  const r = await spawnWorkers(m, { settings, deps, env });
   assert.equal(r.cap.cap, 1, 'a saturated machine runs one worker');
   assert.equal(r.launched.length, 1);
   assert.equal(spawned[0].title, '[Worker] c1');
   assert.ok(spawned[0].env?.STARCI_GUARD_FILE, 'a [Worker] launches with the guard layer (node-modules-link-wipe)');
   if (spawned[0].pathPrefix) assert.equal(spawned[0].pathPrefix, spawned[0].env.STARCI_GUARD_BIN, 'the npm shim is first on its PATH');
-  assert.equal(jobOf(ledger.db, a.job.job_id).status, 'running');
+  assert.equal(jobOf(m, a.job.job_id).status, 'running');
+  const attempt = m.latestSupAttempt(a.job.job_id);
+  assert.equal(attempt.terminal_handle, 'term_1', 'one sup_attempts row per spawn names its terminal');
+  assert.equal(attempt.branch, `sup/${a.job.job_id}`);
   deps.load = () => ({ cpuBusy: 0.1, freeMem: 0.9 });
-  const r2 = await spawnWorkers(ledger, { settings, deps, env });
+  const r2 = await spawnWorkers(m, { settings, deps, env });
   assert.ok(r2.skipped.some((s) => /files leased by/.test(s.reason)), 'c2 waits for the lease on scripts/a.mjs');
   assert.equal(r2.launched.length, 2);
-  assert.deepEqual(leaseConflicts(ledger.db, ['scripts/a.mjs']).map((c) => c.jobId), [a.job.job_id]);
+  assert.deepEqual(leaseConflicts(m, ['scripts/a.mjs']).map((c) => c.jobId), [a.job.job_id]);
 });
 
 test('worker routing: the balanced pick skips an unavailable provider and prefers the furthest below its share', async () => {
@@ -194,13 +194,12 @@ test('worker readiness: a qwen worker launches its profile command (routed --mod
   assert.match(qwen ?? '', /^qwen --model deepseek-v4\.1-flash .*--yolo/, 'a bare `qwen` starts on the host default model and never shows the card identity');
   assert.equal(workerLaunchCommand({ pool: 'claude-agent', provider: 'claude', model: 'm' }), null, 'a card with terminalFallback pins the model itself');
   const env = envOf(t);
-  const ledger = openSupervisorLedger({ env });
-  t.after(() => ledger.close());
+  const m = machineOf(t, env);
   const runtimes = parseYaml(fs.readFileSync(new URL('../modules/models/runtimes.yaml', import.meta.url), 'utf8'));
   const shares = { 'claude-agent': 25, 'codex-agent': 25, 'qwen-agent': 25 };
   const recent = { 'claude-agent': 9, 'codex-agent': 5, 'qwen-agent': 0 };
-  const a = createJob(ledger, { cluster: 'r1', files: ['scripts/r1.mjs'] });
-  const b = createJob(ledger, { cluster: 'r2', files: ['scripts/r2.mjs'] });
+  const a = createJob(m, { cluster: 'r1', files: ['scripts/r1.mjs'] });
+  const b = createJob(m, { cluster: 'r2', files: ['scripts/r2.mjs'] });
   const routed = [], spawned = [];
   const deps = {
     load: () => ({ cpuBusy: 0, freeMem: 1 }),
@@ -209,24 +208,25 @@ test('worker readiness: a qwen worker launches its profile command (routed --mod
     unstage: () => ({}),
     spawn: (opts) => { spawned.push(opts); return opts.provider === 'qwen' ? { ok: false, step: 'readiness', error: 'terminal readiness timeout after 120000ms' } : { ok: true, terminal: `term_${spawned.length}` }; },
   };
-  const r = await spawnWorkers(ledger, { settings, deps, env });
+  const r = await spawnWorkers(m, { settings, deps, env });
   assert.equal(spawned[0].provider, 'qwen', 'qwen is furthest below its share');
   assert.match(spawned[0].command ?? '', /--model deepseek-v4\.1-flash/);
   assert.equal(spawned[1].provider, 'codex', 'the rest of the pass skips the provider that just failed readiness');
   assert.deepEqual(r.failed.map((f) => f.jobId), [a.job.job_id]);
-  const requeued = jobOf(ledger.db, a.job.job_id);
+  const requeued = jobOf(m, a.job.job_id);
   assert.equal(requeued.status, 'queued');
   assert.deepEqual(requeued.payload.avoidAgents, ['qwen']);
   assert.equal(requeued.payload.agent, null, 'the requeued job keeps its own agent request, not the provider routed to it');
-  const r2 = await spawnWorkers(ledger, { settings, deps, env });
+  assert.ok(m.latestSupAttempt(a.job.job_id).cancelled_at, 'the failed spawn attempt is closed');
+  const r2 = await spawnWorkers(m, { settings, deps, env });
   assert.equal(r2.launched[0].jobId, a.job.job_id);
   assert.notEqual(r2.launched[0].agent, 'qwen', 'a requeued job is never re-routed to the provider that failed it');
   assert.ok(routed.at(-1).avoid.includes('qwen'));
-  assert.equal(jobOf(ledger.db, b.job.job_id).status, 'running');
+  assert.equal(jobOf(m, b.job.job_id).status, 'running');
   // READINESS_FAILS_PER_HOUR failures in the hour exclude the provider for every job, fresh ones included.
-  for (let i = 0; i < READINESS_FAILS_PER_HOUR; i += 1) ledger.transaction(() => ledger.appendEvent({ workflowId: SUPERVISOR_WF, entityType: 'job', entityId: `x${i}`, kind: 'worker-spawn-failed', payload: { agent: 'devin', step: 'readiness' } }));
-  createJob(ledger, { cluster: 'r3', files: ['scripts/r3.mjs'] });
-  await spawnWorkers(ledger, { settings, deps, env });
+  for (let i = 0; i < READINESS_FAILS_PER_HOUR; i += 1) supervisorEvent(m, { entityType: 'job', entityId: `x${i}`, kind: 'worker-spawn-failed', payload: { agent: 'devin', step: 'readiness' } });
+  createJob(m, { cluster: 'r3', files: ['scripts/r3.mjs'] });
+  await spawnWorkers(m, { settings, deps, env });
   assert.ok(routed.at(-1).avoid.includes('devin'), JSON.stringify(routed.at(-1)));
 });
 
@@ -350,7 +350,7 @@ test('land gate: re-landing a landed commit is already-landed and moves nothing,
   assert.match(describe(again), /LAND already-landed .*nothing moved/);
   const gate = await land({ commits: [sha], root, env, push: false, deps: { runChecks: lightChecks } });
   assert.equal(gate.ok, true);
-  assert.deepEqual(withSupervisorRead((db) => gateLandedShas(db), [], { env }), [], 'no land-passed sha is recorded for it');
+  assert.deepEqual(readSupervisor((m) => gateLandedShas(m), [], { env }), [], 'no land-passed sha is recorded for it');
 });
 
 test('land gate queue: the oldest live waiter claims first; a dead waiter ticket is cancelled', (t) => {
@@ -440,27 +440,30 @@ test('config specs: false - the gate runs no spec unless the land asks (--specs 
 test('a worker job lands end to end: report -> gate -> succeeded, leases released, checkout and branch removed', async (t) => {
   const env = envOf(t);
   const root = repoFixture(t);
-  const ledger = openSupervisorLedger({ env });
-  const { job } = createJob(ledger, { cluster: 'e2e', files: ['scripts/a.mjs'] });
-  const r = await spawnWorkers(ledger, { settings, env, root, deps: {
+  const m = openMachine({ env });
+  const { job } = createJob(m, { cluster: 'e2e', files: ['scripts/a.mjs'] });
+  const r = await spawnWorkers(m, { settings, env, root, deps: {
     load: () => ({ cpuBusy: 0, freeMem: 1 }), route: async () => ({ pool: 'claude-agent', agent: 'claude', model: 'm' }),
     spawn: () => ({ ok: true, terminal: 'term_w' }) } });
   assert.equal(r.launched.length, 1);
-  const staging = jobOf(ledger.db, job.job_id).payload.staging;
+  const staging = jobOf(m, job.job_id).payload.staging;
   fs.writeFileSync(path.join(staging.path, 'scripts', 'a.mjs'), 'export const a = 7;\n');
   git(staging.path, 'commit', '-q', '-am', 'fix');
   const sha = git(staging.path, 'rev-parse', 'HEAD');
-  assert.equal(fileReport(ledger, { jobId: job.job_id, outcome: 'done', root }).ok, false, 'a done report names its commit');
-  const rep = fileReport(ledger, { jobId: job.job_id, outcome: 'done', commit: sha, root });
+  assert.equal(fileReport(m, { jobId: job.job_id, outcome: 'done', root }).ok, false, 'a done report names its commit');
+  const rep = fileReport(m, { jobId: job.job_id, outcome: 'done', commit: sha, root });
   assert.ok(rep.ok, rep.error);
-  ledger.close();
+  assert.equal(jobOf(m, job.job_id).status, 'reported');
+  m.close();
   const out = await land({ jobId: job.job_id, root, env, push: false, deps: { runChecks: lightChecks } });
   assert.ok(out.ok, JSON.stringify(out));
   assert.equal(fs.readFileSync(path.join(root, 'scripts', 'a.mjs'), 'utf8'), 'export const a = 7;\n');
-  const after = openSupervisorLedger({ env });
-  t.after(() => after.close());
-  assert.equal(jobOf(after.db, job.job_id).status, 'succeeded');
-  assert.equal(leaseConflicts(after.db, ['scripts/a.mjs']).length, 0);
+  const after = machineOf(t, env);
+  assert.equal(jobOf(after, job.job_id).status, 'succeeded');
+  assert.equal(leaseConflicts(after, ['scripts/a.mjs']).length, 0);
+  const attempt = after.latestSupAttempt(job.job_id);
+  assert.ok(attempt.landed_at && attempt.landed_sha, 'the attempt records the land');
+  assert.equal(after.supReports({ jobId: job.job_id, unconsumed: true }).length, 0, 'the landed report is consumed');
   assert.ok(!fs.existsSync(stagingPathOf(job.job_id, env)), 'the checkout lives only until it lands');
   assert.equal(git(root, 'branch', '--list', `sup/${job.job_id}`), '');
   const other = createJob(after, { cluster: 'cancel-me', files: ['scripts/q.mjs'] });
@@ -473,12 +476,12 @@ test('contract-changes.yaml is never leased and two appends to it both land thro
   fs.writeFileSync(path.join(root, '.gitattributes'), 'modules/kernel/contract-changes.yaml merge=union\n');
   git(root, 'add', '-A');
   git(root, 'commit', '-q', '-m', 'union registry');
-  const ledger = openSupervisorLedger({ env });
-  const one = stageSelf(ledger, { name: 'reg-a', files: ['modules/kernel/contract-changes.yaml', 'scripts/a.mjs'], root, env });
-  const two = stageSelf(ledger, { name: 'reg-b', files: ['modules/kernel/contract-changes.yaml', 'scripts/b.mjs'], root, env });
+  const m = openMachine({ env });
+  const one = stageSelf(m, { name: 'reg-a', files: ['modules/kernel/contract-changes.yaml', 'scripts/a.mjs'], root, env });
+  const two = stageSelf(m, { name: 'reg-b', files: ['modules/kernel/contract-changes.yaml', 'scripts/b.mjs'], root, env });
   assert.ok(one.ok && two.ok, JSON.stringify({ one, two }));
-  assert.deepEqual(leaseConflicts(ledger.db, ['modules/kernel/contract-changes.yaml']), []);
-  ledger.close();
+  assert.deepEqual(leaseConflicts(m, ['modules/kernel/contract-changes.yaml']), []);
+  m.close();
   const registry = fs.readFileSync(path.join(root, 'modules', 'kernel', 'contract-changes.yaml'), 'utf8');
   const a = sideCommit(root, 'append-a', { 'modules/kernel/contract-changes.yaml': `${registry}  - id: a\n    summary: first\n` });
   const b = sideCommit(root, 'append-b', { 'modules/kernel/contract-changes.yaml': `${registry}  - id: b\n    summary: second\n` });
@@ -493,9 +496,9 @@ test('contract-changes.yaml is never leased and two appends to it both land thro
 test('a self checkout landed with --commit closes its job: succeeded, leases released, checkout and branch removed', async (t) => {
   const env = envOf(t);
   const root = repoFixture(t);
-  const ledger = openSupervisorLedger({ env });
-  const one = stageSelf(ledger, { name: 'tooling', files: ['scripts/a.mjs'], root, env });
-  const two = stageSelf(ledger, { name: 'rules', files: ['scripts/b.mjs'], root, env });
+  const m = openMachine({ env });
+  const one = stageSelf(m, { name: 'tooling', files: ['scripts/a.mjs'], root, env });
+  const two = stageSelf(m, { name: 'rules', files: ['scripts/b.mjs'], root, env });
   assert.ok(one.ok && two.ok, JSON.stringify({ one, two }));
   fs.writeFileSync(path.join(one.path, 'scripts', 'a.mjs'), 'export const a = 9;\n');
   git(one.path, 'commit', '-q', '-am', 'self fix');
@@ -508,28 +511,27 @@ test('a self checkout landed with --commit closes its job: succeeded, leases rel
   fs.writeFileSync(path.join(two.path, 'scripts', 'b.mjs'), 'export const b = 3;\n');
   git(two.path, 'commit', '-q', '-am', 'r3');
   const r3 = git(two.path, 'rev-parse', 'HEAD');
-  ledger.close();
+  m.close();
   const out = await land({ commits: [sha], root, env, push: false, deps: { runChecks: lightChecks } });
   assert.ok(out.ok, JSON.stringify(out));
-  let db = openSupervisorLedger({ env });
-  assert.equal(jobOf(db.db, one.jobId).status, 'succeeded', 'land --commit of a self branch never leaves its job running');
-  assert.equal(leaseConflicts(db.db, ['scripts/a.mjs']).length, 0, 'its leases no longer block a worker');
+  let db = openMachine({ env });
+  assert.equal(jobOf(db, one.jobId).status, 'succeeded', 'land --commit of a self branch never leaves its job running');
+  assert.equal(leaseConflicts(db, ['scripts/a.mjs']).length, 0, 'its leases no longer block a worker');
   assert.ok(!fs.existsSync(one.path));
   assert.equal(git(root, 'branch', '--list', `sup/${one.jobId}`), '');
-  assert.equal(jobOf(db.db, two.jobId).status, 'running', 'an untouched self job stays open');
+  assert.equal(jobOf(db, two.jobId).status, 'running', 'an untouched self job stays open');
   db.close();
   const half = await land({ commits: [r2], root, env, push: false, deps: { runChecks: lightChecks } });
   assert.ok(half.ok, JSON.stringify(half));
   assert.deepEqual(half.selfPending.map((p) => p.jobId), [two.jobId]);
-  db = openSupervisorLedger({ env });
-  assert.equal(jobOf(db.db, two.jobId).status, 'running', 'a partly landed self branch keeps its checkout');
+  db = openMachine({ env });
+  assert.equal(jobOf(db, two.jobId).status, 'running', 'a partly landed self branch keeps its checkout');
   db.close();
   const rest = await land({ commits: [r3], root, env, push: false, deps: { runChecks: lightChecks } });
   assert.ok(rest.ok, JSON.stringify(rest));
-  db = openSupervisorLedger({ env });
-  t.after(() => db.close());
-  assert.equal(jobOf(db.db, two.jobId).status, 'succeeded');
-  assert.equal(leaseConflicts(db.db, ['scripts/b.mjs']).length, 0);
+  db = machineOf(t, env);
+  assert.equal(jobOf(db, two.jobId).status, 'succeeded');
+  assert.equal(leaseConflicts(db, ['scripts/b.mjs']).length, 0);
 });
 
 test('the push secret scan names file, line and pattern, never the value', () => {
@@ -637,11 +639,11 @@ test('Telegram routing: owner text lands in the Supervisor kernel inbox; channel
 
 test('status block and clustering', (t) => {
   const env = envOf(t);
-  const ledger = openSupervisorLedger({ env });
-  ledger.appendEvent({ workflowId: 'wf-supervisor', entityType: 'tick', entityId: 'main', kind: 'supervisor-tick', payload: { owed: 12, clusters: 5 }, createdAt: Date.now() - 600_000 });
-  ledger.appendEvent({ workflowId: 'wf-supervisor', entityType: 'tick', entityId: 'main', kind: 'supervisor-tick', payload: { owed: 9, clusters: 4 }, createdAt: Date.now() });
-  const snap = supervisorSnapshot(ledger.db);
-  ledger.close();
+  withSupervisor((m) => {
+    supervisorEvent(m, { entityType: 'tick', kind: 'supervisor-tick', payload: { owed: 12, clusters: 5 }, now: Date.now() - 600_000 });
+    supervisorEvent(m, { entityType: 'tick', kind: 'supervisor-tick', payload: { owed: 9, clusters: 4 }, now: Date.now() });
+  }, { env });
+  const snap = readSupervisor((m) => supervisorSnapshot(m), null, { env });
   const html = renderSupervisorBlock(snap, { language: 'en' });
   assert.match(html, /OWED: <b>9<\/b> ↓/);
   assert.match(html, /12 → 9/);
@@ -675,13 +677,13 @@ test('the Supervisor seat launches with its subagent tool denied; the prompt sen
 
 test('a diagnosis worker files outcome diagnosed; the watchdog announces it once with a [report] wake', (t) => {
   const env = envOf(t);
-  const ledger = openSupervisorLedger({ env });
-  t.after(() => ledger.close());
-  const { job } = createJob(ledger, { cluster: 'diag', files: ['scripts/x.mjs'] });
-  ledger.db.prepare("UPDATE jobs SET status='running' WHERE job_id=?").run(job.job_id);
-  assert.equal(fileReport(ledger, { jobId: job.job_id, outcome: 'diagnosed' }).ok, false, 'a diagnosis carries its findings');
-  assert.ok(fileReport(ledger, { jobId: job.job_id, outcome: 'diagnosed', summary: 'root cause: x' }).ok);
-  assert.equal(jobOf(ledger.db, job.job_id).status, 'succeeded');
+  const m = machineOf(t, env);
+  const { job } = createJob(m, { cluster: 'diag', files: ['scripts/x.mjs'] });
+  m.setSupJobStatus(job.job_id, 'running');
+  assert.equal(fileReport(m, { jobId: job.job_id, outcome: 'diagnosed' }).ok, false, 'a diagnosis carries its findings');
+  assert.ok(fileReport(m, { jobId: job.job_id, outcome: 'diagnosed', summary: 'root cause: x' }).ok);
+  assert.equal(jobOf(m, job.job_id).status, 'succeeded');
+  assert.equal(jobOf(m, job.job_id).result.reason, 'worker-diagnosed');
   const first = planWake({ now: Date.now(), lastTickAt: Date.now(), filed: [job.job_id] });
   assert.deepEqual(first.tags, ['report']);
   assert.deepEqual(planWake({ now: Date.now(), lastTickAt: Date.now(), filed: [job.job_id], wakes: [{ at: Date.now(), payload: { report: [job.job_id], text: first.text } }] }).tags, []);
@@ -689,18 +691,17 @@ test('a diagnosis worker files outcome diagnosed; the watchdog announces it once
 
 test('ack consumes a decided diagnosis so no later [report] wake announces it again', (t) => {
   const env = envOf(t);
-  const ledger = openSupervisorLedger({ env });
-  t.after(() => ledger.close());
-  const { job } = createJob(ledger, { cluster: 'stale-diag', files: ['scripts/y.mjs'] });
-  ledger.db.prepare("UPDATE jobs SET status='running' WHERE job_id=?").run(job.job_id);
-  assert.ok(fileReport(ledger, { jobId: job.job_id, outcome: 'diagnosed', summary: 'root cause: y' }).ok);
-  const unconsumed = () => ledger.db.prepare("SELECT COUNT(*) n FROM reports WHERE workflow_id=? AND dispatch_id=? AND consumed_at IS NULL").get(SUPERVISOR_WF, job.job_id).n;
+  const m = machineOf(t, env);
+  const { job } = createJob(m, { cluster: 'stale-diag', files: ['scripts/y.mjs'] });
+  m.setSupJobStatus(job.job_id, 'running');
+  assert.ok(fileReport(m, { jobId: job.job_id, outcome: 'diagnosed', summary: 'root cause: y' }).ok);
+  const unconsumed = () => m.supReports({ jobId: job.job_id, unconsumed: true }).length;
   assert.equal(unconsumed(), 1);
-  assert.equal(ackReport(ledger, { jobId: job.job_id, reason: ' ' }).ok, false, 'an ack names its decision');
-  assert.equal(ackReport(ledger, { jobId: job.job_id, reason: 'fix landed as abc123' }).ok, true);
+  assert.equal(ackReport(m, { jobId: job.job_id, reason: ' ' }).ok, false, 'an ack names its decision');
+  assert.equal(ackReport(m, { jobId: job.job_id, reason: 'fix landed as abc123' }).ok, true);
   assert.equal(unconsumed(), 0, 'the watchdog filedReports query no longer sees it');
-  assert.equal(ackReport(ledger, { jobId: job.job_id, reason: 'again' }).already, true);
-  assert.equal(ledger.db.prepare("SELECT COUNT(*) n FROM events WHERE kind='worker-report-acked' AND entity_id=?").get(job.job_id).n, 1);
+  assert.equal(ackReport(m, { jobId: job.job_id, reason: 'again' }).already, true);
+  assert.equal(m.supEvents({ kind: 'worker-report-acked', entityId: job.job_id }).length, 1);
 });
 
 test('watchdog: a busy Supervisor (mid-turn, or idle input with subagents running) is never woken', async (t) => {
@@ -746,12 +747,11 @@ test('watchdog: a wake whose proof failed still counts, and an identical text is
 test('a [Worker] terminal is created on the runtime project Orca worktree and starts its agent in the staging checkout', async (t) => {
   // A staging checkout is no Orca worktree: a terminal created on it is orphaned (under no project in the sidebar).
   const env = envOf(t);
-  const ledger = openSupervisorLedger({ env });
-  t.after(() => ledger.close());
-  createJob(ledger, { cluster: 'orca-tree', files: ['scripts/o.mjs'] });
+  const m = machineOf(t, env);
+  createJob(m, { cluster: 'orca-tree', files: ['scripts/o.mjs'] });
   const spawned = [];
   const root = path.join(os.tmpdir(), 'runtime-root');
-  const r = await spawnWorkers(ledger, { settings, env, root, deps: {
+  const r = await spawnWorkers(m, { settings, env, root, deps: {
     load: () => ({ cpuBusy: 0, freeMem: 1 }), route: async () => ({ pool: 'claude-agent', agent: 'claude', model: 'm' }),
     staging: ({ jobId }) => ({ ok: true, path: path.join(os.tmpdir(), 'staging', jobId), branch: `sup/${jobId}`, base: 'abc' }),
     unstage: () => ({}), spawn: (opts) => { spawned.push(opts); return { ok: true, terminal: 'term_w1' }; } } });
@@ -759,7 +759,7 @@ test('a [Worker] terminal is created on the runtime project Orca worktree and st
   assert.equal(spawned[0].worktree, root, 'the terminal is created on the registered runtime worktree');
   assert.equal(spawned[0].cwd, r.launched[0].staging, 'the agent runs in the staging checkout');
   assert.equal(spawned[0].title, '[Worker] orca-tree');
-  assert.deepEqual([...openWorkerHandles(ledger.db)], ['term_w1']);
+  assert.deepEqual([...openWorkerHandles(m)], ['term_w1']);
   // The launch command changes into the staging checkout before anything else, and stops the line when it cannot.
   const dir = 'C:/x/staging/job-1';
   assert.equal(cwdCommand(dir, 'win32'), "Set-Location -LiteralPath 'C:/x/staging/job-1' -ErrorAction Stop;");
@@ -773,18 +773,20 @@ test('a [Worker] terminal is created on the runtime project Orca worktree and st
 
 test('a live [Worker] of an open job is owned: never a stray, orphan or [Supervisor] duplicate, never swept', async (t) => {
   const env = envOf(t);
-  const sup = openSupervisorLedger({ env });
+  const sup = openMachine({ env });
   const { job } = createJob(sup, { cluster: 'kept', files: ['scripts/k.mjs'] });
-  sup.db.prepare("UPDATE jobs SET status='running', worker_id='term_wk' WHERE job_id=?").run(job.job_id);
+  sup.startSupAttempt({ jobId: job.job_id, agent: 'claude', terminalHandle: 'term_wk' });
+  sup.setSupJobStatus(job.job_id, 'running');
   const { job: done } = createJob(sup, { cluster: 'gone', files: ['scripts/g.mjs'] });
-  sup.db.prepare("UPDATE jobs SET status='succeeded', worker_id='term_old' WHERE job_id=?").run(done.job_id);
+  sup.startSupAttempt({ jobId: done.job_id, agent: 'claude', terminalHandle: 'term_old' });
+  sup.setSupJobStatus(done.job_id, 'succeeded');
   // The watchdog sweep leaves a live running worker alone.
   const d = { verdict: () => ({ verdict: 'live' }), screen: () => '> ', exitedRow: () => null,
     close: () => assert.fail('a live worker of an open job is never closed'), quit: () => assert.fail('never quit'), closeExited: () => assert.fail('never') };
   assert.deepEqual(sweepWorkers(sup, d), { deaths: [], closed: [] });
   sup.close();
   assert.deepEqual([...supervisorWorkerHandles({ env })], ['term_wk']);
-  // The Orca-tree check: the worker sits in the runtime project's worktree, its job in the supervisor ledger.
+  // The Orca-tree check: the worker sits in the runtime project's worktree, its job in machine.sqlite sup_jobs.
   const repo = 'D:/Repositories/starci-academy-backend/.claude';
   withLedger(t, ({ ledger }) => {
     const rows = readTerminals([

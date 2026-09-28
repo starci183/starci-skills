@@ -12,9 +12,11 @@
 // (whose service port must equal that port: a mismatch is a probe failure, `port-drift`), the ask-gateway port from
 // config.yaml connectors.gateway.port.
 //
-// The state machine of DESIGN 9.7 is stepService (pure); its rows live in the `services` table of
-// ~/.starci/supervisor/reconciler.sqlite (the DESIGN 7.3 schema). The same table also holds the Host controller's
-// seat rows (`seat:...`) and ledger rows (`ledger:<id>`), so `boot.mjs --status` shows everything the Host owns.
+// The state machine of DESIGN 9.7 is stepService (pure); its rows live in machine.sqlite (engine/machine-db.mjs, DBTREE
+// B3): one `services` row per name (state: the coarse DBTREE state; the record's own state and fields in
+// last_probe_json), every transition and every restart appended to `service_events` (the restarts of a record are its
+// `restart` events: no restarts_json), every probe to `service_probes`. The same table also holds the Host
+// controller's seat rows (`seat:...`) and ledger rows (`ledger:<id>`), so `boot.mjs --status` shows everything the Host owns.
 //
 //   node scripts/reconciler/services.mjs --list [--json]            the rows of the services table
 //   node scripts/reconciler/services.mjs --probe <name> [--json]    one read-only probe
@@ -30,11 +32,10 @@ import os from 'node:os';
 import path from 'node:path';
 import { execFile, spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
-import { createRequire } from 'node:module';
 import { parseYaml } from '../../engine/yaml.mjs';
+import { openMachine } from '../../engine/machine-db.mjs';
 import { allocationSettings, loadConfig } from '../../engine/config.mjs';
 
-const require = createRequire(import.meta.url);
 export const SKILL_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 export const SERVICES_FILE = 'scripts/reconciler/services.mjs';
 export const HOST_YAML = path.join(SKILL_ROOT, 'modules', 'reconciler', 'host.yaml');
@@ -307,30 +308,85 @@ export function stepService(rec, probe, { now, entry, backoff, quarantine }) {
 
 /* ------------------------------------------------------------ the store */
 
-export const SERVICES_DDL = 'CREATE TABLE IF NOT EXISTS services(name TEXT PRIMARY KEY, state TEXT, since INTEGER, restarts_json TEXT, last_probe_json TEXT)';
-export const reconcilerDbFile = (env = process.env) => path.join(path.resolve(env.STARCI_SUPERVISOR_HOME || path.join(os.homedir(), '.starci', 'supervisor')), 'reconciler.sqlite');
-
-const toRow = (rec) => {
-  const { name, state, since, restarts, ...rest } = rec;
-  return [name, state, since, JSON.stringify(restarts ?? []), JSON.stringify(rest)];
+/** services.kind (DBTREE B3) of a store row name. Pure. */
+export const serviceKindOf = (name) => {
+  const n = String(name ?? '');
+  if (n.startsWith('ledger:')) return 'ledger';
+  if (n.startsWith('sched-task:')) return 'scheduled-task';
+  if (/-tunnel$/.test(n)) return 'tunnel';
+  if (n === 'ask-gateway' || n === 'telegram-bridge') return 'connector';
+  if (n.startsWith('checker:') || n === 'harness-ui') return 'http';
+  return 'host-app';
 };
-const fromRow = (row) => {
-  if (!row) return null;
-  let extra = {}, restarts = [];
-  try { extra = JSON.parse(row.last_probe_json ?? '{}') ?? {}; } catch { extra = {}; }
-  try { restarts = JSON.parse(row.restarts_json ?? '[]') ?? []; } catch { restarts = []; }
-  return { ...extra, name: row.name, state: row.state, since: row.since, restarts };
+/** services.state (DBTREE B3: healthy|ok|degraded|down|quarantined|restarting|booting|stale) of a record state. Pure. */
+export const serviceStateOf = (state) => {
+  switch (String(state ?? '')) {
+    case 'healthy': return 'healthy';
+    case 'ok': case 'live': case 'idle': case 'busy': case 'working': return 'ok';
+    case 'degraded': return 'degraded';
+    case 'quarantined': return 'quarantined';
+    case 'starting': case 'replacing': case 'reserving': return 'restarting';
+    case 'declared': return 'booting';
+    case 'unmanaged': case 'removed': return 'stale';
+    default: return 'down';
+  }
 };
+// last_probe_json keys of the store itself (never part of a record).
+const STORE_KEYS = ['state', 'restartsFrom', 'removed'];
 
-/** The `services` table of a DatabaseSync handle: {get, put, all, remove}. */
-export function sqliteStore(db) {
-  db.exec(SERVICES_DDL);
-  return {
-    get: (name) => fromRow(db.prepare('SELECT * FROM services WHERE name=?').get(name)),
-    put: (rec) => { db.prepare('INSERT INTO services(name,state,since,restarts_json,last_probe_json) VALUES(?,?,?,?,?) ON CONFLICT(name) DO UPDATE SET state=excluded.state, since=excluded.since, restarts_json=excluded.restarts_json, last_probe_json=excluded.last_probe_json').run(...toRow(rec)); return rec; },
-    all: () => db.prepare('SELECT * FROM services ORDER BY name').all().map(fromRow),
-    remove: (name) => { db.prepare('DELETE FROM services WHERE name=?').run(name); },
+/**
+ * The Host controller's records in machine.sqlite: {get, put, all, remove}. A record is {name, state, since, restarts,
+ * ...fields}; `restarts` are the times of its service_events `restart` rows since the record's restartsFrom (a record
+ * put with fewer restarts - the quarantine window moved, a --reopen - moves restartsFrom, never deletes an event).
+ * put appends a service_events row on every change of the record's state and one `restart` row per new restart, and a
+ * service_probes row per new lastProbe. remove keeps the history: the row turns stale/removed.
+ */
+export function machineStore(m) {
+  const restartsOf = (name, from) => m.db.prepare("SELECT at FROM service_events WHERE name=? AND action='restart' AND at>=? ORDER BY at, seq").all(name, Number(from) || 0).map((r) => Number(r.at));
+  const read = (row) => {
+    if (!row) return null;
+    let extra = {};
+    try { extra = JSON.parse(row.last_probe_json ?? '{}') ?? {}; } catch { extra = {}; }
+    if (extra.removed) return null;
+    const { state, restartsFrom, removed, ...fields } = extra;
+    return { ...fields, name: row.name, state: state ?? row.state, since: row.since, restarts: restartsOf(row.name, restartsFrom) };
   };
+  const get = (name) => read(m.db.prepare('SELECT * FROM services WHERE name=?').get(name));
+  const put = (rec) => m.transaction((db) => {
+    const at = m.now();
+    const row = db.prepare('SELECT * FROM services WHERE name=?').get(rec.name);
+    let prev = {};
+    try { prev = JSON.parse(row?.last_probe_json ?? '{}') ?? {}; } catch { prev = {}; }
+    const had = row ? restartsOf(rec.name, prev.restartsFrom) : [];
+    const restarts = (rec.restarts ?? []).map(Number).filter(Number.isFinite).sort((a, b) => a - b);
+    const fresh = restarts.filter((t) => !had.includes(t));
+    const restartsFrom = restarts.length ? restarts[0] : had.length ? had.at(-1) + 1 : 0;
+    const { name, state, since, restarts: _r, ...fields } = rec;
+    const fromState = row && !prev.removed ? prev.state ?? row.state : null;
+    m.upsert('services', { name, kind: row?.kind ?? serviceKindOf(name), state: serviceStateOf(state), since: since ?? at,
+      last_probe_json: { ...fields, state, restartsFrom } }, ['name']);
+    for (const t of fresh) m.insert('service_events', { name, at: t, from_state: fromState, to_state: state, action: 'restart' });
+    if (!fresh.length && fromState !== state) {
+      const action = state === 'quarantined' ? 'quarantine' : fromState === 'quarantined' ? 'release' : null;
+      m.insert('service_events', { name, at, from_state: fromState, to_state: state, action, probe_error: fields.lastProbe?.ok === false ? String(fields.lastProbe?.error ?? '').slice(0, 500) || null : null });
+    }
+    const probe = fields.lastProbe;
+    if (probe && Number.isFinite(Number(probe.at)) && Number(probe.at) !== Number(prev.lastProbe?.at)) {
+      m.recordProbe({ name, ok: probe.ok === true, latencyMs: Number.isFinite(Number(probe.ms ?? probe.latencyMs)) ? Number(probe.ms ?? probe.latencyMs) : null, detail: probe });
+    }
+    return rec;
+  });
+  const all = () => m.db.prepare('SELECT * FROM services ORDER BY name').all().map(read).filter(Boolean);
+  const remove = (name) => m.transaction((db) => {
+    const row = db.prepare('SELECT * FROM services WHERE name=?').get(name);
+    if (!row) return;
+    let prev = {};
+    try { prev = JSON.parse(row.last_probe_json ?? '{}') ?? {}; } catch { prev = {}; }
+    if (prev.removed) return;
+    m.update('services', { state: 'stale', since: m.now(), last_probe_json: { ...prev, removed: true } }, { name });
+    m.insert('service_events', { name, at: m.now(), from_state: prev.state ?? row.state, to_state: 'removed', action: null });
+  });
+  return { get, put, all, remove };
 }
 
 /** An in-memory store with the same shape (specs). */
@@ -340,15 +396,10 @@ export function memoryStore(initial = []) {
 }
 
 let shared = null;
-/** The reconciler state DB's services table (DESIGN 7.3), opened once per process. */
+/** The Host records in machine.sqlite (machineStore over one handle), opened once per process. */
 export function openServiceStore({ env = process.env } = {}) {
   if (shared) return shared;
-  const { DatabaseSync } = require('node:sqlite');
-  const file = reconcilerDbFile(env);
-  fs.mkdirSync(path.dirname(file), { recursive: true });
-  const db = new DatabaseSync(file, { timeout: 15_000 });
-  db.exec('PRAGMA journal_mode=WAL; PRAGMA busy_timeout=15000;');
-  shared = sqliteStore(db);
+  shared = machineStore(openMachine({ env }));
   return shared;
 }
 
@@ -471,8 +522,7 @@ export async function turnProbe({ terminal = null, supervisor = false } = {}) {
   let handle = terminal;
   if (!handle && supervisor) {
     const home = await import('../supervisor/home.mjs');
-    const ledger = home.openSupervisorLedger();
-    try { handle = home.seatOf(ledger.db, Date.now())?.value?.terminal ?? null; } finally { ledger.close(); }
+    handle = home.readSupervisor((m) => home.seatOf(m, Date.now())?.value?.terminal ?? null, null);
   }
   if (!handle) return { ok: false, error: 'no seat terminal' };
   const [{ terminalRead }, { terminalList }, { agentOfTerminal }, { classifyAgentScreen }] = await Promise.all([

@@ -18,9 +18,9 @@
 //   node scripts/supervisor/start-supervisor.mjs --restart [--json]      stop + start (a contract reload)
 //
 // Singleton, three fences:
-//   1. a host lock (connectors claimManager 'supervisor-start'): two launchers never run at once;
-//   2. the seat signal in the supervisor ledger (scripts/supervisor/home.mjs): a 'starting' reservation with
-//      an expiry, then the attested terminal. A seat whose terminal a responding Orca calls live is never
+//   1. a host lock (machine.sqlite host_locks 'supervisor-start'): two launchers never run at once;
+//   2. the seat (machine.sqlite seats row 'supervisor', scripts/supervisor/home.mjs seatOf/writeSeat): a 'starting'
+//      reservation with an expiry, then the attested terminal. A seat whose terminal a responding Orca calls live is never
 //      replaced; an Orca that does not answer proves nothing (exit 75, nothing touched);
 //   3. dedupe: every other terminal whose tab or pane title carries "[Supervisor]" is a duplicate (a [Worker]
 //      tab or a terminal an open worker job owns never is). With no
@@ -33,11 +33,11 @@ import crypto from 'node:crypto';
 import { spawn } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { parseYaml } from '../../engine/yaml.mjs';
-import { claimManager } from '../connectors/lib.mjs';
+import { openMachine, pidAlive } from '../../engine/machine-db.mjs';
 import { agentOfTerminal } from '../kernel/quit-agent.mjs';
 import {
-  SKILL_ROOT, SUPERVISOR_ID, SEAT_SCOPE, SUPERVISOR_TITLE, SUPERVISOR_MARKER, WORKER_MARKER, STARTUP_RESERVATION_MS,
-  openSupervisorLedger, seatOf, enabledOf, setEnabled, supervisorEvent, supervisorSettings, supervisorMode, productRepos, supervisorLog,
+  SKILL_ROOT, SUPERVISOR_ID, SUPERVISOR_TITLE, SUPERVISOR_MARKER, WORKER_MARKER, STARTUP_RESERVATION_MS,
+  readSupervisor, seatOf, writeSeat, clearSeat, enabledOf, setEnabled, supervisorEvent, supervisorSettings, supervisorMode, productRepos, supervisorLog,
 } from './home.mjs';
 import { openWorkerHandles } from './workers.mjs';
 
@@ -201,11 +201,18 @@ function closeDuplicates(entries, deps, fallbackAgent) {
 /** Why no [Supervisor] kernel starts in chat mode (config.yaml supervisor.mode). */
 export const CHAT_MODE_REASON = "config.yaml supervisor.mode is chat: the owner's desktop chat is the Supervisor; no [Supervisor] kernel is started (set supervisor.mode: kernel to run one)";
 
-const writeSeat = (ledger, { token, value, expiresAt = null, now = Date.now() }) => {
-  ledger.db.prepare('DELETE FROM signals WHERE scope=? AND key=?').run(SEAT_SCOPE, SUPERVISOR_ID);
-  ledger.db.prepare('INSERT INTO signals(scope,key,holder_pid,token,value_json,at,expires_at) VALUES(?,?,?,?,?,?,?)')
-    .run(SEAT_SCOPE, SUPERVISOR_ID, process.pid, token, JSON.stringify(value), now, expiresAt);
-};
+export const START_LOCK = 'supervisor-start';
+/**
+ * The launcher lock (host_locks 'supervisor-start', TTL the startup reservation): {ok, release} or {ok:false, holder}.
+ * A holder whose process is gone never blocks the next launcher.
+ */
+function claimStartLock(m) {
+  const take = () => m.acquireHostLock({ name: START_LOCK, holder: 'start-supervisor', ttlMs: STARTUP_RESERVATION_MS });
+  let got = take();
+  if (!got.ok && !pidAlive(got.holder?.holder_pid)) { m.releaseHostLock({ name: START_LOCK, force: true }); got = take(); }
+  if (!got.ok) return { ok: false, holder: { pid: got.holder?.holder_pid ?? null } };
+  return { ok: true, release: () => { try { m.releaseHostLock({ name: START_LOCK }); } catch { /* expires */ } } };
+}
 
 /**
  * One launch pass. `mode`: 'start' (the owner's entry: enables the seat), 'replace' (the watchdog: only when
@@ -219,14 +226,15 @@ export async function launchSupervisor({ mode = 'start', adoptHandle = null, rea
     return { ok: planOnly || mode === 'replace', exit: planOnly || mode === 'replace' ? 0 : 1, action: 'chat-mode', supervisorMode: 'chat', reason: CHAT_MODE_REASON, wouldLaunch: false };
   }
   const d = deps ?? await orcaDeps();
-  const lock = planOnly ? { ok: true, release() {} } : claimManager('supervisor-start', { env });
-  if (!lock.ok) return { ok: true, exit: 0, action: 'start-in-progress', holder: lock.holder?.pid ?? null };
-  const ledger = openSupervisorLedger({ env });
+  // A long-lived writer handle: the spawn below waits for the agent's readiness (no transaction is held meanwhile).
+  const m = openMachine({ env });
+  const lock = planOnly ? { ok: true, release() {} } : claimStartLock(m);
+  if (!lock.ok) { m.close(); return { ok: true, exit: 0, action: 'start-in-progress', holder: lock.holder?.pid ?? null }; }
   try {
-    if (mode === 'start' && !planOnly) setEnabled(ledger, true, { by: 'start-supervisor', now: now() });
-    const enabled = enabledOf(ledger.db);
+    if (mode === 'start' && !planOnly) setEnabled(m, true, { by: 'start-supervisor', now: now() });
+    const enabled = enabledOf(m);
     if (mode === 'replace' && enabled !== true) return { ok: true, exit: 0, action: 'disabled', reason: 'the seat is disabled (start-supervisor --stop); nothing launched' };
-    const seat = seatOf(ledger.db, now());
+    const seat = seatOf(m, now());
     const health = seatHealth(seat, d, now());
     if (health.hostUnavailable) return { ok: false, exit: EXIT_HOST_UNAVAILABLE, action: 'host-unavailable', reason: health.reason };
     if (health.unverified) return { ok: false, exit: 1, action: 'seat-unverified', reason: health.reason, terminal: health.terminal };
@@ -234,7 +242,7 @@ export async function launchSupervisor({ mode = 'start', adoptHandle = null, rea
     let listing = null;
     try { listing = d.list(); } catch (e) { listing = { ok: false, error: String(e?.message ?? e) }; }
     if (listing?.hostUnavailable) return { ok: false, exit: EXIT_HOST_UNAVAILABLE, action: 'host-unavailable', reason: listing.error ?? 'terminal list did not answer' };
-    const marked = listing?.ok ? supervisorTerminals(listing, d.tabTitles, { owned: openWorkerHandles(ledger.db) }) : [];
+    const marked = listing?.ok ? supervisorTerminals(listing, d.tabTitles, { owned: openWorkerHandles(m) }) : [];
     const dedupe = planSupervisorDedupe({ marked, seatTerminal: health.terminal, seatLive: health.live, screenOf: d.screen, exitedRow: d.exitedRow });
     if (adoptHandle) {
       const target = marked.find((t) => t.handle === adoptHandle) ?? { handle: adoptHandle };
@@ -262,19 +270,19 @@ export async function launchSupervisor({ mode = 'start', adoptHandle = null, rea
       if (v.verdict !== 'live' || screen == null || d.exitedRow(screen)) return { ok: false, exit: 1, action: 'adopt-refused', terminal: handle, reason: v.verdict !== 'live' ? v.reason : 'no agent session on screen' };
       const value = { terminal: handle, agent: agentOfTerminal(dedupe.adopt, settings.agent), model: seat?.value?.model ?? settings.model, effort: seat?.value?.effort ?? settings.effort,
         startedAt: seat?.value?.startedAt ?? new Date(at).toISOString(), adoptedAt: new Date(at).toISOString(), attempt };
-      ledger.transaction(() => {
-        writeSeat(ledger, { token, value, now: at });
-        supervisorEvent(ledger, { kind: 'supervisor-adopted', payload: { ...value, previous, reason: dedupe.adopt.reason }, now: at });
+      m.transaction(() => {
+        writeSeat(m, { token, value, now: at });
+        supervisorEvent(m, { kind: 'supervisor-adopted', payload: { ...value, previous, reason: dedupe.adopt.reason }, now: at });
       });
       const closed = closeDuplicates(dedupe.close, d, settings.agent);
       return { ok: true, exit: 0, action: 'adopted', terminal: handle, ...(closed.length ? { closedDuplicates: closed } : {}) };
     }
 
     // Reserve the seat: a concurrent launcher that got past the lock (a stale lock) still meets this row.
-    const reserved = ledger.transaction(() => {
-      const row = seatOf(ledger.db, at);
+    const reserved = m.transaction(() => {
+      const row = seatOf(m, at);
       if (row && (row.starting || (row.token !== seat?.token))) return false;
-      writeSeat(ledger, { token, value: { state: 'starting', attempt }, expiresAt: at + STARTUP_RESERVATION_MS, now: at });
+      writeSeat(m, { token, value: { state: 'starting', attempt }, expiresAt: at + STARTUP_RESERVATION_MS, now: at });
       return true;
     });
     if (!reserved) return { ok: true, exit: 0, action: 'starting', reason: 'another launcher holds the startup reservation' };
@@ -293,46 +301,46 @@ export async function launchSupervisor({ mode = 'start', adoptHandle = null, rea
     const spawned = d.spawn({ provider: settings.agent, model: settings.model, effort: settings.effort, worktree: SKILL_ROOT,
       title: SUPERVISOR_TITLE, prompt, kernel: true, dispatchId: `supervisor-${SUPERVISOR_ID}`, ...(command ? { command } : {}) });
     if (!spawned?.ok) {
-      ledger.transaction(() => {
-        ledger.db.prepare('DELETE FROM signals WHERE scope=? AND key=? AND token=?').run(SEAT_SCOPE, SUPERVISOR_ID, token);
-        supervisorEvent(ledger, { kind: 'supervisor-start-failed', payload: { step: spawned?.step ?? null, error: spawned?.error ?? null, terminal: spawned?.terminal ?? null, agent: settings.agent }, now: now() });
+      m.transaction(() => {
+        clearSeat(m, { token });
+        supervisorEvent(m, { kind: 'supervisor-start-failed', payload: { step: spawned?.step ?? null, error: spawned?.error ?? null, terminal: spawned?.terminal ?? null, agent: settings.agent }, now: now() });
       });
       return { ok: false, exit: 1, action: 'launch-failed', step: spawned?.step ?? null, error: spawned?.error ?? 'spawn failed', terminal: spawned?.terminal ?? null };
     }
     const value = { terminal: spawned.terminal, agent: settings.agent, model: settings.model, effort: settings.effort,
       startedAt: new Date(now()).toISOString(), attempt, modelAttested: spawned.modelAttested ?? null };
-    ledger.transaction(() => {
-      writeSeat(ledger, { token, value, now: now() });
-      supervisorEvent(ledger, { kind: previous ? 'supervisor-restarted' : 'supervisor-booted', payload: { ...value, previous, reason }, now: now() });
+    m.transaction(() => {
+      writeSeat(m, { token, value, now: now() });
+      supervisorEvent(m, { kind: previous ? 'supervisor-restarted' : 'supervisor-booted', payload: { ...value, previous, reason }, now: now() });
     });
     if (previous && health.agentExited) { try { closedPrevious.push({ handle: previous.terminal, ...(d.close(previous.terminal) ?? {}) }); } catch { /* best effort */ } }
     return { ok: true, exit: 0, action: previous ? 'restarted' : 'booted', terminal: spawned.terminal, agent: settings.agent, model: settings.model,
       attempt, ...(closedDuplicates.length ? { closedDuplicates } : {}), ...(closedPrevious.length ? { closedPrevious } : {}) };
   } finally {
-    ledger.close();
     lock.release();
+    m.close();
   }
 }
 
 /** Disable the seat, ask its agent to quit and close its tab. The watchdog then leaves it down. */
 export async function stopSupervisor({ env = process.env, deps = null, now = Date.now } = {}) {
   const d = deps ?? await orcaDeps();
-  const ledger = openSupervisorLedger({ env });
+  const m = openMachine({ env });
   try {
-    setEnabled(ledger, false, { by: 'start-supervisor --stop', now: now() });
-    const seat = seatOf(ledger.db, now());
+    setEnabled(m, false, { by: 'start-supervisor --stop', now: now() });
+    const seat = seatOf(m, now());
     const terminal = seat?.value?.terminal ?? null;
     let quit = null, closed = null;
     if (terminal) {
       try { quit = d.quit(terminal, seat.value.agent ?? 'claude'); } catch (e) { quit = { error: String(e?.message ?? e) }; }
       try { closed = d.close(terminal); } catch (e) { closed = { ok: false, error: String(e?.message ?? e) }; }
     }
-    ledger.transaction(() => {
-      ledger.db.prepare('DELETE FROM signals WHERE scope=? AND key=?').run(SEAT_SCOPE, SUPERVISOR_ID);
-      supervisorEvent(ledger, { kind: 'supervisor-stopped', payload: { terminal, quit, closed: closed?.ok ?? null }, now: now() });
+    m.transaction(() => {
+      clearSeat(m);
+      supervisorEvent(m, { kind: 'supervisor-stopped', payload: { terminal, quit, closed: closed?.ok ?? null }, now: now() });
     });
     return { ok: true, action: 'stopped', terminal, quit, closed: closed?.ok === true || quit?.exited === true };
-  } finally { ledger.close(); }
+  } finally { m.close(); }
 }
 
 
@@ -352,23 +360,20 @@ async function main() {
   if (has('help')) { console.log('use: start-supervisor.mjs [--plan] [--reason <t>] | --replace | --adopt <terminal> | --status | --stop | --restart  [--json]'); return; }
   if (has('status')) {
     const d = await orcaDeps();
-    const ledger = openSupervisorLedger();
-    let r;
-    try { const seat = seatOf(ledger.db); r = { ok: true, action: 'status', supervisorMode: supervisorMode(), enabled: enabledOf(ledger.db), seat: seat?.value ?? null, health: seatHealth(seat, d) }; }
-    finally { ledger.close(); }
-    return out(r);
+    const { seat, enabled } = readSupervisor((m) => ({ seat: seatOf(m), enabled: enabledOf(m) }), { seat: null, enabled: null });
+    return out({ ok: true, action: 'status', supervisorMode: supervisorMode(), enabled, seat: seat?.value ?? null, health: seatHealth(seat, d) });
   }
-  if (has('stop')) { const r = await stopSupervisor(); supervisorLog('start', `stop: ${JSON.stringify(r)}`); return out(r); }
+  if (has('stop')) { const r = await stopSupervisor(); supervisorLog('start', describe(r), { data: r }); return out(r); }
   if (has('restart')) {
     const stopped = await stopSupervisor();
     const r = await launchSupervisor({ mode: 'start', reason: value('reason') ?? 'owner restart (start-supervisor --restart)' });
     r.stopped = stopped;
-    supervisorLog('start', `restart: ${JSON.stringify(r)}`);
+    supervisorLog('start', `restart: ${describe(r)}`, { level: r.ok ? 'info' : 'warn', data: r });
     return out(r);
   }
   const mode = has('replace') ? 'replace' : value('adopt') ? 'adopt' : 'start';
   const r = await launchSupervisor({ mode, adoptHandle: value('adopt'), reason: value('reason'), plan: has('plan') });
-  if (!has('plan')) supervisorLog('start', `${mode}: ${JSON.stringify(r)}`);
+  if (!has('plan')) supervisorLog('start', `${mode}: ${describe(r)}`, { level: r.ok ? 'info' : 'warn', data: r });
   return out(r);
 }
 

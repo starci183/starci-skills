@@ -11,25 +11,29 @@
 //                               run: one `reconciler.would` typed row, {ok: true, shadow: true}.
 //   ctx.run(cmd, args, {timeoutMs})  the same gate for a non-api actuator ('node' = this node; 'scripts/..' paths
 //                               resolve against the runtime root)
-//   ctx.clock(entity, state, slaMs, meta) / ctx.clear(entity, state)   SLA clocks (sla_clocks); shadow records them too
+//   ctx.clock(entity, state, slaMs, meta) / ctx.clear(entity, state)   SLA clocks (machine.sqlite sla_episodes, append-only:
+//                               one open episode per (entity, state), closed once with a reason); shadow records them too
 //   ctx.openDecision(di)        Decision Item through scripts/reconciler/decisions.mjs openDecision (lane C) when
 //                               active; in shadow, or before that module exists, only the would-row
-//   ctx.log(kind, msg, data)    a typed row on the Supervisor ledger (sup-log.mjs), kind prefix `reconciler.` (logRowOf)
+//   ctx.log(kind, msg, data)    a typed row in machine.sqlite machine_logs, actor 'reconciler' (logRowOf, reconcilerLog)
 //   ctx.owns(concern)           whether the concern's controller runs active in THIS engine
-//   ctx.stateDb / ctx.stateFile the engine's reconciler.sqlite handle and file (never open it yourself); ctx.env
+//   ctx.machine                 the engine's machine.sqlite handle (engine/machine-db.mjs; never open another one yourself)
+//   ctx.stateDb / ctx.stateFile its raw connection (ctx.machine.db) and file; ctx.env
 //   ctx.key / ctx.epoch         the key being reconciled (null in list()) and the leader epoch
 //
-// Every real mutation is journaled in `actions` (intent -> running -> done|failed) and fenced: it runs only while
-// this engine's epoch is still the leader's (DESIGN §7.5). A stale intent/running row at boot becomes `unknown`
-// (engine.mjs) and is never replayed: the controller re-evaluates from the ledger.
+// Every real mutation is journaled in machine.sqlite `engine_actions` (intent -> running -> done|failed; fenced) and
+// fenced: it runs only while this engine's epoch is still the leader's (DESIGN §7.5). The FULL result is a blob
+// (result_sha), result_json only a <= 8 KiB summary, stdout/stderr full blobs (MB-03). A stale intent/running row at
+// boot becomes `unknown` (engine.mjs) and is never replayed: the controller re-evaluates from the ledger.
 import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 import { spawn } from 'node:child_process';
 import { openLedgerReader } from '../../engine/ledger-db.mjs';
+import { machineLog } from '../../engine/machine-db.mjs';
 import { LOG_KINDS } from '../kernel/typed-logs.mjs';
-import { supLog } from '../supervisor/sup-log.mjs';
 import { CONCERN_OWNER } from './owns.mjs';
+import { openClock, slaCatalog } from './sla.mjs';
 import { SKILL_ROOT } from './state.mjs';
 
 export const API_FILE = path.join(SKILL_ROOT, 'scripts', 'kernel', 'api.mjs');
@@ -37,7 +41,8 @@ export const DECISIONS_FILE = path.join(SKILL_ROOT, 'scripts', 'reconciler', 'de
 export const DEFAULT_TIMEOUT_MS = 120_000;
 /** The same would-row (controller, verb, argv) is written at most once per this window. */
 export const WOULD_DEDUPE_MS = 10 * 60_000;
-const RESULT_CAP = 4000;
+/** A value up to this many bytes rides in the action summary (engine_actions.result_json, <= 8 KiB); the full result is a blob. */
+const SUMMARY_VALUE_BYTES = 6000;
 
 export const digestOf = (value) => crypto.createHash('sha256').update(JSON.stringify(value)).digest('hex').slice(0, 16);
 const clip = (text, n = 300) => { const s = String(text ?? ''); return s.length > n ? `${s.slice(0, n - 1)}…` : s; };
@@ -64,13 +69,31 @@ export function errorLineOf(r) {
   return clip(r.fenced ? 'epoch-fenced: this engine is no longer the leader' : r.timedOut ? 'timed out' : fromJson ?? firstReal(r.error) ?? firstReal(r.stderr) ?? `exit ${r.code ?? '?'}`, 300);
 }
 
-/** actions.result_json: always valid JSON under RESULT_CAP - {ok, code, error, value | valueHead, timedOut?}. */
-export function actionResultJson(r) {
-  const base = { ok: r?.ok === true, code: r?.code ?? null, ...(r?.timedOut ? { timedOut: true } : {}), ...(r?.ok ? {} : { error: errorLineOf(r) }) };
+/**
+ * The engine_actions.result_json summary of a result: {ok, code, error?, timedOut?, fenced?, value | valueBytes}. The value
+ * rides only when small; the full result is the action's result blob (machine-db actionFinish). Pure.
+ */
+export function actionSummary(r) {
+  const base = { ok: r?.ok === true, code: r?.code ?? null, ...(r?.timedOut ? { timedOut: true } : {}), ...(r?.fenced ? { fenced: true } : {}), ...(r?.ok ? {} : { error: errorLineOf(r) }) };
   let value = null;
   try { value = JSON.stringify(r?.value ?? null); } catch { value = 'null'; }
-  const out = JSON.stringify(value.length <= RESULT_CAP - 400 ? { ...base, value: r?.value ?? null } : { ...base, valueHead: value.slice(0, RESULT_CAP - 400) });
-  return out;
+  return Buffer.byteLength(value) <= SUMMARY_VALUE_BYTES ? { ...base, value: r?.value ?? null } : { ...base, valueBytes: Buffer.byteLength(value) };
+}
+
+/** The full result an action keeps as its blob: the child's answer without stdout/stderr (those are blobs of their own). Pure. */
+const actionResultOf = (r) => { const { stdout, stderr, ...rest } = r ?? {}; return rest; };
+
+/**
+ * Write one ctx/engine log row ({kind, msg, data, refs, level?}, logRowOf) to machine_logs, actor 'reconciler'. With
+ * `m` (the engine's handle) on it; else through machineLog (its own short-lived connection). Returns the rows written.
+ */
+export function reconcilerLog(m, row, { env = process.env } = {}) {
+  const data = row?.data ?? {};
+  const level = row?.level ?? (/\.error$/.test(String(row?.kind ?? '')) ? 'error' : 'info');
+  const out = { actor: 'reconciler', controller: typeof data.controller === 'string' ? data.controller : null, kind: String(row?.kind ?? 'reconciler.event'),
+    msg: String(row?.msg ?? ''), level, data, refs: row?.refs ?? null, actionId: typeof data.actionId === 'string' ? data.actionId : null,
+    workflowId: typeof data.workflowId === 'string' ? data.workflowId : null, ...(row?.at ? { at: row.at } : {}) };
+  return m && !m.readOnly ? m.log(out) : machineLog(out, { env });
 }
 
 /** The last JSON line of a child's stdout, or null. Pure. */
@@ -99,7 +122,7 @@ export function spawnJson(cmd, args, { env = process.env, cwd = SKILL_ROOT, time
       settled = true;
       clearTimeout(timer);
       const value = lastJsonLine(stdout);
-      resolve({ ok: !timedOut && !error && code === 0 && value?.ok !== false, code, value, stdout: clip(stdout, 20000), stderr: clip(stderr, 4000), timedOut, ...(error ? { error } : {}) });
+      resolve({ ok: !timedOut && !error && code === 0 && value?.ok !== false, code, value, stdout, stderr, timedOut, ...(error ? { error } : {}) });
     };
     child.on('error', (error) => finish(null, String(error?.message ?? error)));
     child.on('close', (code) => finish(code));
@@ -126,17 +149,22 @@ export function logRowOf(controller, kind, msg, data = {}, { key = null } = {}) 
 
 const valueOf = (v) => (typeof v === 'function' ? v() : v);
 
+/** The SLA catalogue, read at most once a minute (the code and severity of an episode). */
+let catalogCache = { at: 0, value: null };
+const catalogNow = (at) => { if (!catalogCache.value || at - catalogCache.at > 60_000) catalogCache = { at, value: slaCatalog() }; return catalogCache.value; };
+
 /**
  * Build the ctx of one controller. `key`, `epoch`, `ledgers` and `modes` may be functions (the engine passes live
  * readers: the key of the reconcile running in this async context, the current epoch), so ONE ctx object serves every
  * reconcile of a controller in a mode, and a controller may keep per-ctx memory (a WeakMap keyed by ctx).
- * `shared` = {statusCache: Map, wouldSeen: Map} is shared by every ctx of one engine. Seams: spawnChild (spawnJson),
- * writeLog (supLog), reader (openLedgerReader), loadDecisions (import of decisions.mjs), isCurrentEpoch (the fence).
+ * `shared` = {statusCache: Map, wouldSeen: Map} is shared by every ctx of one engine. `state` is the engine's
+ * machine.sqlite handle (engine/machine-db.mjs openMachine). Seams: spawnChild (spawnJson), writeLog (reconcilerLog),
+ * reader (openLedgerReader), loadDecisions (import of decisions.mjs), isCurrentEpoch (the fence).
  */
 export function createCtx({
-  controller, mode = 'shadow', key = null, state = null, stateFile = null, epoch = 0, ledgers = [], numbers = { statusCacheMs: 20_000 },
+  controller, mode = 'shadow', key = null, state = null, stateFile = state?.file ?? null, epoch = 0, ledgers = [], numbers = { statusCacheMs: 20_000 },
   modes = {}, env = process.env, now = Date.now, shared = { statusCache: new Map(), wouldSeen: new Map() },
-  isCurrentEpoch = () => true, spawnChild = spawnJson, writeLog = (row) => supLog(row, { env }), reader = openLedgerReader,
+  isCurrentEpoch = () => true, spawnChild = spawnJson, writeLog = (row) => reconcilerLog(state, row, { env }), reader = openLedgerReader,
   loadDecisions = async () => (fs.existsSync(DECISIONS_FILE) ? import(`file://${DECISIONS_FILE.replace(/\\/g, '/')}`) : null),
 } = {}) {
   const keyNow = () => valueOf(key) ?? null;
@@ -167,18 +195,20 @@ export function createCtx({
     const id = `act-${crypto.randomBytes(8).toString('hex')}`;
     const digest = digestOf([verb, argv]);
     const k = keyNow(), ep = epochNow();
-    const journal = (sql, ...params) => { try { state?.prepare(sql).run(...params); } catch { /* the journal is best effort */ } };
-    journal('INSERT INTO actions(id,controller,key,verb,argv_digest,epoch,state,started_at) VALUES(?,?,?,?,?,?,?,?)', id, controller, k, verb, digest, ep, 'intent', now());
+    const journal = (fn) => { try { if (state) fn(state); } catch { /* the journal is best effort */ } };
+    journal((m) => m.actionIntent({ id, controller, key: k, verb, argvDigest: digest, epoch: ep, mode: 'active', ledgerId }));
     let current = false;
     try { current = isCurrentEpoch() === true; } catch { current = false; }
     if (!current) {
-      journal("UPDATE actions SET state='failed', finished_at=?, result_json=? WHERE id=?", now(), actionResultJson({ ok: false, fenced: true }), id);
-      return { ok: false, fenced: true, error: 'epoch-fenced: this engine is no longer the leader' };
+      const fenced = { ok: false, fenced: true, error: 'epoch-fenced: this engine is no longer the leader' };
+      journal((m) => m.actionFinish(id, { state: 'fenced', result: fenced, summary: actionSummary(fenced), errorSignature: 'epoch-fenced' }));
+      return fenced;
     }
-    journal("UPDATE actions SET state='running' WHERE id=?", id);
+    journal((m) => m.actionRunning(id));
     let r;
     try { r = await exec(); } catch (error) { r = { ok: false, error: String(error?.message ?? error) }; }
-    journal('UPDATE actions SET state=?, finished_at=?, result_json=? WHERE id=?', r?.ok === true ? 'done' : 'failed', now(), actionResultJson(r), id);
+    journal((m) => m.actionFinish(id, { state: r?.ok === true ? 'done' : 'failed', exitCode: Number.isInteger(r?.code) ? r.code : null, result: actionResultOf(r),
+      summary: actionSummary(r), stdout: r?.stdout ?? null, stderr: r?.stderr ?? null, errorSignature: r?.ok === true ? null : errorLineOf(r) }));
     log('reconciler.act', `${controller} ${r?.ok === true ? 'ran' : 'FAILED'} ${verb} ${clip(argv.join(' '), 200)}`, { verb, ok: r?.ok === true, ...(r?.ok === true ? {} : { detail: errorLineOf(r) }), actionId: id, argv: clip(argv.join(' '), 1000), epoch: ep, ...(ledgerId ? { ledgerId } : {}) });
     return { ...r, actionId: id };
   };
@@ -190,8 +220,10 @@ export function createCtx({
     get key() { return keyNow(); },
     get epoch() { return epochNow(); },
     get ledgers() { return ledgersNow(); },
-    /** The engine's reconciler.sqlite handle (read and write your own tables through it; never open the file yourself). */
-    stateDb: state,
+    /** The engine's machine.sqlite handle (engine/machine-db.mjs); never open the file yourself. */
+    machine: state,
+    /** Its raw connection (schedules.mjs claimDue/finishDuty); null without an engine. */
+    stateDb: state?.db ?? null,
     stateFile,
     now: () => now(),
     read(ledgerId, fn) {
@@ -231,18 +263,12 @@ export function createCtx({
     /** Start (or keep) the SLA clock of (entity, state); meta.enteredAt is its start, meta.ledgerId its ledger. Recorded in shadow too. */
     clock(entity, clockState, slaMs, meta = {}) {
       if (!state) return false;
-      const at = now();
-      state.prepare(`INSERT INTO sla_clocks(entity,state,ledger_id,entered_at,sla_ms,violated_at,reported_at,cleared_at) VALUES(?,?,?,?,?,NULL,NULL,NULL)
-        ON CONFLICT(entity,state) DO UPDATE SET sla_ms=excluded.sla_ms, ledger_id=COALESCE(excluded.ledger_id, sla_clocks.ledger_id),
-          entered_at=CASE WHEN sla_clocks.cleared_at IS NOT NULL THEN excluded.entered_at ELSE MIN(sla_clocks.entered_at, excluded.entered_at) END,
-          violated_at=CASE WHEN sla_clocks.cleared_at IS NOT NULL THEN NULL ELSE sla_clocks.violated_at END,
-          reported_at=CASE WHEN sla_clocks.cleared_at IS NOT NULL THEN NULL ELSE sla_clocks.reported_at END,
-          cleared_at=NULL`).run(String(entity), String(clockState), meta?.ledgerId ?? null, Number.isFinite(Number(meta?.enteredAt)) && meta?.enteredAt != null ? Number(meta.enteredAt) : at, Number(slaMs) || 0);
-      return true;
+      return openClock(state, { entity, state: clockState, slaMs, ledgerId: meta?.ledgerId ?? null, workflowId: meta?.workflowId ?? null, code: meta?.code ?? null,
+        enteredAt: Number.isFinite(Number(meta?.enteredAt)) && meta?.enteredAt != null ? Number(meta.enteredAt) : now(), catalog: catalogNow(now()) });
     },
-    clear(entity, clockState) {
+    clear(entity, clockState, { reason = 'resolved' } = {}) {
       if (!state) return false;
-      return state.prepare('UPDATE sla_clocks SET cleared_at=? WHERE entity=? AND state=? AND cleared_at IS NULL').run(now(), String(entity), String(clockState)).changes > 0;
+      return state.clearSla({ entity: String(entity), state: String(clockState), reason }) > 0;
     },
     /**
      * Open a Decision Item (DESIGN §10.3) through scripts/reconciler/decisions.mjs openDecision(repo, di) when active; a

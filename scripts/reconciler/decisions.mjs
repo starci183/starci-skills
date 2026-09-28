@@ -6,15 +6,16 @@
 //
 //   store     rows in the `inbox` table of a ledger, kind 'decision', key = idempotencyKey, payload_json = the DI
 //             (schema starci/decision-item@1), status = the DI status. Product ledger: the workflow's own rows,
-//             events decision-opened|claimed|resolved|escalated|expired|superseded. Supervisor ledger: the same
-//             rows on workflow wf-supervisor, events supervisor-decision-*.
+//             events decision-opened|claimed|resolved|escalated|expired|superseded. The Supervisor's own DIs are
+//             machine.sqlite sup_decision_items (+ sup_decisions, sup_events sup-decision-*); its doorbell is a
+//             sup_events supervisor-ring and one deliveries row (doorbell, seat supervisor) per attempt.
 //   verb      `api decisions` (scripts/kernel/api-verbs/decisions.mjs) is the only writer of product DIs; this
 //             module's openDecision(repo, di) runs it as a child; the functions taking a `ledger` are its core.
 //   doorbell  ringDoorbell: one fixed line through wake-delivery.mjs, ONLY when the seat reads turn-idle; a busy
 //             seat is `deferred` (the DI is not lost), at most one ring per RING_MIN_GAP_MS per seat, never the
 //             same text twice in a row.
 //   ladder    escalateDue: a Kernel DI past dueAt is escalated once (a reminder, still the Kernel's); past dueAt x2
-//             it is marked escalated and becomes a Supervisor DI in the supervisor ledger.
+//             it is marked escalated and becomes a Supervisor DI in machine.sqlite.
 //
 //   node scripts/reconciler/decisions.mjs ring --repo <r> --workflow <wf> [--json]
 //   node scripts/reconciler/decisions.mjs escalate-due [--apply] [--json]          (default: plan only, shadow)
@@ -55,7 +56,6 @@ export const DEFAULT_DUE_MS = Object.freeze({ kernel: 30 * 60_000, supervisor: 6
 export const RING_MIN_GAP_MS = 2 * 60_000;
 export const RING_TAG = '[decide]';
 const PASS_THROUGH = ['productLedger', 'productWorkflowId', 'code', 'escalatedFrom'];
-export const SUPERVISOR_WF = 'wf-supervisor';
 
 const one = (s, n = 300) => String(s ?? '').replace(/\s+/g, ' ').trim().slice(0, n);
 export const refuse = (message, code, extra = {}) => Object.assign(new Error(message), { code, ...extra });
@@ -412,7 +412,7 @@ export function runDecisionsVerb(repo, argv, { env = process.env, timeoutMs = 60
 
 /**
  * Open a DI (lane rc-engine ctx.openDecision). `di` uses the schema field names, as the controllers build it. A DI
- * whose `ledger` is 'supervisor' goes to the supervisor ledger (openSupervisorDecision; `repo` unused); any other goes
+ * whose `ledger` is 'supervisor' goes to machine.sqlite (openSupervisorDecision; `repo` unused); any other goes
  * to the product ledger at `repo` through `api decisions --open` (a child). Returns {ok, json: {decision, ...}}.
  */
 export function openDecision(repo, di, { env = process.env, run = runDecisionsVerb, now = Date.now() } = {}) {
@@ -505,47 +505,146 @@ export function ringDoorbellWith({ ledger, workflowId, wake, now = Date.now(), m
   return { action: 'rung', delivered: true, open, text: plan.text, terminal: woke.terminal ?? null };
 }
 
-/* ------------------------------------------------------------ the Supervisor's DIs (supervisor ledger) */
+/* ------------------------------------------------------------ the Supervisor's DIs (machine.sqlite sup_decision_items) */
 
-const SUP_PREFIX = 'supervisor-decision';
-const withSup = async (fn, { env = process.env } = {}) => {
-  const { openSupervisorLedger } = await import('../supervisor/home.mjs');
-  const ledger = openSupervisorLedger({ env });
-  try { return fn(ledger); } finally { ledger.close(); }
+const withSup = async (fn, { env = process.env, now = Date.now() } = {}) => {
+  const { withMachine } = await import('../../engine/machine-db.mjs');
+  return withMachine(fn, { env, now: () => now });
 };
 
-/** Open a Supervisor DI (decider supervisor, workflow wf-supervisor) in the supervisor ledger. */
-export const openSupervisorDecision = (spec, { env = process.env, now = Date.now() } = {}) => withSup((ledger) =>
-  openDecisionRow(ledger, { decider: 'supervisor', ...spec, productWorkflowId: spec.productWorkflowId ?? (spec.workflowId && spec.workflowId !== SUPERVISOR_WF ? spec.workflowId : null),
-    productLedger: spec.productLedger ?? null, entity: spec.entity ?? { type: 'supervisor', id: 'main' }, workflowId: SUPERVISOR_WF }, { now, prefix: SUP_PREFIX, ledgerName: 'supervisor' }), { env });
-export const listSupervisorDecisions = ({ env = process.env, all = false, now = Date.now() } = {}) => withSup((ledger) => listDecisions(ledger.db, { workflowId: SUPERVISOR_WF, all, now }), { env });
-export const claimSupervisorDecision = (id, opts = {}) => withSup((ledger) => claimDecision(ledger, id, { ...opts, prefix: SUP_PREFIX }), opts);
-export const resolveSupervisorDecision = (id, opts = {}) => withSup((ledger) => resolveDecision(ledger, id, { ...opts, prefix: SUP_PREFIX }), opts);
+/** A sup_decision_items row as the decision-item@1 object the deciders read (the schema payload + the row's state). */
+const supDiOf = (r) => {
+  const p = parseJsonOr(r.payload_json, {}) ?? {};
+  return { ...p, id: r.di_id, idempotencyKey: r.idempotency_key, kind: r.kind, decider: r.decider, summary: r.summary, status: r.status,
+    dueAt: r.due_at ?? p.dueAt ?? null, escalations: r.escalations ?? 0, deliveredAt: r.delivered_at ?? null,
+    claim: r.claim_by ? { by: r.claim_by, at: r.claim_at, ttlMs: r.claim_ttl_ms ?? CLAIM_TTL_MS } : null,
+    resolution: r.resolved_at != null ? { by: r.resolved_by, verb: r.resolution_verb, decisionId: r.decision_id, at: r.resolved_at } : null,
+    ...(r.superseded_by ? { supersededBy: r.superseded_by } : {}) };
+};
+const supRow = (m, id) => m.db.prepare('SELECT * FROM sup_decision_items WHERE di_id=?').get(id) ?? null;
 
-export const supervisorDoorbellText = (n) => `${RING_TAG} ${n} việc chờ: node scripts/reconciler/decisions.mjs supervisor --list`;
+/** The Supervisor's DIs over a machine handle `m` (live ones unless `all`), critical first, then by dueAt. */
+export const supervisorDecisions = (m, { all = false, now = Date.now() } = {}) => m.listSupDecisions({ open: !all }).map(supDiOf)
+  .map((d) => effective(d, now)).filter((d) => all || LIVE.includes(d.status)).sort(byUrgency);
 
 /**
- * Ring the Supervisor seat (the scripts/supervisor/watchdog.mjs wake path: stall-alert.mjs wakeKernel over the seat's
- * terminal). Same rules as ringDoorbell; a chat-mode Supervisor has no seat terminal: `deferred` (seat-absent).
+ * The MB-07 key parts of a Supervisor DI: the opener's named parts (a ':' inside a part becomes '-') or, without them,
+ * the ':'-separated components of its key. At least two parts, none empty.
+ */
+function supKeyParts(key, named) {
+  if (named) return Object.fromEntries(Object.entries(checkKeyParts(named)).map(([k, v]) => [k, v.replace(/:/g, '-')]));
+  const parts = key.split(':');
+  return parts.length > 1 ? Object.fromEntries(parts.map((v, i) => [i === 0 ? 'kind' : `part${i}`, v])) : { kind: 'key', key };
+}
+
+/** Open a Supervisor DI (decider supervisor unless the opener names the owner) in machine.sqlite; `m` is a writer. */
+function openSupDecisionRow(m, spec, { now = Date.now() } = {}) {
+  const kind = String(spec.kind ?? '').trim();
+  if (!DI_KINDS.includes(kind)) throw refuse(`--kind must be one of ${DI_KINDS.join('|')}`, 'decision-kind-invalid');
+  const decider = String(spec.decider || 'supervisor').trim();
+  if (!['supervisor', 'owner'].includes(decider)) throw refuse('a Supervisor decision is decided by supervisor|owner', 'decision-decider-invalid');
+  const entity = { type: String(spec.entity?.type ?? 'supervisor'), id: String(spec.entity?.id ?? 'main') };
+  const summary = one(spec.summary, 600);
+  if (!summary) throw refuse('a decision needs --summary', 'decision-incomplete');
+  const key = String(spec.idempotencyKey ?? '').trim() || `${kind}:${entity.type}:${entity.id}${kind === 'supervisor-ruling' ? `:${crypto.createHash('sha256').update(summary).digest('hex').slice(0, 8)}` : ''}`;
+  checkKey(key);
+  const keyParts = supKeyParts(key, spec.keyParts ?? null);
+  const by = one(spec.by ?? spec.openedBy ?? 'unknown', 120);
+  const productWorkflowId = spec.productWorkflowId ?? spec.workflowId ?? null;
+  const asked = Number.isFinite(Number(spec.dueMs)) && Number(spec.dueMs) > 0 ? Number(spec.dueMs) : Number.isFinite(spec.dueAt) && spec.dueAt > now ? spec.dueAt - now : null;
+  const dueAt = now + (asked ?? DEFAULT_DUE_MS[decider]);
+  const escalateTo = decider === 'supervisor' ? 'owner' : null;
+  const evidence = (Array.isArray(spec.evidence) ? spec.evidence : []).slice(0, 40);
+  const options = Array.isArray(spec.options) ? spec.options.slice(0, 12) : [];
+  const allowedVerbs = Array.isArray(spec.allowedVerbs) ? spec.allowedVerbs.map(String) : [];
+  const payload = { schema: DI_SCHEMA, idempotencyKey: key, kind, decider, ledger: 'supervisor', workflowId: productWorkflowId, entity, summary, evidence, options, allowedVerbs,
+    severity: spec.severity === 'critical' ? 'critical' : 'normal', openedBy: by, openedAt: now, dueAt, escalateTo,
+    ...(spec.item ? { item: String(spec.item) } : {}), ...(spec.refs ? { refs: spec.refs } : {}), ...(spec.keyParts ? { keyParts: spec.keyParts } : {}),
+    ...Object.fromEntries(PASS_THROUGH.filter((k) => spec[k] != null).map((k) => [k, spec[k]])), ...(productWorkflowId ? { productWorkflowId } : {}) };
+  let ledgerId = null;
+  try { ledgerId = spec.productLedger ? m.resolveLedger({ name: String(spec.productLedger) })?.ledgerId ?? null : null; } catch { ledgerId = null; }
+  return m.transaction(() => {
+    const r = m.openSupDecision({ keyParts, kind, decider, summary, ledgerId, workflowId: productWorkflowId, entityType: entity.type, entityId: entity.id,
+      openedBy: by, dueAt, escalateTo, evidence, options, allowedVerbs, payload });
+    const di = effective(supDiOf(supRow(m, r.diId)), now);
+    if (!r.created) return { di, created: false, existing: true, superseded: [] };
+    const superseded = [];
+    if (spec.supersedeEntity === true) {
+      // MB-07: one live DI per (kind, entity): a new key (a changed failure signature or head) supersedes the older one.
+      for (const old of m.listSupDecisions({ open: true }).map(supDiOf)) {
+        if (old.id === r.diId || old.kind !== kind || old.entity?.type !== entity.type || old.entity?.id !== entity.id) continue;
+        m.setSupDecision(old.id, { status: 'superseded', by, supersededBy: r.diId });
+        superseded.push(old.id);
+      }
+    }
+    return { di, created: true, existing: false, superseded };
+  });
+}
+
+const liveSupOrRefuse = (m, id, now) => {
+  const row = supRow(m, id);
+  if (!row) throw refuse(`decision ${id} is not a Supervisor decision`, 'decision-unknown');
+  const di = effective(supDiOf(row), now);
+  if (!LIVE.includes(di.status)) throw refuse(`decision ${id} is ${di.status}`, 'decision-closed', { status: di.status });
+  return di;
+};
+
+/** Open a Supervisor DI in machine.sqlite (sup_decision_items). Returns {di, created, existing, superseded}. */
+export const openSupervisorDecision = (spec, { env = process.env, now = Date.now() } = {}) => withSup((m) => openSupDecisionRow(m, spec, { now }), { env, now });
+export const listSupervisorDecisions = ({ env = process.env, all = false, now = Date.now() } = {}) => withSup((m) => supervisorDecisions(m, { all, now }), { env, now });
+export const claimSupervisorDecision = (id, { by, env = process.env, now = Date.now() } = {}) => withSup((m) => {
+  if (!String(by ?? '').trim()) throw refuse('--claim needs --by <actor>', 'decision-incomplete');
+  return m.transaction(() => {
+    const di = liveSupOrRefuse(m, id, now);
+    if (heldByOther(di, by, now)) throw refuse(`decision ${id} is claimed by ${di.claim.by} until ${new Date(di.claim.at + (di.claim.ttlMs ?? CLAIM_TTL_MS)).toISOString()}`, 'decision-held-by-other', { holder: di.claim.by });
+    if (di.claimExpired) m.supEvent({ entityType: 'sup-decision', entityId: id, kind: 'sup-decision-claim-expired', payload: { claim: di.claim }, at: now });
+    m.setSupDecision(id, { status: 'claimed', by: String(by) });
+    m.update('sup_decision_items', { claim_ttl_ms: CLAIM_TTL_MS }, { di_id: id });
+    return effective(supDiOf(supRow(m, id)), now);
+  });
+}, { env, now });
+export const resolveSupervisorDecision = (id, { by, verb, decisionId = null, note = null, env = process.env, now = Date.now() } = {}) => withSup((m) => {
+  if (!String(by ?? '').trim() || !String(verb ?? '').trim()) throw refuse('--resolve needs --by <actor> and --verb <what you ran>', 'decision-incomplete');
+  return m.transaction(() => {
+    const di = liveSupOrRefuse(m, id, now);
+    if (heldByOther(di, by, now)) throw refuse(`decision ${id} is claimed by ${di.claim.by}`, 'decision-held-by-other', { holder: di.claim.by });
+    if (!verbAllowed(di, verb)) throw refuse(`decision ${id} (${di.kind}) is resolved by one of: ${di.allowedVerbs.join(', ')}`, 'decision-verb-not-allowed', { allowedVerbs: di.allowedVerbs });
+    m.setSupDecision(id, { status: 'resolved', by: String(by), verb: one(verb, 400), rationale: note ? one(note, 600) : null, result: decisionId ? { decisionId } : null });
+    return supDiOf(supRow(m, id));
+  });
+}, { env, now });
+
+export const supervisorDoorbellText = (n) => `${RING_TAG} ${n} việc chờ: node scripts/reconciler/decisions.mjs supervisor --list`;
+/** The sup_events kind of a delivered Supervisor ring ({text, count, open, decisions}); the newest one is the last ring. */
+export const SUP_RING_KIND = 'supervisor-ring';
+
+/**
+ * Ring the Supervisor seat (the scripts/supervisor/watchdog.mjs wake path: wake-delivery.mjs wakeKernel over the seat's
+ * terminal). Same rules as ringDoorbell; a chat-mode Supervisor has no seat terminal: `deferred` (seat-absent). Every
+ * attempt is a deliveries row (doorbell, seat 'supervisor'); a delivered ring marks the open DIs delivered (MB-02).
  */
 export async function ringSupervisor({ env = process.env, wake = null, now = Date.now(), minGapMs = RING_MIN_GAP_MS } = {}) {
   const home = await import('../supervisor/home.mjs');
-  const ledger = home.openSupervisorLedger({ env });
-  try {
-    const openIds = listDecisions(ledger.db, { workflowId: SUPERVISOR_WF, now }).filter((d) => d.status === 'open').map((d) => d.id);
+  const wakeFn = wake ?? (await import('../kernel/wake-delivery.mjs')).wakeKernel;
+  return withSup((m) => {
+    const openIds = supervisorDecisions(m, { now }).filter((d) => d.status === 'open').map((d) => d.id);
     const open = openIds.length;
-    const last = lastRingOf(ledger.db, RING_SCOPE, SUPERVISOR_WF);
-    const plan = planRing({ open, workflowId: SUPERVISOR_WF, last, now, minGapMs, textOf: (n) => supervisorDoorbellText(n) });
+    const plan = planRing({ open, workflowId: home.SEAT_ID, last: home.newestEvent(m, SUP_RING_KIND), now, minGapMs, textOf: (n) => supervisorDoorbellText(n) });
     if (!plan.ring) return { action: plan.reason, delivered: false, open };
-    const terminal = home.seatOf(ledger.db, now)?.value?.terminal ?? null;
+    const terminal = home.seatOf(m, now)?.value?.terminal ?? null;
     if (!terminal) return { action: 'deferred', delivered: false, open, wake: 'seat-absent' };
-    const wakeFn = wake ?? (await import('../kernel/wake-delivery.mjs')).wakeKernel;
-    const woke = wakeFn({ db: home.terminalSignalDb(terminal), workflowId: SUPERVISOR_WF, text: plan.text });
-    home.supervisorEvent(ledger, { kind: 'supervisor-wake', now, payload: { tags: ['decide'], inbox: [], land: [], report: [], decisions: woke?.delivered === true ? openIds : [], text: plan.text, delivered: woke?.delivered === true, action: woke?.action ?? null } });
-    if (woke?.delivered !== true) return { action: 'deferred', delivered: false, open, text: plan.text, wake: woke?.action ?? null };
-    saveRing(ledger, RING_SCOPE, SUPERVISOR_WF, { at: now, text: plan.text, count: plan.count, open }, now);
+    const woke = wakeFn({ db: home.terminalSignalDb(terminal), workflowId: home.SEAT_ID, text: plan.text });
+    const delivered = woke?.delivered === true;
+    const ev = home.supervisorEvent(m, { kind: 'supervisor-wake', now, payload: { tags: ['decide'], inbox: [], land: [], report: [], decisions: delivered ? openIds : [], text: plan.text, delivered, action: woke?.action ?? null } });
+    m.recordDelivery({ messageKind: 'doorbell', messageRef: ev.eventId, seatId: home.SEAT_ID, terminalHandle: terminal, channel: 'orca-terminal',
+      outcome: delivered ? 'delivered' : 'busy-deferred', detail: woke?.action ?? null });
+    if (!delivered) return { action: 'deferred', delivered: false, open, text: plan.text, wake: woke?.action ?? null };
+    m.transaction(() => {
+      home.supervisorEvent(m, { kind: SUP_RING_KIND, now, payload: { text: plan.text, count: plan.count, open, decisions: openIds } });
+      for (const id of openIds) m.markSupDecisionDelivered(id);
+    });
     return { action: 'rung', delivered: true, open, text: plan.text, terminal };
-  } finally { ledger.close(); }
+  }, { env, now });
 }
 
 /* ------------------------------------------------------------ the escalation ladder */

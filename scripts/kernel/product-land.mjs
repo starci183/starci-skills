@@ -23,7 +23,8 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
-import { claimManager, lockHolder, readJson, recordAlive, writeJson, stateFile } from '../connectors/lib.mjs';
+import { claimManager, lockHolder, pidAlive } from '../connectors/lib.mjs';
+import { withMachine } from '../../engine/machine-db.mjs';
 import { sleepSync } from '../lib/sleep-sync.mjs';
 import { conflictHunks, fastForwardLive } from '../supervisor/land.mjs';
 import {
@@ -34,7 +35,6 @@ import { brokenImports } from './import-scan.mjs';
 
 const selfFile = fileURLToPath(import.meta.url);
 export const EVENTS = Object.freeze({ queued: 'product-land-queued', landed: 'product-land-landed', failed: 'product-land-failed' });
-const TICKET = /^\d{15}-\d+\.json$/;
 const revParse = (cwd, ref) => { const r = git(cwd, ['rev-parse', '--verify', '--quiet', `${ref}^{commit}`]); return r.ok && r.stdout ? r.stdout : null; };
 export const repoNameOf = (repoRoot) => path.basename(path.resolve(repoRoot)).replace(/[^A-Za-z0-9._-]/g, '_');
 export const landLockName = (repoRoot) => `product-land-${repoNameOf(repoRoot)}`;
@@ -58,32 +58,25 @@ export function landPreflight({ repoRoot, branch, main = 'main' }) {
 
 /* ------------------------------------------------------------ the queue */
 
-const queueDir = (repoRoot, env) => stateFile(`${landLockName(repoRoot)}.queue`, env);
-function liveTickets(dir, now = Date.now()) {
-  let names = [];
-  try { names = fs.readdirSync(dir).filter((n) => TICKET.test(n)).sort(); } catch { return []; }
-  return names.filter((name) => {
-    const rec = readJson(path.join(dir, name));
-    if (rec && recordAlive(rec)) return true;
-    let age = Infinity;
-    try { age = now - fs.statSync(path.join(dir, name)).mtimeMs; } catch { return false; }
-    if (!rec && age < 5000) return true;
-    try { fs.rmSync(path.join(dir, name), { force: true }); } catch { /* gone */ }
-    return false;
-  });
+// The queue: one machine.sqlite host_locks row per waiter, '<lock>#<requestedAt>-<pid>' (the old connectors/*.queue dir is gone).
+const ticketPrefix = (repoRoot) => `${landLockName(repoRoot)}#`;
+/** The live tickets of `repoRoot`'s queue, oldest first; a ticket whose waiter died is released. */
+function liveTickets(repoRoot, env) {
+  return withMachine((m) => {
+    const prefix = ticketPrefix(repoRoot);
+    const rows = m.hostLocks().filter((l) => l.name.startsWith(prefix)).sort((x, y) => (x.name < y.name ? -1 : 1));
+    return rows.filter((l) => { if (pidAlive(l.holder_pid)) return true; m.releaseHostLock({ name: l.name, force: true }); return false; }).map((l) => l.name);
+  }, { env });
 }
 /** Wait for `product-land:<repo>` in request order. {ok, release} | {ok:false, holder, ahead} */
 export function acquireProductLand({ repoRoot, env = process.env, waitMs = 1_800_000, pollMs = 2000 }) {
-  const dir = queueDir(repoRoot, env);
-  fs.mkdirSync(dir, { recursive: true });
   const requestedAt = Date.now();
-  const name = `${String(requestedAt).padStart(15, '0')}-${process.pid}.json`;
-  const ticket = path.join(dir, name);
-  writeJson(ticket, { pid: process.pid, startedAt: new Date().toISOString(), requestedAt });
-  const drop = () => { try { fs.rmSync(ticket, { force: true }); } catch { /* gone */ } };
+  const name = `${ticketPrefix(repoRoot)}${String(requestedAt).padStart(15, '0')}-${process.pid}`;
+  withMachine((m) => m.acquireHostLock({ name, holder: 'product-land-waiter', ttlMs: waitMs + 60_000, state: 'starting' }), { env });
+  const drop = () => { try { withMachine((m) => m.releaseHostLock({ name }), { env }); } catch { /* the next waiter releases it */ } };
   try {
     for (const end = requestedAt + waitMs; ;) {
-      const ahead = liveTickets(dir).filter((t) => t < name);
+      const ahead = liveTickets(repoRoot, env).filter((t) => t < name);
       const held = ahead.length ? null : claimManager(landLockName(repoRoot), { env });
       if (held?.ok) return held;
       if (Date.now() >= end) return { ok: false, holder: held?.holder ?? lockHolder(landLockName(repoRoot), env), ahead: ahead.length };

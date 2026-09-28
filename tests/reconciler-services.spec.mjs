@@ -1,15 +1,14 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { createRequire } from 'node:module';
 import {
-  hostSettings, servicePorts, serviceRegistry, harnessIngress, stepService, newRecord, backoffDelay, memoryStore, sqliteStore,
+  hostSettings, servicePorts, serviceRegistry, harnessIngress, stepService, newRecord, backoffDelay, memoryStore, machineStore,
   orcaRestartScript, cleanEnv, DOWN_STATES, seatAgentOf, httpUp, OUTAGE_STATES,
 } from '../scripts/reconciler/services.mjs';
+import { tempState } from '../scripts/reconciler/testing.mjs';
 
 // Lane D rc-host: the ONE host-service registry (scripts/reconciler/services.mjs). The DESIGN 9.7 state machine,
 // its backoff, the quarantine after more than five restarts in thirty minutes, and one source per port.
 
-const require = createRequire(import.meta.url);
 const S = hostSettings();
 const HARNESS_YML = 'tunnel: x\ningress:\n  - hostname: harness.example.org\n    service: http://127.0.0.1:4547\n  - service: http_status:404\n';
 const ALLOC = { supervisorTick: { statusApp: { port: 4547 } } };
@@ -158,15 +157,26 @@ test('Orca restarts through explorer.exe with no agent session variables', async
   assert.deepEqual(env, { PATH: 'x' });
 });
 
-test('the services table round-trips a record (sqlite and memory stores)', () => {
-  const { DatabaseSync } = require('node:sqlite');
-  for (const store of [sqliteStore(new DatabaseSync(':memory:')), memoryStore()]) {
+test('the services table round-trips a record (machine.sqlite and memory stores); restarts and transitions are service_events', (t) => {
+  const st = tempState();
+  t.after(() => st.close());
+  for (const store of [machineStore(st.m), memoryStore()]) {
     const rec = { ...newRecord('orca', 5), state: 'backoff', restarts: [1, 2], failStreak: 3, nextAttemptAt: 9, lastProbe: { ok: false, at: 5, verdict: 'timeout' } };
     store.put(rec);
     assert.deepEqual(store.get('orca'), rec);
     assert.equal(store.get('nope'), null);
     assert.equal(store.all().length, 1);
   }
+  const store = machineStore(st.m);
+  store.put({ ...store.get('orca'), state: 'starting', restarts: [1, 2, 7] });
+  store.put({ ...store.get('orca'), state: 'healthy', restarts: [7] });
+  assert.deepEqual(store.get('orca').restarts, [7], 'the quarantine window moved: earlier restarts leave the record, never the history');
+  const events = st.m.serviceEvents({ name: 'orca', sinceMs: Date.now() });
+  assert.deepEqual(events.map((e) => [e.to_state, e.action]), [['backoff', 'restart'], ['backoff', 'restart'], ['starting', 'restart'], ['healthy', null]]);
+  assert.equal(st.m.services().find((r) => r.name === 'orca').state, 'healthy');
+  store.remove('orca');
+  assert.equal(store.get('orca'), null);
+  assert.equal(st.m.serviceEvents({ name: 'orca', sinceMs: Date.now() }).length, 5, 'a removal keeps the history');
 });
 
 test('a seat agent is Orca agentIdentity, then the tab title, then the frame (Devin needs Esc twice)', () => {

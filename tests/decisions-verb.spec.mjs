@@ -8,7 +8,8 @@ import os from 'node:os';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { openLedger, ledgerFileFor } from '../engine/ledger-db.mjs';
-import { CLAIM_TTL_MS, openDecision, ringDoorbell, claimDecision, dueStep, escalateDecision, escalateDue, getDecision, listDecisions, openDecisionRow, resolveDecision } from '../scripts/reconciler/decisions.mjs';
+import { CLAIM_TTL_MS, openDecision, ringDoorbell, claimDecision, dueStep, escalateDecision, escalateDue, getDecision, listDecisions, listSupervisorDecisions, openDecisionRow, resolveDecision } from '../scripts/reconciler/decisions.mjs';
+import { readSupervisor } from '../scripts/supervisor/home.mjs';
 
 const ROOT = path.resolve(import.meta.dirname, '..');
 const API = path.join(ROOT, 'scripts', 'kernel', 'api.mjs');
@@ -124,23 +125,20 @@ test('the SLA ladder: past dueAt one reminder, past dueAt x2 a Supervisor DI (pl
   assert.deepEqual(dueStep(di, 2000), { step: 'supervisor' });
   const home = fs.mkdtempSync(path.join(os.tmpdir(), 'starci-di-sup-'));
   t.after(() => fs.rmSync(home, { recursive: true, force: true, maxRetries: 20, retryDelay: 25 }));
-  const env = { ...process.env, STARCI_SUPERVISOR_HOME: home };
+  const env = { ...process.env, STARCI_TEST_MACHINE_FILE: path.join(home, 'machine.sqlite') };
   const plan = await escalateDue({ now: 2500, repos: [repo], env });
   assert.deepEqual(plan.actions.map((a) => [a.step, a.applied]), [['supervisor', false]], 'shadow: planned, nothing written');
   const run = await escalateDue({ now: 2500, repos: [repo], env, apply: true });
   assert.equal(run.actions[0].applied, true);
-  assert.match(run.actions[0].supervisorDi, /^di-/);
+  assert.match(run.actions[0].supervisorDi, /^sdi-/);
   const again = await escalateDue({ now: 2600, repos: [repo], env, apply: true });
   assert.equal(again.actions.length, 0, 'an escalated DI is no longer due');
   const l2 = openLedger({ file: ledgerFileFor(repo) });
   try { assert.equal(getDecision(l2.db, di.id).status, 'escalated'); } finally { l2.close(); }
-  const sup = openLedger({ file: ledgerFileFor(home) });
-  try {
-    const rows = listDecisions(sup.db, { workflowId: 'wf-supervisor' });
-    assert.equal(rows.length, 1);
-    assert.equal(rows[0].decider, 'supervisor');
-    assert.equal(sup.db.prepare("SELECT count(*) n FROM events WHERE kind='supervisor-decision-opened'").get().n, 1);
-  } finally { sup.close(); }
+  const rows = await listSupervisorDecisions({ env, now: 2600 });
+  assert.equal(rows.length, 1);
+  assert.equal(rows[0].decider, 'supervisor');
+  assert.equal(readSupervisor((m) => m.supEvents({ kind: 'sup-decision-opened', limit: -1 }).length, 0, { env }), 1);
 });
 
 test('api decisions is an extension verb: open, list and claim through the CLI', (t) => {
@@ -160,10 +158,10 @@ test('api decisions is an extension verb: open, list and claim through the CLI',
   assert.match(ext.stdout, /"decisions"/);
 });
 
-test('a controller-shaped DI with ledger supervisor lands in the supervisor ledger (lane rc-gc-resource cap-starved)', async (t) => {
+test('a controller-shaped DI with ledger supervisor lands in machine.sqlite sup_decision_items (lane rc-gc-resource cap-starved)', async (t) => {
   const home = fs.mkdtempSync(path.join(os.tmpdir(), 'starci-di-sup-'));
   t.after(() => fs.rmSync(home, { recursive: true, force: true, maxRetries: 20, retryDelay: 25 }));
-  const env = { ...process.env, STARCI_SUPERVISOR_HOME: home };
+  const env = { ...process.env, STARCI_TEST_MACHINE_FILE: path.join(home, 'machine.sqlite') };
   const di = { schema: 'starci/decision-item@1', kind: 'cap-starved', decider: 'supervisor', ledger: 'supervisor', workflowId: 'wf-prio',
     idempotencyKey: 'cap-starved:wf-prio:2026-09-28T09:00:00.000Z', entity: { type: 'workflow', id: 'wf-prio' }, summary: 'priority workflow held 0 of 2 reserve slots for 40 min',
     evidence: [{ ref: 'throttle:ok' }], options: [{ key: 'ram-cap-prioritize', verb: 'node scripts/supervisor/ram-cap.mjs prioritize --workflow wf-prio', recommended: true }],
@@ -171,7 +169,8 @@ test('a controller-shaped DI with ledger supervisor lands in the supervisor ledg
   const r = await openDecision(null, di, { env, now: 5_000 });
   assert.equal(r.ok, true, JSON.stringify(r.json));
   assert.equal(r.json.decision.decider, 'supervisor');
-  assert.equal(r.json.decision.workflowId, 'wf-supervisor');
+  assert.equal(r.json.decision.ledger, 'supervisor');
+  assert.match(r.json.decision.id, /^sdi-/);
   assert.equal(r.json.decision.productWorkflowId, 'wf-prio');
   assert.equal(r.json.decision.dueAt, 5_000 + 600_000, 'the dueAt of the controller holds');
   assert.equal(r.json.decision.openedBy, 'resource-controller');

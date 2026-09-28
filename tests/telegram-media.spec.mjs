@@ -4,7 +4,10 @@ import fs from 'node:fs';
 import path from 'node:path';
 import {withLedger,seedWorkflow} from './_ledger-fixture.mjs';
 import {parseYaml} from '../engine/yaml.mjs';
-import {sendSettleMedia,queueSettleMedia,collectDrawings,mediaKindOf,mediaSentFile,fitCaption} from '../scripts/connectors/telegram-media.mjs';
+import {sendSettleMedia,queueSettleMedia,collectDrawings,mediaKindOf,mediaSent,fitCaption} from '../scripts/connectors/telegram-media.mjs';
+import {readMachine} from '../engine/machine-db.mjs';
+// The media dedupe rows (machine.sqlite notifications, kind media) of a machine home.
+const mediaRows=machineHome=>readMachine(m=>m.db.prepare("SELECT * FROM notifications WHERE kind='media' ORDER BY dedupe_key").all(),[],{env:{LOCALAPPDATA:machineHome}});
 
 // scripts/connectors/telegram-media.mjs sends the owner the drawings of a settled interface.draw and
 // the videos of a settled UAT op over Telegram. Every spec runs on a fake Bot API: no network.
@@ -101,8 +104,9 @@ test('a settled interface.draw sends its drawings as one album with a Vietnamese
     assert.match(caption,/1\. cart · cart-ready · desktop · sáng\n2\. cart · cart-empty · mobile · tối/);
     assert.match(caption,/Thầy xem kỹ khi bàn giao \(handover\), hoặc góp ý bất cứ lúc nào\.$/);
     assert.ok(caption.length<=1024);
-    const state=fs.readFileSync(mediaSentFile({LOCALAPPDATA:machineHome}),'utf8');
-    assert.ok(!state.includes(TOKEN)&&!JSON.stringify(r).includes(TOKEN),'the token never reaches the state or the result');
+    const state=JSON.stringify(mediaRows(machineHome));
+    assert.equal(mediaSent('media|wf-shop-x1|job-draw-1|1',{LOCALAPPDATA:machineHome})?.delivery,'sent');
+    assert.ok(!state.includes(TOKEN)&&!JSON.stringify(r).includes(TOKEN),'the token never reaches the store or the result');
   });
 });
 
@@ -165,8 +169,7 @@ test('one send per job attempt: a repeat is skipped, a new attempt sends, and a 
     assert.equal(first.sent,1);assert.equal(again.skipped,'already sent');assert.equal(bot.calls.length,1);
     const next=await sendSettleMedia({ledgerFile,repo:repoRoot,...DRAW,attempt:2,dispatchId:'ctx_draw2'},deps(machineHome,{fetchImpl:bot.fetchImpl}));
     assert.equal(next.sent,1,'attempt 2 is its own send');
-    const store=JSON.parse(fs.readFileSync(mediaSentFile({LOCALAPPDATA:machineHome}),'utf8'));
-    assert.deepEqual(Object.keys(store.jobs).sort(),['wf-shop-x1|job-draw-1|1','wf-shop-x1|job-draw-1|2']);
+    assert.deepEqual(mediaRows(machineHome).map(r=>r.dedupe_key),['media|wf-shop-x1|job-draw-1|1','media|wf-shop-x1|job-draw-1|2']);
     const home=path.join(machineHome,'retry');
     const down=fakeBot({fail:()=>({status:500,description:'Internal'})});
     const lost=await sendSettleMedia({ledgerFile,repo:repoRoot,...DRAW},deps(home,{fetchImpl:down.fetchImpl}));

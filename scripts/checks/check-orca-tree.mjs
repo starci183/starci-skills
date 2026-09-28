@@ -22,7 +22,7 @@
 // title the kernel wrote ([Kernel] … / [Op] …). An owner's own terminals are
 // never findings, and neither is a live [Worker] of an open Supervisor job: it
 // runs in the runtime project's worktree (scripts/supervisor/workers.mjs) and
-// its job lives in the supervisor ledger, not in the ledger checked here.
+// its job lives in machine.sqlite (sup_jobs), not in the ledger checked here.
 //
 //   node scripts/checks/check-orca-tree.mjs --repo <ledger owner>
 //        (--terminals <terminal-list --json receipt> | --live) [--json]
@@ -35,7 +35,7 @@ import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { inspectLedger, ledgerFileFor } from '../../engine/ledger-db.mjs';
 import { terminalList } from '../api/orca/terminal-list.mjs';
-import { withSupervisorRead } from '../supervisor/home.mjs';
+import { readSupervisor } from '../supervisor/home.mjs';
 import { openWorkerHandles } from '../supervisor/workers.mjs';
 import { parseJson } from '../lib/json.mjs';
 import { workflowDisplayName } from '../lib/display-names.mjs';
@@ -108,8 +108,8 @@ export function projectLedger(db) {
   };
 }
 
-/** The terminals the open [Worker] jobs of the supervisor ledger own (empty when there is no ledger). */
-export const supervisorWorkerHandles = ({ env = process.env } = {}) => withSupervisorRead((db) => openWorkerHandles(db), new Set(), { env });
+/** The terminals the open [Worker] jobs own (machine.sqlite sup_jobs; empty when there is no store yet). */
+export const supervisorWorkerHandles = ({ env = process.env } = {}) => readSupervisor((m) => openWorkerHandles(m), new Set(), { env });
 
 /** Every finding the ledger and the listing disagree on, in code order. */
 // The owner reads the Orca sidebar: every live terminal in a project must be

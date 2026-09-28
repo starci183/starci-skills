@@ -9,6 +9,7 @@ import { claimFoundation, declareDependent, readFoundation, writeFoundation } fr
 import { HUB_STUCK_MS, RECORD_CHANGE_REFUSED, dependencyGraph, foundationAliasKey, readBridges } from '../scripts/kernel/dependency-graph.mjs';
 import { createOwnership } from '../scripts/kernel/work-ownership.mjs';
 import { approvalOf, commandFor, main } from '../scripts/supervisor/bridge.mjs';
+import { readMachine } from '../engine/machine-db.mjs';
 
 // Owner mandate 2026-09-28: the [Supervisor] adds supplementary (bridging) workflows when two workflows depend on
 // each other and reorganizes workflows. Fixture ledgers reproduce the three shapes it must find - a circular wait,
@@ -25,7 +26,7 @@ const fixture = (t, { workflows = [WSPV, STUDIO, COLLAB, MOD, AUTH, OLD] } = {})
   t.after(() => fs.rmSync(root, { recursive: true, force: true, maxRetries: 20, retryDelay: 25 }));
   const repo = path.join(root, 'repo');
   fs.mkdirSync(repo, { recursive: true });
-  const env = { ...process.env, STARCI_SUPERVISOR_HOME: path.join(root, 'supervisor') };
+  const env = { ...process.env, STARCI_TEST_MACHINE_FILE: path.join(root, 'machine.sqlite') };
   for (const key of ['ORCA_TERMINAL_HANDLE', 'STARCI_ROLE', 'STARCI_OP_JOB']) delete env[key];
   const seed = (fn) => { const l = openLedger({ file: ledgerFileFor(repo) }); try { return l.transaction(() => fn(l)); } finally { l.close(); } };
   const read = (fn) => { const l = inspectLedger({ file: ledgerFileFor(repo) }); try { return fn(l.db); } finally { l.close(); } };
@@ -88,12 +89,9 @@ test('circular wait: found, designated, and the lead side released', async (t) =
     assert.ok(db.prepare("SELECT 1 FROM events WHERE kind='supervisor-cycle-designated' AND workflow_id=?").get(WSPV));
     assert.equal(dependencyGraph(db, { repo: fx.repo }).findings.filter((f) => f.kind === 'circular-wait').length, 0, 'the cycle is gone');
   });
-  // The supervisor ledger records the action for the SLA (scripts/supervisor/actions.mjs reads supervisor-action).
-  const sup = inspectLedger({ file: ledgerFileFor(fx.env.STARCI_SUPERVISOR_HOME) });
-  try {
-    const row = sup.db.prepare("SELECT payload_json FROM events WHERE kind='supervisor-action'").get();
-    assert.deepEqual([json(row.payload_json).item, json(row.payload_json).action], [cycle.key, 'designate']);
-  } finally { sup.close(); }
+  // machine.sqlite sup_events records the action for the SLA (scripts/supervisor/actions.mjs reads supervisor-action).
+  const [row] = readMachine((m) => m.supEvents({ kind: 'supervisor-action' }), [], { env: fx.env });
+  assert.deepEqual([row.payload.item, row.payload.action], [cycle.key, 'designate']);
 });
 
 test('shared unowned need: an alias merges into the owned foundation, a stopped owner hands over', async (t) => {

@@ -12,7 +12,7 @@
 //     this repository: a git-family process whose command line names this repo (-C, --git-dir, --work-tree) or
 //     names no repository at all (its cwd cannot be read, so it may be this repo's) keeps the lock;
 //   - the lock is the same file (mtime and size) after the probe as before it.
-// A removal is recorded as a `git-index-lock-removed` event in the supervisor ledger (the caller passes
+// A removal is recorded as a `git-index-lock-removed` Supervisor audit event (machine.sqlite sup_events) (the caller passes
 // `record`); every other outcome is returned, never thrown. Callers: the op worker's git shim before running git
 // (scripts/guards/shim.mjs) and the housekeeping area `gitlocks` (scripts/supervisor/housekeeping.mjs).
 import fs from 'node:fs';
@@ -114,10 +114,10 @@ export function recoverStaleIndexLock({ repo, staleMs, now = Date.now(), apply =
   return removed;
 }
 
-/** `record` for recoverStaleIndexLock: one supervisor-ledger event per removal, naming who removed it. */
+/** `record` for recoverStaleIndexLock: one Supervisor audit event (machine.sqlite sup_events) per removal, naming who removed it. */
 export async function supervisorLockRecorder({ env = process.env, by, jobId = null, workflowId = null } = {}) {
-  const { withSupervisorLedger, supervisorEvent } = await import('../supervisor/home.mjs');
-  return (result) => withSupervisorLedger((ledger) => supervisorEvent(ledger, { entityType: 'repo', entityId: result.repo, kind: LOCK_EVENT,
+  const { withSupervisor, supervisorEvent } = await import('../supervisor/home.mjs');
+  return (result) => withSupervisor((m) => supervisorEvent(m, { entityType: 'repo', entityId: result.repo, kind: LOCK_EVENT,
     payload: { lock: result.lock, ageMs: Math.round(result.ageMs), bytes: result.bytes, mtime: result.mtime, by, jobId, workflowId } }), { env });
 }
 

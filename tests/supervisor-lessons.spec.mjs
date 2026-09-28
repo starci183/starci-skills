@@ -2,7 +2,7 @@
 // a repeated failure signature opens one hypothesis, an experiment lands only through the guardrails (tier, a checker
 // change without a wrongly-blocked example, the daily cap), a measured regression makes the revert due and the revert
 // lane lands it, owner feedback outweighs self-derived lessons, and every step is a typed row of the machine log.
-// Temp supervisor home and temp git repos only; the land gate is a stub.
+// A temp machine.sqlite and temp git repos only; the land gate is a stub.
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -14,16 +14,15 @@ import {
   lessonsYaml, learningDigest, propose, signatureOf,
 } from '../scripts/supervisor/lessons.mjs';
 import { parseLessonsFile, withLessons } from '../scripts/supervisor/lessons-file.mjs';
-import { openLogs, readLogs } from '../scripts/kernel/typed-logs.mjs';
-import { supervisorHome, withSupervisorLedger, SEAT_SCOPE, SUPERVISOR_ID, SUPERVISOR_WF } from '../scripts/supervisor/home.mjs';
+import { readSupervisor, supervisorEvent, withSupervisor, writeSeat } from '../scripts/supervisor/home.mjs';
 import { readSupervisorState } from '../scripts/supervisor/state.mjs';
 
 const NOW = Date.parse('2026-09-28T12:00:00Z');
 const SETTINGS = { minRepeats: 2, measureMs: 6 * 3_600_000, dailyAutoLandCap: 2, ownerWeight: 3, successDrop: 0.1 };
 const tmp = (t, prefix) => { const d = fs.mkdtempSync(path.join(os.tmpdir(), prefix)); t.after(() => fs.rmSync(d, { recursive: true, force: true, maxRetries: 20, retryDelay: 50 })); return d; };
-const envOf = (t) => { const root = tmp(t, 'starci-sup-learn-'); return { ...process.env, LOCALAPPDATA: path.join(root, 'la'), STARCI_SUPERVISOR_HOME: path.join(root, 'home'), STARCI_CONNECTORS_OFF: '1' }; };
+const envOf = (t) => { const root = tmp(t, 'starci-sup-learn-'); return { ...process.env, LOCALAPPDATA: path.join(root, 'la'), STARCI_TEST_MACHINE_FILE: path.join(root, 'machine.sqlite'), STARCI_CONNECTORS_OFF: '1' }; };
 const cluster = (id, size, extra = {}) => ({ key: `owed|${id}`, class: 'runtime-defect', subject: id, size, workflowId: 'wf-a', evidence: `${size} item(s): check draw-acceptance failed`, incidents: ['inc-aaaaaaaaaaaa'], ...extra });
-const logRows = (env) => { const logs = openLogs(supervisorHome(env)); try { return readLogs(logs, { workflowId: 'wf-supervisor' }).rows; } finally { logs.close(); } };
+const logRows = (env) => readSupervisor((m) => m.logs({ actor: 'supervisor', limit: 1000 }), [], { env });
 
 test('a signature repeated minRepeats times opens ONE hypothesis with a cause class; a single sighting does not', (t) => {
   const env = envOf(t);
@@ -163,10 +162,9 @@ test('a proposal is recorded (and pushed only with send); the state reader carri
   const pushed = [];
   const p = await propose({ title: 'Weaken gate draw-dna for icons', evidence: '12 wrongly blocked icons', options: 'A keep; B exempt icons', recommendation: 'B', send: true, env, now: () => NOW, push: async (x) => { pushed.push(x); return { ok: true }; } });
   assert.match(pushed[0], /Recommendation: B/);
-  withSupervisorLedger((ledger) => ledger.db.prepare('INSERT INTO signals(scope,key,holder_pid,token,value_json,at,expires_at) VALUES(?,?,?,?,?,?,?)')
-    .run(SEAT_SCOPE, SUPERVISOR_ID, process.pid, 'test-seat', JSON.stringify({ terminal: 'term-test', agent: 'claude', model: 'opus-test', state: 'live' }), NOW - 60_000, NOW + 60_000), { env });
-  withSupervisorLedger((ledger) => ledger.appendEvent({ workflowId: SUPERVISOR_WF, entityType: 'tick', entityId: SUPERVISOR_ID, kind: 'supervisor-tick-duties',
-    payload: { ramThrottle: { effectiveCap: 7, maxParallelOps: 20, running: 3, queued: 2, mode: 'heavy-paused', why: 'low free RAM', capWhy: 'reserve RAM', freeRamPct: 12, cpuBusy: 0.55 } }, createdAt: NOW }), { env });
+  withSupervisor((m) => writeSeat(m, { token: 'test-seat', value: { terminal: 'term-test', agent: 'claude', model: 'opus-test', state: 'live' }, expiresAt: NOW + 60_000, now: NOW - 60_000 }), { env });
+  withSupervisor((m) => supervisorEvent(m, { entityType: 'tick', kind: 'supervisor-tick-duties',
+    payload: { ramThrottle: { effectiveCap: 7, maxParallelOps: 20, running: 3, queued: 2, mode: 'heavy-paused', why: 'low free RAM', capWhy: 'reserve RAM', freeRamPct: 12, cpuBusy: 0.55 } }, now: NOW }), { env });
   const s = readSupervisorState({ env, now: NOW, settings: { mode: 'kernel' } });
   assert.equal(s.schema, 'starci/supervisor-state@1');
   assert.equal(s.seat.mode, 'kernel');

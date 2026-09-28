@@ -13,9 +13,11 @@
 //   node scripts/supervisor/workers.mjs cleanup [--job <id>]                remove finished staging checkouts
 //   ... [--json]
 //
-// Lifecycle (the supervisor ledger, scripts/supervisor/home.mjs): queued -> running (staging checkout + file
-// leases + [Worker] terminal) -> reported (report filed) -> succeeded (landed by scripts/supervisor/land.mjs,
-// checkout removed) | failed | cancelled. The staging checkout is an EPHEMERAL git worktree of the runtime on a
+// Lifecycle (machine.sqlite, engine/machine-db.mjs B1: sup_jobs / sup_leases / sup_attempts / sup_reports, audit in
+// sup_events): queued -> spawning (staging checkout + file leases, one sup_attempts row per spawn) -> running
+// ([Worker] terminal on the attempt) -> reported (sup_reports row) -> succeeded (landed by scripts/supervisor/land.mjs,
+// checkout removed) | failed | cancelled. The job's working state (cluster, files, staging, routing, result) is
+// its payload_json. The staging checkout is an EPHEMERAL git worktree of the runtime on a
 // temp branch sup/<job> under <lanesRoot>/staging (the one lanes root, scripts/lib/hk-lanes.mjs lanesRoot:
 // runtimes.yaml allocation.housekeeping.lanesRoot, default D:/starci-lanes), outside the live tree (the
 // owner-approved narrow exception to "main only, no worktrees"). It lives only until its commit lands (or the job is cancelled).
@@ -25,7 +27,7 @@
 // down to 1 while it is saturated (CPU >= 95% or free memory < 6%).
 //
 // Routing: the balanced allocator over config.yaml allocation.shares (scripts/agent/models.mjs balanceDeficits),
-// counting the machine's recent op dispatches (scripts/agent/balance.mjs) plus this ledger's workers, skipping a
+// counting the machine's recent op dispatches (scripts/agent/balance.mjs) plus the Supervisor's own workers (sup_jobs), skipping a
 // provider whose quota probe is dead or whose provider-health circuit is open on any product ledger, and a
 // provider whose [Worker] terminal failed readiness: for the rest of that spawn pass, for the requeued job it
 // failed (payload.avoidAgents), and for every job once it failed READINESS_FAILS_PER_HOUR times in the last hour.
@@ -41,13 +43,14 @@ import { fileURLToPath } from 'node:url';
 import { parseYaml } from '../../engine/yaml.mjs';
 import { allocationMs, loadConfig, DEFAULT_ALLOCATION_WINDOW_HOURS } from '../../engine/config.mjs';
 import {
-  SKILL_ROOT, SUPERVISOR_WF, FIX_KIND, WORKER_TITLE_PREFIX, stagingRoot, openSupervisorLedger, withSupervisorRead,
+  SKILL_ROOT, FIX_KIND, WORKER_TITLE_PREFIX, stagingRoot, readSupervisor,
   supervisorEvent, supervisorSettings, productRepos, supervisorLog,
 } from './home.mjs';
+import { openMachine } from '../../engine/machine-db.mjs';
 import { safeRemoveTree } from '../lib/safe-remove.mjs';
 import { closeSelfSafe } from '../lib/close-verify.mjs';
 import { sleepSync } from '../lib/sleep-sync.mjs';
-import { parseJson, parseJsonOr, withPayload } from '../lib/json.mjs';
+import { parseJsonOr } from '../lib/json.mjs';
 import { gitSpawn } from '../lib/git.mjs';
 import { readYamlFile } from '../lib/yaml.mjs';
 import { posixPath } from '../lib/path-key.mjs';
@@ -65,9 +68,12 @@ export function workerGuard(jobId, { root = SKILL_ROOT, launch = guardLaunch } =
 }
 
 const selfFile = fileURLToPath(import.meta.url);
-export const OPEN_STATUSES = Object.freeze(['queued', 'leased', 'running', 'reported']);
-export const LIVE_STATUSES = Object.freeze(['leased', 'running', 'reported']);
-export const ACTIVE_STATUSES = Object.freeze(['leased', 'running']);
+export const OPEN_STATUSES = Object.freeze(['queued', 'spawning', 'running', 'reported']);
+export const LIVE_STATUSES = Object.freeze(['spawning', 'running', 'reported']);
+export const ACTIVE_STATUSES = Object.freeze(['spawning', 'running']);
+export const FINAL_STATUSES = Object.freeze(['succeeded', 'failed', 'cancelled']);
+/** sup_attempts.agent is one of these (0001-init CHECK); any other provider is recorded as null. */
+const ATTEMPT_AGENTS = new Set(['devin', 'codex', 'claude', 'qwen']);
 export const MAX_SPAWN_ATTEMPTS = 3;
 export const READINESS_FAILS_PER_HOUR = 2;
 export const AGENTS = Object.freeze({ 'claude-agent': 'claude', 'codex-agent': 'codex', 'devin-agent': 'devin', 'qwen-agent': 'qwen' });
@@ -119,18 +125,39 @@ export function adaptiveCap({ base = 4, max = 10, queued = 0, running = 0, load 
 
 /* ------------------------------------------------------------ jobs */
 
-const rowJob = (row) => (row ? { ...withPayload(row), result: parseJson(row.result_json) } : null);
-export const jobsOf = (db, statuses = null) => db.prepare(`SELECT * FROM jobs WHERE workflow_id=? AND kind=? ${statuses ? `AND status IN (${statuses.map(() => '?').join(',')})` : ''} ORDER BY created_at, job_id`)
-  .all(SUPERVISOR_WF, FIX_KIND, ...(statuses ?? [])).map(rowJob);
-export const jobOf = (db, jobId) => rowJob(db.prepare('SELECT * FROM jobs WHERE job_id=? AND workflow_id=?').get(jobId, SUPERVISOR_WF));
+// A sup_jobs row with its latest attempt: {job_id, status, kind, role, cluster, title, lane, created_at, updated_at,
+// payload, result (payload.result), worker_id (the attempt's terminal; 'supervisor' for a self job), attempt_id,
+// attempt_closed_at}. `m` is the machine handle (engine/machine-db.mjs) everywhere below.
+const JOB_SELECT = `SELECT j.*, a.attempt_id, a.terminal_handle, a.closed_at AS attempt_closed_at FROM sup_jobs j
+  LEFT JOIN sup_attempts a ON a.attempt_id=(SELECT attempt_id FROM sup_attempts WHERE job_id=j.job_id ORDER BY dispatch_seq DESC LIMIT 1)`;
+function rowJob(row) {
+  if (!row) return null;
+  const payload = parse(row.payload_json);
+  const { terminal_handle: handle, payload_json: _p, files_json: _f, ...rest } = row;
+  return { ...rest, payload, result: payload.result ?? null, worker_id: payload.self ? (row.attempt_id != null ? 'supervisor' : null) : handle ?? null };
+}
+export const jobsOf = (m, statuses = null) => m.db.prepare(`${JOB_SELECT} WHERE j.kind=? ${statuses ? `AND j.status IN (${statuses.map(() => '?').join(',')})` : ''} ORDER BY j.created_at, j.job_id`)
+  .all(FIX_KIND, ...(statuses ?? [])).map(rowJob);
+export const jobOf = (m, jobId) => rowJob(m.db.prepare(`${JOB_SELECT} WHERE j.job_id=?`).get(jobId));
 /**
  * The terminals the open [Worker] jobs own: every live-status job's worker_id whose terminal is not closed yet.
  * Orca lists them under the runtime project next to the [Supervisor]; the seat dedupe and the Orca-tree check
  * treat them as owned, never as duplicates, strays or orphans.
  */
-export const openWorkerHandles = (db) => new Set(jobsOf(db, LIVE_STATUSES)
-  .filter((j) => !j.payload.self && j.worker_id && !j.payload.terminalClosed).map((j) => j.worker_id));
-export const reportOf = (db, jobId) => { const r = db.prepare('SELECT * FROM reports WHERE workflow_id=? AND dispatch_id=?').get(SUPERVISOR_WF, jobId); return r ? { ...r, report: parse(r.report_json) } : null; };
+export const openWorkerHandles = (m) => new Set(jobsOf(m, LIVE_STATUSES)
+  .filter((j) => !j.payload.self && j.worker_id && j.attempt_closed_at == null && !j.payload.terminalClosed).map((j) => j.worker_id));
+/** The job's newest report: the sup_reports row with `report` parsed, or null. */
+export const reportOf = (m, jobId) => { const r = m.db.prepare('SELECT * FROM sup_reports WHERE job_id=? ORDER BY report_id DESC LIMIT 1').get(jobId); return r ? { ...r, report: parse(r.report_json) } : null; };
+
+/** Write a job's status and/or payload (sup_jobs; a status change also appends the sup-job-<status> event). */
+function setJob(m, jobId, { status = null, payload = undefined }) {
+  if (status) return m.setSupJobStatus(jobId, status, { payload });
+  return m.update('sup_jobs', { payload_json: payload, updated_at: m.now() }, { job_id: jobId }).changes > 0;
+}
+/** The job's latest attempt id; a job that never spawned (a status set by hand) gets an empty one. */
+function attemptIdOf(m, jobId) {
+  return m.latestSupAttempt(jobId)?.attempt_id ?? m.startSupAttempt({ jobId }).attemptId;
+}
 
 // Append-only registries every contract job adds an entry to (supervise.yaml landGate step 2). Leasing one
 // serialized every contract job behind whichever held it (2026-09-24: three jobs queued 70 min on
@@ -141,41 +168,35 @@ export const SHARED_APPEND_FILES = new Set(['modules/kernel/contract-changes.yam
 const leasable = (files) => files.map(normPath).filter((f) => !SHARED_APPEND_FILES.has(f) && !f.startsWith('modules/kernel/contract-changes/'));
 
 /** Leases other open jobs hold on any of `files`: [{file, jobId}]. */
-export function leaseConflicts(db, files, jobId = null) {
-  const keys = leasable(files).map((f) => `file:${f}`);
+export function leaseConflicts(m, files, jobId = null) {
+  const keys = leasable(files);
   if (!keys.length) return [];
-  return db.prepare(`SELECT resource_key, job_id FROM leases WHERE workflow_id=? AND resource_key IN (${keys.map(() => '?').join(',')})`)
-    .all(SUPERVISOR_WF, ...keys).filter((r) => r.job_id !== jobId).map((r) => ({ file: r.resource_key.slice(5), jobId: r.job_id }));
+  return m.db.prepare(`SELECT path, job_id FROM sup_leases WHERE expires_at>=? AND path IN (${keys.map(() => '?').join(',')})`)
+    .all(m.now(), ...keys).filter((r) => r.job_id !== jobId).map((r) => ({ file: r.path, jobId: r.job_id }));
 }
 
 /** Create the job of one cluster; an open job of the same cluster is returned instead (one worker per cluster). */
-export function createJob(ledger, { cluster, title, files = [], incidents = [], specs = [], brief = '', agent = null, self = false, now = Date.now() }) {
+export function createJob(m, { cluster, title, files = [], incidents = [], specs = [], brief = '', agent = null, self = false, now = Date.now() }) {
   if (!cluster) throw Error('a job needs --cluster <id>');
   if (!files.length) throw Error('a job needs --files <csv>: the explicit file leases');
-  const open = jobsOf(ledger.db, OPEN_STATUSES).find((j) => j.payload.cluster === cluster);
+  const open = jobsOf(m, OPEN_STATUSES).find((j) => j.payload.cluster === cluster);
   if (open) return { created: false, job: open };
   const jobId = `fix-${slug(cluster)}-${crypto.randomBytes(3).toString('hex')}`;
   const payload = { cluster, title: title ?? cluster, files: files.map(normPath), incidents, specs, brief, agent, self, spawnAttempts: 0 };
-  ledger.transaction(() => {
-    ledger.enqueueJob({ jobId, workflowId: SUPERVISOR_WF, opId: FIX_KIND, kind: FIX_KIND, role: self ? 'supervisor' : 'worker', payload, createdAt: now });
-    supervisorEvent(ledger, { entityType: 'job', entityId: jobId, kind: 'worker-job-created', payload: { cluster, files: payload.files, incidents, self }, now });
+  m.transaction(() => {
+    m.upsertSupJob({ jobId, kind: FIX_KIND, role: self ? 'supervisor' : 'worker', cluster, title: payload.title, status: 'queued', files: payload.files, brief: brief || null, payload });
+    supervisorEvent(m, { entityType: 'job', entityId: jobId, kind: 'worker-job-created', payload: { cluster, files: payload.files, incidents, self }, now });
   });
-  return { created: true, job: jobOf(ledger.db, jobId) };
+  return { created: true, job: jobOf(m, jobId) };
 }
 
 // How long a worker job's file leases live (modules/models/runtimes.yaml
 // allocation.workerJobs.leaseTtlMs): long enough to outlive any job, so a dead
 // worker's leases still free themselves.
 export const WORKER_LEASE_TTL_MS = allocationMs('workerJobs.leaseTtlMs');
-function takeLeases(ledger, job, token, now) {
-  const ttl = now + WORKER_LEASE_TTL_MS;
-  ledger.db.prepare('UPDATE jobs SET lease_token=?, updated_at=? WHERE job_id=?').run(token, now, job.job_id);
-  for (const file of leasable(job.payload.files)) {
-    ledger.db.prepare('INSERT OR REPLACE INTO leases(resource_key,job_id,workflow_id,op_id,attempt,generation,token,units,acquired_at,expires_at) VALUES(?,?,?,?,?,?,?,1,?,?)')
-      .run(`file:${file}`, job.job_id, SUPERVISOR_WF, job.op_id, job.attempt, job.generation, token, now, ttl);
-  }
-}
-export const releaseLeases = (ledger, jobId) => ledger.db.prepare('DELETE FROM leases WHERE workflow_id=? AND job_id=?').run(SUPERVISOR_WF, jobId).changes;
+/** The job's file leases (sup_leases; SHARED_APPEND_FILES stay unleased). {ok} or {ok:false, conflicts}. */
+const takeLeases = (m, job) => m.acquireSupLeases(job.job_id, leasable(job.payload.files), { ttlMs: WORKER_LEASE_TTL_MS });
+export const releaseLeases = (m, jobId) => m.releaseSupLeases(jobId);
 
 /* ------------------------------------------------------------ staging */
 
@@ -282,7 +303,7 @@ export async function pickWorkerPool({ shares, runtimes, recent = {}, availabili
 }
 
 /** The live inputs of pickWorkerPool: config shares, recent dispatches (machine + workers), provider health. */
-export async function routeWorker({ db, prefer = null, avoid = [], config = undefined, env = process.env } = {}) {
+export async function routeWorker({ m, prefer = null, avoid = [], config = undefined, env = process.env } = {}) {
   let cfg = config;
   if (cfg === undefined) { try { cfg = loadConfig(); } catch { cfg = null; } }
   // Absent owner shares = equal over every pool runtimes.yaml declares (the
@@ -295,7 +316,7 @@ export async function routeWorker({ db, prefer = null, avoid = [], config = unde
     Object.assign(recent, recentDispatchCounts({ windowHours, machine: true, env }).counts);
   } catch { /* balance is best effort */ }
   const since = Date.now() - windowHours * 3600_000;
-  for (const j of jobsOf(db).filter((x) => x.created_at >= since && x.payload.pool)) recent[j.payload.pool] = (recent[j.payload.pool] ?? 0) + 1;
+  for (const j of jobsOf(m).filter((x) => x.created_at >= since && x.payload.pool)) recent[j.payload.pool] = (recent[j.payload.pool] ?? 0) + 1;
   const { providerAvailability, providerCircuitOf } = await import('../agent/models.mjs');
   let probe = null;
   try { probe = (await import('../api/quota/index.mjs')).probeQuota; } catch { probe = null; }
@@ -310,10 +331,10 @@ export async function routeWorker({ db, prefer = null, avoid = [], config = unde
   return pickWorkerPool({ shares, runtimes: loadRuntimes(), recent, availabilityOf, prefer, avoid });
 }
 
-/** Providers whose [Worker] terminal failed readiness at least `min` times since `since` (supervisor ledger events). */
-export function readinessFailedProviders(db, { since, min = READINESS_FAILS_PER_HOUR } = {}) {
+/** Providers whose [Worker] terminal failed readiness at least `min` times since `since` (sup_events worker-spawn-failed). */
+export function readinessFailedProviders(m, { since, min = READINESS_FAILS_PER_HOUR } = {}) {
   const counts = {};
-  for (const row of db.prepare("SELECT payload_json FROM events WHERE workflow_id=? AND kind='worker-spawn-failed' AND created_at>=?").all(SUPERVISOR_WF, since)) {
+  for (const row of m.db.prepare("SELECT payload_json FROM sup_events WHERE kind='worker-spawn-failed' AND created_at>=?").all(since)) {
     const p = parse(row.payload_json);
     if (p.step === 'readiness' && p.agent) counts[p.agent] = (counts[p.agent] ?? 0) + 1;
   }
@@ -354,37 +375,45 @@ export function renderWorkerPrompt(job, staging, { template = null, skillRoot = 
  * its leases, removes its checkout and requeues the job (failed after MAX_SPAWN_ATTEMPTS).
  * `deps`: {spawn, route, load, staging, unstage} for specs.
  */
-export async function spawnWorkers(ledger, { jobId = null, dryRun = false, settings = supervisorSettings(), deps = {}, env = process.env, root = SKILL_ROOT, now = Date.now } = {}) {
-  const queuedJobs = jobsOf(ledger.db, ['queued']).filter((j) => !j.payload.self && (!jobId || j.job_id === jobId));
-  const running = jobsOf(ledger.db, ACTIVE_STATUSES).filter((j) => !j.payload.self).length;
+export async function spawnWorkers(m, { jobId = null, dryRun = false, settings = supervisorSettings(), deps = {}, env = process.env, root = SKILL_ROOT, now = Date.now } = {}) {
+  const queuedJobs = jobsOf(m, ['queued']).filter((j) => !j.payload.self && (!jobId || j.job_id === jobId));
+  const running = jobsOf(m, ACTIVE_STATUSES).filter((j) => !j.payload.self).length;
   const load = (deps.load ?? machineLoad)();
   const cap = adaptiveCap({ base: settings.workers.base, max: settings.workers.max, queued: queuedJobs.length, running, load });
   const result = { cap, launched: [], skipped: [], failed: [] };
   // Providers whose worker terminal failed readiness this pass, or READINESS_FAILS_PER_HOUR times in the hour.
-  const notReady = new Set(readinessFailedProviders(ledger.db, { since: now() - 3600_000 }));
+  const notReady = new Set(readinessFailedProviders(m, { since: now() - 3600_000 }));
   let live = running;
   for (const job of queuedJobs) {
     if (live >= cap.cap) { result.skipped.push({ jobId: job.job_id, reason: `cap ${cap.cap} reached (${cap.reason})` }); continue; }
-    const conflicts = leaseConflicts(ledger.db, job.payload.files, job.job_id);
+    const conflicts = leaseConflicts(m, job.payload.files, job.job_id);
     if (conflicts.length) { result.skipped.push({ jobId: job.job_id, reason: `files leased by ${[...new Set(conflicts.map((c) => c.jobId))].join(', ')}`, conflicts }); continue; }
     const avoid = [...new Set([...notReady, ...(job.payload.avoidAgents ?? [])])];
     const prefer = job.payload.agent && !avoid.includes(job.payload.agent) ? job.payload.agent : null;
-    const route = await (deps.route ?? ((opts) => routeWorker(opts)))({ db: ledger.db, prefer, avoid, env });
+    const route = await (deps.route ?? ((opts) => routeWorker(opts)))({ m, prefer, avoid, env });
     if (route.error) { result.skipped.push({ jobId: job.job_id, reason: route.error, routeSkipped: route.skipped }); continue; }
     if (dryRun) { result.launched.push({ jobId: job.job_id, wouldLaunch: true, agent: route.agent, model: route.model, pool: route.pool }); live += 1; continue; }
     const staging = (deps.staging ?? createStaging)({ jobId: job.job_id, root, env });
     if (!staging.ok) { result.failed.push({ jobId: job.job_id, step: 'staging', error: staging.error }); continue; }
-    const token = crypto.randomBytes(12).toString('hex');
-    const at = now();
-    ledger.transaction(() => {
-      takeLeases(ledger, job, token, at);
-      ledger.db.prepare("UPDATE jobs SET status='leased', updated_at=? WHERE job_id=?").run(at, job.job_id);
+    // One sup_attempts row per spawn: who (agent/model), where (staging checkout, branch, base).
+    const leased = m.transaction(() => {
+      const held = takeLeases(m, job);
+      if (!held.ok) return held;
+      setJob(m, job.job_id, { status: 'spawning' });
+      const { attemptId } = m.startSupAttempt({ jobId: job.job_id, agent: ATTEMPT_AGENTS.has(route.agent) ? route.agent : null, provider: route.agent ?? null,
+        model: route.model ?? null, effort: route.effort ?? null, worktreePath: staging.path, branch: staging.branch, baseSha: staging.base });
+      return { ok: true, attemptId };
     });
+    if (!leased.ok) {
+      (deps.unstage ?? removeStaging)({ jobId: job.job_id, root, env, base: staging.base });
+      result.skipped.push({ jobId: job.job_id, reason: `files leased by ${[...new Set(leased.conflicts.map((c) => c.holder))].join(', ')}` });
+      continue;
+    }
     const prompt = renderWorkerPrompt(job, staging);
     const title = `${WORKER_TITLE_PREFIX} ${job.payload.cluster}`.slice(0, 80);
     const command = (deps.command ?? workerLaunchCommand)({ pool: route.pool, provider: route.agent, model: route.model });
     const guard = (deps.guard ?? workerGuard)(job.job_id, { root });
-    if (!guard.pathPrefix) supervisorEvent(ledger, { entityType: 'job', entityId: job.job_id, kind: 'worker-guard-missing', payload: { receipt: guard.receipt }, now: now() });
+    if (!guard.pathPrefix) supervisorEvent(m, { entityType: 'job', entityId: job.job_id, kind: 'worker-guard-missing', payload: { receipt: guard.receipt }, now: now() });
     const spawned = (deps.spawn ?? (await import('../agent/lib.mjs')).spawnAgent)({ provider: route.agent, model: route.model, effort: route.effort, worktree: root, cwd: staging.path, title, prompt, kernel: true, dispatchId: job.job_id, command,
       env: guard.env, pathPrefix: guard.pathPrefix });
     const payload = { ...job.payload, pool: route.pool, agent: route.agent, model: route.model, staging: { path: staging.path, branch: staging.branch, base: staging.base },
@@ -396,22 +425,22 @@ export async function spawnWorkers(ledger, { jobId = null, dryRun = false, setti
       const notReadyHere = spawned?.step === 'readiness';
       if (notReadyHere) notReady.add(route.agent);
       const avoidAgents = notReadyHere ? [...new Set([...(job.payload.avoidAgents ?? []), route.agent])] : job.payload.avoidAgents;
-      ledger.transaction(() => {
-        releaseLeases(ledger, job.job_id);
-        ledger.db.prepare('UPDATE jobs SET status=?, lease_token=NULL, payload_json=?, result_json=?, updated_at=? WHERE job_id=?')
-          .run(exhausted ? 'failed' : 'queued', JSON.stringify({ ...payload, agent: job.payload.agent ?? null, lastAgent: route.agent,
-            ...(avoidAgents ? { avoidAgents } : {}), staging: null, lastSpawnError: spawned?.error ?? 'spawn failed' }),
-            exhausted ? JSON.stringify({ reason: 'spawn-failed', step: spawned?.step ?? null, error: spawned?.error ?? null }) : null, now(), job.job_id);
-        supervisorEvent(ledger, { entityType: 'job', entityId: job.job_id, kind: 'worker-spawn-failed', payload: { agent: route.agent, step: spawned?.step ?? null, error: spawned?.error ?? null, exhausted }, now: now() });
+      m.transaction(() => {
+        releaseLeases(m, job.job_id);
+        m.updateSupAttempt(leased.attemptId, { cancelledAt: now(), failureClass: `spawn:${spawned?.step ?? 'spawn'}`, terminalHandle: spawned?.terminal ?? null });
+        setJob(m, job.job_id, { status: exhausted ? 'failed' : 'queued', payload: { ...payload, agent: job.payload.agent ?? null, lastAgent: route.agent,
+          ...(avoidAgents ? { avoidAgents } : {}), staging: null, lastSpawnError: spawned?.error ?? 'spawn failed',
+          result: exhausted ? { reason: 'spawn-failed', step: spawned?.step ?? null, error: spawned?.error ?? null } : null } });
+        supervisorEvent(m, { entityType: 'job', entityId: job.job_id, kind: 'worker-spawn-failed', payload: { agent: route.agent, step: spawned?.step ?? null, error: spawned?.error ?? null, exhausted }, now: now() });
       });
       (deps.unstage ?? removeStaging)({ jobId: job.job_id, root, env, base: staging.base });
       result.failed.push({ jobId: job.job_id, step: spawned?.step ?? 'spawn', error: spawned?.error ?? null, agent: route.agent, requeued: !exhausted });
       continue;
     }
-    ledger.transaction(() => {
-      ledger.db.prepare("UPDATE jobs SET status='running', worker_id=?, payload_json=?, updated_at=? WHERE job_id=?")
-        .run(spawned.terminal, JSON.stringify({ ...payload, startedAt: new Date(now()).toISOString() }), now(), job.job_id);
-      supervisorEvent(ledger, { entityType: 'job', entityId: job.job_id, kind: 'worker-spawned', payload: { terminal: spawned.terminal, agent: route.agent, model: route.model, pool: route.pool, staging: staging.path }, now: now() });
+    m.transaction(() => {
+      m.updateSupAttempt(leased.attemptId, { terminalHandle: spawned.terminal });
+      setJob(m, job.job_id, { status: 'running', payload: { ...payload, startedAt: new Date(now()).toISOString() } });
+      supervisorEvent(m, { entityType: 'job', entityId: job.job_id, kind: 'worker-spawned', payload: { terminal: spawned.terminal, agent: route.agent, model: route.model, pool: route.pool, staging: staging.path }, now: now() });
     });
     live += 1;
     result.launched.push({ jobId: job.job_id, terminal: spawned.terminal, agent: route.agent, model: route.model, staging: staging.path });
@@ -419,23 +448,27 @@ export async function spawnWorkers(ledger, { jobId = null, dryRun = false, setti
   return result;
 }
 
-
 /** The Supervisor's own staging checkout: a self job (no terminal) holding leases, landed through land.mjs. */
-export function stageSelf(ledger, { name, files, root = SKILL_ROOT, env = process.env, now = Date.now() }) {
-  const created = createJob(ledger, { cluster: `self-${slug(name)}`, title: name, files, self: true, now });
+export function stageSelf(m, { name, files, root = SKILL_ROOT, env = process.env, now = Date.now() }) {
+  const created = createJob(m, { cluster: `self-${slug(name)}`, title: name, files, self: true, now });
   const job = created.job;
   if (job.status === 'running' && job.payload.staging?.path && fs.existsSync(job.payload.staging.path)) return { ok: true, reused: true, jobId: job.job_id, ...job.payload.staging };
-  const conflicts = leaseConflicts(ledger.db, job.payload.files, job.job_id);
+  const conflicts = leaseConflicts(m, job.payload.files, job.job_id);
   if (conflicts.length) return { ok: false, jobId: job.job_id, error: `files leased by ${[...new Set(conflicts.map((c) => c.jobId))].join(', ')}`, conflicts };
   const staging = createStaging({ jobId: job.job_id, root, env });
   if (!staging.ok) return { ok: false, jobId: job.job_id, error: staging.error };
-  const token = crypto.randomBytes(12).toString('hex');
-  ledger.transaction(() => {
-    takeLeases(ledger, job, token, now);
-    ledger.db.prepare("UPDATE jobs SET status='running', worker_id='supervisor', payload_json=?, updated_at=? WHERE job_id=?")
-      .run(JSON.stringify({ ...job.payload, staging: { path: staging.path, branch: staging.branch, base: staging.base } }), now, job.job_id);
-    supervisorEvent(ledger, { entityType: 'job', entityId: job.job_id, kind: 'supervisor-staged', payload: { staging: staging.path, files: job.payload.files }, now });
+  const held = m.transaction(() => {
+    const leased = takeLeases(m, job);
+    if (!leased.ok) return leased;
+    m.startSupAttempt({ jobId: job.job_id, worktreePath: staging.path, branch: staging.branch, baseSha: staging.base });
+    setJob(m, job.job_id, { status: 'running', payload: { ...job.payload, staging: { path: staging.path, branch: staging.branch, base: staging.base } } });
+    supervisorEvent(m, { entityType: 'job', entityId: job.job_id, kind: 'supervisor-staged', payload: { staging: staging.path, files: job.payload.files }, now });
+    return { ok: true };
   });
+  if (!held.ok) {
+    removeStaging({ jobId: job.job_id, root, env, base: staging.base });
+    return { ok: false, jobId: job.job_id, error: `files leased by ${[...new Set(held.conflicts.map((c) => c.holder))].join(', ')}` };
+  }
   return { ok: true, jobId: job.job_id, ...staging };
 }
 
@@ -443,13 +476,14 @@ export function stageSelf(ledger, { name, files, root = SKILL_ROOT, env = proces
 
 /**
  * The Supervisor closes its own [Worker]'s terminal (owner, 2026-09-28: the Supervisor owns its workers' lifecycle) and
- * records the verified result on the job (payload.terminalClosed) and as a worker-terminal-closed event. Nothing to do
- * for a self job (worker_id 'supervisor'), a job that never got a terminal, or one already closed with proof. A close
- * that is not proven stays unrecorded on the payload so openWorkerHandles still counts the terminal and the tick GC
- * (gc.mjs) retries it as a leftover. `close` is closeSelfSafe (seam). Returns the close result or null.
+ * records the verified result on the job (payload.terminalClosed, the attempt's closed_at) and as a
+ * worker-terminal-closed event. Nothing to do for a self job (worker_id 'supervisor'), a job that never got a
+ * terminal, or one already closed with proof. A close that is not proven stays unrecorded on the payload so
+ * openWorkerHandles still counts the terminal and the tick GC (gc.mjs) retries it as a leftover. `close` is
+ * closeSelfSafe (seam). Returns the close result or null.
  */
-export function closeWorkerTerminal(ledger, { jobId, env = process.env, now = Date.now(), close = closeSelfSafe } = {}) {
-  const job = jobOf(ledger.db, jobId);
+export function closeWorkerTerminal(m, { jobId, env = process.env, now = Date.now(), close = closeSelfSafe } = {}) {
+  const job = jobOf(m, jobId);
   const handle = job?.worker_id;
   if (!handle || handle === 'supervisor' || job.payload.self) return null;
   if (job.payload.terminalClosed?.ok === true) return null;
@@ -458,20 +492,23 @@ export function closeWorkerTerminal(ledger, { jobId, env = process.env, now = Da
   const record = { handle, ok: r?.ok === true, proof: r?.proof ?? null, ...(r?.detached ? { detached: true } : {}), ...(r?.reason ? { reason: r.reason } : {}),
     ...(r?.error ? { error: String(r.error).slice(0, 200) } : {}), at: new Date(now).toISOString() };
   try {
-    ledger.transaction(() => {
-      const fresh = jobOf(ledger.db, jobId);
-      if (record.ok) ledger.db.prepare('UPDATE jobs SET payload_json=?, updated_at=? WHERE job_id=?').run(JSON.stringify({ ...fresh.payload, terminalClosed: record }), now, jobId);
-      supervisorEvent(ledger, { entityType: 'job', entityId: jobId, kind: record.ok ? 'worker-terminal-closed' : 'worker-terminal-unclosed', payload: record, now });
+    m.transaction(() => {
+      const fresh = jobOf(m, jobId);
+      if (record.ok) {
+        setJob(m, jobId, { payload: { ...fresh.payload, terminalClosed: record } });
+        if (fresh.attempt_id != null) m.updateSupAttempt(fresh.attempt_id, { closedAt: now });
+      }
+      supervisorEvent(m, { entityType: 'job', entityId: jobId, kind: record.ok ? 'worker-terminal-closed' : 'worker-terminal-unclosed', payload: record, now });
     });
   } catch { /* the close stands; the tick GC re-reads Orca */ }
   return record;
 }
 
 /** The worker files its report: the commit on its temp branch, the incidents it fixes, the specs that prove it. */
-export function fileReport(ledger, { jobId, outcome, commit = null, specs = [], summary = '', needs = [], incidents = null, root = SKILL_ROOT, terminal = null, now = Date.now(), closeDeps = {} }) {
-  const job = jobOf(ledger.db, jobId);
+export function fileReport(m, { jobId, outcome, commit = null, specs = [], summary = '', needs = [], incidents = null, root = SKILL_ROOT, terminal = null, now = Date.now(), closeDeps = {} }) {
+  const job = jobOf(m, jobId);
   if (!job) return { ok: false, error: `no job ${jobId}` };
-  if (!['running', 'leased'].includes(job.status)) return { ok: false, error: `job ${jobId} is ${job.status}, not running` };
+  if (!ACTIVE_STATUSES.includes(job.status)) return { ok: false, error: `job ${jobId} is ${job.status}, not running` };
   // diagnosed: a diagnosis job (the Supervisor never diagnoses with its own subagents) - the summary is the result.
   if (!['done', 'diagnosed', 'blocked', 'failed'].includes(outcome)) return { ok: false, error: 'outcome must be done, diagnosed, blocked or failed' };
   if (outcome === 'diagnosed' && !String(summary ?? '').trim()) return { ok: false, error: 'a diagnosed report carries its diagnosis in --summary (or --summary-file)' };
@@ -486,36 +523,36 @@ export function fileReport(ledger, { jobId, outcome, commit = null, specs = [], 
     if (job.payload.staging?.base && sha === job.payload.staging.base) return { ok: false, error: 'the commit is the base: nothing was committed' };
   }
   const report = { outcome, commit: sha, base: job.payload.staging?.base ?? null, branch: job.payload.staging?.branch ?? null,
-    specs: specs.length ? specs : job.payload.specs ?? [], incidents: incidents ?? job.payload.incidents ?? [], summary, needs };
-  ledger.transaction(() => {
-    ledger.db.prepare('INSERT OR REPLACE INTO reports(workflow_id,dispatch_id,op_id,attempt,generation,outcome,report_json,from_terminal,consumed_at,created_at) VALUES(?,?,?,?,?,?,?,?,NULL,?)')
-      .run(SUPERVISOR_WF, jobId, FIX_KIND, job.attempt, job.generation, outcome, JSON.stringify(report), terminal, now);
-    ledger.db.prepare("UPDATE jobs SET status=?, updated_at=? WHERE job_id=?").run(outcome === 'done' ? 'reported' : outcome === 'diagnosed' ? 'succeeded' : 'failed', now, jobId);
-    if (outcome !== 'done') {
-      releaseLeases(ledger, jobId);
-      ledger.db.prepare('UPDATE jobs SET result_json=? WHERE job_id=?').run(JSON.stringify({ reason: `worker-${outcome}`, summary, needs }), jobId);
-    }
-    supervisorEvent(ledger, { entityType: 'job', entityId: jobId, kind: 'worker-reported', payload: { outcome, commit: sha, specs: report.specs, needs }, now });
+    specs: specs.length ? specs : job.payload.specs ?? [], incidents: incidents ?? job.payload.incidents ?? [], summary, needs, terminal };
+  m.transaction(() => {
+    const attemptId = attemptIdOf(m, jobId);
+    m.recordSupReport({ attemptId, jobId, outcome, report });
+    m.updateSupAttempt(attemptId, { reportedAt: now, reportOutcome: outcome, ...(sha ? { headSha: sha } : {}) });
+    const status = outcome === 'done' ? 'reported' : outcome === 'diagnosed' ? 'succeeded' : 'failed';
+    if (outcome !== 'done') releaseLeases(m, jobId);
+    setJob(m, jobId, { status, payload: outcome === 'done' ? undefined : { ...job.payload, result: { reason: `worker-${outcome}`, summary, needs } } });
+    supervisorEvent(m, { entityType: 'job', entityId: jobId, kind: 'worker-reported', payload: { outcome, commit: sha, specs: report.specs, needs }, now });
   });
   // A diagnosed/blocked/failed report is the worker's last act: the Supervisor closes its terminal now (a done report
   // keeps it until the land, so a red gate can still be handed back to it). Filed from inside that terminal, the close
   // goes to a detached verifier (close-verify.mjs closeSelfSafe) so this process finishes writing first.
-  const terminalClosed = outcome === 'done' ? null : closeWorkerTerminal(ledger, { jobId, now, ...closeDeps });
+  const terminalClosed = outcome === 'done' ? null : closeWorkerTerminal(m, { jobId, now, ...closeDeps });
   return { ok: true, jobId, outcome, commit: sha, report, ...(terminalClosed ? { terminalClosed } : {}) };
 }
 
 /** Cancel a job: leases released, checkout removed (its branch kept when it holds commits). */
-export function cancelJob(ledger, { jobId, reason = 'cancelled by the Supervisor', root = SKILL_ROOT, env = process.env, now = Date.now(), closeDeps = {} }) {
-  const job = jobOf(ledger.db, jobId);
+export function cancelJob(m, { jobId, reason = 'cancelled by the Supervisor', root = SKILL_ROOT, env = process.env, now = Date.now(), closeDeps = {} }) {
+  const job = jobOf(m, jobId);
   if (!job) return { ok: false, error: `no job ${jobId}` };
-  if (!OPEN_STATUSES.includes(job.status) && job.status !== 'leased') return { ok: false, error: `job ${jobId} is already ${job.status}` };
-  ledger.transaction(() => {
-    releaseLeases(ledger, jobId);
-    ledger.db.prepare("UPDATE jobs SET status='cancelled', result_json=?, updated_at=? WHERE job_id=?").run(JSON.stringify({ reason }), now, jobId);
-    supervisorEvent(ledger, { entityType: 'job', entityId: jobId, kind: 'worker-cancelled', payload: { reason }, now });
+  if (!OPEN_STATUSES.includes(job.status)) return { ok: false, error: `job ${jobId} is already ${job.status}` };
+  m.transaction(() => {
+    releaseLeases(m, jobId);
+    if (job.attempt_id != null) m.updateSupAttempt(job.attempt_id, { cancelledAt: now });
+    setJob(m, jobId, { status: 'cancelled', payload: { ...job.payload, result: { reason } } });
+    supervisorEvent(m, { entityType: 'job', entityId: jobId, kind: 'worker-cancelled', payload: { reason }, now });
   });
   const staged = job.payload.staging ? removeStaging({ jobId, root, env, base: job.payload.staging.base }) : null;
-  const terminalClosed = closeWorkerTerminal(ledger, { jobId, env, now, ...closeDeps });
+  const terminalClosed = closeWorkerTerminal(m, { jobId, env, now, ...closeDeps });
   return { ok: true, jobId, terminal: job.worker_id ?? null, staged, ...(terminalClosed ? { terminalClosed } : {}) };
 }
 
@@ -524,35 +561,63 @@ export function cancelJob(ledger, { jobId, reason = 'cancelled by the Supervisor
  * consumed with the decision recorded, so the watchdog's [report] wake (filedReports: unconsumed, not done) stops
  * announcing it. 2026-09-28: four 2026-09-24 reports whose fixes had long landed resurfaced in [report] wakes all night.
  */
-export function ackReport(ledger, { jobId, reason, now = Date.now() }) {
+export function ackReport(m, { jobId, reason, now = Date.now() }) {
   if (!jobId || !String(reason ?? '').trim()) return { ok: false, error: 'ack needs --job and --reason' };
-  const report = ledger.db.prepare('SELECT outcome, consumed_at FROM reports WHERE workflow_id=? AND dispatch_id=?').get(SUPERVISOR_WF, jobId);
+  const report = reportOf(m, jobId);
   if (!report) return { ok: false, error: `no report for ${jobId}` };
   if (report.consumed_at != null) return { ok: true, jobId, already: true };
-  ledger.transaction(() => {
-    ledger.db.prepare('UPDATE reports SET consumed_at=? WHERE workflow_id=? AND dispatch_id=?').run(now, SUPERVISOR_WF, jobId);
-    supervisorEvent(ledger, { entityType: 'job', entityId: jobId, kind: 'worker-report-acked', payload: { outcome: report.outcome, reason: String(reason).slice(0, 600) }, now });
+  m.transaction(() => {
+    m.consumeSupReport(report.report_id);
+    m.updateSupAttempt(report.attempt_id, { ackedAt: now });
+    supervisorEvent(m, { entityType: 'job', entityId: jobId, kind: 'worker-report-acked', payload: { outcome: report.outcome, reason: String(reason).slice(0, 600) }, now });
   });
   return { ok: true, jobId, outcome: report.outcome };
 }
 
 /** Mark a landed job succeeded, release its leases and remove its checkout and temp branch. */
-export function finishLanded(ledger, { jobId, landedSha, root = SKILL_ROOT, env = process.env, now = Date.now(), closeDeps = {} }) {
-  const job = jobOf(ledger.db, jobId);
+export function finishLanded(m, { jobId, landedSha, root = SKILL_ROOT, env = process.env, now = Date.now(), closeDeps = {} }) {
+  const job = jobOf(m, jobId);
   if (!job) return { ok: false, error: `no job ${jobId}` };
-  ledger.transaction(() => {
-    releaseLeases(ledger, jobId);
-    ledger.db.prepare("UPDATE jobs SET status='succeeded', result_json=?, updated_at=? WHERE job_id=?").run(JSON.stringify({ landed: landedSha }), now, jobId);
-    ledger.db.prepare('UPDATE reports SET consumed_at=? WHERE workflow_id=? AND dispatch_id=?').run(now, SUPERVISOR_WF, jobId);
+  m.transaction(() => {
+    releaseLeases(m, jobId);
+    if (job.attempt_id != null) m.updateSupAttempt(job.attempt_id, { landedAt: now, landedSha: landedSha ?? null });
+    setJob(m, jobId, { status: 'succeeded', payload: { ...job.payload, result: { landed: landedSha ?? null } } });
+    for (const r of m.supReports({ jobId, unconsumed: true })) m.consumeSupReport(r.report_id);
   });
   const staged = job.payload.staging ? removeStaging({ jobId, root, env, landed: true, base: job.payload.staging.base }) : null;
-  const terminalClosed = closeWorkerTerminal(ledger, { jobId, env, now, ...closeDeps });
+  const terminalClosed = closeWorkerTerminal(m, { jobId, env, now, ...closeDeps });
   return { ok: true, jobId, staged, terminal: job.worker_id ?? null, ...(terminalClosed ? { terminalClosed } : {}) };
 }
 
+/** A red gate on a job: the failure is kept on the job (payload.result); the job stays open for its worker. */
+export function recordLandFailed(m, { jobId, reason, startedAt = Date.now() }) {
+  const job = jobOf(m, jobId);
+  if (!job) return false;
+  return setJob(m, jobId, { payload: { ...job.payload, result: { landFailed: reason ?? null, at: new Date(startedAt).toISOString() } } });
+}
+
+/**
+ * The running self jobs (workers.mjs stage --self) a `--commit` land just completed: a landed commit is on the
+ * job's branch sup/<job> beyond its base, and `git cherry main <branch> <base>` finds no commit of that branch
+ * still missing from main. A branch only partly landed stays open ({jobId, pending}). Returns {done: [jobId], partial}.
+ */
+export function selfJobsLandedBy(m, commits, { root = SKILL_ROOT } = {}) {
+  const shas = commits.map((c) => git(['rev-parse', '--verify', '--quiet', `${c}^{commit}`], { cwd: root }).stdout).filter(Boolean);
+  const done = [], partial = [];
+  for (const job of jobsOf(m, ACTIVE_STATUSES).filter((j) => j.payload.self && j.payload.staging?.branch && j.payload.staging?.base)) {
+    const { branch, base } = job.payload.staging;
+    if (!git(['rev-parse', '--verify', '--quiet', `refs/heads/${branch}`], { cwd: root }).ok) continue;
+    const onBranch = (sha) => git(['merge-base', '--is-ancestor', sha, branch], { cwd: root }).ok && !git(['merge-base', '--is-ancestor', sha, base], { cwd: root }).ok;
+    if (!shas.some(onBranch)) continue;
+    const pending = git(['cherry', 'refs/heads/main', branch, base], { cwd: root }).stdout.split(/\r?\n/).filter((l) => l.startsWith('+')).map((l) => l.slice(2).trim());
+    (pending.length ? partial : done).push({ jobId: job.job_id, pending });
+  }
+  return { done: done.map((d) => d.jobId), partial };
+}
+
 /** Remove the checkouts of every finished job that still has one. */
-export function cleanupStaging(ledger, { jobId = null, root = SKILL_ROOT, env = process.env } = {}) {
-  const done = jobsOf(ledger.db, ['succeeded', 'failed', 'cancelled']).filter((j) => (!jobId || j.job_id === jobId) && j.payload.staging && fs.existsSync(stagingPathOf(j.job_id, env)));
+export function cleanupStaging(m, { jobId = null, root = SKILL_ROOT, env = process.env } = {}) {
+  const done = jobsOf(m, FINAL_STATUSES).filter((j) => (!jobId || j.job_id === jobId) && j.payload.staging && fs.existsSync(stagingPathOf(j.job_id, env)));
   return done.map((j) => removeStaging({ jobId: j.job_id, root, env, landed: j.status === 'succeeded', base: j.payload.staging.base }));
 }
 
@@ -561,15 +626,15 @@ export function cleanupStaging(ledger, { jobId = null, root = SKILL_ROOT, env = 
 const ageMin = (iso, now = Date.now()) => { const t = Date.parse(iso ?? ''); return Number.isFinite(t) ? Math.round((now - t) / 60000) : null; };
 
 /** The worker board /status and tick.mjs print: {active:[...], queued:[...], reported:[...], recent:[...]}. */
-export function workerBoard(db, { now = Date.now() } = {}) {
+export function workerBoard(m, { now = Date.now() } = {}) {
   const view = (j) => ({ jobId: j.job_id, status: j.status, cluster: j.payload.cluster, agent: j.payload.agent ?? null, model: j.payload.model ?? null,
     terminal: j.worker_id ?? null, self: j.payload.self === true, ageMin: ageMin(j.payload.startedAt, now) ?? Math.round((now - j.created_at) / 60000),
     files: j.payload.files, incidents: j.payload.incidents ?? [], staging: j.payload.staging?.path ?? null });
   return {
-    active: jobsOf(db, ['leased', 'running']).map(view),
-    queued: jobsOf(db, ['queued']).map(view),
-    reported: jobsOf(db, ['reported']).map((j) => ({ ...view(j), report: reportOf(db, j.job_id)?.report ?? null })),
-    recent: db.prepare(`SELECT * FROM jobs WHERE workflow_id=? AND kind=? AND status IN ('succeeded','failed','cancelled') ORDER BY updated_at DESC LIMIT 8`).all(SUPERVISOR_WF, FIX_KIND).map(rowJob).map((j) => ({ ...view(j), result: j.result })),
+    active: jobsOf(m, ACTIVE_STATUSES).map(view),
+    queued: jobsOf(m, ['queued']).map(view),
+    reported: jobsOf(m, ['reported']).map((j) => ({ ...view(j), report: reportOf(m, j.job_id)?.report ?? null })),
+    recent: m.db.prepare(`${JOB_SELECT} WHERE j.kind=? AND j.status IN ('succeeded','failed','cancelled') ORDER BY j.updated_at DESC LIMIT 8`).all(FIX_KIND).map(rowJob).map((j) => ({ ...view(j), result: j.result })),
   };
 }
 
@@ -584,47 +649,48 @@ async function main() {
   const out = (r, text = null) => { console.log(asJson || !text ? JSON.stringify(r, null, asJson ? 0 : 2) : text); if (r?.ok === false) process.exitCode = 1; };
   if (!verb || has('help')) { console.log('use: workers.mjs create|spawn|stage|report|list|cap|show|cancel|cleanup ... (see the header)'); return; }
   if (verb === 'list') {
-    const board = withSupervisorRead((db) => workerBoard(db), { active: [], queued: [], reported: [], recent: [] });
+    const board = readSupervisor((m) => workerBoard(m), { active: [], queued: [], reported: [], recent: [] });
     const line = (j) => `  ${j.jobId} [${j.status}] ${j.cluster} ${j.agent ?? '-'} age ${j.ageMin}m${j.terminal ? ` ${j.terminal}` : ''}${j.report ? ` commit ${String(j.report.commit ?? '').slice(0, 9)}` : ''}${j.result ? ` ${JSON.stringify(j.result).slice(0, 120)}` : ''}`;
     return out(board, [`active ${board.active.length}`, ...board.active.map(line), `queued ${board.queued.length}`, ...board.queued.map(line),
       `reported (land queue) ${board.reported.length}`, ...board.reported.map(line), 'recent', ...board.recent.map(line)].join('\n'));
   }
   if (verb === 'cap') {
     const settings = supervisorSettings();
-    const counts = withSupervisorRead((db) => ({ queued: jobsOf(db, ['queued']).length, running: jobsOf(db, ACTIVE_STATUSES).filter((j) => !j.payload.self).length }), { queued: 0, running: 0 });
+    const counts = readSupervisor((m) => ({ queued: jobsOf(m, ['queued']).length, running: jobsOf(m, ACTIVE_STATUSES).filter((j) => !j.payload.self).length }), { queued: 0, running: 0 });
     const cap = adaptiveCap({ ...settings.workers, ...counts, load: machineLoad() });
     return out(cap, `cap ${cap.cap} (${cap.reason}); running ${cap.running}, queued ${cap.queued}, free ${cap.free}; cpu ${Math.round(cap.load.cpuBusy * 100)}% free mem ${Math.round(cap.load.freeMem * 100)}%`);
   }
-  if (verb === 'show') return out(withSupervisorRead((db) => ({ job: jobOf(db, value('job')), report: reportOf(db, value('job')) }), null));
-  const ledger = openSupervisorLedger();
+  if (verb === 'show') return out(readSupervisor((m) => ({ job: jobOf(m, value('job')), report: reportOf(m, value('job')) }), null));
+  // A long-lived writer handle: spawn waits minutes for a worker's readiness (no transaction is held meanwhile).
+  const m = openMachine();
   try {
     if (verb === 'create') {
       let brief = value('brief') ?? '';
       if (value('brief-file')) brief = fs.readFileSync(value('brief-file'), 'utf8');
-      const r = createJob(ledger, { cluster: value('cluster'), title: value('title'), files: csv(value('files')), incidents: csv(value('incidents')), specs: csv(value('specs')), brief, agent: value('agent') });
+      const r = createJob(m, { cluster: value('cluster'), title: value('title'), files: csv(value('files')), incidents: csv(value('incidents')), specs: csv(value('specs')), brief, agent: value('agent') });
       return out({ ok: true, created: r.created, jobId: r.job.job_id, status: r.job.status }, `${r.created ? 'created' : 'exists'} ${r.job.job_id} [${r.job.status}]`);
     }
     if (verb === 'spawn') {
-      const r = await spawnWorkers(ledger, { jobId: value('job'), dryRun: has('dry-run') });
-      supervisorLog('workers', `spawn: ${JSON.stringify(r)}`);
+      const r = await spawnWorkers(m, { jobId: value('job'), dryRun: has('dry-run') });
+      supervisorLog('workers', `spawn: launched ${r.launched.length}, skipped ${r.skipped.length}, failed ${r.failed.length}`, { data: r });
       return out(r);
     }
     if (verb === 'stage') {
       if (!has('self')) return out({ ok: false, error: 'stage is the Supervisor\'s own checkout: stage --self --name <slug> --files <csv>' });
-      return out(stageSelf(ledger, { name: value('name') ?? 'change', files: csv(value('files')) }));
+      return out(stageSelf(m, { name: value('name') ?? 'change', files: csv(value('files')) }));
     }
     if (verb === 'report') {
       const summary = value('summary-file') ? fs.readFileSync(value('summary-file'), 'utf8') : value('summary') ?? '';
-      const r = fileReport(ledger, { jobId: value('job'), outcome: value('outcome'), commit: value('commit'), specs: csv(value('specs')), summary,
+      const r = fileReport(m, { jobId: value('job'), outcome: value('outcome'), commit: value('commit'), specs: csv(value('specs')), summary,
         needs: csv(value('needs')), terminal: process.env.ORCA_TERMINAL_HANDLE ?? null });
-      supervisorLog('workers', `report: ${JSON.stringify(r)}`);
+      supervisorLog('workers', `report ${value('job')}: ${r.ok ? r.outcome : r.error}`, { level: r.ok ? 'info' : 'warn', data: r });
       return out(r);
     }
-    if (verb === 'cancel') return out(cancelJob(ledger, { jobId: value('job'), reason: value('reason') ?? undefined }));
-    if (verb === 'ack') return out(ackReport(ledger, { jobId: value('job'), reason: value('reason') }));
-    if (verb === 'cleanup') return out(cleanupStaging(ledger, { jobId: value('job') }));
+    if (verb === 'cancel') return out(cancelJob(m, { jobId: value('job'), reason: value('reason') ?? undefined }));
+    if (verb === 'ack') return out(ackReport(m, { jobId: value('job'), reason: value('reason') }));
+    if (verb === 'cleanup') return out(cleanupStaging(m, { jobId: value('job') }));
     return out({ ok: false, error: `unknown verb ${verb}` });
-  } finally { ledger.close(); }
+  } finally { m.close(); }
 }
 
 if (process.argv[1] && path.resolve(process.argv[1]) === selfFile) main();

@@ -3,36 +3,30 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { createRequire } from 'node:module';
-import { slaPass, slaCatalog, codeOf, entityOf, setClock, clearClock, clocksOf, openViolations, SLA_CLOCKS_DDL, VIOLATED_KIND, CLEARED_KIND } from '../scripts/reconciler/sla.mjs';
-import { withSupervisorRead, SUPERVISOR_WF } from '../scripts/supervisor/home.mjs';
+import { slaPass, slaCatalog, codeOf, entityOf, setClock, clearClock, clocksOf, openViolations, VIOLATED_KIND, CLEARED_KIND } from '../scripts/reconciler/sla.mjs';
+import { TEST_REGISTRY_ENV, openMachine } from '../engine/machine-db.mjs';
 import { allocationSettings } from '../engine/config.mjs';
 
-// Lane rc-sla-workflow (DESIGN.md §8.8, Appendix A): a clock past its SLA is ONE runtime-invariant-violated event on the
-// supervisor ledger (deduped by code|entity across passes), its clear ONE runtime-invariant-cleared event, and a
-// critical code ONE runtime-defect DI for the Supervisor. The state DB is a temp reconciler.sqlite with the §7.3
-// sla_clocks table; the ctx is the smallest one the engine contract (LANES.md "Shared contract") describes.
+// Lane rc-sla-workflow (DESIGN.md §8.8, Appendix A): a clock past its SLA is ONE runtime-invariant-violated Supervisor
+// event (sup_events; deduped by code|entity across passes), its clear ONE runtime-invariant-cleared event, and a
+// critical code ONE runtime-defect DI for the Supervisor. The clocks are machine.sqlite sla_episodes (append-only) of a
+// temp machine.sqlite; the ctx is the smallest one the engine contract (LANES.md "Shared contract") describes.
 
-const require = createRequire(import.meta.url);
 const MIN = 60_000;
 
 function world(t) {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'starci-rc-sla-'));
-  const env = { ...process.env, LOCALAPPDATA: path.join(root, 'la'), STARCI_SUPERVISOR_HOME: path.join(root, 'home'), STARCI_CONNECTORS_OFF: '1' };
+  const env = { ...process.env, LOCALAPPDATA: path.join(root, 'la'), STARCI_SUPERVISOR_HOME: path.join(root, 'home'), STARCI_CONNECTORS_OFF: '1',
+    [TEST_REGISTRY_ENV]: path.join(root, 'machine.sqlite') };
   fs.mkdirSync(env.STARCI_SUPERVISOR_HOME, { recursive: true });
-  const stateFile = path.join(env.STARCI_SUPERVISOR_HOME, 'reconciler.sqlite');
-  const { DatabaseSync } = require('node:sqlite');
-  const db = new DatabaseSync(stateFile);
-  db.exec(SLA_CLOCKS_DDL);
-  db.close();
-  t.after(() => fs.rmSync(root, { recursive: true, force: true, maxRetries: 20, retryDelay: 50 }));
   let now = Date.parse('2026-09-28T10:00:00Z');
+  const m = openMachine({ env, now: () => now });
+  t.after(() => { m.close(); fs.rmSync(root, { recursive: true, force: true, maxRetries: 20, retryDelay: 50 }); });
   const decisions = [];
-  const ctx = { mode: 'shadow', env, stateFile, now: () => now, openDecision: async (di) => { decisions.push(di); return { ok: true, shadow: true }; } };
-  const events = (kind) => withSupervisorRead((sdb) => sdb.prepare('SELECT entity_id, payload_json FROM events WHERE workflow_id=? AND kind=? ORDER BY seq').all(SUPERVISOR_WF, kind)
-    .map((r) => ({ key: r.entity_id, ...JSON.parse(r.payload_json) })), [], { env });
-  const logs = () => withSupervisorRead((sdb) => sdb.prepare("SELECT kind, msg, data_json FROM logs WHERE workflow_id=? ORDER BY seq").all(SUPERVISOR_WF), [], { env });
-  return { ctx, env, decisions, events, logs, advance: (ms) => { now += ms; }, at: () => now };
+  const ctx = { mode: 'shadow', env, machine: m, stateFile: m.file, now: () => now, openDecision: async (di) => { decisions.push(di); return { ok: true, shadow: true }; } };
+  const events = (kind) => m.supEvents({ kind, entityType: 'invariant', order: 'asc', limit: 1000 }).map((r) => ({ key: r.entity_id, ...r.payload }));
+  const logs = () => m.logs({ actor: 'reconciler', limit: 1000 }).reverse();
+  return { ctx, m, env, decisions, events, logs, advance: (ms) => { now += ms; }, at: () => now };
 }
 
 test('a clock past its SLA is exactly one violation event (deduped across passes); clearing it is one cleared event', async (t) => {
@@ -56,17 +50,16 @@ test('a clock past its SLA is exactly one violation event (deduped across passes
 
   w.advance(MIN);
   r = await slaPass(w.ctx);
-  assert.equal(r.violated.length, 0, 'deduped: the clock is marked violated');
-  // Even with the clock's mark lost (a state DB reset), the ledger's newest event for the dedupeKey dedupes.
-  { const { DatabaseSync } = require('node:sqlite'); const db = new DatabaseSync(w.ctx.stateFile); db.exec('UPDATE sla_clocks SET violated_at=NULL'); db.close(); }
-  r = await slaPass(w.ctx);
-  assert.equal(r.violated.length, 0);
+  assert.equal(r.violated.length, 0, 'deduped: the episode is marked violated');
   assert.equal(w.events(VIOLATED_KIND).length, 1);
+  assert.equal(w.m.db.prepare('SELECT COUNT(*) AS n FROM invariant_violations WHERE cleared_at IS NULL').get().n, 1, 'one open invariant violation');
   await clearClock(w.ctx, { entity: 'workflow:nivo-backend:wf-nivo-a', state: 'STALL_UNOWNED' });
   r = await slaPass(w.ctx);
   assert.equal(r.cleared.length, 1);
   assert.equal(w.events(CLEARED_KIND).length, 1);
-  assert.equal(clocksOf(w.ctx, { open: false }).length, 0, 'the reported clear drops the row');
+  assert.equal(clocksOf(w.ctx).length, 0, 'no open episode');
+  assert.deepEqual(clocksOf(w.ctx, { open: false }).map((c) => c.clearReason), ['resolved'], 'the episode stays, cleared once (append-only)');
+  assert.equal(w.m.db.prepare('SELECT COUNT(*) AS n FROM invariant_violations WHERE cleared_at IS NULL').get().n, 0, 'the violation is cleared');
   r = await slaPass(w.ctx);
   assert.equal(r.cleared.length + r.violated.length, 0, 'nothing twice');
   assert.equal(openViolations({ env: w.env }).length, 0);
@@ -114,13 +107,13 @@ test('the catalogue covers Appendix A and cites runtimes.yaml keys instead of co
   assert.deepEqual(entityOf('job:nivo-backend:op-x', 'nivo-backend').type, 'job');
 });
 
-test('no state DB is a skipped pass, never a throw', async (t) => {
+test('no machine.sqlite is a skipped pass, never a throw', async (t) => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'starci-rc-sla-none-'));
   t.after(() => fs.rmSync(root, { recursive: true, force: true }));
-  const r = await slaPass({ now: () => Date.now(), env: { ...process.env, STARCI_SUPERVISOR_HOME: root }, stateFile: path.join(root, 'absent.sqlite') });
+  const r = await slaPass({ now: () => Date.now(), env: { ...process.env, STARCI_SUPERVISOR_HOME: root, [TEST_REGISTRY_ENV]: path.join(root, 'absent.sqlite') }, stateFile: path.join(root, 'absent.sqlite') });
   assert.equal(r.ok, true);
   assert.deepEqual(r.skipped, ['no-state-db']);
-  assert.equal(fs.existsSync(path.join(root, 'absent.sqlite')), false, 'the layer never creates the engine state file');
+  assert.equal(fs.existsSync(path.join(root, 'absent.sqlite')), false, 'the read-only pass never creates the store');
 });
 
 // Coordinator 2026-09-28 (live, every controller active): SERVICE_DOWN service:harness-ui and DECISION_OVERDUE

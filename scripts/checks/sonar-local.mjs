@@ -26,7 +26,7 @@ import {emitCheckOutput} from './output.mjs';
  * setting. A stored token is validated (/api/authentication/validate) before use: one the server rejects
  * (a container and database recreated behind custody - starci-next inc-733bf51f2d75) is re-minted with a
  * valid admin token through the same mint path, stored over the rejected member through the same
- * stack-secret tool, and recorded as a supervisor-ledger `sonar-token-reminted` event.
+ * stack-secret tool, and recorded as a `sonar-token-reminted` Supervisor audit event (machine.sqlite sup_events).
  *
  *   status                                   server, container, custody and token validity
  *   ensure-project --key K [--with-token]    admin token -> create the project (and its token) when missing
@@ -85,7 +85,7 @@ export const PUBLIC_HOST='https://sonar.starci.org';
 export const CONTAINER='starci-sonarqube';
 export const ADMIN_TOKEN='sonarqube-admin-token.key';
 export const ANALYSIS_TOKEN='sonarqube-analysis-token.txt';
-/** The supervisor-ledger event a re-mint of a token the server rejected records. */
+/** The Supervisor audit event (sup_events) a re-mint of a token the server rejected records. */
 export const REMINT_EVENT='sonar-token-reminted';
 const MASTER_IDENTITY=path.join(os.homedir(),'.starci','master.identity');
 const IS_WINDOWS=process.platform==='win32';
@@ -353,16 +353,16 @@ async function mintToken(cfg,{admin,ref,type,projectKey=null,label}){
 }
 
 /**
- * One supervisor-ledger event per re-mint; never a value. cfg.record replaces the ledger, and a spec run
- * (NODE_TEST_CONTEXT) never reaches the real supervisor ledger without one.
+ * One Supervisor audit event (machine.sqlite sup_events) per re-mint; never a value. cfg.record replaces the
+ * store, and a spec run (NODE_TEST_CONTEXT) never writes it without one.
  */
 async function recordRemint(cfg,event){
   const payload={...event,host:cfg.host,stack:cfg.stackDir};
   try{
     if(typeof cfg.record==='function')return void cfg.record({kind:REMINT_EVENT,payload});
     if(process.env.NODE_TEST_CONTEXT)return;
-    const {withSupervisorLedger,supervisorEvent}=await import('../supervisor/home.mjs');
-    withSupervisorLedger(ledger=>supervisorEvent(ledger,{entityType:'service',entityId:'sonar',kind:REMINT_EVENT,payload}));
+    const {withSupervisor,supervisorEvent}=await import('../supervisor/home.mjs');
+    withSupervisor(m=>supervisorEvent(m,{entityType:'service',entityId:'sonar',kind:REMINT_EVENT,payload}));
   }catch{/* the repaired custody stands without its event */}
 }
 

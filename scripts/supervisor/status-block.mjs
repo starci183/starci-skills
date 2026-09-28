@@ -2,19 +2,20 @@
 // (scripts/connectors/telegram-bridge.mjs onStatus; modules/supervisor/supervise.yaml chat): the seat, the OWED
 // count and its trend over the last ticks, the active workers (agent, cluster, age), the land-gate queue and the
 // last push of each main, and the base pool (Qwen, owner ruling 2026-09-24) with its provider-health circuit
-// state across the product ledgers. Read-only; null when the Supervisor was never started.
+// state across the product ledgers. Read-only over machine.sqlite; null when it does not exist yet.
 import fs from 'node:fs';
 import path from 'node:path';
 import { createRequire } from 'node:module';
 import { fileURLToPath } from 'node:url';
-import { withSupervisorRead, seatOf, enabledOf, supervisorMode, SUPERVISOR_WF } from './home.mjs';
+import { readSupervisor, seatOf, enabledOf, supervisorMode } from './home.mjs';
 import { workerBoard } from './workers.mjs';
 import { landStatus } from './land.mjs';
 import { probeAll as probeAllQuota } from '../api/quota/index.mjs';
 import { machineLedgerFiles } from '../agent/balance.mjs';
 import { openLedgerReader } from '../../engine/ledger-db.mjs';
+import { TEST_REGISTRY_ENV } from '../../engine/machine-db.mjs';
 import { inspectOwnerConfig, configRoot } from '../../engine/config.mjs';
-import { parseJsonOr as parse, withPayload } from '../lib/json.mjs';
+import { parseJsonOr as parse } from '../lib/json.mjs';
 import { readYamlFile } from '../lib/yaml.mjs';
 import { fmtAgo as ago, stampMinuteShort as shortIso } from '../lib/time.mjs';
 
@@ -24,14 +25,23 @@ export const BASE_POOL = 'qwen-agent';
 
 const esc = (s) => String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 
-/** Everything the block shows, from the supervisor ledger: {seat, enabled, ticks, board, pushes, lands}. */
-export function supervisorSnapshot(db, { now = Date.now() } = {}) {
-  const events = (kinds, limit) => db.prepare(`SELECT kind, entity_id, payload_json, created_at FROM events WHERE workflow_id=? AND kind IN (${kinds.map(() => '?').join(',')}) ORDER BY seq DESC LIMIT ?`)
-    .all(SUPERVISOR_WF, ...kinds, limit).map((e) => withPayload(e));
+/**
+ * Everything the block shows, from machine.sqlite over the machine handle `m` (seats row 'supervisor', sup_signals,
+ * sup_events ticks, pushes, land_runs, the [Worker] board): {seat, enabled, ticks, board, pushes, lands}.
+ */
+export function supervisorSnapshot(m, { now = Date.now() } = {}) {
+  const events = (kinds, limit) => m.supEvents({ kinds, limit }).map((e) => ({ kind: e.kind, entity_id: e.entity_id, created_at: e.created_at, payload: e.payload ?? {} }));
   const ticks = events(['supervisor-tick'], 6).map((e) => ({ at: e.created_at, owed: e.payload.owed ?? null, clusters: e.payload.clusters ?? null }));
+  // The newest push per repository (machine.sqlite pushes) and the newest land-gate runs (land_runs).
   const pushes = new Map();
-  for (const e of events(['push-main', 'push-refused'], 40)) if (!pushes.has(e.entity_id)) pushes.set(e.entity_id, e);
-  return { seat: seatOf(db, now), enabled: enabledOf(db), ticks, board: workerBoard(db, { now }), pushes: [...pushes.values()], lands: events(['land-passed', 'land-failed'], 3) };
+  for (const p of m.pushes({ limit: 40 })) {
+    if (pushes.has(p.repo_root) || p.result === 'skipped') continue;
+    pushes.set(p.repo_root, { kind: p.result === 'pushed' ? 'push-main' : 'push-refused', entity_id: p.repo_root, created_at: p.at,
+      payload: { head: p.head, refused: p.result === 'pushed' ? null : (p.failure_signature ?? p.reason) } });
+  }
+  const lands = m.landRuns({ limit: 3 }).map((r) => ({ kind: r.result === 'passed' ? 'land-passed' : 'land-failed', entity_id: r.lane ?? r.commit_sha,
+    created_at: r.finished_at ?? r.started_at, payload: { landed: r.landed_sha, lane: r.lane, reason: r.reason } }));
+  return { seat: seatOf(m, now), enabled: enabledOf(m), ticks, board: workerBoard(m, { now }), pushes: [...pushes.values()], lands };
 }
 
 const TEXT = {
@@ -148,10 +158,13 @@ export function renderSupervisorBlock(snap, { language = 'en', land = { busy: fa
   return lines.join('\n');
 }
 
-/** The /status block for `language`, or null (never started, or a spec run without its own supervisor home). */
+/**
+ * The /status block for `language`, or null (machine.sqlite not created yet or unreadable, or a spec run whose `env`
+ * names no test machine.sqlite).
+ */
 export function supervisorStatusMessage({ language = 'en', env = process.env, now = Date.now(), quota = undefined, base = undefined } = {}) {
-  if ((env.NODE_TEST_CONTEXT || process.env.NODE_TEST_CONTEXT) && !env.STARCI_SUPERVISOR_HOME) return null;
-  const read = withSupervisorRead((db) => supervisorSnapshot(db, { now }), null, { env });
+  if ((env.NODE_TEST_CONTEXT || process.env.NODE_TEST_CONTEXT) && !env[TEST_REGISTRY_ENV]) return null;
+  const read = readSupervisor((m) => supervisorSnapshot(m, { now }), null, { env });
   const snap = read ? { ...read, mode: supervisorMode({ env }) } : null;
   // The provider quota line: a live probeAll() unless the caller injected one;
   // a probing failure just drops the line.

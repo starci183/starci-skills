@@ -31,17 +31,16 @@ import { sleepSync } from '../lib/sleep-sync.mjs';
 import { INPUT_GLYPH_CLASS } from '../lib/input-glyph.mjs';
 import { readInbox, getSupervisor, heartbeatSupervisor } from '../connectors/telegram-bridge.mjs';
 import {
-  SKILL_ROOT, SUPERVISOR_ID, SUPERVISOR_WF, SUPERVISOR_TITLE, WORKER_TITLE_PREFIX, openSupervisorLedger, withSupervisorRead, seatOf, enabledOf, supervisorEvent, supervisorSettings,
+  SKILL_ROOT, SUPERVISOR_ID, SEAT_ID, SUPERVISOR_TITLE, WORKER_TITLE_PREFIX, seatOf, enabledOf, supervisorEvent, supervisorSettings,
   supervisorMode, terminalSignalDb, supervisorLog, DEFAULTS,
 } from './home.mjs';
 import { seatHealth } from './start-supervisor.mjs';
-import { jobsOf, reportOf, releaseLeases } from './workers.mjs';
-import { parseJsonOr } from '../lib/json.mjs';
+import { jobsOf, reportOf } from './workers.mjs';
+import { openMachine, withMachine } from '../../engine/machine-db.mjs';
 import { terminalList } from '../api/orca/terminal-list.mjs';
 import { terminalRename } from '../api/orca/terminal-rename.mjs';
 import { tabTitlesOf } from '../kernel/terminal-dedupe.mjs';
-import { listDecisions } from '../reconciler/decisions.mjs';
-import { withMachine } from '../../engine/machine-db.mjs';
+import { supervisorDecisions } from '../reconciler/decisions.mjs';
 
 const selfFile = fileURLToPath(import.meta.url);
 const START_FILE = path.join(SKILL_ROOT, 'scripts', 'supervisor', 'start-supervisor.mjs');
@@ -50,16 +49,14 @@ export const LIVENESS_MS = 180_000;
 export const INBOX_REWAKE_MS = 10 * 60_000;
 export const WAKE_TAG = '[Supervisor watchdog]';
 
-const parse = parseJsonOr;
 /** Every recent wake ATTEMPT, newest first: a wake whose proof failed may still have reached the screen. */
-const recentWakes = (db) => db.prepare("SELECT payload_json, created_at FROM events WHERE workflow_id=? AND kind='supervisor-wake' ORDER BY seq DESC LIMIT 50").all(SUPERVISOR_WF)
-  .map((e) => ({ at: e.created_at, payload: parse(e.payload_json) }));
+const recentWakes = (m) => m.supEvents({ kind: 'supervisor-wake', limit: 50 }).map((e) => ({ at: e.created_at, payload: e.payload ?? {} }));
 /** How far back unconsumed worker reports are read (modules/models/runtimes.yaml
  * allocation.workerJobs.reportWindowMs). */
 export const WORKER_REPORT_WINDOW_MS = allocationMs('workerJobs.reportWindowMs');
 /** The job ids of worker reports not yet consumed that are not done (diagnosed, blocked, failed), the last WORKER_REPORT_WINDOW_MS. */
-const filedReports = (db, now) => db.prepare("SELECT dispatch_id FROM reports WHERE workflow_id=? AND outcome!='done' AND consumed_at IS NULL AND created_at>?")
-  .all(SUPERVISOR_WF, now - WORKER_REPORT_WINDOW_MS).map((r) => r.dispatch_id);
+const filedReports = (m, now) => m.db.prepare("SELECT DISTINCT job_id FROM sup_reports WHERE outcome!='done' AND consumed_at IS NULL AND created_at>?")
+  .all(now - WORKER_REPORT_WINDOW_MS).map((r) => r.job_id);
 
 /**
  * Claude Code keeps its input row idle while subagents it launched still run: the frame then lists them
@@ -89,21 +86,19 @@ export const SUBAGENT_INPUT = new RegExp(`^\\s*${INPUT_GLYPH_CLASS}[^\\n]*@[\\w@
 /** Busy screen states a frozen frame rescues; gates/failed/unreadable stay plain busy. */
 const FROZEN_BUSY = new Set(['active', 'unknown', 'wedged', 'subagents-running']);
 
-/** The signals scope that keeps the last busy-frame signature per terminal ({signature, since, reads}). */
+/** The sup_signals scope that keeps the last busy-frame signature per terminal ({signature, since, reads}). */
 export const BUSY_SCOPE = 'supervisor-busy';
 
 /** The stored busy-frame state of one terminal, or null. */
-export const busyFrameOf = (db, terminal) => {
-  const row = db.prepare('SELECT value_json FROM signals WHERE scope=? AND key=?').get(BUSY_SCOPE, terminal);
-  const value = parse(row?.value_json);
-  return typeof value.signature === 'string' ? value : null;
+export const busyFrameOf = (m, terminal) => {
+  const value = m.supSignal(BUSY_SCOPE, terminal)?.value;
+  return typeof value?.signature === 'string' ? value : null;
 };
 
 /** Record the busy-frame state of `terminal`; rows of other (gone) terminals are dropped. */
-const putBusyFrame = (ledger, terminal, state, now) => {
-  ledger.db.prepare('INSERT INTO signals(scope,key,holder_pid,token,value_json,at,expires_at) VALUES(?,?,?,?,?,?,NULL) ON CONFLICT(scope,key) DO UPDATE SET value_json=excluded.value_json,at=excluded.at')
-    .run(BUSY_SCOPE, terminal, process.pid, null, JSON.stringify(state), now);
-  ledger.db.prepare('DELETE FROM signals WHERE scope=? AND key<>?').run(BUSY_SCOPE, terminal);
+const putBusyFrame = (m, terminal, state) => {
+  m.setSupSignal({ scope: BUSY_SCOPE, key: terminal, value: state });
+  m.db.prepare('DELETE FROM sup_signals WHERE scope=? AND key<>?').run(BUSY_SCOPE, terminal);
 };
 
 /**
@@ -187,7 +182,7 @@ async function hostDeps() {
       try { stale = config.allocationMs('liveness.activeStaleMs'); } catch { /* none */ }
       return liveness.staleAwareState(liveness.classifyAgentScreen(s).state, outputAge(handle), stale).state;
     },
-    wake: (terminal, text) => wake.wakeKernel({ db: terminalSignalDb(terminal), workflowId: SUPERVISOR_WF, text }),
+    wake: (terminal, text) => wake.wakeKernel({ db: terminalSignalDb(terminal), workflowId: SEAT_ID, text }),
     enter: (terminal) => wake.sendEnterWithProof({ terminal }),
     quit: (handle, agent) => quitMod.quitAgent({ handle, agent }),
     close: (handle) => closeMod.closeOperationTerminal(handle),
@@ -223,10 +218,10 @@ export function repairSupervisorTabTitles(seatTerminal, workers, d) {
   return repairs;
 }
 
-/** The [Worker] sweep: returns {deaths:[{jobId, reason}], closed:[...]}. */
-export function sweepWorkers(ledger, d, { now = Date.now() } = {}) {
+/** The [Worker] sweep over the machine handle `m` (sup_jobs): returns {deaths:[{jobId, reason}], closed:[...]}. */
+export function sweepWorkers(m, d, { now = Date.now() } = {}) {
   const out = { deaths: [], closed: [] };
-  for (const job of jobsOf(ledger.db, ['running', 'reported'])) {
+  for (const job of jobsOf(m, ['running', 'reported'])) {
     const handle = job.worker_id;
     if (!handle || job.payload.self || job.payload.terminalClosed) continue;
     const v = d.verdict(handle);
@@ -234,25 +229,24 @@ export function sweepWorkers(ledger, d, { now = Date.now() } = {}) {
     const screen = v.verdict === 'live' ? d.screen(handle) : null;
     const exited = screen != null && d.exitedRow(screen);
     const dead = v.verdict !== 'live' || Boolean(exited);
-    const reported = job.status === 'reported' || Boolean(reportOf(ledger.db, job.job_id));
+    const reported = job.status === 'reported' || Boolean(reportOf(m, job.job_id));
     if (reported) {
       // The worker filed its report: it should have exited; make sure its terminal is gone.
       let quit = null, closed = null;
       if (!dead) { try { quit = d.quit(handle, job.payload.agent ?? 'claude'); } catch { /* best effort */ } }
       try { closed = dead && v.verdict !== 'live' ? { ok: true, gone: true } : d.close(handle); } catch (e) { closed = { ok: false, error: String(e?.message ?? e) }; }
       if (closed?.ok || quit?.exited) {
-        ledger.transaction(() => ledger.db.prepare('UPDATE jobs SET payload_json=?, updated_at=? WHERE job_id=?').run(JSON.stringify({ ...job.payload, terminalClosed: true }), now, job.job_id));
+        m.transaction(() => m.update('sup_jobs', { payload_json: { ...job.payload, terminalClosed: true }, updated_at: now }, { job_id: job.job_id }));
         out.closed.push({ jobId: job.job_id, handle });
       }
       continue;
     }
     if (!dead) continue;
     const reason = exited ? 'agent exited without a report' : `terminal ${v.verdict} without a report`;
-    ledger.transaction(() => {
-      releaseLeases(ledger, job.job_id);
-      ledger.db.prepare("UPDATE jobs SET status='failed', result_json=?, payload_json=?, updated_at=? WHERE job_id=?")
-        .run(JSON.stringify({ reason: 'worker-died-no-report', detail: reason }), JSON.stringify({ ...job.payload, terminalClosed: true }), now, job.job_id);
-      supervisorEvent(ledger, { entityType: 'job', entityId: job.job_id, kind: 'worker-died', payload: { terminal: handle, reason, agent: job.payload.agent ?? null }, now });
+    m.transaction(() => {
+      m.releaseSupLeases(job.job_id);
+      m.setSupJobStatus(job.job_id, 'failed', { payload: { ...job.payload, terminalClosed: true, result: { reason: 'worker-died-no-report', detail: reason } } });
+      supervisorEvent(m, { entityType: 'job', entityId: job.job_id, kind: 'worker-died', payload: { terminal: handle, reason, agent: job.payload.agent ?? null }, now });
     });
     if (exited) { try { d.closeExited(handle); } catch { /* best effort */ } }
     out.deaths.push({ jobId: job.job_id, reason });
@@ -265,21 +259,21 @@ export async function watchdogPass({ env = process.env, d = null, now = Date.now
   if (supervisorMode({ env }) === 'chat') return { ok: true, action: 'chat-mode' };
   const deps = d ?? await hostDeps();
   const settings = supervisorSettings();
-  const ledger = openSupervisorLedger({ env });
+  const m = openMachine({ env });
   try {
-    const enabled = enabledOf(ledger.db);
+    const enabled = enabledOf(m);
     if (enabled !== true) return { ok: true, action: enabled === false ? 'disabled' : 'never-started' };
-    const seat = seatOf(ledger.db, now());
+    const seat = seatOf(m, now());
     let health = seatHealth(seat, deps, now());
     if (health.starting) return { ok: true, action: 'starting' };
     if (health.hostUnavailable || health.unverified) return { ok: true, action: 'host-unavailable', reason: health.reason };
     if (!health.live && seat?.value?.terminal) {
       if (deps.settleMs > 0) deps.sleep(deps.settleMs);
-      health = seatHealth(seatOf(ledger.db, now()), deps, now());
+      health = seatHealth(seatOf(m, now()), deps, now());
       if (health.live || health.hostUnavailable || health.unverified) return { ok: true, action: 'death-unconfirmed', reason: health.reason };
     }
     if (!health.live) {
-      ledger.close();
+      m.close();
       const replaced = deps.replace();
       const titleRepairs = replaced?.ok && replaced?.terminal ? repairSupervisorTabTitles(replaced.terminal, [], deps) : [];
       supervisorLog('watchdog', `replace: ${JSON.stringify(replaced)}`, { env });
@@ -288,16 +282,16 @@ export async function watchdogPass({ env = process.env, d = null, now = Date.now
     const terminal = health.terminal;
     // [Worker] terminals (deaths, reported-worker close) are the Job controller's: it calls sweepWorkers itself.
     const sweep = { deaths: [], closed: [], action: 'job-controller' };
-    const titleRepairs = repairSupervisorTabTitles(terminal, jobsOf(ledger.db, ['running']), deps);
+    const titleRepairs = repairSupervisorTabTitles(terminal, jobsOf(m, ['running']), deps);
     const sup = getSupervisor(SUPERVISOR_ID, env);
     const registered = Boolean(sup && sup.terminal === terminal);
     if (registered) heartbeatSupervisor(SUPERVISOR_ID, { env });
     const unread = readInbox(SUPERVISOR_ID, env).filter((m) => !m.read);
-    const reported = jobsOf(ledger.db, ['reported']).map((j) => j.job_id);
-    const filed = filedReports(ledger.db, now());
+    const reported = jobsOf(m, ['reported']).map((j) => j.job_id);
+    const filed = filedReports(m, now());
     let decisions = [];
-    try { decisions = listDecisions(ledger.db, { workflowId: SUPERVISOR_WF, now: now() }); } catch { decisions = []; }
-    const plan = planWake({ now: now(), wakes: recentWakes(ledger.db), unread, reported, filed, workerDeaths: sweep.deaths, registered, decisions });
+    try { decisions = supervisorDecisions(m, { now: now() }); } catch { decisions = []; }
+    const plan = planWake({ now: now(), wakes: recentWakes(m), unread, reported, filed, workerDeaths: sweep.deaths, registered, decisions });
     if (!plan.text) return { ok: true, action: 'idle', terminal, registered, workers: sweep, ...(titleRepairs.length ? { titleRepairs } : {}) };
     const state = deps.state(terminal);
     if (state === 'queued-input' || state === 'staged-input') {
@@ -311,8 +305,8 @@ export async function watchdogPass({ env = process.env, d = null, now = Date.now
       const signature = frame == null ? null : busySignature(frame);
       if (signature == null) return { ok: true, action: 'busy', state: busy, terminal, pending: plan.tags };
       const outputAgeMs = deps.outputAge ? deps.outputAge(terminal) : null;
-      const frozen = frozenBusyFrame({ signature, prev: busyFrameOf(ledger.db, terminal), now: now(), outputAgeMs, frozenMs: settings.frozenMinutes * 60_000 });
-      ledger.transaction(() => putBusyFrame(ledger, terminal, frozen.state, now()));
+      const frozen = frozenBusyFrame({ signature, prev: busyFrameOf(m, terminal), now: now(), outputAgeMs, frozenMs: settings.frozenMinutes * 60_000 });
+      m.transaction(() => putBusyFrame(m, terminal, frozen.state));
       if (!frozen.frozen) return { ok: true, action: 'busy', state: busy, terminal, pending: plan.tags };
       // A frozen pane is not a busy seat: Escape an input row aimed at a subagent, then the proven wake.
       const escaped = deps.escape && SUBAGENT_INPUT.test(frame) ? deps.escape(terminal) : null;
@@ -320,12 +314,12 @@ export async function watchdogPass({ env = process.env, d = null, now = Date.now
       noteInputOutcome(terminal, woke.action, { env });
       const after = deps.screen(terminal);
       const stillFrozen = after != null && busySignature(after) === signature;
-      ledger.transaction(() => supervisorEvent(ledger, { kind: 'supervisor-wake', now: now(), payload: { tags: plan.tags, inbox: plan.inbox, land: plan.land, report: plan.report, decisions: plan.decisions, text: plan.text,
+      m.transaction(() => supervisorEvent(m, { kind: 'supervisor-wake', now: now(), payload: { tags: plan.tags, inbox: plan.inbox, land: plan.land, report: plan.report, decisions: plan.decisions, text: plan.text,
         delivered: woke.delivered === true, action: woke.action,
         frozen: { signature, since: frozen.state.since, reads: frozen.state.reads, outputAgeMs, state: busy, escaped: escaped == null ? null : escaped.ok === true } } }));
       if (stillFrozen) {
-        ledger.transaction(() => supervisorEvent(ledger, { kind: 'supervisor-frozen-replace', now: now(), payload: { terminal, signature, since: frozen.state.since, reads: frozen.state.reads, wake: woke.action ?? null } }));
-        ledger.close();
+        m.transaction(() => supervisorEvent(m, { kind: 'supervisor-frozen-replace', now: now(), payload: { terminal, signature, since: frozen.state.since, reads: frozen.state.reads, wake: woke.action ?? null } }));
+        m.close();
         const replaced = deps.replace();
         const titleRepairs = replaced?.ok && replaced?.terminal ? repairSupervisorTabTitles(replaced.terminal, [], deps) : [];
         supervisorLog('watchdog', `frozen-replace: ${JSON.stringify(replaced)}`, { env });
@@ -334,21 +328,20 @@ export async function watchdogPass({ env = process.env, d = null, now = Date.now
       return { ok: woke.delivered === true || woke.action === 'kernel-busy', action: woke.delivered ? 'frozen-woken' : woke.action, terminal, tags: plan.tags, workers: sweep };
     }
     if (busy) return { ok: true, action: 'busy', state: busy, terminal, pending: plan.tags };
-    ledger.db.prepare('DELETE FROM signals WHERE scope=?').run(BUSY_SCOPE);
+    m.db.prepare('DELETE FROM sup_signals WHERE scope=?').run(BUSY_SCOPE);
     const woke = deps.wake(terminal, plan.text);
-    ledger.transaction(() => supervisorEvent(ledger, { kind: 'supervisor-wake', now: now(), payload: { tags: plan.tags, inbox: plan.inbox, land: plan.land, report: plan.report, decisions: plan.decisions, text: plan.text, delivered: woke.delivered === true, action: woke.action } }));
+    m.transaction(() => supervisorEvent(m, { kind: 'supervisor-wake', now: now(), payload: { tags: plan.tags, inbox: plan.inbox, land: plan.land, report: plan.report, decisions: plan.decisions, text: plan.text, delivered: woke.delivered === true, action: woke.action } }));
     // MB-05: a seat that refuses input SEAT_DEAF_MAX times in a row is replaced, not woken forever.
     const deaf = noteInputOutcome(terminal, woke.action, { env });
     if (deaf.replace) {
-      ledger.transaction(() => supervisorEvent(ledger, { kind: 'supervisor-deaf-replace', now: now(), payload: { terminal, failures: deaf.failures, since: deaf.since, last: woke.action } }));
-      ledger.close();
+      m.transaction(() => supervisorEvent(m, { kind: 'supervisor-deaf-replace', now: now(), payload: { terminal, failures: deaf.failures, since: deaf.since, last: woke.action } }));
       const replaced = deps.replace();
       const titleRepairs = replaced?.ok && replaced?.terminal ? repairSupervisorTabTitles(replaced.terminal, [], deps) : [];
       supervisorLog('watchdog', `deaf-replace after ${deaf.failures} refused input(s): ${JSON.stringify(replaced)}`, { env });
       return { ok: replaced?.ok !== false, action: replaced?.action === 'booted' || replaced?.action === 'restarted' ? 'restarted' : (replaced?.action ?? 'replace-failed'), reason: `seat-deaf x${deaf.failures}`, inputFailures: deaf.failures, terminal, tags: plan.tags, detail: replaced, ...(titleRepairs.length ? { titleRepairs } : {}) };
     }
     return { ok: woke.delivered === true || woke.action === 'kernel-busy', action: woke.delivered ? 'woken' : woke.action, terminal, tags: plan.tags, workers: sweep, inputFailures: deaf.failures };
-  } finally { try { ledger.close(); } catch { /* closed above */ } }
+  } finally { m.close(); }
 }
 
 /** MB-05: this many refused inputs in a row replace the seat (DBTREE v_deaf_seats: input_failures_consecutive >= 3). */

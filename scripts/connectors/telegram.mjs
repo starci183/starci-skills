@@ -29,11 +29,14 @@
 // (https://<hostname>/a-<nonce>, served by scripts/connectors/ask-gateway.mjs).
 // A credential ask never gets a public link unless
 // connectors.telegram.exposeCredentialAsks is true: the message says to answer
-// it on the machine and carries only the localhost link. The store
-// <state>/connectors/telegram-sent.json keeps, per ask, its short key (the
-// button's callback_data `ask:<key>`, 16 hex chars, well under Telegram's 64
-// bytes), its repo and ledger, every message id that shows it, and the URL the
-// messages currently carry. A missing token or chatId is a no-op with one
+// it on the machine and carries only the localhost link. The notice store is
+// machine.sqlite `notifications`: one row per ask (kind 'ask', dedupe_key
+// `ask:<workflow>|<dispatch>`) whose `ref` keeps its short key (the button's
+// callback_data `ask:<key>`, 16 hex chars, well under Telegram's 64 bytes), its
+// repo and ledger, every message id that shows it, and the URL the messages
+// currently carry; one row per sent event (kind 'ack', dedupe_key the event
+// key). Writers take the host lock 'telegram-sent' (lib.mjs withHostMutex) so two
+// asks parked at once never both send. A missing token or chatId is a no-op with one
 // stderr line; nothing here ever throws into its caller. Ledgers are read
 // read-only. The bot token comes from the env var botTokenEnv names (or
 // connectors.secretsFile), is never printed, and is scrubbed from every error.
@@ -44,7 +47,8 @@ import { fileURLToPath } from 'node:url';
 import { sha256 } from '../../engine/index.mjs';
 import { inspectLedger, ledgerFileFor } from '../../engine/ledger-db.mjs';
 import { configRoot, connectorEnv, connectorSecret, connectorsConfig } from '../../engine/config.mjs';
-import { argsOf, askRepos, askState, ownerConfig, readJson, stateFile, withLedgerRead, writeJson } from './lib.mjs';
+import { readMachine, withMachine } from '../../engine/machine-db.mjs';
+import { argsOf, askRepos, askState, ownerConfig, withHostMutex, withLedgerRead } from './lib.mjs';
 import { publicBase } from './tunnel.mjs';
 import { clip } from '../lib/clip.mjs';
 import { parseJson } from '../lib/json.mjs';
@@ -54,7 +58,6 @@ import { sleep } from '../lib/sleep.mjs';
 export const DEFAULT_API_BASE = 'https://api.telegram.org';
 /** The longest text one sendMessage carries, under Telegram's 4096-character cap. */
 export const TEXT_MAX = 3900;
-const SENT_KEEP_MS = 30 * 24 * 60 * 60 * 1000;
 
 const TEXT = {
   en: {
@@ -245,40 +248,58 @@ export function telegramSettings({ config = ownerConfig(), env = process.env, ro
 
 /* ------------------------------------------------------------ the sent store */
 
-// One writer at a time for the store: two asks may be parked at once.
-async function withLock(file, fn, { waitMs = 10000 } = {}) {
-  const lock = `${file}.lock`;
-  fs.mkdirSync(path.dirname(lock), { recursive: true });
-  const end = Date.now() + waitMs;
-  let fd = null;
-  while (fd === null) {
-    try { fd = fs.openSync(lock, 'wx'); } catch {
-      try { if (Date.now() - fs.statSync(lock).mtimeMs > 60000) fs.rmSync(lock, { force: true }); } catch { /* gone */ }
-      if (Date.now() > end) return { ok: false, skipped: 'dedupe store is locked' };
-      await sleep(100);
-    }
+// The store is machine.sqlite `notifications`, read into the in-memory shape the notices work on:
+// {asks: {<workflow>|<dispatch>: entry}, keys: {<button key>: <workflow>|<dispatch>}, events: {<key>: at}}.
+const SENT_LOCK = 'telegram-sent';
+const ASK_PREFIX = 'ask:';
+const EVENT_KIND = 'ack';
+const emptyStore = () => ({ schema: 'starci/telegram-sent@3', events: {}, asks: {}, keys: {} });
+function storeOf(m) {
+  const store = emptyStore();
+  for (const row of m.db.prepare("SELECT dedupe_key, kind, ref, sent_at FROM notifications WHERE channel='telegram' AND kind IN ('ask','ack') AND dedupe_key IS NOT NULL").all()) {
+    if (row.kind === 'ask' && row.dedupe_key.startsWith(ASK_PREFIX)) {
+      const entry = parse(row.ref, null);
+      if (!entry || typeof entry !== 'object') continue;
+      const askKey = row.dedupe_key.slice(ASK_PREFIX.length);
+      store.asks[askKey] = entry;
+      if (entry.key) store.keys[entry.key] = askKey;
+    } else if (row.kind === EVENT_KIND) store.events[row.dedupe_key] = row.sent_at;
   }
-  try { return await fn(); } finally { try { fs.closeSync(fd); fs.rmSync(lock, { force: true }); } catch { /* best effort */ } }
-}
-
-export const sentFile = (env = process.env) => stateFile('telegram-sent.json', env);
-const loadStore = (file) => {
-  const store = readJson(file, null) ?? {};
-  store.schema = 'starci/telegram-sent@2';
-  store.events ??= {}; store.asks ??= {}; store.keys ??= {};
   return store;
-};
+}
+/** Write every ask entry and event of `store` that differs from `before`, in one transaction. `texts` names a notice's text. */
+function saveStore(env, store, before, { texts = {} } = {}) {
+  withMachine((m) => m.transaction(() => {
+    for (const [askKey, entry] of Object.entries(store.asks)) {
+      const ref = JSON.stringify(entry);
+      if (before.asks[askKey] && JSON.stringify(before.asks[askKey]) === ref && !texts[askKey]) continue;
+      const dedupeKey = `${ASK_PREFIX}${askKey}`;
+      const text = texts[askKey] ?? m.db.prepare('SELECT text FROM notifications WHERE dedupe_key=?').get(dedupeKey)?.text ?? `ask ${askKey}`;
+      m.upsert('notifications', { channel: 'telegram', kind: 'ask', text, sent_at: entry.at ?? m.now(), delivery: entry.closed ? `closed:${entry.closed}` : 'sent', ref, dedupe_key: dedupeKey }, ['dedupe_key']);
+    }
+    for (const [key, at] of Object.entries(store.events)) {
+      if (before.events[key] != null) continue;
+      m.upsert('notifications', { channel: 'telegram', kind: EVENT_KIND, text: texts[key] ?? key, sent_at: at, delivery: 'sent', dedupe_key: key }, ['dedupe_key']);
+    }
+  }), { env });
+}
+/** fn(store) under the host lock 'telegram-sent'; what it changed is written back. {ok:false, skipped} when the lock stays taken. */
+const withStore = (env, fn) => withHostMutex(SENT_LOCK, async () => {
+  const before = readMachine(storeOf, emptyStore(), { env });
+  const store = structuredClone(before), texts = {};
+  const out = await fn(store, texts);
+  saveStore(env, store, before, { texts });
+  return out;
+}, { env });
+
 /** The message ids that show one ask (a pre-button entry kept one `messageId`). */
 export const messageIdsOf = (entry) => [...new Set([
   ...(Array.isArray(entry?.messageIds) ? entry.messageIds : []), ...(Number.isInteger(entry?.messageId) ? [entry.messageId] : []),
 ].filter(Number.isInteger))];
 /** Read the store (no lock): a snapshot for lookups. */
-export const readSentStore = (env = process.env) => loadStore(sentFile(env));
+export const readSentStore = (env = process.env) => readMachine(storeOf, emptyStore(), { env });
 /** Change the store under its lock; `fn(store)` mutates it and returns the result. */
-export const updateSentStore = (fn, { env = process.env } = {}) => {
-  const file = sentFile(env);
-  return withLock(file, async () => { const store = loadStore(file); const out = await fn(store); writeJson(file, store); return out; });
-};
+export const updateSentStore = (fn, { env = process.env } = {}) => withStore(env, (store) => fn(store));
 /** The ask a button key names ({askKey, key, repo, ledgerFile, workflowId, dispatchId, ...}), or null. */
 export const askEntryByKey = (key, env = process.env) => {
   const store = readSentStore(env), askKey = store.keys[key];
@@ -407,13 +428,7 @@ export async function notifyAsk({ ledgerFile, repo = null, workflowId, dispatchI
     if (!view) return { ok: true, skipped: 'no ask report' };
     if (view.closed) return { ok: true, skipped: `already ${view.closed}` };
     if (!push) return { ok: true, listed: true, key: askKeyOf(workflowId, dispatchId) };
-    const file = sentFile(env);
-    return await withLock(file, async () => {
-      const store = loadStore(file);
-      for (const [key, at] of Object.entries(store.events)) if (now - at > SENT_KEEP_MS) delete store.events[key];
-      for (const [askKey, ask] of Object.entries(store.asks)) {
-        if (now - (ask?.at ?? 0) > SENT_KEEP_MS && !messageIdsOf(ask).length) { delete store.asks[askKey]; if (ask?.key) delete store.keys[ask.key]; }
-      }
+    return await withStore(env, async (store, texts) => {
       const askKey = askStoreKey(workflowId, dispatchId), key = askKeyOf(workflowId, dispatchId);
       const entry = store.asks[askKey];
       if (entry?.key && !entry.closed && messageIdsOf(entry).length) return { ok: true, skipped: 'already notified', key, messageId: messageIdsOf(entry).at(-1) };
@@ -425,12 +440,10 @@ export async function notifyAsk({ ledgerFile, repo = null, workflowId, dispatchI
       const text = askMessage({ workflow: { id: workflowId, title: view.title, job: view.jobName ?? null }, question: view.question, language: settings.language, note: drawReview ? drawReplyHint(settings.language) : null });
       const sent = await sendMessage({ token: settings.token, apiBase, fetchImpl, sleepImpl, chatId: settings.chatId, text, markup: askButton(settings.language, key) });
       if (!sent.ok) { warn(`telegram: ask not sent: ${sent.error}`); return { ok: false, status: sent.status, error: sent.error }; }
-      // A pre-button message of this ask (it carried a link) goes with the rest when the ask closes.
-      const legacy = entry && !entry.closed ? messageIdsOf(entry) : [];
-      store.asks[askKey] = { key, repo, ledgerFile, workflowId, dispatchId, messageIds: [...legacy, ...(album?.messageIds ?? []), sent.messageId], url: null, at: now,
+      store.asks[askKey] = { key, repo, ledgerFile, workflowId, dispatchId, messageIds: [...(album?.messageIds ?? []), sent.messageId], url: null, at: now,
         ...(drawReview ? { kind: DRAW_REVIEW_ASK, partMessages: album?.partMessages ?? {} } : {}) };
       store.keys[key] = askKey;
-      writeJson(file, store);
+      texts[askKey] = text;
       return { ok: true, sent: 1, key, messageId: sent.messageId };
     });
   } catch (error) {
@@ -457,9 +470,7 @@ export async function markAskClosed({ ledgerFile, workflowId, dispatchId, reason
     if (off) return { ok: true, skipped: off };
     const settings = given ?? telegramSettings({ config, env, root });
     if (!settings.ready) return { ok: true, skipped: 'telegram off' };
-    const file = sentFile(env);
-    return await withLock(file, async () => {
-      const store = loadStore(file);
+    return await withStore(env, async (store) => {
       const askKey = askStoreKey(workflowId, dispatchId), sent = store.asks[askKey];
       const ids = messageIdsOf(sent);
       if (!sent || (!ids.length && !sent.closed)) return { ok: true, skipped: 'no message sent for this ask' };
@@ -479,7 +490,6 @@ export async function markAskClosed({ ledgerFile, workflowId, dispatchId, reason
       if (out.failed.length) warn(`telegram: ${out.failed.length} message(s) of ask ${dispatchId} could not be removed; the bridge sweep retries`);
       store.asks[askKey] = { ...sent, messageIds: out.failed, messageId: undefined, url: null, closed: closedAs, closedAt: now,
         deleted: [...(sent.deleted ?? []), ...out.deleted], edited: [...(sent.edited ?? []), ...out.edited] };
-      writeJson(file, store);
       return { ok: out.failed.length === 0, reason: closedAs, ...out };
     });
   } catch (error) {
@@ -557,9 +567,7 @@ export async function notifyAutoAccepted({ ledgerFile, workflowId, dispatchId, l
     if (off) return { ok: true, skipped: off };
     const settings = telegramSettings({ config, env, root });
     if (!settings.ready) { if (settings.warning) warn(settings.warning); return { ok: true, skipped: settings.warning ?? 'telegram off' }; }
-    const file = sentFile(env);
-    return await withLock(file, async () => {
-      const store = loadStore(file);
+    return await withStore(env, async (store, texts) => {
       const key = `ask-auto-accepted|${workflowId}|${dispatchId}`;
       if (store.events[key]) return { ok: true, skipped: 'already sent', key };
       let question = { text: '' }, title = null;
@@ -576,7 +584,7 @@ export async function notifyAutoAccepted({ ledgerFile, workflowId, dispatchId, l
       const sent = await sendMessage({ token: settings.token, apiBase, fetchImpl, sleepImpl, chatId: settings.chatId, text });
       if (!sent.ok) { warn(`telegram: auto-accept message not sent: ${sent.error}`); return { ok: false, status: sent.status, error: sent.error }; }
       store.events[key] = now;
-      writeJson(file, store);
+      texts[key] = text;
       return { ok: true, sent: 1, key, messageId: sent.messageId };
     });
   } catch (error) {

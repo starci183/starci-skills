@@ -7,11 +7,12 @@
 // It classifies nothing twice: OWED incidents and patterns come from owed.mjs through cluster.mjs, stalls/gates/waits
 // from stall.mjs (the poll digest), frontiers from `api status`, dead kernels and
 // pushes from the tick. This file maps each to a class and a concrete action, and keeps the SLA:
-//   first seen   tick state owedSeen (supervisor ledger signal supervisor-tick), a key a tick no longer sees starts over
+//   first seen   tick state owedSeen (the tick's state), a key a tick no longer sees starts over
 //   acted        a `supervisor-action` event naming the item (this CLI `record`, notify.mjs --item), or a
 //                `supervisor-notice` to the item's workflow, after it was first seen
 //   breach       first seen more than runtimes.yaml allocation.supervisorTick.actionSlaMs ago and no action since
-// The tick records one `supervisor-owed-actions` event per run; `list` prints the newest.
+// The tick records one `supervisor-owed-actions` event per run; `list` prints the newest. Every event here is a
+// machine.sqlite sup_events row (home.mjs supervisorEvent / newestEvent).
 //
 //   node scripts/supervisor/actions.mjs list [--json] [--open]
 //   node scripts/supervisor/actions.mjs record --item <key> --action <verb> --reason <text> [--workflow <id>] [--refs <csv>] [--until <iso> | --hold-ms <ms>]
@@ -19,11 +20,11 @@
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { clipLine } from '../lib/clip.mjs';
-import { parseJsonOr } from '../lib/json.mjs';
 import { hhmm, stampMinute } from '../lib/time.mjs';
 import { OWNER_ONLY } from './owed.mjs';
 import { actionRow, supLog } from './sup-log.mjs';
-import { SUPERVISOR_WF, openSupervisorLedger, supervisorEvent, supervisorSettings, withSupervisorRead } from './home.mjs';
+import { fullJson } from '../../engine/machine-db.mjs';
+import { newestEvent, readSupervisor, supervisorEvent, supervisorSettings, withSupervisor } from './home.mjs';
 
 const selfFile = fileURLToPath(import.meta.url);
 export const ACTION_KIND = 'supervisor-action';
@@ -134,13 +135,18 @@ export function owedActions({ clusters = [], stalls = [], flows = {}, pushes = [
   return out;
 }
 
-/** The newest action time per item key and per workflow notice (since `since`): {byKey, byWorkflow}. */
-export function actedOf(db, { since = 0 } = {}) {
+/** sup_events of `kinds` created after `after` (strictly, or at/after with `inclusive`), oldest first, payload parsed. */
+export function eventsSince(m, kinds, after = 0, { inclusive = false } = {}) {
+  return m.db.prepare(`SELECT kind, entity_id, payload_json, created_at FROM sup_events WHERE kind IN (${kinds.map(() => '?').join(',')}) AND created_at${inclusive ? '>=' : '>'}? ORDER BY seq`)
+    .all(...kinds, after).map((r) => { let p = null; try { p = fullJson(JSON.parse(r.payload_json ?? 'null')); } catch { p = null; } return { ...r, payload: p ?? {} }; });
+}
+
+/** The newest action time per item key and per workflow notice (since `since`), over the machine handle `m`: {byKey, byWorkflow}. */
+export function actedOf(m, { since = 0 } = {}) {
   const byKey = {}, byWorkflow = {};
-  const rows = db.prepare('SELECT kind, entity_id, payload_json, created_at FROM events WHERE workflow_id=? AND kind IN (?,?) AND created_at>=? ORDER BY seq')
-    .all(SUPERVISOR_WF, ACTION_KIND, NOTICE_KIND, since);
+  const rows = eventsSince(m, [ACTION_KIND, NOTICE_KIND], since, { inclusive: true });
   for (const r of rows) {
-    const p = parseJsonOr(r.payload_json, {}) ?? {};
+    const p = r.payload ?? {};
     if (r.kind === ACTION_KIND && p.item) byKey[p.item] = { at: r.created_at, action: p.action ?? null, reason: p.reason ?? null, ...(Number.isFinite(p.until) ? { until: p.until } : {}) };
     if (r.kind === NOTICE_KIND && p.delivered) { byWorkflow[p.workflowId ?? r.entity_id] = r.created_at; if (p.item) byKey[p.item] = { at: r.created_at, action: 'notify', reason: null }; }
   }
@@ -183,20 +189,14 @@ export function recordAction({ item, action, reason, workflowId = null, refs = [
   if (!item || !action || !String(reason ?? '').trim()) throw Object.assign(new Error('record needs --item, --action and --reason'), { code: 'action-incomplete' });
   if (until != null && !(Number.isFinite(until) && until > now)) throw Object.assign(new Error('--until/--hold-ms must name a time after now'), { code: 'action-until-invalid' });
   const heldUntil = until == null ? null : Math.min(until, now + MAX_HOLD_MS);
-  const ledger = openSupervisorLedger({ env });
-  try {
-    ledger.transaction(() => supervisorEvent(ledger, { entityType: 'action', entityId: item, kind: ACTION_KIND, now,
-      payload: { item, action, reason: one(reason, 600), workflowId, refs, by, ...(heldUntil ? { until: heldUntil } : {}) } }));
-  } finally { ledger.close(); }
+  withSupervisor((m) => supervisorEvent(m, { entityType: 'action', entityId: item, kind: ACTION_KIND, now,
+    payload: { item, action, reason: one(reason, 600), workflowId, refs, by, ...(heldUntil ? { until: heldUntil } : {}) } }), { env });
   supLog(actionRow({ item, action, reason: one(reason, 600), workflowId, refs, at: now }), { env });
   return { ok: true, item, action, at: now, ...(heldUntil ? { until: heldUntil } : {}) };
 }
 
 /** The newest owed-actions record the tick left: {at, items} or null. */
-export const latestOwedActions = ({ env = process.env } = {}) => withSupervisorRead((db) => {
-  const r = db.prepare('SELECT created_at, payload_json FROM events WHERE workflow_id=? AND kind=? ORDER BY seq DESC LIMIT 1').get(SUPERVISOR_WF, OWED_ACTIONS_KIND);
-  return r ? { at: r.created_at, ...(parseJsonOr(r.payload_json, {}) ?? {}) } : null;
-}, null, { env });
+export const latestOwedActions = ({ env = process.env } = {}) => readSupervisor((m) => newestEvent(m, OWED_ACTIONS_KIND), null, { env });
 
 /* ------------------------------------------------------------ the owner's digest */
 
@@ -236,14 +236,11 @@ export function digestText({ actions = [], owed = null, learning = [], trend = n
  * Build a read-only preview of the owner's digest. The Fleet Notifier owns delivery.
  */
 export async function ownerDigest({ env = process.env, now = Date.now(), language = null } = {}) {
-  const read = withSupervisorRead((db) => {
-    const last = db.prepare('SELECT created_at FROM events WHERE workflow_id=? AND kind=? ORDER BY seq DESC LIMIT 1').get(SUPERVISOR_WF, DIGEST_KIND)?.created_at ?? 0;
-    const actions = db.prepare('SELECT payload_json FROM events WHERE workflow_id=? AND kind=? AND created_at>? ORDER BY seq').all(SUPERVISOR_WF, ACTION_KIND, last)
-      .map((r) => parseJsonOr(r.payload_json, {}) ?? {});
+  const read = readSupervisor((m) => {
+    const last = newestEvent(m, DIGEST_KIND)?.at ?? 0;
+    const since = (kind) => eventsSince(m, [kind], last).map((r) => r.payload);
     // What the tick GC collected since the last digest (supervisor-gc events, tick.mjs).
-    const gcRuns = db.prepare('SELECT payload_json FROM events WHERE workflow_id=? AND kind=? AND created_at>? ORDER BY seq').all(SUPERVISOR_WF, 'supervisor-gc', last)
-      .map((r) => parseJsonOr(r.payload_json, {}) ?? {});
-    return { last, actions, gcRuns };
+    return { last, actions: since(ACTION_KIND), gcRuns: since('supervisor-gc') };
   }, { last: 0, actions: [], gcRuns: [] }, { env });
   let learning = [];
   try { const l = await import('./lessons.mjs'); learning = l.learningDigest(l.readLearning({ env }), { since: read.last }); } catch { /* the digest goes without it */ }

@@ -102,11 +102,9 @@ const liveDeps = {
     }));
   },
   recordSweep: async (report) => {
-    const { openSupervisorLedger, supervisorEvent } = await import('../../supervisor/home.mjs');
+    const { withSupervisor, supervisorEvent } = await import('../../supervisor/home.mjs');
     const { GC_EVENT_KIND } = await import('../../supervisor/gc.mjs');
-    const w = openSupervisorLedger();
-    try { w.transaction(() => supervisorEvent(w, { entityType: 'gc', entityId: 'reconciler', kind: GC_EVENT_KIND, payload: { ...report.counts, line: report.line, errors: report.errors.length, by: OWNER } })); }
-    finally { try { w.close(); } catch { /* closed */ } }
+    withSupervisor((m) => supervisorEvent(m, { entityType: 'gc', entityId: 'reconciler', kind: GC_EVENT_KIND, payload: { ...report.counts, line: report.line, errors: report.errors.length, by: OWNER } }));
   },
 };
 

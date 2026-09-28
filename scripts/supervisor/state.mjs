@@ -1,21 +1,18 @@
 // state.mjs — the Supervisor's state for a reader (ui/server.mjs /api/supervisor/state, ui/CONTRACT.md SupervisorState):
-// read-only over the supervisor ledger (<supervisor home>/.starciwork/runtime.sqlite) and its channel files. Where each
-// part lives:
-//   seat        signals supervisor-seat / supervisor-enabled (home.mjs seatOf, enabledOf), events supervisor-booted |
-//               supervisor-restarted | supervisor-adopted, config.yaml supervisor.mode
-//   tick        events supervisor-tick (OWED counts) and supervisor-tick-duties (ok, alerts, errors)
+// read-only over machine.sqlite (home.mjs readSupervisor). Where each part lives:
+//   seat        seats row 'supervisor' and sup_signals supervisor-enabled (home.mjs seatOf, enabledOf), sup_events
+//               supervisor-booted | supervisor-restarted | supervisor-adopted, config.yaml supervisor.mode
+//   tick        sup_events supervisor-tick (OWED counts) and supervisor-tick-duties (ok, alerts, errors)
 //   workflows   the newest supervisor-owed-actions event: per running workflow its frontier state, ready ops and holds
 //               (api status queuedCauses) - the sequence each workflow waits in
 //   owed        the same event's items: every stuck item with its class, action, age, SLA breach and matching lessons
-//   actions     events supervisor-action (actions.mjs record) and supervisor-notice (notify.mjs)
-//   messages    the channel 'main' inbox / outbox (scripts/connectors/telegram-bridge.mjs readInbox / readOutbox)
-//   learning    events supervisor-hypothesis | -experiment | -experiment-result | -lesson | -proposal (lessons.mjs)
-//   digest      events supervisor-owner-digest
-// The typed rows are in the same ledger's `logs` table (sup-log.mjs; /api/supervisor/logs).
-import { parseJsonOr } from '../lib/json.mjs';
+//   actions     sup_events supervisor-action (actions.mjs record) and supervisor-notice (notify.mjs)
+//   messages    sup_messages direction 'in' (inbox) and 'out' (outbox)
+//   learning    sup_learning (lessons.mjs learningState)
+//   digest      sup_events supervisor-owner-digest
+// The typed rows are machine_logs actor supervisor (sup-log.mjs; /api/supervisor/logs).
 import { redactText } from '../lib/redact.mjs';
-import { readInbox, readOutbox } from '../connectors/telegram-bridge.mjs';
-import { SUPERVISOR_ID, SUPERVISOR_WF, enabledOf, seatOf, supervisorSettings, withSupervisorRead } from './home.mjs';
+import { enabledOf, newestEvent, readSupervisor, seatOf, supervisorSettings } from './home.mjs';
 import { ACTION_KIND, DIGEST_KIND, NOTICE_KIND, OWED_ACTIONS_KIND } from './actions.mjs';
 import { learningState } from './lessons.mjs';
 
@@ -24,28 +21,28 @@ const txt = (v, n = 600) => { const s = redactText(String(v ?? '').replace(/\s+/
 const orNull = (v, n) => (v == null || v === '' ? null : txt(v, n));
 const num = (v) => (v != null && v !== '' && Number.isFinite(Number(v)) ? Number(v) : null);
 const int = (v, d = 0) => (Number.isInteger(Number(v)) ? Number(v) : d);
-
-const newest = (db, kind) => {
-  const r = db.prepare('SELECT created_at, payload_json FROM events WHERE workflow_id=? AND kind=? ORDER BY seq DESC LIMIT 1').get(SUPERVISOR_WF, kind);
-  return r ? { at: r.created_at, ...(parseJsonOr(r.payload_json, {}) ?? {}) } : null;
-};
+const iso = (at) => (Number.isFinite(Number(at)) ? new Date(Number(at)).toISOString() : '');
 
 /** The whole state, every field typed as ui/src/contract.ts SupervisorState says. Never throws. */
 export function readSupervisorState({ env = process.env, now = Date.now(), limit = 50, settings = null } = {}) {
   let mode = 'chat';
   try { mode = (settings ?? supervisorSettings()).mode; } catch { /* the default */ }
-  const base = withSupervisorRead((db) => {
-    const seat = seatOf(db, now);
-    const boot = db.prepare("SELECT created_at FROM events WHERE workflow_id=? AND kind IN ('supervisor-booted','supervisor-restarted','supervisor-adopted') ORDER BY seq DESC LIMIT 1").get(SUPERVISOR_WF);
-    const tick = newest(db, 'supervisor-tick');
-    const duties = newest(db, 'supervisor-tick-duties');
-    const owed = newest(db, OWED_ACTIONS_KIND);
-    const digest = newest(db, DIGEST_KIND);
-    const acts = db.prepare('SELECT kind, created_at, payload_json FROM events WHERE workflow_id=? AND kind IN (?,?) ORDER BY seq DESC LIMIT ?').all(SUPERVISOR_WF, ACTION_KIND, NOTICE_KIND, limit)
-      .map((r) => ({ at: r.created_at, kind: r.kind, p: parseJsonOr(r.payload_json, {}) ?? {} }));
-    const learning = learningState(db);
+  const message = (r) => ({ id: String(r.msg_id ?? ''), at: iso(r.at), from: r.from_ref ? String(r.from_ref) : (r.chat_id ? 'telegram' : null), text: txt(r.text, 600), read: r.read_at != null });
+  const reply = (r) => ({ id: String(r.msg_id ?? ''), at: iso(r.at), to: r.to_ref ? String(r.to_ref) : null, via: r.via ? String(r.via) : null, ok: r.ok !== 0, text: txt(r.text, 600) });
+  const base = readSupervisor((m) => {
+    const seat = seatOf(m, now);
+    const boot = m.supEvents({ kinds: ['supervisor-booted', 'supervisor-restarted', 'supervisor-adopted'], limit: 1 })[0] ?? null;
+    const tick = newestEvent(m, 'supervisor-tick');
+    const duties = newestEvent(m, 'supervisor-tick-duties');
+    const owed = newestEvent(m, OWED_ACTIONS_KIND);
+    const digest = newestEvent(m, DIGEST_KIND);
+    const acts = m.supEvents({ kinds: [ACTION_KIND, NOTICE_KIND], limit }).map((r) => ({ at: r.created_at, kind: r.kind, p: r.payload ?? {} }));
+    const learning = learningState(m);
+    let inbox = [], outbox = [];
+    try { inbox = m.supMessages({ direction: 'in', limit }).map(message); } catch { inbox = []; }
+    try { outbox = m.supMessages({ direction: 'out', limit }).map(reply); } catch { outbox = []; }
     return {
-      seat: { mode, enabled: enabledOf(db), terminal: seat?.value?.terminal ?? null, agent: seat?.value?.agent ?? null, model: seat?.value?.model ?? null,
+      seat: { mode, enabled: enabledOf(m), terminal: seat?.value?.terminal ?? null, agent: seat?.value?.agent ?? null, model: seat?.value?.model ?? null,
         state: seat ? (seat.starting ? 'starting' : seat.expired ? 'expired' : seat.value?.state ?? 'live') : null,
         since: num(seat?.at), lastBoot: num(boot?.created_at) },
       tick: tick || duties ? { at: int(duties?.at ?? tick?.at), ok: duties?.ok !== false, alerts: int((duties?.alerts ?? []).length), errors: int((duties?.errors ?? []).length),
@@ -67,17 +64,12 @@ export function readSupervisorState({ env = process.env, now = Date.now(), limit
         proposals: Object.values(learning.proposals).map((p) => ({ id: p.id, title: txt(p.title, 200), evidence: txt(p.evidence, 800), options: txt(p.options, 600), recommendation: txt(p.recommendation, 400), status: String(p.status ?? 'open'), at: int(p.at) })),
       },
       digest: digest ? { at: int(digest.at), sent: Boolean(digest.telegram?.ok !== false && !digest.telegram?.skipped) } : null,
+      messages: { inbox, outbox },
     };
   }, null, { env });
-  const message = (m) => ({ id: String(m.id ?? ''), at: String(m.at ?? ''), from: m.from ? String(m.from) : (m.chatId ? 'telegram' : null), text: txt(m.text, 600), read: m.read === true });
-  const reply = (m) => ({ id: String(m.id ?? ''), at: String(m.at ?? ''), to: m.to ? String(m.to) : null, via: m.via ? String(m.via) : null, ok: m.ok !== false, text: txt(m.text, 600) });
-  let inbox = [], outbox = [];
-  try { inbox = readInbox(SUPERVISOR_ID, env).slice(-limit).map(message); } catch { inbox = []; }
-  try { outbox = readOutbox(SUPERVISOR_ID, env).slice(-limit).map(reply); } catch { outbox = []; }
   return {
     schema: STATE_SCHEMA, at: now,
     ...(base ?? { seat: { mode, enabled: null, terminal: null, agent: null, model: null, state: null, since: null, lastBoot: null }, tick: null, workflows: [], owed: { at: null, items: [] }, actions: [],
-      learning: { hypotheses: [], experiments: [], lessons: [], proposals: [] }, digest: null }),
-    messages: { inbox, outbox },
+      learning: { hypotheses: [], experiments: [], lessons: [], proposals: [] }, digest: null, messages: { inbox: [], outbox: [] } }),
   };
 }

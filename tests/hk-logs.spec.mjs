@@ -63,7 +63,6 @@ test('age deletes covered *.log/*.jsonl under the StarCi roots; young files and 
 test('rotated families are skipped, never deleted by age', async (t) => {
   const env = envOf(t);
   const starci = path.join(env.LOCALAPPDATA, 'StarCi');
-  const home = path.join(env.USERPROFILE, '.starci');
   const files = [
     put(path.join(starci, 'runtime', 'watchdog-logs', 'wf-a.log'), 'w', OLD),
     put(path.join(starci, 'runtime', 'watchdog-logs', 'wf-a.log.1'), 'w1', OLD),
@@ -73,26 +72,12 @@ test('rotated families are skipped, never deleted by age', async (t) => {
     put(path.join(starci, 'runtime', 'connectors', 'telegram-media.log'), 'm', OLD),
     put(path.join(starci, 'runtime', 'connectors', 'cloudflared.log'), 'c', OLD),
     put(path.join(starci, 'runtime', 'connectors', 'telegram-bridge.log'), 'b', OLD),
-    put(path.join(home, 'supervisor', 'logs', 'tick.log'), 't', OLD),
-    put(path.join(home, 'supervisor', 'logs', 'tick.log.1'), 't1', OLD),
   ];
   const r = await sweepStarciLogs({ apply: true, now: NOW, env, allocation: HK });
   assert.ok(r.ok);
   assert.deepEqual(r.deleted, []);
   for (const file of files) assert.equal(fs.existsSync(file), true, `${file} is a rotated family's file`);
   assert.equal(r.skipped.filter((e) => /^rotated:/.test(e.reason)).length, files.length);
-});
-
-test('channel queues (*.inbox/outbox.jsonl) are data, skipped never deleted', async (t) => {
-  const env = envOf(t);
-  const inbox = put(path.join(env.LOCALAPPDATA, 'StarCi', 'runtime', 'connectors', 'supervisors', 'main.inbox.jsonl'), '{}\n', OLD);
-  const outbox = put(path.join(env.LOCALAPPDATA, 'StarCi', 'runtime', 'connectors', 'supervisors', 'main.outbox.jsonl'), '{}\n', OLD);
-  const r = await sweepStarciLogs({ apply: true, now: NOW, env, allocation: HK });
-  assert.ok(r.ok);
-  assert.equal(fs.existsSync(inbox), true);
-  assert.equal(fs.existsSync(outbox), true);
-  assert.deepEqual(paths(r.skipped).sort(), [inbox, outbox].sort());
-  assert.ok(r.skipped.every((e) => e.reason === 'channel-queue'));
 });
 
 test('a covered file inside the window but over the cap is rotated to .1 (the rotateLog convention)', async (t) => {

@@ -9,9 +9,8 @@
 // When Orca does not answer, nobody can rule an owner out: nothing is removed.
 import path from 'node:path';
 import { pathKey } from './path-key.mjs';
-import { parseJson } from './json.mjs';
 import { terminalList } from '../api/orca/terminal-list.mjs';
-import { withSupervisorRead, SUPERVISOR_WF, FIX_KIND } from '../supervisor/home.mjs';
+import { readSupervisor, FIX_KIND } from '../supervisor/home.mjs';
 
 export const LANE_IDLE_MS = 3_600_000;
 const SUP_FINAL = new Set(['succeeded', 'failed', 'cancelled']);
@@ -62,7 +61,7 @@ export function laneOwnerOf({ lanePath, branch = null, terminals, titles = new M
 }
 
 /**
- * The live owner evidence, read once: {terminals (null when Orca did not answer or the Supervisor ledger is unreadable),
+ * The live owner evidence, read once: {terminals (null when Orca did not answer or machine.sqlite is unreadable),
  * titles, sup}. Synchronous, as sweepLanes is.
  */
 export function liveLaneOwners({ env = process.env, list = () => terminalList({ includeVisualLayouts: true }) } = {}) {
@@ -73,13 +72,14 @@ export function liveLaneOwners({ env = process.env, list = () => terminalList({ 
   } catch { terminals = null; }
   let sup = { jobs: [] };
   try {
-    sup = { jobs: withSupervisorRead((db) => db.prepare('SELECT job_id, status, payload_json FROM jobs WHERE workflow_id=? AND kind=?').all(SUPERVISOR_WF, FIX_KIND).map((r) => {
-      const p = parseJson(r.payload_json || '{}', {});
+    // machine.sqlite sup_jobs (the Supervisor's runtime.fix jobs); null when the store cannot be read.
+    sup = { jobs: readSupervisor((m) => m.listSupJobs({ kind: FIX_KIND }).map((r) => {
+      const p = r.payload ?? {};
       return { jobId: r.job_id, status: r.status, branch: p.staging?.branch ?? null, stagingPath: p.staging?.path ?? null };
     }), null, { env }) };
     if (!Array.isArray(sup.jobs)) sup = null;
   } catch { sup = null; }
-  // An unreadable Supervisor ledger is an owner nobody can rule out either.
+  // An unreadable machine.sqlite is an owner nobody can rule out either.
   if (!sup) terminals = null;
   return { terminals, titles, sup: sup ?? { jobs: [] } };
 }

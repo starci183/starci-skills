@@ -1,44 +1,25 @@
 // scripts/connectors/lib.mjs — what the ask gateway, the tunnel manager and the
-// Telegram notifier share: the connectors state directory, the repositories
+// Telegram notifier share: the host locks every singleton manager claims, the
+// connectors rows (machine.sqlite `connectors`: gateway, tunnel,
+// telegram-bridge, telegram-route, supervisor-channel:<id>), the repositories
 // whose asks go public, the read-only projection of open ask forms, and the
-// small file/process helpers. docs/connectors.md is the design note.
+// small process helpers. docs/connectors.md is the design note.
 //
 // Every ledger read here goes through inspectLedger (read-only): the
-// connectors observe asks, they never write a ledger.
+// connectors observe asks, they never write a ledger. Every piece of host state
+// lives in machine.sqlite (engine/machine-db.mjs): a manager lock is a
+// host_locks row, a launch still starting is that row in state 'starting'.
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { spawn } from 'node:child_process';
-import { inspectLedger, ledgerFileFor, runtimeRootFor, isRuntimeRoot } from '../../engine/ledger-db.mjs';
+import { inspectLedger, ledgerFileFor, isRuntimeRoot } from '../../engine/ledger-db.mjs';
+import { machineLog, readMachine, withMachine } from '../../engine/machine-db.mjs';
 import { skillRoot } from '../../engine/runtime-root.mjs';
 import { loadConfig } from '../../engine/config.mjs';
 import { parseJson, readJsonFile } from '../lib/json.mjs';
 import { jobDisplayNameOf, workflowNameOf } from '../lib/display-names.mjs';
-import { renameOver } from '../lib/rename-over.mjs';
-import { sleepSync } from '../lib/sleep-sync.mjs';
-
-/**
- * Machine-local connectors state: beside machine.sqlite
- * (%LOCALAPPDATA%/StarCi/runtime/connectors, or ~/.local/state/StarCi/runtime/connectors).
- * Keyed off the environment so a spec can repoint it.
- */
-export const stateDir = (env = process.env) => path.join(runtimeRootFor(env), 'connectors');
-export const stateFile = (name, env = process.env) => path.join(stateDir(env), name);
-
-export const readJson = readJsonFile;
-/** Write JSON through a temp file and a rename, so a reader never sees half a file. */
-export const writeJson = (file, value) => {
-  fs.mkdirSync(path.dirname(file), { recursive: true });
-  const tmp = `${file}.${process.pid}.${Date.now()}.tmp`;
-  fs.writeFileSync(tmp, `${JSON.stringify(value, null, 2)}\n`, { mode: 0o600 });
-  renameRetrying(tmp, file);
-};
-// Windows refuses a rename onto a file another process (a reader, an antivirus scan) holds open with
-// EPERM/EACCES/EBUSY for a few milliseconds; a watchdog lock handover failed on exactly that on
-// 2026-09-28. The rename is retried with a short backoff, and the temp file removed when it finally fails
-// (scripts/lib/rename-over.mjs).
-export const renameRetrying = (from, to, { attempts = 8, sleep = sleepSync, rename = fs.renameSync } = {}) =>
-  renameOver(from, to, { retries: attempts - 1, delayMs: (i) => Math.min(25 * 2 ** i, 1000), sleep, rename });
+import { sleep } from '../lib/sleep.mjs';
 
 export const pidAlive = (pid) => {
   if (!Number.isInteger(pid) || pid <= 0) return false;
@@ -50,95 +31,189 @@ export const hostBootAt = () => Date.now() - os.uptime() * 1000;
 /**
  * Whether the process a state record names ({pid, startedAt}) is still that process: its pid is
  * live AND it started in this boot. After a reboot the recorded pid may name an unrelated process,
- * and a connector that trusted it would never start again.
+ * and a connector that trusted it would never start again. `startedAt` is an ISO time or epoch ms.
  */
 export const recordAlive = (record) => {
   if (!record?.pid || !pidAlive(record.pid)) return false;
-  const started = Date.parse(record.startedAt ?? '');
+  const started = typeof record.startedAt === 'number' ? record.startedAt : Date.parse(record.startedAt ?? '');
   return !Number.isFinite(started) || started >= hostBootAt() - 60_000;
 };
 
+/* ------------------------------------------------------------ host locks (machine.sqlite host_locks) */
+
 /**
- * Claim the single-manager lock <state>/<name>.lock for this process, created exclusively ('wx').
- * `current` is the manager's state record (tunnel.json, gateway.json): a live one that is not this
- * process owns the state even without the lock (a manager started before the lock existed).
- * A lock whose holder is dead or from an earlier boot is stale and taken over; an unreadable lock
- * younger than 5s is one being written. Returns {ok:true, release} or {ok:false, holder}.
+ * How long a held manager lock stays unexpired without a renewal. The holder renews it every LOCK_RENEW_MS from an
+ * unref'd timer, so an expired lock (v_leaks) is one whose holder stopped renewing. Who holds a lock is decided by its
+ * holder pid (recordAlive: live and of this boot), never by the expiry: a busy holder that missed a renewal keeps it.
+ */
+export const LOCK_TTL_MS = 10 * 60_000;
+export const LOCK_RENEW_MS = 3 * 60_000;
+const holderLabel = () => (process.argv[1] ? path.basename(process.argv[1]) : 'node');
+/** A host_locks row as the record callers read: {pid, startedAt (ISO), at, handedOverFrom, state, holder}. */
+const lockRecord = (row) => (row ? { pid: row.holder_pid, startedAt: new Date(row.started_at).toISOString(), at: row.started_at,
+  handedOverFrom: row.handed_over_from ?? null, state: row.state, holder: row.holder ?? null } : null);
+const liveRow = (row) => Boolean(row) && row.state !== 'released' && recordAlive({ pid: row.holder_pid, startedAt: row.started_at });
+
+// The renewal timers of the locks this process holds, by name.
+const renewals = new Map();
+const stopRenewal = (name) => { clearInterval(renewals.get(name)); renewals.delete(name); };
+function startRenewal(name, env) {
+  stopRenewal(name);
+  const timer = setInterval(() => {
+    let still = true;
+    try { still = withMachine((m) => m.renewHostLock({ name, ttlMs: LOCK_TTL_MS }), { env }); } catch { /* a busy store: the next tick tries again */ }
+    if (!still) stopRenewal(name);
+  }, LOCK_RENEW_MS);
+  timer.unref?.();
+  renewals.set(name, timer);
+}
+/** The handle a successful claim returns: release() frees the lock only while it still names this process. */
+function heldBy(name, env, extra = {}) {
+  startRenewal(name, env);
+  const release = () => {
+    stopRenewal(name);
+    try { withMachine((m) => m.releaseHostLock({ name }), { env }); } catch { /* the store is gone: nothing left to free */ }
+  };
+  return { ok: true, release, name, ...extra };
+}
+
+/**
+ * Take `name` for this process inside one transaction on `m`: refused while another live process of this boot holds
+ * it (state 'held'); a dead holder, one from an earlier boot, or a launch still 'starting' is replaced. Returns
+ * {ok:true} or {ok:false, holder}.
+ */
+function takeLock(m, name) {
+  return m.transaction(() => {
+    const cur = m.hostLock(name);
+    if (cur && cur.state === 'held' && cur.holder_pid !== process.pid && liveRow(cur)) return { ok: false, holder: lockRecord(cur) };
+    if (cur && cur.state !== 'released' && cur.holder_pid !== process.pid) m.releaseHostLock({ name, force: true });
+    const got = m.acquireHostLock({ name, holder: holderLabel(), ttlMs: LOCK_TTL_MS, state: 'held' });
+    return got.ok ? { ok: true } : { ok: false, holder: lockRecord(got.holder) };
+  });
+}
+
+/**
+ * Claim the single-manager host lock `name` for this process. `current` is the manager's own record (its connectors
+ * row: gateway, tunnel): a live one that is not this process owns the state even without the lock. A lock whose
+ * holder is dead or from an earlier boot is stale and taken over. Returns {ok:true, release} or {ok:false, holder}.
  */
 export function claimManager(name, { current = null, env = process.env } = {}) {
   if (current && current.pid !== process.pid && recordAlive(current)) return { ok: false, holder: current };
-  const file = stateFile(`${name}.lock`, env);
-  fs.mkdirSync(path.dirname(file), { recursive: true });
-  for (let attempt = 0; attempt < 3; attempt += 1) {
-    try {
-      fs.writeFileSync(file, JSON.stringify({ pid: process.pid, startedAt: new Date().toISOString() }), { flag: 'wx' });
-      const release = () => { try { if (readJson(file)?.pid === process.pid) fs.rmSync(file, { force: true }); } catch { /* gone */ } };
-      return { ok: true, release, file };
-    } catch (error) {
-      if (error?.code !== 'EEXIST') throw error;
-      const held = readJson(file);
-      if (held && held.pid !== process.pid && recordAlive(held)) return { ok: false, holder: held };
-      if (!held) {
-        let age = Infinity;
-        try { age = Date.now() - fs.statSync(file).mtimeMs; } catch { /* vanished: retry */ }
-        if (age < 5000) return { ok: false, holder: null };
-      }
-      // Stale: move it aside under a unique name, so two claimants cannot both delete a fresh lock.
-      try { fs.renameSync(file, `${file}.stale-${process.pid}-${Date.now()}`); } catch { continue; }
-      for (const leftover of fs.readdirSync(path.dirname(file)).filter((f) => f.startsWith(`${name}.lock.stale-`))) {
-        try { fs.rmSync(path.join(path.dirname(file), leftover), { force: true }); } catch { /* best effort */ }
-      }
-    }
-  }
-  return { ok: false, holder: readJson(file) };
+  const got = withMachine((m) => takeLock(m, name), { env });
+  return got.ok ? heldBy(name, env) : { ok: false, holder: got.holder ?? null };
 }
 
 /**
  * Claim a manager lock that may be handed over (scripts/lib/self-reload.mjs): a loop that re-execs itself
  * spawns its replacement with `from` = its own pid and waits, still holding the lock, until the lock names
- * the replacement. The replacement rewrites the lock only while it still names `from`, so there is no moment
- * the lock is free for a third claimant. Without `from`, or when the lock no longer names it, this is
- * claimManager. Returns {ok:true, release, file, takenOver?} or {ok:false, holder}.
+ * the replacement. The replacement takes the row over only while it still names `from`, in one transaction,
+ * so there is no moment the lock is free for a third claimant. Without `from`, or when the lock no longer
+ * names it, this is claimManager. Returns {ok:true, release, takenOver?} or {ok:false, holder}.
  */
 export function claimOrTakeOver(name, { from = null, env = process.env } = {}) {
-  const file = stateFile(`${name}.lock`, env);
   const fromPid = Number(from);
-  if (Number.isInteger(fromPid) && fromPid > 0 && readJson(file)?.pid === fromPid) {
-    writeJson(file, { pid: process.pid, startedAt: new Date().toISOString(), handedOverFrom: fromPid });
-    if (readJson(file)?.pid === process.pid) {
-      const release = () => { try { if (readJson(file)?.pid === process.pid) fs.rmSync(file, { force: true }); } catch { /* gone */ } };
-      return { ok: true, release, file, takenOver: true };
-    }
+  if (Number.isInteger(fromPid) && fromPid > 0) {
+    const took = withMachine((m) => m.transaction(() => {
+      const cur = m.hostLock(name);
+      if (!cur || cur.state === 'released' || cur.holder_pid !== fromPid) return false;
+      const at = m.now();
+      return m.update('host_locks', { holder_pid: process.pid, holder: holderLabel(), started_at: at, heartbeat_at: at, expires_at: at + LOCK_TTL_MS,
+        handed_over_from: fromPid, state: 'held' }, { name, holder_pid: fromPid }).changes > 0;
+    }), { env });
+    if (took) return heldBy(name, env, { takenOver: true });
   }
   return claimManager(name, { env });
 }
 
-/** Write a manager lock naming this process again (a handover that failed after the replacement took it). */
+/** Make the lock name this process again (a handover that failed after the replacement took it). */
 export const reassertManager = (name, { env = process.env } = {}) => {
-  writeJson(stateFile(`${name}.lock`, env), { pid: process.pid, startedAt: new Date().toISOString() });
-  return readJson(stateFile(`${name}.lock`, env))?.pid === process.pid;
+  const ok = withMachine((m) => m.transaction(() => {
+    const cur = m.hostLock(name);
+    if (cur && cur.state !== 'released' && cur.holder_pid !== process.pid) m.releaseHostLock({ name, force: true });
+    return m.acquireHostLock({ name, holder: holderLabel(), ttlMs: LOCK_TTL_MS, state: 'held' }).ok;
+  }), { env });
+  if (ok) startRenewal(name, env);
+  return ok;
 };
 
-/** The live holder of a manager lock, or null. */
+/** The live holder of a manager lock ({pid, startedAt, handedOverFrom, ...}), or null. A launch still starting is not one. */
 export const lockHolder = (name, env = process.env) => {
-  const held = readJson(stateFile(`${name}.lock`, env));
-  return held && recordAlive(held) ? held : null;
+  const row = readMachine((m) => m.hostLock(name), null, { env });
+  return row?.state === 'held' && liveRow(row) ? lockRecord(row) : null;
 };
 
 /**
  * A manager a starter just launched but that has not claimed its lock yet (node takes a while to
- * start on a loaded host). `start` records `<state>/<name>.starting.json` {pid, at} right after the
+ * start on a loaded host). `start` marks the lock row 'starting' with the launched pid right after the
  * spawn, and every liveness test counts it for STARTING_MS while that pid lives, so two starters in
- * that window do not both launch a manager.
+ * that window do not both launch a manager. The launched manager's claim turns the row 'held'.
  */
 export const STARTING_MS = 30_000;
 export const markStarting = (name, pid, env = process.env) => {
-  if (Number.isInteger(pid) && pid > 0) writeJson(stateFile(`${name}.starting.json`, env), { pid, at: Date.now(), startedAt: new Date().toISOString() });
+  if (!Number.isInteger(pid) || pid <= 0) return false;
+  return withMachine((m) => m.transaction(() => {
+    const cur = m.hostLock(name);
+    // A live holder (the launched manager already claimed, or another one) is never overwritten.
+    if (cur && cur.state === 'held' && liveRow(cur)) return false;
+    if (cur && cur.state !== 'released' && cur.holder_pid !== pid) m.releaseHostLock({ name, force: true });
+    return m.acquireHostLock({ name, holder: 'starting', pid, ttlMs: STARTING_MS, state: 'starting' }).ok;
+  }), { env });
 };
 export const startingHolder = (name, env = process.env, { windowMs = STARTING_MS, now = Date.now() } = {}) => {
-  const rec = readJson(stateFile(`${name}.starting.json`, env));
-  return rec && Number.isFinite(rec.at) && now - rec.at < windowMs && pidAlive(rec.pid) ? rec : null;
+  const row = readMachine((m) => m.hostLock(name), null, { env });
+  return row?.state === 'starting' && now - row.started_at < windowMs && pidAlive(row.holder_pid)
+    ? { pid: row.holder_pid, at: row.started_at, startedAt: new Date(row.started_at).toISOString() } : null;
 };
+
+/**
+ * Run async `fn` while holding the host lock `name` (a short cross-process mutex: the Telegram notice store, the
+ * media dedupe). Waits up to `waitMs`, then resolves {ok:false, skipped} without running `fn`. Calls from one
+ * process are chained, since a host lock is per pid.
+ */
+const chains = new Map();
+export function withHostMutex(name, fn, { env = process.env, waitMs = 10_000, stepMs = 100 } = {}) {
+  const prior = chains.get(name) ?? Promise.resolve();
+  const run = prior.catch(() => {}).then(async () => {
+    const end = Date.now() + waitMs;
+    for (;;) {
+      let got;
+      try { got = withMachine((m) => takeLock(m, name), { env }); } catch { got = { ok: false }; }
+      if (got.ok) break;
+      if (Date.now() > end) return { ok: false, skipped: `${name} is locked` };
+      await sleep(stepMs);
+    }
+    try { return await fn(); } finally { try { withMachine((m) => m.releaseHostLock({ name }), { env }); } catch { /* gone */ } }
+  });
+  chains.set(name, run);
+  run.catch(() => {}).finally(() => { if (chains.get(name) === run) chains.delete(name); });
+  return run;
+}
+
+/* ------------------------------------------------------------ connectors rows (machine.sqlite connectors) */
+
+const recordOf = (row) => (row ? { ...(row.config ?? {}), pid: row.pid ?? row.config?.pid ?? null, port: row.port ?? row.config?.port ?? null,
+  publicUrl: row.public_url ?? null, state: row.state ?? null, cursor: row.cursor ?? null, updatedAt: row.updated_at } : null);
+/**
+ * One connector's record, or null: its config_json spread, with the row's pid, port, publicUrl, state, cursor and
+ * updatedAt. `name`: gateway | tunnel | telegram-bridge | telegram-route | supervisor-channel:<id>.
+ */
+export const connectorState = (name, env = process.env) => readMachine((m) => recordOf(m.connectorOf(name)), null, { env });
+/** Every connector row whose name starts with `prefix`, as connectorState records with their `name`. */
+export const connectorStates = (prefix, env = process.env) => readMachine((m) => m.db.prepare('SELECT name FROM connectors WHERE substr(name,1,length(?))=? ORDER BY name')
+  .all(prefix, prefix).map((r) => ({ name: r.name, ...recordOf(m.connectorOf(r.name)) })), [], { env });
+/**
+ * Write one connector row: only the fields given change (`config` and `cursor` replace their column whole). Returns
+ * true. No secret ever goes here (the token lives in .starcistacks / the secrets file).
+ */
+export const writeConnectorState = (name, { kind, state, pid, port, publicUrl, config, cursor } = {}, env = process.env) => withMachine((m) => {
+  const row = { name, updated_at: m.now(), kind, state, pid, port, public_url: publicUrl, config_json: config, cursor_json: cursor };
+  m.upsert('connectors', Object.fromEntries(Object.entries(row).filter(([, v]) => v !== undefined)), ['name']);
+  return true;
+}, { env });
+
+/** One connector log line in machine_logs (actor connector, kind `<source>.<kind>`). Never throws. */
+export const connectorLog = (source, msg, { env = process.env, level = 'info', kind = 'log', data = null } = {}) =>
+  machineLog({ actor: 'connector', kind: `${source}.${kind}`, msg: String(msg), level, data }, { env });
 
 /** Launch `node <script> ...args` detached from this process, output discarded. */
 export const spawnDetached = (script, args = [], { env = process.env } = {}) => {
@@ -170,7 +245,7 @@ export function askRepos(connectors, { env = process.env, extra = [] } = {}) {
     try { entries = fs.readdirSync(projects, { withFileTypes: true }); } catch { /* no bindings */ }
     for (const entry of entries) {
       if (!entry.isDirectory()) continue;
-      const doc = readJson(path.join(projects, entry.name, 'work.json'));
+      const doc = readJsonFile(path.join(projects, entry.name, 'work.json'));
       const owner = doc?.repositories?.[doc?.work?.ownerRole ?? 'be'];
       if (typeof owner?.pathFromSource === 'string' && owner.pathFromSource.trim()) candidates.push(path.resolve(source, owner.pathFromSource));
     }
@@ -286,9 +361,9 @@ export function openAskList(db, { now = Date.now() } = {}) {
   return out;
 }
 
-/** The repos the Telegram store names (asks notified from any ledger), so the gateway can route their forms. */
-export const notifiedRepos = (env = process.env) =>
-  [...new Set(Object.values(readJson(stateFile('telegram-sent.json', env))?.asks ?? {}).map((a) => a?.repo).filter((r) => typeof r === 'string' && r))];
+/** The repos the Telegram ask notices name (notifications kind 'ask'), so the gateway can route their forms. */
+export const notifiedRepos = (env = process.env) => readMachine((m) => [...new Set(m.db.prepare("SELECT json_extract(ref,'$.repo') repo FROM notifications WHERE kind='ask' AND json_valid(ref)").all()
+  .map((r) => r.repo).filter((r) => typeof r === 'string' && r))], [], { env });
 
 /** Open one repo's ledger read-only for `fn`, always closing it; a missing or unreadable ledger yields `fallback`. */
 export function withLedgerRead(repo, fn, fallback = null) {

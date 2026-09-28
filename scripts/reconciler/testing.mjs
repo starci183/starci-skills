@@ -9,26 +9,28 @@
 //                        map `${ledgerId}:${workflowId}` -> value, or a function. `read(ledgerId, fn)` runs fn over
 //                        `dbs[ledgerId]` (e.g. a DatabaseSync on a fixture ledger). `owns` defaults to mode === 'active'.
 //                        Any other member (read, api, clock, log, ...) passed in `overrides` replaces the default, so a
-//                        spec keeps its own recorders and still gets the whole ctx contract (env, stateDb, stateFile,
-//                        key, epoch, openReader).
-//   tempState()          a reconciler.sqlite in a fresh temp directory: {dir, file, env, db, own(x), close()}; close()
-//                        closes every own()ed handle first, then removes the directory.
+//                        spec keeps its own recorders and still gets the whole ctx contract (env, machine, stateDb,
+//                        stateFile, key, epoch, openReader).
+//   tempState()          a machine.sqlite in a fresh temp directory: {dir, file, env, m, db (= m), own(x), close()}; env
+//                        names it (STARCI_TEST_MACHINE_FILE); close() closes every own()ed handle first, then removes
+//                        the directory.
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { openState } from './state.mjs';
+import { TEST_REGISTRY_ENV, openMachine } from '../../engine/machine-db.mjs';
 import { safeRemoveTree } from '../lib/safe-remove.mjs';
 
 export function fakeCtx(overrides = {}) {
   const {
     mode = 'shadow', controller = 'test', key = null, now = () => Date.now(), ledgers = [{ ledgerId: 'test', repo: os.tmpdir(), file: path.join(os.tmpdir(), 'none.sqlite') }],
     status = {}, dbs = {}, apiResult = () => ({ ok: true, value: { ok: true } }), runResult = () => ({ ok: true, value: { ok: true } }),
-    decisionResult = () => ({ ok: true }), owns = null, epoch = 1, env = process.env, stateDb = undefined, stateFile = null, ...rest
+    decisionResult = () => ({ ok: true }), owns = null, epoch = 1, env = process.env, machine = undefined, stateDb = undefined, stateFile = null, ...rest
   } = overrides;
   const calls = { api: [], run: [], decisions: [], log: [], clock: [], clear: [], status: [] };
   const clocks = new Map();
   const ctx = {
     controller, key, mode, epoch, ledgers, calls, clocks, env, stateFile,
+    ...(machine !== undefined ? { machine, stateDb: machine?.db ?? null, stateFile: stateFile ?? machine?.file ?? null } : {}),
     ...(stateDb !== undefined ? { stateDb } : {}),
     now: typeof now === 'function' ? now : () => now,
     read(ledgerId, fn) { const db = dbs[ledgerId]; return db ? fn(db) : null; },
@@ -72,15 +74,16 @@ export function fakeCtx(overrides = {}) {
   return ctx;
 }
 
-/** A reconciler.sqlite in a fresh temp directory. env has STARCI_RECONCILER_STATE pointing at it. */
+/** A machine.sqlite in a fresh temp directory; env names it (STARCI_TEST_MACHINE_FILE). `m` (also `db`) is a writer on it. */
 export function tempState({ prefix = 'starci-reconciler-' } = {}) {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), prefix));
-  const file = path.join(dir, 'reconciler.sqlite');
-  const env = { ...process.env, STARCI_RECONCILER_STATE: file, STARCI_SUPERVISOR_HOME: dir, LOCALAPPDATA: dir };
-  const db = openState({ env, file });
+  const file = path.join(dir, 'machine.sqlite');
+  const env = { ...process.env, [TEST_REGISTRY_ENV]: file, STARCI_SUPERVISOR_HOME: dir, LOCALAPPDATA: dir };
+  const m = openMachine({ env, file });
+  const db = m;
   const owned = [];
   return {
-    dir, file, env, db,
+    dir, file, env, m, db,
     /** Close `x` (an engine, a ledger handle) before the directory goes: Windows keeps an open SQLite file. */
     own(x) { owned.push(x); return x; },
     close() {

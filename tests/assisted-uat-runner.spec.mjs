@@ -13,10 +13,10 @@ import {
 import {acquireUatSlot,slotHolders} from '../scripts/uat/uat-slots.mjs';
 
 // Every detached worker this file starts takes its slot from a private semaphore capped at 1 — never the
-// machine's <runtime>/uat-slots — so a spec run cannot fill the owner's UAT ceiling (the worker inherits
+// machine's slots — so a spec run cannot fill the owner's UAT ceiling: its own machine.sqlite (the worker inherits
 // this env when startSession spawns it).
 const SLOTS=fs.mkdtempSync(path.join(os.tmpdir(),'starci-uat-slots-runner-spec-'));
-process.env.STARCI_UAT_SLOTS_DIR=SLOTS;process.env.STARCI_UAT_MAX_CONCURRENT='1';
+process.env.STARCI_TEST_MACHINE_FILE=path.join(SLOTS,'machine.sqlite');process.env.STARCI_UAT_MAX_CONCURRENT='1';
 test.after(()=>fs.rmSync(SLOTS,{recursive:true,force:true,maxRetries:20,retryDelay:25}));
 const pidAlive=pid=>{if(!Number.isInteger(pid)||pid<1)return false;try{process.kill(pid,0);return true;}catch(error){return error.code==='EPERM';}};
 const settle=ms=>new Promise(resolve=>setTimeout(resolve,ms));

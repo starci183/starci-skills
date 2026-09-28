@@ -731,20 +731,20 @@ test('the scanner command forces the local host and an outside work directory, n
   assert.equal(typeof scrub('x'),'string');
 });
 
-test('a re-mint in a spec run without a recorder never reaches the supervisor ledger', async t => {
+test('a re-mint in a spec run without a recorder never writes machine.sqlite', async t => {
   const root=temporary(t,'remint-noledger');
   const {host,state}=await fakeSonar(t);
   const custody=fakeCustody(root);
   state.tokens.delete(ANALYSIS);
   const home=temporary(t,'remint-home');
   const saved={...process.env};
-  t.after(()=>{for(const key of ['STARCI_SUPERVISOR_HOME'])if(saved[key]===undefined)delete process.env[key];else process.env[key]=saved[key];});
-  process.env.STARCI_SUPERVISOR_HOME=home;
+  t.after(()=>{for(const key of ['STARCI_TEST_MACHINE_FILE'])if(saved[key]===undefined)delete process.env[key];else process.env[key]=saved[key];});
+  process.env.STARCI_TEST_MACHINE_FILE=path.join(home,'machine.sqlite');
   const config=configFor(host,custody);
   delete config.record;
   const {report}=await sonarLocalMain(['status'],{config});
   assert.equal(report.custody.analysis.reminted,true);
-  assert.deepEqual(fs.readdirSync(home),[],'no supervisor ledger was opened');
+  assert.deepEqual(fs.readdirSync(home),[],'machine.sqlite was never opened');
 });
 
 // nivo-backend: a whole analysis spent 17-40 minutes (JS/TS sensor over ~5600 files) to judge a 1-5 file slice.

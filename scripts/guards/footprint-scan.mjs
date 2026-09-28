@@ -9,8 +9,9 @@
 //   - every link (symlink, junction, other reparse point) to depth --depth whose target is in ANOTHER top-level
 //     directory of the root than the link itself (a scratch tree's node_modules junctioned into a live checkout); a
 //     workspace link inside its own repository and a link out of the root are not flagged.
-// A worktree or link not seen by an earlier scan is FRESH: logged to runtime/guards/footprint.jsonl and recorded as a
-// supervisor event (kind worker-footprint). Nothing is removed or changed - the Supervisor decides.
+// A worktree or link not seen by an earlier scan is FRESH. Every scan is one machine.sqlite host_samples row (kind
+// worker-footprint, subject the root, detail {state, fresh}); the newest row's state is what the next scan compares
+// against. Nothing is removed or changed - the Supervisor decides.
 //
 //   node scripts/guards/footprint-scan.mjs [--root <dir>] [--depth <n>] [--json]      one scan
 //   The reconciler Host controller runs it every host.yaml footprintEveryMs (scripts/reconciler/controllers/host.mjs).
@@ -29,7 +30,6 @@ export const FOOTPRINT_EVERY_MS = allocationMs('footprint.everyMs');
 export const FOOTPRINT_LOCK_STALE_MS = allocationMs('footprint.lockStaleMs');
 export const DEFAULT_DEPTH = 4;
 const fold = foldCase;
-const stateDir = (skillRoot) => path.join(skillRoot, 'runtime', 'guards');
 /** The repositories root: the directory that holds the source host repository (its .claude is the runtime). */
 export const defaultRoot = (skillRoot = SKILL_ROOT) => path.resolve(skillRoot, '..', '..');
 const topOf = (root, p) => { const relative = path.relative(root, p); return relative && !relative.startsWith('..') && !path.isAbsolute(relative) ? relative.split(path.sep)[0] : null; };
@@ -91,24 +91,16 @@ export function scanFootprint({ root = defaultRoot(), depth = DEFAULT_DEPTH, sta
   return { root: resolvedRoot, depth, at: now, links, worktrees, fresh, state: { schema: 'starci/worker-footprint@1', lastScanAt: now, seen } };
 }
 
-/** Scan, persist the state, and log each fresh entry (jsonl + supervisor event). The first scan only records a baseline. */
-export async function runFootprintScan({ skillRoot = SKILL_ROOT, root = defaultRoot(skillRoot), depth = DEFAULT_DEPTH } = {}) {
-  const dir = stateDir(skillRoot), stateFile = path.join(dir, 'footprint.json');
-  fs.mkdirSync(dir, { recursive: true });
-  let state = null; try { state = JSON.parse(fs.readFileSync(stateFile, 'utf8')); } catch { state = null; }
-  const result = scanFootprint({ root, depth, state });
-  const tmp = `${stateFile}.${process.pid}.tmp`;
-  fs.writeFileSync(tmp, `${JSON.stringify(result.state, null, 1)}\n`); fs.renameSync(tmp, stateFile);
-  if (result.fresh.length) {
-    fs.appendFileSync(path.join(dir, 'footprint.jsonl'), result.fresh.map((entry) => `${JSON.stringify({ at: result.at, ...entry })}\n`).join(''));
-    try {
-      const { openSupervisorLedger, supervisorEvent } = await import('../supervisor/home.mjs');
-      const ledger = openSupervisorLedger();
-      try { ledger.transaction(() => supervisorEvent(ledger, { entityType: 'footprint', entityId: 'repositories', kind: 'worker-footprint', payload: { root: result.root, fresh: result.fresh } })); }
-      finally { ledger.close(); }
-    } catch { /* the jsonl line stands without the event */ }
-  }
-  return result;
+/** Scan and record it (machine.sqlite host_samples kind worker-footprint). The first scan only records a baseline. */
+export async function runFootprintScan({ skillRoot = SKILL_ROOT, root = defaultRoot(skillRoot), depth = DEFAULT_DEPTH, env = process.env } = {}) {
+  const { withMachine } = await import('../../engine/machine-db.mjs');
+  return withMachine((m) => {
+    const last = m.db.prepare("SELECT detail_json FROM host_samples WHERE kind='worker-footprint' AND subject=? ORDER BY seq DESC LIMIT 1").get(path.resolve(root));
+    let state = null; try { state = JSON.parse(last?.detail_json ?? 'null')?.state ?? null; } catch { state = null; }
+    const result = scanFootprint({ root, depth, state });
+    m.recordHostSample({ kind: 'worker-footprint', subject: result.root, detailJson: { state: result.state, fresh: result.fresh } });
+    return result;
+  }, { env });
 }
 
 if (process.argv[1] && path.resolve(process.argv[1]) === selfFile) {

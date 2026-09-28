@@ -2,7 +2,7 @@
 // ask-gateway.mjs — one local HTTP front for every serve-ask form, so one
 // Cloudflare tunnel can publish them all (docs/connectors.md).
 //
-//   node scripts/connectors/ask-gateway.mjs start     launch detached (records gateway.json)
+//   node scripts/connectors/ask-gateway.mjs start     launch detached (records the connectors row 'gateway' in machine.sqlite)
 //   node scripts/connectors/ask-gateway.mjs run       run in the foreground
 //   node scripts/connectors/ask-gateway.mjs status | stop
 //       [--port <n>]   default config.yaml connectors.gateway.port
@@ -23,7 +23,7 @@ import http from 'node:http';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { connectorsConfig } from '../../engine/config.mjs';
-import { argsOf, askRepos, claimManager, lockHolder, markStarting, NONCE, notifiedRepos, ownerConfig, pidAlive, readJson, recordAlive, servingAsksAcross, spawnDetached, startingHolder, stateFile, writeJson } from './lib.mjs';
+import { argsOf, askRepos, claimManager, connectorState, lockHolder, markStarting, NONCE, notifiedRepos, ownerConfig, pidAlive, recordAlive, servingAsksAcross, spawnDetached, startingHolder, writeConnectorState } from './lib.mjs';
 
 export const GATEWAY_FILE = fileURLToPath(import.meta.url);
 
@@ -101,8 +101,9 @@ export function createGateway({ resolve, exposeCredentialAsks = () => false, lan
   });
 }
 
-export const gatewayState = (env = process.env) => readJson(stateFile('gateway.json', env));
-// Alive: gateway.json names a live process of this boot, a gateway holds the start lock, or a
+/** The gateway's connectors row ({pid, port, startedAt, state, ...}), or null. */
+export const gatewayState = (env = process.env) => connectorState('gateway', env);
+// Alive: the gateway row names a live process of this boot, a gateway holds the host lock, or a
 // starter launched one moments ago that has not claimed it yet.
 export const gatewayAlive = (env = process.env) => recordAlive(gatewayState(env)) || Boolean(lockHolder('gateway', env)) || Boolean(startingHolder('gateway', env));
 
@@ -118,13 +119,13 @@ const settings = (args) => {
 async function run(args) {
   const { extra, port } = settings(args);
   // One gateway per host: concurrent `start` calls each launch a `run`; only the one that claims
-  // <state>/gateway.lock (and finds no other live gateway in gateway.json) serves.
+  // the host lock 'gateway' (and finds no other live gateway in its connectors row) serves.
   const claim = claimManager('gateway', { current: gatewayState() });
   if (!claim.ok) {
     console.log(JSON.stringify({ ok: false, already: true, error: 'another ask gateway owns the gateway state', pid: claim.holder?.pid ?? null }));
     process.exit(1);
   }
-  process.on('exit', claim.release);
+  process.on('exit', () => { try { writeConnectorState('gateway', { state: 'stopped' }); } catch { /* the store is gone */ } claim.release(); });
   const live = () => { try { return connectorsConfig(ownerConfig() ?? undefined); } catch { return null; } };
   const server = createGateway({
     // The configured repos plus every repo a Telegram ask notice named (a kernel's `api serve-ask`
@@ -135,7 +136,8 @@ async function run(args) {
   });
   server.on('error', (error) => { console.error(JSON.stringify({ ok: false, error: `gateway cannot listen on 127.0.0.1:${port}: ${error.code ?? error.message}` })); process.exit(1); });
   server.listen(port, '127.0.0.1', () => {
-    writeJson(stateFile('gateway.json'), { schema: 'starci/ask-gateway@1', pid: process.pid, port, startedAt: new Date().toISOString() });
+    const startedAt = new Date().toISOString(), bound = server.address()?.port ?? port;
+    writeConnectorState('gateway', { kind: 'ask-gateway', state: 'running', pid: process.pid, port: bound, config: { schema: 'starci/ask-gateway@1', pid: process.pid, port: bound, startedAt } });
     console.log(JSON.stringify({ ok: true, gateway: `http://127.0.0.1:${port}`, pid: process.pid, repos: askRepos(live(), { extra }) }));
   });
   const stop = () => { server.close(); process.exit(0); };

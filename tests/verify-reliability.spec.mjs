@@ -16,7 +16,7 @@ import {inspectLedger,ledgerFileFor,openLedger} from '../engine/ledger-db.mjs';
 import {classifyFailure,measurementCheckClass,resolveRootOwner,failureSignature} from '../scripts/kernel/verify-failure.mjs';
 import {validateOpReport} from '../scripts/kernel/report-envelope.mjs';
 import {parseYaml} from '../engine/yaml.mjs';
-import {checkEnvironments,discoverHealth,probeHttp,envHealthMain,environmentIdsOfPaths} from '../scripts/uat/env-health.mjs';
+import {checkEnvironments,discoverHealth,probeHttp,envHealthMain,environmentIdsOfPaths,readRegistered} from '../scripts/uat/env-health.mjs';
 
 // These cases exercise the owner-flow routing of verify failures; autopilot (scripts/kernel/autopilot.mjs, owner ruling
 // 2026-09-28) is on by default and re-routes an owner gate to a supervisor-gate, so this spec runs with it off -
@@ -259,7 +259,7 @@ test('env-health serve registers a server so the next pre-step restarts it itsel
   const dir=fs.mkdtempSync(path.join(os.tmpdir(),'starci-env-serve-'));
   const pids=new Set();
   t.after(async()=>{
-    try{pids.add(JSON.parse(fs.readFileSync(path.join(dir,'servers','environment.t.local__web.json'),'utf8')).pid);}catch{}
+    try{pids.add(readRegistered('environment.t.local','web',env).pid);}catch{}
     for(const pid of pids){try{process.kill(pid);}catch{}}
     await new Promise(r=>setTimeout(r,500));
     try{fs.rmSync(dir,{recursive:true,force:true,maxRetries:20,retryDelay:100});}catch{/* a Windows handle may linger */}
@@ -267,15 +267,15 @@ test('env-health serve registers a server so the next pre-step restarts it itsel
   const port=await new Promise(r=>{const s=net.createServer();s.listen(0,'127.0.0.1',()=>{const p=s.address().port;s.close(()=>r(p));});});
   const script=path.join(dir,'server.mjs');
   fs.writeFileSync(script,`import http from 'node:http';http.createServer((q,s)=>{s.writeHead(200);s.end('ok');}).listen(${port},'127.0.0.1');`);
-  const env={...process.env,STARCI_ENV_SERVERS_DIR:path.join(dir,'servers')};
+  const env={...process.env,STARCI_TEST_MACHINE_FILE:path.join(dir,'machine.sqlite')};
   const out=[];const write=s=>out.push(s);
   const code=await envHealthMain(['serve','--env','environment.t.local','--service','web','--cwd',dir,'--url',`http://127.0.0.1:${port}/`,'--json','--','node',script],{write,env});
   const served=JSON.parse(out.pop());
   pids.add(served.pid);
   assert.equal(code,0,JSON.stringify(served));
   assert.equal(served.ready,true);
-  const reg=JSON.parse(fs.readFileSync(path.join(dir,'servers','environment.t.local__web.json'),'utf8'));
-  assert.deepEqual([reg.pid,reg.command],[served.pid,['node',script]]);
+  const reg=readRegistered('environment.t.local','web',env);
+  assert.deepEqual([reg.pid,reg.command,reg.state],[served.pid,['node',script],'ready']);
   // The server dies; the next pre-step with --restart brings it back from the registry.
   process.kill(served.pid);
   await new Promise(r=>setTimeout(r,500));
@@ -287,6 +287,9 @@ test('env-health serve registers a server so the next pre-step restarts it itsel
   const web=result.environments[0].services[0];
   assert.equal(web.state,'restarted',JSON.stringify(web));
   assert.equal(result.ready,true);
+  const again=readRegistered('environment.t.local','web',env);
+  assert.equal(again.state,'ready');
+  assert.notEqual(again.pid,served.pid,'the registry names the restarted server');
 });
 
 test('api dispatch runs the environment pre-step for a walk: a foreign hung port refuses environment-not-ready before any host call; a ready stack rides the packet',async t=>{

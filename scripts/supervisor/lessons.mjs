@@ -21,8 +21,14 @@
 //   owner       `feedback` records owner feedback (chat relay, Telegram, draw notes) as lessons with source owner,
 //               weight allocation.supervisorLearning.ownerWeight above self-derived ones
 //
-// Everything is a supervisor-ledger event (never a hand-written ledger):
-//   supervisor-hypothesis, supervisor-experiment, supervisor-experiment-result, supervisor-lesson, supervisor-proposal.
+// Everything is a machine.sqlite sup_learning row (item_id stable, detail_json the full record) with one sup_events
+// audit row per change (kinds supervisor-hypothesis, supervisor-experiment, supervisor-experiment-result,
+// supervisor-lesson, supervisor-proposal):
+//   hypothesis         item hyp:<signature>, the newest hypothesis of the signature
+//   experiment         item <exp id>, state measuring | revert-due | kept | reverted | did-not-work
+//   experiment-result  item <exp id>:result, the newest verdict (parent the experiment)
+//   lesson | owner-feedback | leftover   one item per lesson (owner feedback and GC leftovers by their own kind)
+//   proposal           item <prop id>
 //
 //   node scripts/supervisor/lessons.mjs list [--json]                      hypotheses, experiments, lessons, proposals
 //   node scripts/supervisor/lessons.mjs match (--signature <s> | --text <t>) [--json]
@@ -41,10 +47,9 @@ import crypto from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 import { allocationSettings } from '../../engine/config.mjs';
 import { gitSpawn } from '../lib/git.mjs';
-import { parseJsonOr } from '../lib/json.mjs';
 import { clipLine } from '../lib/clip.mjs';
 import { posixPath } from '../lib/path-key.mjs';
-import { SKILL_ROOT, SUPERVISOR_WF, openSupervisorLedger, supervisorEvent, withSupervisorRead } from './home.mjs';
+import { SKILL_ROOT, readSupervisor, supervisorEvent, withSupervisor } from './home.mjs';
 import { refsOf, supLog } from './sup-log.mjs';
 import { LESSONS_FILE, lessonsForChecks, parseLessonsFile } from './lessons-file.mjs';
 
@@ -104,32 +109,64 @@ export function newHypotheses(items, state, { minRepeats }) {
 
 /* ------------------------------------------------------------ the state */
 
-/** Fold the learning events into {signatures: {sig: {status, hypothesis, experiments}}, experiments, lessons, proposals}. */
-export function learningState(db) {
-  const rows = db.prepare(`SELECT kind, payload_json, created_at FROM events WHERE workflow_id=? AND kind IN (${Object.values(KINDS).map(() => '?').join(',')}) ORDER BY seq`)
-    .all(SUPERVISOR_WF, ...Object.values(KINDS));
-  const signatures = {}, experiments = {}, lessons = [], proposals = {};
+const EMPTY_STATE = () => ({ signatures: {}, experiments: {}, lessons: [], proposals: {} });
+const LESSON_KINDS = new Set(['lesson', 'owner-feedback', 'leftover']);
+
+/**
+ * The learning state from the sup_learning rows over the machine handle `m`: {signatures: {sig: {status, hypothesis,
+ * experiments}}, experiments, lessons, proposals}. Each record carries `seq` (its audit event), so the rows replay in the
+ * order they were written.
+ */
+export function learningState(m) {
+  const rows = m.db.prepare('SELECT kind, item_id, detail_json FROM sup_learning').all()
+    .map((r) => { let d = null; try { d = JSON.parse(r.detail_json ?? 'null'); } catch { d = null; } return { kind: r.kind, id: r.item_id, p: d ?? {} }; })
+    .sort((a, b) => (a.p.seq ?? 0) - (b.p.seq ?? 0) || (a.p.at ?? 0) - (b.p.at ?? 0));
+  const { signatures, experiments, lessons, proposals } = EMPTY_STATE();
   const sig = (s) => (signatures[s] ??= { status: null, hypothesis: null, experiments: [] });
+  // An experiment row holds its landing; its result row (the newest verdict) replays at the verdict's own seq.
   for (const r of rows) {
-    const p = { ...(parseJsonOr(r.payload_json, {}) ?? {}), at: r.created_at };
-    if (r.kind === KINDS.hypothesis) Object.assign(sig(p.signature), { status: 'open', hypothesis: p });
-    else if (r.kind === KINDS.experiment) { experiments[p.id] = { ...p, status: 'measuring' }; sig(p.signature).experiments.push(p.id); sig(p.signature).status = 'measuring'; }
-    else if (r.kind === KINDS.result && experiments[p.id]) {
+    const p = r.p;
+    if (r.kind === 'hypothesis') Object.assign(sig(p.signature), { status: 'open', hypothesis: p });
+    else if (r.kind === 'experiment') {
+      experiments[p.id] = { ...p, status: 'measuring' };
+      sig(p.signature).experiments.push(p.id); sig(p.signature).status = 'measuring';
+    } else if (r.kind === 'experiment-result' && experiments[p.id]) {
       experiments[p.id] = { ...experiments[p.id], status: p.outcome, result: p };
       const s = sig(experiments[p.id].signature);
       s.status = p.outcome === 'kept' ? 'kept' : p.outcome === 'revert-due' ? 'measuring' : 'reverted';
       if (p.outcome === 'revert-due') experiments[p.id].status = 'revert-due';
-    } else if (r.kind === KINDS.lesson) lessons.push(p);
-    else if (r.kind === KINDS.proposal) proposals[p.id] = { ...(proposals[p.id] ?? {}), ...p };
+    } else if (LESSON_KINDS.has(r.kind)) lessons.push(p);
+    else if (r.kind === 'proposal') proposals[p.id] = p;
   }
   return { signatures, experiments, lessons, proposals };
 }
-export const readLearning = ({ env = process.env } = {}) => withSupervisorRead((db) => learningState(db), { signatures: {}, experiments: {}, lessons: [], proposals: {} }, { env });
+export const readLearning = ({ env = process.env } = {}) => readSupervisor((m) => learningState(m), EMPTY_STATE(), { env });
 
+/** The sup_learning row of one change: {itemId, kind, parentId, title, state}. Pure over `kind` and the payload. */
+function learningItem(kind, p) {
+  if (kind === KINDS.hypothesis) return { itemId: `hyp:${p.signature}`, kind: 'hypothesis', title: String(p.signature), state: 'open' };
+  if (kind === KINDS.experiment) return { itemId: p.id, kind: 'experiment', title: String(p.signature), state: 'measuring', lane: p.lane ?? null, landedSha: p.head ?? null };
+  if (kind === KINDS.result) return { itemId: `${p.id}:result`, kind: 'experiment-result', parentId: p.id, title: String(p.signature), state: p.outcome ?? null };
+  if (kind === KINDS.proposal) return { itemId: p.id, kind: 'proposal', title: String(p.title ?? p.id), state: p.status ?? 'open' };
+  const lessonKind = p.status === 'owner-feedback' ? 'owner-feedback' : p.via === 'gc' ? 'leftover' : 'lesson';
+  return { itemId: `les-${crypto.randomUUID()}`, kind: lessonKind, title: String(p.signature ?? p.text ?? 'lesson').slice(0, 200), state: p.status ?? null, lane: p.lane ?? null };
+}
+
+/**
+ * Record one learning change: its sup_events audit row, then its sup_learning row (detail_json the full record with
+ * `at` and `seq`). A result also moves its experiment row's state; a proposal merges into its existing record.
+ */
 const write = (env, kind, payload, now = Date.now()) => {
-  const ledger = openSupervisorLedger({ env });
-  try { ledger.transaction(() => supervisorEvent(ledger, { entityType: 'learning', entityId: payload.id ?? payload.signature ?? kind, kind, payload, now })); }
-  finally { ledger.close(); }
+  const item = learningItem(kind, payload);
+  withSupervisor((m) => m.transaction(() => {
+    const { seq } = supervisorEvent(m, { entityType: 'learning', entityId: payload.id ?? payload.signature ?? kind, kind, payload, now });
+    const prior = m.db.prepare('SELECT detail_json, created_at FROM sup_learning WHERE item_id=?').get(item.itemId);
+    const merged = kind === KINDS.proposal && prior ? { ...(JSON.parse(prior.detail_json ?? '{}') ?? {}), ...payload } : payload;
+    const parentId = item.parentId && m.db.prepare('SELECT 1 FROM sup_learning WHERE item_id=?').get(item.parentId) ? item.parentId : null;
+    m.upsert('sup_learning', { item_id: item.itemId, kind: item.kind, parent_id: parentId, title: item.title, state: item.state, source_ref: payload.signature ?? null,
+      lane: item.lane ?? null, landed_sha: item.landedSha ?? null, detail_json: { ...merged, at: now, seq }, created_at: prior?.created_at ?? now, updated_at: now }, ['item_id']);
+    if (parentId && kind === KINDS.result) m.update('sup_learning', { state: payload.outcome, updated_at: now }, { item_id: parentId });
+  }), { env });
   supLog(learningRow(kind, payload, now), { env });
   return payload;
 };
@@ -389,7 +426,7 @@ export function matchLessons(lessons, { signature = null, text = null, limit = 5
 export function lessonsYaml(state) {
   const q = (s) => JSON.stringify(String(s ?? ''));
   const rows = state.lessons.filter((l) => ['kept', 'reverted', 'owner-feedback'].includes(l.status));
-  return ['# lessons.yaml - GENERATED by `node scripts/supervisor/lessons.mjs export --write` from the supervisor ledger',
+  return ['# lessons.yaml - GENERATED by `node scripts/supervisor/lessons.mjs export --write` from machine.sqlite sup_learning',
     '# (supervise.yaml selfLearning). Never hand-edit: record lessons with lessons.mjs (feedback, land, measured results).',
     'schema: starci/supervisor-lessons@1', 'lessons:',
     ...rows.flatMap((l) => [`  - signature: ${q(l.signature ?? '')}`, `    source: ${l.source}`, `    weight: ${l.weight ?? 1}`, `    status: ${l.status}`,
