@@ -70,8 +70,24 @@ properties:
     description: What the op changes outside its own evidence. An empty list is a claim of none.
   graphPolicy:
     type: object
-    description: How this op may touch the Work graph. Shape owned by modules/ops/_common.yaml.
+    additionalProperties: false
+    description: "The op's Work graph access and prerequisite contract. Dispatch reads prerequisiteState;
+      work-graph writes read workGraph. The other fields describe the agent's scope and are part of its brief."
     properties:
+      mode:
+        enum: [read-only, selected-scope-only]
+        description: Whether this op may edit its selected Work scope.
+      location:
+        type: string
+        minLength: 1
+        description: Where the op reads or writes Work graph records and their assets.
+      prerequisiteState:
+        enum: [done, done-or-exact-workspace-canonicalization-proposal-with-regression, done-or-exact-direct-predecessor-proposal]
+        description: "The dispatch prerequisite rule. scripts/kernel/prerequisites.mjs enforces `done`;
+          the proposal forms are handled by their operation-specific contracts."
+      dispatch:
+        const: never
+        description: Operations do not dispatch successor jobs themselves.
       workGraph:
         enum: [draw, revise, cut]
         description: "The op's write permission on the workflow's work graph (modules/schemas/work-graph.schema.yaml),
@@ -194,6 +210,7 @@ properties:
     description: The `<name>` tokens the reads/writes paths use, and what selects each one.
   layoutPolicy:
     type: object
+    additionalProperties: false
     description: "Where artifacts land and which validator refuses a wrong layout. The invariant is
       uniform across ops — the catalog defines the layout (never the agent), every structured write
       carries its declared schema const, and a wrong path name or schema const fails the run — so a

@@ -29,20 +29,11 @@ reads:
   - id: target
     path: .starciwork/features/<feature>/impl/<repository>/<name>/index.yaml
     purpose:
-      en: "Read the existing selected implementation record, its feature scope, declared
-        refs/dependsOn/proof demands and validator freshness. This consumer op requires its target
-        record to exist. An absent target is a scope/graph gap: report it and propose a separately
-        selected scope op; do not create a target or invent its acceptance/graph here. Current
-        reviewed todo requirement/design inputs are semantic refs; the settled-pass decide jobs are
-        the execution prerequisites. Do not require those specification refs to be Work state done
-        before implementation. The same holds for a declared dependsOn on another implementation
-        or contract node: Work leaves stay `state: todo` until final reconciliation authors done,
-        and `api dispatch` already evaluated the machine prerequisites (scripts/kernel/prerequisites.mjs)
-        before you were launched - a dependency whose record reads todo is not unmet by itself. It is
-        DECLARED_DEPENDENCY_UNMET only when an artifact this slice needs from it (an exported
-        symbol, module, table, contract file or route) is actually absent at HEAD: name that artifact,
-        where you looked and the dependency id (starci-next learn-content op-backend.implement-d5bf375e7a
-        blocked on seven todo dependencies whose code had landed; the next attempt built the slice)."
+      en: "The existing selected implementation record, its feature scope, declared
+        refs/dependsOn/proof demands and validator freshness. Requirement and design Work leaves
+        can still read `state: todo` after their decide jobs settle; the source artifacts from a
+        declared dependency may already be present at HEAD (starci-next learn-content
+        op-backend.implement-d5bf375e7a)."
   - id: business
     path: .starciwork/features/<feature>/{br,fr,nfr,decision}/**/index.yaml
     purpose:
@@ -185,7 +176,13 @@ steps:
       - profile
     writes: []
     action:
-      en: "Bind the exact operation/AC set and inspect existing code plus sibling conventions, including
+      en: "Require the selected target record to exist; if absent, report the scope/graph gap for a
+        separately selected scope op, without creating its acceptance or graph here. Treat reviewed
+        requirement/design Work leaves still marked todo as semantic refs after their decide jobs
+        settle, not as missing prerequisites. For a declared implementation or contract dependency,
+        report DECLARED_DEPENDENCY_UNMET only when an artifact this slice needs is absent at HEAD;
+        name the artifact, where you looked and its dependency id. Bind the exact operation/AC set
+        and inspect existing code plus sibling conventions, including
         DI/module registration and every relevant caller. Reuse already conforming behavior. Own
         preparation through delivery: inspect readiness and reproduce the requested defect when
         applicable, partition the selected work into cohesive changes and check callers before

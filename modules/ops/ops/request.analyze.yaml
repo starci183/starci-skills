@@ -11,7 +11,6 @@ graphPolicy:
   location: .starciwork node dependsOn/refs with direct sourceRefs and collocated assets
   prerequisiteState: done
   dispatch: never
-  host: calling-chat-app
 reads:
   - id: request
     path: current user request, supplied files/references and existing task authorization
