@@ -11,7 +11,7 @@
 //   node scripts/kernel/transcripts.mjs snapshot --repo <repo> [--every-ms <ms>] [--json]
 //     one pass over the repo ledger's open attempts; a periodic caller (the reconciler) runs it every minute.
 import path from 'node:path';
-import { frameText, terminalOf, orcaCall } from '../api/orca/lib.mjs';
+import { terminalRead } from '../api/orca/terminal-read.mjs';
 import { stageText, registerBlob, recordAttemptSnapshot, recordFinalTranscript, TRANSCRIPT_SNAPSHOT_MS } from './evidence-store.mjs';
 
 /** Rows of retained terminal output a scrollback read asks Orca for. */
@@ -25,8 +25,8 @@ export function readScrollback(handle, { limit = SCROLLBACK_LIMIT, read = null }
   if (!handle) return null;
   try {
     if (read) { const r = read({ terminal: handle, screen: false, limit }); return r?.ok ? String(r.text ?? r.screen ?? '') : null; }
-    const r = orcaCall('terminal-read', { terminal: handle, screen: false, limit });
-    return r.exitCode === 0 ? frameText(terminalOf(r)) : null;
+    const r = terminalRead({ terminal: handle, screen: false, limit });
+    return r.ok ? String(r.screen ?? '') : null;
   } catch { return null; }
 }
 

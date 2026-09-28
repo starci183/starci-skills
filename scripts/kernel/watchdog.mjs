@@ -25,7 +25,7 @@ import { fileURLToPath } from 'node:url';
 import { allocationMs } from '../../engine/config.mjs';
 import { terminalRead } from '../api/orca/terminal-read.mjs';
 import { terminalList } from '../api/orca/terminal-list.mjs';
-import { orcaCall } from '../api/orca/lib.mjs';
+import { terminalRename } from '../api/orca/terminal-rename.mjs';
 import { tabTitlesOf } from './terminal-dedupe.mjs';
 import { classifyAgentScreen, staleAwareState, outputAgeOf, exitedAgentPromptRow } from './terminal-liveness.mjs';
 import { sendWakeWithProof, sendEnterWithProof, deliveryFieldsOf, wakeSendRefused, WAKE_BOUNDS, withWakeIdentity } from './wake-delivery.mjs';
@@ -102,7 +102,7 @@ export const wakePromptOf = (workflow, statusValue) =>
 
 /** Repair only the Orca tab title: the agent owns the pane title and may change it on every turn. */
 export function repairKernelTabTitle(terminal, name, { list = () => terminalList({ includeVisualLayouts: true }), tabTitles = tabTitlesOf,
-  rename = (handle, title) => { const r = orcaCall('terminal-rename', { terminal: handle, title }); return { ok: r.exitCode === 0 && Boolean(r.result), error: r.error }; } } = {}) {
+  rename = (handle, title) => terminalRename({ terminal: handle, title }) } = {}) {
   if (!terminal) return null;
   try {
     const listed = list();

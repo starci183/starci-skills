@@ -541,8 +541,8 @@ ops:
   - id: integration.verify
     family: integration
     goal: Prove one declared external integration against the real provider, in its sandbox account,
-      with the credential the owner supplies, read at the moment of use from the tree's own
-      encrypted identity cust
+      with the credential the owner supplies, read at the moment of use from the selected backend
+      Stack environment
     nodeKinds:
       - integration
     completionProfile: integration

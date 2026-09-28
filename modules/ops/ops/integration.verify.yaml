@@ -2,8 +2,8 @@ schema: starci/op@1
 id: integration.verify
 goal:
   en: Prove one declared external integration against the real provider, in its sandbox account, with
-    the credential the owner supplies, read at the moment of use from the tree's own encrypted
-    identity custody, and keep the live exchange as evidence.
+    the credential the owner supplies, read at the moment of use from the selected backend Stack
+    environment's encrypted identity custody, and keep the live exchange as evidence.
 nodeKinds: [integration]
 completionProfile: integration
 sideEffects:
@@ -11,7 +11,7 @@ sideEffects:
     scope
   - scenario-owned data created in that sandbox account and disposed by the same run
   - reading the owner-provided credential through sops from the declared identity custody
-    (.starciwork/_resources/identity/<slug>/secrets.enc.yaml), inside the checking process only,
+    (.starcistacks/<env>/secrets/<slug>/secrets.enc.yaml), inside the checking process only,
     never writing its value
 graphPolicy:
   mode: read-only
@@ -23,7 +23,8 @@ reads:
     path: knowledge/application-stacks.yaml + docs/application-stacks.md +
       docs/application-stacks-vps.md + modules/schemas/application-stacks.schema.yaml
     purpose:
-      en: When the selected scope touches application deployment, .starcistacks, bootstrap or recovery,
+      en: Resolve the selected backend Stack environment and its identity custody for every credential
+        read. When the selected scope touches application deployment, bootstrap or recovery,
         load the whole-application dev/VPS contract. Reconcile component ownership, encrypted
         credential custody, lifecycle commands and existing consumers. Run the `starci-stacks-check`
         when validating a materialized stack; bind its exact inputs and limitations. Acceptance
@@ -64,10 +65,11 @@ reads:
         it actually reads the credential from. The proof binds the exact tested tree, so a claim
         without a resolved repository and a named client is not a proof.
   - id: credential
-    path: .starciwork/_resources/identity/<slug>/secrets.enc.yaml, read with sops at the moment of use
+    path: .starcistacks/<env>/secrets/<slug>/{resource.yaml,secrets.enc.yaml}, read with sops at the moment of use
     purpose:
-      en: The value authenticates the live call and is written nowhere - not into a record, a report, a
-        log or a chat.
+      en: Resolve the identity alias, variable names and selected environment from the backend Stack
+        declaration and readable resource metadata. The encrypted value authenticates the live call
+        and is written nowhere - not into Work, a record, a report, a log or a chat.
   - id: effects
     path: current request authorization + declared sandbox account allowed effects
     purpose:
@@ -152,10 +154,11 @@ steps:
     writes: [evidence]
     action:
       en: "Run everything that needs the credential inside `sops exec-env
-        .starciwork/_resources/identity/<slug>/secrets.enc.yaml '<command>'`, so the value is
+        .starcistacks/<env>/secrets/<slug>/secrets.enc.yaml '<command>'`, so the value is
         resolved from exactly that variable in exactly that process and nowhere else. If sops is not
-        installed, the key for this tree is unavailable, or that custody holds no such variable,
-        stop here and report `blocked` with reason `environment` naming the slug and the variable,
+        installed, the key for the selected Stack environment is unavailable, or that custody holds
+        no such variable, stop here and report `blocked` with reason `environment` naming the
+        environment, slug and variable,
         so the owner can provide it: do not substitute a second variable, do not export it into the
         shell or an .env file, do not read a key out of the repository, do not generate one, and do
         not continue with the provider replaced by a stand-in. Confirm the resolved account is the
@@ -167,7 +170,7 @@ steps:
         defaulted, never read from a second variable that looks similar, never exported into a shell
         or an .env file and never taken from a checked-in file. No sops, no key for this tree, no
         such custody or no such variable in it is reported `blocked` with reason `environment`
-        naming the slug and that exact variable, which is the owner's question; it is never a reason
+        naming the environment, slug and that exact variable, which is the owner's question; it is never a reason
         to fake the provider, skip the assertion or report a pass."
   - reads:
       - repo
@@ -252,7 +255,7 @@ proofs:
         it names, read through sops at the moment of use and from nowhere else; it was never
         invented, defaulted, substituted, exported into a shell or an .env file, or silently
         skipped, and its value appears in no record, report, asset, log or message. A custody that
-        cannot give it is blocked with the slug and that variable named.
+        cannot give it is blocked with the environment, slug and that variable named.
   - id: readback
     requirement:
       en: The observed effect was read back through the provider's own surface where one exists, so an
@@ -281,7 +284,7 @@ blockers:
     condition:
       en: "The declared identity custody holds no value under the exact variable the declaration names.
         After official research and executable setup, report blocked with reason environment, the
-        slug and that variable name so the kernel presents its workflow-owned form in Orca or hidden
+        selected Stack environment, slug and that variable name so the kernel presents its workflow-owned form in Orca or hidden
         fill prompt in Orca. Missing sops or a host decryption key is a setup failure: repair it
         within authority or report its actual environment/authority boundary, never ask for another
         provider credential to fix it. Never invent, default, substitute or skip a key, fall back to
@@ -307,6 +310,7 @@ blockers:
         run predecessors or weaken dependsOn/refs/required to proceed.
 placeholders:
   feature: Feature folder of the selected records, inside the operation allowlist
+  env: Selected backend Stack environment from .starcistacks/application-stacks.yaml
   slug: Identity custody slug the integration declaration names (custody identity:<slug>)
   repo-id: Resolved direct repository name or path
   bound-paths: Inspected source read set covering the delivered client of this integration

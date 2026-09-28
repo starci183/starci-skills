@@ -338,7 +338,7 @@ $defs:
           custody:
             type: string
             pattern: "^identity:[a-z0-9]+([-_.][a-z0-9]+)*$"
-            description: "identity:<slug> - the encrypted identity resource of this Work tree that holds the value."
+            description: "identity:<slug> - the stable identity alias. Resolve its selected environment from the backend Stack declaration; encrypted custody is .starcistacks/<env>/secrets/<slug>/, outside the Work tree."
           where:
             type: string
             minLength: 1
@@ -353,16 +353,17 @@ $defs:
       evidence manifest that only fakes it is read as proven against a fake, not live."
   identityResource:
     type: object
-    description: "The custody of a credential, at .starciwork/_resources/identity/<slug>/resource.yaml
-      (schema work/resource@1, kind identity) beside secrets.enc.yaml. The resource record is readable and
-      carries the alias the product calls this identity by, the subject on the provider (the account, the
-      sender, the merchant - the WHO, never the what), the role it is allowed to play, and the variable
-      NAMES it holds. It never carries a value: every value lives in secrets.enc.yaml, encrypted with sops
-      under the host's own age or GPG key (the product repositories already carry a .sops.yaml), and is read
-      only at the moment of use - `sops exec-env <secrets.enc.yaml> '<command>'` - so it exists inside one
-      process and is never copied into a file, a log, a report or a contract. An operation that cannot reach
-      sops, the key or the resource reports blocked environment naming the slug and the variable; it never
-      invents, stubs or defaults a value, and it never prints one."
+    description: "The custody of a credential is the backend Stack environment selected by
+      .starcistacks/application-stacks.yaml: .starcistacks/<env>/secrets/<slug>/resource.yaml
+      (schema work/resource@1, kind identity) beside secrets.enc.yaml. The resource declaration is readable
+      and carries the alias the product calls this identity by, the subject on the provider (the account,
+      sender or merchant - the WHO, never the value), its allowed role and the variable NAMES it holds.
+      The declaration never carries a value: every value lives in secrets.enc.yaml, encrypted with sops
+      under the host's own age or GPG key and read only at the moment of use with `sops exec-env
+      .starcistacks/<env>/secrets/<slug>/secrets.enc.yaml '<command>'`. The value exists inside that process
+      only and is never copied into Work, a file, a log, a report or a contract. An operation that cannot
+      reach sops, the key or the selected Stack custody reports blocked environment naming the environment,
+      slug and variable; it never invents, stubs or defaults a value, and it never prints one."
   sourceRef:
     type: object
     additionalProperties: false

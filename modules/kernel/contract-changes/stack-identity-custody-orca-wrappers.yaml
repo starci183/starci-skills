@@ -1,0 +1,14 @@
+id: stack-identity-custody-orca-wrappers
+effectiveAt: '2026-09-29T05:22:53+07:00'
+summary: "Identity:<slug> remains a stable Work declaration alias, while its readable resource metadata and sops ciphertext reside under the selected backend .starcistacks/<env>/secrets/<slug>/ custody. Integration verification, decision preparation and provision asks resolve that Stack environment. Kernel transcript reads and tab-title repair call the existing Orca API wrappers."
+reach: new-legs
+paths:
+  - modules/schemas/work.schema.yaml
+  - modules/ops/ops/integration.verify.yaml
+  - modules/ops/ops/decision.prepare.yaml
+  - modules/ops/ops/provision.ask.yaml
+  - modules/ops/registry.yaml
+  - scripts/kernel/transcripts.mjs
+  - scripts/kernel/watchdog.mjs
+  - tests/kernel-watchdog.spec.mjs
+  - modules/kernel/contract-changes/stack-identity-custody-orca-wrappers.yaml

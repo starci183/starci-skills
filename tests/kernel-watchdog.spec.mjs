@@ -210,12 +210,12 @@ test('the watchdog is one --once pass the Host controller runs; there is no loop
   });
 });
 
-// Orca's sidebar shows the tab title set at creation or by rename, while the
-// listed `title` is the pane title the agent CLI rewrites every turn; a
-// per-tick rename chased the wrong field, so the watchdog renames nothing.
-test('the watchdog never renames terminals', () => {
+// The watchdog repairs the sidebar tab title through the public Orca wrapper;
+// it never imports the raw runner or restores the removed keepTitles loop.
+test('the watchdog repairs tab titles through the Orca wrapper', () => {
   const src = fs.readFileSync(new URL('../scripts/kernel/watchdog.mjs', import.meta.url), 'utf8');
-  assert.doesNotMatch(src, /terminalRename|keepTitles/);
+  assert.match(src, /from ['"]\.\.\/api\/orca\/terminal-rename\.mjs['"]/);
+  assert.doesNotMatch(src, /\borcaCall\b|keepTitles/);
 });
 
 // A Codex release put its update menu in front of every fresh op launch for
