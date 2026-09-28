@@ -76,7 +76,7 @@ archetypes:
         does not match this lifecycle scope.
       phrases: [canonicaliz*, canonicalis*, normaliz*, normalis*, migrat*, refactor, chuẩn hoá, chuẩn hóa, tái cấu trúc, di trú]
       requires:
-        - [.starciwork, .starcistacks, .stacks, work tree, application stack, application-stack, cây work]
+        - [.starciwork, .starcistacks, work tree, application stack, application-stack, cây work]
 
   # --- spec-foundation ---
   - id: spec-foundation
@@ -188,7 +188,7 @@ archetypes:
         proves zero. A request naming the Work or stack roots is
         workspace-canonicalization.
       phrases: [refactor, clean up, cleanup, clean-up, restructure, rename, tái cấu trúc, dọn dẹp code, dọn code, đổi tên, $canonIntent]
-      excludes: [.starciwork, .starcistacks, .stacks, work tree, application stack, application-stack, $buildIntent]
+      excludes: [.starciwork, .starcistacks, work tree, application stack, application-stack, $buildIntent]
 
   # --- external-integration ---
   - id: external-integration

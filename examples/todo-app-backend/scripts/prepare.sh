@@ -7,7 +7,7 @@ for arg in "$@"; do case "$arg" in --cipher-only) cipher_only=1;; --initialize) 
 case "$env_name:$cipher_only" in dev:0|vps:1);; dev:1) echo 'dev preparation must materialize its runtime secret' >&2; exit 2;; *) echo 'vps preparation requires --cipher-only; persistent VPS plaintext is forbidden' >&2; exit 2;; esac
 root=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd -P); case "$key_file" in /*);; *) key_file=$(pwd -P)/$key_file;; esac
 case "$key_file" in "$root"|"$root"/*) echo 'age key must be outside the application root' >&2; exit 1;; esac
-key_dir=$(dirname -- "$key_file"); env_dir="$root/.stacks/$env_name"; cipher="$env_dir/secrets.yaml.enc"; secret="$env_dir/secrets.yaml"; marker="$env_dir/.initialized"
+key_dir=$(dirname -- "$key_file"); env_dir="$root/.starcistacks/$env_name"; cipher="$env_dir/secrets.yaml.enc"; secret="$env_dir/secrets.yaml"; marker="$env_dir/.initialized"
 check_path() { target=$1; current=/; oldIFS=$IFS; IFS=/; set -- ${target#/}; IFS=$oldIFS; for part do [ -n "$part" ] || continue; current=${current%/}/$part; [ ! -L "$current" ] || { echo "custody path has a symlink ancestor: $current" >&2; exit 1; }; done; }
 for target in "$root" "$env_dir" "$key_file" "$cipher" "$secret" "$marker"; do check_path "$target"; done
 for target in "$key_file" "$cipher" "$secret" "$marker"; do [ ! -e "$target" ] || [ -f "$target" ] || { echo "custody path is not a regular file: $target" >&2; exit 1; }; done

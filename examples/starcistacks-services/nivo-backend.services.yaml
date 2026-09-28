@@ -1,6 +1,5 @@
 # Ready-to-apply services block for nivo-backend (owner ruling 2026-09-24).
-# Apply: add `services:` below as the top-level `services` key of nivo-backend/.starcistacks/application-stacks.yaml
-# (the declaration mid-rename from .stacks; the legacy .stacks copy is retired by the same rename).
+# Apply: add `services:` below as the top-level `services` key of nivo-backend/.starcistacks/application-stacks.yaml.
 # Observed 2026-09-24: GitHub starci-lab/nivo-backend carries secret SONAR_TOKEN and variable SONAR_HOST_URL;
 # CI uploads to Codecov with OIDC; deploy.yml and agentos-images.yml push to GHCR with GITHUB_TOKEN.
 # Custody: sonarqube-nivo-be-token.key validated against the local server (valid).

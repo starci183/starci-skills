@@ -3,7 +3,7 @@ set -eu
 umask 077
 [ "${1:-}" = create ]&&[ "${2:-}" = vps ]||{ echo 'usage: swarm-secret.sh create vps <external-age-key> [--initialize]' >&2;exit 2; }
 key=${3:?external age key path required};initialize=${4:-};[ -z "$initialize" ]||[ "$initialize" = --initialize ]||{ echo 'unknown option' >&2;exit 2; }
-root=$(CDPATH= cd -- "$(dirname -- "$0")/.."&&pwd);env_dir="$root/.stacks/vps";runtime_name=tiny-stateful-app-token-v1;tmp="$env_dir/.swarm-secret.$$"
+root=$(CDPATH= cd -- "$(dirname -- "$0")/.."&&pwd);env_dir="$root/.starcistacks/vps";runtime_name=tiny-stateful-app-token-v1;tmp="$env_dir/.swarm-secret.$$"
 trap 'rm -f -- "$tmp"' EXIT HUP INT TERM
 if [ "$initialize" = --initialize ];then "$root/scripts/prepare.sh" vps "$key" --cipher-only --initialize;else "$root/scripts/prepare.sh" vps "$key" --cipher-only;fi
 docker secret inspect "$runtime_name" >/dev/null 2>&1&&{ echo 'secret version exists; declare a new version' >&2;exit 1; }

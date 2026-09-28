@@ -1,7 +1,7 @@
 #!/bin/sh
 set -eu
 env_name=${1:-dev};case "$env_name" in dev|vps);;*) exit 2;;esac
-root=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd); compose="$root/.stacks/$env_name/compose.yaml"; secret="$root/.stacks/$env_name/secrets.yaml"
+root=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd); compose="$root/.starcistacks/$env_name/compose.yaml"; secret="$root/.starcistacks/$env_name/secrets.yaml"
 [ -f "$secret" ] || { echo 'run prepare first' >&2; exit 1; }
 project="starci-kit-${env_name}-$$"; port=$((20000 + ($$ % 20000))); export STACK_PORT=$port
 cleanup(){ docker compose -p "$project" -f "$compose" down --volumes --remove-orphans >/dev/null 2>&1 || true; };trap cleanup EXIT INT TERM

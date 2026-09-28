@@ -14,9 +14,9 @@ const hasPowerShell7=pwshProbe.status===0&&Number(String(pwshProbe.stdout??'').t
 const needsPowerShell7=hasPowerShell7?false:'PowerShell 7 (pwsh) is unavailable; static script contract tests still run';
 function fixture(t){
   const root=fs.mkdtempSync(path.join(os.tmpdir(),'starci-custody-'));t.after(()=>fs.rmSync(root,{recursive:true,force:true}));
-  fs.mkdirSync(path.join(root,'scripts'),{recursive:true});fs.mkdirSync(path.join(root,'.stacks','dev'),{recursive:true});fs.mkdirSync(path.join(root,'.stacks','vps'),{recursive:true});
+  fs.mkdirSync(path.join(root,'scripts'),{recursive:true});fs.mkdirSync(path.join(root,'.starcistacks','dev'),{recursive:true});fs.mkdirSync(path.join(root,'.starcistacks','vps'),{recursive:true});
   for(const name of ['prepare.ps1','cleanup-runtime.ps1'])fs.copyFileSync(new URL(name,source),path.join(root,'scripts',name));
-  for(const env of ['dev','vps'])fs.writeFileSync(path.join(root,'.stacks',env,'compose.yaml'),'services: {}\n');
+  for(const env of ['dev','vps'])fs.writeFileSync(path.join(root,'.starcistacks',env,'compose.yaml'),'services: {}\n');
   const tools=path.join(root,'tools');fs.mkdirSync(tools);fs.writeFileSync(path.join(tools,'docker.cmd'),'@echo off\r\nif "%MOCK_RUNNING%"=="1" echo container-id\r\nexit /b 0\r\n');
   const env={...process.env,PATH:`${tools};${process.env.PATH}`};return {root,env,key:path.join(root,'..',`${path.basename(root)}.agekey`)};
 }
@@ -30,12 +30,12 @@ test('custody scripts declare private staging, ancestor checks, and dev-only mat
 
 test('prepare refuses implicit initialization and initialized ciphertext loss before Docker',{skip:needsPowerShell7},t=>{
   const f=fixture(t),script=path.join(f.root,'scripts','prepare.ps1');let result=run(script,['dev','-KeyFile',f.key],{env:f.env});assert.notEqual(result.status,0);assert.match(result.stderr,/pass -Initialize/);
-  fs.writeFileSync(path.join(f.root,'.stacks','dev','.initialized'),'');result=run(script,['dev','-KeyFile',f.key,'-Initialize'],{env:f.env});assert.notEqual(result.status,0);assert.match(result.stderr,/missing ciphertext/);
+  fs.writeFileSync(path.join(f.root,'.starcistacks','dev','.initialized'),'');result=run(script,['dev','-KeyFile',f.key,'-Initialize'],{env:f.env});assert.notEqual(result.status,0);assert.match(result.stderr,/missing ciphertext/);
   result=run(script,['vps','-KeyFile',f.key],{env:f.env});assert.notEqual(result.status,0);assert.match(result.stderr,/requires -CipherOnly/);
 });
 
 test('cleanup refuses a running selected project and removes only owned dev plaintext after stop',{skip:needsPowerShell7},t=>{
-  const f=fixture(t),script=path.join(f.root,'scripts','cleanup-runtime.ps1'),dir=path.join(f.root,'.stacks','dev'),plain=path.join(dir,'secrets.yaml'),cipher=path.join(dir,'secrets.yaml.enc'),marker=path.join(dir,'.initialized');
+  const f=fixture(t),script=path.join(f.root,'scripts','cleanup-runtime.ps1'),dir=path.join(f.root,'.starcistacks','dev'),plain=path.join(dir,'secrets.yaml'),cipher=path.join(dir,'secrets.yaml.enc'),marker=path.join(dir,'.initialized');
   fs.writeFileSync(plain,'synthetic');fs.writeFileSync(cipher,'cipher');fs.writeFileSync(marker,'');let result=run(script,['dev'],{env:{...f.env,MOCK_RUNNING:'1'}});assert.notEqual(result.status,0);assert.equal(fs.existsSync(plain),true);
   result=run(script,['dev'],{env:{...f.env,MOCK_RUNNING:'0'}});assert.equal(result.status,0,result.stderr);assert.equal(fs.existsSync(plain),false);assert.equal(fs.existsSync(cipher),true);assert.equal(fs.existsSync(marker),true);
 });

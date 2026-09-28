@@ -7,7 +7,7 @@
 # key is decryptable by everyone who can read this file, forever.
 #
 # DO NOT reuse this identity outside this example. DO NOT encrypt a real credential to
-# its public key. DO NOT copy this pattern into `.stacks` (the production layout) or
+# its public key. DO NOT copy this pattern into a production stack or
 # into any non-example environment. Rotate/replace it (and every `.enc` file encrypted
 # to it) if it is ever mistaken for a live key.
 #

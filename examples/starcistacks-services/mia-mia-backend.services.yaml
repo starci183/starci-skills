@@ -1,7 +1,5 @@
 # Ready-to-apply services block for mia-mia-backend (GitHub starci-lab/miamia-be) - owner ruling 2026-09-24.
-# Apply: mia-mia-backend has a legacy .stacks tree (dev, vps) and NO declaration yet. The applying leg
-# (workspace.manage mode stacks) authors .starcistacks/application-stacks.yaml (renaming .stacks) with
-# this `services` block; until then check-starcistacks reports STACKS_DECLARATION_MISSING as a suspect.
+# Apply: add `services:` below as the top-level `services` key of mia-mia-backend/.starcistacks/application-stacks.yaml.
 # Observed 2026-09-24: GitHub carries secret SONAR_TOKEN and variable SONAR_HOST_URL. The local server
 # has an older project miamia-be; sonar-project.properties now names mia-mia-backend, which
 # sonar-local.mjs ensure-project creates. No per-project token is in custody yet: BEFORE applying, run

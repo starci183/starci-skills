@@ -63,7 +63,7 @@ than receiving a full-tree assumption.
 SRS and SDS remain source-independent. Their current input digests may
 invalidate dependent completion or evidence, while source paths and symbols
 stay in implementation mappings. `.starciwork/runtime.sqlite`, `.git`, and
-`.stacks/staging` are never scanning targets.
+`.starcistacks/staging` are never scanning targets.
 
 ## Operation use
 

@@ -41,13 +41,13 @@ vocabularies:
   # `architecture-rules`, `design-patterns`, `code-pattern-enforcement`, `grammars/<name>`, `ui/*`,
   # `application-stacks`); `checks` names executable check scripts (`scripts/checks/check-scoped-lint.mjs`,
   # `scripts/checks/code-patterns/*.mjs`, `scripts/checks/architecture/*.mjs`, `scripts/checks/acceptance.mjs`); `stacks` names the
-  # bound repository's `.stacks` compose manifests and the `.claude`-owned layout and schema definitions an
+  # bound repository's `.starcistacks` compose manifests and the `.claude`-owned layout and schema definitions an
   # op's artifacts obey - `modules/schemas/work-layout.yaml` for `.starciwork` paths and filenames,
   # `modules/schemas/workspace-routing.yaml` for bound-source routing, and the `modules/schemas/*.schema.yaml` shape each
   # `carries` const validates against. A kind that declares an empty list is handed nothing from that
   # domain - an explicit none, not a missing field.
   inputs: [knowledge, checks, stacks]
-  # The schema consts a written `.starciwork`/`.stacks` artifact must carry in its `schema:` field. A kind
+  # The schema consts a written `.starciwork`/`.starcistacks` artifact must carry in its `schema:` field. A kind
   # names the exact consts of the artifacts it writes as `carries`; an op that writes none of those
   # artifacts declares `carries: []`. The definitions are `.claude`-owned under `modules/schemas/` and enter the op
   # as `stacks` inputs - the const is what the output claims, the file is what the op reads to get there.
@@ -436,7 +436,7 @@ kinds:
     writes: [runtime, code]
     knowledge: [application-stacks]
     checks: []
-    stacks: [.stacks/**, modules/schemas/application-stacks.schema.yaml, modules/schemas/work.schema.yaml, modules/schemas/work-layout.yaml]
+    stacks: [.starcistacks/**, modules/schemas/application-stacks.schema.yaml, modules/schemas/work.schema.yaml, modules/schemas/work-layout.yaml]
     carries: [work/resource@1, starci/application-stacks@1]
     purpose: Operate the runtime the product needs - migrations, environment, deployment, infrastructure.
     reports:
@@ -547,7 +547,7 @@ kinds:
     writes: [evidence]
     knowledge: [application-stacks]
     checks: [scripts/checks/acceptance.mjs]
-    stacks: [.stacks/**, modules/schemas/application-stacks.schema.yaml, modules/schemas/work.schema.yaml, modules/schemas/work-layout.yaml]
+    stacks: [.starcistacks/**, modules/schemas/application-stacks.schema.yaml, modules/schemas/work.schema.yaml, modules/schemas/work-layout.yaml]
     carries: [work/evidence@1, starci/evidence-packet@1]
     purpose: Prove one declared external integration against the real provider with the credential the owner supplies, and leave the live run as evidence.
     reports:
@@ -614,7 +614,7 @@ kinds:
     writes: [record, srs, sds, decision, integration]
     knowledge: [application-stacks]
     checks: []
-    stacks: [.stacks/**, modules/schemas/work.schema.yaml, modules/schemas/work-layout.yaml]
+    stacks: [.starcistacks/**, modules/schemas/work.schema.yaml, modules/schemas/work-layout.yaml]
     carries: [work/*, work/disposable-accounts@1]
     purpose: Complete the authored fields of one Work node - its write scope and its checks - so the kernel can launch it; an intake authors a feature's records and reconciles them against the decided ones as three typed cases (reference, conflict, new), editing no record of another feature and reporting no gap against one; a cut splits a node too big for one operation into child nodes with disjoint write scopes, the seam first, and leaves the node a derived parent whose assertions become the group's acceptance.
     reports:

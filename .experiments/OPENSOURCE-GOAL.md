@@ -67,4 +67,4 @@ its file:line and the lane that owns it. Read it there rather than keeping a
 second copy here.
 
 One gap `fable.md` does not cover: Sonar/Codecov per-project encrypted tokens
-under `.stacks` via SOPS are still pending.
+under `.starcistacks` via SOPS are still pending.
