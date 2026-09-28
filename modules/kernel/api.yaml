@@ -614,50 +614,6 @@ commands:
   # ESTIMATE — deterministic same-op slice sizing. No ledger row is touched.
   # --------------------------------------------------------------------------
 
-  estimate:
-    args: '--files <n> [--assertions <n>] [--components <n>] [--records <n>] [--paths <csv>] [--gear <n>]'
-    reads: >-
-      modules/models/runtimes.yaml allocation.slicing only — {weights:{file,
-      assertion, component, record}, targetMinutes:[lo,hi], maxSlices, gears,
-      size:{<class>:{from, agents}}} — plus the owner's parallel.gear through
-      the one reader engine/config.mjs (`parallelGear()` in engine/config.mjs;
-      STARCI_OWNER_ROOT repoints it). The kernel measures the write scope and
-      passes the counts; the weights, class bounds, gear vocabulary and
-      agents-per-gear table are declared data, never a model's guess. No ledger
-      row is read
-    writes: 'nothing — a pure computation, no row and no event'
-    computes: >-
-      W = sum(weight * count) agent-minutes;
-      size = the largest allocation.slicing.size class any one count reaches its `from` bound of,
-      else `s` when W is inside targetMinutes[0] and `m` above it;
-      agentsRequested = 1 for `s`/`m`, else size.<class>.agents[gear];
-      agentsAchievable = clamp(min(agentsRequested, maxSlices, <disjoint path prefixes of --paths>), 1, ...);
-      perSliceMinutes = W / agentsAchievable
-    gear: >-
-      the owner's parallel.gear is the standing answer; `--gear <n>` overrides it for a dry run and
-      writes nothing. A gear outside allocation.slicing.gears refuses either way. The gear raises
-      only agentsRequested — never a pool's maxParallel, maxParallelOps or budgets.maxOps
-    achievable: >-
-      the seam-first partition itself is derived by the Kernel agent from repository evidence
-      (driver-loop.yaml cutExecution), not by this code, so agentsAchievable is an UPPER BOUND and
-      `achievableBasis` names which one: `disjoint-owned-path-prefixes` when --paths supplied a
-      closure (the pairwise-disjoint concrete prefixes engine/admission.mjs normalizeOwnedPaths
-      collapses it to), `unbounded-no-path-closure` when it did not
-    returns: >-
-      {ok:true, minutes, size:s|m|l|xl, gear, gearSource:config|flag, agentsRequested,
-      agentsAchievable, achievableBasis, reason, pathGroups?, slices, perSliceMinutes, counts,
-      weights, targetMinutes, maxSlices, gears, overTarget}. `reason` names why achievable fell
-      below requested and is null when it did not. `slices` equals agentsAchievable — it is the N
-      the --cut-total flags carry. `overTarget` means each slice still exceeds targetMinutes[1]:
-      gear up or decompose the closure finer
-    refuses:
-      - estimate-no-measure: 'every count is absent or zero — there is nothing to size'
-      - estimate-paths-invalid: '--paths holds a glob, an absolute path, a parent traversal or nothing concrete (engine/admission.mjs normalizeOwnedPath; a Next.js App Router segment - [lang], [...slug], [[...opt]], (group), @slot, (.)photo - is a literal name, not a glob)'
-      - gear-undeclared: '--gear names an integer allocation.slicing.gears does not declare'
-      - 'the owner config being unparsable or schema-short (UNTYPED): estimate reads parallel.gear strictly and refuses with the validation message rather than sizing a fan-out against a guessed gear. `--gear` does not consult the file and answers anyway. Admission (route/dispatch) keeps the opposite tolerance — see route.maxOps'
-      - slicing-undeclared: 'allocation.slicing omits weights/targetMinutes/maxSlices/gears/size, a weight for a supplied count, or an agent count for this size at this gear'
-    usedBy: 'the cut-bound evaluation before enqueue — the agent count the --cut-total flags carry (driver-loop.yaml tick.enqueue.cutExecution)'
-
   # --------------------------------------------------------------------------
   # PLAN — persist the derived plan + structural diff vs the approved shape.
   # --------------------------------------------------------------------------
@@ -2608,28 +2564,6 @@ commands:
       - archive-needs-reason
       - 'archive-bad-by: --by is neither owner nor supervisor'
     usedBy: 'the owner or supervisor stopping a running workflow to replace it'
-  run-deferred-tests:
-    args: '--workflow <id> [--kind unit|e2e] [--by <who>] [--dry-run]'
-    reads: 'the workflow''s jobs whose result verdict is deferred (api status testsDeferred); the owner config.yaml specs switches'
-    writes: >-
-      The owner's "test later" (owner 2026-09-28 "speed up development; test later when asked"). The owner
-      config.yaml root `specs: {unit?, e2e?}` switches product testing off per class; an op whose brief
-      policy.specsToggle.<class> is defer-leg (test.author, e2e.verify) is then never dispatched: api enqueue,
-      api route and api dispatch settle its queued job status succeeded with result {verdict: deferred,
-      deferred: {kind, reason: specs.<class>=false, at, via}} and one tests-deferred event - no lease, no
-      dispatch, no attempt spent - and the legs behind it proceed. This command re-queues every such job of the
-      workflow (only --kind's class when given) in one transaction: status queued on its same attempt, result
-      cleared, payload.specsForced {at, by, kind} (so it dispatches even while its class is still off, with its
-      whole brief - packet context.specs_forced), and one tests-requeued event each. The Kernel then routes and
-      dispatches them as usual. --dry-run lists what it would re-queue and writes nothing
-    returns: '{ok:true, workflowId, kind, dryRun, deferred:[{jobId, op, attempt, kind, reason, at, via}], requeued:[...same], specs:{harness, unit, e2e}}'
-    refuses:
-      - workflow-unknown
-      - 'deferred-tests-bad-kind: --kind is neither unit nor e2e'
-      - 'workflow-finished: a finished or archived workflow takes no new work'
-      - 'op-context-refused: an op terminal never re-queues legs'
-    usedBy: 'the owner or supervisor running the tests the specs switches deferred (after flipping a switch back, or when asked)'
-
 # ============================================================================
 # ASK LIFECYCLE — the events an `outcome: ask` report passes through after it
 # is filed. The report row stays OPEN until a terminal kind lands; every reader

@@ -61,11 +61,11 @@ import {
 } from '../../engine/ledger-db.mjs';
 import { parseYaml } from '../../engine/yaml.mjs';
 import {
-  AWAITING_OWNER, RETRY_CLASS_ENVIRONMENT, admitOpSlot, cutRetryLineage, deriveRetryLineage, findOwnedPathLeaseConflicts, normalizeOwnedPaths, ownedPathLeaseRequests,
+  AWAITING_OWNER, RETRY_CLASS_ENVIRONMENT, admitOpSlot, cutRetryLineage, deriveRetryLineage, findOwnedPathLeaseConflicts, ownedPathLeaseRequests,
   retiredBeforeDispatch, sameWorkLineage,
 } from '../../engine/admission.mjs';
 import {
-  activeDelegation, allocationMs, allocationSettings, defaultParallelGear, inspectOwnerConfig, loadConfig, runtimeProfile,
+  activeDelegation, allocationMs, allocationSettings, inspectOwnerConfig, loadConfig, runtimeProfile,
 } from '../../engine/config.mjs';
 import { OP_REPORT_OUTCOMES, validateOpReport } from './report-envelope.mjs';
 import { buildOpPrompt, renderOwnedPath, opCommitPolicyOf } from './op-prompt.mjs';
@@ -82,7 +82,6 @@ import { OWNER_CLAIM_UNPROVEN, RESOLVERS, incidentKindOf, ownerClaimAudit, owner
 import { isAwaitingOwner, unresolvedFailures } from './failure-steps.mjs';
 import { legOpsOf, planAncestorsOf, planGraphOf } from '../route/plan-edges.mjs';
 import { domainsOfPaths, latestVersion as latestGraphVersion, workGraphStatus } from '../work/work-graph-store.mjs';
-import { agentsFor, countsOf, sizeOf, slicingContract } from '../work/slice-estimate.mjs';
 import { lineageRouteAdjust } from './lineage-route.mjs';
 import { DRAW_OWNER_EVERY_CHANGE, DRAW_REVIEW_CHANGE, DRAW_REVIEW_OP, DRAW_REVIEW_UNJUDGED_CHANGE, drawReviewsOwed } from '../work/draw-review.mjs';
 import { enqueueRepository, ownedPathPlacements, projectBinding } from './target-repo.mjs';
@@ -136,7 +135,7 @@ import { nextResetAt as qwenNextResetAt } from '../api/quota/qwen.mjs';
 import { kindRoute as kindRouteOf, kindOrder, isFanOutSlice } from '../agent/models.mjs';
 import { recentDispatchCounts, auditAuthorOf } from '../agent/balance.mjs';
 import { configuredAllocationPolicy } from '../../engine/config.mjs';
-import { deferJob, deferralOf as testDeferralOf, ownerSpecs, deferredTestsOf, planLegDeferral, requeueDeferredTests, SPECS_CLASSES, specsOff } from './spec-deferral.mjs';
+import { deferJob, deferralOf as testDeferralOf, ownerSpecs, deferredTestsOf, planLegDeferral, specsOff } from './spec-deferral.mjs';
 import { resolveOpParams, splitGoalLegParams } from '../route/dispatch-op.mjs';
 import { checkPrerequisites, prerequisiteDetail } from './prerequisites.mjs';
 import {
@@ -3427,71 +3426,6 @@ function cmdPlan(ledger, args) {
 // computation and never a model's guess. The class plus the owner's config.yaml
 // parallel.gear names agentsRequested, and the closure's disjoint path partition
 // bounds agentsAchievable.
-function cmdEstimate(ledger, args) {
-  const contract = slicingContract();
-  const { weights, target, maxSlices, gears } = contract;
-  const counts = countsOf(args);
-  const { minutes, size } = sizeOf(counts, contract);
-
-  // --gear is a dry run: the owner's config.yaml parallel.gear is the standing
-  // answer and is never written by this command.
-  const gearSource = args.gear !== undefined ? 'flag' : 'config';
-  let gear;
-  if (gearSource === 'flag') {
-    gear = Number(args.gear);
-    if (!Number.isInteger(gear) || !gears.includes(gear)) {
-      throw Object.assign(
-        new Error(`--gear ${args.gear} is not declared by modules/models/runtimes.yaml allocation.slicing.gears (known: ${gears.join(', ')})`),
-        { code: 'gear-undeclared' });
-    }
-  } else {
-    gear = loadConfig(ownerRoot)?.parallel?.gear ?? defaultParallelGear();
-  }
-  const agentsRequested = agentsFor(size, gear, contract);
-
-  // The seam-first partition itself is derived by the Kernel agent from
-  // repository evidence (driver-loop.yaml cutExecution), not by this code, so
-  // what is computable here is an UPPER BOUND: the pairwise-disjoint concrete
-  // prefixes the declared closure already holds. Without --paths there is no
-  // closure to bound it with and the request stands unbounded.
-  const pathArg = args.paths === undefined ? null : csvList(args.paths);
-  let pathGroups = null;
-  if (pathArg) {
-    try { pathGroups = normalizeOwnedPaths(pathArg); }
-    catch (e) { throw Object.assign(new Error(`--paths: ${e.message}`), { code: 'estimate-paths-invalid' }); }
-    if (!pathGroups.length) {
-      throw Object.assign(new Error('--paths resolved to no concrete prefix'), { code: 'estimate-paths-invalid' });
-    }
-  }
-  const achievableBasis = pathGroups ? 'disjoint-owned-path-prefixes' : 'unbounded-no-path-closure';
-  const bounds = [agentsRequested, maxSlices, ...(pathGroups ? [pathGroups.length] : [])];
-  const agentsAchievable = Math.max(1, Math.min(...bounds));
-  const reason = agentsAchievable < agentsRequested
-    ? (pathGroups && pathGroups.length < agentsRequested
-      ? `closure partitions into ${pathGroups.length} pairwise-disjoint path prefix(es); size ${size} at gear ${gear} requests ${agentsRequested}`
-      : `allocation.slicing.maxSlices ${maxSlices} caps the ${agentsRequested} agents size ${size} requests at gear ${gear}`)
-    : null;
-
-  const slices = agentsAchievable;
-  const perSliceMinutes = Math.round((minutes / slices) * 10) / 10;
-  const out = {
-    ok: true, minutes, size, gear, gearSource,
-    agentsRequested, agentsAchievable, achievableBasis, reason,
-    ...(pathGroups ? { pathGroups } : {}),
-    slices, perSliceMinutes, counts, weights,
-    targetMinutes: target, maxSlices, gears,
-    overTarget: perSliceMinutes > target[1],
-  };
-  emit(out, [
-    `estimate: ${minutes} agent-min -> size ${size} at gear ${gear} (${gearSource})`,
-    `  agents: requested ${agentsRequested}, achievable ${agentsAchievable} (${achievableBasis})${reason ? ` — ${reason}` : ''}`,
-    `  ${slices} slice(s) ~${perSliceMinutes}min each (target ${target[0]}-${target[1]}min, cap ${maxSlices})`,
-    // What would actually move the number: a gear only helps while the gear is
-    // what bounds the set. Once the partition does, a wider closure decomposition is the only lever.
-    ...(out.overTarget ? [`  each slice still exceeds ${target[1]}min — ${reason ? 'decompose the closure into more disjoint prefixes' : 'raise the gear or decompose the closure finer'} before enqueue`] : []),
-  ].join('\n'), args.json);
-}
-
 /* --------------------------------------------------------------- enqueue */
 function cmdEnqueue(ledger, args, repo) {
   const db = ledger.db, workflowId = args.workflow, now = Date.now();
@@ -3822,23 +3756,6 @@ function deferQueuedTestLeg(ledger, { job, op, payload, via, args }) {
 // `api run-deferred-tests --workflow <id> [--kind unit|e2e] [--dry-run]`: the owner's "test later" - every leg the
 // specs switches deferred goes back to queued on its same attempt, stamped specsForced so it dispatches even while
 // its class is still off; then the Kernel routes and dispatches it as usual.
-function cmdRunDeferredTests(ledger, args) {
-  const db = ledger.db, workflowId = args.workflow;
-  const wf = getWorkflow(db, workflowId);
-  if (!wf) throw Object.assign(new Error(`unknown workflow ${workflowId}`), { code: 'workflow-unknown' });
-  if (args.kind != null && !SPECS_CLASSES.includes(args.kind)) throw Object.assign(new Error(`--kind must be ${SPECS_CLASSES.join('|')}, got '${args.kind}'`), { code: 'deferred-tests-bad-kind' });
-  if (wf.phase === 'finished' || wf.archived_at) throw Object.assign(new Error(`workflow ${workflowId} is ${wf.archived_at ? 'archived' : 'finished'}; its deferred tests run in a new workflow`), { code: 'workflow-finished' });
-  const kind = args.kind ?? null;
-  const pending = deferredTestsOf(db, workflowId, { kind });
-  const requeued = args['dry-run'] ? [] : requeueDeferredTests(ledger, { workflowId, kind, by: args.by ?? 'owner' });
-  const out = { ok: true, workflowId, kind, dryRun: Boolean(args['dry-run']), deferred: pending, requeued, specs: ownerSpecs(skillRoot) };
-  emit(out, [
-    `run-deferred-tests ${workflowId}${kind ? ` --kind ${kind}` : ''}: ${args['dry-run'] ? `would re-queue ${pending.length}` : `re-queued ${requeued.length}`} deferred test leg(s)`,
-    ...(args['dry-run'] ? pending : requeued).map((item) => `  ${item.jobId} ${item.op} a${item.attempt} (${item.reason})`),
-    ...(requeued.length ? ['  next: api status, then route and dispatch each (they run even while the switch is still off)'] : []),
-  ].join('\n'), args.json);
-}
-
 /* ----------------------------------------------------------------- route */
 // The quota probe shells out to a provider CLI, so it is imported lazily and
 // every probe degrades to {state:'unknown'} when it throws — routing still
@@ -9238,14 +9155,14 @@ const opGuardLaunch = ({ job, jobId, repo, placements, workerCwd, shims = true }
   }
 };
 const KERNEL_ONLY_VERBS = new Set(['plan', 'enqueue', 'route', 'dispatch', 'reconcile', 'nudge', 'observe',
-  'questions', 'messages', 'reply', 'foundation', 'record-change', 'settle', 'check', 'consume-report', 'incident', 'provider-health', 'finish', 'archive', 'autopilot', 'contract-release', 'run-deferred-tests']);
+  'questions', 'messages', 'reply', 'foundation', 'record-change', 'settle', 'check', 'consume-report', 'incident', 'provider-health', 'finish', 'archive', 'autopilot', 'contract-release']);
 /* ------------------------------------------------------------------ extensions */
 // New verbs, boolean flags and status fields are files, not edits of the shared lines above
 // (scripts/kernel/api-extensions.mjs; lane land-throughput 2026-09-28).
 const API_EXT = await loadApiExtensions();
 // What an extension verb may call of this module (the settle's async tail: scripts/kernel/api-verbs/settle-tail.mjs).
 const API_INTERNALS = Object.freeze({
-  runSettleTail,
+  runSettleTail, ownerRoot,
   // Verbs split out of this file (lane slim-04) still call these shared helpers.
   skillRoot, getWorkflow,
 });
@@ -9295,7 +9212,6 @@ async function main() {
     'contract-release': ['family'],
     'cut-seam': [],
     autopilot: ['workflow'],
-    'run-deferred-tests': ['workflow'],
   };
   if (!required[cmd]) usage(2);
   for (const k of required[cmd]) need(args[k], `${cmd} needs --${k}`);
@@ -9336,7 +9252,6 @@ async function main() {
       case 'hierarchy': return cmdHierarchy(ledger, args);
       case 'plan': return cmdPlan(ledger, args);
       case 'enqueue': return cmdEnqueue(ledger, args, repo);
-      case 'estimate': return cmdEstimate(ledger, args);
       case 'route': return await cmdRoute(ledger, args);
       case 'dispatch': return cmdDispatch(ledger, args, repo);
       case 'reconcile': return cmdReconcile(ledger, args, repo);
@@ -9360,7 +9275,6 @@ async function main() {
       case 'contract-release': return cmdContractRelease(ledger, args);
       case 'cut-seam': return cmdCutSeam(ledger, args, repo, caller);
       case 'autopilot': return cmdAutopilot(ledger, args, repo);
-      case 'run-deferred-tests': return cmdRunDeferredTests(ledger, args);
     }
   } catch (error) {
     console.error(JSON.stringify({ ok: false, error: String(error?.message ?? error), code: error?.code }));
