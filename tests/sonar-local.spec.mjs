@@ -176,7 +176,7 @@ test('status reports server, custody and token validity - never a value', async 
   let blobBytes;
   const blobbed=await sonarLocalMain(['status','--blob'],{config:configFor(host,custody),
     put:async bytes=>{blobBytes=Buffer.from(bytes);return {sha:'a'.repeat(64),size:bytes.length,mediaType:'application/json'};}});
-  assert.deepEqual(blobbed.blob,{sha:'a'.repeat(64)});
+  assert.deepEqual(blobbed.blob,{sha:'a'.repeat(64),redaction:'v1'});
   assert.deepEqual(JSON.parse(blobBytes.toString()),blobbed.report);
 });
 
@@ -390,7 +390,7 @@ test('--blob stores both the sanitized scanner log and the Sonar report', async 
     {config:configFor(host,custody),put});
   assert.equal(exitCode,0,JSON.stringify(report));
   assert.equal(report.scanner.logSha,String(1).padStart(64,'0'));
-  assert.deepEqual(blob,{sha:String(2).padStart(64,'0')});
+  assert.deepEqual(blob,{sha:String(2).padStart(64,'0'),redaction:'v1'});
   assert.equal(saved[0].mediaType,'text/plain');
   assert.equal(saved[1].mediaType,'application/json');
   assert.deepEqual(JSON.parse(saved[1].body),report);
