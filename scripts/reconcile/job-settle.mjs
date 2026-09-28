@@ -54,7 +54,7 @@ import path from 'node:path';
 import crypto from 'node:crypto';
 import { spawnSync, spawn } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
-import { openLedger, ledgerFileFor, updateAttempt } from '../../engine/ledger-db.mjs';
+import { openLedger, ledgerFileFor, updateAttempt, releaseLeases, setCondition } from '../../engine/ledger-db.mjs';
 import { allocationSettings } from '../../engine/config.mjs';
 import { claimManager, lockHolder } from '../connectors/lib.mjs';
 import { canonParityVerdict, parityEligible, parityFingerprint, parityTransient, PARITY_REASONS, resolveOwnedRoot } from './canon-parity.mjs';
@@ -559,6 +559,7 @@ const lockName = (repo, id) => `job-settle-${repoKey(repo)}-${slug(id)}`;
  */
 export async function reconcileJobSettle({ repo, workflowId = null, jobId = null, dryRun = false, now = Date.now, env = process.env,
   settings = settlerSettings(), verify = verifyReported, api = runApi, close = null, locks = true } = {}) {
+  await loadDecisions();
   const out = { ok: true, repo: path.resolve(repo), workflowId, jobId, settled: [], kernel: [], released: [], skipped: [], errors: [] };
   const ledger = openLedger({ file: ledgerFileFor(path.resolve(repo)) });
   try {
@@ -611,6 +612,10 @@ export async function reconcileJobSettle({ repo, workflowId = null, jobId = null
     // The async settle tail (api settle-tail): a failed or never-started tail run is retried here.
     if (!dryRun) {
       try { out.tails = retryDueTails({ repo, settings, env, now: now() }); } catch (error) { out.errors.push({ step: 'tail', error: String(error?.message ?? error).slice(0, 300) }); }
+      // H12: leaked leases and overdue incidents are closed or escalated through their owner, every pass.
+      if (!jobId) {
+        try { out.leaks = sweepLedgerLeaks(ledger, { workflowId, now: now() }); } catch (error) { out.errors.push({ step: 'leaks', error: String(error?.message ?? error).slice(0, 300) }); }
+      }
     }
     // released -> worktree-removed (DESIGN §16.7): every released isolated op's product worktree goes now, finished
     // workflows' integration worktrees once landed, and leftovers are swept (each logged as a bug).
@@ -621,6 +626,59 @@ export async function reconcileJobSettle({ repo, workflowId = null, jobId = null
   } finally { ledger.close(); }
   return out;
 }
+
+/* ------------------------------------------------------------ leaks (H12) */
+
+/** An open incident without a due time is overdue after this long (its owner still answers for it). */
+export const INCIDENT_DEFAULT_DUE_MS = 24 * 3_600_000;
+const LIVE_JOB = ['leased', 'running', 'answering', 'reported', 'deciding', 'effect_unknown'];
+const DECIDER_OF = { owner: 'owner', supervisor: 'supervisor' };
+/**
+ * H12: the ledger's leaks (DBTREE v_ledger_leaks), each closed through its owner:
+ *   - an expired lease of a job that is not live any more (queued/ready: a launch that never finished) is released;
+ *   - an expired lease of a live job raises the job's LeaseLive=False condition (owner controller): the Job controller's
+ *     dead-worker step reads it, and v_blocking shows it until the lease is renewed or the job settles;
+ *   - an open incident past its due time (or older than INCIDENT_DEFAULT_DUE_MS without one) opens ONE stale-gate
+ *     Decision Item for the incident's owner.
+ * Returns {leases:[...], incidents:[...]}. Idempotent: a condition only moves once, a Decision Item is keyed.
+ */
+export function sweepLedgerLeaks(ledger, { workflowId = null, now = Date.now() } = {}) {
+  const db = ledger.db, out = { leases: [], incidents: [] };
+  const scoped = (sql) => workflowId ? `${sql} AND workflow_id=?` : sql;
+  const args = (...a) => (workflowId ? [...a, workflowId] : a);
+  const leases = db.prepare(scoped('SELECT DISTINCT l.job_id, l.workflow_id, j.status FROM leases l JOIN jobs j ON j.job_id=l.job_id WHERE l.expires_at < ?').replace('AND workflow_id', 'AND l.workflow_id')).all(...args(now));
+  for (const lease of leases) {
+    if (!LIVE_JOB.includes(lease.status)) {
+      const released = ledger.transaction((tx) => releaseLeases(tx, { jobId: lease.job_id }));
+      out.leases.push({ jobId: lease.job_id, status: lease.status, released });
+      continue;
+    }
+    const moved = ledger.transaction((tx) => setCondition(tx, { workflowId: lease.workflow_id, entityType: 'job', entityId: lease.job_id, type: 'LeaseLive', status: 'False',
+      reason: 'LeaseExpired', owner: 'controller', message: `${lease.status} job's lease expired: its worker stopped renewing (dead-worker check)`, at: now }));
+    out.leases.push({ jobId: lease.job_id, status: lease.status, condition: 'LeaseLive=False', moved });
+  }
+  const incidents = db.prepare(scoped(`SELECT incident_id, workflow_id, job_id, kind, owner, detail, last_progress, due_at, created_at FROM incidents
+    WHERE status='open' AND COALESCE(due_at, created_at + ${INCIDENT_DEFAULT_DUE_MS}) < ?`)).all(...args(now));
+  let open = null;
+  for (const inc of incidents) {
+    try {
+      open ??= openDecisionFn();
+      const decider = DECIDER_OF[inc.owner] ?? 'kernel';
+      const di = open(ledger, { kind: 'stale-gate', decider, workflowId: inc.workflow_id, entity: inc.job_id ? { type: 'job', id: inc.job_id } : { type: 'workflow', id: inc.workflow_id },
+        idempotencyKey: `incident-overdue:${inc.incident_id}`, by: 'settler',
+        summary: `incident ${inc.incident_id} (${inc.kind}, owner ${inc.owner ?? '-'}) is open past its due time: resolve it or say why it still holds - ${String(inc.detail ?? inc.last_progress ?? '').slice(0, 300)}` }, { now })?.di ?? null;
+      out.incidents.push({ incidentId: inc.incident_id, decider, decision: di?.id ?? null });
+    } catch (error) { out.incidents.push({ incidentId: inc.incident_id, error: String(error?.message ?? error).slice(0, 200) }); }
+  }
+  return out;
+}
+let decisionsModule = null;
+const openDecisionFn = () => {
+  if (!decisionsModule) throw Object.assign(new Error('decisions module not loaded'), { code: 'decisions-unloaded' });
+  return decisionsModule.openDecisionRow;
+};
+/** Load the Decision Item writer once (scripts/reconciler/decisions.mjs) before a sweep that may need it. */
+export const loadDecisions = async () => { decisionsModule ??= await import('../reconciler/decisions.mjs'); return decisionsModule; };
 
 /* ------------------------------------------------------------ async settle tail queue */
 
@@ -675,7 +733,9 @@ export function startSettlerFor(repo, { workflowId = null, jobId = null, env = p
 /** The ledgers the Supervisor watches (config.yaml supervisor.repos, scripts/supervisor/home.mjs productRepos). */
 export const supervisedRepos = async () => { try { return (await import('../supervisor/home.mjs')).productRepos(); } catch { return []; } };
 
-if (process.argv[1] && path.resolve(process.argv[1]) === selfFile) {
+// No top-level await: scripts/reconciler/decisions.mjs imports this module, and a dynamic import of it while this
+// module still evaluates would deadlock (exit 13).
+if (process.argv[1] && path.resolve(process.argv[1]) === selfFile) (async () => {
   const argv = process.argv.slice(2);
   const val = (n) => { const i = argv.indexOf(`--${n}`); return i >= 0 ? argv[i + 1] ?? null : null; };
   const has = (n) => argv.includes(`--${n}`);
@@ -699,4 +759,4 @@ if (process.argv[1] && path.resolve(process.argv[1]) === selfFile) {
   if (has('json')) console.log(JSON.stringify(out));
   else for (const r of results) console.log(`[settler] ${r.repo}${r.violations ? ` violations=${r.violations.length}` : ` settled=${r.settled?.length ?? 0} kernel=${r.kernel?.length ?? 0} released=${r.released?.filter((x) => x.state === 'released').length ?? 0}${r.action ? ` ${r.action}` : ''}${r.errors?.length ? ` errors=${r.errors.length}` : ''}`}`);
   process.exitCode = out.ok ? 0 : 1;
-}
+})();

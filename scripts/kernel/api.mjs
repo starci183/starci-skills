@@ -2662,11 +2662,16 @@ const HOST_TERMINAL_WIPE = 'host-terminal-wipe';
 const LAUNCH_ABANDONED = 'launch-abandoned';
 const hostTerminalWipeOf = (db, job, worker, sinceMs) => {
   if (worker?.liveness === LAUNCH_ABANDONED) return { cause: LAUNCH_ABANDONED, errorCode: null, kernelTerminal: null, proof: 'no-worker-launched' };
-  if (worker?.liveness === 'disconnected' || (worker?.liveness === 'gone' && TERMINAL_GONE_CODES.has(worker.errorCode))) {
-    const wide = hostWideDisconnectOf(db);
-    if (wide) return { cause: HOST_TERMINAL_WIPE, errorCode: worker.errorCode ?? null, kernelTerminal: null, proof: 'host-wide-disconnect', workflows: wide };
+  // H14: EVERY death without a report is checked against the host-event window, whatever the worker's liveness
+  // read (gone, disconnected, wedged, quiet): a host wipe is never the op's business failure.
+  const wide = hostWideDisconnectOf(db);
+  if (wide) return { cause: HOST_TERMINAL_WIPE, errorCode: worker?.errorCode ?? null, kernelTerminal: null, proof: 'host-wide-disconnect', workflows: wide };
+  const clearedSince = () => db.prepare("SELECT payload_json FROM events WHERE workflow_id=? AND kind='kernel-stale-cleared' AND created_at>=? ORDER BY seq DESC")
+    .all(job.workflow_id, Number(sinceMs) || 0).map((row) => parseJson(row.payload_json, {}) ?? {}).find((p) => TERMINAL_GONE_CODES.has(p.reason));
+  if (worker?.liveness !== 'gone' || !TERMINAL_GONE_CODES.has(worker.errorCode)) {
+    const cleared = clearedSince();
+    return cleared ? { cause: HOST_TERMINAL_WIPE, errorCode: worker?.errorCode ?? null, kernelTerminal: cleared.terminal ?? null, proof: 'kernel-stale-cleared' } : null;
   }
-  if (worker?.liveness !== 'gone' || !TERMINAL_GONE_CODES.has(worker.errorCode)) return null;
   const seat = kernelSeatOf(db, job.workflow_id);
   if (seat?.terminal && seat.terminal !== worker.terminalHandle) {
     const shown = bestEffort(() => terminalShow({ terminal: seat.terminal }));
