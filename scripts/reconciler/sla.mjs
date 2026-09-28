@@ -223,6 +223,7 @@ function truthSources(ctx) {
   };
   return {
     ledgerOf,
+    state: (fn) => withStateDb(ctx, fn, null),
     registry: async () => {
       if (registry === undefined) {
         try { registry = ctx?.serviceRegistry ? await ctx.serviceRegistry() : (await import('./services.mjs')).serviceRegistry(); } catch { registry = null; }
@@ -272,6 +273,18 @@ export async function clockTruth(row, code, src, { now = Date.now() } = {}) {
       }
       return { holds: true };
     }
+    if (code === TRANSCRIPT_CODE && p[0] === 'attempt' && p.length >= 3) {
+      const db = src.ledgerOf(p[1]);
+      if (!db) return null;
+      const a = db.prepare('SELECT transcript_sha FROM op_attempts WHERE attempt_id=?').get(p.slice(2).join(':'));
+      if (!a) return { holds: false, why: 'attempt gone' };
+      return a.transcript_sha ? { holds: false, why: 'transcript captured' } : { holds: true };
+    }
+    if (code === TRANSCRIPT_CODE && p[0] === 'seat-turn' && p.length >= 2) {
+      const t = src.state?.((db) => db.prepare('SELECT t.seat_id, t.ended_at, EXISTS(SELECT 1 FROM seat_transcript_snapshots s WHERE s.seat_id=t.seat_id AND s.at >= t.ended_at) AS captured FROM seat_turns t WHERE t.turn_id=?').get(Number(p[1])));
+      if (t == null) return null;
+      return t.captured ? { holds: false, why: 'transcript captured' } : { holds: true };
+    }
     if ((p[0] === 'workflow' && p.length >= 3) || (p[0] === 'stuck' && p.length >= 4)) {
       const db = src.ledgerOf(p[1]);
       if (!db) return null;
@@ -282,6 +295,55 @@ export async function clockTruth(row, code, src, { now = Date.now() } = {}) {
     }
     return null;
   } catch { return null; }
+}
+
+/* ------------------------------------------------------------------------------------------------ transcripts */
+// TRANSCRIPT_MISSING (UI-API §2.10): a closed op attempt (op_attempts.terminal_closed_at set) whose full scrollback
+// never became a blob (transcript_sha NULL), or an ended seat turn (machine seat_turns.ended_at) with no seat transcript
+// snapshot taken at or after its end. The clock starts at the close/end; the catalogue's grace (slaMs) is how long the
+// capture (a3-3: close-op-terminal.mjs, orca-runs.mjs) may take. A ledger or state DB without those tables (the old
+// schema) is skipped. The truth check clears the clock once the transcript exists.
+
+export const TRANSCRIPT_CODE = 'TRANSCRIPT_MISSING';
+const TRANSCRIPT_WINDOW_MS = 86_400_000;
+const TRANSCRIPT_LIMIT = 200;
+const hasTable = (db, name) => Boolean(db.prepare("SELECT 1 FROM sqlite_master WHERE type IN ('table','view') AND name=?").get(name));
+
+/** The closed attempts of one ledger that lack a transcript: [{attemptId, workflowId, closedAt}]. Pure over the handle. */
+export function attemptsWithoutTranscript(db, { now = Date.now(), windowMs = TRANSCRIPT_WINDOW_MS, limit = TRANSCRIPT_LIMIT } = {}) {
+  if (!hasTable(db, 'op_attempts')) return [];
+  const cols = new Set(db.prepare('PRAGMA table_info(op_attempts)').all().map((c) => c.name));
+  if (!cols.has('transcript_sha') || !cols.has('terminal_closed_at')) return [];
+  return db.prepare('SELECT attempt_id, workflow_id, terminal_closed_at FROM op_attempts WHERE terminal_closed_at IS NOT NULL AND transcript_sha IS NULL AND terminal_closed_at > ? ORDER BY terminal_closed_at DESC LIMIT ?')
+    .all(now - windowMs, limit).map((r) => ({ attemptId: r.attempt_id, workflowId: r.workflow_id ?? null, closedAt: Number(r.terminal_closed_at) }));
+}
+
+/** The ended seat turns (machine.sqlite) with no transcript snapshot at or after their end: [{turnId, seatId, endedAt}]. */
+export function seatTurnsWithoutTranscript(db, { now = Date.now(), windowMs = TRANSCRIPT_WINDOW_MS, limit = TRANSCRIPT_LIMIT } = {}) {
+  if (!hasTable(db, 'seat_turns') || !hasTable(db, 'seat_transcript_snapshots')) return [];
+  return db.prepare(`SELECT t.turn_id, t.seat_id, t.ended_at FROM seat_turns t WHERE t.ended_at IS NOT NULL AND t.ended_at > ?
+      AND NOT EXISTS(SELECT 1 FROM seat_transcript_snapshots s WHERE s.seat_id=t.seat_id AND s.at >= t.ended_at) ORDER BY t.ended_at DESC LIMIT ?`)
+    .all(now - windowMs, limit).map((r) => ({ turnId: r.turn_id, seatId: r.seat_id, endedAt: Number(r.ended_at) }));
+}
+
+/** Start a TRANSCRIPT_MISSING clock per attempt / seat turn found. Returns the number of clocks set. Never throws. */
+export async function transcriptPass(ctx, { catalog, now }) {
+  const graceMs = catalog?.codes?.[TRANSCRIPT_CODE]?.slaMs ?? 120_000;
+  const found = [];
+  const list = typeof ctx?.ledgers === 'function' ? ctx.ledgers() : ctx?.ledgers ?? [];
+  for (const l of list.filter((x) => x?.ledgerId && x.ledgerId !== 'supervisor' && x.file)) {
+    let db = null;
+    try {
+      if (!fs.existsSync(l.file)) continue;
+      db = (ctx.openReader ?? openLedgerReader)(l.file);
+      for (const a of attemptsWithoutTranscript(db, { now })) found.push({ entity: `attempt:${l.ledgerId}:${a.attemptId}`, ledgerId: l.ledgerId, enteredAt: a.closedAt, meta: { workflowId: a.workflowId } });
+    } catch { /* unreadable ledger: its own clocks cover it */ } finally { try { db?.close(); } catch { /* closed */ } }
+  }
+  for (const t of withStateDb(ctx, (db) => seatTurnsWithoutTranscript(db, { now }), []) ?? []) found.push({ entity: `seat-turn:${t.turnId}`, ledgerId: 'supervisor', enteredAt: t.endedAt, meta: { seatId: t.seatId } });
+  for (const f of found) {
+    try { await setClock(ctx, { entity: f.entity, state: TRANSCRIPT_CODE, slaMs: graceMs, ledgerId: f.ledgerId, enteredAt: f.enteredAt, meta: { code: TRANSCRIPT_CODE, owner: 'gc-controller', ...f.meta } }); } catch { /* next */ }
+  }
+  return found.length;
 }
 
 /** Clear every open clock whose condition is gone. Returns Map(entity KEY_SEP state -> why). */
@@ -315,6 +377,7 @@ export async function slaPass(ctx, { catalog = null, env = ctx?.env ?? process.e
   const now = typeof ctx?.now === 'function' ? ctx.now() : Date.now();
   const cat = catalog ?? slaCatalog();
   const out = { ok: true, violated: [], cleared: [], decisions: 0, skipped: [], truthCleared: [] };
+  try { out.transcriptClocks = await transcriptPass(ctx, { catalog: cat, now }); } catch { out.transcriptClocks = 0; }
   const truth = await truthPass(ctx, { catalog: cat, now });
   out.truthCleared = [...truth.entries()].map(([k, why]) => ({ clock: k.split(KEY_SEP).join(' '), why }));
   const due = withStateDb(ctx, (db) => db.prepare('SELECT * FROM sla_clocks WHERE violated_at IS NULL AND cleared_at IS NULL AND entered_at + sla_ms < ? ORDER BY entered_at').all(now), null);

@@ -48,6 +48,7 @@ codes:
   TERMINAL_LEAK:            {slaMs: 60000, severity: warn, owner: gc-controller, autoAction: 'close and verify; an ownerless terminal waits housekeeping.gcMinAgeMs'}
   TASK_LEAK:                {slaMs: 300000, severity: warn, owner: gc-controller, autoAction: 'close the Orca Task'}
   LEASE_LEAK:               {slaMs: 60000, severity: warn, owner: gc-controller, autoAction: 'release the lease'}
+  TRANSCRIPT_MISSING:       {slaMs: 120000, severity: warn, owner: gc-controller, autoAction: 'none (reported): a closed op attempt without op_attempts.transcript_sha, or an ended seat turn without a seat transcript snapshot, past the capture grace (scripts/reconciler/sla.mjs transcriptPass; entity attempt:<ledgerId>:<attemptId> or seat-turn:<turnId>)'}
   # ---- Workflow (§9.2): the workflow controller (this lane) sets these.
   WAIT_OVERDUE:             {slaKey: opTelemetry.stuckSla.dependency.warnMs, criticalKey: opTelemetry.stuckSla.dependency.criticalMs, severity: warn, owner: workflow-controller, autoAction: 'none (reported); the clock carries the stuckSla of its wait kind'}
   PEER_WAIT_OVERDUE:        {slaKey: opTelemetry.stuckSla.peer-wait.warnMs, criticalKey: opTelemetry.stuckSla.peer-wait.criticalMs, severity: warn, owner: workflow-controller, autoAction: 'a STALE-PEER-WAIT finding opens a stale-peer-wait DI'}
