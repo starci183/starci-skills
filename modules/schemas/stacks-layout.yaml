@@ -54,6 +54,8 @@ custody:
     and `!.starcistacks/*/infra/terraform/**`; then deny the VALUE files inside infra AGAIN, after those
     re-includes (git applies the last matching rule, so a re-include written after `.env.*` tracked
     every plaintext env under compose - mia inc-5360513a96b3: .starcistacks/dev/infra/compose/.env.generated),
+    deny the credential files terraform decodes into infra/terraform/files/ and packs into a tarball
+    (mia-mia-backend 2026-09-28: the terraform re-include alone exposed 14 decoded vps credentials),
     and re-include `!.starcistacks/**/*.enc` LAST so every encrypted twin survives every deny. The exact
     ordered list is gitignoreRules; starci-starcistacks-check refuses a repository whose rules leave a value
     file under infra unignored (STACKS_GITIGNORE_VALUE_OPEN) or that tracks one (STACKS_PLAINTEXT_TRACKED).
@@ -77,6 +79,8 @@ custody:
     - .starcistacks/*/infra/terraform/.terraform/
     - .starcistacks/*/infra/terraform/*.tfstate
     - .starcistacks/*/infra/terraform/*.tfstate.*
+    - .starcistacks/*/infra/terraform/files/
+    - .starcistacks/*/infra/terraform/*.tar.gz
     - '!.starcistacks/**/*.enc'
   legacyRoot: >-
     `.stacks` is the pre-rename name of the same tree (the runtime's source host and older products

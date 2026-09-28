@@ -228,8 +228,24 @@ test('ignore rules that leave an infra value file trackable are refused; the lay
   assert.ok(!codes(result).includes('STACKS_RUNBOOK_IGNORED'), JSON.stringify(result.findings));
   for (const [rel, ignored] of [['dev/infra/compose/.env.generated', true], ['dev/infra/compose/.env.generated.enc', false], ['dev/infra/compose/compose.yaml', false],
     ['dev/infra/compose/sub/.env.local', true], ['dev/infra/terraform/main.tf', false], ['dev/infra/terraform/prod.tfvars', true], ['dev/runtime/env/app.env', true], ['application-stacks.yaml', false],
-    ['dev/README.md', false]])
+    ['dev/README.md', false], ['vps/infra/terraform/files/postgres-password.txt', true], ['vps/infra/terraform/files.tar.gz', true]])
     assert.equal(g('check-ignore', '-q', '--no-index', '--', `.starcistacks/${rel}`).status === 0, ignored, rel);
   assert.ok(CODES.includes('STACKS_GITIGNORE_VALUE_OPEN'));
   assert.ok(CODES.includes('STACKS_RUNBOOK_IGNORED'));
+});
+
+test('a frontend governed by its backend declaration is not held to the backend-only CI wiring', (t) => {
+  const { dir, host } = workspace(t);
+  const backend = path.join(dir, 'backend'), frontend = path.join(dir, 'product-fe');
+  const registry = { provider: 'ghcr', mode: 'hosted', host: { public: 'https://ghcr.io' }, auth: 'github-token',
+    projects: [{ repository: 'backend', key: 'ghcr.io/org/backend' }], credentials: [],
+    ci: { wiring: 'required', permissions: ['packages: write'], secrets: [], vars: [] }, ownerAction: 'none' };
+  write(path.join(backend, '.starcistacks', DECL), yamlOf({ ...baseDoc, sources: [{ repository: 'backend' }, { repository: 'product-fe' }],
+    services: { sonar: sonarEntry('product-fe'), codecov: codecovEntry('product-fe'), 'container-registry': registry } }));
+  write(path.join(frontend, '.github', 'workflows', 'ci.yml'), CI);
+  process.env.STARCI_SOURCE_ROOT = host;
+  const result = checkStarciStacks(frontend);
+  assert.equal(result.governedBy?.endsWith('backend'), true, JSON.stringify(result));
+  assert.ok(!codes(result).includes('STACKS_CI_UNUSED'), JSON.stringify(result.findings));
+  assert.ok(!codes(result).includes('STACKS_DECLARATION_MISSING'), JSON.stringify(result.findings));
 });

@@ -374,7 +374,10 @@ export function checkStarciStacks(repoRoot, { newRepo = false, advisoryCodes = [
         add('refuse', 'STACKS_OWNER_ACTION_REDUNDANT', `${at}.ownerAction`, 'every credential is already in custody; ownerAction must be none - the owner is never asked for what the runtime holds');
       if (service.ci.wiring === 'not-used' && ciUses[id].length)
         add('refuse', 'STACKS_CI_CONTRADICTION', `${at}.ci`, `ci.wiring not-used, but ${ciUses[id].join(', ')} call it`);
-      if (service.ci.wiring === 'required' && !ciUses[id].length && SERVICE_CATALOG[id].ci.length)
+      // A frontend governed by its backend declaration answers only for the services that name it as a project:
+      // the backend CI wiring (its image registry, say) is not the frontend's to call.
+      const servesThisRepository = !governing || service.projects.some((project) => project.repository === name);
+      if (service.ci.wiring === 'required' && !ciUses[id].length && SERVICE_CATALOG[id].ci.length && servesThisRepository)
         add('suspect', 'STACKS_CI_UNUSED', `${at}.ci`, 'ci.wiring required, but no workflow calls the service');
       if (['required', 'optional-follow-up'].includes(service.ci.wiring) && ciUses[id].length)
         for (const item of [...service.ci.secrets, ...service.ci.vars])

@@ -2,15 +2,33 @@ node_modules/
 dist/
 *.tsbuildinfo
 
-# Decrypted, DEMO-ONLY secret materializations - never the tracked record.
-.starcistacks/*/runtime/env/*.env
-!.starcistacks/*/runtime/env/*.env.enc
-.starcistacks/*/runtime/files/*.key
-!.starcistacks/*/runtime/files/*.key.enc
-.starcistacks/*/runtime/config/*.yaml
-!.starcistacks/*/runtime/config/*.yaml.enc
-.starcistacks/*/secrets/*
-!.starcistacks/*/secrets/*.enc
+# .starcistacks custody: the ordered modules/schemas/stacks-layout.yaml custody.gitignoreRules, plus the
+# value-free members this kit tracks (seeds, rendered environment.json, the VPS stack file and the
+# DEMO-ONLY age identity). Decrypted materializations are never the tracked record.
+.starcistacks/**
+!.starcistacks/**/
+!.starcistacks/**/KEYS.md
+!.starcistacks/**/.gitkeep
+!.starcistacks/application-stacks.yaml
+!.starcistacks/*/README.md
+!.starcistacks/*/environment.json
+!.starcistacks/*/seeds/**
+!.starcistacks/*/infra/stack.yaml
+!.starcistacks/dev/runtime/env/demo.agekey
+!.starcistacks/*/infra/compose/**
+!.starcistacks/*/infra/terraform/**
+.starcistacks/*/infra/**/.env
+.starcistacks/*/infra/**/.env.*
+.starcistacks/*/infra/**/*.env
+.starcistacks/*/infra/**/*.key
+.starcistacks/*/infra/**/*.pem
+.starcistacks/*/infra/**/*.tfvars
+.starcistacks/*/infra/terraform/.terraform/
+.starcistacks/*/infra/terraform/*.tfstate
+.starcistacks/*/infra/terraform/*.tfstate.*
+.starcistacks/*/infra/terraform/files/
+.starcistacks/*/infra/terraform/*.tar.gz
+!.starcistacks/**/*.enc
 
 # UAT run videos ARE tracked, by owner ruling (2026-09-18): the recording is acceptance evidence an
 # outsourcer has to be able to open from a fresh clone, and
