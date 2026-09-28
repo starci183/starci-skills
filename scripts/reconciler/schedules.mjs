@@ -8,8 +8,8 @@
 //
 //   claimDue(ctx, {controller, duty, intervalMs, now, earlyAfterMs?, force?})
 //        -> {due: true, reason: 'first-run'|'due'|'early'|'forced'|'reclaimed'} once this caller holds the run
-//           (running_pid), or {due: false, nextAt, reason?}. A row whose running_pid is dead, or is this process and
-//           older than one interval (a pass that threw), is reclaimed. earlyAfterMs: due already when that long has
+//           (running_pid), or {due: false, nextAt, reason?}. A holder that died or ran past one interval is
+//           reclaimed (machine-db claimSchedule). earlyAfterMs: due already when that long has
 //           passed since the last start (housekeeping on a low-resource host). A fresh store runs each duty once.
 //   finishDuty(ctx, {controller, duty, result: 'done'|'failed'|'skipped'|'unknown', actionId?, digest?})
 //        -> next_due_at = now + interval, running_pid cleared.
@@ -70,11 +70,9 @@ export function claimDue(ctx, { controller, duty, intervalMs, now = Date.now(), 
       const row = m.ensureSchedule({ controller, duty, intervalMs, firstDueAt: now });
       const d = dueOf(row, { intervalMs, now, earlyAfterMs, force, pid });
       if (!d.due) return d;
-      // Make the row claimable now (a reclaimed, early or forced run), then take it; the claim is the no-overlap guard.
-      if (row.running_pid != null || Number(row.next_due_at) > now) {
-        m.finishSchedule({ controller, duty, result: row.running_pid != null ? 'unknown' : row.last_result ?? 'skipped', digest: row.last_result_digest ?? null, nextDueAt: now });
-      }
-      return m.claimSchedule({ controller, duty, pid }) ? d : { due: false, nextAt: null, reason: 'claimed-elsewhere' };
+      // An early or forced run pulls next_due_at in; a dead or expired holder is reclaimed by claimSchedule itself.
+      if (Number(row.next_due_at) > now) m.update('schedules', { next_due_at: now }, { controller, duty });
+      return m.claimSchedule({ controller, duty, pid, ttlMs: intervalMs }) ? d : { due: false, nextAt: null, reason: 'claimed-elsewhere' };
     }), { env: ctx?.env ?? process.env, now: () => now });
   } catch (error) { return { due: false, nextAt: null, reason: 'store-unavailable', error: String(error?.message ?? error).slice(0, 200) }; }
 }

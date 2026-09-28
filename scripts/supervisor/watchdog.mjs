@@ -9,7 +9,8 @@
 //     once by id, reminded every INBOX_REWAKE_MS while it stays open). Delivery is screen-proven
 //     (scripts/kernel/wake-delivery.mjs wakeKernel);
 //   - replaces a seat that refused input SEAT_DEAF_MAX times in a row (kernel-unwritable / -exited / -unavailable /
-//     -wake-failed: MB-05, 42 failed wakes and no replacement on 2026-09-27); a delivered wake resets the count;
+//     -send-failed, counted in machine.sqlite seats/deliveries: MB-05, 42 failed wakes and no replacement on
+//     2026-09-27); a delivered wake resets the count;
 //   - heartbeats channel 'main' while the seat is proven live and registered from its own terminal;
 //   [Worker] terminals are the Job controller's (scripts/reconciler/controllers/job.mjs calls sweepWorkers below).
 //
@@ -40,6 +41,7 @@ import { terminalList } from '../api/orca/terminal-list.mjs';
 import { terminalRename } from '../api/orca/terminal-rename.mjs';
 import { tabTitlesOf } from '../kernel/terminal-dedupe.mjs';
 import { listDecisions } from '../reconciler/decisions.mjs';
+import { withMachine } from '../../engine/machine-db.mjs';
 
 const selfFile = fileURLToPath(import.meta.url);
 const START_FILE = path.join(SKILL_ROOT, 'scripts', 'supervisor', 'start-supervisor.mjs');
@@ -315,7 +317,7 @@ export async function watchdogPass({ env = process.env, d = null, now = Date.now
       // A frozen pane is not a busy seat: Escape an input row aimed at a subagent, then the proven wake.
       const escaped = deps.escape && SUBAGENT_INPUT.test(frame) ? deps.escape(terminal) : null;
       const woke = deps.wake(terminal, plan.text);
-      noteInputOutcome(ledger, terminal, woke.action, now());
+      noteInputOutcome(terminal, woke.action, { env });
       const after = deps.screen(terminal);
       const stillFrozen = after != null && busySignature(after) === signature;
       ledger.transaction(() => supervisorEvent(ledger, { kind: 'supervisor-wake', now: now(), payload: { tags: plan.tags, inbox: plan.inbox, land: plan.land, report: plan.report, decisions: plan.decisions, text: plan.text,
@@ -336,7 +338,7 @@ export async function watchdogPass({ env = process.env, d = null, now = Date.now
     const woke = deps.wake(terminal, plan.text);
     ledger.transaction(() => supervisorEvent(ledger, { kind: 'supervisor-wake', now: now(), payload: { tags: plan.tags, inbox: plan.inbox, land: plan.land, report: plan.report, decisions: plan.decisions, text: plan.text, delivered: woke.delivered === true, action: woke.action } }));
     // MB-05: a seat that refuses input SEAT_DEAF_MAX times in a row is replaced, not woken forever.
-    const deaf = noteInputOutcome(ledger, terminal, woke.action, now());
+    const deaf = noteInputOutcome(terminal, woke.action, { env });
     if (deaf.replace) {
       ledger.transaction(() => supervisorEvent(ledger, { kind: 'supervisor-deaf-replace', now: now(), payload: { terminal, failures: deaf.failures, since: deaf.since, last: woke.action } }));
       ledger.close();
@@ -349,29 +351,18 @@ export async function watchdogPass({ env = process.env, d = null, now = Date.now
   } finally { try { ledger.close(); } catch { /* closed above */ } }
 }
 
-/** MB-05: wake outcomes that mean the seat's terminal refuses input (a stale process, a shell, no terminal). */
-export const INPUT_REFUSED = new Set(['kernel-unwritable', 'kernel-exited', 'kernel-unavailable', 'kernel-wake-failed']);
 /** MB-05: this many refused inputs in a row replace the seat (DBTREE v_deaf_seats: input_failures_consecutive >= 3). */
 export const SEAT_DEAF_MAX = 3;
-export const DEAF_SCOPE = 'supervisor-input';
+export const SUPERVISOR_SEAT_ID = 'supervisor';
 
 /**
- * Count one wake outcome of `terminal`: a refused input adds one, a delivered wake resets, anything else (busy,
- * gated) leaves the count. A new terminal starts from zero. Returns {failures, since, replace}.
+ * Count one wake outcome of the Supervisor seat in machine.sqlite (machine-db recordSeatInput: one deliveries row, the
+ * seat's input_failures_consecutive kept by its trigger; a refused input adds one, a delivered wake resets, busy leaves
+ * it; a new terminal starts from zero). Returns {failures, since, replace}. Never throws.
  */
-export function noteInputOutcome(ledger, terminal, action, now = Date.now()) {
-  try { return countInput(ledger, terminal, action, now); } catch (error) { return { failures: 0, since: null, replace: false, error: String(error?.message ?? error).slice(0, 200) }; }
-}
-function countInput(ledger, terminal, action, now) {
-  const prev = parse(ledger.db.prepare('SELECT value_json FROM signals WHERE scope=? AND key=?').get(DEAF_SCOPE, 'main')?.value_json);
-  const same = prev?.terminal === terminal;
-  let failures = same ? Number(prev.failures) || 0 : 0;
-  let since = same ? prev.since ?? null : null;
-  if (INPUT_REFUSED.has(action)) { failures += 1; since ??= now; }
-  else if (action === 'kernel-woken') { failures = 0; since = null; }
-  ledger.transaction(() => ledger.db.prepare('INSERT INTO signals(scope,key,holder_pid,token,value_json,at,expires_at) VALUES(?,?,?,?,?,?,NULL) ON CONFLICT(scope,key) DO UPDATE SET value_json=excluded.value_json,at=excluded.at')
-    .run(DEAF_SCOPE, 'main', process.pid, null, JSON.stringify({ terminal, failures, since, last: action }), now));
-  return { failures, since, replace: failures >= SEAT_DEAF_MAX };
+export function noteInputOutcome(terminal, action, { env = process.env } = {}) {
+  try { return withMachine((m) => m.recordSeatInput({ seatId: SUPERVISOR_SEAT_ID, terminal, action, role: 'supervisor', max: SEAT_DEAF_MAX }), { env }); }
+  catch (error) { return { failures: 0, since: null, replace: false, error: String(error?.message ?? error).slice(0, 200) }; }
 }
 
 if (process.argv[1] && path.resolve(process.argv[1]) === selfFile) {
