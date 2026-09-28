@@ -205,7 +205,10 @@ export async function runSupervisorTick({ repos = null, push = true, heartbeat =
   // host.kernel-seat; the DEAD-KERNEL alert is the fallback.
   const dead = yielded('host.kernel-seat') ? []
     : await step('deadKernels', () => (deps.deadKernels ?? deadKernels)({ workflows: running, deadKernelMs: t.deadKernelMs, now: now() })) ?? [];
-  const stalled = noProgress((out.tick?.digests ?? []).flatMap((d) => d.stalls ?? []), t);
+  // A stalled or orphaned workflow is the Workflow controller's (progress-stall / orphaned-frontier Decision Items, escalated
+  // to the Supervisor past progress.supervisorGraceMs) while it owns workflow.progress; these alerts are the fallback.
+  const progressOwned = yielded('workflow.progress');
+  const stalled = progressOwned ? [] : noProgress((out.tick?.digests ?? []).flatMap((d) => d.stalls ?? []), t);
   out.flows = { workflows: frontiers?.workflows ?? [], waits: frontiers?.waits ?? {}, orphaned: frontiers?.orphaned ?? [], deadKernels: dead, noProgress: stalled.map((f) => f.line),
     // the waits api status aged past their SLA (op-metrics.mjs stuckOf): owed actions (actions.mjs) and the opHealth duty
     stuck: (frontiers?.stuck ?? []).filter((item) => item.severity === 'warn' || item.severity === 'critical') };
@@ -238,12 +241,12 @@ export async function runSupervisorTick({ repos = null, push = true, heartbeat =
   let state;
   try { state = readTickState(ledger.db); } finally { ledger.close(); }
   const orphanSeen = persisting(out.flows.orphaned.map((o) => o.workflowId), state.seen, { now: now(), minMs: t.orphanedFrontierMs });
-  for (const o of out.flows.orphaned.filter((x) => orphanSeen.persisting.includes(x.workflowId)))
+  for (const o of out.flows.orphaned.filter((x) => !progressOwned && orphanSeen.persisting.includes(x.workflowId)))
     alerts.push({ key: `orphaned-frontier|${o.workflowId}`, text: `ORPHANED-FRONTIER ${wfName(o.workflowId)} for ${Math.round((now() - orphanSeen.seen[o.workflowId]) / 60_000)}m: nothing open and no next step named${o.reason ? ` (${o.reason})` : ''}` });
 
   // The outcome duty FIRST (supervise.yaml mission.progress; scripts/supervisor/progress-watch.mjs): is each workflow,
   // the priority one first, progressing? A Kernel's stall past allocation.progress.supervisorGraceMs is the Supervisor's.
-  out.progress = yielded('workflow.progress') ? null : await step('progress', () => (deps.progress ?? progressDuty)({ flows: out.flows, repos: list, env, now: now(),
+  out.progress = progressOwned ? null : await step('progress', () => (deps.progress ?? progressDuty)({ flows: out.flows, repos: list, env, now: now(),
     acted: withSupervisorRead((db) => actedOf(db, { since: now() - 7 * 24 * 3_600_000 }), { byKey: {} }, { env }),
     notify: deps.notify === null ? null : (deps.notify ?? ((w, text, item) => notifyKernel({ repo: w.repo, workflowId: w.workflowId, text, item, env }))) }));
   // The owed actions (supervise.yaml mission; scripts/supervisor/actions.mjs): every stuck item with its action and SLA.

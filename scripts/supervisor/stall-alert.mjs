@@ -537,7 +537,10 @@ export async function runStallAlert({
   }
 
   // Escalate only when self-heal failed, plus what no Kernel can fix.
-  const escalations = dueEscalations(plan.routed, entries, { now, escalateMs, capMs, rateMs });
+  // A Kernel-routed finding is the Workflow controller's Decision Item while it owns workflow.stall-wake, and the controller
+  // escalates that item to the Supervisor itself; only the supervisor-routed findings (plan.inbox) still go from here.
+  const escalations = plan.routed.length && yieldTo('workflow.stall-wake', null, { owns, env }) ? []
+    : dueEscalations(plan.routed, entries, { now, escalateMs, capMs, rateMs });
   const toSupervisor = [...plan.inbox, ...escalations].map((f) => ({ f, why: escalationWhy(f, entries[f.key], now) }));
   if (toSupervisor.length) {
     try {
