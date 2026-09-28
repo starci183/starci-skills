@@ -3,5 +3,11 @@
   "compilerOptions": {
     "noEmit": false
   },
-  "exclude": ["node_modules", "dist", "src/**/*.spec.ts", "src/tests"]
+  "exclude": [
+    "node_modules",
+    "dist",
+    "src/**/*.spec.ts",
+    "apps/**/*.spec.ts",
+    "src/tests"
+  ]
 }

@@ -7,14 +7,16 @@ recordDigest: 9d1621333c19021fed6bceee3eefcf0a035ae5ce47ff61f42a97f87bd5ffe938
 outcome: pass
 assertions:
   - id: crypto-shred-built
-    command: npx jest src/modules/bussiness/audit/audit-erasure.service.spec.ts
-      src/modules/bussiness/audit/audit-keystore.service.spec.ts
+    command: npx jest src/modules/domain/audit/audit-erasure.service.spec.ts
+      src/modules/domain/audit/audit-keystore.service.spec.ts
     exit: 0
     outcome: pass
-    observation: npx jest src/modules/bussiness/audit/audit-erasure.service.spec.ts
-      src/modules/bussiness/audit/audit-keystore.service.spec.ts exited 0
+    observation: npx jest src/modules/domain/audit/audit-erasure.service.spec.ts
+      src/modules/domain/audit/audit-keystore.service.spec.ts exited 0
 provenance:
   actor: example-evidence
   tool: scripts/example/example-evidence.mjs
   environment: local
   capturedAt: 2026-09-22T18:12:57.923Z
+stale: true
+staleReason: HFS moved the owner paths and implementation code after this evidence was captured; its recorded hashes and assertions remain historical.

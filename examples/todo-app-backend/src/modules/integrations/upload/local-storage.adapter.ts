@@ -8,11 +8,11 @@ import {
     join, resolve, sep 
 } from "node:path"
 import {
-    AppConfigService 
-} from "@modules/platform/config/app-config.service"
+    AppConfigService,
+} from "@modules/platform/config/index"
 import {
-    UploadStorageUnavailableException 
-} from "@modules/shared/exceptions/errors/upload/upload-storage-unavailable"
+    UploadStorageUnavailableException,
+} from "./errors/upload-storage-unavailable"
 import {
     UploadStoragePort 
 } from "./upload.contracts"

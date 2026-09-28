@@ -19,7 +19,7 @@ export type UploadStatus = "pending" | "ready";
 /** What a presigned-intent answer looks like to a client: the verb, the door, the credential header
  * and the expiry - deliberately the same shape an S3 presigned PUT returns, so swapping the storage
  * adapter changes only the url/host, never the client flow. */
-export interface PresignedUpload {
+export interface PresignedUploadResult {
   readonly uploadId: string;
   readonly method: "PUT";
   /** Where the client PUTs the bytes. The local adapter answers the api's own `/uploads/<id>/content`

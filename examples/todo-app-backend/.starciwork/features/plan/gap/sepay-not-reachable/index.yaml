@@ -28,7 +28,7 @@ change:
     - "no module exists yet at src/plan/payments (gap.plan.unbuilt-module)"
     - "no request has ever reached SePay's sandbox merchant account for real"
   reason: Both withdrawn clauses are now false and the measurement replaces them. The plan module and the
-    SePay client exist (src/modules/bussiness/plan, src/modules/integrations/sepay;
+    SePay client exist (src/modules/domain/plan, src/modules/integrations/sepay;
     gap.plan.unbuilt-module is done), and requests have reached SePay's hosts for real from this machine -
     what has not happened is a call that completed, which is the fact this gap has always stood on. The
     record's id keeps its original "not-reachable" spelling because ids are identity, not summary; the

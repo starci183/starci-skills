@@ -14,8 +14,8 @@ exceptionFlows:
 postconditions:
   - event.task.deleted is published, and only after the row is gone.
 composes:
-  - {rule: br.task.delete.final, module: src/modules/bussiness/task}
-  - {rule: br.task.single-owner, module: src/modules/bussiness/task}
+  - {rule: br.task.delete.final, module: src/modules/domain/task}
+  - {rule: br.task.single-owner, module: src/modules/domain/task}
 refs: [event.task.deleted]
 
 blockedBy:
@@ -32,8 +32,8 @@ requiresProof:
 change: {rev: 1, kind: initial, at: 2026-09-19T00:00:00.000Z}
 
 # The flow exists in code and had no record (v6-3 Q1): DeleteTaskResolver
-# (src/features/todo/graphql/mutations/task/delete-task) resolves the session actor and dispatches
-# DeleteTaskCommand to DeleteTaskHandler (src/modules/bussiness/task/delete-task.handler.ts), which calls
+# (src/features/todo/transport/graphql/mutations/task/delete-task) resolves the session actor and dispatches
+# DeleteTaskCommand to DeleteTaskHandler (src/modules/domain/task/delete-task.handler.ts), which calls
 # TaskService.delete - findOwnedRow applies OwnershipGuard unconditionally, so only the owner ever deletes
 # (br.task.single-owner's second statement; br.share.editor.no-delete's ac exercises the same single
 # check), a missing row throws TaskNotFoundException, and TaskDeletedEvent is published after the row is

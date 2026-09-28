@@ -10,9 +10,9 @@ repository: todo-app-frontend
 # en|vi), so the route ownership is now both directories: the page and its media handler. A path
 # that exists but is not the implementation is invisible to an existence check; that is the hazard.
 owners:
-  - {role: route, path: "src/app/[lang]/sign-in"}
-  - {role: route, path: src/app/sign-in}
-  - {role: block, path: src/components/login/sign-in}
+  - {role: route, path: "apps/web/src/app/[lang]/sign-in"}
+  - {role: route, path: apps/web/src/app/sign-in}
+  - {role: block, path: apps/web/src/components/blocks/sign-in-screen}
 revision: b104d71744a67bd6c231e374292c12d78fa7ca9a
 proves: [ui.login.sign-in]
 assets:

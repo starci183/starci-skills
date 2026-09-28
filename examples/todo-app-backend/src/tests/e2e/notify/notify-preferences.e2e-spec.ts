@@ -1,15 +1,15 @@
 import {
     E2EWorld, bootE2EWorld 
-} from "@tests/infra/e2e-world"
+} from "@tests/harness/e2e-world"
 import {
     pollUntil 
-} from "@tests/infra/e2e-poll"
+} from "@tests/harness/e2e-poll"
 import {
     E2E_BOOT_TIMEOUT_MS 
-} from "@tests/infra/testing-infra.options"
+} from "@tests/harness/testing-infra.options"
 import {
     GraphqlObserved 
-} from "@tests/infra/integrations/http/e2e-http.service"
+} from "@tests/harness/integrations/http/e2e-http.service"
 
 jest.setTimeout(120_000)
 
@@ -27,9 +27,9 @@ jest.setTimeout(120_000)
  */
 
 const UPDATE_PREFS =
-  "mutation UpdatePrefs($input: UpdateNotificationPreferencesInput!) { updateNotificationPreferences(input: $input) { channel unsubscribed digestWindowMinutes } }"
+  "mutation UpdatePrefs($input: UpdateNotificationPreferencesInput!) { updateNotificationPreferences(request: $input) { channel unsubscribed digestWindowMinutes } }"
 const UNSUBSCRIBE =
-  "mutation Unsubscribe($input: UnsubscribeInput!) { unsubscribe(input: $input) { channel unsubscribed } }"
+  "mutation Unsubscribe($input: UnsubscribeInput!) { unsubscribe(request: $input) { channel unsubscribed } }"
 
 const RUN = `e2e-notify-${Date.now().toString(36)}`
 const CHANNEL = "email"

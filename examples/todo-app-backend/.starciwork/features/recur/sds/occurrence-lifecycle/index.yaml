@@ -3,7 +3,7 @@ id: sds.recur.occurrence-lifecycle
 title: How an occurrence is born, finished, and outlives its rule
 state: done
 owners:
-  - {role: module, path: src/modules/bussiness/recur}
+  - {role: module, path: src/modules/domain/recur}
 responsibility: "Holds one row per materialised occurrence, its owner, its due instant and its status.
   \"scheduled\" is not a row: an occurrence a rule will fire on next week is a date the generator has not
   reached yet, computed live from the rule (see sds.recur.generation-engine), not a pending record someone

@@ -5,29 +5,29 @@ import {
     Test 
 } from "@nestjs/testing"
 import {
-    AppConfigService 
-} from "@modules/platform/config/app-config.service"
+    AppConfigService,
+} from "@modules/platform/config/index"
 import {
-    KeycloakModule 
-} from "@modules/integrations/keycloak/keycloak.module"
+    KeycloakModule,
+} from "@modules/integrations/keycloak/index"
 import {
-    NotifyQueueModule 
-} from "@modules/integrations/notify-queue/notify-queue.module"
+    NotifyQueueModule,
+} from "@modules/integrations/notify-queue/index"
 import {
-    NotifySmtpClient 
-} from "@modules/integrations/notify-smtp/notify-smtp.client"
+    NotifySmtpClient,
+} from "@modules/integrations/notify-smtp/index"
 import {
-    NotifySmtpModule 
-} from "@modules/integrations/notify-smtp/notify-smtp.module"
+    NotifySmtpModule,
+} from "@modules/integrations/notify-smtp/index"
 import {
-    NotifySmtpPort 
-} from "@modules/integrations/notify-smtp/notify-smtp.contracts"
+    NotifySmtpPort,
+} from "@modules/integrations/notify-smtp/index"
 import {
-    SepayClient 
-} from "@modules/integrations/sepay/sepay.client"
+    SepayClient,
+} from "@modules/integrations/sepay/index"
 import {
-    SepayModule 
-} from "@modules/integrations/sepay/sepay.module"
+    SepayModule,
+} from "@modules/integrations/sepay/index"
 
 /** Wiring edges the main module spec does not reach: SepayModule's own binding and the shared
  * isGlobal extra every integration module-definition carries. */

@@ -9,8 +9,8 @@ repository: todo-app-frontend
 # privacy/, so the served route is still /<lang>/audit/privacy as that narrative says. Quoted because
 # core/yaml.mjs rejects a bracketed plain scalar inside a flow mapping.
 owners:
-  - {role: route, path: "src/app/[lang]/audit"}
-  - {role: block, path: src/components/audit}
+  - {role: route, path: "apps/web/src/app/[lang]/audit"}
+  - {role: block, path: apps/web/src/components/blocks/privacy}
 proves: [ui.audit.privacy]
 
 change:

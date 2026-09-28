@@ -8,7 +8,7 @@ statement: The example is moving to a real NestJS backend and a Next.js frontend
   against.
 closedBy: [impl.share.todo-app-backend.access, impl.share.todo-app-backend.invitations]
 verificationSource: authored-claim
-because: "Both backend-half closers are done with real evidence: src/modules/bussiness/share (access.service.ts,
+because: "Both backend-half closers are done with real evidence: src/modules/domain/share (access.service.ts,
   completion-authority.ts, invitation.service.ts, collaborator-cache.ts, the CQRS commands/queries and
   the GraphQL mutations/queries under features/todo/graphql/{mutations,queries}/share/**) exists,
   builds, typechecks, and is proven by jest and scripts/live-proof-share.sh against the real running

@@ -12,7 +12,7 @@ exceptionFlows:
 postconditions:
   - The export contains no other person's lines.
 composes:
-  - {rule: br.audit.append-only, module: src/modules/bussiness/audit}
+  - {rule: br.audit.append-only, module: src/modules/domain/audit}
 
 requiresProof:
   unit:

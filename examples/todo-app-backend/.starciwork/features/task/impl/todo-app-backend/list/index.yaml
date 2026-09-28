@@ -4,13 +4,13 @@ title: The owned-list query
 state: done
 repository: todo-app-backend
 owners:
-  - {role: module, path: src/modules/bussiness/task}
-  - {role: module, path: src/features/todo/graphql/queries/task/list-tasks}
-  - {role: module, path: src/features/todo/graphql/queries/task/task-counts}
+  - {role: module, path: src/modules/domain/task}
+  - {role: module, path: src/features/todo/transport/graphql/queries/task/list-tasks}
+  - {role: module, path: src/features/todo/transport/graphql/queries/task/task-counts}
 proves: [br.task.list.owned]
 change: {rev: 1, kind: initial, at: 2026-09-19T17:00:00.000Z, reason: "Owners expansion (v10-2):
   owners now also claims the shipped list read doors,
-  src/features/todo/graphql/queries/task/{list-tasks,task-counts} - their resolvers dispatch
+  src/features/todo/transport/graphql/queries/task/{list-tasks,task-counts} - their resolvers dispatch
   ListTasksQuery and TaskCountsQuery into the module above (the task-counts half is the provider
   surface this record already carries as contract.task.list-for-dashboard's provider assertion).
   Record metadata only; no code changed."}

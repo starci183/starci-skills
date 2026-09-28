@@ -4,15 +4,15 @@ title: The fail-closed operator check and the filtered whole-chain read
 repository: todo-app-backend
 state: done
 owners:
-  - {role: module, path: src/modules/bussiness/audit}
-  - {role: module, path: src/features/todo/graphql/queries/audit/audit-log}
+  - {role: module, path: src/modules/domain/audit}
+  - {role: module, path: src/features/todo/transport/graphql/queries/audit/audit-log}
 proves: [fr.audit.log.read]
 change:
   rev: 3
   kind: clarifying
   at: 2026-09-19T17:00:00.000Z
   reason: "decision.audit.operator-role is decided (audit-verified-roster), so the operator read is built
-    and reachable end to end inside src/modules/bussiness/audit. audit-operator.service.ts mints a
+    and reachable end to end inside src/modules/domain/audit. audit-operator.service.ts mints a
     verifiable operator claim from the authenticated subject against a trusted server-side roster;
     AuditLogHandler dispatches on isOperatorRead of that claim - an operator reads the whole chain
     (AuditLogService.readAllLines) filtered by action/target (matchOperatorFilter) and summarized without
@@ -24,6 +24,6 @@ change:
     audit-operator.guard.spec.ts, the whole-chain filtered read dispatched through the handler in
     audit-log.handler.spec.ts, the trusted claim source and its DI resolution in
     audit-operator.service.spec.ts. rev 3 (owners expansion): owners now also claims the audit-log
-    query door, src/features/todo/graphql/queries/audit/audit-log - its resolver dispatches
+    query door, src/features/todo/transport/graphql/queries/audit/audit-log - its resolver dispatches
     AuditLogQuery into this module's AuditLogHandler, the dispatch point the operator read hangs on.
     Record metadata only; no code changed."

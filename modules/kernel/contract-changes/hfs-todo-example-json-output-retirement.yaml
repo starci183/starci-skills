@@ -1,0 +1,11 @@
+id: hfs-todo-example-json-output-retirement
+effectiveAt: '2026-09-28T21:35:00Z'
+summary: >-
+  Remove JSON exceptions for retired todo example lint output and Work agent data.
+  The HFS keeps those outputs outside the tracked repository.
+reach: new-legs
+paths:
+  - modules/schemas/json-exceptions.yaml
+  - modules/kernel/contract-changes/hfs-todo-example-json-output-retirement.yaml
+  - examples/todo-app-backend/.starciwork/_derived/deep-baseline.json
+  - examples/todo-app-backend/.starciwork/features/task/impl/todo-app-frontend/task-list/flows.json

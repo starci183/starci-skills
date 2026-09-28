@@ -1,10 +1,21 @@
 node_modules/
 dist/
+.next/
+coverage/
+.scannerwork/
+test-results/
+.turbo/
+.tools/
 *.tsbuildinfo
+report*.json
+*.tmp.json
+lf.json
+lt.json
+*-lint.json
 
 # .starcistacks custody: the ordered modules/schemas/stacks-layout.yaml custody.gitignoreRules, plus the
-# value-free members this kit tracks (seeds, rendered environment.json, the VPS stack file and the
-# DEMO-ONLY age identity). Decrypted materializations are never the tracked record.
+# value-free members this kit tracks (seeds, rendered environment.json and the VPS stack file).
+# Decrypted materializations and the demo age identity are never tracked.
 .starcistacks/**
 !.starcistacks/**/
 !.starcistacks/**/KEYS.md
@@ -14,7 +25,6 @@ dist/
 !.starcistacks/*/environment.json
 !.starcistacks/*/seeds/**
 !.starcistacks/*/infra/stack.yaml
-!.starcistacks/dev/runtime/env/demo.agekey
 !.starcistacks/*/infra/compose/**
 !.starcistacks/*/infra/terraform/**
 .starcistacks/*/infra/**/.env

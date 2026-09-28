@@ -10,7 +10,7 @@
  */
 import {
     bootE2EWorld 
-} from "@tests/infra/e2e-world"
+} from "@tests/harness/e2e-world"
 import {
     apiHealthUrls,
     composeProjectOf,

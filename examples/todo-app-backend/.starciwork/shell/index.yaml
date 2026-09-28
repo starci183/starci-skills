@@ -1,4 +1,4 @@
-# The todo app's layout tree (work/layout-tree@1), scanned out of examples/todo-app-frontend/src/app by
+# The todo app's layout tree (work/layout-tree@1), scanned out of examples/todo-app-frontend/apps/web/src/app by
 # `node scripts/work/layout-tree.mjs convert` from the app-shell@1 record lane S wrote. It is honest about
 # being unsettled: the only layout, [lang]/layout.tsx, mounts providers plus a floating theme and locale
 # control, and the chrome the accepted ui.task.list direction drew (WorkspaceShell, DestinationNav) is
@@ -15,7 +15,7 @@ origin: repository
 app:
   repository: todo-app-frontend
   root: .
-  appDir: src/app
+  appDir: apps/web/src/app
   framework: next-app-router
   localeParam: lang
 source:
@@ -28,14 +28,14 @@ productLocale:
   locales:
     - en
     - vi
-  source: examples/todo-app-frontend/src/i18n/config.ts defaultLocale en, locales [en, vi]
+  source: examples/todo-app-frontend/apps/web/src/modules/i18n/config.ts defaultLocale en, locales [en, vi]
 i18n:
   catalogs:
     - locale: en
-      path: src/messages/en.json
+      path: apps/web/src/messages/en.json
       sha256: 37b899ba6a1889061bbdcf2b2ae8dce69697cf13b9de2a64890837bd3bd61a95
     - locale: vi
-      path: src/messages/vi.json
+      path: apps/web/src/messages/vi.json
       sha256: 5d8b6f8a77aa7249902cf247b5477ab983813fa19c99e83f97a2e55e5a8d9102
 breakpoints:
   - name: desktop
@@ -62,10 +62,10 @@ nodes:
     origin: repository
     files:
       layout:
-        path: src/app/[lang]/layout.tsx
+        path: apps/web/src/app/[lang]/layout.tsx
         sha256: 4001e64049529b57b3c5044cef9123614d46acf3ce4c495df62663e337c574f8
       page:
-        path: src/app/[lang]/page.tsx
+        path: apps/web/src/app/[lang]/page.tsx
         sha256: fa0d8b65b37de612dae935ea21ef588c361a079a8e893e0ed145212ad457251f
     layout:
       component: ThemeToggle
@@ -86,7 +86,7 @@ nodes:
     origin: repository
     files:
       page:
-        path: src/app/[lang]/audit/privacy/page.tsx
+        path: apps/web/src/app/[lang]/audit/privacy/page.tsx
         sha256: fd73b617c1a185b4300affc62549871e9629604bfe537b0095f6121ccf3461aa
   - id: /[lang]/notify
     parent: /[lang]
@@ -102,7 +102,7 @@ nodes:
     origin: repository
     files:
       page:
-        path: src/app/[lang]/notify/preferences/page.tsx
+        path: apps/web/src/app/[lang]/notify/preferences/page.tsx
         sha256: 99af480801d3873dae6cb6829c8a118fa50030ab15b4302d09cbacd22a06a3dc
   - id: /[lang]/notify/unsubscribe
     parent: /[lang]/notify
@@ -112,7 +112,7 @@ nodes:
     origin: repository
     files:
       page:
-        path: src/app/[lang]/notify/unsubscribe/page.tsx
+        path: apps/web/src/app/[lang]/notify/unsubscribe/page.tsx
         sha256: adf75507c8cf13d19366ef527c43c795608c98f31ea84576bdecf56413bbdf79
   - id: /[lang]/plan
     parent: /[lang]
@@ -122,7 +122,7 @@ nodes:
     origin: repository
     files:
       page:
-        path: src/app/[lang]/plan/page.tsx
+        path: apps/web/src/app/[lang]/plan/page.tsx
         sha256: e7b1eebc5125240adb5e9396e90d6ee9e91a7482fd9021a589f64632ced9767e
   - id: /[lang]/plan/usage
     parent: /[lang]/plan
@@ -132,7 +132,7 @@ nodes:
     origin: repository
     files:
       page:
-        path: src/app/[lang]/plan/usage/page.tsx
+        path: apps/web/src/app/[lang]/plan/usage/page.tsx
         sha256: a38a067f48fa036e259ac00d95bd75775f1be36906ecec9e2e5c0cdfe1a2b007
   - id: /[lang]/recur
     parent: /[lang]
@@ -142,7 +142,7 @@ nodes:
     origin: repository
     files:
       page:
-        path: src/app/[lang]/recur/page.tsx
+        path: apps/web/src/app/[lang]/recur/page.tsx
         sha256: 3ac50a944ebf46042db1148fb1d178f2c71eb3cf7a2842334b0b7a75c855e09c
   - id: /[lang]/sign-in
     parent: /[lang]
@@ -152,7 +152,7 @@ nodes:
     origin: repository
     files:
       page:
-        path: src/app/[lang]/sign-in/page.tsx
+        path: apps/web/src/app/[lang]/sign-in/page.tsx
         sha256: e95b78168f030652b7824041970760cff06183ea5ce6b3cc41334dee921b3f53
   - id: /[lang]/tasks
     parent: /[lang]
@@ -162,7 +162,7 @@ nodes:
     origin: repository
     files:
       page:
-        path: src/app/[lang]/tasks/page.tsx
+        path: apps/web/src/app/[lang]/tasks/page.tsx
         sha256: d61bca8ef9a3a0d0c056d94fbfba4fe6e556fd786f0d70ea8ba7d315999e1cfa
   - id: /[lang]/tasks/[taskId]
     parent: /[lang]/tasks
@@ -178,7 +178,7 @@ nodes:
     origin: repository
     files:
       page:
-        path: src/app/[lang]/tasks/[taskId]/share/page.tsx
+        path: apps/web/src/app/[lang]/tasks/[taskId]/share/page.tsx
         sha256: dc69ddc23674ee48b48ad349d82cbb7b02c99dd29b3eeb8b3ae5d9a53f644145
   - id: /sign-in
     parent: /
@@ -194,13 +194,13 @@ nodes:
     origin: repository
     files:
       route:
-        path: src/app/sign-in/turtle-master.png/route.ts
+        path: apps/web/src/app/sign-in/turtle-master.png/route.ts
         sha256: c3f3956bd7ff3b0043c5a93f61451026a8135aba9a0598862c9da3cb3a354a89
 change:
   rev: 2
   kind: breaking
   at: 2026-09-23T18:49:19Z
-  reason: Converted from work/app-shell@1 rev 1 into the layout tree scanned from src/app.
+  reason: Converted from work/app-shell@1 rev 1 into the layout tree scanned from apps/web/src/app.
 refs:
   - ui.task.list
 blockers:
@@ -208,7 +208,7 @@ blockers:
     breakpoint and theme, and every layout with chrome unknown needs brand.decide to decide it,
     before anything draws under it."
   - The destination row (DestinationNav in WorkspaceShell) is composed inside TasksPage
-    (src/features/pages/tasks/index.tsx), not by a route layout, so the tree has no layout that draws it
+    (apps/web/src/features/pages/tasks/index.tsx), not by a route layout, so the tree has no layout that draws it
     and no navigation registry to read labels from; moving it into a (workspace) route-group layout is an
     interface.implement change the owner has not ruled.
   - The brand logo is unruled (brand/index.yaml logo.status), so no lockup exists to record.

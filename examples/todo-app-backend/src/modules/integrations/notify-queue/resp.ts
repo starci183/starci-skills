@@ -1,6 +1,6 @@
 import {
-    NotifyQueueProtocolException 
-} from "@modules/shared/exceptions/errors/notify/notify-queue-protocol"
+    NotifyQueueProtocolException,
+} from "./errors/notify-queue-protocol"
 
 /**
  * A minimal RESP (REdis Serialization Protocol) codec - just enough to send a command array and parse

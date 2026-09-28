@@ -20,7 +20,7 @@ acceptance:
     then:
       - The read returns free.
       - The stored row still says lapsed; nothing wrote to it to produce this answer.
-module: src/modules/bussiness/plan
+module: src/modules/domain/plan
 change:
   rev: 3
   kind: editorial

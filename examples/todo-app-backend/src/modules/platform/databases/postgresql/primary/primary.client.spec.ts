@@ -5,17 +5,17 @@ import {
     Pool 
 } from "pg"
 import {
-    AppConfigService 
-} from "@modules/platform/config/app-config.service"
+    AppConfigService,
+} from "@modules/platform/config/index"
 import {
-    LogEvent 
-} from "@modules/platform/logging/log-events"
+    LogEvent,
+} from "@modules/platform/logging/index"
 import {
-    WinstonService 
-} from "@modules/platform/logging/winston.service"
+    WinstonService,
+} from "@modules/platform/logging/index"
 import {
-    PostgresPrimaryUnavailableException 
-} from "@modules/shared/exceptions/errors/postgres/postgres-primary-unavailable"
+    PostgresPrimaryUnavailableException,
+} from "./errors/postgres-primary-unavailable"
 
 import {
     PostgresPrimaryClient 
@@ -163,7 +163,7 @@ describe("PostgresPrimaryClient",
                 try {
                     const handler = on.mock.calls.find(([event]) => event === "error")?.[1] as (error: unknown) => void
                     expect(() => handler(new Error("Connection terminated unexpectedly"))).not.toThrow()
-                    expect(log).toHaveBeenCalledWith(LogEvent.POSTGRESQL_PRIMARY_POOL_IDLE_CLIENT_ERROR,
+                    expect(log).toHaveBeenCalledWith(LogEvent.PostgresqlPrimaryPoolIdleClientError,
                         {
                             reason: expect.stringContaining("Connection terminated unexpectedly") 
                         })

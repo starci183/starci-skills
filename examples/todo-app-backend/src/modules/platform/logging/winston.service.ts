@@ -5,6 +5,8 @@ import {
     LogEvent 
 } from "./log-events"
 
+type LogData = Record<string, unknown>
+
 @Injectable()
 /**
  * The house logging surface every capability injects instead of the framework's `Logger`. Lines leave
@@ -17,7 +19,7 @@ export class WinstonService {
      * Emits one info-level structured line for `event`. `data` carries the variable half of the
      * observation - anything that would tempt a caller into interpolating the name.
      */
-    log(event: LogEvent, data: Record<string, unknown> = {
+    log(event: LogEvent, data: LogData = {
     }): void {
         process.stdout.write(`${JSON.stringify({
             level: "info", event, ...data 

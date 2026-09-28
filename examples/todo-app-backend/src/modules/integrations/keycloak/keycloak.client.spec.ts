@@ -2,8 +2,8 @@ import {
     Test, TestingModule 
 } from "@nestjs/testing"
 import {
-    AppConfigService 
-} from "@modules/platform/config/app-config.service"
+    AppConfigService,
+} from "@modules/platform/config/index"
 import {
     KeycloakClient 
 } from "./keycloak.client"

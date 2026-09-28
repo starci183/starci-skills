@@ -33,7 +33,7 @@ change:
   kind: clarifying
   at: 2026-09-18T12:00:00.000Z
   reason: "gap.audit.unbuilt-module is closed: AuditLogService.verifyChain
-    (src/modules/bussiness/audit/audit-log.service.ts) recomputes prevHash from each row's actual
+    (src/modules/domain/audit/audit-log.service.ts) recomputes prevHash from each row's actual
     predecessor rather than trusting a row's own stored prevHash, so a removed middle line surfaces as
     a broken link at its successor and a changed field surfaces as a content mismatch at that line -
     both proven by an out-of-band-mutation fuzz in audit-log.service.spec.ts (every line x every

@@ -25,13 +25,15 @@ codeDigest:
 outcome: pass
 assertions:
   - id: event.task.created
-    command: npx jest src/modules/bussiness/task/create-task.handler.spec.ts -t "event.task.created"
+    command: npx jest src/modules/domain/task/create-task.handler.spec.ts -t "event.task.created"
     exit: 0
     outcome: pass
-    observation: npx jest src/modules/bussiness/task/create-task.handler.spec.ts -t "event.task.created"
+    observation: npx jest src/modules/domain/task/create-task.handler.spec.ts -t "event.task.created"
       exited 0
 provenance:
   actor: example-evidence
   tool: scripts/example/example-evidence.mjs
   environment: local
   capturedAt: 2026-09-22T18:36:24.456Z
+stale: true
+staleReason: HFS moved the owner paths and implementation code after this evidence was captured; its recorded hashes and assertions remain historical.

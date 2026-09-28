@@ -3,7 +3,9 @@
     "module": "commonjs",
     "moduleResolution": "node",
     "target": "ES2021",
-    "lib": ["ES2021"],
+    "lib": [
+      "ES2021"
+    ],
     "declaration": false,
     "removeComments": true,
     "emitDecoratorMetadata": true,
@@ -19,14 +21,31 @@
     "strictNullChecks": true,
     "noImplicitAny": true,
     "forceConsistentCasingInFileNames": true,
-    "types": ["node", "jest"],
+    "types": [
+      "node",
+      "jest"
+    ],
     "paths": {
-      "@e2e-kit/*": ["../../packages/e2e-kit/src/*"],
-      "@features/*": ["./src/features/*"],
-      "@modules/*": ["./src/modules/*"],
-      "@tests/*": ["./src/tests/*"]
+      "@e2e-kit/*": [
+        "../../packages/e2e-kit/src/*"
+      ],
+      "@features/*": [
+        "./src/features/*"
+      ],
+      "@modules/*": [
+        "./src/modules/*"
+      ],
+      "@tests/*": [
+        "./src/tests/*"
+      ]
     }
   },
-  "include": ["src"],
-  "exclude": ["node_modules", "dist"]
+  "include": [
+    "src",
+    "apps"
+  ],
+  "exclude": [
+    "node_modules",
+    "dist"
+  ]
 }

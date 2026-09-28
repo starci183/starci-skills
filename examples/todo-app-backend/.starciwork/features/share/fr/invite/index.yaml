@@ -13,8 +13,8 @@ exceptionFlows:
 postconditions:
   - Exactly one pending invitation exists for that submission.
 composes:
-  - {rule: br.share.role.permissions, module: src/modules/bussiness/share}
-  - {rule: br.share.invite.expiry, module: src/modules/bussiness/share}
+  - {rule: br.share.role.permissions, module: src/modules/domain/share}
+  - {rule: br.share.invite.expiry, module: src/modules/domain/share}
 
 requiresProof:
   unit:

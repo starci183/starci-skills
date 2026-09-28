@@ -7,10 +7,10 @@ recordDigest: b0b1f88ef934a068203bb1cf6947ea72c29e1055730438bc70a7a4c14a8a04e9
 outcome: pass
 assertions:
   - id: unit
-    command: npx jest src/modules/bussiness/share/list-collaborators.handler.spec.ts
+    command: npx jest src/modules/domain/share/list-collaborators.handler.spec.ts
     exit: 0
     outcome: pass
-    observation: npx jest src/modules/bussiness/share/list-collaborators.handler.spec.ts exited 0
+    observation: npx jest src/modules/domain/share/list-collaborators.handler.spec.ts exited 0
   - id: live-proof
     command: bash scripts/live-proof-share.sh
     exit: 0

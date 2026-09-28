@@ -10,8 +10,8 @@ mainFlow:
 postconditions:
   - Exactly one erasure-request row exists per submission, in state requested.
 composes:
-  - {rule: br.audit.erasure.right, module: src/modules/bussiness/audit}
-  - {rule: br.audit.erasure.logged, module: src/modules/bussiness/audit}
+  - {rule: br.audit.erasure.right, module: src/modules/domain/audit}
+  - {rule: br.audit.erasure.logged, module: src/modules/domain/audit}
 
 requiresProof:
   unit:

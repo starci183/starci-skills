@@ -1,7 +1,7 @@
 /*
  * Rules are authored in the trust tree and published as @starci/eslint-canon-be; this repository
  * owns only which globs they apply to and which vendored repository-local rules join them
- * (./plugins/eslint — the seven rules canon does not publish, copied from the host repo's
+ * (./scripts/eslint — the seven rules canon does not publish, copied from the host repo's
  * plugins/eslint/index.mjs).
  *
  *   plugins: { "starci-be": { rules: { ...canon, ...local } } },
@@ -15,9 +15,9 @@ import js from "@eslint/js"
 import globals from "globals"
 import tseslint from "typescript-eslint"
 import { defineConfig } from "eslint/config"
-import starciBe from "./plugins/eslint/index.mjs"
+import starciBe from "./scripts/eslint/index.mjs"
 
-const APP_GLOBS = ["src/**/*.ts"]
+const APP_GLOBS = ["src/**/*.ts", "apps/**/*.ts"]
 
 export default defineConfig([
     {
@@ -26,7 +26,7 @@ export default defineConfig([
             "**/dist/**",
             "**/coverage/**",
             "scripts/**",
-            "gateway/**",
+            ".starcistacks/**",
             "eslint.config.mjs",
             "**/*.js",
             "**/*.cjs",
@@ -92,7 +92,7 @@ export default defineConfig([
         // else process.env stays banned; the `as unknown as` ban still applies here.
         files: [
             "src/modules/platform/config/app-config.service.ts",
-            "src/modules/bussiness/audit/audit-operator.service.ts",
+            "src/modules/domain/audit/audit-operator.service.ts",
         ],
         rules: {
             "no-restricted-syntax": [

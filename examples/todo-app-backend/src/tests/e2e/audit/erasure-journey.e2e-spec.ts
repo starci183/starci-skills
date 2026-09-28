@@ -1,15 +1,15 @@
 import {
     E2EWorld, bootE2EWorld 
-} from "@tests/infra/e2e-world"
+} from "@tests/harness/e2e-world"
 import {
     pollUntil 
-} from "@tests/infra/e2e-poll"
+} from "@tests/harness/e2e-poll"
 import {
     E2E_BOOT_TIMEOUT_MS 
-} from "@tests/infra/testing-infra.options"
+} from "@tests/harness/testing-infra.options"
 import {
     E2EHttpClient 
-} from "@tests/infra/integrations/http/e2e-http.service"
+} from "@tests/harness/integrations/http/e2e-http.service"
 
 jest.setTimeout(300_000)
 
@@ -23,11 +23,11 @@ const OWNER = {
     email: "demo@todo.dev", password: "todo-demo-pass" 
 }
 
-const CREATE_TASK = "mutation CreateTask($input: CreateTaskInput!) { createTask(input: $input) { taskId title } }"
+const CREATE_TASK = "mutation CreateTask($input: CreateTaskInput!) { createTask(request: $input) { taskId title } }"
 const AUDIT_LOG = "query { auditLog { at action target } }"
 const EXPORT_MY_DATA = "query { exportMyData { at action target } }"
 const REQUEST_ERASURE = "mutation { requestErasure { requestId state } }"
-const COMPLETE_ERASURE = "mutation CompleteErasure($requestId: ID!) { completeErasure(requestId: $requestId) { requestId state } }"
+const COMPLETE_ERASURE = "mutation CompleteErasure($requestId: ID!) { completeErasure(request: {requestId: $requestId}) { requestId state } }"
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/
 /** The `iv.tag.ciphertext` shape a sealed actor keeps - the plaintext personId must never appear. */

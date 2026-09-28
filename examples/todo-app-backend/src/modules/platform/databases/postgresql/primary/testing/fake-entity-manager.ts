@@ -1,6 +1,15 @@
 import {
-    PostgresPrimaryUnavailableException 
-} from "@modules/shared/exceptions/errors/postgres/postgres-primary-unavailable"
+    PostgresPrimaryUnavailableException,
+} from "../errors/postgres-primary-unavailable"
+
+type FakeEntityKey<T extends object> = keyof T | ((row: Partial<T>) => string)
+
+interface FakeEntityManagerResult<T extends object> {
+    findOneBy(target: unknown, where: Partial<T>): Promise<T | null>
+    findBy(target: unknown, where: Partial<T>): Promise<Array<T>>
+    save(target: unknown, entityLike: Partial<T>): Promise<T>
+    delete(target: unknown, criteria: unknown): Promise<void>
+}
 
 /**
  * A minimal in-memory stand-in for `EntityManager`, scoped to one entity and keyed by one field or a
@@ -14,7 +23,7 @@ import {
  * primary key) or a function deriving a composite key string from a partial row - needed for
  * data.notify.preference's (personId, channel) primary key, where no single field is unique on its own.
  */
-export const createFakeEntityManager = <T extends object>(keyOf: keyof T | ((row: Partial<T>) => string)) => {
+export const createFakeEntityManager = <T extends object>(keyOf: FakeEntityKey<T>): FakeEntityManagerResult<T> => {
     const rows = new Map<string, T>()
     const keyOfPartial = (value: Partial<T>): string | undefined => {
         if (typeof keyOf === "function") return keyOf(value)

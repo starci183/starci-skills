@@ -15,7 +15,7 @@ change:
   at: 2026-09-19T00:00:00.000Z
   reason: "wiring verified against code, state left todo for the evidence lane: SignOutHandler publishes
     SignedOutEvent on the PlatformEventBus after the session row is revoked
-    (src/modules/bussiness/session/sign-out.handler.ts) and the named test 'event.login.signed-out:
+    (src/modules/domain/session/sign-out.handler.ts) and the named test 'event.login.signed-out:
     publishes on the PlatformEventBus after the session is revoked' in sign-out.handler.spec.ts asserts
     the payload (personId). The payload fields here match SignedOutEvent exactly (personId, signedOutAt,
     sourceEventId). The consumer edge resolves the other way: fr.audit.log.append's subscribes names

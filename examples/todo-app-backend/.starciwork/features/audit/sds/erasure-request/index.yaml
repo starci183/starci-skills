@@ -10,7 +10,7 @@ interfaces:
 refs: [br.audit.erasure.right, br.audit.erasure.logged]
 dependsOn: [sds.audit.log-chain]
 owners:
-  - {role: module, path: src/modules/bussiness/audit}
+  - {role: module, path: src/modules/domain/audit}
 
 stateMachine:
   states: [requested, verified, executing, complete, refused]
@@ -77,7 +77,7 @@ change:
   kind: clarifying
   at: 2026-09-18T12:00:00.000Z
   reason: "impl.audit.todo-app-backend.erasure names the real module: AuditErasureService
-    (src/modules/bussiness/audit/audit-erasure.service.ts) implements t-request/t-verify/t-refuse/
+    (src/modules/domain/audit/audit-erasure.service.ts) implements t-request/t-verify/t-refuse/
     t-execute/t-complete under exactly those method names, each proven in
     audit-erasure.service.spec.ts. owners added naming the real capability directory; blockedBy removed
     now that gap.audit.unbuilt-module is closed. sequence.note gained the re-authentication-collapse

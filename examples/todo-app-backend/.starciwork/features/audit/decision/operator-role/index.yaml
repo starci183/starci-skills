@@ -6,13 +6,13 @@ outcome: decided
 chosen: audit-verified-roster
 question: gap.audit.operator-role rev 2 states the absence precisely - SessionRecord resolves to
   {token, personId, issuedAt, expiresAt} and data.login.person has no role field, so no call site can
-  present a role claim to check. Audit's fail-closed check (src/modules/bussiness/audit
+  present a role claim to check. Audit's fail-closed check (src/modules/domain/audit
   /audit-operator-read.ts) already honors operator and operator:*; this decision settles who may hold
   such a claim and where it comes from, so fr.audit.log.read's operator read can honestly run.
 options:
   - id: audit-verified-roster
     state: chosen
-    summary: Audit owns the claim. AuditOperatorService (src/modules/bussiness/audit
+    summary: Audit owns the claim. AuditOperatorService (src/modules/domain/audit
       /audit-operator.service.ts) resolves the authenticated subject - the personId
       contract.login.identity-for-task hands the resolver - against a trusted, server-side operator
       roster and mints the operator claim itself; audit-operator-read.ts then checks that verified
@@ -57,6 +57,6 @@ change:
     check as built, makes the whole-chain read live, and stays inside the capability that owns the
     decision instead of rewriting login's session contract - the reason session-role-claim and
     keycloak-realm-role were rejected - and unlike no-operator-ever it does not retire the requirement.
-    Implemented in src/modules/bussiness/audit: audit-operator.service.ts mints the claim, AuditLogHandler
+    Implemented in src/modules/domain/audit: audit-operator.service.ts mints the claim, AuditLogHandler
     dispatches on isOperatorRead of that verified claim, and AuditLogQueryParams no longer carries a
     caller role. Closes gap.audit.operator-role; unblocks fr.audit.log.read's operator read."

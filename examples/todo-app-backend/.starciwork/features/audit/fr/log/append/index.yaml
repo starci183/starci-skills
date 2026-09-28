@@ -12,8 +12,8 @@ postconditions:
   - The line count increases by exactly one.
   - Recomputing the chain from the first line still reports valid.
 composes:
-  - {rule: br.audit.append-only, module: src/modules/bussiness/audit}
-  - {rule: br.audit.retention, module: src/modules/bussiness/audit}
+  - {rule: br.audit.append-only, module: src/modules/domain/audit}
+  - {rule: br.audit.retention, module: src/modules/domain/audit}
 subscribes: [event.task.created, event.task.completed, event.task.deleted, event.login.signed-in, event.login.signed-out]
 
 requiresProof:

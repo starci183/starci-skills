@@ -13,7 +13,7 @@ exceptionFlows:
 postconditions:
   - The downgrade is never refused for being over the new cap.
 composes:
-  - {rule: br.plan.downgrade.freeze, module: src/modules/bussiness/plan}
+  - {rule: br.plan.downgrade.freeze, module: src/modules/domain/plan}
 refs: [decision.plan.downgrade.policy, sds.plan.subscription-lifecycle]
 
 requiresProof:

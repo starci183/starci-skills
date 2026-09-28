@@ -2,7 +2,7 @@ schema: work/gap@1
 id: gap.audit.unbuilt-module
 title: No audit module exists under the NestJS layout yet
 state: done
-statement: The example backend has moved to NestJS. src/modules/bussiness/audit now exists under that
+statement: The example backend has moved to NestJS. src/modules/domain/audit now exists under that
   layout (AuditLogService, AuditKeystoreService, AuditErasureService, AuditEventSubscriber, every audit
   CQRS command/query handler, registered as AuditModule in app.module.ts, plus the auditLog/exportMyData
   GraphQL queries and requestErasure/completeErasure GraphQL mutations under features/todo/graphql), so

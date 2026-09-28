@@ -15,7 +15,7 @@ acceptance:
     then:
       - No reader recovers the person's identity from any line they produced.
       - "The lines themselves are unchanged: same bytes, same position, same hash chain."
-module: src/modules/bussiness/audit
+module: src/modules/domain/audit
 refs: [decision.audit.erasure-method, br.audit.retention]
 
 change:
@@ -29,5 +29,5 @@ change:
     longer contradict. The decision stays linked through refs; keeping a conflictsWith whose because
     quotes a statement the target no longer makes would record a resolved conflict as live. Rev 2's
     reason stands on the record: crypto-shred is settled and built in AuditErasureService, module
-    corrected to src/modules/bussiness/audit, proven by audit-erasure.service.spec.ts. rev 4 (v11 ac-collapse): acceptanceCriteria renamed to acceptance and now carries each criterion's id, given, when and then inline from the retired ac/ sub-records; refs to the old ac ids remap to br.audit.erasure.right#<former-ac-id>. Encoding change only, no semantic change."
+    corrected to src/modules/domain/audit, proven by audit-erasure.service.spec.ts. rev 4 (v11 ac-collapse): acceptanceCriteria renamed to acceptance and now carries each criterion's id, given, when and then inline from the retired ac/ sub-records; refs to the old ac ids remap to br.audit.erasure.right#<former-ac-id>. Encoding change only, no semantic change."
 

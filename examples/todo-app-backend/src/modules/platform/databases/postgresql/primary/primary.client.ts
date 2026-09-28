@@ -5,17 +5,17 @@ import {
     Pool, PoolClient 
 } from "pg"
 import {
-    AppConfigService 
-} from "@modules/platform/config/app-config.service"
+    AppConfigService,
+} from "@modules/platform/config/index"
 import {
-    LogEvent 
-} from "@modules/platform/logging/log-events"
+    LogEvent,
+} from "@modules/platform/logging/index"
 import {
-    WinstonService 
-} from "@modules/platform/logging/winston.service"
+    WinstonService,
+} from "@modules/platform/logging/index"
 import {
-    PostgresPrimaryUnavailableException 
-} from "@modules/shared/exceptions/errors/postgres/postgres-primary-unavailable"
+    PostgresPrimaryUnavailableException,
+} from "./errors/postgres-primary-unavailable"
 
 
 /** How long a probe waits before declaring the database gone - a health check must fail fast, not hang on a dead connection. */
@@ -44,7 +44,7 @@ export class PostgresPrimaryClient implements OnModuleDestroy {
         // pg-pool re-emits an idle client's death on the pool itself; left unlistened that surfaces as
         // an 'Unhandled error' event and the whole api exits before any ping can report the outage.
         this.pool.on("error",
-            (error) => this.winston.log(LogEvent.POSTGRESQL_PRIMARY_POOL_IDLE_CLIENT_ERROR,
+            (error) => this.winston.log(LogEvent.PostgresqlPrimaryPoolIdleClientError,
                 {
                     reason: String(error) 
                 }))

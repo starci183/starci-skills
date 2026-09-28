@@ -15,12 +15,12 @@ acceptance:
     then:
       - The attempt is refused.
       - The task still exists afterward.
-module: src/modules/bussiness/share
+module: src/modules/domain/share
 change:
   rev: 3
   kind: editorial
   at: 2026-09-19T15:59:33.966Z
-  reason: impl.share.todo-app-backend.access is built (src/modules/bussiness/share, not the earlier-guessed
+  reason: impl.share.todo-app-backend.access is built (src/modules/domain/share, not the earlier-guessed
     src/share); completion-authority.spec.ts proves an accepted editor collaborator refused at delete
     through task's own unmodified OwnershipGuard, and scripts/live-proof-share.sh proves the same refusal
     end to end against the real running stack. gap.share.unbuilt-module's blockedBy is resolved.

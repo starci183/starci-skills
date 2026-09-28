@@ -19,7 +19,7 @@ postconditions:
   - A person is never charged twice for one intent, however many times reconciliation and a webhook both
     try to apply it.
 composes:
-  - {rule: br.plan.payment.idempotent, module: src/modules/bussiness/plan}
+  - {rule: br.plan.payment.idempotent, module: src/modules/domain/plan}
 refs: [sds.plan.reconciliation, integration.plan.sepay]
 
 requiresProof:

@@ -2,8 +2,8 @@ import {
     DynamicModule, MiddlewareConsumer, Module, NestModule 
 } from "@nestjs/common"
 import {
-    WinstonService 
-} from "@modules/platform/logging/winston.service"
+    WinstonService,
+} from "@modules/platform/logging/index"
 import {
     ConfigurableModuleClass, OPTIONS_TYPE 
 } from "./observability.module-definition"

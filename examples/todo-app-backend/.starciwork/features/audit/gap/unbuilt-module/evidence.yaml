@@ -7,12 +7,14 @@ recordDigest: c9fc7bdf071eae6533624bb1255aa6317c2b3d6e797399e78e84862438d1c483
 outcome: pass
 assertions:
   - id: audit-module-exists-and-registers
-    command: npx jest src/modules/bussiness/audit src/app.boot.spec.ts
+    command: npx jest src/modules/domain/audit apps/todo/src/app.boot.spec.ts
     exit: 0
     outcome: pass
-    observation: npx jest src/modules/bussiness/audit src/app.boot.spec.ts exited 0
+    observation: npx jest src/modules/domain/audit apps/todo/src/app.boot.spec.ts exited 0
 provenance:
   actor: example-evidence
   tool: scripts/example/example-evidence.mjs
   environment: local
   capturedAt: 2026-09-22T18:16:25.553Z
+stale: true
+staleReason: HFS moved the owner paths and implementation code after this evidence was captured; its recorded hashes and assertions remain historical.

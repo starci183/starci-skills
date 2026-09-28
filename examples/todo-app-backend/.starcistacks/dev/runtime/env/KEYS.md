@@ -3,11 +3,10 @@
 Every row is one secret. The `.enc` member is the tracked record; the decrypted member is produced by
 `npm run sync` and is never committed.
 
-DEMO-ONLY: every `.enc` file in this example is encrypted to the age identity committed at
-`runtime/env/demo.agekey`, so that a reader can `sops -d` them and see a genuine, round-tripping SOPS
-document. Every decrypted value is a placeholder string, never a real credential. That identity, and every
-`.enc` file encrypted to it, exists purely to teach the shape of the layout; none of it may be reused for a
-real deployment, and no real secret may ever be encrypted to this public key.
+DEMO-ONLY: every `.enc` file in this example is encrypted to the age identity expected at
+`runtime/env/demo.agekey`. The private identity is untracked and must be provisioned before `sops -d`
+can open these documents. Every decrypted value is an example value, never a real credential. This
+identity and its encrypted documents teach the layout; neither may be reused for a real deployment.
 
 | Key | Encrypted owner | Purpose |
 |---|---|---|
@@ -23,4 +22,3 @@ real deployment, and no real secret may ever be encrypted to this public key.
 
 A key that the declaration names and this table does not is an undocumented secret: the check reports it
 rather than assuming somebody knows what it unlocks.
-

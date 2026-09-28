@@ -11,7 +11,7 @@ interfaces:
 refs: [br.share.invite.expiry, br.share.revoke.on-read, br.share.role.permissions]
 dependsOn: [integration.login.postgres]
 owners:
-  - {role: module, path: src/modules/bussiness/share}
+  - {role: module, path: src/modules/domain/share}
 
 stateMachine:
   states: [requested, pending, accepted, expired, revoked]
@@ -73,7 +73,7 @@ change:
   rev: 2
   kind: clarifying
   at: 2026-09-18T16:00:00.000Z
-  reason: impl.share.todo-app-backend.invitations built this component at src/modules/bussiness/share;
+  reason: impl.share.todo-app-backend.invitations built this component at src/modules/domain/share;
     every transition is proven by invitation.service.spec.ts (t-invite, t-accept, t-revoke-pending,
     t-revoke-accepted) and completion-authority.spec.ts/scripts/live-proof-share.sh (t-expire's
     read-time recompute, and the revoke-then-refuse sequence). The sequence's transport is updated from

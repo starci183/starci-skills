@@ -12,7 +12,7 @@ exceptionFlows:
 postconditions:
   - No row owned by another person appears in the list or moves the counts.
 composes:
-  - {rule: br.task.list.owned, module: src/modules/bussiness/task}
+  - {rule: br.task.list.owned, module: src/modules/domain/task}
 refs: [decision.task.list.scope, contract.task.list-for-dashboard]
 
 requiresProof:
@@ -26,8 +26,8 @@ requiresProof:
 change: {rev: 1, kind: initial, at: 2026-09-19T00:00:00.000Z}
 
 # The read had handlers but no record (v6-3 Q1): the listTasks and taskCounts queries
-# (src/features/todo/graphql/queries/task/{list-tasks,task-counts}) resolve the session actor and
-# dispatch to ListTasksHandler/TaskCountsHandler (src/modules/bussiness/task), both reading through
+# (src/features/todo/transport/graphql/queries/task/{list-tasks,task-counts}) resolve the session actor and
+# dispatch to ListTasksHandler/TaskCountsHandler (src/modules/domain/task), both reading through
 # TaskService.listOwnedBy - so the counts the dashboard contract describes are the same owned read, and
 # both doors refuse a dead session with SESSION_NOT_FOUND before any row is touched. The compose is a
 # single rule because the code enforces a single rule here: listOwnedBy is the only source on both read

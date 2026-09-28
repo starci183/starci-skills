@@ -5,44 +5,44 @@ import {
     Test, TestingModule 
 } from "@nestjs/testing"
 import {
-    AppConfigService 
-} from "@modules/platform/config/app-config.service"
+    AppConfigService,
+} from "@modules/platform/config/index"
 import {
-    POSTGRESQL_PRIMARY 
-} from "@modules/platform/databases/postgresql/primary/constants/connection"
+    POSTGRESQL_PRIMARY,
+} from "@modules/platform/databases/postgresql/primary/index"
 import {
-    TaskEntity 
-} from "@modules/platform/databases/postgresql/primary/entities/task.entity"
+    TaskEntity,
+} from "@modules/platform/databases/postgresql/primary/index"
 import {
-    UploadEntity 
-} from "@modules/platform/databases/postgresql/primary/entities/upload.entity"
+    UploadEntity,
+} from "@modules/platform/databases/postgresql/primary/index"
 import {
-    createFakeEntityManager 
-} from "@modules/platform/databases/postgresql/primary/testing/fake-entity-manager"
+    createFakeEntityManager,
+} from "@modules/platform/databases/postgresql/primary/index"
 import {
-    TaskForbiddenException 
-} from "@modules/shared/exceptions/errors/task/task-forbidden"
+    TaskForbiddenException,
+} from "@modules/domain/task/index"
 import {
-    TaskNotFoundException 
-} from "@modules/shared/exceptions/errors/task/task-not-found"
+    TaskNotFoundException,
+} from "@modules/domain/task/index"
 import {
-    UploadForbiddenException 
-} from "@modules/shared/exceptions/errors/upload/upload-forbidden"
+    UploadForbiddenException,
+} from "./errors/upload-forbidden"
 import {
-    UploadMimeNotAllowedException 
-} from "@modules/shared/exceptions/errors/upload/upload-mime-not-allowed"
+    UploadMimeNotAllowedException,
+} from "./errors/upload-mime-not-allowed"
 import {
-    UploadNotReadyException 
-} from "@modules/shared/exceptions/errors/upload/upload-not-ready"
+    UploadNotReadyException,
+} from "./errors/upload-not-ready"
 import {
-    UploadScanRejectedException 
-} from "@modules/shared/exceptions/errors/upload/upload-scan-rejected"
+    UploadScanRejectedException,
+} from "./errors/upload-scan-rejected"
 import {
-    UploadTokenInvalidException 
-} from "@modules/shared/exceptions/errors/upload/upload-token-invalid"
+    UploadTokenInvalidException,
+} from "./errors/upload-token-invalid"
 import {
-    UploadTooLargeException 
-} from "@modules/shared/exceptions/errors/upload/upload-too-large"
+    UploadTooLargeException,
+} from "./errors/upload-too-large"
 import {
     UploadStoragePort, VirusScanPort 
 } from "./upload.contracts"

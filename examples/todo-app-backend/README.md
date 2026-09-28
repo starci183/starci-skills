@@ -22,18 +22,19 @@ runner rather than a developer's laptop:
   SOPS secrets, builds and runs the real API and the real Next.js production server, proves sign-in,
   the uniform wrong-password/unknown-email refusal, the full task lifecycle, CORS and persistence across an
   API process restart with `curl` against the running services - never a mock - and then runs the
-  Playwright UAT flows (`examples/todo-app-frontend/uat`) against that same stack, uploading each run's
+  Playwright UAT flows (`examples/todo-app-frontend/e2e`) against that same stack, uploading each run's
   `manifest.yaml`, `result.md`, screens and videos from the Work tree here as CI artifacts.
 
-No job needs a GitHub Actions secret. `.starcistacks/dev/runtime/env/demo.agekey` is a demo key committed
-on purpose: it encrypts demo values only - every `.enc` file it opens holds a placeholder string, never a
-real credential - which is exactly why nothing real may ever be encrypted to it (see
-`scripts/with-dev-secrets.sh` and `.starcistacks/dev/runtime/env/KEYS.md`).
+The DEMO-ONLY age identity at `.starcistacks/dev/runtime/env/demo.agekey` is untracked under HFS secret
+custody. A local operator must provision it before decrypting the committed `.enc` examples; the live CI
+job needs the same provisioned identity before it can run. The encrypted documents hold example values
+only, and this identity must never protect a real credential (see `scripts/with-dev-secrets.sh` and
+`.starcistacks/dev/runtime/env/KEYS.md`).
 
 ## Probes and metrics
 
 `GET /health` and `GET /ready` answer the dependency-checked Postgres probe (200 ok / 503), and
 `GET /metrics` serves Prometheus text exposition of per-route request counters and durations. Every
 request carries an `x-request-id` correlation id echoed on the response and written on one structured
-`http.request.completed` log line. See `TESTING.md` for the exact commands and how the dev stack's
+`http.request.completed` log line. See `docs/TESTING.md` for the exact commands and how the dev stack's
 Prometheus service scrapes the api.

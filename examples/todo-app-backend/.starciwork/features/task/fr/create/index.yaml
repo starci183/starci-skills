@@ -15,9 +15,9 @@ exceptionFlows:
 postconditions:
   - Exactly one task exists for that submission.
 composes:
-  - {rule: br.task.single-owner, module: src/modules/bussiness/task}
-  - {rule: br.task.title.required, module: src/modules/bussiness/task}
-  - {rule: br.plan.caps.limit, module: src/modules/bussiness/plan}
+  - {rule: br.task.single-owner, module: src/modules/domain/task}
+  - {rule: br.task.title.required, module: src/modules/domain/task}
+  - {rule: br.plan.caps.limit, module: src/modules/domain/plan}
 refs: [contract.plan.create-precondition]
 
 requiresProof:

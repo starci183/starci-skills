@@ -9,7 +9,7 @@ import {
  * Inject the PRIMARY entity manager - this example's one owned database. Matches nivo's own
  * `primary.decorators.ts` exactly: a named decorator rather than `@InjectEntityManager(POSTGRESQL_PRIMARY)`
  * at every call site, so the connection has one spelling (a typo in a repeated string argument compiles;
- * `InjectPrimryEntityManager` does not) and importing capabilities (`bussiness/session`, `bussiness/task`)
+ * `InjectPrimryEntityManager` does not) and importing capabilities (`domain/session`, `domain/task`)
  * use `entityManager.findOneBy(Entity, ...)`/`.save(Entity, ...)`/`.delete(Entity, ...)` instead of a
  * per-entity `@InjectRepository` - nivo's own convention: a capability owns behaviour, the databases
  * module owns persistence, and `@InjectRepository` appears nowhere outside it.

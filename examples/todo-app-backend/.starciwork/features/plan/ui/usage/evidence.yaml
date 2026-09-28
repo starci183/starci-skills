@@ -40,3 +40,5 @@ provenance:
   tool: scripts/example-evidence.mjs
   environment: local
   capturedAt: 2026-09-19T22:52:47.961Z
+stale: true
+staleReason: HFS moved the owner paths and implementation code after this evidence was captured; its recorded hashes and assertions remain historical.

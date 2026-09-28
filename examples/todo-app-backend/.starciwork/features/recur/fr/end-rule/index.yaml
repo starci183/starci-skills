@@ -12,7 +12,7 @@ mainFlow:
 postconditions:
   - The rule carries an endedAt local date, and nothing it already produced was deleted.
 composes:
-  - {rule: br.recur.ending.preserves-history, module: src/modules/bussiness/recur}
+  - {rule: br.recur.ending.preserves-history, module: src/modules/domain/recur}
 refs: [data.recur.rule]
 
 requiresProof:

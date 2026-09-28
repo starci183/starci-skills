@@ -8,13 +8,13 @@ repository: todo-app-frontend
 # than authored: src/app/[lang]/tasks/[taskId]/share. src/app/tasks never existed. The rev-1 reason's
 # served-route claim /tasks/<id>/share is the locale-prefixed URL beneath that segment.
 owners:
-  - {role: route, path: "src/app/[lang]/tasks/[taskId]/share"}
-  - {role: feature, path: src/features/pages/share}
-  - {role: block, path: src/components/blocks/share-invite}
-  - {role: hooks, path: src/hooks/share}
-  - {role: api, path: src/modules/api}
-  - {role: leaf, path: src/components/leaves/Link}
-  - {role: hooks, path: src/hooks/auth}
+  - {role: route, path: "apps/web/src/app/[lang]/tasks/[taskId]/share"}
+  - {role: feature, path: apps/web/src/features/pages/share}
+  - {role: block, path: apps/web/src/components/blocks/share-invite}
+  - {role: hooks, path: apps/web/src/hooks/share}
+  - {role: api, path: apps/web/src/modules/api}
+  - {role: leaf, path: apps/web/src/modules/ui/Link}
+  - {role: hooks, path: apps/web/src/hooks/auth}
 proves: [ui.share.invite]
 change:
   rev: 3

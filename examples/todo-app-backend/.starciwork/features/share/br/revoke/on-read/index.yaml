@@ -16,12 +16,12 @@ acceptance:
     then:
       - The invitation reads revoked.
       - A completion attempt made in that same instant is refused.
-module: src/modules/bussiness/share
+module: src/modules/domain/share
 change:
   rev: 3
   kind: editorial
   at: 2026-09-19T15:59:33.966Z
-  reason: impl.share.todo-app-backend.invitations is built (src/modules/bussiness/share, not the
+  reason: impl.share.todo-app-backend.invitations is built (src/modules/domain/share, not the
     earlier-guessed src/share); the acceptance criterion is proven both by a unit test asserting the
     synchronous CollaboratorCache clears at the moment revoke() commits, and by an integration test and
     scripts/live-proof-share.sh showing the very next completion attempt already refused, with no wait.

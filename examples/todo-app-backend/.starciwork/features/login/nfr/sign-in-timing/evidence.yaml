@@ -7,14 +7,16 @@ recordDigest: 5f7b2b127754b5c302003930f8f731b1722a7f02fdfa0a2aa7b0573db82036c1
 outcome: pass
 assertions:
   - id: identical-refusal-parity
-    command: npx jest src/app.boot.spec.ts -t "refuses sign-in with the wrong password and with an
+    command: npx jest apps/todo/src/app.boot.spec.ts -t "refuses sign-in with the wrong password and with an
       unknown email identically"
     exit: 0
     outcome: pass
-    observation: npx jest src/app.boot.spec.ts -t "refuses sign-in with the wrong password and with an
+    observation: npx jest apps/todo/src/app.boot.spec.ts -t "refuses sign-in with the wrong password and with an
       unknown email identically" exited 0
 provenance:
   actor: example-evidence
   tool: scripts/example/example-evidence.mjs
   environment: local
   capturedAt: 2026-09-22T18:21:37.487Z
+stale: true
+staleReason: HFS moved the owner paths and implementation code after this evidence was captured; its recorded hashes and assertions remain historical.

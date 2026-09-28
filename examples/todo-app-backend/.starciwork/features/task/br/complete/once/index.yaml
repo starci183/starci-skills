@@ -18,7 +18,7 @@ acceptance:
     then:
       - The task reads incomplete.
       - Its completion timestamp is cleared.
-module: [src/modules/bussiness/task]
+module: [src/modules/domain/task]
 change:
   rev: 3
   kind: editorial
@@ -28,7 +28,7 @@ change:
     rev 3 (v11 ac-collapse) - acceptanceCriteria renamed to acceptance and now carries each criterion's id, given, when and then inline from the retired ac/ sub-records; refs to the old ac ids remap to br.task.complete.once#<former-ac-id>. Encoding change only, no semantic change.
 # gap.task.collaborator-completion closed (lane be-share), and this lane has now regenerated the
 # evidence for both rev-2 statements: ac.task.complete.once.is-idempotent and ac.task.complete.once
-# .is-reversible are each re-proved by the named jest tests in src/modules/bussiness/task
+# .is-reversible are each re-proved by the named jest tests in src/modules/domain/task
 # (complete-task.handler.spec.ts asserts the second completion is byte-identical on completedAt,
 # title and owner; reopen-task.handler.spec.ts asserts reopen clears complete and completedAt), plus
 # a full re-run of scripts/live-proof.sh against a live API built from this source tree on a

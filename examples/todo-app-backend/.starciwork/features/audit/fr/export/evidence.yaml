@@ -7,12 +7,14 @@ recordDigest: af540438c1dfc3eb50373923a2402bce9bfc27799b11d1f9bdc2c002e467d3e2
 outcome: pass
 assertions:
   - id: br.audit.append-only
-    command: npx jest src/modules/bussiness/audit/export-my-data.handler.spec.ts
+    command: npx jest src/modules/domain/audit/export-my-data.handler.spec.ts
     exit: 0
     outcome: pass
-    observation: npx jest src/modules/bussiness/audit/export-my-data.handler.spec.ts exited 0
+    observation: npx jest src/modules/domain/audit/export-my-data.handler.spec.ts exited 0
 provenance:
   actor: example-evidence
   tool: scripts/example/example-evidence.mjs
   environment: local
   capturedAt: 2026-09-22T18:15:40.549Z
+stale: true
+staleReason: HFS moved the owner paths and implementation code after this evidence was captured; its recorded hashes and assertions remain historical.

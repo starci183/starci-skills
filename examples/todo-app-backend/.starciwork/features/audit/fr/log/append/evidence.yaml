@@ -7,14 +7,16 @@ recordDigest: 743d827f855f3172a79f64c69329d0c612cf4f71edc3a9598b1f6098d541a606
 outcome: pass
 assertions:
   - id: fr.audit.log.append
-    command: npx jest src/modules/bussiness/audit/audit-event.subscriber.spec.ts
-      src/modules/bussiness/audit/append-log-line.handler.spec.ts
+    command: npx jest src/modules/domain/audit/audit-event.subscriber.spec.ts
+      src/modules/domain/audit/append-log-line.handler.spec.ts
     exit: 0
     outcome: pass
-    observation: npx jest src/modules/bussiness/audit/audit-event.subscriber.spec.ts
-      src/modules/bussiness/audit/append-log-line.handler.spec.ts exited 0
+    observation: npx jest src/modules/domain/audit/audit-event.subscriber.spec.ts
+      src/modules/domain/audit/append-log-line.handler.spec.ts exited 0
 provenance:
   actor: example-evidence
   tool: scripts/example/example-evidence.mjs
   environment: local
   capturedAt: 2026-09-22T18:15:47.480Z
+stale: true
+staleReason: HFS moved the owner paths and implementation code after this evidence was captured; its recorded hashes and assertions remain historical.

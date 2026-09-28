@@ -36,7 +36,7 @@ provenance:
   capturedAt: '2026-09-19T11:28:44.857Z'
   stack: >-
     A run-owned compose project (todo-uat-v7) booted for this lane from
-    src/tests/infra/platform/stack/compose.e2e.yaml - the same file E2EStackService drives - pinned to
+    src/tests/harness/platform/stack/compose.e2e.yaml - the same file E2EStackService drives - pinned to
     the dev-convention ports: postgres:16 on 127.0.0.1:5432 (database todo, schema+seed mounted from
     .starcistacks/dev/seeds), keycloak 26.0 on 127.0.0.1:8089 (realm todo imported from
     .starcistacks/dev/infra/compose/realm-todo.json), redis on 6379. The dev compose stack itself was

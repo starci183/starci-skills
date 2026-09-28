@@ -1,0 +1,23 @@
+import {
+    AbstractException,
+} from "@modules/platform/exceptions/index"
+import type {
+    AbstractExceptionMetadata,
+} from "@modules/platform/exceptions/index"
+
+/** Metadata for an accept attempt against a revoked invitation. */
+export interface ShareInvitationRevokedExceptionMetadata extends AbstractExceptionMetadata {
+  invitationId?: string;
+}
+
+/** fr.share.accept exceptionFlows: "Accepting a revoked invitation is refused." */
+export class ShareInvitationRevokedException extends AbstractException {
+    constructor({ invitationId, ...metadata }: ShareInvitationRevokedExceptionMetadata = {
+    }) {
+        super("This invitation was revoked.",
+            "SHARE_INVITATION_REVOKED_EXCEPTION",
+            {
+                invitationId, ...metadata 
+            })
+    }
+}

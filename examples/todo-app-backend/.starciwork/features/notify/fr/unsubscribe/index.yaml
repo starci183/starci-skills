@@ -12,7 +12,7 @@ exceptionFlows:
 postconditions:
   - No message on that channel is sent to that person until they re-subscribe.
 composes:
-  - {rule: br.notify.unsubscribe.honored, module: src/modules/bussiness/notify}
+  - {rule: br.notify.unsubscribe.honored, module: src/modules/domain/notify}
 
 requiresProof:
   unit:
@@ -22,4 +22,4 @@ requiresProof:
   uat:
     required: true
 
-change: {rev: 2, kind: clarifying, at: 2026-09-18T12:00:00.000Z, reason: "GraphQL now exposes updateNotificationPreferences and unsubscribe mutations (src/features/todo/graphql/mutations/notify/**) backing this requirement's `unsubscribe from a channel` trigger, and PreferencesService/NotifyService (src/modules/bussiness/notify) enforce it on every admission. `requiresProof.e2e.command` corrected from the aspirational `npm run test:e2e -- notify/unsubscribe` (no such script exists in this repository) to the real command. Proven by unsubscribe.handler.spec.ts, notify.service.spec.ts's fr.notify.unsubscribe case, and a live run of scripts/live-proof-notify.sh (real unsubscribe mutation, then a real task completion lands suppressed). `requiresProof.uat.required` stays true and unmet: uat.notify.digest-and-unsubscribe (not owned by this lane) has not been walked - see gap.notify.live-proof. gap.notify.unbuilt-module's blocker is resolved."}
+change: {rev: 2, kind: clarifying, at: 2026-09-18T12:00:00.000Z, reason: "GraphQL now exposes updateNotificationPreferences and unsubscribe mutations (src/features/todo/transport/graphql/mutations/notify/**) backing this requirement's `unsubscribe from a channel` trigger, and PreferencesService/NotifyService (src/modules/domain/notify) enforce it on every admission. `requiresProof.e2e.command` corrected from the aspirational `npm run test:e2e -- notify/unsubscribe` (no such script exists in this repository) to the real command. Proven by unsubscribe.handler.spec.ts, notify.service.spec.ts's fr.notify.unsubscribe case, and a live run of scripts/live-proof-notify.sh (real unsubscribe mutation, then a real task completion lands suppressed). `requiresProof.uat.required` stays true and unmet: uat.notify.digest-and-unsubscribe (not owned by this lane) has not been walked - see gap.notify.live-proof. gap.notify.unbuilt-module's blocker is resolved."}

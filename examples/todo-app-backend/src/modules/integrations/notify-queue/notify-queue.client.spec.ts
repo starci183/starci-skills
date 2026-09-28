@@ -5,8 +5,8 @@ import {
     AddressInfo, createServer, Server, Socket 
 } from "node:net"
 import {
-    AppConfigService 
-} from "@modules/platform/config/app-config.service"
+    AppConfigService,
+} from "@modules/platform/config/index"
 import {
     NotifyQueueClient 
 } from "./notify-queue.client"

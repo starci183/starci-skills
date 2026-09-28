@@ -44,8 +44,8 @@ admits criteria as nested `br/<rule>/ac/<name>/` records; this example keeps the
 
 **`fr` (functional requirement)** composes rules into a flow. `fr.task.complete` names its actors
 (`[owner, collaborator]`), its trigger, its main and exception flows, and a `composes` list:
-`{rule: br.task.single-owner, module: src/modules/bussiness/task}`, `{rule: br.task.complete.once, ...}`,
-`{rule: br.share.role.permissions, module: src/modules/bussiness/share}` — one entry per rule the flow
+`{rule: br.task.single-owner, module: src/modules/domain/task}`, `{rule: br.task.complete.once, ...}`,
+`{rule: br.share.role.permissions, module: src/modules/domain/share}` — one entry per rule the flow
 relies on, each naming the module that implements it.
 
 **`sds` (SDS component)** carries a state machine as data and a sequence of observable steps, not prose.
@@ -92,7 +92,7 @@ its `because` recording which half remains another lane's `todo` record.
 
 **`impl` (owners)** names real files by role, plural, because one screen or flow can span more than one
 artifact. `impl.task.todo-app-backend.ownership`'s `owners: [{role: module, path:
-src/modules/bussiness/task}]`, a `revision` (a git commit), and `proves: [sds.task.ownership-guard]` — it
+src/modules/domain/task}]`, a `revision` (a git commit), and `proves: [sds.task.ownership-guard]` — it
 deliberately does not prove `br.task.single-owner` while that rule is still `todo`, because the gate refuses
 a `done` record whose `proves` target is not done.
 
@@ -111,7 +111,7 @@ requires both `fr.login.sign-in` and `fr.task.create`.
 authored by hand: `scripts/example/example-evidence.mjs` writes it by actually running the assertion
 commands below against `--cwd`, and stamps that in its header. It carries a `recordDigest` (a sha256 of the record's own `index.yaml` bytes),
 a `codeDigest` (per-file sha256 over the record's `owners` paths), an `outcome`, per-assertion
-`command`/`exit`/`outcome` rows (`npx jest src/modules/bussiness/task/list-tasks.handler.spec.ts`, `exit: 0`),
+`command`/`exit`/`outcome` rows (`npx jest src/modules/domain/task/list-tasks.handler.spec.ts`, `exit: 0`),
 and `provenance` naming the actor. A run is replayable in the sense that its command, its environment and its
 observed result are all named — someone can rerun the assertion and compare.
 
@@ -173,13 +173,13 @@ named by `gap.task.no-load-harness`.
 
 **Owners and modules name real files.** A `work/business-rule@1`'s `module` is a plain string or list of
 strings naming the source path(s) that carry it — `br.task.complete.once`'s `module:
-[src/modules/bussiness/task]`. A
+[src/modules/domain/task]`. A
 `work/implementation@1`'s `owners` is a list of `{role, path}` pairs, one entry per real artifact a screen or
 flow spans — never a single `directory`/`files` pair, which `scripts/checks/check-example-work.mjs` refuses outright
 ("work/implementation@1 carries directory/files/targetFiles; use owners: [{role, path}] instead").
 
 **Test names quote acceptance criteria and business rules verbatim.** In
-`examples/todo-app-backend/src/modules/bussiness/task/create-task.handler.spec.ts`:
+`examples/todo-app-backend/src/modules/domain/task/create-task.handler.spec.ts`:
 
 ```ts
 it('fr.task.create: the task is created, owned by the submitter, not complete', async () => { ... });

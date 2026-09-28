@@ -7,7 +7,7 @@ observableCriterion: An unknown email and a wrong password produce the identical
   same body - because both are answered by the same single Keycloak round-trip, not by two different code
   paths whose durations could be told apart.
 measurement:
-  how: The parity test in src/app.boot.spec.ts drives both shapes through the real HTTP route and asserts
+  how: The parity test in apps/todo/src/app.boot.spec.ts drives both shapes through the real HTTP route and asserts
     identical status and body. There is no separate timing-difference budget to measure, because
     sign-in.use-case.ts never branches on which half was wrong before calling Keycloak once. An unknown
     email and a wrong password both fall through to the same keycloakClient.signIn() call and the same
@@ -26,7 +26,7 @@ change:
     timing budget at all - whichever half of the pair is wrong, the code takes the identical single
     Keycloak round-trip, so there is no separate code path whose timing could differ in the first place.
     The observable criterion moves from "the timing gap is small" to "there is no gap to measure, by
-    construction", proven by the parity test already in src/app.boot.spec.ts.
+    construction", proven by the parity test already in apps/todo/src/app.boot.spec.ts.
 requiresProof:
   measurement:
     required: true

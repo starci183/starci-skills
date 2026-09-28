@@ -8,47 +8,54 @@ import type {
     EntityManager 
 } from "typeorm"
 import {
-    AppConfigService 
-} from "@modules/platform/config/app-config.service"
+    AppConfigService,
+} from "@modules/platform/config/index"
 import {
-    InjectPrimaryEntityManager 
-} from "@modules/platform/databases/postgresql/primary/primary.decorators"
+    InjectPrimaryEntityManager,
+} from "@modules/platform/databases/postgresql/primary/index"
 import {
-    TaskEntity 
-} from "@modules/platform/databases/postgresql/primary/entities/task.entity"
+    TaskEntity,
+} from "@modules/platform/databases/postgresql/primary/index"
 import {
-    UploadEntity 
-} from "@modules/platform/databases/postgresql/primary/entities/upload.entity"
+    UploadEntity,
+} from "@modules/platform/databases/postgresql/primary/index"
 import {
-    TaskForbiddenException 
-} from "@modules/shared/exceptions/errors/task/task-forbidden"
+    TaskForbiddenException,
+} from "@modules/domain/task/index"
 import {
-    TaskNotFoundException 
-} from "@modules/shared/exceptions/errors/task/task-not-found"
+    TaskNotFoundException,
+} from "@modules/domain/task/index"
 import {
-    UploadForbiddenException 
-} from "@modules/shared/exceptions/errors/upload/upload-forbidden"
+    UploadForbiddenException,
+} from "./errors/upload-forbidden"
 import {
-    UploadMimeNotAllowedException 
-} from "@modules/shared/exceptions/errors/upload/upload-mime-not-allowed"
+    UploadMimeNotAllowedException,
+} from "./errors/upload-mime-not-allowed"
 import {
-    UploadNotFoundException 
-} from "@modules/shared/exceptions/errors/upload/upload-not-found"
+    UploadNotFoundException,
+} from "./errors/upload-not-found"
 import {
-    UploadNotReadyException 
-} from "@modules/shared/exceptions/errors/upload/upload-not-ready"
+    UploadNotReadyException,
+} from "./errors/upload-not-ready"
 import {
-    UploadTokenInvalidException 
-} from "@modules/shared/exceptions/errors/upload/upload-token-invalid"
+    UploadTokenInvalidException,
+} from "./errors/upload-token-invalid"
 import {
-    UploadTooLargeException 
-} from "@modules/shared/exceptions/errors/upload/upload-too-large"
+    UploadTooLargeException,
+} from "./errors/upload-too-large"
 import {
-    PresignedUpload, UploadRecord, UploadStoragePort, VirusScanPort 
+    PresignedUploadResult, UploadRecord, UploadStoragePort, VirusScanPort
 } from "./upload.contracts"
 import {
     signUploadToken, UPLOAD_TOKEN_HEADER, verifyUploadToken 
 } from "./upload-token"
+
+type UploadContentToken = string | undefined
+
+interface UploadContentResult {
+    record: UploadRecord
+    content: Buffer
+}
 
 
 /**
@@ -77,7 +84,7 @@ export class UploadService {
 
     /** Opens an upload intent: validates the declared shape, writes the pending row and returns the
    * presigned PUT contract the client fulfils against acceptContent. */
-    async createIntent(owner: string, filename: string, mime: string, sizeBytes: number): Promise<PresignedUpload> {
+    async createIntent(owner: string, filename: string, mime: string, sizeBytes: number): Promise<PresignedUploadResult> {
         this.assertIntakeAllowed(mime,
             sizeBytes)
         const row = await this.entityManager.save(UploadEntity,
@@ -113,7 +120,7 @@ export class UploadService {
     /** The presigned data plane: verifies the token against the row, enforces the same size cap a
    * second time (a client can declare a small intent and PUT a large body - the received bytes are
    * what count), stores, scans and flips the row to ready. */
-    async acceptContent(uploadId: string, token: string | undefined, content: Buffer): Promise<UploadRecord> {
+    async acceptContent(uploadId: string, token: UploadContentToken, content: Buffer): Promise<UploadRecord> {
         const row = await this.findRow(uploadId)
         const verdict = verifyUploadToken(uploadId,
             token,
@@ -225,7 +232,7 @@ export class UploadService {
     /** Reads the object's bytes for its owner. A ready row whose object vanished from storage answers
    * not-found - metadata without bytes is not downloadable, and the refusal is the same shape a
    * never-existing id gets so existence alone leaks nothing about the store's internals. */
-    async readContent(uploadId: string, actorId: string): Promise<{ record: UploadRecord; content: Buffer }> {
+    async readContent(uploadId: string, actorId: string): Promise<UploadContentResult> {
         const row = await this.findRow(uploadId)
         this.assertOwned(row,
             actorId)

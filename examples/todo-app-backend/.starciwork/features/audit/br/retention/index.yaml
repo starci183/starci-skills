@@ -21,14 +21,14 @@ acceptance:
         validity are unchanged. A separate case must advance to well past the window with an active
         erasure against the line's subject and assert the line still exists but no longer decrypts -
         proving retention and erasure are independent axes, not one flag."
-module: src/modules/bussiness/audit
+module: src/modules/domain/audit
 
 change:
   rev: 3
   kind: editorial
   at: 2026-09-19T15:59:33.966Z
   reason: "gap.audit.unbuilt-module is closed: AuditLogService takes an injected Clock
-    (src/modules/bussiness/audit/audit-log.service.ts) so audit-log.service.spec.ts can advance past 400
+    (src/modules/domain/audit/audit-log.service.ts) so audit-log.service.spec.ts can advance past 400
     days without a real wait and assert sweepRetention's count and chain validity are unchanged, and a
     second case proves retention and erasure are independent axes (the line still exists past the window
     but no longer decrypts once its subject is erased). module corrected from the drafted src/audit/log

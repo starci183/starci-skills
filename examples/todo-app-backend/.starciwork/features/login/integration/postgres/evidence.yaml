@@ -35,3 +35,5 @@ provenance:
   tool: scripts/live-proof.sh plus a direct psql check (both run by hand, not scripts/example-evidence.mjs)
   environment: local
   capturedAt: 2026-09-18T08:52:00.000Z
+stale: true
+staleReason: HFS moved the owner paths and implementation code after this evidence was captured; its recorded hashes and assertions remain historical.

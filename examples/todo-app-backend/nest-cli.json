@@ -1,0 +1,15 @@
+{
+  "$schema": "https://json.schemastore.org/nest-cli",
+  "collection": "@nestjs/schematics",
+  "monorepo": true,
+  "root": "apps/todo",
+  "sourceRoot": "apps/todo/src",
+  "projects": {
+    "todo": {
+      "type": "application",
+      "root": "apps/todo",
+      "entryFile": "main",
+      "sourceRoot": "apps/todo/src"
+    }
+  }
+}

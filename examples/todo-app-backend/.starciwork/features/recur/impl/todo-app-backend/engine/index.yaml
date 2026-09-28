@@ -4,9 +4,9 @@ title: The rule, occurrence and generation engine
 state: done
 repository: todo-app-backend
 owners:
-  - {role: module, path: src/modules/bussiness/recur}
-  - {role: feature, path: src/features/todo/graphql/mutations/recur}
-  - {role: feature, path: src/features/todo/graphql/queries/recur}
+  - {role: module, path: src/modules/domain/recur}
+  - {role: feature, path: src/features/todo/transport/graphql/mutations/recur}
+  - {role: feature, path: src/features/todo/transport/graphql/queries/recur}
 proves: [br.recur.generation.once, br.recur.impossible-date.skips, br.recur.occurrence.owned-by-rule-owner,
   br.recur.ending.preserves-history, br.recur.timezone.owner-local-time, sds.recur.occurrence-lifecycle,
   sds.recur.generation-engine]

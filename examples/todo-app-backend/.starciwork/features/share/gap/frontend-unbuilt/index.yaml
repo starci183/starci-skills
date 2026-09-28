@@ -2,7 +2,7 @@ schema: work/gap@1
 id: gap.share.frontend-unbuilt
 title: No share invite screen exists under the Next.js layout yet
 state: done
-statement: gap.share.unbuilt-module closed on its backend half (src/modules/bussiness/share exists,
+statement: gap.share.unbuilt-module closed on its backend half (src/modules/domain/share exists,
   proven by jest and scripts/live-proof-share.sh - lane be-share, backend-only per its brief). The
   frontend half it also named now exists too - the served route /tasks/<id>/share mounts
   features/pages/share -> components/blocks/share-invite, consuming the Grammar core package

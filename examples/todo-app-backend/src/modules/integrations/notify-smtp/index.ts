@@ -1,0 +1,6 @@
+export { NotifySmtpPermanentRejectionException } from "./errors/notify-smtp-permanent-rejection"
+export { NotifySmtpTransientFailureException } from "./errors/notify-smtp-transient-failure"
+export { NotifySmtpClient } from "./notify-smtp.client"
+export { NotifySmtpMessageParams, NotifySmtpPort } from "./notify-smtp.contracts"
+export { NotifySmtpModule } from "./notify-smtp.module"
+export { FakeNotifySmtpClient } from "./testing/fake-notify-smtp.client"

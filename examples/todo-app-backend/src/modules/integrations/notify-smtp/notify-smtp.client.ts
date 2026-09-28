@@ -5,17 +5,17 @@ import {
     Socket 
 } from "node:net"
 import {
-    AppConfigService 
-} from "@modules/platform/config/app-config.service"
+    AppConfigService,
+} from "@modules/platform/config/index"
 import {
-    NotifySmtpPermanentRejectionException 
-} from "@modules/shared/exceptions/errors/notify/notify-smtp-permanent-rejection"
+    NotifySmtpPermanentRejectionException,
+} from "./errors/notify-smtp-permanent-rejection"
 import {
-    NotifySmtpTransientFailureException 
-} from "@modules/shared/exceptions/errors/notify/notify-smtp-transient-failure"
+    NotifySmtpTransientFailureException,
+} from "./errors/notify-smtp-transient-failure"
 
 import {
-    NotifySmtpMessage, NotifySmtpPort 
+    NotifySmtpMessageParams, NotifySmtpPort
 } from "./notify-smtp.contracts"
 
 const CONNECT_TIMEOUT_MS = 5_000
@@ -42,7 +42,7 @@ export class NotifySmtpClient extends NotifySmtpPort {
         super()
     }
 
-    async send(message: NotifySmtpMessage): Promise<void> {
+    async send(message: NotifySmtpMessageParams): Promise<void> {
         const host = this.config.getSmtpHost()
         const port = this.config.getSmtpPort()
         const from = this.config.getSmtpFromAddress()

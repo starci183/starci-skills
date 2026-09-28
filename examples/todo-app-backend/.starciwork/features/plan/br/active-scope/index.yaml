@@ -20,12 +20,12 @@ acceptance:
     then:
       - The count is 19.
       - Creating one more task is allowed.
-module: src/modules/bussiness/plan
+module: src/modules/domain/plan
 change:
   rev: 3
   kind: editorial
   at: 2026-09-19T15:59:33.966Z
-  reason: PlanCapGuardPolicy (src/modules/bussiness/plan/cap-guard.policy.ts) computes the active count by
+  reason: PlanCapGuardPolicy (src/modules/domain/plan/cap-guard.policy.ts) computes the active count by
     filtering out completed tasks from TaskService.listOwnedBy, proven by
     cap-guard.policy.spec.ts's ac.plan.active-scope.excludes-complete case.
     rev 3 (v11 ac-collapse) - acceptanceCriteria renamed to acceptance and now carries each criterion's id, given, when and then inline from the retired ac/ sub-records; refs to the old ac ids remap to br.plan.active-scope#<former-ac-id>. Encoding change only, no semantic change.

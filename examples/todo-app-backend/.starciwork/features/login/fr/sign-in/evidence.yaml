@@ -7,20 +7,20 @@ recordDigest: 644c0139cbfb65e219ba8bed7a86b9ce3db0c923a3bb3b28dc0cdf6a93132b53
 outcome: pass
 assertions:
   - id: unit-composed-rules
-    command: npx jest src/modules/bussiness/session
+    command: npx jest src/modules/domain/session
     exit: 0
     outcome: pass
-    observation: npx jest src/modules/bussiness/session exited 0
+    observation: npx jest src/modules/domain/session exited 0
   - id: boot-drives-real-sign-in-route
-    command: npx jest src/app.boot.spec.ts -t "drives sign-in"
+    command: npx jest apps/todo/src/app.boot.spec.ts -t "drives sign-in"
     exit: 0
     outcome: pass
-    observation: npx jest src/app.boot.spec.ts -t "drives sign-in" exited 0
+    observation: npx jest apps/todo/src/app.boot.spec.ts -t "drives sign-in" exited 0
   - id: boot-refuses-unauthenticated-tasks
-    command: npx jest src/app.boot.spec.ts -t "refuses an unauthenticated tasks query"
+    command: npx jest apps/todo/src/app.boot.spec.ts -t "refuses an unauthenticated tasks query"
     exit: 0
     outcome: pass
-    observation: npx jest src/app.boot.spec.ts -t "refuses an unauthenticated tasks query" exited 0
+    observation: npx jest apps/todo/src/app.boot.spec.ts -t "refuses an unauthenticated tasks query" exited 0
   - id: frontend-lands-on-tasks-after-sign-in
     command: cd ../todo-app-frontend && npx vitest run src/hooks/auth/useSignIn.spec.ts
     exit: 0

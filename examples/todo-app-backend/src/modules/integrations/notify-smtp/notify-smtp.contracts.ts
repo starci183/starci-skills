@@ -1,5 +1,5 @@
 /** Contract naming the notify smtp message shape integrations/notify-smtp code and its consumers share; a second site never retypes it inline. */
-export interface NotifySmtpMessage {
+export interface NotifySmtpMessageParams {
   readonly to: string;
   readonly subject: string;
   readonly body: string;
@@ -14,5 +14,5 @@ export interface NotifySmtpMessage {
  * matching this codebase's own convention for ports (`KeycloakClient`'s shape, `CompletionAuthority`).
  */
 export abstract class NotifySmtpPort {
-  abstract send(message: NotifySmtpMessage): Promise<void>;
+  abstract send(message: NotifySmtpMessageParams): Promise<void>;
 }

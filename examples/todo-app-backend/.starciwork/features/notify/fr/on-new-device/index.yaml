@@ -14,8 +14,8 @@ postconditions:
   - Within the person's digest window after the new sign-in, one message names that a new device signed
     in, unless suppressed.
 composes:
-  - {rule: br.notify.delivery.once, module: src/modules/bussiness/notify}
-  - {rule: br.notify.digest.window, module: src/modules/bussiness/notify}
+  - {rule: br.notify.delivery.once, module: src/modules/domain/notify}
+  - {rule: br.notify.digest.window, module: src/modules/domain/notify}
 refs: [contract.notify.new-device-signal]
 subscribes: [event.login.new-device-signin]
 

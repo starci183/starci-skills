@@ -5,8 +5,8 @@ import {
     Socket 
 } from "node:net"
 import {
-    AppConfigService 
-} from "@modules/platform/config/app-config.service"
+    AppConfigService,
+} from "@modules/platform/config/index"
 import {
     NotifyQueuePort 
 } from "./notify-queue.contracts"

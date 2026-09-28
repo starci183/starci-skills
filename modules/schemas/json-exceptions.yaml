@@ -112,41 +112,15 @@ exceptions:
       Rendered vps environment for the todo-app-backend application stack;
       starci/rendered-environment output of application-stacks.yaml, JSON by
       the rendering contract.
-  - path: examples/todo-app-backend/.starciwork/_derived/deep-baseline.json
-    reason: >
-      Derived deep-check baseline written by the work-tree checker for todo-app-backend; generated evidence, JSON by the checker writer contract.
-  - path: examples/todo-app-backend/.starciwork/features/audit/impl/todo-app-frontend/privacy/assets/todo-app-export-desktop-1280.json
-    reason: >
-      Captured export payload asset for the privacy audit feature; JSON is the export format.
-  - path: examples/todo-app-backend/.starciwork/features/audit/impl/todo-app-frontend/privacy/assets/todo-app-export-mobile-390.json
-    reason: >
-      Captured export payload asset for the privacy audit feature; JSON is the export format.
-  - path: examples/todo-app-backend/.starciwork/features/task/impl/todo-app-frontend/task-list/flows.json
-    reason: >
-      Captured flow payload asset for the task-list feature; JSON is the harness writer contract.
   - path: examples/todo-app-backend/.starciwork/features/task/ui/list/assets/grammar-reference-review.json
     reason: >
       Captured grammar review asset for the ui list feature; JSON is the reviewer output format.
-  - path: examples/todo-app-backend/.starciwork/ledger-anchor.json
-    reason: >
-      Illustrative runtime ledger anchor for the example Work tree; the real
-      file is kernel-owned runtime custody (engine/index.mjs ROOT_LOCAL_DIRS),
-      committed here only as example output, and JSON is its own format.
   - path: examples/todo-app-backend/architecture.json
     reason: NestJS architecture config for the real todo-app-backend example; the architecture checker reads starci/architecture-config@1 as JSON.
-  - path: examples/todo-app-backend/lf.json
-    reason: >
-      Lint tool configuration/output for the todo-app-backend example project; JSON by the tool contract.
-  - path: examples/todo-app-backend/lt.json
-    reason: >
-      Lint tool configuration/output for the todo-app-backend example project; JSON by the tool contract.
   - path: examples/todo-app-backend/package-lock.json
     reason: npm lockfile for the real todo-app-backend example; package managers require JSON filename and syntax.
   - path: examples/todo-app-backend/package.json
     reason: npm package manifest for the real todo-app-backend example; Node/npm require JSON filename and syntax.
-  - path: examples/todo-app-backend/todo-lint.json
-    reason: >
-      Lint tool configuration/output for the todo-app-backend example project; JSON by the tool contract.
   - path: examples/todo-app-backend/tsconfig.build.json
     reason: TypeScript build project config for the real todo-app-backend example; tsc expects a JSON tsconfig file.
   - path: examples/todo-app-backend/tsconfig.json

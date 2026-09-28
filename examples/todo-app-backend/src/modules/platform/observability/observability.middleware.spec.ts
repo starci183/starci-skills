@@ -8,11 +8,11 @@ import {
     EventEmitter 
 } from "node:events"
 import {
-    LogEvent 
-} from "@modules/platform/logging/log-events"
+    LogEvent,
+} from "@modules/platform/logging/index"
 import {
-    WinstonService 
-} from "@modules/platform/logging/winston.service"
+    WinstonService,
+} from "@modules/platform/logging/index"
 import {
     MetricsService 
 } from "./metrics.service"
@@ -138,7 +138,7 @@ describe("observability middleware",
                 const text = metrics.renderPrometheus()
                 expect(text).toContain("http_requests_total{method=\"PUT\",route=\"/uploads/:uploadId/content\",status=\"201\"} 1")
                 expect(logged).toHaveLength(1)
-                expect(logged[0].event).toBe(LogEvent.HTTP_REQUEST_COMPLETED)
+                expect(logged[0].event).toBe(LogEvent.HttpRequestCompleted)
                 expect(logged[0].data).toMatchObject({
                     requestId: "req-1",
                     method: "PUT",

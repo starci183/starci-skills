@@ -130,4 +130,4 @@ provenance:
   environment: local
   capturedAt: 2026-09-19T22:46:43.275Z
 stale: true
-staleReason: alpha.3 moved this implementation's captures from assets/ into the blob store (the record now cites them by sha256), so the record digest this evidence captured no longer matches; the evidence stays as history.
+staleReason: alpha.3 moved this implementation's captures from assets/ into the blob store (the record now cites them by sha256), so the record digest this evidence captured no longer matches; the evidence stays as history. The frontend source moved to apps/web/src under HFS, so the captured code paths are also historical.

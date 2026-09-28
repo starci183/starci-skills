@@ -8,11 +8,11 @@ import {
     getEntityManagerToken 
 } from "@nestjs/typeorm"
 import {
-    AppConfigService 
-} from "@modules/platform/config/app-config.service"
+    AppConfigService,
+} from "@modules/platform/config/index"
 import {
-    POSTGRESQL_PRIMARY 
-} from "@modules/platform/databases/postgresql/primary/constants/connection"
+    POSTGRESQL_PRIMARY,
+} from "@modules/platform/databases/postgresql/primary/index"
 import {
     LocalStorageAdapter 
 } from "./local-storage.adapter"

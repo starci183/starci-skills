@@ -2,7 +2,7 @@
 <#
 Decrypts every DEMO-ONLY .enc secret this example ships under .starcistacks/dev/runtime/**, then runs the
 given command. The decrypted files are never committed (see the backend's .gitignore); the identity they
-are encrypted to is itself committed and documented as demo-only in runtime/env/KEYS.md.
+are encrypted to is untracked and documented as demo-only in runtime/env/KEYS.md.
 
 Usage: .\scripts\with-dev-secrets.ps1 <command> [args...]
   e.g. .\scripts\with-dev-secrets.ps1 docker compose -f .starcistacks/dev/infra/compose/compose.yaml up -d

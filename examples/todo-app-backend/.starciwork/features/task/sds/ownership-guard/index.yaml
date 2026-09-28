@@ -13,7 +13,7 @@ refs: [br.task.single-owner]
 dependsOn: [integration.login.postgres, contract.share.completion-guard-for-task]
 
 owners:
-  - {role: module, path: src/modules/bussiness/task}
+  - {role: module, path: src/modules/domain/task}
 
 change:
   rev: 2

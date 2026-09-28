@@ -4,8 +4,8 @@ title: The log module
 state: done
 repository: todo-app-backend
 owners:
-  - {role: module, path: src/modules/bussiness/audit}
-  - {role: module, path: src/features/todo/graphql/queries/audit/export-my-data}
+  - {role: module, path: src/modules/domain/audit}
+  - {role: module, path: src/features/todo/transport/graphql/queries/audit/export-my-data}
 proves: [br.audit.append-only, br.audit.retention, sds.audit.log-chain]
 
 change:
@@ -17,11 +17,11 @@ change:
     AuditKeystoreService (the crypto-shred keystore), AppendLogLineCommand/Handler,
     AuditEventSubscriber (the PlatformEventBus consumer sds.audit.log-chain's subscribes names), the
     AuditLogLine/AuditKey entities and their migration under
-    src/modules/platform/databases/postgresql/primary, all under src/modules/bussiness/audit/. Owners
+    src/modules/platform/databases/postgresql/primary, all under src/modules/domain/audit/. Owners
     corrected from the drafted src/audit/log.service.ts + src/audit/log.repository.ts + src/audit
     /keystore.service.ts (never built, and this example keeps no separate repository files - persistence
-    is @InjectPrimaryEntityManager(), matching bussiness/task's own convention) to the one real module
+    is @InjectPrimaryEntityManager(), matching domain/task's own convention) to the one real module
     directory, following impl.task.todo-app-backend.create-task's own single-directory owners shape.
     rev 3 (owners expansion): owners now also claims the export-my-data query door,
-    src/features/todo/graphql/queries/audit/export-my-data - its ExportMyDataQuery/Handler calls this
+    src/features/todo/transport/graphql/queries/audit/export-my-data - its ExportMyDataQuery/Handler calls this
     module's AuditLogService.exportForPerson. Record metadata only; no code changed."

@@ -9,7 +9,7 @@ statement: The example backend is moving to NestJS (checks/architecture.mjs, che
 closedBy: impl.plan.todo-app-backend.plan
 verificationSource: authored-claim
 because: "closedBy names impl.plan.todo-app-backend.plan, itself done with a fresh implementation under
-  src/modules/bussiness/plan (+ integrations/sepay, the webhook door) and real evidence.yaml files for
+  src/modules/domain/plan (+ integrations/sepay, the webhook door) and real evidence.yaml files for
   every br/sds it proves. The backend half of this gap is closed; the frontend half
   (impl.plan.todo-app-frontend.usage, app/plan) is a separate record this backend-only lane does not own
   and remains its own todo - see the final report."

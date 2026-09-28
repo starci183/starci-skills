@@ -10,7 +10,7 @@ interfaces:
     subclass) is registered into the existing TaskCreationPolicyRegistry seam by
     PlanModule.onModuleInit; see appliesTo below and owners.
 owners:
-  - {role: module, path: src/modules/bussiness/plan}
+  - {role: module, path: src/modules/domain/plan}
 refs: [br.plan.caps.limit, br.plan.active-scope]
 dependsOn: [sds.plan.subscription-lifecycle, contract.plan.create-precondition]
 appliesTo: [fr.task.create]
@@ -42,7 +42,7 @@ sequence:
   note: This is the sequence the guard runs. cap-guard.policy.spec.ts's own registry-based case
     ("registered into TaskCreationPolicyRegistry, the registry itself refuses the over-cap create")
     exercises the actual seam object task's own CreateTaskHandler consults, without editing
-    bussiness/task's files.
+    domain/task's files.
 
 requiresProof:
   implementation:
@@ -54,7 +54,7 @@ change:
   rev: 2
   kind: clarifying
   at: 2026-09-18T16:00:00.000Z
-  reason: Built at src/modules/bussiness/plan (cap-guard.policy.ts) and wired into
+  reason: Built at src/modules/domain/plan (cap-guard.policy.ts) and wired into
     TaskCreationPolicyRegistry by PlanModule.onModuleInit, closing gap.plan.unbuilt-module's cap-guard
     half and gap.plan.cap-guard-not-wired entirely - see cap-guard.policy.spec.ts.
 

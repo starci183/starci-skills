@@ -2,16 +2,19 @@
   "name": "todo-app-backend",
   "version": "1.0.0",
   "private": true,
-  "description": "Todo app backend: NestJS example matching nivo's own backend shape (capability modules under modules/{platform,integrations,bussiness}, GraphQL transport under features/<feature>/graphql) for the runtime's architecture checks.",
+  "description": "Todo app backend: NestJS example with domain, platform and integrations modules, and Todo GraphQL and HTTP transport under src/features/todo/transport.",
   "scripts": {
     "build": "tsc -p tsconfig.build.json && tsc-alias -p tsconfig.build.json",
-    "start": "node -r tsconfig-paths/register dist/main.js",
-    "start:dev": "ts-node-dev --respawn --transpile-only -r tsconfig-paths/register src/main.ts",
+    "start": "node -r tsconfig-paths/register dist/apps/todo/src/main.js",
+    "start:dev": "ts-node-dev --respawn --transpile-only -r tsconfig-paths/register apps/todo/src/main.ts",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
     "test": "jest",
+    "test:unit": "jest",
     "test:coverage": "jest --coverage",
     "test:e2e": "jest --config src/tests/e2e/jest.config.ts",
-    "lint": "eslint \"src/**/*.ts\"",
-    "lint:fix": "eslint \"src/**/*.ts\" --fix"
+    "lint": "eslint \"src/**/*.ts\" \"apps/**/*.ts\"",
+    "lint:check": "eslint \"src/**/*.ts\" \"apps/**/*.ts\"",
+    "lint:fix": "eslint \"src/**/*.ts\" \"apps/**/*.ts\" --fix"
   },
   "dependencies": {
     "@nestjs/apollo": "^12.2.2",
@@ -34,7 +37,7 @@
     "@apollo/client": "^4.3.1",
     "@nestjs/testing": "^10.4.4",
     "@starci-examples/e2e-kit": "file:../../packages/e2e-kit",
-    "@starci/eslint-canon-be": "^1.2.1",
+    "@starci/eslint-canon-be": "file:../../packages/eslint/be",
     "@types/express": "^4.17.21",
     "@types/jest": "^29.5.12",
     "@types/node": "^20.14.10",

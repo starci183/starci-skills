@@ -5,32 +5,32 @@ import {
     Test 
 } from "@nestjs/testing"
 import {
-    AppConfigService 
-} from "@modules/platform/config/app-config.service"
+    AppConfigService,
+} from "@modules/platform/config/index"
 import {
-    KeycloakClient 
-} from "@modules/integrations/keycloak/keycloak.client"
+    KeycloakClient,
+} from "@modules/integrations/keycloak/index"
 import {
-    KeycloakModule 
-} from "@modules/integrations/keycloak/keycloak.module"
+    KeycloakModule,
+} from "@modules/integrations/keycloak/index"
 import {
-    NotifyQueueClient 
-} from "@modules/integrations/notify-queue/notify-queue.client"
+    NotifyQueueClient,
+} from "@modules/integrations/notify-queue/index"
 import {
-    NotifyQueuePort 
-} from "@modules/integrations/notify-queue/notify-queue.contracts"
+    NotifyQueuePort,
+} from "@modules/integrations/notify-queue/index"
 import {
-    NotifyQueueModule 
-} from "@modules/integrations/notify-queue/notify-queue.module"
+    NotifyQueueModule,
+} from "@modules/integrations/notify-queue/index"
 import {
-    NotifySmtpClient 
-} from "@modules/integrations/notify-smtp/notify-smtp.client"
+    NotifySmtpClient,
+} from "@modules/integrations/notify-smtp/index"
 import {
-    NotifySmtpPort 
-} from "@modules/integrations/notify-smtp/notify-smtp.contracts"
+    NotifySmtpPort,
+} from "@modules/integrations/notify-smtp/index"
 import {
-    NotifySmtpModule 
-} from "@modules/integrations/notify-smtp/notify-smtp.module"
+    NotifySmtpModule,
+} from "@modules/integrations/notify-smtp/index"
 
 /** Each integration module resolves AppConfigService from the globally-registered ConfigModule
  * (see keycloak.module.ts's comment); this stub stands in for that global provider. */

@@ -2,15 +2,15 @@ import {
     Injectable 
 } from "@nestjs/common"
 import {
-    AppConfigService 
-} from "@modules/platform/config/app-config.service"
+    AppConfigService,
+} from "@modules/platform/config/index"
 import {
-    PlanWebhookUnauthorizedException 
-} from "@modules/shared/exceptions/errors/plan/plan-webhook-unauthorized"
+    PlanWebhookUnauthorizedException,
+} from "./errors/plan-webhook-unauthorized"
 
 import {
-    SepayRequestFailedException 
-} from "@modules/shared/exceptions/errors/sepay/sepay-request-failed"
+    SepayRequestFailedException,
+} from "./errors/sepay-request-failed"
 
 /** Contract naming the sepay create intent params shape integrations/sepay code and its consumers share; a second site never retypes it inline. */
 export interface SepayCreateIntentParams {
@@ -136,7 +136,7 @@ export class SepayClient {
     /** fr.plan.upgrade's exception flow: an invalid webhook signature is ignored, never applied. SePay
    * authenticates its webhook delivery with a shared secret carried in the Authorization header
    * (integration.plan.sepay's credential), compared here rather than a computed body signature. */
-    assertWebhookAuthorized(authorizationHeader: string | undefined): void {
+    assertWebhookAuthorized(authorizationHeader?: string): void {
         const expected = this.config.getSepayWebhookSecret()
         if (!expected || authorizationHeader !== `Bearer ${expected}`) {
             throw new PlanWebhookUnauthorizedException({

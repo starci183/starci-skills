@@ -10,9 +10,9 @@ mainFlow:
 exceptionFlows:
   - A task the actor neither owns nor holds an accepted editor invitation on is refused.
 composes:
-  - {rule: br.task.single-owner, module: src/modules/bussiness/task}
-  - {rule: br.task.complete.once, module: src/modules/bussiness/task}
-  - {rule: br.share.role.permissions, module: src/modules/bussiness/share}
+  - {rule: br.task.single-owner, module: src/modules/domain/task}
+  - {rule: br.task.complete.once, module: src/modules/domain/task}
+  - {rule: br.share.role.permissions, module: src/modules/domain/share}
 refs: [contract.share.completion-guard-for-task]
 blockedBy:
   - {record: br.task.single-owner, rev: 4, because: "br.task.single-owner is still todo at rev 4: its evidence.yaml is stale: true - the captured run proves the delete half and the stranger negatives but never exercises the accepted-editor complete arm this flow composes (that absence is now named by gap.task.single-owner-editor-arm, which the rule's own blockedBy points at). A composed flow does not outrun a rule that is not yet done."}
@@ -24,7 +24,7 @@ blockedBy:
 # The blockedBy onto br.task.complete.once rev 2 is dropped: that rule is now done at rev 2, its
 # reversible statement is proven (that was the edge's whole text), and the layout refuses an edge
 # onto a done record. composes[].module paths were corrected to the real capability directories
-# (src/modules/bussiness/task and src/modules/bussiness/share - the earlier src/modules/domain/task/**,
+# (src/modules/domain/task and src/modules/domain/share - the earlier src/modules/domain/task/**,
 # src/features/complete-task/** and src/share/access.service.ts were pre-migration paths that never
 # existed in this generation). What still keeps this flow todo is br.task.single-owner's held flag
 # above, requiresProof.e2e (the command now names the real spec - task-lifecycle.e2e-spec.ts covers

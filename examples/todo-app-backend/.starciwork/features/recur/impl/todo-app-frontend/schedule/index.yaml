@@ -10,8 +10,8 @@ repository: todo-app-frontend
 # route now lives is stale for the same reason. Quoted because core/yaml.mjs rejects a bracketed
 # plain scalar inside a flow mapping.
 owners:
-  - {role: route, path: "src/app/[lang]/recur"}
-  - {role: block, path: src/components/recur}
+  - {role: route, path: "apps/web/src/app/[lang]/recur"}
+  - {role: block, path: apps/web/src/components/blocks/recur}
 proves: [ui.recur.schedule]
 # gap.recur.render-proof closed at rev 4 (w10): the mobile palette failures were antialiased
 # halo dominance in viewport-only captures, not a stylesheet defect - capture.mjs now takes

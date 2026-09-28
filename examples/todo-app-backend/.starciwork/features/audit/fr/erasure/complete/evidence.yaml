@@ -17,12 +17,14 @@ assertions:
     outcome: pass
     observation: npx jest -t ac.audit.erasure.logged.request-and-completion-are-lines exited 0
   - id: handler
-    command: npx jest src/modules/bussiness/audit/complete-erasure.handler.spec.ts
+    command: npx jest src/modules/domain/audit/complete-erasure.handler.spec.ts
     exit: 0
     outcome: pass
-    observation: npx jest src/modules/bussiness/audit/complete-erasure.handler.spec.ts exited 0
+    observation: npx jest src/modules/domain/audit/complete-erasure.handler.spec.ts exited 0
 provenance:
   actor: example-evidence
   tool: scripts/example/example-evidence.mjs
   environment: local
   capturedAt: 2026-09-22T18:14:25.643Z
+stale: true
+staleReason: HFS moved the owner paths and implementation code after this evidence was captured; its recorded hashes and assertions remain historical.

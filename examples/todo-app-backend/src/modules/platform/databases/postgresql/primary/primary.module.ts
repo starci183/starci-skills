@@ -8,14 +8,14 @@ import {
     join 
 } from "node:path"
 import {
-    AppConfigService 
-} from "@modules/platform/config/app-config.service"
+    AppConfigService,
+} from "@modules/platform/config/index"
 import {
-    ConfigModule 
-} from "@modules/platform/config/config.module"
+    ConfigModule,
+} from "@modules/platform/config/index"
 import {
-    WinstonService 
-} from "@modules/platform/logging/winston.service"
+    WinstonService,
+} from "@modules/platform/logging/index"
 import {
     ConfigurableModuleClass, OPTIONS_TYPE 
 } from "./primary.module-definition"

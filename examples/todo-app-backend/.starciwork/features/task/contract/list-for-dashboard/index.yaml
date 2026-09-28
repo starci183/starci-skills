@@ -20,8 +20,8 @@ refs: [br.task.list.owned]
 # decision.task.list.scope is decided (owner-only), and br.task.list.owned - the rule this contract's
 # single guarantee rests on - is now done, so the reason this record's earlier comment gave for
 # holding back is gone. The provider half is built and proven: TaskCountsQuery/TaskCountsHandler
-# (src/modules/bussiness/task) implement the countsFor shape, exposed on the one door a dashboard can
-# reach - the GraphQL taskCounts query (src/features/todo/graphql/queries/task/task-counts), which
+# (src/modules/domain/task) implement the countsFor shape, exposed on the one door a dashboard can
+# reach - the GraphQL taskCounts query (src/features/todo/transport/graphql/queries/task/task-counts), which
 # takes no person argument and counts for the session actor only; two named contract.task.list-for-
 # dashboard.* unit tests plus a live signed-in probe (counts moved 0/0 -> 1/0 -> 0/1 across a real
 # completion, unauthenticated reads refused with SESSION_NOT_FOUND) run against an API built from

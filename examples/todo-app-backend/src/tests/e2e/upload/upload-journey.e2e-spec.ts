@@ -1,9 +1,9 @@
 import {
     E2EWorld, bootE2EWorld 
-} from "@tests/infra/e2e-world"
+} from "@tests/harness/e2e-world"
 import {
     E2E_BOOT_TIMEOUT_MS 
-} from "@tests/infra/testing-infra.options"
+} from "@tests/harness/testing-infra.options"
 
 jest.setTimeout(120_000)
 
@@ -12,7 +12,7 @@ const DEMO = {
     email: "demo@todo.dev", password: "todo-demo-pass" 
 }
 
-interface PresignedUpload {
+interface PresignedUploadResult {
   uploadId: string;
   method: string;
   url: string;
@@ -100,7 +100,7 @@ describe("upload journey (e2e)",
 
                 const content = Buffer.from(`e2e upload payload ${Date.now()}`,
                     "utf8")
-                const intent = await api.post<PresignedUpload>("/uploads/intents",
+                const intent = await api.post<PresignedUploadResult>("/uploads/intents",
                     {
                         filename: "note.txt",
                         mime: "text/plain",

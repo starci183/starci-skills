@@ -1,9 +1,9 @@
 import {
     E2EWorld, bootE2EWorld 
-} from "@tests/infra/e2e-world"
+} from "@tests/harness/e2e-world"
 import {
     E2E_BOOT_TIMEOUT_MS 
-} from "@tests/infra/testing-infra.options"
+} from "@tests/harness/testing-infra.options"
 
 /**
  * auth/sign-in - one complete A->Z journey through the public GraphQL door only: create a realm

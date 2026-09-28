@@ -2,14 +2,14 @@ import {
     Injectable 
 } from "@nestjs/common"
 import {
-    AppConfigService 
-} from "@modules/platform/config/app-config.service"
+    AppConfigService,
+} from "@modules/platform/config/index"
 import {
-    KeycloakInvalidCredentialsException 
-} from "@modules/shared/exceptions/errors/keycloak/keycloak-invalid-credentials"
+    KeycloakInvalidCredentialsException,
+} from "./errors/keycloak-invalid-credentials"
 import {
-    KeycloakUnavailableException 
-} from "@modules/shared/exceptions/errors/keycloak/keycloak-unavailable"
+    KeycloakUnavailableException,
+} from "./errors/keycloak-unavailable"
 
 
 /** Contract naming the keycloak sign in result shape integrations/keycloak code and its consumers share; a second site never retypes it inline. */

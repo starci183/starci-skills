@@ -7,10 +7,10 @@ recordDigest: 164c4f48d169ffd0fcbe6a8060557febaa295a3b808727b924fee208396e2a6d
 outcome: pass
 assertions:
   - id: unit
-    command: npx jest src/modules/bussiness/share/revoke-collaborator.handler.spec.ts
+    command: npx jest src/modules/domain/share/revoke-collaborator.handler.spec.ts
     exit: 0
     outcome: pass
-    observation: npx jest src/modules/bussiness/share/revoke-collaborator.handler.spec.ts exited 0
+    observation: npx jest src/modules/domain/share/revoke-collaborator.handler.spec.ts exited 0
   - id: live-proof
     command: bash scripts/live-proof-share.sh
     exit: 0

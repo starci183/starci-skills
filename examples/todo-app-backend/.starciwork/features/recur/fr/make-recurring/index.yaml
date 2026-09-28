@@ -15,8 +15,8 @@ postconditions:
   - Exactly one recurrence rule exists for that submission, and it exists whether or not the day it names
     exists in the current month.
 composes:
-  - {rule: br.recur.impossible-date.skips, module: src/modules/bussiness/recur}
-  - {rule: br.recur.timezone.owner-local-time, module: src/modules/bussiness/recur}
+  - {rule: br.recur.impossible-date.skips, module: src/modules/domain/recur}
+  - {rule: br.recur.timezone.owner-local-time, module: src/modules/domain/recur}
 refs: [data.recur.rule]
 
 requiresProof:

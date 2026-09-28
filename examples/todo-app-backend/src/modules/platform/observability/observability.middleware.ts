@@ -8,11 +8,11 @@ import type {
     NextFunction, Request, Response 
 } from "express"
 import {
-    LogEvent 
-} from "@modules/platform/logging/log-events"
+    LogEvent,
+} from "@modules/platform/logging/index"
 import {
-    WinstonService 
-} from "@modules/platform/logging/winston.service"
+    WinstonService,
+} from "@modules/platform/logging/index"
 import {
     MetricsService 
 } from "./metrics.service"
@@ -57,7 +57,7 @@ export class ObservabilityMiddleware implements NestMiddleware {
                     route,
                     res.statusCode,
                     durationMs)
-                this.winston.log(LogEvent.HTTP_REQUEST_COMPLETED,
+                this.winston.log(LogEvent.HttpRequestCompleted,
                     {
                         requestId,
                         method: req.method,

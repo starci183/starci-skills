@@ -14,7 +14,8 @@ records:
     schema: work/business-rule@1
     feature: audit
     state: done
-    effectiveState: done
+    effectiveState: suspended
+    suspensionReason: evidence-marked-stale
     usedBy:
       refs:
         - data.audit.log-line
@@ -30,7 +31,8 @@ records:
     schema: work/business-rule@1
     feature: audit
     state: done
-    effectiveState: done
+    effectiveState: suspended
+    suspensionReason: evidence-marked-stale
     usedBy:
       refs:
         - data.audit.erasure-request
@@ -42,7 +44,8 @@ records:
     schema: work/business-rule@1
     feature: audit
     state: done
-    effectiveState: done
+    effectiveState: suspended
+    suspensionReason: evidence-marked-stale
     usedBy:
       refs:
         - data.audit.erasure-request
@@ -57,7 +60,8 @@ records:
     schema: work/business-rule@1
     feature: audit
     state: done
-    effectiveState: done
+    effectiveState: suspended
+    suspensionReason: evidence-marked-stale
     usedBy:
       refs:
         - br.audit.erasure.right
@@ -72,7 +76,8 @@ records:
     schema: work/business-rule@1
     feature: login
     state: done
-    effectiveState: done
+    effectiveState: suspended
+    suspensionReason: evidence-marked-stale
     usedBy:
       refs:
         - data.login.person
@@ -84,7 +89,8 @@ records:
     schema: work/business-rule@1
     feature: login
     state: done
-    effectiveState: done
+    effectiveState: suspended
+    suspensionReason: evidence-marked-stale
     usedBy:
       refs:
         - contract.login.identity-for-task
@@ -113,7 +119,8 @@ records:
     schema: work/business-rule@1
     feature: notify
     state: done
-    effectiveState: done
+    effectiveState: suspended
+    suspensionReason: evidence-marked-stale
     usedBy:
       refs:
         - contract.notify.new-device-signal
@@ -130,7 +137,8 @@ records:
     schema: work/business-rule@1
     feature: notify
     state: done
-    effectiveState: done
+    effectiveState: suspended
+    suspensionReason: evidence-marked-stale
     usedBy:
       refs:
         - data.notify.notification
@@ -144,7 +152,8 @@ records:
     schema: work/business-rule@1
     feature: notify
     state: done
-    effectiveState: done
+    effectiveState: suspended
+    suspensionReason: evidence-marked-stale
     usedBy:
       refs:
         - data.notify.delivery-attempt
@@ -154,7 +163,8 @@ records:
     schema: work/business-rule@1
     feature: notify
     state: done
-    effectiveState: done
+    effectiveState: suspended
+    suspensionReason: evidence-marked-stale
     usedBy:
       refs:
         - data.notify.delivery-attempt
@@ -166,7 +176,8 @@ records:
     schema: work/business-rule@1
     feature: observability
     state: done
-    effectiveState: done
+    effectiveState: suspended
+    suspensionReason: evidence-marked-stale
     usedBy:
       composes:
         - fr.observability.request-logging
@@ -174,7 +185,8 @@ records:
     schema: work/business-rule@1
     feature: observability
     state: done
-    effectiveState: done
+    effectiveState: suspended
+    suspensionReason: evidence-marked-stale
     usedBy:
       composes:
         - fr.observability.probes
@@ -182,7 +194,8 @@ records:
     schema: work/business-rule@1
     feature: plan
     state: done
-    effectiveState: done
+    effectiveState: suspended
+    suspensionReason: evidence-marked-stale
     usedBy:
       refs:
         - fr.plan.usage.view
@@ -191,7 +204,8 @@ records:
     schema: work/business-rule@1
     feature: plan
     state: done
-    effectiveState: done
+    effectiveState: suspended
+    suspensionReason: evidence-marked-stale
     usedBy:
       refs:
         - br.plan.downgrade.freeze
@@ -208,7 +222,8 @@ records:
     schema: work/business-rule@1
     feature: plan
     state: done
-    effectiveState: done
+    effectiveState: suspended
+    suspensionReason: evidence-marked-stale
     usedBy:
       refs:
         - data.plan.subscription
@@ -219,7 +234,8 @@ records:
     schema: work/business-rule@1
     feature: plan
     state: done
-    effectiveState: done
+    effectiveState: suspended
+    suspensionReason: evidence-marked-stale
     usedBy:
       refs:
         - data.plan.subscription
@@ -228,7 +244,8 @@ records:
     schema: work/business-rule@1
     feature: plan
     state: done
-    effectiveState: done
+    effectiveState: suspended
+    suspensionReason: evidence-marked-stale
     usedBy:
       refs:
         - data.plan.payment-intent
@@ -240,7 +257,8 @@ records:
     schema: work/business-rule@1
     feature: recur
     state: done
-    effectiveState: done
+    effectiveState: suspended
+    suspensionReason: evidence-marked-stale
     usedBy:
       refs:
         - data.recur.occurrence
@@ -252,7 +270,8 @@ records:
     schema: work/business-rule@1
     feature: recur
     state: done
-    effectiveState: done
+    effectiveState: suspended
+    suspensionReason: evidence-marked-stale
     usedBy:
       refs:
         - data.recur.occurrence
@@ -262,7 +281,8 @@ records:
     schema: work/business-rule@1
     feature: recur
     state: done
-    effectiveState: done
+    effectiveState: suspended
+    suspensionReason: evidence-marked-stale
     usedBy:
       refs:
         - data.recur.rule
@@ -274,7 +294,8 @@ records:
     schema: work/business-rule@1
     feature: recur
     state: done
-    effectiveState: done
+    effectiveState: suspended
+    suspensionReason: evidence-marked-stale
     usedBy:
       refs:
         - data.recur.occurrence
@@ -285,7 +306,8 @@ records:
     schema: work/business-rule@1
     feature: recur
     state: done
-    effectiveState: done
+    effectiveState: suspended
+    suspensionReason: evidence-marked-stale
     usedBy:
       refs:
         - data.recur.rule
@@ -297,7 +319,7 @@ records:
     feature: share
     state: done
     effectiveState: suspended
-    suspensionReason: digest-mismatch
+    suspensionReason: evidence-marked-stale
     usedBy:
       refs:
         - contract.share.completion-guard-for-task
@@ -306,7 +328,7 @@ records:
     feature: share
     state: done
     effectiveState: suspended
-    suspensionReason: digest-mismatch
+    suspensionReason: evidence-marked-stale
     usedBy:
       refs:
         - data.share.invitation
@@ -321,7 +343,7 @@ records:
     feature: share
     state: done
     effectiveState: suspended
-    suspensionReason: digest-mismatch
+    suspensionReason: evidence-marked-stale
     usedBy:
       refs:
         - contract.share.completion-guard-for-task
@@ -337,7 +359,7 @@ records:
     feature: share
     state: done
     effectiveState: suspended
-    suspensionReason: digest-mismatch
+    suspensionReason: evidence-marked-stale
     usedBy:
       refs:
         - contract.share.completion-guard-for-task
@@ -353,7 +375,7 @@ records:
     feature: task
     state: done
     effectiveState: suspended
-    suspensionReason: digest-mismatch
+    suspensionReason: evidence-marked-stale
     usedBy:
       refs:
         - data.task.task
@@ -366,7 +388,7 @@ records:
     feature: task
     state: done
     effectiveState: suspended
-    suspensionReason: digest-mismatch
+    suspensionReason: evidence-marked-stale
     usedBy:
       refs:
         - br.plan.active-scope
@@ -380,7 +402,7 @@ records:
     feature: task
     state: done
     effectiveState: suspended
-    suspensionReason: digest-mismatch
+    suspensionReason: evidence-marked-stale
     usedBy:
       refs:
         - br.plan.active-scope
@@ -392,7 +414,8 @@ records:
     schema: work/business-rule@1
     feature: task
     state: todo
-    effectiveState: blocked
+    effectiveState: suspended
+    suspensionReason: evidence-marked-stale
     usedBy:
       refs:
         - contract.login.identity-for-task
@@ -420,7 +443,8 @@ records:
     schema: work/business-rule@1
     feature: task
     state: done
-    effectiveState: done
+    effectiveState: suspended
+    suspensionReason: evidence-marked-stale
     usedBy:
       composes:
         - fr.task.create
@@ -428,7 +452,8 @@ records:
     schema: work/business-rule@1
     feature: upload
     state: done
-    effectiveState: done
+    effectiveState: suspended
+    suspensionReason: evidence-marked-stale
     usedBy:
       composes:
         - fr.upload.intake
@@ -436,7 +461,8 @@ records:
     schema: work/business-rule@1
     feature: upload
     state: done
-    effectiveState: done
+    effectiveState: suspended
+    suspensionReason: evidence-marked-stale
     usedBy:
       refs:
         - data.upload.upload
@@ -448,7 +474,8 @@ records:
     schema: work/business-rule@1
     feature: upload
     state: done
-    effectiveState: done
+    effectiveState: suspended
+    suspensionReason: evidence-marked-stale
     usedBy:
       refs:
         - data.upload.upload
@@ -461,7 +488,7 @@ records:
     feature: null
     state: done
     effectiveState: suspended
-    suspensionReason: digest-mismatch
+    suspensionReason: evidence-marked-stale
   contract.audit.emitted-events:
     schema: work/contract@1
     feature: audit
@@ -505,7 +532,8 @@ records:
     schema: work/contract@1
     feature: plan
     state: done
-    effectiveState: done
+    effectiveState: suspended
+    suspensionReason: evidence-marked-stale
     usedBy:
       refs:
         - fr.task.create
@@ -546,7 +574,8 @@ records:
     schema: work/data@1
     feature: audit
     state: done
-    effectiveState: done
+    effectiveState: suspended
+    suspensionReason: evidence-marked-stale
     usedBy:
       tension:
         - decision.audit.deleted-task-target
@@ -648,7 +677,8 @@ records:
     schema: work/policy-decision@1
     feature: audit
     state: done
-    effectiveState: done
+    effectiveState: suspended
+    suspensionReason: evidence-marked-stale
     usedBy:
       refs:
         - br.audit.erasure.right
@@ -772,7 +802,8 @@ records:
     schema: work/event@1
     feature: task
     state: done
-    effectiveState: done
+    effectiveState: suspended
+    suspensionReason: evidence-marked-stale
     usedBy:
       subscribes:
         - fr.audit.log.append
@@ -782,7 +813,8 @@ records:
     schema: work/event@1
     feature: task
     state: done
-    effectiveState: done
+    effectiveState: suspended
+    suspensionReason: evidence-marked-stale
     usedBy:
       subscribes:
         - fr.audit.log.append
@@ -791,7 +823,8 @@ records:
     schema: work/event@1
     feature: task
     state: done
-    effectiveState: done
+    effectiveState: suspended
+    suspensionReason: evidence-marked-stale
     usedBy:
       refs:
         - fr.task.delete
@@ -807,12 +840,14 @@ records:
     schema: work/functional-requirement@1
     feature: audit
     state: done
-    effectiveState: done
+    effectiveState: suspended
+    suspensionReason: evidence-marked-stale
   fr.audit.erasure.request:
     schema: work/functional-requirement@1
     feature: audit
     state: done
-    effectiveState: done
+    effectiveState: suspended
+    suspensionReason: evidence-marked-stale
     usedBy:
       refs:
         - ui.audit.privacy
@@ -820,7 +855,8 @@ records:
     schema: work/functional-requirement@1
     feature: audit
     state: done
-    effectiveState: done
+    effectiveState: suspended
+    suspensionReason: evidence-marked-stale
     usedBy:
       refs:
         - ui.audit.privacy
@@ -828,18 +864,20 @@ records:
     schema: work/functional-requirement@1
     feature: audit
     state: done
-    effectiveState: done
+    effectiveState: suspended
+    suspensionReason: evidence-marked-stale
   fr.audit.log.read:
     schema: work/functional-requirement@1
     feature: audit
     state: done
-    effectiveState: done
+    effectiveState: suspended
+    suspensionReason: evidence-marked-stale
   fr.login.sign-in:
     schema: work/functional-requirement@1
     feature: login
     state: done
     effectiveState: suspended
-    suspensionReason: digest-mismatch
+    suspensionReason: evidence-marked-stale
     usedBy:
       refs:
         - event.login.new-device-signin
@@ -858,13 +896,13 @@ records:
     feature: notify
     state: done
     effectiveState: suspended
-    suspensionReason: digest-mismatch
+    suspensionReason: evidence-marked-stale
   fr.notify.on-completion:
     schema: work/functional-requirement@1
     feature: notify
     state: done
     effectiveState: suspended
-    suspensionReason: digest-mismatch
+    suspensionReason: evidence-marked-stale
     usedBy:
       refs:
         - contract.notify.task-completion-feed
@@ -891,7 +929,7 @@ records:
     feature: notify
     state: done
     effectiveState: suspended
-    suspensionReason: digest-mismatch
+    suspensionReason: evidence-marked-stale
     usedBy:
       refs:
         - ui.notify.preferences
@@ -900,13 +938,13 @@ records:
     feature: observability
     state: done
     effectiveState: suspended
-    suspensionReason: digest-mismatch
+    suspensionReason: evidence-marked-stale
   fr.observability.request-logging:
     schema: work/functional-requirement@1
     feature: observability
     state: done
     effectiveState: suspended
-    suspensionReason: digest-mismatch
+    suspensionReason: evidence-marked-stale
   fr.plan.downgrade:
     schema: work/functional-requirement@1
     feature: plan
@@ -1078,13 +1116,13 @@ records:
     feature: share
     state: done
     effectiveState: suspended
-    suspensionReason: digest-mismatch
+    suspensionReason: evidence-marked-stale
   fr.share.invite:
     schema: work/functional-requirement@1
     feature: share
     state: done
     effectiveState: suspended
-    suspensionReason: digest-mismatch
+    suspensionReason: evidence-marked-stale
     usedBy:
       refs:
         - ui.share.invite
@@ -1093,7 +1131,7 @@ records:
     feature: share
     state: done
     effectiveState: suspended
-    suspensionReason: digest-mismatch
+    suspensionReason: evidence-marked-stale
     usedBy:
       refs:
         - ui.share.invite
@@ -1102,13 +1140,13 @@ records:
     feature: share
     state: done
     effectiveState: suspended
-    suspensionReason: digest-mismatch
+    suspensionReason: evidence-marked-stale
   fr.task.complete:
     schema: work/functional-requirement@1
     feature: task
     state: todo
     effectiveState: suspended
-    suspensionReason: digest-mismatch
+    suspensionReason: evidence-marked-stale
     usedBy:
       refs:
         - event.task.completed
@@ -1127,7 +1165,8 @@ records:
     schema: work/functional-requirement@1
     feature: task
     state: done
-    effectiveState: done
+    effectiveState: suspended
+    suspensionReason: evidence-marked-stale
     usedBy:
       refs:
         - event.task.created
@@ -1160,25 +1199,25 @@ records:
     feature: task
     state: todo
     effectiveState: suspended
-    suspensionReason: digest-mismatch
+    suspensionReason: evidence-marked-stale
   fr.upload.attach:
     schema: work/functional-requirement@1
     feature: upload
     state: done
     effectiveState: suspended
-    suspensionReason: digest-mismatch
+    suspensionReason: evidence-marked-stale
   fr.upload.intake:
     schema: work/functional-requirement@1
     feature: upload
     state: done
     effectiveState: suspended
-    suspensionReason: digest-mismatch
+    suspensionReason: evidence-marked-stale
   fr.upload.manage:
     schema: work/functional-requirement@1
     feature: upload
     state: done
     effectiveState: suspended
-    suspensionReason: digest-mismatch
+    suspensionReason: evidence-marked-stale
   gap.audit.direction-not-drawn:
     schema: work/gap@1
     feature: audit
@@ -1202,7 +1241,8 @@ records:
     schema: work/gap@1
     feature: audit
     state: done
-    effectiveState: done
+    effectiveState: suspended
+    suspensionReason: evidence-marked-stale
   gap.audit.render-proof:
     schema: work/gap@1
     feature: audit
@@ -1212,7 +1252,8 @@ records:
     schema: work/gap@1
     feature: audit
     state: done
-    effectiveState: done
+    effectiveState: suspended
+    suspensionReason: evidence-marked-stale
   gap.login.device-field:
     schema: work/gap@1
     feature: login
@@ -1444,151 +1485,164 @@ records:
     schema: work/implementation@1
     feature: audit
     state: done
-    effectiveState: done
+    effectiveState: suspended
+    suspensionReason: evidence-marked-stale
   impl.audit.todo-app-backend.log:
     schema: work/implementation@1
     feature: audit
     state: done
-    effectiveState: done
+    effectiveState: suspended
+    suspensionReason: evidence-marked-stale
   impl.audit.todo-app-backend.operator-read:
     schema: work/implementation@1
     feature: audit
     state: done
-    effectiveState: done
+    effectiveState: suspended
+    suspensionReason: evidence-marked-stale
   impl.audit.todo-app-frontend.privacy:
     schema: work/implementation@1
     feature: audit
     state: done
     effectiveState: suspended
-    suspensionReason: digest-mismatch
+    suspensionReason: evidence-marked-stale
   impl.login.todo-app-backend.auth:
     schema: work/implementation@1
     feature: login
     state: done
     effectiveState: suspended
-    suspensionReason: digest-mismatch
+    suspensionReason: evidence-marked-stale
   impl.login.todo-app-frontend.sign-in:
     schema: work/implementation@1
     feature: login
     state: done
     effectiveState: suspended
-    suspensionReason: digest-mismatch
+    suspensionReason: evidence-marked-stale
   impl.notify.todo-app-backend.pipeline:
     schema: work/implementation@1
     feature: notify
     state: done
     effectiveState: suspended
-    suspensionReason: digest-mismatch
+    suspensionReason: evidence-marked-stale
   impl.notify.todo-app-frontend.preferences:
     schema: work/implementation@1
     feature: notify
     state: done
     effectiveState: suspended
-    suspensionReason: digest-mismatch
+    suspensionReason: evidence-marked-stale
   impl.observability.todo-app-backend.observability:
     schema: work/implementation@1
     feature: observability
     state: done
     effectiveState: suspended
-    suspensionReason: digest-mismatch
+    suspensionReason: evidence-marked-stale
   impl.plan.todo-app-backend.plan:
     schema: work/implementation@1
     feature: plan
     state: done
-    effectiveState: done
+    effectiveState: suspended
+    suspensionReason: evidence-marked-stale
   impl.plan.todo-app-frontend.usage:
     schema: work/implementation@1
     feature: plan
     state: done
     effectiveState: suspended
-    suspensionReason: digest-mismatch
+    suspensionReason: evidence-marked-stale
   impl.recur.todo-app-backend.engine:
     schema: work/implementation@1
     feature: recur
     state: done
     effectiveState: suspended
-    suspensionReason: digest-mismatch
+    suspensionReason: evidence-marked-stale
   impl.recur.todo-app-frontend.schedule:
     schema: work/implementation@1
     feature: recur
     state: done
     effectiveState: suspended
-    suspensionReason: digest-mismatch
+    suspensionReason: evidence-marked-stale
   impl.share.todo-app-backend.access:
     schema: work/implementation@1
     feature: share
     state: done
     effectiveState: suspended
-    suspensionReason: digest-mismatch
+    suspensionReason: evidence-marked-stale
   impl.share.todo-app-backend.invitations:
     schema: work/implementation@1
     feature: share
     state: done
     effectiveState: suspended
-    suspensionReason: digest-mismatch
+    suspensionReason: evidence-marked-stale
   impl.share.todo-app-frontend.invite-screen:
     schema: work/implementation@1
     feature: share
     state: done
     effectiveState: suspended
-    suspensionReason: digest-mismatch
+    suspensionReason: evidence-marked-stale
   impl.task.todo-app-backend.complete-task:
     schema: work/implementation@1
     feature: task
     state: done
-    effectiveState: done
+    effectiveState: suspended
+    suspensionReason: evidence-marked-stale
   impl.task.todo-app-backend.create-task:
     schema: work/implementation@1
     feature: task
     state: done
-    effectiveState: done
+    effectiveState: suspended
+    suspensionReason: evidence-marked-stale
   impl.task.todo-app-backend.delete-task:
     schema: work/implementation@1
     feature: task
     state: done
-    effectiveState: done
+    effectiveState: suspended
+    suspensionReason: evidence-marked-stale
   impl.task.todo-app-backend.list:
     schema: work/implementation@1
     feature: task
     state: done
-    effectiveState: done
+    effectiveState: suspended
+    suspensionReason: evidence-marked-stale
   impl.task.todo-app-backend.ownership:
     schema: work/implementation@1
     feature: task
     state: done
-    effectiveState: done
+    effectiveState: suspended
+    suspensionReason: evidence-marked-stale
   impl.task.todo-app-backend.platform-database:
     schema: work/implementation@1
     feature: task
     state: done
-    effectiveState: done
+    effectiveState: suspended
+    suspensionReason: evidence-marked-stale
   impl.task.todo-app-backend.platform-events:
     schema: work/implementation@1
     feature: task
     state: done
-    effectiveState: done
+    effectiveState: suspended
+    suspensionReason: evidence-marked-stale
   impl.task.todo-app-backend.reopen-task:
     schema: work/implementation@1
     feature: task
     state: done
-    effectiveState: done
+    effectiveState: suspended
+    suspensionReason: evidence-marked-stale
   impl.task.todo-app-frontend.task-list:
     schema: work/implementation@1
     feature: task
     state: done
     effectiveState: suspended
-    suspensionReason: digest-mismatch
+    suspensionReason: evidence-marked-stale
   impl.upload.todo-app-backend.upload:
     schema: work/implementation@1
     feature: upload
     state: done
     effectiveState: suspended
-    suspensionReason: digest-mismatch
+    suspensionReason: evidence-marked-stale
   integration.login.keycloak:
     schema: work/integration@1
     feature: login
     state: done
-    effectiveState: done
+    effectiveState: suspended
+    suspensionReason: evidence-marked-stale
     usedBy:
       dependsOn:
         - sds.login.session-store
@@ -1596,7 +1650,8 @@ records:
     schema: work/integration@1
     feature: login
     state: done
-    effectiveState: done
+    effectiveState: suspended
+    suspensionReason: evidence-marked-stale
     usedBy:
       dependsOn:
         - sds.login.session-store
@@ -1610,7 +1665,7 @@ records:
     feature: notify
     state: done
     effectiveState: suspended
-    suspensionReason: digest-mismatch
+    suspensionReason: evidence-marked-stale
     usedBy:
       dependsOn:
         - sds.notify.delivery-lifecycle
@@ -1635,7 +1690,7 @@ records:
     feature: plan
     state: todo
     effectiveState: suspended
-    suspensionReason: digest-mismatch
+    suspensionReason: evidence-marked-stale
     usedBy:
       refs:
         - data.plan.payment-intent
@@ -1667,7 +1722,7 @@ records:
     feature: recur
     state: done
     effectiveState: suspended
-    suspensionReason: digest-mismatch
+    suspensionReason: evidence-marked-stale
     usedBy:
       refs:
         - nfr.recur.generation.timeliness
@@ -1760,7 +1815,7 @@ records:
     feature: upload
     state: done
     effectiveState: suspended
-    suspensionReason: digest-mismatch
+    suspensionReason: evidence-marked-stale
   login:
     schema: work/feature@1
     feature: login
@@ -1770,17 +1825,20 @@ records:
     schema: work/non-functional-requirement@1
     feature: audit
     state: done
-    effectiveState: done
+    effectiveState: suspended
+    suspensionReason: evidence-marked-stale
   nfr.audit.tamper-evidence:
     schema: work/non-functional-requirement@1
     feature: audit
     state: done
-    effectiveState: done
+    effectiveState: suspended
+    suspensionReason: evidence-marked-stale
   nfr.login.sign-in-timing:
     schema: work/non-functional-requirement@1
     feature: login
     state: done
-    effectiveState: done
+    effectiveState: suspended
+    suspensionReason: evidence-marked-stale
   nfr.notify.delivery.guarantee:
     schema: work/non-functional-requirement@1
     feature: notify
@@ -1823,7 +1881,7 @@ records:
       - id: gap.share.load-proof
         rootKind: gap
         cyclic: false
-        because: The share module now exists (src/modules/bussiness/share) and its read path is functionally
+        because: The share module now exists (src/modules/domain/share) and its read path is functionally
           proven, but no k6 run has been made against it - this lane ran jest unit/integration tests
           and a curl-based live-proof script, neither of which say anything about latency under
           load.
@@ -1862,12 +1920,14 @@ records:
     schema: work/sds-component@1
     feature: audit
     state: done
-    effectiveState: done
+    effectiveState: suspended
+    suspensionReason: evidence-marked-stale
   sds.audit.log-chain:
     schema: work/sds-component@1
     feature: audit
     state: done
-    effectiveState: done
+    effectiveState: suspended
+    suspensionReason: evidence-marked-stale
     usedBy:
       dependsOn:
         - sds.audit.erasure-request
@@ -1875,7 +1935,8 @@ records:
     schema: work/sds-component@1
     feature: login
     state: done
-    effectiveState: done
+    effectiveState: suspended
+    suspensionReason: evidence-marked-stale
     usedBy:
       refs:
         - br.plan.lapse.reverts-on-read
@@ -1884,7 +1945,8 @@ records:
     schema: work/sds-component@1
     feature: notify
     state: done
-    effectiveState: done
+    effectiveState: suspended
+    suspensionReason: evidence-marked-stale
     usedBy:
       refs:
         - integration.notify.queue
@@ -1892,7 +1954,8 @@ records:
     schema: work/sds-component@1
     feature: plan
     state: done
-    effectiveState: done
+    effectiveState: suspended
+    suspensionReason: evidence-marked-stale
     usedBy:
       refs:
         - contract.plan.create-precondition
@@ -1924,7 +1987,8 @@ records:
     schema: work/sds-component@1
     feature: plan
     state: done
-    effectiveState: done
+    effectiveState: suspended
+    suspensionReason: evidence-marked-stale
     usedBy:
       refs:
         - br.plan.lapse.reverts-on-read
@@ -1940,7 +2004,8 @@ records:
     schema: work/sds-component@1
     feature: recur
     state: done
-    effectiveState: done
+    effectiveState: suspended
+    suspensionReason: evidence-marked-stale
     usedBy:
       refs:
         - integration.recur.scheduler
@@ -1948,18 +2013,20 @@ records:
     schema: work/sds-component@1
     feature: recur
     state: done
-    effectiveState: done
+    effectiveState: suspended
+    suspensionReason: evidence-marked-stale
   sds.share.invitation-lifecycle:
     schema: work/sds-component@1
     feature: share
     state: done
     effectiveState: suspended
-    suspensionReason: digest-mismatch
+    suspensionReason: evidence-marked-stale
   sds.task.completion-state:
     schema: work/sds-component@1
     feature: task
     state: done
-    effectiveState: done
+    effectiveState: suspended
+    suspensionReason: evidence-marked-stale
     usedBy:
       refs:
         - data.recur.occurrence
@@ -1967,12 +2034,18 @@ records:
     schema: work/sds-component@1
     feature: task
     state: done
-    effectiveState: done
+    effectiveState: suspended
+    suspensionReason: evidence-marked-stale
   share:
     schema: work/feature@1
     feature: share
     state: null
     effectiveState: null
+  shell:
+    schema: work/layout-tree@1
+    feature: null
+    state: todo
+    effectiveState: todo
   task:
     schema: work/feature@1
     feature: task
@@ -2005,53 +2078,13 @@ records:
     feature: login
     state: done
     effectiveState: suspended
-    suspensionReason: digest-mismatch
-  uat.login.sign-in.runs.20260918T061141Z-af3dfbbc:
-    schema: starci/uat-run-manifest@1
-    feature: login
-    state: null
-    effectiveState: null
-  uat.login.sign-in.runs.20260918T070052Z-b037b5fe:
-    schema: starci/uat-run-manifest@1
-    feature: login
-    state: null
-    effectiveState: null
-  uat.login.sign-in.runs.20260918T080854Z-f7ab26f0:
-    schema: starci/uat-run-manifest@1
-    feature: login
-    state: null
-    effectiveState: null
-  uat.login.sign-in.runs.20260918T090054Z-240aa95e:
-    schema: starci/uat-run-manifest@1
-    feature: login
-    state: null
-    effectiveState: null
-  uat.login.sign-in.runs.20260918T173922Z-023dd8d9:
-    schema: starci/uat-run-manifest@1
-    feature: login
-    state: null
-    effectiveState: null
-  uat.login.sign-in.runs.20260918T174721Z-023dd8d9:
-    schema: starci/uat-run-manifest@1
-    feature: login
-    state: null
-    effectiveState: null
-  uat.login.sign-in.runs.20260919T112508Z-5c10a673:
-    schema: starci/uat-run-manifest@1
-    feature: login
-    state: null
-    effectiveState: null
-  uat.login.sign-in.runs.20260919T183145Z-5c10a673:
-    schema: starci/uat-run-manifest@1
-    feature: login
-    state: null
-    effectiveState: null
+    suspensionReason: evidence-marked-stale
   uat.notify.digest-and-unsubscribe:
     schema: work/uat-flow@1
     feature: notify
     state: todo
     effectiveState: suspended
-    suspensionReason: digest-mismatch
+    suspensionReason: evidence-marked-stale
     blockers:
       - id: gap.notify.live-proof
         rootKind: gap
@@ -2069,52 +2102,12 @@ records:
         because: login exposes no device field on a session today; this record stays todo until
           event.login.new-device-signin is actually raised, which subscribes now names as the
           trigger instead of overloading contract.notify.new-device-signal for it.
-  uat.notify.digest-and-unsubscribe.runs.20260919T142930Z-5c10a673:
-    schema: starci/uat-run-manifest@1
-    feature: notify
-    state: null
-    effectiveState: null
-  uat.notify.digest-and-unsubscribe.runs.20260919T142944Z-5c10a673:
-    schema: starci/uat-run-manifest@1
-    feature: notify
-    state: null
-    effectiveState: null
-  uat.notify.digest-and-unsubscribe.runs.20260919T143109Z-5c10a673:
-    schema: starci/uat-run-manifest@1
-    feature: notify
-    state: null
-    effectiveState: null
-  uat.notify.digest-and-unsubscribe.runs.20260919T143153Z-5c10a673:
-    schema: starci/uat-run-manifest@1
-    feature: notify
-    state: null
-    effectiveState: null
-  uat.notify.digest-and-unsubscribe.runs.20260919T143409Z-5c10a673:
-    schema: starci/uat-run-manifest@1
-    feature: notify
-    state: null
-    effectiveState: null
-  uat.notify.digest-and-unsubscribe.runs.20260919T144004Z-5c10a673:
-    schema: starci/uat-run-manifest@1
-    feature: notify
-    state: null
-    effectiveState: null
-  uat.notify.digest-and-unsubscribe.runs.20260919T144259Z-5c10a673:
-    schema: starci/uat-run-manifest@1
-    feature: notify
-    state: null
-    effectiveState: null
-  uat.notify.digest-and-unsubscribe.runs.20260919T144517Z-5c10a673:
-    schema: starci/uat-run-manifest@1
-    feature: notify
-    state: null
-    effectiveState: null
   uat.plan.upgrade-after-cap:
     schema: work/uat-flow@1
     feature: plan
     state: todo
     effectiveState: suspended
-    suspensionReason: digest-mismatch
+    suspensionReason: evidence-marked-stale
     blockers:
       - id: gap.plan.live-proof
         rootKind: gap
@@ -2124,11 +2117,6 @@ records:
           integration.plan.sepay is inprogress, the live gateway leg remains unproven
           (gap.plan.sepay-not-reachable), and the owner directive forbids simulating the signed
           webhook.
-  uat.plan.upgrade-after-cap.runs.20260919T143402Z-5c10a673:
-    schema: starci/uat-run-manifest@1
-    feature: plan
-    state: null
-    effectiveState: null
   uat.recur.make-recurring:
     schema: work/uat-flow@1
     feature: recur
@@ -2145,27 +2133,12 @@ records:
           occurrence rows are read-only; completing the backing task row does not touch
           occurrences.status). Also observed: this record's entry /tasks/:taskId/schedule is not
           served (404); the walk reaches the recur surface at /<lang>/recur?task=<task title>."
-  uat.recur.make-recurring.runs.20260919T143618Z-5c10a673:
-    schema: starci/uat-run-manifest@1
-    feature: recur
-    state: null
-    effectiveState: null
-  uat.recur.make-recurring.runs.20260919T144405Z-5c10a673:
-    schema: starci/uat-run-manifest@1
-    feature: recur
-    state: null
-    effectiveState: null
-  uat.recur.make-recurring.runs.20260919T150331Z-5c10a673:
-    schema: starci/uat-run-manifest@1
-    feature: recur
-    state: null
-    effectiveState: null
   uat.share.invite-and-collaborate:
     schema: work/uat-flow@1
     feature: share
     state: todo
     effectiveState: suspended
-    suspensionReason: digest-mismatch
+    suspensionReason: evidence-marked-stale
     blockers:
       - id: gap.share.live-proof
         rootKind: gap
@@ -2175,66 +2148,36 @@ records:
           legs (invite, pending list, t-revoke-pending, cleanup) are proven live, while the invitee
           legs cannot be walked at all because the product has no acceptance surface (see the gap's
           statement).
-  uat.share.invite-and-collaborate.runs.20260919T142631Z-5c10a673:
-    schema: starci/uat-run-manifest@1
-    feature: share
-    state: null
-    effectiveState: null
-  uat.share.invite-and-collaborate.runs.20260919T142709Z-5c10a673:
-    schema: starci/uat-run-manifest@1
-    feature: share
-    state: null
-    effectiveState: null
   uat.task.create:
     schema: work/uat-flow@1
     feature: task
     state: done
     effectiveState: suspended
-    suspensionReason: digest-mismatch
-  uat.task.create.runs.20260918T080854Z-f7ab26f0:
-    schema: starci/uat-run-manifest@1
-    feature: task
-    state: null
-    effectiveState: null
-  uat.task.create.runs.20260918T090054Z-240aa95e:
-    schema: starci/uat-run-manifest@1
-    feature: task
-    state: null
-    effectiveState: null
-  uat.task.create.runs.20260919T112508Z-5c10a673:
-    schema: starci/uat-run-manifest@1
-    feature: task
-    state: null
-    effectiveState: null
-  uat.task.create.runs.20260919T112844Z-5c10a673:
-    schema: starci/uat-run-manifest@1
-    feature: task
-    state: null
-    effectiveState: null
+    suspensionReason: evidence-marked-stale
   ui.audit.privacy:
     schema: work/ui-screen@1
     feature: audit
     state: done
     effectiveState: suspended
-    suspensionReason: digest-mismatch
+    suspensionReason: evidence-marked-stale
   ui.login.sign-in:
     schema: work/ui-screen@1
     feature: login
     state: done
     effectiveState: suspended
-    suspensionReason: digest-mismatch
+    suspensionReason: evidence-marked-stale
   ui.notify.preferences:
     schema: work/ui-screen@1
     feature: notify
     state: done
     effectiveState: suspended
-    suspensionReason: digest-mismatch
+    suspensionReason: evidence-marked-stale
   ui.plan.usage:
     schema: work/ui-screen@1
     feature: plan
     state: done
     effectiveState: suspended
-    suspensionReason: digest-mismatch
+    suspensionReason: evidence-marked-stale
     usedBy:
       refs:
         - fr.plan.usage.view
@@ -2243,19 +2186,22 @@ records:
     feature: recur
     state: done
     effectiveState: suspended
-    suspensionReason: digest-mismatch
+    suspensionReason: evidence-marked-stale
   ui.share.invite:
     schema: work/ui-screen@1
     feature: share
     state: done
     effectiveState: suspended
-    suspensionReason: digest-mismatch
+    suspensionReason: evidence-marked-stale
   ui.task.list:
     schema: work/ui-screen@1
     feature: task
     state: done
     effectiveState: suspended
-    suspensionReason: digest-mismatch
+    suspensionReason: evidence-marked-stale
+    usedBy:
+      refs:
+        - shell
   upload:
     schema: work/feature@1
     feature: upload
@@ -2263,46 +2209,46 @@ records:
     effectiveState: null
 tally:
   overall:
-    done: 120
+    done: 53
     todo: 27
-    stale: 53
-    blocked: 28
+    stale: 121
+    blocked: 27
     total: 228
   byFeature:
     audit:
-      done: 25
+      done: 5
       todo: 3
-      stale: 2
+      stale: 22
       blocked: 2
       total: 32
     login:
-      done: 12
+      done: 6
       todo: 5
-      stale: 5
+      stale: 11
       blocked: 2
       total: 24
     notify:
-      done: 14
+      done: 9
       todo: 6
-      stale: 8
+      stale: 13
       blocked: 5
       total: 33
     observability:
-      done: 2
+      done: 0
       todo: 0
-      stale: 3
+      stale: 5
       blocked: 0
       total: 5
     plan:
-      done: 17
+      done: 8
       todo: 3
-      stale: 4
+      stale: 13
       blocked: 7
       total: 31
     recur:
-      done: 17
+      done: 10
       todo: 2
-      stale: 4
+      stale: 11
       blocked: 6
       total: 29
     share:
@@ -2312,15 +2258,15 @@ tally:
       blocked: 3
       total: 27
     task:
-      done: 21
+      done: 6
       todo: 6
-      stale: 8
-      blocked: 3
+      stale: 24
+      blocked: 2
       total: 38
     upload:
-      done: 4
+      done: 1
       todo: 0
-      stale: 5
+      stale: 8
       blocked: 0
       total: 9
   gaps:
@@ -2529,6 +2475,9 @@ tally:
       closedBy: null
   unbuiltModuleGaps: 0
 frontier:
+  - id: shell
+    feature: null
+    title: null
   - id: contract.audit.emitted-events
     feature: audit
     title: The emitted-event contract audit subscribes to
@@ -3063,435 +3012,6 @@ unclassifiedEdges:
   - from: uat.login.sign-in
     field: proves
     target: fr.login.sign-in
-  - from: uat.login.sign-in.runs.20260918T061141Z-af3dfbbc
-    field: assertions.id
-    target: br.login.password.sign-in
-  - from: uat.login.sign-in.runs.20260918T061141Z-af3dfbbc
-    field: assertions.id
-    target: br.login.session.restores
-  - from: uat.login.sign-in.runs.20260918T061141Z-af3dfbbc
-    field: assertions.id
-    target: fr.login.sign-in
-  - from: uat.login.sign-in.runs.20260918T061141Z-af3dfbbc
-    field: files.cleanup.json.flow
-    target: uat.login.sign-in
-  - from: uat.login.sign-in.runs.20260918T061141Z-af3dfbbc
-    field: files.flows.json.flow.id
-    target: uat.login.sign-in
-  - from: uat.login.sign-in.runs.20260918T061141Z-af3dfbbc
-    field: files.flows.json.flow.proves
-    target: br.login.password.sign-in
-  - from: uat.login.sign-in.runs.20260918T061141Z-af3dfbbc
-    field: files.flows.json.flow.proves
-    target: br.login.session.restores
-  - from: uat.login.sign-in.runs.20260918T061141Z-af3dfbbc
-    field: files.flows.json.flow.proves
-    target: fr.login.sign-in
-  - from: uat.login.sign-in.runs.20260918T061141Z-af3dfbbc
-    field: files.readback.json.flow
-    target: uat.login.sign-in
-  - from: uat.login.sign-in.runs.20260918T061141Z-af3dfbbc
-    field: files.readback.json.notRun
-    target: br.login.password.sign-in
-  - from: uat.login.sign-in.runs.20260918T061141Z-af3dfbbc
-    field: files.readback.json.notRun
-    target: br.login.session.restores
-  - from: uat.login.sign-in.runs.20260918T061141Z-af3dfbbc
-    field: files.readback.json.notRun
-    target: fr.login.sign-in
-  - from: uat.login.sign-in.runs.20260918T061141Z-af3dfbbc
-    field: files.run-ledger.json.flow
-    target: uat.login.sign-in
-  - from: uat.login.sign-in.runs.20260918T061141Z-af3dfbbc
-    field: files.ux-checks.json.checks.id
-    target: br.login.password.sign-in
-  - from: uat.login.sign-in.runs.20260918T061141Z-af3dfbbc
-    field: files.ux-checks.json.checks.id
-    target: br.login.session.restores
-  - from: uat.login.sign-in.runs.20260918T061141Z-af3dfbbc
-    field: files.ux-checks.json.checks.id
-    target: fr.login.sign-in
-  - from: uat.login.sign-in.runs.20260918T061141Z-af3dfbbc
-    field: files.ux-checks.json.flow
-    target: uat.login.sign-in
-  - from: uat.login.sign-in.runs.20260918T061141Z-af3dfbbc
-    field: files.walk.json.flow
-    target: uat.login.sign-in
-  - from: uat.login.sign-in.runs.20260918T061141Z-af3dfbbc
-    field: nodeId
-    target: uat.login.sign-in
-  - from: uat.login.sign-in.runs.20260918T070052Z-b037b5fe
-    field: assertions.id
-    target: br.login.password.sign-in
-  - from: uat.login.sign-in.runs.20260918T070052Z-b037b5fe
-    field: assertions.id
-    target: br.login.session.restores
-  - from: uat.login.sign-in.runs.20260918T070052Z-b037b5fe
-    field: assertions.id
-    target: fr.login.sign-in
-  - from: uat.login.sign-in.runs.20260918T070052Z-b037b5fe
-    field: files.cleanup.json.flow
-    target: uat.login.sign-in
-  - from: uat.login.sign-in.runs.20260918T070052Z-b037b5fe
-    field: files.flows.json.flow.id
-    target: uat.login.sign-in
-  - from: uat.login.sign-in.runs.20260918T070052Z-b037b5fe
-    field: files.flows.json.flow.proves
-    target: br.login.password.sign-in
-  - from: uat.login.sign-in.runs.20260918T070052Z-b037b5fe
-    field: files.flows.json.flow.proves
-    target: br.login.session.restores
-  - from: uat.login.sign-in.runs.20260918T070052Z-b037b5fe
-    field: files.flows.json.flow.proves
-    target: fr.login.sign-in
-  - from: uat.login.sign-in.runs.20260918T070052Z-b037b5fe
-    field: files.readback.json.flow
-    target: uat.login.sign-in
-  - from: uat.login.sign-in.runs.20260918T070052Z-b037b5fe
-    field: files.readback.json.notRun
-    target: br.login.password.sign-in
-  - from: uat.login.sign-in.runs.20260918T070052Z-b037b5fe
-    field: files.readback.json.notRun
-    target: br.login.session.restores
-  - from: uat.login.sign-in.runs.20260918T070052Z-b037b5fe
-    field: files.readback.json.notRun
-    target: fr.login.sign-in
-  - from: uat.login.sign-in.runs.20260918T070052Z-b037b5fe
-    field: files.run-ledger.json.flow
-    target: uat.login.sign-in
-  - from: uat.login.sign-in.runs.20260918T070052Z-b037b5fe
-    field: files.ux-checks.json.checks.id
-    target: br.login.password.sign-in
-  - from: uat.login.sign-in.runs.20260918T070052Z-b037b5fe
-    field: files.ux-checks.json.checks.id
-    target: br.login.session.restores
-  - from: uat.login.sign-in.runs.20260918T070052Z-b037b5fe
-    field: files.ux-checks.json.checks.id
-    target: fr.login.sign-in
-  - from: uat.login.sign-in.runs.20260918T070052Z-b037b5fe
-    field: files.ux-checks.json.flow
-    target: uat.login.sign-in
-  - from: uat.login.sign-in.runs.20260918T070052Z-b037b5fe
-    field: files.walk.json.flow
-    target: uat.login.sign-in
-  - from: uat.login.sign-in.runs.20260918T070052Z-b037b5fe
-    field: nodeId
-    target: uat.login.sign-in
-  - from: uat.login.sign-in.runs.20260918T080854Z-f7ab26f0
-    field: assertions.id
-    target: br.login.password.sign-in
-  - from: uat.login.sign-in.runs.20260918T080854Z-f7ab26f0
-    field: assertions.id
-    target: br.login.session.restores
-  - from: uat.login.sign-in.runs.20260918T080854Z-f7ab26f0
-    field: assertions.id
-    target: fr.login.sign-in
-  - from: uat.login.sign-in.runs.20260918T080854Z-f7ab26f0
-    field: files.cleanup.json.flow
-    target: uat.login.sign-in
-  - from: uat.login.sign-in.runs.20260918T080854Z-f7ab26f0
-    field: files.flows.json.flow.id
-    target: uat.login.sign-in
-  - from: uat.login.sign-in.runs.20260918T080854Z-f7ab26f0
-    field: files.flows.json.flow.proves
-    target: br.login.password.sign-in
-  - from: uat.login.sign-in.runs.20260918T080854Z-f7ab26f0
-    field: files.flows.json.flow.proves
-    target: br.login.session.restores
-  - from: uat.login.sign-in.runs.20260918T080854Z-f7ab26f0
-    field: files.flows.json.flow.proves
-    target: fr.login.sign-in
-  - from: uat.login.sign-in.runs.20260918T080854Z-f7ab26f0
-    field: files.readback.json.checked
-    target: br.login.password.sign-in
-  - from: uat.login.sign-in.runs.20260918T080854Z-f7ab26f0
-    field: files.readback.json.checked
-    target: br.login.session.restores
-  - from: uat.login.sign-in.runs.20260918T080854Z-f7ab26f0
-    field: files.readback.json.checked
-    target: fr.login.sign-in
-  - from: uat.login.sign-in.runs.20260918T080854Z-f7ab26f0
-    field: files.readback.json.flow
-    target: uat.login.sign-in
-  - from: uat.login.sign-in.runs.20260918T080854Z-f7ab26f0
-    field: files.run-ledger.json.flow
-    target: uat.login.sign-in
-  - from: uat.login.sign-in.runs.20260918T080854Z-f7ab26f0
-    field: files.ux-checks.json.checks.id
-    target: br.login.password.sign-in
-  - from: uat.login.sign-in.runs.20260918T080854Z-f7ab26f0
-    field: files.ux-checks.json.checks.id
-    target: br.login.session.restores
-  - from: uat.login.sign-in.runs.20260918T080854Z-f7ab26f0
-    field: files.ux-checks.json.checks.id
-    target: fr.login.sign-in
-  - from: uat.login.sign-in.runs.20260918T080854Z-f7ab26f0
-    field: files.ux-checks.json.flow
-    target: uat.login.sign-in
-  - from: uat.login.sign-in.runs.20260918T080854Z-f7ab26f0
-    field: files.walk.json.flow
-    target: uat.login.sign-in
-  - from: uat.login.sign-in.runs.20260918T080854Z-f7ab26f0
-    field: nodeId
-    target: uat.login.sign-in
-  - from: uat.login.sign-in.runs.20260918T090054Z-240aa95e
-    field: assertions.id
-    target: br.login.password.sign-in
-  - from: uat.login.sign-in.runs.20260918T090054Z-240aa95e
-    field: assertions.id
-    target: br.login.session.restores
-  - from: uat.login.sign-in.runs.20260918T090054Z-240aa95e
-    field: assertions.id
-    target: fr.login.sign-in
-  - from: uat.login.sign-in.runs.20260918T090054Z-240aa95e
-    field: files.cleanup.json.flow
-    target: uat.login.sign-in
-  - from: uat.login.sign-in.runs.20260918T090054Z-240aa95e
-    field: files.flows.json.flow.id
-    target: uat.login.sign-in
-  - from: uat.login.sign-in.runs.20260918T090054Z-240aa95e
-    field: files.flows.json.flow.proves
-    target: br.login.password.sign-in
-  - from: uat.login.sign-in.runs.20260918T090054Z-240aa95e
-    field: files.flows.json.flow.proves
-    target: br.login.session.restores
-  - from: uat.login.sign-in.runs.20260918T090054Z-240aa95e
-    field: files.flows.json.flow.proves
-    target: fr.login.sign-in
-  - from: uat.login.sign-in.runs.20260918T090054Z-240aa95e
-    field: files.readback.json.checked
-    target: br.login.password.sign-in
-  - from: uat.login.sign-in.runs.20260918T090054Z-240aa95e
-    field: files.readback.json.checked
-    target: br.login.session.restores
-  - from: uat.login.sign-in.runs.20260918T090054Z-240aa95e
-    field: files.readback.json.checked
-    target: fr.login.sign-in
-  - from: uat.login.sign-in.runs.20260918T090054Z-240aa95e
-    field: files.readback.json.flow
-    target: uat.login.sign-in
-  - from: uat.login.sign-in.runs.20260918T090054Z-240aa95e
-    field: files.run-ledger.json.flow
-    target: uat.login.sign-in
-  - from: uat.login.sign-in.runs.20260918T090054Z-240aa95e
-    field: files.ux-checks.json.checks.id
-    target: br.login.password.sign-in
-  - from: uat.login.sign-in.runs.20260918T090054Z-240aa95e
-    field: files.ux-checks.json.checks.id
-    target: br.login.session.restores
-  - from: uat.login.sign-in.runs.20260918T090054Z-240aa95e
-    field: files.ux-checks.json.checks.id
-    target: fr.login.sign-in
-  - from: uat.login.sign-in.runs.20260918T090054Z-240aa95e
-    field: files.ux-checks.json.flow
-    target: uat.login.sign-in
-  - from: uat.login.sign-in.runs.20260918T090054Z-240aa95e
-    field: files.walk.json.flow
-    target: uat.login.sign-in
-  - from: uat.login.sign-in.runs.20260918T090054Z-240aa95e
-    field: nodeId
-    target: uat.login.sign-in
-  - from: uat.login.sign-in.runs.20260918T173922Z-023dd8d9
-    field: files.cleanup.json.flow
-    target: uat.login.sign-in
-  - from: uat.login.sign-in.runs.20260918T173922Z-023dd8d9
-    field: files.flows.json.flow.id
-    target: uat.login.sign-in
-  - from: uat.login.sign-in.runs.20260918T173922Z-023dd8d9
-    field: files.flows.json.flow.proves
-    target: br.login.password.sign-in
-  - from: uat.login.sign-in.runs.20260918T173922Z-023dd8d9
-    field: files.flows.json.flow.proves
-    target: br.login.session.restores
-  - from: uat.login.sign-in.runs.20260918T173922Z-023dd8d9
-    field: files.flows.json.flow.proves
-    target: fr.login.sign-in
-  - from: uat.login.sign-in.runs.20260918T173922Z-023dd8d9
-    field: files.readback.json.flow
-    target: uat.login.sign-in
-  - from: uat.login.sign-in.runs.20260918T173922Z-023dd8d9
-    field: files.run-ledger.json.flow
-    target: uat.login.sign-in
-  - from: uat.login.sign-in.runs.20260918T173922Z-023dd8d9
-    field: files.ux-checks.json.flow
-    target: uat.login.sign-in
-  - from: uat.login.sign-in.runs.20260918T173922Z-023dd8d9
-    field: files.walk.json.flow
-    target: uat.login.sign-in
-  - from: uat.login.sign-in.runs.20260918T173922Z-023dd8d9
-    field: nodeId
-    target: uat.login.sign-in
-  - from: uat.login.sign-in.runs.20260918T174721Z-023dd8d9
-    field: assertions.id
-    target: br.login.password.sign-in
-  - from: uat.login.sign-in.runs.20260918T174721Z-023dd8d9
-    field: assertions.id
-    target: br.login.session.restores
-  - from: uat.login.sign-in.runs.20260918T174721Z-023dd8d9
-    field: assertions.id
-    target: fr.login.sign-in
-  - from: uat.login.sign-in.runs.20260918T174721Z-023dd8d9
-    field: files.cleanup.json.flow
-    target: uat.login.sign-in
-  - from: uat.login.sign-in.runs.20260918T174721Z-023dd8d9
-    field: files.flows.json.flow.id
-    target: uat.login.sign-in
-  - from: uat.login.sign-in.runs.20260918T174721Z-023dd8d9
-    field: files.flows.json.flow.proves
-    target: br.login.password.sign-in
-  - from: uat.login.sign-in.runs.20260918T174721Z-023dd8d9
-    field: files.flows.json.flow.proves
-    target: br.login.session.restores
-  - from: uat.login.sign-in.runs.20260918T174721Z-023dd8d9
-    field: files.flows.json.flow.proves
-    target: fr.login.sign-in
-  - from: uat.login.sign-in.runs.20260918T174721Z-023dd8d9
-    field: files.readback.json.checked
-    target: br.login.password.sign-in
-  - from: uat.login.sign-in.runs.20260918T174721Z-023dd8d9
-    field: files.readback.json.checked
-    target: br.login.session.restores
-  - from: uat.login.sign-in.runs.20260918T174721Z-023dd8d9
-    field: files.readback.json.checked
-    target: fr.login.sign-in
-  - from: uat.login.sign-in.runs.20260918T174721Z-023dd8d9
-    field: files.readback.json.flow
-    target: uat.login.sign-in
-  - from: uat.login.sign-in.runs.20260918T174721Z-023dd8d9
-    field: files.run-ledger.json.flow
-    target: uat.login.sign-in
-  - from: uat.login.sign-in.runs.20260918T174721Z-023dd8d9
-    field: files.ux-checks.json.checks.id
-    target: br.login.password.sign-in
-  - from: uat.login.sign-in.runs.20260918T174721Z-023dd8d9
-    field: files.ux-checks.json.checks.id
-    target: br.login.session.restores
-  - from: uat.login.sign-in.runs.20260918T174721Z-023dd8d9
-    field: files.ux-checks.json.checks.id
-    target: fr.login.sign-in
-  - from: uat.login.sign-in.runs.20260918T174721Z-023dd8d9
-    field: files.ux-checks.json.flow
-    target: uat.login.sign-in
-  - from: uat.login.sign-in.runs.20260918T174721Z-023dd8d9
-    field: files.walk.json.flow
-    target: uat.login.sign-in
-  - from: uat.login.sign-in.runs.20260918T174721Z-023dd8d9
-    field: nodeId
-    target: uat.login.sign-in
-  - from: uat.login.sign-in.runs.20260919T112508Z-5c10a673
-    field: assertions.id
-    target: br.login.password.sign-in
-  - from: uat.login.sign-in.runs.20260919T112508Z-5c10a673
-    field: assertions.id
-    target: br.login.session.restores
-  - from: uat.login.sign-in.runs.20260919T112508Z-5c10a673
-    field: assertions.id
-    target: fr.login.sign-in
-  - from: uat.login.sign-in.runs.20260919T112508Z-5c10a673
-    field: files.cleanup.json.flow
-    target: uat.login.sign-in
-  - from: uat.login.sign-in.runs.20260919T112508Z-5c10a673
-    field: files.flows.json.flow.id
-    target: uat.login.sign-in
-  - from: uat.login.sign-in.runs.20260919T112508Z-5c10a673
-    field: files.flows.json.flow.proves
-    target: br.login.password.sign-in
-  - from: uat.login.sign-in.runs.20260919T112508Z-5c10a673
-    field: files.flows.json.flow.proves
-    target: br.login.session.restores
-  - from: uat.login.sign-in.runs.20260919T112508Z-5c10a673
-    field: files.flows.json.flow.proves
-    target: fr.login.sign-in
-  - from: uat.login.sign-in.runs.20260919T112508Z-5c10a673
-    field: files.readback.json.checked
-    target: br.login.password.sign-in
-  - from: uat.login.sign-in.runs.20260919T112508Z-5c10a673
-    field: files.readback.json.checked
-    target: br.login.session.restores
-  - from: uat.login.sign-in.runs.20260919T112508Z-5c10a673
-    field: files.readback.json.checked
-    target: fr.login.sign-in
-  - from: uat.login.sign-in.runs.20260919T112508Z-5c10a673
-    field: files.readback.json.flow
-    target: uat.login.sign-in
-  - from: uat.login.sign-in.runs.20260919T112508Z-5c10a673
-    field: files.run-ledger.json.flow
-    target: uat.login.sign-in
-  - from: uat.login.sign-in.runs.20260919T112508Z-5c10a673
-    field: files.ux-checks.json.checks.id
-    target: br.login.password.sign-in
-  - from: uat.login.sign-in.runs.20260919T112508Z-5c10a673
-    field: files.ux-checks.json.checks.id
-    target: br.login.session.restores
-  - from: uat.login.sign-in.runs.20260919T112508Z-5c10a673
-    field: files.ux-checks.json.checks.id
-    target: fr.login.sign-in
-  - from: uat.login.sign-in.runs.20260919T112508Z-5c10a673
-    field: files.ux-checks.json.flow
-    target: uat.login.sign-in
-  - from: uat.login.sign-in.runs.20260919T112508Z-5c10a673
-    field: files.walk.json.flow
-    target: uat.login.sign-in
-  - from: uat.login.sign-in.runs.20260919T112508Z-5c10a673
-    field: nodeId
-    target: uat.login.sign-in
-  - from: uat.login.sign-in.runs.20260919T183145Z-5c10a673
-    field: assertions.id
-    target: br.login.password.sign-in
-  - from: uat.login.sign-in.runs.20260919T183145Z-5c10a673
-    field: assertions.id
-    target: br.login.session.restores
-  - from: uat.login.sign-in.runs.20260919T183145Z-5c10a673
-    field: assertions.id
-    target: fr.login.sign-in
-  - from: uat.login.sign-in.runs.20260919T183145Z-5c10a673
-    field: files.cleanup.json.flow
-    target: uat.login.sign-in
-  - from: uat.login.sign-in.runs.20260919T183145Z-5c10a673
-    field: files.flows.json.flow.id
-    target: uat.login.sign-in
-  - from: uat.login.sign-in.runs.20260919T183145Z-5c10a673
-    field: files.flows.json.flow.proves
-    target: br.login.password.sign-in
-  - from: uat.login.sign-in.runs.20260919T183145Z-5c10a673
-    field: files.flows.json.flow.proves
-    target: br.login.session.restores
-  - from: uat.login.sign-in.runs.20260919T183145Z-5c10a673
-    field: files.flows.json.flow.proves
-    target: fr.login.sign-in
-  - from: uat.login.sign-in.runs.20260919T183145Z-5c10a673
-    field: files.readback.json.flow
-    target: uat.login.sign-in
-  - from: uat.login.sign-in.runs.20260919T183145Z-5c10a673
-    field: files.readback.json.notRun
-    target: br.login.password.sign-in
-  - from: uat.login.sign-in.runs.20260919T183145Z-5c10a673
-    field: files.readback.json.notRun
-    target: br.login.session.restores
-  - from: uat.login.sign-in.runs.20260919T183145Z-5c10a673
-    field: files.readback.json.notRun
-    target: fr.login.sign-in
-  - from: uat.login.sign-in.runs.20260919T183145Z-5c10a673
-    field: files.run-ledger.json.flow
-    target: uat.login.sign-in
-  - from: uat.login.sign-in.runs.20260919T183145Z-5c10a673
-    field: files.ux-checks.json.checks.id
-    target: br.login.password.sign-in
-  - from: uat.login.sign-in.runs.20260919T183145Z-5c10a673
-    field: files.ux-checks.json.checks.id
-    target: br.login.session.restores
-  - from: uat.login.sign-in.runs.20260919T183145Z-5c10a673
-    field: files.ux-checks.json.checks.id
-    target: fr.login.sign-in
-  - from: uat.login.sign-in.runs.20260919T183145Z-5c10a673
-    field: files.ux-checks.json.flow
-    target: uat.login.sign-in
-  - from: uat.login.sign-in.runs.20260919T183145Z-5c10a673
-    field: files.walk.json.flow
-    target: uat.login.sign-in
-  - from: uat.login.sign-in.runs.20260919T183145Z-5c10a673
-    field: nodeId
-    target: uat.login.sign-in
   - from: uat.notify.digest-and-unsubscribe
     field: proves
     target: br.notify.digest.window
@@ -3504,507 +3024,6 @@ unclassifiedEdges:
   - from: uat.notify.digest-and-unsubscribe
     field: proves
     target: fr.notify.unsubscribe
-  - from: uat.notify.digest-and-unsubscribe.runs.20260919T142930Z-5c10a673
-    field: assertions.id
-    target: br.notify.digest.window
-  - from: uat.notify.digest-and-unsubscribe.runs.20260919T142930Z-5c10a673
-    field: assertions.id
-    target: br.notify.unsubscribe.honored
-  - from: uat.notify.digest-and-unsubscribe.runs.20260919T142930Z-5c10a673
-    field: assertions.id
-    target: fr.notify.digest
-  - from: uat.notify.digest-and-unsubscribe.runs.20260919T142930Z-5c10a673
-    field: assertions.id
-    target: fr.notify.unsubscribe
-  - from: uat.notify.digest-and-unsubscribe.runs.20260919T142930Z-5c10a673
-    field: files.cleanup.json.flow
-    target: uat.notify.digest-and-unsubscribe
-  - from: uat.notify.digest-and-unsubscribe.runs.20260919T142930Z-5c10a673
-    field: files.flows.json.flow.id
-    target: uat.notify.digest-and-unsubscribe
-  - from: uat.notify.digest-and-unsubscribe.runs.20260919T142930Z-5c10a673
-    field: files.flows.json.flow.proves
-    target: br.notify.digest.window
-  - from: uat.notify.digest-and-unsubscribe.runs.20260919T142930Z-5c10a673
-    field: files.flows.json.flow.proves
-    target: br.notify.unsubscribe.honored
-  - from: uat.notify.digest-and-unsubscribe.runs.20260919T142930Z-5c10a673
-    field: files.flows.json.flow.proves
-    target: fr.notify.digest
-  - from: uat.notify.digest-and-unsubscribe.runs.20260919T142930Z-5c10a673
-    field: files.flows.json.flow.proves
-    target: fr.notify.unsubscribe
-  - from: uat.notify.digest-and-unsubscribe.runs.20260919T142930Z-5c10a673
-    field: files.readback.json.flow
-    target: uat.notify.digest-and-unsubscribe
-  - from: uat.notify.digest-and-unsubscribe.runs.20260919T142930Z-5c10a673
-    field: files.readback.json.notRun
-    target: br.notify.digest.window
-  - from: uat.notify.digest-and-unsubscribe.runs.20260919T142930Z-5c10a673
-    field: files.readback.json.notRun
-    target: br.notify.unsubscribe.honored
-  - from: uat.notify.digest-and-unsubscribe.runs.20260919T142930Z-5c10a673
-    field: files.readback.json.notRun
-    target: fr.notify.digest
-  - from: uat.notify.digest-and-unsubscribe.runs.20260919T142930Z-5c10a673
-    field: files.readback.json.notRun
-    target: fr.notify.unsubscribe
-  - from: uat.notify.digest-and-unsubscribe.runs.20260919T142930Z-5c10a673
-    field: files.run-ledger.json.flow
-    target: uat.notify.digest-and-unsubscribe
-  - from: uat.notify.digest-and-unsubscribe.runs.20260919T142930Z-5c10a673
-    field: files.ux-checks.json.checks.id
-    target: br.notify.digest.window
-  - from: uat.notify.digest-and-unsubscribe.runs.20260919T142930Z-5c10a673
-    field: files.ux-checks.json.checks.id
-    target: br.notify.unsubscribe.honored
-  - from: uat.notify.digest-and-unsubscribe.runs.20260919T142930Z-5c10a673
-    field: files.ux-checks.json.checks.id
-    target: fr.notify.digest
-  - from: uat.notify.digest-and-unsubscribe.runs.20260919T142930Z-5c10a673
-    field: files.ux-checks.json.checks.id
-    target: fr.notify.unsubscribe
-  - from: uat.notify.digest-and-unsubscribe.runs.20260919T142930Z-5c10a673
-    field: files.ux-checks.json.flow
-    target: uat.notify.digest-and-unsubscribe
-  - from: uat.notify.digest-and-unsubscribe.runs.20260919T142930Z-5c10a673
-    field: files.walk.json.flow
-    target: uat.notify.digest-and-unsubscribe
-  - from: uat.notify.digest-and-unsubscribe.runs.20260919T142930Z-5c10a673
-    field: nodeId
-    target: uat.notify.digest-and-unsubscribe
-  - from: uat.notify.digest-and-unsubscribe.runs.20260919T142944Z-5c10a673
-    field: files.cleanup.json.flow
-    target: uat.notify.digest-and-unsubscribe
-  - from: uat.notify.digest-and-unsubscribe.runs.20260919T142944Z-5c10a673
-    field: files.flows.json.flow.id
-    target: uat.notify.digest-and-unsubscribe
-  - from: uat.notify.digest-and-unsubscribe.runs.20260919T142944Z-5c10a673
-    field: files.flows.json.flow.proves
-    target: br.notify.digest.window
-  - from: uat.notify.digest-and-unsubscribe.runs.20260919T142944Z-5c10a673
-    field: files.flows.json.flow.proves
-    target: br.notify.unsubscribe.honored
-  - from: uat.notify.digest-and-unsubscribe.runs.20260919T142944Z-5c10a673
-    field: files.flows.json.flow.proves
-    target: fr.notify.digest
-  - from: uat.notify.digest-and-unsubscribe.runs.20260919T142944Z-5c10a673
-    field: files.flows.json.flow.proves
-    target: fr.notify.unsubscribe
-  - from: uat.notify.digest-and-unsubscribe.runs.20260919T142944Z-5c10a673
-    field: files.readback.json.flow
-    target: uat.notify.digest-and-unsubscribe
-  - from: uat.notify.digest-and-unsubscribe.runs.20260919T142944Z-5c10a673
-    field: files.run-ledger.json.flow
-    target: uat.notify.digest-and-unsubscribe
-  - from: uat.notify.digest-and-unsubscribe.runs.20260919T142944Z-5c10a673
-    field: files.ux-checks.json.flow
-    target: uat.notify.digest-and-unsubscribe
-  - from: uat.notify.digest-and-unsubscribe.runs.20260919T142944Z-5c10a673
-    field: files.walk.json.flow
-    target: uat.notify.digest-and-unsubscribe
-  - from: uat.notify.digest-and-unsubscribe.runs.20260919T142944Z-5c10a673
-    field: nodeId
-    target: uat.notify.digest-and-unsubscribe
-  - from: uat.notify.digest-and-unsubscribe.runs.20260919T143109Z-5c10a673
-    field: files.cleanup.json.flow
-    target: uat.notify.digest-and-unsubscribe
-  - from: uat.notify.digest-and-unsubscribe.runs.20260919T143109Z-5c10a673
-    field: files.flows.json.flow.id
-    target: uat.notify.digest-and-unsubscribe
-  - from: uat.notify.digest-and-unsubscribe.runs.20260919T143109Z-5c10a673
-    field: files.flows.json.flow.proves
-    target: br.notify.digest.window
-  - from: uat.notify.digest-and-unsubscribe.runs.20260919T143109Z-5c10a673
-    field: files.flows.json.flow.proves
-    target: br.notify.unsubscribe.honored
-  - from: uat.notify.digest-and-unsubscribe.runs.20260919T143109Z-5c10a673
-    field: files.flows.json.flow.proves
-    target: fr.notify.digest
-  - from: uat.notify.digest-and-unsubscribe.runs.20260919T143109Z-5c10a673
-    field: files.flows.json.flow.proves
-    target: fr.notify.unsubscribe
-  - from: uat.notify.digest-and-unsubscribe.runs.20260919T143109Z-5c10a673
-    field: files.readback.json.flow
-    target: uat.notify.digest-and-unsubscribe
-  - from: uat.notify.digest-and-unsubscribe.runs.20260919T143109Z-5c10a673
-    field: files.run-ledger.json.flow
-    target: uat.notify.digest-and-unsubscribe
-  - from: uat.notify.digest-and-unsubscribe.runs.20260919T143109Z-5c10a673
-    field: files.ux-checks.json.flow
-    target: uat.notify.digest-and-unsubscribe
-  - from: uat.notify.digest-and-unsubscribe.runs.20260919T143109Z-5c10a673
-    field: files.walk.json.flow
-    target: uat.notify.digest-and-unsubscribe
-  - from: uat.notify.digest-and-unsubscribe.runs.20260919T143109Z-5c10a673
-    field: nodeId
-    target: uat.notify.digest-and-unsubscribe
-  - from: uat.notify.digest-and-unsubscribe.runs.20260919T143153Z-5c10a673
-    field: files.cleanup.json.flow
-    target: uat.notify.digest-and-unsubscribe
-  - from: uat.notify.digest-and-unsubscribe.runs.20260919T143153Z-5c10a673
-    field: files.flows.json.flow.id
-    target: uat.notify.digest-and-unsubscribe
-  - from: uat.notify.digest-and-unsubscribe.runs.20260919T143153Z-5c10a673
-    field: files.flows.json.flow.proves
-    target: br.notify.digest.window
-  - from: uat.notify.digest-and-unsubscribe.runs.20260919T143153Z-5c10a673
-    field: files.flows.json.flow.proves
-    target: br.notify.unsubscribe.honored
-  - from: uat.notify.digest-and-unsubscribe.runs.20260919T143153Z-5c10a673
-    field: files.flows.json.flow.proves
-    target: fr.notify.digest
-  - from: uat.notify.digest-and-unsubscribe.runs.20260919T143153Z-5c10a673
-    field: files.flows.json.flow.proves
-    target: fr.notify.unsubscribe
-  - from: uat.notify.digest-and-unsubscribe.runs.20260919T143153Z-5c10a673
-    field: files.readback.json.flow
-    target: uat.notify.digest-and-unsubscribe
-  - from: uat.notify.digest-and-unsubscribe.runs.20260919T143153Z-5c10a673
-    field: files.run-ledger.json.flow
-    target: uat.notify.digest-and-unsubscribe
-  - from: uat.notify.digest-and-unsubscribe.runs.20260919T143153Z-5c10a673
-    field: files.ux-checks.json.flow
-    target: uat.notify.digest-and-unsubscribe
-  - from: uat.notify.digest-and-unsubscribe.runs.20260919T143153Z-5c10a673
-    field: files.walk.json.flow
-    target: uat.notify.digest-and-unsubscribe
-  - from: uat.notify.digest-and-unsubscribe.runs.20260919T143153Z-5c10a673
-    field: nodeId
-    target: uat.notify.digest-and-unsubscribe
-  - from: uat.notify.digest-and-unsubscribe.runs.20260919T143409Z-5c10a673
-    field: assertions.id
-    target: br.notify.digest.window
-  - from: uat.notify.digest-and-unsubscribe.runs.20260919T143409Z-5c10a673
-    field: assertions.id
-    target: br.notify.unsubscribe.honored
-  - from: uat.notify.digest-and-unsubscribe.runs.20260919T143409Z-5c10a673
-    field: assertions.id
-    target: fr.notify.digest
-  - from: uat.notify.digest-and-unsubscribe.runs.20260919T143409Z-5c10a673
-    field: assertions.id
-    target: fr.notify.unsubscribe
-  - from: uat.notify.digest-and-unsubscribe.runs.20260919T143409Z-5c10a673
-    field: files.cleanup.json.flow
-    target: uat.notify.digest-and-unsubscribe
-  - from: uat.notify.digest-and-unsubscribe.runs.20260919T143409Z-5c10a673
-    field: files.flows.json.flow.id
-    target: uat.notify.digest-and-unsubscribe
-  - from: uat.notify.digest-and-unsubscribe.runs.20260919T143409Z-5c10a673
-    field: files.flows.json.flow.proves
-    target: br.notify.digest.window
-  - from: uat.notify.digest-and-unsubscribe.runs.20260919T143409Z-5c10a673
-    field: files.flows.json.flow.proves
-    target: br.notify.unsubscribe.honored
-  - from: uat.notify.digest-and-unsubscribe.runs.20260919T143409Z-5c10a673
-    field: files.flows.json.flow.proves
-    target: fr.notify.digest
-  - from: uat.notify.digest-and-unsubscribe.runs.20260919T143409Z-5c10a673
-    field: files.flows.json.flow.proves
-    target: fr.notify.unsubscribe
-  - from: uat.notify.digest-and-unsubscribe.runs.20260919T143409Z-5c10a673
-    field: files.readback.json.checked
-    target: br.notify.digest.window
-  - from: uat.notify.digest-and-unsubscribe.runs.20260919T143409Z-5c10a673
-    field: files.readback.json.checked
-    target: br.notify.unsubscribe.honored
-  - from: uat.notify.digest-and-unsubscribe.runs.20260919T143409Z-5c10a673
-    field: files.readback.json.checked
-    target: fr.notify.digest
-  - from: uat.notify.digest-and-unsubscribe.runs.20260919T143409Z-5c10a673
-    field: files.readback.json.checked
-    target: fr.notify.unsubscribe
-  - from: uat.notify.digest-and-unsubscribe.runs.20260919T143409Z-5c10a673
-    field: files.readback.json.flow
-    target: uat.notify.digest-and-unsubscribe
-  - from: uat.notify.digest-and-unsubscribe.runs.20260919T143409Z-5c10a673
-    field: files.run-ledger.json.flow
-    target: uat.notify.digest-and-unsubscribe
-  - from: uat.notify.digest-and-unsubscribe.runs.20260919T143409Z-5c10a673
-    field: files.ux-checks.json.checks.id
-    target: br.notify.digest.window
-  - from: uat.notify.digest-and-unsubscribe.runs.20260919T143409Z-5c10a673
-    field: files.ux-checks.json.checks.id
-    target: br.notify.unsubscribe.honored
-  - from: uat.notify.digest-and-unsubscribe.runs.20260919T143409Z-5c10a673
-    field: files.ux-checks.json.checks.id
-    target: fr.notify.digest
-  - from: uat.notify.digest-and-unsubscribe.runs.20260919T143409Z-5c10a673
-    field: files.ux-checks.json.checks.id
-    target: fr.notify.unsubscribe
-  - from: uat.notify.digest-and-unsubscribe.runs.20260919T143409Z-5c10a673
-    field: files.ux-checks.json.flow
-    target: uat.notify.digest-and-unsubscribe
-  - from: uat.notify.digest-and-unsubscribe.runs.20260919T143409Z-5c10a673
-    field: files.walk.json.flow
-    target: uat.notify.digest-and-unsubscribe
-  - from: uat.notify.digest-and-unsubscribe.runs.20260919T143409Z-5c10a673
-    field: nodeId
-    target: uat.notify.digest-and-unsubscribe
-  - from: uat.notify.digest-and-unsubscribe.runs.20260919T144004Z-5c10a673
-    field: assertions.id
-    target: br.notify.digest.window
-  - from: uat.notify.digest-and-unsubscribe.runs.20260919T144004Z-5c10a673
-    field: assertions.id
-    target: br.notify.unsubscribe.honored
-  - from: uat.notify.digest-and-unsubscribe.runs.20260919T144004Z-5c10a673
-    field: assertions.id
-    target: fr.notify.digest
-  - from: uat.notify.digest-and-unsubscribe.runs.20260919T144004Z-5c10a673
-    field: assertions.id
-    target: fr.notify.unsubscribe
-  - from: uat.notify.digest-and-unsubscribe.runs.20260919T144004Z-5c10a673
-    field: files.cleanup.json.flow
-    target: uat.notify.digest-and-unsubscribe
-  - from: uat.notify.digest-and-unsubscribe.runs.20260919T144004Z-5c10a673
-    field: files.flows.json.flow.id
-    target: uat.notify.digest-and-unsubscribe
-  - from: uat.notify.digest-and-unsubscribe.runs.20260919T144004Z-5c10a673
-    field: files.flows.json.flow.proves
-    target: br.notify.digest.window
-  - from: uat.notify.digest-and-unsubscribe.runs.20260919T144004Z-5c10a673
-    field: files.flows.json.flow.proves
-    target: br.notify.unsubscribe.honored
-  - from: uat.notify.digest-and-unsubscribe.runs.20260919T144004Z-5c10a673
-    field: files.flows.json.flow.proves
-    target: fr.notify.digest
-  - from: uat.notify.digest-and-unsubscribe.runs.20260919T144004Z-5c10a673
-    field: files.flows.json.flow.proves
-    target: fr.notify.unsubscribe
-  - from: uat.notify.digest-and-unsubscribe.runs.20260919T144004Z-5c10a673
-    field: files.readback.json.checked
-    target: br.notify.digest.window
-  - from: uat.notify.digest-and-unsubscribe.runs.20260919T144004Z-5c10a673
-    field: files.readback.json.checked
-    target: br.notify.unsubscribe.honored
-  - from: uat.notify.digest-and-unsubscribe.runs.20260919T144004Z-5c10a673
-    field: files.readback.json.checked
-    target: fr.notify.unsubscribe
-  - from: uat.notify.digest-and-unsubscribe.runs.20260919T144004Z-5c10a673
-    field: files.readback.json.flow
-    target: uat.notify.digest-and-unsubscribe
-  - from: uat.notify.digest-and-unsubscribe.runs.20260919T144004Z-5c10a673
-    field: files.readback.json.notRun
-    target: fr.notify.digest
-  - from: uat.notify.digest-and-unsubscribe.runs.20260919T144004Z-5c10a673
-    field: files.run-ledger.json.flow
-    target: uat.notify.digest-and-unsubscribe
-  - from: uat.notify.digest-and-unsubscribe.runs.20260919T144004Z-5c10a673
-    field: files.ux-checks.json.checks.id
-    target: br.notify.digest.window
-  - from: uat.notify.digest-and-unsubscribe.runs.20260919T144004Z-5c10a673
-    field: files.ux-checks.json.checks.id
-    target: br.notify.unsubscribe.honored
-  - from: uat.notify.digest-and-unsubscribe.runs.20260919T144004Z-5c10a673
-    field: files.ux-checks.json.checks.id
-    target: fr.notify.digest
-  - from: uat.notify.digest-and-unsubscribe.runs.20260919T144004Z-5c10a673
-    field: files.ux-checks.json.checks.id
-    target: fr.notify.unsubscribe
-  - from: uat.notify.digest-and-unsubscribe.runs.20260919T144004Z-5c10a673
-    field: files.ux-checks.json.flow
-    target: uat.notify.digest-and-unsubscribe
-  - from: uat.notify.digest-and-unsubscribe.runs.20260919T144004Z-5c10a673
-    field: files.walk.json.flow
-    target: uat.notify.digest-and-unsubscribe
-  - from: uat.notify.digest-and-unsubscribe.runs.20260919T144004Z-5c10a673
-    field: nodeId
-    target: uat.notify.digest-and-unsubscribe
-  - from: uat.notify.digest-and-unsubscribe.runs.20260919T144259Z-5c10a673
-    field: assertions.id
-    target: br.notify.digest.window
-  - from: uat.notify.digest-and-unsubscribe.runs.20260919T144259Z-5c10a673
-    field: assertions.id
-    target: br.notify.unsubscribe.honored
-  - from: uat.notify.digest-and-unsubscribe.runs.20260919T144259Z-5c10a673
-    field: assertions.id
-    target: fr.notify.digest
-  - from: uat.notify.digest-and-unsubscribe.runs.20260919T144259Z-5c10a673
-    field: assertions.id
-    target: fr.notify.unsubscribe
-  - from: uat.notify.digest-and-unsubscribe.runs.20260919T144259Z-5c10a673
-    field: files.cleanup.json.flow
-    target: uat.notify.digest-and-unsubscribe
-  - from: uat.notify.digest-and-unsubscribe.runs.20260919T144259Z-5c10a673
-    field: files.flows.json.flow.id
-    target: uat.notify.digest-and-unsubscribe
-  - from: uat.notify.digest-and-unsubscribe.runs.20260919T144259Z-5c10a673
-    field: files.flows.json.flow.proves
-    target: br.notify.digest.window
-  - from: uat.notify.digest-and-unsubscribe.runs.20260919T144259Z-5c10a673
-    field: files.flows.json.flow.proves
-    target: br.notify.unsubscribe.honored
-  - from: uat.notify.digest-and-unsubscribe.runs.20260919T144259Z-5c10a673
-    field: files.flows.json.flow.proves
-    target: fr.notify.digest
-  - from: uat.notify.digest-and-unsubscribe.runs.20260919T144259Z-5c10a673
-    field: files.flows.json.flow.proves
-    target: fr.notify.unsubscribe
-  - from: uat.notify.digest-and-unsubscribe.runs.20260919T144259Z-5c10a673
-    field: files.readback.json.checked
-    target: br.notify.digest.window
-  - from: uat.notify.digest-and-unsubscribe.runs.20260919T144259Z-5c10a673
-    field: files.readback.json.checked
-    target: br.notify.unsubscribe.honored
-  - from: uat.notify.digest-and-unsubscribe.runs.20260919T144259Z-5c10a673
-    field: files.readback.json.checked
-    target: fr.notify.digest
-  - from: uat.notify.digest-and-unsubscribe.runs.20260919T144259Z-5c10a673
-    field: files.readback.json.checked
-    target: fr.notify.unsubscribe
-  - from: uat.notify.digest-and-unsubscribe.runs.20260919T144259Z-5c10a673
-    field: files.readback.json.flow
-    target: uat.notify.digest-and-unsubscribe
-  - from: uat.notify.digest-and-unsubscribe.runs.20260919T144259Z-5c10a673
-    field: files.run-ledger.json.flow
-    target: uat.notify.digest-and-unsubscribe
-  - from: uat.notify.digest-and-unsubscribe.runs.20260919T144259Z-5c10a673
-    field: files.ux-checks.json.checks.id
-    target: br.notify.digest.window
-  - from: uat.notify.digest-and-unsubscribe.runs.20260919T144259Z-5c10a673
-    field: files.ux-checks.json.checks.id
-    target: br.notify.unsubscribe.honored
-  - from: uat.notify.digest-and-unsubscribe.runs.20260919T144259Z-5c10a673
-    field: files.ux-checks.json.checks.id
-    target: fr.notify.digest
-  - from: uat.notify.digest-and-unsubscribe.runs.20260919T144259Z-5c10a673
-    field: files.ux-checks.json.checks.id
-    target: fr.notify.unsubscribe
-  - from: uat.notify.digest-and-unsubscribe.runs.20260919T144259Z-5c10a673
-    field: files.ux-checks.json.flow
-    target: uat.notify.digest-and-unsubscribe
-  - from: uat.notify.digest-and-unsubscribe.runs.20260919T144259Z-5c10a673
-    field: files.walk.json.flow
-    target: uat.notify.digest-and-unsubscribe
-  - from: uat.notify.digest-and-unsubscribe.runs.20260919T144259Z-5c10a673
-    field: nodeId
-    target: uat.notify.digest-and-unsubscribe
-  - from: uat.notify.digest-and-unsubscribe.runs.20260919T144517Z-5c10a673
-    field: assertions.id
-    target: br.notify.digest.window
-  - from: uat.notify.digest-and-unsubscribe.runs.20260919T144517Z-5c10a673
-    field: assertions.id
-    target: br.notify.unsubscribe.honored
-  - from: uat.notify.digest-and-unsubscribe.runs.20260919T144517Z-5c10a673
-    field: assertions.id
-    target: fr.notify.digest
-  - from: uat.notify.digest-and-unsubscribe.runs.20260919T144517Z-5c10a673
-    field: assertions.id
-    target: fr.notify.unsubscribe
-  - from: uat.notify.digest-and-unsubscribe.runs.20260919T144517Z-5c10a673
-    field: files.cleanup.json.flow
-    target: uat.notify.digest-and-unsubscribe
-  - from: uat.notify.digest-and-unsubscribe.runs.20260919T144517Z-5c10a673
-    field: files.flows.json.flow.id
-    target: uat.notify.digest-and-unsubscribe
-  - from: uat.notify.digest-and-unsubscribe.runs.20260919T144517Z-5c10a673
-    field: files.flows.json.flow.proves
-    target: br.notify.digest.window
-  - from: uat.notify.digest-and-unsubscribe.runs.20260919T144517Z-5c10a673
-    field: files.flows.json.flow.proves
-    target: br.notify.unsubscribe.honored
-  - from: uat.notify.digest-and-unsubscribe.runs.20260919T144517Z-5c10a673
-    field: files.flows.json.flow.proves
-    target: fr.notify.digest
-  - from: uat.notify.digest-and-unsubscribe.runs.20260919T144517Z-5c10a673
-    field: files.flows.json.flow.proves
-    target: fr.notify.unsubscribe
-  - from: uat.notify.digest-and-unsubscribe.runs.20260919T144517Z-5c10a673
-    field: files.readback.json.checked
-    target: br.notify.digest.window
-  - from: uat.notify.digest-and-unsubscribe.runs.20260919T144517Z-5c10a673
-    field: files.readback.json.checked
-    target: br.notify.unsubscribe.honored
-  - from: uat.notify.digest-and-unsubscribe.runs.20260919T144517Z-5c10a673
-    field: files.readback.json.checked
-    target: fr.notify.digest
-  - from: uat.notify.digest-and-unsubscribe.runs.20260919T144517Z-5c10a673
-    field: files.readback.json.checked
-    target: fr.notify.unsubscribe
-  - from: uat.notify.digest-and-unsubscribe.runs.20260919T144517Z-5c10a673
-    field: files.readback.json.flow
-    target: uat.notify.digest-and-unsubscribe
-  - from: uat.notify.digest-and-unsubscribe.runs.20260919T144517Z-5c10a673
-    field: files.run-ledger.json.flow
-    target: uat.notify.digest-and-unsubscribe
-  - from: uat.notify.digest-and-unsubscribe.runs.20260919T144517Z-5c10a673
-    field: files.ux-checks.json.checks.id
-    target: br.notify.digest.window
-  - from: uat.notify.digest-and-unsubscribe.runs.20260919T144517Z-5c10a673
-    field: files.ux-checks.json.checks.id
-    target: br.notify.unsubscribe.honored
-  - from: uat.notify.digest-and-unsubscribe.runs.20260919T144517Z-5c10a673
-    field: files.ux-checks.json.checks.id
-    target: fr.notify.digest
-  - from: uat.notify.digest-and-unsubscribe.runs.20260919T144517Z-5c10a673
-    field: files.ux-checks.json.checks.id
-    target: fr.notify.unsubscribe
-  - from: uat.notify.digest-and-unsubscribe.runs.20260919T144517Z-5c10a673
-    field: files.ux-checks.json.flow
-    target: uat.notify.digest-and-unsubscribe
-  - from: uat.notify.digest-and-unsubscribe.runs.20260919T144517Z-5c10a673
-    field: files.walk.json.flow
-    target: uat.notify.digest-and-unsubscribe
-  - from: uat.notify.digest-and-unsubscribe.runs.20260919T144517Z-5c10a673
-    field: nodeId
-    target: uat.notify.digest-and-unsubscribe
-  - from: uat.plan.upgrade-after-cap.runs.20260919T143402Z-5c10a673
-    field: assertions.id
-    target: br.plan.caps.limit
-  - from: uat.plan.upgrade-after-cap.runs.20260919T143402Z-5c10a673
-    field: assertions.id
-    target: fr.plan.upgrade
-  - from: uat.plan.upgrade-after-cap.runs.20260919T143402Z-5c10a673
-    field: assertions.id
-    target: fr.plan.usage.view
-  - from: uat.plan.upgrade-after-cap.runs.20260919T143402Z-5c10a673
-    field: assertions.id
-    target: integration.plan.sepay
-  - from: uat.plan.upgrade-after-cap.runs.20260919T143402Z-5c10a673
-    field: files.cleanup.json.flow
-    target: uat.plan.upgrade-after-cap
-  - from: uat.plan.upgrade-after-cap.runs.20260919T143402Z-5c10a673
-    field: files.flows.json.flow.id
-    target: uat.plan.upgrade-after-cap
-  - from: uat.plan.upgrade-after-cap.runs.20260919T143402Z-5c10a673
-    field: files.readback.json.checked
-    target: br.plan.caps.limit
-  - from: uat.plan.upgrade-after-cap.runs.20260919T143402Z-5c10a673
-    field: files.readback.json.checked
-    target: fr.plan.usage.view
-  - from: uat.plan.upgrade-after-cap.runs.20260919T143402Z-5c10a673
-    field: files.readback.json.flow
-    target: uat.plan.upgrade-after-cap
-  - from: uat.plan.upgrade-after-cap.runs.20260919T143402Z-5c10a673
-    field: files.readback.json.notRun
-    target: fr.plan.upgrade
-  - from: uat.plan.upgrade-after-cap.runs.20260919T143402Z-5c10a673
-    field: files.readback.json.notRun
-    target: integration.plan.sepay
-  - from: uat.plan.upgrade-after-cap.runs.20260919T143402Z-5c10a673
-    field: files.run-ledger.json.flow
-    target: uat.plan.upgrade-after-cap
-  - from: uat.plan.upgrade-after-cap.runs.20260919T143402Z-5c10a673
-    field: files.ux-checks.json.checks.id
-    target: br.plan.caps.limit
-  - from: uat.plan.upgrade-after-cap.runs.20260919T143402Z-5c10a673
-    field: files.ux-checks.json.checks.id
-    target: fr.plan.upgrade
-  - from: uat.plan.upgrade-after-cap.runs.20260919T143402Z-5c10a673
-    field: files.ux-checks.json.checks.id
-    target: fr.plan.usage.view
-  - from: uat.plan.upgrade-after-cap.runs.20260919T143402Z-5c10a673
-    field: files.ux-checks.json.checks.id
-    target: integration.plan.sepay
-  - from: uat.plan.upgrade-after-cap.runs.20260919T143402Z-5c10a673
-    field: files.ux-checks.json.flow
-    target: uat.plan.upgrade-after-cap
-  - from: uat.plan.upgrade-after-cap.runs.20260919T143402Z-5c10a673
-    field: files.walk.json.flow
-    target: uat.plan.upgrade-after-cap
-  - from: uat.plan.upgrade-after-cap.runs.20260919T143402Z-5c10a673
-    field: nodeId
-    target: uat.plan.upgrade-after-cap
   - from: uat.recur.make-recurring
     field: proves
     target: br.recur.ending.preserves-history
@@ -4020,240 +3039,6 @@ unclassifiedEdges:
   - from: uat.recur.make-recurring
     field: proves
     target: fr.recur.see-upcoming
-  - from: uat.recur.make-recurring.runs.20260919T143618Z-5c10a673
-    field: assertions.id
-    target: fr.recur.make-recurring
-  - from: uat.recur.make-recurring.runs.20260919T143618Z-5c10a673
-    field: assertions.id
-    target: fr.recur.see-upcoming
-  - from: uat.recur.make-recurring.runs.20260919T143618Z-5c10a673
-    field: files.cleanup.json.flow
-    target: uat.recur.make-recurring
-  - from: uat.recur.make-recurring.runs.20260919T143618Z-5c10a673
-    field: files.flows.json.flow.id
-    target: uat.recur.make-recurring
-  - from: uat.recur.make-recurring.runs.20260919T143618Z-5c10a673
-    field: files.flows.json.flow.proves
-    target: br.recur.ending.preserves-history
-  - from: uat.recur.make-recurring.runs.20260919T143618Z-5c10a673
-    field: files.flows.json.flow.proves
-    target: br.recur.generation.once
-  - from: uat.recur.make-recurring.runs.20260919T143618Z-5c10a673
-    field: files.flows.json.flow.proves
-    target: fr.recur.end-rule
-  - from: uat.recur.make-recurring.runs.20260919T143618Z-5c10a673
-    field: files.flows.json.flow.proves
-    target: fr.recur.make-recurring
-  - from: uat.recur.make-recurring.runs.20260919T143618Z-5c10a673
-    field: files.flows.json.flow.proves
-    target: fr.recur.see-upcoming
-  - from: uat.recur.make-recurring.runs.20260919T143618Z-5c10a673
-    field: files.readback.json.checked
-    target: fr.recur.make-recurring
-  - from: uat.recur.make-recurring.runs.20260919T143618Z-5c10a673
-    field: files.readback.json.checked
-    target: fr.recur.see-upcoming
-  - from: uat.recur.make-recurring.runs.20260919T143618Z-5c10a673
-    field: files.readback.json.flow
-    target: uat.recur.make-recurring
-  - from: uat.recur.make-recurring.runs.20260919T143618Z-5c10a673
-    field: files.run-ledger.json.flow
-    target: uat.recur.make-recurring
-  - from: uat.recur.make-recurring.runs.20260919T143618Z-5c10a673
-    field: files.ux-checks.json.checks.id
-    target: fr.recur.make-recurring
-  - from: uat.recur.make-recurring.runs.20260919T143618Z-5c10a673
-    field: files.ux-checks.json.checks.id
-    target: fr.recur.see-upcoming
-  - from: uat.recur.make-recurring.runs.20260919T143618Z-5c10a673
-    field: files.ux-checks.json.flow
-    target: uat.recur.make-recurring
-  - from: uat.recur.make-recurring.runs.20260919T143618Z-5c10a673
-    field: files.walk.json.flow
-    target: uat.recur.make-recurring
-  - from: uat.recur.make-recurring.runs.20260919T143618Z-5c10a673
-    field: nodeId
-    target: uat.recur.make-recurring
-  - from: uat.recur.make-recurring.runs.20260919T144405Z-5c10a673
-    field: assertions.id
-    target: br.recur.ending.preserves-history
-  - from: uat.recur.make-recurring.runs.20260919T144405Z-5c10a673
-    field: assertions.id
-    target: br.recur.generation.once
-  - from: uat.recur.make-recurring.runs.20260919T144405Z-5c10a673
-    field: assertions.id
-    target: br.recur.occurrence.owned-by-rule-owner
-  - from: uat.recur.make-recurring.runs.20260919T144405Z-5c10a673
-    field: assertions.id
-    target: fr.recur.end-rule
-  - from: uat.recur.make-recurring.runs.20260919T144405Z-5c10a673
-    field: assertions.id
-    target: fr.recur.make-recurring
-  - from: uat.recur.make-recurring.runs.20260919T144405Z-5c10a673
-    field: assertions.id
-    target: fr.recur.see-upcoming
-  - from: uat.recur.make-recurring.runs.20260919T144405Z-5c10a673
-    field: files.cleanup.json.flow
-    target: uat.recur.make-recurring
-  - from: uat.recur.make-recurring.runs.20260919T144405Z-5c10a673
-    field: files.flows.json.flow.id
-    target: uat.recur.make-recurring
-  - from: uat.recur.make-recurring.runs.20260919T144405Z-5c10a673
-    field: files.flows.json.flow.proves
-    target: br.recur.ending.preserves-history
-  - from: uat.recur.make-recurring.runs.20260919T144405Z-5c10a673
-    field: files.flows.json.flow.proves
-    target: br.recur.generation.once
-  - from: uat.recur.make-recurring.runs.20260919T144405Z-5c10a673
-    field: files.flows.json.flow.proves
-    target: fr.recur.end-rule
-  - from: uat.recur.make-recurring.runs.20260919T144405Z-5c10a673
-    field: files.flows.json.flow.proves
-    target: fr.recur.make-recurring
-  - from: uat.recur.make-recurring.runs.20260919T144405Z-5c10a673
-    field: files.flows.json.flow.proves
-    target: fr.recur.see-upcoming
-  - from: uat.recur.make-recurring.runs.20260919T144405Z-5c10a673
-    field: files.readback.json.checked
-    target: br.recur.ending.preserves-history
-  - from: uat.recur.make-recurring.runs.20260919T144405Z-5c10a673
-    field: files.readback.json.checked
-    target: br.recur.generation.once
-  - from: uat.recur.make-recurring.runs.20260919T144405Z-5c10a673
-    field: files.readback.json.checked
-    target: br.recur.occurrence.owned-by-rule-owner
-  - from: uat.recur.make-recurring.runs.20260919T144405Z-5c10a673
-    field: files.readback.json.checked
-    target: fr.recur.end-rule
-  - from: uat.recur.make-recurring.runs.20260919T144405Z-5c10a673
-    field: files.readback.json.checked
-    target: fr.recur.make-recurring
-  - from: uat.recur.make-recurring.runs.20260919T144405Z-5c10a673
-    field: files.readback.json.checked
-    target: fr.recur.see-upcoming
-  - from: uat.recur.make-recurring.runs.20260919T144405Z-5c10a673
-    field: files.readback.json.flow
-    target: uat.recur.make-recurring
-  - from: uat.recur.make-recurring.runs.20260919T144405Z-5c10a673
-    field: files.run-ledger.json.flow
-    target: uat.recur.make-recurring
-  - from: uat.recur.make-recurring.runs.20260919T144405Z-5c10a673
-    field: files.ux-checks.json.checks.id
-    target: br.recur.ending.preserves-history
-  - from: uat.recur.make-recurring.runs.20260919T144405Z-5c10a673
-    field: files.ux-checks.json.checks.id
-    target: br.recur.generation.once
-  - from: uat.recur.make-recurring.runs.20260919T144405Z-5c10a673
-    field: files.ux-checks.json.checks.id
-    target: br.recur.occurrence.owned-by-rule-owner
-  - from: uat.recur.make-recurring.runs.20260919T144405Z-5c10a673
-    field: files.ux-checks.json.checks.id
-    target: fr.recur.end-rule
-  - from: uat.recur.make-recurring.runs.20260919T144405Z-5c10a673
-    field: files.ux-checks.json.checks.id
-    target: fr.recur.make-recurring
-  - from: uat.recur.make-recurring.runs.20260919T144405Z-5c10a673
-    field: files.ux-checks.json.checks.id
-    target: fr.recur.see-upcoming
-  - from: uat.recur.make-recurring.runs.20260919T144405Z-5c10a673
-    field: files.ux-checks.json.flow
-    target: uat.recur.make-recurring
-  - from: uat.recur.make-recurring.runs.20260919T144405Z-5c10a673
-    field: files.walk.json.flow
-    target: uat.recur.make-recurring
-  - from: uat.recur.make-recurring.runs.20260919T144405Z-5c10a673
-    field: nodeId
-    target: uat.recur.make-recurring
-  - from: uat.recur.make-recurring.runs.20260919T150331Z-5c10a673
-    field: assertions.id
-    target: br.recur.ending.preserves-history
-  - from: uat.recur.make-recurring.runs.20260919T150331Z-5c10a673
-    field: assertions.id
-    target: br.recur.generation.once
-  - from: uat.recur.make-recurring.runs.20260919T150331Z-5c10a673
-    field: assertions.id
-    target: br.recur.occurrence.owned-by-rule-owner
-  - from: uat.recur.make-recurring.runs.20260919T150331Z-5c10a673
-    field: assertions.id
-    target: fr.recur.end-rule
-  - from: uat.recur.make-recurring.runs.20260919T150331Z-5c10a673
-    field: assertions.id
-    target: fr.recur.make-recurring
-  - from: uat.recur.make-recurring.runs.20260919T150331Z-5c10a673
-    field: assertions.id
-    target: fr.recur.see-upcoming
-  - from: uat.recur.make-recurring.runs.20260919T150331Z-5c10a673
-    field: files.cleanup.json.flow
-    target: uat.recur.make-recurring
-  - from: uat.recur.make-recurring.runs.20260919T150331Z-5c10a673
-    field: files.flows.json.flow.id
-    target: uat.recur.make-recurring
-  - from: uat.recur.make-recurring.runs.20260919T150331Z-5c10a673
-    field: files.flows.json.flow.proves
-    target: br.recur.ending.preserves-history
-  - from: uat.recur.make-recurring.runs.20260919T150331Z-5c10a673
-    field: files.flows.json.flow.proves
-    target: br.recur.generation.once
-  - from: uat.recur.make-recurring.runs.20260919T150331Z-5c10a673
-    field: files.flows.json.flow.proves
-    target: fr.recur.end-rule
-  - from: uat.recur.make-recurring.runs.20260919T150331Z-5c10a673
-    field: files.flows.json.flow.proves
-    target: fr.recur.make-recurring
-  - from: uat.recur.make-recurring.runs.20260919T150331Z-5c10a673
-    field: files.flows.json.flow.proves
-    target: fr.recur.see-upcoming
-  - from: uat.recur.make-recurring.runs.20260919T150331Z-5c10a673
-    field: files.readback.json.checked
-    target: br.recur.ending.preserves-history
-  - from: uat.recur.make-recurring.runs.20260919T150331Z-5c10a673
-    field: files.readback.json.checked
-    target: br.recur.generation.once
-  - from: uat.recur.make-recurring.runs.20260919T150331Z-5c10a673
-    field: files.readback.json.checked
-    target: br.recur.occurrence.owned-by-rule-owner
-  - from: uat.recur.make-recurring.runs.20260919T150331Z-5c10a673
-    field: files.readback.json.checked
-    target: fr.recur.end-rule
-  - from: uat.recur.make-recurring.runs.20260919T150331Z-5c10a673
-    field: files.readback.json.checked
-    target: fr.recur.make-recurring
-  - from: uat.recur.make-recurring.runs.20260919T150331Z-5c10a673
-    field: files.readback.json.checked
-    target: fr.recur.see-upcoming
-  - from: uat.recur.make-recurring.runs.20260919T150331Z-5c10a673
-    field: files.readback.json.flow
-    target: uat.recur.make-recurring
-  - from: uat.recur.make-recurring.runs.20260919T150331Z-5c10a673
-    field: files.run-ledger.json.flow
-    target: uat.recur.make-recurring
-  - from: uat.recur.make-recurring.runs.20260919T150331Z-5c10a673
-    field: files.ux-checks.json.checks.id
-    target: br.recur.ending.preserves-history
-  - from: uat.recur.make-recurring.runs.20260919T150331Z-5c10a673
-    field: files.ux-checks.json.checks.id
-    target: br.recur.generation.once
-  - from: uat.recur.make-recurring.runs.20260919T150331Z-5c10a673
-    field: files.ux-checks.json.checks.id
-    target: br.recur.occurrence.owned-by-rule-owner
-  - from: uat.recur.make-recurring.runs.20260919T150331Z-5c10a673
-    field: files.ux-checks.json.checks.id
-    target: fr.recur.end-rule
-  - from: uat.recur.make-recurring.runs.20260919T150331Z-5c10a673
-    field: files.ux-checks.json.checks.id
-    target: fr.recur.make-recurring
-  - from: uat.recur.make-recurring.runs.20260919T150331Z-5c10a673
-    field: files.ux-checks.json.checks.id
-    target: fr.recur.see-upcoming
-  - from: uat.recur.make-recurring.runs.20260919T150331Z-5c10a673
-    field: files.ux-checks.json.flow
-    target: uat.recur.make-recurring
-  - from: uat.recur.make-recurring.runs.20260919T150331Z-5c10a673
-    field: files.walk.json.flow
-    target: uat.recur.make-recurring
-  - from: uat.recur.make-recurring.runs.20260919T150331Z-5c10a673
-    field: nodeId
-    target: uat.recur.make-recurring
   - from: uat.share.invite-and-collaborate
     field: proves
     target: br.share.revoke.on-read
@@ -4269,351 +3054,9 @@ unclassifiedEdges:
   - from: uat.share.invite-and-collaborate
     field: proves
     target: fr.share.revoke
-  - from: uat.share.invite-and-collaborate.runs.20260919T142631Z-5c10a673
-    field: assertions.id
-    target: br.share.revoke.on-read
-  - from: uat.share.invite-and-collaborate.runs.20260919T142631Z-5c10a673
-    field: assertions.id
-    target: br.share.role.permissions
-  - from: uat.share.invite-and-collaborate.runs.20260919T142631Z-5c10a673
-    field: assertions.id
-    target: fr.share.accept
-  - from: uat.share.invite-and-collaborate.runs.20260919T142631Z-5c10a673
-    field: assertions.id
-    target: fr.share.invite
-  - from: uat.share.invite-and-collaborate.runs.20260919T142631Z-5c10a673
-    field: assertions.id
-    target: fr.share.revoke
-  - from: uat.share.invite-and-collaborate.runs.20260919T142631Z-5c10a673
-    field: files.cleanup.json.flow
-    target: uat.share.invite-and-collaborate
-  - from: uat.share.invite-and-collaborate.runs.20260919T142631Z-5c10a673
-    field: files.flows.json.flow.id
-    target: uat.share.invite-and-collaborate
-  - from: uat.share.invite-and-collaborate.runs.20260919T142631Z-5c10a673
-    field: files.flows.json.flow.proves
-    target: br.share.revoke.on-read
-  - from: uat.share.invite-and-collaborate.runs.20260919T142631Z-5c10a673
-    field: files.flows.json.flow.proves
-    target: br.share.role.permissions
-  - from: uat.share.invite-and-collaborate.runs.20260919T142631Z-5c10a673
-    field: files.flows.json.flow.proves
-    target: fr.share.accept
-  - from: uat.share.invite-and-collaborate.runs.20260919T142631Z-5c10a673
-    field: files.flows.json.flow.proves
-    target: fr.share.invite
-  - from: uat.share.invite-and-collaborate.runs.20260919T142631Z-5c10a673
-    field: files.flows.json.flow.proves
-    target: fr.share.revoke
-  - from: uat.share.invite-and-collaborate.runs.20260919T142631Z-5c10a673
-    field: files.readback.json.checked
-    target: fr.share.invite
-  - from: uat.share.invite-and-collaborate.runs.20260919T142631Z-5c10a673
-    field: files.readback.json.checked
-    target: fr.share.revoke
-  - from: uat.share.invite-and-collaborate.runs.20260919T142631Z-5c10a673
-    field: files.readback.json.flow
-    target: uat.share.invite-and-collaborate
-  - from: uat.share.invite-and-collaborate.runs.20260919T142631Z-5c10a673
-    field: files.readback.json.notRun
-    target: br.share.revoke.on-read
-  - from: uat.share.invite-and-collaborate.runs.20260919T142631Z-5c10a673
-    field: files.readback.json.notRun
-    target: br.share.role.permissions
-  - from: uat.share.invite-and-collaborate.runs.20260919T142631Z-5c10a673
-    field: files.readback.json.notRun
-    target: fr.share.accept
-  - from: uat.share.invite-and-collaborate.runs.20260919T142631Z-5c10a673
-    field: files.run-ledger.json.flow
-    target: uat.share.invite-and-collaborate
-  - from: uat.share.invite-and-collaborate.runs.20260919T142631Z-5c10a673
-    field: files.ux-checks.json.checks.id
-    target: br.share.revoke.on-read
-  - from: uat.share.invite-and-collaborate.runs.20260919T142631Z-5c10a673
-    field: files.ux-checks.json.checks.id
-    target: br.share.role.permissions
-  - from: uat.share.invite-and-collaborate.runs.20260919T142631Z-5c10a673
-    field: files.ux-checks.json.checks.id
-    target: fr.share.accept
-  - from: uat.share.invite-and-collaborate.runs.20260919T142631Z-5c10a673
-    field: files.ux-checks.json.checks.id
-    target: fr.share.invite
-  - from: uat.share.invite-and-collaborate.runs.20260919T142631Z-5c10a673
-    field: files.ux-checks.json.checks.id
-    target: fr.share.revoke
-  - from: uat.share.invite-and-collaborate.runs.20260919T142631Z-5c10a673
-    field: files.ux-checks.json.flow
-    target: uat.share.invite-and-collaborate
-  - from: uat.share.invite-and-collaborate.runs.20260919T142631Z-5c10a673
-    field: files.walk.json.flow
-    target: uat.share.invite-and-collaborate
-  - from: uat.share.invite-and-collaborate.runs.20260919T142631Z-5c10a673
-    field: nodeId
-    target: uat.share.invite-and-collaborate
-  - from: uat.share.invite-and-collaborate.runs.20260919T142709Z-5c10a673
-    field: assertions.id
-    target: br.share.revoke.on-read
-  - from: uat.share.invite-and-collaborate.runs.20260919T142709Z-5c10a673
-    field: assertions.id
-    target: br.share.role.permissions
-  - from: uat.share.invite-and-collaborate.runs.20260919T142709Z-5c10a673
-    field: assertions.id
-    target: fr.share.accept
-  - from: uat.share.invite-and-collaborate.runs.20260919T142709Z-5c10a673
-    field: assertions.id
-    target: fr.share.invite
-  - from: uat.share.invite-and-collaborate.runs.20260919T142709Z-5c10a673
-    field: assertions.id
-    target: fr.share.revoke
-  - from: uat.share.invite-and-collaborate.runs.20260919T142709Z-5c10a673
-    field: files.cleanup.json.flow
-    target: uat.share.invite-and-collaborate
-  - from: uat.share.invite-and-collaborate.runs.20260919T142709Z-5c10a673
-    field: files.flows.json.flow.id
-    target: uat.share.invite-and-collaborate
-  - from: uat.share.invite-and-collaborate.runs.20260919T142709Z-5c10a673
-    field: files.flows.json.flow.proves
-    target: br.share.revoke.on-read
-  - from: uat.share.invite-and-collaborate.runs.20260919T142709Z-5c10a673
-    field: files.flows.json.flow.proves
-    target: br.share.role.permissions
-  - from: uat.share.invite-and-collaborate.runs.20260919T142709Z-5c10a673
-    field: files.flows.json.flow.proves
-    target: fr.share.accept
-  - from: uat.share.invite-and-collaborate.runs.20260919T142709Z-5c10a673
-    field: files.flows.json.flow.proves
-    target: fr.share.invite
-  - from: uat.share.invite-and-collaborate.runs.20260919T142709Z-5c10a673
-    field: files.flows.json.flow.proves
-    target: fr.share.revoke
-  - from: uat.share.invite-and-collaborate.runs.20260919T142709Z-5c10a673
-    field: files.readback.json.checked
-    target: fr.share.invite
-  - from: uat.share.invite-and-collaborate.runs.20260919T142709Z-5c10a673
-    field: files.readback.json.checked
-    target: fr.share.revoke
-  - from: uat.share.invite-and-collaborate.runs.20260919T142709Z-5c10a673
-    field: files.readback.json.flow
-    target: uat.share.invite-and-collaborate
-  - from: uat.share.invite-and-collaborate.runs.20260919T142709Z-5c10a673
-    field: files.readback.json.notRun
-    target: br.share.revoke.on-read
-  - from: uat.share.invite-and-collaborate.runs.20260919T142709Z-5c10a673
-    field: files.readback.json.notRun
-    target: br.share.role.permissions
-  - from: uat.share.invite-and-collaborate.runs.20260919T142709Z-5c10a673
-    field: files.readback.json.notRun
-    target: fr.share.accept
-  - from: uat.share.invite-and-collaborate.runs.20260919T142709Z-5c10a673
-    field: files.run-ledger.json.flow
-    target: uat.share.invite-and-collaborate
-  - from: uat.share.invite-and-collaborate.runs.20260919T142709Z-5c10a673
-    field: files.ux-checks.json.checks.id
-    target: br.share.revoke.on-read
-  - from: uat.share.invite-and-collaborate.runs.20260919T142709Z-5c10a673
-    field: files.ux-checks.json.checks.id
-    target: br.share.role.permissions
-  - from: uat.share.invite-and-collaborate.runs.20260919T142709Z-5c10a673
-    field: files.ux-checks.json.checks.id
-    target: fr.share.accept
-  - from: uat.share.invite-and-collaborate.runs.20260919T142709Z-5c10a673
-    field: files.ux-checks.json.checks.id
-    target: fr.share.invite
-  - from: uat.share.invite-and-collaborate.runs.20260919T142709Z-5c10a673
-    field: files.ux-checks.json.checks.id
-    target: fr.share.revoke
-  - from: uat.share.invite-and-collaborate.runs.20260919T142709Z-5c10a673
-    field: files.ux-checks.json.flow
-    target: uat.share.invite-and-collaborate
-  - from: uat.share.invite-and-collaborate.runs.20260919T142709Z-5c10a673
-    field: files.walk.json.flow
-    target: uat.share.invite-and-collaborate
-  - from: uat.share.invite-and-collaborate.runs.20260919T142709Z-5c10a673
-    field: nodeId
-    target: uat.share.invite-and-collaborate
   - from: uat.task.create
     field: proves
     target: fr.task.create
-  - from: uat.task.create.runs.20260918T080854Z-f7ab26f0
-    field: assertions.id
-    target: br.task.single-owner
-  - from: uat.task.create.runs.20260918T080854Z-f7ab26f0
-    field: assertions.id
-    target: fr.task.create
-  - from: uat.task.create.runs.20260918T080854Z-f7ab26f0
-    field: files.cleanup.json.flow
-    target: uat.task.create
-  - from: uat.task.create.runs.20260918T080854Z-f7ab26f0
-    field: files.flows.json.flow.id
-    target: uat.task.create
-  - from: uat.task.create.runs.20260918T080854Z-f7ab26f0
-    field: files.flows.json.flow.proves
-    target: br.task.single-owner
-  - from: uat.task.create.runs.20260918T080854Z-f7ab26f0
-    field: files.flows.json.flow.proves
-    target: fr.task.create
-  - from: uat.task.create.runs.20260918T080854Z-f7ab26f0
-    field: files.readback.json.checked
-    target: fr.task.create
-  - from: uat.task.create.runs.20260918T080854Z-f7ab26f0
-    field: files.readback.json.flow
-    target: uat.task.create
-  - from: uat.task.create.runs.20260918T080854Z-f7ab26f0
-    field: files.readback.json.notRun
-    target: br.task.single-owner
-  - from: uat.task.create.runs.20260918T080854Z-f7ab26f0
-    field: files.run-ledger.json.flow
-    target: uat.task.create
-  - from: uat.task.create.runs.20260918T080854Z-f7ab26f0
-    field: files.ux-checks.json.checks.id
-    target: br.task.single-owner
-  - from: uat.task.create.runs.20260918T080854Z-f7ab26f0
-    field: files.ux-checks.json.checks.id
-    target: fr.task.create
-  - from: uat.task.create.runs.20260918T080854Z-f7ab26f0
-    field: files.ux-checks.json.flow
-    target: uat.task.create
-  - from: uat.task.create.runs.20260918T080854Z-f7ab26f0
-    field: files.walk.json.flow
-    target: uat.task.create
-  - from: uat.task.create.runs.20260918T080854Z-f7ab26f0
-    field: nodeId
-    target: uat.task.create
-  - from: uat.task.create.runs.20260918T090054Z-240aa95e
-    field: assertions.id
-    target: br.task.single-owner
-  - from: uat.task.create.runs.20260918T090054Z-240aa95e
-    field: assertions.id
-    target: fr.task.create
-  - from: uat.task.create.runs.20260918T090054Z-240aa95e
-    field: files.cleanup.json.flow
-    target: uat.task.create
-  - from: uat.task.create.runs.20260918T090054Z-240aa95e
-    field: files.flows.json.flow.id
-    target: uat.task.create
-  - from: uat.task.create.runs.20260918T090054Z-240aa95e
-    field: files.flows.json.flow.proves
-    target: br.task.single-owner
-  - from: uat.task.create.runs.20260918T090054Z-240aa95e
-    field: files.flows.json.flow.proves
-    target: fr.task.create
-  - from: uat.task.create.runs.20260918T090054Z-240aa95e
-    field: files.readback.json.checked
-    target: br.task.single-owner
-  - from: uat.task.create.runs.20260918T090054Z-240aa95e
-    field: files.readback.json.checked
-    target: fr.task.create
-  - from: uat.task.create.runs.20260918T090054Z-240aa95e
-    field: files.readback.json.flow
-    target: uat.task.create
-  - from: uat.task.create.runs.20260918T090054Z-240aa95e
-    field: files.run-ledger.json.flow
-    target: uat.task.create
-  - from: uat.task.create.runs.20260918T090054Z-240aa95e
-    field: files.ux-checks.json.checks.id
-    target: br.task.single-owner
-  - from: uat.task.create.runs.20260918T090054Z-240aa95e
-    field: files.ux-checks.json.checks.id
-    target: fr.task.create
-  - from: uat.task.create.runs.20260918T090054Z-240aa95e
-    field: files.ux-checks.json.flow
-    target: uat.task.create
-  - from: uat.task.create.runs.20260918T090054Z-240aa95e
-    field: files.walk.json.flow
-    target: uat.task.create
-  - from: uat.task.create.runs.20260918T090054Z-240aa95e
-    field: nodeId
-    target: uat.task.create
-  - from: uat.task.create.runs.20260919T112508Z-5c10a673
-    field: assertions.id
-    target: br.task.single-owner
-  - from: uat.task.create.runs.20260919T112508Z-5c10a673
-    field: assertions.id
-    target: fr.task.create
-  - from: uat.task.create.runs.20260919T112508Z-5c10a673
-    field: files.cleanup.json.flow
-    target: uat.task.create
-  - from: uat.task.create.runs.20260919T112508Z-5c10a673
-    field: files.flows.json.flow.id
-    target: uat.task.create
-  - from: uat.task.create.runs.20260919T112508Z-5c10a673
-    field: files.flows.json.flow.proves
-    target: br.task.single-owner
-  - from: uat.task.create.runs.20260919T112508Z-5c10a673
-    field: files.flows.json.flow.proves
-    target: fr.task.create
-  - from: uat.task.create.runs.20260919T112508Z-5c10a673
-    field: files.readback.json.checked
-    target: br.task.single-owner
-  - from: uat.task.create.runs.20260919T112508Z-5c10a673
-    field: files.readback.json.checked
-    target: fr.task.create
-  - from: uat.task.create.runs.20260919T112508Z-5c10a673
-    field: files.readback.json.flow
-    target: uat.task.create
-  - from: uat.task.create.runs.20260919T112508Z-5c10a673
-    field: files.run-ledger.json.flow
-    target: uat.task.create
-  - from: uat.task.create.runs.20260919T112508Z-5c10a673
-    field: files.ux-checks.json.checks.id
-    target: br.task.single-owner
-  - from: uat.task.create.runs.20260919T112508Z-5c10a673
-    field: files.ux-checks.json.checks.id
-    target: fr.task.create
-  - from: uat.task.create.runs.20260919T112508Z-5c10a673
-    field: files.ux-checks.json.flow
-    target: uat.task.create
-  - from: uat.task.create.runs.20260919T112508Z-5c10a673
-    field: files.walk.json.flow
-    target: uat.task.create
-  - from: uat.task.create.runs.20260919T112508Z-5c10a673
-    field: nodeId
-    target: uat.task.create
-  - from: uat.task.create.runs.20260919T112844Z-5c10a673
-    field: assertions.id
-    target: br.task.single-owner
-  - from: uat.task.create.runs.20260919T112844Z-5c10a673
-    field: assertions.id
-    target: fr.task.create
-  - from: uat.task.create.runs.20260919T112844Z-5c10a673
-    field: files.cleanup.json.flow
-    target: uat.task.create
-  - from: uat.task.create.runs.20260919T112844Z-5c10a673
-    field: files.flows.json.flow.id
-    target: uat.task.create
-  - from: uat.task.create.runs.20260919T112844Z-5c10a673
-    field: files.flows.json.flow.proves
-    target: br.task.single-owner
-  - from: uat.task.create.runs.20260919T112844Z-5c10a673
-    field: files.flows.json.flow.proves
-    target: fr.task.create
-  - from: uat.task.create.runs.20260919T112844Z-5c10a673
-    field: files.readback.json.checked
-    target: br.task.single-owner
-  - from: uat.task.create.runs.20260919T112844Z-5c10a673
-    field: files.readback.json.checked
-    target: fr.task.create
-  - from: uat.task.create.runs.20260919T112844Z-5c10a673
-    field: files.readback.json.flow
-    target: uat.task.create
-  - from: uat.task.create.runs.20260919T112844Z-5c10a673
-    field: files.run-ledger.json.flow
-    target: uat.task.create
-  - from: uat.task.create.runs.20260919T112844Z-5c10a673
-    field: files.ux-checks.json.checks.id
-    target: br.task.single-owner
-  - from: uat.task.create.runs.20260919T112844Z-5c10a673
-    field: files.ux-checks.json.checks.id
-    target: fr.task.create
-  - from: uat.task.create.runs.20260919T112844Z-5c10a673
-    field: files.ux-checks.json.flow
-    target: uat.task.create
-  - from: uat.task.create.runs.20260919T112844Z-5c10a673
-    field: files.walk.json.flow
-    target: uat.task.create
-  - from: uat.task.create.runs.20260919T112844Z-5c10a673
-    field: nodeId
-    target: uat.task.create
   - from: ui.audit.privacy
     field: assets.generation.inputRefs
     target: fr.audit.erasure.request

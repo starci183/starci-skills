@@ -8,11 +8,11 @@ import {
     TypeOrmModuleOptions 
 } from "@nestjs/typeorm"
 import {
-    AppConfigService 
-} from "@modules/platform/config/app-config.service"
+    AppConfigService,
+} from "@modules/platform/config/index"
 import {
-    ConfigModule 
-} from "@modules/platform/config/config.module"
+    ConfigModule,
+} from "@modules/platform/config/index"
 import {
     POSTGRESQL_PRIMARY 
 } from "./constants/connection"

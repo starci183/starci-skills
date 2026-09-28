@@ -15,14 +15,14 @@ acceptance:
     then:
       - An erasure-requested line and an erasure-completed line both exist, in that order.
       - Neither line's actor field resolves to the erased person; both name only the request.
-module: src/modules/bussiness/audit
+module: src/modules/domain/audit
 
 change:
   rev: 3
   kind: editorial
   at: 2026-09-19T15:59:33.966Z
   reason: "decision.audit.erasure-method is settled and built: AuditErasureService.tRequest/tComplete
-    (src/modules/bussiness/audit/audit-erasure.service.ts) append an erasure-requested and an
+    (src/modules/domain/audit/audit-erasure.service.ts) append an erasure-requested and an
     erasure-completed line, both sealed under AuditKeystoreService.SYSTEM_ACTOR_ID's key and both naming
     only the requestId as target, never the subject's personId - proven in
     audit-erasure.service.spec.ts. module corrected from the drafted src/audit/erasure (never built) to

@@ -1,22 +1,122 @@
 {
   "schema": "starci/architecture-config@1",
-  "kinds": ["backend"],
+  "kinds": [
+    "backend"
+  ],
   "backend": {
     "moduleRegistration": {
       "providerIdentity": "exported-class-token",
-      "handlerDecorators": ["CommandHandler", "QueryHandler"]
+      "handlerDecorators": [
+        "CommandHandler",
+        "QueryHandler"
+      ]
     }
   },
   "owners": [
-    {"id": "feature-todo-graphql", "root": "src/features/todo/graphql", "entry": "src/features/todo/graphql/graphql.module.ts"},
-    {"id": "feature-todo-http-health", "root": "src/features/todo/http/health", "entry": "src/features/todo/http/health/health.module.ts"},
-    {"id": "module-bussiness-session", "root": "src/modules/bussiness/session", "entry": "src/modules/bussiness/session/index.ts"},
-    {"id": "module-bussiness-task", "root": "src/modules/bussiness/task", "entry": "src/modules/bussiness/task/index.ts"},
-    {"id": "module-bussiness-share", "root": "src/modules/bussiness/share", "entry": "src/modules/bussiness/share/index.ts"},
-    {"id": "module-platform-config", "root": "src/modules/platform/config", "entry": "src/modules/platform/config/index.ts"},
-    {"id": "module-shared-exceptions", "root": "src/modules/shared/exceptions", "entry": "src/modules/shared/exceptions/index.ts"},
-    {"id": "module-platform-events", "root": "src/modules/platform/events", "entry": "src/modules/platform/events/index.ts"},
-    {"id": "module-platform-databases-postgresql-primary", "root": "src/modules/platform/databases/postgresql/primary", "entry": "src/modules/platform/databases/postgresql/primary/index.ts"},
-    {"id": "module-integrations-keycloak", "root": "src/modules/integrations/keycloak", "entry": "src/modules/integrations/keycloak/index.ts"}
+    {
+      "id": "feature-todo",
+      "root": "src/features/todo",
+      "entry": "src/features/todo/index.ts"
+    },
+    {
+      "id": "module-domain-audit",
+      "root": "src/modules/domain/audit",
+      "entry": "src/modules/domain/audit/index.ts"
+    },
+    {
+      "id": "module-domain-notify",
+      "root": "src/modules/domain/notify",
+      "entry": "src/modules/domain/notify/index.ts"
+    },
+    {
+      "id": "module-domain-plan",
+      "root": "src/modules/domain/plan",
+      "entry": "src/modules/domain/plan/index.ts"
+    },
+    {
+      "id": "module-domain-recur",
+      "root": "src/modules/domain/recur",
+      "entry": "src/modules/domain/recur/index.ts"
+    },
+    {
+      "id": "module-domain-session",
+      "root": "src/modules/domain/session",
+      "entry": "src/modules/domain/session/index.ts"
+    },
+    {
+      "id": "module-domain-share",
+      "root": "src/modules/domain/share",
+      "entry": "src/modules/domain/share/index.ts"
+    },
+    {
+      "id": "module-domain-task",
+      "root": "src/modules/domain/task",
+      "entry": "src/modules/domain/task/index.ts"
+    },
+    {
+      "id": "module-platform-config",
+      "root": "src/modules/platform/config",
+      "entry": "src/modules/platform/config/index.ts"
+    },
+    {
+      "id": "module-platform-cqrs",
+      "root": "src/modules/platform/cqrs",
+      "entry": "src/modules/platform/cqrs/index.ts"
+    },
+    {
+      "id": "module-platform-databases",
+      "root": "src/modules/platform/databases",
+      "entry": "src/modules/platform/databases/index.ts"
+    },
+    {
+      "id": "module-platform-events",
+      "root": "src/modules/platform/events",
+      "entry": "src/modules/platform/events/index.ts"
+    },
+    {
+      "id": "module-platform-exceptions",
+      "root": "src/modules/platform/exceptions",
+      "entry": "src/modules/platform/exceptions/index.ts"
+    },
+    {
+      "id": "module-platform-logging",
+      "root": "src/modules/platform/logging",
+      "entry": "src/modules/platform/logging/index.ts"
+    },
+    {
+      "id": "module-platform-observability",
+      "root": "src/modules/platform/observability",
+      "entry": "src/modules/platform/observability/index.ts"
+    },
+    {
+      "id": "module-integrations-keycloak",
+      "root": "src/modules/integrations/keycloak",
+      "entry": "src/modules/integrations/keycloak/index.ts"
+    },
+    {
+      "id": "module-integrations-notify-queue",
+      "root": "src/modules/integrations/notify-queue",
+      "entry": "src/modules/integrations/notify-queue/index.ts"
+    },
+    {
+      "id": "module-integrations-notify-smtp",
+      "root": "src/modules/integrations/notify-smtp",
+      "entry": "src/modules/integrations/notify-smtp/index.ts"
+    },
+    {
+      "id": "module-integrations-sepay",
+      "root": "src/modules/integrations/sepay",
+      "entry": "src/modules/integrations/sepay/index.ts"
+    },
+    {
+      "id": "module-integrations-upload",
+      "root": "src/modules/integrations/upload",
+      "entry": "src/modules/integrations/upload/index.ts"
+    },
+    {
+      "id": "module-platform-databases-postgresql-primary",
+      "root": "src/modules/platform/databases/postgresql/primary",
+      "entry": "src/modules/platform/databases/postgresql/primary/index.ts"
+    }
   ]
 }

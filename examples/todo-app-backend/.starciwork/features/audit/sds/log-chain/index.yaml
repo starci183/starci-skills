@@ -11,7 +11,7 @@ refs: [br.audit.append-only, br.audit.retention]
 dependsOn: [contract.login.identity-for-task]
 subscribes: [event.task.created, event.task.completed, event.task.deleted, event.login.signed-in, event.login.signed-out]
 owners:
-  - {role: module, path: src/modules/bussiness/audit}
+  - {role: module, path: src/modules/domain/audit}
 
 stateMachine:
   states: [open, appended]
@@ -43,7 +43,7 @@ change:
   kind: clarifying
   at: 2026-09-18T12:00:00.000Z
   reason: "impl.audit.todo-app-backend.log names the real module: AuditLogService.append
-    (src/modules/bussiness/audit/audit-log.service.ts) is t-append, dispatched by AppendLogLineHandler,
+    (src/modules/domain/audit/audit-log.service.ts) is t-append, dispatched by AppendLogLineHandler,
     itself driven by AuditEventSubscriber subscribing to PlatformEventBus for exactly the five events
     `subscribes` names (audit-event.subscriber.spec.ts proves the routing for each). owners added
     naming the real capability directory; blockedBy removed now that gap.audit.unbuilt-module is closed."

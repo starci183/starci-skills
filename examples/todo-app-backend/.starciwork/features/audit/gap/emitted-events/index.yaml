@@ -9,13 +9,13 @@ statement: "The contract half of this gap is now declared: contract.audit.emitte
   src/modules/platform/events/events.types.ts field for field, each already listed in
   fr.audit.log.append's and sds.audit.log-chain's subscribes. Audit's subscriber is built against
   PlatformEventBus and routes exactly those five kinds through AUDIT_SEALED_ACTIONS
-  (src/modules/bussiness/audit/audit-event.subscriber.ts). What keeps the gap open is the provider
+  (src/modules/domain/audit/audit-event.subscriber.ts). What keeps the gap open is the provider
   half, named precisely: the five product-event records this lane declares have no provider-side
   implementation record done for their emissions - event.task.created/completed/deleted need
   impl.task.todo-app-backend.platform-events done (its own note: every task handler really calls
   PlatformEventBus.publish and create-task.handler.spec.ts proves the call today), and
   event.login.signed-in/event.login.signed-out need login's session-side prover done for
-  SignInHandler/SignOutHandler (src/modules/bussiness/session/sign-in.handler.ts, sign-out.handler.ts
+  SignInHandler/SignOutHandler (src/modules/domain/session/sign-in.handler.ts, sign-out.handler.ts
   - their specs assert the publish today) - so PROVES_TARGET_NOT_DONE still refuses every candidate
   closer, this gap's own closedBy included. An emitter that does not exist yet is named there rather
   than papered over: the subscriber stands and the gap stays honest todo until the provider lanes

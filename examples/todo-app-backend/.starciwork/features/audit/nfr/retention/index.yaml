@@ -20,7 +20,7 @@ change:
   kind: clarifying
   at: 2026-09-18T12:00:00.000Z
   reason: "gap.audit.unbuilt-module is closed. AuditLogService takes an injected Clock constructor
-    parameter (src/modules/bussiness/audit/audit-log.service.ts, defaulting to the real clock) so
+    parameter (src/modules/domain/audit/audit-log.service.ts, defaulting to the real clock) so
     audit-log.service.spec.ts can advance a fake clock past 400 days with no real wait and assert
     sweepRetention's line count and chain validity are unchanged, plus a second case proving retention
     holds independently of an active erasure against the same line's subject."

@@ -1,15 +1,15 @@
 import {
     E2EWorld, bootE2EWorld 
-} from "@tests/infra/e2e-world"
+} from "@tests/harness/e2e-world"
 import {
     pollUntil 
-} from "@tests/infra/e2e-poll"
+} from "@tests/harness/e2e-poll"
 import {
     E2E_BOOT_TIMEOUT_MS 
-} from "@tests/infra/testing-infra.options"
+} from "@tests/harness/testing-infra.options"
 import {
     E2EHttpClient 
-} from "@tests/infra/integrations/http/e2e-http.service"
+} from "@tests/harness/integrations/http/e2e-http.service"
 
 jest.setTimeout(300_000)
 
@@ -23,11 +23,11 @@ const OWNER = {
     email: "demo@todo.dev", password: "todo-demo-pass" 
 }
 
-const SIGN_IN = "mutation SignIn($input: SignInInput!) { signIn(input: $input) { sessionToken personId } }"
-const SIGN_OUT = "mutation SignOut($input: SignOutInput!) { signOut(input: $input) { signedOut } }"
-const CREATE_TASK = "mutation CreateTask($input: CreateTaskInput!) { createTask(input: $input) { taskId title } }"
-const COMPLETE_TASK = "mutation CompleteTask($id: ID!) { completeTask(id: $id) { taskId complete } }"
-const DELETE_TASK = "mutation DeleteTask($id: ID!) { deleteTask(id: $id) { deleted } }"
+const SIGN_IN = "mutation SignIn($input: SignInInput!) { signIn(request: $input) { sessionToken personId } }"
+const SIGN_OUT = "mutation SignOut($input: SignOutInput!) { signOut(request: $input) { signedOut } }"
+const CREATE_TASK = "mutation CreateTask($input: CreateTaskInput!) { createTask(request: $input) { taskId title } }"
+const COMPLETE_TASK = "mutation CompleteTask($id: ID!) { completeTask(request: {id: $id}) { taskId complete } }"
+const DELETE_TASK = "mutation DeleteTask($id: ID!) { deleteTask(request: {id: $id}) { deleted } }"
 const AUDIT_LOG = "query { auditLog { at action target } }"
 const EXPORT_MY_DATA = "query { exportMyData { at action target } }"
 
