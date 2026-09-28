@@ -177,7 +177,9 @@ test('api enqueue records the resolved target repository; an unbound repository 
 
   const beJob=enqueue('--op','backend.implement','--paths','src/');
   assert.equal(beJob.r.status,0,beJob.r.stderr||beJob.r.stdout);
-  assert.equal(payloadOf(beJob.body.job_id).repository,undefined,'a backend op targets where dispatch places it');
+  // An unqualified path binds the one repository it exists in (enqueue-unqualified-path-binding): src/ exists only in
+  // the backend repo, so the job records be explicitly instead of falling back to the dispatch placement.
+  assert.equal(payloadOf(beJob.body.job_id).repository,'be','a bare path binds the repository it exists in');
 
   const named=enqueue('--op','code.refactor','--paths','apps/app/src','--repository','shop-fe');
   assert.equal(named.r.status,0,named.r.stderr||named.r.stdout);
