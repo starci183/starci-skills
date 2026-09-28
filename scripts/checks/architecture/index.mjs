@@ -9,6 +9,7 @@ import { checkOwners } from './owners.mjs';
 import { checkModuleRegistration, REGISTRATION_RULE_IDS } from './registration.mjs';
 import { checkFrontendDataLifecycle, SWR_DATA_RULE_IDS } from './next-data.mjs';
 import { checkBackendSourceShape, SOURCE_LAYOUT_RULE_ID, SOURCE_NAME_RULE_ID } from './source-names.mjs';
+import { checkHfs, HFS_RULE_IDS } from './hfs.mjs';
 
 export { REGISTRATION_RULE_IDS, SWR_DATA_RULE_IDS };
 
@@ -81,6 +82,7 @@ export function checkArchitecture({ repositoryRoot, configFile, injectedTypeScri
     return { schema: 'starci/architecture-check@1', ok: false, repository: String(repositoryRoot ?? ''), kinds: [], files: 0,
       compiler: null, violations: [], errors: [{ ruleId: 'ARCH_CONFIG_INVALID', message: String(error.message ?? error) }], limitations: LIMITATIONS };
   }
+  const hfs = checkHfs(config);
   let context;
   try {
     context = buildTypeScriptContext(config, injectedTypeScript, paths);
@@ -88,9 +90,10 @@ export function checkArchitecture({ repositoryRoot, configFile, injectedTypeScri
     const message = String(error.message ?? error);
     const match = /^(ARCH_[A-Z_]+):\s*/.exec(message);
     return { schema: 'starci/architecture-check@1', ok: false, repository: config.root, kinds: config.kinds, files: 0,
-      compiler: null, violations: [], errors: [{ ruleId: match?.[1] ?? 'ARCH_COMPILER_FAILURE', message: message.replace(/^(ARCH_[A-Z_]+):\s*/, '') }], limitations: LIMITATIONS };
+      compiler: null, violations: hfs.violations, coverage: { hfs: hfs.coverage },
+      errors: [{ ruleId: match?.[1] ?? 'ARCH_COMPILER_FAILURE', message: message.replace(/^(ARCH_[A-Z_]+):\s*/, '') }], limitations: LIMITATIONS };
   }
-  const violations = [];
+  const violations = [...hfs.violations];
   let moduleRegistration = { status: 'not-applicable' };
   let backendSourceShape = { status: 'not-applicable' };
   let backendContractTypeForm = { publicContracts: { status: 'not-applicable' }, readonlyBoundaries: { status: 'not-applicable' } };
@@ -132,6 +135,7 @@ export function checkArchitecture({ repositoryRoot, configFile, injectedTypeScri
   const missingOwnerEntries = config.owners?.filter(owner => !sourceFiles.has(canonical(path.resolve(config.root, ...owner.entry.split('/'))))) ?? [];
   const coverage = {
     sourceFiles: context.files.map(file => relativePath(config.root, canonical(file.fileName))).sort(),
+    hfs: hfs.coverage,
     backendContractTypeForm,
     backendSourceShape,
     frontendDataLifecycle,
@@ -150,6 +154,7 @@ export function checkArchitecture({ repositoryRoot, configFile, injectedTypeScri
   };
   coverage.checkedRuleIds = [...new Set([
     ...COMMON_RULE_IDS,
+    ...(hfs.coverage.status === 'checked' ? HFS_RULE_IDS : []),
     ...(config.kinds.includes('backend') ? BACKEND_RULE_IDS : []),
     ...(frontendChecked ? FRONTEND_RULE_IDS : []),
     ...(coverage.ownerPublicApi.status === 'checked' ? OWNER_RULE_IDS : []),

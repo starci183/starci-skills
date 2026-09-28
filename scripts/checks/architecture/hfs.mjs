@@ -1,0 +1,181 @@
+import fs from 'node:fs';
+import path from 'node:path';
+import { execFileSync } from 'node:child_process';
+
+/**
+ * HFS v1 repository-tree check (D:/starci-tmp/hfs/HFS-SPEC.md): every StarCi repository is an
+ * apps/<app>/ monorepo on npm with a fixed root-entry allowlist; backend composition lives in
+ * apps/<app>/src and shared source under src/{features,modules,tests} with the three module tiers
+ * domain/platform/integrations; frontend source lives only under apps/<app>/src. The judged tree is
+ * the tracked one (`git ls-files` from the target root); a target outside a work tree falls back to
+ * the filesystem view so fixtures and un-tracked checkouts are judged the same way.
+ */
+
+export const HFS_RULE_IDS = [
+  'HFS_APPS_REQUIRED',
+  'HFS_APP_LAYOUT_INVALID',
+  'HFS_MODULE_TIER_INVALID',
+  'HFS_PACKAGE_MANAGER_MIXED',
+  'HFS_ROOT_ENTRY_FORBIDDEN',
+  'HFS_ROOT_ENTRY_MISSING',
+  'HFS_ROOT_SRC_FORBIDDEN_FE',
+  'HFS_SRC_LAYOUT_INVALID',
+  'HFS_STACKS_IN_FE',
+  'HFS_WORK_IN_FE',
+];
+
+const REQUIRED_COMMON = ['.gitattributes', '.github', '.gitignore', '.husky', 'architecture.json',
+  'codecov.yml', 'eslint.config.mjs', 'package-lock.json', 'package.json', 'README.md',
+  'sonar-project.properties', 'tsconfig.json'];
+const OPTIONAL_COMMON = new Set(['.dockerignore', '.editorconfig', '.npmrc', '.nvmrc', 'docs', 'e2e',
+  'packages', 'scripts', 'tsconfig.build.json']);
+const REQUIRED_BACKEND = ['.sops.yaml', '.starcistacks', '.starciwork', 'jest.config.js', 'nest-cli.json', 'src'];
+const OPTIONAL_FRONTEND = new Set(['turbo.json', 'vitest.config.ts', 'vitest.setup.ts']);
+const OPTIONAL_FRONTEND_PATTERN = /^playwright.*\.config\.ts$/;
+const NON_NPM_ENTRIES = new Set(['pnpm-lock.yaml', 'pnpm-workspace.yaml', 'yarn.lock']);
+const BACKEND_SRC_CHILDREN = new Set(['features', 'modules', 'tests']);
+const MODULE_TIERS = new Set(['domain', 'integrations', 'platform']);
+const TEST_CHILDREN = new Set(['e2e', 'fixtures', 'harness', 'integration']);
+
+function gitPaths(root) {
+  try {
+    // An empty index is still a Git tree. Falling back to disk in that case would count
+    // untracked build output as repository content.
+    execFileSync('git', ['rev-parse', '--is-inside-work-tree'], {
+      cwd: root, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'],
+    });
+    const out = execFileSync('git', ['ls-files', '--cached', '-z', '--', '.'], {
+      cwd: root, encoding: 'utf8', maxBuffer: 256 * 1024 * 1024, stdio: ['ignore', 'pipe', 'pipe'],
+    });
+    return out.split('\0').filter(Boolean);
+  } catch {
+    return null;
+  }
+}
+
+function fsHasDir(root, relative) {
+  try { return fs.statSync(path.join(root, ...relative.split('/'))).isDirectory(); } catch { return false; }
+}
+
+function fsHasFile(root, relative) {
+  try { return fs.statSync(path.join(root, ...relative.split('/'))).isFile(); } catch { return false; }
+}
+
+function fsChildren(root, relative) {
+  try {
+    return fs.readdirSync(path.join(root, ...relative.split('/')), { withFileTypes: true })
+      .map(entry => entry.name);
+  } catch {
+    return [];
+  }
+}
+
+/** Uniform tree view: top entries plus children(dir)/hasDir/hasFile answers over posix relatives. */
+function treeView(root) {
+  const tracked = gitPaths(root);
+  if (tracked !== null) {
+    const files = new Set(tracked);
+    return {
+      source: 'git',
+      top: [...new Set(tracked.map(file => file.split('/')[0]))],
+      children: dir => {
+        const prefix = `${dir}/`;
+        const names = new Set();
+        for (const file of tracked) if (file.startsWith(prefix)) names.add(file.slice(prefix.length).split('/')[0]);
+        return [...names];
+      },
+      hasDir: dir => tracked.some(file => file.startsWith(`${dir}/`)),
+      hasFile: file => files.has(file),
+    };
+  }
+  return {
+    source: 'fs',
+    top: fsChildren(root, '.'),
+    children: dir => fsChildren(root, dir),
+    hasDir: dir => fsHasDir(root, dir),
+    hasFile: file => fsHasFile(root, file),
+  };
+}
+
+export function checkHfs(config) {
+  const kinds = config.kinds ?? [];
+  const backend = kinds.includes('backend');
+  const frontend = kinds.includes('frontend');
+  if (!backend && !frontend) return { violations: [], coverage: { status: 'not-applicable' } };
+  const tree = treeView(config.root);
+  const violations = [];
+  const finding = (ruleId, entry, message) => violations.push({ ruleId, path: entry, line: 1, column: 1, message });
+
+  const allowed = new Set(['apps', ...REQUIRED_COMMON, ...OPTIONAL_COMMON,
+    ...(backend ? REQUIRED_BACKEND : []), ...(frontend ? OPTIONAL_FRONTEND : [])]);
+  for (const entry of [...tree.top].sort()) {
+    if (NON_NPM_ENTRIES.has(entry)) {
+      finding('HFS_PACKAGE_MANAGER_MIXED', entry, `Root entry ${entry} belongs to a package manager other than npm; the HFS tree keeps only package-lock.json.`);
+      continue;
+    }
+    if (frontend && !backend) {
+      if (entry === '.starciwork') { finding('HFS_WORK_IN_FE', entry, 'A frontend repository must not hold a .starciwork tree; Work records live in the backend repository.'); continue; }
+      if (entry === '.starcistacks') { finding('HFS_STACKS_IN_FE', entry, 'A frontend repository must not hold .starcistacks; stack declarations live in the backend repository.'); continue; }
+      if (entry === 'src') { finding('HFS_ROOT_SRC_FORBIDDEN_FE', entry, 'A frontend repository keeps source only under apps/<app>/src; the root src/ tree must move.'); continue; }
+    }
+    if (!allowed.has(entry) && !(frontend && OPTIONAL_FRONTEND_PATTERN.test(entry))) {
+      finding('HFS_ROOT_ENTRY_FORBIDDEN', entry, `Root entry ${entry} is not in the HFS ${backend ? 'backend' : 'frontend'} allowlist.`);
+    }
+  }
+
+  const required = new Set(REQUIRED_COMMON);
+  if (backend) for (const entry of REQUIRED_BACKEND) required.add(entry);
+  for (const entry of [...required].sort()) {
+    if (entry === 'apps') continue;
+    if (!tree.top.includes(entry)) finding('HFS_ROOT_ENTRY_MISSING', entry, `The ${backend ? 'backend' : 'frontend'} HFS tree requires root entry ${entry}.`);
+  }
+
+  const apps = tree.children('apps').sort();
+  if (!tree.hasDir('apps') || apps.length === 0) {
+    finding('HFS_APPS_REQUIRED', 'apps', 'Every HFS repository is an apps/<app>/ monorepo; apps/ must hold at least one application.');
+  }
+  for (const app of apps) {
+    const missing = [];
+    if (!tree.hasDir(`apps/${app}`)) {
+      finding('HFS_APP_LAYOUT_INVALID', `apps/${app}`, `Application entry apps/${app} must be a directory.`);
+      continue;
+    }
+    if (!tree.hasDir(`apps/${app}/src`)) missing.push('src/');
+    if (backend) for (const entry of ['src/main.ts', 'src/app.module.ts']) {
+      if (!tree.hasFile(`apps/${app}/${entry}`)) missing.push(entry);
+    }
+    if (frontend) for (const entry of ['package.json', 'next.config.ts', 'tsconfig.json', 'postcss.config.mjs', 'next-env.d.ts']) {
+      if (!tree.hasFile(`apps/${app}/${entry}`)) missing.push(entry);
+    }
+    if (missing.length) finding('HFS_APP_LAYOUT_INVALID', `apps/${app}`, `Application apps/${app} lacks ${missing.join(', ')} required by the HFS app layout.`);
+  }
+
+  if (backend) {
+    for (const child of tree.children('src').sort()) {
+      if (!BACKEND_SRC_CHILDREN.has(child)) {
+        finding('HFS_SRC_LAYOUT_INVALID', `src/${child}`, `Backend src/ holds only features/, modules/ and tests/; ${child} must move to its owner.`);
+      }
+    }
+    for (const tier of tree.children('src/modules').sort()) {
+      if (!MODULE_TIERS.has(tier)) {
+        finding('HFS_MODULE_TIER_INVALID', `src/modules/${tier}`, `Module tier ${tier} is not one of domain, platform, integrations.`);
+      }
+    }
+    for (const child of tree.children('src/tests').sort()) {
+      if (!TEST_CHILDREN.has(child)) {
+        finding('HFS_SRC_LAYOUT_INVALID', `src/tests/${child}`, `Backend tests/ holds only integration, fixtures, harness and e2e; ${child} must move.`);
+      }
+    }
+  }
+
+  return {
+    violations,
+    coverage: {
+      status: 'checked',
+      source: tree.source,
+      rootEntries: tree.top.length,
+      apps,
+      ruleIds: [...HFS_RULE_IDS],
+    },
+  };
+}

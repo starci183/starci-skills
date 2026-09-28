@@ -230,8 +230,14 @@ function redirectCanon(name, entry) {
 function detectProfile(root) {
   const pkg = JSON.parse(fs.readFileSync(path.join(root, 'package.json'), 'utf8'));
   const deps = { ...pkg.dependencies, ...pkg.devDependencies };
-  if (deps.next || fs.existsSync(path.join(root, 'apps'))) return 'next';
   if (deps['@nestjs/core']) return 'nest';
+  if (deps.next) return 'next';
+  const architecture = path.join(root, 'architecture.json');
+  if (fs.existsSync(architecture)) {
+    const kinds = JSON.parse(fs.readFileSync(architecture, 'utf8')).kinds ?? [];
+    if (kinds.includes('backend')) return 'nest';
+    if (kinds.includes('frontend')) return 'next';
+  }
   throw Object.assign(Error('cannot tell next from nest; pass --profile'), { code: 'PROFILE_UNKNOWN' });
 }
 

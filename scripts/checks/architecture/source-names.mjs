@@ -31,10 +31,6 @@ function absoluteRoots(root, relatives) {
   return relatives.map(relative => path.resolve(root, ...relative.split('/')));
 }
 
-function insideAny(roots, target) {
-  return roots.some(root => isInside(root, target));
-}
-
 function canonical(file) {
   return path.resolve(file);
 }
@@ -396,13 +392,11 @@ export function checkBackendSourceShape(config, context) {
   const ts = context.ts;
   const featureRoots = absoluteRoots(config.root, config.backend.features);
   const moduleRoots = absoluteRoots(config.root, config.backend.modules);
-  const legacyRoots = absoluteRoots(config.root, config.backend.legacyRoots);
   const localFiles = new Set(context.files.map(file => canonical(file.fileName)));
   const frameworkByChecker = new Map();
   const violations = [];
   const layoutReasons = [];
   const namingReasons = [];
-  const legacyFiles = [];
   let checkedFiles = 0;
 
   for (const sourceFile of context.files) {
@@ -411,10 +405,6 @@ export function checkBackendSourceShape(config, context) {
     const moduleRoot = locatedRoot(moduleRoots, fileName);
     if (!featureRoot && !moduleRoot) continue;
     checkedFiles += 1;
-    if (insideAny(legacyRoots, fileName)) {
-      legacyFiles.push(relativePath(config.root, fileName));
-      continue;
-    }
     const checker = context.checkerFor(fileName);
     if (!frameworkByChecker.has(checker)) frameworkByChecker.set(checker, frameworkTargets(config, context, checker, localFiles));
     const framework = frameworkByChecker.get(checker);
@@ -589,14 +579,8 @@ export function checkBackendSourceShape(config, context) {
     layoutReasons.push('the checked TypeScript program contains no configured backend feature or module source');
     namingReasons.push('the checked TypeScript program contains no configured backend feature or module source');
   }
-  if (legacyFiles.length) {
-    const roots = config.backend.legacyRoots.join(', ');
-    layoutReasons.push(`unsupported legacy source roots contain ${legacyFiles.length} checked file(s): ${roots}`);
-    namingReasons.push(`unsupported legacy source roots contain ${legacyFiles.length} checked file(s): ${roots}`);
-  }
   const coverage = {
     files: checkedFiles,
-    legacyFiles: legacyFiles.sort(),
     layout: layoutReasons.length
       ? { status: 'unavailable', reason: 'one or more backend source placement relations are not statically proved', details: [...new Set(layoutReasons)].sort() }
       : { status: 'checked' },

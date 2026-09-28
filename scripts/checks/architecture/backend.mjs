@@ -32,7 +32,12 @@ function appSource(config, fileName, excludedRoots = []) {
     const parts = relativePath(appRoot, fileName).split('/');
     const sourceIndex = parts.indexOf('src');
     if (sourceIndex >= 0) return { appRoot, relative: parts.slice(sourceIndex + 1).join('/') };
-    if (path.basename(appRoot).toLowerCase() === 'src') return { appRoot, relative: parts.join('/') };
+    // An app root may name its src/ directly (apps/<app>/src), but the repository src/ itself is
+    // never an app root: HFS composition lives under apps/<app> only.
+    const appRootRelative = relativePath(config.root, appRoot).split('/');
+    if (path.basename(appRoot).toLowerCase() === 'src' && appRootRelative[0] === 'apps' && appRootRelative.length > 1) {
+      return { appRoot, relative: parts.join('/') };
+    }
     return null;
   }
   return null;

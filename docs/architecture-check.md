@@ -1,7 +1,7 @@
 # Architecture check
 
 `scripts/checks/architecture.mjs` (`checkArchitecture`) is a read-only
-TypeScript dependency and source-shape check. It resolves the checked
+HFS tree, TypeScript dependency, and source-shape check. It resolves the checked
 repository's manifests, `tsconfig` aliases, relative paths, workspace/file
 packages, declared exports, re-export barrels, static `import()` calls, and
 string-literal `require()` calls. It reports architectural evidence; it does
@@ -30,16 +30,22 @@ errors; exit code `2` means bad arguments. Each finding identifies a repository-
 location, stable rule id, message, and, for resolved dependency failures, the
 target and dependency chain.
 
+HFS tree violations use `HFS_ROOT_ENTRY_FORBIDDEN`, `HFS_ROOT_ENTRY_MISSING`,
+`HFS_APPS_REQUIRED`, `HFS_APP_LAYOUT_INVALID`, `HFS_ROOT_SRC_FORBIDDEN_FE`,
+`HFS_SRC_LAYOUT_INVALID`, `HFS_MODULE_TIER_INVALID`, `HFS_WORK_IN_FE`,
+`HFS_STACKS_IN_FE`, and `HFS_PACKAGE_MANAGER_MIXED`. The `coverage.hfs` object
+records whether the tree came from the Git index or a filesystem fallback.
+
 ## Responsibility model
 
-Topology and architecture answer different questions. A single-project Nest application, a Nest monorepo, a Next application with local `file:` packages, an npm-workspaces frontend, and an explicitly bound repository containing both backend and frontend can implement the same responsibility boundaries. A same-root binding still has one Work owner and one runtime; it does not erase backend/frontend roles or permit duplicated workspace state.
+Every backend and frontend repository uses the HFS tree: `apps/<app>/` holds each application, npm owns the package lock, and tracked root entries follow the backend or frontend allowlist. The checker reads tracked entries with `git ls-files` and uses the filesystem only outside a Git worktree. Backend shared source lives under `src/{features,modules,tests}`, with module tiers `domain`, `platform`, and `integrations`. Frontend source lives under `apps/<app>/src`; root `src/` is forbidden.
 
-Backend dependencies point from executable application composition to use-case features to cohesive capabilities/modules. Features orchestrate entry scenarios. Modules own cohesive domain or infrastructure capabilities and expose narrow APIs even when only one feature consumes them. Apps may bootstrap the framework, select modules/providers, install process middleware and app-wide adapters, and start the process; they do not own business handlers, services, controllers, resolvers, repositories, or entities. A configured or single-application-layout `apps` root never absorbs the feature and module roots nested inside it, so a single `src/main.ts` plus `src/app.module.ts` beside `src/features` and `src/modules` is still measured as thin app composition rather than counting every feature/module file as app source.
+Backend dependencies point from executable application composition to use-case features to cohesive capabilities/modules. Features orchestrate entry scenarios. Modules own cohesive domain or infrastructure capabilities and expose narrow APIs even when only one feature consumes them. Apps may bootstrap the framework, select modules/providers, install process middleware and app-wide adapters, and start the process; they do not own business handlers, services, controllers, resolvers, repositories, or entities.
 
 Frontend roots are explicit: `app`, `features/{pages,layouts,overlays}`, `components/{blocks,composites,branches,leaves}`, `hooks/<domain>`, and `modules/<capability>`. App adapters may use React, Next and external framework packages, while every resolved internal import or re-export, including type-only edges, enters a feature public entry. Features compose components, hooks and modules. Components cannot point to features/app; hooks cannot point to components/features/app; modules cannot point to hooks/components/features/app. The visual tiers form a bounded dependency graph, not a requirement to pass through every tier.
 
 Configured app, feature, component, hook and module roots are disjoint; transport may remain nested under
-modules. Discovered workspace roots are additive, so a narrow authored map cannot hide another Next app.
+modules. Discovered workspace roots are additive, so a narrow authored map cannot hide another Next app. Authored roots must still point to the HFS tree; a custom map cannot make an alternate layout conformant.
 When `owners` declares public entries, that list is closed and app imports may use only its exact feature
 entries. Without `owners`, the checker can validate the exact structural feature index, while owner public-API
 coverage remains unavailable and cannot support a full conformance claim.
@@ -68,7 +74,7 @@ Nest modules export their public provider API. A consumer should import the owni
 
 When a backend explicitly selects `exported-class-token` registration checking, the checker discovers every resolved Nest `@Module`, `@CommandHandler`, and `@QueryHandler` in the checked production TypeScript program. A class-token provider that a module both provides and exports has one static owner; another module listing that same class token must import the owner instead. A provider object with a different named token remains a distinct registration. Selected CQRS decorators must have exactly one direct module registration. Dynamic/spread provider metadata, an unresolved framework binding, or a discovered handler decorator omitted from the selected set makes registration coverage unavailable rather than passing an incomplete inventory. This static relation does not prove runtime scope, dynamic-module options, or a bootable DI container.
 
-Resolved backend feature/module roots use the adopted domain-first source shape without an enablement flag. Recognized application roles live under `application/`; recognized protocol roles live under `transport/<protocol>/`. Resolved GraphQL DTO decorators bind DTOs to `transport/graphql`, while resolved TypeORM entity/migration identities cannot make a feature the schema owner. The naming check covers kebab-case role files, exported class role suffixes, application object contracts whose roles are known, enum declarations, and static GraphQL field/argument names. It does not invent a role for an arbitrary helper or infer persistence/error ownership from a folder string. An unclassified role, constructed decorator binding, dynamic GraphQL name, or declared unsupported root (`legacyRoots`) makes the applicable layout or naming coverage unavailable and omits that rule ID from `coverage.checkedRuleIds`.
+Resolved backend feature/module roots use the adopted domain-first source shape without an enablement flag. Recognized application roles live under `application/`; recognized protocol roles live under `transport/<protocol>/`. Resolved GraphQL DTO decorators bind DTOs to `transport/graphql`, while resolved TypeORM entity/migration identities cannot make a feature the schema owner. The naming check covers kebab-case role files, exported class role suffixes, application object contracts whose roles are known, enum declarations, and static GraphQL field/argument names. It does not invent a role for an arbitrary helper or infer persistence/error ownership from a folder string. An unclassified role, constructed decorator binding, or dynamic GraphQL name makes the applicable layout or naming coverage unavailable and omits that rule ID from `coverage.checkedRuleIds`.
 
 The [Nest contract check](nest-contract-check.md) separately resolves callable owner/use-case signatures and readonly injected dependency or CQRS message fields. It follows inherited generic `execute` contracts and constructor assignments to declared fields without treating transport DTOs as immutable messages. Owner gaps, dynamic framework identity, unsupported field storage or unresolved signatures make only the affected contract coverage unavailable; declaration shape never claims runtime validation, DI lifetime or serialized compatibility.
 
@@ -90,9 +96,9 @@ Local reference evidence is pinned, and includes debt rather than being copied a
 - `starci-academy-fe@44bba218685b7eed2a5d9e479689707ab6381bc8`: redirect-only routes under `[lang]/page.tsx` and `courses/[displayId]/learn/flashcards/page.tsx` are valid zero-visual-owner adapters. `subscriptions/page.tsx` rendering `ShellNav` beside `ProSubscriptionPage` is reference debt. `StarCiAiFab/component.tsx` owns DOM refs, resize handling, drag, and reduced-motion behavior without transport/product-world ownership; forcing a forwarding Base twin would add ceremony without a responsibility boundary.
 - That frontend is one app with `file:packages/grammar` and `file:packages/heroicons`; `nivo-fe@a01a7bd7474fc6b43b831853d9ef870c202f3844` is npm workspaces with `apps/{app,expert,landing}` and `packages/ui`. Both topologies must obey the same ownership and public-export rules.
 
-## Optional layout config
+## Architecture config
 
-Repositories with equivalent responsibilities at different paths may add a small JSON config. It changes roots and role mappings; it cannot contain baselines, ignores, or suppressions. `legacyRoots` records an existing unsupported source profile and deliberately makes source-shape coverage unavailable; it never turns that source green or excludes it from `coverage.sourceFiles`.
+Repositories may declare the HFS roots and role mappings in a small JSON config. It cannot contain baselines, ignores, suppressions, or alternate source layouts.
 
 ```json
 {
@@ -100,22 +106,21 @@ Repositories with equivalent responsibilities at different paths may add a small
   "kinds": ["backend", "frontend"],
   "tsconfig": "tsconfig.json",
   "backend": {
-    "modules": "server/modules",
-    "features": "server/features",
-    "apps": ["server/apps"],
-    "legacyRoots": ["server/features/transport-first"],
+    "modules": "src/modules",
+    "features": "src/features",
+    "apps": ["apps"],
     "moduleRegistration": {
       "providerIdentity": "exported-class-token",
       "handlerDecorators": ["CommandHandler", "QueryHandler"]
     }
   },
   "frontend": {
-    "routes": "web/app",
-    "features": "web/features",
-    "components": "web/components",
-    "hooks": "web/hooks",
-    "modules": "web/modules",
-    "transport": "web/modules/api"
+    "routes": "apps/web/src/app",
+    "features": "apps/web/src/features",
+    "components": "apps/web/src/components",
+    "hooks": "apps/web/src/hooks",
+    "modules": "apps/web/src/modules",
+    "transport": "apps/web/src/modules/api"
   }
 }
 ```

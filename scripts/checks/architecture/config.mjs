@@ -7,7 +7,7 @@ import { isInside } from '../common.mjs';
 const CONFIG_SCHEMA = 'starci/architecture-config@1';
 const KINDS = new Set(['backend', 'frontend']);
 const TOP_LEVEL_KEYS = new Set(['schema', 'kinds', 'tsconfig', 'projects', 'backend', 'frontend', 'owners']);
-const BACKEND_KEYS = new Set(['modules', 'features', 'apps', 'legacyRoots', 'moduleRegistration']);
+const BACKEND_KEYS = new Set(['modules', 'features', 'apps', 'moduleRegistration']);
 const FRONTEND_KEYS = new Set(['routes', 'features', 'components', 'hooks', 'modules', 'transport', 'grammar']);
 const OWNER_KEYS = new Set(['id', 'root', 'entry']);
 const GRAMMAR_KEYS = new Set(['package', 'entry', 'styleEntry', 'styleSources', 'consumerManifests', 'peers']);
@@ -168,8 +168,9 @@ function discoveredProjects(root, workspaces) {
 }
 
 function inferredLayout(root, workspaces) {
-  const roots = ['', ...workspaces];
-  const collect = suffix => roots.map(prefix => prefix ? `${prefix}/${suffix}` : suffix).filter(relative => existingDirectory(root, relative));
+  // HFS: frontend source roots live only under workspace packages (apps/<app>/, packages/<pkg>/);
+  // the repository root itself is never a frontend source root.
+  const collect = suffix => workspaces.map(prefix => `${prefix}/${suffix}`).filter(relative => existingDirectory(root, relative));
   // A design-system workspace whose src carries tier dirs (leaves/branches/…) IS a component root;
   // collecting its src/components too would nest two roots in one role and fail the disjoint check.
   const tierSources = new Set(workspaces.map(prefix => `${prefix}/src`)
@@ -239,14 +240,6 @@ function assertFrontendRolesDisjoint(root, frontend) {
       throw Error(`Architecture frontend role roots must be disjoint; ${left.role} ${left.relative} overlaps ${right.role} ${right.relative}.`);
     }
   }
-}
-
-function optionalPathList(value, label) {
-  if (value === undefined) return [];
-  const list = Array.isArray(value) ? value : [value];
-  const normalized = list.map(item => safeRelative(item, label));
-  if (new Set(normalized).size !== normalized.length) throw Error(`${label} paths must be unique.`);
-  return normalized;
 }
 
 function requireAuthoredDirectories(root, value, label) {
@@ -340,38 +333,24 @@ export function loadArchitectureConfig(repositoryRoot, configFile) {
   const frontend = authored.frontend ?? {};
   exactKeys(backend, BACKEND_KEYS, 'Architecture config backend');
   exactKeys(frontend, FRONTEND_KEYS, 'Architecture config frontend');
-  for (const key of ['modules', 'features', 'apps', 'legacyRoots']) requireAuthoredDirectories(root, backend[key], `Architecture backend.${key}`);
+  for (const key of ['modules', 'features', 'apps']) requireAuthoredDirectories(root, backend[key], `Architecture backend.${key}`);
   for (const key of ['routes', 'features', 'components', 'hooks', 'modules', 'transport']) requireAuthoredDirectories(root, frontend[key], `Architecture frontend.${key}`);
   const discovered = discoveredProjects(root, workspaces);
   const projects = pathList(authored.projects ?? authored.tsconfig, discovered, 'Architecture TypeScript project');
-  const singleAppComposition = backend.apps === undefined && !existingDirectory(root, 'apps')
-    && existingDirectory(root, 'src/features') && existingDirectory(root, 'src/modules')
-    && existingRegularFile(root, 'src/main.ts') && existingRegularFile(root, 'src/app.module.ts');
   const resolvedBackend = {
     modules: pathList(backend.modules, ['src/modules'], 'Architecture backend.modules'),
     features: pathList(backend.features, ['src/features'], 'Architecture backend.features'),
-    apps: pathList(backend.apps, singleAppComposition ? ['src'] : ['apps'], 'Architecture backend.apps'),
-    legacyRoots: optionalPathList(backend.legacyRoots, 'Architecture backend.legacyRoots'),
+    apps: pathList(backend.apps, ['apps'], 'Architecture backend.apps'),
     moduleRegistration: moduleRegistrationConfig(backend.moduleRegistration),
   };
-  const backendSourceRoots = [...resolvedBackend.modules, ...resolvedBackend.features].map(relative => path.join(root, ...relative.split('/')));
-  const legacySourceRoots = resolvedBackend.legacyRoots.map(relative => path.join(root, ...relative.split('/')));
-  if (legacySourceRoots.some(legacy => !backendSourceRoots.some(source => isInside(source, legacy)))) {
-    throw Error('Architecture backend.legacyRoots must stay inside a configured module or feature source root.');
-  }
-  for (let index = 0; index < legacySourceRoots.length; index += 1) for (let other = index + 1; other < legacySourceRoots.length; other += 1) {
-    if (isInside(legacySourceRoots[index], legacySourceRoots[other]) || isInside(legacySourceRoots[other], legacySourceRoots[index])) {
-      throw Error('Architecture backend.legacyRoots cannot overlap.');
-    }
-  }
   const owners = configuredOwners(root, authored.owners);
   const resolvedFrontend = {
-    routes: frontendPathList(frontend.routes, inferred.routes, ['src/app'], 'Architecture frontend.routes'),
-    features: frontendPathList(frontend.features, inferred.features, ['src/features'], 'Architecture frontend.features'),
-    components: frontendPathList(frontend.components, inferred.components, ['src/components'], 'Architecture frontend.components'),
-    hooks: frontendPathList(frontend.hooks, inferred.hooks, ['src/hooks'], 'Architecture frontend.hooks'),
-    modules: frontendPathList(frontend.modules, inferred.modules, ['src/modules'], 'Architecture frontend.modules'),
-    transport: frontendPathList(frontend.transport, inferred.transport, ['src/modules/api'], 'Architecture frontend.transport'),
+    routes: frontendPathList(frontend.routes, inferred.routes, ['apps/app/src/app'], 'Architecture frontend.routes'),
+    features: frontendPathList(frontend.features, inferred.features, ['apps/app/src/features'], 'Architecture frontend.features'),
+    components: frontendPathList(frontend.components, inferred.components, ['apps/app/src/components'], 'Architecture frontend.components'),
+    hooks: frontendPathList(frontend.hooks, inferred.hooks, ['apps/app/src/hooks'], 'Architecture frontend.hooks'),
+    modules: frontendPathList(frontend.modules, inferred.modules, ['apps/app/src/modules'], 'Architecture frontend.modules'),
+    transport: frontendPathList(frontend.transport, inferred.transport, ['apps/app/src/modules/api'], 'Architecture frontend.transport'),
     grammar: grammarConfig(root, frontend.grammar),
   };
   assertFrontendRolesDisjoint(root, resolvedFrontend);
