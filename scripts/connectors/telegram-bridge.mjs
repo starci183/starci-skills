@@ -705,10 +705,21 @@ export function createBridge({
     writeJson(bridgeStateFile(env), { ...state, schema: 'starci/telegram-bridge@1', offset, updatedAt: new Date(now()).toISOString() });
   };
 
+  // MB-11: config.yaml read while it is being rewritten is not "telegram off": the last good settings carry on (the
+  // bridge stopped 4 times for 1-6 min on exactly that), and a real change of settings is picked up on the next read.
+  let lastGood = null, unreadableSince = null;
   /** One getUpdates round: {ok, count} | {stop} | {conflict} | {error, status, retryAfter}. */
   const pollOnce = async () => {
-    current = settings();
+    const fresh = settings();
+    if (!fresh?.ready && lastGood && /cannot be read/i.test(String(fresh?.warning ?? ''))) {
+      if (unreadableSince == null) { unreadableSince = now(); say(`${fresh.warning}; keeping the last good settings`); }
+      current = lastGood;
+    } else {
+      if (unreadableSince != null) { say('config.yaml readable again'); unreadableSince = null; }
+      current = fresh;
+    }
     if (!current?.ready) return { stop: current?.warning ?? 'telegram off' };
+    lastGood = current;
     const offset = Number.isSafeInteger(bridgeState(env)?.offset) ? bridgeState(env).offset : null;
     const r = await getUpdates({ token: current.token, offset, timeoutS, apiBase, fetchImpl });
     if (!r.ok) {
@@ -785,6 +796,12 @@ export function ensureTelegramBridge({ env = process.env, config = undefined, ro
 
 /* ------------------------------------------------------------ CLI */
 
+/**
+ * MB-11: a new runtime HEAD reloads the bridge only when it changed a file under these (the bridge re-exec'd on every
+ * land: 198 takeovers, 8-12 an hour). Its own files below reload it by mtime as before.
+ */
+export const BRIDGE_HEAD_PATHS = Object.freeze(['scripts/connectors/', 'scripts/lib/', 'scripts/supervisor/progress-report.mjs', 'scripts/kernel/serve-ask.mjs', 'engine/']);
+
 /** What the bridge process runs: its own file and its direct imports. A change to one, or a new runtime HEAD, reloads it. */
 export const bridgeReloadFiles = (root = configRoot) => [
   'scripts/connectors/telegram-bridge.mjs', 'scripts/connectors/telegram.mjs', 'scripts/connectors/lib.mjs', 'scripts/connectors/tunnel.mjs',
@@ -822,7 +839,7 @@ async function runMain() {
   console.log(JSON.stringify({ ok: true, pid: process.pid, log: bridgeLogFile(env) }));
   log(`bridge ${process.pid} started${claim.takenOver ? ` (took over from ${handoverFrom})` : ''}`);
   const bridge = createBridge({ env, log, settings: () => telegramSettings({ env }) });
-  const watch = createReloadWatch({ root: configRoot, files: bridgeReloadFiles(), lastReloadAt: reloadedAt });
+  const watch = createReloadWatch({ root: configRoot, files: bridgeReloadFiles(), lastReloadAt: reloadedAt, headPaths: BRIDGE_HEAD_PATHS });
   const reload = async () => {
     const check = watch.check();
     if (!check.reload) return null;
