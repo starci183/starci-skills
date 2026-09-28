@@ -52,7 +52,7 @@ export function snapshotOpenAttempts(ledger, { now = Date.now(), everyMs = TRANS
     const captured = captureTerminal(row.terminal_handle, { read, repoRoots: [...repoRoots, row.worktree_path].filter(Boolean) });
     if (!captured) { out.unreadable += 1; continue; }
     const r = ledger.transaction(() => recordAttemptSnapshot(db, { workflowId: row.workflow_id, attemptId: row.attempt_id, text: captured.text, blob: captured.blob, at: now }));
-    if (r?.snapshotId) out.written += 1; else out.unchanged += 1;
+    if (r?.written) out.written += 1; else out.unchanged += 1;
   }
   return out;
 }
