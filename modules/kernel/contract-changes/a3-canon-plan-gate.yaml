@@ -1,0 +1,15 @@
+id: a3-canon-plan-gate
+effectiveAt: '2026-09-29T02:30:00+07:00'
+summary: >-
+  H6 (alpha.3): the canon slice planner is mandatory. api enqueue refuses the first try of a canon slice without
+  --canon-scan <the record it was cut from>, without the plan's grants in its --paths, or when its moves are held by
+  another slice (no fix target: cut again). graph-edit recut enqueues through the planner (slices with grants, one
+  canon-wire leg per wave) and its units inherit the reshaped units' remaining budget; graph-edit undo re-enqueues a
+  dropped unit as a new try; scan records and proposal patches are kernel artifacts, never .starciwork/kernel-evidence.
+reach: new-legs
+paths:
+  - modules/kernel/api-commands/enqueue.yaml
+  - modules/kernel/api-commands/graph-edit.yaml
+  - modules/kernel/api-commands/kernel-proposal.yaml
+  - modules/kernel/driver-loop.yaml
+  - modules/kernel/contract-changes/a3-canon-plan-gate.yaml

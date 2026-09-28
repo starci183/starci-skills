@@ -412,7 +412,9 @@ tick:
       PLUS the relocation destinations its findings need, and each wave's
       shared-root files go to ONE serial canon-wire leg: run `node
       scripts/kernel/cut-seam.mjs canon-plan --scan <that canon-scan json>
-      --cut-id <id>` and enqueue its `commands` in order - each slice with its
+      --cut-id <id>` and enqueue its `commands` in order, each slice with
+      --canon-scan <that json> (api enqueue refuses a canon slice without it or
+      without the plan grants, H6) - each slice with its
       `owned` (paths + grants, never overlapping a sibling), then per wave `api
       enqueue --op code.refactor --paths <wire> --params
       '{"canonWire":true}' --after <every ordinal of the wave>`, which owns the

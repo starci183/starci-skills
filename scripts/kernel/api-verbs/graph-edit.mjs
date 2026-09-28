@@ -15,7 +15,7 @@
 //     params   --job <queued> --set '<json>'            per-unit override: notes, commandTimeoutMs, difficulty, model, effort
 //     scan     --op <op> --cut-id <id> [--exclude <csv>] start a fresh canon-scan in the background (a canon cut's own method)
 //     recut    --op <op> --cut-id <id> --from-scan <file> [--path-prefix <p>]   re-cut the cut's remaining queued units
-//     undo     --undo <edit id>                         revert one edit (restore dropped units, drop created ones, restore fields)
+//     undo     --undo <edit id>                         revert one edit (re-enqueue dropped units as a new try, drop created ones, restore fields)
 //
 // Bounds: at most runtimes.yaml allocation.progress.maxUnitsPerEdit units touched per edit (a recut from a canon-scan
 // record - the goal's own cut method - is exempt); only queued, never-dispatched units change; a running unit is never
@@ -31,6 +31,9 @@ import {
   recordKernel, refuse, requireDecision, restoreJob, setPayload, settingsN, shapeOf, validateOverride,
 } from '../kernel-authority.mjs';
 import { GRAPH_EDIT_KIND, OPEN_JOB, opJobsOf, unitsOf } from '../progress-rca.mjs';
+import { canonCutPlanOf } from '../cut-seam.mjs';
+import { readCanonScan, unfixableSlicesOf } from '../canon-plan-gate.mjs';
+import { putArtifact, stageBlob } from '../evidence-store.mjs';
 
 const EDITS = ['drop', 'widen', 'wire', 'continue', 'retry', 'reorder', 'split', 'merge', 'params', 'scan', 'recut', 'undo'];
 const COMMIT_RE = /\b(?:commit(?:ted)?|land(?:ed)?(?: commit)?|đã (?:land )?commit)\s+([0-9a-f]{7,40})\b/i;
@@ -226,41 +229,66 @@ export default {
       rec.scan = { file, root, exclude: exclude.length, pid: child.pid, prefix };
       human = `canon-scan started in the background (pid ${child.pid}) -> ${file}; next wake: api graph-edit --workflow ${wf} --edit recut --op ${args.op} --cut-id ${args['cut-id']} --from-scan ${file} --decision ${decision.id}`;
     } else if (edit === 'recut') {
+      // H6: a re-cut goes through the canon planner (scripts/kernel/cut-seam.mjs canonCutPlanOf): each slice owns its paths
+      // PLUS the relocation destinations its findings need, contested moves go to one canon-wire leg per wave, and a slice
+      // whose moves another slice holds (no fix target) is refused here and cut again - never enqueued to block.
       const file = String(args['from-scan'] ?? '');
       if (!file || !fs.existsSync(file)) throw refuse('recut needs --from-scan <canon-scan json file> (start one with --edit scan)', 'edit-invalid');
       let scan;
-      try { scan = JSON.parse(fs.readFileSync(file, 'utf8')); } catch { throw refuse(`${file} is not complete JSON yet (the scan may still run: check ${file}.log)`, 'scan-incomplete'); }
-      if (!Array.isArray(scan?.slices) || !scan.schema?.startsWith?.('starci/canon-findings')) throw refuse(`${file} is no canon-scan record (schema starci/canon-findings@1 with slices)`, 'scan-invalid');
+      try { scan = readCanonScan(file); } catch (error) { throw refuse(`${error.message} (the scan may still run: check ${file}.log)`, error.code === 'canon-scan-invalid' ? 'scan-invalid' : 'scan-incomplete'); }
       if (scan.status === 'unavailable') throw refuse(`the scan answered unavailable (${(scan.issues ?? []).map((i) => i.code).join(', ')}): fix the checker first (a kernel-proposal), never re-cut on a partial measurement`, 'scan-unavailable');
       const cutId = String(args['cut-id'] ?? '');
-      const units = db.prepare("SELECT * FROM jobs WHERE workflow_id=? AND op_id=? AND (json_extract(payload_json,'$.cut.id')=? OR json_extract(payload_json,'$.kernelEdit.recutOf')=?)").all(wf, args.op, cutId, cutId)
+      const units = db.prepare(`SELECT job_id, op_id, status, payload_json FROM jobs WHERE workflow_id=? AND op_id=? AND (json_extract(payload_json,'$.cut.id')=? OR json_extract(payload_json,'$.kernelEdit.recutOf')=?)`).all(wf, args.op, cutId, cutId)
         .map((j) => ({ ...j, payload: JSON.parse(j.payload_json) }));
       if (!units.length) throw refuse(`no ${args.op} unit of cut ${cutId}`, 'cut-unknown');
       const prefix = args['path-prefix'] ?? `${String(units[0].payload.owned_paths?.[0] ?? '').split('/')[0]}/`;
       const retire = units.filter((j) => j.status === 'queued' && !dispatchedEver(db, j.job_id));
       const running = units.filter((j) => OPEN_JOB.includes(j.status) && j.status !== 'queued');
       const busy = running.flatMap((j) => j.payload.owned_paths ?? []).map((p) => String(p).toLowerCase());
-      const slices = scan.slices.map((s) => ({ ...s, paths: s.paths.map((p) => `${prefix}${p}`) }))
-        .filter((s) => !s.paths.some((p) => busy.some((b) => p.toLowerCase().startsWith(b) || b.startsWith(p.toLowerCase()))));
-      const clear = slices.filter((s) => !foreignOverlap(db, { repo, workflowId: wf, op: args.op, payload: units[0].payload, paths: s.paths }).length);
-      if (!clear.length) throw refuse('the fresh scan leaves no slice outside running or foreign work', 'recut-empty');
       const n = 1 + db.prepare("SELECT COUNT(*) n FROM events WHERE workflow_id=? AND kind=? AND json_extract(payload_json,'$.edit')='recut'").get(wf, GRAPH_EDIT_KIND).n;
       const newCut = `${cutId}-r${n}`;
-      const total = clear.length;
-      const waves = [...new Set(clear.map((s) => s.wave))];
+      const plan = canonCutPlanOf(scan, { cutId: newCut, op: args.op });
+      const unfixable = unfixableSlicesOf(plan);
+      const noTarget = new Set(unfixable.map((u) => u.ordinal));
+      const prefixed = (list) => list.map((p) => `${prefix}${p}`);
+      const clear = plan.slices.filter((sl) => !noTarget.has(sl.ordinal)).map((sl) => ({ ...sl, owned: prefixed(sl.owned) }))
+        .filter((sl) => !sl.owned.some((p) => busy.some((bz) => p.toLowerCase().startsWith(bz) || bz.startsWith(p.toLowerCase()))))
+        .filter((sl) => !foreignOverlap(db, { repo, workflowId: wf, op: args.op, payload: units[0].payload, paths: sl.owned }).length);
+      if (!clear.length) throw refuse(`the fresh scan leaves no plannable slice outside running or foreign work${unfixable.length ? ` (${unfixable.length} slice(s) have no fix target: cut again)` : ''}`, 'recut-empty');
+      // The record the cut comes from is kept as a kernel artifact; the enqueue gate re-plans each slice from it.
+      const scanBlob = stageBlob(fs.readFileSync(file), { mediaType: 'application/json', repoRoots: [repo] });
+      const scanArt = ledger.transaction((tx) => putArtifact(tx, { workflowId: wf, attemptId: null, role: 'scan', kind: 'file', name: `scans/${newCut}.json`, blob: scanBlob, origin: 'kernel' }));
+      // The gate re-plans from a scan whose slices are exactly the kept ones, renumbered 1..total.
+      const kept = new Set(clear.map((sl) => sl.ordinal));
+      const cutScan = { ...scan, slices: scan.slices.filter((sl) => kept.has(Number(sl.ordinal))).map((sl, i) => ({ ...sl, ordinal: i + 1 })) };
+      const cutFile = path.join(kernelScratchDirOf(repo, wf, 'scans'), `${newCut}.plan.json`);
+      fs.mkdirSync(path.dirname(cutFile), { recursive: true });
+      fs.writeFileSync(cutFile, JSON.stringify(cutScan));
+      const cutPlan = canonCutPlanOf(cutScan, { cutId: newCut, op: args.op });
+      const total = cutPlan.slices.length;
+      const derivedFrom = units.map((j) => j.job_id);
       const byWave = new Map();
-      for (const [i, s] of clear.entries()) {
-        const prior = waves.indexOf(s.wave) > 0 ? byWave.get(waves[waves.indexOf(s.wave) - 1]) ?? [] : [];
-        const id = enqueueUnit({ repo, wf, op: args.op, paths: s.paths, what: `recut ${i + 1}/${total} ${s.wave ?? ''}`.trim(),
-          extra: [...(total >= 2 ? ['--cut-id', newCut, '--cut-ordinal', String(i + 1), '--cut-total', String(total)] : []), ...(prior.length ? ['--after', prior.join(',')] : [])] });
+      const waves = [...new Set(cutPlan.slices.map((sl) => sl.wave))];
+      for (const sl of cutPlan.slices) {
+        const prior = waves.indexOf(sl.wave) > 0 ? byWave.get(waves[waves.indexOf(sl.wave) - 1]) ?? [] : [];
+        const id = enqueueUnit({ repo, wf, op: args.op, paths: prefixed(sl.owned), what: `recut ${sl.ordinal}/${total} ${sl.wave ?? ''}`.trim(), derivedFrom,
+          extra: [...(total >= 2 ? ['--cut-id', newCut, '--cut-ordinal', String(sl.ordinal), '--cut-total', String(total), '--canon-scan', cutFile] : []),
+            ...(prior.length ? ['--after', prior.join(',')] : [])] });
         rec.created.push(id);
-        tag(id, { recutOf: cutId, scan: file });
-        if (!byWave.has(s.wave)) byWave.set(s.wave, []);
-        byWave.get(s.wave).push(id);
+        tag(id, { recutOf: cutId, scan: { artifactId: scanArt.artifactId, sha256: scanBlob.sha } });
+        if (!byWave.has(sl.wave)) byWave.set(sl.wave, []);
+        byWave.get(sl.wave).push(id);
+      }
+      for (const wire of cutPlan.wires) {
+        const id = enqueueUnit({ repo, wf, op: args.op, paths: prefixed(wire.paths), what: `canon wire ${wire.wave}`, derivedFrom,
+          extra: ['--params', JSON.stringify({ canonWire: true }), ...((byWave.get(wire.wave) ?? []).length ? ['--after', byWave.get(wire.wave).join(',')] : [])] });
+        rec.created.push(id);
+        tag(id, { recutOf: cutId, wire: true });
       }
       ledger.transaction(() => { for (const j of retire) { dropJob(ledger, jobRow(db, j.job_id), { reason: `re-cut into ${newCut} from a fresh canon-scan`, editId, now }); rec.dropped.push(j.job_id); } });
-      rec.recut = { from: cutId, to: newCut, scan: file, slices: scan.slices.length, kept: total, skippedBusy: scan.slices.length - total, running: running.map((j) => j.job_id) };
-      human = `re-cut ${cutId}: ${retire.length} queued unit(s) retired, ${total} new unit(s) in ${newCut} (${scan.slices.length - total} slice(s) skipped: running or foreign)`;
+      rec.recut = { from: cutId, to: newCut, scan: { artifactId: scanArt.artifactId, sha256: scanBlob.sha }, slices: scan.slices.length, kept: total, wires: cutPlan.wires.length,
+        noFixTarget: unfixable, skipped: plan.slices.length - total - unfixable.length, running: running.map((j) => j.job_id) };
+      human = `re-cut ${cutId}: ${retire.length} queued unit(s) retired, ${total} planned unit(s) in ${newCut} + ${cutPlan.wires.length} wire leg(s)${unfixable.length ? `, ${unfixable.length} slice(s) refused (no fix target: cut again)` : ''}`;
     } else if (edit === 'undo') {
       const id = String(args.undo ?? '');
       const ev = db.prepare('SELECT payload_json FROM events WHERE workflow_id=? AND kind=? AND entity_id=?').get(wf, GRAPH_EDIT_KIND, id);
@@ -274,7 +302,8 @@ export default {
           if (j?.status === 'queued' && !dispatchedEver(db, jobId)) { dropJob(ledger, j, { reason: `undo ${id}`, editId, now }); rec.dropped.push(jobId); }
           else if (j) kept.push(`${jobId} (${j.status})`);
         }
-        for (const jobId of e.dropped ?? []) if (restoreJob(ledger, jobId, { editId: id, now })) rec.created.push(jobId);
+        // A dropped unit comes back as a NEW try of its unit (resume_of the cancelled job): cancelled is terminal.
+        for (const jobId of e.dropped ?? []) { const restored = restoreJob(ledger, jobId, { editId: id, now }); if (restored) rec.created.push(restored); else kept.push(`${jobId} (not restorable)`); }
         for (const c of e.changed ?? []) {
           const j = jobRow(db, c.jobId);
           if (j?.status === 'queued' && !dispatchedEver(db, c.jobId)) { setPayload(ledger, j, { ...j.payload, ...c.before }, now); rec.changed.push({ jobId: c.jobId, restored: Object.keys(c.before) }); }

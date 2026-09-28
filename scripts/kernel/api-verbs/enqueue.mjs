@@ -14,6 +14,7 @@ import { lineageHeadById } from '../gate-conditions.mjs';
 import { loadContractChanges, changeById } from '../contract-version.mjs';
 import { normalizeFoundationName, readFoundation } from '../foundations.mjs';
 import { admitUnit, writeUnitTry } from '../units.mjs';
+import { isCanonSlice, requirePlannedCanonSlice } from '../canon-plan-gate.mjs';
 import { requirePhase, ACCEPTS_WORK } from '../api-lib/lifecycle.mjs';
 import { seamPriorityOf } from '../cut-seam.mjs';
 import { deferralOf as testDeferralOf, deferJob } from '../spec-deferral.mjs';
@@ -172,6 +173,10 @@ export default {
     throw Object.assign(new Error('cut enqueue requires a non-empty id and integers 1 <= ordinal <= total with total >= 2'), { code: 'cut-invalid' });
   }
   const cut = hasCut ? { id: String(args['cut-id']).trim(), ordinal: cutOrdinal, total: cutTotal } : null;
+  // H6: the first try of a canon slice comes from the canon plan (scripts/kernel/canon-plan-gate.mjs): its owned paths
+  // cover the plan's grants, and a slice whose moves another slice holds is cut again, never enqueued to block.
+  const canonPlan = isCanonSlice({ cut, params: resolvedParams.params }) && !(typeof args['retry-of'] === 'string' && args['retry-of'].trim())
+    ? requirePlannedCanonSlice({ cut, ownedPaths, scanFile: args['canon-scan'] ?? null }).plan : null;
   // Bind a new cut slice to its already enqueued siblings when its own path
   // has not been created yet. A sibling's qualified paths can supply the role.
   const siblingRepositories = cut ? db.prepare("SELECT payload_json FROM jobs WHERE workflow_id=? AND op_id=? AND json_extract(payload_json,'$.cut.id')=?")
@@ -276,6 +281,7 @@ export default {
       ...(foundationLeg ? { foundation: foundationLeg } : {}),
       ...(contractChange ? { contractChange } : {}),
       ...(commitOnly ? { commitOnly } : {}),
+      ...(canonPlan ? { canonPlan } : {}),
       goal_binding: { revision: goal?.revision ?? null, identity: goal?.goal_identity ?? null },
       hierarchy: {
         schema: AGENT_HIERARCHY_SCHEMA,

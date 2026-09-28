@@ -1,0 +1,22 @@
+# The contract of `api lifecycle` (scripts/kernel/api-verbs/lifecycle.mjs): pause, stop and resume a workflow (Q14).
+purpose: >-
+  The one verb that pauses, stops and resumes a workflow (DBTREE workflow_transitions + lifecycle_changes). A paused or
+  stopped workflow takes no new job (api enqueue refuses workflow-not-accepting-work) and launches none (api dispatch
+  refuses); an op already running finishes and settles. Paused is a hold the owner, the Supervisor or the Kernel may
+  set and the owner or the Supervisor lifts; stopped is the owner's (or the Supervisor's) stop and only the OWNER
+  resumes it (stopped -> queued, then the Kernel seat starts again). No controller ever moves a phase (MB-08).
+args: --workflow <id> (--pause | --stop | --resume) --by owner|supervisor|kernel --reason <text> [--json]
+moves:
+  pause: running -> paused; by owner, supervisor or kernel
+  stop: awaiting-approval | queued | running | paused -> stopped; by owner or supervisor
+  resume: paused -> running (owner or supervisor); stopped -> queued (owner only)
+writes: one lifecycle_changes row {from_phase, to_phase, by, reason} and workflows.phase/phase_reason in one transaction, plus one phase-transition event (engine/ledger-db.mjs changeWorkflowPhase)
+returns: '{ok, workflowId, move, from, to, by, reason}'
+refusals:
+  lifecycle-move: not exactly one of --pause, --stop, --resume
+  lifecycle-needs-reason: --reason is missing
+  workflow-unknown: the workflow is not in this ledger
+  lifecycle-by-refused: --by may not make this move
+  lifecycle-phase-refused: the workflow's phase is not one the move leaves from
+  lifecycle-owner-only: a stopped workflow is resumed by the owner only (Q14)
+exit: 0 moved, 1 refused

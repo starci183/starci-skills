@@ -19,7 +19,9 @@ guardrails:
     and never overlap another workflow's open unit or lease (path-held-by-other-workflow)
   - every new unit goes through api enqueue (its autopilot, foundation and family refusals hold)
   - a retry or widen that reproduces a shape that already failed for a shape cause is refused (shape-already-failed)
-  - every edit is a kernel-graph-edit event holding its inverse; --edit undo --undo <edit> reverts it
-writes: [jobs payload (queued units only), jobs status queued->cancelled (dropped) and back on undo, events kernel-graph-edit, logs kind decision]
+  - every edit is a kernel-graph-edit event holding its inverse; --edit undo --undo <edit> reverts it (a dropped unit comes back as a NEW try of its unit, resume_of the cancelled job: cancelled is terminal)
+  - split, merge, wire and recut create units --derived-from the units they reshape: the new units inherit what is left of those try budgets, never a fresh one (H3)
+  - recut goes through the canon planner (scripts/kernel/cut-seam.mjs canonCutPlanOf): each slice owns its paths plus the relocation grants its findings need, contested moves go to one canon-wire leg per wave, and a slice with no fix target (its moves held by another slice) is refused and cut again (H6); the scan runs under the OS temp dir and the record a recut uses is kept as a kernel artifact (role scan)
+writes: [jobs payload (queued units only), jobs status queued->cancelled (dropped), a new try on undo, job_artifacts (the recut scan record), events kernel-graph-edit, logs kind decision]
 kernelOnly: true
 exit: 0 applied, 1 refused

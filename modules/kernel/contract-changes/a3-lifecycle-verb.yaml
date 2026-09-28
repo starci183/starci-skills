@@ -1,0 +1,9 @@
+id: a3-lifecycle-verb
+effectiveAt: '2026-09-29T02:00:00+07:00'
+summary: >-
+  Q14 (alpha.3): new api lifecycle verb - pause (running -> paused), stop (-> stopped) and resume (paused -> running;
+  stopped -> queued, owner only). A paused or stopped workflow takes and launches no new job.
+reach: new-legs
+paths:
+  - modules/kernel/api-commands/lifecycle.yaml
+  - modules/kernel/contract-changes/a3-lifecycle-verb.yaml
