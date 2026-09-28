@@ -48,12 +48,13 @@ const runtime = (t) => {
   git(root, 'add', '-A'); git(root, 'commit', '-qm', 'A');
   const A = git(root, 'rev-parse', 'HEAD');
   write(root, 'modules/ops/ops/interface.draw.yaml', 'id: interface.draw\nnew: rule\n');
+  write(root, 'modules/kernel/driver-loop.yaml', 'loop: 2\n');
   write(root, 'knowledge/ui/rule.yaml', 'rule: 1\n');
   write(root, 'README.md', 'not kernel relevant\n');
-  write(root, 'modules/kernel/contract-changes.yaml', REGISTRY(`  - id: draw-new-rule\n    effectiveAt: '2026-09-27T20:00:00+07:00'\n    summary: "The draw brief gained a rule"\n    ops: [interface.draw]\n`));
+  write(root, 'modules/kernel/contract-changes.yaml', REGISTRY(`  - id: draw-new-rule\n    effectiveAt: '2026-09-27T20:00:00+07:00'\n    summary: "The draw brief gained a rule"\n    reach: new-legs\n    ops: [interface.draw]\n`));
   git(root, 'add', '-A'); git(root, 'commit', '-qm', 'B');
   const B = git(root, 'rev-parse', 'HEAD');
-  for (let i = 0; i <= REV_DIFF_MAX_FILES; i += 1) write(root, `knowledge/bulk/k${i}.yaml`, `k: ${i}\n`);
+  for (let i = 0; i <= REV_DIFF_MAX_FILES; i += 1) write(root, `modules/kernel/api-commands/k${i}.yaml`, `k: ${i}\n`);
   git(root, 'add', '-A'); git(root, 'commit', '-qm', 'C');
   const C = git(root, 'rev-parse', 'HEAD');
   return { root, A, B, C, checkout: (rev) => git(root, 'checkout', '-q', rev) };
@@ -73,12 +74,12 @@ test('an acked rev behind HEAD is stale: the wake names the rev, the changed ker
   const rt = runtime(t); rt.checkout(rt.B);
   const { db, wf, ack } = ledgerFixture(t);
   ack(rt.A, 'boot');
-  const state = kernelRevState(db, wf, { root: rt.root });
+  const state = kernelRevState(db, wf, { root: rt.root, ops: ['interface.draw'] });
   assert.deepEqual([state.current, state.acked, state.ackSource, state.stale, state.full ?? false], [rt.B, rt.A, 'boot', true, false]);
-  assert.deepEqual(state.files, ['knowledge/ui/rule.yaml', 'modules/kernel/contract-changes.yaml', 'modules/ops/ops/interface.draw.yaml'], 'README.md is not kernel-relevant');
+  assert.deepEqual(state.files, ['modules/kernel/contract-changes.yaml', 'modules/kernel/driver-loop.yaml', 'modules/ops/ops/interface.draw.yaml'], 'README.md and knowledge are not this Kernel\'s contract');
   assert.deepEqual(state.changes.map((c) => [c.id, c.ops]), [['draw-new-rule', ['interface.draw']]]);
   const line = revWakeLine(state, wf);
-  assert.ok(line.startsWith(`Runtime rev ${shortRev(rt.B)} is newer than your acked rev ${shortRev(rt.A)}: re-read knowledge/ui/rule.yaml, modules/kernel/contract-changes.yaml, modules/ops/ops/interface.draw.yaml`), line);
+  assert.ok(line.startsWith(`Runtime rev ${shortRev(rt.B)} is newer than your acked rev ${shortRev(rt.A)}: re-read modules/kernel/contract-changes.yaml, modules/kernel/driver-loop.yaml, modules/ops/ops/interface.draw.yaml`), line);
   assert.match(line, /new contract changes: draw-new-rule \(The draw brief gained a rule\)/);
   assert.match(line, new RegExp(`api kernel-ack-rev --workflow ${wf} --rev ${shortRev(rt.B)}`));
   assert.doesNotMatch(line, /\n/, 'one line: a newline would submit half a wake');
@@ -105,7 +106,7 @@ test('past the file cap, or for a rev git no longer knows, the wake asks for the
 
   ack(rt.A);
   const full = kernelRevState(db, wf, { root: rt.root });
-  assert.deepEqual([full.stale, full.full, full.files.length, full.fileCount], [true, true, REV_DIFF_MAX_FILES, REV_DIFF_MAX_FILES + 4]);
+  assert.deepEqual([full.stale, full.full, full.files.length, full.fileCount], [true, true, REV_DIFF_MAX_FILES, REV_DIFF_MAX_FILES + 2]);
   assert.match(revWakeLine(full, wf), /re-read modules\/kernel\/kernel-prompt\.md and modules\/kernel\/driver-loop\.yaml in full, then api kernel-ack-rev/);
   assert.ok(opRevStale(full, 'interface.draw', { root: rt.root }), 'the gate reads every changed file, not the capped list');
   assert.equal(opRevStale(full, 'code.refactor', { root: rt.root }), null);
@@ -195,7 +196,7 @@ test('api: a stale Kernel is refused kernel-rev-stale for the changed op only, s
 
   const status = fx.ok(['status', '--workflow', fx.wf]);
   assert.deepEqual([status.kernelRev.acked, status.kernelRev.stale], [rt.A, true]);
-  assert.deepEqual(status.kernelRev.files, ['knowledge/ui/rule.yaml', 'modules/kernel/contract-changes.yaml', 'modules/ops/ops/interface.draw.yaml']);
+  assert.deepEqual(status.kernelRev.files, ['modules/kernel/driver-loop.yaml'], 'no interface.draw leg yet: only the Kernel contract file asks for the re-read');
   assert.equal(status.nextActions[0].kind, 'reread');
   assert.match(status.nextActions[0].reason, new RegExp(`api kernel-ack-rev --workflow ${fx.wf} --rev ${shortRev(rt.B)}`));
   assert.equal(status.frontier.actionable, true, 'a stale Kernel has work: the re-read');
@@ -243,4 +244,45 @@ test('api settle WARNs op-rev-drift when the op contract changed after dispatch;
   assert.match(r.stderr, /WARN op-rev-drift: job-d \(interface\.draw\)/);
   const status = fx.ok(['status', '--workflow', fx.wf]);
   assert.deepEqual(status.opRevDrift.map((w) => [w.jobId, w.op, w.from, w.to]), [['job-d', 'interface.draw', rt.A, rt.B]]);
+});
+
+test('runtime churn: a land outside the Kernel contract is silent; an op-contract-only land is coalesced for 30 min after the last ack', (t) => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'starci-runtime-churn-'));
+  t.after(() => fs.rmSync(root, { recursive: true, force: true, maxRetries: 20, retryDelay: 25 }));
+  git(root, 'init', '-q');
+  git(root, 'config', 'user.email', 'spec@example.test'); git(root, 'config', 'user.name', 'spec'); git(root, 'config', 'commit.gpgsign', 'false');
+  write(root, 'modules/kernel/kernel-prompt.md', 'prompt\n');
+  write(root, 'modules/kernel/driver-loop.yaml', 'loop: 1\n');
+  write(root, 'modules/kernel/contract-changes.yaml', REGISTRY());
+  write(root, 'modules/ops/ops/interface.draw.yaml', 'id: interface.draw\n');
+  write(root, 'scripts/kernel/op-prompt.mjs', 'export {};\n');
+  git(root, 'add', '-A'); git(root, 'commit', '-qm', 'A');
+  const A = git(root, 'rev-parse', 'HEAD');
+  // A reconciler lane: code, a spec, runtimes.yaml numbers and its own contract change, none of them the Kernel's.
+  write(root, 'scripts/reconciler/engine.mjs', 'export {};\n');
+  write(root, 'modules/models/runtimes.yaml', 'allocation: {}\n');
+  write(root, 'modules/kernel/contract-changes/rc-engine.yaml', "id: rc-engine\neffectiveAt: '2026-09-28T15:00:00+07:00'\nsummary: engine\nreach: new-legs\npaths: [scripts/reconciler/engine.mjs]\n");
+  git(root, 'add', '-A'); git(root, 'commit', '-qm', 'B');
+  const B = git(root, 'rev-parse', 'HEAD');
+  const { db, wf, ack } = ledgerFixture(t);
+  ack(A);
+  const silent = kernelRevState(db, wf, { root, ops: ['interface.draw'] });
+  assert.deepEqual([silent.stale, silent.files, silent.changes], [false, [], []], 'no re-read, no ack');
+  assert.equal(revWakeLine(silent, wf), `Runtime rev ${shortRev(B)}.`);
+  // An op contract the workflow dispatches moves: coalesced within 30 min of the ack, asked after.
+  write(root, 'modules/ops/ops/interface.draw.yaml', 'id: interface.draw\nnew: 1\n');
+  git(root, 'add', '-A'); git(root, 'commit', '-qm', 'C');
+  const at = Date.now();
+  const soon = kernelRevState(db, wf, { root, ops: ['interface.draw'], now: at + 60_000 });
+  assert.equal(soon.stale, false);
+  assert.deepEqual(soon.deferred.files, ['modules/ops/ops/interface.draw.yaml']);
+  assert.ok(opRevStale(soon, 'interface.draw', { root }), 'the dispatch gate still holds the changed op');
+  const later = kernelRevState(db, wf, { root, ops: ['interface.draw'], now: at + 31 * 60_000 });
+  assert.deepEqual([later.stale, later.files], [true, ['modules/ops/ops/interface.draw.yaml']]);
+  // A Kernel contract file is never coalesced.
+  write(root, 'modules/kernel/kernel-prompt.md', 'prompt 2\n');
+  git(root, 'add', '-A'); git(root, 'commit', '-qm', 'D');
+  const contract = kernelRevState(db, wf, { root, ops: ['interface.draw'], now: at + 60_000 });
+  assert.equal(contract.stale, true);
+  assert.ok(contract.files.includes('modules/kernel/kernel-prompt.md'));
 });

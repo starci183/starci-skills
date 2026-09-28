@@ -1,0 +1,13 @@
+id: kernel-rev-churn
+effectiveAt: '2026-09-28T16:30:00+07:00'
+summary: >-
+  A new runtime rev asks a Kernel to re-read and ack only when the land touched its own contract: kernel-prompt.md,
+  driver-loop.yaml, api.yaml, api-commands/, owner-rulings.yaml, the op contract files of an op the workflow has
+  dispatched, or a contract change with reach new-legs|follow-up that applies to it. Any other land (reconciler, ui,
+  gc, specs, docs, knowledge, runtimes.yaml numbers) updates the code silently. A re-read that touches no Kernel
+  contract file is coalesced to at most one per 30 minutes after the last ack. The kernel-rev-stale dispatch gate is
+  unchanged.
+reach: follow-up
+paths:
+  - modules/kernel/contract-changes/kernel-rev-churn.yaml
+  - scripts/kernel/runtime-rev.mjs

@@ -19,6 +19,17 @@
 //     in between (opRevDrift) - never a refusal.
 // A workflow with no runtime-rev-acked event yet (a Kernel booted before this module) is `unacked`: its
 // wake asks for one full re-read and an ack, and nothing is gated until it has acked once.
+//
+// Runtime churn (2026-09-28: ~12 .claude lands in 90 min each made the fe-canon Kernel re-read and ack): a new
+// runtime rev asks the Kernel to re-read (kernelRev.stale, the wake line, the reread next action) ONLY when the land
+// touched the Kernel's own contract - KERNEL_CONTRACT_FILES (kernel-prompt.md, driver-loop.yaml, api.yaml,
+// api-commands/, owner-rulings.yaml), the op contract files of an op this workflow has dispatched (opRevFiles), or a
+// contract change with reach new-legs|follow-up that applies to it (its ops, an every-op change, or its paths in
+// that set). Every other land (reconciler, ui, gc, specs, docs, knowledge, runtimes.yaml numbers) updates the code
+// silently. Coalescing: a re-read that touches no KERNEL_CONTRACT_FILES waits until REV_ACK_COALESCE_MS after the
+// last ack (kernelRev.deferred), so a Kernel is asked at most once per 30 min unless its contract file changed.
+// The kernel-rev-stale gate (opRevStale) is unchanged: it still reads every op contract change since the ack
+// (the non-enumerable kernelRev.gate), so a leg is never built from a contract its Kernel has not read.
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
@@ -33,6 +44,12 @@ export const OP_REV_DRIFT = 'op-rev-drift';
 /** The runtime paths a Kernel's contract is read from (a directory covers what is inside it). */
 export const KERNEL_REV_PATHS = Object.freeze(['modules/kernel', 'modules/ops', 'knowledge', 'modules/models', 'scripts/kernel/op-prompt.mjs']);
 export const KERNEL_BOOT_FILES = Object.freeze(['modules/kernel/kernel-prompt.md', 'modules/kernel/driver-loop.yaml']);
+/** The Kernel's own contract: a change to one of these always asks for a re-read (a directory covers what is inside it). */
+export const KERNEL_CONTRACT_FILES = Object.freeze([...KERNEL_BOOT_FILES, 'modules/kernel/api.yaml', 'modules/kernel/api-commands', 'modules/kernel/owner-rulings.yaml']);
+/** A re-read of op contracts / contract changes alone is asked at most once per this window after the last ack. */
+export const REV_ACK_COALESCE_MS = 30 * 60_000;
+/** Contract changes with these reaches can require a Kernel re-read. */
+export const REV_REACHES = Object.freeze(['new-legs', 'follow-up']);
 export const OP_PROMPT_FILE = 'scripts/kernel/op-prompt.mjs';
 /** Past this many changed files the wake asks for the full re-read instead of a list. */
 export const REV_DIFF_MAX_FILES = 12;
@@ -75,7 +92,12 @@ const changesAt = (root, rev) => {
         const ops = Array.isArray(c.ops) ? c.ops.filter((op) => typeof op === 'string') : [];
         // An unscoped change reaches every op's contract only when it adds a check or code or is safety-critical.
         const everyOp = !ops.length && (Boolean(c.adds?.checks?.length || c.adds?.codes?.length) || c.safetyCritical === true);
-        return { id: c.id, summary: clip(c.summary, SUMMARY_MAX), ops, ...(everyOp ? { everyOp: true } : {}) };
+        const paths = Array.isArray(c.paths) ? c.paths.filter((p) => typeof p === 'string') : [];
+        const out = { id: c.id, summary: clip(c.summary, SUMMARY_MAX), ops, ...(everyOp ? { everyOp: true } : {}) };
+        // reach and paths ride non-enumerable: the wake and api status keep their shape.
+        Object.defineProperty(out, 'reach', { value: typeof c.reach === 'string' ? c.reach : null, enumerable: false });
+        Object.defineProperty(out, 'paths', { value: paths, enumerable: false });
+        return out;
       });
   } catch { return []; }
 };
@@ -119,23 +141,53 @@ export function latestRevAck(db, workflowId) {
  * in between (a revision git cannot compare is stale and full). `files` is capped at REV_DIFF_MAX_FILES;
  * the whole list rides as the non-enumerable `allFiles` for the gate.
  */
-export function kernelRevState(db, workflowId, { root = revRootOf(), current = currentRuntimeRev(root) } = {}) {
+const within = (file, list) => list.some((p) => file === p || file.startsWith(`${p}/`));
+/** The ops this workflow has enqueued or dispatched (jobs.op_id); [] when unreadable. */
+export function workflowOpsOf(db, workflowId) {
+  try { return db.prepare('SELECT DISTINCT op_id FROM jobs WHERE workflow_id=? AND op_id IS NOT NULL').all(workflowId).map((r) => r.op_id).filter(Boolean); } catch { return []; }
+}
+
+/**
+ * The part of a rev diff that asks THIS Kernel to re-read: {files, changes, contract} - files in KERNEL_CONTRACT_FILES
+ * or in the op contract files of `ops`, the contract changes (reach new-legs|follow-up) scoped to `ops`, every-op, or
+ * whose paths touch that set (their registry file then counts too); contract: a KERNEL_CONTRACT_FILES file moved. Pure
+ * but for opRevFiles.
+ */
+export function kernelRelevantOf(diff, ops, { root = revRootOf() } = {}) {
+  const opFiles = new Set(ops.flatMap((op) => { try { return opRevFiles(root, op); } catch { return []; } }));
+  const mine = (file) => within(file, KERNEL_CONTRACT_FILES) || opFiles.has(file);
+  const changes = (diff.changes ?? []).filter((c) => REV_REACHES.includes(c.reach)
+    && ((c.ops?.length ? c.ops.some((op) => ops.includes(op)) : c.everyOp === true) || (c.paths ?? []).some((p) => mine(p) && !isContractChangesPath(p))));
+  const files = (diff.files ?? []).filter((file) => (isContractChangesPath(file) ? changes.length > 0 : mine(file)));
+  return { files, changes, contract: files.some((file) => within(file, KERNEL_CONTRACT_FILES)) };
+}
+
+export function kernelRevState(db, workflowId, { root = revRootOf(), current = currentRuntimeRev(root), now = Date.now(), ops = null } = {}) {
   const ack = latestRevAck(db, workflowId);
   const state = { current: current ?? null, acked: ack?.rev ?? null, ackedAt: ack?.at ?? null, ackSource: ack?.source ?? null,
     stale: false, files: [], fileCount: 0, changes: [] };
-  let all = [];
+  // The gate (opRevStale) reads every kernel-path file and contract change since the ack, whatever the wake asks.
+  let gate = { stale: false, unknownDiff: false, allFiles: [], changes: [] };
   if (!current) state.unknownCurrent = true;
   else if (!ack) state.unacked = true;
   else if (ack.rev !== current) {
     const diff = revDiff(root, ack.rev, current);
-    if (!diff.known) Object.assign(state, { stale: true, full: true, unknownDiff: true });
-    else {
-      all = diff.files;
-      Object.assign(state, { stale: diff.files.length > 0 || diff.changes.length > 0, files: diff.files.slice(0, REV_DIFF_MAX_FILES),
-        fileCount: diff.files.length, changes: diff.changes, ...(diff.files.length > REV_DIFF_MAX_FILES ? { full: true } : {}) });
+    if (!diff.known) {
+      Object.assign(state, { stale: true, full: true, unknownDiff: true });
+      gate = { stale: true, unknownDiff: true, allFiles: [], changes: [] };
+    } else {
+      gate = { stale: diff.files.length > 0 || diff.changes.length > 0, unknownDiff: false, allFiles: diff.files, changes: diff.changes };
+      const rel = kernelRelevantOf(diff, ops ?? workflowOpsOf(db, workflowId), { root });
+      const wants = rel.files.length > 0 || rel.changes.length > 0;
+      const coalesced = wants && !rel.contract && Number.isFinite(ack.at) && now - ack.at < REV_ACK_COALESCE_MS;
+      if (coalesced) state.deferred = { files: rel.files.slice(0, REV_DIFF_MAX_FILES), changes: rel.changes.map((c) => c.id), until: ack.at + REV_ACK_COALESCE_MS };
+      else if (wants) Object.assign(state, { stale: true, files: rel.files.slice(0, REV_DIFF_MAX_FILES), fileCount: rel.files.length, changes: rel.changes,
+        ...(rel.files.length > REV_DIFF_MAX_FILES ? { full: true } : {}) });
+      if (!wants && diff.files.length) state.silent = diff.files.length; // kernel-path files moved that are not this Kernel's contract
     }
   }
-  Object.defineProperty(state, 'allFiles', { value: all, enumerable: false });
+  Object.defineProperty(state, 'allFiles', { value: gate.allFiles, enumerable: false });
+  Object.defineProperty(state, 'gate', { value: gate, enumerable: false });
   return state;
 }
 
@@ -149,11 +201,12 @@ export const opRevFiles = (root, op) => [...new Set([...contractFilesOf(root, op
  * the acked revision. A revision git cannot compare holds every leg.
  */
 export function opRevStale(state, op, { root = revRootOf() } = {}) {
-  if (!state?.stale) return null;
-  if (state.unknownDiff) return { files: ['(the acked revision is unknown to git)'], changes: [] };
+  const gate = state?.gate ?? state;
+  if (!gate?.stale) return null;
+  if (gate.unknownDiff) return { files: ['(the acked revision is unknown to git)'], changes: [] };
   const mine = new Set(opRevFiles(root, op));
-  const files = (state.allFiles ?? state.files).filter((file) => mine.has(file));
-  const changes = state.changes.filter((c) => (c.ops.length ? c.ops.includes(op) : c.everyOp === true)).map((c) => c.id);
+  const files = (gate.allFiles ?? state.allFiles ?? state.files ?? []).filter((file) => mine.has(file));
+  const changes = (gate.changes ?? []).filter((c) => (c.ops?.length ? c.ops.includes(op) : c.everyOp === true)).map((c) => c.id);
   return files.length || changes.length ? { files, changes } : null;
 }
 
