@@ -1,41 +1,48 @@
-# StarCi Status UI
+# StarCi Operations Center
 
-Dashboard cục bộ, chỉ đọc, hỗ trợ Sáng/Tối và VI/EN, dùng Vite/React và các thành phần shadcn/ui. Lựa chọn giao diện và ngôn ngữ được lưu trong trình duyệt.
+This is the public, read-only StarCi control-plane UI. It shows how an approved Goal becomes a Workflow, how a long-lived Kernel seat dispatches short-lived Op agents, what those agents reported, which checks ran, what the settler decided, and whether code landed. It also shows decisions owed to the owner or Supervisor and the reconciler's health.
 
-## Chạy
+The interface uses React, Vite, shadcn-style components, Lucide icons and Vietnamese labels. It is one web app with its API on the same origin. The server reads the host machine database and registered project ledgers through the read-only engine readers. It has no write API, login, answer form, CLI-backed request or live worktree diff.
 
-Windows: chạy `start.cmd`. Hoặc trong thư mục này:
+## Local preview
+
+From `.claude/ui`:
 
 ```powershell
-npm install
-npm run dev
+npm ci
+npm run build
+$env:STARCI_MACHINE_DB = 'D:/starci-lanes/ui/ui/fixtures/seed/machine.sqlite'
+$env:STARCI_ARTIFACT_ROOT = 'D:/starci-tmp/ui-seed-artifacts'
+$env:STARCI_STATUS_PORT = '4556'
+node server.mjs
 ```
 
-Mở [http://127.0.0.1:4545](http://127.0.0.1:4545). Cần Node.js 22.13+.
+To prepare the fixture first, run `node ui/fixtures/seed.mjs` from the runtime root. The fixture uses the engine's database writers and stores its content-addressed blobs outside the Git worktree. Set `STARCI_MACHINE_DB` and `STARCI_ARTIFACT_ROOT` to the paths printed by that command. Use a separate preview port; the live harness service is outside this workflow.
 
-Bản chạy công khai tại `https://harness.starci.org` dùng Cloudflare Tunnel riêng, không yêu cầu mật khẩu. Xem [DEPLOYMENT.md](DEPLOYMENT.md) để build, chạy và kiểm tra.
+Without `STARCI_MACHINE_DB`, `engine/machine-db.mjs` resolves the host's real `machine.sqlite` (normally `%LOCALAPPDATA%/StarCi/machine.sqlite`). Each project `runtime.sqlite` is found through `machine.ledgers`. The UI never creates or repairs either database.
 
-## Có gì trên màn hình
+For source development, `npm run dev` starts Vite and the API preview; see `package.json` for the current script and ports. `npm run build` runs lint, TypeScript and Vite build. The public server defaults to `127.0.0.1:4547` unless `STARCI_STATUS_PORT` is set.
 
-- **Tổng quan:** số workflow, tín hiệu kernel, worker, việc chờ thầy, OWED, verdict gần đây và bản xem nhanh code diff/ảnh đang có.
-- **Dự án:** tổng theo Nivo, StarCi Next, Mia Mia; vào từng dự án để xem workflow và điểm nghẽn.
-- **Workflow:** mục tiêu, tiến độ từng chặng, frontier, việc đang chạy/chờ, incident, peer-wait và verdict gần nhất.
-- **Agents:** Qwen, Devin, Claude, Codex; Kernel điều phối tách khỏi op worker. Thẻ hệ thống hiển thị CPU, RAM, GPU/VRAM, nhiệt độ và công suất GPU toàn máy khi driver cung cấp. Mỗi op có câu hành động tiếng Việt, mã op, lần chạy, chặng và mô tả nhiệm vụ gốc từ ledger. Nút **Nhật ký** mở mốc hoạt động trực quan và tab terminal nguyên văn của đúng agent, tự cập nhật mỗi 5 giây. Nút **Diff & ảnh** đọc Git diff của tệp code và ảnh trong các đường dẫn được giao cho op, tự cập nhật mỗi 15 giây. CPU/RAM theo từng hãng agent là số tổng hợp theo loại tiến trình, không phải tài nguyên riêng của terminal.
-- **Diff & bằng chứng:** diff chưa commit của op đang chạy, diff code trong commit gần đây của FE/BE, thư viện ảnh AI từ `interface.draw`, ảnh chụp màn hình và video UAT. Tìm kiếm, lọc theo dự án/loại, xem ảnh lớn, phát/tua video và mở tệp nguồn bằng ID được cấp từ chỉ mục. Thư viện chỉ đọc các thư mục bằng chứng được cho phép, không nhận đường dẫn tùy ý từ URL.
-- **Kết quả kiểm tra:** lịch sử `pass`, `fail`, `blocked` theo từng lần chạy op, có số check đạt/trượt.
-- **Cần thầy làm:** tách câu hỏi duyệt và yêu cầu credential; chỉ hiện link mẫu khi runtime báo còn sống.
-- **Giám sát:** OWED, inbox, land queue, lần push và pool nền.
+## Pages
 
-API ở `127.0.0.1:4546` có `GET /api/snapshot`, `GET /api/agents` và `GET /api/agents/:terminal/log` cho terminal thuộc danh sách đang theo dõi. Snapshot ledger làm mới tối đa mỗi 30 giây; agent làm mới mỗi 10 giây. Log là tối đa 80 dòng của màn hình terminal hiện tại qua lệnh đọc `orca terminal read --screen`; không phải lịch sử đầy đủ. `config.yaml` hiện đặt `language: vi`, nên dashboard diễn giải các mốc hoạt động và nhiệm vụ bằng tiếng Việt. Lệnh và đầu ra công cụ trong tab **Terminal gốc** được giữ nguyên ngôn ngữ để đối chiếu; cấu hình ngôn ngữ không tự dịch nội dung do CLI hoặc công cụ khác phát ra. API dùng các lệnh đọc của runtime (`progress-report --json`, `status --json`, `owed --json`, `inbox --peek --json`), `orca terminal list --json` và mở ledger SQLite với `readOnly: true` để cộng verdict từ sự kiện `op-settled` và ghép agent với terminal. Trên Windows, `process-sample.ps1` đo nhóm tiến trình và phần cứng toàn máy; GPU NVIDIA dùng `nvidia-smi`, GPU khác chỉ hiện tên nếu không có số đo tin cậy. Không có đường ghi hoặc nút điều khiển workflow.
+| Route | Purpose |
+| --- | --- |
+| `#/` | Overview: attention, workflow progress, project selector and system health |
+| `#/w/:project/:workflow` | Workflow: goal, progress, blockers, grouped Work DAG, units and evidence |
+| `#/a/:project/:attempt` | Attempt: route, timeline, transcript, report, checks, verdict, diff and land |
+| `#/decisions` | Owner, Supervisor and Kernel Decision Items, asks and incidents |
+| `#/system` | Engine, SLA, Resources, Services, Cleanup, Land, Supervisor and Learning |
+| `#/logs` | Filtered machine and project logs with live follow mode |
+| `#/_kit` | UI component and state vocabulary preview |
 
-`GET /api/agents/:job/changes` trả diff Git chưa stage, đã stage, tệp code mới, tối đa 3 commit gần nhất từ khi op bắt đầu và danh sách ảnh từ các `owned_paths` của op đang chạy. `GET /api/agents/:job/images/:id` chỉ phục vụ ảnh trong phạm vi đó. Diff và ảnh có thể là thay đổi chung của checkout nếu nhiều agent dùng cùng một repo; đây là quan sát theo phạm vi op, không phải bằng chứng chắc chắn agent nào đã viết từng dòng. “Đang cook” là tín hiệu terminal có output gần đây và đang hiện trạng thái xử lý; “Mở · chưa có tín hiệu” không kết luận agent đã dừng hay đang chờ chủ máy.
+Workflow tabs include Units, Graph, Attempts, Decisions, Why, Timeline, Evidence and Infrastructure. Equal-op units with the same predecessor set may appear as one graph card with ×N; selecting it reveals each real unit and its edges. A graph card never changes the ledger's unit identity or dependency semantics.
 
-CPU là phần trăm năng lực CPU toàn máy, RAM là tổng private bytes của các tiến trình cùng loại (kể cả phiên ngoài StarCi). Orca không trả PID của terminal nên các số này **không phải** CPU/RAM riêng từng agent. Vòng quay chỉ xuất hiện khi terminal Orca có tín hiệu hoạt động gần đây. Tên model trên thẻ lấy từ runtime ledger; terminal không gắn workflow sẽ hiện model chưa xác minh. Trên hệ điều hành ngoài Windows, phần CPU/RAM sẽ hiện dấu `—`.
+The Attempt page keeps the Op's reported outcome distinct from the final verdict. Its transcript is stored redacted scrollback or a live snapshot, not a terminal-screen guess. Diff and media come from indexed blob evidence; a finished job is never reconstructed from the current checkout.
 
-Logo lưu cục bộ trong `public/logos/`: Qwen, Devin, Claude và biểu tượng OpenAI trắng/đen từ [brand kit chính thức](https://openai.com/brand/) cho Codex. Devin dùng dấu đen trên nền trắng. Vệt sáng chạy dọc viền vuông bo góc quanh logo, không xoay logo; thiết bị yêu cầu giảm chuyển động sẽ không chạy animation.
+Old hash routes such as `#/agents`, `#/changes`, `#/proofs` and `#/supervisor` open Overview. They expose no legacy data surface.
 
-VI/EN chỉ dịch nhãn và giải thích giao diện. Tên workflow, nội dung ledger, code diff và log vẫn giữ nguyên nguồn; riêng phần diễn giải log tiếp tục dùng ngôn ngữ từ `config.yaml`.
+## API contract
 
-Số lần `pass/fail/blocked` là lịch sử của op trong các workflow đang chạy, không phải số workflow đã hoàn thành. Nhãn kernel “có tín hiệu” dựa trên signal còn hiệu lực và trạng thái `api status`, không thay thế kiểm tra terminal trực tiếp; `signals.at` không được coi là heartbeat. Các chuỗi hiển thị được rút gọn và lọc mẫu credential thông dụng trước khi gửi tới trình duyệt.
+The current endpoint and concept-to-source mapping is [CONTRACT.md](CONTRACT.md). JSON uses `{data, meta}` envelopes, ETag/304 and opaque cursors. `/api/live` sends invalidation events so the client refetches only affected queries; hidden tabs pause their polling. Public API routes support GET and HEAD only. Text is redacted again at read time, and absolute paths, PIDs, command lines and credential questions are withheld.
 
-Timeline workflow đọc `GET /api/workflow-events?project=<id>&workflow=<id>` (tối đa 80 mốc gần nhất) và SSE `GET /api/workflow-events/stream?project=<id>&workflow=<id>&after=<seq>` (mốc mới mỗi 5 giây). API chỉ chiếu các trường đã lọc từ ledger: nguồn/đích, op/job, thời gian, outcome, verdict và model; không trả payload gốc hoặc đường dẫn report. Giao diện dùng GET mỗi 15 giây để bù khi SSE gián đoạn. Không có POST log công khai: runtime tiếp tục ghi event vào ledger, dashboard chỉ đọc. Work Graph mặc định mở domain có việc đang xử lý; nút **Tổng quan domain** chỉ vẽ các domain và liên kết giữa chúng, chạm vào domain để xem các node bên trong. Chọn nút hoặc job để xem report, diff, ảnh và video; nếu op có terminal đang mở, log terminal hiện riêng và không được dùng để suy ra verdict.
+This README describes the source preview. Deployment and live service lifecycle are handled by the host controller, not by the UI.

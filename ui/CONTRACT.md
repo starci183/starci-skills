@@ -1,182 +1,87 @@
-# Harness data contract
+# StarCi public status UI contract
 
-What the status API behind `harness.starci.org` serves, field by field, so the harness UI can be built against data
-rather than against guesses. Three files hold it and a spec keeps them in step:
+The StarCi runtime is a control plane. The owner defines a Goal; one long-lived Kernel seat steers each Workflow; an ephemeral Op agent runs one job and reports; checks and the settler determine the verdict; the reconciler's seven controllers maintain mechanical progress; the Supervisor makes fleet-level decisions. The public UI observes these records and never performs their transitions.
 
-| File | Role |
-| --- | --- |
-| `ui/src/contract.ts` | The TypeScript types of every response (`CONTRACT_VERSION` names this revision). Import from here. |
-| `ui/contract-shapes.mjs` | The same shapes, checkable at runtime (`validateEndpoint(name, body)`). Strict: a field the contract does not document is a finding. |
-| `ui/fixtures/*.json` | One real response per endpoint, captured read-only from the live API and redacted (`{endpoint, capturedAt, source, status, contentType, body}`; a stream holds `events[]`). |
-| `tests/harness-contract.spec.mjs` | Fails when `contract.ts` and the shapes disagree on any field or optional flag, when a vocabulary drifts from the runtime's, when a fixture does not fit, or when `ui/server.mjs` started on a fixture ledger (never the live port) answers outside the contract. |
+The canonical schema is `starci/runtime@1` for each project ledger and `starci/machine@1` for the host machine. The runtime source is `.claude`; the machine database path is resolved by `engine/machine-db.mjs` (normally `%LOCALAPPDATA%/StarCi/machine.sqlite`). Project ledger paths are resolved only through `machine.ledgers`. The UI opens both through the exported read-only engine readers.
 
-Recapture fixtures after a server change: `node ui/contract-capture.mjs --base http://127.0.0.1:4546 [--base2 <newer server> --prefer2 <names>]`
-(GET only; `--check` validates the live API without writing). A server started with `STARCI_STATUS_OFFLINE=1
-STARCI_STATUS_LOG_SYNC=0 STARCI_STATUS_PORT=<port>` writes nothing (no supervisor CLIs, no log sync);
-`STARCI_STATUS_PROJECTS='[{"id","name","repo"}]'` points it at other ledgers; `STARCI_STATUS_SOURCE=<host>` names the host holding `.workspaces` when the server runs from a lane worktree.
+## 0. Concept trace
 
-## Conventions
+| Concept | Question answered | UI location | Read API | Source |
+| --- | --- | --- | --- | --- |
+| C1 Goal | What was approved and which revision? | Workflow goal | `/api/workflows/:p/:wf` | `goals`, `goal_inputs` |
+| C2 Workflow | Is it progressing; why; when will it finish? | Overview rows, Workflow header | `/api/fleet`, `/api/workflows*` | `workflows`, `v_workflow_progress`, `lifecycle_changes`, `metrics_snapshots` |
+| C3 Seat | Is its Kernel or Supervisor present? | Workflow seat, System Services | `/api/seats` | `v_seats`, `v_deaf_seats`, `seat_turns` |
+| C4 Work graph | What is ready and what blocks it? | Workflow graph, units and inspector | `/api/workflows/:p/:wf/graph`, `/units*` | `v_units`, `unit_edges`, `v_blocking` |
+| C5 Kernel decision | What did the Kernel decide; did it work? | Workflow Decisions and Why | `/api/decisions/log`, `/rca` | `decisions`, `metrics_snapshots` |
+| C6 Dispatch | Who was routed and admitted, and why? | Attempt route step | `/api/attempts/:p/:id` | `op_attempts`, `throttle_decisions` |
+| C7 Attempt | What is the Op doing right now? | Attempt timeline and transcript | `/api/attempts*`, `/transcript*` | `v_op_history`, `attempt_transcript_snapshots`, `blobs` |
+| C8 Report | What did the Op claim? | Attempt report | `/api/attempts/:p/:id` | `reports`, `report_attachments` |
+| C9 Checks | Which checks proved or rejected it? | Attempt checks | `/checks/:id`, `/api/blob/:sha` | `v_checks`, `blobs` |
+| C10 Verdict | What did the settler decide? | Attempt verdict and retry | `/api/attempts/:p/:id` | `op_attempts`, `jobs`, `decisions` |
+| C11 Land | Has the result integrated? | Attempt land, System Land | `/api/land*`, `/api/lanes`, `/diff` | `product_lands`, `land_queue`, `land_runs`, `pushes` |
+| C12 Decision Item | Who must decide; when; has it escalated? | Overview attention, Decisions, Workflow | `/api/decisions*`, `/api/asks`, `/api/incidents` | `v_decision_rows`, `sup_decision_items`, `ask_requests`, `incidents` |
+| C13 Reconciler | Which invariant or controller changed state? | Overview health, System Engine/SLA | `/api/health`, `/api/reconciler*`, `/api/sla/*` | `v_engine_health`, `engine_queue`, `v_engine_actions`, `v_sla_open` |
+| C14 Resources | Why was work throttled? | System Resources | `/api/resources*`, `/api/terminals` | `throttle_state`, `provider_health`, `quotas`, `host_leases` |
+| C15 Cleanup | What is leaking or awaiting GC? | System Cleanup, Workflow Infra | `/api/gc/*`, `/api/leaks`, `/worktrees` | `gc_runs`, `gc_items`, `v_leaks`, `v_ledger_leaks` |
+| C16 Learning | Which lesson or ruling changed policy? | System Learning, Attempt related lessons | `/api/supervisor/lessons`, `/rulings`, `/api/metrics/ops` | `sup_learning`, `sup_owner_rulings`, `v_model_scorecard` |
+| C17 Observation | What happened in order, with source proof? | Logs, Workflow timeline, Attempt transcript | `/api/logs*`, `/api/timeline`, `/api/live` | `logs`, `machine_logs`, `events`, `v_timeline` |
+| Identity | Where is this ID? | Global search | `/api/search` | `v_search_ids`, log FTS |
 
-- Times are epoch **milliseconds** unless a field says ISO (`InboxMessage.at`, `capturedAt`). Durations are `durationMs`. Sizes are **bytes** (`bytes`, `size`, `ramBytes`); `cpuPercent`/`percent` are % of the whole machine; `ageMin` is minutes.
-- `null` means known-absent; an optional field (`?`) may be missing from an older server. Unknown keys never appear (the spec refuses them).
-- Every string passed the server's secret redaction and is clipped (status text 300 chars, reasons 600). Paths are repo-relative and `/`-separated unless named `repo`.
-- Ids: workflow `wf-...`, job `op-<op>-<hash>`, terminal `term_...`, project `nivo | starci-next | mia-mia` (`GET /api/contract` lists them).
-- Errors are `{"error": "<Vietnamese text>"}` with 404 (unknown project/workflow/job/file), 400 (bad query), 500, or 502 (a proof verb could not run).
+The Work DAG groups units only when their operation and predecessor set match. A group displays ×N and opens individual units; edges keep their actual kind (`after`, `seam`, `dependsOn`, `peer-wait`). A grouped node is a visual summary, never a replacement for stored unit identity.
 
-## Endpoints
+## 1. HTTP API and source map
 
-| Endpoint | Type | Notes |
+Every JSON success has `{data,meta:{at,etag,sources,stale,next}}`. Error responses have `{error:{code,message}}`. List cursors are opaque. All API routes accept GET and HEAD only; other methods return 405. The SPA and API share one server, default port 4547. A single `/api/live` SSE channel invalidates selected queries; `/api/logs/stream` emits filtered log rows. Conditional JSON reads use ETag/304. Static assets do not consume the API rate budget.
+
+| Endpoint | Main source | UI consumer |
 | --- | --- | --- |
-| `GET /api/contract` | `ContractInfo` | Contract version and the runtime's vocabularies (artifact kinds/subkinds, log kinds/actors/levels). Check first. |
-| `GET /api/snapshot` | `Snapshot` | Whole board; cached 30 s. Per workflow: kernel signal, verdict counts, running/queued jobs, incidents, legs with colours and units, work graph, frontier, next actions, asks, holds, workers, `grammarProposals`, `drawReviews` (the owner's image review board: rounds, notes, golden per shape, images by evidence id), `logTypedMissing`. Top level `opHealth` (per-op success rate, queue wait, run/settle time, top failure class over the telemetry window, `scripts/supervisor/op-metrics.mjs`) and `stuck[]` (every wait `api status` aged, with severity against the stuck SLA and the owner of the next action). `sources` names every source that failed. Names: a workflow's `name` is its display name (`workflows.display_name`, set by `api rename` / define-goal; else the goal slug) and `id` stays the key; running/queued jobs, verdicts, units and next actions carry `displayName` `<op label> · <what> · <workflow name>`; `opLabels` is the shared op label map (modules/ops/labels.yaml). |
-| `GET /api/agents` | `AgentSnapshot` | Live agent terminals joined to the ledger, machine stats; cached 10 s. |
-| `GET /api/agents/<terminal>/log` | `AgentLog` | The terminal's current screen (at most 80 lines). Never proof of a verdict. |
-| `GET /api/agents/<op job>/changes` | `AgentChanges` | A running op's changes. `source: op-worktree`: an isolated op (its `payload.productWorktree` record, `scripts/kernel/product-worktree.mjs`) is diffed in its own worktree `<repo>/.starciwork/worktrees/<wf>/<op>` against its base (the record's `baseSha`, else the merge-base with the workflow branch): `committed` (base..HEAD), `staged`, `working`, `untracked`; `worktree` names path, branch, base and head. `source: shared-tree`: an op with no record keeps the main checkout's uncommitted and recent diffs in its owned paths (other agents may share it). `source: worktree-missing`: the record's worktree is gone, no patches. Images are the owned paths' images in the bound repositories. `/images/<id>` serves image bytes. Live only: a job that is no longer running answers 404; its settled diff is `/api/diff?project&job=<BoardUnit.diff.jobId>` (never a working-tree diff dressed as history). |
-| `GET /api/evidence[?project&kind&q&offset]` | `EvidencePage` | Evidence gallery, 48 items per page from `offset`; `/api/evidence/<id>` streams the file (byte ranges). |
-| `GET /api/history?project` | `History` | Recent code commits (BE/FE). `/api/history/<project>/<BE\|FE>/<sha>` → `CommitPatch`. |
-| `GET /api/proofs?project&workflow&op[&jobs=a,b]` | `OpProofs` | One op's recent jobs (max 16): report, heads, files (max 160) each served at `url` with byte ranges. |
-| `GET /api/artifacts?project&workflow[&job][&kind][&subkind]` | `Artifacts` | Every indexed job artifact with `kind` and `subkind`, grouped by job, `byKind` / `bySubkind` counts. |
-| `GET /api/artifacts/file?project&job&sha256` | bytes | Streams a file indexed for that job, with byte ranges for video. The SHA is the indexed file's identifier; the server resolves its stored path and checks it remains inside the project repo. 404 when absent. |
-| `GET /api/workflow-events?project&workflow[&after]` | `WorkflowEvents` | Whitelisted ledger transitions (newest 80, or after a seq). `/stream`: SSE, one `WorkflowEvent` per message, `id` = seq, heartbeat every 5 s, resume with `Last-Event-ID`. |
-| `GET /api/logs?project&workflow[&job=a,b][&kinds=][&after][&limit]` | `LogPage` | Typed log rows (below). `/stream`: SSE of `LogRow`, `id` = seq, polled every 3 s. |
-| `GET /api/supervisor/logs[?kinds=][&levels=][&ref=][&after][&limit]` | `SupervisorLogPage` | The Supervisor's machine log: every observation, decision, action, message and experiment as a `LogRow` of the supervisor ledger (`~/.starci/supervisor/.starciwork/runtime.sqlite`, workflow `wf-supervisor`, actor `runtime`; `scripts/supervisor/sup-log.mjs`). Kinds used: `supervisor.action`, `decision`, `narration`, `cmd.run`, `check.result`, `warning`, `error`, `gc.collect` (one thing the garbage collection closed, removed, archived or refused; `scripts/supervisor/gc.mjs`), `gc.summary` (one per GC run), `reconciler.would` (a call a shadow reconciler controller would have made; `scripts/reconciler/ctx.mjs`), `reconciler.act` (a call an active controller made), `reconciler.error`, `reconciler.event` (any other reconciler row, `data.kind` names it), `invariant.violated` / `invariant.cleared` (the SLA layer, `scripts/reconciler/sla.mjs`). `refs` name the product `workflow:` / `job:` / `repo:` / `commit:` / `item:` / `experiment:` / `signature:` / `proposal:` a row concerns; `ref=` filters by one. Read-only: no supervisor ledger yet is an empty page. `/stream`: SSE of `LogRow`, `id` = seq, polled every 3 s, resume with `Last-Event-ID`. |
-| `GET /api/home` | `HomeView` (`ui/src/reconciler.tsx`; not yet in `contract.ts`) | The Tình hình page: per live workflow `progress` (units that passed their gates, never attempts; units/hour, ETA, running vs allowed; `scripts/kernel/progress-rca.mjs workflowView`), `pill` (`ok`, `slow`, `stuck`, `done`), `topReason` when slow or stuck, `onIt` (`owner`, `supervisor` or `kernel`, next action, source); `owner` (owner-only items: asks, owner-decider Decision Items, images awaiting review, plan revisions, the handover credential checklist as one line); `health` (RAM, services healthy/managed, open SLA violations, GC leftovers, controller modes, land gate, `ok`). Built once per tick (`STARCI_STATUS_TICK_MS`, default 20 s); `api status` runs in its own background loop. |
-| `GET /api/workflow?id[&project]` | `WorkflowPageData` | One workflow: `snapshot` (a `Snapshot` holding just that workflow, for the tracker), `fleet` (progress, pill, onIt, RCA clusters and ranked actions, the Kernel's decision log), `board` (units by job phase `queued`, `running`, `reported`, `settled`, `released`, DESIGN §9.1; each unit's `attempt` provider/model/timing, the Op report `outcome` apart from the Kernel `verdict`, its stored settled `diff`; `board.graph` the unit dependency DAG, below), `decisions` (its Decision Items, live plus recent), `worktrees` (git worktrees naming the workflow or one of its jobs). 404 for an unknown workflow. |
-| `GET /api/system` | `SystemView` | The Hệ thống page: `reconciler` (engine leader/epoch/heartbeat/rev, per controller mode and when it was set, last pass, would/act/error/event rows over 24 h with the newest act and error, queue depth; `others` for the engine's own and the SLA layer's rows; services, seats and ledgers from the Host controller's store; open SLA violations; newest GC summary), `decisions` (the Supervisor's queue and recent decisions, the workflows' live DIs), `supervisor` (its seat from the Host controller's store, the Notifier's last digest / urgent sends / `judge` lines, the channel inbox), `opHealth`, `stuck`, `land`, `sources`. The harness route `#/supervisor` shows this page. |
-| `GET /api/nav` | `NavView` | `{updatedAt, owner, live, stuck}`: the counts the navigation shows. |
-| `GET /api/reconciler/state` | `ReconcilerView` | The engine and its controllers as above (lane rc-fleet-ui). |
-| `GET /api/reconciler/decisions[?workflow]` | `{updatedAt, decisions: DecisionView[]}` | Decision Items across the product ledgers and the supervisor ledger (`scripts/reconciler/decisions.mjs listDecisions`), live plus the newest closed; `workflow=` keeps one workflow's. |
-| `GET /api/supervisor/state` | `SupervisorState` | Legacy: no harness page reads it since the Supervisor tick was deleted (rc-cleanup 3175d8b8b); its `tick` and owed-action fields stay null / stale (nothing writes those events). The Supervisor's live state is `/api/system` `supervisor` and `decisions.supervisor`. The Supervisor's seat (mode, enabled, terminal, recorded agent/model), newest tick (including the recorded RAM guard cap when available), per-workflow frontier state / ready ops / holds, owed actions (class, action, age, SLA breach, lessons), recent acts and notices, channel `main` inbox and replies, self-learning (open hypotheses, experiments, lessons with owner weight, owner proposals with evidence and options), newest owner digest (`scripts/supervisor/state.mjs readSupervisorState`). |
-| `GET /api/diff?project&job` | `JobDiff` | The job's patch pre-structured: files, hunks, line numbers, image sides. 404 when the job has no patch. |
-| `GET /api/diff/asset?project&job&blob[&path]` | image bytes | One image side of a diff file (`before.blob` / `after.blob`). |
-| `GET /api/coverage?project&workflow` | `Coverage` | `api coverage`: FRs, shapes and proof cases with their evidence (proven / stale / missing). Cached 60 s; 502 when the verb cannot run. |
-| `GET /api/verify-proofs?project&workflow` | `VerifyProofs` | `api verify-proofs`: every indexed file re-hashed, the events digest chain walked. Cached 60 s. |
+| `/healthz` | `machine_meta`, `ledgers`, read-only open check | Health probe |
+| `/api/contract` | `machine_meta`, `meta`, `ledgers`, `ui_states`, `ui_state_map` | Shell and state vocabulary |
+| `/api/search` | machine and ledger `v_search_ids`, log FTS | Global search |
+| `/api/blob/:sha` | machine or ledger `blobs`, content-addressed artifact store | Evidence, transcript, images, diff, logs |
+| `/api/live` | machine and ledger `v_live_marks` | Shell invalidation |
+| `/api/fleet` | `v_workflow_progress`, decisions, seats, SLA, progress snapshots | Overview |
+| `/api/projects` | `ledgers`, `repositories`, `workflows` | Overview project selector |
+| `/api/workflows` | `v_workflow_progress`, `workflows` | Overview list |
+| `/api/workflows/:p/:wf` | `workflows`, `goals`, progress/RCA snapshots, seats, blockers | Workflow header |
+| `/api/workflows/:p/:wf/graph` | `v_units`, `unit_edges`, `v_op_history` | Workflow DAG |
+| `/api/workflows/:p/:wf/units` and `/units/:unit` | `v_units`, `v_op_history`, `unit_edges`, decisions, blockers | Workflow list and inspector |
+| `/api/workflows/:p/:wf/rca` | `metrics_snapshots` (RCA) | Workflow Why |
+| `/api/workflows/:p/:wf/worktrees` | machine `worktrees` | Workflow Infra |
+| `/api/workflows/:p/:wf/coverage` and `/verify` | `metrics_snapshots` (coverage, verify) | Workflow Evidence |
+| `/api/attempts` and `/api/attempts/:p/:id` | `v_op_history`, `op_attempts`, jobs, reports, checks, artifacts, decisions, usage | Workflow Attempts and Attempt |
+| `/api/attempts/:p/:id/checks/:checkId` | `v_checks`, output blobs | Attempt Checks |
+| `/api/attempts/:p/:id/diff` | `job_artifacts` (patch/diff), patch blob | Attempt Diff |
+| `/api/attempts/:p/:id/transcript` and `/transcript/snapshots` | `op_attempts.transcript_sha`, `attempt_transcript_snapshots`, `blobs` | Attempt Transcript |
+| `/api/media` | `v_media`, `job_artifacts`, `blobs` | Attempt/Workflow Evidence |
+| `/api/metrics/ops` | `v_model_scorecard`, `v_op_history` | System Learning |
+| `/api/decisions` and `/api/decisions/:id` | `v_decision_rows`, `sup_decision_items`, deliveries/events | Decisions and drawer |
+| `/api/decisions/log` | `decisions`, `sup_decisions` | Workflow Kernel decisions |
+| `/api/asks`, `/api/incidents` | `ask_requests`, `incidents` | Decisions |
+| `/api/health` | engine, service, seat, resource, SLA, leak and land views | Overview health |
+| `/api/reconciler`, `/actions`, `/queue` | `v_engine_health`, leader, modes, queue, `v_engine_actions`, schedules | System Engine, Attempt |
+| `/api/sla/violations`, `/clocks`, `/catalog` | `invariant_violations`, `v_sla_open`, `sla_episodes`, `modules/reconciler/sla.yaml` | System SLA |
+| `/api/services` and `/api/services/:name/probes` | `v_services`, `service_probes`, `service_events` | System Services |
+| `/api/seats` and `/api/terminals` | `v_seats`, `v_deaf_seats`, seat snapshots, `terminals` | System Services/Resources |
+| `/api/resources` and `/samples` | throttle, provider, pool, quota, lease, budget and `host_samples` | System Resources |
+| `/api/gc/runs` and `/api/gc/runs/:id` | `gc_runs`, `gc_items` | System Cleanup |
+| `/api/leaks` | `v_leaks` and each ledger's `v_ledger_leaks` | System Cleanup |
+| `/api/land`, `/api/land/runs`, `/api/lanes` | `land_queue`, `land_runs`, `pushes`, `lanes` | System Land |
+| `/api/supervisor`, `/workers`, `/lessons`, `/rulings` | supervisor seat/decisions/jobs/attempts/learning/rulings | System Supervisor/Learning |
+| `/api/notifications` | `notifications`, `blobs` | System Supervisor |
+| `/api/logs` and `/api/logs/stream` | `machine_logs`, ledger `logs` and their FTS views | Logs, Attempt Log |
+| `/api/timeline` | ledger `v_timeline`, machine violations/actions | Workflow/Attempt timeline |
 
-Not served (so not in the contract): asset slots owed have no endpoint. Grammar proposals and draw reviews ride on
-`Snapshot.projects[].workflows[]`. The cross-workflow dependency view rides on `Snapshot.projects[].dependencies`
-(`scripts/kernel/dependency-graph.mjs`): hard waits between live workflows, the Supervisor's findings with the action it
-takes (`bridge | transfer | revise | designate`, `clearCut`), and its bridging records (`provisional` under autopilot).
+The implementation lives in `ui/api/index.mjs` and `ui/api/routes/*.mjs`. The route table above describes the public read surface, not permission to write to any source.
 
-## Workflow page: units, attempts, the unit graph (`/api/workflow`)
+## 2. Public redaction boundary
 
-Built once per tick (`STARCI_STATUS_TICK_MS`, default 20 s) from the product ledger, so a ledger change shows within
-one to two ticks; `board.graph.at` is when it was read. Everything below is the ledger's own record; a field with no
-source is `null`, never a guess (`ui/unit-graph.mjs`).
+Write-time redaction is owned by `scripts/lib/redact.mjs` before text is stored in the blob/log layer. Read-time projection is owned by `ui/api/redact-read.mjs` and `ui/api/routes/blob.mjs`; it reuses the same redaction module for JSON strings and old text blobs lacking a redaction marker. A blob recorded as redacted text may be streamed as stored; binary blobs retain bytes, Range and content type. Blob addresses are content SHA references, never filesystem paths.
 
-- **Unit** (`BoardUnit.key`): a cut slice `op|cut#ordinal` or, uncut, a retry lineage (`progress-rca.mjs unitsOf`),
-  shown by its newest job. `verdict` is the Kernel's settle verdict after verification (`pass | fail | blocked`);
-  `outcome` is the Op's report, its testimony (`done | blocked | ...`). They are separate fields and never merged.
-- **`attempt`** (`UnitAttempt`) — that job's provider and model. Provider/model belong to the attempt, never to an
-  authority node. `agent`, `provider`, `model` (the model id) and `pool` come from `jobs.payload.hierarchy.runtime`:
-  route writes them, and dispatch adds the dispatch id and terminal. Otherwise they come from the newest
-  `op-dispatched` event's `model` / `modelId`.
-  - `stage`: `dispatched` (it started), `routed` (a pool was chosen, never dispatched), `none` (never routed, every
-    provider field null).
-  - `routedAt` is `payload.routedAt`; `startedAt` the first `op-dispatched` (`dispatches` counts rebinds);
-    `lastEventAt` the newest ledger event about the job; `reportedAt` the report; `settledAt` `op-settled`.
-  - `why` names each null (e.g. `effort: none recorded by route or dispatch` for devin pools,
-    `provider: not recorded on the job` on an older dispatch).
-- **`diff`** (`UnitDiffRef`) — the unit's newest stored patch (`job_artifacts` kind `patch`, written by settle):
-  `jobId`, `label landed | unlanded`, head/landed sha. Open it with `GET /api/diff?project&job=<diff.jobId>`.
-  - `null` when no attempt stored one (a failed or never-run attempt).
-  - The op's product worktree is deleted at settle, so there is no live diff of a finished job.
-- **`board.graph`** (`UnitGraph`) — the work dependency DAG between ALL units, not capped at the group size:
-  - `nodes`: `unitKey`, `jobId`, `op`, `status`, `unitState`, `cut`.
-  - `edges`: `from` is the prerequisite unit, `to` the one that waits, plus `kind`, `source`, `fromJob`/`toJob`, and
-    `met` (the prerequisite unit succeeded). `released` is the recorded seam release (`cut.seamStub.mode`).
-  - Only the gates dispatch admission applies and the ledger records are drawn:
-    - `after`: `jobs.payload.after`, written by `api enqueue --after`, `api graph-edit` and settle's canon-wire widening.
-    - `seam`: a cut ordinal > 1 waits on ordinal 1 of the same op and cut (`cut-seam.mjs`).
-  - Nothing is inferred from ordinal order, time or `plan.edges`; `plan.edges` is the op-level leg order, a different
-    graph. The Kernel/Op actor hierarchy is not this graph either.
-  - `status: empty` with a `reason` when no job records a dependency.
-  - `counts.dangling` counts an `after` naming a job outside the workflow; `counts.selfLoops` an `after` inside its own
-    retry lineage.
-  - `omitted` names what is not drawn. Work-record `dependsOn` holds are read from Work YAML at `api status` time and are
-    not recorded in the ledger.
-  - The snapshot's `workGraph` (Work nodes from `work_graph_versions`) stays `null` for a workflow that never
-    recorded a work-graph version; the unit graph is the job-level view.
+Responses omit absolute paths, PID fields, command lines, connector configuration and credential-ask text. Repositories and worktrees are represented by names or relative paths. A credential-related ask exposes its state and decision reference, with its question suppressed. API errors contain generic messages. The UI has no auth or mutation controls; its public exposure requires these server-side boundaries even when source records are sensitive.
 
-## System page: controllers (`/api/system`)
+The seven UI states are `ok`, `running`, `waiting`, `warn`, `bad`, `done` and `unknown`. `ui/api/state.mjs` computes states from the DB vocabulary when a view has not already supplied one. Reasons carry a code and parameters; Vietnamese display text is in `ui/src/i18n/vi.ts`. Raw source text is an explicit disclosure only where supported.
 
-`reconciler.controllers` is always the seven controllers, in order: `job`, `host`, `gc`, `resource`, `workflow`,
-`fleet`, `learning`.
+## 3. Removed surface
 
-- Counts cover `windowMs` (24 h) of the supervisor ledger's `reconciler.*` log rows. The source is `logSource`;
-  freshness is `reconciler.at`, one tick.
-- A row's `actor` is always `runtime`; the controller is its `data.controller` (refs `reconciler:<name>`).
-- The engine logs a controller's failed reconcile as controller `engine` with `data.name` naming the failing
-  controller (`reconciler.reconcile-failed`). That row counts as the named controller's `errors` / `lastError` /
-  `lastErrorAt`; before this it was dropped.
-- Rows of the engine itself and of the SLA layer are `reconciler.others`.
-- `modeAt` is when `reconciler.sqlite` set the mode; `null` when only config names it. `lastActAt` is the newest
-  `reconciler.act`; `events` counts `reconciler.event` rows.
-- There is no per-controller CPU or RAM: the engine does not measure it. Host RAM is `SystemView.ram`.
-
-## Artifacts: `kind` and `subkind`
-
-`kind` is the file type, from its name: `diff | patch | image | video | report | log | trace | file`.
-
-`subkind` is what produced it, derived at index time from facts only (the job's op id, the runtime's own path
-conventions, and the ui record manifests `index.yaml` / `draws.yaml` / `manifest.yaml` with `generation.tool` or
-`provenance.tool`); `null` when no rule proves it — never a guess (`scripts/kernel/artifact-subkind.mjs`).
-
-| subkind | kind | Produced by |
-| --- | --- | --- |
-| `draw-render` | image, file | interface.draw token render: a manifest says `tool: draw-render`, a draw-loop round (`draw-loop/<shape>/round-<n>/`), a `starci/draw-render@1` record beside the PNG, or a `token-*` directory |
-| `asset-gen` | image, file | an image model: a manifest says `tool: image_gen.*` (the image and its prompt file), or an `interface.asset` job's image |
-| `app-capture` | image | screenshots of the running app: `features/<f>/(impl\|operations)/…/(E\|evidence\|screens\|captures\|live\|observed\|renders\|calibration\|tools)/`, or such a directory of an implement/audit/scaffold job |
-| `e2e-capture` / `uat-capture` | image | screenshots of an `e2e.verify` / `uat.*` job, or under a `features/<f>/e2e|uat/` record |
-| `e2e-video` / `uat-video` | video | the same runs' browser video |
-| `playwright-trace` | trace | a Playwright `trace.zip` (open with `npx playwright show-trace <file>`) |
-| `patch` | patch | the job's `git format-patch` (`<job>.patch`) |
-| `patch-json` | file | its pre-structured diff (`<job>.patch.json`, what `/api/diff` serves) |
-| `diff` | diff | a `.diff` file an op wrote |
-| `report` | report | a report envelope (`report-<id>.json`) or report file |
-| `log` | log | text/log output, the typed-log sidecar `log.jsonl` |
-| `critique` | file | `critique*.json` — the draw loop's independent critic verdict |
-| `metrics` | file | `metrics.json`, `*.score.json` — draw-loop machine metrics |
-| `grammar-proposal` | file | `grammar-proposal*.{md,yaml,json}` |
-| `asset-request` | file | `asset-request*.{md,yaml,json}` |
-
-`bySubkind` counts a `null` subkind as `unknown`. `label` is the shape a file shows (`XBase#state@viewport`, a
-viewport, `draw-loop <shape> round-<n> <viewport>`, or a patch state `landed | unlanded`); `origin` is where a file
-copied in from outside `.starciwork` came from (e.g. a Playwright recording folder).
-
-Browser runs: every Playwright test the runtime launches (`scripts/uat/uat-slots.mjs run`, assisted UAT, e2e.verify)
-records video, trace and screenshots; without `--record-dir` an op's run lands in its own recording folder, which settle
-indexes as that job's proof (`e2e-video`, `playwright-trace`, `e2e-capture`). `draw-render --trace` adds a trace per
-viewport (off by default: Work's byte budget).
-
-## Typed logs
-
-Rows live in the `logs` table of the project's ledger (`<repo>/.starciwork/runtime.sqlite`; before 2026-09-27 a
-separate `logs.sqlite`). The server's only write is the sync a read runs (derived and sidecar rows, through the
-buffered log writer, limited to `logs`/`log_cursors`); every other handle is read-only. `LogPage.synced.deferred`
-is `legacy-logs-pending` while the old file is not yet migrated (the sync waits).
-
-A `LogRow` is `{seq, at, workflowId, jobId, actor, nodeId, level, kind, msg, data, refs}`. `msg` is one short
-owner-language line; the facts are in `data`, typed per `kind` (`LogData` in contract.ts); `refs` point at repo files,
-artifacts or `commit:<sha>`.
-
-- **actor**: `op` (the agent logged it: `api log` or its `log.jsonl` sidecar), `kernel`, `runtime` (derived from ledger
-  events), `check` (a recorded check), `land`.
-- **level**: `info | warn | error`, defaulted from the data (a failed check is `error`, a non-zero `cmd.run` `warn`).
-- **kinds**: `step.start`, `step.end`, `cmd.run`, `file.edit`, `check.result`, `test.result`, `render`, `video`,
-  `trace`, `warning`, `decision`, `narration`, `ask`, `error`, and the derived `dispatch`, `report`, `settle`, `land`,
-  `incident`, `job.drop`, `log.truncated`.
-
-Every job has a timeline even when its agent logged nothing: the runtime derives `dispatch`, `report`,
-`check.result` **and a `cmd.run` per recorded check** (command, exit, duration when recorded, evidence file), `settle`,
-`land`, and from the job's artifact index **a `file.edit` per changed file** (`+added -removed`, `status`,
-`diffRef` = `<patch>.json#<path>` into `/api/diff`) and **a `render` / `video` / `trace` per indexed image / video /
-trace** with its `subkind`. An op job that settles without its own `step.start`, `step.end` and a `cmd.run` per
-reported check gets a runtime `warning` row `LOG_TYPED_MISSING` (WARN, never a refusal), listed in
-`Snapshot…workflows[].logTypedMissing`.
-
-## Diff
-
-`JobDiff.files[]`: `status A|M|D|R`, `added`/`removed` line counts, `language` for highlighting, `hunks[].lines[]` as
-`{t: ' '|'+'|'-', o: old line, n: new line, s: text}`, `truncated` when a cap cut it (`caps`), `binary`/`image`
-flags and image sides `before/after.blob` for `/api/diff/asset`. `unlanded` true means the commits never reached the
-branch; `landedLater` names the sha it landed as after the patch was cut.
+The old snapshot, home, nav, system, agent, proof, evidence, artifact, history, supervisor-log, workflow-event and CLI-backed APIs have been removed. Historic hash paths route to Overview; they do not restore the old data model. Settled diff comes from an attempt's stored artifact, not a live shared checkout. An Op's report outcome and the Kernel/settler verdict remain separate fields and chips.
