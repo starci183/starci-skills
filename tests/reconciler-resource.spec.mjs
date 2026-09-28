@@ -132,7 +132,7 @@ test('quota: probe every 5 min while a quota circuit is open; quota-exhausted wh
   assert.equal((await c.reconcile('resource:quota:nivo-backend', ctx)).probed, false);
   advance(5 * 60_000);
   assert.equal((await c.reconcile('resource:quota:nivo-backend', ctx)).probed, true);
-  assert.deepEqual(await c.list(ctx), [HOST_KEY, 'resource:quota:nivo-backend']);
+  assert.deepEqual(await c.list(ctx), [HOST_KEY, 'resource:pools', 'resource:quota:nivo-backend']);
   assert.deepEqual(quotaExhausted({ jobs: [{ op: 'a', status: 'queued', pool: null }], openProviders: ['qwen'], providerOf: () => 'qwen' }), [], 'an unrouted kind is never judged');
 });
 

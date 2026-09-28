@@ -1,0 +1,15 @@
+# The contract of `api provider-backoff` (scripts/kernel/api-verbs/provider-backoff.mjs): open the provider circuit a
+# persisting rate limit calls for (reconciler Resource controller, adaptive per-pool concurrency, scripts/lib/pool-backoff.mjs).
+purpose: >-
+  Open the ledger's provider-health circuit for one provider (failureKind quota by default, or rate-limited) for
+  allocation.cooldownMs.<kind>, when the Resource controller's AIMD backoff held the provider's pool at its floor and
+  the rate limit still persisted. The same circuit api route and api dispatch already refuse on; it clears by expiry,
+  the quota probe (quota) or the Kernel's provider-health --recover. Idempotent: an open circuit is left as it is.
+args: --provider <p> --open-circuit [--kind quota|rate-limited] --reason <text> --by <actor> [--json]
+writes: [signals scope provider-health, key <provider>]
+refusals:
+  provider-missing: --provider names no provider
+  action-missing: --open-circuit is absent
+  kind-invalid: --kind is neither quota nor rate-limited
+kernelOnly: true
+exit: 0 opened or already open, 1 refused

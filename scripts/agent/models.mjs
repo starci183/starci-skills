@@ -31,6 +31,7 @@ import { parseYaml } from '../../engine/yaml.mjs';
 import { ALLOCATION_POLICIES } from '../../engine/config.mjs';
 import { credentialFingerprintOf, credentialRotated } from './credential-fingerprint.mjs';
 import { parseJsonOr } from '../lib/json.mjs';
+import { poolCapsNow } from '../lib/pool-backoff.mjs';
 
 const skillRoot = path.resolve(fileURLToPath(new URL('.', import.meta.url)), '..', '..');
 const DEFAULT_MODELS_DIR = path.join(skillRoot, 'modules', 'models');
@@ -258,7 +259,7 @@ export function missingHostTools({ pool, kind, modelsDir, opsDir } = {}) {
 // the mechanical ops are decide/plan/write-role kinds the hands take anyway
 // (owner routing 2026-09-26). Order keys that are not roles (think, ui,
 // review, draw, scaffold, sol-think) never widen serving.
-function poolRejectionReasons({ pool, target, role, kind, order = null, difficulty, capacity, grants, runtimes, modelsDir, opsDir }) {
+function poolRejectionReasons({ pool, target, role, kind, order = null, difficulty, capacity, grants, runtimes, modelsDir, opsDir, backoff = {} }) {
   const reasons = [];
   if (!pool) return [`no runtimes.yaml entry for pool '${target}'`];
   const orderServed = order && order !== role ? ` or order '${order}'` : '';
@@ -296,6 +297,11 @@ function poolRejectionReasons({ pool, target, role, kind, order = null, difficul
     const running = Number(cap.running ?? 0);
     if (Number.isFinite(max) && Number.isFinite(running) && running >= max)
       reasons.push(`pool at capacity (${running}/${max} running)`);
+    // Adaptive per-pool concurrency (scripts/lib/pool-backoff.mjs): after provider rate limits the reconciler's
+    // Resource controller halves the pool's effective parallelism; the next eligible pool of the order takes the job.
+    const backedOff = Number(backoff?.[target]);
+    if (Number.isInteger(backedOff) && backedOff > 0 && Number.isFinite(running) && running >= backedOff && !(Number.isFinite(max) && running >= max))
+      reasons.push(`pool backed off after provider rate limits (${running}/${backedOff} running, maxParallel ${Number.isFinite(max) ? max : '-'})`);
     if (cap.openIncident === true) reasons.push('pool has an open incident');
   }
   return reasons;
@@ -358,10 +364,16 @@ export function auditFamilyOf(rt, target) {
 //     for a pool-attributable cause moves to the end of the order and is taken
 //     only when no other candidate is eligible (demote); one they failed on
 //     twice is rejected for this retry (exclude).
+//   Rate-limit backoff (`backoff` = {pool: cap}, default the live caps of
+//     scripts/lib/pool-backoff.mjs when a capacity map is passed): a pool
+//     whose running count reached its backed-off cap is rejected, so the next
+//     eligible pool takes the job.
 // Returns the chosen pool with its launch model, or {error} with the full
 // rejected list.
 export function selectPool({ kind, role, difficulty, bias, capacity, runtimes, modelsDir, opsDir,
-  policy, shares, recent, grants, auditOf, fanOut = false, lineage = null } = {}) {
+  policy, shares, recent, grants, auditOf, fanOut = false, lineage = null, backoff = null } = {}) {
+  // The backed-off pool caps apply to a live route (a capacity map); a caller may pass them, else they are read once.
+  const backoffCaps = backoff ?? (capacity ? poolCapsNow() : {});
   // The kind's declared order, else think work the tier's `think` order whatever
   // its role, else the role's order; the role - or an order that names a role -
   // still gates each pool below.
@@ -389,7 +401,7 @@ export function selectPool({ kind, role, difficulty, bias, capacity, runtimes, m
       rejected.push({ target, reason, reasons: [reason] });
       continue;
     }
-    const reasons = poolRejectionReasons({ pool, target, role: resolvedRole, kind, order: chainKey, difficulty: d, capacity, grants, runtimes: rt, modelsDir, opsDir });
+    const reasons = poolRejectionReasons({ pool, target, role: resolvedRole, kind, order: chainKey, difficulty: d, capacity, grants, runtimes: rt, modelsDir, opsDir, backoff: backoffCaps });
     if (reasons.length) { rejected.push({ target, reason: reasons[0], reasons }); continue; }
     eligible.push(target);
     // prefer-then-overflow stops at the first eligible pool

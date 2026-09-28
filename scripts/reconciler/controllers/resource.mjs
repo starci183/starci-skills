@@ -32,9 +32,15 @@ const NAME = 'resource';
 const WRITER = 'reconciler/resource';
 const WOULD = 'reconciler.would';
 export const HOST_KEY = 'resource:host';
+export const POOLS_KEY = 'resource:pools';
+export const RATE_LIMITED_EVENT = 'provider-rate-limited';
 export const quotaKey = (ledgerId) => `resource:quota:${ledgerId}`;
 export const DEFAULTS = Object.freeze({ resyncMs: 30_000, concurrency: 2, footprintEveryMs: 300_000, quotaProbeEveryMs: 300_000,
-  capStarvedMs: 900_000, ramCriticalSlaMs: 600_000, diskLowSlaMs: 3_600_000, quotaProbeTimeoutMs: 120_000 });
+  capStarvedMs: 900_000, ramCriticalSlaMs: 600_000, diskLowSlaMs: 3_600_000, quotaProbeTimeoutMs: 120_000,
+  backoffFloor: 2, backoffDecreaseCooldownMs: 120_000, backoffIncreaseAfterMs: 900_000, backoffIncreaseStepMs: 300_000,
+  backoffStaleMs: 600_000, backoffPersistMs: 900_000 });
+/** Non-numeric settings of resource.yaml. */
+export const TEXT_DEFAULTS = Object.freeze({ backoffCircuitKind: 'quota' });
 
 /** modules/reconciler/resource.yaml over the defaults. */
 export function resourceControllerSettings(file = path.join(ROOT, 'modules', 'reconciler', 'resource.yaml')) {
@@ -42,8 +48,12 @@ export function resourceControllerSettings(file = path.join(ROOT, 'modules', 're
   try { doc = parseYaml(fs.readFileSync(file, 'utf8')) ?? {}; } catch { doc = {}; }
   const out = { ...DEFAULTS };
   for (const k of Object.keys(DEFAULTS)) { const n = Number(doc?.[k]); if (Number.isFinite(n) && n > 0) out[k] = n; }
+  for (const [k, d] of Object.entries(TEXT_DEFAULTS)) out[k] = ['quota', 'rate-limited'].includes(doc?.[k]) ? doc[k] : d;
   return out;
 }
+
+/** {pool: cap} of the backed-off entries. */
+const poolCapsOf = (entries) => Object.fromEntries(Object.entries(entries ?? {}).filter(([, e]) => e && e.cap < e.max).map(([k, e]) => [k, e.cap]));
 
 /* ------------------------------------------------------------ fair share (pure) */
 
@@ -133,6 +143,9 @@ const liveDeps = {
     return (pool) => Object.entries(doc?.runtimes ?? {}).find(([id, r]) => (r?.target ?? id) === pool)?.[1]?.provider ?? null;
   },
   host: async () => (await import('../../lib/host-resources.mjs')).hostResourcesFor({}),
+  poolBackoff: () => import('../../lib/pool-backoff.mjs'),
+  pools: async () => Object.entries((await import('../../../engine/config.mjs')).runtimeProfile()?.runtimes ?? {})
+    .map(([id, r]) => ({ target: r?.target ?? id, provider: r?.provider ? String(r.provider).toLowerCase().replace(/-agent$/, '') : null, maxParallel: Number(r?.maxParallel) || null })),
   load: async () => { try { return (await import('../../supervisor/workers.mjs')).machineLoad({ sampleMs: 200 })?.cpuBusy ?? null; } catch { return null; } },
   census: async () => (await import('../../lib/ram-throttle.mjs')).fleetCensus({}),
   footprints: async (limit) => { try { return (await import('../../lib/ram-throttle.mjs')).recentFootprints({ limit }); } catch { return []; } },
@@ -152,7 +165,8 @@ export function createResourceController(overrides = {}) {
   const deps = { ...liveDeps, ...overrides };
   const settings = { ...resourceControllerSettings(), ...(overrides.config ?? {}) };
   // Shadow keeps its own hysteresis (it never writes the file); active reads it back from the file it writes.
-  const memory = { shadowPrev: null, lastWould: null, lastFootprintAt: null, starving: {}, clocks: {}, lastProbe: {} };
+  const memory = { shadowPrev: null, lastWould: null, lastFootprintAt: null, starving: {}, clocks: {}, lastProbe: {},
+    pools: null, poolCursor: {}, providerSeen: {}, poolWould: null, circuits: {} };
 
   const clock = (ctx, entity, state, on, slaMs, meta) => {
     const k = `${entity}|${state}`;
@@ -187,7 +201,7 @@ export function createResourceController(overrides = {}) {
     const patch = { mode: m.mode, ramMode: m.ramMode, cpuHot: m.cpuHot, why: m.why, at: new Date(now).toISOString(), since,
       ...(changed ? { from: prev.mode ?? null } : {}), freeRamPct: Math.round(Number(host?.freeRamPct ?? 0) * 10) / 10,
       cpuBusy: cpuBusy == null ? null : Math.round(cpuBusy * 1000) / 1000, effectiveCap: cap.effectiveCap, heavyCap: cap.heavyCap, running: running.length,
-      writer: WRITER, slotTargets: { at: new Date(now).toISOString(), maxParallelOps, capacity: share.capacity, targets: share.targets } };
+      writer: WRITER, slotTargets: { at: new Date(now).toISOString(), maxParallelOps, capacity: share.capacity, targets: share.targets, poolCaps: poolCapsOf(memory.pools) } };
 
     let wrote = false;
     if (active) wrote = t.updateThrottleState(file, () => patch);
@@ -239,6 +253,120 @@ export function createResourceController(overrides = {}) {
     return { mode: m.mode, changed, wrote, shadow: !active, targets: share.targets, footprint: footprint != null, decisions };
   }
 
+  /**
+   * resource:pools — adaptive per-pool concurrency (AIMD, scripts/lib/pool-backoff.mjs). The rate-limit signals since
+   * the last pass: provider-rate-limited events of every product ledger (payload pool / model / target, else the
+   * job's routed pool, else every pool of payload.provider) and provider-health rows of failureKind rate-limited
+   * observed since. Halve on a signal (floor backoffFloor, at most once per backoffDecreaseCooldownMs), +1 per
+   * backoffIncreaseStepMs after backoffIncreaseAfterMs quiet, up to the pool's runtimes.yaml maxParallel. Active:
+   * publish poolBackoff in the throttle state (route reads it and prefers the next eligible pool); shadow: a would-row
+   * when the caps change. A pool held at its floor while the rate limit persists for backoffPersistMs opens the
+   * provider circuit (api provider-backoff) on every product ledger, once per floor episode.
+   */
+  async function reconcilePools(ctx) {
+    const pb = await deps.poolBackoff();
+    const t = await deps.throttle();
+    const now = ctx.now();
+    const pools = await deps.pools(); // [{target, provider, maxParallel}]
+    const byTarget = new Map(pools.map((p) => [p.target, p]));
+    const byProvider = new Map();
+    for (const p of pools) if (p.provider) { const l = byProvider.get(p.provider) ?? []; l.push(p.target); byProvider.set(p.provider, l); }
+    const providerKey = (v) => String(v ?? '').trim().toLowerCase().replace(/-agent$/, '');
+    const hits = {}; // pool target -> newest signal time
+    const hit = (target, at) => { if (target && byTarget.has(target)) hits[target] = Math.max(hits[target] ?? 0, Number(at) || now); };
+    const seedSince = now - settings.backoffIncreaseAfterMs;
+    // One signal's pool: a named pool target (model / pool / target / the job's routed pool), else every pool of its
+    // provider (provider / pool naming a provider, e.g. the worker's agent identity).
+    const hitSignal = (p, at) => {
+      const named = [p.model, p.pool, p.target, p.jobPool].find((v) => v && byTarget.has(v));
+      if (named) return hit(named, at);
+      const prov = [p.provider, p.pool].map(providerKey).find((v) => v && byProvider.has(v));
+      for (const target of byProvider.get(prov) ?? []) hit(target, at);
+    };
+    // The Job controller's worker-health probe logs reconciler.provider-rate-limited typed rows on the Supervisor
+    // ledger (ctx.log, lane B): {jobId, workflowId, provider, pool, model, resetMs}.
+    try {
+      const since = memory.poolCursor.supervisor ?? null;
+      const rows = await ctx.read('supervisor', (db) => ({
+        logs: db.prepare(`SELECT seq, at, data_json d FROM logs WHERE kind IN ('reconciler.provider-rate-limited','provider-rate-limited') AND ${since == null ? 'at>=?' : 'seq>?'} ORDER BY seq`).all(since == null ? seedSince : since),
+        maxSeq: db.prepare('SELECT COALESCE(MAX(seq),0) s FROM logs').get()?.s ?? 0,
+      }));
+      if (rows) {
+        memory.poolCursor.supervisor = Math.max(Number(since) || 0, Number(rows.maxSeq) || 0);
+        for (const r of rows.logs ?? []) { let d = {}; try { d = JSON.parse(r.d || '{}'); } catch { d = {}; } hitSignal(d, r.at); }
+      }
+    } catch { /* an unreadable supervisor ledger adds no signal */ }
+    const EVENTS_SQL = `SELECT e.seq, e.created_at at, e.payload_json p, json_extract(j.payload_json,'$.model') jobPool
+      FROM events e LEFT JOIN jobs j ON j.job_id=e.entity_id WHERE e.kind=? AND `;
+    for (const l of (ctx.ledgers ?? []).filter((x) => x.ledgerId !== 'supervisor')) {
+      const since = memory.poolCursor[l.ledgerId] ?? null;
+      let rows = null;
+      try {
+        rows = await ctx.read(l.ledgerId, (db) => ({
+          events: db.prepare(EVENTS_SQL + (since == null ? 'e.created_at>=? ORDER BY e.seq' : 'e.seq>? ORDER BY e.seq')).all(RATE_LIMITED_EVENT, since == null ? seedSince : since),
+          maxSeq: db.prepare('SELECT COALESCE(MAX(seq),0) s FROM events').get()?.s ?? 0,
+          health: db.prepare("SELECT key, value_json FROM signals WHERE scope='provider-health'").all(),
+        }));
+      } catch { rows = null; }
+      if (!rows) continue;
+      memory.poolCursor[l.ledgerId] = Math.max(Number(since) || 0, Number(rows.maxSeq) || 0);
+      for (const e of rows.events ?? []) {
+        let p = {}; try { p = JSON.parse(e.p || '{}'); } catch { p = {}; }
+        hitSignal({ ...p, jobPool: e.jobPool }, e.at);
+      }
+      for (const h of rows.health ?? []) {
+        let v = {}; try { v = JSON.parse(h.value_json || '{}'); } catch { v = {}; }
+        const at = Number(v.observedAt) || 0;
+        const k = providerKey(v.provider ?? h.key);
+        if (v.failureKind !== 'rate-limited' || at < seedSince || at <= (memory.providerSeen[k] ?? 0)) continue;
+        memory.providerSeen[k] = at;
+        for (const target of byProvider.get(k) ?? []) hit(target, at);
+      }
+    }
+    const file = deps.stateFile ?? t.throttleStateFile();
+    const live = t.readThrottleState(file);
+    const active = ctx.mode === 'active';
+    const prevAll = memory.pools ?? (active ? live[pb.POOL_BACKOFF_KEY] ?? {} : {});
+    const next = {};
+    for (const p of pools) {
+      const max = Number(p.maxParallel);
+      if (!Number.isInteger(max) || max < 1) continue;
+      const e = pb.aimdStep(prevAll[p.target] ?? null, { max, rateLimitAt: hits[p.target] ?? null, now, floor: settings.backoffFloor,
+        decreaseCooldownMs: settings.backoffDecreaseCooldownMs, increaseAfterMs: settings.backoffIncreaseAfterMs, increaseStepMs: settings.backoffIncreaseStepMs });
+      if (e) next[p.target] = { ...e, provider: p.provider ?? null };
+    }
+    memory.pools = next;
+    const caps = poolCapsOf(next);
+    if (active) {
+      if (Object.keys(next).length || Object.keys(live[pb.POOL_BACKOFF_KEY] ?? {}).length)
+        t.updateThrottleState(file, () => ({ [pb.POOL_BACKOFF_KEY]: next, poolBackoffAt: new Date(now).toISOString(), poolBackoffStaleMs: settings.backoffStaleMs, poolBackoffWriter: WRITER }));
+    } else {
+      const sig = JSON.stringify(caps);
+      if (sig !== memory.poolWould) {
+        memory.poolWould = sig;
+        const text = Object.entries(next).map(([k, e]) => `${k} ${e.cap}/${e.max}${e.reason ? ` (${e.reason})` : ''}`).join(', ') || 'every pool at its maxParallel';
+        ctx.log(WOULD, `pool backoff: ${text}`, { controller: NAME, action: 'writeThrottleState', file, patch: { [pb.POOL_BACKOFF_KEY]: next }, caps });
+      }
+    }
+    // A rate limit that persists at the floor: the provider circuit, once per floor episode, on every product ledger.
+    const circuits = [];
+    const byProv = new Map();
+    for (const [target, e] of Object.entries(next)) {
+      const per = pb.backoffPersists(e, { now, persistMs: settings.backoffPersistMs, floor: Math.min(settings.backoffFloor, e.max) });
+      if (per.persists && e.provider && !byProv.has(e.provider)) byProv.set(e.provider, { target, e, since: per.since });
+    }
+    for (const [provider, { target, e, since }] of byProv) {
+      const episode = `${provider}|${since}`;
+      if (memory.circuits[provider] === episode) continue;
+      memory.circuits[provider] = episode;
+      const reason = `pool ${target} held at ${e.cap}/${e.max} since ${new Date(since).toISOString()} and still rate limited (last ${new Date(e.lastRateLimitAt).toISOString()})`;
+      for (const l of (ctx.ledgers ?? []).filter((x) => x.ledgerId !== 'supervisor'))
+        await ctx.api(l.ledgerId, 'provider-backoff', ['--provider', provider, '--open-circuit', '--kind', settings.backoffCircuitKind, '--reason', reason, '--by', WRITER], { timeoutMs: 60_000 });
+      circuits.push(provider);
+    }
+    return { caps, hits: Object.keys(hits), circuits, shadow: !active };
+  }
+
   async function reconcileQuota(ctx, ledgerId) {
     if (ledgerId === 'supervisor') return { skipped: 'the supervisor ledger runs no provider ops' };
     const now = ctx.now();
@@ -277,10 +405,12 @@ export function createResourceController(overrides = {}) {
     concerns: ['resource.throttle', 'resource.quota'],
     resyncMs: settings.resyncMs,
     concurrency: settings.concurrency,
-    routes: {},
-    async list(ctx) { return [HOST_KEY, ...(ctx?.ledgers ?? []).filter((l) => l.ledgerId !== 'supervisor').map((l) => quotaKey(l.ledgerId))]; },
+    // A rate-limit signal (lane B's worker-health probe) re-reads every pool at once.
+    routes: { [RATE_LIMITED_EVENT]: () => POOLS_KEY },
+    async list(ctx) { return [HOST_KEY, POOLS_KEY, ...(ctx?.ledgers ?? []).filter((l) => l.ledgerId !== 'supervisor').map((l) => quotaKey(l.ledgerId))]; },
     async reconcile(key, ctx) {
       if (key === HOST_KEY) return reconcileHost(ctx);
+      if (key === POOLS_KEY) return reconcilePools(ctx);
       const m = /^resource:quota:(.+)$/.exec(String(key));
       if (m) return reconcileQuota(ctx, m[1]);
       return { skipped: `unknown key ${key}` };
