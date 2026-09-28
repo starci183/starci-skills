@@ -316,7 +316,7 @@ tick:
       On a wake that names a runtime rev newer than the one you acked, BEFORE
       anything else: re-read exactly the files it lists (the changed
       modules/kernel, modules/ops, knowledge, modules/models files and the op
-      prompt builder, plus the new contract-changes.yaml entries it names) - or
+      prompt builder, plus the new contract-changes/<id>.yaml entries it names) - or
       kernel-prompt.md and driver-loop.yaml in full when it says so - then run
       `api kernel-ack-rev --workflow <id> --rev <that rev> --files <what you
       re-read>`. Until you ack, `api enqueue` and `api dispatch` of a leg whose
@@ -1446,7 +1446,7 @@ foundations:
 
 # ============================================================================
 # CONTRACT ROLLOUT — a contract change never lands on running work
-#    (modules/kernel/contract-changes.yaml; scripts/kernel/contract-version.mjs).
+#    (modules/kernel/contract-changes/<id>.yaml; scripts/kernel/contract-version.mjs).
 # ============================================================================
 contractRollout:
   admitted: >-

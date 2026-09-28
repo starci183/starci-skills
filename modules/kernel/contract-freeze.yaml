@@ -6,7 +6,7 @@
 # reached 9-11 per node). So, for a family listed here (scripts/kernel/contract-version.mjs):
 #
 #   family     the op the freeze governs; a change governs it when the family is in its ops or its followUp
-#              op/ops (modules/kernel/contract-changes.yaml)
+#              op/ops (modules/kernel/contract-changes/<id>.yaml)
 #   since      ISO date-time: every change governing the family that lands at or after it is BATCHED (a change
 #              may also name its batch itself: `batch: <slug>`); safetyCritical changes are never batched
 #   batch      the default batch name (defaults to the family)

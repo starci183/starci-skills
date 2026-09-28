@@ -1,0 +1,12 @@
+id: yaml-kernel-registry-names
+effectiveAt: '2026-09-28T16:00:00+07:00'
+summary: >-
+  Point active Kernel and Supervisor authoring instructions at the per-entry contract change
+  registry. Historical references to the old file and its transition reader remain as history.
+  Text only; no API verb, YAML key, check or finding code changes.
+reach: new-legs
+paths:
+  - modules/kernel/driver-loop.yaml
+  - modules/kernel/contract-freeze.yaml
+  - modules/supervisor/supervise.yaml
+  - modules/kernel/contract-changes/yaml-kernel-registry-names.yaml

@@ -375,7 +375,7 @@ grammarRelease:
        node_modules junction) and verify the stamp: `node scripts/checks/grammar-dist.mjs` is fresh.
     3. Move the CHANGELOG entry under the new version with the date, and regenerate the knowledge
        snapshots with `node scripts/checks/grammar-knowledge.mjs --write` (registered in
-       modules/kernel/contract-changes.yaml, guardrail source-knowledge-edits).
+       modules/kernel/contract-changes/<id>.yaml, guardrail source-knowledge-edits).
     4. Land through the gate (land.mjs --commit <sha> --lane <name> --specs <csv>); dist/ is not tracked,
        so rebuild packages/grammar/dist on live main after the land until grammar-dist.mjs is fresh there.
     5. From live packages/grammar run `npm pack --dry-run` and check the file list: dist, README.md,
