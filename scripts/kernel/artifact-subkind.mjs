@@ -25,7 +25,7 @@
 //   uat-video          a video of a uat.* job, or under a features/<f>/uat/ record
 //   e2e-video          a video of an e2e.verify job, or under a features/<f>/e2e/ record
 //   report             kind report (a job's report envelope or filed report)
-//   log                kind log (.log/.txt/.out/.jsonl, the typed-log sidecar)
+//   log                kind log (.log/.txt/.out/.jsonl)
 import fs from 'node:fs';
 import path from 'node:path';
 import { parseYaml } from '../../engine/yaml.mjs';

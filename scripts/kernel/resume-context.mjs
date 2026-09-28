@@ -7,7 +7,7 @@
 // a10 began again from nothing). resumeContextOf(db, job) reads the attempt the retry continues
 // (jobs.retry_of) and, when that attempt settled failed-no-report, returns the packet's
 // context.resume_from: its liveness and environment, the effect evidence settle recorded (dirty files,
-// commits), and the tail of its typed op log (the sidecar log.jsonl rows ingested at settle).
+// commits), and the tail of its typed op log (the rows it wrote through api log).
 // resumePromptLines renders it. Ledger reads only.
 import { parseJsonOr } from '../lib/json.mjs';
 import { jobResultSql } from './api-lib/rows.mjs';

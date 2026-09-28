@@ -169,7 +169,7 @@ import {
 } from './cut-seam.mjs';
 import { destinationsOf } from './progress-rca.mjs';
 import {
-  LOG_TYPED_MISSING, LOG_TYPED_MISSING_EVENT, ingestSidecar, insertLogRows,
+  LOG_TYPED_MISSING, LOG_TYPED_MISSING_EVENT, insertLogRows,
   openLogs, prepareLogRow, syncLogs, typedLogGaps,
 } from './typed-logs.mjs';
 import { bindWorkflowRun, staleTasks, CLOSED_TASK_STATUSES } from './orca-runs.mjs';
@@ -293,7 +293,7 @@ const usage = (code) => {
   artifacts --workflow <id> [--job <job_id>] [--kind <kind>]   every indexed proof file of the workflow's jobs (job_artifacts), per job
   log      --workflow <id> [--job <job_id>] --kind <kind> --msg <short text> [--data '<json>'] [--refs <csv>] [--level info|warn|error] [--node <work-graph node>] [--actor kernel|runtime|check|land]
            one typed log row into the ledger's logs table (the buffered log writer: no events row, no ledger transaction held); an op logs only its own job, as actor op
-  logs     --workflow <id> [--job <job_id>] [--after <seq>] [--kinds <csv>] [--limit <n>]   the workflow's typed log rows (events and sidecars synced first)
+  logs     --workflow <id> [--job <job_id>] [--after <seq>] [--kinds <csv>] [--limit <n>]   the workflow's typed log rows (events synced first)
   coverage --workflow <id>   every FR, shape and proof case of the workflow's scope with its evidence: proven|stale|missing
   verify-proofs --workflow <id>   re-hash every indexed proof file and walk the events digest chain; exit 1 on tampering
   plan     --workflow <id> --file <plan.json>
@@ -4194,17 +4194,15 @@ function indexSettledArtifacts(ledger, job, repo) {
     return r.ok ? { indexed: r.indexed, byKind: r.byKind, patch: r.patch, ...(r.patchJson ? { patchJson: r.patchJson } : {}), ...(r.missing.length ? { missing: r.missing.slice(0, 20) } : {}), logs } : { error: r.error, logs };
   } catch (error) { return { error: String(error?.message ?? error) }; }
 }
-// A settled job's typed log is complete: its sidecar (log.jsonl, what the op appended directly - a crashed worker's
-// lines included) is ingested and the rows its settle events stand for are derived (typed-logs.mjs). A failure never
-// un-settles; the next read of the workflow's logs catches up.
+// A settled job's typed log is complete: the op's own rows came through `api log`, and the rows its settle events stand
+// for are derived here (typed-logs.mjs). A failure never un-settles; the next read of the workflow's logs catches up.
 function settleJobLogs(ledger, job, repo) {
   let logs = null;
   try {
     logs = openLogs(repo);
-    const sidecar = ingestSidecar(logs, { repo, workflowId: job.workflow_id, jobId: job.job_id });
-    const derived = syncLogs(logs, ledger.db, { repo, workflowId: job.workflow_id }).derived;
+    const derived = syncLogs(logs, ledger.db, { repo }).derived;
     const typedMissing = warnTypedLogGaps(ledger, logs, job);
-    return { sidecar: { read: sidecar.read, inserted: sidecar.inserted, invalid: sidecar.invalid }, derived: derived.inserted, ...(typedMissing ? { typedMissing } : {}) };
+    return { derived: derived.inserted, ...(typedMissing ? { typedMissing } : {}) };
   } catch (error) { return { error: String(error?.message ?? error) }; }
   finally { try { logs?.close(); } catch { /* closing */ } }
 }
@@ -4221,7 +4219,7 @@ function warnTypedLogGaps(ledger, logs, job) {
   const prepared = prepareLogRow({ workflowId: job.workflow_id, jobId: job.job_id, actor: 'runtime', kind: 'warning', level: 'warn', src: `ltm:${job.job_id}`,
     msg: `${LOG_TYPED_MISSING}: op không ghi đủ nhật ký có cấu trúc (${gaps.missing.slice(0, 3).join(', ')}${gaps.missing.length > 3 ? ', …' : ''})`,
     data: { code: LOG_TYPED_MISSING, message: `${op} attempt ${tryOf(job)} settled with ${gaps.opRows} op log row(s); missing ${gaps.missing.join('; ')}`.slice(0, 1500), missing: gaps.missing.slice(0, 40),
-      hint: 'op prompt logging: block - api log / log.jsonl step.start, step.end and cmd.run per check' } });
+      hint: 'op prompt logging: block - api log step.start, step.end and cmd.run per check' } });
   if (prepared.row) insertLogRows(logs, [prepared.row]);
   const seen = ledger.db.prepare('SELECT 1 FROM events WHERE kind=? AND entity_id=? LIMIT 1').get(LOG_TYPED_MISSING_EVENT, job.job_id);
   if (!seen) ledger.transaction(() => ledger.appendEvent({ workflowId: job.workflow_id, entityType: 'job', entityId: job.job_id, kind: LOG_TYPED_MISSING_EVENT,

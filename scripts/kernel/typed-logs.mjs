@@ -9,11 +9,9 @@
 //
 // Append-only: a trigger refuses every UPDATE, and a DELETE unless the row's workflow is being purged by the
 // owner-approved workflow purge (workflow_purges.state 'deleting', scripts/work/purge-workflow.mjs: archive to a
-// verified ZIP first). Nothing in housekeeping removes a row. Rows come from four writers:
+// verified ZIP first). Nothing in housekeeping removes a row. Rows come from three writers (alpha.3: no log file
+// anywhere - the retired .starciwork/kernel-evidence/<wf>/jobs/<job>/log.jsonl sidecar is gone):
 //   - `api log` (scripts/kernel/api.mjs cmdLog): a Kernel or an op logs one typed row, no ledger write;
-//   - the per-job sidecar <job dir>/log.jsonl an op may append to directly: ingestSidecar reads it from the
-//     byte offset it last reached, keyed by line hash + offset, so a re-read inserts nothing twice and a
-//     crashed worker's lines still land (settle ingests; every read of the workflow's logs ingests too);
 //   - the ledger's own events (syncDerivedLogs): dispatch, report, checks, settle, land, incident rows are
 //     DERIVED from the events that already record them (rowsOfEvent), never re-written by the code paths
 //     that append those events; a cursor per ledger keeps it incremental and `src` keeps it idempotent. So every
@@ -29,7 +27,7 @@
 // secret-named keys. A value is blanked, its key kept.
 //
 //   node scripts/kernel/typed-logs.mjs sync --repo <repo> [--workflow <id>] [--rederive] [--apply] [--json]
-//       derive rows from the ledger's events and ingest every job sidecar; a dry run (the default) counts
+//       derive rows from the ledger's events; a dry run (the default) counts
 //       what it would insert and writes nothing. --rederive derives from every event again (seq 0), so a new
 //       derivation reaches old events; rows already stored are duplicates by src and are not written twice.
 import fs from 'node:fs';
@@ -41,7 +39,6 @@ import { ledgerFileFor, openLedger } from '../../engine/ledger-db.mjs';
 import { jobResultSql } from './api-lib/rows.mjs';
 import { independentChecksOf } from './api-lib/check-evidence.mjs';
 import { logWriterFor } from './log-writer.mjs';
-import { jobScratchDirOf } from './op-prompt.mjs';
 import { redactData, redactPath, redactText } from '../lib/redact.mjs';
 
 export const LOG_ACTORS = Object.freeze(['kernel', 'op', 'runtime', 'check', 'land']);
@@ -61,9 +58,6 @@ export function logSettings() {
 
 /** The typed logs live in the repository's ledger (its logs table). */
 export const logsFileFor = (repo) => ledgerFileFor(repo);
-// The op's sidecar lives in its job scratch (op-prompt.mjs jobScratchDirOf), never in the repository (alpha.3).
-export const jobLogDirOf = (repo, workflowId, jobId) => jobScratchDirOf(repo, workflowId, jobId);
-export const sidecarFileOf = (repo, workflowId, jobId) => path.join(jobLogDirOf(repo, workflowId, jobId), 'log.jsonl');
 
 // ---------------------------------------------------------------------------------------------- kinds
 // Each kind names its data fields: required and optional, by type. Extra fields are kept (they count against
@@ -232,49 +226,6 @@ export function appendLog(logs, row, { clip = false, ...options } = {}) {
   const r = insertLogRows(logs, [prepared.row], options);
   if (r.rejected) throw Object.assign(new Error(`workflow ${prepared.row.workflowId} is not in the ledger`), { code: 'workflow-unknown' });
   return { ok: true, seq: r.seqs[0] ?? null, ...(r.dropped ? { dropped: true } : {}), ...(r.duplicate ? { duplicate: true } : {}), ...(r.deferred ? { deferred: true } : {}), row: prepared.row };
-}
-
-// ------------------------------------------------------------------------------------------ sidecar
-/**
- * Ingest the new tail of one job's log.jsonl: each complete line a JSON object {kind, msg, data?, refs?, at?,
- * level?, node?}, written as actor `op`. Its key is the hash of the job, the line's byte offset and the line, so
- * re-reading the file inserts nothing twice. A malformed or invalid line is counted, never stored.
- */
-export function ingestSidecar(logs, { repo, workflowId, jobId, file = sidecarFileOf(repo, workflowId, jobId), dryRun = false, now = Date.now() }) {
-  const out = { file, read: 0, inserted: 0, duplicate: 0, dropped: 0, invalid: 0, errors: [] };
-  let st;
-  try { st = fs.statSync(file); } catch { return out; }
-  const cursorName = `jl:${jobId}`;
-  const cursor = Number(logs.db.prepare('SELECT value FROM log_cursors WHERE name=?').get(cursorName)?.value ?? 0);
-  const from = cursor > st.size ? 0 : cursor;
-  if (from === st.size) return out;
-  const buf = Buffer.alloc(st.size - from);
-  const fd = fs.openSync(file, 'r');
-  try { fs.readSync(fd, buf, 0, buf.length, from); } finally { fs.closeSync(fd); }
-  const end = buf.lastIndexOf(0x0a);
-  if (end < 0) return out;
-  const rows = [];
-  let offset = from, start = 0;
-  while (start <= end) {
-    const nl = buf.indexOf(0x0a, start);
-    const line = buf.subarray(start, nl).toString('utf8').replace(/\r$/, '');
-    const at = offset + start;
-    start = nl + 1;
-    if (!line.trim()) continue;
-    out.read += 1;
-    let parsed = null;
-    try { parsed = JSON.parse(line); } catch { parsed = null; }
-    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) { out.invalid += 1; if (out.errors.length < 20) out.errors.push({ offset: at, error: 'not a JSON object' }); continue; }
-    const prepared = prepareLogRow({ at: parsed.at, workflowId, jobId, actor: 'op', nodeId: parsed.node ?? parsed.nodeId ?? null, level: parsed.level, kind: parsed.kind,
-      msg: parsed.msg, data: parsed.data, refs: parsed.refs, src: `jl:${crypto.createHash('sha256').update(`${jobId}\n${at}\n${line}`).digest('hex').slice(0, 40)}` }, { now });
-    if (prepared.error) { out.invalid += 1; if (out.errors.length < 20) out.errors.push({ offset: at, code: prepared.code, error: prepared.error }); continue; }
-    rows.push(prepared.row);
-  }
-  if (dryRun) { out.wouldInsert = rows.filter((r) => !logs.db.prepare('SELECT 1 FROM logs WHERE src=?').get(r.src)).length; return out; }
-  // The rows and the cursor move commit together (chunks of <= 200 rows; the cursor rides on the last).
-  const r = insertLogRows(logs, rows, { now, cursors: [{ name: cursorName, value: from + end + 1, mode: 'set' }] });
-  Object.assign(out, { inserted: r.inserted, duplicate: r.duplicate, dropped: r.dropped });
-  return out;
 }
 
 // ------------------------------------------------------------------------------------ derived rows
@@ -473,19 +424,9 @@ export function syncDerivedLogs(logs, ledgerDb, { batch = 1000, maxBatches = 300
   return out;
 }
 
-/** The jobs of a workflow (or all workflows) whose sidecar exists: [{workflowId, jobId, file}]. */
-export function sidecarsOf(repo, ledgerDb, { workflowId = null } = {}) {
-  const rows = ledgerDb.prepare(`SELECT job_id, workflow_id FROM jobs WHERE kind<>'kernel'${workflowId ? ' AND workflow_id=?' : ''}`).all(...(workflowId ? [workflowId] : []));
-  return rows.map((r) => ({ workflowId: r.workflow_id, jobId: r.job_id, file: sidecarFileOf(repo, r.workflow_id, r.job_id) })).filter((r) => fs.existsSync(r.file));
-}
-
-
-/** Derive from events and ingest every sidecar of the workflow (or the repo): what a read of the logs runs first. */
-export function syncLogs(logs, ledgerDb, { repo, workflowId = null, dryRun = false, rederive = false } = {}) {
-  const derived = syncDerivedLogs(logs, ledgerDb, { dryRun, repo, rederive });
-  const sidecars = sidecarsOf(repo, ledgerDb, { workflowId }).map((s) => ingestSidecar(logs, { repo, workflowId: s.workflowId, jobId: s.jobId, file: s.file, dryRun }));
-  return { derived, sidecars: { files: sidecars.length, read: sidecars.reduce((n, s) => n + s.read, 0), inserted: sidecars.reduce((n, s) => n + s.inserted + (s.wouldInsert ?? 0), 0),
-    invalid: sidecars.reduce((n, s) => n + s.invalid, 0), errors: sidecars.flatMap((s) => s.errors.map((e) => ({ file: s.file, ...e }))).slice(0, 20) } };
+/** Derive the workflow's (or the repo's) rows from the ledger's events: what a read of the logs runs first. */
+export function syncLogs(logs, ledgerDb, { repo, dryRun = false, rederive = false } = {}) {
+  return { derived: syncDerivedLogs(logs, ledgerDb, { dryRun, repo, rederive }) };
 }
 
 // ------------------------------------------------------------------------------------ adoption gate
@@ -494,7 +435,7 @@ export const LOG_TYPED_MISSING_EVENT = 'log-typed-missing';
 const normCmd = (c) => String(c ?? '').replace(/\s+/g, ' ').trim().toLowerCase();
 
 /**
- * The typed rows an op job owed but never wrote itself (actor op: `api log` or its log.jsonl sidecar): at least one
+ * The typed rows an op job owed but never wrote itself (actor op: `api log`): at least one
  * step.start and one step.end, and a cmd.run for each check its report says it ran (matched by command, else by
  * count). `checks` are the report's [{name, command, exitCode}]. Returns {missing: [...], opRows, kinds}: missing is
  * empty when the job logged what it owed. Read-only.
@@ -566,9 +507,9 @@ async function main() {
   const dryRun = !args.apply;
   const logs = openLogs(repo);
   try {
-    const out = { ok: true, repo, dryRun, logs: logsFileFor(repo), ...syncLogs(logs, ledger.db, { repo, workflowId: args.workflow ?? null, dryRun, rederive: Boolean(args.rederive) }) };
+    const out = { ok: true, repo, dryRun, logs: logsFileFor(repo), ...syncLogs(logs, ledger.db, { repo, dryRun, rederive: Boolean(args.rederive) }) };
     if (args.json) console.log(JSON.stringify(out, null, 2));
-    else console.log(`${dryRun ? 'dry run: would insert' : 'inserted'} ${out.derived.inserted} derived row(s) from ${out.derived.events} event(s); ${out.sidecars.inserted} sidecar row(s) from ${out.sidecars.files} file(s) (${out.sidecars.invalid} invalid) -> ${out.logs}`);
+    else console.log(`${dryRun ? 'dry run: would insert' : 'inserted'} ${out.derived.inserted} derived row(s) from ${out.derived.events} event(s) -> ${out.logs}`);
   } finally {
     logs.close(); ledger.close();
   }

@@ -21,9 +21,8 @@ kinds: >-
   message, hint?} | warning {code, message, missing?}; derived from ledger events (a Kernel may write them):
   dispatch, report, settle, land, incident, job.drop, log.truncated
 sidecar: >-
-  an op may instead append one JSON object per line - {kind, msg, data?, refs?, at?, level?, node?} - to
-  <repo>/.starciwork/kernel-evidence/<workflow>/jobs/<job>/log.jsonl; settle and every read ingest it by line
-  hash and byte offset, so a crashed worker keeps its lines and nothing is stored twice
+  none (alpha.3): the retired .starciwork/kernel-evidence/<workflow>/jobs/<job>/log.jsonl file is gone; every op row
+  comes through this verb into the ledger's logs table
 returns:
   seq: 'the stored row''s sequence (null when dropped)'
   kind: 'the kind'

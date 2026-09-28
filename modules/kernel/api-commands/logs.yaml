@@ -1,7 +1,7 @@
 # The contract of `api logs` (scripts/kernel/api-verbs/logs.mjs). One file per extension verb
 # (scripts/kernel/api-extensions.mjs); split out of modules/kernel/api.yaml commands.logs (lane slim-04).
 purpose: >-
-  The workflow's typed log rows, oldest first; the ledger's events and every job sidecar are synced first.
+  The workflow's typed log rows, oldest first; the ledger's events are synced first.
 args: '--workflow <id> [--job <job_id>] [--after <seq>] [--kinds <csv>] [--limit <n>]'
 reads: >-
   the ledger's logs table, after syncing it: the ledger
@@ -11,7 +11,7 @@ reads: >-
   incident-* -> incident, worker-failed-no-report and dispatch-rejected -> error, job-dropped -> job.drop,
   artifacts-indexed -> one file.edit per changed file of the job's patch (from <patch>.json, diffRef
   <patch>.json#<path>) and one render / video / trace per indexed image / video / Playwright trace with its
-  subkind) and every job sidecar is ingested. An op job that settles without its own step.start, step.end and a
+  subkind). An op job that settles without its own step.start, step.end and a
   cmd.run per reported check gets a runtime warning row LOG_TYPED_MISSING (WARN, never a refusal; api status
   logTypedMissing)
 writes: 'the logs and log_cursors tables only (the derived and ingested rows, idempotent by src), through the buffered log writer; no other ledger table'
@@ -19,7 +19,7 @@ returns:
   rows: '[{seq, at, workflowId, jobId, actor, nodeId, level, kind, msg, data, refs}] oldest first; without --after the newest --limit (default 500)'
   cursor: 'the last seq returned: pass it as --after to follow'
   more: 'true when more rows follow the cursor'
-  synced: '{derived, sidecar, deferred?}: rows the sync added'
+  synced: '{derived}: rows the sync added'
 refusals:
   workflow-unknown: no workflows row for --workflow
   log-kind-unknown: '--kinds names a kind that is not a log kind'

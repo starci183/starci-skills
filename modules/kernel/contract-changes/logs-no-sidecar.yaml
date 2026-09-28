@@ -1,0 +1,7 @@
+id: logs-no-sidecar
+effectiveAt: '2026-09-29T02:00:00+07:00'
+summary: "alpha.3: the per-job typed-log sidecar <repo>/.starciwork/kernel-evidence/<workflow>/jobs/<job>/log.jsonl is gone with its ingestion (typed-logs.mjs ingestSidecar, sidecarsOf, sidecarFileOf, jobLogDirOf). Every op row comes through `api log` into the ledger's logs table; api logs and settle only derive rows from events, and their synced block is {derived}. Adds no check or finding code"
+reach: new-legs
+paths:
+  - modules/kernel/api-commands/log.yaml
+  - modules/kernel/api-commands/logs.yaml

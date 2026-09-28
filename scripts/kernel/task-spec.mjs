@@ -9,7 +9,7 @@
 // which embeds the spec, through `terminal send --text` - the same ceiling a second time.
 //
 // A prompt at or under TASK_SPEC_MAX_CHARS goes inline exactly as before. A longer one is written
-// verbatim to the job's evidence directory (beside its log.jsonl sidecar) and the Task spec becomes a
+// verbatim to the job's scratch directory (op-prompt.mjs jobScratchDirOf) and the Task spec becomes a
 // short pointer that names the file and tells the worker to read all of it first: the packet the
 // worker follows is byte-for-byte the one buildOpPrompt rendered, only its transport changed.
 

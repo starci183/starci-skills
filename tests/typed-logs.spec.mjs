@@ -6,8 +6,8 @@ import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { ledgerFileFor, openLedger } from '../engine/ledger-db.mjs';
 import {
-  LOG_TRUNCATED, appendLog, fitData, ingestSidecar, insertLogRows, logsFileFor, openLogs, prepareLogRow, readLogs,
-  redactData, redactPath, redactText, rowsOfEvent, sidecarFileOf, syncDerivedLogs, validateLogData,
+  LOG_TRUNCATED, appendLog, fitData, insertLogRows, logsFileFor, openLogs, prepareLogRow, readLogs,
+  redactData, redactPath, redactText, rowsOfEvent, syncDerivedLogs, validateLogData,
 } from '../scripts/kernel/typed-logs.mjs';
 import { SECRET_PATTERNS } from '../scripts/supervisor/push-mains.mjs';
 import { SECRET_PATTERNS as SHARED } from '../scripts/lib/secret-patterns.mjs';
@@ -115,28 +115,6 @@ test('per-job cap: a job stops at the cap with one log.truncated row; derived ro
   assert.deepEqual(kinds.filter((k) => k === LOG_TRUNCATED).length, 1);
   assert.equal(kinds.filter((k) => k === 'narration').length, 3);
   assert.ok(kinds.includes('settle'));
-});
-
-test('sidecar ingest: new lines only, idempotent on re-read, invalid lines counted and never stored', (t) => {
-  const repo = repoDir(t);
-  const logs = logsOf(t, repo);
-  const file = sidecarFileOf(repo, WF, 'op-side-1');
-  fs.mkdirSync(path.dirname(file), { recursive: true });
-  const line = (o) => `${JSON.stringify(o)}\n`;
-  fs.writeFileSync(file, line({ kind: 'step.start', msg: 'Build', data: { name: 'build' }, at: 1000 }) + line({ kind: 'cmd.run', msg: 'tsc', data: { cmd: 'tsc', exit: 0 } }) + 'not json\n'
-    + line({ kind: 'cmd.run', msg: 'missing exit', data: { cmd: 'x' } }));
-  const first = ingestSidecar(logs, { repo, workflowId: WF, jobId: 'op-side-1' });
-  assert.deepEqual([first.read, first.inserted, first.invalid], [4, 2, 2]);
-  assert.equal(ingestSidecar(logs, { repo, workflowId: WF, jobId: 'op-side-1' }).inserted, 0, 'the cursor holds');
-  fs.appendFileSync(file, line({ kind: 'step.end', msg: 'Build xong', data: { name: 'build', durationMs: 1200 } }) + '{"kind":"narration","msg":"half');
-  const second = ingestSidecar(logs, { repo, workflowId: WF, jobId: 'op-side-1' });
-  assert.deepEqual([second.read, second.inserted], [1, 1], 'a partial last line waits for its newline');
-  // A rewritten file (the cursor past its end) is re-read from the start: the line hashes keep it idempotent.
-  fs.writeFileSync(file, line({ kind: 'step.start', msg: 'Build', data: { name: 'build' }, at: 1000 }));
-  assert.equal(ingestSidecar(logs, { repo, workflowId: WF, jobId: 'op-side-1' }).inserted, 0);
-  const rows = readLogs(logs, { workflowId: WF, jobIds: ['op-side-1'] }).rows;
-  assert.deepEqual(rows.map((r) => [r.kind, r.actor]), [['step.start', 'op'], ['cmd.run', 'op'], ['step.end', 'op']]);
-  assert.equal(rows[0].at, 1000);
 });
 
 test('event-derived rows: dispatch, checks, settle with land, incident, drop - pure mapping', () => {
