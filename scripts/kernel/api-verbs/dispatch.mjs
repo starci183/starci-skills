@@ -19,7 +19,7 @@ import { jobPayloadOf, operationTerminalHandleOf, latestGoal, ownedPathsOf, work
 import { DISPATCHES, requirePhase } from '../api-lib/lifecycle.mjs';
 import { PEER_WAIT, leaseCanonOf, openPeerWaits, releaseTypedWaits } from '../api-lib/peers.mjs';
 import { hostResourcesFor, HOST_RESOURCES_LOW } from '../../lib/host-resources.mjs';
-import { hostThrottle, noteThrottled, DISPATCH_THROTTLED } from '../../lib/ram-throttle.mjs';
+import { hostThrottle, noteThrottled, releaseThrottled, DISPATCH_THROTTLED } from '../../lib/ram-throttle.mjs';
 import { deferredQueueCause } from '../autopilot.mjs';
 import { resolveCardLaunchModel, resolveLaunchModel, missingHostTools, defaultOperationTarget } from '../../agent/models.mjs';
 import { kindOrder, isFanOutSlice } from '../../agent/models.mjs';
@@ -411,12 +411,13 @@ export default {
     } : null;
     if (throttled) {
       try { ledger.transaction(() => ledger.appendEvent({ workflowId: job.workflow_id, entityType: 'job', entityId: jobId, kind: DISPATCH_THROTTLED, payload: throttled })); } catch { /* the wait stands without its event */ }
-      if (!throttle.testContext) noteThrottled(throttle.stateFile, { at: new Date().toISOString(), jobId, workflowId: job.workflow_id, op, reason: admission.reason, freeRamPct: throttled.freeRamPct, effectiveCap: admission.effectiveCap });
+      if (!throttle.testContext) noteThrottled({ jobId, workflowId: job.workflow_id, ledgerId: ledger.ledgerId ?? null, reason: admission.reason });
     }
     emit({ ok: false, jobId, op, reason: HOST_RESOURCES_LOW, waiting: true, host: { ...host, lowRam: host.lowRam || Boolean(throttled) }, ...(throttled ? { throttle: throttled } : {}), detail },
       `dispatch WAITING for ${jobId} (${op}): ${HOST_RESOURCES_LOW} - ${detail}`, args.json);
     process.exit(1);
   }
+  if (admission?.ok) releaseThrottled({ jobId, ledgerId: ledger.ledgerId ?? null });
   // A route decision may have been persisted before another job proves the
   // shared provider credential is dead. Re-check the durable provider circuit
   // before taking leases or creating an Orca Task so an already-routed sibling

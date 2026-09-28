@@ -11,11 +11,11 @@
 //   node scripts/supervisor/ram-cap.mjs unprioritize --workflow <id> [--json]
 //        drop the host override; runtimes.yaml allocation.resources.ramThrottle.priorities applies again
 //
-// The override lives in the throttle state file next to the machine registry (ram-throttle.json), read by every
-// dispatch of every workflow on this host.
+// The override lives in machine.sqlite throttle_state.priorities_json, read by every dispatch of every workflow on
+// this host.
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { hostThrottle, setPriority, throttleStateFile, throttleLine, readThrottleState, priorityTable } from '../lib/ram-throttle.mjs';
+import { hostThrottle, setPriority, throttleLine, readThrottleState, priorityTable } from '../lib/ram-throttle.mjs';
 
 const selfFile = fileURLToPath(import.meta.url);
 
@@ -24,16 +24,15 @@ function main(argv) {
   const opt = (name) => { const i = argv.indexOf(`--${name}`); return i >= 0 ? argv[i + 1] : null; };
   const json = argv.includes('--json');
   const out = (value, text) => console.log(json ? JSON.stringify(value) : text);
-  const file = throttleStateFile();
   if (verb === 'prioritize' || verb === 'unprioritize') {
     const workflowId = opt('workflow');
     if (!workflowId) { console.error(`${verb} needs --workflow <id>`); return 2; }
     const weight = verb === 'prioritize' ? Number(opt('weight')) : null;
     if (verb === 'prioritize' && !(weight > 0)) { console.error('prioritize needs --weight <positive number>'); return 2; }
-    const ok = setPriority(file, { workflowId, weight, reserve: Number(opt('reserve') ?? 0) });
-    const priorities = priorityTable(null, readThrottleState(file));
-    out({ ok, workflowId, priority: priorities[workflowId] ?? { weight: 1, reserve: 0 }, stateFile: file },
-      `${ok ? 'set' : 'FAILED'}: ${workflowId} ${JSON.stringify(priorities[workflowId] ?? { weight: 1, reserve: 0 })} (${file})`);
+    const ok = setPriority({ workflowId, weight, reserve: Number(opt('reserve') ?? 0) });
+    const priorities = priorityTable(null, readThrottleState());
+    out({ ok, workflowId, priority: priorities[workflowId] ?? { weight: 1, reserve: 0 }, store: 'machine.sqlite throttle_state' },
+      `${ok ? 'set' : 'FAILED'}: ${workflowId} ${JSON.stringify(priorities[workflowId] ?? { weight: 1, reserve: 0 })} (machine.sqlite throttle_state)`);
     return ok ? 0 : 1;
   }
   if (verb === 'status' || !verb) {

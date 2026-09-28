@@ -6,6 +6,8 @@ import path from 'node:path';
 import {spawnSync} from 'node:child_process';
 import {FAKE_ORCA} from './helpers/fake-orca.mjs';
 import {inspectLedger,ledgerFileFor,openLedger} from '../engine/ledger-db.mjs';
+import {withMachine} from '../engine/machine-db.mjs';
+import {publishThrottle} from '../scripts/lib/ram-throttle.mjs';
 
 // Spec item 3: `api dispatch --spawn` refuses on a host below allocation.resources.minFreeDiskGb /
 // minFreeRamPct with the typed reason host-resources-low — a WAIT like path-lease (waiting:true, the
@@ -50,16 +52,17 @@ const fixture=t=>{
     STARCI_FAKE_ORCA_LOG:path.join(root,'calls.jsonl'),
     STARCI_FAKE_ORCA_STATE:path.join(root,'state.json'),
     LOCALAPPDATA:path.join(root,'localappdata'),
-    STARCI_RAM_THROTTLE_STATE:path.join(root,'ram-throttle.json'),
+    STARCI_TEST_MACHINE_FILE:path.join(root,'machine.sqlite'),
   };
   const run=(extraEnv,...args)=>spawnSync(process.execPath,[API,...args,'--repo',repo,'--json'],{cwd:ROOT,encoding:'utf8',windowsHide:true,timeout:180000,env:{...env,...extraEnv}});
-  const withWrite=fn=>{const l=openLedger({file:ledgerFileFor(repo)});try{return fn(l);}finally{l.close();}};
+  const withWrite=fn=>{const l=openLedger({file:ledgerFileFor(repo,{env})});try{return fn(l);}finally{l.close();}};
   withWrite(l=>{
     l.ensureWorkflow({workflowId:WORKFLOW,title:'host resources'});
     l.db.prepare("UPDATE workflows SET phase='queued' WHERE workflow_id=?").run(WORKFLOW);
   });
-  const inspect=fn=>{const l=inspectLedger({file:ledgerFileFor(repo)});try{return fn(l.db);}finally{l.close();}};
-  return {root,repo,run,inspect,withWrite};
+  const inspect=fn=>{const l=inspectLedger({file:ledgerFileFor(repo,{env})});try{return fn(l.db);}finally{l.close();}};
+  const machine=fn=>withMachine(fn,{env});
+  return {root,repo,run,inspect,withWrite,machine};
 };
 const leading=stdout=>{
   const open=stdout.indexOf('{'),close=stdout.indexOf('\n}');
@@ -154,7 +157,9 @@ test('under 10% free RAM a heavy op waits with a dispatch-throttled event; a lig
   assert.equal(fx.inspect(db=>db.prepare('SELECT status FROM jobs WHERE job_id=?').get(heavy).status),'queued');
   // 13% is back over the 10% floor but under the 15% resume line: the hysteresis is the Resource controller's (the one
   // writer of the mode); while its published mode is heavy-paused, the heavy op still waits.
-  fs.writeFileSync(path.join(fx.root,'ram-throttle.json'),JSON.stringify({mode:'heavy-paused',ramMode:'heavy-paused',cpuHot:false,why:'free RAM 8% < 10%',at:new Date().toISOString(),writer:'reconciler/resource'}));
+  const held=fx.machine(m=>m.db.prepare('SELECT job_id,reason,released_at FROM throttle_decisions').all());
+  assert.deepEqual(held.map(r=>[r.job_id,r.reason,r.released_at]),[[heavy,'heavy-paused',null]],'the held op is an open throttle_decisions row');
+  fx.machine(m=>publishThrottle(m,{mode:'heavy-paused',why:'free RAM 8% < 10%',writer:'reconciler/resource'}));
   const again=fx.run({[HOST_ENV]:RAM_AT(13)},'dispatch','--job',heavy,'--model','qwen-agent','--spawn');
   assert.notEqual(again.status,0);
   assert.equal(leading(again.stdout).throttle.reason,'heavy-paused');
@@ -165,7 +170,11 @@ test('under 10% free RAM a heavy op waits with a dispatch-throttled event; a lig
   assert.equal(fx.inspect(db=>db.prepare('SELECT status FROM jobs WHERE job_id=?').get(light).status),'running');
 
   // At 20%, above the 15% resume line, the controller publishes normal again and the heavy op launches.
-  fs.writeFileSync(path.join(fx.root,'ram-throttle.json'),JSON.stringify({mode:'normal',ramMode:'normal',cpuHot:false,why:'free RAM 20%',at:new Date().toISOString(),writer:'reconciler/resource'}));
+  fx.machine(m=>publishThrottle(m,{mode:'normal',why:'free RAM 20%',writer:'reconciler/resource'}));
   const back=fx.run({[HOST_ENV]:RAM_AT(20)},'dispatch','--job',heavy,'--model','qwen-agent','--spawn');
   assert.equal(back.status,0,`above the resume line the heavy op dispatches: ${back.stderr||back.stdout}`);
+  const decisions=fx.machine(m=>m.db.prepare('SELECT job_id,released_at,waited_ms FROM throttle_decisions').all());
+  assert.equal(decisions.length,1,'one row per held job, however often it re-probed');
+  assert.ok(decisions[0].released_at!=null&&decisions[0].waited_ms>=0,'admitted: released with its wait');
+  assert.deepEqual(fx.machine(m=>m.db.prepare('SELECT from_mode,to_mode FROM throttle_events ORDER BY seq').all().map(e=>[e.from_mode,e.to_mode])),[[null,'heavy'],['heavy','normal']]);
 });

@@ -5,14 +5,14 @@
 //   key resource:host, every resyncMs (30 s):
 //     fleetCensus (every ledger the machine registry names) + machineLoad + memoryProbe (host-resources) → nextMode
 //     (hysteresis: minFreeRamPct 10 / heavyResumeAbovePct 15, landSpecPauseBelowPct 2.5 / landSpecResumeAbovePct 5,
-//     CPU 0.95 / 0.85) → the throttle state (ram-throttle.json, writeThrottleState through updateThrottleState): in
-//     active this controller is the single writer of the mode; in shadow it writes NOTHING and keeps its own
-//     hysteresis in memory, recording a reconciler.would row when its mode or slot targets change (with the live
-//     file's mode beside it: the shadow diff);
+//     CPU 0.95 / 0.85) → machine.sqlite throttle_state (publishThrottle → setThrottle: a mode change appends its
+//     throttle_events row first) + one host_samples row kind 'host': in active this controller is the single writer
+//     of the mode; in shadow it writes NOTHING and keeps its own hysteresis in memory, recording a reconciler.would
+//     row when its mode or slot targets change (with the published mode beside it: the shadow diff);
 //     fair share: per-workflow slot targets (reserve first, then weight share of maxParallelOps among workflows with
 //     ready work, water-filled up to each one's demand) published as `slotTargets` in the same state, for lane B's
 //     dispatch pass and admitOp to read; admitOp's own semantics are unchanged;
-//     every footprintEveryMs (5 min) one op-ram-footprint supervisor event (footprintSample, as tick.mjs did);
+//     every footprintEveryMs (5 min) one op-ram-footprint sample (footprintSample) as host_samples kind 'op-footprint';
 //     clocks RAM_CRITICAL (mode critical) and DISK_LOW (host-resources lowDisk); cap-starved: the priority workflow
 //     (reserve > 0) held fewer slots than min(reserve, demand) for capStarvedMs (15 min) → a Decision Item to the
 //     Supervisor;
@@ -27,6 +27,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { parseYaml } from '../../../engine/yaml.mjs';
 import { claimDue, finishDuty } from '../schedules.mjs';
+import { readSupervisor, withSupervisor } from '../../supervisor/home.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..', '..');
 const NAME = 'resource';
@@ -168,23 +169,26 @@ const liveDeps = {
     .map(([id, r]) => ({ target: r?.target ?? id, provider: r?.provider ? String(r.provider).toLowerCase().replace(/-agent$/, '') : null, maxParallel: Number(r?.maxParallel) || null })),
   load: async () => { try { return (await import('../../supervisor/workers.mjs')).machineLoad({ sampleMs: 200 })?.cpuBusy ?? null; } catch { return null; } },
   census: async () => (await import('../../lib/ram-throttle.mjs')).fleetCensus({}),
-  footprints: async (limit) => { try { return (await import('../../lib/ram-throttle.mjs')).recentFootprints({ limit }); } catch { return []; } },
+  footprints: async (limit, env) => { try { return (await import('../../lib/ram-throttle.mjs')).recentFootprints({ limit, env: env ?? process.env }); } catch { return []; } },
   owners: async () => { const h = await import('../../supervisor/host-health.mjs'); return h.groupByOwner(h.listProcesses(), { limit: Infinity }); },
-  recordFootprint: async (payload) => {
-    const { openSupervisorLedger, supervisorEvent } = await import('../../supervisor/home.mjs');
-    const { OP_RAM_FOOTPRINT } = await import('../../lib/ram-throttle.mjs');
-    const w = openSupervisorLedger();
-    try { w.transaction(() => supervisorEvent(w, { entityType: 'host', entityId: 'ram', kind: OP_RAM_FOOTPRINT, payload })); }
-    finally { try { w.close(); } catch { /* closed */ } }
+  recordFootprint: async (payload, env) => {
+    const { recordFootprint } = await import('../../lib/ram-throttle.mjs');
+    withSupervisor((m) => recordFootprint(m, payload), { env });
   },
+  // machine.sqlite of this env (a spec passes STARCI_TEST_MACHINE_FILE in `env`); null: process.env.
+  env: null,
 };
+const MB = 1048576;
 
 /* ------------------------------------------------------------ the controller */
 
 export function createResourceController(overrides = {}) {
   const deps = { ...liveDeps, ...overrides };
+  const env = () => deps.env ?? process.env;
+  const writeMachine = (fn) => withSupervisor(fn, { env: env() });
+  const readMachineOr = (fn, fallback) => readSupervisor(fn, fallback, { env: env() });
   const settings = { ...resourceControllerSettings(), ...(overrides.config ?? {}) };
-  // Shadow keeps its own hysteresis (it never writes the file); active reads it back from the file it writes.
+  // Shadow keeps its own hysteresis (it never writes throttle_state); active reads it back from the row it writes.
   const memory = { shadowPrev: null, lastWould: null, lastFootprintAt: null, starving: {}, clocks: {}, lastProbe: {},
     pools: null, poolCursor: {}, providerSeen: {}, poolWould: null, circuits: {} };
 
@@ -203,15 +207,14 @@ export function createResourceController(overrides = {}) {
     const cpuBusy = await deps.load();
     const census = await deps.census();
     const ops = census?.ops ?? [];
-    const file = deps.stateFile ?? t.throttleStateFile();
-    const live = t.readThrottleState(file);
+    const live = t.readThrottleState({ env: env() });
     const active = ctx.mode === 'active';
     const prev = active ? live : (memory.shadowPrev ?? { ramMode: live.ramMode, cpuHot: live.cpuHot, mode: live.mode, since: live.since });
     const ramKnown = Number(host?.totalRamBytes) > 0 || host?.freeRamPct != null && host?.override;
     const m = ramKnown ? t.nextMode(prev, { freeRamPct: host.freeRamPct, cpuBusy }, thresholds)
       : { mode: prev.mode ?? 'normal', ramMode: prev.ramMode ?? 'normal', cpuHot: Boolean(prev.cpuHot), why: 'RAM unmeasured: mode unchanged' };
     const maxParallelOps = await deps.maxParallelOps();
-    const estimates = t.opRamEstimates(t.opRamTable(s), await deps.footprints(thresholds.historySamples), thresholds);
+    const estimates = t.opRamEstimates(t.opRamTable(s), await deps.footprints(thresholds.historySamples, env()), thresholds);
     const running = ops.filter((o) => o.status !== 'queued');
     const cap = t.effectiveCapOf({ maxParallelOps, running: running.length, host, mode: m.mode, estimates, thresholds });
     const priorities = t.priorityTable(s, live);
@@ -224,14 +227,25 @@ export function createResourceController(overrides = {}) {
       writer: WRITER, slotTargets: { at: new Date(now).toISOString(), maxParallelOps, capacity: share.capacity, targets: share.targets, poolCaps: poolCapsOf(memory.pools) } };
 
     let wrote = false;
-    if (active) wrote = t.updateThrottleState(file, () => patch);
-    else {
+    if (active) {
+      try {
+        const freeRamMb = host?.freeRamBytes == null ? null : Math.round(Number(host.freeRamBytes) / MB);
+        writeMachine((mm) => mm.transaction(() => {
+          t.publishThrottle(mm, { mode: m.mode, cpuHot: m.cpuHot, why: m.why, effectiveCap: cap.effectiveCap, heavyCap: cap.heavyCap, running: running.length,
+            freeRamPct: patch.freeRamPct, freeRamMb, cpuBusy: patch.cpuBusy, slotTargets: patch.slotTargets, writer: WRITER,
+            sample: { freeRamPct: patch.freeRamPct, cpuBusy: patch.cpuBusy, ramMode: m.ramMode, cpuHot: m.cpuHot, why: m.why } });
+          mm.recordHostSample({ kind: 'host', freeRamPct: patch.freeRamPct, freeRamMb, cpuPct: patch.cpuBusy == null ? null : Math.round(patch.cpuBusy * 1000) / 10,
+            freeDiskGb: host?.freeDiskGb ?? null, mode: t.dbMode(m.mode), effectiveCap: cap.effectiveCap, running: running.length });
+        }));
+        wrote = true;
+      } catch (error) { ctx.log('reconciler.resource.error', `throttle_state: ${String(error?.message ?? error).slice(0, 200)}`, { controller: NAME }); }
+    } else {
       memory.shadowPrev = { mode: m.mode, ramMode: m.ramMode, cpuHot: m.cpuHot, since };
       const sig = JSON.stringify({ mode: m.mode, targets: Object.fromEntries(Object.entries(share.targets).map(([k, v]) => [k, v.target])) });
       if (sig !== memory.lastWould) {
         memory.lastWould = sig;
-        ctx.log(WOULD, `throttle state: mode ${m.mode} (live file: ${live.mode ?? '-'}), slot targets ${Object.entries(share.targets).map(([k, v]) => `${k}=${v.target}`).join(', ') || '-'}`,
-          { controller: NAME, action: 'writeThrottleState', file, patch, liveMode: live.mode ?? null, liveWriter: live.writer ?? null, diff: (live.mode ?? 'normal') !== m.mode });
+        ctx.log(WOULD, `throttle state: mode ${m.mode} (published: ${live.mode ?? '-'}), slot targets ${Object.entries(share.targets).map(([k, v]) => `${k}=${v.target}`).join(', ') || '-'}`,
+          { controller: NAME, action: 'setThrottle', patch, liveMode: live.mode ?? null, liveWriter: live.writer ?? null, diff: (live.mode ?? 'normal') !== m.mode });
       }
     }
 
@@ -243,8 +257,8 @@ export function createResourceController(overrides = {}) {
       try {
         const owners = await deps.owners();
         footprint = t.footprintSample({ owners, ops, kernels: census?.kernels ?? 0, freeRamPct: patch.freeRamPct });
-        if (active) await deps.recordFootprint(footprint);
-        else ctx.log(WOULD, `op-ram-footprint: op agents ${footprint.opAgentRamMb} MB`, { controller: NAME, action: 'supervisorEvent', kind: 'op-ram-footprint', payload: footprint });
+        if (active) await deps.recordFootprint(footprint, env());
+        else ctx.log(WOULD, `op-ram-footprint: op agents ${footprint.opAgentRamMb} MB`, { controller: NAME, action: 'recordHostSample', kind: t.FOOTPRINT_SAMPLE_KIND, payload: footprint });
       } catch (error) { ctx.log('reconciler.resource.error', `footprint: ${String(error?.message ?? error).slice(0, 200)}`, { controller: NAME }); }
     }
 
@@ -291,7 +305,7 @@ export function createResourceController(overrides = {}) {
    * job's routed pool, else every pool of payload.provider) and provider-health rows of failureKind rate-limited
    * observed since. Halve on a signal (floor backoffFloor, at most once per backoffDecreaseCooldownMs), +1 per
    * backoffIncreaseStepMs after backoffIncreaseAfterMs quiet, up to the pool's runtimes.yaml maxParallel. Active:
-   * publish poolBackoff in the throttle state (route reads it and prefers the next eligible pool); shadow: a would-row
+   * machine.sqlite pool_backoff rows (route reads them and prefers the next eligible pool); shadow: a would-row
    * when the caps change. A pool held at its floor while the rate limit persists for backoffPersistMs opens the
    * provider circuit (api provider-backoff) on every product ledger, once per floor episode.
    */
@@ -315,19 +329,19 @@ export function createResourceController(overrides = {}) {
       const prov = [p.provider, p.pool].map(providerKey).find((v) => v && byProvider.has(v));
       for (const target of byProvider.get(prov) ?? []) hit(target, at);
     };
-    // The Job controller's worker-health probe logs reconciler.provider-rate-limited typed rows on the Supervisor
-    // ledger (ctx.log, lane B): {jobId, workflowId, provider, pool, model, resetMs}.
+    // The Job controller's worker-health probe logs reconciler.provider-rate-limited typed rows (ctx.log, lane B) in
+    // machine.sqlite machine_logs: {jobId, workflowId, provider, pool, model, resetMs}.
     try {
-      const since = memory.poolCursor.supervisor ?? null;
-      const rows = await ctx.read('supervisor', (db) => ({
-        logs: db.prepare(`SELECT seq, at, data_json d FROM logs WHERE kind IN ('reconciler.provider-rate-limited','provider-rate-limited') AND ${since == null ? 'at>=?' : 'seq>?'} ORDER BY seq`).all(since == null ? seedSince : since),
-        maxSeq: db.prepare('SELECT COALESCE(MAX(seq),0) s FROM logs').get()?.s ?? 0,
-      }));
+      const since = memory.poolCursor.machine ?? null;
+      const rows = readMachineOr((mm) => ({
+        logs: mm.db.prepare(`SELECT seq, at, data_json d FROM machine_logs WHERE kind IN ('reconciler.provider-rate-limited','provider-rate-limited') AND ${since == null ? 'at>=?' : 'seq>?'} ORDER BY seq`).all(since == null ? seedSince : since),
+        maxSeq: mm.db.prepare('SELECT COALESCE(MAX(seq),0) s FROM machine_logs').get()?.s ?? 0,
+      }), null);
       if (rows) {
-        memory.poolCursor.supervisor = Math.max(Number(since) || 0, Number(rows.maxSeq) || 0);
+        memory.poolCursor.machine = Math.max(Number(since) || 0, Number(rows.maxSeq) || 0);
         for (const r of rows.logs ?? []) { let d = {}; try { d = JSON.parse(r.d || '{}'); } catch { d = {}; } hitSignal(d, r.at); }
       }
-    } catch { /* an unreadable supervisor ledger adds no signal */ }
+    } catch { /* an unreadable machine.sqlite adds no signal */ }
     const EVENTS_SQL = `SELECT e.seq, e.created_at at, e.payload_json p, json_extract(j.payload_json,'$.model') jobPool
       FROM events e LEFT JOIN jobs j ON j.job_id=e.entity_id WHERE e.kind=? AND `;
     for (const l of (ctx.ledgers ?? []).filter((x) => x.ledgerId !== 'supervisor')) {
@@ -355,10 +369,9 @@ export function createResourceController(overrides = {}) {
         for (const target of byProvider.get(k) ?? []) hit(target, at);
       }
     }
-    const file = deps.stateFile ?? t.throttleStateFile();
-    const live = t.readThrottleState(file);
+    const liveRows = readMachineOr((mm) => mm.poolBackoff(), []);
     const active = ctx.mode === 'active';
-    const prevAll = memory.pools ?? (active ? live[pb.POOL_BACKOFF_KEY] ?? {} : {});
+    const prevAll = memory.pools ?? (active ? pb.entriesOfRows(liveRows) : {});
     const next = {};
     for (const p of pools) {
       const max = Number(p.maxParallel);
@@ -370,14 +383,20 @@ export function createResourceController(overrides = {}) {
     memory.pools = next;
     const caps = poolCapsOf(next);
     if (active) {
-      if (Object.keys(next).length || Object.keys(live[pb.POOL_BACKOFF_KEY] ?? {}).length)
-        t.updateThrottleState(file, () => ({ [pb.POOL_BACKOFF_KEY]: next, poolBackoffAt: new Date(now).toISOString(), poolBackoffStaleMs: settings.backoffStaleMs, poolBackoffWriter: WRITER }));
+      if (Object.keys(next).length || liveRows.length) {
+        try {
+          writeMachine((mm) => mm.transaction(() => {
+            for (const [pool, e] of Object.entries(next)) mm.setPoolBackoff(pb.poolRowOf(pool, e, { now, staleMs: settings.backoffStaleMs }));
+            for (const r of liveRows) if (!next[r.pool]) mm.clearPoolBackoff(r.pool);
+          }));
+        } catch (error) { ctx.log('reconciler.resource.error', `pool_backoff: ${String(error?.message ?? error).slice(0, 200)}`, { controller: NAME }); }
+      }
     } else {
       const sig = JSON.stringify(caps);
       if (sig !== memory.poolWould) {
         memory.poolWould = sig;
         const text = Object.entries(next).map(([k, e]) => `${k} ${e.cap}/${e.max}${e.reason ? ` (${e.reason})` : ''}`).join(', ') || 'every pool at its maxParallel';
-        ctx.log(WOULD, `pool backoff: ${text}`, { controller: NAME, action: 'writeThrottleState', file, patch: { [pb.POOL_BACKOFF_KEY]: next }, caps });
+        ctx.log(WOULD, `pool backoff: ${text}`, { controller: NAME, action: 'setPoolBackoff', patch: { poolBackoff: next }, caps });
       }
     }
     // A rate limit that persists at the floor: the provider circuit, once per floor episode, on every product ledger.

@@ -139,21 +139,21 @@ test('footprint sample: agent and op process groups count, the rest do not', () 
 test('hostThrottle: a fake host sample drives admission; the dispatch path never writes the mode (the Resource controller does)', (t) => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'starci-ram-throttle-'));
   t.after(() => fs.rmSync(dir, { recursive: true, force: true }));
-  const stateFile = path.join(dir, 'ram-throttle.json');
-  const env = (freePct, extra = {}) => ({ ...process.env, STARCI_HOST_RESOURCES_JSON: JSON.stringify({ freeDiskGb: 500, totalRamBytes: 68.6 * GB, freeRamBytes: 68.6 * GB * freePct / 100, cpuBusy: 0.6, ops: running(6), ...extra }) });
-  const first = hostThrottle({ op: 'code.refactor', workflowId: 'wf-a', env: env(8), stateFile });
+  const machine = { ...process.env, STARCI_TEST_MACHINE_FILE: path.join(dir, 'machine.sqlite') };
+  const env = (freePct, extra = {}) => ({ ...machine, STARCI_HOST_RESOURCES_JSON: JSON.stringify({ freeDiskGb: 500, totalRamBytes: 68.6 * GB, freeRamBytes: 68.6 * GB * freePct / 100, cpuBusy: 0.6, ops: running(6), ...extra }) });
+  const first = hostThrottle({ op: 'code.refactor', workflowId: 'wf-a', env: env(8) });
   assert.equal(first.mode, 'heavy-paused');
   assert.equal(first.admission.ok, false);
   assert.equal(first.admission.reason, 'heavy-paused');
-  assert.equal(readThrottleState(stateFile).mode, undefined, 'nothing written: the hysteresis state is the Resource controller\'s');
-  const back = hostThrottle({ op: 'code.refactor', workflowId: 'wf-a', env: env(20), stateFile });
+  assert.equal(readThrottleState({ env: machine }).mode, undefined, 'nothing written: the hysteresis state is the Resource controller\'s');
+  const back = hostThrottle({ op: 'code.refactor', workflowId: 'wf-a', env: env(20) });
   assert.equal(back.mode, 'normal');
   assert.equal(back.admission.ok, true);
   assert.equal(back.cap.maxParallelOps, 20);
   assert.match(throttleLine(back), /effective cap \d+\/20/);
   // The Supervisor's override puts wf-a on top: its heavy op starts under the heavy pause.
-  setPriority(stateFile, { workflowId: 'wf-a', weight: 5, reserve: 3 });
-  const prio = hostThrottle({ op: 'code.refactor', workflowId: 'wf-a', env: env(8), stateFile });
+  assert.equal(setPriority({ workflowId: 'wf-a', weight: 5, reserve: 3, env: machine }), true);
+  const prio = hostThrottle({ op: 'code.refactor', workflowId: 'wf-a', env: env(8) });
   assert.equal(prio.mode, 'heavy-paused');
   assert.equal(prio.admission.ok, true, prio.admission.detail);
 });

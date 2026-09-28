@@ -27,7 +27,7 @@ import { parseYaml } from '../../engine/yaml.mjs';
 import { skillRoot } from '../../engine/runtime-root.mjs';
 import { parseJsonOr } from '../lib/json.mjs';
 import { clipLine } from '../lib/clip.mjs';
-import { priorityTable, readThrottleState, throttleStateFile } from '../lib/ram-throttle.mjs';
+import { priorityTable, readThrottleState } from '../lib/ram-throttle.mjs';
 import { specsOf } from './spec-deferral.mjs';
 import { kernelDecisionItems } from '../reconcile/job-settle.mjs';
 import { importsBrokenOf } from './api-status/imports.mjs';
@@ -101,7 +101,7 @@ const runtimesDoc = (() => { let doc; return () => { if (doc === undefined) { tr
 
 /** The priority table (runtimes.yaml ramThrottle.priorities + the Supervisor's host overrides). Never throws. */
 export function priorities() {
-  try { return priorityTable(null, readThrottleState(throttleStateFile())); }
+  try { return priorityTable(null, readThrottleState()); }
   catch { try { return priorityTable(null, {}); } catch { return {}; } }
 }
 

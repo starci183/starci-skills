@@ -14,7 +14,7 @@
 //      maxParallelOps - the owner's 20 is never exceeded, whatever the RAM says;
 //   2. priority slots: a workflow below the top priority weight leaves the prioritized workflows' reserved slots
 //      free (min(reserve, their queued + running) - their running);
-//   3. mode (hysteresis, persisted across dispatch processes in ram-throttle.json next to the machine registry):
+//   3. mode (hysteresis; the Resource controller publishes it in machine.sqlite throttle_state, DBTREE.sql B4):
 //        normal        free RAM >= minFreeRamPct (10) and CPU below cpuHeavyStopAbove - every op may start;
 //        heavy-paused  free RAM < 10%, or CPU saturated - no NEW heavy op (Playwright / render / test / implement:
 //                      the `heavy` class of the opRam table) from a workflow below the top priority; the
@@ -26,33 +26,36 @@
 //      top priority also leaves the RAM the prioritized workflows' pending ops need (a light op only its slots).
 // Running ops are never killed: the throttle only refuses NEW launches, as the typed wait host-resources-low
 // (waiting:true, nothing recorded as a rejection - the job stays queued and the next dispatch re-probes). Each
-// refusal is a `dispatch-throttled` event on the job's ledger with the numbers.
+// refusal is a `dispatch-throttled` event on the job's ledger with the numbers, and one open throttle_decisions row per
+// held job (machine.sqlite; released with its waited_ms when the job is admitted).
 //
 // Priorities: allocation.resources.ramThrottle.priorities in runtimes.yaml ({<workflowId>: {weight, reserve}}),
-// overridden per host by the Supervisor (scripts/supervisor/ram-cap.mjs prioritize) in the state file. Weight 1 is
+// overridden per host by the Supervisor (scripts/supervisor/ram-cap.mjs prioritize) in throttle_state.priorities_json. Weight 1 is
 // everyone's default; with no weight above 1 anywhere, every workflow is equal and steps 2 and 4's priority share
 // do nothing.
 //
 // Per-op RAM estimates: the opRam table of runtimes.yaml (allocation.resources.opRam) is the prior; the
 // op-ram-footprint history (one per supervisor tick sample, scripts/supervisor/tick.mjs: the RAM of the agent
 // process trees minus the kernels', shared across the running ops in proportion to their priors) replaces a kind's
-// prior once it has historyMinObservations observations, clamped to [0.5x, 3x] of the prior so one noisy sample
+// prior once it has historyMinObservations observations (machine.sqlite host_samples kind 'op-footprint'), clamped to [0.5x, 3x] of the prior so one noisy sample
 // cannot admit or starve a kind. The worker-footprint events of scripts/guards/footprint-scan.mjs are the FILE
-// footprint (worktrees, links) and carry no RAM, so the RAM history is its own event kind.
+// footprint (worktrees, links) and carry no RAM, so the RAM history is its own sample kind.
 //
 // Seams: every pure function takes its numbers; hostThrottle() takes `env` (STARCI_HOST_RESOURCES_JSON - the fake
 // host sample a spec hands the dispatch CLI, which may also carry cpuBusy, ops [{op, workflowId, status}] and
-// footprints), `load`, `census`, `footprints` and `stateFile`. STARCI_RAM_THROTTLE_STATE names the state file.
-import fs from 'node:fs';
-import path from 'node:path';
+// footprints), `load`, `census`, `footprints` and `state` (the throttle state object; default read from machine.sqlite
+// of `env`, STARCI_TEST_MACHINE_FILE in a spec).
+//
+// The store (machine.sqlite, DBTREE.sql B4; ram-throttle.json is retired): throttle_state (one row id=1, the writer and
+// its rev - MB-15), throttle_events (every mode change, append-only - G7), throttle_decisions (ops held back),
+// host_samples (kind 'host' per controller pass, 'op-footprint' per footprint sample). The DB mode enum is
+// normal|heavy|critical; this module's MODES name heavy 'heavy-paused' (mapped at the boundary: dbMode/codeMode).
 import { allocationSettings, runtimeProfile } from '../../engine/config.mjs';
 import { openLedgerReader } from '../../engine/ledger-db.mjs';
-import { runtimeRootFor } from '../../engine/machine-db.mjs';
+import { readMachine, withMachine } from '../../engine/machine-db.mjs';
 import { hostResourcesFor, resourceThresholds, HOST_RESOURCES_ENV } from './host-resources.mjs';
 import { machineLedgerFiles } from '../agent/balance.mjs';
 import { machineLoad } from '../supervisor/workers.mjs';
-import { SUPERVISOR_WF, withSupervisorRead } from '../supervisor/home.mjs';
-import { renameOver } from './rename-over.mjs';
 
 /** The Resource controller's writer tag (scripts/reconciler/controllers/resource.mjs) and how long its mode stays usable. */
 export const RECONCILER_WRITER = 'reconciler/resource';
@@ -60,7 +63,8 @@ export const RECONCILER_MODE_FRESH_MS = 120_000;
 
 export const DISPATCH_THROTTLED = 'dispatch-throttled';
 export const OP_RAM_FOOTPRINT = 'op-ram-footprint';
-export const THROTTLE_STATE_ENV = 'STARCI_RAM_THROTTLE_STATE';
+/** host_samples.kind of one op-ram-footprint sample. */
+export const FOOTPRINT_SAMPLE_KIND = 'op-footprint';
 export const MODES = Object.freeze(['normal', 'heavy-paused', 'critical']);
 // The job statuses that hold a slot (scripts/kernel/api.mjs SLOT_HOLDING_STATUSES: dispatched and not settled).
 export const SLOT_STATUSES = Object.freeze(['leased', 'running', 'reported', 'effect_unknown', 'answering']);
@@ -271,38 +275,86 @@ export function admitOp({ op, workflowId = null, ops = [], maxParallelOps = null
 
 /* ------------------------------------------------------------ IO */
 
-export const throttleStateFile = (env = process.env) => (env?.[THROTTLE_STATE_ENV] ? path.resolve(env[THROTTLE_STATE_ENV]) : path.join(runtimeRootFor(env), 'ram-throttle.json'));
+/** The DB mode (throttle_state / throttle_events enum normal|heavy|critical) of a code mode, and back. */
+export const dbMode = (mode) => (mode === 'heavy-paused' ? 'heavy' : MODES.includes(mode) ? mode : 'normal');
+export const codeMode = (mode) => (mode === 'heavy' ? 'heavy-paused' : MODES.includes(mode) ? mode : null);
+const iso = (ms) => (ms != null && Number.isFinite(Number(ms)) ? new Date(Number(ms)).toISOString() : null);
 
-export function readThrottleState(file) {
-  try { const v = JSON.parse(fs.readFileSync(file, 'utf8')); return v && typeof v === 'object' ? v : {}; } catch { return {}; }
+/**
+ * The throttle state object out of the throttle_state row and throttle_decisions: {mode, ramMode, cpuHot, why, at,
+ * since, writer, writerRev, effectiveCap, heavyCap, running, freeRamPct, cpuBusy, slotTargets, priorities, throttled:
+ * {count, open, last}}; {} with neither. ramMode is not a column: it reads as the mode (conservative - after a CPU-only
+ * heavy pause the RAM hysteresis holds until free RAM clears heavyResumeAbovePct).
+ */
+export function throttleStateOf(m) {
+  const row = m.throttleState();
+  const decisions = m.db.prepare('SELECT count(*) n, sum(released_at IS NULL) open FROM throttle_decisions').get();
+  const last = m.db.prepare('SELECT * FROM throttle_decisions ORDER BY seq DESC LIMIT 1').get();
+  const throttled = Number(decisions?.n) > 0 ? { count: Number(decisions.n), open: Number(decisions.open ?? 0),
+    last: last ? { at: iso(last.at), jobId: last.job_id, workflowId: last.workflow_id, ledgerId: last.ledger_id, reason: last.reason, waitedMs: last.waited_ms, releasedAt: iso(last.released_at) } : null } : null;
+  if (!row) return throttled ? { throttled } : {};
+  const mode = codeMode(row.mode);
+  return { mode, ramMode: mode, cpuHot: Boolean(row.cpu_hot), why: row.reason ?? null, at: iso(row.updated_at), since: iso(row.since),
+    writer: row.writer, writerRev: row.writer_rev, effectiveCap: row.effective_cap, heavyCap: row.heavy_cap, running: row.running,
+    freeRamPct: row.free_ram_pct, cpuBusy: row.cpu_pct == null ? null : row.cpu_pct / 100, slotTargets: row.slotTargets ?? null,
+    priorities: row.priorities ?? {}, throttled };
 }
 
-export function writeThrottleState(file, state) {
-  try {
-    fs.mkdirSync(path.dirname(file), { recursive: true });
-    const tmp = `${file}.${process.pid}.tmp`;
-    fs.writeFileSync(tmp, `${JSON.stringify(state, null, 2)}\n`);
-    renameOver(tmp, file);
-    return true;
-  } catch { return false; }
-}
+/** The throttle state of machine.sqlite for `env` ({} when there is no store or no row). Never throws. */
+export const readThrottleState = ({ env = process.env } = {}) => readMachine((m) => throttleStateOf(m), {}, { env });
 
-/** Merge `patch` into the state file (read-modify-write). */
-export const updateThrottleState = (file, patch) => writeThrottleState(file, { ...readThrottleState(file), ...patch(readThrottleState(file)) });
-
-/** The Supervisor's host override of one workflow's priority; weight null removes it. */
-export function setPriority(file, { workflowId, weight = null, reserve = 0, by = 'supervisor', now = Date.now() }) {
-  if (!workflowId) throw Error('setPriority needs a workflow id');
-  return updateThrottleState(file, (s) => {
-    const priorities = { ...(s.priorities ?? {}) };
-    if (weight == null) priorities[workflowId] = null;
-    else priorities[workflowId] = { weight: positive(weight, 1), reserve: Math.max(0, Math.floor(num(reserve))), by, at: new Date(now).toISOString() };
-    return { priorities };
+/**
+ * Publish the throttle row (the Resource controller, the one writer of the mode): setThrottle appends a
+ * throttle_events row first on a mode change (G7) and carries the writer and its rev (MB-15). The Supervisor's
+ * priorities (priorities_json) are kept: read inside the same write transaction.
+ */
+export function publishThrottle(m, { mode, cpuHot = false, why = null, effectiveCap = null, heavyCap = null, running = null, freeRamPct = null, freeRamMb = null,
+  cpuBusy = null, slotTargets = null, writer, sample = null }) {
+  return m.transaction(() => {
+    const cur = m.throttleState();
+    return m.setThrottle({ mode: dbMode(mode), effectiveCap, heavyCap, running, freeRamPct, freeRamMb: freeRamMb == null ? null : Math.round(freeRamMb),
+      cpuPct: cpuBusy == null ? null : Math.round(cpuBusy * 1000) / 10, cpuHot: Boolean(cpuHot), reason: why, writer, slotTargets, priorities: cur?.priorities ?? null, sample });
   });
 }
 
-/** Record the last throttled dispatch on the state file (the digest shows it). */
-export const noteThrottled = (file, entry) => updateThrottleState(file, (s) => ({ throttled: { count: (s.throttled?.count ?? 0) + 1, last: entry } }));
+/** The Supervisor's host override of one workflow's priority (throttle_state.priorities_json); weight null removes it. */
+export function setPriority({ workflowId, weight = null, reserve = 0, by = 'supervisor', now = Date.now(), env = process.env }) {
+  if (!workflowId) throw Error('setPriority needs a workflow id');
+  try {
+    return withMachine((m) => m.transaction(() => {
+      const cur = m.throttleState();
+      const priorities = { ...(cur?.priorities ?? {}) };
+      if (weight == null) priorities[workflowId] = null;
+      else priorities[workflowId] = { weight: positive(weight, 1), reserve: Math.max(0, Math.floor(num(reserve))), by, at: new Date(now).toISOString() };
+      if (cur) m.update('throttle_state', { priorities_json: priorities }, { id: 1 });
+      // No row yet (the Resource controller never published): a normal row by ram-cap, its mode event recorded.
+      else m.setThrottle({ mode: 'normal', writer: 'supervisor/ram-cap', reason: `priority override for ${workflowId} before any throttle publication`, priorities });
+      return true;
+    }), { env });
+  } catch { return false; }
+}
+
+/**
+ * One op held back by the throttle: an open throttle_decisions row per job (a re-probe of a job already held adds
+ * nothing, so waited_ms runs from the first refusal). The row's seq, or null. Never throws.
+ */
+export function noteThrottled({ jobId, workflowId = null, ledgerId = null, reason, env = process.env }) {
+  try {
+    return withMachine((m) => m.transaction(() => {
+      const open = m.db.prepare('SELECT seq FROM throttle_decisions WHERE job_id IS ? AND ledger_id IS ? AND released_at IS NULL ORDER BY seq LIMIT 1').get(jobId ?? null, ledgerId);
+      return open ? open.seq : m.recordThrottleDecision({ ledgerId, workflowId, jobId, reason });
+    }), { env });
+  } catch { return null; }
+}
+
+/** The job was admitted: release its open throttle_decisions rows (waited_ms set). The count released; never throws. */
+export function releaseThrottled({ jobId, ledgerId = null, env = process.env }) {
+  const sql = 'SELECT seq FROM throttle_decisions WHERE job_id=? AND ledger_id IS ? AND released_at IS NULL';
+  try {
+    if (!readMachine((m) => m.db.prepare(sql).all(jobId, ledgerId).length, 0, { env })) return 0;
+    return withMachine((m) => m.transaction(() => m.db.prepare(sql).all(jobId, ledgerId).filter((r) => m.releaseThrottleDecision(r.seq)).length), { env });
+  } catch { return 0; }
+}
 
 const CENSUS_SQL = `SELECT workflow_id workflowId, op_id op, status, json_extract(payload_json,'$.model') pool FROM jobs
   WHERE kind<>'kernel' AND op_id IS NOT NULL AND status IN ('queued',${SLOT_STATUSES.map(() => '?').join(',')})`;
@@ -338,13 +390,13 @@ const overrideOf = (env) => {
 
 /**
  * The throttle verdict for the host now: {host, cpuBusy, mode, ramMode, cpuHot, modeWhy, since, running,
- * runningByKind, queued, estimates, priorities, cap, admission (when `op` is named), thresholds, stateFile}.
+ * runningByKind, queued, estimates, priorities, cap, admission (when `op` is named), thresholds, throttled}.
  * Reads the mode the Resource controller published (it alone keeps the hysteresis state). `load()` returns {cpuBusy}; `census()` the fleet census; `footprints()` the
  * op-ram-footprint samples; each has a live default. Inside a node --test tree with no override the verdict is
  * computed but never refuses and nothing is written (as hostResourcesFor).
  */
 export function hostThrottle({ op = null, workflowId = null, env = process.env, repo = null, db = null, ledgerFile = null, settings = null,
-  load = null, census = null, footprints = null, stateFile = null, now = Date.now() } = {}) {
+  load = null, census = null, footprints = null, state = null, now = Date.now() } = {}) {
   const s = settings ?? allocationSettings();
   const thresholds = throttleThresholds(s);
   const table = opRamTable(s);
@@ -360,8 +412,7 @@ export function hostThrottle({ op = null, workflowId = null, env = process.env, 
   const samples = Array.isArray(override?.footprints) ? override.footprints
     : override ? [] : (() => { try { return (footprints ?? (() => recentFootprints({ limit: thresholds.historySamples, env })))(); } catch { return []; } })();
   const estimates = opRamEstimates(table, samples, thresholds);
-  const file = stateFile ?? throttleStateFile(env);
-  const prev = readThrottleState(file);
+  const prev = state ?? readThrottleState({ env });
   const priorities = priorityTable(s, prev);
   const ramKnown = num(host.totalRamBytes) > 0 || override?.freeRamPct != null;
   // Single writer (DESIGN §8.3): the reconciler's Resource controller alone writes the mode. This call reads the mode
@@ -380,7 +431,7 @@ export function hostThrottle({ op = null, workflowId = null, env = process.env, 
   const since = changed ? new Date(now).toISOString() : prev.since ?? null;
   return { host, cpuBusy, mode: m.mode, ramMode: m.ramMode, cpuHot: m.cpuHot, modeWhy: m.why, since, running: running.length,
     runningByKind: countByKind(running), queued: ops.length - running.length, kernels: num(fleet.kernels), estimates, priorities, cap, admission,
-    thresholds, stateFile: file, throttled: prev.throttled ?? null, modeWriter: RECONCILER_WRITER, modePublished: published, ...(testContext ? { testContext: true } : {}) };
+    thresholds, throttled: prev.throttled ?? null, modeWriter: RECONCILER_WRITER, modePublished: published, ...(testContext ? { testContext: true } : {}) };
 }
 
 /** The compact view status, the digest and the tick event carry. */
@@ -418,7 +469,12 @@ export function footprintSample({ owners = [], ops = [], kernels = 0, freeRamPct
     ...(freeRamPct != null ? { freeRamPct } : {}) };
 }
 
-/** The newest `limit` op-ram-footprint samples from the supervisor ledger, oldest first. */
-export const recentFootprints = ({ limit = DEFAULTS.historySamples, env = process.env } = {}) => withSupervisorRead((db) => db.prepare(
-  'SELECT payload_json FROM events WHERE workflow_id=? AND kind=? ORDER BY seq DESC LIMIT ?').all(SUPERVISOR_WF, OP_RAM_FOOTPRINT, limit)
-  .reverse().map((r) => JSON.parse(r.payload_json)), [], { env });
+/** The newest `limit` op-ram-footprint samples (machine.sqlite host_samples kind 'op-footprint'), oldest first. */
+export const recentFootprints = ({ limit = DEFAULTS.historySamples, env = process.env } = {}) => readMachine((m) => m.db.prepare(
+  'SELECT detail_json FROM host_samples WHERE kind=? ORDER BY seq DESC LIMIT ?').all(FOOTPRINT_SAMPLE_KIND, limit)
+  .reverse().map((r) => JSON.parse(r.detail_json)).filter((v) => v && typeof v === 'object'), [], { env });
+
+/** Record one footprintSample as host_samples kind 'op-footprint' (the full sample in detail_json). */
+export const recordFootprint = (m, sample) => m.recordHostSample({ kind: FOOTPRINT_SAMPLE_KIND, subject: OP_RAM_FOOTPRINT,
+  ramMb: Math.round(num(sample?.opAgentRamMb)), freeRamPct: sample?.freeRamPct ?? null,
+  running: Object.values(sample?.running ?? {}).reduce((a, b) => a + num(b), 0), detailJson: sample });

@@ -5,23 +5,20 @@
 // provider-rate-limited signal it HALVES the pool's effective parallelism (floor `floor`, 2), at most once per
 // decreaseCooldownMs so one burst of stalled workers counts once; after increaseAfterMs (15 min) with no rate-limit
 // signal it raises the cap by +1 per increaseStepMs up to the pool's runtimes.yaml maxParallel, and the entry is
-// dropped once back at max. It publishes {<pool target>: {cap, max, ...}} as `poolBackoff` in the throttle state
-// (ram-throttle.json) with `poolBackoffAt`.
+// dropped once back at max. It publishes one machine.sqlite pool_backoff row per backed-off pool (DBTREE.sql B4):
+// until_at = the staleness horizon (written + staleMs), strikes = the halvings, reason = the AIMD entry as JSON
+// ({cap, max, lastRateLimitAt, lastDecreaseAt, lastIncreaseAt, floorSince, provider, reason}); a pool back at max is
+// deleted (poolRowOf / entryOfRow).
 //
 // Readers: route (scripts/agent/models.mjs selectPool, a live route with a capacity map) rejects a pool whose running
 // count reached its backed-off cap, so the next eligible pool of the order takes the job (and a job with no other
 // eligible pool stays queued); `api dispatch-ready` routes every job before dispatching, so dispatch respects it.
-// A publication older than staleMs is ignored (a dead engine never pins a pool at its floor).
+// A row past its until_at is ignored (a dead engine never pins a pool at its floor).
 //
-// Pure over its inputs except poolCapsNow (one file read, cached CACHE_MS). Under the test runner it reads nothing
-// unless STARCI_RAM_THROTTLE_STATE names a state file.
-import path from 'node:path';
-import { runtimeRootFor } from '../../engine/machine-db.mjs';
-import { readJsonFile } from './json.mjs';
+// Pure over its inputs except poolCapsNow (one machine.sqlite read, cached CACHE_MS).
+import { readMachine } from '../../engine/machine-db.mjs';
 
-export const POOL_BACKOFF_KEY = 'poolBackoff';
 export const DEFAULTS = Object.freeze({ floor: 2, decreaseCooldownMs: 120_000, increaseAfterMs: 900_000, increaseStepMs: 300_000, staleMs: 600_000 });
-const STATE_ENV = 'STARCI_RAM_THROTTLE_STATE';
 const CACHE_MS = 5000;
 
 const int = (v, d) => { const n = Math.floor(Number(v)); return Number.isFinite(n) && n > 0 ? n : d; };
@@ -63,34 +60,49 @@ export function backoffPersists(entry, { now, persistMs, floor = DEFAULTS.floor 
   return { persists: now - entry.lastRateLimitAt < persistMs && now - since >= persistMs, since };
 }
 
+/* ------------------------------------------------------------ the store */
+
+/** The pool_backoff row of one AIMD entry: {pool, untilAt, strikes, reason}. Pure. */
+export const poolRowOf = (pool, entry, { now, staleMs = DEFAULTS.staleMs }) => ({ pool, untilAt: now + staleMs, strikes: Number(entry?.halvings) || 0,
+  reason: JSON.stringify({ cap: entry.cap, max: entry.max, lastRateLimitAt: entry.lastRateLimitAt ?? null, lastDecreaseAt: entry.lastDecreaseAt ?? null,
+    lastIncreaseAt: entry.lastIncreaseAt ?? null, floorSince: entry.floorSince ?? null, provider: entry.provider ?? null, reason: entry.reason ?? null }) });
+
+/** The AIMD entry of one pool_backoff row (halvings from strikes, the rest from reason); null when unreadable. Pure. */
+export function entryOfRow(row) {
+  let e = null;
+  try { e = JSON.parse(row?.reason ?? 'null'); } catch { e = null; }
+  if (!e || typeof e !== 'object' || !Number.isFinite(Number(e.cap))) return null;
+  return { ...e, halvings: Number(row.strikes) || 0 };
+}
+
+/** {<pool>: entry} of the pool_backoff rows. Pure. */
+export const entriesOfRows = (rows) => Object.fromEntries((rows ?? []).map((r) => [r.pool, entryOfRow(r)]).filter(([, e]) => e));
+
 /* ------------------------------------------------------------ the reader */
 
-const stateFileOf = (env) => (env?.[STATE_ENV] ? path.resolve(env[STATE_ENV]) : path.join(runtimeRootFor(env), 'ram-throttle.json'));
 const cache = new Map();
 
-/** The live backed-off caps from a throttle state object: {<pool target>: cap}. Pure. */
-export function capsOf(state, { now = Date.now(), staleMs = DEFAULTS.staleMs } = {}) {
-  const at = Date.parse(state?.poolBackoffAt ?? '');
-  const limit = Number(state?.poolBackoffStaleMs) > 0 ? Number(state.poolBackoffStaleMs) : staleMs;
-  if (!Number.isFinite(at) || now - at >= limit) return {};
+/** The live backed-off caps of pool_backoff rows: {<pool target>: cap}, rows past until_at skipped. Pure. */
+export function capsOf(rows, { now = Date.now() } = {}) {
   const out = {};
-  for (const [pool, e] of Object.entries(state?.[POOL_BACKOFF_KEY] ?? {})) {
+  for (const r of rows ?? []) {
+    if (!(Number(r?.until_at) > now)) continue;
+    const e = entryOfRow(r);
     const cap = Number(e?.cap), max = Number(e?.max);
-    if (Number.isInteger(cap) && cap > 0 && (!Number.isFinite(max) || cap < max)) out[pool] = cap;
+    if (Number.isInteger(cap) && cap > 0 && (!Number.isFinite(max) || cap < max)) out[r.pool] = cap;
   }
   return out;
 }
 
-/** The backed-off caps published now ({} on any error, when stale, or in a spec with no state file named). */
-export function poolCapsNow({ env = process.env, now = Date.now(), staleMs = DEFAULTS.staleMs } = {}) {
+/** The backed-off caps published now ({} on any error, with no store, or when stale). */
+export function poolCapsNow({ env = process.env, now = Date.now() } = {}) {
   try {
-    if (env.NODE_TEST_CONTEXT && !env[STATE_ENV]) return {};
-    const file = stateFileOf(env);
-    const hit = cache.get(file);
-    if (hit && now - hit.at < CACHE_MS && now >= hit.at) return capsOf(hit.state, { now, staleMs });
-    const state = readJsonFile(file) ?? {};
-    cache.set(file, { at: now, state });
-    return capsOf(state, { now, staleMs });
+    const key = env?.STARCI_TEST_MACHINE_FILE ?? '';
+    const hit = cache.get(key);
+    if (hit && now - hit.at < CACHE_MS && now >= hit.at) return capsOf(hit.rows, { now });
+    const rows = readMachine((m) => m.poolBackoff(), [], { env });
+    cache.set(key, { at: now, rows });
+    return capsOf(rows, { now });
   } catch { return {}; }
 }
 

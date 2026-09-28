@@ -1,13 +1,15 @@
 // reconciler-resource.spec.mjs — the reconciler Resource controller (scripts/reconciler/controllers/resource.mjs):
 // mode hysteresis, the single writer of the throttle state (shadow writes nothing), fair-share slot targets, the
 // quota probe and the quota-exhausted / cap-starved Decision Items. Every host seam is injected; the throttle state
-// lives in a temp file.
+// lives in a scratch machine.sqlite (STARCI_TEST_MACHINE_FILE) per controller.
 import test, { after } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { createResourceController, fairShare, quotaExhausted, starvedWorkflows, HOST_KEY } from '../scripts/reconciler/controllers/resource.mjs';
+import { readThrottleState, publishThrottle } from '../scripts/lib/ram-throttle.mjs';
+import { readMachine, withMachine } from '../engine/machine-db.mjs';
 
 import { fakeCtx } from '../scripts/reconciler/testing.mjs';
 const TMP = fs.mkdtempSync(path.join(os.tmpdir(), 'starci-rc-resource-spec-'));
@@ -27,15 +29,17 @@ function ctxOf(mode, extra = {}) {
   return { ctx, calls, advance: (ms) => { now += ms; } };
 }
 
-function controller({ pct = () => 50, ops = () => [], priorities = null, file = null, ready = () => null } = {}) {
-  const stateFile = file ?? path.join(fs.mkdtempSync(path.join(TMP, 'rc-resource-')), 'ram-throttle.json');
+const scratchEnv = () => ({ ...process.env, STARCI_TEST_MACHINE_FILE: path.join(fs.mkdtempSync(path.join(TMP, 'rc-resource-')), 'machine.sqlite') });
+
+function controller({ pct = () => 50, ops = () => [], priorities = null, env = null, ready = () => null } = {}) {
+  const machineEnv = env ?? scratchEnv();
   const footprints = [];
   const settings = priorities ? { ...SETTINGS, resources: { ...SETTINGS.resources, ramThrottle: { ...SETTINGS.resources.ramThrottle, priorities } } } : SETTINGS;
-  const c = createResourceController({ settings: async () => settings, maxParallelOps: async () => 20, stateFile,
+  const c = createResourceController({ settings: async () => settings, maxParallelOps: async () => 20, env: machineEnv,
     host: async () => ({ totalRamBytes: 100 * GB, freeRamBytes: pct() * GB, freeRamPct: pct(), lowDisk: false }),
     load: async () => 0.2, census: async () => ({ ops: ops(), kernels: 0 }), footprints: async () => [], owners: async () => [],
     recordFootprint: async (p) => footprints.push(p), queuedReady: async (ctx, wf) => ready(wf), providerOf: async () => (pool) => ({ 'qwen-agent': 'qwen', 'codex-agent': 'codex' })[pool] ?? null });
-  return { c, stateFile, footprints };
+  return { c, env: machineEnv, footprints };
 }
 
 test('mode hysteresis: heavy at 10% resumes above 15%; critical at 2.5% resumes above 5%', async () => {
@@ -51,22 +55,28 @@ test('single writer: shadow writes nothing (would-rows only); active writes the 
   const s = ctxOf('shadow');
   const r = await shadow.c.reconcile(HOST_KEY, s.ctx);
   assert.equal(r.wrote, false);
-  assert.equal(fs.existsSync(shadow.stateFile), false, 'shadow never writes the throttle state');
-  assert.equal(shadow.footprints.length, 0, 'shadow records no footprint event');
+  assert.deepEqual(readThrottleState({ env: shadow.env }), {}, 'shadow never writes the throttle state');
+  assert.equal(shadow.footprints.length, 0, 'shadow records no footprint sample');
   const would = s.calls.log.filter((l) => l.kind === 'reconciler.would');
-  assert.ok(would.some((l) => l.data.action === 'writeThrottleState' && l.data.patch.mode === 'heavy-paused' && l.data.diff === true));
-  assert.ok(would.some((l) => l.data.action === 'supervisorEvent' && l.data.kind === 'op-ram-footprint'));
+  assert.ok(would.some((l) => l.data.action === 'setThrottle' && l.data.patch.mode === 'heavy-paused' && l.data.diff === true));
+  assert.ok(would.some((l) => l.data.action === 'recordHostSample' && l.data.kind === 'op-footprint'));
   // An unchanged mode and target set logs no second would-row.
   await shadow.c.reconcile(HOST_KEY, s.ctx);
-  assert.equal(s.calls.log.filter((l) => l.data.action === 'writeThrottleState').length, 1);
+  assert.equal(s.calls.log.filter((l) => l.data.action === 'setThrottle').length, 1);
 
   const active = controller({ pct: () => 8, ops: () => [{ op: 'code.refactor', workflowId: 'wf-a', status: 'queued' }] });
   const a = ctxOf('active');
   assert.equal((await active.c.reconcile(HOST_KEY, a.ctx)).wrote, true);
-  const st = JSON.parse(fs.readFileSync(active.stateFile, 'utf8'));
+  const st = readThrottleState({ env: active.env });
   assert.equal(st.mode, 'heavy-paused');
   assert.equal(st.writer, 'reconciler/resource');
+  assert.ok(st.writerRev, 'the writer rev rides the row (MB-15)');
   assert.equal(st.slotTargets.targets['wf-a'].target, 1);
+  const rows = readMachine((m) => ({ events: m.db.prepare('SELECT from_mode, to_mode FROM throttle_events').all(), hosts: m.hostSamples({ kind: 'host' }).length,
+    mode: m.throttleState().mode }), null, { env: active.env });
+  assert.deepEqual(rows.events.map((e) => [e.from_mode, e.to_mode]), [[null, 'heavy']], 'the mode change is a throttle_events row (heavy-paused is heavy in the DB)');
+  assert.equal(rows.mode, 'heavy');
+  assert.equal(rows.hosts, 1, 'one host sample per active pass');
   assert.equal(active.footprints.length, 1);
   assert.ok(a.calls.clocks.length === 0, 'no clock at 8% (not critical, disk fine)');
 });
@@ -138,19 +148,18 @@ test('quota: probe every 5 min while a quota circuit is open; quota-exhausted wh
 
 test('hostThrottle reads the mode the Resource controller published and writes nothing', async () => {
   const { hostThrottle, RECONCILER_WRITER } = await import('../scripts/lib/ram-throttle.mjs');
-  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'starci-rc-throttle-yield-'));
-  const stateFile = path.join(dir, 'ram-throttle.json');
-  const env = { STARCI_HOST_RESOURCES_JSON: JSON.stringify({ totalRamBytes: 100 * GB, freeRamBytes: 50 * GB, ops: [] }) };
-  const published = { mode: 'critical', ramMode: 'critical', cpuHot: false, why: 'free RAM 2%', at: new Date(T - 30_000).toISOString(), writer: RECONCILER_WRITER };
-  fs.writeFileSync(stateFile, JSON.stringify(published));
-  const owned = hostThrottle({ env, stateFile, now: T, settings: SETTINGS });
+  const machine = scratchEnv();
+  const env = { ...machine, STARCI_HOST_RESOURCES_JSON: JSON.stringify({ totalRamBytes: 100 * GB, freeRamBytes: 50 * GB, ops: [] }) };
+  withMachine((m) => publishThrottle(m, { mode: 'critical', why: 'free RAM 2%', writer: RECONCILER_WRITER }), { env: machine, now: () => T - 30_000 });
+  const published = readThrottleState({ env: machine });
+  const owned = hostThrottle({ env, now: T, settings: SETTINGS });
   assert.equal(owned.mode, 'critical', 'the published mode, not a local recompute at 50% free');
   assert.equal(owned.modePublished, true);
-  assert.deepEqual(JSON.parse(fs.readFileSync(stateFile, 'utf8')), published, 'the dispatch path wrote nothing');
+  assert.deepEqual(readThrottleState({ env: machine }), published, 'the dispatch path wrote nothing');
   // A stale publication: computed locally, still not written.
-  const stale = hostThrottle({ env, stateFile, now: T + 10 * 60_000, settings: SETTINGS });
+  const stale = hostThrottle({ env, now: T + 10 * 60_000, settings: SETTINGS });
   assert.equal(stale.modePublished, false);
-  assert.deepEqual(JSON.parse(fs.readFileSync(stateFile, 'utf8')), published);
+  assert.deepEqual(readThrottleState({ env: machine }), published);
 });
 
 test('cap-starved counts only queued-READY work: jobs waiting on leases, dependencies or decisions never starve; a stale clock is cleared', async () => {

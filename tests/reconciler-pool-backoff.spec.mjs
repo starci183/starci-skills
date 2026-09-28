@@ -9,7 +9,8 @@ import os from 'node:os';
 import path from 'node:path';
 import { createRequire } from 'node:module';
 import { parseYaml } from '../engine/yaml.mjs';
-import { aimdStep, backoffPersists, capsOf } from '../scripts/lib/pool-backoff.mjs';
+import { aimdStep, backoffPersists, capsOf, poolRowOf, entriesOfRows } from '../scripts/lib/pool-backoff.mjs';
+import { readMachine, withMachine } from '../engine/machine-db.mjs';
 import { selectPool } from '../scripts/agent/models.mjs';
 import { createResourceController, POOLS_KEY } from '../scripts/reconciler/controllers/resource.mjs';
 
@@ -45,9 +46,11 @@ test('persistence: at the floor and still rate limited for persistMs', () => {
 });
 
 test('capsOf: only backed-off pools of a fresh publication', () => {
-  const state = { poolBackoffAt: new Date(T).toISOString(), poolBackoff: { 'devin-agent': { cap: 5, max: 10 }, 'qwen-agent': { cap: 10, max: 10 } } };
-  assert.deepEqual(capsOf(state, { now: T + MIN }), { 'devin-agent': 5 });
-  assert.deepEqual(capsOf(state, { now: T + 11 * MIN }), {}, 'stale: a dead engine never pins a pool');
+  const row = (pool, e) => { const r = poolRowOf(pool, e, { now: T, staleMs: 10 * MIN }); return { pool: r.pool, until_at: r.untilAt, strikes: r.strikes, reason: r.reason }; };
+  const rows = [row('devin-agent', { cap: 5, max: 10, halvings: 1 }), row('qwen-agent', { cap: 10, max: 10 })];
+  assert.deepEqual(capsOf(rows, { now: T + MIN }), { 'devin-agent': 5 });
+  assert.deepEqual(capsOf(rows, { now: T + 11 * MIN }), {}, 'stale: a dead engine never pins a pool');
+  assert.equal(entriesOfRows(rows)['devin-agent'].halvings, 1, 'strikes carry the halvings');
 });
 
 test('route: a pool at its backed-off cap is rejected and the next eligible pool takes the job', () => {
@@ -69,22 +72,25 @@ function ledgerDb({ events = [], health = [], logs = [] }) {
   }) };
 }
 function setup({ events = [], health = [], logs = [] } = {}) {
-  const stateFile = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'starci-rc-pool-')), 'ram-throttle.json');
-  const c = createResourceController({ stateFile, pools: async () => [{ target: 'devin-agent', provider: 'devin', maxParallel: 10 }, { target: 'qwen-agent', provider: 'qwen', maxParallel: 10 }] });
+  const env = { ...process.env, STARCI_TEST_MACHINE_FILE: path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'starci-rc-pool-')), 'machine.sqlite') };
+  // The Job controller's rate-limit rows live in machine_logs (actor reconciler).
+  if (logs.length) withMachine((m) => m.log(logs.map((l) => ({ actor: 'reconciler', kind: 'reconciler.provider-rate-limited', msg: 'rate limited', at: l.at, data: JSON.parse(l.d) }))), { env });
+  const c = createResourceController({ env, pools: async () => [{ target: 'devin-agent', provider: 'devin', maxParallel: 10 }, { target: 'qwen-agent', provider: 'qwen', maxParallel: 10 }] });
   const calls = { api: [], log: [] };
   const src = { events, health, logs };
   let now = T;
   const ctxOf = (mode) => ({ mode, now: () => now, ledgers: [{ ledgerId: 'nivo-backend' }, { ledgerId: 'supervisor' }],
     read: (id, fn) => fn(ledgerDb(src)), api: async (...a) => { calls.api.push(a); return { ok: true }; }, run: async () => ({ ok: true }),
     clock() {}, clear() {}, openDecision: async () => ({ ok: true }), log: (kind, msg, data) => calls.log.push({ kind, msg, data }) });
-  return { c, stateFile, calls, src, ctxOf, advance: (ms) => { now += ms; }, at: () => now };
+  const backoff = () => entriesOfRows(readMachine((m) => m.poolBackoff(), [], { env }));
+  return { c, env, backoff, calls, src, ctxOf, advance: (ms) => { now += ms; }, at: () => now };
 }
 
 test('resource:pools in shadow: a provider-rate-limited event halves devin, a would-row, nothing written', async () => {
   const s = setup({ events: [{ seq: 5, at: T - 10_000, p: JSON.stringify({ provider: 'devin', evidence: 'Reached free model rate limit' }), jobPool: 'devin-agent' }] });
   const r = await s.c.reconcile(POOLS_KEY, s.ctxOf('shadow'));
   assert.deepEqual(r.caps, { 'devin-agent': 5 });
-  assert.equal(fs.existsSync(s.stateFile), false, 'shadow writes nothing');
+  assert.deepEqual(s.backoff(), {}, 'shadow writes nothing');
   assert.ok(s.calls.log.some((l) => l.kind === 'reconciler.would' && /devin-agent 5\/10/.test(l.msg)));
   assert.equal(s.calls.api.length, 0);
 });
@@ -95,12 +101,10 @@ test('resource:pools in active: publishes poolBackoff; a limit persisting at the
   let seq = 0;
   const limit = () => { seq += 1; s.src.events = [{ seq, at: s.at(), p: JSON.stringify({ pool: 'devin-agent' }) }]; };
   limit(); await s.c.reconcile(POOLS_KEY, ctx);
-  let st = JSON.parse(fs.readFileSync(s.stateFile, 'utf8'));
-  assert.equal(st.poolBackoff['devin-agent'].cap, 5);
-  assert.ok(st.poolBackoffAt);
+  assert.equal(s.backoff()['devin-agent'].cap, 5);
+  assert.ok(readMachine((m) => m.poolBackoff('devin-agent').until_at, null, { env: s.env }) > s.at(), 'until_at: the staleness horizon');
   for (let i = 0; i < 12; i++) { s.advance(3 * MIN); limit(); await s.c.reconcile(POOLS_KEY, ctx); }
-  st = JSON.parse(fs.readFileSync(s.stateFile, 'utf8'));
-  assert.equal(st.poolBackoff['devin-agent'].cap, 2);
+  assert.equal(s.backoff()['devin-agent'].cap, 2);
   const opened = s.calls.api.filter((a) => a[1] === 'provider-backoff');
   assert.equal(opened.length, 1, 'one circuit per floor episode, on the one product ledger');
   assert.deepEqual(opened[0].slice(0, 2), ['nivo-backend', 'provider-backoff']);
@@ -108,7 +112,7 @@ test('resource:pools in active: publishes poolBackoff; a limit persisting at the
   // Quiet: +1 after 15 minutes.
   s.src.events = [];
   s.advance(16 * MIN); await s.c.reconcile(POOLS_KEY, ctx);
-  assert.equal(JSON.parse(fs.readFileSync(s.stateFile, 'utf8')).poolBackoff['devin-agent'].cap, 3);
+  assert.equal(s.backoff()['devin-agent'].cap, 3);
 });
 
 test('api provider-backoff opens the provider circuit once (idempotent)', async () => {
