@@ -116,18 +116,18 @@ export function reportedJobs(db, { workflowId = null, jobId = null } = {}) {
   }));
 }
 
-/** Prefer the structured check ledger. Older, already-running jobs may only have report.checks. */
+/** The latest run of each check of the item's attempt for one runner (check_runs, alpha.3). */
 export function checkRunsOf(db, item, runner = 'op') {
-  try {
-    const statement = db.prepare(`SELECT name, phase, runner, command, cwd, exit_code, status, started_at, finished_at,
-        stdout_sha, stderr_sha, output_sha, summary_json
-      FROM check_runs WHERE workflow_id=? AND job_id=? AND attempt=? AND runner=? ORDER BY check_id`);
-    return typeof statement.all === 'function' ? statement.all(item.workflowId, item.jobId, item.attempt, runner) : [];
-  } catch (error) {
-    if (/no such table: check_runs/i.test(String(error?.message))) return [];
-    throw error;
-  }
+  const attemptId = attemptIdOf(db, item);
+  if (attemptId == null) return [];
+  return db.prepare(`SELECT c.name, c.phase, c.runner, c.command, c.cwd, c.exit_code, c.declared_exit_code, c.status, c.started_at, c.finished_at,
+      c.stdout_sha, c.stderr_sha, c.output_sha, c.summary_json
+    FROM check_runs c WHERE c.attempt_id=? AND c.runner=? AND c.run_seq=(SELECT max(run_seq) FROM check_runs x
+      WHERE x.attempt_id=c.attempt_id AND x.runner=c.runner AND x.phase=c.phase AND x.name=c.name) ORDER BY c.check_id`).all(attemptId, runner);
 }
+/** The op_attempts row the item's report was filed from. */
+const attemptIdOf = (db, item) => item.attemptId ?? db.prepare(`SELECT attempt_id FROM op_attempts WHERE (workflow_id=? AND dispatch_id=?) OR job_id=?
+  ORDER BY (dispatch_id=?) DESC, dispatch_seq DESC LIMIT 1`).get(item.workflowId, item.dispatchId ?? null, item.jobId, item.dispatchId ?? null)?.attempt_id ?? null;
 
 /** Blob references are read and verified before a recorded check is trusted. */
 async function checksFromStore(db, item, { store = null } = {}) {
@@ -149,7 +149,7 @@ async function checksFromStore(db, item, { store = null } = {}) {
     const claim = byName.get(row.name) ?? {};
     const output = raw.output ? parse(raw.output.toString('utf8')) : null;
     if (raw.output && output === null) return { reason: 'check-output-invalid', detail: [`${row.name}:output is not JSON`] };
-    checks.push({ ...claim, name: row.name, command: row.command ?? claim.command ?? '', exitCode: row.exit_code,
+    checks.push({ ...claim, name: row.name, command: row.command ?? claim.command ?? '', exitCode: row.exit_code ?? row.declared_exit_code,
       status: row.status, phase: row.phase, summary: parse(row.summary_json), ...(output !== null ? { output } : {}),
       ...(raw.stdout ? { stdoutTail: raw.stdout.toString('utf8').slice(-300) } : {}),
       ...(raw.stderr ? { stderrTail: raw.stderr.toString('utf8').slice(-300) } : {}) });
@@ -283,37 +283,27 @@ export async function canonSliceCheck(item, { repo }) {
   return { exitCode: report?.status === 'ok' ? 0 : report?.status === 'findings' ? 1 : 3, status: report?.status ?? null, findings, list, root: bases[0], paths: places.length, output: report };
 }
 
-/** Persist each settler measurement before its verdict is used, including failed re-runs. */
-export async function recordSettlerCheck(ledger, item, run, { store = null, now = Date.now } = {}) {
-  const blobs = store ?? await import('../lib/artifact-store.mjs');
-  const media = (content, mediaType) => content == null ? null : blobs.putBlob(
-    Buffer.isBuffer(content) ? content : Buffer.from(typeof content === 'string' ? content : JSON.stringify(content)), { mediaType });
-  const output = await media(run.output, 'application/json');
-  const stdout = await media(run.stdout ?? '', 'text/plain');
-  const stderr = await media(run.stderr ?? '', 'text/plain');
+/**
+ * Persist each settler measurement before its verdict is used, including failed re-runs: one check_runs row
+ * (scripts/kernel/evidence-store.mjs recordCheck) with the RAW exit this runner observed, stdout/stderr/output as
+ * redacted blobs. A checker that could not run (exit 124 timeout / 127 spawn failure, or status 'unavailable') is
+ * 'unavailable', never red (H7). Returns the check id.
+ */
+export async function recordSettlerCheck(ledger, item, run, { now = Date.now } = {}) {
+  const { stageBlob, recordCheck, CHECK_STATUSES } = await import('../kernel/evidence-store.mjs');
+  const bytes = (content) => (content == null ? null : Buffer.isBuffer(content) ? content : Buffer.from(typeof content === 'string' ? content : JSON.stringify(content)));
+  const blob = (content, mediaType) => { const b = bytes(content); return b && b.length ? stageBlob(b, { mediaType, repoRoots: [item.repo].filter(Boolean) }) : null; };
+  const stdout = blob(run.stdout, 'text/plain'), stderr = blob(run.stderr, 'text/plain'), output = blob(run.output, 'application/json');
   const at = now();
-  const status = run.status ?? (run.exitCode === 0 ? 'pass' : run.exitCode === 124 || run.exitCode === 127 ? 'unavailable' : 'fail');
+  const status = CHECK_STATUSES.includes(run.status) ? run.status : null;
   return ledger.transaction((db) => {
-    for (const [blob, type] of [[stdout, 'text/plain'], [stderr, 'text/plain'], [output, 'application/json']]) {
-      if (blob) db.prepare(`INSERT INTO blobs(sha256,bytes,media_type,file_uri,http_path,created_at) VALUES(?,?,?,?,?,?)
-        ON CONFLICT(sha256) DO UPDATE SET file_uri=COALESCE(blobs.file_uri,excluded.file_uri),
-          http_path=COALESCE(blobs.http_path,excluded.http_path)`)
-        .run(blob.sha, blob.size, blob.mediaType ?? type, blobs.blobPath(blob.sha), `/api/blob/${blob.sha}`, at);
-    }
-    const info = db.prepare(`INSERT INTO check_runs(workflow_id,job_id,op_id,attempt,name,phase,runner,command,cwd,exit_code,status,
-      started_at,finished_at,stdout_sha,stderr_sha,output_sha,summary_json,created_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`)
-      .run(item.workflowId, item.jobId, item.op, item.attempt, String(run.name), run.phase ?? 'verify', run.runner ?? 'settler',
-        run.command ?? null, run.cwd ?? null, run.exitCode ?? null, status, run.startedAt ?? at, run.finishedAt ?? at,
-        stdout?.sha ?? null, stderr?.sha ?? null, output?.sha ?? null, run.summary ? JSON.stringify(run.summary) : null, at);
-    const checkId = Number(info.lastInsertRowid);
-    for (const [part, blob, role] of [['stdout', stdout, 'check-stdout'], ['stderr', stderr, 'check-stderr'], ['output', output, 'check-output']]) {
-      if (!blob) continue;
-      db.prepare(`INSERT INTO job_artifacts_v2(workflow_id,job_id,op_id,attempt,role,kind,name,storage,sha256,bytes,media_type,origin,created_at)
-        VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)`).run(item.workflowId, item.jobId, item.op, item.attempt, role, 'check',
-        `checks/${checkId}/${part}`, 'blob', blob.sha, blob.size, part === 'output' ? 'application/json' : 'text/plain',
-        run.runner ?? 'settler', at);
-    }
-    return checkId;
+    const attemptId = attemptIdOf(db, item);
+    if (attemptId == null) throw Object.assign(new Error(`no attempt for job ${item.jobId}`), { code: 'check-attempt-missing' });
+    return recordCheck(db, { attemptId, name: String(run.name), phase: run.phase ?? 'verify', runner: run.runner ?? 'settler', command: run.command ?? null,
+      cwd: run.cwd ?? null, inputDigest: run.inputDigest ?? null, exitCode: Number.isInteger(run.exitCode) ? run.exitCode : null,
+      declaredExitCode: Number.isInteger(run.declaredExitCode) ? run.declaredExitCode : null, attribution: run.attribution ?? null, status,
+      unavailable: status === 'unavailable' || run.exitCode === 124 || run.exitCode === 127, startedAt: run.startedAt ?? at, finishedAt: run.finishedAt ?? at,
+      stdout, stderr, output, summary: run.summary ?? null, note: run.note ?? null, now: at }).checkId;
   });
 }
 
