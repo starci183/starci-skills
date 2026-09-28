@@ -3,6 +3,7 @@ import { changeWorkflowPhase, resolveIncident, setInboxStatus, updateIncident } 
 import { getWorkflow } from '../api-lib/rows.mjs';
 import { requirePhase } from '../api-lib/lifecycle.mjs';
 import { kernelCustodyOf } from '../api-lib/kernel-seat.mjs';
+import { closeHeldTasks, closeKernelTerminal, releaseKernelSeat, retainAfterEnd } from '../api-lib/workflow-end.mjs';
 import { handoverGateOf } from '../handover.mjs';
 
 export default {
@@ -11,7 +12,7 @@ export default {
   kernelOnly: true,
   usageInCore: true,
   run({ ledger, args, emit, internals }) {
-    const { FINAL_SETTLED, releaseKernelSeat, closeHeldTasks, retainAfterEnd, closeKernelTerminal } = internals;
+    const { FINAL_SETTLED } = internals;
   const db = ledger.db, workflowId = args.workflow, now = Date.now();
   const wf = getWorkflow(db, workflowId);
   if (!wf) throw Object.assign(new Error(`unknown workflow ${workflowId}`), { code: 'workflow-unknown' });
@@ -63,7 +64,7 @@ export default {
       kind: 'workflow-finished', payload: { inboxClosed: closed, incidentsClosed, alreadyFinished: already, kernelSignalsReleased, kernelJobsSettled, kernelTerminal, ...(handoverFinish ? { handover: handoverFinish } : {}) },
     });
   });
-  const tasksClosed = closeHeldTasks(db, workflowId, kernelTerminal, now);
+  const tasksClosed = closeHeldTasks(db, workflowId, kernelTerminal, now, internals);
   const retention = retainAfterEnd(db, now);
 
   const out = { ok: true, workflowId, phase: 'finished', inboxClosed: closed, incidentsClosed, alreadyFinished: already,

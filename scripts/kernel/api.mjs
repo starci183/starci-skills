@@ -88,13 +88,13 @@ import { terminalRead } from '../api/orca/terminal-read.mjs';
 import { terminalShow, TERMINAL_GONE_CODES } from '../api/orca/terminal-show.mjs';
 import { terminalSend } from '../api/orca/terminal-send.mjs';
 import { sleepSync } from '../lib/sleep-sync.mjs';
-import { retainLedgerDb } from '../lib/hk-ledger.mjs';
 import { parseJson } from '../lib/json.mjs';
 // The reads and guards the split-out verbs share with what stays here (lane slim-api):
 // one definition per helper, in scripts/kernel/api-lib/, imported back under the same names.
 import {
   csvList, getWorkflow, goalJsonOf, jobOpOf, jobPayloadOf, operationTerminalHandleOf,
   latestGoal, ownedPathsOf, workDirOf, JOB_ROW, jobResultSql, latestContractOf, latestReportOf, latestAttemptOf,
+  operationTaskOf,
 } from './api-lib/rows.mjs';
 import { KERNEL_LAUNCH_EVENTS, kernelSeatOf } from './api-lib/kernel-seat.mjs';
 import { dispatchEvidenceOf } from './api-lib/dispatch-state.mjs';
@@ -4372,15 +4372,6 @@ function custodyOf({ release = null, agentHandle = null } = {}) {
   return { state: 'unknown', proof: shown?.hostUnavailable ? 'host-unavailable' : 'terminal-unreadable', terminal: agentHandle };
 }
 
-// The operation Task an op holds, whichever launch kind opened it, and the
-// Run/kernel-terminal identity task-update needs to address it. Returns null
-// when the attempt never got a Task — there is then nothing to close.
-const operationTaskOf = (payload) => {
-  const taskId = payload?.orca?.taskId ?? payload?.managed?.taskId ?? payload?.hierarchy?.runtime?.taskId ?? null;
-  if (!taskId) return null;
-  return { taskId, runId: payload?.orca?.runId ?? payload?.managed?.runId ?? payload?.hierarchy?.runtime?.runId ?? null };
-};
-
 // 'completed' is Task closure, not a verdict: the verdict lives in the ledger.
 // An op that fails still leaves no open Task. Orca accepts only pending,
 // ready, dispatched, completed, failed or blocked; the former 'done' was
@@ -4398,97 +4389,6 @@ function closeOperationTask(db, job, payload, kernelHandle) {
   return { taskId: task.taskId, status: TASK_CLOSED_STATUS, ok: r?.ok === true, ...(r?.error ? { error: String(r.error) } : {}) };
 }
 
-/* ----------------------------------------------------- lifecycle helpers */
-/**
- * Move a job to `to` along the shortest job_transitions path from its current status (inside the caller's
- * transaction); `fields` ride on the last step. False when the job is already settled or no path leads there.
- */
-const walkJobStatus = (db, { jobId, to, reason, at = Date.now(), ...fields }) => {
-  const from = db.prepare('SELECT status FROM jobs WHERE job_id=?').get(jobId)?.status;
-  if (!from || FINAL_SETTLED.includes(from)) return false;
-  const edges = db.prepare('SELECT from_status, to_status FROM job_transitions').all();
-  const prev = new Map([[from, null]]), queue = [from];
-  while (queue.length && !prev.has(to)) {
-    const node = queue.shift();
-    for (const e of edges) if (e.from_status === node && !prev.has(e.to_status)) { prev.set(e.to_status, node); queue.push(e.to_status); }
-  }
-  if (!prev.has(to)) return false;
-  const steps = [];
-  for (let node = to; node !== from; node = prev.get(node)) steps.unshift(node);
-  steps.forEach((step, i) => setJobStatus(db, { jobId, to: step, reason, at, ...(i === steps.length - 1 ? fields : {}) }));
-  return true;
-};
-// Inside the caller's transaction: the singleton signal is deleted and the Kernel job settles as
-// `status` with `result`, its terminal binding cleared and `stamp` merged into its payload.
-// The Kernel job moves to `status` along the shortest job_transitions path (a running seat reaches succeeded through
-// reported); a job already settled, or with no path there, is left as is and counts 0.
-const releaseKernelSeat = (db, workflowId, seat, { status, result, stamp, now }) => {
-  const kernelSignalsReleased = clearSignal(db, { scope: 'kernel', key: workflowId }) ? 1 : 0;
-  let kernelJobsSettled = 0;
-  if (seat.job) {
-    const nextPayload = { ...seat.payload, ...stamp };
-    if (nextPayload.hierarchy?.runtime) {
-      nextPayload.hierarchy = { ...nextPayload.hierarchy, runtime: { ...nextPayload.hierarchy.runtime, terminalHandle: null, releasedAt: now } };
-    }
-    const jobId = seat.job.job_id;
-    releaseLeases(db, { jobId });
-    if (walkJobStatus(db, { jobId, to: status, reason: `kernel-seat-${status}`, at: now, payload: nextPayload, workerId: null, leaseToken: null, deadline: null })) {
-      recordJobResult(db, { jobId, result, at: now });
-      kernelJobsSettled = 1;
-    }
-  }
-  return { kernelSignalsReleased, kernelJobsSettled };
-};
-// A workflow that ends leaves no open Task in its Run. Settle closes an op's Task as it settles;
-// this catches the ones no settle ever reached — a cancelled attempt, a job settled before task
-// closure existed, an op whose task-update was refused (taskClosed.ok false).
-const closeHeldTasks = (db, workflowId, kernelTerminal, now) => {
-  const tasksClosed = [];
-  for (const row of db.prepare(`SELECT ${JOB_ROW} FROM jobs WHERE workflow_id=? AND kind<>'kernel' ORDER BY created_at,job_id`).all(workflowId)) {
-    const payload = jobPayloadOf(row);
-    if (!operationTaskOf(payload) || payload?.taskClosed?.ok === true) continue;
-    const result = closeOperationTask(db, row, payload, kernelTerminal);
-    if (!result) continue;
-    tasksClosed.push({ jobId: row.job_id, ...result });
-    updateJob(db, { jobId: row.job_id, payload: { ...payload, taskClosed: result }, at: now });
-  }
-  return tasksClosed;
-};
-// E1 ledger retention: the ending transaction released this kernel's seat, so the ledger is
-// retainable when no other workflow in it is still live — retainLedgerDb re-proves that under the
-// write lock and no-ops otherwise. Housekeeping never fails the caller.
-const retainAfterEnd = (db, now) => {
-  try { return retainLedgerDb(db, { now }); }
-  catch (error) { return { retained: false, reason: 'retention-error', error: String(error?.message ?? error) }; }
-};
-// Called after the durable receipt is emitted, because a Kernel normally closes its own terminal
-// this way: the ledger is already authoritative if the host closes the PTY first.
-// The close is verified (close-verify.mjs): from another terminal inline; from the Kernel's own terminal a detached
-// verifier closes it after this process exits and writes the proof to the Supervisor's machine log (gc.collect). A
-// Kernel terminal still open after that is a leftover the Supervisor's tick GC closes and records as a lesson.
-const closeKernelTerminal = (kernelTerminal, { owner = 'kernel' } = {}) => {
-  if (!kernelTerminal) return null;
-  try { return closeSelfSafe(kernelTerminal, { owner }); } catch { return null; /* the ledger state stands; the tick GC reconciles host cleanup */ }
-};
-
-/* ------------------------------------------------------ archive helpers */
-// `archive --workflow <id> --reason <text> [--by owner|supervisor]`: the owner's stop for a
-// workflow that will not finish. workflows.archived_at is set - every reader of a live workflow
-// already excludes it - and everything the workflow still holds is torn down: its open owner asks
-// retired, its inbox closed, every unsettled operation job cancelled as dropped with its leases and
-// worker released, the Kernel seat released, every Task left in its Run closed, and the Kernel
-// terminal closed last. Archiving an archived workflow writes nothing.
-const openAskDispatchesOf = (db, workflowId) => db.prepare(`SELECT r.dispatch_id FROM reports r
-   WHERE r.workflow_id=? AND r.outcome='ask' AND NOT EXISTS (SELECT 1 FROM events e WHERE e.workflow_id=r.workflow_id
-     AND e.kind IN ('ask-answered','ask-superseded') AND json_extract(e.payload_json,'$.dispatchId')=r.dispatch_id)
-   GROUP BY r.dispatch_id ORDER BY MIN(r.report_id)`).all(workflowId).map((row) => row.dispatch_id);
-// The worker of a dropped operation: a managed Dispatch is stopped and released, a plain terminal
-// quits and closes. A queued job holds no worker.
-const releaseDroppedWorker = (db, job, payload, repo) => {
-  if (payload.managed?.dispatchId) return { managedWorker: releaseManagedWorker(db, job, payload, repo) };
-  const handle = operationTerminalHandleOf(job, payload);
-  return handle ? { terminalClosed: quitWorkerTerminal(handle, payload) } : {};
-};
 /* ------------------------------------------------------------- op IPC */
 // The op-IPC durability verbs: contracts out (kernel→worker, written at
 // dispatch), reports in (worker→kernel, filed by the worker), checks beside
@@ -4706,8 +4606,7 @@ const API_INTERNALS = Object.freeze({
   runSettleTail, ownerRoot, agentHierarchyOf, bindRunToKernel, foundationDutyOf,
   FINAL_SETTLED, staleInputProjection, staleOperationLine, sourceDriftLines, peerDriftLines,
   resolveJob, parseAttempt, reportDispatchIdOf, OWNER_GATE_KINDS,
-  getWorkflow, releaseKernelSeat, closeHeldTasks, retainAfterEnd, closeKernelTerminal,
-  openAskDispatchesOf, releaseDroppedWorker, indexSettledArtifacts,
+  getWorkflow, indexSettledArtifacts,
   stagedInputEvidenceOf, livenessMsOf, ACTIVE_STALE_MS, workerOutageEvidence, recordWorkerOutageEvidence,
   LAUNCH_GRACE_MS, workerCardOf, GATE_ANSWERED_EVENT, runningOpRevDriftOf,
   workerInputRowText, INPUT_ROW_PLACEHOLDER, runtimeOwnedInput, TERMINAL_NOT_WRITABLE, UNWRITABLE_EVENT,
@@ -4734,7 +4633,7 @@ const API_INTERNALS = Object.freeze({
   reconcileOrphanKernelJobs, reconcileOrcaTasks, reconcileWorkDebt,
   reconcileDrop, reconcileReap, reconcileReleaseWorker, reconcileDeadWorker, reconcileDebris,
   cleanupManagedWorker,
-  releaseManagedWorker, closeOperationTask, custodyOf,
+  releaseManagedWorker, closeOperationTask, custodyOf, quitWorkerTerminal,
   CUT_SLICE_CHECKS, VERDICT_OUTCOMES, agentOfJob, canonSettleFollowUp, enqueueNextStep, failureClassOf,
   failureShapeOf, latestKernelJobOf, ownProductWorktreeOf, reapIfStillLive, recordOpRevDrift,
   recordSettledAssetSlots, recordSettledGrammarProposals, releasedWhileHeldOf, seamSettleReconciles,

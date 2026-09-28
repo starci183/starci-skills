@@ -4,6 +4,13 @@ import { ledgerFileFor } from '../../../engine/ledger-db.mjs';
 import { closeAskMessages } from '../serve-ask.mjs';
 import { getWorkflow } from './rows.mjs';
 
+// The open owner asks of a workflow: every ask dispatch no ask-answered/ask-superseded event closed,
+// oldest report first (`api archive` retires each before the phase moves).
+export const openAskDispatchesOf = (db, workflowId) => db.prepare(`SELECT r.dispatch_id FROM reports r
+   WHERE r.workflow_id=? AND r.outcome='ask' AND NOT EXISTS (SELECT 1 FROM events e WHERE e.workflow_id=r.workflow_id
+     AND e.kind IN ('ask-answered','ask-superseded') AND json_extract(e.payload_json,'$.dispatchId')=r.dispatch_id)
+   GROUP BY r.dispatch_id ORDER BY MIN(r.report_id)`).all(workflowId).map((row) => row.dispatch_id);
+
 // `retire-ask --workflow <id> --dispatch <id> --reason <text>`: close an ask the
 // owner should no longer answer. A StarCi Next brand ask asked the owner to
 // rule on 0.4.13 contrast values that grammar 0.5.0 then fixed; with no way to

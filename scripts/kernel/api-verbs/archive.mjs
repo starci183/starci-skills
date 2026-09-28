@@ -3,7 +3,8 @@ import { changeWorkflowPhase, getUnit, recordJobResult, resolveIncident, setInbo
 import { parseJson } from '../../lib/json.mjs';
 import { ARCHIVED_BY, JOB_ROW, getWorkflow, jobOpOf, jobPayloadOf, latestAttemptOf } from '../api-lib/rows.mjs';
 import { kernelCustodyOf } from '../api-lib/kernel-seat.mjs';
-import { retireAsk } from '../api-lib/asks.mjs';
+import { openAskDispatchesOf, retireAsk } from '../api-lib/asks.mjs';
+import { closeHeldTasks, closeKernelTerminal, releaseDroppedWorker, releaseKernelSeat, retainAfterEnd } from '../api-lib/workflow-end.mjs';
 import { reportedJobs } from '../../reconcile/job-settle.mjs';
 
 const WORKFLOW_ARCHIVED = 'workflow-archived';
@@ -21,8 +22,7 @@ export default {
   kernelOnly: true,
   usageInCore: true,
   async run({ ledger, args, repo, emit, internals }) {
-    const { FINAL_SETTLED, releaseKernelSeat, closeHeldTasks, retainAfterEnd, closeKernelTerminal,
-      openAskDispatchesOf, releaseDroppedWorker, indexSettledArtifacts } = internals;
+    const { FINAL_SETTLED, indexSettledArtifacts } = internals;
   const db = ledger.db, workflowId = args.workflow;
   const wf = getWorkflow(db, workflowId);
   if (!wf) throw Object.assign(new Error(`unknown workflow ${workflowId}`), { code: 'workflow-unknown' });
@@ -94,7 +94,7 @@ export default {
   if (racedAt != null) return alreadyArchived(racedAt);
   // After the durable record: each dropped operation's worker is released, then the Run's Tasks close.
   const jobsDropped = dropped.map(({ job, leasesReleased }) => {
-    const worker = releaseDroppedWorker(db, job, jobPayloadOf(job), repo);
+    const worker = releaseDroppedWorker(db, job, jobPayloadOf(job), repo, internals);
     if (worker.managedWorker || worker.terminalClosed) {
       const stored = parseJson(db.prepare('SELECT payload_json FROM jobs WHERE job_id=?').get(job.job_id)?.payload_json) ?? {};
       updateJob(db, { jobId: job.job_id, payload: { ...stored, ...worker } });
@@ -103,7 +103,7 @@ export default {
     const artifacts = job.status === 'queued' ? null : indexSettledArtifacts(ledger, job, repo);
     return { jobId: job.job_id, priorStatus: job.status, leasesReleased, ...worker, ...(artifacts ? { artifacts } : {}) };
   });
-  const tasksClosed = closeHeldTasks(db, workflowId, kernelTerminal, now);
+  const tasksClosed = closeHeldTasks(db, workflowId, kernelTerminal, now, internals);
   const retention = retainAfterEnd(db, now);
   const out = { ok: true, workflowId, archived: true, archivedAt: now, reason, by, inboxClosed, incidentsClosed, jobsDropped, asksRetired,
     kernelSignalsReleased, kernelJobsSettled, kernelTerminal, kernelTerminalCloseRequested: Boolean(kernelTerminal), tasksClosed, retention };
