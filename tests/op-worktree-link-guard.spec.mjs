@@ -6,7 +6,7 @@ import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { classifyGit } from '../scripts/guards/git-policy.mjs';
 import { BASH_ENV_FILE, bashEnvBody, bindGuardTerminal, ensureGuardBin, ensureHistoryHook, guardLaunch, msysPath, writeJobGuard } from '../scripts/guards/install.mjs';
-import { footprintTick, scanFootprint } from '../scripts/guards/footprint-scan.mjs';
+import { scanFootprint } from '../scripts/guards/footprint-scan.mjs';
 import { linksUnder } from '../scripts/checks/scoped-lint-baseline.mjs';
 import { safeRemoveTree } from '../scripts/lib/safe-remove.mjs';
 
@@ -187,26 +187,4 @@ test('the footprint watch flags a new worktree or cross-repository link under th
   links = saved;
   const back = scanFootprint({ root, state: gone.state, git, listLinks, now: 't4' });
   assert.deepEqual(back.fresh.map((entry) => entry.type), ['link'], 'made again: fresh again');
-});
-
-test('the watchdog starts a detached footprint scan at most once per period, host-wide', (t) => {
-  const skillRoot = tempDir(t, 'footprint-skill-');
-  const started = [];
-  const start = () => started.push(1);
-  assert.deepEqual(footprintTick({ skillRoot, now: 1_000_000, every: 600_000, start }), { started: true });
-  assert.deepEqual(footprintTick({ skillRoot, now: Date.now(), every: 600_000, start }), { started: false }, 'claimed: another watchdog does not start a second scan');
-  fs.mkdirSync(path.join(skillRoot, 'runtime', 'guards'), { recursive: true });
-  fs.writeFileSync(path.join(skillRoot, 'runtime', 'guards', 'footprint.json'), JSON.stringify({ lastScanAt: new Date(Date.now() - 3_600_000).toISOString() }));
-  fs.utimesSync(path.join(skillRoot, 'runtime', 'guards', 'footprint.claim'), new Date(Date.now() - 3_600_000), new Date(Date.now() - 3_600_000));
-  assert.deepEqual(footprintTick({ skillRoot, every: 600_000, start }), { started: true }, 'due again after the period');
-  assert.equal(started.length, 2);
-  // Another watchdog is claiming this very moment (its lock is held): this tick leaves the slot to it.
-  const guards = path.join(skillRoot, 'runtime', 'guards');
-  fs.utimesSync(path.join(guards, 'footprint.claim'), new Date(Date.now() - 3_600_000), new Date(Date.now() - 3_600_000));
-  fs.writeFileSync(path.join(guards, 'footprint.claim.lock'), '999');
-  assert.deepEqual(footprintTick({ skillRoot, every: 600_000, start }), { started: false }, 'a held claim lock: no second scan');
-  fs.utimesSync(path.join(guards, 'footprint.claim.lock'), new Date(Date.now() - 120_000), new Date(Date.now() - 120_000));
-  assert.deepEqual(footprintTick({ skillRoot, every: 600_000, start }), { started: false }, 'a crashed tick\'s lock is cleared...');
-  assert.deepEqual(footprintTick({ skillRoot, every: 600_000, start }), { started: true }, '...and the next tick claims the slot');
-  assert.equal(started.length, 3);
 });

@@ -10,7 +10,6 @@ import {
   createReloadWatch, reexecSelf, runtimeHead, moduleStamps, rotateLog, RELOAD_ENV, RELOAD_MIN_INTERVAL_MS, LOG_CAP_BYTES,
 } from '../scripts/lib/self-reload.mjs';
 import { claimOrTakeOver, claimManager, lockHolder, stateFile } from '../scripts/connectors/lib.mjs';
-import { runWatchdogLoop, watchdogLockName, reloadWatchedFiles } from '../scripts/kernel/watchdog.mjs';
 import { runLoop } from '../scripts/supervisor/watchdog.mjs';
 import { watchdogLogFile, watchdogLogFile as sharedLogFile } from '../scripts/kernel/watchdog-log.mjs';
 
@@ -196,7 +195,6 @@ test('the singleton lock is handed over, never freed: only the named predecessor
   assert.equal(lockHolder(name, env).pid, process.pid);
   took.release();
   assert.equal(fs.existsSync(file), false, 'the new holder releases it normally');
-  assert.equal(watchdogLockName('wf:odd/id'), 'kernel-watchdog-wf_odd_id');
 });
 
 test('a real re-exec: the replacement appends to the same log and takes the lock over from the spawning loop', async (t) => {
@@ -225,45 +223,6 @@ setTimeout(() => { held.release?.(); process.exit(0); }, held.ok ? 20000 : 0);
   const text = fs.readFileSync(log, 'utf8');
   assert.match(text, /^first generation line\n/, 'the log is appended, not truncated');
   assert.match(text, new RegExp(`replacement ${r.pid} args=--workflow wf-e2e --repair took=true`));
-});
-
-test('the kernel watchdog loop reloads between ticks and exits only once the replacement holds the lock', async () => {
-  const f = fakes();
-  const watch = createReloadWatch({ head: f.head, stamps: f.stamps, now: f.now });
-  const printed = [];
-  let ticks = 0;
-  const tick = () => { ticks += 1; if (ticks === 2) f.git.head = SHA_B; return { ok: true, workflowId: 'wf-1', action: 'active' }; };
-  const r = await runWatchdogLoop({ workflow: 'wf-1', tick, print: (x) => printed.push(x), sleep: async (ms) => { f.clock.t += ms; }, interval: 300_000,
-    watch, reload: async (check) => { assert.match(check.reason, /runtime HEAD/); return { ok: true, pid: 5151 }; }, maxIterations: 10 });
-  assert.deepEqual(r, { exitCode: 0, reloaded: 5151 });
-  assert.equal(ticks, 2, 'the reload comes after the tick that saw main move, before the next one');
-  assert.deepEqual(printed.at(-1), { ok: true, workflowId: 'wf-1', action: 'reloaded', reason: `runtime HEAD aaaaaaaaa -> bbbbbbbbb`, replacementPid: 5151 });
-
-  // A failed handover keeps the loop ticking, and the guard holds the next attempt for 5 minutes.
-  const g = fakes();
-  const watch2 = createReloadWatch({ head: g.head, stamps: g.stamps, now: g.now });
-  g.git.head = SHA_B;
-  let attempts = 0;
-  const kept = await runWatchdogLoop({ workflow: 'wf-2', tick: () => ({ ok: true, workflowId: 'wf-2', action: 'idle-waiting' }), print: () => {},
-    sleep: async (ms) => { g.clock.t += ms; }, interval: 60_000, watch: watch2,
-    reload: async () => { attempts += 1; return { ok: false, pid: 9, error: 'no lock' }; }, maxIterations: 7 });
-  assert.deepEqual(kept, { exitCode: 0 });
-  assert.equal(attempts, 2, 'one attempt at minute 1, the next at minute 6, none between');
-
-  // A finished workflow ends the loop without a reload check.
-  const done = await runWatchdogLoop({ workflow: 'wf-3', tick: () => ({ ok: true, workflowId: 'wf-3', action: 'finished' }), print: () => {},
-    sleep: async () => assert.fail('no sleep after finished'), watch: { check: () => assert.fail('no check after finished') }, reload: async () => ({ ok: true }) });
-  assert.deepEqual(done, { exitCode: 0, finished: true });
-});
-
-test('the kernel loop watches its own modules and the cards; its log is the one resume-all starts it with', () => {
-  const files = reloadWatchedFiles(ROOT).map((file) => path.relative(ROOT, file).split(path.sep).join('/'));
-  for (const rel of ['scripts/kernel/watchdog.mjs', 'scripts/kernel/terminal-liveness.mjs', 'scripts/kernel/wake-delivery.mjs', 'scripts/kernel/host-outage.mjs',
-    'modules/models/runtimes.yaml', 'modules/models/agents/claude.yaml']) assert.ok(files.includes(rel), rel);
-  for (const rel of files) assert.ok(fs.existsSync(path.join(ROOT, rel)), `${rel} exists`);
-  const env = { LOCALAPPDATA: 'C:/x' };
-  assert.equal(watchdogLogFile('wf:1', env), sharedLogFile('wf:1', env));
-  assert.equal(path.basename(sharedLogFile('wf:1', env)), 'wf_1.log');
 });
 
 test('the supervisor watchdog loop reloads the same way and hands its lock over', async () => {

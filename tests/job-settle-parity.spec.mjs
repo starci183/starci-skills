@@ -207,20 +207,6 @@ test('the settle invariant: a job being verified is not a violation; a violation
   try { assert.equal(ledger.db.prepare('SELECT COUNT(*) n FROM events WHERE kind=?').get(EVENTS.invariant).n, 1); } finally { ledger.close(); }
 });
 
-test('the watchdog loop checks the settle invariant on the settler cadence', async () => {
-  const { runWatchdogLoop, checkSettleInvariant } = await import('../scripts/kernel/watchdog.mjs');
-  const printed = [];
-  let settles = 0, checks = 0;
-  await runWatchdogLoop({ workflow: 'wf-x', tick: () => ({ ok: true, workflowId: 'wf-x', action: 'idle' }), sleep: async () => {}, print: (r) => printed.push(r),
-    interval: 180_000, maxIterations: 1, settle: () => { settles += 1; }, settleEveryMs: 60_000, owns: () => false,
-    invariant: () => { checks += 1; return checks === 2 ? { violations: 1, recorded: 1, jobs: ['op-a 4m'] } : { violations: 0 }; } });
-  assert.equal(settles, 3); assert.equal(checks, 3);
-  assert.deepEqual(printed.filter((r) => r.action === 'settle-invariant').map((r) => r.violations), [1]);
-  const r = checkSettleInvariant({ repoPath: tmp('parity-none-'), workflow: 'wf-x', duty: (a) => { assert.equal(a.record, true); assert.equal(a.workflowId, 'wf-x'); return { violations: [], verifying: [], recorded: 0 }; } });
-  assert.equal(r.violations, 0);
-  assert.match(checkSettleInvariant({ repoPath: '.', workflow: 'wf-x', duty: () => { throw new Error('boom'); } }).error, /boom/);
-});
-
 test('a specs skip record is not a claim; node --check re-runs; a preload flag is never run', async () => {
   const { root, base } = checkout({ 'src/slice/a.ts': 'export const a = 1;\n', 'e2e/x.mjs': 'export const x = 1;\n', 'e2e/bad.mjs': 'export const = ;\n' });
   const skip = { name: 'specs.unit', command: '(skipped - specs disabled)', exitCode: 0, evidence: 'skipped: specs.unit=false (config.yaml)' };

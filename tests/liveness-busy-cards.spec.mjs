@@ -211,22 +211,6 @@ test('D: --release-worker refuses a running job no wait holds, and a job whose r
   assert.equal((orcaState().quits??[]).length,0);
 },{screen:QWEN_DONE,provider:'qwen'}));
 
-test('D: the watchdog releases every frontier heldWorkerJobs entry through the api', async () => {
-  const {releaseHeldWorkers}=await import('../scripts/kernel/watchdog.mjs');
-  const calls=[];
-  const run=(args)=>{calls.push(args);return args.includes('job-b')
-    ?{ok:false,value:{ok:false,code:'release-worker-not-settled'},stderr:''}
-    :{ok:true,value:{ok:true,releasedWhileHeld:true,custody:{state:'released'},leasesReleased:1}};};
-  const released=releaseHeldWorkers({frontier:{heldWorkerJobs:['job-a','job-b']}},{run,repoPath:'D:/repo'});
-  assert.deepEqual(calls.map(a=>a.slice(a.indexOf('--job'),a.indexOf('--job')+3)),[['--job','job-a','--release-worker'],['--job','job-b','--release-worker']]);
-  assert.deepEqual(released[0],{jobId:'job-a',ok:true,custody:'released',leasesReleased:1});
-  assert.deepEqual([released[1].ok,released[1].reason],[false,'release-worker-not-settled']);
-  assert.deepEqual(releaseHeldWorkers({frontier:{}},{run}),[]);
-  const src=fs.readFileSync(path.join(ROOT,'scripts','kernel','watchdog.mjs'),'utf8');
-  assert.match(src,/repair && \(status\.value\?\.frontier\?\.heldWorkerJobs \?\? \[\]\)\.length \? releaseHeldWorkers/,'only a --repair watchdog releases');
-});
-
-/* ------------------------------------------------------------------ E */
 test('E: /status lists each held settle per workflow: done, waiting on <peer workflow>/<job>, with its age', async (t) => {
   const {workflowProgress,progressMessages,settleHoldsOf}=await import('../scripts/supervisor/progress-report.mjs');
   await withLedger(t, async ({ledger}) => {

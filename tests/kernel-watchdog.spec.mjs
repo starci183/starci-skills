@@ -158,7 +158,7 @@ test('any Claude spinner row and a still-executing tool call are active; finishe
 
 test('watchdog wake transfers cadence ownership outside the Kernel model turn',()=>{
   const prompt=buildWakePrompt('wf-example');
-  assert.match(prompt,/external watchdog owns the 5-minute cadence/i);
+  assert.match(prompt,/Host controller\) owns the ~5-minute cadence/i);
   assert.match(prompt,/yield the model turn immediately/i);
   assert.match(prompt,/Never run Start-Sleep/i);
   assert.doesNotMatch(prompt,/poll canonical status again/i);
@@ -190,29 +190,24 @@ test('watchdog wakes a turn-idle Kernel only when status says the frontier is ac
 // Every nivo watchdog imported the liveness classifier once, hours before the
 // night's classifier fixes, and kept calling yielded Kernels active. The loop
 // now runs each tick as a fresh `--once` child, so a fix lands on the next tick.
-test('the watchdog loop runs each tick in a fresh child and stops on a finished workflow', async t => {
+test('the watchdog is one --once pass the Host controller runs; there is no loop mode', async t => {
   const { withLedger, seedWorkflow } = await import('./_ledger-fixture.mjs');
   const { spawnSync } = await import('node:child_process');
   const path = await import('node:path');
   const WATCHDOG = path.resolve(import.meta.dirname, '..', 'scripts', 'kernel', 'watchdog.mjs');
   await withLedger(t, async ({ repoRoot, ledger }) => {
-    seedWorkflow(ledger, { id: 'wf-watchdog-loop', state: { phase: 'finished' } });
-    ledger.db.prepare("UPDATE workflows SET phase='finished' WHERE workflow_id='wf-watchdog-loop'").run();
-    const r = spawnSync(process.execPath, [WATCHDOG, '--repo', repoRoot, '--workflow', 'wf-watchdog-loop', '--repair', '--interval-ms', '10000', '--json'],
+    seedWorkflow(ledger, { id: 'wf-watchdog-once', state: { phase: 'finished' } });
+    ledger.db.prepare("UPDATE workflows SET phase='finished' WHERE workflow_id='wf-watchdog-once'").run();
+    const r = spawnSync(process.execPath, [WATCHDOG, '--repo', repoRoot, '--workflow', 'wf-watchdog-once', '--once', '--repair', '--json'],
       { encoding: 'utf8', windowsHide: true, timeout: 60000 });
     assert.equal(r.status, 0, r.stderr || r.stdout);
-    const last = JSON.parse(r.stdout.trim().split(/\r?\n/).pop());
-    assert.equal(last.action, 'finished', 'the child tick reported finished and the loop ended');
-    // LC-8: a loop without --repair held the workflow's singleton lock and only reported, so a
-    // dead kernel under it was never replaced and resume-all counted it as coverage.
-    const probeLoop = spawnSync(process.execPath, [WATCHDOG, '--repo', repoRoot, '--workflow', 'wf-watchdog-loop', '--interval-ms', '10000', '--json'],
+    assert.equal(JSON.parse(r.stdout.trim().split(/\r?\n/).pop()).action, 'finished');
+    const loop = spawnSync(process.execPath, [WATCHDOG, '--repo', repoRoot, '--workflow', 'wf-watchdog-once', '--repair', '--json'],
       { encoding: 'utf8', windowsHide: true, timeout: 60000 });
-    assert.equal(probeLoop.status, 2, 'a loop without --repair is refused before it takes the lock');
-    assert.match(probeLoop.stderr, /--once \[--repair\]/, 'the usage names the read-only --once probe');
-    assert.equal(probeLoop.stdout.trim(), '', 'no tick ran');
+    assert.equal(loop.status, 2, 'no loop mode: without --once it is refused');
+    assert.match(loop.stderr, /there is no loop/);
+    assert.equal(loop.stdout.trim(), '', 'no tick ran');
   });
-  const source = fs.readFileSync(WATCHDOG, 'utf8');
-  assert.match(source, /spawnSync\(process\.execPath, \[self, \.\.\.argv, '--once'/, 'the loop re-executes itself per tick');
 });
 
 // Orca's sidebar shows the tab title set at creation or by rename, while the
@@ -255,41 +250,3 @@ test('the Codex rate-limit model nudge is a gate the Codex card answers by keepi
 // child, and the edge in runtime/guards/host-resources.json keeps a fresh --once child from
 // starting it again while the host stays low. The probe is stubbed here (the contract is
 // {lowDisk, lowRam, drive, freeDiskGb, freeRamPct}); a spec run never measures the real host.
-test('host resources: a low edge runs one detached housekeeping child; stays-low does not, recovery re-arms it', async (t) => {
-  const { hostResourcesTick } = await import('../scripts/kernel/watchdog.mjs');
-  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'starci-watchdog-hk-'));
-  t.after(() => fs.rmSync(dir, { recursive: true, force: true }));
-  const stateFile = path.join(dir, 'host-resources.json');
-  let low = true, starts = 0;
-  const probe = () => ({ lowDisk: low, lowRam: false, drive: 'C:', freeDiskGb: 9, freeRamPct: 42 });
-  const start = () => { starts += 1; };
-  const first = await hostResourcesTick({ probe, start, stateFile, now: 1_000 });
-  assert.equal(first.started, true, 'the low edge runs housekeeping');
-  assert.equal(first.drive, 'C:');
-  assert.equal(starts, 1);
-  const still = await hostResourcesTick({ probe, start, stateFile, now: 2_000 });
-  assert.equal(still.started, false, 'one run per low episode: staying low starts nothing');
-  assert.equal(starts, 1);
-  low = false;
-  const ok = await hostResourcesTick({ probe, start, stateFile, now: 3_000 });
-  assert.equal(ok.started, false);
-  assert.equal(starts, 1, 'a healthy host never runs housekeeping from the watchdog');
-  low = true;
-  const rearmed = await hostResourcesTick({ probe, start, stateFile, now: 4_000 });
-  assert.equal(rearmed.started, true, 'recovered then low again: a new episode runs housekeeping');
-  assert.equal(starts, 2);
-  const state = JSON.parse(fs.readFileSync(stateFile, 'utf8'));
-  assert.equal(state.low, true);
-  assert.equal(state.drive, 'C:');
-});
-
-test('host resources: the watchdog child is housekeeping.mjs --apply, detached, never a sweep of its own', async () => {
-  const { hostResourcesTick } = await import('../scripts/kernel/watchdog.mjs');
-  const r = await hostResourcesTick({ probe: () => null, stateFile: path.join(os.tmpdir(), `starci-hk-none-${process.pid}.json`) });
-  assert.equal(r.started, false, 'a probe without a reading starts nothing');
-  const src = fs.readFileSync(new URL('../scripts/kernel/watchdog.mjs', import.meta.url), 'utf8');
-  assert.match(src, /housekeeping\.mjs/);
-  assert.match(src, /'--apply'/, 'the sweep itself lives in housekeeping.mjs --apply');
-  assert.match(src, /detached: true/, 'the housekeeping child is detached');
-  assert.match(src, /hostResourcesTick\(\)/, 'the tick calls the hook');
-});

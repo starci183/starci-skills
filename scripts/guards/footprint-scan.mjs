@@ -13,11 +13,9 @@
 // supervisor event (kind worker-footprint). Nothing is removed or changed - the Supervisor decides.
 //
 //   node scripts/guards/footprint-scan.mjs [--root <dir>] [--depth <n>] [--json]      one scan
-//   footprintTick({...})  the kernel watchdog's hook: starts a detached scan when one is due (host-wide, every
-//                         FOOTPRINT_EVERY_MS), never blocking the watchdog.
+//   The reconciler Host controller runs it every host.yaml footprintEveryMs (scripts/reconciler/controllers/host.mjs).
 import fs from 'node:fs';
 import path from 'node:path';
-import { spawn } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { isLinkLike } from '../lib/safe-remove.mjs';
 import { foldCase } from '../lib/path-key.mjs';
@@ -111,35 +109,6 @@ export async function runFootprintScan({ skillRoot = SKILL_ROOT, root = defaultR
     } catch { /* the jsonl line stands without the event */ }
   }
   return result;
-}
-
-/**
- * The kernel watchdog's hook: when no scan ran for FOOTPRINT_EVERY_MS (host-wide, runtime/guards/footprint.json), claim
- * the slot and start one detached scan. Returns {started} without waiting; never throws.
- */
-export function footprintTick({ skillRoot = SKILL_ROOT, now = Date.now(), every = FOOTPRINT_EVERY_MS, start = null } = {}) {
-  try {
-    const dir = stateDir(skillRoot), claim = path.join(dir, 'footprint.claim');
-    let last = 0; try { last = Date.parse(JSON.parse(fs.readFileSync(path.join(dir, 'footprint.json'), 'utf8')).lastScanAt) || 0; } catch { last = 0; }
-    let claimed = 0; try { claimed = fs.statSync(claim).mtimeMs; } catch { claimed = 0; }
-    if (now - Math.max(last, claimed) < every) return { started: false };
-    fs.mkdirSync(dir, { recursive: true });
-    // Nine watchdogs tick in the same minute: the slot is claimed under an exclusive lock file, and re-checked
-    // inside it, so one tick starts the scan. A lock left by a crashed tick is cleared after FOOTPRINT_LOCK_STALE_MS.
-    const lock = `${claim}.lock`;
-    try { fs.writeFileSync(lock, String(process.pid), { flag: 'wx' }); } catch {
-      try { if (now - fs.statSync(lock).mtimeMs > FOOTPRINT_LOCK_STALE_MS) fs.rmSync(lock, { force: true }); } catch { /* gone */ }
-      return { started: false };
-    }
-    try {
-      let taken = 0; try { taken = fs.statSync(claim).mtimeMs; } catch { taken = 0; }
-      if (now - Math.max(last, taken) < every) return { started: false };
-      fs.writeFileSync(claim, String(process.pid));
-    } finally { fs.rmSync(lock, { force: true }); }
-    const run = start ?? (() => { const child = spawn(process.execPath, [selfFile, '--quiet'], { cwd: skillRoot, detached: true, stdio: 'ignore', windowsHide: true }); child.unref(); });
-    run();
-    return { started: true };
-  } catch (error) { return { started: false, error: String(error?.message ?? error) }; }
 }
 
 if (process.argv[1] && path.resolve(process.argv[1]) === selfFile) {

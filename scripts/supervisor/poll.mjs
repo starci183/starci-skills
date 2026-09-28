@@ -27,7 +27,6 @@
 // the current state as baseline.
 
 import fs from 'node:fs';
-import { spawnSync } from 'node:child_process';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { openLedger, ledgerFileFor } from '../../engine/ledger-db.mjs';
@@ -44,7 +43,6 @@ import { dependencyGraph, findingLine } from '../kernel/dependency-graph.mjs';
 import { owedFindings } from './owed.mjs';
 import { supervisorSettings } from './home.mjs';
 import { opLabel, workflowNames } from '../lib/display-names.mjs';
-import { listHostProcesses } from '../lib/process-list.mjs';
 
 // The digest's first cycle has no previous cycle to diff against: it prints
 // this many trailing reports so the chat starts from a state, not a blank.
@@ -184,21 +182,12 @@ export const newArtifacts = (repo, sinceMs) => {
 // --- health the supervisor must raise on its own -------------------------------
 // All eight watchdogs were dead and five Codex op launches had failed before the
 // owner asked why nothing moved: the supervisor saw neither because nothing it
-// polls said so. Each cycle now reports a running workflow with no watchdog,
-// runtime-shaped open incidents, and a streak of refused agent launches.
+// polls said so. Each cycle now reports runtime-shaped open incidents and a streak of refused agent launches
+// (a dead Kernel seat is the reconciler Host controller's: there are no per-workflow watchdog processes).
 export const RUNTIME_INCIDENT = /^\[(?:source-runtime-defect|supervisor-gate|runtime-[^\]]*|environment|provider-launch-failure|op-boundary-drift|worker-prompt-stall|settled-terminal[^\]]*)\]/;
 export const LAUNCH_STREAK = 3;
 export const LAUNCH_WINDOW_MS = 3600000;
 
-/** Workflow ids that have a live watchdog process on this host (Windows process list; elsewhere null = unknown). */
-export const liveWatchdogs = ({ platform = process.platform, run = spawnSync } = {}) => {
-  if (platform !== 'win32') return null;
-  const rows = listHostProcesses({ where: "Name='node.exe'", match: /watchdog\.mjs/i, run, platform, timeoutMs: 30000 });
-  if (!rows) return null;
-  const ids = new Set();
-  for (const p of rows) { const m = /--workflow\s+"?([^\s"]+)/.exec(p.cmd); if (m) ids.add(m[1]); }
-  return ids;
-};
 
 /**
  * Kernel jobs still dispatchable whose workflow is finished or archived: a seat nothing releases
@@ -229,16 +218,14 @@ export const launchStreaks = (db, wanted = new Set(), { now = Date.now() } = {})
 };
 
 // --- the cycle ---------------------------------------------------------------
-export const cycle = async (db, { repo, wanted = new Set(), state, timeoutMs = PROBE_TIMEOUT_MS, watchdogs = liveWatchdogs, stall = stallFindings, stallMinutes = stallMinutesOf(),
+export const cycle = async (db, { repo, wanted = new Set(), state, timeoutMs = PROBE_TIMEOUT_MS, stall = stallFindings, stallMinutes = stallMinutesOf(),
   owed = (ledgerDb, opts) => owedFindings(ledgerDb, opts).owed }) => {
   const lines = [`===== poll ${ts(Date.now())} =====`];
   const wfs = workflows(db, wanted);
   const names = workflowNames(db);
-  const dogs = watchdogs();
   for (const w of wfs) {
     const k = kernelState(db, w.workflow_id);
     lines.push(`${named(names, w.workflow_id)} [${w.phase}] kernel ${k.state} ${k.terminal ?? ''}`);
-    if (dogs && w.phase === 'running' && !dogs.has(w.workflow_id)) lines.push(`  WATCHDOG-DEAD ${named(names, w.workflow_id)}: no watchdog process; restart it (node scripts/kernel/watchdog.mjs --repo <repo> --workflow ${w.workflow_id} --repair, detached)`);
   }
   const running = new Set(wfs.filter((w) => w.phase === 'running').map((w) => w.workflow_id));
   for (const i of runtimeIncidents(db, wanted).filter((x) => running.has(x.workflow_id))) lines.push(`  RUNTIME ${named(names, i.workflow_id)} ${i.incident_id} ${String(i.last_progress).replace(/\s+/g, ' ').slice(0, 200)}`);

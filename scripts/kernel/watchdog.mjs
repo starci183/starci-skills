@@ -1,49 +1,26 @@
 #!/usr/bin/env node
-// watchdog.mjs — the maintenance loop of one durable Kernel workflow. It never
-// plans, routes, dispatches or finishes a workflow; verdicts are settled by the settler it calls, never by itself.
+// watchdog.mjs — one liveness pass over one durable Kernel seat. The reconciler's Host controller runs it for every
+// running workflow (scripts/reconciler/controllers/host.mjs, concern host.kernel-seat); it is no longer a loop (owner
+// ruling 2026-09-28 "có lỗi xóa luôn": the reconciler is the only loop). It never plans, routes, dispatches, settles or
+// finishes a workflow: settles and worker recovery are the Job controller's, quota probes the Resource controller's,
+// housekeeping the GC controller's, the footprint scan the Host controller's own step.
 //
-//   node scripts/kernel/watchdog.mjs --repo <ledger-owner> --workflow <id> --repair [--interval-ms <ms>] [--json]
 //   node scripts/kernel/watchdog.mjs --repo <ledger-owner> --workflow <id> --once [--repair] [--json]
 //
-// Between ticks the loop starts the runtime settler (scripts/reconcile/job-settle.mjs) every
-// allocation.settler.everyMs: green reports settle without the Kernel's turn (owner ruling settle-runtime-service).
-// A loop always runs --repair; a loop without it is refused (exit 2). --once
-// without --repair is the read-only probe: it reports restart-needed /
-// wake-needed and acts on nothing. --repair continues an approved workflow; it
-// never creates one or widens its authority.
-//
-// Every tick reads canonical status/survey and the attested Kernel terminal and
-// starts the host footprint scan (scripts/guards/footprint-scan.mjs: detached,
-// at most every allocation.footprint.everyMs). Under --repair it also:
-//   - probes the ledger's open quota circuits (api provider-health --quota-probe);
-//   - settles every frontier deadWorkerJobs entry through `api reconcile
-//     --dead-worker --settle-failed` (re-proves the death, settles the attempt
-//     failed-no-report, releases lease, worker and Task, queues the retry);
-//   - releases every frontier heldWorkerJobs worker through `api reconcile
-//     --release-worker` (the job stays unsettled until its wait releases);
-//   - replaces the Kernel through start-workflow when a responding Orca proves
-//     its terminal disconnected or gone (twice) or back at a bare shell (two
-//     reads), and adopts back a live kernel whose seat was lost;
-//   - presses Enter on a queued or staged input, and wakes a turn-idle Kernel
-//     when the frontier is actionable;
-//   - starts housekeeping once when the host-resources probe crosses low
-//     (scripts/lib/host-resources.mjs: a detached housekeeping.mjs --apply child, one
-//     run per low episode - the watchdog never sweeps itself).
-// An Orca outage (runtime_unavailable, orca.exe ENOENT) is host-unavailable:
-// waited out and re-verified, never a restart (scripts/kernel/host-outage.mjs).
-//
-// The default cadence is modules/models/runtimes.yaml allocation.watchdogCadenceMs.
-//
-// The loop (no --once) is a singleton per workflow: host lock 'kernel-watchdog-<workflow>' (a second loop
-// answers action=already-watched and exits 0). Every tick runs as a fresh `--once` child, and the loop itself
-// reloads (scripts/lib/self-reload.mjs): when the runtime's HEAD or a watched module/card changed, it spawns
-// its replacement with the same argv (detached, hidden, the same watchdog-logs/<workflow>.log), hands it the
-// lock and exits - at most once per allocation.selfReload.minIntervalMs. A replacement that does not take the lock leaves this loop running.
+// --once without --repair is the read-only probe: it reports restart-needed / wake-needed and acts on nothing.
+// --repair continues an approved workflow; it never creates one or widens its authority. It reads canonical
+// status/survey and the attested Kernel terminal, then:
+//   - replaces the Kernel through start-workflow when a responding Orca proves its terminal disconnected or gone
+//     (twice) or back at a bare shell (two reads), and adopts back a live kernel whose seat was lost;
+//   - presses Enter on a queued or staged input, and wakes a turn-idle Kernel when the frontier is actionable;
+//   - repairs the seat's tab title.
+// An Orca outage (runtime_unavailable, orca.exe ENOENT) is host-unavailable: waited out and re-verified, never a
+// restart (scripts/kernel/host-outage.mjs). The cadence is the Host controller's (modules/reconciler/host.yaml).
 
 import '../lib/hide-child-windows.mjs';
 import fs from 'node:fs';
 import path from 'node:path';
-import { spawn, spawnSync } from 'node:child_process';
+import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { allocationMs } from '../../engine/config.mjs';
 import { terminalRead } from '../api/orca/terminal-read.mjs';
@@ -56,14 +33,8 @@ import { closeOperationTerminal } from './close-op-terminal.mjs';
 import { openLedger, ledgerFileFor } from '../../engine/ledger-db.mjs';
 import { settledKernelVerdict, DEAD_VERDICTS, DEATH_SETTLE_MS } from './host-outage.mjs';
 import { sleepSync } from '../api/orca/lib.mjs';
-import { claimOrTakeOver } from '../connectors/lib.mjs';
-import { createReloadWatch, reexecSelf, RELOAD_ENV } from '../lib/self-reload.mjs';
-import { watchdogLogFile } from './watchdog-log.mjs';
-import { footprintTick } from '../guards/footprint-scan.mjs';
 import { readJsonFile } from '../lib/json.mjs';
 import { revWakeLine } from './runtime-rev.mjs';
-import { reconcilerOwns, yieldTo } from '../reconciler/owns.mjs';
-import { settleInvariantDuty } from '../reconcile/job-settle.mjs';
 
 const skillRoot = path.resolve(fileURLToPath(new URL('.', import.meta.url)), '..', '..');
 const apiFile = path.join(skillRoot, 'scripts', 'kernel', 'api.mjs');
@@ -120,7 +91,7 @@ export const classifyKernelScreen = classifyAgentScreen;
 export const buildWakePrompt = (workflow, attempt = null, revLine = null) => withWakeIdentity([
   `Watchdog liveness wake for ${workflow}: phase=running and the prior model turn returned to the input prompt; act on it now.`,
   'Re-read canonical api status and survey. The runtime settles green reports itself; decide every needs-kernel-decision item first (api status settleDecisions: settle it fail/blocked, route its retry or incident, or check+settle what the settler could not verify), then work the ranked actions and the frontier until nothing is immediately executable.',
-  `If it is then waiting on an active Op, a lease, a not-before time or a report/message, record the exact wait and yield the model turn immediately; the external watchdog owns the ${Math.round(intervalMs / 60_000)}-minute cadence and wakes this same Kernel.`,
+  `If it is then waiting on an active Op, a lease, a not-before time or a report/message, record the exact wait and yield the model turn immediately; the runtime (the reconciler Host controller) owns the ~${Math.round(intervalMs / 60_000)}-minute cadence and wakes this same Kernel.`,
   'Never run Start-Sleep, shell sleep, a timer or an in-turn polling loop.',
   WAKE_BOUNDS,
 ].join(' '), workflow, attempt, revLine);
@@ -231,19 +202,9 @@ const replaceWakeDeadKernel = ({ phase, terminal, stale, outputAgeMs, misses, fi
     deathReason: `kernel terminal ${terminal} missed ${misses} wakes since ${new Date(firstAt).toISOString()} with no output: a dead kernel behind a listed terminal` });
 };
 
-// A dead worker never files its report, and before this each one sat until its
-// Kernel hand-wrote an incident and settled it (inc-305adcb1d3c1,
-// inc-e6e2e0d274a9, inc-c6cf249ecd5a and 25 more on 2026-09-23). The api
-// re-proves every death itself and refuses a live worker.
-export const recoverDeadWorkers = (statusValue, { run = (args) => runNodeJson(apiFile, args), repoPath = repo } = {}) =>
-  (statusValue?.frontier?.deadWorkerJobs ?? []).map((jobId) => {
-    const r = run(['reconcile', '--repo', path.resolve(repoPath), '--job', jobId, '--dead-worker', '--settle-failed', '--json']);
-    const v = r.value ?? {};
-    return { jobId, ok: r.ok && v.ok !== false, recovery: v.recovery ?? null, status: v.status ?? null,
-      ...(v.retry?.jobId ? { retry: v.retry.jobId } : {}), ...(v.pattern?.raised ? { patternIncident: v.pattern.incidentId } : {}),
-      ...(r.ok && v.ok !== false ? {} : { reason: v.reason ?? String(r.stderr || r.stdout || r.error || '').slice(0, 300) }) };
-  });
 
+// TEMPORARY: dead since the Resource controller owns resource.quota; kept only until lane slim-11 lands its edit of
+// tests/qwen-base-pool.spec.mjs, then deleted with that spec case (lane rc-cleanup).
 // The base pool (Qwen) is blocked only while its quota circuit is open. Every --repair tick asks the
 // api to run the recovery probe of each open quota circuit of this ledger; the api throttles it to
 // one real 1-token completion per probe interval (and one right after the plan reset), so
@@ -255,108 +216,20 @@ export const probeQuotaCircuits = ({ run = (args) => runNodeJson(apiFile, args),
     : [{ ok: false, error: String(r.stderr || r.stdout || r.error || '').slice(0, 300) }];
 };
 
-// A worker whose job is done but whose settle waits on a peer or the owner kept its terminal
-// open and its lease renewed through the whole wait (nivo op-integration.verify-25532858e7 under
-// peer-wait inc-8cce1cf1b330). The api re-proves the hold itself and refuses anything else.
-export const releaseHeldWorkers = (statusValue, { run = (args) => runNodeJson(apiFile, args), repoPath = repo } = {}) =>
-  (statusValue?.frontier?.heldWorkerJobs ?? []).map((jobId) => {
-    const r = run(['reconcile', '--repo', path.resolve(repoPath), '--job', jobId, '--release-worker', '--json']);
-    const v = r.value ?? {};
-    return { jobId, ok: r.ok && v.ok !== false, custody: v.custody?.state ?? null, leasesReleased: v.leasesReleased ?? null,
-      ...(r.ok && v.ok !== false ? {} : { reason: v.reason ?? v.code ?? String(r.stderr || r.stdout || r.error || '').slice(0, 300) }) };
-  });
-
-const settlerFile = path.join(skillRoot, 'scripts', 'reconcile', 'job-settle.mjs');
-const SETTLE_EVERY_MS = (() => { try { return allocationMs('settler.everyMs'); } catch { return 60_000; } })();
-/** Start one settler pass for this workflow, detached (scripts/reconcile/job-settle.mjs holds its own pass lock). */
-export const startSettler = ({ repoPath = repo, workflow = workflowId, run = spawn } = {}) => {
-  const child = run(process.execPath, [settlerFile, '--repo', path.resolve(repoPath), '--workflow', workflow, '--json'],
-    { cwd: skillRoot, detached: true, stdio: 'ignore', windowsHide: true });
-  child.unref?.();
-  return child.pid ?? null;
-};
-/**
- * The settle invariant for this workflow, every settleEveryMs from the loop (not only the 30-minute Supervisor tick):
- * a reported job older than allocation.settler.invariantMaxAgeMs that the settler neither settled nor handed to the
- * Kernel is recorded once (event job-settle-invariant-violated); the settler pass the loop just started is the
- * self-heal. Never throws. {violations, verifying, recorded} or null.
- */
-export const checkSettleInvariant = ({ repoPath = repo, workflow = workflowId, duty = settleInvariantDuty } = {}) => {
-  try {
-    const r = duty({ repos: [path.resolve(repoPath)], workflowId: workflow, record: true, start: () => null });
-    return { violations: r.violations.length, verifying: r.verifying?.length ?? 0, recorded: r.recorded ?? 0,
-      jobs: r.violations.slice(0, 6).map((v) => `${v.jobId} ${v.ageMin}m`) };
-  } catch (error) { return { error: String(error?.message ?? error).slice(0, 200) }; }
-};
-const housekeepingFile = path.join(skillRoot, 'scripts', 'supervisor', 'housekeeping.mjs');
-/** The persisted edge of the host-resources probe: one housekeeping run per low episode. */
-export const hostResourcesStateFile = (root = skillRoot) => path.join(root, 'runtime', 'guards', 'host-resources.json');
-
-/**
- * Host housekeeping on a low-resources edge. The probe is scripts/lib/host-resources.mjs
- * ({lowDisk, lowRam, drive, freeDiskGb, freeRamPct}); the sweep is housekeeping.mjs --apply, started
- * detached ONCE per low episode: the edge lives in runtime/guards/host-resources.json, so a fresh
- * --once child does not start it again while the host stays low, and a recovered host arms the next
- * low edge. Never throws, never waits on the child. A spec injects `probe`, `start` and `stateFile`;
- * under the test runner the real probe never runs (a spec measures a stub, not this host).
- */
-export async function hostResourcesTick({ probe = null, start = null, stateFile = hostResourcesStateFile(), now = Date.now() } = {}) {
-  try {
-    const read = probe ?? await (async () => {
-      if (process.env.NODE_TEST_CONTEXT) return null;
-      const mod = await import('../lib/host-resources.mjs').catch(() => null);
-      return mod?.probeHostResources ?? mod?.probe ?? null;
-    })();
-    const res = typeof read === 'function' ? await read() : null;
-    if (res == null) return { started: false };
-    const low = res.lowDisk === true || res.lowRam === true;
-    const prev = readJsonFile(stateFile);
-    const remember = () => {
-      fs.mkdirSync(path.dirname(stateFile), { recursive: true });
-      fs.writeFileSync(stateFile, `${JSON.stringify({ schema: 'starci/host-resources@1', at: new Date(now).toISOString(), low, drive: res.drive ?? null, freeDiskGb: res.freeDiskGb ?? null, freeRamPct: res.freeRamPct ?? null })}\n`);
-    };
-    if (!low || prev?.low === true) { remember(); return { started: false, low }; }
-    (start ?? (() => { const child = spawn(process.execPath, [housekeepingFile, '--apply'], { cwd: skillRoot, detached: true, stdio: 'ignore', windowsHide: true }); child.unref(); }))();
-    // The edge is recorded only after the child is spawned, so a failed spawn is retried next tick.
-    remember();
-    return { started: true, low, drive: res.drive ?? null, freeDiskGb: res.freeDiskGb ?? null, freeRamPct: res.freeRamPct ?? null };
-  } catch (error) { return { started: false, error: String(error?.message ?? error) }; }
-}
-
 export async function watchdogTick() {
-  // Each duty yields to the reconciler while it owns the concern (scripts/reconciler/owns.mjs; modules/reconciler/reconciler.yaml yields).
-  const reconcilerOwned = [];
-  const quotaProbes = repair && !yieldTo('resource.quota', reconcilerOwned) ? probeQuotaCircuits() : null;
-  // The worktree/link footprint watch (nivo-fe inc-c8fbf76aa499): a detached, host-wide scan at most every FOOTPRINT_EVERY_MS
-  // that flags new worktrees and cross-repository links under the repositories root; it never blocks this tick.
-  const footprint = yieldTo('host.processes', reconcilerOwned) ? {} : footprintTick();
-  // Housekeeping on a low-resources edge; a read-only --once probe acts on nothing, so repair only.
-  const hostResources = repair && !yieldTo('gc.housekeeping', reconcilerOwned) ? await hostResourcesTick() : null;
-  const tick = await statusTick({ reconcilerOwned });
-  return { ...tick, ...(quotaProbes ? { quotaProbes } : {}), ...(footprint.started || footprint.error ? { footprint } : {}),
-    ...(hostResources && (hostResources.started || hostResources.error) ? { hostResources } : {}), ...(reconcilerOwned.length ? { reconcilerOwned } : {}) };
+  return statusTick();
 }
 
-async function statusTick({ reconcilerOwned = [] } = {}) {
-  let status = api('status');
+async function statusTick() {
+  const status = api('status');
   if (!status.ok || !status.value?.ok) return {
     ok: false, workflowId, action: 'status-failed',
     error: status.error ?? status.value?.reason ?? status.stderr ?? status.stdout,
   };
   const phase = status.value.phase;
   if (phase === 'finished') return { ok: true, workflowId, phase, action: 'finished' };
-  // An archived workflow is stopped for good: its Kernel is never replaced and the loop ends.
+  // An archived workflow is stopped for good: its Kernel is never replaced.
   if (status.value.archivedAt != null) return { ok: true, workflowId, phase, action: 'archived', archivedAt: status.value.archivedAt };
-  let deadWorkersRecovered = null;
-  const workerOwned = repair && ((status.value?.frontier?.deadWorkerJobs ?? []).length || (status.value?.frontier?.heldWorkerJobs ?? []).length)
-    && yieldTo('job.worker', reconcilerOwned);
-  if (repair && !workerOwned && (status.value?.frontier?.deadWorkerJobs ?? []).length) {
-    deadWorkersRecovered = recoverDeadWorkers(status.value);
-    // The retries it queued make the frontier actionable: the Kernel tick below reads it fresh.
-    const again = api('status');
-    if (again.ok && again.value?.ok) status = again;
-  }
-  const heldWorkersReleased = repair && !workerOwned && (status.value?.frontier?.heldWorkerJobs ?? []).length ? releaseHeldWorkers(status.value) : null;
   const result = kernelTick(status, phase);
   // Creation supplies the title, but a moved/restored tab can lose it. The sidebar reads
   // visualLayouts' tab title, not terminal-list's agent-controlled pane title.
@@ -366,7 +239,7 @@ async function statusTick({ reconcilerOwned = [] } = {}) {
   // The runtime revision the Kernel acked and the wake this tick types (or would type): a read-only --once
   // probe shows what the next wake carries (runtime-rev.mjs).
   const kernelRev = status.value?.kernelRev ?? null;
-  return { ...result, ...(titleRepair ? { titleRepair } : {}), ...(kernelRev ? { kernelRev, nextWake: wakePromptOf(workflowId, status.value) } : {}), ...(deadWorkersRecovered ? { deadWorkersRecovered } : {}), ...(heldWorkersReleased ? { heldWorkersReleased } : {}) };
+  return { ...result, ...(titleRepair ? { titleRepair } : {}), ...(kernelRev ? { kernelRev, nextWake: wakePromptOf(workflowId, status.value) } : {}) };
 }
 
 function kernelTick(status, phase) {
@@ -496,113 +369,13 @@ const print = result => {
   else console.log(`[Kernel watchdog] ${result.workflowId} phase=${result.phase ?? '?'} action=${result.action}${result.terminal ? ` terminal=${result.terminal}` : ''}${/^reload|^already/.test(result.action ?? '') ? ` pid=${result.pid ?? result.replacementPid ?? '?'}${result.reason ? ` reason=${result.reason}` : ''}${result.error ? ` error=${result.error}` : ''}` : ''}`);
 };
 
-// Tick actions after which the workflow never needs a Kernel again.
-const ENDED_ACTIONS = new Set(['finished', 'archived']);
-/** The host lock that keeps one watchdog loop per workflow. */
-export const watchdogLockName = (workflow) => `kernel-watchdog-${String(workflow).replace(/[^A-Za-z0-9._-]/g, '_')}`;
-
-/**
- * What the loop process itself runs: its own file, its static imports, the cards they read. A change to any
- * of them in the live checkout, or a new runtime HEAD, reloads the loop. The per-tick child reads everything
- * fresh anyway.
- */
-export const reloadWatchedFiles = (root = skillRoot) => [
-  'scripts/kernel/watchdog.mjs', 'scripts/kernel/watchdog-log.mjs', 'scripts/reconcile/job-settle.mjs', 'scripts/reconcile/canon-parity.mjs', 'scripts/kernel/terminal-liveness.mjs', 'scripts/kernel/wake-delivery.mjs',
-  'scripts/kernel/host-outage.mjs', 'scripts/kernel/runtime-rev.mjs', 'scripts/api/orca/terminal-read.mjs', 'scripts/api/orca/lib.mjs', 'scripts/lib/self-reload.mjs',
-  'scripts/lib/hide-child-windows.mjs', 'scripts/connectors/lib.mjs', 'engine/config.mjs', 'modules/models/runtimes.yaml',
-  'modules/models/agents/claude.yaml', 'modules/models/agents/codex.yaml', 'modules/models/agents/devin.yaml', 'modules/models/agents/qwen.yaml',
-].map((rel) => path.join(root, ...rel.split('/')));
-
-/**
- * The long-lived loop: tick, sleep, then the reload check. Seams: `tick` (one --once pass -> result), `sleep`,
- * `print`, `watch` (createReloadWatch) and `reload` (reexecSelf -> {ok, pid, error}). Returns {exitCode,
- * finished?} or {exitCode: 0, reloaded: pid} - the caller then exits without releasing the lock it handed over.
- */
-export async function runWatchdogLoop({ workflow = workflowId, tick, sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms)),
-  print: out = print, interval = intervalMs, watch = null, reload = null, maxIterations = Infinity, settle = null, settleEveryMs = null,
-  owns = reconcilerOwns, invariant = null } = {}) {
-  let exitCode = 0;
-  const owned = (concern) => { try { return owns(concern) === true; } catch { return false; } };
-  // The runtime settler (scripts/reconcile/job-settle.mjs; owner ruling settle-runtime-service) runs every
-  // settleEveryMs between ticks, independent of the Kernel's turn: `settle` only starts it (detached, one pass per
-  // scope at a time), so the loop's cadence never waits on a settle.
-  const wait = async (ms) => {
-    if (!settle || !(settleEveryMs > 0)) return sleep(ms);
-    for (let left = ms; left > 0; left -= settleEveryMs) {
-      // The settler yields to the reconciler's Job controller while it owns job.settle.
-      const settlerOwned = owned('job.settle');
-      try { if (!settlerOwned) settle(); } catch { /* the next slice starts it again */ }
-      // The settle invariant runs on the same cadence (a violation is recorded the minute it exists); while the Job
-      // controller owns job.settle its SLA clock is the invariant.
-      if (invariant && !settlerOwned) {
-        try { const r = invariant(); if (r?.violations || r?.error) out({ ok: !r.error, workflowId: workflow, action: 'settle-invariant', ...r }); }
-        catch { /* the next slice checks again */ }
-      }
-      await sleep(Math.min(settleEveryMs, left));
-    }
-  };
-  for (let i = 0; i < maxIterations; i += 1) {
-    // The reconciler's Host controller runs this workflow's --once ticks itself while it owns host.kernel-seat: the loop steps aside.
-    if (owned('host.kernel-seat')) {
-      out({ ok: true, workflowId: workflow, action: 'reconciler-owned', concern: 'host.kernel-seat' });
-      return { exitCode: 0, reconcilerOwned: true };
-    }
-    const result = tick();
-    out(result);
-    if (!result.ok) exitCode = 1;
-    if (ENDED_ACTIONS.has(result.action)) return { exitCode, finished: true };
-    await wait(interval);
-    const check = watch?.check();
-    if (!check?.reload || !reload) continue;
-    watch.markAttempt();
-    const handed = await reload(check);
-    out({ ok: handed.ok === true, workflowId: workflow, action: handed.ok ? 'reloaded' : 'reload-failed', reason: check.reason,
-      replacementPid: handed.pid ?? null, ...(handed.ok ? {} : { error: handed.error ?? null }) });
-    if (handed.ok) return { exitCode: 0, reloaded: handed.pid };
-  }
-  return { exitCode };
-}
 
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
-  if (!repo || !workflowId || (!once && !repair)) {
-    console.error(`use: watchdog.mjs --repo <ledger-owner> --workflow <id> --repair [--interval-ms ${CADENCE_MS}] [--json]\n     watchdog.mjs --repo <ledger-owner> --workflow <id> --once [--repair] [--json]`);
+  if (!repo || !workflowId || !once) {
+    console.error('use: watchdog.mjs --repo <ledger-owner> --workflow <id> --once [--repair] [--json]  (the Host controller runs it; there is no loop)');
     process.exit(2);
   }
-  if (once) {
-    const result = await watchdogTick();
-    print(result);
-    process.exitCode = result.ok ? 0 : 1;
-  } else {
-    // A replacement this loop's predecessor spawned takes its lock over; nothing else may.
-    const handoverFrom = process.env[RELOAD_ENV.handoverFrom] ?? null;
-    const reloadedAt = Number(process.env[RELOAD_ENV.reloadedAt]) || null;
-    delete process.env[RELOAD_ENV.handoverFrom];
-    delete process.env[RELOAD_ENV.reloadedAt];
-    const lockName = watchdogLockName(workflowId);
-    const held = claimOrTakeOver(lockName, { from: handoverFrom });
-    if (!held.ok) {
-      print({ ok: true, workflowId, action: 'already-watched', pid: held.holder?.pid ?? null });
-      process.exit(0);
-    }
-    process.on('exit', held.release);
-    if (held.takenOver) print({ ok: true, workflowId, action: 'reload-took-over', pid: process.pid, reason: `lock ${lockName} handed over by pid ${handoverFrom}` });
-    // The long-lived loop runs every tick as a fresh `--once` child, so a
-    // runtime fix to the liveness classifier or the wake rules reaches an
-    // already-running watchdog on its next tick. A watchdog that imported the
-    // classifier once at 03:37 kept calling yielded Kernels active all night
-    // after the fixes landed. The loop process itself reloads on a new HEAD.
-    const self = fileURLToPath(import.meta.url);
-    const tick = () => {
-      const child = spawnSync(process.execPath, [self, ...argv, '--once', '--json'], { encoding: 'utf8', windowsHide: true, timeout: Math.max(intervalMs, 120000) });
-      const line = String(child.stdout ?? '').trim().split(/\r?\n/).filter(Boolean).pop() ?? '';
-      try { return JSON.parse(line); } catch { return { ok: false, workflowId, action: 'tick-failed', error: (child.stderr || line || `exit ${child.status}`).slice(0, 400) }; }
-    };
-    // A log past its cap reloads the loop too: the replacement starts on a rotated file.
-    const watch = createReloadWatch({ root: skillRoot, files: reloadWatchedFiles(), lastReloadAt: reloadedAt, logFile: watchdogLogFile(workflowId) });
-    const reload = () => reexecSelf({ script: self, args: argv, logFile: watchdogLogFile(workflowId), lockName, cwd: skillRoot });
-    const r = await runWatchdogLoop({ tick, watch, reload, settle: () => startSettler(), settleEveryMs: SETTLE_EVERY_MS,
-      invariant: () => checkSettleInvariant() });
-    if (r.reloaded) process.exit(0);
-    process.exitCode = r.exitCode;
-  }
+  const result = await watchdogTick();
+  print(result);
+  process.exitCode = result.ok ? 0 : 1;
 }

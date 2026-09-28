@@ -299,7 +299,7 @@ test('the supervisor digest prints one OWED line per item, and a failing owed ch
   const {cycle}=await import('../scripts/supervisor/poll.mjs');
   await withLedger(t,async({repoRoot,ledger})=>{
     seed(ledger);
-    const base={repo:repoRoot,state:{lastReportId:0,lastArtifacts:Date.now(),first:false},watchdogs:()=>null,stall:()=>[]};
+    const base={repo:repoRoot,state:{lastReportId:0,lastArtifacts:Date.now(),first:false},stall:()=>[]};
     const out=await cycle(ledger.db,{...base,owed:(db,opts)=>owedFindings(db,{...opts,now:NOW,commitsOf:()=>COMMITS,staleOf:()=>[]}).owed});
     assert.match(out.text,/\n {2}OWED wf-nivo-app-auth-mudqjob3 inc-111111111111 \[source-runtime-defect\] age=120m fixed-by aaaaaaaaa\?: /);
     assert.match(out.text,/\n {2}OWED wf-nivo-app-auth-mudqjob3 inc-666666666666 \[weird-new-kind\] age=45m open: /);

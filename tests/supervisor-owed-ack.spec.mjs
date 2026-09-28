@@ -107,7 +107,7 @@ test('stall-alert and the poll OWED lines leave an acked item out',async t=>{
       wake:()=>({action:'kernel-busy',delivered:false}),owedOf});
     assert.deepEqual(r.alerted.owed,[REPEAT],'only the un-acked repeat-check is alerted');
     assert.doesNotMatch(readInbox('main',env).map(m=>m.text).join('\n'),/pattern:retry-loop/);
-    const out=await cycle(ledger.db,{repo:repoRoot,state:{lastReportId:0,lastArtifacts:Date.now(),first:false},watchdogs:()=>null,stall:()=>[],
+    const out=await cycle(ledger.db,{repo:repoRoot,state:{lastReportId:0,lastArtifacts:Date.now(),first:false},stall:()=>[],
       owed:(db,opts)=>owedFindings(db,{...opts,now:NOW,commitsOf:()=>[],staleOf:()=>[],acks}).owed});
     assert.doesNotMatch(out.text,/OWED \S+ pattern:retry-loop/);
     assert.match(out.text,/OWED \S+ pattern:repeat-check:/);

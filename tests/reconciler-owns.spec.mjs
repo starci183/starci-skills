@@ -8,7 +8,6 @@ import { fileURLToPath } from 'node:url';
 import { reconcilerOwns, resetOwnsCache, yieldTo, CONCERN_OWNER, CONCERNS } from '../scripts/reconciler/owns.mjs';
 import { tempState } from '../scripts/reconciler/testing.mjs';
 import { parseYaml } from '../engine/yaml.mjs';
-import { runWatchdogLoop } from '../scripts/kernel/watchdog.mjs';
 import { resumeAll } from '../scripts/kernel/resume-all.mjs';
 import { runLoop } from '../scripts/supervisor/watchdog.mjs';
 
@@ -76,20 +75,7 @@ test('CONCERN_OWNER is the concerns map of modules/reconciler/reconciler.yaml', 
   assert.equal(CONCERNS.length, 24);
 });
 
-test('the yields: the kernel watchdog loop, the supervisor watchdog loop and resume-all step aside for an owned concern', async () => {
-  const printed = [];
-  const loop = await runWatchdogLoop({ workflow: 'wf-x', tick: () => assert.fail('an owned seat runs no tick'), print: (r) => printed.push(r),
-    owns: (c) => c === 'host.kernel-seat', sleep: async () => {} });
-  assert.deepEqual(loop, { exitCode: 0, reconcilerOwned: true });
-  assert.equal(printed[0].action, 'reconciler-owned');
-
-  let settles = 0, ticks = 0;
-  const kept = await runWatchdogLoop({ workflow: 'wf-x', tick: () => { ticks += 1; return { ok: true, action: 'observed' }; }, print: () => {}, maxIterations: 1,
-    interval: 20, settle: () => { settles += 1; }, settleEveryMs: 10, owns: (c) => c === 'job.settle', sleep: async () => {} });
-  assert.equal(kept.exitCode, 0);
-  assert.equal(ticks, 1, 'the seat is not owned: the loop ticks');
-  assert.equal(settles, 0, 'job.settle owned: the settler is not started');
-
+test('the yields: the supervisor watchdog loop and resume-all step aside for an owned concern', async () => {
   const sup = await runLoop({ claim: () => ({ ok: true, release() {} }), owns: (c) => c === 'host.supervisor-seat', log: () => {}, pass: async () => assert.fail('no pass'),
     standDown: () => null, sleep: async () => {} });
   assert.deepEqual(sup, { exited: 'reconciler-owned' });

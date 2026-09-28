@@ -305,18 +305,3 @@ test('status renews the path lease of a live running worker and never the lease 
     assert.ok(leases()[0].expires_at<Date.now()+3*MIN,'a disconnected worker keeps its old expiry');
   },{leaseExpiresIn:2*MIN});
 });
-
-test('the watchdog recovers every dead worker the frontier lists, through the api',async()=>{
-  const {recoverDeadWorkers}=await import('../scripts/kernel/watchdog.mjs');
-  const calls=[];
-  const run=(args)=>{calls.push(args);return args.includes('job-b')
-    ?{ok:false,value:{ok:false,reason:'worker-alive'},stderr:''}
-    :{ok:true,value:{ok:true,recovery:'settled-failed',status:'failed',retry:{jobId:'job-a-retry'},pattern:{raised:true,incidentId:'inc-x'}}};};
-  const healed=recoverDeadWorkers({frontier:{deadWorkerJobs:['job-a','job-b']}},{run,repoPath:'D:/repo'});
-  assert.deepEqual(calls.map(a=>a.slice(a.indexOf('--job'),a.indexOf('--job')+4)),[['--job','job-a','--dead-worker','--settle-failed'],['--job','job-b','--dead-worker','--settle-failed']]);
-  assert.deepEqual(healed[0],{jobId:'job-a',ok:true,recovery:'settled-failed',status:'failed',retry:'job-a-retry',patternIncident:'inc-x'});
-  assert.deepEqual([healed[1].ok,healed[1].reason],[false,'worker-alive'],'a live worker is refused by the api, never recovered');
-  assert.deepEqual(recoverDeadWorkers({frontier:{deadWorkerJobs:[]}},{run}),[]);
-  const src=fs.readFileSync(path.join(ROOT,'scripts','kernel','watchdog.mjs'),'utf8');
-  assert.match(src,/if \(repair && \(status\.value\?\.frontier\?\.deadWorkerJobs \?\? \[\]\)\.length\)/,'only a --repair watchdog recovers');
-});
