@@ -54,6 +54,11 @@ branches:
     title: Enforcement
     path: patterns/enforcement.yaml
     use: Anti-bypass requirements and explicitly proposed cross-project upgrades.
+  - id: repo-patterns
+    title: Repository tree
+    path: patterns/repo/folder.yaml
+    use: The one standard repository root and top-level layout (HFS) - tracked-root allowlist,
+      mandatory apps/<app> on both profiles, backend-only .starciwork/.starcistacks, npm only.
   - id: backend-patterns
     title: Backend patterns
     path: patterns/be/index.yaml

@@ -31,7 +31,7 @@ provenance:
     architecture.json, all with exit 0; tests/repository-baseline.spec.mjs repeats that proof.
 parameters:
   name: npm package name of the new repository - the bound repository name
-  app: Nest application folder under apps/ - the service name the record or design declares
+  app: Application folder under apps/ - the service or app name the record or design declares
   grammarFamily: The bound @starci/grammar family whose stylesheet the app imports (core, heritage or offset-pop)
 guidance:
   - id: BASELINE-ONE-SOURCE
@@ -44,9 +44,11 @@ guidance:
       (Promise<void>, Readonly<NodeJS.ProcessEnv>) is source text and stays as written. common.*
       references resolve to the value they name, and a modules/models/code-patterns.yaml#dotted.path
       citation resolves to the value that file owns. The manifest is composed as common.manifest
-      orders it, with starci taken from the profile shape, and every entry under files is written
-      byte for byte at its path with only its placeholders filled. A value the shapes do not carry is
-      a named gap in the scaffold evidence, never an improvised choice.
+      orders it, with starci taken from the profile shape and workspaces written after private when
+      the profile's manifest.workspaces declares it (a profile without manifest.workspaces emits no
+      workspaces key), and every entry under files is written byte for byte at its path with only its
+      placeholders filled - including a path placeholder such as apps/<app>/.... A value the shapes do
+      not carry is a named gap in the scaffold evidence, never an improvised choice.
   - id: BASELINE-CHECK-ONLY-GATES
     requirement: |
       CI and pre-push run check-only commands (lint:check, typecheck, test:ci, build). Only the
@@ -99,11 +101,16 @@ guidance:
       that adds an owner, env parser, error family or transport extends them in the same change.
   - id: BASELINE-ONE-LAYOUT
     requirement: |
-      Nest is a monorepo of deployable apps: apps/<app>/src holds only main.ts and app.module.ts,
-      features live under src/features and capabilities under src/modules, as
-      docs/backend-source-pattern.md draws the default tree. nest build compiles the whole tsconfig
-      rootDir, so the entry is dist/apps/<app>/src/main.js, the path start:prod runs. Next is one app
-      rooted at src/app; build writes .next and start serves it with next start.
+      Both profiles are apps/<app>/ monorepos under the HFS (knowledge/patterns/repo/folder.yaml),
+      even with one app. Nest: apps/<app>/src holds only main.ts and app.module.ts, features live
+      under src/features and capabilities under src/modules/{domain,platform,integrations}, as
+      docs/backend-source-pattern.md draws the tree. nest build compiles the whole tsconfig
+      rootDir, so the entry is dist/apps/<app>/src/main.js, the path start:prod runs. Next: the app
+      is a workspace package at apps/<app>/ carrying its own package.json, next.config.ts,
+      tsconfig.json and postcss.config.mjs, with all product source under apps/<app>/src (the
+      repository root has no src/); the root package.json declares "workspaces": ["apps/*",
+      "packages/*"], and dev/build/start run as next dev|build|start apps/<app> so .next and the
+      served app stay inside the app folder.
 shapes:
   - id: common
     packageManager: npm@11.6.2
@@ -117,7 +124,7 @@ shapes:
       name: <name>
       version: 0.1.0
       private: true
-      order: [name, version, private, packageManager, engines, scripts, lint-staged, starci, dependencies, devDependencies]
+      order: [name, version, private, workspaces, packageManager, engines, scripts, lint-staged, starci, dependencies, devDependencies]
       lint-staged: common.hooks.lintStaged
     typescript:
       strict: true
@@ -678,6 +685,8 @@ shapes:
     eslintKit: '@starci/eslint-canon-fe'
     testRunner: vitest
     testDependencies: [vitest, '@vitest/coverage-v8', '@vitejs/plugin-react', vite, jsdom, '@testing-library/react', '@testing-library/dom', '@testing-library/jest-dom']
+    manifest:
+      workspaces: ['apps/*', 'packages/*']
     dependencies:
       next: 16.1.6
       react: 19.2.3
@@ -703,24 +712,25 @@ shapes:
       '@testing-library/dom': ^10.4.1
       '@testing-library/jest-dom': ^7.0.1
     scripts:
-      build: next build
-      dev: next dev
-      start: next start
+      build: next build apps/<app>
+      dev: next dev apps/<app>
+      start: next start apps/<app>
+      typecheck: tsc --noEmit --pretty false -p apps/<app>/tsconfig.json
       test: vitest run
       test:unit: vitest run
       test:ci: vitest run --coverage
       test:affected: vitest run --changed origin/main --passWithNoTests
     gitignore: [.next/, next-env.d.ts, '*.tsbuildinfo']
     sonar:
-      sources: src
-      tests: src
+      sources: apps
+      tests: apps
       exclusions: '**/*.spec.ts,**/*.spec.tsx,**/.next/**,**/node_modules/**,**/coverage/**'
       testInclusions: '**/*.spec.ts,**/*.spec.tsx'
-      typescriptTsconfigPaths: tsconfig.json
+      typescriptTsconfigPaths: apps/<app>/tsconfig.json
     grammar:
       package: '@starci/grammar'
       peers: ['@heroui/react', '@heroui/styles']
-      stylesheet: src/app/globals.css imports tailwind, HeroUI styles and the bound family sheet (which imports the common sheet itself), and lets Tailwind scan the grammar dist
+      stylesheet: apps/<app>/src/app/globals.css imports tailwind, HeroUI styles and the bound family sheet (which imports the common sheet itself), and lets Tailwind scan the grammar dist
       components: import from '@starci/grammar/<grammarFamily>', which re-exports common; architecture.json selects that one code entry and style entry, and the baseline adds no other UI library
       oneStyleEntry: "Every app imports exactly one grammar stylesheet, the one frontend.grammar.styleEntry names, because the package ships them nested: each family sheet (core.css, heritage.css, offset-pop.css) begins with an @import of common's sheet, and each family code entry re-exports ./common. A product on a StarCi family binds entry @starci/grammar/<grammarFamily> with styleEntry @starci/grammar/<grammarFamily>.css; a product that is its own family (its palette in its own package, as nivo's @nivo/ui/family.css) binds @starci/grammar/common with @starci/grammar/common.css. Importing common.css beside a family sheet, or two family sheets, is ARCH_GRAMMAR_EXPORT_BYPASS, never a second style entry. In a workspace monorepo every consumer manifest lists the same @starci/grammar registry range so one copy is hoisted; the architecture check still judges each consumer against the copy Node resolves for it."
     health: GET /health/live route at the path docs/application-runtime-config-and-health.md names for Next
@@ -728,7 +738,7 @@ shapes:
       codePatterns:
         next:
           schema: starci/next-code-pattern-contract@1
-          projects: [tsconfig.json]
+          projects: [apps/<app>/tsconfig.json]
           owners: []
           closedVocabularies: []
           grammarGuards:
@@ -740,7 +750,7 @@ shapes:
             vectorProfile: starci/grammar-guards-v1
           errorState:
             schema: starci/next-error-state@1
-            sourceRoots: [src]
+            sourceRoots: ['apps/<app>/src']
             transports: []
             worldMappings: []
             envelopes: []
@@ -752,15 +762,15 @@ shapes:
         {
           "schema": "starci/architecture-config@1",
           "kinds": ["frontend"],
-          "tsconfig": "tsconfig.json",
+          "projects": ["apps/<app>/tsconfig.json"],
           "owners": [],
           "frontend": {
-            "routes": "src/app",
+            "routes": "apps/<app>/src/app",
             "grammar": {
               "package": "@starci/grammar",
               "entry": "@starci/grammar/<grammarFamily>",
               "styleEntry": "@starci/grammar/<grammarFamily>.css",
-              "styleSources": ["src/app/globals.css"],
+              "styleSources": ["apps/<app>/src/app/globals.css"],
               "consumerManifests": ["package.json"],
               "peers": ["react", "@heroui/react"]
             }
@@ -781,7 +791,26 @@ shapes:
             "resolveJsonModule": true,
             "isolatedModules": true,
             "jsx": "react-jsx",
-            "incremental": true,
+            "incremental": true
+          },
+          "files": []
+        }
+      apps/<app>/package.json: |
+        {
+          "name": "<app>",
+          "version": "0.1.0",
+          "private": true,
+          "scripts": {
+            "dev": "next dev",
+            "build": "next build",
+            "start": "next start",
+            "typecheck": "tsc --noEmit --pretty false"
+          }
+        }
+      apps/<app>/tsconfig.json: |
+        {
+          "extends": "../../tsconfig.json",
+          "compilerOptions": {
             "plugins": [{ "name": "next" }],
             "paths": {
               "@/*": ["./src/*"]
@@ -790,7 +819,7 @@ shapes:
           "include": ["next-env.d.ts", "src/**/*.ts", "src/**/*.tsx", ".next/types/**/*.ts", ".next/dev/types/**/*.ts"],
           "exclude": ["node_modules"]
         }
-      next.config.ts: |
+      apps/<app>/next.config.ts: |
         import type { NextConfig } from "next"
 
         const nextConfig: NextConfig = {
@@ -801,7 +830,7 @@ shapes:
         }
 
         export default nextConfig
-      postcss.config.mjs: |
+      apps/<app>/postcss.config.mjs: |
         const config = {
             plugins: {
                 "@tailwindcss/postcss": {},
@@ -809,31 +838,47 @@ shapes:
         }
 
         export default config
-      vitest.config.ts: |
+      apps/<app>/vitest.config.ts: |
         import react from "@vitejs/plugin-react"
         import { resolve } from "node:path"
         import { defineConfig } from "vitest/config"
 
+        /** Workspace lane for this app: it owns the environment and the @/ alias; the root config owns coverage. */
         export default defineConfig({
             plugins: [react()],
             resolve: {
                 alias: { "@": resolve(import.meta.dirname, "src") },
             },
             test: {
+                name: "<app>",
+                root: import.meta.dirname,
                 environment: "jsdom",
                 globals: true,
-                setupFiles: ["./vitest.setup.ts"],
+                setupFiles: ["../../vitest.setup.ts"],
                 include: ["src/**/*.spec.{ts,tsx}"],
                 server: {
                     deps: {
                         inline: [/[\\/]node_modules[\\/]@starci[\\/]grammar[\\/]/],
                     },
                 },
+            },
+        })
+      vitest.config.ts: |
+        import { defineConfig } from "vitest/config"
+
+        /**
+         * ONE run, ONE report. Vitest `projects` keeps each workspace isolated - its own root, its
+         * own aliases - while one invocation still writes a single coverage/lcov.info, so Codecov
+         * and SonarQube read the same run.
+         */
+        export default defineConfig({
+            test: {
+                projects: ["apps/*/vitest.config.ts", "packages/*/vitest.config.ts"],
                 coverage: {
                     provider: "v8",
                     reporter: ["text-summary", "json-summary", "lcov"],
                     reportsDirectory: "<coverage.reportsDirectory>",
-                    include: ["src/**/*.{ts,tsx}"],
+                    include: ["apps/*/src/**/*.{ts,tsx}", "packages/*/src/**/*.{ts,tsx}"],
                     exclude: ["**/*.d.ts", "**/*.spec.{ts,tsx}"],
                     thresholds: {
                         statements: <coverage.thresholds.statements>,
@@ -897,7 +942,7 @@ shapes:
                 },
             },
             {
-                files: ["src/**/*.{ts,tsx}"],
+                files: ["apps/*/src/**/*.{ts,tsx}", "packages/*/src/**/*.{ts,tsx}"],
                 languageOptions: {
                     parserOptions: {
                         projectService: true,
@@ -913,7 +958,7 @@ shapes:
                 },
             },
             starciFeConfig({
-                layout: "single-app",
+                layout: "monorepo",
                 plugin: starciFe,
                 recommended: starciRecommended,
                 linterOptions: starciLinterOptions,
@@ -923,13 +968,13 @@ shapes:
                 languageOptions: { globals: globals.node },
             },
         ])
-      src/app/globals.css: |
+      apps/<app>/src/app/globals.css: |
         @import "tailwindcss";
         @import "@heroui/styles/css";
         @import "@starci/grammar/<grammarFamily>.css";
 
-        @source "../../node_modules/@starci/grammar/dist";
-      src/app/layout.tsx: |
+        @source "../../../../node_modules/@starci/grammar/dist";
+      apps/<app>/src/app/layout.tsx: |
         import type { ReactNode } from "react"
         import "./globals.css"
 
@@ -945,7 +990,7 @@ shapes:
         )
 
         export default RootLayout
-      src/app/layout.spec.tsx: |
+      apps/<app>/src/app/layout.spec.tsx: |
         import { renderToStaticMarkup } from "react-dom/server"
         import { describe, expect, it } from "vitest"
         import RootLayout from "./layout"
@@ -956,13 +1001,13 @@ shapes:
                 expect(markup).toContain("<body class=\"min-h-dvh\">shell</body>")
             })
         })
-      src/app/health/live/route.ts: |
+      apps/<app>/src/app/health/live/route.ts: |
         /** Liveness is answered per request, never prerendered at build time. */
         export const dynamic = "force-dynamic"
 
         /** Liveness probe: answers from process-local state and never touches a dependency. */
         export const GET = (): Response => Response.json({ status: "ok" })
-      src/app/health/live/route.spec.ts: |
+      apps/<app>/src/app/health/live/route.spec.ts: |
         import { describe, expect, it } from "vitest"
         import { GET } from "./route"
 
@@ -1018,6 +1063,14 @@ observations:
       path aliases; the baseline keeps that shape for one app, and adds src/modules/platform/env as the
       one env parser plus EnvError as the one error family the code-pattern contracts require. Its liveness is a Terminus check with no
       indicators at /health/live, which the baseline keeps; its readiness indicators are SDS-owned.
+  - id: next-layout
+    observed: nivo-fe is an npm workspaces monorepo (workspaces apps/*, packages/*) - the shape every
+      StarCi frontend takes. Each app is a package at apps/<app>/ with its own
+      package.json, next.config.ts, tsconfig.json, postcss.config.mjs and vitest.config.ts, source
+      under apps/<app>/src, while the root vitest.config.ts fans out to apps/*/vitest.config.ts and
+      packages/*/vitest.config.ts through its projects field and owns the one coverage report, the
+      root tsconfig.json is the shared base the app tsconfigs extend, and eslint.config.mjs stays at
+      the root with the canon monorepo layout. A new repository keeps this shape with one app.
   - id: grammar
     observed: nivo-fe apps pin @starci/grammar 0.4.13 (the published version at readAt) beside @heroui/react
       and @heroui/styles ^3.2.1, which the grammar declares as peers. globals.css imports tailwind, HeroUI
@@ -1046,4 +1099,7 @@ observations:
 related:
   - architecture-rules.yaml
   - application-stacks.yaml
+  - patterns/repo/folder.yaml
+  - patterns/be/folder.yaml
+  - patterns/fe/folder.yaml
   - ../docs/application-runtime-config-and-health.md

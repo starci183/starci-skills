@@ -23,8 +23,10 @@ provenance:
     - packages/grammar/src/**
   limitations: |
     Cited counts and notes are historical observations at skill commit
-    edf72554425f918e80c9205e9c6db10596e722f0, not a census of the current project. Inspect actual
-    source, manifest/lockfile, aliases and lint/test configuration in the selected repository before use.
+    edf72554425f918e80c9205e9c6db10596e722f0, not a census of the current project. The src/ paths they
+    name are the pre-HFS reference layout; FE-FOLDER-1 now places that source under apps/<app>/src.
+    Inspect actual source, manifest/lockfile, aliases and lint/test configuration in the selected
+    repository before use.
     Historical links supply provenance, not scripts or execution instructions. Counts are file counts
     at the time of reading; old counts cannot claim a fresh scan. Verify installed Grammar exports at
     @starci/grammar/common.
@@ -33,12 +35,15 @@ rules:
     title: Responsibility directories
     kind: mandatory
     requirement: |
-      Each Next source root uses app/ for framework adapters; features/{pages,layouts,overlays} for
-      route-facing product composition; components/{blocks,composites,branches,leaves} for product
+      Every frontend repository is an apps/<app>/ monorepo even with one app, named by its role (for
+      example web), and all product source lives under apps/<app>/src - a repository-root src/ is
+      forbidden. Each Next source root (apps/<app>/src) uses app/ for framework adapters;
+      features/{pages,layouts,overlays} for route-facing product composition;
+      components/{blocks,composites,branches,leaves} for product
       visuals; hooks/<domain> for every authored custom hook; and modules/<capability> for cohesive
       reusable technical/domain capabilities. No empty role folder is required. Grammar remains a
       separate product-agnostic package. The only files that may sit directly in the source root (the
-      directory holding app/, usually src/) are the framework-pinned root files listed in
+      directory holding app/) are the framework-pinned root files listed in
       frameworkPinnedRootFiles below: Next.js loads them from that exact place, so they cannot move
       without changing behaviour. Each is a thin framework adapter whose internal imports enter modules
       or a feature public entry only; every other rule still applies to it, except that the export
@@ -74,46 +79,53 @@ rules:
       instrumentation: [register, onRequestError]
       instrumentation-client: [onRouterTransitionStart]
     rationale: |
-      Stable, explicit role roots remain portable across a single source root and a monorepo while
-      preventing app helpers, component-local hooks and feature-local transport buckets from becoming
-      undeclared owners.
+      One fixed source root per app keeps every repository the same shape while preventing app
+      helpers, component-local hooks and feature-local transport buckets from becoming undeclared
+      owners.
     cases:
       - id: case-1
         when: "A routed authentication scenario"
-        write: "src/features/pages/AuthenticationPage/index.tsx"
+        write: "apps/<app>/src/features/pages/AuthenticationPage/index.tsx"
       - id: case-2
         when: "A reusable API client or session store"
         write: >
-          src/modules/api/ or src/modules/session/ with one explicit public index.ts entry
+          apps/<app>/src/modules/api/ or apps/<app>/src/modules/session/ with one explicit public
+          index.ts entry
       - id: case-3
         when: "A reusable product visual without scenario ownership"
-        write: "src/components/{blocks,composites,branches,leaves}/<Name>/index.tsx"
+        write: "apps/<app>/src/components/{blocks,composites,branches,leaves}/<Name>/index.tsx"
       - id: case-4
         when: "An authored custom hook, including an intrinsic useAutoScroll helper"
-        write: "src/hooks/<domain>/useAutoScroll.ts; built-in React hook calls may remain in visuals"
+        write: "apps/<app>/src/hooks/<domain>/useAutoScroll.ts; built-in React hook calls may remain in visuals"
       - id: case-5
         kind: exception
         when: "Next.js only loads the file from the source root: middleware or its Next 16 name proxy, instrumentation or instrumentation-client (.ts/.js/.mjs), or next-env.d.ts"
         write: >
-          src/middleware.ts beside src/app/ as a thin adapter; locale routing, proxies and other logic
-          live in src/modules/<capability>/ (or a feature public entry) and the adapter imports them;
+          apps/<app>/src/middleware.ts beside apps/<app>/src/app/ as a thin adapter; locale routing,
+          proxies and other logic
+          live in apps/<app>/src/modules/<capability>/ (or a feature public entry) and the adapter
+          imports them;
           the names the framework mandates there (frameworkPinnedRootExports, e.g. export const config
           = { matcher }) keep their framework spelling
       - id: case-6
-        when: "Any other file or folder directly under the source root (src/i18n/request.ts, src/middleware/helper.ts, src/config.ts)"
+        when: "Any other file or folder directly under the source root (apps/<app>/src/i18n/request.ts, apps/<app>/src/middleware/helper.ts, apps/<app>/src/config.ts), and equally a repository-root src/ in a frontend repository"
         write: >
-          Move it to its owner, e.g. src/modules/i18n/request.ts, and point framework configuration
-          (next.config.ts) at the new path
+          Move it to its owner, e.g. apps/<app>/src/modules/i18n/request.ts, and point framework
+          configuration (apps/<app>/next.config.ts) at the new path
       - id: case-7
         when: "The per-slot data-status recipe"
         write: >
-          src/components/composites/SlotView/index.tsx, src/modules/slot/index.ts (Slot, toSlot,
-          SlotLabels) and src/hooks/slot/useSlotLabels.ts, one copy each (examples/shape-slot)
+          apps/<app>/src/components/composites/SlotView/index.tsx, apps/<app>/src/modules/slot/index.ts
+          (Slot, toSlot,
+          SlotLabels) and apps/<app>/src/hooks/slot/useSlotLabels.ts, one copy each
+          (examples/shape-slot)
     verification:
       automated:
         - FE_SOURCE_LAYOUT_INVALID
         - FE_FRAMEWORK_ADAPTER_IMPORT
         - FE_CUSTOM_HOOK_LOCATION
+        - HFS_APPS_REQUIRED
+        - HFS_ROOT_SRC_FORBIDDEN_FE
       manual:
         - Confirm the unit's responsibility and public entry, rather than assigning it by consumer count.
     relatedExamples:
@@ -223,19 +235,19 @@ rules:
     cases:
       - id: case-1
         when: "Authentication request lifecycle"
-        write: "src/hooks/authentication/useAuthentication.ts"
+        write: "apps/<app>/src/hooks/authentication/useAuthentication.ts"
       - id: case-2
         when: "Feature wire mapping"
-        write: "src/hooks/authentication/useAuthentication.ts maps module results to the feature-facing lifecycle"
+        write: "apps/<app>/src/hooks/authentication/useAuthentication.ts maps module results to the feature-facing lifecycle"
       - id: case-3
         when: "Generic Apollo client/link chain"
-        write: "src/modules/api/client/create-apollo-client.ts"
+        write: "apps/<app>/src/modules/api/client/create-apollo-client.ts"
       - id: case-4
         when: "Shared session storage"
-        write: "src/modules/session/session-store.ts, exported through src/modules/session/index.ts"
+        write: "apps/<app>/src/modules/session/session-store.ts, exported through apps/<app>/src/modules/session/index.ts"
       - id: case-5
         when: "Intrinsic custom helper"
-        write: "src/hooks/ui/useAutoScroll.ts; direct useRef/useState calls may remain in their visual owner"
+        write: "apps/<app>/src/hooks/ui/useAutoScroll.ts; direct useRef/useState calls may remain in their visual owner"
     verification:
       automated:
         - FE_CUSTOM_HOOK_LOCATION
@@ -303,8 +315,8 @@ rules:
       - id: case-4
         when: "A deployment constant"
         write: >
-          Never. process.env.NEXT_PUBLIC_* lives under src/modules/ and is reached through the module
-          that owns it. A component folder that reads the variable inline takes a default with it, so
+          Never. process.env.NEXT_PUBLIC_* lives under apps/<app>/src/modules/ and is reached through
+          the module that owns it. A component folder that reads the variable inline takes a default with it, so
           the same environment change acquires one home per folder that read it. The occurrences are in
           https://github.com/starci183/starci-skills/blob/edf72554425f918e80c9205e9c6db10596e722f0/tests/evidence/20260903-presentation-sweep.json
     verification:

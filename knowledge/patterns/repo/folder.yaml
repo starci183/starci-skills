@@ -1,0 +1,137 @@
+schema: starci/knowledge-source@1
+id: repo.folder
+title: Repository folder
+purpose: |
+  The one standard repository tree (HFS) for every StarCi repository: which tracked entries the
+  repository root may carry, where application source lives, which roots are backend-only, and the
+  one package manager. docs/source-layout.md draws the same law; the BE/FE pattern topics own the
+  source rules inside it.
+appliesTo:
+  - backend
+  - frontend
+family: repo
+provenance:
+  reviewedAt: 2026-09-29
+  sources:
+    - owner-approved HFS v1 (2026-09-29)
+    - docs/source-layout.md
+    - docs/backend-source-pattern.md
+    - docs/architecture-rules.md
+    - nivo-backend (apps/<app> composition + root src/features|modules)
+    - nivo-fe (apps/<app> npm workspaces, one app per folder)
+  limitations: The tree law governs tracked root entries and top-level placement only; it does not
+    certify a repository's contents, behavior or deployment. Record shape inside .starciwork stays
+    with modules/schemas/work-layout.yaml; stack declaration shape stays with
+    knowledge/application-stacks.yaml and scripts/checks/check-starcistacks.mjs.
+rules:
+  - id: REPO-FOLDER-1
+    title: Tracked root allowlist
+    kind: mandatory
+    requirement: |
+      A repository root tracks exactly its declared entries, nothing else. Required on both
+      profiles: .gitignore, .gitattributes, README.md, package.json, package-lock.json,
+      tsconfig.json (base/solution config; tsconfig.build.json optional), eslint.config.mjs,
+      architecture.json, sonar-project.properties, codecov.yml, .husky/, .github/, apps/.
+      Optional on both: packages/ (only real separately-built packages with explicit exports),
+      scripts/ (repository tooling only - *.mjs plus colocated specs; no product code, no agent
+      output), docs/ (human docs; loose *.md beyond README.md move here or into .starciwork
+      records), e2e/ (repository-level Playwright specs; old uat/ folders move here),
+      .editorconfig, .npmrc, .dockerignore, .nvmrc. A backend repository additionally requires
+      src/ (the shared feature/module source roots), nest-cli.json, jest.config.js, .starciwork/,
+      .starcistacks/ and .sops.yaml. A frontend repository additionally allows vitest.config.ts,
+      vitest.setup.ts, turbo.json and playwright*.config.ts, and forbids src/ at the root
+      (REPO-FOLDER-2). package.json declares npm workspaces ("workspaces": ["apps/*",
+      "packages/*"]) whenever the repository holds more than one package. Never tracked
+      (.gitignore must cover them): node_modules/, dist/, .next/, coverage/, .scannerwork/,
+      test-results/, .turbo/, .tools/, *.tsbuildinfo and agent output (report*.json, *.tmp.json,
+      %*% names, nul, .qwen*/, .artifacts/, .tmp-*, *-lint.json, lf.json, lt.json). Anything else
+      at the root moves to its owner: infrastructure, compose, docker and env templates, seeds
+      and db init to .starcistacks/<environment>/; migrations and schemas to the owning
+      src/modules/platform/<db> or src/modules/domain/<capability>; product docs and workflow
+      notes to .starciwork records or docs/; code generators to scripts/ or a real packages/<pkg>.
+    rationale: |
+      One closed root contract makes every repository machine-checkable and leaves no unnamed
+      place for agent output, second layouts or drifting project metadata to collect.
+    verification:
+      automated:
+        - HFS_ROOT_ENTRY_FORBIDDEN
+        - HFS_ROOT_ENTRY_MISSING
+      manual:
+        - Judge each leftover root entry by its owner and move it, never by tolerating a new root name.
+    relatedExamples: []
+  - id: REPO-FOLDER-2
+    title: apps/<app> is the only application root
+    kind: mandatory
+    requirement: |
+      Every repository, backend and frontend, is an apps/<app>/ monorepo even with one
+      application; a single-app repository names the app by its role (for example web). A
+      backend app's composition lives in apps/<app>/src (main.ts, app.module.ts, optional
+      <app>.composition.spec.ts) and nothing else; shared backend source lives in src/features
+      and src/modules. A frontend app carries its own package.json, next.config.ts,
+      tsconfig.json, postcss.config.mjs and next-env.d.ts in apps/<app>/, and all product source
+      sits under apps/<app>/src; a frontend repository has no root src/. There is no
+      single-app-versus-monorepo fork and no mapped/legacy alternative layout.
+    rationale: |
+      One topology for every repository removes the layout fork that let per-project roots drift
+      and keeps every app's source root addressable by the same FE/BE rules.
+    verification:
+      automated:
+        - HFS_APPS_REQUIRED
+        - HFS_ROOT_SRC_FORBIDDEN_FE
+      manual:
+        - Confirm apps/<app> holds composition/config only and product source has a named owner.
+    relatedExamples: []
+  - id: REPO-FOLDER-3
+    title: npm is the only package manager
+    kind: mandatory
+    requirement: |
+      package.json plus package-lock.json and npm ci/npm install are the only package-management
+      contract. pnpm-lock.yaml, pnpm-workspace.yaml, yarn.lock and any other manager's lockfile or
+      workspace file are never tracked; a stray one is deleted, not kept beside package-lock.json.
+    rationale: |
+      Two lockfiles disagree silently and hide the real dependency resolution a build ran against.
+    verification:
+      automated:
+        - HFS_PACKAGE_MANAGER_MIXED
+      manual:
+        - Confirm package.json#packageManager names npm and the lockfile is the one CI installs.
+    relatedExamples: []
+  - id: REPO-FOLDER-4
+    title: .starciwork lives only in the backend repository
+    kind: mandatory
+    requirement: |
+      .starciwork/ is required in the project's backend repository and forbidden in a frontend
+      repository; the frontend consumes the same records and never copies them. It holds product
+      content only - exactly the paths scripts/lib/starciwork-boundary.mjs isProductPath accepts -
+      and .starciwork/.gitignore is exactly starciworkGitignoreText(). Agent data (evidence,
+      reports, checks, captures, draw rounds, UAT runs, logs, kernel-evidence, kernel-strays,
+      runtime.sqlite files, operations, E/) is not repository content and is archived out, not
+      committed.
+    rationale: |
+      One canonical Work tree per project keeps product records authoritative; agent data is
+      ledger/blob-store content, never repository history.
+    verification:
+      automated:
+        - HFS_WORK_IN_FE
+      manual:
+        - node scripts/checks/work-validate.mjs <repo>/.starciwork passes on the backend tree.
+    relatedExamples: []
+  - id: REPO-FOLDER-5
+    title: .starcistacks lives only in the backend repository
+    kind: mandatory
+    requirement: |
+      .starcistacks/ and .sops.yaml are required in the project's backend repository and forbidden
+      in a frontend repository. The tree is application-stacks.yaml plus one folder per
+      environment (dev/, vps/, ...) carrying only infra/, runtime/, secrets/, seeds/ and
+      environment.json where the schema asks for it; secrets exist only as sops *.enc twins,
+      never plaintext. Shared host services (SonarQube first) are declared, not copied: the stack
+      declaration points at the host extension .claude/ext/<service>/.
+    rationale: |
+      Deployment custody is backend-owned per project, and shared services are referenced at their
+      host extension rather than duplicated into every repository.
+    verification:
+      automated:
+        - HFS_STACKS_IN_FE
+      manual:
+        - node scripts/checks/check-starcistacks.mjs <repo> exits 0 on the backend tree.
+    relatedExamples: []

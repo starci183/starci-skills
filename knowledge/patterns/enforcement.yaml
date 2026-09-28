@@ -21,9 +21,10 @@ rules:
     title: Preserve responsibilities across projects
     kind: mandatory
     requirement: |
-      Use the extracted BE/FE pattern cases and code-examples, not a generic instruction to
-      consult another repository. Preserve the same responsibilities, unit layout, dependency
-      directions and public contracts across projects. Business names, database ownership and
+      Use the extracted BE/FE pattern cases, the repository tree law in patterns/repo/folder.yaml
+      and code-examples, not a generic instruction to consult another repository. Preserve the
+      same responsibilities, unit layout, dependency directions and public contracts across
+      projects. Business names, database ownership and
       actual platform constraints vary; convention consistency does not mean copying one
       application's behavior or connection token.
     rationale: |

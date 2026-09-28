@@ -31,6 +31,26 @@ guidance:
       Concrete examples and proposed enforcement upgrades are collocated under code-examples and
       patterns/enforcement.yaml.
 observations:
+  - id: repo-tree-law
+    lane: cross-cutting
+    kind: observation
+    summary: |
+      The repository root and top-level tree are now normative knowledge, not per-project choice:
+      knowledge/patterns/repo/folder.yaml (REPO-FOLDER-1..5) owns the tracked-root allowlist, the
+      mandatory apps/<app> monorepo shape on both profiles, backend-only .starciwork/.starcistacks
+      placement and the npm-only rule. The architecture machine reports them as the HFS_* codes
+      (HFS_ROOT_ENTRY_FORBIDDEN, HFS_ROOT_ENTRY_MISSING, HFS_APPS_REQUIRED, HFS_ROOT_SRC_FORBIDDEN_FE,
+      HFS_MODULE_TIER_INVALID, HFS_WORK_IN_FE, HFS_STACKS_IN_FE, HFS_PACKAGE_MANAGER_MIXED); the old
+      "mapped layout" compatibility allowances are gone.
+    automated:
+      - HFS_ROOT_ENTRY_FORBIDDEN
+      - HFS_ROOT_ENTRY_MISSING
+      - HFS_APPS_REQUIRED
+      - HFS_ROOT_SRC_FORBIDDEN_FE
+      - HFS_MODULE_TIER_INVALID
+      - HFS_WORK_IN_FE
+      - HFS_STACKS_IN_FE
+      - HFS_PACKAGE_MANAGER_MIXED
   - id: be-units
     lane: backend
     kind: observation

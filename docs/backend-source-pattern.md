@@ -6,12 +6,16 @@ This is the adopted Nest/TypeScript implementation of the [portable responsibili
 
 An application composes a process. A feature orchestrates an externally meaningful use case. A module owns a cohesive domain, platform, or provider capability. Transport adapts a protocol into a use case. Persistence adapts a named data store into its owning capability. A class, file, database table, or second consumer is not itself a reason to create another module.
 
-Use this default tree for new source. Create only folders with an actual responsibility:
+This is the backend tree, on every repository - `knowledge/patterns/be/folder.yaml`
+(BE-FOLDER-1) and `knowledge/patterns/repo/folder.yaml` own it as law, and the
+architecture check reports violations as `HFS_APPS_REQUIRED` /
+`HFS_MODULE_TIER_INVALID`. Create only folders with an actual responsibility:
 
 ```text
-apps/<app>/src/
-  main.ts                         # startup, shutdown, process wiring
-  app.module.ts                   # feature/module composition and app-wide adapters
+apps/<app>/                         # mandatory even with one application
+  src/                              # composition only; no feature/module source
+    main.ts                         # startup, shutdown, process wiring
+    app.module.ts                   # feature/module composition and app-wide adapters
 src/
   features/<feature>/
     index.ts                      # explicit consumer API; no export-star collection
@@ -29,14 +33,26 @@ src/
     domain/<capability>/          # reusable business invariants and owned state
     platform/<capability>/        # configuration, database, logging, health, runtime facilities
     integrations/<provider>/     # external protocol/client, validation, failure translation
-  tests/{integration,fixtures,harness}/
+  tests/{integration,fixtures,harness,e2e}/
 ```
 
 Within a module use a narrow `index.ts`, `<name>.module.ts` when Nest registration is needed, meaningful services/policies/contracts, and colocated tests. An independently configurable module may add `<name>.module-definition.ts`. A pure TypeScript library does not need a Nest module. A database module can own `entities/` and `migrations/`; another persistence layout must still identify one connection, schema/migration owner, and transaction owner. Do not scatter schema ownership among feature transports.
 
-For a standard single application the composition files may be `src/main.ts` and `src/app.module.ts`, with `src/features` and `src/modules` unchanged. In a package monorepo put each deployable process in `apps/<app>` and independently owned reusable packages in `packages/<capability>`; each package declares its explicit exports. Package extraction is justified by ownership/build/lifecycle, not by a wish to fill a `packages` folder. Configure the actual roots in `architecture.json`; topology never reverses dependencies.
+Every backend repository is an `apps/<app>/` monorepo, including a
+single-application one: each deployable process composes in `apps/<app>/src`
+(`main.ts`, `app.module.ts`, an optional composition spec) and nothing else
+lives there, while `src/features` and `src/modules` stay at the repository
+root and are shared by every app. Independently owned reusable packages sit in
+`packages/<capability>`; each package declares its explicit exports. Package
+extraction is justified by ownership/build/lifecycle, not by a wish to fill a
+`packages` folder. `architecture.json` declares these same roots; topology
+never reverses dependencies.
 
-The Academy transport-first `src/features/api/core/graphql/...` tree remains a mapped existing layout. New cohesive features use the domain-first layout above so HTTP, messages and GraphQL can call the same use case. A source transition is an authorized change with fresh evidence; installing this runtime does not move project files or bless existing violations.
+The Academy transport-first `src/features/api/core/graphql/...` tree is retired
+debt, not a mapped alternative - every feature uses the domain-first layout
+above so HTTP, messages and GraphQL call the same use case. A source
+transition is an authorized change with fresh evidence; installing this
+runtime does not move project files or bless existing violations.
 
 ## Dependency and contract boundaries
 
@@ -119,15 +135,15 @@ Inspected Academy backend `1731b15ba4ed526477e3c572b9d82c31ab64f1d5`:
 | `apps/core/src/app.module.ts` composes features, named databases and platform facilities | Retain thin composition and named identity; global registration is deliberate, not universal. |
 | `src/features/api/core/graphql/mutations/courses/add-to-cart/` splits resolver, forwarding service, message, handler and dynamic module | Retain protocol/use-case separation; remove mandatory forwarding/template/dynamic-module boilerplate from the standard. |
 | `src/modules/platform/cqrs/icqrs-handler.ts` forwards `execute` to `process` | Existing API remains supported; forwarding alone does not justify a mandatory base for new code. |
-| `src/modules/databases/postgresql/primary/primary.module-definition.ts` has real typed database options | Valid configurable-module example; an empty-options feature definition is not equivalent. |
+| Academy `primary.module-definition.ts` (then under the retired `databases` tier, now `platform`) has real typed database options | Valid configurable-module example; an empty-options feature definition is not equivalent. |
 | Add-to-cart checks then saves; GraphQL request declares `ID`; response uses ORM entity | Those shapes do not prove concurrent idempotency, semantic validation or a safe public projection. Require the actual constraints and behavioral evidence. |
-| `src/modules/bussiness/community/community-outbox-publisher.service.ts` claims a row, emits locally, then updates by id | Atomic outbox creation is useful; this source alone does not prove durable subscriber acknowledgement or stale-claim settlement rejection. |
+| Academy `community-outbox-publisher.service.ts` (then under the retired `bussiness` tier, now `domain`) claims a row, emits locally, then updates by id | Atomic outbox creation is useful; this source alone does not prove durable subscriber acknowledgement or stale-claim settlement rejection. |
 
 Read-only Nivo saga inspection also found the external step precedes local fenced acknowledgement. That is a recovery case to investigate, not evidence that the remote resource honors the fence. This runtime change does not claim those product defects are repaired.
 
 ## What enforcement proves
 
-`node scripts/checks/architecture.mjs <repository>` resolves actual imports and checks app/feature/module direction, thin app source roles, declared package exports, supported application/transport placement, statically identified TypeORM/GraphQL placement, and mechanically decidable filename/declaration forms. Unknown roles, dynamic decorator/name expressions and explicit `legacyRoots` entries are unavailable coverage rather than accepted exceptions. The checker does not infer error, persistence or capability ownership from a folder name; those remain design and behavioral review. `node scripts/checks/check-stales.mjs` compares canonical Work and bound source evidence. Scoped lint checks the selected project's installed rules and actual files. These are separate results, not a combined certificate of correctness.
+`node scripts/checks/architecture.mjs <repository>` resolves actual imports and checks app/feature/module direction, thin app source roles, declared package exports, supported application/transport placement, statically identified TypeORM/GraphQL placement, and mechanically decidable filename/declaration forms. Unknown roles and dynamic decorator/name expressions are unavailable coverage rather than accepted exceptions; no `legacyRoots`-style layout mapping exists. The checker does not infer error, persistence or capability ownership from a folder name; those remain design and behavioral review. `node scripts/checks/check-stales.mjs` compares canonical Work and bound source evidence. Scoped lint checks the selected project's installed rules and actual files. These are separate results, not a combined certificate of correctness.
 
 Static analysis cannot prove cohesive ownership, complete public API design, DI identity, resource authorization, transaction isolation, idempotency, crash recovery or remote fencing. Those require applicable boot, contract, database-concurrency and failure-injection tests with evidence against the exact source/contract revision. Do not create all test categories for a pure helper; select them from actual effects and invariants. Missing proof is an explicit finding, not an inferred pass.
 

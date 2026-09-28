@@ -97,7 +97,7 @@ rules:
     title: Application contracts do not depend on transport adapters
     kind: mandatory
     requirement: |-
-      In the adopted feature/application layout, use cases and their plain contracts do not import feature/transport DTOs or protocol framework surfaces. Transport adapters import application contracts and project results. Nest injection alone is allowed in the concrete Nest profile; a namespace alias must not hide protocol decorators. Earlier transport-first source is mapped explicitly and is not silently reclassified or relabeled.
+      In the adopted feature/application layout, use cases and their plain contracts do not import feature/transport DTOs or protocol framework surfaces. Transport adapters import application contracts and project results. Nest injection alone is allowed in the concrete Nest profile; a namespace alias must not hide protocol decorators. Earlier transport-first source is retired debt: it is neither silently reclassified nor relabeled.
     rationale: |-
       Multiple protocols can reuse a scenario only when its contract does not depend on one protocol's request or response representation.
     verification:

@@ -1,6 +1,6 @@
 # Common architecture rules
 
-These are the shared rules for StarCi projects: TypeScript, Next.js frontend and NestJS backend, using the owner's Academy code patterns and enterprise design obligations. This is a fixed technology family, not a framework-selection system. The rules fix responsibilities, dependency direction, authority, state and effect invariants. Nest/Next profiles supply concrete paths and code forms; repository topology supplies build/source mappings. Neither an example nor a historical reference file count can add a mandatory layer.
+These are the shared rules for StarCi projects: TypeScript, Next.js frontend and NestJS backend, using the owner's Academy code patterns and enterprise design obligations. This is a fixed technology family, not a framework-selection system. The rules fix responsibilities, dependency direction, authority, state and effect invariants. Nest/Next profiles supply concrete code forms inside the one repository topology (`knowledge/patterns/repo/folder.yaml`); that topology fixes the source roots, not per-project mapping. Neither an example nor a historical reference file count can add a mandatory layer.
 
 ## Authority and load order
 
@@ -56,7 +56,7 @@ The owning design records the trigger and invariant, then chooses the smallest m
 
 ## Fixed stack and repository profiles
 
-Every project in this standard uses Next.js and NestJS. Backend composition maps to the real Nest `main.ts`/`app.module.ts` boundaries; frontend composition maps to Next route/layout/provider boundaries. Single-source and monorepo layouts share these rules. Agents do not substitute another framework or a generic architecture dialect merely because it can satisfy a weaker check.
+Every project in this standard uses Next.js and NestJS and follows the one HFS tree (`knowledge/patterns/repo/folder.yaml`): an `apps/<app>/` monorepo on both profiles, with backend shared source at root `src/` and frontend source inside `apps/<app>/src`. Backend composition maps to the real Nest `main.ts`/`app.module.ts` boundaries inside `apps/<app>/src`; frontend composition maps to Next route/layout/provider boundaries inside `apps/<app>/src/app`. Agents do not substitute another framework or a generic architecture dialect merely because it can satisfy a weaker check.
 
 Similarly:
 
@@ -64,7 +64,7 @@ Similarly:
 - A configuration/lifetime contract is common; use the adopted Nest static/dynamic module rule rather than inventing another registration architecture.
 - Transaction/connection identity is common; TypeORM-owning code follows Academy named EntityManager injection and its executable rules. Any purposeful boundary abstraction must preserve that identity and must not bypass the pattern.
 - Frontend composition follows the owner's patterns and verified Grammar public APIs. Never invent package exports or component props.
-- A monorepo package and a separate source repository preserve the same owner graph. Paths, build tools and package managers are discovered/configured rather than assumed.
+- A `packages/<pkg>` package and a separate source repository preserve the same owner graph. Paths and build tools follow the fixed profile; npm (`package-lock.json`, npm workspaces) is the package manager, not a discovery outcome.
 
 Existing historical Academy topics remain useful only within their stated profile. Current common rules and adopted boundary rules take precedence over historical wrapper, global-registration, deep-import or test-shape examples. A conflicting installed lint rule must be updated coherently within authorized scope; turning it off to claim conformance is not an update.
 
