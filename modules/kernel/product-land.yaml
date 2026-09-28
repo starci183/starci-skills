@@ -45,5 +45,12 @@ land:                           # wf/<wf> -> the product's main (per-repository 
   syncWorkflowAfterLand: true   # fast-forward wf/<wf> to the new main
   maxMainRetries: 3
 
+deps:                           # the workflow's serial deps unit (api product-deps; product-worktree.mjs applyDepsUnit)
+  installTimeoutMs: 1200000
+  install:                      # the first lockfile present at the _wf root picks the install (argv, no shell)
+    package-lock.json: [npm, ci]
+    pnpm-lock.yaml: [pnpm, install, --frozen-lockfile]
+    yarn.lock: [yarn, install, --frozen-lockfile]
+
 invariant:
   importsCacheMs: 300000        # api status importsBroken: one scan per tree state within this window

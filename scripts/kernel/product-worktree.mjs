@@ -50,6 +50,7 @@ import { claimManager } from '../connectors/lib.mjs';
 import { sleepSync } from '../lib/sleep-sync.mjs';
 import { WORKTREES_REL, WORKFLOW_DIR_NAME, WORKTREES_EXCLUDE_LINE, isWorktreesPath } from '../lib/worktree-exclude.mjs';
 import { brokenImports } from './import-scan.mjs';
+import { launchFor } from '../uat/launch.mjs';
 
 const selfFile = fileURLToPath(import.meta.url);
 export const SKILL_ROOT = path.resolve(path.dirname(selfFile), '..', '..');
@@ -68,6 +69,9 @@ export const EVENTS = Object.freeze({
 });
 const SETTLED = ['succeeded', 'failed', 'cancelled'];
 const OVERLAY_MARKER = '.starci-overlay.json';
+/** Written into a workflow worktree's node_modules by its deps unit: a real install, the overlay source of its ops. */
+const INSTALL_MARKER = '.starci-install.json';
+export const installedIn = (dir) => { try { return JSON.parse(fs.readFileSync(path.join(dir, 'node_modules', INSTALL_MARKER), 'utf8')); } catch { return null; } };
 const ARCHIVE_PREFIX = 'refs/starci/archive';
 
 /* ------------------------------------------------------------ settings */
@@ -81,6 +85,8 @@ const DEFAULTS = Object.freeze({
     depsFiles: ['package.json', 'package-lock.json', 'pnpm-lock.yaml', 'yarn.lock', 'npm-shrinkwrap.json', 'pnpm-workspace.yaml'] },
   land: { lockWaitMs: 1_800_000, checks: [], importScan: true, push: false, syncWorkflowAfterLand: true, maxMainRetries: 3 },
   invariant: { importsCacheMs: 300_000 },
+  deps: { installTimeoutMs: 1_200_000,
+    install: { 'package-lock.json': ['npm', 'ci'], 'pnpm-lock.yaml': ['pnpm', 'install', '--frozen-lockfile'], 'yarn.lock': ['yarn', 'install', '--frozen-lockfile'] } },
 });
 const merge = (a, b) => {
   if (!b || typeof b !== 'object' || Array.isArray(b)) return b ?? a;
@@ -228,9 +234,11 @@ const junction = (target, link) => { fs.symlinkSync(target, link, 'junction'); }
  * whose real path is inside the checkout and outside any node_modules - which are junctioned to the worktree's own
  * copy. Files (.package-lock.json) are copied. {ok, dirs, links, workspace: [{name, target}], lockHash}
  */
-export function buildOverlay({ repoRoot, worktree, settings = productSettings() }) {
-  const rootReal = realOf(repoRoot) ?? path.resolve(repoRoot);
-  const out = { ok: true, dirs: [], links: 0, copied: 0, workspace: [], lockHash: lockHashOf(repoRoot, settings), errors: [] };
+export function buildOverlay({ repoRoot, worktree, source = repoRoot, settings = productSettings() }) {
+  // `source`: the install the overlay mirrors - the main checkout, or the workflow worktree once its deps unit installed
+  // there (a package.json/lockfile change of the workflow, not yet in main).
+  const rootReal = realOf(source) ?? path.resolve(source);
+  const out = { ok: true, dirs: [], links: 0, copied: 0, workspace: [], lockHash: lockHashOf(source, settings), source: path.resolve(source), errors: [] };
   const mapTarget = (entryAbs) => {
     const real = realOf(entryAbs);
     if (!real) return null;
@@ -244,7 +252,7 @@ export function buildOverlay({ repoRoot, worktree, settings = productSettings() 
   const fill = (srcDir, dstDir, label) => {
     fs.mkdirSync(dstDir, { recursive: true });
     for (const e of fs.readdirSync(srcDir, { withFileTypes: true })) {
-      if (e.name === OVERLAY_MARKER) continue;
+      if (e.name === OVERLAY_MARKER || e.name === INSTALL_MARKER) continue;
       const src = path.join(srcDir, e.name), dst = path.join(dstDir, e.name);
       try { fs.lstatSync(dst); continue; } catch { /* not there yet */ }
       try {
@@ -265,15 +273,15 @@ export function buildOverlay({ repoRoot, worktree, settings = productSettings() 
       } catch (error) { out.errors.push({ entry: `${label}${e.name}`, error: String(error?.message ?? error).slice(0, 200) }); }
     }
   };
-  for (const dir of nodeModulesDirs(repoRoot, { maxDepth: settings.worktrees.overlay.maxDepth })) {
-    const src = path.join(repoRoot, dir, 'node_modules');
+  for (const dir of nodeModulesDirs(source, { maxDepth: settings.worktrees.overlay.maxDepth })) {
+    const src = path.join(source, dir, 'node_modules');
     const wtDir = path.join(worktree, dir);
     if (!fs.existsSync(wtDir)) continue; // a workspace dir the worktree's commit does not have
     fill(realOf(src) ?? src, path.join(wtDir, 'node_modules'), dir ? `${dir}/node_modules/` : 'node_modules/');
     out.dirs.push(dir);
   }
   fs.mkdirSync(path.join(worktree, 'node_modules'), { recursive: true });
-  fs.writeFileSync(path.join(worktree, 'node_modules', OVERLAY_MARKER), JSON.stringify({ lockHash: out.lockHash, dirs: out.dirs, builtAt: new Date().toISOString(), links: out.links }));
+  fs.writeFileSync(path.join(worktree, 'node_modules', OVERLAY_MARKER), JSON.stringify({ lockHash: out.lockHash, source: out.source, dirs: out.dirs, builtAt: new Date().toISOString(), links: out.links }));
   out.ok = out.errors.filter((e) => /workspace/.test(e.error)).length === 0;
   return out;
 }
@@ -306,14 +314,18 @@ export function removeOverlay(worktree, { settings = productSettings() } = {}) {
   return out;
 }
 
-/** Rebuild the overlay when missing or when a root lockfile changed since it was built. */
-export function ensureOverlay({ repoRoot, worktree, settings = productSettings() }) {
+/**
+ * Rebuild the overlay when missing, when its source's lockfile changed since it was built, or when its source changed
+ * (the workflow's deps unit installed in _wf). A worktree holding a real install (the deps unit's) is left alone.
+ */
+export function ensureOverlay({ repoRoot, worktree, source = repoRoot, settings = productSettings() }) {
+  if (installedIn(worktree)) return { ok: true, fresh: true, installed: true };
   let marker = null;
   try { marker = JSON.parse(fs.readFileSync(path.join(worktree, 'node_modules', OVERLAY_MARKER), 'utf8')); } catch { marker = null; }
-  const lockHash = lockHashOf(repoRoot, settings);
-  if (marker?.lockHash === lockHash) return { ok: true, fresh: true, lockHash };
+  const lockHash = lockHashOf(source, settings);
+  if (marker?.lockHash === lockHash && samePath(marker.source ?? repoRoot, source)) return { ok: true, fresh: true, lockHash };
   if (marker) { const rm = removeOverlay(worktree, { settings }); if (!rm.ok) return { ok: false, reason: 'overlay-link-stuck', stuck: rm.stuck }; }
-  const built = buildOverlay({ repoRoot, worktree, settings });
+  const built = buildOverlay({ repoRoot, worktree, source, settings });
   return { ...built, rebuilt: Boolean(marker) };
 }
 
@@ -463,7 +475,7 @@ export function ensureOpWorktree({ repoRoot, workflowId, jobId, handFrom = [], s
     return { ok: true, created: added.created, wfTip, handed };
   }, { waitMs: settings.integrate.lockWaitMs });
   if (!locked.ok) return { ok: false, reason: locked.reason, detail: locked.detail ?? locked.holder };
-  const overlay = ensureOverlay({ repoRoot, worktree: lay.op.path, settings });
+  const overlay = ensureOverlay({ repoRoot, worktree: lay.op.path, source: installedIn(lay.workflow.path) ? lay.workflow.path : repoRoot, settings });
   const resolution = overlay.fresh ? null : verifyResolution(lay.op.path, overlay);
   if (overlay.ok === false || (resolution && !resolution.ok)) return { ok: false, reason: overlay.ok === false ? (overlay.reason ?? 'overlay-failed') : 'resolution-outside-worktree', detail: resolution ?? summarizeOverlay(overlay) };
   const record = {
@@ -614,8 +626,10 @@ export function integrateOp({ record, head = null, depsUnit = false, checks = []
     if (!pending.length) return { ok: true, already: true, before: W, after: W, map: [], viaPatchId: true };
     const base = git(repoRoot, ['merge-base', W, tip]).stdout;
     const changed = git(repoRoot, ['diff', '--name-only', base, tip]).stdout.split(/\r?\n/).filter(Boolean);
-    const deps = changed.filter((f) => settings.integrate.depsFiles.includes(path.posix.basename(f)));
-    if (deps.length && !depsUnit) return { ok: false, reason: 'deps-unit-required', files: deps, hint: 'a package.json/lockfile change goes to the workflow\'s serial deps unit (params.depsUnit); re-cut this op without it or enqueue the deps unit' };
+    // A dependency manifest the op changes that the workflow branch does not carry yet (its deps unit applies it).
+    const deps = changed.filter((f) => settings.integrate.depsFiles.includes(path.posix.basename(f)) && !git(repoRoot, ['diff', '--quiet', W, tip, '--', f]).ok);
+    if (deps.length && !depsUnit) return { ok: false, reason: 'deps-unit-required', files: deps, depsUnit: { workflowId: record.workflowId, fromJob: record.jobId },
+      hint: `a package.json/lockfile change goes through the workflow's serial deps unit: api product-deps --workflow ${record.workflowId} --from-job ${record.jobId} applies ${deps.join(', ')} on ${wf.branch}, installs in its _wf and rebuilds the op overlays; then settle this job again` };
     const chain = rebaseChain(repoRoot, pending, W, { hunksOf });
     if (!chain.ok) return { ok: false, reason: chain.conflicts ? 'product-integrate-conflict' : chain.reason, conflicts: chain.conflicts ?? [], onto: W, detail: chain.detail ?? null,
       hint: `rebase ${op.branch} onto ${wf.branch} (git rebase ${wf.branch} in ${posix(op.path)}), resolve the files, commit, report the new head; or re-cut the slice` };
@@ -654,6 +668,75 @@ export function cherryOf(repoRoot, upstream, head, limit = null) {
   const out = new Map();
   for (const line of r.stdout.split(/\r?\n/).filter(Boolean)) { const [mark, sha] = line.trim().split(/\s+/); if (sha) out.set(sha, mark); }
   return out;
+}
+
+/* ------------------------------------------------------------ the deps unit */
+
+/** The install command for a checkout: the first configured lockfile present at its root. */
+export function installCommandOf(dir, settings = productSettings()) {
+  for (const [lock, argv] of Object.entries(settings.deps.install ?? {})) if (fs.existsSync(path.join(dir, lock))) return { lock, argv };
+  return null;
+}
+const runInstall = (argv, cwd, timeoutMs) => {
+  const { file, args } = launchFor(argv);
+  const r = spawnSync(file, args, { cwd, encoding: 'utf8', windowsHide: true, timeout: timeoutMs, maxBuffer: 64 * 1024 * 1024 });
+  return { ok: !r.error && r.status === 0, exitCode: r.status, tail: String(r.stderr || r.stdout || r.error?.message || '').trim().split(/\r?\n/).slice(-4).join(' / ').slice(0, 500) };
+};
+
+/**
+ * The workflow's SERIAL deps unit (DESIGN §16.7, mitigation 1): an op may not change package.json or a lockfile on its
+ * own (integrateOp refuses deps-unit-required); this applies exactly the dependency manifests `fromJob` changed onto
+ * wf/<wf> as one commit in the _wf worktree, replaces _wf's junction overlay with a REAL install (settings.deps.install,
+ * e.g. npm ci), marks it (the overlay source of the workflow's ops from now on) and rebuilds the overlay of every live op
+ * worktree of the workflow. Under the per-workflow lock; a failed install rolls wf/<wf> back and restores the overlay.
+ * The job itself then settles again (its manifests now equal the workflow branch's). Seam: install(argv, cwd, timeoutMs).
+ * {ok, commit, files, install, rebuilt: [op dir]} | {ok:false, reason}
+ */
+export function applyDepsUnit({ record, settings = productSettings(), install = runInstall }) {
+  const { repoRoot } = record;
+  const wf = record.workflow;
+  return withLock(workflowLockName(repoRoot, wf.short), () => {
+    if (!fs.existsSync(wf.path)) return { ok: false, reason: 'workflow-worktree-missing', path: wf.path };
+    const W = revParse(repoRoot, wf.branch);
+    const tip = revParse(repoRoot, record.op.branch) ?? archivedOpRef(repoRoot, record.jobId, settings)?.sha ?? null;
+    if (!W || !tip) return { ok: false, reason: 'ref-unresolved', branch: record.op.branch };
+    const base = git(repoRoot, ['merge-base', W, tip]).stdout;
+    const files = git(repoRoot, ['diff', '--name-only', base, tip]).stdout.split(/\r?\n/).filter(Boolean)
+      .filter((f) => settings.integrate.depsFiles.includes(path.posix.basename(f)) && !git(repoRoot, ['diff', '--quiet', W, tip, '--', f]).ok);
+    if (!files.length) return { ok: true, nothing: true, files: [] };
+    if (git(wf.path, ['status', '--porcelain', '--untracked-files=no']).stdout) return { ok: false, reason: 'workflow-worktree-dirty', path: wf.path };
+    const co = git(wf.path, ['checkout', tip, '--', ...files]);
+    if (!co.ok) return { ok: false, reason: 'deps-apply-failed', detail: co.stderr.slice(0, 300) };
+    const c = git(wf.path, ['commit', '-q', '-m', `deps: ${files.join(', ')} (deps unit for ${record.jobId})`]);
+    if (!c.ok) { git(wf.path, ['reset', '--hard', W]); return { ok: false, reason: 'deps-commit-failed', detail: c.stderr.slice(0, 300) }; }
+    const commit = revParse(wf.path, 'HEAD');
+    const cmd = installCommandOf(wf.path, settings);
+    const out = { ok: true, commit, files, install: null, rebuilt: [] };
+    if (cmd) {
+      const rm = removeOverlay(wf.path, { settings });
+      if (!rm.ok) { git(wf.path, ['reset', '--hard', W]); return { ok: false, reason: 'overlay-link-stuck', stuck: rm.stuck }; }
+      try { safeRemoveTree(path.join(wf.path, 'node_modules')); } catch { /* the install recreates it */ }
+      const r = install(cmd.argv, wf.path, settings.deps.installTimeoutMs);
+      out.install = { lock: cmd.lock, argv: cmd.argv, ...r };
+      if (!r.ok) {
+        git(wf.path, ['reset', '--hard', W]);
+        removeOverlay(wf.path, { settings });
+        try { safeRemoveTree(path.join(wf.path, 'node_modules')); } catch { /* rebuilt below */ }
+        ensureOverlay({ repoRoot, worktree: wf.path, settings });
+        return { ok: false, reason: 'deps-install-failed', files, install: out.install, rolledBack: W };
+      }
+      fs.mkdirSync(path.join(wf.path, 'node_modules'), { recursive: true });
+      fs.writeFileSync(path.join(wf.path, 'node_modules', INSTALL_MARKER), JSON.stringify({ lockHash: lockHashOf(wf.path, settings), commit, job: record.jobId, installedAt: new Date().toISOString() }));
+    }
+    let ops = [];
+    try { ops = fs.readdirSync(path.dirname(wf.path)).filter((n) => n !== WORKFLOW_DIR_NAME); } catch { ops = []; }
+    for (const name of ops) {
+      const dir = path.join(path.dirname(wf.path), name);
+      const r = ensureOverlay({ repoRoot, worktree: dir, source: installedIn(wf.path) ? wf.path : repoRoot, settings });
+      out.rebuilt.push({ path: dir, ok: r.ok !== false });
+    }
+    return out;
+  }, { waitMs: settings.integrate.lockWaitMs });
 }
 
 /* ------------------------------------------------------------ removal */

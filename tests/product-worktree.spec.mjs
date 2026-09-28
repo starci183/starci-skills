@@ -12,7 +12,7 @@ import { spawnSync } from 'node:child_process';
 import { openLedger, ledgerFileFor } from '../engine/ledger-db.mjs';
 import {
   ensureOpWorktree, ensureWorkflowWorktree, integrateOp, removeOpWorktree, removeWorkflowWorktree, layoutOf, verifyResolution,
-  reapJobWorktree, archivedOpRef, planIsolation, shortIdOf, EVENTS,
+  reapJobWorktree, archivedOpRef, planIsolation, shortIdOf, EVENTS, applyDepsUnit, installedIn,
 } from '../scripts/kernel/product-worktree.mjs';
 import { WORKTREES_REL } from '../scripts/lib/worktree-exclude.mjs';
 
@@ -166,8 +166,19 @@ test('integration: a green op lands in wf/<wf>; a conflicting one is refused wit
   const d = ensureOpWorktree({ repoRoot: repo, workflowId: WF, jobId: 'op-code.refactor-ee55ff66aa' }).record;
   write(d.op.path, 'package.json', JSON.stringify({ name: 'nivo', private: true, workspaces: ['apps/*', 'packages/*'], dependencies: { x: '1' } }));
   git(d.op.path, 'commit', '-qam', 'deps');
-  assert.equal(integrateOp({ record: d }).reason, 'deps-unit-required');
-  assert.equal(integrateOp({ record: d, depsUnit: true }).ok, true);
+  const refused = integrateOp({ record: d });
+  assert.equal(refused.reason, 'deps-unit-required');
+  assert.match(refused.hint, /api product-deps --workflow wf-nivo-fe-canon-mujek980 --from-job op-code.refactor-ee55ff66aa/);
+  // The serial deps unit: the manifests land on wf/<wf>, _wf gets a real install, the op overlays now mirror it.
+  const installs = [];
+  const deps = applyDepsUnit({ record: d, install: (argv, cwd) => { installs.push({ argv, cwd }); write(cwd, 'node_modules/x/package.json', '{"name":"x"}'); return { ok: true, exitCode: 0 }; } });
+  assert.ok(deps.ok, JSON.stringify(deps));
+  assert.deepEqual(deps.files, ['package.json']);
+  assert.deepEqual(installs, [{ argv: ['npm', 'ci'], cwd: d.workflow.path }]);
+  assert.ok(installedIn(d.workflow.path), 'the _wf holds the real install');
+  assert.equal(real(path.join(d.op.path, 'node_modules', 'x')), real(path.join(d.workflow.path, 'node_modules', 'x')), 'the op overlay mirrors the workflow install');
+  assert.ok(deps.rebuilt.some((r) => r.path === d.op.path && r.ok));
+  assert.equal(integrateOp({ record: d }).ok, true, 'its manifests are the workflow branch now: the op settles');
 });
 
 test('released -> worktree-removed: the reap records the transition once; the workflow worktree waits for its land', (t) => {

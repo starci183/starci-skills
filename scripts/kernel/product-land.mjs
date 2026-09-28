@@ -168,6 +168,9 @@ export function productLand({ repoRoot, workflowId, dryRun = false, push = null,
           return { ok: false, reason: ff.reason, base, head, dirty: ff.dirty ?? null, detail: ff.detail ?? null, checks };
         }
         const out = { ok: true, landed: head, base, head, branch, changed, checks };
+        // A deps unit's manifests reached main: the live checkout's install (every overlay's source) is now behind them.
+        const depsChanged = changed.filter((f) => settings.integrate.depsFiles.includes(path.posix.basename(f)));
+        if (depsChanged.length) Object.assign(out, { depsChanged, hint: `main's dependency manifests changed (${depsChanged.join(', ')}): run the install in the live checkout ${repoRoot} so new worktree overlays mirror it` });
         if (push ?? settings.land.push) {
           const p = (deps.push ?? ((root) => git(root, ['push', 'origin', 'main'])))(repoRoot);
           out.push = { pushed: p.ok, detail: p.ok ? null : String(p.stderr ?? '').slice(0, 300) };
@@ -182,7 +185,7 @@ export function productLand({ repoRoot, workflowId, dryRun = false, push = null,
             return { ok: isAncestor(repoRoot, W, head) && git(repoRoot, ['update-ref', `refs/heads/${branch}`, head, W]).ok };
           }, { waitMs: 60_000 });
         }
-        emitEvent(EVENTS.landed, { base, head, changed: changed.length, pushed: out.push?.pushed ?? false });
+        emitEvent(EVENTS.landed, { base, head, changed: changed.length, pushed: out.push?.pushed ?? false, ...(out.depsChanged ? { depsChanged: out.depsChanged } : {}) });
         return out;
       } finally { removeWorktreeVerified({ repoRoot, dir: scratch, settings }); }
     }

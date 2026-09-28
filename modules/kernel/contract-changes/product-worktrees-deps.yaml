@@ -1,0 +1,17 @@
+id: product-worktrees-deps
+effectiveAt: '2026-09-28T17:00:00+07:00'
+summary: >-
+  THE WORKFLOW'S SERIAL DEPS UNIT (DESIGN §16.7, mitigation 1). An isolated op's settle refuses deps-unit-required when
+  it changes a dependency manifest the workflow branch does not carry yet, naming `api product-deps --workflow <wf>
+  --from-job <job>`. That verb applies exactly those manifests onto wf/<wf> as one commit in the _wf worktree under the
+  per-workflow lock, installs for real there (modules/kernel/product-land.yaml deps.install by lockfile), makes that
+  install the node_modules overlay source of the workflow's ops and rebuilds their overlays; the refused job then
+  settles. A land whose manifests reach main reports depsChanged (the live checkout's install is behind).
+reach: new-legs
+paths:
+  - modules/kernel/contract-changes/product-worktrees-deps.yaml
+  - modules/kernel/api-commands/product-deps.yaml
+  - modules/kernel/product-land.yaml
+  - scripts/kernel/api-verbs/product-deps.mjs
+  - scripts/kernel/product-worktree.mjs
+  - scripts/kernel/product-land.mjs
