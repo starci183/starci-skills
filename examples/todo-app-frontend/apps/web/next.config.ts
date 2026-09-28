@@ -1,10 +1,10 @@
 import createNextIntlPlugin from 'next-intl/plugin';
+import type { NextConfig } from 'next';
 
 /** The request config the plugin resolves a locale and a message catalogue from, per request. */
 const withNextIntl = createNextIntlPlugin('./src/modules/i18n/request.ts');
 
-/** @type {import('next').NextConfig} */
-const nextConfig = {
+const nextConfig: NextConfig = {
   reactStrictMode: true,
   // @todo-app/grammar is a `file:` workspace package whose `main`/`exports` point straight at its own
   // TSX source (no build step of its own) - webpack does not transpile node_modules by default, so
