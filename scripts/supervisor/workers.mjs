@@ -9,6 +9,7 @@
 //   node scripts/supervisor/workers.mjs report --job <id> --outcome done|diagnosed|blocked|failed [--commit <sha>]
 //        [--specs <csv>] [--summary <t>] [--needs <csv>]                  (the worker's last act)
 //   node scripts/supervisor/workers.mjs list | cap | show --job <id> | cancel --job <id> [--reason <t>]
+//   node scripts/supervisor/workers.mjs ack --job <id> --reason <t>   a decided diagnosed/blocked/failed report: consumed, never re-announced
 //   node scripts/supervisor/workers.mjs cleanup [--job <id>]                remove finished staging checkouts
 //   ... [--json]
 //
@@ -469,6 +470,23 @@ export function cancelJob(ledger, { jobId, reason = 'cancelled by the Supervisor
   return { ok: true, jobId, terminal: job.worker_id ?? null, staged };
 }
 
+/**
+ * The Supervisor's decision on a filed report that lands nothing (diagnosed, blocked, failed): the report is marked
+ * consumed with the decision recorded, so the watchdog's [report] wake (filedReports: unconsumed, not done) stops
+ * announcing it. 2026-09-28: four 2026-09-24 reports whose fixes had long landed resurfaced in [report] wakes all night.
+ */
+export function ackReport(ledger, { jobId, reason, now = Date.now() }) {
+  if (!jobId || !String(reason ?? '').trim()) return { ok: false, error: 'ack needs --job and --reason' };
+  const report = ledger.db.prepare('SELECT outcome, consumed_at FROM reports WHERE workflow_id=? AND dispatch_id=?').get(SUPERVISOR_WF, jobId);
+  if (!report) return { ok: false, error: `no report for ${jobId}` };
+  if (report.consumed_at != null) return { ok: true, jobId, already: true };
+  ledger.transaction(() => {
+    ledger.db.prepare('UPDATE reports SET consumed_at=? WHERE workflow_id=? AND dispatch_id=?').run(now, SUPERVISOR_WF, jobId);
+    supervisorEvent(ledger, { entityType: 'job', entityId: jobId, kind: 'worker-report-acked', payload: { outcome: report.outcome, reason: String(reason).slice(0, 600) }, now });
+  });
+  return { ok: true, jobId, outcome: report.outcome };
+}
+
 /** Mark a landed job succeeded, release its leases and remove its checkout and temp branch. */
 export function finishLanded(ledger, { jobId, landedSha, root = SKILL_ROOT, env = process.env, now = Date.now() }) {
   const job = jobOf(ledger.db, jobId);
@@ -553,6 +571,7 @@ async function main() {
       return out(r);
     }
     if (verb === 'cancel') return out(cancelJob(ledger, { jobId: value('job'), reason: value('reason') ?? undefined }));
+    if (verb === 'ack') return out(ackReport(ledger, { jobId: value('job'), reason: value('reason') }));
     if (verb === 'cleanup') return out(cleanupStaging(ledger, { jobId: value('job') }));
     return out({ ok: false, error: `unknown verb ${verb}` });
   } finally { ledger.close(); }

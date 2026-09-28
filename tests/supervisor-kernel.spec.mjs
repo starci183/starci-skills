@@ -12,7 +12,7 @@ import { spawnSync } from 'node:child_process';
 import { launchSupervisor, stopSupervisor, planSupervisorDedupe, ensureSupervisor, doctrineOf, seatCommand, supervisorTerminals } from '../scripts/supervisor/start-supervisor.mjs';
 import { openSupervisorLedger, seatOf, enabledOf, setEnabled, supervisorEvent, withSupervisorRead, SUPERVISOR_ID, SUPERVISOR_WF, SKILL_ROOT } from '../scripts/supervisor/home.mjs';
 import {
-  adaptiveCap, createJob, spawnWorkers, createStaging, removeStaging, fileReport, jobOf, stagingPathOf, leaseConflicts, pickWorkerPool, cancelJob,
+  adaptiveCap, createJob, spawnWorkers, createStaging, removeStaging, fileReport, jobOf, stagingPathOf, leaseConflicts, pickWorkerPool, cancelJob, ackReport,
   stageSelf, workerLaunchCommand, READINESS_FAILS_PER_HOUR, openWorkerHandles,
 } from '../scripts/supervisor/workers.mjs';
 import { landCommits, land, contractCoverage, governedPaths, specsTouching, specPlan, runChecks, describe, acquireLand, landQueue, specTimeoutMs, LAND_WAIT_MS } from '../scripts/supervisor/land.mjs';
@@ -724,6 +724,22 @@ test('a diagnosis worker files outcome diagnosed; the watchdog announces it once
   const first = planWake({ now: Date.now(), lastTickAt: Date.now(), filed: [job.job_id] });
   assert.deepEqual(first.tags, ['report']);
   assert.deepEqual(planWake({ now: Date.now(), lastTickAt: Date.now(), filed: [job.job_id], wakes: [{ at: Date.now(), payload: { report: [job.job_id], text: first.text } }] }).tags, []);
+});
+
+test('ack consumes a decided diagnosis so no later [report] wake announces it again', (t) => {
+  const env = envOf(t);
+  const ledger = openSupervisorLedger({ env });
+  t.after(() => ledger.close());
+  const { job } = createJob(ledger, { cluster: 'stale-diag', files: ['scripts/y.mjs'] });
+  ledger.db.prepare("UPDATE jobs SET status='running' WHERE job_id=?").run(job.job_id);
+  assert.ok(fileReport(ledger, { jobId: job.job_id, outcome: 'diagnosed', summary: 'root cause: y' }).ok);
+  const unconsumed = () => ledger.db.prepare("SELECT COUNT(*) n FROM reports WHERE workflow_id=? AND dispatch_id=? AND consumed_at IS NULL").get(SUPERVISOR_WF, job.job_id).n;
+  assert.equal(unconsumed(), 1);
+  assert.equal(ackReport(ledger, { jobId: job.job_id, reason: ' ' }).ok, false, 'an ack names its decision');
+  assert.equal(ackReport(ledger, { jobId: job.job_id, reason: 'fix landed as abc123' }).ok, true);
+  assert.equal(unconsumed(), 0, 'the watchdog filedReports query no longer sees it');
+  assert.equal(ackReport(ledger, { jobId: job.job_id, reason: 'again' }).already, true);
+  assert.equal(ledger.db.prepare("SELECT COUNT(*) n FROM events WHERE kind='worker-report-acked' AND entity_id=?").get(job.job_id).n, 1);
 });
 
 test('a filed diagnosis wants a watchdog pass of its own until a wake announced it', (t) => {
