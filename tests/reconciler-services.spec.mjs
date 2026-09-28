@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
 import {
   hostSettings, servicePorts, serviceRegistry, harnessIngress, stepService, newRecord, backoffDelay, memoryStore, sqliteStore,
-  orcaRestartScript, cleanEnv, DOWN_STATES,
+  orcaRestartScript, cleanEnv, DOWN_STATES, seatAgentOf,
 } from '../scripts/reconciler/services.mjs';
 
 // Lane D rc-host: the ONE host-service registry (scripts/reconciler/services.mjs). The DESIGN 9.7 state machine,
@@ -167,4 +167,14 @@ test('the services table round-trips a record (sqlite and memory stores)', () =>
     assert.equal(store.get('nope'), null);
     assert.equal(store.all().length, 1);
   }
+});
+
+test('a seat agent is Orca agentIdentity, then the tab title, then the frame (Devin needs Esc twice)', () => {
+  assert.equal(seatAgentOf({ agentIdentity: 'devin', title: 'x' }), 'devin');
+  assert.equal(seatAgentOf({ title: '⠼ Devin' }), 'devin');
+  assert.equal(seatAgentOf({ title: '✳ Claude Code' }), 'claude');
+  assert.equal(seatAgentOf({ title: 'shell' }, 'Running tools · 5m 52s (esc twice to interrupt)'), 'devin');
+  assert.equal(seatAgentOf({ title: 'shell' }), 'claude');
+  assert.deepEqual(S.turnBudget.interruptKeys.devin, ['esc', 'esc']);
+  assert.deepEqual(S.turnBudget.interruptKeys.claude, ['esc']);
 });

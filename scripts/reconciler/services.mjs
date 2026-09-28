@@ -22,6 +22,9 @@
 //   node scripts/reconciler/services.mjs --reopen <name> [--json]   a quarantined service/seat back to `declared`
 //   node scripts/reconciler/services.mjs --dedupe [--dry-run] [--json]   terminal-dedupe over config.yaml supervisor.repos
 //   node scripts/reconciler/services.mjs --processes                the process table (host-health listProcesses) as JSON
+//   node scripts/reconciler/services.mjs --turn (--terminal <h> | --supervisor) [--json]   a seat's turn (read-only)
+//   node scripts/reconciler/services.mjs --turn-interrupt --terminal <h> --agent <a> (--repo <r> --workflow <wf> | --supervisor)
+//   node scripts/reconciler/services.mjs --turn-replace --terminal <h> --agent <a>   quit + close the overdue seat terminal
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -75,6 +78,10 @@ export function hostSettings(raw = parseYaml(fs.readFileSync(HOST_YAML, 'utf8'))
       supervisor: seat('supervisor', ['timeoutMs']),
     },
     processes: section('processes', ['everyMs', 'orphanMinAgeMs', 'orphanSlaMs', 'footprintEveryMs', 'terminalSlack', 'terminalDriftSlaMs']),
+    turnBudget: {
+      ...section('turnBudget', ['idleWaitMs', 'sameTurnSlackMs', 'probeTimeoutMs']),
+      interruptKeys: Object.fromEntries(Object.entries(h?.turnBudget?.interruptKeys ?? {}).map(([agent, keys]) => [agent, (Array.isArray(keys) ? keys : [keys]).map(String)])),
+    },
     ledgerHealth: {
       ...section('ledgerHealth', ['quickCheckEveryMs', 'keep', 'backupTimeoutMs']),
       backupHour: Number(h?.ledgerHealth?.backupHour ?? 3),
@@ -399,6 +406,103 @@ export async function startService(name, { settings = hostSettings(), ports = se
   }
 }
 
+/* ------------------------------------------------------------ turn budget (a seat's one long busy turn) */
+
+const TURN_ROW = /esc(?:\s+twice)?\s+to\s+(?:interrupt|cancel)|\b(?:Working|Thinking|Running tools)\b/i;
+/**
+ * The minutes of the running turn on a TUI frame, read from its spinner timer, or null when no timer shows. Claude
+ * "(12m 30s · ↓ 3k tokens · esc to interrupt)", Codex "Working (1h 02m 13s • esc to interrupt)", Devin
+ * "Thinking · 5m 58s (esc twice to interrupt)". The lowest spinner row of the last 40 rows wins. Pure.
+ */
+export function turnMinutesOf(screen) {
+  const rows = String(screen ?? '').split(/\r?\n/).slice(-40).reverse();
+  for (const row of rows) {
+    if (!TURN_ROW.test(row)) continue;
+    const m = /(?:\b(\d+)h\s*)?\b(\d+)m(?:\s*\d+s)?\b/.exec(row);
+    if (m) return Number(m[1] ?? 0) * 60 + Number(m[2]);
+    const h = /\b(\d+)h\b/.exec(row);
+    if (h) return Number(h[1]) * 60;
+    if (/\b\d+s\b/.test(row)) return 0;
+  }
+  return null;
+}
+
+export const KEY_BYTES = Object.freeze({ esc: '\u001b', 'ctrl+c': '\u0003' });
+
+const SEAT_AGENTS = ['claude', 'codex', 'qwen', 'devin'];
+/**
+ * The agent a seat terminal runs, from a terminal-list entry {agentIdentity, title} and its frame: Orca's
+ * agentIdentity first, then the title ("⠼ Devin", "✳ Claude Code"), then the frame's own interrupt hint (Devin asks
+ * "esc twice"), else quit-agent's heuristic. The interrupt key depends on it: one Esc does not stop Devin. Pure.
+ */
+export function seatAgentOf(entry, screen = '', fallback = null) {
+  const named = String(entry?.agentIdentity ?? entry?.agent ?? '').toLowerCase();
+  if (SEAT_AGENTS.includes(named)) return named;
+  const title = String(entry?.title ?? entry?.tabTitle ?? '');
+  for (const a of ['devin', 'qwen', 'codex', 'claude']) if (new RegExp(`\\b${a}\\b`, 'i').test(title)) return a;
+  if (/esc\s+twice\s+to\s+interrupt|Ask Devin\b/i.test(String(screen ?? ''))) return 'devin';
+  return fallback ? fallback(entry, 'claude') : 'claude';
+}
+
+/** The seat's terminal, agent and turn: {ok, terminal, agent, state, busy, minutes}. Read-only. */
+export async function turnProbe({ terminal = null, supervisor = false } = {}) {
+  let handle = terminal;
+  if (!handle && supervisor) {
+    const home = await import('../supervisor/home.mjs');
+    const ledger = home.openSupervisorLedger();
+    try { handle = home.seatOf(ledger.db, Date.now())?.value?.terminal ?? null; } finally { ledger.close(); }
+  }
+  if (!handle) return { ok: false, error: 'no seat terminal' };
+  const [{ terminalRead }, { terminalList }, { agentOfTerminal }, { classifyAgentScreen }] = await Promise.all([
+    import('../api/orca/terminal-read.mjs'), import('../api/orca/terminal-list.mjs'), import('../kernel/quit-agent.mjs'), import('../kernel/terminal-liveness.mjs')]);
+  const listed = terminalList();
+  const entry = (listed.terminals ?? []).find((t) => t.handle === handle) ?? null;
+  if (!listed.ok || !entry) return { ok: false, terminal: handle, error: listed.ok ? 'terminal not listed' : 'orca unavailable' };
+  const read = terminalRead({ terminal: handle, screen: true });
+  if (!read?.ok) return { ok: false, terminal: handle, error: 'terminal unreadable' };
+  const agent = seatAgentOf(entry, read.screen, agentOfTerminal);
+  const state = classifyAgentScreen(String(read.screen ?? ''), { provider: agent }).state;
+  const busy = state === 'active' || state === 'wedged';
+  return { ok: true, terminal: handle, agent, state, busy, minutes: busy ? turnMinutesOf(read.screen) : null };
+}
+
+/**
+ * The soft interrupt: the agent's own interrupt key(s), a wait of up to idleWaitMs for the turn to end, then the
+ * decision doorbell (top DI + its ranked actions) rung at once. Active mode only (reached through ctx.run).
+ */
+export async function turnInterrupt({ terminal, agent, repo = null, workflowId = null, supervisor = false, settings = hostSettings() }) {
+  const [{ terminalSend }, { sleepSync }] = await Promise.all([import('../api/orca/terminal-send.mjs'), import('../api/orca/lib.mjs')]);
+  const keys = settings.turnBudget.interruptKeys[agent] ?? ['esc'];
+  const sent = [];
+  for (const key of keys) {
+    const bytes = KEY_BYTES[key] ?? key;
+    let r = null;
+    try { r = terminalSend({ terminal, text: bytes, enter: false }); } catch (error) { r = { ok: false, error: String(error?.message ?? error) }; }
+    sent.push({ key, ok: r?.ok === true });
+    sleepSync(400);
+  }
+  let after = null;
+  for (let waited = 0; waited <= settings.turnBudget.idleWaitMs; waited += 2000) {
+    after = await turnProbe({ terminal });
+    if (after.ok && !after.busy) break;
+    sleepSync(2000);
+  }
+  const d = await import('./decisions.mjs');
+  let ring;
+  try { ring = supervisor ? await d.ringSupervisor({ minGapMs: 0 }) : await d.ringDoorbell({ repo, workflowId, minGapMs: 0 }); } catch (error) { ring = { action: 'ring-failed', error: String(error?.message ?? error) }; }
+  return { ok: sent.every((x) => x.ok), terminal, agent, sent, stateAfter: after?.state ?? null, ring: { action: ring?.action ?? null, delivered: ring?.delivered === true, open: ring?.open ?? null } };
+}
+
+/** Close an overdue seat's terminal (the agent's quit first) so the seat watchdog proves it gone and replaces it. */
+export async function turnReplace({ terminal, agent }) {
+  const [{ quitAgent }, { terminalClose }] = await Promise.all([import('../kernel/quit-agent.mjs'), import('../api/orca/terminal-close.mjs')]);
+  let quit = null;
+  try { quit = quitAgent({ handle: terminal, agent }); } catch (error) { quit = { error: String(error?.message ?? error) }; }
+  let closed;
+  try { closed = terminalClose({ terminal }); } catch (error) { closed = { ok: false, error: String(error?.message ?? error) }; }
+  return { ok: closed?.ok === true || quit?.exited === true, terminal, agent, quit, closed: { ok: closed?.ok === true, error: closed?.error ?? null } };
+}
+
 /* ------------------------------------------------------------ CLI */
 
 const argsOf = (argv) => {
@@ -407,7 +511,7 @@ const argsOf = (argv) => {
     const t = argv[i];
     if (!t.startsWith('--')) { a._.push(t); continue; }
     const k = t.slice(2), next = argv[i + 1];
-    if (next != null && !next.startsWith('--') && ['probe', 'start', 'reopen'].includes(k)) { a[k] = next; i += 1; } else a[k] = true;
+    if (next != null && !next.startsWith('--') && ['probe', 'start', 'reopen', 'terminal', 'agent', 'repo', 'workflow'].includes(k)) { a[k] = next; i += 1; } else a[k] = true;
   }
   return a;
 };
@@ -435,12 +539,18 @@ async function main() {
     const r = dedupeTerminals({ repos, dryRun: a['dry-run'] === true });
     return out({ ...r, repos });
   }
+  if (a.turn) return out(await turnProbe({ terminal: a.terminal ?? null, supervisor: a.supervisor === true }));
+  if (a['turn-interrupt']) {
+    const r = await turnInterrupt({ terminal: a.terminal, agent: a.agent, repo: a.repo ?? null, workflowId: a.workflow ?? null, supervisor: a.supervisor === true });
+    out(r); if (!r.ok) process.exitCode = 1; return;
+  }
+  if (a['turn-replace']) { const r = await turnReplace({ terminal: a.terminal, agent: a.agent }); out(r); if (!r.ok) process.exitCode = 1; return; }
   if (a.processes) {
     const { listProcesses } = await import('../supervisor/host-health.mjs');
     const procs = listProcesses();
     return console.log(JSON.stringify({ ok: procs != null, procs: procs ?? [] }));
   }
-  console.error('usage: services.mjs --list | --probe <name> | --start <name> | --reopen <name> | --dedupe [--dry-run] | --processes  [--json]');
+  console.error('usage: services.mjs --list | --probe <name> | --start <name> | --reopen <name> | --dedupe [--dry-run] | --processes | --turn | --turn-interrupt | --turn-replace  [--json]');
   process.exitCode = 2;
 }
 

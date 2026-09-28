@@ -245,7 +245,12 @@ allocation:
   # - never nudge-ready, and api nudge skips it worker-starting (inc-bc0b90a7ec70, inc-9ae771781252).
   # A command-terminal dispatch has already proven its prompt submitted and carries no grace; a
   # staged paste is nudge-ready at any age, and a nudge since the dispatch ends the grace.
-  liveness: {activeUnclassifiedMs: 120000, activeStaleMs: 600000, quietMs: 1200000, launchGraceMs: 90000}
+  # kernelTurnBudgetMs / supervisorTurnBudgetMs: the longest ONE busy turn of a Kernel / the [Supervisor] seat (its
+  # spinner timer) before the reconciler's host controller sends the agent's own interrupt key and re-wakes it with
+  # the decision doorbell; still the same turn turnInterruptGraceMs later, the seat is replaced (KERNEL_TURN_OVERDUE,
+  # scripts/reconciler/controllers/host.mjs turnStep). A busy turn defers every doorbell and notice (kernel-busy).
+  liveness: {activeUnclassifiedMs: 120000, activeStaleMs: 600000, quietMs: 1200000, launchGraceMs: 90000,
+    kernelTurnBudgetMs: 1200000, supervisorTurnBudgetMs: 1800000, turnInterruptGraceMs: 300000}
   # settle's landed proof (scripts/kernel/settle-landed.mjs): one local git read, and the fetch a pushing
   # commitPolicy needs before origin/<branch> can be read.
   settleGit: {commandMs: 15000, fetchMs: 60000}

@@ -14,11 +14,18 @@
 //                                 goal-text-missing for the Supervisor. More than maxReplacementsPerHour replacements
 //                                 -> quarantined + DI seat-unrecoverable.
 //   seat:supervisor               scripts/supervisor/watchdog.mjs --once --json (nothing in config.yaml supervisor.mode chat).
+//                                 Both seat kinds carry a TURN BUDGET (turnStep): busy in one turn (its spinner timer)
+//                                 past allocation.liveness.kernelTurnBudgetMs (Supervisor: supervisorTurnBudgetMs) ->
+//                                 the agent's own interrupt key + the decision doorbell re-wake (services.mjs
+//                                 --turn-interrupt) and the KERNEL_TURN_OVERDUE clock; the same turn
+//                                 turnInterruptGraceMs later -> the seat terminal is closed (--turn-replace) and the
+//                                 seat's watchdog pass replaces it.
 //   host:processes                runaway guard-shim chains (host-health hostVerdict -> stop), orphan runtime loops
 //                                 (ORPHAN_PROCESS -> stop), the footprint scan, the Orca terminal count (TERMINAL_COUNT_DRIFT).
 //   ledger:<ledgerId>             hourly PRAGMA quick_check (LEDGER_CORRUPT clock + DI), nightly VACUUM INTO backup.
 //
-// Every mutation goes through ctx.run / ctx.api / ctx.openDecision, so shadow mode records it and runs nothing.
+// Every clock's state is a code of modules/reconciler/sla.yaml (SERVICE_DOWN, SEAT_VACANT, ...): the SLA layer reads the
+// code from the state. Every mutation goes through ctx.run / ctx.api / ctx.openDecision, so shadow mode records it and runs nothing.
 // Probes are read-only and run in both modes. The factory takes every seam for the specs.
 import path from 'node:path';
 import {
@@ -27,6 +34,7 @@ import {
 } from '../services.mjs';
 import { quickCheck, backupDue } from '../ledger-health.mjs';
 import { goalTextRefusal } from '../../goal/goal-text.mjs';
+import { allocationSettings } from '../../../engine/config.mjs';
 
 export const CONCERNS = Object.freeze(['host.kernel-seat', 'host.supervisor-seat', 'host.services', 'host.orca', 'host.processes', 'host.ledger-health']);
 export const KERNEL_WATCHDOG = 'scripts/kernel/watchdog.mjs';
@@ -51,6 +59,29 @@ export function seatStateOf(action) {
   if (action === 'interactive-gate') return 'gated';
   return 'live';
 }
+
+/**
+ * One turn-budget step of a seat: {turn, act: 'interrupt'|'replace'|null, overdue, ended}. `prev` is the seat's
+ * recorded turn {startedAt, interruptedAt, replacedAt} or null; `obs` {busy, minutes} one reading (minutes: the
+ * spinner timer, null when none shows). A reading whose implied start lies within sameTurnSlackMs of the recorded one
+ * is the same turn (no timer: the same while it stays busy). Over budgetMs -> interrupt once; still the same turn
+ * graceMs after the interrupt -> replace once. Pure.
+ */
+export function turnStep(prev, obs, { now, budgetMs, graceMs, sameTurnSlackMs }) {
+  if (!obs?.busy) return { turn: null, act: null, overdue: false, ended: prev != null };
+  const est = Number.isFinite(obs.minutes) ? now - obs.minutes * 60_000 : null;
+  const same = prev != null && (est == null || Math.abs(est - prev.startedAt) <= sameTurnSlackMs);
+  const turn = same ? { ...prev, startedAt: est == null ? prev.startedAt : Math.min(prev.startedAt, est) } : { startedAt: est ?? now, interruptedAt: null, replacedAt: null };
+  const overdue = now - turn.startedAt > budgetMs;
+  let act = null;
+  if (overdue && turn.interruptedAt == null) { act = 'interrupt'; turn.interruptedAt = now; }
+  else if (turn.interruptedAt != null && turn.replacedAt == null && now - turn.interruptedAt >= graceMs) { act = 'replace'; turn.replacedAt = now; }
+  return { turn, act, overdue, ended: prev != null && !same };
+}
+
+// The clock states before they became sla.yaml codes: cleared once so no pre-code clock stays open.
+const LEGACY_STATE = Object.freeze({ SERVICE_DOWN: 'down', SEAT_VACANT: 'vacant', KERNEL_GATED: 'gated', ORCA_DOWN: 'hostOutage', KERNEL_INPUT_STUCK: 'inputPending',
+  SEAT_QUARANTINED: 'quarantined', ORPHAN_PROCESS: 'orphan', TERMINAL_COUNT_DRIFT: 'drift', LEDGER_CORRUPT: 'corrupt' });
 
 /** The goal problem of a workflow's newest goal text, or null (INV-W4; scripts/goal/goal-text.mjs). */
 export function goalProblem(markdown, refusal) {
@@ -142,12 +173,20 @@ export function createHostController(deps = {}) {
     if (state.clocks.get(k) === true) return;
     state.clocks.set(k, true);
     await ctx.clock(entity, st, slaMs, meta);
+    if (LEGACY_STATE[st] && state.clocks.get(`${entity}|${LEGACY_STATE[st]}`) !== false) {
+      state.clocks.set(`${entity}|${LEGACY_STATE[st]}`, false);
+      await ctx.clear(entity, LEGACY_STATE[st]);
+    }
   };
   const clear = async (ctx, entity, st) => {
     const k = `${entity}|${st}`;
     if (state.clocks.get(k) === false) return;
     state.clocks.set(k, false);
     await ctx.clear(entity, st);
+    if (LEGACY_STATE[st] && state.clocks.get(`${entity}|${LEGACY_STATE[st]}`) !== false) {
+      state.clocks.set(`${entity}|${LEGACY_STATE[st]}`, false);
+      await ctx.clear(entity, LEGACY_STATE[st]);
+    }
   };
 
   const productLedgers = (ctx) => (ctx.ledgers ?? []).filter((l) => l.ledgerId !== 'supervisor');
@@ -158,6 +197,62 @@ export function createHostController(deps = {}) {
     } catch { return []; }
   };
   const rowOf = (name, now) => store().get(name) ?? newRecord(name, now);
+
+  /* -------------------------------------------------------- turn budget */
+
+  const turnNumbers = deps.turnNumbers ?? (() => {
+    const l = allocationSettings()?.liveness ?? {};
+    const n = (v, d) => (Number(v) > 0 ? Number(v) : d);
+    return { kernelBudgetMs: n(l.kernelTurnBudgetMs, 1_200_000), supervisorBudgetMs: n(l.supervisorTurnBudgetMs, 1_800_000), graceMs: n(l.turnInterruptGraceMs, 300_000) };
+  });
+  const probeTurn = deps.probeTurn ?? (async ({ terminal, supervisor }) => {
+    const r = await runChild(process.execPath, [path.join(SKILL_ROOT, SERVICES_FILE), '--turn', ...(terminal ? ['--terminal', terminal] : []), ...(supervisor && !terminal ? ['--supervisor'] : []), '--json'],
+      { timeoutMs: settings().turnBudget?.probeTimeoutMs ?? 60_000 });
+    return lastJson(r.stdout);
+  });
+
+  async function endTurn(ctx, key, rec) {
+    if (!rec.turn) return null;
+    rec.turn = null;
+    await clear(ctx, key, 'KERNEL_TURN_OVERDUE');
+    return { ended: true };
+  }
+
+  /**
+   * The seat's turn budget: read its turn (read-only), step it, and on `interrupt` send the interrupt key + doorbell
+   * re-wake (then the seat's own pass, which wakes a turn-idle Kernel on an actionable frontier); on `replace` close
+   * the seat terminal and run the seat's watchdog pass, which proves it gone and replaces it.
+   */
+  async function turnBudget(ctx, { key, rec, terminal, ledgerId = null, workflowId = null, repo = null, supervisor }) {
+    const now = ctx.now(), n = turnNumbers(), tb = settings().turnBudget ?? { sameTurnSlackMs: 180_000 };
+    const budgetMs = supervisor ? n.supervisorBudgetMs : n.kernelBudgetMs;
+    const obs = await probeTurn({ terminal, supervisor });
+    if (!obs?.ok) return null;
+    const step = turnStep(rec.turn ?? null, obs, { now, budgetMs, graceMs: n.graceMs, sameTurnSlackMs: tb.sameTurnSlackMs });
+    rec.turn = step.turn;
+    const meta = { code: 'KERNEL_TURN_OVERDUE', owner: 'host-controller', ledgerId: ledgerId ?? 'supervisor', workflowId: workflowId ?? 'wf-supervisor',
+      terminal: obs.terminal, agent: obs.agent, budgetMs, enteredAt: step.turn?.startedAt };
+    if (step.ended || !step.overdue) await clear(ctx, key, 'KERNEL_TURN_OVERDUE');
+    if (step.overdue) await clock(ctx, key, 'KERNEL_TURN_OVERDUE', budgetMs, meta);
+    const minutes = step.turn ? Math.round((now - step.turn.startedAt) / 60_000) : 0;
+    if (step.act === 'interrupt') {
+      const args = [SERVICES_FILE, '--turn-interrupt', '--terminal', obs.terminal, '--agent', obs.agent, ...(supervisor ? ['--supervisor'] : ['--repo', repo, '--workflow', workflowId]), '--json'];
+      const r = await ctx.run('node', args, { timeoutMs: 120_000 });
+      await ctx.log('reconciler.host.turn-budget', `${key}: one turn ${minutes} min > ${Math.round(budgetMs / 60_000)} min budget; interrupt (${obs.agent}) + doorbell`, { key, act: 'interrupt', minutes, agent: obs.agent, terminal: obs.terminal, result: outputOf(r) });
+      if (ctx.mode === 'active') {
+        // The re-wake: a turn-idle seat on an actionable frontier (or with inbox/tick work) is woken by its own pass.
+        await ctx.run('node', supervisor ? [SUPERVISOR_WATCHDOG, '--once', '--json'] : [KERNEL_WATCHDOG, '--repo', repo, '--workflow', workflowId, '--once', '--repair', '--json'],
+          { timeoutMs: supervisor ? settings().seats.supervisor.timeoutMs : settings().seats.kernel.timeoutMs });
+      }
+    } else if (step.act === 'replace') {
+      const r = await ctx.run('node', [SERVICES_FILE, '--turn-replace', '--terminal', obs.terminal, '--agent', obs.agent, '--json'], { timeoutMs: 180_000 });
+      await ctx.log('reconciler.host.turn-budget', `${key}: still the same turn ${minutes} min after the interrupt; seat replaced`, { key, act: 'replace', minutes, agent: obs.agent, terminal: obs.terminal, result: outputOf(r) });
+      const pass = await ctx.run('node', supervisor ? [SUPERVISOR_WATCHDOG, '--once', '--json'] : [KERNEL_WATCHDOG, '--repo', repo, '--workflow', workflowId, '--once', '--repair', '--json'],
+        { timeoutMs: supervisor ? settings().seats.supervisor.timeoutMs : settings().seats.kernel.timeoutMs });
+      if (!supervisor && REPLACED.has(outputOf(pass)?.action)) rec.restarts = [...(rec.restarts ?? []), now];
+    }
+    return { state: obs.state, minutes, act: step.act, overdue: step.overdue };
+  }
 
   /* -------------------------------------------------------- services */
 
@@ -191,8 +286,8 @@ export function createHostController(deps = {}) {
         summary: `${name} unavailable for ${Math.round((now - next.downSince) / 60000)} min; legs that need it are deferred`, evidence: [{ ref: `probe:${JSON.stringify(next.lastProbe).slice(0, 200)}` }],
       }));
     }
-    if (DOWN_STATES.has(step.to)) await clock(ctx, `service:${name}`, 'down', entry.slaMs, { code: 'SERVICE_DOWN', owner: 'host-controller', ledgerId: 'supervisor', since: next.downSince, state: step.to });
-    else await clear(ctx, `service:${name}`, 'down');
+    if (DOWN_STATES.has(step.to)) await clock(ctx, `service:${name}`, 'SERVICE_DOWN', entry.slaMs, { code: 'SERVICE_DOWN', owner: 'host-controller', ledgerId: 'supervisor', since: next.downSince, state: step.to });
+    else await clear(ctx, `service:${name}`, 'SERVICE_DOWN');
     if (name === 'orca' && DOWN_BEFORE_BOOT.has(step.from) && step.to === 'healthy') state.bootPending = true;
     if (step.from !== step.to) await ctx.log('reconciler.host.service', `${name} ${step.from} -> ${step.to}`, { name, from: step.from, to: step.to, act: step.act, probe: next.lastProbe });
     store().put(next);
@@ -210,7 +305,7 @@ export function createHostController(deps = {}) {
       const g = db.prepare('SELECT markdown FROM goals WHERE workflow_id=? ORDER BY revision DESC LIMIT 1').get(workflowId);
       return w ? { phase: w.phase, archivedAt: w.archived_at, goal: g?.markdown ?? null } : null;
     });
-    const clearAll = async () => { for (const st of ['vacant', 'gated', 'hostOutage', 'inputPending', 'quarantined']) await clear(ctx, key, st); };
+    const clearAll = async () => { for (const st of ['SEAT_VACANT', 'KERNEL_GATED', 'ORCA_DOWN', 'KERNEL_INPUT_STUCK', 'SEAT_QUARANTINED', 'KERNEL_TURN_OVERDUE']) await clear(ctx, key, st); };
     if (!wf || wf.phase !== 'running' || wf.archivedAt != null) { await clearAll(); store().remove?.(key); return { ok: true, skipped: 'not-running' }; }
     const rec = rowOf(key, now);
     const problem = goalProblem(wf.goal, goalRefusal);
@@ -225,12 +320,14 @@ export function createHostController(deps = {}) {
     }
     if (rec.state === 'quarantined' && now - rec.since < s.holdMs) return { ok: true, quarantined: true };
     const args = [KERNEL_WATCHDOG, '--repo', ledger.repo, '--workflow', workflowId, '--once', '--repair', '--json'];
-    let action, acted = false;
+    let action, acted = false, seatOut = null;
     if (ctx.mode === 'active') {
-      action = outputOf(await ctx.run('node', args, { timeoutMs: s.timeoutMs }))?.action ?? 'unknown';
+      seatOut = outputOf(await ctx.run('node', args, { timeoutMs: s.timeoutMs }));
+      action = seatOut?.action ?? 'unknown';
       acted = true;
     } else {
-      action = (await probeSeat({ repo: ledger.repo, workflowId, timeoutMs: s.timeoutMs }))?.action ?? 'unknown';
+      seatOut = await probeSeat({ repo: ledger.repo, workflowId, timeoutMs: s.timeoutMs });
+      action = seatOut?.action ?? 'unknown';
       if (NEEDS_REPAIR.has(action)) { await ctx.run('node', args, { timeoutMs: s.timeoutMs }); acted = true; }
     }
     const replaced = ctx.mode === 'active' ? REPLACED.has(action) : acted && action === 'restart-needed';
@@ -248,14 +345,15 @@ export function createHostController(deps = {}) {
       }
     }
     if (next.state !== seat) { next.state = seat; next.since = now; }
-    const clocks = { vacant: ['suspect', 'replacing', 'reserving'], gated: ['gated'], hostOutage: ['hostOutage'], inputPending: ['inputPending'], quarantined: ['quarantined'] };
-    const sla = { vacant: [s.vacantSlaMs, 'SEAT_VACANT'], gated: [s.gatedSlaMs, 'KERNEL_GATED'], hostOutage: [s.hostOutageSlaMs, 'ORCA_DOWN'], inputPending: [s.inputSlaMs, 'KERNEL_INPUT_STUCK'], quarantined: [s.quarantinedSlaMs, 'SEAT_QUARANTINED'] };
-    for (const [name, states] of Object.entries(clocks)) {
-      if (states.includes(seat)) await clock(ctx, key, name, sla[name][0], { code: sla[name][1], owner: 'host-controller', ledgerId, workflowId, action });
-      else await clear(ctx, key, name);
+    const clocks = { SEAT_VACANT: [['suspect', 'replacing', 'reserving'], s.vacantSlaMs], KERNEL_GATED: [['gated'], s.gatedSlaMs], ORCA_DOWN: [['hostOutage'], s.hostOutageSlaMs],
+      KERNEL_INPUT_STUCK: [['inputPending'], s.inputSlaMs], SEAT_QUARANTINED: [['quarantined'], s.quarantinedSlaMs] };
+    for (const [code, [states, slaMs]] of Object.entries(clocks)) {
+      if (states.includes(seat)) await clock(ctx, key, code, slaMs, { code, owner: 'host-controller', ledgerId, workflowId, action });
+      else await clear(ctx, key, code);
     }
+    const turn = seat === 'live' && action !== 'woken' ? await turnBudget(ctx, { key, rec: next, terminal: seatOut?.terminal ?? null, ledgerId, workflowId, repo: ledger.repo, supervisor: false }) : await endTurn(ctx, key, next);
     store().put(next);
-    return { ok: true, action, seat, acted, replaced };
+    return { ok: true, action, seat, acted, replaced, ...(turn ? { turn } : {}) };
   }
 
   async function reconcileSupervisorSeat(ctx) {
@@ -265,8 +363,12 @@ export function createHostController(deps = {}) {
     const action = outputOf(r)?.action ?? (r?.shadow ? 'shadow' : 'unknown');
     const rec = rowOf(key, now);
     const seat = action === 'shadow' ? rec.state : seatStateOf(action === 'replace-failed' ? 'restart-failed' : action);
-    store().put({ ...rec, state: seat, since: rec.state === seat ? rec.since : now, lastAction: action, lastAt: now });
-    return { ok: true, action, seat };
+    const next = { ...rec, state: seat, since: rec.state === seat ? rec.since : now, lastAction: action, lastAt: now };
+    // The Supervisor's pass reports `busy` for a running turn; in shadow the pass did not run, so the seat is read.
+    const turn = ['busy', 'shadow', 'idle'].includes(action) || seat === 'live'
+      ? await turnBudget(ctx, { key, rec: next, terminal: outputOf(r)?.terminal ?? null, supervisor: true }) : await endTurn(ctx, key, next);
+    store().put(next);
+    return { ok: true, action, seat, ...(turn ? { turn } : {}) };
   }
 
   /* -------------------------------------------------------- boot (DESIGN 7.7) */
@@ -318,11 +420,11 @@ export function createHostController(deps = {}) {
     for (const o of orphans) {
       const entity = `process:${o.pid}`;
       seen.add(entity);
-      await clock(ctx, entity, 'orphan', p.orphanSlaMs, { code: 'ORPHAN_PROCESS', owner: 'host-controller', ledgerId: 'supervisor', repo: o.repo, workflowId: o.workflowId, script: o.script });
+      await clock(ctx, entity, 'ORPHAN_PROCESS', p.orphanSlaMs, { code: 'ORPHAN_PROCESS', owner: 'host-controller', ledgerId: 'supervisor', repo: o.repo, workflowId: o.workflowId, script: o.script });
       await ctx.run('taskkill.exe', ['/F', '/T', '/PID', String(o.pid)], { timeoutMs: 120_000 });
       out.orphans.push(o);
     }
-    for (const entity of state.orphanClocks) if (!seen.has(entity)) await clear(ctx, entity, 'orphan');
+    for (const entity of state.orphanClocks) if (!seen.has(entity)) await clear(ctx, entity, 'ORPHAN_PROCESS');
     state.orphanClocks = seen;
     if (now - state.lastFootprintAt >= p.footprintEveryMs) { state.lastFootprintAt = now; await ctx.run('node', [FOOTPRINT_SCAN, '--json'], { timeoutMs: 600_000 }); out.footprint = true; }
     // INV-H2: Orca's shells against the seats and running workers it should hold.
@@ -335,8 +437,8 @@ export function createHostController(deps = {}) {
       }
       const expected = seats + workers + p.terminalSlack;
       out.terminals = { count: terminals, expected, seats, workers };
-      if (terminals > expected) await clock(ctx, 'host:terminals', 'drift', p.terminalDriftSlaMs, { code: 'TERMINAL_COUNT_DRIFT', owner: 'host-controller', ledgerId: 'supervisor', count: terminals, expected });
-      else await clear(ctx, 'host:terminals', 'drift');
+      if (terminals > expected) await clock(ctx, 'host:terminals', 'TERMINAL_COUNT_DRIFT', p.terminalDriftSlaMs, { code: 'TERMINAL_COUNT_DRIFT', owner: 'host-controller', ledgerId: 'supervisor', count: terminals, expected });
+      else await clear(ctx, 'host:terminals', 'TERMINAL_COUNT_DRIFT');
     }
     return { ok: true, ...out };
   }
@@ -354,9 +456,9 @@ export function createHostController(deps = {}) {
       rec.lastCheckAt = now; rec.lastCheck = r;
       const was = rec.state;
       if (rec.state !== (r.ok ? 'ok' : 'corrupt')) { rec.state = r.ok ? 'ok' : 'corrupt'; rec.since = now; }
-      if (r.ok) await clear(ctx, key, 'corrupt');
+      if (r.ok) await clear(ctx, key, 'LEDGER_CORRUPT');
       else {
-        await clock(ctx, key, 'corrupt', 0, { code: 'LEDGER_CORRUPT', severity: 'critical', owner: 'host-controller', ledgerId, result: r.result.slice(0, 5) });
+        await clock(ctx, key, 'LEDGER_CORRUPT', 0, { code: 'LEDGER_CORRUPT', severity: 'critical', owner: 'host-controller', ledgerId, result: r.result.slice(0, 5) });
         if (was !== 'corrupt') {
           await ctx.openDecision(di({
             kind: 'runtime-defect', ledger: ledgerId, entity: { type: 'ledger', id: ledgerId }, idempotencyKey: `ledger-corrupt:${ledgerId}:${now}`, severity: 'critical',

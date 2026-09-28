@@ -1,8 +1,10 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
-import { createHostController, findOrphans, seatStateOf, goalProblem, outputOf, NEEDS_REPAIR } from '../scripts/reconciler/controllers/host.mjs';
-import { hostSettings, memoryStore } from '../scripts/reconciler/services.mjs';
+import fs from 'node:fs';
+import { createHostController, findOrphans, seatStateOf, goalProblem, outputOf, NEEDS_REPAIR, turnStep } from '../scripts/reconciler/controllers/host.mjs';
+import { parseYaml } from '../engine/yaml.mjs';
+import { hostSettings, memoryStore, turnMinutesOf } from '../scripts/reconciler/services.mjs';
 import { goalTextRefusal } from '../scripts/goal/goal-text.mjs';
 
 import { fakeCtx } from '../scripts/reconciler/testing.mjs';
@@ -60,6 +62,8 @@ function controller(over = {}) {
     listProcesses: async () => [], hostVerdict: async () => ({ stop: [], alert: false }), orcaTerminals: async () => null,
     supervisorMode: async () => 'kernel', quickCheck: () => ({ ok: true, result: ['ok'] }), backupDue: () => false,
     dedupeDryRun: async () => ({ ok: true, closed: [] }),
+    probeTurn: async () => ({ ok: true, busy: false, state: 'turn-idle' }),
+    turnNumbers: () => ({ kernelBudgetMs: 20 * 60_000, supervisorBudgetMs: 30 * 60_000, graceMs: 5 * 60_000 }),
     ...over,
   });
 }
@@ -174,7 +178,7 @@ test('an orphan watchdog of a temp repo -> stop planned + ORPHAN_PROCESS clock; 
   const again = controller({ listProcesses: async () => c2 });
   again._state.orphanClocks = new Set(['process:101', 'process:105']);
   await again.reconcile('host:processes', ctx);
-  assert.ok(ctx.calls.clear.some((x) => x.entity === 'process:101' && x.state === 'orphan'), 'a stopped orphan clears its clock');
+  assert.ok(ctx.calls.clear.some((x) => x.entity === 'process:101' && x.state === 'ORPHAN_PROCESS'), 'a stopped orphan clears its clock');
 });
 
 test('the runaway shim chains hostVerdict marks safe are stopped; the terminal count drift is a clock', async () => {
@@ -233,7 +237,7 @@ test('a service that keeps failing: its start goes through ctx.run, then a quara
   assert.ok(ctx.calls.clock.some((x) => x.entity === 'service:telegram-bridge' && x.code === 'SERVICE_DOWN'));
   assert.equal(store.get('telegram-bridge').state, 'quarantined');
   await c.reconcile('service:orca', ctx);
-  assert.ok(ctx.calls.clear.some((x) => x.entity === 'service:orca' && x.state === 'down'));
+  assert.ok(ctx.calls.clear.some((x) => x.entity === 'service:orca' && x.state === 'SERVICE_DOWN'));
 });
 
 test('ledger health: a failed quick_check is LEDGER_CORRUPT + one DI; the nightly backup is recorded once a day', async () => {
@@ -250,7 +254,7 @@ test('ledger health: a failed quick_check is LEDGER_CORRUPT + one DI; the nightl
   assert.equal(ctx.calls.decisions.length, 1, 'still corrupt: no second DI');
   ok = true; ctx.advance(S.ledgerHealth.quickCheckEveryMs);
   await c.reconcile('ledger:nivo-backend', ctx);
-  assert.ok(ctx.calls.clear.some((x) => x.entity === 'ledger:nivo-backend' && x.state === 'corrupt'));
+  assert.ok(ctx.calls.clear.some((x) => x.entity === 'ledger:nivo-backend' && x.state === 'LEDGER_CORRUPT'));
   const backups = ctx.calls.run.filter((r) => r.args[0] === 'scripts/reconciler/ledger-health.mjs');
   assert.equal(backups.length, 1);
   assert.deepEqual(backups[0].args, ['scripts/reconciler/ledger-health.mjs', '--backup', '--ledger-id', 'nivo-backend', '--file', 'D:/r/.starciwork/runtime.sqlite', '--json']);
@@ -275,4 +279,112 @@ test('the module export matches the shared contract', async () => {
   assert.equal(typeof mod.list, 'function');
   assert.equal(typeof mod.reconcile, 'function');
   assert.equal(mod.routes['workflow-finished']({ ledgerId: 'l', workflowId: 'wf-x' }), 'seat:kernel:l:wf-x');
+});
+
+/* ------------------------------------------------------------ turn budget (KERNEL_TURN_OVERDUE) */
+
+const TB = { budgetMs: 20 * 60_000, graceMs: 5 * 60_000, sameTurnSlackMs: 180_000 };
+
+test('turnMinutesOf reads the spinner timer of Claude, Codex and Devin', () => {
+  assert.equal(turnMinutesOf('● Read file\n✻ Cogitating… (12m 30s · ↓ 3.2k tokens · esc to interrupt)\n❯ '), 12);
+  assert.equal(turnMinutesOf('• Working (1h 02m 13s • esc to interrupt)'), 62);
+  assert.equal(turnMinutesOf('⠠⠤ Thinking · 5m 58s (esc twice to interrupt) · (457c · ctrl+o for'), 5);
+  assert.equal(turnMinutesOf('✻ Pondering… (41s · esc to interrupt)'), 0);
+  assert.equal(turnMinutesOf('❭ Ask Devin to build features\nSWE-2 Max'), null);
+});
+
+test('turnStep: over budget -> interrupt once; the same turn grace later -> replace once; a new turn starts over', () => {
+  let t = T0, r = turnStep(null, { busy: true, minutes: 10 }, { now: t, ...TB });
+  assert.equal(r.act, null);
+  assert.equal(r.turn.startedAt, t - 10 * 60_000);
+  r = turnStep(r.turn, { busy: true, minutes: 21 }, { now: t += 11 * 60_000, ...TB });
+  assert.equal(r.act, 'interrupt');
+  assert.equal(r.overdue, true);
+  r = turnStep(r.turn, { busy: true, minutes: 23 }, { now: t += 2 * 60_000, ...TB });
+  assert.equal(r.act, null, 'within the grace nothing more');
+  const replace = turnStep(r.turn, { busy: true, minutes: 26 }, { now: t + 3 * 60_000, ...TB });
+  assert.equal(replace.act, 'replace');
+  assert.equal(turnStep(replace.turn, { busy: true, minutes: 27 }, { now: t + 4 * 60_000, ...TB }).act, null, 'replace once');
+  const fresh = turnStep(r.turn, { busy: true, minutes: 1 }, { now: t + 3 * 60_000, ...TB });
+  assert.equal(fresh.act, null, 'the interrupt worked: a new turn');
+  assert.equal(fresh.ended, true);
+  assert.equal(fresh.turn.interruptedAt, null);
+  const idle = turnStep(r.turn, { busy: false }, { now: t, ...TB });
+  assert.deepEqual([idle.turn, idle.act, idle.ended], [null, null, true]);
+  let n = null;
+  for (let i = 0; i <= 21; i += 1) n = turnStep(n?.turn ?? null, { busy: true, minutes: null }, { now: T0 + i * 60_000, ...TB });
+  assert.equal(n.act, 'interrupt', 'no timer on screen: continuous busy readings count as one turn');
+});
+
+test('active Kernel seat: a 25-minute turn -> interrupt key + doorbell + re-wake pass, KERNEL_TURN_OVERDUE; still the same turn 5 min later -> replaced', async () => {
+  const dbs = { 'nivo-backend': ledgerDb({ workflows: [{ id: 'wf-nivo-fe-canon', goal: GOAL }] }) };
+  const store = memoryStore();
+  let minutes = 25, replaced = false;
+  const c = booted(controller({ store: () => store, probeTurn: async () => ({ ok: true, busy: true, state: 'active', minutes, terminal: 'term_k', agent: 'devin' }) }));
+  const ctx = hostCtx({ dbs, mode: 'active', runAnswer: (cmd, args) => {
+    if (args.includes('--turn-replace')) { replaced = true; return { ok: true, stdout: '{"ok":true}' }; }
+    const action = replaced ? 'restarted' : 'active';
+    return { ok: true, stdout: JSON.stringify(args[0] === 'scripts/kernel/watchdog.mjs' ? { ok: true, action, terminal: 'term_k' } : { ok: true }) };
+  } });
+  const r1 = await c.reconcile(SEAT, ctx);
+  assert.equal(r1.turn.act, 'interrupt');
+  const argsOf = () => ctx.calls.run.map((x) => x.args.join(' '));
+  assert.ok(argsOf().includes('scripts/reconciler/services.mjs --turn-interrupt --terminal term_k --agent devin --repo D:/Repositories/nivo-backend --workflow wf-nivo-fe-canon --json'));
+  assert.equal(argsOf().filter((a) => a.startsWith('scripts/kernel/watchdog.mjs')).length, 2, 'the seat pass, then the re-wake pass');
+  const overdue = ctx.calls.clock.find((x) => x.state === 'KERNEL_TURN_OVERDUE');
+  assert.equal(overdue.entity, SEAT);
+  assert.equal(overdue.enteredAt, T0 - 25 * 60_000, 'the clock starts at the turn start');
+  assert.ok(ctx.calls.log.some((l) => l.kind === 'reconciler.host.turn-budget' && l.data.act === 'interrupt'));
+  ctx.advance(2 * 60_000); minutes = 27;
+  assert.equal((await c.reconcile(SEAT, ctx)).turn.act, null);
+  ctx.advance(3 * 60_000); minutes = 30;
+  const r3 = await c.reconcile(SEAT, ctx);
+  assert.equal(r3.turn.act, 'replace');
+  assert.ok(argsOf().includes('scripts/reconciler/services.mjs --turn-replace --terminal term_k --agent devin --json'));
+  assert.ok(ctx.calls.log.some((l) => l.data?.act === 'replace'));
+  assert.equal(store.get(SEAT).restarts.length, 1, 'the budget replacement counts toward the seat quarantine');
+});
+
+test('an interrupt that ends the turn clears KERNEL_TURN_OVERDUE and replaces nothing', async () => {
+  const dbs = { 'nivo-backend': ledgerDb({ workflows: [{ id: 'wf-nivo-fe-canon', goal: GOAL }] }) };
+  let obs = { ok: true, busy: true, state: 'active', minutes: 21, terminal: 'term_k', agent: 'claude' };
+  const c = booted(controller({ probeTurn: async () => obs }));
+  const ctx = hostCtx({ dbs, mode: 'active' });
+  await c.reconcile(SEAT, ctx);
+  ctx.advance(6 * 60_000); obs = { ok: true, busy: false, state: 'turn-idle', minutes: null, terminal: 'term_k', agent: 'claude' };
+  await c.reconcile(SEAT, ctx);
+  assert.ok(ctx.calls.clear.some((x) => x.entity === SEAT && x.state === 'KERNEL_TURN_OVERDUE'));
+  assert.ok(!ctx.calls.run.some((x) => x.args.includes('--turn-replace')));
+});
+
+test('shadow: an overdue turn records the interrupt, runs nothing, and a 19-minute turn is left alone', async () => {
+  const dbs = { 'nivo-backend': ledgerDb({ workflows: [{ id: 'wf-nivo-fe-canon', goal: GOAL }] }) };
+  let minutes = 19;
+  const c = booted(controller({ probeTurn: async () => ({ ok: true, busy: true, state: 'active', minutes, terminal: 'term_k', agent: 'devin' }) }));
+  const ctx = hostCtx({ dbs });
+  await c.reconcile(SEAT, ctx);
+  assert.equal(ctx.calls.run.length, 0);
+  ctx.advance(2 * 60_000); minutes = 21;
+  await c.reconcile(SEAT, ctx);
+  assert.deepEqual(ctx.calls.run.map((x) => x.args[1]), ['--turn-interrupt'], 'shadow records only the interrupt (ctx.run is the gate)');
+});
+
+test('the Supervisor seat has its own 30-minute budget and interrupts with --supervisor', async () => {
+  let minutes = 25;
+  const c = booted(controller({ probeTurn: async () => ({ ok: true, busy: true, state: 'active', minutes, terminal: 'term_s', agent: 'claude' }) }));
+  const ctx = hostCtx({ dbs: { 'nivo-backend': ledgerDb() }, mode: 'active', runAnswer: () => ({ ok: true, stdout: '{"ok":true,"action":"busy","terminal":"term_s"}' }) });
+  assert.equal((await c.reconcile('seat:supervisor', ctx)).turn.act, null);
+  ctx.advance(6 * 60_000); minutes = 31;
+  assert.equal((await c.reconcile('seat:supervisor', ctx)).turn.act, 'interrupt');
+  assert.ok(ctx.calls.run.some((x) => x.args.join(' ') === 'scripts/reconciler/services.mjs --turn-interrupt --terminal term_s --agent claude --supervisor --json'));
+  assert.equal(ctx.calls.clock.find((x) => x.state === 'KERNEL_TURN_OVERDUE').slaMs, 30 * 60_000);
+});
+
+test('every clock state the host controller sets is a code of the SLA catalogue', () => {
+  const codes = parseYaml(fs.readFileSync(new URL('../modules/reconciler/sla.yaml', import.meta.url), 'utf8')).codes;
+  const src = fs.readFileSync(new URL('../scripts/reconciler/controllers/host.mjs', import.meta.url), 'utf8');
+  const used = [...src.matchAll(/await clock\(ctx, [^,]+, '([A-Z_]+)'/g)].map((m) => m[1]);
+  used.push('SEAT_VACANT', 'KERNEL_GATED', 'ORCA_DOWN', 'KERNEL_INPUT_STUCK', 'SEAT_QUARANTINED');
+  assert.ok(used.includes('KERNEL_TURN_OVERDUE') && used.includes('SERVICE_DOWN') && used.includes('LEDGER_CORRUPT'));
+  for (const code of used) assert.ok(codes[code], `${code} is in modules/reconciler/sla.yaml codes`);
 });

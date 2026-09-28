@@ -44,6 +44,17 @@ seats:
   kernel: {maxReplacementsPerHour: 3, holdMs: 3600000, timeoutMs: 900000, vacantSlaMs: 180000, inputSlaMs: 60000, gatedSlaMs: 600000, hostOutageSlaMs: 600000, quarantinedSlaMs: 1800000}
   supervisor: {timeoutMs: 900000}
 
+# Turn budget (the numbers are modules/models/runtimes.yaml allocation.liveness kernelTurnBudgetMs,
+# supervisorTurnBudgetMs, turnInterruptGraceMs): a seat busy in one turn past its budget gets its agent's own interrupt
+# key (interruptKeys: one entry per key press, `esc` = Escape; Devin asks for Esc twice), then the doorbell re-wake;
+# idleWaitMs bounds the wait for the turn to end before the ring. sameTurnSlackMs: two readings of the spinner timer
+# whose implied turn starts differ by less than this are the same turn.
+turnBudget:
+  interruptKeys: {claude: [esc], codex: [esc], qwen: [esc], devin: [esc, esc]}
+  idleWaitMs: 20000
+  sameTurnSlackMs: 180000
+  probeTimeoutMs: 60000
+
 # Processes (DESIGN 8.4): every everyMs. An orphan runtime loop (watchdog.mjs / start-workflow.mjs / serve-ask.mjs
 # whose --repo no managed ledger owns and whose workflow no managed ledger runs) older than orphanMinAgeMs is
 # stopped. The footprint scan runs every footprintEveryMs. More Orca terminals than seats + running workers +

@@ -65,6 +65,7 @@ codes:
   SEAT_QUARANTINED:         {slaMs: 1800000, severity: critical, owner: supervisor, autoAction: 'seat-unrecoverable DI; the owner when twice'}
   DUPLICATE_SEAT:           {slaMs: 0, severity: critical, owner: host-controller, autoAction: 'INV-H4: close the duplicate (check-orca-tree DUPLICATE_KERNEL)'}
   KERNEL_LONG_TURN:         {slaMs: 1200000, severity: warn, owner: kernel, autoAction: 'none: mechanical work never waits on the turn; each DI escalates on its own SLA'}
+  KERNEL_TURN_OVERDUE:      {slaKey: liveness.kernelTurnBudgetMs, severity: warn, owner: host-controller, autoAction: 'interrupt key + doorbell re-wake; the same turn turnInterruptGraceMs later replaces the seat (the Supervisor seat uses supervisorTurnBudgetMs on its own clock)'}
   KERNEL_INPUT_STUCK:       {slaMs: 60000, severity: warn, owner: host-controller, autoAction: 'send Enter'}
   KERNEL_GATED:             {slaMs: 600000, severity: critical, owner: supervisor, autoAction: 'DI to the Supervisor'}
   ORCA_DOWN:                {slaMs: 600000, severity: critical, owner: host-controller, autoAction: 'restartOrcaApp after hostOutage.waitMs probes'}
