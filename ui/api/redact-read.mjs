@@ -15,6 +15,9 @@ export function publicJson(value, key = null) {
   if (value && typeof value === 'object') {
     return Object.fromEntries(Object.entries(value).filter(([name]) => !OMIT.has(name)).map(([name, item]) => [name, publicJson(item, name)]));
   }
+  // URL paths are root-relative in browsers; on Windows path.isAbsolute also
+  // classifies them as filesystem paths. Keep only the one public blob route.
+  if (typeof value === 'string' && key === 'href' && /^\/api\/blob\/[a-f0-9]{64}$/.test(value)) return redactData(value, key);
   if (typeof value === 'string' && path.isAbsolute(value)) return redactData(path.basename(value), key);
   return redactData(value, key);
 }
