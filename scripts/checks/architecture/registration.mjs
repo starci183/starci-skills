@@ -189,6 +189,39 @@ function registrationFinding(module, node, ruleId, message, extra = {}) {
   return { ruleId, path: module.path, ...sourceLocation(node.getSourceFile(), node), module: module.name, message, ...extra };
 }
 
+/** A module belongs to an app only when its runtime source is reachable from that app's composition root. */
+function applicationGraphs(config, context, modules) {
+  const roots = modules.filter(module => /^apps\/[^/]+\/src\/app\.module\.ts$/.test(module.path))
+    .sort((a, b) => a.path.localeCompare(b.path));
+  // Small architecture fixtures without app composition retain the original single-graph relation.
+  if (!roots.length) return [modules];
+  const byFile = new Map();
+  for (const module of modules) {
+    const file = canonical(path.resolve(config.root, ...module.path.split('/')));
+    if (!byFile.has(file)) byFile.set(file, []);
+    byFile.get(file).push(module);
+  }
+  const bound = new Set();
+  const graphs = roots.map(root => {
+    const queue = [canonical(path.resolve(config.root, ...root.path.split('/')))];
+    const seen = new Set();
+    const reachable = [];
+    for (let index = 0; index < queue.length; index += 1) {
+      const file = queue[index];
+      if (seen.has(file)) continue;
+      seen.add(file);
+      for (const module of byFile.get(file) ?? []) {
+        reachable.push(module);
+        bound.add(module);
+      }
+      for (const edge of context.edges.get(file) ?? []) if (edge.runtime && !seen.has(edge.to)) queue.push(edge.to);
+    }
+    return reachable;
+  });
+  // A module outside every proven app graph can still contain a duplicate in its own metadata.
+  return [...graphs, ...modules.filter(module => !bound.has(module)).map(module => [module])];
+}
+
 /** Prove only static exported class-token identity and selected CQRS handler registration. */
 export function checkModuleRegistration(config, context) {
   const selected = config.backend.moduleRegistration;
@@ -241,20 +274,28 @@ export function checkModuleRegistration(config, context) {
     if (!providerOwners.has(key)) providerOwners.set(key, []);
     providerOwners.get(key).push(module);
   }
-  for (const [key, owners] of providerOwners) {
-    const orderedOwners = [...owners].sort((a, b) => a.path.localeCompare(b.path));
-    const owner = orderedOwners[0];
-    const registrations = modules.flatMap(module => (module.providers.get(key) ?? []).map(node => ({ module, node })))
+  const reportedRegistrations = new Set();
+  for (const graph of applicationGraphs(config, context, modules)) for (const [key] of providerOwners) {
+    const owners = graph.filter(module => module.providers.has(key) && module.exports.has(key))
+      .sort((a, b) => a.path.localeCompare(b.path));
+    if (!owners.length) continue;
+    const owner = owners[0];
+    const registrations = graph.flatMap(module => (module.providers.get(key) ?? []).map(node => ({ module, node })))
       .sort((a, b) => a.module.path.localeCompare(b.module.path) || a.node.getStart() - b.node.getStart());
     let keptOwnerRegistration = false;
     for (const duplicate of registrations.filter(registration => {
       if (registration.module !== owner || keptOwnerRegistration) return true;
       keptOwnerRegistration = true;
       return false;
-    })) violations.push(registrationFinding(duplicate.module, duplicate.node,
-      'BE_MODULE_PROVIDER_REREGISTRATION',
-      `Class-token provider exported by ${owner.name} is registered again by ${duplicate.module.name}; import the owning module and preserve one class-token registration.`,
-      { ownerModule: owner.name, ownerPath: owner.path }));
+    })) {
+      const identity = `${key}\0${duplicate.module.path}\0${duplicate.node.getStart()}`;
+      if (reportedRegistrations.has(identity)) continue;
+      reportedRegistrations.add(identity);
+      violations.push(registrationFinding(duplicate.module, duplicate.node,
+        'BE_MODULE_PROVIDER_REREGISTRATION',
+        `Class-token provider exported by ${owner.name} is registered again by ${duplicate.module.name} in one application graph; import the owning module and preserve one class-token registration.`,
+        { ownerModule: owner.name, ownerPath: owner.path }));
+    }
   }
   for (const handler of handlers.filter(item => item.key && selected.handlerDecorators.includes(item.kind))) {
     const registrations = modules.flatMap(module => (module.providers.get(handler.key) ?? []).map(node => ({ module, node })));

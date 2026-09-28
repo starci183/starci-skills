@@ -103,7 +103,11 @@ export function checkArchitecture({ repositoryRoot, configFile, injectedTypeScri
   if (context.program) violations.push(...checkOwners(config, context));
   if (context.program && config.kinds.includes('backend')) {
     violations.push(...checkBackend(config, context));
-    const registration = checkModuleRegistration(config, context);
+    // A slice may omit every app root. Registration ownership needs the complete
+    // composition graph even when the caller asks for findings in only one path.
+    const registrationContext = paths.length && config.backend.moduleRegistration
+      ? buildTypeScriptContext(config, injectedTypeScript) : context;
+    const registration = checkModuleRegistration(config, registrationContext);
     violations.push(...registration.violations);
     moduleRegistration = registration.coverage;
     const sourceShape = checkBackendSourceShape(config, context);
