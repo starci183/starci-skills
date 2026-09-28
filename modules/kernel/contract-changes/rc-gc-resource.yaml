@@ -1,0 +1,22 @@
+id: rc-gc-resource
+effectiveAt: '2026-09-28T18:00:00+07:00'
+summary: >-
+  Reconciler lane E (DESIGN §8.3, §8.5, §14, §15). The GC controller verifies each settled job, released worker, ended
+  workflow and landed [Worker] job right after its event (terminals via classifyTerminals restricted to the entity,
+  leases, staging), runs the 30-minute gc.mjs sweep and daily housekeeping; the Resource controller computes the
+  throttle mode, per-workflow fair-share slot targets (slotTargets in ram-throttle.json), op-ram-footprint samples,
+  quota probes and the quota-exhausted / cap-starved Decision Items. Both land in shadow: they record reconciler.would
+  rows and change nothing until config.yaml reconciler.controllers.<name>.mode is active. gc.mjs gains two collectors,
+  default on: leases (report-only LEASE_LEAK; no api path deletes a settled job's lease) and lanelogs (top-level
+  *.err/*.json/*.log of the lanes root older than 24 h move to <archiveRoot>/lane-logs, deleted after 14 days), and
+  the host lock `gc` (<supervisorHome>/gc.lock) so two GC apply runs never overlap.
+reach: new-legs
+paths:
+  - modules/kernel/contract-changes/rc-gc-resource.yaml
+  - modules/reconciler/gc.yaml
+  - modules/reconciler/resource.yaml
+  - scripts/reconciler/controllers/gc.mjs
+  - scripts/reconciler/controllers/resource.mjs
+  - scripts/supervisor/gc.mjs
+  - tests/reconciler-gc.spec.mjs
+  - tests/reconciler-resource.spec.mjs

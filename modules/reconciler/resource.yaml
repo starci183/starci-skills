@@ -1,0 +1,19 @@
+# Resource controller (scripts/reconciler/controllers/resource.mjs; DESIGN §8.3, §14; lane rc-gc-resource).
+# The throttle thresholds (minFreeRamPct 10, heavyResumeAbovePct 15, landSpecPauseBelowPct 2.5, landSpecResumeAbovePct 5,
+# hardFloorPct, cpuHeavyStopAbove 0.95, cpuHeavyResumeBelow 0.85) and priorities stay in modules/models/runtimes.yaml
+# allocation.resources (scripts/lib/ram-throttle.mjs throttleThresholds); this file holds only the controller's numbers.
+name: resource
+concerns: [resource.throttle, resource.quota]
+# resource:host is reconciled every resyncMs (census, load, memory -> mode, slot targets).
+resyncMs: 30000
+concurrency: 2
+# One op-ram-footprint supervisor event per footprintEveryMs (the per-op RAM history ram-throttle.mjs reads).
+footprintEveryMs: 300000
+# resource:quota:<ledger>: api provider-health --quota-probe at most once per quotaProbeEveryMs while a quota circuit is open.
+quotaProbeEveryMs: 300000
+quotaProbeTimeoutMs: 120000
+# cap-starved: the priority workflow held fewer than min(reserve, demand) slots for this long -> Decision Item to the Supervisor.
+capStarvedMs: 900000
+# SLA clocks (lane F reads them): RAM_CRITICAL while the throttle is critical, DISK_LOW while host-resources reads lowDisk.
+ramCriticalSlaMs: 600000
+diskLowSlaMs: 3600000

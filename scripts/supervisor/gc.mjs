@@ -39,6 +39,16 @@
 //             approved zip-then-purge on 2026-09-28).
 //   tmp       %TEMP% entries with a runtime prefix past tmpMaxAgeMs (hk-tmp.mjs sweepTmp).
 //   tasks     Orca Tasks of settled jobs whose close was refused: closed again (task-update completed).
+//   leases    lease rows (product ledgers and the supervisor ledger) of a settled job, a job the ledger no longer
+//             has, or an ended workflow, older than leaseMinAgeMs (DESIGN §15.2, LEASE_LEAK). No api path deletes
+//             the lease of an already-settled job, so this collector REPORTS them (verdict refuse, reportOnly) and
+//             never deletes; the reconciler GC controller opens a runtime-defect Decision Item for the Supervisor.
+//   lanelogs  *.err / *.json / *.log files at the top level of the lanes root older than laneLogMinAgeMs (24 h):
+//             moved to <archiveRoot>/lane-logs/; archived lane logs older than laneLogRetentionMs (14 days, by
+//             their last write) are deleted. Subdirectories (the lane worktrees) are never touched.
+//
+// Host lock `gc` (reconciler lane rc-gc-resource): a live --apply run holds <supervisorHome>/gc.lock, so the tick, a
+// hand-run gc.mjs and the reconciler GC controller never overlap; a busy lock returns ok:false, busy:true untouched.
 //
 // Output: the report {schema, apply, ok, counts, freedBytes, ramFreedBytes, items: [{class, action, target, ...}],
 // refused, errors, line}. Every item and one summary are typed rows of the machine log (gc.collect, gc.summary).
@@ -62,13 +72,22 @@ import { workflowNameOf } from '../lib/display-names.mjs';
 import { jobTerminalHandles, ledgerJobs, kernelSignalRows, pathUnder } from '../lib/terminal-ledger.mjs';
 import { SKILL_ROOT, SUPERVISOR_WF, FIX_KIND, landRoot, productRepos, seatOf, stagingRoot, supervisorHome, withSupervisorRead } from './home.mjs';
 import { removeStaging, unlinkNodeModulesLink } from './workers.mjs';
+import { acquireDepsLock } from '../guards/deps-guard.mjs';
 
 const selfFile = fileURLToPath(import.meta.url);
 export const SCHEMA = 'starci/gc-report@1';
 /** The supervisor-ledger event the tick records per GC run (tick.mjs); the owner digest sums them (actions.mjs). */
 export const GC_EVENT_KIND = 'supervisor-gc';
-export const COLLECTORS = Object.freeze(['agents', 'shells', 'lanes', 'evidence', 'tmp', 'tasks']);
-export const DEFAULTS = Object.freeze({ gcMinAgeMs: 600_000, gcLaneGraceMs: 1_800_000, gcEvidenceRetentionMs: 259_200_000, sweepMs: 1_800_000 });
+export const COLLECTORS = Object.freeze(['agents', 'shells', 'lanes', 'evidence', 'tmp', 'tasks', 'leases', 'lanelogs']);
+export const DEFAULTS = Object.freeze({ gcMinAgeMs: 600_000, gcLaneGraceMs: 1_800_000, gcEvidenceRetentionMs: 259_200_000, sweepMs: 1_800_000,
+  leaseMinAgeMs: 60_000, laneLogMinAgeMs: 86_400_000, laneLogRetentionMs: 1_209_600_000 });
+/** The DESIGN §15.3 leftover class of each new collector's item and the step whose bug it points at. */
+export const LEFTOVER_OWNERS = Object.freeze({
+  lease: 'settle/reconcile did not release the job lease (scripts/kernel/api.mjs cmdSettle/cmdReconcile DELETE FROM leases, workers.mjs releaseLeases)',
+  'lane-log': 'the lane process left its log at the lanes root instead of cleaning it after land',
+});
+const SETTLED_JOB = new Set(['succeeded', 'failed', 'cancelled']);
+const LANE_LOG = /\.(err|json|log)$/i;
 export const APPROVAL = Object.freeze({ by: 'owner', ref: 'owner chat 2026-09-28: zip-then-purge approved for finished/archived workflow evidence past retention (gc.mjs)' });
 const LIVE_JOB = new Set(['queued', 'leased', 'running', 'answering', 'effect_unknown']);
 const HOLDING_JOB = new Set(['running', 'answering']);
@@ -87,7 +106,20 @@ export function gcSettings(allocation = allocationSettings()) {
   const keepTitles = (Array.isArray(gc.keepTitles) ? gc.keepTitles : []).map((p) => { try { return new RegExp(String(p)); } catch { return null; } }).filter(Boolean);
   return { minAgeMs: num(hk.gcMinAgeMs, DEFAULTS.gcMinAgeMs), laneGraceMs: num(hk.gcLaneGraceMs, DEFAULTS.gcLaneGraceMs),
     evidenceRetentionMs: num(hk.gcEvidenceRetentionMs, DEFAULTS.gcEvidenceRetentionMs), archiveRoot: hk.archiveRoot || 'D:/starci-archive', housekeeping: hk,
-    sweepMs: num(gc.sweepMs, DEFAULTS.sweepMs), keepTitles };
+    sweepMs: num(gc.sweepMs, DEFAULTS.sweepMs), keepTitles,
+    leaseMinAgeMs: num(gc.leaseMinAgeMs, DEFAULTS.leaseMinAgeMs), laneLogMinAgeMs: num(gc.laneLogMinAgeMs, DEFAULTS.laneLogMinAgeMs),
+    laneLogRetentionMs: num(gc.laneLogRetentionMs, DEFAULTS.laneLogRetentionMs) };
+}
+
+/* ------------------------------------------------------------ host lock: one GC apply at a time */
+
+export const gcLockFile = (env = process.env) => path.join(supervisorHome(env), 'gc.lock');
+/**
+ * The host lock `gc`: an apply run (the tick, a hand-run `gc.mjs --apply`, the reconciler GC controller) holds it so
+ * two never overlap. {ok, release()} | {ok:false, holder}. A lock whose holder process is gone is taken over.
+ */
+export function acquireGcLock({ env = process.env, holder = 'gc', waitMs = 0, staleMs = 3_600_000, pollMs = 250 } = {}) {
+  return acquireDepsLock({ lockFile: gcLockFile(env), holder: { holder }, waitMs, staleMs, pollMs });
 }
 
 /**
@@ -175,8 +207,8 @@ export function supervisorView({ env = process.env, now = Date.now() } = {}) {
       return { jobId: r.job_id, status: r.status, cluster: p.cluster ?? null, handle: r.worker_id ?? null, self: p.self === true,
         stagingPath: p.staging?.path ?? null, branch: p.staging?.branch ?? null, base: p.staging?.base ?? null, updatedAt: r.updated_at };
     });
-    return { seat: seat ? { handle: seat.value?.terminal ?? null, live: !seat.expired && !seat.starting } : null, jobs };
-  }, { seat: null, jobs: [] }, { env });
+    return { seat: seat ? { handle: seat.value?.terminal ?? null, live: !seat.expired && !seat.starting } : null, jobs, leases: leaseRowsOf(db) };
+  }, { seat: null, jobs: [], leases: [] }, { env });
 }
 
 /** One product ledger's view: {repo, workflows: [{workflowId, name, ended, endedAt, kernelHandle}], jobs: [{jobId, workflowId, kind, status, handles}]}. */
@@ -192,12 +224,98 @@ export function ledgerView(repo) {
       workflowId: w.workflow_id, name: (() => { try { return workflowNameOf(db, w.workflow_id); } catch { return null; } })(),
       ended: w.phase === 'finished' || w.archived_at != null, endedAt: w.archived_at ?? (w.phase === 'finished' ? w.updated_at : null),
       purged: purged.has(w.workflow_id), kernelHandle: signals.get(w.workflow_id) ?? null }));
-    const jobs = ledgerJobs(db).map((j) => ({ jobId: j.job_id, workflowId: j.workflow_id, kind: j.kind, status: j.status,
+    const updatedAt = new Map((() => { try { return db.prepare('SELECT job_id, updated_at FROM jobs').all().map((r) => [r.job_id, r.updated_at]); } catch { return []; } })());
+    const jobs = ledgerJobs(db).map((j) => ({ jobId: j.job_id, workflowId: j.workflow_id, kind: j.kind, status: j.status, updatedAt: updatedAt.get(j.job_id) ?? null,
       handles: [...new Set([...jobTerminalHandles(j, j.payload), j.payload?.launchTerminal?.handle].filter(Boolean))],
       task: (() => { const p = j.payload; const taskId = p?.orca?.taskId ?? p?.managed?.taskId ?? p?.hierarchy?.runtime?.taskId ?? null;
         return taskId ? { taskId, runId: p?.orca?.runId ?? p?.managed?.runId ?? p?.hierarchy?.runtime?.runId ?? null, closed: p?.taskClosed?.ok === true } : null; })() }));
-    return { repo: path.resolve(repo), workflows, jobs };
+    return { repo: path.resolve(repo), workflows, jobs, leases: leaseRowsOf(db) };
   } finally { h.close(); }
+}
+
+/** Every lease row of a ledger with its job's and workflow's state (the leases collector's input). */
+export function leaseRowsOf(db) {
+  try {
+    return db.prepare(`SELECT l.resource_key resourceKey, l.job_id jobId, l.workflow_id workflowId, l.acquired_at acquiredAt, l.expires_at expiresAt,
+        j.status jobStatus, j.updated_at jobUpdatedAt, w.phase phase, w.archived_at archivedAt, w.updated_at workflowUpdatedAt
+      FROM leases l LEFT JOIN jobs j ON j.job_id=l.job_id LEFT JOIN workflows w ON w.workflow_id=l.workflow_id`).all();
+  } catch { return []; }
+}
+
+/**
+ * The leaked leases. Pure. `rows` from leaseRowsOf (each may carry `ledger`). A lease leaks when its job is settled
+ * or gone, or its workflow ended, and the settle/end is older than minAgeMs. A lease of a live job (queued, leased,
+ * running, answering, reported, effect_unknown) of a live workflow is never one. [{ledger, resourceKey, jobId,
+ * workflowId, why, sinceMs}].
+ */
+export function classifyLeases({ rows = [], now = Date.now(), minAgeMs = DEFAULTS.leaseMinAgeMs }) {
+  const out = [];
+  for (const r of rows) {
+    const ended = r.phase === 'finished' || r.archivedAt != null;
+    const settled = r.jobStatus == null || SETTLED_JOB.has(r.jobStatus);
+    if (!settled && !ended) continue;
+    const since = settled ? (r.jobUpdatedAt ?? r.acquiredAt ?? null) : (r.archivedAt ?? r.workflowUpdatedAt ?? null);
+    if (since == null || now - Number(since) < minAgeMs) continue;
+    const why = r.jobStatus == null ? 'its job is gone from the ledger' : settled ? `its job ${r.jobId} is ${r.jobStatus}` : `its workflow ${r.workflowId} ended`;
+    out.push({ ledger: r.ledger ?? null, resourceKey: r.resourceKey, jobId: r.jobId, workflowId: r.workflowId, why, sinceMs: now - Number(since) });
+  }
+  return out;
+}
+
+/**
+ * The lane-log plan. Pure. `top`: [{name, mtimeMs, isFile}] at the lanes root; `archived`: the same in
+ * <archiveRoot>/lane-logs. {move: [name], purge: [name]}: only plain files named *.err/*.json/*.log, never a directory.
+ */
+export function planLaneLogs({ top = [], archived = [], now = Date.now(), minAgeMs = DEFAULTS.laneLogMinAgeMs, retentionMs = DEFAULTS.laneLogRetentionMs }) {
+  const old = (e, ms) => e.isFile === true && Number(e.mtimeMs) > 0 && now - Number(e.mtimeMs) >= ms;
+  return { move: top.filter((e) => LANE_LOG.test(e.name) && old(e, minAgeMs)).map((e) => e.name),
+    purge: archived.filter((e) => LANE_LOG.test(e.name) && old(e, retentionMs)).map((e) => e.name) };
+}
+
+const dirEntries = (dir) => {
+  try {
+    return fs.readdirSync(dir, { withFileTypes: true }).map((d) => {
+      let st = null; try { st = fs.statSync(path.join(dir, d.name)); } catch { st = null; }
+      return { name: d.name, isFile: d.isFile(), mtimeMs: st?.mtimeMs ?? 0, bytes: st?.size ?? 0 };
+    });
+  } catch { return []; }
+};
+
+/** Move one file, across drives too (copy, then unlink). An archived name already taken gets a time suffix. */
+function moveFile(from, to) {
+  fs.mkdirSync(path.dirname(to), { recursive: true });
+  let dest = to;
+  if (fs.existsSync(dest)) { const ext = path.extname(to); dest = `${to.slice(0, -ext.length || undefined)}.${Date.now()}${ext}`; }
+  try { fs.renameSync(from, dest); } catch (error) {
+    if (error?.code !== 'EXDEV') throw error;
+    fs.copyFileSync(from, dest); fs.unlinkSync(from);
+  }
+}
+
+/** Decide and (apply) archive the lane logs. `fsx` {list(dir), move(from, to), remove(file)} is the spec seam. {items, freedBytes, errors}. */
+export function collectLaneLogs({ apply = false, env = process.env, now = Date.now(), settings, fsx = null }) {
+  const base = lanesRoot({ env });
+  const archiveDir = path.join(settings.archiveRoot, 'lane-logs');
+  const list = fsx?.list ?? dirEntries;
+  const top = list(base), archived = list(archiveDir);
+  const plan = planLaneLogs({ top, archived, now, minAgeMs: settings.laneLogMinAgeMs, retentionMs: settings.laneLogRetentionMs });
+  const items = [], errors = [];
+  let freedBytes = 0;
+  const bytesOf = (entries, name) => entries.find((e) => e.name === name)?.bytes ?? 0;
+  for (const name of plan.move) {
+    const from = path.join(base, name), to = path.join(archiveDir, name);
+    let ok = null;
+    if (apply) { try { (fsx?.move ?? moveFile)(from, to); ok = true; } catch (error) { ok = false; errors.push(`lane log ${from}: ${String(error?.message ?? error).slice(0, 160)}`); } }
+    items.push({ class: 'lane-log', action: 'archive-file', target: from, verdict: ok === false ? 'refuse' : 'collect', reason: `${apply ? 'moved' : 'would move'} to ${archiveDir} (older than ${Math.round(settings.laneLogMinAgeMs / 3_600_000)}h)`, ok, leftover: true, bytes: bytesOf(top, name) });
+  }
+  for (const name of plan.purge) {
+    const p = path.join(archiveDir, name);
+    let ok = null;
+    if (apply) { try { (fsx?.remove ?? ((f) => fs.unlinkSync(f)))(p); ok = true; freedBytes += bytesOf(archived, name); } catch (error) { ok = false; errors.push(`archived lane log ${p}: ${String(error?.message ?? error).slice(0, 160)}`); } }
+    else freedBytes += bytesOf(archived, name);
+    items.push({ class: 'lane-log', action: 'remove-file', target: p, verdict: ok === false ? 'refuse' : 'collect', reason: `${apply ? 'deleted' : 'would delete'}: archived lane log older than ${Math.round(settings.laneLogRetentionMs / 86_400_000)} days`, ok, bytes: bytesOf(archived, name) });
+  }
+  return { items, freedBytes, errors };
 }
 
 /**
@@ -495,7 +613,20 @@ export async function runGc({ apply = false, only = null, env = process.env, now
   const settings = gcSettings(allocation ?? allocationSettings());
   const want = new Set(only ?? COLLECTORS);
   const report = { schema: SCHEMA, apply: apply === true, at: new Date(now).toISOString(), ok: true, items: [], errors: [],
-    counts: { agents: 0, terminals: 0, worktrees: 0, processes: 0, evidence: 0, tmp: 0, tasks: 0, refused: 0, leftovers: 0, freedBytes: 0, ramFreedBytes: 0 } };
+    counts: { agents: 0, terminals: 0, worktrees: 0, processes: 0, evidence: 0, tmp: 0, tasks: 0, leases: 0, laneLogs: 0, refused: 0, leftovers: 0, freedBytes: 0, ramFreedBytes: 0 } };
+  // The host lock `gc` (live apply runs only: a spec's injected deps never take the host lock unless it passes deps.lock).
+  const lockFn = deps.lock ?? (Object.keys(deps).some((k) => k !== 'holder') ? null : acquireGcLock);
+  let lock = null;
+  if (apply && lockFn) {
+    lock = lockFn({ env, holder: deps.holder ?? 'gc.mjs' });
+    if (!lock?.ok) {
+      report.ok = false; report.busy = true;
+      report.errors.push(`gc-busy: another GC apply holds the host lock (${JSON.stringify(lock?.holder ?? null).slice(0, 160)}); nothing was touched`);
+      report.line = gcLine(report.counts, { language: language ?? 'vi', apply }); report.durationMs = Date.now() - started;
+      return report;
+    }
+  }
+  try {
   const state = (deps.readState ?? readState)(env);
   const seenNow = {};
   const sup = (deps.sup ?? supervisorView)({ env, now });
@@ -630,6 +761,27 @@ export async function runGc({ apply = false, only = null, env = process.env, now
     }
   }
 
+  if (want.has('leases')) {
+    const rows = [...(sup.leases ?? []).map((r) => ({ ...r, ledger: 'supervisor' })), ...ledgers.flatMap((l) => (l.leases ?? []).map((r) => ({ ...r, ledger: path.basename(l.repo) })))];
+    for (const lk of classifyLeases({ rows, now, minAgeMs: settings.leaseMinAgeMs })) {
+      report.items.push({ class: 'lease', action: 'report-lease', target: `${lk.ledger}:${lk.resourceKey}`, owner: lk.jobId, verdict: 'refuse', reportOnly: true, leftover: true, ok: null,
+        ledger: lk.ledger, jobId: lk.jobId, workflowId: lk.workflowId,
+        reason: `LEASE_LEAK: lease ${lk.resourceKey} still held although ${lk.why}; no api path deletes a settled job's lease - reported, not deleted` });
+      report.counts.leases += 1;
+    }
+  }
+
+  if (want.has('lanelogs')) {
+    try {
+      const r = collectLaneLogs({ apply, env, now, settings, fsx: deps.fsx ?? null });
+      report.items.push(...r.items);
+      report.counts.laneLogs += r.items.filter((i) => i.verdict === 'collect').length;
+      report.counts.refused += r.items.filter((i) => i.verdict === 'refuse').length;
+      report.counts.freedBytes += r.freedBytes;
+      report.errors.push(...r.errors);
+    } catch (error) { report.errors.push(`lanelogs: ${String(error?.message ?? error).slice(0, 200)}`); }
+  }
+
   (deps.writeState ?? writeState)({ seen: seenNow }, env);
   if (apply && (report.counts.agents || report.counts.terminals)) {
     // Orca stops the PTY trees on close; give the OS a moment before reading free RAM back.
@@ -650,26 +802,28 @@ export async function runGc({ apply = false, only = null, env = process.env, now
   rows.push({ kind: 'gc.summary', at: now, level: report.errors.length ? 'warn' : 'info', msg: report.line,
     data: { agents: report.counts.agents, terminals: report.counts.terminals, worktrees: report.counts.worktrees, freedBytes: report.counts.freedBytes,
       apply, ramFreedBytes: report.counts.ramFreedBytes, refused: report.counts.refused, errors: report.errors.length, leftovers: report.counts.leftovers,
-      evidence: report.counts.evidence, tmp: report.counts.tmp, tasks: report.counts.tasks, line: report.line } });
+      evidence: report.counts.evidence, tmp: report.counts.tmp, tasks: report.counts.tasks, leases: report.counts.leases, laneLogs: report.counts.laneLogs, line: report.line } });
   try { (deps.log ?? (await import('./sup-log.mjs')).supLogRows)(rows, { env }); } catch { /* best effort */ }
 
   // A leftover is a bug in its owner step: one lesson per class (lessons.mjs recordLeftover, deduped per day).
   if (apply) {
     const byClass = {};
-    for (const i of report.items) if (i.leftover && i.ok) (byClass[i.class] ??= []).push(`${i.target} ${String(i.title ?? '').slice(0, 50)}`);
+    for (const i of report.items) if (i.leftover && (i.ok || i.reportOnly)) (byClass[i.class] ??= []).push(`${i.target} ${String(i.title ?? '').slice(0, 50)}`.trim());
     if (report.counts.terminals) byClass['idle-shell'] = report.items.filter((i) => i.class === 'idle-shell' && i.ok).map((i) => i.target);
     try {
       const record = deps.lesson ?? (await import('./lessons.mjs')).recordLeftover;
-      for (const [klass, examples] of Object.entries(byClass)) if (examples.length) record({ klass, count: examples.length, examples, env, now });
+      for (const [klass, examples] of Object.entries(byClass)) if (examples.length)
+        record({ klass, count: examples.length, examples: LEFTOVER_OWNERS[klass] ? [`owner step: ${LEFTOVER_OWNERS[klass]}`, ...examples] : examples, env, now });
     } catch { /* the lesson is best effort */ }
   }
   return report;
+  } finally { try { lock?.release?.(); } catch { /* released or taken over */ } }
 }
 
 /** The report as lines for a human. */
 export function describe(report) {
   const lines = [`===== GC ${report.apply ? 'APPLY' : 'DRY-RUN'} ${report.at} ${report.ok ? 'ok' : 'WITH ERRORS'} =====`, report.line,
-    `counts: agents ${report.counts.agents}, idle shells ${report.counts.terminals}, worktrees ${report.counts.worktrees}, processes ${report.counts.processes}, evidence ${report.counts.evidence}, tmp ${report.counts.tmp}, tasks ${report.counts.tasks}, refused ${report.counts.refused}; disk ${fmtGb(report.counts.freedBytes)}, RAM ${fmtGb(report.counts.ramFreedBytes)}`];
+    `counts: agents ${report.counts.agents}, idle shells ${report.counts.terminals}, worktrees ${report.counts.worktrees}, processes ${report.counts.processes}, evidence ${report.counts.evidence}, tmp ${report.counts.tmp}, tasks ${report.counts.tasks}, leases ${report.counts.leases ?? 0} (report-only), lane logs ${report.counts.laneLogs ?? 0}, refused ${report.counts.refused}; disk ${fmtGb(report.counts.freedBytes)}, RAM ${fmtGb(report.counts.ramFreedBytes)}`];
   const order = ['collect', 'refuse', 'keep'];
   for (const v of order) {
     const rows = report.items.filter((i) => i.verdict === v);

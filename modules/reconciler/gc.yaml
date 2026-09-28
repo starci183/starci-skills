@@ -1,0 +1,16 @@
+# GC controller (scripts/reconciler/controllers/gc.mjs; DESIGN §8.5, §15; lane rc-gc-resource).
+# The sweep cadence stays in modules/models/runtimes.yaml allocation.gc.sweepMs (30 min) and the collector windows in
+# allocation.housekeeping.gc* / allocation.gc.* (scripts/supervisor/gc.mjs gcSettings); this file holds only the
+# controller's own numbers.
+name: gc
+concerns: [gc.sweep, gc.housekeeping]
+# How often the engine re-lists gc:sweep and gc:housekeeping; each key decides for itself whether it is due.
+resyncMs: 60000
+concurrency: 2
+# Housekeeping (scripts/supervisor/housekeeping.mjs --apply) every 24 h, and at once when host-resources reads lowDisk
+# or lowRam - at most once per lowResourceGapMs while the host stays low.
+housekeepingEveryMs: 86400000
+lowResourceGapMs: 3600000
+# An entity event is verified only once its job has been still for eventGraceMs: the owner step (settle, report, land)
+# closes its own terminals right after writing the event, and the GC must not race it.
+eventGraceMs: 60000

@@ -1,0 +1,205 @@
+// reconciler-gc.spec.mjs — the reconciler GC controller (scripts/reconciler/controllers/gc.mjs) and gc.mjs's new
+// collectors (leases, lanelogs) and host lock. Pure: every host seam is injected; nothing touches Orca, git, the
+// ledgers or the lanes root.
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import path from 'node:path';
+import { createGcController, parseKey, ROUTES } from '../scripts/reconciler/controllers/gc.mjs';
+import { classifyLeases, planLaneLogs, collectLaneLogs, runGc, COLLECTORS } from '../scripts/supervisor/gc.mjs';
+
+const T = 2_000_000_000_000;
+const REPO = 'D:/Repositories/nivo-backend';
+
+/** A ctx per the reconciler contract (lane A testing.mjs fakeCtx shape), recording every actuator call. */
+function ctxOf(mode, extra = {}) {
+  const calls = { run: [], api: [], log: [], decisions: [], clocks: [] };
+  const ctx = {
+    mode, now: () => T, ledgers: [{ ledgerId: 'nivo-backend', repo: REPO, file: `${REPO}/.starci/ledger.sqlite` }, { ledgerId: 'supervisor', repo: null, file: null }],
+    read: () => null, status: () => null,
+    api: async (...a) => { calls.api.push(a); return mode === 'active' ? { ok: true } : { ok: true, shadow: true }; },
+    run: async (...a) => { calls.run.push(a); return mode === 'active' ? { ok: true } : { ok: true, shadow: true }; },
+    clock: (...a) => calls.clocks.push(['clock', ...a]), clear: (...a) => calls.clocks.push(['clear', ...a]),
+    openDecision: async (di) => { calls.decisions.push(di); return { ok: true }; },
+    log: (kind, msg, data) => calls.log.push({ kind, msg, data }), owns: () => mode === 'active', ...extra,
+  };
+  return { ctx, calls };
+}
+
+const view = ({ status = 'succeeded', updatedAt = T - 5 * 60_000, leases = [] } = {}) => ({
+  repo: REPO, workflows: [{ workflowId: 'wf-1', name: 'Nivo · One', ended: false, kernelHandle: 'term_k' }],
+  jobs: [{ jobId: 'op-1', workflowId: 'wf-1', kind: 'op', status, handles: ['term_op'], updatedAt },
+    { jobId: 'kernel-wf-1', workflowId: 'wf-1', kind: 'kernel', status: 'running', handles: ['term_k'], updatedAt: T - 3_600_000 }],
+  leases,
+});
+const listed = { ok: true, terminals: [{ handle: 'term_op', title: '[Op] code.refactor · Nivo · One', connected: true, worktreePath: REPO },
+  { handle: 'term_k', title: '[Kernel] Nivo · One', connected: true, worktreePath: REPO }], visualLayouts: [] };
+
+function controller(extra = {}) {
+  const lessons = [];
+  const c = createGcController({ ledgerView: () => extra.view ?? view(), list: async () => listed, read: async () => () => ({ ok: true, screen: '' }),
+    lesson: async (a) => { lessons.push(a); return a; }, ...extra.deps });
+  return { c, lessons };
+}
+
+test('routes: the six entity events key one entity each; land-failed and a lane land key nothing', () => {
+  assert.equal(ROUTES['op-settled']({ kind: 'op-settled', ledgerId: 'nivo-backend', entityType: 'job', entityId: 'op-1' }), 'gc:job:nivo-backend:op-1');
+  assert.equal(ROUTES['worker-released-on-report']({ ledgerId: 'nivo-backend', entityType: 'job', entityId: 'op-1' }), 'gc:job:nivo-backend:op-1');
+  assert.equal(ROUTES['workflow-finished']({ ledgerId: 'nivo-backend', workflowId: 'wf-1' }), 'gc:workflow:nivo-backend:wf-1');
+  assert.equal(ROUTES['kernel-stale-cleared']({ ledgerId: 'nivo-backend', workflowId: 'wf-1' }), 'gc:workflow:nivo-backend:wf-1');
+  assert.equal(ROUTES['land-passed']({ kind: 'land-passed', ledgerId: 'supervisor', payload: { jobId: 'fix-a-123456' } }), 'gc:land:fix-a-123456');
+  assert.equal(ROUTES['land-passed']({ kind: 'land-passed', ledgerId: 'supervisor', payload: { jobId: null, lane: 'lane/x' } }), null);
+  for (const k of ['op-settled', 'worker-released', 'kernel-stale-cleared', 'land-succeeded', 'workflow-finished', 'workflow-archived']) assert.equal(typeof ROUTES[k], 'function', k);
+  assert.deepEqual(parseKey('gc:job:nivo-backend:op-code.refactor-1'), { type: 'job', ledgerId: 'nivo-backend', id: 'op-code.refactor-1' });
+  assert.deepEqual(parseKey('gc:sweep'), { type: 'sweep' });
+});
+
+test('op-settled with its [Op] terminal still live: a verified close and a leftover lesson (active)', async () => {
+  const { c, lessons } = controller();
+  const { ctx, calls } = ctxOf('active');
+  const r = await c.reconcile('gc:job:nivo-backend:op-1', ctx);
+  assert.equal(r.closes.length, 1);
+  assert.equal(calls.run.length, 1);
+  const [cmd, args] = calls.run[0];
+  assert.equal(cmd, 'node');
+  assert.deepEqual(args.slice(0, 3), ['scripts/lib/close-verify.mjs', '--terminal', 'term_op']);
+  assert.ok(args.includes('--tree'), 'the close counts only when the process tree is gone');
+  assert.equal(lessons.length, 1);
+  assert.equal(lessons[0].klass, 'op-worker');
+  assert.ok(!calls.run.some(([, a]) => a.includes('term_k')), 'the live Kernel seat is never closed');
+});
+
+test('op-settled in shadow: the close goes through the gate as a would, no lesson', async () => {
+  const { c, lessons } = controller();
+  const { ctx, calls } = ctxOf('shadow');
+  await c.reconcile('gc:job:nivo-backend:op-1', ctx);
+  assert.equal(calls.run.length, 1, 'the engine gate records it as reconciler.would');
+  assert.equal(lessons.length, 0);
+});
+
+test('an event inside the grace window waits for the owner step; a live job is left alone', async () => {
+  const { ctx, calls } = ctxOf('active');
+  const young = controller({ view: view({ updatedAt: T - 5_000 }) }).c;
+  await assert.rejects(young.reconcile('gc:job:nivo-backend:op-1', ctx), (e) => e.retryAfterMs > 0);
+  const live = controller({ view: view({ status: 'running' }) }).c;
+  assert.match((await live.reconcile('gc:job:nivo-backend:op-1', ctx)).skipped, /running/);
+  assert.equal(calls.run.length, 0);
+});
+
+test('a settled job still holding a lease: reported and a runtime-defect DI, never deleted', async () => {
+  const leases = [{ resourceKey: 'path:src/a.ts', jobId: 'op-1', workflowId: 'wf-1', acquiredAt: T - 600_000, expiresAt: T + 60_000, jobStatus: 'succeeded', jobUpdatedAt: T - 300_000, phase: 'build' }];
+  const { c } = controller({ view: view({ leases }) });
+  const { ctx, calls } = ctxOf('shadow');
+  const r = await c.reconcile('gc:job:nivo-backend:op-1', ctx);
+  assert.equal(r.leases, 1);
+  assert.equal(calls.decisions.length, 1);
+  assert.equal(calls.decisions[0].kind, 'runtime-defect');
+  assert.equal(calls.decisions[0].decider, 'supervisor');
+  assert.match(calls.decisions[0].summary, /LEASE_LEAK/);
+  assert.equal(calls.decisions[0].idempotencyKey, 'lease-leak:nivo-backend:op-1');
+});
+
+/** runGc seams: one settled op worker to collect, no lanes, no temp, no tasks. `closes` counts real closes. */
+function gcDeps(closes) {
+  return { list: () => listed, read: () => ({ ok: true, screen: '' }), procs: async () => [], table: () => [], sup: () => ({ seat: null, jobs: [], leases: [] }),
+    ledgers: () => [view()], git: () => ({ ok: true, stdout: '' }), landBusy: async () => false, sweepTmp: async () => ({ ok: true, skipped: [], deleted: [] }),
+    taskUpdate: () => ({ ok: true }), fsx: { list: () => [], move: () => { throw Error('no move in a spec'); }, remove: () => { throw Error('no remove'); } },
+    readState: () => ({ seen: {} }), freemem: () => 0, close: (h) => { closes.push(h); return { ok: true, proof: 'gone' }; }, kill: () => true, reap: () => ({ checked: false }) };
+}
+
+test('the sweep in shadow: zero closes, the would-rows name what a live sweep would collect', async () => {
+  const closes = [];
+  const { c } = controller({ deps: { gcDeps: gcDeps(closes), settings: { sweepMs: 1_800_000 } } });
+  const { ctx, calls } = ctxOf('shadow');
+  const r = await c.reconcile('gc:sweep', ctx);
+  assert.equal(r.shadow, true);
+  assert.equal(closes.length, 0, 'a shadow sweep closes nothing');
+  assert.deepEqual(calls.run.map(([, a]) => a[0]), ['scripts/supervisor/gc.mjs']);
+  const would = calls.log.find((l) => l.kind === 'reconciler.would' && l.data.action === 'gc-sweep');
+  assert.ok(would, 'one would-row for the sweep');
+  assert.ok(would.data.items.some((i) => i.target === 'term_op' && i.class === 'op-worker'));
+  assert.ok(!would.data.items.some((i) => i.target === 'term_k'));
+  // Not due again until sweepMs has passed.
+  assert.match((await c.reconcile('gc:sweep', ctx)).skipped, /not due/);
+});
+
+test('the sweep in active applies under the host lock and records the supervisor-gc event', async () => {
+  const closes = [], recorded = [];
+  const { c } = controller({ deps: { gcDeps: { ...gcDeps(closes), lock: () => ({ ok: true, release() {} }), settleMs: 0, log: () => {}, writeState: () => {}, lesson: () => null },
+    recordSweep: async (rep) => recorded.push(rep) } });
+  const { ctx } = ctxOf('active');
+  const r = await c.reconcile('gc:sweep', ctx);
+  assert.deepEqual(closes, ['term_op']);
+  assert.equal(recorded.length, 1);
+  assert.equal(r.counts.agents, 1);
+});
+
+test('housekeeping: daily, and at once when the host reads lowDisk', async () => {
+  let low = false;
+  const { c } = controller({ deps: { hostResources: async () => ({ lowDisk: low, lowRam: false, freeDiskGb: 5 }) } });
+  let now = T;
+  const { ctx, calls } = ctxOf('shadow', { now: () => now });
+  await c.reconcile('gc:housekeeping', ctx);
+  assert.deepEqual(calls.run.at(-1)[1], ['scripts/supervisor/housekeeping.mjs', '--apply']);
+  now += 2 * 3_600_000;
+  assert.match((await c.reconcile('gc:housekeeping', ctx)).skipped, /not due/);
+  low = true;
+  await c.reconcile('gc:housekeeping', ctx);
+  assert.equal(calls.run.length, 2, 'lowDisk runs it before the 24 h');
+});
+
+test('leases collector: live seats and young settles kept; settled, gone and ended-workflow leases reported', () => {
+  const rows = [
+    { resourceKey: 'path:a', jobId: 'kernel-wf', workflowId: 'wf', jobStatus: 'running', jobUpdatedAt: T - 9e6, phase: 'build' },
+    { resourceKey: 'path:b', jobId: 'op-young', workflowId: 'wf', jobStatus: 'succeeded', jobUpdatedAt: T - 30_000, phase: 'build' },
+    { resourceKey: 'path:c', jobId: 'op-old', workflowId: 'wf', jobStatus: 'failed', jobUpdatedAt: T - 300_000, phase: 'build' },
+    { resourceKey: 'path:d', jobId: 'op-gone', workflowId: 'wf', jobStatus: null, acquiredAt: T - 300_000 },
+    { resourceKey: 'path:e', jobId: 'op-r', workflowId: 'wf-end', jobStatus: 'reported', jobUpdatedAt: T - 9e6, phase: 'finished', workflowUpdatedAt: T - 300_000 },
+    { resourceKey: 'path:f', jobId: 'op-q', workflowId: 'wf', jobStatus: 'queued', jobUpdatedAt: T - 9e6, phase: 'build' },
+  ];
+  const leaks = classifyLeases({ rows, now: T, minAgeMs: 60_000 }).map((l) => l.resourceKey);
+  assert.deepEqual(leaks, ['path:c', 'path:d', 'path:e']);
+});
+
+test('leases through runGc apply: report-only items and one lesson, nothing deleted', async () => {
+  const lessons = [];
+  const leases = [{ resourceKey: 'path:c', jobId: 'op-old', workflowId: 'wf-1', jobStatus: 'succeeded', jobUpdatedAt: T - 300_000, phase: 'build' }];
+  const rep = await runGc({ apply: true, only: ['leases'], now: T, deps: { sup: () => ({ seat: null, jobs: [], leases: [] }), ledgers: () => [{ ...view(), leases }],
+    readState: () => ({ seen: {} }), writeState: () => {}, log: () => {}, lesson: (a) => lessons.push(a), freemem: () => 0 } });
+  const item = rep.items.find((i) => i.class === 'lease');
+  assert.equal(item.verdict, 'refuse');
+  assert.equal(item.reportOnly, true);
+  assert.equal(rep.counts.leases, 1);
+  assert.equal(lessons.length, 1);
+  assert.equal(lessons[0].klass, 'lease');
+});
+
+test('lane logs: young files, directories and other names kept; old logs archived; archived past 14 days deleted', () => {
+  const day = 86_400_000;
+  const top = [
+    { name: 'rc-engine.log', isFile: true, mtimeMs: T - 2 * 3_600_000 },
+    { name: 'land1.json', isFile: true, mtimeMs: T - 2 * day },
+    { name: 'npmci.err', isFile: true, mtimeMs: T - 3 * day },
+    { name: 'rc-gc-resource', isFile: false, mtimeMs: T - 9 * day },
+    { name: 'notes.txt', isFile: true, mtimeMs: T - 9 * day },
+  ];
+  const archived = [{ name: 'old.log', isFile: true, mtimeMs: T - 15 * day }, { name: 'recent.log', isFile: true, mtimeMs: T - 3 * day }];
+  const plan = planLaneLogs({ top, archived, now: T });
+  assert.deepEqual(plan.move, ['land1.json', 'npmci.err']);
+  assert.deepEqual(plan.purge, ['old.log']);
+  const moved = [], removed = [];
+  const r = collectLaneLogs({ apply: true, now: T, env: { STARCI_LANES_ROOT: 'D:/lanes-spec' }, settings: { archiveRoot: 'D:/archive-spec', laneLogMinAgeMs: day, laneLogRetentionMs: 14 * day },
+    fsx: { list: (d) => (/archive-spec/.test(d) ? archived : top), move: (a, b) => moved.push([path.basename(a), b]), remove: (f) => removed.push(path.basename(f)) } });
+  assert.deepEqual(moved.map(([n]) => n), ['land1.json', 'npmci.err']);
+  assert.ok(moved.every(([, to]) => to.includes(path.join('archive-spec', 'lane-logs'))));
+  assert.deepEqual(removed, ['old.log']);
+  assert.equal(r.errors.length, 0);
+});
+
+test('host lock: a busy gc lock touches nothing; both new collectors are default on', async () => {
+  const closes = [];
+  const rep = await runGc({ apply: true, now: T, deps: { ...gcDeps(closes), lock: () => ({ ok: false, holder: { holder: 'gc.mjs', pid: 1 } }) } });
+  assert.equal(rep.ok, false);
+  assert.equal(rep.busy, true);
+  assert.equal(closes.length, 0);
+  assert.ok(COLLECTORS.includes('leases') && COLLECTORS.includes('lanelogs'));
+});
