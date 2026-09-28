@@ -41,6 +41,7 @@ import { ledgerFileFor, openLedger } from '../../engine/ledger-db.mjs';
 import { jobResultSql } from './api-lib/rows.mjs';
 import { independentChecksOf } from './api-lib/check-evidence.mjs';
 import { logWriterFor } from './log-writer.mjs';
+import { jobScratchDirOf } from './op-prompt.mjs';
 import { redactData, redactPath, redactText } from '../lib/redact.mjs';
 
 export const LOG_ACTORS = Object.freeze(['kernel', 'op', 'runtime', 'check', 'land']);
@@ -60,7 +61,8 @@ export function logSettings() {
 
 /** The typed logs live in the repository's ledger (its logs table). */
 export const logsFileFor = (repo) => ledgerFileFor(repo);
-export const jobLogDirOf = (repo, workflowId, jobId) => path.join(path.resolve(repo), '.starciwork', 'kernel-evidence', workflowId, 'jobs', jobId);
+// The op's sidecar lives in its job scratch (op-prompt.mjs jobScratchDirOf), never in the repository (alpha.3).
+export const jobLogDirOf = (repo, workflowId, jobId) => jobScratchDirOf(repo, workflowId, jobId);
 export const sidecarFileOf = (repo, workflowId, jobId) => path.join(jobLogDirOf(repo, workflowId, jobId), 'log.jsonl');
 
 // ---------------------------------------------------------------------------------------------- kinds
