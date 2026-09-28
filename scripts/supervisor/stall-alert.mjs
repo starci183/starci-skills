@@ -130,7 +130,7 @@ const since = (at, now) => {
  * naming nothing checkable (only the owner releases it). A gate justified only by a record a peer
  * has not written yet is not the owner's.
  */
-export const ownerGateWait = (f) => f.type === 'GATE' && f.young !== true
+export const ownerGateWait = (f) => f.type === 'GATE' && f.gateKind !== 'supervisor-gate' && f.young !== true
   && ((f.asks?.length ?? 0) > 0 || (!(f.waits?.length) && !PEER_DEPENDENCY.test(f.text ?? '')));
 /**
  * An owner gate its own text calls a peer dependency, with no owner ask open: the wait is typed
@@ -139,16 +139,19 @@ export const ownerGateWait = (f) => f.type === 'GATE' && f.young !== true
  * it as a peer-wait, which the stall check can judge.
  */
 export const PEER_DEPENDENCY = /\bpeer(?:[- ]dependen\w*| workflow)\b|\bnot an owner (?:step|decision|gate)\b/i;
-export const misfiledPeerGate = (f) => f.type === 'GATE' && f.young !== true && !(f.asks?.length) && PEER_DEPENDENCY.test(f.text ?? '');
+export const misfiledPeerGate = (f) => f.type === 'GATE' && f.gateKind !== 'supervisor-gate' && f.young !== true && !(f.asks?.length) && PEER_DEPENDENCY.test(f.text ?? '');
 
 /** One finding's route (ROUTES), given the other findings of its pass. */
 export function routeOf(f, { now = Date.now(), graceMs = GATE_GRACE_MS, ownerWfs = new Set(), staleWfs = new Set() } = {}) {
   switch (f.type) {
-    case 'STALE-GATE': case 'STALE-WAIT': case 'STALE-PEER-WAIT': return ROUTES.kernel;
+    case 'STALE-GATE': return f.gateKind === 'supervisor-gate' ? ROUTES.supervisor : ROUTES.kernel;
+    case 'STALE-WAIT': case 'STALE-PEER-WAIT': return ROUTES.kernel;
     // A message that just arrived is the Kernel's next read anyway (frontier peer-message).
     case 'UNREAD-PEER': return f.pendingSince != null && now - f.pendingSince < graceMs ? ROUTES.none : ROUTES.kernel;
-    case 'GATE': return ownerGateWait(f) ? ROUTES.owner : misfiledPeerGate(f) ? ROUTES.kernel : ROUTES.none;
+    case 'GATE': return f.gateKind === 'supervisor-gate' ? (f.young ? ROUTES.none : ROUTES.supervisor) : ownerGateWait(f) ? ROUTES.owner : misfiledPeerGate(f) ? ROUTES.kernel : ROUTES.none;
+    case 'SUPERVISOR-WAIT': return ROUTES.none;
     case 'STALLED':
+      if (f.frontierState === 'supervisor-wait' && !f.actionable) return ROUTES.none;
       // Parked on the owner (stall.mjs justifiedOwnerWait): not a stall, but the owner's digest lists it.
       if (f.justifiedOwnerWait && !staleWfs.has(f.workflowId)) return ROUTES.owner;
       if (f.alert === false) return ROUTES.none;

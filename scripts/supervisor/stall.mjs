@@ -68,7 +68,7 @@ export const GATE_GRACE_MS = 10 * 60_000;
 export const PROGRESS_KINDS = ['op-dispatched', 'report-filed', 'report-consumed', 'checks-recorded', 'op-settled', 'plan-derived',
   'job-enqueued', 'incident-resolved', 'ask-answered', 'dispatch-reconciled', 'phase-transition', 'run-created', 'goal-defined'];
 /** Incident kinds that hold queued jobs (scripts/kernel/api.mjs OWNER_GATE_KINDS). */
-export const OWNER_GATE_KINDS = ['owner-gate', 'owner-gate-pending'];
+export const OWNER_GATE_KINDS = ['owner-gate', 'owner-gate-pending', 'supervisor-gate'];
 /** The typed wait on a peer workflow (scripts/kernel/api.mjs PEER_WAIT, openPeerWaits). */
 export const PEER_WAIT_KIND = 'peer-wait';
 /** Worker liveness that is a turn in progress: a workflow with one is working, not stalled. */
@@ -161,7 +161,8 @@ export const settleOwedJobs = (db, workflowId) => db.prepare(
         OR r.dispatch_id=json_extract(j.payload_json,'$.hierarchy.runtime.dispatchId')))
     ORDER BY j.created_at, j.job_id`).all(workflowId);
 
-export const heldBy = (gate, job) => gate.holds.includes(job.job_id) || (job.op_id && gate.holds.includes(job.op_id));
+export const heldBy = (gate, job) => (gate.kind === 'supervisor-gate' && gate.holds.includes('*'))
+  || gate.holds.includes(job.job_id) || (job.op_id && gate.holds.includes(job.op_id));
 
 /**
  * Owner asks still open in one workflow: an `ask` report nobody answered, and not retired (a
@@ -523,8 +524,8 @@ export function stallFindings(db, {
     for (const { gate, held, heldSettle, verdict } of gates) {
       const label = `${gateLabel(gate, held.length)}${settleLabel(heldSettle, true)}`;
       if (verdict.stale) {
-        out.push({ type: 'STALE-GATE', key: `STALE-GATE|${wf}|${gate.incidentId}`, workflowId: wf, repo, incidentId: gate.incidentId, raisedAt: gate.raisedAt, alert: true,
-          reasons: verdict.reasons, line: `STALE-GATE ${wf} ${label} for ${minutes(now - gate.raisedAt)}m: ${verdict.reasons.join('; ')}; tell its Kernel to resolve it (api incident --resolve) with this evidence` });
+        out.push({ type: 'STALE-GATE', key: `STALE-GATE|${wf}|${gate.incidentId}`, workflowId: wf, repo, incidentId: gate.incidentId, gateKind: gate.kind, raisedAt: gate.raisedAt, alert: true,
+          reasons: verdict.reasons, line: `STALE-GATE ${wf} ${label} for ${minutes(now - gate.raisedAt)}m: ${verdict.reasons.join('; ')}; ${gate.kind === 'supervisor-gate' ? 'the Supervisor resolves it --by supervisor' : 'tell its Kernel to resolve it (api incident --resolve) with this evidence'}` });
       } else {
         const why = verdict.young ? `raised ${minutes(now - gate.raisedAt)}m ago (inside the grace window)`
           : `justified: ${[...verdict.asks.map((a) => `ask ${a.dispatchId} open in ${a.workflowId}`), ...verdict.waits.map((w) => `waits: ${w}`)].join(', ')
@@ -562,6 +563,14 @@ export function stallFindings(db, {
     if (idleMs <= thresholdMs) continue;
     // A worker or the Kernel itself mid-turn is the workflow moving (busyWhy, the same judgement a peer gets).
     if (busyWhy(status, () => kernelTurnOf(db, wf))) continue;
+    // This is the Supervisor's pending repair. The Kernel cannot clear a supervisor-gate, and
+    // api status has already checked that no unheld frontier move remains.
+    if (frontier?.state === 'supervisor-wait' && !frontier.actionable && gates.some(({ gate }) => gate.kind === 'supervisor-gate')) {
+      const incidents = gates.filter(({ gate }) => gate.kind === 'supervisor-gate').map(({ gate }) => gate.incidentId);
+      out.push({ type: 'SUPERVISOR-WAIT', key: `SUPERVISOR-WAIT|${wf}`, workflowId: wf, repo, incidentIds: incidents, alert: false,
+        line: `SUPERVISOR-WAIT ${wf}: supervisor-gate ${incidents.join(', ')} holds the remaining work; the Supervisor resolves it --by supervisor` });
+      continue;
+    }
     const since = `idle ${minutes(idleMs)}m`;
     const gateBits = gates.filter((g) => g.held.length || g.heldSettle.length || !queued.length)
       .map(({ gate, held, heldSettle, verdict }) => `${gate.incidentId} ${verdict.stale ? 'STALE' : verdict.young ? 'new' : 'justified'}${held.length ? ` holds ${held.length}` : ''}${heldSettle.length ? ` defers settle of ${heldSettle.map((j) => j.job_id).join(', ')}` : ''}`);
@@ -595,6 +604,6 @@ export function stallFindings(db, {
       line: `STALLED ${wf} ${since}: ${reason}${peerParked ? ' (justified: every peer-wait still holds)' : ownerParked ? ' (justified: it waits on the owner)' : ''}` });
   }
   // Stalls first, then the gates and waits that explain them.
-  const order = { STALLED: 0, 'STALE-GATE': 1, 'STALE-PEER-WAIT': 1, 'STALE-WAIT': 2, 'UNREAD-PEER': 3, GATE: 4, 'PEER-WAIT': 4 };
+  const order = { STALLED: 0, 'SUPERVISOR-WAIT': 0, 'STALE-GATE': 1, 'STALE-PEER-WAIT': 1, 'STALE-WAIT': 2, 'UNREAD-PEER': 3, GATE: 4, 'PEER-WAIT': 4 };
   return out.sort((a, b) => order[a.type] - order[b.type] || a.key.localeCompare(b.key));
 }

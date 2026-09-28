@@ -2785,7 +2785,14 @@ function graphProjectionOf(db, { wf, legOps, planAncestors, workflowJobs, jobsBy
     actions.push({ kind: 'wait', op: item.opId, jobId: item.jobId, reason: `${item.queuedBecause}${item.detail ? `: ${item.detail}` : ''}${seamFirst}` });
   }
   for (const wait of peerWaits) actions.push({ kind: 'wait', op: wait.opId, incidentId: wait.incidentId, reason: `peer-wait on ${wait.peer}: ${wait.detail.slice(0, 160)}` });
-  const nextActions = NEXT_ACTION_KINDS.flatMap((kind) => actions.filter((action) => action.kind === kind));
+  // A proposed leg has no job yet, so queuedBecause cannot mark it held. Keep it visible, but do not
+  // turn the frontier actionable for a dispatch the same supervisor-gate will refuse after enqueue.
+  const nextActions = NEXT_ACTION_KINDS.flatMap((kind) => actions.filter((action) => action.kind === kind).map((action) => {
+    if (!NEXT_ACTION_MOVES.includes(action.kind) || action.deferred) return action;
+    const gate = ownerGates.find((item) => item.kind === SUPERVISOR_GATE
+      && (item.holds.includes('*') || (action.jobId && item.holds.includes(action.jobId)) || (action.op && item.holds.includes(action.op))));
+    return gate ? { ...action, heldBy: { incident: gate.incidentId }, reason: `${action.reason}; held by supervisor-gate ${gate.incidentId} until the Supervisor resolves it` } : action;
+  }));
 
   const unresolvedIds = new Set(unresolved.map((row) => row.job_id));
   const ownerWaitOps = new Set(awaitingOwner.map((item) => item.opId));
@@ -3518,7 +3525,7 @@ function cmdStatus(ledger, args, repo = null) {
   const frozenContract = (() => { try { return frozenChangesFor(db, loadContractChanges(skillRoot), { workflowId }).map((c) => ({ id: c.id, batch: c.batch, families: c.families, reach: c.reach, effectiveAt: c.effectiveAtText })); } catch { return []; } })();
   // With nothing open, a step nextActions names is the Kernel's next move; orphaned-frontier is left for a
   // ledger that names none (a runtime defect, or a workflow with no plan yet).
-  if (['orphaned-frontier', 'supervisor-wait'].includes(frontierState) && graph.nextActions.some((action) => NEXT_ACTION_MOVES.includes(action.kind))) frontierState = 'next-ready';
+  if (['orphaned-frontier', 'supervisor-wait'].includes(frontierState) && graph.nextActions.some((action) => NEXT_ACTION_MOVES.includes(action.kind) && !action.heldBy)) frontierState = 'next-ready';
   const actionable = ACTIONABLE_FRONTIER_STATES.includes(frontierState) || kernelRev?.stale === true || readyOperations > 0 || staleReady.length > 0 || askReserve.length > 0 || peerMessages.length > 0 || deadPeerWaits.length > 0 || contractFollowUps.length > 0;
   const frontier = {
     state: frontierState,
