@@ -1,0 +1,10 @@
+id: a3-7-dead-checks
+effectiveAt: '2026-09-28T21:00:00+07:00'
+summary: >-
+  Two checks that nothing ran are deleted with their specs: scripts/checks/check-work-history.mjs and
+  scripts/checks/check-work-replay.mjs. No op manifest, check registry, CLI or script invoked them;
+  modules/kernel/retired-paths.yaml records them.
+reach: new-legs
+paths:
+  - modules/kernel/contract-changes/a3-7-dead-checks.yaml
+  - modules/kernel/retired-paths.yaml

@@ -28,3 +28,5 @@ retired:
   - {path: tests/evidence-store.spec.mjs, retiredAt: 2026-09-28, removedIn: a3-1-runtime-db, replacedBy: 'clean slate: engine/migrations/runtime/0001-init.sql and the engine/ledger-db.mjs writer; no migration or backfill (the comeback archives old state)'}
   - {path: tests/logs-into-ledger.spec.mjs, retiredAt: 2026-09-28, removedIn: a3-1-runtime-db, replacedBy: 'clean slate: engine/migrations/runtime/0001-init.sql and the engine/ledger-db.mjs writer; no migration or backfill (the comeback archives old state)'}
   - {path: tests/migrate-runtime.spec.mjs, retiredAt: 2026-09-28, removedIn: a3-1-runtime-db, replacedBy: 'clean slate: engine/migrations/runtime/0001-init.sql and the engine/ledger-db.mjs writer; no migration or backfill (the comeback archives old state)'}
+  - {path: scripts/checks/check-work-history.mjs, retiredAt: 2026-09-28, removedIn: a3-7-release, replacedBy: 'none: no op, check registry or script ran it; only its own spec did'}
+  - {path: scripts/checks/check-work-replay.mjs, retiredAt: 2026-09-28, removedIn: a3-7-release, replacedBy: 'none: no op, check registry or script ran it; only its own spec did'}
