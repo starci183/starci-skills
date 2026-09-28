@@ -5588,7 +5588,12 @@ function cmdDispatch(ledger, args, repo) {
     ]
     : [
       { step: 'task', argv: ['orchestration', 'task-create', '--run', '<workflow-run-id>', '--task-title', `${op} #${job.attempt}`, '--display-name', title, '--spec', '<prompt>', '--parent', '<kernel-terminal>', '--from', '<kernel-terminal>', '--json'] },
-      { step: 'worker-start', argv: ['orchestration', 'worker-start', '--task', '<task-id>', '--worktree', worktree, '--agent', model.provider ?? '<agent>', '--model', '<resolved-model-id>', '--display-name', title, '--run', '<workflow-run-id>', '--from', '<kernel-terminal>', '--json'], note: `${model.target} is a managed agent; worker-start owns dispatch/injection and must not be followed by orchestration dispatch` },
+      ...(orcaWorktree !== worktree ? [
+        { step: 'create', argv: ['terminal', 'create', '--worktree', orcaWorktree, '--title', terminalTitle, '--command', `Set-Location -LiteralPath '${worktree}'; <${model.provider ?? 'agent'} launch, routed model>`, '--json'], note: 'a product op worktree is not an Orca worktree: the agent is launched on the repository root so the sidebar lists it' },
+        { step: 'worker-start', argv: ['orchestration', 'worker-start', '--task', '<task-id>', '--worktree', orcaWorktree, '--terminal', '<handle>', '--display-name', title, '--run', '<workflow-run-id>', '--from', '<kernel-terminal>', '--json'], note: 'adopts the launched terminal; refused with no effect -> the terminal is closed and worker-start --agent runs in the op worktree' },
+      ] : [
+        { step: 'worker-start', argv: ['orchestration', 'worker-start', '--task', '<task-id>', '--worktree', worktree, '--agent', model.provider ?? '<agent>', '--model', '<resolved-model-id>', '--display-name', title, '--run', '<workflow-run-id>', '--from', '<kernel-terminal>', '--json'], note: `${model.target} is a managed agent; worker-start owns dispatch/injection and must not be followed by orchestration dispatch` },
+      ]),
     ];
 
   if (!args.spawn) {
@@ -5743,7 +5748,7 @@ function cmdDispatch(ledger, args, repo) {
     // worker-start owns a managed agent's environment, so no shim reaches it; the
     // history hook in its checkouts does, finding the op by its bound Orca terminal.
     const guard = opGuardLaunch({ job, jobId, repo, placements, workerCwd, shims: false });
-    return cmdDispatchManaged(ledger, args, { job, jobId, payload, op, model, packet, prompt, packetFile, worktree, title, reserve, inputs, guard, launchDifficulty: launchOrder.difficulty });
+    return cmdDispatchManaged(ledger, args, { job, jobId, payload, op, model, packet, prompt, packetFile, worktree, orcaWorktree, title, reserve, inputs, guard, launchDifficulty: launchOrder.difficulty });
   }
   if (model.kind !== 'command-terminal') {
     throw Object.assign(new Error(`spawn refused: ${model.target} is launch kind '${model.kind}' — use 'orca orchestration worker-start' with a Task id (managed-agent path)`), { code: 'managed-agent' });
@@ -6075,7 +6080,7 @@ const cleanupManagedWorker = (dispatchId) => {
 // path as a dead terminal spawn (job failed + event + infra-provider incident
 // on attestation failures) — after stopping and releasing whatever partial
 // Dispatch the attempt created, per calls.yaml settle-dispatch.
-function cmdDispatchManaged(ledger, args, { job, jobId, payload, op, model, packet, prompt, packetFile = null, worktree, title, reserve, inputs = null, guard = null, launchDifficulty = null }) {
+function cmdDispatchManaged(ledger, args, { job, jobId, payload, op, model, packet, prompt, packetFile = null, worktree, orcaWorktree = null, title, reserve, inputs = null, guard = null, launchDifficulty = null }) {
   const db = ledger.db;
 
   const reconcileFailure = (effectState, dispatchId) => {
@@ -6146,10 +6151,35 @@ function cmdDispatchManaged(ledger, args, { job, jobId, payload, op, model, pack
   // 4. worker-start — outcome ok means a ready worker (calls.yaml classify:
   // exit 0 + result.state 'ready'). Anything else, including a receipt with no
   // dispatchId, is a rejection; a partial effect is stopped + released.
-  const started = workerStart({
+  // A product op worktree is not an Orca worktree, so a worker Orca launches there shows under no project (DESIGN
+  // §16.7, owner-visible 2026-09-28). The runtime launches the agent itself on the repository's ROOT Orca worktree with
+  // the op worktree as its directory (spawnAgent cwd: Set-Location first, the routed model attested on screen) and
+  // hands that terminal to worker-start --terminal. If the adoption is refused with no effect, the terminal is closed
+  // and the worker starts the old way, so a dispatch never fails on visibility alone.
+  let adopted = null, adoption = null;
+  if (orcaWorktree && orcaWorktree !== worktree) {
+    const sp = spawnAgent({ provider: model.provider, worktree: orcaWorktree, cwd: worktree, title, prompt: null, command: model.command ?? null,
+      dispatchId: jobId, model: modelId, effort, attest: false, env: { ...opLaunchEnv(jobId, model.provider), ...(guard?.env ?? {}) }, pathPrefix: guard?.pathPrefix ?? null,
+      onCreated: (created) => recordLaunchTerminal(ledger, jobId, created) });
+    adoption = { orcaWorktree, cwd: worktree, spawned: sp.ok === true, terminal: sp.terminal ?? null, ...(sp.ok ? {} : { step: sp.step, error: sp.error }) };
+    if (sp.ok && sp.terminal) adopted = sp.terminal;
+  }
+  let started = adopted
+    ? workerStart({ task: taskId, worktree: orcaWorktree, terminal: adopted, displayName: title, run: runId, from: kernelHandle })
+    : null;
+  if (adopted && (started?.ok !== true || (started.outcome != null && started.outcome !== 'ok') || !started.dispatchId)) {
+    adoption.workerStart = { outcome: started?.outcome ?? null, effectState: started?.effectState ?? null, error: started?.error ?? null };
+    if ((started?.effectState ?? 'none') === 'none') {
+      try { closeOperationTerminal(adopted); } catch { /* recorded launch terminal; the gc closes it */ }
+      adopted = null; started = null;
+    }
+  }
+  if (!started) started = workerStart({
     task: taskId, worktree, agent: model.provider, model: modelId, effort,
     displayName: title, run: runId, from: kernelHandle,
   });
+  if (adoption) ledger.transaction(() => ledger.appendEvent({ workflowId: job.workflow_id, entityType: 'job', entityId: jobId, kind: 'product-worker-adoption',
+    payload: { ...adoption, adopted: Boolean(adopted) } }));
   const dispatchId = started?.dispatchId ?? null;
   if (started?.ok !== true || (started.outcome != null && started.outcome !== 'ok') || !dispatchId) {
     return reject({
@@ -6188,7 +6218,10 @@ function cmdDispatchManaged(ledger, args, { job, jobId, payload, op, model, pack
   const eff = attest?.effective ?? {};
   const effAgent = eff.agent ?? eff.provider ?? null;
   const effModel = eff.model ?? eff.modelId ?? null;
-  if (attest?.ok !== true || effAgent !== model.provider || effModel !== modelId) {
+  // An adopted terminal's agent was launched and model-attested by spawnAgent; Orca may not know its effective launch.
+  const agentOk = effAgent === model.provider || (adopted && effAgent == null);
+  const modelOk = effModel === modelId || (adopted && effModel == null);
+  if (attest?.ok !== true || !agentOk || !modelOk) {
     return reject({
       step: 'attestation', dispatchId, incident: true,
       signal: `worker attest failed: expected agent=${model.provider} model=${modelId}, got agent=${effAgent} model=${effModel} state=${attest?.state ?? 'none'}`,
