@@ -1,0 +1,9 @@
+id: interface-op-manifest-write-paths
+effectiveAt: '2026-09-29T05:41:05+07:00'
+summary: "Keep interface.audit scope validation in its applying step and declare interface.implement screenshot and rendered markup as separate scratch writes while preserving both capture artifacts and their report attachment."
+reach: new-legs
+paths:
+  - modules/ops/ops/interface.audit.yaml
+  - modules/ops/ops/interface.implement.yaml
+  - modules/ops/registry.yaml
+  - modules/kernel/contract-changes/interface-op-manifest-write-paths.yaml

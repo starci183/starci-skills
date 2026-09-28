@@ -32,9 +32,7 @@ reads:
     mustExist: true
     purpose:
       en: Read the selected audit scope - exact route/state/viewport/theme matrix, assertion IDs, dependencies -
-        from the packet, and the audit's earlier verdict and findings from its interface_audits row (the audit is
-        agent data in the ledger, never a .starciwork record). An absent scope or an audit-expanded matrix is a
-        scope gap, not permission to invent coverage.
+        from the packet, and the audit's earlier verdict and findings from its interface_audits ledger row.
   - id: intent
     path: .starciwork/features/<feature>/{br,fr,nfr,data,journey,decision,sds,ui}/**/index.yaml + accepted direction
       assets
@@ -199,7 +197,8 @@ steps:
       - profile
     writes: [evidence]
     action:
-      en: Resolve all applicable draw receipts and explicit owner acceptances first. Select exactly the
+      en: Treat an absent audit scope or an audit-expanded matrix as a scope gap; do not invent coverage.
+        Resolve all applicable draw receipts and explicit owner acceptances first. Select exactly the
         latest causally ordered explicit acceptance for the scope and recompute its receipt, image,
         prompt and coverage/content hashes; never select by mtime or overwrite/relabel prior
         history. Freeze round 1's route x state x viewport x theme matrix, accepted-draw receipt
