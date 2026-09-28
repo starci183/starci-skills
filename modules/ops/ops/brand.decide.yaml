@@ -89,7 +89,7 @@ reads:
     path: .starciwork/shell/index.yaml
     purpose:
       en: "The product's layout tree (work/layout-tree@1) with its rev, nodes, per-layout revs and captures
-        under shell/assets/**, or a work/app-shell@1 record an earlier revision of this op wrote, which is
+        (cited blobs, scripts/lib/blob-lookup.mjs), or a work/app-shell@1 record an earlier revision of this op wrote, which is
         converted. Absent until the tree is first scanned or planned; this op then writes it at rev 1."
   - id: shellSource
     path: repository:<repo-id>/<bound-paths>
