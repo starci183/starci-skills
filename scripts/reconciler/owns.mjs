@@ -59,7 +59,9 @@ export function reconcilerOwns(concern, { env = process.env, now = Date.now(), s
   try {
     const owner = CONCERN_OWNER[concern];
     if (!owner) return false;
-    if (env.NODE_TEST_CONTEXT && !env.STARCI_RECONCILER_STATE) return false;
+    // The test guard reads the PROCESS env too: a spec that passes its own env object (no NODE_TEST_CONTEXT in it) must
+    // still never see the live host's engine.
+    if ((env.NODE_TEST_CONTEXT || process.env.NODE_TEST_CONTEXT) && !env.STARCI_RECONCILER_STATE) return false;
     const file = reconcilerStateFile(env);
     let entry = cache.get(file);
     if (!entry || now - entry.at >= CACHE_MS || now < entry.at) {
