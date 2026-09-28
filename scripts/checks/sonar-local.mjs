@@ -145,7 +145,10 @@ export function findDeclaration(cwd){
  * (modules/schemas/application-stacks.schema.yaml `services`) can evolve on its own. It reads
  * `services.sonar` (also the earlier `quality.sonar` / `services.quality.sonar` drafts) and normalizes:
  *   provider, mode local|hosted|disabled (+ reason), host {local, public},
- *   stack {repository, root, environment, compose, container} - the stack that runs a local server; the
+ *   stack - the stack that runs a local server: the project form {repository, root: .starcistacks,
+ *     environment, compose, container} resolved under that repository's checkout, or the host form
+ *     {owner: host, root: .claude/ext/<service>, environment, compose, container} resolved inside this
+ *     runtime tree (`environment` names the slot the extension serves, never a path segment); the
  *     string `source-host` (or no stack) means the runtime source repository's dev stack,
  *   projects [{repository, key, name}],
  *   credentials [{id, env, custody {repository, path}}] - custody paths from that repository's root; an
@@ -162,11 +165,20 @@ export function readSonarDeclaration(file,repoRoot=path.dirname(path.dirname(pat
   const repoDir=name=>!name||name===path.basename(repoRoot)?repoRoot:name===path.basename(sourceRoot)?sourceRoot:path.join(path.dirname(repoRoot),name);
   let stackDir=null,composeFile=null,container=null;
   if(plain(sonar.stack)){
-    const dir=repoDir(text(sonar.stack.repository));
-    stackDir=path.join(dir,text(sonar.stack.root)??'.starcistacks',text(sonar.stack.environment)??'dev');
-    const compose=text(sonar.stack.compose);
-    if(compose)composeFile=/^\.starcistacks[\\/]/.test(compose)?path.join(dir,compose):path.resolve(stackDir,compose);
-    container=text(sonar.stack.container);
+    const stack=sonar.stack;
+    const compose=text(stack.compose);
+    if(text(stack.owner)==='host'){
+      // The host form lives in this runtime tree (.claude/ext/<service>), not in the declaring
+      // repository (check-starcistacks.mjs normalizeService resolves it the same way).
+      const root=text(stack.root)?.replace(/\\/g,'/');
+      stackDir=root&&/^\.claude\/ext\/[a-z][a-z0-9-]*$/.test(root)?path.join(skillRoot,root.slice('.claude/'.length)):null;
+      if(compose&&stackDir)composeFile=path.join(stackDir,compose);
+    }else{
+      const dir=repoDir(text(stack.repository));
+      stackDir=path.join(dir,text(stack.root)??'.starcistacks',text(stack.environment)??'dev');
+      if(compose)composeFile=/^\.starcistacks[\\/]/.test(compose)?path.join(dir,compose):path.resolve(stackDir,compose);
+    }
+    container=text(stack.container);
   }else if(text(sonar.stack)&&sonar.stack!=='source-host')stackDir=path.join(repoRoot,'.starcistacks',sonar.stack);
   const projects=(Array.isArray(sonar.projects)?sonar.projects.filter(plain).map(p=>({repository:text(p.repository),key:text(p.key),name:text(p.name)}))
     :plain(sonar.projects)?Object.entries(sonar.projects).map(([repository,v])=>({repository,key:text(v)??text(v?.key),name:text(v?.name)})):[]).filter(p=>p.key);
@@ -265,11 +277,12 @@ const launcher=(bin,args)=>/\.(?:c|m)?js$/i.test(bin)?[process.execPath,[bin,...
  */
 export function readCustody(cfg,ref){
   // A relative reference is a member of the configured stack; an absolute one (a declaration credential,
-  // resolved from its repository root) must still sit inside a .starcistacks tree.
+  // resolved from its repository root) must still sit inside a custody tree - a repository's
+  // .starcistacks/.stacks or the runtime's .claude/ext/<service> extension.
   const plainFile=path.resolve(cfg.stackDir,ref);
   const name=String(ref).replace(/\\/g,'/');
   const inside=path.isAbsolute(String(ref))
-    ?/[\\/]\.starcistacks[\\/]/.test(plainFile)
+    ?/[\\/]\.(?:starcistacks|stacks)[\\/]/.test(plainFile)||/[\\/]\.claude[\\/]ext[\\/]/.test(plainFile)
     :plainFile.startsWith(cfg.stackDir+path.sep);
   if(!inside)return {present:false,name,reason:`custody reference ${name} is outside a stack custody tree`};
   const enc=`${plainFile}.enc`;
@@ -303,16 +316,29 @@ const custodyView=entry=>({name:entry.name,present:entry.present,...(entry.via?{
 /** The custody member a minted project analysis token lives in: runtime/files/sonarqube-KEY-token.key. */
 export const projectTokenRef=key=>`runtime/files/sonarqube-${String(key).replace(/[^A-Za-z0-9_.-]/g,'_')}-token.key`;
 
+/** The .starcistacks/.stacks root a custody member resolves into - the tree a stack-secret tool manages. */
+const stackRootOf=file=>{
+  const at=/[\\/]\.(starcistacks|stacks)(?=[\\/]|$)/.exec(file);
+  return at?file.slice(0,at.index+at[0].length):null;
+};
+
 /**
  * Store a value as an encrypted custody member through the stack's own tool (scripts/stack-secret.mjs of the
- * repository whose .starcistacks holds the stack). The value travels through a 0600 temp file only - never argv.
+ * repository whose .starcistacks/.stacks holds the member). An absolute reference (a declaration credential
+ * resolved from its repository root) names that tree directly - a project token minted into the declaring
+ * repository while the sonar stack itself is the host extension; a relative one stays a member of the
+ * configured stack. Host-extension custody (.claude/ext) has no stack-secret tool: minting there is refused
+ * and mintToken revokes the value again. The value travels through a 0600 temp file only - never argv.
  */
 function writeCustody(cfg,ref,value){
-  const stacksRoot=path.dirname(cfg.stackDir);
+  const file=path.resolve(cfg.stackDir,ref);
+  const managed=path.isAbsolute(String(ref))?stackRootOf(file):path.dirname(cfg.stackDir);
+  const stacksRoot=managed??path.dirname(cfg.stackDir);
   const tool=cfg.stackSecret??path.join(path.dirname(stacksRoot),'scripts','stack-secret.mjs');
-  if(path.basename(stacksRoot)!=='.starcistacks'&&!cfg.stackSecret)return {ok:false,reason:`the stack ${cfg.stackDir} is not under a .starcistacks tree its stack-secret tool manages`};
+  if((!managed||!/^\.(starcistacks|stacks)$/.test(path.basename(managed)))&&!cfg.stackSecret)
+    return {ok:false,reason:`the custody member ${ref} is not under a .starcistacks/.stacks tree a stack-secret tool manages`};
   if(!fs.existsSync(tool))return {ok:false,reason:`no stack-secret tool at ${tool}`};
-  const target=path.relative(stacksRoot,path.resolve(cfg.stackDir,ref)).replace(/\\/g,'/');
+  const target=path.relative(stacksRoot,file).replace(/\\/g,'/');
   const tmp=path.join(os.tmpdir(),`sonar-local-${process.pid}-${Date.now().toString(36)}`);
   try{
     fs.writeFileSync(tmp,value,{mode:0o600});
@@ -334,8 +360,13 @@ export async function tokenAccepted(cfg,value){
   return null;
 }
 
-/** A custody reference inside the configured stack - one writeCustody may store over. */
-const inStack=(cfg,ref)=>path.resolve(cfg.stackDir,ref).startsWith(cfg.stackDir+path.sep);
+/** A custody reference writeCustody may store over: a member of the configured stack, or an absolute
+ *  declaration credential inside a repository's .starcistacks/.stacks tree (host-extension custody is not). */
+const inStack=(cfg,ref)=>{
+  const file=path.resolve(cfg.stackDir,ref);
+  if(!path.isAbsolute(String(ref))&&!file.startsWith(cfg.stackDir+path.sep))return false;
+  return stackRootOf(file)!==null;
+};
 
 /**
  * The one mint path: the admin token generates a token of `type` (for `projectKey` when given) and the
@@ -415,7 +446,12 @@ export async function projectToken(cfg,{key,admin,tokenRef,mint=true}={}){
   const {entry,misses,stale}=await firstAccepted(cfg,refs);
   if(entry)return entry;
   if(key&&mint&&admin?.present){
-    const ref=stale&&inStack(cfg,stale.name)?stale.name:projectTokenRef(key);
+    // Over the member the server rejected when it can be written; else the declaration's own custody
+    // reference for the project (a product repository's .starcistacks while the sonar stack is the host
+    // extension), else the conventional member of the configured stack.
+    const ref=stale&&inStack(cfg,stale.name)?stale.name
+      :inStack(cfg,cfg.declaredTokenRef??'')?cfg.declaredTokenRef
+      :projectTokenRef(key);
     const minted=await mintToken(cfg,{admin,ref,type:'PROJECT_ANALYSIS_TOKEN',projectKey:key,label:key});
     if(minted.present){
       if(!stale)return minted;
