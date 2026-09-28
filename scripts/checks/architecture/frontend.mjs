@@ -872,6 +872,20 @@ function checkWorldRenderBoundaries(config, context, roots) {
   const expressionSuppliesRender = (expression, checker) => expressionHasRender(expression, checker)
     || expressionFunctions(expression, checker).some(fn => functionHasRender(fn, checker));
 
+  const routedLayoutChild = (opening, child, checker) => {
+    if (!ts.isJsxExpression(child) || !child.expression) return false;
+    const source = opening.getSourceFile().fileName;
+    if (!/^apps\/[^/]+\/src\/features\/layouts\/[^/]+\/index\.tsx$/.test(relativePath(config.root, source))) return false;
+    const sibling = path.resolve(path.dirname(source), 'component.tsx');
+    if (!pureRenderTarget(opening.tagName, checker, sibling)) return false;
+    const value = unwrapExpression(ts, child.expression);
+    if (!ts.isPropertyAccessExpression(value) || !['content', 'children'].includes(value.name.text)) return false;
+    const receiver = unwrapExpression(ts, value.expression);
+    if (!ts.isIdentifier(receiver)) return false;
+    const symbol = checker.getSymbolAtLocation(receiver);
+    return (symbol?.getDeclarations?.() ?? []).some(declaration => ts.isParameter(declaration));
+  };
+
   const renderBoundary = (expression, checker, seen = new Set(), allowEmpty = false, expectedFile = null) => {
     expression = unwrapExpression(ts, expression);
     if (!expression) return allowEmpty;
@@ -945,7 +959,10 @@ function checkWorldRenderBoundaries(config, context, roots) {
         ? expression.children.filter(child => !ts.isJsxText(child) || child.text.trim()) : [];
       let hasBoundary = pureTarget;
       if (children.length) {
-        if (!children.every(child => ts.isJsxExpression(child)
+        // A layout may hand its one opaque router-supplied child to its pure sibling.
+        // Extra drawing still has to satisfy the ordinary resolved render boundary.
+        const routedChild = pureTarget && children.length === 1 && routedLayoutChild(opening, children[0], checker);
+        if (!routedChild && !children.every(child => ts.isJsxExpression(child)
           ? renderBoundary(child.expression, checker, seen, false, expectedFile)
           : ts.isJsxText(child) ? false : renderBoundary(child, checker, seen, false, expectedFile))) return false;
         hasBoundary = true;
