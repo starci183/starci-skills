@@ -62,6 +62,7 @@ import { watchdogLogFile } from './watchdog-log.mjs';
 import { footprintTick } from '../guards/footprint-scan.mjs';
 import { revWakeLine } from './runtime-rev.mjs';
 import { reconcilerOwns, yieldTo } from '../reconciler/owns.mjs';
+import { settleInvariantDuty } from '../reconcile/job-settle.mjs';
 
 const skillRoot = path.resolve(fileURLToPath(new URL('.', import.meta.url)), '..', '..');
 const apiFile = path.join(skillRoot, 'scripts', 'kernel', 'api.mjs');
@@ -272,6 +273,19 @@ export const startSettler = ({ repoPath = repo, workflow = workflowId, run = spa
     { cwd: skillRoot, detached: true, stdio: 'ignore', windowsHide: true });
   child.unref?.();
   return child.pid ?? null;
+};
+/**
+ * The settle invariant for this workflow, every settleEveryMs from the loop (not only the 30-minute Supervisor tick):
+ * a reported job older than allocation.settler.invariantMaxAgeMs that the settler neither settled nor handed to the
+ * Kernel is recorded once (event job-settle-invariant-violated); the settler pass the loop just started is the
+ * self-heal. Never throws. {violations, verifying, recorded} or null.
+ */
+export const checkSettleInvariant = ({ repoPath = repo, workflow = workflowId, duty = settleInvariantDuty } = {}) => {
+  try {
+    const r = duty({ repos: [path.resolve(repoPath)], workflowId: workflow, record: true, start: () => null });
+    return { violations: r.violations.length, verifying: r.verifying?.length ?? 0, recorded: r.recorded ?? 0,
+      jobs: r.violations.slice(0, 6).map((v) => `${v.jobId} ${v.ageMin}m`) };
+  } catch (error) { return { error: String(error?.message ?? error).slice(0, 200) }; }
 };
 const housekeepingFile = path.join(skillRoot, 'scripts', 'supervisor', 'housekeeping.mjs');
 /** The persisted edge of the host-resources probe: one housekeeping run per low episode. */
@@ -492,7 +506,7 @@ export const watchdogLockName = (workflow) => `kernel-watchdog-${String(workflow
  * fresh anyway.
  */
 export const reloadWatchedFiles = (root = skillRoot) => [
-  'scripts/kernel/watchdog.mjs', 'scripts/kernel/watchdog-log.mjs', 'scripts/reconcile/job-settle.mjs', 'scripts/kernel/terminal-liveness.mjs', 'scripts/kernel/wake-delivery.mjs',
+  'scripts/kernel/watchdog.mjs', 'scripts/kernel/watchdog-log.mjs', 'scripts/reconcile/job-settle.mjs', 'scripts/reconcile/canon-parity.mjs', 'scripts/kernel/terminal-liveness.mjs', 'scripts/kernel/wake-delivery.mjs',
   'scripts/kernel/host-outage.mjs', 'scripts/kernel/runtime-rev.mjs', 'scripts/api/orca/terminal-read.mjs', 'scripts/api/orca/lib.mjs', 'scripts/lib/self-reload.mjs',
   'scripts/lib/hide-child-windows.mjs', 'scripts/connectors/lib.mjs', 'engine/config.mjs', 'modules/models/runtimes.yaml',
   'modules/models/agents/claude.yaml', 'modules/models/agents/codex.yaml', 'modules/models/agents/devin.yaml', 'modules/models/agents/qwen.yaml',
@@ -505,7 +519,7 @@ export const reloadWatchedFiles = (root = skillRoot) => [
  */
 export async function runWatchdogLoop({ workflow = workflowId, tick, sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms)),
   print: out = print, interval = intervalMs, watch = null, reload = null, maxIterations = Infinity, settle = null, settleEveryMs = null,
-  owns = reconcilerOwns } = {}) {
+  owns = reconcilerOwns, invariant = null } = {}) {
   let exitCode = 0;
   const owned = (concern) => { try { return owns(concern) === true; } catch { return false; } };
   // The runtime settler (scripts/reconcile/job-settle.mjs; owner ruling settle-runtime-service) runs every
@@ -515,7 +529,14 @@ export async function runWatchdogLoop({ workflow = workflowId, tick, sleep = (ms
     if (!settle || !(settleEveryMs > 0)) return sleep(ms);
     for (let left = ms; left > 0; left -= settleEveryMs) {
       // The settler yields to the reconciler's Job controller while it owns job.settle.
-      try { if (!owned('job.settle')) settle(); } catch { /* the next slice starts it again */ }
+      const settlerOwned = owned('job.settle');
+      try { if (!settlerOwned) settle(); } catch { /* the next slice starts it again */ }
+      // The settle invariant runs on the same cadence (a violation is recorded the minute it exists); while the Job
+      // controller owns job.settle its SLA clock is the invariant.
+      if (invariant && !settlerOwned) {
+        try { const r = invariant(); if (r?.violations || r?.error) out({ ok: !r.error, workflowId: workflow, action: 'settle-invariant', ...r }); }
+        catch { /* the next slice checks again */ }
+      }
       await sleep(Math.min(settleEveryMs, left));
     }
   };
@@ -578,7 +599,8 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
     // A log past its cap reloads the loop too: the replacement starts on a rotated file.
     const watch = createReloadWatch({ root: skillRoot, files: reloadWatchedFiles(), lastReloadAt: reloadedAt, logFile: watchdogLogFile(workflowId) });
     const reload = () => reexecSelf({ script: self, args: argv, logFile: watchdogLogFile(workflowId), lockName, cwd: skillRoot });
-    const r = await runWatchdogLoop({ tick, watch, reload, settle: () => startSettler(), settleEveryMs: SETTLE_EVERY_MS });
+    const r = await runWatchdogLoop({ tick, watch, reload, settle: () => startSettler(), settleEveryMs: SETTLE_EVERY_MS,
+      invariant: () => checkSettleInvariant() });
     if (r.reloaded) process.exit(0);
     process.exitCode = r.exitCode;
   }

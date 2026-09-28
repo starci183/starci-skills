@@ -37,6 +37,10 @@
 //     canon-scan in-process over its owned paths (cut-slice-postcondition, paths never on a command line) and the
 //     declared re-runs are its cut-regression-inventory; any other cut, and the set-closing pass (full-regression-final),
 //     is the Kernel's.
+//   - CANON PARITY (contract change canon-parity-settle): a done code.refactor canon cut slice whose declared checks are
+//     red or not re-verifiable is measured by the settler itself over its owned paths against its admission base
+//     (scripts/reconcile/canon-parity.mjs): canon-scan 0 findings, check-scoped-lint no new finding, typecheck no new
+//     error, every declared red superseded by those owned-scope measurements (foreign residue). Any new finding -> Kernel.
 import '../lib/hide-child-windows.mjs';
 import fs from 'node:fs';
 import os from 'node:os';
@@ -47,6 +51,7 @@ import { fileURLToPath } from 'node:url';
 import { openLedger, ledgerFileFor } from '../../engine/ledger-db.mjs';
 import { allocationSettings } from '../../engine/config.mjs';
 import { claimManager, lockHolder } from '../connectors/lib.mjs';
+import { canonParityVerdict, parityEligible, parityFingerprint, parityTransient, PARITY_REASONS, resolveOwnedRoot } from './canon-parity.mjs';
 
 const selfFile = fileURLToPath(import.meta.url);
 export const SKILL_ROOT = path.resolve(path.dirname(selfFile), '..', '..');
@@ -56,6 +61,7 @@ export const EVENTS = Object.freeze({
   settled: 'job-settle-settled',
   needsKernel: 'job-settle-needs-kernel',
   released: 'job-settle-released',
+  invariant: 'job-settle-invariant-violated',
 });
 export const STATES = Object.freeze({ reported: 'reported', settled: 'settled', released: 'released', kernel: 'needs-kernel' });
 const LIVE = ['running', 'answering', 'effect_unknown'];
@@ -136,9 +142,9 @@ export function kernelDecisionItems(db, workflowId, { now = Date.now(), ageMs = 
  * THE INVARIANT (Supervisor tick): no reported job older than maxAgeMs that the runtime neither settled nor handed to
  * the Kernel. Each one is a runtime bug (settle-unsettled-report). [{workflowId, jobId, op, outcome, ageMin, consumed}]
  */
-export function unsettledViolations(db, { now = Date.now(), maxAgeMs = settlerSettings().invariantMaxAgeMs } = {}) {
-  return reportedJobs(db).filter((it) => now - it.filedAt > maxAgeMs && it.outcome === 'done' && !KERNEL_ONLY_OPS.includes(it.op) && !kernelHandoverOf(db, it))
-    .map((it) => ({ workflowId: it.workflowId, jobId: it.jobId, op: it.op, outcome: it.outcome, ageMin: Math.round((now - it.filedAt) / 60_000), consumed: it.consumedAt != null }));
+export function unsettledViolations(db, { now = Date.now(), maxAgeMs = settlerSettings().invariantMaxAgeMs, workflowId = null } = {}) {
+  return reportedJobs(db, { workflowId }).filter((it) => now - it.filedAt > maxAgeMs && it.outcome === 'done' && !KERNEL_ONLY_OPS.includes(it.op) && !kernelHandoverOf(db, it))
+    .map((it) => ({ workflowId: it.workflowId, jobId: it.jobId, dispatchId: it.dispatchId, op: it.op, outcome: it.outcome, ageMin: Math.round((now - it.filedAt) / 60_000), ageMs: now - it.filedAt, consumed: it.consumedAt != null }));
 }
 
 /* ------------------------------------------------------------ verification */
@@ -225,7 +231,43 @@ export async function canonSliceCheck(item, { repo }) {
  * Is this reported job green? {green, reason?, detail?, checks?: envelope for api check (null: already recorded), via}
  * Seams: rerun (rerunCheck), canon (canonSliceCheck).
  */
-export async function verifyReported(db, item, { repo, settings = settlerSettings(), rerun = rerunCheck, canon = canonSliceCheck, env = process.env } = {}) {
+export async function verifyReported(db, item, { repo, settings = settlerSettings(), rerun = rerunCheck, canon = canonSliceCheck, env = process.env,
+  parity = parityEnabled(env) ? canonParityVerdict : null, parityDeps = {} } = {}) {
+  const plain = await verifyDeclared(db, item, { repo, settings, rerun, canon, env });
+  // CANON PARITY (canon-parity-settle): a canon cut slice the declared checks cannot carry is measured by the settler
+  // itself over its owned paths; it settles only when nothing is new there, else the Kernel gets the parity reason.
+  if (plain.green || !parity || !parityEligible(item) || !PARITY_REASONS.includes(plain.reason)) return plain;
+  // A measurement takes minutes and the settler passes every minute: a handed-over verdict is reused while the slice's
+  // base and owned files are unchanged (PARITY_RECHECK_MS; a sibling's mid-run edit only PARITY_TRANSIENT_MS).
+  const resolveRoot = parityDeps.resolveRoot ?? resolveOwnedRoot;
+  let fingerprint = null;
+  try { fingerprint = await parityFingerprint(item, { repo, resolveRoot }); } catch { fingerprint = null; }
+  const cached = fingerprint ? readParityCache(repo, item) : null;
+  const now = Date.now();
+  if (cached && cached.dispatchId === item.dispatchId && cached.fingerprint === fingerprint
+    && now - cached.at < (cached.transient ? PARITY_TRANSIENT_MS : PARITY_RECHECK_MS)) return { ...cached.verdict, cached: true };
+  const measured = await parity(item, { repo, settings, env, rerun, canon, classify: (c) => classifyCheck(c), baseline: isBaselineCheck,
+    ...parityDeps, resolveRoot });
+  const verdict = measured.green ? measured
+    : { ...measured, detail: [`declared: ${plain.reason}${plain.detail ? ` ${plain.detail.slice(0, 4).join(', ')}` : ''}`, ...(measured.detail ?? [])].slice(0, 8) };
+  if (!verdict.green && fingerprint) writeParityCache(repo, item, { fingerprint, at: now, transient: parityTransient(measured), verdict: { green: false, reason: verdict.reason, detail: verdict.detail } });
+  return verdict;
+}
+export const PARITY_RECHECK_MS = 30 * 60_000;
+export const PARITY_TRANSIENT_MS = 5 * 60_000;
+/** <ledger dir>/settle-parity/<jobId>.json: the last non-green parity verdict of a dispatch. */
+export const parityCacheFile = (repo, jobId) => path.join(path.dirname(ledgerFileFor(path.resolve(repo))), 'settle-parity', `${slug(jobId)}.json`);
+function readParityCache(repo, item) { try { return JSON.parse(fs.readFileSync(parityCacheFile(repo, item.jobId), 'utf8')); } catch { return null; } }
+function writeParityCache(repo, item, rec) {
+  try { const f = parityCacheFile(repo, item.jobId); fs.mkdirSync(path.dirname(f), { recursive: true }); fs.writeFileSync(f, JSON.stringify({ dispatchId: item.dispatchId, ...rec })); } catch { /* a cache */ }
+}
+/** STARCI_SETTLER_PARITY=0 turns the canon parity verifier off (the rollback of canon-parity-settle). */
+export const parityEnabled = (env = process.env) => String(env.STARCI_SETTLER_PARITY ?? '1') !== '0';
+/** A baseline measured BEFORE the change (canon-scan-before, scoped-lint-before ...): evidence, never a verdict. */
+export const isBaselineCheck = (c) => BASELINE_NAME.test(String(c?.name ?? ''));
+
+/** The declared-checks verdict: the worker's checks, re-run where the runtime can. */
+async function verifyDeclared(db, item, { repo, settings, rerun, canon, env }) {
   if (item.outcome !== 'done') return { green: false, reason: `outcome-${item.outcome}` };
   if (KERNEL_ONLY_OPS.includes(item.op)) return { green: false, reason: 'owner-act' };
   const recorded = recordedChecksOf(db, item);
@@ -234,7 +276,7 @@ export async function verifyReported(db, item, { repo, settings = settlerSetting
   if (!declared.length) return { green: false, reason: 'no-declared-checks' };
   // A baseline measured BEFORE the change (canon-scan-before, scoped-lint-before ...) is the refactor's starting point,
   // not its verdict: its exit code is evidence, never a red, and it is not re-run (the tree has moved on).
-  const baseline = (c) => BASELINE_NAME.test(String(c?.name ?? ''));
+  const baseline = isBaselineCheck;
   const red = declared.filter((c) => !baseline(c) && c?.exitCode !== 0);
   if (red.length) return { green: false, reason: 'declared-check-red', detail: red.slice(0, 8).map((c) => `${c.name}:${c.exitCode}`) };
   const classed = declared.filter((c) => !baseline(c)).map((c) => ({ check: c, ...classifyCheck(c) }));
@@ -390,7 +432,7 @@ export async function reconcileJobSettle({ repo, workflowId = null, jobId = null
         const at = now();
         event(ledger, fresh, EVENTS.settled, { from: STATES.reported, to: STATES.settled, op: fresh.op, attempt: fresh.attempt, via: verdict.via,
           latencyMs: at - fresh.filedAt, consumedBefore: fresh.consumedAt != null, nextStep: settled.value?.nextStep ?? null, cutSet: settled.value?.cutSet ?? null,
-          tail: settled.value?.tail ?? null });
+          tail: settled.value?.tail ?? null, ...(verdict.parity ? { parity: verdict.parity } : {}) });
         out.settled.push({ jobId: fresh.jobId, op: fresh.op, via: verdict.via, latencyMs: at - fresh.filedAt, status: settled.value?.status ?? 'succeeded' });
       } catch (error) {
         out.ok = false;
@@ -492,23 +534,48 @@ if (process.argv[1] && path.resolve(process.argv[1]) === selfFile) {
   process.exitCode = out.ok ? 0 : 1;
 }
 
+/** How many item budgets a running pass may hold a queued job before the invariant counts it. */
+export const PASS_BUDGET_ITEMS = 4;
+/** A settler pass holds this job: its per-job lock, or the pass lock of its workflow or of the whole ledger. */
+export const heldBySettler = (repo, v) => lockHolder(lockName(repo, v.jobId)) || lockHolder(lockName(repo, `pass-${v.workflowId}-all`))
+  || lockHolder(lockName(repo, 'pass-all-all'));
 /**
- * The Supervisor tick's settle invariant: across `repos`, every reported job older than invariantMaxAgeMs that the
- * runtime neither settled nor handed to the Kernel (a runtime bug: the settler did not run or failed). Each repo with a
- * violation gets a settler pass started (self-heal); the violations are returned for the tick's alert.
- * {violations: [{repo, workflowId, jobId, op, outcome, ageMin, consumed}], started: [{repo, pid}]}. Seams: start, open.
+ * THE SETTLE INVARIANT duty: across `repos` (optionally one workflow), every reported job older than invariantMaxAgeMs
+ * that the runtime neither settled nor handed to the Kernel (a runtime bug: the settler did not run or failed). A job
+ * a settler pass is verifying right now (its per-job lock is held: a canon parity measurement takes minutes) is not
+ * one. Each repo with a violation gets a settler pass started (self-heal). With `record`, each violation is written once
+ * per dispatch as a job-settle-invariant-violated ledger event (the watchdog loop's 60 s check; the Supervisor tick
+ * alerts the owner). {violations: [{repo, workflowId, jobId, dispatchId, op, outcome, ageMin, consumed}], started: [{repo, pid}],
+ * verifying: [{repo, jobId}], recorded}. Seams: start, open, held.
  */
-export function settleInvariantDuty({ repos, now = Date.now(), settings = settlerSettings(), start = (repo) => startSettlerFor(repo),
-  open = (repo) => openLedger({ file: ledgerFileFor(repo) }) } = {}) {
-  const violations = [], started = [];
+export function settleInvariantDuty({ repos, workflowId = null, now = Date.now(), settings = settlerSettings(), start = (repo) => startSettlerFor(repo, { workflowId }),
+  open = (repo) => openLedger({ file: ledgerFileFor(repo) }), held = heldBySettler, record = false } = {}) {
+  const violations = [], started = [], verifying = [];
+  let recorded = 0;
   for (const repo of repos ?? []) {
     if (!fs.existsSync(ledgerFileFor(path.resolve(repo)))) continue;
     const ledger = open(repo);
     let found = [];
-    try { found = unsettledViolations(ledger.db, { now, maxAgeMs: settings.invariantMaxAgeMs }); } finally { ledger.close(); }
+    try {
+      found = unsettledViolations(ledger.db, { now, maxAgeMs: settings.invariantMaxAgeMs, workflowId }).filter((v) => {
+        // Held within its budget: being verified, or queued in a running pass of its scope (a parity measurement takes
+        // minutes per slice). Held past PASS_BUDGET_ITEMS item budgets (a hung pass) is still a violation.
+        const busy = v.ageMs <= settings.invariantMaxAgeMs + PASS_BUDGET_ITEMS * settings.itemBudgetMs
+          && (() => { try { return Boolean(held(repo, v)); } catch { return false; } })();
+        if (busy) verifying.push({ repo: path.resolve(repo), jobId: v.jobId });
+        return !busy;
+      });
+      if (record) for (const v of found) {
+        const prior = ledger.db.prepare(`SELECT 1 FROM events WHERE kind=? AND entity_id=? AND json_extract(payload_json,'$.dispatchId')=? LIMIT 1`).get(EVENTS.invariant, v.jobId, v.dispatchId);
+        if (prior) continue;
+        event(ledger, { workflowId: v.workflowId, jobId: v.jobId, dispatchId: v.dispatchId }, EVENTS.invariant,
+          { code: 'settle-unsettled-report', op: v.op, outcome: v.outcome, ageMs: v.ageMs, maxAgeMs: settings.invariantMaxAgeMs, consumed: v.consumed });
+        recorded += 1;
+      }
+    } finally { ledger.close(); }
     if (!found.length) continue;
     violations.push(...found.map((v) => ({ repo: path.resolve(repo), ...v })));
     started.push({ repo: path.resolve(repo), pid: start(repo) });
   }
-  return { violations, started };
+  return { violations, started, verifying, recorded };
 }
