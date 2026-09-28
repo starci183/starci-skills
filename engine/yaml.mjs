@@ -1,3 +1,9 @@
+// engine/yaml.mjs — GENERATED, frozen. This is the yaml@2.9.0 package bundled by esbuild, with the
+// runtime's parseYaml/stringifyYaml wrapper as the entry module (the `// scripts/yaml-source.mjs`
+// section at the bottom). The installed runtime carries zero npm dependencies
+// (tests/npm-package.spec.mjs), so it vendors this parser rather than importing node_modules.
+// License: engine/yaml-license.json. Rebuild only when deliberately upgrading yaml: bundle the
+// wrapper entry with `esbuild --bundle --format=esm`, and update yaml-license.json with it.
 import {createRequire} from 'node:module'; const require=createRequire(import.meta.url);
 var __create = Object.create;
 var __defProp = Object.defineProperty;
