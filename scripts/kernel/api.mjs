@@ -2272,9 +2272,8 @@ function afterChainReaches(db, row, targetId) {
  * ordinal its seam no longer holds carries seamStub {mode, seamJobId, reason} - it runs now on the seam's
  * published interface or a stub of its own, never waiting past allocation.cutSeam.maxSiblingWaitMs.
  */
-const ROUTE_HOLD_MS_DEFAULT = 15 * 60 * 1000;
 /** runtimes.yaml allocation.routeHoldMs: how long a routed-but-queued job keeps its pool slot after its latest route. */
-const routeHoldMsOf = () => { try { return allocationMs('routeHoldMs'); } catch { return ROUTE_HOLD_MS_DEFAULT; } };
+const routeHoldMsOf = () => allocationMs('routeHoldMs');
 /**
  * Pool load fleet-wide, the one count `api route` (capacity) and `api status` (queuedBecause pool-full) both
  * reason with, so they agree: every non-settled job whose payload.model names a pool holds a slot of it - running,
