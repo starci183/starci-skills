@@ -7332,60 +7332,6 @@ function releaseWorkerOnReport(ledger, job, payload, report) {
 /* ---------------------------------------------------------------- check */
 // The verification half: upsert the re-run check results for an op attempt
 // (one row per workflow_id,op_id,attempt).
-function cmdCheck(ledger, args, repo) {
-  const db = ledger.db, job = resolveJob(db, args.job);
-  const op = args.op ?? jobOpOf(job);
-  if (!op) throw Object.assign(new Error(`job ${job.job_id} carries no op identity — pass --op`), { code: 'job-no-op' });
-  const attempt = parseAttempt(args.attempt) ?? job.attempt;
-  const raw = args.checks ?? (() => {
-    const file = [path.resolve(args['checks-file']), path.resolve(repo, args['checks-file'])].find((p) => fs.existsSync(p));
-    if (!file) throw Object.assign(new Error(`checks file missing: ${args['checks-file']}`), { code: 'checks-file-missing' });
-    return fs.readFileSync(file, 'utf8');
-  })();
-  const parsed = parseJson(raw);
-  if (!isCheckResultEnvelope(parsed)) {
-    throw Object.assign(new Error('checks payload must be an object with a non-empty checks[] of {name, exitCode, command?, evidence?} entries'), { code: 'checks-invalid' });
-  }
-  if (attempt !== job.attempt) {
-    throw Object.assign(new Error(`checks attempt ${attempt} does not match job ${job.job_id} attempt ${job.attempt}`), {
-      code: 'checks-attempt-mismatch', attempt, jobAttempt: job.attempt,
-    });
-  }
-  const dispatchId = requireDispatchedReportBinding(db, job);
-  const reportRow = db.prepare('SELECT dispatch_id FROM reports WHERE workflow_id=? AND dispatch_id=?')
-    .get(job.workflow_id, dispatchId);
-  if (!reportRow) {
-    throw Object.assign(new Error(`job ${job.job_id} has no filed worker report for dispatch ${dispatchId}`), {
-      code: 'checks-report-missing', dispatchId,
-    });
-  }
-  // The leg is judged against the contract it was admitted under: a red check (or finding code) a
-  // contract change added after that admission is recorded advisory, a suspect and not a refusal
-  // (scripts/kernel/contract-version.mjs; modules/kernel/contract-changes.yaml).
-  const admitted = admittedContractOf(db, { ...job, op_id: op });
-  const laterChanges = laterChangesFor(loadContractChanges(skillRoot), { admittedAt: admitted.at, op, withheld: admitted.withheld });
-  parsed.checks = attributeChecks(db, { repo, job: { ...job, op_id: op }, checks: classifyChecks(parsed.checks, laterChanges) });
-  // Only the api marks a measurement leg's findings as measured (verify-failure.mjs); a caller's mark is dropped.
-  const measurementLeg = isMeasurementLeg(db, { ...job, op_id: op }, { buildOps: buildOpsOf() });
-  parsed.checks = parsed.checks.map((check) => { if (!check || typeof check !== 'object') return check; const { measured: _m, ...clean } = check; return measurementLeg ? markMeasured(clean) : clean; });
-  const advisoryChecks = parsed.checks.filter((check) => check.advisory).map((check) => ({ name: check.name, changes: check.advisory.changes }));
-  const peerBlockedChecks = parsed.checks.filter(isPeerBlockedCheck).map((check) => ({ name: check.name, peers: check.peerBlocked.peers }));
-  const checkEvidence = summarizeCheckEvidence(parsed);
-  ledger.transaction(() => {
-    const now = Date.now();
-    db.prepare('INSERT OR REPLACE INTO checks(workflow_id,op_id,attempt,checks_json,created_at) VALUES(?,?,?,?,?)')
-      .run(job.workflow_id, op, attempt, JSON.stringify(parsed), now);
-    ledger.appendEvent({
-      workflowId: job.workflow_id, entityType: 'job', entityId: job.job_id,
-      kind: 'checks-recorded', payload: { op, attempt, ...(advisoryChecks.length ? { advisory: advisoryChecks } : {}), ...(peerBlockedChecks.length ? { peerBlocked: peerBlockedChecks } : {}) },
-    });
-  });
-  const out = { ok: true, jobId: job.job_id, workflowId: job.workflow_id, op, attempt, checks: parsed.checks.length, checkEvidence,
-    ...(advisoryChecks.length ? { advisory: advisoryChecks, admittedAt: admitted.at } : {}),
-    ...(peerBlockedChecks.length ? { peerBlocked: peerBlockedChecks } : {}) };
-  emit(out, `checks recorded for ${job.job_id} (op ${op}, attempt ${attempt})${advisoryChecks.length ? `; advisory for this leg (added after it was admitted): ${advisoryChecks.map((c) => `${c.name} [${c.changes.join(',')}]`).join(', ')}` : ''}${peerBlockedChecks.length ? `; peer-blocked (a peer's change, not this op's): ${peerBlockedChecks.map((c) => `${c.name} [${c.peers.map((p) => p.jobId ?? p.commit?.slice(0, 12)).join(',')}]`).join(', ')}` : ''}`, args.json);
-}
-
 // A red check that names its `failing` files is attributed (scripts/kernel/gate-attribution.mjs):
 // class peer marks it peerBlocked {peers[], routes[]}, which summarizeCheckEvidence counts neither
 // passed nor failed. Only the api decides: a caller-supplied peerBlocked or attribution is dropped.
@@ -7525,7 +7471,7 @@ const opGuardLaunch = ({ job, jobId, repo, placements, workerCwd, shims = true }
   }
 };
 const KERNEL_ONLY_VERBS = new Set(['enqueue', 'route', 'dispatch', 'reconcile',
-   'settle', 'check', 'provider-health']);
+   'settle', 'provider-health']);
 /* ------------------------------------------------------------------ extensions */
 // New verbs, boolean flags and status fields are files, not edits of the shared lines above
 // (scripts/kernel/api-extensions.mjs; lane land-throughput 2026-09-28).
@@ -7543,6 +7489,7 @@ const API_INTERNALS = Object.freeze({
   workerInputRowText, INPUT_ROW_PLACEHOLDER, runtimeOwnedInput, TERMINAL_NOT_WRITABLE, UNWRITABLE_EVENT,
   resolveJob, requireDispatchedReportBinding, reportOwnedPaths, reportIdentityOf, jobCommitPolicy,
   handoverProofGate, skillRoot, reportFiledWake, releaseWorkerOnReport,
+  isCheckResultEnvelope, parseAttempt, attributeChecks, buildOpsOf, markMeasured, isPeerBlockedCheck, summarizeCheckEvidence,
 });
 let statusAsk = null;
 const runExtensionVerb = async (spec, args, repo) => {
@@ -7584,14 +7531,12 @@ async function main() {
     enqueue: ['workflow', 'op', ...(args['commit-only-work-debt'] ? [] : ['paths'])], estimate: [], route: ['job'], dispatch: ['job'],
     reconcile: [],
     settle: ['job', 'verdict'],
-    check: ['job'],
     'provider-health': args['quota-probe'] ? [] : ['provider'],
   };
   if (!required[cmd]) usage(2);
   for (const k of required[cmd]) need(args[k], `${cmd} needs --${k}`);
   if (cmd === 'settle' && !['pass', 'fail', 'blocked'].includes(args.verdict)) need(false, `settle --verdict must be pass|fail|blocked, got '${args.verdict}'`);
   if (cmd === 'reconcile') need(args.job || args['orphan-kernel-jobs'] || args['orca-tasks'] || args['work-debt'], 'reconcile needs --job <job_id> (or --orphan-kernel-jobs | --orca-tasks | --work-debt)');
-  if (cmd === 'check') need(args.checks != null || args['checks-file'], 'check needs --checks <json> or --checks-file <path>');
   if (cmd === 'provider-health' && args.recover) need(typeof args.reason === 'string' && args.reason.trim(), 'provider-health --recover needs --reason <text>');
   if (cmd === 'provider-health' && args.probe) need(args.recover, 'provider-health --probe goes with --recover');
 
@@ -7617,7 +7562,6 @@ async function main() {
       case 'dispatch': return cmdDispatch(ledger, args, repo);
       case 'reconcile': return cmdReconcile(ledger, args, repo);
       case 'settle': return await cmdSettle(ledger, args, repo);
-      case 'check': return cmdCheck(ledger, args, repo);
       case 'provider-health': return await cmdProviderHealth(ledger, args);
     }
   } catch (error) {
