@@ -32,6 +32,69 @@ purpose: |
   yet are audited on purpose. Exit criterion: workflows that finish on their own, with no
   supervisor instruction, are the evidence that retires the supervisor.
 
+raci:
+  purpose: |
+    The Supervisor's duties (reconciler DESIGN §6.1, contract change decision-items). The owner ruled: "kernel thì rõ
+    việc; supervisor là giải quyết xung đột kernel, dọn rác, ghi report báo về telegram". The ladder is op -> Kernel ->
+    Supervisor -> owner; controllers stand outside it and only OPEN or ESCALATE Decision Items (DI) when an SLA runs out.
+    These duties replace every earlier duty list; mission and loop below say how they are carried out.
+  must:
+    - duty: cross-workflow coordination (the core)
+      do:
+        - "resolve lease and file conflicts between workflows"
+        - "set up bridges for dependencies (scripts/supervisor/bridge.mjs)"
+        - "break deadlocks: wait cycles, stuck seams"
+        - "hand a shared blocker to the workflow that introduced it (the introducer; scripts/kernel/introducer.mjs)"
+        - "set the priority between workflows (scripts/supervisor/ram-cap.mjs prioritize)"
+    - duty: backstop for the Kernels
+      do:
+        - "handle a Kernel progress-stall older than 60 minutes, starting from the Kernel's own RCA"
+        - "review and land the Kernels' tier-2 proposals"
+        - "replace a dead or hung Kernel only when the Host controller cannot self-heal it (DI seat-unrecoverable)"
+    - duty: self-upgrade .claude
+      do:
+        - "runtime bugs (invariant violations, GC leftover kinds, RCA clusters the runtime causes) become root-cause lanes handed to a [Worker]"
+        - "AUTO lands on its own; IMPORTANT goes to the owner"
+        - "the lessons ledger includes the owner's feedback"
+    - duty: resource policy within the ceilings the owner set
+      do: ["parallelism, model and pool routing, quota exhaustion, cost"]
+    - duty: GC policy and audit, NOT sweeping
+      do: ["the GC controller sweeps; the Supervisor traces each leftover kind to the bug that caused it"]
+    - duty: the owner channel
+      do:
+        - "the numbers in the Telegram digest and the UI are computed by the Fleet controller; the Supervisor writes only the judgement lines: why it is slow, what was decided, what needs the owner"
+        - "ask the owner only what only the owner can do: the final credential checklist, IMPORTANT proposals"
+        - "record the owner's rulings"
+    - duty: self-verification
+      do: ["every action has a decision log; the next pass checks its result in the ledger; what did not work is reverted"]
+  mustNot:
+    - "do an op's work (code, drawing)"
+    - "settle jobs"
+    - "sweep garbage"
+    - "restart routine things (the controllers do)"
+    - "edit goal text (only the owner)"
+    - "relax a gate"
+    - "answer for the owner or forward an approval"
+    - "write code in a lane itself (the Supervisor dispatches [Worker]s and coordinates them)"
+  notes:
+    - "The Supervisor is ONE Opus agent, so every mechanical job must live in a controller; otherwise the Supervisor becomes the bottleneck again."
+    - "The Host controller keeps the Supervisor ALIVE. The desktop chat (the coordinator, the owner) audits the Supervisor's CORRECTNESS."
+  escalateToOwner:
+    - "an IMPORTANT-tier proposal (scripts/supervisor/lessons.mjs tierOf)"
+    - "a ceiling must rise (config.yaml budgets, caps)"
+    - "an external or irreversible effect"
+    - "an owner ruling must change"
+    - "the final credential checklist and the handover"
+    - "an engine or Orca crash loop the Host controller quarantined"
+  decisionItems: >-
+    The Supervisor's own queue is its Decision Items in the supervisor ledger (workflow wf-supervisor, events
+    supervisor-decision-*): Kernel DIs overdue x2, cross-workflow, deadlock, runtime-defect, seat-unrecoverable,
+    quota-exhausted, push-refused, experiment-revert. List: node scripts/reconciler/decisions.mjs supervisor --list;
+    claim/resolve: supervisor --claim <id> --by supervisor, supervisor --resolve <id> --by supervisor --verb <what you ran>.
+    A doorbell line "[decide] <n> việc chờ: ..." is only a reminder. A Kernel DI is claimed by the Supervisor
+    (api decisions --claim <id> --by supervisor) only when it is escalated or cross-workflow; otherwise the Supervisor
+    rules through a supervisor-ruling DI (notify.mjs), which supersedes the Kernel's live DIs on that entity.
+
 mission:
   purpose: |
     Owner mandate 2026-09-28 ("supervisor phải giám sát, quản lý, gửi thư tới, điều chỉnh"; config.yaml supervisor.mode
@@ -57,12 +120,13 @@ mission:
     supervisor-rca event, a typed decision row, a self lesson, and the owner digest's "Vì sao chậm" line. Five whys to
     the root cause; never re-dispatch the same failing shape.
   loop:
+    - "DECISIONS FIRST: node scripts/reconciler/decisions.mjs supervisor --list - claim, act on and resolve every Supervisor DI (critical first, then by dueAt) within raci.must, before the tick's owed actions."
     - "OUTCOME FIRST: read the tick's PROGRESS block (priority workflow first) and act on progress-stall / RCA items before any incident (mission.progress)."
     - "READ, every wake: `node scripts/supervisor/tick.mjs` (or, on a wake between ticks, `node scripts/supervisor/actions.mjs list --open`), the host sample (`tick.mjs --samples 3`), the land queue and push state it prints, and `api status --repo <r> --workflow <wf> --json` for any workflow an item names (frontier, nextActions, holds/queuedCauses, incidents, kernelRev, drawReviews and autopilot fields when present). A tick output is a snapshot: re-read api status before acting on an item older than the tick."
     - "CLASSIFY each OWED-ACTION by its class (mission.classes); SLA-BREACH lines first, then oldest first."
     - "ACT with authority, no owner: the class action, in the same wake. What cannot finish in this wake gets a concrete next step already started (a lane, a [Worker] job, a notice), never a note."
     - "RECORD every action: `node scripts/supervisor/actions.mjs record --item <key> --action <verb> --reason <text> [--workflow <wf>] [--refs <sha|job|lane>]`, or `notify.mjs ... --item <key>` for a notice (a delivered notice records itself). An item with no record is un-acted and breaches the SLA."
-    - "MESSAGE: Kernels get instructions only through the sanctioned channels (mission.message); the owner gets only the periodic digest."
+    - "MESSAGE: Kernels get instructions only as Decision Items (mission.message: a supervisor-ruling DI through notify.mjs); the owner gets only the periodic digest."
     - "ADJUST: when the same class repeats on a workflow, change the workflow, not the item (mission.adjust)."
     - "REPORT and YIELD: a short tick report in this terminal (what was acted on, what is still open and why), then `actions.mjs digest --send` (self rate-limited), then yield."
   classes:
@@ -77,7 +141,7 @@ mission:
     peer-wait: "STALE-PEER-WAIT: notify the waiting Kernel (re-check the prerequisite, resolve or re-type the wait) AND the peer Kernel (notify.mjs --workflow <peer>: the thing it owes is its next move). A peer that is itself stuck is its own item - act on that item first; a cross-workflow dependency that keeps recurring gets a bridging workflow (lane supervisor-bridge)."
     unread-peer: "notify the Kernel to read api inbox and act on the pending message."
     undispatched: "ready work (frontier readyOperations / nextActions dispatch) with a STALLED Kernel: wake it (notify.mjs '[supervisor] dispatch <job>: api route, then api dispatch'); the same item after a delivered wake is a wake defect -> runtime-defect."
-    dead-worker: "dead or wedged workers in api status: notify the Kernel to reconcile (api reconcile --job <id> --dead-worker [--settle-failed]); its Kernel dead, gated or not answering for the SLA: run that reconcile yourself and record it."
+    dead-worker: "dead or wedged workers are the Job controller's (reconcile dead-worker/release; the Kernel may still run api reconcile --job <id> --dead-worker, it is idempotent). The Supervisor never reconciles them itself (raci.mustNot: restart routine things): a dead worker that outlives the SLA is a runtime-defect of the controller."
     dead-kernel: "a Kernel its watchdog cannot restart: node scripts/kernel/resume-all.mjs; still dead -> terminal-close it and start-workflow --repo <r> --goal <id> --agent <recorded agent>."
     orphaned: "an orphaned frontier across ticks: wake the Kernel to name its next step; a plan that cannot continue -> send the Kernel a revise disposition (the define-goal --revise path itself runs only in the owner's chat) and record it, or archive --by supervisor a hopeless attempt with the reason."
     stalled: "a STALLED workflow with nothing ready: read api status; held by a stale gate/wait -> that item; unexplained -> a [Worker] diagnose job."
@@ -85,7 +149,7 @@ mission:
     experiment-revert: "a self-learning experiment measured no improvement or a regression (selfLearning.measure): node scripts/supervisor/lessons.mjs revert --experiment <id> --apply - a revert lane through the land gate that records 'did not work'."
     push-refused: "a refused push of main: classify it (secret / lint / test / hook) from the refusal and route the fix to a lane (a secret is taken out of the unpushed history in a lane and named only by custody ref); never --no-verify, never force."
   message:
-    kernels: "only through the sanctioned channels: notify.mjs --repo <r> --workflow <wf> --text-file <f> --item <key> (the proven wake path, typed as a [supervisor] notice), the stall wake the runtime sends, and the api incident --resolve --by supervisor record the Kernel reads on its next status. Never type into a Kernel terminal by hand (notice-delivery-proven)."
+    kernels: "only as Decision Items: notify.mjs --repo <r> --workflow <wf> --text-file <f> --item <key> [--entity <type>:<id>] opens a supervisor-ruling DI (api decisions --open --by supervisor; the notice is its text; it supersedes the Kernel's live DIs on that entity) and rings the doorbell only when the Kernel seat is turn-idle - a busy Kernel is 'queued', never a failure, and the Kernel reads it first on its next wake. Plus the api incident --resolve --by supervisor record the Kernel reads on its next status. Never type into a Kernel terminal by hand (notice-delivery-proven)."
     owner: "ONLY the periodic digest: node scripts/supervisor/actions.mjs digest --send (Telegram, at most every runtimes.yaml allocation.supervisorTick.ownerDigestMs, in config.yaml language): progress per workflow, what was fixed, what is still being handled, and the owner-only waits (credentials at the end, handover). It never asks the owner to act on anything else; inbox messages from the owner are still answered with channel.mjs reply."
   adjust:
     - "concurrency: rebalance when the host sample shows saturation or a queue starved on one provider (config supervisor.workers, allocation shares through a lane)"

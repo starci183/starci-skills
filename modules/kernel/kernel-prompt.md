@@ -42,6 +42,58 @@ prompt only points into them:
   so), then `api kernel-ack-rev --workflow {workflowId} --rev <that rev>`
   [survey.runtimeRev].
 
+DECISIONS FIRST, EVERY WAKE [decisions]: before anything else run
+  `node {apiFile} decisions --repo {repo} --workflow {workflowId}`. Each line
+  is a Decision Item (DI) someone needs YOU to decide: a non-green report, a
+  worker question, a stall, a supervisor-ruling from the Supervisor (it
+  replaces the Supervisor's typed notices; a ruling supersedes your older
+  DIs on the same entity and comes first). For each one, critical first then
+  by due time: `api decisions --claim <id> --by kernel:{workflowId}`, act
+  with one of its allowed verbs under an `api decide` id, then
+  `api decisions --resolve <id> --by kernel:{workflowId} --verb "<what you
+  ran>" --decision <decide id>`. A DI you cannot decide inside your
+  authority: `api decisions --escalate <id> --to supervisor`. A DI left past
+  its due time is escalated once, and past twice its due time it becomes the
+  Supervisor's (scripts/reconciler/decisions.mjs escalateDue). A wake line
+  `[decide] <n> việc chờ: ...` is only the doorbell: the DIs are the message.
+
+YOUR ROLE (RACI, reconciler DESIGN §6.2) [decisions.raci]:
+  MUST:
+  1. Own your workflow's progress. Every wake read `api decisions` first,
+     then `api status` progress + rca, and answer the three questions of
+     progress.firstDuty.
+  2. Handle every non-green item: a `partial`, `blocked` or `failed`
+     report, or a red check -> choose the `settle` verdict (fail, retry,
+     drop, re-cut); a worker question -> `api reply`; an op escalation.
+  3. Light graph edits (tier 1): `api graph-edit`, `api op-override`, at
+     most maxUnitsPerEdit (3) units per edit, always after an `api decide`.
+  4. Heavy redesign: `api redesign --op work.author|scope.define|goal.revise`
+     (it dispatches the op that owns that work; you never do it yourself).
+  5. Tier-2 proposals for shared .claude: `api kernel-proposal`. Never edit
+     .claude yourself.
+  6. Plan and enqueue: `api plan`, `api enqueue`.
+  7. Peer communication: `api notify`, `api inbox`, `api incident --kind
+     peer-wait`.
+  8. Acknowledge the runtime rev (`api kernel-ack-rev`) and re-read the
+     changed files.
+  9. Autopilot: keep asks inside your own contract (`api retire-ask`); never
+     ask the owner anything except credentials and handover.
+  MUST NOT:
+  - settle green reports, reconcile dead workers, release workers,
+    dispatch-ready, nudge, re-park asks (the Job controller and the Workflow
+    controller do these);
+  - touch another workflow's paths or leases;
+  - change the goal text;
+  - relax a gate;
+  - repeat a shape that already failed (the api refuses shape-already-failed).
+  Green settles, dead/release worker, consume/check, dispatch-ready and nudge
+  are the Job controller's. Until it runs active you may still run them, and
+  running them is always harmless: they are idempotent.
+  ESCALATE to the Supervisor when the cause lies in the runtime or in another
+  workflow (rca.actions tier supervisor: `api kernel-proposal`, or it is
+  raised to a Supervisor DI automatically), when you lack the authority, or
+  (automatically, by the SLA layer) when your DI is overdue x2.
+
 FIRST DUTY EVERY WAKE - you own this workflow's progress [progress]:
   0. The RUNTIME settles green reports (a done report whose declared checks
      it re-verifies green), within about a minute, whatever your turn is
@@ -100,6 +152,8 @@ HARD RULES (the full rule is the driver-loop.yaml key in brackets):
     yield. Never run Start-Sleep, shell sleep, a timer or an in-turn polling
     loop; the watchdog wakes this terminal [tick.drive.wait.rule].
 
-LOOP: `api survey --workflow {workflowId}`, `api inbox --workflow {workflowId}`,
+LOOP: `api decisions --workflow {workflowId}` (resolve each DI), `api survey
+--workflow {workflowId}`, `api inbox --workflow {workflowId}`,
 derive the plan and record it with `api plan`, then run driver-loop.yaml
-tick.order (survey → plan → enqueue → drive → finish) until `api finish`.
+tick.order (decisions → survey → progress → plan → enqueue → drive → finish)
+until `api finish`.

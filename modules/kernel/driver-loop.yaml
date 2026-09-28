@@ -224,8 +224,66 @@ progress:
     when it is a runtime/.claude bug (your kernel-proposals), or when you
     lack the authority (scripts/supervisor/progress-watch.mjs).
 
+decisions:
+  rule: >-
+    DECISIONS FIRST, every wake (reconciler DESIGN §10, contract change
+    decision-items): `api decisions --workflow <wf>` lists the live Decision
+    Items (DI, starci/decision-item@1) that wait on this Kernel - opened by the
+    runtime's controllers (a non-green report, a worker question, a stall, a
+    stale gate or wait, an unread peer, a rev to ack) or by the Supervisor as a
+    supervisor-ruling. Critical first, then by dueAt. For each: `api decisions
+    --claim <id> --by kernel:<wf>` (a claim holds it 15 minutes; another
+    claimer is refused decision-held-by-other), act with one of its
+    allowedVerbs under an `api decide` id, then `api decisions --resolve <id>
+    --by kernel:<wf> --verb "<what you ran>" --decision <decide id>`. A DI
+    outside your authority: `api decisions --escalate <id> --to supervisor`.
+  doorbell: >-
+    The line `[decide] <n> việc chờ: api decisions --workflow <wf>` typed into
+    this terminal is only a doorbell (scripts/reconciler/decisions.mjs
+    ringDoorbell): it rings only when the seat reads turn-idle, at most once per
+    2 minutes, and never carries the message. The DI in the ledger is the
+    message; a busy Kernel loses nothing.
+  supervisorRuling: >-
+    The Supervisor never types notices any more: scripts/supervisor/notify.mjs
+    opens a supervisor-ruling DI (its text is the notice). A ruling supersedes
+    your live DIs on the same entity (status superseded) and is first in the
+    list: follow it, then resolve it with what you ran.
+  sla: >-
+    A Kernel DI past its dueAt is escalated once (a reminder, still yours);
+    past twice its due time the SLA layer escalates it to the Supervisor as a
+    Supervisor DI, whatever the Kernel does (escalateDue).
+  raci:
+    must:
+      - "Own your workflow's progress. Every wake read `api decisions` first, then `api status` progress + rca, and answer the three questions of progress.firstDuty."
+      - "Handle every non-green item: a partial, blocked or failed report, or a red check -> choose the settle verdict (fail, retry, drop, re-cut); a worker question -> `api reply`; an op escalation."
+      - "Light graph edits (tier 1): `api graph-edit`, `api op-override`; at most maxUnitsPerEdit (3) units per edit, always after an `api decide`."
+      - "Heavy redesign: `api redesign --op work.author|scope.define|goal.revise` (it dispatches the op that owns that work; the Kernel never does it itself)."
+      - "Tier-2 proposals for shared .claude: `api kernel-proposal`. Never edit .claude yourself."
+      - "Plan and enqueue: `api plan`, `api enqueue`."
+      - "Peer communication: `api notify`, `api inbox`, `api incident --kind peer-wait`."
+      - "Acknowledge the runtime rev (`api kernel-ack-rev`) and re-read the changed files."
+      - "Autopilot: keep asks inside your own contract (`api retire-ask`); never ask the owner anything except credentials and handover."
+    mustNot:
+      - "settle green reports, reconcile dead workers, release workers, dispatch-ready, nudge, re-park asks (the Job controller and the Workflow controller do these)"
+      - "touch another workflow's paths or leases"
+      - "change the goal text"
+      - "relax a gate"
+      - "repeat a shape that already failed (the api refuses shape-already-failed)"
+    controllerOwned: >-
+      Green settles, dead/release worker, consume/check, dispatch-ready and
+      nudge are the Job controller's (the runtime settler already settles
+      green reports: progress.settleFirst). Until the Job controller runs
+      active the Kernel may still run them, and running them is always
+      harmless: they are idempotent.
+    escalate:
+      - "the cause lies in the runtime or in another workflow (rca.actions tier supervisor): `api kernel-proposal`, or it is raised to a Supervisor DI automatically"
+      - "the Kernel lacks the authority"
+      - "a Kernel DI is overdue x2 (the SLA layer escalates it on its own, independent of the Kernel)"
+  citation: "modules/kernel/api-commands/decisions.yaml; scripts/kernel/api-verbs/decisions.mjs; scripts/reconciler/decisions.mjs"
+
 tick:
   order:
+    - decisions # api decisions --workflow — the Decision Items waiting on you, resolved first, each with an allowed verb and --decision (§ decisions)
     - survey    # api survey --workflow — the tick opens on the ledger, never on memory; then api inbox (peer messages)
     - progress  # FIRST DUTY every wake: api status progress + rca - am I progressing? if not, why (clusters), which ONE change fixes the most? act on rca.actions (§ progress)
     - plan      # api plan --workflow --file <plan.json> — persist the derived plan; structural diff vs the approved opChain

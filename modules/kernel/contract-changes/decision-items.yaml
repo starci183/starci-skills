@@ -1,0 +1,32 @@
+id: decision-items
+effectiveAt: '2026-09-28T16:00:00+07:00'
+summary: >-
+  DECISION ITEMS AND A DOORBELL (reconciler DESIGN §6, §10.3-10.4, §11; lane rc-decisions). "Someone must decide" is
+  now a durable Decision Item (DI, starci/decision-item@1) in the ledger inbox table (kind decision, key =
+  idempotencyKey), written only through the new additive verb `api decisions` (--workflow [--list] [--all] | --open |
+  --claim | --resolve | --escalate; events decision-opened|claimed|resolved|escalated|expired|superseded). Open is
+  idempotent on its key; a claim holds a DI 15 minutes (a second claimer is refused decision-held-by-other); the
+  Supervisor claims a Kernel DI only when it is escalated or cross-workflow; a supervisor-ruling supersedes the
+  Kernel's live DIs on the same entity. The decider defaults by kind: cap-starved, quota-exhausted, runtime-defect,
+  cross-workflow, deadlock, seat-unrecoverable, service-quarantined, experiment-revert, hypothesis, push-refused and
+  kernel-proposal are the Supervisor's; the rest the Kernel's. scripts/reconciler/decisions.mjs holds the store,
+  openDecision(repo, di) for the controllers (lane rc-engine ctx.openDecision; a DI with ledger 'supervisor' goes to
+  the supervisor ledger), the doorbell (one fixed line through wake-delivery.mjs, only when
+  the seat reads turn-idle, busy = deferred, at most 1 ring / 2 min / seat, never the same text twice), the SLA
+  ladder escalateDue (past dueAt one reminder; past dueAt x2 a Supervisor DI in the supervisor ledger, events
+  supervisor-decision-*) and ringSupervisor. scripts/supervisor/notify.mjs keeps its CLI but now opens a
+  supervisor-ruling DI and rings; a busy Kernel is `queued` (delivered: true) instead of kernel-busy. The Kernel
+  reads `api decisions` FIRST every wake (kernel-prompt.md, driver-loop.yaml decisions, tick.order) and the RACI of
+  DESIGN §6.2 is contract text; the Supervisor's duties are DESIGN §6.1 (supervise.yaml raci, supervisor-prompt.md)
+  and its mission loop reads its own DIs first. Nothing else changes: every existing verb still works.
+reach: new-legs
+paths:
+  - modules/kernel/contract-changes/decision-items.yaml
+  - modules/kernel/api-commands/decisions.yaml
+  - modules/kernel/kernel-prompt.md
+  - modules/kernel/driver-loop.yaml
+  - modules/supervisor/supervise.yaml
+  - modules/supervisor/supervisor-prompt.md
+  - scripts/kernel/api-verbs/decisions.mjs
+  - scripts/reconciler/decisions.mjs
+  - scripts/supervisor/notify.mjs
