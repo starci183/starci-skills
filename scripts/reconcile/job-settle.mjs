@@ -104,7 +104,7 @@ export function reportedJobs(db, { workflowId = null, jobId = null } = {}) {
     WHERE ${where.join(' AND ')} ORDER BY r.created_at`).all(...args).map((r) => ({
     jobId: r.job_id, workflowId: r.workflow_id, op: r.op_id, attempt: r.attempt, status: r.status, workerId: r.worker_id,
     payload: parse(r.payload_json) ?? {}, dispatchId: r.dispatch_id, outcome: r.outcome, consumedAt: r.consumed_at ?? null,
-    filedAt: Number(r.created_at), report: parse(r.report_json) ?? {},
+    filedAt: Number(r.filed_at), report: parse(r.report_json) ?? {},
   }));
 }
 
