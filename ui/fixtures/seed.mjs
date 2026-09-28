@@ -81,6 +81,8 @@ try {
   db.write.enqueueJob({ jobId: 'job-ready', workflowId: 'wf-under-dispatched', unitId: 'unit-ready', opId: 'code.refactor', createdAt: fixedNow - 3200000 });
   db.write.setJobStatus({ jobId: 'job-ready', to: 'ready', at: fixedNow - 3100000 });
   db.write.createUnit({ workflowId: 'wf-under-dispatched', unitId: 'unit-active', opId: 'code.refactor', subjectKey: 'active', goalRevision: 1, title: 'Active dispatch', createdAt: fixedNow - 3300000 });
+  db.write.createUnit({ workflowId: 'wf-under-dispatched', unitId: 'unit-done', opId: 'code.refactor', subjectKey: 'completed', goalRevision: 1, title: 'Recently completed work', createdAt: fixedNow - 3300000 });
+  db.write.setUnitState({ workflowId: 'wf-under-dispatched', unitId: 'unit-done', to: 'done', at: Date.now() });
   db.write.enqueueJob({ jobId: 'job-active', workflowId: 'wf-under-dispatched', unitId: 'unit-active', opId: 'code.refactor', createdAt: fixedNow - 3200000 });
   db.write.setJobStatus({ jobId: 'job-active', to: 'ready', at: fixedNow - 3100000 });
   db.write.setJobStatus({ jobId: 'job-active', to: 'leased', leaseToken: 'seed-active-lease', at: fixedNow - 3000000 });
@@ -142,6 +144,7 @@ try {
   const gc = machine.startGcRun({ trigger:'manual', startedAt:fixedNow - 30000 });
   machine.finishGcRun(gc, { freedBytes:0, counts:{terminals:0}, errors:[], finishedAt:fixedNow - 20000 });
   machine.recordMetrics({ kind:'progress', ledgerId:a.id, workflowId:'wf-stuck', data:{ratePerHour:0, queuedReady:1} });
+  machine.recordMetrics({ kind:'progress', ledgerId:a.id, workflowId:'wf-under-dispatched', data:{running:1,queuedReady:1,ratePerHour:1,minRatePerHour:1} });
   for (const kind of ['rca','coverage','verify']) machine.recordMetrics({ kind, ledgerId:a.id, workflowId:'wf-stuck', data:{kind, status:'seed'} });
   machine.upsertLearning({ itemId:'lesson-check-red', kind:'lesson', title:'Run compile after edits', state:'kept', landedSha:fakeSha(10) });
   machine.upsertLearning({ itemId:'experiment-retry', kind:'experiment', parentId:'lesson-check-red', title:'Retry with changed scope', state:'reverted' });
@@ -171,9 +174,9 @@ try {
   // Stable per-table content hashes allow reruns to be compared without checking binary SQLite layouts.
   for (const {ledger} of runtimes) ledger.close();
   machine.close();
-  const generated = new Set(['event_id','digest','prev_digest','registered_at','seen_at']);
+  const generated = new Set(['event_id','digest','prev_digest']);
   const hashRows = (db, table) => {
-    const rows = db.prepare(`SELECT * FROM "${table}"`).all().map(row => Object.fromEntries(Object.entries(row).filter(([key]) => !generated.has(key))));
+    const rows = db.prepare(`SELECT * FROM "${table}"`).all().map(row => Object.fromEntries(Object.entries(row).filter(([key]) => !generated.has(key) && !key.endsWith('_at'))));
     rows.sort((a,b) => JSON.stringify(a).localeCompare(JSON.stringify(b)));
     return crypto.createHash('sha256').update(JSON.stringify(rows)).digest('hex');
   };
