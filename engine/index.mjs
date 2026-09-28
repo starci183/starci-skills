@@ -115,15 +115,9 @@ function validate(root,completions=null,authoredTargets=null) {
     try{return fs.readdirSync(dir,{withFileTypes:true}).some(ent=>{if(ent.name==='.git'||ent.name==='assets'||ent.name.startsWith('_'))return false;const p=path.join(dir,ent.name);if(ent.isDirectory())return hasCanonicalNode(p);if(ent.name!=='index.yaml')return false;try{return /(?:^|\n)\s*schema:\s*work\/node@1(?:\s|$)/.test(fs.readFileSync(p,'utf8'));}catch{return false;}});}catch{return false;}
   }
   const canonicalWork=hasCanonicalNode(absolute);
-  // The runtime's own record at the workspace root, not Work artifacts: the ledger `runtime.sqlite` (+ its
-  // WAL siblings) with the reserved name `ledger-anchor.json` beside it — a legacy copy an older runtime
-  // left; nothing writes it now (work-layout.yaml workflowAnchor). None
-  // of it is a Work record, so reading it as one makes every tree that has ever been run invalid on
-  // `JSON_ARTIFACT` - and an invalid tree derives no node at all, which strands the whole run.
-  const runtimeCustody=new Set(['runtime.sqlite','runtime.sqlite-journal','runtime.sqlite-wal','runtime.sqlite-shm','ledger-anchor.json',
-    // The retired typed-log file (scripts/kernel/typed-logs.mjs; the logs live in runtime.sqlite since 2026-09-27) and
-    // its logs.sqlite.migrated-<date> copy (matched below): the runtime's own record, never Work.
-    'logs.sqlite','logs.sqlite-journal','logs.sqlite-wal','logs.sqlite-shm']);
+  // The runtime ledger lives outside .starciwork (decision Q1: %LOCALAPPDATA%/StarCi/projects/<ledger_id>/runtime.sqlite),
+  // so no ledger file is a custody exception here: a runtime.sqlite or logs.sqlite left in a Work tree is not Work.
+  const runtimeCustody=new Set();
   // `kernel-evidence` holds the kernel's immutable validation receipts, `kernel-strays` quarantines
   // untracked stray files, and `kernel-approvals` holds the scoped delegation mandates -
   // kernel-owned working state, not Work records.
@@ -135,7 +129,7 @@ function validate(root,completions=null,authoredTargets=null) {
       if (ent.name === '.git') continue;
       const p=path.join(dir,ent.name);
       if (ent.isSymbolicLink()) { issue('SYMLINK',rel(p),'Symlinks are not accepted in canonical workspace artifacts.'); continue; }
-      if (dir===absolute && (ent.isFile()?(runtimeCustody.has(ent.name)||/^logs[.]sqlite[.]migrated-/.test(ent.name)):runtimeCustodyDirectories.has(ent.name))) continue;
+      if (dir===absolute && (ent.isFile()?runtimeCustody.has(ent.name):runtimeCustodyDirectories.has(ent.name))) continue;
       // Asset folders contain payloads, not Work metadata. Still traverse them
       // to reject symlinks; a fixture named index.yaml is not a child node.
       if(inAssets){if(ent.isDirectory())walk(p,true);continue;}

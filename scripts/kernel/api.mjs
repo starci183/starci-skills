@@ -165,7 +165,7 @@ import {
 } from './cut-seam.mjs';
 import { destinationsOf } from './progress-rca.mjs';
 import {
-  LOG_TYPED_MISSING, LOG_TYPED_MISSING_EVENT, LOGS_DEFERRED, ingestSidecar, insertLogRows, legacyLogsPending,
+  LOG_TYPED_MISSING, LOG_TYPED_MISSING_EVENT, ingestSidecar, insertLogRows,
   openLogs, prepareLogRow, syncLogs, typedLogGaps,
 } from './typed-logs.mjs';
 import { bindWorkflowRun, staleTasks, CLOSED_TASK_STATUSES } from './orca-runs.mjs';
@@ -4180,11 +4180,8 @@ function indexSettledArtifacts(ledger, job, repo) {
 }
 // A settled job's typed log is complete: its sidecar (log.jsonl, what the op appended directly - a crashed worker's
 // lines included) is ingested and the rows its settle events stand for are derived (typed-logs.mjs). A failure never
-// un-settles; the next read of the workflow's logs catches up. While the retired logs.sqlite is not yet migrated into
-// the ledger (typed-logs.mjs legacyLogsPending) the whole step waits, the typed-log gap check included: the op's rows
-// may still sit in that file.
+// un-settles; the next read of the workflow's logs catches up.
 function settleJobLogs(ledger, job, repo) {
-  if (legacyLogsPending(repo)) return { deferred: LOGS_DEFERRED };
   let logs = null;
   try {
     logs = openLogs(repo);

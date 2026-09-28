@@ -148,9 +148,8 @@ shape:
     - "E/ evidence/ runs/ draw-loop/ operations/ report*.json *.tmp.json /features/**/impl/**/assets/ /shell/assets/"
   evidence: <node>/evidence/<id>/** - a retired bundle shape and agent data (agentData); a record's proof is its
     sibling evidence.yaml citing artifacts.
-  workflowRunState: one SQLite file per project ledger, .starciwork/runtime.sqlite until decision Q1 lands (lane
-    a3-1), then %LOCALAPPDATA%/StarCi/projects/<ledger_id>/runtime.sqlite resolved through machine.ledgers,
-    outside every repository. Untracked, never product content (shape.agentData). It holds workflows, units, jobs,
+  workflowRunState: one SQLite file per project ledger, %LOCALAPPDATA%/StarCi/projects/<ledger_id>/runtime.sqlite
+    (decision Q1; engine/ledger-db.mjs ledgerFileFor resolves it through machine.ledgers), outside every repository. Untracked, never product content (shape.agentData). It holds workflows, units, jobs,
     op attempts, contracts, reports, check runs, artifacts, blobs, events, logs, conditions, leases, inbox and
     citations. Report JSON lives only in reports.report_json. Query views expose op history, media, timeline and
     workflow progress. See ledger-db.md.

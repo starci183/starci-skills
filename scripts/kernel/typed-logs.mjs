@@ -1,7 +1,6 @@
-// typed-logs.mjs — logs as typed rows, not scraped terminal text. The `logs` table of the repository's ledger,
-// <repo>/.starciwork/runtime.sqlite (engine/schema.sql; owner ruling 2026-09-27: ONE complete RDBMS per product repo, so
-// a finished workflow is archived and deleted as a unit). Until then they lived in <repo>/.starciwork/logs.sqlite;
-// scripts/work/migrate-logs-into-ledger.mjs copies that file in and retires it (while it is pending, sync waits).
+// typed-logs.mjs — logs as typed rows, not scraped terminal text. The `logs` table of the repository's ledger
+// (engine/ledger-db.mjs ledgerFileFor; engine/migrations/runtime/0001-init.sql; one RDBMS per project, so a finished
+// workflow is archived and deleted as a unit).
 // Every write goes through the process's ONE buffered writer (log-writer.mjs: its own connection, short batched
 // BEGIN IMMEDIATE transactions, never inside a caller's ledger transaction), so twenty ops logging at once never hold
 // the ledger's write lock for more than milliseconds.
@@ -38,7 +37,7 @@ import path from 'node:path';
 import crypto from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 import { allocationSettings } from '../../engine/config.mjs';
-import { ledgerFileFor, openLedger, openLedgerReader } from '../../engine/ledger-db.mjs';
+import { ledgerFileFor, openLedger } from '../../engine/ledger-db.mjs';
 import { logWriterFor } from './log-writer.mjs';
 import { redactData, redactPath, redactText } from '../lib/redact.mjs';
 
@@ -57,10 +56,8 @@ export function logSettings() {
   return { perJobCap: positive(raw.perJobCap, DEFAULTS.perJobCap), dataMaxBytes: positive(raw.dataMaxBytes, DEFAULTS.dataMaxBytes) };
 }
 
-/** The typed logs live in the repository's ledger (engine/schema.sql logs), since 2026-09-27. */
+/** The typed logs live in the repository's ledger (its logs table). */
 export const logsFileFor = (repo) => ledgerFileFor(repo);
-/** The retired per-repo logs file (before 2026-09-27); scripts/work/migrate-logs-into-ledger.mjs copies and retires it. */
-export const legacyLogsFileFor = (repo) => path.join(path.resolve(repo), '.starciwork', 'logs.sqlite');
 export const jobLogDirOf = (repo, workflowId, jobId) => path.join(path.resolve(repo), '.starciwork', 'kernel-evidence', workflowId, 'jobs', jobId);
 export const sidecarFileOf = (repo, workflowId, jobId) => path.join(jobLogDirOf(repo, workflowId, jobId), 'log.jsonl');
 
@@ -195,11 +192,11 @@ export function prepareLogRow(row, { dataMaxBytes = logSettings().dataMaxBytes, 
 }
 
 // ------------------------------------------------------------------------------------------- storage
-// The `logs` and `log_cursors` tables live in the ledger (engine/schema.sql; created by openLedger's migration). Every
+// The `logs` and `log_cursors` tables live in the ledger (created by openLedger from 0001-init.sql). Every
 // write goes through the process's ONE buffered writer (log-writer.mjs); reads use the writer's own connection.
 /**
- * The repository's typed logs: {db, file, writer, legacyPending, close()}. `db` reads (the writer's connection to
- * runtime.sqlite); writes go through `writer`. The ledger is created (migrated) when missing. `close()` releases this
+ * The repository's typed logs: {db, file, writer, close()}. `db` reads (the writer's connection to
+ * runtime.sqlite); writes go through `writer`. The ledger is created when missing. `close()` releases this
  * handle; the last one flushes and closes the connection.
  */
 export function openLogs(repo, { file = logsFileFor(repo) } = {}) {
@@ -208,7 +205,6 @@ export function openLogs(repo, { file = logsFileFor(repo) } = {}) {
   let open = true;
   return {
     file, writer, get db() { return writer.db; },
-    get legacyPending() { return legacyLogsPending(repo); },
     close() { if (!open) return; open = false; writer.release(); },
   };
 }
@@ -480,26 +476,9 @@ export function sidecarsOf(repo, ledgerDb, { workflowId = null } = {}) {
   return rows.map((r) => ({ workflowId: r.workflow_id, jobId: r.job_id, file: sidecarFileOf(repo, r.workflow_id, r.job_id) })).filter((r) => fs.existsSync(r.file));
 }
 
-/**
- * True while the retired per-repo logs.sqlite still sits beside the ledger, not yet copied in by
- * scripts/work/migrate-logs-into-ledger.mjs: derivation and sidecar ingest wait (their cursors are in that file), so the
- * move never re-derives or re-ingests out of order. `api log` rows are written meanwhile.
- */
-export function legacyLogsPending(repo) {
-  if (!fs.existsSync(legacyLogsFileFor(repo))) return false;
-  // Once the ledger records the move (meta logs_migrated_from), a logs.sqlite that reappears - an old-code process
-  // (a ui server not yet restarted) recreating it - holds nothing the ledger lacks: it never holds the sync back again.
-  try {
-    const db = openLedgerReader(ledgerFileFor(repo));
-    try { return !db.prepare("SELECT 1 FROM meta WHERE key='logs_migrated_from'").get(); } finally { db.close(); }
-  } catch { return true; }
-}
-export const LOGS_DEFERRED = 'legacy-logs-pending';
 
 /** Derive from events and ingest every sidecar of the workflow (or the repo): what a read of the logs runs first. */
 export function syncLogs(logs, ledgerDb, { repo, workflowId = null, dryRun = false, rederive = false } = {}) {
-  if (legacyLogsPending(repo)) return { deferred: LOGS_DEFERRED, derived: { events: 0, rows: 0, inserted: 0, duplicate: 0, invalid: 0, deferred: LOGS_DEFERRED },
-    sidecars: { files: 0, read: 0, inserted: 0, invalid: 0, errors: [], deferred: LOGS_DEFERRED } };
   const derived = syncDerivedLogs(logs, ledgerDb, { dryRun, repo, rederive });
   const sidecars = sidecarsOf(repo, ledgerDb, { workflowId }).map((s) => ingestSidecar(logs, { repo, workflowId: s.workflowId, jobId: s.jobId, file: s.file, dryRun }));
   return { derived, sidecars: { files: sidecars.length, read: sidecars.reduce((n, s) => n + s.read, 0), inserted: sidecars.reduce((n, s) => n + s.inserted + (s.wouldInsert ?? 0), 0),
@@ -586,7 +565,6 @@ async function main() {
   try {
     const out = { ok: true, repo, dryRun, logs: logsFileFor(repo), ...syncLogs(logs, ledger.db, { repo, workflowId: args.workflow ?? null, dryRun, rederive: Boolean(args.rederive) }) };
     if (args.json) console.log(JSON.stringify(out, null, 2));
-    else if (out.deferred) console.log(`deferred: ${legacyLogsFileFor(repo)} is not migrated yet (node scripts/work/migrate-logs-into-ledger.mjs --repo ${repo})`);
     else console.log(`${dryRun ? 'dry run: would insert' : 'inserted'} ${out.derived.inserted} derived row(s) from ${out.derived.events} event(s); ${out.sidecars.inserted} sidecar row(s) from ${out.sidecars.files} file(s) (${out.sidecars.invalid} invalid) -> ${out.logs}`);
   } finally {
     logs.close(); ledger.close();
