@@ -283,8 +283,12 @@ CREATE TRIGGER IF NOT EXISTS jobs_enqueue_guard BEFORE INSERT ON jobs WHEN NEW.k
       WHERE EXISTS(SELECT 1 FROM work_units u WHERE u.workflow_id=NEW.workflow_id AND u.unit_id=NEW.unit_id AND u.state='done');
     SELECT RAISE(ABORT,'unit-try-budget-exhausted')
       WHERE NEW.try_no > (SELECT try_budget FROM work_units u WHERE u.workflow_id=NEW.workflow_id AND u.unit_id=NEW.unit_id);
+    -- H5: the try after a reopen follows a PASSED try, so it has no retry_of/resume_of; it is admitted only as the
+    -- next try of a unit reopenUnit just moved out of 'done' (reopened_at set, state no longer done).
     SELECT RAISE(ABORT,'first-try-must-be-1-without-lineage')
-      WHERE NEW.retry_of IS NULL AND NEW.resume_of IS NULL AND NEW.try_no<>1;
+      WHERE NEW.retry_of IS NULL AND NEW.resume_of IS NULL AND NEW.try_no<>1
+        AND NOT EXISTS(SELECT 1 FROM work_units u WHERE u.workflow_id=NEW.workflow_id AND u.unit_id=NEW.unit_id
+                         AND u.reopened_at IS NOT NULL AND u.state<>'done' AND NEW.try_no=u.tries+1);
     SELECT RAISE(ABORT,'retry-lineage-invalid: retry_of must be a FAILED job of the same unit with try_no-1')
       WHERE NEW.retry_of IS NOT NULL AND NOT EXISTS(SELECT 1 FROM jobs p WHERE p.job_id=NEW.retry_of
               AND p.workflow_id=NEW.workflow_id AND p.unit_id=NEW.unit_id AND p.status='failed' AND p.try_no=NEW.try_no-1);
