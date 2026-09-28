@@ -130,8 +130,9 @@ api verbs, routing, agent lifecycle and the checks — is [docs/cli.md](docs/cli
 ## Documentation
 
 - [Installation, update and binding](docs/installation.md)
-- [Architecture: kernel agent, api gate, op agents, ledger](docs/architecture.md)
-- [Ledger schema and access rules](docs/ledger-db.md)
+- [Architecture: two databases, blob store, Kernel, reconciler, Supervisor, phases](docs/architecture.md)
+- [Storage: runtime.sqlite, machine.sqlite and blobs](docs/ledger-db.md)
+- [Debugging: the ten questions and their SQL](docs/debugging.md)
 - [Writing an op manifest](docs/ops.md)
 - [Host contracts and agent cards](docs/host-contract.md)
 - [CLI and script reference](docs/cli.md)

@@ -11,11 +11,26 @@ they disagree with prose, the YAML wins.
 
 ```text
 owner prompt
-  → node scripts/goal/define-goal.mjs        workflows + goals(rev) + inbox rows
-  → node scripts/kernel/start-workflow.mjs   claims the inbox row, spawns [Kernel] <workflow_id>
-  → driver loop (below)                      until every job settled + final verify pass
-  → api finish                               phase=finished; history preserved, never deleted
+  → node scripts/goal/define-goal.mjs        workflows + goals(rev) + inbox rows      phase queued
+  → node scripts/kernel/start-workflow.mjs   claims the inbox row, spawns [Kernel] <workflow_id>   phase running
+  → driver loop (below)                      until every unit settled + final verify pass
+  → api finish                               phase finished; history preserved
 ```
+
+## Phases, including paused and stopped
+
+A workflow's phase is one of `awaiting-approval`, `queued`, `running`, `paused`, `stopped`,
+`finished`, `archived`. The database holds the allowed transitions (`workflow_transitions`) and
+refuses any other; every change writes a `lifecycle_changes` row with who and why
+([architecture](architecture.md#workflow-phases)).
+
+- **paused** is temporary: the Kernel seat is `parked` with a reason, no new work is dispatched,
+  and the phase returns to `running` when the reason clears.
+- **stopped** belongs to the owner. `api lifecycle --stop` stops a workflow; only the owner's
+  `api lifecycle --resume` moves it back to `queued`. No controller, Kernel or Supervisor resumes a
+  stopped workflow, and no controller replaces the seat of a paused or stopped one.
+- A `finished` or `stopped` workflow can be `archived`; an archived workflow accepts no new event or
+  job, and its open incidents were closed when it finished.
 
 Kernel death is recoverable: re-running `start-workflow` with the same goal
 spawns a *replacement* kernel (attempt+1, same workflow generation) — durable
@@ -98,20 +113,21 @@ reservation is settled, never left leasing a ghost.
 Two layers, kept distinct: the op's **report outcome**
 (`done|partial|failed|ask|blocked`, schema `starci/op-report@1`) is what the
 agent claims; the kernel's **verdict** (`pass|fail|blocked`) is what the api
-records after re-proof. `settle` validates the report file — identity binds
-`{workflow_id, op_id, attempt, generation, lease_token}` exactly, files stay
-inside `owned_paths`, and `pass` is recorded only after the op's declared
-checks re-ran green on bytes computed from git. A refused settle
+records after re-proof, in separate columns of the attempt row (`report_outcome`, `verdict`).
+`settle` validates the report row — it belongs to exactly this attempt (`attempt_id`, `dispatch_id`)
+under the job's current lease token, files stay inside `owned_paths`, and `pass` is recorded only
+after the op's declared checks re-ran green under the runtime's runner (the raw exit code, never the
+op's declared one) on bytes computed from git. A refused settle
 (`stale-lease-settle`, `out-of-scope-files`, `report-invalid`) is a routed
 fact, never silent loss.
 
 ## What the kernel may not do
 
-- Open `.starciwork/runtime.sqlite` or write any row directly — api only.
+- Open `runtime.sqlite` or write any row directly — api only.
 - Call the host (Orca) API or spawn terminals directly — `dispatch` owns host mechanics.
 - Pick a model by taste — `scripts/route/route-model.mjs` resolves eligibility from `modules/models/selection.yaml`; owner `config.yaml` and an explicit `--agent` override in that order.
 - Delete history — `finish` preserves goals/jobs/reports/events.
-- Retry forever — routes carry per-kind limits; exhaustion is an `incident`, and identical evidence is not progress.
+- Retry forever — each unit has a try budget (default 5) that the database enforces; only the owner or the Supervisor raises it. Exhaustion is an incident, and identical evidence is not progress.
 
 ## Durable memory
 

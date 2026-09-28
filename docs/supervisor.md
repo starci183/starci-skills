@@ -36,8 +36,19 @@ define-goal and a kernel start run only in the owner's chat, on the owner's own 
 | Reconciler Fleet controller | Opens Supervisor Decision Items for owed work and sends the owner digest through `scripts/reconciler/notifier.mjs`. |
 | Telegram bridge | Files owner messages in channel `main` and relays replies. |
 
-State lives in one ledger under `~/.starci/supervisor` (`STARCI_SUPERVISOR_HOME`), outside every repository:
-the seat, the enabled flag, `runtime.fix` jobs, file leases, worker reports and the audit events.
+State lives in `machine.sqlite`, written only through `engine/machine-db.mjs` ([storage](ledger-db.md) §4):
+
+| Fact | Table |
+| --- | --- |
+| The seat, its terminal, parked state and input failures | `seats`, `deliveries`, `seat_turns`, `seat_transcript_snapshots` |
+| `runtime.fix` jobs, their file leases, attempts and reports | `sup_jobs`, `sup_leases`, `sup_attempts`, `sup_reports` |
+| Decision Items and decisions | `sup_decision_items`, `sup_decisions` |
+| Owed clusters, lessons, owner rulings | `sup_owed`, `sup_learning`, `sup_owner_rulings` |
+| Channel messages and bridges | `sup_messages`, `sup_bridges`, `sup_signals` |
+| The audit trail | `sup_events` (append-only, JS digest chain), `machine_logs` |
+| Lanes, the land queue, land runs and pushes | `lanes`, `land_queue`, `land_runs`, `pushes` |
+
+There is no Supervisor ledger file, no inbox/outbox JSONL and no `logs/*.log`.
 
 ## Start, stop, restart (mode kernel)
 
@@ -90,13 +101,12 @@ neither), failure classes (`dead-worker:<liveness>`, `root-cause:<category>`, `c
 dead-worker rate, owner-wait and throttle time. `node scripts/supervisor/op-metrics.mjs [--by workflow] [--json]` prints
 the table; `--trend` the recorded snapshots.
 
-`api status` ages workflow waits in `stuck[]`, grades them against
-`allocation.opTelemetry.stuckSla`, and names who can move each one. The Workflow
-controller opens and escalates progress or stall Decision Items; the Fleet
-controller turns owed clusters into Supervisor Decision Items and includes owner
-waits in its digest. `scripts/supervisor/op-metrics.mjs` remains a read-only
-measurement command; `--trend` reads historical snapshots when present. The
-status UI shows `opHealth` and `stuck[]`.
+What is stuck and who must move it is a query, not a verb: `v_blocking` and `v_settle_overdue` in each
+ledger, `v_sla_open` (open `sla_episodes`, including `SETTLE_OVERDUE`, `SEAT_DEAF` and `TRANSCRIPT_MISSING`)
+and `v_open_sup_decisions` in machine ([debugging](debugging.md)). The Workflow controller writes progress and RCA
+snapshots to `metrics_snapshots` and opens and escalates stall Decision Items; the Fleet controller turns owed
+clusters into Supervisor Decision Items and includes owner waits in its digest. `op-metrics.mjs` stays a
+read-only measurement command. The harness reads these rows; it never runs `api status`.
 
 ## Worker lifecycle
 
