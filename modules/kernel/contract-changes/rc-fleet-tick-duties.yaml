@@ -1,0 +1,18 @@
+id: rc-fleet-tick-duties
+effectiveAt: '2026-09-28T17:30:00+07:00'
+summary: >-
+  The two duties only the deleted Supervisor tick ran (rc-cleanup 3175d8b8b, ead83839f) move into the Fleet controller
+  (scripts/reconciler/controllers/fleet.mjs, lane rc-fleet-ui). fleet:metrics, every modules/reconciler/fleet.yaml
+  metricsEveryMs (30 min): the op-health snapshot of scripts/supervisor/op-metrics.mjs (aggregate over every product
+  ledger plus the stuck waits of the cached api status) recorded as ONE supervisor-op-metrics event on the supervisor
+  ledger - telemetry, recorded in shadow too - which op-metrics.mjs currentTrend reads; the owner digest of
+  scripts/reconciler/notifier.mjs now carries that trend line. fleet:direct, every directEveryMs (15 min) and only while
+  config.yaml supervisor.landGate.mode is exclusive: each first-parent commit on .claude main no gate land produced
+  (scripts/supervisor/direct-commits.mjs) is ONE Supervisor Decision Item, kind runtime-defect, key
+  direct-commit:<sha>, options revert-and-reland or accept-with-reason. No api verb, ledger schema or op contract changes.
+reach: new-legs
+paths:
+  - modules/kernel/contract-changes/rc-fleet-tick-duties.yaml
+  - modules/reconciler/fleet.yaml
+  - scripts/reconciler/controllers/fleet.mjs
+  - scripts/reconciler/notifier.mjs
