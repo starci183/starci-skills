@@ -12,7 +12,7 @@ import { Progress } from '@/components/ui/progress';
 import type { WorkflowRow as LegacyWorkflowRow, WorkGraph } from './types';
 import type { OpHealth, StuckItem } from './contract';
 import type { Snapshot as ContractSnapshot } from './contract';
-import { ago, clock, DecisionList, deciderName, type DecisionView } from './decisions';
+import { ago, clock, DecisionList, deciderName, NOTICE_KINDS, type DecisionView } from './decisions';
 import { OpHealthPanel } from './op-health';
 import { LegGraph, WorkGraphView } from './workflow-graph';
 import { ProofDrawer, type ProofTarget } from './proofs';
@@ -28,7 +28,7 @@ export interface ProgressBlock {
   running: number; allowedParallel: number; parallelWhy: string; queuedReady: number; etaHours: number | null; eta: string | null; lastUnitAt: string | null;
   legs: { done: number; total: number }; stall: { stalled: boolean; reasons: string[]; since: string | null; sinceMin: number; supervisorDue: boolean }; unsettled: number;
 }
-export interface OnIt { who: 'owner' | 'supervisor' | 'kernel' | string; next: string | null; source: string | null }
+export interface OnIt { who: 'owner' | 'supervisor' | 'kernel' | string; next: string | null; source: string | null; actionKey?: string | null; unblocks?: number | null }
 export interface HomeWorkflow {
   id: string; projectId: string; projectName: string; name: string; goal: string; kernel: string; pill: Pill; progress: ProgressBlock | null;
   topReason: { text: string; cause: string | null; source: string } | null; onIt: OnIt | null; rcaWhy: string | null; statusAt: number | null; source: string;
@@ -56,7 +56,7 @@ type Phase = 'queued' | 'running' | 'reported' | 'settled' | 'released';
 interface WorkflowPageData {
   updatedAt: number; projectId: string; projectName: string; snapshot: ContractSnapshot; fleet: Fleet | null;
   board: { counts: Record<Phase, number>; groups: Record<Phase, BoardUnit[]> } | null; decisions: DecisionView[];
-  worktrees: { kind: 'wf' | 'op'; path: string; branch: string | null; head: string | null; jobId: string | null; jobStatus: string | null; state: string }[]; statusAt: number | null;
+  worktrees: { kind: 'wf' | 'op'; path: string; branch: string | null; short: string | null; jobId: string | null; jobStatus: string | null; exists: boolean; state: 'active' | 'awaiting-reap' | 'removed' | 'missing'; at?: number | null }[]; statusAt: number | null;
 }
 interface ControllerRow { name: string; mode: string | null; modeSource: string | null; lastPassAt: number | null; would: number; acts: number; failed: number; errors: number; lastWould: string | null; queue: { depth: number; failing: number; dueAt: number | null } }
 interface ServiceRow { name: string; state: string; since: number | null; restarts: number; lastAt?: number | null; detail: string | null; down?: boolean }
@@ -132,6 +132,33 @@ export function reasonVi(text: string): string {
   if (m) return `${m[1]} đơn vị hỏng so với ${m[2]} đạt`;
   return text;
 }
+/**
+ * One short Vietnamese line for an rca action (scripts/kernel/progress-rca.mjs actionsOf): its key names what it does,
+ * the numbers come from the key or the title. Unknown keys fall back to the stall-reason translation, then the text.
+ */
+export function actionVi(key: string | null | undefined, title: string | null | undefined): string {
+  const t = String(title ?? '');
+  const k = String(key ?? '');
+  const [kind, ...rest] = k.split(':');
+  const num = (re: RegExp) => re.exec(t)?.[1] ?? '';
+  switch (kind) {
+    case 'settle-backlog': return `settle ${rest[0] || num(/decide (\d+)/)} lát cần quyết định trước khi giao việc mới`;
+    case 'repoint': return 'sửa lại các import bị gãy sau khi di chuyển tệp';
+    case 'dispatch-ready': return `giao thêm ${num(/dispatch (\d+)/)} đơn vị đã sẵn sàng`;
+    case 'drop': return `bỏ ${num(/drop (\d+)/) || rest.length} đơn vị cắt trên đường dẫn không tồn tại`;
+    case 'recut': return `cắt lại các lát còn lại${rest[1] ? ` của ${rest[1]}` : ''} từ lần quét mới`;
+    case 'continue': return `nối tiếp ${num(/continue (\d+)/) || rest.length} commit dở thay vì coi là hỏng`;
+    case 'wire': return 'thêm một lát nối giữ các đích dùng chung';
+    case 'widen': return `nới quyền sửa cho ${num(/widen (\d+)/) || rest.length} đơn vị theo đích báo cáo nêu`;
+    case 'retry': return 'chạy lại đơn vị với đích mà báo cáo nêu';
+    case 'params': return rest[0] === 'commandTimeoutMs' ? 'tăng thời gian chờ của lệnh kiểm tra' : 'đổi tham số chạy theo ruling';
+    case 'test': return `thêm test hồi quy cho ${rest.length} đơn vị`;
+    case 'proposal': return rest[0] === 'canon-conflict' ? 'đề xuất chỉnh luật canon cho Supervisor duyệt' : `báo lỗi runtime (${rest[0]}) cho Supervisor, vẫn giao các đơn vị khỏe`;
+    case 'supervisor': return 'báo luồng gốc sửa phía họ, vẫn giao các đơn vị khác';
+    default: return reasonVi(t);
+  }
+}
+
 const etaLine = (p: ProgressBlock, now: number) => p.unitsTotal > 0 && p.unitsDone === p.unitsTotal ? 'Đã đủ đơn vị' : p.eta ? `Dự kiến xong ${ago(p.eta, now).replace('còn ', 'sau ')} (${clock(p.eta)})` : 'Chưa ước tính được (chưa có đơn vị nào đạt trong 6 giờ)';
 
 /** The progress line of one workflow: bar, units, speed, ETA. Every number carries its source in a tooltip. */
@@ -150,9 +177,14 @@ function ProgressLine({ p, now }: { p: ProgressBlock; now: number }) {
   </div>;
 }
 
-function OnItLine({ onIt }: { onIt: OnIt | null }) {
+/** Who is on it and the next action, one line in Vietnamese; the runtime's own text is the tooltip (and `raw` shows it). */
+function OnItLine({ onIt, raw = false }: { onIt: OnIt | null; raw?: boolean }) {
   if (!onIt) return null;
-  return <p className="line-clamp-2 break-words text-xs text-zinc-400" title={`${onIt.next ?? ''}\n${onIt.source ?? ''}`}><span className="font-medium text-zinc-300">{whoName(onIt.who)} đang lo</span>{onIt.next ? <> · tiếp theo: <span className="text-zinc-300">{reasonVi(onIt.next)}</span></> : ' · không có việc chờ quyết'}</p>;
+  const line = onIt.actionKey ? actionVi(onIt.actionKey, onIt.next) : onIt.next ? reasonVi(onIt.next) : null;
+  return <div className="text-xs text-zinc-400">
+    <p className="truncate" title={`${onIt.next ?? ''}\n${onIt.source ?? ''}`}><span className="font-medium text-zinc-300">{whoName(onIt.who)} đang lo</span>{line ? <>: <span className="text-zinc-300">{line}</span></> : ' · không có việc chờ quyết'}</p>
+    {raw && onIt.next && line !== onIt.next && <details className="mt-1"><summary className="cursor-pointer text-[11px] text-zinc-500">Nguyên văn của runtime</summary><p className="mt-1 break-words font-mono text-[11px] text-zinc-500">{onIt.next}</p></details>}
+  </div>;
 }
 
 /** One live workflow as a row: name, pill, progress, top reason when slow/stuck, who is on it. */
@@ -281,8 +313,40 @@ function RcaPanel({ rca }: { rca: Fleet['rca'] }) {
     {closed.length > 0 && <p className="text-xs text-zinc-500">Đã qua: {closed.map((c) => `${causeName[c.cause] ?? c.cause} ×${c.count}`).join(' · ')}</p>}
     {rca.actions.length > 0 && <div><h3 className="mb-1 text-sm font-medium">Hành động xếp hạng</h3><ol className="space-y-1.5">{rca.actions.map((a) => <li key={a.key} className="rounded-lg border border-zinc-800 p-2 text-xs">
       <div className="flex flex-wrap items-center gap-2"><span className="font-semibold tabular-nums text-zinc-300">#{a.rank}</span><Badge variant="secondary">{tierName[a.tier] ?? a.tier}</Badge><span className="text-zinc-500">{a.unblocks >= 1000 ? 'làm trước mọi việc khác' : `gỡ ${a.unblocks} đơn vị`}</span>{a.tried && <Badge variant="outline" className={a.tried.status === 'revert' ? 'border-red-500/30 text-red-400' : 'border-sky-500/30 text-sky-400'}>{a.tried.status === 'revert' ? 'đã thử, không hiệu quả' : a.tried.status === 'keep' ? 'đã thử, giữ' : 'đang đo'}</Badge>}</div>
-      <p className="mt-1 break-words text-zinc-300">{a.title}</p></li>)}</ol></div>}
+      <p className="mt-1 break-words text-zinc-200" title={a.title}>{actionVi(a.key, a.title)}</p><p className="mt-0.5 line-clamp-2 break-words font-mono text-[11px] text-zinc-600" title={a.title}>{a.title}</p></li>)}</ol></div>}
   </div>;
+}
+
+const wtState: Record<string, { name: string; tone: string }> = {
+  active: { name: 'đang dùng', tone: 'border-emerald-500/30 text-emerald-400' },
+  'awaiting-reap': { name: 'chờ dọn', tone: 'border-amber-500/30 text-amber-400' },
+  removed: { name: 'đã dọn', tone: 'border-zinc-700 text-zinc-500' },
+  missing: { name: 'mất thư mục', tone: 'border-red-500/30 text-red-400' },
+};
+/**
+ * The workflow's product worktrees as Lane H lays them out (scripts/kernel/product-worktree.mjs):
+ * <repo>/.starciwork/worktrees/<wf8>/_wf on wf/<wf8>, and <wf8>/<op8> on op/<op8>. Removed ones behind a toggle.
+ */
+function WorktreePanel({ rows }: { rows: WorkflowPageData['worktrees'] }) {
+  const [all, setAll] = useState(false);
+  const live = rows.filter((w) => w.state !== 'removed');
+  const shown = all ? rows : live;
+  const count = (st: string) => rows.filter((w) => w.kind === 'op' && w.state === st).length;
+  return <section className={`${card} p-4`}>
+    <H2 note="Theo product-worktree.mjs: <repo>/.starciwork/worktrees/<wf8>/_wf (nhánh wf/…) và <wf8>/<op8> (nhánh op/…).">Worktree</H2>
+    {rows.length ? <>
+      <p className="mb-2 text-xs text-zinc-400">{rows.some((w) => w.kind === 'wf') ? '1 worktree luồng · ' : ''}{count('active')} op đang dùng · {count('awaiting-reap')} chờ dọn · {count('removed')} đã dọn{count('missing') ? ` · ${count('missing')} mất thư mục` : ''}</p>
+      <ul className="divide-y divide-zinc-800/80 rounded-lg border border-zinc-800">{shown.map((w) => <li key={w.path} className="flex flex-wrap items-center gap-2 p-2 text-xs" title={w.path}>
+        <Badge variant="secondary">{w.kind === 'wf' ? 'luồng' : 'op'}</Badge>
+        <span className="font-mono text-zinc-200">{w.kind === 'wf' ? `${w.short}/_wf` : `${w.path.split(/[\\/]/).slice(-2).join('/')}`}</span>
+        <span className="font-mono text-zinc-500">{w.branch}</span>
+        {w.jobStatus && <span className="text-zinc-500">job {statusName[w.jobStatus] ?? w.jobStatus}</span>}
+        <span className="min-w-0 flex-1 truncate text-right font-mono text-[11px] text-zinc-600">{w.path.replace(/[\\/]\.starciwork[\\/]worktrees[\\/].*$/, '')}</span>
+        <Badge variant="outline" className={(wtState[w.state] ?? wtState.missing).tone}>{(wtState[w.state] ?? { name: w.state }).name}</Badge>
+      </li>)}</ul>
+      {rows.length > live.length && <button type="button" onClick={() => setAll((v) => !v)} className="mt-2 text-xs text-sky-400 hover:underline">{all ? 'Ẩn worktree đã dọn' : `Hiện cả ${rows.length - live.length} worktree đã dọn`}</button>}
+    </> : <p className="text-sm text-zinc-500">Luồng này chưa có worktree riêng (chưa có op nào được cô lập).</p>}
+  </section>;
 }
 
 const decisionStatus: Record<string, string> = { open: 'đang đo', keep: 'giữ', revert: 'bỏ (không hiệu quả)' };
@@ -293,7 +357,7 @@ export function WorkflowPage({ id }: { id: string }) {
   const now = useNow();
   const wf = data?.snapshot.projects[0]?.workflows[0] as unknown as LegacyWorkflowRow | undefined;
   const openUnit = useCallback((u: BoardUnit) => setTarget({ title: `${u.displayName || u.label} · ${opName(u.op)}`, op: u.op, jobIds: [u.jobId], units: [] }), []);
-  const liveDis = useMemo(() => (data?.decisions ?? []).filter((d) => ['open', 'claimed', 'escalated'].includes(d.status)), [data]);
+  const liveDis = useMemo(() => (data?.decisions ?? []).filter((d) => ['open', 'claimed', 'escalated'].includes(d.status) && !NOTICE_KINDS.includes(d.kind)), [data]);
   if (!data || !wf) return <div className="space-y-3"><a href="#/workflows" className="text-xs text-zinc-500 hover:underline">← Workflow</a><Loading error={error} /></div>;
   const f = data.fleet;
   return <div className="min-w-0 space-y-6" data-testid="workflow-page">
@@ -301,7 +365,7 @@ export function WorkflowPage({ id }: { id: string }) {
     <header className="space-y-3">
       <a href="#/workflows" className="text-xs text-zinc-500 hover:underline">← Workflow</a>
       <div className="flex flex-wrap items-start justify-between gap-2"><div className="min-w-0"><p className="text-xs text-zinc-500">{data.projectName}</p><h1 className="break-words text-2xl font-semibold tracking-tight md:text-3xl">{wf.name || wf.id}</h1><p className="mt-1 line-clamp-2 text-sm text-zinc-500">{wf.goal}</p></div>{f && <StatePill pill={f.pill} />}</div>
-      {f && <div className={`${card} space-y-3 p-4`}><ProgressLine p={f.progress} now={now} />{f.topReason && <p className="text-xs text-amber-300" title={`${f.topReason.text}\n${f.topReason.source}`}>Vì sao: {reasonVi(f.topReason.text)}</p>}{f.progress.stall.stalled && f.progress.stall.reasons.length > 1 && <ul className="list-disc pl-5 text-xs text-zinc-400">{f.progress.stall.reasons.slice(1).map((r, i) => <li key={i} title={r}>{reasonVi(r)}</li>)}</ul>}<OnItLine onIt={f.onIt} /><p className="text-[11px] text-zinc-600">Nguồn: progress-rca.mjs workflowView (= api status progress) · cập nhật {ago(data.updatedAt, now)}{data.statusAt ? ` · api status ${ago(data.statusAt, now)}` : ' · api status chưa về'}</p></div>}
+      {f && <div className={`${card} space-y-3 p-4`}><ProgressLine p={f.progress} now={now} />{f.topReason && <p className="text-xs text-amber-300" title={`${f.topReason.text}\n${f.topReason.source}`}>Vì sao: {reasonVi(f.topReason.text)}</p>}{f.progress.stall.stalled && f.progress.stall.reasons.length > 1 && <ul className="list-disc pl-5 text-xs text-zinc-400">{f.progress.stall.reasons.slice(1).map((r, i) => <li key={i} title={r}>{reasonVi(r)}</li>)}</ul>}<OnItLine onIt={f.onIt} raw /><p className="text-[11px] text-zinc-600">Nguồn: progress-rca.mjs workflowView (= api status progress) · cập nhật {ago(data.updatedAt, now)}{data.statusAt ? ` · api status ${ago(data.statusAt, now)}` : ' · api status chưa về'}</p></div>}
     </header>
 
     <section className={`${card} p-4`}><H2 note="Xanh: xong · Vàng: đang chạy · Đỏ: làm lại · Xám: chưa tới">Đồ thị công việc</H2>
@@ -319,9 +383,7 @@ export function WorkflowPage({ id }: { id: string }) {
 
     {f && <section className={`${card} p-4`}><H2>Vì sao chậm: phân tích nguyên nhân</H2><RcaPanel rca={f.rca} /></section>}
 
-    <section className={`${card} p-4`}><H2 note="Worktree riêng của luồng (wf) và của từng op (op).">Worktree</H2>
-      {data.worktrees.length ? <ul className="divide-y divide-zinc-800/80 rounded-lg border border-zinc-800">{data.worktrees.map((w) => <li key={w.path} className="flex flex-wrap items-center gap-2 p-2 text-xs"><Badge variant="secondary">{w.kind}</Badge><span className="min-w-0 flex-1 break-all font-mono text-zinc-300">{w.path}</span><span className="text-zinc-500">{w.branch ?? 'detached'}{w.jobStatus ? ` · job ${statusName[w.jobStatus] ?? w.jobStatus}` : ''}</span><Badge variant="outline" className={w.state === 'active' ? 'border-emerald-500/30 text-emerald-400' : 'border-amber-500/30 text-amber-400'}>{w.state === 'active' ? 'đang dùng' : w.state === 'leftover' ? 'còn sót' : w.state}</Badge></li>)}</ul> : <p className="text-sm text-zinc-500">Luồng này chưa có worktree riêng (các op làm trên checkout chính).</p>}
-    </section>
+    <WorktreePanel rows={data.worktrees} />
 
     <details className={`${card} p-4`}><summary className="cursor-pointer text-base font-semibold">Chi tiết đầy đủ: theo phần, diễn biến, bằng chứng</summary>
       <div className="mt-4 border-t border-zinc-800 pt-4"><WorkflowTracker data={data.snapshot} agents={null} id={wf.id} snapshotError={error} /></div>

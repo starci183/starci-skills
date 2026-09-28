@@ -7,7 +7,7 @@
 //                   state pill (ok | slow | stuck | done), the top RCA reason, who is on it and the next action.
 //   unitBoard       the workflow's units grouped by the job state machine (DESIGN §9.1): queued, running, reported,
 //                   settled, released.
-//   worktreesOf     git worktrees of the project repo that belong to the workflow or one of its jobs.
+//   productWorktreesOf  the workflow's product worktrees as Lane H records them (_wf + one per isolated op job).
 //   reconcilerState leader, epoch, heartbeat age, controller modes, queue depth, would/act rows per controller,
 //                   services, open SLA violations, GC summaries (reconciler.sqlite + the supervisor ledger).
 //   decisionsOf     Decision Items across ledgers (scripts/reconciler/decisions.mjs listDecisions).
@@ -17,14 +17,11 @@
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { execFile } from 'node:child_process';
-import { promisify } from 'node:util';
 import { DatabaseSync } from 'node:sqlite';
 import { workflowView, unitsOf, opJobsOf, reportsOf, OPEN_JOB } from '../scripts/kernel/progress-rca.mjs';
 import { listDecisions, SUPERVISOR_WF } from '../scripts/reconciler/decisions.mjs';
 import { withSupervisorRead } from '../scripts/supervisor/home.mjs';
 
-const run = promisify(execFile);
 const optional = (spec) => import(spec).catch((error) => { if (error?.code === 'ERR_MODULE_NOT_FOUND') return null; throw error; });
 // Lane A (rc-engine) owns state.mjs; lanes D/F own services.mjs and sla.mjs. Each is read only when present.
 const [engineState, services, sla] = await Promise.all([optional('../scripts/reconciler/state.mjs'), optional('../scripts/reconciler/services.mjs'), optional('../scripts/reconciler/sla.mjs')]);
@@ -52,7 +49,8 @@ export function pillOf(p) {
 }
 
 /**
- * Who is on it and the next action. Pure. Order: an owner-only item, the most urgent live Decision Item, a stall the
+ * Who is on it and the next action. Pure. `actionKey` (an rca action) lets the UI say it in one Vietnamese line;
+ * `next` keeps the runtime's own text for the tooltip and the detail view. Order: an owner-only item, the most urgent live Decision Item, a stall the
  * Supervisor now owns (supervisorDue, or the top action is a runtime cause), a stall the Kernel owns, else the Kernel
  * dispatching. {who: owner|supervisor|kernel, next, source}.
  */
@@ -63,8 +61,9 @@ export function onItOf({ progress, actions = [], decisions = [], ownerAsks = [] 
   if (di) return { who: di.decider ?? 'kernel', next: clip(di.summary ?? di.kind, 200), source: `decision ${di.id}` };
   const top = actions.find((a) => a.tried?.status !== 'revert') ?? null;
   const stalled = Boolean(progress?.stall?.stalled);
-  if (stalled && (progress.stall.supervisorDue || top?.tier === 'supervisor')) return { who: 'supervisor', next: clip(top?.title ?? progress.stall.reasons[0], 200), source: top ? `rca action ${top.key}` : 'progress.stall' };
-  if (stalled) return { who: 'kernel', next: clip(top?.title ?? progress.stall.reasons[0], 200), source: top ? `rca action ${top.key}` : 'progress.stall' };
+  const nextOf = (who) => ({ who, next: clip(top?.title ?? progress.stall.reasons[0], 600), actionKey: top?.key ?? null, unblocks: top?.unblocks ?? null, source: top ? `rca action ${top.key}` : 'progress.stall' });
+  if (stalled && (progress.stall.supervisorDue || top?.tier === 'supervisor')) return nextOf('supervisor');
+  if (stalled) return nextOf('kernel');
   if (!progress) return { who: 'kernel', next: null, source: null };
   return { who: 'kernel', next: progress.queuedReady ? `giao ${progress.queuedReady} đơn vị sẵn sàng` : null, source: 'progress' };
 }
@@ -150,45 +149,36 @@ export function unitBoard(db, workflowId, { cap = 60, nameOf = () => null } = {}
 
 /* ------------------------------------------------------------ worktrees */
 
-/** `git worktree list --porcelain` parsed: [{path, head, branch, detached, locked, prunable}]. */
-export function parseWorktrees(text) {
-  const out = [];
-  let cur = null;
-  for (const line of String(text ?? '').split(/\r?\n/)) {
-    if (line.startsWith('worktree ')) { cur = { path: line.slice(9), head: null, branch: null, detached: false, locked: false, prunable: false }; out.push(cur); }
-    else if (!cur) continue;
-    else if (line.startsWith('HEAD ')) cur.head = line.slice(5, 17);
-    else if (line.startsWith('branch ')) cur.branch = line.slice(7).replace(/^refs\/heads\//, '');
-    else if (line === 'detached') cur.detached = true;
-    else if (line.startsWith('locked')) cur.locked = true;
-    else if (line.startsWith('prunable')) cur.prunable = true;
-  }
-  return out;
-}
-
-/** The repo's worktrees (the main checkout excluded); [] when git fails. */
-export async function listWorktrees(repo) {
-  try {
-    const { stdout } = await run('git', ['-C', repo, 'worktree', 'list', '--porcelain'], { timeout: 10_000, windowsHide: true, maxBuffer: 4 * 1024 * 1024 });
-    const main = path.resolve(repo).toLowerCase();
-    return parseWorktrees(stdout).filter((w) => path.resolve(w.path).toLowerCase() !== main);
-  } catch { return []; }
-}
-
 /**
- * The worktrees of one workflow: a worktree whose path or branch names the workflow (a wf worktree) or one of its
- * jobs (an op worktree). Pure over `worktrees` and `jobs` ([{job_id, status}]). [{kind: wf|op, path, branch, jobId, jobStatus, state}].
+ * The product worktrees of one workflow as Lane H lays them out (scripts/kernel/product-worktree.mjs, the source of
+ * its `status` verb, read here over the read-only ledger handle): <repo>/.starciwork/worktrees/<wf8>/_wf on branch
+ * wf/<wf8>, and <wf8>/<op8> on op/<op8> per isolated op job. Each: {kind, path, branch, short, jobId, jobStatus,
+ * exists, state: active | awaiting-reap | removed | missing}. [] when the module is absent or nothing is isolated.
  */
-export function worktreesOfWorkflow(worktrees, { workflowId, jobs = [] }) {
-  const slug = workflowId.replace(/^wf-/, '').toLowerCase();
+export async function productWorktreesOf(db, workflowId) {
+  const pw = await optional('../scripts/kernel/product-worktree.mjs');
+  if (!pw?.isolatedJobs) return [];
+  let jobs = [];
+  try { jobs = pw.isolatedJobs(db, { workflowId }); } catch { return []; }
+  const removedKind = pw.EVENTS?.removed ?? 'job-worktree-removed';
+  const removed = new Set(db.prepare('SELECT entity_id FROM events WHERE workflow_id=? AND kind=?').all(workflowId, removedKind).map((r) => r.entity_id));
   const out = [];
-  for (const w of worktrees) {
-    const hay = `${w.path} ${w.branch ?? ''}`.toLowerCase();
-    const job = jobs.find((j) => hay.includes(String(j.job_id).toLowerCase()));
-    if (job) out.push({ kind: 'op', path: w.path, branch: w.branch, head: w.head, jobId: job.job_id, jobStatus: job.status, state: w.prunable ? 'prunable' : TERMINAL.has(job.status) ? 'leftover' : 'active' });
-    else if (hay.includes(slug)) out.push({ kind: 'wf', path: w.path, branch: w.branch, head: w.head, jobId: null, jobStatus: null, state: w.prunable ? 'prunable' : 'active' });
+  const wfSeen = new Set();
+  for (const { row, record } of jobs) {
+    const wf = record.workflow;
+    if (wf?.path && !wfSeen.has(wf.path)) {
+      wfSeen.add(wf.path);
+      const exists = fs.existsSync(wf.path);
+      out.push({ kind: 'wf', path: wf.path, branch: wf.branch ?? null, short: wf.short ?? null, jobId: null, jobStatus: null, exists, state: exists ? 'active' : 'missing' });
+    }
+    const op = record.op;
+    if (!op?.path) continue;
+    const exists = fs.existsSync(op.path);
+    const terminal = TERMINAL.has(row.status);
+    out.push({ kind: 'op', path: op.path, branch: op.branch ?? null, short: op.short ?? null, jobId: row.job_id, jobStatus: row.status, exists,
+      state: exists ? (terminal ? 'awaiting-reap' : 'active') : removed.has(row.job_id) || terminal ? 'removed' : 'missing', at: Number(row.updated_at) || null });
   }
-  return out;
+  return out.sort((a, b) => (a.kind === 'wf' ? -1 : 0) - (b.kind === 'wf' ? -1 : 0) || (b.at ?? 0) - (a.at ?? 0));
 }
 
 /* ------------------------------------------------------------ decisions */

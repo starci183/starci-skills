@@ -20,7 +20,7 @@ import { readWorkflowEvents } from './workflow-events.mjs';
 import { logQueryOf, readDiffAsset, readJobDiff, readProjectLogs } from './typed-logs.mjs';
 import { readSupervisorLogs, readSupervisorStateForUi, supervisorLogQueryOf } from './supervisor.mjs';
 import { aggregate, jobRecords, telemetrySettings } from '../scripts/supervisor/op-metrics.mjs';
-import { hostRam, listWorktrees, probeServices, productDecisions, progressRow, reconcilerState, supervisorDecisions, unitBoard, worktreesOfWorkflow } from './reconciler.mjs';
+import { hostRam, probeServices, productDecisions, productWorktreesOf, progressRow, reconcilerState, supervisorDecisions, unitBoard } from './reconciler.mjs';
 
 // The approved leg graph comes from scripts/route/plan-edges.mjs. When a runtime does not have that module, the UI draws the linear chain.
 const planEdges = await import('../scripts/route/plan-edges.mjs').catch((error) => {
@@ -344,7 +344,6 @@ async function buildSnapshot() {
   const now = Date.now();
   const boards = new Map();
   await mapLimit(projectRows.filter((project) => project.workflows.length), 3, async (project) => {
-    const worktrees = offline ? [] : await listWorktrees(project.repo);
     let db;
     try { db = openLedgerReader(path.join(project.repo, '.starciwork', 'runtime.sqlite')); } catch (error) { sources[`fleet:${project.id}`] = safe(error.message); return; }
     try {
@@ -355,8 +354,7 @@ async function buildSnapshot() {
           const state = statusCache.get(wf.id)?.value ?? null;
           const core = state ? { legs: state.legs, frontier: state.frontier, stuck: state.stuck, ramThrottle: state.ramThrottle, poolLoad: state.poolLoad } : {};
           const fleet = progressRow(db, { workflowId: wf.id, repo: project.repo, core, now, decisions: live, ownerAsks: (wf.asks ?? []).filter((ask) => ask.askClass !== 'credential') });
-          const jobs = db.prepare("SELECT job_id, status FROM jobs WHERE workflow_id=? AND kind='op'").all(wf.id);
-          boards.set(wf.id, { fleet, board: unitBoard(db, wf.id), decisions, worktrees: worktreesOfWorkflow(worktrees, { workflowId: wf.id, jobs }), coreFrom: statusCache.get(wf.id)?.at ?? null });
+          boards.set(wf.id, { fleet, board: unitBoard(db, wf.id), decisions, worktrees: await productWorktreesOf(db, wf.id), coreFrom: statusCache.get(wf.id)?.at ?? null });
         } catch (error) { sources[`fleet:${wf.id}`] = safe(error.message); }
       }
     } finally { db.close(); }

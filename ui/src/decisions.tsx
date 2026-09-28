@@ -1,5 +1,6 @@
 // decisions.tsx — Decision Items (DESIGN §10.3, scripts/reconciler/decisions.mjs) as the owner reads them: what is
 // asked, of whom, since when, who claimed it and how it ended. Read-only; the deciders act through `api decisions`.
+import { useState } from 'react';
 import { Badge } from '@/components/ui/badge';
 
 export interface DecisionView {
@@ -7,6 +8,9 @@ export interface DecisionView {
   summary: string; entity: { type: string; id: string } | null; openedBy: string | null; openedAt: number | null; dueAt: number | null; escalations: number; severity: string | null;
   claim: { by: string; at: number } | null; resolution: { by: string; verb: string; at: number } | null; options: { key: string; recommended: boolean }[];
 }
+
+/** Notices a decider only acknowledges (a Supervisor ruling, a runtime rev): hidden from the lists by default. */
+export const NOTICE_KINDS: string[] = ['supervisor-ruling', 'rev-ack'];
 
 export const deciderName: Record<string, string> = { kernel: 'Kernel', supervisor: 'Supervisor', owner: 'Thầy' };
 const statusView: Record<string, { name: string; tone: string }> = {
@@ -35,9 +39,13 @@ export const clock = (at: number | string | null | undefined) => {
 };
 
 export function DecisionList({ items, empty, showWorkflow = true }: { items: DecisionView[]; empty: string; showWorkflow?: boolean }) {
-  if (!items.length) return <p className="rounded-lg border border-dashed border-zinc-800 p-4 text-sm text-zinc-500">{empty}</p>;
+  const [notices, setNotices] = useState(false);
+  const hidden = items.filter((d) => NOTICE_KINDS.includes(d.kind)).length;
+  const shown = notices ? items : items.filter((d) => !NOTICE_KINDS.includes(d.kind));
+  const toggle = hidden > 0 && <button type="button" onClick={() => setNotices((v) => !v)} className="mt-2 text-xs text-sky-400 hover:underline" aria-pressed={notices}>{notices ? 'Ẩn thông báo (supervisor-ruling)' : `Hiện ${hidden} thông báo (supervisor-ruling)`}</button>;
+  if (!shown.length) return <div><p className="rounded-lg border border-dashed border-zinc-800 p-4 text-sm text-zinc-500">{empty}</p>{toggle}</div>;
   const now = Date.now();
-  return <ul className="divide-y divide-zinc-800/80 rounded-lg border border-zinc-800">{items.map((d) => {
+  return <div><ul className="divide-y divide-zinc-800/80 rounded-lg border border-zinc-800">{shown.map((d) => {
     const st = statusView[d.status] ?? { name: d.status, tone: 'border-zinc-700 text-zinc-400' };
     const overdue = d.dueAt != null && d.dueAt < now && ['open', 'claimed', 'escalated'].includes(d.status);
     return <li key={`${d.ledger}:${d.id}`} className="space-y-1 p-3 text-sm">
@@ -58,5 +66,5 @@ export function DecisionList({ items, empty, showWorkflow = true }: { items: Dec
         <span className="font-mono">{d.ledger} · {d.id}</span>
       </p>
     </li>;
-  })}</ul>;
+  })}</ul>{toggle}</div>;
 }
