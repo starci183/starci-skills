@@ -14,6 +14,8 @@ import { repeatedAnswerOf, ownerAnswersOf } from '../owner-answers.mjs';
 import { foreignReportOwner, relocateForeignReport } from '../report-owner.mjs';
 import { renderReportBlock } from '../report-render.mjs';
 import { startSettlerFor } from '../../reconcile/job-settle.mjs';
+import { hasLedgerTable } from '../../../engine/ledger-db.mjs';
+import { attachedArgs, reportScratch, stageReportEvidence, insertReportEvidence, markAttemptReported, removeReportScratch } from '../api-lib/report-evidence.mjs';
 
 export default {
   verb: 'report',
@@ -24,7 +26,7 @@ export default {
     if (args.outcome) need(['done', 'partial', 'failed', 'ask', 'blocked'].includes(args.outcome),
       `report --outcome must be done|partial|failed|ask|blocked, got '${args.outcome}'`);
   },
-  run({ ledger, args, repo, emit, internals }) {
+  async run({ ledger, args, repo, emit, internals }) {
     const { resolveJob, requireDispatchedReportBinding, reportOwnedPaths, reportIdentityOf,
       jobCommitPolicy, handoverProofGate, skillRoot, reportFiledWake, releaseWorkerOnReport } = internals;
   const db = ledger.db, job = resolveJob(db, args.job);
@@ -130,20 +132,44 @@ export default {
   const dispatchId = report.dispatch, op = jobOpOf(job);
   // A report path another op's lineage filed first stays that op's verdict: this job's report is filed at
   // report.<jobId>.json beside it and the owner's report is put back (scripts/kernel/report-owner.mjs).
-  const foreignOwner = foreignReportOwner(db, reportAbs, op);
+  const scratch = reportScratch(reportAbs);
+  const attach = attachedArgs();
+  const evidenceReady = ['blobs', 'job_artifacts_v2', 'report_attachments', 'check_runs'].every((table) => hasLedgerTable(db, table));
+  if ((scratch || attach.length || report.checks?.some((check) => check.stdoutPath || check.stderrPath || check.outputPath))
+      && !evidenceReady)
+    throw Object.assign(new Error('ledger evidence tables are unavailable for scratch report evidence'), { code: 'report-evidence-unavailable' });
+  const staged = evidenceReady ? await stageReportEvidence({ report, repo, scratch, attach }) : [];
+  // A scratch report has no durable file path. Older in-flight jobs may still
+  // file at a Work path; retain their existing report ownership behavior.
+  const foreignOwner = scratch ? null : foreignReportOwner(db, reportAbs, op);
   const relocated = foreignOwner ? relocateForeignReport(db, { reportAbs, raw: reportRaw, jobId: job.job_id, owner: foreignOwner }) : null;
-  const filedAt = relocated?.report ?? reportAbs;
+  const filedAt = scratch ? null : relocated?.report ?? reportAbs;
   const relocation = relocated ? { relocatedFrom: relocated.relocatedFrom, owner: relocated.owner, restored: relocated.restored } : null;
+  const storedReport = scratch ? { ...report, checks: report.checks?.map(({ stdoutPath: _stdout, stderrPath: _stderr, outputPath: _output, ...check }) => check) } : report;
+  let reportId;
   ledger.transaction(() => {
     const now = Date.now();
+    const previousAttachmentIds = hasLedgerTable(db, 'report_attachments')
+      ? db.prepare(`SELECT ra.artifact_id FROM report_attachments ra JOIN reports r ON r.report_id=ra.report_id
+        WHERE r.workflow_id=? AND r.dispatch_id=?`).all(job.workflow_id, dispatchId).map((row) => row.artifact_id)
+      : [];
     db.prepare('INSERT OR REPLACE INTO reports(workflow_id,dispatch_id,op_id,attempt,generation,outcome,report_json,from_terminal,consumed_at,created_at) VALUES(?,?,?,?,?,?,?,?,NULL,?)')
-      .run(job.workflow_id, dispatchId, op, job.attempt, job.generation, report.outcome, JSON.stringify(report),
+      .run(job.workflow_id, dispatchId, op, job.attempt, job.generation, report.outcome, JSON.stringify(storedReport),
         jobPayload.managed?.agentTerminalHandle ?? jobPayload.orca?.agentTerminalHandle ?? job.worker_id ?? null, now);
+    reportId = db.prepare('SELECT report_id FROM reports WHERE workflow_id=? AND dispatch_id=?').get(job.workflow_id, dispatchId).report_id;
+    if (evidenceReady) {
+      insertReportEvidence(db, { job, op, report, reportId, staged, now });
+      const dropStale = db.prepare(`DELETE FROM job_artifacts_v2 WHERE artifact_id=?
+        AND NOT EXISTS(SELECT 1 FROM report_attachments WHERE artifact_id=?)`);
+      for (const id of previousAttachmentIds) dropStale.run(id, id);
+    }
+    if (hasLedgerTable(db, 'op_attempts')) markAttemptReported(db, { job, op, dispatchId, report, now });
     ledger.appendEvent({
       workflowId: job.workflow_id, entityType: 'job', entityId: job.job_id,
-      kind: 'report-filed', payload: { dispatchId, op, attempt: job.attempt, outcome: report.outcome, report: filedAt, ...(reask ? { reask } : {}), ...(relocation ?? {}) },
+      kind: 'report-filed', payload: { dispatchId, op, attempt: job.attempt, outcome: report.outcome, report: filedAt, reportId, ...(reask ? { reask } : {}), ...(relocation ?? {}) },
     });
   });
+  removeReportScratch(scratch);
   if (reask) console.error(`api report WARNING: ask ${dispatchId} re-asks ${reask.dispatchId}, which is already answered in this job's lineage; declared reason: ${reask.reason}`);
   if (relocation) console.error(`api report WARNING: ${reportAbs} is the report of ${relocation.owner.op} (${relocation.owner.jobId}); this report is filed at ${filedAt}${relocation.restored ? ' and the owner report is back at the path' : ''}. Write your report as report.${job.job_id}.json next time`);
   const kernelWake = reportFiledWake(ledger, {
@@ -152,7 +178,7 @@ export default {
     jobId: job.job_id,
     dispatchId,
   });
-  const out = { ok: true, jobId: job.job_id, workflowId: job.workflow_id, dispatchId, outcome: report.outcome, report: filedAt, kernelWake, ...(reask ? { reask } : {}), ...(relocation ?? {}) };
+  const out = { ok: true, jobId: job.job_id, workflowId: job.workflow_id, dispatchId, outcome: report.outcome, report: filedAt, reportId, attachments: staged.length, kernelWake, ...(reask ? { reask } : {}), ...(relocation ?? {}) };
   emit(out, `report filed for ${job.job_id} (dispatch ${dispatchId}, outcome ${report.outcome})`, args.json);
   // The op terminal gets the canonical human rendering of the filed row — the
   // reports row is the truth, this block is its projection.

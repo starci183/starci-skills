@@ -1,5 +1,5 @@
 report:
-  args: '--job <job_id> --report <file> [--outcome <done|partial|failed|ask|blocked>]'
+  args: '--job <job_id> --report <scratch-file> [--attach <file>...] [--outcome <done|partial|failed|ask|blocked>]'
   reads: 'the job row (identity + dispatch_id); the report file — a starci/op-report@1 JSON envelope {outcome, summary, files[], checks[{name,command,exitCode}], open|question|blocker per outcome}'
   writes: >-
     reports row UPSERT keyed UNIQUE(workflow_id, dispatch_id) — one
@@ -17,14 +17,21 @@ report:
     or queued is kernel-woken, a staged wake gets one Enter-only send, and
     only a screen-proven miss is kernel-wake-failed; kernelWake and the
     event carry delivery, evidence and sendErrorCode. The watchdog
-    (modules/models/runtimes.yaml allocation.watchdogCadenceMs) is only the fallback for a missed/racing event wake. The file stays the artifact the row binds —
+    (modules/models/runtimes.yaml allocation.watchdogCadenceMs) is only the fallback for a missed/racing event wake. For scratch reports, report_json is the only durable report copy;
     the ROW is the record, and `api status` projects it so the kernel
     knows exactly when an op answered and with what outcome. A row filed
     with outcome 'ask' then follows askLifecycle below until it is answered
     or superseded.
-  returns: '{ok:true, jobId, workflowId, dispatchId, outcome, report, kernelWake:{action,terminal,...}, reask?:{dispatchId, reason}, relocatedFrom?, owner?:{jobId, op, dispatchId}, restored?}'
+  returns: '{ok:true, jobId, workflowId, dispatchId, outcome, reportId, report:null for scratch, attachments, kernelWake:{action,terminal,...}, reask?:{dispatchId, reason}, relocatedFrom?, owner?:{jobId, op, dispatchId}, restored?}'
+  scratchStorage: >-
+    A report filed from STARCI_JOB_SCRATCH is stored only in reports.report_json.
+    Repeatable --attach files and checks[].stdoutPath/stderrPath/outputPath are
+    stored as blobs and linked in job_artifacts_v2, report_attachments and
+    check_runs. The transaction stamps op_attempts.reported_at and
+    report_outcome. Scratch is removed only after the transaction commits.
+    Older in-flight jobs using a Work-path report retain their path behavior.
   reportOwner: >-
-    A report path belongs to the op lineage that filed it first (report-filed events, every workflow
+    Legacy Work-path reports only: a report path belongs to the op lineage that filed it first (report-filed events, every workflow
     of the ledger); a later attempt of that op files at it in place. A job of another op filing at it
     is filed at report.<jobId>.json beside it (<stem>.<jobId><ext>), the owner's latest reports row is
     written back at the path, and the event and result carry report (the scoped path), relocatedFrom,
@@ -66,4 +73,3 @@ report:
     - report-identity-mismatch: 'the caller is an op (conventions.callerBoundary) and --job is not its own job'
     - job-unknown / job-settled
   usedBy: 'the [Op] worker — filing its answer is this verb, never a bare file drop or last words on a terminal'
-

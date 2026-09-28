@@ -135,6 +135,14 @@ export function validateOpReport(value, { ownedPaths = [], identity = {}, commit
       if (!c || typeof c !== 'object' || !text(c.name) || !text(c.command) || !Number.isInteger(c.exitCode)) fail(`checks[${i}] needs {name, command, exitCode}`);
       else if (c.evidence !== undefined && String(c.evidence).length > 400) fail(`checks[${i}].evidence exceeds 400 chars`);
       else if (c.failing !== undefined && (!Array.isArray(c.failing) || c.failing.some((f) => !text(f)))) fail(`checks[${i}].failing must be an array of file paths`);
+      for (const field of ['stdoutPath', 'stderrPath', 'outputPath', 'cwd'])
+        if (c?.[field] !== undefined && !text(c[field])) fail(`checks[${i}].${field} must be a nonempty path`);
+      if (c?.phase !== undefined && !['before', 'after', 'verify', 'parity', 'integrate'].includes(c.phase))
+        fail(`checks[${i}].phase must be before|after|verify|parity|integrate`);
+      for (const field of ['startedAt', 'finishedAt'])
+        if (c?.[field] !== undefined && (!Number.isInteger(c[field]) || c[field] < 0)) fail(`checks[${i}].${field} must be an epoch millisecond integer`);
+      if (Number.isInteger(c?.startedAt) && Number.isInteger(c?.finishedAt) && c.finishedAt < c.startedAt)
+        fail(`checks[${i}].finishedAt precedes startedAt`);
     });
   }
   if (value.outcome === 'partial' && (!Array.isArray(value.open) || !value.open.length || value.open.some((o) => !text(o)))) fail("outcome 'partial' requires a nonempty open[] of unfinished items");
