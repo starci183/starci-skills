@@ -21,7 +21,7 @@ import { PEER_WAIT, leaseCanonOf, openPeerWaits, releaseTypedWaits } from '../ap
 import { hostResourcesFor, HOST_RESOURCES_LOW } from '../../lib/host-resources.mjs';
 import { hostThrottle, noteThrottled, DISPATCH_THROTTLED } from '../../lib/ram-throttle.mjs';
 import { deferredQueueCause } from '../autopilot.mjs';
-import { resolveCardLaunchModel, missingHostTools, defaultOperationTarget } from '../../agent/models.mjs';
+import { resolveCardLaunchModel, resolveLaunchModel, missingHostTools, defaultOperationTarget } from '../../agent/models.mjs';
 import { kindOrder, isFanOutSlice } from '../../agent/models.mjs';
 import { resolveOpParams } from '../../route/dispatch-op.mjs';
 import { checkPrerequisites, prerequisiteDetail } from '../prerequisites.mjs';
@@ -36,6 +36,12 @@ import { kernelOverrideFor, refuseSettleBacklog } from '../kernel-authority.mjs'
 import { jobDirOf } from '../job-artifacts.mjs';
 import { packetFileOf } from '../task-spec.mjs';
 import { ENV_GATED_OPS } from '../verify-failure.mjs';
+import { ensureLaunchTrust } from '../../agent/trust.mjs';
+import { workerStart } from '../../api/orca/worker-start.mjs';
+import { workerShow } from '../../api/orca/worker-show.mjs';
+import { closeOperationTerminal } from '../close-op-terminal.mjs';
+import { bindGuardTerminal } from '../../guards/install.mjs';
+import { terminalRename } from '../../api/orca/terminal-rename.mjs';
 
 export default {
   verb: 'dispatch',
@@ -43,7 +49,7 @@ export default {
   kernelOnly: true,
   usageInCore: true,
   run({ ledger, args, repo, emit, internals }) {
-    const { skillRoot, SETTLED, opSlotAdmission, queuedSeamsOf, observeOperationWorker, AGENT_HIERARCHY_SCHEMA, kernelNodeId, operationNodeId, openOwnerGates, ownerGateOf, refuseStaleKernelRev, latestGraphNodesOf, deferQueuedTestLeg, kernelBiasIgnored, biasIgnoredText, providerHealthOf, circuitClearHint, resolveModel, buildPacket, bestEffort, rejectDispatch, recordGateAnswers, DISPATCH_LEASE_TTL_MS, opLeaseRequests, livePathLeaseWait, reserveOpLeases, buildContractMarkdown, fileContract, envServicesOf, servingWorktreeOf, environmentPreStep, raiseEnvironmentIncident, MANAGED_KINDS, recordLaunchTerminal, ensureWorkflowRun, createOperationTask, cmdDispatchManaged, opLaunchEnv, opGuardLaunch } = internals;
+    const { skillRoot, SETTLED, opSlotAdmission, queuedSeamsOf, observeOperationWorker, AGENT_HIERARCHY_SCHEMA, kernelNodeId, operationNodeId, openOwnerGates, ownerGateOf, refuseStaleKernelRev, latestGraphNodesOf, deferQueuedTestLeg, kernelBiasIgnored, biasIgnoredText, providerHealthOf, circuitClearHint, resolveModel, buildPacket, bestEffort, rejectDispatch, recordGateAnswers, DISPATCH_LEASE_TTL_MS, opLeaseRequests, livePathLeaseWait, reserveOpLeases, buildContractMarkdown, fileContract, envServicesOf, servingWorktreeOf, environmentPreStep, raiseEnvironmentIncident, MANAGED_KINDS, recordLaunchTerminal, ensureWorkflowRun, createOperationTask, opLaunchEnv, opGuardLaunch } = internals;
 
   const db = ledger.db, jobId = args.job;
   // Dispatch never re-decides the route; a Kernel's --prefer/--avoid here is ignored like on api route.
@@ -467,7 +473,7 @@ export default {
     // worker-start owns a managed agent's environment, so no shim reaches it; the
     // history hook in its checkouts does, finding the op by its bound Orca terminal.
     const guard = opGuardLaunch({ job, jobId, repo, placements, workerCwd, shims: false });
-    return cmdDispatchManaged(ledger, args, { job, jobId, payload, op, model, packet, prompt, packetFile, worktree, orcaWorktree, title, reserve, inputs, guard, launchDifficulty: launchOrder.difficulty });
+    return cmdDispatchManaged(ledger, args, { job, jobId, payload, op, model, packet, prompt, packetFile, worktree, orcaWorktree, title, reserve, inputs, guard, launchDifficulty: launchOrder.difficulty }, internals, emit);
   }
   if (model.kind !== 'command-terminal') {
     throw Object.assign(new Error(`spawn refused: ${model.target} is launch kind '${model.kind}' — use 'orca orchestration worker-start' with a Task id (managed-agent path)`), { code: 'managed-agent' });
@@ -640,3 +646,200 @@ export default {
 
   },
 };
+
+function cmdDispatchManaged(ledger, args, { job, jobId, payload, op, model, packet, prompt, packetFile = null, worktree, orcaWorktree = null, title, reserve, inputs = null, guard = null, launchDifficulty = null }, internals, emit) {
+  const { cleanupManagedWorker, rejectDispatch, ensureWorkflowRun, createOperationTask, opLaunchEnv, recordLaunchTerminal, skillRoot, AGENT_HIERARCHY_SCHEMA, operationNodeId, kernelNodeId, buildContractMarkdown, fileContract } = internals;
+  const db = ledger.db;
+
+  const reconcileFailure = (effectState, dispatchId) => {
+    if (effectState === 'none') return { effectState: 'none', observation: null, cleanup: null };
+    if (effectState === 'unknown') {
+      if (!dispatchId) return { effectState: 'unknown', observation: null, cleanup: null };
+      let observation;
+      try { observation = workerShow({ dispatch: dispatchId }); }
+      catch (e) { observation = { ok: false, error: String(e?.message ?? e) }; }
+      if (!observation?.ok || !['failed', 'stopped', 'released'].includes(observation.state))
+        return { effectState: 'unknown', observation, cleanup: null };
+      const cleanup = cleanupManagedWorker(dispatchId);
+      return { effectState: cleanup.effectState, observation, cleanup };
+    }
+    const cleanup = cleanupManagedWorker(dispatchId);
+    return { effectState: cleanup.effectState, observation: null, cleanup };
+  };
+
+  let trust = null;
+  const reject = ({ step, signal = null, error = null, dispatchId = null, incident = false,
+    effectState = 'none', details = null }) => {
+    const reconciliation = reconcileFailure(effectState, dispatchId);
+    const rejection = rejectDispatch(ledger, job, jobId, op, model, {
+      step, signal, error, terminal: dispatchId, incident,
+      effectState: reconciliation.effectState, details, settled: reconciliation.cleanup, trust,
+    });
+    const reason = signal ?? error ?? `managed dispatch failed at ${step}`;
+    const out = { ok: false, jobId, rejected: 'dispatch-rejected', packet, rejection,
+      managed: { step, dispatchId, effectState: reconciliation.effectState,
+        ...(reconciliation.observation ? { observation: reconciliation.observation } : {}),
+        ...(reconciliation.cleanup ? { cleanup: reconciliation.cleanup } : {}) } };
+    emit(out, `dispatch REJECTED for ${jobId} (${step}): ${reason} — job status=${rejection.status}, effect=${reconciliation.effectState}${reconciliation.cleanup ? `, worker ${dispatchId} cleanup stop=${reconciliation.cleanup.stop?.ok} release=${reconciliation.cleanup.release?.ok}` : ''}`, args.json);
+    process.exit(1);
+  };
+
+  // 1. Launch model: the `api route` decision on the job payload wins; without
+  // it, or when --model names another pool, resolveLaunchModel picks this pool's pin at the kind's tier.
+  const routedHere = !payload.model || payload.model === model.target;
+  let modelId = routedHere ? payload.modelId ?? null : null;
+  let effort = routedHere ? payload.effort ?? null : null;
+  if (!modelId) {
+    const resolved = resolveLaunchModel(model.target, launchDifficulty ?? payload.difficulty ?? 'medium');
+    if (!resolved || resolved.error || !resolved.modelId) {
+      return reject({ step: 'route', error: resolved?.error ?? 'resolveLaunchModel returned no modelId' });
+    }
+    modelId = resolved.modelId;
+    effort = resolved.effort ?? null;
+  }
+
+  // 2. Run id — one workflow Run, with the Kernel terminal as coordinator.
+  const run = ensureWorkflowRun(ledger, { job, jobId, payload });
+  if (!run.ok) return reject({ step: 'run-create', error: run.error });
+  const { runId, kernelHandle } = run;
+
+  // 3. Task — the operation's contract. The spec is the rendered packet prompt
+  // (the same text a command-terminal launch would have sent).
+  const task = createOperationTask({ runId, prompt, op, title, attempt: job.attempt, kernelHandle, jobId, packetFile });
+  if (!task?.ok || !task.taskId) {
+    return reject({ step: 'task-create', error: task?.error ?? 'task-create returned no taskId' });
+  }
+  const taskId = task.taskId;
+
+  // 4a. Pre-trust the worktree the managed worker launches in (trust.mjs):
+  // the owner never answers a Claude/Codex launch prompt.
+  try { trust = ensureLaunchTrust({ agent: model.provider, cwd: worktree }); }
+  catch (e) { trust = { agent: model.provider, paths: [], status: 'failed', errors: [{ error: String(e?.message ?? e) }] }; }
+
+  // 4. worker-start — outcome ok means a ready worker (calls.yaml classify:
+  // exit 0 + result.state 'ready'). Anything else, including a receipt with no
+  // dispatchId, is a rejection; a partial effect is stopped + released.
+  // A product op worktree is not an Orca worktree, so a worker Orca launches there shows under no project (DESIGN
+  // §16.7, owner-visible 2026-09-28). The runtime launches the agent itself on the repository's ROOT Orca worktree with
+  // the op worktree as its directory (spawnAgent cwd: Set-Location first, the routed model attested on screen) and
+  // hands that terminal to worker-start --terminal. If the adoption is refused with no effect, the terminal is closed
+  // and the worker starts the old way, so a dispatch never fails on visibility alone.
+  let adopted = null, adoption = null;
+  if (orcaWorktree && orcaWorktree !== worktree) {
+    const sp = spawnAgent({ provider: model.provider, worktree: orcaWorktree, cwd: worktree, title, prompt: null, command: model.command ?? null,
+      dispatchId: jobId, model: modelId, effort, attest: false, env: { ...opLaunchEnv(jobId, model.provider), ...(guard?.env ?? {}) }, pathPrefix: guard?.pathPrefix ?? null,
+      onCreated: (created) => recordLaunchTerminal(ledger, jobId, created) });
+    adoption = { orcaWorktree, cwd: worktree, spawned: sp.ok === true, terminal: sp.terminal ?? null, ...(sp.ok ? {} : { step: sp.step, error: sp.error }) };
+    if (sp.ok && sp.terminal) adopted = sp.terminal;
+  }
+  let started = adopted
+    ? workerStart({ task: taskId, worktree: orcaWorktree, terminal: adopted, displayName: title, run: runId, from: kernelHandle })
+    : null;
+  if (adopted && (started?.ok !== true || (started.outcome != null && started.outcome !== 'ok') || !started.dispatchId)) {
+    adoption.workerStart = { outcome: started?.outcome ?? null, effectState: started?.effectState ?? null, error: started?.error ?? null };
+    if ((started?.effectState ?? 'none') === 'none') {
+      try { closeOperationTerminal(adopted); } catch { /* recorded launch terminal; the gc closes it */ }
+      adopted = null; started = null;
+    }
+  }
+  if (!started) started = workerStart({
+    task: taskId, worktree, agent: model.provider, model: modelId, effort,
+    displayName: title, run: runId, from: kernelHandle,
+  });
+  if (adoption) ledger.transaction(() => ledger.appendEvent({ workflowId: job.workflow_id, entityType: 'job', entityId: jobId, kind: 'product-worker-adoption',
+    payload: { ...adoption, adopted: Boolean(adopted) } }));
+  const dispatchId = started?.dispatchId ?? null;
+  if (started?.ok !== true || (started.outcome != null && started.outcome !== 'ok') || !dispatchId) {
+    return reject({
+      step: 'worker-start', dispatchId,
+      error: started?.error ?? `worker-start outcome=${started?.outcome ?? 'none'} state=${started?.state ?? 'none'} effect=${started?.effectState ?? 'none'}`,
+      effectState: started?.effectState ?? 'unknown', details: started,
+    });
+  }
+
+  // 5. Resolve the exact terminal worker-start already dispatched. This is a
+  // read/attestation step, not a second orchestration dispatch.
+  const shown = dispatchShow({ task: taskId, from: kernelHandle });
+  if (!shown?.ok || !shown.assigneeHandle) {
+    return reject({ step: 'dispatch-show', error: shown?.error ?? 'dispatch-show returned no assignee', dispatchId,
+      effectState: 'partial', details: shown });
+  }
+  // The op's guard, keyed by the terminal Orca exports as ORCA_TERMINAL_HANDLE (scripts/guards/install.mjs bindGuardTerminal).
+  if (guard?.receipt && typeof guard.receipt.jobFile === 'string') {
+    try { guard.receipt.terminal = bindGuardTerminal({ skillRoot, handle: shown.assigneeHandle, jobFile: guard.receipt.jobFile }); }
+    catch (e) { guard.receipt.terminal = { error: String(e?.message ?? e) }; }
+  }
+
+  // Managed workers created inside an existing worktree receive Orca's
+  // default `worker-task_<id>` terminal title; worker-start creation labels
+  // do not apply there. Rename the exact attested assignee so the visible UI
+  // preserves the semantic [Op] role. A presentation failure must not stop a
+  // healthy worker, but it is returned and persisted for diagnosis.
+  let terminalTitle = null;
+  try { terminalTitle = terminalRename({ terminal: shown.assigneeHandle, title }); }
+  catch (e) { terminalTitle = { ok: false, terminal: shown.assigneeHandle, title, error: String(e?.message ?? e) }; }
+
+  // 6. Attest — the worker's EFFECTIVE agent/model must equal what routing
+  // decided. A mismatch is a provider-side defect: rejected with the typed
+  // infra-provider incident (same as a terminal attestation rejection).
+  const attest = workerShow({ dispatch: dispatchId });
+  const eff = attest?.effective ?? {};
+  const effAgent = eff.agent ?? eff.provider ?? null;
+  const effModel = eff.model ?? eff.modelId ?? null;
+  // An adopted terminal's agent was launched and model-attested by spawnAgent; Orca may not know its effective launch.
+  const agentOk = effAgent === model.provider || (adopted && effAgent == null);
+  const modelOk = effModel === modelId || (adopted && effModel == null);
+  if (attest?.ok !== true || !agentOk || !modelOk) {
+    return reject({
+      step: 'attestation', dispatchId, incident: true,
+      signal: `worker attest failed: expected agent=${model.provider} model=${modelId}, got agent=${effAgent} model=${effModel} state=${attest?.state ?? 'none'}`,
+      effectState: 'partial', details: attest,
+    });
+  }
+
+  // 7. Running — worker_id is the Dispatch id (managed workers have no
+  // command-terminal handle); payload.managed carries the Orca ids settle needs.
+  payload.managed = { runId, taskId, dispatchId, agentTerminalHandle: shown.assigneeHandle,
+    terminalTitle: title, terminalTitleApplied: terminalTitle?.ok === true };
+  payload.agent = model.provider;
+  payload.provider = model.provider;
+  payload.model = model.target;
+  payload.modelId = modelId;
+  payload.effort = effort;
+  payload.hierarchy = payload.hierarchy ?? {
+    schema: AGENT_HIERARCHY_SCHEMA, nodeId: operationNodeId(jobId),
+    parentNodeId: kernelNodeId(job.workflow_id), role: 'operation',
+    workflowId: job.workflow_id, jobId, opId: op,
+    attempt: job.attempt, generation: job.generation,
+  };
+  payload.hierarchy.runtime = {
+    ...(payload.hierarchy.runtime ?? {}), host: 'orca',
+    agent: model.provider, provider: model.provider, model: modelId,
+    profile: model.target, runtimePool: model.target,
+    runId, taskId, dispatchId, terminalHandle: shown.assigneeHandle,
+  };
+  const contractMarkdown = buildContractMarkdown({ op, jobId, prompt, packet });
+  ledger.transaction(() => {
+    const now = Date.now();
+    // Same contract-first order as the terminal path: the contracts row is
+    // the dispatch authority; dispatch_id is the worker's Dispatch id.
+    fileContract(db, {
+      job, op, dispatchId, markdown: contractMarkdown, now,
+      context: { packet, worktree, model: model.target, managed: payload.managed, hierarchy: payload.hierarchy, lease: { token: reserve.leaseToken, expiresAt: reserve.expiresAt, fencing: reserve.fencing }, inputs },
+    });
+    db.prepare("UPDATE jobs SET status='running', worker_id=?, payload_json=?, result_json=NULL, updated_at=? WHERE job_id=?")
+      .run(dispatchId, JSON.stringify(payload), now, jobId);
+    transitionWorkflowToRunning(ledger, { workflowId: job.workflow_id, now, generation: job.generation });
+    ledger.appendEvent({
+      workflowId: job.workflow_id, entityType: 'job', entityId: jobId,
+      kind: 'op-dispatched',
+      payload: { op, dispatch: dispatchId, model: model.target, worktree, managed: true, runId, taskId, modelId, ...(trust ? { trust } : {}), ...(guard ? { guard: guard.receipt } : {}), parentNodeId: payload.hierarchy.parentNodeId, nodeId: payload.hierarchy.nodeId, leaseToken: reserve.leaseToken, fencing: reserve.fencing },
+    });
+  });
+  const out = {
+    ok: true, jobId, spawned: true, dispatchId, packet,
+    managed: { runId, taskId, dispatchId, modelId, effort, assignee: shown.assigneeHandle, terminalTitle },
+    hierarchy: payload.hierarchy,
+  };
+  emit(out, `dispatched ${jobId} — [Op] ${op} managed worker ${dispatchId} (${model.target}/${modelId}, task ${taskId}); job status=running`, args.json);
+}
