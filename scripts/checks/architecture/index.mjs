@@ -9,7 +9,7 @@ import { checkOwners } from './owners.mjs';
 import { checkModuleRegistration, REGISTRATION_RULE_IDS } from './registration.mjs';
 import { checkFrontendDataLifecycle, SWR_DATA_RULE_IDS } from './next-data.mjs';
 import { checkBackendSourceShape, SOURCE_LAYOUT_RULE_ID, SOURCE_NAME_RULE_ID } from './source-names.mjs';
-import { checkHfs, HFS_RULE_IDS } from './hfs.mjs';
+import { checkHfs, checkHfsWithoutConfig, HFS_RULE_IDS } from './hfs.mjs';
 
 export { REGISTRATION_RULE_IDS, SWR_DATA_RULE_IDS };
 
@@ -79,8 +79,10 @@ export function checkArchitecture({ repositoryRoot, configFile, injectedTypeScri
   try {
     config = loadArchitectureConfig(repositoryRoot, configFile);
   } catch (error) {
+    const hfs = checkHfsWithoutConfig(repositoryRoot, configFile);
     return { schema: 'starci/architecture-check@1', ok: false, repository: String(repositoryRoot ?? ''), kinds: [], files: 0,
-      compiler: null, violations: [], errors: [{ ruleId: 'ARCH_CONFIG_INVALID', message: String(error.message ?? error) }], limitations: LIMITATIONS };
+      compiler: null, violations: stable(hfs.violations), coverage: { hfs: hfs.coverage },
+      errors: [{ ruleId: 'ARCH_CONFIG_INVALID', message: String(error.message ?? error) }], limitations: LIMITATIONS };
   }
   const hfs = checkHfs(config);
   let context;
