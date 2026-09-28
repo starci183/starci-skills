@@ -185,8 +185,17 @@ steps:
         exception is migrationAuthority: preserve the complete red baseline, map every failure to
         the bound workspace-canonicalization proposal, and proceed only when no unrelated failure
         exists. For context.cut, also bind the stable cut id/ordinal/total, complete path-union
-        manifest and passed-ordinal state before editing; ambiguity or a missing sibling mapping
-        blocks. No existing, covering, runnable check is reported `blocked` with blocker kind
+        manifest and passed-ordinal state before editing: dispatch binds them in the packet as
+        context.cut.manifest (ordinals[{ordinal, jobId, status, paths}], pathUnion, passed, open,
+        absent, disjoint, wires), read from the ledger's cut set - bind that, never block for it or
+        search the checkout for another manifest; an ordinal with no job yet is an open ordinal, not
+        ambiguity. Only a manifest whose paths overlap your owned paths (disjoint false naming your
+        ordinal) blocks. When a code-pattern or architecture machine answers unavailable (exit 2/3,
+        SCRIPT_INPUT_UNAVAILABLE, an unresolved import or a repository obligation on a file outside
+        your owned paths), that is a tool error, never the slice's blocker: record the raw result as
+        a check with `toolError: true`, keep the same command for the after run, prove the slice
+        with the machines that did run (canon-scan's lint families, the scoped lint's slice counts,
+        the repository typecheck on owned files) and continue. No existing, covering, runnable check is reported `blocked` with blocker kind
         `test-gap` and this op stops; it never authors the missing tests itself. Resolve the
         execution profile and actual tool availability before selecting instruments; this does not
         switch the model/runtime or spawn workers. Never create the target or invent its
@@ -320,10 +329,14 @@ blockers:
       en: The requested restructure needs a path outside the selected write ceiling; report the exact
         paths as blocker kind shared-change rather than widening the allowlist. A canon slice
         (params.canonFamilies set, params.canonWire false) whose remaining finding needs only a
-        shared-root registration (policy.canonConformance.sharedRoots) or a consumer outside its owned
-        paths is not blocked - it moves what it owns (its relocation grants are in its owned paths),
-        commits, and reports done listing each such finding as owedToWire [{path, finding}]; the wave's
-        canon-wire leg lands it.
+        shared-root registration (policy.canonConformance.sharedRoots), a config file, a public entry
+        (index.*) or parent folder outside its owned paths, or a consumer outside its owned paths is
+        not blocked - it moves what it owns (its relocation grants are in its owned paths), commits,
+        and reports done listing each such finding as owedToWire [{path, finding}]; the wave's
+        canon-wire leg lands it. A canon slice that still settles blocked is followed up by settle
+        itself (scripts/kernel/cut-seam.mjs canonSettleFollowUpOf) - a continuation from its commit
+        (params.resumeFrom) owning the destinations its report names, and the shared, config and
+        public-entry paths go to the canon-wire leg.
   - code: REQUIREMENT_UNSETTLED
     condition:
       en: The observable behavior, actor permission or business effect to preserve is not settled by the
@@ -341,7 +354,9 @@ blockers:
     condition:
       en: The declared regression runner, a declared architecture/code-pattern machine, a dependency or
         the sandbox cannot start here and the cause is provably unfixable from the allowlist -
-        report blocked with blocker kind environment naming the exact missing piece.
+        report blocked with blocker kind environment naming the exact missing piece. A machine that
+        started and answered unavailable is not this blocker - it is a tool error recorded with its
+        raw result (toolError true) while the slice proceeds on the machines that ran.
   - code: AUTHORITY_REQUIRED
     condition:
       en: Completing the request needs an authority the goal does not grant - report blocked with blocker

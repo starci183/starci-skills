@@ -169,7 +169,8 @@ import { taskUpdate } from '../api/orca/task-update.mjs';
 import { orchInbox } from '../api/orca/orch-inbox.mjs';
 import { orchReply } from '../api/orca/orch-reply.mjs';
 import { productLocaleFor } from './product-locale.mjs';
-import { SEAM_PRIORITY_CLASS, SEAM_INTERFACE_EVENT, SEAM_RELEASED_EVENT, SEAM_RECONCILED_EVENT, SEAM_RECONCILE_CHECK, cutSeamSettings, digestInterfaceFiles, isSeamCut, recutPlanOf, seamPriorityOf, seamReconcileOf, seamStateOf, seamStubForDispatch, siblingSeamHold } from './cut-seam.mjs';
+import { SEAM_PRIORITY_CLASS, SEAM_INTERFACE_EVENT, SEAM_RELEASED_EVENT, SEAM_RECONCILED_EVENT, SEAM_RECONCILE_CHECK, cutSeamSettings, digestInterfaceFiles, isSeamCut, recutPlanOf, seamPriorityOf, seamReconcileOf, seamStateOf, seamStubForDispatch, siblingSeamHold, cutManifestOf, canonSettleFollowUpOf, canonConformancePolicy } from './cut-seam.mjs';
+import { destinationsOf } from './progress-rca.mjs';
 import { LOG_KINDS, LOG_TYPED_MISSING, LOG_TYPED_MISSING_EVENT, LOGS_DEFERRED, appendLog, ingestSidecar, insertLogRows, legacyLogsPending, openLogs, prepareLogRow, readLogs, syncLogs, typedLogGaps } from './typed-logs.mjs';
 import { bindWorkflowRun, staleTasks, CLOSED_TASK_STATUSES } from './orca-runs.mjs';
 import { taskList } from '../api/orca/task-list.mjs';
@@ -5464,6 +5465,9 @@ function cmdDispatch(ledger, args, repo) {
   const packet = buildPacket({ job: { ...job, op_id: op }, payload, model, goal: latestGoal(db, job.workflow_id), params: dispatchParams, placements, productLocale: productLocaleFor(repo), ownerAnswers, boundGoal });
   if (environmentHealth?.declared) packet.context.environment = { ready: environmentHealth.ready, checkedAt: environmentHealth.at, services: envServicesOf(environmentHealth), remedies: environmentHealth.remedies };
   if (payload.repairFor) packet.context.repair_for = payload.repairFor;
+  // The cut manifest the brief binds before the first edit (cut-seam.mjs cutManifestOf): every ordinal's paths and
+  // status, the path union and the passed ordinals, read from the ledger now. Packet-only: never persisted on the job.
+  if (packet.context.cut) { let manifest = null; try { manifest = cutManifestOf(db, { workflowId: job.workflow_id, op, cut: payload.cut, ownJobId: jobId }); } catch { manifest = null; } if (manifest) packet.context.cut = { ...packet.context.cut, manifest }; }
   // The Kernel's local, additive override of this op (api op-override, graph-edit params/continue, redesign).
   { const ko = kernelOverrideFor(db, job.workflow_id, op, payload); if (ko) packet.context.kernel_override = ko; }
   // The retry of a worker that died without a report resumes from what it left (scripts/kernel/resume-context.mjs).
@@ -6957,6 +6961,82 @@ function enqueueNextStep(ledger, job, { shape, envelope = null, environment = fa
   }
   return record({ kind: 'none', reason: `no route in modules/models/kinds.yaml resolves ${op} with ${JSON.stringify(shape)}` });
 }
+const CANON_FOLLOW_UP_REASON = 'canon-follow-up';
+const CANON_FOLLOW_UP_LIMIT = 3;
+const REPORT_COMMIT_RE = /\b(?:commit(?:ted)?|land(?:ed)?(?: commit)?|đã (?:land )?commit)\s+([0-9a-f]{7,40})\b/i;
+/**
+ * Settle's own next step for a canon slice (code.refactor params.canonFamilies, not its canon-wire leg) that
+ * settled blocked with a filed report (cut-seam.mjs canonSettleFollowUpOf): ONE follow-up attempt of the same
+ * ordinal --retry-of it - a continuation from its commit (params.resumeFrom, kernelEdit.continuationOf, so the
+ * unit counts it) when it committed, owning the relocation grants its report names - and the shared-root,
+ * config and public-entry files it needs go to the cut's queued canon-wire leg (widened), or a new wire leg
+ * after the follow-up. Bounded by CANON_FOLLOW_UP_LIMIT per ordinal; a retry the Kernel already queued wins.
+ * Records result_json.nextStep {kind: canon-follow-up}. Null when there is nothing to do.
+ */
+// The admission commit a slice's scoped lint measured against (`check-scoped-lint.mjs ... --base <sha>` in its report's checks).
+const admissionBaseOfReport = (envelope) => (Array.isArray(envelope?.checks) ? envelope.checks : [])
+  .map((check) => /--base\s+([0-9a-f]{7,40})/i.exec(String(check?.command ?? ''))?.[1]).find(Boolean) ?? null;
+function canonSettleFollowUp(ledger, job, payload, envelope) {
+  const db = ledger.db, op = jobOpOf(job), wf = job.workflow_id;
+  const manifest = cutManifestOf(db, { workflowId: wf, op, cut: payload.cut, ownJobId: job.job_id });
+  const commit = REPORT_COMMIT_RE.exec([envelope?.summary, envelope?.blocker?.detail].join(' '))?.[1] ?? null;
+  let sharedRoots = ['architecture.json'];
+  try { sharedRoots = canonConformancePolicy().sharedRoots; } catch { /* the default holds */ }
+  const plan = canonSettleFollowUpOf({ payload, report: envelope, manifest, destinations: destinationsOf(envelope, payload.owned_paths ?? []), commit, sharedRoots });
+  if (!plan) return null;
+  const record = (step) => {
+    const result = jobResultOf(db.prepare('SELECT result_json FROM jobs WHERE job_id=?').get(job.job_id));
+    db.prepare('UPDATE jobs SET result_json=? WHERE job_id=?').run(JSON.stringify({ ...result, nextStep: step }), job.job_id);
+    ledger.appendEvent({ workflowId: wf, entityType: 'job', entityId: job.job_id, kind: 'failure-routed', payload: { opId: op, shape: { verdict: 'blocked', class: 'canon-follow-up' }, ...step } });
+    return step;
+  };
+  const prior = db.prepare(`SELECT COUNT(*) n FROM jobs WHERE workflow_id=? AND op_id=? AND json_extract(payload_json,'$.cut.id')=? AND json_extract(payload_json,'$.cut.ordinal')=?
+    AND json_extract(payload_json,'$.retryReason.reason')=?`).get(wf, op, String(payload.cut.id), Number(payload.cut.ordinal), CANON_FOLLOW_UP_REASON).n;
+  if (prior >= CANON_FOLLOW_UP_LIMIT) return record({ kind: 'none', reason: `cut ${payload.cut.id} ordinal ${payload.cut.ordinal} already had ${prior} canon follow-up(s) (limit ${CANON_FOLLOW_UP_LIMIT}): the Kernel re-cuts or wires it` });
+  const follow = enqueueFollowOn(ledger, job, { retryOf: job.job_id, reason: CANON_FOLLOW_UP_REASON, of: job.job_id });
+  const jobs = [];
+  if (follow?.jobId) jobs.push(follow.jobId);
+  if (follow?.jobId && follow.reason !== 'retry-exists') {
+    const row = db.prepare('SELECT * FROM jobs WHERE job_id=?').get(follow.jobId);
+    const next = jobPayloadOf(row);
+    const params = { ...(next.params ?? {}), ...(plan.resumeFrom ? { resumeFrom: plan.resumeFrom, admissionBase: String(payload.params?.admissionBase || admissionBaseOfReport(envelope) || '') } : {}) };
+    const note = [
+      plan.resumeFrom ? `Continuation of ${job.job_id}: its commit ${plan.resumeFrom} already landed the in-ceiling part - bring it in (params.resumeFrom) and finish what its report left open; never redo it.` : `Follow-up of ${job.job_id}, which blocked ${plan.blocker ?? ''}: its report is your starting point.`,
+      plan.grants.length ? `You now also own the relocation destinations ${plan.grants.join(', ')}.` : null,
+      plan.wire.length ? `The canon-wire leg owns ${plan.wire.join(', ')}: a finding that needs one of them is owedToWire [{path, finding}] - fix everything else, commit, and report done; never block on it.` : 'A finding that needs a shared-root, config or public-entry file outside your owned paths is owedToWire [{path, finding}]: report done with it listed, never blocked.',
+    ].filter(Boolean).join(' ');
+    next.owned_paths = [...new Set([...(next.owned_paths ?? []), ...plan.grants])];
+    next.params = params;
+    next.kernelEdit = { ...(next.kernelEdit ?? {}), unitOf: job.job_id, by: 'settle', ...(plan.resumeFrom ? { continuationOf: job.job_id, commits: [plan.resumeFrom] } : { retryOf: job.job_id }) };
+    next.kernelOverride = { ...(next.kernelOverride ?? {}), notes: [...(next.kernelOverride?.notes ?? []), note] };
+    db.prepare('UPDATE jobs SET payload_json=?, updated_at=? WHERE job_id=?').run(JSON.stringify(next), Date.now(), follow.jobId);
+    if (plan.resumeFrom) ledger.appendEvent({ workflowId: wf, entityType: 'job', entityId: job.job_id, kind: 'unit-partial-continued', payload: { by: follow.jobId, commit: plan.resumeFrom, via: 'settle' } });
+  }
+  let wire = null;
+  if (plan.wire.length) {
+    const queuedWire = db.prepare("SELECT * FROM jobs WHERE workflow_id=? AND op_id=? AND status='queued' AND json_extract(payload_json,'$.params.canonWire')=1 ORDER BY attempt DESC").all(wf, op)
+      .find((row) => !db.prepare("SELECT 1 FROM events WHERE entity_type='job' AND entity_id=? AND kind IN ('op-dispatched','dispatch-attested','worker-attested') LIMIT 1").get(row.job_id));
+    if (queuedWire) {
+      const wp = jobPayloadOf(queuedWire);
+      const add = plan.wire.filter((p) => !(wp.owned_paths ?? []).includes(p));
+      if (add.length) {
+        wp.owned_paths = [...(wp.owned_paths ?? []), ...add];
+        wp.after = [...new Set([...(wp.after ?? []), ...jobs])];
+        db.prepare('UPDATE jobs SET payload_json=?, updated_at=? WHERE job_id=?').run(JSON.stringify(wp), Date.now(), queuedWire.job_id);
+        ledger.appendEvent({ workflowId: wf, entityType: 'job', entityId: queuedWire.job_id, kind: 'canon-wire-widened', payload: { add, of: job.job_id, by: 'settle' } });
+      }
+      wire = { jobId: queuedWire.job_id, widened: add };
+    } else {
+      const created = enqueueFollowOn(ledger, job, { reason: 'canon-wire', of: job.job_id, after: jobs, title: `code.refactor: canon-wire ${plan.wire.slice(0, 2).map((p) => p.split('/').pop()).join(',')}`,
+        repair: { records: payload.records ?? [], ownedPaths: plan.wire, repository: payload.repository ?? null, params: { ...(payload.params ?? {}), canonWire: true, resumeFrom: '', admissionBase: '' } } });
+      if (created?.jobId) wire = { jobId: created.jobId, created: true };
+    }
+    if (wire?.jobId) jobs.push(wire.jobId);
+  }
+  const how = plan.resumeFrom ? `continues from ${plan.resumeFrom}` : 'follow-up';
+  return record({ kind: 'canon-follow-up', counted: false, jobs, ...(plan.resumeFrom ? { resumeFrom: plan.resumeFrom } : {}), grants: plan.grants, wire: plan.wire, ...(wire ? { wireJob: wire.jobId } : {}),
+    reason: `canon slice ${payload.cut.id} ${payload.cut.ordinal}/${payload.cut.total} blocked (${plan.blocker ?? 'no kind'}): ${how} as ${follow?.jobId ?? '-'}${follow?.reason === 'retry-exists' ? " (the Kernel's own redo)" : ''}${plan.grants.length ? `, +grants ${plan.grants.join(', ')}` : ''}${wire ? `; wire ${wire.jobId} owns ${plan.wire.join(', ')}` : ''}` });
+}
 // One open pattern incident per (workflow, op) once its failed-no-report settles reach the threshold.
 const raiseDeadWorkerPattern = (ledger, job) => {
   const db = ledger.db, op = jobOpOf(job), workflowId = job.workflow_id;
@@ -8233,6 +8313,13 @@ async function cmdSettle(ledger, args, repo) {
         { shape: failureShapeOf({ reportFiled, reportOutcome, claimOverruled, failureClass: failure?.class ?? null, op: jobOpOf(job) }), envelope, repo, failure });
       if (failure) db.prepare('UPDATE jobs SET result_json=json_set(result_json, \'$.failureClass\', json(?)) WHERE job_id=?').run(JSON.stringify(failure), jobId);
       if (nextStep?.kind === 'peer-blocked') peerBlocked = jobResultOf(db.prepare('SELECT result_json FROM jobs WHERE job_id=?').get(jobId)).peerBlocked ?? null;
+    }
+    // A canon slice that settled blocked with a filed report is never a dead end (canonSettleFollowUp):
+    // its committed part continues, its relocation grants widen, its shared/config/public-entry needs go to the wire.
+    if (verdict === 'blocked' && reportFiled && !claimOverruled && payload.cut && !nextStep) {
+      try { nextStep = canonSettleFollowUp(ledger, { ...job, payload_json: JSON.stringify(payload) }, payload, envelope) ?? null; } catch (error) {
+        ledger.appendEvent({ workflowId: job.workflow_id, entityType: 'job', entityId: jobId, kind: 'canon-follow-up-failed', payload: { error: String(error?.message ?? error).slice(0, 400) } });
+      }
     }
     // The owner's approval, recorded after the settle it rides on so it is
     // newer than every business settle (api finish reads it: handoverGateOf).

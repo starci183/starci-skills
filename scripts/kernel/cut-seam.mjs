@@ -356,6 +356,104 @@ export function canonRedispatchOf(db, jobId, { extraPaths = [] } = {}) {
   return { jobId: row.job_id, status: row.status, ...params, patch: patch.path ?? null, owned, command };
 }
 
+/**
+ * The cut manifest a slice binds before its first edit (code.refactor step 1, "the stable cut id/ordinal/total,
+ * complete path-union manifest and passed-ordinal state"), read from the ledger's cut set at dispatch so the
+ * packet carries it: every ordinal's latest live job with its owned paths and status, the path union, the
+ * passed and open ordinals, ordinals no job holds yet (`absent`), any overlap between two ordinals' paths, and
+ * the cut's canon-wire legs. Before this the packet held only {id, ordinal, total} and slices blocked
+ * authority on the missing manifest (wf-nivo-fe-canon-mujek980 op-code.refactor-cae0499f4a, -da9ab10e32).
+ */
+export function cutManifestOf(db, { workflowId, op, cut, ownJobId = null }) {
+  if (!cut || cut.id == null) return null;
+  const rows = db.prepare(`SELECT job_id,status,attempt,worker_id,payload_json,json_extract(payload_json,'$.cut.ordinal') AS ordinal FROM jobs
+    WHERE workflow_id=? AND op_id=? AND json_extract(payload_json,'$.cut.id')=? ORDER BY attempt`).all(workflowId, op, String(cut.id))
+    .filter((row) => row.job_id === ownJobId || (row.status !== 'cancelled' && !retiredBeforeDispatch(row)));
+  const latest = new Map();
+  for (const row of rows) latest.set(Number(row.ordinal), row);
+  const total = Math.max(0, Number(cut.total) || 0);
+  const ordinals = [];
+  for (let n = 1; n <= total; n += 1) {
+    const row = latest.get(n);
+    ordinals.push(row ? { ordinal: n, jobId: row.job_id, status: row.status, paths: ownedOf(payloadOf(row)) } : { ordinal: n, jobId: null, status: 'absent', paths: [] });
+  }
+  // Only open ordinals can collide: a passed ordinal's paths are history (its leases are released).
+  const live = ordinals.filter((o) => o.status !== 'succeeded' && o.paths.length);
+  const overlapsOut = [];
+  for (let i = 0; i < live.length; i += 1) {
+    for (let j = i + 1; j < live.length; j += 1) {
+      const hit = live[i].paths.find((a) => live[j].paths.some((b) => overlaps(a, b)));
+      if (hit) overlapsOut.push({ ordinals: [live[i].ordinal, live[j].ordinal], path: hit });
+    }
+  }
+  const wires = db.prepare(`SELECT job_id,status,payload_json FROM jobs WHERE workflow_id=? AND op_id=? AND json_extract(payload_json,'$.params.canonWire')=1
+    AND status<>'cancelled' ORDER BY attempt`).all(workflowId, op).map((row) => ({ jobId: row.job_id, status: row.status, paths: ownedOf(payloadOf(row)) }));
+  return {
+    source: 'ledger cut set at dispatch', cutId: String(cut.id), total, self: Number(cut.ordinal),
+    passed: ordinals.filter((o) => o.status === 'succeeded').map((o) => o.ordinal),
+    open: ordinals.filter((o) => o.status !== 'succeeded').map((o) => o.ordinal),
+    absent: ordinals.filter((o) => o.status === 'absent').map((o) => o.ordinal),
+    pathUnion: [...new Set(ordinals.flatMap((o) => o.paths))].sort(),
+    disjoint: overlapsOut.length === 0, overlaps: overlapsOut.slice(0, 20),
+    ordinals, wires,
+  };
+}
+
+/** The prompt lines of a bound cut manifest (op-prompt.mjs). */
+export function cutManifestPromptLines(manifest) {
+  if (!manifest) return [];
+  return [
+    `cut_manifest: bound at dispatch from the ledger (packet context.cut.manifest, api op-contract --json): ${manifest.total} ordinal(s), path union ${manifest.pathUnion.length} path(s), ${manifest.disjoint ? 'pairwise-disjoint' : `OVERLAPS ${manifest.overlaps.map((o) => `${o.ordinals.join('/')}@${o.path}`).slice(0, 3).join(', ')}`}`,
+    `  passed ordinals: ${manifest.passed.join(',') || '(none)'}; open: ${manifest.open.join(',') || '(none)'}${manifest.absent.length ? `; no job yet: ${manifest.absent.join(',')}` : ''}; canon-wire legs: ${manifest.wires.map((w) => `${w.jobId} ${w.status}`).join(', ') || '(none)'}`,
+    `  this IS the complete path-union manifest and passed-ordinal state the brief requires: bind it, never block for it; a sibling path is never yours to edit`,
+  ];
+}
+
+const CONFIG_FILE_RE = /(?:^|\/)(?:architecture\.json|tsconfig[^/]*\.json|package\.json|\.eslintrc[^/]*|[^/]+\.config\.[cm]?[jt]s)$/;
+const PUBLIC_ENTRY_RE = /\/index\.[cm]?[jt]sx?$/;
+/**
+ * What settle does with a canon slice (params.canonFamilies, not the canon-wire leg) that settled blocked or
+ * failed WITH a filed report, so a partial or scope-bound slice is never a dead end (wf-nivo-fe-canon-mujek980
+ * 06:01-06:03Z: 14 slices blocked on shared-change after committing in-ceiling work, nothing requeued them):
+ *   - `resumeFrom`: the commit it left (its report head, else a commit its report names) - the follow-up is a
+ *     continuation from it, never a redo;
+ *   - `grants`: relocation destinations its report names outside its paths that no sibling ordinal holds -
+ *     the follow-up owns them;
+ *   - `wire`: shared-root/config/public-entry files and destinations a sibling holds - the canon-wire leg's.
+ * Pure over its inputs; null when the slice is no canon slice or there is nothing to follow up.
+ */
+export function canonSettleFollowUpOf({ payload, report, manifest = null, destinations = [], commit = null, sharedRoots = ['architecture.json'] }) {
+  const params = payload?.params ?? {};
+  if (!payload?.cut || !String(params.canonFamilies ?? '').trim() || params.canonWire === true) return null;
+  if (!report || !['blocked', 'failed'].includes(String(report.outcome))) return null;
+  const owned = ownedOf(payload);
+  const prefix = (owned.find((p) => /^[^/]+\/(?:apps|packages)\//.test(p)) ?? '').replace(/^([^/]+\/)(?:apps|packages)\/.*$/, '$1');
+  const norm = (p) => { const clean = String(p).replace(/\\/g, '/').replace(/\/+$/, ''); return prefix && !clean.startsWith(prefix) ? `${prefix}${clean}` : clean; };
+  const siblings = (manifest?.ordinals ?? []).filter((o) => o.ordinal !== Number(payload.cut.ordinal) && o.status !== 'succeeded').flatMap((o) => o.paths);
+  const grants = [], wire = [];
+  const text = [report.summary, report.blocker?.detail, ...(report.checks ?? []).map((c) => c?.evidence)].join(' ');
+  // A page surface under components/pages moves to its feature tier (pages is a FEATURE tier, FE_SOURCE_LAYOUT_INVALID,
+  // FE_ROUTE_ONE_PAGE): the destination is known from the owned path itself, not only from the report's prose.
+  const derived = owned.map((p) => /^(.*\/src)\/components\/pages\/([^/]+)$/.exec(p)).filter(Boolean).map((m) => `${m[1]}/features/pages/${m[2]}`);
+  // A new or moved feature owner is registered in its package's shared root (architecture.json): the wire's.
+  const packages = [...new Set(owned.map((p) => /^(.*)\/src\//.exec(p)?.[1]).filter(Boolean))];
+  const sharedNamed = sharedRoots.filter((root) => text.includes(root));
+  const sharedWire = (derived.length || sharedNamed.length) ? packages.flatMap((pkg) => (sharedNamed.length ? sharedNamed : sharedRoots).map((root) => `${pkg}/${root}`)) : [];
+  for (const dest of [...destinations.map(norm), ...derived, ...sharedWire]) {
+    if (owned.some((o) => within(dest, o))) continue;
+    if (CONFIG_FILE_RE.test(dest) || sharedRoots.some((root) => dest === root || dest.endsWith(`/${root}`))) { wire.push(dest); continue; }
+    // A public entry (index.*) is its folder's: the slice gets the folder unless a sibling holds it.
+    const target = PUBLIC_ENTRY_RE.test(dest) ? dest.replace(PUBLIC_ENTRY_RE, '') : dest;
+    if (!target || owned.some((o) => overlaps(target, o) && target.length <= o.length)) { wire.push(dest); continue; }
+    if (siblings.some((p) => overlaps(target, p))) wire.push(dest);
+    else grants.push(target);
+  }
+  const head = /^[0-9a-f]{7,40}$/i.test(String(report.head ?? '')) ? String(report.head) : (commit ?? null);
+  const blocker = String(report.blocker?.kind ?? '');
+  if (!head && !grants.length && !wire.length && blocker !== 'shared-change') return null;
+  return { resumeFrom: head, grants: [...new Set(grants)], wire: [...new Set(wire)], blocker: blocker || null };
+}
+
 // The Kernel's two canon-cut commands (modules/kernel/driver-loop.yaml enqueue.cutExecution):
 //   node scripts/kernel/cut-seam.mjs canon-plan --scan <canon-scan --json file> --cut-id <id>
 //   node scripts/kernel/cut-seam.mjs canon-redispatch --repo <ledger repo> --job <blocked slice job> [--paths <extra csv>]

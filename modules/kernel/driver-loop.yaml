@@ -356,7 +356,13 @@ tick:
       [--paths <grants it lacked>]` prints the `api enqueue ... --cut-id <id>
       --cut-ordinal <n> --cut-total <N> --retry-of <job> --params
       '{"resumeFrom":"<its patch head>","admissionBase":"<its admission
-      base>"}'` to run. The semantic leg also waits for every canon-wire leg
+      base>"}'` to run. A canon slice that settles blocked with a filed report
+      is followed up by settle itself (result nextStep kind canon-follow-up,
+      scripts/kernel/cut-seam.mjs canonSettleFollowUpOf) - a continuation from
+      its commit owning its page relocations, its shared-root needs added to
+      the queued canon-wire leg - so the Kernel never enqueues a second redo
+      of that job; every slice packet carries context.cut.manifest (the path
+      union and passed ordinals) from dispatch. The semantic leg also waits for every canon-wire leg
       of the cut. Route the set spread across
       the fan-out order by routing each slice with plain `api route --job
       <id>` in turn: persisted routes count queued and leased lanes and the

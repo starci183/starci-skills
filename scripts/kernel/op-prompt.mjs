@@ -14,7 +14,7 @@ import { PATHSPEC_LIST_COMMIT } from '../guards/git-policy.mjs';
 import { renderPromptReads } from '../context/pack.mjs';
 import { renderGrammarContext } from './grammar-context.mjs';
 import { jobLogDirOf, sidecarFileOf } from './typed-logs.mjs';
-import { seamPromptLines } from './cut-seam.mjs';
+import { cutManifestPromptLines, seamPromptLines } from './cut-seam.mjs';
 import { resumePromptLines } from './resume-context.mjs';
 import { specsBriefLines, specsOf } from './spec-deferral.mjs';
 
@@ -149,6 +149,7 @@ export function buildOpPrompt({ skillRoot, packet, jobId = null, repo = null, pr
   ...renderGrammarContext(packet.context.grammar),
   ...(packet.context.cut ? [`cut: ${packet.context.cut.id} ordinal=${packet.context.cut.ordinal}/${packet.context.cut.total} — this job owns only this bounded SAME-op slice; never widen to sibling slices`] : []),
   ...seamPromptLines({ cut: packet.context.cut, jobLabel, api: path.join(skillRoot, 'scripts', 'kernel', 'api.mjs'), repoLabel }),
+  ...cutManifestPromptLines(packet.context.cut?.manifest),
   ...(roots.length ? [`writes_in: ${roots.map((p) => `${path.resolve(p.root)}${p.repository ? ` (repository ${p.repository})` : ''}`).join(', ')} — each owned path below is relative to your checkout ${cwd} unless it is written rooted at another checkout; edit, commit and report head in the checkout that holds it (api settle checks it there)`] : []),
   ownedPathsLine({ paths: [...new Set(owned.filter((p) => !p.unresolved).map((p) => renderOwnedPath(p, cwd)))], repo, workflowId: packet.context.workflow?.id ?? null, jobId }),
   `   only owned_paths may be modified; anything else is out of scope.`,
