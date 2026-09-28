@@ -12,8 +12,7 @@
  * generalises on its own, and the gap between them is exactly where a third step gets invented.
  */
 
-/** Forward-slash form of a filename, so Windows paths compare like every other path. */
-const normalizePath = (filename) => String(filename || "").replace(/\\/g, "/")
+import { normalizePath } from "./lib/path.mjs"
 
 /** The one module allowed to name a glyph from a library. */
 const ICON_MODULE_RELATIVE = "leaves/Icon/index.tsx"

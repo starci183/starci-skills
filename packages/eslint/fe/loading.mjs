@@ -12,8 +12,7 @@
  * lint rule is for - the one nothing else will ever report.
  */
 
-/** Forward-slash form of a filename, so Windows paths compare like every other path. */
-const normalizePath = (filename) => String(filename || "").replace(/\\/g, "/")
+import { normalizePath } from "./lib/path.mjs"
 
 /** The component tree; a placeholder in a test fixture is a fixture, not a second tree. */
 const isComponentFile = (filename) => normalizePath(filename).includes("/src/components/")

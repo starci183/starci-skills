@@ -3,7 +3,7 @@
  * classNames files own the utility-token composition.
  */
 
-const normalizePath = (filename) => String(filename || "").replace(/\\/g, "/")
+import { normalizePath } from "./lib/path.mjs"
 const isComponentSource = (filename) => normalizePath(filename).includes("/src/components/")
 const isClassNamesFile = (filename) => /\/classNames\.tsx?$/.test(normalizePath(filename))
 const isClassAttribute = (node) => node.type === "JSXAttribute" && ["className", "class"].includes(node.name?.name)

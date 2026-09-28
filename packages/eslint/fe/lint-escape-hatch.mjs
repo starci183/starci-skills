@@ -1,7 +1,6 @@
 /** The rule and flat-config fence that hold `lint-escape-hatch.md`. */
 
-/** Forward-slash form of a filename, so Windows paths compare like every other path. */
-const normalizePath = (filename) => String(filename || "").replace(/\\/g, "/")
+import { normalizePath } from "./lib/path.mjs"
 
 /** Product source is governed; canon tests deliberately construct forbidden directives. */
 const isProductSource = (filename) => normalizePath(filename).includes("/src/")

@@ -11,8 +11,7 @@
  * that splits, so the convention does the scoping and the rule needs no configuration.
  */
 
-/** Forward-slash form of a filename, so Windows paths compare like every other path. */
-const normalizePath = (filename) => String(filename || "").replace(/\\/g, "/")
+import { normalizePath } from "./lib/path.mjs"
 
 /** The drawing half, named by the convention every split surface follows. */
 const isDrawingHalf = (filename) => /(?:^|\/)component\.tsx$/.test(normalizePath(filename))

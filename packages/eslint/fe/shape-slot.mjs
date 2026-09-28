@@ -19,8 +19,7 @@
  * never wrong, beyond it.
  */
 
-/** Forward-slash form of a filename, so Windows paths compare like every other path. */
-const normalizePath = (filename) => String(filename || "").replace(/\\/g, "/")
+import { normalizePath } from "./lib/path.mjs"
 
 /** The pure half of a split tier, and which tier it is. */
 const pureHalf = (filename) => {

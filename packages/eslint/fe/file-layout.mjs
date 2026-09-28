@@ -12,8 +12,7 @@
  * to rather than merely refusing.
  */
 
-/** Forward-slash form of a filename, so Windows paths compare like every other path. */
-const normalizePath = (filename) => String(filename || "").replace(/\\/g, "/")
+import { normalizePath } from "./lib/path.mjs"
 
 /** Tiers whose folder holds exactly the two halves of one surface. */
 // `features/` is the current root for route-facing surfaces (knowledge FE-FOLDER-1); `components/` is the

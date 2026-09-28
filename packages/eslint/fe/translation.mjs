@@ -17,8 +17,7 @@
  * copy and spares tokens is worth more than a clever one nobody trusts.
  */
 
-/** Forward-slash form of a filename, so Windows paths compare like every other path. */
-const normalizePath = (filename) => String(filename || "").replace(/\\/g, "/")
+import { normalizePath } from "./lib/path.mjs"
 
 /** Tiers that receive every word they render: they know no domain, so they can know no sentence. */
 const VOCABULARY_DIRS = ["leaves", "shells", "composites", "branches"]

@@ -10,8 +10,7 @@
  * hand-rolled - with the right tag and the wrong look, or the right look and no tag.
  */
 
-/** Forward-slash form of a filename, so Windows paths compare like every other path. */
-const normalizePath = (filename) => String(filename || "").replace(/\\/g, "/")
+import { normalizePath } from "./lib/path.mjs"
 
 /** Product source lives under `src/`; tooling and config are out of scope. */
 const isSourceFile = (filename) => normalizePath(filename).includes("/src/")
