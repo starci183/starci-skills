@@ -1302,7 +1302,18 @@ export function checkNextErrors({ root, files, ruleIds, contextFiles = [], sourc
     const available = new Set([...files, ...contextFiles]);
     if (sourceContextFiles !== undefined && sourceContextFiles.some(file => !available.has(file))) throw Error('Every Next sourceContextFiles path must also be selected or present in contextFiles.');
     const document = readContract(repository), config = loadArchitectureConfig(repository, architectureConfig), context = buildTypeScriptContext(config);
-    if (context.errors.length) throw Error(context.errors.map(error => error.message).join('; '));
+    // An unresolved internal import is a located defect of the file that holds it, never the whole machine's
+    // failure (wf-nivo-fe-canon-mujek980: @/i18n/navigation residue in 39 sibling files made every slice's
+    // scoped lint unavailable). On a selected file it is that file's located input gap - a finding of the slice
+    // that owns it; on a context-only file it is recorded in execution.contextImportGaps and the check runs.
+    const importGap = (error) => error?.ruleId === 'ARCH_INTERNAL_IMPORT_UNRESOLVED' && typeof error.path === 'string' && error.path;
+    const selected = new Set(files);
+    const fatal = context.errors.filter(error => !importGap(error));
+    if (fatal.length) throw Error(fatal.map(error => error.message).join('; '));
+    const gaps = context.errors.filter(importGap);
+    for (const error of gaps.filter(item => selected.has(item.path))) result.errors.push({ ruleId: null, path: error.path, line: error.line ?? null, column: error.column ?? null, message: error.message });
+    const contextGaps = gaps.filter(item => !selected.has(item.path));
+    if (contextGaps.length) result.execution = { ...(result.execution ?? {}), contextImportGaps: contextGaps.map(item => ({ path: item.path, line: item.line ?? null, specifier: item.specifier ?? null })).slice(0, 200) };
     const coverageRoots = [...new Set([
       ...document.sourceRoots,
       ...(ruleIds.includes('FE_NEXT_ERROR_BOUNDARY_LOCATION') ? config.frontend.routes : []),

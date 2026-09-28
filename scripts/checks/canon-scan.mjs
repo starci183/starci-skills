@@ -310,10 +310,16 @@ export async function scanCanon(options) {
       result = outcome.result;
     }
     catch (error) { result = { errors: [{ ruleId: 'ARCH_EXECUTION_UNAVAILABLE', message: String(error.message ?? error) }], violations: [] }; }
-    if (result.errors?.length) {
+    // An unresolved internal import located on a file is that file's finding (the slice holding it repoints it),
+    // never the machine's unavailability (wf-nivo-fe-canon-mujek980: @/i18n/navigation residue left by a moved
+    // seam made every slice's canon-scan exit 3). Anything else the machine could not do stays unavailable.
+    const importGaps = (result.errors ?? []).filter((error) => error.ruleId === 'ARCH_INTERNAL_IMPORT_UNRESOLVED' && error.path);
+    const machineErrors = (result.errors ?? []).filter((error) => !importGaps.includes(error));
+    for (const error of importGaps) all.push({ machine: 'architecture', ruleId: error.ruleId, family: 'architecture', file: posixPath(error.path), line: error.line ?? 0, fixable: false, ...(error.specifier ? { specifier: error.specifier } : {}) });
+    if (machineErrors.length) {
       report.machines.architecture = { status: 'unavailable', files: result.files ?? 0 };
-      for (const error of result.errors) report.issues.push({ machine: 'architecture', code: error.ruleId, message: error.message });
-    } else report.machines.architecture = { status: 'ran', files: result.files ?? 0 };
+      for (const error of machineErrors) report.issues.push({ machine: 'architecture', code: error.ruleId, message: error.message, ...(error.path ? { path: posixPath(error.path) } : {}) });
+    } else report.machines.architecture = { status: 'ran', files: result.files ?? 0, ...(importGaps.length ? { importGaps: importGaps.length } : {}) };
     for (const violation of result.violations ?? []) {
       all.push({ machine: 'architecture', ruleId: violation.ruleId, family: 'architecture', file: posixPath(violation.path ?? violation.file ?? ''), line: violation.line ?? 0, fixable: false, ...(violation.resolvedPath ? { related: posixPath(violation.resolvedPath) } : {}) });
     }
