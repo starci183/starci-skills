@@ -2,7 +2,7 @@
  * StarCi's React/TypeScript canon is published as @starci/eslint-canon-fe; this repository owns
  * only which globs the law applies to. Mirrors the reference config at
  * starci-academy-fe/eslint.config.mjs, with every block scoped to APP_GLOBS - this example tree
- * also holds out-of-lane scratch (root *.mjs harnesses, uat/) that lint must not govern.
+ * also holds out-of-lane scratch (scripts/ harnesses, e2e/) that lint must not govern.
  */
 import starciFe, {
     recommended as starciRecommended,
@@ -18,7 +18,7 @@ import pluginReactHooks from "eslint-plugin-react-hooks"
 import { defineConfig } from "eslint/config"
 import jsxA11y from "eslint-plugin-jsx-a11y"
 
-const APP_GLOBS = ["src/**/*.{ts,tsx}"]
+const APP_GLOBS = ["apps/*/src/**/*.{ts,tsx}", "apps/*/test/**/*.{ts,tsx}"]
 
 export default defineConfig([
     {
@@ -69,7 +69,7 @@ export default defineConfig([
         },
     },
     starciFeConfig({
-        layout: "single-app",
+        layout: "monorepo",
         plugin: starciFe,
         recommended: starciRecommended,
         linterOptions: starciLinterOptions,
@@ -86,14 +86,14 @@ export default defineConfig([
         // A connected block and its pure twin are an architectural boundary, not a local lint
         // preference. Inline config is disabled in both halves so neither `eslint-disable` nor
         // `eslint-enable` can turn that boundary off. There is deliberately no allowlist.
-        files: ["src/components/blocks/**/{index,component}.tsx"],
+        files: ["apps/*/src/components/blocks/**/{index,component}.tsx"],
         linterOptions: { noInlineConfig: true },
     },
     {
         // The legacy filename-twin heuristic is switched off for connected blocks per
         // NEXT-LEGACY-BLOCK-TWIN-GUARD (the conditional world-owner architecture check
         // replaces it) - see the starci.codePatterns block in package.json.
-        files: ["src/components/blocks/**/index.tsx"],
+        files: ["apps/*/src/components/blocks/**/index.tsx"],
         rules: {
             "starci-fe/connected-block-has-presentational-twin": "off",
         },

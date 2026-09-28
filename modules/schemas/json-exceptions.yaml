@@ -145,22 +145,26 @@ exceptions:
     reason: TypeScript build project config for the real todo-app-backend example; tsc expects a JSON tsconfig file.
   - path: examples/todo-app-backend/tsconfig.json
     reason: TypeScript project config for the real todo-app-backend example; tsc expects a JSON tsconfig file.
+  - path: examples/todo-app-frontend/apps/web/package.json
+    reason: npm workspace manifest for the todo frontend app; Node/npm require JSON filename and syntax.
+  - path: examples/todo-app-frontend/apps/web/src/messages/en.json
+    reason: >
+      i18n message catalog inside the todo-app-frontend app source; the app i18n loader consumes JSON.
+  - path: examples/todo-app-frontend/apps/web/src/messages/vi.json
+    reason: >
+      i18n message catalog inside the todo-app-frontend app source; the app i18n loader consumes JSON.
+  - path: examples/todo-app-frontend/apps/web/tsconfig.json
+    reason: TypeScript project config for the todo frontend app; tsc expects a JSON tsconfig file.
   - path: examples/todo-app-frontend/architecture.json
     reason: Next.js architecture config for the real todo-app-frontend example; the architecture checker reads starci/architecture-config@1 as JSON.
+  - path: examples/todo-app-frontend/e2e/tsconfig.json
+    reason: TypeScript project config for the Playwright uat harness; tsc expects a JSON tsconfig file.
   - path: examples/todo-app-frontend/package-lock.json
     reason: npm lockfile for the real todo-app-frontend example; package managers require JSON filename and syntax.
   - path: examples/todo-app-frontend/package.json
     reason: npm package manifest for the real todo-app-frontend example; Node/npm require JSON filename and syntax.
-  - path: examples/todo-app-frontend/src/messages/en.json
-    reason: >
-      i18n message catalog inside the todo-app-frontend app source; the app i18n loader consumes JSON.
-  - path: examples/todo-app-frontend/src/messages/vi.json
-    reason: >
-      i18n message catalog inside the todo-app-frontend app source; the app i18n loader consumes JSON.
   - path: examples/todo-app-frontend/tsconfig.json
     reason: TypeScript project config for the real todo-app-frontend example; tsc expects a JSON tsconfig file.
-  - path: examples/todo-app-frontend/uat/tsconfig.json
-    reason: TypeScript project config for the Playwright uat harness; tsc expects a JSON tsconfig file.
   - path: knowledge/ui/proof/calibration/calibration.json
     reason: >
       Explicit calibration dataset exception; all other authored knowledge JSON

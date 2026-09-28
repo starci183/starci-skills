@@ -1,0 +1,31 @@
+name: Example frontend checks
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: examples/todo-app-frontend/package-lock.json
+      - run: npm ci
+        working-directory: examples/todo-app-frontend
+      - run: node ../../packages/fe-kit/scripts/link-peers.mjs todo-app-frontend
+        working-directory: examples/todo-app-frontend
+      - run: npm run lint:check
+        working-directory: examples/todo-app-frontend
+      - run: npm run typecheck
+        working-directory: examples/todo-app-frontend
+      - run: npm run test:unit
+        working-directory: examples/todo-app-frontend
+      - run: npm run build
+        working-directory: examples/todo-app-frontend

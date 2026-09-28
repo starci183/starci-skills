@@ -216,16 +216,16 @@ npm test              # jest, rootDir src, testRegex *.spec.ts
 Frontend (`examples/todo-app-frontend/package.json`):
 
 ```sh
-npm run dev        # next dev
-npm run build      # next build
-npm run typecheck  # tsc --noEmit
+npm run dev        # delegates to apps/web: next dev
+npm run build      # delegates to apps/web: next build
+npm run typecheck  # delegates to apps/web: tsc --noEmit
 npm run test:unit  # vitest run
 ```
 
 Infra (`.starcistacks/dev/README.md`): one Compose project,
 `.starcistacks/dev/infra/compose/compose.yaml`, one file per component. `api` and `web` are declared with
 placeholder images behind the `app` Compose profile; this example instead runs both processes on the host —
-`npm run build && npm run start` in `todo-app-backend`, `npx next dev -p 3000` in `todo-app-frontend` —
+`npm run build && npm run start` in `todo-app-backend`, `npm run dev` in `todo-app-frontend` —
 against the infra the compose file brings up:
 
 | command | effect |

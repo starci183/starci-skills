@@ -94,11 +94,11 @@ const SCAFFOLD_KEYS = {
     scripts: ['build', 'dev', 'start', 'test', 'test:unit', 'test:ci', 'test:affected'],
     dependencies: ['next', 'react', 'react-dom', '@starci/grammar'],
     devDependencies: ['@types/react', '@types/react-dom', 'tailwindcss', '@tailwindcss/postcss', 'vitest', '@vitest/coverage-v8', 'jsdom', '@testing-library/react', '@testing-library/jest-dom'],
-    files: ['tsconfig.json', 'next.config.ts', 'postcss.config.mjs', 'vitest.config.ts', 'vitest.setup.ts', 'eslint.config.mjs', 'src/app/globals.css', 'architecture.json'],
+    files: ['tsconfig.json', 'apps/<app>/package.json', 'apps/<app>/tsconfig.json', 'apps/<app>/next.config.ts', 'apps/<app>/postcss.config.mjs', 'apps/<app>/vitest.config.ts', 'vitest.config.ts', 'vitest.setup.ts', 'eslint.config.mjs', 'apps/<app>/src/app/globals.css', 'architecture.json'],
     compilerOptions: ['module', 'moduleResolution', 'target', 'jsx', 'strict'],
   },
 };
-const MANIFEST_SOURCES = ['name', 'version', 'private', 'packageManager', 'engines', 'scripts', 'lint-staged', 'starci', 'dependencies', 'devDependencies'];
+const MANIFEST_SOURCES = ['name', 'version', 'private', 'workspaces', 'packageManager', 'engines', 'scripts', 'lint-staged', 'starci', 'dependencies', 'devDependencies'];
 
 for (const profile of ['nest', 'next']) {
   test(`the ${profile} shape carries every key a scaffold needs to install, build, lint, typecheck and test`, () => {
@@ -132,8 +132,15 @@ for (const profile of ['nest', 'next']) {
       if (file.endsWith('.json')) assert.doesNotThrow(() => JSON.parse(fill(content)), `${file} is JSON`);
     }
     const { compilerOptions } = JSON.parse(fill(shape.files['tsconfig.json']));
-    for (const key of want.compilerOptions) assert.notEqual(compilerOptions[key], undefined, `${profile} tsconfig sets ${key}`);
+    const appOptions = profile === 'next'
+      ? JSON.parse(fill(shape.files['apps/<app>/tsconfig.json'])).compilerOptions
+      : {};
+    for (const key of want.compilerOptions) assert.notEqual(appOptions[key] ?? compilerOptions[key], undefined, `${profile} tsconfig sets ${key}`);
     assert.equal(compilerOptions.strict, common.typescript.strict, 'the baseline stays strict');
+    if (profile === 'next') {
+      assert.deepEqual(shape.manifest.workspaces, ['apps/*', 'packages/*']);
+      assert.equal(JSON.parse(fill(shape.files['apps/<app>/tsconfig.json'])).extends, '../../tsconfig.json');
+    }
   });
 }
 

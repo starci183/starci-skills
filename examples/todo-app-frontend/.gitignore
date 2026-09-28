@@ -4,3 +4,17 @@ next-env.d.ts
 *.tsbuildinfo
 coverage
 .scannerwork/
+test-results/
+playwright-report/
+.turbo/
+.tools/
+*.tmp.json
+report*.json
+*-lint.json
+lf.json
+lt.json
+%*%
+nul
+.qwen*/
+.artifacts/
+.tmp-*

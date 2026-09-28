@@ -56,6 +56,7 @@ export function composeProfile(profile, parameters, doc = readBaseline()) {
   const fill = filler(doc, parameters), resolve = value => deepFill(value, fill, common);
   const sources = {
     name: common.manifest.name, version: common.manifest.version, private: common.manifest.private,
+    workspaces: shape.manifest?.workspaces,
     packageManager: common.packageManager, engines: common.engines,
     scripts: { ...common.scripts, ...shape.scripts }, 'lint-staged': common.manifest['lint-staged'], starci: shape.starci,
     dependencies: { ...shape.dependencies }, devDependencies: { ...common.devDependencies, ...shape.devDependencies },

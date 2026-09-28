@@ -3,25 +3,19 @@
   "private": true,
   "version": "0.1.0",
   "type": "module",
+  "workspaces": [
+    "apps/*"
+  ],
   "scripts": {
-    "dev": "next dev",
-    "build": "next build",
-    "typecheck": "tsc --noEmit",
+    "dev": "npm run dev --workspace @starci/todo-web --",
+    "build": "npm run build --workspace @starci/todo-web --",
+    "start": "npm run start --workspace @starci/todo-web --",
+    "typecheck": "npm run typecheck --workspace @starci/todo-web --",
+    "lint:check": "eslint . --max-warnings=0",
     "test:unit": "vitest run",
     "test:coverage": "vitest run --coverage",
-    "uat": "playwright test -c uat/playwright.config.ts",
-    "uat:typecheck": "tsc --noEmit -p uat/tsconfig.json"
-  },
-  "dependencies": {
-    "@heroui/react": "^3.2.1",
-    "@heroui/styles": "^3.2.1",
-    "@starci-examples/fe-kit": "file:../../packages/fe-kit",
-    "@starci/grammar": "0.4.13",
-    "next": "^15.0.0",
-    "next-intl": "^4.14.5",
-    "react": "^19.0.0",
-    "react-dom": "^19.0.0",
-    "swr": "^2.2.5"
+    "uat": "playwright test -c e2e/playwright.config.ts",
+    "uat:typecheck": "tsc --noEmit -p e2e/tsconfig.json"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.5",
@@ -54,19 +48,19 @@
       "next": {
         "schema": "starci/next-code-pattern-contract@1",
         "projects": [
-          "tsconfig.json"
+          "apps/web/tsconfig.json"
         ],
         "owners": [
           {
-            "root": "src/components/blocks/share-invite",
+            "root": "apps/web/src/components/blocks/share-invite",
             "name": "ShareInvite"
           },
           {
-            "root": "src/components/blocks/task-list",
+            "root": "apps/web/src/components/blocks/task-list",
             "name": "TaskList"
           },
           {
-            "root": "src/components/blocks/sign-in-form",
+            "root": "apps/web/src/components/blocks/sign-in-form",
             "name": "SignInForm"
           }
         ],
@@ -83,11 +77,11 @@
         "errorState": {
           "schema": "starci/next-error-state@1",
           "sourceRoots": [
-            "src"
+            "apps/web/src"
           ],
           "transports": [
             {
-              "root": "src/modules/api",
+              "root": "apps/web/src/modules/api",
               "mode": "throwing"
             }
           ],
@@ -95,21 +89,21 @@
             {
               "id": "share-collaborators-read-refusal",
               "owner": {
-                "path": "src/components/blocks/share-invite/index.tsx",
+                "path": "apps/web/src/components/blocks/share-invite/index.tsx",
                 "export": "ShareInviteBlock"
               },
               "source": {
-                "path": "src/hooks/share/useCollaborators.ts",
+                "path": "apps/web/src/hooks/share/useCollaborators.ts",
                 "export": "useCollaborators"
               },
               "failurePath": "collaboratorsQuery.error",
               "state": {
-                "path": "src/components/blocks/share-invite/component.tsx",
+                "path": "apps/web/src/components/blocks/share-invite/component.tsx",
                 "export": "ShareInviteState"
               },
               "failureState": "refused",
               "render": {
-                "path": "src/components/blocks/share-invite/component.tsx",
+                "path": "apps/web/src/components/blocks/share-invite/component.tsx",
                 "symbol": "ShareInviteView",
                 "stateProp": "state"
               }
@@ -117,21 +111,21 @@
             {
               "id": "share-invite-refusal",
               "owner": {
-                "path": "src/components/blocks/share-invite/index.tsx",
+                "path": "apps/web/src/components/blocks/share-invite/index.tsx",
                 "export": "ShareInviteBlock"
               },
               "source": {
-                "path": "src/hooks/share/useInviteCollaborator.ts",
+                "path": "apps/web/src/hooks/share/useInviteCollaborator.ts",
                 "export": "useInviteCollaborator"
               },
               "failurePath": "invite.error",
               "state": {
-                "path": "src/components/blocks/share-invite/component.tsx",
+                "path": "apps/web/src/components/blocks/share-invite/component.tsx",
                 "export": "ShareInviteState"
               },
               "failureState": "refused",
               "render": {
-                "path": "src/components/blocks/share-invite/component.tsx",
+                "path": "apps/web/src/components/blocks/share-invite/component.tsx",
                 "symbol": "ShareInviteView",
                 "stateProp": "state"
               }
@@ -139,21 +133,21 @@
             {
               "id": "share-revoke-refusal",
               "owner": {
-                "path": "src/components/blocks/share-invite/index.tsx",
+                "path": "apps/web/src/components/blocks/share-invite/index.tsx",
                 "export": "ShareInviteBlock"
               },
               "source": {
-                "path": "src/hooks/share/useRevokeCollaborator.ts",
+                "path": "apps/web/src/hooks/share/useRevokeCollaborator.ts",
                 "export": "useRevokeCollaborator"
               },
               "failurePath": "revoke.error",
               "state": {
-                "path": "src/components/blocks/share-invite/component.tsx",
+                "path": "apps/web/src/components/blocks/share-invite/component.tsx",
                 "export": "ShareInviteState"
               },
               "failureState": "refused",
               "render": {
-                "path": "src/components/blocks/share-invite/component.tsx",
+                "path": "apps/web/src/components/blocks/share-invite/component.tsx",
                 "symbol": "ShareInviteView",
                 "stateProp": "state"
               }
@@ -161,21 +155,21 @@
             {
               "id": "task-list-read-refusal",
               "owner": {
-                "path": "src/components/blocks/task-list/index.tsx",
+                "path": "apps/web/src/components/blocks/task-list/index.tsx",
                 "export": "TaskListBlock"
               },
               "source": {
-                "path": "src/hooks/task/useTasks.ts",
+                "path": "apps/web/src/hooks/task/useTasks.ts",
                 "export": "useTasks"
               },
               "failurePath": "tasksQuery.error",
               "state": {
-                "path": "src/components/blocks/task-list/component.tsx",
+                "path": "apps/web/src/components/blocks/task-list/component.tsx",
                 "export": "TaskListState"
               },
               "failureState": "refused",
               "render": {
-                "path": "src/components/blocks/task-list/component.tsx",
+                "path": "apps/web/src/components/blocks/task-list/component.tsx",
                 "symbol": "TaskListView",
                 "stateProp": "state"
               }
@@ -183,21 +177,21 @@
             {
               "id": "sign-in-refusal",
               "owner": {
-                "path": "src/components/blocks/sign-in-form/index.tsx",
+                "path": "apps/web/src/components/blocks/sign-in-form/index.tsx",
                 "export": "SignInFormBlock"
               },
               "source": {
-                "path": "src/hooks/auth/useSignIn.ts",
+                "path": "apps/web/src/hooks/auth/useSignIn.ts",
                 "export": "useSignIn"
               },
               "failurePath": "refusal",
               "state": {
-                "path": "src/components/blocks/sign-in-form/component.tsx",
+                "path": "apps/web/src/components/blocks/sign-in-form/component.tsx",
                 "export": "SignInFormState"
               },
               "failureState": "refused",
               "render": {
-                "path": "src/components/blocks/sign-in-form/component.tsx",
+                "path": "apps/web/src/components/blocks/sign-in-form/component.tsx",
                 "symbol": "SignInFormView",
                 "stateProp": "state"
               }
@@ -207,85 +201,85 @@
           "writes": [
             {
               "action": {
-                "path": "src/modules/api/share.ts",
+                "path": "apps/web/src/modules/api/share.ts",
                 "export": "inviteCollaborator"
               },
               "feedback": {
-                "path": "src/modules/api/write-feedback.ts",
+                "path": "apps/web/src/modules/api/write-feedback.ts",
                 "export": "runWrite"
               },
               "binding": "callback",
               "sites": [
                 {
-                  "path": "src/modules/api/share.ts",
+                  "path": "apps/web/src/modules/api/share.ts",
                   "export": "inviteCollaboratorAndNotify"
                 }
               ]
             },
             {
               "action": {
-                "path": "src/modules/api/share.ts",
+                "path": "apps/web/src/modules/api/share.ts",
                 "export": "revokeCollaborator"
               },
               "feedback": {
-                "path": "src/modules/api/write-feedback.ts",
+                "path": "apps/web/src/modules/api/write-feedback.ts",
                 "export": "runWrite"
               },
               "binding": "callback",
               "sites": [
                 {
-                  "path": "src/modules/api/share.ts",
+                  "path": "apps/web/src/modules/api/share.ts",
                   "export": "revokeCollaboratorAndNotify"
                 }
               ]
             },
             {
               "action": {
-                "path": "src/modules/api/tasks.ts",
+                "path": "apps/web/src/modules/api/tasks.ts",
                 "export": "createTask"
               },
               "feedback": {
-                "path": "src/modules/api/write-feedback.ts",
+                "path": "apps/web/src/modules/api/write-feedback.ts",
                 "export": "runWrite"
               },
               "binding": "callback",
               "sites": [
                 {
-                  "path": "src/modules/api/tasks.ts",
+                  "path": "apps/web/src/modules/api/tasks.ts",
                   "export": "createTaskAndNotify"
                 }
               ]
             },
             {
               "action": {
-                "path": "src/modules/api/tasks.ts",
+                "path": "apps/web/src/modules/api/tasks.ts",
                 "export": "setTaskComplete"
               },
               "feedback": {
-                "path": "src/modules/api/write-feedback.ts",
+                "path": "apps/web/src/modules/api/write-feedback.ts",
                 "export": "runWrite"
               },
               "binding": "callback",
               "sites": [
                 {
-                  "path": "src/modules/api/tasks.ts",
+                  "path": "apps/web/src/modules/api/tasks.ts",
                   "export": "setTaskCompleteAndNotify"
                 }
               ]
             },
             {
               "action": {
-                "path": "src/modules/api/tasks.ts",
+                "path": "apps/web/src/modules/api/tasks.ts",
                 "export": "deleteTask"
               },
               "feedback": {
-                "path": "src/modules/api/write-feedback.ts",
+                "path": "apps/web/src/modules/api/write-feedback.ts",
                 "export": "runWrite"
               },
               "binding": "callback",
               "sites": [
                 {
-                  "path": "src/modules/api/tasks.ts",
+                  "path": "apps/web/src/modules/api/tasks.ts",
                   "export": "deleteTaskAndNotify"
                 }
               ]
@@ -303,7 +297,7 @@
           "hooks": [
             {
               "id": "share-collaborators-query",
-              "path": "src/hooks/share/useCollaborators.ts",
+              "path": "apps/web/src/hooks/share/useCollaborators.ts",
               "export": "useCollaborators",
               "kind": "query",
               "resultBinding": "collaboratorsQuery",
@@ -324,7 +318,7 @@
             },
             {
               "id": "share-invite-mutation",
-              "path": "src/hooks/share/useInviteCollaborator.ts",
+              "path": "apps/web/src/hooks/share/useInviteCollaborator.ts",
               "export": "useInviteCollaborator",
               "kind": "mutation",
               "resultBinding": "invite",
@@ -345,7 +339,7 @@
             },
             {
               "id": "share-revoke-mutation",
-              "path": "src/hooks/share/useRevokeCollaborator.ts",
+              "path": "apps/web/src/hooks/share/useRevokeCollaborator.ts",
               "export": "useRevokeCollaborator",
               "kind": "mutation",
               "resultBinding": "revoke",
@@ -366,7 +360,7 @@
             },
             {
               "id": "share-task-title-query",
-              "path": "src/hooks/share/useTaskTitle.ts",
+              "path": "apps/web/src/hooks/share/useTaskTitle.ts",
               "export": "useTaskTitle",
               "kind": "query",
               "resultBinding": "taskTitleQuery",
@@ -387,7 +381,7 @@
             },
             {
               "id": "task-list-query",
-              "path": "src/hooks/task/useTasks.ts",
+              "path": "apps/web/src/hooks/task/useTasks.ts",
               "export": "useTasks",
               "kind": "query",
               "resultBinding": "tasksQuery",
@@ -402,7 +396,7 @@
             },
             {
               "id": "task-create-mutation",
-              "path": "src/hooks/task/useCreateTask.ts",
+              "path": "apps/web/src/hooks/task/useCreateTask.ts",
               "export": "useCreateTask",
               "kind": "mutation",
               "resultBinding": "createTask",
@@ -417,7 +411,7 @@
             },
             {
               "id": "task-complete-mutation",
-              "path": "src/hooks/task/useSetTaskComplete.ts",
+              "path": "apps/web/src/hooks/task/useSetTaskComplete.ts",
               "export": "useSetTaskComplete",
               "kind": "mutation",
               "resultBinding": "setTaskComplete",
@@ -432,7 +426,7 @@
             },
             {
               "id": "task-delete-mutation",
-              "path": "src/hooks/task/useDeleteTask.ts",
+              "path": "apps/web/src/hooks/task/useDeleteTask.ts",
               "export": "useDeleteTask",
               "kind": "mutation",
               "resultBinding": "deleteTask",
