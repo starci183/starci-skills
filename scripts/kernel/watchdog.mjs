@@ -45,6 +45,9 @@ import { spawn, spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { allocationMs } from '../../engine/config.mjs';
 import { terminalRead } from '../api/orca/terminal-read.mjs';
+import { terminalList } from '../api/orca/terminal-list.mjs';
+import { orcaCall } from '../api/orca/lib.mjs';
+import { tabTitlesOf } from './terminal-dedupe.mjs';
 import { classifyAgentScreen, staleAwareState, outputAgeOf, exitedAgentPromptRow } from './terminal-liveness.mjs';
 import { sendWakeWithProof, sendEnterWithProof, deliveryFieldsOf, wakeSendRefused, WAKE_BOUNDS, withWakeIdentity } from './wake-delivery.mjs';
 import { terminalClose } from '../api/orca/terminal-close.mjs';
@@ -119,6 +122,22 @@ export const buildWakePrompt = (workflow, attempt = null, revLine = null) => wit
 /** The liveness wake this tick would type, from one api status read: its seat attempt and its kernelRev (runtime-rev.mjs). */
 export const wakePromptOf = (workflow, statusValue) =>
   buildWakePrompt(workflow, statusValue?.kernel?.attempt ?? null, statusValue?.kernel ? revWakeLine(statusValue?.kernelRev, workflow) : null);
+
+/** Repair only the Orca tab title: the agent owns the pane title and may change it on every turn. */
+export function repairKernelTabTitle(terminal, name, { list = () => terminalList({ includeVisualLayouts: true }), tabTitles = tabTitlesOf,
+  rename = (handle, title) => { const r = orcaCall('terminal-rename', { terminal: handle, title }); return { ok: r.exitCode === 0 && Boolean(r.result), error: r.error }; } } = {}) {
+  if (!terminal) return null;
+  try {
+    const listed = list();
+    if (!listed?.ok) return { ok: false, error: listed?.error ?? 'terminal list unavailable' };
+    const row = (listed.terminals ?? []).find((t) => t.handle === terminal && t.connected !== false);
+    if (!row) return { ok: false, error: 'terminal absent from listing' };
+    const title = `[Kernel] ${name}`;
+    if (tabTitles(listed.visualLayouts ?? [], listed.terminals).get(terminal) === title) return null;
+    const result = rename(terminal, title);
+    return { ok: result?.ok === true, terminal, title, ...(result?.ok ? {} : { error: result?.error ?? 'terminal rename failed' }) };
+  } catch (error) { return { ok: false, terminal, error: String(error?.message ?? error) }; }
+}
 
 const api = command => runNodeJson(apiFile, [command, '--repo', path.resolve(repo), '--workflow', workflowId, '--json']);
 
@@ -308,10 +327,15 @@ async function statusTick() {
   }
   const heldWorkersReleased = repair && (status.value?.frontier?.heldWorkerJobs ?? []).length ? releaseHeldWorkers(status.value) : null;
   const result = kernelTick(status, phase);
+  // Creation supplies the title, but a moved/restored tab can lose it. The sidebar reads
+  // visualLayouts' tab title, not terminal-list's agent-controlled pane title.
+  const titleTerminal = result.replacementTerminal ?? result.adoptedTerminal ?? result.terminal;
+  const titleRepair = repair && titleTerminal && (result.replacementTerminal || result.adoptedTerminal || !['host-unavailable', 'terminal-unverified', 'restart-failed', 'adopt-failed', 'terminal-unreadable', 'restart-needed', 'agent-exit-unconfirmed', 'kernel-terminal-close-failed'].includes(result.action))
+    ? repairKernelTabTitle(titleTerminal, status.value.title ?? workflowId) : null;
   // The runtime revision the Kernel acked and the wake this tick types (or would type): a read-only --once
   // probe shows what the next wake carries (runtime-rev.mjs).
   const kernelRev = status.value?.kernelRev ?? null;
-  return { ...result, ...(kernelRev ? { kernelRev, nextWake: wakePromptOf(workflowId, status.value) } : {}), ...(deadWorkersRecovered ? { deadWorkersRecovered } : {}), ...(heldWorkersReleased ? { heldWorkersReleased } : {}) };
+  return { ...result, ...(titleRepair ? { titleRepair } : {}), ...(kernelRev ? { kernelRev, nextWake: wakePromptOf(workflowId, status.value) } : {}), ...(deadWorkersRecovered ? { deadWorkersRecovered } : {}), ...(heldWorkersReleased ? { heldWorkersReleased } : {}) };
 }
 
 function kernelTick(status, phase) {

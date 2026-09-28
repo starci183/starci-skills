@@ -38,12 +38,15 @@ import { sleepSync } from '../lib/sleep-sync.mjs';
 import { INPUT_GLYPH_CLASS } from '../lib/input-glyph.mjs';
 import { readInbox, getSupervisor, heartbeatSupervisor } from '../connectors/telegram-bridge.mjs';
 import {
-  SKILL_ROOT, SUPERVISOR_ID, SUPERVISOR_WF, openSupervisorLedger, withSupervisorRead, seatOf, enabledOf, supervisorEvent, supervisorSettings,
+  SKILL_ROOT, SUPERVISOR_ID, SUPERVISOR_WF, SUPERVISOR_TITLE, WORKER_TITLE_PREFIX, openSupervisorLedger, withSupervisorRead, seatOf, enabledOf, supervisorEvent, supervisorSettings,
   supervisorMode, terminalSignalDb, supervisorLog, logsRoot, DEFAULTS,
 } from './home.mjs';
 import { seatHealth } from './start-supervisor.mjs';
 import { jobsOf, reportOf, releaseLeases } from './workers.mjs';
 import { parseJsonOr } from '../lib/json.mjs';
+import { terminalList } from '../api/orca/terminal-list.mjs';
+import { terminalRename } from '../api/orca/terminal-rename.mjs';
+import { tabTitlesOf } from '../kernel/terminal-dedupe.mjs';
 
 const selfFile = fileURLToPath(import.meta.url);
 const START_FILE = path.join(SKILL_ROOT, 'scripts', 'supervisor', 'start-supervisor.mjs');
@@ -174,6 +177,8 @@ async function hostDeps() {
     try { return liveness.outputAgeOf(terminalShow({ terminal: handle })?.terminal?.lastOutputAt).outputAgeMs; } catch { return null; }
   };
   return {
+    list: () => terminalList({ includeVisualLayouts: true }), tabTitles: tabTitlesOf,
+    rename: (terminal, title) => terminalRename({ terminal, title }),
     verdict: (h) => host.kernelTerminalVerdict(h), screen, exitedRow: liveness.exitedAgentPromptRow, settleMs: host.DEATH_SETTLE_MS, outputAge,
     // Escape (no Enter) leaves an input row that targets a subagent before the wake is typed.
     escape: (handle) => { try { return terminalSend({ terminal: handle, text: '\u001b', enter: false }); } catch (e) { return { ok: false, error: String(e?.message ?? e) }; } },
@@ -195,6 +200,29 @@ async function hostDeps() {
     },
     sleep: sleepSync,
   };
+}
+
+/** Restore runtime names in Orca's sidebar from the tab titles, never from agent-controlled pane titles. */
+export function repairSupervisorTabTitles(seatTerminal, workers, d) {
+  if (!d?.list || !d?.rename) return [];
+  let listed;
+  try { listed = d.list(); } catch { return []; }
+  if (!listed?.ok) return [];
+  const titles = (d.tabTitles ?? tabTitlesOf)(listed.visualLayouts ?? [], listed.terminals ?? []);
+  const expected = [
+    { terminal: seatTerminal, title: SUPERVISOR_TITLE },
+    ...workers.filter((job) => job.worker_id && !job.payload?.self && !job.payload?.terminalClosed)
+      .map((job) => ({ terminal: job.worker_id, title: `${WORKER_TITLE_PREFIX} ${job.payload.cluster}`.slice(0, 80) })),
+  ];
+  const repairs = [];
+  for (const { terminal, title } of expected) {
+    if (!terminal || titles.get(terminal) === title || !(listed.terminals ?? []).some((t) => t.handle === terminal && t.connected !== false)) continue;
+    try {
+      const r = d.rename(terminal, title);
+      repairs.push({ terminal, title, ok: r?.ok === true, ...(r?.ok ? {} : { error: r?.error ?? 'terminal rename failed' }) });
+    } catch (error) { repairs.push({ terminal, title, ok: false, error: String(error?.message ?? error) }); }
+  }
+  return repairs;
 }
 
 /** The [Worker] sweep: returns {deaths:[{jobId, reason}], closed:[...]}. */
@@ -266,11 +294,13 @@ export async function watchdogPass({ env = process.env, d = null, now = Date.now
     if (!health.live) {
       ledger.close();
       const replaced = deps.replace();
+      const titleRepairs = replaced?.ok && replaced?.terminal ? repairSupervisorTabTitles(replaced.terminal, [], deps) : [];
       supervisorLog('watchdog', `replace: ${JSON.stringify(replaced)}`, { env });
-      return { ok: replaced?.ok !== false, action: replaced?.action === 'booted' || replaced?.action === 'restarted' ? 'restarted' : (replaced?.action ?? 'replace-failed'), reason: health.reason, detail: replaced };
+      return { ok: replaced?.ok !== false, action: replaced?.action === 'booted' || replaced?.action === 'restarted' ? 'restarted' : (replaced?.action ?? 'replace-failed'), reason: health.reason, detail: replaced, ...(titleRepairs.length ? { titleRepairs } : {}) };
     }
     const terminal = health.terminal;
     const sweep = sweepWorkers(ledger, deps, { now: now() });
+    const titleRepairs = repairSupervisorTabTitles(terminal, jobsOf(ledger.db, ['running']), deps);
     const sup = getSupervisor(SUPERVISOR_ID, env);
     const registered = Boolean(sup && sup.terminal === terminal);
     if (registered) heartbeatSupervisor(SUPERVISOR_ID, { env });
@@ -279,7 +309,7 @@ export async function watchdogPass({ env = process.env, d = null, now = Date.now
     const filed = filedReports(ledger.db, now());
     const plan = planWake({ now: now(), pollIntervalMs: settings.pollIntervalMs, lastTickAt: lastEvent(ledger.db, 'supervisor-tick')?.at ?? null,
       wakes: recentWakes(ledger.db), unread, reported, filed, workerDeaths: sweep.deaths, registered });
-    if (!plan.text) return { ok: true, action: 'idle', terminal, registered, workers: sweep };
+    if (!plan.text) return { ok: true, action: 'idle', terminal, registered, workers: sweep, ...(titleRepairs.length ? { titleRepairs } : {}) };
     const state = deps.state(terminal);
     if (state === 'queued-input' || state === 'staged-input') {
       const proof = deps.enter(terminal);
@@ -307,8 +337,9 @@ export async function watchdogPass({ env = process.env, d = null, now = Date.now
         ledger.transaction(() => supervisorEvent(ledger, { kind: 'supervisor-frozen-replace', now: now(), payload: { terminal, signature, since: frozen.state.since, reads: frozen.state.reads, wake: woke.action ?? null } }));
         ledger.close();
         const replaced = deps.replace();
+        const titleRepairs = replaced?.ok && replaced?.terminal ? repairSupervisorTabTitles(replaced.terminal, [], deps) : [];
         supervisorLog('watchdog', `frozen-replace: ${JSON.stringify(replaced)}`, { env });
-        return { ok: replaced?.ok !== false, action: replaced?.action === 'booted' || replaced?.action === 'restarted' ? 'restarted' : (replaced?.action ?? 'replace-failed'), terminal, tags: plan.tags, detail: replaced };
+        return { ok: replaced?.ok !== false, action: replaced?.action === 'booted' || replaced?.action === 'restarted' ? 'restarted' : (replaced?.action ?? 'replace-failed'), terminal, tags: plan.tags, detail: replaced, ...(titleRepairs.length ? { titleRepairs } : {}) };
       }
       return { ok: woke.delivered === true || woke.action === 'kernel-busy', action: woke.delivered ? 'frozen-woken' : woke.action, terminal, tags: plan.tags, workers: sweep };
     }
