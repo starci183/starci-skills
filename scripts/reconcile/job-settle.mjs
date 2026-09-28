@@ -54,7 +54,7 @@ import path from 'node:path';
 import crypto from 'node:crypto';
 import { spawnSync, spawn } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
-import { openLedger, ledgerFileFor } from '../../engine/ledger-db.mjs';
+import { openLedger, ledgerFileFor, updateAttempt } from '../../engine/ledger-db.mjs';
 import { allocationSettings } from '../../engine/config.mjs';
 import { claimManager, lockHolder } from '../connectors/lib.mjs';
 import { canonParityVerdict, parityEligible, parityFingerprint, parityTransient, PARITY_REASONS, resolveOwnedRoot } from './canon-parity.mjs';
@@ -72,7 +72,8 @@ export const EVENTS = Object.freeze({
   checkUnavailable: 'job-settle-check-unavailable',
 });
 export const STATES = Object.freeze({ reported: 'reported', settled: 'settled', released: 'released', kernel: 'needs-kernel' });
-const LIVE = ['running', 'answering', 'effect_unknown'];
+// A job whose op filed its report (api report moves it to reported) until a verdict settles it.
+const LIVE = ['running', 'answering', 'effect_unknown', 'reported', 'deciding'];
 const SETTLED = ['succeeded', 'failed', 'cancelled'];
 /** Ops whose pass is an owner act, never a machine verdict. */
 export const KERNEL_ONLY_OPS = Object.freeze(['handover.review']);
@@ -111,14 +112,14 @@ export function reportedJobs(db, { workflowId = null, jobId = null } = {}) {
   const args = [...LIVE];
   if (workflowId) { where.push('j.workflow_id=?'); args.push(workflowId); }
   if (jobId) { where.push('j.job_id=?'); args.push(jobId); }
-  return db.prepare(`SELECT j.job_id, j.workflow_id, j.op_id, j.attempt, j.status, j.worker_id, j.payload_json,
+  return db.prepare(`SELECT j.job_id, j.workflow_id, j.op_id, j.try_no AS attempt, j.status, j.worker_id, j.payload_json, a.attempt_id,
       r.dispatch_id, r.outcome, r.consumed_at, r.created_at AS filed_at, r.report_json
     FROM jobs j
-    JOIN contracts c ON c.workflow_id=j.workflow_id AND c.op_id=j.op_id AND c.attempt=j.attempt
-    JOIN reports r ON r.workflow_id=j.workflow_id AND r.dispatch_id=c.dispatch_id
-    JOIN workflows w ON w.workflow_id=j.workflow_id AND w.archived_at IS NULL
+    JOIN op_attempts a ON a.job_id=j.job_id AND a.attempt_id=(SELECT max(x.attempt_id) FROM op_attempts x WHERE x.job_id=j.job_id)
+    JOIN reports r ON r.attempt_id=a.attempt_id
+    JOIN workflows w ON w.workflow_id=j.workflow_id AND w.phase<>'archived'
     WHERE ${where.join(' AND ')} ORDER BY r.created_at`).all(...args).map((r) => ({
-    jobId: r.job_id, workflowId: r.workflow_id, op: r.op_id, attempt: r.attempt, status: r.status, workerId: r.worker_id,
+    jobId: r.job_id, workflowId: r.workflow_id, op: r.op_id, attempt: r.attempt, attemptId: r.attempt_id, status: r.status, workerId: r.worker_id,
     payload: parse(r.payload_json) ?? {}, dispatchId: r.dispatch_id, outcome: r.outcome, consumedAt: r.consumed_at ?? null,
     filedAt: Number(r.filed_at), report: parse(r.report_json) ?? {},
   }));
@@ -444,21 +445,12 @@ const checksFile = (item, envelope) => {
 const event = (ledger, item, kind, payload) => ledger.transaction(() => ledger.appendEvent({
   workflowId: item.workflowId, entityType: 'job', entityId: item.jobId, kind, payload: { dispatchId: item.dispatchId ?? null, ...payload } }));
 
-/** Keep the attempt history current even for a job dispatched before op_attempts existed. */
+/** Stamp the job's latest attempt (op_attempts, through the ledger writer). */
 function markAttempt(ledger, item, fields) {
-  try {
-    ledger.transaction((db) => {
-      const key = [item.workflowId, item.jobId, item.attempt];
-      const prior = db.prepare('SELECT attempt_id FROM op_attempts WHERE workflow_id=? AND job_id=? AND attempt=?').get(...key);
-      if (!prior) db.prepare('INSERT INTO op_attempts(workflow_id,job_id,op_id,attempt,dispatch_id) VALUES(?,?,?,?,?)')
-        .run(item.workflowId, item.jobId, item.op, item.attempt, item.dispatchId ?? null);
-      const names = Object.keys(fields);
-      db.prepare(`UPDATE op_attempts SET ${names.map((name) => `${name}=?`).join(',')} WHERE workflow_id=? AND job_id=? AND attempt=?`)
-        .run(...names.map((name) => fields[name]), ...key);
-    });
-  } catch (error) {
-    if (!/no such table: op_attempts/i.test(String(error?.message))) throw error;
-  }
+  ledger.transaction((db) => {
+    const attemptId = item.attemptId ?? db.prepare('SELECT max(attempt_id) id FROM op_attempts WHERE job_id=?').get(item.jobId)?.id ?? null;
+    if (attemptId != null) updateAttempt(db, { attemptId, ...fields });
+  });
 }
 
 /** Reasons a raw re-run or the worker's own declared red decide: the claim is overruled, the attempt fails. */
@@ -530,7 +522,7 @@ export async function releaseSettled(ledger, { workflowId = null, jobId = null, 
   const args = [...SETTLED, now - settings.releaseWindowMs];
   if (workflowId) { where.push('workflow_id=?'); args.push(workflowId); }
   if (jobId) { where.push('job_id=?'); args.push(jobId); }
-  const rows = ledger.db.prepare(`SELECT job_id, workflow_id, op_id, attempt, worker_id, payload_json, status FROM jobs j WHERE ${where.join(' AND ')}
+  const rows = ledger.db.prepare(`SELECT job_id, workflow_id, op_id, try_no AS attempt, worker_id, payload_json, status FROM jobs j WHERE ${where.join(' AND ')}
     AND NOT EXISTS (SELECT 1 FROM events e WHERE e.kind=? AND e.entity_id=j.job_id)`).all(...args, EVENTS.released);
   const out = [];
   let closer = close;
@@ -550,7 +542,7 @@ export async function releaseSettled(ledger, { workflowId = null, jobId = null, 
     if (!proof) { out.push({ jobId: row.job_id, state: STATES.settled, released: false, reason: closed?.reason ?? closed?.error ?? (payload.managed ? 'managed-unproven' : 'unproven') }); continue; }
     if (!dryRun) {
       event(ledger, item, EVENTS.released, { from: STATES.settled, to: STATES.released, status: row.status, handle, proof, ...(closed ? { closedNow: true } : {}) });
-      markAttempt(ledger, item, { released_at: now() });
+      markAttempt(ledger, item, { releasedAt: now });
     }
     out.push({ jobId: row.job_id, state: STATES.released, proof, ...(closed ? { closedNow: true } : {}) });
   }
@@ -607,7 +599,7 @@ export async function reconcileJobSettle({ repo, workflowId = null, jobId = null
         event(ledger, fresh, EVENTS.settled, { from: STATES.reported, to: STATES.settled, op: fresh.op, attempt: fresh.attempt, verdict: settleAs, via: verdict.via,
           latencyMs: at - fresh.filedAt, consumedBefore: fresh.consumedAt != null, nextStep: settled.value?.nextStep ?? null, cutSet: settled.value?.cutSet ?? null,
           tail: settled.value?.tail ?? null, ...(verdict.parity ? { parity: verdict.parity } : {}) });
-        markAttempt(ledger, fresh, { settled_at: at, verdict: settleAs, settled_by: 'settler' });
+        markAttempt(ledger, fresh, { settledAt: at, settledBy: 'settler' });
         out.settled.push({ jobId: fresh.jobId, op: fresh.op, verdict: settleAs, via: verdict.via, latencyMs: at - fresh.filedAt, status: settled.value?.status ?? (settleAs === 'pass' ? 'succeeded' : 'failed') });
       } catch (error) {
         out.ok = false;

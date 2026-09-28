@@ -56,6 +56,7 @@ import cp, { spawn, spawnSync } from 'node:child_process';
 import { syncBuiltinESMExports } from 'node:module';
 import {
   openLedger, ledgerFileFor, newToken, JOB_STATUSES, reserveTwoPhase,
+  startAttempt, writeContract, updateAttempt, setJobStatus, recordJobResult, releaseLeases, openIncident,
 } from '../../engine/ledger-db.mjs';
 import { machineFileFor, openMachine } from '../../engine/machine-db.mjs';
 import { parseYaml } from '../../engine/yaml.mjs';
@@ -2057,7 +2058,7 @@ const screenTailOf = (screen) => {
   return rows.length ? rows.join('\n').slice(-1500) : null;
 };
 const rejectDispatch = (ledger, job, jobId, op, model, {
-  step, signal = null, error = null, terminal = null, incident = false,
+  step, signal = null, error = null, terminal = null, incident = false, attemptId = null,
   effectState = 'none', details = null, providerHealthEvidence = null,
   closeTerminal = null, alreadyClosed = false, settled = null, createRecovery = null, trust = null,
 }) => {
@@ -2074,16 +2075,17 @@ const rejectDispatch = (ledger, job, jobId, op, model, {
   // candidate is safe to reroute regardless of whether the infrastructure
   // cause was auth, the machine arbiter, or worker startup. Provider auth has
   // the additional side effect of opening the typed provider circuit.
+  // H13: a launch refused before the op accepted its contract spends no try of the unit, whatever its effect: the same
+  // job goes back to ready (leased -> ready) when nothing ran, or is fenced effect_unknown (reconcile requeues the SAME
+  // job, effect_unknown -> ready) when a worker may have started. It never becomes a failed try.
   const reusable = effectState === 'none';
-  const status = reusable ? 'queued' : (['partial', 'unknown', 'committed'].includes(effectState) ? 'effect_unknown' : 'failed');
+  const status = reusable ? 'ready' : 'effect_unknown';
   let providerHealth = null;
   // Resolved outside the transaction: an Orca-managed identity is a host call.
   const credential = authFailure && !providerHealthEvidence && model?.provider ? currentCredentialOf(model.provider) : null;
   ledger.transaction(() => {
     const now = Date.now();
-    const leasesReleased = effectState === 'none'
-      ? ledger.db.prepare('DELETE FROM leases WHERE job_id=?').run(jobId).changes
-      : 0;
+    const leasesReleased = effectState === 'none' ? releaseLeases(ledger.db, { jobId }) : 0;
     if (outageFailure) {
       providerHealth = openOutageCircuit(ledger.db, {
         provider: model.provider, model: model.target, jobId, step, signal, error, evidence: outageFailure, now,
@@ -2128,21 +2130,22 @@ const rejectDispatch = (ledger, job, jobId, op, model, {
     }
     const result = {
       reason: 'dispatch-rejected', step, signal, detail: error, provider: model.provider,
-      effectState, attemptConsumed: !reusable, retryable: reusable, providerHealth, at: now,
+      effectState, attemptConsumed: false, retryable: reusable, providerHealth, at: now,
       terminalClosed, ...(closed ? { closed } : {}),
     };
-    if (effectState === 'none') {
-      ledger.db.prepare('UPDATE jobs SET status=?, payload_json=?, result_json=?, worker_id=NULL, lease_token=NULL, deadline=NULL, updated_at=? WHERE job_id=?')
-        .run(status, JSON.stringify(priorPayload), JSON.stringify(result), now, jobId);
-    } else {
-      ledger.db.prepare('UPDATE jobs SET status=?, payload_json=?, result_json=?, worker_id=COALESCE(?,worker_id), updated_at=? WHERE job_id=?')
-        .run(status, JSON.stringify(priorPayload), JSON.stringify(result), terminal, now, jobId);
+    const db = ledger.db, current = db.prepare('SELECT status FROM jobs WHERE job_id=?').get(jobId)?.status;
+    if (reusable) setJobStatus(db, { jobId, to: 'ready', reason: `dispatch-rejected:${step}`, at: now, payload: JSON.stringify(priorPayload), workerId: null, leaseToken: null, deadline: null });
+    else {
+      if (current === 'leased') setJobStatus(db, { jobId, to: 'running', reason: `dispatch-rejected:${step}`, at: now, workerId: terminal ?? null });
+      setJobStatus(db, { jobId, to: 'effect_unknown', reason: `dispatch-rejected:${step}`, at: now, payload: JSON.stringify(priorPayload) });
     }
+    if (attemptId != null) updateAttempt(db, { attemptId, at: now, endState: reusable ? 'requeued' : 'effect-unknown', effectState });
+    recordJobResult(db, { jobId, result, at: now });
     ledger.appendEvent({
       workflowId: job.workflow_id, entityType: 'job', entityId: jobId,
       kind: 'dispatch-rejected',
       payload: { op, step, signal, error, provider: model.provider, model: model.target, terminal,
-        effectState, attemptConsumed: !reusable, retryable: reusable, leasesReleased, providerHealth,
+        effectState, attemptConsumed: false, retryable: reusable, leasesReleased, providerHealth,
         terminalClosed, ...(closed ? { closed } : {}), ...(createRecovery ? { createRecovery } : {}), ...(trust ? { trust } : {}),
         ...(screenTailOf(details?.screen) ? { screenTail: screenTailOf(details.screen) } : {}) },
     });
@@ -2157,13 +2160,12 @@ const rejectDispatch = (ledger, job, jobId, op, model, {
     // A permanent open incident would outlive that cooldown and prevent
     // recovery after the owner refreshes credentials.
     if (incident && !authFailure && !outageFailure) {
-      ledger.db.prepare("INSERT INTO incidents(incident_id,workflow_id,op_id,attempts,model_calls,tokens,elapsed_ms,last_progress,status,updated_at) VALUES(?,?,?,0,0,0,0,?,'open',?)")
-        .run(`inc-${newToken().slice(0, 12)}`, job.workflow_id, op,
-          `[infra-provider] ${JSON.stringify({ provider: model.provider, signal: signal ?? error ?? null, jobId,
-            ...(providerHealth?.status === 'unavailable' ? { circuitUntil: providerHealth.expiresAt ?? null, recover: providerRecoverCommand(providerHealth.provider) } : {}) })}`, now);
+      openIncident(ledger.db, { workflowId: job.workflow_id, kind: 'infra-provider', opId: op, jobId, attemptId, at: now,
+        detail: `[infra-provider] ${JSON.stringify({ provider: model.provider, signal: signal ?? error ?? null, jobId,
+          ...(providerHealth?.status === 'unavailable' ? { circuitUntil: providerHealth.expiresAt ?? null, recover: providerRecoverCommand(providerHealth.provider) } : {}) })}` });
     }
   });
-  return { status, effectState, attemptConsumed: !reusable, retryable: reusable, providerHealth,
+  return { status, effectState, attemptConsumed: false, retryable: reusable, providerHealth,
     terminalClosed, ...(closed ? { closed } : {}) };
 };
 
@@ -2286,9 +2288,18 @@ const admittedVersionOf = (op, now, { db = null, workflowId = null } = {}) => {
   try { if (db && workflowId) withheld = withheldChangesFor(db, loadContractChanges(skillRoot), { workflowId, op, now }); } catch { withheld = []; }
   return withheld.length ? { ...version, withheld } : version;
 };
-const fileContract = (db, { job, op, dispatchId, markdown, context, now }) =>
-  db.prepare('INSERT OR REPLACE INTO contracts(workflow_id,op_id,attempt,dispatch_id,markdown,context_json,created_at) VALUES(?,?,?,?,?,?,?)')
-    .run(job.workflow_id, op, job.attempt, dispatchId, markdown, JSON.stringify(context ? { ...context, contract: context.contract ?? admittedVersionOf(op, now, { db, workflowId: job.workflow_id }) } : null), now);
+/**
+ * The dispatch's attempt and its contract (DBTREE op_attempts + contracts): one op_attempts row per dispatch - the
+ * dispatch guard admits it only for a leased job of a running workflow - carrying the job scratch the op reports from
+ * (a3-3: api report reads the report ONLY from op_attempts.scratch_dir), then the contract keyed by that attempt.
+ * Returns the attempt id. Runs inside the caller's transaction.
+ */
+const fileContract = (db, { job, op, dispatchId, markdown, context, now, attempt = {} }) => {
+  const row = startAttempt(db, { workflowId: job.workflow_id, jobId: job.job_id, dispatchId, at: now, dispatchedAt: now, ...attempt });
+  writeContract(db, { attemptId: row.attempt_id, markdown, createdAt: now,
+    context: context ? { ...context, contract: context.contract ?? admittedVersionOf(op, now, { db, workflowId: job.workflow_id }) } : null });
+  return row.attempt_id;
+};
 
 /** One line per checked service of an env-health result. */
 const envServicesOf = (health) => (health?.environments ?? []).flatMap((e) => e.services.map((s) => ({ env: e.id, service: s.service, state: s.state, ready: s.ready,
@@ -4628,7 +4639,7 @@ function renewLiveWorkerLeases(ledger, workers, now) {
 // the marker; the api cannot stop raw file access, only refuse its verbs.
 // STARCI_OP_PROVIDER names the pool's provider (devin, codex ...): the draw loop keeps its critic a different model
 // from the drawer (scripts/work/draw-critic.mjs criticFor; owner ruling 2026-09-27).
-const opLaunchEnv = (jobId, provider = null) => ({ STARCI_ROLE: OP_ROLE, STARCI_OP_JOB: jobId, ...(provider ? { STARCI_OP_PROVIDER: String(provider) } : {}) });
+const opLaunchEnv = (jobId, provider = null, scratchDir = null) => ({ STARCI_ROLE: OP_ROLE, STARCI_OP_JOB: jobId, ...(provider ? { STARCI_OP_PROVIDER: String(provider) } : {}), ...(scratchDir ? { STARCI_JOB_SCRATCH: scratchDir } : {}) });
 // The shared-checkout guard of one op launch (scripts/guards/install.mjs,
 // modules/kernel/api.yaml conventions.sharedCheckout): the job's owned paths as
 // absolute paths for the git/npm shims, and the history hook in every checkout

@@ -1,0 +1,10 @@
+id: a3-dispatch-attempts
+effectiveAt: '2026-09-29T01:30:00+07:00'
+summary: >-
+  alpha.3 dispatch on the clean-slate schema: one op_attempts row plus its contract per dispatch, the job scratch
+  bound on the attempt (scratch_dir) and in the op's environment (STARCI_JOB_SCRATCH); a launch refused before the
+  op took its contract returns the same job to ready and spends no try (H13); dispatch launches queued or ready jobs.
+reach: new-legs
+paths:
+  - modules/kernel/api-commands/dispatch.yaml
+  - modules/kernel/contract-changes/a3-dispatch-attempts.yaml
