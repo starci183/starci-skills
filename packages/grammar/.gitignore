@@ -5,3 +5,4 @@ reference-renders/
 
 *storybook.log
 storybook-static
+coverage/
