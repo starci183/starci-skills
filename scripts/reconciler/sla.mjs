@@ -285,10 +285,12 @@ export async function clockTruth(row, code, src, { now = Date.now() } = {}) {
       if (t == null) return null;
       return t.captured ? { holds: false, why: 'transcript captured' } : { holds: true };
     }
-    if ((p[0] === 'workflow' && p.length >= 3) || (p[0] === 'stuck' && p.length >= 4)) {
-      const db = src.ledgerOf(p[1]);
+    // MB-08 / Q14: a seat or workflow clock of a workflow that is no longer running (paused, stopped, finished,
+    // archived) is gone: a stopped workflow's seat is not vacant, and no controller ever brings it back.
+    if ((p[0] === 'workflow' && p.length >= 3) || (p[0] === 'stuck' && p.length >= 4) || (p[0] === 'seat' && p[1] === 'kernel' && p.length >= 4)) {
+      const db = src.ledgerOf(p[0] === 'seat' ? p[2] : p[1]);
       if (!db) return null;
-      const wf = p[0] === 'workflow' ? p.slice(2).join(':') : p[2];
+      const wf = p[0] === 'workflow' ? p.slice(2).join(':') : p[0] === 'seat' ? p.slice(3).join(':') : p[2];
       const w = db.prepare('SELECT phase, archived_at FROM workflows WHERE workflow_id=?').get(wf);
       if (!w || w.phase !== 'running' || w.archived_at != null) return { holds: false, why: `workflow ${w ? (w.archived_at != null ? 'archived' : w.phase ?? 'not running') : 'gone'}` };
       return { holds: true };

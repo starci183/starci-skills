@@ -382,6 +382,12 @@ export function createHostController(deps = {}) {
     const rec = rowOf(key, now);
     const seat = action === 'shadow' ? rec.state : seatStateOf(action === 'replace-failed' ? 'restart-failed' : action);
     const next = { ...rec, state: seat, since: rec.state === seat ? rec.since : now, lastAction: action, lastAt: now };
+    // MB-05: consecutive refused inputs (the watchdog replaces the seat at SEAT_DEAF_MAX) ride on the SEAT_DEAF clock.
+    const failures = Number(outputOf(r)?.inputFailures);
+    if (Number.isFinite(failures)) {
+      if (failures > 0) await clock(ctx, key, 'SEAT_DEAF', 900_000, { code: 'SEAT_DEAF', owner: 'host-controller', ledgerId: 'supervisor', failures });
+      else await clear(ctx, key, 'SEAT_DEAF');
+    }
     // The Supervisor's pass reports `busy` for a running turn; in shadow the pass did not run, so the seat is read.
     const turn = ['busy', 'shadow', 'idle'].includes(action) || seat === 'live'
       ? await turnBudget(ctx, { key, rec: next, terminal: outputOf(r)?.terminal ?? null, supervisor: true }) : await endTurn(ctx, key, next);
