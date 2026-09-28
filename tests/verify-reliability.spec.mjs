@@ -18,6 +18,11 @@ import {validateOpReport} from '../scripts/kernel/report-envelope.mjs';
 import {parseYaml} from '../engine/yaml.mjs';
 import {checkEnvironments,discoverHealth,probeHttp,envHealthMain,environmentIdsOfPaths} from '../scripts/uat/env-health.mjs';
 
+// These cases exercise the owner-flow routing of verify failures; autopilot (scripts/kernel/autopilot.mjs, owner ruling
+// 2026-09-28) is on by default and re-routes an owner gate to a supervisor-gate, so this spec runs with it off -
+// tests/autopilot.spec.mjs covers the autopilot flow (same as tests/op-ipc.spec.mjs).
+process.env.STARCI_AUTOPILOT ??= 'off';
+
 const ROOT=path.resolve(import.meta.dirname,'..');
 const API=path.join(ROOT,'scripts','kernel','api.mjs');
 const json=v=>JSON.stringify(v??null);
