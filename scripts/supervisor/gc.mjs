@@ -28,12 +28,12 @@
 //   shells    idle bare shells: a plain Orca shell tab (title "Terminal <n>" or the worktree's name), no agent, bound to
 //             nothing, whose screen holds nothing but prompts, older than gcMinAgeMs (by first sight, or by the age of
 //             every child-less `powershell -NoExit` under the Orca daemon). 322 of them held ~20 GB on 2026-09-28.
-//   lanes     worktrees under the lanes root (hk-lanes.mjs lanesRoot): a lane/* branch fully in main (git cherry finds
-//             no '+') with a clean tree, idle for gcLaneGraceMs; a sup/<job> staging checkout whose job is finished;
+//   lanes     worktrees under the lanes root (hk-lanes.mjs lanesRoot): a lane/* branch landed by patch, ledger or
+//             file content with a clean tree, idle for gcLaneGraceMs; a sup/<job> staging checkout whose job is finished;
 //             a detached land scratch while no land runs; an empty leftover directory. The node_modules junction is
 //             unlinked first, then the tree goes through safeRemoveTree (links unlinked, never followed; never
-//             `git worktree remove --force`, nivo-fe inc-c8fbf76aa499), then the registration is pruned and the branch
-//             deleted. Unmerged or dirty lanes are kept and reported.
+//             `git worktree remove --force`, nivo-fe inc-c8fbf76aa499), then the registration is pruned. Lane branches
+//             are kept as commit evidence. Unmerged or dirty lanes are kept and reported.
 //   evidence  a finished or archived workflow with no live job, ended longer than gcEvidenceRetentionMs ago: zipped to
 //             archiveRoot, verified and purged by scripts/work/purge-workflow.mjs (the one sanctioned delete; the owner
 //             approved zip-then-purge on 2026-09-28).
@@ -344,6 +344,40 @@ export function orphanProcesses({ table, now = Date.now(), minAgeMs = DEFAULTS.g
 
 /* ------------------------------------------------------------ lanes */
 
+function landedCommitsForLane(branch, env) {
+  return withSupervisorRead((db) => {
+    const landed = new Set();
+    const rows = db.prepare("SELECT payload_json FROM events WHERE workflow_id=? AND kind='land-passed' AND json_extract(payload_json,'$.lane')=?").all(SUPERVISOR_WF, branch);
+    for (const row of rows) {
+      let payload;
+      try { payload = JSON.parse(row.payload_json); } catch { continue; }
+      if (Array.isArray(payload.commits)) for (const sha of payload.commits) if (typeof sha === 'string') landed.add(sha);
+    }
+    return landed;
+  }, new Set(), { env });
+}
+
+/** Conservative file proof for a lane whose land changed patch IDs (conflict resolution or contract entry). */
+function laneContentLanded(commits, branch, root, run) {
+  const touched = new Set();
+  for (const sha of commits) {
+    const paths = run(['diff-tree', '--root', '-r', '--no-commit-id', '--name-only', '-z', sha], { cwd: root });
+    if (!paths.ok) return false;
+    for (const file of paths.stdout.split('\0').filter(Boolean)) touched.add(file);
+  }
+  if (!touched.size) return false;
+  for (const file of touched) {
+    const diff = run(['diff', '--name-only', '-z', 'main', branch, '--', file], { cwd: root });
+    if (!diff.ok) return false;
+    if (!diff.stdout) continue;
+    const mainTime = run(['log', '-1', '--format=%ct', 'main', '--', file], { cwd: root });
+    const laneTime = run(['log', '-1', '--format=%ct', branch, '--', file], { cwd: root });
+    if (!mainTime.ok || !laneTime.ok || !mainTime.stdout.trim() || !laneTime.stdout.trim() ||
+        Number(mainTime.stdout.trim()) <= Number(laneTime.stdout.trim())) return false;
+  }
+  return true;
+}
+
 /**
  * Decide and (apply) remove the lane worktrees. `git` runner (args, {cwd}) -> {ok, stdout, error}; `sup` supervisorView.
  * Returns {items, freedBytes, errors}.
@@ -364,14 +398,13 @@ export function collectLanes({ apply = false, env = process.env, now = Date.now(
   const item = (verdict, target, reason, extra = {}) => items.push({ class: 'lane', verdict, target, reason, ...extra });
   const branchOf = (ref) => String(ref ?? '').replace(/^refs\/heads\//, '');
   const dirty = (p) => { const s = run(['status', '--porcelain', '--untracked-files=normal'], { cwd: p }); return s.ok ? s.stdout.trim().split(/\r?\n/).filter(Boolean).length : null; };
-  const removeTree = (w, branch, { deleteBranch, why = 'merged into main, clean, idle' }) => {
+  const removeTree = (w, branch, { why = 'landed in main, clean, idle' }) => {
     const bytes = treeBytes(w.path);
     if (!apply) { item('collect', w.path, `would remove (${why})`, { bytes, branch, worktree: true }); freedBytes += bytes; return; }
     if (!unlinkNodeModulesLink(w.path)) { errors.push(`${w.path}: node_modules link could not be unlinked; left in place`); item('refuse', w.path, 'node_modules junction could not be unlinked'); return; }
     const r = safeRemoveWorktree(w.path, { repo: root, git: run });
     if (!r.ok) { errors.push(`${w.path}: ${(r.errors ?? []).slice(0, 2).map((e) => e.message).join('; ')}`); item('refuse', w.path, 'removal failed', { ok: false }); return; }
-    const dropped = deleteBranch && branch ? run(['branch', '-D', branch], { cwd: root }).ok : false;
-    item('collect', w.path, `removed (${why})`, { bytes, branch, branchDeleted: dropped, ok: true, worktree: true });
+    item('collect', w.path, `removed (${why})`, { bytes, branch, branchDeleted: false, ok: true, worktree: true });
     freedBytes += bytes;
   };
   for (const w of worktrees) {
@@ -385,7 +418,7 @@ export function collectLanes({ apply = false, env = process.env, now = Date.now(
       if (landBusy) { item('keep', w.path, 'a land is running'); continue; }
       let mtime = 0; try { mtime = fs.statSync(w.path).mtimeMs; } catch { /* unknown */ }
       if (now - mtime < settings.laneGraceMs) { item('keep', w.path, 'recent land scratch'); continue; }
-      removeTree(w, null, { deleteBranch: false, why: 'land scratch, no land running' });
+      removeTree(w, null, { why: 'land scratch, no land running' });
       continue;
     }
     const d = dirty(w.path);
@@ -408,11 +441,20 @@ export function collectLanes({ apply = false, env = process.env, now = Date.now(
     const cherry = run(['cherry', 'main', branch], { cwd: root });
     if (!cherry.ok) { item('keep', w.path, 'merge check failed', { branch }); continue; }
     const ahead = cherry.stdout.split(/\r?\n/).filter((l) => l.startsWith('+')).length;
-    if (ahead) { item('keep', w.path, `${ahead} commit(s) not in main`, { branch, unmerged: true }); continue; }
+    if (ahead) {
+      const list = run(['rev-list', 'main..' + branch], { cwd: root });
+      if (!list.ok) { item('keep', w.path, 'commit list unreadable', { branch }); continue; }
+      const commits = list.stdout.split(/\r?\n/).filter(Boolean);
+      const ledger = landedCommitsForLane(branch, env);
+      const ledgerLanded = commits.length > 0 && commits.every((sha) => ledger.has(sha));
+      if (!ledgerLanded && !laneContentLanded(commits, branch, root, run)) {
+        item('keep', w.path, `${ahead} commit(s) not landed in main`, { branch, unmerged: true }); continue;
+      }
+    }
     const act = laneActivity({ worktree: w.path, branch: w.branch, root, run });
     const idle = act.lastActiveMs == null ? null : now - act.lastActiveMs;
-    if (idle == null || idle < settings.laneGraceMs) { item('keep', w.path, `merged but active ${idle == null ? '?' : Math.round(idle / 60000)}m ago`, { branch }); continue; }
-    removeTree(w, branch, { deleteBranch: true });
+    if (idle == null || idle < settings.laneGraceMs) { item('keep', w.path, `landed but active ${idle == null ? '?' : Math.round(idle / 60000)}m ago`, { branch }); continue; }
+    removeTree(w, branch, { why: 'landed in main, clean, idle; branch kept' });
   }
   if (apply) run(['worktree', 'prune'], { cwd: root });
   // Leftover empty directories of removed checkouts (staging/<job>, land/<scratch>) whose registration is gone.
