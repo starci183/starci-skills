@@ -74,6 +74,7 @@ import { jobTerminalHandles, ledgerJobs, kernelSignalRows, pathUnder } from '../
 import { SKILL_ROOT, SUPERVISOR_WF, FIX_KIND, landRoot, productRepos, seatOf, stagingRoot, supervisorHome, withSupervisorRead } from './home.mjs';
 import { removeStaging, unlinkNodeModulesLink } from './workers.mjs';
 import { acquireDepsLock } from '../guards/deps-guard.mjs';
+import { LANE_IDLE_MS, laneOwnerOf, tabTitles } from '../lib/lane-owner.mjs';
 
 const selfFile = fileURLToPath(import.meta.url);
 export const SCHEMA = 'starci/gc-report@1';
@@ -81,7 +82,7 @@ export const SCHEMA = 'starci/gc-report@1';
 export const GC_EVENT_KIND = 'supervisor-gc';
 export const COLLECTORS = Object.freeze(['agents', 'shells', 'lanes', 'evidence', 'tmp', 'tasks', 'leases', 'lanelogs']);
 export const DEFAULTS = Object.freeze({ gcMinAgeMs: 600_000, gcLaneGraceMs: 1_800_000, gcEvidenceRetentionMs: 259_200_000, sweepMs: 1_800_000,
-  leaseMinAgeMs: 60_000, laneLogMinAgeMs: 86_400_000, laneLogRetentionMs: 1_209_600_000, laneIdleMs: 3_600_000 });
+  leaseMinAgeMs: 60_000, laneLogMinAgeMs: 86_400_000, laneLogRetentionMs: 1_209_600_000, laneIdleMs: LANE_IDLE_MS });
 /** The DESIGN §15.3 leftover class of each new collector's item and the step whose bug it points at. */
 export const LEFTOVER_OWNERS = Object.freeze({
   lease: 'settle/reconcile did not release the job lease (scripts/kernel/api.mjs cmdSettle/cmdReconcile DELETE FROM leases, workers.mjs releaseLeases)',
@@ -114,31 +115,6 @@ export function gcSettings(allocation = allocationSettings()) {
     laneIdleMs: Math.max(num(gc.laneIdleMs, DEFAULTS.laneIdleMs), num(hk.gcLaneGraceMs, DEFAULTS.gcLaneGraceMs)) };
 }
 
-/**
- * The live owner of a lane worktree, or null. Pure. A lane is still owned while (coordinator 2026-09-28: GC removed
- * the rc-job and rc-cleanup worktrees right after they landed, while their agents still worked in them):
- *   - a connected Orca terminal is titled "[Worker] <lane> ..." (the lane name: the branch without lane/, or the
- *     folder name), or its worktree / cwd is inside the lane folder;
- *   - a Supervisor job that is not final is registered for it (its staging branch or path).
- * `terminals` null (Orca did not answer) is an owner nobody can rule out.
- */
-export function laneOwnerOf({ lanePath, branch = null, terminals, titles = new Map(), sup = { jobs: [] } }) {
-  if (!Array.isArray(terminals)) return 'the Orca terminal list is unavailable: a live owner cannot be ruled out';
-  const names = [...new Set([String(branch ?? '').replace(/^lane\//, ''), path.basename(String(lanePath ?? ''))].filter(Boolean))];
-  const esc = (x) => x.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-  const named = names.map((n) => new RegExp(`^\\[Worker\\]\\s+${esc(n)}(?![\\w.-])`, 'i'));
-  for (const t of terminals) {
-    if (t.connected === false) continue;
-    const title = String(titles.get(t.handle) ?? t.title ?? '').trim();
-    if (named.some((re) => re.test(title) || re.test(String(t.title ?? '').trim()))) return `live terminal ${t.handle} "${title.slice(0, 60)}"`;
-    if (t.worktreePath && pathUnder(t.worktreePath, lanePath)) return `live terminal ${t.handle} works in it (${t.worktreePath})`;
-  }
-  for (const j of sup?.jobs ?? []) {
-    if (SUP_FINAL.has(j.status)) continue;
-    if ((branch && j.branch === branch) || (j.stagingPath && pathUnder(j.stagingPath, lanePath))) return `Supervisor job ${j.jobId} (${j.status}) is registered for it`;
-  }
-  return null;
-}
 
 /* ------------------------------------------------------------ host lock: one GC apply at a time */
 
@@ -172,26 +148,8 @@ export function writeState(state, env = process.env) {
 
 /* ------------------------------------------------------------ pure classification */
 
-/** Tab titles by handle from terminal-list visualLayouts (the title the runtime gave the tab, which agents never rewrite). */
-export function tabTitles(visualLayouts = []) {
-  const out = new Map();
-  const panes = (p, tab) => {
-    if (!p) return;
-    if (p.type === 'terminal' && p.handle) out.set(p.handle, tab);
-    for (const c of p.children ?? []) panes(c, tab);
-    if (p.first) panes(p.first, tab);
-    if (p.second) panes(p.second, tab);
-  };
-  const walk = (n) => {
-    if (!n) return;
-    for (const t of n.tabs ?? []) panes(t.panes, t.title ?? null);
-    for (const c of n.children ?? []) walk(c);
-    if (n.first) walk(n.first);
-    if (n.second) walk(n.second);
-  };
-  for (const l of visualLayouts ?? []) walk(l.root);
-  return out;
-}
+// tabTitles and laneOwnerOf live in scripts/lib/lane-owner.mjs (the one lane-removal rule, shared with hk-lanes.mjs).
+export { tabTitles, laneOwnerOf };
 
 /** The runtime role a title marks: supervisor | worker | kernel | op | shell | null. `worktreeName` is the tab's worktree folder. */
 export function roleOfTitle(title, { worktreeName = null } = {}) {

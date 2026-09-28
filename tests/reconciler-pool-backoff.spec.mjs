@@ -69,7 +69,7 @@ function ledgerDb({ events = [], health = [], logs = [] }) {
   }) };
 }
 function setup({ events = [], health = [], logs = [] } = {}) {
-  const stateFile = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'rc-pool-')), 'ram-throttle.json');
+  const stateFile = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'starci-rc-pool-')), 'ram-throttle.json');
   const c = createResourceController({ stateFile, pools: async () => [{ target: 'devin-agent', provider: 'devin', maxParallel: 10 }, { target: 'qwen-agent', provider: 'qwen', maxParallel: 10 }] });
   const calls = { api: [], log: [] };
   const src = { events, health, logs };

@@ -24,6 +24,7 @@ import { allocationSettings } from '../../engine/config.mjs';
 import { gitResult } from './git.mjs';
 import { isLinkLike, safeRemoveWorktree } from './safe-remove.mjs';
 import { pathKey } from './path-key.mjs';
+import { LANE_IDLE_MS, laneOwnerOf, liveLaneOwners } from './lane-owner.mjs';
 
 const SKILL_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 
@@ -128,7 +129,7 @@ export function laneActivity({ worktree, branch, root, run }) {
  * nothing. `git` is an injectable runner `(args, {cwd}) -> {ok, stdout, error}`.
  * Returns {ok, apply, at, lanesRoot, freedBytes, removed, wouldRemove, skipped, errors}.
  */
-export function sweepLanes({ apply = false, now = Date.now(), env = process.env, allocation = undefined, root = SKILL_ROOT, git = null } = {}) {
+export function sweepLanes({ apply = false, now = Date.now(), env = process.env, allocation = undefined, root = SKILL_ROOT, git = null, owners = undefined } = {}) {
   const run = git ?? ((args, { cwd }) => gitResult(args, { cwd }));
   const base = lanesRoot({ env, allocation });
   const out = { ok: true, apply: apply === true, at: new Date(now).toISOString(), lanesRoot: base, freedBytes: 0, removed: [], wouldRemove: [], skipped: [], errors: [] };
@@ -140,6 +141,10 @@ export function sweepLanes({ apply = false, now = Date.now(), env = process.env,
   const mainKey = worktrees[0] ? pathKey(worktrees[0].path) : null; // the main worktree lists first
   const selfKey = pathKey(path.resolve(root));
   const baseKey = `${pathKey(base)}/`;
+  // The live owners (scripts/lib/lane-owner.mjs, the same rule gc.mjs applies), read once when a lane gets that far.
+  // A spec process with no owners passed reads none (never the live host's Orca).
+  let ownerInfo = owners ?? null;
+  const ownersNow = () => (ownerInfo ??= (process.env.NODE_TEST_CONTEXT ? { terminals: [], titles: new Map(), sup: { jobs: [] } } : liveLaneOwners({ env })));
   const graceMs = laneGraceMs(allocation === undefined ? (() => { try { return allocationSettings(); } catch { return null; } })() : allocation);
   for (const w of worktrees) {
     const key = pathKey(w.path);
@@ -162,10 +167,14 @@ export function sweepLanes({ apply = false, now = Date.now(), env = process.env,
     if (graceMs === null) { skip(w.path, 'lane-grace-unset', 'allocation.housekeeping.laneGraceMs'); continue; }
     const activity = laneActivity({ worktree: w.path, branch: w.branch, root, run });
     const idleMs = activity.lastActiveMs === null ? null : now - activity.lastActiveMs;
-    if (idleMs === null || idleMs < graceMs) {
-      skip(w.path, activity.noWork ? 'no-work-yet' : 'recent-activity', idleMs === null ? 'no activity time readable' : `idle ${Math.round(idleMs)}ms < laneGraceMs ${graceMs}ms`);
+    const minIdleMs = Math.max(graceMs, LANE_IDLE_MS);
+    if (idleMs === null || idleMs < minIdleMs) {
+      skip(w.path, activity.noWork ? 'no-work-yet' : 'recent-activity', idleMs === null ? 'no activity time readable' : `idle ${Math.round(idleMs)}ms < ${minIdleMs}ms (laneGraceMs, at least 60 min)`);
       continue;
     }
+    const o = ownersNow();
+    const owner = laneOwnerOf({ lanePath: w.path, branch: w.branch, terminals: o.terminals, titles: o.titles, sup: o.sup });
+    if (owner) { skip(w.path, 'live-owner', owner); continue; }
     const freedBytes = treeBytes(w.path);
     const branch = shortBranch(w.branch);
     if (!out.apply) { out.wouldRemove.push({ path: w.path, branch, freedBytes }); out.freedBytes += freedBytes; continue; }

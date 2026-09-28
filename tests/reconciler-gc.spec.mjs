@@ -209,7 +209,7 @@ test('lane worktrees: never collected while the owner agent lives or git moved i
   const { collectLanes, laneOwnerOf, gcSettings } = await import('../scripts/supervisor/gc.mjs');
   const fs = await import('node:fs');
   const os = await import('node:os');
-  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'gc-lanes-'));
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'starci-gc-lanes-'));
   const lanes = path.join(root, 'lanes');
   const mk = (n) => { const d = path.join(lanes, n); fs.mkdirSync(d, { recursive: true }); return d; };
   const dirs = { owned: mk('slim-api'), cwd: mk('slim-ui'), fresh: mk('slim-db'), idle: mk('slim-docs') };
@@ -235,4 +235,33 @@ test('lane worktrees: never collected while the owner agent lives or git moved i
   assert.equal(down['slim-docs'].verdict, 'keep', 'Orca down: an owner cannot be ruled out');
   assert.equal(laneOwnerOf({ lanePath: path.join(lanes, 'slim'), branch: 'lane/slim', terminals }), null, '[Worker] slim-api does not own lane slim');
   assert.equal(gcSettings({}).laneIdleMs, 3_600_000);
+});
+
+test('housekeeping sweepLanes applies the same live-owner rule as gc.mjs (scripts/lib/lane-owner.mjs)', async () => {
+  const { sweepLanes } = await import('../scripts/lib/hk-lanes.mjs');
+  const gc = await import('../scripts/supervisor/gc.mjs');
+  const lo = await import('../scripts/lib/lane-owner.mjs');
+  assert.equal(gc.laneOwnerOf, lo.laneOwnerOf, 'one shared function');
+  const fs = await import('node:fs');
+  const os = await import('node:os');
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'starci-hk-owner-'));
+  const lanes = path.join(root, 'lanes');
+  const dir = path.join(lanes, 'slim-api'); fs.mkdirSync(dir, { recursive: true });
+  const now = Date.now() + 30 * 3_600_000;
+  const porcelain = `worktree ${root}\nHEAD aaaaaaa\nbranch refs/heads/main\n\nworktree ${dir}\nHEAD bbbbbbb\nbranch refs/heads/lane/slim-api\n`;
+  const git = (args) => {
+    if (args[0] === 'worktree') return { ok: true, stdout: args[1] === 'list' ? porcelain : '' };
+    if (args[0] === 'reflog') return { ok: true, stdout: `bbbbbbb x@{${Math.floor((now - 26 * 3_600_000) / 1000)}}` };
+    if (args[0] === 'rev-parse' || args[0] === 'merge-base') return { ok: true, stdout: 'bbbbbbb' };
+    return { ok: true, stdout: '' };
+  };
+  const allocation = { housekeeping: { lanesRoot: lanes, laneGraceMs: 86_400_000 } };
+  const run = (owners) => sweepLanes({ apply: false, now, env: {}, allocation, root, git, owners });
+  const owned = run({ terminals: [{ handle: 't1', title: '[Worker] slim-api still going', connected: true }], titles: new Map(), sup: { jobs: [] } });
+  assert.deepEqual(owned.wouldRemove, []);
+  assert.equal(owned.skipped.find((x) => x.path === dir)?.reason, 'live-owner');
+  const down = run({ terminals: null, titles: new Map(), sup: { jobs: [] } });
+  assert.equal(down.skipped.find((x) => x.path === dir)?.reason, 'live-owner', 'Orca down: nothing removed');
+  const free = run({ terminals: [], titles: new Map(), sup: { jobs: [] } });
+  assert.deepEqual(free.wouldRemove.map((x) => x.path), [dir]);
 });

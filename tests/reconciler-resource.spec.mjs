@@ -10,7 +10,7 @@ import path from 'node:path';
 import { createResourceController, fairShare, quotaExhausted, starvedWorkflows, HOST_KEY } from '../scripts/reconciler/controllers/resource.mjs';
 
 import { fakeCtx } from '../scripts/reconciler/testing.mjs';
-const TMP = fs.mkdtempSync(path.join(os.tmpdir(), 'rc-resource-spec-'));
+const TMP = fs.mkdtempSync(path.join(os.tmpdir(), 'starci-rc-resource-spec-'));
 after(() => fs.rmSync(TMP, { recursive: true, force: true }));
 const T = 2_000_000_000_000;
 const GB = 1024 ** 3;
@@ -138,7 +138,7 @@ test('quota: probe every 5 min while a quota circuit is open; quota-exhausted wh
 
 test('hostThrottle steps aside while the reconciler owns resource.throttle: reads the published mode, writes nothing', async () => {
   const { hostThrottle, RECONCILER_WRITER } = await import('../scripts/lib/ram-throttle.mjs');
-  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'rc-throttle-yield-'));
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'starci-rc-throttle-yield-'));
   const stateFile = path.join(dir, 'ram-throttle.json');
   const env = { STARCI_HOST_RESOURCES_JSON: JSON.stringify({ totalRamBytes: 100 * GB, freeRamBytes: 50 * GB, ops: [] }) };
   const published = { mode: 'critical', ramMode: 'critical', cpuHot: false, why: 'free RAM 2%', at: new Date(T - 30_000).toISOString(), writer: RECONCILER_WRITER };

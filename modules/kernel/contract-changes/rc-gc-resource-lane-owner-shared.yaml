@@ -1,0 +1,15 @@
+id: rc-gc-resource-lane-owner-shared
+effectiveAt: '2026-09-28T16:00:00+07:00'
+summary: >-
+  One rule for removing a lane worktree (scripts/lib/lane-owner.mjs laneOwnerOf, LANE_IDLE_MS), used by both removers:
+  the Supervisor GC (gc.mjs collectLanes) and housekeeping (hk-lanes.mjs sweepLanes). Housekeeping now also keeps a
+  merged, clean, idle lane while a connected Orca terminal titled "[Worker] <lane> ..." or working inside it exists, or a
+  non-final Supervisor job is registered for it (skip reason live-owner), removes nothing when Orca or the Supervisor
+  ledger cannot be read, and waits at least 60 minutes of git inactivity whatever laneGraceMs says.
+reach: new-legs
+paths:
+  - modules/kernel/contract-changes/rc-gc-resource-lane-owner-shared.yaml
+  - scripts/lib/lane-owner.mjs
+  - scripts/lib/hk-lanes.mjs
+  - scripts/supervisor/gc.mjs
+  - tests/reconciler-gc.spec.mjs
