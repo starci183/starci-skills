@@ -54,7 +54,7 @@ node scripts/checks/work-validate.mjs <work-root-or-record-dir> --strict
 node scripts/checks/work-validate.mjs <feature-dir> --strict --owned <path>[,<path>]
 ```
 
-See [workflow-kernel](workflow-kernel.md) for the loop these calls serve.
+See [workflow-kernel](workflow-kernel.md) for the Kernel decisions these calls serve.
 
 ## Routing (`node scripts/route/*`)
 

@@ -72,19 +72,14 @@ meanings `start-kernel` gives them — never collapse them into “provider”.
 
 ## 3. Poll and relay
 
-- Every few minutes run `api.mjs status --workflow <id>` for the cheap projection (phase, job
+- On each owner check-in or Kernel question, run `api.mjs status --workflow <id>` for the cheap projection (phase, job
   counts, pending inbox rows), and `api.mjs survey --workflow <id>` when you need the detail —
   open jobs, live signals, the events tail, open incidents.
-- When the owner authorized unattended continuation, make the five-minute
-  liveness poll deterministic with:
-
-  ```
-  node <skill root>/scripts/kernel/watchdog.mjs --repo <repo> --workflow <id> --once --repair --json
-  ```
-
-  Without that authorization omit `--repair` and report `wake-needed`/`restart-needed` instead.
-  The watchdog only wakes the same Kernel or re-enters start-workflow on exact dead proof; the
-  Kernel's own yield rule is `.claude/modules/kernel/driver-loop.yaml`.
+- The reconciler Host controller owns Kernel seat liveness and runs
+  `scripts/kernel/watchdog.mjs --once --repair` as a single pass. The Workflow
+  controller opens progress and stall Decision Items. Read their ledger evidence
+  when reporting a stalled workflow; the monitor does not start a watchdog cadence.
+  The Kernel's yield rule is `.claude/modules/kernel/driver-loop.yaml`.
 - Read the kernel's own words with `terminal-read --terminal <kernel handle> --screen`: what it is
   doing, what it is asking. Relay every owner-bound item — a question the kernel poses, an open
   `incident`, a pending `inbox` row that needs the owner — verbatim, then say what answering it

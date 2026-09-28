@@ -56,7 +56,8 @@ Optional keys:
 - `connectors` — the public owner-ask channel `{secretsFile?, repos?, gateway?, cloudflare?, telegram?}`,
   all off by default; secrets are named by env var, never stored (docs/connectors.md)
 - `supervisor` — `{mode?, kernel?, pollIntervalMs?, repos?, stallMinutes?, frozenMinutes?, workers?, landGate?}`:
-  the supervisor role, its cadence and the repositories it resumes and watches ([supervisor](supervisor.md);
+  the Supervisor seat, optional chat digest cadence and managed product repositories; the reconciler
+  Host and Workflow controllers own seat recovery and stall detection ([supervisor](supervisor.md);
   defaults `scripts/supervisor/home.mjs` `DEFAULTS`)
 - `delegation` — `{asks, until, excludes?, note?}` or null: a named delegate answers owner asks until `until`;
   the excluded classes stay owner-only

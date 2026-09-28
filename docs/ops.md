@@ -143,8 +143,10 @@ kernel: api enqueue --op <id> --paths <csv> [--params '<json>']
 ```
 
 The packet fields and lease semantics are `modules/kernel/dispatch.yaml`; what
-`settle` accepts is `modules/kernel/verdict-contract.yaml`; the tick that calls
-them is `modules/kernel/driver-loop.yaml` ([workflow-kernel](workflow-kernel.md)).
+`settle` accepts is `modules/kernel/verdict-contract.yaml`. The Job controller
+handles eligible green reports and dispatch mechanics; the Kernel makes
+non-green decisions through `modules/kernel/driver-loop.yaml`
+([workflow-kernel](workflow-kernel.md)).
 
 ## Checklist for a new op
 

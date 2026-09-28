@@ -72,9 +72,9 @@ Executable: `.claude/scripts/kernel/start-workflow.mjs`
   (verbs: `.claude/modules/kernel/api.yaml`); its boundary and op lifecycle are
   `.claude/modules/kernel/driver-loop.yaml`. Hand it no op-level work and no
   direct-ledger instructions.
-- `scripts/kernel/watchdog.mjs` keeps the long-lived identity alive on the
-  `allocation.watchdogCadenceMs` cadence (`.claude/modules/models/runtimes.yaml`):
-  it wakes the same terminal on `turn-idle` and re-enters this start path only
-  after exact disconnected/unwritable proof. It never chooses Ops.
+- The reconciler Host controller keeps the long-lived seat alive by running
+  `scripts/kernel/watchdog.mjs --once --repair`. It wakes the same terminal when
+  work is actionable and replaces it only after exact disconnected/unwritable
+  proof. `scripts/reconciler/boot.mjs ensure` starts the one host loop.
 - Spawn flags come from `.claude/modules/models/agents/<agent>.yaml` —
   never improvise flags.

@@ -17,8 +17,8 @@ StarCi provides:
   through one `node scripts/kernel/api.mjs <verb>` call. `modules/kernel/api.yaml` and
   `modules/kernel/api-commands/` hold the verb contracts; [docs/cli.md](docs/cli.md) is the human list.
 - **One host reconciler:** active controllers handle mechanical Job, Workflow, Resource, Host,
-  GC, Fleet and Learning concerns. Kernels decide through durable Decision Items; old loops cover
-  concerns without active ownership (`modules/reconciler/reconciler.yaml`).
+  GC, Fleet and Learning concerns. Kernels decide through durable Decision Items; `scripts/reconciler/engine.mjs`
+  is the single host runtime loop (`modules/reconciler/reconciler.yaml`).
 - **Ephemeral op agents:** `api dispatch` spawns one short-lived `[Op]` agent per job through the
   per-agent cards (`modules/models/agents/`). Adapter flags are injected by the spawner — the kernel
   cannot forget them; `settle` records the verdict and closes the worker.

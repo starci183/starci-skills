@@ -50,7 +50,7 @@ export const LEDGER_SCHEMA='starci/ledger-db@1';
 export const LEDGER_VERSION=1;
 export const ledgerFileFor=repoRoot=>...;   // <repo>/.starciwork/runtime.sqlite; refuses the runtime root
 export const machineFileFor=(env=process.env)=>...;  // <runtime state root>/machine.sqlite; STARCI_TEST_MACHINE_FILE first; a temp registry inside node --test
-export const runtimeRootFor=(env=process.env)=>...;  // <runtime state root>: connectors, uat-slots, watchdog logs
+export const runtimeRootFor=(env=process.env)=>...;  // <runtime state root>: connectors, uat-slots, host state
 
 export function openLedger({file,now=Date.now,busyTimeoutMs=15000,journalMode='WAL',machine=null});
 export function inspectLedger({file});      // read-only, no migration — operator inspection

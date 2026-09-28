@@ -36,29 +36,28 @@ kernel: {group: [{agent: claude, model: claude-opus-5-5}, {agent: codex, model: 
 # the first declared gear. A gear raises only what `api estimate` requests; it
 # never raises a pool's maxParallel, maxParallelOps or budgets.maxOps below.
 parallel: {gear: 1}
-# supervisor — the monitoring cadence. pollIntervalMs is how often
-# scripts/supervisor/poll.mjs prints a digest and the [Supervisor] kernel ticks
-# (at least 60000); null uses scripts/supervisor/home.mjs DEFAULTS, and
-# --interval-ms on the poll command line wins over this key.
-# repos: the product ledger-owner repositories scripts/kernel/resume-all.mjs
-# resumes after a reboot (one watchdog per running workflow), relative to the
-# source root (the directory holding this skill) or absolute. Only these are
-# resumed - nothing is discovered - and [] resumes none; --repo on the command
-# line adds more. stallMinutes (optional, integer >= 5): a running workflow with
-# no progress for this long is STALLED (scripts/supervisor/stall.mjs); the same
-# repos are checked by scripts/supervisor/stall-alert.mjs. The [Supervisor]
+# supervisor — the optional chat digest cadence. pollIntervalMs controls
+# scripts/supervisor/poll.mjs when run continuously (at least 60000); null uses
+# scripts/supervisor/home.mjs DEFAULTS, and --interval-ms overrides this key.
+# The reconciler engine owns host runtime cadence and restores seats after reboot.
+# repos: managed product ledger-owner repositories for the reconciler and Supervisor tools,
+# relative to the source root (the directory holding this skill) or absolute.
+# --repo on the poll command line can add another. stallMinutes (optional,
+# integer >= 5) marks a running workflow STALLED in scripts/supervisor/stall.mjs;
+# the Workflow controller turns actionable findings into Decision Items. The [Supervisor]
 # kernel (docs/supervisor.md) also takes, optional, defaults in home.mjs DEFAULTS:
 #   kernel: {agent, model, effort}   its agent pin (default: the kernel pin below)
 #   workers: {base, max}             the adaptive [Worker] cap
 #   landGate: {mode: shared, push: true}   shared lets running lanes commit directly; exclusive = gate only
 supervisor:
-  # mode: chat (default) - the owner's desktop chat session is the Supervisor: it owns channel 'main' and ticks
-  #   itself; nothing starts a [Supervisor] kernel. kernel - the optional [Supervisor] Orca kernel
-  #   (scripts/supervisor/start-supervisor.mjs) with its watchdog. docs/supervisor.md.
+  # mode: chat (default) - the owner's desktop chat session is the Supervisor: it owns channel 'main'
+  #   and reads Decision Items; nothing starts a [Supervisor] kernel. kernel - the optional [Supervisor]
+  #   Orca kernel (scripts/supervisor/start-supervisor.mjs), kept alive by the reconciler Host controller.
+  #   See docs/supervisor.md.
   # mode: chat
   pollIntervalMs: null
   repos: []
-  # frozenMinutes: <n>   # watchdog: a busy seat frame unchanged this long is frozen, not busy
+  # frozenMinutes: <n>   # Host seat check: a busy frame unchanged this long is frozen, not busy
   # landGate: {mode: shared|exclusive, push: true}
 # quota — plan figures a provider has no API for (scripts/api/quota/qwen.mjs), e.g.
 #   quota: {qwen: {planQuota: 180000, unit: requests, resetAt: <ISO>}}
