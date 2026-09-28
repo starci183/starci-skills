@@ -16,6 +16,7 @@ import { exitedAgentPromptRow, clipDraft } from './terminal-liveness.mjs';
 import { clearDraft } from './clear-draft.mjs';
 import { draftText, sleepSync } from '../api/orca/lib.mjs';
 import { allocationMs } from '../../engine/config.mjs';
+import { captureTerminal } from './transcripts.mjs';
 
 // The quit input each agent CLI understands at its prompt. Claude gets two
 // Ctrl+C in one write, no Enter: Orca delivers `/exit` as pasted text, which
@@ -53,13 +54,23 @@ export function agentOfTerminal(entry, fallback = 'claude') {
  * when the agent has no known quit command or the terminal is not live; a
  * draft that Ctrl+U shrank but could not clear returns {sent:false, reason:'draft-stuck', draft}; a
  * stale draft (the first Ctrl+U left it unchanged) adds {draftNote:'draft-stale', staleDraft}.
+ * Before any input the terminal's full scrollback is captured, redacted, into the blob store (transcripts.mjs
+ * captureTerminal): every result carries it as `transcript` ({text, blob} or null) for the caller to finalize
+ * (transcripts.mjs finalizeAttemptTranscript / finalizeTranscriptOfTerminal → op_attempts.transcript_sha).
  */
 export function quitAgent({ handle, agent, waitMs = QUIT_WAIT_MS, intervalMs = 500,
-  show = terminalShow, send = terminalSend, read = terminalRead, sleep = sleepSync } = {}) {
+  show = terminalShow, send = terminalSend, read = terminalRead, sleep = sleepSync, capture = captureTerminal } = {}) {
   const command = QUIT_COMMAND[agent];
   if (!handle || !command) return null;
   const connected = () => { try { const s = show({ terminal: handle }); return s?.ok === true ? s.connected === true : null; } catch { return null; } };
   if (connected() !== true) return null;
+  let transcript = null;
+  try { transcript = capture ? capture(handle) : null; } catch { transcript = null; }
+  const result = quitLive({ handle, agent, command, waitMs, intervalMs, connected, send, read, sleep });
+  return transcript ? { ...result, transcript } : result;
+}
+
+function quitLive({ handle, agent, command, waitMs, intervalMs, connected, send, read, sleep }) {
   // An agent that already exited left a bare shell: typing the quit input there would run it as a
   // shell command (a /quit or a Ctrl+C sent to PowerShell). Nothing is typed; the close follows.
   let draft = null;
