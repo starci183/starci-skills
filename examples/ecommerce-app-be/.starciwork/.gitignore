@@ -13,9 +13,11 @@
 !/features/
 /brand/*
 !/brand/index.yaml
+!/brand/evidence.yaml
 !/brand/assets/
 /shell/*
 !/shell/index.yaml
+!/shell/evidence.yaml
 /_resources/*
 !/_resources/environments/
 !/_resources/identities/
@@ -25,6 +27,8 @@
 /_derived/*
 !/_derived/index.yaml
 !/_derived/frontier.md
+!/_derived/critique.yaml
+!/_derived/critique.md
 E/
 evidence/
 runs/

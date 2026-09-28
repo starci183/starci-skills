@@ -27,13 +27,13 @@ import {
 } from "@modules/platform/databases/postgresql/order/constants/connection"
 import {
     CartService 
-} from "../cart/cart.service"
+} from "ecommerce-app-be/modules/domain/cart"
 import {
     CatalogService 
-} from "../catalog/catalog.service"
+} from "ecommerce-app-be/modules/domain/catalog"
 import {
     PaymentService 
-} from "../payment/payment.service"
+} from "ecommerce-app-be/modules/domain/payment"
 import {
     CheckoutPolicy 
 } from "./checkout.policy"
