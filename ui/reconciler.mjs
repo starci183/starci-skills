@@ -18,7 +18,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
-import { workflowView, unitsOf, opJobsOf, reportsOf, OPEN_JOB } from '../scripts/kernel/progress-rca.mjs';
+import { workflowView, unitsOf, opJobsOf, reportsOf, progressSettings, OPEN_JOB } from '../scripts/kernel/progress-rca.mjs';
 import { listDecisions, SUPERVISOR_WF } from '../scripts/reconciler/decisions.mjs';
 import { withSupervisorRead } from '../scripts/supervisor/home.mjs';
 
@@ -34,17 +34,23 @@ const clip = (value, n = 240) => { const s = String(value ?? '').replace(/\s+/g,
 /* ------------------------------------------------------------ progress */
 
 /**
- * The state pill of one workflow. Pure over the progress block (starci/progress@1):
+ * The state pill of one workflow. Pure over the progress block (starci/progress@1), `now` and the grace window
+ * (runtimes.yaml allocation.progress.supervisorGraceMs, 60 min):
  *   done   every unit passed its gates;
- *   stuck  the stall verdict holds and nothing runs, or it has held for supervisorGrace (supervisorDue);
- *   slow   the stall verdict holds, or the rate is under the workflow's minimum;
- *   ok     otherwise.
+ *   stuck  work remains and nothing runs, or no unit passed its gates within the grace window;
+ *   slow   the rate is under the workflow's minimum, or ready units wait while parallel slots are free (under-dispatch);
+ *   ok     at or above the minimum rate with the allowed parallelism in use.
+ * A stall reason alone (e.g. settles waiting on the Kernel) is not "stuck" while units keep passing.
  */
-export function pillOf(p) {
+export function pillOf(p, { now = Date.now(), graceMs = 3_600_000 } = {}) {
   if (!p) return 'unknown';
   if (p.unitsTotal > 0 && p.unitsDone === p.unitsTotal) return 'done';
-  if (p.stall?.stalled && (p.running === 0 || p.stall.supervisorDue)) return 'stuck';
-  if (p.stall?.stalled || (p.minUnitsPerHour > 0 && p.unitsPerHour < p.minUnitsPerHour)) return 'slow';
+  const last = p.lastUnitAt ? Date.parse(p.lastUnitAt) : null;
+  const quiet = last == null ? Boolean(p.stall?.stalled) : now - last > graceMs;
+  if (p.running === 0 || quiet) return 'stuck';
+  const underRate = p.minUnitsPerHour > 0 && p.unitsPerHour < p.minUnitsPerHour;
+  const underDispatch = p.queuedReady > 0 && p.running < p.allowedParallel;
+  if (underRate || underDispatch) return 'slow';
   return 'ok';
 }
 
@@ -83,7 +89,7 @@ export function topReasonOf(progress, rca) {
 export function progressRow(db, { workflowId, repo, core = {}, now = Date.now(), decisions = [], ownerAsks = [] }) {
   const view = workflowView({ db, workflowId, core, repo, now });
   const { progress, rca } = view;
-  const pill = pillOf(progress);
+  const pill = pillOf(progress, { now, graceMs: progressSettings().supervisorGraceMs });
   const top = pill === 'slow' || pill === 'stuck' ? topReasonOf(progress, rca) : null;
   return {
     progress: {
