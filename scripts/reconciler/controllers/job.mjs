@@ -34,6 +34,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { parseYaml } from '../../../engine/yaml.mjs';
 import { allocationSettings } from '../../../engine/config.mjs';
+import { classifyWorker, planHealth, HEALTH_DEFAULTS } from '../worker-health.mjs';
 import { settlerSettings, reportedJobs, kernelHandoverOf, releaseProofOf, EVENTS as SETTLE_EVENTS, KERNEL_ONLY_OPS } from '../../reconcile/job-settle.mjs';
 
 const selfFile = fileURLToPath(import.meta.url);
@@ -43,6 +44,7 @@ export const SETTLER_SCRIPT = 'scripts/reconcile/job-settle.mjs';
 export const OPENED_BY = 'job-controller';
 export const SUPERVISOR_LEDGER = 'supervisor';
 export const WORKERS_KEY = 'workers:supervisor';
+export const HEALTH_KEY = 'health:all';
 const OPEN = ['queued', 'leased', 'running', 'answering', 'effect_unknown'];
 const SETTLED = ['succeeded', 'failed', 'cancelled'];
 
@@ -78,6 +80,7 @@ export function jobSettings({ file = JOB_FILE, allocation = null } = {}) {
     },
     continuationCap: num(doc.continuationCap, 2),
     worktreeRemoveSlaMs: num(doc.worktreeRemoveSlaMs, 60_000),
+    health: Object.fromEntries(Object.entries(HEALTH_DEFAULTS).map(([k, v]) => [k, num(doc.health?.[k], v)])),
     allowedVerbs: Array.isArray(doc.allowedVerbs) && doc.allowedVerbs.length ? doc.allowedVerbs.map(String) : ['settle', 'check', 'reconcile', 'enqueue', 'incident'],
   };
 }
@@ -95,6 +98,7 @@ export const wfKey = (ledgerId, workflowId) => `wf:${ledgerId}:${workflowId}`;
 export function parseKey(key) {
   const s = String(key ?? '');
   if (s === WORKERS_KEY) return { type: 'workers', ledgerId: SUPERVISOR_LEDGER, id: null };
+  if (s === HEALTH_KEY) return { type: 'health', ledgerId: null, id: null };
   const m = /^(job|wf|overlap):([^:]+):(.+)$/.exec(s);
   return m ? { type: m[1], ledgerId: m[2], id: m[3] } : null;
 }
@@ -415,10 +419,84 @@ async function reconcileWorkers(ctx, settings) {
   } finally { ledger.close(); }
 }
 
+/* ------------------------------------------------------------------------------------------------ worker health */
+
+const healthMem = new Map(); // jobId -> probe memory (worker-health.mjs planHealth), per engine process
+let lastSendAt = 0;          // the stagger across every worker of the host
+const LIVE_WORKER = ['leased', 'running', 'answering'];
+const TERMINAL_SEND = 'scripts/api/orca/terminal-send.mjs';
+
+/** One probe: every live op job's worker, classified from ONE orca terminal list. */
+async function showTerminal(handle, ctx) {
+  try {
+    if (ctx.terminalShow) return (await ctx.terminalShow(handle)) ?? null;
+    const r = (await import('../../api/orca/terminal-show.mjs')).terminalShow({ terminal: handle });
+    return r?.ok ? r.terminal ?? null : null;
+  } catch { return null; }
+}
+async function reconcileHealth(ctx, settings, { list = null } = {}) {
+  const H = settings.health;
+  let listed;
+  try { listed = list ? await list() : (await import('../../api/orca/terminal-list.mjs')).terminalList({}); } catch (error) { listed = { ok: false, error: String(error?.message ?? error) }; }
+  if (!listed?.ok || listed.hostUnavailable) return { ok: true, action: 'host-unavailable', error: listed?.error ?? null };
+  const byHandle = new Map((listed.terminals ?? []).map((t) => [t.handle, t]));
+  const now = ctx.now();
+  const out = { ok: true, action: 'health', probed: 0, states: {}, sends: 0, decisions: 0 };
+  const seen = new Set();
+  for (const l of ctx.ledgers ?? []) {
+    if (l.ledgerId === SUPERVISOR_LEDGER) continue;
+    const jobs = ctx.read(l.ledgerId, (db) => db.prepare(`SELECT job_id, workflow_id, op_id, status, worker_id, payload_json FROM jobs WHERE kind='op' AND worker_id IS NOT NULL
+      AND status IN (${LIVE_WORKER.map(() => '?').join(',')})`).all(...LIVE_WORKER).map((r) => ({ ...r, reportFiled: reportedJobs(db, { jobId: r.job_id }).length > 0 }))) ?? [];
+    for (const j of jobs) {
+      out.probed += 1;
+      seen.add(j.job_id);
+      // A product-worktree terminal is not in the default list: read it by handle.
+      if (!byHandle.has(j.worker_id)) byHandle.set(j.worker_id, await showTerminal(j.worker_id, ctx));
+      const term = byHandle.get(j.worker_id) ?? null;
+      const mem = healthMem.get(j.job_id) ?? {};
+      const c = classifyWorker(term, { mem, reportFiled: j.reportFiled, now, settings: H });
+      out.states[c.state] = (out.states[c.state] ?? 0) + 1;
+      const planned = planHealth(c, { mem, now, settings: H });
+      const entity = jobKey(l.ledgerId, j.job_id);
+      if (['rate-limited', 'idle-at-prompt', 'done-without-report'].includes(c.state)) ctx.clock(entity, 'WORKER_STALLED', H.idleMs, { ledgerId: l.ledgerId, enteredAt: planned.mem.since ?? now });
+      else ctx.clear(entity, 'WORKER_STALLED');
+      const payload = parse(j.payload_json) ?? {};
+      const who = { jobId: j.job_id, workflowId: j.workflow_id, op: j.op_id, terminal: j.worker_id, provider: term?.agentIdentity ?? payload.provider ?? null, pool: payload.agent ?? payload.provider ?? null, model: payload.model ?? null };
+      if (c.state !== mem.state && c.state !== 'working') {
+        ctx.log('reconciler.worker-health', `${j.job_id} ${c.state}${c.resetMs != null ? ` (reset in ${Math.round(c.resetMs / 1000)}s)` : ''}`, { ...who, state: c.state, preview: String(term?.preview ?? '').slice(0, 200) });
+        if (c.state === 'rate-limited') ctx.log('reconciler.provider-rate-limited', `provider ${who.provider ?? '?'} rate-limited (${j.job_id})`, { ...who, resetMs: c.resetMs ?? null });
+      }
+      let next = planned.mem;
+      const a = planned.action;
+      if (a && ctx.mode === 'active' && !ctx.owns('job.worker')) { healthMem.set(j.job_id, mem); continue; }
+      if (a?.kind === 'send') {
+        if (now - lastSendAt < H.staggerMs) { healthMem.set(j.job_id, { ...mem, state: c.state, since: planned.mem.since, seenAt: planned.mem.seenAt }); continue; }
+        lastSendAt = now;
+        await ctx.run('node', [TERMINAL_SEND, '--terminal', j.worker_id, '--text', a.text], { timeoutMs: 60_000 });
+        out.sends += 1;
+      } else if (a?.kind === 'fail-no-report') {
+        // done-without-report past doneFailAfterMs: the failed-no-report path (its salvage continues from the commits).
+        await ctx.api(l.ledgerId, 'reconcile', ['--job', j.job_id, '--dead-worker', '--settle-failed']);
+      } else if (a?.kind === 'decision') {
+        await ctx.openDecision({ schema: 'starci/decision-item@1', kind: 'worker-stalled', idempotencyKey: `worker-stalled:${j.job_id}:${c.state}:${planned.mem.since ?? now}`,
+          decider: 'kernel', ledger: l.ledgerId, workflowId: j.workflow_id, entity: { type: 'job', id: j.job_id },
+          summary: `${j.op_id} ${j.job_id} (${who.provider ?? 'worker'}) is ${c.state}: ${a.why}; the automatic nudges did not move it`,
+          evidence: [{ ref: `terminal:${j.worker_id}` }, { ref: String(term?.preview ?? '').slice(0, 200) }], allowedVerbs: ['nudge', 'reconcile', 'route', 'enqueue'],
+          dueAt: now + settings.decisionDueMs, escalateTo: 'supervisor', openedBy: OPENED_BY, openedAt: now });
+        out.decisions += 1;
+      }
+      healthMem.set(j.job_id, next);
+    }
+  }
+  for (const id of [...healthMem.keys()]) if (!seen.has(id)) healthMem.delete(id); // a job no longer live forgets its probe memory
+  return out;
+}
+export const _health = { reset: () => { healthMem.clear(); lastSendAt = 0; }, mem: healthMem };
+
 export default {
   name: 'job',
   concerns: ['job.settle', 'job.worker', 'job.dispatch', 'job.consume-check', 'job.close-verify'],
-  resyncMs: 60_000,
+  resyncMs: 30_000,
   concurrency: 2,
   timeoutMs: 960_000,
   routes: {
@@ -434,6 +512,7 @@ export default {
         if (n) keys.push(WORKERS_KEY);
         continue;
       }
+      if (!keys.includes(HEALTH_KEY)) keys.push(HEALTH_KEY);
       keys.push(...(ctx.read(l.ledgerId, (db) => listKeysOf(db, l.ledgerId, { now: ctx.now(), settings })) ?? []));
     }
     return keys;
@@ -443,6 +522,7 @@ export default {
     if (!k) return { ok: false, action: 'bad-key', key };
     const settings = jobSettings();
     if (k.type === 'workers') return reconcileWorkers(ctx, settings);
+    if (k.type === 'health') return reconcileHealth(ctx, settings, { list: ctx.terminalList ?? null });
     if (k.type === 'wf') return reconcileWorkflow(ctx, k.ledgerId, k.id, settings);
     if (k.type === 'overlap') return reconcileOverlap(ctx, k.ledgerId, Number(k.id), settings);
     return reconcileJob(ctx, k.ledgerId, k.id, settings);

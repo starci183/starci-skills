@@ -1,0 +1,26 @@
+id: worker-health-probe
+effectiveAt: '2026-09-28T15:10:00+07:00'
+summary: >-
+  WORKER-HEALTH PROBE (owner-driven: five fe-canon Devin workers sat at "Reached free model rate limit ... Send a
+  message to retry" unseen). The Job controller (key health:all, every resync = 30 s) reads one orca terminal list
+  (plus terminal show for product-worktree terminals the list omits) and classifies each live op job's worker
+  deterministically (scripts/reconciler/worker-health.mjs): working (output advanced); rate-limited (preview
+  /rate limit|Send a message to retry|Upgrade to .* for higher limits/i) -> wait for the reset hint, else backoff
+  30 s -> 5 min with jitter, then send "Retry: continue your task from where you stopped.", with a typed
+  reconciler.provider-rate-limited row (provider/pool) for the Resource controller; idle-at-prompt (no output 5 min,
+  no report) -> at most 2 nudges "Continue your task, or file your report with api report if done."; 
+  done-without-report (/Worked for .* done|Press enter to continue/, no report) -> nudge "File your report now with
+  api report", after 10 min api reconcile --dead-worker --settle-failed (failed-no-report; its salvage continues from
+  the commits); dead (terminal gone or exited) -> the dead-worker step. Sends go through
+  scripts/api/orca/terminal-send.mjs, at most one per 15 s across all workers. A Decision Item worker-stalled opens
+  only after the automatic actions fail (idle after 2 nudges, rate limit past 30 min). SLA code WORKER_STALLED
+  (5 min) on job:<ledger>:<job>. Typed rows reconciler.worker-health per state change. Shadow: every send, reconcile
+  and DI is a would-row; active when the Job controller is (concern job.worker).
+reach: new-legs
+paths:
+  - modules/kernel/contract-changes/worker-health-probe.yaml
+  - scripts/reconciler/worker-health.mjs
+  - scripts/reconciler/controllers/job.mjs
+  - modules/reconciler/job.yaml
+  - modules/reconciler/sla.yaml
+  - tests/reconciler-worker-health.spec.mjs

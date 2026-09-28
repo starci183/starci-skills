@@ -35,6 +35,7 @@ codes:
   LEASE_STUCK:              {slaMs: 300000, severity: warn, owner: job-controller, autoAction: 'api reconcile'}
   WORKER_START_STUCK:       {slaKey: liveness.launchGraceMs, plusMs: 120000, severity: warn, owner: job-controller, autoAction: 'treated as dead: api reconcile --dead-worker (launch-abandoned)'}
   WORKER_SILENT:            {slaKey: liveness.activeStaleMs, severity: warn, owner: job-controller, autoAction: 'api nudge'}
+  WORKER_STALLED:           {slaMs: 300000, severity: warn, owner: job-controller, autoAction: 'worker-health probe: rate-limit retry with backoff, idle/report nudges (staggered), failed-no-report after 10 min; DI worker-stalled when those fail'}
   WORKER_WEDGED:            {slaKey: liveness.quietMs, severity: warn, owner: job-controller, autoAction: 'worker dead after quietMs past the nudge'}
   QUESTION_OVERDUE:         {slaMs: 600000, severity: warn, owner: kernel, autoAction: 'DI escalates; the worker is nudged to wait'}
   WORKER_RELEASE_LEAK:      {slaMs: 60000, severity: warn, owner: job-controller, autoAction: 'close and verify the worker (close-verify.mjs), recordLeftover'}
