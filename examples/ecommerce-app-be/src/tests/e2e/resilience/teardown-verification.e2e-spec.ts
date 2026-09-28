@@ -12,7 +12,7 @@ import {
 } from "node:process"
 import {
     bootE2eWorld 
-} from "@tests/infra/e2e-world"
+} from "@tests/harness/e2e-world"
 import {
     dockerAvailable,
     dockerLines,

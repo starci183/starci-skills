@@ -1,18 +1,18 @@
 import {
     E2EWorld, bootE2eWorld 
-} from "@tests/infra/e2e-world"
+} from "@tests/harness/e2e-world"
 import {
     E2EAuthService 
-} from "@tests/infra/domain/accounts/e2e-auth.service"
+} from "@tests/harness/domain/accounts/e2e-auth.service"
 import {
     E2EDbService 
-} from "@tests/infra/platform/databases/e2e-db.service"
+} from "@tests/harness/platform/databases/e2e-db.service"
 import {
     E2EHttpService 
-} from "@tests/infra/integrations/http/e2e-http.service"
+} from "@tests/harness/integrations/http/e2e-http.service"
 import {
     E2EGraphqlClient, E2EGraphqlService 
-} from "@tests/infra/integrations/graphql/e2e-graphql.service"
+} from "@tests/harness/integrations/graphql/e2e-graphql.service"
 
 jest.setTimeout(120_000)
 

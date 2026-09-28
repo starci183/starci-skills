@@ -1,18 +1,18 @@
 import {
     E2EWorld, bootE2eWorld 
-} from "@tests/infra/e2e-world"
+} from "@tests/harness/e2e-world"
 import {
     E2EDbService 
-} from "@tests/infra/platform/databases/e2e-db.service"
+} from "@tests/harness/platform/databases/e2e-db.service"
 import {
     E2EHttpService 
-} from "@tests/infra/integrations/http/e2e-http.service"
+} from "@tests/harness/integrations/http/e2e-http.service"
 import {
     E2EGraphqlService 
-} from "@tests/infra/integrations/graphql/e2e-graphql.service"
+} from "@tests/harness/integrations/graphql/e2e-graphql.service"
 import {
     E2EStackService 
-} from "@tests/infra/platform/stack/e2e-stack.service"
+} from "@tests/harness/platform/stack/e2e-stack.service"
 
 /** The register mutation's payload. */
 interface RegisterPayload { personId: string }
