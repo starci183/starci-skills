@@ -201,7 +201,10 @@ export async function runSupervisorTick({ repos = null, push = true, heartbeat =
 
   const frontiers = await step('workflows', () => workflowFrontiers({ repos: list, ...(deps.frontiers ?? {}) }));
   const running = (frontiers?.workflows ?? []).map(({ workflowId, repo }) => ({ workflowId, repo }));
-  const dead = await step('deadKernels', () => (deps.deadKernels ?? deadKernels)({ workflows: running, deadKernelMs: t.deadKernelMs, now: now() })) ?? [];
+  // A dead Kernel is the Host controller's seat state machine (replace, quarantine, DI seat-unrecoverable) while it owns
+  // host.kernel-seat; the DEAD-KERNEL alert is the fallback.
+  const dead = yielded('host.kernel-seat') ? []
+    : await step('deadKernels', () => (deps.deadKernels ?? deadKernels)({ workflows: running, deadKernelMs: t.deadKernelMs, now: now() })) ?? [];
   const stalled = noProgress((out.tick?.digests ?? []).flatMap((d) => d.stalls ?? []), t);
   out.flows = { workflows: frontiers?.workflows ?? [], waits: frontiers?.waits ?? {}, orphaned: frontiers?.orphaned ?? [], deadKernels: dead, noProgress: stalled.map((f) => f.line),
     // the waits api status aged past their SLA (op-metrics.mjs stuckOf): owed actions (actions.mjs) and the opHealth duty
