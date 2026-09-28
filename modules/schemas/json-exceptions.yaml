@@ -31,9 +31,6 @@ exceptions:
   - path: examples/ecommerce-app-be/architecture.json
     reason: >
       Rendered architecture document for the ecommerce-app-be example project; JSON by the renderer contract.
-  - path: examples/ecommerce-app-be/ec-lint.json
-    reason: >
-      Lint tool configuration/output for the ecommerce-app-be example project; JSON by the tool contract.
   - path: examples/ecommerce-app-be/metadata.json
     reason: >
       Example project metadata for ecommerce-app-be; JSON by the example tooling contract.

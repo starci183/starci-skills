@@ -2,3 +2,6 @@ node_modules/
 dist/
 *.log
 .scannerwork/
+
+# eslint -f json dumps (e.g. ec-lint.json) are review output, not source.
+*-lint.json
