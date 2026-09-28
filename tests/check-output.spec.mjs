@@ -27,7 +27,7 @@ test('check output writes exact bytes to scratch or stores them by sha', async t
   assert.equal(fs.readFileSync(out, 'utf8'), body);
   let printed = '';
   const {sha} = await emitCheckOutput(body, {blob: true, put, write: text => { printed += text; }});
-  assert.deepEqual(JSON.parse(printed), {sha});
+  assert.deepEqual(JSON.parse(printed), {sha, redaction: 'v1'});
   assert.equal(stored[0].bytes.toString(), body);
   assert.equal(stored[0].mediaType, 'application/json');
   await assert.rejects(emitCheckOutput(body, {out, blob: true, put}), /mutually exclusive/);
@@ -75,6 +75,6 @@ test('canon and scoped lint accept blob or scratch output without changing the v
     checker: async () => ({status: 'findings', ok: false}), put, write: text => { printed += text; },
   });
   assert.equal(result.exitCode, 1);
-  assert.deepEqual(JSON.parse(printed), {sha: stored[0].sha});
+  assert.deepEqual(JSON.parse(printed), {sha: stored[0].sha, redaction: 'v1'});
   assert.deepEqual(JSON.parse(stored[0].bytes.toString()), result.report);
 });
