@@ -135,6 +135,9 @@ test('stuckOf: every wait gets an age, a severity and the owner of its next acti
   assert.deepEqual(pick(by('throttled', 'op-pool')), { severity: 'warn', owner: 'supervisor', ageMs: 2 * HOUR });
   assert.deepEqual(pick(by('deferred-settle', 'op-held')), { severity: 'ok', owner: 'supervisor', ageMs: 30 * MIN });
   assert.equal(by('owner-gate', 'op-ask').cause, 'owner-ask');
+  const pilot = stuckOf({ db, workflowId: 'wf-a', now: NOW, sla: SLA, ownerGates: [{ incidentId: 'inc-gate000002', kind: 'supervisor-gate', holds: ['*'], detail: 'budget spent' }],
+    queued: [{ jobId: 'op-dep-1', queuedBecause: 'supervisor-gate', blockedBy: { incident: 'inc-gate000002' } }, { jobId: 'op-ready', queuedBecause: 'deferred-to-handover' }] });
+  assert.deepEqual(pilot.map((i) => [i.kind, i.cause, i.owner]), [['owner-gate', 'supervisor-gate', 'supervisor']], 'autopilot: the supervisor-gate belongs to the Supervisor; a job deferred to handover is no wait');
   assert.equal(stuck[0].severity, 'critical', 'critical first');
   const counts = stuckCounts(stuck);
   assert.equal(counts.critical, 2);

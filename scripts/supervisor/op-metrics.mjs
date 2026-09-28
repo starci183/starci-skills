@@ -25,7 +25,7 @@
 // them by `failureClassOf`, never re-derives them.
 //
 // STUCK SLA. Every wait a running workflow holds gets an age (`stuckOf`, called by `api status`, which owns the
-// frontier it reads): owner-gate (an open owner gate or pending owner ask), peer-wait, dependency, retry-cap (a
+// frontier it reads): owner-gate (an open owner gate, a pending owner ask, or an autopilot supervisor-gate), peer-wait, dependency, retry-cap (a
 // retry route fired its limit and handed the job to an owner gate), deferred-settle (a consumed report not settled,
 // or a settle held behind a wait), queued-ready (a queued job nothing holds), throttled (pool-full, circuit-open,
 // max-ops, path-lease). Past runtimes.yaml allocation.opTelemetry.stuckSla.<kind>.warnMs it is severity warn, past
@@ -320,6 +320,11 @@ export function stuckOf({ db, workflowId, now = Date.now(), sla = telemetrySetti
         owner: 'supervisor', detail: `route ${cap.step.route} fired ${cap.step.firing ?? '?'} of ${cap.step.limit ?? '?'}: diagnose the root cause before anything runs it again` });
       continue;
     }
+    // Autopilot (scripts/kernel/autopilot.mjs): a supervisor-gate is the Supervisor's step, never the owner's.
+    if (gate.kind === 'supervisor-gate') {
+      push({ kind: 'owner-gate', cause: 'supervisor-gate', incidentId: gate.incidentId, opId: gate.opId ?? null, since: incidentRaisedAt(db, workflowId, gate.incidentId), owner: 'supervisor', detail: gate.detail ?? '' });
+      continue;
+    }
     const holds = Array.isArray(gate.holds) ? gate.holds : [];
     const asked = ASK_NAMED.test(gate.detail ?? '') || pendingAsks.some((a) => holds.includes(a.jobId) || (a.opId && holds.includes(a.opId)));
     push({ kind: 'owner-gate', incidentId: gate.incidentId, opId: gate.opId ?? null, since: incidentRaisedAt(db, workflowId, gate.incidentId), owner: asked ? 'owner' : 'supervisor',
@@ -337,7 +342,7 @@ export function stuckOf({ db, workflowId, now = Date.now(), sla = telemetrySetti
   }
   for (const item of heldSettle) {
     const since = firstJobEventAt(db, item.jobId, ['report-consumed', 'report-filed']) ?? Number(jobRow.get(item.jobId)?.updated_at);
-    const byGate = item.heldBecause === 'owner-gate';
+    const byGate = item.heldBecause === 'owner-gate' || item.heldBecause === 'supervisor-gate';
     push({ kind: 'deferred-settle', cause: `held-${item.heldBecause}`, jobId: item.jobId, opId: item.opId ?? null, incidentId: item.blockedBy?.incident ?? null, since,
       owner: byGate ? (out.find((i) => i.incidentId === item.blockedBy?.incident && ['owner-gate', 'retry-cap'].includes(i.kind))?.owner ?? 'supervisor') : `peer:${item.blockedBy?.peer ?? '?'}`, blockedBy: item.blockedBy ?? null, detail: item.detail });
   }
@@ -354,7 +359,7 @@ export function stuckOf({ db, workflowId, now = Date.now(), sla = telemetrySetti
     const q = byJob.get(jobId);
     if (!q || seen.has(jobId)) return 'kernel';
     seen.add(jobId);
-    if (['owner-gate', 'peer-wait'].includes(q.queuedBecause)) return gateOwner.get(q.blockedBy?.incident) ?? (q.queuedBecause === 'peer-wait' ? `peer:${q.blockedBy?.peer ?? '?'}` : 'owner');
+    if (['owner-gate', 'supervisor-gate', 'peer-wait'].includes(q.queuedBecause)) return gateOwner.get(q.blockedBy?.incident) ?? (q.queuedBecause === 'peer-wait' ? `peer:${q.blockedBy?.peer ?? '?'}` : q.queuedBecause === 'supervisor-gate' ? 'supervisor' : 'owner');
     if (q.queuedBecause === 'dependency' && q.blockedBy?.job) return ownerOfJob(q.blockedBy.job, seen);
     if (THROTTLE_CAUSES.includes(q.queuedBecause)) return 'supervisor';
     return 'kernel';
@@ -364,7 +369,9 @@ export function stuckOf({ db, workflowId, now = Date.now(), sla = telemetrySetti
     const job = jobRow.get(q.jobId);
     const since = Number(job?.updated_at ?? job?.created_at) || null;
     const because = q.queuedBecause;
-    if (because === 'owner-gate' || because === 'peer-wait') continue; // the gate / wait itself is the item
+    if (['owner-gate', 'supervisor-gate', 'peer-wait'].includes(because)) continue; // the gate / wait itself is the item
+    // Parked for the owner's one review at handover by design (autopilot): not a wait anyone owes a move on now.
+    if (because === 'deferred' || because === 'deferred-to-handover') continue;
     if (because === 'dependency') {
       const blocker = q.blockedBy?.job ?? q.blockedBy?.op ?? q.jobId;
       const at = Number(job?.created_at) || since || now;
