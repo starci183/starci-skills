@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // grammar-registry-pin.mjs — a product manifest names @starci/grammar by a
-// registry semver range, never a local path.
+// registry spec, never a local path. This check does not validate semver syntax.
 //   node scripts/checks/grammar-registry-pin.mjs --repo <frontend repo> [--json]
 // The owner ruled on 2026-09-23 that consumers take the grammar from npm: a
 // `file:` link left starci-academy-fe on a hand-built dist, while nivo-fe and
@@ -8,7 +8,7 @@
 // package.json under the repo (node_modules excluded) is read.
 import path from 'node:path';
 import { readJsonFile } from '../lib/json.mjs';
-import { walkFiles } from './common.mjs';
+import { isMain, walkFiles } from './common.mjs';
 
 const PACKAGE = '@starci/grammar';
 const LOCAL = /^(?:file:|link:|portal:|workspace:|\.{0,2}\/|[A-Za-z]:[\\/])/;
@@ -35,13 +35,31 @@ export function grammarPinsIn(repo) {
   return out;
 }
 
-if (process.argv[1]?.endsWith('grammar-registry-pin.mjs')) {
-  const argv = process.argv.slice(2);
-  const repo = argv[argv.indexOf('--repo') + 1];
-  if (!repo || argv.indexOf('--repo') < 0) { console.error('use: grammar-registry-pin.mjs --repo <path> [--json]'); process.exit(2); }
-  const pins = grammarPinsIn(repo);
-  const bad = pins.filter((p) => !p.ok);
-  if (argv.includes('--json')) console.log(JSON.stringify({ ok: bad.length === 0, pins }, null, 2));
-  else for (const p of pins) console.log(`${p.ok ? 'ok ' : 'BAD'} ${p.file} ${p.section} ${p.spec}${p.reason ? ` — ${p.reason}` : ''}`);
-  process.exit(bad.length ? 1 : 0);
+const USAGE = 'use: grammar-registry-pin.mjs --repo <path> [--json]';
+
+function parseArgs(argv) {
+  let repo, json = false;
+  for (let index = 0; index < argv.length; index++) {
+    const value = argv[index];
+    if (value === '--repo' && repo === undefined) {
+      repo = argv[++index];
+      if (!repo || repo.startsWith('--')) throw Error(USAGE);
+    } else if (value === '--json' && !json) json = true;
+    else throw Error(`unexpected argument ${value}; ${USAGE}`);
+  }
+  if (!repo) throw Error(USAGE);
+  return { repo, json };
+}
+
+if (isMain(import.meta.url)) {
+  let repo, json;
+  try { ({ repo, json } = parseArgs(process.argv.slice(2))); }
+  catch (error) { console.error(error.message); process.exitCode = 2; }
+  if (repo) {
+    const pins = grammarPinsIn(repo);
+    const bad = pins.filter((p) => !p.ok);
+    if (json) console.log(JSON.stringify({ ok: bad.length === 0, pins }, null, 2));
+    else for (const p of pins) console.log(`${p.ok ? 'ok ' : 'BAD'} ${p.file} ${p.section} ${p.spec}${p.reason ? ` — ${p.reason}` : ''}`);
+    process.exitCode = bad.length ? 1 : 0;
+  }
 }
