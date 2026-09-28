@@ -18,7 +18,8 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath, pathToFileURL } from 'node:url';
-import { openLedgerReader, machineFileFor } from '../../engine/ledger-db.mjs';
+import { openLedgerReader } from '../../engine/ledger-db.mjs';
+import { machineFileFor, readMachine } from '../../engine/machine-db.mjs';
 import { loadContractFreeze } from '../kernel/contract-version.mjs';
 import { parseJson } from '../lib/json.mjs';
 
@@ -29,9 +30,7 @@ const list = (value) => (Array.isArray(value) ? value : value == null ? [] : [va
 /** The ledger files of this host's registry (machine.sqlite `ledgers`) that still exist. */
 export function registeredLedgers({ machine = machineFileFor() } = {}) {
   if (!fs.existsSync(machine)) return [];
-  let db;
-  try { db = openLedgerReader(machine); } catch { return []; }
-  try { return db.prepare('SELECT file FROM ledgers ORDER BY file').all().map((row) => row.file).filter((file) => fs.existsSync(file)); } catch { return []; } finally { db.close(); }
+  return readMachine((m) => m.listLedgers().map((l) => l.file).sort(), [], { file: machine }).filter((file) => fs.existsSync(file));
 }
 
 /** The latest accepted leg of `family` per live workflow of one ledger: [{workflowId, jobId, attempt, files[]}]. */

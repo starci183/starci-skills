@@ -14,7 +14,8 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { createRequire } from 'node:module';
-import { hasLedgerTable, machineFileFor, openLedgerReader } from '../../engine/ledger-db.mjs';
+import { hasLedgerTable, openLedgerReader } from '../../engine/ledger-db.mjs';
+import { machineFileFor, readMachine } from '../../engine/machine-db.mjs';
 import { pathKey } from './path-key.mjs';
 
 const require = createRequire(import.meta.url);
@@ -29,14 +30,7 @@ const openReadOnly = (file) => openLedgerReader(file);
 export function registeredRepos({ env = process.env, now = Date.now() } = {}) {
   const file = machineFileFor(env);
   if (cache.file === file && now - cache.at < REGISTRY_TTL_MS) return cache.repos;
-  let repos = [];
-  if (fs.existsSync(file)) {
-    try {
-      const db = openReadOnly(file);
-      try { repos = db.prepare('SELECT file FROM ledgers').all().map((row) => ({ ledger: row.file, repo: path.dirname(path.dirname(row.file)) })); }
-      finally { db.close(); }
-    } catch { repos = null; }
-  }
+  const repos = fs.existsSync(file) ? readMachine((m) => m.listLedgers().map((l) => ({ ledger: l.file, repo: l.repoRoot })), null, { file, env }) : [];
   cache = { file, at: now, repos };
   return repos;
 }

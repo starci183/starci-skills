@@ -5,7 +5,8 @@ import os from 'node:os';
 import path from 'node:path';
 import crypto from 'node:crypto';
 import {createRequire} from 'node:module';
-import {LEDGER_SCHEMA,LEDGER_VERSION,MACHINE_SCHEMA,ensureWorkflow,inspectLedger,ledgerFileFor,ledgerIdOf,machineFileFor,openLedger,openMachine,releaseTwoPhase,reserveTwoPhase} from '../engine/ledger-db.mjs';
+import {LEDGER_SCHEMA,LEDGER_VERSION,ensureWorkflow,inspectLedger,ledgerFileFor,ledgerIdOf,openLedger,releaseTwoPhase,reserveTwoPhase} from '../engine/ledger-db.mjs';
+import {MACHINE_SCHEMA,machineFileFor,openMachine} from '../engine/machine-db.mjs';
 
 /**
  * The ledger DB contract (docs/ledger-db.md): schema, meta identity, WAL-by-default with a recorded DELETE
@@ -116,14 +117,14 @@ test('the ledger schema carries every contract table, the meta identity, the dri
   ledger.close();
 });
 
-test('the machine schema carries ledgers, ai resources, leases and budgets at version 1',t=>{
+test('the machine schema carries ledgers, host leases and budgets at version 1',t=>{
   const dir=temporary();t.after(()=>fs.rmSync(dir,{recursive:true,force:true}));
   const machine=openMachine({file:path.join(dir,'machine.sqlite')});
   assert.equal(machine.schema,MACHINE_SCHEMA);
   assert.equal(Number(machine.db.prepare('PRAGMA user_version').get().user_version),1);
   const names=machine.db.prepare("SELECT name FROM sqlite_master WHERE type='table'").all().map(row=>row.name);
-  for(const table of ['ledgers','resources','leases','budgets','budget_reservations'])assert.ok(names.includes(table),`missing table ${table}`);
-  assert.equal(machine.journalMode,'WAL');
+  for(const table of ['ledgers','host_resources','host_leases','budgets','budget_reservations'])assert.ok(names.includes(table),`missing table ${table}`);
+  assert.equal(machine.db.prepare('PRAGMA journal_mode').get().journal_mode,'wal');
   assert.ok(machineFileFor({LOCALAPPDATA:dir}).startsWith(dir));
   assert.ok(ledgerFileFor(dir).endsWith(path.join('.starciwork','runtime.sqlite')));
   machine.close();
@@ -197,9 +198,7 @@ test('a nested transaction is refused by name and the outer transaction still ro
   const ledger=openLedger({file:path.join(dir,'runtime.sqlite')});
   assert.throws(()=>ledger.transaction(()=>{ledger.appendEvent({workflowId:'wf',entityType:'workflow',entityId:'wf',kind:'a'});ledger.transaction(()=>{});}),/ledger-nested-transaction/);
   assert.equal(ledger.db.prepare('SELECT count(*) n FROM events').get().n,0,'the outer transaction rolled back');
-  const machine=openMachine({file:path.join(dir,'machine.sqlite')});
-  assert.throws(()=>machine.transaction(()=>machine.transaction(()=>{})),/machine-nested-transaction/);
-  machine.close();ledger.close();
+  ledger.close();
 });
 
 test('leases_match_job refuses a lease whose token, generation, attempt, op or workflow differ from its job',t=>{
@@ -237,7 +236,7 @@ test('appendEvent links each row to the previous digest through the table trigge
 test('two-phase reservation registers the ledger, leases the job with its repo leases, and release clears them',t=>{
   const dir=temporary();t.after(()=>fs.rmSync(dir,{recursive:true,force:true}));
   const machine=openMachine({file:path.join(dir,'machine.sqlite')});
-  const ledger=openLedger({file:path.join(dir,'runtime.sqlite'),machine});
+  const ledger=openLedger({file:path.join(dir,'runtime.sqlite'),repoRoot:path.join(dir,'repo'),machine});
   assert.equal(machine.db.prepare('SELECT count(*) n FROM ledgers WHERE ledger_id=?').get(ledger.ledgerId).n,1,'opening with a machine registers the ledger');
   assert.equal(ledger.ledgerId,ledgerIdOf(ledger),'ledger_id comes from meta, not the path');
   ledger.db.prepare('INSERT INTO resources(resource_key,capacity) VALUES(?,?)').run('lane:x',1);

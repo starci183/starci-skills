@@ -313,6 +313,16 @@ const textBlob = (m, text, mediaType = 'text/plain') => (text == null || text ==
 // ---------------------------------------------------------------------------------------------------------------------
 const ledgerRow = (row) => (row ? { ledgerId: row.ledger_id, name: row.name, product: row.product, repoRoot: row.repo_root, file: row.file, state: row.state,
   schemaVersion: row.schema_version, registeredAt: row.registered_at, seenAt: row.seen_at, retiredAt: row.retired_at, retiredReason: row.retired_reason } : null);
+/** A ledger's own meta (key → value), read-only; {} when the file cannot be read. */
+function ledgerMetaOf(file) {
+  let db = null;
+  try {
+    if (!fs.existsSync(file)) return {};
+    const { DatabaseSync } = require('node:sqlite');
+    db = new DatabaseSync(file, { readOnly: true, timeout: MACHINE_BUSY_TIMEOUT_MS });
+    return Object.fromEntries(db.prepare('SELECT key, value FROM meta').all().map((r) => [r.key, r.value]));
+  } catch { return {}; } finally { try { db?.close(); } catch { /* closed */ } }
+}
 const repoKey = (root) => path.resolve(String(root)).replace(/\\/g, '/').replace(/^[a-z]:/, (d) => d.toUpperCase());
 export const repoKeyOf = repoKey;
 /**
@@ -333,7 +343,10 @@ function registerLedger(m, { ledgerId, name = null, repoRoot = null, file = null
         ...(product ? { product } : {}), ...(schemaVersion != null ? { schema_version: int(schemaVersion) } : {}),
         ...(existing.state === 'retired' ? {} : { state: 'active' }) }, { ledger_id: ledgerId });
     } else {
-      need(name && repoRoot, `registerLedger: a new ledger ${ledgerId} needs name and repoRoot`);
+      // A ledger opened by its writer names itself: repo_root / product come from its own meta when not given.
+      if (!repoRoot) { const own = ledgerMetaOf(target); repoRoot = own.repo_root ?? null; product = product ?? own.product ?? null; }
+      name = name ?? (repoRoot ? path.basename(path.resolve(repoRoot)) : null);
+      if (!name || !repoRoot) return { ledgerId, registered: false, refused: `registry-no-repo-root: ${target} names no repo_root in its meta and none was given` };
       insertRow(db, 'ledgers', { ledger_id: ledgerId, name, product, repo_root: repoKey(repoRoot), file: target, state: 'active',
         schema_version: int(schemaVersion), registered_at: at, seen_at: at });
     }

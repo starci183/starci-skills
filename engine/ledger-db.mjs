@@ -52,8 +52,6 @@ export const JOB_ARTIFACT_ROLES=Object.freeze(['check-output','check-stdout','ch
 
 export const LEDGER_SCHEMA='starci/runtime@1';
 export const LEDGER_VERSION=1;
-export const MACHINE_SCHEMA='starci/machine-db@1';
-export const MACHINE_VERSION=1;
 /** Where the comeback lives: every refusal of an old ledger names it. */
 export const COMEBACK_HINT='run the alpha.3 comeback (node scripts/supervisor/comeback.mjs) to archive the old runtime state and create a fresh runtime.sqlite';
 
@@ -74,10 +72,6 @@ export const isRuntimeRoot=root=>RUNTIME_MARKER(path.resolve(root));
 // The per-host runtime state root (%LOCALAPPDATA%/StarCi/runtime, or ~/.local/state/StarCi/runtime).
 const localStateRoot=(env=process.env)=>path.join(env.LOCALAPPDATA||path.join(os.homedir(),'.local','state'),'StarCi');
 export const runtimeRootFor=(env=process.env)=>path.join(localStateRoot(env),'runtime');
-/**
- * The explicit test registry: a machine.sqlite path that replaces the host's for this process tree.
- */
-export const TEST_REGISTRY_ENV='STARCI_TEST_MACHINE_FILE';
 /** Overrides the projects root (the directory holding <ledger_id>/runtime.sqlite) for this process tree. */
 export const PROJECTS_ROOT_ENV='STARCI_PROJECTS_ROOT';
 const normDir=file=>path.resolve(String(file)).replace(/\\/g,'/').replace(/\/+$/,'').toLowerCase();
@@ -93,16 +87,6 @@ export function isUnderTempDir(file,{env=process.env,tempDirs=tempDirsOf(env)}={
   try{forms.push(normDir(fs.realpathSync.native(file)));}catch{/* missing: the written path decides */}
   return forms.some(form=>dirs.some(dir=>form.startsWith(`${dir}/`)));
 }
-/**
- * The machine registry (machine.sqlite) for `env`: the explicit test registry when TEST_REGISTRY_ENV is set; else
- * <runtime root>/machine.sqlite - except inside a node --test process tree, which gets a registry under the OS temp dir.
- */
-export const machineFileFor=(env=process.env)=>{
-  if(env[TEST_REGISTRY_ENV])return path.resolve(env[TEST_REGISTRY_ENV]);
-  const file=path.join(runtimeRootFor(env),'machine.sqlite');
-  if(env.NODE_TEST_CONTEXT&&!isUnderTempDir(file,{env}))return path.join(os.tmpdir(),'starci-test-registry','machine.sqlite');
-  return file;
-};
 /** %LOCALAPPDATA%/StarCi/projects (a node --test process tree gets one under the OS temp directory). */
 export const projectsRootFor=(env=process.env)=>{
   if(env[PROJECTS_ROOT_ENV])return path.resolve(env[PROJECTS_ROOT_ENV]);
@@ -976,68 +960,4 @@ export function releaseTwoPhase(ledger,machine,{jobId,status=null,reason=null}={
     return n;
   });
   return {ok:true,released};
-}
-
-// ---------------------------------------------------------------------------------------------------------
-// machine.sqlite (lane a3-2 replaces this block with engine/machine-db.mjs)
-// ---------------------------------------------------------------------------------------------------------
-const MACHINE_SQL=fs.readFileSync(new URL('machine.sql',import.meta.url),'utf8');
-const realpathOf=file=>{try{return fs.realpathSync(file);}catch{return path.resolve(file);}};
-const inTransaction=(db,fn)=>{beginImmediate(db);try{const result=fn();db.exec('COMMIT');return result;}catch(error){try{db.exec('ROLLBACK');}catch{}throw error;}};
-function migrateMachine(db){
-  const version=userVersion(db);
-  need(version<=MACHINE_VERSION,`Machine db version ${version} is newer than supported ${MACHINE_VERSION}`);
-  if(version!==0)return;
-  inTransaction(db,()=>{if(userVersion(db)===0)db.exec(`${MACHINE_SQL}
-    PRAGMA user_version=${MACHINE_VERSION};`);});
-}
-const MACHINE_PRAGMAS=Object.freeze({synchronous:'NORMAL',foreign_keys:'ON',temp_store:'MEMORY',cache_size:-16000,wal_autocheckpoint:8000,journal_size_limit:67108864});
-
-/**
- * One-shot, idempotent registry maintenance: delete the `ledgers` rows whose file is missing or under the OS temp
- * directory. A row that still owns machine leases or budget reservations is kept.
- */
-export function pruneRegistry(machine,{env=process.env,tempDirs=tempDirsOf(env),dryRun=false,exists=fs.existsSync}={}){
-  need(machine?.db,'pruneRegistry needs a machine handle');
-  const {db}=machine,count=()=>Number(db.prepare('SELECT count(*) n FROM ledgers').get().n);
-  const before=count(),victims=[],kept=[];
-  let missing=0,temp=0;
-  const held=db.prepare('SELECT (SELECT count(*) FROM leases WHERE ledger_id=?)+(SELECT count(*) FROM budget_reservations WHERE ledger_id=?) n');
-  for(const row of db.prepare('SELECT ledger_id,file FROM ledgers ORDER BY ledger_id').all()){
-    const isTemp=isUnderTempDir(row.file,{env,tempDirs}),isMissing=!isTemp&&!exists(row.file);
-    if(!isTemp&&!isMissing)continue;
-    if(Number(held.get(row.ledger_id,row.ledger_id).n)>0){kept.push({ledgerId:row.ledger_id,file:row.file,reason:'holds machine leases or budget reservations'});continue;}
-    victims.push(row.ledger_id);if(isTemp)temp++;else missing++;
-  }
-  if(!dryRun&&victims.length){
-    const drop=inner=>{const del=inner.prepare('DELETE FROM ledgers WHERE ledger_id=?');for(const id of victims)del.run(id);};
-    if(machine.transaction)machine.transaction(drop);else{db.exec('BEGIN IMMEDIATE');try{drop(db);db.exec('COMMIT');}catch(error){try{db.exec('ROLLBACK');}catch{}throw error;}}
-  }
-  return {ok:true,dryRun,before,after:dryRun?before:count(),pruned:victims.length,missing,temp,kept};
-}
-
-/** The live registry refuses to enrol a ledger under the OS temp directory. */
-export function openMachine({file,now=Date.now,busyTimeoutMs=LEDGER_BUSY_TIMEOUT_MS,journalMode='WAL',env=process.env,tempDirs=tempDirsOf(env)}={}){
-  const {db,sqliteVersion,journalMode:actual}=openDb({file,busyTimeoutMs,journalMode,label:'openMachine',pragmas:MACHINE_PRAGMAS});
-  migrateMachine(db);
-  const transaction=makeTransaction(db,'machine');
-  const live=!env[TEST_REGISTRY_ENV]&&!isUnderTempDir(file,{env,tempDirs});
-  return {
-    schema:MACHINE_SCHEMA,file,path:path.resolve(file),sqliteVersion,journalMode:actual,db,now,transaction,live,
-    registerLedger({file:ledgerFile,ledgerId}={}){
-      need(ledgerId,'registerLedger needs the ledger meta.ledger_id');
-      if(live&&isUnderTempDir(ledgerFile,{env,tempDirs}))
-        return {ledgerId,registered:false,refused:`registry-temp-ledger: ${path.resolve(ledgerFile)} is under the OS temp directory and ${path.resolve(file)} is the live registry; set ${TEST_REGISTRY_ENV} to a test registry`};
-      const at=now();
-      db.prepare('INSERT INTO ledgers(ledger_id,file,registered_at,seen_at) VALUES(?,?,?,?) ON CONFLICT(ledger_id) DO UPDATE SET file=excluded.file,seen_at=excluded.seen_at').run(ledgerId,realpathOf(ledgerFile),at,at);
-      return {ledgerId,registered:true};
-    },
-    pruneRegistry(options={}){return pruneRegistry({db,transaction},{env,tempDirs,...options});},
-    release(tokens){
-      const list=[...new Set([tokens].flat().map(item=>typeof item==='string'?item:item?.token).filter(Boolean))];
-      let released=0;for(const token of list)released+=db.prepare('DELETE FROM leases WHERE token=?').run(token).changes;
-      return {ok:true,released};
-    },
-    close(){db.close();}
-  };
 }

@@ -46,7 +46,8 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { allocationSettings, runtimeProfile } from '../../engine/config.mjs';
-import { machineFileFor, openLedgerReader } from '../../engine/ledger-db.mjs';
+import { openLedgerReader } from '../../engine/ledger-db.mjs';
+import { runtimeRootFor } from '../../engine/machine-db.mjs';
 import { hostResourcesFor, resourceThresholds, HOST_RESOURCES_ENV } from './host-resources.mjs';
 import { machineLedgerFiles } from '../agent/balance.mjs';
 import { machineLoad } from '../supervisor/workers.mjs';
@@ -270,7 +271,7 @@ export function admitOp({ op, workflowId = null, ops = [], maxParallelOps = null
 
 /* ------------------------------------------------------------ IO */
 
-export const throttleStateFile = (env = process.env) => (env?.[THROTTLE_STATE_ENV] ? path.resolve(env[THROTTLE_STATE_ENV]) : path.join(path.dirname(machineFileFor(env)), 'ram-throttle.json'));
+export const throttleStateFile = (env = process.env) => (env?.[THROTTLE_STATE_ENV] ? path.resolve(env[THROTTLE_STATE_ENV]) : path.join(runtimeRootFor(env), 'ram-throttle.json'));
 
 export function readThrottleState(file) {
   try { const v = JSON.parse(fs.readFileSync(file, 'utf8')); return v && typeof v === 'object' ? v : {}; } catch { return {}; }

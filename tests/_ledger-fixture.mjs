@@ -2,7 +2,8 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import crypto from 'node:crypto';
-import {TEST_REGISTRY_ENV,ledgerFileFor,machineFileFor,openLedger,openMachine} from '../engine/ledger-db.mjs';
+import {ledgerFileFor,openLedger} from '../engine/ledger-db.mjs';
+import {TEST_REGISTRY_ENV,machineFileFor,openMachine} from '../engine/machine-db.mjs';
 
 const digest=value=>crypto.createHash('sha256').update(value).digest('hex');
 /* Inlined from the removed kernel/store.mjs: the seed's goal identity only has to be the same stable

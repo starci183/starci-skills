@@ -1,5 +1,5 @@
 // api archive: stop a workflow while preserving its history.
-import { machineFileFor, openMachine } from '../../../engine/ledger-db.mjs';
+import { machineFileFor, openMachine } from '../../../engine/machine-db.mjs';
 import { parseJson } from '../../lib/json.mjs';
 import { ARCHIVED_BY, getWorkflow, jobOpOf, jobPayloadOf } from '../api-lib/rows.mjs';
 import { kernelCustodyOf } from '../api-lib/kernel-seat.mjs';

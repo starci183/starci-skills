@@ -1,6 +1,6 @@
 // api reconcile: recover a fenced launch or handle one typed recovery mode.
 import path from 'node:path';
-import { openMachine, machineFileFor } from '../../../engine/ledger-db.mjs';
+import { openMachine, machineFileFor } from '../../../engine/machine-db.mjs';
 import { parseJson } from '../../lib/json.mjs';
 import { jobPayloadOf, operationTerminalHandleOf } from '../api-lib/rows.mjs';
 import { leaseCanonOf } from '../api-lib/peers.mjs';

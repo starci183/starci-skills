@@ -25,7 +25,8 @@
 // between probe and retain lands in the transaction window and flips the answer back to skipped.
 import fs from 'node:fs';
 import path from 'node:path';
-import { inspectLedger, machineFileFor, openLedger, openMachine, JOB_STATUSES } from '../../engine/ledger-db.mjs';
+import { inspectLedger, openLedger, JOB_STATUSES } from '../../engine/ledger-db.mjs';
+import { machineFileFor, readMachine } from '../../engine/machine-db.mjs';
 import { allocationSettings } from '../../engine/config.mjs';
 
 const SETTLED = JOB_STATUSES.settled;
@@ -137,10 +138,8 @@ export function sweepLedgers({ apply = false, now = Date.now(), env = process.en
   let list = files;
   if (!list) {
     const file = machineFile ?? machineFileFor(env);
-    if (!fs.existsSync(file)) return out;
-    const machine = openMachine({ file, env });
-    try { list = machine.db.prepare('SELECT file FROM ledgers ORDER BY ledger_id').all().map((row) => row.file); }
-    finally { machine.close(); }
+    list = readMachine((m) => m.listLedgers().map((l) => l.file), null, { file, env });
+    if (!list) return out;
   }
   for (const entry of new Set(list.map((file) => path.resolve(String(file))))) {
     const file = entry;

@@ -56,8 +56,9 @@ import { fileURLToPath } from 'node:url';
 import cp, { spawn, spawnSync } from 'node:child_process';
 import { syncBuiltinESMExports } from 'node:module';
 import {
-  openLedger, ledgerFileFor, machineFileFor, openMachine, newToken, JOB_STATUSES, reserveTwoPhase,
+  openLedger, ledgerFileFor, newToken, JOB_STATUSES, reserveTwoPhase,
 } from '../../engine/ledger-db.mjs';
+import { machineFileFor, openMachine } from '../../engine/machine-db.mjs';
 import { parseYaml } from '../../engine/yaml.mjs';
 import {
   AWAITING_OWNER, RETRY_CLASS_ENVIRONMENT, admitOpSlot, cutRetryLineage, deriveRetryLineage,

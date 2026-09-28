@@ -16,7 +16,7 @@
 // Pure over its inputs except poolCapsNow (one file read, cached CACHE_MS). Under the test runner it reads nothing
 // unless STARCI_RAM_THROTTLE_STATE names a state file.
 import path from 'node:path';
-import { machineFileFor } from '../../engine/ledger-db.mjs';
+import { runtimeRootFor } from '../../engine/machine-db.mjs';
 import { readJsonFile } from './json.mjs';
 
 export const POOL_BACKOFF_KEY = 'poolBackoff';
@@ -65,7 +65,7 @@ export function backoffPersists(entry, { now, persistMs, floor = DEFAULTS.floor 
 
 /* ------------------------------------------------------------ the reader */
 
-const stateFileOf = (env) => (env?.[STATE_ENV] ? path.resolve(env[STATE_ENV]) : path.join(path.dirname(machineFileFor(env)), 'ram-throttle.json'));
+const stateFileOf = (env) => (env?.[STATE_ENV] ? path.resolve(env[STATE_ENV]) : path.join(runtimeRootFor(env), 'ram-throttle.json'));
 const cache = new Map();
 
 /** The live backed-off caps from a throttle state object: {<pool target>: cap}. Pure. */

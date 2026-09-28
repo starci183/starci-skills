@@ -18,7 +18,8 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { createRequire } from 'node:module';
-import { machineFileFor, openLedgerReader } from '../../engine/ledger-db.mjs';
+import { openLedgerReader } from '../../engine/ledger-db.mjs';
+import { machineFileFor, readMachine } from '../../engine/machine-db.mjs';
 import { DEFAULT_ALLOCATION_WINDOW_HOURS } from '../../engine/config.mjs';
 import { parseJsonOr } from '../lib/json.mjs';
 
@@ -58,16 +59,10 @@ export function recentPoolCounts(db, sinceMs) {
  * the host's, resolved from `env`.
  */
 export function machineLedgerFiles({ env = process.env, exclude = [], machineFile = null } = {}) {
-  const machine = machineFile ?? machineFileFor(env);
-  if (!fs.existsSync(machine)) return [];
   const skip = new Set(exclude.filter(Boolean).map(norm));
-  let db = null;
-  try {
-    db = openReadOnly(machine);
-    const files = db.prepare('SELECT file FROM ledgers').all().map((row) => row.file).filter(Boolean);
-    return [...new Set(files.map((file) => path.resolve(file)))]
-      .filter((file) => !isFixtureLedgerPath(file, { env }) && !skip.has(norm(file)) && fs.existsSync(file));
-  } catch { return []; } finally { try { db?.close(); } catch { /* read-only */ } }
+  const files = readMachine((m) => m.listLedgers().map((l) => l.file), [], { file: machineFile ?? machineFileFor(env), env });
+  return [...new Set(files.filter(Boolean).map((file) => path.resolve(file)))]
+    .filter((file) => !isFixtureLedgerPath(file, { env }) && !skip.has(norm(file)) && fs.existsSync(file));
 }
 
 /**
