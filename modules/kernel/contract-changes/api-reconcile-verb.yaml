@@ -1,0 +1,8 @@
+id: api-reconcile-verb
+effectiveAt: '2026-09-28T18:35:00+07:00'
+summary: 'Move the reconcile command and its contract into a per-verb module, retaining the shared recovery helpers.'
+paths:
+  - scripts/kernel/api.mjs
+  - scripts/kernel/api-verbs/reconcile.mjs
+  - modules/kernel/api.yaml
+  - modules/kernel/api-commands/reconcile.yaml
