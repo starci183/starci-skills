@@ -1,0 +1,11 @@
+id: status-api-op-worktree-changes
+effectiveAt: '2026-09-28T20:10:00+07:00'
+summary: "Harness status API (read-only, CONTRACT_VERSION 2026-09-28.6): GET /api/agents/<job>/changes for a LIVE isolated op diffs that op's own product worktree (<repo>/.starciwork/worktrees/<wf>/<op>, the job's payload.productWorktree record from scripts/kernel/product-worktree.mjs jobWorktreeOf, only a record naming this job) against its base (record baseSha, else the merge-base with the workflow branch): committed base..HEAD, staged, working, untracked; AgentChanges gains source op-worktree | shared-tree | worktree-missing and worktree {repository, path, branch, workflowBranch, base, head}. An op with no record keeps the shared-tree diff of its owned paths (source shared-tree); a record whose worktree is gone answers worktree-missing with no patches, never the main checkout. STARCI_STATUS_SOURCE names the host when the server runs from a lane worktree. No runtime, ledger or op behaviour change; adds no check or finding code"
+reach: new-legs
+paths:
+  - ui/agent-changes.mjs
+  - ui/contract-shapes.mjs
+  - ui/src/contract.ts
+  - ui/CONTRACT.md
+  - ui/fixtures/agent-changes.json
+  - tests/status-api-units.spec.mjs

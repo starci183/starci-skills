@@ -9,7 +9,7 @@
  * server sends has passed its secret redaction and is clipped (e.g. 300 chars for status text).
  */
 
-export const CONTRACT_VERSION = '2026-09-28.5';
+export const CONTRACT_VERSION = '2026-09-28.6';
 
 // ------------------------------------------------------------------------------------------ vocabularies
 
@@ -290,7 +290,14 @@ export interface AgentLog {
 /** `line` indexes into lines. */
 export interface AgentLogEvent { kind: 'running' | 'command' | 'success' | 'error' | 'change'; title: string; detail: string; line: number }
 /** GET /api/agents/<op job>/changes — the running op's uncommitted and recent diffs and images in its owned paths. */
-export interface AgentChanges { jobId: string; updatedAt: number; note: string; patches: AgentPatch[]; images: AgentImage[] }
+/**
+ * GET /api/agents/<op job>/changes — a LIVE op's changes (404 once it stops running; its settled diff is /api/diff).
+ * source: op-worktree (an isolated op, diffed in its own product worktree against its base), shared-tree (no worktree
+ * record: the main checkout's owned paths, may mix agents), worktree-missing (a record whose worktree is gone: no patches).
+ */
+export interface AgentChanges { jobId: string; updatedAt: number; source: 'op-worktree' | 'shared-tree' | 'worktree-missing'; worktree: AgentWorktree | null; note: string; patches: AgentPatch[]; images: AgentImage[] }
+/** The op's worktree (scripts/kernel/product-worktree.mjs record): path is repo-relative; base the sha diffed from (record baseSha, else the merge-base with workflowBranch); head its HEAD. base/head are null when worktree-missing. */
+export interface AgentWorktree { repository: Repository | null; path: string; branch: string | null; workflowBranch: string | null; base: string | null; head: string | null }
 export interface AgentPatch { repository: Repository; kind: 'working' | 'staged' | 'untracked' | 'committed'; files: string[]; patch: string; truncated: boolean }
 /** GET /api/agents/<job>/images/<id> serves the bytes. */
 export interface AgentImage { id: string; repository: Repository; name: string; path: string; modifiedAt: number; size: number }

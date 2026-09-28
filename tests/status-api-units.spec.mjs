@@ -111,3 +111,37 @@ test('reconcilerState attributes an engine reconcile-failed row to the controlle
   assert.equal(st.windowMs, 24 * 3_600_000);
   assert.ok(!('cpuPercent' in c.gc) && !('ramBytes' in c.gc), 'no per-controller CPU/RAM: the engine does not measure it');
 });
+
+test('diffForWorktree diffs the op\'s own worktree against its base, never the main checkout', async (t) => {
+  const { spawnSync } = await import('node:child_process');
+  const { diffForWorktree } = await import('../ui/agent-changes.mjs');
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'starci-status-wt-'));
+  t.after(() => fs.rmSync(root, { recursive: true, force: true, maxRetries: 30, retryDelay: 50 }));
+  const git = (cwd, ...args) => { const r = spawnSync('git', ['-C', cwd, ...args], { encoding: 'utf8', windowsHide: true }); assert.equal(r.status, 0, r.stderr); return r.stdout.trim(); };
+  const repo = path.join(root, 'fe');
+  fs.mkdirSync(repo);
+  git(repo, 'init', '--quiet', '-b', 'main'); git(repo, 'config', 'user.email', 'l@t'); git(repo, 'config', 'user.name', 'l'); git(repo, 'config', 'core.autocrlf', 'false');
+  fs.writeFileSync(path.join(repo, 'a.ts'), 'export const a = 1;\n'); fs.writeFileSync(path.join(repo, '.gitignore'), '.starciwork/\n');
+  git(repo, 'add', '.'); git(repo, 'commit', '--quiet', '-m', 'init');
+  git(repo, 'branch', 'wf/w1');
+  const base = git(repo, 'rev-parse', 'HEAD');
+  const dir = path.join(repo, '.starciwork', 'worktrees', 'w1', 'o1');
+  git(repo, 'worktree', 'add', '--quiet', '-b', 'op/o1', dir, 'wf/w1');
+  fs.writeFileSync(path.join(dir, 'a.ts'), 'export const a = 2;\n'); git(dir, 'commit', '--quiet', '-am', 'op edit');
+  fs.writeFileSync(path.join(dir, 'b.ts'), 'export const b = 1;\n');
+  fs.writeFileSync(path.join(dir, 'a.ts'), 'export const a = 3;\n');
+  // The main checkout changes too: never part of the op's diff.
+  fs.writeFileSync(path.join(repo, 'main-only.ts'), 'x\n');
+  const record = { repoRoot: repo, workflow: { branch: 'wf/w1' }, op: { branch: 'op/o1', path: dir } };
+  for (const rec of [{ ...record, baseSha: base }, record]) {
+    const d = await diffForWorktree('FE', dir, rec);
+    assert.equal(d.base, base, 'the record baseSha, else the merge-base with the workflow branch');
+    assert.equal(d.head, git(dir, 'rev-parse', 'HEAD'));
+    const kinds = Object.fromEntries(d.sections.map((x) => [x.kind, x]));
+    assert.deepEqual(kinds.committed.files, ['a.ts']);
+    assert.match(kinds.committed.patch, /\+export const a = 2;/);
+    assert.match(kinds.working.patch, /\+export const a = 3;/);
+    assert.deepEqual(kinds.untracked.files, ['b.ts']);
+    assert.ok(!d.sections.some((x) => x.files.includes('main-only.ts')));
+  }
+});

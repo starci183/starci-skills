@@ -1,47 +1,44 @@
 {
-  "endpoint": "/api/agents/op-interface.draw-3cd517a152/changes",
-  "capturedAt": "2026-09-27T13:09:17.113Z",
-  "source": "127.0.0.1:4546",
+  "endpoint": "/api/agents/op-code.refactor-5640c787c6/changes",
+  "capturedAt": "2026-09-28T10:36:21.218Z",
+  "source": "127.0.0.1:4591",
   "status": 200,
   "contentType": "application/json; charset=utf-8",
   "body": {
-    "jobId": "op-interface.draw-3cd517a152",
-    "updatedAt": 1790514557111,
-    "patches": [],
-    "images": [
+    "jobId": "op-code.refactor-5640c787c6",
+    "updatedAt": 1790591780642,
+    "images": [],
+    "source": "op-worktree",
+    "worktree": {
+      "repository": "FE",
+      "path": ".starciwork/worktrees/mujek980/5640c787",
+      "branch": "op/5640c787",
+      "workflowBranch": "wf/mujek980",
+      "base": "f32e91db1393ef486f4f72be560e701d4246bbcd",
+      "head": "f32e91db1393ef486f4f72be560e701d4246bbcd"
+    },
+    "patches": [
       {
-        "id": "5178cffd7438913ac79b",
-        "repository": "BE",
-        "name": "payment-not-started-1440.png",
-        "path": ".starciwork/features/workspace-provision/impl/nivo-fe/checkout-review/evidence/repair-round8/screens/payment-not-started-1440.png",
-        "modifiedAt": 1790403261804.208,
-        "size": 119916
+        "repository": "FE",
+        "kind": "working",
+        "files": [
+          "apps/landing-draft/src/features/layouts/SiteShell/SectionIntro.tsx",
+          "apps/landing-draft/src/features/layouts/SiteShell/index.tsx"
+        ],
+        "patch": "diff --git a/apps/landing-draft/src/features/layouts/SiteShell/SectionIntro.tsx b/apps/landing-draft/src/features/layouts/SiteShell/SectionIntro.tsx\ndeleted file mode 100644\nindex 06aac2d..0000000\n--- a/apps/landing-draft/src/features/layouts/SiteShell/SectionIntro.tsx\n+++ /dev/null\n@@ -1,32 +0,0 @@\n-import { SectionHeader, Text } from \"@starci/grammar/common\"\n-import type { ReactNode } from \"react\"\n-import { SITE_CLASS_NAMES } from \"./classNames\"\n-\n-/** Copy contract for a route-safe public-site section introduction. */\n-export type SectionIntroProps = {\n-    readonly id: string\n-    readonly…",
+        "truncated": false
       },
       {
-        "id": "b0f1e5742b6458c938bd",
-        "repository": "BE",
-        "name": "admission-refused-or-terms-changed-1440.returned.png",
-        "path": ".starciwork/features/workspace-provision/impl/nivo-fe/checkout-review/evidence/repair-round8/screens/admission-refused-or-terms-changed-1440.returned.png",
-        "modifiedAt": 1790403259631.1448,
-        "size": 55644
-      },
-      {
-        "id": "c567134d6deeccd0c43c",
-        "repository": "BE",
-        "name": "admission-refused-or-terms-changed-1440.png",
-        "path": ".starciwork/features/workspace-provision/impl/nivo-fe/checkout-review/evidence/repair-round8/screens/admission-refused-or-terms-changed-1440.png",
-        "modifiedAt": 1790403257975.4475,
-        "size": 51189
-      },
-      {
-        "id": "bb00a1c99c7e87757b4a",
-        "repository": "BE",
-        "name": "checkout-review-1440.png",
-        "path": ".starciwork/features/workspace-provision/impl/nivo-fe/checkout-review/evidence/repair-round8/screens/checkout-review-1440.png",
-        "modifiedAt": 1790403255576.269,
-        "size": 118441
+        "repository": "FE",
+        "kind": "untracked",
+        "files": [
+          "apps/landing-draft/src/components/blocks/landing/SectionIntro/component.tsx",
+          "apps/landing-draft/src/components/blocks/landing/SectionIntro/index.tsx"
+        ],
+        "patch": "diff --git a/apps/landing-draft/src/components/blocks/landing/SectionIntro/component.tsx b/apps/landing-draft/src/components/blocks/landing/SectionIntro/component.tsx\nnew file mode 100644\n--- /dev/null\n+++ b/apps/landing-draft/src/components/blocks/landing/SectionIntro/component.tsx\n@@ -0,0 +1,37 @@\n+import { SectionHeader, Text } from \"@starci/grammar/common\"\n+import type { ReactNode } from \"react\"\n+\n+const SECTION_INTRO_CLASS_NAMES = {\n+    standard: \"site-section-intro\",\n+    inverse: \"site-section-intro site-section-intro--inverse\"\n+} as const\n+\n+/** Copy contract for a route-safe public-s…",
+        "truncated": false
       }
     ],
-    "note": "Diff giới hạn trong đường dẫn được giao cho op; có cả thay đổi chưa commit và tối đa 3 commit gần nhất từ khi op bắt đầu. Checkout có thể được nhiều agent dùng chung nên chưa thể quy từng dòng cho một agent."
+    "note": "Diff trong worktree riêng của op (op/5640c787) so với base f32e91db1393: commit của op, thay đổi staged, chưa commit và file mới."
   }
 }

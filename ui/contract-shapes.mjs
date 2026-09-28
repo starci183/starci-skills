@@ -182,7 +182,8 @@ const AgentSnapshot = obj('AgentSnapshot', { updatedAt: N, language: S, agents: 
   sources: rec(nul(S)) });
 const AgentLog = obj('AgentLog', { terminal: S, updatedAt: N, source: S, language: S, lines: arr(S),
   events: arr(obj('AgentLogEvent', { kind: en('running', 'command', 'success', 'error', 'change'), title: S, detail: S, line: I })), limited: B });
-const AgentChanges = obj('AgentChanges', { jobId: S, updatedAt: N, note: S,
+const AgentChanges = obj('AgentChanges', { jobId: S, updatedAt: N, source: en('op-worktree', 'shared-tree', 'worktree-missing'),
+  worktree: nul(obj('AgentWorktree', { repository: nul(en(V.repositories)), path: S, branch: nul(S), workflowBranch: nul(S), base: nul(S), head: nul(S) })), note: S,
   patches: arr(obj('AgentPatch', { repository: en(V.repositories), kind: en('working', 'staged', 'untracked', 'committed'), files: arr(S), patch: S, truncated: B })),
   images: arr(obj('AgentImage', { id: S, repository: en(V.repositories), name: S, path: S, modifiedAt: N, size: I })) });
 
