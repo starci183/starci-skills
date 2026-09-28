@@ -23,7 +23,10 @@ const parse = (t) => { try { return JSON.parse(t); } catch { return {}; } };
 /** The trees to scan for one workflow: its _wf worktrees, else the live checkout a legacy running cut edits. */
 export function importTreesOf(db, { workflowId, repo }) {
   const trees = [...new Set(isolatedJobs(db, { workflowId }).map((j) => layoutOf({ repoRoot: j.record.repoRoot, workflowId }).workflow.path))].filter((p) => fs.existsSync(p));
-  if (trees.length) return trees.map((p) => ({ path: p, kind: 'workflow' }));
+  if (trees.length) {
+    const byPath = new Map(isolatedJobs(db, { workflowId }).map((j) => [layoutOf({ repoRoot: j.record.repoRoot, workflowId }).workflow.path, j.record.repoRoot]));
+    return trees.map((p) => ({ path: p, kind: 'workflow', repoRoot: byPath.get(p) ?? null }));
+  }
   const cut = db.prepare(`SELECT op_id, payload_json FROM jobs WHERE workflow_id=? AND op_id='code.refactor' AND json_extract(payload_json,'$.cut.id') IS NOT NULL
     AND status IN (${LIVE.map(() => '?').join(',')}) LIMIT 1`).get(workflowId, ...LIVE);
   if (!cut) return [];
@@ -33,7 +36,7 @@ export function importTreesOf(db, { workflowId, repo }) {
   let placements = [];
   try { placements = ownedPathPlacements({ op: cut.op_id, payload, ownedPaths: owned, repo, worktree: null, timeoutMs: 20_000 }); } catch { placements = []; }
   const roots = [...new Set(placements.filter((p) => !p.unresolved && p.role && p.role !== binding?.ownerRole).map((p) => binding?.repos.find((r) => r.role === p.role)?.root).filter(Boolean))];
-  return roots.map((p) => ({ path: path.resolve(p), kind: 'live' }));
+  return roots.map((p) => ({ path: path.resolve(p), kind: 'live', repoRoot: path.resolve(p) }));
 }
 
 const stateKey = (tree) => {
@@ -42,28 +45,39 @@ const stateKey = (tree) => {
   return `${tree.path}\0${head}\0${dirty}`;
 };
 
+/**
+ * The invariant value for one workflow, or null when nothing is broken (also read by progress-rca.mjs, which ranks
+ * the repoint unit): brokenFiles are the importers to own, repository-qualified (<repo name>/<path>) as owned paths.
+ */
+export function importsBrokenOf({ db, workflowId, repo, now = Date.now() }) {
+  const trees = importTreesOf(db, { workflowId, repo });
+  if (!trees.length) return null;
+  const ttl = productSettings().invariant.importsCacheMs;
+  let count = 0, files = 0;
+  const sample = [], scanned = [], brokenFiles = new Set();
+  for (const tree of trees) {
+    const key = stateKey(tree);
+    let hit = cache.get(key);
+    if (!hit || now - hit.at > ttl) { hit = { at: now, value: brokenImports(tree.path, { limit: 400 }) }; cache.set(key, hit); }
+    count += hit.value.count; files += hit.value.files;
+    sample.push(...hit.value.broken.slice(0, 5).map((b) => ({ ...b, tree: tree.path })));
+    const name = tree.repoRoot ? path.basename(tree.repoRoot) : null;
+    for (const b of hit.value.broken) brokenFiles.add(name ? `${name}/${b.from}` : b.from);
+    scanned.push({ path: tree.path, kind: tree.kind, count: hit.value.count });
+  }
+  if (!count) return null;
+  const repointQueued = Boolean(db.prepare(`SELECT 1 FROM jobs WHERE workflow_id=? AND op_id='code.refactor'
+    AND (json_extract(payload_json,'$.params.canonWire')=1 OR json_extract(payload_json,'$.kernelEdit.wire')=1)
+    AND status IN (${LIVE.map(() => '?').join(',')}) LIMIT 1`).get(workflowId, ...LIVE));
+  return { code: 'IMPORTS_BROKEN_AFTER_MOVE', rcaCause: 'broken-import', count, files, sample: sample.slice(0, 10), brokenFiles: [...brokenFiles].sort().slice(0, 200),
+    trees: scanned, repointQueued, blocksNextWave: !repointQueued };
+}
+
 export default {
   key: 'importsBroken',
   compute(ctx) {
     if (ctx.wf?.phase === 'finished' || ctx.wf?.archived_at) return null;
-    const trees = importTreesOf(ctx.db, { workflowId: ctx.workflowId, repo: ctx.repo });
-    if (!trees.length) return null;
-    const ttl = productSettings().invariant.importsCacheMs;
-    const now = ctx.now ?? Date.now();
-    let count = 0, files = 0;
-    const sample = [], scanned = [];
-    for (const tree of trees) {
-      const key = stateKey(tree);
-      let hit = cache.get(key);
-      if (!hit || now - hit.at > ttl) { hit = { at: now, value: brokenImports(tree.path, { limit: 10 }) }; cache.set(key, hit); }
-      count += hit.value.count; files += hit.value.files;
-      sample.push(...hit.value.broken.slice(0, 5).map((b) => ({ ...b, tree: tree.path })));
-      scanned.push({ path: tree.path, kind: tree.kind, count: hit.value.count });
-    }
-    if (!count) return null;
-    const repointQueued = Boolean(ctx.db.prepare(`SELECT 1 FROM jobs WHERE workflow_id=? AND op_id='code.refactor' AND json_extract(payload_json,'$.params.canonWire')=1
-      AND status IN (${LIVE.map(() => '?').join(',')}) LIMIT 1`).get(ctx.workflowId, ...LIVE));
-    return { code: 'IMPORTS_BROKEN_AFTER_MOVE', rcaCause: 'broken-import', count, files, sample: sample.slice(0, 10), trees: scanned, repointQueued, blocksNextWave: !repointQueued };
+    return importsBrokenOf({ db: ctx.db, workflowId: ctx.workflowId, repo: ctx.repo, now: ctx.now ?? Date.now() });
   },
   lines: (v) => [`IMPORTS_BROKEN_AFTER_MOVE ${v.count} import(s) in ${v.files} file(s) resolve to nothing (${v.trees.map((t) => `${t.kind} ${t.path}`).join('; ')})`
     + `${v.repointQueued ? ' - a repoint unit is queued' : ' - NO repoint unit queued: enqueue one wave canon-wire unit owning the importers before the next wave'}; e.g. ${v.sample.slice(0, 3).map((s) => `${s.from} -> ${s.spec}`).join('; ')}`],

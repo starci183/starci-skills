@@ -86,3 +86,18 @@ test('IMPORTS_BROKEN_AFTER_MOVE: after the move lands, the unrepointed importers
   write(repo, `${SRC}/middleware.ts`, fs.readFileSync(path.join(repo, SRC, 'middleware.ts'), 'utf8').replace('./i18n/request', './modules/i18n/request'));
   assert.equal(brokenImports(repo).count, 0, 'the invariant is clean again');
 });
+
+test('RCA: a checker failing on an unresolved import is broken-import (not checker-unavailable), and the repoint unit is ranked first', async () => {
+  const { causesOf, actionsOf, CAUSES } = await import('../scripts/kernel/progress-rca.mjs');
+  assert.equal(CAUSES['broken-import'].authority, 'kernel');
+  const report = { outcome: 'blocked', blocker: { kind: 'environment', detail: 'check-scoped-lint status=unavailable: TS2307 Cannot find module "@/i18n/request"' } };
+  assert.deepEqual(causesOf({ status: 'failed', report }), ['broken-import']);
+  assert.equal(causesOf({ status: 'failed', report: { outcome: 'blocked', blocker: { kind: 'environment', detail: 'checker is unavailable (exit 3)' } } })[0], 'checker-unavailable');
+  const importsBroken = { count: 26, files: 3, repointQueued: false, brokenFiles: ['nivo-fe/apps/app/src/a.ts', 'nivo-fe/apps/app/src/b.ts', 'nivo-fe/apps/app/src/c.ts'] };
+  const units = [{ key: 'u1', op: 'code.refactor', state: 'open', open: [], jobs: [{ job_id: 'op-next-1', status: 'queued' }] }];
+  const progress = { queuedReady: 1, running: 1, allowedParallel: 3 };
+  const acts = actionsOf({ progress, rca: { clusters: [] }, units, workflowId: 'wf-x', repo: 'D:/r', importsBroken });
+  assert.equal(acts[0].cause, 'broken-import', 'ranked above dispatching more units into broken imports');
+  assert.ok(acts[0].command.endsWith('graph-edit --repo D:/r --workflow wf-x --edit wire --op code.refactor --paths "nivo-fe/apps/app/src/a.ts,nivo-fe/apps/app/src/b.ts,nivo-fe/apps/app/src/c.ts" --before op-next-1 --decision <id>'), acts[0].command);
+  assert.ok(!actionsOf({ progress, rca: { clusters: [] }, units, workflowId: 'wf-x', importsBroken: { ...importsBroken, repointQueued: true } }).some((a) => a.cause === 'broken-import'), 'a queued repoint is not asked for twice');
+});

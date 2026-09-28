@@ -30,6 +30,7 @@ import { clipLine } from '../lib/clip.mjs';
 import { priorityTable, readThrottleState, throttleStateFile } from '../lib/ram-throttle.mjs';
 import { specsOf } from './spec-deferral.mjs';
 import { kernelDecisionItems } from '../reconcile/job-settle.mjs';
+import { importsBrokenOf } from './api-status/imports.mjs';
 
 const unitSpecsOff = () => { try { return specsOf({ skillRoot }).unit === false; } catch { return false; } };
 
@@ -229,6 +230,9 @@ export const CAUSES = Object.freeze({
   'partial-commit': { why: 'the unit committed its in-ceiling part and stopped: progress, not a failure', authority: 'kernel' },
   'canon-conflict': { why: 'the cut asks for a location a canon rule forbids', authority: 'kernel' },
   'binding-defect': { why: 'the runtime bound the job to the wrong repository/guard', authority: 'supervisor' },
+  // FMEA #20 / DESIGN §16.7: code moved and its importers still point at the old path - fixed by ONE repoint unit per
+  // wave, never by the Supervisor; a checker that fails on an unresolved import is this, not checker-unavailable.
+  'broken-import': { why: 'code moved and its importers still import the old path (IMPORTS_BROKEN_AFTER_MOVE)', authority: 'kernel' },
   'checker-unavailable': { why: 'a required checker answered unavailable', authority: 'supervisor' },
   upstream: { why: 'the root cause lives in another workflow', authority: 'supervisor' },
   'product-defect': { why: 'the product code failed its checks', authority: 'kernel' },
@@ -254,11 +258,14 @@ export function causesOf({ status = 'failed', result = {}, report = null }) {
   if (/timed? ?out|timeout|30[- ]?s(?:econd)?\b|30 giây|exit(?:code)?[=: ]*124|ngắt sau/i.test(text)) add('tool-timeout');
   if (kind === 'test-gap' || /regression suite|kiểm thử hồi quy|no (?:existing )?regression/i.test(text)) add('test-gap');
   if (kind === 'grammar-gap' || /MONOREPO_TIER|monorepo-tier|canon rule .* forbids/i.test(text)) add('canon-conflict');
-  if (/status[= ]unavailable|unavailable \(exit|checker (?:is )?unavailable|không khả dụng/i.test(text) && kind === 'environment') add('checker-unavailable');
+  if (/IMPORTS_BROKEN_AFTER_MOVE|broken-import|Cannot find module ['"]?[@./]|Module not found: (?:Error: )?Can't resolve|TS2307|unresolved import|Failed to resolve import/i.test(text)) add('broken-import');
+  if (!causes.includes('broken-import') && /status[= ]unavailable|unavailable \(exit|checker (?:is )?unavailable|không khả dụng/i.test(text) && kind === 'environment') add('checker-unavailable');
   if (report?.rootCause && report.rootCause.self === false && /^wf-/.test(String(report.rootCause.node ?? ''))) add('upstream');
   if (report && COMMIT_RE.test(text) && (report.outcome === 'blocked' || status === 'failed')) add('partial-commit');
   if (!causes.length && report && (result?.verdict === 'fail' || report.outcome === 'failed')) add('product-defect');
   if (!causes.length) add(kind === 'environment' ? 'checker-unavailable' : 'other');
+  // An unresolved import is the cause even when the attempt also reads as something else (its checker "unavailable").
+  if (causes.includes('broken-import') && causes[0] !== 'broken-import') causes.unshift(...causes.splice(causes.indexOf('broken-import'), 1));
   // A partial commit is a secondary fact: the blocker that stopped the unit leads.
   if (causes[0] === 'partial-commit' && causes.length > 1) causes.push(causes.shift());
   return causes;
@@ -358,7 +365,7 @@ const actionKey = (...parts) => parts.join(':');
  * `repo`, `decisions`, `missingQueued` ([{jobId, paths}] of queued units whose every owned path is absent on disk).
  * Each: {rank, key, tier: light|heavy|proposal|supervisor, title, command, expected, unblocks, cause, tried}.
  */
-export function actionsOf({ progress, rca, units = [], workflowId, repo = '<repo>', decisions = [], missingQueued = [], settings = progressSettings(), recutOp = null }) {
+export function actionsOf({ progress, rca, units = [], workflowId, repo = '<repo>', decisions = [], missingQueued = [], settings = progressSettings(), recutOp = null, importsBroken = null }) {
   const api = `node scripts/kernel/api.mjs`;
   const base = `--repo ${q(repo)} --workflow ${workflowId}`;
   const acts = [];
@@ -380,6 +387,23 @@ export function actionsOf({ progress, rca, units = [], workflowId, repo = '<repo
       title: `decide ${ids.length} needs-kernel-decision settle(s) BEFORE any route or dispatch (api route/dispatch refuse settle-backlog meanwhile): ${items.slice(0, 8).map((it) => `${it.jobId}${it.reason ? ` [${it.reason}]` : ''}`).join(', ')}`,
       command: items.slice(0, 20).map((it) => `${it.outcome === 'done' ? `${api} check --repo ${q(repo)} --job ${it.jobId} --checks-file <your re-run> && ` : ''}${api} settle --repo ${q(repo)} --job ${it.jobId} --verdict ${verdictOf(it)}`).join(' ; '),
       expected: 'each settle closes its [Op] terminal (verified close), frees its slot and lets the unit count or route its repair' });
+  }
+  // 0b. IMPORTS_BROKEN_AFTER_MOVE (DESIGN §16.7, FMEA #20): moved code left importers on the old path and no repoint
+  // unit owns them. ONE wire unit owning every broken importer, before the next queued units - ranked right after the
+  // settle backlog: every later unit's checker fails on these imports until it runs.
+  const brokenCluster = cl.get('broken-import');
+  if ((importsBroken?.count && !importsBroken.repointQueued) || (!importsBroken && brokenCluster?.open)) {
+    const files = importsBroken?.brokenFiles ?? [];
+    const nextUnits = units.flatMap(queuedOf).slice(0, N - 1).map((j) => j.job_id);
+    add({ key: actionKey('repoint', ...(files.length ? files.slice(0, 4) : ['rca'])), tier: 'light', cause: 'broken-import',
+      unblocks: 500 + (importsBroken?.files ?? brokenCluster?.open ?? 1),
+      title: importsBroken
+        ? `enqueue ONE repoint unit owning the ${importsBroken.files} file(s) whose ${importsBroken.count} import(s) resolve to nothing (IMPORTS_BROKEN_AFTER_MOVE): repoint imports to the new locations; no other change`
+        : `${brokenCluster.open} unit(s) failed on an unresolved import: enqueue ONE repoint unit owning the importers of the moved paths`,
+      command: files.length
+        ? `${api} graph-edit ${base} --edit wire --op code.refactor --paths ${q(files.slice(0, 60).join(','))}${nextUnits.length ? ` --before ${nextUnits.join(',')}` : ''} --decision <id>`
+        : `${api} status ${base} --json   (read importsBroken.brokenFiles, then: ${api} graph-edit ${base} --edit wire --op code.refactor --paths <them> --before <the next queued units> --decision <id>)`,
+      expected: 'the importers point at the moved code; importsBroken clears and later checkers stop failing on the old paths' });
   }
   // 1. parallelism: the cheapest, most certain win.
   if (progress && progress.queuedReady > 0 && progress.running < progress.allowedParallel) {
@@ -557,7 +581,9 @@ export function workflowView({ db, workflowId, core = {}, repo, now = Date.now()
   const units = unitsOf(jobs);
   const missingQueued = resolve ? missingQueuedOf(units, resolve) : [];
   const decisions = decisionsOf(db, workflowId);
-  const actions = actionsOf({ progress, rca, units, workflowId, repo, decisions, missingQueued, settings, recutOp: recutTargetOf(units) });
+  let importsBroken = null;
+  try { importsBroken = repo ? importsBrokenOf({ db, workflowId, repo, now }) : null; } catch { importsBroken = null; }
+  const actions = actionsOf({ progress, rca, units, workflowId, repo, decisions, missingQueued, settings, recutOp: recutTargetOf(units), importsBroken });
   const { rows, ...rcaOut } = rca;
   return { progress, rca: { ...rcaOut, id: rcaDigest(rca), why: whyLine(rca, { language: 'en' }), missingQueued, actions,
     decisions: decisions.slice(-8).map((d) => ({ id: d.id, actionKey: d.actionKey ?? null, status: d.status, hypothesis: one(d.hypothesis, 120), observed: d.observed ? one(d.observed, 120) : null })) } };
