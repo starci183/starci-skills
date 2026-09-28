@@ -132,30 +132,20 @@ test('the quota line never meters the base pool; other providers keep their numb
   assert.equal(renderQuotaLine({ qwen: quota.qwen }), null);
 });
 
-test('/status shows Qwen as the base pool with its circuit state across the product ledgers', (t) => {
+test('/status shows Qwen as the base pool with its fleet-wide circuit state (machine provider_health)', () => {
   const now = Date.now();
-  const ledgerWith = (value, expiresAt) => {
-    const repo = tmp(t, 'starci-qwen-status-');
-    const l = openLedger({ file: ledgerFileFor(repo) });
-    try {
-      if (value) l.db.prepare(`INSERT INTO signals(scope,key,holder_pid,token,value_json,at,expires_at) VALUES('provider-health','qwen',NULL,NULL,?,?,?)`)
-        .run(JSON.stringify(value), now - 1000, expiresAt);
-    } finally { l.close(); }
-    return ledgerFileFor(repo);
-  };
   const config = { allocation: { shares: { 'qwen-agent': 40, 'claude-agent': 20, 'codex-agent': 20, 'devin-agent': 20 } } };
-  const clean = [ledgerWith(null), ledgerWith({ status: 'recovered', failureKind: 'quota' }, now - 1)];
-  const closed = basePoolState({ files: clean, config, now });
-  assert.deepEqual([closed.pool, closed.model, closed.sharePercent, closed.ledgers, closed.open], ['qwen-agent', 'deepseek-v4.1-flash', 40, 2, []]);
+  const closed = basePoolState({ circuits: [{ provider: 'qwen', value: { status: 'recovered', failureKind: 'quota' }, expiresAt: now - 1 }], config, now });
+  assert.deepEqual([closed.pool, closed.model, closed.sharePercent, closed.ledgers, closed.open], ['qwen-agent', 'deepseek-v4.1-flash', 40, 1, []]);
   assert.equal(renderBasePoolLine(closed, { language: 'en', now }), '🟢 Base pool: qwen-agent (deepseek-v4.1-flash) · share 40% · circuit closed');
   assert.equal(renderBasePoolLine(closed, { language: 'vi', now }), '🟢 Pool nền: qwen-agent (deepseek-v4.1-flash) · tỉ trọng 40% · circuit đóng');
 
   const until = Date.parse('2099-01-15T01:00:00Z');
-  const open = basePoolState({ files: [...clean, ledgerWith({ status: 'unavailable', failureKind: 'quota', observedAt: now - 5000,
-    quotaProbe: { at: now - 12 * 60000, state: 'quota-exhausted' } }, until)], config, now });
+  const open = basePoolState({ circuits: [{ provider: 'qwen', value: { status: 'unavailable', failureKind: 'quota', observedAt: now - 5000,
+    quotaProbe: { at: now - 12 * 60000, state: 'quota-exhausted' } }, expiresAt: until }], config, now });
   assert.equal(open.open.length, 1);
   const line = renderBasePoolLine(open, { language: 'en', now });
-  assert.equal(line, '⛔ Base pool: qwen-agent (deepseek-v4.1-flash) · share 40% · circuit OPEN (quota) in 1/3 ledger(s) until 01-15 01:00Z · last probe 12m ago (quota-exhausted)');
+  assert.equal(line, '⛔ Base pool: qwen-agent (deepseek-v4.1-flash) · share 40% · circuit OPEN (quota) until 01-15 01:00Z · last probe 12m ago (quota-exhausted)');
 
   const snap = { seat: null, enabled: true, ticks: [], board: { active: [], reported: [] }, pushes: [], lands: [] };
   const html = renderSupervisorBlock(snap, { language: 'en', base: open, now });

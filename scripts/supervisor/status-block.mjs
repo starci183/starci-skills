@@ -11,9 +11,8 @@ import { readSupervisor, seatOf, enabledOf, supervisorMode } from './home.mjs';
 import { workerBoard } from './workers.mjs';
 import { landStatus } from './land.mjs';
 import { probeAll as probeAllQuota } from '../api/quota/index.mjs';
-import { machineLedgerFiles } from '../agent/balance.mjs';
-import { openLedgerReader } from '../../engine/ledger-db.mjs';
 import { TEST_REGISTRY_ENV } from '../../engine/machine-db.mjs';
+import { providerCircuits } from '../kernel/provider-circuit.mjs';
 import { inspectOwnerConfig, configRoot } from '../../engine/config.mjs';
 import { parseJsonOr as parse } from '../lib/json.mjs';
 import { readYamlFile } from '../lib/yaml.mjs';
@@ -47,11 +46,11 @@ export function supervisorSnapshot(m, { now = Date.now() } = {}) {
 const TEXT = {
   en: { head: 'Supervisor', chat: 'in the owner chat', off: 'disabled', none: 'no seat', owed: 'OWED', trend: 'trend', noTick: 'no tick yet', workers: 'Workers', idle: 'none active',
     queue: 'Land queue', empty: 'empty', landing: 'landing now', pushes: 'Last pushes', lastLand: 'Last land', tick: 'last tick', quota: 'Quota', used: 'used',
-    base: 'Base pool', share: 'share', closed: 'circuit closed', open: 'circuit OPEN', inLedgers: (n, of) => `in ${n}/${of} ledger(s)`, until: 'until',
+    base: 'Base pool', share: 'share', closed: 'circuit closed', open: 'circuit OPEN', until: 'until',
     probe: 'last probe', never: 'not probed yet', ago: 'ago', noLedgers: 'no ledger read' },
   vi: { head: 'Supervisor', chat: 'trong chat của owner', off: 'đang tắt', none: 'chưa có terminal', owed: 'OWED', trend: 'xu hướng', noTick: 'chưa chạy tick này', workers: 'Worker', idle: 'không có worker nào chạy',
     queue: 'Hàng chờ land', empty: 'trống', landing: 'đang land', pushes: 'Lần push gần nhất', lastLand: 'Land gần nhất', tick: 'tick gần nhất', quota: 'Hạn mức', used: 'đã dùng',
-    base: 'Pool nền', share: 'tỉ trọng', closed: 'circuit đóng', open: 'circuit MỞ', inLedgers: (n, of) => `ở ${n}/${of} ledger`, until: 'đến',
+    base: 'Pool nền', share: 'tỉ trọng', closed: 'circuit đóng', open: 'circuit MỞ', until: 'đến',
     probe: 'probe gần nhất', never: 'chưa probe', ago: 'trước', noLedgers: 'chưa đọc được ledger nào' },
 };
 
@@ -75,14 +74,13 @@ export function renderQuotaLine(quota, { language = 'en' } = {}) {
   return parts.length ? `📶 ${t.quota}: ${parts.join(' · ')}` : null;
 }
 
-const openReadOnly = (file) => openLedgerReader(file);
 
 /**
  * The base pool's state for /status: {pool, provider, model, sharePercent, ledgers, open:[{ledger, failureKind,
- * expiresAt, observedAt, probe}]}. The circuit is the provider-health row of each product ledger the machine
- * arbiter registered (`files` overrides the list for specs); an unreadable ledger is skipped.
+ * expiresAt, observedAt, probe}]}. The circuit is the provider's one fleet-wide row in machine.sqlite provider_health
+ * (scripts/kernel/provider-circuit.mjs; `circuits` overrides it for specs), so `ledgers` is 1 (the machine) when read.
  */
-export function basePoolState({ env = process.env, now = Date.now(), files = undefined, config = undefined, runtimes = undefined } = {}) {
+export function basePoolState({ now = Date.now(), circuits = undefined, config = undefined, runtimes = undefined } = {}) {
   let rt = runtimes;
   if (rt === undefined) { rt = readYamlFile(path.join(SKILL_DIR, 'modules', 'models', 'runtimes.yaml')); }
   const card = rt?.runtimes?.[BASE_POOL] ?? {};
@@ -92,22 +90,16 @@ export function basePoolState({ env = process.env, now = Date.now(), files = und
   const shares = cfg?.allocation?.shares ?? null;
   const total = Object.values(shares ?? {}).reduce((sum, v) => sum + (Number(v) > 0 ? Number(v) : 0), 0);
   const sharePercent = total > 0 ? Math.round((Math.max(0, Number(shares?.[BASE_POOL] ?? 0)) / total) * 100) : null;
-  const list = files ?? machineLedgerFiles({ env });
   const open = [];
-  let read = 0;
-  for (const file of list) {
-    let db = null;
-    try {
-      db = openReadOnly(file);
-      read += 1;
-      const row = db.prepare("SELECT value_json,expires_at FROM signals WHERE scope='provider-health' AND key=?").get(provider);
-      if (!row || (row.expires_at != null && row.expires_at <= now)) continue;
-      const value = parse(row.value_json);
-      if (value.status !== 'unavailable') continue;
-      open.push({ ledger: file, failureKind: value.failureKind ?? 'auth', expiresAt: row.expires_at ?? null, observedAt: value.observedAt ?? null,
-        probe: value.quotaProbe ? { at: value.quotaProbe.at, state: value.quotaProbe.state } : null });
-    } catch { /* unreadable ledger */ } finally { try { db?.close(); } catch { /* read-only */ } }
+  let rows = circuits;
+  if (rows === undefined) { try { rows = providerCircuits(); } catch { rows = []; } }
+  const row = (rows ?? []).find((c) => c.provider === provider) ?? null;
+  const value = row?.value ?? {};
+  if (row && value.status === 'unavailable' && !(row.expiresAt != null && row.expiresAt <= now)) {
+    open.push({ ledger: 'machine', failureKind: value.failureKind ?? 'auth', expiresAt: row.expiresAt ?? null, observedAt: value.observedAt ?? null,
+      probe: value.quotaProbe ? { at: value.quotaProbe.at, state: value.quotaProbe.state } : null });
   }
+  const read = rows ? 1 : 0;
   const models = Object.values(card.models ?? {});
   return { pool: BASE_POOL, provider, model: models[0] ?? null, sharePercent, ledgers: read, open };
 }
@@ -123,7 +115,7 @@ export function renderBasePoolLine(base, { language = 'en', now = Date.now() } =
   const probes = base.open.map((o) => o.probe).filter((p) => Number.isFinite(Number(p?.at)));
   const last = probes.sort((a, b) => b.at - a.at)[0] ?? null;
   const probe = last ? `${t.probe} ${ago(last.at, now)} ${t.ago} (${esc(last.state ?? '?')})` : t.never;
-  return `⛔ ${t.base}: ${head} · ${t.open} (${esc(kinds)}) ${t.inLedgers(base.open.length, base.ledgers)}${until ? ` ${t.until} ${shortIso(until)}` : ''} · ${probe}`;
+  return `⛔ ${t.base}: ${head} · ${t.open} (${esc(kinds)})${until ? ` ${t.until} ${shortIso(until)}` : ''} · ${probe}`;
 }
 
 /** The block as Telegram HTML, or null. `quota` is a probeAll() result map (null/absent hides the line). */
@@ -171,6 +163,6 @@ export function supervisorStatusMessage({ language = 'en', env = process.env, no
   let q = quota;
   if (q === undefined) { try { q = probeAllQuota({ env }); } catch { q = null; } }
   let b = base;
-  if (b === undefined) { try { b = basePoolState({ env, now }); } catch { b = null; } }
+  if (b === undefined) { try { b = basePoolState({ now }); } catch { b = null; } }
   return renderSupervisorBlock(snap, { language, land: landStatus({ env }), now, quota: q, base: b });
 }

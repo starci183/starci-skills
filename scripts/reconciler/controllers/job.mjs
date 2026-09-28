@@ -438,6 +438,10 @@ async function reconcileWorkers(ctx, settings) {
 /* ------------------------------------------------------------------------------------------------ worker health */
 
 const healthMem = new Map(); // jobId -> probe memory (worker-health.mjs planHealth), per engine process
+/** H14/H12: the settler's lease sweep marked the job's lease dead (conditions LeaseLive=False). */
+const leaseLostOf = (db, jobId) => {
+  try { return Boolean(db.prepare("SELECT 1 FROM conditions WHERE entity_type='job' AND entity_id=? AND type='LeaseLive' AND status='False'").get(jobId)); } catch { return false; }
+};
 let lastSendAt = 0;          // the stagger across every worker of the host
 const LIVE_WORKER = ['leased', 'running', 'answering'];
 const TERMINAL_SEND = 'scripts/api/orca/terminal-send.mjs';
@@ -462,7 +466,7 @@ async function reconcileHealth(ctx, settings, { list = null } = {}) {
   for (const l of ctx.ledgers ?? []) {
     if (l.ledgerId === SUPERVISOR_LEDGER) continue;
     const jobs = ctx.read(l.ledgerId, (db) => db.prepare(`SELECT job_id, workflow_id, op_id, status, worker_id, payload_json FROM jobs WHERE kind='op' AND worker_id IS NOT NULL
-      AND status IN (${LIVE_WORKER.map(() => '?').join(',')})`).all(...LIVE_WORKER).map((r) => ({ ...r, reportFiled: reportedJobs(db, { jobId: r.job_id }).length > 0 }))) ?? [];
+      AND status IN (${LIVE_WORKER.map(() => '?').join(',')})`).all(...LIVE_WORKER).map((r) => ({ ...r, reportFiled: reportedJobs(db, { jobId: r.job_id }).length > 0, leaseLost: leaseLostOf(db, r.job_id) }))) ?? [];
     for (const j of jobs) {
       out.probed += 1;
       seen.add(j.job_id);
@@ -470,7 +474,7 @@ async function reconcileHealth(ctx, settings, { list = null } = {}) {
       if (!byHandle.has(j.worker_id)) byHandle.set(j.worker_id, await showTerminal(j.worker_id, ctx));
       const term = byHandle.get(j.worker_id) ?? null;
       const mem = healthMem.get(j.job_id) ?? {};
-      const c = classifyWorker(term, { mem, reportFiled: j.reportFiled, now, settings: H });
+      const c = classifyWorker(term, { mem, reportFiled: j.reportFiled, leaseLost: j.leaseLost, now, settings: H });
       out.states[c.state] = (out.states[c.state] ?? 0) + 1;
       const planned = planHealth(c, { mem, now, settings: H });
       const entity = jobKey(l.ledgerId, j.job_id);
@@ -490,6 +494,10 @@ async function reconcileHealth(ctx, settings, { list = null } = {}) {
         lastSendAt = now;
         await ctx.run('node', [TERMINAL_SEND, '--terminal', j.worker_id, '--text', a.text], { timeoutMs: 60_000 });
         out.sends += 1;
+      } else if (a?.kind === 'dead-worker') {
+        // H14: a gone/exited worker, or one whose lease the settler found expired (LeaseLive=False), is settled now.
+        ctx.log('reconciler.worker-health', `${j.job_id} dead (${a.why}): api reconcile --dead-worker --settle-failed`, { ...who, state: 'dead', why: a.why });
+        await ctx.api(l.ledgerId, 'reconcile', ['--job', j.job_id, '--dead-worker', '--settle-failed']);
       } else if (a?.kind === 'fail-no-report') {
         // done-without-report past doneFailAfterMs: the failed-no-report path (its salvage continues from the commits).
         await ctx.api(l.ledgerId, 'reconcile', ['--job', j.job_id, '--dead-worker', '--settle-failed']);

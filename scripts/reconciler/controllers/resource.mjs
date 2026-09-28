@@ -26,6 +26,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { parseYaml } from '../../../engine/yaml.mjs';
+import { providerCircuits } from '../../kernel/provider-circuit.mjs';
 import { claimDue, finishDuty } from '../schedules.mjs';
 import { readSupervisor, withSupervisor } from '../../supervisor/home.mjs';
 
@@ -351,7 +352,6 @@ export function createResourceController(overrides = {}) {
         rows = await ctx.read(l.ledgerId, (db) => ({
           events: db.prepare(EVENTS_SQL + (since == null ? 'e.created_at>=? ORDER BY e.seq' : 'e.seq>? ORDER BY e.seq')).all(RATE_LIMITED_EVENT, since == null ? seedSince : since),
           maxSeq: db.prepare('SELECT COALESCE(MAX(seq),0) s FROM events').get()?.s ?? 0,
-          health: db.prepare("SELECT key, value_json FROM signals WHERE scope='provider-health'").all(),
         }));
       } catch { rows = null; }
       if (!rows) continue;
@@ -360,14 +360,15 @@ export function createResourceController(overrides = {}) {
         let p = {}; try { p = JSON.parse(e.p || '{}'); } catch { p = {}; }
         hitSignal({ ...p, jobPool: e.jobPool }, e.at);
       }
-      for (const h of rows.health ?? []) {
-        let v = {}; try { v = JSON.parse(h.value_json || '{}'); } catch { v = {}; }
-        const at = Number(v.observedAt) || 0;
-        const k = providerKey(v.provider ?? h.key);
-        if (v.failureKind !== 'rate-limited' || at < seedSince || at <= (memory.providerSeen[k] ?? 0)) continue;
-        memory.providerSeen[k] = at;
-        for (const target of byProvider.get(k) ?? []) hit(target, at);
-      }
+    }
+    // The provider circuits: one fleet-wide row per provider in machine.sqlite provider_health (a3-4, provider-circuit.mjs).
+    for (const c of (deps.providerCircuits ?? providerCircuits)()) {
+      const v = c.value ?? {};
+      const at = Number(v.observedAt) || Number(c.at) || 0;
+      const k = providerKey(v.provider ?? c.provider);
+      if (v.failureKind !== 'rate-limited' || at < seedSince || at <= (memory.providerSeen[k] ?? 0)) continue;
+      memory.providerSeen[k] = at;
+      for (const target of byProvider.get(k) ?? []) hit(target, at);
     }
     const liveRows = readMachineOr((mm) => mm.poolBackoff(), []);
     const active = ctx.mode === 'active';
@@ -421,16 +422,14 @@ export function createResourceController(overrides = {}) {
   async function reconcileQuota(ctx, ledgerId) {
     if (ledgerId === 'supervisor') return { skipped: 'the supervisor ledger runs no provider ops' };
     const now = ctx.now();
+    const circuits = (deps.providerCircuits ?? providerCircuits)().map((c) => ({ provider: c.value?.provider ?? c.provider, status: c.value?.status ?? null,
+      failureKind: c.value?.failureKind ?? null, expiresAt: Number(c.expiresAt) || null }));
     const read = ctx.read(ledgerId, (db) => {
-      const circuits = db.prepare("SELECT key, value_json, expires_at FROM signals WHERE scope='provider-health'").all().map((r) => {
-        let v = {}; try { v = JSON.parse(r.value_json || '{}'); } catch { v = {}; }
-        return { provider: v.provider ?? r.key, status: v.status ?? null, failureKind: v.failureKind ?? null, expiresAt: Number(r.expires_at) || null };
-      });
       const jobs = db.prepare(`SELECT op_id op, status, json_extract(payload_json,'$.model') pool FROM jobs WHERE kind<>'kernel' AND op_id IS NOT NULL
         AND status IN ('queued','leased','running','reported','effect_unknown','answering')`).all();
-      return { circuits, jobs };
+      return { jobs };
     });
-    const { circuits = [], jobs = [] } = (await read) ?? {};
+    const { jobs = [] } = (await read) ?? {};
     const open = circuits.filter((c) => c.status === 'unavailable' && (c.expiresAt == null || c.expiresAt > now));
     const quotaOpen = open.filter((c) => c.failureKind === 'quota');
     let probed = false;

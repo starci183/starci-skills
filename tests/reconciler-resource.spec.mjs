@@ -31,14 +31,14 @@ function ctxOf(mode, extra = {}) {
 
 const scratchEnv = () => ({ ...process.env, STARCI_TEST_MACHINE_FILE: path.join(fs.mkdtempSync(path.join(TMP, 'rc-resource-')), 'machine.sqlite') });
 
-function controller({ pct = () => 50, ops = () => [], priorities = null, env = null, ready = () => null } = {}) {
+function controller({ pct = () => 50, ops = () => [], priorities = null, env = null, ready = () => null, providerCircuits = () => [] } = {}) {
   const machineEnv = env ?? scratchEnv();
   const footprints = [];
   const settings = priorities ? { ...SETTINGS, resources: { ...SETTINGS.resources, ramThrottle: { ...SETTINGS.resources.ramThrottle, priorities } } } : SETTINGS;
   const c = createResourceController({ settings: async () => settings, maxParallelOps: async () => 20, env: machineEnv,
     host: async () => ({ totalRamBytes: 100 * GB, freeRamBytes: pct() * GB, freeRamPct: pct(), lowDisk: false }),
     load: async () => 0.2, census: async () => ({ ops: ops(), kernels: 0 }), footprints: async () => [], owners: async () => [],
-    recordFootprint: async (p) => footprints.push(p), queuedReady: async (ctx, wf) => ready(wf), providerOf: async () => (pool) => ({ 'qwen-agent': 'qwen', 'codex-agent': 'codex' })[pool] ?? null });
+    recordFootprint: async (p) => footprints.push(p), queuedReady: async (ctx, wf) => ready(wf), providerOf: async () => (pool) => ({ 'qwen-agent': 'qwen', 'codex-agent': 'codex' })[pool] ?? null, providerCircuits });
   return { c, env: machineEnv, footprints };
 }
 
@@ -128,10 +128,11 @@ test('cap-starved: the reserve workflow short of its slots for 15 min opens one 
 });
 
 test('quota: probe every 5 min while a quota circuit is open; quota-exhausted when every pool of a waiting kind is out', async () => {
-  const circuits = [{ key: 'qwen', value_json: JSON.stringify({ provider: 'qwen', status: 'unavailable', failureKind: 'quota' }), expires_at: T + 3_600_000 }];
+  // The circuits are machine.sqlite provider_health rows (scripts/kernel/provider-circuit.mjs providerCircuits).
+  const circuits = [{ provider: 'qwen', value: { provider: 'qwen', status: 'unavailable', failureKind: 'quota' }, expiresAt: T + 3_600_000 }];
   const jobs = [{ op: 'interface.draw', status: 'queued', pool: 'qwen-agent' }, { op: 'interface.draw', status: 'queued', pool: 'qwen-agent' }, { op: 'code.refactor', status: 'queued', pool: 'codex-agent' }];
-  const read = (id, fn) => fn({ prepare: (sql) => ({ all: () => (/signals/.test(sql) ? circuits : jobs) }) });
-  const { c } = controller();
+  const read = (id, fn) => fn({ prepare: () => ({ all: () => jobs }) });
+  const { c } = controller({ providerCircuits: () => circuits });
   const { ctx, calls, advance } = ctxOf('shadow', { read });
   const r = await c.reconcile('resource:quota:nivo-backend', ctx);
   assert.equal(r.probed, true);

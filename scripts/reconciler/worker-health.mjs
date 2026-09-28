@@ -14,7 +14,9 @@
 //                        failed-no-report path, whose salvage continues from the worker's commits)
 //   idle-at-prompt       no output for idleMs (5 min) and no filed report: nudge "Continue your task, or file your
 //                        report with api report if done." at most maxIdleNudges (2), then a DI
-//   dead                 terminal gone (not listed nor shown) or exited: left to the dead-worker step (api status deadWorkerJobs)
+//   dead                 terminal gone (not listed nor shown) or exited, or the settler's sweep set the job condition
+//                        LeaseLive=False: api reconcile --dead-worker --settle-failed at once, once per job (H14: a dead
+//                        worker is settled within one probe, never left waiting for the Kernel's next turn)
 //
 // Nudges are staggered: at most one send per staggerMs (15 s) across all workers. The memory of each job (last output
 // seen, nudges, backoff) lives in the engine process (a restart only re-arms the clocks). planHealth is pure.
@@ -40,10 +42,11 @@ export function resetHintMs(text) {
 }
 
 /** Classify one worker. Pure. `mem` is the job's probe memory ({lastOutputAt, ...}); `term` the orca terminal row or null. */
-export function classifyWorker(term, { mem = {}, reportFiled = false, now = Date.now(), settings = HEALTH_DEFAULTS } = {}) {
+export function classifyWorker(term, { mem = {}, reportFiled = false, leaseLost = false, now = Date.now(), settings = HEALTH_DEFAULTS } = {}) {
+  if (leaseLost) return { state: 'dead', why: 'lease-lost' };
   // Orca reports a product-worktree terminal orphaned and disconnected while its agent still runs: only a missing
   // terminal or one with an exit cause is dead (the dead-worker step proves it).
-  if (!term || term.exitCause) return { state: 'dead' };
+  if (!term || term.exitCause) return { state: 'dead', why: term ? `exited: ${term.exitCause}` : 'terminal gone' };
   const preview = String(term.preview ?? '');
   const out = Number(term.lastOutputAt) || null;
   if (RATE_LIMITED.test(preview)) return { state: 'rate-limited', resetMs: resetHintMs(preview) };
@@ -56,11 +59,17 @@ export function classifyWorker(term, { mem = {}, reportFiled = false, now = Date
 
 /**
  * The next memory and the action for one worker. Pure. Actions: {kind: 'send', text} | {kind: 'fail-no-report'} |
- * {kind: 'decision', why} | null. `rand` is the jitter source.
+ * {kind: 'dead-worker', why} | {kind: 'decision', why} | null. `rand` is the jitter source.
  */
 export function planHealth(c, { mem = {}, now = Date.now(), settings = HEALTH_DEFAULTS, rand = Math.random } = {}) {
   const m = { ...mem, state: c.state, seenAt: mem.seenAt ?? now };
-  if (c.state === 'working' || c.state === 'dead') {
+  if (c.state === 'dead') {
+    // H14: the dead-worker reconcile runs from the probe itself, once per job (a failed one is retried by the next probe
+    // only after the Job controller's own dead-worker step has had its turn: reconciledAt holds it for one idleMs).
+    if (mem.state === 'dead' && mem.reconciledAt != null && now - mem.reconciledAt < settings.idleMs) return { mem, action: null };
+    return { mem: { lastOutputAt: mem.lastOutputAt ?? null, seenAt: now, state: 'dead', reconciledAt: now }, action: { kind: 'dead-worker', why: c.why ?? 'dead' } };
+  }
+  if (c.state === 'working') {
     return { mem: { lastOutputAt: c.lastOutputAt ?? mem.lastOutputAt ?? null, seenAt: now, state: c.state }, action: null };
   }
   if (c.state !== mem.state) { m.since = now; m.nudges = 0; m.lastNudgeAt = null; m.backoffMs = null; m.decided = false; }
