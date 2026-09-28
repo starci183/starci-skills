@@ -49,6 +49,18 @@ import { safeRemoveTree } from '../lib/safe-remove.mjs';
 import { closeSelfSafe } from '../lib/close-verify.mjs';
 import { sleepSync } from '../lib/sleep-sync.mjs';
 import { parseJson, parseJsonOr, withPayload } from '../lib/json.mjs';
+import { guardLaunch } from '../guards/install.mjs';
+
+/**
+ * The guard layer of a [Worker] launch, the same shim bin op workers get (scripts/guards/install.mjs guardLaunch):
+ * its staging checkout's node_modules is a junction to the LIVE runtime's, and npm reifying through that junction
+ * empties it (node-modules-link-wipe, 2026-09-28) - the npm shim refuses that (DEPS_THROUGH_LINK). No product
+ * history hook: a [Worker] commits only in its runtime staging branch. {env, pathPrefix, receipt}.
+ */
+export function workerGuard(jobId, { root = SKILL_ROOT, launch = guardLaunch } = {}) {
+  try { return launch({ skillRoot: root, jobId, workflowId: 'supervisor', ledgerRepo: null, owned: [], repos: [] }); }
+  catch (error) { return { env: {}, pathPrefix: null, receipt: { error: String(error?.message ?? error) } }; }
+}
 
 const selfFile = fileURLToPath(import.meta.url);
 export const OPEN_STATUSES = Object.freeze(['queued', 'leased', 'running', 'reported']);
@@ -369,9 +381,12 @@ export async function spawnWorkers(ledger, { jobId = null, dryRun = false, setti
     const prompt = renderWorkerPrompt(job, staging);
     const title = `${WORKER_TITLE_PREFIX} ${job.payload.cluster}`.slice(0, 80);
     const command = (deps.command ?? workerLaunchCommand)({ pool: route.pool, provider: route.agent, model: route.model });
-    const spawned = (deps.spawn ?? (await import('../agent/lib.mjs')).spawnAgent)({ provider: route.agent, model: route.model, effort: route.effort, worktree: root, cwd: staging.path, title, prompt, kernel: true, dispatchId: job.job_id, command });
+    const guard = (deps.guard ?? workerGuard)(job.job_id, { root });
+    if (!guard.pathPrefix) supervisorEvent(ledger, { entityType: 'job', entityId: job.job_id, kind: 'worker-guard-missing', payload: { receipt: guard.receipt }, now: now() });
+    const spawned = (deps.spawn ?? (await import('../agent/lib.mjs')).spawnAgent)({ provider: route.agent, model: route.model, effort: route.effort, worktree: root, cwd: staging.path, title, prompt, kernel: true, dispatchId: job.job_id, command,
+      env: guard.env, pathPrefix: guard.pathPrefix });
     const payload = { ...job.payload, pool: route.pool, agent: route.agent, model: route.model, staging: { path: staging.path, branch: staging.branch, base: staging.base },
-      spawnAttempts: (job.payload.spawnAttempts ?? 0) + 1 };
+      spawnAttempts: (job.payload.spawnAttempts ?? 0) + 1, guard: guard.receipt };
     if (!spawned?.ok) {
       const exhausted = payload.spawnAttempts >= MAX_SPAWN_ATTEMPTS;
       // A requeued job keeps the agent it asked for (never the one routed to it) and never returns to a provider

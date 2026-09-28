@@ -169,6 +169,8 @@ test('workers: one job per cluster, launches stop at the cap, a leased file wait
   assert.equal(r.cap.cap, 1, 'a saturated machine runs one worker');
   assert.equal(r.launched.length, 1);
   assert.equal(spawned[0].title, '[Worker] c1');
+  assert.ok(spawned[0].env?.STARCI_GUARD_FILE, 'a [Worker] launches with the guard layer (node-modules-link-wipe)');
+  if (spawned[0].pathPrefix) assert.equal(spawned[0].pathPrefix, spawned[0].env.STARCI_GUARD_BIN, 'the npm shim is first on its PATH');
   assert.equal(jobOf(ledger.db, a.job.job_id).status, 'running');
   deps.load = () => ({ cpuBusy: 0.1, freeMem: 0.9 });
   const r2 = await spawnWorkers(ledger, { settings, deps, env });
