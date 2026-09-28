@@ -9,7 +9,7 @@
  * server sends has passed its secret redaction and is clipped (e.g. 300 chars for status text).
  */
 
-export const CONTRACT_VERSION = '2026-09-28.4';
+export const CONTRACT_VERSION = '2026-09-28.5';
 
 // ------------------------------------------------------------------------------------------ vocabularies
 
@@ -528,6 +528,179 @@ export interface SupervisorExperiment { id: string; signature: string; status: s
 export interface SupervisorLesson { signature: string | null; source: string; weight: number; status: string; text: string; at: number }
 export interface SupervisorProposal { id: string; title: string; evidence: string; options: string; recommendation: string; status: string; at: number }
 export interface SupervisorDigest { at: number; sent: boolean }
+
+// ----------------------------------------------------------------------- GET /api/workflow (one workflow)
+
+/**
+ * GET /api/workflow?id[&project] — one workflow's page, built once per status tick (STARCI_STATUS_TICK_MS, 20 s):
+ * the tracker's one-workflow Snapshot, the Fleet progress/RCA, the unit board (with the unit dependency graph), its
+ * Decision Items and product worktrees. 404 for an unknown workflow.
+ */
+export interface WorkflowPageData {
+  updatedAt: number; projectId: string; projectName: string;
+  /** A Snapshot holding just this project and workflow (what the tracker reads). */
+  snapshot: Snapshot;
+  /** Progress, pill and RCA (scripts/kernel/progress-rca.mjs workflowView = api status progress/rca); null when it could not be read (see snapshot.sources). */
+  fleet: Fleet | null;
+  board: UnitBoard | null;
+  decisions: DecisionView[];
+  worktrees: WorktreeRow[];
+  /** When the `api status` the fleet row used was taken; null before the first status run (or offline). */
+  statusAt: number | null;
+}
+export interface Fleet { progress: ProgressBlock; pill: string; topReason: TopReason | null; onIt: OnIt; rca: RcaView; decisionLog: DecisionLogRow[] }
+/** starci/progress@1: units that PASSED their gates (never attempts), speed, ETA, parallelism, the stall. */
+export interface ProgressBlock {
+  unitsDone: number; unitsTotal: number; unitsOpen: number; unitsFailed: number; share: number | null; unitsPerHour: number; minUnitsPerHour: number; priority: boolean;
+  running: number; allowedParallel: number; parallelWhy: string; queuedReady: number;
+  /** eta / lastUnitAt are ISO; null when the rate is zero / no unit passed yet. */
+  etaHours: number | null; eta: string | null; lastUnitAt: string | null;
+  legs: ProgressLegs; stall: ProgressStall; unsettled: number;
+}
+export interface ProgressLegs { done: number; total: number }
+/** since is ISO. */
+export interface ProgressStall { stalled: boolean; reasons: string[]; since: string | null; sinceMin: number; supervisorDue: boolean }
+export interface TopReason { text: string; cause: string | null; source: string }
+/** who: owner | supervisor | kernel (a DI's decider otherwise). */
+export interface OnIt { who: string; next: string | null; source: string | null; actionKey?: string | null; unblocks?: number | null }
+export interface RcaView { id: string; attempts: number; trigger: string | null; why: string | null; clusters: RcaCluster[]; actions: RcaAction[] }
+export interface RcaCluster { cause: string; why: string; authority: string; count: number; open: number; units: number; examples: string[] }
+export interface RcaAction { rank: number; key: string; tier: string; cause: string; unblocks: number; title: string; expected: string; tried: RcaTried | null }
+export interface RcaTried { decision: string; status: string }
+/** The Kernel's decision log (api decide); observed is what it recorded when it closed the entry. */
+export interface DecisionLogRow { id: string; actionKey: string | null; status: string; hypothesis: string; observed: unknown }
+
+/**
+ * The workflow's units (progress-rca.mjs unitsOf: a cut slice `op|cut#ordinal`, else a retry lineage) grouped by the
+ * job state machine (DESIGN §9.1); each group holds its newest 60, `counts` all.
+ */
+export interface UnitBoard { counts: UnitBoardCounts; groups: UnitBoardGroups; graph: UnitGraph }
+export interface UnitBoardCounts { queued: number; running: number; reported: number; settled: number; released: number }
+export interface UnitBoardGroups { queued: BoardUnit[]; running: BoardUnit[]; reported: BoardUnit[]; settled: BoardUnit[]; released: BoardUnit[] }
+/** One unit as its NEWEST job shows it. */
+export interface BoardUnit {
+  key: string; op: string; jobId: string; status: string;
+  /** done | open | failed | dropped. */
+  unitState: string;
+  attempts: number; label: string; title: string | null; displayName: string | null;
+  /** The Kernel's settle verdict (jobs.result verdict, after verification): pass | fail | blocked; null before settle. */
+  verdict: string | null;
+  /** The Op's own report (its testimony): done | blocked | failed ...; null when no report was filed. Never the verdict. */
+  outcome: string | null;
+  summary: string | null; at: number | null;
+  /** The provider/model this attempt ran on and its timing, from the ledger only. */
+  attempt: UnitAttempt;
+  /** The unit's stored settled diff (its newest job with a patch); null when none was stored. Fetch GET /api/diff?project&job=<diff.jobId>. */
+  diff: UnitDiffRef | null;
+}
+/**
+ * One attempt (the unit's newest job) — provider/model are properties of the attempt, never of an authority node.
+ * stage: dispatched (an op-dispatched event / a runtime dispatchId), routed (a pool was chosen, the attempt never
+ * started), none (never routed: every provider field is null). Each field is null when no ledger source records it;
+ * `why` lists those reasons.
+ */
+export interface UnitAttempt {
+  number: number | null; stage: 'dispatched' | 'routed' | 'none';
+  /** jobs.payload.hierarchy.runtime agent/provider/model(id)/runtimePool, else the newest op-dispatched event's model/modelId. */
+  agent: string | null; provider: string | null; model: string | null; pool: string | null; effort: string | null;
+  /** payload.routedAt; the first op-dispatched event; how many dispatches (a rebind re-dispatches). */
+  routedAt: number | null; startedAt: number | null; dispatches: number;
+  /** Newest ledger event about the job; the report's filing; the op-settled event (Kernel verdict). */
+  lastEventAt: number | null; reportedAt: number | null; settledAt: number | null;
+  source: string | null; why: string | null;
+}
+/** A stored patch (job_artifacts kind patch): label landed | unlanded (null on an older row). */
+export interface UnitDiffRef { jobId: string; label: 'landed' | 'unlanded' | null; headSha: string | null; landedSha: string | null; at: number | null }
+/**
+ * The work dependency DAG between units — only edges the dispatch gate applies and the ledger records (ui/unit-graph.mjs):
+ * `after` (jobs.payload.after) and `seam` (a cut ordinal > 1 waits on ordinal 1 of its cut). Never inferred from order,
+ * time or plan.edges (op-level). status `empty` with `reason` when no unit records a dependency. Not the actor graph.
+ */
+export interface UnitGraph {
+  status: 'ok' | 'empty'; reason: string | null;
+  nodes: UnitGraphNode[]; edges: UnitGraphEdge[]; counts: UnitGraphCounts; sources: UnitGraphSources; omitted: UnitGraphOmission[];
+  /** When the board was read (freshness) and from where. */
+  at: number; source: string;
+}
+export interface UnitGraphNode { unitKey: string; jobId: string; op: string; status: string; unitState: string; attempts: number; cut: UnitGraphCut | null }
+export interface UnitGraphCut { id: string; ordinal: number; total: number | null }
+/**
+ * from = the prerequisite unit, to = the unit that waits (BoardUnit.key / UnitGraphNode.unitKey). fromJob/toJob: the
+ * jobs that recorded it. met: the prerequisite unit has a succeeded job. released: a seam edge the runtime lifted
+ * (cut.seamStub.mode: timeout | kernel-override | interface ...), null otherwise.
+ */
+export interface UnitGraphEdge { from: string; to: string; kind: 'after' | 'seam'; source: string; fromJob: string; toJob: string; met: boolean; released: string | null }
+/** dangling: an `after` naming a job outside this workflow; selfLoops: an `after` inside the same unit (its own retry lineage). */
+export interface UnitGraphCounts { after: number; seam: number; dangling: number; selfLoops: number }
+export interface UnitGraphSources { after: string; seam: string }
+/** What the graph does not draw and why (kind record: Work-record dependsOn holds, not in the ledger). */
+export interface UnitGraphOmission { kind: string; why: string }
+/** A Decision Item (scripts/reconciler/decisions.mjs). ledger: the project id or `supervisor`. */
+export interface DecisionView {
+  id: string; kind: string; decider: string | null; status: string; ledger: string; workflowId: string | null; summary: string;
+  entity: DecisionEntity | null; openedBy: string | null; openedAt: number | null; dueAt: number | null; escalations: number; severity: string | null;
+  claim: DecisionClaim | null; resolution: DecisionResolution | null; options: DecisionOption[];
+  /** On SystemView.decisions.product only. */
+  projectId?: string;
+}
+export interface DecisionEntity { type: string; id: string }
+export interface DecisionClaim { by: string; at: number }
+export interface DecisionResolution { by: string; verb: string; at: number }
+export interface DecisionOption { key: string; recommended: boolean }
+/** A product worktree (scripts/kernel/product-worktree.mjs): kind wf | op; state active | awaiting-reap | removed | missing. */
+export interface WorktreeRow { kind: 'wf' | 'op'; path: string; branch: string | null; short: string | null; jobId: string | null; jobStatus: string | null; exists: boolean; state: string; at?: number | null }
+
+// ------------------------------------------------------------------------------ GET /api/system (Hệ thống)
+
+/** GET /api/system — the reconciler, the Supervisor, Decision Items, op health, stuck waits and the land gate; built once per tick. */
+export interface SystemView {
+  updatedAt: number; reconciler: ReconcilerView; ram: HostRam; supervisor: SystemSupervisor;
+  decisions: SystemDecisions; opHealth: OpHealth | null; stuck: StuckItem[]; land: SystemLand | null;
+  /** Every source that failed this tick, by name, with its error; a missing key is a healthy source. */
+  sources: Record<string, string | null>;
+}
+/** GET /api/reconciler/state is this object alone. */
+export interface ReconcilerView {
+  at: number; engine: EngineView;
+  /** The seven controllers, always in this order: job, host, gc, resource, workflow, fleet, learning. No per-controller CPU/RAM: the engine does not measure it. */
+  controllers: ControllerRow[];
+  /** Reconciler log rows that are no controller's: `engine` (leader, epochs, the engine's own) and `sla` (the invariant layer). */
+  others: ReconcilerOtherRow[];
+  /** The log window the counts cover (24 h) and where they are read. */
+  windowMs: number; logSource: string;
+  queueDepth: number; services: ServicesView; violations: ViolationsView; gc: GcView | null;
+}
+export interface EngineView { running: boolean; why: string | null; holder: string | null; pid: number | null; epoch: number | null; heartbeatAgeMs: number | null; rev: string | null }
+/**
+ * One controller over the window. Attribution is the row's data.controller (actor is always `runtime`); an engine
+ * `reconcile-failed` row counts as the error of the controller it names (data.name). modeAt: when the mode was set
+ * (reconciler.sqlite modes); lastPassAt: its newest log row; lastError: that error row's msg.
+ */
+export interface ControllerRow {
+  name: string; mode: string | null; modeSource: string | null; modeAt: number | null; lastPassAt: number | null;
+  would: number; acts: number; failed: number; errors: number; events: number;
+  lastActAt: number | null; lastErrorAt: number | null; lastError: string | null; lastWould: string | null; queue: ControllerQueue;
+}
+export interface ControllerQueue { depth: number; failing: number; dueAt: number | null }
+export interface ReconcilerOtherRow { name: string; would: number; acts: number; errors: number; events: number; lastAt: number | null; lastErrorAt: number | null; lastError: string | null }
+export interface ServicesView { rows: ServiceRow[]; managed: number; healthy: number; down: string[]; seats: ServiceRow[]; ledgers: ServiceRow[]; source: string | null }
+/** A Host-controller row (service, seat:*, ledger:*); lastAt its newest probe. down is on service rows only. */
+export interface ServiceRow { name: string; state: string; since: number | null; restarts: number; lastAt?: number | null; detail: string | null; down?: boolean }
+export interface ViolationsView { open: number; critical: number; byCode: Record<string, number>; rows: ViolationRow[]; clocks: number; source: string | null }
+export interface ViolationRow { key: string; code: string | null; severity: string | null; entity: string; at: number | null }
+export interface GcView { at: number; msg: string; collected24h: number; leftovers: number | null; counts: GcCounts | null; source: string }
+export interface GcCounts { agents: number; terminals: number; worktrees: number; freedBytes: number; refused: number; errors: number }
+export interface HostRam { percent: number; usedBytes: number; totalBytes: number }
+export interface SystemSupervisor { seat: SystemSeat | null; notifier: NotifierView | null; inboxUnread: number; inbox: SystemInboxRow[] }
+/** The Supervisor seat as the Host controller keeps it (reconciler.sqlite services seat:supervisor). */
+export interface SystemSeat { state: string; since: number | null; lastAt: number | null; source: string }
+export interface NotifierView { lastDigestAt: number | null; urgent: NotifierUrgent[]; judgements: NotifierJudgement[]; source: string }
+export interface NotifierUrgent { key: string; at: number }
+export interface NotifierJudgement { text: string; at: number }
+/** at is ISO (the channel inbox). */
+export interface SystemInboxRow { at: string; from: string; text: string; read: boolean }
+export interface SystemDecisions { supervisor: DecisionView[]; product: DecisionView[] }
+export interface SystemLand { busy: boolean; queued: number; current: string; lastLands: LandEvent[]; pushes: PushEvent[] }
 
 // ------------------------------------------------------------------------------------------------ diff
 

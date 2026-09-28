@@ -31,7 +31,7 @@ STARCI_STATUS_LOG_SYNC=0 STARCI_STATUS_PORT=<port>` writes nothing (no superviso
 | `GET /api/snapshot` | `Snapshot` | Whole board; cached 30 s. Per workflow: kernel signal, verdict counts, running/queued jobs, incidents, legs with colours and units, work graph, frontier, next actions, asks, holds, workers, `grammarProposals`, `drawReviews` (the owner's image review board: rounds, notes, golden per shape, images by evidence id), `logTypedMissing`. Top level `opHealth` (per-op success rate, queue wait, run/settle time, top failure class over the telemetry window, `scripts/supervisor/op-metrics.mjs`) and `stuck[]` (every wait `api status` aged, with severity against the stuck SLA and the owner of the next action). `sources` names every source that failed. Names: a workflow's `name` is its display name (`workflows.display_name`, set by `api rename` / define-goal; else the goal slug) and `id` stays the key; running/queued jobs, verdicts, units and next actions carry `displayName` `<op label> · <what> · <workflow name>`; `opLabels` is the shared op label map (modules/ops/labels.yaml). |
 | `GET /api/agents` | `AgentSnapshot` | Live agent terminals joined to the ledger, machine stats; cached 10 s. |
 | `GET /api/agents/<terminal>/log` | `AgentLog` | The terminal's current screen (at most 80 lines). Never proof of a verdict. |
-| `GET /api/agents/<op job>/changes` | `AgentChanges` | A running op's uncommitted and recent diffs and images in its owned paths. `/images/<id>` serves image bytes. |
+| `GET /api/agents/<op job>/changes` | `AgentChanges` | A running op's uncommitted and recent diffs and images in its owned paths. `/images/<id>` serves image bytes. Live only: a job that is no longer running answers 404; its settled diff is `/api/diff?project&job=<BoardUnit.diff.jobId>` (never a working-tree diff dressed as history). |
 | `GET /api/evidence[?project&kind&q&offset]` | `EvidencePage` | Evidence gallery, 48 items per page from `offset`; `/api/evidence/<id>` streams the file (byte ranges). |
 | `GET /api/history?project` | `History` | Recent code commits (BE/FE). `/api/history/<project>/<BE\|FE>/<sha>` → `CommitPatch`. |
 | `GET /api/proofs?project&workflow&op[&jobs=a,b]` | `OpProofs` | One op's recent jobs (max 16): report, heads, files (max 160) each served at `url` with byte ranges. |
@@ -40,11 +40,11 @@ STARCI_STATUS_LOG_SYNC=0 STARCI_STATUS_PORT=<port>` writes nothing (no superviso
 | `GET /api/workflow-events?project&workflow[&after]` | `WorkflowEvents` | Whitelisted ledger transitions (newest 80, or after a seq). `/stream`: SSE, one `WorkflowEvent` per message, `id` = seq, heartbeat every 5 s, resume with `Last-Event-ID`. |
 | `GET /api/logs?project&workflow[&job=a,b][&kinds=][&after][&limit]` | `LogPage` | Typed log rows (below). `/stream`: SSE of `LogRow`, `id` = seq, polled every 3 s. |
 | `GET /api/supervisor/logs[?kinds=][&levels=][&ref=][&after][&limit]` | `SupervisorLogPage` | The Supervisor's machine log: every observation, decision, action, message and experiment as a `LogRow` of the supervisor ledger (`~/.starci/supervisor/.starciwork/runtime.sqlite`, workflow `wf-supervisor`, actor `runtime`; `scripts/supervisor/sup-log.mjs`). Kinds used: `supervisor.action`, `decision`, `narration`, `cmd.run`, `check.result`, `warning`, `error`, `gc.collect` (one thing the garbage collection closed, removed, archived or refused; `scripts/supervisor/gc.mjs`), `gc.summary` (one per GC run), `reconciler.would` (a call a shadow reconciler controller would have made; `scripts/reconciler/ctx.mjs`), `reconciler.act` (a call an active controller made), `reconciler.error`, `reconciler.event` (any other reconciler row, `data.kind` names it), `invariant.violated` / `invariant.cleared` (the SLA layer, `scripts/reconciler/sla.mjs`). `refs` name the product `workflow:` / `job:` / `repo:` / `commit:` / `item:` / `experiment:` / `signature:` / `proposal:` a row concerns; `ref=` filters by one. Read-only: no supervisor ledger yet is an empty page. `/stream`: SSE of `LogRow`, `id` = seq, polled every 3 s, resume with `Last-Event-ID`. |
-| `GET /api/home` | `HomeView` (`ui/src/reconciler.tsx`) | The Tình hình page: per live workflow `progress` (units that passed their gates, never attempts; units/hour, ETA, running vs allowed; `scripts/kernel/progress-rca.mjs workflowView`), `pill` (`ok`, `slow`, `stuck`, `done`), `topReason` when slow or stuck, `onIt` (`owner`, `supervisor` or `kernel`, next action, source); `owner` (owner-only items: asks, owner-decider Decision Items, images awaiting review, plan revisions, the handover credential checklist as one line); `health` (RAM, services healthy/managed, open SLA violations, GC leftovers, controller modes, land gate, `ok`). Built once per tick (`STARCI_STATUS_TICK_MS`, default 20 s); `api status` runs in its own background loop. |
-| `GET /api/workflow?id[&project]` | `WorkflowPageData` | One workflow: `snapshot` (a `Snapshot` holding just that workflow, for the tracker), `fleet` (progress, pill, onIt, RCA clusters and ranked actions, the Kernel's decision log), `board` (units by job phase `queued`, `running`, `reported`, `settled`, `released`, DESIGN §9.1), `decisions` (its Decision Items, live plus recent), `worktrees` (git worktrees naming the workflow or one of its jobs). 404 for an unknown workflow. |
-| `GET /api/system` | `SystemView` | The Hệ thống page: `reconciler` (engine leader/epoch/heartbeat/rev, per controller mode, last pass, would/act/error rows over 24 h and queue depth; services, seats and ledgers from the Host controller's store; open SLA violations; newest GC summary), `decisions` (the Supervisor's queue and recent decisions, the workflows' live DIs), `supervisor` (its seat from the Host controller's store, the Notifier's last digest / urgent sends / `judge` lines, the channel inbox), `opHealth`, `stuck`, `land`, `sources`. The harness route `#/supervisor` shows this page. |
+| `GET /api/home` | `HomeView` (`ui/src/reconciler.tsx`; not yet in `contract.ts`) | The Tình hình page: per live workflow `progress` (units that passed their gates, never attempts; units/hour, ETA, running vs allowed; `scripts/kernel/progress-rca.mjs workflowView`), `pill` (`ok`, `slow`, `stuck`, `done`), `topReason` when slow or stuck, `onIt` (`owner`, `supervisor` or `kernel`, next action, source); `owner` (owner-only items: asks, owner-decider Decision Items, images awaiting review, plan revisions, the handover credential checklist as one line); `health` (RAM, services healthy/managed, open SLA violations, GC leftovers, controller modes, land gate, `ok`). Built once per tick (`STARCI_STATUS_TICK_MS`, default 20 s); `api status` runs in its own background loop. |
+| `GET /api/workflow?id[&project]` | `WorkflowPageData` | One workflow: `snapshot` (a `Snapshot` holding just that workflow, for the tracker), `fleet` (progress, pill, onIt, RCA clusters and ranked actions, the Kernel's decision log), `board` (units by job phase `queued`, `running`, `reported`, `settled`, `released`, DESIGN §9.1; each unit's `attempt` provider/model/timing, the Op report `outcome` apart from the Kernel `verdict`, its stored settled `diff`; `board.graph` the unit dependency DAG, below), `decisions` (its Decision Items, live plus recent), `worktrees` (git worktrees naming the workflow or one of its jobs). 404 for an unknown workflow. |
+| `GET /api/system` | `SystemView` | The Hệ thống page: `reconciler` (engine leader/epoch/heartbeat/rev, per controller mode and when it was set, last pass, would/act/error/event rows over 24 h with the newest act and error, queue depth; `others` for the engine's own and the SLA layer's rows; services, seats and ledgers from the Host controller's store; open SLA violations; newest GC summary), `decisions` (the Supervisor's queue and recent decisions, the workflows' live DIs), `supervisor` (its seat from the Host controller's store, the Notifier's last digest / urgent sends / `judge` lines, the channel inbox), `opHealth`, `stuck`, `land`, `sources`. The harness route `#/supervisor` shows this page. |
 | `GET /api/nav` | `NavView` | `{updatedAt, owner, live, stuck}`: the counts the navigation shows. |
-| `GET /api/reconciler/state` | `SystemView['reconciler']` | The engine and its controllers as above (lane rc-fleet-ui). |
+| `GET /api/reconciler/state` | `ReconcilerView` | The engine and its controllers as above (lane rc-fleet-ui). |
 | `GET /api/reconciler/decisions[?workflow]` | `{updatedAt, decisions: DecisionView[]}` | Decision Items across the product ledgers and the supervisor ledger (`scripts/reconciler/decisions.mjs listDecisions`), live plus the newest closed; `workflow=` keeps one workflow's. |
 | `GET /api/supervisor/state` | `SupervisorState` | Legacy: no harness page reads it since the Supervisor tick was deleted (rc-cleanup 3175d8b8b); its `tick` and owed-action fields stay null / stale (nothing writes those events). The Supervisor's live state is `/api/system` `supervisor` and `decisions.supervisor`. The Supervisor's seat (mode, enabled, terminal, recorded agent/model), newest tick (including the recorded RAM guard cap when available), per-workflow frontier state / ready ops / holds, owed actions (class, action, age, SLA breach, lessons), recent acts and notices, channel `main` inbox and replies, self-learning (open hypotheses, experiments, lessons with owner weight, owner proposals with evidence and options), newest owner digest (`scripts/supervisor/state.mjs readSupervisorState`). |
 | `GET /api/diff?project&job` | `JobDiff` | The job's patch pre-structured: files, hunks, line numbers, image sides. 404 when the job has no patch. |
@@ -56,6 +56,62 @@ Not served (so not in the contract): asset slots owed have no endpoint. Grammar 
 `Snapshot.projects[].workflows[]`. The cross-workflow dependency view rides on `Snapshot.projects[].dependencies`
 (`scripts/kernel/dependency-graph.mjs`): hard waits between live workflows, the Supervisor's findings with the action it
 takes (`bridge | transfer | revise | designate`, `clearCut`), and its bridging records (`provisional` under autopilot).
+
+## Workflow page: units, attempts, the unit graph (`/api/workflow`)
+
+Built once per tick (`STARCI_STATUS_TICK_MS`, default 20 s) from the product ledger, so a ledger change shows within
+one to two ticks; `board.graph.at` is when it was read. Everything below is the ledger's own record; a field with no
+source is `null`, never a guess (`ui/unit-graph.mjs`).
+
+- **Unit** (`BoardUnit.key`): a cut slice `op|cut#ordinal` or, uncut, a retry lineage (`progress-rca.mjs unitsOf`),
+  shown by its newest job. `verdict` is the Kernel's settle verdict after verification (`pass | fail | blocked`);
+  `outcome` is the Op's report, its testimony (`done | blocked | ...`). They are separate fields and never merged.
+- **`attempt`** (`UnitAttempt`) — that job's provider and model. Provider/model belong to the attempt, never to an
+  authority node. `agent`, `provider`, `model` (the model id) and `pool` come from `jobs.payload.hierarchy.runtime`:
+  route writes them, and dispatch adds the dispatch id and terminal. Otherwise they come from the newest
+  `op-dispatched` event's `model` / `modelId`.
+  - `stage`: `dispatched` (it started), `routed` (a pool was chosen, never dispatched), `none` (never routed, every
+    provider field null).
+  - `routedAt` is `payload.routedAt`; `startedAt` the first `op-dispatched` (`dispatches` counts rebinds);
+    `lastEventAt` the newest ledger event about the job; `reportedAt` the report; `settledAt` `op-settled`.
+  - `why` names each null (e.g. `effort: none recorded by route or dispatch` for devin pools,
+    `provider: not recorded on the job` on an older dispatch).
+- **`diff`** (`UnitDiffRef`) — the unit's newest stored patch (`job_artifacts` kind `patch`, written by settle):
+  `jobId`, `label landed | unlanded`, head/landed sha. Open it with `GET /api/diff?project&job=<diff.jobId>`.
+  - `null` when no attempt stored one (a failed or never-run attempt).
+  - The op's product worktree is deleted at settle, so there is no live diff of a finished job.
+- **`board.graph`** (`UnitGraph`) — the work dependency DAG between ALL units, not capped at the group size:
+  - `nodes`: `unitKey`, `jobId`, `op`, `status`, `unitState`, `cut`.
+  - `edges`: `from` is the prerequisite unit, `to` the one that waits, plus `kind`, `source`, `fromJob`/`toJob`, and
+    `met` (the prerequisite unit succeeded). `released` is the recorded seam release (`cut.seamStub.mode`).
+  - Only the gates dispatch admission applies and the ledger records are drawn:
+    - `after`: `jobs.payload.after`, written by `api enqueue --after`, `api graph-edit` and settle's canon-wire widening.
+    - `seam`: a cut ordinal > 1 waits on ordinal 1 of the same op and cut (`cut-seam.mjs`).
+  - Nothing is inferred from ordinal order, time or `plan.edges`; `plan.edges` is the op-level leg order, a different
+    graph. The Kernel/Op actor hierarchy is not this graph either.
+  - `status: empty` with a `reason` when no job records a dependency.
+  - `counts.dangling` counts an `after` naming a job outside the workflow; `counts.selfLoops` an `after` inside its own
+    retry lineage.
+  - `omitted` names what is not drawn. Work-record `dependsOn` holds are read from Work YAML at `api status` time and are
+    not recorded in the ledger.
+  - The snapshot's `workGraph` (Work nodes from `work_graph_versions`) stays `null` for a workflow that never
+    recorded a work-graph version; the unit graph is the job-level view.
+
+## System page: controllers (`/api/system`)
+
+`reconciler.controllers` is always the seven controllers, in order: `job`, `host`, `gc`, `resource`, `workflow`,
+`fleet`, `learning`.
+
+- Counts cover `windowMs` (24 h) of the supervisor ledger's `reconciler.*` log rows. The source is `logSource`;
+  freshness is `reconciler.at`, one tick.
+- A row's `actor` is always `runtime`; the controller is its `data.controller` (refs `reconciler:<name>`).
+- The engine logs a controller's failed reconcile as controller `engine` with `data.name` naming the failing
+  controller (`reconciler.reconcile-failed`). That row counts as the named controller's `errors` / `lastError` /
+  `lastErrorAt`; before this it was dropped.
+- Rows of the engine itself and of the SLA layer are `reconciler.others`.
+- `modeAt` is when `reconciler.sqlite` set the mode; `null` when only config names it. `lastActAt` is the newest
+  `reconciler.act`; `events` counts `reconciler.event` rows.
+- There is no per-controller CPU or RAM: the engine does not measure it. Host RAM is `SystemView.ram`.
 
 ## Artifacts: `kind` and `subkind`
 

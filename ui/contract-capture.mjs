@@ -109,6 +109,8 @@ async function main() {
     ['verify-proofs', `/api/verify-proofs?${q({ project: project.id, workflow: wf.id })}`],
     ['supervisor-state', '/api/supervisor/state'],
     ['supervisor-logs', '/api/supervisor/logs?limit=400'],
+    ['workflow', `/api/workflow?${q({ id: wf.id, project: project.id })}`],
+    ['system', '/api/system'],
   ];
   const streams = [
     ['workflow-events-stream', `/api/workflow-events/stream?${q({ project: project.id, workflow: wf.id })}`],

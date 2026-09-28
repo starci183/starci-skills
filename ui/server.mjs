@@ -355,7 +355,8 @@ async function buildSnapshot() {
           const state = statusCache.get(wf.id)?.value ?? null;
           const core = state ? { legs: state.legs, frontier: state.frontier, stuck: state.stuck, ramThrottle: state.ramThrottle, poolLoad: state.poolLoad } : {};
           const fleet = progressRow(db, { workflowId: wf.id, repo: project.repo, core, now, decisions: live, ownerAsks: (wf.asks ?? []).filter((ask) => ask.askClass !== 'credential') });
-          boards.set(wf.id, { fleet, board: unitBoard(db, wf.id), decisions, worktrees: await productWorktreesOf(db, wf.id), coreFrom: statusCache.get(wf.id)?.at ?? null });
+          const names = new Map((wf.jobLog ?? []).map((job) => [job.jobId, job.displayName]));
+          boards.set(wf.id, { fleet, board: unitBoard(db, wf.id, { nameOf: (jobId) => (names.get(jobId) ? safe(names.get(jobId)) : null), now }), decisions, worktrees: await productWorktreesOf(db, wf.id), coreFrom: statusCache.get(wf.id)?.at ?? null });
         } catch (error) { sources[`fleet:${wf.id}`] = safe(error.message); }
       }
     } finally { db.close(); }

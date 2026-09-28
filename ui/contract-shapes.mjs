@@ -8,6 +8,7 @@
 // so a server field the contract does not document fails the spec), open(name, fields) (extra keys allowed).
 import { JOB_ARTIFACT_KINDS, JOB_ARTIFACT_SUBKINDS } from '../engine/ledger-db.mjs';
 import { LOG_ACTORS, LOG_KINDS, LOG_LEVELS, validateLogData } from '../scripts/kernel/typed-logs.mjs';
+import { UNIT_EDGE_KINDS } from './unit-graph.mjs';
 
 const S = { t: 'string' }, N = { t: 'number' }, I = { t: 'int' }, B = { t: 'bool' }, U = { t: 'any' };
 const nul = (x) => ({ ...x, nullable: true });
@@ -42,6 +43,9 @@ export const VOCAB = Object.freeze({
   coverageItemKinds: ['fr', 'shape', 'case'],
   evidenceStates: ['fresh', 'stale', 'unbaselined'],
   tamperReasons: ['missing', 'modified', 'ledger-row-differs-from-chain'],
+  attemptStages: ['dispatched', 'routed', 'none'],
+  unitEdgeKinds: UNIT_EDGE_KINDS,
+  controllers: ['job', 'host', 'gc', 'resource', 'workflow', 'fleet', 'learning'],
 });
 const V = VOCAB;
 
@@ -91,6 +95,11 @@ const ProjectRow = obj('ProjectRow', { id: S, name: S, repo: S, error: opt(S),
   dependencies: opt(nul(DependencyView)) });
 const OpHealthRow = obj('OpHealthRow', { key: S, jobs: I, succeeded: I, failed: I, successRate: nul(N), queueWaitP50: nul(N), queueWaitP90: nul(N), runP50: nul(N), settleP50: nul(N),
   topFailureClass: nul(S), failureClasses: arr(obj('FailureClassCount', { class: S, n: I })), repeatedIdentical: I, deadWorkerRate: nul(N), attemptsMax: nul(I), ownerWaitMs: N, throttleMs: N });
+const LandEvent = obj('LandEvent', { kind: S, id: S, at: N });
+const PushEvent = obj('PushEvent', { kind: S, repo: S, head: S, error: S, at: N });
+const OpHealth = obj('OpHealth', { windowMs: N, at: N, totals: OpHealthRow, ops: arr(OpHealthRow) });
+const StuckItem = obj('StuckItem', { key: S, projectId: nul(S), workflowId: S, kind: S, cause: S, jobId: nul(S), opId: nul(S), incidentId: nul(S),
+  since: N, ageMs: N, severity: en('ok', 'warn', 'critical'), owner: S, count: I, detail: S });
 const Snapshot = obj('Snapshot', {
   updatedAt: N, sources: rec(nul(S)), opLabels: opt(rec(obj('OpLabel', { vi: S, en: S }))), projects: arr(ProjectRow),
   owed: arr(obj('OwedItem', { key: S, projectId: nul(S), workflowId: S, kind: S, summary: S, ageMin: nul(N), status: S })),
@@ -99,14 +108,68 @@ const Snapshot = obj('Snapshot', {
   supervisor: nul(obj('SupervisorView', {
     activeWorkers: arr(obj('SupervisorWorker', { agent: S, cluster: S, ageMin: nul(N) })),
     land: obj('LandQueue', { busy: B, queued: I, current: S }),
-    lastLands: arr(obj('LandEvent', { kind: S, id: S, at: N })),
-    pushes: arr(obj('PushEvent', { kind: S, repo: S, head: S, error: S, at: N })),
+    lastLands: arr(LandEvent),
+    pushes: arr(PushEvent),
     basePool: obj('BasePool', { name: S, provider: S, model: S, open: I, ledgers: I }),
   })),
-  opHealth: opt(nul(obj('OpHealth', { windowMs: N, at: N, totals: OpHealthRow, ops: arr(OpHealthRow) }))),
-  stuck: opt(arr(obj('StuckItem', { key: S, projectId: nul(S), workflowId: S, kind: S, cause: S, jobId: nul(S), opId: nul(S), incidentId: nul(S),
-    since: N, ageMs: N, severity: en('ok', 'warn', 'critical'), owner: S, count: I, detail: S }))),
+  opHealth: opt(nul(OpHealth)),
+  stuck: opt(arr(StuckItem)),
 });
+
+// ------------------------------------------------------------------------- workflow page, system page
+const UnitAttempt = obj('UnitAttempt', { number: nul(I), stage: en(V.attemptStages), agent: nul(S), provider: nul(S), model: nul(S), pool: nul(S), effort: nul(S),
+  routedAt: nul(N), startedAt: nul(N), dispatches: I, lastEventAt: nul(N), reportedAt: nul(N), settledAt: nul(N), source: nul(S), why: nul(S) });
+const BoardUnit = obj('BoardUnit', { key: S, op: S, jobId: S, status: S, unitState: S, attempts: I, label: S, title: nul(S), displayName: nul(S),
+  verdict: nul(S), outcome: nul(S), summary: nul(S), at: nul(N), attempt: UnitAttempt,
+  diff: nul(obj('UnitDiffRef', { jobId: S, label: nul(en('landed', 'unlanded')), headSha: nul(S), landedSha: nul(S), at: nul(N) })) });
+const UnitGraph = obj('UnitGraph', { status: en('ok', 'empty'), reason: nul(S),
+  nodes: arr(obj('UnitGraphNode', { unitKey: S, jobId: S, op: S, status: S, unitState: S, attempts: I, cut: nul(obj('UnitGraphCut', { id: S, ordinal: I, total: nul(I) })) })),
+  edges: arr(obj('UnitGraphEdge', { from: S, to: S, kind: en(V.unitEdgeKinds), source: S, fromJob: S, toJob: S, met: B, released: nul(S) })),
+  counts: obj('UnitGraphCounts', { after: I, seam: I, dangling: I, selfLoops: I }),
+  sources: obj('UnitGraphSources', { after: S, seam: S }),
+  omitted: arr(obj('UnitGraphOmission', { kind: S, why: S })), at: N, source: S });
+const UnitBoard = obj('UnitBoard', {
+  counts: obj('UnitBoardCounts', { queued: I, running: I, reported: I, settled: I, released: I }),
+  groups: obj('UnitBoardGroups', { queued: arr(BoardUnit), running: arr(BoardUnit), reported: arr(BoardUnit), settled: arr(BoardUnit), released: arr(BoardUnit) }),
+  graph: UnitGraph });
+const DecisionView = obj('DecisionView', { id: S, kind: S, decider: nul(S), status: S, ledger: S, workflowId: nul(S), summary: S,
+  entity: nul(obj('DecisionEntity', { type: S, id: S })), openedBy: nul(S), openedAt: nul(N), dueAt: nul(N), escalations: I, severity: nul(S),
+  claim: nul(obj('DecisionClaim', { by: S, at: N })), resolution: nul(obj('DecisionResolution', { by: S, verb: S, at: N })),
+  options: arr(obj('DecisionOption', { key: S, recommended: B })), projectId: opt(S) });
+const ProgressBlock = obj('ProgressBlock', { unitsDone: I, unitsTotal: I, unitsOpen: I, unitsFailed: I, share: nul(N), unitsPerHour: N, minUnitsPerHour: N, priority: B,
+  running: I, allowedParallel: I, parallelWhy: S, queuedReady: I, etaHours: nul(N), eta: nul(S), lastUnitAt: nul(S),
+  legs: obj('ProgressLegs', { done: I, total: I }),
+  stall: obj('ProgressStall', { stalled: B, reasons: arr(S), since: nul(S), sinceMin: N, supervisorDue: B }), unsettled: I });
+const Fleet = obj('Fleet', { progress: ProgressBlock, pill: S, topReason: nul(obj('TopReason', { text: S, cause: nul(S), source: S })),
+  onIt: obj('OnIt', { who: S, next: nul(S), source: nul(S), actionKey: opt(nul(S)), unblocks: opt(nul(N)) }),
+  rca: obj('RcaView', { id: S, attempts: I, trigger: nul(S), why: nul(S),
+    clusters: arr(obj('RcaCluster', { cause: S, why: S, authority: S, count: I, open: I, units: I, examples: arr(S) })),
+    actions: arr(obj('RcaAction', { rank: I, key: S, tier: S, cause: S, unblocks: N, title: S, expected: S, tried: nul(obj('RcaTried', { decision: S, status: S })) })) }),
+  decisionLog: arr(obj('DecisionLogRow', { id: S, actionKey: nul(S), status: S, hypothesis: S, observed: U })) });
+const WorkflowPageData = obj('WorkflowPageData', { updatedAt: N, projectId: S, projectName: S, snapshot: Snapshot, fleet: nul(Fleet), board: nul(UnitBoard),
+  decisions: arr(DecisionView),
+  worktrees: arr(obj('WorktreeRow', { kind: en('wf', 'op'), path: S, branch: nul(S), short: nul(S), jobId: nul(S), jobStatus: nul(S), exists: B, state: S, at: opt(nul(N)) })),
+  statusAt: nul(N) });
+const ServiceRow = obj('ServiceRow', { name: S, state: S, since: nul(N), restarts: I, lastAt: opt(nul(N)), detail: nul(S), down: opt(B) });
+const ReconcilerView = obj('ReconcilerView', { at: N,
+  engine: obj('EngineView', { running: B, why: nul(S), holder: nul(S), pid: nul(I), epoch: nul(I), heartbeatAgeMs: nul(N), rev: nul(S) }),
+  controllers: arr(obj('ControllerRow', { name: en(V.controllers), mode: nul(S), modeSource: nul(S), modeAt: nul(N), lastPassAt: nul(N),
+    would: I, acts: I, failed: I, errors: I, events: I, lastActAt: nul(N), lastErrorAt: nul(N), lastError: nul(S), lastWould: nul(S),
+    queue: obj('ControllerQueue', { depth: I, failing: I, dueAt: nul(N) }) })),
+  others: arr(obj('ReconcilerOtherRow', { name: S, would: I, acts: I, errors: I, events: I, lastAt: nul(N), lastErrorAt: nul(N), lastError: nul(S) })),
+  windowMs: N, logSource: S, queueDepth: I,
+  services: obj('ServicesView', { rows: arr(ServiceRow), managed: I, healthy: I, down: arr(S), seats: arr(ServiceRow), ledgers: arr(ServiceRow), source: nul(S) }),
+  violations: obj('ViolationsView', { open: I, critical: I, byCode: rec(I), rows: arr(obj('ViolationRow', { key: S, code: nul(S), severity: nul(S), entity: S, at: nul(N) })), clocks: I, source: nul(S) }),
+  gc: nul(obj('GcView', { at: N, msg: S, collected24h: I, leftovers: nul(N), counts: nul(obj('GcCounts', { agents: I, terminals: I, worktrees: I, freedBytes: N, refused: I, errors: I })), source: S })) });
+const SystemView = obj('SystemView', { updatedAt: N, reconciler: ReconcilerView, ram: obj('HostRam', { percent: N, usedBytes: N, totalBytes: N }),
+  supervisor: obj('SystemSupervisor', {
+    seat: nul(obj('SystemSeat', { state: S, since: nul(N), lastAt: nul(N), source: S })),
+    notifier: nul(obj('NotifierView', { lastDigestAt: nul(N), urgent: arr(obj('NotifierUrgent', { key: S, at: N })), judgements: arr(obj('NotifierJudgement', { text: S, at: N })), source: S })),
+    inboxUnread: I, inbox: arr(obj('SystemInboxRow', { at: S, from: S, text: S, read: B })) }),
+  decisions: obj('SystemDecisions', { supervisor: arr(DecisionView), product: arr(DecisionView) }),
+  opHealth: nul(OpHealth), stuck: arr(StuckItem),
+  land: nul(obj('SystemLand', { busy: B, queued: I, current: S, lastLands: arr(LandEvent), pushes: arr(PushEvent) })),
+  sources: rec(nul(S)) });
 
 // ---------------------------------------------------------------------------------------------- agents
 const AgentRow = obj('AgentRow', { id: S, workflowId: nul(S), workflowName: nul(S), displayName: opt(nul(S)), projectId: nul(S), projectName: nul(S), role: en(V.agentRoles), op: S, attempt: nul(I), task: S, action: S,
@@ -198,7 +261,7 @@ export const ENDPOINTS = Object.freeze({
   snapshot: Snapshot, contract: ContractInfo, agents: AgentSnapshot, 'agent-log': AgentLog, 'agent-changes': AgentChanges,
   evidence: EvidencePage, history: History, 'history-commit': CommitPatch, proofs: OpProofs, artifacts: Artifacts,
   'workflow-events': WorkflowEvents, logs: LogPage, diff: JobDiff, coverage: Coverage, 'verify-proofs': VerifyProofs,
-  'supervisor-logs': SupervisorLogPage, 'supervisor-state': SupervisorState,
+  'supervisor-logs': SupervisorLogPage, 'supervisor-state': SupervisorState, workflow: WorkflowPageData, system: SystemView,
   'workflow-event': WorkflowEvent, 'log-row': LogRow,
 });
 /** Streams (SSE): fixture name -> the item endpoint each `data:` line is. */

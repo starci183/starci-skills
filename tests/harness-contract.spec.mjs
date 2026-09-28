@@ -66,7 +66,7 @@ test('contract.ts vocabularies are the runtime\'s own', () => {
 test('every fixture fits its endpoint\'s shape; every required endpoint has a fixture', () => {
   const files = fs.readdirSync(FIXTURES).filter((f) => f.endsWith('.json'));
   const names = files.map((f) => f.replace(/\.json$/, ''));
-  for (const required of ['snapshot', 'contract', 'agents', 'evidence', 'history', 'history-commit', 'proofs', 'artifacts', 'workflow-events', 'logs', 'diff', 'workflow-events-stream', 'logs-stream', 'coverage', 'verify-proofs', 'supervisor-logs', 'supervisor-logs-stream', 'supervisor-state']) {
+  for (const required of ['snapshot', 'contract', 'agents', 'evidence', 'history', 'history-commit', 'proofs', 'artifacts', 'workflow-events', 'logs', 'diff', 'workflow-events-stream', 'logs-stream', 'coverage', 'verify-proofs', 'supervisor-logs', 'supervisor-logs-stream', 'supervisor-state', 'workflow', 'system']) {
     assert.ok(names.includes(required), `ui/fixtures/${required}.json is captured`);
   }
   for (const name of names) {
@@ -172,7 +172,9 @@ const firstEvents = async (base, url, want = 1, ms = 8000) => {
 
 test('the fixture server answers every endpoint in the contract\'s shape (never the live port)', async (t) => {
   const { repo, wf, jobId, op } = fixtureRepo(t);
-  const base = await startServer(t, [{ id: 'fx', name: 'Fixture', repo }]);
+  const supNone = fs.mkdtempSync(path.join(os.tmpdir(), 'starci-contract-nosup-'));
+  t.after(() => fs.rmSync(supNone, { recursive: true, force: true, maxRetries: 30, retryDelay: 50 }));
+  const base = await startServer(t, [{ id: 'fx', name: 'Fixture', repo }], { STARCI_SUPERVISOR_HOME: supNone });
   assert.doesNotMatch(base, /:454[67]$/, 'a fixture server, not the live one');
   const q = (o) => new URLSearchParams(o).toString();
   const check = async (name, url) => {
@@ -186,6 +188,22 @@ test('the fixture server answers every endpoint in the contract\'s shape (never 
   assert.match(contract.version, /^\d{4}-\d{2}-\d{2}\.\d+$/);
   const snap = await check('snapshot', '/api/snapshot');
   assert.equal(snap.projects[0].workflows[0].id, wf);
+  // One workflow's page: the unit board carries each attempt's recorded provider/model (null with why when absent),
+  // the stored settled diff, and the unit graph (empty with a reason: this fixture records no dependency).
+  const page = await check('workflow', `/api/workflow?${q({ id: wf, project: 'fx' })}`);
+  const unit = Object.values(page.board.groups).flat().find((u) => u.jobId === jobId);
+  assert.equal(unit.attempt.stage, 'dispatched');
+  assert.equal(unit.attempt.pool, 'claude-agent', 'the op-dispatched event names the pool');
+  assert.equal(unit.attempt.provider, null, 'no runtime record names the provider: null, never guessed');
+  assert.match(unit.attempt.why, /provider: not recorded/);
+  assert.equal(unit.verdict, 'pass', 'the Kernel verdict');
+  assert.equal(unit.outcome, 'done', 'the Op report, kept apart');
+  assert.equal(unit.diff.jobId, jobId, 'the settled diff is served by /api/diff');
+  assert.equal(page.board.graph.status, 'empty');
+  assert.match(page.board.graph.reason, /records a dependency/);
+  assert.equal((await getJson(base, `/api/workflow?${q({ id: 'wf-nope' })}`)).status, 404);
+  const system = await check('system', '/api/system');
+  assert.deepEqual(system.reconciler.controllers.map((c) => c.name), ['job', 'host', 'gc', 'resource', 'workflow', 'fleet', 'learning']);
   const arts = await check('artifacts', `/api/artifacts?${q({ project: 'fx', workflow: wf })}`);
   const subkinds = arts.jobs[0].artifacts.map((a) => a.subkind);
   for (const sk of ['app-capture', 'patch', 'patch-json', 'report']) assert.ok(subkinds.includes(sk), `artifacts carry subkind ${sk}`);
@@ -232,6 +250,7 @@ test('the fixture server answers the Supervisor endpoints in the contract\'s sha
   assert.deepEqual(validateEndpoint('supervisor-state', state.body), []);
   assert.equal(state.body.learning.proposals.length, 1);
   assert.equal(state.body.messages.inbox[0].text, '/status');
+  assert.deepEqual(validateEndpoint('system', (await getJson(base, '/api/system')).body), [], 'the system page over a seeded supervisor home');
   const logs = await getJson(base, '/api/supervisor/logs');
   assert.deepEqual(validateEndpoint('supervisor-logs', logs.body), []);
   const kinds = new Set(logs.body.rows.map((row) => row.kind));

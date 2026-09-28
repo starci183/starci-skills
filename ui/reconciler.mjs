@@ -21,6 +21,7 @@ import { DatabaseSync } from 'node:sqlite';
 import { workflowView, unitsOf, opJobsOf, reportsOf, progressSettings, OPEN_JOB } from '../scripts/kernel/progress-rca.mjs';
 import { listDecisions, SUPERVISOR_WF } from '../scripts/reconciler/decisions.mjs';
 import { withSupervisorRead } from '../scripts/supervisor/home.mjs';
+import { attemptOf, diffRefOf, unitGraphOf } from './unit-graph.mjs';
 
 const optional = (spec) => import(spec).catch((error) => { if (error?.code === 'ERR_MODULE_NOT_FOUND') return null; throw error; });
 // Lane A (rc-engine) owns state.mjs; lanes D/F own services.mjs and sla.mjs. Each is read only when present.
@@ -130,13 +131,31 @@ export function unitPhaseOf(job, { reported, released }) {
   return released ? 'released' : 'settled';
 }
 
-/** The workflow's units grouped by phase: {counts, groups: {phase: [unit]}}; each group keeps its newest `cap`. */
-export function unitBoard(db, workflowId, { cap = 60, nameOf = () => null } = {}) {
+/**
+ * The workflow's units grouped by phase: {counts, groups: {phase: [unit]}, graph}; each group keeps its newest `cap`.
+ * A unit carries its newest attempt's provider/model and timing (`attempt`, unit-graph.mjs attemptOf), the Op's
+ * report outcome (`outcome`) apart from the Kernel's settle verdict (`verdict`), and a pointer to its stored settled
+ * diff (`diff`, served by GET /api/diff). `graph` is the recorded dependency DAG between ALL its units
+ * (unit-graph.mjs unitGraphOf).
+ */
+export function unitBoard(db, workflowId, { cap = 60, nameOf = () => null, now = Date.now() } = {}) {
   const jobs = opJobsOf(db, workflowId);
   const reports = reportsOf(db, workflowId);
   const releasedIds = new Set(db.prepare("SELECT entity_id FROM events WHERE workflow_id=? AND kind IN ('job-settle-released','worker-released-on-report')").all(workflowId).map((r) => r.entity_id));
+  // Each job's ledger events (timing of its attempt); only op-dispatched payloads are parsed.
+  const jobIds = new Set(jobs.map((j) => j.job_id));
+  const eventsOf = new Map();
+  for (const e of db.prepare('SELECT entity_id, kind, created_at, payload_json FROM events WHERE workflow_id=? ORDER BY seq').all(workflowId)) {
+    if (!jobIds.has(e.entity_id)) continue;
+    if (!eventsOf.has(e.entity_id)) eventsOf.set(e.entity_id, []);
+    eventsOf.get(e.entity_id).push({ kind: e.kind, created_at: Number(e.created_at), payload: e.kind === 'op-dispatched' ? parse(e.payload_json) : null });
+  }
+  // Stored settled patches (api settle -> job_artifacts kind patch); the newest row of a job wins.
+  const patches = new Map();
+  if (hasTable(db, 'job_artifacts')) for (const r of db.prepare("SELECT job_id, label, head_sha, landed_sha, created_at FROM job_artifacts WHERE workflow_id=? AND kind='patch' ORDER BY created_at").all(workflowId)) patches.set(r.job_id, r);
+  const units = unitsOf(jobs);
   const groups = Object.fromEntries(UNIT_STATES.map((s) => [s, []]));
-  for (const u of unitsOf(jobs)) {
+  for (const u of units) {
     const job = u.last;
     const phase = unitPhaseOf(job, { reported: reports.has(`${job.op_id}|${job.attempt}`), released: releasedIds.has(job.job_id) || Boolean(job.payload?.workerReleased) });
     const report = reports.get(`${job.op_id}|${job.attempt}`);
@@ -146,11 +165,13 @@ export function unitBoard(db, workflowId, { cap = 60, nameOf = () => null } = {}
       title: clip(job.payload?.title ?? '', 160) || null, displayName: nameOf(job.job_id) ?? null,
       verdict: job.result?.verdict ?? null, outcome: report?.outcome ?? null, summary: report ? clip(report.summary ?? report.blocker?.detail ?? '', 220) : null,
       at: Number(job.updated_at) || Number(job.created_at) || null,
+      attempt: attemptOf(job, eventsOf.get(job.job_id) ?? [], report ?? null),
+      diff: diffRefOf(u, patches),
     });
   }
   const counts = {};
   for (const s of UNIT_STATES) { groups[s].sort((a, b) => (b.at ?? 0) - (a.at ?? 0)); counts[s] = groups[s].length; groups[s] = groups[s].slice(0, cap); }
-  return { counts, groups };
+  return { counts, groups, graph: { ...unitGraphOf(jobs, units), at: now, source: 'this workflow\'s ledger jobs (payload after, cut), read once per status tick' } };
 }
 
 /* ------------------------------------------------------------ worktrees */
@@ -190,7 +211,7 @@ export async function productWorktreesOf(db, workflowId) {
 /* ------------------------------------------------------------ decisions */
 
 const diView = (d, ledger) => ({
-  id: d.id, kind: d.kind, decider: d.decider, status: d.status, ledger, workflowId: d.productWorkflowId ?? d.workflowId ?? null,
+  id: d.id, kind: String(d.kind ?? ''), decider: d.decider ?? null, status: String(d.status ?? ''), ledger, workflowId: d.productWorkflowId ?? d.workflowId ?? null,
   summary: clip(d.summary, 300), entity: d.entity ? { type: d.entity.type, id: clip(d.entity.id, 120) } : null,
   openedBy: d.openedBy ?? null, openedAt: d.openedAt ?? null, dueAt: d.dueAt ?? null, escalations: d.escalations ?? 0, severity: d.severity ?? null,
   claim: d.claim ? { by: clip(d.claim.by, 80), at: d.claim.at } : null,
@@ -236,8 +257,10 @@ function configuredModes() {
 
 /**
  * The engine as the UI shows it. {engine: {running, why, holder, pid, epoch, heartbeatAgeMs, rev}, controllers:
- * [{name, mode, lastPassAt, would, acts, errors, queue}], queueDepth, services: {healthy, total, rows, source},
- * violations: {open, byCode, rows}, gc: {lastAt, summary, leftovers}}.
+ * [{name, mode, modeAt, lastPassAt, would, acts, failed, errors, events, lastActAt, lastErrorAt, lastError, queue}] for
+ * the seven controllers, others (engine/SLA rows), windowMs, logSource, queueDepth, services: {healthy, total, rows,
+ * source}, violations: {open, byCode, rows}, gc: {lastAt, summary, leftovers}}. The engine does not measure CPU or RAM
+ * per controller, so there is no such field.
  */
 export function reconcilerState({ now = Date.now(), env = process.env, serviceProbe = null, windowMs = 24 * HOUR } = {}) {
   const st = withStateReader((db) => ({
@@ -261,14 +284,20 @@ export function reconcilerState({ now = Date.now(), env = process.env, servicePr
     for (const r of db.prepare("SELECT kind, count(*) n, max(at) last FROM logs WHERE workflow_id=? AND kind LIKE 'reconciler.%' AND at>=? GROUP BY kind").all(SUPERVISOR_WF, now - windowMs)) {
       byController._all ??= {}; byController._all[r.kind] = { n: r.n, last: r.last };
     }
-    for (const r of db.prepare("SELECT kind, data_json, at FROM logs WHERE workflow_id=? AND kind IN ('reconciler.would','reconciler.act','reconciler.error') AND at>=? ORDER BY seq DESC LIMIT 5000").all(SUPERVISOR_WF, now - windowMs)) {
+    // A row names its controller in data.controller (ctx.mjs). The engine logs a controller's failed reconcile as
+    // controller `engine` with data.name = the controller that failed (engine.mjs reconcile-failed): that error is
+    // the named controller's. Rows of the engine itself and of the SLA layer are not a controller's (`others`).
+    for (const r of db.prepare("SELECT kind, msg, data_json, at FROM logs WHERE workflow_id=? AND kind IN ('reconciler.would','reconciler.act','reconciler.error','reconciler.event') AND at>=? ORDER BY seq DESC LIMIT 5000").all(SUPERVISOR_WF, now - windowMs)) {
       const data = parse(r.data_json);
-      const c = data.controller ?? data.ctl ?? 'unknown';
-      const slot = (byController[c] ??= { would: 0, acts: 0, errors: 0, last: null, lastWould: null });
-      if (r.kind === 'reconciler.would') { slot.would++; slot.lastWould ??= clip(`${data.verb ?? ''} ${data.argv ?? ''}`, 160); }
-      else if (r.kind === 'reconciler.act') slot.acts++;
-      else slot.errors++;
-      slot.last = Math.max(slot.last ?? 0, Number(r.at));
+      const failedOf = data.controller === 'engine' && data.kind === 'reconciler.reconcile-failed' && typeof data.name === 'string' && data.name ? data.name : null;
+      const c = failedOf ?? data.controller ?? data.ctl ?? 'unknown';
+      const slot = (byController[c] ??= { would: 0, acts: 0, errors: 0, events: 0, last: null, lastWould: null, lastActAt: null, lastErrorAt: null, lastError: null });
+      const at = Number(r.at);
+      if (r.kind === 'reconciler.would') { slot.would++; slot.lastWould ??= clip(`${data.verb ?? data.action ?? ''} ${data.argv ?? ''}`, 160); }
+      else if (r.kind === 'reconciler.act') { slot.acts++; slot.lastActAt = Math.max(slot.lastActAt ?? 0, at); }
+      else if (r.kind === 'reconciler.error') { slot.errors++; if (at > (slot.lastErrorAt ?? 0)) { slot.lastErrorAt = at; slot.lastError = clip(r.msg, 240); } }
+      else slot.events++;
+      slot.last = Math.max(slot.last ?? 0, at);
     }
     const gcRow = db.prepare("SELECT msg, data_json, at FROM logs WHERE workflow_id=? AND kind='gc.summary' ORDER BY seq DESC LIMIT 1").get(SUPERVISOR_WF);
     const gcDay = db.prepare("SELECT count(*) n FROM logs WHERE workflow_id=? AND kind='gc.collect' AND at>=?").get(SUPERVISOR_WF, now - windowMs);
@@ -278,15 +307,22 @@ export function reconcilerState({ now = Date.now(), env = process.env, servicePr
   const conf = configuredModes();
   const queueOf = new Map((st?.queue ?? []).map((q) => [q.controller, q]));
   const actsOf = (c) => (st?.actions ?? []).filter((a) => a.controller === c);
+  const empty = { would: 0, acts: 0, errors: 0, events: 0, last: null, lastWould: null, lastActAt: null, lastErrorAt: null, lastError: null };
   const controllers = CONTROLLERS.map((name) => {
-    const r = rows.byController[name] ?? { would: 0, acts: 0, errors: 0, last: null, lastWould: null };
+    const r = rows.byController[name] ?? empty;
     const q = queueOf.get(name);
     const journal = actsOf(name);
     return { name, mode: st?.modes?.[name]?.mode ?? conf?.[name] ?? null, modeSource: st?.modes?.[name] ? 'reconciler.sqlite modes' : conf ? 'config.yaml reconciler.controllers' : null,
+      modeAt: Number(st?.modes?.[name]?.at) || null,
       lastPassAt: r.last ?? (journal.length ? Math.max(...journal.map((a) => Number(a.last) || 0)) || null : null),
       would: r.would, acts: r.acts || journal.filter((a) => a.state === 'done').reduce((n, a) => n + a.n, 0), failed: journal.filter((a) => a.state === 'failed').reduce((n, a) => n + a.n, 0), errors: r.errors,
+      events: r.events, lastActAt: r.lastActAt, lastErrorAt: r.lastErrorAt, lastError: r.lastError,
       lastWould: r.lastWould, queue: q ? { depth: q.n, failing: q.failing, dueAt: q.due } : { depth: 0, failing: 0, dueAt: null } };
   });
+  // Rows that are no controller's: the engine's own (leader, epoch, its own failures) and the SLA layer's.
+  const others = Object.entries(rows.byController).filter(([name]) => !CONTROLLERS.includes(name) && name !== '_all')
+    .map(([name, r]) => ({ name, would: r.would, acts: r.acts, errors: r.errors, events: r.events, lastAt: r.last, lastErrorAt: r.lastErrorAt, lastError: r.lastError }))
+    .sort((a, b) => a.name.localeCompare(b.name));
 
   // Services: the Host controller's store when it has rows, else the UI's own probe (serviceProbe, same registry).
   const stored = (st?.services ?? []).map((s) => {
@@ -310,7 +346,7 @@ export function reconcilerState({ now = Date.now(), env = process.env, servicePr
   const byCode = {};
   for (const v of open) byCode[v.code ?? '?'] = (byCode[v.code ?? '?'] ?? 0) + 1;
   const violations = { open: open.length, critical: open.filter((v) => v.severity === 'critical').length, byCode,
-    rows: open.slice(0, 40).map((v) => ({ key: clip(v.dedupeKey, 160), code: v.code ?? null, severity: v.severity ?? null, entity: typeof v.entity === 'string' ? clip(v.entity, 120) : clip(JSON.stringify(v.entity ?? ''), 120), at: v.at })),
+    rows: open.slice(0, 40).map((v) => ({ key: clip(v.dedupeKey, 160), code: v.code ?? null, severity: v.severity ?? null, entity: typeof v.entity === 'string' ? clip(v.entity, 120) : clip(JSON.stringify(v.entity ?? ''), 120), at: Number(v.at) || null })),
     clocks: (st?.clocks ?? []).length, source: sla ? 'supervisor ledger runtime-invariant-violated (sla.mjs openViolations)' : null };
 
   const g = rows.gc;
@@ -318,7 +354,7 @@ export function reconcilerState({ now = Date.now(), env = process.env, servicePr
   const lo = g?.data?.leftovers;
   const leftovers = typeof lo === 'number' ? lo : lo && typeof lo === 'object' ? Object.values(lo).reduce((n, v) => n + (Number(v) || 0), 0) : null;
   const gcCounts = g?.data ? { agents: g.data.agents ?? 0, terminals: g.data.terminals ?? 0, worktrees: g.data.worktrees ?? 0, freedBytes: g.data.freedBytes ?? 0, refused: g.data.refused ?? 0, errors: g.data.errors ?? 0 } : null;
-  return { at: now, engine, controllers, queueDepth: (st?.queue ?? []).reduce((n, q) => n + q.n, 0), services: svc, violations,
+  return { at: now, engine, controllers, others, windowMs, logSource: 'supervisor ledger logs reconciler.would/act/error/event (workflow wf-supervisor, data.controller)', queueDepth: (st?.queue ?? []).reduce((n, q) => n + q.n, 0), services: svc, violations,
     gc: g ? { at: g.at, msg: g.msg, collected24h: g.collected24h, leftovers, counts: gcCounts, source: 'supervisor ledger gc.summary' } : null };
 }
 
