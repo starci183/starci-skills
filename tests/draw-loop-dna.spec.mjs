@@ -30,7 +30,6 @@ import { settleDrawMetricFindings, DRAW_LOOP_CHANGE } from '../scripts/work/draw
 import { ARCHETYPES, archetypeOf, directionReadiness } from '../scripts/work/ui-archetype.mjs';
 import { DIRECTION_ARCHETYPES } from '../scripts/checks/brand.mjs';
 import { checkPrerequisites, directionPrerequisiteOn, directionVerdicts } from '../scripts/kernel/prerequisites.mjs';
-import { evidenceDirOf } from '../scripts/kernel/job-artifacts.mjs';
 import { loadContractChanges } from '../scripts/kernel/contract-version.mjs';
 import { drawQualityFindings } from '../scripts/checks/draw-quality.mjs';
 import { withRationale, writeRationale } from './_draw-rationale-fixture.mjs';
@@ -284,7 +283,6 @@ test('a loop that never passes stops without progress and finishes blocked with 
   assert.ok(done.remaining.some((f) => f.code === DRAW_OFF_GRAMMAR_COMPONENT));
   assert.ok(done.remaining.some((f) => f.code === 'DRAW_BEAUTY_BELOW'));
   assert.equal(readLoop(r3.out).outcome, 'blocked');
-  assert.equal(evidenceDirOf(path.relative(p.repo, path.join(r3.out, 'round-2', 'metrics.json')).replace(/\\/g, '/')), path.relative(p.repo, r3.out).replace(/\\/g, '/'), 'the loop directory is an evidence directory: every round is indexed');
 });
 
 test('a passing loop installs its best round; the record binds generation.loop; settle re-measures every part itself', async (t) => {

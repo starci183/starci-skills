@@ -4,9 +4,9 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
-import { ADDITIVE_COLUMNS, JOB_ARTIFACT_SUBKINDS, hasLedgerColumn, inspectLedger, ledgerFileFor, openLedger } from '../engine/ledger-db.mjs';
+import { JOB_ARTIFACT_SUBKINDS, ledgerFileFor, openLedger } from '../engine/ledger-db.mjs';
 import { clearManifestCache, manifestToolOf, subkindOf, subkindOfTool } from '../scripts/kernel/artifact-subkind.mjs';
-import { collectJobFiles, listJobArtifacts } from '../scripts/kernel/job-artifacts.mjs';
+import { collectJobFiles } from '../scripts/kernel/job-artifacts.mjs';
 import { RECORDINGS_ROOT_ENV, defaultRecordRoot, recordingsRootOf } from '../scripts/uat/playwright-recording.mjs';
 import { LOG_TYPED_MISSING, openLogs, readLogs, rowsOfEvent, prepareLogRow, typedLogGaps, appendLog } from '../scripts/kernel/typed-logs.mjs';
 
@@ -78,31 +78,6 @@ test('manifests decide a drawing: index.yaml generation.tool, draws.yaml provena
   assert.equal(subkindOf({ kind: 'image', path: `${ui}/evidence/r/cap.png`, opId: 'interface.draw', repo }), 'draw-render', 'a starci/draw-render@1 record beside it');
   assert.equal(subkindOf({ kind: 'image', path: `${ui}/assets/unnamed.png`, opId: 'interface.draw', repo }), null, 'nothing names it: null');
 });
-
-test('migration: an existing ledger gains job_artifacts.subkind once, nothing else changes', (t) => {
-  const repo = tmp(t);
-  const file = ledgerFileFor(repo);
-  let ledger = openLedger({ file });
-  ledger.ensureWorkflow({ workflowId: 'wf-m' });
-  ledger.db.prepare('INSERT INTO job_artifacts(workflow_id,job_id,op_id,attempt,kind,path,sha256,bytes,created_at) VALUES(?,?,?,?,?,?,?,?,?)').run('wf-m', 'op-a-1', 'e2e.verify', 1, 'trace', 'x/trace.zip', 'a'.repeat(64), 3, 1);
-  // A ledger made before the column: drop it, as an old file lacks it.
-  ledger.db.exec('ALTER TABLE job_artifacts DROP COLUMN subkind');
-  assert.equal(hasLedgerColumn(ledger.db, 'job_artifacts', 'subkind'), false);
-  ledger.close();
-  const old = inspectLedger({ file });
-  assert.deepEqual(listJobArtifacts(old.db, { workflowId: 'wf-m' }).jobs[0].artifacts[0].subkind, null, 'a read-only handle on an old ledger reads null');
-  assert.equal(listJobArtifacts(old.db, { workflowId: 'wf-m', subkind: 'playwright-trace' }).total, 0);
-  old.close();
-  ledger = openLedger({ file });
-  assert.ok(ADDITIVE_COLUMNS.some(([table, column]) => table === 'job_artifacts' && column === 'subkind'));
-  assert.equal(hasLedgerColumn(ledger.db, 'job_artifacts', 'subkind'), true);
-  assert.equal(ledger.db.prepare('SELECT count(*) n FROM job_artifacts').get().n, 1, 'rows kept');
-  ledger.close();
-  openLedger({ file }).close();
-  const ro = inspectLedger({ file });
-  try { assert.throws(() => listJobArtifacts(ro.db, { workflowId: 'wf-m', subkind: 'nope' }), /artifact subkind must be/); } finally { ro.close(); }
-});
-
 
 test('a job\'s Playwright recordings (uat-slots default folder) are its proof: collected, video/trace with their subkinds', (t) => {
   const repo = tmp(t);
@@ -200,62 +175,6 @@ const seedJob = (repo, { jobId, op = 'backend.implement', wf = 'wf-s', report })
   } finally { ledger.close(); }
 };
 const api = (...args) => { const r = spawnSync(process.execPath, [API, ...args, '--json'], { cwd: ROOT, encoding: 'utf8', windowsHide: true, timeout: 180000, env: { ...process.env, STARCI_ROLE: '', STARCI_OP_JOB: '' } }); let body = null; try { body = JSON.parse(r.stdout); } catch { body = null; } return { r, body }; };
-
-test('settle: rows carry their subkind, the patch json is indexed, the timeline gets runtime rows, and an op that logged nothing gets LOG_TYPED_MISSING (warn, not a refusal)', (t) => {
-  const { repo, head } = checkout(t);
-  write(repo, '.starciwork/features/f/impl/fe/view/E/screens/home--desktop.png', PNG);
-  write(repo, '.starciwork/features/f/impl/fe/view/E/run.log', 'ok\n');
-  const checks = [{ name: 'unit', command: 'npm test', exitCode: 0, evidence: 'green' }];
-  seedJob(repo, { jobId: 'op-quiet-1', report: { head, branch: 'main', files: ['.starciwork/features/f/impl/fe/view/E/screens/home--desktop.png', 'src/a.ts'], checks } });
-  const { r, body } = api('settle', '--repo', repo, '--job', 'op-quiet-1', '--verdict', 'pass');
-  assert.equal(r.status, 0, r.stderr || r.stdout);
-  assert.equal(body.verdict, 'pass', 'a warning never refuses');
-  assert.equal(body.artifacts.logs.typedMissing.code, LOG_TYPED_MISSING);
-  assert.deepEqual(body.artifacts.logs.typedMissing.missing, ['step.start', 'step.end', 'cmd.run unit']);
-  const ledger = inspectLedger({ file: ledgerFileFor(repo) });
-  const rows = Object.fromEntries(ledger.db.prepare('SELECT path, kind, subkind FROM job_artifacts WHERE job_id=?').all('op-quiet-1').map((row) => [row.path.split('/').pop(), [row.kind, row.subkind]]));
-  const warned = ledger.db.prepare("SELECT payload_json FROM events WHERE kind='log-typed-missing' AND entity_id=?").all('op-quiet-1');
-  ledger.close();
-  assert.deepEqual(rows['home--desktop.png'], ['image', 'app-capture']);
-  assert.deepEqual(rows['run.log'], ['log', 'log']);
-  assert.deepEqual(rows['op-quiet-1.patch'], ['patch', 'patch']);
-  assert.deepEqual(rows['op-quiet-1.patch.json'], ['file', 'patch-json']);
-  assert.deepEqual(rows['report-1.json'], ['report', 'report']);
-  assert.equal(warned.length, 1);
-  const logs = openLogs(repo);
-  const timeline = readLogs(logs, { workflowId: 'wf-s', jobIds: ['op-quiet-1'] }).rows;
-  logs.close();
-  const kinds = timeline.map((row) => row.kind);
-  assert.ok(kinds.includes('file.edit'), 'the patch file is a file.edit row');
-  assert.equal(timeline.find((row) => row.kind === 'file.edit').data.path, 'src/a.ts');
-  assert.equal(timeline.find((row) => row.kind === 'render').data.subkind, 'app-capture');
-  const warning = timeline.find((row) => row.kind === 'warning');
-  assert.deepEqual([warning.actor, warning.level, warning.data.code], ['runtime', 'warn', LOG_TYPED_MISSING]);
-  const status = api('status', '--repo', repo, '--workflow', 'wf-s');
-  assert.equal(status.r.status, 0, status.r.stderr);
-  assert.deepEqual(status.body.logTypedMissing.map((w) => [w.jobId, w.code]), [['op-quiet-1', LOG_TYPED_MISSING]]);
-  const listed = api('artifacts', '--repo', repo, '--workflow', 'wf-s', '--subkind', 'app-capture');
-  assert.equal(listed.r.status, 0, listed.r.stderr);
-  assert.equal(listed.body.total, 1);
-});
-
-test('settle: an op that logged its steps and its check command owes nothing', (t) => {
-  const { repo, head } = checkout(t);
-  const checks = [{ name: 'unit', command: 'npm test', exitCode: 0 }];
-  seedJob(repo, { jobId: 'op-loud-1', report: { head, branch: 'main', files: ['src/a.ts'], checks } });
-  const sidecar = path.join(repo, '.starciwork', 'kernel-evidence', 'wf-s', 'jobs', 'op-loud-1', 'log.jsonl');
-  write(repo, path.relative(repo, sidecar), [
-    { kind: 'step.start', msg: 'Bắt đầu', data: { name: 'implement' } },
-    { kind: 'cmd.run', msg: 'Chạy test', data: { cmd: 'npm test', exit: 0, durationMs: 1200 } },
-    { kind: 'step.end', msg: 'Xong', data: { name: 'implement', durationMs: 5000, ok: true } },
-  ].map((row) => JSON.stringify(row)).join('\n') + '\n');
-  const { r, body } = api('settle', '--repo', repo, '--job', 'op-loud-1', '--verdict', 'pass');
-  assert.equal(r.status, 0, r.stderr || r.stdout);
-  assert.equal(body.artifacts.logs.typedMissing, undefined);
-  assert.equal(body.artifacts.logs.sidecar.inserted, 3);
-  const status = api('status', '--repo', repo, '--workflow', 'wf-s');
-  assert.equal(status.body.logTypedMissing, undefined);
-});
 
 test('the typed-log rules reach every new dispatch and every kernel boot', async () => {
   const { buildOpPrompt } = await import('../scripts/kernel/op-prompt.mjs');

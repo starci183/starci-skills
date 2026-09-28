@@ -1,7 +1,7 @@
 // proof-integrity.mjs — what each indexed artifact proves, whether that proof still holds, and whether its
 // bytes are the ones the ledger chained.
 //
-//   claims     every job_artifacts row gets an artifact_proofs row (engine/schema.sql) at indexing: the FR ids,
+//   claims     every job_artifacts row gets an artifact_proofs row (keyed artifact_id) at indexing: the FR ids,
 //              knowledge/ui proof cases ("ANATOMY-2 case-1"), XBase#state shapes and test specs it proves. They
 //              come from the op report (its `claims`, and the specs and ids its passing checks name), the image
 //              label (XBase#state@viewport), a starci/ui-proof-score@1 file (its passing cases), a uat flow the
@@ -13,19 +13,22 @@
 //   coverage   every FR, shape and applicable proof case of the workflow's scope with its evidence and status
 //              proven | stale | missing (api coverage); an FR whose requiresProof has a required kind is a
 //              must-have, and handover.review may not ask the owner while one is missing or stale (api report).
-//   tamper     the artifacts-indexed event carries every indexed {path, sha256}, so the events digest chain
-//              covers them; verifyProofs re-hashes each file and walks the chain (api verify-proofs).
+//   tamper     the report-filed and artifacts-indexed events carry every artifact {id, name, sha256}, so the events
+//              digest chain covers them; verifyProofs re-reads each blob (the store re-hashes it) and walks the chain
+//              (api verify-proofs). A Work record cites an artifact by id + sha256, never by a path (ARCHITECTURE-DB §5.3).
 import fs from 'node:fs';
 import path from 'node:path';
 import { execFileSync } from 'node:child_process';
-import { sha256 } from '../../engine/digest.mjs';
-import { hasLedgerTable, JOB_STATUSES } from '../../engine/ledger-db.mjs';
+import { JOB_STATUSES, recordArtifactProof, verifyEventChain } from '../../engine/ledger-db.mjs';
+import { getBlob } from '../lib/artifact-store.mjs';
 import { parseYaml } from '../../engine/yaml.mjs';
 import { parseJson } from '../lib/json.mjs';
 import { list } from '../lib/list.mjs';
 import { createDigester, createWorkDigester, isWorkInput, WORK_PREFIX } from './input-digests.mjs';
 import { latestVersion } from '../work/work-graph-store.mjs';
 import { ARTIFACTS_INDEXED } from './job-artifacts.mjs';
+// The events whose payload chains artifact {id, sha256} (read lazily: job-artifacts.mjs imports this module).
+const chainedArtifactEvents = () => [ARTIFACTS_INDEXED, 'report-filed'];
 
 export const PROOF_COVERAGE_SCHEMA = 'starci/proof-coverage@1';
 /** The contract change that made a handover ask owe its must-have proof (modules/kernel/contract-changes.yaml, reach new-legs). */
@@ -99,7 +102,8 @@ const specsIn = (text) => [...String(text ?? '').matchAll(SPEC_IN_TEXT)].map((m)
 const specMatches = (command, spec) => specsIn(command).some((s) => s === spec || s.endsWith(`/${spec}`) || spec.endsWith(`/${s}`));
 
 /**
- * The claims one job's artifacts carry: {job, byPath: Map(path -> claims)}. Report-derived claims count only on a
+ * The claims one job's artifacts carry: {job, byArtifact: Map(artifactId -> claims)}. `rows` are job_artifacts
+ * views {artifactId, name, kind, label, abs (the blob file)}. Report-derived claims count only on a
  * done|partial report and a check with exitCode 0; a label or a score file speaks for itself.
  */
 export function claimsOfJob({ repo, job, payload = {}, envelope = null, rows = [], frRecords = null }) {
@@ -129,24 +133,25 @@ export function claimsOfJob({ repo, job, payload = {}, envelope = null, rows = [
   const boundUi = uniq(list(payload.records).map((r) => UI_DIR.exec(`${slashed(r)}/`)?.[1]));
   const shapesOf = new Map();
   const uiShape = (row, label) => {
-    const dir = UI_DIR.exec(row.path)?.[1] ?? (boundUi.length === 1 ? boundUi[0] : null);
+    const dir = boundUi.length === 1 ? boundUi[0] : null;
     if (!dir || row.kind !== 'image') return [];
     if (!shapesOf.has(dir)) shapesOf.set(dir, list(recordAt(repo, dir)?.ui?.shapes).filter((s) => s?.base && s?.state));
     const bases = shapesOf.get(dir).filter((s) => s.state === label.split('--')[0]).map((s) => `${s.base}#${s.state}`).filter((id) => SHAPE_ID.test(id));
     return bases.length === 1 ? bases : [];
   };
-  const byPath = new Map();
+  const byArtifact = new Map();
   for (const row of rows) {
     const label = typeof row.label === 'string' ? row.label.split('@')[0] : null;
     const own = { shapes: !label ? [] : SHAPE_ID.test(label) ? [label] : uiShape(row, label) };
-    if (/\.json$/i.test(row.path) && row.kind !== 'report') {
-      const doc = parseJson((() => { try { return fs.readFileSync(path.join(repo, row.path), 'utf8'); } catch { return 'null'; } })());
+    if (/\.json$/i.test(row.name) && row.kind !== 'report') {
+      const doc = parseJson((() => { try { return fs.readFileSync(row.abs, 'utf8'); } catch { return 'null'; } })());
       if (doc?.schema === 'starci/ui-proof-score@1') own.cases = list(doc.cases).filter((c) => c?.status === 'pass').map((c) => `${c.rule} ${c.case}`);
     }
-    const scoped = declared.filter((c) => list(c.paths).some((p) => covers(p, row.path) || (row.origin && covers(p, row.origin))));
-    byPath.set(row.path, withSpecFrs(mergeClaims(job0, own, ...scoped)));
+    // claims[].paths name the proof files as the op attached them: the artifact name or its file name.
+    const scoped = declared.filter((c) => list(c.paths).some((p) => covers(p, row.name) || slashed(p).split('/').pop() === row.name.split('/').pop()));
+    byArtifact.set(row.artifactId, withSpecFrs(mergeClaims(job0, own, ...scoped)));
   }
-  return { job: withSpecFrs(job0), byPath, frRecords };
+  return { job: withSpecFrs(job0), byArtifact, frRecords };
 }
 
 const gitHead = (repo) => { try { return execFileSync('git', ['-C', repo, 'rev-parse', 'HEAD'], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'], windowsHide: true }).trim() || null; } catch { return null; } };
@@ -165,40 +170,34 @@ export function dependencyPathsOf({ db, job, payload = {}, claims = emptyClaims(
 
 /**
  * The artifact_proofs rows of one indexing, written inside the caller's transaction: claims per artifact, the code
- * sha, and the digest of every dependency. A row is re-baselined only when its path is in `refresh` (the artifact's
- * bytes changed); any other row keeps the baseline it was made against, so a re-index never freshens a stale proof.
- * Returns the number of rows written.
+ * sha, and the digest of every dependency. Artifacts are immutable, so a proof row is written once, when its artifact
+ * is first indexed, and keeps the baseline it was made against: a re-index never freshens a stale proof.
+ * `artifacts`: [{artifactId, name, kind, label, abs}]. Returns the number of rows written.
  */
-export function recordArtifactProofs(ledger, { repo, job, payload = {}, envelope = null, rows = [], refresh = null, headSha = null, now = Date.now() }) {
-  const db = ledger.db;
-  if (!hasLedgerTable(db, 'artifact_proofs') || !rows.length) return 0;
-  const known = new Set(db.prepare('SELECT path FROM artifact_proofs WHERE workflow_id=? AND job_id=?').all(job.workflow_id, job.job_id).map((r) => r.path));
-  rows = rows.filter((row) => !known.has(row.path) || refresh?.has(row.path));
+export function recordArtifactProofs(db, { repo, job, payload = {}, envelope = null, artifacts = [], headSha = null, now = Date.now() }) {
+  const known = new Set(artifacts.length ? db.prepare(`SELECT artifact_id FROM artifact_proofs WHERE artifact_id IN (${artifacts.map(() => '?').join(',')})`)
+    .all(...artifacts.map((a) => a.artifactId)).map((r) => r.artifact_id) : []);
+  const rows = artifacts.filter((a) => !known.has(a.artifactId));
   if (!rows.length) return 0;
-  const { job: jobClaims, byPath } = claimsOfJob({ repo, job, payload, envelope, rows });
-  const { code, work } = dependencyPathsOf({ db, job, payload, claims: mergeClaims(jobClaims, ...byPath.values()) });
+  const { job: jobClaims, byArtifact } = claimsOfJob({ repo, job, payload, envelope, rows });
+  const { code, work } = dependencyPathsOf({ db, job, payload, claims: mergeClaims(jobClaims, ...byArtifact.values()) });
   const cd = codeDigester(repo), wd = createWorkDigester(repo);
   const deps = [...code.map((p) => ({ path: p, kind: 'code', digest: cd(p) })), ...work.map((p) => ({ path: p, kind: 'work', digest: wd(p) }))];
   const codeSha = headSha ?? envelope?.head ?? gitHead(repo);
-  const upsert = db.prepare(`INSERT INTO artifact_proofs(workflow_id,job_id,path,claims_json,code_sha,deps_json,created_at) VALUES(?,?,?,?,?,?,?)
-    ON CONFLICT(workflow_id,job_id,path) DO UPDATE SET claims_json=excluded.claims_json,code_sha=excluded.code_sha,deps_json=excluded.deps_json,created_at=excluded.created_at`);
-  for (const row of rows) upsert.run(job.workflow_id, job.job_id, row.path, JSON.stringify(byPath.get(row.path) ?? emptyClaims()), codeSha, JSON.stringify(deps), now);
+  for (const row of rows) recordArtifactProof(db, { artifactId: row.artifactId, claims: byArtifact.get(row.artifactId) ?? emptyClaims(), codeSha, deps, createdAt: now });
   return rows.length;
 }
 
 /**
- * Every indexed artifact of a workflow with its claims and freshness: [{jobId, op, attempt, jobStatus, path, kind,
- * sha256, codeSha, claims, state: fresh|stale|unbaselined, changed[]}]. An artifact indexed without an artifact_proofs
- * row (before this module) is `unbaselined`: it counts as evidence but can never be judged stale.
+ * Every indexed artifact of a workflow with its claims and freshness: [{artifactId, jobId, op, attempt, attemptId,
+ * jobStatus, name, kind, sha256, codeSha, claims, state: fresh|stale|unbaselined, changed[]}]. An artifact without an
+ * artifact_proofs row is `unbaselined`: it counts as evidence but can never be judged stale.
  */
 export function proofArtifactsOf(db, workflowId, { repo }) {
-  if (!hasLedgerTable(db, 'job_artifacts')) return [];
-  const proofs = hasLedgerTable(db, 'artifact_proofs');
-  const rows = db.prepare(`SELECT a.job_id,a.op_id,a.attempt,a.path,a.kind,a.sha256,a.label,j.status AS job_status,j.updated_at AS job_at
-      ${proofs ? ',p.claims_json,p.code_sha,p.deps_json' : ''}
-    FROM job_artifacts a LEFT JOIN jobs j ON j.job_id=a.job_id
-    ${proofs ? 'LEFT JOIN artifact_proofs p ON p.workflow_id=a.workflow_id AND p.job_id=a.job_id AND p.path=a.path' : ''}
-    WHERE a.workflow_id=? ORDER BY a.created_at,a.job_id,a.path`).all(workflowId);
+  const rows = db.prepare(`SELECT a.artifact_id,a.job_id,a.op_id,a.attempt_id,a.name,a.kind,a.sha256,a.label,j.try_no,j.status AS job_status,j.updated_at AS job_at,
+      p.claims_json,p.code_sha,p.deps_json
+    FROM job_artifacts a LEFT JOIN jobs j ON j.job_id=a.job_id LEFT JOIN artifact_proofs p ON p.artifact_id=a.artifact_id
+    WHERE a.workflow_id=? ORDER BY a.artifact_id`).all(workflowId);
   const cd = codeDigester(repo), wd = createWorkDigester(repo);
   const now = new Map();
   const digestOf = (dep) => { const key = `${dep.kind}\0${dep.path}`; if (!now.has(key)) now.set(key, dep.kind === 'work' ? wd(dep.path) : cd(dep.path)); return now.get(key); };
@@ -206,8 +205,8 @@ export function proofArtifactsOf(db, workflowId, { repo }) {
     const claims = r.claims_json ? mergeClaims(parseJson(r.claims_json, {})) : emptyClaims();
     const deps = r.deps_json ? list(parseJson(r.deps_json, [])) : null;
     const changed = deps ? deps.filter((d) => typeof d?.path === 'string' && digestOf(d) !== d.digest).map((d) => d.path) : [];
-    return { jobId: r.job_id, op: r.op_id, attempt: r.attempt, jobStatus: r.job_status ?? null, jobAt: r.job_at ?? null, path: r.path, kind: r.kind, sha256: r.sha256,
-      codeSha: r.code_sha ?? null, claims, state: !deps ? 'unbaselined' : changed.length ? 'stale' : 'fresh', changed };
+    return { artifactId: r.artifact_id, jobId: r.job_id, op: r.op_id, attempt: r.try_no ?? null, attemptId: r.attempt_id, jobStatus: r.job_status ?? null, jobAt: r.job_at ?? null,
+      name: r.name, kind: r.kind, sha256: r.sha256, codeSha: r.code_sha ?? null, claims, state: !deps ? 'unbaselined' : changed.length ? 'stale' : 'fresh', changed };
   });
 }
 
@@ -287,7 +286,7 @@ export function coverageOf(db, workflowId, { repo, briefCases = null, artifacts 
       catch (error) { errors.push({ record: dir, error: String(error?.message ?? error).slice(0, 200) }); }
     }
   }
-  const evidenceView = (a) => ({ jobId: a.jobId, op: a.op, attempt: a.attempt, path: a.path, kind: a.kind, sha256: a.sha256, codeSha: a.codeSha, state: a.state, ...(a.changed.length ? { changed: a.changed } : {}) });
+  const evidenceView = (a) => ({ artifactId: a.artifactId, jobId: a.jobId, op: a.op, attempt: a.attempt, name: a.name, kind: a.kind, sha256: a.sha256, codeSha: a.codeSha, state: a.state, ...(a.changed.length ? { changed: a.changed } : {}) });
   const push = (kind, id, extra) => { const evidence = index.get(itemKey(kind, id)) ?? []; items.push({ kind, id, ...extra, status: statusOf(evidence), evidence: evidence.map(evidenceView) }); };
   for (const id of scope.frs) {
     const fr = frRecords.get(id), waived = (fr?.required ?? []).filter((kind) => notCounted.includes(kind)), counted = (fr?.required ?? []).filter((kind) => !notCounted.includes(kind));
@@ -304,42 +303,33 @@ export function coverageOf(db, workflowId, { repo, briefCases = null, artifacts 
 /** One text line per coverage item, for the human form of api coverage. */
 export const coverageLines = (cov) => [
   `coverage ${cov.workflowId}: ${cov.summary.proven} proven, ${cov.summary.stale} stale, ${cov.summary.missing} missing of ${cov.summary.total}${cov.summary.mustOwed ? `; ${cov.summary.mustOwed} must-have owed` : ''}`,
-  ...cov.items.map((i) => `  ${i.status.padEnd(7)} ${i.kind.padEnd(5)} ${i.id}${i.must ? ' (must)' : ''}${i.evidence.length ? ` — ${i.evidence.map((e) => `${e.jobId}:${e.path}${e.state === 'stale' ? ` [stale: ${list(e.changed).slice(0, 3).join(', ')}]` : ''}`).slice(0, 3).join('; ')}${i.evidence.length > 3 ? ` (+${i.evidence.length - 3})` : ''}` : ''}`),
+  ...cov.items.map((i) => `  ${i.status.padEnd(7)} ${i.kind.padEnd(5)} ${i.id}${i.must ? ' (must)' : ''}${i.evidence.length ? ` — ${i.evidence.map((e) => `${e.jobId}:${e.name}${e.state === 'stale' ? ` [stale: ${list(e.changed).slice(0, 3).join(', ')}]` : ''}`).slice(0, 3).join('; ')}${i.evidence.length > 3 ? ` (+${i.evidence.length - 3})` : ''}` : ''}`),
 ];
 
-/** The chain digest of one events row, exactly as engine/triggers.sql computes it. */
-export const eventDigestOf = (prev, row) => sha256(`${prev ?? ''}${row.event_id}${row.kind}${row.payload_json ?? ''}${row.created_at}`);
-
 /**
- * api verify-proofs: re-hash every indexed file, compare it with its ledger row and with the {path, sha256} the chained
- * artifacts-indexed event recorded, and walk the workflow's events digest chain. Returns {ok, files{checked, intact,
- * tampered[{jobId, path, reason, expected, actual?}], unchained}, chain{events, ok, broken[{seq, kind, reason}]}}.
+ * api verify-proofs: re-read every artifact's blob (the store re-hashes it), compare its sha with the {id, sha256} the
+ * chained report-filed / artifacts-indexed events recorded, and walk the workflow's events digest chain (engine/ledger-db.mjs
+ * verifyEventChain). Returns {ok, files{checked, intact, tampered[{artifactId, jobId, name, reason, expected, actual?}],
+ * unchained}, chain{events, ok, brokenAt, broken[{seq, kind, reason}]}}.
  */
-export function verifyProofs(db, workflowId, { repo }) {
-  const events = db.prepare('SELECT seq,event_id,kind,entity_id,payload_json,prev_digest,digest,created_at FROM events WHERE workflow_id=? ORDER BY seq').all(workflowId);
-  const broken = [];
-  let prev = null;
-  for (const e of events) {
-    if ((e.prev_digest ?? null) !== prev) broken.push({ seq: e.seq, kind: e.kind, reason: 'prev_digest does not link to the event before it' });
-    if (eventDigestOf(prev, e) !== e.digest) broken.push({ seq: e.seq, kind: e.kind, reason: 'digest does not match the event row' });
-    prev = e.digest;
-  }
+export function verifyProofs(db, workflowId) {
+  const chain = verifyEventChain(db, workflowId);
   const chained = new Map();
-  for (const e of events) if (e.kind === ARTIFACTS_INDEXED) for (const a of list(parseJson(e.payload_json, {})?.artifacts)) if (a?.path && a?.sha256) chained.set(`${e.entity_id}\0${a.path}`, a.sha256);
-  const rows = hasLedgerTable(db, 'job_artifacts') ? db.prepare('SELECT job_id,path,sha256 FROM job_artifacts WHERE workflow_id=? ORDER BY job_id,path').all(workflowId) : [];
+  for (const e of db.prepare(`SELECT kind,payload_json FROM events WHERE workflow_id=? AND kind IN (${chainedArtifactEvents().map(() => '?').join(',')}) ORDER BY seq`)
+    .all(workflowId, ...chainedArtifactEvents())) for (const a of list(parseJson(e.payload_json, {})?.artifacts)) if (a?.id != null && a?.sha256) chained.set(Number(a.id), a.sha256);
+  const rows = db.prepare('SELECT artifact_id,job_id,name,sha256 FROM job_artifacts WHERE workflow_id=? ORDER BY artifact_id').all(workflowId);
   const tampered = [];
   let unchained = 0;
   for (const r of rows) {
-    const recorded = chained.get(`${r.job_id}\0${r.path}`) ?? null;
+    const recorded = chained.get(r.artifact_id) ?? null;
     if (!recorded) unchained += 1;
-    const expected = recorded ?? r.sha256;
-    let actual = null;
-    try { actual = sha256(fs.readFileSync(path.join(repo, r.path))); } catch { actual = null; }
-    if (actual === null) tampered.push({ jobId: r.job_id, path: r.path, reason: 'missing', expected });
-    else if (actual !== expected) tampered.push({ jobId: r.job_id, path: r.path, reason: 'modified', expected, actual });
-    else if (recorded && r.sha256 !== recorded) tampered.push({ jobId: r.job_id, path: r.path, reason: 'ledger-row-differs-from-chain', expected: recorded, actual: r.sha256 });
+    const base = { artifactId: r.artifact_id, jobId: r.job_id, name: r.name };
+    let problem = null;
+    try { getBlob(r.sha256); } catch (error) { problem = error?.code === 'ENOENT' ? 'missing' : 'modified'; }
+    if (problem) tampered.push({ ...base, reason: problem, expected: r.sha256 });
+    else if (recorded && recorded !== r.sha256) tampered.push({ ...base, reason: 'ledger-row-differs-from-chain', expected: recorded, actual: r.sha256 });
   }
-  return { schema: PROOF_VERIFY_SCHEMA, workflowId, ok: !tampered.length && !broken.length,
+  return { schema: PROOF_VERIFY_SCHEMA, workflowId, ok: !tampered.length && chain.ok,
     files: { checked: rows.length, intact: rows.length - tampered.length, tampered, unchained },
-    chain: { events: events.length, ok: !broken.length, broken } };
+    chain: { events: chain.count, ok: chain.ok, brokenAt: chain.brokenAt, broken: chain.ok ? [] : [{ seq: chain.brokenAt, kind: null, reason: 'the digest chain breaks at this event' }] } };
 }

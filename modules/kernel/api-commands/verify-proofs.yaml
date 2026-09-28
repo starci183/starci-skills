@@ -2,18 +2,18 @@
 # verb (scripts/kernel/api-extensions.mjs); split out of modules/kernel/api.yaml commands.verify-proofs
 # (lane slim-04).
 purpose: >-
-  Re-hash every indexed proof file and walk the events digest chain; exit 1 on tampering.
+  Re-read every artifact's blob (the store re-hashes it) and walk the events digest chain; exit 1 on tampering.
 args: '--workflow <id> [--json]'
-reads: 'every job_artifacts row of the workflow, the file each names, and the workflow''s events digest chain'
+reads: 'every job_artifacts row of the workflow, the blob each cites, and the workflow''s events digest chain'
 writes: 'nothing — pure projection; exit 1 when anything is tampered or the chain is broken'
 returns:
   schema: starci/proof-verify@1
   ok: 'true when every file matches and the chain holds'
   files: >-
-    {checked, intact, unchained, tampered:[{jobId, path, reason: missing|modified|ledger-row-differs-from-chain,
-    expected, actual?}]} — a file is compared with the sha256 its chained artifacts-indexed event recorded
-    (else its row); unchained counts rows no chained event covers yet
-  chain: '{events, ok, broken:[{seq, kind, reason}]} — every events row re-digested as engine/ledger-db.mjs eventDigest computes it'
+    {checked, intact, unchained, tampered:[{artifactId, jobId, name, reason: missing|modified|ledger-row-differs-from-chain,
+    expected, actual?}]} — a blob must still hash to its sha256, and the row's sha256 must be the one its chained
+    report-filed / artifacts-indexed event recorded; unchained counts rows no chained event covers
+  chain: '{events, ok, brokenAt, broken:[{seq, kind, reason}]} — engine/ledger-db.mjs verifyEventChain'
 refusals:
   workflow-unknown: no workflows row for --workflow
 usedBy: 'the owner and supervisor auditing that a workflow''s proof is the proof that was indexed'

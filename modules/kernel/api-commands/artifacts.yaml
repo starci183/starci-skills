@@ -12,8 +12,8 @@ subkinds: >-
 writes: 'nothing — pure projection'
 returns:
   workflowId: 'the workflow read'
-  total: 'the number of indexed files'
-  jobs: '[{jobId, opId, attempt, cut, status, byKind, bySubkind, artifacts:[{kind, subkind, path (repo-relative), sha256, bytes, mime, label, origin, headSha?, landedSha?, baseSha?, createdAt}]}] — a patch row carries its range; bySubkind counts a null subkind as unknown'
+  total: 'the number of artifacts'
+  jobs: '[{jobId, opId, tryNo, cut, status, byKind, bySubkind, artifacts:[{artifactId, attemptId, role, kind, subkind, name, sha256, bytes, mediaType, label, origin, httpPath (/api/blob/<sha256>), round, runId, baseSha?, headSha?, integratedSha?, createdAt}]}] — a patch/diff row carries its range; bySubkind counts a null subkind as unknown; a Work record cites an artifact by artifactId + sha256'
 refusals:
   artifact-kind-unknown: '--kind is not a job_artifacts kind (engine/ledger-db.mjs JOB_ARTIFACT_KINDS)'
   artifact-subkind-unknown: '--subkind is not a job_artifacts subkind (engine/ledger-db.mjs JOB_ARTIFACT_SUBKINDS)'

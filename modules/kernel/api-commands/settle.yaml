@@ -124,18 +124,16 @@ settle:
     finish` reads that event.
   artifacts: >-
     After every settle - pass, fail, blocked and failed-no-report - and for every job `api archive` drops after it
-    ran, the job's outputs are indexed into job_artifacts (scripts/kernel/job-artifacts.mjs indexJobArtifacts): the report envelope (written once to
-    .starciwork/kernel-evidence/<workflow>/jobs/<job>/report-<report_id>.json), the report file, every Work,
-    media, trace, log or report path its report names and every file of the evidence directory holding one,
-    each with sha256, bytes, mime and label. A named file outside <repo>/.starciwork is copied into that job
-    dir first (origin keeps its source). A job with commits gets <job>.patch there, written once by git
-    format-patch over its owned paths: from the landed sha (landed^..landed for a land.mjs cherry-pick, the
-    job's commits since admission for a verified head), else from the report head, labelled unlanded. The
-    settle appends `artifacts-indexed` {jobId, indexed, added, updated, byKind, copied, patch, artifacts:[{path, sha256}],
-    missing?} - the events digest chain covers every indexed file - and writes each new or changed file's
-    artifact_proofs row: its claims, the code sha and its dependency digests (scripts/kernel/proof-integrity.mjs), and
-    returns `artifacts` on the receipt; an index failure never un-settles. Housekeeping never removes an indexed path
-    (scripts/lib/artifact-hold.mjs).
+    ran, what the settler owns of the attempt is indexed into job_artifacts (scripts/kernel/job-artifacts.mjs
+    indexJobArtifacts), bytes in the blob store, keyed (attempt_id, name), origin settler: patch.diff (git format-patch
+    over the owned paths: from the landed sha, else the report head, labelled unlanded; written in a private temp
+    directory, never in the repository), patch.json + patch.assets/* (the same diff pre-structured, subkind patch-json)
+    and recordings/* (the Playwright video, trace and screenshots its uat-slots runs wrote under
+    STARCI_UAT_RECORDINGS_ROOT). The op's own outputs were filed by api report. Every new artifact of the attempt gets
+    its artifact_proofs row (claims, code sha, dependency digests; scripts/kernel/proof-integrity.mjs) and the settle
+    appends `artifacts-indexed` {jobId, attemptId, indexed, added, proofs, byKind, bySubkind, artifacts:[{id, name,
+    sha256}]} - the events digest chain covers every artifact - and returns `artifacts` on the receipt; an index
+    failure never un-settles. Nothing is copied into .starciwork/kernel-evidence any more.
   proofMedia: >-
     A pass of an op whose manifest declares policy.proofMedia {images, video: required|when-browser} owes
     that visual proof among the files it names, checked before anything is written: at least `images`

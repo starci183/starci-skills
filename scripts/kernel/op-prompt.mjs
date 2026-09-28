@@ -59,10 +59,20 @@ function loggingLines({ skillRoot, packet, jobLabel, repoLabel }) {
 // job's scratch folder; the prompt names the file, the count and the first few.
 export const OWNED_INLINE_MAX = 60;
 export const OWNED_INLINE_CHARS = 6000;
-export const ownedPathsFileOf = (repo, workflowId, jobId, scratchDir = null) => path.join(
-  scratchDir ?? path.join(os.tmpdir(), 'starci-job-scratch', sha256(`${path.resolve(repo)}\0${workflowId}\0${jobId}`)),
-  'owned-paths.txt',
-);
+// THE SCRATCH CONTRACT: every job owns one directory outside every repository, under the OS temp directory,
+// STARCI_JOB_SCRATCH. Dispatch creates it fresh (ensureJobScratch), records it as op_attempts.scratch_dir and puts it
+// in the agent's environment; the op writes its report, raw check output, screenshots, videos, traces and patches
+// there; api report stores what it carries as blobs and deletes the directory (api-lib/report-evidence.mjs).
+export const JOB_SCRATCH_ROOT = 'starci-job-scratch';
+export const jobScratchDirOf = (repo, workflowId, jobId) => path.join(os.tmpdir(), JOB_SCRATCH_ROOT, sha256(`${path.resolve(repo)}\0${workflowId}\0${jobId}`));
+/** The job's scratch, created empty for a new dispatch: what an earlier attempt left there is removed first. */
+export function ensureJobScratch({ repo, workflowId, jobId, fresh = true }) {
+  const dir = jobScratchDirOf(repo, workflowId, jobId);
+  if (fresh) fs.rmSync(dir, { recursive: true, force: true, maxRetries: 3 });
+  fs.mkdirSync(dir, { recursive: true });
+  return dir;
+}
+export const ownedPathsFileOf = (repo, workflowId, jobId, scratchDir = null) => path.join(scratchDir ?? jobScratchDirOf(repo, workflowId, jobId), 'owned-paths.txt');
 export function ownedPathsLine({ paths, repo = null, workflowId = null, jobId = null, scratchDir = null }) {
   if (!paths.length) return 'owned_paths: (per brief write-ceiling)';
   const inline = paths.join(', ');
