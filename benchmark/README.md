@@ -60,7 +60,7 @@ benchmark/
 ## Citing the benchmark
 
 A routing or profile change built on this evidence cites it in the changed file's comment and in its
-`modules/kernel/contract-changes.yaml` entry. Name the snapshot file, the findings note and the specific
+`modules/kernel/contract-changes/<id>.yaml` entry. Name the snapshot file, the findings note and the specific
 figure, for example:
 `benchmark/snapshots/2026-09-25-72h.json: backend.scaffold qwen 92% pass (36 jobs) vs devin 73% (45) vs codex 43% (23); benchmark/findings/2026-09-25.md`.
 A claim with no snapshot behind it is marked `INFERRED`, as the profiles already do. Public benchmark figures

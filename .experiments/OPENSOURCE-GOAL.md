@@ -20,7 +20,7 @@ Not "tests pass" — *a stranger can clone it, run it, understand it, and trust 
 
 | Dimension | Done means |
 |---|---|
-| **Architecture** | `.claude/` is the canonical layout and the runtime: `modules/` contract data (`goal`, `kernel`, `ops`, `models`, `host`, `quality`, `supervisor`, `schemas`), `engine/` mechanism, `scripts/{goal,kernel,route,agent,api,context,checks,example,install}/` executables, `skills/`, `knowledge/`, `docs/`, `bin/starci.mjs`. `node` reads the tree directly. |
+| **Architecture** | `.claude/` is the canonical runtime tree: `modules/` holds contracts (including `reconciler`), `engine/` holds shared mechanisms, and `scripts/reconciler/` owns the host's idempotent controllers. Kernel and Supervisor agents make decisions through durable items; controllers perform the mechanical work. `scripts/` holds executables, with `skills/`, `knowledge/`, `docs/` and `bin/starci.mjs` as the public entry surfaces. `node` reads the tree directly. |
 | **Operating model** | Chat → goal → `[Kernel]` agent (1/project) → `[Op]` agents (1 op = 1 agent) → spine settle → re-plan. Works on any project, not just this repo. |
 | **Durability** | `.starciwork/runtime.sqlite` is the single truth — state survives worktree deletion, reboots, agent churn. Zero input loss, zero lease drift. |
 | **Correctness** | Work-correction policy enforced: wrong business flow → re-run from affected boundary with fresh evidence. No debt ledgers, no stale-evidence assertions. |

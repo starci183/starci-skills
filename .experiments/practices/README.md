@@ -3,9 +3,10 @@
 > **Status: EXPERIMENTAL** — during the draft phase these entries are the
 > primary upgrade mechanism: practice → observe → distill → standard.
 
-Append-only log of what the fleet actually did, what broke, and what standard was
+Referenced practice records of what the fleet did, what broke, and what standard was
 derived from it. This is how `.claude` upgrades: **practice → observe → distill →
-standard**, not theory-first design.
+standard**. Superseded records without contract or code references were pruned on
+2026-09-28; the retained evidence is append-only.
 
 ## Entry format
 
