@@ -1,0 +1,8 @@
+id: api-report-verb
+effectiveAt: '2026-09-28T17:20:00+07:00'
+summary: 'Move worker report validation and filing with its command contract to a per-verb module.'
+paths:
+  - scripts/kernel/api.mjs
+  - scripts/kernel/api-verbs/report.mjs
+  - modules/kernel/api.yaml
+  - modules/kernel/api-commands/report.yaml
