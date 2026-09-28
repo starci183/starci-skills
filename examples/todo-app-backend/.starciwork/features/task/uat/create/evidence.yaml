@@ -7,13 +7,25 @@
 schema: work/evidence@1
 record: uat.task.create
 recordDigest: 13376ae19d9698ca10a0d17638482626c150e267adf3074b19cf7d802c9c753a
-run: runs/20260919T112844Z-5c10a673
+run:
+  id: 20260919T112844Z-5c10a673
+  outcome: pass
+  bundle: 2a9047d6c87fb9745036b25ea5bf74990a77e1d6253db4667bec3ef36161c866
+  result: {name: result.md, sha256: bfb180361c8c54699b473ddeaefeb2ec010e20cea8485d3bb8d820720e1fd383}
+  screens:
+    - {name: screens/owner-list-unchanged-and-cleaned-up.png, sha256: 4fc84318865a53c0f1b5073ce5dffb3836201fbc3a880466f5840bdd4b720d01}
+    - {name: screens/owner-signed-in.png, sha256: 4fc84318865a53c0f1b5073ce5dffb3836201fbc3a880466f5840bdd4b720d01}
+    - {name: screens/screenshot.png, sha256: 4fc84318865a53c0f1b5073ce5dffb3836201fbc3a880466f5840bdd4b720d01}
+    - {name: screens/stranger-delete-refused.png, sha256: 4fc84318865a53c0f1b5073ce5dffb3836201fbc3a880466f5840bdd4b720d01}
+    - {name: screens/task-created.png, sha256: da14082d059864998b9e8f2619b1bf4a275e1ce667bff5ca76b0bcd88639a8e4}
+  videos:
+    - {name: videos/create.webm, sha256: 7f7a0acc77ae08ea11c69a40a56c73c3e24ee081d828a47bb85b8938936ace82}
 outcome: pass
 # The run's own manifest.yaml carries the full asset list with a sha256 per file; these lines repeat
 # only the recording concept 12 refuses a done record for lacking, so the video is named by the record
 # that settles on it and not only by a file inside the run it points at.
 assets:
-  - path: runs/20260919T112844Z-5c10a673/videos/create.webm
+  - name: runs/20260919T112844Z-5c10a673/videos/create.webm
     sha256: 7f7a0acc77ae08ea11c69a40a56c73c3e24ee081d828a47bb85b8938936ace82
 provenance:
   # Same actor caveat as uat.login.sign-in's evidence: neither starci-kernel nor example-evidence wrote
@@ -50,3 +62,5 @@ provenance:
     Playwright's bundled ffmpeg, ms-playwright/ffmpeg-1011). Password fields render as the browser's
     own bullets during capture and page.screenshot masks them whenever present, so no credential is
     in the committed bytes.
+stale: true
+staleReason: the record changed after this evidence was captured (found by check-example-work at the alpha.3 release); it stays as history until the record is proven again.

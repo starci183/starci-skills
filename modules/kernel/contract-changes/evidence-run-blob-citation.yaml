@@ -1,0 +1,13 @@
+id: evidence-run-blob-citation
+effectiveAt: '2026-09-28T23:00:00+07:00'
+summary: >-
+  work/evidence@1 cites agent output in the blob store, never a path into the tree. `run` is an object
+  {id, outcome, bundle, result, screens[], videos[]} whose files are cited by {name, sha256, artifact?}
+  (a UAT run is agent data, ARCHITECTURE-DB §5.2); an `assets[]` item names either a product file by
+  `path` or a blob by `name` + `sha256`. The string `run: runs/<id>` form is gone (clean slate). The example
+  trees were converted: UAT runs, implementation captures and the ledger anchor left .starciwork for the
+  blob store, and evidence whose record or code digest no longer matches is marked stale with a reason.
+reach: new-legs
+paths:
+  - modules/kernel/contract-changes/evidence-run-blob-citation.yaml
+  - modules/schemas/work-evidence.schema.yaml

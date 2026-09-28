@@ -129,12 +129,40 @@ properties:
             same thing - the command and its exit code, the step of the walk and what was on the screen. A
             restatement of the assertion is not an observation; it is the assertion written twice.
   run:
-    type: string
-    pattern: ^runs/[0-9]{8}T[0-9]{6}Z-[a-f0-9]+$
-    description: The one append-only UAT run this manifest settled on, as a path relative to the record's
-      own directory. A done work/uat-flow@1 must name exactly one, and the gate then requires that run to
-      hold at least one screenshot, at least one recording and a result.md reporting a pass. It is a pointer
-      rather than a copy, because the run directory is the evidence and this file is what chose it.
+    type: object
+    additionalProperties: false
+    required:
+      - id
+      - result
+      - screens
+      - videos
+    description: The one UAT run this manifest settled on. A run is agent output (ARCHITECTURE-DB §5.2) - its
+      files are blobs, cited here by sha256 (and the job_artifacts id when api report returned one), never a
+      runs/ directory in the tree. A done work/uat-flow@1 must cite exactly one run with at least one
+      screenshot, at least one recording and a result reporting a pass.
+    properties:
+      id:
+        type: string
+        pattern: ^[0-9]{8}T[0-9]{6}Z-[a-f0-9]+$
+        description: The run id the harness minted.
+      outcome:
+        $ref: "#/$defs/outcome"
+        description: The outcome the run's result recorded, repeated so a reader without the blob store sees it.
+      bundle:
+        $ref: "#/$defs/sha256"
+        description: The starci/blob-bundle@1 manifest of every file of the run (scripts/lib/blob-lookup.mjs putBundle).
+      result:
+        $ref: "#/$defs/blobCitation"
+      screens:
+        type: array
+        minItems: 1
+        items:
+          $ref: "#/$defs/blobCitation"
+      videos:
+        type: array
+        minItems: 1
+        items:
+          $ref: "#/$defs/blobCitation"
   assets:
     type: array
     minItems: 1
@@ -146,12 +174,21 @@ properties:
       type: object
       additionalProperties: false
       required:
-        - path
         - sha256
+      oneOf:
+        - required: [path]
+        - required: [name]
       properties:
         path:
           $ref: "#/$defs/prose"
-          description: The artifact's path relative to the record's own directory.
+          description: A product file's path relative to the record's own directory.
+        name:
+          $ref: "#/$defs/prose"
+          description: The name of an agent-output blob (a run file, a capture) - its bytes are in the blob store.
+        artifact:
+          type: integer
+          minimum: 1
+          description: The job_artifacts id api report returned for the blob (optional; the sha256 is the citation).
         sha256:
           $ref: "#/$defs/sha256"
           description: The artifact's digest, so the manifest is a statement about specific bytes rather
@@ -325,6 +362,21 @@ allOf:
       a contradiction, and it is the shape a green tree hides a red check in. The overall outcome may be
       fail or partial-pass while individual assertions passed; the reverse is refused.
 $defs:
+  blobCitation:
+    type: object
+    additionalProperties: false
+    required:
+      - name
+      - sha256
+    properties:
+      name:
+        type: string
+        minLength: 1
+      artifact:
+        type: integer
+        minimum: 1
+      sha256:
+        $ref: "#/$defs/sha256"
   prose:
     type: string
     minLength: 1

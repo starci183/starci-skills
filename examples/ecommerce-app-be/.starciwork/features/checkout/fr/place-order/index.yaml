@@ -18,7 +18,7 @@ postconditions:
   - A confirmed person has orders - visible through contract.checkout.order-for-identity.
 composes:
   - rule: br.checkout.place-order
-    module: src/modules/bussiness/order
+    module: src/modules/business/order
 
 requiresProof:
   unit:

@@ -16,7 +16,7 @@ postconditions:
   - Nothing is written; the answer reflects what the order service holds at that moment.
 composes:
   - rule: br.identity.account
-    module: src/modules/bussiness/account
+    module: src/modules/business/account
   - rule: br.identity.account
     module: src/modules/integrations/order
 

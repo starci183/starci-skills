@@ -21,3 +21,5 @@ provenance:
   tool: scripts/example-evidence.mjs
   environment: local
   capturedAt: 2026-09-18T09:17:45.073Z
+stale: true
+staleReason: the record changed after this evidence was captured (found by check-example-work at the alpha.3 release); it stays as history until the record is proven again.

@@ -7,13 +7,27 @@
 schema: work/evidence@1
 record: uat.login.sign-in
 recordDigest: dc1ef715c18fe44e72704eb5751b459a0739bccddaa9cd1507371ddd5e1bfd7b
-run: runs/20260918T174721Z-023dd8d9
+run:
+  id: 20260918T174721Z-023dd8d9
+  outcome: pass
+  bundle: 867c59d4f01e39c02c1e82912e89e2c8ca79968fd1d5ea72ff8c578b6896eeed
+  result: {name: result.md, sha256: df06ca5fe85863e0875e668d375b2596e77f36e7555387e804515a4236892916}
+  screens:
+    - {name: screens/empty.png, sha256: 728a1058b8a851c5122aa88d2b745629a63a93b40f61f1be72523a7009b015d8}
+    - {name: screens/filled.png, sha256: 4c5ae88e4a348588b92edf0884416d8ed91c54f7b4b8a37d09d34377d0d92925}
+    - {name: screens/screenshot.png, sha256: 73f209766186662112213cdb1d7aa11d955f34fc7d5a3da4ee181c26513f005d}
+    - {name: screens/session-restores-on-reload.png, sha256: e5349b25acef798226df05018d8bdc5a78d9261f17a43255b7e0d1291910bbd1}
+    - {name: screens/signed-in.png, sha256: 5725afd27a4afdb6c0596eeaa5ad63970220dad856384b94dfa00704f1e4ea86}
+    - {name: screens/task-list-after-sign-in.png, sha256: e5349b25acef798226df05018d8bdc5a78d9261f17a43255b7e0d1291910bbd1}
+    - {name: screens/working-and-refused.png, sha256: 053d5235b12354a948f0d6c2f3f0b37490b7f37c808db69da95e81092d7e6f14}
+  videos:
+    - {name: videos/sign-in.webm, sha256: 7fa50cc65c40f04462686a68af4a676ea4e292da8e61844857bd72a111b7a910}
 outcome: pass
 # The run's own manifest.yaml carries the full asset list with a sha256 per file; these two lines repeat
 # only the recording concept 12 refuses a done record for lacking, so the video is named by the record
 # that settles on it and not only by a file inside the run it points at.
 assets:
-  - path: runs/20260918T174721Z-023dd8d9/videos/sign-in.webm
+  - name: runs/20260918T174721Z-023dd8d9/videos/sign-in.webm
     sha256: 7fa50cc65c40f04462686a68af4a676ea4e292da8e61844857bd72a111b7a910
 provenance:
   # The layout declares exactly two provenance.actor values (schemas/work-layout.yaml's work/evidence@1
@@ -49,3 +63,5 @@ provenance:
     by Playwright's own bundled ffmpeg (ms-playwright/ffmpeg-1011/ffmpeg-win64.exe -v error -i
     sign-in.webm). Inspected frame by frame before tracking: the password field renders as the browser's
     own bullets in every frame, so nothing secret is in the bytes now committed.
+stale: true
+staleReason: the record changed after this evidence was captured (found by check-example-work at the alpha.3 release); it stays as history until the record is proven again.

@@ -7,10 +7,24 @@
 schema: work/evidence@1
 record: uat.plan.upgrade-after-cap
 recordDigest: 0e1d936406c7fc8df16f48a457db56c69fb3b008296b9b3a5b642ba9697ad5f6
-run: runs/20260919T143402Z-5c10a673
+run:
+  id: 20260919T143402Z-5c10a673
+  outcome: fail
+  bundle: edcfd641fb0313195e19ff3360932d679370104923daec3eb2a1b6009a367b60
+  result: {name: result.md, sha256: 47d47d34baac06786a784a90db4f12064af8fdd82153b53b7fc366411d23453b}
+  screens:
+    - {name: screens/owner-seeded-to-cap.png, sha256: 0dcc72c416f06ce7a41477c276ad11d2d1b9af95cd72a06c794da63f270bc1c7}
+    - {name: screens/owner-signed-in.png, sha256: 0dcc72c416f06ce7a41477c276ad11d2d1b9af95cd72a06c794da63f270bc1c7}
+    - {name: screens/run-tasks-deleted-and-verified-absent.png, sha256: a17e37fe857507b91255de5ee999d5a4b47671157cf2856f4bbfaa8affcfe070}
+    - {name: screens/screenshot.png, sha256: a17e37fe857507b91255de5ee999d5a4b47671157cf2856f4bbfaa8affcfe070}
+    - {name: screens/twenty-first-create-refused.png, sha256: 5a0b5584d7c493cd59bcbfa76cdb8341820001421385640f238e25b1b57cd703}
+    - {name: screens/upgrade-action-refused-at-gateway.png, sha256: a17e37fe857507b91255de5ee999d5a4b47671157cf2856f4bbfaa8affcfe070}
+    - {name: screens/usage-shows-at-cap.png, sha256: 3b21bdae8cf9e7aa83fe289c629ce7460b2fa6e9e0bbcb71bcfe85a7631aa356}
+  videos:
+    - {name: videos/upgrade-after-cap.webm, sha256: bca92d92b76f0f58783d59a715bcbbbfc32ad50078eeba86dadba8a20bb47a96}
 outcome: fail
 assets:
-  - path: runs/20260919T143402Z-5c10a673/videos/upgrade-after-cap.webm
+  - name: runs/20260919T143402Z-5c10a673/videos/upgrade-after-cap.webm
     sha256: bca92d92b76f0f58783d59a715bcbbbfc32ad50078eeba86dadba8a20bb47a96
 provenance:
   actor: playwright-harness
@@ -43,3 +57,5 @@ provenance:
     videos/upgrade-after-cap.webm, 161,964 bytes, WebM (EBML header verified), captured by Playwright
     with video: 'on'. Password fields render as the browser's own bullets and page.screenshot masks
     them whenever present; no credential is in the committed bytes.
+stale: true
+staleReason: the record changed after this evidence was captured (found by check-example-work at the alpha.3 release); it stays as history until the record is proven again.

@@ -18,48 +18,56 @@ proves: [ui.recur.schedule]
 # full-page mobile screenshots so enough accent-painted content outranks the fringe, and the
 # re-run canonical render proof holds for every capture.
 assets:
-  - path: assets/capture.mjs
+  - {name: captures/running-page-active-desktop.html, role: markup, sha256: 10d8de9a0c750912a8c9014de0bec11b2e018134cb6a41cecd1a14433fee437f}
+  - {name: captures/running-page-active-mobile.html, role: markup, sha256: fc655f70b3c5389eb2e6115baabdc7025bbfbde095212bfe63b8bf924f8bfd76}
+  - {name: captures/running-page-ended-desktop.html, role: markup, sha256: ed2a99d012d91d86091c58d975edea310c47a44ea1704a8559bab51ea86337bd}
+  - {name: captures/running-page-ended-mobile.html, role: markup, sha256: 4f4782d1f19364b2b45f1d1eade839c17bd6acf7c8968824f444e1e98f2fa1d1}
+  - {name: captures/running-page-no-rule-desktop.html, role: markup, sha256: 6c51cdfcfa71f268526e4ec7375c7c4eab787cdca77b601df42297da02456c42}
+  - {name: captures/running-page-no-rule-mobile.html, role: markup, sha256: 6c51cdfcfa71f268526e4ec7375c7c4eab787cdca77b601df42297da02456c42}
+  - {name: captures/running-page-refused-desktop.html, role: markup, sha256: 037506a2875d4e7f42a3eaabd0f7a5e3c663cc130a3e48196417622899394559}
+  - {name: captures/running-page-refused-mobile.html, role: markup, sha256: b3d7171cbb0503ce3da6e2b42f9028f4534cabf92a8d2768afe4a67ebd699283}
+  - name: captures/capture.mjs
     role: capture-script
     sha256: 3bad35eeb337ced3a659f184b7ae2bea3524fecb6e245d940d8b7d70473c5f8e
     provenance: The replayable Playwright driver that produced every running-page capture below by
       driving the real served build through the page's own controls - no staged DOM.
-  - path: assets/running-page-no-rule-desktop.png
+  - name: captures/running-page-no-rule-desktop.png
     role: running-page
     sha256: 1dc7d6e6c908437ad8e7fd9c2a2ad3ce0c118cedd34ac5070cab6d52f3156797
     provenance: Served build at desktop-1280, no-rule state; markup beside it at
       running-page-no-rule-desktop.html.
-  - path: assets/running-page-refused-desktop.png
+  - name: captures/running-page-refused-desktop.png
     role: running-page
     sha256: 54462dedb8ba46b3b89430245307bb1c97bb1cfaf0f3a537de3fe63dfd78fd50
     provenance: Served build at desktop-1280, refused state - every-n-days submitted with n=0, all
       draft values retained; markup beside it at running-page-refused-desktop.html.
-  - path: assets/running-page-active-desktop.png
+  - name: captures/running-page-active-desktop.png
     role: running-page
     sha256: e410b342362881c1edcd35be5a4f828b58b5176cbf3e7da46d2b1aaedcb23ccd
     provenance: Served build at desktop-1280, active state after a real makeRecurring +
       upcomingOccurrences against the live API; markup beside it at
       running-page-active-desktop.html.
-  - path: assets/running-page-ended-desktop.png
+  - name: captures/running-page-ended-desktop.png
     role: running-page
     sha256: 430131314133edf1039225ecdd23b783900ebf758624856e9cd37187077d40b9
     provenance: Served build at desktop-1280, ended state after a real endRecurrence against the
       live API; markup beside it at running-page-ended-desktop.html.
-  - path: assets/running-page-no-rule-mobile.png
+  - name: captures/running-page-no-rule-mobile.png
     role: running-page
     sha256: e2b58d9e22bff9c8b88e4bdb02acec28faa80d83ca99123b09c35386e8649801
     provenance: Served build at mobile-390, no-rule state - compact header/navigation, fields
       stacked, no horizontal overflow; markup beside it at running-page-no-rule-mobile.html.
-  - path: assets/running-page-refused-mobile.png
+  - name: captures/running-page-refused-mobile.png
     role: running-page
     sha256: 486139f140e0510404fb0fb2b6bc13e159d2ea8ba676b91a255451f90957a8a3
     provenance: Served build at mobile-390, refused state; markup beside it at
       running-page-refused-mobile.html.
-  - path: assets/running-page-active-mobile.png
+  - name: captures/running-page-active-mobile.png
     role: running-page
     sha256: 82a0491f8deb3eccddfb1f8d1615e79e571c1eb97892c2f777215210712a3bfc
     provenance: Served build at mobile-390, active state; markup beside it at
       running-page-active-mobile.html.
-  - path: assets/running-page-ended-mobile.png
+  - name: captures/running-page-ended-mobile.png
     role: running-page
     sha256: 24302dd276469b15704d98ea20f5774927c1604919176a61bdcd6a65f1972e53
     provenance: Served build at mobile-390, ended state; markup beside it at

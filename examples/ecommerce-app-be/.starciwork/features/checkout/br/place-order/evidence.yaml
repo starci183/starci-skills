@@ -7,17 +7,17 @@ recordDigest: 081e342c0b658c567c99a2b64d9de3025fa3f1ff28a28a3d06406bc979122567
 codeDigest:
   algorithm: sha256
   files:
-    - path: src/modules/bussiness/order/checkout.policy.spec.ts
+    - path: src/modules/business/order/checkout.policy.spec.ts
       sha256: a28fe4124a69322de74df7054212635a2939c40e4fb4415830a86c4109cca98a
-    - path: src/modules/bussiness/order/checkout.policy.ts
+    - path: src/modules/business/order/checkout.policy.ts
       sha256: 949480e8253590304fd5347ff64f81e5d60532c818cd32b35c7690abd3f04818
-    - path: src/modules/bussiness/order/order.module-definition.ts
+    - path: src/modules/business/order/order.module-definition.ts
       sha256: d439398712cb22e99772e193f32e46512061b2a87444019b456ab682d3617e2e
-    - path: src/modules/bussiness/order/order.module.ts
+    - path: src/modules/business/order/order.module.ts
       sha256: 9c2e0ffdb126b070e2d0a2e94f6496bd23232d05dda819f81ee7a5f7ac590718
-    - path: src/modules/bussiness/order/order.service.spec.ts
+    - path: src/modules/business/order/order.service.spec.ts
       sha256: b488d6c7683239f4509172e0cc33157182355a5a2af5ffae1e7a914af13b59ce
-    - path: src/modules/bussiness/order/order.service.ts
+    - path: src/modules/business/order/order.service.ts
       sha256: e6925178c210ccfdd10a5531f93fd7bff71c495c202f8e068147f8d7a0135f4b
     - path: src/modules/integrations/identity/identity.client.spec.ts
       sha256: 6ebf873d6e3acdd5d1b840a65b4b0d0fbf810bf2eba75ce78d547001cc62aac6
@@ -58,3 +58,5 @@ provenance:
   tool: scripts/example-evidence.mjs
   environment: local
   capturedAt: 2026-09-19T16:12:40.225Z
+stale: true
+staleReason: the record and the code it owns changed after this evidence was captured (found by check-example-work at the alpha.3 release); it stays as history until the record is proven again.

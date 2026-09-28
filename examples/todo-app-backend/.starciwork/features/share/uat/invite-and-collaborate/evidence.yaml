@@ -6,10 +6,24 @@
 schema: work/evidence@1
 record: uat.share.invite-and-collaborate
 recordDigest: f7f5192c6b5570b55889eb6f5fc7ac85875d2f85f4a0f9f492f33af8d3716f1e
-run: runs/20260919T142709Z-5c10a673
+run:
+  id: 20260919T142709Z-5c10a673
+  outcome: fail
+  bundle: 37402f4a3d2f5452522d2749670efc5b9e312e1e08aee287cc17e806d768bf6b
+  result: {name: result.md, sha256: 7bf9d9ec7e649464d17c67689fd0aadd11a08e3c8dca73baf67cda061a7bbfd2}
+  screens:
+    - {name: screens/editor-and-viewer-invited-pending.png, sha256: 0852ec27820794a4c6f6fc17389a828fe7ec7b5bd998588ab13136781d801acb}
+    - {name: screens/editor-sign-in-finds-no-accept-surface.png, sha256: 56df68b7a77d842cec8afcd19c9bc44d9a47b2c99741469ec57e39eb1bb7d754}
+    - {name: screens/owner-revokes-both-pending-invitations.png, sha256: 51db8a6c18b580ea50590449a1279ee5393702b848665ff5dbb55c8ccb36b022}
+    - {name: screens/owner-signed-in.png, sha256: b3e45d42038725c5baea17d2f83248cea9f09133598d9e8e8c3954a884b17ec5}
+    - {name: screens/screenshot.png, sha256: 244c5d3ce5c0cf102dd5b7f852e94c32845d6a3d920c60cbacd9b0b299e0b5cf}
+    - {name: screens/task-created.png, sha256: da99181eaef6595e6dbdafa1ae8b1ab147840268b9bcb86da09078bd25a6018d}
+    - {name: screens/task-deleted-and-invitation-rows-cleaned.png, sha256: 0d26a6fb67f6d03db127433b9225bf26f5b0fbd400e84a1e53766d1384b574cb}
+  videos:
+    - {name: videos/invite-and-collaborate.webm, sha256: 13937231eea72d42c1c38578b76a837593993f171e1fa718dca5777641a89241}
 outcome: partial-pass
 assets:
-  - path: runs/20260919T142709Z-5c10a673/videos/invite-and-collaborate.webm
+  - name: runs/20260919T142709Z-5c10a673/videos/invite-and-collaborate.webm
     sha256: 13937231eea72d42c1c38578b76a837593993f171e1fa718dca5777641a89241
 provenance:
   actor: playwright-harness
@@ -41,3 +55,5 @@ provenance:
     (Playwright bundled ffmpeg, ms-playwright/ffmpeg-1011). Password fields render as the browser's
     own bullets and page.screenshot masks them whenever present; no credential is in the committed
     bytes.
+stale: true
+staleReason: the record changed after this evidence was captured (found by check-example-work at the alpha.3 release); it stays as history until the record is proven again.

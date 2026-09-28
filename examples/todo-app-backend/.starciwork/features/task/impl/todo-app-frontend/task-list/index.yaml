@@ -29,3 +29,24 @@ verificationSource: observed
 # state only, refused state replacing the task block with assertive text. captures under assets/
 # were produced by assets/capture.mjs (production build, stubbed GraphQL transport, no shared
 # API/Postgres writes) and checked by assets/render-check.mjs.
+# Captures, their markup and the scripts that produced them are agent output in the blob store,
+# cited by sha256 (alpha.3; they were kept under assets/ before).
+assets:
+  - {name: captures/capture.mjs, role: script, sha256: c4383c84ae6612aa8a34ac5bcc1e13e793729f490e894db7c931c1373939f156}
+  - {name: captures/list-empty-desktop-1280.html, role: markup, sha256: 4491a06db8b7ef23d7480802dc971ac50ca9e85e70019349704496ebf1fadbe2}
+  - {name: captures/list-empty-desktop-1280.png, role: capture, sha256: 7f672a022949157207dd465c78329a32771c62d5128df8d22893c1ca7a1132a0}
+  - {name: captures/list-empty-mobile-390.html, role: markup, sha256: 26d9587924768216206673c7d872e059bb0ef4b6da536fdbc7bbed66a8e2fcbc}
+  - {name: captures/list-empty-mobile-390.png, role: capture, sha256: e41a34243f9f40cc71174408fb52f04508769271459b62de440b22be7ced48d6}
+  - {name: captures/list-many-tasks-desktop-1280.html, role: markup, sha256: eb548b9a34cd4a502d807783b0fbe6e5791260670abe63dc1fa56b84691eb736}
+  - {name: captures/list-many-tasks-desktop-1280.png, role: capture, sha256: 4fd927c7aea5e5997257a48d5fe8a8a17f0c0f56814297c2f704072724bbf100}
+  - {name: captures/list-many-tasks-mobile-390.html, role: markup, sha256: 784e41c7b382544c15c0365d6b3dd4f66bf91ca48d5cd2e9a53a431e3783266d}
+  - {name: captures/list-many-tasks-mobile-390.png, role: capture, sha256: 11dbcd443e50fbd986c9771ba3d7d03295a1cc0d9599bd1d9a4a4562d85ddebe}
+  - {name: captures/list-one-task-desktop-1280.html, role: markup, sha256: 27a15b93ff66f177049b9771576e45d7c140d8607c100e05e1548eb50544bc8f}
+  - {name: captures/list-one-task-desktop-1280.png, role: capture, sha256: 0beeb5289a0c4d669b3dc6e0f58e14cd242fa52da6db721abc950e1482971a6a}
+  - {name: captures/list-one-task-mobile-390.html, role: markup, sha256: bbe6afc919e3c2a30ebcefc2534f490d7cf69e05154389a88e4448c63c5c7a1f}
+  - {name: captures/list-one-task-mobile-390.png, role: capture, sha256: ccc060121fc8f38fa8aafc7e61b86d2c8abfb15b3904d40580fdd4d270e5d34f}
+  - {name: captures/list-refused-desktop-1280.html, role: markup, sha256: 14477e84ba0608fc6c494ef254106c8f70198dccb0b00688d072dd9ee103b997}
+  - {name: captures/list-refused-desktop-1280.png, role: capture, sha256: 41fdf34fe17461a7e61416f9b51b85d5303e150eb20d69e861290781a68aa11b}
+  - {name: captures/list-refused-mobile-390.html, role: markup, sha256: 14477e84ba0608fc6c494ef254106c8f70198dccb0b00688d072dd9ee103b997}
+  - {name: captures/list-refused-mobile-390.png, role: capture, sha256: cc700eccda6c7301d93d720a0ef025d15e54415e994151f05230d340d166ce03}
+  - {name: captures/render-check.mjs, role: script, sha256: d42c2835b00742c12e41d6405c9737b6ee07dd9a060cc40ba7cc798eb89ac77f}

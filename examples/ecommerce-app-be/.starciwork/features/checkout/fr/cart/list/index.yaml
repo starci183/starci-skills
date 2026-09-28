@@ -13,7 +13,7 @@ postconditions:
   - Nothing is written; the answer reflects what the cart and the catalog hold at that moment.
 composes:
   - rule: br.checkout.cart
-    module: src/modules/bussiness/cart
+    module: src/modules/business/cart
 
 requiresProof:
   unit:

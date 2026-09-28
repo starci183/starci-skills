@@ -65,3 +65,27 @@ change:
     entity-list-in-card and primary-absent pass on all 10 captures, palette-off-brand fails as
     recorded. Sonar and coverage gates: no runner is configured in this repository - not run,
     never claimed."
+# Captures, their markup and the scripts that produced them are agent output in the blob store,
+# cited by sha256 (alpha.3; they were kept under assets/ before).
+assets:
+  - {name: captures/capture.mjs, role: script, sha256: ecd74271a110889833c5c691147b9f7be5d2639f5d8934198b643079af5568ce}
+  - {name: captures/running-page-accepted-desktop-1280.html, role: markup, sha256: 7256e96d3a4b37e4fa8820646a181d66ab092a13abbe370ec072bb18b0ec81c3}
+  - {name: captures/running-page-accepted-desktop-1280.png, role: capture, sha256: 0c5b990b16cbaa0a056a5f85ea0de3a29af084bf759e52ac24fb427927f66d30}
+  - {name: captures/running-page-accepted-mobile-390.html, role: markup, sha256: 4e88b987355e127288b1335793cfdd5afa01d6de31dbc9d067073634cb476705}
+  - {name: captures/running-page-accepted-mobile-390.png, role: capture, sha256: abf496928f39dec62aa6e311fc72baf9dcd7ed7af755f84ffd046a167afe125a}
+  - {name: captures/running-page-empty-desktop-1280.html, role: markup, sha256: b76db1507db456ca67b9190d84afa5fc366fbd83b480e404275b688dcd86932e}
+  - {name: captures/running-page-empty-desktop-1280.png, role: capture, sha256: 7f2e1e81b9f5b35286139a9011f6dbfc1abd0f0f18945fe1b4e836f120376cf0}
+  - {name: captures/running-page-empty-mobile-390.html, role: markup, sha256: d4388f461e90d3ad83609bae0cec8f4005a9418f2334545136e81adce344fd38}
+  - {name: captures/running-page-empty-mobile-390.png, role: capture, sha256: a6cd40ee0d970b677972268b89309a8cbb6c428479968b8789d9903f8034cd9a}
+  - {name: captures/running-page-inviting-desktop-1280.html, role: markup, sha256: 5d2338e96f65c00acfd1e1b9cbb4725a43108e1bf0539a00e69c4afe3a6b776f}
+  - {name: captures/running-page-inviting-desktop-1280.png, role: capture, sha256: c37a5ff68d79f852c6d101f020316480bd8bf5527c8835b3436688da1588cd68}
+  - {name: captures/running-page-inviting-mobile-390.html, role: markup, sha256: 38d1f92010fa02609fe6890fa8552193067752dda1ec1dc8cae79ed85f56397e}
+  - {name: captures/running-page-inviting-mobile-390.png, role: capture, sha256: 9c3421d3c95d030315071935c323d4dce4665993ea5aa444af2b95b7ded55a18}
+  - {name: captures/running-page-pending-list-desktop-1280.html, role: markup, sha256: fa119bb9f6339a07ffd6fa7dd842e4141ccf90827bdb8ffa983c9d5a3f7bfa7c}
+  - {name: captures/running-page-pending-list-desktop-1280.png, role: capture, sha256: 09868641efc2a09964de947830822af260dd2f0bb31db5b0fab20287724e6b4c}
+  - {name: captures/running-page-pending-list-mobile-390.html, role: markup, sha256: dbd27de5aa9ee571b0e1b8f504afea1b40e2fe52634e747c1e89408966ade0ff}
+  - {name: captures/running-page-pending-list-mobile-390.png, role: capture, sha256: abf496928f39dec62aa6e311fc72baf9dcd7ed7af755f84ffd046a167afe125a}
+  - {name: captures/running-page-refused-desktop-1280.html, role: markup, sha256: 6d8ccf35765cfbd3932e24cf96cadccc7ee50803048714f4ced73b2be1503729}
+  - {name: captures/running-page-refused-desktop-1280.png, role: capture, sha256: ec657ce3408a5c2d92f780c4c56e67b9832dceb6815740f6b04eb768237971ac}
+  - {name: captures/running-page-refused-mobile-390.html, role: markup, sha256: af7144b419a136b4d6281f41bc6896b93e6c212116dfae494acbbb5bbb4fe0f3}
+  - {name: captures/running-page-refused-mobile-390.png, role: capture, sha256: e9215162acbf4268355192932d7954a9faaf0455a2b53de725c5e6127348ce16}

@@ -9,13 +9,26 @@
 schema: work/evidence@1
 record: uat.identity.sign-in
 recordDigest: 617314a75f0cf5fa89ae6b1d64b4369439019939c0d0a90756af2b9d3afd5a02
-run: runs/20260919T152145Z-5c10a673
+run:
+  id: 20260919T152145Z-5c10a673
+  outcome: pass
+  bundle: 33074d60c2a26820ce2097d9025a293fcd823232b2604f1fc5e7baad4b486963
+  result: {name: result.md, sha256: 3042e5170555c6d95564474fed3bad22cf051608cc89256f0e282120d0fb0347}
+  screens:
+    - {name: screens/missing-half-refused.png, sha256: 620c91874dea15667f49250aeec711c31a302b6bdff8c073cbe0706102c97f28}
+    - {name: screens/register-pair.png, sha256: 11949c4b0c62934159a8c4d5533b61ae7cde75ae176eea510e34b0ff05ae7ca1}
+    - {name: screens/screenshot.png, sha256: 7f363c2a32bebef7349b94adbd0e2382be971e7de381998bf9eeb83a28310123}
+    - {name: screens/second-sign-in-new-session.png, sha256: 7f363c2a32bebef7349b94adbd0e2382be971e7de381998bf9eeb83a28310123}
+    - {name: screens/taken-email-conflict.png, sha256: 1fb1aba887441967fe2993247b2500635ab251f154e92b8dc32d4ad7a0fce42c}
+    - {name: screens/wrong-pair-uniform-refusal.png, sha256: ef6c4bb692cf5bda1d8945134f01d853b96c4ab4ff950a4213e2aac7bf879321}
+  videos:
+    - {name: videos/sign-in.webm, sha256: e2bdb6565f16f49afab54bea01cf6e85272050a498c57858301c58588826a85b}
 outcome: pass
 # The run's own manifest.yaml carries the full asset list with a sha256 per file; this entry repeats only
 # the recording concept 12 refuses a done record for lacking, so the video is named by the record that
 # settles on it and not only by a file inside the run it points at.
 assets:
-  - path: runs/20260919T152145Z-5c10a673/videos/sign-in.webm
+  - name: runs/20260919T152145Z-5c10a673/videos/sign-in.webm
     sha256: e2bdb6565f16f49afab54bea01cf6e85272050a498c57858301c58588826a85b
 provenance:
   # Same note as the todo evidence files: the layout's provenance.actor vocabulary has only starci-kernel
@@ -51,3 +64,5 @@ provenance:
     decoding frames with Playwright's bundled ffmpeg (ms-playwright/ffmpeg-1011/ffmpeg-win64.exe -v
     error -i sign-in.webm -vsync 0 -frames:v 5) - zero decode errors. Password fields are masked at
     capture time on every screenshot and video frame, so nothing secret is in the committed bytes.
+stale: true
+staleReason: the record changed after this evidence was captured (found by check-example-work at the alpha.3 release); it stays as history until the record is proven again.

@@ -8,10 +8,25 @@
 schema: work/evidence@1
 record: uat.notify.digest-and-unsubscribe
 recordDigest: 5213e2384e355f91ebab34511023bb54f69f012b29422a8c5651ae7584acd408
-run: runs/20260919T144517Z-5c10a673
+run:
+  id: 20260919T144517Z-5c10a673
+  outcome: fail
+  bundle: 1e71f94fb0449e52e29c20d228eb587a21c6954e9f4500a4225146989156c53a
+  result: {name: result.md, sha256: b13814a9dd76c94e123eca640f5d35f16cbc1f67ea8cd8754842867656bfa429}
+  screens:
+    - {name: screens/cleaned-up.png, sha256: 4bf45025aadca0b642f0635475e0f7133943d94d2c2f6b986c28110cc7ac9704}
+    - {name: screens/digest-flushes-one-message.png, sha256: 9a03dc325ce42eecf1c77e711d03e84a45e677642a6b9bc1d1a692616a4b8d4f}
+    - {name: screens/owner-signed-in.png, sha256: 782ee79686136158ba1db65a47ee6bf3ffb8d09c9d164e9efebc70fabf0db7b0}
+    - {name: screens/preferences-reachable.png, sha256: fd1785db0a5306b16d3e21734d96404cdb36e7c937b7ee8ceb59eb42fe46f122}
+    - {name: screens/screenshot.png, sha256: 4bf45025aadca0b642f0635475e0f7133943d94d2c2f6b986c28110cc7ac9704}
+    - {name: screens/third-event-suppressed.png, sha256: c00d87249e65cb9f75ee5aa1563056911f7cee90023fda15904a19a413651f34}
+    - {name: screens/two-events-one-window.png, sha256: 9a03dc325ce42eecf1c77e711d03e84a45e677642a6b9bc1d1a692616a4b8d4f}
+    - {name: screens/unsubscribed-in-preferences.png, sha256: a1ea056fe5a59447bceec9477a02807a7a02768500ea62001bbb4ad6d19f038d}
+  videos:
+    - {name: videos/digest-and-unsubscribe.webm, sha256: 4b42ffc06f448ae8cc9b345becc95b611367a7ec46910b68ad24acc3d04610e8}
 outcome: partial-pass
 assets:
-  - path: runs/20260919T144517Z-5c10a673/videos/digest-and-unsubscribe.webm
+  - name: runs/20260919T144517Z-5c10a673/videos/digest-and-unsubscribe.webm
     sha256: 4b42ffc06f448ae8cc9b345becc95b611367a7ec46910b68ad24acc3d04610e8
 provenance:
   actor: playwright-harness
@@ -51,3 +66,5 @@ provenance:
     videos/digest-and-unsubscribe.webm, 1,470,781 bytes, WebM, captured by Playwright with video: 'on'.
     Password fields render as the browser's own bullets and page.screenshot masks them whenever
     present; no credential is in the committed bytes.
+stale: true
+staleReason: the record changed after this evidence was captured (found by check-example-work at the alpha.3 release); it stays as history until the record is proven again.

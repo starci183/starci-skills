@@ -8,10 +8,25 @@
 schema: work/evidence@1
 record: uat.checkout.place-order
 recordDigest: 0d35216202eea80d168283cc870d05ac909bf8a05bf83d0c5e810484d42d4363
-run: runs/20260919T155312Z-5c10a673
+run:
+  id: 20260919T155312Z-5c10a673
+  outcome: pass
+  bundle: 92be11c0d984603f6ba4a2d0e904b617cd75891a403702ccb803d236b2ce3c53
+  result: {name: result.md, sha256: 922dc476edf6b94572f4ea2803b746d6479e0ef407f0044ff782a7e8f44ef335}
+  screens:
+    - {name: screens/screenshot.png, sha256: d571699c43235162f894b03d6b5c1a0b17f6fd4d6cd6e8d0c4f46656ebe2459b}
+    - {name: screens/step1-sign-in-and-catalogue.png, sha256: 84917a0404bb079557d69ace01814cbea3fad47f97b063660a1c67253fdb32ea}
+    - {name: screens/step2-add-one-product.png, sha256: c7c7c18a5635a10fef2ba8670dc5d7b64e7880463545bf96b9da4889103f522b}
+    - {name: screens/step3-confirm-order.png, sha256: 88ebb644a9f6b08a674e4bab122567792edcf74c0d12b1f0557ab1d82f51f789}
+    - {name: screens/step4-replay-confirmation.png, sha256: 4ab60638649279a01f364239a8ae5fc2a50b608336f3101dc90dd4cd9065d30a}
+    - {name: screens/step5-confirm-empty-cart.png, sha256: 4d91c4822181e6265b657472cd7a98ef883f91d64ab46a092688f269999ffb25}
+    - {name: screens/step6-beyond-stock-refusal.png, sha256: 644b78f9c020e0f9733a6ff11acb99fe911b57d99ec0b43c067a10b6d5b79d2c}
+    - {name: screens/step7-account-page.png, sha256: 828e0855d83f5d01aa605de79086fa0caf583a73133084ef0d12addba07d38df}
+  videos:
+    - {name: videos/place-order.webm, sha256: 29b07d962ce41df5ee7e91abfe5ed858f613910b382e2097196a5cc2fd21aaa2}
 outcome: pass
 assets:
-  - path: runs/20260919T155312Z-5c10a673/videos/place-order.webm
+  - name: runs/20260919T155312Z-5c10a673/videos/place-order.webm
     sha256: 29b07d962ce41df5ee7e91abfe5ed858f613910b382e2097196a5cc2fd21aaa2
 provenance:
   actor: playwright-harness
@@ -46,3 +61,5 @@ provenance:
     for either - and the run's session was revoked through the product sign-out and verified absent
     (SESSION_INVALID) at the identity verify door. cleanup.json in the run folder carries the same
     accounting.
+stale: true
+staleReason: the record changed after this evidence was captured (found by check-example-work at the alpha.3 release); it stays as history until the record is proven again.
