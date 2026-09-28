@@ -1,0 +1,29 @@
+id: alpha3-release
+effectiveAt: '2026-09-29T00:30:00+07:00'
+summary: >-
+  1.0.0-alpha.3 release summary (CHANGELOG [1.0.0-alpha.3]); the per-change entries it sums up are
+  runtime-db-clean-slate, runtime-db-location, runtime-db-writer-redaction, reconciler-state-in-machine-db,
+  evidence-db-report, evidence-db-blob-store, evidence-db-blobs, evidence-off-starciwork, work-citations,
+  starciwork-product-boundary, a3-lifecycle-verb, a3-work-unit-gate, evidence-run-blob-citation,
+  stacks-root-starcistacks-only, alpha3-stores-in-contracts and a3-7-dead-checks.
+  SCHEMA: two clean-slate databases at user_version 1 - runtime.sqlite (starci/runtime@1,
+  engine/migrations/runtime/0001-init.sql, one per project at %LOCALAPPDATA%/StarCi/projects/<ledger_id>/,
+  written only by engine/ledger-db.mjs) and machine.sqlite (starci/machine@1,
+  engine/migrations/machine/0001-init.sql, %LOCALAPPDATA%/StarCi/machine.sqlite, written only by
+  engine/machine-db.mjs) - plus the blob store ~/.starci/artifacts. work_units / jobs (try_no, retry_of) /
+  op_attempts (dispatch_seq) replace jobs.attempt and jobs.result_json; reports, check_runs (raw exit_code
+  apart from declared_exit_code), job_artifacts and work_citations are immutable or keyed by attempt;
+  workflow_transitions and job_transitions with their triggers refuse any other transition; workflow
+  phases add paused and stopped with lifecycle_changes; conditions, decision_items, api_requests,
+  llm_usage (tokens only), logs with FTS5 and the v_* debugging views are new. machine.sqlite absorbs the
+  Supervisor ledger (sup_*), reconciler.sqlite (engine_*, process_runs, leader_history, schedules,
+  controller_modes + mode_changes, sla_episodes, invariant_violations), and every JSON state file and
+  text log. An older schema is refused with a pointer to scripts/supervisor/comeback.mjs; there is no
+  migrator. API: new verbs api lifecycle (--pause/--stop/--resume; only the owner resumes a stopped
+  workflow) and api unit (--raise-budget, owner or Supervisor only); enqueue --reopen for a passed unit;
+  api report stores the report only in reports and takes attachments from STARCI_JOB_SCRATCH; api check
+  records check_runs and a declared result never counts green; api settle --report is gone. Work
+  records cite agent output by artifact id + sha256, never a path under .starciwork.
+reach: new-legs
+paths:
+  - modules/kernel/contract-changes/alpha3-release.yaml
