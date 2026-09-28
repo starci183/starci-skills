@@ -6,9 +6,9 @@
 // `file:` link left starci-academy-fe on a hand-built dist, while nivo-fe and
 // miamia-fe pinned 0.4.x from the registry and never saw 0.5.0. Every
 // package.json under the repo (node_modules excluded) is read.
-import fs from 'node:fs';
 import path from 'node:path';
 import { readJsonFile } from '../lib/json.mjs';
+import { walkFiles } from './common.mjs';
 
 const PACKAGE = '@starci/grammar';
 const LOCAL = /^(?:file:|link:|portal:|workspace:|\.{0,2}\/|[A-Za-z]:[\\/])/;
@@ -27,21 +27,11 @@ export function grammarPinsOf(manifest) {
 /** All manifests under `repo` that name the grammar: [{file, section, spec, ok, reason}]. */
 export function grammarPinsIn(repo) {
   const out = [];
-  const walk = (dir, depth) => {
-    if (depth > 4) return;
-    let entries = [];
-    try { entries = fs.readdirSync(dir, { withFileTypes: true }); } catch { return; }
-    for (const entry of entries) {
-      if (entry.name === 'node_modules' || entry.name.startsWith('.')) continue;
-      const full = path.join(dir, entry.name);
-      if (entry.isDirectory()) walk(full, depth + 1);
-      else if (entry.name === 'package.json') {
-        const manifest = readJsonFile(full);
-        for (const pin of grammarPinsOf(manifest)) out.push({ file: path.relative(repo, full).split(path.sep).join('/'), ...pin });
-      }
-    }
-  };
-  walk(path.resolve(repo), 0);
+  for (const full of walkFiles(path.resolve(repo), {maxDepth: 4, ignoreReadErrors: true,
+    exclude: name => name === 'node_modules' || name.startsWith('.'), filter: name => name === 'package.json'})) {
+    const manifest = readJsonFile(full);
+    for (const pin of grammarPinsOf(manifest)) out.push({ file: path.relative(repo, full).split(path.sep).join('/'), ...pin });
+  }
   return out;
 }
 

@@ -19,6 +19,7 @@ import {parseYaml} from '../../engine/yaml.mjs';
 import fs from 'node:fs';
 import path from 'node:path';
 import {fileURLToPath} from 'node:url';
+import {walkFiles} from './common.mjs';
 
 const WRAPPER_DIR='scripts/api/orca';
 const ALLOW_FILE='scripts/checks/host-boundary.allow';
@@ -32,14 +33,7 @@ const CODE_ROOTS=['engine','scripts','modules','bin','init','tests','packages'];
 const rel=(root,file)=>path.relative(root,file).replaceAll('\\','/');
 
 function walk(dir,keep,out=[]){
-  let entries;
-  try{entries=fs.readdirSync(dir,{withFileTypes:true});}catch{return out;}
-  for(const entry of entries){
-    if(entry.name==='node_modules'||entry.name.startsWith('.'))continue;
-    const full=path.join(dir,entry.name);
-    if(entry.isDirectory())walk(full,keep,out);
-    else if(keep(full))out.push(full);
-  }
+  out.push(...walkFiles(dir,{filter:(_,full)=>keep(full),exclude:name=>name==='node_modules'||name.startsWith('.'),ignoreReadErrors:true}));
   return out;
 }
 

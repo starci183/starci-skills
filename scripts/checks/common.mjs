@@ -16,19 +16,25 @@ export const isMain = (metaUrl, argv = process.argv) => Boolean(argv[1]) && path
 
 /**
  * Every entry under `dir` that is not a directory, depth-first; `filter` sees the entry name and full
- * path. `sorted` sorts each directory's entries by name (default: readdir order).
+ * path. `sorted` sorts each directory's entries by name (default: readdir order). `exclude`
+ * applies to files and directories before descent; `maxDepth` counts from the starting dir.
  */
-export function walkFiles(dir, {filter = () => true, sorted = false} = {}) {
+export function walkFiles(dir, {filter = () => true, sorted = false, exclude = () => false,
+  maxDepth = Infinity, ignoreReadErrors = false} = {}) {
   const out = [];
-  const visit = (current) => {
-    let entries = fs.readdirSync(current, {withFileTypes: true});
+  const visit = (current, depth) => {
+    if (depth > maxDepth) return;
+    let entries;
+    try { entries = fs.readdirSync(current, {withFileTypes: true}); }
+    catch (error) { if (ignoreReadErrors) return; throw error; }
     if (sorted) entries = entries.sort((a, b) => a.name.localeCompare(b.name));
     for (const entry of entries) {
       const full = path.join(current, entry.name);
-      if (entry.isDirectory()) visit(full);
+      if (exclude(entry.name, full, entry)) continue;
+      if (entry.isDirectory()) visit(full, depth + 1);
       else if (filter(entry.name, full)) out.push(full);
     }
   };
-  visit(dir);
+  visit(dir, 0);
   return out;
 }

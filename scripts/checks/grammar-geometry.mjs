@@ -22,6 +22,7 @@ import path from 'node:path';
 import { createRequire } from 'node:module';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { flag as argOf } from '../work/work-io.mjs';
+import { walkFiles } from './common.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 export const GEOMETRY_CODE = 'GEOMETRY_OFF_GRAMMAR';
@@ -414,18 +415,9 @@ export function installedPackages(repo, name) {
 
 /** Every css file of the repo's own source (build output and installed packages pruned). */
 export function repoCssFiles(repo, maxDepth = 8) {
-  const out = [];
-  const walk = (dir, depth) => {
-    if (depth > maxDepth) return;
-    let entries = [];
-    try { entries = fs.readdirSync(dir, { withFileTypes: true }); } catch { return; }
-    for (const e of entries) {
-      if (e.isDirectory()) { if (!PRUNE.has(e.name) && !e.name.startsWith('.')) walk(path.join(dir, e.name), depth + 1); }
-      else if (e.name.endsWith('.css')) out.push(path.join(dir, e.name));
-    }
-  };
-  walk(repo, 0);
-  return out.sort();
+  return walkFiles(repo, {maxDepth, ignoreReadErrors: true,
+    exclude: (name, _full, entry) => entry.isDirectory() && (PRUNE.has(name) || name.startsWith('.')),
+    filter: name => name.endsWith('.css')}).sort();
 }
 
 const familyScopeRe = (id) => new RegExp(`data-grammar-family\\s*=\\s*["']?${id}["']?\\s*\\]`);
@@ -815,10 +807,7 @@ export function htmlTargets(target) {
   const abs = path.resolve(target);
   if (!fs.existsSync(abs)) return [];
   if (fs.statSync(abs).isFile()) return /\.html?$/i.test(abs) ? [abs] : [];
-  const out = [];
-  const walk = (dir, depth) => { if (depth > 2) return; for (const e of fs.readdirSync(dir, { withFileTypes: true })) { const f = path.join(dir, e.name); if (e.isDirectory()) walk(f, depth + 1); else if (/\.html?$/i.test(e.name)) out.push(f); } };
-  walk(abs, 0);
-  return out.sort();
+  return walkFiles(abs, {maxDepth: 2, filter: name => /\.html?$/i.test(name)}).sort();
 }
 
 /** In-page collector: every rendered element's box, computed geometry and colour (sRGB via canvas). */
