@@ -8,8 +8,8 @@
 //
 // A new decision whose --action-key was already reverted is refused (decision-repeats-failed); so is one whose key
 // is still open (decision-open). Brainstorming beyond api status rca.actions is allowed: invent a key, log it here.
-import { DECISION_KIND, DECISION_RESULT_KIND, decisionsOf, recordKernel, refuse, newId } from '../kernel-authority.mjs';
-import { opJobsOf, unitsOf } from '../progress-rca.mjs';
+import { recordKernel, refuse, newId } from '../kernel-authority.mjs';
+import { DECISION_KIND, DECISION_RESULT_KIND, decisionsOf, opJobsOf, unitsOf } from '../progress-rca.mjs';
 
 const snapshot = (db, wf, now = Date.now()) => {
   const units = unitsOf(opJobsOf(db, wf)).filter((u) => u.state !== 'dropped');

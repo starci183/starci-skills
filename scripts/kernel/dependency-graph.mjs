@@ -45,7 +45,6 @@ import { list } from '../lib/list.mjs';
 
 export const BRIDGE_SCOPE = 'supervisor-bridge';
 export const BRIDGE_SCHEMA = 'starci/supervisor-bridge@1';
-export { TRANSFER_SCHEMA, TRANSFER_SCOPE, readTransfers };
 export const BRIDGE_ACTIONS = Object.freeze(['bridge', 'transfer', 'revise', 'designate']);
 export const FINDING_KINDS = Object.freeze(['circular-wait', 'unowned-need', 'hub-blocker', 'duplicate-work']);
 export const RECORD_CHANGE_REFUSED = 'record-change-refused';

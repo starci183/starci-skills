@@ -25,7 +25,7 @@ import { clipLine } from '../lib/clip.mjs';
 import { leaseCanonicalizer } from './lease-canon.mjs';
 import { familyGuardOf, familyViolations } from './write-families.mjs';
 import { openLogs, appendLog } from './typed-logs.mjs';
-import { DECISION_KIND, DECISION_RESULT_KIND, GRAPH_EDIT_KIND, OPEN_JOB, causesOf, decisionsOf, isShapeCause, progressSettings, reportsOf, unitsOf, opJobsOf } from './progress-rca.mjs';
+import { OPEN_JOB, causesOf, decisionsOf, isShapeCause, progressSettings, reportsOf, unitsOf, opJobsOf } from './progress-rca.mjs';
 import { kernelDecisionItems } from '../reconcile/job-settle.mjs';
 import { CHILD_ENV, refuseDecisionsFirst } from '../reconciler/decisions.mjs';
 
@@ -244,24 +244,19 @@ export function recordKernel(ledger, { workflowId, entityType, entityId, kind, p
 export const settingsN = () => progressSettings().maxUnitsPerEdit;
 
 /**
+ * Refuse a route/dispatch while >= settleBacklog.max filed reports wait unconsumed (an api guard, not a prompt rule).
  * SETTLE-FIRST, the Kernel's half (owner 2026-09-28; narrowed by owner ruling settle-runtime-service): the runtime
  * settles green reports itself (scripts/reconcile/job-settle.mjs), so the backlog counts only the reported jobs of this
  * workflow older than allocation.progress.settleBacklog.ageMs that wait on the Kernel's decision - non-green outcomes
- * and done reports the settler handed over - consumed or not. [{jobId, op, attempt, outcome, reason, ageMin}].
+ * and done reports the settler handed over - consumed or not (job-settle.mjs kernelDecisionItems).
  */
-export function settleBacklogOf(db, workflowId, { now = Date.now(), ageMs = progressSettings().settleBacklog.ageMs } = {}) {
-  return kernelDecisionItems(db, workflowId, { now, ageMs });
-}
-
-/** Refuse a route/dispatch while >= settleBacklog.max filed reports wait unconsumed (an api guard, not a prompt rule). */
 export function refuseSettleBacklog(db, workflowId, verb, { now = Date.now() } = {}) {
   // DECISIONS FIRST (coordinator 2026-09-28, fe-canon): an open, unclaimed Kernel Decision Item older than 2 min refuses
   // route/dispatch too, with the item's exact commands (scripts/reconciler/decisions.mjs refuseDecisionsFirst).
   refuseDecisionsFirst(db, workflowId, verb, { now });
   const s = progressSettings().settleBacklog;
-  const backlog = settleBacklogOf(db, workflowId, { now, ageMs: s.ageMs });
+  const backlog = kernelDecisionItems(db, workflowId, { now, ageMs: s.ageMs });
   if (backlog.length >= s.max) {
     throw Object.assign(new Error(`settle-backlog: ${backlog.length} reported job(s) of ${workflowId} wait on your settle decision for more than ${Math.round(s.ageMs / 60_000)}m - DECIDE THEM FIRST (driver-loop.yaml progress.settleFirst; api status settleDecisions): api settle --job <id> --verdict <fail|blocked from its report>, or re-run its checks (api check) and settle pass, for ${backlog.slice(0, 12).map((b) => `${b.jobId ?? `${b.op}#${b.attempt}`} (${b.outcome}${b.reason ? `, ${b.reason}` : ''}, ${b.ageMin}m)`).join(', ')}; then ${verb} again`), { code: 'settle-backlog', backlog });
   }
 }
-export { DECISION_KIND, DECISION_RESULT_KIND, GRAPH_EDIT_KIND, decisionsOf };

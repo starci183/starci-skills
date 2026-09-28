@@ -41,12 +41,12 @@ import { allocationSettings } from '../../engine/config.mjs';
 import { parseJson } from '../lib/json.mjs';
 import { list } from '../lib/list.mjs';
 import {
-  BRIDGE_SCHEMA, TRANSFER_SCHEMA, dependencyGraph, findingLine, readBridge, readBridges, shortWorkflow, writeBridge, writeTransfer,
+  BRIDGE_SCHEMA, dependencyGraph, findingLine, readBridge, readBridges, shortWorkflow, writeBridge, writeTransfer,
 } from '../kernel/dependency-graph.mjs';
 import {
   FOUNDATION_KINDS, claimFoundation, declareDependent, normalizeFoundationName, readDeclaration, readFoundation, writeDeclaration, writeFoundation,
 } from '../kernel/foundations.mjs';
-import { createOwnership, normWork } from '../kernel/work-ownership.mjs';
+import { TRANSFER_SCHEMA, createOwnership, normWork } from '../kernel/work-ownership.mjs';
 import { SKILL_ROOT, openSupervisorLedger, productRepos, supervisorEvent, supervisorSettings } from './home.mjs';
 
 const selfFile = fileURLToPath(import.meta.url);

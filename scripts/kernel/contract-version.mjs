@@ -44,7 +44,6 @@ import { normWork } from './work-ownership.mjs';
 import { parseJson, withPayload } from '../lib/json.mjs';
 
 export const CONTRACT_VERSION_SCHEMA = 'starci/contract-version@1';
-export { CONTRACT_CHANGES_SCHEMA, CONTRACT_CHANGES_FILE, CONTRACT_CHANGES_DIR, isContractChangesPath } from './contract-changes-store.mjs';
 export const CHANGE_REACH = ['new-legs', 'follow-up'];
 export const CONTRACT_FREEZE_SCHEMA = 'starci/contract-freeze@1';
 export const CONTRACT_FREEZE_FILE = 'modules/kernel/contract-freeze.yaml';

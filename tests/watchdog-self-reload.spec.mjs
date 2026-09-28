@@ -12,8 +12,7 @@ import {
 import { claimOrTakeOver, claimManager, lockHolder, stateFile } from '../scripts/connectors/lib.mjs';
 import { runWatchdogLoop, watchdogLockName, reloadWatchedFiles } from '../scripts/kernel/watchdog.mjs';
 import { runLoop } from '../scripts/supervisor/watchdog.mjs';
-import { watchdogLogFile } from '../scripts/kernel/resume-all.mjs';
-import { watchdogLogFile as sharedLogFile } from '../scripts/kernel/watchdog-log.mjs';
+import { watchdogLogFile, watchdogLogFile as sharedLogFile } from '../scripts/kernel/watchdog-log.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const SHA_A = 'a'.repeat(40), SHA_B = 'b'.repeat(40), SHA_C = 'c'.repeat(40);

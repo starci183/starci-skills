@@ -28,10 +28,7 @@
 //   log                kind log (.log/.txt/.out/.jsonl, the typed-log sidecar)
 import fs from 'node:fs';
 import path from 'node:path';
-import { JOB_ARTIFACT_SUBKINDS } from '../../engine/ledger-db.mjs';
 import { parseYaml } from '../../engine/yaml.mjs';
-
-export { JOB_ARTIFACT_SUBKINDS };
 export const DRAW_RENDER_SCHEMA = 'starci/draw-render@1';
 
 const UAT_OPS = new Set(['uat.verify', 'uat.assisted.prepare', 'uat.assisted.verify']);

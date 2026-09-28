@@ -22,8 +22,6 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { parseYaml } from '../../engine/yaml.mjs';
 import { FAILURE_CLASSES } from './report-envelope.mjs';
-
-export { FAILURE_CLASSES };
 /** The verify ops whose red is, by default, a defect in what they walked or measured - never in the walk. */
 export const VERIFY_OPS = ['uat.verify', 'uat.assisted.verify', 'e2e.verify', 'integration.verify', 'interface.audit', 'review.verify', 'security.verify', 'perf.verify'];
 /** The ops that walk a served stack: `api dispatch` runs the environment pre-step (scripts/uat/env-health.mjs) for them. */

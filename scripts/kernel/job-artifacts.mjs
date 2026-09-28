@@ -170,7 +170,6 @@ const PROOF_DIR = /^(?:E|evidence|runs?|screens?|videos?|traces?|captures?|rende
 // Where scripts/uat/uat-slots.mjs records a Playwright run an op launched without --record-dir (playwright-recording.mjs
 // recordingsRootOf): indexJobArtifacts copies the proof files found there into the job dir, so a browser run's trace and
 // video are indexed even when the op never named them.
-export { RECORDINGS_ROOT_ENV, recordingsRootOf };
 // A directory a report names is walked only when it is (or sits in) an evidence directory: naming a feature
 // or a checkout never links its whole tree to one job.
 const walkable = (work, repo, dir) => (inside(work, dir) ? evidenceDirOf(`${slashed(path.relative(repo, dir))}/x`) !== null

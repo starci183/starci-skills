@@ -170,7 +170,6 @@ export function planWatchdogs({ workflows, watchdogs }) {
 }
 
 // One log file per workflow, shared with the loop's own re-exec (scripts/kernel/watchdog-log.mjs).
-export { watchdogLogFile };
 
 /** Start one watchdog loop detached with --repair, stdout/stderr appended to its log. */
 export function spawnWatchdog({ workflowId, repo }, { env = process.env } = {}) {
