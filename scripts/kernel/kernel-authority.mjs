@@ -26,6 +26,7 @@ import { leaseCanonicalizer } from './lease-canon.mjs';
 import { familyGuardOf, familyViolations } from './write-families.mjs';
 import { openLogs, appendLog } from './typed-logs.mjs';
 import { DECISION_KIND, DECISION_RESULT_KIND, GRAPH_EDIT_KIND, OPEN_JOB, causesOf, decisionsOf, isShapeCause, progressSettings, reportsOf, unitsOf, opJobsOf } from './progress-rca.mjs';
+import { kernelDecisionItems } from '../reconcile/job-settle.mjs';
 
 export const API_FILE = path.join(path.dirname(fileURLToPath(import.meta.url)), 'api.mjs');
 export const OVERRIDE_KIND = 'kernel-op-override';
@@ -241,15 +242,13 @@ export function recordKernel(ledger, { workflowId, entityType, entityId, kind, p
 export const settingsN = () => progressSettings().maxUnitsPerEdit;
 
 /**
- * SETTLE-FIRST (owner 2026-09-28: finished [Op] tabs stayed open because their reports sat unconsumed, so the settle
- * close never fired): the filed reports of this workflow older than allocation.progress.settleBacklog.ageMs that no
- * consume-report took. [{jobId, op, attempt, outcome, ageMin}].
+ * SETTLE-FIRST, the Kernel's half (owner 2026-09-28; narrowed by owner ruling settle-runtime-service): the runtime
+ * settles green reports itself (scripts/reconcile/job-settle.mjs), so the backlog counts only the reported jobs of this
+ * workflow older than allocation.progress.settleBacklog.ageMs that wait on the Kernel's decision - non-green outcomes
+ * and done reports the settler handed over - consumed or not. [{jobId, op, attempt, outcome, reason, ageMin}].
  */
 export function settleBacklogOf(db, workflowId, { now = Date.now(), ageMs = progressSettings().settleBacklog.ageMs } = {}) {
-  return db.prepare(`SELECT r.op_id, r.attempt, r.outcome, r.created_at, j.job_id FROM reports r
-    LEFT JOIN jobs j ON j.workflow_id=r.workflow_id AND j.op_id=r.op_id AND j.attempt=r.attempt AND j.kind='op'
-    WHERE r.workflow_id=? AND r.consumed_at IS NULL AND r.created_at<? ORDER BY r.created_at`).all(workflowId, now - ageMs)
-    .map((r) => ({ jobId: r.job_id ?? null, op: r.op_id, attempt: r.attempt, outcome: r.outcome, ageMin: Math.round((now - Number(r.created_at)) / 60_000) }));
+  return kernelDecisionItems(db, workflowId, { now, ageMs });
 }
 
 /** Refuse a route/dispatch while >= settleBacklog.max filed reports wait unconsumed (an api guard, not a prompt rule). */
@@ -257,7 +256,7 @@ export function refuseSettleBacklog(db, workflowId, verb, { now = Date.now() } =
   const s = progressSettings().settleBacklog;
   const backlog = settleBacklogOf(db, workflowId, { now, ageMs: s.ageMs });
   if (backlog.length >= s.max) {
-    throw Object.assign(new Error(`settle-backlog: ${backlog.length} filed report(s) of ${workflowId} wait unconsumed for more than ${Math.round(s.ageMs / 60_000)}m - SETTLE FIRST (driver-loop.yaml progress.settleFirst): api consume-report --job <id>, then api settle --job <id> --verdict <from its report>, for ${backlog.slice(0, 12).map((b) => `${b.jobId ?? `${b.op}#${b.attempt}`} (${b.outcome}, ${b.ageMin}m)`).join(', ')}; then ${verb} again`), { code: 'settle-backlog', backlog });
+    throw Object.assign(new Error(`settle-backlog: ${backlog.length} reported job(s) of ${workflowId} wait on your settle decision for more than ${Math.round(s.ageMs / 60_000)}m - DECIDE THEM FIRST (driver-loop.yaml progress.settleFirst; api status settleDecisions): api settle --job <id> --verdict <fail|blocked from its report>, or re-run its checks (api check) and settle pass, for ${backlog.slice(0, 12).map((b) => `${b.jobId ?? `${b.op}#${b.attempt}`} (${b.outcome}${b.reason ? `, ${b.reason}` : ''}, ${b.ageMin}m)`).join(', ')}; then ${verb} again`), { code: 'settle-backlog', backlog });
   }
 }
 export { DECISION_KIND, DECISION_RESULT_KIND, GRAPH_EDIT_KIND, decisionsOf };

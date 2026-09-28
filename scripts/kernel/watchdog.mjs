@@ -1,10 +1,12 @@
 #!/usr/bin/env node
 // watchdog.mjs — the maintenance loop of one durable Kernel workflow. It never
-// plans, routes, dispatches, settles a verdict or finishes a workflow.
+// plans, routes, dispatches or finishes a workflow; verdicts are settled by the settler it calls, never by itself.
 //
 //   node scripts/kernel/watchdog.mjs --repo <ledger-owner> --workflow <id> --repair [--interval-ms <ms>] [--json]
 //   node scripts/kernel/watchdog.mjs --repo <ledger-owner> --workflow <id> --once [--repair] [--json]
 //
+// Between ticks the loop starts the runtime settler (scripts/reconcile/job-settle.mjs) every
+// allocation.settler.everyMs: green reports settle without the Kernel's turn (owner ruling settle-runtime-service).
 // A loop always runs --repair; a loop without it is refused (exit 2). --once
 // without --repair is the read-only probe: it reports restart-needed /
 // wake-needed and acts on nothing. --repair continues an approved workflow; it
@@ -114,7 +116,7 @@ export const classifyKernelScreen = classifyAgentScreen;
 
 export const buildWakePrompt = (workflow, attempt = null, revLine = null) => withWakeIdentity([
   `Watchdog liveness wake for ${workflow}: phase=running and the prior model turn returned to the input prompt; act on it now.`,
-  'Re-read canonical api status and survey, handle every filed Op outcome through consume-report/check/settle or its retry/incident route, and work the frontier until nothing is immediately executable.',
+  'Re-read canonical api status and survey. The runtime settles green reports itself; decide every needs-kernel-decision item first (api status settleDecisions: settle it fail/blocked, route its retry or incident, or check+settle what the settler could not verify), then work the ranked actions and the frontier until nothing is immediately executable.',
   `If it is then waiting on an active Op, a lease, a not-before time or a report/message, record the exact wait and yield the model turn immediately; the external watchdog owns the ${Math.round(intervalMs / 60_000)}-minute cadence and wakes this same Kernel.`,
   'Never run Start-Sleep, shell sleep, a timer or an in-turn polling loop.',
   WAKE_BOUNDS,
@@ -261,6 +263,15 @@ export const releaseHeldWorkers = (statusValue, { run = (args) => runNodeJson(ap
       ...(r.ok && v.ok !== false ? {} : { reason: v.reason ?? v.code ?? String(r.stderr || r.stdout || r.error || '').slice(0, 300) }) };
   });
 
+const settlerFile = path.join(skillRoot, 'scripts', 'reconcile', 'job-settle.mjs');
+const SETTLE_EVERY_MS = (() => { try { return allocationMs('settler.everyMs'); } catch { return 60_000; } })();
+/** Start one settler pass for this workflow, detached (scripts/reconcile/job-settle.mjs holds its own pass lock). */
+export const startSettler = ({ repoPath = repo, workflow = workflowId, run = spawn } = {}) => {
+  const child = run(process.execPath, [settlerFile, '--repo', path.resolve(repoPath), '--workflow', workflow, '--json'],
+    { cwd: skillRoot, detached: true, stdio: 'ignore', windowsHide: true });
+  child.unref?.();
+  return child.pid ?? null;
+};
 const housekeepingFile = path.join(skillRoot, 'scripts', 'supervisor', 'housekeeping.mjs');
 /** The persisted edge of the host-resources probe: one housekeeping run per low episode. */
 export const hostResourcesStateFile = (root = skillRoot) => path.join(root, 'runtime', 'guards', 'host-resources.json');
@@ -476,7 +487,7 @@ export const watchdogLockName = (workflow) => `kernel-watchdog-${String(workflow
  * fresh anyway.
  */
 export const reloadWatchedFiles = (root = skillRoot) => [
-  'scripts/kernel/watchdog.mjs', 'scripts/kernel/watchdog-log.mjs', 'scripts/kernel/terminal-liveness.mjs', 'scripts/kernel/wake-delivery.mjs',
+  'scripts/kernel/watchdog.mjs', 'scripts/kernel/watchdog-log.mjs', 'scripts/reconcile/job-settle.mjs', 'scripts/kernel/terminal-liveness.mjs', 'scripts/kernel/wake-delivery.mjs',
   'scripts/kernel/host-outage.mjs', 'scripts/kernel/runtime-rev.mjs', 'scripts/api/orca/terminal-read.mjs', 'scripts/api/orca/lib.mjs', 'scripts/lib/self-reload.mjs',
   'scripts/lib/hide-child-windows.mjs', 'scripts/connectors/lib.mjs', 'engine/config.mjs', 'modules/models/runtimes.yaml',
   'modules/models/agents/claude.yaml', 'modules/models/agents/codex.yaml', 'modules/models/agents/devin.yaml', 'modules/models/agents/qwen.yaml',
@@ -488,14 +499,24 @@ export const reloadWatchedFiles = (root = skillRoot) => [
  * finished?} or {exitCode: 0, reloaded: pid} - the caller then exits without releasing the lock it handed over.
  */
 export async function runWatchdogLoop({ workflow = workflowId, tick, sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms)),
-  print: out = print, interval = intervalMs, watch = null, reload = null, maxIterations = Infinity } = {}) {
+  print: out = print, interval = intervalMs, watch = null, reload = null, maxIterations = Infinity, settle = null, settleEveryMs = null } = {}) {
   let exitCode = 0;
+  // The runtime settler (scripts/reconcile/job-settle.mjs; owner ruling settle-runtime-service) runs every
+  // settleEveryMs between ticks, independent of the Kernel's turn: `settle` only starts it (detached, one pass per
+  // scope at a time), so the loop's cadence never waits on a settle.
+  const wait = async (ms) => {
+    if (!settle || !(settleEveryMs > 0)) return sleep(ms);
+    for (let left = ms; left > 0; left -= settleEveryMs) {
+      try { settle(); } catch { /* the next slice starts it again */ }
+      await sleep(Math.min(settleEveryMs, left));
+    }
+  };
   for (let i = 0; i < maxIterations; i += 1) {
     const result = tick();
     out(result);
     if (!result.ok) exitCode = 1;
     if (ENDED_ACTIONS.has(result.action)) return { exitCode, finished: true };
-    await sleep(interval);
+    await wait(interval);
     const check = watch?.check();
     if (!check?.reload || !reload) continue;
     watch.markAttempt();
@@ -544,7 +565,7 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
     // A log past its cap reloads the loop too: the replacement starts on a rotated file.
     const watch = createReloadWatch({ root: skillRoot, files: reloadWatchedFiles(), lastReloadAt: reloadedAt, logFile: watchdogLogFile(workflowId) });
     const reload = () => reexecSelf({ script: self, args: argv, logFile: watchdogLogFile(workflowId), lockName, cwd: skillRoot });
-    const r = await runWatchdogLoop({ tick, watch, reload });
+    const r = await runWatchdogLoop({ tick, watch, reload, settle: () => startSettler(), settleEveryMs: SETTLE_EVERY_MS });
     if (r.reloaded) process.exit(0);
     process.exitCode = r.exitCode;
   }

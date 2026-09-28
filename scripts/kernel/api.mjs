@@ -105,6 +105,7 @@ import { hostThrottle, noteThrottled, throttleSummary, DISPATCH_THROTTLED } from
 import { slash, pathKey } from '../lib/path-key.mjs';
 import { closeOperationTerminal, closeExitedTerminal } from './close-op-terminal.mjs';
 import { closeAndVerify, closeSelfSafe, orcaAgents, processTable, reapOrphaned } from '../lib/close-verify.mjs';
+import { queueTail as queueSettleTail, startTail as startSettleTail, startSettlerFor } from '../reconcile/job-settle.mjs';
 import { releaseSettledSession, sessionIdentityOf } from './op-session.mjs';
 import { reapAgentProcess } from './reap-agent-process.mjs';
 import { sourceRootOf, withLedgerRead } from '../connectors/lib.mjs';
@@ -8117,6 +8118,45 @@ function typedLogWarningsOf(db, workflowId, { limit = 20 } = {}) {
     .map((e) => { const p = parseJson(e.payload_json) ?? {}; return { jobId: e.entity_id, op: p.op ?? null, attempt: p.attempt ?? null, code: LOG_TYPED_MISSING, level: 'warn', missing: Array.isArray(p.missing) ? p.missing : [], opRows: p.opRows ?? 0, at: e.created_at }; });
 }
 
+/**
+ * The settle's async tail for one settled job (owner ruling settle-runtime-service): session retention, the Telegram
+ * media sender, the input re-baseline, artifact indexing (evidence copy + typed logs). Each step is best effort and
+ * never un-settles; {ok, sessionReleased, artifacts, errors}. Run inline by settle under the test runner, else by
+ * `api settle-tail` (scripts/kernel/api-verbs/settle-tail.mjs), retried by the settler until it succeeds.
+ */
+async function runSettleTail(ledger, job, repo, { verdict = null } = {}) {
+  const db = ledger.db, jobId = job.job_id, errors = [];
+  const payload = jobPayloadOf(job);
+  const settledVerdict = verdict ?? parseJson(job.result_json)?.verdict ?? payload.verdict ?? null;
+  let sessionReleased = null;
+  try {
+    sessionReleased = await releaseSettledSession({ db, job, payload, repo, archiveRoot: allocationSettings()?.housekeeping?.archiveRoot ?? null });
+  } catch (error) { sessionReleased = { released: false, reason: String(error?.message ?? error) }; }
+  if (sessionReleased) {
+    const stored = parseJson(db.prepare('SELECT payload_json FROM jobs WHERE job_id=?').get(jobId)?.payload_json) ?? {};
+    db.prepare('UPDATE jobs SET payload_json=? WHERE job_id=?').run(JSON.stringify({ ...stored, sessionReleased }), jobId);
+  }
+  // The owner sees on Telegram what a draw or UAT op produced (the drawn
+  // screens, the UAT videos): a detached sender, so Telegram never slows or
+  // fails the settle (scripts/connectors/telegram-media.mjs).
+  try { queueSettleMedia({ repo, ledgerFile: ledgerFileFor(repo), workflowId: job.workflow_id, jobId, attempt: job.attempt, op: jobOpOf(job), verdict: settledVerdict, dispatchId: reportDispatchIdOf(db, job) }); }
+  catch (error) { errors.push(`media: ${String(error?.message ?? error).slice(0, 200)}`); }
+  // The product records this job read, re-baselined to the bytes it settled on: its own writes are
+  // its result, and only a later change from outside its workflow makes it stale (input-digests.mjs).
+  try {
+    const contract = db.prepare('SELECT context_json FROM contracts WHERE workflow_id=? AND op_id=? AND attempt=?').get(job.workflow_id, jobOpOf(job), job.attempt);
+    const context = parseJson(contract?.context_json);
+    const rebased = context?.inputs ? baselineWorkInputs(context.inputs, repo, { workDir: workDirOf(repo) }) : null;
+    if (rebased && rebased !== context.inputs) {
+      db.prepare('UPDATE contracts SET context_json=? WHERE workflow_id=? AND op_id=? AND attempt=?')
+        .run(JSON.stringify({ ...context, inputs: rebased }), job.workflow_id, jobOpOf(job), job.attempt);
+    }
+  } catch (error) { errors.push(`baseline: ${String(error?.message ?? error).slice(0, 200)}`); }
+  const artifacts = indexSettledArtifacts(ledger, job, repo);
+  if (artifacts?.error) errors.push(`artifacts: ${String(artifacts.error).slice(0, 200)}`);
+  return { ok: errors.length === 0, sessionReleased, artifacts, errors };
+}
+
 async function cmdSettle(ledger, args, repo) {
   const db = ledger.db, jobId = args.job, verdict = args.verdict;
   let reportAbs = args.report
@@ -8428,49 +8468,36 @@ async function cmdSettle(ledger, args, repo) {
   // job; the ledger row is already the record.
   const taskClosed = closeOperationTask(db, job, settledPayload);
 
-  // Per-op session release (host housekeeping): the settled op's own agent
-  // session files move to the session archive root now that the worker's
-  // custody is proven — never the live kernel's session, never a session
-  // whose terminal is still open, and never an unattributed file
-  // (scripts/kernel/op-session.mjs). A skip or archive failure never
-  // un-settles the job; the receipt is kept on the payload like terminalClosed.
-  let sessionReleased = null;
-  try {
-    sessionReleased = await releaseSettledSession({ db, job, payload: settledPayload, repo,
-      archiveRoot: allocationSettings()?.housekeeping?.archiveRoot ?? null });
-  } catch (error) { sessionReleased = { released: false, reason: String(error?.message ?? error) }; }
-
   // The worker receipt is kept with the Task proof: settle's stdout is the
   // only other place it lived, and an orphaned op terminal left no trace.
-  if (taskClosed || managedWorker || terminalClosed || sessionReleased) {
+  if (taskClosed || managedWorker || terminalClosed) {
     const stored = parseJson(db.prepare('SELECT payload_json FROM jobs WHERE job_id=?').get(jobId)?.payload_json) ?? {};
     db.prepare('UPDATE jobs SET payload_json=?, updated_at=? WHERE job_id=?')
-      .run(JSON.stringify({ ...stored, ...(taskClosed ? { taskClosed } : {}), ...(managedWorker ? { managedWorker } : {}), ...(terminalClosed ? { terminalClosed } : {}), ...(sessionReleased ? { sessionReleased } : {}) }), Date.now(), jobId);
+      .run(JSON.stringify({ ...stored, ...(taskClosed ? { taskClosed } : {}), ...(managedWorker ? { managedWorker } : {}), ...(terminalClosed ? { terminalClosed } : {}) }), Date.now(), jobId);
   }
 
-  // The owner sees on Telegram what a draw or UAT op produced (the drawn
-  // screens, the UAT videos): a detached sender, so Telegram never slows or
-  // fails the settle (scripts/connectors/telegram-media.mjs).
-  try { queueSettleMedia({ repo, ledgerFile: ledgerFileFor(repo), workflowId: job.workflow_id, jobId, attempt: job.attempt, op: jobOpOf(job), verdict, dispatchId: reportDispatchIdOf(db, job) }); } catch { /* never un-settles */ }
+  // LIGHT SETTLE, HEAVY WORK ASYNC (owner ruling settle-runtime-service): everything above is the settle's
+  // synchronous core (verdict, leases, worker release, next-step enqueue, ledger events). The tail - session
+  // retention, the Telegram media, the input re-baseline, artifact indexing with its evidence copy and typed logs -
+  // runs in a detached `api settle-tail` (scripts/kernel/api-verbs/settle-tail.mjs) queued under the ledger's
+  // settle-tail/ dir: it can neither block nor fail the settle, and a failed run is logged and retried by the
+  // settler (scripts/reconcile/job-settle.mjs retryDueTails). Under the test runner, or with --sync-tail, it runs inline.
+  let tail, sessionReleased = null, artifacts = null;
+  if (process.env.NODE_TEST_CONTEXT || args['sync-tail']) {
+    tail = await runSettleTail(ledger, db.prepare('SELECT * FROM jobs WHERE job_id=?').get(jobId) ?? job, repo, { verdict });
+    ({ sessionReleased, artifacts } = tail);
+    tail = { mode: 'sync', ok: tail.ok };
+  } else {
+    let queued = null, pid = null;
+    try { queued = queueSettleTail(repo, jobId); pid = startSettleTail(repo, jobId); } catch (error) { queued = { error: String(error?.message ?? error) }; }
+    tail = { mode: 'async', queued: typeof queued === 'string' ? queued : null, pid, ...(queued?.error ? { error: queued.error } : {}) };
+  }
 
-  // The product records this job read, re-baselined to the bytes it settled on: its own writes are
-  // its result, and only a later change from outside its workflow makes it stale (input-digests.mjs).
-  try {
-    const contract = db.prepare('SELECT context_json FROM contracts WHERE workflow_id=? AND op_id=? AND attempt=?').get(job.workflow_id, jobOpOf(job), job.attempt);
-    const context = parseJson(contract?.context_json);
-    const rebased = context?.inputs ? baselineWorkInputs(context.inputs, repo, { workDir: workDirOf(repo) }) : null;
-    if (rebased && rebased !== context.inputs) {
-      db.prepare('UPDATE contracts SET context_json=? WHERE workflow_id=? AND op_id=? AND attempt=?')
-        .run(JSON.stringify({ ...context, inputs: rebased }), job.workflow_id, jobOpOf(job), job.attempt);
-    }
-  } catch { /* a baseline failure never un-settles; the job then reports no Work staleness */ }
-
-  const artifacts = indexSettledArtifacts(ledger, job, repo);
   const grammarProposals = recordSettledGrammarProposals(ledger, job, repo);
   const assetSlots = recordSettledAssetSlots(ledger, job, repo);
   const revDrift = recordOpRevDrift(ledger, job);
   const status = verdict === 'pass' ? 'succeeded' : 'failed';
-  const out = { ok: true, jobId, verdict, status, awaitingOwner, artifacts, ...(grammarProposals.length ? { grammarProposals: grammarProposals.map(({ name, file, complete }) => ({ name, file, complete })) } : {}), ...(assetSlots.owed.length ? { assetSlotsOwed: assetSlots.owed.map(({ key, html, requested }) => ({ key, html, requested })) } : {}), ...(assetSlots.filled.length ? { assetSlotsFilled: assetSlots.filled.map(({ key, sha256 }) => ({ key, sha256 })) } : {}), report: reportAbs, reportFiled, reportOutcome, checkEvidence, claimOverruled, ...(peerBlocked ? { peerBlocked } : {}), ...(nextStep ? { nextStep } : {}), ...(handoverApproval ? { handoverApproved: { dispatchId: handoverApproval.ask.dispatchId, answeredBy: handoverApproval.ask.answeredBy } } : {}), ...(cutSet ? { cutSet: { id: cutSet.id, total: cutSet.total, closesSet: cutSet.open.length === 0, open: cutSet.open } } : {}), leasesReleased: released, machineRefsReleased: machineReleased, reportsConsumed, terminalClosed, taskClosed, ...(guardUnbound.length ? { guardUnbound } : {}), ...(managedWorker ? { managedWorker } : {}), ...(sessionReleased ? { sessionReleased } : {}), ...(landed?.checked ? { landed: landed.detail } : {}), ...(revDrift ? { opRevDrift: revDrift } : {}) };
+  const out = { ok: true, jobId, verdict, status, awaitingOwner, artifacts, ...(grammarProposals.length ? { grammarProposals: grammarProposals.map(({ name, file, complete }) => ({ name, file, complete })) } : {}), ...(assetSlots.owed.length ? { assetSlotsOwed: assetSlots.owed.map(({ key, html, requested }) => ({ key, html, requested })) } : {}), ...(assetSlots.filled.length ? { assetSlotsFilled: assetSlots.filled.map(({ key, sha256 }) => ({ key, sha256 })) } : {}), report: reportAbs, reportFiled, reportOutcome, checkEvidence, claimOverruled, ...(peerBlocked ? { peerBlocked } : {}), ...(nextStep ? { nextStep } : {}), ...(handoverApproval ? { handoverApproved: { dispatchId: handoverApproval.ask.dispatchId, answeredBy: handoverApproval.ask.answeredBy } } : {}), ...(cutSet ? { cutSet: { id: cutSet.id, total: cutSet.total, closesSet: cutSet.open.length === 0, open: cutSet.open } } : {}), leasesReleased: released, machineRefsReleased: machineReleased, reportsConsumed, terminalClosed, taskClosed, ...(guardUnbound.length ? { guardUnbound } : {}), ...(managedWorker ? { managedWorker } : {}), ...(sessionReleased ? { sessionReleased } : {}), ...(landed?.checked ? { landed: landed.detail } : {}), ...(revDrift ? { opRevDrift: revDrift } : {}), tail };
   if (revDrift) console.error(`api settle WARN ${OP_REV_DRIFT}: ${jobId} (${revDrift.op}) was dispatched under runtime rev ${shortRev(revDrift.from)}; its op contract changed on main by ${shortRev(revDrift.to)}: ${revDrift.files.join(', ')} - judged as admitted, never refused`);
   // A typed --until-job wait on this job, in any workflow of the ledger, may hold now: release it and
   // wake that Kernel instead of leaving it to the next watchdog tick (gate-conditions.mjs).
@@ -9241,6 +9268,10 @@ function cmdReport(ledger, args, repo) {
   // The op terminal gets the canonical human rendering of the filed row — the
   // reports row is the truth, this block is its projection.
   console.log(renderReportBlock(report));
+  // SETTLE AS A RUNTIME SERVICE (owner ruling settle-runtime-service): the settler runs for this job right away,
+  // detached and outside the op's identity, so a green done report settles without waiting for the Kernel's turn and
+  // anything else is handed to the Kernel as needs-kernel-decision (scripts/reconcile/job-settle.mjs).
+  if (!process.env.NODE_TEST_CONTEXT) startSettlerFor(repo, { workflowId: job.workflow_id, jobId: job.job_id });
   releaseWorkerOnReport(ledger, job, jobPayload, report);
 }
 
@@ -9763,10 +9794,12 @@ const refuseOpCaller = (ledger, { cmd, caller, code, detail }) => {
 // New verbs, boolean flags and status fields are files, not edits of the shared lines above
 // (scripts/kernel/api-extensions.mjs; lane land-throughput 2026-09-28).
 const API_EXT = await loadApiExtensions();
+// What an extension verb may call of this module (the settle's async tail: scripts/kernel/api-verbs/settle-tail.mjs).
+const API_INTERNALS = Object.freeze({ runSettleTail });
 let statusAsk = null;
 const runExtensionVerb = async (spec, args, repo) => {
   for (const k of requiredOf(spec, args)) need(args[k], `${spec.verb} needs --${k}`);
-  if (spec.ledger === false) return await spec.run({ ledger: null, args, repo, emit, need, caller: null, ext: API_EXT });
+  if (spec.ledger === false) return await spec.run({ ledger: null, args, repo, emit, need, caller: null, ext: API_EXT, internals: API_INTERNALS });
   let ledger;
   try { ledger = openRepoLedger(repo); } catch (error) {
     console.error(JSON.stringify({ ok: false, error: String(error?.message ?? error) }));
@@ -9777,7 +9810,7 @@ const runExtensionVerb = async (spec, args, repo) => {
     refuseOpCaller(ledger, { cmd: spec.verb, caller, code: 'op-context-refused',
       detail: `'${spec.verb}' is a kernel verb and this caller is operation ${caller.jobId ?? '(unbound)'} (${caller.via}); an op files its own api report and nothing else` });
   }
-  try { return await spec.run({ ledger, args, repo, emit, need, caller, ext: API_EXT }); } catch (error) {
+  try { return await spec.run({ ledger, args, repo, emit, need, caller, ext: API_EXT, internals: API_INTERNALS }); } catch (error) {
     console.error(JSON.stringify({ ok: false, error: String(error?.message ?? error), code: error?.code }));
     process.exit(1);
   } finally { ledger.close(); }

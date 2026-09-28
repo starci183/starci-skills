@@ -46,6 +46,7 @@ import { SNAPSHOT_KIND, tickTelemetry } from './op-metrics.mjs';
 import { runGc, GC_EVENT_KIND, gcSettings, sweepDue } from './gc.mjs';
 import { progressDuty, writeProgressRecords } from './progress-watch.mjs';
 import { notifyKernel } from './notify.mjs';
+import { settleInvariantDuty, settlerSettings } from '../reconcile/job-settle.mjs';
 
 const selfFile = fileURLToPath(import.meta.url);
 
@@ -201,6 +202,16 @@ export async function runSupervisorTick({ repos = null, push = true, heartbeat =
   };
   for (const k of dead) alerts.push({ key: `dead-kernel|${k.workflowId}`, text: `DEAD-KERNEL ${wfName(k.workflowId)}: its watchdog read ${k.action} on the last ${k.count} tick(s) (~${Math.round(k.failingMs / 60_000)}m).` });
   for (const f of stalled) alerts.push({ key: `no-progress|${f.workflowId}`, text: `NO-PROGRESS ${clipLine(f.line, 300)}` });
+  // SETTLE INVARIANT (owner ruling settle-runtime-service): no reported job older than allocation.settler.invariantMaxAgeMs
+  // that the runtime settler neither settled nor handed to the Kernel. A violation is a runtime bug (the settler did not
+  // run or failed): alerted as settle-unsettled-report, and a settler pass is started for its ledger. A run with injected
+  // seams (a spec) checks nothing on the real host unless it injects deps.settleInvariant.
+  const settleFn = deps.settleInvariant ?? (Object.keys(deps).length ? null : settleInvariantDuty);
+  out.settleInvariant = settleFn ? await step('settleInvariant', () => settleFn({ repos: list, now: now() })) : null;
+  const unsettledByRepo = new Map();
+  for (const v of out.settleInvariant?.violations ?? []) unsettledByRepo.set(v.repo, [...(unsettledByRepo.get(v.repo) ?? []), v]);
+  for (const [repo, vs] of unsettledByRepo) alerts.push({ key: `settle-unsettled-report|${repo}`,
+    text: `RUNTIME-BUG settle-unsettled-report ${path.basename(repo)}: ${vs.length} reported job(s) neither settled nor handed to the Kernel after ${Math.round(settlerSettings().invariantMaxAgeMs / 60_000)}m (settler pass started): ${vs.slice(0, 6).map((v) => `${v.jobId} ${v.op} ${v.outcome} ${v.ageMin}m${v.consumed ? ' consumed' : ''}`).join('; ')}` });
   const ledger = openSupervisorLedger({ env });
   let state;
   try { state = readTickState(ledger.db); } finally { ledger.close(); }

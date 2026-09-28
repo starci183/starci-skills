@@ -317,8 +317,24 @@ allocation:
     commandTimeoutMs: 600000
     # settleBacklog: SETTLE-FIRST - api route/dispatch refuse settle-backlog while >= max filed reports older than ageMs
     # wait unconsumed (a finished [Op] keeps its terminal and slot until its settle closes it).
+    # The runtime settles green reports itself (settler below); this refusal counts only the reports waiting on the Kernel
+    # (non-green outcomes and done reports the settler handed over as needs-kernel-decision), consumed or not.
     settleBacklog: {max: 3, ageMs: 120000}
     rca: {minFailures: 3, windowMs: 86400000, examples: 4}
+  # settler (scripts/reconcile/job-settle.mjs; owner ruling settle-runtime-service 2026-09-28): the runtime settles every
+  # filed done report whose declared checks re-verify green through the same `api check` + `api settle` path, from each
+  # workflow watchdog loop every everyMs and right after `api report`. rerunTimeoutMs bounds one declared check re-run and
+  # itemBudgetMs one report. invariantMaxAgeMs: the Supervisor tick asserts no filed/consumed report of a live job stays
+  # unsettled and un-handed-over longer than this (settle-unsettled-report, a runtime bug). releaseWindowMs: settled jobs
+  # this recent whose worker close is unproven are closed and verified. tail: the async settle tail (artifact indexing,
+  # evidence copy, session retention, input baselines, rev drift) retries a failed run after retryMs, up to maxAttempts.
+  settler:
+    everyMs: 60000
+    rerunTimeoutMs: 300000
+    itemBudgetMs: 900000
+    invariantMaxAgeMs: 180000
+    releaseWindowMs: 86400000
+    tail: {retryMs: 120000, maxAttempts: 5}
   # redesign (api redesign; owner 2026-09-28: heavy redesign is dispatched to the op that owns it, and the Kernel stays on
   # Devin): these ops, enqueued from an RCA, route as `routeAs` (implementation.plan: the plan order - Opus, then Sol) at
   # >= minDifficulty at `effort` whatever their usual order (work.author walks the review order, Devin first, otherwise).

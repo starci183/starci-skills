@@ -29,6 +29,7 @@ import { parseJsonOr } from '../lib/json.mjs';
 import { clipLine } from '../lib/clip.mjs';
 import { priorityTable, readThrottleState, throttleStateFile } from '../lib/ram-throttle.mjs';
 import { specsOf } from './spec-deferral.mjs';
+import { kernelDecisionItems } from '../reconcile/job-settle.mjs';
 
 const unitSpecsOff = () => { try { return specsOf({ skillRoot }).unit === false; } catch { return false; } };
 
@@ -153,7 +154,7 @@ export function isPriority(workflowId, prio = priorities()) {
  * The progress block of `api status`. Pure over its inputs: `jobs` (opJobsOf), `core` (the api status out: legs,
  * frontier, ramThrottle, poolLoad, stuck), `createdAt` (the workflow row), `now`, `settings`.
  */
-export function progressOf({ jobs, core = {}, workflowId, createdAt = null, now = Date.now(), settings = progressSettings(), prio = priorities() }) {
+export function progressOf({ jobs, core = {}, workflowId, createdAt = null, now = Date.now(), settings = progressSettings(), prio = priorities(), kernelItems = null }) {
   const units = unitsOf(jobs).filter((u) => u.state !== 'dropped');
   const done = units.filter((u) => u.state === 'done');
   const total = units.length;
@@ -183,10 +184,15 @@ export function progressOf({ jobs, core = {}, workflowId, createdAt = null, now 
     reasons.push(`slow: ${unitsPerHour} units/h < ${minRate}/h${priority ? ' (priority workflow)' : ''}, last unit ${lastDoneAt ? `${Math.round((now - lastDoneAt) / 60_000)}m ago` : 'never'}`);
     since = since == null ? quietSince : Math.min(since, quietSince);
   }
-  // SETTLE-FIRST: reports filed and never consumed hold a slot and a terminal each (core.reports from api status).
-  const unsettled = (core.reports ?? []).filter((r) => !r.consumed_at && now - Number(r.created_at) >= settings.settleBacklog.ageMs);
+  // SETTLE-FIRST, the Kernel's half (owner ruling settle-runtime-service): the runtime settles green reports itself
+  // (scripts/reconcile/job-settle.mjs); what waits is only what it handed to the Kernel - non-green outcomes and done
+  // reports it could not verify (`kernelItems`, oldest first, already aged past settleBacklog.ageMs). Without them
+  // (a caller that passes none) the old reading stands: filed reports never consumed.
+  const unsettled = kernelItems
+    ? kernelItems.map((k) => ({ job_id: k.jobId, created_at: now - k.ageMin * 60_000, reason: k.reason }))
+    : (core.reports ?? []).filter((r) => !r.consumed_at && now - Number(r.created_at) >= settings.settleBacklog.ageMs);
   if (unsettled.length) {
-    reasons.push(`unsettled: ${unsettled.length} filed report(s) not consumed/settled (their [Op] terminals and slots stay held)`);
+    reasons.push(`needs-kernel-decision: ${unsettled.length} reported job(s) wait on the Kernel's settle decision (their slots stay held)`);
     const oldest = Math.min(...unsettled.map((r) => Number(r.created_at)));
     since = since == null ? oldest : Math.min(since, oldest);
   }
@@ -198,6 +204,7 @@ export function progressOf({ jobs, core = {}, workflowId, createdAt = null, now 
     unitsPerHour, minUnitsPerHour: minRate, share: total ? Math.round(done.length / total * 1000) / 1000 : null,
     legs: { done: legsDone, total: legs.length },
     unsettledReports: unsettled.map((r) => r.job_id ?? r.dispatch_id),
+    settleDecisions: kernelItems ?? null,
     running, allowedParallel: par.allowed, parallelCap: par.cap, parallelWhy: par.why, queuedReady, readyJobs,
     etaHours: remaining === 0 ? 0 : etaRate > 0 ? Math.round(remaining / etaRate * 10) / 10 : null,
     eta: remaining === 0 ? new Date(now).toISOString() : etaRate > 0 ? new Date(now + remaining / etaRate * HOUR).toISOString() : null,
@@ -362,12 +369,16 @@ export function actionsOf({ progress, rca, units = [], workflowId, repo = '<repo
   const lastFailedOf = (u) => [...u.jobs].reverse().find((j) => j.status === 'failed') ?? null;
   const cl = new Map((rca?.clusters ?? []).map((c) => [c.cause, c]));
 
-  // 0. SETTLE FIRST: a filed report nobody consumed keeps its terminal, its slot and its unit's verdict hostage.
+  // 0. NEEDS-KERNEL-DECISION first (owner ruling settle-runtime-service): the runtime settled every green report; what
+  // is left is a judgment - a blocked/failed/ask/partial outcome, or a done report whose checks the settler could not
+  // re-verify. Each keeps its slot and its unit's verdict hostage until the Kernel decides it.
   if (progress?.unsettledReports?.length) {
     const ids = progress.unsettledReports.filter(Boolean);
-    add({ key: actionKey('settle-backlog', ids.length), tier: 'light', cause: 'unsettled-reports', unblocks: 1000 + ids.length,
-      title: `consume + settle ${ids.length} filed report(s) BEFORE any route or dispatch (api route/dispatch refuse settle-backlog meanwhile)`,
-      command: ids.slice(0, 20).map((id) => `${api} consume-report --repo ${q(repo)} --job ${id} && ${api} settle --repo ${q(repo)} --job ${id} --verdict <pass|fail|blocked from its report>`).join(' ; '),
+    const items = progress.settleDecisions ?? ids.map((id) => ({ jobId: id, outcome: null, reason: null }));
+    const verdictOf = (it) => (it.outcome === 'done' ? 'pass' : it.outcome === 'blocked' || it.outcome === 'ask' ? 'blocked' : it.outcome ? 'fail' : '<pass|fail|blocked from its report>');
+    add({ key: actionKey('settle-backlog', ids.length), tier: 'light', cause: 'needs-kernel-decision', unblocks: 1000 + ids.length,
+      title: `decide ${ids.length} needs-kernel-decision settle(s) BEFORE any route or dispatch (api route/dispatch refuse settle-backlog meanwhile): ${items.slice(0, 8).map((it) => `${it.jobId}${it.reason ? ` [${it.reason}]` : ''}`).join(', ')}`,
+      command: items.slice(0, 20).map((it) => `${it.outcome === 'done' ? `${api} check --repo ${q(repo)} --job ${it.jobId} --checks-file <your re-run> && ` : ''}${api} settle --repo ${q(repo)} --job ${it.jobId} --verdict ${verdictOf(it)}`).join(' ; '),
       expected: 'each settle closes its [Op] terminal (verified close), frees its slot and lets the unit count or route its repair' });
   }
   // 1. parallelism: the cheapest, most certain win.
@@ -538,7 +549,9 @@ export function missingQueuedOf(units, resolve) {
 export function workflowView({ db, workflowId, core = {}, repo, now = Date.now(), settings = progressSettings(), resolve = null }) {
   const wf = db.prepare('SELECT created_at FROM workflows WHERE workflow_id=?').get(workflowId);
   const jobs = opJobsOf(db, workflowId);
-  const progress = progressOf({ jobs, core, workflowId, createdAt: wf?.created_at ?? null, now, settings });
+  let kernelItems = null;
+  try { kernelItems = kernelDecisionItems(db, workflowId, { now, ageMs: settings.settleBacklog.ageMs }); } catch { kernelItems = null; }
+  const progress = progressOf({ jobs, core, workflowId, createdAt: wf?.created_at ?? null, now, settings, kernelItems });
   const reports = reportsOf(db, workflowId);
   const rca = rcaOf({ jobs, reports, now, settings, stalled: progress.stall.stalled });
   const units = unitsOf(jobs);

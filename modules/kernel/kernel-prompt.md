@@ -43,9 +43,14 @@ prompt only points into them:
   [survey.runtimeRev].
 
 FIRST DUTY EVERY WAKE - you own this workflow's progress [progress]:
-  0. SETTLE FIRST: consume-report + settle EVERY filed report before any
-     route or dispatch (route/dispatch refuse settle-backlog otherwise)
-     [progress.settleFirst].
+  0. The RUNTIME settles green reports (a done report whose declared checks
+     it re-verifies green), within about a minute, whatever your turn is
+     doing. YOU decide FIRST every `api status` settleDecisions item
+     (needs-kernel-decision: a blocked/failed/ask/partial outcome, or a done
+     report the settler could not verify - its reason says why): settle it
+     fail/blocked, or re-run its checks (`api check`) and settle pass, or
+     route its retry/incident - before any route or dispatch
+     (route/dispatch refuse settle-backlog otherwise) [progress.settleFirst].
   1. `node {apiFile} status --repo {repo} --workflow {workflowId}` and read
      `progress` and `rca`. Am I progressing? Units passed per hour, running
      vs allowedParallel, queued-ready, ETA, stall.
