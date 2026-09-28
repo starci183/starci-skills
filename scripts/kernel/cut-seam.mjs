@@ -289,7 +289,7 @@ export function relocationOf(finding, relocations) {
  * without a shared-root file.
  */
 export const REPOINT_BRIEF = 'repoint imports to the new locations; no other change';
-export function canonCutPlanOf(scan, { cutId, op = CANON_OP, policy = null, importersOf = null } = {}) {
+export function canonCutPlanOf(scan, { cutId, op = CANON_OP, policy = null, importersOf = null, scanFile = null } = {}) {
   const { relocations, sharedRoots } = policy ?? canonConformancePolicy();
   const findings = scan?.findings ?? [];
   const slices = (scan?.slices ?? []).map((slice) => ({ ordinal: Number(slice.ordinal), wave: String(slice.wave), paths: [...slice.paths], grants: [] }));
@@ -356,7 +356,7 @@ export function canonCutPlanOf(scan, { cutId, op = CANON_OP, policy = null, impo
   const commands = [];
   for (const [index, wave] of waves.entries()) {
     for (const slice of out.filter((item) => item.wave === wave)) {
-      commands.push(`api enqueue --op ${op} --paths ${slice.owned.join(',')} --cut-id ${cutId} --cut-ordinal ${slice.ordinal} --cut-total ${total}`
+      commands.push(`api enqueue --op ${op} --paths ${slice.owned.join(',')} --cut-id ${cutId} --cut-ordinal ${slice.ordinal} --cut-total ${total} --canon-scan ${scanFile ?? '<this scan file>'}`
         + (index ? ` --after <every job of wave ${waves[index - 1]} and its canon-wire leg>` : ''));
     }
     const wire = wires.find((item) => item.wave === wave);
@@ -499,7 +499,7 @@ async function main(argv) {
     const root = flag('root') ?? scan.repository ?? null;
     const { importersOf } = await import('./import-scan.mjs');
     const scanImporters = root && fs.existsSync(path.join(root, '.git')) ? (moved) => importersOf(root, moved) : null;
-    console.log(JSON.stringify(canonCutPlanOf(scan, { cutId: flag('cut-id') ?? 'canon', importersOf: scanImporters }), null, 2));
+    console.log(JSON.stringify(canonCutPlanOf(scan, { cutId: flag('cut-id') ?? 'canon', importersOf: scanImporters, scanFile: path.resolve(flag('scan')) }), null, 2));
     return 0;
   }
   if (verb === 'canon-redispatch' && flag('repo') && flag('job')) {
