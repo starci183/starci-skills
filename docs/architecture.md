@@ -21,8 +21,8 @@ Every kernel state operation is one command:
 node scripts/kernel/api.mjs <verb> --repo <path> [...]
 ```
 
-`modules/kernel/api.yaml` `commands:` names every verb with its arguments,
-reads, writes and refusal strings. Reads return projections. Each write runs
+`modules/kernel/api.yaml` `commands:` and `modules/kernel/api-commands/<verb>.yaml`
+together name every verb with its arguments, reads, writes and refusal strings. Reads return projections. Each write runs
 inside one `BEGIN IMMEDIATE` transaction and appends one hash-chained event. A
 refusal exits non-zero with `{ok:false, reason}` — a refusal is a fact the
 driver loop routes, never a crash.
@@ -52,8 +52,8 @@ the same durable Kernel hierarchy regardless of launch adapter.
 `<repo>/.starciwork/runtime.sqlite` is the record: workflows, goals, jobs,
 leases, budgets, reports, contracts, inbox, signals and the hash-chained
 `events` log. The DDL is data — `engine/schema.sql` — opened only through
-`engine/ledger-db.mjs`. A parallel `machine.sqlite` holds only the cross-ledger
-provider-quota arbiter. See [ledger-db](ledger-db.md). Dispatch artifacts
+`engine/ledger-db.mjs`. A parallel `machine.sqlite` holds the host ledger
+registry; its resource and budget tables are reserved. See [ledger-db](ledger-db.md). Dispatch artifacts
 stage in the OS temp dir and are removed once delivered.
 
 ## The loop
@@ -65,9 +65,12 @@ survey → plan → enqueue → drive { status → dispatch → wait → settle 
 ```
 
 The kernel re-derives the frontier from ledger state each tick — never from
-memory of what it sent. A five-minute liveness watchdog may wake the same
-Kernel terminal after a provider turn returns to its input prompt, but it never
-chooses workflow work. A connected operation terminal at an input prompt is
+memory of what it sent. The reconciler Host controller, or the fallback liveness
+watchdog when that concern is not active, may wake the same Kernel terminal
+after a provider turn returns to its input prompt. Neither chooses workflow work.
+See [workflow kernel](workflow-kernel.md) for the ownership handoff.
+
+A connected operation terminal at an input prompt is
 `turn-idle`, not active; the Kernel uses `nudge` to resume that exact worker
 without creating a replacement job, lease, retry, or authority. `observe`
 gives the Kernel a read-only screen tail of its own job's op terminal —

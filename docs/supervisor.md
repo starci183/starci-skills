@@ -2,6 +2,9 @@
 
 One Supervisor seat, `[Worker]` fix agents spawned on demand, one land gate. The contract is
 `modules/supervisor/supervise.yaml` (`chatSeat`, `kernelSeat`, `workers`, `landGate`, `chat`); this note is the map.
+The reconciler owns selected Host, Job, Fleet and notification concerns when its
+controller is active; the old tick and watchdog yield those duties according to
+`modules/reconciler/reconciler.yaml` and `scripts/reconciler/owns.mjs`.
 
 ## Mode
 
@@ -51,7 +54,8 @@ node scripts/supervisor/start-supervisor.mjs --stop     # disable: watchdog and 
 A singleton by three fences: a host lock around every launch, the seat signal (a 'starting' reservation, then
 the attested terminal; a live seat is never replaced, an Orca outage proves nothing), and a dedupe of every
 terminal titled `[Supervisor]` (with no live seat a live one is adopted, the rest are closed). `resume-all`
-(the StarCi-Resume-Every10m task), `restart-all` and `/restart` keep its watchdog running while it is enabled.
+(the StarCi-Resume-Every10m task), `restart-all` and `/restart` keep the seat covered while it is enabled.
+The old Supervisor watchdog loop exits while the reconciler owns `host.supervisor-seat`.
 
 The same `--install-startup --apply` installs the daily `StarCi-Housekeeping` task, which runs
 `scripts/supervisor/housekeeping.mjs --apply`: the one host sweep of the storage contract — `%TEMP%` fixtures,
