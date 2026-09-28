@@ -27,7 +27,10 @@ import { claimDue, finishDuty } from '../schedules.mjs';
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..', '..');
 const NAME = 'gc';
 const OWNER = 'reconciler/gc';
-export const DEFAULTS = Object.freeze({ resyncMs: 60_000, concurrency: 2, housekeepingEveryMs: 86_400_000, lowResourceGapMs: 3_600_000, eventGraceMs: 60_000 });
+export const DEFAULTS = Object.freeze({ resyncMs: 60_000, concurrency: 2, housekeepingEveryMs: 86_400_000, lowResourceGapMs: 3_600_000, eventGraceMs: 60_000,
+  eventMaxTries: 6, ownerlessEscalateMs: 21_600_000 });
+/** MB-14: a retry lands this long after the grace window closes, never exactly on its edge. */
+export const GRACE_MARGIN_MS = 5_000;
 const LIVE_JOB = new Set(['queued', 'leased', 'running', 'answering', 'effect_unknown']);
 const SETTLED = new Set(['succeeded', 'failed', 'cancelled']);
 const SUP_FINAL = new Set(['succeeded', 'failed', 'cancelled']);
@@ -86,6 +89,16 @@ const liveDeps = {
   lesson: async (args) => (await import('../../supervisor/lessons.mjs')).recordLeftover(args),
   removeStaging: async (args) => (await import('../../supervisor/workers.mjs')).removeStaging(args),
   stagingExists: async (jobId) => fs.existsSync((await import('../../supervisor/workers.mjs')).stagingPathOf(jobId)),
+  // MB-13/MB-14 (G4): every GC item's final outcome in machine.sqlite gc_runs / gc_items, through the one writer.
+  recordRun: async ({ trigger, report = null, items = [] }) => {
+    const { withMachine } = await import('../../../engine/machine-db.mjs');
+    return withMachine((m) => m.transaction(() => {
+      const runId = m.startGcRun({ trigger });
+      for (const it of items) m.recordGcItem({ runId, ...it });
+      m.finishGcRun(runId, { counts: report?.counts ?? null, errors: report?.errors ?? null, freedBytes: report?.counts?.freedBytes ?? null, report });
+      return runId;
+    }));
+  },
   recordSweep: async (report) => {
     const { openSupervisorLedger, supervisorEvent } = await import('../../supervisor/home.mjs');
     const { GC_EVENT_KIND } = await import('../../supervisor/gc.mjs');
@@ -95,6 +108,16 @@ const liveDeps = {
   },
 };
 
+/** One sweep report item as a gc_items row (G4): the action taken and its final outcome. Pure. */
+export function sweepItem(i) {
+  const failed = i.ok === false, done = i.ok === true;
+  const acted = { 'close-terminal': 'closed', 'kill-tree': 'killed' }[i.action] ?? 'removed';
+  const action = i.verdict === 'refuse' ? 'refuse' : i.verdict === 'keep' ? 'keep' : failed ? 'failed' : done ? acted : 'collect';
+  return { collector: 'gc-sweep', kind: String(i.class ?? 'unknown'), target: String(i.target ?? ''), ownerRef: i.owner ?? null, action, reason: i.reason ?? null,
+    bytes: Number(i.bytes ?? i.ramBytes) || null, ageMs: i.firstSeenAt ? Math.max(0, Date.now() - Number(i.firstSeenAt)) : null,
+    outcome: failed ? 'gave-up' : done ? 'done' : 'dropped', ...(failed ? { lastError: String(i.error ?? 'failed').slice(0, 300) } : {}) };
+}
+
 /* ------------------------------------------------------------ the controller */
 
 export function createGcController(overrides = {}) {
@@ -102,6 +125,41 @@ export function createGcController(overrides = {}) {
   const settings = { ...gcControllerSettings(), ...(overrides.settings ?? {}) };
 
   const would = (ctx, action, target, data = {}) => ctx.log(WOULD, `${action} ${target}`, { controller: NAME, action, target, ...data });
+  const tries = new Map(); // key -> grace waits so far (per engine process; the final outcome is durable in gc_items)
+
+  /** Record GC items (active only: shadow changed nothing). Never throws; a failed write is one error row. */
+  async function record(ctx, trigger, items, report = null) {
+    if (ctx.mode !== 'active' || !items.length) return null;
+    try { return await deps.recordRun({ trigger, report, items }); }
+    catch (error) { ctx.log('reconciler.gc.record.error', `gc_items write failed: ${String(error?.message ?? error).slice(0, 200)}`, { controller: NAME }); return null; }
+  }
+
+  /**
+   * MB-14: an entity changed inside the grace window is re-queued for grace - age + GRACE_MARGIN_MS (not a full grace,
+   * not an error). After eventMaxTries waits it is given up, and that outcome is recorded.
+   */
+  async function graceWait(ctx, key, { age, what }) {
+    const n = (tries.get(key) ?? 0) + 1;
+    tries.set(key, n);
+    if (n > settings.eventMaxTries) {
+      tries.delete(key);
+      ctx.log('reconciler.gc.gave-up', `${what}: still changing after ${n - 1} grace waits; given up (the sweep covers it)`, { controller: NAME, key, tries: n - 1 });
+      await record(ctx, 'event', [{ collector: 'gc-event', kind: parseKey(key).type, target: key, action: 'keep', reason: `still changing after ${n - 1} grace waits`, tries: n - 1, outcome: 'gave-up' }]);
+      return { gaveUp: true, key, tries: n - 1 };
+    }
+    return { waiting: true, key, tries: n, requeueAfterMs: Math.max(1_000, settings.eventGraceMs - age + GRACE_MARGIN_MS) };
+  }
+
+  /** The final outcome of one event key: its closes (closed / failed) and one summary item (done / dropped). */
+  async function recordEvent(ctx, key, { closes = [], skipped = null } = {}) {
+    const n = tries.get(key) ?? 0;
+    tries.delete(key);
+    const items = closes.map((c) => ({ collector: 'gc-event', kind: c.klass ?? 'terminal', target: c.handle, ownerRef: key, action: c.ok === true ? 'closed' : 'failed',
+      reason: c.reason ?? null, tries: n + 1, outcome: c.ok === true ? 'done' : 'gave-up', ...(c.ok === true ? { verifiedGoneAt: ctx.now() } : { lastError: c.error ?? 'close failed' }) }));
+    items.push({ collector: 'gc-event', kind: parseKey(key).type, target: key, action: skipped ? 'keep' : 'collect', reason: skipped ?? `${closes.length} close(s)`, tries: n + 1,
+      outcome: skipped ? 'dropped' : closes.every((c) => c.ok === true) ? 'done' : 'gave-up' });
+    await record(ctx, 'event', items);
+  }
 
   /** One verified close of a runtime terminal (the engine's shadow gate records it instead in shadow). */
   async function closeTerminal(ctx, d, { entity }) {
@@ -109,7 +167,7 @@ export function createGcController(overrides = {}) {
     const closed = ctx.mode === 'active' && r?.ok === true && !r?.shadow;
     ctx.log('reconciler.gc.close', `${closed ? 'closed' : ctx.mode === 'active' ? 'close FAILED' : 'would close'} ${d.klass} ${d.handle} of ${entity}`, { controller: NAME, handle: d.handle, klass: d.klass, reason: d.reason, entity, ok: r?.ok ?? null, shadow: ctx.mode !== 'active' });
     if (closed) await deps.lesson({ klass: d.klass, count: 1, examples: [`${d.handle} ${String(d.title ?? '').slice(0, 50)} (${entity}, closed by the GC controller after its event)`] });
-    return { handle: d.handle, klass: d.klass, ok: r?.ok ?? null, shadow: ctx.mode !== 'active' };
+    return { handle: d.handle, klass: d.klass, reason: d.reason, ok: r?.ok ?? null, shadow: ctx.mode !== 'active', ...(closed || ctx.mode !== 'active' ? {} : { error: r?.error ?? r?.value?.error ?? 'close failed' }) };
   }
 
   /** The runtime terminals of one entity that are due to close: classifyTerminals over just those handles. */
@@ -150,12 +208,13 @@ export function createGcController(overrides = {}) {
     if (!job) return { skipped: 'job not in its ledger' };
     if (LIVE_JOB.has(job.status)) return { skipped: `job is ${job.status}` };
     const updatedAt = Number(job.updatedAt ?? 0);
-    if (updatedAt && ctx.now() - updatedAt < settings.eventGraceMs)
-      throw Object.assign(new Error(`job ${jobId} changed ${Math.round((ctx.now() - updatedAt) / 1000)}s ago: its owner step may still be closing`), { retryAfterMs: settings.eventGraceMs });
+    const key = jobKey(ledgerId, jobId);
+    if (updatedAt && ctx.now() - updatedAt < settings.eventGraceMs) return graceWait(ctx, key, { age: ctx.now() - updatedAt, what: `job ${jobId}` });
     const closes = [];
     for (const d of await decideTerminals(ctx, { handles: job.handles, sup: { seat: null, jobs: [] }, ledgers: [view] })) closes.push(await closeTerminal(ctx, d, { entity: `job ${jobId}` }));
     const leaks = SETTLED.has(job.status) ? gc.classifyLeases({ rows: (view.leases ?? []).filter((l) => l.jobId === jobId).map((l) => ({ ...l, ledger: ledgerId })), now: ctx.now(), minAgeMs: 0 }) : [];
     const leases = await leaseDecision(ctx, leaks, { ledgerId, entity: jobId });
+    await recordEvent(ctx, key, { closes });
     return { entity: `job:${jobId}`, closes, leases };
   }
 
@@ -164,8 +223,7 @@ export function createGcController(overrides = {}) {
     if (!job) return { skipped: 'supervisor job unknown' };
     if (!SUP_FINAL.has(job.status)) return { skipped: `supervisor job is ${job.status}` };
     const updatedAt = Number(job.updatedAt ?? 0);
-    if (updatedAt && ctx.now() - updatedAt < settings.eventGraceMs)
-      throw Object.assign(new Error(`supervisor job ${jobId} changed ${Math.round((ctx.now() - updatedAt) / 1000)}s ago: its land/report may still be closing`), { retryAfterMs: settings.eventGraceMs });
+    if (updatedAt && ctx.now() - updatedAt < settings.eventGraceMs) return graceWait(ctx, landKey(jobId), { age: ctx.now() - updatedAt, what: `supervisor job ${jobId}` });
     const closes = [];
     if (job.handle && job.handle !== 'supervisor')
       for (const d of await decideTerminals(ctx, { handles: [job.handle], sup, ledgers: [] })) closes.push(await closeTerminal(ctx, d, { entity: `[Worker] job ${jobId}` }));
@@ -181,6 +239,7 @@ export function createGcController(overrides = {}) {
     }
     const leaks = gc.classifyLeases({ rows: (sup.leases ?? []).filter((l) => l.jobId === jobId).map((l) => ({ ...l, ledger: 'supervisor' })), now: ctx.now(), minAgeMs: 0 });
     const leases = await leaseDecision(ctx, leaks, { ledgerId: 'supervisor', entity: jobId });
+    await recordEvent(ctx, landKey(jobId), { closes });
     return { entity: `sup-job:${jobId}`, closes, staging, leases };
   }
 
@@ -197,6 +256,7 @@ export function createGcController(overrides = {}) {
     for (const d of await decideTerminals(ctx, { handles: null, sup: { seat: null, jobs: [] }, ledgers: [view], owners })) closes.push(await closeTerminal(ctx, d, { entity: `workflow ${workflowId}` }));
     const leaks = wf.ended ? gc.classifyLeases({ rows: (view.leases ?? []).filter((l) => l.workflowId === workflowId).map((l) => ({ ...l, ledger: ledgerId })), now: ctx.now(), minAgeMs: 0 }) : [];
     const leases = await leaseDecision(ctx, leaks, { ledgerId, entity: workflowId });
+    await recordEvent(ctx, workflowKey(ledgerId, workflowId), { closes });
     return { entity: `workflow:${workflowId}`, ended: wf.ended, closes, leases };
   }
 
@@ -215,6 +275,7 @@ export function createGcController(overrides = {}) {
       ctx.log(WOULD, `sweep: ${report.line}`, { controller: NAME, action: 'gc-sweep', counts: report.counts,
         items: collect.slice(0, 300).map((i) => ({ class: i.class, action: i.action, target: String(i.target), owner: i.owner ?? null })), truncated: collect.length > 300 });
       await leaseDecisionsOf(ctx, report);
+      await ownerlessDecisions(ctx, report);
       finishDuty(ctx.stateDb ?? ctx, { controller: NAME, duty: 'sweep', result: 'skipped', now: ctx.now() });
       return { shadow: true, wouldCollect: collect.length, counts: report.counts };
     }
@@ -227,8 +288,30 @@ export function createGcController(overrides = {}) {
     try { await deps.recordSweep(report); } catch { /* the sweep happened; the event is the digest's */ }
     ctx.log('reconciler.gc.sweep', report.line, { controller: NAME, counts: report.counts, errors: report.errors.slice(0, 5) });
     await leaseDecisionsOf(ctx, report);
+    await ownerlessDecisions(ctx, report);
+    await record(ctx, 'sweep', report.items.map(sweepItem), report);
     finishDuty(ctx.stateDb ?? ctx, { controller: NAME, duty: 'sweep', result: report.ok === false ? 'failed' : 'done', now: ctx.now() });
     return { counts: report.counts, ok: report.ok };
+  }
+
+  /**
+   * MB-13: a terminal the sweep keeps refusing because no ledger job owns it and no removed lane explains it is ONE
+   * Supervisor DI after ownerlessEscalateMs (key ownerless-terminal:<handle>): close it, or name its owner.
+   */
+  async function ownerlessDecisions(ctx, report) {
+    const now = ctx.now();
+    for (const i of report.items.filter((x) => x.ownerless && x.verdict === 'refuse' && now - Number(x.firstSeenAt ?? now) >= settings.ownerlessEscalateMs)) {
+      const hours = Math.round((now - Number(i.firstSeenAt)) / 3_600_000);
+      await ctx.openDecision({
+        schema: 'starci/decision-item@1', kind: 'runtime-defect', decider: 'supervisor', ledger: 'supervisor',
+        idempotencyKey: `ownerless-terminal:${String(i.target).replace(/:/g, '_')}`, entity: { type: 'terminal', id: String(i.target) },
+        summary: `Terminal ${i.target} (${String(i.title ?? '').slice(0, 60)}) has no owner for ${hours}h: ${i.reason}`,
+        evidence: [{ ref: `terminal:${i.target}`, why: i.reason }, ...(i.lane ? [{ ref: `lane:${i.lane}` }] : [])],
+        options: [{ key: 'close', verb: `node scripts/lib/close-verify.mjs --terminal ${i.target} --tree --log`, recommended: !i.lane },
+          { key: 'keep', title: 'Name its owner (a lane still in use) and keep it' }],
+        allowedVerbs: [], openedBy: 'gc-controller', escalateTo: 'owner',
+      });
+    }
   }
 
   async function leaseDecisionsOf(ctx, report) {

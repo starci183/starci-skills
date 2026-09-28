@@ -314,7 +314,10 @@ export function collectLaneLogs({ apply = false, env = process.env, now = Date.n
  * seen ({handle: firstSeenMs}), now, minAgeMs. Returns [{handle, role, klass, verdict: 'collect'|'keep'|'refuse',
  * reason, owner?, title}].
  */
-export function classifyTerminals({ terminals, titles, sup, ledgers, screenOf, procs = null, seen = {}, now = Date.now(), minAgeMs = DEFAULTS.gcMinAgeMs, runtimeRoot = SKILL_ROOT, keepTitles = [] }) {
+export function classifyTerminals({ terminals, titles, sup, ledgers, screenOf, procs = null, seen = {}, now = Date.now(), minAgeMs = DEFAULTS.gcMinAgeMs, runtimeRoot = SKILL_ROOT, keepTitles = [],
+  lanesBase = null, laneExists = null }) {
+  const laneRootDir = lanesBase ?? (() => { try { return lanesRoot(); } catch { return null; } })();
+  const laneAlive = laneExists ?? ((name) => (laneRootDir ? fs.existsSync(path.join(laneRootDir, name)) : true));
   const listed = new Set(terminals.filter((t) => t.connected !== false).map((t) => t.handle));
   const out = [];
   const aged = (h) => seen[h] != null && now - seen[h] >= minAgeMs;
@@ -350,6 +353,20 @@ export function classifyTerminals({ terminals, titles, sup, ledgers, screenOf, p
     const worktreeName = path.basename(String(t.worktreePath ?? ''));
     let role = roleOfTitle(title, { worktreeName }) ?? roleOfTitle(t.title, { worktreeName });
     const row = (verdict, klass, reason, extra = {}) => out.push({ handle: h, role, klass, verdict, reason, title: String(title).slice(0, 120), worktree: t.worktreePath ?? null, ...extra });
+    // MB-13: a runtime-titled terminal no ledger job owns is matched to a lane (its worktree under the lanes root, or
+    // "[Worker] <lane>"): a lane whose worktree is gone is over, so its aged terminal is collected; otherwise it is
+    // refused as ownerless (the GC controller escalates it once after ownerlessEscalateMs), never refused silently forever.
+    const ownerless = (klass, why) => {
+      const wt = String(t.worktreePath ?? '');
+      const inLane = laneRootDir && wt && pathUnder(wt, laneRootDir) ? path.relative(laneRootDir, wt).split(/[\\/]/)[0] : null;
+      const named = /^\[Worker\]\s+(\S+)/.exec(String(title).trim())?.[1] ?? null;
+      const lane = [inLane, named].find((n) => n && !['staging', 'land'].includes(n)) ?? null;
+      // Only a terminal whose own working directory was the removed lane is proven the lane's; a title alone is not.
+      if (inLane && lane === inLane && !laneAlive(lane) && aged(h)) return row('collect', klass, `${why}; its lane ${lane} is gone (worktree removed)`, { owner: `lane:${lane}` });
+      const laneWhy = !lane ? '; no lane matches it' : laneAlive(lane) ? `; lane ${lane} still exists`
+        : inLane ? `; its lane ${lane} is gone, closed once seen for ${Math.round(minAgeMs / 60000)}m` : `; its title names lane ${lane}, which has no worktree (a title is no proof)`;
+      return row('refuse', klass, `${why}${laneWhy}`, { ownerless: true, lane, ...(inLane && !laneAlive(lane) ? { pendingAge: true } : {}) });
+    };
     if (sup.seat?.handle === h) { row('keep', 'supervisor-seat', 'the live Supervisor seat'); continue; }
     if (keepTitles.some((re) => re.test(String(title)) || re.test(String(t.title ?? '')))) { row('keep', 'unknown', 'allowlisted (allocation.gc.keepTitles)'); continue; }
     if (t.connected === false) { row('keep', role ?? 'unknown', 'already disconnected'); continue; }
@@ -385,14 +402,14 @@ export function classifyTerminals({ terminals, titles, sup, ledgers, screenOf, p
       const byStaging = STAGING_ON_SCREEN.exec(s)?.[1] ?? null;
       const cluster = /^\[Worker\]\s+(.+)$/.exec(String(title).trim())?.[1]?.trim() ?? null;
       const jobs = sup.jobs.filter((j) => (byStaging && j.jobId.toLowerCase() === byStaging.toLowerCase()) || (!byStaging && cluster && j.cluster === cluster));
-      if (!jobs.length) { row('refuse', 'sup-worker', `no supervisor job matches ${byStaging ?? cluster ?? 'this worker'}`); continue; }
+      if (!jobs.length) { ownerless('sup-worker', `no supervisor job matches ${byStaging ?? cluster ?? 'this worker'}`); continue; }
       const live = jobs.filter((j) => SUP_LIVE.has(j.status));
       if (!live.length) row('collect', 'sup-worker', `[Worker] of ${jobs.map((j) => `${j.jobId} ${j.status}`).join(', ')}`, { owner: jobs.map((j) => j.jobId).join(',') });
       else if (live.every((j) => j.handle && listed.has(j.handle)) && aged(h)) row('collect', 'sup-worker', `duplicate of live job ${live.map((j) => j.jobId).join(', ')}'s worker ${live.map((j) => j.handle).join(', ')}`, { owner: live[0].jobId });
       else row('refuse', 'sup-worker', `job ${live.map((j) => j.jobId).join(', ')} is ${live.map((j) => j.status).join('/')} and this may be its worker`);
     } else if (role === 'kernel' || role === 'op') {
       const l = ledgerOfPath(t.worktreePath ?? '');
-      if (!l) { row('refuse', role === 'op' ? 'op-worker' : 'kernel', 'no ledger owns its worktree'); continue; }
+      if (!l) { ownerless(role === 'op' ? 'op-worker' : 'kernel', 'no ledger owns its worktree'); continue; }
       const named = workflowsNamed(title, l.workflows);
       const candidates = named.length ? named : l.workflows;
       const liveOnes = candidates.filter((w) => !w.ended);
@@ -647,7 +664,8 @@ export async function runGc({ apply = false, only = null, env = process.env, now
           if (d.klass === 'unknown') report.items.push({ class: 'unknown', action: 'none', target: d.handle, title: d.title, reason: d.reason, verdict: 'keep' });
           continue;
         }
-        const it = { class: d.klass, action: 'close-terminal', target: d.handle, title: d.title, reason: d.reason, owner: d.owner ?? null, verdict: d.verdict, leftover: !isShell };
+        const it = { class: d.klass, action: 'close-terminal', target: d.handle, title: d.title, reason: d.reason, owner: d.owner ?? null, verdict: d.verdict, leftover: !isShell,
+          firstSeenAt: seenNow[d.handle] ?? now, ...(d.ownerless ? { ownerless: true, lane: d.lane ?? null } : {}) };
         if (d.verdict === 'refuse') { report.items.push(it); if (!d.pendingAge) report.counts.refused += 1; continue; }
         if (!apply) { report.items.push({ ...it, ok: null }); }
         else {

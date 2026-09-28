@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
+import os from 'node:os';
 import path from 'node:path';
 import {checkWorkConsistencyTree, checkTreeParity, declaredStateValues} from '../scripts/checks/check-work-consistency.mjs';
 import {loadRecords} from '../scripts/example/example-ownership.mjs';
@@ -13,10 +14,11 @@ import {walk} from '../scripts/checks/check-example-work.mjs';
  * `.starciwork`; these trees are deliberately NOT run through that gate, because most of them break a
  * cross-record rule on purpose and would otherwise drown in unrelated refusals.
  *
- * Fixtures live on the same drive as the repo (never os.tmpdir(), which can be a different drive on this host
- * and break relative path handling used elsewhere in the toolchain).
+ * Fixtures live under one %TEMP% root that the file removes when its tests end (MB-16).
  */
-const TMP_ROOT = path.join(path.parse(process.cwd()).root, 'starci-tmp');
+// MB-16: every fixture of this file lives under ONE mkdtemp root in %TEMP%, removed when the file's tests end.
+const TMP_ROOT = fs.mkdtempSync(path.join(os.tmpdir(), 'work-consistency-'));
+test.after(() => fs.rmSync(TMP_ROOT, { recursive: true, force: true, maxRetries: 10, retryDelay: 50 }));
 
 let counter = 0;
 function freshDir() {

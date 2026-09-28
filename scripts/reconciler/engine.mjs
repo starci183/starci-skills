@@ -343,6 +343,9 @@ export class Engine {
     try {
       const result = await work;
       this.queue.done(c.name, item.key);
+      // A known wait (a grace window, a busy owner step) is not a failure: the key comes back at that time, no error row.
+      const wait = Number(result?.requeueAfterMs);
+      if (Number.isFinite(wait) && wait > 0) this.queue.add(c.name, item.key, { reason: 'wait', dueAt: this.now() + wait });
       return { ok: true, key: item.key, result: result ?? null, ms: this.now() - started, ...(overBudget ? { overBudget } : {}) };
     } catch (error) {
       const delay = this.queue.failed(c.name, item.key, error);

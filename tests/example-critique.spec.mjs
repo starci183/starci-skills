@@ -1,20 +1,22 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
+import os from 'node:os';
 import path from 'node:path';
 import {computeCritique, runCritique} from '../scripts/example/example-critique.mjs';
 
 /**
- * One fixture tree per section this lane was asked to compute, plus its freshness gate. Fixtures live on
- * the same drive as the repo for the same reason tests/example-derive.spec.mjs's own fixtures do: a
- * different-drive os.tmpdir() breaks the relative-path handling scripts/checks/check-example-work.mjs relies on.
+ * One fixture tree per section this lane was asked to compute, plus its freshness gate. Fixtures live
+ * under one %TEMP% root that the file removes when its tests end (MB-16: the drive-root starci-tmp leaked).
  *
  * Each fixture's own `.starciwork` sits directly under a throwaway repo directory (`root`), mirroring the
  * real example's shape (`examples/todo-app-backend/.starciwork`) closely enough for path resolution (a
  * fixture record's `owners`/`module` path is resolved against `root` unless a test needs a second
  * repository, in which case it declares one in workspace.yaml exactly like the real tree does).
  */
-const TMP_ROOT = path.join(path.parse(process.cwd()).root, 'starci-tmp');
+// MB-16: every fixture of this file lives under ONE mkdtemp root in %TEMP%, removed when the file's tests end.
+const TMP_ROOT = fs.mkdtempSync(path.join(os.tmpdir(), 'example-critique-'));
+test.after(() => fs.rmSync(TMP_ROOT, { recursive: true, force: true, maxRetries: 10, retryDelay: 50 }));
 
 let counter = 0;
 function freshRoot() {

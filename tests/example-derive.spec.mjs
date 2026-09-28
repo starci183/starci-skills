@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
+import os from 'node:os';
 import path from 'node:path';
 import crypto from 'node:crypto';
 import {computeDerived, buildYamlDocument, runDerive} from '../scripts/example/example-derive.mjs';
@@ -10,11 +11,12 @@ import {parseYaml} from '../engine/yaml.mjs';
 
 /**
  * One fixture tree per derived field this lane was asked to prove, plus the two refusal gates
- * (scripts/checks/check-example-derived.mjs). Fixtures live on the same drive as the repo, exactly like
- * tests/example-work-gate.spec.mjs's own fixtures, and for the same reason: os.tmpdir() can be a different
- * drive on this host, which breaks the relative-path handling both scripts rely on.
+ * (scripts/checks/check-example-derived.mjs). Fixtures live under one %TEMP% root that the
+ * file removes when its tests end (MB-16).
  */
-const TMP_ROOT = path.join(path.parse(process.cwd()).root, 'starci-tmp');
+// MB-16: every fixture of this file lives under ONE mkdtemp root in %TEMP%, removed when the file's tests end.
+const TMP_ROOT = fs.mkdtempSync(path.join(os.tmpdir(), 'example-derive-'));
+test.after(() => fs.rmSync(TMP_ROOT, { recursive: true, force: true, maxRetries: 10, retryDelay: 50 }));
 
 let counter = 0;
 function freshDir() {

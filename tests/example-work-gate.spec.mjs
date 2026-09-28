@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
+import os from 'node:os';
 import path from 'node:path';
 import crypto from 'node:crypto';
 import { checkWorkTree, checkFamiliesDrift, FAMILIES } from '../scripts/checks/check-example-work.mjs';
@@ -8,10 +9,11 @@ import { checkWorkTree, checkFamiliesDrift, FAMILIES } from '../scripts/checks/c
 /**
  * One fixture tree per new-concept rule in scripts/checks/check-example-work.mjs, proving each rule refuses the
  * exact malformed shape it targets - and, where useful, that the corrected shape is accepted. Fixtures live
- * on the same drive as the repo (never os.tmpdir(), which can be a different drive on this host and break
- * relative path handling used elsewhere in the toolchain).
+ * under one %TEMP% root that the file removes when its tests end (MB-16).
  */
-const TMP_ROOT = path.join(path.parse(process.cwd()).root, 'starci-tmp');
+// MB-16: every fixture of this file lives under ONE mkdtemp root in %TEMP%, removed when the file's tests end.
+const TMP_ROOT = fs.mkdtempSync(path.join(os.tmpdir(), 'example-work-gate-'));
+test.after(() => fs.rmSync(TMP_ROOT, { recursive: true, force: true, maxRetries: 10, retryDelay: 50 }));
 
 let counter = 0;
 function freshDir() {

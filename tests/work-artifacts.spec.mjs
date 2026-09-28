@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
+import os from 'node:os';
 import path from 'node:path';
 import crypto from 'node:crypto';
 import {checkWorkArtifacts} from '../scripts/checks/check-work-artifacts.mjs';
@@ -9,10 +10,12 @@ import {encodePng, screen} from './helpers/png.mjs';
 /**
  * One fixture tree per byte rule in scripts/checks/check-work-artifacts.mjs, proving each refuses the exact
  * mismatch between a declaration and the disk it names - and, where the shape is cheap to build correctly,
- * that the corrected bytes are accepted. Fixtures live on the same drive as the repo (never os.tmpdir(),
- * which can be a different drive on this host), the way tests/example-work-gate.spec.mjs does.
+ * that the corrected bytes are accepted. Fixtures live under one %TEMP% root that the
+ * file removes when its tests end (MB-16).
  */
-const TMP_ROOT = path.join(path.parse(process.cwd()).root, 'starci-tmp');
+// MB-16: every fixture of this file lives under ONE mkdtemp root in %TEMP%, removed when the file's tests end.
+const TMP_ROOT = fs.mkdtempSync(path.join(os.tmpdir(), 'work-artifacts-'));
+test.after(() => fs.rmSync(TMP_ROOT, { recursive: true, force: true, maxRetries: 10, retryDelay: 50 }));
 const EBML = Buffer.from([0x1a, 0x45, 0xdf, 0xa3]);
 const pngBytes = () => encodePng({width: 40, height: 40, ...screen({width: 40, height: 40, bands: [{hex: '#2f6bff', rows: 12}]})});
 const sha256 = bytes => crypto.createHash('sha256').update(bytes).digest('hex');

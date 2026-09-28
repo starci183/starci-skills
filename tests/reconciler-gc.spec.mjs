@@ -80,7 +80,10 @@ test('op-settled in shadow: the close goes through the gate as a would, no lesso
 test('an event inside the grace window waits for the owner step; a live job is left alone', async () => {
   const { ctx, calls } = ctxOf('active');
   const young = controller({ view: view({ updatedAt: T - 5_000 }) }).c;
-  await assert.rejects(young.reconcile('gc:job:nivo-backend:op-1', ctx), (e) => e.retryAfterMs > 0);
+  // MB-14: a wait, not a failure: requeued for the rest of the grace window plus a margin, never a full grace.
+  const waited = await young.reconcile('gc:job:nivo-backend:op-1', ctx);
+  assert.equal(waited.waiting, true);
+  assert.equal(waited.requeueAfterMs, 60_000 - 5_000 + 5_000);
   const live = controller({ view: view({ status: 'running' }) }).c;
   assert.match((await live.reconcile('gc:job:nivo-backend:op-1', ctx)).skipped, /running/);
   assert.equal(calls.run.length, 0);

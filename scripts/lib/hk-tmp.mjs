@@ -19,6 +19,11 @@
 //     (.git, HEAD, index, logs/HEAD) changed within tmpMaxAgeMs is live and skipped; one outside the temp root
 //     stays refused by safeRemoveTree.
 //
+// MB-16: spec fixtures once lived at the drive root's starci-tmp (artifacts-fixture-*, gate-fixture-*: 41k entries on
+// 2026-09-28); they now live under %TEMP% and are removed by their spec. Leftovers of the old place are swept too:
+// allocation.housekeeping.legacyFixturePrefixes, matched in <runtime drive>/starci-tmp only (that directory also
+// holds evidence and lane notes, which no fixture prefix matches), same age and link rules as %TEMP%.
+//
 // The seams are injected so the spec never touches the real TEMP: `env` supplies TEMP/TMP, `now` supplies
 // the clock, `remove` supplies the remover (safeRemoveTree with checkoutsUnder the temp root by default),
 // `allocation` supplies the settings.
@@ -27,9 +32,12 @@
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { allocationSettings } from '../../engine/config.mjs';
 import { isLinkLike, safeRemoveTree } from './safe-remove.mjs';
 import { foldCase } from './path-key.mjs';
+
+const RUNTIME_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 
 // STORAGE-PROMPT 1.tmp declares the two-day age default. An undeclared prefix list matches nothing: the
 // sweep fails safe, never wide.
@@ -87,22 +95,30 @@ export async function sweepTmp({
   env = process.env,
   allocation = allocationSettings()?.housekeeping ?? {},
   remove = null,
+  legacyFixtureRoot = path.join(path.parse(RUNTIME_ROOT).root, 'starci-tmp'),
 } = {}) {
   const tempRoot = path.resolve(env.TEMP ?? env.TMP ?? os.tmpdir());
-  const removeEntry = remove ?? ((target) => safeRemoveTree(target, { checkoutsUnder: tempRoot }));
-  const prefixes = (Array.isArray(allocation?.tmpPrefixes) ? allocation.tmpPrefixes : [])
-    .map((prefix) => foldCase(String(prefix))).filter(Boolean);
+  const listOf = (v) => (Array.isArray(v) ? v : []).map((prefix) => foldCase(String(prefix))).filter(Boolean);
   const declaredAge = Number(allocation?.tmpMaxAgeMs);
   const maxAgeMs = Number.isFinite(declaredAge) && declaredAge > 0 ? declaredAge : DEFAULT_TMP_MAX_AGE_MS;
   const out = { ok: true, freedBytes: 0, deleted: [], skipped: [], errors: [] };
+  const roots = [{ root: tempRoot, prefixes: listOf(allocation?.tmpPrefixes) }];
+  const legacy = listOf(allocation?.legacyFixturePrefixes);
+  if (legacyFixtureRoot && legacy.length && fs.existsSync(legacyFixtureRoot) && foldCase(path.resolve(legacyFixtureRoot)) !== foldCase(tempRoot)) roots.push({ root: path.resolve(legacyFixtureRoot), prefixes: legacy, missingOk: true });
+  for (const r of roots) sweepRoot(r, { apply, now, maxAgeMs, remove, out });
+  if (out.errors.length) out.ok = false;
+  return out;
+}
+
+function sweepRoot({ root: tempRoot, prefixes }, { apply, now, maxAgeMs, remove, out }) {
+  const removeEntry = remove ?? ((target) => safeRemoveTree(target, { checkoutsUnder: tempRoot }));
 
   let parentReal = null;
   try { parentReal = fs.realpathSync.native(tempRoot); } catch { /* isLinkLike resolves it per entry */ }
   let names;
   try { names = fs.readdirSync(tempRoot); } catch (error) {
-    out.ok = false;
     out.errors.push({ path: tempRoot, error: String(error?.message ?? error) });
-    return out;
+    return;
   }
 
   for (const name of names) {
@@ -154,6 +170,4 @@ export async function sweepTmp({
       out.errors.push({ path: entry, error: describe(result?.errors) || 'removal failed' });
     }
   }
-  if (out.errors.length) out.ok = false;
-  return out;
 }
