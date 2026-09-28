@@ -987,7 +987,15 @@ SELECT l.workflow_id, 'workflow', l.workflow_id, 'product-land', CAST(l.land_id 
        l.started_at, 'kernel'
   FROM product_lands l
  WHERE l.result IN ('failed','conflict','red')
-   AND NOT EXISTS(SELECT 1 FROM product_lands k WHERE k.workflow_id=l.workflow_id AND k.land_id>l.land_id AND k.result='landed');
+   AND NOT EXISTS(SELECT 1 FROM product_lands k WHERE k.workflow_id=l.workflow_id AND k.land_id>l.land_id AND k.result='landed')
+UNION ALL
+-- H1: a filed report nobody settled within its SLA (the same rows as v_settle_overdue) blocks its job.
+SELECT a.workflow_id, 'attempt', CAST(a.attempt_id AS TEXT), 'settle', CAST(a.attempt_id AS TEXT),
+       'SettleOverdue:'||COALESCE(a.report_outcome,'?'), a.job_id, a.reported_at,
+       CASE WHEN a.report_outcome='done' THEN 'settler' ELSE 'kernel' END
+  FROM op_attempts a
+ WHERE a.reported_at IS NOT NULL AND a.settled_at IS NULL AND a.end_state IS NULL
+   AND (CAST(unixepoch('subsec')*1000 AS INTEGER) - a.reported_at) > CASE WHEN a.report_outcome='done' THEN 180000 ELSE 900000 END;
 
 -- Việc đang mở (DI + job giữ lease/đang chạy).
 CREATE VIEW IF NOT EXISTS v_open_work AS
