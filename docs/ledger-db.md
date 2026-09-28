@@ -28,12 +28,13 @@ ingests declared and attached files into the external blob store, writes artifac
 and check rows, and removes the scratch directory. Settler re-runs write their
 outputs directly to the blob store and `check_runs`.
 
-Only proof cited by a canonical Work record stays in the bound `.starciwork`
-tree (for example a record's `E/**`, `evidence/**`, `assets/**` or `runs/**`). It
-keeps its record-relative path and is committed with that Work record. Operational
-reports, check logs, parsed output, patches and uncited captures live in the
-ledger and blob store, outside product git. `.starciwork/kernel-evidence/**` is
-retired; a legacy tree is migration input, never a new output location. See
+The bound `.starciwork` tree keeps important product content: Work records,
+SRS/SDS, UI specifications and brand. Agent and runtime metadata — attempts,
+models, reports, checks, logs, evidence, captures and renders — lives in SQL
+plus the blob store, including evidence a product record cites. Existing
+`E/**`, `evidence/**`, `assets/**` and `runs/**` execution proof paths are
+migration inputs, not new output locations. `.starciwork/kernel-evidence/**` is
+retired. See
 `modules/schemas/work-layout.yaml` for the Work boundary.
 
 The blob root is `~/.starci/artifacts/`, overridden by `STARCI_ARTIFACT_ROOT`.
@@ -134,7 +135,7 @@ Full DDL: `engine/schema.sql` and `engine/evidence.sql`. Orientation only:
 | `resources` (ledger), `leases` | Repo-scoped capacity fences | `api dispatch` → `reserveOpLeases` seeds `path:*` capacity-1 resources and takes leases via `reserveTwoPhase`; `api settle`/dispatch-reject release them |
 | `work_graph_versions` | A workflow's work graph (`starci/work-graph@1`), one immutable row per version with its diff, colours, reason and author op/job; created on an existing ledger by `migrateLedger` (additive) | `scripts/work/work-graph.mjs propose`, `scripts/work/backfill-work-graph.mjs --apply` |
 | `blobs` | One row per SHA: byte count, media type, optional encoding, `file_uri`, `http_path`, creation and verified archive state. Work proof hashes also have metadata-only rows so artifact foreign keys hold | Artifact and check ingestion; GC only after `blob_refs.refs=0` and an archive exists |
-| `job_artifacts_v2` | One row per logical output name and job attempt. `storage=blob` has SHA and no repo path; `storage=work-proof` has the cited `.starciwork` path. Roles distinguish checks, patches, media, logs and proof; patch revision fields remain | `api report`, settle and backfill; becomes canonical `job_artifacts` after all readers switch |
+| `job_artifacts_v2` | One row per logical output name and job attempt. New operational output uses `storage=blob` with SHA and no repo path; `storage=work-proof` represents existing Work proof paths during migration. Roles distinguish checks, patches, media, logs and proof; patch revision fields remain | `api report`, settle and backfill; becomes canonical `job_artifacts` after all readers switch |
 | `report_attachments` | Links each report to its artifact IDs | `api report` and backfill |
 | `artifact_proofs_v2` | Proof claims keyed by artifact ID rather than a filesystem path | Artifact/proof ingestion and backfill; becomes canonical `artifact_proofs` after all readers switch |
 | `blob_refs` | View summing references from job artifacts and check-run output SHA columns | GC reads; no writer |
@@ -206,8 +207,9 @@ api settle`).
 - **`job_artifacts_v2` and `report_attachments`** — an artifact has a logical
   `name` unique within the attempt, a role and a storage class. `blob` means
   `repo_path` is null and the bytes are in the external store. `work-proof`
-  means `repo_path` identifies a Work-record proof inside `.starciwork`; its
-  hash still has a metadata row in `blobs` for the foreign key. Attachment
+  represents an existing `repo_path` to Work proof during migration; its
+  hash still has a metadata row in `blobs` for the foreign key. New execution
+  proof uses blobs even when a product record cites it. Attachment
   links use artifact IDs, and `artifact_proofs_v2` keys claims by artifact ID.
   The old path-based tables remain only during verified migration.
 

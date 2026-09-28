@@ -11,9 +11,11 @@ summary: >-
   state; job_artifacts_v2 indexes each output
   by logical name, role, storage and sha256; report_attachments links reports to
   artifacts, and artifact_proofs_v2 links proof claims to artifact IDs. A blob
-  artifact has no repo_path. A Work proof cited by a canonical record remains
-  at its declared .starciwork path (storage=work-proof), with a metadata-only
-  blobs row for its sha256 foreign key.
+  artifact has no repo_path. .starciwork retains only important product content
+  (Work records, SRS/SDS, UI specifications and brand); execution evidence,
+  captures and renders belong in SQL plus blobs even when product records cite
+  them. The SCHEMA.sql work-proof storage class handles existing on-disk proof
+  through migration; it does not authorize new agent-operational files there.
   New op attempts write raw output to STARCI_JOB_SCRATCH outside every repository;
   api report ingests it into the ledger and blob store, then removes scratch.
   Existing .starciwork/kernel-evidence trees are backfilled into DB and blobs,

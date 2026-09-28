@@ -121,6 +121,6 @@ never edits `.starciwork/runtime.sqlite`. After its own checks, the surrounding 
 `starci/op-report@1` envelope in `STARCI_JOB_SCRATCH`, cites only owned artifact paths, and files it through
 `node .claude/scripts/kernel/api.mjs report --repo <bound-repo> --job <current-job> --report <op-report.json> [--attach <path>...]`.
 The API stores the report JSON in the ledger and raw attachments in the external blob store, then clears scratch.
-Proof a canonical Work record cites stays under that record in `.starciwork`; an uncited session capture is an
-operational blob. The kernel re-runs declared checks before settlement. No separate assisted-UAT ingestion verb or
+A canonical Work record may cite an artifact by its durable DB/blob identity; session captures and verification
+evidence remain operational artifacts. The kernel re-runs declared checks before settlement. No separate assisted-UAT ingestion verb or
 direct SQL path exists.

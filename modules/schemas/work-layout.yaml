@@ -115,9 +115,10 @@ shape:
     attachments belong in the content-addressed blob store outside every repository
     (~/.starci/artifacts/, or STARCI_ARTIFACT_ROOT). The ledger references each blob by sha256
     and records file_uri plus http_path (/api/blob/<sha256>) for direct queries;
-    no operational copy belongs in canonical Work or .starciwork/kernel-evidence. This does not
-    relocate proof that a Work record itself cites: those files stay under that record's declared
-    E/, evidence/, assets/ or runs/ path in the bound .starciwork tree."
+    no operational copy belongs in canonical Work or .starciwork/kernel-evidence. Product Work
+    records may cite blob-backed evidence; a citation does not turn execution output into
+    product content. Existing E/, evidence/, assets/ or runs/ proof paths are migration inputs,
+    not permission for new agent-operational files in .starciwork."
   workflowLogs: the typed log rows the kernel, ops and runtime write (scripts/kernel/typed-logs.mjs) are the logs
     table of .starciwork/runtime.sqlite since 2026-09-27 (one RDBMS per repo). The retired .starciwork/logs.sqlite
     and its logs.sqlite.migrated-<date> copy (scripts/work/migrate-logs-into-ledger.mjs) stay runtime custody -
@@ -290,11 +291,11 @@ rules:
   - "Record output screenshots/videos in evidence assets with scope: node and paths under the
     primary owner assets/. Output evidence is not also declared as a semantic input, avoiding
     self-invalidating proof."
-  - "Retain only proof that a Work record cites in its owning .starciwork E/, evidence/, assets/
-    or runs/ location. Operational reports, check outputs, patches and uncited raw media live in
-    runtime.sqlite or the external content-addressed blob store, never as duplicate Work files.
-    A Work proof path remains a repo-relative repo_path in job_artifacts_v2;
-    blob-only rows have no repo_path."
+  - "Product records, SRS/SDS, UI specifications and brand remain canonical Work in .starciwork.
+    Agent/runtime metadata, including execution evidence, captures and renders, lives in SQL
+    plus the external blob store even when a product record cites it. Existing Work proof paths
+    are read-only migration inputs; job_artifacts_v2 may represent them as storage=work-proof
+    until migrated, while new operational artifacts use storage=blob and have no repo_path."
   - Source code remains in bound repositories; code/index.yaml tracks requirements, exact source
     references and completion.
   - All structured Work records and results use YAML. JSON and underscore-prefixed directories are
