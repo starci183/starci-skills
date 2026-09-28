@@ -1,7 +1,36 @@
-runtime.sqlite
-runtime.sqlite-wal
-runtime.sqlite-shm
-kernel-evidence/
-kernel-strays/
-kernel-approvals/
-
+# StarCi .starciwork: product content only (ARCHITECTURE-DB §5.1, work-layout.yaml shape.productPaths).
+# Agent output (reports, checks, captures, draw rounds, UAT runs, logs, ledgers, worktrees) lives in
+# runtime.sqlite rows and blobs outside the repository.
+/*
+!/.gitignore
+!/.gitattributes
+!/workspace.yaml
+!/index.yaml
+!/brand/
+!/shell/
+!/_resources/
+!/_derived/
+!/features/
+/brand/*
+!/brand/index.yaml
+!/brand/assets/
+/shell/*
+!/shell/index.yaml
+/_resources/*
+!/_resources/environments/
+!/_resources/identities/
+!/_resources/fixtures/
+!/_resources/runtimes/
+!/_resources/grammar-captures/
+/_derived/*
+!/_derived/index.yaml
+!/_derived/frontier.md
+E/
+evidence/
+runs/
+draw-loop/
+operations/
+report*.json
+*.tmp.json
+/features/**/impl/**/assets/
+/shell/assets/

@@ -217,9 +217,10 @@ shapes:
       - .env
       - .env.*
       - '!.env.example'
-      - .starciwork/runtime.sqlite*
-      - .starciwork/_local/
       - config.yaml
+    starciworkGitignore: a backend repository's .starciwork/.gitignore is modules/schemas/work-layout.yaml
+      shape.starciworkIgnore (scripts/lib/starciwork-boundary.mjs STARCIWORK_GITIGNORE) - product content only;
+      the ledger lives outside the repository (decision Q1) and a frontend repository has no .starciwork
     editorconfig:
       render: 'root = true, then one [*] section carrying every other key below'
       root: true
@@ -1010,7 +1011,7 @@ observations:
       uses lint-staged - the baseline adds staged lint on commit and moves typecheck plus affected
       tests to push. The staged lint is the profile's eslint --fix with the shared warning budget and
       --no-warn-ignored, because ESLint 9 warns "File ignored" for a staged file the config ignores
-      (.starciwork evidence) and the zero budget would fail the commit. lint-staged 16 is the pin
+      (.starciwork records) and the zero budget would fail the commit. lint-staged 16 is the pin
       because 17 requires Node 22.22.1, above the engines floor.
   - id: nest-layout
     observed: nivo-backend is a Nest monorepo with apps/<app>/src composition roots and @features/@modules

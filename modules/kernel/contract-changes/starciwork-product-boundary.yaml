@@ -1,0 +1,26 @@
+id: starciwork-product-boundary
+effectiveAt: '2026-09-28T22:00:00+07:00'
+summary: >-
+  .starciwork holds product content only (ARCHITECTURE-DB §5.1). work-layout.yaml gains shape.productPaths (the
+  explicit list), shape.agentData (the §5.2 categories: kernel-evidence, kernel-strays, evidence bundles, E/ and
+  impl captures, shell/assets layout captures, uat runs, draw-loop rounds, operations/, stray report*.json,
+  settle caches, ledger and log files, worktrees) and shape.starciworkIgnore (the .starciwork/.gitignore the
+  runtime installs, scripts/lib/starciwork-boundary.mjs STARCIWORK_GITIGNORE; the example trees and
+  work-example.mjs now carry it). workflowRunState names the project ledger outside the repository (Q1);
+  operationalBlobs, workflowLogs, setup and the custody rules point at the ledger and the blob store; the
+  retired workflowAnchor and kernelCustody entries go. The shape keys ops still write (E/, runs/, captures,
+  operations/) stay admitted and are labelled agent data until lane a3-3 routes those outputs to blobs.
+  knowledge/index.yaml and repository-baseline.yaml follow (the root .gitignore no longer lists .starciwork
+  paths). scripts/supervisor/comeback.mjs archives and removes agent data and never deletes drift (product
+  records in a legacy layout). Adds no check or finding code; nothing is refused that was accepted before.
+safetyCritical: false
+reach: new-legs
+paths:
+  - modules/kernel/contract-changes/starciwork-product-boundary.yaml
+  - modules/schemas/work-layout.yaml
+  - knowledge/index.yaml
+  - knowledge/repository-baseline.yaml
+  - examples/todo-app-backend/.starciwork/.gitignore
+  - examples/ecommerce-app-be/.starciwork/.gitignore
+  - scripts/example/work-example.mjs
+  - tests/repository-baseline.spec.mjs

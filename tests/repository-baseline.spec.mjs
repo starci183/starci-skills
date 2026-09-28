@@ -29,7 +29,7 @@ test('the repository baseline is one registered knowledge source with nest and n
   assert.deepEqual(shapes.common.ci.gates, ['lint', 'typecheck', 'test', 'build']);
   const ciRuns = shapes.common.ci.steps.filter(s => s.name).map(s => s.name);
   assert.deepEqual(ciRuns, shapes.common.ci.gates, 'every CI gate is a named step');
-  for (const entry of ['.starciwork/runtime.sqlite*', 'config.yaml', '.env.*', '!.env.example']) {
+  for (const entry of ['config.yaml', '.env.*', '!.env.example']) {
     assert.ok(shapes.common.gitignore.includes(entry), `gitignore carries ${entry}`);
   }
   assert.ok(shapes.common.gitattributes.includes('* text=auto eol=lf'));

@@ -22,7 +22,8 @@ guidance:
       topic. All projects use Next.js/NestJS and the owner Academy patterns. Code patterns are checked by
       executable scripts; design patterns and edge cases are reviewed by agents using Markdown guidance.
       Knowledge has no translated mirrors and grants no execution authority. Product requirements, design,
-      scope, state and evidence belong in .starciwork.
+      scope and state belong in .starciwork; execution evidence (captures, runs, logs, reports) lives in the
+      project ledger and the blob store and a record cites it (modules/schemas/work-layout.yaml productPaths).
 branches:
   - id: architecture-rules
     title: Common Nest/Next architecture rules
