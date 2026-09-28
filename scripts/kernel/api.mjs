@@ -6974,6 +6974,31 @@ const REPORT_COMMIT_RE = /\b(?:commit(?:ted)?|land(?:ed)?(?: commit)?|đã (?:la
  * after the follow-up. Bounded by CANON_FOLLOW_UP_LIMIT per ordinal; a retry the Kernel already queued wins.
  * Records result_json.nextStep {kind: canon-follow-up}. Null when there is nothing to do.
  */
+/**
+ * The cut's canon-wire leg takes `paths` (cut-seam.mjs canonSettleFollowUpOf wire, or a passed slice's report
+ * owedToWire): the newest queued, never-dispatched wire leg of the workflow is widened (and waits on `after`),
+ * else a new wire leg is enqueued after `after`. {jobId, widened|created} or null.
+ */
+function widenCanonWire(ledger, job, payload, paths, after = []) {
+  const db = ledger.db, op = jobOpOf(job), wf = job.workflow_id;
+  let wire = null;
+  const queuedWire = db.prepare("SELECT * FROM jobs WHERE workflow_id=? AND op_id=? AND status='queued' AND json_extract(payload_json,'$.params.canonWire')=1 ORDER BY attempt DESC").all(wf, op)
+    .find((row) => !db.prepare("SELECT 1 FROM events WHERE entity_type='job' AND entity_id=? AND kind IN ('op-dispatched','dispatch-attested','worker-attested') LIMIT 1").get(row.job_id));
+  if (queuedWire) {
+    const wp = jobPayloadOf(queuedWire);
+    const add = paths.filter((p) => !(wp.owned_paths ?? []).includes(p));
+    if (add.length || after.some((id) => !(wp.after ?? []).includes(id))) {
+      wp.owned_paths = [...(wp.owned_paths ?? []), ...add];
+      wp.after = [...new Set([...(wp.after ?? []), ...after])];
+      db.prepare('UPDATE jobs SET payload_json=?, updated_at=? WHERE job_id=?').run(JSON.stringify(wp), Date.now(), queuedWire.job_id);
+      ledger.appendEvent({ workflowId: wf, entityType: 'job', entityId: queuedWire.job_id, kind: 'canon-wire-widened', payload: { add, after, of: job.job_id, by: 'settle' } });
+    }
+    return { jobId: queuedWire.job_id, widened: add };
+  }
+  const created = enqueueFollowOn(ledger, job, { reason: 'canon-wire', of: job.job_id, after, title: `code.refactor: canon-wire ${paths.slice(0, 2).map((p) => p.split('/').pop()).join(',')}`,
+    repair: { records: payload.records ?? [], ownedPaths: paths, repository: payload.repository ?? null, params: { ...(payload.params ?? {}), canonWire: true, resumeFrom: '', admissionBase: '' } } });
+  return created?.jobId ? { jobId: created.jobId, created: true } : wire;
+}
 // The admission commit a slice's scoped lint measured against (`check-scoped-lint.mjs ... --base <sha>` in its report's checks).
 const admissionBaseOfReport = (envelope) => (Array.isArray(envelope?.checks) ? envelope.checks : [])
   .map((check) => /--base\s+([0-9a-f]{7,40})/i.exec(String(check?.command ?? ''))?.[1]).find(Boolean) ?? null;
@@ -7015,23 +7040,7 @@ function canonSettleFollowUp(ledger, job, payload, envelope) {
   }
   let wire = null;
   if (plan.wire.length) {
-    const queuedWire = db.prepare("SELECT * FROM jobs WHERE workflow_id=? AND op_id=? AND status='queued' AND json_extract(payload_json,'$.params.canonWire')=1 ORDER BY attempt DESC").all(wf, op)
-      .find((row) => !db.prepare("SELECT 1 FROM events WHERE entity_type='job' AND entity_id=? AND kind IN ('op-dispatched','dispatch-attested','worker-attested') LIMIT 1").get(row.job_id));
-    if (queuedWire) {
-      const wp = jobPayloadOf(queuedWire);
-      const add = plan.wire.filter((p) => !(wp.owned_paths ?? []).includes(p));
-      if (add.length) {
-        wp.owned_paths = [...(wp.owned_paths ?? []), ...add];
-        wp.after = [...new Set([...(wp.after ?? []), ...jobs])];
-        db.prepare('UPDATE jobs SET payload_json=?, updated_at=? WHERE job_id=?').run(JSON.stringify(wp), Date.now(), queuedWire.job_id);
-        ledger.appendEvent({ workflowId: wf, entityType: 'job', entityId: queuedWire.job_id, kind: 'canon-wire-widened', payload: { add, of: job.job_id, by: 'settle' } });
-      }
-      wire = { jobId: queuedWire.job_id, widened: add };
-    } else {
-      const created = enqueueFollowOn(ledger, job, { reason: 'canon-wire', of: job.job_id, after: jobs, title: `code.refactor: canon-wire ${plan.wire.slice(0, 2).map((p) => p.split('/').pop()).join(',')}`,
-        repair: { records: payload.records ?? [], ownedPaths: plan.wire, repository: payload.repository ?? null, params: { ...(payload.params ?? {}), canonWire: true, resumeFrom: '', admissionBase: '' } } });
-      if (created?.jobId) wire = { jobId: created.jobId, created: true };
-    }
+    wire = widenCanonWire(ledger, job, payload, plan.wire, jobs);
     if (wire?.jobId) jobs.push(wire.jobId);
   }
   const how = plan.resumeFrom ? `continues from ${plan.resumeFrom}` : 'follow-up';
@@ -8353,6 +8362,17 @@ async function cmdSettle(ledger, args, repo) {
         { shape: failureShapeOf({ reportFiled, reportOutcome, claimOverruled, failureClass: failure?.class ?? null, op: jobOpOf(job) }), envelope, repo, failure });
       if (failure) db.prepare('UPDATE jobs SET result_json=json_set(result_json, \'$.failureClass\', json(?)) WHERE job_id=?').run(JSON.stringify(failure), jobId);
       if (nextStep?.kind === 'peer-blocked') peerBlocked = jobResultOf(db.prepare('SELECT result_json FROM jobs WHERE job_id=?').get(jobId)).peerBlocked ?? null;
+    }
+    // A passed canon slice's owedToWire findings are the canon-wire leg's to land (verdict-contract owedToWire).
+    if (verdict === 'pass' && payload.cut && String(payload.params?.canonFamilies ?? '').trim() && payload.params?.canonWire !== true && Array.isArray(envelope?.owedToWire) && envelope.owedToWire.length) {
+      try {
+        const prefix = String((payload.owned_paths ?? []).find((p) => typeof p === 'string' && /^[^/]+\/(?:apps|packages)\//.test(p)) ?? '').replace(/^([^/]+\/).*$/, '$1');
+        const owed = [...new Set(envelope.owedToWire.map((o) => String(o.path).replace(/\\/g, '/').replace(/\/+$/, '')).map((p) => (prefix && !p.startsWith(prefix) ? `${prefix}${p}` : p)))];
+        const wire = widenCanonWire(ledger, { ...job, payload_json: JSON.stringify(payload) }, payload, owed, []);
+        if (wire) db.prepare("UPDATE jobs SET result_json=json_set(result_json, '$.owedToWire', json(?)) WHERE job_id=?").run(JSON.stringify({ paths: owed, wireJob: wire.jobId }), jobId);
+      } catch (error) {
+        ledger.appendEvent({ workflowId: job.workflow_id, entityType: 'job', entityId: jobId, kind: 'canon-follow-up-failed', payload: { error: String(error?.message ?? error).slice(0, 400) } });
+      }
     }
     // A canon slice that settled blocked with a filed report is never a dead end (canonSettleFollowUp):
     // its committed part continues, its relocation grants widen, its shared/config/public-entry needs go to the wire.

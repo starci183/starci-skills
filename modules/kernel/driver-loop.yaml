@@ -427,7 +427,10 @@ tick:
       its commit owning its page relocations, its shared-root needs added to
       the queued canon-wire leg - so the Kernel never enqueues a second redo
       of that job; every slice packet carries context.cut.manifest (the path
-      union and passed ordinals) from dispatch. The semantic leg also waits for every canon-wire leg
+      union and passed ordinals) from dispatch. A canon slice's
+      cut-slice-postcondition is green when every residual canon-scan finding
+      on its owned paths is listed in its report's owedToWire (verdict-contract);
+      settle adds those paths to the queued canon-wire leg. The semantic leg also waits for every canon-wire leg
       of the cut. Route the set spread across
       the fan-out order by routing each slice with plain `api route --job
       <id>` in turn: persisted routes count queued and leased lanes and the

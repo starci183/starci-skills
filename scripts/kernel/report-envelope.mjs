@@ -21,7 +21,7 @@ export const BLOCKER_KINDS = (() => {
   return blockers;
 })();
 
-const ALLOWED_KEYS = new Set(['schema', 'outcome', 'run', 'task', 'dispatch', 'from', 'summary', 'files', 'checks', 'open', 'question', 'blocker', 'branch', 'head', 'credentialPending', 'rootCause', 'claims', 'failureClass', 'seamAssumptions']);
+const ALLOWED_KEYS = new Set(['schema', 'outcome', 'run', 'task', 'dispatch', 'from', 'summary', 'files', 'checks', 'open', 'question', 'blocker', 'branch', 'head', 'credentialPending', 'rootCause', 'claims', 'failureClass', 'seamAssumptions', 'owedToWire']);
 // Why a failed attempt failed (scripts/kernel/verify-failure.mjs): the route table keys failed routes on it.
 // The api derives it from the evidence and accepts a stated one only where the evidence does not contradict it.
 export const FAILURE_CLASSES = ['environment', 'tool', 'findings', 'product', 'deterministic', 'transient'];
@@ -118,6 +118,13 @@ export function validateOpReport(value, { ownedPaths = [], identity = {}, commit
     || value.seamAssumptions.some((a) => !a || typeof a !== 'object' || Array.isArray(a) || !text(a.symbol) || !text(a.assumption) || (a.file !== undefined && !text(a.file)))))
     fail('seamAssumptions must be an array of {symbol, assumption, file?}');
 
+  // owedToWire: a canon slice's residual findings that only its cut's canon-wire leg can land (a shared-root
+  // registration, config, public entry or consumer outside its owned paths; modules/ops/ops/code.refactor.yaml
+  // SCOPE_WIDENING). The brief always named it; the envelope refused it, so slices could not declare it
+  // (wf-nivo-fe-canon-mujek980 op-code.refactor-c54caae5fb overruled for 'missing the formal owedToWire').
+  if (value.owedToWire !== undefined && (!Array.isArray(value.owedToWire)
+    || value.owedToWire.some((o) => !o || typeof o !== 'object' || Array.isArray(o) || !text(o.path) || !text(o.finding) || Object.keys(o).some((k) => !['path', 'finding', 'file', 'ruleId'].includes(k)))))
+    fail('owedToWire must be an array of {path, finding, file?, ruleId?}');
   if (value.files !== undefined) {
     if (!Array.isArray(value.files) || value.files.some((f) => !text(f)) || new Set(value.files).size !== value.files.length) fail('files must be an array of unique path strings');
     else for (const f of value.files) if (!underOwned(f, ownedPaths)) fail(`file '${f}' is outside owned_paths`);
