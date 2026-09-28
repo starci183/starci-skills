@@ -1,5 +1,5 @@
 // Readable names (owner request 2026-09-27): a workflow has a display name (workflows.display_name, set at
-// define-goal and by `api rename`), an op a Vietnamese label (modules/ops/labels.yaml), and an op job the name
+// define-goal and by `api rename`), an op a Vietnamese label (modules/ops/_labels.yaml), and an op job the name
 // `<op label> · <what> · <workflow name>`. workflow_id, op_id and job_id stay the keys; the names are what
 // the [Kernel]/[Op] Orca tabs, api status, the supervisor digest, Telegram and the harness UI show.
 import test from 'node:test';

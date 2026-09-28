@@ -4,7 +4,7 @@
 // The ids stay the keys everywhere (workflow_id, op_id, job_id); these are labels only:
 //   workflow  workflows.display_name (api rename; derived at define-goal), else the goal slug in
 //             workflows.title, else the workflow id. Vietnamese, `<Product> · <what it does>`.
-//   operation modules/ops/labels.yaml (vi/en), else the op id.
+//   operation modules/ops/_labels.yaml (vi/en), else the op id.
 //   op job    `<op label> · <what> · <workflow name>`: `what` is the job's target — an explicit
 //             enqueue --what, the work-graph node it covers, the Work record it owns, the slice
 //             its title names, its feature path, its cut — at most JOB_WHAT_MAX characters.
@@ -21,9 +21,9 @@ export const DISPLAY_NAME_LIMIT = 80;
 export const JOB_WHAT_MAX = 40;
 export const NAME_SEPARATOR = ' · ';
 
-const LABELS_FILE = new URL('../../modules/ops/labels.yaml', import.meta.url);
+const LABELS_FILE = new URL('../../modules/ops/_labels.yaml', import.meta.url);
 let labelsCache = null;
-/** {op: {vi, en}} from modules/ops/labels.yaml; {} when the file is unreadable. */
+/** {op: {vi, en}} from modules/ops/_labels.yaml; {} when the file is unreadable. */
 export function opLabelMap() {
   if (labelsCache) return labelsCache;
   try { labelsCache = Object.freeze({ ...(parseYaml(fs.readFileSync(LABELS_FILE, 'utf8'))?.labels ?? {}) }); }

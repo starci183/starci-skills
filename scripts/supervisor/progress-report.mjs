@@ -28,7 +28,7 @@ import { opLabelMap } from '../lib/display-names.mjs';
 const TZ = 'Asia/Ho_Chi_Minh';
 
 // Plain Vietnamese for each leg, so the owner never has to decode an op id: the shared op labels
-// (modules/ops/labels.yaml through scripts/lib/display-names.mjs), the same words the UI and Orca show.
+// (modules/ops/_labels.yaml through scripts/lib/display-names.mjs), the same words the UI and Orca show.
 export const LEG_VI = Object.freeze(Object.fromEntries(Object.entries(opLabelMap()).map(([op, label]) => [op, label.vi ?? op])));
 const legVi = (op) => LEG_VI[op] ?? op;
 const ALIASES = { 'nivo-app-auth': 'AUTH (đăng nhập)', 'nivo-workspace-provision': 'WSPV (mua & cấp workspace)',

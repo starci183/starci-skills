@@ -928,7 +928,7 @@ moduleLocalDocumentKinds:
     files: [modules/kernel/owner-rulings.yaml]
   - id: starci/op-labels@1
     governs: "The human name (vi/en) of every operation; op ids stay the key (scripts/lib/display-names.mjs opLabel)."
-    files: [modules/ops/labels.yaml]
+    files: [modules/ops/_labels.yaml]
   - id: starci/module-kernel-dispatch@1
     governs: "The packet an operation is launched with."
     files: [modules/kernel/dispatch.yaml]

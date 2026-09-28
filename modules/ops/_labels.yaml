@@ -1,4 +1,7 @@
-# labels.yaml — the human name of every operation, one shared map.
+# _labels.yaml — the human name of every operation, one shared map.
+# The underscore prefix keeps this file out of the op catalog scan, like
+# _common.yaml: scripts/route/build-ops-registry.mjs and route-op.mjs skip
+# modules/ops/*.yaml files whose names start with "_".
 #
 # Owner request 2026-09-27: kernels, workflows and op workers carry names a person understands. The
 # op id (interface.draw) stays the key everywhere — the ledger, the api, job ids, contracts; this map
