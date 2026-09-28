@@ -75,7 +75,7 @@ export function claimDue(ctx, { controller, duty, intervalMs, now = Date.now(), 
         m.finishSchedule({ controller, duty, result: row.running_pid != null ? 'unknown' : row.last_result ?? 'skipped', digest: row.last_result_digest ?? null, nextDueAt: now });
       }
       return m.claimSchedule({ controller, duty, pid }) ? d : { due: false, nextAt: null, reason: 'claimed-elsewhere' };
-    }), { env: ctx?.env ?? process.env });
+    }), { env: ctx?.env ?? process.env, now: () => now });
   } catch (error) { return { due: false, nextAt: null, reason: 'store-unavailable', error: String(error?.message ?? error).slice(0, 200) }; }
 }
 
@@ -93,7 +93,7 @@ export function finishDuty(ctx, { controller, duty, result = 'done', actionId = 
     return withMachine((m) => m.transaction(() => {
       const row = m.schedules().find((s) => s.controller === controller && s.duty === duty);
       return m.finishSchedule({ controller, duty, result: r, digest: digest ?? row?.last_result_digest ?? null });
-    }), { env: ctx?.env ?? process.env });
+    }), { env: ctx?.env ?? process.env, now: () => now });
   } catch { return false; }
 }
 
