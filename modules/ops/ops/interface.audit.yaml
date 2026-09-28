@@ -87,7 +87,7 @@ reads:
   - id: shell
     path: .starciwork/shell/index.yaml
     purpose:
-      en: "The product's layout tree (work/layout-tree@1) and its shell/assets/** captures: the app/ nodes
+      en: "The product's layout tree (work/layout-tree@1) and the captures it cites (blobs, scripts/lib/blob-lookup.mjs): the app/ nodes
         with their layouts, chrome decisions, navigation and labels per locale, per-layout revs and
         slot-measured captures per breakpoint and theme, productLocale and the demo personas - the
         structure every accepted direction is composited into and every delivered route is compared with."

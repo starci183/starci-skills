@@ -393,12 +393,13 @@ $defs:
     type: object
     additionalProperties: false
     required:
-      - path
+      - name
       - sha256
     properties:
-      path:
+      name:
         $ref: "#/$defs/prose"
-        description: Relative to this record's directory - assets/...
+        description: The logical name - assets/lockups/lockup--<theme>.png. The bytes are a blob the sha256 cites
+          (agent data, never a file under shell/assets; scripts/lib/blob-lookup.mjs resolves it).
       sha256:
         $ref: "#/$defs/sha256"
       theme:
@@ -442,7 +443,7 @@ $defs:
     required:
       - breakpoint
       - theme
-      - path
+      - name
       - sha256
       - width
       - height
@@ -461,9 +462,10 @@ $defs:
           - dark
       locale:
         $ref: "#/$defs/localeTag"
-      path:
+      name:
         $ref: "#/$defs/prose"
-        description: Relative to this record's directory - assets/layouts/<node-slug>--<breakpoint>--<theme>.png.
+        description: The logical name - assets/layouts/<node-slug>--<breakpoint>--<theme>.png; a composite knows it as
+          shell/<name>. The bytes are a blob the sha256 cites (agent data, never a file under shell/assets).
       sha256:
         $ref: "#/$defs/sha256"
       width:

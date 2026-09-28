@@ -125,7 +125,7 @@ schemas:
     dialect: json-schema
     subsystem: work-tree
     governs: "The product's layout tree as ONE root record beside brand/ — the frontend's Next.js app/ directory as one node per segment (layouts, route groups, @slots, (.)intercepts, loading/error/not-found) with source digests, each visible layout's chrome, navigation labels per locale and slot-measured captures per breakpoint and theme, productLocale, demo personas by role and the brand lockup."
-    binds: .starciwork/shell/index.yaml (+ shell/assets/**)
+    binds: .starciwork/shell/index.yaml (its captures and lockups are cited blobs)
     usedBy:
       - "scripts/work/layout-tree.mjs (scan, convert, capture, plan - the record is generated, never hand-listed)"
       - "scripts/work/compose-direction.mjs (the layout capture and slot a direction is composited into)"

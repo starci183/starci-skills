@@ -29,6 +29,8 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { stringifyYaml } from '../../engine/yaml.mjs';
+import { putBlob } from '../lib/artifact-store.mjs';
+import { blobAsFile } from '../lib/blob-lookup.mjs';
 import { cropImage, decodePng, encodePng, keyRect } from './png.mjs';
 import { REQUIRED_BREAKPOINTS, REQUIRED_THEMES, drawingAcceptance } from './direction-part.mjs';
 import {
@@ -649,11 +651,11 @@ export function layoutSettlement(record, node, { shellDir = null, uiLoader = nul
       for (const bp of breakpoints) for (const theme of themes) {
         const capture = list(layout.captures).find((c) => c?.breakpoint === bp && c?.theme === theme);
         if (!capture) { reasons.push(`${node.id} has no capture at ${bp}/${theme}`); continue; }
-        if (!capture.slot) reasons.push(`${node.id} capture ${capture.path} has no measured slot`);
+        if (!capture.slot) reasons.push(`${node.id} capture ${captureRelOf(capture)} has no measured slot`);
         if (shellDir) {
-          const file = path.join(shellDir, capture.path);
-          if (!fs.existsSync(file)) reasons.push(`${node.id} capture ${capture.path} is not on disk`);
-          else if (capture.sha256 && sha256File(file) !== capture.sha256) reasons.push(`${node.id} capture ${capture.path} no longer hashes to its recorded sha256`);
+          const file = captureFileOf(shellDir, capture);
+          if (!file || !fs.existsSync(file)) reasons.push(`${node.id} capture ${captureRelOf(capture)} is neither in the blob store nor on disk`);
+          else if (capture.sha256 && sha256File(file) !== capture.sha256) reasons.push(`${node.id} capture ${captureRelOf(capture)} no longer hashes to its recorded sha256`);
         }
       }
       // Each destination is a render of its own, held to the same matrix, disk and digest as the default.
@@ -661,11 +663,11 @@ export function layoutSettlement(record, node, { shellDir = null, uiLoader = nul
         for (const bp of breakpoints) for (const theme of themes) {
           const capture = d.captures.find((c) => c?.breakpoint === bp && c?.theme === theme);
           if (!capture) { reasons.push(`${node.id} destination ${d.key} has no capture at ${bp}/${theme}`); continue; }
-          if (!capture.slot && !d.legacy) reasons.push(`${node.id} destination ${d.key} capture ${capture.path} has no measured slot`);
+          if (!capture.slot && !d.legacy) reasons.push(`${node.id} destination ${d.key} capture ${captureRelOf(capture)} has no measured slot`);
           if (shellDir) {
-            const file = path.join(shellDir, capture.path);
-            if (!fs.existsSync(file)) reasons.push(`${node.id} destination ${d.key} capture ${capture.path} is not on disk`);
-            else if (capture.sha256 && sha256File(file) !== capture.sha256) reasons.push(`${node.id} destination ${d.key} capture ${capture.path} no longer hashes to its recorded sha256`);
+            const file = captureFileOf(shellDir, capture);
+            if (!file || !fs.existsSync(file)) reasons.push(`${node.id} destination ${d.key} capture ${captureRelOf(capture)} is neither in the blob store nor on disk`);
+            else if (capture.sha256 && sha256File(file) !== capture.sha256) reasons.push(`${node.id} destination ${d.key} capture ${captureRelOf(capture)} no longer hashes to its recorded sha256`);
           }
         }
       }
@@ -749,18 +751,41 @@ export function destinationFor(record, node, { route = null, activeNav = null, k
   return byNav ? { destination: byNav, by: 'activeNav' } : null;
 }
 
-/** Every recorded capture of a layout node (default and per destination) at bp/theme: [{rel, sha256, destination|null}]. */
+// alpha.3 (ARCHITECTURE-DB §5.1): a layout capture is agent data - a blob the layout tree cites {name, sha256, ...},
+// never a file under .starciwork/shell/assets. addCapture puts the bytes in the blob store (and a copy in the job's
+// STARCI_JOB_SCRATCH/captures/layouts, which api report attaches by itself). A capture recorded with a `path` (a tree
+// written before) still reads from the tree.
+/** The readable PNG of one recorded capture: the blob it cites, else its file under `shellDir`; null when neither. */
+export function captureFileOf(shellDir, capture) {
+  if (!capture) return null;
+  if (typeof capture.path === 'string' && capture.path) return shellDir ? path.join(shellDir, capture.path) : null;
+  return blobAsFile({ sha256: capture.sha256 }, { ext: '.png' });
+}
+/** The name a capture is known by in composites and findings: shell/<name> (shell/<path> for a tree-kept one). */
+export const captureRelOf = (capture) => `shell/${slash(capture?.path ?? capture?.name ?? '')}`;
+/** Put a capture's bytes in the blob store (and the job scratch); returns the logical name recorded as `name`. */
+function storeCapture(bytes, name) {
+  putBlob(bytes, { mediaType: 'image/png' });
+  if (process.env.STARCI_JOB_SCRATCH) {
+    const copy = path.join(path.resolve(process.env.STARCI_JOB_SCRATCH), 'captures', 'layouts', path.basename(name));
+    fs.mkdirSync(path.dirname(copy), { recursive: true });
+    fs.writeFileSync(copy, bytes);
+  }
+  return name;
+}
+
+/** Every recorded capture of a layout node (default and per destination) at bp/theme: [{rel, sha256, path|null, name|null, destination|null}]. */
 export function capturesAt(record, node, bp, theme) {
   const out = [];
-  for (const c of list(node?.layout?.captures)) if (c?.breakpoint === bp && c?.theme === theme) out.push({ rel: `shell/${slash(c.path)}`, sha256: c.sha256, destination: null });
-  for (const d of destinationsOf(record, node)) for (const c of d.captures) if (c?.breakpoint === bp && c?.theme === theme) out.push({ rel: `shell/${slash(c.path)}`, sha256: c.sha256, destination: d.key });
+  for (const c of list(node?.layout?.captures)) if (c?.breakpoint === bp && c?.theme === theme) out.push({ rel: captureRelOf(c), sha256: c.sha256, path: c.path ?? null, name: c.name ?? null, destination: null });
+  for (const d of destinationsOf(record, node)) for (const c of d.captures) if (c?.breakpoint === bp && c?.theme === theme) out.push({ rel: captureRelOf(c), sha256: c.sha256, path: c.path ?? null, name: c.name ?? null, destination: d.key });
   return out;
 }
 
 /** A capture's slot and size: as recorded, else measured from the PNG on disk (legacy destination captures). */
 function measuredCapture(shellDir, capture) {
   if (capture.slot && capture.width && capture.height) return capture;
-  const file = shellDir ? path.join(shellDir, capture.path) : null;
+  const file = captureFileOf(shellDir, capture);
   if (!file || !fs.existsSync(file)) return capture;
   const image = decodePng(fs.readFileSync(file));
   const key = keyRect(image, SLOT_KEY);
@@ -791,14 +816,14 @@ export function baseLayoutFor(record, route, bp, theme, { shellDir, uiLoader = n
     const hit = picked.destination.captures.find((c) => c?.breakpoint === bp && c?.theme === theme);
     if (hit) {
       const c = measuredCapture(shellDir, hit);
-      if (!c.slot) return { missing: `${node.id} destination ${picked.destination.key} capture ${hit.path} has no measured #FF00FF slot` };
-      return { node: node.id, file: path.join(shellDir, c.path), rel: `shell/${slash(c.path)}`, sha256: c.sha256, slot: c.slot, width: c.width, height: c.height, destination: picked.destination.key, by: picked.by, equivalents: same(c.sha256) };
+      if (!c.slot) return { missing: `${node.id} destination ${picked.destination.key} capture ${captureRelOf(hit)} has no measured #FF00FF slot` };
+      return { node: node.id, file: captureFileOf(shellDir, c), rel: captureRelOf(c), sha256: c.sha256, slot: c.slot, width: c.width, height: c.height, destination: picked.destination.key, by: picked.by, equivalents: same(c.sha256) };
     }
     if (REQUIRED_BREAKPOINTS.includes(bp) && REQUIRED_THEMES.includes(theme)) return { missing: `${node.id} destination ${picked.destination.key} (active for ${ui?.route ?? route}) has no capture at ${bp}/${theme}` };
     destination = picked.destination.key;
   }
   const capture = list(node.layout.captures).find((c) => c?.breakpoint === bp && c?.theme === theme);
-  if (capture) return { node: node.id, file: path.join(shellDir, capture.path), rel: `shell/${slash(capture.path)}`, sha256: capture.sha256, slot: capture.slot, width: capture.width, height: capture.height, destination: null, ...(destination ? { destinationFallback: destination } : {}), equivalents: same(capture.sha256) };
+  if (capture) return { node: node.id, file: captureFileOf(shellDir, capture), rel: captureRelOf(capture), sha256: capture.sha256, slot: capture.slot, width: capture.width, height: capture.height, destination: null, ...(destination ? { destinationFallback: destination } : {}), equivalents: same(capture.sha256) };
   if (node.layout.design && uiLoader) {
     const design = uiLoader(node.layout.design);
     const hit = design && designCaptureOf(design, bp, theme);
@@ -1005,11 +1030,8 @@ export function addCapture(record, shellDir, { node: id, breakpoint, theme, file
   const image = decodePng(bytes);
   const key = keyRect(image, SLOT_KEY);
   if (!key || key.fill < SLOT_FILL_MIN) throw new Error(`${file}: no solid #FF00FF slot found (fill ${key ? key.fill.toFixed(3) : 0}) - capture with the page slot emptied and keyed`);
-  const rel = `assets/layouts/${nodeSlug(id)}--${breakpoint}--${theme}.png`;
-  const dest = path.join(shellDir, rel);
-  fs.mkdirSync(path.dirname(dest), { recursive: true });
-  if (path.resolve(dest) !== path.resolve(file)) fs.writeFileSync(dest, bytes);
-  const capture = { breakpoint, theme, ...(locale ? { locale } : {}), path: rel, sha256: sha256Of(bytes), width: image.width, height: image.height, slot: key.rect, kind: 'render', ...(url ? { url } : {}), ...(provenance ? { provenance } : {}) };
+  const name = storeCapture(bytes, `assets/layouts/${nodeSlug(id)}--${breakpoint}--${theme}.png`);
+  const capture = { breakpoint, theme, ...(locale ? { locale } : {}), name, sha256: sha256Of(bytes), width: image.width, height: image.height, slot: key.rect, kind: 'render', ...(url ? { url } : {}), ...(provenance ? { provenance } : {}) };
   const cell = (c) => c.breakpoint === breakpoint && c.theme === theme;
   const prior = list(node.layout.captures).find(cell);
   node.layout.captures = [...list(node.layout.captures).filter((c) => !cell(c)), capture].sort((a, b) => `${a.breakpoint}/${a.theme}`.localeCompare(`${b.breakpoint}/${b.theme}`));
@@ -1049,11 +1071,8 @@ export function addDestinationCapture(record, shellDir, { node: id, destination,
   if (!wanted.length) throw new Error(`${destination}: name the node ids it is active for with --route (it is not a nav item of ${id} with a target)`);
   for (const r of wanted) if (!nodeById(record, r) || !underNode(r, id)) throw new Error(`${r}: not a node at or below ${id}`);
   const measured = readCaptureFile(file);
-  const rel = `assets/layouts/${nodeSlug(id)}--${destination}--${breakpoint}--${theme}.png`;
-  const dest = path.join(shellDir, rel);
-  fs.mkdirSync(path.dirname(dest), { recursive: true });
-  if (path.resolve(dest) !== path.resolve(file)) fs.writeFileSync(dest, measured.bytes);
-  const capture = { breakpoint, theme, ...(locale ? { locale } : {}), path: rel, sha256: measured.sha256, width: measured.width, height: measured.height, slot: measured.slot, kind: 'render', ...(url ? { url } : {}), ...(provenance ? { provenance } : {}) };
+  const name = storeCapture(measured.bytes, `assets/layouts/${nodeSlug(id)}--${destination}--${breakpoint}--${theme}.png`);
+  const capture = { breakpoint, theme, ...(locale ? { locale } : {}), name, sha256: measured.sha256, width: measured.width, height: measured.height, slot: measured.slot, kind: 'render', ...(url ? { url } : {}), ...(provenance ? { provenance } : {}) };
   if (!entry) { entry = { key: destination, routes: wanted, captures: [] }; dests.push(entry); } else entry.routes = wanted;
   const prior = list(entry.captures).find((c) => c.breakpoint === breakpoint && c.theme === theme);
   entry.captures = [...list(entry.captures).filter((c) => !(c.breakpoint === breakpoint && c.theme === theme)), capture].sort((a, b) => `${a.breakpoint}/${a.theme}`.localeCompare(`${b.breakpoint}/${b.theme}`));
@@ -1139,10 +1158,10 @@ export function lockupSourceOf(record, workRoot, ref, uiLoader = null) {
   const rel = shell[1];
   for (const node of nodesOf(record).filter((n) => n.layout)) {
     const captures = [...list(node.layout.captures), ...destinationsOf(record, node).flatMap((d) => d.captures)];
-    const hit = captures.find((c) => slash(c.path) === rel);
+    const hit = captures.find((c) => slash(c.path ?? c.name ?? '') === rel);
     if (!hit) continue;
-    const file = path.join(shellDir, rel);
-    if (!fs.existsSync(file)) return { error: `${rel} is not on disk` };
+    const file = captureFileOf(shellDir, hit);
+    if (!file || !fs.existsSync(file)) return { error: `${rel} is neither in the blob store nor on disk` };
     const sha256 = sha256File(file);
     if (hit.sha256 && hit.sha256 !== sha256) return { error: `${rel} no longer hashes to its recorded sha256` };
     return { file, ref: `shell/${rel}`, kind: 'render', sha256, node: node.id, theme: hit.theme ?? null };
@@ -1153,7 +1172,7 @@ export function lockupSourceOf(record, workRoot, ref, uiLoader = null) {
 /**
  * Crop the lockup out of a source image (lockupSourceOf) at `rect` and upsert it into brand.lockups for its
  * theme, with `source` naming the image, its digest and the rectangle so the crop is re-derivable. Mutates
- * `record`; writes assets/lockups/lockup--<theme>.png under the shell dir.
+ * `record`; the crop is a blob (+ the job scratch copy) the lockup cites as name assets/lockups/lockup--<theme>.png.
  */
 export function addLockup(record, workRoot, { from, rect, theme = null, provenance = null, uiLoader = null }) {
   const source = lockupSourceOf(record, workRoot, from, uiLoader);
@@ -1165,12 +1184,9 @@ export function addLockup(record, workRoot, { from, rect, theme = null, provenan
   const th = theme ?? source.theme ?? 'light';
   if (!THEMES.includes(th)) throw new Error(`${th}: not a theme (${THEMES.join(', ')})`);
   const bytes = encodePng(cropImage(image, r));
-  const rel = `assets/lockups/lockup--${th}.png`;
-  const dest = path.join(workRoot, 'shell', rel);
-  fs.mkdirSync(path.dirname(dest), { recursive: true });
-  fs.writeFileSync(dest, bytes);
+  const name = storeCapture(bytes, `assets/lockups/lockup--${th}.png`);
   const lockup = {
-    path: rel, sha256: sha256Of(bytes), theme: th, width: r.width, height: r.height,
+    name, sha256: sha256Of(bytes), theme: th, width: r.width, height: r.height,
     provenance: provenance ?? `cropped by ${SCANNER} lockup from ${source.kind === 'render' ? 'the real render' : 'the accepted layout drawing'} ${source.ref}`,
     source: { ref: source.ref, kind: source.kind, sha256: source.sha256, rect: r },
   };

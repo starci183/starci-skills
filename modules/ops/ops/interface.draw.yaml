@@ -77,7 +77,7 @@ reads:
     mustExist: true
     layoutChain: true
     purpose:
-      en: "The product's layout tree (work/layout-tree@1) with its shell/assets/** captures: one node per
+      en: "The product's layout tree (work/layout-tree@1) with the captures it cites (blobs, scripts/lib/blob-lookup.mjs): one node per
         app/ segment - route groups, parallel slots @x, intercepting routes (.)x, loading/error/not-found
         files - each layout with its chrome (visible or passthrough), rev, navigation with labels per
         locale out of the i18n catalogs, and real captures per breakpoint and theme with the page slot

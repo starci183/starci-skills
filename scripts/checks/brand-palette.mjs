@@ -58,7 +58,7 @@ import { brandColours } from './render.mjs';
 import { decodePng, keyRect } from '../work/png.mjs';
 import { sha256File } from '../../engine/digest.mjs';
 import { isPartName } from '../work/direction-part.mjs';
-import { capturesAt, matrixOf, nodesOf } from '../work/layout-tree.mjs';
+import { captureFileOf, capturesAt, matrixOf, nodesOf } from '../work/layout-tree.mjs';
 import { assetsOf, indexFilesUnder, list, readYamlOrNull, slash } from '../work/work-io.mjs';
 
 export const PALETTE_CODES = { offBrand: 'PALETTE_OFF_BRAND', primaryAbsent: 'PRIMARY_ABSENT', unavailable: 'BRAND_PALETTE_UNAVAILABLE', unreadable: 'PALETTE_IMAGE_UNREADABLE' };
@@ -418,7 +418,7 @@ export async function scanTargets(workRoot) {
     for (const node of nodesOf(shell)) for (const bp of breakpoints) for (const th of themes) for (const c of capturesAt(shell, node, bp, th)) {
       if (seen.has(c.rel)) continue;
       seen.add(c.rel);
-      targets.push({ record: `shell ${node.id}${c.destination ? ` (${c.destination})` : ''}`, recordFile: shellFile, kind: 'layout capture', file: path.join(workRoot, ...c.rel.split('/')), declared: true });
+      targets.push({ record: `shell ${node.id}${c.destination ? ` (${c.destination})` : ''}`, recordFile: shellFile, kind: 'layout capture', file: captureFileOf(path.join(workRoot, 'shell'), c), declared: true });
     }
   }
   return targets;

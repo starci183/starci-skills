@@ -27,9 +27,10 @@ import { fileURLToPath } from 'node:url';
 import { blankImage, cropImage, decodePng, dimImage, drawOver, encodePng, keyRect, resizeImage } from './png.mjs';
 import {
   OVERLAY_SURFACES, SLOT_KEY, baseLayoutFor, directionAt, isLayoutTree, isOverlayRecord, loadUiRecords, matrixOf,
-  nodeById, readShellRecord, surfaceAt,
+  captureFileOf, captureRelOf, destinationsOf, nodeById, nodesOf, readShellRecord, surfaceAt,
 } from './layout-tree.mjs';
 import { DRAW_TOOL } from '../checks/ui-shapes.mjs';
+import { parseYaml } from '../../engine/yaml.mjs';
 import { SLOT_FILL_MIN, assetsOf, flag, list, parseUiRef, readYamlOrNull, sha256Of, slash, workRootOf } from './work-io.mjs';
 
 export const COMPOSITOR = 'scripts/work/compose-direction.mjs';
@@ -84,6 +85,15 @@ export function resolveImageRef(workRoot, ref, uiRecords = null) {
   if (m) {
     const ui = (uiRecords ?? loadUiRecords(workRoot)).get(m.id);
     return ui ? path.join(path.dirname(ui.file), m.path) : null;
+  }
+  // shell/<name>: a layout capture or lockup the layout tree cites - a blob (alpha.3), or a file a tree kept.
+  const shellRef = /^shell\/(.+)$/.exec(String(ref));
+  if (shellRef) {
+    let tree = null;
+    try { tree = parseYaml(fs.readFileSync(path.join(workRoot, 'shell', 'index.yaml'), 'utf8')); } catch { tree = null; }
+    const cited = [...nodesOf(tree ?? {}).flatMap((n) => [...list(n.layout?.captures), ...destinationsOf(tree, n).flatMap((d) => d.captures)]), ...list(tree?.brand?.lockups)]
+      .find((c) => captureRelOf(c) === `shell/${shellRef[1]}`);
+    if (cited) return captureFileOf(path.join(workRoot, 'shell'), cited);
   }
   return path.join(workRoot, ref);
 }

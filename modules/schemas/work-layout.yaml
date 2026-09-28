@@ -7,7 +7,7 @@ shape:
   brand: brand/index.yaml
   brandAssets: brand/assets/**/<file-in-original-format>
   shell: shell/index.yaml
-  shellAssets: shell/assets/**/<file-in-original-format> - layout captures; agent data (shape.agentData), cited by shell/index.yaml
+  shellAssets: none - layout captures and lockups are blobs shell/index.yaml cites {name, sha256} (agent data, shape.agentData)
   families: [br, ac, fr, nfr, data, journey, decision, sds, ui, impl, uat, contract, integration, gap, event]
   familiesNote: "The array above is the executable form of this shape block: every record lives in a flat
     family folder directly under its feature - features/<feature>/<family>/<name>/index.yaml - with no
@@ -124,9 +124,10 @@ shape:
     - the ledger and log files (runtime.sqlite*, logs.sqlite*) and worktrees/ (op worktrees live at D:/starci-wt)
     - "E/** bundles, UAT runs and interface.audit verdicts are filed from STARCI_JOB_SCRATCH with api report --attach
       (modules/ops/_common.yaml Path and field contract): artifacts of the attempt, the audit an interface_audits row.
-      Transition: the impl running-page captures, the shell/assets layout captures and the draw-loop rounds are still
-      written in place by interface.implement, brand.decide and draw-loop.mjs until their readers resolve blobs; they
-      are agent data all the same, the next comeback archives them, and check-example-work warns on them."
+      Draw-loop rounds are one blob bundle generation.loop cites {sha256, round}; impl running-page captures are blobs
+      the implementation record's assets[] cites {artifact?, name, role, sha256}; layout captures and lockups are blobs
+      shell/index.yaml cites {name, sha256}. Every reader resolves them through scripts/lib/blob-lookup.mjs. The final
+      directions the owner accepts stay product content under ui/<screen>/assets (decision Q2)."
   starciworkIgnore:
     - "The .starciwork/.gitignore the runtime installs in a backend repository (starciwork-boundary.mjs
       STARCIWORK_GITIGNORE, written by the comeback): deny the root, re-admit the productPaths roots, deny agent
@@ -162,8 +163,8 @@ shape:
     every state the record's states list names. Until interface.draw has run, the record stays todo
     and cites a gap.<feature>.direction-not-drawn record in blockedBy - the image is a designed op
     output, not something an agent types into place."
-  frontendCaptures: "features/<feature>/impl/<repository>/<name>/assets/<running-page-screenshot>,
-    with a matching markup reference kept beside each capture. These assets never carry a
+  frontendCaptures: "blobs the implementation record's assets[] cites {artifact?, name, role, sha256} - the running-page
+    screenshot and its markup under the same stem, filed from STARCI_JOB_SCRATCH/captures (never under the impl node). These assets never carry a
     generation record - that is what tells a capture and a direction apart regardless of prose
     provenance (see scripts/checks/render.mjs's capture-identity rule) - and a generation-bearing asset
     never sits outside a work/ui-screen@1 record's own assets/. Agent data (shape.agentData): its target is job_artifacts(role=capture/dom) + blobs."
@@ -337,8 +338,8 @@ rules:
     promptPath, inputRefs}} asset with its exact prompt kept as a sibling {role: prompt} asset; a
     model name is recorded only when the tool exposes one, never authored, and never the host (an
     Orca-run image step is the host, not a generation field). frontend.implement's implementation
-    capture is a real running-page screenshot under the owning impl/<repository>/<name>/ record's
-    assets/ with a matching markup reference and never a generation record. uat.verify's run is the
+    capture is a real running-page screenshot the owning impl/<repository>/<name>/ record cites as a blob
+    with its markup under the same stem and never a generation record. uat.verify's run is the
     append-only
     run the op's writes.evidence names, filed as blobs of its attempt and cited by the flow's sibling
     evidence.yaml (run {id, result, screens[], videos[]} by sha256). A generation-bearing asset outside a
@@ -515,8 +516,6 @@ example:
     - assets/imagery/reference-hero.webp
   shell/:
     - index.yaml
-    - assets/layouts/locale-console--desktop--light.png
-    - assets/brand-lockup.png
   features/knowledge/:
     - index.yaml
     - fr/documents/index.yaml

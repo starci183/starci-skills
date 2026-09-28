@@ -208,10 +208,11 @@ writes:
         validate lists it as DESIGN_PLANNED, never refuses it, so it stays in layout.design and is never moved into blockers.
         A sibling evidence.yaml binds the scan and capture runs."
   - id: shellAssets
-    path: .starciwork/shell/assets/<asset>
-    fields: [capture bytes with sha256 provenance]
+    path: blob store (+ <STARCI_JOB_SCRATCH>/captures/layouts, attached by api report) - never .starciwork/shell/assets
+    fields: [capture bytes cited by name + sha256 in shell/index.yaml]
     content:
-      en: "Real browser renders of the running frontend at assets/layouts/<node>--<breakpoint>--<theme>.png -
+      en: "Agent data (ARCHITECTURE-DB §5.1): `layout-tree.mjs capture|lockup --write` puts the bytes in the blob store and
+        the layout tree cites each {name, sha256, ...}. Real browser renders of the running frontend named assets/layouts/<node>--<breakpoint>--<theme>.png -
         each visible layout rendered with the full chain above it, in the productLocale default, the page
         slot's children hidden and the slot filled #FF00FF so its rectangle is measured from the image -
         and the brand lockup cropped from the same render. Never a generated image; a planned layout is
@@ -219,7 +220,7 @@ writes:
         cropped from the planned layout's ACCEPTED layout composite instead (`layout-tree.mjs lockup --work
         .starciwork --from <design-ui-id>:<layout composite path> --rect x,y,w,h --write`, which records
         brand.lockups[].source), and re-cropped from a real render (`--from shell/<capture path>`) once
-        the frontend renders it."
+        the frontend renders it; a capture is named shell/<name> in --from."
   - id: evidence
     path: E/**
     fields: [id, nodeId, inputDigest, outcome, assertions, assets, provenance, extensions]

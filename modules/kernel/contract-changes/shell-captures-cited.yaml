@@ -1,0 +1,11 @@
+id: shell-captures-cited
+effectiveAt: '2026-09-29T05:00:00+07:00'
+summary: "alpha.3 (ARCHITECTURE-DB §5.1): layout captures and brand lockups are agent data. layout-tree.mjs capture / lockup put the bytes in the blob store (and a copy in STARCI_JOB_SCRATCH/captures/layouts, which api report attaches) and the work/layout-tree@1 record cites each {name, sha256, ...} - no path, never a file under .starciwork/shell/assets; a composite still names a capture shell/<name>. layout-tree.mjs captureFileOf / captureRelOf, compose-direction.mjs resolveImageRef, shell-conformance and brand-palette read them through scripts/lib/blob-lookup.mjs. Adds no check or finding code"
+reach: new-legs
+paths:
+  - modules/ops/ops/brand.decide.yaml
+  - modules/ops/ops/interface.audit.yaml
+  - modules/ops/ops/interface.draw.yaml
+  - modules/schemas/work-layout-tree.schema.yaml
+  - modules/schemas/work-layout.yaml
+  - modules/schemas/index.yaml
