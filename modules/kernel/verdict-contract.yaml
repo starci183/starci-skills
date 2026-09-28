@@ -168,8 +168,8 @@ retryAccounting:
     A dispatch-rejected/provider failure is excluded from business route limits
     only when its durable result explicitly carries effectState:none,
     retryable:true and attemptConsumed:false. The queued job keeps
-    its durable attempt and businessAttempt while consuming the separately
-    bounded infrastructure restart allowance.
+    its try (the same job row, no new try_no: a leased -> ready move) while
+    consuming the separately bounded infrastructure restart allowance.
   ownerWait: >-
     An ask is a wait on the owner, not a failure. `api settle --verdict
     blocked` on a filed `ask` report records result_json.verdict

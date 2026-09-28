@@ -1,5 +1,5 @@
 reconcile:
-  args: '--job <job_id> [--retry-lineage | --drop --reason <text> | --reap | --dead-worker [--settle-failed] [--no-salvage] | --release-worker | --debris [--commit]] | --orphan-kernel-jobs [--workflow <id>] [--dry-run] | --orca-tasks [--workflow <id>] [--dry-run] | --work-debt [--workflow <id>]'
+  args: '--job <job_id> [--drop --reason <text> | --reap | --dead-worker [--settle-failed] [--no-salvage] | --release-worker | --debris [--commit]] | --orphan-kernel-jobs [--workflow <id>] [--dry-run] | --orca-tasks [--workflow <id>] [--dry-run] | --work-debt [--workflow <id>]'
   debris: >-
     `--job <id> --debris [--commit]`: the debris a job found in its owned paths - dirty files last written
     before its admission that its report does not name (scripts/kernel/settle-landed.mjs landedProof
@@ -229,7 +229,7 @@ reconcile:
     reap-no-terminal. Leftover op terminals are the Kernel's to clean.
   drop: >-
     `--drop --reason <text>` retires a QUEUED job that never crossed the
-    dispatch boundary (the same evidence test as --retry-lineage): the row
+    dispatch boundary: the row
     settles `cancelled` with result {verdict:'dropped', reason, at} and one
     event 'job-dropped' {op, attempt, reason, cut, waiting}. `waiting` names
     every queued job whose --after is this job, or whose cut seam this job
@@ -241,23 +241,7 @@ reconcile:
     is how a Kernel clears a cut whose grants are wrong before it re-plans
     it. Refuses drop-not-queued, drop-needs-reason and drop-dispatched
     (with `evidence`).
-  retryLineage: >-
-    `--retry-lineage` is a separate repair, not a launch reconcile: for a
-    QUEUED job that never crossed the dispatch boundary it re-derives
-    payload.retry exactly as enqueue now would (the cut rule above: same
-    op + cut id + ordinal, skipping rows retired before dispatch) from the
-    jobs before its attempt, rewrites it in
-    one transaction and appends one event 'retry-lineage-repaired'
-    {attempt, cut, before, after}. An already-correct lineage writes
-    nothing and returns repaired:false. Returns
-    '{ok:true,jobId,repaired,attempt,cut,before,after}' (repaired:false
-    returns {retry} instead of before/after). Refuses
-    retry-lineage-not-queued (status is not queued) and
-    retry-lineage-dispatched (a contract, report, check, held lease,
-    worker id, managed/orca/runtime dispatch binding, rejectedDispatches
-    entry or dispatch-side event exists for the job; the refusal carries
-    `evidence`) — a dispatched attempt's lineage is history and is never
-    rewritten.
+
   reads: >-
     either an effect_unknown managed launch, or a queued row whose accepted
     contract still points at a connected+writable exact operation terminal;
@@ -284,8 +268,6 @@ reconcile:
   refuses:
     - job-unknown
     - job-not-reconcilable: 'status is neither effect_unknown nor the idempotent case of a row already back at queued'
-    - retry-lineage-not-queued: '--retry-lineage on a job that is not queued'
-    - retry-lineage-dispatched: '--retry-lineage on a job that was ever dispatched (refusal carries evidence[])'
     - dispatch-identity-missing: 'no exact managed Dispatch id is bound'
     - accepted-contract-exists: 'operation authority may have landed; never infer no effect'
     - worker-report-exists: 'worker evidence exists; use ordinary consume/check/settle'

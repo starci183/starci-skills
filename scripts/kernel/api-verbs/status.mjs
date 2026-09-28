@@ -1,7 +1,7 @@
 // api status: workflow projection, action frontier, and bounded host reads.
 import path from 'node:path';
 import { spawn } from 'node:child_process';
-import { sameWorkLineage } from '../../../engine/admission.mjs';
+import { sameUnit } from '../../../engine/admission.mjs';
 import { runtimeProfile } from '../../../engine/config.mjs';
 import { ownerClaimAudit, ownerGatesNotOwnerWork } from '../owner-claim.mjs';
 import { isAwaitingOwner } from '../failure-steps.mjs';
@@ -182,12 +182,12 @@ function cmdStatus(ledger, args, repo, { emit, internals, ext }) {
   const stillWaits = (row) => {
     const subject = subjectOfJob(row.job_id);
     // Neither subject nor cut: the wait holds until a later job of the same op AND the same unit of
-    // work exists (engine/admission.mjs sameWorkLineage) - an unrelated same-op job enqueued meanwhile
+    // work unit exists (scripts/kernel/units.mjs) - an unrelated same-op job enqueued meanwhile
     // is not its successor (mia inc-2f7968ede59c: two served asks vanished from awaitingOwner).
     if (!subject) {
       const own = workflowJobs.find((j) => j.job_id === row.job_id) ?? row;
       return !workflowJobs.some((other) => other.op_id === row.op_id && other.attempt > row.attempt && other.status !== 'cancelled'
-        && !subjectOfJob(other.job_id) && sameWorkLineage(other, own));
+        && !subjectOfJob(other.job_id) && sameUnit(other, own));
     }
     return !workflowJobs.some((other) => other.op_id === row.op_id && other.attempt > row.attempt && subjectOfJob(other.job_id) === subject);
   };

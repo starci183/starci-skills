@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
-import {admitOpSlot,deriveRetryLineage,normalizeOwnedPath,normalizeOwnedPaths,opSlotCeiling,ownedPathLeaseKey,ownedPathsIntersect,retryDisposition} from '../engine/admission.mjs';
+import {admitOpSlot,normalizeOwnedPath,normalizeOwnedPaths,opSlotCeiling,ownedPathLeaseKey,ownedPathsIntersect,retryDisposition} from '../engine/admission.mjs';
 import {reserveTwoPhase} from '../engine/ledger-db.mjs';
 import {parseYaml} from '../engine/yaml.mjs';
 import {withLedger} from './_ledger-fixture.mjs';
@@ -78,19 +78,16 @@ test('an expired path lease stays a fence until its attempt is explicitly settle
 test('only explicit no-effect infrastructure failures resume without consuming business retry budget',()=>{
   const rejected={job_id:'j1',attempt:1,payload_json:JSON.stringify({businessAttempt:1}),result_json:JSON.stringify({reason:'dispatch-rejected',effectState:'none',retryable:true,attemptConsumed:false})};
   assert.deepEqual(retryDisposition(rejected),{retryClass:'infrastructure',effectState:'none',resumable:true,consumesBusinessRetry:false});
-  assert.deepEqual(deriveRetryLineage(rejected),{retryOf:null,resumeOf:'j1',attempt:1,businessAttempt:1,retryClass:'infrastructure',effectState:'none',resumed:true,reusesDurableAttempt:true,consumesBusinessRetry:false});
 
   const unknown={job_id:'j2',attempt:2,payload_json:JSON.stringify({retry:{businessAttempt:1}}),result_json:JSON.stringify({reason:'dispatch-rejected',retryClass:'infrastructure'})};
   assert.equal(retryDisposition(unknown).resumable,false);
-  assert.deepEqual(deriveRetryLineage(unknown),{retryOf:'j2',resumeOf:null,attempt:3,businessAttempt:2,retryClass:'business',effectState:'unknown',resumed:false,reusesDurableAttempt:false,consumesBusinessRetry:true});
   const refused={job_id:'j3',attempt:1,result_json:JSON.stringify({reason:'dispatch-rejected',effectState:'none',retryable:false,attemptConsumed:true})};
   assert.equal(retryDisposition(refused).resumable,false,'no-effect alone is not enough without durable reusable classification');
 });
 
-test('an attempt settled awaiting-owner advances the durable attempt but spends no business retry',()=>{
+test('an attempt settled awaiting-owner spends no business retry',()=>{
   const asked={job_id:'ask1',attempt:3,payload_json:JSON.stringify({retry:{businessAttempt:2}}),result_json:JSON.stringify({verdict:'awaiting-owner',kernelVerdict:'blocked'})};
   assert.deepEqual(retryDisposition(asked),{retryClass:'owner-answer',effectState:'unknown',resumable:false,consumesBusinessRetry:false});
-  assert.deepEqual(deriveRetryLineage(asked),{retryOf:'ask1',resumeOf:null,attempt:4,businessAttempt:2,retryClass:'owner-answer',effectState:'unknown',resumed:false,reusesDurableAttempt:false,consumesBusinessRetry:false});
   const blocked={job_id:'b1',attempt:1,result_json:JSON.stringify({verdict:'blocked'})};
   assert.equal(retryDisposition(blocked).consumesBusinessRetry,true,'a typed blocker is still a business attempt');
 });

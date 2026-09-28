@@ -66,33 +66,18 @@ export function progressSettings(allocation = null) {
 
 /** The op jobs of one workflow, parsed. */
 export function opJobsOf(db, workflowId) {
-  return db.prepare("SELECT job_id, op_id, attempt, status, payload_json, result_json, created_at, updated_at FROM jobs WHERE workflow_id=? AND kind='op' ORDER BY created_at, job_id")
+  return db.prepare("SELECT job_id, op_id, unit_id, try_no, try_no AS attempt, status, payload_json, created_at, updated_at FROM jobs WHERE workflow_id=? AND kind='op' ORDER BY created_at, job_id")
     .all(workflowId).map((j) => ({ ...j, payload: parse(j.payload_json), result: parse(j.result_json) }));
 }
 
 /**
- * One unit per bounded piece of work: a cut slice (op|cut.id#ordinal) or, uncut, the root of a retry lineage. A
- * continuation (graph-edit continue) joins the unit it continues. A unit is `done` only when one of its jobs
+ * One unit per work unit (payload.unit.id, scripts/kernel/units.mjs): every try of one bounded piece of work, a
+ * continuation (graph-edit continue --retry-of) included. A unit is `done` only when its latest try
  * succeeded (settled through its checks), `dropped` when every job was cancelled, `open` while a job is open, else
  * `failed`. Pure over `jobs`.
  */
 export function unitsOf(jobs) {
-  const byId = new Map(jobs.map((j) => [j.job_id, j]));
-  const keyMemo = new Map();
-  const keyOf = (j, depth = 0) => {
-    if (keyMemo.has(j.job_id)) return keyMemo.get(j.job_id);
-    const p = j.payload ?? {};
-    const via = p.kernelEdit?.continuationOf ?? p.kernelEdit?.unitOf ?? null;
-    let k;
-    if (via && byId.has(via) && depth < 20) k = keyOf(byId.get(via), depth + 1);
-    else if (p.cut?.id != null && p.cut?.ordinal != null) k = `${j.op_id}|${p.cut.id}#${p.cut.ordinal}`;
-    else {
-      const prior = p.retry?.retryOf ?? null;
-      k = prior && byId.has(prior) && depth < 20 ? keyOf(byId.get(prior), depth + 1) : `${j.op_id}|${j.job_id}`;
-    }
-    keyMemo.set(j.job_id, k);
-    return k;
-  };
+  const keyOf = (j) => `${j.op_id}|${j.unit_id ?? j.job_id}`;
   const units = new Map();
   for (const j of jobs) {
     const k = keyOf(j);
@@ -102,7 +87,7 @@ export function unitsOf(jobs) {
   for (const u of units.values()) {
     const ok = u.jobs.filter((j) => j.status === 'succeeded');
     u.doneAt = ok.length ? Math.min(...ok.map((j) => Number(j.updated_at))) : null;
-    u.state = ok.length ? 'done' : u.jobs.some((j) => OPEN_JOB.includes(j.status)) ? 'open'
+    u.state = u.jobs.at(-1)?.status === 'succeeded' ? 'done' : u.jobs.some((j) => OPEN_JOB.includes(j.status)) ? 'open'
       : u.jobs.every((j) => j.status === 'cancelled') ? 'dropped' : 'failed';
     u.last = u.jobs[u.jobs.length - 1];
     u.open = u.jobs.filter((j) => OPEN_JOB.includes(j.status));

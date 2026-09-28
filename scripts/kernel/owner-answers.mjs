@@ -13,12 +13,10 @@
 // (modules/kernel/api.yaml commands.dispatch ownerAnswers, commands.report
 // refuses ask-already-answered; modules/kernel/dispatch.yaml packet).
 //
-// The lineage is the chain payload.retry.retryOf (or resumeOf) that enqueue
-// writes (engine/admission.mjs deriveRetryLineage; for a cut, its own ordinal
-// only). Every ask report of a lineage attempt that holds an `ask-answered`
-// event is an answer. Ledger reads plus the answer receipt file; never writes.
+// An answer binds to the work unit it answers (H4; scripts/kernel/units.mjs): every ask report of an
+// earlier try of the SAME unit that holds an `ask-answered` event is an answer - never one of another
+// unit, however the retry chain was spelled. Ledger reads plus the answer receipt file; never writes.
 import { HANDOVER_OP } from './handover.mjs';
-import { sameWorkLineage } from '../../engine/admission.mjs';
 import { parseJsonOr, readJsonFile } from '../lib/json.mjs';
 
 const parse = parseJsonOr;
@@ -44,25 +42,17 @@ export function lineageJobsOf(db, job) {
 const readReceipt = readJsonFile;
 
 /**
- * The answered asks of `job`'s retry lineage, oldest first:
+ * The answered asks of `job`'s work unit (its earlier tries), oldest first:
  * [{dispatchId, jobId, attempt, question, options[], chosen:{index,label}|null, picks, note,
  *   answeredBy, answeredAt, receipt}]. `question`/`options` are the ask report's; `chosen` comes from
  * the ask-answered event, else its starci/ask-answer@1 receipt. An unanswered or superseded ask is
- * not an answer, and an attempt about another params.subject is not this job's. A job with no
- * lineage (a first attempt) has none.
+ * not an answer. A first try (no earlier try of its unit) has none.
  */
 export function ownerAnswersOf(db, job) {
   const answers = [];
-  // One op may ask about several subjects at once (provision.ask params.subject, serve-ask.mjs
-  // askSubjectOf): an uncut lineage chains to the op's latest attempt, which can be another subject's.
-  const subjectOf = (row) => { const s = payloadOf(row).params?.subject; return typeof s === 'string' && s.trim() ? s.trim() : null; };
-  const subject = subjectOf(job);
-  const uncut = !payloadOf(job).cut;
-  for (const row of lineageJobsOf(db, job).reverse()) {
-    if (subject && subjectOf(row) && subjectOf(row) !== subject) continue;
-    // A lineage row of another unit of work (a chain an older enqueue mislinked) holds none of this
-    // job's answers (mia inc-bca4d2034f8c: 8 answers of unrelated records rode a new record's packet).
-    if (uncut && !sameWorkLineage(row, job)) continue;
+  const unitId = job?.unit_id ?? null;
+  const tries = unitId ? db.prepare('SELECT * FROM jobs WHERE workflow_id=? AND job_id<>? AND unit_id=? ORDER BY try_no').all(job.workflow_id, job.job_id, unitId) : [];
+  for (const row of tries) {
     const op = row.op_id ?? payloadOf(row).opId ?? null;
     const reports = db.prepare("SELECT dispatch_id, report_json, created_at FROM reports WHERE workflow_id=? AND op_id IS ? AND attempt=? AND outcome='ask' ORDER BY report_id")
       .all(row.workflow_id, op, row.attempt)

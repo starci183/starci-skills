@@ -1,3 +1,5 @@
+import { createHash } from 'node:crypto';
+
 const PATH_LEASE_PREFIX='path:';
 const GLOB_META=/[*?[\]{}]/;
 // Next.js App Router spells route segments as literal directory names: dynamic `[lang]`, catch-all
@@ -187,33 +189,6 @@ export function retryDisposition(job){
 }
 
 /**
- * Derive the next retry/resume identity. A proven no-effect launch rejection reuses the queued durable
- * attempt; an effectful/business failure advances both durable and business attempt ordinals.
- * `options.priorBusinessAttempt` overrides the predecessor's recorded business attempt (a cut ordinal counts
- * its own chain, see cutRetryLineage); `options.attempt` is the durable attempt the new row actually takes
- * when that differs from predecessor+1 (a cut ordinal shares the op's durable attempt counter).
- */
-export function deriveRetryLineage(priorJob,{attempt=null,priorBusinessAttempt=null}={}){
-  if(!priorJob?.job_id&&!priorJob?.jobId)throw Error('retry lineage needs a prior durable job');
-  const payload=payloadOf(priorJob),disposition=retryDisposition(priorJob);
-  const priorAttempt=Number(priorJob.attempt);
-  if(!Number.isInteger(priorAttempt)||priorAttempt<1)throw Error('retry lineage needs a positive durable attempt');
-  const priorBusiness=Number(priorBusinessAttempt??payload.retry?.businessAttempt??payload.businessAttempt??priorAttempt);
-  const priorJobId=priorJob.job_id??priorJob.jobId;
-  return {
-    retryOf:disposition.resumable?null:priorJobId,
-    resumeOf:disposition.resumable?priorJobId:null,
-    attempt:disposition.resumable?priorAttempt:Number.isInteger(attempt)?attempt:priorAttempt+1,
-    businessAttempt:priorBusiness+(disposition.consumesBusinessRetry?1:0),
-    retryClass:disposition.retryClass,
-    effectState:disposition.effectState,
-    resumed:disposition.resumable,
-    reusesDurableAttempt:disposition.resumable,
-    consumesBusinessRetry:disposition.consumesBusinessRetry,
-  };
-}
-
-/**
  * A row retired while still queued - `api reconcile --drop` (result.verdict `dropped`) or a goal revision
  * that superseded it (result.reason `goal-revision-superseded`) - with no dispatch binding in its payload.
  * It ran nothing, so it is no attempt: never a retry predecessor, never a cut seam, never the latest job
@@ -230,48 +205,73 @@ export function retiredBeforeDispatch(job){
   return !bound;
 }
 
-/** The cut slice a job row carries, or null: {id, ordinal} identify one bounded SAME-op slice. */
-const safeIntersect=(a,b)=>{try{return ownedPathsIntersect(a,b);}catch{return String(a)===String(b);}};
-const lineagePaths=list=>(Array.isArray(list)?list:[]).map(item=>typeof item==='string'?item:item?.path).filter(p=>typeof p==='string'&&p.trim());
-const lineageSubject=payload=>{const s=payload?.params?.subject;return typeof s==='string'&&s.trim()?s.trim():null;};
-/**
- * Whether two jobs of one uncut op are the same unit of work - its retry lineage. The same
- * params.subject when either names one; else overlapping owned paths; else overlapping records.
- * Two jobs that name none of them are one lineage, as every uncut job was before. An uncut op's
- * retry used to chain to the op's latest earlier job whatever it owned, so a retry of the Collab
- * tasks slice got the membership slice's green checks (nivo inc-6a0cfe1b39d4) and a new
- * social-only-password decision got a community record's red checks and answers (mia
- * inc-bca4d2034f8c). Accepts job rows or payloads.
- */
-export function sameWorkLineage(a,b){
-  const pa=a?.payload_json!=null||a?.payload!=null?payloadOf(a):(a??{}),pb=b?.payload_json!=null||b?.payload!=null?payloadOf(b):(b??{});
-  const sa=lineageSubject(pa),sb=lineageSubject(pb);
-  if(sa||sb)return sa===sb;
-  const oa=lineagePaths(pa.owned_paths),ob=lineagePaths(pb.owned_paths);
-  if(oa.length&&ob.length)return oa.some(x=>ob.some(y=>safeIntersect(x,y)));
-  const ra=lineagePaths(pa.records),rb=lineagePaths(pb.records);
-  if(ra.length&&rb.length)return ra.some(x=>rb.some(y=>safeIntersect(x,y)));
-  return true;
-}
 
+/** The cut slice a job row carries, or null: {id, ordinal} identify one bounded SAME-op slice. */
 export function cutOf(job){
   const cut=payloadOf(job).cut;
   return cut&&cut.id!=null&&cut.ordinal!=null?{id:String(cut.id),ordinal:Number(cut.ordinal),total:Number(cut.total)}:null;
 }
 
+
+/* ------------------------------------------------------------ work units (H3, H4, H5) */
+
+/** The default try budget of a unit (Q13; DBTREE work_units.try_budget). Only the owner or the Supervisor raises one. */
+export const UNIT_TRY_BUDGET=5;
+const shortDigest=value=>createHash('sha256').update(value).digest('hex').slice(0,16);
+const lineagePaths=list=>(Array.isArray(list)?list:[]).map(item=>typeof item==='string'?item:item?.path).filter(p=>typeof p==='string'&&p.trim());
+const normList=list=>[...new Set(lineagePaths(list).map(p=>p.replace(/\\/g,'/').replace(/\/\*\*$/,'').replace(/\/+$/,'')))].sort();
+
 /**
- * Retry lineage of a cut ordinal. A cut's ordinals share the op's durable attempt counter but are
- * independent slices, so the predecessor is the latest job with the SAME op, cut id AND ordinal - never a
- * sibling ordinal that happened to run later - and the business attempt counts only that ordinal's own
- * business attempts (1 + every earlier same-ordinal attempt whose disposition consumed one). `ordinalJobs`
- * are that ordinal's prior jobs (any order); a row retired before it dispatched (retiredBeforeDispatch) is
- * skipped, so the lineage stays on the last attempt that ran. The result is null when the ordinal has none
- * (a first attempt).
+ * The work identity of a job (DBTREE work_units.subject_key): a cut slice is `cut:<id>#<ordinal>`, an op about one
+ * named subject `subject:<s>`, else the digest of its records, else of its owned paths. One op, one subject key and
+ * one goal revision are ONE unit (UNIQUE(workflow_id, op_id, subject_key, goal_revision)): a try of the same work can
+ * never start a fresh budget.
  */
-export function cutRetryLineage(ordinalJobs,{attempt=null}={}){
-  const jobs=[...(ordinalJobs??[])].filter(job=>!retiredBeforeDispatch(job)).sort((a,b)=>Number(a.attempt)-Number(b.attempt));
-  if(!jobs.length)return null;
-  const prior=jobs.at(-1);
-  const priorBusinessAttempt=1+jobs.slice(0,-1).filter(job=>retryDisposition(job).consumesBusinessRetry).length;
-  return deriveRetryLineage(prior,{attempt,priorBusinessAttempt});
+export function unitSubjectKey({cut=null,params=null,records=[],ownedPaths=[]}={}){
+  if(cut?.id!=null&&cut?.ordinal!=null)return `cut:${cut.id}#${Number(cut.ordinal)}`;
+  const subject=typeof params?.subject==='string'&&params.subject.trim()?params.subject.trim():null;
+  if(subject)return `subject:${subject}`;
+  const recs=normList(records);
+  if(recs.length)return `records:${shortDigest(recs.join('|'))}`;
+  return `paths:${shortDigest(normList(ownedPaths).join('|'))}`;
+}
+
+/** Two jobs are tries of one work unit (jobs.unit_id). */
+export const sameUnit=(a,b)=>Boolean(a?.unit_id&&a.unit_id===b?.unit_id);
+
+const OPEN_TRY=['queued','ready','leased','running','answering','reported','deciding','effect_unknown'];
+const refuseUnit=(message,code,extra={})=>Object.assign(new Error(message),{code,...extra});
+/** The jobs.retry_class of a successor of `last` (DBTREE: business | infra | resume | follow-up). */
+const retryClassOf=(last,disposition)=>last.status==='cancelled'?'resume'
+  :disposition?.retryClass==='business'?'business'
+    :disposition?.retryClass==='infrastructure'||disposition?.retryClass===RETRY_CLASS_ENVIRONMENT?'infra':'follow-up';
+/**
+ * Admit one more try of a unit (the code side of DBTREE jobs_enqueue_guard + work_units_done_guard), pure over the
+ * unit's row and its tries. `tries` are the unit's jobs with {job_id, status, try_no, result_json?} (result_json the
+ * settle result retryDisposition reads); `unit` is the work_units row. Returns {tryNo, retryOf, resumeOf, retryClass,
+ * reopen} or throws a typed refusal:
+ *   unit-in-flight             a try of the unit is still open (edit it, or let it settle first)
+ *   unit-already-passed        the unit is done; a re-run needs an explicit reopen with a reason (H5)
+ *   retry-lineage-invalid      retryOf is not the unit's latest try, or that try did not fail (H4)
+ *   unit-try-budget-exhausted  try_no would pass work_units.try_budget; only the owner or the Supervisor raises it (H3)
+ */
+export function admitUnitTry({unit=null,tries=[],retryOf=null,reopen=null}={}){
+  const ordered=[...tries].sort((a,b)=>Number(a.try_no)-Number(b.try_no));
+  const last=ordered.at(-1)??null;
+  if(!unit||!last){
+    if(retryOf)throw refuseUnit(`--retry-of ${retryOf} names no earlier try of this unit`,'retry-lineage-invalid');
+    return {tryNo:1,retryOf:null,resumeOf:null,retryClass:null,reopen:null};
+  }
+  const open=ordered.filter(job=>OPEN_TRY.includes(job.status));
+  if(open.length)throw refuseUnit(`unit ${unit.unit_id} already has an open try ${open.map(j=>`${j.job_id} (${j.status})`).join(', ')}: edit that try (api graph-edit widen|params) or let it settle`,'unit-in-flight',{open:open.map(j=>j.job_id)});
+  if(retryOf&&retryOf!==last.job_id)throw refuseUnit(`--retry-of ${retryOf} is not the latest try of unit ${unit.unit_id} (${last.job_id} is): a retry follows the unit's latest failed try`,'retry-lineage-invalid',{latest:last.job_id});
+  const done=unit.state==='done'||last.status==='succeeded';
+  if(done&&!(reopen?.reason&&reopen?.by))throw refuseUnit(`unit ${unit.unit_id} already passed (${last.job_id}); running it again needs an explicit reopen with a reason (--reopen <reason>)`,'unit-already-passed',{passed:last.job_id});
+  if(retryOf&&!done&&last.status!=='failed')throw refuseUnit(`--retry-of ${retryOf} is ${last.status}: a retry follows a FAILED try of the same unit`,'retry-lineage-invalid');
+  const tryNo=Number(last.try_no)+1;
+  if(tryNo>Number(unit.try_budget))throw refuseUnit(`unit ${unit.unit_id} spent ${last.try_no} of its ${unit.try_budget} tries: the owner or the Supervisor decides (api unit --raise-budget), never another try`,'unit-try-budget-exhausted',{tries:Number(last.try_no),budget:Number(unit.try_budget)});
+  if(done)return {tryNo,retryOf:null,resumeOf:null,retryClass:'follow-up',reopen:{reason:String(reopen.reason),by:String(reopen.by)}};
+  const disposition=last.status==='failed'?retryDisposition(last):null;
+  const resume=last.status==='cancelled';
+  return {tryNo,retryOf:resume?null:last.job_id,resumeOf:resume?last.job_id:null,retryClass:retryClassOf(last,disposition),reopen:null};
 }

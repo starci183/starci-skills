@@ -55,7 +55,10 @@ function afterClosure(db, start) {
   return seen;
 }
 
-function enqueueUnit({ repo, wf, op, paths, what, extra = [] }) {
+// A unit a graph edit carves out of other units (split, merge, recut, wire) passes --derived-from: it inherits what is
+// left of their try budgets, never a fresh one (scripts/kernel/units.mjs admitUnit, H3).
+function enqueueUnit({ repo, wf, op, paths, what, extra = [], derivedFrom = [] }) {
+  if (derivedFrom.length) extra = [...extra, '--derived-from', derivedFrom.join(',')];
   const r = apiRun(['enqueue', '--workflow', wf, '--op', op, '--paths', paths.join(','), '--what', what.slice(0, 60), '--title', `${op}: ${what}`.slice(0, 120), ...extra], { repo });
   if (!r.ok || !r.json?.job_id) throw refuse(`enqueue ${op} refused: ${r.json?.reason ?? ''} ${r.json?.detail ?? r.json?.error ?? r.err ?? r.out}`.trim(), r.json?.reason ?? r.json?.code ?? 'enqueue-refused');
   return r.json.job_id;
@@ -128,7 +131,7 @@ export default {
       const op = args.op ?? before[0]?.op_id ?? 'code.refactor';
       const refPaths = before[0]?.payload?.owned_paths ?? [];
       const paths = checkPaths(db, { repo, workflowId: wf, op, payload: before[0]?.payload ?? {}, current: refPaths, add: csv(args.paths) });
-      const created = enqueueUnit({ repo, wf, op, paths, what: `wire ${paths.slice(0, 2).map((p) => p.split('/').pop()).join(',')}` });
+      const created = enqueueUnit({ repo, wf, op, paths, what: `wire ${paths.slice(0, 2).map((p) => p.split('/').pop()).join(',')}`, derivedFrom: before.map((j) => j.job_id) });
       rec.created.push(created);
       tag(created, { wire: true });
       ledger.transaction(() => { for (const j of before) change(jobRow(db, j.job_id), { after: [...new Set([...(j.payload.after ?? []), created])] }); });
@@ -185,7 +188,7 @@ export default {
       const own = new Set(job.payload.owned_paths ?? []);
       const flat = parts.flat();
       if (flat.some((p) => !own.has(p)) || new Set(flat).size !== flat.length || flat.length !== own.size) throw refuse('the parts must partition the unit\'s owned paths exactly (disjoint, nothing added or lost)', 'edit-invalid');
-      for (const [i, p] of parts.entries()) { const id = enqueueUnit({ repo, wf, op: job.op_id, paths: p, what: `split ${i + 1}/${parts.length} of ${job.payload.displayWhat ?? job.job_id}` }); rec.created.push(id); tag(id, { splitOf: job.job_id }); }
+      for (const [i, p] of parts.entries()) { const id = enqueueUnit({ repo, wf, op: job.op_id, paths: p, what: `split ${i + 1}/${parts.length} of ${job.payload.displayWhat ?? job.job_id}`, derivedFrom: [job.job_id] }); rec.created.push(id); tag(id, { splitOf: job.job_id }); }
       ledger.transaction(() => { dropJob(ledger, jobRow(db, job.job_id), { reason: `split into ${rec.created.join(', ')}`, editId, now }); rec.dropped.push(job.job_id); });
       human = `split ${job.job_id} into ${rec.created.join(', ')}`;
     } else if (edit === 'merge') {
@@ -194,7 +197,7 @@ export default {
       bound(jobs.length + 1);
       if (new Set(jobs.map((j) => j.op_id)).size !== 1) throw refuse('merge joins units of one op', 'edit-invalid');
       const paths = [...new Set(jobs.flatMap((j) => j.payload.owned_paths ?? []))];
-      const id = enqueueUnit({ repo, wf, op: jobs[0].op_id, paths, what: `merge of ${jobs.length} units` });
+      const id = enqueueUnit({ repo, wf, op: jobs[0].op_id, paths, what: `merge of ${jobs.length} units`, derivedFrom: jobs.map((j) => j.job_id) });
       rec.created.push(id); tag(id, { mergeOf: jobs.map((j) => j.job_id) });
       ledger.transaction(() => { for (const j of jobs) { dropJob(ledger, jobRow(db, j.job_id), { reason: `merged into ${id}`, editId, now }); rec.dropped.push(j.job_id); } });
       human = `merged ${jobs.map((j) => j.job_id).join(', ')} into ${id}`;

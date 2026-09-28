@@ -29,7 +29,7 @@
 // provider fault (leases, reserve), a cancelled or dropped row.
 // Ledger reads only; never writes.
 import { lineageJobsOf } from './owner-answers.mjs';
-import { AWAITING_OWNER, RETRY_CLASS_ENVIRONMENT, sameWorkLineage } from '../../engine/admission.mjs';
+import { AWAITING_OWNER, RETRY_CLASS_ENVIRONMENT, sameUnit } from '../../engine/admission.mjs';
 import { OUTAGE_KEYS } from '../agent/provider-outage.mjs';
 import { hostDeadWorker, hostEventAround } from './host-event.mjs';
 import { parseJsonOr } from '../lib/json.mjs';
@@ -126,9 +126,8 @@ export function attemptCauseOf(db, row, previous = null) {
  * `exclude` pools with EXCLUDE_AFTER or more.
  */
 export function lineageRouteAdjust(db, job) {
-  const uncut = !payloadOf(job).cut;
-  // A lineage row of another unit of work (a chain an older enqueue mislinked) is not this job's history.
-  const lineage = lineageJobsOf(db, job).filter((row) => !uncut || sameWorkLineage(row, job));
+  // Only the tries of this job's own work unit are its history (H4): the lineage stops at another unit's job.
+  const lineage = lineageJobsOf(db, job).filter((row) => sameUnit(row, job));
   if (!lineage.length) return null;
   const attempts = lineage.map((row, i) => {
     const { cause, attributable, detail } = attemptCauseOf(db, row, lineage[i + 1] ?? null);

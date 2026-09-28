@@ -1,7 +1,7 @@
 // failure-steps.mjs — which failed attempts the frontier still owes a step (jobs.result_json.nextStep, recorded by
 // api.mjs enqueueNextStep on a failed settle). api status reads unresolvedFailures for nextActions and leg colours;
 // scripts/work/migrate-runtime.mjs reads stepOwedFailures: failed settles from before the router.
-import { AWAITING_OWNER, sameWorkLineage } from '../../engine/admission.mjs';
+import { AWAITING_OWNER, sameUnit } from '../../engine/admission.mjs';
 import { parseJson } from '../lib/json.mjs';
 import { retryAttemptOf } from './gate-conditions.mjs';
 
@@ -21,11 +21,8 @@ export const isAwaitingOwner = (db, row) => {
     .get(row.workflow_id, row.op_id, row.attempt));
 };
 
-/** Two jobs of one op do the same unit of work: the same cut ordinal, else the same work lineage. */
-export const sameUnitOfWork = (a, b) => {
-  const ca = payloadOf(a).cut, cb = payloadOf(b).cut;
-  return ca || cb ? Boolean(ca && cb && String(ca.id) === String(cb.id) && Number(ca.ordinal) === Number(cb.ordinal)) : sameWorkLineage(a, b);
-};
+/** Two jobs are tries of one work unit (scripts/kernel/units.mjs). */
+export const sameUnitOfWork = sameUnit;
 
 /**
  * The failed jobs nothing follows: no retry names them, the step their settle recorded enqueued nothing, and no
@@ -52,7 +49,7 @@ export function stepOwedFailures(db, workflowId) {
   return unresolvedFailures(db, failed, jobs)
     .filter((row) => resultOf(row).verdict === 'fail' && !resultOf(row).nextStep)
     .map((job) => {
-      const later = jobs.filter((other) => other.op_id === job.op_id && other.attempt > job.attempt && other.status !== 'cancelled' && sameWorkLineage(other, job));
+      const later = jobs.filter((other) => other.op_id === job.op_id && other.attempt > job.attempt && other.status !== 'cancelled' && sameUnit(other, job));
       return { job, supersededBy: later.at(-1)?.job_id ?? null };
     });
 }

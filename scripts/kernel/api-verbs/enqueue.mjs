@@ -1,10 +1,9 @@
-// api enqueue: validate one planned operation and write its queued attempt.
+// api enqueue: validate one planned operation and write its queued try of a work unit.
 import fs from 'node:fs';
 import path from 'node:path';
 import { newToken } from '../../../engine/ledger-db.mjs';
 import { parseYaml } from '../../../engine/yaml.mjs';
 import { getWorkflow, latestGoal, jobPayloadOf, ownedPathsOf } from '../api-lib/rows.mjs';
-import { dispatchEvidenceOf } from '../api-lib/dispatch-state.mjs';
 import { peerOverlapHeadsUp } from '../api-lib/peers.mjs';
 import { splitGoalLegParams, resolveOpParams } from '../../route/dispatch-op.mjs';
 import { AUTOPILOT_RULING, HANDOVER_CREDENTIALS_SUBJECT, provisionAskMidFlow } from '../autopilot.mjs';
@@ -14,7 +13,8 @@ import { ownedPathPlacements, enqueueRepository } from '../target-repo.mjs';
 import { lineageHeadById } from '../gate-conditions.mjs';
 import { loadContractChanges, changeById } from '../contract-version.mjs';
 import { normalizeFoundationName, readFoundation } from '../foundations.mjs';
-import { lineageJobsOf } from '../owner-answers.mjs';
+import { admitUnit, writeUnitTry } from '../units.mjs';
+import { requirePhase, ACCEPTS_WORK } from '../api-lib/lifecycle.mjs';
 import { seamPriorityOf } from '../cut-seam.mjs';
 import { deferralOf as testDeferralOf, deferJob } from '../spec-deferral.mjs';
 
@@ -25,15 +25,14 @@ export default {
   usageInCore: true,
   run({ ledger, args, repo, emit, internals }) {
     const { refuseDecisionsFirst, refuseStaleKernelRev, goalLegOf, workflowFinished, workDebtOf,
-      workflowScopeOf, liveWorkflowIds, scopeCovers, foundationDutyOf, retryLineageFor,
+      workflowScopeOf, liveWorkflowIds, scopeCovers, foundationDutyOf,
       AGENT_HIERARCHY_SCHEMA, operationNodeId, kernelNodeId, FINAL_SETTLED, skillRoot } = internals;
   const db = ledger.db, workflowId = args.workflow, now = Date.now();
   refuseDecisionsFirst(db, workflowId, 'enqueue', { now, resolves: args.resolves ?? null, repo });
   const wf = getWorkflow(db, workflowId);
   if (!wf) throw Object.assign(new Error(`unknown workflow ${workflowId}`), { code: 'workflow-unknown' });
-  if (wf.phase === 'finished') {
-    throw Object.assign(new Error(`workflow ${workflowId} is finished; a finished phase takes no new work`), { code: 'workflow-finished' });
-  }
+  // A paused, stopped, finished or archived workflow takes no new work (DBTREE jobs_enqueue_guard).
+  requirePhase(wf, ACCEPTS_WORK, 'enqueue');
   const briefFile = path.join(skillRoot, 'modules', 'ops', 'ops', `${args.op}.yaml`);
   if (!fs.existsSync(briefFile)) {
     throw Object.assign(new Error(`unknown op ${args.op} — no brief at modules/ops/ops/${args.op}.yaml`), { code: 'unknown-op' });
@@ -254,41 +253,18 @@ export default {
   const jobId = `op-${args.op}-${newToken().slice(0, 10)}`;
   let payload;
 
-  let job, peers = { overlap: [], messages: [] }, testsDeferred = null;
+  let job, unit = null, peers = { overlap: [], messages: [] }, testsDeferred = null;
   ledger.transaction(() => {
-    const attempt = db.prepare('SELECT COALESCE(MAX(attempt),0)+1 a FROM jobs WHERE workflow_id=? AND op_id=?').get(workflowId, args.op).a;
-    // A retry's provenance. `attempt` is durable dispatch identity; `businessAttempt`
-    // only advances when the prior attempt actually spent one — an infrastructure
-    // launch rejected before any effect does not (engine/admission.mjs deriveRetryLineage).
-    // A cut ordinal's predecessor is its own ordinal, never a sibling slice.
-    const lineageOf = () => retryLineageFor(db, { workflowId, op: args.op, cut, attempt,
-      payload: { owned_paths: ownedPaths, records, ...(Object.keys(resolvedParams.params).length ? { params: resolvedParams.params } : {}) },
-      retryOf: typeof args['retry-of'] === 'string' && args['retry-of'].trim() ? args['retry-of'].trim() : null });
-    let retry = lineageOf();
-    // The Kernel's own enqueue of a step the runtime already queued (enqueueNextStep) replaces that
-    // never-dispatched row: it is retired as dropped, so lineage and --after follow this job instead.
-    for (let hop = 0; retry?.retryOf && hop < 4; hop += 1) {
-      const auto = db.prepare(`SELECT * FROM jobs WHERE workflow_id=? AND op_id=? AND status='queued' AND json_extract(payload_json,'$.retryReason.auto')=1
-        AND (job_id=? OR json_extract(payload_json,'$.retry.retryOf')=?)`).all(workflowId, args.op, retry.retryOf, retry.retryOf)
-        .filter((row) => !dispatchEvidenceOf(db, row, jobPayloadOf(row)).length);
-      if (!auto.length) break;
-      for (const row of auto) {
-        db.prepare("UPDATE jobs SET status='cancelled', result_json=?, updated_at=? WHERE job_id=? AND status='queued'")
-          .run(JSON.stringify({ verdict: 'dropped', reason: 'superseded-by-enqueue', by: jobId, at: now }), now, row.job_id);
-        ledger.appendEvent({ workflowId, entityType: 'job', entityId: row.job_id, kind: 'job-dropped', payload: { reason: 'superseded-by-enqueue', by: jobId, auto: true } });
-      }
-      retry = lineageOf();
-    }
-    // An --after on this job's own retry lineage waits on itself: a failed prior carries on through its lineage head,
-    // and that head is this job (nivo op-interface.draw-e3bf65f8ed sat 4.6 h queued behind itself, then was dropped
-    // as a self-dependency). A retry chains to its predecessor through the lineage, never through --after.
-    if (retry?.retryOf) {
-      const pred = db.prepare('SELECT * FROM jobs WHERE job_id=? AND workflow_id=?').get(retry.retryOf, workflowId);
-      const own = new Set([retry.retryOf, ...(pred ? lineageJobsOf(db, pred).map((row) => row.job_id) : [])]);
-      const statusOf = (id) => db.prepare('SELECT status FROM jobs WHERE job_id=?').get(id)?.status;
-      const self = after.filter((prior) => statusOf(prior) !== 'succeeded' && (own.has(prior) || own.has(lineageHeadById(db, prior)?.row?.job_id)));
-      if (self.length) throw Object.assign(new Error(`--after names ${self.join(', ')}, which is this job's own retry lineage (it retries ${retry.retryOf}): it would wait on itself; enqueue without that --after - a retry chains through its lineage`), { code: 'after-self-lineage' });
-    }
+    // The work unit this job is a try of (scripts/kernel/units.mjs, H3/H4/H5): its budget, its lineage (--retry-of may
+    // name only the unit's latest failed try) and the reopen a passed unit needs. A refusal is typed and nothing is written.
+    const admitted = admitUnit(db, { workflowId, op: args.op, goalRevision: goal?.revision ?? null,
+      payload: { cut, records, owned_paths: ownedPaths, ...(Object.keys(resolvedParams.params).length ? { params: resolvedParams.params } : {}) },
+      retryOf: typeof args['retry-of'] === 'string' && args['retry-of'].trim() ? args['retry-of'].trim() : null,
+      reopen: typeof args.reopen === 'string' && args.reopen.trim() ? { reason: args.reopen.trim(), by: 'kernel' } : null,
+      derivedFrom: String(args['derived-from'] ?? '').split(',').map((id) => id.trim()).filter(Boolean) });
+    // An --after on a try of this very unit waits on itself: a retry chains to its predecessor through the unit.
+    const self = admitted.unitId ? after.filter((prior) => db.prepare('SELECT unit_id FROM jobs WHERE job_id=?').get(prior)?.unit_id === admitted.unitId) : [];
+    if (self.length) throw Object.assign(new Error(`--after names ${self.join(', ')}, a try of this job's own unit ${admitted.unitId}: it would wait on itself; enqueue without that --after - a retry chains through its unit`), { code: 'after-self-lineage' });
     payload = {
       opId: args.op, records, owned_paths: ownedPaths, title: args.title ?? args.op, risk: args.risk ?? null,
       // --what: the short human name of the target (Vietnamese, ≤40 chars) the op-job display name shows.
@@ -297,7 +273,6 @@ export default {
       ...(Object.keys(resolvedParams.params).length ? { params: resolvedParams.params } : {}),
       ...(cut ? { cut } : {}),
       ...(after.length ? { after } : {}),
-      ...(retry ? { retry } : {}),
       ...(foundationLeg ? { foundation: foundationLeg } : {}),
       ...(contractChange ? { contractChange } : {}),
       ...(commitOnly ? { commitOnly } : {}),
@@ -310,21 +285,19 @@ export default {
         workflowId,
         jobId,
         opId: args.op,
-        attempt,
+        attempt: admitted.tryNo,
         generation: wf.generation ?? 0,
         runtime: { host: 'orca' },
       },
     };
-    job = ledger.enqueueJob({ jobId, workflowId, opId: args.op, attempt, generation: wf.generation ?? 0, kind: 'op', role: 'op', payload, priority: seamPriorityOf(cut), createdAt: now });
-    ledger.appendEvent({
-      workflowId, entityType: 'job', entityId: jobId,
-      kind: 'job-enqueued', payload: { opId: args.op, attempt, records: records.length, ownedPaths: ownedPaths.length, risk: payload.risk, cut, repository: payload.repository ?? null },
-    });
+    const unitTry = writeUnitTry(db, admitted, { workflowId, jobId, op: args.op, title: payload.title, cut, repository: payload.repository ?? null, at: now });
+    job = ledger.enqueueJob({ jobId, workflowId, opId: args.op, ...unitTry, generation: wf.generation ?? 0, kind: 'op', role: 'op', payload, priority: seamPriorityOf(cut), createdAt: now });
+    unit = { unitId: unitTry.unitId, tryNo: unitTry.tryNo, tryBudget: admitted.tryBudget, retryOf: unitTry.retryOf, resumeOf: unitTry.resumeOf, ...(admitted.reopen ? { reopen: admitted.reopen } : {}) };
     // The owner's config.yaml specs switch off this test class: the leg settles deferred at once, no attempt
     // spent, and the legs behind it proceed (scripts/kernel/spec-deferral.mjs; api run-deferred-tests runs it later).
     const deferral = testDeferralOf({ skillRoot, op: args.op, payload });
     if (deferral) {
-      testsDeferred = deferJob(ledger, { job: { job_id: jobId, workflow_id: workflowId, op_id: args.op, attempt }, deferral, via: 'enqueue', now });
+      testsDeferred = deferJob(ledger, { job: { job_id: jobId, workflow_id: workflowId, op_id: args.op, try_no: unitTry.tryNo }, deferral, via: 'enqueue', now });
       if (testsDeferred) job = { ...job, status: 'succeeded' };
     }
     // Owned paths that overlap an open job of a running peer workflow: the
@@ -332,11 +305,11 @@ export default {
     peers = peerOverlapHeadsUp(ledger, { self: wf, jobId, op: args.op, ownedPaths, now, repo, payload });
   });
 
-  const out = { ok: true, job_id: jobId, workflowId, op: args.op, status: job.status, attempt: job.attempt, cut, params: payload.params ?? null, repository: payload.repository ?? null,
+  const out = { ok: true, job_id: jobId, workflowId, op: args.op, status: job.status, unit, cut, params: payload.params ?? null, repository: payload.repository ?? null,
     peerOverlap: peers.overlap, peerHeadsUp: peers.messages, ...(testsDeferred ? { deferred: testsDeferred } : {}),
     ...(foundationLeg ? { foundation: foundationLeg } : {}), ...(contractChange ? { contractChange } : {}), ...(foundationAdvisory ? { foundationAdvisory } : {}) };
   if (foundationAdvisory) process.stderr.write(`api: advisory: ${foundationAdvisory}\n`);
-  emit(out, `enqueued ${jobId} (op ${args.op}, attempt ${job.attempt}, status ${job.status}${testsDeferred ? `, DEFERRED ${testsDeferred.reason}: not dispatched, no attempt spent; api run-deferred-tests --workflow ${workflowId} runs it later` : ''}${payload.repository ? `, repository ${payload.repository}` : ''}${cut ? `, cut ${cut.ordinal}/${cut.total} ${cut.id}` : ''}${payload.params ? `, params ${Object.entries(payload.params).map(([k, v]) => `${k}=${JSON.stringify(v)}`).join(' ')}` : ''})${peers.overlap.length ? `; overlaps peer job(s) ${[...new Set(peers.overlap.map((hit) => `${hit.workflowId}/${hit.jobId}`))].join(', ')}, heads-up sent to ${peers.messages.map((message) => message.to).join(', ') || 'nobody new'}` : ''}`, args.json);
+  emit(out, `enqueued ${jobId} (op ${args.op}, unit ${unit.unitId} try ${unit.tryNo}/${unit.tryBudget}${unit.retryOf ? ` retry of ${unit.retryOf}` : ''}${unit.reopen ? ` REOPENED: ${unit.reopen.reason}` : ''}, status ${job.status}${testsDeferred ? `, DEFERRED ${testsDeferred.reason}: not dispatched, no attempt spent; api run-deferred-tests --workflow ${workflowId} runs it later` : ''}${payload.repository ? `, repository ${payload.repository}` : ''}${cut ? `, cut ${cut.ordinal}/${cut.total} ${cut.id}` : ''}${payload.params ? `, params ${Object.entries(payload.params).map(([k, v]) => `${k}=${JSON.stringify(v)}`).join(' ')}` : ''})${peers.overlap.length ? `; overlaps peer job(s) ${[...new Set(peers.overlap.map((hit) => `${hit.workflowId}/${hit.jobId}`))].join(', ')}, heads-up sent to ${peers.messages.map((message) => message.to).join(', ') || 'nobody new'}` : ''}`, args.json);
 
   },
 };

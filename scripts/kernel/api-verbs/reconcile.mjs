@@ -15,7 +15,7 @@ export default {
       'reconcile needs --job <job_id> (or --orphan-kernel-jobs | --orca-tasks | --work-debt)');
   },
   run({ ledger, args, repo, emit, internals }) {
-    const { reconcileOrphanKernelJobs, reconcileOrcaTasks, reconcileWorkDebt, reconcileRetryLineage,
+    const { reconcileOrphanKernelJobs, reconcileOrcaTasks, reconcileWorkDebt,
       reconcileDrop, reconcileReap, reconcileReleaseWorker, reconcileDeadWorker, reconcileDebris,
       observeOperationWorker, reserveOpLeases, opLeaseRequests, cleanupManagedWorker } = internals;
   if (args['orphan-kernel-jobs']) return reconcileOrphanKernelJobs(ledger, args);
@@ -24,7 +24,6 @@ export default {
   const db = ledger.db, jobId = args.job;
   const job = db.prepare('SELECT * FROM jobs WHERE job_id=?').get(jobId);
   if (!job) throw Object.assign(new Error(`unknown job ${jobId}`), { code: 'job-unknown' });
-  if (args['retry-lineage']) return reconcileRetryLineage(ledger, args, job);
   if (args.drop) return reconcileDrop(ledger, args, job);
   if (args.reap) return reconcileReap(ledger, args, job);
   if (args['release-worker']) return reconcileReleaseWorker(ledger, args, job, repo);

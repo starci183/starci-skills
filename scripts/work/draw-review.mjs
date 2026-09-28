@@ -54,7 +54,7 @@ import { dataStatusOf, recipeRenderedOf } from '../checks/ui-shapes.mjs';
 import { assetsOf, flag, indexFilesUnder, list, readYaml, sha256File, slash, stateKey, workRootOf, writeRecordFile } from './work-io.mjs';
 import { AUTO_ACCEPTED_BY } from '../kernel/ask-recommendation.mjs';
 import { lineageJobsOf, ownerAnswersOf } from '../kernel/owner-answers.mjs';
-import { retryDisposition, sameWorkLineage } from '../../engine/admission.mjs';
+import { retryDisposition, sameUnit } from '../../engine/admission.mjs';
 import { inspectLedger, ledgerFileFor } from '../../engine/ledger-db.mjs';
 import { parseJsonOr, readJsonFile } from '../lib/json.mjs';
 import { proposalFilesUnder, proposalImageOf, readProposals } from './grammar-proposal.mjs';
@@ -239,7 +239,7 @@ const noteOf = (answer) => {
  */
 export function drawOwnerRulingOf(db, { job = null, record = null, beforeReportId = null } = {}) {
   if (job) {
-    const chain = [job, ...lineageJobsOf(db, job)].filter((row) => row === job || sameWorkLineage(row, job));
+    const chain = [job, ...lineageJobsOf(db, job)].filter((row) => row === job || sameUnit(row, job));
     const answers = ownerAnswersOf(db, job);
     for (let i = 0; i < chain.length; i += 1) {
       const row = chain[i], payload = parseJsonOr(row.payload_json);

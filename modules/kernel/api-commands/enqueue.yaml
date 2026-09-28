@@ -3,25 +3,23 @@ enqueue:
     --workflow <id> --op <opId> --paths <csv> [--records <csv>] [--params '<json>']
     [--repository <repo-id>] [--cut-id <stable-id> --cut-ordinal <n> --cut-total <N>] [--after <jobId>,...]
     [--foundation <name>] [--contract-change <id> --follow-up-of <jobId>] [--commit-only-of <jobId>,...]
-    [--retry-of <jobId>] [--what <short human name of the target, <=40 chars>]
+    [--retry-of <jobId>] [--reopen <reason>] [--derived-from <jobId>,...] [--what <short human name of the target, <=40 chars>]
     | --workflow <id> --op <opId> --commit-only-work-debt [--adopt-from <finishedWf> [--as-repo-owner]]
-  uncutLineage: >-
-    an uncut op's retry lineage (payload.retry) chains only within its own unit of work
-    (engine/admission.mjs sameWorkLineage): the same params.subject when either job names one, else
-    overlapping owned paths, else overlapping records; two jobs naming none of them are one lineage. It
-    used to chain to the op's latest earlier job whatever it owned, so a retry of the Collab tasks slice
-    inherited the membership slice's green checks and lost its own red one (nivo inc-6a0cfe1b39d4) and a
-    new decision record got another record's red checks and eight unrelated owner answers (mia
-    inc-bca4d2034f8c). --retry-of <jobId> pins the predecessor explicitly (an earlier job of the same op
-    that ran; else refused retry-of-invalid). The same rule narrows prior_attempt_failures, owner_answers
-    and status awaitingOwner (an ask waits until a later job of ITS unit of work exists, mia
-    inc-2f7968ede59c)
-  replacesAutoStep: >-
-    When the predecessor the lineage resolves to is, or is retried by, a queued never-dispatched job
-    the runtime enqueued itself (payload.retryReason.auto, settle.nextStep), that job is retired
-    (cancelled, result {verdict:dropped, reason:superseded-by-enqueue, by}, event 'job-dropped') and
-    the lineage resolves again, so the Kernel's own enqueue replaces the runtime's step instead of
-    doubling it; --after waits on the retired job follow this one (gate-conditions.mjs replacementOf)
+  workUnit: >-
+    Every op job is a try of exactly one work unit (scripts/kernel/units.mjs; DBTREE work_units,
+    jobs_enqueue_guard): one op, one subject key (engine/admission.mjs unitSubjectKey - cut:<id>#<ordinal>, else
+    subject:<params.subject>, else the digest of the records, else of the owned paths) and one goal revision.
+    enqueue admits the try on the unit's gate (H3/H4/H5): a new work identity creates the unit (its id is the new
+    job's id, try_no 1, no lineage); the same identity is the next try of that unit - retry_of its latest try when
+    that one failed, resume_of it when it was cancelled - and --retry-of <jobId> names the unit explicitly (it must
+    be the unit's latest try and failed, else retry-lineage-invalid; a job of another op or unit is
+    retry-of-foreign), whatever shape the new try has. A unit whose latest try passed runs again only with
+    --reopen <reason> (work_units.reopen_reason/by/at). No try passes work_units.try_budget (default 5, Q13; only
+    the owner or the Supervisor raises it: api unit --raise-budget). A new unit over the owned paths or records of a
+    FAILED unit of the same op is refused unit-overlaps-failed-unit (retry that unit instead). --derived-from
+    <jobs> (graph-edit split, merge, wire, recut) makes a new unit inherit what is left of those units' budgets.
+    owner_answers, prior_attempt_failures and the lineage route adjustments read the unit's own tries only
+
   foundations: >-
     --foundation <name> marks a leg that builds a shared foundation this workflow
     claimed (api foundation --claim): payload.foundation, and status lists it first in
@@ -104,25 +102,8 @@ enqueue:
     all three cut flags are atomic, ordinal is 1-based and total is at least
     two. The goal binding is
     frozen at enqueue so a later approved revision cannot silently retarget
-    an already queued job. When a prior attempt of the op exists the payload
-    also carries `retry` (engine/admission.mjs deriveRetryLineage):
-    {retryOf, resumeOf, attempt, businessAttempt, retryClass, effectState,
-    resumed, reusesDurableAttempt, consumesBusinessRetry}. `attempt` is
-    durable dispatch identity; `businessAttempt` is what a route's retry
-    limit is budgeted against, and it does not advance for a launch the
-    prior result proved rejected before any effect (retryClass
-    infrastructure) nor after an attempt that settled awaiting-owner
-    (retryClass owner-answer). A cut enqueue chains only to its own
-    ordinal (engine/admission.mjs cutRetryLineage): the predecessor is the
-    latest job with the SAME op, cut id AND ordinal, `businessAttempt`
-    counts only that ordinal's business attempts, `effectState` is that
-    predecessor's, and `attempt` is the row's durable attempt; the first
-    job of an ordinal carries no `retry`, whatever sibling ordinals ran.
-    A row retired before it dispatched (reconcile --drop, or a goal revision
-    that superseded it, with no dispatch binding: engine/admission.mjs
-    retiredBeforeDispatch) ran nothing and is never a predecessor, cut or
-    uncut: the retry of an answered ask stays retryClass owner-answer at
-    the ask's businessAttempt however many queued retries were dropped.
+    an already queued job. The unit and its lineage live on the job row (unit_id, try_no, retry_of,
+    resume_of, retry_class; commands.enqueue workUnit), never in the payload.
     `records` is the explicit closed read binding carried
     unchanged into the dispatch packet; omission means no Work record is
     bound and never licenses repository-wide discovery.
@@ -144,7 +125,14 @@ enqueue:
     capacity-1 path leases dispatch takes already serialize the writes
   refuses:
     - workflow-unknown: 'no workflows row'
-    - workflow-finished: 'a finished phase takes no new work (finish below)'
+    - 'workflow-finished | workflow-archived | workflow-not-accepting-work: only a queued or running workflow takes new work (paused, stopped, finished and archived do not; DBTREE jobs_enqueue_guard)'
+    - 'unit-in-flight (field open): a try of this work unit is still open; edit it (api graph-edit widen|params) or let it settle'
+    - 'unit-already-passed: the unit''s latest try passed; a re-run needs --reopen <reason> (H5)'
+    - 'unit-try-budget-exhausted: the next try would pass work_units.try_budget; only the owner or the Supervisor raises it (api unit --raise-budget, H3)'
+    - 'retry-lineage-invalid: --retry-of is not the unit''s latest try, or that try did not fail (H4)'
+    - 'retry-of-foreign: --retry-of names no earlier job of this op in this workflow'
+    - 'unit-overlaps-failed-unit (field overlaps): a new unit over the owned paths or records of a failed unit of the same op would restart its budget; retry that unit with --retry-of'
+    - 'after-self-lineage: --after names a try of this job''s own unit'
     - unknown-op: 'no brief at modules/ops/ops/<opId>.yaml'
     - 'kernel-rev-stale: the Kernel''s acked runtime rev is behind and this op''s contract (its brief, _common, the verdict contract, the schemas and checks it cites, scripts/kernel/op-prompt.mjs) or a contract change scoped to it changed in between (runtime-rev.mjs opRevStale). Re-read what api status kernelRev lists, api kernel-ack-rev, enqueue again; legs of other ops are unaffected'
     - empty-paths: 'an op without owned_paths is an unbounded grant — never enqueued'
