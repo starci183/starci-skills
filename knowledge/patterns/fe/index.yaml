@@ -9,7 +9,7 @@ purpose: |
   a ui/ rule never chooses a file name. Every rule below was extracted from
   the reference application (src/) and its Grammar package (packages/grammar/src/) by opening files and counting,
   and each table cites the files it was read from. Where the code is split, the file records the
-  historical variant counts. Follow ../../coding-reference.json: starci-academy-fe is the required
+  historical variant counts. Follow ../../coding-reference.yaml: starci-academy-fe is the required
   coding reference.
   Applicability: these are historical reference-source observations preserved at skill commit
   edf72554425f918e80c9205e9c6db10596e722f0, not universal framework rules or current-project

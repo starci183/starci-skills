@@ -2,7 +2,7 @@ schema: starci/knowledge-source@1
 id: coding-reference
 title: Enforced coding conventions
 purpose: All StarCi projects use Next.js frontend and NestJS backend with the owner Academy code patterns.
-  Read architecture-rules.json before the concrete patterns. Monorepo and single-source mappings specialize
+  Read knowledge/architecture-rules.yaml before the concrete patterns. Monorepo and single-source mappings specialize
   this fixed stack; they do not permit framework substitution. Every applicable mechanical code pattern must
   be checked by executable scripts with complete rule/file coverage. Design choices and edge cases are
   reviewed by agents against the Markdown guidance and actual behavior evidence. Reference debt is corrected
