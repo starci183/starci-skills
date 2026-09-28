@@ -117,7 +117,7 @@
   --font-mono: 'Geist Mono', ui-monospace, SFMono-Regular, monospace;
 }
 
-* { box-sizing: border-box; }
+*, ::before, ::after { box-sizing: border-box; border-color: var(--border); }
 html { background: var(--background); }
 body { margin: 0; min-width: 320px; background: var(--background); color: var(--foreground); font-family: 'Geist Variable', ui-sans-serif, system-ui, sans-serif; font-size: 14px; line-height: 1.5; }
 button, input { font: inherit; }

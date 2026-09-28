@@ -26,7 +26,7 @@ let liveStatus: 'live' | 'polling' | 'hidden' = document.hidden ? 'hidden' : 'po
 let live: EventSource | null = null;
 let retryTimer: ReturnType<typeof setTimeout> | null = null;
 let liveTopics = '';
-let queryHealth = { latestAt: null as number | null, staleCount: 0, errorCount: 0 };
+let queryHealth = { latestAt: null as number | null, staleCount: 0, errorCount: 0, sources: [] as string[], stale: [] as string[] };
 
 function getRecord(url: string): QueryRecord {
   const existing = records.get(url);
@@ -48,6 +48,8 @@ function publish(record: QueryRecord, patch: Partial<QuerySnapshot<unknown>>): v
     latestAt: at.length ? Math.max(...at) : null,
     staleCount: active.reduce((sum, item) => sum + (item.state.meta?.stale?.length ?? 0), 0),
     errorCount: active.filter((item) => item.state.error).length,
+    sources: [...new Set(active.flatMap((item) => item.state.meta?.sources?.map((source) => `${source.db}:${source.rel}`) ?? []))],
+    stale: [...new Set(active.flatMap((item) => item.state.meta?.stale ?? []))],
   };
   healthListeners.forEach((listener) => listener());
 }

@@ -83,6 +83,7 @@ export default function App() {
 
   const observedAt = health.latestAt ?? contract.meta?.at ?? null;
   const isStale = health.staleCount > 0 || health.errorCount > 0 || Boolean(contract.error);
+  const provenance = [health.sources.length ? `Nguồn: ${health.sources.slice(0, 8).join(', ')}${health.sources.length > 8 ? ` +${health.sources.length - 8}` : ''}` : 'Chưa có nguồn', health.stale.length ? `Chậm: ${health.stale.join(', ')}` : '', health.errorCount ? `${health.errorCount} nguồn lỗi` : ''].filter(Boolean).join(' · ');
   return <div className="app-shell">
     <aside className="shell-sidebar" aria-label="Điều hướng chính">
       <a className="shell-brand" href="#/" aria-label="StarCi · Tổng quan">
@@ -103,11 +104,11 @@ export default function App() {
     <div className="shell-content">
       <header className="shell-header">
         <div className="shell-header-left">
-          <span className="shell-live" data-status={isStale ? 'stale' : live} title={isStale ? 'Một nguồn dữ liệu đang chậm hoặc lỗi' : live === 'live' ? 'Đang nhận cập nhật trực tiếp' : 'Đang cập nhật định kỳ'}>
+          <span className="shell-live" data-status={isStale ? 'stale' : live} title={`${isStale ? 'Một nguồn dữ liệu đang chậm hoặc lỗi' : live === 'live' ? 'Đang nhận cập nhật trực tiếp' : 'Đang cập nhật định kỳ'} · ${provenance}`}>
             <span className="shell-live-dot" aria-hidden="true" />{isStale ? 'Nguồn chậm' : live === 'live' ? 'Trực tiếp' : live === 'hidden' ? 'Tạm dừng' : 'Định kỳ'}
           </span>
           <span className="shell-header-separator" aria-hidden="true" />
-          <span className="shell-last-updated">{observedAt == null ? 'Chưa có dữ liệu' : `Nguồn: ${formatAbsolute(observedAt)}`}</span>
+          <span className="shell-last-updated" title={provenance}>{observedAt == null ? 'Chưa có dữ liệu' : `Nguồn: ${formatAbsolute(observedAt)}`}</span>
         </div>
         <div className="shell-header-right">
           <SearchBox />
