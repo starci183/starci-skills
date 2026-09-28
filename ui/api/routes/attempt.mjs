@@ -149,12 +149,15 @@ function allLedgers(store, project, fn) {
     .flatMap(entry => entry.error ? [] : entry.result ?? []);
 }
 function listedAttempts(store, url) {
+  const active = url.searchParams.get('active') === '1';
   const filters = { project: url.searchParams.get('project'), wf: url.searchParams.get('wf'), unit: url.searchParams.get('unit'),
     op: url.searchParams.get('op'), agent: url.searchParams.get('agent'), model: url.searchParams.get('model'),
     verdict: url.searchParams.get('verdict'), outcome: url.searchParams.get('outcome'), failureClass: url.searchParams.get('failureClass'),
     endState: url.searchParams.get('endState'), ui: url.searchParams.get('ui'), since: Number(url.searchParams.get('since')) || null,
     until: Number(url.searchParams.get('until')) || null };
-  const rows = allLedgers(store, filters.project, (ledger, db) => many(db, 'SELECT * FROM v_op_history ORDER BY attempt_id DESC').map(row => attemptRow(row, ledger.name)));
+  const rows = allLedgers(store, filters.project, (ledger, db) => many(db, active
+    ? 'SELECT * FROM v_op_history WHERE dispatched_at IS NOT NULL AND settled_at IS NULL ORDER BY attempt_id DESC'
+    : 'SELECT * FROM v_op_history ORDER BY attempt_id DESC').map(row => attemptRow(row, ledger.name)));
   return rows.filter(row => (!filters.wf || row.wf === filters.wf) && (!filters.unit || row.unit === filters.unit)
     && (!filters.op || row.op === filters.op) && (!filters.agent || row.agent === filters.agent)
     && (!filters.model || row.model === filters.model) && (!filters.verdict || row.verdict === filters.verdict)

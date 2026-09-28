@@ -17,12 +17,12 @@ const safeLimit = url => Math.min(200, Math.max(1, Number(url.searchParams.get('
 const cursorOf = url => { try { return Math.max(0, Number(JSON.parse(Buffer.from(url.searchParams.get('cursor') ?? '', 'base64url').toString()).offset) || 0); } catch { return 0; } };
 const nextOf = offset => Buffer.from(JSON.stringify({ offset })).toString('base64url');
 const page = (rows, url) => { const offset = cursorOf(url), limit = safeLimit(url); return { data: rows.slice(offset, offset + limit), next: offset + limit < rows.length ? nextOf(offset + limit) : null }; };
-const ref = (kind, id, project = null) => ({ kind, ...(project ? { project } : {}), id: String(id), href: hrefOf(kind, id, project) });
-function hrefOf(kind, id, project) {
+const ref = (kind, id, project = null, wf = null) => ({ kind, ...(project ? { project } : {}), id: String(id), href: hrefOf(kind, id, project, wf) });
+function hrefOf(kind, id, project, wf = null) {
   const p = encodeURIComponent(project ?? '');
   const key = encodeURIComponent(String(id));
   if (kind === 'workflow') return `#/w/${p}/${key}`;
-  if (kind === 'unit') return `#/w/${p}?tab=units&unit=${key}`;
+  if (kind === 'unit') return project && wf ? `#/w/${p}/${encodeURIComponent(wf)}?tab=units&unit=${key}` : '#/';
   if (kind === 'attempt') return `#/a/${p}/${key}`;
   if (kind === 'di') return `#/decisions?id=${key}`;
   if (kind === 'violation') return `#/system/sla?id=${key}`;
@@ -152,14 +152,14 @@ function projects(store) {
       ledgerOk: Boolean(ledger), schemaVersion: row.schemaVersion };
   });
 }
-function blockerRef(blocker, project) {
+function blockerRef(blocker, project, wf) {
   const kind = blocker.blocker_type === 'decision' ? 'di' : blocker.blocker_type === 'unit' ? 'unit' : blocker.blocker_type === 'incident' ? 'incident' : 'workflow';
-  return ref(kind, blocker.blocker_id, project);
+  return ref(kind, blocker.blocker_id, project, wf);
 }
 function blockedBy(store, row, db, wf) {
   const machine = store.machine.db;
   const rows = many(db, 'SELECT * FROM v_blocking WHERE workflow_id=?', wf).map(blocker => ({
-    ref: blockerRef(blocker, row.name), ui: blocker.blocker_type === 'decision' ? 'warn' : 'waiting',
+    ref: blockerRef(blocker, row.name, wf), ui: blocker.blocker_type === 'decision' ? 'warn' : 'waiting',
     reason: reason(blocker.reason_code, {}, blocker.detail ?? undefined), since: blocker.since, who: blocker.who,
     sort: blocker.blocker_type === 'decision' ? 0 : blocker.blocker_type === 'condition' ? 3 : blocker.blocker_type === 'unit' ? 4 : 3,
   }));
@@ -170,7 +170,7 @@ function blockedBy(store, row, db, wf) {
     since: sla.entered_at, who: 'controller', sort: 1,
   });
   for (const unit of many(db, "SELECT unit_id,updated_at FROM work_units WHERE workflow_id=? AND state='failed'", wf)) rows.push({
-    ref: ref('unit', unit.unit_id, row.name), ui: 'bad', reason: reason('UNIT_FAILED', {}),
+    ref: ref('unit', unit.unit_id, row.name, wf), ui: 'bad', reason: reason('UNIT_FAILED', {}),
     since: unit.updated_at, who: 'kernel', sort: 2,
   });
   rows.sort((a, b) => a.sort - b.sort || a.since - b.since);
@@ -217,7 +217,7 @@ function unitRow(db, unit, project) {
 function graph(db, project, wf) {
   const units = many(db, 'SELECT * FROM v_units WHERE workflow_id=? ORDER BY created_at,unit_id', wf);
   const nodes = units.map(u => ({ unit: u.unit_id, op: u.op_id, title: u.title ?? u.unit_id, ui: u.ui, state: u.state,
-    attempts: u.dispatches, cut: u.cut_ordinal == null ? null : { ordinal: u.cut_ordinal, total: u.cut_total }, href: hrefOf('unit', u.unit_id, project) }));
+    attempts: u.dispatches, cut: u.cut_ordinal == null ? null : { ordinal: u.cut_ordinal, total: u.cut_total }, href: hrefOf('unit', u.unit_id, project, wf) }));
   const edges = many(db, 'SELECT from_unit,to_unit,kind FROM unit_edges WHERE workflow_id=?', wf).map(e => ({ from: e.from_unit, to: e.to_unit, kind: e.kind }));
   const groups = [...new Set(nodes.map(n => n.op))].map(op => {
     const selected = nodes.filter(n => n.op === op);
@@ -233,10 +233,10 @@ function unitDetail(db, project, wf, unitId) {
   const blockers = many(db, "SELECT * FROM v_blocking WHERE workflow_id=? AND entity_type='unit' AND entity_id=?", wf, unitId);
   return { unit: unitRow(db, unit, project),
     attempts: many(db, 'SELECT * FROM v_op_history WHERE workflow_id=? AND unit_id=? ORDER BY attempt_id DESC', wf, unitId).map(a => attemptRow(a, project)),
-    edges: { in: edges.filter(e => e.to_unit === unitId).map(e => ref('unit', e.from_unit, project)),
-      out: edges.filter(e => e.from_unit === unitId).map(e => ref('unit', e.to_unit, project)) },
+    edges: { in: edges.filter(e => e.to_unit === unitId).map(e => ref('unit', e.from_unit, project, wf)),
+      out: edges.filter(e => e.from_unit === unitId).map(e => ref('unit', e.to_unit, project, wf)) },
     decisions: decisions.map(d => ({ id: d.decision_id, choice: d.choice, rationale: d.rationale, result: parse(d.result_json), at: d.decided_at })),
-    blockedBy: blockers.map(b => ({ ref: blockerRef(b, project), ui: b.blocker_type === 'unit' ? 'waiting' : 'warn', reason: reason(b.reason_code, {}, b.detail ?? undefined), since: b.since })) };
+    blockedBy: blockers.map(b => ({ ref: blockerRef(b, project, wf), ui: b.blocker_type === 'unit' ? 'waiting' : 'warn', reason: reason(b.reason_code, {}, b.detail ?? undefined), since: b.since })) };
 }
 function decisionLog(store, url) {
   const machine = store.machine.db;
@@ -247,13 +247,14 @@ function decisionLog(store, url) {
     if (project && project !== ledger.name) return [];
     return many(db, 'SELECT * FROM decisions WHERE (? IS NULL OR workflow_id=?) ORDER BY decided_at DESC', wf, wf).map(d => ({
       id: d.decision_id, decider: d.decider, di: d.di_id ? ref('di', d.di_id, ledger.name) : null,
-      subject: d.subject_type && d.subject_id ? ref(d.subject_type === 'unit' ? 'unit' : d.subject_type === 'attempt' ? 'attempt' : 'workflow', d.subject_id, ledger.name) : null,
+      subject: d.subject_type && d.subject_id ? ref(d.subject_type === 'unit' ? 'unit' : d.subject_type === 'attempt' ? 'attempt' : 'workflow', d.subject_id, ledger.name, d.workflow_id) : null,
       choice: d.choice, rationale: d.rationale, result: parse(d.result_json), at: d.decided_at,
     }));
   });
   rows.push(...many(machine, 'SELECT * FROM sup_decisions WHERE (? IS NULL OR workflow_id=?) ORDER BY decided_at DESC', wf, wf).map(d => ({
     id: d.decision_id, decider: d.decider, di: d.di_id ? ref('di', d.di_id) : null,
-    subject: d.subject_type && d.subject_id ? ref(d.subject_type === 'unit' ? 'unit' : 'workflow', d.subject_id) : null,
+    subject: d.subject_type && d.subject_id ? ref(d.subject_type === 'unit' ? 'unit' : 'workflow', d.subject_id,
+      store.projects().find(projectRow => projectRow.ledgerId === d.ledger_id)?.name ?? null, d.workflow_id) : null,
     choice: d.choice, rationale: d.rationale, result: parse(d.result_json), at: d.decided_at,
   })));
   return rows.filter(d => !decider || d.decider === decider).sort((a, b) => b.at - a.at);
