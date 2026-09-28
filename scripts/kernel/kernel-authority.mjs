@@ -239,4 +239,25 @@ export function recordKernel(ledger, { workflowId, entityType, entityId, kind, p
 }
 
 export const settingsN = () => progressSettings().maxUnitsPerEdit;
+
+/**
+ * SETTLE-FIRST (owner 2026-09-28: finished [Op] tabs stayed open because their reports sat unconsumed, so the settle
+ * close never fired): the filed reports of this workflow older than allocation.progress.settleBacklog.ageMs that no
+ * consume-report took. [{jobId, op, attempt, outcome, ageMin}].
+ */
+export function settleBacklogOf(db, workflowId, { now = Date.now(), ageMs = progressSettings().settleBacklog.ageMs } = {}) {
+  return db.prepare(`SELECT r.op_id, r.attempt, r.outcome, r.created_at, j.job_id FROM reports r
+    LEFT JOIN jobs j ON j.workflow_id=r.workflow_id AND j.op_id=r.op_id AND j.attempt=r.attempt AND j.kind='op'
+    WHERE r.workflow_id=? AND r.consumed_at IS NULL AND r.created_at<? ORDER BY r.created_at`).all(workflowId, now - ageMs)
+    .map((r) => ({ jobId: r.job_id ?? null, op: r.op_id, attempt: r.attempt, outcome: r.outcome, ageMin: Math.round((now - Number(r.created_at)) / 60_000) }));
+}
+
+/** Refuse a route/dispatch while >= settleBacklog.max filed reports wait unconsumed (an api guard, not a prompt rule). */
+export function refuseSettleBacklog(db, workflowId, verb, { now = Date.now() } = {}) {
+  const s = progressSettings().settleBacklog;
+  const backlog = settleBacklogOf(db, workflowId, { now, ageMs: s.ageMs });
+  if (backlog.length >= s.max) {
+    throw Object.assign(new Error(`settle-backlog: ${backlog.length} filed report(s) of ${workflowId} wait unconsumed for more than ${Math.round(s.ageMs / 60_000)}m - SETTLE FIRST (driver-loop.yaml progress.settleFirst): api consume-report --job <id>, then api settle --job <id> --verdict <from its report>, for ${backlog.slice(0, 12).map((b) => `${b.jobId ?? `${b.op}#${b.attempt}`} (${b.outcome}, ${b.ageMin}m)`).join(', ')}; then ${verb} again`), { code: 'settle-backlog', backlog });
+  }
+}
 export { DECISION_KIND, DECISION_RESULT_KIND, GRAPH_EDIT_KIND, decisionsOf };

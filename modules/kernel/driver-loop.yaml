@@ -143,6 +143,14 @@ boundary:
 # actions, each with its exact command. The Kernel picks, runs, logs, measures.
 # ============================================================================
 progress:
+  settleFirst: >-
+    Every wake, BEFORE any route, dispatch or edit: consume and settle every
+    filed report (`api consume-report --job <id>`, re-run checks, `api settle
+    --job <id> --verdict ...`). A settle closes the finished [Op] terminal and
+    frees its slot; an unconsumed report holds both. api route and api
+    dispatch refuse settle-backlog while >= runtimes.yaml
+    allocation.progress.settleBacklog.max reports older than its ageMs wait,
+    and api status progress ranks consume+settle as the top action.
   firstDuty: >-
     Every wake, right after survey and inbox, read `api status` progress and
     rca and answer three questions before anything else: (1) am I progressing

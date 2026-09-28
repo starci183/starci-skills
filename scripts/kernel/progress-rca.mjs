@@ -55,6 +55,7 @@ export function progressSettings(allocation = null) {
     recutThreshold: pos(p.recutThreshold, 3),
     rca: { minFailures: pos(p.rca?.minFailures, 3), windowMs: pos(p.rca?.windowMs, 24 * HOUR), examples: pos(p.rca?.examples, 4) },
     commandTimeoutMs: pos(p.commandTimeoutMs, 600_000),
+    settleBacklog: { max: pos(p.settleBacklog?.max, 3), ageMs: pos(p.settleBacklog?.ageMs, 120_000) },
   };
 }
 
@@ -182,6 +183,13 @@ export function progressOf({ jobs, core = {}, workflowId, createdAt = null, now 
     reasons.push(`slow: ${unitsPerHour} units/h < ${minRate}/h${priority ? ' (priority workflow)' : ''}, last unit ${lastDoneAt ? `${Math.round((now - lastDoneAt) / 60_000)}m ago` : 'never'}`);
     since = since == null ? quietSince : Math.min(since, quietSince);
   }
+  // SETTLE-FIRST: reports filed and never consumed hold a slot and a terminal each (core.reports from api status).
+  const unsettled = (core.reports ?? []).filter((r) => !r.consumed_at && now - Number(r.created_at) >= settings.settleBacklog.ageMs);
+  if (unsettled.length) {
+    reasons.push(`unsettled: ${unsettled.length} filed report(s) not consumed/settled (their [Op] terminals and slots stay held)`);
+    const oldest = Math.min(...unsettled.map((r) => Number(r.created_at)));
+    since = since == null ? oldest : Math.min(since, oldest);
+  }
   const failedUnits = units.filter((u) => u.state === 'failed').length;
   if (failedUnits > 0 && failedUnits >= done.length && remaining > 0) reasons.push(`failing: ${failedUnits} unit(s) parked failed vs ${done.length} done`);
   const sinceMs = since == null ? 0 : Math.max(0, now - since);
@@ -189,6 +197,7 @@ export function progressOf({ jobs, core = {}, workflowId, createdAt = null, now 
     schema: 'starci/progress@1', priority, unitsTotal: total, unitsDone: done.length, unitsOpen: units.filter((u) => u.state === 'open').length, unitsFailed: failedUnits,
     unitsPerHour, minUnitsPerHour: minRate, share: total ? Math.round(done.length / total * 1000) / 1000 : null,
     legs: { done: legsDone, total: legs.length },
+    unsettledReports: unsettled.map((r) => r.job_id ?? r.dispatch_id),
     running, allowedParallel: par.allowed, parallelCap: par.cap, parallelWhy: par.why, queuedReady, readyJobs,
     etaHours: remaining === 0 ? 0 : etaRate > 0 ? Math.round(remaining / etaRate * 10) / 10 : null,
     eta: remaining === 0 ? new Date(now).toISOString() : etaRate > 0 ? new Date(now + remaining / etaRate * HOUR).toISOString() : null,
@@ -353,6 +362,14 @@ export function actionsOf({ progress, rca, units = [], workflowId, repo = '<repo
   const lastFailedOf = (u) => [...u.jobs].reverse().find((j) => j.status === 'failed') ?? null;
   const cl = new Map((rca?.clusters ?? []).map((c) => [c.cause, c]));
 
+  // 0. SETTLE FIRST: a filed report nobody consumed keeps its terminal, its slot and its unit's verdict hostage.
+  if (progress?.unsettledReports?.length) {
+    const ids = progress.unsettledReports.filter(Boolean);
+    add({ key: actionKey('settle-backlog', ids.length), tier: 'light', cause: 'unsettled-reports', unblocks: 1000 + ids.length,
+      title: `consume + settle ${ids.length} filed report(s) BEFORE any route or dispatch (api route/dispatch refuse settle-backlog meanwhile)`,
+      command: ids.slice(0, 20).map((id) => `${api} consume-report --repo ${q(repo)} --job ${id} && ${api} settle --repo ${q(repo)} --job ${id} --verdict <pass|fail|blocked from its report>`).join(' ; '),
+      expected: 'each settle closes its [Op] terminal (verified close), frees its slot and lets the unit count or route its repair' });
+  }
   // 1. parallelism: the cheapest, most certain win.
   if (progress && progress.queuedReady > 0 && progress.running < progress.allowedParallel) {
     const k = progress.allowedParallel - progress.running;

@@ -1,0 +1,17 @@
+id: kernel-settle-first
+effectiveAt: '2026-09-28T13:05:00+07:00'
+summary: >-
+  SETTLE-FIRST. Every wake the Kernel consumes and settles every filed report before any route or
+  dispatch (driver-loop.yaml progress.settleFirst). api route and api dispatch refuse settle-backlog
+  while >= runtimes.yaml allocation.progress.settleBacklog.max reports older than its ageMs wait
+  unconsumed, naming them; api status progress counts them as a stall cause and ranks consume+settle
+  as the top rca action. A finished [Op] keeps its terminal and slot until its settle closes it.
+reach: new-legs
+paths:
+  - modules/kernel/contract-changes/kernel-settle-first.yaml
+  - modules/kernel/driver-loop.yaml
+  - modules/kernel/kernel-prompt.md
+  - modules/models/runtimes.yaml
+  - scripts/kernel/api.mjs
+  - scripts/kernel/kernel-authority.mjs
+  - scripts/kernel/progress-rca.mjs

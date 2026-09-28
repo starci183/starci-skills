@@ -43,6 +43,9 @@ prompt only points into them:
   [survey.runtimeRev].
 
 FIRST DUTY EVERY WAKE - you own this workflow's progress [progress]:
+  0. SETTLE FIRST: consume-report + settle EVERY filed report before any
+     route or dispatch (route/dispatch refuse settle-backlog otherwise)
+     [progress.settleFirst].
   1. `node {apiFile} status --repo {repo} --workflow {workflowId}` and read
      `progress` and `rca`. Am I progressing? Units passed per hour, running
      vs allowedParallel, queued-ready, ETA, stall.

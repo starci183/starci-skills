@@ -175,7 +175,7 @@ import { bindWorkflowRun, staleTasks, CLOSED_TASK_STATUSES } from './orca-runs.m
 import { taskList } from '../api/orca/task-list.mjs';
 import { CONDITIONS_ATTACHED_EVENT, UNTIL_FLAGS, autoResolveTypedIncidents, conditionLabel, gateConditionView, lineageHeadById, parseConditions, sharedBlockerUntil, typedIncidents } from './gate-conditions.mjs';
 import { extensionUsage, loadApiExtensions, requiredOf, statusExtras } from './api-extensions.mjs';
-import { kernelOverrideFor } from './kernel-authority.mjs';
+import { kernelOverrideFor, refuseSettleBacklog } from './kernel-authority.mjs';
 import { BLOCKING_HEADS_UP_AUTO, blockingHeadsUpDue, blockingJobs, blockingOthersOf, orderQueuedByBlocking } from './waiter-priority.mjs';
 import { parkedBehindWaits, waitHeldOperations } from './frontier-parked.mjs';
 import { ownerAskConflict } from '../checks/check-starcistacks.mjs';
@@ -4654,6 +4654,8 @@ async function cmdRoute(ledger, args) {
   if (job.status === 'effect_unknown') throw Object.assign(new Error(`job ${jobId} requires reconcile before it can be routed`), { code: 'job-reconcile-required' });
   if (FINAL_SETTLED.includes(job.status)) throw Object.assign(new Error(`job ${jobId} is already settled (${job.status})`), { code: 'job-settled' });
   if (job.status !== 'queued') throw Object.assign(new Error(`job ${jobId} cannot be routed while ${job.status}; only queued jobs are routable`), { code: 'job-not-queued' });
+  // SETTLE-FIRST (driver-loop.yaml progress.settleFirst): no new route while filed reports wait unconsumed.
+  refuseSettleBacklog(db, job.workflow_id, 'route');
   const priorWorker = operationTerminalHandleOf(job) ? observeOperationWorker(job) : null;
   if (priorWorker?.connected && priorWorker?.writable) {
     throw Object.assign(new Error(`job ${jobId} is queued in the ledger but exact worker ${priorWorker.terminalHandle} is still live; reconcile it instead of rerouting`), {
@@ -5318,6 +5320,8 @@ function cmdDispatch(ledger, args, repo) {
   if (!job) throw Object.assign(new Error(`unknown job ${jobId}`), { code: 'job-unknown' });
   if (SETTLED.includes(job.status)) throw Object.assign(new Error(`job ${jobId} is already settled (${job.status})`), { code: 'job-settled' });
   if (job.status !== 'queued') throw Object.assign(new Error(`job ${jobId} cannot dispatch while ${job.status}; settle/reconcile the current worker first`), { code: 'job-not-queued' });
+  // SETTLE-FIRST (driver-loop.yaml progress.settleFirst): no new dispatch while filed reports wait unconsumed.
+  refuseSettleBacklog(db, job.workflow_id, 'dispatch');
   const priorWorker = operationTerminalHandleOf(job) ? observeOperationWorker(job) : null;
   if (priorWorker?.connected && priorWorker?.writable) {
     throw Object.assign(new Error(`job ${jobId} is queued in the ledger but exact worker ${priorWorker.terminalHandle} is still live; reconcile it instead of dispatching a duplicate`), {
