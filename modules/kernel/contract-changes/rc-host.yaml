@@ -1,0 +1,29 @@
+id: rc-host
+effectiveAt: '2026-09-28T19:00:00+07:00'
+summary: >-
+  Reconciler lane D (DESIGN §7.7, §8.4, §9.4, §9.5, §9.7, §12, §13). The Host controller owns the host services, both
+  seat types, orphan runtime processes, the boot order and ledger health. scripts/reconciler/services.mjs is the ONE
+  service registry (orca, harness-ui, harness-tunnel, ask-gateway, ask-tunnel, telegram-bridge, checker:<name>,
+  sched-task:StarCi-Reconciler): each port or URL is read from one source (runtimes.yaml statusApp.port,
+  ~/.cloudflared/harness.yml ingress, config.yaml connectors.gateway.port; a tunnel ingress on another port than the
+  harness is a probe failure, port-drift). Services step through the DESIGN §9.7 state machine, persisted in the
+  services table of reconciler.sqlite: backoff 1 s doubling to 5 min, more than 5 restarts in 30 min -> quarantined
+  + DI service-quarantined. Every actuator is `services.mjs --start <name>`, reached only through ctx.run; Orca is
+  relaunched through explorer.exe with no agent session variables. Kernel seats run scripts/kernel/watchdog.mjs
+  --once --repair (in shadow the read-only --once probe, recording a repair only when the probe needs one); a
+  missing or unrendered goal text refuses the seat with a DI goal-text-missing (INV-W4); more than 3 replacements
+  an hour quarantine the seat with a DI seat-unrecoverable. The Supervisor seat runs scripts/supervisor/watchdog.mjs
+  --once. host:processes stops runaway guard-shim chains and orphan watchdog/start-workflow/serve-ask loops of an
+  unlisted repo older than 30 min (ORPHAN_PROCESS), runs the footprint scan every 10 min and clocks
+  TERMINAL_COUNT_DRIFT. ledger-health.mjs runs PRAGMA quick_check hourly (LEDGER_CORRUPT + DI) and a nightly VACUUM
+  INTO backup to D:/starci-archive/ledger-backups, keeping 7; restore stays manual and owner-approved. Lands in
+  shadow: nothing acts until config.yaml reconciler.controllers.host.mode is active.
+reach: new-legs
+paths:
+  - modules/kernel/contract-changes/rc-host.yaml
+  - modules/reconciler/host.yaml
+  - scripts/reconciler/controllers/host.mjs
+  - scripts/reconciler/services.mjs
+  - scripts/reconciler/ledger-health.mjs
+  - tests/reconciler-host.spec.mjs
+  - tests/reconciler-services.spec.mjs

@@ -1,0 +1,418 @@
+// host.mjs — the reconciler's Host controller (DESIGN 7.7, 8.4, 9.4, 9.5, 9.7, 12; LANES.md Lane D).
+//
+// Keys:
+//   host:boot                     the boot order of DESIGN 7.7, at engine start and when Orca comes back
+//                                 (failed -> healthy): Orca, harness, tunnels, connectors, terminal dedupe, api reconcile
+//                                 --orphan-kernel-jobs / --orca-tasks per ledger, then the seats. Seat keys wait for it.
+//   service:<name>                one registry service (scripts/reconciler/services.mjs), stepped through the DESIGN 9.7
+//                                 state machine; a start is the entry's actuator command through ctx.run.
+//   seat:kernel:<ledgerId>:<wf>   one running, unarchived workflow's Kernel seat: scripts/kernel/watchdog.mjs --once
+//                                 --repair (that child proves death twice, respects host outages, replaces, adopts,
+//                                 presses Enter, repairs titles). In shadow the read-only probe (--once without
+//                                 --repair) runs, and a repair is recorded only when the probe says one is needed.
+//                                 A workflow whose goal text is missing or unrendered (INV-W4) gets no seat and a DI
+//                                 goal-text-missing for the Supervisor. More than maxReplacementsPerHour replacements
+//                                 -> quarantined + DI seat-unrecoverable.
+//   seat:supervisor               scripts/supervisor/watchdog.mjs --once --json (nothing in config.yaml supervisor.mode chat).
+//   host:processes                runaway guard-shim chains (host-health hostVerdict -> stop), orphan runtime loops
+//                                 (ORPHAN_PROCESS -> stop), the footprint scan, the Orca terminal count (TERMINAL_COUNT_DRIFT).
+//   ledger:<ledgerId>             hourly PRAGMA quick_check (LEDGER_CORRUPT clock + DI), nightly VACUUM INTO backup.
+//
+// Every mutation goes through ctx.run / ctx.api / ctx.openDecision, so shadow mode records it and runs nothing.
+// Probes are read-only and run in both modes. The factory takes every seam for the specs.
+import path from 'node:path';
+import {
+  SKILL_ROOT, SERVICES_FILE, DOWN_STATES, hostSettings, serviceRegistry, servicePorts, openServiceStore, newRecord,
+  stepService, runChild, lastJson, probeOrcaAsync,
+} from '../services.mjs';
+import { quickCheck, backupDue } from '../ledger-health.mjs';
+import { goalTextRefusal } from '../../goal/goal-text.mjs';
+
+export const CONCERNS = Object.freeze(['host.kernel-seat', 'host.supervisor-seat', 'host.services', 'host.orca', 'host.processes', 'host.ledger-health']);
+export const KERNEL_WATCHDOG = 'scripts/kernel/watchdog.mjs';
+export const SUPERVISOR_WATCHDOG = 'scripts/supervisor/watchdog.mjs';
+export const FOOTPRINT_SCAN = 'scripts/guards/footprint-scan.mjs';
+export const LEDGER_HEALTH = 'scripts/reconciler/ledger-health.mjs';
+
+// A read-only probe answer that a --repair pass would act on (scripts/kernel/watchdog.mjs statusTick/kernelTick).
+export const NEEDS_REPAIR = new Set(['restart-needed', 'wake-needed', 'queued-input', 'staged-input']);
+// A --repair answer that replaced (or tried to replace) the Kernel.
+export const REPLACED = new Set(['restarted', 'restart-failed']);
+const DOWN_BEFORE_BOOT = new Set(['failed', 'backoff', 'starting', 'quarantined']);
+
+/** The seat state a watchdog action puts the seat in (DESIGN 9.4). Pure. */
+export function seatStateOf(action) {
+  if (['finished', 'archived'].includes(action)) return 'vacant';
+  if (['restart-needed', 'agent-exit-unconfirmed', 'terminal-unverified', 'terminal-unreadable'].includes(action)) return 'suspect';
+  if (['restarted', 'adopted'].includes(action)) return 'reserving';
+  if (['restart-failed', 'adopt-failed', 'kernel-terminal-close-failed'].includes(action)) return 'replacing';
+  if (action === 'host-unavailable') return 'hostOutage';
+  if (['queued-input', 'staged-input'].includes(action)) return 'inputPending';
+  if (action === 'interactive-gate') return 'gated';
+  return 'live';
+}
+
+/** The goal problem of a workflow's newest goal text, or null (INV-W4; scripts/goal/goal-text.mjs). */
+export function goalProblem(markdown, refusal) {
+  if (markdown == null || !String(markdown).trim()) return 'goal-text-missing';
+  return refusal(markdown) ? 'goal-text-unresolved' : null;
+}
+
+const normRepo = (p) => path.resolve(String(p)).replace(/\\/g, '/').replace(/\/+$/, '').toLowerCase();
+const argOf = (cmd, name) => {
+  const m = new RegExp(`(?:^|\\s)--${name}(?:=|\\s+)(?:"([^"]*)"|'([^']*)'|(\\S+))`).exec(String(cmd ?? ''));
+  return m ? (m[1] ?? m[2] ?? m[3]) : null;
+};
+export const RUNTIME_LOOP = /[\\/](watchdog|start-workflow|serve-ask)\.mjs["']?(?=\s|$)/i;
+
+/**
+ * Orphan runtime loops in a process table: a watchdog.mjs / start-workflow.mjs / serve-ask.mjs whose --repo no managed
+ * ledger owns, whose workflow no managed ledger runs, older than minAgeMs. A process with no --repo (the
+ * Supervisor's watchdog) and a listed repo are never orphans. Pure.
+ */
+export function findOrphans(procs, { knownRepos, runningWorkflows, now, minAgeMs, exclude = [] }) {
+  const known = new Set([...knownRepos].map(normRepo));
+  const out = [];
+  for (const p of procs ?? []) {
+    const cmd = String(p?.cmd ?? '');
+    const m = RUNTIME_LOOP.exec(cmd);
+    if (!m || exclude.includes(p.pid)) continue;
+    const repo = argOf(cmd, 'repo');
+    if (!repo || known.has(normRepo(repo))) continue;
+    const workflowId = argOf(cmd, 'workflow') ?? argOf(cmd, 'goal');
+    if (workflowId && runningWorkflows.has(workflowId)) continue;
+    const ageMs = p.created ? now - p.created : 0;
+    if (!p.created || ageMs < minAgeMs) continue;
+    out.push({ pid: p.pid, script: `${m[1]}.mjs`, repo, workflowId, ageMs, cmd: cmd.slice(0, 200) });
+  }
+  return out;
+}
+
+/** The JSON a ctx.run/ctx.api answer carries, or null (shadow answers carry none). */
+export function outputOf(r) {
+  if (r == null || r.shadow) return null;
+  if (typeof r === 'string') return lastJson(r);
+  return (r.stdout != null ? lastJson(r.stdout) : null) ?? r.value ?? r.json ?? r.result ?? null;
+}
+
+const di = (fields) => ({ schema: 'starci/decision-item@1', openedBy: 'host-controller', decider: 'supervisor', escalateTo: 'owner', ...fields });
+const brief = (probe) => {
+  if (!probe || typeof probe !== 'object') return {};
+  const v = probe.value ?? {};
+  const pick = { verdict: probe.verdict, status: probe.status, error: probe.error, terminals: probe.terminals, exists: probe.exists,
+    taskStatus: probe.status && probe.exists != null ? probe.status : undefined, running: v.running, pid: v.pid, offset: v.offset, port: v.port,
+    problems: v.health?.problems?.length ? v.health.problems.slice(0, 3) : undefined };
+  return Object.fromEntries(Object.entries(pick).filter(([, x]) => x !== undefined && x !== null));
+};
+
+// The engine reads resyncMs/concurrency from modules/reconciler/host.yaml itself; the export mirrors them, and an
+// unreadable file never breaks discovery.
+const yamlNumber = (key, fallback) => { try { return hostSettings()[key]; } catch { return fallback; } };
+
+export function createHostController(deps = {}) {
+  const lazy = (fn) => { let v; let done = false; return () => { if (!done) { v = fn(); done = true; } return v; }; };
+  const settings = lazy(deps.settings ?? (() => hostSettings()));
+  const registry = lazy(deps.registry ?? (() => serviceRegistry({ settings: settings(), ports: servicePorts() })));
+  const store = lazy(deps.store ?? (() => openServiceStore()));
+  const goalRefusal = deps.goalRefusal ?? goalTextRefusal;
+  const probeSeat = deps.probeSeat ?? (async ({ repo, workflowId, timeoutMs }) => {
+    const r = await runChild(process.execPath, [path.join(SKILL_ROOT, KERNEL_WATCHDOG), '--repo', repo, '--workflow', workflowId, '--once', '--json'], { timeoutMs });
+    return lastJson(r.stdout) ?? { ok: false, action: r.timedOut ? 'probe-timeout' : 'probe-failed', error: String(r.stderr).slice(0, 300) };
+  });
+  const listProcesses = deps.listProcesses ?? (async () => {
+    const r = await runChild(process.execPath, [path.join(SKILL_ROOT, SERVICES_FILE), '--processes'], { timeoutMs: 240_000 });
+    const v = lastJson(r.stdout);
+    return v?.ok ? v.procs : null;
+  });
+  const hostVerdict = deps.hostVerdict ?? (async (procs) => {
+    const [{ hostVerdict: verdict }, { allocationSettings }] = await Promise.all([import('../../supervisor/host-health.mjs'), import('../../../engine/config.mjs')]);
+    const h = allocationSettings()?.supervisorTick?.host;
+    return h ? verdict(procs, { ...h, now: Date.now() }) : { stop: [], alert: false };
+  });
+  const orcaTerminals = deps.orcaTerminals ?? (async () => (await probeOrcaAsync({ timeoutMs: settings().services.orca?.probeTimeoutMs ?? 30_000 })).terminals ?? null);
+  const supervisorMode = deps.supervisorMode ?? (async () => { try { return (await import('../../supervisor/home.mjs')).supervisorMode(); } catch { return 'chat'; } });
+  const checkLedger = deps.quickCheck ?? quickCheck;
+  const isBackupDue = deps.backupDue ?? backupDue;
+
+  const state = { bootPending: true, lastFootprintAt: 0, lastProcessesAt: 0, orphanClocks: new Set(), backupDay: new Map(), clocks: new Map() };
+  // SLA clocks are sent on an edge only (ctx.clock when a clock starts, ctx.clear when it stops), as the other
+  // controllers do; after an engine restart each clock state is sent once more.
+  const clock = async (ctx, entity, st, slaMs, meta) => {
+    const k = `${entity}|${st}`;
+    if (state.clocks.get(k) === true) return;
+    state.clocks.set(k, true);
+    await ctx.clock(entity, st, slaMs, meta);
+  };
+  const clear = async (ctx, entity, st) => {
+    const k = `${entity}|${st}`;
+    if (state.clocks.get(k) === false) return;
+    state.clocks.set(k, false);
+    await ctx.clear(entity, st);
+  };
+
+  const productLedgers = (ctx) => (ctx.ledgers ?? []).filter((l) => l.ledgerId !== 'supervisor');
+  const running = async (ctx, ledgerId) => {
+    try {
+      return (await ctx.read(ledgerId, (db) => db.prepare("SELECT workflow_id FROM workflows WHERE phase='running' AND archived_at IS NULL ORDER BY workflow_id").all()))
+        .map((r) => r.workflow_id);
+    } catch { return []; }
+  };
+  const rowOf = (name, now) => store().get(name) ?? newRecord(name, now);
+
+  /* -------------------------------------------------------- services */
+
+  async function reconcileService(name, ctx, { force = false } = {}) {
+    const now = ctx.now();
+    const entry = registry().find((e) => e.name === name);
+    if (!entry) return { ok: false, skipped: 'unknown-service' };
+    const rec = rowOf(name, now);
+    if (!force && rec.lastProbe?.at && now - rec.lastProbe.at < entry.everyMs) return { ok: true, skipped: 'fresh', state: rec.state };
+    let probe;
+    try { probe = await entry.probe(); } catch (error) { probe = { ok: false, error: String(error?.message ?? error).slice(0, 200) }; }
+    const s = settings();
+    const step = stepService(rec, { ok: probe?.ok === true, unmanaged: probe?.unmanaged === true, detail: brief(probe) }, { now, entry, backoff: s.backoff, quarantine: s.quarantine });
+    const next = step.rec;
+    if (step.act === 'start') {
+      const a = entry.start();
+      if (a) { next.lastStart = { at: now, cmd: a.cmd, args: a.args }; next.lastStartResult = await ctx.run(a.cmd, a.args, { timeoutMs: entry.startTimeoutMs }); }
+    }
+    if (step.quarantined) {
+      await ctx.openDecision(di({
+        kind: 'service-quarantined', ledger: 'supervisor', entity: { type: 'service', id: name },
+        idempotencyKey: `service-quarantined:${name}:${next.since}`, severity: entry.ownerPath ? 'critical' : 'warn', ownerPath: entry.ownerPath === true,
+        summary: `${name}: more than ${s.quarantine.maxRestarts} restarts in ${Math.round(s.quarantine.windowMs / 60000)} min, quarantined`,
+        evidence: [{ ref: `probe:${JSON.stringify(next.lastProbe).slice(0, 200)}` }, { ref: `restarts:${next.restarts.length}` }],
+        options: [{ key: 'reopen', verb: `node ${SERVICES_FILE} --reopen ${name}`, recommended: true }], allowedVerbs: ['reopen'],
+      }));
+    }
+    if (entry.kind === 'checker' && step.to === 'failed' && next.downSince != null && now - next.downSince >= entry.slaMs) {
+      await ctx.openDecision(di({
+        kind: 'runtime-defect', ledger: 'supervisor', entity: { type: 'service', id: name }, idempotencyKey: `checker-unavailable:${name}:${next.downSince}`,
+        summary: `${name} unavailable for ${Math.round((now - next.downSince) / 60000)} min; legs that need it are deferred`, evidence: [{ ref: `probe:${JSON.stringify(next.lastProbe).slice(0, 200)}` }],
+      }));
+    }
+    if (DOWN_STATES.has(step.to)) await clock(ctx, `service:${name}`, 'down', entry.slaMs, { code: 'SERVICE_DOWN', owner: 'host-controller', ledgerId: 'supervisor', since: next.downSince, state: step.to });
+    else await clear(ctx, `service:${name}`, 'down');
+    if (name === 'orca' && DOWN_BEFORE_BOOT.has(step.from) && step.to === 'healthy') state.bootPending = true;
+    if (step.from !== step.to) await ctx.log('reconciler.host.service', `${name} ${step.from} -> ${step.to}`, { name, from: step.from, to: step.to, act: step.act, probe: next.lastProbe });
+    store().put(next);
+    return { ok: true, name, from: step.from, to: step.to, act: step.act, quarantined: step.quarantined };
+  }
+
+  /* -------------------------------------------------------- seats */
+
+  async function reconcileKernelSeat(ledgerId, workflowId, ctx) {
+    const now = ctx.now(), key = `seat:kernel:${ledgerId}:${workflowId}`, s = settings().seats.kernel;
+    const ledger = (ctx.ledgers ?? []).find((l) => l.ledgerId === ledgerId);
+    if (!ledger) return { ok: false, skipped: 'unknown-ledger' };
+    const wf = await ctx.read(ledgerId, (db) => {
+      const w = db.prepare('SELECT phase, archived_at FROM workflows WHERE workflow_id=?').get(workflowId);
+      const g = db.prepare('SELECT markdown FROM goals WHERE workflow_id=? ORDER BY revision DESC LIMIT 1').get(workflowId);
+      return w ? { phase: w.phase, archivedAt: w.archived_at, goal: g?.markdown ?? null } : null;
+    });
+    const clearAll = async () => { for (const st of ['vacant', 'gated', 'hostOutage', 'inputPending', 'quarantined']) await clear(ctx, key, st); };
+    if (!wf || wf.phase !== 'running' || wf.archivedAt != null) { await clearAll(); store().remove?.(key); return { ok: true, skipped: 'not-running' }; }
+    const rec = rowOf(key, now);
+    const problem = goalProblem(wf.goal, goalRefusal);
+    if (problem) {
+      await ctx.openDecision(di({
+        kind: 'goal-text-missing', ledger: ledgerId, workflowId, entity: { type: 'workflow', id: workflowId }, idempotencyKey: `goal-text-missing:${ledgerId}:${workflowId}`,
+        summary: `${workflowId}: the goal text is ${problem === 'goal-text-missing' ? 'missing' : 'an unrendered value'}; no Kernel seat is started (INV-W4). Only the owner edits a goal.`,
+        evidence: [{ ref: `goal:${String(wf.goal ?? 'null').slice(0, 120)}` }], escalateTo: 'owner',
+      }));
+      store().put({ ...rec, state: 'refused', since: rec.state === 'refused' ? rec.since : now, lastAction: problem });
+      return { ok: true, refused: problem };
+    }
+    if (rec.state === 'quarantined' && now - rec.since < s.holdMs) return { ok: true, quarantined: true };
+    const args = [KERNEL_WATCHDOG, '--repo', ledger.repo, '--workflow', workflowId, '--once', '--repair', '--json'];
+    let action, acted = false;
+    if (ctx.mode === 'active') {
+      action = outputOf(await ctx.run('node', args, { timeoutMs: s.timeoutMs }))?.action ?? 'unknown';
+      acted = true;
+    } else {
+      action = (await probeSeat({ repo: ledger.repo, workflowId, timeoutMs: s.timeoutMs }))?.action ?? 'unknown';
+      if (NEEDS_REPAIR.has(action)) { await ctx.run('node', args, { timeoutMs: s.timeoutMs }); acted = true; }
+    }
+    const replaced = ctx.mode === 'active' ? REPLACED.has(action) : acted && action === 'restart-needed';
+    const next = { ...rec, restarts: (rec.restarts ?? []).filter((t) => now - t < 3_600_000), lastAction: action, lastAt: now, mode: ctx.mode };
+    if (replaced) next.restarts.push(now);
+    let seat = seatStateOf(action);
+    if (next.restarts.length > s.maxReplacementsPerHour) {
+      seat = 'quarantined';
+      if (rec.state !== 'quarantined') {
+        await ctx.openDecision(di({
+          kind: 'seat-unrecoverable', ledger: ledgerId, workflowId, entity: { type: 'seat', id: key }, idempotencyKey: `seat-unrecoverable:${key}:${now}`,
+          summary: `${workflowId}: the Kernel seat was replaced ${next.restarts.length} times in an hour; quarantined`,
+          evidence: [{ ref: `action:${action}` }], options: [{ key: 'reopen', verb: `node ${SERVICES_FILE} --reopen ${key}`, recommended: true }], allowedVerbs: ['reopen'],
+        }));
+      }
+    }
+    if (next.state !== seat) { next.state = seat; next.since = now; }
+    const clocks = { vacant: ['suspect', 'replacing', 'reserving'], gated: ['gated'], hostOutage: ['hostOutage'], inputPending: ['inputPending'], quarantined: ['quarantined'] };
+    const sla = { vacant: [s.vacantSlaMs, 'SEAT_VACANT'], gated: [s.gatedSlaMs, 'KERNEL_GATED'], hostOutage: [s.hostOutageSlaMs, 'ORCA_DOWN'], inputPending: [s.inputSlaMs, 'KERNEL_INPUT_STUCK'], quarantined: [s.quarantinedSlaMs, 'SEAT_QUARANTINED'] };
+    for (const [name, states] of Object.entries(clocks)) {
+      if (states.includes(seat)) await clock(ctx, key, name, sla[name][0], { code: sla[name][1], owner: 'host-controller', ledgerId, workflowId, action });
+      else await clear(ctx, key, name);
+    }
+    store().put(next);
+    return { ok: true, action, seat, acted, replaced };
+  }
+
+  async function reconcileSupervisorSeat(ctx) {
+    const now = ctx.now(), key = 'seat:supervisor';
+    if ((await supervisorMode()) === 'chat') { store().remove?.(key); return { ok: true, skipped: 'chat-mode' }; }
+    const r = await ctx.run('node', [SUPERVISOR_WATCHDOG, '--once', '--json'], { timeoutMs: settings().seats.supervisor.timeoutMs });
+    const action = outputOf(r)?.action ?? (r?.shadow ? 'shadow' : 'unknown');
+    const rec = rowOf(key, now);
+    const seat = action === 'shadow' ? rec.state : seatStateOf(action === 'replace-failed' ? 'restart-failed' : action);
+    store().put({ ...rec, state: seat, since: rec.state === seat ? rec.since : now, lastAction: action, lastAt: now });
+    return { ok: true, action, seat };
+  }
+
+  /* -------------------------------------------------------- boot (DESIGN 7.7) */
+
+  async function boot(ctx) {
+    const steps = [];
+    const orca = await reconcileService('orca', ctx, { force: true });
+    steps.push({ step: 'orca', ...orca });
+    if (orca.to !== 'healthy') return { ok: false, waiting: 'orca', steps };
+    for (const name of ['harness-ui', 'harness-tunnel', 'ask-gateway', 'ask-tunnel', 'telegram-bridge']) steps.push({ step: name, ...(await reconcileService(name, ctx, { force: true })) });
+    // Terminal dedupe before any seat: Orca restores old tabs as duplicate Kernels (FMEA 15).
+    const dedupeArgs = [SERVICES_FILE, '--dedupe', '--json'];
+    if (ctx.mode === 'active') steps.push({ step: 'dedupe', result: outputOf(await ctx.run('node', dedupeArgs, { timeoutMs: 600_000 })) });
+    else {
+      const dry = deps.dedupeDryRun ? await deps.dedupeDryRun() : lastJson((await runChild(process.execPath, [path.join(SKILL_ROOT, SERVICES_FILE), '--dedupe', '--dry-run', '--json'], { timeoutMs: 600_000 })).stdout);
+      if ((dry?.closed ?? []).length) await ctx.run('node', dedupeArgs, { timeoutMs: 600_000 });
+      steps.push({ step: 'dedupe', dryRun: true, wouldClose: (dry?.closed ?? []).length, ok: dry?.ok !== false });
+    }
+    for (const l of productLedgers(ctx)) {
+      for (const flag of ['--orphan-kernel-jobs', '--orca-tasks']) {
+        const r = await ctx.api(l.ledgerId, 'reconcile', [flag], { timeoutMs: 600_000 });
+        steps.push({ step: `reconcile ${flag}`, ledgerId: l.ledgerId, ok: r?.ok !== false });
+      }
+    }
+    state.bootPending = false;
+    for (const l of productLedgers(ctx)) for (const wf of await running(ctx, l.ledgerId)) steps.push({ step: 'seat', ledgerId: l.ledgerId, workflowId: wf, ...(await reconcileKernelSeat(l.ledgerId, wf, ctx)) });
+    steps.push({ step: 'seat:supervisor', ...(await reconcileSupervisorSeat(ctx)) });
+    await ctx.log('reconciler.host.boot', `boot order done (${ctx.mode})`, { steps: steps.map((x) => ({ step: x.step, ok: x.ok, to: x.to, action: x.action })) });
+    return { ok: true, steps };
+  }
+
+  /* -------------------------------------------------------- processes */
+
+  async function processes(ctx) {
+    const now = ctx.now(), p = settings().processes;
+    if (now - state.lastProcessesAt < p.everyMs) return { ok: true, skipped: 'fresh' };
+    state.lastProcessesAt = now;
+    const procs = await listProcesses();
+    if (!procs) return { ok: false, error: 'process table unreadable' };
+    const out = { stopped: [], orphans: [] };
+    const verdict = await hostVerdict(procs);
+    for (const r of verdict.stop ?? []) { await ctx.run('taskkill.exe', ['/F', '/T', '/PID', String(r.rootPid)], { timeoutMs: 120_000 }); out.stopped.push({ kind: r.kind, pid: r.rootPid }); }
+    if (verdict.alert) await ctx.log('reconciler.host.runaway', 'process counts over threshold with nothing safe to stop', { counts: verdict.counts, topParents: verdict.topParents });
+    const known = [...(ctx.ledgers ?? []).map((l) => l.repo).filter(Boolean)];
+    const runningIds = new Set();
+    for (const l of ctx.ledgers ?? []) for (const wf of await running(ctx, l.ledgerId)) runningIds.add(wf);
+    const orphans = findOrphans(procs, { knownRepos: known, runningWorkflows: runningIds, now, minAgeMs: p.orphanMinAgeMs, exclude: [process.pid, process.ppid] });
+    const seen = new Set();
+    for (const o of orphans) {
+      const entity = `process:${o.pid}`;
+      seen.add(entity);
+      await clock(ctx, entity, 'orphan', p.orphanSlaMs, { code: 'ORPHAN_PROCESS', owner: 'host-controller', ledgerId: 'supervisor', repo: o.repo, workflowId: o.workflowId, script: o.script });
+      await ctx.run('taskkill.exe', ['/F', '/T', '/PID', String(o.pid)], { timeoutMs: 120_000 });
+      out.orphans.push(o);
+    }
+    for (const entity of state.orphanClocks) if (!seen.has(entity)) await clear(ctx, entity, 'orphan');
+    state.orphanClocks = seen;
+    if (now - state.lastFootprintAt >= p.footprintEveryMs) { state.lastFootprintAt = now; await ctx.run('node', [FOOTPRINT_SCAN, '--json'], { timeoutMs: 600_000 }); out.footprint = true; }
+    // INV-H2: Orca's shells against the seats and running workers it should hold.
+    const terminals = await orcaTerminals();
+    if (terminals != null) {
+      let seats = (await supervisorMode()) === 'kernel' ? 1 : 0, workers = 0;
+      for (const l of ctx.ledgers ?? []) {
+        if (l.ledgerId !== 'supervisor') seats += (await running(ctx, l.ledgerId)).length;
+        try { workers += (await ctx.read(l.ledgerId, (db) => db.prepare("SELECT COUNT(*) AS n FROM jobs WHERE status IN ('running','answering') AND worker_id IS NOT NULL").get()))?.n ?? 0; } catch { /* no jobs table */ }
+      }
+      const expected = seats + workers + p.terminalSlack;
+      out.terminals = { count: terminals, expected, seats, workers };
+      if (terminals > expected) await clock(ctx, 'host:terminals', 'drift', p.terminalDriftSlaMs, { code: 'TERMINAL_COUNT_DRIFT', owner: 'host-controller', ledgerId: 'supervisor', count: terminals, expected });
+      else await clear(ctx, 'host:terminals', 'drift');
+    }
+    return { ok: true, ...out };
+  }
+
+  /* -------------------------------------------------------- ledger health */
+
+  async function ledgerHealth(ledgerId, ctx) {
+    const now = ctx.now(), lh = settings().ledgerHealth, key = `ledger:${ledgerId}`;
+    const ledger = (ctx.ledgers ?? []).find((l) => l.ledgerId === ledgerId);
+    if (!ledger?.file) return { ok: false, skipped: 'unknown-ledger' };
+    const rec = rowOf(key, now);
+    const out = { ok: true };
+    if (!rec.lastCheckAt || now - rec.lastCheckAt >= lh.quickCheckEveryMs) {
+      const r = checkLedger(ledger.file);
+      rec.lastCheckAt = now; rec.lastCheck = r;
+      const was = rec.state;
+      if (rec.state !== (r.ok ? 'ok' : 'corrupt')) { rec.state = r.ok ? 'ok' : 'corrupt'; rec.since = now; }
+      if (r.ok) await clear(ctx, key, 'corrupt');
+      else {
+        await clock(ctx, key, 'corrupt', 0, { code: 'LEDGER_CORRUPT', severity: 'critical', owner: 'host-controller', ledgerId, result: r.result.slice(0, 5) });
+        if (was !== 'corrupt') {
+          await ctx.openDecision(di({
+            kind: 'runtime-defect', ledger: ledgerId, entity: { type: 'ledger', id: ledgerId }, idempotencyKey: `ledger-corrupt:${ledgerId}:${now}`, severity: 'critical',
+            summary: `${ledgerId}: PRAGMA quick_check failed; restore from the newest ${lh.backupDir} backup only with the owner's approval`,
+            evidence: r.result.slice(0, 5).map((x) => ({ ref: `quick_check:${x}` })), escalateTo: 'owner',
+          }));
+        }
+      }
+      out.check = r;
+    }
+    const today = new Date(now).toDateString();
+    if (rec.state !== 'corrupt' && state.backupDay.get(ledgerId) !== today && isBackupDue({ ledgerId, now, dir: lh.backupDir, backupHour: lh.backupHour })) {
+      state.backupDay.set(ledgerId, today);
+      await ctx.run('node', [LEDGER_HEALTH, '--backup', '--ledger-id', ledgerId, '--file', ledger.file, '--json'], { timeoutMs: lh.backupTimeoutMs });
+      rec.lastBackupAt = now;
+      out.backup = true;
+    }
+    store().put(rec);
+    return out;
+  }
+
+  /* -------------------------------------------------------- the controller */
+
+  return {
+    name: 'host',
+    concerns: [...CONCERNS],
+    resyncMs: yamlNumber('resyncMs', 60_000),
+    concurrency: yamlNumber('concurrency', 1),
+    routes: {
+      'kernel-start-failed': (ev) => (ev.workflowId ? `seat:kernel:${ev.ledgerId}:${ev.workflowId}` : null),
+      'kernel-exited-terminal-closed': (ev) => (ev.workflowId ? `seat:kernel:${ev.ledgerId}:${ev.workflowId}` : null),
+      'workflow-finished': (ev) => (ev.workflowId ? `seat:kernel:${ev.ledgerId}:${ev.workflowId}` : null),
+    },
+    async list(ctx) {
+      const keys = state.bootPending ? ['host:boot'] : [];
+      keys.push(...registry().map((e) => `service:${e.name}`), 'host:processes');
+      for (const l of ctx.ledgers ?? []) keys.push(`ledger:${l.ledgerId}`);
+      for (const l of productLedgers(ctx)) for (const wf of await running(ctx, l.ledgerId)) keys.push(`seat:kernel:${l.ledgerId}:${wf}`);
+      keys.push('seat:supervisor');
+      return keys;
+    },
+    async reconcile(key, ctx) {
+      if (key === 'host:boot') return state.bootPending ? boot(ctx) : { ok: true, skipped: 'booted' };
+      if (key.startsWith('service:')) return reconcileService(key.slice('service:'.length), ctx);
+      if (key === 'host:processes') return processes(ctx);
+      if (key.startsWith('ledger:')) return ledgerHealth(key.slice('ledger:'.length), ctx);
+      if (key.startsWith('seat:')) {
+        if (state.bootPending) return { ok: true, deferred: 'boot' };
+        if (key === 'seat:supervisor') return reconcileSupervisorSeat(ctx);
+        const rest = key.slice('seat:kernel:'.length), cut = rest.lastIndexOf(':');
+        return reconcileKernelSeat(rest.slice(0, cut), rest.slice(cut + 1), ctx);
+      }
+      return { ok: false, skipped: 'unknown-key' };
+    },
+    _state: state,
+  };
+}
+
+export default createHostController();

@@ -1,0 +1,56 @@
+schema: starci/reconciler-controller@1
+name: host
+title: Host controller - host services, Kernel and Supervisor seats, orphan processes, the boot order, ledger health
+# DESIGN (D:/starci-tmp/reconciler-design/DESIGN.md) sections 7.7, 8.4, 9.4, 9.5, 9.7 and 12; LANES.md Lane D.
+# The code is scripts/reconciler/controllers/host.mjs, scripts/reconciler/services.mjs and
+# scripts/reconciler/ledger-health.mjs. Every number the host controller acts on is here; ports and URLs are NOT:
+# services.mjs servicePorts reads them once from their one source each (runtimes.yaml
+# allocation.supervisorTick.statusApp.port, ~/.cloudflared/harness.yml ingress, config.yaml connectors.gateway.port).
+concerns: [host.kernel-seat, host.supervisor-seat, host.services, host.orca, host.processes, host.ledger-health]
+resyncMs: 60000
+concurrency: 1
+
+# Service state machine (DESIGN 9.7): healthy -> degraded on one failed probe; degraded -> failed after failAfter
+# consecutive failed probes; failed -> backoff (minMs doubling by factor up to maxMs) -> starting; starting ->
+# failed when no probe passes within startTimeoutMs; more than maxRestarts restarts within windowMs -> quarantined
+# (a DI service-quarantined for the Supervisor); quarantined -> starting again after retryMs.
+backoff: {minMs: 1000, maxMs: 300000, factor: 2}
+quarantine: {maxRestarts: 5, windowMs: 1800000, retryMs: 3600000}
+
+# One entry per registry service (services.mjs SERVICES). everyMs: the least time between two probes (the
+# controller resyncs every resyncMs; a service probed more recently than everyMs is not probed again).
+# slaMs: how long the service may be down before the SERVICE_DOWN clock is a violation (the sla layer reports it).
+services:
+  orca: {everyMs: 60000, probeTimeoutMs: 30000, failAfter: 5, startTimeoutMs: 600000, slaMs: 180000, closeWaitMs: 30000}
+  harness-ui: {everyMs: 60000, probeTimeoutMs: 5000, failAfter: 2, startTimeoutMs: 120000, slaMs: 120000, probePath: /, task: 'StarCi Harness App'}
+  harness-tunnel: {everyMs: 300000, probeTimeoutMs: 15000, failAfter: 2, startTimeoutMs: 300000, slaMs: 300000, probePath: /, task: 'StarCi Harness Tunnel'}
+  ask-gateway: {everyMs: 60000, probeTimeoutMs: 30000, failAfter: 2, startTimeoutMs: 120000, slaMs: 120000}
+  ask-tunnel: {everyMs: 60000, probeTimeoutMs: 60000, failAfter: 2, startTimeoutMs: 300000, slaMs: 300000}
+  telegram-bridge: {everyMs: 60000, probeTimeoutMs: 30000, failAfter: 2, startTimeoutMs: 300000, slaMs: 300000}
+  sched-task:StarCi-Reconciler: {everyMs: 3600000, probeTimeoutMs: 30000, failAfter: 1, startTimeoutMs: 300000, slaMs: 60000}
+
+# The scheduled task StarCi-Reconciler is re-created only through `boot.mjs --install-task --apply`, and only when
+# this is true (owner-approved once, DESIGN 25 item 6). While false a missing task is reported `unmanaged`.
+allowTaskRepair: false
+
+# Checkers (Sonar, ...): probed and published as `checker:<name>` rows for the job controller, never restarted.
+# Each: {name, cmd, args, everyMs, probeTimeoutMs, slaMs}; a probe passes when the command exits 0.
+# Down longer than slaMs -> a DI for the Supervisor.
+checkers: []
+
+# Kernel seats (DESIGN 9.4): more than maxReplacementsPerHour replacements -> quarantined + DI seat-unrecoverable;
+# a quarantined seat is left alone for holdMs (or until `services.mjs --reopen <seat>`).
+seats:
+  kernel: {maxReplacementsPerHour: 3, holdMs: 3600000, timeoutMs: 900000, vacantSlaMs: 180000, inputSlaMs: 60000, gatedSlaMs: 600000, hostOutageSlaMs: 600000, quarantinedSlaMs: 1800000}
+  supervisor: {timeoutMs: 900000}
+
+# Processes (DESIGN 8.4): every everyMs. An orphan runtime loop (watchdog.mjs / start-workflow.mjs / serve-ask.mjs
+# whose --repo no managed ledger owns and whose workflow no managed ledger runs) older than orphanMinAgeMs is
+# stopped. The footprint scan runs every footprintEveryMs. More Orca terminals than seats + running workers +
+# terminalSlack -> the TERMINAL_COUNT_DRIFT clock.
+processes: {everyMs: 60000, orphanMinAgeMs: 1800000, orphanSlaMs: 60000, footprintEveryMs: 600000, terminalSlack: 5, terminalDriftSlaMs: 600000}
+
+# Ledger health (DESIGN 13): PRAGMA quick_check (read-only) every quickCheckEveryMs; nightly (from backupHour local
+# time) VACUUM INTO <backupDir>/<ledgerId>-<yyyymmdd>.sqlite, the newest keep kept. Restore is manual and
+# owner-approved; nothing here restores.
+ledgerHealth: {quickCheckEveryMs: 3600000, backupHour: 3, backupDir: 'D:/starci-archive/ledger-backups', keep: 7, backupTimeoutMs: 1800000}
