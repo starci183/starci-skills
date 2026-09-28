@@ -442,8 +442,9 @@ export function changeWorkflowPhase(db,{workflowId,to,by,reason,at=nowMs(),finis
   const fields={phase:to,phaseReason:reason,updatedAt:at};
   if(to==='finished'){fields.finishedAt=at;if(finished!==undefined)fields.finishedJson=json(finished);}
   if(to==='archived')fields.archivedAt=at;
-  updateRow(db,'workflows',{workflowId},fields);
+  // The event goes first: an archived workflow refuses every later write (events_refuse_archived), its own last event included.
   appendEvent(db,{workflowId,entityType:'workflow',entityId:workflowId,kind:'phase-transition',payload:{from:row.phase,to,by,reason},createdAt:at});
+  updateRow(db,'workflows',{workflowId},fields);
   return true;
 }
 const WORKFLOW_SPEC_FIELDS=new Set(['title','displayName','ledgerMode','sourceRoots','generation','observedGeneration','goalIdentity','pinDigest','allowedParallel','finished']);
@@ -652,6 +653,11 @@ export function updateAttempt(db,{attemptId,at=nowMs(),...fields}){
   if(marks.length)appendEvent(db,{workflowId:row.workflow_id,entityType:'attempt',entityId:String(attemptId),attemptId,spanId:row.span_id,kind:'attempt-updated',
     payload:Object.fromEntries(marks),createdAt:at});
   return true;
+}
+/** Re-baseline an attempt's contract context (settle's input digests); the markdown and revision never change. */
+export function updateContractContext(db,{attemptId,context}){
+  need(db.prepare('SELECT 1 FROM contracts WHERE attempt_id=?').get(attemptId),`contract of attempt ${attemptId} not found`);
+  updateRow(db,'contracts',{attemptId},{context});
 }
 export function writeContract(db,{attemptId,markdown,context=null,contractRev=null,createdAt=nowMs()}){
   const a=db.prepare('SELECT workflow_id,job_id FROM op_attempts WHERE attempt_id=?').get(attemptId);
