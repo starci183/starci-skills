@@ -152,7 +152,9 @@ test('under 10% free RAM a heavy op waits with a dispatch-throttled event; a lig
   assert.deepEqual(events.map(e=>e.kind),['dispatch-throttled']);
   assert.equal(JSON.parse(events[0].payload_json).reason,'heavy-paused');
   assert.equal(fx.inspect(db=>db.prepare('SELECT status FROM jobs WHERE job_id=?').get(heavy).status),'queued');
-  // 13% is back over the 10% floor but under the 15% resume line: the heavy op still waits.
+  // 13% is back over the 10% floor but under the 15% resume line: the hysteresis is the Resource controller's (the one
+  // writer of the mode); while its published mode is heavy-paused, the heavy op still waits.
+  fs.writeFileSync(path.join(fx.root,'ram-throttle.json'),JSON.stringify({mode:'heavy-paused',ramMode:'heavy-paused',cpuHot:false,why:'free RAM 8% < 10%',at:new Date().toISOString(),writer:'reconciler/resource'}));
   const again=fx.run({[HOST_ENV]:RAM_AT(13)},'dispatch','--job',heavy,'--model','qwen-agent','--spawn');
   assert.notEqual(again.status,0);
   assert.equal(leading(again.stdout).throttle.reason,'heavy-paused');
@@ -162,7 +164,8 @@ test('under 10% free RAM a heavy op waits with a dispatch-throttled event; a lig
   assert.equal(l.status,0,`a light op launches under the heavy pause: ${l.stderr||l.stdout}`);
   assert.equal(fx.inspect(db=>db.prepare('SELECT status FROM jobs WHERE job_id=?').get(light).status),'running');
 
-  // At 20%, above the 15% resume line, the heavy op launches again.
+  // At 20%, above the 15% resume line, the controller publishes normal again and the heavy op launches.
+  fs.writeFileSync(path.join(fx.root,'ram-throttle.json'),JSON.stringify({mode:'normal',ramMode:'normal',cpuHot:false,why:'free RAM 20%',at:new Date().toISOString(),writer:'reconciler/resource'}));
   const back=fx.run({[HOST_ENV]:RAM_AT(20)},'dispatch','--job',heavy,'--model','qwen-agent','--spawn');
   assert.equal(back.status,0,`above the resume line the heavy op dispatches: ${back.stderr||back.stdout}`);
 });
