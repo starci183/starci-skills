@@ -340,7 +340,9 @@ test('--accept-foreign settles only on a resolved foreign-file-committed inciden
   // ledger is refused owner-claim-unproven (scripts/kernel/owner-claim.mjs).
   const refusedClaim=runApi('incident','--repo',repo,'--workflow','wf-landed','--resolve',incident,'--detail','Owner confirmed: peer.ts is adopted debt','--json');
   assert.equal(refusedClaim.status,1,refusedClaim.stdout);
-  assert.equal(JSON.parse(refusedClaim.stderr).code,'owner-claim-unproven');
+  // stderr carries Node's SQLite ExperimentalWarning before the api's JSON line: parse that line, not the stream.
+  assert.equal(JSON.parse(refusedClaim.stderr.split(/?
+/).find((l)=>l.trim().startsWith('{'))).code,'owner-claim-unproven');
   const legacy=runApi('incident','--repo',repo,'--workflow','wf-landed','--kind','foreign-file-committed','--detail','peer.ts committed by a foreign job','--json');
   const legacyId=JSON.parse(legacy.stdout).incidentId;
   const l=openLedger({file:ledgerFileFor(repo)});
