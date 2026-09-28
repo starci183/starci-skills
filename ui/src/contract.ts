@@ -36,7 +36,8 @@ export type FleetView = {
 };
 export type WorkflowRow = {
   project: string; id: string; name: string; phase: string; ui: UiState; reason: Reason | null;
-  units: { done: number; total: number; active: number; failed: number }; ratePerHour: number; minRatePerHour: number | null; etaAt: number | null;
+  units: { done: number; total: number; active: number; failed: number }; unitStates: Record<UnitRow['state'], number>;
+  ratePerHour: number; minRatePerHour: number | null; etaAt: number | null;
   running: number; allowedParallel: number | null; lastUnitAt: number | null;
   onIt: { who: 'owner'|'supervisor'|'kernel'|'controller'; ref: Ref | null; reason: Reason } | null;
   seat: { state: string; lastSeenAt: number | null } | null; updatedAt: number;

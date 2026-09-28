@@ -61,6 +61,8 @@ function workflowRow(store, row, db, progress, extra = {}) {
   const violations = many(machine, 'SELECT code,severity,violated_at,ui FROM v_sla_open WHERE ledger_id=? AND workflow_id=?', row.ledgerId, wf);
   const seat = seatOf(machine, p, wf);
   const jobs = one(db, "SELECT sum(status IN ('leased','running','answering','reported','deciding')) AS running, sum(status='ready') AS queued_ready FROM jobs WHERE workflow_id=?", wf);
+  const unitStates = Object.fromEntries(['planned', 'queued', 'running', 'reported', 'deciding', 'done', 'failed', 'dropped'].map(state => [state, 0]));
+  for (const state of many(db, 'SELECT state,count(*) AS n FROM v_units WHERE workflow_id=? GROUP BY state', wf)) unitStates[state.state] = state.n;
   const running = Number(latest.running ?? jobs?.running ?? progress.units_active ?? 0);
   const current = {
     ...progress, ...latest, running, phaseReason: extra.phase_reason ?? null,
@@ -77,7 +79,7 @@ function workflowRow(store, row, db, progress, extra = {}) {
   return {
     project: p, id: wf, name: progress.display_name ?? extra.title ?? wf, phase: progress.phase,
     ui: state.ui, reason: state.reason,
-    units: { done: progress.units_done, total: progress.units_total, active: progress.units_active, failed: progress.units_failed },
+    units: { done: progress.units_done, total: progress.units_total, active: progress.units_active, failed: progress.units_failed }, unitStates,
     ratePerHour: Number(latest.ratePerHour ?? (progress.done_last_6h / 6)),
     minRatePerHour: latest.minRatePerHour ?? null, etaAt: latest.etaAt ?? progress.eta_at,
     running, allowedParallel: current.allowedParallel ?? null, lastUnitAt: progress.last_unit_at,
@@ -269,7 +271,7 @@ export function handleWork(request, response, store, url) {
   if (pathname === '/api/fleet') {
     sendJson(request, response, fleet(store, url), { sources: [
       ...source('machine', 'v_engine_health', 'v_sla_open', 'invariant_violations', 'v_open_sup_decisions', 'v_seats', 'metrics_snapshots'),
-      ...store.projects().flatMap(row => source(row.name, 'v_workflow_progress', 'workflows', 'v_decision_rows'))], stale: staleOf(store) });
+      ...store.projects().flatMap(row => source(row.name, 'v_workflow_progress', 'workflows', 'v_units', 'v_decision_rows'))], stale: staleOf(store) });
     return true;
   }
   if (pathname === '/api/projects') {
@@ -287,7 +289,7 @@ export function handleWork(request, response, store, url) {
     rows.sort((a, b) => b.updatedAt - a.updatedAt || a.id.localeCompare(b.id));
     const result = page(rows, url);
     sendJson(request, response, result.data, { sources: [...source('machine', 'metrics_snapshots', 'v_seats', 'v_sla_open'),
-      ...store.projects().flatMap(row => source(row.name, 'v_workflow_progress', 'workflows'))], stale: staleOf(store), next: result.next });
+      ...store.projects().flatMap(row => source(row.name, 'v_workflow_progress', 'workflows', 'v_units'))], stale: staleOf(store), next: result.next });
     return true;
   }
   if (pathname === '/api/decisions/log') {
@@ -307,7 +309,7 @@ export function handleWork(request, response, store, url) {
   const route = match[3] ?? 'detail';
   if (route === 'detail') {
     sendJson(request, response, detail(store, row, db, wf), { sources: [
-      ...source(row.name, 'workflows', 'lifecycle_changes', 'goals', 'v_workflow_progress', 'v_blocking', 'v_decision_rows', 'incidents', 'v_op_history', 'llm_usage'),
+      ...source(row.name, 'workflows', 'lifecycle_changes', 'goals', 'v_workflow_progress', 'v_units', 'v_blocking', 'v_decision_rows', 'incidents', 'v_op_history', 'llm_usage'),
       ...source('machine', 'metrics_snapshots', 'v_seats', 'v_sla_open')], stale: staleOf(store) });
     return true;
   }
