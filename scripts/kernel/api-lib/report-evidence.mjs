@@ -36,13 +36,13 @@ export function scratchOf(attempt, env = process.env) {
   return dir;
 }
 
-/** `file` resolved against the scratch, refused unless it is a readable file inside it. */
-export function scratchFile(given, scratch, what = 'report attachment') {
+/** `file` resolved against the scratch, refused unless it is a readable file (or, with `dirs`, a directory) inside it. */
+export function scratchFile(given, scratch, what = 'report attachment', { dirs = false } = {}) {
   if (typeof given !== 'string' || !given.trim()) throw refuse(`${what} path is empty`, 'report-attachment-invalid');
   const abs = path.isAbsolute(given) ? path.resolve(given) : path.resolve(scratch, given);
   let st = null;
   try { st = fs.statSync(abs); } catch { st = null; }
-  if (!st?.isFile()) throw refuse(`${what} missing or unreadable: ${given}`, 'report-attachment-missing');
+  if (!st?.isFile() && !(dirs && st?.isDirectory())) throw refuse(`${what} missing or unreadable: ${given}`, 'report-attachment-missing');
   if (!inside(scratch, real(abs))) throw refuse(`${what} is outside STARCI_JOB_SCRATCH (${slash(scratch)}): ${given}`, 'report-attachment-outside-scratch');
   return abs;
 }
@@ -58,23 +58,55 @@ export function attachedArgs(argv = process.argv.slice(2)) {
   return out;
 }
 
+const ATTACH_MAX_FILES = 2000;
+/** Every file under a directory (bounded), sorted. */
+function filesUnder(dir, out = []) {
+  let entries = [];
+  try { entries = fs.readdirSync(dir, { withFileTypes: true }); } catch { return out; }
+  for (const e of entries.sort((a, b) => a.name.localeCompare(b.name))) {
+    if (out.length >= ATTACH_MAX_FILES) break;
+    const full = path.join(dir, e.name);
+    if (e.isDirectory()) filesUnder(full, out); else if (e.isFile()) out.push(full);
+  }
+  return out;
+}
 /**
- * Put every file the report carries in the blob store, BEFORE the report transaction: the --attach files as
- * attachments/<name>, each check's stdout/stderr/output as checks/<i>-<check>/<stream><ext>. Returns
- * [{name, role, kind, subkind, blob, checkIndex, stream}].
+ * What an attached file is, from where it sits in the scratch (the op's layout is the contract, op-prompt.mjs):
+ * runs/<runId>/** is a UAT run (role uat-run, run_id), captures/** an app capture (capture | dom), round-<n>/ a draw
+ * or audit round (round n), interface-audit.json the audit verdict; anything else by its file kind (roleOf).
+ */
+export function attachmentFacts(rel) {
+  const parts = slash(rel).split('/');
+  const run = parts.indexOf('runs');
+  const runId = run >= 0 && parts.length > run + 2 ? parts[run + 1] : null;
+  const roundSeg = parts.find((p) => /^round-\d+$/.test(p));
+  const round = roundSeg ? Number(roundSeg.slice(6)) : null;
+  let role = roleOf(rel);
+  if (runId) role = 'uat-run';
+  else if (parts.includes('captures')) role = /\.(html?|mhtml)$/i.test(rel) ? 'dom' : 'capture';
+  return { role, runId, round };
+}
+
+/**
+ * Put every file the report carries in the blob store, BEFORE the report transaction: each --attach file (or every
+ * file of an --attach directory) as attachments/<its path in the scratch>, each check's stdout/stderr/output as
+ * checks/<i>-<check>/<stream><ext>. Returns [{name, role, kind, subkind, blob, runId, round, checkIndex, stream}].
  */
 export function stageReportEvidence({ report, scratch, attach = [], opId = null, repoRoots = [] }) {
   const staged = [], names = new Set();
-  const add = ({ abs, name, role, checkIndex = null, stream = null }) => {
+  const add = ({ abs, name, role, runId = null, round = null, checkIndex = null, stream = null }) => {
     let logical = slash(name).replace(/^\/+/, '');
-    for (let n = 2; names.has(logical); n++) logical = slash(name).replace(/(\.[^./]*)?$/, (ext) => `-${n}${ext ?? ''}`);
+    if (names.has(logical)) return;
     names.add(logical);
     const kind = kindOf(abs);
-    staged.push({ name: logical, role, kind, subkind: subkindOf({ kind, path: slash(abs), opId }), blob: stageBlob(abs, { repoRoots }), checkIndex, stream });
+    staged.push({ name: logical, role, kind, subkind: subkindOf({ kind, path: slash(logical), opId }), blob: stageBlob(abs, { repoRoots }), runId, round, checkIndex, stream });
   };
   for (const given of attach) {
-    const abs = scratchFile(given, scratch);
-    add({ abs, name: `attachments/${path.basename(abs)}`, role: roleOf(abs) });
+    const target = scratchFile(given, scratch, 'report attachment', { dirs: true });
+    for (const abs of fs.statSync(target).isDirectory() ? filesUnder(target) : [target]) {
+      const rel = slash(path.relative(scratch, abs));
+      add({ abs, name: `attachments/${rel}`, ...attachmentFacts(rel) });
+    }
   }
   (report.checks ?? []).forEach((check, index) => {
     for (const [field, role, stream] of CHECK_FILE_FIELDS) {
@@ -107,7 +139,7 @@ export function fileReportEvidence(db, { attempt, reportId, report, staged, now 
   const artifacts = [];
   for (const item of staged) {
     const { artifactId } = putArtifact(db, { workflowId: attempt.workflow_id, attemptId: attempt.attempt_id, role: item.role, kind: item.kind,
-      subkind: item.subkind ?? null, name: item.name, blob: item.blob, origin: 'op', headSha: report.head ?? null, now });
+      subkind: item.subkind ?? null, name: item.name, blob: item.blob, origin: 'op', headSha: report.head ?? null, runId: item.runId ?? null, round: item.round ?? null, now });
     linkReportAttachment(db, { reportId, artifactId });
     artifacts.push({ artifactId, name: item.name, sha256: item.blob.sha, role: item.role });
   }
@@ -119,7 +151,33 @@ export function fileReportEvidence(db, { attempt, reportId, report, staged, now 
       stdout: blobOf('stdout'), stderr: blobOf('stderr'), output: blobOf('output'), summary: Object.keys(summary).length ? summary : null, now });
     return { checkId: r.checkId, name, status: r.status };
   });
-  return { artifacts, checks };
+  const audit = interfaceAuditOf(db, { attempt, staged, now });
+  return { artifacts, checks, ...(audit ? { audit } : {}) };
+}
+
+export const INTERFACE_AUDIT_FILE = 'interface-audit.json';
+export const INTERFACE_AUDIT_SCHEMA = 'starci/interface-audit-operation@1';
+/**
+ * interface.audit's verdict (ARCHITECTURE-DB §5.2: features/<f>/operations/** → interface_audits): an attached
+ * interface-audit.json {schema starci/interface-audit-operation@1, id operation.<feature>.<name>, feature?, scope |
+ * selectedMatrix, verdict?, findings?, routeTo?} becomes the interface_audits row of that audit, bound to this attempt.
+ */
+function interfaceAuditOf(db, { attempt, staged, now }) {
+  const item = staged.find((s) => s.name.split('/').pop() === INTERFACE_AUDIT_FILE);
+  if (!item) return null;
+  let doc = null;
+  try { doc = JSON.parse(fs.readFileSync(item.blob.fileUri, 'utf8')); } catch { doc = null; }
+  if (doc?.schema !== INTERFACE_AUDIT_SCHEMA || !/^operation\.[a-z0-9-]+\.[a-z0-9-]+/.test(String(doc.id ?? '')))
+    throw refuse(`${item.name} is not a ${INTERFACE_AUDIT_SCHEMA} verdict with id operation.<feature>.<name>`, 'report-attachment-invalid');
+  const feature = doc.feature ?? String(doc.id).split('.')[1];
+  const verdict = ['pass', 'fail', 'partial'].includes(doc.verdict) ? doc.verdict : null;
+  const routeTo = ['interface.implement', 'interface.draw'].includes(doc.routeTo) ? doc.routeTo : null;
+  db.prepare(`INSERT INTO interface_audits(audit_id,workflow_id,attempt_id,feature,scope_json,verdict,findings_json,route_to,created_at,updated_at)
+      VALUES(?,?,?,?,?,?,?,?,?,?) ON CONFLICT(audit_id) DO UPDATE SET workflow_id=excluded.workflow_id,attempt_id=excluded.attempt_id,feature=excluded.feature,
+      scope_json=excluded.scope_json,verdict=excluded.verdict,findings_json=excluded.findings_json,route_to=excluded.route_to,updated_at=excluded.updated_at`)
+    .run(doc.id, attempt.workflow_id, attempt.attempt_id, feature, JSON.stringify(doc.scope ?? doc.selectedMatrix ?? {}), verdict,
+      doc.findings == null ? null : JSON.stringify(doc.findings), routeTo, now, now);
+  return { auditId: doc.id, verdict };
 }
 
 /** Delete the scratch once the report is durable. Only a directory strictly inside the OS temp directory. */

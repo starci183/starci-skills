@@ -8,6 +8,7 @@ import {renderProofProblems} from '../example/example-render-proof.mjs';
 import {DRAW_TOOL, RASTER_TOOL, generatedDrawingsOf, recipeRenderedOf, uiShapeFindings} from './ui-shapes.mjs';
 import {ASSET_SLOT_UNFILLED, assetSlotsOf} from '../work/asset-slot.mjs';
 import {walkFiles} from './common.mjs';
+import {blobPath} from '../lib/artifact-store.mjs';
 import {isProductPath, agentDataCategory} from '../lib/starciwork-boundary.mjs';
 
 /**
@@ -25,19 +26,7 @@ import {isProductPath, agentDataCategory} from '../lib/starciwork-boundary.mjs';
  * for what they needed. Each gets one rule here, not a field bolted on per complaint.
  */
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
-export const FAMILIES = new Set(['br', 'ac', 'fr', 'nfr', 'data', 'journey', 'decision', 'sds', 'ui', 'impl', 'uat', 'contract', 'integration', 'gap', 'event', 'operations']);
-/** The id prefix of a family whose folder name differs from it; every other family's id starts with its folder. */
-const ID_PREFIX = Object.freeze({ operations: 'operation' });
-/**
- * interface.audit legs that ran before its writes.node named `starci/interface-audit-operation@1` invented
- * `work/operations@1` with id `operations.<feature>.<audit>` (starci-next op-interface.audit-d8d648584f,
- * features/learning-paths/operations/audit-r1). Contract change operations-record-legacy (reach new-legs):
- * such a record at features/<feature>/operations/<audit>/index.yaml is a suspect naming the canonical shape,
- * never an id-vs-place or strict SCHEMA_UNKNOWN refusal, so the running leg still validates.
- */
-export const LEGACY_OPERATIONS_SCHEMA = 'work/operations@1';
-export const legacyOperationsRecord = (segments, record) => record?.schema === LEGACY_OPERATIONS_SCHEMA
-  && segments.length === 5 && segments[0] === 'features' && segments[2] === 'operations' && segments[4] === 'index.yaml';
+export const FAMILIES = new Set(['br', 'ac', 'fr', 'nfr', 'data', 'journey', 'decision', 'sds', 'ui', 'impl', 'uat', 'contract', 'integration', 'gap', 'event']);
 // `work/node@*` is the retired recursive specification envelope from the
 // pre-flat business/srs and architecture/sds layouts.  Existing trees still
 // carry those records during canonicalization, and engine/index.mjs keeps the
@@ -68,7 +57,7 @@ const expectedId = segments => {
   const rest = segments.slice(2, -1);
   const family = [...rest].reverse().find(segment => FAMILIES.has(segment));
   if (!family) return null;
-  return [ID_PREFIX[family] ?? family, feature, ...rest.filter(segment => !FAMILIES.has(segment))].join('.');
+  return [family, feature, ...rest.filter(segment => !FAMILIES.has(segment))].join('.');
 };
 
 /**
@@ -84,7 +73,6 @@ export const DEFAULT_MIN_ID_SEGMENTS = 2;
 const FAMILY_PLACE = Object.freeze({
   impl: 'features/<feature>/impl/<repository>/<name>/index.yaml',
   ac: 'features/<feature>/br/<rule>/ac/<name>/index.yaml',
-  operation: 'features/<feature>/operations/<name>/index.yaml',
 });
 /** The PLACE_TOO_SHALLOW finding for a place-derived id shallower than its family admits, or null. */
 export const placeDepthFinding = (shown, want) => {
@@ -263,9 +251,7 @@ export function checkWorkTree(workRoot, problems, warnings = [], infos = [], res
     }
     const recursiveNode = isRecursiveNodeSchema(record.schema);
     if (record.id) records.set(record.id, {schema: record.schema, state: record.state, change: record.change, file, shown, dir: path.dirname(file), data: record, recursiveNode});
-    if (legacyOperationsRecord(segments, record)) {
-      warnings.push(`${shown}: legacy interface.audit record ${LEGACY_OPERATIONS_SCHEMA} (id ${record.id}); the record is schema starci/interface-audit-operation@1 with id operation.${segments[1]}.${segments[3]} - the next audit leg rewrites it [LEGACY_OPERATIONS_RECORD]`);
-    } else if (segments[0] === 'features' && segments.length > 2 && !EXEMPT.has(record.schema) && !recursiveNode) {
+    if (segments[0] === 'features' && segments.length > 2 && !EXEMPT.has(record.schema) && !recursiveNode) {
       const want = expectedId(segments);
       if (want && record.id !== want) problems.push(`${shown}: id is ${record.id}, but its place says ${want}`);
       if (!want) problems.push(`${shown}: no record family in its path; ${[...FAMILIES].join(', ')} are the families`);
@@ -676,8 +662,20 @@ export function checkWorkTree(workRoot, problems, warnings = [], infos = [], res
         problems.push(`${rec.shown}: state is done but there is no sibling evidence.yaml naming the run it settled on`);
       } else {
         const ev = parseYaml(fs.readFileSync(evidenceFile, 'utf8'));
-        if (!ev?.run) {
-          problems.push(`${rec.shown}: evidence.yaml has no run pointing at runs/<runId> - a done uat-flow must name the exact run it settled on`);
+        const cited = (v) => (Array.isArray(v) ? v : v ? [v] : []).filter((c) => c && typeof c === 'object' && /^[a-f0-9]{64}$/.test(String(c.sha256 ?? '')));
+        if (ev?.run && typeof ev.run === 'object') {
+          // alpha.3: the run is agent data in the blob store; evidence.yaml cites its files by sha256 (+ artifact id).
+          const run = ev.run;
+          if (!cited(run.screens).length) problems.push(`${rec.shown}: run ${run.id ?? '?'} cites no screenshot (run.screens[] {artifact?, sha256})`);
+          if (!cited(run.videos).length) problems.push(`${rec.shown}: run ${run.id ?? '?'} cites no playable recording (run.videos[] {artifact?, sha256})`);
+          if (!cited(run.result).length) problems.push(`${rec.shown}: run ${run.id ?? '?'} cites no result (run.result {artifact?, sha256})`);
+          else {
+            const file = blobPath(cited(run.result)[0].sha256);
+            const outcome = file ? (/outcome:\s*pass/i.test(fs.readFileSync(file, 'utf8')) ? 'pass' : 'not-pass') : (run.outcome ?? ev.outcome ?? null);
+            if (outcome !== 'pass') problems.push(`${rec.shown}: run ${run.id ?? '?'}'s result does not record outcome: pass`);
+          }
+        } else if (!ev?.run) {
+          problems.push(`${rec.shown}: evidence.yaml has no run - a done uat-flow must cite the exact run it settled on (run {id, result, screens[], videos[]} by sha256)`);
         } else {
           const runDir = path.join(rec.dir, ev.run);
           const screensDir = path.join(runDir, 'screens');

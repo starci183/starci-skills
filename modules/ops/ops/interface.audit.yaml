@@ -28,12 +28,13 @@ graphPolicy:
   dispatch: never
 reads:
   - id: target
-    path: .starciwork/features/<feature>/operations/<audit>/index.yaml
+    path: packet params.audit (id operation.<feature>.<audit>, selectedMatrix) + the audit's interface_audits row (api op-contract)
     mustExist: true
     purpose:
-      en: Read the existing selected audit scope, exact route/state/viewport/theme matrix, assertion IDs,
-        dependencies, attempt number and evidence lineage. An absent target or audit-expanded matrix
-        is a scope gap, not permission to invent coverage.
+      en: Read the selected audit scope - exact route/state/viewport/theme matrix, assertion IDs, dependencies -
+        from the packet, and the audit's earlier verdict and findings from its interface_audits row (the audit is
+        agent data in the ledger, never a .starciwork record). An absent scope or an audit-expanded matrix is a
+        scope gap, not permission to invent coverage.
   - id: intent
     path: .starciwork/features/<feature>/{br,fr,nfr,data,journey,decision,sds,ui}/**/index.yaml + accepted direction
       assets
@@ -138,15 +139,15 @@ reads:
       en: Prove the actual image, DOM/accessibility and computed-style inspection capabilities used.
 writes:
   - id: node
-    path: .starciwork/features/<feature>/operations/<audit>/index.yaml
+    path: <STARCI_JOB_SCRATCH>/interface-audit.json
     schema: starci/interface-audit-operation@1
-    fields: [state, blockedBy, completion.inputDigest, completion.evidence]
+    fields: [id, feature, selectedMatrix, verdict, findings, routeTo, blockedBy, completion.inputDigest]
     content:
-      en: Update only this audit record's state/blocker/completion binding. The record's schema is
-        starci/interface-audit-operation@1 and its id is operation.<feature>.<audit>
-        (modules/schemas/interface-audit-operation.yaml); never invent a work/ schema for it.
-        Completion says the selected matrix has no actionable drift; it never completes UI,
-        implementation, UAT or review nodes.
+      en: The audit's verdict for this attempt, id operation.<feature>.<audit> (modules/schemas/interface-audit-operation.yaml),
+        verdict pass | fail | partial, findings and routeTo interface.implement | interface.draw. File it with
+        `api report --attach <scratch>/interface-audit.json`; the api writes it as the audit's interface_audits row.
+        Never a record under .starciwork. Completion says the selected matrix has no actionable drift; it never
+        completes UI, implementation, UAT or review nodes.
   - id: evidence
     path: E/**
     fields: [id, nodeId, inputDigest, outcome, assertions, assets, provenance, codeRefs, extensions]

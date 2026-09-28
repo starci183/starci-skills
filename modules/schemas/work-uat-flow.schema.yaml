@@ -7,8 +7,9 @@ description: "A walk somebody performs against the running product, written as s
   asserting it, which is why its steps are phrased as actions and its accounts are a collocated fixture of
   disposable identities - a walk that needs a real person's credentials is a walk nobody will repeat. What
   it `proves` is the authored forward edge to the records it demonstrates, and it reaches done only once a
-  settled run under runs/<runId> holds at least one screenshot, at least one recording and a result.md
-  reporting a pass."
+  settled run - cited from its sibling evidence.yaml as run {id, result, screens[], videos[]} by sha256, the
+  files themselves blobs of the uat.verify attempt - holds at least one screenshot, at least one recording and
+  a result reporting a pass."
 required:
   - schema
   - id

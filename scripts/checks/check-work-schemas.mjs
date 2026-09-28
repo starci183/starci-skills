@@ -20,7 +20,6 @@ import { createRequire } from 'node:module';
 import { fileURLToPath } from 'node:url';
 import { parseYaml } from '../../engine/yaml.mjs';
 import { isWorkRecordSchema, readWorkspace } from '../example/example-ownership.mjs';
-import { legacyOperationsRecord } from './check-example-work.mjs';
 
 const runtimeRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 const SKIPPED_ROOTS = new Set(['kernel-evidence', 'kernel-strays', 'kernel-approvals', '_derived']);
@@ -92,8 +91,6 @@ export function checkWorkSchemas(root, refused, info = [], { workRoot = root } =
     if ((family === 'work/evidence@1' && path.basename(rel) !== 'evidence.yaml')
       || (path.basename(rel) === 'manifest.yaml' && segments.includes('evidence'))) continue;
     const shown = path.relative(workRoot, file).split(path.sep).join('/') || rel;
-    // The structural gate owns the legacy interface.audit record's suspect (contract change operations-record-legacy).
-    if (legacyOperationsRecord(shown.split('/'), record)) continue;
     const entry = loaded.validators.get(family);
     if (!entry) {
       refused.push(`${shown}: names schema ${family}, which no catalogued work-tree schema defines [SCHEMA_UNKNOWN]`);

@@ -206,10 +206,16 @@ sections:
         for each raw file the job needs retained. The API stores the report in the ledger and the
         attachments as content-addressed blobs, then removes scratch. `report.files` names authored
         owned paths, not scratch attachments. Never put operational output in `.starciwork`."
-      - "An E/ path in an op brief is Work-record proof only when modules/schemas/work-layout.yaml
-        requires that selected record to retain it. Keep a small, inspectable proof manifest and
-        its indispensable cited assets there; raw checker output still goes through scratch and
-        `api report --attach`. Do not create an E/ bundle solely to retain an operation log."
+      - "`E/` in an op brief is the attempt's evidence folder INSIDE STARCI_JOB_SCRATCH (`<scratch>/E/`), never a
+        folder in `.starciwork` (ARCHITECTURE-DB §5.1: E/ is agent data). Write the proof manifest and its assets
+        there and file them with `api report --attach <scratch>/E` (a directory attaches every file under it); each
+        becomes the artifact `attachments/E/<path>` of this attempt (blob + job_artifacts). The same holds for a
+        UAT run (`<scratch>/runs/<runId>/**`, artifacts role uat-run with the run id), app and render captures
+        (`<scratch>/captures/**`, role capture/dom) and an interface.audit verdict (`<scratch>/interface-audit.json`,
+        the ledger's interface_audits row). The record's sibling evidence.yaml cites each file by sha256 (and its
+        artifact name) - `{artifact?, sha256, role?, label?}` - never by a path; api report returns every artifact
+        {id, name, sha256}, and the settle binds the citations (work_citations). A read of another op's `E/<file>`
+        reads that attempt's artifact `attachments/E/<file>` (`api artifacts --workflow <wf> --job <job>`)."
       - Paths below are templates, not discovered locations. Resolve `<feature>`, `<family>`,
         `<name>`, resource slugs and repository IDs from the selected workspace. Never persist
         literal angle-bracket placeholders or guess a path by similar name. `N` means the selected

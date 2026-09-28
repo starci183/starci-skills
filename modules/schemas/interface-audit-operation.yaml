@@ -2,9 +2,9 @@ schema: starci/schema@1
 describes: starci/interface-audit-operation@1
 module: modules/ops/ops/interface.audit.yaml
 purpose: |-
-  The record one interface.audit scope lives in, at .starciwork/features/<feature>/operations/<name>/index.yaml
-  (work-layout.yaml shape.operations): reads.target reads it, writes.node settles it, and its evidence
-  bundle sits at E/ beside it.
+  The verdict one interface.audit attempt files as <STARCI_JOB_SCRATCH>/interface-audit.json (api report --attach):
+  the api writes it as the audit's interface_audits row in the project ledger (alpha.3: operations/ is agent data,
+  never a .starciwork record); its evidence is the attempt's attachments/E/** artifacts.
 shape:
   schema: 'starci/interface-audit-operation@1'
   id: 'operation.<feature>.<name> - singular operation, the feature, then the folder name'

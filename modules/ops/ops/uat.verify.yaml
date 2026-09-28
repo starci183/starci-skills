@@ -134,11 +134,15 @@ writes:
         verification input digest. Preserve reusable identity records; per-run effects and cleanup
         results belong to evidence rather than post-proof resource edits.
   - id: evidence
-    path: .starciwork/features/<feature>/uat/<flow>/runs/<runId>/**
+    path: <STARCI_JOB_SCRATCH>/runs/<runId>/**
     fields: [id, nodeId, inputDigest, outcome, assertions, assets, provenance, codeRefs, extensions]
     artifacts: [manifest.yaml, result.md, screens/**/*.png, videos/**]
     content:
-      en: "Keep request flow order, original assertion IDs, actual locators/actions and business results,
+      en: "The run is agent data (ARCHITECTURE-DB §5.1): write it under STARCI_JOB_SCRATCH, never under .starciwork,
+        and file it with `api report --attach <scratch>/runs/<runId>` - every file becomes an artifact of this attempt
+        (role uat-run, run_id <runId>). The flow's sibling evidence.yaml cites the run it settled on as
+        run {id: <runId>, result: {artifact?, sha256}, screens: [{artifact?, sha256, label}], videos: [{artifact?, sha256}]}.
+        Keep request flow order, original assertion IDs, actual locators/actions and business results,
         per-check expected yes/no and observed yes/no, screenshots and playable real browser video
         indexed by flow/step/time. For unobserved checks keep actual null with not-run/inconclusive
         outside the yes/no answer column. Record stable run ID, reused versus created objects,

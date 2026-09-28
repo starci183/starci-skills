@@ -171,9 +171,10 @@ export default {
     appendEvent(tx, { workflowId: job.workflow_id, entityType: 'job', entityId: job.job_id, attemptId: attempt.attempt_id, spanId: attempt.span_id, kind: 'report-filed', createdAt: now,
       payload: { dispatchId, op, attemptId: attempt.attempt_id, tryNo: job.try_no, outcome: report.outcome, reportId: row.report_id,
         artifacts: evidence.artifacts.map((a) => ({ id: a.artifactId, name: a.name, sha256: a.sha256 })), checks: evidence.checks, ...(reask ? { reask } : {}) } });
-    return { reportId: row.report_id, attachments: evidence.artifacts.length, checks: evidence.checks.length };
+    return { reportId: row.report_id, attachments: evidence.artifacts.length, checks: evidence.checks.length,
+      artifacts: evidence.artifacts.map((a) => ({ id: a.artifactId, name: a.name, sha256: a.sha256 })), ...(evidence.audit ? { audit: evidence.audit } : {}) };
   }));
-  const { reportId, attachments } = filed.result;
+  const { reportId, attachments, artifacts = [], audit = null } = filed.result;
   removeScratch(scratch);
   if (filed.replayed) {
     emit({ ok: true, replayed: true, jobId: job.job_id, workflowId: job.workflow_id, dispatchId, outcome: report.outcome, reportId, attachments },
@@ -189,7 +190,7 @@ export default {
     jobId: job.job_id,
     dispatchId,
   });
-  const out = { ok: true, jobId: job.job_id, workflowId: job.workflow_id, dispatchId, attemptId: attempt.attempt_id, outcome: report.outcome, reportId, attachments, kernelWake, ...(reask ? { reask } : {}) };
+  const out = { ok: true, jobId: job.job_id, workflowId: job.workflow_id, dispatchId, attemptId: attempt.attempt_id, outcome: report.outcome, reportId, attachments, artifacts, ...(audit ? { audit } : {}), kernelWake, ...(reask ? { reask } : {}) };
   emit(out, `report filed for ${job.job_id} (dispatch ${dispatchId}, outcome ${report.outcome})`, args.json);
   // The op terminal gets the canonical human rendering of the filed row — the
   // reports row is the truth, this block is its projection.
