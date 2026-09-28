@@ -2,7 +2,7 @@
 // gc.mjs — the Supervisor's garbage collection ("dọn rác"; owner, 2026-09-28: "sao supervisor không xóa worker, và op
 // đầy rác thế!!! phải có dọn rác chứ"). Every supervisor tick runs it (tick.mjs, duty gc); an operator runs it by hand.
 //
-//   node scripts/supervisor/gc.mjs [--dry-run] [--apply] [--only agents,shells,lanes,evidence,tmp,tasks] [--json]
+//   node scripts/supervisor/gc.mjs [--dry-run] [--apply] [--only agents,shells,lanes,tmp,tasks] [--json]
 //
 // Default is the dry run: every collector reports what it WOULD close or remove and mutates nothing (it only records
 // when it first saw a candidate, so the age rules below can hold). --apply closes and removes.
@@ -34,9 +34,8 @@
 //             unlinked first, then the tree goes through safeRemoveTree (links unlinked, never followed; never
 //             `git worktree remove --force`, nivo-fe inc-c8fbf76aa499), then the registration is pruned. Lane branches
 //             are kept as commit evidence. Unmerged or dirty lanes are kept and reported.
-//   evidence  a finished or archived workflow with no live job, ended longer than gcEvidenceRetentionMs ago: zipped to
-//             archiveRoot, verified and purged by scripts/work/purge-workflow.mjs (the one sanctioned delete; the owner
-//             approved zip-then-purge on 2026-09-28).
+//   (ended workflows are NOT purged here: housekeeping is the only purger — 30 days, zipped and verified first, Q6 —
+//    through scripts/lib/hk-ledger.mjs and scripts/work/purge-workflow.mjs.)
 //   tmp       %TEMP% entries with a runtime prefix past tmpMaxAgeMs (hk-tmp.mjs sweepTmp).
 //   tasks     Orca Tasks of settled jobs whose close was refused: closed again (task-update completed).
 //   leases    lease rows (product ledgers and machine.sqlite sup_leases) of a settled job, a job the ledger no longer
@@ -83,8 +82,8 @@ const selfFile = fileURLToPath(import.meta.url);
 export const SCHEMA = 'starci/gc-report@1';
 /** The supervisor-ledger event the tick records per GC run (tick.mjs); the owner digest sums them (actions.mjs). */
 export const GC_EVENT_KIND = 'supervisor-gc';
-export const COLLECTORS = Object.freeze(['agents', 'shells', 'lanes', 'evidence', 'tmp', 'tasks', 'leases', 'lanelogs']);
-export const DEFAULTS = Object.freeze({ gcMinAgeMs: 600_000, gcLaneGraceMs: 1_800_000, gcEvidenceRetentionMs: 259_200_000, sweepMs: 1_800_000,
+export const COLLECTORS = Object.freeze(['agents', 'shells', 'lanes', 'tmp', 'tasks', 'leases', 'lanelogs']);
+export const DEFAULTS = Object.freeze({ gcMinAgeMs: 600_000, gcLaneGraceMs: 1_800_000, sweepMs: 1_800_000,
   leaseMinAgeMs: 60_000, laneLogMinAgeMs: 86_400_000, laneLogRetentionMs: 1_209_600_000, laneIdleMs: LANE_IDLE_MS });
 /** The DESIGN §15.3 leftover class of each new collector's item and the step whose bug it points at. */
 export const LEFTOVER_OWNERS = Object.freeze({
@@ -93,7 +92,6 @@ export const LEFTOVER_OWNERS = Object.freeze({
 });
 const SETTLED_JOB = new Set(['succeeded', 'failed', 'cancelled']);
 const LANE_LOG = /\.(err|json|log)$/i;
-export const APPROVAL = Object.freeze({ by: 'owner', ref: 'owner chat 2026-09-28: zip-then-purge approved for finished/archived workflow evidence past retention (gc.mjs)' });
 const LIVE_JOB = new Set(['queued', 'leased', 'running', 'answering', 'effect_unknown']);
 const HOLDING_JOB = new Set(['running', 'answering']);
 const SUP_LIVE = new Set(['queued', 'spawning', 'running', 'reported']);
@@ -110,7 +108,7 @@ export function gcSettings(allocation = allocationSettings()) {
   const gc = allocation?.gc ?? {};
   const keepTitles = (Array.isArray(gc.keepTitles) ? gc.keepTitles : []).map((p) => { try { return new RegExp(String(p)); } catch { return null; } }).filter(Boolean);
   return { minAgeMs: num(hk.gcMinAgeMs, DEFAULTS.gcMinAgeMs), laneGraceMs: num(hk.gcLaneGraceMs, DEFAULTS.gcLaneGraceMs),
-    evidenceRetentionMs: num(hk.gcEvidenceRetentionMs, DEFAULTS.gcEvidenceRetentionMs), archiveRoot: hk.archiveRoot || 'D:/starci-archive', housekeeping: hk,
+    archiveRoot: hk.archiveRoot || 'D:/starci-archive', housekeeping: hk,
     sweepMs: num(gc.sweepMs, DEFAULTS.sweepMs), keepTitles,
     leaseMinAgeMs: num(gc.leaseMinAgeMs, DEFAULTS.leaseMinAgeMs), laneLogMinAgeMs: num(gc.laneLogMinAgeMs, DEFAULTS.laneLogMinAgeMs),
     laneLogRetentionMs: num(gc.laneLogRetentionMs, DEFAULTS.laneLogRetentionMs),
@@ -781,29 +779,6 @@ export async function runGc({ apply = false, only = null, env = process.env, now
     }
     report.counts.freedBytes += l.freedBytes;
     report.errors.push(...l.errors);
-  }
-
-  if (want.has('evidence')) {
-    const purge = deps.purge ?? (async (args) => (await import('../work/purge-workflow.mjs')).purgeWorkflow(args));
-    for (const l of ledgers) {
-      const liveOf = new Set(l.jobs.filter((j) => LIVE_JOB.has(j.status)).map((j) => j.workflowId));
-      for (const w of l.workflows) {
-        if (!w.ended || w.purged) continue;
-        if (w.endedAt == null || now - w.endedAt < settings.evidenceRetentionMs) continue;
-        const target = `${path.basename(l.repo)}:${w.workflowId}`;
-        if (liveOf.has(w.workflowId)) { report.items.push({ class: 'evidence', action: 'archive-purge', target, verdict: 'refuse', reason: 'ended workflow still holds a live job' }); report.counts.refused += 1; continue; }
-        try {
-          const r = await purge({ repo: l.repo, workflowId: w.workflowId, apply, approvedBy: APPROVAL.by, approvalRef: APPROVAL.ref, archiveRoot: settings.archiveRoot });
-          const bytes = Number(r?.fileBytes ?? r?.purge?.archive_bytes ?? 0) || 0;
-          report.items.push({ class: 'evidence', action: 'archive-purge', target, verdict: 'collect', reason: apply ? `archived to ${r?.archive ?? r?.purge?.archive_path ?? '?'} (verified) and purged` : `would archive ${r?.files ?? '?'} file(s) to ${r?.archive ?? '?'} and purge`, bytes, ok: apply ? r?.ok !== false : null });
-          report.counts.evidence += 1;
-          report.counts.freedBytes += bytes;
-        } catch (error) {
-          report.items.push({ class: 'evidence', action: 'archive-purge', target, verdict: 'refuse', reason: String(error?.message ?? error).slice(0, 300), ok: false });
-          report.errors.push(`purge ${target}: ${String(error?.message ?? error).slice(0, 200)}`);
-        }
-      }
-    }
   }
 
   if (want.has('tmp')) {

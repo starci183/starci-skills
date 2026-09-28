@@ -57,7 +57,7 @@ test('allocation.resources declares the disk and RAM floors the admission guard 
 test('engine/config.mjs allocationSettings exposes both blocks to the scripts that read them', () => {
   const allocation = allocationSettings();
   assert.deepEqual(Object.keys(allocation.housekeeping).sort(),
-    ['archiveMaxAgeMs', 'archiveRoot', 'claudeTranscriptArchiveAfterMs', 'gcEvidenceRetentionMs', 'gcLaneGraceMs', 'gcMinAgeMs', 'gitIndexLockStaleMs',
+    ['archiveMaxAgeMs', 'archiveRoot', 'claudeTranscriptArchiveAfterMs', 'gcLaneGraceMs', 'gcMinAgeMs', 'gitIndexLockStaleMs',
       'laneGraceMs', 'lanesRoot', 'legacyFixturePrefixes', 'logMaxAgeMs', 'sessionArchiveAfterMs', 'tmpMaxAgeMs', 'tmpPrefixes']);
   assert.equal(allocation.resources.minFreeDiskGb, 20);
   assert.equal(allocation.resources.minFreeRamPct, 10);
