@@ -7924,7 +7924,10 @@ const ownProductWorktreeOf = (job) => {
 // can re-run (job-settle.mjs classifyCheck), their paths moved from the op worktree to the workflow worktree.
 const BASELINE_CHECK = /(?:^|[-_.\s])(?:before|baseline)(?:$|[-_.\s])/i;
 function integrateForSettle(job, rec, envelope) {
-  const declared = (Array.isArray(envelope?.checks) ? envelope.checks : []).filter((c) => !BASELINE_CHECK.test(String(c?.name ?? '')));
+  // Only a check the op itself declared GREEN on its own base is re-run: the post-merge verify asks whether the MERGE
+  // broke something. A check already red on the op's base (a canon slice's accepted residue, a non-final cut's inventory)
+  // was judged by the settle that got here and is never re-blamed on the workflow branch.
+  const declared = (Array.isArray(envelope?.checks) ? envelope.checks : []).filter((c) => !BASELINE_CHECK.test(String(c?.name ?? '')) && c?.exitCode === 0);
   const recheck = (checks, { cwd, from, to, timeoutMs }) => checks.flatMap((c) => {
     const cls = settlerClassifyCheck(c, { skillRoot });
     if (cls.kind !== 'runtime') return [];
