@@ -1,0 +1,34 @@
+notify:
+  args: '--workflow <from> --to <peerId,...|peers> --kind <request|heads-up|handoff|reply|follow-up> --subject <s> --body <text> [--reply-to <key>] [--refs <csv>]'
+  kinds: >-
+    request (work the sender needs that lies in the peer's scope — the peer builds it or answers
+    why not), heads-up (the sender changed or will change a shared contract, record or path the
+    peer reads), handoff (the sender gives the peer a piece of work or ownership, e.g. a repo-wide
+    change no workflow owns), reply (answers a received message; --reply-to is required), follow-up (routes a shared
+    blocker to the workflow that introduced it)
+  reads: 'the sender and every target workflows row; the sender''s received message --reply-to names; the targets'' pending peer messages'
+  writes: >-
+    one inbox row per target {workflow_id: <target>, kind: peer-message, key: pm-<12 hex>, status
+    pending, payload {from, fromTitle, kind, subject, body, replyTo, refs[], at}} and one event
+    'peer-message-sent' {to, key, kind, subject, replyTo} on the sender. `--to peers` sends to
+    every current peer (none is ok:true with sent []). A message identical to one still pending
+    for that target (same from, kind, subject, body, replyTo) is not written again: its key comes
+    back with deduped:true. A new message to a target that holds open peer-wait incidents on the
+    sender resolves each of them marked --until-message ('incident-resolved' {detail, peerMessage,
+    peer, by:peer-message} on the target) and wakes the target's Kernel best-effort with a
+    peer-wait-message transition (kernel-transition-woken); a wait without --until-message stays
+    open for that Kernel to resolve once it has checked the proof. Each target's typed waits
+    (--until-message <peer>[:kind], commands.incident.typedRelease) are then evaluated: one that
+    now holds is resolved and, unless the peer-wait wake above already ran, its Kernel is woken
+    (transition incident-auto-resolved); sent[].autoResolved names them
+  returns: '{ok:true, workflowId, kind, subject, replyTo, sent:[{to, key, kind, subject, deduped?, peerWait?:{waits[], resolved[], wake}, autoResolved?:[{incidentId, evidence[], wake?}]}]}'
+  refuses:
+    - workflow-unknown
+    - workflow-finished: 'a finished sender sends nothing'
+    - peer-kind-invalid: '--kind is not request|heads-up|handoff|reply|follow-up'
+    - peer-message-empty: '--subject or --body is blank'
+    - reply-to-missing: '--kind reply without --reply-to'
+    - reply-to-unknown: '--reply-to names no peer message the sender received'
+    - reply-to-mismatch: 'the targets do not include the sender of the --reply-to message'
+    - 'peer-self / peer-unknown / peer-not-running / peer-not-shared-source: a target is the sender, no workflow of this ledger, finished or archived, or shares no source root. Nothing is written for any target'
+  usedBy: 'drive — a request instead of doing a peer''s work or asking the owner who should; a heads-up on every shared-contract change; a reply to every request'

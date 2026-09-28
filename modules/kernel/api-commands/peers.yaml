@@ -1,0 +1,27 @@
+peers:
+  args: '--workflow <id>'
+  rule: >-
+    A peer is every OTHER workflow of the same ledger whose phase is running, that is not
+    archived, and that shares a source root (workflows.source_roots_json) with --workflow; a
+    workflow with no recorded roots shares every root. define-goal records the ledger's own repo
+    as every workflow's root and a job's `repository` is mostly unset, so in practice every
+    running workflow of one ledger is a peer: the ledger is one product whose binding spans its
+    repositories (nivo-backend + nivo-fe)
+  reads: 'workflows rows; the open (queued|leased|running|answering|effect_unknown) jobs of each peer; pending peer-message inbox rows'
+  writes: 'nothing — pure projection'
+  returns: >-
+    {ok:true, workflowId, rule, peers:[{workflowId, title, phase, currentLeg:{jobId, op, status,
+    attempt}|null (the most recently moved in-flight job, else the latest queued one),
+    ownedPaths:[{jobId, op, status, paths[]}], pending:{toPeer:[{key, from, to, kind, subject, at}],
+    fromPeer:[...]}}], dependencies:{edges:[{from, to, via, ref, strength:hard|soft, job?}],
+    findings:[{key, kind:circular-wait|unowned-need|hub-blocker|duplicate-work, workflows[], summary,
+    action:bridge|transfer|revise|designate, clearCut}], bridges:[{id, action, state, provisional,
+    reason, ...}], self:{waitsOn[], waitedBy[], edges[], findings[], bridges[]}}} - dependencies is the
+    whole ledger's cross-workflow dependency graph (scripts/kernel/dependency-graph.mjs: peer-waits,
+    typed until-* conditions, gates naming a peer's job, peer requests, foundation dependents,
+    foreign-file incidents, refused record-change declarations, work-graph reads) with the
+    Supervisor's findings and bridging records (modules/supervisor/bridging.yaml); {error} when it
+    cannot be computed, never a refusal
+  refuses:
+    - workflow-unknown
+  usedBy: 'before planning work that may belong to another workflow''s scope, to see who owns a path before touching it, and to see which workflows wait on which and any bridging workflow the Supervisor added'

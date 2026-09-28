@@ -22,7 +22,7 @@
 //   questions --repo <path> --workflow <id>
 //   reply    --repo <path> --workflow <id> --message <msg_id> (--body <answer> | --to-owner [--body <note>])
 //   peers    --repo <path> --workflow <id>
-//   notify   --repo <path> --workflow <id> --to <peerId,...|peers> --kind <request|heads-up|handoff|reply>
+//   notify   --repo <path> --workflow <id> --to <peerId,...|peers> --kind <request|heads-up|handoff|reply|follow-up>
 //            --subject <s> --body <text> [--reply-to <key>] [--refs <csv>]
 //   inbox    --repo <path> --workflow <id> [--ack <key> --disposition <text>]
 //   foundations --repo <path> [--workflow <id>]
@@ -105,7 +105,7 @@ import { parseJson } from '../lib/json.mjs';
 import { ARCHIVED_BY, csvList, getWorkflow, goalJsonOf, jobPayloadOf, jobResultOf, latestGoal, ownedPathsOf, workflowRunning, workDirOf } from './api-lib/rows.mjs';
 import { KERNEL_LAUNCH_EVENTS, kernelCustodyOf, kernelSeatOf } from './api-lib/kernel-seat.mjs';
 import { retireAsk } from './api-lib/asks.mjs';
-import { PEER_MESSAGE, PEER_WAIT, blockingHeadsUp, blockingViewOf, currentLegOf, leaseCanonOf, openPeerWaits, peerMessageOf, peerMessageRows, peerOpenJobsOf, peerOverlapHeadsUp, peerRefusalOf, peerWaitMessageArrived, peerWorkflowsOf, pendingPeerMessagesOf, releaseTypedWaits, writePeerMessage } from './api-lib/peers.mjs';
+import { PEER_WAIT, blockingHeadsUp, blockingViewOf, leaseCanonOf, openPeerWaits, peerOverlapHeadsUp, peerRefusalOf, peerWorkflowsOf, pendingPeerMessagesOf, releaseTypedWaits, writePeerMessage } from './api-lib/peers.mjs';
 import { OP_ROLE, callerOf, refuseOpCaller } from './api-lib/caller.mjs';
 import { hostResourcesFor, HOST_RESOURCES_LOW } from '../lib/host-resources.mjs';
 import { hostThrottle, noteThrottled, throttleSummary, DISPATCH_THROTTLED } from '../lib/ram-throttle.mjs';
@@ -323,7 +323,7 @@ const usage = (code) => {
   messages  --workflow <id> [--all]   every orchestration message on the workflow's Runs (read-only; the 'You have N orchestration messages' notice)
   reply    --workflow <id> --message <msg_id> (--body <answer> | --to-owner [--body <note>])
   peers    --workflow <id>
-  notify   --workflow <id> --to <peerId,...|peers> --kind <request|heads-up|handoff|reply>
+  notify   --workflow <id> --to <peerId,...|peers> --kind <request|heads-up|handoff|reply|follow-up>
            --subject <s> --body <text> [--reply-to <key>] [--refs <csv>]
   inbox    --workflow <id> [--ack <key> --disposition <text>]
   foundations [--workflow <id>]   the ledger's shared foundations: owner, state, dependents, waits; undeclared workflows
@@ -1373,167 +1373,6 @@ function cmdReply(ledger, args) {
 }
 
 /* --------------------------------------------------------- peer messages */
-// Several workflows of one product repo share its ledger and build in the
-// same source repositories (nivo: Login, workspace provision, modules and
-// collab in nivo-backend + nivo-fe). With no channel between their Kernels a
-// Collab Kernel that needed the Login workflow's phone verification asked the
-// owner who should build it, two workflows edited overlapping areas, and a
-// repo-wide migration was owned by no workflow. Peers now talk through the
-// ledger inbox (kind peer-message): `api notify` writes one pending row per
-// target, the target's status frontier is actionable until its Kernel reads
-// `api inbox` and acks each row with a disposition the sender can read back,
-// and `api enqueue` sends an automatic heads-up when a new job's owned_paths
-// overlap an open job of a peer. These are Kernel verbs; an op never sends.
-//
-// PEER RULE: every other workflow of the same ledger that is phase running,
-// not archived, and shares a source root with this one; a workflow with no
-// recorded roots shares every root. define-goal records the ledger's own repo
-// as each workflow's source_roots_json and a job's `repository` is rarely set,
-// so in practice every running workflow of one ledger is a peer: the ledger
-// is one product and its binding spans the product's repositories.
-// Peer messaging and overlap detection share one implementation in api-lib/peers.mjs.
-const PEER_MESSAGE_KINDS = ['request', 'heads-up', 'handoff', 'reply', 'follow-up'];
-const PEER_RULE = 'every other running, unarchived workflow of this ledger that shares a source root (source_roots_json; unrecorded roots share all)';
-const PEER_SENT_LIMIT = 20;
-
-function cmdPeers(ledger, args, repo = null) {
-  const db = ledger.db, workflowId = args.workflow;
-  const self = getWorkflow(db, workflowId);
-  if (!self) throw Object.assign(new Error(`unknown workflow ${workflowId}`), { code: 'workflow-unknown' });
-  const pendingRows = peerMessageRows(db).filter((row) => row.status === 'pending').map(peerMessageOf);
-  const peers = peerWorkflowsOf(db, self).map((wf) => {
-    const jobs = peerOpenJobsOf(db, wf.workflow_id);
-    const brief = ({ key, from, to, kind, subject, at }) => ({ key, from, to, kind, subject, at });
-    return {
-      workflowId: wf.workflow_id, title: wf.title ?? null, phase: wf.phase ?? null, currentLeg: currentLegOf(jobs),
-      ownedPaths: jobs.filter((job) => job.paths.length).map(({ jobId, op, status, paths }) => ({ jobId, op, status, paths })),
-      pending: {
-        toPeer: pendingRows.filter((m) => m.to === wf.workflow_id && m.from === workflowId).map(brief),
-        fromPeer: pendingRows.filter((m) => m.to === workflowId && m.from === wf.workflow_id).map(brief),
-      },
-    };
-  });
-  // The ledger's cross-workflow dependency graph (waits, foundations, foreign files, record owners, work-graph
-  // reads), its findings and the Supervisor's bridges; `dependencies.self` is the part touching this workflow.
-  let dependencies = null;
-  try {
-    const graph = dependencyGraph(db, { repo });
-    dependencies = { edges: graph.edges.map(({ from, to, via, ref, strength, job }) => ({ from, to, via, ref, strength, ...(job ? { job } : {}) })),
-      findings: graph.findings.map(({ key, kind, workflows, summary, proposal }) => ({ key, kind, workflows, summary, action: proposal?.action ?? null, clearCut: Boolean(proposal?.clearCut) })),
-      bridges: graph.bridges, self: dependenciesOf(graph, workflowId) };
-  } catch (error) { dependencies = { error: String(error?.message ?? error).slice(0, 200) }; }
-  const out = { ok: true, workflowId, rule: PEER_RULE, peers, dependencies };
-  emit(out, [
-    `peers ${workflowId}: ${peers.length} running peer(s)`,
-    ...peers.flatMap((peer) => [
-      `  ${peer.workflowId} "${peer.title ?? '-'}" leg=${peer.currentLeg ? `${peer.currentLeg.op ?? '-'}:${peer.currentLeg.status} (${peer.currentLeg.jobId})` : '-'} pending to-peer=${peer.pending.toPeer.length} from-peer=${peer.pending.fromPeer.length}`,
-      ...peer.ownedPaths.map((job) => `    ${job.jobId} ${job.op ?? '-'} ${job.status}: ${job.paths.join(', ')}`),
-    ]),
-    ...(dependencies?.edges ? [`dependencies: ${dependencies.edges.filter((e) => e.strength === 'hard').length} wait(s), ${dependencies.findings.length} finding(s), ${dependencies.bridges.length} bridge(s)`,
-      ...dependencies.edges.filter((e) => e.strength === 'hard').map((e) => `  ${shortWorkflow(e.from)} waits on ${shortWorkflow(e.to)} via ${e.via} ${e.ref ?? '-'}${e.job ? ` (${e.job})` : ''}`),
-      ...dependencies.findings.map((f) => `  ${f.kind}: ${f.summary.slice(0, 220)} -> supervisor ${f.action ?? '-'}${f.clearCut ? ' (clear-cut)' : ''}`),
-      ...dependencies.bridges.map((b) => `  bridge ${b.id} ${b.action} ${b.state ?? '-'}${b.provisional ? ' provisional' : ''}${b.workflowId ? ` ${b.workflowId}` : ''}${b.foundation ? ` owns ${b.foundation}` : ''}: ${b.reason.slice(0, 160)}`)]
-      : dependencies?.error ? [`dependencies: unavailable (${dependencies.error})`] : []),
-  ].join('\n'), args.json);
-}
-
-function cmdNotify(ledger, args) {
-  const db = ledger.db, workflowId = args.workflow;
-  const self = getWorkflow(db, workflowId);
-  if (!self) throw Object.assign(new Error(`unknown workflow ${workflowId}`), { code: 'workflow-unknown' });
-  if (self.phase === 'finished') {
-    throw Object.assign(new Error(`workflow ${workflowId} is finished; a finished workflow sends no peer message`), { code: 'workflow-finished' });
-  }
-  const kind = String(args.kind).trim();
-  if (!PEER_MESSAGE_KINDS.includes(kind)) {
-    throw Object.assign(new Error(`--kind must be ${PEER_MESSAGE_KINDS.join('|')}, got '${kind}'`), { code: 'peer-kind-invalid' });
-  }
-  const subject = String(args.subject).trim(), body = String(args.body).trim();
-  if (!subject || !body) throw Object.assign(new Error('notify needs a non-empty --subject and --body'), { code: 'peer-message-empty' });
-  const replyTo = args['reply-to'] ? String(args['reply-to']).trim() : null;
-  let original = null;
-  if (replyTo) {
-    const row = db.prepare('SELECT * FROM inbox WHERE workflow_id=? AND kind=? AND key=? ORDER BY inbox_id DESC LIMIT 1').get(workflowId, PEER_MESSAGE, replyTo);
-    if (!row) throw Object.assign(new Error(`--reply-to ${replyTo} names no peer message ${workflowId} received`), { code: 'reply-to-unknown' });
-    original = peerMessageOf(row);
-  } else if (kind === 'reply') {
-    throw Object.assign(new Error('a reply names the message it answers with --reply-to <key>'), { code: 'reply-to-missing' });
-  }
-  const wanted = String(args.to).trim();
-  const targets = wanted === 'peers' ? peerWorkflowsOf(db, self).map((wf) => wf.workflow_id) : csvList(wanted);
-  for (const to of new Set(targets)) {
-    const refusal = peerRefusalOf(db, self, to);
-    if (refusal) throw Object.assign(new Error(refusal.detail), { code: refusal.code });
-  }
-  if (original && !targets.includes(original.from)) {
-    throw Object.assign(new Error(`--reply-to ${replyTo} came from ${original.from}; a reply goes back to its sender`), { code: 'reply-to-mismatch' });
-  }
-  const refs = csvList(args.refs);
-  const sent = [];
-  ledger.transaction(() => {
-    const now = Date.now();
-    for (const to of [...new Set(targets)]) {
-      // A Kernel re-sending after a crash sends the same message, not a second one.
-      const same = pendingPeerMessagesOf(db, to).find((m) => m.from === workflowId && m.kind === kind && m.subject === subject
-        && m.body === body && (m.replyTo ?? null) === replyTo);
-      if (same) { sent.push({ to, key: same.key, kind, subject, deduped: true }); continue; }
-      sent.push(writePeerMessage(ledger, { from: self, to, kind, subject, body, replyTo, refs, now }));
-    }
-  });
-  // A target waiting on this workflow (peer-wait) is woken now, and its --until-message waits resolve.
-  for (const message of sent.filter((m) => !m.deduped)) {
-    const arrived = peerWaitMessageArrived(ledger, { waiter: message.to, peer: workflowId, key: message.key, kind, subject });
-    if (arrived) message.peerWait = arrived;
-  }
-  // A typed --until-message wait of a target (gate-conditions.mjs) may hold now; its release wakes the
-  // target unless the peer-wait wake above already did.
-  for (const message of sent.filter((m) => !m.deduped)) {
-    const released = releaseTypedWaits(ledger, { repo: path.resolve(args.repo ?? process.cwd()), workflowId: message.to, wake: !message.peerWait, self: workflowId }).resolved;
-    if (released.length) message.autoResolved = released.map(({ incidentId, evidence, wake }) => ({ incidentId, evidence, ...(wake ? { wake } : {}) }));
-  }
-  const out = { ok: true, workflowId, kind, subject, replyTo, sent };
-  emit(out, `notify ${workflowId} [${kind}] ${subject} -> ${sent.map((m) => `${m.to} (${m.key}${m.deduped ? ', already pending' : ''})`).join(', ') || 'no running peer'}`, args.json);
-}
-
-function cmdInbox(ledger, args) {
-  const db = ledger.db, workflowId = args.workflow;
-  if (!getWorkflow(db, workflowId)) throw Object.assign(new Error(`unknown workflow ${workflowId}`), { code: 'workflow-unknown' });
-  if (args.ack != null) {
-    const key = String(args.ack).trim();
-    const disposition = typeof args.disposition === 'string' ? args.disposition.trim() : '';
-    if (!disposition) throw Object.assign(new Error('an ack says what was done: --disposition <text>'), { code: 'disposition-missing' });
-    const row = db.prepare("SELECT * FROM inbox WHERE workflow_id=? AND kind=? AND key=? ORDER BY CASE status WHEN 'pending' THEN 0 ELSE 1 END, inbox_id DESC LIMIT 1")
-      .get(workflowId, PEER_MESSAGE, key);
-    if (!row) throw Object.assign(new Error(`no peer message ${key} in ${workflowId}'s inbox`), { code: 'peer-message-unknown' });
-    const message = peerMessageOf(row);
-    if (row.status !== 'pending') {
-      throw Object.assign(new Error(`peer message ${key} is already ${row.status}${message.disposition?.disposition ? `: ${message.disposition.disposition}` : ''}`), { code: 'peer-message-not-pending' });
-    }
-    ledger.transaction(() => {
-      const now = Date.now();
-      db.prepare("UPDATE inbox SET status='applied', disposition_json=?, applied_at=? WHERE inbox_id=? AND status='pending'")
-        .run(JSON.stringify({ disposition, by: workflowId, at: now }), now, row.inbox_id);
-      ledger.appendEvent({ workflowId, entityType: 'workflow', entityId: workflowId, kind: 'peer-message-acked',
-        payload: { key, from: message.from, kind: message.kind, disposition } });
-    });
-    const out = { ok: true, workflowId, acked: { key, from: message.from, kind: message.kind, subject: message.subject, disposition },
-      pending: pendingPeerMessagesOf(db, workflowId).length };
-    emit(out, `acked ${key} from ${message.from} [${message.kind}] ${message.subject}: ${disposition} (${out.pending} still pending)`, args.json);
-    return;
-  }
-  const pending = pendingPeerMessagesOf(db, workflowId)
-    .map(({ key, from, fromTitle, kind, subject, body, replyTo, refs, at }) => ({ key, from, fromTitle, kind, subject, body, replyTo, refs, at }));
-  const sent = peerMessageRows(db).map(peerMessageOf).filter((m) => m.from === workflowId).slice(-PEER_SENT_LIMIT).reverse()
-    .map(({ key, to, kind, subject, replyTo, at, status, disposition, appliedAt }) => ({ key, to, kind, subject, replyTo, at, status, disposition, appliedAt }));
-  const out = { ok: true, workflowId, pending, sent };
-  emit(out, [
-    `inbox ${workflowId}: ${pending.length} pending peer message(s)`,
-    ...pending.map((m) => `  ${m.key} from ${m.from} [${m.kind}] ${m.subject}${m.replyTo ? ` (reply to ${m.replyTo})` : ''}\n    ${m.body}${m.refs.length ? `\n    refs: ${m.refs.join(', ')}` : ''}`),
-    ...(sent.length ? [`sent (latest ${sent.length}):`] : []),
-    ...sent.map((m) => `  ${m.key} to ${m.to} [${m.kind}] ${m.subject} — ${m.status}${m.disposition?.disposition ? `: ${m.disposition.disposition}` : ''}`),
-  ].join('\n'), args.json);
-}
-
 /* ----------------------------------------------------------- foundations */
 // Shared foundations across the workflows of one ledger (scripts/kernel/foundations.mjs;
 // modules/kernel/driver-loop.yaml foundations): a layout tree/shell, a brand, a @starci/grammar
@@ -9399,7 +9238,7 @@ const opGuardLaunch = ({ job, jobId, repo, placements, workerCwd, shims = true }
   }
 };
 const KERNEL_ONLY_VERBS = new Set(['plan', 'enqueue', 'route', 'dispatch', 'reconcile', 'nudge', 'observe',
-  'questions', 'messages', 'reply', 'peers', 'notify', 'inbox', 'foundation', 'record-change', 'settle', 'check', 'consume-report', 'incident', 'provider-health', 'finish', 'archive', 'autopilot', 'contract-release', 'run-deferred-tests']);
+  'questions', 'messages', 'reply', 'foundation', 'record-change', 'settle', 'check', 'consume-report', 'incident', 'provider-health', 'finish', 'archive', 'autopilot', 'contract-release', 'run-deferred-tests']);
 /* ------------------------------------------------------------------ extensions */
 // New verbs, boolean flags and status fields are files, not edits of the shared lines above
 // (scripts/kernel/api-extensions.mjs; lane land-throughput 2026-09-28).
@@ -9445,7 +9284,6 @@ async function main() {
     enqueue: ['workflow', 'op', ...(args['commit-only-work-debt'] ? [] : ['paths'])], estimate: [], route: ['job'], dispatch: ['job'],
     reconcile: [], nudge: ['job'], observe: ['job'],
     questions: ['workflow'], messages: ['workflow'], reply: ['workflow', 'message'],
-    peers: ['workflow'], notify: ['workflow', 'to', 'kind', 'subject', 'body'], inbox: ['workflow'],
     foundations: [], foundation: ['workflow'], 'record-change': ['workflow', 'record', 'reach', 'reason'],
     settle: ['job', 'verdict'],
     report: ['job', 'report'], 'op-contract': [], check: ['job'],
@@ -9466,7 +9304,6 @@ async function main() {
   if (cmd === 'op-contract') need(args.job || (args.workflow && args.op), 'op-contract needs --job <job_id> or --workflow <id> --op <opId> [--attempt <n>]');
   if (cmd === 'reconcile') need(args.job || args['orphan-kernel-jobs'] || args['orca-tasks'] || args['work-debt'], 'reconcile needs --job <job_id> (or --orphan-kernel-jobs | --orca-tasks | --work-debt)');
   if (cmd === 'check') need(args.checks != null || args['checks-file'], 'check needs --checks <json> or --checks-file <path>');
-  if (cmd === 'inbox' && args.ack != null) need(args.disposition, 'inbox --ack <key> needs --disposition <what was done>');
   if (cmd === 'provider-health' && args.recover) need(typeof args.reason === 'string' && args.reason.trim(), 'provider-health --recover needs --reason <text>');
   if (cmd === 'provider-health' && args.probe) need(args.recover, 'provider-health --probe goes with --recover');
   if (cmd === 'incident') {
@@ -9508,9 +9345,6 @@ async function main() {
       case 'questions': return cmdQuestions(ledger, args);
       case 'messages': return cmdMessages(ledger, args);
       case 'reply': return cmdReply(ledger, args);
-      case 'peers': return cmdPeers(ledger, args, repo);
-      case 'notify': return cmdNotify(ledger, args);
-      case 'inbox': return cmdInbox(ledger, args);
       case 'foundations': return cmdFoundations(ledger, args);
       case 'foundation': return cmdFoundation(ledger, args);
       case 'record-change': return cmdRecordChange(ledger, args, repo);
