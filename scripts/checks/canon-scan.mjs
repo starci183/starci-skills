@@ -31,6 +31,7 @@ import { readDistJson } from '../../engine/runtime-root.mjs';
 import { allocationSettings } from '../../engine/config.mjs';
 import { checkArchitecture } from './architecture/index.mjs';
 import { posixPath } from '../lib/path-key.mjs';
+import { WORKTREES_IGNORE_GLOBS } from '../lib/worktree-exclude.mjs';
 
 export const CANON_FINDINGS = 'starci/canon-findings@1';
 const skillRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
@@ -242,7 +243,8 @@ async function lintRepository(root, options, canon, relative) {
   redirectCanon(canon.name, canon.entry);
   const loaded = await import(pathToFileURL(canon.entry).href);
   const selected = (ruleId) => !options.families.length || options.families.includes(familyOf(ruleId, canon.prefix, loaded.ruleOwners ?? {}));
-  const eslint = new ESLint({ cwd: root, errorOnUnmatchedPattern: false, fix: options.fix ? (message) => selected(message.ruleId) : false });
+  // Sibling product worktrees (<repo>/.starciwork/worktrees/**, DESIGN §16.7) are never linted as this checkout's files.
+  const eslint = new ESLint({ cwd: root, ignorePatterns: [...WORKTREES_IGNORE_GLOBS], errorOnUnmatchedPattern: false, fix: options.fix ? (message) => selected(message.ruleId) : false });
   const targets = options.paths.length ? options.paths.filter((item) => fs.existsSync(path.join(root, item))) : ['.'];
   const results = targets.length ? await eslint.lintFiles(targets) : [];
   if (options.fix) await ESLint.outputFixes(results);

@@ -316,6 +316,30 @@ preflight:
 # ============================================================================
 # SPAWN MECHANICS — how a packet becomes a running agent on Orca.
 # ============================================================================
+  context.product_worktree:
+    meaning: >-
+      Where an isolated op works (DESIGN §16.7; scripts/kernel/product-worktree.mjs). An op whose brief sets
+      policy.isolation: worktree (default: modules/kernel/product-land.yaml defaultIsolation) and whose owned
+      paths land in ONE bound product repository other than the Work owner gets its OWN git worktree
+      <repo>/.starciwork/worktrees/<wf>/<op> on branch op/<op>, cut from the workflow's integration branch
+      wf/<wf> (worktree <repo>/.starciwork/worktrees/<wf>/_wf, cut from the product's main at the workflow's
+      first isolated job). `api dispatch --spawn` creates it (a requeued attempt reuses it; a continuation
+      starts from its predecessor's archived commits), places the worker there (the Orca terminal / managed
+      worker's worktree, owned-path placements, packet paths) and records payload.productWorktree
+      {repoRoot, workflow {short, branch, path, port}, op {short, branch, path}, baseSha}. node_modules is a
+      junction overlay (workspace packages point at the worktree's own copy). Dev servers, UAT and drawing
+      run against the workflow worktree on its port. A dry-run shows the planned paths (preview: true).
+    settle: >-
+      settle --verdict pass proves the commit clean in the op worktree, then rebases op/<op> onto the latest
+      wf/<wf>, fast-forwards it and re-verifies ON the workflow branch (the op's re-runnable declared checks +
+      an import check of its changed files). Refusals: product-integrate-conflict (files + hunks),
+      product-integrate-red (wf/<wf> rolled back; a continuation on the new base, never a failure),
+      deps-unit-required. The worktree is removed right after the worker is released (released ->
+      worktree-removed, verified, SLA worktrees.opRemoveSlaMs); wf/<wf> lands into main through
+      `api product-land` (serial per repository).
+    refusals:
+      product-worktree-unavailable: the worktree or its node_modules overlay could not be made (reason in detail); the job stays queued
+
 spawnMechanics:
   caller: >-
     The kernel agent invokes `node scripts/kernel/api.mjs dispatch --job

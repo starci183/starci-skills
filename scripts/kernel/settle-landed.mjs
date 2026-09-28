@@ -312,3 +312,16 @@ export function landedProof({ base, ownedPaths, placements, head, branch, pushes
   }
   return { checked: true, ok: true, detail };
 }
+
+// An isolated product op (DESIGN §16.7, scripts/kernel/product-worktree.mjs) settles pass only once its commits are
+// IN its workflow branch: every commit of the op up to `head` (since `base`, the workflow tip it was cut from) is an
+// ancestor of `branch` or has a patch-id equivalent there - the settle rebases it onto the workflow tip, so the shas
+// differ (git cherry). {ok, missing: [sha], via} | {ok:false, reason:'landed-unverifiable', error}.
+export function integratedProof({ root, head, branch, base = null, timeoutMs = allocationMs('settleGit.commandMs') }) {
+  if (!head) return { ok: false, reason: 'landed-unverifiable', error: 'no head' };
+  if (git(root, ['merge-base', '--is-ancestor', head, branch], timeoutMs).ok) return { ok: true, missing: [], via: 'ancestor' };
+  const cherry = git(root, ['cherry', branch, head, ...(base ? [base] : [])], timeoutMs);
+  if (!cherry.ok) return { ok: false, reason: 'landed-unverifiable', error: cherry.error };
+  const missing = cherry.stdout.split(/\r?\n/).filter((l) => l.startsWith('+')).map((l) => l.slice(2).trim());
+  return missing.length ? { ok: false, reason: 'not-landed', missing, branch } : { ok: true, missing: [], via: 'patch-id' };
+}

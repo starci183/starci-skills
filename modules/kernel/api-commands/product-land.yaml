@@ -1,0 +1,21 @@
+# The contract of `api product-land` (scripts/kernel/api-verbs/product-land.mjs, scripts/kernel/product-land.mjs):
+# the serial per-repository land of a workflow branch into a product repository's main (DESIGN §16.7).
+purpose: >-
+  Land wf/<wf> - the workflow's integration branch, fed by its ops' green settles - into the product repository's main.
+  The Kernel decides when (per wave, or when a leg completes). A lock-free merge-tree preflight runs before the queue;
+  the land itself holds product-land:<repo>, merges in a scratch worktree, runs product-land.yaml land.checks and the
+  import scan (red only when worse than main), then moves main by compare-and-swap and updates exactly the changed
+  paths of the live checkout. After a land wf/<wf> fast-forwards to the new main.
+args: --workflow <id> [--repository <role|path>] [--dry-run] [--push] | --abandon --reason <text> | --show [--json]
+writes: [events product-land-queued / product-land-landed / product-land-failed / workflow-branch-abandoned, product refs/heads/main, the live checkout's changed paths]
+refusals:
+  product-land-conflict: wf/<wf> conflicts with main (files + hunks); main untouched - across workflows the Supervisor orders it
+  product-land-red: a land check or the import scan is red on the merged result; nothing lands
+  live-not-on-main: the product's live checkout is not on main
+  live-paths-dirty: the live checkout has uncommitted changes on a path the land writes
+  land-busy: another land of this repository held the lock past land.lockWaitMs
+  main-moving: main moved under the land land.maxMainRetries times
+  workflow-branch-missing: the workflow never made a product worktree in that repository
+  repository-unknown: --repository names no bound product checkout
+kernelOnly: true
+exit: 0 landed, already landed, dry-run clean, shown or abandoned; 1 refused

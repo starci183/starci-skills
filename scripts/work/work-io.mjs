@@ -5,6 +5,7 @@ import { parseYaml } from '../../engine/yaml.mjs';
 import { sha256, sha256File } from '../../engine/index.mjs';
 import { renameOver } from '../lib/rename-over.mjs';
 import { slash } from '../lib/path-key.mjs';
+import { underWorktrees } from '../lib/worktree-exclude.mjs';
 export { slash };
 
 /** How many directories below its start a record walk descends (features/<f>/ui/<r> is 3). */
@@ -55,7 +56,7 @@ export function indexFilesUnder(root) {
     try { entries = fs.readdirSync(dir, { withFileTypes: true }); } catch { return; }
     for (const e of entries) {
       const full = path.join(dir, e.name);
-      if (e.isDirectory()) { if (depth < RECORD_DEPTH && !RECORD_SKIP.includes(e.name)) walk(full, depth + 1); }
+      if (e.isDirectory()) { if (depth < RECORD_DEPTH && !RECORD_SKIP.includes(e.name) && !underWorktrees(root, full)) walk(full, depth + 1); }
       else if (e.name === 'index.yaml') out.push(full);
     }
   };

@@ -46,6 +46,7 @@ import { sha256 } from '../../engine/index.mjs';
 import { admittedContractOf } from './contract-version.mjs';
 import { changeNoteOf, committedMatches, committedReader, createOwnership, inside, normWork, ownedOf, ownerDeclarationFor, readRecordChanges } from './work-ownership.mjs';
 import { parseJson } from '../lib/json.mjs';
+import { underWorktrees } from '../lib/worktree-exclude.mjs';
 
 export const INPUT_DIGEST_SCHEMA = 'starci/input-digests@1';
 export const ABSENT = 'absent';
@@ -127,7 +128,7 @@ const listFiles = (abs, skip = SKIP_DIRS) => {
     try { entries = fs.readdirSync(dir, { withFileTypes: true }); } catch { return; }
     for (const entry of entries) {
       const p = path.join(dir, entry.name);
-      if (entry.isDirectory()) { if (!skip.has(entry.name)) visit(p); }
+      if (entry.isDirectory()) { if (!skip.has(entry.name) && !underWorktrees(abs, p)) visit(p); }
       else if (entry.isFile()) out.push(p);
     }
   };

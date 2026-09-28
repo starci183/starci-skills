@@ -1,0 +1,43 @@
+id: product-worktrees
+effectiveAt: '2026-09-28T15:00:00+07:00'
+summary: >-
+  ONE WORKTREE PER WORKFLOW, ONE PER OP (owner rulings 2026-09-28; DESIGN §16.7, FMEA #20; lane H rc-product-worktrees).
+  An op whose brief sets policy.isolation: worktree (code.refactor now; modules/kernel/product-land.yaml
+  defaultIsolation adopts it for every op) and whose owned paths land in one bound product repository other than the
+  Work owner runs in its OWN git worktree <repo>/.starciwork/worktrees/<wf>/<op> on op/<op>, cut from the workflow's
+  integration branch wf/<wf> (worktree <repo>/.starciwork/worktrees/<wf>/_wf, cut from the product's main at the
+  workflow's first isolated job; 8-char ids, core.longpaths on, the dir in .git/info/exclude and skipped by every
+  scanner). node_modules is a junction overlay whose workspace packages point at the worktree's own copy, verified by
+  a resolution check. api dispatch --spawn places the worker there (payload.productWorktree, packet
+  context.product_worktree, the prompt's worktree rules; dev servers/UAT/draw on the workflow worktree's port).
+  settle --verdict pass proves the commit clean in the op worktree, rebases op/<op> onto the latest wf/<wf> under a
+  per-workflow lock, fast-forwards it and re-verifies ON the workflow branch; refusals product-integrate-conflict
+  (files + hunks), product-integrate-red (rolled back; a continuation on the new base, not a failure),
+  deps-unit-required; the landed proof is settle-landed.mjs integratedProof (ancestor or patch-id). Job state machine
+  reported -> settled -> released -> worktree-removed: the op worktree is removed right after the worker is released
+  (evidence under .starciwork salvaged and asserted, junctions unlinked first, safeRemoveTree, git worktree prune,
+  removal verified; unintegrated commits archived as refs/starci/archive/op/<op> for a continuation), SLA 1 min,
+  events job-worktree-removed / product-worktree-sla-missed; leftovers are swept and logged as bugs
+  (product-worktree-leftover). wf/<wf> lands into main through `api product-land` (serial per repository: merge-tree
+  preflight before the queue, scratch merge, land checks + import scan, CAS of main + live-tree update of the changed
+  paths); the workflow worktree goes once the workflow finished/archived and landed (or recorded abandoned). Running
+  workflows merge main into wf/<wf> when it moves (overlap signal product-wf-overlap for the Fleet). A wave that moves
+  code gets ONE canon-wire unit owning every importer of the moved paths (cut-seam.mjs canonCutPlanOf repoint), and
+  api status importsBroken reports IMPORTS_BROKEN_AFTER_MOVE (rca cause broken-import).
+reach: new-legs
+paths:
+  - modules/kernel/contract-changes/product-worktrees.yaml
+  - modules/kernel/product-land.yaml
+  - modules/kernel/api-commands/product-land.yaml
+  - modules/kernel/dispatch.yaml
+  - modules/ops/ops/code.refactor.yaml
+  - scripts/kernel/product-worktree.mjs
+  - scripts/kernel/product-land.mjs
+  - scripts/kernel/import-scan.mjs
+  - scripts/kernel/api-verbs/product-land.mjs
+  - scripts/kernel/api-status/imports.mjs
+  - scripts/kernel/api.mjs
+  - scripts/kernel/settle-landed.mjs
+  - scripts/kernel/cut-seam.mjs
+  - scripts/reconcile/job-settle.mjs
+  - scripts/lib/worktree-exclude.mjs

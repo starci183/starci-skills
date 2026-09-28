@@ -72,7 +72,7 @@ import { buildOpPrompt, renderOwnedPath, opCommitPolicyOf } from './op-prompt.mj
 import { foreignReportOwner, ownFiledReportOf, relocateForeignReport, reservedReportPaths } from './report-owner.mjs';
 import { renderReportBlock } from './report-render.mjs';
 import {
-  WORK_COMMIT_CHANGE, admittedCommitPolicy, asciiName, landedProof, ownedPathEffects, ownedPathsDirty, policyCommits, policyPushes,
+  WORK_COMMIT_CHANGE, admittedCommitPolicy, asciiName, integratedProof, landedProof, ownedPathEffects, ownedPathsDirty, policyCommits, policyPushes,
 } from './settle-landed.mjs';
 import { PUSH_GATE_CHANGE, pushGateProof } from './push-gate.mjs';
 import { priorAttemptFailures } from './prior-failures.mjs';
@@ -86,6 +86,7 @@ import { agentsFor, countsOf, sizeOf, slicingContract } from '../work/slice-esti
 import { lineageRouteAdjust } from './lineage-route.mjs';
 import { DRAW_OWNER_EVERY_CHANGE, DRAW_REVIEW_CHANGE, DRAW_REVIEW_OP, DRAW_REVIEW_UNJUDGED_CHANGE, drawReviewsOwed } from '../work/draw-review.mjs';
 import { enqueueRepository, ownedPathPlacements, projectBinding } from './target-repo.mjs';
+import { ensureOpWorktree, layoutOf as productLayoutOf, planIsolation, worktreePromptRules, integrateOp, retargetArgv, EVENTS as PRODUCT_EVENTS } from './product-worktree.mjs';
 import { grammarContextRequired, grammarInputsOf, resolveGrammarContext, grammarMissingDetail } from './grammar-context.mjs';
 import { leaseCanonicalizer } from './lease-canon.mjs';
 import {
@@ -105,7 +106,7 @@ import { hostThrottle, noteThrottled, throttleSummary, DISPATCH_THROTTLED } from
 import { slash, pathKey } from '../lib/path-key.mjs';
 import { closeOperationTerminal, closeExitedTerminal } from './close-op-terminal.mjs';
 import { closeAndVerify, closeSelfSafe, orcaAgents, processTable, reapOrphaned } from '../lib/close-verify.mjs';
-import { queueTail as queueSettleTail, startTail as startSettleTail, startSettlerFor } from '../reconcile/job-settle.mjs';
+import { queueTail as queueSettleTail, startTail as startSettleTail, startSettlerFor, classifyCheck as settlerClassifyCheck, rerunCheck as settlerRerunCheck } from '../reconcile/job-settle.mjs';
 import { releaseSettledSession, sessionIdentityOf } from './op-session.mjs';
 import { reapAgentProcess } from './reap-agent-process.mjs';
 import { sourceRootOf, withLedgerRead } from '../connectors/lib.mjs';
@@ -5451,7 +5452,35 @@ function cmdDispatch(ledger, args, repo) {
   const briefDoc = briefForAdmission ?? parseYaml(fs.readFileSync(path.join(skillRoot, 'modules', 'ops', 'ops', `${op}.yaml`), 'utf8'));
   const dispatchParams = resolveOpParams(briefDoc, {}).params;
   for (const [name, value] of Object.entries(payload.params ?? {})) if (Object.hasOwn(briefDoc?.params ?? {}, name)) dispatchParams[name] = value;
-  const worktree = args.worktree ?? repo;
+  // Product worktrees (DESIGN §16.7, scripts/kernel/product-worktree.mjs): an op whose policy.isolation is `worktree` and
+  // whose owned paths land in ONE bound product repository (not the Work owner) runs in its OWN worktree
+  // <repo>/.starciwork/worktrees/<wf>/<op> on op/<op>, off the workflow's integration branch wf/<wf>. Only a --spawn
+  // makes it (reused by a requeued attempt; a continuation starts from its predecessor's archived commits).
+  const productIsolation = (() => {
+    if (args.worktree) return { isolate: false, reason: 'worktree-flag' };
+    try {
+      const bare = ownedPathPlacements({ op, payload, ownedPaths: ownedPathsOf(payload), repo, worktree: null, timeoutMs: allocationMs('settleGit.commandMs') });
+      return planIsolation({ brief: briefDoc, placements: bare, binding: projectBinding(repo) });
+    } catch (error) { return { isolate: false, reason: 'plan-error', detail: String(error?.message ?? error).slice(0, 200) }; }
+  })();
+  if (payload.productWorktree && payload.productWorktree.jobId !== jobId) delete payload.productWorktree; // a retry's copy of its predecessor's
+  let productWorktree = null;
+  if (productIsolation.isolate && args.spawn) {
+    const handFrom = [payload.retry?.retryOf, payload.retry?.resumeOf, payload.kernelEdit?.continuationOf].filter(Boolean);
+    const made = ensureOpWorktree({ repoRoot: productIsolation.repoRoot, workflowId: job.workflow_id, jobId, handFrom,
+      onEvent: (kind, p) => ledger.transaction(() => ledger.appendEvent({ workflowId: job.workflow_id, entityType: 'job', entityId: jobId, kind, payload: p })) });
+    if (!made.ok) {
+      const out = { ok: false, jobId, op, reason: 'product-worktree-unavailable', detail: { reason: made.reason, detail: made.detail ?? null, repoRoot: productIsolation.repoRoot } };
+      emit(out, `dispatch REFUSED for ${jobId} (${op}): product-worktree-unavailable — ${made.reason}${made.detail ? ` ${JSON.stringify(made.detail).slice(0, 300)}` : ''}; job stays queued`, args.json);
+      process.exit(1);
+    }
+    productWorktree = made.record;
+    payload.productWorktree = productWorktree;
+    db.prepare('UPDATE jobs SET payload_json=? WHERE job_id=?').run(JSON.stringify(payload), jobId);
+  } else if (productIsolation.isolate) {
+    productWorktree = { ...productLayoutOf({ repoRoot: productIsolation.repoRoot, workflowId: job.workflow_id, jobId }), preview: true };
+  }
+  const worktree = args.worktree ?? productWorktree?.op.path ?? repo;
   const workerCwd = (() => { const abs = path.resolve(repo, worktree); try { return fs.statSync(abs).isDirectory() ? abs : repo; } catch { return repo; } })();
   const placements = (() => {
     try {
@@ -5466,6 +5495,8 @@ function cmdDispatch(ledger, args, repo) {
   const packet = buildPacket({ job: { ...job, op_id: op }, payload, model, goal: latestGoal(db, job.workflow_id), params: dispatchParams, placements, productLocale: productLocaleFor(repo), ownerAnswers, boundGoal });
   if (environmentHealth?.declared) packet.context.environment = { ready: environmentHealth.ready, checkedAt: environmentHealth.at, services: envServicesOf(environmentHealth), remedies: environmentHealth.remedies };
   if (payload.repairFor) packet.context.repair_for = payload.repairFor;
+  if (productWorktree) packet.context.product_worktree = { repo: productWorktree.repoRoot, op: productWorktree.op, workflow: productWorktree.workflow, baseSha: productWorktree.baseSha ?? null, ...(productWorktree.preview ? { preview: true } : {}) };
+  else if (productIsolation.reason && productIsolation.reason !== 'policy-shared') packet.context.product_isolation = { isolate: false, reason: productIsolation.reason };
   // The cut manifest the brief binds before the first edit (cut-seam.mjs cutManifestOf): every ordinal's paths and
   // status, the path union and the passed ordinals, read from the ledger now. Packet-only: never persisted on the job.
   if (packet.context.cut) { let manifest = null; try { manifest = cutManifestOf(db, { workflowId: job.workflow_id, op, cut: payload.cut, ownJobId: jobId }); } catch { manifest = null; } if (manifest) packet.context.cut = { ...packet.context.cut, manifest }; }
@@ -5501,7 +5532,7 @@ function cmdDispatch(ledger, args, repo) {
       return reservedReportPaths(db, { op, roots });
     } catch { return []; }
   })();
-  const prompt = buildOpPrompt({ skillRoot, packet, jobId, repo, priorFailures, cwd: workerCwd, reservedReports });
+  const prompt = buildOpPrompt({ skillRoot, packet, jobId, repo, priorFailures, cwd: workerCwd, reservedReports }) + worktreePromptRules(productWorktree);
   const packetFile = repo ? packetFileOf(jobDirOf(repo, job.workflow_id, jobId), job.attempt) : null;
   // The names a person reads (owner request 2026-09-27, scripts/lib/display-names.mjs): the Task display
   // name, the managed worker's tab (terminal-rename after dispatch-show) and the command terminal's title
@@ -7873,6 +7904,24 @@ const foreignPathCheckOf = (db, job, accept = []) => {
   const { paths, unproven } = foreignAcceptProof(db, job.workflow_id, accept);
   return { sinceMs: admitted.at, accept: paths, unproven };
 };
+/** The job's OWN product worktree record (payload.productWorktree), never a retry's copy of its predecessor's. */
+const ownProductWorktreeOf = (job) => {
+  const rec = jobPayloadOf(job)?.productWorktree;
+  return rec?.op?.path && rec?.workflow?.branch && (!rec.jobId || rec.jobId === job.job_id) ? rec : null;
+};
+// The op's declared checks re-run ON the workflow branch after the merge: only the runtime checks the settler itself
+// can re-run (job-settle.mjs classifyCheck), their paths moved from the op worktree to the workflow worktree.
+const BASELINE_CHECK = /(?:^|[-_.\s])(?:before|baseline)(?:$|[-_.\s])/i;
+function integrateForSettle(job, rec, envelope) {
+  const declared = (Array.isArray(envelope?.checks) ? envelope.checks : []).filter((c) => !BASELINE_CHECK.test(String(c?.name ?? '')));
+  const recheck = (checks, { cwd, from, to, timeoutMs }) => checks.flatMap((c) => {
+    const cls = settlerClassifyCheck(c, { skillRoot });
+    if (cls.kind !== 'runtime') return [];
+    const r = settlerRerunCheck({ ...cls, argv: retargetArgv(cls.argv, from, to) }, { repo: cwd, timeoutMs });
+    return [{ name: String(c.name ?? cls.rel), exitCode: r.exitCode, tail: r.tail, ms: r.ms }];
+  });
+  return integrateOp({ record: rec, head: envelope?.head ?? null, depsUnit: jobPayloadOf(job)?.params?.depsUnit === true, checks: declared, recheck });
+}
 function settleLanding(db, jobId, repo, reportAbs, acceptForeign = [], reportText = null) {
   const job = db.prepare('SELECT * FROM jobs WHERE job_id=?').get(jobId);
   if (!job || !REPORTABLE_JOB_STATUSES.has(job.status)) return null;
@@ -7885,6 +7934,9 @@ function settleLanding(db, jobId, repo, reportAbs, acceptForeign = [], reportTex
   if (envelope?.outcome !== 'done') return null;
   const pushes = policyPushes(policy);
   const placements = jobPlacements(db, job, repo);
+  // An isolated op (DESIGN §16.7) proves its commit clean in its OWN worktree, then lands it in its workflow branch
+  // below; pushing is product-land's (wf/<wf> -> main), never the op's.
+  const productRec = ownProductWorktreeOf(job);
   const foreign = foreignPathCheckOf(db, job, acceptForeign);
   if (foreign?.unproven) {
     return { checked: true, ok: false, reason: 'foreign-accept-unproven', detail: { accept: foreign.accept, unproven: foreign.unproven },
@@ -7897,7 +7949,7 @@ function settleLanding(db, jobId, repo, reportAbs, acceptForeign = [], reportTex
   const reportBases = [...new Set([repo, ...placements.filter((p) => !p.unresolved).map((p) => p.base)])];
   const ownFiles = (Array.isArray(envelope.files) ? envelope.files : []).filter((f) => typeof f === 'string' && f.trim())
     .flatMap((f) => (path.isAbsolute(f) ? [f] : reportBases.map((b) => path.resolve(b, f))));
-  const proof = landedProof({ placements, head: envelope.head, branch: envelope.branch, pushes,
+  const proof = landedProof({ placements, head: envelope.head, branch: envelope.branch, pushes: productRec ? false : pushes,
     exclude: filedReportPathsOf(db, job.workflow_id, reportAbs), foreign,
     // A commit-only attempt exists to commit exactly such files: for it they are never debris.
     debris: Number.isFinite(admittedAt) && !jobPayloadOf(job).commitOnly ? { sinceMs: admittedAt, own: ownFiles } : null });
@@ -7906,6 +7958,21 @@ function settleLanding(db, jobId, repo, reportAbs, acceptForeign = [], reportTex
       ? `The job's commit(s) carry files outside its owned paths (detail.foreign). Never rewrite the shared branch: raise api incident --kind foreign-file-committed naming the files so their owner confirms or reverts them with a new commit, then settle with --accept-foreign <those paths>,incident:<incidentId>`
       : undefined;
     return { ...proof, op, status: job.status, pushes, ...(hint ? { hint } : {}) };
+  }
+  if (productRec) {
+    // Settle passes only once the op's commits are IN its workflow branch: rebased onto wf/<wf>'s tip (conflict ->
+    // files + hunks), wf/<wf> fast-forwarded, then re-verified ON the workflow branch (product-worktree.mjs integrateOp).
+    const integration = integrateForSettle(job, productRec, envelope);
+    if (!integration.ok) {
+      return { checked: true, ok: false, reason: integration.reason, detail: { ...proof.detail, integration }, op, status: job.status, pushes,
+        hint: integration.reason === 'product-integrate-red'
+          ? `the op is green on its own base but breaks ${productRec.workflow.branch} (${(integration.failures ?? []).join('; ').slice(0, 300)}): the workflow branch was rolled back; continue the op on the new base (a continuation from ${String(integration.continuation?.resumeFrom ?? '').slice(0, 12)}, never a failure)`
+          : integration.hint ?? `the op's commits do not integrate into ${productRec.workflow.branch}` };
+    }
+    const inBranch = integratedProof({ root: productRec.repoRoot, head: envelope.head ?? integration.after, branch: productRec.workflow.branch, base: productRec.baseSha ?? null });
+    if (!inBranch.ok) return { checked: true, ok: false, reason: inBranch.reason, detail: { ...proof.detail, integration: { ...integration, inBranch } }, op, status: job.status, pushes };
+    return { ...proof, detail: { ...proof.detail, integration: { branch: productRec.workflow.branch, inBranch: inBranch.via, before: integration.before, after: integration.after, already: Boolean(integration.already),
+      commits: (integration.map ?? []).length, verify: integration.verify ? { checks: (integration.verify.checks ?? []).length, importsBroken: integration.verify.imports?.count ?? 0 } : null } }, op, status: job.status, pushes };
   }
   const gate = settlePushGate(db, job, proof.detail, envelope, pushes);
   if (gate.refused) {
@@ -8190,6 +8257,14 @@ async function cmdSettle(ledger, args, repo) {
     catch { throw Object.assign(new Error(`report file unreadable: ${reportAbs}`), { code: 'report-unreadable' }); }
   }
   const landed = verdict === 'pass' ? settleLanding(db, jobId, repo, reportAbs, acceptForeign, reportText) : null;
+  if (landed?.detail?.integration) {
+    const settlingJob = db.prepare('SELECT workflow_id FROM jobs WHERE job_id=?').get(jobId);
+    const integ = landed.detail.integration;
+    if (settlingJob && (landed.ok ? !integ.already : true)) {
+      ledger.transaction(() => ledger.appendEvent({ workflowId: settlingJob.workflow_id, entityType: 'job', entityId: jobId, kind: landed.ok ? PRODUCT_EVENTS.integrated : PRODUCT_EVENTS.integrateRefused,
+        payload: landed.ok ? integ : { reason: landed.reason, conflicts: (integ.conflicts ?? []).map((c) => c.file), failures: integ.failures ?? null, files: integ.files ?? null, continuation: integ.continuation ?? null } }));
+    }
+  }
   if (landed?.checked && !landed.ok) {
     const out = { ok: false, jobId, op: landed.op, reason: landed.reason, detail: landed.detail, ...(landed.hint ? { hint: landed.hint } : {}) };
     emit(out, `settle REFUSED for ${jobId} (${landed.op}): ${landed.reason} — ${JSON.stringify(landed.detail)}; the job stays ${landed.status}. ${landed.hint ?? `Re-dispatch the owning slice to commit its own paths${landed.pushes ? ' and push' : ''}`}, then settle again`, args.json);
@@ -8494,6 +8569,16 @@ async function cmdSettle(ledger, args, repo) {
     const stored = parseJson(db.prepare('SELECT payload_json FROM jobs WHERE job_id=?').get(jobId)?.payload_json) ?? {};
     db.prepare('UPDATE jobs SET payload_json=?, updated_at=? WHERE job_id=?')
       .run(JSON.stringify({ ...stored, ...(taskClosed ? { taskClosed } : {}), ...(managedWorker ? { managedWorker } : {}), ...(terminalClosed ? { terminalClosed } : {}) }), Date.now(), jobId);
+  }
+
+  // released -> worktree-removed (DESIGN §16.7): an isolated op's worktree is removed right after its worker is released,
+  // off the settle's path (product-worktree.mjs reap: salvage + assert, junctions unlinked, verified removal); the
+  // settler's productWorktreeDuty is the backstop, the leftover sweep logs whatever both missed as a bug.
+  if (ownProductWorktreeOf(db.prepare('SELECT job_id, payload_json FROM jobs WHERE job_id=?').get(jobId) ?? job) && !process.env.NODE_TEST_CONTEXT) {
+    try {
+      spawn(process.execPath, [path.join(skillRoot, 'scripts', 'kernel', 'product-worktree.mjs'), 'reap', '--repo', repo, '--job', jobId, '--json'],
+        { detached: true, stdio: 'ignore', windowsHide: true }).unref();
+    } catch { /* the settler reaps it */ }
   }
 
   // LIGHT SETTLE, HEAVY WORK ASYNC (owner ruling settle-runtime-service): everything above is the settle's

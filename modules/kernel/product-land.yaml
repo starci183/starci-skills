@@ -1,0 +1,37 @@
+# Product worktrees and product-land (DESIGN §16.7, FMEA #20; owner rulings 2026-09-28: one worktree per workflow, one
+# per op; worktrees at <product repo>/.starciwork/worktrees/<wf>/{_wf,<op>}; removed as soon as they are not needed).
+# Read by scripts/kernel/product-worktree.mjs productSettings(), scripts/kernel/product-land.mjs, api product-land and
+# scripts/kernel/api-status/imports.mjs. Every value has the same default in code.
+
+# The isolation of an op whose brief sets no policy.isolation. `worktree` = the two-level model for every op that
+# writes a product repository (the owner chose one model for all workflows); `shared` = the old single working tree.
+# Rollout: code.refactor sets policy.isolation: worktree itself; flip this to `worktree` to adopt it everywhere.
+defaultIsolation: shared
+
+worktrees:
+  shortIdLength: 8              # <wf> and <op> directory / branch ids (Windows path length)
+  opRemoveSlaMs: 60000          # an op worktree outliving its job's settle by more than this is an SLA miss (logged)
+  archiveTtlMs: 604800000       # an archived op branch (refs/starci/archive/op/<op>) no continuation took, kept 7 days
+  commandMs: 300000
+  overlay:                      # the node_modules junction overlay of every worktree
+    lockfiles: [package-lock.json, pnpm-lock.yaml, yarn.lock, npm-shrinkwrap.json]   # a change rebuilds the overlay
+    maxDepth: 3                 # how deep workspace dirs holding a node_modules are looked for
+  ports: {base: 43100, span: 800}   # the dev-server/UAT port of a workflow worktree: base + hash(path) % span
+
+integrate:                      # an op's green settle into its workflow branch (per-workflow lock)
+  lockWaitMs: 600000
+  recheck: declared             # declared = re-run the op's re-runnable declared checks on the workflow branch; none
+  recheckTimeoutMs: 300000
+  importCheck: changed-files    # the op's changed files must import only existing paths after the merge
+  depsFiles: [package.json, package-lock.json, pnpm-lock.yaml, yarn.lock, npm-shrinkwrap.json, pnpm-workspace.yaml]
+
+land:                           # wf/<wf> -> the product's main (per-repository serial queue)
+  lockWaitMs: 1800000
+  checks: []                    # [{name, argv: [..]}] run in the land scratch (no shell); none by default
+  importScan: true              # red when the merged result has more broken imports than main had
+  push: false                   # push main after a land (api product-land --push asks for one land)
+  syncWorkflowAfterLand: true   # fast-forward wf/<wf> to the new main
+  maxMainRetries: 3
+
+invariant:
+  importsCacheMs: 300000        # api status importsBroken: one scan per tree state within this window

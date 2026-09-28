@@ -279,8 +279,16 @@ export function relocationOf(finding, relocations) {
  * one `wires` leg per wave holding the shared-root files and the contested relocations, with the api
  * commands a Kernel runs. `scan` is canon-scan's --json record. A grant never overlaps a sibling slice's
  * paths or another slice's grant: such a destination - and the home it moves from - goes to the wave's wire.
+ *
+ * Repoint (DESIGN §16.7, FMEA #20): with `importersOf(movedPaths) -> [file]` (import-scan.mjs importersOf over the
+ * repository's main, tsconfig aliases such as `@/i18n` included), the wave's ONE wire leg also owns EVERY importer of
+ * the paths the wave moves (each relocation's moving file and the owner folder it leaves), so a move never leaves an
+ * importer nobody owns: `repoint` {moved, importers} on the wire, whose brief is "repoint imports to the new
+ * locations; no other change", enqueued --after every slice of the wave. A wave that moves code gets the wire even
+ * without a shared-root file.
  */
-export function canonCutPlanOf(scan, { cutId, op = CANON_OP, policy = null } = {}) {
+export const REPOINT_BRIEF = 'repoint imports to the new locations; no other change';
+export function canonCutPlanOf(scan, { cutId, op = CANON_OP, policy = null, importersOf = null } = {}) {
   const { relocations, sharedRoots } = policy ?? canonConformancePolicy();
   const findings = scan?.findings ?? [];
   const slices = (scan?.slices ?? []).map((slice) => ({ ordinal: Number(slice.ordinal), wave: String(slice.wave), paths: [...slice.paths], grants: [] }));
@@ -315,13 +323,35 @@ export function canonCutPlanOf(scan, { cutId, op = CANON_OP, policy = null } = {
       }
     }
   }
+  // Every importer of what the wave moves: the wave's wire repoints them after its slices land.
+  const repointByWave = new Map();
+  if (typeof importersOf === 'function') {
+    const movedByWave = new Map();
+    for (const finding of findings) {
+      const move = relocationOf(finding, relocations);
+      const slice = move && (holderOf(move.moving) ?? holderOf(move.file));
+      if (!slice) continue;
+      if (!movedByWave.has(slice.wave)) movedByWave.set(slice.wave, new Set());
+      for (const moved of [move.moving, move.home]) movedByWave.get(slice.wave).add(moved);
+    }
+    for (const [wave, movedSet] of movedByWave) {
+      const moved = [...movedSet].sort();
+      let importers = [];
+      try { importers = [...new Set(importersOf(moved) ?? [])].sort(); } catch (error) { importers = []; wireOf(wave).reasons.push(`repoint importers unavailable: ${String(error?.message ?? error).slice(0, 120)}`); }
+      const wire = wireOf(wave);
+      for (const file of importers) wire.paths.add(file);
+      wire.reasons.push(`repoint: ${importers.length} importer(s) of ${moved.length} moved path(s)`);
+      repointByWave.set(wave, { moved, importers });
+    }
+  }
   const total = slices.length;
   const out = slices.map((slice) => ({ ...slice, owned: [...slice.paths, ...slice.grants] }));
   const waves = [...new Set(out.map((slice) => slice.wave))];
-  const wires = waves.filter((wave) => wireByWave.get(wave)?.paths.size).map((wave) => ({
-    wave, paths: [...wireByWave.get(wave).paths].sort(), reasons: wireByWave.get(wave).reasons,
+  const wires = waves.filter((wave) => wireByWave.get(wave)?.paths.size || repointByWave.has(wave)).map((wave) => ({
+    wave, paths: [...(wireByWave.get(wave)?.paths ?? [])].sort(), reasons: wireByWave.get(wave)?.reasons ?? [],
     after: out.filter((slice) => slice.wave === wave).map((slice) => slice.ordinal),
-  }));
+    ...(repointByWave.has(wave) ? { repoint: repointByWave.get(wave), brief: REPOINT_BRIEF } : {}),
+  })).filter((wire) => wire.paths.length);
   const commands = [];
   for (const [index, wave] of waves.entries()) {
     for (const slice of out.filter((item) => item.wave === wave)) {
@@ -329,7 +359,7 @@ export function canonCutPlanOf(scan, { cutId, op = CANON_OP, policy = null } = {
         + (index ? ` --after <every job of wave ${waves[index - 1]} and its canon-wire leg>` : ''));
     }
     const wire = wires.find((item) => item.wave === wave);
-    if (wire) commands.push(`api enqueue --op ${op} --paths ${wire.paths.join(',')} --params '{"canonWire":true}' --after <every job of wave ${wave}: ordinals ${wire.after.join(',')}> (ONE canon-wire leg)`);
+    if (wire) commands.push(`api enqueue --op ${op} --paths ${wire.paths.join(',')} --params '{"canonWire":true}' --after <every job of wave ${wave}: ordinals ${wire.after.join(',')}> (ONE canon-wire leg${wire.repoint ? `; ${REPOINT_BRIEF}` : ''})`);
   }
   return { cutId: cutId == null ? null : String(cutId), op, total, slices: out, wires, commands };
 }
@@ -456,7 +486,7 @@ export function canonSettleFollowUpOf({ payload, report, manifest = null, destin
 }
 
 // The Kernel's two canon-cut commands (modules/kernel/driver-loop.yaml enqueue.cutExecution):
-//   node scripts/kernel/cut-seam.mjs canon-plan --scan <canon-scan --json file> --cut-id <id>
+//   node scripts/kernel/cut-seam.mjs canon-plan --scan <canon-scan --json file> --cut-id <id> [--root <scanned repo>]
 //   node scripts/kernel/cut-seam.mjs canon-redispatch --repo <ledger repo> --job <blocked slice job> [--paths <extra csv>]
 // Each prints JSON whose `commands` / `command` are the api enqueue lines to run. Ledger reads only.
 async function main(argv) {
@@ -464,7 +494,11 @@ async function main(argv) {
   const flag = (name) => { const at = rest.indexOf(`--${name}`); return at >= 0 ? rest[at + 1] : undefined; };
   if (verb === 'canon-plan' && flag('scan')) {
     const scan = JSON.parse(fs.readFileSync(path.resolve(flag('scan')), 'utf8'));
-    console.log(JSON.stringify(canonCutPlanOf(scan, { cutId: flag('cut-id') ?? 'canon' }), null, 2));
+    // The repoint unit's importers are read from the scanned repository (--root, else the scan's own repository).
+    const root = flag('root') ?? scan.repository ?? null;
+    const { importersOf } = await import('./import-scan.mjs');
+    const scanImporters = root && fs.existsSync(path.join(root, '.git')) ? (moved) => importersOf(root, moved) : null;
+    console.log(JSON.stringify(canonCutPlanOf(scan, { cutId: flag('cut-id') ?? 'canon', importersOf: scanImporters }), null, 2));
     return 0;
   }
   if (verb === 'canon-redispatch' && flag('repo') && flag('job')) {

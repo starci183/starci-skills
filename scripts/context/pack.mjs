@@ -31,6 +31,7 @@ import { fileURLToPath } from 'node:url';
 import { parseYaml } from '../../engine/yaml.mjs';
 import { loadRecords, readWorkspace, resolveOwnedDirs } from '../example/example-ownership.mjs';
 import { clipLine } from '../lib/clip.mjs';
+import { underWorktrees } from '../lib/worktree-exclude.mjs';
 
 const DEFAULT_ROOT = path.resolve(fileURLToPath(new URL('.', import.meta.url)), '..', '..');
 const VERDICT_CONTRACT = 'modules/kernel/verdict-contract.yaml';
@@ -53,7 +54,7 @@ function listFiles(abs, budget) {
     for (const e of entries) {
       if (out.length >= budget) return;
       const p = path.join(dir, e.name);
-      if (e.isDirectory()) { if (!SKIP_DIRS.has(e.name)) visit(p); }
+      if (e.isDirectory()) { if (!SKIP_DIRS.has(e.name) && !underWorktrees(abs, p)) visit(p); }
       else if (e.isFile()) out.push(p);
     }
   };

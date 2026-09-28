@@ -13,6 +13,8 @@
 //   reported --(outcome done + declared checks re-verify green)--> settled   event job-settle-settled
 //   reported --(anything else)-----------------------------------> kernel    event job-settle-needs-kernel
 //   settled  --(worker close proven, or closed and verified now)--> released  event job-settle-released
+//   released --(isolated op: its product worktree removed, verified)--> worktree-removed  event job-worktree-removed
+//            (scripts/kernel/product-worktree.mjs productWorktreeDuty; DESIGN §16.7)
 //
 // `reported` is a live job (running/answering/effect_unknown) with a reports row for its contract's dispatch, consumed
 // or not: consume is part of settle, so consumed-but-unsettled is due like filed. The settle itself is the SAME code
@@ -204,7 +206,10 @@ export function rerunCheck(c, { repo, timeoutMs, env = process.env, run = spawnS
 export async function canonSliceCheck(item, { repo }) {
   const { ownedPathPlacements } = await import('../kernel/target-repo.mjs');
   const owned = item.payload.owned_paths ?? [];
-  const places = ownedPathPlacements({ op: item.op, payload: item.payload, ownedPaths: owned, repo });
+  // An isolated op (DESIGN §16.7) is measured in its OWN worktree, never the live checkout its siblings still edit.
+  const own = item.payload.productWorktree;
+  const worktree = own?.op?.path && (!own.jobId || own.jobId === item.jobId) && fs.existsSync(own.op.path) ? own.op.path : undefined;
+  const places = ownedPathPlacements({ op: item.op, payload: item.payload, ownedPaths: owned, repo, worktree });
   const bases = [...new Set(places.map((p) => p.base && path.resolve(p.base)).filter(Boolean))];
   if (!owned.length || places.some((p) => p.unresolved || !p.base) || bases.length !== 1) return { exitCode: 2, status: 'unresolved', why: 'owned paths do not resolve into one checkout' };
   const { scanCanon, parseCanonScanArgs } = await import('../checks/canon-scan.mjs');
@@ -397,6 +402,12 @@ export async function reconcileJobSettle({ repo, workflowId = null, jobId = null
     // The async settle tail (api settle-tail): a failed or never-started tail run is retried here.
     if (!dryRun) {
       try { out.tails = retryDueTails({ repo, settings, env, now: now() }); } catch (error) { out.errors.push({ step: 'tail', error: String(error?.message ?? error).slice(0, 300) }); }
+    }
+    // released -> worktree-removed (DESIGN §16.7): every released isolated op's product worktree goes now, finished
+    // workflows' integration worktrees once landed, and leftovers are swept (each logged as a bug).
+    if (!dryRun && !jobId) {
+      try { const { productWorktreeDuty } = await import('../kernel/product-worktree.mjs'); out.productWorktrees = productWorktreeDuty({ ledger, ledgerRepo: path.resolve(repo), now: now() }); }
+      catch (error) { out.errors.push({ step: 'product-worktrees', error: String(error?.message ?? error).slice(0, 300) }); }
     }
   } finally { ledger.close(); }
   return out;

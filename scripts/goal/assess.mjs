@@ -13,6 +13,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { readJsonFile as readJson } from '../lib/json.mjs';
+import { isWorktreesPath } from '../lib/worktree-exclude.mjs';
 
 const FILE_CAP = 20000;          // max files enumerated per tree walk
 const CONTENT_CAP = 2000;        // max files content-grepped (eslint-disable / any)
@@ -41,7 +42,7 @@ function walk(root) {
     for (const ent of entries) {
       const relPath = rel ? `${rel}/${ent.name}` : ent.name;
       if (ent.isDirectory()) {
-        if (!SKIP_DIRS.has(ent.name)) stack.push(relPath);
+        if (!SKIP_DIRS.has(ent.name) && !isWorktreesPath(relPath)) stack.push(relPath);
       } else if (ent.isFile()) {
         files.push(relPath);
         if (files.length >= FILE_CAP) { truncated = true; break; }

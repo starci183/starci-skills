@@ -10,6 +10,7 @@ import {isGeneratedPath,isToolingModule,loadTargetTypeScript} from './architectu
 import {discoverNestMetadataInputs} from './code-patterns/nest-metadata.mjs';
 import {judgeSliceBaseline,measureBaseTree} from './scoped-lint-baseline.mjs';
 import {typeScriptProgramRun} from './typescript-programs.mjs';
+import {isWorktreesPath} from '../lib/worktree-exclude.mjs';
 import {braceVariants,globExpression} from '../lib/glob.mjs';
 import {posixPath} from '../lib/path-key.mjs';
 
@@ -30,7 +31,7 @@ function descendantMayMatch(directory,globs=[]){const segments=clean(directory).
 function sourceFiles(repository,globs){
   const roots=new Set();for(const pattern of globs){const first=clean(pattern).split('/')[0];roots.add(/[?*{]/.test(first)?repository:path.join(repository,first));}
   const files=[],unsafe=[];const visit=directory=>{let stat;try{stat=fs.lstatSync(directory);}catch(error){if(error?.code!=='ENOENT')unsafe.push(clean(path.relative(repository,directory))||'.');return;}if(stat.isSymbolicLink()){unsafe.push(clean(path.relative(repository,directory))||'.');return;}if(stat.isFile()){const relative=clean(path.relative(repository,directory));if(matchAny(relative,globs))files.push(relative);return;}if(!stat.isDirectory()){unsafe.push(clean(path.relative(repository,directory))||'.');return;}let entries;try{entries=fs.readdirSync(directory,{withFileTypes:true});}catch{unsafe.push(clean(path.relative(repository,directory))||'.');return;}
-    for(const entry of entries.sort((a,b)=>a.name.localeCompare(b.name))){const absolute=path.join(directory,entry.name),relative=clean(path.relative(repository,absolute)),fileMatch=matchAny(relative,globs),descendantMatch=descendantMayMatch(relative,globs);if(!fileMatch&&!descendantMatch)continue;
+    for(const entry of entries.sort((a,b)=>a.name.localeCompare(b.name))){const absolute=path.join(directory,entry.name),relative=clean(path.relative(repository,absolute)),fileMatch=matchAny(relative,globs),descendantMatch=descendantMayMatch(relative,globs);if(isWorktreesPath(relative)||(!fileMatch&&!descendantMatch))continue;
       let stat;try{stat=fs.lstatSync(absolute);}catch{unsafe.push(relative);continue;}if(stat.isSymbolicLink()){unsafe.push(relative);continue;}
       if(stat.isDirectory()&&descendantMatch)visit(absolute);else if(stat.isFile()&&fileMatch)files.push(relative);}};
   for(const root of [...roots].sort())visit(root);return {files:[...new Set(files)].sort(),unsafe:[...new Set(unsafe)].sort()};
