@@ -8,6 +8,7 @@ const parse = (value, fallback = null) => { try { return value == null ? fallbac
 const limitOf = url => Math.min(200, Math.max(1, Number(url.searchParams.get('limit')) || 50));
 const encode = value => Buffer.from(JSON.stringify(value)).toString('base64url');
 const decode = value => { try { return JSON.parse(Buffer.from(value, 'base64url').toString('utf8')); } catch { return {}; } };
+const LOG_LEVELS = ['debug', 'info', 'warn', 'error'];
 const projectName = (store, ledgerId) => store.projects().find(row => row.ledgerId === ledgerId)?.name ?? null;
 const ref = (kind, id, project = null) => ({ kind, ...(project ? { project } : {}), id: String(id),
   href: kind === 'attempt' ? `#/a/${encodeURIComponent(project ?? '')}/${encodeURIComponent(id)}`
@@ -36,6 +37,11 @@ function queryRows(dbInfo, url, position = null, afterSeq = null) {
   if (afterSeq != null) add('l.seq > ?', afterSeq);
   for (const [param, column] of [['wf', 'workflow_id'], ['job', 'job_id'], ['actor', 'actor'], ['level', 'level']]) {
     if (url.searchParams.has(param)) add(`l.${column} = ?`, url.searchParams.get(param));
+  }
+  if (url.searchParams.has('minLevel')) {
+    const levels = LOG_LEVELS.slice(LOG_LEVELS.indexOf(url.searchParams.get('minLevel')));
+    terms.push(`l.level IN (${levels.map(() => '?').join(',')})`);
+    args.push(...levels);
   }
   if (url.searchParams.has('controller')) {
     if (name !== 'machine') return [];
@@ -159,6 +165,10 @@ function streamLogs(request, response, store, url) {
 
 /** C17 log search, merge, timeline and stream. */
 export function handleLogs(request, response, store, url) {
+  if (['/api/logs', '/api/logs/stream'].includes(url.pathname) && url.searchParams.has('minLevel')
+    && !LOG_LEVELS.includes(url.searchParams.get('minLevel'))) {
+    sendError(request, response, 400, 'BAD_MIN_LEVEL', 'Invalid minimum log level'); return true;
+  }
   if (url.pathname === '/api/logs') {
     if (!store.machine) { sendError(request, response, 503, 'MACHINE_UNAVAILABLE', 'Machine database unavailable'); return true; }
     const result = listLogs(store, url);
