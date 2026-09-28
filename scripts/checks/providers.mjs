@@ -21,7 +21,6 @@ const agentsDir=root=>path.join(root,'modules','models','agents');
 const hostsDir=root=>path.join(root,'modules','host');
 const profilesDir=root=>path.join(root,'modules','models','profiles');
 const registryFile=root=>path.join(root,'modules','models','registry.yaml');
-const AGENTS_DIR=agentsDir(skillRoot);
 const AGENT_CARD_SCHEMA='starci/agent-card@1';
 
 const yamlFilesIn=dir=>fs.existsSync(dir)
@@ -29,39 +28,6 @@ const yamlFilesIn=dir=>fs.existsSync(dir)
   :[];
 
 const readYamlFile=file=>parseYaml(fs.readFileSync(file,'utf8'));
-
-/** Read one agent card by name (`qwen` -> modules/models/agents/qwen.yaml). */
-export function loadAgentCard(agent){
-  if(typeof agent!=='string'||!agent||agent.includes('..')||agent.includes('/')||agent.includes('\\'))
-    throw Error(`Invalid agent name: ${agent}`);
-  const file=path.join(AGENTS_DIR,`${agent}.yaml`);
-  if(!fs.existsSync(file))throw Error(`Unknown agent: ${agent} (no card at modules/models/agents/${agent}.yaml)`);
-  return readYamlFile(file);
-}
-
-/**
- * Load one provider's contract docs from the new tree. Host documents come from
- * `modules/host/<provider>/*.yaml` keyed by file stem (`index`, `api`, `calls`,
- * `envelopes`, ...); `adapters` holds the agent cards that provider can launch —
- * for the Orca host that is every card in modules/models/agents/, for any other
- * provider the `<provider>.yaml` card when one exists.
- */
-export function loadProviderContract(provider){
-  if(typeof provider!=='string'||!provider||provider.includes('..')||provider.includes('/')||provider.includes('\\'))
-    throw Error(`Invalid provider name: ${provider}`);
-  const hostDir=path.join(skillRoot,'modules','host',provider);
-  const loaded={};
-  for(const name of yamlFilesIn(hostDir))loaded[path.basename(name).replace(/\.ya?ml$/i,'')]=readYamlFile(path.join(hostDir,name));
-  loaded.adapters={};
-  const cardNames=provider==='orca'?yamlFilesIn(AGENTS_DIR).map(name=>name.replace(/\.ya?ml$/i,'')):[provider];
-  for(const agent of cardNames){
-    const file=path.join(AGENTS_DIR,`${agent}.yaml`);
-    if(fs.existsSync(file))loaded.adapters[agent]=readYamlFile(file);
-  }
-  if(!Object.keys(loaded).some(key=>key!=='adapters')&&!Object.keys(loaded.adapters).length)
-    throw Error(`Unknown provider: ${provider} (no modules/host/${provider}/ docs and no agent card)`);
-  return loaded;
-}
 
 /** Validate the provider contract tree before an operation launch is planned. */
 export function validateProviderContracts({root=skillRoot}={}){
@@ -221,12 +187,6 @@ export function compareCallsToLiveSchema({root=skillRoot,listing}={}){
       missingCommand:missing.flags?false:true,missingFlags:missing.flags??[]});
   }
   return {ok:drift.length===0,drift};
-}
-
-export function requireProviderContracts(){
-  const result=validateProviderContracts();
-  if(!result.ok)throw Error(result.errors.join('; '));
-  return result;
 }
 
 /** Checks entry: `node scripts/checks/providers.mjs` prints the validation report as JSON. */

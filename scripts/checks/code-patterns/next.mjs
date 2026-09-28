@@ -1308,5 +1308,3 @@ export function checkNextPatterns({ root, files, ruleIds, contextFiles, architec
   return result;
 }
 
-/** Rich-name alias retained for direct library consumers; the runner uses checkNextPatterns. */
-export const checkNextCodePatterns = checkNextPatterns;

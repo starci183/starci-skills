@@ -265,8 +265,6 @@ export function visibleElement(el) {
   return true;
 }
 
-/** The component element that owns `el` (itself or its nearest ancestor with a component), or null. */
-export const componentOwnerOf = (el) => [el, ...ancestors(el)].find((a) => a.attrs?.[COMPONENT_ATTR]) ?? null;
 const componentNameOf = (el) => (el?.attrs?.[COMPONENT_ATTR] ?? '').trim();
 /** The component name when `el` is that component's root (no nearest enclosing element names the same component). */
 export const componentRootOf = (el) => {

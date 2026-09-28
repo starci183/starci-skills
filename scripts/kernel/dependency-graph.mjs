@@ -86,9 +86,6 @@ export const writeTransfer = (db, record, now = Date.now()) => db.prepare(
   'INSERT OR REPLACE INTO signals(scope,key,holder_pid,token,value_json,at,expires_at) VALUES(?,?,NULL,NULL,?,?,NULL)',
 ).run(TRANSFER_SCOPE, record.path, JSON.stringify(record), now);
 
-/** The bridges one workflow takes part in: as the bridge, a dependent, the blocker, or a side of a designation. */
-export const bridgesOf = (bridges, workflowId) => bridges.filter((b) => b.workflowId === workflowId || b.blocker === workflowId
-  || list(b.dependents).includes(workflowId) || b.owner === workflowId || b.waiter === workflowId || b.to === workflowId || b.from === workflowId);
 /** One bridge record as a status/peers row. */
 export const bridgeBrief = (b) => ({ id: b.id, action: b.action, state: b.state ?? null, provisional: b.provisional === true, reason: clip(b.reason, 300),
   ...(b.workflowId ? { workflowId: b.workflowId } : {}), ...(b.foundation ? { foundation: b.foundation } : {}), ...(b.blocker ? { blocker: b.blocker } : {}),

@@ -196,5 +196,3 @@ export function subkindOf({ kind, path: rel, opId = null, origin = null, repo = 
   return null;
 }
 
-/** Guard: a subkind is null or one of JOB_ARTIFACT_SUBKINDS. */
-export const isSubkind = (value) => value === null || JOB_ARTIFACT_SUBKINDS.includes(value);

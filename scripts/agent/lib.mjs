@@ -20,7 +20,6 @@ import { parseYaml } from '../../engine/yaml.mjs';
 import { terminalCreate } from '../api/orca/terminal-create.mjs';
 import { terminalSend } from '../api/orca/terminal-send.mjs';
 import { terminalRead } from '../api/orca/terminal-read.mjs';
-import { terminalShow } from '../api/orca/terminal-show.mjs';
 import { terminalClose } from '../api/orca/terminal-close.mjs';
 import { closeOperationTerminal } from '../kernel/close-op-terminal.mjs';
 import { terminalList } from '../api/orca/terminal-list.mjs';
@@ -905,14 +904,3 @@ export function spawnAgent({ provider, model = null, effort = null, worktree, cw
     ...(createRecovery ? { createRecovery } : {}), ...(trust ? { trust } : {}), ...(gateAnswers ? { gateAnswers } : {}) };
 }
 
-// Health: terminal identity is the proof — connected + writable, with the
-// caller's own freshness check on top via terminalRead.
-export function agentHealth(handle) {
-  const shown = terminalShow({ terminal: handle });
-  return {
-    live: shown.ok && shown.connected && shown.writable,
-    connected: shown.connected, writable: shown.writable,
-    reason: shown.ok ? (shown.connected ? 'terminal connected' : (shown.exitCause ?? 'terminal disconnected')) : (shown.error ?? 'show failed'),
-    terminal: shown.terminal,
-  };
-}

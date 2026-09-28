@@ -13,7 +13,6 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { parseYaml } from '../../engine/yaml.mjs';
-import { hasLedgerColumn } from '../../engine/ledger-db.mjs';
 import { clipLine } from './clip.mjs';
 
 export const WORKFLOW_NAME_MAX = 48;
@@ -61,8 +60,6 @@ export function normalizeDisplayName(name) {
   return s;
 }
 
-/** Whether this ledger's workflows table has the display_name column (a read-only older ledger has not). */
-export const hasDisplayNameColumn = (db) => { try { return hasLedgerColumn(db, 'workflows', 'display_name'); } catch { return false; } };
 /** A workflows row's name: display_name, else the goal slug (title), else the workflow id. */
 export function workflowDisplayName(row) {
   if (!row) return null;

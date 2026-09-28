@@ -69,8 +69,6 @@ export function claimsProblems(claims) {
   return out;
 }
 
-/** fr.<feature>.<a>[.<b>] -> .starciwork/features/<feature>/fr/<a>[/<b>] */
-export const frRecordDir = (id) => { const [, feature, ...rest] = id.split('.'); return `${WORK_PREFIX}features/${feature}/fr/${rest.join('/')}`; };
 const readYaml = (file) => { try { return parseYaml(fs.readFileSync(file, 'utf8')); } catch { return null; } };
 const recordAt = (repo, rel) => readYaml(path.join(repo, slashed(rel).replace(/\/index\.yaml$/, ''), 'index.yaml'));
 
