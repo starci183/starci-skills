@@ -20,7 +20,6 @@ import { ArtifactText, artifactUrl } from './artifacts';
 import type { Artifacts, DrawReviewImage } from './contract';
 import { WorkflowTracker } from './workflow-tracker';
 import { applyOpNames } from './workflow-tracker-model';
-import { SupervisorPage } from './supervisor-page';
 import { applyPreferences, initialLanguage, initialTheme, observeLanguage, type Language, type Theme, registerTranslations } from './preferences';
 import { HomePage, LogPage, SystemPage, WorkflowListPage, WorkflowPage, usePoll, type NavView } from './reconciler';
 
@@ -33,7 +32,7 @@ const baseNav = [
   { href: '#/log', label: 'Nhật ký', icon: ScrollText },
 ];
 const ownerNav = { href: '#/owner', label: 'Cần thầy', icon: Bell };
-const legacyTitle: Record<string, string> = { '#/projects': 'Dự án', '#/agents': 'Máy và agent', '#/changes': 'Diff và bằng chứng', '#/verdicts': 'Lịch sử verdict', '#/supervisor': 'Supervisor' };
+const legacyTitle: Record<string, string> = { '#/projects': 'Dự án', '#/agents': 'Máy và agent', '#/changes': 'Diff và bằng chứng', '#/verdicts': 'Lịch sử verdict', '#/supervisor': 'Hệ thống' };
 const time = (value: number | string | null | undefined) => {
   if (!value) return '—';
   const date = new Date(value);
@@ -301,8 +300,9 @@ export default function App() {
   }, []);
   // Each new page reads its own endpoint (ui/src/reconciler.tsx); the legacy snapshot and the agent sample are read
   // only on the routes that still use them.
-  const newRoute = route === '#/' || route === '' || route === '#/workflows' || route.startsWith('#/workflows/') || route === '#/system' || route === '#/log';
-  const needsAgents = ['#/agents', '#/changes', '#/supervisor'].includes(route);
+  // #/supervisor folded into Hệ thống once the tick it read was deleted (rc-cleanup 3175d8b8b).
+  const newRoute = route === '#/' || route === '' || route === '#/workflows' || route.startsWith('#/workflows/') || route === '#/system' || route === '#/supervisor' || route === '#/log';
+  const needsAgents = ['#/agents', '#/changes'].includes(route);
   useEffect(() => { if (newRoute) return; void fetchSnapshot(); const timer = window.setInterval(() => void fetchSnapshot(), 30_000); return () => window.clearInterval(timer); }, [fetchSnapshot, newRoute]);
   useEffect(() => { if (!needsAgents) return; void fetchAgents(); const timer = window.setInterval(() => void fetchAgents(), 10_000); return () => window.clearInterval(timer); }, [fetchAgents, needsAgents]);
   const { data: navData } = usePoll<NavView>('/api/nav', 20_000);
@@ -335,7 +335,7 @@ export default function App() {
         {!newRoute && !liveRoute && !detailRoute && error && <div className="mb-5 flex items-center gap-2 rounded-lg border border-red-500/20 bg-red-500/10 p-3 text-sm text-red-300"><CircleAlert className="size-4" /> Không tải được snapshot: {error}. {data && 'Đang giữ bản gần nhất.'}</div>}
         {liveRoute && agentError && <div className="mb-5 flex items-center gap-2 rounded-lg border border-amber-500/20 bg-amber-500/10 p-3 text-sm text-amber-300"><CircleAlert className="size-4" /> Không tải được số liệu agent: {agentError}. {agents && 'Đang giữ bản gần nhất.'}</div>}
         {!newRoute && !liveRoute && !detailRoute && data && Object.values(data.sources).some(Boolean) && <div className="mb-5 flex flex-wrap items-center justify-between gap-2 rounded-lg border border-amber-500/20 bg-amber-500/10 p-3 text-sm text-amber-300"><span className="flex items-center gap-2"><CircleAlert className="size-4" /> Có {Object.values(data.sources).filter(Boolean).length} nguồn dữ liệu chưa đọc được.</span><Button variant="ghost" size="sm" onClick={() => go('#/system')}>Xem lỗi nguồn <ArrowRight /></Button></div>}
-        {route === '#/' || route === '' ? <HomePage /> : route === '#/workflows' ? <WorkflowListPage /> : route.startsWith('#/workflows/') ? <WorkflowPage id={decodeURIComponent(route.split('/')[2] || '')} /> : route === '#/system' ? <SystemPage /> : route === '#/log' ? <LogPage /> : route === '#/agents' ? <AgentsPage data={agents} /> : route === '#/changes' ? <CodeDiffPage data={agents} /> : !data ? <div className="flex h-72 items-center justify-center gap-2 text-sm text-zinc-500"><LoaderCircle className="size-4 animate-spin" /> Đang đọc trạng thái...</div> : route === '#/' || route === '' ? <HomePage /> : route === '#/projects' ? <ProjectsPage data={data} agents={agents} /> : route.startsWith('#/projects/') ? <ProjectsPage data={data} agents={agents} projectId={decodeURIComponent(route.split('/')[2] || '')} /> : route === '#/workflows' ? <WorkflowsPage data={data} agents={agents} /> : route.startsWith('#/workflows/') ? <WorkflowDetail data={data} agents={agents} id={decodeURIComponent(route.split('/')[2] || '')} snapshotError={error} /> : route.startsWith('#/proofs/') ? <ProofPage parts={route.split('/').slice(2).map((part) => decodeURIComponent(part))} /> : route === '#/verdicts' ? <VerdictsPage data={data} /> : route === '#/owner' ? <OwnerPage data={data} /> : route === '#/supervisor' ? <SupervisorPage data={data} agents={agents} /> : <HomePage />}
+        {route === '#/' || route === '' ? <HomePage /> : route === '#/workflows' ? <WorkflowListPage /> : route.startsWith('#/workflows/') ? <WorkflowPage id={decodeURIComponent(route.split('/')[2] || '')} /> : route === '#/system' || route === '#/supervisor' ? <SystemPage /> : route === '#/log' ? <LogPage /> : route === '#/agents' ? <AgentsPage data={agents} /> : route === '#/changes' ? <CodeDiffPage data={agents} /> : !data ? <div className="flex h-72 items-center justify-center gap-2 text-sm text-zinc-500"><LoaderCircle className="size-4 animate-spin" /> Đang đọc trạng thái...</div> : route === '#/' || route === '' ? <HomePage /> : route === '#/projects' ? <ProjectsPage data={data} agents={agents} /> : route.startsWith('#/projects/') ? <ProjectsPage data={data} agents={agents} projectId={decodeURIComponent(route.split('/')[2] || '')} /> : route === '#/workflows' ? <WorkflowsPage data={data} agents={agents} /> : route.startsWith('#/workflows/') ? <WorkflowDetail data={data} agents={agents} id={decodeURIComponent(route.split('/')[2] || '')} snapshotError={error} /> : route.startsWith('#/proofs/') ? <ProofPage parts={route.split('/').slice(2).map((part) => decodeURIComponent(part))} /> : route === '#/verdicts' ? <VerdictsPage data={data} /> : route === '#/owner' ? <OwnerPage data={data} /> : <HomePage />}
       </main>
       <footer className="mx-auto flex max-w-[1600px] items-center justify-between border-t border-zinc-800/70 px-4 py-5 text-[11px] text-zinc-600 md:px-8"><span>StarCi Status · Dữ liệu cục bộ</span><span>Snapshot {time(updatedAt)}</span></footer>
     </div>

@@ -20,6 +20,7 @@ import { readWorkflowEvents } from './workflow-events.mjs';
 import { logQueryOf, readDiffAsset, readJobDiff, readProjectLogs } from './typed-logs.mjs';
 import { readSupervisorLogs, readSupervisorStateForUi, supervisorLogQueryOf } from './supervisor.mjs';
 import { aggregate, jobRecords, telemetrySettings } from '../scripts/supervisor/op-metrics.mjs';
+import { notifierState } from '../scripts/reconciler/notifier.mjs';
 import { hostRam, probeServices, productDecisions, productWorktreesOf, progressRow, reconcilerState, supervisorDecisions, unitBoard } from './reconciler.mjs';
 
 // The approved leg graph comes from scripts/route/plan-edges.mjs. When a runtime does not have that module, the UI draws the linear chain.
@@ -409,7 +410,7 @@ async function buildSnapshot() {
   };
   // Per-workflow detail and the page views ride along out of /api/snapshot's JSON (non-enumerable).
   Object.defineProperty(out, 'boards', { value: boards, enumerable: false });
-  const views = pageViews(out);
+  const views = await pageViews(out);
   Object.defineProperty(out, 'views', { value: views, enumerable: false });
   return out;
 }
@@ -426,7 +427,7 @@ const PILL_RANK = { stuck: 0, slow: 1, unknown: 2, ok: 3, done: 4 };
  *   nav     the counts the navigation shows.
  * Every number names its source.
  */
-function pageViews(snap) {
+async function pageViews(snap) {
   const now = Date.now();
   const rows = snap.projects.flatMap((project) => project.workflows.map((wf) => ({ project, wf })));
   const supDecisions = offline ? [] : supervisorDecisions({ now });
@@ -468,8 +469,24 @@ function pageViews(snap) {
   health.ok = health.ram.percent < 85 && health.services.down.length === 0 && health.violations.open === 0 && !(health.gc?.leftovers > 0);
 
   const home = { updatedAt: snap.updatedAt, workflows, owner, health };
+  // The Supervisor (the tick is deleted, rc-cleanup 3175d8b8b): its seat as the Host controller keeps it, its Decision
+  // Items (above), the Notifier's sends and judgements (scripts/reconciler/notifier.mjs), its channel inbox.
+  let notifier = null;
+  if (!offline) {
+    try {
+      const st = await notifierState({ now });
+      notifier = { lastDigestAt: st.lastDigestAt, urgent: Object.entries(st.urgentSent).map(([key, at]) => ({ key: safe(key, 120), at })),
+        judgements: st.judgements.slice(-5).map((j) => ({ text: safe(j.text, 400), at: j.at })), source: 'supervisor ledger notifier-*-sent, supervisor-judgement' };
+    } catch (error) { snap.sources.notifier = safe(error.message); }
+  }
+  const seat = reconciler.services.seats.find((s) => s.name === 'seat:supervisor') ?? null;
+  const supervisor = {
+    seat: seat ? { state: seat.state, since: seat.since, lastAt: seat.lastAt ?? null, source: 'reconciler.sqlite services seat:supervisor (Host controller)' } : null,
+    notifier, inboxUnread: snap.inboxUnreadTotal ?? 0,
+    inbox: (snap.inbox ?? []).slice(0, 8).map((m) => ({ at: m.at, from: m.from, text: safe(m.text, 300), read: m.read })),
+  };
   const system = {
-    updatedAt: snap.updatedAt, reconciler, ram,
+    updatedAt: snap.updatedAt, reconciler, ram, supervisor,
     decisions: { supervisor: supDecisions, product: productDis.filter((d) => d.decider !== 'kernel' || LIVE_DI.includes(d.status)).slice(0, 60) },
     opHealth: snap.opHealth, stuck: snap.stuck,
     land: snap.supervisor ? { ...snap.supervisor.land, lastLands: snap.supervisor.lastLands, pushes: snap.supervisor.pushes } : null,

@@ -74,6 +74,11 @@ interface SystemView {
   opHealth: OpHealth | null; stuck: StuckItem[];
   land: { busy: boolean; queued: number; current: string; lastLands: { kind: string; id: string; at: number }[]; pushes: { kind: string; repo: string; head: string; error: string; at: number }[] } | null;
   sources: Record<string, string | null>;
+  supervisor: {
+    seat: { state: string; since: number | null; lastAt: number | null; source: string } | null;
+    notifier: { lastDigestAt: number | null; urgent: { key: string; at: number }[]; judgements: { text: string; at: number }[]; source: string } | null;
+    inboxUnread: number; inbox: { at: string | number; from: string; text: string; read: boolean }[];
+  };
 }
 export interface NavView { updatedAt: number; owner: number; live: number; stuck: number }
 
@@ -397,6 +402,22 @@ export function WorkflowPage({ id }: { id: string }) {
 const modeTone: Record<string, string> = { active: 'border-emerald-500/30 text-emerald-400', shadow: 'border-sky-500/30 text-sky-400', off: 'border-zinc-700 text-zinc-500' };
 const svcTone = (state: string) => state === 'healthy' || state === 'ok' || state === 'live' ? 'border-emerald-500/30 text-emerald-400' : state === 'unmanaged' || state === 'declared' ? 'border-zinc-700 text-zinc-400' : 'border-red-500/30 text-red-400';
 
+/** The Supervisor at a glance: its seat (Host controller), the Notifier's last digest / urgent sends / judgements, its inbox. */
+function SupervisorStrip({ s, now }: { s: SystemView['supervisor'] | undefined; now: number }) {
+  if (!s) return null;
+  const n = s.notifier;
+  return <div className="mb-3 space-y-2 rounded-lg border border-zinc-800 p-3 text-xs">
+    <p className="flex flex-wrap gap-x-4 gap-y-1 text-zinc-400">
+      <span title={s.seat?.source}>Ghế: {s.seat ? <Badge variant="outline" className={svcTone(s.seat.state)}>{s.seat.state}</Badge> : 'chưa có dữ liệu'}{s.seat?.lastAt ? ` · ${ago(s.seat.lastAt, now)}` : ''}</span>
+      <span title={n?.source}>Digest cho thầy: {n?.lastDigestAt ? ago(n.lastDigestAt, now) : 'chưa gửi'}</span>
+      <span title={n?.source}>Tin khẩn 6 giờ qua: {n?.urgent.length ?? 0}</span>
+      <span>Hộp thư: {s.inboxUnread} chưa đọc</span>
+    </p>
+    {n?.judgements.length ? <div><p className="text-zinc-500">Nhận định gần nhất (notifier.mjs judge):</p><ul className="mt-1 space-y-1">{n.judgements.slice().reverse().map((j, i) => <li key={i} className="break-words text-zinc-300">{j.text} <span className="text-zinc-600">· {ago(j.at, now)}</span></li>)}</ul></div> : null}
+    {s.inbox.some((m) => !m.read) && <details><summary className="cursor-pointer text-sky-400">Tin chưa đọc</summary><ul className="mt-1 space-y-1">{s.inbox.filter((m) => !m.read).map((m, i) => <li key={i} className="break-words text-zinc-300">{m.from}: {m.text} <span className="text-zinc-600">· {ago(m.at, now)}</span></li>)}</ul></details>}
+  </div>;
+}
+
 export function SystemPage() {
   const { data, error } = usePoll<SystemView>('/api/system', 20_000);
   const now = useNow();
@@ -433,7 +454,8 @@ export function SystemPage() {
     </section>
 
     <div className="grid gap-6 xl:grid-cols-2">
-      <section className={`${card} p-4`}><div className="mb-2 flex items-center gap-2"><ShieldAlert className="size-4 text-zinc-400" /><h2 className="text-base font-semibold">Hàng quyết định của Supervisor · {liveSup.length}</h2><a href="#/supervisor" className="ml-auto text-xs text-sky-400 hover:underline">Supervisor chi tiết →</a></div>
+      <section className={`${card} p-4`}><div className="mb-2 flex items-center gap-2"><ShieldAlert className="size-4 text-zinc-400" /><h2 className="text-base font-semibold">Supervisor · {liveSup.length} việc chờ quyết</h2><a href="#/log" className="ml-auto text-xs text-sky-400 hover:underline">Nhật ký máy →</a></div>
+        <SupervisorStrip s={data.supervisor} now={now} />
         <DecisionList items={liveSup} empty="Supervisor không có việc chờ quyết." />
         {doneSup.length > 0 && <details className="mt-3"><summary className="cursor-pointer text-xs text-sky-400">Quyết định gần đây ({doneSup.length})</summary><div className="mt-2"><DecisionList items={doneSup} empty="" /></div></details>}
         {data.decisions.product.length > 0 && <><h3 className="mb-1 mt-4 text-sm font-medium">Decision Item đang mở của các luồng</h3><DecisionList items={data.decisions.product} empty="" /></>}
