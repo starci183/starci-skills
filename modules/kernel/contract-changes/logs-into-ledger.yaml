@@ -4,7 +4,6 @@ summary: "Owner ruling 2026-09-27: ONE complete RDBMS per product repo. The type
 reach: new-legs
 paths:
   - engine/schema.sql
-  - engine/machine.sql
   - engine/ledger-db.mjs
   - engine/index.mjs
   - scripts/kernel/typed-logs.mjs
