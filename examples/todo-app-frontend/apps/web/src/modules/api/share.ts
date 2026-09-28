@@ -39,7 +39,7 @@ const toCollaborator = (summary: CollaboratorSummary): Collaborator => ({
 })
 
 const LIST_COLLABORATORS_DOCUMENT =
-  "query Collaborators($taskId: ID!) { collaborators(taskId: $taskId) { invitationId email role status } }"
+  "query Collaborators($taskId: ID!) { collaborators(request: { taskId: $taskId }) { invitationId email role status } }"
 
 /**
  * fr.share.list: reads the task's collaborators as the owner (or a bound collaborator) sees them; a
@@ -52,7 +52,7 @@ export const listCollaborators = async (token: string, taskId: string): Promise<
 }
 
 const INVITE_DOCUMENT =
-  "mutation Invite($input: InviteInput!) { invite(input: $input) { invitationId taskId email role status } }"
+  "mutation Invite($input: InviteInput!) { invite(request: $input) { invitationId taskId email role status } }"
 
 /**
  * fr.share.invite: submits one email and one viewer/editor role for the owner's own task; an invalid
@@ -74,7 +74,7 @@ export const inviteCollaborator = async (
 }
 
 const REVOKE_COLLABORATOR_DOCUMENT =
-  "mutation RevokeCollaborator($input: RevokeCollaboratorInput!) { revokeCollaborator(input: $input) { invitationId status } }"
+  "mutation RevokeCollaborator($input: RevokeCollaboratorInput!) { revokeCollaborator(request: $input) { invitationId status } }"
 
 /**
  * fr.share.revoke: revokes one pending or accepted invitation on the owner's own task; revoking an

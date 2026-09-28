@@ -46,7 +46,7 @@ const apiUpcoming = async (token: string, ruleId: string): Promise<Upcoming | nu
     method: 'POST',
     headers: { 'content-type': 'application/json', authorization: `Bearer ${token}` },
     body: JSON.stringify({
-      query: 'query Q($ruleId: String!) { upcomingOccurrences(ruleId: $ruleId) { materialised { occurrenceId localDate status } previewDates } }',
+      query: 'query Q($ruleId: String!) { upcomingOccurrences(request: { ruleId: $ruleId }) { materialised { occurrenceId localDate status } previewDates } }',
       variables: { ruleId },
     }),
   });

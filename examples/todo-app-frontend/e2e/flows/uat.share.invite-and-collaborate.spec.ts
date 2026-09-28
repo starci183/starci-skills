@@ -33,7 +33,7 @@ const apiCollaborators = async (
     method: 'POST',
     headers: { 'content-type': 'application/json', authorization: `Bearer ${token}` },
     body: JSON.stringify({
-      query: 'query Collaborators($taskId: ID!) { collaborators(taskId: $taskId) { invitationId email role status } }',
+      query: 'query Collaborators($taskId: ID!) { collaborators(request: { taskId: $taskId }) { invitationId email role status } }',
       variables: { taskId },
     }),
   });

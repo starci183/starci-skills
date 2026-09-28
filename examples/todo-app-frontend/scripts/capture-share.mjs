@@ -23,7 +23,7 @@ fs.mkdirSync(OUT, { recursive: true });
 let delayInvite = false;
 const graphqlRoute = async route => {
   const body = route.request().postData() ?? '';
-  if (delayInvite && body.includes('invite(input')) {
+  if (delayInvite && body.includes('invite(request')) {
     await new Promise(resolve => setTimeout(resolve, 3000));
   }
   const response = await route.fetch();
@@ -119,7 +119,7 @@ const run = async () => {
 
   // ---------- accept pat through the real mutation ----------
   const accepted = await graphql(INVITEE_TOKEN,
-    'mutation A($input: AcceptInvitationInput!) { acceptInvitation(input: $input) { invitationId status } }',
+    'mutation A($input: AcceptInvitationInput!) { acceptInvitation(request: $input) { invitationId status } }',
     { input: { invitationId: PAT_INVITATION, email: 'pat@example.com' } });
   if (accepted?.data?.acceptInvitation?.status !== 'accepted') throw new Error(`accept failed: ${JSON.stringify(accepted)}`);
   console.log('pat@example.com accepted via acceptInvitation mutation');

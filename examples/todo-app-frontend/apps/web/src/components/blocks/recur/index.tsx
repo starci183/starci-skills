@@ -36,13 +36,13 @@ export type ScheduleBlockProps = {
 };
 
 const MAKE_RECURRING_DOCUMENT =
-  "mutation MakeRecurring($input: MakeRecurringInput!) { makeRecurring(input: $input) { ruleId title frequency timeZone time startDate } }"
+  "mutation MakeRecurring($input: MakeRecurringInput!) { makeRecurring(request: $input) { ruleId title frequency timeZone time startDate } }"
 
 const UPCOMING_OCCURRENCES_DOCUMENT =
-  "query UpcomingOccurrences($ruleId: String!) { upcomingOccurrences(ruleId: $ruleId) { ruleId materialised { occurrenceId localDate dueAtUtc status } previewDates } }"
+  "query UpcomingOccurrences($ruleId: String!) { upcomingOccurrences(request: { ruleId: $ruleId }) { ruleId materialised { occurrenceId localDate dueAtUtc status } previewDates } }"
 
 const END_RECURRENCE_DOCUMENT =
-  "mutation EndRecurrence($input: EndRecurrenceInput!) { endRecurrence(input: $input) { ruleId endedAt orphanedCount } }"
+  "mutation EndRecurrence($input: EndRecurrenceInput!) { endRecurrence(request: $input) { ruleId endedAt orphanedCount } }"
 
 /**
  * The wire name each domain frequency travels under. The backend registers RecurFrequencyInput

@@ -43,7 +43,7 @@ export const requestErasure = async (token: string): Promise<ErasureRequest> => 
 }
 
 const COMPLETE_ERASURE_DOCUMENT =
-  "mutation CompleteErasure($requestId: ID!) { completeErasure(requestId: $requestId) { requestId state } }"
+  "mutation CompleteErasure($requestId: ID!) { completeErasure(request: { requestId: $requestId }) { requestId state } }"
 
 /** fr.audit.erasure.complete: destroys the caller's key so their lines become unreadable. */
 export const completeErasure = async (token: string, requestId: string): Promise<ErasureRequest> => {

@@ -14,7 +14,7 @@ export interface SignInResult {
   readonly token: string;
 }
 
-const SIGN_IN_DOCUMENT = "mutation SignIn($input: SignInInput!) { signIn(input: $input) { sessionToken personId } }"
+const SIGN_IN_DOCUMENT = "mutation SignIn($input: SignInInput!) { signIn(request: $input) { sessionToken personId } }"
 
 /** The one sign-in call; every refusal reason it can hit collapses to SIGN_IN_REFUSAL_MESSAGE. */
 export const signIn = async (email: string, password: string): Promise<SignInResult> => {
@@ -25,7 +25,7 @@ export const signIn = async (email: string, password: string): Promise<SignInRes
     return { token: result.data.sessionToken }
 }
 
-const SIGN_OUT_DOCUMENT = "mutation SignOut($input: SignOutInput!) { signOut(input: $input) { signedOut } }"
+const SIGN_OUT_DOCUMENT = "mutation SignOut($input: SignOutInput!) { signOut(request: $input) { signedOut } }"
 
 /** Ends a session by its token. Best-effort from the caller's point of view: the local session is
  * cleared either way (`modules/session`'s `clearToken`), so a network failure here never traps the

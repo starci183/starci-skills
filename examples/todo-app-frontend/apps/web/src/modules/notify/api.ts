@@ -26,7 +26,7 @@ const unwrap = <T>(result: Result<T>): T => {
 }
 
 const NOTIFICATION_PREFERENCES_DOCUMENT =
-  "query { notificationPreferences { channel unsubscribed digestWindowMinutes } }"
+  "query { notificationPreferences(request: {}) { channel unsubscribed digestWindowMinutes } }"
 
 /** The caller's own notification preferences for the email channel; a missing or expired token
  * surfaces as a thrown refusal, same as `listTasks`. */
@@ -35,7 +35,7 @@ export const readNotificationPreferences = async (token: string): Promise<Notifi
 }
 
 const UPDATE_NOTIFICATION_PREFERENCES_DOCUMENT =
-  "mutation UpdateNotificationPreferences($input: UpdateNotificationPreferencesInput!) { updateNotificationPreferences(input: $input) { channel unsubscribed digestWindowMinutes } }"
+  "mutation UpdateNotificationPreferences($input: UpdateNotificationPreferencesInput!) { updateNotificationPreferences(request: $input) { channel unsubscribed digestWindowMinutes } }"
 
 /** Persists the email digest preference the owner toggled; the backend answers with the saved row. */
 export const updateNotificationPreferences = async (token: string, unsubscribed: boolean): Promise<NotificationPreferences> => {
@@ -45,7 +45,7 @@ export const updateNotificationPreferences = async (token: string, unsubscribed:
 }
 
 const UNSUBSCRIBE_DOCUMENT =
-  "mutation Unsubscribe($input: UnsubscribeInput!) { unsubscribe(input: $input) { channel unsubscribed } }"
+  "mutation Unsubscribe($input: UnsubscribeInput!) { unsubscribe(request: $input) { channel unsubscribed } }"
 
 /** fr.notify.unsubscribe: stops the email channel outright for the person `token` resolves to -
  * the same mutation whether the token came from the signed-in session or from an email link. */

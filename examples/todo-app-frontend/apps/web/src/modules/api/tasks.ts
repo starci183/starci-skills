@@ -34,7 +34,7 @@ export const listTasks = async (token: string): Promise<ReadonlyArray<Task>> => 
     return unwrap(result).map(toTask)
 }
 
-const CREATE_TASK_DOCUMENT = "mutation CreateTask($input: CreateTaskInput!) { createTask(input: $input) { taskId title } }"
+const CREATE_TASK_DOCUMENT = "mutation CreateTask($input: CreateTaskInput!) { createTask(request: $input) { taskId title } }"
 
 /** Creates one task from its trimmed title. */
 export const createTask = async (token: string, title: string): Promise<Task> => {
@@ -43,8 +43,8 @@ export const createTask = async (token: string, title: string): Promise<Task> =>
     return { id: created.taskId, title: created.title, complete: false }
 }
 
-const COMPLETE_TASK_DOCUMENT = "mutation CompleteTask($id: ID!) { completeTask(id: $id) { taskId complete } }"
-const REOPEN_TASK_DOCUMENT = "mutation ReopenTask($id: ID!) { reopenTask(id: $id) { taskId complete } }"
+const COMPLETE_TASK_DOCUMENT = "mutation CompleteTask($id: ID!) { completeTask(request: { id: $id }) { taskId complete } }"
+const REOPEN_TASK_DOCUMENT = "mutation ReopenTask($id: ID!) { reopenTask(request: { id: $id }) { taskId complete } }"
 
 /**
  * Sets one task's complete flag (br.task.complete.once: completing twice is a no-op; reopening clears
@@ -61,7 +61,7 @@ export const setTaskComplete = async (token: string, id: string, complete: boole
     return { id: updated.taskId, title: "", complete: updated.complete }
 }
 
-const DELETE_TASK_DOCUMENT = "mutation DeleteTask($id: ID!) { deleteTask(id: $id) { deleted } }"
+const DELETE_TASK_DOCUMENT = "mutation DeleteTask($id: ID!) { deleteTask(request: { id: $id }) { deleted } }"
 
 /** Deletes one task permanently (br.task.delete.final: there is no undo). */
 export const deleteTask = async (token: string, id: string): Promise<void> => {

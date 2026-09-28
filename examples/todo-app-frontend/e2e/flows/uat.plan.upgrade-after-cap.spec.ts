@@ -39,8 +39,8 @@ const api = async (token: string, query: string, variables?: Record<string, unkn
   return (await res.json().catch(() => null)) as GraphqlBody | null;
 };
 
-const CREATE_TASK = 'mutation CreateTask($input: CreateTaskInput!) { createTask(input: $input) { taskId title } }';
-const DELETE_TASK = 'mutation DeleteTask($id: ID!) { deleteTask(id: $id) { deleted } }';
+const CREATE_TASK = 'mutation CreateTask($input: CreateTaskInput!) { createTask(request: $input) { taskId title } }';
+const DELETE_TASK = 'mutation DeleteTask($id: ID!) { deleteTask(request: { id: $id }) { deleted } }';
 const LIST_TASKS = 'query { tasks { taskId title complete } }';
 const PLAN_USAGE = 'query { planUsage { plan cap activeCount } }';
 

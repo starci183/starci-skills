@@ -89,7 +89,7 @@ type Preferences = { channel: string; unsubscribed: boolean; digestWindowMinutes
 const readPreferences = async (token: string): Promise<Preferences | null> => {
   const data = await graphql<{ notificationPreferences: Preferences }>(
     token,
-    'query { notificationPreferences { channel unsubscribed digestWindowMinutes } }',
+    'query { notificationPreferences(request: {}) { channel unsubscribed digestWindowMinutes } }',
   );
   return data?.notificationPreferences ?? null;
 };
@@ -97,7 +97,7 @@ const readPreferences = async (token: string): Promise<Preferences | null> => {
 const updatePreferences = (token: string, unsubscribed: boolean, digestWindowMinutes: number | null) =>
   graphql<{ updateNotificationPreferences: Preferences }>(
     token,
-    'mutation Update($input: UpdateNotificationPreferencesInput!) { updateNotificationPreferences(input: $input) { channel unsubscribed digestWindowMinutes } }',
+    'mutation Update($input: UpdateNotificationPreferencesInput!) { updateNotificationPreferences(request: $input) { channel unsubscribed digestWindowMinutes } }',
     { input: { channel: 'email', unsubscribed, digestWindowMinutes } },
   );
 
@@ -196,7 +196,7 @@ test.describe(record.id, () => {
       const allIds = new Set(taskIds);
       for (const task of list?.tasks ?? []) if (titles.includes(task.title)) allIds.add(task.taskId);
       for (const id of allIds) {
-        await graphql(token, 'mutation DeleteTask($id: ID!) { deleteTask(id: $id) { deleted } }', { id }).catch(() => null);
+        await graphql(token, 'mutation DeleteTask($id: ID!) { deleteTask(request: { id: $id }) { deleted } }', { id }).catch(() => null);
       }
       const idList = [...allIds].map(id => `'${id}'`).join(',');
       if (idList) {
