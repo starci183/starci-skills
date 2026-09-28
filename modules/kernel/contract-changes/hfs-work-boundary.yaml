@@ -1,0 +1,12 @@
+id: hfs-work-boundary
+effectiveAt: '2026-09-29T04:35:00+07:00'
+summary: "HFS Work product classification admits the recursive feature catalog and semantic scope indexes, brand and shell evidence, authored UI flow/design payloads, and generated critique files. The derived critique remains freshness checked and its files are re-included by the canonical .starciwork ignore. Acceptance criteria under a business rule no longer require an undefined reverse acceptanceCriteria list; explicit legacy links remain checked. Bound sibling repository paths resolve from an isolated backend worktree through its main checkout."
+reach: new-legs
+paths:
+  - modules/schemas/work-layout.yaml
+  - scripts/lib/starciwork-boundary.mjs
+  - scripts/checks/check-example-derived.mjs
+  - scripts/checks/check-work-consistency.mjs
+  - scripts/example/example-derive.mjs
+  - scripts/example/example-ownership.mjs
+  - scripts/example/example-critique.mjs

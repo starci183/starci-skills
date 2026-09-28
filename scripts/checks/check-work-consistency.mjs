@@ -165,7 +165,7 @@ export function checkConsistencyTree(workRoot, records, sink) {
 
     // The reverse direction for inlined criteria: when the rule still authors an acceptanceCriteria
     // list, every inline entry must be reachable through it, or no reader reaches the criterion.
-    if (isList(rec.data.acceptanceCriteria).length || criterionDirs.length) {
+    if (Object.hasOwn(rec.data, 'acceptanceCriteria')) {
       for (const c of inlineCriteria) {
         const shortName = c.name ?? c.id?.split('.').pop();
         if (shortName && !named.includes(shortName)) {
@@ -189,7 +189,13 @@ export function checkConsistencyTree(workRoot, records, sink) {
         if (e && typeof e === 'object') for (const t of [e.id, e.name, e.ref]) if (typeof t === 'string') named.add(t);
       }
     }
-    if (!named.has(dirName) && !named.has(criterionId)) {
+    // The current business-rule schema has no acceptanceCriteria reverse list. A criterion's rule id
+    // and its place under that rule's ac/ directory are sufficient; only legacy records that actually
+    // author a reverse list or explicit pointer can disagree with it.
+    const hasReverseLink = Object.hasOwn(owner.data, 'acceptanceCriteria') ||
+      INLINE_CRITERION_FIELDS.some(field => Array.isArray(owner.data[field]) &&
+        owner.data[field].some(e => e && typeof e === 'object' && [e.id, e.name, e.ref].some(t => typeof t === 'string')));
+    if (hasReverseLink && !named.has(dirName) && !named.has(criterionId)) {
       refuse(shownFile(rec), 'AC_NAMING_ASYMMETRY',
         `criterion proves ${owner.id} but ${owner.id}'s acceptanceCriteria is [${isList(owner.data.acceptanceCriteria).join(', ')}] - it does not list ${dirName}, so no reader reaches this criterion from the rule`);
     }

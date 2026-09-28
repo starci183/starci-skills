@@ -5,7 +5,8 @@ import {isPlainObject} from '../../engine/index.mjs';
 import {parseYaml, stringifyYaml} from '../../engine/yaml.mjs';
 import {walk} from '../checks/check-example-work.mjs';
 import {computeDerived} from './example-derive.mjs';
-import {indexInlineCriteria, resolveRecordRef} from './example-ownership.mjs';
+import {indexInlineCriteria, repoRootFor, resolveRecordRef} from './example-ownership.mjs';
+import {isProductPath} from '../lib/starciwork-boundary.mjs';
 
 /**
  * `.starciwork` can already answer "what is done, what is stale, what is blocked" (example-derive.mjs).
@@ -71,13 +72,12 @@ function readRawTree(workRoot) {
 /**
  * The workspace's declared repositories, resolved to a directory on disk. `role: be` always resolves to the
  * repository that owns `workRoot` (the layout's "one project owns one canonical .starciwork in its bound
- * source repository" rule) regardless of its declared name; every other role resolves by looking for a
- * sibling directory next to it named after the repository. A name that resolves to nothing is left absent
+ * source repository" rule) regardless of its declared name; every other role uses the same bound sibling
+ * resolution as Work ownership, including when the backend is an isolated Git worktree. A name that resolves to nothing is left absent
  * from the map rather than guessed at - callers report that as an unresolved repository, not a false path.
  */
 function resolveRepositories(workRoot) {
   const backendDir = path.dirname(workRoot);
-  const examplesRoot = path.dirname(backendDir);
   let workspace = null;
   try { workspace = parseYaml(fs.readFileSync(path.join(workRoot, 'workspace.yaml'), 'utf8')); } catch { workspace = null; }
   const repositories = Array.isArray(workspace?.repositories) ? workspace.repositories : [];
@@ -85,7 +85,7 @@ function resolveRepositories(workRoot) {
   for (const repo of repositories) {
     if (!isPlainObject(repo) || typeof repo.name !== 'string' || !repo.name) continue;
     if (repo.role === 'be') { dirByName.set(repo.name, backendDir); continue; }
-    const candidate = path.join(examplesRoot, repo.name);
+    const candidate = repoRootFor(workRoot, repo.name, workspace);
     if (fs.existsSync(candidate)) dirByName.set(repo.name, candidate);
   }
   return {dirByName, backendDir};
@@ -631,6 +631,9 @@ function canonicalJSON(value) {
 }
 
 export function runCritique(workRoot, {write} = {}) {
+  if (write && [CRITIQUE_YAML_REL, CRITIQUE_MD_REL].some(rel => !isProductPath(rel))) {
+    throw new Error('Critique output is outside the product boundary');
+  }
   const critique = computeCritique(workRoot);
   const yamlDoc = buildCritiqueYamlDocument(critique);
   const markdown = buildCritiqueMarkdown(critique);

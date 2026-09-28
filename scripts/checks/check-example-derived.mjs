@@ -5,6 +5,7 @@ import {parseYaml} from '../../engine/yaml.mjs';
 import {walk} from './check-example-work.mjs';
 import {runDerive} from '../example/example-derive.mjs';
 import {runCritique} from '../example/example-critique.mjs';
+import {isProductPath} from '../lib/starciwork-boundary.mjs';
 
 /**
  * A separate gate rather than a line inside scripts/checks/check-example-work.mjs: another lane owns that file's
@@ -29,6 +30,9 @@ import {runCritique} from '../example/example-critique.mjs';
 const FORBIDDEN_TOP_LEVEL_FIELDS = ['usedBy', 'effectiveState', 'frontier', 'provenBy', 'derived'];
 
 export function checkExampleDerived(workRoot, problems) {
+  for (const rel of ['_derived/index.yaml', '_derived/frontier.md', '_derived/critique.yaml', '_derived/critique.md']) {
+    if (!isProductPath(rel)) problems.push(`${rel}: generated Work output is outside the product boundary`);
+  }
   const result = runDerive(workRoot, {write: false});
   if (!result.ok) problems.push(`${workRoot}/_derived/index.yaml is missing or stale; run \`node scripts/example/example-derive.mjs --work ${workRoot} --write\` to refresh it`);
 

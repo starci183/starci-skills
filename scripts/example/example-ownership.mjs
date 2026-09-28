@@ -1,7 +1,9 @@
 import fs from 'node:fs';
 import path from 'node:path';
+import {fileURLToPath} from 'node:url';
 import {parseYaml} from '../../engine/yaml.mjs';
 import {sha256, sha256File} from '../../engine/index.mjs';
+import {bindingRepo, projectBinding} from '../kernel/target-repo.mjs';
 
 /**
  * Shared resolution of "what directories does this record's code live under" - the question concepts 1
@@ -56,9 +58,30 @@ export function isWorkRecordSchema(schema, workspaceDoc) {
  * With no workspace.yaml, no repositories list, or no matching entry, the backend root is the only honest
  * guess (a single-repository product has no other repository to name anyway).
  */
+function mainCheckoutRoot(repoRoot) {
+  try {
+    const gitFile = path.join(repoRoot, '.git');
+    if (!fs.statSync(gitFile).isFile()) return repoRoot;
+    const pointer = /^gitdir:\s*(.+)\s*$/m.exec(fs.readFileSync(gitFile, 'utf8'))?.[1];
+    if (!pointer) return repoRoot;
+    const gitDir = path.resolve(repoRoot, pointer);
+    const commonDir = path.resolve(gitDir, fs.readFileSync(path.join(gitDir, 'commondir'), 'utf8').trim());
+    return path.dirname(commonDir);
+  } catch { return repoRoot; }
+}
+
+const runtimeRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
+const sourceRoot = process.env.STARCI_SOURCE_ROOT
+  ? path.resolve(process.env.STARCI_SOURCE_ROOT) : path.dirname(mainCheckoutRoot(runtimeRoot));
+const bindingByBackend = new Map();
+
 export function repoRootFor(workRoot, repositoryName, workspaceDoc) {
   const backendRoot = path.dirname(workRoot);
   if (!repositoryName) return backendRoot;
+  const backendMain = mainCheckoutRoot(backendRoot);
+  if (!bindingByBackend.has(backendMain)) bindingByBackend.set(backendMain, projectBinding(backendMain, {sourceRoot}));
+  const bound = bindingRepo(bindingByBackend.get(backendMain), repositoryName);
+  if (bound) return bound.root;
   const repos = Array.isArray(workspaceDoc?.repositories) ? workspaceDoc.repositories : [];
   const entry = repos.find(r => r?.name === repositoryName);
   if (!entry || entry.role === 'be') return backendRoot;

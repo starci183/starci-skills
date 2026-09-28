@@ -5,6 +5,7 @@ import {parseYaml, stringifyYaml} from '../../engine/yaml.mjs';
 import {isPlainObject, sha256File} from '../../engine/index.mjs';
 import {ID_RE, walk as walkAll} from '../checks/check-example-work.mjs';
 import {readWorkspace, resolveOwnedDirs, hashOwnedDirs, indexInlineCriteria, inlineCriteriaOf, splitRef, resolveRecordRef} from './example-ownership.mjs';
+import {isProductPath} from '../lib/starciwork-boundary.mjs';
 
 /**
  * The layout promises a reader can answer every work question from the tree without opening source
@@ -393,6 +394,9 @@ const DERIVED_FRONTIER_REL = `${DERIVED_DIR_NAME}/frontier.md`;
  * nothing else, because computeDerived is a pure function of the tree.
  */
 export function runDerive(workRoot, {write} = {}) {
+  if (write && [DERIVED_INDEX_REL, DERIVED_FRONTIER_REL].some(rel => !isProductPath(rel))) {
+    throw new Error('Derived Work output is outside the product boundary');
+  }
   const derived = computeDerived(workRoot);
   const doc = buildYamlDocument(derived);
   const derivedDir = path.join(workRoot, DERIVED_DIR_NAME);
