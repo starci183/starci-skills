@@ -118,7 +118,9 @@ or blocked even when the person supplied `ok` and the runner exited zero.
 
 Preparation, the runner receipt and verification evidence are artifacts of dispatched operations. The runner
 never edits `.starciwork/runtime.sqlite`. After its own checks, the surrounding operation creates the ordinary
-`starci/op-report@1` envelope, cites only owned artifact paths, files it through
-`node .claude/scripts/kernel/api.mjs report --repo <bound-repo> --job <current-job> --report <op-report.json>`,
-then signals the kernel. The kernel re-runs declared checks before settlement. No separate assisted-UAT ingestion
-verb or direct SQL path exists.
+`starci/op-report@1` envelope in `STARCI_JOB_SCRATCH`, cites only owned artifact paths, and files it through
+`node .claude/scripts/kernel/api.mjs report --repo <bound-repo> --job <current-job> --report <op-report.json> [--attach <path>...]`.
+The API stores the report JSON in the ledger and raw attachments in the external blob store, then clears scratch.
+Proof a canonical Work record cites stays under that record in `.starciwork`; an uncited session capture is an
+operational blob. The kernel re-runs declared checks before settlement. No separate assisted-UAT ingestion verb or
+direct SQL path exists.

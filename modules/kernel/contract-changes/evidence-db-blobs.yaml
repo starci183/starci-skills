@@ -1,0 +1,42 @@
+id: evidence-db-blobs
+effectiveAt: '2026-09-28T18:43:00+07:00'
+summary: >-
+  Owner ruling evidence-in-db-and-blobs (owner chat 2026-09-28): operational evidence
+  leaves product git. The product ledger <repo>/.starciwork/runtime.sqlite holds the
+  only op report JSON (reports.report_json), declared and re-run checks (check_runs),
+  verdicts and artifact indexes. Raw check logs and JSON, patches, screenshots,
+  videos, DOM snapshots and report attachments are immutable sha256 blobs under
+  ~/.starci/artifacts/ (STARCI_ARTIFACT_ROOT may override). blobs indexes their
+  hash, size, media type, file_uri, http_path (/api/blob/<sha256>) and archive
+  state; job_artifacts_v2 indexes each output
+  by logical name, role, storage and sha256; report_attachments links reports to
+  artifacts, and artifact_proofs_v2 links proof claims to artifact IDs. A blob
+  artifact has no repo_path. A Work proof cited by a canonical record remains
+  at its declared .starciwork path (storage=work-proof), with a metadata-only
+  blobs row for its sha256 foreign key.
+  New op attempts write raw output to STARCI_JOB_SCRATCH outside every repository;
+  api report ingests it into the ledger and blob store, then removes scratch.
+  Existing .starciwork/kernel-evidence trees are backfilled into DB and blobs,
+  verified by hash, size and rows, archived to verified ZIPs, and removed from
+  product git without rewriting history. After all readers use the new schema,
+  the v1 tables are renamed and the v2 artifact/proof tables become canonical.
+  After verified ledger archives, the retired v1 tables and every legacy
+  kernel-evidence read fallback are removed. No writer may create new
+  operational evidence there. op_attempts records each attempt's runner,
+  provider/model/pool, terminal/worktree, timestamps, op report outcome versus
+  verified verdict, failure class and reported cost. unit_edges materializes
+  the work DAG. v_op_history, v_media, v_timeline and v_workflow_progress make
+  the project ledger queryable; the media view exposes file_uri and http_path.
+  blob_refs governs archived, unreferenced GC. Machine and fleet state belongs
+  in the host's machine.sqlite, consolidated by a separate lane; no third DB.
+reach: new-legs
+paths:
+  - modules/kernel/owner-rulings.yaml
+  - modules/schemas/work-layout.yaml
+  - docs/ledger-db.md
+  - engine/evidence.sql
+  - engine/ledger-db.mjs
+  - scripts/lib/artifact-store.mjs
+  - scripts/migrate/evidence-to-blobs.mjs
+  - scripts/kernel/api.mjs
+  - scripts/kernel/job-artifacts.mjs

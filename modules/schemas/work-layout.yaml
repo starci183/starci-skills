@@ -107,16 +107,26 @@ shape:
   evidence: Profiles using execution proof may retain <node>/evidence/<id>/manifest.yaml; this is not
     a required folder for every layer.
   workflowRunState: one SQLite file, .starciwork/runtime.sqlite (plus its -wal and -shm siblings),
-    holding events, jobs, leases, goals, reports, contracts, checks, inbox and signals.
-    Untracked. See ledger-db.md.
+    holding events, jobs, op attempts, unit edges, leases, goals, reports, check runs, artifact
+    references, contracts, inbox and signals. Untracked. Report JSON lives only in
+    reports.report_json. Query views expose op history, media, timeline and workflow progress.
+    See ledger-db.md.
+  operationalBlobs: "Raw check logs and JSON, patches, screenshots, videos, DOM snapshots and report
+    attachments belong in the content-addressed blob store outside every repository
+    (~/.starci/artifacts/, or STARCI_ARTIFACT_ROOT). The ledger references each blob by sha256
+    and records file_uri plus http_path (/api/blob/<sha256>) for direct queries;
+    no operational copy belongs in canonical Work or .starciwork/kernel-evidence. This does not
+    relocate proof that a Work record itself cites: those files stay under that record's declared
+    E/, evidence/, assets/ or runs/ path in the bound .starciwork tree."
   workflowLogs: the typed log rows the kernel, ops and runtime write (scripts/kernel/typed-logs.mjs) are the logs
     table of .starciwork/runtime.sqlite since 2026-09-27 (one RDBMS per repo). The retired .starciwork/logs.sqlite
     and its logs.sqlite.migrated-<date> copy (scripts/work/migrate-logs-into-ledger.mjs) stay runtime custody -
     untracked, never deleted by housekeeping, excluded from Work validation and hashes.
   workflowAnchor: .starciwork/ledger-anchor.json - a reserved runtime-custody name; nothing writes it, and a
     copy left by an older runtime is excluded from Work validation
-  kernelCustody: .starciwork/{kernel-evidence,kernel-strays,kernel-approvals}/** - kernel-owned
-    working state with a real lifetime, untracked, excluded from Work validation, never canonical Work
+  kernelCustody: .starciwork/{kernel-strays,kernel-approvals}/** - kernel-owned
+    working state with a real lifetime, untracked, excluded from Work validation, never canonical Work.
+    The former kernel-evidence/ root is retired; older trees are migration input only.
   uiDirectionAsset: "features/<feature>/ui/<screen>/assets/<name>.png with a sibling
     <name>.prompt.txt under the same assets/. interface.draw writes both - the record's ui block
     (intent, surfaces, states, coverage {scale, representativeScreens, map}, accessibility,
@@ -280,6 +290,11 @@ rules:
   - "Record output screenshots/videos in evidence assets with scope: node and paths under the
     primary owner assets/. Output evidence is not also declared as a semantic input, avoiding
     self-invalidating proof."
+  - "Retain only proof that a Work record cites in its owning .starciwork E/, evidence/, assets/
+    or runs/ location. Operational reports, check outputs, patches and uncited raw media live in
+    runtime.sqlite or the external content-addressed blob store, never as duplicate Work files.
+    A Work proof path remains a repo-relative repo_path in job_artifacts_v2;
+    blob-only rows have no repo_path."
   - Source code remains in bound repositories; code/index.yaml tracks requirements, exact source
     references and completion.
   - All structured Work records and results use YAML. JSON and underscore-prefixed directories are
@@ -314,7 +329,9 @@ rules:
   - "The tree distinguishes two custodies at its root, and a reader must be able to tell them apart without
     knowing the runtime: canonical Work (workspace.yaml, the catalog index.yaml with its setup
     evidence/, brand/, shell/, features/, _resources/ - tracked, hashed) and runtime custody (runtime.sqlite,
-    logs.sqlite and logs.sqlite.migrated-<date>, a legacy ledger-anchor.json and the kernel-* directories - never hashed, excluded from validation). A file at the root that
+    logs.sqlite and logs.sqlite.migrated-<date>, a legacy ledger-anchor.json and the kernel-strays/
+    and kernel-approvals/ directories - never hashed, excluded from validation). The retired
+    kernel-evidence/ root, when present before verified backfill, is migration input only. A file at the root that
     is none of these is drift."
   - interface.draw writes one or more selected records at ui/<name>/index.yaml, nesting deeper by
     name segment where a screen group needs it. Store all actual drawings, reference images and

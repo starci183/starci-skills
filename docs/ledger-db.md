@@ -1,25 +1,49 @@
 # Ledger DB — `.starciwork/runtime.sqlite`
 
 Status: keystone contract. The schema is **data**, not prose: the executed DDL is
-`engine/schema.sql` (ledger), `engine/machine.sql` (machine registry) and
+`engine/schema.sql` and `engine/evidence.sql` (project ledger), `engine/machine.sql` (host) and
 `engine/triggers.sql`, which `engine/ledger-db.mjs` reads at load. This document
 explains the decisions and invariants; it does not inline the DDL — when they
 disagree, the `.sql` files and the module win.
 
 ## 1. Decision
 
-One SQLite file per ledger-owning repository holds everything a workflow needs
-to continue, to be audited and to be archived:
+The final storage architecture has exactly two kinds of SQLite database. A
+project's ledger holds its complete workflow history; the host DB holds machine
+and fleet state. The machine consolidation is a separate migration lane.
 
 ```text
-<ledger repo>/.starciwork/runtime.sqlite    ← THE record: workflows, goals, jobs,
-                                              leases, reports, contracts, checks,
-                                              inbox, signals, incidents, events
-<runtime root>/machine.sqlite               ← the host's registry of ledgers
-                                              (`ledgers`). Nothing else is live here.
+<ledger repo>/.starciwork/runtime.sqlite    ← that project's workflows, jobs,
+                                              attempts, reports, checks, blobs,
+                                              Work DAG, verdicts, events, logs
+%LOCALAPPDATA%/StarCi/runtime/machine.sqlite ← host registry, Supervisor,
+                                               reconciler, services, throttle,
+                                               GC, land, budgets, machine logs
 ```
 
-Dispatch artifacts stage in the OS temp dir and are removed once delivered.
+Dispatch and op scratch files stage in the OS temp dir outside every repository.
+The runtime passes `STARCI_JOB_SCRATCH` to new jobs. `api report --report <file>
+[--attach <path>...]` validates the report, stores its JSON in `reports.report_json`,
+ingests declared and attached files into the external blob store, writes artifact
+and check rows, and removes the scratch directory. Settler re-runs write their
+outputs directly to the blob store and `check_runs`.
+
+Only proof cited by a canonical Work record stays in the bound `.starciwork`
+tree (for example a record's `E/**`, `evidence/**`, `assets/**` or `runs/**`). It
+keeps its record-relative path and is committed with that Work record. Operational
+reports, check logs, parsed output, patches and uncited captures live in the
+ledger and blob store, outside product git. `.starciwork/kernel-evidence/**` is
+retired; a legacy tree is migration input, never a new output location. See
+`modules/schemas/work-layout.yaml` for the Work boundary.
+
+The blob root is `~/.starci/artifacts/`, overridden by `STARCI_ARTIFACT_ROOT`.
+Content is write-once at `<root>/<first-two-sha-digits>/<sha256>`, with a
+`<sha256>.json` sidecar containing size, media type and creation time. A SHA is
+computed from the original bytes, even when stored compressed. `blobs` records
+metadata, archive state, `file_uri` (absolute file path) and `http_path`
+(`/api/blob/<sha256>`). Both links are available directly in queries; the
+harness serves the HTTP path. A blob file is removed only by the GC policy after
+its reference count reaches zero and an archive is verified.
 
 The kernel agent's only writer is `scripts/kernel/api.mjs` — the [Kernel] never
 opens this file; every state operation is one api verb inside one
@@ -36,12 +60,13 @@ ledger-facing store vocabulary lives in `engine/ledger-db.mjs`.
   `lease-identity-drift`, orphan reservations and unreconciled unsettled jobs
   become **impossible to persist**, not merely detectable: `leases.job_id` →
   `jobs`, and the `leases_match_job` trigger raises on identity drift.
-- Archive = copy one file. Inspect = `SELECT`.
+- Structured history is archived from one ledger file; raw outputs require its
+  referenced blobs. Inspect structured history with `SELECT`.
 - Worktree deletion and process crash keep the record: the ledger lives in the
   owning repository, outside every worker's `owned_paths`. A repo re-clone does
   not keep it: `runtime.sqlite` is untracked.
-- The host keeps one registry of its ledgers in `machine.sqlite`, keyed by each
-  ledger's own `meta.ledger_id`.
+- The host keeps its ledger registry and machine/fleet state in `machine.sqlite`,
+  keyed by each ledger's own `meta.ledger_id`.
 
 ## 3. Module — `engine/ledger-db.mjs`
 
@@ -89,12 +114,14 @@ moves with the bytes, so renaming the repo cannot re-key the ledger.
 
 ## 4. What the tables are for
 
-Full DDL: `engine/schema.sql`. Orientation only:
+Full DDL: `engine/schema.sql` and `engine/evidence.sql`. Orientation only:
 
 | Table(s) | Role | Writers |
 | --- | --- | --- |
 | `meta` | Ledger identity + open-mode facts; seeded once | `engine/ledger-db.mjs` create/migrate; `journal_mode` when an open achieves a different mode |
 | `workflows` | One row per workflow: registration, bound generation, phase | `ensureWorkflow` (engine), `define-goal` (phase `queued`), `start-workflow` (phase `running`), `api finish` (phase `finished`) |
+| `op_attempts` | One row per op attempt, with agent/provider/model/pool/effort, terminal and worktree identity, route through release timestamps, op `report_outcome` separate from verified `verdict`, `settled_by`, failure class and reported token/cost values | Route, dispatch, report, settle and release transitions |
+| `unit_edges` | Materialized work DAG edge (`after`, `seam` or `dependsOn`) with source | Work graph writers; read by workflow board |
 | `goals` | Approved goal revisions, append-only per `(workflow_id, revision)` | `define-goal` INSERT; `api plan` UPDATEs `json.derivedPlan` |
 | `inbox` | The queue kernels claim from: pending → claimed/done | `define-goal` INSERT; `start-workflow` claims (`status='claimed'`); `api finish` closes |
 | `jobs` | The queue itself — one row per op attempt or kernel seat | `api enqueue`/`route`/`dispatch`/`settle`; `start-workflow` kernel row; engine `enqueueJob` (supervisor) / `reserveTwoPhase` |
@@ -102,18 +129,26 @@ Full DDL: `engine/schema.sql`. Orientation only:
 | `incidents` | Fingerprinted escalations | `api incident`; `dispatch` rejection path files `infra-provider` incidents |
 | `signals` | Kernel liveness singleton — one kernel per workflow, enforced in data | `start-workflow` (`scope='kernel', key=<workflow_id>` reserve→confirm→release) |
 | `contracts` | Op IPC, kernel → worker — see §4a | `api dispatch` (`fileContract`, INSERT OR REPLACE before `jobs`→`running`); read by `api op-contract` |
-| `reports` | Op IPC, worker → kernel — see §4a | `api report` (INSERT OR REPLACE, `consumed_at` reset NULL); `consumed_at` stamped by `api consume-report` and by `settle` |
-| `checks` | Kernel's re-run results per op attempt — see §4a | `api check` (INSERT OR REPLACE) |
+| `reports` | Op IPC, worker → kernel; `report_json` is the only report copy — see §4a | `api report` (INSERT OR REPLACE, `consumed_at` reset NULL); `consumed_at` stamped by `api consume-report` and by `settle` |
+| `check_runs` | One row per declared or re-run check of a job attempt: name, phase, runner, command, cwd, exit/status, timestamps, small summary and SHA references to raw stdout, stderr and parsed JSON output | `api report`, `api check`, settler; migrated from `checks.checks_json` |
 | `resources` (ledger), `leases` | Repo-scoped capacity fences | `api dispatch` → `reserveOpLeases` seeds `path:*` capacity-1 resources and takes leases via `reserveTwoPhase`; `api settle`/dispatch-reject release them |
 | `work_graph_versions` | A workflow's work graph (`starci/work-graph@1`), one immutable row per version with its diff, colours, reason and author op/job; created on an existing ledger by `migrateLedger` (additive) | `scripts/work/work-graph.mjs propose`, `scripts/work/backfill-work-graph.mjs --apply` |
-| `job_artifacts` | Every output a job produced (report envelope and file, named Work and media, its evidence directory, its `.patch`), one row per file: repo-relative path, sha256, bytes, mime, label, and a patch's head/landed/base shas; paths only, never bytes. Created on an existing ledger by `migrateLedger` (additive); housekeeping never removes an indexed path | `api settle` (every verdict, `scripts/kernel/job-artifacts.mjs`), `scripts/work/backfill-job-artifacts.mjs --apply`; read by `api artifacts` |
+| `blobs` | One row per SHA: byte count, media type, optional encoding, `file_uri`, `http_path`, creation and verified archive state. Work proof hashes also have metadata-only rows so artifact foreign keys hold | Artifact and check ingestion; GC only after `blob_refs.refs=0` and an archive exists |
+| `job_artifacts_v2` | One row per logical output name and job attempt. `storage=blob` has SHA and no repo path; `storage=work-proof` has the cited `.starciwork` path. Roles distinguish checks, patches, media, logs and proof; patch revision fields remain | `api report`, settle and backfill; becomes canonical `job_artifacts` after all readers switch |
+| `report_attachments` | Links each report to its artifact IDs | `api report` and backfill |
+| `artifact_proofs_v2` | Proof claims keyed by artifact ID rather than a filesystem path | Artifact/proof ingestion and backfill; becomes canonical `artifact_proofs` after all readers switch |
+| `blob_refs` | View summing references from job artifacts and check-run output SHA columns | GC reads; no writer |
+| `v_op_history`, `v_media`, `v_timeline`, `v_workflow_progress` | Read views for attempt history and checks, image/video links by job and attempt, ordered events/logs/attempts, and units done/total with rate and ETA | UI/API read-only handles |
 | `logs`, `log_cursors` | The typed log rows (`scripts/kernel/typed-logs.mjs`) and the sync cursors; moved INTO the ledger on 2026-09-27 (owner ruling: one complete RDBMS per product repo) from the retired `<repo>/.starciwork/logs.sqlite`. `logs.workflow_id` references `workflows` (ON DELETE CASCADE); append-only (no UPDATE; a DELETE only while the workflow's `workflow_purges` row is `deleting`); `src` is the idempotent derivation key. Created on an existing ledger by `migrateLedger` (additive; the AUTOINCREMENT starts past the old file's newest seq) | ONLY the process's buffered log writer (`scripts/kernel/log-writer.mjs`: its own connection, batches of <= 200 rows or every 250 ms in one short `BEGIN IMMEDIATE`, never inside a caller's ledger transaction; an SQLite authorizer limits that connection to these tables) - `api log`, settle's sidecar ingest and event derivation, `api logs`, the ui server's `/api/logs`; `scripts/work/migrate-logs-into-ledger.mjs` copies the old file in |
 | `workflow_purges` | The one sanctioned delete path of a finished workflow (below): approval, the verified evidence archive (path, sha256, bytes, manifest sha256, events head, counts), state `planned`/`archived`/`deleting`/`purged`; the row is the tombstone | `scripts/work/purge-workflow.mjs --apply` |
 | `state_snapshots`, `budgets`, `budget_reservations`, `inputs` | Reserved | none — kept so the table shape of existing ledgers never changes |
 
 `machine.sqlite` (`engine/machine.sql`): `ledgers` is the host registry
-(`registerLedger` at every admission; read by `scripts/agent/balance.mjs`); its
-other tables are reserved.
+(`registerLedger` at every admission; read by `scripts/agent/balance.mjs`). The
+final host schema also owns Supervisor, reconciler, service, throttle, GC, land,
+budget and machine-log tables, plus machine-level blobs. It attaches registered
+project ledgers on demand for fleet views. That consolidation is a separate lane;
+the project evidence migration does not create another machine-state database.
 
 Its `ledgers` registry is the host's, and a test never writes it. The
 `node --test` preload `tests/setup/isolated-registry.mjs` (npm test and the
@@ -161,11 +196,20 @@ api settle`).
   `api consume-report` (which appends a `report-consumed` event) and again by
   `settle` when it integrates the verdict — the durable worker→kernel signal
   is spent exactly once; a paused op's own report is consumed so it is never
-  read as its answer.
-- **`checks`** — the kernel's re-run results for the same
-  `(workflow_id, op_id, attempt)` key (`api check --checks <json> |
-  --checks-file <path>`). Filed between `consume-report` and `settle`, which
-  then releases the leases and closes the worker.
+  read as its answer. The JSON column is the only report copy; neither scratch
+  nor `.starciwork/kernel-evidence` retains a `report.json`.
+- **`check_runs`** — one row per declared or re-run check, including runner,
+  phase, command, status, timing and a small `summary_json`. `stdout_sha`,
+  `stderr_sha` and `output_sha` point to blobs containing raw output. A check
+  that did not produce one of those outputs leaves its SHA null. `api check`
+  re-runs are recorded here before settlement.
+- **`job_artifacts_v2` and `report_attachments`** — an artifact has a logical
+  `name` unique within the attempt, a role and a storage class. `blob` means
+  `repo_path` is null and the bytes are in the external store. `work-proof`
+  means `repo_path` identifies a Work-record proof inside `.starciwork`; its
+  hash still has a metadata row in `blobs` for the foreign key. Attachment
+  links use artifact IDs, and `artifact_proofs_v2` keys claims by artifact ID.
+  The old path-based tables remain only during verified migration.
 
 ## 5. Identity fence
 
@@ -186,10 +230,9 @@ exception (owner rulings 2026-09-27) is the owner-approved **workflow purge**,
 2. the evidence is archived first, as a ZIP on drive D
    (`D:/starci-archive/<product>/<workflowId>-<date>.zip`): every ledger row of
    the workflow as NDJSON (`ledger/<table>.ndjson`: events, jobs, reports,
-   checks, incidents, contracts, goals, inbox, job_artifacts, artifact_proofs,
-   logs, work_graph_versions, leases, signals, the workflows row), every
-   indexed artifact file and the workflow's kernel-evidence tree
-   (`files/<path>`: patches, images, videos, traces, reports, draw rounds),
+   check_runs, incidents, contracts, goals, inbox, job_artifacts,
+   artifact_proofs, report_attachments, logs, work_graph_versions, leases,
+   signals, the workflows row), referenced blobs and cited Work proof files,
    and `manifest.json` (sha256 and bytes of every entry, the row counts, the
    events digest-chain head);
 3. the archive is re-opened from disk and every entry inflated and checked
@@ -200,9 +243,19 @@ exception (owner rulings 2026-09-27) is the owner-approved **workflow purge**,
    without the approval and a verified archive, and the `logs` delete guard
    (`logs_delete_only_by_purge`) opens for that workflow only while it holds -
    and the workflow's rows are deleted table by table in short batches, the
-   `workflows` row last, then its kernel-evidence directory; state `purged`.
-   Indexed files outside that directory (Work records, product files) are
-   archived but not deleted: other workflows may still read them.
+   `workflows` row last; state `purged`. Cited Work proof files remain in the
+   product tree because other records may still refer to them. Blob files are
+   removed only by a separate refcount sweep after verified archive custody.
+
+The 2026-09-28 evidence migration is distinct from a workflow purge. It backs
+up each ledger before schema migration, ingests each existing
+`.starciwork/kernel-evidence/**` file into `blobs`, `job_artifacts_v2` and
+`check_runs` as applicable, verifies hash/size/row counts and report JSON
+identity, then writes and verifies a ZIP at `D:/starci-archive`. Only after
+that verification may the old folder leave product git. Once all readers use
+the new tables, the v1 artifact/proof/check tables are retired, the v2
+artifact/proof tables take their canonical names, and a verified ledger archive
+precedes dropping the retired tables. No legacy path read fallback remains.
 
 ## 6. Refusal discipline
 
