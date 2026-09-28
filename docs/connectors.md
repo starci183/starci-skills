@@ -48,7 +48,7 @@ that directory with an exclusive create and refuses (exit 1, at once) while anot
 the lock or owns `gateway.json` / `tunnel.json`. A running tunnel manager re-checks every 30 s
 (`STARCI_TUNNEL_OWNER_CHECK_MS`) that the lock still names it: when another live process holds it, it
 stops its cloudflared (leaving `tunnel.json` to the owner) and exits; when the lock vanished it takes
-it back. A starter (`start`, `ensureAskConnectors`, `resume-all.mjs`) never launches while a
+it back. A starter (`start`, `ensureAskConnectors`, or the reconciler Host controller) never launches while a
 manager is alive, and records `<name>.starting.json` so a launch still claiming its lock counts as
 alive for 30 s. A recorded pid counts as live only if that process started in the current boot, so
 after a reboot a stale record never blocks a fresh start.
@@ -157,22 +157,22 @@ supervisor chat  -> channel.mjs reply -> sendMessage "[<label>] ..." -> owner (T
   lone registered supervisor is picked automatically; otherwise the message is held (up to 20) and
   the chooser shown, and the held messages are delivered once the owner picks.
 - **Registry.** `<state>/supervisors/<id>.json` `{id, label, repos, registeredAt, heartbeatAt}`.
-- **Lifecycle.** `channel.mjs register` / `heartbeat` start the bridge when none runs
-  (`ensureTelegramBridge`); `resume-all.mjs` (the every-10-minutes task) does the same once any
-  supervisor has registered, so the bridge survives a reboot. Telegram off or a spec run is a no-op.
-- **Stall alerts.** `resume-all.mjs` also launches `scripts/supervisor/stall-alert.mjs` detached each
-  pass. Each finding of `scripts/supervisor/stall.mjs` goes to whoever can fix it:
-
-  | Finding | Route | Delivery |
-  |---|---|---|
-  | STALE-GATE, STALE-WAIT, STALE-PEER-WAIT; UNREAD-PEER past the 10-min grace; STALLED that is actionable, on a stale gate/wait, or unexplained; an owner-gate its own text calls a peer dependency | owning Kernel | one `[stall]` wake per workflow into its Kernel terminal (proven delivery, `scripts/kernel/wake-delivery.mjs`) with the evidence and the exact `api` action; a `stall-wake` event on the workflow; a busy Kernel or a worker mid-turn is retried next pass; one wake per finding per 20 min |
-  | the same finding 20 min after its first delivered wake; a Kernel unable to take a wake for 20 min; never woken in 60 min; STALLED with an unreadable frontier or behind a gate only a peer can release | supervisor | supervisor `main`'s inbox as `STALL-ALERT <n> finding(s) the workflows could not fix themselves: <line> [why]` (chatId and messageId null, so `wait` fires with no owner message behind it); at most once per finding per hour |
-  | a justified owner gate past its grace waiting on an open owner ask or naming nothing checkable; STALLED on frontier `awaiting-owner` | owner | ONE Telegram digest in `language` at most every 60 min: per workflow what waits on the owner and since when, one count line for the credential asks (`/creds`), and `/asks`; an unchanged digest is repeated at most every 4 h. A workflow parked on credential asks alone never makes a digest due |
-  | PEER-WAIT, a young gate, a gate waiting on a record a peer owes, STALLED parked on justified peer-waits | none | printed only |
-
-  No STALE-*, UNREAD-PEER or actionable STALLED is ever sent to the owner's Telegram by this check;
-  forwarding a runtime escalation to the owner is the supervisor's call. Dedupe state:
-  `<state>/stall-alerts.json` (`starci/stall-alerts@2`).
+- **Lifecycle.** `channel.mjs register` / `heartbeat` can start the bridge when none
+  runs. The reconciler Host controller also probes and restores the Telegram
+  bridge, ask gateway and tunnel after reboot; `StarCi-Reconciler` starts that
+  controller through `scripts/reconciler/boot.mjs ensure`. Telegram off or a
+  spec run is a no-op.
+- **Workflow findings.** The Workflow controller reads
+  `scripts/supervisor/stall.mjs` findings, opens one durable Kernel Decision
+  Item per actionable stall or stale wait, and escalates overdue items to the
+  Supervisor. `scripts/reconciler/decisions.mjs` supplies the doorbell; a busy
+  Kernel keeps the item in its queue. See `modules/reconciler/workflow.yaml`.
+- **Owner notification.** The Fleet controller is the owner-bound sender. It
+  invokes `scripts/reconciler/notifier.mjs` for the periodic digest and urgent
+  invariant alerts; `scripts/connectors/telegram.mjs` sends the message. Owner
+  asks retain their immediate notice and `/asks` or `/creds` handling above.
+  Digest and urgent dedupe are recorded in the Supervisor ledger, as defined by
+  `modules/reconciler/fleet.yaml` and `scripts/reconciler/notifier.mjs`.
 
 ```
 node scripts/supervisor/channel.mjs register --id <id> --label <text> [--repos <csv>]

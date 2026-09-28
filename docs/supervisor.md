@@ -1,40 +1,40 @@
 # Supervisor
 
-One Supervisor seat, `[Worker]` fix agents spawned on demand, one land gate. The contract is
-`modules/supervisor/supervise.yaml` (`chatSeat`, `kernelSeat`, `workers`, `landGate`, `chat`); this note is the map.
-The reconciler owns selected Host, Job, Fleet and notification concerns when its
-controller is active; the old tick and watchdog yield those duties according to
-`modules/reconciler/reconciler.yaml` and `scripts/reconciler/owns.mjs`.
+One Supervisor decision seat, `[Worker]` fix agents spawned on demand, and one land gate.
+`modules/supervisor/supervise.yaml` defines the seat and its authority. The single
+long-running host loop is `scripts/reconciler/engine.mjs`: its Job, Workflow,
+Resource, Host, GC, Fleet and Learning controllers perform deterministic duties
+and open Decision Items for the Supervisor when judgment is required.
+`modules/reconciler/reconciler.yaml` is the controller contract.
 
 ## Mode
 
 `config.yaml supervisor.mode` says where the seat runs (validated: `chat` or `kernel`; default `chat`):
 
-- **chat** (default; owner, 2026-09-25: "dời supervisor vào chat đi cho persistent"): the owner's desktop Claude
-  chat session is the Supervisor, as before 2026-09-24. It registers channel `main` with no Orca terminal
-  (`channel.mjs register --id main --label <text>`; the chat's `CLAUDE_CODE_SESSION_ID` is recorded) and is the
-  only reader that drains it (`channel.mjs inbox --id main`); every other reader uses `--peek`, and an Orca
-  terminal is refused. It watches the inbox (`channel.mjs wait --id main` under a Monitor), runs the tick every
-  `supervisor.pollIntervalMs` itself (`tick.mjs`, `poll.mjs`, `owed.mjs`), and fixes through Opus lanes: an
-  ephemeral worktree `<lanesRoot>/<name>` on `lane/<name>` (`<lanesRoot>` is runtimes.yaml
-  `allocation.housekeeping.lanesRoot`, default `D:/starci-lanes`), commits there, `land.mjs --commit <sha> --lane
-  <name> --specs <csv>`, then the worktree and branch are removed. `[Worker]` spawning stays available, not
-  required. Nothing starts a `[Supervisor]` kernel: resume-all, restart-all, `/restart` and the supervisor
-  watchdog skip it (`start-supervisor.mjs` answers `chat-mode`), and a running watchdog loop exits.
-- **kernel** (optional): the `[Supervisor] main` Orca kernel below, with its watchdog.
+- **chat** (default): the owner's desktop chat is the Supervisor. It owns channel `main`
+  without an Orca terminal (`channel.mjs register --id main --label <text>`), reads
+  its inbox and Supervisor Decision Items, and fixes through lanes landed by
+  `scripts/supervisor/land.mjs`. `scripts/supervisor/poll.mjs --once` is a read-only
+  digest; the chat does not run a deterministic tick. No `[Supervisor]` terminal is
+  started in this mode (`start-supervisor.mjs` answers `chat-mode`).
+- **kernel** (optional): `[Supervisor] main` is one long-lived Orca terminal.
+  The reconciler Host controller keeps its seat alive by running
+  `scripts/supervisor/watchdog.mjs --once`; the Fleet controller opens its owed
+  Decision Items. There is no Supervisor watchdog loop.
 
 Either way: the Supervisor never dispatches ops, never writes a product ledger and never answers an owner ask;
 define-goal and a kernel start run only in the owner's chat, on the owner's own words.
 
 ## Roles
 
-| Role | What it is | Never |
-| --- | --- | --- |
-| Supervisor (mode chat) | The owner's desktop chat session: owns channel `main`, ticks, clusters OWED items, rules, notifies Kernels, fixes through Opus lanes and `land.mjs --lane`, pushes main. | dispatches product work, writes a product ledger, answers owner asks, touches the source host repository, commits on main directly |
-| `[Supervisor] main` (mode kernel) | One long-lived Orca terminal in the runtime's own worktree running the configured agent (`config.yaml supervisor.kernel`, default the kernel pin). The single brain and decision desk: ticks, clusters OWED items, rules, notifies Kernels, spawns workers, lands changes, pushes main. | dispatches product work, writes a product ledger, answers owner asks, touches the source host repository |
-| `[Worker] <cluster>` | One fix agent per root-cause cluster (claude, codex/chatgpt, devin or qwen by the balanced allocator), in an ephemeral staging checkout with explicit file leases. Finishes with one report. | edits the live `.claude` tree, commits on main, pushes |
-| Watchdog (mode kernel) | `scripts/supervisor/watchdog.mjs`, one loop per host. Replaces a dead Supervisor, wakes it with tags, heartbeats its channel, sweeps workers. Exits cleanly in mode chat or while the seat is DISABLED. | decides anything |
-| Relay | The Telegram bridge files owner messages in inbox `main` and posts the replies; in mode kernel the owner's desktop session relays with `tell.mjs`. | supervises |
+| Role | Responsibility |
+| --- | --- |
+| Supervisor (chat or kernel mode) | Decides runtime and cross-workflow questions from Decision Items, handles owner messages, and fixes through the land gate. It does not dispatch product work or write a product ledger directly. |
+| `[Worker] <cluster>` | Works on one fix cluster in an ephemeral staging checkout with file leases and one report. |
+| Reconciler Host controller | Maintains the Supervisor seat and runs `scripts/supervisor/watchdog.mjs --once` in kernel mode. |
+| Reconciler Job controller | Verifies and closes reported `[Worker]` terminals through `sweepWorkers`. |
+| Reconciler Fleet controller | Opens Supervisor Decision Items for owed work and sends the owner digest through `scripts/reconciler/notifier.mjs`. |
+| Telegram bridge | Files owner messages in channel `main` and relays replies. |
 
 State lives in one ledger under `~/.starci/supervisor` (`STARCI_SUPERVISOR_HOME`), outside every repository:
 the seat, the enabled flag, `runtime.fix` jobs, file leases, worker reports and the audit events.
@@ -44,26 +44,20 @@ the seat, the enabled flag, `runtime.fix` jobs, file leases, worker reports and 
 Only in `supervisor.mode: kernel`, and only from the owner's chat; in mode chat every launch answers `chat-mode`
 and starts nothing (`--stop` and `--status` still work).
 
-```
-node scripts/supervisor/start-supervisor.mjs            # enable, launch (or keep the live one), ensure the watchdog
-node scripts/supervisor/start-supervisor.mjs --status   # seat, health, watchdog pid
-node scripts/supervisor/start-supervisor.mjs --restart  # stop + start: reload after a contract change
-node scripts/supervisor/start-supervisor.mjs --stop     # disable: watchdog and resume-all leave it down
+```text
+node scripts/supervisor/start-supervisor.mjs            # enable or keep the seat
+node scripts/supervisor/start-supervisor.mjs --status   # seat status
+node scripts/supervisor/start-supervisor.mjs --restart  # deliberate seat reload
+node scripts/supervisor/start-supervisor.mjs --stop     # disable and close the seat
 ```
 
-A singleton by three fences: a host lock around every launch, the seat signal (a 'starting' reservation, then
-the attested terminal; a live seat is never replaced, an Orca outage proves nothing), and a dedupe of every
-terminal titled `[Supervisor]` (with no live seat a live one is adopted, the rest are closed). `resume-all`
-(the StarCi-Resume-Every10m task), `restart-all` and `/restart` keep the seat covered while it is enabled.
-The old Supervisor watchdog loop exits while the reconciler owns `host.supervisor-seat`.
-
-The same `--install-startup --apply` installs the daily `StarCi-Housekeeping` task, which runs
-`scripts/supervisor/housekeeping.mjs --apply`: the one host sweep of the storage contract — `%TEMP%` fixtures,
-agent session archives, Claude/Devin/Orca session data, StarCi logs, finished-workflow ledger retention and
-merged lane worktrees idle for `laneGraceMs` (a fresh lane with no commit yet is kept), every window under
-runtimes.yaml `allocation.housekeeping.*`. Its
-`starci/housekeeping-report@1` report lands at `runtime/connectors/housekeeping-report.json` and every
-stall-alert pass surfaces its totals.
+A host lock, a durable seat signal and terminal dedupe preserve the singleton.
+The Host controller proves a seat dead before replacing it; an Orca outage is
+not death. After reboot, the `StarCi-Reconciler` task invokes
+`scripts/reconciler/boot.mjs ensure` and the Host controller restores the seat.
+`node scripts/reconciler/boot.mjs --restart` restarts the engine and runs the
+Host boot phase. The GC controller runs `scripts/supervisor/housekeeping.mjs`
+on its declared cadence; its report is `starci/housekeeping-report@1`.
 
 ## Claude Code updates
 
@@ -75,15 +69,17 @@ managed workers Orca launches; an owner-set value is kept). Updates are applied 
 after a reboot, or with the seats stopped, run `npm i -g @anthropic-ai/claude-code`, check `claude --version`,
 then `/restart` relaunches every seat on the new binary.
 
-## Tick
+## Reconciler duties and decisions
 
-The task `StarCi-Supervisor-Every30m` (`scripts/supervisor/install-tick-task.ps1`) runs the tick with no chat:
-host health (a runaway guard-shim chain is stopped), Orca health (restart + `restart-all`), the status UI, dead kernels,
-orphaned frontiers, one bottleneck sample (`tick.mjs --samples`), op health and the stuck SLA (below) and inbox + Telegram
-alerts (`supervise.yaml` `scheduledTick`). In mode chat the Supervisor also runs its own tick every `supervisor.pollIntervalMs`. In mode kernel the watchdog wakes
-the idle Supervisor with one line: `[inbox]`, `[land]`, `[report]`, `[worker]`, `[register]`.
-Owner text is never typed into the terminal. Fleet Decision Items bring owed clusters to the Supervisor;
-`node scripts/supervisor/tick.mjs` remains a diagnostic view of the product ledgers, workers, land queue and pushes.
+`StarCi-Reconciler` invokes `scripts/reconciler/boot.mjs ensure` at logon and
+periodically. The one engine runs all seven controllers: Host maintains services,
+Orca and seats; Job settles eligible reports and manages workers; Workflow watches
+progress and stalls; Resource manages capacity; GC sweeps and runs housekeeping;
+Fleet handles owed work, land and owner notification; Learning measures outcomes.
+Controllers use the existing API for product-ledger writes and open durable
+Decision Items for the Kernel or Supervisor. The Supervisor reads its items with
+`node scripts/reconciler/decisions.mjs supervisor --list`; its read-only digest is
+`node scripts/supervisor/poll.mjs --once`.
 
 ## Op health and the stuck SLA
 
@@ -94,12 +90,13 @@ neither), failure classes (`dead-worker:<liveness>`, `root-cause:<category>`, `c
 dead-worker rate, owner-wait and throttle time. `node scripts/supervisor/op-metrics.mjs [--by workflow] [--json]` prints
 the table; `--trend` the recorded snapshots.
 
-`api status` ages every wait a workflow holds (`stuck[]`: owner-gate, peer-wait, dependency, retry-cap,
-deferred-settle, queued-ready, throttled), grades it against `allocation.opTelemetry.stuckSla` (ok / warn / critical)
-and names who moves it next (owner, kernel, `peer:<workflow>`, supervisor), and carries the workflow's `opHealth`. The
-tick lists every item past its SLA as a Supervisor owed action (`STUCK <severity> ...` with its action), alerts every
-critical one, records one `supervisor-op-metrics` event, and the owner digest carries the one-line trend. The status UI
-shows the "Sức khỏe op" panel on the overview (`/api/snapshot` `opHealth`, `stuck[]`).
+`api status` ages workflow waits in `stuck[]`, grades them against
+`allocation.opTelemetry.stuckSla`, and names who can move each one. The Workflow
+controller opens and escalates progress or stall Decision Items; the Fleet
+controller turns owed clusters into Supervisor Decision Items and includes owner
+waits in its digest. `scripts/supervisor/op-metrics.mjs` remains a read-only
+measurement command; `--trend` reads historical snapshots when present. The
+status UI shows `opHealth` and `stuck[]`.
 
 ## Worker lifecycle
 
@@ -151,8 +148,8 @@ pin registry semver, never a `file:` link.
 - Telegram: the bridge files every owner message in channel `main` and posts its replies. Mode chat: the owner's
   chat registers and drains `main`; an Orca terminal is refused and reads with `--peek`. Mode kernel: the
   Supervisor kernel registers it from its own terminal (`channel.mjs` refuses `main` from anywhere else).
-  `channel.mjs reply --to <id>` answers a Telegram message on Telegram; a runtime alert (`STALL-ALERT`,
-  land-gate) or a desktop relay is answered locally (recorded only); a reply with no `--to` goes to
+  `channel.mjs reply --to <id>` answers a Telegram message on Telegram; a runtime alert
+  or a desktop relay is answered locally (recorded only); a reply with no `--to` goes to
   Telegram. `/status` adds the
   Supervisor block (OWED count and trend, active workers, land queue, last pushes); `/asks`, `/creds`, `/choose`, `/help`
   are unchanged.

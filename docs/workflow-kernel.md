@@ -23,45 +23,43 @@ plan, jobs and events survive agent churn. A `signals` singleton row enforces
 one kernel per workflow in data, not by politeness. Contract:
 `modules/kernel/start-workflow.yaml`.
 
-Host liveness and report settlement follow the concern ownership in
-`modules/reconciler/reconciler.yaml`. When the reconciler owns `host.kernel-seat`,
-its Host controller runs the kernel watchdog's `--once` checks and the old
-watchdog loop exits. When it does not, the loop remains the fallback. Both use
-ledger status and terminal evidence before replacing a dead Kernel; a provider
-turn at an input prompt keeps the same durable Kernel identity. The Kernel
-yields when waiting instead of polling inside a model turn. See
-`scripts/reconciler/owns.mjs` and `scripts/kernel/watchdog.mjs` for the handoff.
+The `StarCi-Reconciler` task starts the one host engine through
+`scripts/reconciler/boot.mjs ensure`. Its Host controller keeps the Kernel seat
+alive by running `scripts/kernel/watchdog.mjs --once --repair` for the workflow.
+That command is a single liveness pass: it reads ledger status and attested
+terminal evidence, wakes a turn-idle Kernel when work is actionable, and replaces
+a seat only after proving it dead or unwritable. There is no per-workflow
+watchdog loop or fallback process.
 
-When the reconciler owns `job.settle`, its Job controller handles eligible green
-reports and opens a Decision Item for non-green settlement. Otherwise the runtime
-settler launched by the watchdog remains responsible for eligible green reports.
-The Kernel decides non-green verdicts. `api report` files the durable report and
-can wake an idle Kernel; the liveness pass covers missed
-wakes. The settlement boundary is `scripts/reconcile/job-settle.mjs` and
-`modules/kernel/verdict-contract.yaml`.
+The Job controller runs `scripts/reconcile/job-settle.mjs` for eligible green
+reports, reconciles dead or held workers and dispatches ready work through the
+existing API. A non-green report opens a `settle-nongreen` Decision Item; the
+Kernel chooses its verdict. The Workflow controller opens progress and stall
+Decision Items and re-parks asks. The Kernel reads its Decision Items first on
+every wake, acts through `scripts/kernel/api.mjs`, then yields when nothing needs
+a decision. See `modules/reconciler/reconciler.yaml` and
+`modules/kernel/driver-loop.yaml` for the ownership split.
 
-After a host restart, `scripts/kernel/resume-all.mjs` restores only concerns the
-reconciler does not own. For `host.kernel-seat`, the Host controller or fallback
-watchdog re-establishes the seat. For `job.worker`, the Job controller or fallback
-watchdog reconciles dead or held workers through the API. A filed report is
-consumed; an attempt with no proven effect can return to queued; evidence of an
-unknown effect is fenced for a Kernel decision. The ledger preserves the plan,
-jobs and events across agent and host restarts.
+After a host restart, the Host controller's boot phase restores services and
+Kernel seats. The Job controller reconciles dead or held workers. A filed
+report is consumed; an attempt with no proven effect can return to queued;
+evidence of an unknown effect is fenced for a Kernel decision. The ledger
+preserves the plan, jobs and events across restarts.
 
-## The tick — `modules/kernel/driver-loop.yaml`
+## Kernel decision cycle — `modules/kernel/driver-loop.yaml`
 
-Each iteration, in order, expressed in API calls. The drive row includes fallback
-mechanics; active controllers own their corresponding concerns:
+The Kernel uses these API calls for its decisions. Controllers own green settlement,
+worker recovery, ready dispatch and seat liveness:
 
 | Step | Call | Why |
 | --- | --- | --- |
 | survey | `api survey --workflow <id>` | Open on the ledger, never on memory: goal revision + `opChain`, all jobs, inbox, signals, event tail, open incidents. |
 | plan | `api plan --workflow <id> --file <plan.json>` | Persist the derived plan; the api stores its digest and the *structural* diff vs the approved `opChain`. Divergence → `incident --kind plan-divergence`; dispatch nothing on a divergent plan. |
 | enqueue | `api enqueue --workflow <id> --op <opId> --paths <csv>` | One `queued` job row per planned op the queue lacks. An oversized semantic op is partitioned into bounded same-op jobs with `--cut-id/--cut-ordinal/--cut-total`; this does not change the approved plan. |
-| drive | `status → dispatch → durable wait/observe → nudge → settle → retry\|incident` | Launch only what is disjoint (paths) and admitted (leases/budgets); yield when no transition is executable and let the Host controller or fallback watchdog own the cadence (`modules/reconciler/reconciler.yaml`, `modules/models/runtimes.yaml`); observe a running op's screen on `allocation.observeCadenceMs` for context; nudge an exact `turn-idle` worker that owes a report; decide non-green verdicts while the active Job controller settles eligible green reports; route retries inside the kind's budget, then escalate. |
+| drive | `api decisions --workflow <id>` then `api status` and an allowed decision verb | Claim and resolve non-green verdicts, worker questions, progress stalls and Supervisor rulings; use `--decision <id>` for the chosen action. Yield when no decision is executable. Job, Workflow and Host controllers continue their mechanical passes. |
 | finish | `api finish --workflow <id>` | Last call. Refuses while any job is unsettled (`workflow-open-jobs`) or the owner has not approved the newest handover after the last business settle (`handover-not-approved`). |
 
-The kernel decides order and assignment. It never decides scope, identity or
+The kernel decides the plan and its open Decision Items. It never decides scope, identity or
 authority, never answers an `ask` itself, and never edits the ledger by hand.
 
 ## The verbs — `modules/kernel/api.yaml`
@@ -81,7 +79,7 @@ exits 1 with `{ok:false, reason}` where the reason string is the contract.
 `observe` is read-only in every way that matters: it returns the exact worker
 terminal's liveness plus a bounded screen tail as reasoning context and
 appends only a compact `op-observed` receipt — an op's screen is never proof,
-and only `api report` plus kernel-run `api check` rows settle a verdict.
+and only `api report` plus recorded `api check` rows support a verdict.
 
 ## Dispatch — `modules/kernel/dispatch.yaml`
 

@@ -10,13 +10,13 @@ lives in **one SQLite ledger**. The kernel reasons; small executables transact.
 | Actor | Lifetime | What it does | What it never does |
 | --- | --- | --- | --- |
 | Owner / chat | — | Creates the goal (`node scripts/goal/define-goal.mjs`), answers asks, approves. As the workflow monitor it relays; asked to supervise, it patches `.claude` and restarts kernels per `modules/supervisor/supervise.yaml`. See `CONTEXT.md` for the three chat roles. | Never an agent layer inside the kernel's loop: it does not plan, enqueue, dispatch, settle or answer an ask on the owner's behalf. |
-| `[Kernel] <workflow>` | One per workflow, long-lived | Decides the plan and non-green verdicts, handles incidents and finishes the workflow. Uses API fallback duties for concerns the reconciler does not own. Spawned by `node scripts/kernel/start-workflow.mjs`. | Never opens the sqlite file, writes a job row, spawns a terminal or calls the host (Orca) API directly. |
-| Reconciler controllers | One host engine | Handle active mechanical concerns: Job, Workflow, Resource, Host, GC, Fleet and Learning. Use the existing API for product-ledger writes; old loops resume duties when ownership is inactive. | Never make business or workflow decisions for an LLM. |
+| `[Kernel] <workflow>` | One per workflow, long-lived | Decides the plan and non-green verdicts, handles incidents and finishes the workflow. Acts on durable Decision Items for non-green outcomes, progress and rulings. Spawned by `node scripts/kernel/start-workflow.mjs`. | Never opens the sqlite file, writes a job row, spawns a terminal or calls the host (Orca) API directly. |
+| Reconciler controllers | One host engine | Handle active mechanical concerns: Job, Workflow, Resource, Host, GC, Fleet and Learning. Use the existing API for product-ledger writes; the reconciler is the only host runtime loop. | Never make business or workflow decisions for an LLM. |
 | `[Op] <op-id>` | One per job, ephemeral | Receives one dispatch packet, works inside its `owned_paths`, writes one report, dies. | Never sees the ledger; its report file is its only channel back. |
 
 ## The gate: `scripts/kernel/api.mjs`
 
-Every kernel state operation is one command:
+Product-ledger operations from the Kernel and controllers use one command surface:
 
 ```text
 node scripts/kernel/api.mjs <verb> --repo <path> [...]
@@ -57,23 +57,23 @@ leases, budgets, reports, contracts, inbox, signals and the hash-chained
 registry; its resource and budget tables are reserved. See [ledger-db](ledger-db.md). Dispatch artifacts
 stage in the OS temp dir and are removed once delivered.
 
-## The loop
+## Reconciler loop and Kernel decisions
 
-`modules/kernel/driver-loop.yaml` is the tick the kernel agent runs:
+`modules/kernel/driver-loop.yaml` is the Kernel's decision loop:
 
 ```text
-survey → plan → enqueue → drive { status → dispatch → wait → settle → retry|incident } → finish
+read Decision Items -> inspect ledger -> choose an allowed action -> record it -> yield
 ```
 
-The drive sequence shows fallback calls. For an active concern, its controller
-handles the mechanical step and opens a Decision Item when the Kernel must
-decide (`modules/reconciler/reconciler.yaml`).
-
-The kernel re-derives the frontier from ledger state each tick — never from
-memory of what it sent. The reconciler Host controller, or the fallback liveness
-watchdog when that concern is not active, may wake the same Kernel terminal
-after a provider turn returns to its input prompt. Neither chooses workflow work.
-See [workflow kernel](workflow-kernel.md) for the ownership handoff.
+The single host reconciler (`scripts/reconciler/engine.mjs`) runs seven active
+controllers. Job handles green settlement, worker recovery and ready dispatch;
+Workflow detects stalls and opens Decision Items; Host maintains services and
+seats; Resource, GC, Fleet and Learning own their respective mechanical duties.
+The Host controller runs `scripts/kernel/watchdog.mjs --once --repair` as a seat
+check. There is no independent Kernel watchdog loop. The scheduled task
+`StarCi-Reconciler` calls `scripts/reconciler/boot.mjs ensure` at logon and
+periodically; `boot.mjs --restart` is the restart entry. See
+[workflow kernel](workflow-kernel.md) for the Kernel's decision flow.
 
 A connected operation terminal at an input prompt is
 `turn-idle`, not active; the Kernel or Job controller uses `nudge` to
@@ -108,7 +108,8 @@ committed per project policy; secrets never are.
 | --- | --- |
 | Agent entry and load order | `CONTEXT.md` |
 | Project binding | `.workspaces/projects/<p>/work.json` (`modules/schemas/workspace-routing.yaml`) |
-| Kernel loop and ledger gate | `modules/kernel/*.yaml`, `scripts/kernel/api.mjs` |
+| Kernel decisions and ledger gate | `modules/kernel/*.yaml`, `scripts/kernel/api.mjs` |
+| Host runtime loop | `modules/reconciler/reconciler.yaml`, `scripts/reconciler/engine.mjs` |
 | Operation contracts | `modules/ops/ops/*.yaml` ([ops-source-ownership](ops-source-ownership.md)) |
 | Model routing | `modules/models/selection.yaml`, `scripts/route/route-model.mjs` |
 | Ledger schema | `engine/schema.sql` |
