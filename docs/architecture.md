@@ -32,7 +32,7 @@ Kernel reasons; small executables transact; one host engine does the mechanical 
 | Store | Where | Holds | Only writer |
 | --- | --- | --- | --- |
 | `runtime.sqlite` | `%LOCALAPPDATA%/StarCi/projects/<ledger_id>/runtime.sqlite`, one per project, resolved through `machine.ledgers` | workflows, goals, work units, jobs (tries), op attempts (dispatches), contracts, leases, API idempotency, reports, check runs, artifacts, citations, conditions, Decision Items, decisions, incidents, events and logs | `engine/ledger-db.mjs` |
-| `machine.sqlite` | `%LOCALAPPDATA%/StarCi/runtime/machine.sqlite`, one per host | the ledger and repository registry, the Supervisor (`sup_*`), the reconciler engine (`engine_*`, process runs, leader history, schedules, controller modes, SLA episodes), services, seats and deliveries, terminals, worktrees, throttle, provider health, quotas, GC, land queue and pushes, machine logs and metrics | `engine/machine-db.mjs` |
+| `machine.sqlite` | `%LOCALAPPDATA%/StarCi/machine.sqlite`, one per host | the ledger and repository registry, the Supervisor (`sup_*`), the reconciler engine (`engine_*`, process runs, leader history, schedules, controller modes, SLA episodes), services, seats and deliveries, terminals, worktrees, throttle, provider health, quotas, GC, land queue and pushes, machine logs and metrics | `engine/machine-db.mjs` |
 | blob store | `~/.starci/artifacts/<sha[0:2]>/<sha256>` (`STARCI_ARTIFACT_ROOT` overrides) | redacted transcripts and scrollback, prompts, check stdout/stderr/output, patches, images, videos, renders | `scripts/lib/artifact-store.mjs`, called by the two writers |
 
 Rules that hold everywhere:

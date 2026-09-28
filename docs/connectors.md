@@ -28,30 +28,37 @@ Cloudflare edge -> cloudflared (tunnel.mjs) -> 127.0.0.1:<gateway.port> ask-gate
 | Piece | File | What it does |
 | --- | --- | --- |
 | Gateway | `scripts/connectors/ask-gateway.mjs` | One fixed local port. Proxies `/a-<nonce>` and `/a-<nonce>/...` (GET, HEAD, POST, redirects rewritten to paths) to the loopback form whose latest open `ask-serving` event carries that nonce and whose serve-ask process is alive, in the configured repos' ledgers plus every repo a Telegram notice named. Everything else is 404 and never forwarded (so the public host serves question forms and nothing else, and only while one is served); dot segments are refused; a non-loopback form URL is never a target. Adds `Referrer-Policy: no-referrer`, `Cache-Control: no-store`, `X-Robots-Tag: noindex`. |
-| Tunnel | `scripts/connectors/tunnel.mjs` | Runs cloudflared at the gateway and restarts it when it dies (1 s doubling to 60 s). Always passes its own `--config` (written under the state dir), so `~/.cloudflared/config.yml` is never read. Records the public base URL in `tunnel.json`. `status` carries `health` (below). |
+| Tunnel | `scripts/connectors/tunnel.mjs` | Runs cloudflared at the gateway and restarts it when it dies (1 s doubling to 60 s). Always passes its own `--config` (`%LOCALAPPDATA%/StarCi/cloudflared/cloudflared.yml`), so `~/.cloudflared/config.yml` is never read. Records the public base URL in its `tunnel` connectors row. `status` carries `health` (below). |
 | Notifier | `scripts/connectors/telegram.mjs` | Called by the kernel's `api serve-ask` (`serve-ask.mjs parkAsk`): one message with the workflow, the question and its numbered options, in config `language`, and one inline button **Generate URL** ("Tạo link trả lời" in vi; `callback_data` `ask:<16 hex>`), with NO link. Deduped per ask while its notice is in the chat. `markAskClosed` deletes every message of an ask once it is answered, auto-accepted, retired or superseded (edited to "answered" only where Telegram refuses a delete, e.g. older than 48 h); `sweepAskMessages` is the bridge's reconciler. A missing token or chat id is a no-op with one stderr line; it never throws into its caller. Also `sweep`, `discover-chat` and `test`. |
-| Media | `scripts/connectors/telegram-media.mjs` | Queued by the kernel's `api settle` (`cmdSettle` calls `queueSettleMedia`, which launches this file detached, so Telegram never slows or fails a settle; its stderr goes to `telegram-media.log`). An `interface.draw` / `interface.asset` settled pass sends its drawings as albums of up to 10 (the `draws[]` of the draws.yaml the report names, else the report's final images, else the ui record's `directionAsset`s) - always each drawing's part (page content, overlay panel, layout drawing), never the composite placed into the layout capture (`scripts/work/direction-part.mjs`) with one caption: what was drawn, screens, variants, states, the summary, "review at handover". A `uat.verify` / `uat.assisted.*` / `e2e.verify` settle sends every recorded video (any verdict) captioned with the verdict (ĐẠT / KHÔNG ĐẠT) and the flow's steps from its uat record; a pass with no video sends its screenshots. Images over 10 MB and videos over 50 MB are named by local path instead. Deduped per workflow, job and attempt. |
+| Media | `scripts/connectors/telegram-media.mjs` | Queued by the kernel's `api settle` (`cmdSettle` calls `queueSettleMedia`, which launches this file detached, so Telegram never slows or fails a settle; its output goes to `machine_logs`). An `interface.draw` / `interface.asset` settled pass sends its drawings as albums of up to 10 (the `draws[]` of the draws.yaml the report names, else the report's final images, else the ui record's `directionAsset`s) - always each drawing's part (page content, overlay panel, layout drawing), never the composite placed into the layout capture (`scripts/work/direction-part.mjs`) with one caption: what was drawn, screens, variants, states, the summary, "review at handover". A `uat.verify` / `uat.assisted.*` / `e2e.verify` settle sends every recorded video (any verdict) captioned with the verdict (ĐẠT / KHÔNG ĐẠT) and the flow's steps from its uat record; a pass with no video sends its screenshots. Images over 10 MB and videos over 50 MB are named by local path instead. Deduped per workflow, job and attempt. |
 
 Repositories read: `connectors.repos`, or by default the source root plus every
 `.workspaces/projects/*/work.json` Work owner registered in `machine.ledgers`. The connectors open
 ledgers read-only and never write one.
 
-State lives beside the machine arbiter: `%LOCALAPPDATA%/StarCi/runtime/connectors/`
-(`gateway.json`, `tunnel.json`, `cloudflared.yml`, `cloudflared.log`, `telegram-sent.json`,
-`telegram-media-sent.json`, `telegram-media.log`). `telegram-sent.json` (`starci/telegram-sent@2`)
-keeps per ask `{key, repo, ledgerFile, workflowId, dispatchId, messageIds[], url, closed?}` and
-`keys{<button key>: <workflow>|<dispatch>}`.
+All connector state lives in `machine.sqlite` ([storage](ledger-db.md) §4), written through
+`engine/machine-db.mjs`; there is no connector state file and no connector log file:
 
-The gateway and the tunnel manager are single-instance per host (18 tunnel managers once ran at once,
-all started by code from before the lock). Each `run` first claims `gateway.lock` / `tunnel.lock` in
-that directory with an exclusive create and refuses (exit 1, at once) while another live manager holds
-the lock or owns `gateway.json` / `tunnel.json`. A running tunnel manager re-checks every 30 s
-(`STARCI_TUNNEL_OWNER_CHECK_MS`) that the lock still names it: when another live process holds it, it
-stops its cloudflared (leaving `tunnel.json` to the owner) and exits; when the lock vanished it takes
-it back. A starter (`start`, `ensureAskConnectors`, or the reconciler Host controller) never launches while a
-manager is alive, and records `<name>.starting.json` so a launch still claiming its lock counts as
-alive for 30 s. A recorded pid counts as live only if that process started in the current boot, so
-after a reboot a stale record never blocks a fresh start.
+| Fact | Where |
+| --- | --- |
+| Each manager's state (`gateway`, `tunnel`, `telegram-bridge`, `telegram-route`, `supervisor-channel:<id>`): pid, port, public URL, config, cursor | `connectors` rows |
+| The single-instance lock of each manager, and a launch still starting | `host_locks` rows (state `held` or `starting`) |
+| Ask notices and settled-media sends, deduped per ask or per workflow/job/attempt | `notifications` rows (kind `ask` or `media`) |
+| Supervisor channel messages in and out | `sup_messages` rows |
+| Manager output (cloudflared's notable lines, the bridge log, media sends) | `machine_logs` rows (actor `connector`) |
+
+The only file is the cloudflared configuration the tunnel starts with,
+`%LOCALAPPDATA%/StarCi/cloudflared/cloudflared.yml`, rewritten on every start so
+`~/.cloudflared/config.yml` is never read.
+
+The gateway, the tunnel manager and the Telegram bridge are single-instance per host (18 tunnel managers
+once ran at once, all started by code from before the lock). Each `run` first takes its `host_locks`
+row and refuses (exit 1, at once) while another live manager holds it. A running tunnel manager renews
+its lock every 30 s (`STARCI_TUNNEL_OWNER_CHECK_MS`): when another live process holds it, it stops its
+cloudflared and exits; when the lock was released, it takes it back. A starter (`start`,
+`ensureAskConnectors`, or the reconciler Host controller) never launches while a manager is alive, and
+records the lock in state `starting` so a launch that has not claimed it yet counts as alive for 30 s.
+A lock whose holder process is gone, or started before the current boot, never blocks a fresh start.
 
 ## Owner asks on demand
 
@@ -128,20 +135,20 @@ node scripts/connectors/telegram-media.mjs settle --ledger <file> --repo <repo> 
 bot. Several supervisors may be registered at once; buttons pick which one the owner talks to.
 
 ```
-owner (Telegram) -> getUpdates long poll -> telegram-bridge.mjs -> <state>/supervisors/<id>.inbox.jsonl
+owner (Telegram) -> getUpdates long poll -> telegram-bridge.mjs -> machine.sqlite sup_messages (to <id>)
                                                                         |
 supervisor chat  <- channel.mjs wait / inbox  <-------------------------+
 supervisor chat  -> channel.mjs reply -> sendMessage "[<label>] ..." -> owner (Telegram)
 ```
 
-- **One poller per host.** The bridge claims `telegram-bridge.lock` (the same single-manager lock as
-  the gateway and tunnel) and records `telegram-bridge.json` `{pid, startedAt, offset}`. It long-polls
+- **One poller per host.** The bridge takes the `telegram-bridge` host lock (the same single-manager lock as
+  the gateway and tunnel) and keeps `{pid, startedAt, offset}` in its `connectors` row. It long-polls
   `getUpdates` (`POLL_TIMEOUT_S`, `message` + `callback_query`) and stores the next offset *before* handling an
   update, so a restart never delivers a message twice. A `409 Conflict` exits when another bridge holds
   the lock, else backs off; network and 5xx errors back off 1 s doubling to 60 s; a refused token
   (401/403/404) or Telegram turning off stops it. Between rounds it reloads itself when the runtime changes
   (`scripts/lib/self-reload.mjs`): the replacement takes the lock over and resumes from the stored offset.
-  Logs: `telegram-bridge.log`, numeric ids only.
+  Its log is `machine_logs` (kind `telegram-bridge.log`), numeric ids only.
 - **Hard auth.** An update is accepted only when its chat id AND its sender id both equal
   `connectors.telegram.chatId` (the owner's private chat). Anything else is dropped unanswered and
   logged by numeric id; message text is never logged.
@@ -151,12 +158,12 @@ supervisor chat  -> channel.mjs reply -> sendMessage "[<label>] ..." -> owner (T
   the open approval asks, each with its Generate URL button, and `/creds` the credential asks in one
   message ("Owner asks on demand" above); `/help`. The
   bot's replies follow config.yaml `language` (vi, else en).
-- **Routing.** A pick is stored per chat in `telegram-route.json`. Plain text goes to the routed
-  supervisor's inbox as `{id, at, chatId, messageId, text, read:false}` and is acknowledged as a reply
+- **Routing.** A pick is stored per chat in the `telegram-route` connectors row. Plain text goes to the routed
+  supervisor's inbox as one `sup_messages` row (direction `in`, unread) and is acknowledged as a reply
   ("📥 Đã chuyển cho <label>.", plus an offline note when its heartbeat is stale). With no route, a
   lone registered supervisor is picked automatically; otherwise the message is held (up to 20) and
   the chooser shown, and the held messages are delivered once the owner picks.
-- **Registry.** `<state>/supervisors/<id>.json` `{id, label, repos, registeredAt, heartbeatAt}`.
+- **Registry.** The `supervisor-channel:<id>` connectors row: `{id, label, repos, registeredAt, heartbeatAt}`.
 - **Lifecycle.** `channel.mjs register` / `heartbeat` can start the bridge when none
   runs. The reconciler Host controller also probes and restores the Telegram
   bridge, ask gateway and tunnel after reboot; `StarCi-Reconciler` starts that
@@ -171,7 +178,7 @@ supervisor chat  -> channel.mjs reply -> sendMessage "[<label>] ..." -> owner (T
   invokes `scripts/reconciler/notifier.mjs` for the periodic digest and urgent
   invariant alerts; `scripts/connectors/telegram.mjs` sends the message. Owner
   asks retain their immediate notice and `/asks` or `/creds` handling above.
-  Digest and urgent dedupe are recorded in the Supervisor ledger, as defined by
+  Digest and urgent dedupe are `notifications` rows in machine.sqlite, as defined by
   `modules/reconciler/fleet.yaml` and `scripts/reconciler/notifier.mjs`.
 
 ```

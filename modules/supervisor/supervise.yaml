@@ -87,8 +87,8 @@ raci:
     - "the final credential checklist and the handover"
     - "an engine or Orca crash loop the Host controller quarantined"
   decisionItems: >-
-    The Supervisor's own queue is its Decision Items in the supervisor ledger (workflow wf-supervisor, events
-    supervisor-decision-*): Kernel DIs overdue x2, cross-workflow, deadlock, runtime-defect, seat-unrecoverable,
+    The Supervisor's own queue is its Decision Items in machine.sqlite sup_decision_items (with sup_decisions and
+    sup_events): Kernel DIs overdue x2, cross-workflow, deadlock, runtime-defect, seat-unrecoverable,
     quota-exhausted, push-refused, experiment-revert. List: node scripts/reconciler/decisions.mjs supervisor --list;
     claim/resolve: supervisor --claim <id> --by supervisor, supervisor --resolve <id> --by supervisor --verb <what you ran>.
     A doorbell line "[decide] <n> việc chờ: ..." is only a reminder. A Kernel DI is claimed by the Supervisor
@@ -279,8 +279,8 @@ kernelSeat:
     In mode chat every launch answers action chat-mode and starts nothing; --stop and --status still work.
     The kernel start, like define-goal, runs only in the owner's chat.
   singleton: |
-    Three fences, never politeness: a host lock (supervisor-start) around every launch; the seat signal in the
-    supervisor ledger (scripts/supervisor/home.mjs: a 'starting' reservation with an expiry, then the attested
+    Three fences, never politeness: a host lock (supervisor-start) around every launch; the seat row in
+    machine.sqlite seats (scripts/supervisor/home.mjs: a 'starting' reservation with an expiry, then the attested
     terminal - a seat a responding Orca proves live is never replaced, an Orca outage proves nothing); and a
     dedupe of every terminal titled "[Supervisor]": with no live seat a live session among them is adopted
     instead of launching a second, every other one is quit and closed.
@@ -545,7 +545,7 @@ loop:
           pattern whose causes are already fixed (a retry-loop/repeat-check stays OWED until a
                      success breaks its streak): once the fixing commits are on main, ack it -
                      `node scripts/supervisor/owed.mjs ack --item <key> --commits <sha,...> --reason <text>`
-                     (kept in the supervisor ledger; `acks` lists, `unack --item` drops). It is quiet in
+                     (kept in machine.sqlite sup_owed; `acks` lists, `unack --item` drops). It is quiet in
                      the OWED lines until a failure NEWER than the ack lands on its
                      lineage, which re-opens it (ack-reopened). A lineage whose newest job is queued
                      behind an open owner gate or owner ask is the owner's, never OWED.

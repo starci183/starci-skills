@@ -5,7 +5,7 @@ close. Never call an API verb to look at state, and never open a database for wr
 
 ```text
 runtime.sqlite   %LOCALAPPDATA%/StarCi/projects/<ledger_id>/runtime.sqlite
-machine.sqlite   %LOCALAPPDATA%/StarCi/runtime/machine.sqlite
+machine.sqlite   %LOCALAPPDATA%/StarCi/machine.sqlite
 blob             GET /api/blob/<sha256> on the harness, or blobs.file_uri
 ```
 

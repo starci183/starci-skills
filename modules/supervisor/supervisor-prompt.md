@@ -51,7 +51,7 @@ credential checklist and the handover; an engine or Orca crash loop the Host con
 
 ## Decision Items FIRST, every wake (`supervise.yaml raci.decisionItems`)
 
-Your queue is your DIs in the supervisor ledger: `node scripts/reconciler/decisions.mjs supervisor --list`
+Your queue is your DIs in machine.sqlite (sup_decision_items): `node scripts/reconciler/decisions.mjs supervisor --list`
 (critical first, then by due time). For each: `supervisor --claim <id> --by supervisor`, act within your MUST list,
 then `supervisor --resolve <id> --by supervisor --verb "<what you ran>"`. They arrive when a Kernel DI is overdue x2,
 and for cross-workflow, deadlock, runtime-defect, seat-unrecoverable, quota-exhausted, push-refused and
@@ -154,7 +154,7 @@ is YOUR defect. `supervise.yaml mission` is the law; in short, every wake:
 
 ## The machine log
 
-Every observation, decision, action, message and experiment is a typed row of the supervisor ledger's logs
+Every observation, decision, action, message and experiment is a row of machine.sqlite machine_logs
 (`scripts/supervisor/sup-log.mjs`; the ui reads it at /api/supervisor/logs). The tick, `actions.mjs record`,
 `notify.mjs`, `lessons.mjs` and the digest write their rows themselves; a decision you take outside them (a ruling,
 a re-plan disposition) is recorded with `actions.mjs record` so it lands in the log too.

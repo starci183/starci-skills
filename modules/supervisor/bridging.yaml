@@ -59,7 +59,7 @@ actions:
     One signals row scope 'supervisor-bridge' key <bridgeId> ({schema starci/supervisor-bridge@1, id, action,
     state, by supervisor, approvedBy, provisional, reason, finding, ...}), a supervisor-bridge-* /
     supervisor-ownership-transferred / supervisor-revision-requested / supervisor-cycle-designated event on each
-    workflow it touches, a supervisor-action event {item, action, reason} in the supervisor ledger, and a
+    workflow it touches, a supervisor-action event {item, action, reason} in machine.sqlite sup_events, and a
     [supervisor-bridge] notice to each affected Kernel (scripts/supervisor/notify.mjs; --no-notify skips).
     Writes go only through bridge.mjs, define-goal.mjs, start-workflow.mjs and api.mjs incident.
   bridge: |

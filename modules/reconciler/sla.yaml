@@ -5,16 +5,16 @@
 # built-in pass (lane rc-engine calls it every passMs through a guarded optional import).
 #
 # How a clock becomes a violation:
-#   - a controller records `(entity, state, entered_at, sla_ms)` in reconciler.sqlite sla_clocks (ctx.clock) when an
-#     entity enters a state, and `cleared_at` (ctx.clear) when it leaves;
+#   - a controller opens a machine.sqlite `sla_episodes` row `(entity, state, entered_at, sla_ms)` (ctx.clock) when an
+#     entity enters a state, and sets its `cleared_at` (ctx.clear) when it leaves; episodes are append-only;
 #   - a clock's `state` is a code of this catalogue (`SETTLE_OVERDUE`), or `<CODE>/critical` for the second, critical
 #     threshold of the same code on the same entity; any other state is looked up in `states` below, and an unknown
 #     state reports as itself, severity warn;
 #   - every pass, a clock past its sla_ms (the clock's own sla_ms wins: the controller that set it knew the case) and
-#     not yet violated is ONE `runtime-invariant-violated` event on the supervisor ledger (wf-supervisor, entity type
-#     `invariant`, entity id = dedupeKey `<CODE>|<entity>`, `|critical` appended for a critical clock) plus one typed
-#     row (kind `warning`, data.event `invariant.violated`, data.code the code); when the entity leaves the state, ONE
-#     `runtime-invariant-cleared` event and the clock row is removed;
+#     not yet violated is marked violated once and recorded as ONE `runtime-invariant-violated` Supervisor event (sup_events), ONE `invariant_violations` row (dedupeKey
+#     `<CODE>|<entity>`, `|critical` appended for a critical clock) plus one machine_logs row (kind `invariant.violated`,
+#     data.code the code); when the entity leaves the state, the episode is cleared and the violation closed
+#     (`invariant.cleared`);
 #   - `critical` opens a Decision Item `runtime-defect` for the Supervisor (ctx.openDecision; in shadow a would-row).
 # The layer only REPORTS (concern sla.report): it records violations in every mode, including shadow, and never acts.
 #

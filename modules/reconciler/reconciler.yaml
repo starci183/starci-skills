@@ -77,7 +77,7 @@ concerns:
 
 routing:
   source: every ledger's events (sources.mjs), per allocation.reconciler.pollMs; the first run of a ledger starts at MAX(seq), no replay
-  ledgers: config.yaml supervisor.repos (ledgerId = folder name) + the Supervisor ledger (ledgerId supervisor)
+  ledgers: config.yaml supervisor.repos (ledgerId = folder name) + the Supervisor (ledgerId supervisor, its events in machine.sqlite sup_events)
   examples:   # DESIGN §7.4
     op-reported: 'job:<ledgerId>:<jobId>'
     op-dispatched: ['job:<ledgerId>:<jobId>', 'resource:host']
@@ -96,7 +96,7 @@ workqueue:
 shadow:
   meaning: |-
     A shadow controller reads everything and records clocks, but ctx.api, ctx.run and ctx.openDecision run nothing:
-    each writes one `reconciler.would` typed row on the Supervisor ledger (scripts/supervisor/sup-log.mjs; the same
+    each writes one `reconciler.would` row to machine.sqlite machine_logs (scripts/reconciler/ctx.mjs; the same
     call at most once per 10 minutes) and answers {ok: true, shadow: true}. ctx.owns() is false: nobody does the
     duty, so a controller is only left in shadow for a first trial. --safe (crash loop) runs every active controller
     as shadow. Every controller lands in shadow; flipping one to active is a separate config change (order: job, host,
