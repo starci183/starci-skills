@@ -1,0 +1,8 @@
+id: ui-retire-legacy-cites
+effectiveAt: '2026-09-29T02:31:00+07:00'
+summary: 'The read-only status UI now serves artifacts, graph, logs and Supervisor views from ui/api/routes. Legacy UI modules and their old specs are intentionally retired, so historical contract citations remain valid through retired-paths. The live artifacts command names the current attempt API. The DB opener pending list is empty because the legacy opener was removed. No runtime, ledger, Op or finding behavior changes.'
+reach: new-legs
+paths:
+  - modules/kernel/api-commands/artifacts.yaml
+  - modules/kernel/retired-paths.yaml
+  - scripts/checks/check-db-openers.mjs
