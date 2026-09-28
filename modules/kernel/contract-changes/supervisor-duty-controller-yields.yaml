@@ -1,0 +1,15 @@
+id: supervisor-duty-controller-yields
+effectiveAt: '2026-09-28T17:30:00+07:00'
+summary: >-
+  Duty text aligned with the reconciler DESIGN and the controllers already active (job, host, gc, workflow in
+  config.yaml reconciler.controllers): supervise.yaml dropped the Supervisor's stale reconcile --dead-worker grant
+  (dead workers are the Job controller's, classes.dead-worker already said so) and its dead-kernel class now names
+  the Host controller's seat-unrecoverable DI; kernelSeat.liveness, scheduledTick, loop.recovery, loop.perCycle.stall
+  and lanes.watchdog state that the active controller runs the same pass and the old loop yields (reconciler-owned);
+  supervisor-prompt.md says the same for the seat and the dead-kernel class. Text only - adds no check or finding
+  code; a leg admitted earlier is unaffected.
+reach: new-legs
+paths:
+  - modules/supervisor/supervise.yaml
+  - modules/supervisor/supervisor-prompt.md
+  - modules/kernel/contract-changes/supervisor-duty-controller-yields.yaml
