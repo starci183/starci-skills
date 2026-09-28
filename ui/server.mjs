@@ -20,6 +20,7 @@ import { readWorkflowEvents } from './workflow-events.mjs';
 import { logQueryOf, readDiffAsset, readJobDiff, readProjectLogs } from './typed-logs.mjs';
 import { readSupervisorLogs, readSupervisorStateForUi, supervisorLogQueryOf } from './supervisor.mjs';
 import { aggregate, jobRecords, telemetrySettings } from '../scripts/supervisor/op-metrics.mjs';
+import { hostRam, listWorktrees, probeServices, productDecisions, progressRow, reconcilerState, supervisorDecisions, unitBoard, worktreesOfWorkflow } from './reconciler.mjs';
 
 // The approved leg graph comes from scripts/route/plan-edges.mjs. When a runtime does not have that module, the UI draws the linear chain.
 const planEdges = await import('../scripts/route/plan-edges.mjs').catch((error) => {
@@ -298,10 +299,13 @@ async function buildSnapshot() {
     wf.asks = Array.isArray(row?.asks) ? row.asks.map((ask) => ({ op: safe(ask.op), askClass: safe(ask.askClass), text: safe(ask.text), link: liveFormLink(ask.link) })) : [];
     wf.holds = Array.isArray(row?.holds) ? row.holds.map((hold) => ({ op: safe(hold.op), reason: safe(hold.heldBecause), peer: safe(hold.peer), jobId: safe(hold.jobId), since: hold.since })) : [];
   }
+  // `api status` of each live workflow runs in its own loop (statusLoop, below): the snapshot applies the last answer
+  // it has, so no page ever waits on the 30-50 s verb.
   const liveRows = projectRows.flatMap((project) => project.workflows.map((wf) => ({ project, wf })));
-  await mapLimit(liveRows, 4, async ({ project, wf }) => {
-    const status = await readCli('scripts/kernel/api.mjs', ['status', '--repo', project.repo, '--workflow', wf.id, '--json'], null);
-    if (status.error) { sources[`status:${wf.id}`] = status.error; return; }
+  for (const { project, wf } of liveRows) {
+    const status = statusCache.get(wf.id);
+    if (!status) { sources[`status:${wf.id}`] = offline ? 'offline' : 'api status chưa chạy xong lần đầu'; continue; }
+    if (status.error) { sources[`status:${wf.id}`] = status.error; if (!status.value) continue; }
     const state = status.value;
     wf.stuck = Array.isArray(state?.stuck) ? state.stuck : [];
     wf.frontier = {
@@ -334,6 +338,28 @@ async function buildSnapshot() {
     // Grammar proposals interface.draw filed and nobody resolved (the owner decides them) and LOG_TYPED_MISSING warnings.
     wf.grammarProposals = Array.isArray(state?.grammarProposals) ? state.grammarProposals.map((p) => ({ name: safe(p.name), opId: p.opId ? safe(p.opId) : null, jobId: p.jobId ? safe(p.jobId) : null, file: p.file ? safe(p.file) : null, complete: Boolean(p.complete) })) : [];
     wf.logTypedMissing = Array.isArray(state?.logTypedMissing) ? state.logTypedMissing.map((w) => ({ jobId: safe(w.jobId), op: w.op ? safe(w.op) : null, attempt: Number.isInteger(w.attempt) ? w.attempt : null, code: 'LOG_TYPED_MISSING', missing: (w.missing ?? []).map((m) => safe(m)), opRows: Number(w.opRows) || 0, at: w.at ?? null })) : [];
+  }
+  // Progress, RCA, units by job state, DIs and worktrees of each live workflow, in-process (progress-rca.mjs
+  // workflowView is the function behind api status progress/rca; ~30 ms a workflow).
+  const now = Date.now();
+  const boards = new Map();
+  await mapLimit(projectRows.filter((project) => project.workflows.length), 3, async (project) => {
+    const worktrees = offline ? [] : await listWorktrees(project.repo);
+    let db;
+    try { db = openLedgerReader(path.join(project.repo, '.starciwork', 'runtime.sqlite')); } catch (error) { sources[`fleet:${project.id}`] = safe(error.message); return; }
+    try {
+      for (const wf of project.workflows) {
+        try {
+          const decisions = productDecisions(db, { ledger: project.id, workflowId: wf.id, now });
+          const live = decisions.filter((d) => ['open', 'claimed', 'escalated'].includes(d.status));
+          const state = statusCache.get(wf.id)?.value ?? null;
+          const core = state ? { legs: state.legs, frontier: state.frontier, stuck: state.stuck, ramThrottle: state.ramThrottle, poolLoad: state.poolLoad } : {};
+          const fleet = progressRow(db, { workflowId: wf.id, repo: project.repo, core, now, decisions: live, ownerAsks: (wf.asks ?? []).filter((ask) => ask.askClass !== 'credential') });
+          const jobs = db.prepare("SELECT job_id, status FROM jobs WHERE workflow_id=? AND kind='op'").all(wf.id);
+          boards.set(wf.id, { fleet, board: unitBoard(db, wf.id), decisions, worktrees: worktreesOfWorkflow(worktrees, { workflowId: wf.id, jobs }), coreFrom: statusCache.get(wf.id)?.at ?? null });
+        } catch (error) { sources[`fleet:${wf.id}`] = safe(error.message); }
+      }
+    } finally { db.close(); }
   });
   for (const project of projectRows) for (const wf of project.workflows) delete wf.jobLog;
   // Op health across every project and the stuck waits api status aged (critical first, then oldest), at most 60.
@@ -370,7 +396,7 @@ async function buildSnapshot() {
     };
   } catch (error) { sources.supervisor = safe(error.message); }
   else sources.supervisor = 'offline';
-  return {
+  const out = {
     updatedAt: Date.now(), sources,
     // The shared op labels (modules/ops/labels.yaml): the UI shows exactly these words for an op id.
     opLabels: Object.fromEntries(Object.entries(opLabelMap()).map(([op, label]) => [op, { vi: safe(label.vi ?? op), en: safe(label.en ?? label.vi ?? op) }])),
@@ -383,12 +409,133 @@ async function buildSnapshot() {
     opHealth,
     stuck,
   };
+  // Per-workflow detail and the page views ride along out of /api/snapshot's JSON (non-enumerable).
+  Object.defineProperty(out, 'boards', { value: boards, enumerable: false });
+  const views = pageViews(out);
+  Object.defineProperty(out, 'views', { value: views, enumerable: false });
+  return out;
 }
 
-async function snapshot() {
-  if (cache && Date.now() - cache.updatedAt < TTL) return cache;
+const LIVE_DI = ['open', 'claimed', 'escalated'];
+const PLAN_GATE = /\b(?:goal|plan) revision\b|bản chỉnh kế hoạch|sửa kế hoạch/i;
+const PILL_RANK = { stuck: 0, slow: 1, unknown: 2, ok: 3, done: 4 };
+/**
+ * The page views, built once per tick from the snapshot (each page reads ONE endpoint):
+ *   home    the live workflows (progress, speed, ETA, pill, top reason, who is on it), the owner-only items (shown
+ *           only when any) and the one-line system health strip;
+ *   system  the reconciler (engine, controllers, services, violations, GC), the Supervisor's decisions, op health
+ *           and the land gate;
+ *   nav     the counts the navigation shows.
+ * Every number names its source.
+ */
+function pageViews(snap) {
+  const now = Date.now();
+  const rows = snap.projects.flatMap((project) => project.workflows.map((wf) => ({ project, wf })));
+  const supDecisions = offline ? [] : supervisorDecisions({ now });
+  const productDis = rows.flatMap(({ project, wf }) => (snap.boards.get(wf.id)?.decisions ?? []).map((d) => ({ ...d, projectId: project.id })));
+  const reconciler = reconcilerState({ now, serviceProbe });
+  const ram = hostRam();
+
+  const workflows = rows.map(({ project, wf }) => ({
+    id: wf.id, projectId: project.id, projectName: project.name, name: wf.name, goal: safe(wf.goal, 200),
+    kernel: wf.kernel.state, pill: snap.boards.get(wf.id)?.fleet?.pill ?? 'unknown', progress: snap.boards.get(wf.id)?.fleet?.progress ?? null, topReason: snap.boards.get(wf.id)?.fleet?.topReason ?? null, onIt: snap.boards.get(wf.id)?.fleet?.onIt ?? null,
+    rcaWhy: snap.boards.get(wf.id)?.fleet?.rca?.why ?? null, statusAt: snap.boards.get(wf.id)?.coreFrom ?? null,
+    source: 'progress-rca.mjs workflowView (= api status progress)',
+  })).sort((a, b) => (PILL_RANK[a.pill] ?? 2) - (PILL_RANK[b.pill] ?? 2) || String(a.name).localeCompare(String(b.name)));
+
+  // Owner-only items (DESIGN §20): asks, owner-decider DIs, images awaiting the owner, plan revisions; credentials
+  // only as the one handover checklist line.
+  const owner = [];
+  for (const { wf } of rows) {
+    for (const ask of wf.asks ?? []) if (ask.askClass !== 'credential') owner.push({ kind: 'ask', workflowId: wf.id, workflowName: wf.name, text: ask.text, link: ask.link, source: 'progress-report asks' });
+    for (const review of wf.drawReviews ?? []) if (review.awaitingOwner || review.state === 'awaiting-owner') owner.push({ kind: 'draw-review', workflowId: wf.id, workflowName: wf.name, text: `Duyệt hình ${review.record}`, link: null, source: 'api status drawReviews' });
+    for (const incident of wf.incidents ?? []) if (/^\[owner-gate/.test(incident.text) && PLAN_GATE.test(incident.text)) owner.push({ kind: 'plan-revision', workflowId: wf.id, workflowName: wf.name, text: safe(incident.text, 240), link: null, source: `incident ${incident.id}` });
+  }
+  for (const d of [...productDis, ...supDecisions]) if (d.decider === 'owner' && LIVE_DI.includes(d.status)) owner.push({ kind: 'decision', workflowId: d.workflowId, workflowName: rows.find(({ wf }) => wf.id === d.workflowId)?.wf.name ?? null, text: d.summary, link: null, source: `decision ${d.id}` });
+  const credentials = rows.reduce((n, { wf }) => n + (wf.asks ?? []).filter((ask) => ask.askClass === 'credential').length, 0);
+  if (credentials) owner.push({ kind: 'credentials', workflowId: null, workflowName: null, text: `Checklist credential khi bàn giao: ${credentials} mục`, link: null, source: 'progress-report asks (askClass credential)' });
+
+  const modes = {};
+  for (const c of reconciler.controllers) if (c.mode) modes[c.mode] = (modes[c.mode] ?? 0) + 1;
+  const land = snap.supervisor?.land ?? null;
+  const health = {
+    ram: { ...ram, source: 'os.totalmem/os.freemem' },
+    services: { healthy: reconciler.services.healthy, total: reconciler.services.managed, down: reconciler.services.down, source: reconciler.services.source },
+    violations: { open: reconciler.violations.open, critical: reconciler.violations.critical, source: reconciler.violations.source },
+    gc: reconciler.gc ? { leftovers: reconciler.gc.leftovers, at: reconciler.gc.at, msg: reconciler.gc.msg, source: reconciler.gc.source } : null,
+    controllers: { engineRunning: reconciler.engine.running, why: reconciler.engine.why, modes, source: 'reconciler.sqlite leader/modes' },
+    land: land ? { busy: land.busy, queued: land.queued, source: 'land.mjs landStatus' } : null,
+    sourcesMissing: Object.values(snap.sources).filter(Boolean).length,
+  };
+  health.ok = health.ram.percent < 85 && health.services.down.length === 0 && health.violations.open === 0 && !(health.gc?.leftovers > 0);
+
+  const home = { updatedAt: snap.updatedAt, workflows, owner, health };
+  const system = {
+    updatedAt: snap.updatedAt, reconciler, ram,
+    decisions: { supervisor: supDecisions, product: productDis.filter((d) => d.decider !== 'kernel' || LIVE_DI.includes(d.status)).slice(0, 60) },
+    opHealth: snap.opHealth, stuck: snap.stuck,
+    land: snap.supervisor ? { ...snap.supervisor.land, lastLands: snap.supervisor.lastLands, pushes: snap.supervisor.pushes } : null,
+    sources: snap.sources,
+  };
+  const nav = { updatedAt: snap.updatedAt, owner: owner.length, live: workflows.length, stuck: workflows.filter((w) => w.pill === 'stuck').length };
+  return { home, system, nav };
+}
+
+/** One workflow's detail page: the snapshot row (as the tracker reads it) plus progress, units by state, DIs, worktrees. */
+function workflowPage(snap, projectId, workflowId) {
+  const project = snap.projects.find((p) => p.id === projectId && p.workflows.some((wf) => wf.id === workflowId)) ?? snap.projects.find((p) => p.workflows.some((wf) => wf.id === workflowId));
+  const wf = project?.workflows.find((item) => item.id === workflowId);
+  if (!project || !wf) return null;
+  const extra = snap.boards.get(wf.id) ?? {};
+  return {
+    updatedAt: snap.updatedAt, projectId: project.id, projectName: project.name,
+    // The tracker reads a Snapshot: the one project with the one workflow.
+    snapshot: { updatedAt: snap.updatedAt, sources: snap.sources, opLabels: snap.opLabels, projects: [{ ...project, workflows: [wf] }], owed: [], owedCounts: {}, inboxUnreadTotal: 0, inbox: [], supervisor: null, opHealth: null, stuck: snap.stuck.filter((s) => s.workflowId === wf.id) },
+    fleet: extra.fleet ?? null, board: extra.board ?? null, decisions: extra.decisions ?? [], worktrees: extra.worktrees ?? [], statusAt: extra.coreFrom ?? null,
+  };
+}
+
+// One build per tick, never per request (owner 2026-09-28: api status took 30-50 s a call). A request answers the
+// cached build at once; the tick rebuilds it in the background. Only the very first request waits.
+const TICK_MS = Math.max(5_000, Number(process.env.STARCI_STATUS_TICK_MS) || 20_000);
+function refresh() {
   if (!pending) pending = buildSnapshot().then((result) => { cache = result; return result; }).finally(() => { pending = null; });
   return pending;
+}
+async function snapshot() {
+  if (cache) { if (Date.now() - cache.updatedAt >= TTL) refresh().catch(() => {}); return cache; }
+  return refresh();
+}
+
+// api status per live workflow, in its own loop: {value, error, at} by workflow id; a round ends with a rebuild.
+const statusCache = new Map();
+let statusRunning = false;
+async function statusLoop() {
+  if (offline || statusRunning || !cache) return;
+  statusRunning = true;
+  try {
+    const rows = cache.projects.flatMap((project) => project.workflows.map((wf) => ({ project, id: wf.id })));
+    await mapLimit(rows, 4, async ({ project, id }) => {
+      const status = await readCli('scripts/kernel/api.mjs', ['status', '--repo', project.repo, '--workflow', id, '--json'], null, { timeout: 120_000 });
+      const prior = statusCache.get(id);
+      statusCache.set(id, status.error ? { value: prior?.value ?? null, error: status.error, at: prior?.at ?? null } : { value: status.value, error: null, at: Date.now() });
+    });
+    for (const id of statusCache.keys()) if (!rows.some((row) => row.id === id)) statusCache.delete(id);
+    await refresh();
+  } catch { /* the next round retries */ } finally { statusRunning = false; }
+}
+
+// While the Host controller has not written its service store, the UI probes the same registry every 2 minutes.
+let serviceProbe = null;
+async function serviceLoop() {
+  if (offline) return;
+  try { serviceProbe = await probeServices() ?? serviceProbe; } catch { /* keep the last */ }
+}
+if (!process.env.STARCI_STATUS_NO_TICK) {
+  setInterval(() => { refresh().catch(() => {}); }, TICK_MS).unref();
+  setInterval(() => { statusLoop(); }, TICK_MS).unref();
+  setInterval(() => { serviceLoop(); }, 120_000).unref();
+  refresh().then(() => { statusLoop(); serviceLoop(); }).catch(() => {});
 }
 
 async function agents() {
@@ -468,7 +615,7 @@ const server = http.createServer(async (request, response) => {
   const evidenceMatch = /^\/api\/evidence\/([a-f0-9]{24})$/i.exec(url.pathname);
   const proofFileMatch = /^\/api\/proofs\/([a-z0-9-]{1,40})\/(op-[a-z0-9._-]+)\/([a-f0-9]{24})$/i.exec(url.pathname);
   const commitMatch = /^\/api\/history\/([a-z0-9-]{1,40})\/(BE|FE)\/([a-f0-9]{40})$/i.exec(url.pathname);
-  if (request.method !== 'GET' || (!['/api/snapshot', '/api/agents', '/api/evidence', '/api/history', '/api/proofs', '/api/artifacts', '/api/artifacts/file', '/api/workflow-events', '/api/workflow-events/stream', '/api/logs', '/api/logs/stream', '/api/supervisor/logs', '/api/supervisor/logs/stream', '/api/supervisor/state', '/api/diff', '/api/diff/asset', '/api/coverage', '/api/verify-proofs', '/api/contract'].includes(url.pathname) && !proofFileMatch && !logMatch && !changesMatch && !imageMatch && !evidenceMatch && !commitMatch)) {
+  if (request.method !== 'GET' || (!['/api/snapshot', '/api/agents', '/api/evidence', '/api/history', '/api/proofs', '/api/artifacts', '/api/artifacts/file', '/api/workflow-events', '/api/workflow-events/stream', '/api/logs', '/api/logs/stream', '/api/supervisor/logs', '/api/supervisor/logs/stream', '/api/supervisor/state', '/api/home', '/api/system', '/api/workflow', '/api/nav', '/api/reconciler/state', '/api/reconciler/decisions', '/api/diff', '/api/diff/asset', '/api/coverage', '/api/verify-proofs', '/api/contract'].includes(url.pathname) && !proofFileMatch && !logMatch && !changesMatch && !imageMatch && !evidenceMatch && !commitMatch)) {
     response.writeHead(404, { 'content-type': 'application/json; charset=utf-8' }); response.end('{"error":"Không tìm thấy"}'); return;
   }
   try {
@@ -639,6 +786,21 @@ const server = http.createServer(async (request, response) => {
         response.end(image.body); return;
       }
       data = await readAgentChanges(project, jobId);
+    } else if (['/api/home', '/api/system', '/api/nav', '/api/reconciler/state'].includes(url.pathname)) {
+      const snap = await snapshot();
+      data = url.pathname === '/api/home' ? snap.views.home : url.pathname === '/api/nav' ? snap.views.nav : url.pathname === '/api/system' ? snap.views.system : snap.views.system.reconciler;
+    } else if (url.pathname === '/api/workflow') {
+      const workflowId = url.searchParams.get('id') || '';
+      if (!/^wf-[a-z0-9._-]{1,120}$/i.test(workflowId)) { response.writeHead(404, { 'content-type': 'application/json; charset=utf-8' }); response.end('{"error":"Không tìm thấy workflow"}'); return; }
+      data = workflowPage(await snapshot(), url.searchParams.get('project'), workflowId);
+      if (!data) { response.writeHead(404, { 'content-type': 'application/json; charset=utf-8' }); response.end('{"error":"Không tìm thấy workflow"}'); return; }
+    } else if (url.pathname === '/api/reconciler/decisions') {
+      // DIs across ledgers (lane rc-fleet-ui, DESIGN §10.3): the live ones and the newest closed, optionally one workflow.
+      const snap = await snapshot();
+      const workflowId = url.searchParams.get('workflow');
+      const product = snap.projects.flatMap((project) => project.workflows.flatMap((wf) => (snap.boards.get(wf.id)?.decisions ?? []).map((d) => ({ ...d, projectId: project.id }))));
+      const all = [...product, ...snap.views.system.decisions.supervisor];
+      data = { updatedAt: snap.updatedAt, decisions: workflowId ? all.filter((d) => d.workflowId === workflowId) : all };
     } else data = url.pathname === '/api/agents' ? await agents() : await snapshot();
     response.writeHead(200, { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store' });
     response.end(JSON.stringify(data));
