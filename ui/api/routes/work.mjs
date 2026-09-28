@@ -57,6 +57,12 @@ function workflowRow(store, row, db, progress, extra = {}) {
   const wf = progress.workflow_id;
   const p = row.name;
   const latest = latestMetric(machine, 'progress', row.ledgerId, wf)?.data ?? {};
+  // The progress view bases eta_at on SQLite's current millisecond, so use a stable read bucket.
+  const asOf = Math.floor(Date.now() / 60_000) * 60_000;
+  const remaining = progress.units_total - progress.units_done - progress.units_dropped;
+  const etaAt = progress.done_last_6h > 0
+    ? asOf + Math.trunc(6 * HOUR * remaining / progress.done_last_6h)
+    : null;
   const dIs = many(db, `SELECT di_id,kind,decider,status,due_at,opened_at,summary,ui FROM v_decision_rows WHERE workflow_id=? AND status IN ${OPEN_DI}`, wf);
   const violations = many(machine, 'SELECT code,severity,violated_at,ui FROM v_sla_open WHERE ledger_id=? AND workflow_id=?', row.ledgerId, wf);
   const seat = seatOf(machine, p, wf);
@@ -81,7 +87,7 @@ function workflowRow(store, row, db, progress, extra = {}) {
     ui: state.ui, reason: state.reason,
     units: { done: progress.units_done, total: progress.units_total, active: progress.units_active, failed: progress.units_failed }, unitStates,
     ratePerHour: Number(latest.ratePerHour ?? (progress.done_last_6h / 6)),
-    minRatePerHour: latest.minRatePerHour ?? null, etaAt: latest.etaAt ?? progress.eta_at,
+    minRatePerHour: latest.minRatePerHour ?? null, etaAt: latest.etaAt ?? etaAt,
     running, allowedParallel: current.allowedParallel ?? null, lastUnitAt: progress.last_unit_at,
     onIt, seat: seat ? { state: seat.state, lastSeenAt: seat.last_seen_at } : null,
     updatedAt: extra.updated_at ?? latest.at ?? Date.now(),
@@ -96,18 +102,19 @@ function workflowRows(store, { project = null } = {}) {
 }
 function attention(store) {
   const machine = store.machine.db;
+  const asOf = Math.floor(Date.now() / 60_000) * 60_000;
   const ledgerNames = new Map(store.projects().map(row => [row.ledgerId, row.name]));
   const items = ledgerRows(store, (row, db) => many(db, `SELECT * FROM v_decision_rows WHERE status IN ${OPEN_DI} AND ui IN ('bad','warn')`).map(di => ({
     ref: ref('di', di.di_id, row.name), ui: di.ui, reason: reason(di.overdue ? 'DECISION_OVERDUE' : 'DECISION_OPEN', { kind: di.kind }),
-    age: Math.max(0, Date.now() - di.opened_at), who: di.decider, since: di.opened_at,
+    age: Math.max(0, asOf - di.opened_at), who: di.decider, since: di.opened_at,
   })));
   for (const di of many(machine, "SELECT * FROM v_open_sup_decisions WHERE ui IN ('bad','warn')")) items.push({
     ref: ref('di', di.di_id), ui: di.ui, reason: reason(di.ui === 'bad' ? 'DECISION_OVERDUE' : 'DECISION_OPEN', { kind: di.kind }),
-    age: Math.max(0, Date.now() - di.opened_at), who: 'supervisor', since: di.opened_at,
+    age: Math.max(0, asOf - di.opened_at), who: 'supervisor', since: di.opened_at,
   });
   for (const row of many(machine, 'SELECT * FROM invariant_violations WHERE cleared_at IS NULL')) items.push({
     ref: ref('violation', row.violation_id, ledgerNames.get(row.ledger_id)), ui: row.severity === 'critical' ? 'bad' : 'warn',
-    reason: reason(row.code, {}), age: Math.max(0, Date.now() - row.violated_at), who: 'controller', since: row.violated_at,
+    reason: reason(row.code, {}), age: Math.max(0, asOf - row.violated_at), who: 'controller', since: row.violated_at,
   });
   items.sort((a, b) => Number(b.ui === 'bad') - Number(a.ui === 'bad') || a.since - b.since);
   return items.slice(0, 10).map(({ since, ...item }) => item);
