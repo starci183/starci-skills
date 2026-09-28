@@ -1,0 +1,11 @@
+id: hfs-ecommerce-example-json
+effectiveAt: '2026-09-29T04:10:24+07:00'
+summary: >-
+  The ecommerce backend example moves its resolved port projection from repository-root
+  metadata.json to .starcistacks/dev/infra/metadata.json and adds nest-cli.json for the
+  identity/order application monorepo. Update the JSON exception list to the two current
+  authored JSON paths; the former root metadata exception no longer applies.
+reach: new-legs
+paths:
+  - modules/kernel/contract-changes/hfs-ecommerce-example-json.yaml
+  - modules/schemas/json-exceptions.yaml

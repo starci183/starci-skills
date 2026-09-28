@@ -1,6 +1,6 @@
 import {
     E2EAuthService, E2ESession 
-} from "@tests/infra/business/accounts/e2e-auth.service"
+} from "@tests/infra/domain/accounts/e2e-auth.service"
 import {
     E2EGraphqlClient, E2EGraphqlService 
 } from "@tests/infra/integrations/graphql/e2e-graphql.service"

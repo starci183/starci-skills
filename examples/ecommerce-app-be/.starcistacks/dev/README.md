@@ -2,7 +2,7 @@
 
 The dev environment for the second example product: the two shared stateful components
 (Postgres on 5501, Redis on 6448) run under Compose; the two services run on the host against
-them, resolving every port from `../../metadata.json` - the same numbers as the `ports:` blocks
+them, resolving every port from `../infra/metadata.json` - the same numbers as the `ports:` blocks
 below, read not copied.
 
 Declared in `.starcistacks/application-stacks.yaml`; this file is its runbook. Only `dev` is

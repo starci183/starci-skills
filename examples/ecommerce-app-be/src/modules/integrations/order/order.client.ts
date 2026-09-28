@@ -3,13 +3,13 @@ import {
 } from "@nestjs/common"
 import {
     AppConfigService 
-} from "@modules/platform/config/identity/app-config.service"
+} from "ecommerce-app-be/modules/platform/config/identity"
 import {
     OrderServiceUnavailableException 
-} from "@modules/platform/exceptions/errors/integrations/order-service-unavailable"
+} from "ecommerce-app-be/modules/platform/exceptions"
 import {
     OrderContractMismatchException 
-} from "@modules/platform/exceptions/errors/integrations/order-contract-mismatch"
+} from "ecommerce-app-be/modules/platform/exceptions"
 
 /** The buyer-status answer the order service's internal door provides for a person. */
 export interface BuyerStatusResult {

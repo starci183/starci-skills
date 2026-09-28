@@ -4,8 +4,8 @@ title: The account and session modules of the identity service
 state: done
 repository: ecommerce-app-be
 owners:
-  - {role: module, path: src/modules/business/account}
-  - {role: module, path: src/modules/business/session}
+  - {role: module, path: src/modules/domain/account}
+  - {role: module, path: src/modules/domain/session}
   - {role: module, path: src/modules/integrations/order}
   - {role: feature, path: src/features/identity}
 proves: [br.identity.sign-in, fr.identity.sign-in, contract.identity.internal.sessions, contract.identity.health]
@@ -18,5 +18,5 @@ change:
     v10-3, first recorded rev: proves now also names
     contract.identity.internal.sessions and contract.identity.health - this module is the
     provider half of both wires (features/identity/transport/http/session.controller.ts and
-    health.controller.ts serve them through src/modules/business/session and the platform
+    health.controller.ts serve them through src/modules/domain/session and the platform
     clients).

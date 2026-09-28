@@ -3,7 +3,7 @@ import {
 } from "@tests/infra/e2e-world"
 import {
     E2EAuthService 
-} from "@tests/infra/business/accounts/e2e-auth.service"
+} from "@tests/infra/domain/accounts/e2e-auth.service"
 import {
     E2EDbService 
 } from "@tests/infra/platform/databases/e2e-db.service"
@@ -253,7 +253,9 @@ describe("checkout journey (e2e)",
                 const account = await identityGql.query<AccountData>("account",
                     {
                         variables: {
-                            personId 
+                            request: {
+                                personId
+                            }
                         } 
                     })
                 expect(account.errorCode).toBeNull()

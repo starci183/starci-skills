@@ -7,7 +7,7 @@ import {
 } from "@nestjs/testing"
 import {
     SessionService 
-} from "@modules/business/session/session.service"
+} from "@modules/domain/session/session.service"
 import {
     SessionController 
 } from "./session.controller"

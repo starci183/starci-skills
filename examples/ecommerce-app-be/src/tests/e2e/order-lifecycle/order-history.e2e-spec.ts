@@ -3,7 +3,7 @@ import {
 } from "@tests/infra/e2e-world"
 import {
     E2EAuthService 
-} from "@tests/infra/business/accounts/e2e-auth.service"
+} from "@tests/infra/domain/accounts/e2e-auth.service"
 import {
     E2EDbService 
 } from "@tests/infra/platform/databases/e2e-db.service"
@@ -121,7 +121,9 @@ describe("order lifecycle - order history (e2e)",
                 const freshAccount = await identityGql.query<AccountData>("account",
                     {
                         variables: {
-                            personId: buyer.personId 
+                            request: {
+                                personId: buyer.personId
+                            }
                         } 
                     })
                 expect(freshAccount.data?.account.hasOrders).toBe(false)
@@ -276,7 +278,9 @@ describe("order lifecycle - order history (e2e)",
                 const accountNow = await identityGql.query<AccountData>("account",
                     {
                         variables: {
-                            personId: buyer.personId 
+                            request: {
+                                personId: buyer.personId
+                            }
                         } 
                     })
                 expect(accountNow.data?.account).toMatchObject({

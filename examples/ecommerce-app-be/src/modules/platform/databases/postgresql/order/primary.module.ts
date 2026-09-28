@@ -9,7 +9,7 @@ import {
 } from "node:path"
 import {
     AppConfigService 
-} from "@modules/platform/config/order/app-config.service"
+} from "ecommerce-app-be/modules/platform/config/order"
 import {
     POSTGRESQL_PRIMARY 
 } from "./constants/connection"

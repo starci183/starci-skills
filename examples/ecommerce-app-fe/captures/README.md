@@ -2,7 +2,7 @@
 
 Real screenshots + served markup of the production builds, taken by `capture.mjs` (Playwright,
 `@playwright/test` at this repo's root) while both apps served their `next start` builds on their
-projected ports — resolved live by `scripts/serve.mjs` from `../ecommerce-app-be/metadata.json`,
+projected ports — resolved live by `scripts/serve.mjs` from `../ecommerce-app-be/.starcistacks/dev/infra/metadata.json`,
 not restated here.
 
 ## What they honestly show (2026-09-18)

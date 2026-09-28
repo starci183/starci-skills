@@ -3,31 +3,31 @@ import {
 } from "@nestjs/common"
 import {
     ConfigModule 
-} from "@modules/platform/config/order/config.module"
+} from "ecommerce-app-be/modules/platform/config/order"
 import {
     PostgresqlPrimaryModule 
-} from "@modules/platform/databases/postgresql/order/primary.module"
+} from "ecommerce-app-be/modules/platform/databases/postgresql/order"
 import {
     CatalogModule 
-} from "@modules/business/catalog/catalog.module"
+} from "ecommerce-app-be/modules/domain/catalog"
 import {
     CartModule 
-} from "@modules/business/cart/cart.module"
+} from "ecommerce-app-be/modules/domain/cart"
 import {
     OrderModule 
-} from "@modules/business/order/order.module"
+} from "ecommerce-app-be/modules/domain/order"
 import {
     PaymentModule 
-} from "@modules/business/payment/payment.module"
+} from "ecommerce-app-be/modules/domain/payment"
 import {
     IdentityModule 
-} from "@modules/integrations/identity/identity.module"
+} from "ecommerce-app-be/modules/integrations/identity"
 import {
     CheckoutModule 
-} from "@features/checkout/checkout.module"
+} from "ecommerce-app-be/features/checkout"
 import {
     CheckoutGraphqlModule 
-} from "@features/checkout/graphql/graphql.module"
+} from "ecommerce-app-be/features/checkout"
 
 @Module({
     imports: [
@@ -61,7 +61,7 @@ import {
  * root module wires the platform database, the four capability modules (catalog, cart, order,
  * payment), the HTTP client that verifies sessions against the identity service (the consumer
  * half of the order<->identity pair), the checkout feature's justified HTTP doors and the
- * canonical GraphQL transport for the user-facing API (features/checkout/graphql). Every
+ * canonical GraphQL transport for the user-facing API (features/checkout/transport/graphql). Every
  * capability and platform module is registered `isGlobal: true` HERE - whether a capability is app-wide is a
  * fact about this application, so the root declares it and the modules never declare it about
  * themselves. That is what lets the checkout feature mount its doors and its guard without

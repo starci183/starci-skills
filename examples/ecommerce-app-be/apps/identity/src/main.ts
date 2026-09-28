@@ -7,7 +7,7 @@ import {
 } from "./app.module"
 import {
     AppConfigService 
-} from "@modules/platform/config/identity/app-config.service"
+} from "ecommerce-app-be/modules/platform/config/identity"
 
 async function bootstrap(): Promise<void> {
     const app = await NestFactory.create(AppModule)

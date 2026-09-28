@@ -12,16 +12,21 @@ import {
 } from "node:process"
 import {
     MetadataFileMissingException 
-} from "@modules/platform/exceptions/errors/platform/metadata-file-missing"
+} from "ecommerce-app-be/modules/platform/exceptions"
 import {
     MetadataUnreadableException 
-} from "@modules/platform/exceptions/errors/platform/metadata-unreadable"
+} from "ecommerce-app-be/modules/platform/exceptions"
 import {
     MetadataPortsMissingException 
-} from "@modules/platform/exceptions/errors/platform/metadata-ports-missing"
+} from "ecommerce-app-be/modules/platform/exceptions"
 
-/** Env var naming this checkout's metadata.json; the fallback walk searches upward from the process cwd. */
+/** Env var naming this checkout's metadata.json outright; the fallback walk searches upward from the process cwd for the repository that owns `.starcistacks`. */
 export const METADATA_FILE_ENV = "ECOMMERCE_APP_BE_METADATA"
+/** The projection's home under a repository root: the dev environment's infra declarations. */
+const METADATA_REL = join(".starcistacks",
+    "dev",
+    "infra",
+    "metadata.json")
 /** Env vars that override a resolved value outright (deployment injects them; dev reads metadata). */
 export const PORT_ENV = "ORDER_PORT"
 export const DATABASE_URL_ENV = "ORDER_DATABASE_URL"
@@ -79,12 +84,12 @@ function findMetadataFile(): string {
     let dir = resolve(process.cwd())
     for (;;) {
         const candidate = join(dir,
-            "metadata.json")
+            METADATA_REL)
         if (existsSync(candidate)) return candidate
         const parent = dirname(dir)
         if (parent === dir) {
             throw new MetadataFileMissingException({
-                message: `no metadata.json found from ${process.cwd()} upward; set ${METADATA_FILE_ENV} to its path.` 
+                message: `no metadata.json found from ${process.cwd()} upward (searched ${METADATA_REL} at each ancestor); set ${METADATA_FILE_ENV} to its path.`
             })
         }
         dir = parent

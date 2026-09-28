@@ -34,7 +34,7 @@ export type PlaceOrderOutcome =
     | { readonly kind: "failed"; readonly reason: string; readonly code?: string };
 
 const PLACE_ORDER_MUTATION = `mutation ShopPlaceOrder($input: PlaceOrderInput!) {
-    placeOrder(input: $input) { orderId status totalMinorUnits currency paymentId replayed }
+    placeOrder(request: $input) { orderId status totalMinorUnits currency paymentId replayed }
 }`
 
 /**

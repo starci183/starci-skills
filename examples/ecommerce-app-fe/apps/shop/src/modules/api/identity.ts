@@ -40,13 +40,13 @@ export type AccountView = {
 };
 
 const SIGN_IN_DOCUMENT =
-    "mutation SignIn($input: SignInInput!) { signIn(input: $input) { sessionToken personId } }"
+    "mutation SignIn($input: SignInInput!) { signIn(request: $input) { sessionToken personId } }"
 
 const REGISTER_DOCUMENT =
-    "mutation Register($input: RegisterInput!) { register(input: $input) { personId } }"
+    "mutation Register($input: RegisterInput!) { register(request: $input) { personId } }"
 
 const ACCOUNT_DOCUMENT =
-    "query Account($personId: ID!) { account(personId: $personId) { personId email hasOrders } }"
+    "query Account($request: AccountRequest!) { account(request: $request) { personId email hasOrders } }"
 
 /**
  * THE SETTLED CONTRACT — the landing → shop session handoff, concretely.
@@ -95,7 +95,7 @@ export const verifySession = async (sessionToken: string): Promise<Result<Verifi
 
 /** `account(personId)`: the person's own view, joining their live buyer status from the order service. */
 export const fetchAccount = async (personId: string): Promise<Result<AccountView>> =>
-    postGraphql<{ account: AccountView }>(IDENTITY_API_URL, ACCOUNT_DOCUMENT, { personId }, null)
+    postGraphql<{ account: AccountView }>(IDENTITY_API_URL, ACCOUNT_DOCUMENT, { request: { personId } }, null)
         .then((result) => (result.ok ? { ok: true, data: result.data.account } : result))
 
 /**

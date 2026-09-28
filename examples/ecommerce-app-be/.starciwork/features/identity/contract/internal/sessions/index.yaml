@@ -10,13 +10,13 @@ surface:
   - name: verifySession
     shape: POST /internal/sessions/verify -> {personId}
     transport: >-
-      Plain HTTP/JSON between the two services on the ports metadata.json resolves (identity on
+      Plain HTTP/JSON between the two services on the ports .starcistacks/dev/infra/metadata.json resolves (identity on
       identityApi). The door is internal - it sits under /internal/sessions on the identity
       service (features/identity/transport/http/session.controller.ts), the same shelf
       contract.checkout.order-for-identity's /internal/buyers door sits on over at the order
       service, never on a user-facing route. The bearer token travels in the JSON body as
       {sessionToken}; an internal hop carries no user session of its own. The order service's
-      session guard (features/checkout/graphql/session.guard.ts through
+      session guard (features/checkout/transport/graphql/session.guard.ts through
       modules/integrations/identity/identity.client.ts) calls it on every person-scoped GraphQL
       door, and the shop frontend's own session door calls it while rendering an account page.
     guarantee: >-

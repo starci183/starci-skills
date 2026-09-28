@@ -2,18 +2,30 @@
   "name": "ecommerce-app-be",
   "version": "1.0.0",
   "private": true,
-  "description": "Ecommerce app backend: the second example product, a NestJS monorepo (npm workspaces under apps/*) shaped like nivo-backend - each capability deployed as its own service (identity, order) instead of one src/, proving the Work layout survives a multi-repo-at-product / monorepo-inside-each-repo topology. Ports come from the one runtime projection this repository owns: metadata.json.",
+  "description": "Ecommerce app backend: a NestJS monorepo with identity and order services. Ports come from .starcistacks/dev/infra/metadata.json.",
   "workspaces": [
     "apps/*"
   ],
+  "exports": {
+    "./features/*": {
+      "types": "./src/features/*/index.ts",
+      "default": "./dist/src/features/*/index.js"
+    },
+    "./modules/*": {
+      "types": "./src/modules/*/index.ts",
+      "default": "./dist/src/modules/*/index.js"
+    }
+  },
   "scripts": {
     "build": "tsc -p tsconfig.build.json",
+    "lint:check": "npm run lint",
+    "test:unit": "npm test -- --runInBand",
     "typecheck": "tsc --noEmit",
     "test": "jest",
     "test:coverage": "jest --coverage",
     "test:e2e": "jest --config src/tests/e2e/jest.config.js",
-    "start:identity": "node -r tsconfig-paths/register dist/apps/identity/src/main.js",
-    "start:order": "node -r tsconfig-paths/register dist/apps/order/src/main.js",
+    "start:identity": "node dist/apps/identity/src/main.js",
+    "start:order": "node dist/apps/order/src/main.js",
     "live-proof": "node scripts/live-proof.mjs",
     "lint": "eslint \"src/**/*.ts\" \"apps/**/*.ts\"",
     "lint:fix": "eslint \"src/**/*.ts\" \"apps/**/*.ts\" --fix"

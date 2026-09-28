@@ -28,13 +28,13 @@ import {
 } from "@modules/platform/caches/redis/primary/redis.client"
 import {
     AccountService 
-} from "@modules/business/account/account.service"
+} from "@modules/domain/account/account.service"
 import {
     SessionRepository 
-} from "@modules/business/session/session.repository"
+} from "@modules/domain/session/session.repository"
 import {
     SessionService 
-} from "@modules/business/session/session.service"
+} from "@modules/domain/session/session.service"
 import {
     OrderApiClient 
 } from "@modules/integrations/order/order.client"
@@ -46,13 +46,13 @@ import {
 } from "@features/identity/transport/http/session.controller"
 import {
     AccountResolver 
-} from "@features/identity/graphql/queries/account/account/account.resolver"
+} from "@features/identity/transport/graphql/queries/account/account/account.resolver"
 import {
     RegisterResolver 
-} from "@features/identity/graphql/mutations/session/register/register.resolver"
+} from "@features/identity/transport/graphql/mutations/session/register/register.resolver"
 import {
     SignInResolver 
-} from "@features/identity/graphql/mutations/session/sign-in/sign-in.resolver"
+} from "@features/identity/transport/graphql/mutations/session/sign-in/sign-in.resolver"
 
 /**
  * The identity deployable's DI smoke: AppModule must compile with the platform boundary - the

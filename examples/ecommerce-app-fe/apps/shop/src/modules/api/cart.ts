@@ -31,7 +31,7 @@ const CART_QUERY = `query ShopCart {
 }`
 
 const ADD_CART_ITEM_MUTATION = `mutation ShopAddCartItem($input: AddCartItemInput!) {
-    addCartItem(input: $input) { item { productId quantity } }
+    addCartItem(request: $input) { item { productId quantity } }
 }`
 
 const CLEAR_CART_MUTATION = `mutation ShopClearCart {

@@ -38,6 +38,55 @@ environments:
     # nothing to custody yet - a real environment adopts the SOPS+age pattern the todo-app example
     # demonstrates before it holds anything worth encrypting.
     secrets: []
+# Delivery/quality services (contract change starcistacks-services). Codecov is the one service CI
+# calls for this repository: the parent's example-coverage.yml uploads coverage/lcov.info under flag
+# ecommerce-be with OIDC. Sonar points to the shared host extension; CI does not scan this example.
+services:
+  sonar:
+    provider: sonarqube
+    mode: local
+    purpose: Local static analysis for the ecommerce backend example.
+    host:
+      local: http://localhost:9010
+      public: https://sonar.starci.org
+    stack:
+      owner: host
+      root: .claude/ext/sonar
+      environment: dev
+      compose: compose.yaml
+      container: starci-sonarqube
+      publishedBy: cloudflared.yaml
+    auth: token
+    projects:
+      - {repository: ecommerce-app-be, key: starci-ecommerce-app-be}
+    credentials:
+      - id: admin
+        purpose: Host SonarQube project provisioning for this example; no CI analysis token is declared.
+        env: SONAR_TOKEN
+        custody: {repository: starci-academy-backend, path: .claude/ext/sonar/secrets/sonarqube-admin-token.key}
+    ci:
+      wiring: not-used
+    ownerAction: none
+  codecov:
+    provider: codecov
+    mode: hosted
+    purpose: Coverage dashboard for the example unit suite (lcov.info upload, flag ecommerce-be).
+    host:
+      public: https://app.codecov.io
+    auth: oidc
+    projects:
+      - {repository: ecommerce-app-be, key: gh/starci183/starci-skills, name: starci-skills}
+    credentials: []
+    ci:
+      workflow: .github/workflows/example-coverage.yml
+      wiring: required
+      permissions: ['id-token: write']
+      secrets: []
+      vars: []
+      provisioning: >-
+        codecov/codecov-action@v5 with use_oidc true, flags ecommerce-be; the workflow lives in the
+        parent repository's .github/workflows because examples carry no CI of their own.
+    ownerAction: none
 k8s:
   status: deferred
   reason: >-

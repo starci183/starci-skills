@@ -19,6 +19,9 @@ exceptions:
   - path: examples/ecommerce-app-be/.starcistacks/dev/environment.json
     reason: >
       starci/rendered-environment output for the ecommerce-app-be application stack; JSON by the rendering contract.
+  - path: examples/ecommerce-app-be/.starcistacks/dev/infra/metadata.json
+    reason: >
+      Resolved runtime projection (port map) for the ecommerce product; JSON by the example tooling contract.
   - path: examples/ecommerce-app-be/.starciwork/_derived/deep-baseline.json
     reason: >
       Derived deep-check baseline written by the work-tree checker for ecommerce-app-be; generated evidence, JSON by the checker writer contract.
@@ -31,9 +34,9 @@ exceptions:
   - path: examples/ecommerce-app-be/architecture.json
     reason: >
       Rendered architecture document for the ecommerce-app-be example project; JSON by the renderer contract.
-  - path: examples/ecommerce-app-be/metadata.json
+  - path: examples/ecommerce-app-be/nest-cli.json
     reason: >
-      Example project metadata for ecommerce-app-be; JSON by the example tooling contract.
+      Nest CLI monorepo map inside the ecommerce-app-be project; the nest toolchain reads JSON.
   - path: examples/ecommerce-app-be/package-lock.json
     reason: >
       npm lockfile inside the ecommerce-app-be project; npm writes JSON by contract.

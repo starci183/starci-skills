@@ -10,6 +10,6 @@ services:
       - postgres
       - redis
     environment:
-      ECOMMERCE_APP_BE_METADATA: /repo/examples/ecommerce-app-be/metadata.json
+      ECOMMERCE_APP_BE_METADATA: /repo/examples/ecommerce-app-be/.starcistacks/dev/infra/metadata.json
     ports:
       - "5070:5070"

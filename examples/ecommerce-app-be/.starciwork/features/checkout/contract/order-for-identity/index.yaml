@@ -10,12 +10,12 @@ surface:
   - name: buyerStatus
     shape: GET /internal/buyers/:personId -> {personId, hasOrders}
     transport: >-
-      Plain HTTP/JSON between the two services on the ports metadata.json resolves (order on
+      Plain HTTP/JSON between the two services on the ports .starcistacks/dev/infra/metadata.json resolves (order on
       orderApi). The door is internal - it sits under /internal/buyers on the order service
       (features/checkout/transport/http/buyer.controller.ts), beside /internal/sessions on the
       identity side, never on a user-facing route. The consumer is the identity service's
       account view: the account(personId) GraphQL query composes its own person row with this
-      call's answer and nothing else (features/identity/graphql/queries/account). There is no
+      call's answer and nothing else (features/identity/transport/graphql/queries/account). There is no
       shared table and no shared cache behind the answer - the call is the only way identity
       learns it.
     guarantee: >-

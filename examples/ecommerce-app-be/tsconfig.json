@@ -26,6 +26,12 @@
       "jest"
     ],
     "paths": {
+      "ecommerce-app-be/features/*": [
+        "./src/features/*/index.ts"
+      ],
+      "ecommerce-app-be/modules/*": [
+        "./src/modules/*/index.ts"
+      ],
       "@e2e-kit/*": [
         "../../packages/e2e-kit/src/*"
       ],

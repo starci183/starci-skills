@@ -8,7 +8,7 @@ statements:
   - Clearing removes every line the person holds and touches nobody else's; a confirmed order clears the cart inside its own transaction.
   - The cart read answers the person's own lines in product order, together with the catalog's live price-and-stock snapshot.
 authorityRefs:
-  - "code-truth: src/modules/business/cart/cart.service.ts and the add-cart-item / clear-cart / cart resolvers - these doors shipped without a record; this rule states what they actually do."
+  - "code-truth: src/modules/domain/cart/cart.service.ts and the add-cart-item / clear-cart / cart resolvers - these doors shipped without a record; this rule states what they actually do."
 acceptance:
   - id: ac.checkout.cart.accumulates-on-held-product
     given: A person whose cart already holds 2 of a product
@@ -25,7 +25,7 @@ acceptance:
     when: They clear the cart
     then:
       - A later read answers no lines, and the lines of nobody else were touched.
-module: src/modules/business/cart
+module: src/modules/domain/cart
 change:
   rev: 2
   kind: breaking

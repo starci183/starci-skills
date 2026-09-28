@@ -3,7 +3,7 @@ import {
 } from "@nestjs/common"
 import {
     CheckoutRefusalReason 
-} from "@modules/business/order/checkout.policy"
+} from "ecommerce-app-be/modules/domain/order"
 import {
     AbstractException 
 } from "../abstract"

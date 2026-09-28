@@ -100,6 +100,9 @@ describe("AppConfigService (identity) - the metadata.json runtime projection",
             async () => {
                 const cwd = process.cwd()
                 const parentFile = join(dirname(cwd),
+                    ".starcistacks",
+                    "dev",
+                    "infra",
                     "metadata.json")
                 existsSyncMock.mockImplementation((path: string) => path === parentFile)
                 readFileSyncMock.mockReturnValue(JSON.stringify(METADATA))
@@ -108,6 +111,9 @@ describe("AppConfigService (identity) - the metadata.json runtime projection",
                 try {
                     expect(moduleRef.get(AppConfigService).getPort()).toBe(5070)
                     expect(existsSyncMock).toHaveBeenCalledWith(join(cwd,
+                        ".starcistacks",
+                        "dev",
+                        "infra",
                         "metadata.json"))
                     expect(existsSyncMock).toHaveBeenCalledWith(parentFile)
                 } finally {

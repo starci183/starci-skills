@@ -19,18 +19,18 @@ import {
  * service class, a repository or an entity; preconditions are created by the public operations
  * that create them.
  *
- * These are the operations the resolvers under src/features/{identity,checkout}/graphql
+ * These are the operations the resolvers under src/features/{identity,checkout}/transport/graphql
  * actually register: the identity service answers register/signIn/account, the order service
  * answers cart/addCartItem/clearCart/placeOrder.
  */
 export const GRAPHQL_DOCUMENTS = {
-    register: "mutation Register($input: RegisterInput!) { register(input: $input) { personId } }",
-    signIn: "mutation SignIn($input: SignInInput!) { signIn(input: $input) { sessionToken personId } }",
-    account: "query Account($personId: ID!) { account(personId: $personId) { personId email hasOrders } }",
+    register: "mutation Register($input: RegisterInput!) { register(request: $input) { personId } }",
+    signIn: "mutation SignIn($input: SignInInput!) { signIn(request: $input) { sessionToken personId } }",
+    account: "query Account($request: AccountRequest!) { account(request: $request) { personId email hasOrders } }",
     cart: "query { cart { items { productId quantity } catalog { id name priceMinorUnits stock } } }",
-    addCartItem: "mutation AddCartItem($input: AddCartItemInput!) { addCartItem(input: $input) { item { productId quantity } } }",
+    addCartItem: "mutation AddCartItem($input: AddCartItemInput!) { addCartItem(request: $input) { item { productId quantity } } }",
     clearCart: "mutation { clearCart { cleared } }",
-    placeOrder: "mutation PlaceOrder($input: PlaceOrderInput!) { placeOrder(input: $input) { orderId status totalMinorUnits currency paymentId replayed } }",
+    placeOrder: "mutation PlaceOrder($input: PlaceOrderInput!) { placeOrder(request: $input) { orderId status totalMinorUnits currency paymentId replayed } }",
 } as const
 
 /** The registry key of a frozen GraphQL document - what a spec passes instead of a raw string. */

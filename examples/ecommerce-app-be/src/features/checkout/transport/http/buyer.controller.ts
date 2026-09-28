@@ -3,7 +3,7 @@ import {
 } from "@nestjs/common"
 import {
     BuyerStatusResult, OrderService 
-} from "@modules/business/order/order.service"
+} from "ecommerce-app-be/modules/domain/order"
 
 @Controller("internal/buyers")
 /**

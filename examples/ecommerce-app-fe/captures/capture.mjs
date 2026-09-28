@@ -14,7 +14,7 @@
  * it intentionally ships static copy so it works with no backend.
  *
  * Both apps are booted by scripts/serve.mjs, which reads their ports from the product's resolved
- * projection (../ecommerce-app-be/metadata.json) - so this script resolves the base URLs the same
+ * projection (../ecommerce-app-be/.starcistacks/dev/infra/metadata.json) - so this script resolves the base URLs the same
  * way instead of restating them. NEXT_PUBLIC_* env vars still override, same precedence as the
  * apps' own config.
  *

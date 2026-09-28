@@ -247,6 +247,9 @@ export class E2EStackService implements OnModuleInit, OnApplicationShutdown, OnM
         const env: NodeJS.ProcessEnv = {
             ...process.env,
             ECOMMERCE_APP_BE_METADATA: join(BACKEND_ROOT,
+                ".starcistacks",
+                "dev",
+                "infra",
                 "metadata.json"),
             // The emitted dist keeps @modules/@features specifiers verbatim (tsc does not rewrite
             // paths); pointing tsconfig-paths' baseUrl at dist resolves them to dist/src/**.

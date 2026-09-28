@@ -11,10 +11,10 @@ interfaces:
   - Only the checkout feature's HTTP transport writes these tables; the identity service never touches them.
   - The buyer answer this component gives (contract.checkout.order-for-identity) is derived - a count over written orders, never a copied flag.
 owners:
-  - {role: module, path: src/modules/business/order}
-  - {role: module, path: src/modules/business/cart}
-  - {role: module, path: src/modules/business/payment}
-  - {role: module, path: src/modules/business/catalog}
+  - {role: module, path: src/modules/domain/order}
+  - {role: module, path: src/modules/domain/cart}
+  - {role: module, path: src/modules/domain/payment}
+  - {role: module, path: src/modules/domain/catalog}
 refs: [br.checkout.place-order, fr.checkout.place-order, contract.checkout.order-for-identity]
 dependsOn: [integration.checkout.postgres]
 

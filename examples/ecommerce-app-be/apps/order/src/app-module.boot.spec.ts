@@ -25,25 +25,25 @@ import {
 } from "@modules/platform/databases/postgresql/order/constants/connection"
 import {
     CartService 
-} from "@modules/business/cart/cart.service"
+} from "@modules/domain/cart/cart.service"
 import {
     CatalogService 
-} from "@modules/business/catalog/catalog.service"
+} from "@modules/domain/catalog/catalog.service"
 import {
     CheckoutPolicy 
-} from "@modules/business/order/checkout.policy"
+} from "@modules/domain/order/checkout.policy"
 import {
     OrderService 
-} from "@modules/business/order/order.service"
+} from "@modules/domain/order/order.service"
 import {
     PaymentService 
-} from "@modules/business/payment/payment.service"
+} from "@modules/domain/payment/payment.service"
 import {
     IdentityApiClient 
 } from "@modules/integrations/identity/identity.client"
 import {
     SessionGuard 
-} from "@features/checkout/graphql/session.guard"
+} from "@features/checkout/transport/graphql/session.guard"
 import {
     BuyerController 
 } from "@features/checkout/transport/http/buyer.controller"
@@ -52,16 +52,16 @@ import {
 } from "@features/checkout/transport/http/health.controller"
 import {
     CartResolver 
-} from "@features/checkout/graphql/queries/cart/cart/cart.resolver"
+} from "@features/checkout/transport/graphql/queries/cart/cart/cart.resolver"
 import {
     AddCartItemResolver 
-} from "@features/checkout/graphql/mutations/cart/add-cart-item/add-cart-item.resolver"
+} from "@features/checkout/transport/graphql/mutations/cart/add-cart-item/add-cart-item.resolver"
 import {
     ClearCartResolver 
-} from "@features/checkout/graphql/mutations/cart/clear-cart/clear-cart.resolver"
+} from "@features/checkout/transport/graphql/mutations/cart/clear-cart/clear-cart.resolver"
 import {
     PlaceOrderResolver 
-} from "@features/checkout/graphql/mutations/order/place-order/place-order.resolver"
+} from "@features/checkout/transport/graphql/mutations/order/place-order/place-order.resolver"
 
 /**
  * The order deployable's DI smoke, sibling of apps/identity's: AppModule must compile with the

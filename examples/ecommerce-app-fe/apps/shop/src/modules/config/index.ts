@@ -6,7 +6,7 @@ import { readProjectedPorts } from "@shared/config/projection"
  *
  * A component or page never touches `process.env` and never hardcodes a host: each service base URL is one
  * `NEXT_PUBLIC_*_API_URL` env override, and the fallback is the product's resolved projection
- * (`ecommerce-app-be/metadata.json`, `ports.orderApi`/`ports.identityApi`) - the same file the backend
+ * (`ecommerce-app-be/.starcistacks/dev/infra/metadata.json`, `ports.orderApi`/`ports.identityApi`) - the same file the backend
  * services boot from, so no literal port exists in this repository to drift against the allocation.
  * Point the shop at a deployed stack by setting the env vars; the fallback only ever serves local
  * development and always resolves to the allocation.

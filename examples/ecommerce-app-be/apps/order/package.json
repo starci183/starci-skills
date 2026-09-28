@@ -2,7 +2,7 @@
   "name": "@ecommerce-app-be/order",
   "version": "1.0.0",
   "private": true,
-  "description": "Order service: catalog, cart, order, payment. Listens on the port metadata.json resolves for orderApi; verifies sessions against the identity service over real HTTP.",
+  "description": "Order service: catalog, cart, order, payment. Listens on the port .starcistacks/dev/infra/metadata.json resolves for orderApi; verifies sessions against the identity service over real HTTP.",
   "dependencies": {
     "@apollo/server": "^4.13.0",
     "@nestjs/apollo": "^12.2.2",

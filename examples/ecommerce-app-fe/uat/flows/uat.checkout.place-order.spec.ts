@@ -52,7 +52,7 @@ const ensurePerson = async (creds: Creds): Promise<string | null> => {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify({
-      query: 'mutation EnsurePerson($input: RegisterInput!) { register(input: $input) { personId } }',
+      query: 'mutation EnsurePerson($input: RegisterInput!) { register(request: $input) { personId } }',
       variables: { input: { email: creds.email, password: creds.password } },
     }),
   });

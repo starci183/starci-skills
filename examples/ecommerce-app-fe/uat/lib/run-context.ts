@@ -4,7 +4,7 @@ import path from 'node:path';
 import { FRONTEND_ROOT, BACKEND_ROOT } from './paths';
 
 /**
- * The product's one runtime projection is `ecommerce-app-be/metadata.json` - the same file
+ * The product's one runtime projection is `ecommerce-app-be/.starcistacks/dev/infra/metadata.json` - the same file
  * `scripts/projection.mjs` and the BE's own AppConfigService resolve every port from, so this
  * harness reads it rather than carrying a second copy that could drift. `ECOMMERCE_APP_BE_METADATA`
  * names the file outright when a run injects a different checkout; otherwise the sibling repo's own
@@ -13,7 +13,7 @@ import { FRONTEND_ROOT, BACKEND_ROOT } from './paths';
 export const METADATA_FILE_ENV = 'ECOMMERCE_APP_BE_METADATA';
 
 const projectedPort = (key: 'identityApi' | 'orderApi' | 'landing' | 'shop'): number => {
-  const file = process.env[METADATA_FILE_ENV] ?? path.join(BACKEND_ROOT, 'metadata.json');
+  const file = process.env[METADATA_FILE_ENV] ?? path.join(BACKEND_ROOT, '.starcistacks', 'dev', 'infra', 'metadata.json');
   const parsed = JSON.parse(fs.readFileSync(file, 'utf8')) as { ports?: Record<string, unknown> };
   const port = parsed.ports?.[key];
   if (typeof port !== 'number') {

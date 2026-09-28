@@ -1,7 +1,8 @@
 /**
  * The resolved port projection reader, mirroring the backend lane's AppConfigService bargain:
- * there is one runtime projection - `examples/ecommerce-app-be/metadata.json` - and consumers
- * READ it instead of keeping a second copy that agrees only until somebody moves the offset.
+ * there is one runtime projection - `examples/ecommerce-app-be/.starcistacks/dev/infra/metadata.json`
+ * - and consumers READ it instead of keeping a second copy that agrees only until somebody moves
+ * the offset.
  *
  * The projection lives in the sibling backend repository (the BE repo owns the product's Work
  * tree, so its metadata.json is the whole product's resolved projection - its own README states
@@ -10,7 +11,8 @@
  *
  *   1. `ECOMMERCE_APP_BE_METADATA` names the file outright (deployment/tests inject it).
  *   2. Otherwise each ancestor of the FE repository root is searched for
- *      `ecommerce-app-be/metadata.json` - the sibling-repo form of the BE's upward walk.
+ *      `ecommerce-app-be/.starcistacks/dev/infra/metadata.json` - the sibling-repo form of the
+ *      BE's upward walk.
  *
  * A missing or malformed projection throws naming the env var; nothing here invents a number.
  */
@@ -21,6 +23,7 @@ import { fileURLToPath } from 'node:url';
 export const METADATA_FILE_ENV = 'ECOMMERCE_APP_BE_METADATA';
 /** The sibling repository directory the projection is searched under. */
 const SIBLING_REPO_DIR = 'ecommerce-app-be';
+const PROJECTION_REL = ['.starcistacks', 'dev', 'infra', 'metadata.json'];
 const REQUIRED_PORT_KEYS = ['identityApi', 'orderApi', 'landing', 'shop'];
 
 const repoRoot = () => resolve(dirname(fileURLToPath(import.meta.url)), '..');
@@ -35,12 +38,12 @@ export const findMetadataFile = (startDir = repoRoot()) => {
   }
   let dir = resolve(startDir);
   for (;;) {
-    const candidate = join(dir, SIBLING_REPO_DIR, 'metadata.json');
+    const candidate = join(dir, SIBLING_REPO_DIR, ...PROJECTION_REL);
     if (existsSync(candidate)) return candidate;
     const parent = dirname(dir);
     if (parent === dir) {
       throw new Error(
-        `no ${SIBLING_REPO_DIR}/metadata.json found from ${startDir} upward; set ${METADATA_FILE_ENV} to its path.`,
+        `no ${SIBLING_REPO_DIR}/${PROJECTION_REL.join('/')} found from ${startDir} upward; set ${METADATA_FILE_ENV} to its path.`,
       );
     }
     dir = parent;

@@ -4,13 +4,16 @@ import {
 import Redis from "ioredis"
 import {
     AppConfigService 
-} from "@modules/platform/config/identity/app-config.service"
+} from "ecommerce-app-be/modules/platform/config/identity"
 import {
     RedisUnexpectedReplyException 
-} from "@modules/platform/exceptions/errors/platform/redis-unexpected-reply"
+} from "ecommerce-app-be/modules/platform/exceptions"
 import {
     RedisConnectionException 
-} from "@modules/platform/exceptions/errors/platform/redis-connection"
+} from "ecommerce-app-be/modules/platform/exceptions"
+
+/** Stored Redis value, or null when the key is absent. */
+export type RedisLookupResult = string | null
 
 @Injectable()
 /**
@@ -47,7 +50,7 @@ export class RedisPrimaryClient {
             ttlSeconds)
     }
 
-    async lookup(key: string): Promise<string | null> {
+    async lookup(key: string): Promise<RedisLookupResult> {
         await this.ready()
         return this.redis.get(key)
     }

@@ -25,7 +25,7 @@ const here = dirname(fileURLToPath(import.meta.url));
 const repoRoot = resolve(here, '..');
 
 function loadPorts() {
-  const file = join(repoRoot, 'metadata.json');
+  const file = join(repoRoot, '.starcistacks', 'dev', 'infra', 'metadata.json');
   if (!existsSync(file)) throw new Error(`no metadata.json at ${file}`);
   return JSON.parse(readFileSync(file, 'utf8')).ports;
 }

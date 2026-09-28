@@ -7,31 +7,31 @@ recordDigest: 473d762aa5f655afd17ec8b8b9b8359d110ab91331f9b1235ddbb457c6ad43f2
 codeDigest:
   algorithm: sha256
   files:
-    - path: src/modules/business/account/account.module-definition.ts
+    - path: src/modules/domain/account/account.module-definition.ts
       sha256: d439398712cb22e99772e193f32e46512061b2a87444019b456ab682d3617e2e
-    - path: src/modules/business/account/account.module.ts
+    - path: src/modules/domain/account/account.module.ts
       sha256: de7a6b04643e2f312bdcccb408b2fde81e5d56e00e2eed80e354df16082e0e4a
-    - path: src/modules/business/account/account.service.spec.ts
+    - path: src/modules/domain/account/account.service.spec.ts
       sha256: 905a9b88c7ded5886d6e1415bfd90dc50f225d63545f6749bfb88ad6dba406b3
-    - path: src/modules/business/account/account.service.ts
+    - path: src/modules/domain/account/account.service.ts
       sha256: df0c2ec9ca97adfa171721b2bd46940cc6a90bc43d27db83720d0d79d060239e
-    - path: src/modules/business/account/password.policy.spec.ts
+    - path: src/modules/domain/account/password.policy.spec.ts
       sha256: b47f9ed43ab5c850457c53f90f291648161fa9e3b9a4f2827a8e400d0e3bd69c
-    - path: src/modules/business/account/password.policy.ts
+    - path: src/modules/domain/account/password.policy.ts
       sha256: 26c9fc2bfb1a86b71cfc93f0a2074d3d23583eb4864e5a05578b02f9d58b4f65
-    - path: src/modules/business/session/session.lifecycle.spec.ts
+    - path: src/modules/domain/session/session.lifecycle.spec.ts
       sha256: dc0250c3925f304e4bdc2186a5a77ec8b7738ea82ca14e29d11d9ef6496c9118
-    - path: src/modules/business/session/session.module-definition.ts
+    - path: src/modules/domain/session/session.module-definition.ts
       sha256: d439398712cb22e99772e193f32e46512061b2a87444019b456ab682d3617e2e
-    - path: src/modules/business/session/session.module.ts
+    - path: src/modules/domain/session/session.module.ts
       sha256: 023935e1584dfc9bbcb64ce92343c0f3b37e20122e8698f18926f729c4d2ccf2
-    - path: src/modules/business/session/session.repository.spec.ts
+    - path: src/modules/domain/session/session.repository.spec.ts
       sha256: 6a59d61a6be7ebbb1c0c96a8c21430fe301580c47a168828ba803b3c3e72df12
-    - path: src/modules/business/session/session.repository.ts
+    - path: src/modules/domain/session/session.repository.ts
       sha256: 1d5f856bc7f8539e5474867a08af44e2e94c8b75a17b12a8445ff6186975f89e
-    - path: src/modules/business/session/session.service.spec.ts
+    - path: src/modules/domain/session/session.service.spec.ts
       sha256: b6d8e8d4bbfa8dc5fa6a86f7f62a191fdeb778236a752bd82fedfaad1f760e2c
-    - path: src/modules/business/session/session.service.ts
+    - path: src/modules/domain/session/session.service.ts
       sha256: c0eb56dea6c736b26979145fa9a97c9d9a6923789eb269fd4d8eb787881b395e
   digest: 95bf4bab0a17c622a1cdc0bacae1f34069f88497188821b9b9039cca178b251d
 outcome: pass

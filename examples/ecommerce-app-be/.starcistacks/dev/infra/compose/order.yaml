@@ -6,6 +6,6 @@ services:
     depends_on:
       - postgres
     environment:
-      ECOMMERCE_APP_BE_METADATA: /repo/examples/ecommerce-app-be/metadata.json
+      ECOMMERCE_APP_BE_METADATA: /repo/examples/ecommerce-app-be/.starcistacks/dev/infra/metadata.json
     ports:
       - "6070:6070"

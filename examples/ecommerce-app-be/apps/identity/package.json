@@ -2,7 +2,7 @@
   "name": "@ecommerce-app-be/identity",
   "version": "1.0.0",
   "private": true,
-  "description": "Identity service: auth, account, session. Listens on the port metadata.json resolves for identityApi; sessions live in Redis, persons in Postgres.",
+  "description": "Identity service: auth, account, session. Listens on the port .starcistacks/dev/infra/metadata.json resolves for identityApi; sessions live in Redis, persons in Postgres.",
   "dependencies": {
     "@apollo/server": "^4.13.0",
     "@nestjs/apollo": "^12.2.2",

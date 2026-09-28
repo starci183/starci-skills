@@ -23,7 +23,7 @@ marked in-source with `// contract:` pointers.
 
 ## Ports: there is one projection and it is read, never restated
 
-The product's resolved runtime projection is **`../ecommerce-app-be/metadata.json`** (`ports.landing`,
+The product's resolved runtime projection is **`../ecommerce-app-be/.starcistacks/dev/infra/metadata.json`** (`ports.landing`,
 `ports.shop`, `ports.identityApi`, `ports.orderApi`) — the BE repo owns it because it owns the Work tree,
 and its own README states the FE lane's ports are "declared here, consumed there". No port literal exists
 in this repository:
@@ -32,7 +32,7 @@ in this repository:
 - `packages/shared/src/config/projection.ts` resolves the file for both apps' service base URLs;
   each app's `src/modules/config` module applies its own environment overrides.
 - Resolution order (same shape as the BE's `findMetadataFile`): `ECOMMERCE_APP_BE_METADATA` names the
-  file outright, else the walk searches each ancestor for `ecommerce-app-be/metadata.json`.
+  file outright, else the walk searches each ancestor for `ecommerce-app-be/.starcistacks/dev/infra/metadata.json`.
 - Env overrides keep the BE's precedence — `NEXT_PUBLIC_ORDER_API_URL`, `NEXT_PUBLIC_IDENTITY_API_URL`,
   `NEXT_PUBLIC_SHOP_URL` win outright; the projection is the fallback.
 

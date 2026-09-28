@@ -3,18 +3,21 @@ import {
 } from "@nestjs/common"
 import {
     AppConfigService 
-} from "@modules/platform/config/order/app-config.service"
+} from "ecommerce-app-be/modules/platform/config/order"
 import {
     IdentityServiceUnavailableException 
-} from "@modules/platform/exceptions/errors/integrations/identity-service-unavailable"
+} from "ecommerce-app-be/modules/platform/exceptions"
 import {
     IdentityContractMismatchException 
-} from "@modules/platform/exceptions/errors/integrations/identity-contract-mismatch"
+} from "ecommerce-app-be/modules/platform/exceptions"
 
 /** The person behind a live session, as identity's internal verify door answers it. */
 export interface SessionPersonResult {
   personId: string;
 }
+
+/** Identity service answer for a live session; null means the bearer was refused. */
+export type VerifiedSessionPersonResult = SessionPersonResult | null
 
 @Injectable()
 /**
@@ -27,7 +30,7 @@ export interface SessionPersonResult {
 export class IdentityApiClient {
     constructor(private readonly config: AppConfigService) {}
 
-    async verifySession(sessionToken: string): Promise<SessionPersonResult | null> {
+    async verifySession(sessionToken: string): Promise<VerifiedSessionPersonResult> {
         let response: Response
         try {
             response = await fetch(`${this.config.getIdentityApiBaseUrl()}/internal/sessions/verify`,

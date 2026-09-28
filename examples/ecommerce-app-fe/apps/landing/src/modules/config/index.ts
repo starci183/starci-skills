@@ -7,7 +7,7 @@ import { readProjectedPorts } from "@shared/config/projection"
  * "Enter shop" link at a different host is one edit here.
  *
  * The shop is this example's *own* second app, not a backend service, and its port is read from the
- * product's resolved projection (`ecommerce-app-be/metadata.json`, `ports.shop`) exactly the way the
+ * product's resolved projection (`ecommerce-app-be/.starcistacks/dev/infra/metadata.json`, `ports.shop`) exactly the way the
  * backend services read theirs - `NEXT_PUBLIC_SHOP_URL` overrides it outright, the projection is the
  * fallback. No literal port exists in this repository to drift against the allocation.
  */

@@ -5,7 +5,7 @@
   "roots": ["apps/*"],
   "portProjection": {
     "comment": "The one runtime projection for the whole product, resolved by the BE lane. Every port this file used to restate is read from it - by scripts/serve.mjs for the listeners and by each app's src/modules/config for the service base URLs.",
-    "file": "../ecommerce-app-be/metadata.json",
+    "file": "../ecommerce-app-be/.starcistacks/dev/infra/metadata.json",
     "env": "ECOMMERCE_APP_BE_METADATA"
   },
   "apps": [

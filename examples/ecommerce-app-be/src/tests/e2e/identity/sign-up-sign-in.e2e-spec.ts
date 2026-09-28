@@ -150,7 +150,9 @@ describe("identity sign-up → sign-in journey",
                 const account = await identityGql.query<AccountData>("account",
                     {
                         variables: {
-                            personId 
+                            request: {
+                                personId
+                            }
                         } 
                     })
                 expect(account.errorCode).toBeNull()

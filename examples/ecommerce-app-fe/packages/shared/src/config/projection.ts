@@ -3,17 +3,20 @@ import { dirname, join, resolve } from "node:path"
 
 /**
  * The resolved port projection reader, mirroring the backend lane's AppConfigService bargain:
- * there is one runtime projection - `examples/ecommerce-app-be/metadata.json` - and consumers
- * READ it instead of keeping a second copy that agrees only until somebody moves the offset.
+ * there is one runtime projection - `examples/ecommerce-app-be/.starcistacks/dev/infra/metadata.json`
+ * - and consumers READ it instead of keeping a second copy that agrees only until somebody moves
+ * the offset.
  *
  * The projection lives in the sibling backend repository, so the upward walk from the process
- * cwd looks for `ecommerce-app-be/metadata.json` per ancestor - the sibling-repo form of the
- * BE's own `findMetadataFile`. `ECOMMERCE_APP_BE_METADATA` names the file outright when a
- * deployment or test injects it; a missing or malformed projection throws rather than guessing.
+ * cwd looks for `ecommerce-app-be/.starcistacks/dev/infra/metadata.json` per ancestor - the
+ * sibling-repo form of the BE's own `findMetadataFile`. `ECOMMERCE_APP_BE_METADATA` names the
+ * file outright when a deployment or test injects it; a missing or malformed projection throws
+ * rather than guessing.
  */
 export const METADATA_FILE_ENV = "ECOMMERCE_APP_BE_METADATA"
 
 const SIBLING_REPO_DIR = "ecommerce-app-be"
+const PROJECTION_REL = join(".starcistacks", "dev", "infra", "metadata.json")
 
 /** The slice of metadata.json the frontend reads. Extra keys the BE adds are ignored. */
 export interface ProjectedPorts {
@@ -40,12 +43,12 @@ const findMetadataFile = (): string => {
     }
     let dir = resolve(process.cwd())
     for (;;) {
-        const candidate = join(dir, SIBLING_REPO_DIR, "metadata.json")
+        const candidate = join(dir, SIBLING_REPO_DIR, PROJECTION_REL)
         if (existsSync(candidate)) return candidate
         const parent = dirname(dir)
         if (parent === dir) {
             throw new Error(
-                `no ${SIBLING_REPO_DIR}/metadata.json found from ${process.cwd()} upward; set ${METADATA_FILE_ENV} to its path.`,
+                `no ${SIBLING_REPO_DIR}/${PROJECTION_REL.split(/[\\/]/).join("/")} found from ${process.cwd()} upward; set ${METADATA_FILE_ENV} to its path.`,
             )
         }
         dir = parent

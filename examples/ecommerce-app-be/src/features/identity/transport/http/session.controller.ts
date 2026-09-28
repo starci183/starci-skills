@@ -3,13 +3,13 @@ import {
 } from "@nestjs/common"
 import {
     SessionService 
-} from "@modules/business/session/session.service"
+} from "ecommerce-app-be/modules/domain/session"
 import {
     SessionInvalidException 
-} from "@modules/platform/exceptions/errors/sessions/session-invalid"
+} from "ecommerce-app-be/modules/platform/exceptions"
 import {
     RequestInvalidException 
-} from "@modules/platform/exceptions/errors/requests/request-invalid"
+} from "ecommerce-app-be/modules/platform/exceptions"
 import {
     BusinessCodeExceptionFilter 
 } from "./business-code.filter"

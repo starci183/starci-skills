@@ -39,7 +39,7 @@ provenance:
   environment: local
   capturedAt: '2026-09-19T15:21:53.502Z'
   stack: >-
-    The ecommerce example's own topology per examples/ecommerce-app-be/metadata.json: identity GraphQL
+    The ecommerce example's own topology per examples/ecommerce-app-be/.starcistacks/dev/infra/metadata.json: identity GraphQL
     API on 5070 (built with npm run build, started with npm run start:identity), order API on 6070, and
     the shop served by npm run dev:shop on 4069 (Next dev, not a production build). The browser served
     and the browser proved are the same bytes as the frontendCommit/backendCommit recorded in the run

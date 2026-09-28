@@ -3,10 +3,10 @@ import {
 } from "@nestjs/common"
 import {
     PostgresPrimaryClient 
-} from "@modules/platform/databases/postgresql/identity/primary.client"
+} from "ecommerce-app-be/modules/platform/databases/postgresql/identity"
 import {
     RedisPrimaryClient 
-} from "@modules/platform/caches/redis/primary/redis.client"
+} from "ecommerce-app-be/modules/platform/caches/redis/primary"
 
 /** The dependency map a healthy answer reports: each named dependency is confirmed "ok". */
 interface HealthChecksResult {

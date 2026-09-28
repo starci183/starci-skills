@@ -12,6 +12,8 @@ module.exports = {
   testRegex: '.*\\.spec\\.ts$',
   moduleFileExtensions: ['ts', 'js', 'json'],
   moduleNameMapper: {
+    '^ecommerce-app-be/features/(.*)$': '<rootDir>/src/features/$1/index.ts',
+    '^ecommerce-app-be/modules/(.*)$': '<rootDir>/src/modules/$1/index.ts',
     '^@modules/(.*)$': '<rootDir>/src/modules/$1',
     '^@features/(.*)$': '<rootDir>/src/features/$1',
     '^@tests/(.*)$': '<rootDir>/src/tests/$1',
