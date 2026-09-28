@@ -1,0 +1,13 @@
+consume-report:
+  args: '--job <job_id>'
+  reads: 'the reports row for the job''s dispatch_id'
+  writes: >-
+    reports.consumed_at = now — the kernel has read and integrated the
+    report into its view of the frontier. The kernel consumes BEFORE it
+    re-runs checks and settles; `api settle` enforces consumption at the
+    latest by marking the row itself — a report that never gets consumed
+    is a dispatch that never settled.
+  returns: '{ok:true, jobId, workflowId, dispatchId, consumed} — consumed:false when no unconsumed reports row exists; an unfiled report is a fact, not a refusal'
+  refuses:
+    - job-unknown
+  usedBy: 'drive.settle — the kernel reads the filed report, integrates it, consumes it, THEN re-runs checks'

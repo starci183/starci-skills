@@ -1262,78 +1262,6 @@ const agentHierarchyOf = (db, workflowId) => {
   return { schema: AGENT_HIERARCHY_SCHEMA, workflow: root, nodes, edges };
 };
 
-/* ---------------------------------------------------------------- survey */
-// Settled results whose product Work inputs changed since they settled and owe
-// work (staleInput: an owner-declared breaking change, or an unattributed edit of
-// a record the workflow owns), the committed peer changes that owe nothing
-// (peerDrift, advisory: work-ownership.mjs) and the Source-law edits since their
-// admission (sourceDrift, advisory only - never stale, never actionable;
-// input-digests.mjs). A finished workflow reports none; a projection error is
-// surfaced beside empty lists rather than failing the poll.
-const staleInputProjection = (db, wf, repo = null) => {
-  if (wf.phase === 'finished') return { staleInput: [], sourceDrift: [], peerDrift: [] };
-  try {
-    const drift = inputDrift(db, wf.workflow_id, { root: skillRoot, repo, workDir: repo ? workDirOf(repo) : '.starciwork', registry: loadContractChanges(skillRoot) });
-    return { staleInput: drift.stale, sourceDrift: drift.sourceDrift, peerDrift: drift.peerDrift };
-  } catch (e) { return { staleInput: [], sourceDrift: [], peerDrift: [], staleInputError: String(e?.message ?? e) }; }
-};
-const peerDriftLines = (summary, indent = '') => (summary ? summary.records.map((entry) => `${indent}peer-drift (advisory, not stale): ${entry.file} (owner ${entry.owner ?? '-'} by ${entry.ownerBy}) changed after ${entry.jobs} settled job(s) read it${entry.writers.length ? ` — written by ${entry.writers.join(', ')}` : ''}${entry.foreignWrite ? ' (a peer wrote a record this workflow owns: review it, redo nothing)' : ''}${entry.breakingIgnored === 'written-by-non-owner' ? ' — its breaking change note was written by a non-owner and binds nothing' : ''}; nothing to redo unless its owner declares the change breaking`) : []);
-const staleOperationLine = (item) => `${item.followUp ? 'breaking-follow-up' : 'stale-input'}: ${staleLabel(item)} — ${item.paths.join(', ')}${item.breakingBy ? ` (breaking change declared by owner ${item.breakingBy.join(', ')}${item.followUp ? '; ONE follow-up leg' : ''})` : ''}`;
-const sourceDriftLines = (summary, indent = '') => (summary ? summary.paths.map((entry) => `${indent}source-drift (advisory, not stale): ${entry.path} edited after ${entry.jobs} settled job(s) were admitted${entry.changes.length ? ` — registered ${entry.changes.join(', ')}` : ' — UNREGISTERED in modules/kernel/contract-changes.yaml'}${entry.followUp.length ? `; follow-up via contractFollowUps (${entry.followUp.join(', ')})` : '; nothing to redo'}`) : []);
-const staleLabel = (item) => `${item.jobId} (${item.op} a${item.attempt}${item.cut ? ` cut ${item.cut.id} ${item.cut.ordinal}/${item.cut.total}` : ''})`;
-function cmdSurvey(ledger, args, repo = null) {
-  const db = ledger.db, workflowId = args.workflow, now = Date.now();
-  const wf = getWorkflow(db, workflowId);
-  if (!wf) throw Object.assign(new Error(`unknown workflow ${workflowId}`), { code: 'workflow-unknown' });
-  const g = latestGoal(db, workflowId), gj = goalJsonOf(g);
-  const openJobs = db.prepare(
-    `SELECT * FROM jobs WHERE workflow_id=? AND status NOT IN (${FINAL_SETTLED.map(() => '?').join(',')}) ORDER BY created_at,job_id`
-  ).all(workflowId, ...FINAL_SETTLED)
-    .map((r) => ({ job_id: r.job_id, op_id: r.op_id, kind: r.kind, status: r.status, attempt: r.attempt, generation: r.generation, worker_id: r.worker_id, payload: jobPayloadOf(r), created_at: r.created_at, updated_at: r.updated_at }));
-  const inbox = db.prepare('SELECT * FROM inbox WHERE workflow_id=? ORDER BY inbox_id').all(workflowId)
-    .map((r) => ({ ...r, payload: parseJson(r.payload_json), disposition: parseJson(r.disposition_json) }));
-  const signals = db.prepare(
-    `SELECT scope,key,holder_pid,token,value_json,at,expires_at FROM signals
-     WHERE (scope=? OR key=? OR scope=?) AND (expires_at IS NULL OR expires_at>?) ORDER BY scope,key`
-  ).all(workflowId, workflowId, PROVIDER_HEALTH_SCOPE, now).map((r) => ({ ...r, value: parseJson(r.value_json) }));
-  const events = db.prepare('SELECT seq,event_id,generation,entity_type,entity_id,kind,payload_json,created_at FROM events WHERE workflow_id=? ORDER BY seq DESC LIMIT 10')
-    .all(workflowId).reverse().map((r) => ({ ...r, payload: parseJson(r.payload_json) }));
-  const incidents = db.prepare("SELECT * FROM incidents WHERE workflow_id=? AND status='open' ORDER BY updated_at").all(workflowId);
-  const stale = staleInputProjection(db, wf, repo);
-  const out = {
-    ok: true, workflowId,
-    workflow: wf,
-    goal: g ? {
-      revision: g.revision, identity: g.goal_identity, markdown: g.markdown,
-      opChain: gj.opChain ?? null, derivedPlan: gj.derivedPlan ?? null, json: gj,
-    } : null,
-    jobs: openJobs,
-    inbox, signals, events,
-    incidentsOpen: incidents,
-    eventsHead: ledger.eventsHead(workflowId),
-    ...stale,
-    // --deliveries: what a handover package is assembled from - every settled
-    // job's filed report and the earlier handover answers. A read projection,
-    // so an op terminal may call it (modules/ops/ops/handover.review.yaml).
-    ...(args.deliveries ? { ...deliveriesOf(db, workflowId), ...(autopilotOn(db, workflowId) ? { autopilot: autopilotBundle(db, workflowId) } : {}) } : {}),
-  };
-  emit(out, [
-    `workflow ${workflowId} — phase=${wf.phase ?? '-'} title=${workflowDisplayName(wf) ?? '-'}${wf.display_name && wf.title ? ` (slug ${wf.title})` : ''}`,
-    `goal rev ${g?.revision ?? '-'} (${g?.goal_identity ?? '-'}) chain: ${(gj.opChain?.legs ?? []).map((l) => l.op).join(' → ') || '(none stored)'}`,
-    `open jobs: ${openJobs.length} (${openJobs.map((j) => `${j.job_id}:${j.status}`).join(', ') || 'none'})`,
-    `inbox: ${inbox.length} rows (${inbox.filter((i) => i.status === 'pending').length} pending) | live signals: ${signals.length} | open incidents: ${incidents.length}`,
-    `last events: ${events.map((e) => `${e.seq}:${e.kind}`).join(', ') || 'none'}`,
-    ...staleOperationsOf(stale.staleInput).map(staleOperationLine),
-    ...sourceDriftLines(sourceDriftSummaryOf(stale.sourceDrift)),
-    ...peerDriftLines(peerDriftSummaryOf(stale.peerDrift)),
-    ...(out.deliveries ? [
-      `deliveries: ${out.deliveries.length} settled job(s); credentialPending: ${out.credentialPending.join(', ') || 'none'}; handover asks: ${out.handoverHistory.length}`,
-      ...out.deliveries.map((d) => `  ${d.jobId} ${d.op} a${d.attempt} ${d.status}${d.outcome ? ` outcome=${d.outcome}` : ''}${d.head ? ` head=${d.head}` : ''}${d.summary ? ` — ${d.summary}` : ''}`),
-      ...out.handoverHistory.map((h) => `  handover ${h.dispatchId} a${h.attempt} ${h.state}${h.decision ? ` ${h.decision} by ${h.answeredBy ?? '-'}` : ''}${h.note ? ` — ${h.note}` : ''}`),
-    ] : []),
-  ].join('\n'), args.json);
-}
-
 /* ---------------------------------------------------------------- status */
 /**
  * Whether the serve-ask form an ask-serving event names still answers: its
@@ -8152,55 +8080,6 @@ function releaseWorkerOnReport(ledger, job, payload, report) {
   } catch { return null; /* settle closes it; the tick GC reaps a leftover */ }
 }
 
-/* ---------------------------------------------------------- op-contract */
-// The worker reads its own contract: print the markdown to stdout. --job
-// resolves (workflow,op,attempt); --workflow + --op [--attempt] works too
-// (latest attempt's contract when --attempt is omitted).
-const OP_CONTRACT_WAIT_MS = 120_000;
-function cmdOpContract(ledger, args) {
-  const db = ledger.db;
-  let workflowId, op, attempt = parseAttempt(args.attempt);
-  if (args.job) {
-    const job = resolveJob(db, args.job);
-    workflowId = job.workflow_id; op = args.op ?? jobOpOf(job);
-    if (attempt == null) attempt = job.attempt;
-  } else {
-    workflowId = args.workflow; op = args.op;
-    if (attempt == null) attempt = db.prepare('SELECT MAX(attempt) a FROM contracts WHERE workflow_id=? AND op_id=?').get(workflowId, op)?.a ?? null;
-  }
-  const read = () => (attempt == null ? null
-    : db.prepare('SELECT * FROM contracts WHERE workflow_id=? AND op_id=? AND attempt=?').get(workflowId, op, attempt));
-  let row = read();
-  // Dispatch commits the contract row together with status running, after the
-  // terminal is up, the preamble sent and the model attested (~20s+); a worker
-  // whose first action is `api op-contract` lands inside that window and read
-  // contract-missing for a row the Kernel saw seconds later (nivo Modules
-  // inc-e09140ad9c22, WSPV inc-7f437d11edae). While the job is still leased,
-  // wait for the dispatch to commit it instead of answering missing.
-  if (!row && args.job && attempt != null) {
-    const deadline = Date.now() + OP_CONTRACT_WAIT_MS;
-    while (!row && Date.now() < deadline) {
-      const status = db.prepare('SELECT status FROM jobs WHERE job_id=?').get(String(args.job))?.status
-        ?? db.prepare('SELECT status FROM jobs WHERE workflow_id=? AND op_id=? AND attempt=? ORDER BY updated_at DESC LIMIT 1').get(workflowId, op, attempt)?.status;
-      if (status !== 'leased') break;
-      sleepSync(1000);
-      row = read();
-    }
-  }
-  if (!row) throw Object.assign(new Error(`no contract row for ${workflowId}/${op} attempt ${attempt ?? '(none filed)'}`), { code: 'contract-missing' });
-  if (args.json) {
-    // The admission this attempt is judged by, and what landed after it: the checks and finding codes
-    // those changes added are suspects for this leg (a check script takes --admitted-at <admittedAt>).
-    const admission = admittedContractOf(db, { workflow_id: workflowId, op_id: op, attempt: row.attempt });
-    const registry = loadContractChanges(skillRoot);
-    const advisory = Number.isFinite(admission.at) ? advisoryCodesFor(registry, { admittedAt: admission.at, op, withheld: admission.withheld }) : { codes: [], checks: [], changes: [] };
-    emit({ ok: true, workflowId, op, attempt: row.attempt, dispatchId: row.dispatch_id, markdown: row.markdown, context: parseJson(row.context_json), createdAt: row.created_at,
-      admission: { admittedAt: admission.at, source: admission.source, withheld: admission.withheld ?? [], runtimeSha: admission.version?.runtimeSha ?? null, digest: admission.version?.digest ?? null, laterChanges: advisory.changes, advisoryChecks: advisory.checks, advisoryCodes: advisory.codes } }, '', true);
-  } else {
-    process.stdout.write(row.markdown.endsWith('\n') ? row.markdown : `${row.markdown}\n`);
-  }
-}
-
 /* ---------------------------------------------------------------- check */
 // The verification half: upsert the re-run check results for an op attempt
 // (one row per workflow_id,op_id,attempt).
@@ -8434,28 +8313,6 @@ function cmdAutopilot(ledger, args, repo) {
   emit(out, `autopilot ${out.on ? 'ON' : 'off'} (${out.source}) ${workflowId}: provisional ${out.provisional.length}, deferred ${out.deferred.length}, deferred-to-handover ${out.deferredToHandover.length}`, args.json);
 }
 
-/* -------------------------------------------------------- consume-report */
-// Kernel-facing: mark the job's reports row integrated so it is never read
-// as a live answer again.
-function cmdConsumeReport(ledger, args) {
-  const db = ledger.db, job = resolveJob(db, args.job);
-  const dispatchId = reportDispatchIdOf(db, job);
-  let consumed = false;
-  ledger.transaction(() => {
-    const now = Date.now();
-    consumed = db.prepare('UPDATE reports SET consumed_at=? WHERE workflow_id=? AND dispatch_id=? AND consumed_at IS NULL')
-      .run(now, job.workflow_id, dispatchId).changes > 0;
-    if (consumed) {
-      ledger.appendEvent({
-        workflowId: job.workflow_id, entityType: 'job', entityId: job.job_id,
-        kind: 'report-consumed', payload: { dispatchId },
-      });
-    }
-  });
-  const out = { ok: true, jobId: job.job_id, workflowId: job.workflow_id, dispatchId, consumed };
-  emit(out, `consume-report ${job.job_id} (dispatch ${dispatchId}): ${consumed ? 'report consumed' : 'no unconsumed report row'}`, args.json);
-}
-
 /* ------------------------------------------------------ caller boundary */
 // An op worker ran node:sqlite against .starciwork/runtime.sqlite to inspect
 // jobs (inc-360891316369). The op contract already forbade it; the owner wants
@@ -8493,7 +8350,7 @@ const opGuardLaunch = ({ job, jobId, repo, placements, workerCwd, shims = true }
   }
 };
 const KERNEL_ONLY_VERBS = new Set(['enqueue', 'route', 'dispatch', 'reconcile', 'nudge', 'observe',
-   'settle', 'check', 'consume-report', 'incident', 'provider-health', 'finish', 'archive', 'autopilot']);
+   'settle', 'check', 'incident', 'provider-health', 'finish', 'archive', 'autopilot']);
 /* ------------------------------------------------------------------ extensions */
 // New verbs, boolean flags and status fields are files, not edits of the shared lines above
 // (scripts/kernel/api-extensions.mjs; lane land-throughput 2026-09-28).
@@ -8501,12 +8358,15 @@ const API_EXT = await loadApiExtensions();
 // What an extension verb may call of this module (the settle's async tail: scripts/kernel/api-verbs/settle-tail.mjs).
 const API_INTERNALS = Object.freeze({
   runSettleTail, ownerRoot, agentHierarchyOf, SETTLED, bindRunToKernel, foundationDutyOf,
+  FINAL_SETTLED, staleInputProjection, staleOperationLine, sourceDriftLines, peerDriftLines,
+  resolveJob, parseAttempt, reportDispatchIdOf,
   // Verbs split out of this file (lane slim-04) still call these shared helpers.
   skillRoot, getWorkflow,
 });
 let statusAsk = null;
 const runExtensionVerb = async (spec, args, repo) => {
   for (const k of requiredOf(spec, args)) need(args[k], `${spec.verb} needs --${k}`);
+  if (typeof spec.validate === 'function') spec.validate(args, need);
   if (spec.ledger === false) return await spec.run({ ledger: null, args, repo, emit, need, caller: null, ext: API_EXT, internals: API_INTERNALS });
   let ledger;
   try { ledger = openRepoLedger(repo); } catch (error) {
@@ -8535,12 +8395,11 @@ async function main() {
   if (API_EXT.verbs.has(cmd)) return runExtensionVerb(API_EXT.verbs.get(cmd), args, repo);
 
   const required = {
-    survey: ['workflow'], status: ['workflow'],
+    status: ['workflow'],
     enqueue: ['workflow', 'op', ...(args['commit-only-work-debt'] ? [] : ['paths'])], estimate: [], route: ['job'], dispatch: ['job'],
     reconcile: [], nudge: ['job'], observe: ['job'],
     settle: ['job', 'verdict'],
-    report: ['job', 'report'], 'op-contract': [], check: ['job'],
-    'consume-report': ['job'],
+    report: ['job', 'report'], check: ['job'],
     incident: [],
     'provider-health': args['quota-probe'] ? [] : ['provider'],
     finish: ['workflow'],
@@ -8551,7 +8410,6 @@ async function main() {
   for (const k of required[cmd]) need(args[k], `${cmd} needs --${k}`);
   if (cmd === 'settle' && !['pass', 'fail', 'blocked'].includes(args.verdict)) need(false, `settle --verdict must be pass|fail|blocked, got '${args.verdict}'`);
   if (cmd === 'report' && args.outcome) need(REPORT_OUTCOMES.includes(args.outcome), `report --outcome must be ${REPORT_OUTCOMES.join('|')}, got '${args.outcome}'`);
-  if (cmd === 'op-contract') need(args.job || (args.workflow && args.op), 'op-contract needs --job <job_id> or --workflow <id> --op <opId> [--attempt <n>]');
   if (cmd === 'reconcile') need(args.job || args['orphan-kernel-jobs'] || args['orca-tasks'] || args['work-debt'], 'reconcile needs --job <job_id> (or --orphan-kernel-jobs | --orca-tasks | --work-debt)');
   if (cmd === 'check') need(args.checks != null || args['checks-file'], 'check needs --checks <json> or --checks-file <path>');
   if (cmd === 'provider-health' && args.recover) need(typeof args.reason === 'string' && args.reason.trim(), 'provider-health --recover needs --reason <text>');
@@ -8581,7 +8439,6 @@ async function main() {
   }
   try {
     switch (cmd) {
-      case 'survey': return cmdSurvey(ledger, args, repo);
       case 'status': return await cmdStatusMemoised(ledger, args, repo);
       case 'enqueue': return cmdEnqueue(ledger, args, repo);
       case 'route': return await cmdRoute(ledger, args);
@@ -8591,9 +8448,7 @@ async function main() {
       case 'observe': return cmdObserve(ledger, args, repo);
       case 'settle': return await cmdSettle(ledger, args, repo);
       case 'report': return cmdReport(ledger, args, repo);
-      case 'op-contract': return cmdOpContract(ledger, args);
       case 'check': return cmdCheck(ledger, args, repo);
-      case 'consume-report': return cmdConsumeReport(ledger, args);
       case 'incident': return cmdIncident(ledger, args);
       case 'provider-health': return await cmdProviderHealth(ledger, args);
       case 'finish': return cmdFinish(ledger, args);
