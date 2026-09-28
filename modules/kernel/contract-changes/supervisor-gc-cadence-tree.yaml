@@ -1,0 +1,20 @@
+id: supervisor-gc-cadence-tree
+effectiveAt: '2026-09-28T13:30:00+07:00'
+summary: >-
+  Owner's GC contract 2026-09-28. (1) A close counts only when the process tree is gone: the Kernel settle snapshots
+  the agents running inside Orca terminals before it closes an op worker and, after the close, kills and reads back
+  any of them that lingers outside Orca (terminalClosed.tree; ok false while one remains). The Supervisor's worker
+  close and the Kernel's finish/archive close do the same through close-verify.mjs (--tree). (2) The periodic sweep
+  runs every allocation.gc.sweepMs (30 minutes); the tick only checks that it is due. It also kills agent CLIs whose
+  parent is gone and child-less PowerShell shells under the Orca daemon beyond the terminals Orca lists. A tab no
+  registry knows with output in the last gcMinAgeMs is reported, not closed; allocation.gc.keepTitles allowlists tabs.
+reach: new-legs
+paths:
+  - modules/kernel/contract-changes/supervisor-gc-cadence-tree.yaml
+  - modules/models/runtimes.yaml
+  - modules/supervisor/supervise.yaml
+  - scripts/kernel/api.mjs
+  - scripts/lib/close-verify.mjs
+  - scripts/supervisor/gc.mjs
+  - scripts/supervisor/tick.mjs
+  - tests/supervisor-gc.spec.mjs

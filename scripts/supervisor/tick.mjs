@@ -43,7 +43,7 @@ import {
   noProgress, persisting, readTickState, writeTickState, dueAlerts, sendAlerts, recordSample,
 } from './tick-duties.mjs';
 import { SNAPSHOT_KIND, tickTelemetry } from './op-metrics.mjs';
-import { runGc, GC_EVENT_KIND } from './gc.mjs';
+import { runGc, GC_EVENT_KIND, gcSettings, sweepDue } from './gc.mjs';
 
 const selfFile = fileURLToPath(import.meta.url);
 
@@ -257,8 +257,11 @@ export async function runSupervisorTick({ repos = null, push = true, heartbeat =
   // terminals whose owner is done, idle leaked shells, merged lanes and op garbage past retention, and logs each as a
   // gc.collect row. A leftover it had to close is a bug in its owner step: runGc records it as a lesson.
   // A run with injected seams (a spec) never collects on the real host unless it injects deps.gc too.
+  // The sweep runs every allocation.gc.sweepMs (owner 2026-09-28: every 30 minutes); the tick only checks it is due.
   const gcFn = deps.gc ?? (Object.keys(deps).length ? null : runGc);
-  out.gc = orcaUp && gcFn ? await step('gc', () => gcFn({ apply: true, env, now: now(), language: supervisorSettings().language })) : null;
+  const gcDue = gcFn ? (deps.gcDue ?? (() => sweepDue({ env, now: now(), sweepMs: gcSettings().sweepMs })))() : { due: false };
+  out.gc = orcaUp && gcFn && gcDue.due ? await step('gc', () => gcFn({ apply: true, env, now: now(), language: supervisorSettings().language })) : null;
+  out.gcNextAt = gcDue.nextAt ?? null;
   if (out.gc?.errors?.length) alerts.push({ key: 'gc-errors', text: `GC ${out.gc.errors.length} error(s): ${clipLine(out.gc.errors.slice(0, 3).join(' | '), 400)}` });
 
   for (const e of out.errors) alerts.push({ key: `tick-error|${e.step}`, text: `TICK-ERROR ${e.step}: ${e.error}` });
@@ -304,7 +307,7 @@ export async function runSupervisorTick({ repos = null, push = true, heartbeat =
     out.sample ? `sample cpu ${Math.round(out.sample.cpuBusy * 100)}% free RAM ${out.sample.freeRamPct}%; top ${out.sample.owners.slice(0, 4).map((g) => `${g.key} ${g.cpuPct}%/${g.ramMb}MB`).join(', ')}` : 'sample: none',
     out.ramThrottle ? throttleLine(out.ramThrottle) : 'ram-throttle: unread',
     ...(out.opHealth ? out.opHealth.lines : ['op health: unread']),
-    out.gc ? `gc: ${out.gc.line}${out.gc.errors.length ? ` (${out.gc.errors.length} error(s))` : ''}` : 'gc: skipped (Orca does not answer)',
+    out.gc ? `gc: ${out.gc.line}${out.gc.errors.length ? ` (${out.gc.errors.length} error(s))` : ''}` : `gc: not due${out.gcNextAt ? ` (next sweep ${new Date(out.gcNextAt).toISOString()})` : ''}`,
     `alerts ${out.alerts.length} (${due.length} sent)${out.alerts.map((a) => `\n  ${a.sent ? '>' : '='} ${a.text}`).join('')}`,
     `----- OWED ACTIONS ${out.actions.length} (${breaches.length} past the ${Math.round(t.actionSlaMs / 60_000)}m SLA): act on each and record it (supervise.yaml mission) -----`,
     ...out.actions.map(actionLine),

@@ -90,3 +90,24 @@ test('closeAndVerify proves the close; closeSelfSafe detaches from its own termi
   assert.equal(self.detached, true);
   assert.ok(spawned.includes('--terminal') && spawned.includes('term_me'));
 });
+
+test('leaked processes: orphan agent CLIs and PowerShell no tab owns; never the Claude desktop app', async () => {
+  const { orphanProcesses } = await import('../scripts/supervisor/gc.mjs');
+  const { isAgentProcess, orcaAgents } = await import('../scripts/lib/close-verify.mjs');
+  const D = 'C:/Orca/daemon-host/1/Orca.exe';
+  const table = [
+    { pid: 1, ppid: 0, name: 'Orca.exe', exe: D, created: 1 },
+    { pid: 2, ppid: 1, name: 'powershell.exe', cmd: 'powershell.exe -NoExit', created: 2 },
+    { pid: 3, ppid: 1, name: 'powershell.exe', cmd: 'powershell.exe -NoExit', created: 3 },
+    { pid: 4, ppid: 3, name: 'codex.exe', cmd: 'codex.exe', created: 4 },
+    { pid: 5, ppid: 1, name: 'powershell.exe', cmd: 'powershell.exe -NoExit', created: 5 },
+    { pid: 6, ppid: 99, name: 'devin.exe', cmd: 'devin.exe', created: 6 },
+    { pid: 7, ppid: 98, name: 'claude.exe', exe: 'C:/Program Files/WindowsApps/Claude/app/Claude.exe', cmd: 'Claude.exe', created: 7 },
+    { pid: 8, ppid: 97, name: 'node.exe', cmd: 'node D:/x/.claude/scripts/supervisor/land.mjs --job fix-a', created: 8 },
+  ];
+  assert.equal(isAgentProcess(table[3]), true);
+  assert.equal(isAgentProcess(table[7]), false);
+  assert.deepEqual([...orcaAgents(table).keys()], [4]);
+  const plan = orphanProcesses({ table, now: 1_000_000, minAgeMs: 10, listedCount: 2 });
+  assert.deepEqual(plan.map((p) => [p.pid, p.kind]), [[6, 'orphan-agent'], [2, 'orphan-shell']]);
+});

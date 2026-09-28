@@ -47,12 +47,13 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { spawnSync } from 'node:child_process';
 import { allocationSettings } from '../../engine/config.mjs';
 import { inspectLedger, ledgerFileFor } from '../../engine/ledger-db.mjs';
 import { terminalList } from '../api/orca/terminal-list.mjs';
 import { terminalRead } from '../api/orca/terminal-read.mjs';
 import { taskUpdate } from '../api/orca/task-update.mjs';
-import { closeAndVerify } from '../lib/close-verify.mjs';
+import { closeAndVerify, isAgentProcess, orcaAgents, processTable, reapOrphaned } from '../lib/close-verify.mjs';
 import { gitResult } from '../lib/git.mjs';
 import { lanesRoot, parseWorktreeList, laneActivity, treeBytes } from '../lib/hk-lanes.mjs';
 import { safeRemoveWorktree } from '../lib/safe-remove.mjs';
@@ -67,7 +68,7 @@ export const SCHEMA = 'starci/gc-report@1';
 /** The supervisor-ledger event the tick records per GC run (tick.mjs); the owner digest sums them (actions.mjs). */
 export const GC_EVENT_KIND = 'supervisor-gc';
 export const COLLECTORS = Object.freeze(['agents', 'shells', 'lanes', 'evidence', 'tmp', 'tasks']);
-export const DEFAULTS = Object.freeze({ gcMinAgeMs: 600_000, gcLaneGraceMs: 1_800_000, gcEvidenceRetentionMs: 259_200_000 });
+export const DEFAULTS = Object.freeze({ gcMinAgeMs: 600_000, gcLaneGraceMs: 1_800_000, gcEvidenceRetentionMs: 259_200_000, sweepMs: 1_800_000 });
 export const APPROVAL = Object.freeze({ by: 'owner', ref: 'owner chat 2026-09-28: zip-then-purge approved for finished/archived workflow evidence past retention (gc.mjs)' });
 const LIVE_JOB = new Set(['queued', 'leased', 'running', 'answering', 'effect_unknown']);
 const HOLDING_JOB = new Set(['running', 'answering']);
@@ -82,8 +83,20 @@ const num = (v, d) => (Number.isFinite(Number(v)) && Number(v) > 0 ? Number(v) :
 /** The gc windows of runtimes.yaml allocation.housekeeping, with their defaults. */
 export function gcSettings(allocation = allocationSettings()) {
   const hk = allocation?.housekeeping ?? {};
+  const gc = allocation?.gc ?? {};
+  const keepTitles = (Array.isArray(gc.keepTitles) ? gc.keepTitles : []).map((p) => { try { return new RegExp(String(p)); } catch { return null; } }).filter(Boolean);
   return { minAgeMs: num(hk.gcMinAgeMs, DEFAULTS.gcMinAgeMs), laneGraceMs: num(hk.gcLaneGraceMs, DEFAULTS.gcLaneGraceMs),
-    evidenceRetentionMs: num(hk.gcEvidenceRetentionMs, DEFAULTS.gcEvidenceRetentionMs), archiveRoot: hk.archiveRoot || 'D:/starci-archive', housekeeping: hk };
+    evidenceRetentionMs: num(hk.gcEvidenceRetentionMs, DEFAULTS.gcEvidenceRetentionMs), archiveRoot: hk.archiveRoot || 'D:/starci-archive', housekeeping: hk,
+    sweepMs: num(gc.sweepMs, DEFAULTS.sweepMs), keepTitles };
+}
+
+/**
+ * Whether the periodic sweep is due (owner 2026-09-28: every allocation.gc.sweepMs, default 30 minutes; the tick only
+ * checks): true when no supervisor-gc event is younger than sweepMs. {due, lastAt, nextAt}.
+ */
+export function sweepDue({ env = process.env, now = Date.now(), sweepMs = DEFAULTS.sweepMs } = {}) {
+  const lastAt = withSupervisorRead((db) => db.prepare('SELECT created_at FROM events WHERE workflow_id=? AND kind=? ORDER BY seq DESC LIMIT 1').get(SUPERVISOR_WF, GC_EVENT_KIND)?.created_at ?? null, null, { env });
+  return { due: lastAt == null || now - lastAt >= sweepMs, lastAt, nextAt: lastAt == null ? now : lastAt + sweepMs };
 }
 
 /* ------------------------------------------------------------ state: when a candidate was first seen */
@@ -193,7 +206,7 @@ export function ledgerView(repo) {
  * seen ({handle: firstSeenMs}), now, minAgeMs. Returns [{handle, role, klass, verdict: 'collect'|'keep'|'refuse',
  * reason, owner?, title}].
  */
-export function classifyTerminals({ terminals, titles, sup, ledgers, screenOf, procs = null, seen = {}, now = Date.now(), minAgeMs = DEFAULTS.gcMinAgeMs, runtimeRoot = SKILL_ROOT }) {
+export function classifyTerminals({ terminals, titles, sup, ledgers, screenOf, procs = null, seen = {}, now = Date.now(), minAgeMs = DEFAULTS.gcMinAgeMs, runtimeRoot = SKILL_ROOT, keepTitles = [] }) {
   const listed = new Set(terminals.filter((t) => t.connected !== false).map((t) => t.handle));
   const out = [];
   const aged = (h) => seen[h] != null && now - seen[h] >= minAgeMs;
@@ -230,6 +243,7 @@ export function classifyTerminals({ terminals, titles, sup, ledgers, screenOf, p
     let role = roleOfTitle(title, { worktreeName }) ?? roleOfTitle(t.title, { worktreeName });
     const row = (verdict, klass, reason, extra = {}) => out.push({ handle: h, role, klass, verdict, reason, title: String(title).slice(0, 120), worktree: t.worktreePath ?? null, ...extra });
     if (sup.seat?.handle === h) { row('keep', 'supervisor-seat', 'the live Supervisor seat'); continue; }
+    if (keepTitles.some((re) => re.test(String(title)) || re.test(String(t.title ?? '')))) { row('keep', 'unknown', 'allowlisted (allocation.gc.keepTitles)'); continue; }
     if (t.connected === false) { row('keep', role ?? 'unknown', 'already disconnected'); continue; }
     const owner = ownerOf.get(h);
     if (owner) {
@@ -283,11 +297,47 @@ export function classifyTerminals({ terminals, titles, sup, ledgers, screenOf, p
     } else if (role === 'shell') {
       if (t.agentIdentity) { row('keep', 'unknown', `shell-titled terminal running ${t.agentIdentity}`); continue; }
       if (liveJobHandles.has(h)) { row('keep', 'idle-shell', 'bound to a live job'); continue; }
+      // A shell no registry knows with output in the last minAgeMs may be the owner's own: reported, never closed.
+      if (Number(t.lastOutputAt) > 0 && now - Number(t.lastOutputAt) < minAgeMs) { row('refuse', 'idle-shell', `recent activity ${Math.round((now - Number(t.lastOutputAt)) / 60000)}m ago: may be the owner's, reported not closed`); continue; }
       const s = screen();
       if (!onlyPrompts(s)) { row('keep', 'unknown', s == null ? 'screen unreadable' : 'shell with something on its screen besides prompts'); continue; }
       if (!(shellsAllOld || aged(h))) { row('refuse', 'idle-shell', `idle bare shell seen for less than ${Math.round(minAgeMs / 60000)}m`, { pendingAge: true }); continue; }
       row('collect', 'idle-shell', 'idle bare shell: no agent, bound to nothing, only prompts on screen');
     } else row('keep', 'unknown', 'not created by the runtime (no ledger binding, no runtime title)');
+  }
+  return out;
+}
+
+/* ------------------------------------------------------------ processes */
+
+/** taskkill /T /F of one process tree; true when it answered 0. */
+export const killTree = (pid) => spawnSync('taskkill.exe', ['/F', '/T', '/PID', String(pid)], { windowsHide: true, timeout: 60_000 }).status === 0;
+
+/**
+ * The leaked processes of a process table. Pure. [{pid, name, kind, reason, ws}]:
+ *   orphan-agent  an agent CLI (isAgentProcess) whose parent is gone, older than minAgeMs - never the Claude desktop
+ *                 app (WindowsApps, --type= helpers)
+ *   orphan-shell  a child-less `powershell -NoExit` under the Orca daemon, older than minAgeMs, beyond the number of
+ *                 terminals Orca lists (`listedCount`): no tab owns that many shells; the oldest go first
+ */
+export function orphanProcesses({ table, now = Date.now(), minAgeMs = DEFAULTS.gcMinAgeMs, listedCount = null }) {
+  const byPid = new Map(table.map((p) => [p.pid, p]));
+  const parentOf = (p) => { const q = byPid.get(p.ppid); return q && !(q.created && p.created && q.created > p.created) ? q : null; };
+  const old = (p) => Number(p.created) > 0 && now - Number(p.created) >= minAgeMs;
+  const out = [];
+  for (const p of table) {
+    if (!isAgentProcess(p) || !old(p) || parentOf(p)) continue;
+    if (/WindowsApps/i.test(String(p.exe ?? p.cmd ?? '')) || /--type=/.test(String(p.cmd ?? ''))) continue;
+    out.push({ pid: p.pid, name: p.name, kind: 'orphan-agent', reason: 'agent CLI whose parent process is gone (leaked from a closed terminal)', ws: Number(p.ws) || null });
+  }
+  if (Number.isInteger(listedCount)) {
+    const hasKids = new Set(table.map((p) => p.ppid));
+    const shells = table.filter((p) => /^(powershell|pwsh)\.exe$/i.test(p.name ?? '') && /-NoExit/i.test(p.cmd ?? '') && ORCA_DAEMON.test(String(parentOf(p)?.exe ?? '')));
+    const surplus = shells.length - listedCount;
+    if (surplus > 0) {
+      const idle = shells.filter((p) => !hasKids.has(p.pid) && old(p)).sort((a, b) => a.created - b.created).slice(0, surplus);
+      for (const p of idle) out.push({ pid: p.pid, name: p.name, kind: 'orphan-shell', reason: `child-less PowerShell under the Orca daemon with no tab (${shells.length} shells, ${listedCount} terminals listed)`, ws: Number(p.ws) || null });
+    }
   }
   return out;
 }
@@ -403,7 +453,7 @@ export async function runGc({ apply = false, only = null, env = process.env, now
   const settings = gcSettings(allocation ?? allocationSettings());
   const want = new Set(only ?? COLLECTORS);
   const report = { schema: SCHEMA, apply: apply === true, at: new Date(now).toISOString(), ok: true, items: [], errors: [],
-    counts: { agents: 0, terminals: 0, worktrees: 0, evidence: 0, tmp: 0, tasks: 0, refused: 0, leftovers: 0, freedBytes: 0, ramFreedBytes: 0 } };
+    counts: { agents: 0, terminals: 0, worktrees: 0, processes: 0, evidence: 0, tmp: 0, tasks: 0, refused: 0, leftovers: 0, freedBytes: 0, ramFreedBytes: 0 } };
   const state = (deps.readState ?? readState)(env);
   const seenNow = {};
   const sup = (deps.sup ?? supervisorView)({ env, now });
@@ -411,6 +461,7 @@ export async function runGc({ apply = false, only = null, env = process.env, now
   const ledgers = (deps.ledgers ?? (() => repos.map((r) => { try { return ledgerView(r); } catch { return null; } }).filter(Boolean)))();
   const freeBefore = (deps.freemem ?? os.freemem)();
 
+  let agentsBeforeOuter = null, lastListedCount = 0;
   if (want.has('agents') || want.has('shells')) {
     const listed = (deps.list ?? (() => terminalList({ includeVisualLayouts: true })))();
     if (!listed?.ok) { report.ok = false; report.errors.push(`terminal list: ${listed?.error ?? 'Orca did not answer'} - no terminal was touched`); }
@@ -419,7 +470,10 @@ export async function runGc({ apply = false, only = null, env = process.env, now
       if (want.has('shells')) { try { procs = (deps.procs ?? (async () => (await import('./host-health.mjs')).listProcesses()))(); procs = await procs; } catch { procs = null; } }
       const screens = new Map();
       const screenOf = (h) => { if (!screens.has(h)) { let s = null; try { const r = (deps.read ?? terminalRead)({ terminal: h, screen: true }); s = r?.ok ? r.screen ?? '' : null; } catch { s = null; } screens.set(h, s); } return screens.get(h); };
-      const decided = classifyTerminals({ terminals: listed.terminals ?? [], titles: tabTitles(listed.visualLayouts), sup, ledgers, screenOf, procs, seen: state.seen, now, minAgeMs: settings.minAgeMs });
+      const decided = classifyTerminals({ terminals: listed.terminals ?? [], titles: tabTitles(listed.visualLayouts), sup, ledgers, screenOf, procs, seen: state.seen, now, minAgeMs: settings.minAgeMs, keepTitles: settings.keepTitles });
+      // The agents inside Orca terminals before any close: whichever lingers outside Orca afterwards is reaped below.
+      lastListedCount = (listed.terminals ?? []).filter((t) => t.connected !== false).length;
+      if (apply) { try { const t = (deps.table ?? processTable)(); agentsBeforeOuter = t ? orcaAgents(t) : null; } catch { agentsBeforeOuter = null; } }
       for (const d of decided) {
         const isShell = d.klass === 'idle-shell';
         if (isShell ? !want.has('shells') : !want.has('agents')) continue;
@@ -443,6 +497,33 @@ export async function runGc({ apply = false, only = null, env = process.env, now
       }
       // Seen-state of shells and runtime terminals is kept only for handles still listed and still candidates.
     }
+  }
+
+  // Processes (owner 2026-09-28: closing a tab while the agent process lingers doesn't count; free orphan PowerShell
+  // under the Orca daemon): after the closes, (1) every agent that ran in an Orca terminal and now lingers outside it is
+  // killed (reapOrphaned); (2) agent CLIs whose parent is gone, older than minAgeMs, are killed; (3) child-less
+  // `powershell -NoExit` shells under the Orca daemon beyond the number of terminals Orca lists (no tab owns them),
+  // older than minAgeMs, oldest first, are killed.
+  if (want.has('shells') || want.has('agents')) {
+    try {
+      const tableFn = deps.table ?? processTable;
+      if (apply && agentsBeforeOuter) {
+        const r = (deps.reap ?? reapOrphaned)(agentsBeforeOuter, { table: tableFn });
+        if (r.checked && r.lingering) report.items.push({ class: 'process', action: 'kill-tree', target: `${r.lingering} lingering agent process(es)`, verdict: 'collect', reason: 'agent of a closed terminal still alive outside Orca', ok: r.remaining === 0, leftover: true });
+        if (r.checked && r.remaining) report.errors.push(`${r.remaining} agent process(es) of closed terminals still alive after taskkill`);
+        report.counts.processes += r.killed ?? 0;
+      }
+      const table = tableFn();
+      const listedNow = apply ? (deps.list ?? (() => terminalList({})))() : null;
+      if (table) {
+        const plan = orphanProcesses({ table, now, minAgeMs: settings.minAgeMs, listedCount: (listedNow?.ok ? listedNow.terminals.filter((t) => t.connected !== false).length : lastListedCount) });
+        for (const p of plan) {
+          let ok = null;
+          if (apply) { ok = (deps.kill ?? killTree)(p.pid); if (ok) report.counts.processes += 1; else report.errors.push(`kill ${p.pid} (${p.kind}) failed`); }
+          report.items.push({ class: 'process', action: 'kill-tree', target: `pid ${p.pid} ${p.name}`, verdict: 'collect', reason: p.reason, ok, ramBytes: p.ws ?? null });
+        }
+      }
+    } catch (error) { report.errors.push(`processes: ${String(error?.message ?? error).slice(0, 200)}`); }
   }
 
   if (want.has('lanes')) {
@@ -546,7 +627,7 @@ export async function runGc({ apply = false, only = null, env = process.env, now
 /** The report as lines for a human. */
 export function describe(report) {
   const lines = [`===== GC ${report.apply ? 'APPLY' : 'DRY-RUN'} ${report.at} ${report.ok ? 'ok' : 'WITH ERRORS'} =====`, report.line,
-    `counts: agents ${report.counts.agents}, idle shells ${report.counts.terminals}, worktrees ${report.counts.worktrees}, evidence ${report.counts.evidence}, tmp ${report.counts.tmp}, tasks ${report.counts.tasks}, refused ${report.counts.refused}; disk ${fmtGb(report.counts.freedBytes)}, RAM ${fmtGb(report.counts.ramFreedBytes)}`];
+    `counts: agents ${report.counts.agents}, idle shells ${report.counts.terminals}, worktrees ${report.counts.worktrees}, processes ${report.counts.processes}, evidence ${report.counts.evidence}, tmp ${report.counts.tmp}, tasks ${report.counts.tasks}, refused ${report.counts.refused}; disk ${fmtGb(report.counts.freedBytes)}, RAM ${fmtGb(report.counts.ramFreedBytes)}`];
   const order = ['collect', 'refuse', 'keep'];
   for (const v of order) {
     const rows = report.items.filter((i) => i.verdict === v);

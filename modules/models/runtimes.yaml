@@ -453,6 +453,12 @@ allocation:
     gcMinAgeMs: 600000
     gcLaneGraceMs: 1800000
     gcEvidenceRetentionMs: 259200000
+  # gc: the cadence of the Supervisor's periodic sweep (scripts/supervisor/gc.mjs; owner 2026-09-28 "every 30 minutes, not
+  # every tick": the tick only checks whether it is due) and the tabs it never touches (keepTitles: regexes on the tab or
+  # pane title; an owner's hand-opened tab with recent output is reported, not closed, allowlisted or not).
+  gc:
+    sweepMs: 1800000
+    keepTitles: []
   # resources: the host-floor guards the provider-health / admission path reads. Below minFreeDiskGb
   # `api dispatch --spawn` refuses host-resources-low until there is room again - measured on the
   # drive that holds %TEMP% and the repos. RAM goes through the RAM-aware, priority-aware throttle

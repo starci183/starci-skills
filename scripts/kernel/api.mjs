@@ -104,7 +104,7 @@ import { hostResourcesFor, HOST_RESOURCES_LOW } from '../lib/host-resources.mjs'
 import { hostThrottle, noteThrottled, throttleSummary, DISPATCH_THROTTLED } from '../lib/ram-throttle.mjs';
 import { slash, pathKey } from '../lib/path-key.mjs';
 import { closeOperationTerminal, closeExitedTerminal } from './close-op-terminal.mjs';
-import { closeAndVerify, closeSelfSafe } from '../lib/close-verify.mjs';
+import { closeAndVerify, closeSelfSafe, orcaAgents, processTable, reapOrphaned } from '../lib/close-verify.mjs';
 import { releaseSettledSession, sessionIdentityOf } from './op-session.mjs';
 import { reapAgentProcess } from './reap-agent-process.mjs';
 import { sourceRootOf, withLedgerRead } from '../connectors/lib.mjs';
@@ -8281,6 +8281,9 @@ async function cmdSettle(ledger, args, repo) {
   } else if ((job.worker_id || settledPayload.launchTerminal?.handle) && !managed) {
     // A job settled before its dispatch bound a worker still closes the terminal that dispatch created.
     const workerHandle = job.worker_id ?? settledPayload.launchTerminal.handle;
+    // The agents inside Orca terminals before the close: one that lingers outside Orca afterwards ran in this one.
+    let agentsBefore = null;
+    try { const t = processTable(); agentsBefore = t ? orcaAgents(t) : null; } catch { agentsBefore = null; }
     const quit = quitAgent({ handle: workerHandle, agent: agentOfJob(settledPayload) });
     const closed = closeOperationTerminal(workerHandle);
     terminalClosed = { handle: workerHandle, ok: closed.ok === true, ...(closed.tab ? { tab: closed.tab } : {}), ...(quit ? { quit } : {}), ...(closed.error ? { error: closed.error } : {}) };
@@ -8292,11 +8295,19 @@ async function cmdSettle(ledger, args, repo) {
     const connectedAfter = terminalClosed.custody?.state === 'retained'
       || (closed.ok === true && (() => { try { const s = terminalShow({ terminal: workerHandle }); return s?.ok && s.connected === true; } catch { return false; } })());
     if (connectedAfter) {
-      const verified = closeAndVerify(workerHandle);
+      const verified = closeAndVerify(workerHandle, { tree: false });
       terminalClosed.verified = verified;
       terminalClosed.ok = verified?.ok === true;
       if (verified?.ok) terminalClosed.custody = { state: 'released', proof: `verified-${verified.proof}` };
     } else terminalClosed.verified = { ok: terminalClosed.custody?.state === 'released', proof: terminalClosed.custody?.proof ?? null };
+    // A closed tab whose agent process lingers does not count (owner 2026-09-28): the lingering tree is killed and read back.
+    try {
+      const tree = reapOrphaned(agentsBefore);
+      if (tree.checked) {
+        terminalClosed.tree = tree;
+        if (tree.remaining !== 0) { terminalClosed.ok = false; terminalClosed.verified = { ...terminalClosed.verified, ok: false, reason: 'process-tree-lingers' }; }
+      }
+    } catch { /* the terminal proof stands; the tick GC reaps a lingering tree */ }
   }
 
   // Managed settle — calls.yaml settle-dispatch: releaseManagedWorker below.
