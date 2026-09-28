@@ -1,0 +1,8 @@
+id: api-provider-health-verb
+effectiveAt: '2026-09-28T17:45:00+07:00'
+summary: 'Move provider circuit inspection, recovery, and quota probes with their contract into a per-verb module.'
+paths:
+  - scripts/kernel/api.mjs
+  - scripts/kernel/api-verbs/provider-health.mjs
+  - modules/kernel/api.yaml
+  - modules/kernel/api-commands/provider-health.yaml

@@ -2950,71 +2950,12 @@ const openOutageCircuit = (db, { evidence, ...fields }) => evidence?.failureKind
   : writeProviderCircuit(db, { signal: null, error: null, model: null, jobId: null, ...fields, failureKind: evidence.failureKind, extra: { evidence } });
 // Whether an open quota circuit's recovery probe is due: never probed, a probe interval since the
 // last one, or the plan reset passed since it.
-const quotaProbeDue = (circuit, now, everyMs) => {
-  const last = Number(circuit?.quotaProbe?.at) || 0;
-  const resetAt = Number(circuit?.resetAt) || 0;
-  if (!last) return { due: true, why: 'first-probe' };
-  if (resetAt && now >= resetAt && last < resetAt) return { due: true, why: 'after-reset' };
-  if (now - last >= everyMs) return { due: true, why: 'interval' };
-  return { due: false, why: 'throttled', nextAt: last + everyMs };
-};
-
 // `api provider-health [--provider <p>] --quota-probe [--force] [--workflow <id>]`: for each provider
 // whose card declares quotaExhausted.probe (or the one named) with an OPEN quota circuit in this
 // ledger, one real 1-token completion when due (quotaProbeDue; --force ignores the throttle). A pass
 // clears the circuit (status recovered, event provider-health-recovered); a quota answer keeps it and,
 // past the reset, rolls it to the next reset; any other answer is recorded and keeps it. Needs no
 // Kernel proof: the probe is the evidence. The kernel watchdog runs it every tick under --repair.
-async function cmdQuotaProbe(ledger, args) {
-  const db = ledger.db, now = Date.now();
-  const providers = args.provider ? [normalizeProviderId(args.provider)] : quotaProbeProviders();
-  const { probeProviderQuota } = await import('../agent/credential-probe.mjs');
-  const results = [];
-  for (const key of providers) {
-    const spec = quotaSpecOf(key);
-    if (!spec?.probe) { results.push({ provider: key, probed: false, reason: 'no-quota-probe' }); continue; }
-    const circuit = providerHealthOf(db, key, now);
-    if (!circuit || circuit.failureKind !== QUOTA_FAILURE_KIND) {
-      results.push({ provider: key, probed: false, reason: circuit ? `circuit-open-${circuit.failureKind ?? 'auth'}` : 'no-open-quota-circuit' });
-      continue;
-    }
-    const due = quotaProbeDue(circuit, now, spec.probe.everyMs);
-    if (!due.due && !args.force) { results.push({ provider: key, probed: false, reason: 'throttled', nextAt: due.nextAt }); continue; }
-    const probe = await probeProviderQuota(key);
-    const summary = { at: now, ok: probe.ok, state: probe.state, status: probe.status ?? null, ...(probe.code ? { code: probe.code } : {}), detail: probe.detail, why: args.force ? 'forced' : due.why };
-    const workflowId = args.workflow
-      ?? (circuit.jobId ? db.prepare('SELECT workflow_id FROM jobs WHERE job_id=?').get(circuit.jobId)?.workflow_id : null) ?? null;
-    const previous = { status: circuit.status, failureKind: circuit.failureKind, jobId: circuit.jobId ?? null, step: circuit.step ?? null,
-      signal: circuit.signal ?? null, detail: circuit.detail ?? null, observedAt: circuit.observedAt ?? null, expiresAt: circuit.expiresAt ?? null,
-      resetAt: circuit.resetAt ?? null };
-    const { at: _at, expiresAt: _exp, ...stored } = circuit;
-    ledger.transaction(() => {
-      if (probe.ok) {
-        const recovered = { schema: 'starci/provider-health@1', provider: key, status: 'recovered', recoveredAt: now,
-          reason: 'quota probe passed', failures: 0, trips: 0, probe: summary, recoveredBy: { quotaProbe: true, workflowId }, previous };
-        db.prepare('UPDATE signals SET value_json=?, at=?, expires_at=?, holder_pid=NULL, token=NULL WHERE scope=? AND key=?')
-          .run(JSON.stringify(recovered), now, now, PROVIDER_HEALTH_SCOPE, key);
-        if (workflowId) ledger.appendEvent({ workflowId, entityType: 'provider', entityId: key, kind: 'provider-health-recovered',
-          payload: { provider: key, reason: 'quota probe passed', probe: summary, previous } });
-        return;
-      }
-      // Still spent past the recorded reset: the plan did not come back, hold it to the next reset.
-      const rolled = probe.state === 'quota-exhausted' && circuit.resetAt && now >= Number(circuit.resetAt)
-        ? quotaResetAtOf(key, now) : null;
-      const expiresAt = rolled ? rolled + spec.probe.everyMs : circuit.expiresAt;
-      db.prepare('UPDATE signals SET value_json=?, expires_at=? WHERE scope=? AND key=?')
-        .run(JSON.stringify({ ...stored, quotaProbe: summary, ...(rolled ? { resetAt: rolled } : {}) }), expiresAt, PROVIDER_HEALTH_SCOPE, key);
-      if (workflowId) ledger.appendEvent({ workflowId, entityType: 'provider', entityId: key, kind: 'provider-quota-probe-failed',
-        payload: { provider: key, probe: summary, circuitUntil: expiresAt ?? null } });
-    });
-    results.push({ provider: key, probed: true, recovered: probe.ok, probe: summary });
-  }
-  emit({ ok: true, now, results },
-    results.length ? results.map((r) => r.probed
-      ? `quota-probe ${r.provider}: ${r.recovered ? 'PASSED - circuit cleared' : `still unavailable (${r.probe.state}) - circuit kept`}; ${r.probe.detail}`
-      : `quota-probe ${r.provider}: not probed (${r.reason}${r.nextAt ? `, next at ${new Date(r.nextAt).toISOString()}` : ''})`).join('\n')
-      : 'quota-probe: no provider declares a quota probe', args.json);
-}
 // Opens the outage circuit for each observed worker whose screen shows an outage row. Not again while
 // that provider's circuit of the same kind is open (a re-read screen is no new strike), and not for a row
 // printed before the last observation of that kind or its recovery (the frame still shows the old error).
@@ -3065,86 +3006,6 @@ function recordWorkerOutageEvidence(ledger, workers, now = Date.now()) {
 // rewrites the row as status 'recovered' expiring now (failures and trips
 // restart) and appends 'provider-health-recovered' with the reason, the probe
 // and the circuit it cleared.
-const kernelCallerProof = (db, env = process.env) => {
-  const handle = env.ORCA_TERMINAL_HANDLE || null;
-  if (!handle) return null;
-  const hit = db.prepare("SELECT job_id,workflow_id,worker_id,payload_json FROM jobs WHERE kind='kernel' AND status='running' ORDER BY updated_at DESC").all()
-    .find((r) => r.worker_id === handle || parseJson(r.payload_json, {})?.hierarchy?.runtime?.terminalHandle === handle);
-  return hit ? { jobId: hit.job_id, workflowId: hit.workflow_id, handle } : null;
-};
-const refuseProviderRecover = (out, human) => {
-  console.error(JSON.stringify(out));
-  console.log(human);
-  process.exit(1);
-};
-async function cmdProviderHealth(ledger, args) {
-  if (args['quota-probe']) return cmdQuotaProbe(ledger, args);
-  const db = ledger.db, key = normalizeProviderId(args.provider), now = Date.now();
-  if (!key) throw Object.assign(new Error('provider-health needs a provider id'), { code: 'provider-unknown' });
-  const raw = db.prepare('SELECT value_json,at,expires_at FROM signals WHERE scope=? AND key=?').get(PROVIDER_HEALTH_SCOPE, key);
-  const value = raw ? parseJson(raw.value_json, {}) ?? {} : null;
-  const current = currentCredentialOf(key);
-  const rotated = Boolean(value?.failureKind === 'auth' && credentialRotated(value, current));
-  const circuit = providerHealthOf(db, key, now);
-  const row = raw ? { ...value, at: raw.at, expiresAt: raw.expires_at, expired: raw.expires_at != null && raw.expires_at <= now } : null;
-  const credential = { fingerprint: current.fingerprint, source: current.source, resolved: current.resolved,
-    recorded: value?.credentialFingerprint ?? null, rotated };
-  const until = (at) => (at ? new Date(at).toISOString() : 'explicit recovery');
-  const state = circuit ? `OPEN (${circuit.failureKind ?? 'auth'}) until ${until(circuit.expiresAt)}`
-    : !row ? 'no row' : row.expired ? `closed (${row.status ?? '-'} row expired ${until(row.expiresAt)})`
-      : rotated ? `closed (credential rotated ${credential.recorded} -> ${credential.fingerprint}; row ${row.status})`
-        : `closed (${row.status ?? '-'})`;
-  if (!args.recover) {
-    emit({ ok: true, provider: key, open: Boolean(circuit), row, credential },
-      `provider-health ${key}: ${state}${row?.jobId ? `; opened by ${row.jobId} at ${row.step ?? '-'}: ${row.detail ?? row.signal ?? '-'}` : ''}; credential ${credential.fingerprint ?? 'unresolved'} (${credential.source ?? 'no source'})`
-      + (circuit ? `; clear with ${circuit.failureKind === QUOTA_FAILURE_KIND ? `${providerQuotaProbeCommand(key)} (runs by itself every watchdog tick, at most once per probe interval)` : providerRecoverCommand(key)}` : ''), args.json);
-    return;
-  }
-  const kernel = kernelCallerProof(db);
-  if (!kernel) {
-    refuseProviderRecover({ ok: false, code: 'kernel-proof-required', provider: key, terminal: process.env.ORCA_TERMINAL_HANDLE || null,
-      error: `provider-health --recover runs only from a running Kernel terminal of this ledger (ORCA_TERMINAL_HANDLE bound to a running kernel job); the Kernel runs ${providerRecoverCommand(key)}` },
-    `provider-health --recover REFUSED for ${key}: kernel-proof-required`);
-  }
-  if (!circuit) {
-    emit({ ok: true, provider: key, recovered: false, reason: 'no-open-circuit', row, credential },
-      `provider-health ${key}: nothing to recover - ${state}`, args.json);
-    return;
-  }
-  let probe = null;
-  if (args.probe) {
-    const { probeProviderCredential, probeProviderQuota } = await import('../agent/credential-probe.mjs');
-    // A quota circuit needs the quota proof (a real completion); the credential probe proves only the key.
-    probe = circuit.failureKind === QUOTA_FAILURE_KIND && quotaSpecOf(key)?.probe
-      ? await probeProviderQuota(key)
-      : await probeProviderCredential(key, { accounts: accountsOnce?.ok ? accountsOnce : undefined });
-    if (!probe.ok) {
-      ledger.transaction(() => ledger.appendEvent({ workflowId: kernel.workflowId, entityType: 'provider', entityId: key,
-        kind: 'provider-health-recover-refused', payload: { provider: key, reason: args.reason, probe, kernelJob: kernel.jobId } }));
-      refuseProviderRecover({ ok: false, code: 'probe-failed', provider: key, probe,
-        error: `the ${probe.kind ?? 'credential'} probe failed (${probe.detail}); the circuit stays open until ${until(circuit.expiresAt)}` },
-      `provider-health --recover REFUSED for ${key}: probe-failed - ${probe.detail}`);
-    }
-  }
-  const previous = { status: circuit.status, failureKind: circuit.failureKind ?? null, jobId: circuit.jobId ?? null, step: circuit.step ?? null,
-    signal: circuit.signal ?? null, detail: circuit.detail ?? null, observedAt: circuit.observedAt ?? null, expiresAt: circuit.expiresAt ?? null,
-    trips: circuit.trips ?? null, credentialFingerprint: circuit.credentialFingerprint ?? null };
-  const probeSummary = probe ? { ok: probe.ok, kind: probe.kind, status: probe.status ?? null, detail: probe.detail } : null;
-  const recovered = {
-    schema: 'starci/provider-health@1', provider: key, status: 'recovered', recoveredAt: now, reason: args.reason,
-    failures: 0, trips: 0, credentialFingerprint: current.fingerprint, credentialSource: current.source, probe: probeSummary,
-    recoveredBy: { kernelJob: kernel.jobId, workflowId: kernel.workflowId, terminal: kernel.handle }, previous,
-  };
-  ledger.transaction(() => {
-    db.prepare('UPDATE signals SET value_json=?, at=?, expires_at=?, holder_pid=NULL, token=NULL WHERE scope=? AND key=?')
-      .run(JSON.stringify(recovered), now, now, PROVIDER_HEALTH_SCOPE, key);
-    ledger.appendEvent({ workflowId: kernel.workflowId, entityType: 'provider', entityId: key, kind: 'provider-health-recovered',
-      payload: { provider: key, reason: args.reason, probe: probeSummary, previous, credential, kernelJob: kernel.jobId } });
-  });
-  emit({ ok: true, provider: key, recovered: true, previous, probe, credential },
-    `provider-health ${key}: circuit cleared (was ${previous.failureKind} until ${until(previous.expiresAt)}, opened by ${previous.jobId ?? '-'})${probe ? `; probe: ${probe.detail}` : ' without a probe'}; reason: ${args.reason}`, args.json);
-}
-
 // `api route` — resolve the pool/model for one job and persist the decision on
 // its payload so `dispatch --spawn` launches exactly what was routed. Bias: only
 // the owner's routing_bias {prefer[], avoid[]} on the workflow goal's json
@@ -7471,7 +7332,7 @@ const opGuardLaunch = ({ job, jobId, repo, placements, workerCwd, shims = true }
   }
 };
 const KERNEL_ONLY_VERBS = new Set(['enqueue', 'route', 'dispatch', 'reconcile',
-   'settle', 'provider-health']);
+   'settle']);
 /* ------------------------------------------------------------------ extensions */
 // New verbs, boolean flags and status fields are files, not edits of the shared lines above
 // (scripts/kernel/api-extensions.mjs; lane land-throughput 2026-09-28).
@@ -7490,6 +7351,8 @@ const API_INTERNALS = Object.freeze({
   resolveJob, requireDispatchedReportBinding, reportOwnedPaths, reportIdentityOf, jobCommitPolicy,
   handoverProofGate, skillRoot, reportFiledWake, releaseWorkerOnReport,
   isCheckResultEnvelope, parseAttempt, attributeChecks, buildOpsOf, markMeasured, isPeerBlockedCheck, summarizeCheckEvidence,
+  normalizeProviderId, providerHealthOf, quotaResetAtOf, providerQuotaProbeCommand, providerRecoverCommand, currentCredentialOf,
+  accountsOnceOf: () => accountsOnce,
 });
 let statusAsk = null;
 const runExtensionVerb = async (spec, args, repo) => {
@@ -7531,14 +7394,11 @@ async function main() {
     enqueue: ['workflow', 'op', ...(args['commit-only-work-debt'] ? [] : ['paths'])], estimate: [], route: ['job'], dispatch: ['job'],
     reconcile: [],
     settle: ['job', 'verdict'],
-    'provider-health': args['quota-probe'] ? [] : ['provider'],
   };
   if (!required[cmd]) usage(2);
   for (const k of required[cmd]) need(args[k], `${cmd} needs --${k}`);
   if (cmd === 'settle' && !['pass', 'fail', 'blocked'].includes(args.verdict)) need(false, `settle --verdict must be pass|fail|blocked, got '${args.verdict}'`);
   if (cmd === 'reconcile') need(args.job || args['orphan-kernel-jobs'] || args['orca-tasks'] || args['work-debt'], 'reconcile needs --job <job_id> (or --orphan-kernel-jobs | --orca-tasks | --work-debt)');
-  if (cmd === 'provider-health' && args.recover) need(typeof args.reason === 'string' && args.reason.trim(), 'provider-health --recover needs --reason <text>');
-  if (cmd === 'provider-health' && args.probe) need(args.recover, 'provider-health --probe goes with --recover');
 
   let ledger;
   try {
@@ -7562,7 +7422,6 @@ async function main() {
       case 'dispatch': return cmdDispatch(ledger, args, repo);
       case 'reconcile': return cmdReconcile(ledger, args, repo);
       case 'settle': return await cmdSettle(ledger, args, repo);
-      case 'provider-health': return await cmdProviderHealth(ledger, args);
     }
   } catch (error) {
     console.error(JSON.stringify({ ok: false, error: String(error?.message ?? error), code: error?.code }));
