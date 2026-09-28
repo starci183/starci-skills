@@ -20,13 +20,17 @@ quarantine: {maxRestarts: 5, windowMs: 1800000, retryMs: 3600000}
 # One entry per registry service (services.mjs SERVICES). everyMs: the least time between two probes (the
 # controller resyncs every resyncMs; a service probed more recently than everyMs is not probed again).
 # slaMs: how long the service may be down before the SERVICE_DOWN clock is a violation (the sla layer reports it).
+# probeTries: one probe PASS tries this many times (each probeTimeoutMs) and passes on the first answer: a server's
+# first request after idle can take seconds (harness 2026-09-28: 5.0 s local, 11.5 s through the tunnel, then 2 ms).
+# aliveTimeoutMs: before any restart, the service's port/URL is asked once more with this timeout; one that still
+# answers HTTP is never restarted (the pass counts as degraded). SERVICE_DOWN starts at `failed`, never `degraded`.
 services:
-  orca: {everyMs: 60000, probeTimeoutMs: 30000, failAfter: 5, startTimeoutMs: 600000, slaMs: 180000, closeWaitMs: 30000}
-  harness-ui: {everyMs: 60000, probeTimeoutMs: 5000, failAfter: 2, startTimeoutMs: 120000, slaMs: 120000, probePath: /, task: 'StarCi Harness App'}
-  harness-tunnel: {everyMs: 300000, probeTimeoutMs: 15000, failAfter: 2, startTimeoutMs: 300000, slaMs: 300000, probePath: /, task: 'StarCi Harness Tunnel'}
-  ask-gateway: {everyMs: 60000, probeTimeoutMs: 30000, failAfter: 2, startTimeoutMs: 120000, slaMs: 120000}
-  ask-tunnel: {everyMs: 60000, probeTimeoutMs: 60000, failAfter: 2, startTimeoutMs: 300000, slaMs: 300000}
-  telegram-bridge: {everyMs: 60000, probeTimeoutMs: 30000, failAfter: 2, startTimeoutMs: 300000, slaMs: 300000}
+  orca: {everyMs: 60000, probeTimeoutMs: 30000, aliveTimeoutMs: 90000, failAfter: 5, startTimeoutMs: 600000, slaMs: 180000, closeWaitMs: 30000}
+  harness-ui: {everyMs: 60000, probeTimeoutMs: 15000, probeTries: 3, aliveTimeoutMs: 30000, failAfter: 3, startTimeoutMs: 120000, slaMs: 120000, probePath: /healthz, task: 'StarCi Harness App'}
+  harness-tunnel: {everyMs: 300000, probeTimeoutMs: 20000, probeTries: 3, aliveTimeoutMs: 45000, failAfter: 2, startTimeoutMs: 300000, slaMs: 300000, probePath: /healthz, task: 'StarCi Harness Tunnel'}
+  ask-gateway: {everyMs: 60000, probeTimeoutMs: 30000, probeTries: 2, aliveTimeoutMs: 30000, failAfter: 3, startTimeoutMs: 120000, slaMs: 120000}
+  ask-tunnel: {everyMs: 60000, probeTimeoutMs: 60000, probeTries: 2, failAfter: 3, startTimeoutMs: 300000, slaMs: 300000}
+  telegram-bridge: {everyMs: 60000, probeTimeoutMs: 30000, probeTries: 2, failAfter: 3, startTimeoutMs: 300000, slaMs: 300000}
   sched-task:StarCi-Reconciler: {everyMs: 3600000, probeTimeoutMs: 30000, failAfter: 1, startTimeoutMs: 300000, slaMs: 60000}
 
 # The scheduled task StarCi-Reconciler is re-created only through `boot.mjs --install-task --apply`, and only when

@@ -29,7 +29,7 @@
 // Probes are read-only and run in both modes. The factory takes every seam for the specs.
 import path from 'node:path';
 import {
-  SKILL_ROOT, SERVICES_FILE, DOWN_STATES, hostSettings, serviceRegistry, servicePorts, openServiceStore, newRecord,
+  SKILL_ROOT, SERVICES_FILE, OUTAGE_STATES, hostSettings, serviceRegistry, servicePorts, openServiceStore, newRecord,
   stepService, runChild, lastJson, probeOrcaAsync,
 } from '../services.mjs';
 import { quickCheck, backupDue } from '../ledger-health.mjs';
@@ -267,6 +267,14 @@ export function createHostController(deps = {}) {
     const s = settings();
     const step = stepService(rec, { ok: probe?.ok === true, unmanaged: probe?.unmanaged === true, detail: brief(probe) }, { now, entry, backoff: s.backoff, quarantine: s.quarantine });
     const next = step.rec;
+    if (step.act === 'start' && entry.answers && await entry.answers().catch(() => false)) {
+      // Slow, not down: its port still answers within aliveTimeoutMs. Never restarted; the pass counts as degraded.
+      next.restarts = next.restarts.slice(0, -1);
+      next.state = 'degraded'; next.since = now; next.nextAttemptAt = null;
+      step.act = null; step.to = 'degraded';
+      next.lastSlowAt = now;
+      await ctx.log('reconciler.host.service-slow', `${name}: probe failed ${next.failStreak}x but it still answers; not restarted`, { name, probe: next.lastProbe });
+    }
     if (step.act === 'start') {
       const a = entry.start();
       if (a) { next.lastStart = { at: now, cmd: a.cmd, args: a.args }; next.lastStartResult = await ctx.run(a.cmd, a.args, { timeoutMs: entry.startTimeoutMs }); }
@@ -286,7 +294,7 @@ export function createHostController(deps = {}) {
         summary: `${name} unavailable for ${Math.round((now - next.downSince) / 60000)} min; legs that need it are deferred`, evidence: [{ ref: `probe:${JSON.stringify(next.lastProbe).slice(0, 200)}` }],
       }));
     }
-    if (DOWN_STATES.has(step.to)) await clock(ctx, `service:${name}`, 'SERVICE_DOWN', entry.slaMs, { code: 'SERVICE_DOWN', owner: 'host-controller', ledgerId: 'supervisor', since: next.downSince, state: step.to });
+    if (OUTAGE_STATES.has(step.to)) await clock(ctx, `service:${name}`, 'SERVICE_DOWN', entry.slaMs, { code: 'SERVICE_DOWN', owner: 'host-controller', ledgerId: 'supervisor', since: next.downSince, state: step.to });
     else await clear(ctx, `service:${name}`, 'SERVICE_DOWN');
     if (name === 'orca' && DOWN_BEFORE_BOOT.has(step.from) && step.to === 'healthy') state.bootPending = true;
     if (step.from !== step.to) await ctx.log('reconciler.host.service', `${name} ${step.from} -> ${step.to}`, { name, from: step.from, to: step.to, act: step.act, probe: next.lastProbe });

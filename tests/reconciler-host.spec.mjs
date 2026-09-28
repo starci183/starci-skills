@@ -388,3 +388,26 @@ test('every clock state the host controller sets is a code of the SLA catalogue'
   assert.ok(used.includes('KERNEL_TURN_OVERDUE') && used.includes('SERVICE_DOWN') && used.includes('LEDGER_CORRUPT'));
   for (const code of used) assert.ok(codes[code], `${code} is in modules/reconciler/sla.yaml codes`);
 });
+
+test('a service whose port still answers is never restarted, and a degraded pass starts no SERVICE_DOWN clock', async () => {
+  const store = memoryStore();
+  let answers = true;
+  const reg = () => noopRegistry((n) => n !== 'harness-ui').map((e) => (e.name === 'harness-ui' ? { ...e, answers: async () => answers } : e));
+  const c = booted(controller({ store: () => store, registry: reg }));
+  const ctx = hostCtx({ dbs: { 'nivo-backend': ledgerDb() } });
+  await c.reconcile('service:harness-ui', ctx);
+  for (let i = 0; i < 12; i += 1) { ctx.advance(60_000); await c.reconcile('service:harness-ui', ctx); }
+  assert.equal(ctx.calls.run.filter((r) => r.args.includes('harness-ui')).length, 0, 'answering: never restarted');
+  assert.equal(store.get('harness-ui').restarts.length, 0, 'and nothing counts toward the quarantine');
+  assert.ok(ctx.calls.log.some((l) => l.kind === 'reconciler.host.service-slow'));
+  const flap = memoryStore();
+  const c2 = booted(controller({ store: () => flap, registry: () => noopRegistry((n) => n !== 'orca') }));
+  const ctx2 = hostCtx({ dbs: { 'nivo-backend': ledgerDb() } });
+  flap.put({ name: 'orca', state: 'healthy', since: T0, restarts: [], failStreak: 0 });
+  await c2.reconcile('service:orca', ctx2);
+  assert.equal(flap.get('orca').state, 'degraded');
+  assert.ok(!ctx2.calls.clock.some((x) => x.state === 'SERVICE_DOWN'), 'degraded is not down');
+  answers = false; ctx.advance(60_000);
+  await c.reconcile('service:harness-ui', ctx);
+  assert.ok(ctx.calls.run.some((r) => r.args.join(' ') === 'scripts/reconciler/services.mjs --start harness-ui --json'), 'silent on its port: restarted');
+});

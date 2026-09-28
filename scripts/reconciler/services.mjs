@@ -155,11 +155,19 @@ export const lastJson = (text) => {
 const node = (script, args = []) => [process.execPath, [path.join(SKILL_ROOT, script), ...args]];
 
 /** GET url: ok while it answers below 500 (Cloudflare answers 502/530 when the origin or the tunnel is gone). */
-export async function httpUp(url, { timeoutMs, fetchImpl = fetch } = {}) {
-  try {
-    const res = await fetchImpl(url, { redirect: 'manual', signal: AbortSignal.timeout(timeoutMs) });
-    return { ok: res.status < 500, status: res.status };
-  } catch (error) { return { ok: false, error: String(error?.cause?.code ?? error?.name ?? error?.message ?? error).slice(0, 200) }; }
+export async function httpUp(url, { timeoutMs, tries = 1, fetchImpl = fetch } = {}) {
+  let last = null;
+  const failures = [];
+  for (let i = 1; i <= Math.max(1, tries); i += 1) {
+    const started = Date.now();
+    try {
+      const res = await fetchImpl(url, { redirect: 'manual', signal: AbortSignal.timeout(timeoutMs) });
+      last = { ok: res.status < 500, status: res.status, tries: i, ms: Date.now() - started };
+    } catch (error) { last = { ok: false, error: String(error?.cause?.code ?? error?.name ?? error?.message ?? error).slice(0, 200), tries: i, ms: Date.now() - started }; }
+    if (last.ok) return failures.length ? { ...last, failures } : last;
+    failures.push(`${last.status ?? last.error} ${last.ms}ms`);
+  }
+  return { ...last, failures };
 }
 
 /** Orca answers a terminal listing: {ok, verdict: ok|timeout|unavailable|error, terminals}. */
@@ -173,12 +181,16 @@ export async function probeOrcaAsync({ timeoutMs, run = runChild } = {}) {
 }
 
 /** `node scripts/connectors/<script> status` answers running (and, for the tunnel, no health problems). */
-export async function connectorUp(script, { timeoutMs, run = runChild, extraArgs = [], judge = (v) => v?.running === true } = {}) {
+export async function connectorUp(script, { timeoutMs, tries = 1, run = runChild, extraArgs = [], judge = (v) => v?.running === true } = {}) {
   const [cmd, args] = node(`scripts/connectors/${script}`, ['status', ...extraArgs]);
-  const r = await run(cmd, args, { timeoutMs });
-  const value = lastJson(r.stdout);
-  if (!value) return { ok: false, error: r.timedOut ? 'timeout' : String(r.stderr || `exit ${r.status}`).slice(0, 200) };
-  return { ok: judge(value) === true, value };
+  let last = null;
+  for (let i = 1; i <= Math.max(1, tries); i += 1) {
+    const r = await run(cmd, args, { timeoutMs });
+    const value = lastJson(r.stdout);
+    last = value ? { ok: judge(value) === true, value, tries: i } : { ok: false, error: r.timedOut ? 'timeout' : String(r.stderr || `exit ${r.status}`).slice(0, 200), tries: i };
+    if (last.ok) return last;
+  }
+  return last;
 }
 
 /** schtasks /query of one task: {ok, exists, status} (status Ready|Running|Disabled|...). */
@@ -205,24 +217,32 @@ export function serviceRegistry({ settings = hostSettings(), ports = servicePort
   const entry = (name, fields) => ({ name, kind: 'service', restart: true, ownerPath: false, ...s[name], ...fields, start: fields.start ?? (() => startCli(name)) });
   const portProblem = () => ports.problems.find((p) => p.startsWith('port-drift')) ?? null;
   const out = [
-    entry('orca', { probe: () => probeOrcaAsync({ timeoutMs: s.orca.probeTimeoutMs, run }) }),
+    // A restart of Orca kills every agent: one that still answers a listing within aliveTimeoutMs is only slow.
+    entry('orca', { probe: () => probeOrcaAsync({ timeoutMs: s.orca.probeTimeoutMs, run }),
+      answers: async () => (await probeOrcaAsync({ timeoutMs: s.orca.aliveTimeoutMs ?? 90_000, run })).ok === true }),
+    // `answers`: asked once more, with aliveTimeoutMs, before any restart; a service that still answers HTTP is never restarted.
     entry('harness-ui', { ownerPath: true, probe: async () => {
       if (!ports.harnessUrl) return { ok: false, error: 'no harness port' };
-      return http(`${ports.harnessUrl}${s['harness-ui'].probePath ?? '/'}`, { timeoutMs: s['harness-ui'].probeTimeoutMs });
-    } }),
+      return http(`${ports.harnessUrl}${s['harness-ui'].probePath ?? '/healthz'}`, { timeoutMs: s['harness-ui'].probeTimeoutMs, tries: s['harness-ui'].probeTries ?? 1 });
+    }, answers: async () => (ports.harnessUrl ? (await http(`${ports.harnessUrl}${s['harness-ui'].probePath ?? '/healthz'}`, { timeoutMs: s['harness-ui'].aliveTimeoutMs ?? 30_000 })).status != null : false) }),
     entry('harness-tunnel', { ownerPath: true, probe: async () => {
       const drift = portProblem();
       if (drift) return { ok: false, error: drift };
       if (!ports.harnessPublicUrl) return { ok: false, error: 'no public hostname' };
-      return http(`${ports.harnessPublicUrl}${s['harness-tunnel'].probePath ?? '/'}`, { timeoutMs: s['harness-tunnel'].probeTimeoutMs });
+      return http(`${ports.harnessPublicUrl}${s['harness-tunnel'].probePath ?? '/healthz'}`, { timeoutMs: s['harness-tunnel'].probeTimeoutMs, tries: s['harness-tunnel'].probeTries ?? 1 });
+    }, answers: async () => {
+      if (!ports.harnessPublicUrl || portProblem()) return false;
+      return (await http(`${ports.harnessPublicUrl}${s['harness-tunnel'].probePath ?? '/healthz'}`, { timeoutMs: s['harness-tunnel'].aliveTimeoutMs ?? 45_000 })).ok === true;
     } }),
-    entry('ask-gateway', { ownerPath: true, probe: () => connectorUp('ask-gateway.mjs', { timeoutMs: s['ask-gateway'].probeTimeoutMs, run,
-      judge: (v) => v.running === true && (ports.gatewayPort == null || v.port == null || Number(v.port) === ports.gatewayPort) }) }),
-    entry('ask-tunnel', { ownerPath: true, probe: () => connectorUp('tunnel.mjs', { timeoutMs: s['ask-tunnel'].probeTimeoutMs, run, extraArgs: ['--fast'],
+    entry('ask-gateway', { ownerPath: true, probe: () => connectorUp('ask-gateway.mjs', { timeoutMs: s['ask-gateway'].probeTimeoutMs, tries: s['ask-gateway'].probeTries ?? 1, run,
+      judge: (v) => v.running === true && (ports.gatewayPort == null || v.port == null || Number(v.port) === ports.gatewayPort) }),
+    // The gateway answers 404 for anything but a form: any HTTP answer on its port is a live gateway.
+    answers: async () => (ports.gatewayPort ? (await http(`http://127.0.0.1:${ports.gatewayPort}/`, { timeoutMs: s['ask-gateway'].aliveTimeoutMs ?? 30_000 })).status != null : false) }),
+    entry('ask-tunnel', { ownerPath: true, probe: () => connectorUp('tunnel.mjs', { timeoutMs: s['ask-tunnel'].probeTimeoutMs, tries: s['ask-tunnel'].probeTries ?? 1, run, extraArgs: ['--fast'],
       judge: (v) => v.running === true && !(v.health?.problems ?? []).length }) }),
     // The bridge long-polls: its offset advances only when an update arrives, so liveness is the recorded pid
     // alive (status.running); the offset is kept in the probe detail for the digest.
-    entry('telegram-bridge', { ownerPath: true, probe: () => connectorUp('telegram-bridge.mjs', { timeoutMs: s['telegram-bridge'].probeTimeoutMs, run }) }),
+    entry('telegram-bridge', { ownerPath: true, probe: () => connectorUp('telegram-bridge.mjs', { timeoutMs: s['telegram-bridge'].probeTimeoutMs, tries: s['telegram-bridge'].probeTries ?? 1, run }) }),
     entry(`sched-task:${RECONCILER_TASK}`, { restart: settings.allowTaskRepair,
       probe: async () => {
         const t = await taskState(RECONCILER_TASK, { timeoutMs: s[`sched-task:${RECONCILER_TASK}`].probeTimeoutMs, run });
@@ -241,6 +261,8 @@ export function serviceRegistry({ settings = hostSettings(), ports = servicePort
 
 export const SERVICE_STATES = Object.freeze(['declared', 'starting', 'healthy', 'degraded', 'failed', 'backoff', 'quarantined', 'unmanaged']);
 export const DOWN_STATES = new Set(['starting', 'degraded', 'failed', 'backoff', 'quarantined']);
+// The states that run the SERVICE_DOWN clock: one bad pass (`degraded`) is not down.
+export const OUTAGE_STATES = new Set(['starting', 'failed', 'backoff', 'quarantined']);
 
 /** Backoff before restart number n+1 (n restarts already in the window): minMs * factor^n, at most maxMs. Pure. */
 export const backoffDelay = (n, { minMs, maxMs, factor }) => Math.min(maxMs, minMs * factor ** Math.max(0, n));

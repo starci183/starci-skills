@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
 import {
   hostSettings, servicePorts, serviceRegistry, harnessIngress, stepService, newRecord, backoffDelay, memoryStore, sqliteStore,
-  orcaRestartScript, cleanEnv, DOWN_STATES, seatAgentOf,
+  orcaRestartScript, cleanEnv, DOWN_STATES, seatAgentOf, httpUp, OUTAGE_STATES,
 } from '../scripts/reconciler/services.mjs';
 
 // Lane D rc-host: the ONE host-service registry (scripts/reconciler/services.mjs). The DESIGN 9.7 state machine,
@@ -45,7 +45,7 @@ test('the probes read the one port source; a drifted tunnel ingress fails the tu
   const reg = serviceRegistry({ settings: S, ports: servicePorts({ allocation: ALLOC, config: CONFIG, harnessYml: HARNESS_YML }), http, run: async () => ({ status: 0, stdout: '{"running":true,"port":7070}' }) });
   assert.equal((await reg.find((e) => e.name === 'harness-ui').probe()).ok, true);
   assert.equal((await reg.find((e) => e.name === 'harness-tunnel').probe()).ok, true);
-  assert.deepEqual(seen, ['http://127.0.0.1:4547/', 'https://harness.example.org/']);
+  assert.deepEqual(seen, ['http://127.0.0.1:4547/healthz', 'https://harness.example.org/healthz'], 'the lightweight /healthz, not the snapshot page');
   assert.equal((await reg.find((e) => e.name === 'ask-gateway').probe()).ok, true);
   const wrongPort = serviceRegistry({ settings: S, ports: servicePorts({ allocation: ALLOC, config: CONFIG, harnessYml: HARNESS_YML }), http, run: async () => ({ status: 0, stdout: '{"running":true,"port":7071}' }) });
   assert.equal((await wrongPort.find((e) => e.name === 'ask-gateway').probe()).ok, false, 'a gateway on another port than config.yaml says is down');
@@ -61,7 +61,7 @@ test('the probes read the one port source; a drifted tunnel ingress fails the tu
 });
 
 test('state machine: healthy -> degraded -> healthy, degraded -> failed after failAfter, failed -> backoff -> starting -> healthy', () => {
-  const e = entryOf('harness-ui');
+  const e = entryOf('harness-ui', { failAfter: 2 });
   let t = 0;
   let r = stepService(newRecord('harness-ui', 0), { ok: true }, opts(e, t));
   assert.equal(r.to, 'healthy');
@@ -177,4 +177,19 @@ test('a seat agent is Orca agentIdentity, then the tab title, then the frame (De
   assert.equal(seatAgentOf({ title: 'shell' }), 'claude');
   assert.deepEqual(S.turnBudget.interruptKeys.devin, ['esc', 'esc']);
   assert.deepEqual(S.turnBudget.interruptKeys.claude, ['esc']);
+});
+
+test('one probe pass retries a slow first request: the harness 5 s idle wake-up is not a failure', async () => {
+  let n = 0;
+  const slowFirst = async () => { n += 1; if (n === 1) throw Object.assign(new Error('The operation was aborted due to timeout'), { name: 'TimeoutError' }); return { status: 200 }; };
+  const r = await httpUp('http://127.0.0.1:4547/healthz', { timeoutMs: 10, tries: 3, fetchImpl: slowFirst });
+  assert.equal(r.ok, true);
+  assert.equal(r.tries, 2);
+  let m = 0;
+  const down = await httpUp('http://x/healthz', { timeoutMs: 10, tries: 3, fetchImpl: async () => { m += 1; throw Object.assign(new Error('refused'), { cause: { code: 'ECONNREFUSED' } }); } });
+  assert.deepEqual([down.ok, down.tries, down.error, m], [false, 3, 'ECONNREFUSED', 3]);
+  assert.ok(S.services['harness-ui'].probeTries >= 3 && S.services['harness-ui'].probeTimeoutMs >= 10000);
+  assert.deepEqual(down.failures.length, 3, 'each failed try is kept for the log');
+  assert.equal(S.services['harness-ui'].probePath, '/healthz');
+  assert.ok(OUTAGE_STATES.has('failed') && !OUTAGE_STATES.has('degraded'), 'one bad pass is not an outage');
 });
