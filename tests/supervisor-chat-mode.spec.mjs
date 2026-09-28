@@ -1,7 +1,7 @@
 // config.yaml supervisor.mode chat (the default; owner, 2026-09-25: "dời supervisor vào chat đi cho persistent"):
 // the owner's desktop chat is the Supervisor again (modules/supervisor/supervise.yaml chatSeat, docs/supervisor.md).
 // The chat registers and drains channel 'main' with no Orca terminal; every other reader peeks. Nothing starts a
-// [Supervisor] kernel: start-supervisor answers chat-mode, resume-all's ensureSupervisor skips, and the supervisor
+// [Supervisor] kernel: start-supervisor answers chat-mode, and the supervisor
 // watchdog loop exits cleanly (also while the seat is DISABLED). Every spec runs on a temp LOCALAPPDATA and a temp
 // supervisor home: no Orca, no agent, no network, never the live runtime.
 import test from 'node:test';
@@ -16,9 +16,8 @@ import { parseYaml } from '../engine/yaml.mjs';
 import { appendInbox, getSupervisor, readInbox, readOutbox, registerSupervisor } from '../scripts/connectors/telegram-bridge.mjs';
 import { drainRefusal, registrationRefusal, replyToOwner } from '../scripts/supervisor/channel.mjs';
 import { openSupervisorLedger, setEnabled, supervisorMode, supervisorSettings } from '../scripts/supervisor/home.mjs';
-import { ensureSupervisor, ensureSupervisorWatchdog, launchSupervisor, CHAT_MODE_REASON } from '../scripts/supervisor/start-supervisor.mjs';
-import { runLoop, standDownReason, watchdogPass, STAND_DOWN_CHECKS } from '../scripts/supervisor/watchdog.mjs';
-import { resumeAll } from '../scripts/kernel/resume-all.mjs';
+import { launchSupervisor, CHAT_MODE_REASON } from '../scripts/supervisor/start-supervisor.mjs';
+import { watchdogPass } from '../scripts/supervisor/watchdog.mjs';
 import { removeStaging, stagingPathOf } from '../scripts/supervisor/workers.mjs';
 
 const ROOT = path.resolve(import.meta.dirname, '..');
@@ -142,78 +141,6 @@ test('chat mode reply: a Telegram message is answered on Telegram; a runtime ale
   assert.equal(sent.length, 1, 'a runtime alert is never answered on Telegram');
   assert.equal(readInbox('main', env).find((m) => m.id === alert.id).read, true);
   assert.deepEqual(readOutbox('main', env).map((o) => o.via), ['telegram', 'local']);
-});
-
-test('chat mode: start-supervisor launches nothing and resume-all never starts the seat or its watchdog', async (t) => {
-  const env = envOf(t);
-  // Even an enabled seat left over from kernel mode is not started in chat mode.
-  const ledger = openSupervisorLedger({ env });
-  setEnabled(ledger, true, { by: 'spec' });
-  ledger.close();
-  const never = { list: () => assert.fail('no Orca call'), verdict: () => assert.fail('no Orca call'), spawn: () => assert.fail('no [Supervisor] spawn') };
-  const start = await launchSupervisor({ mode: 'start', env, deps: never, template: 'x', doc: {} });
-  assert.deepEqual([start.ok, start.exit, start.action, start.reason], [false, 1, 'chat-mode', CHAT_MODE_REASON]);
-  const replace = await launchSupervisor({ mode: 'replace', env, deps: never, template: 'x', doc: {} });
-  assert.deepEqual([replace.ok, replace.exit, replace.action], [true, 0, 'chat-mode'], "the watchdog's replace is a clean no-op");
-  assert.equal((await launchSupervisor({ mode: 'adopt', adoptHandle: 'term_x', env, deps: never })).action, 'chat-mode');
-  assert.deepEqual(ensureSupervisorWatchdog({ env, list: () => assert.fail('no process scan') }), { ok: true, skipped: 'chat mode' });
-  assert.deepEqual(ensureSupervisor({ env, ensure: () => assert.fail('never ensures a watchdog') }), { ok: true, skipped: 'chat mode' });
-
-  const result = resumeAll({ repos: [], workflowsOf: () => [], watchdogs: () => [], spawn: () => assert.fail('no watchdog to start'),
-    probe: () => true, connectors: { cloudflare: { mode: 'off' } }, startOne: () => assert.fail('connectors are off'),
-    ensureBridge: () => ({ ok: true, skipped: 'spec' }), stallAlert: () => ({ ok: true, skipped: 'spec' }),
-    dedupeFn: () => ({ ok: true, closed: [], kept: [], deferred: [] }), logDedupeFn: () => null, orphansOf: () => [],
-    supervisor: (options) => ensureSupervisor({ ...options, env, ensure: () => assert.fail('resume-all never starts the [Supervisor] watchdog in chat mode') }) });
-  assert.deepEqual(result.supervisor, { ok: true, skipped: 'chat mode' });
-
-  // Kernel mode keeps the old behaviour: an enabled seat gets its watchdog ensured.
-  const kernelEnv = { ...env, STARCI_SUPERVISOR_MODE: 'kernel' };
-  assert.deepEqual(ensureSupervisor({ env: kernelEnv, ensure: () => ({ ok: true, launched: 42 }) }), { ok: true, launched: 42 });
-});
-
-test('the supervisor watchdog stands down: chat mode or a DISABLED seat ends the loop cleanly after consecutive checks', async (t) => {
-  const env = envOf(t);
-  assert.equal(standDownReason({ env }), 'chat-mode');
-  assert.deepEqual(await watchdogPass({ env, d: { verdict: () => assert.fail('no Orca call') } }), { ok: true, action: 'chat-mode' });
-  const kernelEnv = { ...env, STARCI_SUPERVISOR_MODE: 'kernel' };
-  assert.equal(standDownReason({ env: kernelEnv }), 'never-started');
-  const ledger = openSupervisorLedger({ env: kernelEnv });
-  setEnabled(ledger, true, { by: 'spec' });
-  assert.equal(standDownReason({ env: kernelEnv }), null, 'an enabled kernel seat is watched');
-  setEnabled(ledger, false, { by: 'spec' });
-  ledger.close();
-  assert.equal(standDownReason({ env: kernelEnv }), 'disabled');
-
-  // The loop: exits (lock released) once STAND_DOWN_CHECKS consecutive checks agree, running no pass.
-  let released = 0, slept = 0;
-  const claim = () => ({ ok: true, release: () => { released += 1; } });
-  const quiet = { claim, sleep: async () => { slept += 1; }, log: () => {}, pass: () => assert.fail('no pass while standing down'), maxIterations: 10 };
-  assert.deepEqual(await runLoop({ ...quiet, env }), { exited: 'chat-mode' });
-  assert.equal(slept, STAND_DOWN_CHECKS - 1, 'it exits on the second agreeing check');
-  assert.ok(released >= 1, 'its lock is released');
-  assert.deepEqual(await runLoop({ ...quiet, env: kernelEnv }), { exited: 'disabled' });
-
-  // A --restart flips the seat off and on again between two checks: a single DISABLED reading never ends the loop.
-  const readings = ['disabled', null, 'disabled', null, null];
-  let passes = 0;
-  const flipping = await runLoop({ claim, sleep: async () => {}, log: () => {}, standDown: () => readings.shift() ?? null,
-    pass: async () => { passes += 1; return Date.now(); }, maxIterations: 5 });
-  assert.deepEqual(flipping, { exited: null }, 'still running after the flip');
-  assert.equal(passes, 3, 'it keeps passing while the seat is enabled');
-
-  // Another loop holds the lock: this one returns at once.
-  assert.deepEqual(await runLoop({ claim: () => ({ ok: false, holder: { pid: 55184 } }), log: () => {} }), { already: true, pid: 55184 });
-});
-
-test('the watchdog loop process exits 0 by itself in chat mode', (t) => {
-  const env = envOf(t);
-  const started = Date.now();
-  const r = spawnSync(process.execPath, [path.join(ROOT, 'scripts', 'supervisor', 'watchdog.mjs')], {
-    cwd: ROOT, encoding: 'utf8', windowsHide: true, timeout: 120_000, env: { ...process.env, ...env },
-  });
-  assert.equal(r.status, 0, r.stderr);
-  assert.deepEqual(JSON.parse(r.stdout.trim().split(/\r?\n/).pop()), { ok: true, exited: 'chat-mode' });
-  assert.ok(Date.now() - started < 110_000);
 });
 
 test('workers cleanup removes a staging directory whose worktree registration is gone (prune, then remove)', (t) => {

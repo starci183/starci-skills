@@ -8,8 +8,6 @@ import { fileURLToPath } from 'node:url';
 import { reconcilerOwns, resetOwnsCache, yieldTo, CONCERN_OWNER, CONCERNS } from '../scripts/reconciler/owns.mjs';
 import { tempState } from '../scripts/reconciler/testing.mjs';
 import { parseYaml } from '../engine/yaml.mjs';
-import { resumeAll } from '../scripts/kernel/resume-all.mjs';
-import { runLoop } from '../scripts/supervisor/watchdog.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const NOW = 5_000_000;
@@ -73,18 +71,4 @@ test('CONCERN_OWNER is the concerns map of modules/reconciler/reconciler.yaml', 
   const contract = parseYaml(fs.readFileSync(path.join(ROOT, 'modules', 'reconciler', 'reconciler.yaml'), 'utf8'));
   assert.deepEqual(contract.concerns, { ...CONCERN_OWNER });
   assert.equal(CONCERNS.length, 24);
-});
-
-test('the yields: the supervisor watchdog loop and resume-all step aside for an owned concern', async () => {
-  const sup = await runLoop({ claim: () => ({ ok: true, release() {} }), owns: (c) => c === 'host.supervisor-seat', log: () => {}, pass: async () => assert.fail('no pass'),
-    standDown: () => null, sleep: async () => {} });
-  assert.deepEqual(sup, { exited: 'reconciler-owned' });
-
-  const result = resumeAll({ repos: ['D:/nowhere'], workflowsOf: () => [{ workflowId: 'wf-x', repo: 'D:/nowhere' }], orphansOf: () => [],
-    watchdogs: () => assert.fail('the kernel seats are owned'), spawn: () => assert.fail('no watchdog'), ensureBridge: () => assert.fail('services owned'),
-    supervisor: () => assert.fail('supervisor seat owned'), stallAlert: () => assert.fail('stall wakes owned'), connectors: { cloudflare: { mode: 'quick' } },
-    startOne: () => assert.fail('services owned'), owns: () => true });
-  assert.equal(result.ok, true);
-  assert.deepEqual(result.reconcilerOwned.map((o) => o.concern).sort(), ['host.kernel-seat', 'host.services', 'host.supervisor-seat', 'workflow.stall-wake']);
-  assert.deepEqual(result.started, []);
 });

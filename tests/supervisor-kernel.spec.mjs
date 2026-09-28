@@ -9,7 +9,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 
-import { launchSupervisor, stopSupervisor, planSupervisorDedupe, ensureSupervisor, doctrineOf, seatCommand, supervisorTerminals } from '../scripts/supervisor/start-supervisor.mjs';
+import { launchSupervisor, stopSupervisor, planSupervisorDedupe, doctrineOf, seatCommand, supervisorTerminals } from '../scripts/supervisor/start-supervisor.mjs';
 import { openSupervisorLedger, seatOf, enabledOf, setEnabled, supervisorEvent, withSupervisorRead, SUPERVISOR_ID, SUPERVISOR_WF, SKILL_ROOT } from '../scripts/supervisor/home.mjs';
 import {
   adaptiveCap, createJob, spawnWorkers, createStaging, removeStaging, fileReport, jobOf, stagingPathOf, leaseConflicts, pickWorkerPool, cancelJob, ackReport,
@@ -22,7 +22,7 @@ import { runTick } from '../scripts/supervisor/tick.mjs';
 import { tell, replies, sinceMs } from '../scripts/supervisor/tell.mjs';
 import { replyToOwner, registrationRefusal } from '../scripts/supervisor/channel.mjs';
 import { appendInbox, readInbox, registerSupervisor, readOutbox, createBridge } from '../scripts/connectors/telegram-bridge.mjs';
-import { planWake, busyScreen, watchdogPass, sweepWorkers, wantsPass } from '../scripts/supervisor/watchdog.mjs';
+import { planWake, busyScreen, watchdogPass, sweepWorkers } from '../scripts/supervisor/watchdog.mjs';
 import { buildSpawnCommand, cwdCommand } from '../scripts/agent/lib.mjs';
 import { orcaTreeFindings, readTerminals, supervisorWorkerHandles } from '../scripts/checks/check-orca-tree.mjs';
 import { withLedger } from './_ledger-fixture.mjs';
@@ -103,7 +103,6 @@ test('singleton: a live startup reservation, a host outage and a disabled seat a
   assert.equal(stopped.action, 'stopped');
   const replace = await launch(env2, fakeHost(), { mode: 'replace' });
   assert.equal(replace.action, 'disabled', 'the watchdog never relaunches a stopped seat');
-  assert.deepEqual(ensureSupervisor({ env: env2, ensure: () => assert.fail('never') }), { ok: true, skipped: 'disabled' });
 });
 
 test('singleton dedupe: with the seat dead a live [Supervisor] session is adopted, extra ones and bare shells are closed', async (t) => {
@@ -742,23 +741,6 @@ test('ack consumes a decided diagnosis so no later [report] wake announces it ag
   assert.equal(unconsumed(), 0, 'the watchdog filedReports query no longer sees it');
   assert.equal(ackReport(ledger, { jobId: job.job_id, reason: 'again' }).already, true);
   assert.equal(ledger.db.prepare("SELECT COUNT(*) n FROM events WHERE kind='worker-report-acked' AND entity_id=?").get(job.job_id).n, 1);
-});
-
-test('a filed diagnosis wants a watchdog pass of its own until a wake announced it', (t) => {
-  const env = envOf(t);
-  const ledger = openSupervisorLedger({ env });
-  t.after(() => ledger.close());
-  const now = Date.now();
-  setEnabled(ledger, true, { now });
-  supervisorEvent(ledger, { kind: 'supervisor-tick', now });
-  const want = () => wantsPass({ env, now, lastFullAt: now, settings: { pollIntervalMs: 600000 } });
-  assert.equal(want(), null);
-  const { job } = createJob(ledger, { cluster: 'diag-pass', files: ['scripts/y.mjs'] });
-  ledger.db.prepare("UPDATE jobs SET status='running' WHERE job_id=?").run(job.job_id);
-  assert.ok(fileReport(ledger, { jobId: job.job_id, outcome: 'diagnosed', summary: 'root cause: y' }).ok);
-  assert.equal(want(), 'report');
-  supervisorEvent(ledger, { kind: 'supervisor-wake', now, payload: { tags: ['report'], report: [job.job_id], text: 'x' } });
-  assert.equal(want(), null, 'announced once');
 });
 
 test('watchdog: a busy Supervisor (mid-turn, or idle input with subagents running) is never woken', async (t) => {

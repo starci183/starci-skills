@@ -10,7 +10,6 @@ import {
   createReloadWatch, reexecSelf, runtimeHead, moduleStamps, rotateLog, RELOAD_ENV, RELOAD_MIN_INTERVAL_MS, LOG_CAP_BYTES,
 } from '../scripts/lib/self-reload.mjs';
 import { claimOrTakeOver, claimManager, lockHolder, stateFile } from '../scripts/connectors/lib.mjs';
-import { runLoop } from '../scripts/supervisor/watchdog.mjs';
 import { watchdogLogFile, watchdogLogFile as sharedLogFile } from '../scripts/kernel/watchdog-log.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -223,22 +222,6 @@ setTimeout(() => { held.release?.(); process.exit(0); }, held.ok ? 20000 : 0);
   const text = fs.readFileSync(log, 'utf8');
   assert.match(text, /^first generation line\n/, 'the log is appended, not truncated');
   assert.match(text, new RegExp(`replacement ${r.pid} args=--workflow wf-e2e --repair took=true`));
-});
-
-test('the supervisor watchdog loop reloads the same way and hands its lock over', async () => {
-  const f = fakes();
-  const watch = createReloadWatch({ head: f.head, stamps: f.stamps, now: f.now });
-  const lines = [];
-  let released = 0, passes = 0;
-  const r = await runLoop({
-    claim: () => ({ ok: true, release: () => { released += 1; } }), standDown: () => null, log: (line) => lines.push(line),
-    pass: async () => { passes += 1; if (passes === 3) f.git.head = SHA_B; return f.now(); },
-    sleep: async (ms) => { f.clock.t += ms; }, watch, reload: async () => ({ ok: true, pid: 8181 }), maxIterations: 10,
-  });
-  assert.deepEqual(r, { reloaded: 8181 });
-  assert.equal(passes, 3);
-  assert.ok(lines.some((line) => /reloaded: pid 8181 took over \(runtime HEAD aaaaaaaaa -> bbbbbbbbb\)/.test(line)), lines.join('\n'));
-  assert.ok(released >= 1, 'release runs, and is a no-op once the lock names the replacement');
 });
 
 test('a loop log past its cap reloads the loop, and the re-exec starts the replacement on a rotated log (LC-12)', async (t) => {

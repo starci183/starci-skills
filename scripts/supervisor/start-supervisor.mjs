@@ -5,11 +5,12 @@
 // with a prompt built from modules/supervisor/supervisor-prompt.md and supervise.yaml.
 //
 // The kernel is OPTIONAL: it runs only in config.yaml supervisor.mode kernel. In chat mode (the default; owner,
-// 2026-09-25) the owner's desktop chat is the Supervisor, and start, --replace, --adopt, --restart, the watchdog
-// and resume-all's ensureSupervisor launch nothing (action 'chat-mode'); --stop and --status still work.
+// 2026-09-25) the owner's desktop chat is the Supervisor, and start, --replace, --adopt and --restart launch nothing
+// (action 'chat-mode'); --stop and --status still work. The seat's liveness is the reconciler Host controller's
+// (concern host.supervisor-seat: scripts/supervisor/watchdog.mjs --once).
 //
-//   node scripts/supervisor/start-supervisor.mjs [--json] [--plan] [--no-watchdog] [--reason <text>]
-//       enable the seat, launch it unless one is live, and make sure its watchdog loop runs
+//   node scripts/supervisor/start-supervisor.mjs [--json] [--plan] [--reason <text>]
+//       enable the seat and launch it unless one is live
 //   node scripts/supervisor/start-supervisor.mjs --replace [--json]      (the watchdog's call; never enables)
 //   node scripts/supervisor/start-supervisor.mjs --adopt <terminal> [--json]
 //   node scripts/supervisor/start-supervisor.mjs --status [--json]
@@ -32,17 +33,15 @@ import crypto from 'node:crypto';
 import { spawn } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { parseYaml } from '../../engine/yaml.mjs';
-import { claimManager, lockHolder } from '../connectors/lib.mjs';
+import { claimManager } from '../connectors/lib.mjs';
 import { agentOfTerminal } from '../kernel/quit-agent.mjs';
 import {
   SKILL_ROOT, SUPERVISOR_ID, SEAT_SCOPE, SUPERVISOR_TITLE, SUPERVISOR_MARKER, WORKER_MARKER, STARTUP_RESERVATION_MS,
-  openSupervisorLedger, withSupervisorRead, seatOf, enabledOf, setEnabled, supervisorEvent, supervisorSettings, supervisorMode, productRepos, supervisorLog, logsRoot,
+  openSupervisorLedger, seatOf, enabledOf, setEnabled, supervisorEvent, supervisorSettings, supervisorMode, productRepos, supervisorLog,
 } from './home.mjs';
 import { openWorkerHandles } from './workers.mjs';
-import { listHostProcesses } from '../lib/process-list.mjs';
 
 const selfFile = fileURLToPath(import.meta.url);
-export const WATCHDOG_FILE = path.join(SKILL_ROOT, 'scripts', 'supervisor', 'watchdog.mjs');
 export const EXIT_HOST_UNAVAILABLE = 75;
 const PROMPT_FILE = path.join(SKILL_ROOT, 'modules', 'supervisor', 'supervisor-prompt.md');
 const DOCTRINE_FILE = path.join(SKILL_ROOT, 'modules', 'supervisor', 'supervise.yaml');
@@ -336,56 +335,12 @@ export async function stopSupervisor({ env = process.env, deps = null, now = Dat
   } finally { ledger.close(); }
 }
 
-/* ------------------------------------------------------------ the watchdog loop */
-
-/** Live supervisor watchdog loops (not their --once children), from the process table; null = unreadable. */
-export function supervisorWatchdogs() {
-  // resume-all's listWatchdogs keeps only lines with --workflow; the supervisor loop has none.
-  const rows = listHostProcesses({ where: "Name='node.exe'", match: /supervisor[\\/]watchdog\.mjs/, timeoutMs: 60_000 });
-  if (!rows) return null;
-  return rows.filter((p) => !/--once/.test(p.cmd)).map((p) => ({ pid: p.pid || null, commandLine: p.cmd }));
-}
-
-/** Start the supervisor watchdog loop detached unless one runs (its own lock also refuses a second). */
-export function ensureSupervisorWatchdog({ env = process.env, dryRun = false, list = supervisorWatchdogs } = {}) {
-  try {
-    if (supervisorMode({ env }) === 'chat') return { ok: true, skipped: 'chat mode' };
-    if (env.NODE_TEST_CONTEXT) return { ok: true, skipped: 'test context' };
-    const held = lockHolder('supervisor-watchdog', env);
-    if (held) return { ok: true, already: true, pid: held.pid };
-    const loops = list();
-    if (loops?.length) return { ok: true, already: true, pid: loops[0].pid };
-    if (dryRun) return { ok: true, wouldStart: true };
-    const log = path.join(logsRoot(env), 'watchdog.log');
-    fs.mkdirSync(path.dirname(log), { recursive: true });
-    const fd = fs.openSync(log, 'a');
-    try {
-      const child = spawn(process.execPath, [WATCHDOG_FILE], { detached: true, stdio: ['ignore', fd, fd], windowsHide: true, cwd: SKILL_ROOT, env });
-      child.unref();
-      return { ok: true, launched: child.pid ?? null, log };
-    } finally { fs.closeSync(fd); }
-  } catch (error) { return { ok: false, error: String(error?.message ?? error) }; }
-}
-
-/**
- * resume-all's step: when the seat is enabled (start-supervisor ran and --stop did not follow), make sure its
- * watchdog loop runs; the loop replaces a dead Supervisor itself. Never throws; never enables anything. In chat
- * mode (config.yaml supervisor.mode, the default) it does nothing: the owner's chat is the Supervisor.
- */
-export function ensureSupervisor({ env = process.env, dryRun = false, ensure = ensureSupervisorWatchdog } = {}) {
-  try {
-    if (supervisorMode({ env }) === 'chat') return { ok: true, skipped: 'chat mode' };
-    const enabled = withSupervisorRead((db) => enabledOf(db), null, { env });
-    if (enabled !== true) return { ok: true, skipped: enabled === false ? 'disabled' : 'never started' };
-    return ensure({ env, dryRun });
-  } catch (error) { return { ok: false, error: String(error?.message ?? error) }; }
-}
 
 /* ------------------------------------------------------------ CLI */
 
 const describe = (r) => {
-  if (r.action === 'status') return `[Supervisor] mode ${r.supervisorMode}; ${r.enabled === false ? 'DISABLED' : r.enabled ? 'enabled' : 'never started'}; seat ${r.seat?.terminal ?? 'none'} (${r.health?.reason ?? '-'})${r.watchdog ? `; watchdog ${r.watchdog.length ? `pid ${r.watchdog.map((w) => w.pid).join(',')}` : 'NOT running'}` : ''}`;
-  return `[Supervisor] ${r.action}${r.terminal ? ` ${r.terminal}` : ''}${r.reason ? ` (${r.reason})` : ''}${r.error ? `: ${r.error}` : ''}${r.watchdog ? `; watchdog ${r.watchdog.already ? `running pid ${r.watchdog.pid}` : r.watchdog.launched ? `started pid ${r.watchdog.launched}` : r.watchdog.skipped ?? r.watchdog.error ?? ''}` : ''}`;
+  if (r.action === 'status') return `[Supervisor] mode ${r.supervisorMode}; ${r.enabled === false ? 'DISABLED' : r.enabled ? 'enabled' : 'never started'}; seat ${r.seat?.terminal ?? 'none'} (${r.health?.reason ?? '-'})`;
+  return `[Supervisor] ${r.action}${r.terminal ? ` ${r.terminal}` : ''}${r.reason ? ` (${r.reason})` : ''}${r.error ? `: ${r.error}` : ''}`;
 };
 
 async function main() {
@@ -394,12 +349,12 @@ async function main() {
   const value = (n) => { const i = argv.indexOf(`--${n}`); return i >= 0 ? argv[i + 1] ?? null : null; };
   const asJson = has('json');
   const out = (r) => { console.log(asJson ? JSON.stringify(r) : describe(r)); process.exitCode = r.exit ?? (r.ok ? 0 : 1); };
-  if (has('help')) { console.log('use: start-supervisor.mjs [--plan] [--no-watchdog] [--reason <t>] | --replace | --adopt <terminal> | --status | --stop | --restart  [--json]'); return; }
+  if (has('help')) { console.log('use: start-supervisor.mjs [--plan] [--reason <t>] | --replace | --adopt <terminal> | --status | --stop | --restart  [--json]'); return; }
   if (has('status')) {
     const d = await orcaDeps();
     const ledger = openSupervisorLedger();
     let r;
-    try { const seat = seatOf(ledger.db); r = { ok: true, action: 'status', supervisorMode: supervisorMode(), enabled: enabledOf(ledger.db), seat: seat?.value ?? null, health: seatHealth(seat, d), watchdog: supervisorWatchdogs() }; }
+    try { const seat = seatOf(ledger.db); r = { ok: true, action: 'status', supervisorMode: supervisorMode(), enabled: enabledOf(ledger.db), seat: seat?.value ?? null, health: seatHealth(seat, d) }; }
     finally { ledger.close(); }
     return out(r);
   }
@@ -408,13 +363,11 @@ async function main() {
     const stopped = await stopSupervisor();
     const r = await launchSupervisor({ mode: 'start', reason: value('reason') ?? 'owner restart (start-supervisor --restart)' });
     r.stopped = stopped;
-    if (!has('no-watchdog') && r.action !== 'chat-mode') r.watchdog = ensureSupervisorWatchdog();
     supervisorLog('start', `restart: ${JSON.stringify(r)}`);
     return out(r);
   }
   const mode = has('replace') ? 'replace' : value('adopt') ? 'adopt' : 'start';
   const r = await launchSupervisor({ mode, adoptHandle: value('adopt'), reason: value('reason'), plan: has('plan') });
-  if (mode === 'start' && !has('plan') && !has('no-watchdog') && r.action !== 'chat-mode') r.watchdog = ensureSupervisorWatchdog();
   if (!has('plan')) supervisorLog('start', `${mode}: ${JSON.stringify(r)}`);
   return out(r);
 }

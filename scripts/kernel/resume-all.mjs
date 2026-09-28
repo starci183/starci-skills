@@ -84,7 +84,6 @@ import { dedupeTerminals, describeDedupe } from './terminal-dedupe.mjs';
 import { orphanKernelJobs } from '../supervisor/poll.mjs';
 import { watchdogLogFile } from './watchdog-log.mjs';
 import { rotateLog } from '../lib/self-reload.mjs';
-import { ensureSupervisor } from '../supervisor/start-supervisor.mjs';
 import { reconcilerOwns, yieldTo } from '../reconciler/owns.mjs';
 import { listHostProcesses } from '../lib/process-list.mjs';
 
@@ -243,13 +242,12 @@ export function resumeAll({
   connectorAlive = (script) => CONNECTOR_ALIVE[path.basename(script)]?.() === true, dryRun = false,
   ensureBridge = ensureTelegramBridge,
   dedupe = 'auto', dedupeFn = defaultDedupe, orphansOf = orphanKernelJobsOf, logDedupeFn = logDedupe,
-  supervisor = (options) => (process.env.NODE_TEST_CONTEXT ? { ok: true, skipped: 'test context' } : ensureSupervisor(options)),
   owns = reconcilerOwns,
 } = {}) {
   // Each duty yields to the reconciler while it owns the concern (scripts/reconciler/owns.mjs; modules/reconciler/reconciler.yaml yields).
   const reconcilerOwned = [];
   const yielded = (concern) => yieldTo(concern, reconcilerOwned, { owns });
-  const result = { ok: !configError, dryRun, repos, missing, ...(configError ? { configError } : {}), workflows: [], started: [], present: [], duplicate: [], connectors: [], telegramBridge: null, supervisor: null, orca: null, skipped: null, dedupe: null, orphanKernelJobs: [] };
+  const result = { ok: !configError, dryRun, repos, missing, ...(configError ? { configError } : {}), workflows: [], started: [], present: [], duplicate: [], connectors: [], telegramBridge: null, orca: null, skipped: null, dedupe: null, orphanKernelJobs: [] };
   try { result.orphanKernelJobs = orphansOf(repos); } catch (error) { result.orphanKernelJobsError = String(error?.message ?? error); }
   // The stray-terminal pass runs once Orca answers and before any watchdog starts a kernel.
   const runDedupe = () => {
@@ -260,9 +258,6 @@ export function resumeAll({
   const servicesOwned = yielded('host.services');
   if (servicesOwned) result.telegramBridge = { ok: true, action: 'reconciler-owned' };
   else try { result.telegramBridge = ensureBridge({ dryRun, requireRegistered: true }); } catch (error) { result.telegramBridge = { ok: false, error: String(error?.message ?? error) }; }
-  // The [Supervisor] kernel's watchdog, when its seat is enabled: best effort, never fails the pass.
-  if (yielded('host.supervisor-seat')) result.supervisor = { ok: true, action: 'reconciler-owned' };
-  else try { result.supervisor = supervisor({ dryRun }); } catch (error) { result.supervisor = { ok: false, error: String(error?.message ?? error) }; }
   if (reconcilerOwned.length) result.reconcilerOwned = reconcilerOwned;
   const cf = servicesOwned ? null : connectors ?? (() => { try { return connectorsConfig(); } catch { return null; } })();
   if (cf && cf.cloudflare?.mode && cf.cloudflare.mode !== 'off') {
@@ -366,7 +361,6 @@ const describe = (result) => [
   ...(result.pending ?? []).map((w) => `  pending   ${w.workflowId} (${w.repo}): Orca did not answer`),
   ...result.connectors.map((c) => `  connector ${c.script} ${c.wouldStart ? 'would start' : c.already ? 'already running' : c.ok ? 'started' : `FAILED ${c.error ?? c.stderr ?? ''}`}`),
   ...(result.telegramBridge ? [`  connector telegram-bridge.mjs ${(({ wouldStart, already, launched, skipped, ok, error }) => (wouldStart ? 'would start' : already ? 'already running' : launched ? `started pid ${launched}` : skipped ? `skipped (${skipped})` : ok ? 'ok' : `FAILED ${error ?? ''}`))(result.telegramBridge)}`] : []),
-  ...(result.supervisor ? [`  supervisor ${(({ wouldStart, already, pid, launched, skipped, ok, error }) => (wouldStart ? 'watchdog would start' : already ? `watchdog running pid ${pid}` : launched ? `watchdog started pid ${launched}` : skipped ? `skipped (${skipped})` : ok ? 'ok' : `FAILED ${error ?? ''}`))(result.supervisor)}`] : []),
   ...(result.skipped ? [`  skipped watchdogs: ${result.skipped}${result.orca ? ` after ${result.orca.attempts} Orca probe(s)` : ''}`] : []),
   ...describeDedupe(result.dedupe),
   ...(result.orphanKernelJobsError ? [`  orphan    check FAILED: ${result.orphanKernelJobsError}`] : []),

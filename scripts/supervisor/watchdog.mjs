@@ -6,40 +6,29 @@
 //   - wakes the idle Supervisor with a one-line tag when it has work: [inbox] unread channel messages (their
 //     text is NEVER typed; the Supervisor reads its inbox), [land] a worker filed a report, [worker] a worker died, [register] the
 //     channel 'main' is not registered from the seat's terminal. Delivery is screen-proven
-//     (scripts/supervisor/stall-alert.mjs wakeKernel -> scripts/kernel/wake-delivery.mjs);
+//     (scripts/kernel/wake-delivery.mjs wakeKernel);
 //   - heartbeats channel 'main' while the seat is proven live and registered from its own terminal;
-//   - sweeps [Worker] terminals: a worker whose terminal died without a report fails its job (leases released,
-//     checkout kept for the Supervisor to inspect); a worker that reported is asked to quit and its tab closed
-//     (scripts/kernel/quit-agent.mjs, close-op-terminal.mjs).
+//   [Worker] terminals are the Job controller's (scripts/reconciler/controllers/job.mjs calls sweepWorkers below).
 //
-//   node scripts/supervisor/watchdog.mjs                 the loop (one per host: lock 'supervisor-watchdog')
-//   node scripts/supervisor/watchdog.mjs --once [--json] one pass
+//   node scripts/supervisor/watchdog.mjs --once [--json] one pass; the reconciler Host controller runs it
+//                                                        (concern host.supervisor-seat). There is no loop (owner ruling
+//                                                        2026-09-28 "có lỗi xóa luôn": the reconciler is the only loop).
 //
 // It serves only the optional [Supervisor] kernel (config.yaml supervisor.mode kernel). In chat mode (the default;
 // owner, 2026-09-25: the Supervisor is the owner's desktop chat again), or while the seat is DISABLED
-// (start-supervisor --stop) or was never started, a pass does nothing and the loop EXITS cleanly (exit 0, its lock
-// released) once two consecutive checks agree - so a --restart's stop-then-start never kills it.
-//
-// The loop checks cheap facts every LOOP_MS (inbox, reports, running workers) and runs a full pass as
-// a fresh `--once` child when one needs acting on, and at least every LIVENESS_MS, so a runtime fix reaches a
-// running watchdog on its next pass. The loop process itself reloads (scripts/lib/self-reload.mjs): a new runtime
-// HEAD or a changed watched module re-execs it with the same argv into the same logs/watchdog.log, the lock
-// 'supervisor-watchdog' handed over to the replacement, at most once per 5 minutes.
+// (start-supervisor --stop) or was never started, a pass does nothing.
 import '../lib/hide-child-windows.mjs';
 import path from 'node:path';
 import { sha256 } from '../../engine/index.mjs';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { allocationMs } from '../../engine/config.mjs';
-import { claimOrTakeOver } from '../connectors/lib.mjs';
-import { createReloadWatch, reexecSelf, RELOAD_ENV } from '../lib/self-reload.mjs';
 import { sleepSync } from '../lib/sleep-sync.mjs';
-import { sleep as sleepAsync } from '../lib/sleep.mjs';
 import { INPUT_GLYPH_CLASS } from '../lib/input-glyph.mjs';
 import { readInbox, getSupervisor, heartbeatSupervisor } from '../connectors/telegram-bridge.mjs';
 import {
   SKILL_ROOT, SUPERVISOR_ID, SUPERVISOR_WF, SUPERVISOR_TITLE, WORKER_TITLE_PREFIX, openSupervisorLedger, withSupervisorRead, seatOf, enabledOf, supervisorEvent, supervisorSettings,
-  supervisorMode, terminalSignalDb, supervisorLog, logsRoot, DEFAULTS,
+  supervisorMode, terminalSignalDb, supervisorLog, DEFAULTS,
 } from './home.mjs';
 import { seatHealth } from './start-supervisor.mjs';
 import { jobsOf, reportOf, releaseLeases } from './workers.mjs';
@@ -48,7 +37,6 @@ import { terminalList } from '../api/orca/terminal-list.mjs';
 import { terminalRename } from '../api/orca/terminal-rename.mjs';
 import { tabTitlesOf } from '../kernel/terminal-dedupe.mjs';
 
-import { reconcilerOwns, yieldTo } from '../reconciler/owns.mjs';
 const selfFile = fileURLToPath(import.meta.url);
 const START_FILE = path.join(SKILL_ROOT, 'scripts', 'supervisor', 'start-supervisor.mjs');
 export const LOOP_MS = 30_000;
@@ -257,19 +245,8 @@ export function sweepWorkers(ledger, d, { now = Date.now() } = {}) {
   return out;
 }
 
-/**
- * Why the watchdog has nothing to watch, or null: 'chat-mode' (config.yaml supervisor.mode chat - the owner's chat
- * is the Supervisor), 'disabled' (start-supervisor --stop) or 'never-started'. An unreadable ledger is not a reason.
- */
-export function standDownReason({ env = process.env } = {}) {
-  if (supervisorMode({ env }) === 'chat') return 'chat-mode';
-  const enabled = withSupervisorRead((db) => enabledOf(db), undefined, { env });
-  if (enabled === undefined) return 'never-started';
-  return enabled === false ? 'disabled' : enabled === true ? null : 'never-started';
-}
-
 /** One watchdog pass. `d` = host seams. Returns {ok, action, ...}. */
-export async function watchdogPass({ env = process.env, d = null, now = Date.now, owns = reconcilerOwns } = {}) {
+export async function watchdogPass({ env = process.env, d = null, now = Date.now } = {}) {
   if (supervisorMode({ env }) === 'chat') return { ok: true, action: 'chat-mode' };
   const deps = d ?? await hostDeps();
   const settings = supervisorSettings();
@@ -294,8 +271,8 @@ export async function watchdogPass({ env = process.env, d = null, now = Date.now
       return { ok: replaced?.ok !== false, action: replaced?.action === 'booted' || replaced?.action === 'restarted' ? 'restarted' : (replaced?.action ?? 'replace-failed'), reason: health.reason, detail: replaced, ...(titleRepairs.length ? { titleRepairs } : {}) };
     }
     const terminal = health.terminal;
-    // The [Worker] close-verify is the reconciler's Job controller's while it owns job.close-verify (scripts/reconciler/owns.mjs).
-    const sweep = yieldTo('job.close-verify', null, { owns, env }) ? { deaths: [], closed: [], action: 'reconciler-owned' } : sweepWorkers(ledger, deps, { now: now() });
+    // [Worker] terminals (deaths, reported-worker close) are the Job controller's: it calls sweepWorkers itself.
+    const sweep = { deaths: [], closed: [], action: 'job-controller' };
     const titleRepairs = repairSupervisorTabTitles(terminal, jobsOf(ledger.db, ['running']), deps);
     const sup = getSupervisor(SUPERVISOR_ID, env);
     const registered = Boolean(sup && sup.terminal === terminal);
@@ -346,106 +323,12 @@ export async function watchdogPass({ env = process.env, d = null, now = Date.now
   } finally { try { ledger.close(); } catch { /* closed above */ } }
 }
 
-/* ------------------------------------------------------------ the loop */
-
-/** Cheap facts for the loop: does anything want a full pass now? */
-export function wantsPass({ env = process.env, now = Date.now(), lastFullAt = 0 } = {}) {
-  return withSupervisorRead((db) => {
-    if (enabledOf(db) !== true) return null;
-    if (now - lastFullAt >= LIVENESS_MS) return 'liveness';
-    const wakes = recentWakes(db);
-    const announced = new Set(wakes.filter((w) => now - w.at < INBOX_REWAKE_MS).flatMap((w) => w.payload.inbox ?? []));
-    if (readInbox(SUPERVISOR_ID, env).some((m) => !m.read && !announced.has(m.id))) return 'inbox';
-    if (jobsOf(db, ['reported']).some((j) => !j.payload.terminalClosed)) return 'land';
-    const reportAnnounced = new Set(wakes.flatMap((w) => w.payload.report ?? []));
-    if (filedReports(db, now).some((id) => !reportAnnounced.has(id))) return 'report';
-    if (jobsOf(db, ['running']).some((j) => !j.payload.self) && now - lastFullAt >= 60_000) return 'workers';
-    return null;
-  }, null, { env });
-}
-
-/** What the loop process itself runs; a change to one of them (or a new runtime HEAD) reloads the loop. */
-export const reloadWatchedFiles = (root = SKILL_ROOT) => [
-  'scripts/supervisor/watchdog.mjs', 'scripts/supervisor/home.mjs', 'scripts/supervisor/start-supervisor.mjs', 'scripts/supervisor/workers.mjs',
-  'scripts/connectors/telegram-bridge.mjs', 'scripts/connectors/lib.mjs', 'scripts/lib/self-reload.mjs', 'engine/config.mjs',
-].map((rel) => path.join(root, ...rel.split('/')));
-
-/** Consecutive checks that must agree on a stand-down reason before the loop exits. */
-export const STAND_DOWN_CHECKS = 2;
-
-/**
- * The loop. `standDown` names why there is nothing to watch (standDownReason); once STAND_DOWN_CHECKS consecutive
- * checks agree, it returns {exited: reason} - the caller exits 0. After each sleep `watch` (createReloadWatch) is
- * asked whether the runtime changed; `reload` (reexecSelf) then hands the lock to a replacement and the loop returns
- * {reloaded: pid}. The seams are injectable (specs).
- */
-export async function runLoop({ env = process.env, claim = () => claimOrTakeOver('supervisor-watchdog', { from: env[RELOAD_ENV.handoverFrom], env }), standDown = () => standDownReason({ env }),
-  pass = null, sleep = sleepAsync, log = (line) => supervisorLog('watchdog', line, { env }), maxIterations = Infinity,
-  watch = null, reload = null, owns = reconcilerOwns } = {}) {
-  const held = claim();
-  if (!held.ok) return { already: true, pid: held.holder?.pid ?? null };
-  if (held.takenOver) log(`loop ${process.pid} took over the lock (reload)`);
-  const onSignal = () => { held.release(); process.exit(0); };
-  process.on('exit', held.release);
-  for (const sig of ['SIGINT', 'SIGTERM']) process.on(sig, onSignal);
-  log(`loop ${process.pid} started`);
-  let lastFullAt = 0, downReason = null, downSeen = 0;
-  try {
-    for (let i = 0; i < maxIterations; i += 1) {
-      // The reconciler's Host controller runs the --once passes itself while it owns host.supervisor-seat: the loop exits.
-      if (yieldTo('host.supervisor-seat', null, { owns, env })) { log(`loop ${process.pid} exits: reconciler-owned (host.supervisor-seat)`); return { exited: 'reconciler-owned' }; }
-      let down = null;
-      try { down = standDown(); } catch { down = null; }
-      downSeen = down && down === downReason ? downSeen + 1 : down ? 1 : 0;
-      downReason = down;
-      if (down && downSeen >= STAND_DOWN_CHECKS) { log(`loop ${process.pid} exits: ${down}`); return { exited: down }; }
-      if (!down) lastFullAt = await (pass ?? loopPass)({ lastFullAt, env });
-      await sleep(LOOP_MS);
-      const check = watch?.check();
-      if (check?.reload && reload) {
-        watch.markAttempt();
-        const handed = await reload(check);
-        log(`loop ${process.pid} ${handed.ok ? `reloaded: pid ${handed.pid} took over` : `reload failed: ${handed.error}`} (${check.reason})`);
-        if (handed.ok) return { reloaded: handed.pid };
-      }
-    }
-    return { exited: null };
-  } finally {
-    held.release();
-    process.removeListener('exit', held.release);
-    for (const sig of ['SIGINT', 'SIGTERM']) process.removeListener(sig, onSignal);
-  }
-}
-
-/** One loop iteration's pass: a fresh --once child when something wants it. Returns the new lastFullAt. */
-function loopPass({ lastFullAt }) {
-  let reason = null;
-  try { reason = wantsPass({ lastFullAt }); } catch (e) { reason = `check-failed ${String(e?.message ?? e).slice(0, 80)}`; }
-  if (!reason) return lastFullAt;
-  const at = Date.now();
-  const child = spawnSync(process.execPath, [selfFile, '--once', '--json'], { cwd: SKILL_ROOT, encoding: 'utf8', windowsHide: true, timeout: 900_000 });
-  const line = String(child.stdout ?? '').trim().split(/\r?\n/).filter(Boolean).pop() ?? '';
-  let r = null;
-  try { r = JSON.parse(line); } catch { r = { ok: false, action: 'pass-failed', error: String(child.stderr || line || `exit ${child.status}`).slice(0, 300) }; }
-  if (r.action !== 'idle' || reason !== 'liveness') supervisorLog('watchdog', `${reason}: ${JSON.stringify(r).slice(0, 600)}`);
-  return at;
-}
-
-async function loop() {
-  const lastReloadAt = Number(process.env[RELOAD_ENV.reloadedAt]) || null;
-  const watch = createReloadWatch({ root: SKILL_ROOT, files: reloadWatchedFiles(), lastReloadAt });
-  const reload = () => reexecSelf({ script: selfFile, args: process.argv.slice(2), logFile: path.join(logsRoot(), 'watchdog.log'), lockName: 'supervisor-watchdog', cwd: SKILL_ROOT });
-  const r = await runLoop({ watch, reload });
-  if (r.reloaded) process.exit(0);
-  if (r.already) console.log(JSON.stringify({ ok: true, already: true, pid: r.pid }));
-  else if (r.exited) console.log(JSON.stringify({ ok: true, exited: r.exited }));
-  process.exit(0);
-}
-
 if (process.argv[1] && path.resolve(process.argv[1]) === selfFile) {
-  if (process.argv.includes('--once')) {
-    const r = await watchdogPass();
-    console.log(process.argv.includes('--json') ? JSON.stringify(r) : `[Supervisor watchdog] ${r.action}${r.terminal ? ` ${r.terminal}` : ''}${r.tags ? ` ${r.tags.join(',')}` : ''}`);
-    process.exit(r.ok ? 0 : 1);
-  } else await loop();
+  if (!process.argv.includes('--once')) {
+    console.error('use: node scripts/supervisor/watchdog.mjs --once [--json]  (the Host controller runs it; there is no loop)');
+    process.exit(2);
+  }
+  const r = await watchdogPass();
+  console.log(process.argv.includes('--json') ? JSON.stringify(r) : `[Supervisor watchdog] ${r.action}${r.terminal ? ` ${r.terminal}` : ''}${r.tags ? ` ${r.tags.join(',')}` : ''}`);
+  process.exit(r.ok ? 0 : 1);
 }
