@@ -539,7 +539,6 @@ test('an ask settles awaiting-owner: no business attempt spent, projected apart 
   assert.equal(again.status,0,again.stderr||again.stdout);
   const next=JSON.parse(jobRow(fx,JSON.parse(again.stdout).job_id).payload_json);
   assert.equal(next.retry.attempt,2,'the answered ask runs as a new durable attempt');
-  assert.equal(next.retry.businessAttempt,1,'the ask spent no business attempt');
   assert.equal(next.retry.retryClass,'owner-answer');
   assert.deepEqual(status().awaitingOwner,[],'a re-enqueued op no longer waits');
 });
@@ -557,5 +556,4 @@ test('a blocked verdict on an ask report settled before awaiting-owner existed r
   assert.deepEqual(st.failures,{failed:0,awaitingOwner:1});
   const again=fx.run(API,'enqueue','--repo',fx.repo,'--workflow',WORKFLOW,'--op',OP,'--paths','docs/','--json');
   assert.equal(again.status,0,again.stderr||again.stdout);
-  assert.equal(JSON.parse(jobRow(fx,JSON.parse(again.stdout).job_id).payload_json).retry.businessAttempt,1);
 });

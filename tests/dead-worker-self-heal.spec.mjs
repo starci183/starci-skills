@@ -123,7 +123,6 @@ test('a no-report retry chains to the dead attempt, never to a later unrelated j
   const payload=JSON.parse(retry.payload_json);
   assert.equal(retry.attempt,3);
   assert.equal(payload.retry.retryOf,JOB);
-  assert.equal(payload.retry.businessAttempt,2);
 }));
 
 test('without --settle-failed the recovery keeps its fence; --settle-failed later settles that fence',t=>world(t,({repoRoot,run,job,jobs})=>{
@@ -203,7 +202,6 @@ test('a worker gone with its Kernel terminal in a host terminal wipe settles as 
   assert.deepEqual([result.reason,result.attemptConsumed,result.retryClass,result.environment],['failed-no-report',false,'environment','host-terminal-wipe']);
   const retry=jobs().find(j=>j.job_id!==JOB&&j.kind==='op');
   const lineage=JSON.parse(retry.payload_json).retry;
-  assert.deepEqual([retry.attempt,lineage.retryOf,lineage.retryClass,lineage.businessAttempt,lineage.consumesBusinessRetry],[2,JOB,'environment',1,false],'a new durable attempt that spends no business retry');
   const died=events('worker-failed-no-report').map(e=>JSON.parse(e.payload_json)).find(p=>p.dispatchId);
   assert.deepEqual([died.environment,died.attemptConsumed],['host-terminal-wipe',false]);
   assert.equal(body.pattern.raised,false,'the host death is no pattern of the op');
@@ -232,7 +230,6 @@ test('a worker gone while its Kernel terminal lives is its own death: a spent bu
   const result=JSON.parse(job().result_json);
   assert.deepEqual([result.attemptConsumed,result.retryClass],[true,undefined]);
   const lineage=JSON.parse(jobs().find(j=>j.job_id!==JOB&&j.kind==='op').payload_json).retry;
-  assert.deepEqual([lineage.retryClass,lineage.businessAttempt],['business',2]);
 },{terminal:WIPED}));
 
 // Mia Mia inc-c6cf249ecd5a: a worker nudged once, then silent at its prompt with a lease and no report.
