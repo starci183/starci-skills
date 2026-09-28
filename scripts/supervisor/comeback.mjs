@@ -42,6 +42,9 @@ const DONE_PHASES = new Set(['stopped', 'finished', 'archived']);
 const LIVE_JOB = new Set(['leased', 'running', 'answering']);
 const FE_CANON = /-fe-canon-/;
 const DROPPED_LEDGERS = ['starci-academy-backend']; // Q9: smoke ledgers are dropped, never relaunched
+// alpha.3 stores a lane created before the comeback: archived and removed FIRST, so step 10 can create the fresh ones
+// at the same paths before the evidence ingest.
+const ALPHA3_KINDS = new Set(['machine-alpha3', 'project-ledger-alpha3']);
 
 // ---------------------------------------------------------------------------------------------------------------
 // roots and small helpers
@@ -417,8 +420,13 @@ export async function writersReady() {
   try { ledger = await import('../../engine/ledger-db.mjs'); } catch { missing.push('engine/ledger-db.mjs'); }
   for (const fn of ['openMachine', 'registerLedger', 'setControllerMode', 'recordArchive']) if (machine && typeof machine[fn] !== 'function') missing.push(`machine-db.mjs ${fn}`);
   if (machine && !Array.isArray(machine.CONTROLLERS)) missing.push('machine-db.mjs CONTROLLERS');
-  for (const fn of ['ledgerFileFor', 'openLedger']) if (ledger && typeof ledger[fn] !== 'function') missing.push(`ledger-db.mjs ${fn}`);
-  return { ok: missing.length === 0, missing, machine, ledger };
+  for (const fn of ['ledgerFileFor', 'openLedger', 'createWorkflow', 'changeWorkflowPhase', 'recordBlob', 'citeBlob']) if (ledger && typeof ledger[fn] !== 'function') missing.push(`ledger-db.mjs ${fn}`);
+  let store = null, blobs = null, yaml = null;
+  try { store = await import('../kernel/evidence-store.mjs'); } catch { missing.push('scripts/kernel/evidence-store.mjs'); }
+  for (const fn of ['stageBlob', 'putArtifact', 'kindOf', 'roleOf']) if (store && typeof store[fn] !== 'function') missing.push(`evidence-store.mjs ${fn}`);
+  try { blobs = await import('../lib/artifact-store.mjs'); } catch { missing.push('scripts/lib/artifact-store.mjs'); }
+  try { yaml = await import('../../engine/yaml.mjs'); } catch { missing.push('engine/yaml.mjs'); }
+  return { ok: missing.length === 0, missing, machine, ledger, store, blobs, yaml };
 }
 
 /** The relaunch list (§6.2 step 1): live workflows of the product ledgers, the FE canon workflow and Q9 ledgers excluded. */
@@ -481,34 +489,55 @@ export function buildPlan(opts = {}, env = process.env) {
 }
 
 // ---------------------------------------------------------------------------------------------------------------
-// Q12: Work records citing agent data
+// Q12 and product evidence: Work records citing agent data
 // ---------------------------------------------------------------------------------------------------------------
+// Owner correction (2026-09-28): UAT images and videos, approved drawings and every file a Work record cites are
+// PRODUCT EVIDENCE. Before anything is archived, each cited file that still exists is put in the blob store (redacted
+// when it is text), re-read and re-hashed, filed as a job_artifacts row of the ledger's comeback carrier workflow,
+// cited in work_citations (which pins it: GC never removes it) and the record's citation is rewritten to
+// {artifact, sha256}. Only a record whose cited evidence is truly gone is marked stale. Caches, stray reports and
+// uncited agent data are archived and deleted as before.
 const PATHISH = /[A-Za-z0-9_.@()\-]+(?:\/[A-Za-z0-9_.@()\-]+)+\/?/g;
-/** The cited agent-data paths in one record file's text (relative to .starciwork). */
-export function citedAgentPaths(text, recordRel) {
-  const out = new Set();
+const NOT_EVIDENCE = new Set(['ledger', 'logs-db', 'worktrees', 'cache', 'stray-report', 'legacy-import']);
+
+/** Every path token in one record file's text that names agent data: [{raw, rel, category}] (rel is .starciwork-relative). */
+export function citationTokens(text, recordRel) {
+  const out = new Map();
   const dir = path.posix.dirname(recordRel);
   for (const m of text.matchAll(PATHISH)) {
-    let p = m[0].replace(/\/$/, '');
+    const raw = m[0].replace(/\/$/, '');
+    let p = raw;
     if (/^https?:|^\/\//.test(p) || p.includes('://')) continue;
     if (p.startsWith('.starciwork/')) p = p.slice('.starciwork/'.length);
     else if (!/^(features|kernel-evidence|kernel-strays|evidence|brand|shell|_resources|settle-parity|settle-tail)\//.test(p)) {
       if (!/^(E|runs|assets|evidence)\//.test(p)) continue;
       p = path.posix.normalize(`${dir}/${p}`);
     }
-    const cat = agentDataCategory(p) ?? agentDataCategory(p, { dir: true });
-    if (cat && !['ledger', 'logs-db', 'worktrees'].includes(cat)) out.add(p);
+    let category = agentDataCategory(p) ?? agentDataCategory(p, { dir: true });
+    // An approved interface.draw direction stays in the Work tree (Q2) and is also pinned as a blob; its path stays.
+    const keepPath = !category && /^features\/[^/]+\/ui\/.+\/assets\/.+\.(png|jpe?g|webp|gif|svg|mp4|webm)$/i.test(p);
+    if (keepPath) category = 'direction';
+    if (category && !['ledger', 'logs-db', 'worktrees'].includes(category) && !out.has(raw)) out.set(raw, { raw, rel: p, category, keepPath });
   }
-  return [...out];
+  return [...out.values()];
 }
+/** The cited agent-data paths of one record (relative to .starciwork). */
+export const citedAgentPaths = (text, recordRel) => [...new Set(citationTokens(text, recordRel).filter((t) => !t.keepPath).map((t) => t.rel))];
 
-/** Every product record (index.yaml / evidence.yaml outside agent data) citing agent data, per repo. */
+/** A record's id: its `id:` (or evidence.yaml `record:`) field, else its path. */
+const recordIdOf = (text, rel) => /^(?:id|record):\s*['"]?([^\s'"#]+)/m.exec(text)?.[1] ?? rel;
+
+/**
+ * Every product record citing agent data, per repo, with each citation resolved on disk: ingest (the file or tree
+ * exists and is evidence), missing (gone, or a cache / stray report that is never evidence). Sizes per category.
+ */
 export function citationScan(plan) {
   const out = [];
   for (const r of plan.starciwork) {
     const work = path.join(r.repo, '.starciwork');
     if (!exists(work)) continue;
     const records = [];
+    const ingestFiles = new Map();
     const walk = (rel) => {
       let entries;
       try { entries = fs.readdirSync(path.join(work, rel), { withFileTypes: true }); } catch { return; }
@@ -519,16 +548,29 @@ export function citationScan(plan) {
         if (!/\.ya?ml$/.test(e.name)) continue;
         let text;
         try { text = fs.readFileSync(path.join(work, r2), 'utf8'); } catch { continue; }
-        const cited = citedAgentPaths(text, r2);
-        if (!cited.length) continue;
-        const done = /^state:\s*done\s*$/m.test(text);
-        const evidence = /(^|\/)evidence\.yaml$/.test(r2);
-        records.push({ rel: r2, cited: cited.length, sample: cited.slice(0, 3), done, evidence, alreadyStale: /^stale:\s*true\s*$/m.test(text) });
+        const tokens = citationTokens(text, r2);
+        if (!tokens.length) continue;
+        const cites = tokens.map((t) => {
+          const abs = path.join(work, t.rel);
+          let st = null;
+          try { st = fs.lstatSync(abs); } catch { /* gone */ }
+          const evidence = st && !NOT_EVIDENCE.has(t.category) && !st.isSymbolicLink();
+          const files = evidence ? walkFiles(abs, { roots: plan.roots }).files : [];
+          for (const f of files) ingestFiles.set(pathKey(f.abs), f);
+          return { ...t, abs, isDir: Boolean(st?.isDirectory()), ingest: Boolean(evidence && files.length), files: files.length, bytes: files.reduce((s, f) => s + f.size, 0) };
+        });
+        const missing = cites.filter((c) => !c.ingest && !c.keepPath);
+        records.push({ rel: r2, recordId: recordIdOf(text, r2), cites, missing: missing.length, sample: missing.slice(0, 3).map((c) => c.rel),
+          done: /^state:\s*done\s*$/m.test(text), evidence: /(^|\/)evidence\.yaml$/.test(r2), alreadyStale: /^stale:\s*true\s*$/m.test(text) });
       }
     };
     walk('');
+    const stale = records.filter((x) => x.missing > 0);
+    const files = [...ingestFiles.values()];
     out.push({ repo: r.repo, name: r.name, records,
-      demote: records.filter((x) => !x.evidence && x.done).length, markStale: records.filter((x) => x.evidence && !x.alreadyStale).length });
+      ingest: { records: records.filter((x) => x.cites.some((c) => c.ingest)).length, citations: records.reduce((s, x) => s + x.cites.filter((c) => c.ingest).length, 0), files: files.length, bytes: files.reduce((s, f) => s + f.size, 0) },
+      stale: { records: stale.length, missingPaths: stale.reduce((s, x) => s + x.missing, 0),
+        demote: stale.filter((x) => !x.evidence && x.done).length, markStale: stale.filter((x) => x.evidence && !x.alreadyStale).length } });
   }
   return out;
 }
@@ -542,6 +584,102 @@ export function markStaleText(text, { evidence, reason }) {
   }
   if (!/^state:\s*done\s*$/m.test(text)) return null;
   return text.replace(/^state:\s*done\s*$/m, `# ${reason}\nstate: todo`);
+}
+
+const escapeRe = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+/**
+ * Rewrite each ingested citation `raw` to its artifact: a scalar that is the whole value becomes the flow map
+ * {artifact: <id>, sha256: <sha>}; a path inside prose becomes `artifact:<id> sha256:<sha>`. Returns the new text,
+ * or null when the result is not YAML (the caller then keeps the text and the record goes stale).
+ */
+export function rewriteCitations(text, refs, parse) {
+  let next = text;
+  for (const { raw, artifactId, sha256 } of refs) {
+    const whole = new RegExp(`^(\\s*(?:-\\s+)?(?:[A-Za-z0-9_.-]+:\\s+)?)(['"]?)${escapeRe(raw)}\\/?\\2(\\s*(?:#.*)?)$`, 'gm');
+    next = next.replace(whole, (_m, lead, _q, tail) => `${lead}{artifact: ${artifactId}, sha256: ${sha256}}${tail}`);
+    next = next.split(raw).join(`artifact:${artifactId} sha256:${sha256}`);
+  }
+  try { parse(next); return next; } catch { return null; }
+}
+
+/** job_artifacts role / subkind and work_citations role for one ingested file. */
+function evidenceRoles(category, rel, kind) {
+  if (category === 'direction') return { role: 'direction', subkind: null, citeRole: 'direction' };
+  if (category === 'uat-run') return { role: 'uat-run', subkind: kind === 'video' ? 'uat-video' : kind === 'image' ? 'uat-capture' : null, citeRole: kind === 'video' ? 'uat-video' : kind === 'image' ? 'uat-screen' : 'uat-result' };
+  if (category === 'draw-round') return { role: 'render', subkind: kind === 'image' ? 'draw-render' : null, citeRole: 'render' };
+  if (category === 'layout-capture') return { role: 'capture', subkind: kind === 'image' ? 'app-capture' : null, citeRole: 'layout-capture' };
+  if (category === 'capture') return { role: kind === 'video' ? 'video' : 'capture', subkind: kind === 'image' ? (rel.includes('/impl/') ? 'app-capture' : 'e2e-capture') : kind === 'video' ? 'e2e-video' : null, citeRole: 'capture' };
+  return { role: null, subkind: null, citeRole: null };
+}
+
+/**
+ * Ingest one repo's cited evidence into its fresh ledger. `w` = {ledger (ledger-db), store (evidence-store), blobs
+ * (artifact-store), yaml}. Returns {files, citations, records, failed: [{record, raw, error}]}.
+ */
+export function ingestRepoEvidence(scan, ledgerFile, w, { date, now = Date.now() } = {}) {
+  const out = { files: 0, citations: 0, records: [], failed: [] };
+  const wf = `wf-comeback-evidence-${date}`;
+  const h = w.ledger.openLedger({ file: ledgerFile });
+  try {
+    h.transaction((db) => {
+      if (db.prepare('SELECT 1 FROM workflows WHERE workflow_id=?').get(wf)) return;
+      w.ledger.createWorkflow(db, { workflowId: wf, by: 'comeback', reason: 'product evidence carried over by the comeback',
+        title: 'comeback evidence', displayName: 'Comeback · bằng chứng sản phẩm giữ lại' });
+      w.ledger.changeWorkflowPhase(db, { workflowId: wf, to: 'stopped', by: 'comeback', reason: 'a carrier of product evidence: never runs' });
+    });
+    const staged = new Map();
+    // One blob per file, OUTSIDE any transaction: put (text is redacted), then re-read and re-hash.
+    const stageFile = (abs) => {
+      const k = pathKey(abs);
+      if (staged.has(k)) return staged.get(k);
+      const blob = w.store.stageBlob(abs);
+      const back = w.blobs.getBlob(blob.sha); // throws unless the stored bytes hash to their name
+      if (blob.redaction === 'binary' && sha256File(abs) !== blob.sha) throw new Error(`${abs}: stored bytes differ from the original`);
+      if (back.length !== blob.bytes) throw new Error(`${abs}: stored size differs`);
+      staged.set(k, blob);
+      return blob;
+    };
+    for (const rec of scan.records) {
+      const refs = [];
+      for (const c of rec.cites.filter((x) => x.ingest)) {
+        try {
+          const files = walkFiles(c.abs, {}).files;
+          const blobs = files.map((f) => ({ f, blob: stageFile(f.abs), rel: slash(path.relative(path.join(scan.repo, '.starciwork'), f.abs)) }));
+          const manifestBlob = c.isDir ? w.store.stageBlob(Buffer.from(JSON.stringify({ schema: 'starci/comeback-evidence-set@1', path: c.rel,
+            files: blobs.map((b) => ({ name: b.rel, sha256: b.blob.sha, bytes: b.blob.bytes, mediaType: b.blob.mediaType })) }, null, 2)), { mediaType: 'application/json', file: false }) : null;
+          if (manifestBlob) w.blobs.getBlob(manifestBlob.sha);
+          const ref = h.transaction((db) => {
+            const ids = [];
+            for (const b of blobs) {
+              const kind = w.store.kindOf(b.rel);
+              const roles = evidenceRoles(c.category, b.rel, kind);
+              const a = w.store.putArtifact(db, { workflowId: wf, origin: 'kernel', role: roles.role ?? w.store.roleOf(b.rel), kind, subkind: roles.subkind,
+                name: `comeback/${b.rel}`, blob: b.blob, scopeRef: rec.recordId, runId: c.category === 'uat-run' ? /\/runs\/([^/]+)/.exec(`/${b.rel}`)?.[1] ?? null : null, now });
+              w.ledger.recordBlob(db, { sha256: b.blob.sha, bytes: b.blob.bytes, mediaType: b.blob.mediaType, fileUri: b.blob.fileUri, redaction: b.blob.redaction, pinned: 1, createdAt: now });
+              ids.push({ artifactId: a.artifactId, sha256: b.blob.sha, roles });
+            }
+            const cited = manifestBlob
+              ? { artifactId: w.store.putArtifact(db, { workflowId: wf, origin: 'kernel', role: c.category === 'uat-run' ? 'uat-run' : 'other', kind: 'file',
+                name: `comeback/${c.rel}/manifest.json`, blob: manifestBlob, scopeRef: rec.recordId, now }).artifactId, sha256: manifestBlob.sha, roles: evidenceRoles(c.category, c.rel, 'file') }
+              : ids[0];
+            w.ledger.citeBlob(db, { recordId: rec.recordId, recordPath: rec.rel, field: `comeback:${c.raw}`, sha256: cited.sha256, artifactId: cited.artifactId,
+              role: cited.roles.citeRole, createdAt: now });
+            return { raw: c.raw, artifactId: cited.artifactId, sha256: cited.sha256 };
+          });
+          if (!c.keepPath) refs.push(ref);
+          out.files += blobs.length;
+          out.citations += 1;
+        } catch (error) { out.failed.push({ record: rec.rel, raw: c.raw, error: String(error?.message ?? error) }); }
+      }
+      if (!refs.length) continue;
+      const file = path.join(scan.repo, '.starciwork', rec.rel);
+      const text = fs.readFileSync(file, 'utf8');
+      const next = rewriteCitations(text, refs, w.yaml.parseYaml);
+      if (next == null) { out.failed.push({ record: rec.rel, raw: '*', error: 'the rewritten record is not YAML: citations kept, the record goes stale' }); continue; }
+      if (next !== text) { fs.writeFileSync(file, next); out.records.push({ repo: scan.repo, record: rec.rel, refs }); }
+    }
+  } finally { h.close(); }
+  return out;
 }
 
 // ---------------------------------------------------------------------------------------------------------------
@@ -562,7 +700,7 @@ function writeManifest(roots, m) {
 function archiveGroups(plan) {
   const groups = [];
   const { roots } = plan;
-  groups.push({ name: 'databases', sources: plan.dbs.map((d) => ({ unit: `db:${d.label}`, root: d.main, files: d.files.map((f) => { const s = fs.statSync(f); return { abs: f, size: s.size, mtimeMs: s.mtimeMs }; }) })) });
+  groups.push({ name: 'databases', sources: plan.dbs.filter((d) => !ALPHA3_KINDS.has(d.kind)).map((d) => ({ unit: `db:${d.label}`, root: d.main, files: d.files.map((f) => { const s = fs.statSync(f); return { abs: f, size: s.size, mtimeMs: s.mtimeMs }; }) })) });
   for (const g of ['state', 'logs']) {
     groups.push({ name: g, sources: plan.stateLogs.filter((s) => s.group === g && !s.keep).map((s) => ({ unit: `${g}:${s.label}`, root: s.path, files: walkFiles(s.path, { roots }).files })) });
   }
@@ -660,6 +798,38 @@ export async function applyComeback(plan, { terminals = null, now = Date.now(), 
     return { workflows: plan.relaunch.list.length };
   });
   step('db-facts', () => { for (const d of plan.dbs) manifest.dbFacts[d.label] = { file: d.main, ...dbFacts(d.main) }; return { dbs: plan.dbs.length }; });
+  const w = writers ?? await writersReady();
+  step('reset-alpha3', () => {
+    const alpha3 = plan.dbs.filter((d) => ALPHA3_KINDS.has(d.kind));
+    if (!alpha3.length) return { dbs: 0 };
+    const group = { name: 'alpha3-stores', sources: alpha3.map((d) => ({ unit: `db:${d.label}`, root: d.main, files: d.files.map((f) => { const st = fs.statSync(f); return { abs: f, size: st.size, mtimeMs: st.mtimeMs }; }) })) };
+    const r = archiveGroup(roots, group, manifest);
+    if (!r.skipped) manifest.zips.push(...r.zips);
+    writeManifest(roots, manifest);
+    for (const d of alpha3) for (const f of d.files) { const x = removePath(f, manifest, roots); (x.ok ? manifest.removed : manifest.kept).push({ kind: 'db', path: f, ...(x.ok ? {} : { why: x.error }) }); }
+    if (manifest.kept.some((k) => alpha3.some((d) => d.files.includes(k.path)))) throw new Error('an alpha.3 store could not be removed; the fresh DBs are not created over it');
+    return { dbs: alpha3.length };
+  });
+  if (!manifest.fresh?.ok) {
+    const fresh = freshDatabases(plan, w);
+    manifest.fresh = fresh;
+    manifest.steps['fresh-dbs'] = { done: fresh.ok, at: new Date().toISOString() };
+    writeManifest(roots, manifest);
+    if (!fresh.ok) return { ok: false, manifest: manifestFile(roots), error: fresh.error };
+  }
+  step('ingest', () => {
+    // Product evidence first: put, re-hash, file, cite and pin every cited file BEFORE the originals are archived.
+    manifest.ingest ??= [];
+    for (const scan of citationScan(plan)) {
+      const ledger = manifest.fresh.ledgers.find((l) => samePath(pathKey(l.repo), pathKey(scan.repo)));
+      if (!scan.records.some((x) => x.cites.some((c) => c.ingest))) continue;
+      if (!ledger) { manifest.ingest.push({ repo: scan.repo, skipped: 'no fresh ledger (dropped or not a product ledger): its citations go stale' }); continue; }
+      const r = ingestRepoEvidence(scan, ledger.file, w, { date: roots.date, now });
+      manifest.ingest.push({ repo: scan.repo, ledger: ledger.name, files: r.files, citations: r.citations, records: r.records.map((x) => x.record), failed: r.failed });
+      writeManifest(roots, manifest);
+    }
+    return { repos: manifest.ingest.length, files: manifest.ingest.reduce((s, x) => s + (x.files ?? 0), 0), failed: manifest.ingest.reduce((s, x) => s + (x.failed?.length ?? 0), 0) };
+  });
   step('archive', () => {
     for (const g of archiveGroups(plan)) { const r = archiveGroup(roots, g, manifest); if (!r.skipped) { manifest.zips.push(...r.zips); writeManifest(roots, manifest); } }
     return { zips: manifest.zips.length, bytes: manifest.zips.reduce((s, z) => s + z.bytes, 0) };
@@ -683,7 +853,7 @@ export async function applyComeback(plan, { terminals = null, now = Date.now(), 
   step('delete', () => {
     const rm = (kind, target, opts = {}) => { const r = removePath(target, manifest, roots, opts); (r.ok ? manifest.removed : manifest.kept).push({ kind, path: target, ...(r.ok ? {} : { why: r.error }) }); };
     // DB files first: the old registry goes with them, so artifact-hold no longer holds the trees below.
-    for (const d of plan.dbs) for (const f of d.files) rm('db', f);
+    for (const d of plan.dbs.filter((x) => !ALPHA3_KINDS.has(x.kind))) for (const f of d.files) rm('db', f);
     for (const s of plan.stateLogs) { if (s.keep) manifest.kept.push({ kind: s.group, path: s.path, why: s.keep }); else rm(s.group, s.path); }
     for (const r of plan.starciwork) for (const u of r.units) rm(`starciwork:${u.category}`, u.abs);
     for (const w of plan.worktrees) {
@@ -710,11 +880,12 @@ export async function applyComeback(plan, { terminals = null, now = Date.now(), 
     return { removed: manifest.removed.length, kept: manifest.kept.length };
   });
   step('stale', () => {
+    // After the ingest rewrote every ingested citation, a record still naming agent data cites something truly gone.
     const zipOf = (name) => manifest.zips.find((z) => z.group === `starciwork-${name}`)?.file ?? null;
     for (const c of citationScan({ ...plan })) {
-      for (const rec of c.records) {
+      for (const rec of c.records.filter((x) => x.missing > 0)) {
         const file = path.join(c.repo, '.starciwork', rec.rel);
-        const reason = `comeback ${roots.date} (Q12): evidence-archived - ${rec.cited} cited agent path(s) moved to ${slash(zipOf(c.name) ?? manifestFile(roots))}; the relaunched workflow proves it again`;
+        const reason = `comeback ${roots.date} (Q12): evidence-missing - ${rec.missing} cited agent path(s) no longer exist (the originals, if any, are in ${slash(zipOf(c.name) ?? manifestFile(roots))}); the relaunched workflow proves it again`;
         const next = markStaleText(fs.readFileSync(file, 'utf8'), { evidence: rec.evidence, reason });
         if (next != null) { fs.writeFileSync(file, next); manifest.stale.push({ repo: c.repo, record: rec.rel, action: rec.evidence ? 'stale' : 'todo' }); }
       }
@@ -733,7 +904,8 @@ export async function applyComeback(plan, { terminals = null, now = Date.now(), 
       }
       fs.writeFileSync(path.join(work, '.gitignore'), starciworkGitignoreText());
       const paths = ['.starciwork/.gitignore', ...r.units.filter((u) => u.tracked > 0).map((u) => `.starciwork/${u.rel}`),
-        ...manifest.stale.filter((s) => samePath(pathKey(s.repo), pathKey(r.repo))).map((s) => `.starciwork/${s.record}`)];
+        ...manifest.stale.filter((s) => samePath(pathKey(s.repo), pathKey(r.repo))).map((s) => `.starciwork/${s.record}`),
+        ...(manifest.ingest ?? []).filter((x) => x.repo && samePath(pathKey(x.repo), pathKey(r.repo))).flatMap((x) => (x.records ?? []).map((rec) => `.starciwork/${rec}`))];
       const list = path.join(roots.comebackDir, `stage-${r.name}.txt`);
       fs.writeFileSync(list, `${paths.join('\n')}\n`);
       gitResult(['add', '-A', '--ignore-errors', `--pathspec-from-file=${list}`], { dir: r.repo });
@@ -745,19 +917,25 @@ export async function applyComeback(plan, { terminals = null, now = Date.now(), 
     }
     return { commits: manifest.commits.length };
   });
-  const fresh = await freshDatabases(plan, manifest, writers);
-  manifest.fresh = fresh;
-  manifest.steps['fresh-dbs'] = { done: fresh.ok, at: new Date().toISOString() };
+  step('record-archives', () => {
+    const machine = w.machine.openMachine({});
+    try {
+      for (const z of manifest.zips) {
+        w.machine.recordArchive(machine, { archivePath: z.file, kind: 'comeback', subject: z.group, bytes: z.bytes, sha256: z.sha256,
+          manifestSha256: null, entries: z.entries, integrity: 'sha-verified', createdAt: z.verifiedAt, verifiedAt: z.verifiedAt, expiresAt: null });
+      }
+    } finally { try { machine?.close?.(); } catch { /* closed */ } }
+    return { archives: manifest.zips.length };
+  });
   manifest.postBaseline = baselineListing(plan);
   writeManifest(roots, manifest);
-  return { ok: fresh.ok, manifest: manifestFile(roots), removed: manifest.removed.length, kept: manifest.kept, stale: manifest.stale.length, commits: manifest.commits, fresh };
+  const ingested = (manifest.ingest ?? []).reduce((s, x) => s + (x.files ?? 0), 0);
+  return { ok: true, manifest: manifestFile(roots), removed: manifest.removed.length, kept: manifest.kept, ingested, ingest: manifest.ingest, stale: manifest.stale.length, commits: manifest.commits, fresh: manifest.fresh };
 }
 
-/** Step 10: fresh machine.sqlite (controllers in shadow), one runtime.sqlite per product ledger, archives rows. */
-async function freshDatabases(plan, manifest, writers = null) {
-  if (manifest.fresh?.ok) return manifest.fresh;
-  const w = writers ?? await writersReady();
-  if (!w.ok) return { ok: false, error: `writers missing: ${w.missing.join(', ')}` };
+/** Step 10, run before the ingest: fresh machine.sqlite (controllers in shadow) and one runtime.sqlite per product ledger. */
+function freshDatabases(plan, w) {
+  if (!w?.ok) return { ok: false, error: `writers missing: ${(w?.missing ?? []).join(', ')}` };
   const machine = w.machine.openMachine({});
   const ledgers = [];
   try {
@@ -769,11 +947,7 @@ async function freshDatabases(plan, manifest, writers = null) {
       const ledgerId = h.ledgerId;
       h.close();
       w.machine.registerLedger(machine, { ledgerId, name: l.name, product, repoRoot: l.repo, file });
-      ledgers.push({ name: l.name, ledgerId, file });
-    }
-    for (const z of manifest.zips) {
-      w.machine.recordArchive(machine, { archivePath: z.file, kind: 'comeback', subject: z.group, bytes: z.bytes, sha256: z.sha256,
-        manifestSha256: null, entries: z.entries, integrity: 'sha-verified', createdAt: z.verifiedAt, verifiedAt: z.verifiedAt, expiresAt: null });
+      ledgers.push({ name: l.name, repo: l.repo, ledgerId, file });
     }
   } finally { try { machine?.close?.(); } catch { /* closed */ } }
   return { ok: true, ledgers };
@@ -798,8 +972,8 @@ export async function postChecks(plan, { manifest = readManifest(plan.roots), no
     const d = starciworkAgentData(r.repo);
     checks.push({ id: '6.4.1', subject: r.name, ok: d.units.length === 0, detail: `${d.units.length} agent-data path(s), ${d.drift.length} drift file(s) outside §5.1 (legacy layout, kept)` });
   }
-  const cites = citationScan(plan).reduce((s, c) => s + c.records.filter((x) => x.done && !x.evidence).length, 0);
-  checks.push({ id: '6.4.1', subject: 'citations', ok: cites === 0, detail: `${cites} done record(s) still cite agent data` });
+  const cites = citationScan(plan).reduce((s, c) => s + c.records.filter((x) => x.done && !x.evidence && x.missing > 0).length, 0);
+  checks.push({ id: '6.4.1', subject: 'citations', ok: cites === 0, detail: `${cites} done record(s) still cite agent data that is not ingested` });
   // 2. no old custody path or bare DatabaseSync in scripts/ and ui/ outside engine/.
   const hits = [];
   for (const top of ['scripts', 'ui']) {
@@ -881,8 +1055,14 @@ function describe(plan, pre, post) {
   }
   L.push('', 'op worktrees and push scratches (zip without node_modules, unlanded commits kept at refs/starci/archive/*, then safe-remove):');
   for (const w of plan.worktrees) L.push(`  ${slash(w.path)}  ${w.branch ?? (w.head ? `detached ${w.head.slice(0, 8)}` : 'unregistered')}  ${human(w.bytes)}${w.unlanded ? `  ${w.unlanded} unlanded` : ''}${w.dirty ? `  ${w.dirty} uncommitted (status + diff archived)` : ''}${w.links ? `  ${w.links} link(s) unlinked` : ''}${w.keep ? `  KEPT: ${w.keep}` : ''}`);
-  L.push('', 'Q12 stale marks:');
-  for (const c of plan.citations) L.push(`  ${c.name}: ${c.records.length} record(s) cite agent data; ${c.demote} done record(s) go back to todo, ${c.markStale} evidence.yaml marked stale`);
+  L.push('', 'Work-record evidence (owner correction: cited evidence is product evidence, ingested and pinned BEFORE any archive):');
+  const tot = { files: 0, bytes: 0, citations: 0, records: 0, stale: 0, missing: 0 };
+  for (const c of plan.citations) {
+    tot.files += c.ingest.files; tot.bytes += c.ingest.bytes; tot.citations += c.ingest.citations; tot.records += c.ingest.records; tot.stale += c.stale.records; tot.missing += c.stale.missingPaths;
+    L.push(`  ${c.name}: ingest-pinned ${c.ingest.files} file(s) ${human(c.ingest.bytes)} for ${c.ingest.citations} citation(s) in ${c.ingest.records} record(s); stale ${c.stale.records} record(s) (${c.stale.missingPaths} missing path(s): ${c.stale.demote} done index.yaml -> todo, ${c.stale.markStale} evidence.yaml stale)`);
+  }
+  const archiveDelete = plan.totals.bytes - tot.bytes;
+  L.push(`  totals: ingest-pinned ${tot.files} file(s) ${human(tot.bytes)} | stale ${tot.stale} record(s), ${tot.missing} missing path(s) | archive-delete ${human(archiveDelete)} (everything else above, ingested originals included once pinned)`);
   L.push('', 'fresh databases (step 10): machine.sqlite with every controller in shadow; runtime.sqlite for ' + plan.ledgers.filter((l) => l.kind === 'project-ledger' && !DROPPED_LEDGERS.includes(l.name)).map((l) => l.name).join(', ') + ' under %LOCALAPPDATA%/StarCi/projects/<ledger_id>/ (Q1), registered in machine.ledgers');
   L.push('', `relaunch (${plan.relaunch.list.length}), goal text from the archived ledger; each: define-goal (owner ok at the entry gate) then start-kernel:`);
   for (const r of plan.relaunch.list) {
