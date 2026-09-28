@@ -57,26 +57,30 @@ export async function blob(request,response,store,url,sha) {
     return sendError(request,response,404,'NOT_FOUND','Blob bytes unavailable');
   }
   const metadata = statBlob(sha);
-  const unmarked = row.redaction == null && isTextMedia(row.media_type);
+  const textMedia = isTextMedia(row.media_type);
+  const unmarked = row.redaction == null && textMedia;
+  // A v1 write marker proves secret filtering ran, but older evidence can still
+  // contain absolute paths. Check small marked text before serving stored bytes.
+  const storedText = textMedia && !unmarked && metadata.size <= MAX_BUFFERED_TEXT ? getBlob(sha) : null;
+  const safeText = storedText ? redactUnmarkedText(storedText) : null;
+  const changedText = Boolean(safeText && !safeText.equals(storedText));
+  const readRedaction = unmarked || changedText || (textMedia && !storedText);
   const mode = url.searchParams.get('text');
   if (mode && !['head','tail'].includes(mode)) return sendError(request,response,400,'INVALID_PREVIEW','Invalid text preview');
-  if (mode && !isTextMedia(row.media_type)) return sendError(request,response,400,'NOT_TEXT','Blob is not text');
-  if (mode && metadata.size > (unmarked ? MAX_BUFFERED_TEXT : 8 * MAX_BUFFERED_TEXT)) return sendError(request,response,413,'PREVIEW_TOO_LARGE','Text preview exceeds the safe size limit');
-  let bytes = null;
-  const streamingRedaction = unmarked && !mode;
+  if (mode && !textMedia) return sendError(request,response,400,'NOT_TEXT','Blob is not text');
+  if (mode && metadata.size > (readRedaction ? MAX_BUFFERED_TEXT : 8 * MAX_BUFFERED_TEXT)) return sendError(request,response,413,'PREVIEW_TOO_LARGE','Text preview exceeds the safe size limit');
+  let bytes = changedText ? safeText : null;
+  const streamingRedaction = readRedaction && !bytes && !mode;
   if (mode) {
-    bytes = getBlob(sha);
-    if (unmarked) bytes = redactUnmarkedText(bytes);
-    if (mode) {
-      const lines = Math.min(2000,Math.max(1,Number(url.searchParams.get('lines'))||200));
-      const content = bytes.toString('utf8').split(/\r?\n/);
-      bytes = Buffer.from((mode==='head'?content.slice(0,lines):content.slice(-lines)).join('\n'));
-    }
+    bytes = unmarked ? redactUnmarkedText(getBlob(sha)) : safeText ?? getBlob(sha);
+    const lines = Math.min(2000,Math.max(1,Number(url.searchParams.get('lines'))||200));
+    const content = bytes.toString('utf8').split(/\r?\n/);
+    bytes = Buffer.from((mode==='head'?content.slice(0,lines):content.slice(-lines)).join('\n'));
   }
-  const length = bytes?.length ?? (unmarked && (request.method === 'HEAD' || request.headers.range) ? await redactedLength(file) : metadata.size);
-  const etag = unmarked ? null : `"${sha}"`;
-  const headers = {'Content-Type':mode?'text/plain; charset=utf-8':row.media_type,'Cache-Control':unmarked?'no-store':'public, max-age=31536000, immutable',...(etag?{'ETag':etag}:{}),'Accept-Ranges':'bytes','Content-Disposition':url.searchParams.get('download')==='1'?`attachment; filename="${sha}.txt"`:'inline','X-Content-Type-Options':'nosniff'};
-  if (unmarked) headers['X-StarCi-Redacted']='stream-v1';
+  const length = bytes?.length ?? (streamingRedaction && (request.method === 'HEAD' || request.headers.range) ? await redactedLength(file) : metadata.size);
+  const etag = readRedaction ? null : `"${sha}"`;
+  const headers = {'Content-Type':mode?'text/plain; charset=utf-8':row.media_type,'Cache-Control':readRedaction?'no-store':'public, max-age=31536000, immutable',...(etag?{'ETag':etag}:{}),'Accept-Ranges':'bytes','Content-Disposition':url.searchParams.get('download')==='1'?`attachment; filename="${sha}.txt"`:'inline','X-Content-Type-Options':'nosniff'};
+  if (readRedaction) headers['X-StarCi-Redacted']=changedText?'read-v1':'stream-v1';
   if (etag && request.headers['if-none-match']===etag) {response.writeHead(304,headers);response.end();return;}
   const range = rangeOf(request.headers.range,length);
   if (range===false) {response.writeHead(416,{...headers,'Content-Range':`bytes */${length}`});response.end();return;}

@@ -76,7 +76,7 @@ The implementation lives in `ui/api/index.mjs` and `ui/api/routes/*.mjs`. The ro
 
 ## 2. Public redaction boundary
 
-Write-time redaction is owned by `scripts/lib/redact.mjs` before text is stored in the blob/log layer. Read-time projection is owned by `ui/api/redact-read.mjs` and `ui/api/routes/blob.mjs`; it reuses the same redaction module for JSON strings and old text blobs lacking a redaction marker. A blob recorded as redacted text may be streamed as stored; binary blobs retain bytes, Range and content type. Blob addresses are content SHA references, never filesystem paths.
+Write-time redaction is owned by `scripts/lib/redact.mjs` before text is stored in the blob/log layer. Read-time projection is owned by `ui/api/redact-read.mjs` and `ui/api/routes/blob.mjs`; it reuses the same redaction module for JSON strings and old text blobs lacking a redaction marker. Marked text is checked again for residual secrets and absolute paths: unchanged text keeps its stored-byte ETag, while changed text is served with no-store caching and byte ranges over the safe response. Large text is filtered while streaming. Binary blobs retain bytes, Range and content type. Blob addresses are content SHA references, never filesystem paths.
 
 Responses omit absolute paths, PID fields, command lines, connector configuration and credential-ask text. Repositories and worktrees are represented by names or relative paths. A credential-related ask exposes its state and decision reference, with its question suppressed. API errors contain generic messages. The UI has no auth or mutation controls; its public exposure requires these server-side boundaries even when source records are sensitive.
 
