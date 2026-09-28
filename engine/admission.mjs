@@ -147,8 +147,13 @@ const object=value=>{
   try{const parsed=JSON.parse(value);return parsed&&typeof parsed==='object'?parsed:{};}catch{return {};}
 };
 
-const payloadOf=job=>object(job?.payload??job?.payload_json);
-const resultOf=job=>object(job?.result??job?.result_json);
+/**
+ * The durable payload/result of a job-shaped row: the parsed object when the row carries the decoded
+ * field (a mapped ledger row), else the tolerant parse of its `*_json` text — a missing, blank or
+ * unparsable field reads as {}. Several scripts spell this by hand; these are the one pair to cite.
+ */
+export const payloadOf=job=>object(job?.payload??job?.payload_json);
+export const resultOf=job=>object(job?.result??job?.result_json);
 
 /** The settled verdict of an attempt that asked the owner and waits for the answer. */
 export const AWAITING_OWNER='awaiting-owner';

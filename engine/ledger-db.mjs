@@ -52,7 +52,7 @@ export function transitionWorkflowToRunning(ledger,{workflowId,now=Date.now(),ge
 export const LEDGER_SCHEMA='starci/ledger-db@1';
 export const LEDGER_VERSION=1;
 export const MACHINE_SCHEMA='starci/machine-db@1';
-export const MACHINE_VERSION=1;
+const MACHINE_VERSION=1;
 /**
  * The runtime tree is never a Work root of its own: a project's Work root is its backend, reached through
  * `.workspaces`. The runtime is its own git checkout, so `git rev-parse --git-common-dir` resolves it as a
@@ -83,7 +83,7 @@ export const TEST_REGISTRY_ENV='STARCI_TEST_MACHINE_FILE';
 const normDir=file=>path.resolve(String(file)).replace(/\\/g,'/').replace(/\/+$/,'').toLowerCase();
 const isFsRoot=dir=>/^(?:[a-z]:)?$/.test(dir);
 /** The OS temp directories (os.tmpdir(), TEMP, TMP, each also as its realpath), normalized; never a filesystem root. */
-export const tempDirsOf=(env=process.env)=>[...new Set([os.tmpdir(),env.TEMP,env.TMP].filter(Boolean)
+const tempDirsOf=(env=process.env)=>[...new Set([os.tmpdir(),env.TEMP,env.TMP].filter(Boolean)
   .flatMap(dir=>{const out=[normDir(dir)];try{out.push(normDir(fs.realpathSync.native(dir)));}catch{}return out;}))]
   .filter(dir=>!isFsRoot(dir));
 /** True when `file` sits under one of `tempDirs` (default: the OS temp directories), as written or as its realpath. */
@@ -143,7 +143,7 @@ const hasSchemaObject=(db,type,name)=>Boolean(db.prepare('SELECT 1 FROM sqlite_m
  * own seq and the timeline order survives the move. Read-only; a missing or unreadable file seeds nothing.
  */
 export const LEGACY_LOGS_FILE='logs.sqlite';
-export const legacyLogsFileOf=ledgerFile=>path.join(path.dirname(path.resolve(ledgerFile)),LEGACY_LOGS_FILE);
+const legacyLogsFileOf=ledgerFile=>path.join(path.dirname(path.resolve(ledgerFile)),LEGACY_LOGS_FILE);
 function legacyLogsMaxSeq(ledgerFile){
   const file=ledgerFile&&ledgerFile!==':memory:'?legacyLogsFileOf(ledgerFile):null;
   if(!file||!fs.existsSync(file))return 0;
@@ -296,7 +296,7 @@ export const isBusyError=error=>error?.errcode===5||error?.errcode===6||/SQLITE_
  * (busy_timeout 0), which takes it within a lock hold or two (same load: p95 0.6 ms); past the window the ordinary
  * busy_timeout wait takes over, so a long holder is still waited out, never failed.
  */
-export const LEDGER_SPIN_MS=20;
+const LEDGER_SPIN_MS=20;
 /** BEGIN IMMEDIATE: spin for `spinMs`, then wait with the connection's own busy_timeout (restored after the spin). */
 export function beginImmediate(db,{spinMs=LEDGER_SPIN_MS}={}){
   if(spinMs>0){
@@ -368,7 +368,7 @@ export function inspectLedger({file}={}){
  * `meta.journal_mode` record run only when the file needs them, so an open never waits on, or takes, the
  * write lock another kernel holds.
  */
-export function openLedger({file,now=Date.now,busyTimeoutMs=15000,journalMode='WAL',machine=null}={}){
+export function openLedger({file,now=Date.now,busyTimeoutMs=LEDGER_BUSY_TIMEOUT_MS,journalMode='WAL',machine=null}={}){
   const {db,sqliteVersion,journalMode:actual}=openDb({file,busyTimeoutMs,journalMode,autoVacuum:true,label:'openLedger'});
   try{
     registerDigestFunction(db);
@@ -437,7 +437,7 @@ export function pruneRegistry(machine,{env=process.env,tempDirs=tempDirsOf(env),
  * registry (TEST_REGISTRY_ENV) in `env`, is the live host registry, and it refuses to enrol a ledger under the
  * OS temp directory - a spec's fixture, whose row would outlive the spec in every later scan.
  */
-export function openMachine({file,now=Date.now,busyTimeoutMs=15000,journalMode='WAL',env=process.env,tempDirs=tempDirsOf(env)}={}){
+export function openMachine({file,now=Date.now,busyTimeoutMs=LEDGER_BUSY_TIMEOUT_MS,journalMode='WAL',env=process.env,tempDirs=tempDirsOf(env)}={}){
   const {db,sqliteVersion,journalMode:actual}=openDb({file,busyTimeoutMs,journalMode,label:'openMachine'});
   migrateMachine(db);
   const transaction=makeTransaction(db,'machine');
