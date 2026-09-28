@@ -513,7 +513,7 @@ allocation:
     keepTitles: []
   # reconciler (scripts/reconciler/*; DESIGN 7.4-7.8, contract modules/reconciler/reconciler.yaml): the engine polls
   # every ledger's events every pollMs; the leader row lasts leaseMs and is renewed (with the heartbeat row and file)
-  # every renewMs; an old loop yields a duty (owns.mjs reconcilerOwns) only while the heartbeat is younger than
+  # every renewMs; boot.mjs ensure restarts an engine whose heartbeat is older than
   # heartbeatStaleMs; one api status snapshot per workflow is shared for statusCacheMs; a failing key backs off
   # backoff.minMs doubling to backoff.maxMs; more than crashLoop.max engine starts in crashLoop.windowMs start it
   # --safe (read-only) and push the owner one urgent Telegram (boot.mjs).

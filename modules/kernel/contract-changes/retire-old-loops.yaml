@@ -16,6 +16,8 @@ paths:
   - modules/supervisor/supervise.yaml
   - modules/supervisor/supervisor-prompt.md
   - modules/reconciler/workflow.yaml
+  - modules/reconciler/reconciler.yaml
+  - modules/reconciler/job.yaml
   - modules/models/runtimes.yaml
   - modules/kernel/api.yaml
   - modules/kernel/api-commands/archive.yaml
