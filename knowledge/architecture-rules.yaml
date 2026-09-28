@@ -77,7 +77,7 @@ rules:
         - ARCH_PACKAGE_EXPORT_BYPASS
       manual:
         - Review public API cohesion and actual DI token/lifetime behavior. Same-source export coverage remains
-          a mechanical obligation in model/code-patterns.yaml and cannot be waived by this review.
+          a mechanical obligation in modules/models/code-patterns.yaml and cannot be waived by this review.
   - id: ARCH-ABSTRACTION
     title: Every abstraction has a responsibility
     kind: mandatory

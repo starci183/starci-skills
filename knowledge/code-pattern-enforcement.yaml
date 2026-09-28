@@ -1,13 +1,13 @@
 schema: starci/knowledge-source@1
 id: code-pattern-enforcement
 title: Executable Nest and Next code-pattern coverage
-purpose: Read docs/code-pattern-enforcement.md and model/code-patterns.yaml before claiming code-pattern conformance. The authored manifest maps mechanical obligations to exact machines and keeps semantic design review separate.
+purpose: Read docs/code-pattern-enforcement.md and modules/models/code-patterns.yaml before claiming code-pattern conformance. The authored manifest maps mechanical obligations to exact machines and keeps semantic design review separate.
 appliesTo: [backend, frontend]
 family: cross-cutting
 provenance:
   reviewedAt: 2026-09-16
   sources:
-    - model/code-patterns.yaml
+    - modules/models/code-patterns.yaml
     - docs/code-pattern-enforcement.md
     - starci-eslint@5d529de0821083903f3924fbde10bdff88c38a57
     - starci-academy-backend@1731b15ba4ed526477e3c572b9d82c31ab64f1d5/eslint.config.mjs
@@ -17,7 +17,7 @@ rules:
   - id: CODE-PATTERN-1
     title: Authored obligations are authority
     kind: mandatory
-    requirement: Use model/code-patterns.yaml as the exact Nest/Next mechanical inventory. Installed package exports are a toolbox and cannot silently add, remove or weaken an obligation.
+    requirement: Use modules/models/code-patterns.yaml as the exact Nest/Next mechanical inventory. Installed package exports are a toolbox and cannot silently add, remove or weaken an obligation.
     rationale: Package recommendations contain outdated, disabled and profile-conflicting rules; adoption must remain explicit and reviewable.
   - id: CODE-PATTERN-2
     title: Complete applicable machine coverage

@@ -4,7 +4,8 @@ summary: "Knowledge stale-cite repair only: model/code-patterns.yaml repointed t
   (architecture-rules, code-pattern-enforcement, scan-coverage); application-stacks.yaml's
   schemas/application-stacks.schema.json repointed to modules/schemas/application-stacks.schema.yaml and the
   removed `starci stacks` launcher verb replaced by the real starci-stacks-check machine
-  (checkApplicationStacks in scripts/checks/stacks.mjs). No rule id, obligation, check or refusal changes."
+  (checkApplicationStacks in scripts/checks/stacks.mjs). This entry file landed ahead of the knowledge edits
+  it covers; the two land together from the slim-docs lane. No rule id, obligation, check or refusal changes."
 reach: new-legs
 paths:
   - knowledge/application-stacks.yaml

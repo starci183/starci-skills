@@ -142,10 +142,10 @@ guidance:
     requirement: |
       Read docs/application-stacks.md, docs/application-stacks-vps.md and the synthetic kit
       examples/todo-app-backend/.starcistacks. Author .starcistacks/application-stacks.yaml against
-      schemas/application-stacks.schema.json. Declare dev docker-compose and VPS docker-swarm.
-      Render the actual deployment model with docker compose config or docker stack config and run
-      `node <skill root>/bin/starci.mjs stacks check <repo-root> --environment dev|vps
-      --deployment-model <rendered.yaml-or-json>`. This is static conformance only. Separately prove empty
+      modules/schemas/application-stacks.schema.yaml. Declare dev docker-compose and VPS docker-swarm.
+      Render the actual deployment model with docker compose config or docker stack config and run the
+      `starci-stacks-check` machine — `checkApplicationStacks({repoRoot, environment, deploymentModelFile})`
+      in `scripts/checks/stacks.mjs` — per environment. This is static conformance only. Separately prove empty
       cold-start, missing/wrong-key refusal, preserved secrets/data after recreation, failed
       init/readiness and scoped cleanup. VPS adds actual Ubuntu bootstrap, relevant DNS/TLS,
       update and image/data recovery. Record revisions, tools, platform, executed and unrun cases.

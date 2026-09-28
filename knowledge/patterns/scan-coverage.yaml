@@ -136,7 +136,7 @@ observations:
       At that scan the FE public entry was @starci/grammar/common; product-shells was an unresolved
       exception, and the installed FE Grammar-boundary module had no active rules. These are
       historical source observations; the adopted layout now places product shells in features/layouts
-      and current script coverage is declared in model/code-patterns.yaml.
+      and current script coverage is declared in modules/models/code-patterns.yaml.
 
   - id: remaining-rescan
     lane: cross-cutting
