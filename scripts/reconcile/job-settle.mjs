@@ -116,6 +116,52 @@ export function reportedJobs(db, { workflowId = null, jobId = null } = {}) {
   }));
 }
 
+/** Prefer the structured check ledger. Older, already-running jobs may only have report.checks. */
+export function checkRunsOf(db, item, runner = 'op') {
+  try {
+    const statement = db.prepare(`SELECT name, phase, runner, command, cwd, exit_code, status, started_at, finished_at,
+        stdout_sha, stderr_sha, output_sha, summary_json
+      FROM check_runs WHERE workflow_id=? AND job_id=? AND attempt=? AND runner=? ORDER BY check_id`);
+    return typeof statement.all === 'function' ? statement.all(item.workflowId, item.jobId, item.attempt, runner) : [];
+  } catch (error) {
+    if (/no such table: check_runs/i.test(String(error?.message))) return [];
+    throw error;
+  }
+}
+
+/** Blob references are read and verified before a recorded check is trusted. */
+async function checksFromStore(db, item, { store = null } = {}) {
+  const rows = checkRunsOf(db, item);
+  if (!rows.length) return { item, source: 'report' }; // in-flight jobs dispatched before the migration
+  const blobs = store ?? await import('../lib/artifact-store.mjs');
+  const declared = Array.isArray(item.report?.checks) ? item.report.checks : [];
+  const byName = new Map(declared.map((c) => [String(c.name), c]));
+  const checks = [];
+  for (const row of rows) {
+    const raw = {};
+    for (const [key, sha] of [['stdout', row.stdout_sha], ['stderr', row.stderr_sha], ['output', row.output_sha]]) {
+      if (!sha) continue;
+      try { raw[key] = await blobs.getBlob(sha); }
+      catch { return { reason: 'check-output-missing', detail: [`${row.name}:${key}:${sha}`] }; }
+      if (!Buffer.isBuffer(raw[key]) || crypto.createHash('sha256').update(raw[key]).digest('hex') !== sha)
+        return { reason: 'check-output-corrupt', detail: [`${row.name}:${key}:${sha}`] };
+    }
+    const claim = byName.get(row.name) ?? {};
+    const output = raw.output ? parse(raw.output.toString('utf8')) : null;
+    if (raw.output && output === null) return { reason: 'check-output-invalid', detail: [`${row.name}:output is not JSON`] };
+    checks.push({ ...claim, name: row.name, command: row.command ?? claim.command ?? '', exitCode: row.exit_code,
+      status: row.status, phase: row.phase, summary: parse(row.summary_json), ...(output !== null ? { output } : {}),
+      ...(raw.stdout ? { stdoutTail: raw.stdout.toString('utf8').slice(-300) } : {}),
+      ...(raw.stderr ? { stderrTail: raw.stderr.toString('utf8').slice(-300) } : {}) });
+  }
+  if (declared.length !== checks.length || declared.some((c) => !checks.some((r) => r.name === c.name)))
+    return { reason: 'check-run-missing', detail: [
+      `declared=${declared.length} stored=${checks.length}`,
+      ...declared.filter((c) => !checks.some((r) => r.name === c.name)).map((c) => String(c.name)),
+    ].slice(0, 8) };
+  return { item: { ...item, report: { ...item.report, checks } }, source: 'check-runs' };
+}
+
 /** The latest needs-kernel handover of a job's current dispatch, or null. */
 export function kernelHandoverOf(db, item) {
   const row = db.prepare(`SELECT payload_json, created_at FROM events WHERE kind=? AND entity_id=? AND json_extract(payload_json,'$.dispatchId')=?
@@ -194,18 +240,27 @@ export function classifyCheck(check, { skillRoot = SKILL_ROOT } = {}) {
   return { kind: 'runtime', script: path.join(skillRoot, ...rel.split('/')), argv: rest, rel };
 }
 
-const recordedChecksOf = (db, item) => parse(db.prepare('SELECT checks_json FROM checks WHERE workflow_id=? AND op_id=? AND attempt=?')
-  .get(item.workflowId, item.op, item.attempt)?.checks_json);
+const recordedChecksOf = (db, item) => {
+  const rows = checkRunsOf(db, item, 'kernel');
+  if (rows.length) return { checks: rows.map((r) => ({ name: r.name, exitCode: r.exit_code, status: r.status })) };
+  try { return parse(db.prepare('SELECT checks_json FROM checks WHERE workflow_id=? AND op_id=? AND attempt=?')
+    .get(item.workflowId, item.op, item.attempt)?.checks_json); }
+  catch (error) { if (/no such table: checks/i.test(String(error?.message))) return null; throw error; }
+};
 const isGreenEnvelope = (env) => Array.isArray(env?.checks) && env.checks.length > 0
-  && env.checks.some((c) => c?.exitCode === 0)
-  && env.checks.every((c) => c?.exitCode === 0 || c?.advisory || c?.peerBlocked || c?.measured);
+  && env.checks.some((c) => c?.exitCode === 0 && (!c.status || c.status === 'pass'))
+  && env.checks.every((c) => (c?.exitCode === 0 && (!c.status || c.status === 'pass')) || c?.advisory || c?.peerBlocked || c?.measured);
 
 /** Re-run one runtime check: argv, no shell, cwd = the ledger repo. {exitCode, ms, tail} */
 export function rerunCheck(c, { repo, timeoutMs, env = process.env, run = spawnSync }) {
   const t0 = Date.now();
   const r = run(process.execPath, [c.script, ...c.argv], { cwd: repo, encoding: 'utf8', windowsHide: true, timeout: timeoutMs, env: runtimeEnv(env), maxBuffer: 64 * 1024 * 1024 });
   const exitCode = r.error ? (r.error.code === 'ETIMEDOUT' ? 124 : 127) : (r.status ?? 1);
-  return { exitCode, ms: Date.now() - t0, tail: String(r.stderr || r.stdout || r.error?.message || '').trim().split(/\r?\n/).slice(-2).join(' ').slice(0, 300) };
+  const stdout = Buffer.isBuffer(r.stdout) ? r.stdout : Buffer.from(String(r.stdout ?? ''));
+  const stderr = Buffer.isBuffer(r.stderr) ? r.stderr : Buffer.from(String(r.stderr ?? r.error?.message ?? ''));
+  return { exitCode, ms: Date.now() - t0, startedAt: t0, finishedAt: Date.now(), cwd: repo,
+    stdout, stderr, output: jsonOf(stdout.toString('utf8')),
+    tail: String(r.stderr || r.stdout || r.error?.message || '').trim().split(/\r?\n/).slice(-2).join(' ').slice(0, 300) };
 }
 
 /** Canon-scan over a slice's owned paths, in-process (no path on a command line). {exitCode, status, findings, root} */
@@ -225,7 +280,41 @@ export async function canonSliceCheck(item, { repo }) {
   const report = await scanCanon(options);
   const findings = Array.isArray(report?.findings) ? report.findings.length : null;
   const list = (Array.isArray(report?.findings) ? report.findings : []).slice(0, 500).map((f) => ({ file: norm(f.file ?? ''), ruleId: f.ruleId ?? null, line: f.line ?? null, family: f.family ?? null }));
-  return { exitCode: report?.status === 'ok' ? 0 : report?.status === 'findings' ? 1 : 3, status: report?.status ?? null, findings, list, root: bases[0], paths: places.length };
+  return { exitCode: report?.status === 'ok' ? 0 : report?.status === 'findings' ? 1 : 3, status: report?.status ?? null, findings, list, root: bases[0], paths: places.length, output: report };
+}
+
+/** Persist each settler measurement before its verdict is used, including failed re-runs. */
+export async function recordSettlerCheck(ledger, item, run, { store = null, now = Date.now } = {}) {
+  const blobs = store ?? await import('../lib/artifact-store.mjs');
+  const media = (content, mediaType) => content == null ? null : blobs.putBlob(
+    Buffer.isBuffer(content) ? content : Buffer.from(typeof content === 'string' ? content : JSON.stringify(content)), { mediaType });
+  const output = await media(run.output, 'application/json');
+  const stdout = await media(run.stdout ?? '', 'text/plain');
+  const stderr = await media(run.stderr ?? '', 'text/plain');
+  const at = now();
+  const status = run.status ?? (run.exitCode === 0 ? 'pass' : run.exitCode === 124 || run.exitCode === 127 ? 'unavailable' : 'fail');
+  return ledger.transaction((db) => {
+    for (const [blob, type] of [[stdout, 'text/plain'], [stderr, 'text/plain'], [output, 'application/json']]) {
+      if (blob) db.prepare(`INSERT INTO blobs(sha256,bytes,media_type,file_uri,http_path,created_at) VALUES(?,?,?,?,?,?)
+        ON CONFLICT(sha256) DO UPDATE SET file_uri=COALESCE(blobs.file_uri,excluded.file_uri),
+          http_path=COALESCE(blobs.http_path,excluded.http_path)`)
+        .run(blob.sha, blob.size, blob.mediaType ?? type, blobs.blobPath(blob.sha), `/api/blob/${blob.sha}`, at);
+    }
+    const info = db.prepare(`INSERT INTO check_runs(workflow_id,job_id,op_id,attempt,name,phase,runner,command,cwd,exit_code,status,
+      started_at,finished_at,stdout_sha,stderr_sha,output_sha,summary_json,created_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`)
+      .run(item.workflowId, item.jobId, item.op, item.attempt, String(run.name), run.phase ?? 'verify', run.runner ?? 'settler',
+        run.command ?? null, run.cwd ?? null, run.exitCode ?? null, status, run.startedAt ?? at, run.finishedAt ?? at,
+        stdout?.sha ?? null, stderr?.sha ?? null, output?.sha ?? null, run.summary ? JSON.stringify(run.summary) : null, at);
+    const checkId = Number(info.lastInsertRowid);
+    for (const [part, blob, role] of [['stdout', stdout, 'check-stdout'], ['stderr', stderr, 'check-stderr'], ['output', output, 'check-output']]) {
+      if (!blob) continue;
+      db.prepare(`INSERT INTO job_artifacts_v2(workflow_id,job_id,op_id,attempt,role,kind,name,storage,sha256,bytes,media_type,origin,created_at)
+        VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)`).run(item.workflowId, item.jobId, item.op, item.attempt, role, 'check',
+        `checks/${checkId}/${part}`, 'blob', blob.sha, blob.size, part === 'output' ? 'application/json' : 'text/plain',
+        run.runner ?? 'settler', at);
+    }
+    return checkId;
+  });
 }
 
 /**
@@ -233,8 +322,11 @@ export async function canonSliceCheck(item, { repo }) {
  * Seams: rerun (rerunCheck), canon (canonSliceCheck).
  */
 export async function verifyReported(db, item, { repo, settings = settlerSettings(), rerun = rerunCheck, canon = canonSliceCheck, env = process.env,
-  parity = parityEnabled(env) ? canonParityVerdict : null, parityDeps = {} } = {}) {
-  const plain = await verifyDeclared(db, item, { repo, settings, rerun, canon, env });
+  parity = parityEnabled(env) ? canonParityVerdict : null, parityDeps = {}, store = null, record = async () => {} } = {}) {
+  const loaded = await checksFromStore(db, item, { store });
+  if (loaded.reason) return { green: false, reason: loaded.reason, detail: loaded.detail };
+  item = loaded.item;
+  const plain = await verifyDeclared(db, item, { repo, settings, rerun, canon, env, record });
   // CANON PARITY (canon-parity-settle): a canon cut slice the declared checks cannot carry is measured by the settler
   // itself over its owned paths; it settles only when nothing is new there, else the Kernel gets the parity reason.
   if (plain.green || !parity || !parityEligible(item) || !PARITY_REASONS.includes(plain.reason)) return plain;
@@ -248,7 +340,7 @@ export async function verifyReported(db, item, { repo, settings = settlerSetting
   if (cached && cached.dispatchId === item.dispatchId && cached.fingerprint === fingerprint
     && now - cached.at < (cached.transient ? PARITY_TRANSIENT_MS : PARITY_RECHECK_MS)) return { ...cached.verdict, cached: true };
   const measured = await parity(item, { repo, settings, env, rerun, canon, classify: (c) => classifyCheck(c), baseline: isBaselineCheck,
-    wireLegs: () => canonWireLegsOf(db, item), ...parityDeps, resolveRoot });
+    wireLegs: () => canonWireLegsOf(db, item), record, ...parityDeps, resolveRoot });
   const verdict = measured.green ? measured
     : { ...measured, detail: [`declared: ${plain.reason}${plain.detail ? ` ${plain.detail.slice(0, 4).join(', ')}` : ''}`, ...(measured.detail ?? [])].slice(0, 8) };
   if (!verdict.green && fingerprint) writeParityCache(repo, item, { fingerprint, at: now, transient: parityTransient(measured), verdict: { green: false, reason: verdict.reason, detail: verdict.detail } });
@@ -276,7 +368,7 @@ export const parityEnabled = (env = process.env) => String(env.STARCI_SETTLER_PA
 export const isBaselineCheck = (c) => BASELINE_NAME.test(String(c?.name ?? ''));
 
 /** The declared-checks verdict: the worker's checks, re-run where the runtime can. */
-async function verifyDeclared(db, item, { repo, settings, rerun, canon, env }) {
+async function verifyDeclared(db, item, { repo, settings, rerun, canon, env, record }) {
   if (item.outcome !== 'done') return { green: false, reason: `outcome-${item.outcome}` };
   if (KERNEL_ONLY_OPS.includes(item.op)) return { green: false, reason: 'owner-act' };
   const recorded = recordedChecksOf(db, item);
@@ -298,6 +390,7 @@ async function verifyDeclared(db, item, { repo, settings, rerun, canon, env }) {
   for (const c of runtime) {
     if (Date.now() - started > settings.itemBudgetMs) return { green: false, reason: 'verify-budget-exceeded' };
     const r = rerun(c, { repo, timeoutMs: settings.rerunTimeoutMs, env });
+    await record({ name: String(c.check.name ?? c.rel), command: String(c.check.command), phase: 'verify', runner: 'settler', ...r });
     if (r.exitCode !== 0) return { green: false, reason: 'rerun-red', detail: [`${c.check.name}:${r.exitCode} ${r.tail}`.slice(0, 300)] };
     checks.push({ name: String(c.check.name ?? c.rel), exitCode: 0, command: String(c.check.command).slice(0, 2000),
       evidence: `runtime settler re-run: exit 0 in ${Math.round(r.ms / 100) / 10}s (worker declared exit 0)` });
@@ -305,6 +398,8 @@ async function verifyDeclared(db, item, { repo, settings, rerun, canon, env }) {
   if (item.payload.cut) {
     if (!item.payload.params?.canonFamilies) return { green: false, reason: 'cut-not-canon' };
     const slice = await canon(item, { repo });
+    await record({ name: CUT_SLICE_CHECKS[0], command: `canon-scan --root ${slice.root ?? repo}`, cwd: slice.root ?? repo,
+      phase: 'verify', runner: 'settler', exitCode: slice.exitCode, output: slice.output ?? slice, summary: { status: slice.status, findings: slice.findings } });
     if (slice.exitCode !== 0) return { green: false, reason: 'cut-postcondition-red', detail: [`canon-scan ${slice.status ?? '?'}${slice.findings != null ? ` ${slice.findings} finding(s)` : ''}${slice.why ? ` ${slice.why}` : ''}`] };
     checks.push({ name: CUT_SLICE_CHECKS[0], exitCode: 0, command: `canon-scan (in-process) --root ${slice.root} over the slice's ${slice.paths} owned path(s)`,
       evidence: `runtime settler: canon-scan status ok, 0 findings on the slice's owned paths (families ${item.payload.params.canonFamilies})` });
@@ -345,6 +440,23 @@ const checksFile = (item, envelope) => {
 const event = (ledger, item, kind, payload) => ledger.transaction(() => ledger.appendEvent({
   workflowId: item.workflowId, entityType: 'job', entityId: item.jobId, kind, payload: { dispatchId: item.dispatchId ?? null, ...payload } }));
 
+/** Keep the attempt history current even for a job dispatched before op_attempts existed. */
+function markAttempt(ledger, item, fields) {
+  try {
+    ledger.transaction((db) => {
+      const key = [item.workflowId, item.jobId, item.attempt];
+      const prior = db.prepare('SELECT attempt_id FROM op_attempts WHERE workflow_id=? AND job_id=? AND attempt=?').get(...key);
+      if (!prior) db.prepare('INSERT INTO op_attempts(workflow_id,job_id,op_id,attempt,dispatch_id) VALUES(?,?,?,?,?)')
+        .run(item.workflowId, item.jobId, item.op, item.attempt, item.dispatchId ?? null);
+      const names = Object.keys(fields);
+      db.prepare(`UPDATE op_attempts SET ${names.map((name) => `${name}=?`).join(',')} WHERE workflow_id=? AND job_id=? AND attempt=?`)
+        .run(...names.map((name) => fields[name]), ...key);
+    });
+  } catch (error) {
+    if (!/no such table: op_attempts/i.test(String(error?.message))) throw error;
+  }
+}
+
 /** reported -> needs-kernel, once per dispatch and reason. */
 function handToKernel(ledger, item, verdict, { now }) {
   const prior = kernelHandoverOf(ledger.db, item);
@@ -373,14 +485,14 @@ export async function releaseSettled(ledger, { workflowId = null, jobId = null, 
   const args = [...SETTLED, now - settings.releaseWindowMs];
   if (workflowId) { where.push('workflow_id=?'); args.push(workflowId); }
   if (jobId) { where.push('job_id=?'); args.push(jobId); }
-  const rows = ledger.db.prepare(`SELECT job_id, workflow_id, worker_id, payload_json, status FROM jobs j WHERE ${where.join(' AND ')}
+  const rows = ledger.db.prepare(`SELECT job_id, workflow_id, op_id, attempt, worker_id, payload_json, status FROM jobs j WHERE ${where.join(' AND ')}
     AND NOT EXISTS (SELECT 1 FROM events e WHERE e.kind=? AND e.entity_id=j.job_id)`).all(...args, EVENTS.released);
   const out = [];
   let closer = close;
   for (const row of rows) {
     const payload = parse(row.payload_json) ?? {};
     const handle = payload.managed ? null : (row.worker_id ?? payload.orca?.agentTerminalHandle ?? payload.launchTerminal?.handle ?? null);
-    const item = { jobId: row.job_id, workflowId: row.workflow_id, dispatchId: null };
+    const item = { jobId: row.job_id, workflowId: row.workflow_id, op: row.op_id, attempt: row.attempt, dispatchId: null };
     // A job that never bound a worker has nothing to release: no transition, no event.
     if (!handle && !payload.managed) continue;
     let proof = releaseProofOf(payload), closed = null;
@@ -391,7 +503,10 @@ export async function releaseSettled(ledger, { workflowId = null, jobId = null, 
       if (closed?.ok) proof = `closed-verified:${closed.proof ?? 'ok'}`;
     }
     if (!proof) { out.push({ jobId: row.job_id, state: STATES.settled, released: false, reason: closed?.reason ?? closed?.error ?? (payload.managed ? 'managed-unproven' : 'unproven') }); continue; }
-    if (!dryRun) event(ledger, item, EVENTS.released, { from: STATES.settled, to: STATES.released, status: row.status, handle, proof, ...(closed ? { closedNow: true } : {}) });
+    if (!dryRun) {
+      event(ledger, item, EVENTS.released, { from: STATES.settled, to: STATES.released, status: row.status, handle, proof, ...(closed ? { closedNow: true } : {}) });
+      markAttempt(ledger, item, { released_at: now() });
+    }
     out.push({ jobId: row.job_id, state: STATES.released, proof, ...(closed ? { closedNow: true } : {}) });
   }
   return out;
@@ -418,7 +533,8 @@ export async function reconcileJobSettle({ repo, workflowId = null, jobId = null
         const fresh = reportedJobs(ledger.db, { jobId: item.jobId })[0];
         if (!fresh) { out.skipped.push({ jobId: item.jobId, reason: 'no-longer-reported' }); continue; }
         let verdict;
-        try { verdict = await verify(ledger.db, fresh, { repo: path.resolve(repo), settings, env }); }
+        try { verdict = await verify(ledger.db, fresh, { repo: path.resolve(repo), settings, env,
+          record: dryRun ? async () => {} : (run) => recordSettlerCheck(ledger, fresh, run) }); }
         catch (error) { verdict = { green: false, reason: 'verify-error', detail: [String(error?.message ?? error).slice(0, 300)] }; }
         if (!verdict.green) {
           if (dryRun) { out.kernel.push({ jobId: item.jobId, state: STATES.kernel, reason: verdict.reason, detail: verdict.detail ?? null, dryRun: true }); continue; }
@@ -442,6 +558,7 @@ export async function reconcileJobSettle({ repo, workflowId = null, jobId = null
         event(ledger, fresh, EVENTS.settled, { from: STATES.reported, to: STATES.settled, op: fresh.op, attempt: fresh.attempt, via: verdict.via,
           latencyMs: at - fresh.filedAt, consumedBefore: fresh.consumedAt != null, nextStep: settled.value?.nextStep ?? null, cutSet: settled.value?.cutSet ?? null,
           tail: settled.value?.tail ?? null, ...(verdict.parity ? { parity: verdict.parity } : {}) });
+        markAttempt(ledger, fresh, { settled_at: at, verdict: 'pass', settled_by: 'settler' });
         out.settled.push({ jobId: fresh.jobId, op: fresh.op, via: verdict.via, latencyMs: at - fresh.filedAt, status: settled.value?.status ?? 'succeeded' });
       } catch (error) {
         out.ok = false;
@@ -542,4 +659,3 @@ if (process.argv[1] && path.resolve(process.argv[1]) === selfFile) {
   else for (const r of results) console.log(`[settler] ${r.repo}${r.violations ? ` violations=${r.violations.length}` : ` settled=${r.settled?.length ?? 0} kernel=${r.kernel?.length ?? 0} released=${r.released?.filter((x) => x.state === 'released').length ?? 0}${r.action ? ` ${r.action}` : ''}${r.errors?.length ? ` errors=${r.errors.length}` : ''}`}`);
   process.exitCode = out.ok ? 0 : 1;
 }
-

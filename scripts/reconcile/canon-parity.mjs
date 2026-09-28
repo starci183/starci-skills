@@ -316,7 +316,8 @@ const brief = (issue) => `${issue.code}${issue.ruleId ? `/${issue.ruleId}` : ''}
  * `classify(check)` is the settler's classifyCheck; `rerun`/`canon` its seams; `lint`, `tsc`, `diffCheck`, `blobs` ours.
  */
 export async function canonParityVerdict(item, { repo, settings, env = process.env, classify, rerun, canon, baseline = () => false,
-  resolveRoot, lint = lintParity, tsc = tscParity, diffCheck = null, blobs = baseBlobsOf, now = Date.now, wireLegs = () => [], canonBase = canonBaseFindings } = {}) {
+  resolveRoot, lint = lintParity, tsc = tscParity, diffCheck = null, blobs = baseBlobsOf, now = Date.now, wireLegs = () => [],
+  canonBase = canonBaseFindings, record = async () => {} } = {}) {
   const started = now();
   const hand = (reason, detail, parity = null) => ({ green: false, reason, detail: (Array.isArray(detail) ? detail : [detail]).filter(Boolean).map((d) => String(d).slice(0, 300)).slice(0, 8), ...(parity ? { parity } : {}) });
   const base = sliceBaseOf(item);
@@ -346,6 +347,7 @@ export async function canonParityVerdict(item, { repo, settings, env = process.e
   for (const c of reruns) {
     if (now() - started > settings.itemBudgetMs) return hand('verify-budget-exceeded', 'parity re-runs');
     const r = rerun(c, { repo, timeoutMs: settings.rerunTimeoutMs, env });
+    await record({ name: String(c.check.name ?? c.rel), command: String(c.check.command), cwd: repo, phase: 'parity', runner: 'parity', ...r });
     if (r.exitCode !== 0) return hand('parity-rerun-red', `${c.check.name}:${r.exitCode} ${r.tail ?? ''}`);
     checks.push({ name: String(c.check.name ?? c.rel), exitCode: 0, command: String(c.check.command).slice(0, 2000),
       evidence: `runtime settler re-run: exit 0 in ${Math.round(r.ms / 100) / 10}s (worker declared exit ${c.check.exitCode})` });
@@ -354,13 +356,19 @@ export async function canonParityVerdict(item, { repo, settings, env = process.e
   // node --check <file>: re-run as argv (no shell) in the checkout; the file must parse.
   for (const c of covered.syntax) {
     const argv = String(c.command).trim().split(/\s+/).slice(1);
+    const syntaxStarted = now();
     const r = spawnSync(process.execPath, argv, { cwd: root, encoding: 'utf8', windowsHide: true, timeout: 60_000 });
+    await record({ name: String(c.name), command: String(c.command), cwd: root, phase: 'parity', runner: 'parity',
+      exitCode: r.status ?? (r.error?.code === 'ETIMEDOUT' ? 124 : 127), startedAt: syntaxStarted, finishedAt: now(), stdout: r.stdout, stderr: r.stderr ?? r.error?.message });
     if (r.status !== 0) return hand('parity-rerun-red', `${c.name}:${r.status} ${String(r.stderr ?? '').trim().split(/\r?\n/)[0] ?? ''}`);
     checks.push({ name: String(c.name), exitCode: 0, command: String(c.command).slice(0, 2000), evidence: `runtime settler re-run in ${root}: exit 0 (worker declared exit ${c.exitCode})` });
   }
 
   // (a) the slice's goal: canon-scan over its owned paths, 0 findings.
   const slice = await canon(item, { repo });
+  await record({ name: 'cut-slice-postcondition', command: `canon-scan --root ${slice.root ?? root}`, cwd: slice.root ?? root,
+    phase: 'parity', runner: 'parity', exitCode: slice.exitCode, output: slice.output ?? slice,
+    summary: { status: slice.status, findings: slice.findings } });
   let owedAccepted = null;
   if (slice.exitCode === 1) {
     // Coordinator ruling (canon-parity-settle, owedToWire): findings left on owned paths pass only when EVERY one is
@@ -377,6 +385,9 @@ export async function canonParityVerdict(item, { repo, settings, env = process.e
   let typed;
   try { typed = await tsc({ root, ownedRels, baseBlobs: baseFiles.blobs, extraProjects: declaredProjectsOf(covered.tsc, root) }); }
   catch (error) { typed = { ok: false, unavailable: String(error?.message ?? error) }; }
+  await record({ name: PARITY_CHECKS.tsc, command: `typescript owned-file parity at ${base}`, cwd: root, phase: 'parity', runner: 'parity',
+    exitCode: typed.ok ? 0 : typed.unavailable ? 127 : 1, output: typed,
+    summary: { projects: typed.projects?.length ?? 0, newErrors: typed.newErrors?.length ?? null, unavailable: typed.unavailable ?? null } });
   if (typed.unavailable) return hand('parity-tsc-unavailable', typed.unavailable);
   if (!typed.ok) return hand('parity-tsc-new', typed.newErrors.slice(0, 8).map((e) => `${e.owned ? 'owned' : 'importer'} ${e.file} ${e.code} x${e.count - e.baseCount}: ${e.message}`), { tsc: typed });
 
@@ -386,12 +397,18 @@ export async function canonParityVerdict(item, { repo, settings, env = process.e
   const files = await lintFilesOf(root, ownedRels, profile);
   if (now() - started > settings.itemBudgetMs) return hand('verify-budget-exceeded', 'before scoped lint');
   const linted = await lint({ root, files, base, profile });
+  await record({ name: PARITY_CHECKS.lint, command: `check-scoped-lint --profile ${profile} --root ${root} --base ${base}`, cwd: root,
+    phase: 'parity', runner: 'parity', exitCode: linted.ok ? 0 : 1, output: linted,
+    summary: { status: linted.status, counts: linted.counts, outside: linted.outside } });
   if (!linted.ok) return hand('parity-lint-new', [`slice ${linted.status} new=${linted.counts?.new ?? '?'} runLevel=${linted.counts?.runLevel ?? '?'} baseline=${linted.baseline?.method ?? '?'}/${linted.baseline?.status ?? '?'}`, ...(linted.gating ?? []).slice(0, 6).map(brief)], { lint: { ...linted, gating: (linted.gating ?? []).slice(0, 20) } });
 
   // git diff --check over the slice's diff (only when the worker declared one).
   let diffed = null;
   if (covered.diff.length) {
     diffed = diffCheck ? diffCheck({ root, base, ownedRels }) : (() => { const r = git(root, ['diff', '--check', base, '--', ...ownedRels]); return { ok: r.ok, tail: String(r.stdout ?? '').trim().split(/\r?\n/).slice(0, 3).join(' ') }; })();
+    await record({ name: PARITY_CHECKS.diff, command: `git diff --check ${base} -- <owned paths>`, cwd: root,
+      phase: 'parity', runner: 'parity', exitCode: diffed.ok ? 0 : 1, output: diffed,
+      summary: { ok: diffed.ok, tail: diffed.tail ?? null } });
     if (!diffed.ok) return hand('parity-diff-check-red', diffed.tail ?? 'git diff --check reported whitespace/conflict errors in the slice diff');
   }
 

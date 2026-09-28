@@ -143,7 +143,7 @@ export function jobFacts(db, jobId, { now = Date.now(), settings = jobSettings()
     handover: handover ? { reason: handover.reason ?? null, detail: handover.detail ?? null, at: handover.at } : null,
     released, releaseProof: releaseProofOf(payload), settledAt: SETTLED.includes(row.status) ? Number(payload.settledAt ?? row.updated_at) : null,
     integrateRefused: refused && (!reported || refused.at >= reported.filedAt) ? { reason: refused.reason, files: refused.files ?? null, conflicts: refused.conflicts ?? null, continuation: refused.continuation ?? null, at: refused.at } : null,
-    head: reported ? (parse(db.prepare('SELECT report_json FROM reports WHERE workflow_id=? AND dispatch_id=?').get(row.workflow_id, reported.dispatchId)?.report_json)?.head ?? null) : null,
+    head: reported?.report?.head ?? null,
     successor, continuations, releasedAt,
     worktree: payload.productWorktree?.op?.path ? (() => {
       const event = db.prepare('SELECT 1 FROM events WHERE kind=? AND entity_id=? LIMIT 1').get(PRODUCT_EVENTS.worktreeRemoved, jobId) != null;
