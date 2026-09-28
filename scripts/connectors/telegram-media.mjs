@@ -38,6 +38,7 @@ import { parseJson, readJsonFile } from '../lib/json.mjs';
 import { list as arr } from '../lib/list.mjs';
 import { sleep } from '../lib/sleep.mjs';
 import { pathKey, slash } from '../lib/path-key.mjs';
+import { isFile, isDir } from '../lib/fs-kind.mjs';
 import { readYamlFile } from '../lib/yaml.mjs';
 
 const SELF = fileURLToPath(import.meta.url);
@@ -60,8 +61,7 @@ const posix = slash;
 const keyOf = pathKey;
 const parse = parseJson;
 const readYaml = readYamlFile;
-const isFile = (file) => { try { return fs.statSync(file).isFile(); } catch { return false; } };
-const isDir = (file) => { try { return fs.statSync(file).isDirectory(); } catch { return false; } };
+
 const sizeOf = (file) => { try { return fs.statSync(file).size; } catch { return -1; } };
 const firstFile = (candidates) => candidates.find((c) => c && isFile(c)) ?? null;
 

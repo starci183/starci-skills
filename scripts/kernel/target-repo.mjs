@@ -9,6 +9,7 @@ import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { readDistJson, skillRoot } from '../../engine/runtime-root.mjs';
 import { readJsonFile } from '../lib/json.mjs';
+import { isDir } from '../lib/fs-kind.mjs';
 
 // STARCI_SOURCE_ROOT is the same registry seam scripts/goal/define-goal.mjs reads.
 export const sourceRootOf = () => (process.env.STARCI_SOURCE_ROOT
@@ -24,7 +25,7 @@ const inside = (root, abs) => {
   const rel = path.relative(key(root), key(abs));
   return rel === '' || (!rel.startsWith('..') && !path.isAbsolute(rel));
 };
-const isDir = (p) => { try { return fs.statSync(p).isDirectory(); } catch { return false; } };
+
 
 // The binding (.workspaces/projects/<p>/work.json) whose work.ownerRole
 // repository is `repo`, or null — no binding means --repo is authoritative.

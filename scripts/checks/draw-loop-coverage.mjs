@@ -11,11 +11,11 @@ export const loopLabelOf = (ref) => (ref?.sha256 ? `blob:${ref.sha256.slice(0, 1
 import path from 'node:path';
 import { sha256 } from '../../engine/index.mjs';
 import { assetsOf, list, slash } from '../work/work-io.mjs';
+import { isFile } from '../lib/fs-kind.mjs';
 
 export const LOOP_SCHEMA = 'starci/draw-loop@1';
 export const DRAW_LOOP_MISSING = 'DRAW_LOOP_MISSING';
 
-const isFile = (p) => { try { return fs.statSync(p).isFile(); } catch { return false; } };
 const readJson = (f) => { try { return JSON.parse(fs.readFileSync(f, 'utf8')); } catch { return null; } };
 const shaOfFile = (f) => sha256(fs.readFileSync(f));
 

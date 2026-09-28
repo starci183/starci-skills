@@ -37,6 +37,7 @@ import { parseYaml } from '../../engine/yaml.mjs';
 import { COMPONENT_ATTR, PART_ATTR, componentRootOf, loadDna, parseHtml, visibleElement, walkElements, classesOf } from './draw-dna.mjs';
 import { readContractChangesDoc } from '../kernel/contract-changes-store.mjs';
 import { list } from '../lib/list.mjs';
+import { isFile } from '../lib/fs-kind.mjs';
 
 export const DRAW_RATIONALE_MISSING = 'DRAW_RATIONALE_MISSING';
 export const DRAW_RATIONALE_CODES = Object.freeze([DRAW_RATIONALE_MISSING]);
@@ -58,8 +59,6 @@ const KNOWLEDGE = path.join(ROOT, 'knowledge');
 const OWNER_RULINGS = path.join(ROOT, 'modules', 'kernel', 'owner-rulings.yaml');
 // null: the runtime registry (entry files + the old list, scripts/kernel/contract-changes-store.mjs).
 const CONTRACT_CHANGES = null;
-
-const isFile = (p) => { try { return fs.statSync(p).isFile(); } catch { return false; } };
 const readJson = (f) => { try { return JSON.parse(fs.readFileSync(f, 'utf8')); } catch { return undefined; } };
 const readYamlOr = (f) => { try { return parseYaml(fs.readFileSync(f, 'utf8')); } catch { return null; } };
 const str = (v) => (v == null ? '' : typeof v === 'string' ? v : typeof v === 'number' ? String(v) : JSON.stringify(v));

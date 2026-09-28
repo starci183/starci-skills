@@ -33,6 +33,7 @@ import { skillRoot } from '../../engine/runtime-root.mjs';
 import { isPlainObject as plain } from '../../engine/index.mjs';
 import { parseYaml } from '../../engine/yaml.mjs';
 import { list } from '../lib/list.mjs';
+import { isFile, isDir } from '../lib/fs-kind.mjs';
 
 export const RESULT_SCHEMA = 'starci/starcistacks-check@1';
 export const DECLARATION_SCHEMA = 'starci/application-stacks@1';
@@ -76,8 +77,7 @@ const INFRA_VALUE_PROBES = ['infra/compose/.env', 'infra/compose/.env.generated'
 
 const text = (value) => (typeof value === 'string' && value.trim() ? value.trim() : null);
 const slash = (value) => String(value ?? '').replaceAll('\\', '/');
-const isFile = (file) => { try { return fs.statSync(file).isFile(); } catch { return false; } };
-const isDir = (file) => { try { return fs.statSync(file).isDirectory(); } catch { return false; } };
+
 const readText = (file) => { try { return fs.statSync(file).size > MAX_BYTES ? null : fs.readFileSync(file, 'utf8'); } catch { return null; } };
 const escapeRe = (value) => String(value).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 

@@ -35,6 +35,7 @@ import fs from 'node:fs';
 import { loopFileOfRef } from './draw-loop-coverage.mjs';
 import path from 'node:path';
 import { decodePng } from '../work/png.mjs';
+import { isFile } from '../lib/fs-kind.mjs';
 import { assetsOf, list, slash, workRootOf } from '../work/work-io.mjs';
 import { sha256File } from '../../engine/digest.mjs';
 import { ownerAcceptanceOf } from '../work/direction-part.mjs';
@@ -59,8 +60,6 @@ export const SCORE_SCHEMA = 'starci/ui-proof-score@1';
 /** The largest share of an image's rows two renders of one XBase may differ in and still be one shape plus a status band. */
 export const STATUS_BAND_MAX = 0.3;
 const OWNER = 'owner';
-
-const isFile = (p) => { try { return fs.statSync(p).isFile(); } catch { return false; } };
 const shaOf = (file) => { try { return sha256File(file); } catch { return null; } };
 const PART_ROLES = new Set(['direction-content', 'direction']);
 

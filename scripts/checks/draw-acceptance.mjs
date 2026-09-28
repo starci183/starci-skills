@@ -41,6 +41,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { parseYaml } from '../../engine/yaml.mjs';
 import { sha256File } from '../../engine/digest.mjs';
+import { isFile, isDir } from '../lib/fs-kind.mjs';
 import { assetsOf, list, slash } from '../work/work-io.mjs';
 import { DATA_STATUS_DRAWN, DRAWING_ROLES, DRAW_TOOL, RASTER_TOOL, assetStateOf, dataStatusOf, drawingsOf, recipeRenderedOf, uiShapeFindings } from './ui-shapes.mjs';
 import { DRAW_QUALITY_CODES, DRAW_SCOPE_FULL_PAGE, drawQualityFindings } from './draw-quality.mjs';
@@ -67,8 +68,7 @@ const readDoc = (file) => {
     return /\.json$/i.test(file) ? JSON.parse(text) : parseYaml(text);
   } catch { return null; }
 };
-const isFile = (p) => { try { return fs.statSync(p).isFile(); } catch { return false; } };
-const isDir = (p) => { try { return fs.statSync(p).isDirectory(); } catch { return false; } };
+
 const shaOf = (file) => { try { return sha256File(file); } catch { return null; } };
 const inAssets = (rel) => /(^|\/)assets\//.test(rel);
 

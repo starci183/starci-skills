@@ -12,6 +12,7 @@ import path from 'node:path';
 import { parseYaml } from '../../engine/yaml.mjs';
 import { readBrandRecord } from '../checks/brand.mjs';
 import { projectBinding, bindingRepo } from './target-repo.mjs';
+import { isFile, isDir } from '../lib/fs-kind.mjs';
 
 export const GRAMMAR_PACKAGE = '@starci/grammar';
 const GRAMMAR_KNOWLEDGE_FAMILY = 'starci';
@@ -23,8 +24,7 @@ export const grammarContextRequired = (brief) => brief?.grammarContext === 'requ
 export const GRAMMAR_INPUTS = Object.freeze(['reference', 'component-source']);
 export const grammarInputsOf = (brief) => (GRAMMAR_INPUTS.includes(brief?.grammarInputs) ? brief.grammarInputs : 'reference');
 
-const isFile = (p) => { try { return fs.statSync(p).isFile(); } catch { return false; } };
-const isDir = (p) => { try { return fs.statSync(p).isDirectory(); } catch { return false; } };
+
 const slash = (p) => p.replace(/\\/g, '/');
 const yamlFilesUnder = (dir) => fs.readdirSync(dir, { withFileTypes: true, recursive: true })
   .filter((e) => e.isFile() && /\.ya?ml$/i.test(e.name))
