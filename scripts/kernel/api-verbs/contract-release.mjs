@@ -1,5 +1,6 @@
 // api contract-release: split from api.mjs.
 import { getWorkflow, jobPayloadOf } from '../api-lib/rows.mjs';
+import { recordJobResult, setJobStatus, updateJob } from '../../../engine/ledger-db.mjs';
 import { dispatchEvidenceOf } from '../api-lib/dispatch-state.mjs';
 import { CONTRACT_RELEASE_EVENT, contractFollowUpsOf, frozenChangesFor, loadContractChanges, releasedChangesOf } from '../contract-version.mjs';
 import { currentRuntimeRev, revRootOf } from '../runtime-rev.mjs';
@@ -49,13 +50,15 @@ export default {
           const stamp = { family, changes: entry.changes, at: now, event: event?.eventId ?? event?.event_id ?? null };
           for (const job of restamp) {
             const payload = jobPayloadOf(job);
-            db.prepare("UPDATE jobs SET payload_json=?, updated_at=? WHERE job_id=? AND status='queued'")
-              .run(JSON.stringify({ ...payload, contractRelease: stamp }), now, job.job_id);
+            if (db.prepare('SELECT status FROM jobs WHERE job_id=?').get(job.job_id)?.status === 'queued')
+              updateJob(db, { jobId: job.job_id, payload: { ...payload, contractRelease: stamp }, at: now });
           }
           for (const job of drop) {
             const by = newestByKey.get(keyOf(job)).job_id;
-            db.prepare("UPDATE jobs SET status='cancelled', result_json=?, updated_at=? WHERE job_id=? AND status='queued'")
-              .run(JSON.stringify({ verdict: 'dropped', reason: 'superseded-by-contract-release', by, at: now }), now, job.job_id);
+            if (db.prepare('SELECT status FROM jobs WHERE job_id=?').get(job.job_id)?.status === 'queued') {
+              setJobStatus(db, { jobId: job.job_id, to: 'cancelled', reason: 'superseded-by-contract-release', at: now });
+              recordJobResult(db, { jobId: job.job_id, result: { verdict: 'dropped', reason: 'superseded-by-contract-release', by, at: now }, at: now });
+            }
             ledger.appendEvent({ workflowId, entityType: 'job', entityId: job.job_id, kind: 'job-dropped', payload: { reason: 'superseded-by-contract-release', by, family, auto: true } });
           }
         });

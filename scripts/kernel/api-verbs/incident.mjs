@@ -1,6 +1,6 @@
 // api incident: durable waits, resolution and shared-blocker routing.
 import path from 'node:path';
-import { newToken } from '../../../engine/ledger-db.mjs';
+import { newToken, openIncident, resolveIncident } from '../../../engine/ledger-db.mjs';
 import { parseJson } from '../../lib/json.mjs';
 import { csvList, getWorkflow } from '../api-lib/rows.mjs';
 import { PEER_WAIT, openPeerWaits, peerRefusalOf, releaseTypedWaits, writePeerMessage } from '../api-lib/peers.mjs';
@@ -38,7 +38,7 @@ export default {
       }
       if (changed) {
         ledger.transaction(() => {
-          db.prepare("UPDATE incidents SET status='resolved',updated_at=? WHERE incident_id=?").run(now, row.incident_id);
+          resolveIncident(db, { incidentId: row.incident_id, reason: 'answered', at: now });
           ledger.appendEvent({
             workflowId, entityType: 'incident', entityId: row.incident_id,
             kind: 'incident-resolved', payload: { detail: args.detail ?? null, by: ownerCheck.by,
@@ -119,9 +119,7 @@ export default {
     const rerouted = internals.OWNER_GATE_KINDS.includes(args.kind) && autopilotOn(db, workflowId) ? { from: args.kind, to: SUPERVISOR_GATE } : null;
     if (rerouted) args = { ...args, kind: SUPERVISOR_GATE };
     ledger.transaction(() => {
-      db.prepare(
-        "INSERT INTO incidents(incident_id,workflow_id,op_id,attempts,model_calls,tokens,elapsed_ms,last_progress,status,updated_at) VALUES(?,?,?,0,0,0,0,?,'open',?)"
-      ).run(incidentId, workflowId, args.op ?? null, `[${args.kind}] ${args.detail}`, now);
+      openIncident(db, { incidentId, workflowId, kind: args.kind, opId: args.op ?? null, detail: args.detail, lastProgress: `[${args.kind}] ${args.detail}`, at: now });
       ledger.appendEvent({
         workflowId, entityType: 'incident', entityId: incidentId,
         kind: 'incident-raised', payload: { kind: args.kind, ...(rerouted ? { rerouted, by: AUTOPILOT_BY } : {}), detail: args.detail, opId: args.op ?? null, ...(holds.length ? { holds } : {}), ...(peerWait ?? {}), ...(until.length ? { until } : {}) },

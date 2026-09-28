@@ -1,5 +1,6 @@
 // api reply: split from api.mjs.
 import { getWorkflow } from '../api-lib/rows.mjs';
+import { postInbox, setInboxStatus, setInboxStatusByKey } from '../../../engine/ledger-db.mjs';
 import { OWNER_ROUTED_REPLY, WORKER_QUESTION, workerQuestionsOf } from '../api-lib/messages.mjs';
 import { orchReply } from '../../api/orca/orch-reply.mjs';
 
@@ -30,14 +31,12 @@ export default {
     }
     ledger.transaction(() => {
       const now = Date.now();
-      const disposition = JSON.stringify({ reply: body, toOwner, at: now });
+      const disposition = { reply: body, toOwner, at: now };
       const { state, bridged, jobStatus, repliedInOrca, ...stored } = item;
-      if (bridged) {
-        db.prepare('UPDATE inbox SET status=\'applied\', disposition_json=?, applied_at=? WHERE workflow_id=? AND kind=? AND key=?')
-          .run(disposition, now, workflowId, WORKER_QUESTION, messageId);
-      } else {
-        db.prepare("INSERT INTO inbox(workflow_id,kind,key,payload_json,status,disposition_json,created_at,applied_at) VALUES(?,?,?,?, 'applied',?,?,?)")
-          .run(workflowId, WORKER_QUESTION, messageId, JSON.stringify(stored), disposition, now, now);
+      if (bridged) setInboxStatusByKey(db, { workflowId, kind: WORKER_QUESTION, key: messageId, status: 'applied', disposition, at: now });
+      else {
+        const inboxId = postInbox(db, { workflowId, kind: WORKER_QUESTION, key: messageId, payload: stored, createdAt: now });
+        setInboxStatus(db, { inboxId, status: 'applied', disposition, at: now });
       }
       ledger.appendEvent({ workflowId, entityType: 'job', entityId: item.jobId, kind: 'worker-question-answered',
         payload: { messageId, dispatchId: item.dispatchId, runId: item.runId, toOwner } });

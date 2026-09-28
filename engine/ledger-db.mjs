@@ -465,6 +465,21 @@ export function insertGoal(db,{workflowId,revision,goalIdentity,markdown,goal,am
   appendEvent(db,{workflowId,entityType:'workflow',entityId:workflowId,kind:'goal-revision',payload:{revision,goalIdentity},createdAt});
   return Number(lastInsertRowid);
 }
+/** Rewrite a goal revision's derived json (api plan: the derived plan); markdown and approval never change. */
+export function updateGoalJson(db,{goalSeq,goal,at=nowMs()}){
+  const row=db.prepare('SELECT workflow_id,revision FROM goals WHERE goal_seq=?').get(goalSeq);
+  need(row,`goal ${goalSeq} not found`);
+  updateRow(db,'goals',{goalSeq},{json:json(goal)});
+  appendEvent(db,{workflowId:row.workflow_id,entityType:'goal',entityId:row.workflow_id,kind:'goal-json-updated',payload:{revision:row.revision},createdAt:at});
+}
+/** Inbox rows by (workflow, kind, key[, status]) moved to `status`; returns how many moved. */
+export function setInboxStatusByKey(db,{workflowId,kind,key=null,onlyStatus=null,status,disposition=undefined,at=nowMs()}){
+  let sql='SELECT inbox_id FROM inbox WHERE workflow_id=? AND kind=?';const args=[workflowId,kind];
+  if(key!==null){sql+=' AND key=?';args.push(key);}
+  if(onlyStatus){sql+=' AND status=?';args.push(onlyStatus);}
+  let n=0;for(const r of db.prepare(sql).all(...args))if(setInboxStatus(db,{inboxId:r.inbox_id,status,disposition,at}))n++;
+  return n;
+}
 export function recordGoalInput(db,{workflowId,key,goalRevision,sha256:sha,origin,createdAt=nowMs()}){
   insertRow(db,'goal_inputs',{workflowId,key,goalRevision,sha256:sha,origin,createdAt});
 }
@@ -703,9 +718,13 @@ export function fileReport(db,{attemptId,outcome,report,fromTerminal=null,create
   updateAttempt(db,{attemptId,reportOutcome:outcome,reportedAt:createdAt,at:createdAt});
   return db.prepare('SELECT * FROM reports WHERE report_id=?').get(lastInsertRowid);
 }
-export function markReportConsumed(db,{attemptId,at=nowMs()}){
-  db.prepare('UPDATE reports SET consumed_at=? WHERE attempt_id=? AND consumed_at IS NULL').run(at,attemptId);
-  updateAttempt(db,{attemptId,consumedAt:at,at});
+/** Mark an attempt's report consumed (by attemptId, or workflowId + dispatchId); returns true when it was not yet. */
+export function markReportConsumed(db,{attemptId=null,workflowId=null,dispatchId=null,at=nowMs()}){
+  const id=attemptId??db.prepare('SELECT attempt_id FROM reports WHERE workflow_id=? AND dispatch_id=?').get(workflowId,dispatchId)?.attempt_id;
+  if(id==null)return false;
+  const changed=db.prepare('UPDATE reports SET consumed_at=? WHERE attempt_id=? AND consumed_at IS NULL').run(at,id).changes>0;
+  if(changed)updateAttempt(db,{attemptId:id,consumedAt:at,at});
+  return changed;
 }
 /** One check_runs row; run_seq follows earlier runs of the same (attempt, runner, phase, name). */
 export function recordCheckRun(db,{attemptId,name,phase,runner,authority=runner==='op'?'declared':'runtime',status,spanId=newSpanId(),createdAt=nowMs(),...fields}){
@@ -971,7 +990,7 @@ export const LEDGER_WRITES=Object.freeze({recordBlob,storeBlob,appendEvent,creat
   createUnit,setUnitState,reopenUnit,raiseTryBudget,addUnitEdge,recordGraphVersion,enqueueJob,setJobStatus,updateJob,startAttempt,updateAttempt,writeContract,
   declareResource,acquireLease,renewLeases,releaseLeases,idempotent,recordFailedRequest,fileReport,markReportConsumed,recordCheckRun,recordArtifact,attachToReport,
   recordArtifactProof,citeBlob,recordTranscriptSnapshot,setAttemptTranscript,recordLlmUsage,appendLog,setLogCursor,setCondition,openIncident,updateIncident,resolveIncident,
-  postInbox,setInboxStatus,openDecisionItem,updateDecisionItem,recordDecision,setSignal,updateSignal,clearSignal,queueSettleTail,recordJobResult,bindKernelJob,releaseKernelJob,recordPurge,deleteWorkflowRows,markBlobArchived,pruneAttemptSnapshots,upsertFoundation,declareFoundations,recordPathTransfer,recordRecordChange,updateSettleTail,recordProductLand,finishProductLand});
+  postInbox,setInboxStatus,setInboxStatusByKey,updateGoalJson,openDecisionItem,updateDecisionItem,recordDecision,setSignal,updateSignal,clearSignal,queueSettleTail,recordJobResult,bindKernelJob,releaseKernelJob,recordPurge,deleteWorkflowRows,markBlobArchived,pruneAttemptSnapshots,upsertFoundation,declareFoundations,recordPathTransfer,recordRecordChange,updateSettleTail,recordProductLand,finishProductLand});
 
 /**
  * The read-write handle. A new (empty) file is created with 0001-init.sql; any other schema is refused (clean slate).

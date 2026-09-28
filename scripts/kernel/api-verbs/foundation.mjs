@@ -1,5 +1,6 @@
 // api foundation: split from api.mjs.
 import path from 'node:path';
+import { resolveIncident } from '../../../engine/ledger-db.mjs';
 import { csvList, getWorkflow, workflowRunning } from '../api-lib/rows.mjs';
 import { PEER_WAIT, openPeerWaits, releaseTypedWaits, writePeerMessage } from '../api-lib/peers.mjs';
 import { FOUNDATION_KINDS, claimFoundation, declarationsOf, declareDependent, landFoundation, normalizeFoundationName, readDeclaration, readFoundation, writeDeclaration, writeFoundation } from '../foundations.mjs';
@@ -76,7 +77,7 @@ export default {
         const waiting = db.prepare("SELECT DISTINCT workflow_id FROM incidents WHERE status='open' AND last_progress LIKE ?").all(`[${PEER_WAIT}]%`).map((row) => row.workflow_id);
         for (const waiter of waiting) {
           for (const wait of openPeerWaits(db, waiter).filter((item) => item.untilFoundation === name)) {
-            db.prepare("UPDATE incidents SET status='resolved',updated_at=? WHERE incident_id=? AND status='open'").run(now, wait.incidentId);
+            resolveIncident(db, { incidentId: wait.incidentId, reason: 'fixed', at: now });
             ledger.appendEvent({ workflowId: waiter, entityType: 'incident', entityId: wait.incidentId, kind: 'incident-resolved',
               payload: { detail: `foundation ${name} landed${result.record.version ? ` at ${result.record.version}` : ''} by ${workflowId}: ${result.record.landed.proof}`, foundation: name, by: 'foundation-landed' } });
             released.push({ workflowId: waiter, incidentId: wait.incidentId, holds: wait.holds });

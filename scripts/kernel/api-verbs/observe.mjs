@@ -1,5 +1,6 @@
 // api observe: bounded screen context on the bound operation worker.
 import { parseJson } from '../../lib/json.mjs';
+import { updateJob } from '../../../engine/ledger-db.mjs';
 import { terminalRead } from '../../api/orca/terminal-read.mjs';
 import { terminalShow } from '../../api/orca/terminal-show.mjs';
 import { jobPayloadOf, operationTerminalHandleOf } from '../api-lib/rows.mjs';
@@ -89,7 +90,7 @@ export default {
     if (sessionIdentity?.files?.length) {
       const stored = parseJson(db.prepare('SELECT payload_json FROM jobs WHERE job_id=?').get(jobId)?.payload_json) ?? {};
       if (!stored.session?.files?.length)
-        db.prepare('UPDATE jobs SET payload_json=? WHERE job_id=?').run(JSON.stringify({ ...stored, session: sessionIdentity }), jobId);
+        updateJob(db, { jobId, payload: { ...stored, session: sessionIdentity } });
     }
   });
   const out = { ok: true, job: jobId, jobId, opId: job.op_id, attempt: job.attempt, ledgerStatus: job.status, terminal, screen, turnState, observedAt: now,

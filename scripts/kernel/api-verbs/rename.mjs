@@ -8,6 +8,7 @@
 //
 //   rename --workflow <id> --title "<name>" [--by owner|supervisor] [--no-terminals] [--dry-run]
 import { ARCHIVED_BY, getWorkflow, jobPayloadOf } from '../api-lib/rows.mjs';
+import { updateWorkflow } from '../../../engine/ledger-db.mjs';
 import { kernelCustodyOf } from '../api-lib/kernel-seat.mjs';
 import { jobDisplayNameOf, normalizeDisplayName } from '../../lib/display-names.mjs';
 import { terminalRename } from '../../api/orca/terminal-rename.mjs';
@@ -35,7 +36,7 @@ export default {
     }
     if (changed) {
       ledger.transaction(() => {
-        db.prepare('UPDATE workflows SET display_name=?, updated_at=? WHERE workflow_id=?').run(name, now, workflowId);
+        updateWorkflow(db, { workflowId, displayName: name, at: now });
         ledger.appendEvent({ workflowId, entityType: 'workflow', entityId: workflowId, kind: 'workflow-renamed',
           payload: { from, to: name, slug: wf.title ?? null, by, at: now } });
       });

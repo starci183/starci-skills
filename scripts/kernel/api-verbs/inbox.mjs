@@ -1,5 +1,6 @@
 // api inbox: split from api.mjs; output and validation remain stable.
 import { getWorkflow } from '../api-lib/rows.mjs';
+import { setInboxStatus } from '../../../engine/ledger-db.mjs';
 import { PEER_MESSAGE, peerMessageOf, peerMessageRows, pendingPeerMessagesOf } from '../api-lib/peers.mjs';
 const PEER_SENT_LIMIT = 20;
 
@@ -24,8 +25,8 @@ export default {
       }
       ledger.transaction(() => {
         const now = Date.now();
-        db.prepare("UPDATE inbox SET status='applied', disposition_json=?, applied_at=? WHERE inbox_id=? AND status='pending'")
-          .run(JSON.stringify({ disposition, by: workflowId, at: now }), now, row.inbox_id);
+        if (db.prepare('SELECT status FROM inbox WHERE inbox_id=?').get(row.inbox_id)?.status === 'pending')
+          setInboxStatus(db, { inboxId: row.inbox_id, status: 'applied', disposition: { disposition, by: workflowId, at: now }, at: now });
         ledger.appendEvent({ workflowId, entityType: 'workflow', entityId: workflowId, kind: 'peer-message-acked',
           payload: { key, from: message.from, kind: message.kind, disposition } });
       });

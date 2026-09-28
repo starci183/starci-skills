@@ -1,4 +1,5 @@
 // api consume-report: split from api.mjs.
+import { markReportConsumed } from '../../../engine/ledger-db.mjs';
 
 export default {
   verb: 'consume-report',
@@ -11,8 +12,7 @@ export default {
     let consumed = false;
     ledger.transaction(() => {
       const now = Date.now();
-      consumed = db.prepare('UPDATE reports SET consumed_at=? WHERE workflow_id=? AND dispatch_id=? AND consumed_at IS NULL')
-        .run(now, job.workflow_id, dispatchId).changes > 0;
+      consumed = markReportConsumed(db, { workflowId: job.workflow_id, dispatchId, at: now });
       if (consumed) {
         ledger.appendEvent({
           workflowId: job.workflow_id, entityType: 'job', entityId: job.job_id,

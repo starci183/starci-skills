@@ -1,4 +1,5 @@
 // api route: choose and persist one pool for a queued operation.
+import { updateJob } from '../../../engine/ledger-db.mjs';
 export default {
   verb: 'route',
   required: ['job'],
@@ -205,8 +206,7 @@ export default {
       profile: decided.model,
       runtimePool: decided.model,
     };
-    db.prepare('UPDATE jobs SET payload_json=?, updated_at=? WHERE job_id=?')
-      .run(JSON.stringify({ ...payload, ...decided, difficulty, hierarchy, routedAt: now }), now, jobId);
+    updateJob(db, { jobId, payload: { ...payload, ...decided, difficulty, hierarchy, routedAt: now }, at: now });
     ledger.appendEvent({
       workflowId: job.workflow_id, entityType: 'job', entityId: jobId,
       kind: 'route-decided', payload: { kind, difficulty, bias, ...routeFacts, ...decided },

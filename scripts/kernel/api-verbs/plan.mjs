@@ -2,6 +2,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { parseJson } from '../../lib/json.mjs';
+import { setInboxStatusByKey, updateGoalJson } from '../../../engine/ledger-db.mjs';
 import { getWorkflow, goalJsonOf, latestGoal } from '../api-lib/rows.mjs';
 import { HANDOVER_OP } from '../handover.mjs';
 import { legOpsOf } from '../../route/plan-edges.mjs';
@@ -66,9 +67,9 @@ export default {
         const edges = Array.isArray(plan.edges) ? plan.edges
           : Array.isArray(prior?.edges) && JSON.stringify(legOpsOf(prior.legs).sort()) === JSON.stringify([...new Set(planOps)].sort()) ? prior.edges : null;
         gj.derivedPlan = { legs, ...(edges ? { edges } : {}), divergence, lineage, derivedAt: now };
-        db.prepare('UPDATE goals SET json=? WHERE goal_seq=?').run(JSON.stringify(gj), g.goal_seq);
-        inboxApplied = db.prepare("UPDATE inbox SET status='applied', disposition_json=?, applied_at=? WHERE workflow_id=? AND kind='goal-revision' AND status='pending' AND key=?")
-          .run(JSON.stringify({ action: 'plan-derived', revision: g.revision, lineage }), now, workflowId, `${workflowId}:${g.revision}`).changes;
+        updateGoalJson(db, { goalSeq: g.goal_seq, goal: gj, at: now });
+        inboxApplied = setInboxStatusByKey(db, { workflowId, kind: 'goal-revision', key: `${workflowId}:${g.revision}`, onlyStatus: 'pending', status: 'applied',
+          disposition: { action: 'plan-derived', revision: g.revision, lineage }, at: now });
       }
       ledger.appendEvent({
         workflowId, entityType: 'workflow', entityId: workflowId,
