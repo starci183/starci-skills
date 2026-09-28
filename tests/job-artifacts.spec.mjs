@@ -196,6 +196,16 @@ test('housekeeping never removes an indexed artifact or its evidence directory',
   assert.equal(removed.ok,false);
   assert.ok(fs.existsSync(path.join(dir,'renders','a--desktop.png')),'safeRemoveTree refused the tree');
   assert.equal(artifactHoldOf(path.join(repoRoot,'node_modules')),null,'an unindexed path is not held');
+  // An artifact filed directly in .starciwork (a scope op's .starciwork/index.yaml) holds itself, not every tree beside it.
+  fs.writeFileSync(path.join(repoRoot,'.starciwork','index.yaml'),'features: []\n');
+  fs.mkdirSync(path.join(repoRoot,'.starciwork','kernel-evidence','wf-gone'),{recursive:true});
+  ledger.enqueueJob({jobId:'op-hk-2',workflowId:'wf-hk',opId:'scope.define',kind:'op'});
+  ledger.db.prepare("UPDATE jobs SET status='succeeded' WHERE job_id='op-hk-2'").run();
+  ledger.db.prepare('INSERT INTO reports(workflow_id,dispatch_id,op_id,attempt,generation,outcome,report_json,from_terminal,consumed_at,created_at) VALUES(?,?,?,?,?,?,?,?,NULL,?)')
+    .run('wf-hk','ctx-hk-2','scope.define',1,0,'done',json({outcome:'done',files:['.starciwork/index.yaml']}),null,Date.now());
+  assert.equal(indexJobArtifacts(ledger,{repo:repoRoot,jobId:'op-hk-2'}).ok,true);
+  assert.ok(artifactHoldOf(path.join(repoRoot,'.starciwork','index.yaml')),'the shallow artifact itself is held');
+  assert.equal(artifactHoldOf(path.join(repoRoot,'.starciwork','kernel-evidence','wf-gone')),null,'a shallow artifact does not hold every tree under .starciwork');
   ledger.db.prepare("UPDATE workflows SET phase='finished' WHERE workflow_id='wf-hk'").run();
   const before=ledger.db.prepare('SELECT count(*) n FROM job_artifacts').get().n;
   const retained=retainLedgerDb(ledger.db);

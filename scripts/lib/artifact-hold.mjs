@@ -1,5 +1,6 @@
 // artifact-hold.mjs — the retention exemption for job proofs. A path an indexed job artifact lives at
-// (job_artifacts, engine/schema.sql), a tree holding one, and the evidence directory around one are never
+// (job_artifacts, engine/schema.sql), a tree holding one, and the evidence directory around one (never a shared root:
+// the repository, .starciwork, .starciwork/evidence or .starciwork/kernel-evidence itself) are never
 // removed by housekeeping, whatever the workflow's phase (running, finished, archived); nor is the repository's
 // ledger .starciwork/runtime.sqlite (it holds the typed logs since 2026-09-27, scripts/kernel/typed-logs.mjs), nor the
 // retired logs file .starciwork/logs.sqlite or its logs.sqlite.migrated-<date> copy, nor a tree holding one. Every
@@ -69,9 +70,14 @@ export function artifactHoldOf(target, { env = process.env, repos = registeredRe
     } catch (error) {
       return { ledger, repo, paths: [], count: null, error: String(error?.message ?? error) };
     }
+    // "Around" holds an evidence directory, never a shared root: an artifact filed at the repository root or directly
+    // in .starciwork (e.g. a scope op indexing .starciwork/index.yaml) held every tree under it, so no purge could
+    // remove an archived workflow's kernel-evidence directory.
+    const shared = new Set([r, norm(work), norm(path.join(work, 'evidence')), norm(path.join(work, 'kernel-evidence'))]);
     const held = paths.filter((rel) => {
       const abs = norm(path.join(repo, rel));
-      return under(abs, t) || under(t, norm(path.dirname(abs)));
+      const dir = norm(path.dirname(abs));
+      return under(abs, t) || (!shared.has(dir) && under(t, dir));
     });
     if (held.length) return { ledger, repo, paths: held.slice(0, 5), count: held.length };
   }
