@@ -6,6 +6,7 @@ import {parseYaml} from '../../engine/yaml.mjs';
 import {skillRoot} from '../../engine/runtime-root.mjs';
 import {grammarDistRefusal} from './grammar-dist.mjs';
 import {slash} from '../lib/path-key.mjs';
+import {isInside as inside, sameOrUnder} from './common.mjs';
 import {readJsonFile as readJson} from '../lib/json.mjs';
 
 /**
@@ -484,8 +485,6 @@ function workRootsOf(brandDir){
   const work=path.dirname(path.resolve(brandDir));
   return {work,repoRoot:path.basename(work)==='.starciwork'?path.dirname(work):work};
 }
-const inside=(root,file)=>{const relative=path.relative(root,file);return relative===''||(!relative.startsWith('..')&&!path.isAbsolute(relative));};
-
 
 /**
  * The owner's answer an exception cites, read from the starci/ask-answer@1 receipt on disk: the named
@@ -718,7 +717,7 @@ export function importSpecifiers(text){
   return [...found.values()].sort((first,second)=>first.line-second.line||first.specifier.localeCompare(second.specifier));
 }
 
-const covers=(entry,specifier)=>specifier===entry||specifier.startsWith(`${entry}/`);
+const covers=(entry,specifier)=>sameOrUnder(specifier,entry);
 
 /**
  * 5. The glyph set is closed. A forbidden package is an offender wherever it appears; any other icon-looking

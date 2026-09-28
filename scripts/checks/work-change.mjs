@@ -2,6 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import {parseYaml} from '../../engine/yaml.mjs';
 import {canonicalJSON,sha256} from '../../engine/index.mjs';
+import {slash} from '../lib/path-key.mjs';
 
 /**
  * The change record: the part of the Work model that decides how far an edit travels.
@@ -53,7 +54,6 @@ const LIFECYCLE=new Set(['change','state','activity','blockers','blockedBy','evi
 class WorkChangeInputError extends Error{constructor(message,code='INVALID_INPUT'){super(message);this.name='WorkChangeInputError';this.code=code;}}
 export {WorkChangeInputError};
 
-const slash=value=>String(value??'').replaceAll('\\','/');
 const object=value=>Boolean(value)&&typeof value==='object'&&!Array.isArray(value);
 const text=value=>typeof value==='string'&&Boolean(value.trim());
 const list=value=>Array.isArray(value)?value:[];

@@ -2,6 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { slash } from '../../lib/path-key.mjs';
 import { readJsonFile as readJson } from '../../lib/json.mjs';
+import { isInside } from '../common.mjs';
 
 const CONFIG_SCHEMA = 'starci/architecture-config@1';
 const KINDS = new Set(['backend', 'frontend']);
@@ -14,11 +15,6 @@ const PRODUCTION_SOURCE = /\.(?:[cm]?[jt]sx?)$/i;
 const DECLARATION_SOURCE = /\.d\.[cm]?[jt]s$/i;
 const MODULE_REGISTRATION_KEYS = new Set(['providerIdentity', 'handlerDecorators']);
 const HANDLER_DECORATORS = new Set(['CommandHandler', 'QueryHandler']);
-
-function isInside(root, target) {
-  const relative = path.relative(root, target);
-  return relative === '' || (!relative.startsWith(`..${path.sep}`) && relative !== '..' && !path.isAbsolute(relative));
-}
 
 /** A file's identity: its resolved real path, or the resolved path when it does not exist. */
 function canonical(file) {

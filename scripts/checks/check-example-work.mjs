@@ -7,6 +7,7 @@ import {readWorkspace, resolveOwnedDirs, missingOwnedDirs, declaresOwnPaths, has
 import {renderProofProblems} from '../example/example-render-proof.mjs';
 import {DRAW_TOOL, RASTER_TOOL, generatedDrawingsOf, recipeRenderedOf, uiShapeFindings} from './ui-shapes.mjs';
 import {ASSET_SLOT_UNFILLED, assetSlotsOf} from '../work/asset-slot.mjs';
+import {walkFiles} from './common.mjs';
 
 /**
  * The layout says an id mirrors its directory while remaining the identity. That sentence is only true if
@@ -58,8 +59,7 @@ const CHANGE_KINDS = new Set(['initial', 'editorial', 'clarifying', 'breaking'])
 const DELIVERY_GUARANTEES = new Set(['at-least-once', 'at-most-once', 'exactly-once']);
 const DELIVERY_ORDERINGS = new Set(['none', 'per-key', 'total']);
 
-export const walk = dir => fs.readdirSync(dir, {withFileTypes: true})
-  .flatMap(entry => entry.isDirectory() ? walk(path.join(dir, entry.name)) : [path.join(dir, entry.name)]);
+export const walk = dir => walkFiles(dir);
 
 /** The id a record in this directory must carry: the innermost family, the feature, then the rest in order. */
 const expectedId = segments => {

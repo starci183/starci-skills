@@ -3,6 +3,7 @@ import path from 'node:path';
 import {fileURLToPath} from 'node:url';
 import {skillRoot} from '../../engine/runtime-root.mjs';
 import {readJsonFile as readJson} from '../lib/json.mjs';
+import {slash} from '../lib/path-key.mjs';
 import {DIGEST_ALGORITHM,STAMP_FILE,STAMP_SCHEMA,distDigest,sourceDigest} from '../../packages/grammar/scripts/build-stamp.mjs';
 
 /**
@@ -23,7 +24,6 @@ export const GRAMMAR_PACKAGE='@starci/grammar';
 export const GRAMMAR_DIST_FIX='run npm run build in packages/grammar';
 export const GRAMMAR_DIST_CHECK='starci/grammar-dist-check@1';
 const TOKEN_DIFF_CAP=20;
-const slash=value=>value.replaceAll('\\','/');
 
 
 export const defaultGrammarPackageRoot=()=>path.join(skillRoot,'packages','grammar');

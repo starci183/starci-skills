@@ -2,6 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { createRequire } from 'node:module';
 import { canonical, isInside, slash } from './config.mjs';
+import { sameOrUnder } from '../common.mjs';
 import { createTypeScriptProgram, sharedInProgramRun } from '../typescript-programs.mjs';
 import { readJsonFile } from '../../lib/json.mjs';
 
@@ -212,7 +213,7 @@ function exportTargetStrings(value) {
 }
 
 function packageExported(workspace, specifier, actualTarget) {
-  if (!workspace.name || (specifier !== workspace.name && !specifier.startsWith(`${workspace.name}/`))) return false;
+  if (!workspace.name || !sameOrUnder(specifier, workspace.name)) return false;
   const request = specifier === workspace.name ? '.' : `.${specifier.slice(workspace.name.length)}`;
   const declaration = workspace.exports;
   let candidates = [];
@@ -306,7 +307,7 @@ function typeScriptContext(config, loaded, paths) {
   const matches = file => paths.some(prefix => {
     const relative = slash(path.relative(config.root, file));
     const normalized = slash(prefix).replace(/\/$/, '');
-    return relative === normalized || relative.startsWith(`${normalized}/`);
+    return sameOrUnder(relative, normalized);
   });
   const selected = new Set();
   const direct = new Set();
@@ -385,7 +386,7 @@ function typeScriptContext(config, loaded, paths) {
       const resolvedName = ts.resolveModuleName(reference.specifier, sourceFile.fileName, project.options, host).resolvedModule?.resolvedFileName;
       if (!resolvedName) {
         const codeLike = !ASSET_EXTENSION.test(reference.specifier);
-        const workspaceImport = [...workspaceNames].some(name => reference.specifier === name || reference.specifier.startsWith(`${name}/`));
+        const workspaceImport = [...workspaceNames].some(name => sameOrUnder(reference.specifier, name));
         const internal = reference.specifier.startsWith('.') || pathAliasMatches(reference.specifier, project.options.paths) || workspaceImport;
         if (codeLike && internal) {
           errors.push({

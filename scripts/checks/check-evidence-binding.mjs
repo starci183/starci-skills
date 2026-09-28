@@ -7,6 +7,7 @@ import {parseYaml} from '../../engine/yaml.mjs';
 import {walk} from './check-example-work.mjs';
 import {readWorkspace, repoRootFor, resolveOwnedDirs, loadRecords} from '../example/example-ownership.mjs';
 import {slash} from '../lib/path-key.mjs';
+import {sameOrUnder} from './common.mjs';
 import {list} from '../lib/list.mjs';
 import {sha256File} from '../../engine/index.mjs';
 
@@ -197,7 +198,7 @@ function repoRootBehind(dir) {
 function resolveCodeDigestPath(rel, dirs, fallbackRoot) {
   for (const dir of dirs) {
     const key = slash(dir.rel);
-    if (rel === key || rel.startsWith(`${key}/`)) {
+    if (sameOrUnder(rel, key)) {
       const inside = rel === key ? '' : rel.slice(key.length + 1);
       return {abs: inside ? path.join(dir.abs, inside) : dir.abs, repoRoot: repoRootBehind(dir)};
     }

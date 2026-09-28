@@ -32,6 +32,7 @@ import { allocationSettings } from '../../engine/config.mjs';
 import { checkArchitecture } from './architecture/index.mjs';
 import { posixPath } from '../lib/path-key.mjs';
 import { WORKTREES_IGNORE_GLOBS } from '../lib/worktree-exclude.mjs';
+import { sameOrUnder } from './common.mjs';
 
 export const CANON_FINDINGS = 'starci/canon-findings@1';
 const skillRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
@@ -40,7 +41,7 @@ const USAGE = 'usage: canon-scan.mjs --root <repo> [--profile next|nest] [--fami
 
 const csv = (value) => String(value ?? '').split(',').map((item) => item.trim()).filter(Boolean);
 const prefixOf = (value) => posixPath(value).replace(/\/+$/, '');
-const under = (file, prefix) => file === prefix || file.startsWith(`${prefix}/`);
+const under = sameOrUnder;
 const count = (map, key) => { map[key] = (map[key] ?? 0) + 1; };
 
 export function parseCanonScanArgs(argv) {

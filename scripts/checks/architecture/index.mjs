@@ -1,5 +1,6 @@
 import path from 'node:path';
 import { canonical, loadArchitectureConfig } from './config.mjs';
+import { sameOrUnder } from '../common.mjs';
 import { buildTypeScriptContext, relativePath } from './typescript.mjs';
 import { checkBackend } from './backend.mjs';
 import { checkBackendContracts, PUBLIC_CONTRACT_RULE_ID, READONLY_BOUNDARY_RULE_ID } from './contracts.mjs';
@@ -124,7 +125,7 @@ export function checkArchitecture({ repositoryRoot, configFile, injectedTypeScri
     violations.push(...dataLifecycle.violations);
     frontendDataLifecycle = dataLifecycle.coverage;
   }
-  const inScope = item => !paths.length || (item.path && paths.some(prefix => item.path === prefix || item.path.startsWith(`${prefix.replace(/\/$/, '')}/`)));
+  const inScope = item => !paths.length || (item.path && paths.some(prefix => sameOrUnder(item.path, prefix.replace(/\/$/, ''))));
   const errors = stable(context.errors.filter(item => item.ruleId.startsWith('ARCH_TSCONFIG_') || !item.path || inScope(item)));
   const scopedViolations = stable(violations.filter(inScope));
   const sourceFiles = new Set(context.files.map(file => canonical(file.fileName)));

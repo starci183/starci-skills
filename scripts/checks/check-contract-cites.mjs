@@ -15,6 +15,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
+import { walkFiles } from './common.mjs';
 
 const HELP = `Usage: node scripts/checks/check-contract-cites.mjs [--root <tree>] [--scan <rel-path> ...] [--json]
 
@@ -49,18 +50,7 @@ export const isUnverifiable = (token) => token.includes('*') || token.includes('
 /** `.claude/x` is how an installed tree spells the runtime root this check walks. */
 const detemplate = (token) => token.replace(/^\.claude\//, '');
 
-const yamlFilesUnder = (dir) => {
-  const out = [];
-  const walk = (current) => {
-    for (const entry of fs.readdirSync(current, { withFileTypes: true }).sort((a, b) => a.name.localeCompare(b.name))) {
-      const full = path.join(current, entry.name);
-      if (entry.isDirectory()) { walk(full); continue; }
-      if (/\.(?:yaml|yml|md)$/.test(entry.name)) out.push(full);
-    }
-  };
-  walk(dir);
-  return out;
-};
+const yamlFilesUnder = (dir) => walkFiles(dir, {sorted: true, filter: name => /\.(?:yaml|yml|md)$/.test(name)});
 
 export function collectScanFiles(root, scan = DEFAULT_SCAN) {
   const files = [];

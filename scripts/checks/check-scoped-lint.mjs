@@ -14,6 +14,7 @@ import {typeScriptProgramRun} from './typescript-programs.mjs';
 import {isWorktreesPath} from '../lib/worktree-exclude.mjs';
 import {braceVariants,globExpression} from '../lib/glob.mjs';
 import {posixPath} from '../lib/path-key.mjs';
+import {isInside as inside} from './common.mjs';
 
 export const CODE_PATTERN_REPORT='starci/code-pattern-check@1';
 const PROFILE_SCHEMA='starci/code-pattern-profile@1',STATUSES=new Set(['implemented','missing','conflict']);
@@ -40,7 +41,6 @@ function sourceFiles(repository,globs){
 
 const inventoryGlobs=profile=>[...new Set([...profile.sourceGlobs,...profile.inputGlobs])].sort();
 const CONFIG_SOURCE=/\.(?:[cm]?[jt]s)$/i,CONFIG_ROOT=name=>name==='package.json'||name==='package-lock.json'||/^tsconfig(?:\..+)?\.json$/.test(name)||/^eslint\.config\.(?:js|mjs|cjs|ts)$/.test(name)||/^\.eslintrc(?:\.(?:js|cjs|json|yaml|yml))?$/.test(name);
-function inside(root,target){const relative=path.relative(root,target);return relative===''||(!path.isAbsolute(relative)&&relative!=='..'&&!relative.startsWith(`..${path.sep}`));}
 function safeRepositoryFile(repository,absolute){if(!inside(repository,absolute))return false;for(let cursor=absolute;cursor!==repository;cursor=path.dirname(cursor)){const stat=fs.lstatSync(cursor);if(stat.isSymbolicLink())throw Object.assign(Error(`Configuration input redirects through a link: ${clean(path.relative(repository,absolute))}.`),{code:'CONFIG_PATH_UNSAFE',file:clean(path.relative(repository,absolute))});if(cursor===absolute&&!stat.isFile())throw Object.assign(Error(`Configuration input is not a regular file: ${clean(path.relative(repository,absolute))}.`),{code:'CONFIG_PATH_UNSAFE',file:clean(path.relative(repository,absolute))});}return true;}
 function architectureProjectSelection(repository,configFile,result){
   if(!configFile)return {value:undefined,contextFiles:[],issues:[]};

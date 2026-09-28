@@ -10,20 +10,12 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { parseYaml } from '../../engine/yaml.mjs';
+import { isMain, walkFiles } from './common.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 
 export function moduleYamlFiles(dir = path.join(root, 'modules')) {
-  const out = [];
-  const walk = (d) => {
-    for (const e of fs.readdirSync(d, { withFileTypes: true })) {
-      const p = path.join(d, e.name);
-      if (e.isDirectory()) walk(p);
-      else if (/\.ya?ml$/i.test(e.name)) out.push(p);
-    }
-  };
-  walk(dir);
-  return out.sort();
+  return walkFiles(dir, {filter: name => /\.ya?ml$/i.test(name)}).sort();
 }
 
 export function unparseableYaml(files = moduleYamlFiles()) {
@@ -35,7 +27,7 @@ export function unparseableYaml(files = moduleYamlFiles()) {
   return bad;
 }
 
-if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+if (isMain(import.meta.url)) {
   const files = moduleYamlFiles();
   const bad = unparseableYaml(files);
   if (process.argv.includes('--json')) console.log(JSON.stringify({ ok: bad.length === 0, files: files.length, bad }, null, 2));
