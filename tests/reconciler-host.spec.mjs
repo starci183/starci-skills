@@ -5,6 +5,7 @@ import { createHostController, findOrphans, seatStateOf, goalProblem, outputOf, 
 import { hostSettings, memoryStore } from '../scripts/reconciler/services.mjs';
 import { goalTextRefusal } from '../scripts/goal/goal-text.mjs';
 
+import { fakeCtx } from '../scripts/reconciler/testing.mjs';
 // Lane D rc-host: the Host controller over a fake ctx (the shared contract of LANES.md: mode, now, ledgers, read,
 // run, api, clock, clear, openDecision, log). ctx.run and ctx.api only record, as shadow does; an active spec
 // answers them with a canned child output. Nothing here touches Orca, a process or a real ledger.
@@ -28,10 +29,10 @@ function ledgerDb({ workflows = [], jobs = [] } = {}) {
   return db;
 }
 
-function fakeCtx({ mode = 'shadow', now = T0, ledgers, dbs, runAnswer = null } = {}) {
+function hostCtx({ mode = 'shadow', now = T0, ledgers, dbs, runAnswer = null } = {}) {
   const calls = { run: [], api: [], clock: [], clear: [], decisions: [], log: [] };
   let t = now;
-  const ctx = {
+  const ctx = fakeCtx({
     mode, calls,
     now: () => t, advance: (ms) => { t += ms; },
     ledgers: ledgers ?? [{ ledgerId: 'nivo-backend', repo: 'D:/Repositories/nivo-backend', file: 'D:/Repositories/nivo-backend/.starciwork/runtime.sqlite' }],
@@ -43,7 +44,7 @@ function fakeCtx({ mode = 'shadow', now = T0, ledgers, dbs, runAnswer = null } =
     openDecision: async (di) => { calls.decisions.push(di); return { ok: true }; },
     log: (kind, msg, data) => { calls.log.push({ kind, msg, data }); },
     owns: () => false,
-  };
+  });
   return ctx;
 }
 
@@ -84,7 +85,7 @@ test('shadow: probe action=restart-needed -> the --repair replace is recorded, n
   const dbs = { 'nivo-backend': ledgerDb({ workflows: [{ id: 'wf-nivo-fe-canon', goal: GOAL }] }) };
   const store = memoryStore();
   const c = booted(controller({ store: () => store, probeSeat: async () => ({ ok: true, action: 'restart-needed' }) }));
-  const ctx = fakeCtx({ dbs });
+  const ctx = hostCtx({ dbs });
   const r = await c.reconcile(SEAT, ctx);
   assert.equal(r.action, 'restart-needed');
   assert.equal(r.replaced, true);
@@ -99,7 +100,7 @@ test('shadow: probe action=restart-needed -> the --repair replace is recorded, n
 test('shadow: a live Kernel records no repair at all', async () => {
   const dbs = { 'nivo-backend': ledgerDb({ workflows: [{ id: 'wf-nivo-fe-canon', goal: GOAL }] }) };
   const c = booted(controller({ probeSeat: async () => ({ ok: true, action: 'active' }) }));
-  const ctx = fakeCtx({ dbs });
+  const ctx = hostCtx({ dbs });
   const r = await c.reconcile(SEAT, ctx);
   assert.equal(r.seat, 'live');
   assert.equal(ctx.calls.run.length, 0);
@@ -109,7 +110,7 @@ test('active: watchdog --once --repair runs through ctx.run and its action=resta
   const dbs = { 'nivo-backend': ledgerDb({ workflows: [{ id: 'wf-nivo-fe-canon', goal: GOAL }] }) };
   const store = memoryStore();
   const c = booted(controller({ store: () => store, probeSeat: async () => assert.fail('active mode does not probe first') }));
-  const ctx = fakeCtx({ dbs, mode: 'active', runAnswer: () => ({ ok: true, stdout: '{"ok":true,"action":"restarted"}' }) });
+  const ctx = hostCtx({ dbs, mode: 'active', runAnswer: () => ({ ok: true, stdout: '{"ok":true,"action":"restarted"}' }) });
   for (let i = 0; i < 3; i += 1) { const r = await c.reconcile(SEAT, ctx); assert.equal(r.replaced, true); ctx.advance(60_000); }
   assert.equal(ctx.calls.decisions.length, 0);
   const r4 = await c.reconcile(SEAT, ctx);
@@ -129,7 +130,7 @@ test('null goal -> no seat, one DI goal-text-missing for the Supervisor', async 
   let probed = 0;
   const c = booted(controller({ probeSeat: async () => { probed += 1; return { action: 'restart-needed' }; } }));
   for (const mode of ['shadow', 'active']) {
-    const ctx = fakeCtx({ dbs, mode });
+    const ctx = hostCtx({ dbs, mode });
     const r1 = await c.reconcile(SEAT, ctx);
     await c.reconcile(SEAT, ctx);
     assert.equal(r1.refused, 'goal-text-unresolved');
@@ -140,7 +141,7 @@ test('null goal -> no seat, one DI goal-text-missing for the Supervisor', async 
   }
   assert.equal(probed, 0);
   const missing = { 'nivo-backend': ledgerDb({ workflows: [{ id: 'wf-nivo-fe-canon' }] }) };
-  const ctx = fakeCtx({ dbs: missing });
+  const ctx = hostCtx({ dbs: missing });
   assert.equal((await booted(controller()).reconcile(SEAT, ctx)).refused, 'goal-text-missing', 'no goal row at all is refused too');
 });
 
@@ -159,7 +160,7 @@ test('an orphan watchdog of a temp repo -> stop planned + ORPHAN_PROCESS clock; 
 
   const dbs = { 'nivo-backend': ledgerDb({ workflows: [{ id: 'wf-nivo-fe-canon', goal: GOAL }] }) };
   const c = controller({ listProcesses: async () => procs });
-  const ctx = fakeCtx({ dbs });
+  const ctx = hostCtx({ dbs });
   const r = await c.reconcile('host:processes', ctx);
   assert.deepEqual(r.orphans.map((o) => o.pid), [101, 105]);
   const kills = ctx.calls.run.filter((x) => x.cmd === 'taskkill.exe');
@@ -179,7 +180,7 @@ test('an orphan watchdog of a temp repo -> stop planned + ORPHAN_PROCESS clock; 
 test('the runaway shim chains hostVerdict marks safe are stopped; the terminal count drift is a clock', async () => {
   const dbs = { 'nivo-backend': ledgerDb({ workflows: [{ id: 'wf-a', goal: GOAL }], jobs: [{ id: 'j1', status: 'running', worker: 't1' }, { id: 'j2', status: 'settled', worker: 't2' }] }) };
   const c = controller({ listProcesses: async () => [{ pid: 1 }], hostVerdict: async () => ({ stop: [{ kind: 'guard-shim-recursion', rootPid: 777 }], alert: false }), orcaTerminals: async () => 9 });
-  const ctx = fakeCtx({ dbs });
+  const ctx = hostCtx({ dbs });
   const r = await c.reconcile('host:processes', ctx);
   assert.deepEqual(r.stopped, [{ kind: 'guard-shim-recursion', pid: 777 }]);
   assert.deepEqual(r.terminals, { count: 9, expected: 1 + 1 + 1 + S.processes.terminalSlack, seats: 2, workers: 1 });
@@ -190,7 +191,7 @@ test('boot: waits for Orca, then services in order, dedupe (dry-run in shadow), 
   const dbs = { 'nivo-backend': ledgerDb({ workflows: [{ id: 'wf-a', goal: GOAL }] }) };
   let orcaUp = false;
   const c = controller({ registry: () => noopRegistry((n) => (n === 'orca' ? orcaUp : true)), probeSeat: async () => ({ action: 'active' }) });
-  const ctx = fakeCtx({ dbs });
+  const ctx = hostCtx({ dbs });
   assert.deepEqual((await c.list(ctx)).slice(0, 2), ['host:boot', 'service:orca']);
   assert.deepEqual(await c.reconcile('seat:kernel:nivo-backend:wf-a', ctx), { ok: true, deferred: 'boot' }, 'no seat before the boot dedupe');
   const down = await c.reconcile('host:boot', ctx);
@@ -210,7 +211,7 @@ test('boot: waits for Orca, then services in order, dedupe (dry-run in shadow), 
 test('Orca failed -> healthy asks for the boot order again', async () => {
   let orcaUp = false;
   const c = booted(controller({ registry: () => noopRegistry((n) => (n === 'orca' ? orcaUp : true)) }));
-  const ctx = fakeCtx({ dbs: { 'nivo-backend': ledgerDb() } });
+  const ctx = hostCtx({ dbs: { 'nivo-backend': ledgerDb() } });
   await c.reconcile('service:orca', ctx);
   assert.equal(c._state.bootPending, false);
   orcaUp = true; ctx.advance(60_000);
@@ -222,7 +223,7 @@ test('a service that keeps failing: its start goes through ctx.run, then a quara
   const store = memoryStore();
   const reg = () => noopRegistry((n) => n !== 'telegram-bridge').map((e) => ({ ...e, startTimeoutMs: 1 }));
   const c = booted(controller({ store: () => store, registry: reg }));
-  const ctx = fakeCtx({ dbs: { 'nivo-backend': ledgerDb() } });
+  const ctx = hostCtx({ dbs: { 'nivo-backend': ledgerDb() } });
   for (let i = 0; i < 20; i += 1) { await c.reconcile('service:telegram-bridge', ctx); ctx.advance(60_000); }
   const starts = ctx.calls.run.filter((r) => r.args.join(' ') === 'scripts/reconciler/services.mjs --start telegram-bridge --json');
   assert.equal(starts.length, 5);
@@ -239,7 +240,7 @@ test('ledger health: a failed quick_check is LEDGER_CORRUPT + one DI; the nightl
   const ledgers = [{ ledgerId: 'nivo-backend', repo: 'D:/r', file: 'D:/r/.starciwork/runtime.sqlite' }];
   let ok = false;
   const c = controller({ quickCheck: () => (ok ? { ok: true, result: ['ok'] } : { ok: false, result: ['*** in database main ***', 'page 7: btree'] }), backupDue: () => true });
-  const ctx = fakeCtx({ ledgers, dbs: { 'nivo-backend': ledgerDb() } });
+  const ctx = hostCtx({ ledgers, dbs: { 'nivo-backend': ledgerDb() } });
   await c.reconcile('ledger:nivo-backend', ctx);
   assert.ok(ctx.calls.clock.some((x) => x.code === 'LEDGER_CORRUPT' && x.severity === 'critical'));
   assert.equal(ctx.calls.decisions.length, 1);
@@ -259,10 +260,10 @@ test('ledger health: a failed quick_check is LEDGER_CORRUPT + one DI; the nightl
 });
 
 test('the supervisor seat runs its watchdog pass through ctx.run; chat mode runs nothing', async () => {
-  const ctx = fakeCtx({ dbs: { 'nivo-backend': ledgerDb() } });
+  const ctx = hostCtx({ dbs: { 'nivo-backend': ledgerDb() } });
   await booted(controller()).reconcile('seat:supervisor', ctx);
   assert.deepEqual(ctx.calls.run.map((r) => r.args), [['scripts/supervisor/watchdog.mjs', '--once', '--json']]);
-  const chat = fakeCtx({ dbs: { 'nivo-backend': ledgerDb() } });
+  const chat = hostCtx({ dbs: { 'nivo-backend': ledgerDb() } });
   assert.equal((await booted(controller({ supervisorMode: async () => 'chat' })).reconcile('seat:supervisor', chat)).skipped, 'chat-mode');
   assert.equal(chat.calls.run.length, 0);
 });

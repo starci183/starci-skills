@@ -125,7 +125,7 @@ export function createCtx({
     if (!(seen != null && at - seen < WOULD_DEDUPE_MS)) {
       shared.wouldSeen.set(digest, at);
       if (shared.wouldSeen.size > 5000) for (const [k, v] of shared.wouldSeen) if (at - v >= WOULD_DEDUPE_MS) shared.wouldSeen.delete(k);
-      log('reconciler.would', `${controller} would run ${verb} ${clip(argv.join(' '), 200)}`, { verb, argv: clip(argv.join(' '), 1000), mode, digest, ...extra });
+      log('reconciler.would', `${controller} would ${verb} ${clip(argv.join(' '), 200)}`, { verb, argv: clip(argv.join(' '), 1000), mode, digest, ...extra });
     }
     return { ok: true, shadow: true };
   };

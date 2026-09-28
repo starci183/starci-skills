@@ -8,6 +8,9 @@
 //                        mode) and `apiResult(call)` / `runResult(call)` / `decisionResult(di)` in active. `status` is a
 //                        map `${ledgerId}:${workflowId}` -> value, or a function. `read(ledgerId, fn)` runs fn over
 //                        `dbs[ledgerId]` (e.g. a DatabaseSync on a fixture ledger). `owns` defaults to mode === 'active'.
+//                        Any other member (read, api, clock, log, ...) passed in `overrides` replaces the default, so a
+//                        spec keeps its own recorders and still gets the whole ctx contract (env, stateDb, stateFile,
+//                        key, epoch, openReader).
 //   tempState()          a reconciler.sqlite in a fresh temp directory: {dir, file, env, db, own(x), close()}; close()
 //                        closes every own()ed handle first, then removes the directory.
 import fs from 'node:fs';
@@ -19,14 +22,16 @@ export function fakeCtx(overrides = {}) {
   const {
     mode = 'shadow', controller = 'test', key = null, now = () => Date.now(), ledgers = [{ ledgerId: 'test', repo: os.tmpdir(), file: path.join(os.tmpdir(), 'none.sqlite') }],
     status = {}, dbs = {}, apiResult = () => ({ ok: true, value: { ok: true } }), runResult = () => ({ ok: true, value: { ok: true } }),
-    decisionResult = () => ({ ok: true }), owns = null, epoch = 1, ...rest
+    decisionResult = () => ({ ok: true }), owns = null, epoch = 1, env = process.env, stateDb = undefined, stateFile = null, ...rest
   } = overrides;
   const calls = { api: [], run: [], decisions: [], log: [], clock: [], clear: [], status: [] };
   const clocks = new Map();
   const ctx = {
-    controller, key, mode, epoch, ledgers, calls, clocks,
+    controller, key, mode, epoch, ledgers, calls, clocks, env, stateFile,
+    ...(stateDb !== undefined ? { stateDb } : {}),
     now: typeof now === 'function' ? now : () => now,
     read(ledgerId, fn) { const db = dbs[ledgerId]; return db ? fn(db) : null; },
+    openReader: (file) => { throw Error(`fakeCtx.openReader(${file}): pass dbs or an openReader override`); },
     async status(ledgerId, workflowId) {
       calls.status.push({ ledgerId, workflowId });
       return typeof status === 'function' ? status(ledgerId, workflowId) : status[`${ledgerId}:${workflowId}`] ?? null;

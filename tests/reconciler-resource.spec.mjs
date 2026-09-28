@@ -2,13 +2,16 @@
 // mode hysteresis, the single writer of the throttle state (shadow writes nothing), fair-share slot targets, the
 // quota probe and the quota-exhausted / cap-starved Decision Items. Every host seam is injected; the throttle state
 // lives in a temp file.
-import test from 'node:test';
+import test, { after } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { createResourceController, fairShare, quotaExhausted, starvedWorkflows, HOST_KEY } from '../scripts/reconciler/controllers/resource.mjs';
 
+import { fakeCtx } from '../scripts/reconciler/testing.mjs';
+const TMP = fs.mkdtempSync(path.join(os.tmpdir(), 'rc-resource-spec-'));
+after(() => fs.rmSync(TMP, { recursive: true, force: true }));
 const T = 2_000_000_000_000;
 const GB = 1024 ** 3;
 const SETTINGS = { resources: { minFreeRamPct: 10, ramThrottle: { heavyResumeAbovePct: 15, landSpecPauseBelowPct: 2.5, landSpecResumeAbovePct: 5, hardFloorPct: 2.5 },
@@ -17,15 +20,15 @@ const SETTINGS = { resources: { minFreeRamPct: 10, ramThrottle: { heavyResumeAbo
 function ctxOf(mode, extra = {}) {
   const calls = { api: [], log: [], decisions: [], clocks: [] };
   let now = T;
-  const ctx = { mode, now: () => now, ledgers: [{ ledgerId: 'nivo-backend', repo: 'D:/r' }, { ledgerId: 'supervisor' }], read: () => null,
+  const ctx = fakeCtx({ mode, now: () => now, ledgers: [{ ledgerId: 'nivo-backend', repo: 'D:/r' }, { ledgerId: 'supervisor' }], read: () => null,
     api: async (...a) => { calls.api.push(a); return { ok: true, shadow: mode !== 'active' }; }, run: async () => ({ ok: true }),
     clock: (...a) => calls.clocks.push(['clock', ...a]), clear: (...a) => calls.clocks.push(['clear', ...a]),
-    openDecision: async (di) => { calls.decisions.push(di); return { ok: true }; }, log: (kind, msg, data) => calls.log.push({ kind, msg, data }), owns: () => false, ...extra };
+    openDecision: async (di) => { calls.decisions.push(di); return { ok: true }; }, log: (kind, msg, data) => calls.log.push({ kind, msg, data }), owns: () => false, ...extra });
   return { ctx, calls, advance: (ms) => { now += ms; } };
 }
 
 function controller({ pct = () => 50, ops = () => [], priorities = null, file = null } = {}) {
-  const stateFile = file ?? path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'rc-resource-')), 'ram-throttle.json');
+  const stateFile = file ?? path.join(fs.mkdtempSync(path.join(TMP, 'rc-resource-')), 'ram-throttle.json');
   const footprints = [];
   const settings = priorities ? { ...SETTINGS, resources: { ...SETTINGS.resources, ramThrottle: { ...SETTINGS.resources.ramThrottle, priorities } } } : SETTINGS;
   const c = createResourceController({ settings: async () => settings, maxParallelOps: async () => 20, stateFile,

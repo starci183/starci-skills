@@ -7,13 +7,14 @@ import path from 'node:path';
 import { createGcController, parseKey, ROUTES } from '../scripts/reconciler/controllers/gc.mjs';
 import { classifyLeases, planLaneLogs, collectLaneLogs, runGc, COLLECTORS } from '../scripts/supervisor/gc.mjs';
 
+import { fakeCtx } from '../scripts/reconciler/testing.mjs';
 const T = 2_000_000_000_000;
 const REPO = 'D:/Repositories/nivo-backend';
 
 /** A ctx per the reconciler contract (lane A testing.mjs fakeCtx shape), recording every actuator call. */
 function ctxOf(mode, extra = {}) {
   const calls = { run: [], api: [], log: [], decisions: [], clocks: [] };
-  const ctx = {
+  const ctx = fakeCtx({
     mode, now: () => T, ledgers: [{ ledgerId: 'nivo-backend', repo: REPO, file: `${REPO}/.starci/ledger.sqlite` }, { ledgerId: 'supervisor', repo: null, file: null }],
     read: () => null, status: () => null,
     api: async (...a) => { calls.api.push(a); return mode === 'active' ? { ok: true } : { ok: true, shadow: true }; },
@@ -21,7 +22,7 @@ function ctxOf(mode, extra = {}) {
     clock: (...a) => calls.clocks.push(['clock', ...a]), clear: (...a) => calls.clocks.push(['clear', ...a]),
     openDecision: async (di) => { calls.decisions.push(di); return { ok: true }; },
     log: (kind, msg, data) => calls.log.push({ kind, msg, data }), owns: () => mode === 'active', ...extra,
-  };
+  });
   return { ctx, calls };
 }
 
