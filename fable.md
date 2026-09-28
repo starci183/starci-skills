@@ -569,7 +569,7 @@ Hai bước còn đỏ trên tree hiện tại, để nguyên vì là drift th�
   Profile `next` thêm `CANON_VERSION_MISMATCH`: `modules/models/code-patterns.yaml:456` pin
   fe canon `3.0.2`, `packages/eslint/fe/package.json:3` là `3.1.0` (lane C).
 - `modules/ops/ops/uat.verify.yaml:165` khai evidence dưới `E/`; harness thật
-  `examples/todo-app-frontend/e2e/lib/paths.ts:36` ghi `runs/<runId>/...` không có `E/` (lane H
+  `examples/todo-app-frontend/uat/lib/paths.ts:36` ghi `runs/<runId>/...` không có `E/` (lane H
   khi migrate op).
 - 18 `.webm` UAT tracked dưới `.starciwork/**/videos/`: là evidence sinh bằng runner, giữ.
 
