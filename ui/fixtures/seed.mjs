@@ -76,7 +76,9 @@ try {
   const db = a.ledger;
   db.write.createUnit({ workflowId: 'wf-stuck', unitId: 'unit-failed', opId: 'code.refactor', subjectKey: 'source-a', goalRevision: 1, title: 'Compile source', createdAt: fixedNow - 3400000 });
   db.write.createUnit({ workflowId: 'wf-stuck', unitId: 'unit-blocked', opId: 'interface.implement', subjectKey: 'screen-b', goalRevision: 1, title: 'Blocked screen', createdAt: fixedNow - 3400000 });
-  db.write.addUnitEdge({ workflowId: 'wf-stuck', fromUnit: 'unit-failed', toUnit: 'unit-blocked', kind: 'after', source: 'seed', createdAt: fixedNow - 3300000 });
+  if (!db.write.addUnitEdge({ workflowId: 'wf-stuck', fromUnit: 'unit-failed', toUnit: 'unit-blocked', kind: 'after', source: 'plan', createdAt: fixedNow - 3300000 })) {
+    throw Error('Seed dependency edge was not written');
+  }
   db.write.createUnit({ workflowId: 'wf-under-dispatched', unitId: 'unit-ready', opId: 'code.refactor', subjectKey: 'ready', goalRevision: 1, title: 'Ready to dispatch', createdAt: fixedNow - 3300000 });
   db.write.enqueueJob({ jobId: 'job-ready', workflowId: 'wf-under-dispatched', unitId: 'unit-ready', opId: 'code.refactor', createdAt: fixedNow - 3200000 });
   db.write.setJobStatus({ jobId: 'job-ready', to: 'ready', at: fixedNow - 3100000 });
