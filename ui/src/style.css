@@ -181,7 +181,7 @@ button:focus-visible, a:focus-visible, input:focus-visible, [tabindex]:focus-vis
 .mobile-row-fields > div { display: flex; justify-content: space-between; gap: 16px; }
 .mobile-row-fields dt { color: var(--muted-foreground); }
 .mobile-row-fields dd { margin: 0; text-align: right; overflow-wrap: anywhere; }
-.drawer-panel { position: fixed !important; top: 0 !important; right: 0 !important; left: auto !important; display: flex !important; width: min(100vw, 480px) !important; max-width: none !important; height: 100dvh !important; transform: none !important; flex-direction: column; gap: 0; border-radius: 0 !important; border-left: 1px solid var(--border); padding: 0 !important; }
+.drawer-panel { position: fixed !important; top: 0 !important; right: 0 !important; left: auto !important; display: flex !important; width: min(100vw, 480px) !important; max-width: none !important; height: 100dvh !important; transform: none !important; --tw-translate-x: 0px !important; --tw-translate-y: 0px !important; flex-direction: column; gap: 0; border-radius: 0 !important; border-left: 1px solid var(--border); padding: 0 !important; }
 .drawer-panel [data-slot=dialog-header] { border-bottom: 1px solid var(--border); padding: 24px; }
 .drawer-body { min-height: 0; overflow-y: auto; padding: 20px 24px 32px; }
 .search-dialog { width: min(100% - 24px, 580px) !important; max-width: 580px !important; }
