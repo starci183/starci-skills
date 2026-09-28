@@ -3,7 +3,7 @@ import path from 'node:path';
 import { createRequire } from 'node:module';
 import { canonical, isInside, slash } from './config.mjs';
 import { sameOrUnder } from '../common.mjs';
-import { createTypeScriptProgram, sharedInProgramRun } from '../typescript-programs.mjs';
+import { createTypeScriptProgram, readTypeScriptProject, sharedInProgramRun, typeScriptProjectReferencePath } from '../typescript-programs.mjs';
 import { readJsonFile } from '../../lib/json.mjs';
 
 const CODE_EXTENSIONS = /\.(?:[cm]?[jt]sx?)$/i;
@@ -280,21 +280,19 @@ function typeScriptContext(config, loaded, paths) {
       invalidProjects.add(relative);
       continue;
     }
-    const read = ts.readConfigFile(configFile, ts.sys.readFile);
+    const { read, parsed } = readTypeScriptProject(ts, configFile);
     if (read.error) {
       errors.push(compilerError(ts, config.root, read.error, relative));
       invalidProjects.add(relative);
       continue;
     }
-    const parsed = ts.parseJsonConfigFileContent(read.config, ts.sys, path.dirname(configFile), undefined, configFile);
     if (parsed.errors.length) {
       errors.push(...parsed.errors.map(item => compilerError(ts, config.root, item, relative)));
       invalidProjects.add(relative);
       continue;
     }
     for (const reference of parsed.projectReferences ?? []) {
-      const referencedFile = ts.resolveProjectReferencePath ? ts.resolveProjectReferencePath(reference)
-        : (path.extname(reference.path) ? reference.path : path.join(reference.path, 'tsconfig.json'));
+      const referencedFile = typeScriptProjectReferencePath(ts, reference);
       const absoluteReference = path.resolve(referencedFile);
       if (!isInside(config.root, absoluteReference)) {
         errors.push({ ruleId: 'ARCH_TSCONFIG_REFERENCE_OUTSIDE', project: relative, message: `Project reference leaves the repository: ${slash(path.relative(config.root, absoluteReference))}.` });
@@ -318,8 +316,7 @@ function typeScriptContext(config, loaded, paths) {
       if (selected.has(relative)) return;
       selected.add(relative);
       for (const reference of parsedProjects.get(relative)?.projectReferences ?? []) {
-        const referencedFile = ts.resolveProjectReferencePath ? ts.resolveProjectReferencePath(reference)
-          : (path.extname(reference.path) ? reference.path : path.join(reference.path, 'tsconfig.json'));
+        const referencedFile = typeScriptProjectReferencePath(ts, reference);
         const referenced = slash(path.relative(config.root, path.resolve(referencedFile)));
         if (parsedProjects.has(referenced)) visit(referenced);
       }

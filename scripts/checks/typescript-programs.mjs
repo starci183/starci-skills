@@ -1,4 +1,5 @@
 import { AsyncLocalStorage } from 'node:async_hooks';
+import path from 'node:path';
 
 // One TypeScript program per (compiler, root names, compiler options, project references) inside a program run, and
 // one value per (kind, compiler, input) for what callers derive from those programs (the architecture context).
@@ -52,4 +53,18 @@ export function sharedInProgramRun(kind, ts, input, build) {
 export function createTypeScriptProgram(ts, { rootNames, options, projectReferences }) {
   return sharedInProgramRun('program', ts, { rootNames, options, projectReferences },
     () => ts.createProgram({ rootNames, options, projectReferences }));
+}
+
+/** Read and expand a tsconfig with the caller's TypeScript compiler and optional tracked file reader. */
+export function readTypeScriptProject(ts, configFile, readFile = ts.sys.readFile) {
+  const read = ts.readConfigFile(configFile, readFile);
+  if (read.error) return { read, parsed: null };
+  const host = readFile === ts.sys.readFile ? ts.sys : { ...ts.sys, readFile };
+  return { read, parsed: ts.parseJsonConfigFileContent(read.config, host, path.dirname(configFile), undefined, configFile) };
+}
+
+/** Resolve a project reference with the compiler's API, including older compiler fallback. */
+export function typeScriptProjectReferencePath(ts, reference) {
+  if (typeof ts.resolveProjectReferencePath === 'function') return ts.resolveProjectReferencePath(reference);
+  return path.extname(reference.path) ? reference.path : path.join(reference.path, 'tsconfig.json');
 }

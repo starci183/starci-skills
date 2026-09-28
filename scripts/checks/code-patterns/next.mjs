@@ -6,7 +6,7 @@ import { isInside, slash } from '../architecture/config.mjs';
 import { loadTargetTypeScript } from '../architecture/typescript.mjs';
 import { compilerIdentity, propertyName, repositoryPath, symbolAt, unalias, unwrap } from './common.mjs';
 import { frameworkMandatedExports } from '../architecture/framework-pinned.mjs';
-import { createTypeScriptProgram } from '../typescript-programs.mjs';
+import { createTypeScriptProgram, readTypeScriptProject, typeScriptProjectReferencePath } from '../typescript-programs.mjs';
 
 export const NEXT_SCRIPT_RULES = Object.freeze([
   'FE_READONLY_PROPS_CONTRACT',
@@ -1154,11 +1154,6 @@ function canonicalFile(file) {
   try { return path.resolve(fs.realpathSync(file)); } catch { return path.resolve(file); }
 }
 
-function projectReferencePath(ts, reference) {
-  if (typeof ts.resolveProjectReferencePath === 'function') return ts.resolveProjectReferencePath(reference);
-  return path.extname(reference.path) ? reference.path : path.join(reference.path, 'tsconfig.json');
-}
-
 function buildProjectAssignments(repository, compiler, authority, selected, errors) {
   const projects = [];
   const queue = [...authority.projects];
@@ -1170,18 +1165,17 @@ function buildProjectAssignments(repository, compiler, authority, selected, erro
     let absolute;
     try { absolute = repositoryPath(repository, relative, `TypeScript project ${relative}`); }
     catch (error) { errors.push({ path: relative, message: error.message }); continue; }
-    const read = compiler.ts.readConfigFile(absolute, compiler.ts.sys.readFile);
+    const { read, parsed } = readTypeScriptProject(compiler.ts, absolute);
     if (read.error) {
       errors.push({ path: relative, message: 'TypeScript project config cannot be read; Next pattern coverage is unavailable.' });
       continue;
     }
-    const parsed = compiler.ts.parseJsonConfigFileContent(read.config, compiler.ts.sys, path.dirname(absolute), undefined, absolute);
     if (parsed.errors.length) {
       errors.push({ path: relative, message: 'TypeScript project config is invalid; Next pattern coverage is unavailable.' });
       continue;
     }
     for (const reference of parsed.projectReferences ?? []) {
-      const target = path.resolve(projectReferencePath(compiler.ts, reference));
+      const target = path.resolve(typeScriptProjectReferencePath(compiler.ts, reference));
       if (!isInside(repository, target)) {
         errors.push({ path: relative, message: 'TypeScript project reference leaves the repository.' });
         continue;
@@ -1307,4 +1301,3 @@ export function checkNextPatterns({ root, files, ruleIds, contextFiles, architec
   stable(result.errors);
   return result;
 }
-

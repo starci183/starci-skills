@@ -6,6 +6,7 @@ import { spawnSync } from 'node:child_process';
 import { sha256 } from '../../../engine/index.mjs';
 import { isInside, slash } from '../architecture/config.mjs';
 import { loadTargetTypeScript } from '../architecture/typescript.mjs';
+import { readTypeScriptProject } from '../typescript-programs.mjs';
 import { plain, repositoryPath } from './common.mjs';
 
 export const NEST_METADATA_RULES = Object.freeze(['NEST_JEST_ALIAS_PARITY', 'NEST_TEST_DISCOVERY']);
@@ -141,9 +142,8 @@ export function discoverNestMetadataInputs({ root, files = [], contextFiles = []
     };
     for (const item of projects) {
       const absolute = safeFile(root, item.tsconfig);
-      const read = ts.readConfigFile(absolute, addRead);
+      const { read, parsed } = readTypeScriptProject(ts, absolute, addRead);
       if (read.error) throw Error(`Cannot parse ${item.tsconfig}.`);
-      const parsed = ts.parseJsonConfigFileContent(read.config, { ...ts.sys, readFile: addRead }, path.dirname(absolute), undefined, absolute);
       const invalid = parsed.errors.filter(error => error.code !== 18003);
       if (invalid.length) throw Error(`Invalid TypeScript project ${item.tsconfig}: ${ts.flattenDiagnosticMessageText(invalid[0].messageText, '\n')}`);
       item.options = parsed.options;
