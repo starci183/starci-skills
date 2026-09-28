@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { ArrowRight, Activity, CircleAlert, Radio } from 'lucide-react';
 import { useApiQuery } from '../../api/query';
 import type { AttemptRow, FleetView, WorkflowRow } from '../../contract';
@@ -34,9 +35,14 @@ function WorkflowCard({ row }: { row: WorkflowRow }) {
 }
 
 export function FleetPage() {
+  const [project, setProject] = useState('all');
   const fleet = useApiQuery<FleetView>('/api/fleet', { topics: ['fleet', 'decisions', 'system'], intervalMs: 20_000 });
+  const projects = useApiQuery<{ id: string; name: string; product: string | null }[]>('/api/projects', { topics: ['fleet'], intervalMs: 60_000 });
+  const workflows = useApiQuery<WorkflowRow[]>('/api/workflows?phase=all&limit=200', { topics: ['fleet'], intervalMs: 20_000 });
   const attempts = useApiQuery<AttemptRow[]>('/api/attempts?active=1&limit=200', { topics: ['fleet'], intervalMs: 20_000 });
   const data = fleet.data;
+  const allWorkflows = workflows.data ?? data?.workflows ?? [];
+  const visibleWorkflows = allWorkflows.filter(row => project === 'all' || row.project === project);
   const activeAttempts = (attempts.data ?? []).filter(item => item.settledAt == null && item.dispatchedAt != null);
   const summary = data ? `${data.counts.live} luồng đang chạy · ${data.counts.bad} cần xử lý · ${data.counts.ownerDecisions} việc chờ thầy` : 'Đang đọc tình hình…';
   return <div className="mx-auto flex w-full max-w-6xl min-w-0 flex-col gap-6 p-4 pb-24 sm:p-6 lg:p-8">
@@ -51,9 +57,9 @@ export function FleetPage() {
     <ConceptBlock concept="C7" as="section"><div className="mb-3 flex items-center gap-2"><Radio className="size-4" aria-hidden="true" /><h2 className="font-semibold">Đang thực thi</h2><span className="text-sm text-muted-foreground">{activeAttempts.length}{attempts.meta?.next ? '+' : ''}</span></div>
       <Card><CardContent className="divide-y">{activeAttempts.map(item => <a key={`${item.project}-${item.id}`} href={item.href} className="flex min-w-0 items-center gap-3 py-3 first:pt-0 last:pb-0 hover:text-primary"><StateChip state={item.ui} compact /><span className="min-w-0 flex-1"><span className="block truncate text-sm font-medium">{item.op} · {item.unit ?? item.job}</span><span className="block truncate text-xs text-muted-foreground">{item.project} / {item.wf} · {item.agent ?? 'agent chưa rõ'} / {item.model ?? 'model chưa rõ'}</span></span><ArrowRight className="size-4 shrink-0" aria-hidden="true" /></a>)}{!activeAttempts.length && <p className="py-3 text-sm text-muted-foreground">{attempts.loading ? 'Đang đọc…' : 'Không có lần thử đang thực thi.'}</p>}</CardContent></Card>
     </ConceptBlock>
-    <ConceptBlock concept="C2" as="section"><div className="mb-3 flex items-center justify-between"><h2 className="font-semibold">Workflow</h2><span className="text-xs text-muted-foreground">{data?.workflows.length ?? 0} luồng</span></div>
-      <div className="grid gap-3">{data?.workflows.map(row => <WorkflowCard key={`${row.project}/${row.id}`} row={row} />) ?? null}
-        {data && data.workflows.length === 0 && <p className="rounded-xl border p-5 text-sm text-muted-foreground">Không có workflow đang hoạt động.</p>}</div>
+    <ConceptBlock concept="C2" as="section"><div className="mb-3 flex flex-wrap items-center justify-between gap-2"><h2 className="font-semibold">Workflow</h2><div className="flex items-center gap-2"><span className="text-xs text-muted-foreground">{visibleWorkflows.length}{workflows.meta?.next ? '+' : ''} luồng</span><label className="sr-only" htmlFor="fleet-project">Dự án</label><select id="fleet-project" value={project} onChange={event => setProject(event.target.value)} className="h-8 rounded-lg border bg-background px-2 text-xs"><option value="all">Mọi dự án</option>{projects.data?.map(item => <option key={item.id} value={item.id}>{item.name}</option>)}</select></div></div>
+      <div className="grid gap-3">{visibleWorkflows.map(row => <WorkflowCard key={`${row.project}/${row.id}`} row={row} />)}
+        {(workflows.data || data) && visibleWorkflows.length === 0 && <p className="rounded-xl border p-5 text-sm text-muted-foreground">Không có workflow phù hợp.</p>}</div>
     </ConceptBlock>
   </div>;
 }
