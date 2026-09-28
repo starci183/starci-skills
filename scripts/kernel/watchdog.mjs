@@ -203,18 +203,6 @@ const replaceWakeDeadKernel = ({ phase, terminal, stale, outputAgeMs, misses, fi
 };
 
 
-// TEMPORARY: dead since the Resource controller owns resource.quota; kept only until lane slim-11 lands its edit of
-// tests/qwen-base-pool.spec.mjs, then deleted with that spec case (lane rc-cleanup).
-// The base pool (Qwen) is blocked only while its quota circuit is open. Every --repair tick asks the
-// api to run the recovery probe of each open quota circuit of this ledger; the api throttles it to
-// one real 1-token completion per probe interval (and one right after the plan reset), so
-// several watchdogs on one ledger never multiply the probes.
-export const probeQuotaCircuits = ({ run = (args) => runNodeJson(apiFile, args), repoPath = repo, workflow = workflowId } = {}) => {
-  const r = run(['provider-health', '--repo', path.resolve(repoPath), '--quota-probe', '--workflow', workflow, '--json']);
-  const probed = (r.value?.results ?? []).filter((x) => x.probed);
-  return r.ok ? (probed.length ? probed.map((x) => ({ provider: x.provider, recovered: x.recovered, state: x.probe?.state ?? null })) : null)
-    : [{ ok: false, error: String(r.stderr || r.stdout || r.error || '').slice(0, 300) }];
-};
 
 export async function watchdogTick() {
   return statusTick();

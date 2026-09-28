@@ -136,7 +136,7 @@ test('footprint sample: agent and op process groups count, the rest do not', () 
   assert.deepEqual(s.runningByPool, { 'devin-agent': 2 });
 });
 
-test('hostThrottle: a fake host sample drives admission and the hysteresis persists across dispatch processes', (t) => {
+test('hostThrottle: a fake host sample drives admission; the dispatch path never writes the mode (the Resource controller does)', (t) => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'starci-ram-throttle-'));
   t.after(() => fs.rmSync(dir, { recursive: true, force: true }));
   const stateFile = path.join(dir, 'ram-throttle.json');
@@ -145,9 +145,7 @@ test('hostThrottle: a fake host sample drives admission and the hysteresis persi
   assert.equal(first.mode, 'heavy-paused');
   assert.equal(first.admission.ok, false);
   assert.equal(first.admission.reason, 'heavy-paused');
-  assert.equal(readThrottleState(stateFile).mode, 'heavy-paused');
-  // 13% is above the 10% floor but not the 15% resume line: still paused.
-  assert.equal(hostThrottle({ op: 'code.refactor', workflowId: 'wf-a', env: env(13), stateFile }).admission.reason, 'heavy-paused');
+  assert.equal(readThrottleState(stateFile).mode, undefined, 'nothing written: the hysteresis state is the Resource controller\'s');
   const back = hostThrottle({ op: 'code.refactor', workflowId: 'wf-a', env: env(20), stateFile });
   assert.equal(back.mode, 'normal');
   assert.equal(back.admission.ok, true);

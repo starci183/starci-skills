@@ -20,7 +20,6 @@ import { selectPool, kindRoute, providerCircuitOf } from '../scripts/agent/model
 import { quotaSpecOf, quotaExhaustedInText, outageOnScreen, quotaProbeProviders } from '../scripts/agent/provider-outage.mjs';
 import { probeProviderQuota, orcaAccountQuota } from '../scripts/agent/credential-probe.mjs';
 import { outageInText } from '../scripts/agent/provider-outage.mjs';
-import { probeQuotaCircuits } from '../scripts/kernel/watchdog.mjs';
 import { FAKE_ORCA } from './helpers/fake-orca.mjs';
 
 const ROOT = path.resolve(import.meta.dirname, '..');
@@ -426,13 +425,7 @@ test('a still-spent plan past its reset rolls the circuit to the next reset', as
   assert.equal(row.expiresAt, next.getTime() + 3600000);
 });
 
-test('the kernel watchdog asks for the quota probe every --repair tick', () => {
-  const calls = [];
-  const probed = probeQuotaCircuits({ repoPath: 'D:/x', workflow: 'wf-1',
-    run: (args) => { calls.push(args); return { ok: true, value: { ok: true, results: [{ provider: 'qwen', probed: true, recovered: true, probe: { state: 'ok' } }, { provider: 'x', probed: false }] } }; } });
-  assert.deepEqual(calls[0], ['provider-health', '--repo', path.resolve('D:/x'), '--quota-probe', '--workflow', 'wf-1', '--json']);
-  assert.deepEqual(probed, [{ provider: 'qwen', recovered: true, state: 'ok' }]);
-  assert.equal(probeQuotaCircuits({ run: () => ({ ok: true, value: { ok: true, results: [] } }), repoPath: 'D:/x', workflow: 'w' }), null, 'nothing probed, nothing reported');
+test('the quota circuit reader closes on expiry like any other', () => {
   // The circuit reader closes on expiry like any other.
   assert.equal(typeof providerCircuitOf, 'function');
 });

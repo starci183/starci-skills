@@ -184,7 +184,7 @@ test('watchdog wakes a turn-idle Kernel only when status says the frontier is ac
   assert.ok(idle>0&&gate>idle&&send>gate,'the actionable gate sits between the turn-idle branch and the wake send');
   assert.match(src,/action: 'idle-waiting'/);
   const supervise=fs.readFileSync(new URL('../modules/supervisor/supervise.yaml',import.meta.url),'utf8');
-  assert.match(supervise,/watchdog\.mjs --repo <repo> --workflow <id> --repair/,'the recovery recipe spawns a watchdog that can wake');
+  assert.match(supervise,/watchdog\.mjs --repo <repo> --workflow <id> --once --repair/,'the recovery recipe runs a liveness pass that can wake');
 });
 
 // Every nivo watchdog imported the liveness classifier once, hours before the
