@@ -149,10 +149,13 @@ test("EXCEPTION-4: exceptions stay in their owning capability's errors folder", 
       { filename: ERRORS, code: "export class CourseNotFoundException extends AbstractException {}" },
       // a class named like an exception but extending nothing is a shape, not a failure
       { filename: HANDLER, code: "class LocalException {}" },
-      { filename: HANDLER, code: "export class AddToCartHandler extends ICQRSHandler {}" },
+      {
+        filename: "/repo/src/features/collab/application/exceptions/errors/collab-forbidden.exception.ts",
+        code: "export class CollabForbiddenException extends AbstractException {}",
+      },
       /*
-       * The shared base may sit at the platform capability root. Concrete domain and provider
-       * failures live in their respective capability's errors folder.
+       * The shared base may sit at the platform capability root. Concrete domain, provider, and
+       * feature failures live in their respective owner's errors folder.
        */
       {
         filename: BASE,

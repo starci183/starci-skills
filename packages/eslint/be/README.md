@@ -36,12 +36,13 @@ A sample, not the list:
 
 | Area | What the rules hold |
 |---|---|
-| **Exceptions** | Every failure carries its own identity and metadata. Concrete exceptions live in their owning capability's `errors/` folder; the shared abstract base may live at the capability root. |
+| **Exceptions** | Every failure carries its own identity and metadata. Concrete exceptions live in their owning feature or module capability's `errors/` folder; the shared abstract base may live at the capability root. |
 | **CQRS** | A handler does not assemble an aggregate inline; reads and writes do not share one path |
 | **Module layering** | Cross-capability imports may use an explicit public `index.ts`; self-aliases, tier-only aliases, folder re-exports, and export-star public entries are refused. |
 | **Data access** | Queries stay where the layer says they may be built |
 | **Transport** | The wire shape is declared, not inferred from whatever a handler happened to return |
 | **Observability** | A failure is logged as a typed exception, so a log line can be traced to the law that names it |
+| **Testing** | Unit specs sit beside their subjects, including structural specs in HFS `src/tests` categories; model-quality harness specs still call providers directly. |
 | **End-to-end flows** | One file, one flow, named steps, and **never sleep** — poll until the state settles, with a deadline |
 | **CDC · event delivery** | Projections and events follow the declared delivery contract |
 | **Comments · naming · type safety** | Comments say why; no double cast through `unknown` |

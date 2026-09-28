@@ -10,6 +10,7 @@
  */
 import assert from "node:assert/strict"
 import test from "node:test"
+import { fileURLToPath } from "node:url"
 import { RuleTester } from "eslint"
 import tsParser from "@typescript-eslint/parser"
 import {
@@ -36,6 +37,7 @@ const E2E = "D:/repo/src/tests/e2e/course-enroll.e2e-spec.ts"
 const SRC = "D:/repo/src/features/api/core/graphql/mutations/courses/add-to-cart/add-to-cart.handler.ts"
 const HARNESS = "D:/repo/src/tests/harness/challenge-grading.harness-spec.ts"
 const HARNESS_HELPER = "D:/repo/src/tests/helpers/harness-credentials.ts"
+const STRUCTURAL_SPEC = fileURLToPath(new URL("./fixtures/src/tests/harness/jest-module-map.spec.ts", import.meta.url))
 
 test("every rule this law declares is exported under its published name", () => {
   for (const [name, rule] of Object.entries(rules)) {
@@ -82,7 +84,7 @@ test("TESTING-7: backend units are colocated specs", () => {
     valid: [
       { filename: UNIT, code: "it('x', () => expect(1).toBe(1))" },
       { filename: E2E, code: "it('x', () => expect(1).toBe(1))" },
-      { filename: HARNESS, code: "it('x', () => expect(1).toBe(1))" },
+      { filename: STRUCTURAL_SPEC, code: "it('x', () => expect(1).toBe(1))" },
     ],
     invalid: [
       { filename: UNIT.replace(".spec.ts", ".test.ts"), code: "it('x', () => expect(1).toBe(1))", errors: [{ messageId: "suffix" }] },

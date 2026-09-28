@@ -40,6 +40,7 @@
  * as if it were the other.
  */
 
+import { statSync } from "node:fs"
 import { normalizePath } from "./lib/path.mjs"
 
 /** The fast lane: a plain unit spec, excluding every other suffix that also ends in `spec.ts`. */
@@ -135,22 +136,37 @@ export const noCallOnlySpec = {
 // -- TESTING-7 -------------------------------------------------------------------------------------
 
 const UNIT_TEST_BUCKET = /\/(?:src\/tests|tests?\/unit)(?:\/|$)/
+const HFS_TEST_CATEGORY = /\/src\/tests\/(?:integration|fixtures|harness|e2e)\//
+const SUBJECT_EXTENSIONS = [".ts", ".tsx", ".mts", ".cts", ".js", ".mjs", ".cjs"]
 
-/** Backend units are colocated `.spec.ts` files; only backend E2E owns a separate tree. */
+/** A structural test in an HFS test category may test a source file beside it. */
+const isColocatedTestInfrastructureSpec = (filename) => {
+  if (!HFS_TEST_CATEGORY.test(filename) || !isUnitSpec(filename)) return false
+  const subject = filename.slice(0, -".spec.ts".length)
+  return SUBJECT_EXTENSIONS.some((extension) => {
+    try {
+      return statSync(`${subject}${extension}`).isFile()
+    } catch {
+      return false
+    }
+  })
+}
+
+/** Backend units are colocated `.spec.ts` files, including structural test infrastructure. */
 export const unitTestColocated = {
   meta: {
     type: "problem",
-    docs: { description: "Backend unit tests are colocated `.spec.ts` files; generic `.test.ts` and unit buckets are forbidden." },
+    docs: { description: "Backend unit tests are colocated `.spec.ts` files; generic `.test.ts` and non-colocated unit buckets are forbidden." },
     schema: [],
     messages: {
       suffix: "`{{name}}` uses `.test.ts`. A backend unit is a colocated `.spec.ts` file beside its production owner.",
-      bucket: "`{{path}}` files a unit in a separate test bucket. Move it beside its production owner; only backend E2E owns a separate test tree.",
+      bucket: "`{{path}}` files a unit away from its subject. Colocate it with the owner, or place a structural spec beside the test-infrastructure file it checks in an HFS src/tests category.",
     },
   },
   create(context) {
     const file = normalizePath(context.filename || context.getFilename())
     const genericUnit = /\.test\.ts$/.test(file)
-    const bucketedUnit = isUnitSpec(file) && UNIT_TEST_BUCKET.test(file)
+    const bucketedUnit = isUnitSpec(file) && UNIT_TEST_BUCKET.test(file) && !isColocatedTestInfrastructureSpec(file)
     if (!genericUnit && !bucketedUnit) return {}
     return {
       Program(node) {

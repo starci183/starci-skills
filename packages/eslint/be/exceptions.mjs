@@ -41,12 +41,13 @@ const FRAMEWORK_EXCEPTIONS = new Set([
   "GatewayTimeoutException",
 ])
 
-/** A capability owns its own errors, including nested error groups. */
-const ERRORS_FOLDER = /\/src\/modules\/(?:domain|platform|integrations)\/[^/]+\/(?:[^/]+\/)*errors\//
+/** A feature or module capability owns its own errors, including nested error groups. */
+const ERRORS_FOLDER = /\/src\/(?:modules\/(?:domain|platform|integrations)|features)\/[^/]+\/(?:[^/]+\/)*errors\//
 
 /**
  * HFS puts domain failures with their domain capability and provider failures with their integration.
- * A central platform exceptions capability can still own its own generic errors.
+ * A feature can likewise own a transport or orchestration error in its own errors folder. A central
+ * platform exceptions capability can still own generic errors.
  */
 const isInErrorsFolder = (filename) => ERRORS_FOLDER.test(normalizePath(filename))
 
@@ -217,7 +218,7 @@ export const exceptionInErrorsFolder = {
     schema: [],
     messages: {
       place:
-        "`{{name}}` is declared outside its owning capability's errors folder. Put domain failures under their domain owner and provider failures under their integration owner.",
+        "`{{name}}` is declared outside its owning feature or module capability's errors folder. Put the failure under that owner's errors directory.",
     },
   },
   create(context) {
