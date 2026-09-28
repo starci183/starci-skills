@@ -209,7 +209,9 @@ function openDb({file,busyTimeoutMs,journalMode='WAL',autoVacuum=false,label,pra
   }
   throw lastError;
 }
-const makeTransaction=(db,label)=>{let inside=false;return fn=>{if(inside)throw Error(`${label}-nested-transaction`);inside=true;try{beginImmediate(db);}catch(error){inside=false;throw error;}openLedgerTransactions++;try{const result=fn(db);db.exec('COMMIT');return result;}catch(error){try{db.exec('ROLLBACK');}catch{}throw error;}finally{inside=false;openLedgerTransactions--;}};};
+// handle.transaction(fn): BEGIN IMMEDIATE … COMMIT; a nested call throws. transaction.active() tells whether one is open,
+// so the handle's one-call writes (write.*, ensureWorkflow, appendEvent, enqueueJob) join an open transaction instead.
+const makeTransaction=(db,label)=>{let inside=false;const tx=fn=>{if(inside)throw Error(`${label}-nested-transaction`);inside=true;try{beginImmediate(db);}catch(error){inside=false;throw error;}openLedgerTransactions++;try{const result=fn(db);db.exec('COMMIT');return result;}catch(error){try{db.exec('ROLLBACK');}catch{}throw error;}finally{inside=false;openLedgerTransactions--;}};tx.active=()=>inside;return tx;};
 const userVersion=db=>Number(db.prepare('PRAGMA user_version').get().user_version);
 const metaOf=db=>Object.fromEntries(db.prepare('SELECT key,value FROM meta').all().map(row=>[row.key,row.value]));
 const hasTable=(db,name)=>Boolean(db.prepare("SELECT 1 FROM sqlite_master WHERE type='table' AND name=?").get(name));
@@ -829,13 +831,14 @@ export function openLedger({file,now=Date.now,busyTimeoutMs=LEDGER_BUSY_TIMEOUT_
   const transaction=makeTransaction(db,'ledger');
   const resolved=path.resolve(file),ledgerId=ledgerIdOf({db});
   if(machine?.registerLedger)machine.registerLedger({ledgerId,file:resolved});
+  const inTx=fn=>transaction.active()?fn(db):transaction(fn);
   const write=Object.fromEntries(Object.entries(LEDGER_WRITES).map(([name,fn])=>[name,
-    name==='idempotent'?(args,body)=>transaction(tx=>fn(tx,{at:now(),...args},body)):args=>transaction(tx=>fn(tx,args??{}))]));
+    name==='idempotent'?(args,body)=>inTx(tx=>fn(tx,{at:now(),...args},body)):args=>inTx(tx=>fn(tx,args??{}))]));
   return {
     schema:LEDGER_SCHEMA,file,path:resolved,sqliteVersion,journalMode,db,now,transaction,ledgerId,write,checkpointer,
-    ensureWorkflow(args={}){return transaction(tx=>ensureWorkflow(tx,{at:now(),...args}));},
-    appendEvent(args){return transaction(tx=>appendEvent(tx,{createdAt:now(),...args}));},
-    enqueueJob(args){return transaction(tx=>enqueueJob(tx,{createdAt:now(),...args}));},
+    ensureWorkflow(args={}){return inTx(tx=>ensureWorkflow(tx,{at:now(),...args}));},
+    appendEvent(args){return inTx(tx=>appendEvent(tx,{createdAt:now(),...args}));},
+    enqueueJob(args){return inTx(tx=>enqueueJob(tx,{createdAt:now(),...args}));},
     /** PASSIVE checkpoint: only the checkpointer connection may run it. */
     checkpoint(){need(checkpointer,'only the checkpointer connection checkpoints');return db.prepare('PRAGMA wal_checkpoint(PASSIVE)').get();},
     ...readAccessors(db),
