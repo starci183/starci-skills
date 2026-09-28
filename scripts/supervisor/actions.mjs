@@ -32,6 +32,8 @@ export const NOTICE_KIND = 'supervisor-notice';
 
 /** The classes, each with what the Supervisor does (supervise.yaml mission.classes). */
 export const CLASSES = Object.freeze({
+  'progress-stall': 'OUTCOME FIRST: the workflow does not progress past allocation.progress.supervisorGraceMs although its Kernel owns it. Read api status progress + rca, five-whys to the root cause, find the ONE systemic change that fixes the most (never re-dispatch the same failing shape): the Kernel lacks authority -> do it (lane) or rule it; a runtime cause -> runtime-defect; cross-workflow -> bridge/notify the peer; the Kernel ignores its rca.actions -> the tick already notified it, a second miss is a Kernel-loop defect (lane)',
+  'kernel-proposal': 'a Kernel filed a tier-2 change for shared .claude (api kernel-proposal): AUTO tier -> land it through a lane (lessons.mjs land), IMPORTANT -> lessons.mjs propose to the owner; record the result and close it in the product ledger',
   'runtime-defect': 'fix it in an Opus lane or ONE [Worker] job per cluster, land it, then resolve each incident: api incident --resolve <inc> --by supervisor --detail "fixed by .claude <sha>" and notify the Kernel',
   'fixed-defect': 'verify the commit against the incident, then api incident --resolve <inc> --by supervisor --detail "fixed by .claude <sha>" and notify the Kernel (or ack the pattern: owed.mjs ack)',
   'retry-cap': 'never a blind retry: diagnose the root cause (a [Worker] diagnose job), then notify the Kernel with the disposition - re-route to the root-cause op, re-cut the leg, or drop it',
@@ -72,9 +74,11 @@ export function pushClass(p) {
  * Returns [{key, class, workflowId, repo, subject, evidence, do}]; one item per root cause (an incident a cluster
  * already carries is never listed again as a gate).
  */
-export function owedActions({ clusters = [], stalls = [], flows = {}, pushes = [], stuck = [], revertDue = [] } = {}) {
+export function owedActions({ clusters = [], stalls = [], flows = {}, pushes = [], stuck = [], revertDue = [], progress = [] } = {}) {
   const out = [];
   const add = (item) => { if (!out.some((x) => x.key === item.key)) out.push({ ...item, do: item.do ?? CLASSES[item.class] }); };
+  // Outcome first (scripts/supervisor/progress-watch.mjs): stalls past the Kernel's grace, runtime RCA clusters, kernel proposals.
+  for (const item of progress) add(item);
   const inCluster = new Set(clusters.flatMap((c) => c.incidents ?? []));
   for (const c of clusters) {
     const retry = ((c.items ?? []).length > 0 && c.items.every((i) => RETRY_PATTERNS.has(i.pattern))) || RETRY_CAP_TEXT.test(`${c.id} ${c.summary ?? ''}`);
@@ -201,9 +205,11 @@ const T = {
 };
 
 /** The digest text from the ledger (actions since `since`, the newest owed actions). Pure over its inputs. */
-export function digestText({ actions = [], owed = null, learning = [], trend = null, gc = null, language = 'en', now = Date.now() }) {
+export function digestText({ actions = [], owed = null, learning = [], trend = null, gc = null, progress = [], language = 'en', now = Date.now() }) {
   const t = T[language] ?? T.en;
   const lines = [`${t.head} ${new Date(now).toISOString().slice(0, 16).replace('T', ' ')}Z`];
+  // Outcome first: progress per workflow, priority first, and why it is slow (progress-watch.mjs).
+  if (progress?.length) lines.push(...progress);
   // The op-health trend line (op-metrics.mjs trendLine, from the tick's supervisor-op-metrics snapshots).
   if (trend) lines.push(trend);
   // The garbage collection since the last digest, one line (gc.mjs gcLine; owner 2026-09-28).
@@ -244,12 +250,14 @@ export async function ownerDigest({ send = false, force = false, env = process.e
   const lang = language ?? supervisorSettings().language;
   let trend = null;
   try { trend = await (await import('./op-metrics.mjs')).currentTrend({ env, language: lang }); } catch { /* the digest goes without it */ }
+  let progress = [];
+  try { progress = (await import('./progress-watch.mjs')).progressDigestLines({ env, language: lang }); } catch { /* the digest goes without it */ }
   let gc = null;
   if (read.gcRuns?.length) {
     const sum = (k) => read.gcRuns.reduce((n, r) => n + (Number(r[k]) || 0), 0);
     try { gc = (await import('./gc.mjs')).gcLine({ agents: sum('agents'), terminals: sum('terminals'), worktrees: sum('worktrees'), freedBytes: sum('freedBytes'), ramFreedBytes: sum('ramFreedBytes') }, { language: lang }); } catch { gc = null; }
   }
-  const text = digestText({ actions: read.actions, owed: latestOwedActions({ env }), learning, trend, gc, language: lang, now });
+  const text = digestText({ actions: read.actions, owed: latestOwedActions({ env }), learning, trend, gc, progress, language: lang, now });
   if (!send) return { ok: true, sent: false, text };
   if (!force && read.last && now - read.last < everyMs) return { ok: true, sent: false, skipped: `last digest ${Math.round((now - read.last) / 60_000)}m ago`, text };
   const pushFn = push ?? (await import('./stall-alert.mjs')).ownerPush;

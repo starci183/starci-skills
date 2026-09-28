@@ -215,7 +215,9 @@ export function workflowFrontiers({ repos, runningOf = runningWorkflows, frontie
         ready: Number(s.frontier?.readyOperations ?? 0), deadWorkerJobs: ids(s.frontier?.deadWorkerJobs), wedgedJobs: ids(s.frontier?.wedgedJobs),
         kernelRevStale: rev?.stale ? { current: rev.current ?? null, acked: rev.acked ?? null, fileCount: rev.fileCount ?? 0 } : null,
         // pending owner asks that are not credential asks (api status awaitingOwner, frontier.credentialAskDispatches)
-        ownerAsks: (s.awaitingOwner ?? []).filter((a) => a?.answer === 'pending' && !(s.frontier?.credentialAskDispatches ?? []).includes(a.dispatchId)).map((a) => a.dispatchId) });
+        ownerAsks: (s.awaitingOwner ?? []).filter((a) => a?.answer === 'pending' && !(s.frontier?.credentialAskDispatches ?? []).includes(a.dispatchId)).map((a) => a.dispatchId),
+        // the outcome view (api status progress + rca; scripts/supervisor/progress-watch.mjs)
+        progress: s.progress ?? null, rca: s.rca ?? null });
       for (const item of s.stuck ?? []) stuck.push({ ...item, repo });
       if (s.frontier?.state === 'orphaned-frontier') orphaned.push({ workflowId, repo, reason: clipLine(s.frontier?.reason ?? '', 200) });
     }

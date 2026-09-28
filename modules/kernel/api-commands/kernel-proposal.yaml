@@ -1,0 +1,12 @@
+# The contract of `api kernel-proposal` (scripts/kernel/api-verbs/kernel-proposal.mjs): tier 2.
+purpose: >-
+  A change the Kernel needs in shared .claude (op manifest, knowledge, grammar, gate, runtime code) is filed
+  as a proposal with evidence and an optional patch; the Supervisor lands AUTO-tier ones through a lane and
+  forwards IMPORTANT ones (lessons.mjs tierOf) to the owner. The Kernel never edits .claude itself; a local
+  override keeps the workflow moving meanwhile.
+args: --workflow <id> (--title <t> --evidence <t> [--patch <file.diff>] [--files <csv>] [--decision <id>] | --list) [--json]
+writes: [events kernel-proposal, kernel-evidence/<wf>/proposals/<id>.diff, the Supervisor inbox]
+refusals:
+  proposal-duplicate: the same title was proposed in the last 6 h
+kernelOnly: true
+exit: 0 filed or listed, 1 refused

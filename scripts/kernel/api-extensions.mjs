@@ -12,7 +12,7 @@
 //                                            run({ledger, args, repo, emit, need, caller, ext}) (may be async)
 //   modules/kernel/api-commands/<verb>.yaml  its contract (what `commands.<verb>` of api.yaml would hold)
 //   scripts/kernel/api-status/<key>.mjs      a status field: export default {key, compute(ctx), lines?(value)}
-//                                            ctx {ledger, db, wf, workflowId, args, repo, now}; a null/undefined
+//                                            ctx {ledger, db, wf, workflowId, args, repo, now, core}; a null/undefined
 //                                            value adds nothing; `lines` adds human lines to `api status`
 //   scripts/kernel/api-boolean-flags.txt     one boolean flag per line (any verb); merge=union, order free
 //
@@ -81,7 +81,8 @@ export function statusExtras(status, ctx, core = {}) {
   for (const spec of status) {
     if (Object.hasOwn(core, spec.key)) continue;
     let value;
-    try { value = spec.compute(ctx); } catch (error) { fields[`${spec.key}Error`] = String(error?.message ?? error).slice(0, 300); continue; }
+    // `core`: the status the api already built (frontier, legs, ramThrottle, poolLoad, stuck ...), read-only.
+    try { value = spec.compute({ ...ctx, core }); } catch (error) { fields[`${spec.key}Error`] = String(error?.message ?? error).slice(0, 300); continue; }
     if (value === null || value === undefined) continue;
     fields[spec.key] = value;
     if (typeof spec.lines === 'function') { try { lines.push(...(spec.lines(value) ?? [])); } catch { /* the field stands */ } }

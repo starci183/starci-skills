@@ -1,0 +1,25 @@
+# The contract of `api graph-edit` (scripts/kernel/api-verbs/graph-edit.mjs): the Kernel's LIGHT unit edits
+# (owner 2026-09-28: ops draw the graph, the Kernel only makes light edits; a heavy redesign is api redesign).
+purpose: >-
+  Edit this workflow's own queued units, logged and reversible: drop units whose paths are absent, widen a
+  unit inside its repository, add ONE serial wire unit for shared files, continue a partial commit as a
+  continuation unit, retry a failed unit with a CHANGED shape, reorder (--after), split or merge a few units,
+  set a unit's override (notes, commandTimeoutMs, difficulty, model, effort), start a fresh canon-scan and
+  re-cut a canon cut's remaining units from it (the goal's own cut method), or undo an edit. The work graph
+  (scripts/work/work-graph.mjs) and the leg plan stay the ops'.
+args: >-
+  --workflow <id> --decision <open decision> --edit drop|widen|wire|continue|retry|reorder|split|merge|params|scan|recut|undo
+  [--jobs <csv>] [--job <id>] [--add-paths <csv>] [--paths <csv>] [--op <op>] [--before <csv>] [--after <csv>]
+  [--parts '<json>'] [--set '<json>'] [--cut-id <id>] [--from-scan <file>] [--path-prefix <p>] [--exclude <csv>]
+  [--reason <t>] [--undo <edit id>] [--json]
+guardrails:
+  - only queued, never-dispatched units change; a running unit is never interrupted
+  - at most runtimes.yaml allocation.progress.maxUnitsPerEdit units per edit (a recut from a canon-scan record is exempt)
+  - added paths stay in the unit's repository, never kernel custody, never .claude, inside the op's write families,
+    and never overlap another workflow's open unit or lease (path-held-by-other-workflow)
+  - every new unit goes through api enqueue (its autopilot, foundation and family refusals hold)
+  - a retry or widen that reproduces a shape that already failed for a shape cause is refused (shape-already-failed)
+  - every edit is a kernel-graph-edit event holding its inverse; --edit undo --undo <edit> reverts it
+writes: [jobs payload (queued units only), jobs status queued->cancelled (dropped) and back on undo, events kernel-graph-edit, logs kind decision]
+kernelOnly: true
+exit: 0 applied, 1 refused

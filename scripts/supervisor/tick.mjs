@@ -44,6 +44,8 @@ import {
 } from './tick-duties.mjs';
 import { SNAPSHOT_KIND, tickTelemetry } from './op-metrics.mjs';
 import { runGc, GC_EVENT_KIND, gcSettings, sweepDue } from './gc.mjs';
+import { progressDuty, writeProgressRecords } from './progress-watch.mjs';
+import { notifyKernel } from './notify.mjs';
 
 const selfFile = fileURLToPath(import.meta.url);
 
@@ -206,10 +208,15 @@ export async function runSupervisorTick({ repos = null, push = true, heartbeat =
   for (const o of out.flows.orphaned.filter((x) => orphanSeen.persisting.includes(x.workflowId)))
     alerts.push({ key: `orphaned-frontier|${o.workflowId}`, text: `ORPHANED-FRONTIER ${wfName(o.workflowId)} for ${Math.round((now() - orphanSeen.seen[o.workflowId]) / 60_000)}m: nothing open and no next step named${o.reason ? ` (${o.reason})` : ''}` });
 
+  // The outcome duty FIRST (supervise.yaml mission.progress; scripts/supervisor/progress-watch.mjs): is each workflow,
+  // the priority one first, progressing? A Kernel's stall past allocation.progress.supervisorGraceMs is the Supervisor's.
+  out.progress = await step('progress', () => (deps.progress ?? progressDuty)({ flows: out.flows, repos: list, env, now: now(),
+    acted: withSupervisorRead((db) => actedOf(db, { since: now() - 7 * 24 * 3_600_000 }), { byKey: {} }, { env }),
+    notify: deps.notify === null ? null : (deps.notify ?? ((w, text, item) => notifyKernel({ repo: w.repo, workflowId: w.workflowId, text, item, env }))) }));
   // The owed actions (supervise.yaml mission; scripts/supervisor/actions.mjs): every stuck item with its action and SLA.
   const stallsAll = (out.tick?.digests ?? []).flatMap((d) => d.stalls ?? []);
   const owedAct = await step('actions', () => {
-    const base = owedActions({ clusters: out.tick?.clusters ?? [], stalls: stallsAll, pushes: out.tick?.pushes ?? [], stuck: out.flows.stuck ?? [],
+    const base = owedActions({ clusters: out.tick?.clusters ?? [], stalls: stallsAll, pushes: out.tick?.pushes ?? [], stuck: out.flows.stuck ?? [], progress: out.progress?.owed ?? [],
       flows: { ...out.flows, orphaned: out.flows.orphaned.filter((x) => orphanSeen.persisting.includes(x.workflowId)) } });
     const acted = withSupervisorRead((db) => actedOf(db, { since: now() - 7 * 24 * 3_600_000 }), { byKey: {}, byWorkflow: {} }, { env });
     const sla = (items) => withSla(items, { seen: state.owedSeen, acted, now: now(), slaMs: t.actionSlaMs });
@@ -295,6 +302,7 @@ export async function runSupervisorTick({ repos = null, push = true, heartbeat =
       noProgress: stalled.map((f) => f.workflowId), alerts: out.alerts.map((a) => ({ key: a.key, sent: a.sent })), errors: out.errors } }));
   } finally { w.close(); }
 
+  if (out.progress?.records?.length) await step('progressRecords', () => (deps.writeProgress ?? writeProgressRecords)(out.progress.records, { env, now: now() }));
   // The machine log (sup-log.mjs): what this tick saw and did, as typed rows on the supervisor ledger.
   (deps.supLogRows ?? supLogRows)(tickLogRows(out, { at: now(), breaches, pushes: out.tick?.pushes ?? [] }), { env });
 
@@ -308,6 +316,7 @@ export async function runSupervisorTick({ repos = null, push = true, heartbeat =
     out.ramThrottle ? throttleLine(out.ramThrottle) : 'ram-throttle: unread',
     ...(out.opHealth ? out.opHealth.lines : ['op health: unread']),
     out.gc ? `gc: ${out.gc.line}${out.gc.errors.length ? ` (${out.gc.errors.length} error(s))` : ''}` : `gc: not due${out.gcNextAt ? ` (next sweep ${new Date(out.gcNextAt).toISOString()})` : ''}`,
+    ...(out.progress?.lines ?? []),
     `alerts ${out.alerts.length} (${due.length} sent)${out.alerts.map((a) => `\n  ${a.sent ? '>' : '='} ${a.text}`).join('')}`,
     `----- OWED ACTIONS ${out.actions.length} (${breaches.length} past the ${Math.round(t.actionSlaMs / 60_000)}m SLA): act on each and record it (supervise.yaml mission) -----`,
     ...out.actions.map(actionLine),

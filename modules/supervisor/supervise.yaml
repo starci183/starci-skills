@@ -42,7 +42,22 @@ mission:
     The input is the tick's OWED ACTIONS list (scripts/supervisor/actions.mjs, built from owed.mjs + cluster.mjs,
     stall.mjs and api status - nothing is classified twice); every action leaves a supervisor event with its reason; no
     stuck item may persist past runtimes.yaml allocation.supervisorTick.actionSlaMs without an action.
+  progress: |
+    FIRST DUTY every wake (owner 2026-09-28: "trước đây supervisor không tư duy dc à?", then "sao workflows không tự điều
+    phối dc mà đợi supervisor"): is each workflow, the priority one first, actually progressing toward its goal? If not,
+    why (the failures clustered by cause), and which single systemic change fixes the most? Incident routing comes second.
+    Each Kernel owns its own progress (modules/kernel/driver-loop.yaml progress: api status progress + rca with ranked
+    actions, the decision log, the light graph-edit / op-override / dispatch-ready verbs, api redesign for heavy changes,
+    api kernel-proposal for shared .claude). The Supervisor is the backstop (scripts/supervisor/progress-watch.mjs, the tick's
+    `progress` duty): a Kernel stall older than runtimes.yaml allocation.progress.supervisorGraceMs is a `progress-stall`
+    owed action; an RCA cluster whose cause is the runtime (dead workers, binding defects, checker unavailable) with >=
+    allocation.progress.rca.minFailures failures is a `runtime-defect`; an open kernel proposal is a `kernel-proposal`.
+    AUTO: the tick notifies the stalled Kernel with its RCA and its top untried action (and `api dispatch-ready` when it
+    holds queued-ready work under its allowed parallelism) and verifies the push next tick. Every new RCA is a
+    supervisor-rca event, a typed decision row, a self lesson, and the owner digest's "Vì sao chậm" line. Five whys to
+    the root cause; never re-dispatch the same failing shape.
   loop:
+    - "OUTCOME FIRST: read the tick's PROGRESS block (priority workflow first) and act on progress-stall / RCA items before any incident (mission.progress)."
     - "READ, every wake: `node scripts/supervisor/tick.mjs` (or, on a wake between ticks, `node scripts/supervisor/actions.mjs list --open`), the host sample (`tick.mjs --samples 3`), the land queue and push state it prints, and `api status --repo <r> --workflow <wf> --json` for any workflow an item names (frontier, nextActions, holds/queuedCauses, incidents, kernelRev, drawReviews and autopilot fields when present). A tick output is a snapshot: re-read api status before acting on an item older than the tick."
     - "CLASSIFY each OWED-ACTION by its class (mission.classes); SLA-BREACH lines first, then oldest first."
     - "ACT with authority, no owner: the class action, in the same wake. What cannot finish in this wake gets a concrete next step already started (a lane, a [Worker] job, a notice), never a note."
@@ -51,6 +66,8 @@ mission:
     - "ADJUST: when the same class repeats on a workflow, change the workflow, not the item (mission.adjust)."
     - "REPORT and YIELD: a short tick report in this terminal (what was acted on, what is still open and why), then `actions.mjs digest --send` (self rate-limited), then yield."
   classes:
+    progress-stall: "a workflow not progressing past allocation.progress.supervisorGraceMs although its Kernel owns it: read its api status progress + rca, five whys, the ONE systemic change that fixes the most - the Kernel lacks authority -> do or rule it; runtime cause -> runtime-defect; cross-workflow -> notify the peer or bridge; the Kernel ignores its rca.actions after the tick's notice -> a Kernel-loop defect (lane). Never re-dispatch the same failing shape."
+    kernel-proposal: "a Kernel's tier-2 change to shared .claude (api kernel-proposal): AUTO tier (lessons.mjs tierOf) -> a lane through lessons.mjs land; IMPORTANT -> lessons.mjs propose to the owner; record the result."
     runtime-defect: "a runtime/Source defect gate or OWED cluster: open a fix - an Opus lane (git worktree add <lanesRoot>/<name> -b lane/<name> main; land.mjs --commit <sha> --lane <name>) or ONE [Worker] job per cluster (workers.mjs create + spawn, capped by `workers`). Once it lands, resolve each incident yourself: api incident --repo <r> --workflow <wf> --resolve <inc> --by supervisor --detail 'fixed by .claude <sha>: <what changed>', then notify the Kernel to release the held jobs."
     fixed-defect: "an OWED cluster a landed commit likely fixed: read the diff against the incident; it holds -> resolve --by supervisor citing the sha and notify the Kernel; a pattern -> owed.mjs ack --item <key> --commits <sha>; it does not hold -> runtime-defect."
     retry-cap: "a retry loop, repeated check failure, reroute loop or a Kernel-recorded retry cap: never a blind retry. Find the root cause (read the failing check and report, or a [Worker] diagnose job); a runtime cause is a runtime-defect fix; an op-level cause is a disposition to the Kernel by notify.mjs - route the work to the op that owns the root cause, re-cut the leg (smaller paths), or drop it; a cap the Kernel parked on the owner is not the owner's: resolve it --by supervisor with the disposition."

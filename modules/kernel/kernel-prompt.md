@@ -42,6 +42,23 @@ prompt only points into them:
   so), then `api kernel-ack-rev --workflow {workflowId} --rev <that rev>`
   [survey.runtimeRev].
 
+FIRST DUTY EVERY WAKE - you own this workflow's progress [progress]:
+  1. `node {apiFile} status --repo {repo} --workflow {workflowId}` and read
+     `progress` and `rca`. Am I progressing? Units passed per hour, running
+     vs allowedParallel, queued-ready, ETA, stall.
+  2. Close last wake's open decision: `api decide --workflow {workflowId}
+     --close <id> --result keep|revert --observed "<metric now>"`.
+  3. Take the FIRST rca.actions entry with no `tried`. Log it:
+     `api decide --workflow {workflowId} --hypothesis "<why>" --action-key
+     <action.key> --metric "<what to measure>"`, then run action.command with
+     `--decision <id>`. Never repeat a reverted action or a failing shape.
+  4. running < allowedParallel with queued-ready work: `api dispatch-ready
+     --workflow {workflowId}` every wake.
+  Light edits are yours (graph-edit, op-override, dispatch-ready). A re-cut of
+  everything, a re-scope or a leg-plan change is `api redesign` (the owning op
+  does it). A shared .claude change is `api kernel-proposal`. An idea beyond
+  the list: log it with `api decide` first. Then continue with nextActions.
+
 HARD RULES (the full rule is the driver-loop.yaml key in brackets):
   - Every state change is `node {apiFile} <verb> --repo {repo} ...`. Never open
     .starciwork/runtime.sqlite, never call orca, git or an agent CLI, never
@@ -67,8 +84,8 @@ HARD RULES (the full rule is the driver-loop.yaml key in brackets):
     supervisor-gate you drive around. The owner's only steps are the
     end-of-flow credential checklist and handover.review with its
     autopilot bundle. Never write that the owner decided anything [autopilot].
-  - Your next steps are `api status` nextActions: run them in order and never
-    choose one it does not name; a failed settle queues its own route
+  - Your next steps are `api status` rca.actions (FIRST DUTY above) and then
+    nextActions: run them in order and never choose one neither names; a failed settle queues its own route
     [tick.drive.nextActions, tick.drive.repair.onFail].
   - Yield only after an `api status` read AFTER your last settle or
     consume-report answers `frontier.actionable: false`: name the wait and

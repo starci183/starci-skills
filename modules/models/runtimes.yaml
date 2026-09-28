@@ -297,6 +297,33 @@ allocation:
   # signature naming a file it changed, or an op success rate lower by successDrop -> revert due); at most
   # dailyAutoLandCap autonomous landings in 24 h; an owner-feedback lesson weighs ownerWeight (a self-derived one 1).
   supervisorLearning: {minRepeats: 2, measureMs: 21600000, dailyAutoLandCap: 8, ownerWeight: 3, successDrop: 0.1}
+  # progress (scripts/kernel/progress-rca.mjs; owner 2026-09-28 "trước đây supervisor không tư duy dc à?" and "sao
+  # workflows không tự điều phối dc mà đợi supervisor"): the outcome SLA each Kernel reads first on every wake (api status
+  # progress + rca) and the Supervisor backstops. units/h over windowMs (only units that passed their gates), ETA over
+  # etaWindowMs. A priority workflow (highest ramThrottle.priorities weight) below minUnitsPerHour.priority for graceMs,
+  # or holding queued-ready work while running < its allowed parallelism, is a progress stall: the Kernel acts on the
+  # ranked rca.actions at once; a stall older than supervisorGraceMs is the Supervisor's (progress-stall). maxUnitsPerEdit
+  # bounds one light graph-edit; recutThreshold open cut-shaped failures (absent paths, grants too narrow) rank a heavy
+  # re-cut first. rca: failures of one op in one workflow >= minFailures inside windowMs open the RCA even without a stall.
+  # commandTimeoutMs: the window the tool-timeout action gives an op (op-override).
+  progress:
+    windowMs: 3600000
+    etaWindowMs: 21600000
+    graceMs: 1800000
+    supervisorGraceMs: 3600000
+    minUnitsPerHour: {priority: 3, default: 0}
+    maxUnitsPerEdit: 3
+    recutThreshold: 3
+    commandTimeoutMs: 600000
+    rca: {minFailures: 3, windowMs: 86400000, examples: 4}
+  # redesign (api redesign; owner 2026-09-28: heavy redesign is dispatched to the op that owns it, and the Kernel stays on
+  # Devin): these ops, enqueued from an RCA, route as `routeAs` (implementation.plan: the plan order - Opus, then Sol) at
+  # >= minDifficulty at `effort` whatever their usual order (work.author walks the review order, Devin first, otherwise).
+  redesign:
+    ops: [work.author, scope.define, goal.revise]
+    routeAs: implementation.plan
+    minDifficulty: hard
+    effort: high
   # restart (scripts/kernel/restart-all.mjs): waits waitMs for every running workflow to show one live
   # Kernel, polling every pollMs.
   restart: {waitMs: 480000, pollMs: 20000}

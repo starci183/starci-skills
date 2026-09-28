@@ -1,0 +1,17 @@
+# The contract of `api decide` (scripts/kernel/api-verbs/decide.mjs): the Kernel's decision log (guardrail d,
+# owner 2026-09-28). One file per extension verb (scripts/kernel/api-extensions.mjs).
+purpose: >-
+  Log every idea before acting on it: hypothesis -> action key -> metric, with a baseline snapshot of the
+  units that passed their gates; close it next wake with keep|revert and what the metric showed. A restarted
+  Kernel reads the log (api status rca.decisions, decide --list) and never repeats a failed idea. Every
+  mutating kernel verb (graph-edit, op-override, redesign) names an open decision.
+args: >-
+  --workflow <id> (--hypothesis <why> --action-key <key> --metric <what to measure> [--command <c>] |
+  --close <id> --result keep|revert --observed <text> | --list) [--json]
+writes: [events kernel-decision / kernel-decision-result, logs kind decision (actor kernel)]
+refusals:
+  decision-repeats-failed: the action key was already tried and reverted - pick the next untried rca action or change the shape under a new key
+  decision-open: the key is still being measured - close it first
+  decision-incomplete: --hypothesis, --action-key and --metric are required
+kernelOnly: true
+exit: 0 recorded, 1 refused

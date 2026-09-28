@@ -133,9 +133,81 @@ boundary:
 #    never a crash. The kernel never skips ahead: a report it has not settled
 #    is a verdict the next pick does not know about.
 # ============================================================================
+# ============================================================================
+# PROGRESS — the Kernel owns its own outcome (owner 2026-09-28: "sao workflows
+# không tự điều phối dc mà đợi supervisor"; "kernel phải brainstorm dc, xử lý lỗi
+# dc ... làm mọi thứ để workflows tiến"; refined: ops draw the graph, the Kernel
+# makes LIGHT edits and dispatches the owning op for a heavy redesign). The
+# thinking is deterministic code (scripts/kernel/progress-rca.mjs): api status
+# computes the progress, the failure clusters and a RANKED list of concrete
+# actions, each with its exact command. The Kernel picks, runs, logs, measures.
+# ============================================================================
+progress:
+  firstDuty: >-
+    Every wake, right after survey and inbox, read `api status` progress and
+    rca and answer three questions before anything else: (1) am I progressing
+    toward the goal - units that PASSED their gates per hour vs
+    progress.minUnitsPerHour, running vs progress.allowedParallel,
+    queued-ready, ETA? (2) if not, why - rca.clusters (dead workers, absent
+    paths, grants too narrow, tool timeouts, test gaps, partial commits,
+    canon conflicts, runtime/binding defects, upstream peers)? (3) which ONE
+    change fixes the most - rca.actions[0] that is not already tried? Only
+    then continue with nextActions. A stall (progress.stall.stalled) is your
+    work this wake, never the Supervisor's first.
+  loop:
+    - "MEASURE: close last wake's open decision first - `api decide --workflow <wf> --close <id> --result keep|revert --observed <what the metric shows now>`; a revert also undoes its edits (`api graph-edit --edit undo --undo <edit>`)."
+    - "PICK: the highest-ranked rca.actions entry whose `tried` is null (an action tried and reverted is never repeated; the api refuses it: decision-repeats-failed)."
+    - "LOG: `api decide --workflow <wf> --hypothesis <why this fixes the most> --action-key <action.key> --metric <what you will measure next wake> --command <action.command>`."
+    - "RUN: the action's command with `--decision <id>`. One action per wake unless the next one is dispatch-ready."
+    - "PUSH: when progress.running < progress.allowedParallel with queued-ready work, `api dispatch-ready --workflow <wf>` every wake, whatever else you did."
+  tiers:
+    light: >-
+      Tier 1, act now, inside your workflow: `api graph-edit` (drop units whose
+      paths are absent, widen a unit inside its repository, ONE serial wire
+      unit for shared files, continue a partial commit, retry a failed unit
+      with a CHANGED shape, reorder/split/merge a few units, per-unit params,
+      canon scan + re-cut of a canon cut from it), `api op-override` (a local,
+      additive variant of an op for this workflow: notes, commandTimeoutMs,
+      difficulty, model, effort), `api dispatch-ready` (parallelism).
+    heavy: >-
+      Re-cut all units, re-scope or change the leg plan is NOT yours: `api
+      redesign --op work.author|scope.define|goal.revise --paths <its write
+      set> --decision <id>` enqueues the owning op with the RCA as its brief
+      and routes it to a strong reasoning pool (runtimes.yaml
+      allocation.redesign). A canon cut (code.refactor with
+      params.canonFamilies) is re-cut by its own method instead: `graph-edit
+      --edit scan` then `--edit recut --from-scan <file>`.
+    proposal: >-
+      Tier 2, shared .claude (op manifests, knowledge, grammar, gates, runtime
+      code): never edit it. `api kernel-proposal --title --evidence [--patch]`
+      files it for the Supervisor (AUTO lands through a lane, IMPORTANT goes to
+      the owner) while a local op-override keeps you moving.
+    supervisor: >-
+      rca.actions of tier supervisor (dead workers, binding defects, checker
+      unavailable, upstream workflow) are runtime or cross-workflow causes:
+      file them once (kernel-proposal / api notify), then keep dispatching
+      the healthy units - never retry the same shape waiting for them.
+  brainstorm: >-
+    An idea beyond the catalogue is allowed: log it as a hypothesis first
+    (`api decide` with a new --action-key), then run it through the same
+    verbs. The decision log is what a restarted Kernel reads; the
+    Supervisor audits it.
+  guardrails:
+    - "progress counts only units whose job succeeded through its checks - never job counts, never a self-marked done"
+    - "never weaken or skip a gate, change the goal text, edit owner rulings, or touch another workflow's paths or leases: the api refuses (override-weakens-gate, override-key-refused, path-held-by-other-workflow, path-shared-runtime)"
+    - "credentials and real money stay deferred (autopilot): every new unit goes through api enqueue"
+    - "every mutating verb names an open decision (decision-required); the same failing shape is refused (shape-already-failed) and skipped by dispatch-ready"
+    - "every graph edit is an event with its inverse; `graph-edit --edit undo` reverts it; at most allocation.progress.maxUnitsPerEdit units per light edit"
+  supervisorBackstop: >-
+    The Supervisor acts only when your stall outlives
+    allocation.progress.supervisorGraceMs, when a cause crosses workflows,
+    when it is a runtime/.claude bug (your kernel-proposals), or when you
+    lack the authority (scripts/supervisor/progress-watch.mjs).
+
 tick:
   order:
     - survey    # api survey --workflow — the tick opens on the ledger, never on memory; then api inbox (peer messages)
+    - progress  # FIRST DUTY every wake: api status progress + rca - am I progressing? if not, why (clusters), which ONE change fixes the most? act on rca.actions (§ progress)
     - plan      # api plan --workflow --file <plan.json> — persist the derived plan; structural diff vs the approved opChain
     - enqueue   # api enqueue --workflow --op --paths [--records] — a queued job row per planned op the queue lacks
     - drive     # loop{ status -> reconcile effect_unknown and worker-dead (--dead-worker) -> nextActions in order -> wait/observe -> report consumed -> checks re-run -> settle } until the frontier empties

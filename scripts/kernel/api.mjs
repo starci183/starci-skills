@@ -175,6 +175,7 @@ import { bindWorkflowRun, staleTasks, CLOSED_TASK_STATUSES } from './orca-runs.m
 import { taskList } from '../api/orca/task-list.mjs';
 import { CONDITIONS_ATTACHED_EVENT, UNTIL_FLAGS, autoResolveTypedIncidents, conditionLabel, gateConditionView, lineageHeadById, parseConditions, sharedBlockerUntil, typedIncidents } from './gate-conditions.mjs';
 import { extensionUsage, loadApiExtensions, requiredOf, statusExtras } from './api-extensions.mjs';
+import { kernelOverrideFor } from './kernel-authority.mjs';
 import { BLOCKING_HEADS_UP_AUTO, blockingHeadsUpDue, blockingJobs, blockingOthersOf, orderQueuedByBlocking } from './waiter-priority.mjs';
 import { parkedBehindWaits, waitHeldOperations } from './frontier-parked.mjs';
 import { ownerAskConflict } from '../checks/check-starcistacks.mjs';
@@ -4769,7 +4770,10 @@ async function cmdRoute(ledger, args) {
   // A cut slice of a fan-out (payload.cut, ordinal of total >= 2) is small bounded work: hands-on slices walk
   // the fan-out order (runtimes.yaml allocation.preference.scaffold, Qwen first; owner decision 2026-09-25).
   const fanOut = isFanOutSlice(payload);
-  const decision = selectPool({ kind, difficulty, bias, capacity,
+  // A redesign leg (api redesign; runtimes.yaml allocation.redesign) routes as its strong-reasoning alias, so the op
+  // that re-cuts, re-scopes or re-plans from an RCA reasons on the plan/think pools whatever its usual order.
+  const redesignAs = typeof payload.redesign?.routeAs === 'string' ? payload.redesign.routeAs : null;
+  const decision = selectPool({ kind: redesignAs ?? kind, difficulty, bias, capacity,
     policy: allocation?.policy ?? undefined,
     shares: allocation?.shares ?? undefined,
     recent: recent?.counts,
@@ -4802,7 +4806,8 @@ async function cmdRoute(ledger, args) {
   }
 
   const decided = {
-    model: decision.target, modelId: decision.modelId ?? null, effort: decision.effort ?? null,
+    // A redesign leg reasons at high effort even on a pool that pins none (runtimes.yaml allocation.redesign.effort).
+    model: decision.target, modelId: decision.modelId ?? null, effort: decision.effort ?? (redesignAs ? (payload.redesign?.effort ?? 'high') : null),
     routeChain: decision.chain ?? [], routeRejected: decision.rejected ?? [], routeOrder: decision.order ?? null,
     // Always written (null when absent) so a reroute never keeps the previous decision's values.
     routePolicy: decision.policy ?? null,
@@ -5455,6 +5460,8 @@ function cmdDispatch(ledger, args, repo) {
   const packet = buildPacket({ job: { ...job, op_id: op }, payload, model, goal: latestGoal(db, job.workflow_id), params: dispatchParams, placements, productLocale: productLocaleFor(repo), ownerAnswers, boundGoal });
   if (environmentHealth?.declared) packet.context.environment = { ready: environmentHealth.ready, checkedAt: environmentHealth.at, services: envServicesOf(environmentHealth), remedies: environmentHealth.remedies };
   if (payload.repairFor) packet.context.repair_for = payload.repairFor;
+  // The Kernel's local, additive override of this op (api op-override, graph-edit params/continue, redesign).
+  { const ko = kernelOverrideFor(db, job.workflow_id, op, payload); if (ko) packet.context.kernel_override = ko; }
   // The retry of a worker that died without a report resumes from what it left (scripts/kernel/resume-context.mjs).
   const resumeFrom = bestEffort(() => resumeContextOf(db, job));
   if (resumeFrom?.of) packet.context.resume_from = resumeFrom;
