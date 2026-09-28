@@ -7478,8 +7478,7 @@ function closeOperationTask(db, job, payload, kernelHandle) {
   return { taskId: task.taskId, status: TASK_CLOSED_STATUS, ok: r?.ok === true, ...(r?.error ? { error: String(r.error) } : {}) };
 }
 
-/* -------------------------------------------------------------- incident */
-/* ---------------------------------------------------------------- finish */
+/* ----------------------------------------------------- lifecycle helpers */
 // Inside the caller's transaction: the singleton signal is deleted and the Kernel job settles as
 // `status` with `result`, its terminal binding cleared and `stamp` merged into its payload.
 const releaseKernelSeat = (db, workflowId, seat, { status, result, stamp, now }) => {
@@ -7528,65 +7527,13 @@ const closeKernelTerminal = (kernelTerminal, { owner = 'kernel' } = {}) => {
   try { return closeSelfSafe(kernelTerminal, { owner }); } catch { return null; /* the ledger state stands; the tick GC reconciles host cleanup */ }
 };
 
-function cmdFinish(ledger, args) {
-  const db = ledger.db, workflowId = args.workflow, now = Date.now();
-  const wf = getWorkflow(db, workflowId);
-  if (!wf) throw Object.assign(new Error(`unknown workflow ${workflowId}`), { code: 'workflow-unknown' });
-  const already = wf.phase === 'finished';
-
-  const openOperations = db.prepare(
-    `SELECT job_id,status FROM jobs WHERE workflow_id=? AND kind<>'kernel' AND status NOT IN (${FINAL_SETTLED.map(() => '?').join(',')}) ORDER BY created_at,job_id`
-  ).all(workflowId, ...FINAL_SETTLED);
-  if (!already && openOperations.length) {
-    throw Object.assign(new Error(`workflow ${workflowId} still has ${openOperations.length} unsettled operation(s)`), {
-      code: 'workflow-open-jobs', openJobs: openOperations,
-    });
-  }
-  // A workflow is done when the owner approved its handover: a handover-approved
-  // event newer than the last business settle (scripts/kernel/handover.mjs
-  // handoverGateOf). An archived workflow is the one existing way out.
-  const handoverGate = already ? null : handoverGateOf(db, workflowId);
-  if (handoverGate && !handoverGate.ok) {
-    throw Object.assign(new Error(`workflow ${workflowId} cannot finish: ${handoverGate.reason}; run handover.review as the final leg and let the owner approve it (api status handover)`), {
-      code: 'handover-not-approved', approvedSeq: handoverGate.approvedSeq ?? null, lastBusinessSettleSeq: handoverGate.lastBusinessSettleSeq ?? null,
-    });
-  }
-  const handoverFinish = handoverGate ? { via: handoverGate.via, approvedSeq: handoverGate.approvedSeq ?? null, answeredBy: handoverGate.approval?.answeredBy ?? null } : null;
-
-  // Finish ≠ erase: goals/events/jobs history stays. Live Kernel custody does
-  // not: release the singleton signal and settle its job before asking Orca
-  // to close the exact terminal.
-  const seat = kernelCustodyOf(db, workflowId), kernelTerminal = seat.terminal;
-  let closed = 0, kernelSignalsReleased = 0, kernelJobsSettled = 0;
-  ledger.transaction(() => {
-    db.prepare("UPDATE workflows SET phase='finished', finished_json=?, updated_at=? WHERE workflow_id=?")
-      .run(JSON.stringify({ finishedAt: now, by: 'kernel-api', ...(handoverFinish ? { handover: handoverFinish } : {}) }), now, workflowId);
-    closed = db.prepare("UPDATE inbox SET status='done', applied_at=? WHERE workflow_id=? AND status NOT IN ('done','applied')").run(now, workflowId).changes;
-    ({ kernelSignalsReleased, kernelJobsSettled } = releaseKernelSeat(db, workflowId, seat,
-      { status: 'succeeded', result: { verdict: 'pass', reason: 'workflow-finished', at: now }, stamp: { finishedAt: now }, now }));
-    ledger.appendEvent({
-      workflowId, entityType: 'workflow', entityId: workflowId,
-      kind: 'workflow-finished', payload: { inboxClosed: closed, alreadyFinished: already, kernelSignalsReleased, kernelJobsSettled, kernelTerminal, ...(handoverFinish ? { handover: handoverFinish } : {}) },
-    });
-  });
-  const tasksClosed = closeHeldTasks(db, workflowId, kernelTerminal, now);
-  const retention = retainAfterEnd(db, now);
-
-  const out = { ok: true, workflowId, phase: 'finished', inboxClosed: closed, alreadyFinished: already,
-    kernelSignalsReleased, kernelJobsSettled, kernelTerminal, kernelTerminalCloseRequested: Boolean(kernelTerminal),
-    tasksClosed, retention, ...(handoverFinish ? { handover: handoverFinish } : {}) };
-  emit(out, `workflow ${workflowId} finished${already ? ' (was already finished)' : ''} — inbox rows closed: ${closed}; kernel signal released=${kernelSignalsReleased}, kernel job settled=${kernelJobsSettled}${tasksClosed.length ? `, ${tasksClosed.length} open Task(s) closed` : ''}${kernelTerminal ? `, terminal ${kernelTerminal} close requested` : ''}; history preserved`, args.json);
-  closeKernelTerminal(kernelTerminal, { owner: `kernel:${workflowId}:finish` });
-}
-
-/* --------------------------------------------------------------- archive */
+/* ------------------------------------------------------ archive helpers */
 // `archive --workflow <id> --reason <text> [--by owner|supervisor]`: the owner's stop for a
 // workflow that will not finish. workflows.archived_at is set - every reader of a live workflow
 // already excludes it - and everything the workflow still holds is torn down: its open owner asks
 // retired, its inbox closed, every unsettled operation job cancelled as dropped with its leases and
 // worker released, the Kernel seat released, every Task left in its Run closed, and the Kernel
 // terminal closed last. Archiving an archived workflow writes nothing.
-const WORKFLOW_ARCHIVED = 'workflow-archived';
 const openAskDispatchesOf = (db, workflowId) => db.prepare(`SELECT r.dispatch_id FROM reports r
    WHERE r.workflow_id=? AND r.outcome='ask' AND NOT EXISTS (SELECT 1 FROM events e WHERE e.workflow_id=r.workflow_id
      AND e.kind IN ('ask-answered','ask-superseded') AND json_extract(e.payload_json,'$.dispatchId')=r.dispatch_id)
@@ -7598,74 +7545,6 @@ const releaseDroppedWorker = (db, job, payload, repo) => {
   const handle = operationTerminalHandleOf(job, payload);
   return handle ? { terminalClosed: quitWorkerTerminal(handle, payload) } : {};
 };
-async function cmdArchive(ledger, args, repo) {
-  const db = ledger.db, workflowId = args.workflow;
-  const wf = getWorkflow(db, workflowId);
-  if (!wf) throw Object.assign(new Error(`unknown workflow ${workflowId}`), { code: 'workflow-unknown' });
-  const reason = String(args.reason ?? '').trim();
-  if (!reason) throw Object.assign(new Error('archive needs --reason <text>: an archived workflow keeps why it was stopped'), { code: 'archive-needs-reason' });
-  const by = args.by ?? 'owner';
-  if (!ARCHIVED_BY.includes(by)) throw Object.assign(new Error(`archive --by must be ${ARCHIVED_BY.join('|')}, got '${by}'`), { code: 'archive-bad-by' });
-  const alreadyArchived = (archivedAt) => emit({ ok: true, workflowId, archived: false, alreadyArchived: true, archivedAt },
-    `workflow ${workflowId} was already archived at ${new Date(archivedAt).toISOString()}; nothing changed`, args.json);
-  if (wf.archived_at != null) return alreadyArchived(wf.archived_at);
-
-  const asksRetired = [];
-  for (const dispatchId of openAskDispatchesOf(db, workflowId)) {
-    const retired = await retireAsk(ledger, { workflowId, dispatchId, reason: WORKFLOW_ARCHIVED, repo });
-    if (retired.retired) asksRetired.push(dispatchId);
-  }
-
-  const now = Date.now(), archived = { at: now, reason, by };
-  const seat = kernelCustodyOf(db, workflowId), kernelTerminal = seat.terminal;
-  const dropped = [], machineRefs = [];
-  let inboxClosed = 0, kernelSignalsReleased = 0, kernelJobsSettled = 0, racedAt = null;
-  ledger.transaction(() => {
-    racedAt = db.prepare('SELECT archived_at FROM workflows WHERE workflow_id=?').get(workflowId)?.archived_at ?? null;
-    if (racedAt != null) return;
-    db.prepare('UPDATE workflows SET archived_at=?, updated_at=? WHERE workflow_id=?').run(now, now, workflowId);
-    inboxClosed = db.prepare("UPDATE inbox SET status='done', disposition_json=?, applied_at=? WHERE workflow_id=? AND status NOT IN ('done','applied')")
-      .run(JSON.stringify({ reason: WORKFLOW_ARCHIVED }), now, workflowId).changes;
-    const open = db.prepare(`SELECT * FROM jobs WHERE workflow_id=? AND kind<>'kernel' AND status NOT IN (${FINAL_SETTLED.map(() => '?').join(',')}) ORDER BY created_at,job_id`)
-      .all(workflowId, ...FINAL_SETTLED);
-    for (const job of open) {
-      machineRefs.push(...db.prepare('SELECT machine_ref FROM leases WHERE job_id=? AND machine_ref IS NOT NULL').all(job.job_id).map((r) => r.machine_ref));
-      const leasesReleased = db.prepare('DELETE FROM leases WHERE job_id=?').run(job.job_id).changes;
-      db.prepare("UPDATE jobs SET status='cancelled', lease_token=NULL, deadline=NULL, result_json=?, updated_at=? WHERE job_id=?")
-        .run(JSON.stringify({ verdict: 'dropped', reason: WORKFLOW_ARCHIVED, priorStatus: job.status, at: now }), now, job.job_id);
-      ledger.appendEvent({ workflowId, entityType: 'job', entityId: job.job_id, kind: 'job-dropped',
-        payload: { op: jobOpOf(job), attempt: job.attempt, reason: WORKFLOW_ARCHIVED, priorStatus: job.status, leasesReleased } });
-      dropped.push({ job, leasesReleased });
-    }
-    ({ kernelSignalsReleased, kernelJobsSettled } = releaseKernelSeat(db, workflowId, seat,
-      { status: 'cancelled', result: { reason: WORKFLOW_ARCHIVED, at: now }, stamp: { archivedAt: now }, now }));
-    ledger.appendEvent({ workflowId, entityType: 'workflow', entityId: workflowId, kind: WORKFLOW_ARCHIVED,
-      payload: { archived, inboxClosed, jobsDropped: dropped.map((d) => d.job.job_id), asksRetired, kernelSignalsReleased, kernelJobsSettled, kernelTerminal } });
-  });
-  if (racedAt != null) return alreadyArchived(racedAt);
-  if (machineRefs.length) {
-    try { const machine = openMachine({ file: machineFileFor() }); try { machine.release(machineRefs); } finally { machine.close(); } }
-    catch { /* ledger rows are the record; machine TTLs expire on their own */ }
-  }
-  // After the durable record: each dropped operation's worker is released, then the Run's Tasks close.
-  const jobsDropped = dropped.map(({ job, leasesReleased }) => {
-    const worker = releaseDroppedWorker(db, job, jobPayloadOf(job), repo);
-    if (worker.managedWorker || worker.terminalClosed) {
-      const stored = parseJson(db.prepare('SELECT payload_json FROM jobs WHERE job_id=?').get(job.job_id)?.payload_json) ?? {};
-      db.prepare('UPDATE jobs SET payload_json=?, updated_at=? WHERE job_id=?').run(JSON.stringify({ ...stored, ...worker }), Date.now(), job.job_id);
-    }
-    // A dropped job that ran keeps what it produced, like a settled one.
-    const artifacts = job.status === 'queued' ? null : indexSettledArtifacts(ledger, job, repo);
-    return { jobId: job.job_id, priorStatus: job.status, leasesReleased, ...worker, ...(artifacts ? { artifacts } : {}) };
-  });
-  const tasksClosed = closeHeldTasks(db, workflowId, kernelTerminal, now);
-  const retention = retainAfterEnd(db, now);
-  const out = { ok: true, workflowId, archived: true, archivedAt: now, reason, by, inboxClosed, jobsDropped, asksRetired,
-    kernelSignalsReleased, kernelJobsSettled, kernelTerminal, kernelTerminalCloseRequested: Boolean(kernelTerminal), tasksClosed, retention };
-  emit(out, `workflow ${workflowId} archived by ${by}: ${reason} — inbox rows closed: ${inboxClosed}; jobs dropped: ${jobsDropped.length}${asksRetired.length ? `; asks retired: ${asksRetired.length}` : ''}; kernel signal released=${kernelSignalsReleased}, kernel job settled=${kernelJobsSettled}${tasksClosed.length ? `, ${tasksClosed.length} open Task(s) closed` : ''}${kernelTerminal ? `, terminal ${kernelTerminal} close requested` : ''}; history preserved`, args.json);
-  closeKernelTerminal(kernelTerminal, { owner: `kernel:${workflowId}:archive` });
-}
-
 /* ------------------------------------------------------------- op IPC */
 // The op-IPC durability verbs: contracts out (kernel→worker, written at
 // dispatch), reports in (worker→kernel, filed by the worker), checks beside
@@ -8122,7 +8001,7 @@ const opGuardLaunch = ({ job, jobId, repo, placements, workerCwd, shims = true }
   }
 };
 const KERNEL_ONLY_VERBS = new Set(['enqueue', 'route', 'dispatch', 'reconcile', 'nudge', 'observe',
-   'settle', 'check', 'provider-health', 'finish', 'archive']);
+   'settle', 'check', 'provider-health']);
 /* ------------------------------------------------------------------ extensions */
 // New verbs, boolean flags and status fields are files, not edits of the shared lines above
 // (scripts/kernel/api-extensions.mjs; lane land-throughput 2026-09-28).
@@ -8133,7 +8012,8 @@ const API_INTERNALS = Object.freeze({
   FINAL_SETTLED, staleInputProjection, staleOperationLine, sourceDriftLines, peerDriftLines,
   resolveJob, parseAttempt, reportDispatchIdOf, OWNER_GATE_KINDS,
   // Verbs split out of this file (lane slim-04) still call these shared helpers.
-  skillRoot, getWorkflow,
+  skillRoot, getWorkflow, FINAL_SETTLED, releaseKernelSeat, closeHeldTasks, retainAfterEnd, closeKernelTerminal,
+  openAskDispatchesOf, releaseDroppedWorker, indexSettledArtifacts,
 });
 let statusAsk = null;
 const runExtensionVerb = async (spec, args, repo) => {
@@ -8173,8 +8053,6 @@ async function main() {
     settle: ['job', 'verdict'],
     report: ['job', 'report'], check: ['job'],
     'provider-health': args['quota-probe'] ? [] : ['provider'],
-    finish: ['workflow'],
-    archive: ['workflow', 'reason'],
   };
   if (!required[cmd]) usage(2);
   for (const k of required[cmd]) need(args[k], `${cmd} needs --${k}`);
@@ -8216,8 +8094,6 @@ async function main() {
       case 'report': return cmdReport(ledger, args, repo);
       case 'check': return cmdCheck(ledger, args, repo);
       case 'provider-health': return await cmdProviderHealth(ledger, args);
-      case 'finish': return cmdFinish(ledger, args);
-      case 'archive': return await cmdArchive(ledger, args, repo);
     }
   } catch (error) {
     console.error(JSON.stringify({ ok: false, error: String(error?.message ?? error), code: error?.code }));

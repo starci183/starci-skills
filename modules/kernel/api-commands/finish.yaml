@@ -1,0 +1,34 @@
+finish:
+  args: '--workflow <id>'
+  reads: 'workflows row; every jobs row; the final verify verdict'
+  writes: >-
+    workflows.phase='finished' + finished_json {at, verdict}; the inbox
+    goal row closed (status 'done'); the kernel singleton signal deleted;
+    the Kernel job settled with worker_id and terminalHandle cleared; the
+    exact Kernel terminal receives a best-effort close request after the
+    durable receipt is emitted; every Task the Run still holds open is closed
+    with `task-update --status done`, so a finished workflow leaves nothing
+    in the Orca tree (modules/kernel/start-workflow.yaml orcaTree);
+    events 'workflow-finished'.
+    The ledger retention pass (checkpoint + incremental vacuum) then runs on
+    the finished workflow's database — never on a ledger a live kernel still
+    holds — recorded on the receipt as `retention`.
+    goals/jobs/reports/events all stay — a
+    finished goal is history, not deletion
+    (start-workflow.yaml: finished goals never re-enter the queue).
+  handoverGate: >-
+    A workflow is done only when the owner approved its handover. Before writing anything, finish
+    requires a `handover-approved` event (settle.handover) whose seq is newer than the last
+    op-settled event of any job other than the Kernel and handover.review
+    (scripts/kernel/handover.mjs handoverGateOf). A chain approved before handover.review existed is
+    held to the same gate: the kernel appends the leg (driver-loop.yaml handoverLoop). The one
+    existing exit without an approval is a workflow the owner archived (workflows.archived_at, set
+    only by api archive); no flag bypasses the gate. finished_json and the workflow-finished event
+    carry handover {via: handover-approved|archived, approvedSeq, answeredBy}. A workflow already
+    finished finishes again idempotently without the gate.
+  returns: '{ok:true, workflowId, phase:finished, inboxClosed:<n>, alreadyFinished, kernelSignalsReleased, kernelJobsSettled, kernelTerminal, kernelTerminalCloseRequested, tasksClosed:[{jobId,taskId,status,ok}], handover?:{via, approvedSeq, answeredBy}, retention?:{ran:true, freedBytes?}|{ran:false, reason}}'
+  refuses:
+    - workflow-unknown
+    - workflow-open-jobs: 'one or more operation jobs are unsettled; a model turn ending is not workflow completion'
+    - 'handover-not-approved: no handover-approved event, or the newest one predates the last business settle (handoverGate); run handover.review and let the owner approve it'
+  usedBy: 'tick.finish — called only once every job is settled, the final verify leg passed and the owner approved the handover (driver-loop.yaml)'
