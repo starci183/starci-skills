@@ -10,6 +10,17 @@ export function initializeReadRedaction(projects) {
   for (const row of projects) if (row.repoRoot) learnStackSecrets(row.repoRoot);
 }
 
+function hideAbsolutePaths(value) {
+  return value
+    .replace(/\b[A-Za-z]:[\\/][^\r\n]*/g, '[redacted:absolute-path]')
+    .replace(/\\\\[^\\\s]+\\[^\\\s]+\\[^\r\n]*/g, '[redacted:absolute-path]')
+    .replace(/(^|[\s(])\/(?:Users|home|tmp|var|etc|opt|mnt|Volumes|private|srv)\/[^\r\n]*/gm, '$1[redacted:absolute-path]');
+}
+
+function publicText(value) {
+  return hideAbsolutePaths(redactText(value));
+}
+
 export function publicJson(value, key = null) {
   if (Array.isArray(value)) return value.map(item => publicJson(item));
   if (value && typeof value === 'object') {
@@ -18,12 +29,13 @@ export function publicJson(value, key = null) {
   // URL paths are root-relative in browsers; on Windows path.isAbsolute also
   // classifies them as filesystem paths. Keep only the one public blob route.
   if (typeof value === 'string' && key === 'href' && /^\/api\/blob\/[a-f0-9]{64}$/.test(value)) return redactData(value, key);
-  if (typeof value === 'string' && path.isAbsolute(value)) return redactData(path.basename(value), key);
-  return redactData(value, key);
+  if (typeof value === 'string' && path.isAbsolute(value)) return '[redacted:absolute-path]';
+  const clean = redactData(value, key);
+  return typeof clean === 'string' ? hideAbsolutePaths(clean) : clean;
 }
 
 export function redactUnmarkedText(bytes) {
-  return Buffer.from(redactText(bytes.toString('utf8')));
+  return Buffer.from(publicText(bytes.toString('utf8')));
 }
 
 // The evidence module currently exposes a text function, so keep complete lines
@@ -54,11 +66,11 @@ export function redactTextStream() {
           held += line;
           if (held.length + pending.length > MAX_BUFFERED_TEXT) { failClosed(this); break; }
           if (line.includes('-----END')) {
-            this.push(redactText(held));
+            this.push(publicText(held));
             held = '';
             pem = false;
           }
-        } else this.push(redactText(line));
+        } else this.push(publicText(line));
       }
       callback();
     },
@@ -66,7 +78,7 @@ export function redactTextStream() {
       if (!discarded) {
         const tail = pending + decoder.end();
         if (held.length + tail.length > MAX_BUFFERED_TEXT) failClosed(this);
-        else if (held || tail) this.push(redactText(held + tail));
+        else if (held || tail) this.push(publicText(held + tail));
       }
       callback();
     },
