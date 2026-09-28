@@ -593,68 +593,7 @@ commands:
       - workflow-unknown
     usedBy: 'the drive loops cheap per-tick poll (driver-loop.yaml drive.status)'
 
-  hierarchy:
-    args: '--workflow <id>'
-    reads: 'workflow row plus every Kernel/Op job payload for the workflow'
-    writes: 'nothing — pure projection'
-    returns:
-      schema: 'starci/agent-hierarchy@1'
-      workflow: '{nodeId, role: workflow, workflowId, title, status, generation}'
-      nodes: '[{nodeId,parentNodeId,role,workflowId,jobId,opId,attempt,generation,status,verdict,runtime:{host,agent,provider,model,profile,runtimePool,runId,taskId,dispatchId,terminalHandle}}] — verdict is result_json.verdict (pass|fail|blocked|awaiting-owner), null while unsettled'
-      edges: '[{parentNodeId,childNodeId,relation: coordinates|dispatches}]'
-    identityRules:
-      - 'titles such as [Kernel]/[Op], tab order and parentPaneKey never define ownership'
-      - 'the workflow Run coordinator handle is the Kernel terminal; worker-start owns managed Task injection and is never followed by a second dispatch'
-      - 'command-terminal agents still receive an Orca Task/Dispatch; worker_id retains their terminal handle only for exact cleanup'
-    refuses:
-      - workflow-unknown
-    usedBy: 'Orca/sidebar integrations and workflow monitors that need a semantic agent tree'
 
-  # --------------------------------------------------------------------------
-  # ESTIMATE — deterministic same-op slice sizing. No ledger row is touched.
-  # --------------------------------------------------------------------------
-
-  # --------------------------------------------------------------------------
-  # PLAN — persist the derived plan + structural diff vs the approved shape.
-  # --------------------------------------------------------------------------
-
-  plan:
-    args: >-
-      --workflow <id> --file <plan.json> [--replanned-from <plan-digest|event-seq>]
-      [--blocker <kind>] [--path-delta <s>] [--routing-reason <s>]
-    fileShape: '{legs: [{op, paths?, notes?}], edges?: [[fromLeg, toLeg]]} — modules/schemas/goal-plan.yaml'
-    reads: 'latest goals row — the approved opChain is goals.json.opChain (define-goal.yaml: advisory, re-derived at boot, never trusted blindly)'
-    writes: >-
-      goals.json.derivedPlan {legs, edges?, divergence, lineage, derivedAt} - edges are the file's,
-      else the ones already recorded while the plan keeps the same set of ops - and
-      one events row kind 'plan-derived' {payload: {goal_revision, plan_digest,
-      diff, lineage}} — the file stays the artifact; the ledger stores its digest
-      and its diff, not a copy. `lineage` = {replannedFrom, blocker, pathDelta,
-      routingReason}: which prior plan-derived event/digest this supersedes, the
-      typed blocker or trigger that forced the re-plan, the owned_paths delta vs
-      the prior legs, and why the legs routed as they did. It is recorded exactly
-      as given, including all-null. Supplying it on a RE-PLAN is a kernel
-      obligation the api does not enforce — re-planning without provenance is a
-      quiet rewrite, and the rule lives in driver-loop.yaml replanTriggers.lineage.
-    diff: >-
-      STRUCTURAL only — the derived op ids vs the approved opChain legs.
-      Added, removed or re-ordered legs are divergence; edges and allowlist
-      wording inside the approved shape are not (modules/schemas/goal-plan.yaml
-      rules: disjoint allowlists). One addition is not divergence: handover.review appended
-      as the LAST leg of a plan whose approved opChain predates it — the
-      owner handover every workflow owes before `api finish`
-      (driver-loop.yaml handoverLoop). The diff then records
-      handoverAppended:true.
-    returns:
-      ok: true
-      goalRevision: '<revision the plan was derived against>'
-      diff: '{added[], removed[], changed[], identical:true|false}'
-      divergent: 'true|false — structural divergence: the driver escalates and dispatches nothing on it'
-    refuses:
-      - plan-file-missing: 'the --file path does not exist'
-      - plan-file-invalid: 'unparseable, or fails the goal-plan {legs:[{op,...}]} shape — the refusal names the rule'
-      - workflow-unknown
-    usedBy: 'tick.plan — divergence -> api incident --kind plan-divergence, never a quiet re-plan (driver-loop.yaml)'
 
   # --------------------------------------------------------------------------
   # QUEUE — queued job rows are the queue; a duplicate is a refusal.

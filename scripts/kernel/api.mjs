@@ -80,7 +80,7 @@ import { withLessons } from '../supervisor/lessons-file.mjs';
 import { lineageJobsOf, ownerAnswersOf, repeatedAnswerOf } from './owner-answers.mjs';
 import { OWNER_CLAIM_UNPROVEN, RESOLVERS, incidentKindOf, ownerClaimAudit, ownerGatesNotOwnerWork, resolutionClaimOf, resolutionOf, resolutionOwnerCheck } from './owner-claim.mjs';
 import { isAwaitingOwner, unresolvedFailures } from './failure-steps.mjs';
-import { legOpsOf, planAncestorsOf, planGraphOf } from '../route/plan-edges.mjs';
+import { planAncestorsOf, planGraphOf } from '../route/plan-edges.mjs';
 import { domainsOfPaths, latestVersion as latestGraphVersion, workGraphStatus } from '../work/work-graph-store.mjs';
 import { lineageRouteAdjust } from './lineage-route.mjs';
 import { DRAW_OWNER_EVERY_CHANGE, DRAW_REVIEW_CHANGE, DRAW_REVIEW_OP, DRAW_REVIEW_UNJUDGED_CHANGE, drawReviewsOwed } from '../work/draw-review.mjs';
@@ -3330,95 +3330,7 @@ function cmdStatus(ledger, args, repo = null) {
 }
 
 /* ------------------------------------------------------------- hierarchy */
-function cmdHierarchy(ledger, args) {
-  const out = { ok: true, ...agentHierarchyOf(ledger.db, args.workflow) };
-  emit(out, [
-    `${out.workflow.nodeId} (${out.workflow.status ?? '-'})`,
-    ...out.nodes.map((node) => `  ${node.parentNodeId} -> ${node.nodeId} [${node.status}${node.verdict === AWAITING_OWNER ? ` ${AWAITING_OWNER}` : ''}]${node.runtime.model ? ` ${node.runtime.agent ?? '-'} / ${node.runtime.model}` : ''}`),
-  ].join('\n'), args.json);
-}
-
 /* ------------------------------------------------------------------ plan */
-function cmdPlan(ledger, args) {
-  const db = ledger.db, workflowId = args.workflow;
-  const now = Date.now();
-  const file = path.resolve(args.file);
-  if (!fs.existsSync(file)) throw Object.assign(new Error(`plan file missing: ${file}`), { code: 'plan-file-missing' });
-  const plan = parseJson(fs.readFileSync(file, 'utf8'));
-  if (!plan || !Array.isArray(plan.legs) || plan.legs.some((l) => !l || typeof l.op !== 'string' || !l.op)
-    || (plan.edges !== undefined && (!Array.isArray(plan.edges) || plan.edges.some((e) => !Array.isArray(e) || e.length !== 2 || e.some((label) => typeof label !== 'string' || !label))))) {
-    throw Object.assign(new Error(`invalid plan file ${file} — expected {legs:[{op,paths?,notes?}], edges?:[[fromLeg,toLeg]]}`), { code: 'plan-file-invalid' });
-  }
-  const legs = plan.legs.map((l) => ({ op: l.op, ...(l.paths ? { paths: l.paths } : {}), ...(l.notes ? { notes: l.notes } : {}) }));
-  const planOps = legs.map((l) => l.op);
-
-  if (!getWorkflow(db, workflowId)) throw Object.assign(new Error(`unknown workflow ${workflowId}`), { code: 'workflow-unknown' });
-  const g = latestGoal(db, workflowId);
-  const storedLegs = goalJsonOf(g)?.opChain?.legs ?? null;
-  const storedOps = storedLegs ? storedLegs.map((l) => l?.op ?? l).filter(Boolean) : null;
-  // A chain approved before the owner handover existed lacks its final leg.
-  // Appending handover.review as the LAST leg is the one addition the Kernel
-  // makes without the owner (api finish requires it), so it is no divergence.
-  const handoverAppended = Boolean(storedOps) && !storedOps.includes(HANDOVER_OP) && planOps.at(-1) === HANDOVER_OP
-    && planOps.indexOf(HANDOVER_OP) === planOps.length - 1;
-  const comparedOps = handoverAppended ? planOps.slice(0, -1) : planOps;
-  // Structural diff only: which stored legs the plan dropped, which plan ops
-  // were never in the approved chain, whether shared ops changed order.
-  const divergence = {
-    storedOps: storedOps ?? null,
-    planOps,
-    missing: storedOps ? storedOps.filter((o) => !planOps.includes(o)) : [],
-    extra: storedOps ? comparedOps.filter((o) => !storedOps.includes(o)) : [...planOps],
-    reordered: storedOps
-      ? JSON.stringify(storedOps.filter((o) => comparedOps.includes(o))) !== JSON.stringify(comparedOps.filter((o) => storedOps.includes(o)))
-      : false,
-    noStoredChain: storedOps === null,
-    ...(handoverAppended ? { handoverAppended: true } : {}),
-  };
-  divergence.diverged = divergence.missing.length > 0 || divergence.extra.length > 0 || divergence.reordered;
-
-  const lineage = {
-    replannedFrom: args['replanned-from'] ?? null,
-    blocker: args.blocker ?? null,
-    pathDelta: args['path-delta'] ?? null,
-    routingReason: args['routing-reason'] ?? null,
-  };
-  let inboxApplied = 0;
-
-  ledger.transaction(() => {
-    if (g) {
-      const gj = goalJsonOf(g);
-      // The plan's own edges, else the recorded ones while the leg set is unchanged (scripts/route/plan-edges.mjs reads them).
-      const prior = gj.derivedPlan ?? null;
-      const edges = Array.isArray(plan.edges) ? plan.edges
-        : Array.isArray(prior?.edges) && JSON.stringify(legOpsOf(prior.legs).sort()) === JSON.stringify([...new Set(planOps)].sort()) ? prior.edges : null;
-      gj.derivedPlan = { legs, ...(edges ? { edges } : {}), divergence, lineage, derivedAt: now };
-      db.prepare('UPDATE goals SET json=? WHERE goal_seq=?').run(JSON.stringify(gj), g.goal_seq);
-      inboxApplied = db.prepare("UPDATE inbox SET status='applied', disposition_json=?, applied_at=? WHERE workflow_id=? AND kind='goal-revision' AND status='pending' AND key=?")
-        .run(JSON.stringify({ action: 'plan-derived', revision: g.revision, lineage }), now, workflowId, `${workflowId}:${g.revision}`).changes;
-    }
-    ledger.appendEvent({
-      workflowId, entityType: 'workflow', entityId: workflowId,
-      kind: 'plan-derived', payload: { goal_revision: g?.revision ?? null, legs, divergence, lineage, inboxApplied, file },
-    });
-  });
-
-  // The legs the owner's config.yaml specs switches defer (never dispatched; api run-deferred-tests runs them later).
-  const specs = ownerSpecs(skillRoot);
-  const deferredLegs = legs.map((leg) => ({ op: leg.op, deferral: planLegDeferral({ skillRoot, op: leg.op, settings: specs }) })).filter((leg) => leg.deferral)
-    .map((leg) => ({ op: leg.op, reason: leg.deferral.reason }));
-  const testsDeferred = { off: specsOff(specs), legs: deferredLegs, jobs: deferredTestsOf(db, workflowId) };
-  const out = { ok: true, workflowId, goalRevision: g?.revision ?? null, divergence, lineage, inboxApplied, legs, testsDeferred };
-  emit(out,
-    `plan-derived for ${workflowId}: ${legs.length} legs — diverged=${divergence.diverged}` +
-    (deferredLegs.length ? ` tests-deferred=[${deferredLegs.map((leg) => `${leg.op}:${leg.reason}`).join(',')}]` : '') +
-    (divergence.missing.length ? ` missing=[${divergence.missing.join(',')}]` : '') +
-    (divergence.extra.length ? ` extra=[${divergence.extra.join(',')}]` : '') +
-    (divergence.reordered ? ' reordered' : '') +
-    (divergence.noStoredChain ? ' (no stored opChain to diff)' : ''),
-    args.json);
-}
-
 /* -------------------------------------------------------------- estimate */
 // Deterministic same-op sizing. The kernel measures the write scope and passes
 // the counts; the computation is scripts/work/slice-estimate.mjs and every number
@@ -9154,7 +9066,7 @@ const opGuardLaunch = ({ job, jobId, repo, placements, workerCwd, shims = true }
     return { env: {}, pathPrefix: null, receipt: { error: String(e?.message ?? e) } };
   }
 };
-const KERNEL_ONLY_VERBS = new Set(['plan', 'enqueue', 'route', 'dispatch', 'reconcile', 'nudge', 'observe',
+const KERNEL_ONLY_VERBS = new Set(['enqueue', 'route', 'dispatch', 'reconcile', 'nudge', 'observe',
   'questions', 'messages', 'reply', 'foundation', 'record-change', 'settle', 'check', 'consume-report', 'incident', 'provider-health', 'finish', 'archive', 'autopilot', 'contract-release']);
 /* ------------------------------------------------------------------ extensions */
 // New verbs, boolean flags and status fields are files, not edits of the shared lines above
@@ -9162,7 +9074,7 @@ const KERNEL_ONLY_VERBS = new Set(['plan', 'enqueue', 'route', 'dispatch', 'reco
 const API_EXT = await loadApiExtensions();
 // What an extension verb may call of this module (the settle's async tail: scripts/kernel/api-verbs/settle-tail.mjs).
 const API_INTERNALS = Object.freeze({
-  runSettleTail, ownerRoot,
+  runSettleTail, ownerRoot, agentHierarchyOf,
   // Verbs split out of this file (lane slim-04) still call these shared helpers.
   skillRoot, getWorkflow,
 });
@@ -9197,7 +9109,7 @@ async function main() {
   if (API_EXT.verbs.has(cmd)) return runExtensionVerb(API_EXT.verbs.get(cmd), args, repo);
 
   const required = {
-    survey: ['workflow'], status: ['workflow'], hierarchy: ['workflow'], plan: ['workflow', 'file'],
+    survey: ['workflow'], status: ['workflow'],
     enqueue: ['workflow', 'op', ...(args['commit-only-work-debt'] ? [] : ['paths'])], estimate: [], route: ['job'], dispatch: ['job'],
     reconcile: [], nudge: ['job'], observe: ['job'],
     questions: ['workflow'], messages: ['workflow'], reply: ['workflow', 'message'],
@@ -9249,8 +9161,6 @@ async function main() {
     switch (cmd) {
       case 'survey': return cmdSurvey(ledger, args, repo);
       case 'status': return await cmdStatusMemoised(ledger, args, repo);
-      case 'hierarchy': return cmdHierarchy(ledger, args);
-      case 'plan': return cmdPlan(ledger, args);
       case 'enqueue': return cmdEnqueue(ledger, args, repo);
       case 'route': return await cmdRoute(ledger, args);
       case 'dispatch': return cmdDispatch(ledger, args, repo);

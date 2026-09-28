@@ -1,0 +1,31 @@
+plan:
+  args: >-
+    --workflow <id> --file <plan.json> [--replanned-from <plan-digest|event-seq>]
+    [--blocker <kind>] [--path-delta <s>] [--routing-reason <s>]
+  fileShape: '{legs: [{op, paths?, notes?}], edges?: [[fromLeg, toLeg]]} — modules/schemas/goal-plan.yaml'
+  reads: 'latest goals row — the approved opChain is goals.json.opChain (define-goal.yaml: advisory, re-derived at boot, never trusted blindly)'
+  writes: >-
+    The latest goals.json.derivedPlan becomes {legs, edges?, divergence, lineage, derivedAt}.
+    Edges come from the file, or from the prior derived plan while the leg op set is unchanged.
+    A pending goal-revision inbox row for this revision is marked applied. One plan-derived event
+    records {goal_revision, legs, divergence, lineage, inboxApplied, file}. `lineage` is
+    {replannedFrom, blocker, pathDelta, routingReason}, recorded exactly as supplied. A re-plan
+    should name its provenance as required by driver-loop.yaml replanTriggers.lineage.
+  diff: >-
+    STRUCTURAL only — the derived op ids vs the approved opChain legs.
+    Added, removed or re-ordered legs are divergence; edges and allowlist
+    wording inside the approved shape are not (modules/schemas/goal-plan.yaml
+    rules: disjoint allowlists). One addition is not divergence: handover.review appended
+    as the LAST leg of a plan whose approved opChain predates it — the
+    owner handover every workflow owes before `api finish`
+    (driver-loop.yaml handoverLoop). The divergence then records
+    handoverAppended:true.
+  returns: >-
+    {ok:true, workflowId, goalRevision, divergence:{storedOps,planOps,missing[],extra[],
+    reordered,noStoredChain,handoverAppended?,diverged}, lineage, inboxApplied, legs,
+    testsDeferred:{off,legs,jobs}}. The legs and divergence are persisted in goals.json.derivedPlan.
+  refuses:
+    - plan-file-missing: 'the --file path does not exist'
+    - plan-file-invalid: 'unparseable, or fails the goal-plan {legs:[{op,...}]} shape — the refusal names the rule'
+    - workflow-unknown
+  usedBy: 'tick.plan — divergence -> api incident --kind plan-divergence, never a quiet re-plan (driver-loop.yaml)'
