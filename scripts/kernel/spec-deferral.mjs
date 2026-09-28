@@ -21,6 +21,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { parseYaml } from '../../engine/yaml.mjs';
 import { inspectOwnerConfig, specsSettings } from '../../engine/config.mjs';
+import { enqueueJob, recordJobResult, setJobStatus } from '../../engine/ledger-db.mjs';
 
 export const SPECS_CLASSES = Object.freeze(['unit', 'e2e']);
 export const SPECS_TOGGLE_VALUES = Object.freeze(['defer-leg', 'skip', 'not-counted']);
@@ -92,7 +93,7 @@ export function planLegDeferral({ skillRoot, op, settings = null }) {
 }
 
 /**
- * Settle one queued job as deferred: status succeeded, result {verdict: 'deferred', deferred}, and one
+ * Settle one queued job as deferred: status cancelled (queued never goes to succeeded), result {verdict: 'deferred', deferred}, and one
  * `tests-deferred` event. No dispatch, no lease, no attempt spent. Returns the deferral, or null when the
  * job was no longer queued. Runs inside the caller's transaction when one is open.
  */
@@ -101,11 +102,11 @@ export function deferJob(ledger, { job, deferral, via, now = Date.now() }) {
   const deferred = { kind: deferral.kind, reason: deferral.reason, at: now, via };
   const result = { verdict: DEFERRED_VERDICT, deferred, summary: `deferred: ${deferral.reason} (owner config.yaml specs; api run-deferred-tests runs it later)` };
   const write = () => {
-    const changed = db.prepare("UPDATE jobs SET status='succeeded', result_json=?, lease_token=NULL, worker_id=NULL, deadline=NULL, updated_at=? WHERE job_id=? AND status='queued'")
-      .run(JSON.stringify(result), now, job.job_id).changes;
-    if (!changed) return null;
+    if (db.prepare('SELECT status FROM jobs WHERE job_id=?').get(job.job_id)?.status !== 'queued') return null;
+    setJobStatus(db, { jobId: job.job_id, to: 'cancelled', reason: 'tests-deferred', at: now });
+    recordJobResult(db, { jobId: job.job_id, result, at: now });
     ledger.appendEvent({ workflowId: job.workflow_id, entityType: 'job', entityId: job.job_id, kind: TESTS_DEFERRED_EVENT,
-      payload: { opId: job.op_id, attempt: job.attempt, ...deferred } });
+      payload: { opId: job.op_id, attempt: job.try_no, ...deferred } });
     return deferred;
   };
   return db.isTransaction ? write() : ledger.transaction(write);
@@ -115,7 +116,11 @@ const parse = (text) => { try { return JSON.parse(text ?? 'null') ?? {}; } catch
 
 /** A workflow's deferred test legs, oldest first: [{jobId, op, attempt, kind, reason, at, via}]. `kind` filters. */
 export function deferredTestsOf(db, workflowId, { kind = null } = {}) {
-  return db.prepare("SELECT job_id, op_id, attempt, result_json FROM jobs WHERE workflow_id=? AND status='succeeded' AND json_extract(result_json,'$.verdict')=? ORDER BY created_at, job_id")
+  // A deferred leg is a cancelled job whose job-result says deferred and that no later job resumes yet.
+  return db.prepare(`SELECT j.job_id, j.op_id, j.try_no AS attempt, e.payload_json AS result_json FROM jobs j
+      JOIN events e ON e.entity_type='job' AND e.entity_id=j.job_id AND e.kind='job-result'
+     WHERE j.workflow_id=? AND j.status='cancelled' AND json_extract(e.payload_json,'$.verdict')=?
+       AND NOT EXISTS(SELECT 1 FROM jobs n WHERE n.resume_of=j.job_id) ORDER BY j.created_at, j.job_id`)
     .all(workflowId, DEFERRED_VERDICT)
     .map((row) => ({ row, deferred: parse(row.result_json).deferred ?? {} }))
     .filter(({ deferred }) => !kind || deferred.kind === kind)
@@ -123,8 +128,8 @@ export function deferredTestsOf(db, workflowId, { kind = null } = {}) {
 }
 
 /**
- * Re-queue a workflow's deferred test legs (`api run-deferred-tests`): each goes back to queued on its same
- * attempt (none was spent) with payload.specsForced, so it dispatches even while its class is still off.
+ * Re-queue a workflow's deferred test legs (`api run-deferred-tests`): each gets a new queued job of the same unit
+ * (resume_of the deferred one, retry_class resume) with payload.specsForced, so it dispatches even while its class is still off.
  * Returns the re-queued items.
  */
 export function requeueDeferredTests(ledger, { workflowId, kind = null, by = 'run-deferred-tests', now = Date.now() }) {
@@ -133,12 +138,13 @@ export function requeueDeferredTests(ledger, { workflowId, kind = null, by = 'ru
   const run = () => {
     const done = [];
     for (const item of items) {
-      const row = db.prepare('SELECT payload_json FROM jobs WHERE job_id=?').get(item.jobId);
-      const payload = { ...parse(row?.payload_json), specsForced: { at: now, by, kind: item.kind } };
-      const changed = db.prepare("UPDATE jobs SET status='queued', result_json=NULL, payload_json=?, updated_at=? WHERE job_id=? AND status='succeeded' AND json_extract(result_json,'$.verdict')=?")
-        .run(JSON.stringify(payload), now, item.jobId, DEFERRED_VERDICT).changes;
-      if (!changed) continue;
-      ledger.appendEvent({ workflowId, entityType: 'job', entityId: item.jobId, kind: TESTS_REQUEUED_EVENT, payload: { opId: item.op, attempt: item.attempt, kind: item.kind, by } });
+      const row = db.prepare('SELECT * FROM jobs WHERE job_id=?').get(item.jobId);
+      if (!row?.unit_id) continue;
+      const payload = { ...parse(row.payload_json), specsForced: { at: now, by, kind: item.kind } };
+      const jobId = `${item.jobId}-r${row.try_no + 1}`;
+      enqueueJob(db, { jobId, workflowId, unitId: row.unit_id, opId: row.op_id, tryNo: row.try_no + 1, resumeOf: item.jobId, retryClass: 'resume',
+        generation: row.generation, kind: row.kind, role: row.role, payload, priority: parse(row.priority_json), createdAt: now });
+      ledger.appendEvent({ workflowId, entityType: 'job', entityId: jobId, kind: TESTS_REQUEUED_EVENT, payload: { opId: item.op, attempt: row.try_no + 1, resumeOf: item.jobId, kind: item.kind, by } });
       done.push(item);
     }
     return done;

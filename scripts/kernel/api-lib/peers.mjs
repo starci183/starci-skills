@@ -18,7 +18,7 @@
 // so in practice every running workflow of one ledger is a peer: the ledger
 // is one product and its binding spans the product's repositories.
 import path from 'node:path';
-import { JOB_STATUSES, newToken } from '../../../engine/ledger-db.mjs';
+import { JOB_STATUSES, newToken, postInbox, resolveIncident } from '../../../engine/ledger-db.mjs';
 import { leaseCompareForm, ownedPathsIntersect } from '../../../engine/admission.mjs';
 import { parseJson } from '../../lib/json.mjs';
 import { leaseCanonicalizer } from '../lease-canon.mjs';
@@ -87,8 +87,7 @@ const pathsIntersectSafe = (a, b) => { try { return ownedPathsIntersect(a, b); }
 export const writePeerMessage = (ledger, { from, to, kind, subject, body, replyTo = null, refs = [], extra = {}, now = Date.now() }) => {
   const key = `pm-${newToken().slice(0, 12)}`;
   const payload = { from: from.workflow_id, fromTitle: from.title ?? null, kind, subject, body, replyTo, refs, at: now, ...extra };
-  ledger.db.prepare("INSERT INTO inbox(workflow_id,kind,key,payload_json,status,created_at) VALUES(?,?,?,?, 'pending',?)")
-    .run(to, PEER_MESSAGE, key, JSON.stringify(payload), now);
+  postInbox(ledger.db, { workflowId: to, kind: PEER_MESSAGE, key, fromRef: from.workflow_id, payload, createdAt: now });
   ledger.appendEvent({ workflowId: from.workflow_id, entityType: 'workflow', entityId: from.workflow_id, kind: 'peer-message-sent',
     payload: { to, key, kind, subject, replyTo, ...(extra.auto ? { auto: extra.auto } : {}) } });
   return { to, key, kind, subject };
@@ -135,7 +134,7 @@ export const peerWaitMessageArrived = (ledger, { waiter, peer, key, kind, subjec
     ledger.transaction(() => {
       const now = Date.now();
       for (const incidentId of resolved) {
-        db.prepare("UPDATE incidents SET status='resolved',updated_at=? WHERE incident_id=? AND status='open'").run(now, incidentId);
+        resolveIncident(db, { incidentId, reason: 'answered', at: now });
         ledger.appendEvent({ workflowId: waiter, entityType: 'incident', entityId: incidentId, kind: 'incident-resolved',
           payload: { detail: `peer-wait met by peer message ${key} (${kind}) from ${peer}: ${subject}`, peerMessage: key, peer, by: 'peer-message' } });
       }

@@ -35,7 +35,7 @@ import { parseYaml } from '../../engine/yaml.mjs';
 import { normalizeFoundationName, readFoundation } from './foundations.mjs';
 import { parseJson } from '../lib/json.mjs';
 import { retiredBeforeDispatch } from '../../engine/admission.mjs';
-import { JOB_STATUSES } from '../../engine/ledger-db.mjs';
+import { JOB_STATUSES, resolveIncident } from '../../engine/ledger-db.mjs';
 
 export const UNTIL_TYPES = Object.freeze(['record', 'job', 'message', 'commit', 'incident', 'foundation', 'landed']);
 // The legs of a workflow that write product code: while one is open its restructure is not over.
@@ -427,8 +427,7 @@ export function autoResolveTypedIncidents(ledger, { repo, workflowId = null, now
     try {
       let changed = false;
       ledger.transaction(() => {
-        changed = ledger.db.prepare("UPDATE incidents SET status='resolved',updated_at=? WHERE incident_id=? AND status='open'")
-          .run(now, incident.incidentId).changes > 0;
+        changed = resolveIncident(ledger.db, { incidentId: incident.incidentId, reason: 'fixed', at: now });
         if (!changed) return;
         ledger.appendEvent({ workflowId: incident.workflowId, entityType: 'incident', entityId: incident.incidentId, kind: 'incident-resolved',
           payload: { detail: `every typed condition holds: ${evidence.join('; ')}`, by: 'until-conditions', evidence } });

@@ -41,7 +41,9 @@ import path from 'node:path';
 import crypto from 'node:crypto';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath, pathToFileURL } from 'node:url';
-import { openLedger, ledgerFileFor, transitionWorkflowToRunning } from '../../engine/ledger-db.mjs';
+import { openLedger, ledgerFileFor, transitionWorkflowToRunning, bindKernelJob, releaseKernelJob, recordJobResult, setSignal, clearSignal, updateSignal, openIncident, resolveIncident, setInboxStatus } from '../../engine/ledger-db.mjs';
+// The kernel seat's boot count lives in its payload (hierarchy.attempt); jobs.try_no is the op-try ordinal only.
+const kernelAttemptOf = (row) => parseJsonOr(row?.payload_json)?.hierarchy?.attempt ?? 0;
 import { inspectOwnerConfig } from '../../engine/config.mjs';
 import { parseYaml } from '../../engine/yaml.mjs';
 import { buildSpawnCommand, spawnAgent, loadAdapter } from '../agent/lib.mjs';
@@ -473,7 +475,7 @@ async function adoptKernel(workflowId, handle) {
   const wf = ledger.db.prepare('SELECT phase,generation FROM workflows WHERE workflow_id=?').get(workflowId);
   if (!wf) refuse('adopt-no-workflow', { workflowId, terminal: handle, error: `no workflow ${workflowId}` });
   const jobId = `kernel-${workflowId}`;
-  const job = ledger.db.prepare('SELECT job_id,status,worker_id,attempt,payload_json FROM jobs WHERE job_id=?').get(jobId);
+  const job = ledger.db.prepare('SELECT job_id,status,worker_id,payload_json FROM jobs WHERE job_id=?').get(jobId);
   if (!job) refuse('adopt-no-kernel-job', { workflowId, terminal: handle, error: `${jobId} does not exist; boot the kernel instead` });
   const events = ledger.db.prepare("SELECT kind,payload_json,created_at FROM events WHERE workflow_id=? AND entity_type='kernel' AND payload_json LIKE ? ORDER BY created_at")
     .all(workflowId, `%${handle}%`).map((e) => withPayload(e, null));
@@ -527,17 +529,14 @@ async function adoptKernel(workflowId, handle) {
   });
   let resolved = [];
   ledger.transaction(() => {
-    ledger.db.prepare("DELETE FROM signals WHERE scope='kernel' AND key=?").run(workflowId);
-    ledger.db.prepare("INSERT INTO signals(scope,key,holder_pid,token,value_json,at,expires_at) VALUES('kernel',?,?,?,?,?,NULL)")
-      .run(workflowId, process.pid, token, JSON.stringify(seat), now);
-    ledger.db.prepare("UPDATE jobs SET status='running',worker_id=?,result_json=NULL,payload_json=?,updated_at=? WHERE job_id=?")
-      .run(handle, payload, now, jobId);
+    setSignal(ledger.db, { scope: 'kernel', key: workflowId, workflowId, holderPid: process.pid, token, value: seat, at: now, expiresAt: null });
+    bindKernelJob(ledger.db, { workflowId, workerId: handle, payload: JSON.parse(payload), reason: 'kernel-adopted', at: now });
     // The failed restart recorded this very terminal as unclosed residue; it is the kernel again.
     resolved = ledger.db.prepare("SELECT incident_id FROM incidents WHERE workflow_id=? AND status='open' AND last_progress LIKE '%kernel-stale-terminal-unclosed%' AND last_progress LIKE ?")
       .all(workflowId, `%${handle}%`).map((row) => row.incident_id);
-    for (const id of resolved) ledger.db.prepare("UPDATE incidents SET status='resolved',updated_at=? WHERE incident_id=?").run(now, id);
+    for (const id of resolved) resolveIncident(ledger.db, { incidentId: id, reason: 'fixed', at: now });
     ledger.appendEvent({ workflowId, entityType: 'kernel', entityId: workflowId, generation: wf.generation ?? 0, kind: 'kernel-adopted', createdAt: now,
-      payload: { ...seat, screenState, attempt: job.attempt,
+      payload: { ...seat, screenState, attempt: kernelAttemptOf(job),
         previousJob: { status: job.status, worker_id: job.worker_id },
         previousSignal: priorSignal ? { token: priorSignal.token, terminal: priorValue.terminal ?? null, reason: priorHealth?.reason ?? null } : null,
         resolvedIncidents: resolved } });
@@ -607,16 +606,15 @@ function closeExitedKernelTerminals(workflowId, handles, liveHandle) {
     for (const r of results.filter((x) => x.closed || x.proof === 'gone')) {
       const ids = ledger.db.prepare("SELECT incident_id FROM incidents WHERE workflow_id=? AND status='open' AND last_progress LIKE '%kernel-stale-terminal-unclosed%' AND last_progress LIKE ?")
         .all(workflowId, `%${r.handle}%`).map((row) => row.incident_id);
-      for (const id of ids) ledger.db.prepare("UPDATE incidents SET status='resolved',updated_at=? WHERE incident_id=?").run(at, id);
+      for (const id of ids) resolveIncident(ledger.db, { incidentId: id, reason: 'fixed', at });
       if (ids.length) r.resolvedIncidents = ids;
     }
     ledger.appendEvent({ workflowId, entityType: 'kernel', entityId: workflowId, generation, kind: 'kernel-exited-terminal-closed',
       payload: { liveTerminal: liveHandle, terminals: results }, createdAt: at });
     for (const r of unclosed) {
-      ledger.db.prepare("INSERT INTO incidents(incident_id,workflow_id,op_id,attempts,model_calls,tokens,elapsed_ms,last_progress,status,updated_at) VALUES(?,?,NULL,0,0,0,0,?,'open',?)")
-        .run(`inc-${crypto.randomBytes(6).toString('hex')}`, workflowId,
-          `[orca-tree] ${JSON.stringify({ code: 'kernel-stale-terminal-unclosed', handle: r.handle, ok: false, agentExited: true,
-            ...(r.proof ? { proof: r.proof } : {}), error: r.error ?? r.reason ?? null })}`, at);
+      openIncident(ledger.db, { incidentId: `inc-${crypto.randomBytes(6).toString('hex')}`, workflowId, kind: 'runtime-defect', owner: 'supervisor', at,
+        lastProgress: `[orca-tree] ${JSON.stringify({ code: 'kernel-stale-terminal-unclosed', handle: r.handle, ok: false, agentExited: true,
+          ...(r.proof ? { proof: r.proof } : {}), error: r.error ?? r.reason ?? null })}` });
     }
   });
   for (const r of unclosed) console.error(`start-workflow: warning: exited kernel terminal ${r.handle} was not closed (${r.error ?? r.reason ?? 'no reason given'}) — incident opened`);
@@ -763,9 +761,10 @@ try {
     const unclosed = staleKernel.terminalClosed && staleKernel.terminalClosed.ok !== true
       ? staleKernel.terminalClosed : null;
     ledger.transaction(() => {
-      ledger.db.prepare("DELETE FROM signals WHERE scope='kernel' AND key=? AND token=?").run(target, priorSignal.token);
-      ledger.db.prepare("UPDATE jobs SET status='stopped', result_json=?, updated_at=? WHERE job_id=? AND status='running'")
-        .run(JSON.stringify({ reason: priorHealth.reason, terminal: staleKernel.terminal }), at, `kernel-${target}`);
+      clearSignal(ledger.db, { scope: 'kernel', key: target, token: priorSignal.token });
+      // The dead kernel's seat is released (running -> ready); the replacement below binds it again.
+      if (releaseKernelJob(ledger.db, { workflowId: target, reason: 'kernel-stale-cleared', at }))
+        recordJobResult(ledger.db, { jobId: `kernel-${target}`, result: { reason: priorHealth.reason, terminal: staleKernel.terminal }, at });
       ledger.appendEvent({ workflowId: target, entityType: 'kernel', entityId: target,
         generation: workflow?.generation ?? 0, kind: 'kernel-stale-cleared', payload: staleKernel, createdAt: at });
       // A terminal the host refused to close outlives this restart and becomes
@@ -776,9 +775,8 @@ try {
         ledger.appendEvent({ workflowId: target, entityType: 'kernel', entityId: target,
           generation: workflow?.generation ?? 0, kind: 'kernel-stale-terminal-unclosed',
           payload: { ...unclosed, reason: priorHealth.reason }, createdAt: at });
-        ledger.db.prepare("INSERT INTO incidents(incident_id,workflow_id,op_id,attempts,model_calls,tokens,elapsed_ms,last_progress,status,updated_at) VALUES(?,?,NULL,0,0,0,0,?,'open',?)")
-          .run(`inc-${crypto.randomBytes(6).toString('hex')}`, target,
-            `[orca-tree] ${JSON.stringify({ code: 'kernel-stale-terminal-unclosed', ...unclosed })}`, at);
+        openIncident(ledger.db, { incidentId: `inc-${crypto.randomBytes(6).toString('hex')}`, workflowId: target, kind: 'runtime-defect', owner: 'supervisor', at,
+          lastProgress: `[orca-tree] ${JSON.stringify({ code: 'kernel-stale-terminal-unclosed', ...unclosed })}` });
       }
     });
     if (unclosed) console.error(`start-workflow: warning: stale kernel terminal ${unclosed.handle} could not be closed (${unclosed.error ?? 'no reason given'}) — incident opened`);
@@ -789,7 +787,7 @@ try {
   ledger.transaction(() => {
     const row = ledger.db.prepare("SELECT inbox_id,workflow_id,payload_json,status FROM inbox WHERE kind='goal' AND status='pending' AND workflow_id=? LIMIT 1").get(target);
     if (!row) return;
-    ledger.db.prepare("UPDATE inbox SET status='claimed',applied_at=? WHERE inbox_id=? AND status='pending'").run(Date.now(), row.inbox_id);
+    setInboxStatus(ledger.db, { inboxId: row.inbox_id, status: 'claimed' });
     claim = row;
   });
   if (!claim) {
@@ -812,9 +810,7 @@ try {
   const reserved = ledger.transaction(() => {
     const occupied = ledger.db.prepare("SELECT token FROM signals WHERE scope='kernel' AND key=? AND (expires_at IS NULL OR expires_at>?)").get(workflowId, reservationAt);
     if (occupied) return false;
-    ledger.db.prepare("DELETE FROM signals WHERE scope='kernel' AND key=?").run(workflowId);
-    ledger.db.prepare("INSERT INTO signals(scope,key,holder_pid,token,value_json,at,expires_at) VALUES('kernel',?,?,?,?,?,?)")
-      .run(workflowId, process.pid, token, JSON.stringify({ state: 'starting' }), reservationAt, reservationExpires);
+    setSignal(ledger.db, { scope: 'kernel', key: workflowId, workflowId, holderPid: process.pid, token, value: { state: 'starting' }, at: reservationAt, expiresAt: reservationExpires });
     return true;
   });
   if (!reserved) {
@@ -835,23 +831,23 @@ try {
   const goal = ledger.db.prepare('SELECT revision,goal_identity,json FROM goals WHERE workflow_id=? ORDER BY revision DESC LIMIT 1').get(workflowId);
   const goalBridge = (() => { const j = parseJson(goal?.json, {}) ?? {}; return j.definedBy === 'supervisor' ? (j.bridge ?? { bridgeId: null }) : null; })();
   const firstBoot = ledger.db.prepare("SELECT created_at FROM events WHERE workflow_id=? AND kind='kernel-booted' ORDER BY seq LIMIT 1").get(workflowId);
-  const priorKernelJob = ledger.db.prepare('SELECT attempt,worker_id FROM jobs WHERE job_id=?').get(`kernel-${workflowId}`);
+  const priorKernelJob = ledger.db.prepare('SELECT payload_json,worker_id FROM jobs WHERE job_id=?').get(`kernel-${workflowId}`);
   // restartAuthority: why this launch is a replacement, stated in the prompt and the receipt.
   const restartAuthority = replaced ? {
     reason: staleKernel?.reason ? `failed its liveness check (${staleKernel.reason})` : 'lost its seat (no live kernel signal after a host or Orca restart)',
     previousTerminal: staleKernel?.terminal ?? priorKernelJob?.worker_id ?? null,
-    previousAttempt: priorKernelJob?.attempt ?? null,
+    previousAttempt: priorKernelJob ? kernelAttemptOf(priorKernelJob) : null,
     launchedBy,
   } : null;
   const launchAuthority = launchAuthorityText({ workflowId, goalRevision: goal?.revision ?? 0, goalIdentity: goal?.goal_identity ?? null,
     approvedAt: firstBoot?.created_at ? new Date(firstBoot.created_at).toISOString() : null, bridge: goalBridge,
-    restart: restartAuthority && { ...restartAuthority, attempt: (priorKernelJob?.attempt ?? 0) + 1, launcher: LAUNCHERS[launchedBy] } });
+    restart: restartAuthority && { ...restartAuthority, attempt: kernelAttemptOf(priorKernelJob) + 1, launcher: LAUNCHERS[launchedBy] } });
   const prompt = renderKernelPrompt({ workflowId, inboxId: claim.inbox_id, goalRevision: goal?.revision ?? 0, launchAuthority });
   const failStart = (step, error, handle = null, extra = {}) => {
     const at = Date.now();
     const workflow = ledger.db.prepare('SELECT generation FROM workflows WHERE workflow_id=?').get(workflowId);
     ledger.transaction(() => {
-      ledger.db.prepare("DELETE FROM signals WHERE scope='kernel' AND key=? AND token=?").run(workflowId, token);
+      clearSignal(ledger.db, { scope: 'kernel', key: workflowId, token });
       ledger.appendEvent({ workflowId, entityType: 'kernel', entityId: workflowId,
         generation: workflow?.generation ?? 0, kind: 'kernel-start-failed', payload: { step, error, terminal: handle, ...extra }, createdAt: at });
     });
@@ -876,7 +872,8 @@ try {
     const at = Date.now();
     if (at - renewedAt < 15000) return;
     renewedAt = at;
-    ledger.db.prepare("UPDATE signals SET expires_at=? WHERE scope='kernel' AND key=? AND token=? AND expires_at IS NOT NULL").run(at + 120000, workflowId, token);
+    const held = ledger.db.prepare("SELECT expires_at FROM signals WHERE scope='kernel' AND key=? AND token=?").get(workflowId, token);
+    if (held?.expires_at != null) updateSignal(ledger.db, { scope: 'kernel', key: workflowId, token, expiresAt: at + 120000 });
   };
   const recordGateAnswers = (member, result) => {
     // gate-auto-approved: each launch gate the runtime answered for this member.
@@ -918,7 +915,7 @@ try {
         ledger.appendEvent({ workflowId, entityType: 'kernel', entityId: workflowId, generation: workflow?.generation ?? 0,
           kind: 'kernel-start-retry', createdAt: at,
           payload: { agent: member.agent, requestedModel: member.model, attempt: attempts.length, ...attempts.at(-1) } });
-        ledger.db.prepare("UPDATE signals SET expires_at=? WHERE scope='kernel' AND key=? AND token=?").run(at + 120000, workflowId, token);
+        updateSignal(ledger.db, { scope: 'kernel', key: workflowId, token, expiresAt: at + 120000 });
       });
       console.error(`start-workflow: warning: kernel launch attempt ${attempts.length} failed at ${spawned.step} (${spawned.failureKind ?? 'transient'}: ${spawned.error}) — retrying once with a fresh terminal${spawned.lastOutput ? `; last output:\n${spawned.lastOutput}` : ''}`);
     }
@@ -963,7 +960,7 @@ try {
         payload: { step: spawned.step, error: spawned.error, terminal: spawned.terminal ?? null, ...failure,
           fellThroughTo: { agent: next.agent, model: next.model ?? null } } });
       // The next member gets a full startup window of its own.
-      ledger.db.prepare("UPDATE signals SET expires_at=? WHERE scope='kernel' AND key=? AND token=?").run(at + 120000, workflowId, token);
+      updateSignal(ledger.db, { scope: 'kernel', key: workflowId, token, expiresAt: at + 120000 });
     });
     fellThrough.push({ agent: member.agent, model: member.model ?? null, step: spawned.step, error: spawned.error,
       ...(spawned.gate ? { gate: spawned.gate } : {}) });
@@ -977,16 +974,16 @@ try {
   const now = Date.now();
   const workflow = ledger.db.prepare('SELECT generation FROM workflows WHERE workflow_id=?').get(workflowId);
   const generation = workflow?.generation ?? 0;
-  const previousJob = ledger.db.prepare('SELECT attempt,payload_json FROM jobs WHERE job_id=?').get(`kernel-${workflowId}`);
+  const previousJob = ledger.db.prepare('SELECT payload_json FROM jobs WHERE job_id=?').get(`kernel-${workflowId}`);
   const previousPayload = parseJsonOr(previousJob?.payload_json);
-  const attempt = previousJob ? previousJob.attempt + 1 : 1;
+  const attempt = kernelAttemptOf(previousJob) + 1;
   const routeInfo = { host: 'orca', agent: route.agent, routedBy: route.routedBy, model: kernelModel,
     effort: kernelEffort, profile: route.route?.profile ?? null, runtimePool: route.runtimePool ?? null, launch: 'terminal' };
 
   ledger.transaction(() => {
-    ledger.db.prepare("UPDATE signals SET holder_pid=?,value_json=?,at=?,expires_at=NULL WHERE scope='kernel' AND key=? AND token=?")
-      .run(process.pid, JSON.stringify({ terminal: handle, host: 'orca', agent: route.agent, routedBy: route.routedBy,
-        model: kernelModel, effort: kernelEffort, launch: routeInfo.launch, modelAttested: true }), now, workflowId, token);
+    updateSignal(ledger.db, { scope: 'kernel', key: workflowId, token, holderPid: process.pid, at: now, expiresAt: null,
+      value: { terminal: handle, host: 'orca', agent: route.agent, routedBy: route.routedBy,
+        model: kernelModel, effort: kernelEffort, launch: routeInfo.launch, modelAttested: true } });
     // A restart replaces the SEAT, not the workflow's Orca identity. Writing a
     // fresh object over payload_json dropped orca.runId, so the next dispatch's
     // ensureWorkflowRun saw no Run and created a second one — the two-tree
@@ -1027,14 +1024,8 @@ try {
         runtime: { ...(previousPayload.hierarchy?.runtime ?? {}), ...nextPayload.hierarchy.runtime },
       },
     });
-    if (previousJob) {
-      ledger.db.prepare("UPDATE jobs SET attempt=?,generation=?,payload_json=?,status='running',worker_id=?,result_json=NULL,updated_at=? WHERE job_id=?")
-        .run(attempt, generation, payload, workerId, now, `kernel-${workflowId}`);
-    } else {
-      // enqueueJob owns the jobs row shape; the kernel row is born running and bound to its worker.
-      ledger.enqueueJob({ jobId: `kernel-${workflowId}`, workflowId, generation, kind: 'kernel', role: 'kernel', payload: parseJson(payload), createdAt: now });
-      ledger.db.prepare("UPDATE jobs SET status='running', worker_id=? WHERE job_id=?").run(workerId, `kernel-${workflowId}`);
-    }
+    // The kernel row is born running and bound to its worker; a released seat (ready) is re-bound, a live one adopted.
+    bindKernelJob(ledger.db, { workflowId, workerId, payload: parseJson(payload), generation, reason: replaced ? 'kernel-restarted' : 'kernel-booted', at: now });
     transitionWorkflowToRunning(ledger, { workflowId, now, generation });
     ledger.appendEvent({ workflowId, entityType: 'kernel', entityId: workflowId, generation,
       kind: replaced ? 'kernel-restarted' : 'kernel-booted',

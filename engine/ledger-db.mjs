@@ -541,6 +541,57 @@ export function setJobStatus(db,{jobId,to,reason=null,at=nowMs(),spanId=null,att
   appendEvent(db,{workflowId:job.workflow_id,entityType:'job',entityId:jobId,kind:'job-status',attemptId,spanId,payload:{from:job.status,to,reason},createdAt:at});
   return true;
 }
+/**
+ * A job's result (jobs has no result column: DBTREE keeps results on the attempt). With an attempt: the job's newest
+ * attempt gets settle_json = result (and verdict / failure_class / next_step when the result names valid ones). Without
+ * one (a job cancelled before dispatch, a kernel job): one 'job-result' event carries it. Read back with jobResult.
+ */
+const VERDICTS=new Set(['pass','fail','partial','blocked','dropped','cancelled']);
+export function recordJobResult(db,{jobId,result,at=nowMs()}){
+  const job=db.prepare('SELECT * FROM jobs WHERE job_id=?').get(jobId);
+  need(job,`job ${jobId} not found`,'STARCI_JOB_NOT_FOUND');
+  const attempt=db.prepare('SELECT attempt_id FROM op_attempts WHERE job_id=? ORDER BY attempt_id DESC LIMIT 1').get(jobId);
+  if(attempt){
+    const fields={settleJson:json(result??null)};
+    if(result&&VERDICTS.has(result.verdict))fields.verdict=result.verdict;
+    if(result?.failureClass!=null)fields.failureClass=typeof result.failureClass==='string'?result.failureClass:json(result.failureClass);
+    if(result?.nextStep!=null)fields.nextStep=typeof result.nextStep==='string'?result.nextStep:json(result.nextStep);
+    updateAttempt(db,{attemptId:attempt.attempt_id,at,...fields});
+  }else appendEvent(db,{workflowId:job.workflow_id,entityType:'job',entityId:jobId,kind:'job-result',payload:result??null,createdAt:at});
+  return true;
+}
+/** The result recordJobResult stored for `jobId` (the newest attempt's settle_json, else the newest job-result event), or null. */
+export function jobResult(db,jobId){
+  const a=db.prepare('SELECT settle_json FROM op_attempts WHERE job_id=? ORDER BY attempt_id DESC LIMIT 1').get(jobId);
+  if(a)return parseJson(a.settle_json);
+  const e=db.prepare("SELECT payload_json FROM events WHERE entity_type='job' AND entity_id=? AND kind='job-result' ORDER BY seq DESC LIMIT 1").get(jobId);
+  return e?parseJson(e.payload_json):null;
+}
+/**
+ * The kernel seat's job (kernel-<wf>, kind 'kernel', no unit): created running on first boot; a released seat (ready)
+ * goes ready → leased → running; a running one is re-bound (adoption). A kernel job that ended cannot come back.
+ */
+export function bindKernelJob(db,{workflowId,workerId,payload=undefined,generation=undefined,reason='kernel-boot',at=nowMs()}){
+  const jobId=`kernel-${workflowId}`;
+  const job=db.prepare('SELECT * FROM jobs WHERE job_id=?').get(jobId);
+  if(!job){enqueueJob(db,{jobId,workflowId,kind:'kernel',role:'kernel',status:'running',payload:payload??null,generation,createdAt:at});updateRow(db,'jobs',{jobId},{workerId,updatedAt:at});return jobId;}
+  need(!SETTLED_JOB_STATUSES.includes(job.status),`kernel-job-ended: ${jobId} is ${job.status}`,'STARCI_KERNEL_JOB_ENDED');
+  const fields={workerId};if(payload!==undefined)fields.payload=payload;if(generation!==undefined)fields.generation=generation;
+  if(job.status==='running'){updateRow(db,'jobs',{jobId},{...fields,updatedAt:at});return jobId;}
+  if(job.status==='queued')setJobStatus(db,{jobId,to:'ready',reason,at});
+  if(['queued','ready'].includes(job.status))setJobStatus(db,{jobId,to:'leased',reason,at});
+  updateRow(db,'jobs',{jobId},{...fields,updatedAt:at});
+  setJobStatus(db,{jobId,to:'running',reason,at});
+  return jobId;
+}
+/** Release the kernel seat's job (running → ready) so a later boot re-binds it; returns false when it was not running. */
+export function releaseKernelJob(db,{workflowId,reason='kernel-stopped',at=nowMs()}){
+  const jobId=`kernel-${workflowId}`;
+  const job=db.prepare('SELECT status FROM jobs WHERE job_id=?').get(jobId);
+  if(job?.status!=='running')return false;
+  setJobStatus(db,{jobId,to:'ready',reason,workerId:null,at});
+  return true;
+}
 /** Update non-status job fields (lease token, worker, deadline, payload, priority). */
 export function updateJob(db,{jobId,at=nowMs(),...fields}){
   for(const key of Object.keys(fields))need(JOB_MUTABLE.has(key),`updateJob cannot set ${key}`);
@@ -722,8 +773,29 @@ export function setCondition(db,{workflowId,entityType,entityId,type,status,reas
   if(moved)appendEvent(db,{workflowId,entityType,entityId:String(entityId),kind:'condition-changed',payload:{type,from:prior?.status??null,to:status,reason},createdAt:at});
   return moved;
 }
-export function openIncident(db,{incidentId=`inc-${newToken().slice(0,12)}`,workflowId,kind,owner,detail=null,dueAt=null,opId=null,jobId=null,attemptId=null,at=nowMs()}){
-  insertRow(db,'incidents',{incidentId,workflowId,opId,jobId,attemptId,kind,detail,owner,dueAt,status:'open',createdAt:at,updatedAt:at});
+export const INCIDENT_KINDS=Object.freeze(['infra-provider','config-defect','owner-ask','credential-missing','safety-block','runtime-defect','evidence-missing','scope-change','partial-effect','other']);
+/**
+ * The runtime's free incident kinds (api incident --kind, the '[kind] detail' prefix of last_progress) mapped onto the
+ * incidents.kind enum and the owner who must clear it. An enum value maps to itself.
+ */
+export function incidentClassOf(freeKind){
+  const k=String(freeKind??'').toLowerCase();
+  if(INCIDENT_KINDS.includes(k))return {kind:k,owner:['owner-ask','credential-missing','safety-block','scope-change','partial-effect'].includes(k)?'owner':['runtime-defect','config-defect'].includes(k)?'supervisor':'kernel'};
+  if(/owner|handover|approval/.test(k))return {kind:'owner-ask',owner:'owner'};
+  if(/credential|secret|provision/.test(k))return {kind:'credential-missing',owner:'owner'};
+  if(/safety/.test(k))return {kind:'safety-block',owner:'owner'};
+  if(/scope|goal/.test(k))return {kind:'scope-change',owner:'owner'};
+  if(/partial|effect/.test(k))return {kind:'partial-effect',owner:'owner'};
+  if(/infra|provider|quota|environment|network/.test(k))return {kind:'infra-provider',owner:'kernel'};
+  if(/config/.test(k))return {kind:'config-defect',owner:'supervisor'};
+  if(/supervisor|runtime|orca|settler|tree|kernel/.test(k))return {kind:'runtime-defect',owner:'supervisor'};
+  if(/evidence|proof|capture/.test(k))return {kind:'evidence-missing',owner:'kernel'};
+  return {kind:'other',owner:'kernel'};
+}
+/** Open one incident. A free `kind` (peer-wait, owner-gate, ...) is classed by incidentClassOf; `owner` defaults to the class's. */
+export function openIncident(db,{incidentId=`inc-${newToken().slice(0,12)}`,workflowId,kind,owner=null,detail=null,lastProgress=null,dueAt=null,opId=null,jobId=null,attemptId=null,at=nowMs()}){
+  const cls=incidentClassOf(kind);kind=cls.kind;owner=owner??cls.owner;
+  insertRow(db,'incidents',{incidentId,workflowId,opId,jobId,attemptId,kind,detail,lastProgress,owner,dueAt,status:'open',createdAt:at,updatedAt:at});
   appendEvent(db,{workflowId,entityType:'incident',entityId:incidentId,attemptId,kind:'incident-opened',payload:{kind,owner,detail},createdAt:at});
   return incidentId;
 }
@@ -780,6 +852,14 @@ export function setSignal(db,{scope,key,workflowId=null,holderPid=null,token=nul
   db.prepare('INSERT INTO signals(scope,key,workflow_id,holder_pid,token,value_json,at,expires_at) VALUES(?,?,?,?,?,?,?,?) ON CONFLICT(scope,key) DO UPDATE SET workflow_id=excluded.workflow_id,holder_pid=excluded.holder_pid,token=excluded.token,value_json=excluded.value_json,at=excluded.at,expires_at=excluded.expires_at')
     .run(scope,key,workflowId,holderPid,token,json(value),at,expiresAt);
 }
+const SIGNAL_MUTABLE=new Set(['holderPid','token','value','expiresAt','at','workflowId']);
+/** Update fields of an existing signal (only when its token matches, if `token` is given); returns true when a row changed. */
+export function updateSignal(db,{scope,key,token=undefined,...fields}){
+  for(const k of Object.keys(fields))need(SIGNAL_MUTABLE.has(k),`updateSignal cannot set ${k}`);
+  const where={scope,key};if(token!==undefined)where.token=token;
+  const set={...fields};if('value' in set){set.valueJson=json(set.value);delete set.value;}
+  return updateRow(db,'signals',where,set).changes>0;
+}
 export function clearSignal(db,{scope,key,token=null}){
   return (token?db.prepare('DELETE FROM signals WHERE scope=? AND key=? AND token=?').run(scope,key,token):db.prepare('DELETE FROM signals WHERE scope=? AND key=?').run(scope,key)).changes>0;
 }
@@ -810,7 +890,7 @@ export const LEDGER_WRITES=Object.freeze({recordBlob,storeBlob,appendEvent,creat
   createUnit,setUnitState,reopenUnit,raiseTryBudget,addUnitEdge,recordGraphVersion,enqueueJob,setJobStatus,updateJob,startAttempt,updateAttempt,writeContract,
   declareResource,acquireLease,renewLeases,releaseLeases,idempotent,recordFailedRequest,fileReport,markReportConsumed,recordCheckRun,recordArtifact,attachToReport,
   recordArtifactProof,citeBlob,recordTranscriptSnapshot,setAttemptTranscript,recordLlmUsage,appendLog,setLogCursor,setCondition,openIncident,updateIncident,resolveIncident,
-  postInbox,setInboxStatus,openDecisionItem,updateDecisionItem,recordDecision,setSignal,clearSignal,queueSettleTail,updateSettleTail,recordProductLand,finishProductLand});
+  postInbox,setInboxStatus,openDecisionItem,updateDecisionItem,recordDecision,setSignal,updateSignal,clearSignal,queueSettleTail,recordJobResult,bindKernelJob,releaseKernelJob,updateSettleTail,recordProductLand,finishProductLand});
 
 /**
  * The read-write handle. A new (empty) file is created with 0001-init.sql; any other schema is refused (clean slate).

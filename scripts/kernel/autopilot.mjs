@@ -36,6 +36,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { allocationSettings } from '../../engine/config.mjs';
+import { openIncident, updateIncident } from '../../engine/ledger-db.mjs';
 import { parseYaml } from '../../engine/yaml.mjs';
 import { parseJson, readJsonFile } from '../lib/json.mjs';
 import { list } from '../lib/list.mjs';
@@ -480,8 +481,7 @@ const newIncidentId = () => `inc-${Math.random().toString(16).slice(2, 8)}${Date
 /** Open one supervisor-gate incident (inside the caller's transaction). */
 export function openSupervisorGate(ledger, { workflowId, opId = null, holds = [], detail, evidence = null, route = null, auto = true }) {
   const incidentId = newIncidentId();
-  ledger.db.prepare("INSERT INTO incidents(incident_id,workflow_id,op_id,attempts,model_calls,tokens,elapsed_ms,last_progress,status,updated_at) VALUES(?,?,?,0,0,0,0,?,'open',?)")
-    .run(incidentId, workflowId, opId, `[${SUPERVISOR_GATE}] ${detail}`, Date.now());
+  openIncident(ledger.db, { incidentId, workflowId, kind: SUPERVISOR_GATE, opId, lastProgress: `[${SUPERVISOR_GATE}] ${detail}`, detail });
   ledger.appendEvent({ workflowId, entityType: 'incident', entityId: incidentId, kind: 'incident-raised',
     payload: { kind: SUPERVISOR_GATE, detail, opId, holds, auto, by: AUTOPILOT_BY, ruling: AUTOPILOT_RULING, ...(route ? { route } : {}), ...(evidence ? { evidence } : {}) } });
   return incidentId;
@@ -515,7 +515,7 @@ export function autopilotSweep({ ledger, repo, workflowId, settings = autopilotS
     for (const row of openIncidents(db, workflowId)) {
       if (!['owner-gate', 'owner-gate-pending'].includes(kindOf(row.last_progress))) continue;
       const detail = String(row.last_progress ?? '').replace(/^\[[^\]]+\]\s*/, '');
-      db.prepare("UPDATE incidents SET last_progress=?,updated_at=? WHERE incident_id=?").run(`[${SUPERVISOR_GATE}] ${detail}`, now, row.incident_id);
+      updateIncident(db, { incidentId: row.incident_id, lastProgress: `[${SUPERVISOR_GATE}] ${detail}`, owner: 'supervisor', at: now });
       const raised = raisedOf(db, workflowId, row.incident_id) ?? {};
       ledger.appendEvent({ workflowId, entityType: 'incident', entityId: row.incident_id, kind: AUTOPILOT_EVENTS.rerouted,
         payload: { from: kindOf(row.last_progress), to: SUPERVISOR_GATE, by: AUTOPILOT_BY, ruling: AUTOPILOT_RULING, holds: raised.holds ?? null, reason: 'under autopilot only the handover waits on the owner: a runtime/process gate is the Supervisor\'s' } });

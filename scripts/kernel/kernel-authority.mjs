@@ -21,6 +21,7 @@ import { fileURLToPath } from 'node:url';
 import { parseYaml } from '../../engine/yaml.mjs';
 import { skillRoot } from '../../engine/runtime-root.mjs';
 import { parseJsonOr } from '../lib/json.mjs';
+import { jobResult, recordJobResult, setJobStatus, updateJob } from '../../engine/ledger-db.mjs';
 import { clipLine } from '../lib/clip.mjs';
 import { leaseCanonicalizer } from './lease-canon.mjs';
 import { familyGuardOf, familyViolations } from './write-families.mjs';
@@ -57,7 +58,7 @@ export function apiRun(argv, { repo, timeoutMs = 240_000, env = process.env } = 
 
 export const jobRow = (db, jobId) => {
   const r = db.prepare('SELECT * FROM jobs WHERE job_id=?').get(jobId);
-  return r ? { ...r, payload: parse(r.payload_json), result: parse(r.result_json) } : null;
+  return r ? { ...r, payload: parse(r.payload_json), result: jobResult(db, jobId) ?? {} } : null;
 };
 export const dispatchedEver = (db, jobId) => Boolean(db.prepare("SELECT 1 FROM events WHERE entity_type='job' AND entity_id=? AND kind IN ('op-dispatched','dispatch-attested','worker-attested') LIMIT 1").get(jobId));
 
@@ -70,22 +71,26 @@ export function editableJob(db, workflowId, jobId) {
 }
 
 export function setPayload(ledger, job, payload, now = Date.now()) {
-  ledger.db.prepare('UPDATE jobs SET payload_json=?, updated_at=? WHERE job_id=? AND status=?').run(JSON.stringify(payload), now, job.job_id, 'queued');
+  const status = ledger.db.prepare('SELECT status FROM jobs WHERE job_id=?').get(job.job_id)?.status;
+  if (status === 'queued') updateJob(ledger.db, { jobId: job.job_id, payload, at: now });
 }
 
 export function dropJob(ledger, job, { reason, editId, now = Date.now() }) {
-  ledger.db.prepare("UPDATE jobs SET status='cancelled', result_json=?, updated_at=? WHERE job_id=? AND status='queued'")
-    .run(JSON.stringify({ verdict: 'dropped', reason, by: editId, at: now }), now, job.job_id);
+  if (ledger.db.prepare('SELECT status FROM jobs WHERE job_id=?').get(job.job_id)?.status === 'queued') {
+    setJobStatus(ledger.db, { jobId: job.job_id, to: 'cancelled', reason: 'kernel-edit-drop', at: now });
+    recordJobResult(ledger.db, { jobId: job.job_id, result: { verdict: 'dropped', reason, by: editId, at: now }, at: now });
+  }
   ledger.appendEvent({ workflowId: job.workflow_id, entityType: 'job', entityId: job.job_id, kind: 'job-dropped', payload: { reason, by: editId, kernelEdit: true } });
 }
 
-/** Undo a drop this edit made: back to queued when nothing replaced it since. */
-export function restoreJob(ledger, jobId, { editId, now = Date.now() }) {
+/**
+ * Undo a drop this edit made. jobs.cancelled is terminal (DBTREE job_transitions): the dropped job never comes back,
+ * so an undo restores nothing and returns false (lane a3-4: an undo re-enqueues the unit as a new job, resume_of it).
+ */
+export function restoreJob(ledger, jobId, { editId }) {
   const j = jobRow(ledger.db, jobId);
   if (!j || j.status !== 'cancelled' || j.result?.by !== editId) return false;
-  ledger.db.prepare("UPDATE jobs SET status='queued', result_json=NULL, updated_at=? WHERE job_id=? AND status='cancelled'").run(now, jobId);
-  ledger.appendEvent({ workflowId: j.workflow_id, entityType: 'job', entityId: jobId, kind: 'job-restored', payload: { undo: editId } });
-  return true;
+  return false;
 }
 
 /* ------------------------------------------------------------ paths and leases */
