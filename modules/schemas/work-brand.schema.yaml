@@ -906,9 +906,9 @@ $defs:
           dispatchId, for example ctx_eb5a945a39ea).
       receipt:
         $ref: "#/$defs/prose"
-        description: The receipt path, relative to the repository root, for example
-          .starciwork/kernel-evidence/<workflow>/serve-ask/answer-<ms>.json. Without it the check finds the
-          newest receipt answering acceptedBy under kernel-evidence.
+        description: The stored answer, blob:<sha256> (the receipt serve-ask stores as a blob and a decisions row,
+          scripts/kernel/ask-receipts.mjs), or a path inside the repository. Without it the check finds the
+          newest receipt answering acceptedBy in the project ledger.
   valueSource:
     type: object
     additionalProperties: false

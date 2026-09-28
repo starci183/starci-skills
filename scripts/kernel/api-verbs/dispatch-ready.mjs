@@ -10,6 +10,7 @@
 // Without --foreground the pushes run in a detached child (dispatches can outlast an agent's command window) and the
 // verb answers at once with the result file; the next `api status` shows the running count.
 import fs from 'node:fs';
+import { kernelScratchDirOf } from '../op-prompt.mjs';
 import path from 'node:path';
 import { spawn } from 'node:child_process';
 import { API_FILE, PUSH_KIND, apiRun, failedShapesOf, jobRow, newId, recordKernel, refuse, shapeOf } from '../kernel-authority.mjs';
@@ -26,7 +27,7 @@ export default {
     // Decisions first: a push never runs past the Kernel's open Decision Items (its route/dispatch children are exempt).
     if (!args['dry-run']) refuseDecisionsFirst(db, wf, 'dispatch-ready', { now, repo });
     const pushId = args['push-id'] ?? newId('push');
-    const dir = path.join(repo, '.starciwork', 'kernel-evidence', wf, 'dispatch');
+    const dir = kernelScratchDirOf(repo, wf, 'dispatch');
     const resultFile = path.join(dir, `${pushId}.json`);
     if (!args.foreground && !args['dry-run']) {
       fs.mkdirSync(dir, { recursive: true });

@@ -95,7 +95,7 @@ sha256. The token is looked up in the declared sources as usual - never in the r
 ### 2. `contrast-aa`
 
 **Inputs:** `brand.color.tokens[]` (`value`, `foreground`, `role`), `brand.color.policy.minContrast`,
-`brand.color.policy.contrastExceptions[]`, and the owner answer receipts under `<work>/kernel-evidence/`.
+`brand.color.policy.contrastExceptions[]`, and the owner answer receipts in the project ledger (blob + `decisions` row, `scripts/kernel/ask-receipts.mjs`).
 
 Every token that declares a `foreground` is a text pair and must reach `policy.minContrast`, defaulting to
 the WCAG AA floor of 4.5:1. The `primary` token against a declared `surface` token is a non-text indicator
@@ -113,7 +113,7 @@ contrastExceptions:
     ratio: 3.45                       # the WCAG ratio the owner accepted
     reason: Academy danger red, owner answer A
     acceptedBy: ctx_eb5a945a39ea      # the owner ask's dispatch id
-    receipt: .starciwork/kernel-evidence/<workflow>/serve-ask/answer-<ms>.json   # optional
+    receipt: blob:<sha256>            # optional: the stored answer serve-ask returned
 ```
 
 An exception covers a pair when its `background` is the pair's background token and its `foreground` token is
@@ -122,8 +122,8 @@ canvas — is measured from the exception's two tokens, so an accepted pair is n
 refused, and the check fails, when either token is undeclared, the pair is listed twice, `reason` is empty,
 the pair now measures more than `CONTRAST_EXCEPTION_TOLERANCE` = 0.05 from `ratio` (the colour changed after
 the owner answered), or no `starci/ask-answer@1` receipt with `dispatchId` = `acceptedBy` and
-`answeredBy: owner` is on disk — at `receipt` inside the repository, else the newest one under
-`<work>/kernel-evidence/*/serve-ask/`. An auto-accepted answer is not the owner's. Every pair the record does
+`answeredBy: owner` exists — the named `receipt` (a stored answer or a file inside the repository), else the newest one answering
+`acceptedBy` in the project ledger. An auto-accepted answer is not the owner's. Every pair the record does
 not list is still held to `minContrast`. Evidence lists each exception with its status: `applied`,
 `unneeded` (the pair meets the floor anyway) or `refused` with the reason.
 

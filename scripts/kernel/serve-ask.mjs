@@ -17,7 +17,7 @@
 // bridge so the pointer reaches the app's env loader. UPPER_SNAKE variables
 // are upserted into BOTH .env.local (the provision-script sink) and app.env
 // (the canonical encrypted env store). A sanitized receipt (names and custody
-// paths only — never values) lands in kernel-evidence, an `ask-answered`
+// paths only — never values) is a blob + decisions row (ask-receipts.mjs), an `ask-answered`
 // event is appended, and the workflow's Kernel is woken through its Orca
 // terminal so it can re-verify custody presence and settle the ask.
 //
@@ -48,6 +48,7 @@
 // the owner asked for that drawing (drawOwnerRequestOf, from the ledger).
 
 import '../lib/hide-child-windows.mjs';
+import { writeAskReceipt } from './ask-receipts.mjs';
 import fs from 'node:fs';
 import http from 'node:http';
 import os from 'node:os';
@@ -489,9 +490,6 @@ export async function answerDrawReviewByReply({ repo, ledgerFile = null, workflo
     if (closed) return { ok: false, why: `already ${closed.kind === 'ask-answered' ? 'answered' : 'retired'}` };
     const d = drawReplyDecision(text);
     const part = partPath ? (question.review.parts ?? []).find((p) => p?.path === partPath) : null;
-    const receiptDir = path.join(repo, '.starciwork', 'kernel-evidence', workflowId, 'serve-ask');
-    fs.mkdirSync(receiptDir, { recursive: true });
-    const receiptPath = path.join(receiptDir, `answer-${now}.json`);
     const option = (question.options ?? [])[d.optionIndex];
     const receipt = {
       schema: 'starci/ask-answer@1', workflowId, dispatchId, opId: report.op_id,
@@ -503,10 +501,10 @@ export async function answerDrawReviewByReply({ repo, ledgerFile = null, workflo
       ...(d.golden ? { golden: true } : {}),
       review: question.review,
     };
-    fs.writeFileSync(receiptPath, JSON.stringify(receipt, null, 2));
+    const { receiptPath, receiptSha, decisionId } = writeAskReceipt(ledger, { workflowId, dispatchId, receipt, at: now });
     ledger.transaction(() => ledger.appendEvent({
       workflowId, entityType: 'report', entityId: dispatchId,
-      kind: 'ask-answered', payload: { dispatchId, receiptPath, answeredBy: OWNER, optionIndex: d.optionIndex, via: 'telegram', custodyWritten: [], envWritten: [], pointersWritten: [], errors: [] },
+      kind: 'ask-answered', payload: { dispatchId, receiptPath, receiptSha, decisionId, answeredBy: OWNER, optionIndex: d.optionIndex, via: 'telegram', custodyWritten: [], envWritten: [], pointersWritten: [], errors: [] },
     }));
     const rulings = recordDrawAnswer(ledger, { workflowId, report, receipt, receiptPath, repo, now });
     const woke = wake(ledger, { workflowId, dispatchId, receiptPath });
@@ -700,9 +698,6 @@ export async function autoAcceptAsk({ ledger, ledgerFile, repo, workflowId, repo
   const picks = pickChoice == null ? null : { [String(pickGroup.id)]: String(typeof pickChoice === 'string' ? pickChoice : pickChoice.id ?? pickChoice.label) };
   const via = { structured: 'question.recommended', text: 'marked in the option text', 'draw-review': 'the accept option of a draw-review ask' }[source] ?? source;
   const note = `auto-accepted by config.yaml ${AUTO_ACCEPT_CONFIG_KEY}: recommended option ${index + 1} (${via})${reason ? ` because ${reason}` : ''}`;
-  const receiptDir = path.join(repo, '.starciwork', 'kernel-evidence', workflowId, 'serve-ask');
-  fs.mkdirSync(receiptDir, { recursive: true });
-  const receiptPath = path.join(receiptDir, `answer-${now}.json`);
   const receipt = {
     schema: 'starci/ask-answer@1',
     workflowId, dispatchId: report.dispatch_id, opId: report.op_id,
@@ -712,11 +707,11 @@ export async function autoAcceptAsk({ ledger, ledgerFile, repo, workflowId, repo
     note, at: new Date(now).toISOString(),
     ...(question.review ? { review: question.review } : {}),
   };
-  fs.writeFileSync(receiptPath, JSON.stringify(receipt, null, 2));
+  const { receiptPath, receiptSha, decisionId } = writeAskReceipt(ledger, { workflowId, dispatchId: report.dispatch_id, receipt, at: now });
   ledger.transaction(() => {
     ledger.appendEvent({
       workflowId, entityType: 'report', entityId: report.dispatch_id,
-      kind: 'ask-answered', payload: { dispatchId: report.dispatch_id, receiptPath, answeredBy: AUTO_ACCEPTED_BY, optionIndex: index, option: label, note, custodyWritten: [], envWritten: [], pointersWritten: [], errors: [] },
+      kind: 'ask-answered', payload: { dispatchId: report.dispatch_id, receiptPath, receiptSha, decisionId, answeredBy: AUTO_ACCEPTED_BY, optionIndex: index, option: label, note, custodyWritten: [], envWritten: [], pointersWritten: [], errors: [] },
     });
     ledger.appendEvent({
       workflowId, entityType: 'report', entityId: report.dispatch_id,
@@ -945,9 +940,6 @@ const main = async () => {
           const v = params.get(`pick:${p.id}`);
           if (v != null && v !== '') picks[p.id] = v;
         }
-        const receiptDir = path.join(repo, '.starciwork', 'kernel-evidence', args.workflow, 'serve-ask');
-        fs.mkdirSync(receiptDir, { recursive: true });
-        const receiptPath = path.join(receiptDir, `answer-${Date.now()}.json`);
         const receipt = {
           schema: 'starci/ask-answer@1',
           workflowId: args.workflow, dispatchId: report.dispatch_id, opId: report.op_id,
@@ -963,10 +955,10 @@ const main = async () => {
           // so the answer proves which drawing it accepted (scripts/work/draw-review.mjs apply).
           ...(question.review ? { review: question.review } : {}),
         };
-        fs.writeFileSync(receiptPath, JSON.stringify(receipt, null, 2));
+        const { receiptPath, receiptSha, decisionId } = writeAskReceipt(ledger, { workflowId: args.workflow, dispatchId: report.dispatch_id, receipt });
         ledger.transaction(() => ledger.appendEvent({
           workflowId: args.workflow, entityType: 'report', entityId: report.dispatch_id,
-          kind: 'ask-answered', payload: { dispatchId: report.dispatch_id, receiptPath, answeredBy, optionIndex: receipt.optionIndex, custodyWritten, envWritten, pointersWritten, errors },
+          kind: 'ask-answered', payload: { dispatchId: report.dispatch_id, receiptPath, receiptSha, decisionId, answeredBy, optionIndex: receipt.optionIndex, custodyWritten, envWritten, pointersWritten, errors },
         }));
         // The runtime, not the Kernel, turns a draw-review answer into owner rulings and an owed redraw (draw-feedback.mjs).
         try { recordDrawAnswer(ledger, { workflowId: args.workflow, report, receipt, receiptPath, repo }); } catch (error) { console.error(`serve-ask: draw feedback not recorded: ${String(error?.message ?? error).slice(0, 300)}`); }

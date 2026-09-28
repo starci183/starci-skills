@@ -7,6 +7,7 @@
 //   kernel-proposal --workflow <wf> --title <t> --evidence <t> [--patch <file.diff>] [--files <csv>] [--decision <id>]
 //   kernel-proposal --workflow <wf> --list
 import fs from 'node:fs';
+import { stageBlob, putArtifact } from '../evidence-store.mjs';
 import path from 'node:path';
 import { PROPOSAL_KIND, csv, newId, recordKernel, refuse } from '../kernel-authority.mjs';
 import { parseJsonOr } from '../../lib/json.mjs';
@@ -33,10 +34,10 @@ export default {
     if (args.patch) {
       if (!fs.existsSync(args.patch)) throw refuse(`--patch ${args.patch} does not exist`, 'proposal-incomplete');
       const text = fs.readFileSync(args.patch, 'utf8');
-      const dir = path.join(repo, '.starciwork', 'kernel-evidence', wf, 'proposals');
-      fs.mkdirSync(dir, { recursive: true });
-      patchFile = path.join(dir, `${id}.diff`);
-      fs.writeFileSync(patchFile, text);
+      // The patch is a kernel artifact of the workflow (blob + job_artifacts proposals/<id>.diff), never a repo file.
+      const blob = stageBlob(Buffer.from(text, 'utf8'), { mediaType: 'text/x-diff' });
+      ledger.transaction((tx) => putArtifact(tx, { workflowId: wf, role: 'patch', kind: 'diff', name: `proposals/${id}.diff`, blob, origin: 'kernel' }));
+      patchFile = blob.fileUri;
       files = [...new Set([...files, ...[...text.matchAll(/^\+\+\+ b\/(.+)$/gm)].map((m) => m[1].trim())])];
     }
     // The tier the Supervisor will apply (supervise.yaml selfLearning.tiers): an owner-ruling, knowledge-meaning, kernel

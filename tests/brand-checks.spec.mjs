@@ -1,5 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import {openLedger,ledgerFileFor,projectsRootFor} from '../engine/ledger-db.mjs';
+import {writeAskReceipt} from '../scripts/kernel/ask-receipts.mjs';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -271,12 +273,16 @@ const dangerException=(fields={})=>({foreground:'--starci-core-danger-foreground
   ratio:measure(LIGHT_DANGER,'#ffffff'),reason:'The Academy danger red, accepted by the owner.',acceptedBy:ASK,...fields});
 const mutedException=(fields={})=>({foreground:'--starci-core-muted',background:'--starci-core-surface',
   ratio:measure(MUTED,'#ffffff'),reason:'The Academy grey, accepted by the owner.',acceptedBy:ASK,...fields});
-/** What serve-ask writes when the ask is answered: <work>/kernel-evidence/<wf>/serve-ask/answer-<ms>.json. */
+// The project ledgers answer() opens live under the test projects root; removed with the spec.
+test.after(()=>fs.rmSync(projectsRootFor(),{recursive:true,force:true,maxRetries:20,retryDelay:25}));
+/** What serve-ask stores when the ask is answered: a blob + decisions row in the project ledger (ask-receipts.mjs), cited blob:<sha256>. */
 function answer(work,{dispatchId=ASK,answeredBy='owner',at=1790274475561,workflow='wf-sn-foundation'}={}){
-  const relative=`kernel-evidence/${workflow}/serve-ask/answer-${at}.json`;
-  write(work,relative,JSON.stringify({schema:OWNER_ANSWER_SCHEMA,workflowId:workflow,dispatchId,opId:'brand.decide',
-    option:'A. Academy values, accept the sub-AA contrast',optionIndex:0,answeredBy,at:new Date(at).toISOString()}));
-  return `.starciwork/${relative}`;
+  const ledger=openLedger({file:ledgerFileFor(path.dirname(work))});
+  try{
+    ledger.ensureWorkflow({workflowId:workflow});
+    return writeAskReceipt(ledger,{workflowId:workflow,dispatchId,at,receipt:{schema:OWNER_ANSWER_SCHEMA,workflowId:workflow,dispatchId,opId:'brand.decide',
+      option:'A. Academy values, accept the sub-AA contrast',optionIndex:0,answeredBy,at:new Date(at).toISOString()}}).receiptRef;
+  }finally{ledger.close();}
 }
 const contrastOf=(work,brand)=>checkContrastAa({brand,brandDir:path.join(work,'brand')});
 const exceptionStatus=(result,foreground)=>result.evidence.exceptions.find(entry=>entry.foreground===foreground);
@@ -298,7 +304,7 @@ test('contrast-aa passes an owner-accepted pair below the floor only through its
   const muted=accepted.evidence.pairs.find(pair=>pair.declaredBy==='contrastExceptions');
   assert.equal(muted.foregroundToken,'--starci-core-muted','a text tone no fill declares is measured from its two tokens');
   assert.equal(muted.ratio,3.45);
-  assert.equal(exceptionStatus(accepted,'--starci-core-danger-foreground').receipt,receipt,'found under kernel-evidence by its dispatch id');
+  assert.equal(exceptionStatus(accepted,'--starci-core-danger-foreground').receipt,receipt,'found in the project ledger by its dispatch id');
   assert.equal(exceptionStatus(accepted,'--starci-core-muted').status,'applied');
   assert.match(accepted.detail,/2 of them below it by an owner-accepted exception/);
 

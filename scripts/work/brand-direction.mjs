@@ -26,6 +26,7 @@
 // the rubric is `brand.direction.rubric.checks`; the reference renders are `brand.direction.golden`.
 // scripts/checks/brand.mjs `direction` re-checks every acceptance against the owner receipt on disk.
 import fs from 'node:fs';
+import { isBlobFile, receiptFileOf, receiptRefOf } from '../kernel/ask-receipts.mjs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { stringifyYaml } from '../../engine/yaml.mjs';
@@ -195,9 +196,11 @@ export function promoteGolden(work, { uiDir, archetype, parts, receiptFile, html
 export function applyDirectionReview(work, receiptFile, { write = false } = {}) {
   const loaded = loadDirection(work);
   const { direction, repoRoot, record, file } = loaded;
-  const receiptAbs = path.resolve(receiptFile);
-  const receiptRel = slash(path.relative(repoRoot, receiptAbs));
-  if (receiptRel.startsWith('../') || path.isAbsolute(receiptRel)) throw new Error(`receipt ${slash(receiptFile)} is outside the repository ${slash(repoRoot)}; apply the receipt serve-ask wrote under .starciwork/kernel-evidence`);
+  // The receipt is the blob serve-ask stored (ask-receipts.mjs: receiptPath, or `blob:<sha256>`); a Work record cites
+  // it as blob:<sha256>. A path inside the repository is still read (an example tree's own receipt).
+  const receiptAbs = receiptFileOf(String(receiptFile), { base: process.cwd() }) ?? path.resolve(String(receiptFile));
+  const receiptRel = receiptRefOf(receiptAbs, repoRoot);
+  if (!isBlobFile(receiptAbs) && (receiptRel.startsWith('../') || path.isAbsolute(receiptRel))) throw new Error(`receipt ${slash(receiptFile)} is neither a stored answer (blob:<sha256>, the receiptPath serve-ask returned) nor a file inside the repository ${slash(repoRoot)}`);
   let receipt;
   try { receipt = JSON.parse(fs.readFileSync(receiptAbs, 'utf8')); } catch (error) { throw new Error(`receipt ${slash(receiptFile)} is unreadable: ${error.message}`); }
   if (receipt?.schema !== OWNER_ANSWER_SCHEMA) throw new Error(`${slash(receiptFile)} is ${receipt?.schema ?? 'not a receipt'}, not ${OWNER_ANSWER_SCHEMA}`);

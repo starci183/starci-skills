@@ -5,7 +5,7 @@ purpose: >-
   forwards IMPORTANT ones (lessons.mjs tierOf) to the owner. The Kernel never edits .claude itself; a local
   override keeps the workflow moving meanwhile.
 args: --workflow <id> (--title <t> --evidence <t> [--patch <file.diff>] [--files <csv>] [--decision <id>] | --list) [--json]
-writes: [events kernel-proposal, kernel-evidence/<wf>/proposals/<id>.diff, the Supervisor inbox]
+writes: [events kernel-proposal, the patch as a kernel artifact proposals/<id>.diff (blob + job_artifacts, origin kernel), the Supervisor inbox]
 refusals:
   proposal-duplicate: the same title was proposed in the last 6 h
 kernelOnly: true

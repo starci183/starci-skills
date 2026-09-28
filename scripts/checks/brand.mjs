@@ -1,5 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
+import {openLedgerReader,ledgerFileFor} from '../../engine/ledger-db.mjs';
+import {receiptsAnswering,receiptFileOf,receiptRefOf} from '../kernel/ask-receipts.mjs';
 import {sha256} from '../../engine/index.mjs';
 import {fileURLToPath} from 'node:url';
 import {parseYaml} from '../../engine/yaml.mjs';
@@ -477,7 +479,6 @@ export const CONTRAST_EXCEPTION_TOLERANCE=0.05;
 /** The receipt serve-ask writes when an ask is answered (scripts/kernel/serve-ask.mjs). */
 export const OWNER_ANSWER_SCHEMA='starci/ask-answer@1';
 const OWNER_ANSWERER='owner';
-const RECEIPT_FILE=/^answer-(\d+)\.json$/;
 
 /** `<work>/brand` -> the Work root and the repository root the record's receipt paths are relative to. */
 function workRootsOf(brandDir){
@@ -486,46 +487,42 @@ function workRootsOf(brandDir){
   return {work,repoRoot:path.basename(work)==='.starciwork'?path.dirname(work):work};
 }
 
+/** The receipts answering `dispatchId` in the project ledger of `repoRoot`, newest first; [] when it cannot be read. */
+function ledgerReceiptsOf(repoRoot,dispatchId){
+  let db=null;
+  try{db=openLedgerReader(ledgerFileFor(repoRoot));return receiptsAnswering(db,dispatchId);}
+  catch{return [];}
+  finally{try{db?.close();}catch{}}
+}
+
 /**
- * The owner's answer an exception cites, read from the starci/ask-answer@1 receipt on disk: the named
- * `receipt` path (relative to the repository root or the Work root, never outside the repository), else the
- * newest `<work>/kernel-evidence/<workflow>/serve-ask/answer-<ms>.json` answering `acceptedBy`. Only an
- * answer the owner gave counts: an auto-accepted recommendation is not the owner accepting a sub-AA pair.
+ * The owner's answer an exception cites, read from its starci/ask-answer@1 receipt: the named `receipt`
+ * (`blob:<sha256>` - the answer serve-ask stored, scripts/kernel/ask-receipts.mjs - or a path inside the
+ * repository), else the newest receipt answering `acceptedBy` in the project ledger. Only an answer the owner
+ * gave counts: an auto-accepted recommendation is not the owner accepting a sub-AA pair.
  */
-export function findOwnerReceipt({acceptedBy,receipt=null,brandDir=null,answerer=OWNER_ANSWERER}){
+export function findOwnerReceipt({acceptedBy,receipt=null,brandDir=null,answerer=OWNER_ANSWERER,receiptsOf=ledgerReceiptsOf}){
   const roots=workRootsOf(brandDir);
   if(!roots)return {ok:false,why:'no Work tree was given, so no owner answer receipt could be read'};
   const judge=(file,answer)=>{
-    const named=slash(path.relative(roots.repoRoot,file));
+    const named=receiptRefOf(file,roots.repoRoot);
     if(answer?.schema!==OWNER_ANSWER_SCHEMA)return {ok:false,why:`${named} is not a ${OWNER_ANSWER_SCHEMA} receipt`};
     if(answer.dispatchId!==acceptedBy)return {ok:false,why:`${named} answers ${answer.dispatchId??'(no dispatch)'}, not ${acceptedBy}`};
     if(answer.answeredBy!==answerer)return {ok:false,why:`${acceptedBy} was answered by ${answer.answeredBy??'(nobody)'}, not ${answerer===OWNER_ANSWERER?'the owner':answerer}`};
     return {ok:true,provisional:answer.provisional===true,gatesOk:answer.acceptance?.receipt?.ok===true,file:named,dispatchId:answer.dispatchId,answeredBy:answer.answeredBy,at:answer.at??null,option:answer.option??null,optionIndex:answer.optionIndex??null,review:answer.review??null};
   };
   if(receipt!==null&&receipt!==undefined){
-    if(typeof receipt!=='string'||!receipt.trim())return {ok:false,why:'receipt must be the path of the owner answer receipt'};
-    const file=[path.resolve(roots.repoRoot,receipt),path.resolve(roots.work,receipt)]
+    if(typeof receipt!=='string'||!receipt.trim())return {ok:false,why:'receipt must be blob:<sha256> or the path of the owner answer receipt'};
+    const stored=/^blob:/.test(receipt.trim())?receiptFileOf(receipt):null;
+    const file=stored??[path.resolve(roots.repoRoot,receipt),path.resolve(roots.work,receipt)]
       .filter(candidate=>inside(roots.repoRoot,candidate))
       .find(candidate=>fs.existsSync(candidate)&&fs.lstatSync(candidate).isFile());
-    if(!file)return {ok:false,why:`the receipt ${slash(receipt)} is not a file inside this repository`};
+    if(!file)return {ok:false,why:`the receipt ${slash(receipt)} is not a stored answer and is not a file inside this repository`};
     return judge(file,readJson(file));
   }
-  const evidence=path.join(roots.work,'kernel-evidence');
-  const files=[];
-  let workflows=[];
-  try{workflows=fs.readdirSync(evidence,{withFileTypes:true}).filter(entry=>entry.isDirectory());}catch{}
-  for(const workflow of workflows){
-    const dir=path.join(evidence,workflow.name,'serve-ask');
-    let names=[];
-    try{names=fs.readdirSync(dir);}catch{continue;}
-    for(const name of names){const match=RECEIPT_FILE.exec(name);if(match)files.push({file:path.join(dir,name),at:Number(match[1])});}
-  }
-  files.sort((one,two)=>two.at-one.at);
-  for(const {file} of files){
-    const answer=readJson(file);
-    if(answer?.dispatchId===acceptedBy)return judge(file,answer);
-  }
-  return {ok:false,why:`no receipt answers ${acceptedBy} under ${slash(path.relative(roots.repoRoot,evidence))||'kernel-evidence'}/*/serve-ask/`};
+  const found=receiptsOf(roots.repoRoot,acceptedBy);
+  if(found.length)return judge(found[0].file,found[0].receipt);
+  return {ok:false,why:`no receipt answers ${acceptedBy} in the project ledger`};
 }
 
 /**

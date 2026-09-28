@@ -34,6 +34,7 @@
 //
 // Every runtime decision is an `autopilot-*` event `by: autopilot`; nothing here ever writes answeredBy owner.
 import fs from 'node:fs';
+import { writeAskReceipt } from './ask-receipts.mjs';
 import path from 'node:path';
 import { allocationSettings } from '../../engine/config.mjs';
 import { openIncident, updateIncident } from '../../engine/ledger-db.mjs';
@@ -250,7 +251,6 @@ export function directionGateEvidence({ repo, review }) {
 
 /* ------------------------------------------------------------------ answering one ask */
 
-const receiptDirOf = (repo, workflowId) => path.join(repo, '.starciwork', 'kernel-evidence', workflowId, 'serve-ask');
 const jobOfAsk = (db, workflowId, report) => {
   const from = (parseJson(report.report_json, {}) ?? {}).from;
   return (from ? db.prepare('SELECT * FROM jobs WHERE job_id=? AND workflow_id=?').get(from, workflowId) : null)
@@ -271,13 +271,9 @@ export function deferralOf(db, workflowId, dispatchId) {
 const STALE_CODES = new Set(['DIRECTION_REV_MOVED', 'REVIEW_PART_REDRAWN', 'GOLDEN_CHANGED']);
 const redrawsOf = (db, workflowId, record) => db.prepare(`SELECT count(*) n FROM events WHERE workflow_id=? AND kind=? AND json_extract(payload_json,'$.record')=? AND COALESCE(json_extract(payload_json,'$.stale'),0)=0`).get(workflowId, AUTOPILOT_EVENTS.redraw, record)?.n ?? 0;
 
-/** Write one autopilot answer receipt and its ask-answered event; returns the receipt path. Never answeredBy owner. */
-function writeAnswer(ledger, { repo, workflowId, report, question, optionIndex, note, extra = {}, now = Date.now() }) {
-  const dir = receiptDirOf(repo, workflowId);
-  fs.mkdirSync(dir, { recursive: true });
-  let at = now;
-  while (fs.existsSync(path.join(dir, `answer-${at}.json`))) at += 1;
-  const receiptPath = path.join(dir, `answer-${at}.json`);
+/** Write one autopilot answer receipt (blob + decisions row, ask-receipts.mjs) and its ask-answered event; returns the receipt file. Never answeredBy owner. */
+function writeAnswer(ledger, { workflowId, report, question, optionIndex, note, extra = {}, now = Date.now() }) {
+  const at = now;
   const option = optionIndex == null ? null : (() => { const o = list(question?.options)[optionIndex]; return o == null ? null : (typeof o === 'string' ? o : o.label ?? null); })();
   const receipt = {
     schema: 'starci/ask-answer@1', workflowId, dispatchId: report.dispatch_id, opId: report.op_id ?? null,
@@ -285,9 +281,9 @@ function writeAnswer(ledger, { repo, workflowId, report, question, optionIndex, 
     custodyWritten: [], envWritten: [], pointersWritten: [], bridge: null, errors: [], note, at: new Date(at).toISOString(),
     ...extra, ...(question?.review ? { review: question.review } : {}),
   };
-  fs.writeFileSync(receiptPath, JSON.stringify(receipt, null, 2));
+  const { receiptPath, receiptSha, decisionId } = writeAskReceipt(ledger, { workflowId, dispatchId: report.dispatch_id, receipt, at });
   ledger.appendEvent({ workflowId, entityType: 'report', entityId: report.dispatch_id, kind: 'ask-answered',
-    payload: { dispatchId: report.dispatch_id, receiptPath, answeredBy: AUTOPILOT_BY, optionIndex: optionIndex ?? null, option, note, custodyWritten: [], envWritten: [], pointersWritten: [], errors: [], ...(extra.provisional ? { provisional: true } : {}) } });
+    payload: { dispatchId: report.dispatch_id, receiptPath, receiptSha, decisionId, answeredBy: AUTOPILOT_BY, optionIndex: optionIndex ?? null, option, note, custodyWritten: [], envWritten: [], pointersWritten: [], errors: [], ...(extra.provisional ? { provisional: true } : {}) } });
   return receiptPath;
 }
 

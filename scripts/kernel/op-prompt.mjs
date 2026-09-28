@@ -72,6 +72,9 @@ export function ensureJobScratch({ repo, workflowId, jobId, fresh = true }) {
   fs.mkdirSync(dir, { recursive: true });
   return dir;
 }
+/** The Kernel's own transient working directory for one workflow (background push results, scan output): OS temp,
+ * outside every repository; never agent data in .starciwork. */
+export const kernelScratchDirOf = (repo, workflowId, kind) => path.join(os.tmpdir(), 'starci-kernel-scratch', sha256(`${path.resolve(repo)}\0${workflowId}`).slice(0, 16), kind);
 export const ownedPathsFileOf = (repo, workflowId, jobId, scratchDir = null) => path.join(scratchDir ?? jobScratchDirOf(repo, workflowId, jobId), 'owned-paths.txt');
 export function ownedPathsLine({ paths, repo = null, workflowId = null, jobId = null, scratchDir = null }) {
   if (!paths.length) return 'owned_paths: (per brief write-ceiling)';

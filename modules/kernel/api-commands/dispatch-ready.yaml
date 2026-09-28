@@ -5,6 +5,6 @@ purpose: >-
   dispatch --spawn (every admission refusal holds). A unit whose shape already failed for a shape cause is
   skipped. Without --foreground it runs detached and answers with its result file.
 args: --workflow <id> [--max <n>] [--dry-run] [--foreground] [--json]
-writes: [through api route/dispatch, events kernel-dispatch-push, logs kind decision, kernel-evidence/<wf>/dispatch/<push>.json]
+writes: [through api route/dispatch, events kernel-dispatch-push, logs kind decision, the push result <kernel scratch>/dispatch/<push>.json (op-prompt.mjs kernelScratchDirOf: OS temp, outside every repository)]
 kernelOnly: true
 exit: 0 pushed (or started), 1 refused

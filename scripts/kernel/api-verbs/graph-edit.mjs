@@ -21,6 +21,7 @@
 // record - the goal's own cut method - is exempt); only queued, never-dispatched units change; a running unit is never
 // interrupted. Every edit is a kernel-graph-edit event with its inverse and a typed decision log row.
 import fs from 'node:fs';
+import { kernelScratchDirOf } from '../op-prompt.mjs';
 import path from 'node:path';
 import { spawn } from 'node:child_process';
 import { skillRoot } from '../../../engine/runtime-root.mjs';
@@ -214,7 +215,7 @@ export default {
       const busy = [...new Set(db.prepare(`SELECT payload_json, workflow_id, status FROM jobs WHERE kind='op' AND status IN (${OPEN_JOB.filter((s) => s !== 'queued').map(() => '?').join(',')})`).all(...OPEN_JOB.filter((s) => s !== 'queued'))
         .flatMap((r) => JSON.parse(r.payload_json).owned_paths ?? []).filter((p) => String(p).startsWith(prefix)).map((p) => String(p).slice(prefix.length)))];
       const exclude = [...new Set([...csv(args.exclude), 'design-plans', ...busy])];
-      const dir = path.join(repo, '.starciwork', 'kernel-evidence', wf, 'scans');
+      const dir = kernelScratchDirOf(repo, wf, 'scans');
       fs.mkdirSync(dir, { recursive: true });
       const file = path.join(dir, `${editId}.json`);
       const log = fs.openSync(`${file}.log`, 'a');
