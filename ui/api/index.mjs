@@ -8,8 +8,10 @@ import { handleWork } from './routes/work.mjs';
 import { handleAttempt } from './routes/attempt.mjs';
 import { handleDecisions } from './routes/decisions.mjs';
 import { handleSystem } from './routes/system.mjs';
+import { handleLogs } from './routes/logs.mjs';
+import { handleLive } from './routes/live.mjs';
 
-export function createApiHandler({ handlers = [handleWork, handleAttempt, handleDecisions, handleSystem], env = process.env } = {}) {
+export function createApiHandler({ handlers = [handleWork, handleAttempt, handleDecisions, handleSystem, handleLogs, handleLive], env = process.env } = {}) {
   const store = openUiDb({ env });
   initializeReadRedaction(store.projects());
   const permit = createRateLimit();
