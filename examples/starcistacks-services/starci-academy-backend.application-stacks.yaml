@@ -1,7 +1,6 @@
-# The runtime source host's own stack declaration (starci-academy-backend, legacy root .stacks).
-# Written to <source>/.stacks/application-stacks.yaml; this copy is the tracked record, because the
-# source host's .gitignore denies .stacks/** and does not yet re-include the declaration
-# (check-starcistacks STACKS_DECLARATION_IGNORED - follow-up: add `!.stacks/application-stacks.yaml`).
+# The runtime source host's own stack declaration (starci-academy-backend), written to
+# <source>/.starcistacks/application-stacks.yaml; the host's .gitignore must re-include it
+# (`!.starcistacks/application-stacks.yaml`, check-starcistacks STACKS_DECLARATION_IGNORED).
 # Its services block is the one every product's Sonar entry points at: the shared SonarQube runs in this
 # stack (compose project `starci`, infra/compose/starci.yaml) and its tokens live in this stack's custody.
 schema: starci/application-stacks@1
@@ -89,7 +88,7 @@ services:
       public: https://sonar.starci.org
     stack:
       repository: starci-academy-backend
-      root: .stacks
+      root: .starcistacks
       environment: dev
       compose: infra/compose/sonarqube.yaml
       container: starci-sonarqube
@@ -109,15 +108,15 @@ services:
       - id: admin
         purpose: Project provisioning and per-project token minting (sonar-local.mjs ensure-project); never handed to CI.
         env: SONAR_TOKEN
-        custody: {repository: starci-academy-backend, path: .stacks/dev/runtime/files/sonarqube-admin-token.key}
+        custody: {repository: starci-academy-backend, path: .starcistacks/dev/runtime/files/sonarqube-admin-token.key}
       - id: analysis
         purpose: The stack's generic analysis token - sonar-local.mjs's last resort; on this server it is scoped to one project, so every product declares its own project token.
         env: SONAR_TOKEN
-        custody: {repository: starci-academy-backend, path: .stacks/dev/runtime/files/sonarqube-analysis-token.txt}
+        custody: {repository: starci-academy-backend, path: .starcistacks/dev/runtime/files/sonarqube-analysis-token.txt}
       - id: starci-academy-backend
         purpose: This repository's project analysis token - local scans and the value its GitHub SONAR_TOKEN secret carries.
         env: SONAR_TOKEN
-        custody: {repository: starci-academy-backend, path: .stacks/dev/runtime/files/sonarqube-starci-academy-be-token.key}
+        custody: {repository: starci-academy-backend, path: .starcistacks/dev/runtime/files/sonarqube-starci-academy-be-token.key}
     ci:
       workflow: .github/workflows/ci.yml
       wiring: required
@@ -143,7 +142,7 @@ services:
       - id: upload-token
         purpose: Fallback upload token for a manual upload; CI does not use it (OIDC).
         env: CODECOV_TOKEN
-        custody: {repository: starci-academy-backend, path: .stacks/dev/runtime/files/codecov-token.key}
+        custody: {repository: starci-academy-backend, path: .starcistacks/dev/runtime/files/codecov-token.key}
     ci:
       workflow: .github/workflows/ci.yml
       wiring: required
@@ -165,7 +164,7 @@ services:
       - id: app-config
         purpose: The DSN the application reads from its mounted app config (getAppConfig().sentryDsn).
         key: sentryDsn
-        custody: {repository: starci-academy-backend, path: .stacks/dev/runtime/files/app.yaml}
+        custody: {repository: starci-academy-backend, path: .starcistacks/dev/runtime/files/app.yaml}
     ci:
       wiring: not-used
     ownerAction: none

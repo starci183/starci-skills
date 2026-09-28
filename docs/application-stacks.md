@@ -56,7 +56,7 @@ The declaration's `services` block (schema `$defs.service`) states the delivery,
 
 `scripts/checks/check-starcistacks.mjs <repo> [--new] [--admitted-at <t>]` (op check `starci-starcistacks-check`, contract change `starcistacks-services`) refuses an unknown or ambiguous entry, missing custody, a redundant owner action, CI calling a disabled or undeclared service, and project-key drift; a missing declaration or services block in an existing repository is a suspect with a planned follow-up (`workspace.manage` mode `stacks`, fixtures in `examples/starcistacks-services/`). `starci validate` reports the same findings as suspects. `api report` refuses an ask for a credential or CI setting a declaration marks `ownerAction: none` with its custody present (`ask-declared-in-stack`). `resolveStackService(repo, id)` is the reader tools such as `scripts/checks/sonar-local.mjs` use; a repository without its own entry falls back to the source host's entry when that lists it among its projects.
 
-The legacy root `.stacks` is read the same way and reported (`STACKS_LEGACY_ROOT`); custody layout follows `modules/schemas/stacks-layout.yaml` `custody` (runtime/files members with tracked `.enc` twins, KEYS.md rosters, a `<root>/**` deny-all ignore rule with re-includes).
+`.starcistacks` is the only stack root. Custody layout follows `modules/schemas/stacks-layout.yaml` `custody` (runtime/files members with tracked `.enc` twins, KEYS.md rosters, a `<root>/**` deny-all ignore rule with re-includes).
 
 ## Checker coverage and acceptance evidence
 

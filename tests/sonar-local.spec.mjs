@@ -129,7 +129,7 @@ async function fakeSonar(t,{gate='OK',firstAnalysis=false,up=true,sources=covere
  * fake stack-secret tool stores minted values as .enc members the fake sops can read back.
  */
 function fakeCustody(root){
-  const stack=path.join(root,'source','.stacks','dev');
+  const stack=path.join(root,'source','.starcistacks','dev');
   write(stack,'runtime/files/sonarqube-admin-token.key',`${ADMIN}\n`);
   write(stack,'runtime/files/sonarqube-analysis-token.txt.enc',`ENC:${ANALYSIS}`);
   const identity=write(root,'master.identity','AGE-SECRET-KEY-FAKE');
@@ -140,7 +140,7 @@ process.stdout.write(fs.readFileSync(file,'utf8').replace(/^ENC:/,''));`);
   const stackSecret=write(root,'fake-stack-secret.mjs',`import fs from 'node:fs';import path from 'node:path';
 const [cmd,target,flag,from]=process.argv.slice(2);
 if(cmd!=='set'||flag!=='--from-file')process.exit(4);
-const file=path.join(process.cwd(),'.stacks',target+'.enc');
+const file=path.join(process.cwd(),'.starcistacks',target+'.enc');
 fs.mkdirSync(path.dirname(file),{recursive:true});
 fs.writeFileSync(file,'ENC:'+fs.readFileSync(from,'utf8'));`);
   return {stack,identity,sops,stackSecret};
@@ -610,10 +610,10 @@ services:
     provider: sonarqube
     mode: local
     host: {local: '${host}'}
-    stack: {repository: source, root: .stacks, environment: dev, compose: .stacks/dev/infra/compose/sonarqube.yaml}
+    stack: {repository: source, root: .starcistacks, environment: dev, compose: .starcistacks/dev/infra/compose/sonarqube.yaml}
     projects: [{repository: product-repo, key: declared-key, name: Declared Name}]
     credentials:
-      - {id: sonarqube-admin, env: SONAR_ADMIN_TOKEN, custody: {repository: source, path: .stacks/dev/runtime/files/sonarqube-admin-token.key}}
+      - {id: sonarqube-admin, env: SONAR_ADMIN_TOKEN, custody: {repository: source, path: .starcistacks/dev/runtime/files/sonarqube-admin-token.key}}
     ci: {wiring: optional-follow-up}
     ownerAction: none
 `;
@@ -657,19 +657,19 @@ services:
     provider: sonarqube
     mode: local
     host: {local: 'http://127.0.0.1:9999', public: 'https://sonar.example.invalid'}
-    stack: {repository: shop-infra, root: .stacks, environment: dev, compose: .stacks/dev/infra/compose/sonarqube.yaml, container: shop-sonarqube}
+    stack: {repository: shop-infra, root: .starcistacks, environment: dev, compose: .starcistacks/dev/infra/compose/sonarqube.yaml, container: shop-sonarqube}
     auth: token
     projects:
       - {repository: shop-be, key: shop-backend, name: Shop Backend}
       - {repository: shop-fe, key: shop-frontend}
     credentials:
-      - {id: sonarqube-admin, env: SONAR_ADMIN_TOKEN, custody: {repository: shop-infra, path: .stacks/dev/runtime/files/sonarqube-admin-token.key}}
-      - {id: sonarqube-shop-frontend, env: SONAR_TOKEN, custody: {repository: shop-infra, path: .stacks/dev/runtime/files/sonarqube-shop-frontend-token.key}}
-      - {id: sonarqube-analysis, env: SONAR_TOKEN, custody: {repository: shop-infra, path: .stacks/dev/runtime/files/sonarqube-analysis-token.txt}}
+      - {id: sonarqube-admin, env: SONAR_ADMIN_TOKEN, custody: {repository: shop-infra, path: .starcistacks/dev/runtime/files/sonarqube-admin-token.key}}
+      - {id: sonarqube-shop-frontend, env: SONAR_TOKEN, custody: {repository: shop-infra, path: .starcistacks/dev/runtime/files/sonarqube-shop-frontend-token.key}}
+      - {id: sonarqube-analysis, env: SONAR_TOKEN, custody: {repository: shop-infra, path: .starcistacks/dev/runtime/files/sonarqube-analysis-token.txt}}
     ci: {wiring: optional-follow-up}
     ownerAction: none
 `);
-  const infra=path.join(root,'shop-infra','.stacks','dev');
+  const infra=path.join(root,'shop-infra','.starcistacks','dev');
   const be=resolveConfig({cwd:backend},{});
   assert.equal(be.host,'http://127.0.0.1:9999');
   assert.equal(be.publicHost,'https://sonar.example.invalid');

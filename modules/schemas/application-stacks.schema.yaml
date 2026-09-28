@@ -134,7 +134,7 @@ $defs:
     required: [repository, root, environment, compose]
     properties:
       repository: {type: string, pattern: '^[A-Za-z0-9._-]+$'}
-      root: {enum: [.starcistacks, .stacks]}
+      root: {const: .starcistacks}
       environment: {type: string, pattern: '^[a-z][a-z0-9-]*$'}
       compose: {type: string, minLength: 1}
       container: {type: string, minLength: 1}

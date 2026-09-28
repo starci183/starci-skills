@@ -19,9 +19,9 @@ const baseDoc = { schema: 'starci/application-stacks@1', components: { api: { ro
   environments: { dev: { status: 'supported', runtime: 'docker-compose', composeFiles: ['infra/compose/compose.yaml'], components: {}, runbook: 'README.md', secrets: [] } },
   k8s: { status: 'deferred', reason: 'not selected' } };
 const sonarEntry = (repo, extra = {}) => ({ provider: 'sonarqube', mode: 'local', host: { local: 'http://localhost:9010', public: 'https://sonar.example.org' },
-  stack: { repository: 'src-host', root: '.stacks', environment: 'dev', compose: 'infra/compose/sonarqube.yaml' }, auth: 'token',
+  stack: { repository: 'src-host', root: '.starcistacks', environment: 'dev', compose: 'infra/compose/sonarqube.yaml' }, auth: 'token',
   projects: [{ repository: repo, key: repo }],
-  credentials: [{ id: 'analysis', env: 'SONAR_TOKEN', custody: { repository: 'src-host', path: '.stacks/dev/runtime/files/sonarqube-analysis-token.txt' } }],
+  credentials: [{ id: 'analysis', env: 'SONAR_TOKEN', custody: { repository: 'src-host', path: '.starcistacks/dev/runtime/files/sonarqube-analysis-token.txt' } }],
   ci: { wiring: 'required', secrets: [{ name: 'SONAR_TOKEN', credential: 'analysis' }], vars: [{ name: 'SONAR_HOST_URL', value: 'https://sonar.example.org' }] },
   ownerAction: 'none', ...extra });
 const codecovEntry = (repo, extra = {}) => ({ provider: 'codecov', mode: 'hosted', host: { public: 'https://app.codecov.io' }, auth: 'oidc',
@@ -32,9 +32,9 @@ function workspace(t, { services, sourceServices, ci = CI, props = null } = {}) 
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'starcistacks-'));
   t.after(() => { fs.rmSync(dir, { recursive: true, force: true }); delete process.env.STARCI_SOURCE_ROOT; });
   const host = path.join(dir, 'src-host'), product = path.join(dir, 'product');
-  write(path.join(host, '.stacks', 'dev', 'infra', 'compose', 'sonarqube.yaml'), 'services: {sonarqube: {image: sonarqube}}\n');
-  write(path.join(host, '.stacks', 'dev', 'runtime', 'files', 'sonarqube-analysis-token.txt.enc'), 'sops: {}\n');
-  write(path.join(host, '.stacks', DECL), yamlOf({ ...baseDoc, ...(sourceServices === undefined ? { services: { sonar: sonarEntry('product') } } : sourceServices ? { services: sourceServices } : {}) }));
+  write(path.join(host, '.starcistacks', 'dev', 'infra', 'compose', 'sonarqube.yaml'), 'services: {sonarqube: {image: sonarqube}}\n');
+  write(path.join(host, '.starcistacks', 'dev', 'runtime', 'files', 'sonarqube-analysis-token.txt.enc'), 'sops: {}\n');
+  write(path.join(host, '.starcistacks', DECL), yamlOf({ ...baseDoc, ...(sourceServices === undefined ? { services: { sonar: sonarEntry('product') } } : sourceServices ? { services: sourceServices } : {}) }));
   write(path.join(product, '.starcistacks', DECL), yamlOf({ ...baseDoc, ...(services ? { services } : {}) }));
   write(path.join(product, '.gitignore'), '.starcistacks/**\n!.starcistacks/**/\n!.starcistacks/**/*.enc\n');
   if (ci) write(path.join(product, '.github', 'workflows', 'ci.yml'), ci);
@@ -95,9 +95,9 @@ test('unknown, ambiguous and contradictory service declarations are refused', (t
 test('custody that is missing, or an owner action for what custody holds, is refused', (t) => {
   const { product, host } = workspace(t, { services: {
     sonar: sonarEntry('product', { ownerAction: { needed: 'a Sonar token', reason: 'asked before' } }),
-    codecov: codecovEntry('product', { auth: 'token', credentials: [{ id: 'upload', env: 'CODECOV_TOKEN', custody: { repository: 'src-host', path: '.stacks/dev/runtime/files/codecov-token.key' } }] }),
+    codecov: codecovEntry('product', { auth: 'token', credentials: [{ id: 'upload', env: 'CODECOV_TOKEN', custody: { repository: 'src-host', path: '.starcistacks/dev/runtime/files/codecov-token.key' } }] }),
   } });
-  assert.ok(fs.existsSync(path.join(host, '.stacks')));
+  assert.ok(fs.existsSync(path.join(host, '.starcistacks')));
   const refused = codes(checkStarciStacks(product), 'refuse');
   assert.ok(refused.includes('STACKS_OWNER_ACTION_REDUNDANT'));
   assert.ok(refused.includes('STACKS_CUSTODY_MISSING'));
@@ -136,7 +136,7 @@ test('the owner is never asked for a declared credential or CI setting', (t) => 
 });
 
 test('an ask is not refused when the declaration asks the owner or custody is missing', (t) => {
-  const { product } = workspace(t, { sourceServices: { sonar: sonarEntry('product', { credentials: [{ id: 'analysis', env: 'SONAR_TOKEN', custody: { repository: 'src-host', path: '.stacks/dev/runtime/files/absent.key' } }], ci: { wiring: 'not-used' } }) } });
+  const { product } = workspace(t, { sourceServices: { sonar: sonarEntry('product', { credentials: [{ id: 'analysis', env: 'SONAR_TOKEN', custody: { repository: 'src-host', path: '.starcistacks/dev/runtime/files/absent.key' } }], ci: { wiring: 'not-used' } }) } });
   assert.equal(ownerAskConflict({ repo: product, question: { text: 'Please provide SONAR_TOKEN' } }), null);
 });
 

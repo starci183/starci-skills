@@ -342,8 +342,7 @@ export const reportImages = (files, repo) => {
   return (outside.length ? outside : sorted).slice(0, 8);
 };
 
-const custodyDirs = (repo) => ['.starcistacks', '.stacks']
-  .map(root => path.join(repo, root, 'dev', 'runtime', 'files'))
+const custodyDirs = (repo) => [path.join(repo, '.starcistacks', 'dev', 'runtime', 'files')]
   .filter(d => fs.existsSync(path.dirname(d)));
 
 export const custodyPresent = (repo, name) => custodyDirs(repo).some(d => fs.existsSync(path.join(d, name)));
@@ -362,7 +361,7 @@ const writeCustody = (repo, name, value) => {
       return { ok: false, error: String(r.stderr || r.stdout || 'stack-secret set failed').slice(0, 300) };
     }
     const dir = custodyDirs(repo)[0];
-    if (!dir) return { ok: false, error: 'no custody dir (.starcistacks/.stacks dev/runtime/files)' };
+    if (!dir) return { ok: false, error: 'no custody dir (.starcistacks/dev/runtime/files)' };
     fs.copyFileSync(tmp, path.join(dir, name));
     return { ok: true, via: 'materialized-file' };
   } finally {
@@ -389,7 +388,7 @@ const appEnvUpsert = (repo, key, value) => {
   const tmp = path.join(os.tmpdir(), `serve-ask-env-${crypto.randomBytes(8).toString('hex')}`);
   try {
     spawnSync(process.execPath, [tool, 'show', APP_ENV_REL], { cwd: repo, stdio: 'ignore' });
-    const cur = [path.join(repo, '.starcistacks', APP_ENV_REL), path.join(repo, '.stacks', APP_ENV_REL)].find(fs.existsSync);
+    const cur = [path.join(repo, '.starcistacks', APP_ENV_REL)].find(fs.existsSync);
     if (!cur) return false;
     fs.writeFileSync(tmp, upsertLines(fs.readFileSync(cur, 'utf8'), key, value), { mode: 0o600 });
     return spawnSync(process.execPath, [tool, 'set', APP_ENV_REL, '--from-file', tmp], { cwd: repo }).status === 0;

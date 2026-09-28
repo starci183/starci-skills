@@ -20,7 +20,7 @@ services:
       public: https://sonar.starci.org
     stack:
       repository: starci-academy-backend
-      root: .stacks
+      root: .starcistacks
       environment: dev
       compose: infra/compose/sonarqube.yaml
       container: starci-sonarqube
@@ -33,15 +33,15 @@ services:
       - id: admin
         purpose: Project creation and per-project token minting by scripts/checks/sonar-local.mjs (ensure-project --with-token); never handed to CI.
         env: SONAR_TOKEN
-        custody: {repository: starci-academy-backend, path: .stacks/dev/runtime/files/sonarqube-admin-token.key}
+        custody: {repository: starci-academy-backend, path: .starcistacks/dev/runtime/files/sonarqube-admin-token.key}
       - id: starci-next
         purpose: The starci-next project analysis token - local scans and the value a GitHub SONAR_TOKEN secret would carry.
         env: SONAR_TOKEN
-        custody: {repository: starci-academy-backend, path: .stacks/dev/runtime/files/sonarqube-starci-next-token.key}
+        custody: {repository: starci-academy-backend, path: .starcistacks/dev/runtime/files/sonarqube-starci-next-token.key}
       - id: starci-next-fe
         purpose: The starci-next-fe project analysis token (the frontend this declaration's sources list).
         env: SONAR_TOKEN
-        custody: {repository: starci-academy-backend, path: .stacks/dev/runtime/files/sonarqube-starci-next-fe-token.key}
+        custody: {repository: starci-academy-backend, path: .starcistacks/dev/runtime/files/sonarqube-starci-next-fe-token.key}
     ci:
       workflow: .github/workflows/ci.yml
       wiring: optional-follow-up

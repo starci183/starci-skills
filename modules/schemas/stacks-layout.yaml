@@ -82,10 +82,6 @@ custody:
     - .starcistacks/*/infra/terraform/files/
     - .starcistacks/*/infra/terraform/*.tar.gz
     - '!.starcistacks/**/*.enc'
-  legacyRoot: >-
-    `.stacks` is the pre-rename name of the same tree (the runtime's source host and older products
-    still use it). It is read with the same rules and reported as a suspect with a rename follow-up
-    (STACKS_LEGACY_ROOT); two roots in one repository are one too many (STACKS_DUAL_ROOT).
 
 roles:
   repository:

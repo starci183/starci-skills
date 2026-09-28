@@ -18,9 +18,9 @@ import {emitCheckOutput} from './output.mjs';
  * Product Sonar analysis runs against a LOCAL SonarQube (owner ruling 2026-09-24). Where it is comes from
  * the repository's stack declaration (.starcistacks/application-stacks.yaml `services.sonar`, read by
  * readSonarDeclaration); without one it is the runtime source repository's dev stack: SonarQube at
- * http://localhost:9010 (container starci-sonarqube, compose .stacks/dev/infra/compose/sonarqube.yaml),
+ * http://localhost:9010 (container starci-sonarqube, compose .starcistacks/dev/infra/compose/sonarqube.yaml),
  * published as https://sonar.starci.org, with the admin token in its custody at
- * .stacks/dev/runtime/files/sonarqube-admin-token.key(.enc). Each project scans with its own
+ * .starcistacks/dev/runtime/files/sonarqube-admin-token.key(.enc). Each project scans with its own
  * PROJECT_ANALYSIS_TOKEN at runtime/files/sonarqube-KEY-token.key, minted with the admin token and stored
  * through the stack-secret tool the first time. No op ever asks the owner for a Sonar token or a GitHub
  * setting. A stored token is validated (/api/authentication/validate) before use: one the server rejects
@@ -107,14 +107,9 @@ export function scrub(text){
 
 // ---- configuration ----------------------------------------------------------------------------------------
 
-/** The source host's dev stack - the stack this runtime tree's own repository runs: <source>/.stacks/dev. */
+/** The source host's dev stack - the stack this runtime tree's own repository runs: <source>/.starcistacks/dev. */
 export function sourceHostStackDir(){
-  const source=path.resolve(skillRoot,'..');
-  for(const root of ['.stacks','.starcistacks']){
-    const dir=path.join(source,root,'dev');
-    if(fs.existsSync(dir))return dir;
-  }
-  return path.join(source,'.stacks','dev');
+  return path.join(path.resolve(skillRoot,'..'),'.starcistacks','dev');
 }
 
 const DECLARATION='application-stacks.yaml';
@@ -170,7 +165,7 @@ export function readSonarDeclaration(file,repoRoot=path.dirname(path.dirname(pat
     const dir=repoDir(text(sonar.stack.repository));
     stackDir=path.join(dir,text(sonar.stack.root)??'.starcistacks',text(sonar.stack.environment)??'dev');
     const compose=text(sonar.stack.compose);
-    if(compose)composeFile=/^\.(?:starci)?stacks[\\/]/.test(compose)?path.join(dir,compose):path.resolve(stackDir,compose);
+    if(compose)composeFile=/^\.starcistacks[\\/]/.test(compose)?path.join(dir,compose):path.resolve(stackDir,compose);
     container=text(sonar.stack.container);
   }else if(text(sonar.stack)&&sonar.stack!=='source-host')stackDir=path.join(repoRoot,'.starcistacks',sonar.stack);
   const projects=(Array.isArray(sonar.projects)?sonar.projects.filter(plain).map(p=>({repository:text(p.repository),key:text(p.key),name:text(p.name)}))
@@ -270,11 +265,11 @@ const launcher=(bin,args)=>/\.(?:c|m)?js$/i.test(bin)?[process.execPath,[bin,...
  */
 export function readCustody(cfg,ref){
   // A relative reference is a member of the configured stack; an absolute one (a declaration credential,
-  // resolved from its repository root) must still sit inside a .stacks or .starcistacks tree.
+  // resolved from its repository root) must still sit inside a .starcistacks tree.
   const plainFile=path.resolve(cfg.stackDir,ref);
   const name=String(ref).replace(/\\/g,'/');
   const inside=path.isAbsolute(String(ref))
-    ?/[\\/]\.(?:starci)?stacks[\\/]/.test(plainFile)
+    ?/[\\/]\.starcistacks[\\/]/.test(plainFile)
     :plainFile.startsWith(cfg.stackDir+path.sep);
   if(!inside)return {present:false,name,reason:`custody reference ${name} is outside a stack custody tree`};
   const enc=`${plainFile}.enc`;
@@ -310,12 +305,12 @@ export const projectTokenRef=key=>`runtime/files/sonarqube-${String(key).replace
 
 /**
  * Store a value as an encrypted custody member through the stack's own tool (scripts/stack-secret.mjs of the
- * repository whose .stacks holds the stack). The value travels through a 0600 temp file only - never argv.
+ * repository whose .starcistacks holds the stack). The value travels through a 0600 temp file only - never argv.
  */
 function writeCustody(cfg,ref,value){
   const stacksRoot=path.dirname(cfg.stackDir);
   const tool=cfg.stackSecret??path.join(path.dirname(stacksRoot),'scripts','stack-secret.mjs');
-  if(path.basename(stacksRoot)!=='.stacks'&&!cfg.stackSecret)return {ok:false,reason:`the stack ${cfg.stackDir} is not under a .stacks tree its stack-secret tool manages`};
+  if(path.basename(stacksRoot)!=='.starcistacks'&&!cfg.stackSecret)return {ok:false,reason:`the stack ${cfg.stackDir} is not under a .starcistacks tree its stack-secret tool manages`};
   if(!fs.existsSync(tool))return {ok:false,reason:`no stack-secret tool at ${tool}`};
   const target=path.relative(stacksRoot,path.resolve(cfg.stackDir,ref)).replace(/\\/g,'/');
   const tmp=path.join(os.tmpdir(),`sonar-local-${process.pid}-${Date.now().toString(36)}`);
@@ -1073,7 +1068,7 @@ const HELP=`Usage: node scripts/checks/sonar-local.mjs <command> [options]
 
   common: [--cwd REPO] [--declaration FILE] [--host URL] [--stack DIR]
           host, stack, custody and project keys come from the repository's .starcistacks/application-stacks.yaml
-          quality.sonar declaration when it has one, else ${DEFAULT_HOST} and the source host's .stacks/dev
+          quality.sonar declaration when it has one, else ${DEFAULT_HOST} and the source host's .starcistacks/dev
 Exit 0 pass/up/ok, 1 failing result or refused scan (stale/missing coverage, empty slice), 2 blocked or usage.`;
 
 function parseArgs(argv){

@@ -47,7 +47,7 @@ reads:
       en: For a credential, read where the code reads the value - the exact variable name - and which
         identity custody of this tree (.starciwork/_resources/identity/<slug>/) will hold it.
   - id: stacks
-    path: repository:<repo-id>/.starcistacks/application-stacks.yaml services (legacy .stacks; the source host's for a shared server)
+    path: repository:<repo-id>/.starcistacks/application-stacks.yaml services (the source host's for a shared server)
     purpose:
       en: Before any credential, host, account or CI secret/variable is named, read the stack declaration's
         services block with starci-starcistacks-check <repo-id>. What it declares ownerAction none with

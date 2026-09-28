@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // test-secrets.mjs — test credentials follow the product repository's own `.starcistacks` convention (owner ruling
-// push-scan-test-secrets-encrypted, 2026-09-28: "hoạt động y chang .stacks, không push mk bình thường lên").
+// push-scan-test-secrets-encrypted, 2026-09-28: they work exactly like the stack custody and a plaintext password is never pushed).
 // There is no store of the runtime's own: a test credential lives at `<repo>/.starcistacks/<stack>/secrets/test/<name>`,
 // its plaintext git-ignored by the repo's `.starcistacks/**` rules and only the sops-encrypted twin `<name>.enc`
 // committed. It is written with the repository's existing command (`node scripts/stack-secret.mjs set

@@ -37,8 +37,8 @@ import { list } from '../lib/list.mjs';
 export const RESULT_SCHEMA = 'starci/starcistacks-check@1';
 export const DECLARATION_SCHEMA = 'starci/application-stacks@1';
 export const DECLARATION = 'application-stacks.yaml';
-/** Canonical root first; `.stacks` is the pre-rename name of the same tree. */
-export const STACK_ROOTS = ['.starcistacks', '.stacks'];
+/** The one stack root a repository owns. */
+export const STACK_ROOT = '.starcistacks';
 export const CONTRACT_CHANGE = 'starcistacks-services';
 export const FOLLOW_UP = { op: 'workspace.manage', params: { mode: 'stacks' },
   detail: 'author the services block of the repository stack declaration (sonar, codecov and every other delivery/quality service) from examples/starcistacks-services/<repository>.services.yaml' };
@@ -57,8 +57,8 @@ export const SERVICE_CATALOG = {
 
 /** Every finding code this check can emit (registered by contract change starcistacks-services). */
 export const CODES = [
-  'STACKS_DECLARATION_MISSING', 'STACKS_DECLARATION_INVALID', 'STACKS_SERVICES_MISSING', 'STACKS_LEGACY_ROOT',
-  'STACKS_DUAL_ROOT', 'STACKS_SCHEMA_INVALID', 'STACKS_SERVICE_UNKNOWN', 'STACKS_PROVIDER_UNKNOWN',
+  'STACKS_DECLARATION_MISSING', 'STACKS_DECLARATION_INVALID', 'STACKS_SERVICES_MISSING',
+  'STACKS_SCHEMA_INVALID', 'STACKS_SERVICE_UNKNOWN', 'STACKS_PROVIDER_UNKNOWN',
   'STACKS_SERVICE_AMBIGUOUS', 'STACKS_STACK_UNRESOLVED', 'STACKS_CUSTODY_MISSING', 'STACKS_CUSTODY_UNVERIFIED',
   'STACKS_OWNER_ACTION_REDUNDANT', 'STACKS_PROJECT_MISSING', 'STACKS_PROJECT_DRIFT', 'STACKS_HOST_DRIFT',
   'STACKS_SERVICE_UNDECLARED', 'STACKS_CI_CONTRADICTION', 'STACKS_CI_UNUSED', 'STACKS_CI_NAME_UNREFERENCED',
@@ -133,18 +133,15 @@ function readDeclaration(file) {
 }
 
 /**
- * The stack declaration a repository owns: {root, file, legacy, dual, roots, doc|error} - or {missing:true, roots}
- * when neither .starcistacks/application-stacks.yaml nor the legacy .stacks one exists.
+ * The stack declaration a repository owns: {root, file, rooted, doc|error} - or {missing:true, rooted}
+ * when .starcistacks/application-stacks.yaml does not exist. `rooted` says the .starcistacks tree exists.
  */
 export function findStackDeclaration(repoRoot) {
   const repo = path.resolve(String(repoRoot ?? ''));
-  const roots = STACK_ROOTS.filter((root) => isDir(path.join(repo, root)));
-  for (const root of STACK_ROOTS) {
-    const file = path.join(repo, root, DECLARATION);
-    if (!isFile(file)) continue;
-    return { repo, root, file, legacy: root !== STACK_ROOTS[0], dual: roots.length > 1, roots, ...readDeclaration(file) };
-  }
-  return { repo, missing: true, roots, dual: roots.length > 1 };
+  const rooted = isDir(path.join(repo, STACK_ROOT));
+  const file = path.join(repo, STACK_ROOT, DECLARATION);
+  if (isFile(file)) return { repo, root: STACK_ROOT, file, rooted, ...readDeclaration(file) };
+  return { repo, missing: true, rooted };
 }
 
 /**
@@ -173,13 +170,11 @@ function governingDeclaration(repo) {
   try { entries = fs.readdirSync(path.dirname(repo), { withFileTypes: true }); } catch { return null; }
   for (const entry of entries) {
     if (!entry.isDirectory() || entry.name === name) continue;
-    for (const root of STACK_ROOTS) {
-      const file = path.join(path.dirname(repo), entry.name, root, DECLARATION);
-      if (!isFile(file)) continue;
-      const read = readDeclaration(file);
-      if (read.doc && list(read.doc.sources).some((source) => source?.repository === name))
-        return { repo: path.join(path.dirname(repo), entry.name), root, file, legacy: root !== STACK_ROOTS[0], governs: name, ...read };
-    }
+    const file = path.join(path.dirname(repo), entry.name, STACK_ROOT, DECLARATION);
+    if (!isFile(file)) continue;
+    const read = readDeclaration(file);
+    if (read.doc && list(read.doc.sources).some((source) => source?.repository === name))
+      return { repo: path.join(path.dirname(repo), entry.name), root: STACK_ROOT, file, governs: name, ...read };
   }
   return null;
 }
@@ -246,7 +241,7 @@ export function resolveStackService(repoRoot, serviceId) {
     const projectKeys = new Set(service.projects.map((project) => project.key));
     if (declaration.sourceHost) service = { ...service, credentials: service.credentials.filter((credential) => !projectKeys.has(credential.id) || credential.id === ownKey),
       ci: { wiring: null, workflow: null, permissions: [], secrets: [], vars: [], provisioning: null } };
-    return { declaration: declaration.file, declaringRepo: declaration.repo, legacy: Boolean(declaration.legacy), sourceHost: Boolean(declaration.sourceHost),
+    return { declaration: declaration.file, declaringRepo: declaration.repo, sourceHost: Boolean(declaration.sourceHost),
       repository: name, projectKey: service.projects.find((project) => project.repository === name)?.key ?? null, ...service };
   }
   return null;
@@ -299,12 +294,9 @@ export function checkStarciStacks(repoRoot, { newRepo = false, advisoryCodes = [
   const declaration = own.missing ? governing : own;
   const shown = (file) => slash(path.relative(repo, file)) || '.';
 
-  if (own.dual) add('suspect', 'STACKS_DUAL_ROOT', '.', `both ${own.roots.join(' and ')} exist; one repository owns one stack root - finish the rename to .starcistacks and remove the other`);
   if (own.missing && !governing) {
     add(missingLevel, 'STACKS_DECLARATION_MISSING', `.starcistacks/${DECLARATION}`,
-      `no stack declaration (.starcistacks/${DECLARATION}, or the legacy .stacks one); the services this repository's CI uses are undeclared - follow-up: ${FOLLOW_UP.op} mode stacks`);
-  } else if (declaration?.legacy) {
-    add('suspect', 'STACKS_LEGACY_ROOT', shown(declaration.file), 'the declaration lives under the legacy .stacks root; rename the tree to .starcistacks (read the same way meanwhile)');
+      `no stack declaration (.starcistacks/${DECLARATION}); the services this repository's CI uses are undeclared - follow-up: ${FOLLOW_UP.op} mode stacks`);
   }
   if (declaration?.error) add('refuse', 'STACKS_DECLARATION_INVALID', shown(declaration.file), declaration.error);
   if (declaration?.doc && declaration.doc.schema !== DECLARATION_SCHEMA)
@@ -408,7 +400,7 @@ export function checkStarciStacks(repoRoot, { newRepo = false, advisoryCodes = [
   }
 
   // Custody layout (modules/schemas/stacks-layout.yaml custody, the product repositories' secrets-guard).
-  for (const root of own.roots ?? []) {
+  for (const root of own.rooted ? [STACK_ROOT] : []) {
     const tracked = git(repo, ['ls-files', '--', root]);
     if (tracked?.status === 0) {
       for (const file of tracked.stdout.split(/\r?\n/).filter(Boolean)) {
@@ -460,11 +452,11 @@ export function checkStarciStacks(repoRoot, { newRepo = false, advisoryCodes = [
     if (finding.level === 'refuse' && advisory.has(finding.code) && !SAFETY_CODES.has(finding.code)) Object.assign(finding, { level: 'suspect', advisory: true });
   const pick = (level) => findings.filter((finding) => finding.level === level).map((finding) => `${finding.file}: ${finding.message} [${finding.code}]${finding.advisory ? ' (added after this leg was admitted)' : ''}`);
   const refused = pick('refuse');
-  const needsFollowUp = findings.some((finding) => ['STACKS_DECLARATION_MISSING', 'STACKS_SERVICES_MISSING', 'STACKS_SERVICE_UNDECLARED', 'STACKS_LEGACY_ROOT'].includes(finding.code) && finding.level !== 'refuse');
+  const needsFollowUp = findings.some((finding) => ['STACKS_DECLARATION_MISSING', 'STACKS_SERVICES_MISSING', 'STACKS_SERVICE_UNDECLARED'].includes(finding.code) && finding.level !== 'refuse');
   const fixture = path.join(skillRoot, 'examples', 'starcistacks-services', `${name}.services.yaml`);
   return {
     schema: RESULT_SCHEMA, ok: refused.length === 0, repository: name, repoRoot: slash(repo), newRepo,
-    declaration: declaration?.file ? slash(declaration.file) : null, root: declaration?.root ?? null, legacy: Boolean(declaration?.legacy),
+    declaration: declaration?.file ? slash(declaration.file) : null, root: declaration?.root ?? null,
     governedBy: governing ? slash(governing.repo) : null,
     services: Object.fromEntries(Object.entries(normalized).map(([id, service]) => [id, summary(service)])),
     refused, suspect: pick('suspect'), findings,

@@ -318,7 +318,7 @@ sections:
         includes the validator there. Layout, name and schema violations are operator failures,
         not content to repair silently."
       - "Delivery and quality services are declared, never inferred (owner ruling 2026-09-24): the
-        repository's stack declaration (.starcistacks/application-stacks.yaml; legacy .stacks, or the
+        repository's stack declaration (.starcistacks/application-stacks.yaml, or the
         backend declaration whose sources list the repository; the runtime source host's for a shared
         server) states in its `services` block each of sonar, codecov, container-registry, analytics
         and error-tracking the code or CI uses - provider, mode local|hosted|disabled, host, the stack
