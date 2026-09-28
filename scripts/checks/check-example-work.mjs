@@ -8,6 +8,7 @@ import {renderProofProblems} from '../example/example-render-proof.mjs';
 import {DRAW_TOOL, RASTER_TOOL, generatedDrawingsOf, recipeRenderedOf, uiShapeFindings} from './ui-shapes.mjs';
 import {ASSET_SLOT_UNFILLED, assetSlotsOf} from '../work/asset-slot.mjs';
 import {walkFiles} from './common.mjs';
+import {isProductPath, agentDataCategory} from '../lib/starciwork-boundary.mjs';
 
 /**
  * The layout says an id mirrors its directory while remaining the identity. That sentence is only true if
@@ -142,6 +143,40 @@ const collectRecordMap = (scopeRoot) => {
   }
   return map;
 };
+
+// Agent-data categories still written in place while their op moves to blobs (lane a3-3 follow-up): a WARN, not a
+// refusal, so a live interface.draw leg's own starci validate is not refused for its loop directory.
+export const BOUNDARY_TRANSITIONAL = Object.freeze(['draw-round']);
+/**
+ * The .starciwork boundary (ARCHITECTURE-DB §5.1, scripts/lib/starciwork-boundary.mjs): every file under the tree is
+ * product content (isProductPath) or it is refused. Known agent data - E/ and impl captures, uat runs, evidence
+ * bundles, operations/ audits, kernel custody, stray report copies, caches, ledgers - is REFUSED
+ * [STARCIWORK_AGENT_DATA], one line per agent-data directory; its home is the project ledger and the blob store
+ * (api report --attach). A path that is neither (a record in a legacy layout) is WARNED [STARCIWORK_DRIFT].
+ * Paths are judged relative to the tree root (`resolveRoot`). The gate below runs it over every example tree.
+ */
+export function checkStarciworkBoundary(workRoot, problems, warnings = [], resolveRoot = workRoot) {
+  const groups = new Map();
+  for (const file of walkFiles(workRoot, {exclude: (name) => name === 'node_modules' || name === '.git', ignoreReadErrors: true})) {
+    const rel = path.relative(resolveRoot, file).replaceAll('\\', '/');
+    if (!rel || rel.startsWith('../') || isProductPath(rel)) continue;
+    const category = agentDataCategory(rel);
+    const parts = rel.split('/');
+    // Group a directory of agent data under its first denied segment (runs/<id>, E, assets, draw-loop, operations/<name>).
+    const at = category ? parts.findIndex((seg, i) => i < parts.length - 1 && /^(E|evidence|runs|draw-loop|operations|assets|kernel-evidence|kernel-strays|kernel-approvals|worktrees|settle-parity|settle-tail|runtime|canon-seams)$/.test(seg)) : -1;
+    const cut = at < 0 ? parts.length : at + (['runs', 'operations', 'evidence'].includes(parts[at]) ? 2 : 1);
+    const key = `${category ?? 'drift'}|${parts.slice(0, Math.min(cut, parts.length)).join('/')}`;
+    groups.set(key, (groups.get(key) ?? 0) + 1);
+  }
+  for (const [key, count] of groups) {
+    const [category, where] = key.split('|');
+    const shown = path.relative(root, path.join(resolveRoot, where)).replaceAll('\\', '/');
+    const files = count > 1 ? ` (${count} files)` : '';
+    if (category === 'drift') warnings.push(`${shown}${files}: not on the .starciwork product path list (work-layout.yaml shape.productPaths) - a record in a legacy layout or a stray file [STARCIWORK_DRIFT]`);
+    else if (BOUNDARY_TRANSITIONAL.includes(category)) warnings.push(`${shown}${files}: ${category} is agent data still written in place; it moves to blobs + job_artifacts [STARCIWORK_AGENT_DATA]`);
+    else problems.push(`${shown}${files}: ${category} is agent data, not product content - it belongs in the project ledger and the blob store (api report --attach from STARCI_JOB_SCRATCH), cited by artifact id + sha256 [STARCIWORK_AGENT_DATA]`);
+  }
+}
 
 /**
  * Runs every check in this file against one .starciwork tree rooted at `workRoot`, appending human-readable
@@ -837,6 +872,7 @@ if (import.meta.url === pathToFileURL(process.argv[1] ?? '').href) {
   checkFamiliesDrift(problems);
   let records = 0, refs = 0, evidence = 0, payloads = 0;
   for (const workRoot of walk(path.join(root, 'examples')).filter(file => file.endsWith(`.starciwork${path.sep}index.yaml`)).map(path.dirname)) {
+    checkStarciworkBoundary(workRoot, problems, warnings);
     const counts = checkWorkTree(workRoot, problems, warnings, infos);
     records += counts.records; refs += counts.refs; evidence += counts.evidence; payloads += counts.payloads;
   }
