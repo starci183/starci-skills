@@ -1203,6 +1203,7 @@ const workerQuestionsOf = (db, workflowId) => {
   const rows = db.prepare('SELECT inbox_id,key,payload_json,status FROM inbox WHERE workflow_id=? AND kind=? ORDER BY inbox_id').all(workflowId, WORKER_QUESTION);
   const ledgerRow = new Map(rows.map((row) => [row.key, row]));
   const jobs = db.prepare("SELECT * FROM jobs WHERE workflow_id=? AND kind<>'kernel'").all(workflowId);
+  const reportedDispatches = new Set(db.prepare('SELECT dispatch_id FROM reports WHERE workflow_id=?').all(workflowId).map((row) => row.dispatch_id));
   const runIds = workflowRunIdsOf(db, workflowId);
   const seen = new Map();
   let error = null;
@@ -1238,9 +1239,13 @@ const workerQuestionsOf = (db, workflowId) => {
   const questions = [...seen.values()].map((item) => {
     const row = ledgerRow.get(item.messageId) ?? null;
     const open = Boolean(item.jobId) && !FINAL_SETTLED.includes(item.jobStatus);
+    const job = item.jobId ? jobs.find((candidate) => candidate.job_id === item.jobId) : null;
+    const reported = Boolean((item.dispatchId && reportedDispatches.has(item.dispatchId))
+      || (job && [...jobDispatchIdsOf(db, job)].some((id) => reportedDispatches.has(id))));
     const state = row && row.status !== 'pending' ? 'answered'
       : item.repliedInOrca ? 'replied-elsewhere'
       : !item.jobId ? 'unmatched'
+      : reported ? 'dispatch-inactive'
       : !open ? 'job-settled'
       : 'pending';
     return { ...item, bridged: Boolean(row), state };
@@ -1265,7 +1270,7 @@ function cmdQuestions(ledger, args) {
     }
     // A bridged question whose worker is gone, or that someone answered in
     // Orca directly, no longer waits on the Kernel.
-    for (const item of questions.filter((q) => q.bridged && ['job-settled', 'replied-elsewhere'].includes(q.state))) {
+    for (const item of questions.filter((q) => q.bridged && ['job-settled', 'replied-elsewhere', 'dispatch-inactive'].includes(q.state))) {
       closed += db.prepare("UPDATE inbox SET status='done', disposition_json=?, applied_at=? WHERE workflow_id=? AND kind=? AND key=? AND status='pending'")
         .run(JSON.stringify({ reason: item.state }), now, workflowId, WORKER_QUESTION, item.messageId).changes;
     }
@@ -3417,7 +3422,8 @@ function cmdStatus(ledger, args, repo = null) {
     ? workerQuestionsOf(db, workflowId)
     : { pending: db.prepare("SELECT key,payload_json FROM inbox WHERE workflow_id=? AND kind=? AND status='pending'").all(workflowId, WORKER_QUESTION)
       .map((row) => ({ ...(parseJson(row.payload_json, {}) ?? {}), messageId: row.key, bridged: true, state: 'pending' }))
-      .filter((item) => item.jobId && workers.some((worker) => worker.jobId === item.jobId)), error: null };
+      .filter((item) => item.jobId && workers.some((worker) => worker.jobId === item.jobId)
+        && !reports.some((report) => report.dispatch_id === item.dispatchId || report.job_id === item.jobId)), error: null };
   const workerQuestions = workerAsks.pending.map(({ messageId, type, jobId, opId, attempt, question, options, askedAt, bridged }) => ({ messageId, type, jobId, opId, attempt, question, options, askedAt, bridged }));
   // A peer workflow's pending message (api notify, or the enqueue overlap
   // heads-up) waits on this Kernel until it reads api inbox and acks it. It
