@@ -1,9 +1,8 @@
 # Changelog
 
-## Unreleased - 2026-09-28
+## 0.7.0 - 2026-09-28
 
-Additive, plus one fix (owner, 2026-09-28, StarCi Next `SignInBase#signed-out`). Not published: the release waits
-for owner approval.
+Additive (minor), plus one fix (owner, 2026-09-28, StarCi Next `SignInBase#signed-out`). Owner approved the publish.
 
 - Fix: `SurfaceCard` `measure="form"` / `"formCompact"` now caps the card. The root's `width: 100% !important`
   (`.starci-core-surface-card`) beat the form surface's `min(100%, 30rem)`, so a form card stretched across the whole
