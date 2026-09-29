@@ -822,7 +822,7 @@ export function recoverCreatedTerminal({ worktree, title, before = null, error =
 // `cwd`, when set, is the directory the agent runs in (cwdCommand).
 // onCreated(handle) runs the moment the terminal exists, before any wait: the caller records the handle
 // durably, so a caller killed mid-spawn leaves a terminal the ledger can still close (nivo inc-e523617a3c31).
-export function spawnAgent({ provider, model = null, effort = null, worktree, cwd = null, title, prompt = null, promptFile = null, command = null, kernel = false, dispatchId, attest = true, env = null, pathPrefix = null, readiness = null, onWait = null, onCreated = null, keepStartingTerminal = false } = {}) {
+export function spawnAgent({ provider, model = null, effort = null, worktree, cwd = null, title, prompt = null, promptFile = null, command = null, kernel = false, dispatchId, attest = true, env = null, pathPrefix = null, readiness = null, onWait = null, onCreated = null, keepStartingTerminal = false, fallbackWorktree = null } = {}) {
   const launchDir = cwd ?? worktree;
   const built = buildSpawnCommand({ provider, kernel, command, model, effort, env, pathPrefix, cwd: cwd && cwd !== worktree ? cwd : null });
   if (built.error) return { ok: false, step: 'command', error: built.error, provider };
@@ -834,6 +834,13 @@ export function spawnAgent({ provider, model = null, effort = null, worktree, cw
   let gateAnswers = null;
   const before = terminalSnapshot(worktree);
   const create = terminalCreate({ worktree, title, command: built.command });
+  // `worktree` may be a checkout Orca does not register (the runtime's own .claude is a nested repo, not a worktree
+  // of the host repo): Orca refuses it with selector_not_found before any effect. The launch then retries on
+  // `fallbackWorktree` (the registered host repo root) with the agent started in `worktree` (cwdCommand).
+  if (!create.handle && create.errorCode === 'selector_not_found' && fallbackWorktree && fallbackWorktree !== worktree) {
+    return spawnAgent({ provider, model, effort, worktree: fallbackWorktree, cwd: cwd ?? worktree, title, prompt, promptFile, command, kernel, dispatchId,
+      attest, env, pathPrefix, readiness, onWait, onCreated, keepStartingTerminal });
+  }
   // A handle-less create whose effect is unknown is reconciled before it is
   // called a failure: adopt the terminal it made, or close it.
   const createRecovery = !create.handle && create.effectUnknown

@@ -369,9 +369,10 @@ export function renderWorkerPrompt(job, staging, { template = null, skillRoot = 
 
 /**
  * Launch queued jobs while the adaptive cap has room. Each launch: lease check, route, staging checkout,
- * leases, [Worker] terminal. The terminal is created on the runtime's own Orca worktree (`root`, the registered
- * .claude project) with the agent started in the staging path (spawnAgent cwd): a staging checkout is no Orca
- * worktree, and a terminal created on it is orphaned, under no project in the sidebar. A failed launch releases
+ * leases, [Worker] terminal. The terminal is created on the runtime's own Orca worktree (`root`), or, when Orca
+ * does not register it (the .claude runtime is a nested repo; selector_not_found), on the host repo root
+ * (spawnAgent fallbackWorktree), with the agent started in the staging path (spawnAgent cwd): a staging checkout
+ * is no Orca worktree, and a terminal created on it is orphaned, under no project in the sidebar. A failed launch releases
  * its leases, removes its checkout and requeues the job (failed after MAX_SPAWN_ATTEMPTS).
  * `deps`: {spawn, route, load, staging, unstage} for specs.
  */
@@ -414,7 +415,7 @@ export async function spawnWorkers(m, { jobId = null, dryRun = false, settings =
     const command = (deps.command ?? workerLaunchCommand)({ pool: route.pool, provider: route.agent, model: route.model });
     const guard = (deps.guard ?? workerGuard)(job.job_id, { root });
     if (!guard.pathPrefix) supervisorEvent(m, { entityType: 'job', entityId: job.job_id, kind: 'worker-guard-missing', payload: { receipt: guard.receipt }, now: now() });
-    const spawned = (deps.spawn ?? (await import('../agent/lib.mjs')).spawnAgent)({ provider: route.agent, model: route.model, effort: route.effort, worktree: root, cwd: staging.path, title, prompt, kernel: true, dispatchId: job.job_id, command,
+    const spawned = (deps.spawn ?? (await import('../agent/lib.mjs')).spawnAgent)({ provider: route.agent, model: route.model, effort: route.effort, worktree: root, fallbackWorktree: path.dirname(root), cwd: staging.path, title, prompt, kernel: true, dispatchId: job.job_id, command,
       env: guard.env, pathPrefix: guard.pathPrefix });
     const payload = { ...job.payload, pool: route.pool, agent: route.agent, model: route.model, staging: { path: staging.path, branch: staging.branch, base: staging.base },
       spawnAttempts: (job.payload.spawnAttempts ?? 0) + 1, guard: guard.receipt };

@@ -1,7 +1,8 @@
 #!/usr/bin/env node
 // start-supervisor.mjs — the entry point of the ONE [Supervisor] kernel (modules/supervisor/supervise.yaml
 // kernelSeat, docs/supervisor.md). It launches a durable Orca terminal titled "[Supervisor] main" in the
-// runtime's own worktree, running the configured agent (config.yaml supervisor.kernel, else the kernel pin)
+// runtime's own worktree (or, when Orca does not register the nested .claude repo, on the host repo root with the
+// agent started in the runtime: spawnAgent fallbackWorktree), running the configured agent (config.yaml supervisor.kernel, else the kernel pin)
 // with a prompt built from modules/supervisor/supervisor-prompt.md and supervise.yaml.
 //
 // The kernel is OPTIONAL: it runs only in config.yaml supervisor.mode kernel. In chat mode (the default; owner,
@@ -298,7 +299,7 @@ export async function launchSupervisor({ mode = 'start', adoptHandle = null, rea
       settings, restart: previous ? (reason ?? `the previous Supervisor terminal ${previous.terminal} failed its liveness check (${previous.reason})`) : null,
     });
     const command = d.card ? seatCommand({ agent: settings.agent, model: settings.model, effort: settings.effort, card: d.card(settings.agent) }) : null;
-    const spawned = d.spawn({ provider: settings.agent, model: settings.model, effort: settings.effort, worktree: SKILL_ROOT,
+    const spawned = d.spawn({ provider: settings.agent, model: settings.model, effort: settings.effort, worktree: SKILL_ROOT, fallbackWorktree: path.dirname(SKILL_ROOT),
       title: SUPERVISOR_TITLE, prompt, kernel: true, dispatchId: `supervisor-${SUPERVISOR_ID}`, ...(command ? { command } : {}) });
     if (!spawned?.ok) {
       m.transaction(() => {
