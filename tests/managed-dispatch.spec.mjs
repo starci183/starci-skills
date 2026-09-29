@@ -7,6 +7,7 @@ import {spawnSync} from 'node:child_process';
 import {FAKE_ORCA} from './helpers/fake-orca.mjs';
 import {openLedger,inspectLedger,ledgerFileFor} from '../engine/ledger-db.mjs';
 import {openMachine,openMachineReader} from '../engine/machine-db.mjs';
+process.env.STARCI_SLEEP_SCALE??='0.02';
 import {jobRowOf} from '../scripts/kernel/api-lib/rows.mjs';
 
 // Build the workflow and logical unit required by the current ledger before
