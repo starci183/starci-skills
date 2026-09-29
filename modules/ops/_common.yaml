@@ -570,5 +570,5 @@ sections:
         blocker of the brief, and a skipped gate is recorded as a check named specs.unit or specs.e2e with
         exitCode 0 - never partial, blocked or a test-gap."
       - "Every deferral is a tests-deferred event and a row of api status testsDeferred; `api run-deferred-tests
-        --workflow <id> [--kind unit|e2e]` re-queues them on their same attempt, and they then run their whole
+        --workflow <id> [--kind unit|e2e|integration]` re-queues them on their same attempt, and they then run their whole
         brief even while the switch is still off."

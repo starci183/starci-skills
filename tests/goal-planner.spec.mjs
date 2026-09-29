@@ -282,3 +282,18 @@ test('archetypes.yaml carries only the keys route-plan reads; the planner derive
     assert.deepEqual(unread, [], `${entry.id} declares keys no code reads: ${unread.join(', ')}`);
   }
 });
+
+test('integration.verify joins a chain only when the prompt explicitly asks for live verification', () => {
+  const ops = prompt => body(run(prompt)).legs.map(leg => leg.op);
+  const live = list => list.filter(op => op === 'integration.verify' || op === 'provision.ask');
+  assert.deepEqual(live(ops('integrate Google OAuth sign-in and SMTP email into the auth backend')), []);
+  assert.ok(ops('integrate Google OAuth sign-in and SMTP email into the auth backend').includes('backend.implement'));
+  assert.deepEqual(live(ops('tích hợp VNPay cho thanh toán khoá học')), []);
+  assert.deepEqual(live(ops('integrate Google OAuth into the auth backend and run the integration tests')), ['provision.ask', 'integration.verify']);
+  assert.deepEqual(live(ops('integrate Google OAuth sign-in, verify OAuth live')), ['provision.ask', 'integration.verify']);
+  assert.deepEqual(live(ops('tích hợp VNPay cho thanh toán, kiểm thử tích hợp')), ['provision.ask', 'integration.verify']);
+  assert.deepEqual(live(ops('build the backend API for wishlist with live verification')), ['provision.ask', 'integration.verify']);
+  assert.deepEqual(live(ops('integrate Stripe payments, skip integration tests')), []);
+  const asked = ops('integrate Google OAuth into the auth backend and run the integration tests');
+  assert.ok(asked.indexOf('backend.implement') < asked.indexOf('integration.verify') && asked.indexOf('integration.verify') < asked.indexOf('review.verify'));
+});

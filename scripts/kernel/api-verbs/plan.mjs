@@ -79,7 +79,7 @@ export default {
 
     // The legs the owner's config.yaml specs switches defer (never dispatched; api run-deferred-tests runs them later).
     const specs = ownerSpecs(internals.skillRoot);
-    const deferredLegs = legs.map((leg) => ({ op: leg.op, deferral: planLegDeferral({ skillRoot: internals.skillRoot, op: leg.op, settings: specs }) })).filter((leg) => leg.deferral)
+    const deferredLegs = legs.map((leg) => ({ op: leg.op, deferral: planLegDeferral({ skillRoot: internals.skillRoot, op: leg.op, settings: specs, goalText: g?.markdown ?? null }) })).filter((leg) => leg.deferral)
       .map((leg) => ({ op: leg.op, reason: leg.deferral.reason }));
     const testsDeferred = { off: specsOff(specs), legs: deferredLegs, jobs: deferredTestsOf(db, workflowId) };
     const out = { ok: true, workflowId, goalRevision: g?.revision ?? null, divergence, lineage, inboxApplied, legs, testsDeferred };

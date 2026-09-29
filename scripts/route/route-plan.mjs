@@ -38,6 +38,7 @@ import {
   loadRecords, readWorkspace, resolveOwnedDirs,
 } from '../example/example-ownership.mjs';
 import { ownerSpecs, planLegDeferral } from '../kernel/spec-deferral.mjs';
+import { normalizeText, phraseHits } from './phrase-match.mjs';
 
 const skillRoot = path.resolve(fileURLToPath(new URL('.', import.meta.url)), '..', '..');
 
@@ -245,29 +246,6 @@ const ARCHETYPE_STAR = {
   },
 };
 
-// Phrase matching per archetypes.yaml signalMatching: NFC + lower-case +
-// collapsed whitespace on both sides, diacritics kept, Unicode word
-// boundaries (JS \b is ASCII-only and never fires beside "đ" or "ệ").
-const normalizeText = s => String(s ?? '').normalize('NFC').toLowerCase().replace(/\s+/g, ' ').trim();
-const WORD_CHAR = /[\p{L}\p{M}\p{N}_]/u;
-const isWordChar = ch => !!ch && WORD_CHAR.test(ch);
-
-function phraseHits(text, phrase) {
-  let p = normalizeText(phrase);
-  const prefix = p.endsWith('*');
-  if (prefix) p = p.slice(0, -1).trimEnd();
-  if (!p) return false;
-  const chars = [...p];
-  const needStart = isWordChar(chars[0]);
-  const needEnd = !prefix && isWordChar(chars.at(-1));
-  for (let i = text.indexOf(p); i >= 0; i = text.indexOf(p, i + 1)) {
-    const before = [...text.slice(Math.max(0, i - 2), i)].at(-1);
-    const after = [...text.slice(i + p.length, i + p.length + 2)][0];
-    if ((!needStart || !isWordChar(before)) && (!needEnd || !isWordChar(after))) return true;
-  }
-  return false;
-}
-
 const asArray = v => (v === undefined || v === null ? [] : Array.isArray(v) ? v : [v]);
 
 function alternativeMatches(text, alt) {
@@ -319,7 +297,7 @@ function loadArchetypeSignals(goalDir) {
     return { ...entry, ...ARCHETYPE_STAR[id] };
   });
   // A refactor whose prompt hits $canonIntent is a canon-conformance cleanup (code.refactor params.canonFamilies).
-  return Object.assign(matchers, { canonIntent: expand(['$canonIntent']), e2eIntent: expand(['$e2eIntent']), uatIntent: expand(['$uatIntent']), proofNegation: expand(['$proofNegation']) });
+  return Object.assign(matchers, { canonIntent: expand(['$canonIntent']), e2eIntent: expand(['$e2eIntent']), uatIntent: expand(['$uatIntent']), proofNegation: expand(['$proofNegation']), integrationIntent: expand(['$integrationIntent']), integrationNegation: expand(['$integrationNegation']) });
 }
 
 function matchArchetypes(rawText, archetypes) {
@@ -330,12 +308,16 @@ function matchArchetypes(rawText, archetypes) {
 }
 
 const PROOF_SCOPES = new Set(['feature-build-fullstack', 'feature-build-with-ui', 'feature-build-backend', 'verify-only']);
+// Live integration verification (integration.verify) is the same kind of manual-only proof (owner ruling 2026-09-29): it can
+// join an external-integration scope or any build scope, and only on an explicit ask.
+const INTEGRATION_SCOPES = new Set([...PROOF_SCOPES, 'external-integration']);
 
 /** E2E runs manually only (owner ruling 2026-09-29): the e2e/UAT proof legs are explicit asks, never defaults. */
 function explicitProofAsk(text, archetypes) {
   const hit = list => asArray(list).some(p => phraseHits(text, p));
   const negated = hit(archetypes.proofNegation);
-  return { e2e: hit(archetypes.e2eIntent) && !negated, uat: hit(archetypes.uatIntent) && !negated };
+  const integrationNegated = hit(archetypes.integrationNegation);
+  return { e2e: hit(archetypes.e2eIntent) && !negated, uat: hit(archetypes.uatIntent) && !negated, integration: hit(archetypes.integrationIntent) && !integrationNegated };
 }
 
 /** Without an explicit ask a backend build ends at impl done (backend) and an interface build at ui audited;
@@ -347,10 +329,13 @@ function applyProofRule(vars, proof, a) {
       out.push({ family: 'impl', suffix: v.suffix, state: 'done', _qual: 'backend', strictQualifier: true });
     } else if (v.family === 'ui' && v.state === 'verified' && !proof.uat) {
       out.push({ family: 'ui', suffix: v.suffix, state: 'audited' });
+    } else if (v.family === 'integration' && v.state === 'verified' && !proof.integration) {
+      out.push({ family: 'impl', suffix: v.suffix, state: 'done', _qual: 'backend', strictQualifier: true });
     } else out.push(v);
   }
   if (proof.e2e && !out.some(v => v.family === 'api' && v.state === 'verified')) out.push({ family: 'api', suffix: a.surfaceName, state: 'verified' });
   if (proof.uat && !out.some(v => v.family === 'ui' && v.state === 'verified')) out.push({ family: 'ui', suffix: a.surfaceName, state: 'verified' });
+  if (proof.integration && !out.some(v => v.family === 'integration' && v.state === 'verified')) out.push({ family: 'integration', suffix: a.surfaceName, state: 'verified' });
   return out;
 }
 
@@ -373,8 +358,9 @@ function intentToStar(text, args, archetypes) {
   // UAT prompt may name e2e/UAT as subject matter without asking for the leg.
   const proofScope = hints.archetypes.some(id => PROOF_SCOPES.has(id));
   const asked = explicitProofAsk(normalizeText(text), archetypes);
-  const proof = { e2e: proofScope && asked.e2e, uat: proofScope && asked.uat };
-  Object.assign(hints, { e2eAsked: proof.e2e, uatAsked: proof.uat });
+  const integrationScope = hints.archetypes.some(id => INTEGRATION_SCOPES.has(id));
+  const proof = { e2e: proofScope && asked.e2e, uat: proofScope && asked.uat, integration: integrationScope && asked.integration };
+  Object.assign(hints, { e2eAsked: proof.e2e, uatAsked: proof.uat, integrationAsked: proof.integration });
   const starVars = applyProofRule(vars, proof, a);
   // fanout: two or more disjoint verify surfaces in one prompt.
   const surfaces = new Set(starVars.map(v => v.family));
@@ -1138,7 +1124,7 @@ function main() {
       extends: l.extends ?? undefined, assumed: l.assumed.length ? [...new Set(l.assumed)] : undefined,
       conditions: l.conditions.length ? [...new Set(l.conditions)] : undefined,
       injected: l.injected, parallel: l.parallel, yaml: l.yaml, missingOp: l.missingOp,
-      deferred: planLegDeferral({ skillRoot, op: l.op, settings: specs })?.reason,
+      deferred: planLegDeferral({ skillRoot, op: l.op, settings: specs, goalText: args.text ?? null })?.reason,
     })),
     edges: planEdges,
     legalityFindings: findings.length ? findings : undefined,

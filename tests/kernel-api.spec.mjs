@@ -98,12 +98,12 @@ const writeFixtureContract=(ledger,jobId,markdown='# fixture contract')=>{
 };
 
 /** A workflow with a goal revision and a pending inbox goal row — the shape define-goal.mjs writes. */
-const seedGoal=(repo,workflowId)=>{
+const seedGoal=(repo,workflowId,markdown='# goal')=>{
   seed(repo,ledger=>{
     const at=Date.now();
     ledger.ensureWorkflow({workflowId,title:'k7 api smoke'});
     ledger.db.prepare('INSERT INTO goals(workflow_id,revision,goal_identity,markdown,json,created_at) VALUES(?,?,?,?,?,?)')
-      .run(workflowId,0,'k7goal','# goal',json({derivedFrom:'k7-test'}),at);
+      .run(workflowId,0,'k7goal',markdown,json({derivedFrom:'k7-test'}),at);
     ledger.db.prepare("INSERT INTO inbox(workflow_id,kind,key,payload_json,status,created_at) VALUES(?,?,?,?,'pending',?)")
       .run(workflowId,'goal',workflowId,json({prompt:'k7'}),at);
   });
@@ -322,7 +322,7 @@ test('status explains every queued job: ready, dependency, path-lease, pool-full
 test('an owner-gate incident holds the jobs it names until the Kernel resolves it',t=>{
   const fx=fixture(t),repo=fx.repo(),wf='wf-k7-owner-gate';
   const owner=ownerConfig(t,{budgets:{maxOps:null}});
-  seedGoal(repo,wf);
+  seedGoal(repo,wf,'# goal: live verification of the Google OAuth integration');
   const api=(...args)=>runApiAsOwner(owner,...args,'--repo',repo,'--json');
   const enq=(op,paths)=>{const r=api('enqueue','--workflow',wf,'--op',op,'--paths',paths);assert.equal(r.status,0,r.stderr);return out(r).job_id;};
   const held=enq('integration.verify','docs/oauth-google');
@@ -1043,4 +1043,33 @@ test('reconcile --reap cleans only a settled job and is a no-op on a dead termin
   const dead=spawnSync(process.execPath,[API,'reconcile','--job',jobId,'--reap','--repo',repo,'--json'],{cwd:ROOT,encoding:'utf8',windowsHide:true,timeout:120000,env:{...env,STARCI_OWNER_ROOT:owner}});
   assert.equal(dead.status,0,dead.stderr);
   assert.equal(JSON.parse(dead.stdout).live,false,'a terminal Orca no longer knows is not live');
+});
+
+// Owner ruling 2026-09-29: live integration verification runs only on an explicit ask. An approved integration.verify leg
+// the goal did not ask for settles deferred at once (the specs.e2e=false path): never dispatched, never red, nothing waits on it.
+test('integration.verify enqueued under a goal that never asked for it settles deferred; one that asks queues it',t=>{
+  const fx=fixture(t),repo=fx.repo();
+  const owner=ownerConfig(t,{budgets:{maxOps:null}});
+  const api=(...args)=>runApiAsOwner(owner,...args,'--repo',repo,'--json');
+  const enq=(wf,op,paths)=>{const r=api('enqueue','--workflow',wf,'--op',op,'--paths',paths);assert.equal(r.status,0,r.stderr);return out(r);};
+  seedGoal(repo,'wf-k7-int-plain','# goal: build the Google OAuth sign-in');
+  const plain=enq('wf-k7-int-plain','integration.verify','docs/oauth-google');
+  assert.equal(plain.status,'succeeded');
+  assert.equal(plain.deferred.kind,'integration');
+  assert.match(plain.deferred.reason,/explicit ask/);
+  const row=read(repo,l=>l.db.prepare('SELECT status FROM jobs WHERE job_id=?').get(plain.job_id));
+  assert.equal(row.status,'cancelled','a deferred job is cancelled with a deferred result, never failed');
+  const after=enq('wf-k7-int-plain','docs.author','docs/readme');
+  assert.equal(after.status,'queued','a dependent of the deferred leg is not blocked by it');
+  const status=out(api('status','--workflow','wf-k7-int-plain'));
+  assert.equal(status.testsDeferred.jobs.find(item=>item.jobId===plain.job_id).kind,'integration');
+
+  seedGoal(repo,'wf-k7-int-asked','# goal: build the Google OAuth sign-in and run the live verification');
+  const asked=enq('wf-k7-int-asked','integration.verify','docs/oauth-google');
+  assert.equal(asked.status,'queued');
+  assert.equal(asked.deferred,undefined);
+
+  const forced=api('run-deferred-tests','--workflow','wf-k7-int-plain','--kind','integration');
+  assert.equal(forced.status,0,forced.stderr||forced.stdout);
+  assert.equal(out(forced).requeued.length,1);
 });

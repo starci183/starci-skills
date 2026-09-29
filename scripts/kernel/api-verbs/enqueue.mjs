@@ -17,7 +17,7 @@ import { admitUnit, writeUnitTry } from '../units.mjs';
 import { isCanonSlice, requirePlannedCanonSlice } from '../canon-plan-gate.mjs';
 import { requirePhase, ACCEPTS_WORK } from '../api-lib/lifecycle.mjs';
 import { seamPriorityOf } from '../cut-seam.mjs';
-import { deferralOf as testDeferralOf, deferJob } from '../spec-deferral.mjs';
+import { deferralOf as testDeferralOf, deferJob, explicitAsksOf } from '../spec-deferral.mjs';
 
 export default {
   verb: 'enqueue',
@@ -282,6 +282,8 @@ export default {
       ...(contractChange ? { contractChange } : {}),
       ...(commitOnly ? { commitOnly } : {}),
       ...(canonPlan ? { canonPlan } : {}),
+      // The manual-only proofs this goal explicitly asks for (spec-deferral.mjs): an explicit-ask-only leg without the stamp is deferred.
+      ...(explicitAsksOf({ skillRoot, text: goal?.markdown }).length ? { explicitAsk: explicitAsksOf({ skillRoot, text: goal?.markdown }) } : {}),
       goal_binding: { revision: goal?.revision ?? null, identity: goal?.goal_identity ?? null },
       hierarchy: {
         schema: AGENT_HIERARCHY_SCHEMA,
@@ -301,6 +303,7 @@ export default {
     unit = { unitId: unitTry.unitId, tryNo: unitTry.tryNo, tryBudget: admitted.tryBudget, retryOf: unitTry.retryOf, resumeOf: unitTry.resumeOf, ...(admitted.reopen ? { reopen: admitted.reopen } : {}) };
     // The owner's config.yaml specs switch off this test class: the leg settles deferred at once, no attempt
     // spent, and the legs behind it proceed (scripts/kernel/spec-deferral.mjs; api run-deferred-tests runs it later).
+    // An explicit-ask-only leg (integration.verify) the goal did not ask for is deferred the same way.
     const deferral = testDeferralOf({ skillRoot, op: args.op, payload });
     if (deferral) {
       testsDeferred = deferJob(ledger, { job: { job_id: jobId, workflow_id: workflowId, op_id: args.op, try_no: unitTry.tryNo }, deferral, via: 'enqueue', now });
@@ -315,7 +318,7 @@ export default {
     peerOverlap: peers.overlap, peerHeadsUp: peers.messages, ...(testsDeferred ? { deferred: testsDeferred } : {}),
     ...(foundationLeg ? { foundation: foundationLeg } : {}), ...(contractChange ? { contractChange } : {}), ...(foundationAdvisory ? { foundationAdvisory } : {}) };
   if (foundationAdvisory) process.stderr.write(`api: advisory: ${foundationAdvisory}\n`);
-  emit(out, `enqueued ${jobId} (op ${args.op}, unit ${unit.unitId} try ${unit.tryNo}/${unit.tryBudget}${unit.retryOf ? ` retry of ${unit.retryOf}` : ''}${unit.reopen ? ` REOPENED: ${unit.reopen.reason}` : ''}, status ${job.status}${testsDeferred ? `, DEFERRED ${testsDeferred.reason}: not dispatched, no attempt spent; api run-deferred-tests --workflow ${workflowId} runs it later` : ''}${payload.repository ? `, repository ${payload.repository}` : ''}${cut ? `, cut ${cut.ordinal}/${cut.total} ${cut.id}` : ''}${payload.params ? `, params ${Object.entries(payload.params).map(([k, v]) => `${k}=${JSON.stringify(v)}`).join(' ')}` : ''})${peers.overlap.length ? `; overlaps peer job(s) ${[...new Set(peers.overlap.map((hit) => `${hit.workflowId}/${hit.jobId}`))].join(', ')}, heads-up sent to ${peers.messages.map((message) => message.to).join(', ') || 'nobody new'}` : ''}`, args.json);
+  emit(out, `enqueued ${jobId} (op ${args.op}, unit ${unit.unitId} try ${unit.tryNo}/${unit.tryBudget}${unit.retryOf ? ` retry of ${unit.retryOf}` : ''}${unit.reopen ? ` REOPENED: ${unit.reopen.reason}` : ''}, status ${job.status}${testsDeferred ? `, DEFERRED (${testsDeferred.reason}): not dispatched, no attempt spent; api run-deferred-tests --workflow ${workflowId} runs it later` : ''}${payload.repository ? `, repository ${payload.repository}` : ''}${cut ? `, cut ${cut.ordinal}/${cut.total} ${cut.id}` : ''}${payload.params ? `, params ${Object.entries(payload.params).map(([k, v]) => `${k}=${JSON.stringify(v)}`).join(' ')}` : ''})${peers.overlap.length ? `; overlaps peer job(s) ${[...new Set(peers.overlap.map((hit) => `${hit.workflowId}/${hit.jobId}`))].join(', ')}, heads-up sent to ${peers.messages.map((message) => message.to).join(', ') || 'nobody new'}` : ''}`, args.json);
 
   },
 };

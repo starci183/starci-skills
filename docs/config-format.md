@@ -206,6 +206,6 @@ What an op does when a class is off is its brief's `policy.specsToggle.<class>`:
   coverage` (and the handover-proof-owed refusal) drops that `requiresProof` kind from must-haves (`notCounted`).
 
 `api status` lists `testsDeferred {off, jobs, planned}` and a `tests deferred` line (legs carry `deferred`);
-`api plan` and `route-plan.mjs` mark deferred legs. `api run-deferred-tests --workflow <id> [--kind unit|e2e]
+`api plan` and `route-plan.mjs` mark deferred legs. `api run-deferred-tests --workflow <id> [--kind unit|e2e|integration]
 [--dry-run]` is "test later": it re-queues the deferred jobs on their same attempt with `payload.specsForced`, and
 they then run their whole brief even while the switch is still off.

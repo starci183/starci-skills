@@ -1,9 +1,11 @@
 schema: starci/op@1
 id: integration.verify
 goal:
-  en: Prove one declared external integration against the real provider, in its sandbox account, with
-    the credential the owner supplies, read at the moment of use from the selected backend Stack
-    environment's encrypted identity custody, and keep the live exchange as evidence.
+  en: >-
+    Runs only on explicit request or before release (owner ruling 2026-09-29, live verification belongs with e2e/UAT and never
+    in a default chain; a leg the goal did not ask for settles deferred). Prove one declared external integration against the
+    real provider, in its sandbox account, with the credential the owner supplies, read at the moment of use from the selected
+    backend Stack environment's encrypted identity custody, and keep the live exchange as evidence.
 nodeKinds: [integration]
 completionProfile: integration
 sideEffects:
@@ -319,6 +321,9 @@ placeholders:
 layoutPolicy:
   checks: [starci-validate, starci-stacks-check]
 policy:
+  # explicitAsk: this op runs only when the goal asks for it (phraseSets.integrationIntent in modules/goal/archetypes.yaml)
+  # or the owner forces it (api run-deferred-tests); otherwise the kernel settles its leg deferred, never dispatched (scripts/kernel/spec-deferral.mjs).
+  explicitAsk: integration
   integrationPolicy:
     proofSurface: real-provider
     fakes: none

@@ -41,7 +41,7 @@
 //   finish   --repo <path> --workflow <id>
 //   kernel-ack-rev --repo <path> --workflow <id> --rev <sha> [--files <csv>]
 //   contract-release --repo <path> --family <op> [--workflow <id>] [--batch <name>] [--reason <text>] [--dry-run]
-//   run-deferred-tests --repo <path> --workflow <id> [--kind unit|e2e] [--dry-run]
+//   run-deferred-tests --repo <path> --workflow <id> [--kind unit|e2e|integration] [--dry-run]
 //
 // Every read prints a JSON-safe result; every write runs inside one
 // ledger.transaction. --json gives the machine form; without it each command
@@ -357,7 +357,7 @@ const usage = (code) => {
            stop a workflow that will not finish: archived_at set, open jobs dropped, asks retired, Kernel and Tasks closed
   rename   --workflow <id> --title "<name>" [--by owner|supervisor] [--no-terminals] [--dry-run]
            set the workflow's display name (workflow_id unchanged); renames its live [Kernel] and [Op] tabs
-  run-deferred-tests --workflow <id> [--kind unit|e2e] [--dry-run]
+  run-deferred-tests --workflow <id> [--kind unit|e2e|integration] [--dry-run]
            re-queue the test legs the owner's config.yaml specs switches deferred (api status testsDeferred)`);
   process.exit(code);
 };
@@ -1219,7 +1219,8 @@ function graphProjectionOf(db, { wf, legOps, planAncestors, workflowJobs, jobsBy
   // The owner's config.yaml specs switches, read once per projection: a test leg of a class that is off is
   // deferred, so nothing waits on it and its enqueue/route only records the deferral (spec-deferral.mjs).
   const specs = ownerSpecs(skillRoot);
-  const deferredPlanOps = new Map(legOps.map((op) => [op, planLegDeferral({ skillRoot, op, settings: specs })]).filter(([, deferral]) => deferral));
+  const goalText = latestGoal(db, wf.workflow_id)?.markdown ?? null;
+  const deferredPlanOps = new Map(legOps.map((op) => [op, planLegDeferral({ skillRoot, op, settings: specs, goalText })]).filter(([, deferral]) => deferral));
   const specDeferredJobs = new Map(deferredTestsOf(db, wf.workflow_id).map((item) => [item.jobId, item.reason ?? 'deferred']));
   for (const row of unresolved) {
     const step = (jobResult(db, row.job_id) ?? {}).nextStep;
@@ -1242,7 +1243,7 @@ function graphProjectionOf(db, { wf, legOps, planAncestors, workflowJobs, jobsBy
   for (const item of queued.filter((row) => deferredQueued.has(row.jobId))) {
     const deferral = deferredQueued.get(item.jobId);
     actions.push({ kind: 'dispatch', op: item.opId, jobId: item.jobId, deferred: deferral.reason,
-      reason: `deferred by the owner's ${deferral.reason}: api route --job ${item.jobId} settles it deferred without dispatch (no attempt spent, whatever it was queued behind) and the legs behind it proceed` });
+      reason: `deferred (${deferral.reason}): api route --job ${item.jobId} settles it deferred without dispatch (no attempt spent, whatever it was queued behind) and the legs behind it proceed` });
   }
   for (const item of queued.filter((row) => row.queuedBecause === 'ready' && !deferredQueued.has(row.jobId))) {
     const payload = jobPayloadOf(rowOf.get(item.jobId));
@@ -1270,7 +1271,7 @@ function graphProjectionOf(db, { wf, legOps, planAncestors, workflowJobs, jobsBy
         const nodes = workGraph ? workGraph.frontier.map((node) => node.id) : [];
         const deferral = deferredPlanOps.get(op);
         actions.push({ kind: 'dispatch', op, ...(nodes.length ? { nodes } : {}), ...(deferral ? { deferred: deferral.reason } : {}), reason: deferral
-          ? `approved leg ${op} is deferred by the owner's ${deferral.reason}: api enqueue --op ${op} with its paths records it - it settles deferred at once, never dispatched, no attempt spent - and the legs behind it do not wait on it`
+          ? `approved leg ${op} is deferred (${deferral.reason}): api enqueue --op ${op} with its paths records it - it settles deferred at once, never dispatched, no attempt spent - and the legs behind it do not wait on it`
           : `approved leg ${op} has no job and every plan leg before it succeeded${placeholder ? ' or waits on a credential only' : ''}: api enqueue --op ${op}${placeholder ? ' building on placeholder values (credentialPending)' : ''}${nodes.length ? ` once per runnable work-graph node (${nodes.join(', ')}) with --paths its ownedPaths` : ''}, then route and dispatch it` });
       }
     }
@@ -1703,10 +1704,10 @@ function deferQueuedTestLeg(ledger, { job, op, payload, via, args }) {
   const deferred = deferJob(ledger, { job, deferral, via });
   if (!deferred) return false;
   const out = { ok: true, jobId: job.job_id, op, status: 'succeeded', deferred };
-  emit(out, `${via} of ${job.job_id} (${op}) DEFERRED: ${deferral.reason} (owner config.yaml specs) - settled without dispatch, no attempt spent; the legs behind it proceed; api run-deferred-tests --workflow ${job.workflow_id} runs it later`, args.json);
+  emit(out, `${via} of ${job.job_id} (${op}) DEFERRED: ${deferral.reason} - settled without dispatch, no attempt spent; the legs behind it proceed; api run-deferred-tests --workflow ${job.workflow_id} runs it later`, args.json);
   return true;
 }
-// `api run-deferred-tests --workflow <id> [--kind unit|e2e] [--dry-run]`: the owner's "test later" - every leg the
+// `api run-deferred-tests --workflow <id> [--kind unit|e2e|integration] [--dry-run]`: the owner's "test later" - every leg the
 // specs switches deferred goes back to queued on its same attempt, stamped specsForced so it dispatches even while
 // its class is still off; then the Kernel routes and dispatches it as usual.
 /* ----------------------------------------------------------------- route */

@@ -1,5 +1,5 @@
 run-deferred-tests:
-  args: '--workflow <id> [--kind unit|e2e] [--by <who>] [--dry-run]'
+  args: '--workflow <id> [--kind unit|e2e|integration] [--by <who>] [--dry-run]'
   reads: 'the workflow''s jobs whose result verdict is deferred (api status testsDeferred); the owner config.yaml specs switches'
   writes: >-
     The owner's "test later" (owner 2026-09-28 "speed up development; test later when asked"). The owner
@@ -15,7 +15,7 @@ run-deferred-tests:
   returns: '{ok:true, workflowId, kind, dryRun, deferred:[{jobId, op, attempt, kind, reason, at, via}], requeued:[...same], specs:{harness, unit, e2e}}'
   refuses:
     - workflow-unknown
-    - 'deferred-tests-bad-kind: --kind is neither unit nor e2e'
+    - 'deferred-tests-bad-kind: --kind is none of unit, e2e, integration'
     - 'workflow-finished: a finished or archived workflow takes no new work'
     - 'op-context-refused: an op terminal never re-queues legs'
   usedBy: 'the owner or supervisor running the tests the specs switches deferred (after flipping a switch back, or when asked)'

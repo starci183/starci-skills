@@ -1,0 +1,37 @@
+id: integration-verify-opt-in
+effectiveAt: '2026-09-29T16:30:00+07:00'
+summary: >-
+  Owner ruling 2026-09-29: live integration verification (integration.verify: real OAuth/IdP, SMTP, payment or
+  provider exchange with real credentials and secrets) belongs with e2e/UAT - manual, explicit, before release - not in
+  default chains. The planner (scripts/route/route-plan.mjs, define-goal --plan) adds integration.verify (and the
+  provision.ask custody leg before it) only when the goal asks: modules/goal/archetypes.yaml signalMatching.phraseSets
+  gains integrationIntent (integration test, kiểm thử tích hợp, live verification, verify OAuth/SMTP/payment live, ...)
+  and integrationNegation; without the ask an external-integration prompt ends at impl.X done (backend). The kernel
+  side: modules/ops/ops/integration.verify.yaml declares policy.explicitAsk: integration; api enqueue stamps
+  payload.explicitAsk from the goal text (scripts/route/explicit-ask.mjs, shared phrase matching in
+  scripts/route/phrase-match.mjs), and scripts/kernel/spec-deferral.mjs settles an integration.verify job (or plan leg)
+  without that stamp deferred at once through the existing deferral path - never dispatched, no attempt spent, result
+  verdict deferred {kind: integration, reason}, dependents not blocked. api run-deferred-tests --kind integration
+  re-queues it when the owner wants the live proof. Adds no check or finding code.
+reach: new-legs
+paths:
+  - modules/kernel/contract-changes/integration-verify-opt-in.yaml
+  - modules/goal/archetypes.yaml
+  - modules/ops/ops/integration.verify.yaml
+  - modules/kernel/api-commands/run-deferred-tests.yaml
+  - modules/ops/_common.yaml
+  - docs/verify-proof.md
+  - CONTEXT.md
+  - scripts/route/route-plan.mjs
+  - scripts/route/explicit-ask.mjs
+  - scripts/route/phrase-match.mjs
+  - scripts/kernel/spec-deferral.mjs
+  - scripts/kernel/api.mjs
+  - scripts/kernel/api-verbs/enqueue.mjs
+  - scripts/kernel/api-verbs/plan.mjs
+  - scripts/kernel/api-verbs/run-deferred-tests.mjs
+  - scripts/kernel/api-verbs/status.mjs
+  - modules/ops/registry.yaml
+  - tests/integration-opt-in.spec.mjs
+  - tests/goal-planner.spec.mjs
+  - tests/kernel-api.spec.mjs

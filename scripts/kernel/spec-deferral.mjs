@@ -14,6 +14,13 @@
 //   not-counted  a review/verify gate that would demand those tests or that coverage does not count them.
 // uat.verify is outside both classes: it is owner-deferred separately until credentials.
 //
+// Explicit-ask-only ops (owner ruling 2026-09-29): an op whose brief declares `policy.explicitAsk: <kind>`
+// (integration.verify: live OAuth/SMTP/payment/provider verification with real credentials) runs only when the
+// goal asked for it (phraseSets.<kind>Intent in modules/goal/archetypes.yaml, read by scripts/route/explicit-ask.mjs)
+// or the owner forced it (`api run-deferred-tests`). The enqueue stamps payload.explicitAsk from the goal text; a job
+// without the stamp - an already-approved leg the goal never asked for - settles deferred at once, the same
+// deferral path as specs.e2e=false: never dispatched, no attempt spent, dependents not blocked.
+//
 // The switches are read per call (ownerSpecs: engine/config.mjs specsSettings over the tolerant owner read), so a kernel that re-reads .claude on its
 // runtime rev picks a flip up on its next wake; nothing restarts.
 
@@ -22,14 +29,17 @@ import path from 'node:path';
 import { parseYaml } from '../../engine/yaml.mjs';
 import { inspectOwnerConfig, specsSettings } from '../../engine/config.mjs';
 import { enqueueJob, recordJobResult, setJobStatus } from '../../engine/ledger-db.mjs';
+import { explicitAsk } from '../route/explicit-ask.mjs';
 
 export const SPECS_CLASSES = Object.freeze(['unit', 'e2e']);
+/** Every kind a leg can be deferred under: the owner's two switches and the explicit-ask-only ops. */
+export const DEFERRAL_KINDS = Object.freeze([...SPECS_CLASSES, 'integration']);
 export const SPECS_TOGGLE_VALUES = Object.freeze(['defer-leg', 'skip', 'not-counted']);
 export const TESTS_DEFERRED_EVENT = 'tests-deferred';
 export const TESTS_REQUEUED_EVENT = 'tests-requeued';
 export const DEFERRED_VERDICT = 'deferred';
 /** The reason a deferral carries: the owner key that caused it. */
-export const deferReasonOf = (kind) => `specs.${kind}=false`;
+export const deferReasonOf = (kind) => (SPECS_CLASSES.includes(kind) ? `specs.${kind}=false` : `${kind} verification runs only on an explicit ask or before release, and this goal did not ask for it`);
 
 // A test path is e2e when a segment or name part says so (test/e2e/**, *.e2e-spec.ts, playwright/**).
 const E2E_PATH = /(?:^|[\\/._-])e2e(?:[\\/._-]|$)|playwright/i;
@@ -51,6 +61,24 @@ export function opSpecsToggle({ skillRoot, op }) {
   briefCache.set(file, { stamp, toggle });
   return toggle;
 }
+
+const askCache = new Map();
+/** The kind an op runs only on an explicit ask for (`policy.explicitAsk` of its brief, e.g. 'integration'), else null. */
+export function opExplicitAskKind({ skillRoot, op }) {
+  if (!op) return null;
+  const file = path.join(skillRoot, 'modules', 'ops', 'ops', `${op}.yaml`);
+  let stamp;
+  try { const stat = fs.statSync(file); stamp = `${stat.mtimeMs}:${stat.size}`; } catch { return null; }
+  const cached = askCache.get(file);
+  if (cached?.stamp === stamp) return cached.kind;
+  let kind = null;
+  try { const declared = parseYaml(fs.readFileSync(file, 'utf8'))?.policy?.explicitAsk; kind = typeof declared === 'string' && declared ? declared : null; } catch { kind = null; }
+  askCache.set(file, { stamp, kind });
+  return kind;
+}
+
+/** The kinds this goal text explicitly asks for, e.g. ['integration'] (the value the enqueue stamps as payload.explicitAsk). */
+export const explicitAsksOf = ({ skillRoot, text }) => ['integration'].filter((kind) => explicitAsk(kind, text, { skillRoot }));
 
 /** The owner switches {harness, unit, e2e} of the owner config.yaml under `root`, read fresh (an unreadable file reads all on). */
 export const ownerSpecs = (root) => { try { return specsSettings(inspectOwnerConfig(root).config); } catch { return specsSettings(null); } };
@@ -77,6 +105,8 @@ export function deferClassOf({ toggle, payload = {} }) {
  */
 export function deferralOf({ skillRoot, op, payload = {}, settings = null }) {
   if (payload?.specsForced) return null;
+  const askKind = opExplicitAskKind({ skillRoot, op });
+  if (askKind && !(Array.isArray(payload?.explicitAsk) && payload.explicitAsk.includes(askKind))) return { kind: askKind, reason: deferReasonOf(askKind) };
   const toggle = opSpecsToggle({ skillRoot, op });
   const kind = deferClassOf({ toggle, payload });
   if (!kind) return null;
@@ -84,8 +114,11 @@ export function deferralOf({ skillRoot, op, payload = {}, settings = null }) {
   return specs[kind] === false ? { kind, reason: deferReasonOf(kind) } : null;
 }
 
-/** Whether a plan leg of `op` would be deferred (no payload yet: the op's declared class). */
-export function planLegDeferral({ skillRoot, op, settings = null }) {
+/** Whether a plan leg of `op` would be deferred (no payload yet: the op's declared class). `goalText` is the approved goal:
+ *  an explicit-ask-only op is deferred unless it asks (unknown goal text reads as not asked). */
+export function planLegDeferral({ skillRoot, op, settings = null, goalText = null }) {
+  const askKind = opExplicitAskKind({ skillRoot, op });
+  if (askKind && !(goalText && explicitAsk(askKind, goalText, { skillRoot }))) return { kind: askKind, reason: deferReasonOf(askKind) };
   const toggle = opSpecsToggle({ skillRoot, op });
   const specs = specsOf({ skillRoot, settings });
   const kind = SPECS_CLASSES.find((k) => toggle[k] === 'defer-leg' && specs[k] === false);
@@ -100,7 +133,7 @@ export function planLegDeferral({ skillRoot, op, settings = null }) {
 export function deferJob(ledger, { job, deferral, via, now = Date.now() }) {
   const db = ledger.db;
   const deferred = { kind: deferral.kind, reason: deferral.reason, at: now, via };
-  const result = { verdict: DEFERRED_VERDICT, deferred, summary: `deferred: ${deferral.reason} (owner config.yaml specs; api run-deferred-tests runs it later)` };
+  const result = { verdict: DEFERRED_VERDICT, deferred, summary: `deferred: ${deferral.reason} (${SPECS_CLASSES.includes(deferral.kind) ? 'owner config.yaml specs; ' : ''}api run-deferred-tests runs it later)` };
   const write = () => {
     if (db.prepare('SELECT status FROM jobs WHERE job_id=?').get(job.job_id)?.status !== 'queued') return null;
     setJobStatus(db, { jobId: job.job_id, to: 'cancelled', reason: 'tests-deferred', at: now });

@@ -1,6 +1,6 @@
 // api run-deferred-tests: split from api.mjs.
 import { getWorkflow } from '../api-lib/rows.mjs';
-import { SPECS_CLASSES, deferredTestsOf, ownerSpecs, requeueDeferredTests } from '../spec-deferral.mjs';
+import { DEFERRAL_KINDS, deferredTestsOf, ownerSpecs, requeueDeferredTests } from '../spec-deferral.mjs';
 
 export default {
   verb: 'run-deferred-tests',
@@ -11,7 +11,7 @@ export default {
     const db = ledger.db, workflowId = args.workflow;
     const wf = getWorkflow(db, workflowId);
     if (!wf) throw Object.assign(new Error(`unknown workflow ${workflowId}`), { code: 'workflow-unknown' });
-    if (args.kind != null && !SPECS_CLASSES.includes(args.kind)) throw Object.assign(new Error(`--kind must be ${SPECS_CLASSES.join('|')}, got '${args.kind}'`), { code: 'deferred-tests-bad-kind' });
+    if (args.kind != null && !DEFERRAL_KINDS.includes(args.kind)) throw Object.assign(new Error(`--kind must be ${DEFERRAL_KINDS.join('|')}, got '${args.kind}'`), { code: 'deferred-tests-bad-kind' });
     if (wf.phase === 'finished' || wf.archived_at) throw Object.assign(new Error(`workflow ${workflowId} is ${wf.archived_at ? 'archived' : 'finished'}; its deferred tests run in a new workflow`), { code: 'workflow-finished' });
     const kind = args.kind ?? null;
     const pending = deferredTestsOf(db, workflowId, { kind });
