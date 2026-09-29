@@ -34,6 +34,9 @@ const SETTLE_PATH = {
   running: { succeeded: ['reported'], failed: ['reported'], unreported: [] },
   answering: { succeeded: ['reported'], failed: ['reported'], unreported: ['running'] },
   effect_unknown: { succeeded: ['running', 'reported'], failed: ['running', 'reported'], unreported: [] },
+  // leased reaches here only when the killed dispatch already created its terminal/attempt — settle fails it
+  // straight, never reported: nothing ran far enough to file a report.
+  leased: { failed: [], unreported: [] },
 };
 const WORK_YAML = /(^|[\\/])\.starciwork[\\/].*\.ya?ml$/i;
 const WORK_WALK_MAX = 2000;
@@ -85,7 +88,13 @@ export default {
   {
     const settling = db.prepare('SELECT status FROM jobs WHERE job_id=?').get(jobId);
     if (settling && ['queued', 'ready', 'leased'].includes(settling.status)) {
-      throw Object.assign(new Error(`job ${jobId} is ${settling.status}: it was never dispatched, so there is no attempt to settle; drop it with api reconcile --job ${jobId} --drop`), { code: 'job-not-dispatched', status: settling.status });
+      // a dispatch killed mid-launch leaves a leased job whose payload.launchTerminal (or an op_attempts
+      // row) names what it created — that IS dispatched; settle must close the orphaned terminal.
+      const dispatched = db.prepare('SELECT 1 FROM op_attempts WHERE job_id=? LIMIT 1').get(jobId) != null
+        || db.prepare("SELECT json_extract(payload_json,'$.launchTerminal.handle') h FROM jobs WHERE job_id=?").get(jobId)?.h != null;
+      if (!dispatched) {
+        throw Object.assign(new Error(`job ${jobId} is ${settling.status}: it was never dispatched, so there is no attempt to settle; drop it with api reconcile --job ${jobId} --drop`), { code: 'job-not-dispatched', status: settling.status });
+      }
     }
   }
 

@@ -134,15 +134,12 @@ test('convert turns a work/app-shell@1 record into the layout tree, carrying loc
     ],
   };
   const { record, notes } = convertAppShell(legacy, scanOf(p), { at: '2026-09-24T00:00:00Z' });
-  // RUNTIME-BUG: convertAppShell (scripts/work/layout-tree.mjs) carries a legacy lockup's `path`
-  // verbatim, but work-layout-tree@1 requires `name` (a blob citation) — the converted record fails
-  // its own schema. The assertion stays: conversion must produce a valid tree.
   assert.equal(validateTree(record), true, JSON.stringify(validateTree.errors));
   assert.equal(record.schema, 'work/layout-tree@1');
   assert.equal(record.state, 'todo', 'a converted tree has no slot-measured captures yet');
   assert.equal(record.rev, 2);
   assert.deepEqual(record.personas, [{ role: 'primary', default: true, workspace: 'Support', user: 'An Nguyen', currency: 'VND', dateFormat: 'd MMM y' }]);
-  assert.deepEqual(record.brand.lockups.map((l) => l.path), ['assets/lockup-light.png']);
+  assert.deepEqual(record.brand.lockups.map((l) => l.name), ['assets/lockup-light.png']);
   assert.deepEqual(record.breakpoints, [{ name: 'desktop', width: 1440, height: 900 }, { name: 'mobile', width: 390, height: 844 }]);
   assert.deepEqual(record.themes, ['light', 'dark']);
   const consoleLayout = nodeById(record, '/[locale]/(console)').layout;

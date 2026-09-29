@@ -981,7 +981,7 @@ export function convertAppShell(legacy, scan, { at = now() } = {}) {
   const assets = list(legacy?.assets);
   if (legacy?.productLocale?.default) record.productLocale = legacy.productLocale;
   if (legacy?.persona) record.personas = [{ role: 'primary', default: true, ...legacy.persona }];
-  const lockups = assets.filter((a) => a?.role === 'brand-lockup').map((a) => ({ path: a.path, sha256: a.sha256, ...(a.theme ? { theme: a.theme } : {}), ...(a.width ? { width: a.width } : {}), ...(a.height ? { height: a.height } : {}), ...(a.provenance ? { provenance: a.provenance } : {}) }));
+  const lockups = assets.filter((a) => a?.role === 'brand-lockup').map((a) => ({ name: a.path ?? a.name, sha256: a.sha256, ...(a.theme ? { theme: a.theme } : {}), ...(a.width ? { width: a.width } : {}), ...(a.height ? { height: a.height } : {}), ...(a.provenance ? { provenance: a.provenance } : {}) }));
   if (lockups.length) record.brand = { ...(legacy.topBar?.brand?.component ? { component: legacy.topBar.brand.component } : {}), ...(legacy.topBar?.brand?.path ? { path: legacy.topBar.brand.path } : {}), lockups };
   const shots = assets.filter((a) => a?.role === 'shell-capture');
   const bps = [];

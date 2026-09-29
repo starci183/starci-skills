@@ -84,6 +84,7 @@ INSERT OR IGNORE INTO job_transitions VALUES
   ('queued','ready'),('queued','cancelled'),
   ('ready','queued'),('ready','leased'),('ready','cancelled'),
   ('leased','running'),('leased','ready'),('leased','cancelled'),        -- leased→ready: dispatch bị từ chối trước khi op nhận hợp đồng (H13: không tiêu lần thử)
+  ('leased','failed'),                                                   -- leased→failed: settle một dispatch chết giữa launch đã tạo terminal/attempt
   ('running','answering'),('answering','running'),
   ('running','reported'),('answering','reported'),
   ('running','effect_unknown'),('running','ready'),('running','failed'),('running','cancelled'),   -- running→ready: requeue sau worker chết
