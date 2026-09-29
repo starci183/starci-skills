@@ -364,7 +364,7 @@ test('a ledger created before awaiting_owner is upgraded in place on the writer 
   try{
     const db=ledger.db;
     assert.ok(db.prepare("SELECT sql FROM sqlite_master WHERE name='jobs'").get().sql.includes("'awaiting_owner'"));
-    assert.deepEqual(db.prepare('SELECT version,name FROM schema_migrations ORDER BY version').all().map(r=>[r.version,r.name]),[[1,'0001-init'],[2,'0002-awaiting-owner']]);
+    assert.deepEqual(db.prepare('SELECT version,name FROM schema_migrations ORDER BY version').all().map(r=>[r.version,r.name]),[[1,'0001-init'],[2,'0002-awaiting-owner'],[3,'0003-usage-unavailable']]);
     assert.equal(db.prepare("SELECT count(*) n FROM job_transitions WHERE to_status='awaiting_owner'").get().n,2);
     assert.equal(db.prepare("SELECT ui FROM ui_state_map WHERE entity='job' AND native='awaiting_owner'").get().ui,'waiting');
     assert.deepEqual(db.prepare("SELECT job_id,status FROM jobs ORDER BY job_id").all().map(r=>[r.job_id,r.status]),[['job-ask','awaiting_owner'],['job-red','failed']],'only the ask moves to the new status');
