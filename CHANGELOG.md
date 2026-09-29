@@ -155,9 +155,9 @@ an old-schema file with a pointer to it. Design: `docs/architecture.md`, `docs/l
   the `reconciler-engine` CLI spec.
 - The Orca live paths are not yet exercised on the new schema: a live worker attesting to running,
   the dead-worker requeue on a real terminal, and transcript capture from a real terminal.
-- The live owner `config.yaml` still carries the ignored `quota.qwen` keys `planQuota`, `unit`,
-  `calibratedRemainingPercent`, `calibratedAt`; `engine/config.mjs` keeps accepting them until the
-  owner removes them.
+- The live owner `config.yaml` still carries the retired `quota.qwen` keys `planQuota`, `unit`,
+  `calibratedRemainingPercent`, `calibratedAt`. WP10 removes them from the engine: `quota.qwen` accepts
+  only `{resetAt}`, and the owner must delete the old keys from `config.yaml`.
 
 ## [1.0.0-alpha.2] — in preparation, base `f87a8f34b`
 
