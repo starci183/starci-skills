@@ -29,10 +29,10 @@ const put = (dir, relative, text = 'export {};\n') => {
 const drop = (dir, relative) => fs.rmSync(path.join(dir, ...relative.split('/')), { recursive: true, force: true });
 const codesOf = (result) => result.findings.map((f) => f.code);
 const only = (result, code) => result.findings.filter((f) => f.code === code);
-const cli = (argv) => {
+const cli = async (argv) => {
   let out = '';
   let err = '';
-  const code = main(argv, { stdout: (s) => { out += s; }, stderr: (s) => { err += s; } });
+  const code = await main(argv, { stdout: (s) => { out += s; }, stderr: (s) => { err += s; } });
   return { code, out, err };
 };
 const HAS_VIETNAMESE = /[À-ỹ]/;
@@ -237,46 +237,52 @@ test('init detects a multi-app front-end repository and refuses what it cannot c
   assert.throws(() => initRepo({ repoRoot: neither, write: false }), (error) => error instanceof HfsSlotsError && error.code === 'HFS_INIT_UNDETECTED');
 });
 
-test('the CLI: check exits 0 clean, 1 on an error finding, 2 on refusal; --json is machine readable', () => {
-  const clean = cli(['check', '--repo', repoOf(BE)]);
+test('the CLI: check exits 0 clean, 1 on an error finding, 2 on refusal; --json is machine readable', async () => {
+  const clean = await cli(['check', '--repo', repoOf(BE)]);
   assert.equal(clean.code, 0);
   assert.match(clean.out, /0 error findings/);
 
   const stray = repoOf(BE, (dir) => put(dir, 'src/stray/thing.ts'));
-  const bad = cli(['check', '--repo', stray, '--json']);
+  const bad = await cli(['check', '--repo', stray, '--json']);
   assert.equal(bad.code, 1);
   const parsed = JSON.parse(bad.out);
   assert.equal(parsed.ok, false);
   assert.equal(parsed.findings[0].code, 'HFS_PATH_NO_SLOT');
 
-  const text = cli(['check', '--repo', stray]);
+  const text = await cli(['check', '--repo', stray]);
   assert.match(text.out, /HFS_PATH_NO_SLOT x1/);
   assert.match(text.out, HAS_VIETNAMESE);
 
   const notGit = writeCleanRepo(BE);
   made.push(notGit);
-  const refused = cli(['check', '--repo', notGit]);
+  const refused = await cli(['check', '--repo', notGit]);
   assert.equal(refused.code, 2);
   assert.match(refused.err, /HFS_REPO_UNREADABLE/);
-  assert.equal(cli(['check', '--nope']).code, 2);
-  assert.equal(cli([]).code, 2);
+  assert.equal((await cli(['check', '--nope'])).code, 2);
+  assert.equal((await cli([])).code, 2);
 });
 
-test('the CLI: report-only backlog leaves the exit code 0; explain and init print what they found', () => {
+test('the CLI: report-only backlog leaves the exit code 0; explain and init print what they found', async () => {
   const dir = repoOf(BE, (d) => put(d, 'apps/core/src/big.ts', 'export {};\n'.repeat(600)));
-  assert.equal(cli(['check', '--repo', dir]).code, 0);
+  assert.equal((await cli(['check', '--repo', dir])).code, 0);
 
-  const explained = cli(['explain', 'src/features/orders/index.ts', '--repo', dir]);
+  const explained = await cli(['explain', 'src/features/orders/index.ts', '--repo', dir]);
   assert.equal(explained.code, 0);
   assert.match(explained.out, /be\.feature/);
   assert.match(explained.out, /may import domain, platform, integrations, package/);
-  assert.equal(cli(['explain', 'src/stray/x.ts', '--repo', dir]).code, 1);
-  assert.equal(cli(['explain', '--repo', dir]).code, 2);
+  assert.equal((await cli(['explain', 'src/stray/x.ts', '--repo', dir])).code, 1);
+  assert.equal((await cli(['explain', '--repo', dir])).code, 2);
 
   const preview = repoOf(BE, null, { declare: false });
-  const init = cli(['init', '--repo', preview, '--stdout']);
+  const init = await cli(['init', '--repo', preview, '--stdout']);
   assert.equal(init.code, 0);
   assert.equal(JSON.parse(init.out).apps[0].kind, 'api');
+});
+
+test('sync is delegated to the packaged sync command: a repository without the generated files fails its --check', async () => {
+  const dir = repoOf(BE);
+  assert.notEqual((await cli(['sync', '--check', '--root', dir])).code, 0);
+  assert.equal((await cli(['sync'])).code === 0, false);
 });
 
 test('the packaged entry point runs from a fresh process with no runtime checkout around it', () => {

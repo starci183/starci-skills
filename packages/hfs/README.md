@@ -8,6 +8,8 @@ catalog slice and the loader, so it runs where there is no runtime checkout.
 npx hfs check   [--repo <dir>] [--json]       # exit 1 on any error-level finding
 npx hfs init    [--repo <dir>] [--stdout]     # write a starter hfs.json (never overwrites); --stdout only prints
 npx hfs explain <path> [--repo <dir>] [--json]
+npx hfs sync (--check | --write) [--root <dir>]   # generated files: husky, CI, .gitignore block, sonar, codecov (sync/, templates/)
+npx hfs work-hygiene                              # pre-commit guard for staged .starciwork / .starcistacks paths
 ```
 
 `hfs check` reads the repository's `hfs.json` and the tracked paths (`git ls-files`), and reports, each with a why code and its

@@ -5,16 +5,21 @@
 //                                            Exit 1 on any error-level finding.
 //   hfs init    [--repo <dir>] [--stdout]   write a starter hfs.json by detecting the profile and the apps.
 //   hfs explain <path> [--repo <dir>] [--json]   which slot owns the path, its tier, allowed imports, required tests.
+//   hfs sync (--check | --write) [--root <dir>]  the generated files (husky, CI, .gitignore block, sonar, codecov); sync/cli.mjs
+//   hfs work-hygiene                              the pre-commit guard for staged .starciwork and .starcistacks paths; sync/cli.mjs
 // Every finding names a why code and carries its Vietnamese text. The command reads the repository, never writes to it
 // (init writes hfs.json only, and only when none exists). Exit codes: 0 clean, 1 error findings, 2 a refusal or bad usage.
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { checkRepo, explainPath, initRepo } from '../runtime/scripts/lib/hfs-check.mjs';
 import { HfsSlotsError } from '../runtime/scripts/lib/hfs-slots.mjs';
+import { main as syncMain } from '../sync/cli.mjs';
 
 const USAGE = `hfs check [--repo <dir>] [--json]
 hfs init [--repo <dir>] [--stdout]
 hfs explain <path> [--repo <dir>] [--json]
+hfs sync (--check | --write) [--root <dir>]
+hfs work-hygiene
 `;
 const PER_CODE_LIMIT = 25;
 const VALUE_FLAGS = new Set(['--repo']);
@@ -63,10 +68,11 @@ function printExplain(e, out) {
   if (e.code) out(`  ${e.code}: ${e.titleVi}\n  ${e.whyVi}\n`);
 }
 
-export function main(argv, { stdout = (s) => process.stdout.write(s), stderr = (s) => process.stderr.write(s) } = {}) {
+export async function main(argv, { stdout = (s) => process.stdout.write(s), stderr = (s) => process.stderr.write(s) } = {}) {
   const [verb, ...rest] = argv;
-  if (!['check', 'init', 'explain'].includes(verb)) { stderr(USAGE); return 2; }
+  if (!['check', 'init', 'explain', 'sync', 'work-hygiene'].includes(verb)) { stderr(USAGE); return 2; }
   try {
+    if (verb === 'sync' || verb === 'work-hygiene') return await syncMain(argv);
     const opts = parse(rest);
     const repoRoot = path.resolve(opts.repo ?? process.cwd());
     if (verb === 'check') {
@@ -91,4 +97,4 @@ export function main(argv, { stdout = (s) => process.stdout.write(s), stderr = (
   }
 }
 
-if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) process.exitCode = main(process.argv.slice(2));
+if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) process.exitCode = await main(process.argv.slice(2));

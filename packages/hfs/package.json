@@ -1,7 +1,7 @@
 {
   "name": "@starci/hfs",
   "version": "1.0.0",
-  "description": "The HFS v2 command line of a StarCi product repository: hfs check, hfs init, hfs explain. Self-contained; installed by starci link, never from a registry.",
+  "description": "The HFS v2 command line of a StarCi product repository: hfs check, init, explain, sync and work-hygiene. Self-contained; installed by starci link, never from a registry.",
   "type": "module",
   "license": "UNLICENSED",
   "private": false,
@@ -11,6 +11,8 @@
   "files": [
     "bin/hfs.mjs",
     "runtime/**",
+    "sync/**",
+    "templates/**",
     "README.md"
   ],
   "engines": {
