@@ -1,0 +1,19 @@
+id: rf-sops-master-identity
+effectiveAt: '2026-09-29T22:00:00+07:00'
+summary: >-
+  Owner ruling 2026-09-29 ("sops dung chung master identity"): ONE shared master age identity
+  (~/.starci/master.identity) decrypts every project's SOPS custody, and every project's envelopes are
+  encrypted to that one master recipient. The stack docs, the STACK-SECRETS knowledge, the HFS README, the
+  repo.secrets pattern (REPO-SECRETS-4 no longer calls per-project recipients an owner follow-up), the be/config
+  pattern, the application-stacks schema field descriptions and the bundled stacks example now say so. No
+  field name, required list or checker behavior changes.
+reach: new-legs
+paths:
+  - docs/application-stacks.md
+  - knowledge/application-stacks.yaml
+  - knowledge/hfs/README.md
+  - knowledge/patterns/repo/secrets.yaml
+  - knowledge/patterns/be/config.yaml
+  - modules/schemas/application-stacks.schema.yaml
+  - examples/starcistacks-services/starci-academy-backend.application-stacks.yaml
+  - modules/kernel/contract-changes/rf-sops-master-identity.yaml

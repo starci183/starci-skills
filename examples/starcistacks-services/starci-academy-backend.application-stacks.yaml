@@ -42,8 +42,8 @@ environments:
     secrets:
       - name: app-config
         where: runtime/files/app.yaml
-        recipientPolicy: SOPS/age to the source stack recipients only.
-        keyCustody: The decryption identity (~/.starci/master.identity) stays outside Git and is backed up by the owner machine.
+        recipientPolicy: SOPS/age to the one shared master age recipient that every project's envelopes use.
+        keyCustody: The shared master identity (~/.starci/master.identity) decrypts every project's custody; it stays outside Git and is backed up by the owner machine.
 k8s:
   status: deferred
   reason: The source host's dev stack is Docker Compose on the owner machine; production runs through deploy-core-vps.

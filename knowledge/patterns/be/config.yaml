@@ -109,5 +109,5 @@ rules:
         - HFS_STACKS_SHAPE
         - HFS_IDENTITY_CUSTODY
       manual:
-        - Owner performs any key operation; verify recipients against the stack declaration.
+        - Owner performs any key operation; verify the recipient in .sops.yaml is the shared master recipient the stack declaration names.
     relatedExamples: []

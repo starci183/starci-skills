@@ -316,7 +316,8 @@ e2e/<area>/*.e2e-spec.ts              plus e2e/{support,fixtures}/, playwright.c
 - Secrets exist only as sops `*.enc` at `.starcistacks/<env>/secrets/<slug>.enc`. A decrypted value is never written into
   the repository tree, ignored or not; it lives in memory or under `%LOCALAPPDATA%/StarCi/secrets/<project>/<env>/`
   and is passed by `*_FILE` (R06). Agents never read, print or commit a secret value and never generate or rotate keys.
-  Today the truth is one shared master age key; per-project recipients are an owner key operation.
+  Owner ruling 2026-09-29: ONE shared master age identity (`~/.starci/master.identity`) decrypts every project's SOPS
+  custody; every project's envelopes are encrypted to that one master recipient, and the stack text says so.
 
 ## 9. Shared tooling, formatter, pins, budgets
 
