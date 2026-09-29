@@ -285,7 +285,7 @@ test('worker guard: a [Worker] owns its leased files, so its git shim lets it st
   };
   await spawnWorkers(m, { settings, deps, env });
   assert.equal(guarded.length, 1);
-  assert.deepEqual(launched[0].owned, ['scripts/g1.mjs', 'tests/g1.spec.mjs']);
+  assert.deepEqual(launched[0].owned, [path.resolve(`/tmp/${job.job.job_id}`, 'scripts/g1.mjs'), path.resolve(`/tmp/${job.job.job_id}`, 'tests/g1.spec.mjs')]);
   assert.equal(launched[0].jobId, job.job.job_id);
 });
 

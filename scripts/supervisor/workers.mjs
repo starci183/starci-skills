@@ -63,13 +63,21 @@ import { outageInText } from '../agent/provider-outage.mjs';
 /**
  * The guard layer of a [Worker] launch, the same shim bin op workers get (scripts/guards/install.mjs guardLaunch):
  * its staging checkout's node_modules is a junction to the LIVE runtime's, and npm reifying through that junction
- * empties it (node-modules-link-wipe, 2026-09-28) - the npm shim refuses that (DEPS_THROUGH_LINK). No product
- * history hook: a [Worker] commits only in its runtime staging branch. Its owned paths are the job's leased files:
- * with none the git shim refuses every `git add`/commit (PATH_NOT_OWNED) and no worker can commit. {env, pathPrefix, receipt}.
+ * empties it (node-modules-link-wipe, 2026-09-28) - the npm shim refuses that (DEPS_THROUGH_LINK). No history
+ * hook (repos []): a [Worker] commits only in its runtime staging branch, and that checkout is a linked worktree of
+ * the live runtime repo, so `git rev-parse --git-path hooks` there is the live repo's SHARED hooks dir - a hook
+ * installed "for the staging checkout" lands in the live repo and refuses every branch deletion and ref rewrite
+ * there (the land gate's sup/* cleanup, lanes; land run 26 refused 3a9558930). Its owned paths are the job's leased
+ * files resolved against its staging checkout, absolute like op leases (scripts/kernel/api.mjs opGuardLaunch): a
+ * directory lease (a trailing `/**` dropped) covers its subtree. With none, or with paths left relative (resolved
+ * against the Supervisor's cwd), the git shim refuses every `git add`/commit (PATH_NOT_OWNED) and no worker can
+ * commit (worker-guard-owned-empty). {env, pathPrefix, receipt}.
  */
-export function workerGuard(jobId, { root = SKILL_ROOT, owned = [], launch = guardLaunch } = {}) {
-  try { return launch({ skillRoot: root, jobId, workflowId: 'supervisor', ledgerRepo: null, owned, repos: [] }); }
-  catch (error) { return { env: {}, pathPrefix: null, receipt: { error: String(error?.message ?? error) } }; }
+export function workerGuard(jobId, { root = SKILL_ROOT, staging = null, files = [], launch = guardLaunch } = {}) {
+  try {
+    const owned = staging ? (files ?? []).filter(Boolean).map((f) => path.resolve(staging, String(f).replace(/[\\/]\*\*[\\/]?$/, '') || '.')) : [];
+    return launch({ skillRoot: root, jobId, workflowId: 'supervisor', ledgerRepo: null, owned, repos: [] });
+  } catch (error) { return { env: {}, pathPrefix: null, receipt: { error: String(error?.message ?? error) } }; }
 }
 
 const selfFile = fileURLToPath(import.meta.url);
@@ -418,7 +426,7 @@ export async function spawnWorkers(m, { jobId = null, dryRun = false, settings =
     const prompt = renderWorkerPrompt(job, staging);
     const title = `${WORKER_TITLE_PREFIX} ${job.payload.cluster}`.slice(0, 80);
     const command = (deps.command ?? workerLaunchCommand)({ pool: route.pool, provider: route.agent, model: route.model });
-    const guard = (deps.guard ?? workerGuard)(job.job_id, { root, owned: job.payload.files ?? [] });
+    const guard = (deps.guard ?? workerGuard)(job.job_id, { root, staging: staging.path, files: job.payload.files ?? [] });
     if (!guard.pathPrefix) supervisorEvent(m, { entityType: 'job', entityId: job.job_id, kind: 'worker-guard-missing', payload: { receipt: guard.receipt }, now: now() });
     const spawned = (deps.spawn ?? (await import('../agent/lib.mjs')).spawnAgent)({ provider: route.agent, model: route.model, effort: route.effort, worktree: root, fallbackWorktree: path.dirname(root), cwd: staging.path, title, prompt, kernel: true, dispatchId: job.job_id, command,
       env: guard.env, pathPrefix: guard.pathPrefix });
