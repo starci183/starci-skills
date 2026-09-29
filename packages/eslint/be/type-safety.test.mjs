@@ -12,10 +12,13 @@ import test from "node:test"
 import { RuleTester } from "eslint"
 import tsParser from "@typescript-eslint/parser"
 import {
+  explicitHandlerReturnType,
   noConstEnum,
   noDoubleCast,
   noInlineObjectType,
   noInlineParamType,
+  noNeverCast,
+  noNonNullAssertion,
   noUnguardedUnknownCast,
   rules,
 } from "./type-safety.mjs"
@@ -228,3 +231,48 @@ test("TYPE-1 (law 2): a value declared unknown is narrowed before it is cast", (
 // reference backend as this canon's own standard requires, and both of its real firings turned
 // out to be independent facts on transport/seed DTOs (GlobalSearchItem, AdvertisementSeedItem) --
 // not a product of states. See the comment in type-safety.mjs where TYPE-5 would sit.
+
+test("R72: a cast to never and a non-null assertion are refused in product code", () => {
+  tester.run("no-never-cast", noNeverCast, {
+    valid: [
+      { filename: SRC, code: "const row = raw as EnrollmentEntity" },
+      { filename: SRC, code: "const raw = value as unknown" },
+      { filename: SRC, code: "const kinds = ['a'] as const" },
+      { filename: SPEC, code: "service.handle(request as never)" },
+    ],
+    invalid: [
+      { filename: SRC, code: "service.handle(request as never)", errors: [{ messageId: "neverCast" }] },
+      { filename: SRC, code: "const handler = { run } as never", errors: [{ messageId: "neverCast" }] },
+    ],
+  })
+  tester.run("no-non-null-assertion", noNonNullAssertion, {
+    valid: [
+      { filename: SRC, code: "const owner = plan.owner ?? fallback" },
+      { filename: SRC, code: "if (plan.owner === undefined) throw new MissingOwner()" },
+      { filename: SPEC, code: "const owner = plan.owner!" },
+    ],
+    invalid: [
+      { filename: SRC, code: "const owner = plan.owner!", errors: [{ messageId: "nonNull" }] },
+      { filename: SRC, code: "rows[0]!.id", errors: [{ messageId: "nonNull" }] },
+    ],
+  })
+})
+
+test("R75: handlers and public methods of an Injectable, Resolver or Controller declare a return type", () => {
+  tester.run("explicit-handler-return-type", explicitHandlerReturnType, {
+    valid: [
+      { filename: SRC, code: "@Resolver() export class PlanResolver { @Query(() => String) plan(): Promise<string> { return load() } }" },
+      { filename: SRC, code: "@Injectable() export class PlanService { list(): Promise<Plan[]> { return this.rows } }" },
+      { filename: SRC, code: "@Injectable() export class PlanService { private helper() { return 1 } }" },
+      { filename: SRC, code: "@Injectable() export class PlanService { protected helper() { return 1 } }" },
+      { filename: SRC, code: "@Injectable() export class PlanService { constructor(private readonly rows: Rows) {} }" },
+      { filename: SRC, code: "export class Plain { list() { return 1 } }" },
+      { filename: SPEC, code: "@Injectable() export class PlanService { list() { return 1 } }" },
+    ],
+    invalid: [
+      { filename: SRC, code: "@Resolver() export class PlanResolver { @Query(() => String) plan() { return load() } }", errors: [{ messageId: "handler" }] },
+      { filename: SRC, code: "@Controller() export class PlanController { @Get() list() { return [] } }", errors: [{ messageId: "handler" }] },
+      { filename: SRC, code: "@Injectable() export class PlanService { list() { return this.rows } }", errors: [{ messageId: "publicMethod" }] },
+    ],
+  })
+})

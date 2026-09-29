@@ -132,11 +132,50 @@ export const noEntityInContract = {
     },
 }
 
+// -- R74 -------------------------------------------------------------------------------------------
+
+const isMigrationPath = (filename) => /\/migrations\/[^/]+\.[cm]?ts$/.test(normalizePath(filename))
+
+const methodNamed = (klass, name) =>
+    klass.body.body.find((member) => member.type === "MethodDefinition" && !member.computed && keyName(member.key) === name)
+
+/** Whether a `down` body does nothing but refuse. */
+const onlyThrows = (body) => body.body.length > 0 && body.body.every((statement) => statement.type === "ThrowStatement")
+
+/** A migration can be undone. */
+export const migrationDownReversible = {
+    meta: {
+        type: "problem",
+        docs: { description: "A migration declares a `down()` that reverses its `up()`." },
+        schema: [],
+        messages: {
+            missing: "This migration has an `up()` and no `down()`. A release that must roll back has no way to. Write `down()` as the exact inverse of `up()`.",
+            empty: "`down()` is empty, so a rollback leaves the schema changed while the migration table says it was undone. Write the inverse of `up()`.",
+            throws: "`down()` only throws. A rollback then fails halfway through a deploy. Write the inverse of `up()`; when `up()` drops data, `down()` recreates the structure and the data loss is stated in the migration's comment.",
+        },
+    },
+    create(context) {
+        const filename = normalizePath(context.filename || context.getFilename())
+        if (isDeclarationFile(filename) || !isMigrationPath(filename) || /\.(?:spec|test)\.ts$/.test(filename)) return {}
+        const check = (node) => {
+            if (!node.body) return
+            const up = methodNamed(node, "up")
+            if (!up) return
+            const down = methodNamed(node, "down")
+            if (!down) context.report({ node: node.id ?? node, messageId: "missing" })
+            else if (down.value.body.body.length === 0) context.report({ node: down.key, messageId: "empty" })
+            else if (onlyThrows(down.value.body)) context.report({ node: down.key, messageId: "throws" })
+        }
+        return { ClassDeclaration: check }
+    },
+}
+
 /** The rules this law contributes to the plugin. */
 export const rules = {
     "no-runtime-schema": noRuntimeSchema,
     "sql-only-in-repository": sqlOnlyInRepository,
     "no-entity-in-contract": noEntityInContract,
+    "migration-down-reversible": migrationDownReversible,
 }
 
 /** All three start at error: HFS keeps no baseline and the schema migration lanes clear the debt first. */
@@ -144,4 +183,5 @@ export const recommended = {
     "starci-be/no-runtime-schema": "error",
     "starci-be/sql-only-in-repository": "error",
     "starci-be/no-entity-in-contract": "error",
+    "starci-be/migration-down-reversible": "error",
 }

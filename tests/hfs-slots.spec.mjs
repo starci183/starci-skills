@@ -135,8 +135,11 @@ test('BE fixture: which slot owns a path', () => {
   assert.equal(owner('apps/migrate/src/main.ts'), 'owned:be.app.migrate');
   assert.equal(owner('src/features/orders/index.ts'), 'owned:be.feature');
   assert.equal(owner('src/features/orders/application/place.use-case.ts'), 'owned:be.feature.application');
+  assert.equal(owner('src/features/orders/application/support/price-lines.ts'), 'owned:be.feature.application.support');
+  assert.equal(owner('src/features/orders/application/support/price-lines.spec.ts'), 'owned:be.feature.application.support');
   assert.equal(owner('src/features/orders/transport/http/place.controller.ts'), 'owned:be.transport.http');
   assert.equal(owner('src/features/orders/transport/schedule/sweep.job.ts'), 'owned:be.transport.schedule');
+  assert.equal(owner('src/features/orders/transport/cli/import.command.ts'), 'not-enabled:be.feature.transport.cli');     // opt-in, not declared
   assert.equal(owner('src/features/orders/transport/message/paid.consumer.ts'), 'not-enabled:be.transport.message');     // opt-in, not declared
   assert.equal(owner('src/modules/domain/orders/orders.service.ts'), 'owned:be.domain');
   assert.equal(owner('src/modules/domain/orders/errors/orders.error.ts'), 'owned:be.errors');
@@ -286,6 +289,34 @@ test('an unknown path is reported with its nearest slot and HFS_PATH_NO_SLOT', (
   assert.equal(rootFile.status, 'no-slot');
   assert.equal(rootFile.nearest.matchedDepth, 0);
   assert.equal(be.classifyPath('src/tests/e2e/orders/place.ts').path, 'src/tests/e2e/orders/place.ts');
+});
+
+test('be.feature.application.support is an optional feature-tier slot inside application/, unit-beside, opt-out by absence', () => {
+  const manifest = loadSlotManifest();
+  const slot = manifest.slots.find((s) => s.id === 'be.feature.application.support');
+  assert.ok(slot, 'the support slot exists');
+  assert.equal(slot.path, 'src/features/<feature>/application/support/');
+  assert.equal(slot.presence, 'optional');
+  assert.equal(slot.tier, 'feature');
+  assert.equal(slot.tests, 'unit-beside');
+  assert.equal(slot.owner, undefined, 'support is not an owner: it belongs to the enclosing feature');
+  const be = openHfs({ declaration: BE });
+  assert.equal(be.classifyPath('src/features/orders/application/place.use-case.ts').slot, 'be.feature.application');
+  assert.equal(be.classifyPath('src/features/orders/application/support/price-lines.ts').slot, 'be.feature.application.support');
+});
+
+test('be.feature.transport.cli is an opt-in feature-tier transport slot, owned once an app of kind cli is declared', () => {
+  const manifest = loadSlotManifest();
+  const slot = manifest.slots.find((s) => s.id === 'be.feature.transport.cli');
+  assert.ok(slot, 'the cli transport slot exists');
+  assert.equal(slot.path, 'src/features/<feature>/transport/cli/');
+  assert.equal(slot.presence, 'opt-in');
+  assert.equal(slot.tier, 'feature');
+  assert.deepEqual(slot.requires, ['<feature>-cli.module.ts']);
+  assert.ok(manifest.appKinds.be.includes('cli'), 'the cli app kind exists');
+  const cli = openHfs({ declaration: { ...BE, apps: [...BE.apps, { name: 'ops', kind: 'cli' }], optionalSlots: [...BE.optionalSlots, 'be.feature.transport.cli'] } });
+  assert.equal(cli.classifyPath('src/features/orders/transport/cli/import.command.ts').slot, 'be.feature.transport.cli');
+  assert.equal(cli.classifyPath('src/features/orders/transport/cli/import.command.ts').status, 'owned');
 });
 
 test('growth is a minor: adding a slot changes no existing answer; every slot pattern owns its own sample', () => {

@@ -12608,3 +12608,106 @@ HFS_REQUIRED_FILE_MISSING:
   nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để tạo tệp còn thiếu đúng chỗ bảng kê chỉ định; nếu cấu trúc hiện có là chủ ý thì đó là việc sửa bảng kê, do người giám sát làm, không phải kho tự đổi."
   owner: op-retry
   kind: check-finding
+
+BE_SQL_INTERPOLATED:
+  title: "SQL text built from a runtime value"
+  title_vi: "Giá trị chạy lúc chạy bị ghép vào chuỗi SQL"
+  meaning_vi: "Một lời gọi .query(...) có chuỗi SQL dựng bằng template hoặc phép cộng chuỗi chứa giá trị biến, nên đầu vào có thể trở thành câu lệnh (SQL injection) và kế hoạch truy vấn không được dùng lại."
+  causes_vi:
+    - "Template literal có ${biến} trong câu SQL"
+    - "Ghép chuỗi SQL bằng dấu +"
+    - "Danh sách cột hoặc mệnh đề SET dựng động không qua danh sách cho phép"
+  nextStep_vi: "Truyền giá trị bằng tham số đánh số ($1, $2) ở mảng đối số; danh sách cột cố định là hằng UPPER_SNAKE; tên động đi qua quoteIdent hoặc sqlIdent; mệnh đề SET động đi qua sqlSetClause có danh sách cột cho phép. Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra."
+  owner: op-retry
+  kind: check-finding
+
+BE_QUERY_UNBOUNDED:
+  title: "Read without a row bound"
+  title_vi: "Truy vấn đọc không có giới hạn số dòng"
+  meaning_vi: "Một lệnh đọc (getMany, getRawMany, find, findBy hoặc SELECT thô) có thể trả về mọi dòng khớp mà không có take, limit hay LIMIT, nên một khách hàng lớn biến nó thành quét toàn bảng nằm trong bộ nhớ."
+  causes_vi:
+    - "getMany hoặc getRawMany không có take hoặc limit"
+    - "find hoặc findBy không có take và không tra theo id"
+    - "SELECT thô không có LIMIT"
+  nextStep_vi: "Thêm take hoặc LIMIT với hằng có tên, hoặc phân trang theo con trỏ; việc cần đủ mọi dòng (batch, xuất) lặp theo trang keyset chứ không cắt cụt kết quả âm thầm. Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra."
+  owner: op-retry
+  kind: check-finding
+
+BE_HTTP_TIMEOUT:
+  title: "Outbound HTTP call without a timeout"
+  title_vi: "Gọi HTTP ra ngoài không có timeout"
+  meaning_vi: "Một lời gọi fetch, axios hoặc HttpService không nêu timeout hay signal huỷ, nên một bên ngoài im lặng giữ yêu cầu, socket và một chỗ worker vô hạn."
+  causes_vi:
+    - "fetch(url) không có { signal }"
+    - "axios.get hoặc post không có timeout"
+    - "axios.create không có timeout"
+  nextStep_vi: "Thêm signal: AbortSignal.timeout(<ms có tên>) cho fetch, hoặc timeout: <ms có tên> cho axios và HttpService. Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra."
+  owner: op-retry
+  kind: check-finding
+
+BE_LOG_SECRET:
+  title: "Secret or personal data in a log call"
+  title_vi: "Bí mật hoặc dữ liệu cá nhân bị ghi vào log"
+  meaning_vi: "Đối số của lời gọi logger có tên là thông tin xác thực (password, secret, token, apiKey, authorization, cookie, otp) hoặc định danh cá nhân (email, phone, fullName, idCard, birthDate), nên giá trị đó tồn tại lâu hơn yêu cầu và bị sao chép sang bên thứ ba."
+  causes_vi:
+    - "Ghi token hoặc mật khẩu vào log để gỡ lỗi"
+    - "Ghi email hoặc số điện thoại vào thông điệp lỗi"
+  nextStep_vi: "Ghi id của chủ sở hữu, độ dài, cờ có hay không, hoặc dạng đã che qua mask(...), không ghi giá trị thật. Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra."
+  owner: op-retry
+  kind: check-finding
+
+BE_TYPE_ESCAPE:
+  title: "Cast to never or non-null assertion"
+  title_vi: "Ép kiểu never hoặc khẳng định non-null"
+  meaning_vi: "Có x as never hoặc x! trong mã sản phẩm, nên trình biên dịch ngừng kiểm tra một giá trị mà thực tế có thể sai kiểu hoặc vắng mặt."
+  causes_vi:
+    - "as never để lọt kiểm tra tham số"
+    - "x! thay cho việc kiểm tra tồn tại"
+  nextStep_vi: "Cho giá trị đúng kiểu tham số cần, thu hẹp bằng guard trả về hoặc ném lỗi có kiểu, hoặc sửa chữ ký để sự vắng mặt không thể xảy ra. Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra."
+  owner: op-retry
+  kind: check-finding
+
+BE_ASYNC_NO_AWAIT:
+  title: "Async function that never awaits"
+  title_vi: "Hàm async không có await"
+  meaning_vi: "Một hàm async không chứa await nào, nên nó hứa việc bất đồng bộ mà không làm, biến lỗi ném ra thành promise bị từ chối vô ích và khiến người đọc tìm một điểm chờ không tồn tại."
+  causes_vi:
+    - "async method chỉ return giá trị đồng bộ"
+    - "async arrow chỉ trả về promise của hàm khác"
+  nextStep_vi: "Bỏ async và trả giá trị (hoặc promise thân hàm đã có); nếu chữ ký phải trả Promise thì trả Promise.resolve(giá trị). Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra."
+  owner: op-retry
+  kind: check-finding
+
+BE_MIGRATION_REVERSIBLE:
+  title: "Migration that cannot be undone"
+  title_vi: "Migration không có down đảo ngược được"
+  meaning_vi: "Một migration có up() nhưng thiếu down(), down() rỗng hoặc chỉ ném lỗi, nên bản phát hành cần quay lui không có đường đi và bảng migration ghi đã hoàn tác trong khi lược đồ vẫn đổi."
+  causes_vi:
+    - "Không có phương thức down"
+    - "down() rỗng"
+    - "down() chỉ throw"
+  nextStep_vi: "Viết down() là phép đảo ngược đúng của up(); khi up() xoá dữ liệu thì down() dựng lại cấu trúc và ghi rõ phần dữ liệu mất trong chú thích migration. Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra."
+  owner: op-retry
+  kind: check-finding
+
+BE_RETURN_TYPE:
+  title: "Handler or public method without a return type"
+  title_vi: "Handler hoặc phương thức công khai thiếu kiểu trả về"
+  meaning_vi: "Một handler (Query, Mutation, Get, Post...) hoặc phương thức công khai của Injectable, Resolver, Controller không khai báo kiểu trả về, nên hợp đồng ra ngoài là thứ thân hàm tình cờ trả về hôm nay."
+  causes_vi:
+    - "Resolver hoặc controller method không có : Promise<T>"
+    - "Phương thức công khai của service để kiểu suy luận"
+  nextStep_vi: "Khai báo kiểu trả về tường minh (Promise<Type>). Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra."
+  owner: op-retry
+  kind: check-finding
+
+BE_JSON_PARSE_UNGUARDED:
+  title: "JSON.parse outside a try"
+  title_vi: "JSON.parse không nằm trong try"
+  meaning_vi: "Một lời gọi JSON.parse không nằm trong try trong cùng hàm, nên văn bản hỏng từ cơ sở dữ liệu, webhook hoặc nhà cung cấp gây ngoại lệ không được che và trả về 500."
+  causes_vi:
+    - "JSON.parse cột văn bản đã lưu"
+    - "JSON.parse thân webhook hay phản hồi nhà cung cấp"
+  nextStep_vi: "Bọc trong try và trả outcome có kiểu (hoặc DomainError) nêu rõ đang phân tích cái gì. Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra."
+  owner: op-retry
+  kind: check-finding

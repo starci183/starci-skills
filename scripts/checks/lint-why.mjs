@@ -6,7 +6,7 @@
 // The map is the single place that ties a lint rule id to a catalogue code; tests/lint-why.spec.mjs proves every
 // mapped rule exists in the plugin, every mapped code is in the catalogue, and every HFS rule is mapped.
 
-/** Lint rule id -> catalogued why code. Several rules of one HFS rule (R41, R45) share its code. */
+/** Lint rule id -> catalogued why code. Several rules of one HFS rule (R41, R45, R72) share its code. */
 export const LINT_WHY = Object.freeze({
   'starci-be/catch-must-account': 'BE_LOGGER_REQUIRED',
   'starci-be/error-home': 'BE_ERROR_HOME',
@@ -30,6 +30,17 @@ export const LINT_WHY = Object.freeze({
   'starci-be/spec-typed-doubles': 'BE_SPEC_QUALITY',
   'starci-be/must-deep-module-import': 'BE_PUBLIC_SURFACE',
   'starci-be/no-folder-reexport': 'BE_PUBLIC_SURFACE',
+  'starci-be/dto-needs-validator': 'BE_INPUT_BOUNDED',
+  'starci-be/no-interpolated-sql': 'BE_SQL_INTERPOLATED',
+  'starci-be/query-needs-limit': 'BE_QUERY_UNBOUNDED',
+  'starci-be/http-needs-timeout': 'BE_HTTP_TIMEOUT',
+  'starci-be/no-secret-in-log': 'BE_LOG_SECRET',
+  'starci-be/no-never-cast': 'BE_TYPE_ESCAPE',
+  'starci-be/no-non-null-assertion': 'BE_TYPE_ESCAPE',
+  'starci-be/async-needs-await': 'BE_ASYNC_NO_AWAIT',
+  'starci-be/migration-down-reversible': 'BE_MIGRATION_REVERSIBLE',
+  'starci-be/explicit-handler-return-type': 'BE_RETURN_TYPE',
+  'starci-be/json-parse-needs-guard': 'BE_JSON_PARSE_UNGUARDED',
 });
 
 /** The why code of a lint rule id, or undefined when the rule has none. */

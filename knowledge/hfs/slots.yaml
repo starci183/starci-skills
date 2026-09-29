@@ -427,6 +427,17 @@ slots:
     forbids: [graphql/, http/, message/, schedule/, transport/]   # no protocol names under application/
     tests: unit-beside
     rules: [BE_APPLICATION_IMPORTS_TRANSPORT, BE_APPLICATION_TRANSPORT_FRAMEWORK, BE_ENTITY_IN_CONTRACT]
+  - id: be.feature.application.support
+    profiles: [be]
+    path: "src/features/<feature>/application/support/"
+    presence: optional            # helpers and types local to ONE feature; same tier as application, never a shared home
+    tracked: tracked
+    tier: feature                 # feature tier: another feature cannot import it (features never import features)
+    allows: ["<name>.ts", "<name>.types.ts", "*.spec.ts"]
+    forbids: [graphql/, http/, message/, schedule/, transport/]
+    tests: unit-beside            # a <name>.spec.ts beside every <name>.ts
+    rules: [BE_APPLICATION_IMPORTS_TRANSPORT, BE_APPLICATION_TRANSPORT_FRAMEWORK, BE_FEATURE_IMPORTS_FEATURE]
+    since: 1.0.0
   - id: be.transport.http
     profiles: [be]
     path: "src/features/<feature>/transport/http/"
@@ -476,6 +487,17 @@ slots:
     requires: ["<feature>-websocket.module.ts"]
     allows: ["<channel>.gateway.ts", "dto/*.ts", "*.spec.ts"]
     tests: unit-beside
+    since: 1.0.0
+  - id: be.feature.transport.cli
+    profiles: [be]
+    path: "src/features/<feature>/transport/cli/"
+    presence: opt-in              # a command line entry: calls application use cases only, composed by an app of kind cli
+    tracked: tracked
+    tier: feature
+    requires: ["<feature>-cli.module.ts"]
+    allows: ["<command>.command.ts", "dto/*.ts", "*.spec.ts"]
+    tests: unit-beside
+    rules: [BE_APPLICATION_IMPORTS_TRANSPORT, BE_FEATURE_NOT_COMPOSED, BE_ENTRYPOINT_ONLY_IN_APPS]
     since: 1.0.0
 
   # ----- BE: modules (three tiers, closed set) -----------------------------------------------------------

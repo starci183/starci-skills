@@ -671,5 +671,5 @@ export function loadRuleCatalog({ root = skillRoot, file = path.join(root, HFS_R
   });
 }
 
-/** The 67 rules of this runtime's catalog, frozen, in id order. */
+/** The 76 rules of this runtime's catalog, frozen, in id order. */
 export const rules = (options) => loadRuleCatalog(options).rules;

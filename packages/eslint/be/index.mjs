@@ -16,6 +16,7 @@
  * every conversation about the failure. Aliasing one here to match a target's older spelling would
  * leave two names for one rule and no way to tell which a message came from.
  */
+import { recommended as asyncDisciplineRecommended, rules as asyncDisciplineRules } from "./async-discipline.mjs"
 import { recommended as authorizationRecommended, rules as authorizationRules } from "./authorization.mjs"
 import { recommended as cdcRecommended, rules as cdcRules } from "./cdc.mjs"
 import { recommended as commentsRecommended, rules as commentsRules } from "./comments.mjs"
@@ -26,10 +27,14 @@ import { recommended as defaultDenyRecommended, rules as defaultDenyRules } from
 import { recommended as e2eFlowRecommended, rules as e2eFlowRules } from "./e2e-flow.mjs"
 import { recommended as errorHandlingRecommended, rules as errorHandlingRules } from "./error-handling.mjs"
 import { recommended as eventDeliveryRecommended, rules as eventDeliveryRules } from "./event-delivery.mjs"
+import { recommended as inputBoundsRecommended, rules as inputBoundsRules } from "./input-bounds.mjs"
+import { recommended as logSafetyRecommended, rules as logSafetyRules } from "./log-safety.mjs"
 import { recommended as moduleLayeringRecommended, rules as moduleLayeringRules } from "./module-layering.mjs"
 import { recommended as moduleShapeRecommended, rules as moduleShapeRules } from "./module-shape.mjs"
 import { recommended as namingRecommended, rules as namingRules } from "./naming.mjs"
 import { recommended as observabilityRecommended, rules as observabilityRules } from "./observability.mjs"
+import { recommended as querySafetyRecommended, rules as querySafetyRules } from "./query-safety.mjs"
+import { recommended as resilienceRecommended, rules as resilienceRules } from "./resilience.mjs"
 import { recommended as schemaAuthorityRecommended, rules as schemaAuthorityRules } from "./schema-authority.mjs"
 import { recommended as sizeBudgetRecommended, rules as sizeBudgetRules } from "./size-budget.mjs"
 import { recommended as specQualityRecommended, rules as specQualityRules } from "./spec-quality.mjs"
@@ -40,6 +45,7 @@ import { recommended as typeSafetyRecommended, rules as typeSafetyRules } from "
 
 /** Each law's contribution, kept separate so a duplicate name is detectable rather than silent. */
 const CONTRIBUTIONS = [
+    { law: "async-discipline", rules: asyncDisciplineRules, recommended: asyncDisciplineRecommended },
     { law: "authorization", rules: authorizationRules, recommended: authorizationRecommended },
     { law: "cdc", rules: cdcRules, recommended: cdcRecommended },
     { law: "comments", rules: commentsRules, recommended: commentsRecommended },
@@ -50,10 +56,14 @@ const CONTRIBUTIONS = [
     { law: "e2e-flow", rules: e2eFlowRules, recommended: e2eFlowRecommended },
     { law: "error-handling", rules: errorHandlingRules, recommended: errorHandlingRecommended },
     { law: "event-delivery", rules: eventDeliveryRules, recommended: eventDeliveryRecommended },
+    { law: "input-bounds", rules: inputBoundsRules, recommended: inputBoundsRecommended },
+    { law: "log-safety", rules: logSafetyRules, recommended: logSafetyRecommended },
     { law: "module-layering", rules: moduleLayeringRules, recommended: moduleLayeringRecommended },
     { law: "module-shape", rules: moduleShapeRules, recommended: moduleShapeRecommended },
     { law: "naming", rules: namingRules, recommended: namingRecommended },
     { law: "observability", rules: observabilityRules, recommended: observabilityRecommended },
+    { law: "query-safety", rules: querySafetyRules, recommended: querySafetyRecommended },
+    { law: "resilience", rules: resilienceRules, recommended: resilienceRecommended },
     { law: "schema-authority", rules: schemaAuthorityRules, recommended: schemaAuthorityRecommended },
     { law: "size-budget", rules: sizeBudgetRules, recommended: sizeBudgetRecommended },
     { law: "spec-quality", rules: specQualityRules, recommended: specQualityRecommended },

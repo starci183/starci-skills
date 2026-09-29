@@ -4,14 +4,14 @@ profiles:
     title: StarCi NestJS code pattern
     canon:
       package: '@starci/eslint-canon-be'
-      version: 1.3.0
+      version: 1.4.0
       contentDigest:
         algorithm: sha256
         include: ['**/*.mjs', '**/*.json', '**/*.md', '**/*.ts']
         exclude: ['**/*.test.mjs']
         framing: sorted-posix-relative-path-null-raw-bytes-null
-        value: dc6b508468a89af80439c8e52474d44e1f974c17c721fe0c9b420a8b545379e0
-        files: 29
+        value: 437257f31a13cb503121d698c0067eb2ad37ab83a6ac5c348eb9aaf152954008
+        files: 34
     sourceRuleRoots:
       - knowledge/patterns/be
     expectedSourceRuleIds:
@@ -283,6 +283,20 @@ profiles:
         semantic:
           guidance: knowledge/patterns/be/error.yaml
           review: Verify redaction and correlation fields against the real logging adapter.
+        status: implemented
+      - id: NEST-HFS-RUNTIME-SAFETY
+        sourceRuleIds: [BE-ERROR-5, BE-ERROR-7, BE-TYPING-2]
+        applicability: { include: ['src/**/*.ts', 'apps/**/*.ts', 'libs/**/*.ts'], exclude: ['**/*.d.ts', '**/*.spec.ts', 'src/tests/**', 'libs/*/src/tests/**'] }
+        mechanical:
+          requirement: SQL text has no runtime substitution and a read states its bound; an outbound HTTP call has a timeout and outside JSON is parsed inside a guard; a log call names no secret or personal identifier; no cast to never or non-null assertion; an async function awaits; handlers declare a return type; a migration reverses; every input property has a validator.
+          check:
+            kind: eslint
+            sourceOnly: true
+            ruleIds: [starci-be/no-interpolated-sql, starci-be/query-needs-limit, starci-be/http-needs-timeout, starci-be/json-parse-needs-guard, starci-be/no-secret-in-log, starci-be/no-never-cast, starci-be/no-non-null-assertion, starci-be/async-needs-await, starci-be/explicit-handler-return-type, starci-be/migration-down-reversible, starci-be/dto-needs-validator]
+            expected: { severity: error }
+        semantic:
+          guidance: knowledge/patterns/be/persistence.yaml
+          review: Verify a chosen bound cannot silently truncate a result the caller treats as complete, and that a masked log value cannot be reversed.
         status: implemented
       - id: NEST-PERSISTENCE-SHAPE
         sourceRuleIds: [BE-FOLDER-6, BE-FUNCTION-3, BE-FUNCTION-5, BE-TYPING-7]

@@ -387,6 +387,99 @@ export const noConstEnum = {
   },
 }
 
+// -- R72 -------------------------------------------------------------------------------------------
+
+/** `as never` asserts that a value is of no type at all, which satisfies every parameter and checks nothing. */
+export const noNeverCast = {
+  meta: {
+    type: "problem",
+    docs: { description: "No `x as never` outside the test lanes." },
+    schema: [],
+    messages: {
+      neverCast:
+        "`as never` makes this value assignable to anything, so the compiler stops checking the call it is passed to. It hides a real mismatch between the value and the parameter. Give the value the type the parameter wants, narrow it with a guard, or fix the signature.",
+    },
+  },
+  create(context) {
+    if (isTestFile(context.filename || context.getFilename())) return {}
+    return {
+      TSAsExpression(node) {
+        if (node.typeAnnotation?.type === "TSNeverKeyword") context.report({ node, messageId: "neverCast" })
+      },
+    }
+  },
+}
+
+/** `x!` claims a value is present without checking. */
+export const noNonNullAssertion = {
+  meta: {
+    type: "problem",
+    docs: { description: "No non-null assertion (`x!`) outside the test lanes." },
+    schema: [],
+    messages: {
+      nonNull:
+        "`!` claims this value is present and checks nothing; when it is not, the failure is a `TypeError` far from here. Narrow with a check that returns or throws a typed error, or change the type so absence is impossible.",
+    },
+  },
+  create(context) {
+    if (isTestFile(context.filename || context.getFilename())) return {}
+    return {
+      TSNonNullExpression(node) {
+        context.report({ node, messageId: "nonNull" })
+      },
+    }
+  },
+}
+
+// -- R75 -------------------------------------------------------------------------------------------
+
+const HANDLER_DECORATORS = new Set(["Query", "Mutation", "Subscription", "ResolveField", "Get", "Post", "Put", "Patch", "Delete", "MessagePattern", "EventPattern", "Cron", "Interval"])
+const SURFACE_CLASS_DECORATORS = new Set(["Injectable", "Resolver", "Controller"])
+
+const decoratorIdentifier = (decorator) => {
+  const expression = decorator?.expression
+  if (!expression) return null
+  if (expression.type === "Identifier") return expression.name
+  if (expression.type === "CallExpression" && expression.callee.type === "Identifier") return expression.callee.name
+  return null
+}
+
+/** A method that a caller or the framework reaches states what it returns. */
+export const explicitHandlerReturnType = {
+  meta: {
+    type: "problem",
+    docs: { description: "Handlers and public methods of an Injectable, Resolver or Controller declare a return type." },
+    schema: [],
+    messages: {
+      handler:
+        "This handler declares no return type, so the transport contract is whatever the body happens to return today and a change of the body silently changes the wire. Declare the return type (`Promise<Type>`).",
+      publicMethod:
+        "This public method declares no return type, so its callers depend on an inferred shape that changes with the body. Declare the return type.",
+    },
+  },
+  create(context) {
+    if (isTestFile(context.filename || context.getFilename())) return {}
+    return {
+      MethodDefinition(node) {
+        if (node.kind !== "method" || node.static || !node.value.body || node.value.returnType) return
+        if (node.computed || node.key.type !== "Identifier") return
+        const isHandler = (node.decorators ?? []).some((decorator) => HANDLER_DECORATORS.has(decoratorIdentifier(decorator)))
+        if (isHandler) {
+          context.report({ node: node.key, messageId: "handler" })
+          return
+        }
+        if (node.accessibility === "private" || node.accessibility === "protected" || node.override) return
+        const klass = node.parent?.parent
+        if (!klass || klass.type !== "ClassDeclaration") return
+        const exported = klass.parent?.type === "ExportNamedDeclaration" || klass.parent?.type === "ExportDefaultDeclaration"
+        const decorators = [...(klass.decorators ?? []), ...(klass.parent?.decorators ?? [])].map(decoratorIdentifier)
+        if (!exported || !decorators.some((name) => SURFACE_CLASS_DECORATORS.has(name))) return
+        context.report({ node: node.key, messageId: "publicMethod" })
+      },
+    }
+  },
+}
+
 // -- TYPE-5 (rule 6) -- ATTEMPTED, NOT SHIPPED ------------------------------------------------------
 //
 // A rule was written here: two-or-more `is`/`has`-prefixed booleans sharing a type literal with a
@@ -409,6 +502,9 @@ export const rules = {
   "no-inline-object-type": noInlineObjectType,
   "no-const-enum": noConstEnum,
   "no-unguarded-unknown-cast": noUnguardedUnknownCast,
+  "no-never-cast": noNeverCast,
+  "no-non-null-assertion": noNonNullAssertion,
+  "explicit-handler-return-type": explicitHandlerReturnType,
 }
 
 /**
@@ -444,6 +540,9 @@ export const recommended = {
   "starci-be/no-inline-object-type": "error",
   "starci-be/no-const-enum": "error",
   "starci-be/no-unguarded-unknown-cast": "warn", // no=3 -- see type-safety.mjs's doc comment
+  "starci-be/no-never-cast": "error",
+  "starci-be/no-non-null-assertion": "error",
+  "starci-be/explicit-handler-return-type": "error",
   "@typescript-eslint/no-explicit-any": "error",
   "@typescript-eslint/array-type": ["error", {
     default: "generic",

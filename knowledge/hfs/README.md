@@ -10,7 +10,7 @@ The machine-readable parts live next to this file and are read by every check, l
 | File | Owns |
 | --- | --- |
 | `slots.yaml` | Every kind of content allowed to exist in a repository: path, presence, tracking, tier, required files, tests, budget, managed template. Versioned `MAJOR.MINOR.PATCH`. |
-| `rules.yaml` | The rule catalog `R01` to `R67` with finding code, gates and the Vietnamese why text (catalog below). |
+| `rules.yaml` | The rule catalog `R01` to `R76` with finding code, gates and the Vietnamese why text (catalog below). |
 | `canon-pins.yaml` | The exact versions of every `@starci/*` package and framework this major supports. |
 
 The pattern cases in `knowledge/patterns/{be,fe,repo}/` explain how to write code and structure files inside these
@@ -56,6 +56,8 @@ optionally a `tier`, `requires`, `allows`, `forbids`, `tests`, `budget`, `manage
 
 | To add | Do | Bump |
 | --- | --- | --- |
+| Helper or type used by one feature only | `application/support/<name>.ts` (`be.feature.application.support`, optional), a spec beside each file; another feature cannot import it, a second user moves it to a `domain` capability | minor |
+| Command line entry | `transport/cli/<command>.command.ts` in the feature plus an app of kind `cli` (`be.feature.transport.cli`, opt-in); it calls application use cases only | minor |
 | Queue consumer | `transport/message/` in the feature plus an app of kind `worker` | none, declared in `hfs.json` |
 | Cron, sweep, outbox publisher | `transport/schedule/<job>.job.ts` | none |
 | Another api app or a cli | `apps/<name>` plus its kind in `hfs.json` | none |
@@ -136,10 +138,12 @@ src/features/<feature>/
   index.ts                            module class and the contract an app needs; no export *
   <feature>.module.ts                 application module (use cases)
   application/                        <action>.use-case.ts, <action>.contracts.ts, optional command/query/handler, specs
+  application/support/                opt-in by need: helpers and types local to this one feature, a spec beside each file
   transport/http/                     <feature>-http.module.ts, <action>.controller.ts, dto/
   transport/graphql/                  <feature>-graphql.module.ts, <action>.resolver.ts, dto/
   transport/message/                  opt-in: <feature>-message.module.ts, <event>.consumer.ts
   transport/schedule/                 opt-in: <feature>-schedule.module.ts, <job>.job.ts
+  transport/cli/                      opt-in: <feature>-cli.module.ts, <command>.command.ts; composed only by an app of kind cli
 src/modules/domain/<capability>/      index.ts, module, config, options, errors/, persistence/, policies, services, contracts
 src/modules/platform/{config,logging,errors,primitives,database,...}/   config, logging, errors, primitives are required
 src/modules/integrations/<provider>/  index.ts, <provider>.config.ts, errors/, client
@@ -217,6 +221,16 @@ application module; never one module per operation. `@Global()` only on `platfor
 no `new` of an `@Injectable`. Every feature and every transport module is composed by at least one app. Apps hold only
 `main.ts`, `app.module.ts`, `<app>.options.ts` and the composition spec. Entrypoints (`main.ts`, `bootstrap()`,
 top-level `void x()`) exist only in `apps/*/src`.
+
+### 5.9 Query, transport and runtime safety (R68 to R76)
+
+A statement is text plus numbered parameters; a runtime value never becomes part of the text (R68). A list read states its
+bound, and a caller that needs every row pages by keyset instead of truncating (R69). Every outbound HTTP call carries a
+timeout or an abort signal (R70). A logger call names no credential and no personal identifier (R71). `as never` and `x!`
+are not used (R72). An `async` function awaits (R73). A migration's `down()` reverses its `up()` (R74). A handler and a
+public method of an Injectable, Resolver or Controller declare their return type (R75). `JSON.parse` of outside text sits
+inside a `try` (R76). Each has an `eslint-be` enforcer in `@starci/eslint-canon-be`; the input classes of R42 carry a
+`class-validator` decorator on every property (`dto-needs-validator`).
 
 ## 6. Frontend
 
@@ -349,7 +363,7 @@ e2e/<area>/*.e2e-spec.ts              plus e2e/{support,fixtures}/, playwright.c
 | PC pre-commit | lint-staged: Prettier, ESLint canon on staged files, stylelint, secrets guard | under 10 s | R06, R07, R18, R19, R34, R40, R41, R43 to R45, R49, R55, R58, R61, R62 |
 | PP pre-push | `typecheck`, `lint:check`, `hfs check --fast`, affected unit specs | under 2 min | PC plus R01, R03 to R05, R12 to R15, R22, R26, R27, R30 |
 | OS op settle | `hfs check --paths <owned paths>` and ESLint on the op's paths; a red result does not settle | per op | every file-level and owner-level rule in scope |
-| LG land gate | full `hfs check` including reachability, composition, contract, size growth, duplicates; canon scan; unit; build | per repo | all 67 |
+| LG land gate | full `hfs check` including reachability, composition, contract, size growth, duplicates; canon scan; unit; build | per repo | all 76 |
 | CI GitHub | the same pinned `npx @starci/hfs check`, lint, typecheck, unit with coverage, build, `prettier --check` | | as LG except R23 on the frontend |
 | SQ Sonar | duplication, cognitive complexity, coverage on new code | | R20, R21 (second gate) |
 
@@ -419,13 +433,22 @@ Every rule is an error from 2.0. Finding code, then the rule. The pattern files 
 | R39 | `BE_ERROR_MASKED` | One filter per app; undeclared errors are masked. |
 | R40 | `BE_LOGGER_REQUIRED` | `platform/logging` exists; every `catch` logs, rethrows or returns a reasoned outcome. |
 | R41 | `BE_DEFAULT_DENY` | `APP_GUARD` plus `@Public({ reason })`; typed bodies; `timingSafeEqual`. |
-| R42 | `BE_INPUT_BOUNDED` | Bounded input, depth limits, rate limits. |
+| R42 | `BE_INPUT_BOUNDED` | Bounded input, depth limits, rate limits; every property of an input class carries a `class-validator` decorator. |
 | R43 | `BE_CONFIG_OWNER` | Only `platform/config` reads `process.env`; config per capability. |
 | R44 | `BE_SECRET_DEFAULT` | No default for a secret key or infrastructure URL. |
 | R45 | `BE_MODULE_SHAPE` | `@Global` only on config, logging, database; typed options; one module per transport. |
 | R46 | `BE_BACKGROUND_UNOWNED` | Every sweep, outbox or retry has a job or consumer run by a worker app. |
 | R47 | `BE_TEST_TOPOLOGY` | One jest config, projects `unit` and `e2e`, live by folder, `diagnostics: false`. |
 | R48 | `BE_SPEC_QUALITY` | No source-reading specs, no cast doubles; `lint:e2e` is green. |
+| R68 | `BE_SQL_INTERPOLATED` | SQL text carries no runtime substitution; values are numbered parameters. |
+| R69 | `BE_QUERY_UNBOUNDED` | A read that can return many rows states `take`, `limit` or `LIMIT`, or pages by cursor. |
+| R70 | `BE_HTTP_TIMEOUT` | Every outbound `fetch`, axios or HttpService call states a timeout or an abort signal. |
+| R71 | `BE_LOG_SECRET` | A logger call carries no credential and no personal identifier by name; log an id or a masked form. |
+| R72 | `BE_TYPE_ESCAPE` | No `as never` and no `x!` outside the test lanes. |
+| R73 | `BE_ASYNC_NO_AWAIT` | An `async` function contains an `await`; otherwise it is not `async`. |
+| R74 | `BE_MIGRATION_REVERSIBLE` | Every migration declares a `down()` that reverses its `up()`; never empty, never a bare throw. |
+| R75 | `BE_RETURN_TYPE` | Handlers and public methods of an Injectable, Resolver or Controller declare their return type. |
+| R76 | `BE_JSON_PARSE_UNGUARDED` | `JSON.parse` sits inside a `try` in its own function and fails as a typed outcome. |
 
 **Frontend**
 

@@ -1,4 +1,4 @@
-# knowledge/hfs/rules.yaml - the machine-readable catalog of the 67 HFS rules (R01-R67).
+# knowledge/hfs/rules.yaml - the machine-readable catalog of the 76 HFS rules (R01-R76).
 #
 # One entry per rule: its id, its finding code, a Vietnamese title, the law in one line, how a violation is fixed
 # (`kinds`), the gates it runs at, the failure codes it reports, and every enforcer that judges it. The prose of each
@@ -423,6 +423,7 @@ rules:
     gates: [settle, land, ci]
     failureCodes: ["BE_INPUT_BOUNDED"]
     enforcers:
+      - {kind: eslint-be, id: dto-needs-validator}
       - {kind: eslint-be, id: input-bounded, status: planned}
   - id: R43
     code: "BE_CONFIG_OWNER"
@@ -682,3 +683,85 @@ rules:
       - {kind: eslint-fe, id: no-barrel-spec}
       - {kind: eslint-fe, id: no-double-cast-in-spec}
       - {kind: eslint-fe, id: connected-spec-has-axe}
+  - id: R68
+    code: "BE_SQL_INTERPOLATED"
+    title_vi: "Giá trị chạy lúc chạy bị ghép vào chuỗi SQL"
+    law: "SQL text carries no runtime substitution; values are numbered parameters."
+    kinds: [lint, codemod]
+    gates: [pre-commit, pre-push, settle, land, ci]
+    failureCodes: ["BE_SQL_INTERPOLATED"]
+    enforcers:
+      - {kind: eslint-be, id: no-interpolated-sql}
+  - id: R69
+    code: "BE_QUERY_UNBOUNDED"
+    title_vi: "Truy vấn đọc không có giới hạn số dòng"
+    law: "A read that can return many rows states `take`, `limit` or `LIMIT`, or pages by cursor."
+    kinds: [lint, codemod]
+    gates: [pre-commit, pre-push, settle, land, ci]
+    failureCodes: ["BE_QUERY_UNBOUNDED"]
+    enforcers:
+      - {kind: eslint-be, id: query-needs-limit}
+  - id: R70
+    code: "BE_HTTP_TIMEOUT"
+    title_vi: "Gọi HTTP ra ngoài không có timeout"
+    law: "Every outbound `fetch`, axios or HttpService call states a timeout or an abort signal."
+    kinds: [lint, codemod]
+    gates: [pre-commit, pre-push, settle, land, ci]
+    failureCodes: ["BE_HTTP_TIMEOUT"]
+    enforcers:
+      - {kind: eslint-be, id: http-needs-timeout}
+  - id: R71
+    code: "BE_LOG_SECRET"
+    title_vi: "Bí mật hoặc dữ liệu cá nhân bị ghi vào log"
+    law: "A logger call carries no credential and no personal identifier by name; log an id or a masked form."
+    kinds: [lint, codemod]
+    gates: [pre-commit, pre-push, settle, land, ci]
+    failureCodes: ["BE_LOG_SECRET"]
+    enforcers:
+      - {kind: eslint-be, id: no-secret-in-log}
+  - id: R72
+    code: "BE_TYPE_ESCAPE"
+    title_vi: "Ép kiểu never hoặc khẳng định non-null"
+    law: "No `as never` and no `x!` outside the test lanes."
+    kinds: [lint, codemod]
+    gates: [pre-commit, pre-push, settle, land, ci]
+    failureCodes: ["BE_TYPE_ESCAPE"]
+    enforcers:
+      - {kind: eslint-be, id: no-never-cast}
+      - {kind: eslint-be, id: no-non-null-assertion}
+  - id: R73
+    code: "BE_ASYNC_NO_AWAIT"
+    title_vi: "Hàm async không có await"
+    law: "An `async` function contains an `await`; otherwise it is not `async`."
+    kinds: [lint, codemod]
+    gates: [pre-commit, pre-push, settle, land, ci]
+    failureCodes: ["BE_ASYNC_NO_AWAIT"]
+    enforcers:
+      - {kind: eslint-be, id: async-needs-await}
+  - id: R74
+    code: "BE_MIGRATION_REVERSIBLE"
+    title_vi: "Migration không có down đảo ngược được"
+    law: "Every migration declares a `down()` that reverses its `up()`; never empty, never a bare throw."
+    kinds: [lint, codemod]
+    gates: [pre-commit, pre-push, settle, land, ci]
+    failureCodes: ["BE_MIGRATION_REVERSIBLE"]
+    enforcers:
+      - {kind: eslint-be, id: migration-down-reversible}
+  - id: R75
+    code: "BE_RETURN_TYPE"
+    title_vi: "Handler hoặc phương thức công khai thiếu kiểu trả về"
+    law: "Handlers and public methods of an Injectable, Resolver or Controller declare their return type."
+    kinds: [lint, codemod]
+    gates: [pre-commit, pre-push, settle, land, ci]
+    failureCodes: ["BE_RETURN_TYPE"]
+    enforcers:
+      - {kind: eslint-be, id: explicit-handler-return-type}
+  - id: R76
+    code: "BE_JSON_PARSE_UNGUARDED"
+    title_vi: "JSON.parse không nằm trong try"
+    law: "`JSON.parse` sits inside a `try` in its own function and fails as a typed outcome."
+    kinds: [lint, codemod]
+    gates: [pre-commit, pre-push, settle, land, ci]
+    failureCodes: ["BE_JSON_PARSE_UNGUARDED"]
+    enforcers:
+      - {kind: eslint-be, id: json-parse-needs-guard}

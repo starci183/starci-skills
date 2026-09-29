@@ -1,7 +1,7 @@
 import test from "node:test"
 import { RuleTester } from "eslint"
 import tsParser from "@typescript-eslint/parser"
-import { noEntityInContract, noRuntimeSchema, sqlOnlyInRepository } from "./schema-authority.mjs"
+import { migrationDownReversible, noEntityInContract, noRuntimeSchema, sqlOnlyInRepository } from "./schema-authority.mjs"
 
 const tester = new RuleTester({
     languageOptions: { parser: tsParser, ecmaVersion: 2022, sourceType: "module" },
@@ -65,6 +65,26 @@ test("an ORM entity never appears in a boundary type", () => {
             { filename: "D:/repo/src/modules/domain/plan/plan.contracts.ts", code: "export interface Plan { owner: UserEntity }", errors: [{ messageId: "entity" }] },
             { filename: "D:/repo/src/features/plan/transport/graphql/get-plan.resolver.ts", code: "class R { get(): Promise<PlanEntity> {} }", errors: [{ messageId: "entity" }] },
             { filename: "D:/repo/src/features/plan/transport/http/dto/get-plan.response.ts", code: "export class Res { plan: PlanEntity }", errors: [{ messageId: "entity" }] },
+        ],
+    })
+})
+
+test("R74: a migration declares a down() that reverses its up()", () => {
+    tester.run("migration-down-reversible", migrationDownReversible, {
+        valid: [
+            {
+                filename: MIGRATION,
+                code: "export class CreatePlan1 { async up(queryRunner) { await queryRunner.query('CREATE TABLE plan (id int)') } async down(queryRunner) { await queryRunner.query('DROP TABLE plan') } }",
+            },
+            // not a migration: no up()
+            { filename: MIGRATION, code: "export class Helper { run() {} }" },
+            // outside the migrations folder
+            { filename: SERVICE, code: "export class Plan { async up() {} }" },
+        ],
+        invalid: [
+            { filename: MIGRATION, code: "export class CreatePlan1 { async up(q) { await q.query('CREATE TABLE plan (id int)') } }", errors: [{ messageId: "missing" }] },
+            { filename: MIGRATION, code: "export class CreatePlan1 { async up(q) { await q.query('x') } async down() {} }", errors: [{ messageId: "empty" }] },
+            { filename: MIGRATION, code: "export class CreatePlan1 { async up(q) { await q.query('x') } async down() { throw new Error('irreversible') } }", errors: [{ messageId: "throws" }] },
         ],
     })
 })

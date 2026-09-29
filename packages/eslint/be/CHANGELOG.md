@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.4.0 - 2026-09-30
+
+Round 2 back-end rules (catalog R42, R68 to R76). Every rule below has RuleTester specs and a why code in `modules/kernel/failure-codes.yaml`; each was measured against nivo-backend, starci-next and mia-mia-backend before it shipped and is on at `error`.
+
+- New: `no-interpolated-sql` (R68: SQL text carries no runtime substitution; a constant column list, a `${n}` placeholder, `quoteIdent(...)`, `sqlSetClause(...)` and a ternary of fixed strings are the only substitutions), `query-needs-limit` (R69: `getMany`, `getRawMany`, `find`, `findBy` and a raw `SELECT` state a bound; a lookup by `id` and an aggregate are exempt), `http-needs-timeout` (R70: `fetch` carries a `signal`, axios and HttpService calls carry `timeout` or `signal`, `axios.create` a `timeout`), `no-secret-in-log` (R71: a logger call names no credential and no personal identifier), `no-never-cast` and `no-non-null-assertion` (R72), `async-needs-await` (R73: an `async` function that never awaits; a class that extends or implements, a decorated method and a generator are exempt), `migration-down-reversible` (R74: `down()` exists, is not empty and is not a bare throw), `explicit-handler-return-type` (R75), `json-parse-needs-guard` (R76), and `dto-needs-validator` (R42: every property of an input class carries a `class-validator` decorator).
+- New laws: `query-safety`, `resilience`, `log-safety`, `async-discipline`, `input-bounds`; `type-safety` and `schema-authority` gain rules.
+
 ## 1.3.0 - 2026-09-29
 
 HFS back-end rules (catalog R18, R20, R34, R36-R38, R40-R45, R48). Every rule below has RuleTester specs and a why code in `modules/kernel/failure-codes.yaml`.
