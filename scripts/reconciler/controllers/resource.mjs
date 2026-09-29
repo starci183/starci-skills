@@ -171,7 +171,8 @@ const liveDeps = {
   load: async () => { try { return (await import('../../supervisor/workers.mjs')).machineLoad({ sampleMs: 200 })?.cpuBusy ?? null; } catch { return null; } },
   census: async () => (await import('../../lib/ram-throttle.mjs')).fleetCensus({}),
   footprints: async (limit, env) => { try { return (await import('../../lib/ram-throttle.mjs')).recentFootprints({ limit, env: env ?? process.env }); } catch { return []; } },
-  owners: async () => { const h = await import('../../supervisor/host-health.mjs'); return h.groupByOwner(h.listProcesses(), { limit: Infinity }); },
+  // async: the sync process-table read blocks the engine's one thread for minutes on a loaded host (ENGINE-STALL)
+  owners: async () => { const h = await import('../../supervisor/host-health.mjs'); return h.groupByOwner(await h.listProcessesAsync(), { limit: Infinity }); },
   recordFootprint: async (payload, env) => {
     const { recordFootprint } = await import('../../lib/ram-throttle.mjs');
     withSupervisor((m) => recordFootprint(m, payload), { env });

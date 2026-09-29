@@ -59,14 +59,17 @@ export function leaderState({ env = process.env, now = Date.now(), numbers = rec
     const row = m.leaderOf(LEADER_NAME);
     const run = row?.process_run_id != null ? m.db.prepare('SELECT * FROM process_runs WHERE run_id=?').get(row.process_run_id) ?? null : null;
     const pushRunning = Boolean(m.db.prepare("SELECT 1 FROM engine_actions WHERE controller='fleet' AND key='fleet:push' AND state='running' AND epoch=? LIMIT 1").get(row?.epoch ?? -1));
-    return { row, run, pushRunning };
+    // Safe mode is read from the LIVE state, not from how the run started: the engine records every controller it forces
+    // shadow as controller_modes reason 'safe mode: ...' (engine.mjs writeModes), and a self-reload keeps the process --safe.
+    const safeModes = m.db.prepare("SELECT controller FROM controller_modes WHERE reason LIKE 'safe mode%'").all().map((r) => r.controller);
+    return { row, run, pushRunning, safeModes };
   }, null, { env });
-  const { row = null, run = null, pushRunning = false } = read ?? {};
+  const { row = null, run = null, pushRunning = false, safeModes = [] } = read ?? {};
   const heartbeatAt = Math.max(Number(row?.heartbeat_at) || 0, run?.ended_at == null ? Number(run?.last_heartbeat_at) || 0 : 0) || null;
   const ageMs = heartbeatAt ? now - heartbeatAt : null;
   return {
     holder: row?.holder ?? null, pid: row?.pid ?? null, epoch: row?.epoch ?? null, heartbeatAt, ageMs,
-    expiresAt: row?.expires_at ?? null, rev: row?.rev ?? null, safe: run?.start_reason === 'crash-restart', runId: run?.run_id ?? null,
+    expiresAt: row?.expires_at ?? null, rev: row?.rev ?? null, safe: safeModes.length > 0, safeModes, runId: run?.run_id ?? null,
     exitReason: run?.exit_reason ?? null, killedBy: run?.killed_by ?? null, startReason: run?.start_reason ?? null,
     draining: Number(row?.draining) === 1 || (run != null && run.ended_at == null && run.draining_since != null), pushRunning,
     fresh: ageMs != null && ageMs < numbers.heartbeatStaleMs,
@@ -77,8 +80,8 @@ export function leaderState({ env = process.env, now = Date.now(), numbers = rec
 export function crashLoopRecord({ env = process.env, now = Date.now(), windowMs = 1_800_000 } = {}) {
   return readMachine((m) => ({
     starts: m.logs({ actor: 'reconciler', kind: SPAWNED_KIND, limit: 200 })
-      // A planned start (owner restart, reload handover, restart after a clean exit) is not a crash; older rows carry the reason in msg only.
-      .filter((r) => !isPlannedStart(r.data?.startReason ?? /\((\S+?)[,)]/.exec(String(r.msg ?? ''))?.[1]))
+      // A planned start (owner restart, reload handover, restart after a clean exit) is not a crash.
+      .filter((r) => !isPlannedStart(r.data?.startReason))
       .map((r) => Number(r.at)).filter((t) => now - t < windowMs).sort((a, b) => a - b),
     alertedAt: m.logs({ actor: 'reconciler', kind: CRASH_ALERT_KIND, limit: 1 })[0]?.at ?? null,
   }), { starts: [], alertedAt: null }, { env });

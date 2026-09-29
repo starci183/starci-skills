@@ -24,7 +24,7 @@ export const CONTROLLER_NAMES = Object.freeze(['job', 'host', 'gc', 'resource', 
 export const START_REASON_ENV = 'STARCI_ENGINE_START_REASON';
 
 const DEFAULT_NUMBERS = Object.freeze({
-  pollMs: 2000, leaseMs: 30000, renewMs: 10000, heartbeatStaleMs: 60000, statusCacheMs: 20000,
+  pollMs: 2000, leaseMs: 30000, renewMs: 10000, heartbeatStaleMs: 60000, statusCacheMs: 20000, stallMaxMs: 300000,
   backoff: Object.freeze({ minMs: 1000, maxMs: 300000 }), crashLoop: Object.freeze({ max: 3, windowMs: 1800000 }),
 });
 
@@ -37,6 +37,8 @@ export function reconcilerNumbers({ allocation = null } = {}) {
     pollMs: num(raw?.pollMs, DEFAULT_NUMBERS.pollMs), leaseMs: num(raw?.leaseMs, DEFAULT_NUMBERS.leaseMs),
     renewMs: num(raw?.renewMs, DEFAULT_NUMBERS.renewMs), heartbeatStaleMs: num(raw?.heartbeatStaleMs, DEFAULT_NUMBERS.heartbeatStaleMs),
     statusCacheMs: num(raw?.statusCacheMs, DEFAULT_NUMBERS.statusCacheMs),
+    // a blocked main thread past this is a hung engine: the heartbeat worker stops renewing (heartbeat-worker.mjs)
+    stallMaxMs: num(raw?.stallMaxMs, DEFAULT_NUMBERS.stallMaxMs),
     backoff: { minMs: num(raw?.backoff?.minMs, DEFAULT_NUMBERS.backoff.minMs), maxMs: num(raw?.backoff?.maxMs, DEFAULT_NUMBERS.backoff.maxMs) },
     crashLoop: { max: num(raw?.crashLoop?.max, DEFAULT_NUMBERS.crashLoop.max), windowMs: num(raw?.crashLoop?.windowMs, DEFAULT_NUMBERS.crashLoop.windowMs) },
   };

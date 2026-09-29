@@ -44,6 +44,8 @@ import { CONTROLLERS as MACHINE_CONTROLLERS, openMachine } from '../../engine/ma
 import { claimOrTakeOver } from '../connectors/lib.mjs';
 import { createReloadWatch, reexecSelf, RELOAD_ENV, runtimeHead } from '../lib/self-reload.mjs';
 import { lowerOwnPriority } from '../lib/low-priority.mjs';
+import { crashLoopPlan, crashLoopRecord } from './boot.mjs';
+import { DEFAULT_STALL_MAX_MS, startHeartbeatWorker } from './heartbeat-worker.mjs';
 import { DECISIONS_FILE, createCtx, logRowOf, reconcilerLog, spawnJson } from './ctx.mjs';
 import { ledgersOf, pollAll } from './sources.mjs';
 import { CONCERN_OWNER } from './owns.mjs';
@@ -137,6 +139,10 @@ export class Engine {
     this.lost = false;
     this.draining = false;
     this.running = new Set();
+    // The heartbeat worker (heartbeat-worker.mjs, started by main()): carries the lease and the heartbeat while a synchronous
+    // duty blocks this thread. null in specs and --once (the timers below are then the only renewal).
+    this.hb = null;
+    this.runningLabels = new Set();
     this.timers = { renewAt: 0, pollAt: 0, configAt: 0, slaAt: 0, staleAt: 0, escalateAt: 0, checkpointAt: 0 };
     this.als = new AsyncLocalStorage();
     this.ctxCache = new Map();
@@ -231,6 +237,7 @@ export class Engine {
       this.lost = false;
       this.epoch = out.epoch;
       this.timers.renewAt = now + this.numbers.renewMs;
+      this.hb?.notify({ leader: true, epoch: this.epoch, holder: this.holder, runId: this.processRunId, draining: this.draining });
       if (first) {
         // A new leader's first checkpoint waits a full period: the engine it took over from may have just checkpointed,
         // and two checkpoints back to back while a land writes is the WAL-reset bug window (SQLite < 3.51.3).
@@ -255,6 +262,7 @@ export class Engine {
     if (!changes) {
       this.leader = false;
       this.lost = true;
+      this.hb?.notify({ leader: false });
       this.log('reconciler.event', `leadership lost at epoch ${this.epoch}`, { kind: 'reconciler.leader-lost', epoch: this.epoch });
       return false;
     }
@@ -299,6 +307,7 @@ export class Engine {
       if (row?.holder === this.holder && Number(row.epoch) === this.epoch) this.state.releaseLeader({ name: LEADER_NAME, epoch: this.epoch, reason });
     } catch { /* best effort */ }
     this.leader = false;
+    this.hb?.notify({ leader: false });
     try { this.lock?.release?.(); } catch { /* best effort */ }
     this.lock = null;
   }
@@ -346,6 +355,10 @@ export class Engine {
   async reconcileOne(c, item, { mode = c.mode } = {}) {
     const started = this.now();
     let overBudget = null;
+    const label = `${c.name} ${item.key}`;
+    this.runningLabels.add(label);
+    this.hb?.phase(`reconcile ${label}`);
+    this.hb?.running(this.runningLabels);
     const ctx = this.ctxFor(c, mode);
     const work = this.als.run({ key: item.key }, async () => c.module.reconcile(item.key, ctx));
     const budget = setTimeout(() => {
@@ -368,7 +381,7 @@ export class Engine {
           { kind: 'reconciler.reconcile-failed', name: c.name, key: item.key, attempts, detail: String(error?.stack ?? error).slice(0, 800) });
       }
       return { ok: false, key: item.key, error: String(error?.message ?? error), retryMs: delay };
-    } finally { clearTimeout(budget); }
+    } finally { clearTimeout(budget); this.runningLabels.delete(label); this.hb?.running(this.runningLabels); }
   }
 
   /** Hand the due keys to their controllers, within each controller's concurrency. Returns the started promises. */
@@ -436,15 +449,20 @@ export class Engine {
       } else return { leader: false };
     }
     if (now >= this.timers.renewAt && !this.renew()) return { leader: false, lost: true };
-    if (now >= this.timers.configAt) { this.timers.configAt = now + CONFIG_REFRESH_MS; this.refreshConfig(); }
-    if (now >= this.timers.staleAt) { this.timers.staleAt = now + 60_000; this.markStaleActions(); }
-    if (now >= this.timers.pollAt) { this.timers.pollAt = now + this.numbers.pollMs; this.pollSources(); }
+    const phase = (label) => this.hb?.phase(label);
+    if (now >= this.timers.configAt) { this.timers.configAt = now + CONFIG_REFRESH_MS; phase('refreshConfig'); this.refreshConfig(); }
+    if (now >= this.timers.staleAt) { this.timers.staleAt = now + 60_000; phase('markStaleActions'); this.markStaleActions(); }
+    if (now >= this.timers.pollAt) { this.timers.pollAt = now + this.numbers.pollMs; phase('pollSources'); this.pollSources(); }
+    phase('resyncDue');
     await this.resyncDue();
+    phase('dispatch');
     this.dispatch();
-    if (now >= this.timers.slaAt) { this.timers.slaAt = now + SLA_PASS_MS; await this.slaPass(); }
-    if (now >= this.timers.escalateAt) { this.timers.escalateAt = now + ESCALATE_MS; await this.escalatePass(); }
+    if (now >= this.timers.slaAt) { this.timers.slaAt = now + SLA_PASS_MS; phase('slaPass'); await this.slaPass(); }
+    if (now >= this.timers.escalateAt) { this.timers.escalateAt = now + ESCALATE_MS; phase('escalatePass'); await this.escalatePass(); }
+    phase('idle');
     if (this.state.checkpointer && now >= this.timers.checkpointAt) {
       this.timers.checkpointAt = now + CHECKPOINT_MS;
+      phase('checkpoint');
       // fenced on the leader row: a superseded or expired engine gets {skipped} and checkpoints nothing
       try { this.state.checkpoint({ name: LEADER_NAME, holder: this.holder, epoch: this.epoch }); } catch (error) { this.log('reconciler.error', `checkpoint failed: ${String(error?.message ?? error).slice(0, 300)}`, { kind: 'reconciler.checkpoint-failed' }); }
     }
@@ -454,19 +472,18 @@ export class Engine {
   /** Wait for every running reconcile; the heartbeat says `draining` meanwhile (boot.mjs ensure leaves it alone). */
   async drain() {
     this.draining = true;
+    this.hb?.notify({ draining: true });
     if (this.leader) this.renew();
     try { while (this.running.size) await Promise.allSettled([...this.running]); }
-    finally { this.draining = false; if (this.leader) this.renew(); }
+    finally { this.draining = false; this.hb?.notify({ draining: false }); if (this.leader) this.renew(); }
   }
 
   /** The long-lived loop: until stop(), a lost lead, or a reload handed over. */
   async run({ sleep = (ms) => new Promise((r) => setTimeout(r, ms)), tickMs = Math.min(500, this.numbers.pollMs), watch = null, reload = null } = {}) {
     let reloadCheckAt = this.now() + RELOAD_CHECK_MS;
-    // MB-04: a reconcile may run for minutes and drain() waits for all of them; the lease renews on its own timer so
-    // neither step() nor drain() ever lets it lapse.
-    const renewal = setInterval(() => {
-      if (this.leader && this.now() >= this.timers.renewAt) this.renew();
-    }, Math.max(100, Math.min(this.numbers.renewMs, 1000)));
+    // The lease and the heartbeat are the heartbeat worker's (heartbeat-worker.mjs, its own thread and connection): no duty,
+    // drain or synchronous block of this thread can lapse them. This timer only proves to the worker that this thread lives.
+    const renewal = setInterval(() => this.hb?.touch(), 1000);
     try {
       while (!this.stopped) {
         let r;
@@ -493,6 +510,7 @@ export class Engine {
   stop() { this.stopped = true; }
 
   close({ releaseLead = true, reason = 'stop' } = {}) {
+    this.hb?.stop();
     if (releaseLead && this.leader) this.release({ reason });
     else { try { this.lock?.release?.(); } catch { /* best effort */ } }
     if (this.ownsState) { try { this.state.close(); } catch { /* closed */ } }
@@ -536,7 +554,7 @@ export class Engine {
 /** What the engine process itself runs; a change to one of them (or a new runtime HEAD) reloads it. */
 export const reloadWatchedFiles = (root = SKILL_ROOT) => [
   'scripts/reconciler/engine.mjs', 'scripts/reconciler/ctx.mjs', 'scripts/reconciler/sources.mjs', 'scripts/reconciler/state.mjs',
-  'scripts/reconciler/owns.mjs', 'scripts/reconciler/workqueue.mjs', 'scripts/lib/self-reload.mjs', 'engine/config.mjs', 'modules/models/runtimes.yaml',
+  'scripts/reconciler/owns.mjs', 'scripts/reconciler/workqueue.mjs', 'scripts/reconciler/heartbeat-worker.mjs', 'scripts/reconciler/boot.mjs', 'scripts/lib/self-reload.mjs', 'engine/config.mjs', 'modules/models/runtimes.yaml',
 ].map((rel) => path.join(root, ...rel.split('/')));
 
 /**
@@ -546,6 +564,21 @@ export const reloadWatchedFiles = (root = SKILL_ROOT) => [
  */
 export const RELOAD_HEAD_PATHS = Object.freeze(['scripts/reconciler/', 'scripts/supervisor/', 'scripts/lib/', 'scripts/connectors/lib.mjs',
   'scripts/kernel/', 'scripts/api/orca/', 'engine/', 'modules/reconciler/', 'modules/models/runtimes.yaml']);
+
+/**
+ * Safe mode of a start. A fresh start (boot ensure) is safe exactly when it was given --safe. A self-reload is NOT
+ * inherited: it re-evaluates the crash-loop plan (boot.mjs crashLoopPlan over the spawn record, where owner restarts,
+ * self-reloads and clean exits never count), so an engine that was safe because of a crash loop that has since aged out
+ * comes back in normal mode instead of staying shadow forever. Returns {safe, inherited, reevaluated, starts, max, windowMs}.
+ */
+export function safeForStart({ argv = [], reloaded = false, numbers = reconcilerNumbers(), now = Date.now(), record = () => crashLoopRecord({ now, windowMs: numbers.crashLoop.windowMs }) } = {}) {
+  const inherited = argv.includes('--safe');
+  if (!reloaded) return { safe: inherited, inherited, reevaluated: false };
+  const { max, windowMs } = numbers.crashLoop;
+  let plan;
+  try { plan = crashLoopPlan(record(), { now, max, windowMs }); } catch { plan = { looping: inherited, starts: [] }; } // unreadable record: keep what we had
+  return { safe: plan.looping, inherited, reevaluated: true, starts: plan.starts.length, max, windowMs };
+}
 
 const argValue = (argv, name) => { const i = argv.indexOf(name); return i >= 0 && i + 1 < argv.length ? argv[i + 1] : null; };
 
@@ -574,7 +607,8 @@ async function main(argv = process.argv.slice(2)) {
   const reloadedAt = Number(process.env[RELOAD_ENV.reloadedAt]) || null;
   delete process.env[RELOAD_ENV.handoverFrom];
   delete process.env[RELOAD_ENV.reloadedAt];
-  const safe = argv.includes('--safe');
+  const safeStart = safeForStart({ argv, reloaded: Boolean(handoverFrom) });
+  const safe = safeStart.safe;
   const startReason = handoverFrom ? 'self-reload' : process.env[START_REASON_ENV] || 'manual';
   delete process.env[START_REASON_ENV];
   // Before machine.sqlite opens, stdout is the only place a crash can go (boot.mjs spawns the engine with no log file).
@@ -593,12 +627,20 @@ async function main(argv = process.argv.slice(2)) {
   process.on('uncaughtException', onCrash);
   process.on('unhandledRejection', onCrash);
   await engine.load();
+  if (safeStart.reevaluated) {
+    engine.log('reconciler.event', `self-reload re-evaluated safe mode: ${safe ? 'SAFE (a real crash loop is on record)' : 'normal'} (was ${safeStart.inherited ? '--safe' : 'normal'}; ${safeStart.starts} abnormal start(s) in the window, limit ${safeStart.max})`,
+      { kind: 'reconciler.safe-reevaluated', safe, wasSafe: safeStart.inherited, abnormalStarts: safeStart.starts, max: safeStart.max, windowMs: safeStart.windowMs });
+  }
+  // The heartbeat worker (heartbeat-worker.mjs): its own connection renews the lease while a synchronous duty blocks this thread.
+  engine.hb = startHeartbeatWorker({ file: engine.stateFile, leaseMs: engine.numbers.leaseMs, renewMs: engine.numbers.renewMs, stallMaxMs: engine.numbers.stallMaxMs ?? DEFAULT_STALL_MAX_MS });
+  if (!engine.hb.active) throw new Error('the heartbeat worker did not start: this engine cannot keep its lease');
   const first = engine.acquire();
   if (!first.ok) engine.log('reconciler.event', `standby: ${first.standby}`, { kind: 'reconciler.standby' });
   const onSignal = (sig) => { stopSignal = sig; engine.stop(); };
   for (const sig of ['SIGINT', 'SIGTERM']) process.on(sig, onSignal);
   const watch = createReloadWatch({ root: SKILL_ROOT, files: reloadWatchedFiles(), lastReloadAt: reloadedAt, headPaths: RELOAD_HEAD_PATHS });
-  const reload = () => reexecSelf({ script: selfFile, args: argv, logFile: null, lockName: LOCK_NAME, cwd: SKILL_ROOT, env: { ...process.env, [START_REASON_ENV]: 'self-reload' } });
+  // --safe is not inherited: the new process re-evaluates the crash-loop plan itself (safeForStart).
+  const reload = () => reexecSelf({ script: selfFile, args: argv.filter((a) => a !== '--safe'), logFile: null, lockName: LOCK_NAME, cwd: SKILL_ROOT, env: { ...process.env, [START_REASON_ENV]: 'self-reload' } });
   const r = await engine.run({ watch, reload });
   endRun({ exitCode: r.exitCode ?? 0, exitReason: r.reloaded ? 'reload-handover' : r.lost ? 'lost-lease' : stopSignal ? 'stopped' : 'clean', killedBy: stopSignal ? `signal:${stopSignal}` : null });
   engine.close({ releaseLead: !r.reloaded && !r.lost, reason: 'stop' });

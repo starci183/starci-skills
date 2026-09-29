@@ -24,7 +24,7 @@
 //   node scripts/reconciler/decisions.mjs supervisor --ring [--json]
 import crypto from 'node:crypto';
 import path from 'node:path';
-import { spawnSync } from 'node:child_process';
+import { execFile, spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { parseJsonOr } from '../lib/json.mjs';
 import { kernelDecisionItems } from '../reconcile/job-settle.mjs';
@@ -449,11 +449,26 @@ export function runDecisionsVerb(repo, argv, { env = process.env, timeoutMs = 60
 }
 
 /**
+ * runDecisionsVerb without blocking the calling thread: the reconciler engine has one thread, and a spawnSync of up to
+ * timeoutMs there stops every timer (the lease and the heartbeat) for that long (ENGINE-STALL).
+ */
+export function runDecisionsVerbAsync(repo, argv, { env = process.env, timeoutMs = 60_000 } = {}) {
+  return new Promise((resolve) => {
+    execFile(process.execPath, [API_FILE, 'decisions', '--repo', repo, ...argv, '--json'], { cwd: SKILL_ROOT, encoding: 'utf8', windowsHide: true, timeout: timeoutMs, env, maxBuffer: 64 * 1024 * 1024 }, (error, stdout, stderr) => {
+      const status = error ? (typeof error.code === 'number' ? error.code : null) : 0;
+      let json = null;
+      for (const text of [stdout, String(stderr ?? '').trim().split(/\r?\n/).pop()]) { try { json = JSON.parse(String(text ?? '').trim()); break; } catch { /* next */ } }
+      resolve({ ok: status === 0 && json?.ok !== false, status, json, err: String(stderr ?? '').slice(0, 1000) });
+    });
+  });
+}
+
+/**
  * Open a DI (lane rc-engine ctx.openDecision). `di` uses the schema field names, as the controllers build it. A DI
  * whose `ledger` is 'supervisor' goes to machine.sqlite (openSupervisorDecision; `repo` unused); any other goes
  * to the product ledger at `repo` through `api decisions --open` (a child). Returns {ok, json: {decision, ...}}.
  */
-export function openDecision(repo, di, { env = process.env, run = runDecisionsVerb, now = Date.now() } = {}) {
+export function openDecision(repo, di, { env = process.env, run = runDecisionsVerbAsync, now = Date.now() } = {}) {
   if (di?.ledger === 'supervisor') {
     return openSupervisorDecision(di, { env, now }).then((r) => ({ ok: true, json: { ok: true, created: r.created, existing: r.existing, superseded: r.superseded, decision: r.di } }),
       (error) => ({ ok: false, json: { ok: false, error: String(error?.message ?? error), code: error?.code ?? null } }));

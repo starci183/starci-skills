@@ -12,7 +12,7 @@ import os from 'node:os';
 import { spawnSync } from 'node:child_process';
 import { MAX_SHIM_DEPTH } from '../guards/shim.mjs';
 import { killProcessTree } from '../lib/kill-tree.mjs';
-import { listHostProcesses } from '../lib/process-list.mjs';
+import { listHostProcesses, listHostProcessesAsync } from '../lib/process-list.mjs';
 
 const SHIM_CMD = /[\\/]scripts[\\/]guards[\\/]shim\.mjs["']?\s+(?:git|npm)\b/i;
 const SHIM_EXE = /[\\/]runtime[\\/]guards[\\/]bin[\\/](?:git|npm)(?:\.exe)?$/i;
@@ -26,6 +26,12 @@ export const isShim = (p) => SHIM_CMD.test(p?.cmd ?? '') || SHIM_EXE.test(p?.exe
 export function listProcesses({ platform = process.platform, run = spawnSync } = {}) {
   if (platform !== 'win32') return null;
   return listHostProcesses({ cmdMax: 600, cpu: true, run, platform, timeoutMs: 180_000 });
+}
+
+/** listProcesses without blocking the thread (the reconciler engine's read): same rows, or null. */
+export function listProcessesAsync({ platform = process.platform, run = null } = {}) {
+  if (platform !== 'win32') return Promise.resolve(null);
+  return listHostProcessesAsync({ cmdMax: 600, cpu: true, run, platform, timeoutMs: 180_000 });
 }
 
 const indexOf = (procs) => {

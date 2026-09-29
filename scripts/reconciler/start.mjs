@@ -177,13 +177,25 @@ export function profileItems(conf, raw) {
 
 /* ------------------------------------------------------------ engine + controllers */
 
+/**
+ * Whether the live engine runs in safe mode, from its LIVE state and not from how it started: boot.mjs leaderState().safe
+ * (a controller_modes reason 'safe mode...'), or a controller configured active whose effective mode is shadow while the
+ * leader is fresh (`--safe` survives a self-reload, and a crash-restart run is not the only safe run). Pure over the status.
+ */
+export function safeShadowOf(s) {
+  if (!s?.leader?.fresh) return [];
+  return Object.entries(s.modes ?? {}).filter(([, m]) => m.configured === 'active' && m.effective === 'shadow').map(([name]) => name);
+}
+export const engineIsSafe = (s) => Boolean(s?.leader?.safe) || safeShadowOf(s).length > 0;
+
 /** Engine and controller rows from boot.mjs status(). Pure over the status. */
 export function engineItems(s, { safeIsCrashLoop = false } = {}) {
   const l = s.leader;
   const items = [];
+  const shadowed = safeShadowOf(s);
   if (!l.fresh) items.push(red('engine', 'engine', 'reconciler engine', l.holder ? `stale: leader ${l.holder} pid ${l.pid} heartbeat ${l.ageMs == null ? 'never' : `${Math.round(l.ageMs / 1000)}s`} old` : 'not running', 'node scripts/reconciler/start.mjs'));
   else items.push(green('engine', 'engine', 'reconciler engine', `leader ${l.holder} pid ${l.pid} epoch ${l.epoch} heartbeat ${Math.round(l.ageMs / 1000)}s ago${l.draining ? ' (draining a reload)' : ''}`));
-  items.push(l.safe ? red('engine', 'safe-mode', 'engine safe mode', safeIsCrashLoop ? 'running --safe: a real crash loop is on record (every controller is forced shadow)' : 'running --safe (every controller forced shadow) without a crash loop behind it', 'node scripts/reconciler/start.mjs (restarts it normally)')
+  items.push(engineIsSafe(s) ? red('engine', 'safe-mode', 'engine safe mode', `${safeIsCrashLoop ? 'running --safe: a real crash loop is on record (every controller is forced shadow)' : 'running --safe (every controller forced shadow) without a crash loop behind it'}${shadowed.length ? `; configured active but running shadow: ${shadowed.join(', ')}` : ''}`, 'node scripts/reconciler/start.mjs (restarts it normally)')
     : green('engine', 'safe-mode', 'engine safe mode', 'normal mode'));
   for (const name of Object.keys(s.modes)) {
     const m = s.modes[name];
@@ -394,7 +406,12 @@ async function up(opts) {
   let l = leaderState({ env });
   const numbers = reconcilerNumbers();
   const plan = crashLoopPlan(crashLoopRecord({ env, windowMs: numbers.crashLoop.windowMs }), { max: numbers.crashLoop.max, windowMs: numbers.crashLoop.windowMs });
-  if (l.fresh && l.safe && !plan.looping) { const r = await restartEngine({ env }); applied.push(`engine restarted out of safe mode: ${r.action} pid ${r.pid ?? '-'}`); }
+  const live = safeRun(() => status({ env }), null);
+  const shadowed = live ? safeShadowOf(live) : [];
+  if (l.fresh && (l.safe || shadowed.length) && !plan.looping) {
+    const r = await restartEngine({ env });
+    applied.push(`engine restarted out of safe mode (${l.safeModes?.length ? `controller_modes: ${l.safeModes.join(', ')}` : 'configured active but running shadow'}${shadowed.length ? `: ${shadowed.join(', ')}` : ''}): ${r.action} pid ${r.pid ?? '-'}${r.safe ? ' SAFE (real crash loop)' : ''}`);
+  } else if (l.fresh && (l.safe || shadowed.length)) applied.push(`engine left in safe mode: a real crash loop is on record (${plan.starts.length} abnormal start(s) in the window)`);
   else if (!l.fresh) { const r = await ensure({ env, reason: 'start' }); applied.push(`engine ${r.action}${r.pid ? ` pid ${r.pid}` : ''}${r.safe ? ' SAFE (real crash loop)' : ''}`); }
   const deadline = Date.now() + waitMs;
   while (Date.now() < deadline) { l = leaderState({ env }); if (l.fresh) break; await sleep(3000); }

@@ -262,7 +262,8 @@ test('--once lists and reconciles every non-off controller once, in shadow unles
   const one = await e.once({ controller: 'gc', key: 'gc:x' });
   assert.deepEqual(one.controllers.map((c) => [c.name, c.keys, c.ok]), [['gc', 1, 1]], 'a named controller runs even when off');
 
-  const cli = spawnSync(process.execPath, [path.join(ROOT, 'scripts', 'reconciler', 'engine.mjs'), '--once', '--json'],
+  // one named controller: the gc controller's real sweep (a child over every lane worktree and Orca terminal) takes minutes on a real host
+  const cli = spawnSync(process.execPath, [path.join(ROOT, 'scripts', 'reconciler', 'engine.mjs'), '--once', '--controller', 'learning', '--json'],
     { cwd: ROOT, encoding: 'utf8', windowsHide: true, timeout: 120000, env: { ...st.env, STARCI_CONNECTORS_OFF: '1' } });
   assert.equal(cli.status, 0, cli.stderr);
   const out = JSON.parse(cli.stdout.trim().split(/\r?\n/).pop());
