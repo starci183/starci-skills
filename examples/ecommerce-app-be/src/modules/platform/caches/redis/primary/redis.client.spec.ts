@@ -1,10 +1,15 @@
 import {
     Test, TestingModule 
 } from "@nestjs/testing"
-import Redis from "ioredis"
 import {
-    AppConfigService 
-} from "@modules/platform/config/identity/app-config.service"
+    mock 
+} from "@starci/jest-preset/mock"
+import {
+    Clock 
+} from "@modules/platform/clock/index"
+import {
+    IdentityConfigService 
+} from "@modules/platform/config/index"
 import {
     RedisPrimaryClient 
 } from "./redis.client"
@@ -46,19 +51,32 @@ interface FakeRedis {
   quit: jest.Mock;
 }
 
+/** A clock that moves 500ms on every read, so the client's readiness deadline passes after a few polls instead of after real seconds. */
+class TickingClock extends Clock {
+    private elapsedMs = 0
+
+    now(): Date {
+        this.elapsedMs += 500
+        return new Date(this.elapsedMs)
+    }
+}
+
 describe("RedisPrimaryClient - the session store handle",
     () => {
         const instances = (): Array<FakeRedis> =>
-            (Redis as unknown as { instances: Array<FakeRedis> }).instances
+            jest.requireMock<{ default: { instances: Array<FakeRedis> } }>("ioredis").default.instances
 
         const boot = async (url = "redis://localhost:6448/0") => {
             const moduleRef: TestingModule = await Test.createTestingModule({
                 providers: [
                     RedisPrimaryClient,
                     {
-                        provide: AppConfigService, useValue: {
+                        provide: IdentityConfigService, useValue: mock<IdentityConfigService>({
                             getRedisUrl: () => url 
-                        } 
+                        })
+                    },
+                    {
+                        provide: Clock, useValue: new TickingClock() 
                     },
                 ],
             }).compile()
@@ -169,8 +187,7 @@ describe("RedisPrimaryClient - the session store handle",
                 } finally {
                     await moduleRef.close()
                 }
-            },
-            10000)
+            })
 
         it("fails immediately on a closed connection instead of waiting out the deadline",
             async () => {

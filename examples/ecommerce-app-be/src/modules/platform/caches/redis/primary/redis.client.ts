@@ -3,6 +3,9 @@ import {
 } from "@nestjs/common"
 import Redis from "ioredis"
 import {
+    Clock 
+} from "ecommerce-app-be/modules/platform/clock"
+import {
     AppConfigService 
 } from "ecommerce-app-be/modules/platform/config/identity"
 import {
@@ -25,7 +28,7 @@ export type RedisLookupResult = string | null
 export class RedisPrimaryClient {
     private readonly redis: Redis
 
-    constructor(config: AppConfigService) {
+    constructor(config: AppConfigService, private readonly clock: Clock) {
         this.redis = new Redis(config.getRedisUrl(),
             {
                 lazyConnect: true, maxRetriesPerRequest: 1 
@@ -79,7 +82,7 @@ export class RedisPrimaryClient {
 
     private async whenSettled(): Promise<void> {
         const timeoutMs = 1500
-        const deadline = Date.now() + timeoutMs
+        const deadline = this.clock.now().getTime() + timeoutMs
         for (;;) {
             if (this.redis.status === "ready") return
             if (this.redis.status === "end" || this.redis.status === "close") {
@@ -87,7 +90,7 @@ export class RedisPrimaryClient {
                     message: `Redis connection is ${this.redis.status}.` 
                 })
             }
-            if (Date.now() >= deadline) {
+            if (this.clock.now().getTime() >= deadline) {
                 throw new RedisConnectionException({
                     message: `Redis did not become ready within ${timeoutMs}ms (status ${this.redis.status}).` 
                 })
