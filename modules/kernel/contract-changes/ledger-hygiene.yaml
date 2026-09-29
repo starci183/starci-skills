@@ -1,0 +1,44 @@
+id: ledger-hygiene
+effectiveAt: '2026-09-30T21:00:00+07:00'
+summary: >-
+  Ledger-state hygiene (COOK-BRIEF F4 handover, incident 2026-09-30: ad-hoc debug probes under the OS temp dir
+  leaked six fake-worker ledgers with workflows stuck "running" into the real %LOCALAPPDATA%/StarCi). One override
+  env var, STARCI_LOCAL_ROOT, replaces the per-host state base for a whole process tree; engine/machine-db.mjs
+  starciLocalRoot is its one definition, and engine/ledger-db.mjs projectsRootFor now calls it instead of its own
+  duplicate LOCALAPPDATA lookup, so machine.sqlite and every project's runtime.sqlite move together. The
+  claude-debug skill (section 5, hard rules) requires every probe or debug script that creates a throwaway repo or
+  ledger to set it and clear it on exit. Two new Vietnamese-catalogued findings: LEDGER_ORPHAN_STATE_ROOT (a
+  registered, non-retired ledger whose every bound repository — machine.sqlite `repositories`, falling back to the
+  ledger's own repo_root — is under the OS temp dir, gone, or absent) and LEDGER_LEGACY_WORK_SQLITE (a bound
+  repository that still has an in-repo .starciwork/runtime.sqlite from before decision Q1). Both are implemented
+  once in scripts/lib/hk-orphan-ledgers.mjs and consumed by three surfaces that used to duplicate or only partly
+  cover this: the `/start --check` preflight (scripts/reconciler/start.mjs, previously an inline, single-repo-root
+  loop with no Vietnamese code), the housekeeping sweep's new `orphanledgers` area
+  (`node scripts/supervisor/housekeeping.mjs --only orphanledgers [--apply]`), and the standalone
+  `node scripts/checks/ledger-hygiene.mjs [--apply] [--json]`, also surfaced through `hfs work-hygiene`
+  (packages/hfs/sync/hygiene.mjs) when that package runs from inside its own full runtime checkout. `--apply` only
+  ever MOVES an orphan ledger's directory to <stateRoot>/archive/orphan-ledgers/<date>/<id>/ (never deletes) and
+  retires its row through the one writer, engine/machine-db.mjs setLedgerState; a legacy in-repo store is report
+  only everywhere — nothing in this change deletes a file inside a product repository, ever (owner ruling: no
+  backward compatibility, no legacy; the owner removes those files by hand once satisfied).
+reach: new-legs
+paths:
+  - modules/kernel/contract-changes/ledger-hygiene.yaml
+  - modules/kernel/failure-codes.yaml
+  - engine/machine-db.mjs
+  - engine/ledger-db.mjs
+  - scripts/lib/hk-orphan-ledgers.mjs
+  - scripts/checks/ledger-hygiene.mjs
+  - scripts/checks/failure-codes.not-codes
+  - scripts/reconciler/start.mjs
+  - scripts/supervisor/housekeeping.mjs
+  - scripts/lib/hk-logs.mjs
+  - packages/hfs/sync/hygiene.mjs
+  - skills/claude-debug/SKILL.md
+  - docs/ledger-db.md
+  - docs/architecture.md
+  - tests/machine-registry-isolation.spec.mjs
+  - tests/hk-orphan-ledgers.spec.mjs
+  - tests/ledger-hygiene-cli.spec.mjs
+  - tests/housekeeping.spec.mjs
+  - tests/hfs-sync.spec.mjs

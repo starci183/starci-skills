@@ -1,7 +1,8 @@
 #!/usr/bin/env node
 // housekeeping.mjs — the ONE host housekeeping run of the live runtime (item 1 of the storage spec): keeps C:
 // and RAM bounded by sweeping the things nobody else removes — %TEMP% fixtures, agent session archives, Claude
-// Code transcripts, Devin data, StarCi logs, finished-workflow ledgers.
+// Code transcripts, Devin data, StarCi logs, finished-workflow ledgers, orphan ledgers (a debug probe's throwaway
+// repo left registered in the live state root).
 //
 //   node scripts/supervisor/housekeeping.mjs [--dry-run] [--apply] [--json] [--only tmp,sessions,...]
 //
@@ -35,6 +36,7 @@ export const AREAS = Object.freeze({
   lanes: { module: '../lib/hk-lanes.mjs', sweep: 'sweepLanes' },
   gitlocks: { module: '../lib/hk-git-locks.mjs', sweep: 'sweepGitLocks' },
   ledgers: { module: '../lib/hk-ledger.mjs', sweep: 'sweepLedgers' },
+  orphanledgers: { module: '../lib/hk-orphan-ledgers.mjs', sweep: 'sweepOrphanLedgers' },
 });
 export const AREA_NAMES = Object.freeze(Object.keys(AREAS));
 

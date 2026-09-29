@@ -347,7 +347,7 @@ describe('work-hygiene', () => {
       ['.starcistacks/dev/infra/tls.pem', 'HFS_STACKS_PLAINTEXT'],
     ]);
   });
-  it('asks git which .starciwork files the generated allowlist ignores', t => {
+  it('asks git which .starciwork files the generated allowlist ignores', async t => {
     const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'hfs-hygiene-'));
     t.after(() => fs.rmSync(dir, { recursive: true, force: true }));
     const git = (...args) => execFileSync('git', args, { cwd: dir, stdio: 'ignore' });
@@ -358,10 +358,22 @@ describe('work-hygiene', () => {
     fs.writeFileSync(path.join(dir, '.starciwork', 'features', 'login', 'evidence', 'run.log'), 'log\n');
     git('add', '-f', '.starciwork');
     const lines = [];
-    assert.equal(runWorkHygiene({ cwd: dir, out: line => lines.push(line) }), 1);
+    assert.equal(await runWorkHygiene({ cwd: dir, out: line => lines.push(line) }), 1);
     assert.match(lines[0], /^HFS_WORK_AGENT_DATA \.starciwork\/features\/login\/evidence\/run\.log/);
     git('rm', '-q', '--cached', '.starciwork/features/login/evidence/run.log');
-    assert.equal(runWorkHygiene({ cwd: dir, out: () => {} }), 0);
+    assert.equal(await runWorkHygiene({ cwd: dir, out: () => {} }), 0);
+  });
+  it('reports the state-root ledger findings when run from inside a full runtime checkout, and stays silent standalone', async t => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'hfs-hygiene-ledger-'));
+    t.after(() => fs.rmSync(dir, { recursive: true, force: true }));
+    execFileSync('git', ['init', '-q'], { cwd: dir, stdio: 'ignore' });
+    // No sibling scripts/checks/ledger-hygiene.mjs three levels up from this temp dir: the section is silently absent.
+    const lines = [];
+    assert.equal(await runWorkHygiene({ cwd: dir, out: line => lines.push(line) }), 0);
+    assert.ok(!lines.some(line => /LEDGER_(ORPHAN_STATE_ROOT|LEGACY_WORK_SQLITE)/.test(line)));
+    // Run from the real checkout (this repo IS the runtime): the section runs and never throws, whatever it finds.
+    const inRepo = [];
+    await runWorkHygiene({ cwd: ROOT, out: line => inRepo.push(line), files: [] });
   });
 });
 
