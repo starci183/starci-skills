@@ -43,19 +43,35 @@ export function reconcilerNumbers({ allocation = null } = {}) {
 }
 
 /**
- * config.yaml `reconciler`: {enabled, controllers: {<name>: {mode}}}. An absent block, an unreadable config or an
- * unknown mode reads as off. Never throws.
+ * The operational profile (owner 2026-09-29): what `start` needs of the engine. job settles and dispatches, host brings
+ * services and seats up, workflow wakes stalled workflows, resource throttles; gc, fleet and learning stay shadow unless
+ * config.yaml says otherwise. `observe` keeps every controller shadow (read-only). No profile = only the explicit
+ * controllers.<name>.mode entries count (an unnamed controller is off).
+ */
+export const PROFILES = Object.freeze({
+  operational: Object.freeze({ job: 'active', host: 'active', workflow: 'active', resource: 'active', gc: 'shadow', fleet: 'shadow', learning: 'shadow' }),
+  observe: Object.freeze({ job: 'shadow', host: 'shadow', workflow: 'shadow', resource: 'shadow', gc: 'shadow', fleet: 'shadow', learning: 'shadow' }),
+});
+/** The controllers `start` needs active: those the operational profile runs active. */
+export const REQUIRED_ACTIVE = Object.freeze(Object.entries(PROFILES.operational).filter(([, m]) => m === 'active').map(([n]) => n));
+
+/**
+ * config.yaml `reconciler`: {enabled, profile, controllers: {<name>: {mode}}}. The profile (when named) supplies the
+ * default mode of every controller; an explicit controllers.<name>.mode overrides it. An absent block, an unreadable
+ * config or an unknown mode reads as off. Never throws.
  */
 export function reconcilerConfig({ config = undefined } = {}) {
   let cfg = config;
   if (cfg === undefined) { try { cfg = loadConfig(); } catch { cfg = null; } }
   const block = cfg?.reconciler ?? null;
+  const profile = Object.hasOwn(PROFILES, block?.profile) ? block.profile : null;
   const controllers = {};
+  for (const [name, mode] of Object.entries(profile ? PROFILES[profile] : {})) controllers[name] = { mode };
   for (const [name, value] of Object.entries(block?.controllers ?? {})) {
     const mode = value?.mode;
     controllers[name] = { mode: MODES.includes(mode) ? mode : 'off' };
   }
-  return { enabled: block?.enabled === true, controllers };
+  return { enabled: block?.enabled === true, profile, controllers };
 }
 
 /** The configured mode of one controller ('off' when unnamed). */

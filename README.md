@@ -127,7 +127,7 @@ scripts/            executables — kernel/api.mjs, kernel/start-workflow.mjs, g
 bin/starci.mjs      thin CLI: init | update | doctor | version | api | start | goal | validate
 modules/host/       per-host contracts — orca call surface (data only)
 skills/             user-facing skills — define-goal, start-kernel, workflow-chat,
-                    restart, run-assisted-uat, orca-cli, orchestration, computer-use
+                    start (restart is an alias), run-assisted-uat, orca-cli, orchestration, computer-use
 init/               AGENTS.md bootstrap template
 knowledge/          authored YAML doctrine the checks and skills cite
 benchmark/          model-pool evidence: expectations.yaml, append-only snapshots/, findings/

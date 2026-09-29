@@ -11,6 +11,7 @@
 //                                                       Telegram (stall-alert.mjs ownerPush) and the engine starts --safe.
 //   node scripts/reconciler/boot.mjs --restart          stop the engine (if any), then ensure
 //   node scripts/reconciler/boot.mjs --status [--json]  leader, epoch, heartbeat age, modes, queue depth, open violations
+//   node scripts/reconciler/boot.mjs up [start.mjs flags]  the `start` skill: bring everything up and print one checklist (start.mjs)
 //   node scripts/reconciler/boot.mjs --install-task [--apply]
 //                                                       print (default) or create the task StarCi-Reconciler: at logon and
 //                                                       every 5 minutes, conhost --headless, IgnoreNew, below-normal. Only
@@ -39,6 +40,15 @@ const selfFile = fileURLToPath(import.meta.url);
 /** Kinds of the machine_logs rows boot.mjs writes (actor reconciler). */
 export const SPAWNED_KIND = 'reconciler.engine-spawned';
 export const CRASH_ALERT_KIND = 'reconciler.crash-loop-alert';
+/**
+ * Starts that are decisions, not crashes: an owner restart (`--restart`, `start`), a self-reload or land re-exec handover,
+ * and a restart after the previous engine ended cleanly. They never count toward the crash-loop guard; only abnormal
+ * exits (a hung or dead engine that ensure had to replace) do.
+ */
+export const PLANNED_START_REASONS = Object.freeze(['owner-restart', 'start', 'self-reload', 'reload', 'handover', 'planned-restart']);
+/** process_runs.exit_reason values of an engine that ended on purpose. */
+export const PLANNED_EXIT_REASONS = Object.freeze(['clean', 'stopped', 'reload-handover']);
+export const isPlannedStart = (reason) => PLANNED_START_REASONS.includes(String(reason ?? ''));
 
 /**
  * The leader as machine.sqlite tells it (engine_leader + its process_runs row): {holder, pid, epoch, heartbeatAt, ageMs,
@@ -57,6 +67,7 @@ export function leaderState({ env = process.env, now = Date.now(), numbers = rec
   return {
     holder: row?.holder ?? null, pid: row?.pid ?? null, epoch: row?.epoch ?? null, heartbeatAt, ageMs,
     expiresAt: row?.expires_at ?? null, rev: row?.rev ?? null, safe: run?.start_reason === 'crash-restart', runId: run?.run_id ?? null,
+    exitReason: run?.exit_reason ?? null, killedBy: run?.killed_by ?? null, startReason: run?.start_reason ?? null,
     draining: Number(row?.draining) === 1 || (run != null && run.ended_at == null && run.draining_since != null), pushRunning,
     fresh: ageMs != null && ageMs < numbers.heartbeatStaleMs,
   };
@@ -65,7 +76,10 @@ export function leaderState({ env = process.env, now = Date.now(), numbers = rec
 /** The crash-loop record from machine_logs: {starts: [spawn ms], alertedAt}. */
 export function crashLoopRecord({ env = process.env, now = Date.now(), windowMs = 1_800_000 } = {}) {
   return readMachine((m) => ({
-    starts: m.logs({ actor: 'reconciler', kind: SPAWNED_KIND, limit: 200 }).map((r) => Number(r.at)).filter((t) => now - t < windowMs).sort((a, b) => a - b),
+    starts: m.logs({ actor: 'reconciler', kind: SPAWNED_KIND, limit: 200 })
+      // A planned start (owner restart, reload handover, restart after a clean exit) is not a crash; older rows carry the reason in msg only.
+      .filter((r) => !isPlannedStart(r.data?.startReason ?? /\((\S+?)[,)]/.exec(String(r.msg ?? ''))?.[1]))
+      .map((r) => Number(r.at)).filter((t) => now - t < windowMs).sort((a, b) => a - b),
     alertedAt: m.logs({ actor: 'reconciler', kind: CRASH_ALERT_KIND, limit: 1 })[0]?.at ?? null,
   }), { starts: [], alertedAt: null }, { env });
 }
@@ -107,7 +121,7 @@ async function pushOwner(text, { env = process.env } = {}) {
  * Seams: leader, spawnOne, stop, push, alive. Returns {ok, action, ...}.
  */
 export async function ensure({ env = process.env, now = Date.now(), numbers = reconcilerNumbers(), leader = () => leaderState({ env, now, numbers }),
-  spawnOne = (opts) => spawnEngine({ ...opts, env }), stop = (pid) => stopTree(pid), push = (text) => pushOwner(text, { env }),
+  spawnOne = (opts) => spawnEngine({ ...opts, env }), reason = null, stop = (pid) => stopTree(pid), push = (text) => pushOwner(text, { env }),
   alive = pidAlive, lock = () => lockHolder('reconciler', env), starting = () => startingHolder('reconciler', env),
   record = (fn) => recordBoot(fn, { env }), starts = () => crashLoopRecord({ env, now, windowMs: numbers.crashLoop.windowMs }) } = {}) {
   const l = leader();
@@ -139,12 +153,33 @@ export async function ensure({ env = process.env, now = Date.now(), numbers = re
       : `URGENT: the StarCi reconciler restarted ${plan.starts.length + 1} times in ${minutes} minutes; running in safe mode (read-only). See machine_logs actor reconciler (boot.mjs --status).`));
     record((m) => m.log({ actor: 'reconciler', kind: CRASH_ALERT_KIND, level: 'error', msg: `crash loop: ${plan.starts.length + 1} starts in ${minutes} min; safe mode`, data: { starts: plan.starts, alert: out.alert ?? null }, at: now }));
   }
-  const startReason = safe ? 'crash-restart' : l.holder ? 'ensure-stale-heartbeat' : 'boot';
+  // A caller-named reason (owner-restart, start) or a previous engine that ended on purpose is a planned start: never a crash.
+  const planned = reason ?? (PLANNED_EXIT_REASONS.includes(l.exitReason) || l.killedBy === 'owner' ? 'planned-restart' : null);
+  const startReason = safe ? 'crash-restart' : planned ?? (l.holder ? 'ensure-stale-heartbeat' : 'boot');
   const pid = spawnOne({ safe, startReason });
   if (pid) markStarting('reconciler', pid, env);
   record((m) => m.log({ actor: 'reconciler', kind: SPAWNED_KIND, level: pid ? 'info' : 'error', msg: `boot ensure ${pid ? `started the engine pid ${pid}` : 'could not start the engine'} (${startReason}${safe ? ', safe' : ''})`,
     data: { pid, safe, startReason, previous: l.pid ?? null, staleMs: l.ageMs ?? null }, at: now }));
   return { ...out, ok: Boolean(pid), pid, safe, startReason, ...(pid ? {} : { action: 'start-failed' }) };
+}
+
+/**
+ * Owner restart: stop the engine (if any), then ensure. The stop ends the engine's run `killed` by the owner and releases
+ * its epoch `killed`; the new start is `owner-restart` (a planned start: never counted toward the crash-loop guard).
+ * Seams: ensure options (leader, spawnOne, ...), stop, record.
+ */
+export async function restartEngine({ env = process.env, reason = 'owner-restart', stop = (pid) => stopTree(pid), ...seams } = {}) {
+  const held = lockHolder('reconciler', env);
+  const l = leaderState({ env });
+  const killed = [held?.pid, l.pid && l.pid !== held?.pid && pidAlive(l.pid) ? l.pid : null].filter(Boolean);
+  for (const pid of killed) stop(pid);
+  // G1/G2: an owner restart ends the engine's run `killed` by the owner and releases its epoch `killed`.
+  recordBoot((m) => m.transaction(() => {
+    for (const run of m.openProcessRuns({ role: 'engine' }).filter((r) => killed.includes(r.pid))) m.endProcessRun(run.run_id, { exitReason: 'killed', killedBy: 'owner' });
+    const row = m.leaderOf(LEADER_NAME);
+    if (row && killed.includes(row.pid)) m.releaseLeader({ name: LEADER_NAME, epoch: row.epoch, reason: 'killed' });
+  }), { env });
+  return ensure({ env, leader: () => ({ ...leaderState({ env }), fresh: false }), lock: () => null, starting: () => null, reason, ...seams });
 }
 
 /** --status: {leader, modes: {name: {configured, effective, setBy}}, queue, violations, actions, starts24h, stateFile}. */
@@ -220,19 +255,10 @@ async function main(argv = process.argv.slice(2)) {
     console.log(json ? JSON.stringify(s) : describeStatus(s));
     return;
   }
+  if (argv.includes('--up') || argv[0] === 'up') { const { main: start } = await import('./start.mjs'); await start(argv.filter((a) => a !== '--up' && a !== 'up')); return; }
   if (argv.includes('--install-task')) { installTask({ apply: argv.includes('--apply'), json }); return; }
   if (argv.includes('--restart')) {
-    const held = lockHolder('reconciler');
-    const l = leaderState();
-    const killed = [held?.pid, l.pid && l.pid !== held?.pid && pidAlive(l.pid) ? l.pid : null].filter(Boolean);
-    for (const pid of killed) stopTree(pid);
-    // G1/G2: an owner restart ends the engine's run `killed` by the owner and releases its epoch `killed`.
-    recordBoot((m) => m.transaction(() => {
-      for (const run of m.openProcessRuns({ role: 'engine' }).filter((r) => killed.includes(r.pid))) m.endProcessRun(run.run_id, { exitReason: 'killed', killedBy: 'owner' });
-      const row = m.leaderOf(LEADER_NAME);
-      if (row && killed.includes(row.pid)) m.releaseLeader({ name: LEADER_NAME, epoch: row.epoch, reason: 'killed' });
-    }));
-    const r = await ensure({ leader: () => ({ ...leaderState(), fresh: false }), lock: () => null, starting: () => null });
+    const r = await restartEngine();
     console.log(json ? JSON.stringify(r) : `[reconciler boot] restart: ${r.action} pid ${r.pid ?? '-'}${r.safe ? ' SAFE' : ''}`);
     process.exitCode = r.ok ? 0 : 1;
     return;

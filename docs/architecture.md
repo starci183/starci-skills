@@ -123,10 +123,19 @@ op declared (`declared_exit_code`), and only the raw one decides a verdict.
 
 `scripts/reconciler/engine.mjs` is the one host runtime loop. The scheduled task
 `StarCi-Reconciler` runs `scripts/reconciler/boot.mjs ensure` at logon and periodically;
-`boot.mjs --restart` is the restart entry. Every engine start, exit and cause is a
+`boot.mjs --restart` is the engine-only restart entry; `scripts/reconciler/start.mjs` (the `start` skill) brings the
+whole host up and prints one green/red checklist (see "Start"). Every engine start, exit and cause is a
 `process_runs` row; every leadership epoch is a `leader_history` row. Each controller runs
 `off`, `shadow` or `active` (`controller_modes`, with every change recorded in `mode_changes`
 first). In shadow mode a controller computes and records what it would do and does nothing.
+
+`config.yaml` `reconciler.profile` sets every controller's default mode: `operational` runs Job, Host, Workflow and
+Resource `active` and GC, Fleet and Learning `shadow`; `observe` keeps all of them `shadow`; no profile means only the
+explicit `controllers.<name>.mode` entries count. An explicit entry overrides the profile for that controller. Safe mode
+(`--safe`) forces every controller to `shadow`; it starts only after a real crash loop (more than `crashLoop.max`
+abnormal starts inside `crashLoop.windowMs`). Owner restarts, self-reload and land re-exec handovers, and a restart after
+a clean exit are planned starts (`start_reason` `owner-restart`, `start`, `self-reload`, `planned-restart`) and never
+count.
 
 | Controller | Duties |
 | --- | --- |
@@ -149,6 +158,21 @@ truncated. SLA breaches are `sla_episodes` (append-only); invariant breaches are
 escalates to the Supervisor. The doorbell (`[decide] N items waiting …` typed into an idle seat) is
 only a reminder; every delivery attempt is a `deliveries` row, and a seat that refuses input
 repeatedly is replaced.
+
+### Start
+
+`node scripts/reconciler/start.mjs` (skill `start`; `/restart` is an alias) runs, in order: preflight (Node bundles
+SQLite >= 3.51.3, `machine.sqlite` quick_check, registered ledgers on temp/test paths or with missing files, legacy
+in-repo `.starciwork/runtime.sqlite`, kernel/supervisor pins whose agent card cannot attest the model, Orca reachable);
+applies `reconciler.profile: operational` to `config.yaml` (backup first; `--no-apply-profile` only validates);
+rebuilds `ui/dist` with `npm run build` in `ui/` when any `ui/src`, `ui/package.json`, `ui/index.html` or vite config is
+newer than the build (a failed build is red); starts the engine, or restarts it out of `--safe` when no real crash loop
+is on record; starts every registry service that is down (never Orca); runs `start-supervisor.mjs` (only in
+`supervisor.mode: kernel`) and the Kernel watchdog `--once --repair` of each running workflow. It prints one checklist
+(text, or `--json`) of the engine leader and heartbeat, safe mode, each controller against the profile, each service
+(harness UI local and public `/healthz`, tunnels, Telegram, ask gateway), the Supervisor seat, each running workflow's
+Kernel seat, open violations and the preflight rows, and exits 0 only when every required row is green. `--check`
+changes nothing.
 
 ## Ownership
 

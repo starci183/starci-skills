@@ -67,7 +67,8 @@ The Host controller proves a seat dead before replacing it; an Orca outage is
 not death. After reboot, the `StarCi-Reconciler` task invokes
 `scripts/reconciler/boot.mjs ensure` and the Host controller restores the seat.
 `node scripts/reconciler/boot.mjs --restart` restarts the engine and runs the
-Host boot phase. The GC controller runs `scripts/supervisor/housekeeping.mjs`
+Host boot phase; `node scripts/reconciler/start.mjs` (the `start` skill) does that plus the services, the UI build and the
+seats, calls `start-supervisor.mjs` in `supervisor.mode: kernel`, and prints one checklist. The GC controller runs `scripts/supervisor/housekeeping.mjs`
 on its declared cadence; its report is `starci/housekeeping-report@1`.
 
 ## Claude Code updates

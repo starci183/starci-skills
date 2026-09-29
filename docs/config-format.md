@@ -59,6 +59,9 @@ Optional keys:
   the Supervisor seat, optional chat digest cadence and managed product repositories; the reconciler
   Host and Workflow controllers own seat recovery and stall detection ([supervisor](supervisor.md);
   defaults `scripts/supervisor/home.mjs` `DEFAULTS`)
+- `reconciler` — `{enabled?, profile?, controllers?}`: `profile` `operational` (job, host, workflow, resource active; gc, fleet,
+  learning shadow) or `observe` (all shadow) sets every controller's default mode; `controllers.<name>.mode`
+  (`off|shadow|active`) overrides one. The `start` skill applies and checks `operational` (docs/architecture.md "The reconciler")
 - `delegation` — `{asks, until, excludes?, note?}` or null: a named delegate answers owner asks until `until`;
   the excluded classes stay owner-only
 - `asks` — `{autoAcceptRecommended?, excludes?}` or null: answer an ask that carries a recommended option with

@@ -169,11 +169,18 @@ uat:
 # reconciler — the host's one reconciler engine (scripts/reconciler/engine.mjs; contract
 # modules/reconciler/reconciler.yaml). Each controller runs off | shadow (reads, records what it would do as
 # reconciler.would rows, runs nothing) | active (acts; the old loop yields that duty via scripts/reconciler/owns.mjs).
+# profile — the operational default of every controller, so a host is never left all-shadow by accident:
+#   operational  job, host, workflow, resource active (they settle jobs, start services and seats, wake stalled
+#                workflows, throttle); gc, fleet, learning shadow. The `start` skill applies and checks it.
+#   observe      every controller shadow (read-only; a debugging or audit host).
+#   (absent)     only the explicit controllers.<name>.mode entries count; an unnamed controller is off.
+# controllers.<name>.mode overrides the profile for that one controller (e.g. gc: {mode: active}).
 # Rollback of a controller: set its mode to off (the old loops take the duty back within
 # allocation.reconciler.heartbeatStaleMs). Numbers: modules/models/runtimes.yaml allocation.reconciler.
 reconciler:
   enabled: true
-  controllers: {job: {mode: shadow}, host: {mode: shadow}, gc: {mode: shadow}, resource: {mode: shadow}, workflow: {mode: shadow}, fleet: {mode: shadow}, learning: {mode: shadow}}
+  profile: operational
+  controllers: {}
 # specs.unit / specs.e2e in workflows (the `specs` map near the top; owner 2026-09-28 "speed up development;
 # test later when asked"; scripts/kernel/spec-deferral.mjs). Each op brief's policy.specsToggle says what it does:
 #   unit: false - backend.implement, interface.implement and code.refactor run no jest/vitest/test:ci/coverage
