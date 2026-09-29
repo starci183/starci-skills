@@ -3,7 +3,7 @@
 // Serialized by a host lock; a change reaches live main only through all of it, or not at all.
 //
 //   node scripts/supervisor/land.mjs --job <jobId> [--specs <csv>] [--no-push] [--notify] [--json]
-//   node scripts/supervisor/land.mjs --commit <sha>[,<sha>...] [--specs <csv|touching|all>] [--lane <name>] [--no-push] [--notify] [--json]
+//   node scripts/supervisor/land.mjs --commit <sha>[,<sha>...] [--specs <csv|touching|direct|all>] [--lane <name>] [--no-push] [--notify] [--json]
 //   node scripts/supervisor/land.mjs --status [--json]
 //
 // 1. The land queue in machine.sqlite (engine/machine-db.mjs land_queue): each waiter files a ticket and only the
@@ -22,7 +22,8 @@
 //      check-module-yaml, check-contract-cites, check-api-surface, check-db-openers (red only when red on the candidate and not
 //        the same on main, so a lane's pre-existing breakage never blocks an unrelated land);
 //      the specs named by the worker/--specs plus every spec that names a changed file (node --test,
-//        --test-concurrency allocation.landGate.specConcurrency, timeout specsBaseMs + perSpecMs per spec) -
+//        --test-concurrency allocation.landGate.specConcurrency, timeout specsBaseMs + perSpecMs per spec; `--specs direct` keeps the
+//        specs that can see the change instead: land-specs.mjs, hub files narrowed to the exports the diff reaches) -
 //        only while config.yaml `specs.harness` is true (the default). With `specs.harness: false` (owner, 2026-09-28) the gate
 //        runs NO spec unless the land asks: --specs <csv> runs those, --specs touching the old set (named plus
 //        every spec naming a changed file), --specs all every tests/*.spec.mjs (engine/config.mjs harnessSpecsEnabled);
@@ -34,6 +35,9 @@
 //        gates as main and as the candidate have them over the latest accepted leg of every live workflow
 //        (scripts/supervisor/gate-stability.mjs, read-only) and reports how many would flip - so the Supervisor
 //        decides when to api contract-release it.
+// 3b. git health: a repo whose shared config says core.bare=true fails every work-tree operation ("this operation must be run
+//    in a work tree"); that is refused as `git-unusable` (before the queue and before each scratch), and a cherry-pick that fails
+//    without unmerged files is `git-failed`, never `conflict`. Each attempt owns one scratch-<pid>-<token> worktree it alone removes.
 // 4. Fast-forward live main: main must still be the scratch's base (else the whole gate reruns on the new main,
 //    at most 3 times), the live checkout must be on main and clean for the changed paths; then
 //    `git update-ref refs/heads/main <new> <base>` (compare-and-swap) and a working-tree + index update of just
@@ -47,6 +51,7 @@ import '../lib/hide-child-windows.mjs';
 import fs from 'node:fs';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
+import { randomBytes } from 'node:crypto';
 import { lowerOwnPriority } from '../lib/low-priority.mjs';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { parseYaml } from '../../engine/yaml.mjs';
@@ -61,6 +66,7 @@ import { hostThrottle } from '../lib/ram-throttle.mjs';
 import { grammarDistStatus } from '../checks/grammar-dist.mjs';
 import { CONTRACT_CHANGES_FILE, CONTRACT_CHANGES_DIR, isContractChangesPath, readContractChangesDocAt } from '../kernel/contract-changes-store.mjs';
 import { SKILL_ROOT, landRoot, supervisorSettings } from './home.mjs';
+import { specsDirect, changedExports, headRanges } from './land-specs.mjs';
 
 const selfFile = fileURLToPath(import.meta.url);
 /** The old single-file registry (transition: still read); new entries are files under CONTRACT_CHANGES_DIR. */
@@ -123,7 +129,7 @@ export function specsTouching(changed, { specs }) {
 }
 
 /** --specs keywords: `touching` = the named specs plus every spec naming a changed file; `all` = every spec. */
-export const SPEC_KEYWORDS = Object.freeze(['touching', 'all']);
+export const SPEC_KEYWORDS = Object.freeze(['touching', 'direct', 'all']);
 /**
  * The gate's spec plan. enabled (config.yaml `specs.harness`, default true): named specs plus every spec touching the
  * change, as before. Disabled: nothing unless the land itself asked (`asked`, the --specs of this land): a csv
@@ -133,7 +139,9 @@ export function specPlan({ enabled = true, asked = [], named = [] } = {}) {
   const words = asked.filter((s) => SPEC_KEYWORDS.includes(s));
   const files = [...new Set([...asked.filter((s) => !SPEC_KEYWORDS.includes(s)), ...(enabled ? named : [])])];
   if (words.includes('all')) return { mode: 'all', named: files };
-  if (enabled || words.includes('touching')) return { mode: 'touching', named: files };
+  if (words.includes('touching')) return { mode: 'touching', named: files };
+  if (words.includes('direct')) return { mode: 'direct', named: files };
+  if (enabled) return { mode: 'touching', named: files };
   return files.length ? { mode: 'named', named: files } : { mode: 'none', named: [] };
 }
 
@@ -219,22 +227,51 @@ export function specRunEnv(parent = process.env) {
 }
 const tail = (text, n = 25) => String(text ?? '').trim().split(/\r?\n/).slice(-n).join('\n');
 
+/**
+ * Remove ONE scratch this land made (never another land's: the name carries the pid and a per-attempt token) and drop
+ * its registration. Never throws: a removal that fails is returned (false) and reported by the land, and a scratch
+ * left behind cannot break the next land, whose own scratch has its own name.
+ */
 export function removeScratch(dir, { root }) {
-  // Never remove a scratch whose node_modules link to the live tree is still there.
-  if (!unlinkNodeModulesLink(dir)) return false;
-  // Never `git worktree remove --force`: it follows junctions (nivo-fe inc-c8fbf76aa499). The tree goes
-  // through safeRemoveTree, which never descends into a link; prune drops the registration.
-  if (fs.existsSync(dir)) safeRemoveTree(dir);
-  git(['worktree', 'prune'], { cwd: root });
-  return !fs.existsSync(dir);
+  try {
+    // Never remove a scratch whose node_modules link to the live tree is still there.
+    if (!unlinkNodeModulesLink(dir)) return false;
+    // Never `git worktree remove --force`: it follows junctions (nivo-fe inc-c8fbf76aa499). The tree goes
+    // through safeRemoveTree, which never descends into a link; prune drops the registration.
+    if (fs.existsSync(dir)) safeRemoveTree(dir);
+    git(['worktree', 'prune'], { cwd: root });
+    return !fs.existsSync(dir);
+  } catch { return false; }
+}
+
+/**
+ * git health of `root`: a work-tree operation must work. `core.bare=true` in the SHARED config (2026-09-29 17:21-17:30:
+ * something outside the gate set it, then cleared it) makes `git status` in the live checkout and `git cherry-pick`
+ * in every scratch worktree die with "fatal: this operation must be run in a work tree" - lands 20, 21 and 22 - and the
+ * gate read the cherry-pick failure as a conflict. `git -c core.bare=false` does not help a linked worktree; only the
+ * config does. The gate never edits the live repo's config: it waits a moment for a transient value, then refuses.
+ */
+export function gitHealth({ root = SKILL_ROOT } = {}) {
+  const inside = git(['rev-parse', '--is-inside-work-tree'], { cwd: root });
+  if (inside.ok && inside.stdout === 'true') return { ok: true };
+  const bare = git(['config', '--show-origin', '--get', 'core.bare'], { cwd: root }).stdout;
+  const why = /\btrue$/.test(bare) ? `core.bare=true (${bare.replace(/\s+true$/, '')})` : (inside.stderr || inside.error || `is-inside-work-tree: ${inside.stdout || 'unreadable'}`).slice(0, 200);
+  return { ok: false, detail: why, bare: /\btrue$/.test(bare), hint: /\btrue$/.test(bare) ? `something set core.bare=true on ${root}; run \`git -C ${root} config core.bare false\` (the gate never edits the live repo config), then land again` : `git cannot run a work-tree operation in ${root}; fix that first, then land again` };
+}
+export const GIT_HEALTH_WAIT_MS = 20_000;
+/** gitHealth, retried for a transient value: {ok} or {ok:false, detail, hint, waitedMs}. Seams: check, sleep, now. */
+export function waitGitHealthy({ root = SKILL_ROOT, waitMs = GIT_HEALTH_WAIT_MS, pollMs = 1000, check = gitHealth, sleep = sleepSync, now = Date.now } = {}) {
+  const start = now();
+  let h = check({ root });
+  while (!h.ok && now() - start < waitMs) { sleep(Math.min(pollMs, Math.max(1, waitMs - (now() - start)))); h = check({ root }); }
+  return h.ok ? h : { ...h, waitedMs: now() - start };
 }
 
 function makeScratch({ root, base, env }) {
-  const dir = path.join(landRoot(env), `scratch-${process.pid}`);
+  const dir = path.join(landRoot(env), `scratch-${process.pid}-${Date.now().toString(36)}${randomBytes(2).toString('hex')}`);
   fs.mkdirSync(path.dirname(dir), { recursive: true });
-  removeScratch(dir, { root });
   const added = git(['worktree', 'add', '--detach', dir, base], { cwd: root });
-  if (!added.ok) return { ok: false, error: added.stderr || 'git worktree add failed' };
+  if (!added.ok) { removeScratch(dir, { root }); return { ok: false, error: added.stderr || 'git worktree add failed' }; }
   const nm = path.join(root, 'node_modules');
   try { if (fs.existsSync(nm)) fs.symlinkSync(nm, path.join(dir, 'node_modules'), 'junction'); } catch { /* specs without deps */ }
   try { const cfg = path.join(root, 'config.yaml'); if (fs.existsSync(cfg)) fs.copyFileSync(cfg, path.join(dir, 'config.yaml')); } catch { /* optional */ }
@@ -320,10 +357,21 @@ export function runChecks({ dir, base, head, specs = [], specMode = 'touching', 
         perLeg: report.perLeg.filter((l) => l.flipped || l.newFindings.length).map(({ repo, workflowId, jobId, flipped, newFindings }) => ({ repo, workflowId, jobId, flipped, codes: [...new Set(newFindings.map((f) => f.code))] })) }) });
     }
   } catch (e) { checks.push({ name: 'gate-stability', ok: true, advisory: true, error: String(e?.message ?? e).slice(0, 300) }); }
-  const pool = specMode === 'touching' || specMode === 'all' ? readSpecs(dir) : [];
-  const extra = specMode === 'all' ? pool.map((s) => s.file) : specMode === 'touching' ? specsTouching(changed, { specs: pool }) : [];
+  const pool = ['touching', 'direct', 'all'].includes(specMode) ? readSpecs(dir) : [];
+  let narrowed = [];
+  const symbolsOf = (file) => {
+    const row = rows.find((r) => normPath(r[r.length - 1]) === file);
+    if (!row || row[0] !== 'M' || !/.mjs$/.test(file)) return { symbols: null, why: row?.[0] !== 'M' ? `status ${row?.[0] ?? '?'}` : 'not a .mjs file' };
+    const diff = git(['diff', '-U0', '--no-color', `${base}..${head}`, '--', file], { cwd: dir });
+    const source = git(['show', `${head}:${file}`], { cwd: dir });
+    return diff.ok && source.ok ? changedExports({ source: source.stdout, ranges: headRanges(diff.stdout) }) : { symbols: null, why: 'diff unreadable' };
+  };
+  let extra = [];
+  if (specMode === 'all') extra = pool.map((s) => s.file);
+  else if (specMode === 'touching') extra = specsTouching(changed, { specs: pool });
+  else if (specMode === 'direct') { const d = specsDirect(changed, { specs: pool, symbolsOf }); extra = d.files; narrowed = d.narrowed; }
   const allSpecs = specMode === 'none' ? [] : [...new Set([...specs.map(normPath), ...extra])].filter((f) => fs.existsSync(path.join(dir, f)));
-  if (specMode === 'none') checks.push({ name: 'specs skipped', ok: true, advisory: true, output: 'config.yaml specs.harness: false - no spec runs unless the land asks (--specs <csv|touching|all>)' });
+  if (specMode === 'none') checks.push({ name: 'specs skipped', ok: true, advisory: true, output: 'config.yaml specs.harness: false - no spec runs unless the land asks (--specs <csv|touching|direct|all>)' });
   const missing = specs.map(normPath).filter((f) => !fs.existsSync(path.join(dir, f)));
   if (missing.length) checks.push({ name: 'named specs exist', ok: false, output: `missing: ${missing.join(', ')}` });
   const gate = runSpecs && allSpecs.length ? ramGate() : null;
@@ -337,6 +385,7 @@ export function runChecks({ dir, base, head, specs = [], specMode = 'touching', 
     const r = run(process.execPath, [...importArgs, '--test', `--test-concurrency=${gate?.concurrency || specConcurrency()}`, ...allSpecs], { cwd: dir, timeout: specTimeoutMs(allSpecs.length), env });
     checks.push({ name: `specs (${allSpecs.length})`, ok: r.ok, specs: allSpecs, output: tail(r.stdout + r.stderr, r.ok ? 6 : 40) });
   }
+  if (narrowed.length) checks.push({ name: 'specs direct: hub files', ok: true, advisory: true, narrowed, output: narrowed.map((n) => `${n.file}: ${n.importers} importing specs, kept ${n.kept}${n.symbols ? ` (exports reached: ${n.symbols.join(', ') || 'none'})` : ` (${n.why}: every importer kept)`}`).join('; ') });
   return { ok: checks.every((c) => c.ok), checks, changed, rows, specs: allSpecs };
 }
 
@@ -462,9 +511,12 @@ export function rebuildLandedGrammar({ root = SKILL_ROOT, changed = [] } = {}) {
  */
 export function landCommits({ commits, specs = [], specMode = 'touching', root = SKILL_ROOT, env = process.env, push = true, deps = {} }) {
   const check = deps.runChecks ?? runChecks;
-  const result = { ok: false, commits, attempts: [] };
+  // cleanup is shared by reference with every result below: a scratch this land could not remove shows in it.
+  const result = { ok: false, commits, attempts: [], cleanup: { left: [] } };
   for (let attempt = 1; attempt <= MAX_MAIN_RETRIES; attempt += 1) {
     const base = git(['rev-parse', 'refs/heads/main'], { cwd: root }).stdout;
+    const health = (deps.gitHealth ?? waitGitHealthy)({ root });
+    if (!health.ok) return { ...result, base, reason: 'git-unusable', detail: health.detail, hint: health.hint };
     const scratch = makeScratch({ root, base, env });
     if (!scratch.ok) return { ...result, reason: 'scratch-failed', detail: scratch.error };
     const step = { attempt, base };
@@ -473,11 +525,20 @@ export function landCommits({ commits, specs = [], specMode = 'touching', root =
       if (!deps.runChecks) for (const script of TREE_CHECKS) baseline[script] = treeCheck(scratch.dir, script);
       const pick = git(['cherry-pick', '--allow-empty', '--keep-redundant-commits', ...commits], { cwd: scratch.dir });
       if (!pick.ok) {
-        const stopped = /could not apply ([0-9a-f]{7,40})/.exec(pick.stderr || pick.stdout)?.[1] ?? null;
+        const said = pick.stderr || pick.stdout || pick.error || '';
+        const stopped = /could not apply ([0-9a-f]{7,40})/.exec(said)?.[1] ?? null;
         const conflicts = pickConflicts(scratch.dir, stopped);
         git(['cherry-pick', '--abort'], { cwd: scratch.dir });
+        // A conflict is unmerged files (or git saying so). Anything else is git failing, and it is reported as that: a
+        // broken repo (core.bare) must never read as "rebase your lane" (runs 21 and 22, 2026-09-29).
+        if (!conflicts.length && !/CONFLICT|could not apply|after resolving the conflicts/i.test(said)) {
+          const again = (deps.gitHealth ?? gitHealth)({ root });
+          if (!again.ok) { result.attempts.push({ ...step, reason: 'git-unusable' }); return { ...result, base, reason: 'git-unusable', detail: again.detail, hint: again.hint }; }
+          result.attempts.push({ ...step, reason: 'git-failed' });
+          return { ...result, base, reason: 'git-failed', detail: tail(said, 12), hint: 'git itself failed applying the commit(s); this is not a content conflict, so do not rebase: land again, and if it repeats read the detail' };
+        }
         result.attempts.push({ ...step, reason: 'conflict' });
-        return { ...result, base, reason: 'conflict', detail: tail(pick.stderr || pick.stdout, 12), conflicts, hint: conflictHint(conflicts, stopped) };
+        return { ...result, base, reason: 'conflict', detail: tail(said, 12), conflicts, hint: conflictHint(conflicts, stopped) };
       }
       const head = git(['rev-parse', 'HEAD'], { cwd: scratch.dir }).stdout;
       // The pick changes nothing: main already carries the change (a re-land of a landed commit).
@@ -506,7 +567,7 @@ export function landCommits({ commits, specs = [], specMode = 'touching', root =
       }
       if (push) landed.push = (deps.push ?? pushLive)({ root });
       return landed;
-    } finally { removeScratch(scratch.dir, { root }); }
+    } finally { if (!removeScratch(scratch.dir, { root })) result.cleanup.left.push(scratch.dir); }
   }
   return { ...result, reason: 'main-moving', detail: `main moved under the gate ${MAX_MAIN_RETRIES} times` };
 }
@@ -550,7 +611,7 @@ export function acquireLand({ env = process.env, waitMs = LAND_WAIT_MS, pollMs =
   } catch (error) { process.removeListener('exit', drop); drop(); throw error; }
 }
 
-const landResultOf = (r) => (r.ok ? 'passed' : r.reason === 'conflict' ? 'conflict' : ['dirty', 'not-on-main', 'live-not-on-main', 'main-moved', 'gate-busy'].includes(r.reason) ? 'refused' : 'failed');
+const landResultOf = (r) => (r.ok ? 'passed' : r.reason === 'conflict' ? 'conflict' : ['dirty', 'not-on-main', 'live-not-on-main', 'main-moved', 'gate-busy', 'git-unusable'].includes(r.reason) ? 'refused' : 'failed');
 /** MB-12: a land that moved main but whose push did not happen (refused or failed, not skipped). */
 export const pushOwedOf = (r) => Boolean(r?.ok && r.landed && r.push && !r.push.pushed && !r.push.skipped);
 /**
@@ -620,6 +681,13 @@ export async function land({ jobId = null, commits = null, specs = [], lane = nu
   }
   if (!commits?.length) return { ok: false, reason: 'nothing-to-land' };
   const startedAt = Date.now();
+  // A repo git cannot run a work-tree operation in fails every step after the queue: refuse it up front with its own reason.
+  const health = (deps.gitHealth ?? waitGitHealthy)({ root });
+  if (!health.ok) {
+    const result = { ok: false, commits, reason: 'git-unusable', preflight: true, detail: health.detail, hint: health.hint };
+    try { withMachine((m) => recordLand(m, { result, root, env, lane, commits, jobId, startedAt }), { env }); } catch { /* the answer carries it */ }
+    return result;
+  }
   if (lane) withMachine((m) => { if (!m.laneOf(lane)) m.upsertLane({ name: lane, worktreePath: path.join(lanesRoot({ env }), lane), branch: `lane/${lane}`, owner: jobId ? `worker:${jobId}` : 'owner-chat' }); }, { env });
   // A pick that cannot apply is refused before the queue: the lane learns its exact hunks in seconds, not after
   // waiting its turn (ledger 2026-09-28: 15 of 16 failed lands were conflicts, most retried blind).
@@ -700,7 +768,7 @@ if (process.argv[1] && path.resolve(process.argv[1]) === selfFile) {
   const value = (n) => { const i = argv.indexOf(`--${n}`); return i >= 0 ? argv[i + 1] ?? null : null; };
   const csv = (v) => (v ? v.split(',').map((s) => s.trim()).filter(Boolean) : []);
   if (has('status')) console.log(JSON.stringify(landStatus()));
-  else if (!value('job') && !value('commit')) { console.error('use: land.mjs --job <id> | --commit <sha>[,<sha>] [--specs <csv|touching|all>] [--lane <name>] [--no-push] [--notify] [--json]'); process.exitCode = 2; }
+  else if (!value('job') && !value('commit')) { console.error('use: land.mjs --job <id> | --commit <sha>[,<sha>] [--specs <csv|touching|direct|all>] [--lane <name>] [--no-push] [--notify] [--json]'); process.exitCode = 2; }
   else {
     const r = await land({ jobId: value('job'), commits: value('commit') ? csv(value('commit')) : null, specs: csv(value('specs')), lane: value('lane'),
       push: has('no-push') ? false : null, notify: has('notify'), waitMs: Number(value('wait-ms')) || LAND_WAIT_MS });
