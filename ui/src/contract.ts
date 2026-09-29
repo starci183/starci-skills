@@ -184,3 +184,15 @@ export type HostView = { at: number; name: string | null; os: string; uptimeSec:
   disks: { mount: string; totalGb: number; freeGb: number }[];
   agentsRamMb: Record<string, number>; running: number | null; throttleMode: string | null;
   history: { at: number; cpuPct: number | null; freeRamPct: number | null; gpuTempC?: number | null }[] };
+
+/* ---- v3.1: attempt page as a story (P1 server fields, P2–P4 UI). ---- */
+export type ProductFile = { path: string; status: 'added'|'modified'|'deleted'|'unchanged'|'missing'; kind: EvidenceKind; bytes: number | null;
+  hostPath: string | null; content: string | null; truncated: boolean; diff: string | null; diffTruncated: boolean; error: string | null };
+export type AttemptProducts = { head: string | null; parent: string | null; repo: string | null; files: ProductFile[];
+  otherChanged: { path: string; status: string }[]; claims: unknown[]; error: string | null };
+export type EvidenceFileV3 = EvidenceFile & { dupOf: number | null; empty: boolean; key: boolean; schema: string | null };
+export type AttemptManifest = { outcome: string | null; assertions: { id: string; outcome: string; detail?: string }[]; assets: string[]; provenance: unknown };
+export type PriorAttempt = { id: number; try: number; verdict: AttemptRow['verdict']; reportOutcome: AttemptRow['reportOutcome']; summary: string | null;
+  settleReason: unknown; nextStep: string | null; href: string };
+export type CheckPair = { name: string; op: CheckRow | null; runtime: CheckRow | null };
+export type AttemptDetailV3 = Omit<AttemptDetailV2, 'files'> & { files: EvidenceFileV3[]; manifest: AttemptManifest | null; prior: PriorAttempt | null; checkPairs: CheckPair[] };
