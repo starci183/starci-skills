@@ -1,3 +1,4 @@
+import type { Ref } from 'react';
 import { ChevronRight, Link2 } from 'lucide-react';
 import { Badge } from './ui/badge';
 import { Card, CardContent } from './ui/card';
@@ -58,13 +59,13 @@ export function LogRowItem({ row, fresh = false }: { row: LogRow; fresh?: boolea
   </details>;
 }
 
-export function LogView({ rows, empty = 'Không có dòng nhật ký phù hợp.', freshKeys }: { rows: LogRow[]; empty?: string; freshKeys?: ReadonlySet<string> }) {
+export function LogView({ rows, empty = 'Không có dòng nhật ký phù hợp.', freshKeys, regionRef, onRegionScroll }: { rows: LogRow[]; empty?: string; freshKeys?: ReadonlySet<string>; regionRef?: Ref<HTMLDivElement>; onRegionScroll?: (top: number) => void }) {
   if (!rows.length) return <div className="empty-state" role="status">{empty}</div>;
   return <ConceptBlock concept="C17" aria-label="Dòng nhật ký">
     <style>{'@keyframes log-flash{from{background-color:color-mix(in oklab,var(--primary) 22%,transparent)}to{background-color:transparent}}.log-row-new{animation:log-flash 1.6s ease-out 1}@media (prefers-reduced-motion:reduce){.log-row-new{animation:none}}'}</style>
-    <Card size="sm" className="overflow-hidden py-0"><div className="hidden border-b bg-muted/30 px-3 py-1.5 text-[11px] font-medium uppercase tracking-wider text-muted-foreground md:grid md:grid-cols-[4.7rem_3.4rem_5.5rem_9.5rem_minmax(0,1fr)_10.5rem] md:gap-x-3" aria-hidden="true"><span>Giờ</span><span>Mức</span><span>Actor</span><span>Loại</span><span>Nội dung</span><span>Workflow · lần thử</span></div>
+    <Card size="sm" className="overflow-hidden py-0"><div ref={regionRef} onScroll={(event) => onRegionScroll?.(event.currentTarget.scrollTop)} className="max-h-[calc(100dvh-260px)] min-h-64 overflow-y-auto overscroll-contain" data-log-region><div className="sticky top-0 z-10 hidden border-b bg-muted md:grid md:grid-cols-[4.7rem_3.4rem_5.5rem_9.5rem_minmax(0,1fr)_10.5rem] md:gap-x-3 px-3 py-1.5 text-[11px] font-medium uppercase tracking-wider text-muted-foreground " aria-hidden="true"><span>Giờ</span><span>Mức</span><span>Actor</span><span>Loại</span><span>Nội dung</span><span>Workflow · lần thử</span></div>
       {rows.map((row) => <LogRowItem key={row.key} row={row} fresh={freshKeys?.has(row.key)} />)}
-    </Card>
+    </div></Card>
   </ConceptBlock>;
 }
 

@@ -68,6 +68,8 @@ export default function LogsPage() {
   const [pending, setPending] = useState<LogRow[]>([]);
   const [fresh, setFresh] = useState<ReadonlySet<string>>(new Set());
   const pausedRef = useRef(false);
+  const regionRef = useRef<HTMLDivElement | null>(null);
+  const oldestRef = useRef<number | null>(null);
   const knownRef = useRef<Set<string>>(new Set());
   const workflowList = useApiQuery<WorkflowRow[]>('/api/workflows?phase=all&limit=100', { topics: ['fleet'], intervalMs: 60_000 });
   const [streamStatus, setStreamStatus] = useState<'connecting' | 'live' | 'reconnecting'>('connecting');
@@ -117,7 +119,7 @@ export default function LogsPage() {
       try {
         const row = JSON.parse(event.data) as LogRow;
         if (!row.key || typeof row.at !== 'number') return;
-        if (knownRef.current.has(row.key)) return;
+        if (knownRef.current.has(row.key) || (oldestRef.current != null && row.at < oldestRef.current)) return;
         knownRef.current.add(row.key);
         if (pausedRef.current) { setPending((current) => unique([row, ...current]).slice(0, 200)); return; }
         setStreamed((current) => unique([row, ...current]).slice(0, 200));
@@ -130,11 +132,7 @@ export default function LogsPage() {
     return () => stream.close();
   }, [follow, streamUrl, apiUrl, filters]);
 
-  useEffect(() => {
-    const onScroll = () => { pausedRef.current = window.scrollY > 320; if (!pausedRef.current) flushPending(); };
-    window.addEventListener('scroll', onScroll, { passive: true });
-    return () => window.removeEventListener('scroll', onScroll);
-  }, []);
+  const onRegionScroll = (top: number) => { pausedRef.current = top > 40; if (!pausedRef.current) flushPending(); };
   const flushPending = () => {
     setPending((current) => {
       if (!current.length) return current;
@@ -145,7 +143,7 @@ export default function LogsPage() {
       return [];
     });
   };
-  const showPending = () => { window.scrollTo({ top: 0, behavior: 'smooth' }); pausedRef.current = false; flushPending(); };
+  const showPending = () => { regionRef.current?.scrollTo({ top: 0, behavior: 'smooth' }); pausedRef.current = false; flushPending(); };
   const loadMore = async () => {
     const cursor = nextCursor === undefined ? logs.meta?.next : nextCursor;
     if (!cursor || moreBusy) return;
@@ -161,6 +159,7 @@ export default function LogsPage() {
     finally { setMoreBusy(false); }
   };
   const rows = unique([...(logs.data ?? []), ...streamed, ...older]);
+  oldestRef.current = logs.data?.length ? Math.min(...logs.data.map((row) => row.at)) : null;
   knownRef.current = new Set(rows.map((row) => row.key));
   const activeCount = filterFields.filter((field) => filters.has(field)).length;
   const sources = [...new Set(rows.map((row) => row.db))];
@@ -174,9 +173,9 @@ export default function LogsPage() {
       {pending.length > 0 && <div className="pointer-events-none sticky top-16 z-20 flex justify-center"><Button size="sm" className="pointer-events-auto rounded-full shadow-md" onClick={showPending}><ArrowUp size={14} /> {pending.length} dòng mới</Button></div>}
       {logs.error && <p className="shell-error" role="status">{logs.data ? 'Nguồn đang lỗi; giữ dòng đã đọc gần nhất. ' : 'Không đọc được nhật ký. '}{logs.error}</p>}
       {logs.meta?.stale?.length ? <p className="shell-error" role="status">Nguồn chậm: {logs.meta.stale.join(', ')}</p> : null}
-      {logs.loading && !logs.data ? <p className="empty-state" role="status">Đang đọc nhật ký…</p> : <LogView rows={rows} freshKeys={fresh} />}
+      {logs.loading && !logs.data ? <p className="empty-state" role="status">Đang đọc nhật ký…</p> : <LogView rows={rows} freshKeys={fresh} regionRef={regionRef} onRegionScroll={onRegionScroll} />}
       {moreError && <p className="shell-error" role="status">{moreError}</p>}
-      {canLoadMore && <Button variant="outline" className="w-full" disabled={moreBusy} onClick={loadMore}>{moreBusy ? 'Đang tải…' : 'Tải thêm dòng cũ'}</Button>}
+      {canLoadMore && <Button variant="outline" className="w-full" disabled={moreBusy} onClick={loadMore}>{moreBusy ? 'Đang tải…' : 'Tải thêm'}</Button>}
     </div>
     <Drawer open={filterOpen} onOpenChange={setFilterOpen} title="Bộ lọc nhật ký" description="Các lựa chọn được lưu trong đường dẫn."><FilterFields filters={filters} onChange={change} contract={contract.data} /><div className="mt-5 grid grid-cols-2 gap-2"><Button variant="outline" onClick={() => change('clear', '')}>Xóa lọc</Button><Button onClick={() => setFilterOpen(false)}>Xem kết quả</Button></div></Drawer>
   </ConceptBlock>;
