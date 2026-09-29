@@ -4,6 +4,7 @@ import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
 import {createRequire} from 'node:module';
+import {execFileSync} from 'node:child_process';
 import {checkScopedLint} from '../scripts/checks/check-scoped-lint.mjs';
 import {createTypeScriptProgram,typeScriptProgramRun} from '../scripts/checks/typescript-programs.mjs';
 import {loadArchitectureConfig} from '../scripts/checks/architecture/config.mjs';
@@ -76,27 +77,34 @@ module.exports=new Proxy(ts,{get:(target,key)=>key==='createProgram'?(...args)=>
   const obligation=(id,kind,ruleIds)=>({id,sourceRuleIds:['FE-ERROR-2'],applicability:{include:['**/*.ts']},
     mechanical:{requirement:'Verify the selected contract.',check:{kind,ruleIds}},
     semantic:{guidance:'docs/next-error-state-check.md',review:'Run separate behavior checks.'},status:'implemented'});
-  write('package.json',{private:true,starci:{codePatterns:{next:{schema:'starci/next-code-pattern-contract@1',owners:[],closedVocabularies:[],errorState:{schema:'starci/next-error-state@1',sourceRoots:['src'],worldMappings:[],writes:[],boundaries:[],
-    transports:[{root:'src/modules/api',mode:'envelope',envelopeIds:['read']}],envelopes:[{id:'read',type:{path:'src/modules/api/envelope.ts',export:'Envelope'},discriminator:{field:'ok',success:true},dataField:'data',errorFields:['error'],readers:[{path:'src/modules/api/read.ts',export:'read',emptyData:'valid'}]}]}}}}});
+  write('package.json',{private:true,starci:{codePatterns:{next:{schema:'starci/next-code-pattern-contract@1',owners:[],closedVocabularies:[],errorState:{schema:'starci/next-error-state@1',sourceRoots:['apps/web/src'],worldMappings:[],writes:[],boundaries:[],
+    transports:[{root:'apps/web/src/modules/api',mode:'envelope',envelopeIds:['read']}],envelopes:[{id:'read',type:{path:'apps/web/src/modules/api/envelope.ts',export:'Envelope'},discriminator:{field:'ok',success:true},dataField:'data',errorFields:['error'],readers:[{path:'apps/web/src/modules/api/read.ts',export:'read',emptyData:'valid'}]}]}}}}});
   write('package-lock.json',{lockfileVersion:3});
-  write('architecture.scope.json',{schema:'starci/architecture-config@1',kinds:['frontend'],tsconfig:'tsconfig.scope.json'});
-  write('tsconfig.scope.json',{compilerOptions:{module:'ESNext',moduleResolution:'Bundler',target:'ES2022',strict:true,noEmit:true},include:['src/**/*.ts']});
-  write('src/modules/api/envelope.ts','export type Envelope={readonly ok:true;readonly data:string|null;readonly error?:never}|{readonly ok:false;readonly data:null;readonly error:string};');
-  write('src/modules/api/read.ts',"import type {Envelope} from './envelope'; export function read(result:Envelope):string|null{if(!result.ok)throw new Error(result.error);return result.data??null;}");
+  // HFS v1 frontend tree: an apps/<app>/ monorepo on npm; all source lives under apps/web/src.
+  for(const [file,text] of Object.entries({'.gitattributes':'* text=auto eol=lf\n','.github/workflows/check.yml':'name: check\n','.gitignore':'node_modules/\n',
+    '.husky/pre-commit':'exit 0\n','README.md':'# Fixture\n','codecov.yml':'coverage: {}\n','eslint.config.mjs':'export default [];\n',
+    'sonar-project.properties':'sonar.projectKey=fixture\n','apps/web/package.json':'{"name":"@fixture/web","private":true}\n',
+    'apps/web/next.config.ts':'export default {};\n','apps/web/postcss.config.mjs':'export default {};\n',
+    'apps/web/tsconfig.json':'{"extends":"../../tsconfig.json","include":["src/**/*"]}\n'}))write(file,text);
+  write('architecture.json',{schema:'starci/architecture-config@1',kinds:['frontend'],tsconfig:'tsconfig.json'});
+  write('tsconfig.json',{compilerOptions:{module:'ESNext',moduleResolution:'Bundler',target:'ES2022',strict:true,noEmit:true},include:['apps/web/src/**/*.ts']});
+  write('apps/web/src/modules/api/envelope.ts','export type Envelope={readonly ok:true;readonly data:string|null;readonly error?:never}|{readonly ok:false;readonly data:null;readonly error:string};');
+  write('apps/web/src/modules/api/read.ts',"import type {Envelope} from './envelope'; export function read(result:Envelope):string|null{if(!result.ok)throw new Error(result.error);return result.data??null;}");
   const profileCatalog={schema:'starci/code-pattern-profile@1',profiles:{next:{
     title:'Program sharing',canon:{package:'@starci/eslint-canon-fe',version:'1.0.0',contentDigest:{algorithm:'sha256',include:['**/*.mjs'],exclude:[],framing:'sorted-posix-relative-path-null-raw-bytes-null',value:digest,files:1}},
-    sourceRuleRoots:['knowledge/patterns/fe'],expectedSourceRuleIds:['FE-ERROR-2'],sourceGlobs:['src/**/*.ts'],
-    inputGlobs:['package.json','package-lock.json','architecture.scope.json','tsconfig.scope.json'],semanticOnly:[],
+    sourceRuleRoots:['knowledge/patterns/fe'],expectedSourceRuleIds:['FE-ERROR-2'],sourceGlobs:['apps/web/src/**/*.ts'],
+    inputGlobs:['package.json','package-lock.json','architecture.json','tsconfig.json'],semanticOnly:[],
     obligations:[obligation('SOURCE','architecture',['ARCH_SYNTAX_INVALID']),obligation('NAMES','script',['FE_SOURCE_NAME_SHAPE']),
       obligation('RETURNS','script',['FE_RETURN_TYPE_PROFILE']),obligation('ENVELOPE','script',['FE_ERROR_ENVELOPE_POLICY'])],
   }}};
+  execFileSync('git',['init','-q'],{cwd:root});execFileSync('git',['add','-A','.'],{cwd:root});
   let beforeLint=null,lintPrograms=null;
   const runtime={package:{name:'@starci/eslint-canon-fe',version:'1.0.0',digest,files:1},canon:{rules:{},recommended:{}},builtinRules:new Map(),typescriptRules:{},eslintVersion:'fixture',eslint:{
     isPathIgnored:async()=>false,calculateConfigForFile:async()=>({linterOptions:{noInlineConfig:true},rules:{},plugins:{}}),
     lintFiles:async files=>{beforeLint=created.length;const input={rootNames:[],options:{noEmit:true},projectReferences:undefined};lintPrograms=[createTypeScriptProgram(ts,input),createTypeScriptProgram(ts,input)];
       return files.map(filePath=>({filePath,messages:[],suppressedMessages:[],errorCount:0,warningCount:0,fatalErrorCount:0}));},
   }};
-  const report=await checkScopedLint(root,[],{profile:'next',profileCatalog,runtime,all:true,architectureConfig:'architecture.scope.json'});
+  const report=await checkScopedLint(root,[],{profile:'next',profileCatalog,runtime,all:true,architectureConfig:'architecture.json'});
   assert.deepEqual(report.machineResults.map(item=>[item.obligation??item.kind,item.ok]),[['architecture',true],['NAMES',true],['RETURNS',true],['ENVELOPE',true]],JSON.stringify(report.issues));
   assert.equal(beforeLint,1,'architecture, next.mjs twice and next-errors share the one declared project program');
   assert.notEqual(lintPrograms[0],lintPrograms[1],'the run is released before ESLint');

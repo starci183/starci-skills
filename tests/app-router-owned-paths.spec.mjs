@@ -178,6 +178,8 @@ test('prerequisites bind a placeholder to an App Router owned path; report files
 
 const apiFixture=t=>{
   const root=tempDir(t,'starci-approuter-api-');
+  // The spawned api mints the attempt scratch under STARCI_TEST_TEMP_DIR (inherited env); this fixture owns its removal.
+  if(process.env.STARCI_TEST_TEMP_DIR)t.after(()=>fs.rmSync(path.join(process.env.STARCI_TEST_TEMP_DIR,'starci-job-scratch'),{recursive:true,force:true,maxRetries:20,retryDelay:25}));
   const repo=path.join(root,'repo');
   routeCheckout(repo);
   const stub=path.join(root,'fake-orca.mjs');fs.writeFileSync(stub,FAKE_ORCA);

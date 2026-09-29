@@ -4,6 +4,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import {createRequire} from 'node:module';
+import {execFileSync} from 'node:child_process';
 import {checkScopedLint,settingMatches} from '../scripts/checks/check-scoped-lint.mjs';
 import {checkArchitecture} from '../scripts/checks/architecture/index.mjs';
 
@@ -19,20 +20,20 @@ function fixture(t){
     fs.mkdirSync(path.dirname(file),{recursive:true});
     fs.writeFileSync(file,text);
   };
-  write('src/service.ts','export class Service {}');
-  write('server/modules/store/store.ts','export class Store {}');
-  write('jest.config.ts','export default {testEnvironment:"node"};');
-  const digest='a'.repeat(64),sourceFiles=['server/modules/store/store.ts','src/service.ts'];
+  write('src/modules/domain/store/service.ts','export class Service {}');
+  write('packages/store/src/store.ts','export class Store {}');
+  write('jest.config.js','export default {testEnvironment:"node"};');
+  const digest='a'.repeat(64),sourceFiles=['packages/store/src/store.ts','src/modules/domain/store/service.ts'];
   const profileCatalog={schema:'starci/code-pattern-profile@1',profiles:{nest:{
     title:'Source and metadata role integration',
     canon:{package:'@starci/eslint-canon-be',version:'1.2.1',contentDigest:{algorithm:'sha256',include:['**/*.mjs'],exclude:[],framing:'sorted-posix-relative-path-null-raw-bytes-null',value:digest,files:1}},
     sourceRuleRoots:['knowledge/patterns/be'],expectedSourceRuleIds:['BE-TYPING-1','BE-IMPORTS-6'],
-    sourceGlobs:['src/**/*.ts'],inputGlobs:['jest*.ts'],
+    sourceGlobs:['src/**/*.ts'],inputGlobs:['jest*.js'],
     obligations:[
       {id:'CONTRACTS',sourceRuleIds:['BE-TYPING-1'],applicability:{include:['**/*.ts']},
         mechanical:{requirement:'Check source contracts.',check:{kind:'architecture',ruleIds:['BE_PUBLIC_CONTRACT_FORM']}},
         semantic:{guidance:'docs/nest-contract-check.md',review:'Review behavior separately.'},status:'implemented'},
-      {id:'CONFIGURATION',sourceRuleIds:['BE-IMPORTS-6'],applicability:{include:['jest*.ts']},
+      {id:'CONFIGURATION',sourceRuleIds:['BE-IMPORTS-6'],applicability:{include:['jest*.js']},
         mechanical:{requirement:'Check metadata through its own adapter.',check:{kind:'script',ruleIds:['CONFIG_TEST_RULE']}},
         semantic:{guidance:'docs/architecture-input-scope.md',review:'Check actual configuration execution separately.'},status:'implemented'},
     ],semanticOnly:[],
@@ -56,26 +57,26 @@ test('metadata remains bound and script-checked while custom architecture roots 
   const f=fixture(t),report=await checkScopedLint(f.root,[],f.options);
   assert.equal(report.status,'clean',JSON.stringify(report.issues));
   assert.deepEqual(report.obligations.find(item=>item.id==='CONTRACTS').files,f.sourceFiles);
-  assert.deepEqual(report.obligations.find(item=>item.id==='CONFIGURATION').files,['jest.config.ts']);
-  assert.ok(report.coverage.expectedFiles.includes('jest.config.ts'));
-  assert.ok(report.inputs.before.files.includes('jest.config.ts'));
-  assert.ok(f.seen[0].contextFiles.includes('jest.config.ts'));
-  assert.ok(f.seen[0].contextFiles.includes('server/modules/store/store.ts'));
+  assert.deepEqual(report.obligations.find(item=>item.id==='CONFIGURATION').files,['jest.config.js']);
+  assert.ok(report.coverage.expectedFiles.includes('jest.config.js'));
+  assert.ok(report.inputs.before.files.includes('jest.config.js'));
+  assert.ok(f.seen[0].contextFiles.includes('jest.config.js'));
+  assert.ok(f.seen[0].contextFiles.includes('packages/store/src/store.ts'));
   assert.deepEqual(report.coverage.lintedFiles,f.sourceFiles);
 });
 
 test('omitting a profile source from architecture coverage still blocks conformance',async t=>{
   const f=fixture(t);
-  f.sourceFiles.splice(f.sourceFiles.indexOf('src/service.ts'),1);
+  f.sourceFiles.splice(f.sourceFiles.indexOf('src/modules/domain/store/service.ts'),1);
   const report=await checkScopedLint(f.root,[],f.options);
   assert.equal(report.status,'unavailable');
-  assert.ok(report.issues.some(item=>item.code==='ARCHITECTURE_FILE_COVERAGE_UNAVAILABLE'&&item.files.includes('src/service.ts')));
+  assert.ok(report.issues.some(item=>item.code==='ARCHITECTURE_FILE_COVERAGE_UNAVAILABLE'&&item.files.includes('src/modules/domain/store/service.ts')));
 });
 
 test('configuration changed during checking still invalidates the source result',async t=>{
   const f=fixture(t),lintFiles=f.runtime.eslint.lintFiles;
   f.runtime.eslint.lintFiles=async files=>{
-    f.write('jest.config.ts','export default {testEnvironment:"jsdom"};');
+    f.write('jest.config.js','export default {testEnvironment:"jsdom"};');
     return lintFiles(files);
   };
   const report=await checkScopedLint(f.root,[],f.options);
@@ -93,8 +94,8 @@ test('source-only script includes custom production roots while retaining metada
   assert.equal(report.status,'clean',JSON.stringify(report.issues));
   const input=f.seen.find(item=>item.ruleIds.includes('SOURCE_TEST_RULE'));
   assert.deepEqual(input.files,f.sourceFiles);
-  assert.ok(input.contextFiles.includes('jest.config.ts'));
-  assert.ok(report.inputs.before.files.includes('jest.config.ts'));
+  assert.ok(input.contextFiles.includes('jest.config.js'));
+  assert.ok(report.inputs.before.files.includes('jest.config.js'));
 });
 
 test('source-only subject selection rejects non-boolean values instead of silently narrowing scope',async t=>{
@@ -107,34 +108,40 @@ test('source-only subject selection rejects non-boolean values instead of silent
 
 test('real broad TypeScript programs retain explicit configuration roles without hiding custom source roots',async t=>{
   const f=fixture(t),profile=f.options.profileCatalog.profiles.nest;
+  // HFS v1 backend tree: the repository root holds only the allowlisted entries and every app is an apps/<app>/ composition.
+  for(const [file,text] of Object.entries({'.gitattributes':'* text=auto eol=lf\n','.github/workflows/check.yml':'name: check\n','.gitignore':'node_modules/\n',
+    '.husky/pre-commit':'exit 0\n','.sops.yaml':'creation_rules: []\n','.starcistacks/application-stacks.yaml':'environments: []\n','.starciwork/.gitignore':'runtime.sqlite\n',
+    'README.md':'# Fixture\n','codecov.yml':'coverage: {}\n','eslint.config.mjs':'export default [];\n','nest-cli.json':'{}\n','package-lock.json':'{}\n',
+    'sonar-project.properties':'sonar.projectKey=fixture\n','apps/api/package.json':'{"name":"@fixture/api","private":true}\n','apps/api/src/app.module.ts':'export const AppModule=1;\n'}))f.write(file,text);
   f.write('package.json',JSON.stringify({private:true}));
   f.write('architecture.json',JSON.stringify({schema:'starci/architecture-config@1',kinds:['backend'],tsconfig:'tsconfig.json'}));
-  f.write('tsconfig.json',JSON.stringify({compilerOptions:{target:'ES2022',module:'ESNext',moduleResolution:'Bundler',strict:true},include:['**/*.ts']}));
+  f.write('tsconfig.json',JSON.stringify({compilerOptions:{target:'ES2022',module:'ESNext',moduleResolution:'Bundler',strict:true,allowJs:true},include:['**/*.ts','jest.config.js']}));
   f.write('apps/api/src/main.ts','export {}');
-  f.write('apps/api/jest.config.ts','export default {testEnvironment:"node"};');
+  f.write('apps/api/jest.config.js','export default {testEnvironment:"node"};');
   fs.mkdirSync(path.join(f.root,'node_modules'),{recursive:true});
   const require=createRequire(import.meta.url);
   fs.symlinkSync(path.dirname(require.resolve('typescript/package.json')),path.join(f.root,'node_modules/typescript'),'junction');
-  profile.sourceGlobs.push('apps/*/src/**/*.ts');profile.inputGlobs.push('apps/*/jest*.ts');
+  execFileSync('git',['init','-q'],{cwd:f.root});execFileSync('git',['add','-A','.'],{cwd:f.root});
+  profile.sourceGlobs.push('apps/*/src/**/*.ts');profile.inputGlobs.push('apps/*/jest*.js');
   profile.obligations[0].mechanical.check.ruleIds=['ARCH_SYNTAX_INVALID'];
-  profile.obligations.push({id:'SOURCE-SCRIPT',sourceRuleIds:['BE-TYPING-1'],applicability:{include:['**/*.ts']},
+  profile.obligations.push({id:'SOURCE-SCRIPT',sourceRuleIds:['BE-TYPING-1'],applicability:{include:['**/*.ts','**/*.js']},
     mechanical:{requirement:'Check selected source contracts.',check:{kind:'script',sourceOnly:true,ruleIds:['SOURCE_TEST_RULE']}},
     semantic:{guidance:'docs/architecture-input-scope.md',review:'Review behavior separately.'},status:'implemented'});
   const options={...f.options,architecture:checkArchitecture,architectureConfig:'architecture.json'};
   let report=await checkScopedLint(f.root,[],options);
   assert.equal(report.status,'clean',JSON.stringify(report.issues));
-  const expected=['apps/api/src/main.ts','server/modules/store/store.ts','src/service.ts'];
+  const expected=['apps/api/src/app.module.ts','apps/api/src/main.ts','packages/store/src/store.ts','src/modules/domain/store/service.ts'];
   assert.deepEqual(report.obligations.find(item=>item.id==='SOURCE-SCRIPT').files,expected);
   const input=f.seen.find(item=>item.ruleIds.includes('SOURCE_TEST_RULE'));
   assert.deepEqual(input.sourceContextFiles,expected);
-  for(const file of ['jest.config.ts','apps/api/jest.config.ts']){
+  for(const file of ['jest.config.js','apps/api/jest.config.js']){
     assert.ok(input.contextFiles.includes(file));assert.ok(report.inputs.before.files.includes(file));
     assert.ok(!report.coverage.lintedFiles.includes(file));
   }
-  profile.sourceGlobs.push('jest.config.ts');
+  profile.sourceGlobs.push('jest.config.js');
   report=await checkScopedLint(f.root,[],options);
   assert.equal(report.status,'clean',JSON.stringify(report.issues));
-  assert.ok(report.obligations.find(item=>item.id==='SOURCE-SCRIPT').files.includes('jest.config.ts'));
+  assert.ok(report.obligations.find(item=>item.id==='SOURCE-SCRIPT').files.includes('jest.config.js'));
 });
 
 test('an effective setting that only adds a rule\'s own ESLint defaultOptions still matches the expected setting',()=>{

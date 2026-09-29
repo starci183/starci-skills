@@ -6,7 +6,7 @@ import { createRequire } from 'node:module';
 import { parseYaml, stringifyYaml } from '../engine/yaml.mjs';
 import { checkShellConformance } from '../scripts/checks/shell-conformance.mjs';
 import {
-  addCapture, baseLayoutFor, destinationFor, destinationsOf, layoutTreeMain, mergeScan, nodeById, promoteDestinations, scanAppDir,
+  addCapture, baseLayoutFor, captureFileOf, destinationFor, destinationsOf, layoutTreeMain, mergeScan, nodeById, promoteDestinations, scanAppDir,
 } from '../scripts/work/layout-tree.mjs';
 import { decodePng, encodePng } from '../scripts/work/png.mjs';
 import { drawUi, layoutCapture, settledProduct, uiSkeleton } from './fixtures/layout-tree.mjs';
@@ -51,9 +51,9 @@ test('destination captures are recorded per key, with the nav target as the defa
   const node = nodeById(p.tree, CONSOLE);
   assert.deepEqual(node.layout.destinations.map((d) => [d.key, d.routes]), [['photos', [PHOTOS]], ['reports', [REPORTS]]]);
   const photosDesktop = node.layout.destinations[0].captures.find((c) => c.breakpoint === 'desktop');
-  assert.equal(photosDesktop.path, 'assets/layouts/locale-console--photos--desktop--light.png');
+  assert.equal(photosDesktop.name, 'assets/layouts/locale-console--photos--desktop--light.png', 'a capture is a blob citation, never a file under shell/assets');
   assert.deepEqual(photosDesktop.slot, DESKTOP_SLOT, 'the slot is measured from the key colour');
-  assert.ok(fs.existsSync(path.join(p.shellDir, photosDesktop.path)));
+  assert.ok(fs.existsSync(captureFileOf(p.shellDir, photosDesktop)));
   assert.equal(node.layout.rev, 1, 'a first destination capture does not move the layout rev');
   assert.equal(validateTree(p.tree), true, JSON.stringify(validateTree.errors));
   addCapture(p.tree, p.shellDir, { node: CONSOLE, destination: 'photos', breakpoint: 'desktop', theme: 'light', file: capturePng(p, 'photos2', 'desktop', [11, 151, 11, 255]) });
@@ -167,6 +167,7 @@ test('a legacy extensions.destinationCaptures block is read (nav keys and target
     for (const [key, chrome] of [['photos', PHOTOS_CHROME], ['console-reports', REPORTS_CHROME]]) {
       const rel = `assets/layouts/${key}--${bp}--light.png`;
       const bytes = fs.readFileSync(capturePng(p, key, bp, chrome));
+      fs.mkdirSync(path.dirname(path.join(p.shellDir, rel)), { recursive: true });
       fs.writeFileSync(path.join(p.shellDir, rel), bytes);
       const { createHash } = await import('node:crypto');
       items.push({ key, breakpoint: bp, path: rel, sha256: createHash('sha256').update(bytes).digest('hex') });
