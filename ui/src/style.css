@@ -349,6 +349,15 @@ button.lifecycle-label:hover, button.lifecycle-label[aria-pressed=true] { backgr
 
 /* U4: 8px rhythm for mobile table cards */
 .mobile-row-fields { gap: 8px; }
+.kpi-strip { overflow: hidden; border: 1px solid var(--border); border-radius: var(--radius); background: var(--card); }
+.kpi-cell { min-height: 132px; padding: 24px; }
+.kpi-cell + .kpi-cell { border-left: 1px solid var(--border); }
+.kpi-cell > [data-tone] { height: 100%; }
+.kpi-cell .text-3xl { font-size: 30px; line-height: 1.1; letter-spacing: -.025em; }
+@media (min-width: 761px) and (max-width: 1023px) {
+  .kpi-cell:nth-child(3) { border-left: 0; }
+  .kpi-cell:nth-child(n + 3) { border-top: 1px solid var(--border); }
+}
 
 /* Purified interface system. Semantic hues are confined to data-tone/status components. */
 :root {
@@ -417,6 +426,9 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 .drawer-body { padding: 24px; }
 .drawer-body > section.rounded-lg.border, .drawer-body > div > section.rounded-lg.border { border: 0; border-radius: 0; background: transparent; padding: 0; }
 @media (max-width: 760px) {
+  .kpi-cell { min-height: 124px; padding: 16px; }
+  .kpi-cell:nth-child(3) { border-left: 0; }
+  .kpi-cell:nth-child(n + 3) { border-top: 1px solid var(--border); }
   .shell-header { min-height: 56px; }
   .shell-bottom-nav { background: var(--sidebar); }
   .shell-bottom-nav a { min-height: 56px; }

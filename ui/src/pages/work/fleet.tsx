@@ -42,9 +42,9 @@ export function FleetPage() {
     <section className="flex min-w-0 flex-col gap-4" aria-label="Chi tiết hệ thống">
       <Advanced variant="card" title="Máy chủ" summary={host.data ? `CPU ${host.data.cpu.loadPct ?? '—'} % · RAM ${Math.round(host.data.ram.usedPct)} %` : 'CPU, RAM, GPU, ổ đĩa'}><HostCard bare /></Advanced>
       <Advanced variant="card" title="Mô hình và token" summary="agent đang chạy · op theo mô hình · token 24 giờ"><div className="flex flex-col gap-4"><ModelsPanel summary={data?.summary} bare /><KpiExtras summary={data?.summary} /></div></Advanced>
-      <Advanced variant="card" title="Đang diễn ra" summary="dòng sự kiện trực tiếp"><div className="-mx-4 overflow-hidden rounded-lg border sm:mx-0"><LiveFeed /></div></Advanced>
+      <Advanced variant="card" title="Đang diễn ra" summary="dòng sự kiện trực tiếp"><div className="overflow-hidden"><LiveFeed /></div></Advanced>
       <Advanced variant="card" title="Sức khỏe hệ thống" summary={`${healthCount} mục · ${data?.counts.bad ?? 0} cần xử lý`}>
-        <ConceptBlock concept="C13" as="div" className="flex flex-wrap gap-2">{data?.health.items.map(item => <a key={item.key} href={item.href} className="inline-flex min-w-0 items-center gap-2 rounded-lg border px-3 py-2 text-xs hover:bg-muted/50"><StatusDot status={statusFromUi(item.ui)} /><span className="font-medium">{healthNames[item.key]}</span><span className="truncate text-muted-foreground">{item.value}</span></a>) ?? <span className="text-sm text-muted-foreground">Đang đọc…</span>}</ConceptBlock>
+        <ConceptBlock concept="C13" as="div" className="grid gap-1 sm:grid-cols-2 lg:grid-cols-3">{data?.health.items.map(item => <a key={item.key} href={item.href} className="flex min-w-0 items-center gap-2 rounded-lg px-3 py-2 text-xs hover:bg-muted/50"><StatusDot status={statusFromUi(item.ui)} /><span className="font-medium">{healthNames[item.key]}</span><span className="min-w-0 truncate text-muted-foreground" title={item.value}>{item.value}</span></a>) ?? <span className="text-sm text-muted-foreground">Đang đọc…</span>}</ConceptBlock>
       </Advanced>
     </section>
   </div>;

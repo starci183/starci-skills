@@ -16,13 +16,13 @@ export function KpiStrip({ summary, needsAttention }: { summary: FleetSummary | 
     { tone: 'success', value: summary.passed24h, label: 'đạt 24 giờ', note: 'Lần thử đã chốt với kết quả đạt.' },
     { tone: 'failed', value: summary.failed24h, label: 'hỏng / chặn 24 giờ', note: 'Lần thử đã chốt với kết quả không đạt.' },
   ] : [];
-  if (!summary) return <section aria-label="Số liệu toàn hệ thống" className="grid grid-cols-2 gap-4 lg:grid-cols-4">
-    {Array.from({ length: 4 }, (_, index) => <div key={index} className="h-28 rounded-xl border bg-muted/40" />)}
+  if (!summary) return <section aria-label="Số liệu toàn hệ thống" className="kpi-strip grid grid-cols-2 lg:grid-cols-4">
+    {Array.from({ length: 4 }, (_, index) => <div key={index} className="kpi-cell"><div className="h-8 w-12 rounded bg-muted" /><div className="mt-3 h-4 w-24 rounded bg-muted" /><div className="mt-2 h-3 w-full rounded bg-muted" /></div>)}
   </section>;
-  return <Stagger className="grid grid-cols-2 gap-4 lg:grid-cols-4">
-    {items.map(item => <StaggerItem key={item.label} className="min-w-0"><div data-tone={item.tone} className="flex h-full min-w-0 flex-col gap-1 rounded-xl border bg-card p-4 shadow-sm sm:p-6" aria-label={item.label}>
-      <div className="text-3xl font-semibold tabular-nums leading-none" style={{ color: 'var(--tone)' }}><Ticker value={item.value} /></div>
-      <div className="mt-2 text-sm font-medium">{item.label}</div>
+  return <Stagger className="kpi-strip grid grid-cols-2 lg:grid-cols-4">
+    {items.map(item => <StaggerItem key={item.label} className="kpi-cell min-w-0"><div data-tone={item.tone} className="flex h-full min-w-0 flex-col gap-1" aria-label={item.label}>
+      <div className="text-3xl font-semibold tabular-nums leading-none"><Ticker value={item.value} /></div>
+      <div className="mt-2 flex items-center gap-2 text-sm font-medium"><span className="status-dot" aria-hidden="true" />{item.label}</div>
       <p className="text-xs leading-snug text-muted-foreground">{item.note}</p>
     </div></StaggerItem>)}
   </Stagger>;
@@ -40,7 +40,7 @@ export function KpiExtras({ summary }: { summary: FleetSummary | undefined }) {
     tokens != null ? { label: 'Token 24 giờ', value: compactVi(tokens), note: `vào ${compactVi(usage.inputTokens)} · ra ${compactVi(usage.outputTokens)} · ${costVi(usage.costUsd)}` }
       : { label: 'Token 24 giờ', value: 'chưa ghi nhận', note: 'Runtime chưa ghi token vào llm_usage trong 24 giờ qua.' },
   ];
-  return <dl className="grid gap-3 sm:grid-cols-3">{items.map(item => <div key={item.label} className="flex min-w-0 flex-col gap-1 rounded-lg border p-3">
+  return <dl className="grid gap-3 sm:grid-cols-3">{items.map(item => <div key={item.label} className="flex min-w-0 flex-col gap-1 p-3">
     <dt className="text-xs text-muted-foreground">{item.label}</dt><dd className="text-lg font-semibold tabular-nums leading-tight">{item.value}</dd><p className="text-xs leading-snug text-muted-foreground">{item.note}</p>
   </div>)}</dl>;
 }

@@ -1,6 +1,6 @@
 import type { LegRow, LegStatus, PipelineView } from '../../../contract';
 
-export const NODE_H = 126, COL_GAP = 16, ROW_GAP = 12, PAD_X = 8, HEAD_H = 34, PAD_B = 14;
+export const NODE_H = 116, COL_GAP = 20, ROW_GAP = 16, PAD_X = 8, HEAD_H = 34, PAD_B = 14;
 
 export type PlacedLeg = { leg: LegRow; x: number; y: number; col: number };
 export type Column = { level: number; index: number; label: string; legs: LegRow[] };
@@ -43,7 +43,7 @@ export function layoutPipeline(pipeline: PipelineView, availWidth = 1050) {
   const tallest = Math.max(1, ...columns.map(col => col.legs.length));
   const bodyH = tallest * NODE_H + (tallest - 1) * ROW_GAP;
   const gaps = Math.max(0, columns.length - 1) * COL_GAP;
-  const NODE_W = Math.max(84, Math.min(190, Math.floor((availWidth - PAD_X * 2 - gaps) / Math.max(1, columns.length))));
+  const NODE_W = Math.max(152, Math.min(190, Math.floor((availWidth - PAD_X * 2 - gaps) / Math.max(1, columns.length))));
   const width = PAD_X * 2 + columns.length * NODE_W + gaps;
   const height = HEAD_H + bodyH + PAD_B;
   const placed = new Map<string, PlacedLeg>();

@@ -45,13 +45,13 @@ export function WorkflowCard({ row }: { row: WorkflowRowV2 }) {
     ? <><strong>Vì sao:</strong> {legWhy.headline} <WhyOwnerBadge owner={legWhy.owner} /></>
     : troubled || row.onIt
     ? <><strong>Vì sao:</strong> {formatReason(why)}</>
-    : lead ? <><strong>Đang làm:</strong> <span className="font-mono text-[13px]">{lead.op}</span> {lead.tries > 0 ? `(lần ${lead.tries}/5)` : '(chưa có lần thử)'}</>
+    : lead ? <><strong>Đang làm:</strong> <span className="text-muted-foreground" title={lead.op}>{lead.op}</span> {lead.tries > 0 ? `(lần ${lead.tries}/5)` : '(chưa có lần thử)'}</>
       : <><strong>Trạng thái:</strong> {state.label}</>;
   const base = workflowHref(row);
   const next = row.onIt?.who === 'owner' ? { label: 'Trả lời quyết định', href: row.onIt.ref?.href ?? base }
     : lead ? { label: troubled ? `Xem chặng ${lead.op}` : `Mở chặng ${lead.op}`, href: `${base}?leg=${encodeURIComponent(lead.op)}` }
       : { label: 'Mở workflow', href: base };
-  return <Lift className="min-w-0"><article className="flex h-full min-w-0 flex-col gap-4 rounded-xl border bg-card p-4 shadow-sm transition-colors hover:border-[var(--primary)] sm:p-6">
+  return <Lift className="min-w-0"><article className="flex h-full min-w-0 flex-col gap-4 rounded-xl border bg-card p-4 transition-colors hover:border-[var(--border)] sm:p-6">
     <div className="flex flex-wrap items-start justify-between gap-3">
       <div className="min-w-0 flex-1">
         <p className="truncate text-xs text-muted-foreground">{row.project}</p>
@@ -59,7 +59,7 @@ export function WorkflowCard({ row }: { row: WorkflowRowV2 }) {
       </div>
       <Swap keyValue={`${state.status}-${state.label}`}><StatusChip status={state.status} label={state.label} /></Swap>
     </div>
-    <p className="text-sm">{headline}</p>
+    <p className="line-clamp-4 text-sm" title={legWhy?.headline ?? (troubled || row.onIt ? formatReason(why) : undefined)}>{headline}</p>
     {pipeline && <div className="flex flex-col gap-2">
       <PipelineDots pipeline={pipeline} />
       <p className="text-sm"><strong className="tabular-nums">{pipeline.progress.done}/{pipeline.progress.total}</strong> chặng đạt</p>

@@ -70,7 +70,7 @@ function PipelineSvg({ pipeline, selected, onSelect }: { pipeline: PipelineView;
   const avail = Math.max(900, measured);
   const { columns, placed, edges, width, height, nodeW } = layoutPipeline(pipeline, avail);
   const chars = Math.max(6, Math.floor((nodeW - 14) / 6.3));
-  const scrolls = measured < 900;
+  const scrolls = width > measured;
   return <div className="relative" data-pipeline-graph data-scrolls={scrolls}>
     <div ref={holder} className="overflow-x-auto">
     <svg width={width} height={height} viewBox={`0 0 ${width} ${height}`} role="group" aria-label={`Chuỗi ${pipeline.legs.length} chặng, ${columns.length} cột`} className="block max-w-none">
@@ -80,26 +80,25 @@ function PipelineSvg({ pipeline, selected, onSelect }: { pipeline: PipelineView;
       </defs>
       {columns.map(col => <text key={col.level} x={placed.get(col.legs[0].op)!.x} y={18} fontSize="11" fontWeight="600" letterSpacing=".04em" className="fill-muted-foreground"><title>{`${col.index + 1}. ${col.label}`}</title>{clip(`${col.index + 1}. ${col.label.split(' · ')[0]}`, chars + 3)}</text>)}
       <g fill="none">{edges.map(edge => <path key={`${edge.from}>${edge.to}`} d={edge.path} markerEnd={`url(#pg-arrow-${edge.tone})`}
-        stroke={edgeStroke(edge.tone)} strokeWidth={edge.tone === 'current' ? 2.2 : 1.4} opacity={edge.tone === 'plain' ? 0.55 : 1}><title>{`${edge.from} → ${edge.to}`}</title></path>)}</g>
+        stroke={edgeStroke(edge.tone)} strokeWidth={edge.tone === 'current' ? 1.8 : 1.2} opacity={edge.tone === 'plain' ? 0.42 : 0.8}><title>{`${edge.from} → ${edge.to}`}</title></path>)}</g>
       {[...placed.values()].map(({ leg, x, y }) => {
         const tone = statusTone[leg.status], isSel = selected === leg.op;
         const name = legName(leg), goal = legGoal(leg), agents = legAgents(leg);
         return <g key={leg.op} transform={`translate(${x},${y})`} data-tone={tone} data-leg={leg.op} data-status={leg.status} role="button" tabIndex={0} className="group cursor-pointer outline-none"
           aria-label={`${name} (${leg.op}): ${statusLabels[leg.status]}, ${legSummary(leg)}${leg.current ? ', chặng hiện tại' : ''}`} aria-pressed={isSel}
           onClick={() => onSelect(leg)} onKeyDown={activate(leg, onSelect)}>
-          <motion.g initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} whileHover={{ y: -2 }} transition={{ duration: 0.2, ease: EASE, delay: 0.04 * (placed.get(leg.op)?.col ?? 0) }}>
+          <motion.g initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.2, ease: EASE, delay: 0.04 * (placed.get(leg.op)?.col ?? 0) }}>
           <title>{`${name} (${leg.op}) · ${statusLabels[leg.status]}${leg.deferred ? ` · ${leg.deferred}` : ''}${goal ? `
 ${goal}` : ''}`}</title>
-          {leg.current && <rect x={-4} y={-4} width={nodeW + 8} height={NODE_H + 8} rx={12} fill="none" stroke={toneVar('running')} strokeWidth={2.5} />}
-          <rect width={nodeW} height={NODE_H} rx={9} fill="var(--tone-bg)" stroke={isSel ? 'var(--primary)' : 'var(--tone-line)'} strokeWidth={isSel ? 2.5 : 1.5} strokeDasharray={dashed(leg.status) ? '5 4' : undefined} />
+          {leg.current && <rect x={-3} y={-3} width={nodeW + 6} height={NODE_H + 6} rx={12} fill="none" stroke={toneVar('running')} strokeWidth={2} />}
+          <rect width={nodeW} height={NODE_H} rx={9} fill="var(--card)" stroke={isSel ? 'var(--ring)' : 'var(--border)'} strokeWidth={isSel ? 2 : 1.2} strokeDasharray={dashed(leg.status) ? '5 4' : undefined} />
           <rect x={-3} y={-3} width={nodeW + 6} height={NODE_H + 6} rx={11} fill="none" stroke="var(--primary)" strokeWidth={2} className="opacity-0 group-focus-visible:opacity-100" />
-          <text x={8} y={18} fontSize="13" fontWeight="700" className="fill-foreground">{wrap2(name, Math.floor(chars * 0.9)).map((line, i) => <tspan key={i} x={8} dy={i ? 15 : 0}>{line}</tspan>)}</text>
-          <text x={8} y={50} fontSize="11" className="fill-muted-foreground" fontFamily="var(--font-mono, ui-monospace, monospace)">{clip(leg.op, Math.floor(chars * 0.95))}</text>
-          <circle cx={13} cy={67} r={3.5} fill="var(--tone)" />
-          <text x={21} y={71} fontSize="11.5" fontWeight="600" fill="var(--tone)">{clip(statusLabels[leg.status], chars - 2)}</text>
-          <text x={8} y={87} fontSize="11.5" className="fill-muted-foreground">{clip(legSummary(leg), chars)}</text>
-          {leg.attempts.length > 0 && <AttemptDotsSvg attempts={leg.attempts} x={4} y={104} max={Math.max(2, Math.floor((nodeW - 8) / 12) - 4)} />}
-          {agents.length > 0 && <foreignObject x={nodeW - 8 - 2 * 20 - 30} y={NODE_H - 28} width={2 * 20 + 30} height={22}><div className="flex h-full items-center justify-end"><AgentStack agents={agents} max={3} size={20} /></div></foreignObject>}
+          <text x={8} y={19} fontSize="13" fontWeight="650" className="fill-foreground">{wrap2(name, Math.floor(chars * 0.9)).map((line, i) => <tspan key={i} x={8} dy={i ? 15 : 0}>{line}</tspan>)}</text>
+          <circle cx={12} cy={55} r={3.5} fill="var(--tone)" />
+          <text x={20} y={59} fontSize="11.5" fontWeight="600" fill="var(--tone)">{clip(statusLabels[leg.status], chars - 2)}</text>
+          <text x={8} y={79} fontSize="11.5" className="fill-muted-foreground">{clip(legSummary(leg), chars)}</text>
+          {leg.attempts.length > 0 && <AttemptDotsSvg attempts={leg.attempts} x={4} y={98} max={Math.max(2, Math.floor((nodeW - 8) / 12) - 4)} />}
+          {agents.length > 0 && <foreignObject x={nodeW - (nodeW < 120 ? 36 : 64)} y={NODE_H - 26} width={nodeW < 120 ? 32 : 60} height={22}><div className="flex h-full items-center justify-end"><AgentStack agents={agents} max={nodeW < 120 ? 1 : 2} size={20} /></div></foreignObject>}
           </motion.g>
         </g>;
       })}
@@ -112,16 +111,17 @@ ${goal}` : ''}`}</title>
 function PipelineList({ pipeline, selected, onSelect }: { pipeline: PipelineView; selected: string | null; onSelect: (leg: LegRow) => void }) {
   const columns = buildColumns(pipeline.legs);
   return <div data-pipeline-list><Stagger as="ol" className="flex flex-col gap-4">{columns.map(col => <StaggerItem as="li" key={col.level}>
-    <p className="mb-2 text-[11px] font-semibold tracking-wider text-muted-foreground">{col.index + 1}. {col.label}{col.legs.length > 1 && <span className="font-normal normal-case tracking-normal"> · song song</span>}</p>
+    <p className="mb-2 text-xs font-semibold text-muted-foreground">{col.index + 1}. {col.label}{col.legs.length > 1 && <span className="font-normal normal-case"> · song song</span>}</p>
     <ul className="flex flex-col gap-2">{col.legs.map(leg => <li key={leg.op}>
       <button type="button" data-tone={statusTone[leg.status]} data-leg={leg.op} aria-pressed={selected === leg.op} onClick={() => onSelect(leg)}
-        className={`flex w-full min-w-0 items-center gap-3 rounded-lg border bg-[var(--tone-bg)] px-3 py-3 text-left ${dashed(leg.status) ? 'border-dashed' : ''} ${leg.current ? 'ring-2 ring-[var(--status-running)]' : ''} ${selected === leg.op ? 'border-primary' : 'border-[var(--tone-line)]'}`}>
-        <span className="min-w-0 flex-1"><span className="block truncate text-sm font-semibold" title={legGoal(leg) ?? undefined}>{legName(leg)}</span>
-          <span className="block truncate font-mono text-[11px] text-muted-foreground">{leg.op}</span>
-          <span className="block truncate text-xs text-muted-foreground">{legSummary(leg)}</span></span>
-        {legAgents(leg).length > 0 && <span className="shrink-0"><AgentStack agents={legAgents(leg)} max={2} size={20} /></span>}
-        {leg.attempts.length > 0 && <span className="flex shrink-0 gap-1" aria-hidden="true">{leg.attempts.slice(-6).map(attempt => <span key={attempt.id} className="status-dot" data-tone={statusTone[attempt.status]} />)}</span>}
-        <StatusChip status={leg.status} />
+        className={`flex w-full min-w-0 flex-col gap-2 rounded-lg border bg-card px-4 py-3 text-left ${dashed(leg.status) ? 'border-dashed' : ''} ${leg.current ? 'ring-1 ring-[var(--status-running)]' : ''} ${selected === leg.op ? 'border-ring' : 'border-border'}`}>
+        <span className="flex w-full min-w-0 items-start justify-between gap-2"><span className="min-w-0 flex-1"><span className="block truncate text-sm font-semibold" title={legGoal(leg) ?? undefined}>{legName(leg)}</span>
+          <span className="block truncate text-xs text-muted-foreground" title={leg.op}>{leg.op}</span></span><StatusChip status={leg.status} /></span>
+        <span className="block w-full truncate text-xs text-muted-foreground">{legSummary(leg)}</span>
+        {(legAgents(leg).length > 0 || leg.attempts.length > 0) && <span className="flex w-full items-center justify-between gap-2">
+          {leg.attempts.length > 0 && <span className="flex shrink-0 gap-1" aria-hidden="true">{leg.attempts.slice(-6).map(attempt => <span key={attempt.id} className="status-dot" data-tone={statusTone[attempt.status]} />)}</span>}
+          {legAgents(leg).length > 0 && <span className="shrink-0"><AgentStack agents={legAgents(leg)} max={2} size={20} /></span>}
+        </span>}
       </button>
     </li>)}</ul>
   </StaggerItem>)}</Stagger></div>;

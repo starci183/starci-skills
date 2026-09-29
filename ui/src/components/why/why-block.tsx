@@ -18,7 +18,7 @@ export function whyOwner(owner: string | null | undefined): { label: string; ton
 
 export function WhyOwnerBadge({ owner }: { owner: string | null | undefined }) {
   const o = whyOwner(owner);
-  return <span data-tone={o.tone} className="inline-flex shrink-0 items-center gap-1.5 rounded-full border border-[var(--tone-line)] bg-[var(--tone-bg)] px-2 py-0.5 text-xs font-medium text-[var(--tone)]">
+  return <span data-tone={o.tone} className="inline-flex shrink-0 items-center gap-1.5 text-xs font-medium text-[var(--tone)]">
     <span className="size-1.5 rounded-full bg-[var(--tone)]" aria-hidden="true" />{o.label}
   </span>;
 }
