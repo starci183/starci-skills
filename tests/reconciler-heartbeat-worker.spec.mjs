@@ -93,3 +93,21 @@ test('listHostProcessesAsync reads the table without blocking: rows parsed, a fa
   assert.equal(await listHostProcessesAsync({ platform: 'win32', run: async () => ({ status: 1, stdout: '' }) }), null);
   assert.equal(await listHostProcessesAsync({ platform: 'win32', run: async () => { throw new Error('boom'); } }), null);
 });
+
+test('leaderState reads the live leader and safe mode from machine.sqlite (mode_changes reason of the current mode)', async (t) => {
+  const { leaderState } = await import('../scripts/reconciler/boot.mjs');
+  const st = tempState();
+  t.after(() => st.close());
+  st.m.acquireLeader({ name: 'reconciler', holder: 'h:1:a', pid: 1, leaseMs: 30000 });
+  const at = () => leaderState({ env: st.env, numbers: NUMBERS });
+  assert.equal(at().holder, 'h:1:a', 'the reader answers (a bad column made the whole read null)');
+  assert.equal(at().fresh, true);
+  assert.deepEqual(at().safeModes, []);
+  st.m.setControllerMode({ controller: 'job', mode: 'active', by: 'engine:h', reason: 'config.yaml reconciler.controllers.job.mode' });
+  st.m.setControllerMode({ controller: 'job', mode: 'shadow', by: 'engine:h', reason: 'safe mode: configured active runs shadow' });
+  st.m.setControllerMode({ controller: 'host', mode: 'active', by: 'engine:h', reason: 'config.yaml reconciler.controllers.host.mode' });
+  assert.deepEqual(at().safeModes, ['job']);
+  assert.equal(at().safe, true);
+  st.m.setControllerMode({ controller: 'job', mode: 'active', by: 'engine:h', reason: 'config.yaml reconciler.controllers.job.mode' });
+  assert.equal(at().safe, false, 'a normal restart clears it');
+});

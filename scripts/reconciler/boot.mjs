@@ -61,7 +61,8 @@ export function leaderState({ env = process.env, now = Date.now(), numbers = rec
     const pushRunning = Boolean(m.db.prepare("SELECT 1 FROM engine_actions WHERE controller='fleet' AND key='fleet:push' AND state='running' AND epoch=? LIMIT 1").get(row?.epoch ?? -1));
     // Safe mode is read from the LIVE state, not from how the run started: the engine records every controller it forces
     // shadow as controller_modes reason 'safe mode: ...' (engine.mjs writeModes), and a self-reload keeps the process --safe.
-    const safeModes = m.db.prepare("SELECT controller FROM controller_modes WHERE reason LIKE 'safe mode%'").all().map((r) => r.controller);
+    const safeModes = m.db.prepare(`SELECT c.controller FROM controller_modes c JOIN mode_changes h ON h.change_id=(SELECT MAX(change_id) FROM mode_changes WHERE controller=c.controller AND to_mode=c.mode)
+      WHERE h.reason LIKE 'safe mode%'`).all().map((r) => r.controller);
     return { row, run, pushRunning, safeModes };
   }, null, { env });
   const { row = null, run = null, pushRunning = false, safeModes = [] } = read ?? {};
