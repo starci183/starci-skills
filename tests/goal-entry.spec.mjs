@@ -131,7 +131,7 @@ test('goal revision preview is read-only, identity-preserving and approval-gated
   const rows=read(repo,l=>({
     workflowCount:l.db.prepare('SELECT count(*) n FROM workflows WHERE workflow_id=?').get(workflowId).n,
     workflow:l.db.prepare('SELECT phase,goal_identity FROM workflows WHERE workflow_id=?').get(workflowId),
-    goals:l.db.prepare('SELECT revision,goal_identity,amendment_json FROM goals WHERE workflow_id=? ORDER BY revision').all(workflowId),
+    goals:l.db.prepare('SELECT revision,goal_identity,amendment_json,approval_ref FROM goals WHERE workflow_id=? ORDER BY revision').all(workflowId),
     goalInbox:l.db.prepare("SELECT count(*) n FROM inbox WHERE workflow_id=? AND kind='goal'").get(workflowId).n,
     revisionInbox:l.db.prepare("SELECT status,payload_json FROM inbox WHERE workflow_id=? AND kind='goal-revision'").get(workflowId),
     event:l.db.prepare("SELECT payload_json FROM events WHERE workflow_id=? AND kind='goal-revised' ORDER BY seq DESC LIMIT 1").get(workflowId),
@@ -145,7 +145,11 @@ test('goal revision preview is read-only, identity-preserving and approval-gated
   assert.equal(rows.workflow.goal_identity,rows.goals[1].goal_identity);
   assert.equal(rows.goalInbox,1,'revision must not enqueue a second kernel goal');
   assert.equal(rows.revisionInbox.status,'pending');
-  assert.equal(JSON.parse(rows.revisionInbox.payload_json).approvalToken,preview.approval.token);
+  // The writer redacts *token keys inside inbox.payload_json (REDACTED_COLUMNS, ledger-db.mjs:323 +
+  // redact.mjs:39 SECRET_KEY); the token's durable unredacted home is the goals.approval_ref identity
+  // column (define-goal.mjs:552 passes approvalRef; ledger-db.mjs:462 stores it outside the redaction set).
+  assert.equal(JSON.parse(rows.revisionInbox.payload_json).approvalToken,'[redacted]');
+  assert.equal(rows.goals[1].approval_ref,preview.approval.token);
   assert.equal(JSON.parse(rows.event.payload_json).kernelResume,'resurvey-pending-revision-inbox');
   assert.equal(rows.superseded.status,'cancelled');
   assert.equal(JSON.parse(rows.superseded.result_json).reason,'goal-revision-superseded');

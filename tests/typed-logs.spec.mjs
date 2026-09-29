@@ -12,6 +12,8 @@ import {
 import { SECRET_PATTERNS } from '../scripts/supervisor/push-mains.mjs';
 import { SECRET_PATTERNS as SHARED } from '../scripts/lib/secret-patterns.mjs';
 import { artifactHoldOf } from '../scripts/lib/artifact-hold.mjs';
+import { recordCheck } from '../scripts/kernel/evidence-store.mjs';
+import { seedWorkflow } from './_ledger-fixture.mjs';
 
 // Typed logs (scripts/kernel/typed-logs.mjs): rows in the ledger's logs table (<repo>/.starciwork/runtime.sqlite since
 // 2026-09-27), validated per kind, redacted at write, capped per job, append-only; sidecar ingest and event derivation
@@ -147,10 +149,11 @@ test('event-derived rows: dispatch, checks, settle with land, incident, drop - p
 test('syncDerivedLogs derives from a real ledger once: a second sync stores nothing', (t) => {
   const repo = repoDir(t);
   const ledger = track(t, openLedger({ file: ledgerFileFor(repo) }));
-  ledger.ensureWorkflow({ workflowId: WF });
-  ledger.enqueueJob({ jobId: 'op-backend.implement-1', workflowId: WF, opId: 'backend.implement', attempt: 1, kind: 'op' });
+  seedWorkflow(ledger, { id: WF, jobs: [{ jobId: 'op-backend.implement-1', opId: 'backend.implement', kind: 'op' }] });
+  const attemptId = ledger.db.prepare("SELECT attempt_id FROM op_attempts WHERE job_id='op-backend.implement-1'").get().attempt_id;
   ledger.appendEvent({ workflowId: WF, entityType: 'job', entityId: 'op-backend.implement-1', kind: 'op-dispatched', payload: { op: 'backend.implement', model: 'claude-agent' } });
-  ledger.db.prepare('INSERT INTO checks(workflow_id,op_id,attempt,checks_json,created_at) VALUES(?,?,?,?,?)').run(WF, 'backend.implement', 1, JSON.stringify({ checks: [{ name: 'unit', command: 'npm test', exitCode: 0, evidence: 'green' }] }), 1);
+  // One independent (kernel) check run: the derived rows are its check.result and the cmd.run of its command.
+  recordCheck(ledger.db, { attemptId, name: 'unit', phase: 'verify', runner: 'kernel', command: 'npm test', exitCode: 0, now: 1 });
   ledger.appendEvent({ workflowId: WF, entityType: 'job', entityId: 'op-backend.implement-1', kind: 'checks-recorded', payload: { op: 'backend.implement', attempt: 1 } });
   ledger.appendEvent({ workflowId: WF, entityType: 'job', entityId: 'op-backend.implement-1', kind: 'op-settled', payload: { verdict: 'pass', status: 'succeeded' } });
   const logs = logsOf(t, repo);
@@ -165,9 +168,7 @@ test('syncDerivedLogs derives from a real ledger once: a second sync stores noth
 test('api log: a kernel logs a typed row without a ledger write; an op logs only its own job', (t) => {
   const repo = repoDir(t);
   const ledger = openLedger({ file: ledgerFileFor(repo) });
-  ledger.ensureWorkflow({ workflowId: WF });
-  ledger.enqueueJob({ jobId: 'op-a-1', workflowId: WF, opId: 'a', kind: 'op' });
-  ledger.enqueueJob({ jobId: 'op-b-1', workflowId: WF, opId: 'b', kind: 'op' });
+  seedWorkflow(ledger, { id: WF, jobs: [{ jobId: 'op-a-1', opId: 'a', kind: 'op' }, { jobId: 'op-b-1', opId: 'b', kind: 'op' }] });
   const eventsBefore = Number(ledger.db.prepare('SELECT count(*) n FROM events').get().n);
   ledger.close();
   const env = { ...process.env, STARCI_ROLE: '', STARCI_OP_JOB: '', ORCA_TERMINAL_HANDLE: '' };

@@ -7,6 +7,7 @@ import {spawnSync} from 'node:child_process';
 import {FAKE_ORCA} from './helpers/fake-orca.mjs';
 import {openLedger,inspectLedger,ledgerFileFor} from '../engine/ledger-db.mjs';
 import {parseYaml} from '../engine/yaml.mjs';
+import {seedWorkflow} from './_ledger-fixture.mjs';
 import {checkPrerequisites,prerequisiteDetail,resolveReadPath} from '../scripts/kernel/prerequisites.mjs';
 
 // api dispatch refuses `prerequisite-unmet` from data only: a manifest read
@@ -16,7 +17,11 @@ import {checkPrerequisites,prerequisiteDetail,resolveReadPath} from '../scripts/
 const ROOT=path.resolve(import.meta.dirname,'..');
 const API=path.join(ROOT,'scripts','kernel','api.mjs');
 const AUDIT=parseYaml(fs.readFileSync(path.join(ROOT,'modules','ops','ops','interface.audit.yaml'),'utf8'));
+// interface.audit's `target` read is now a packet/ledger reference (params.audit + the
+// interface_audits row), not a repository file; the file-path form below is the shape
+// mustExist still resolves, exercised through a synthetic read.
 const TARGET='.starciwork/features/<feature>/operations/<audit>/index.yaml';
+const FILE_READ={id:'target',path:TARGET,mustExist:true};
 
 const tmpRepo=t=>{
   const dir=fs.mkdtempSync(path.join(os.tmpdir(),'starci-prereq-'));
@@ -27,7 +32,7 @@ const write=(repo,rel,text)=>{fs.mkdirSync(path.dirname(path.join(repo,rel)),{re
 
 test('interface.audit declares its target operation record mustExist',()=>{
   const target=AUDIT.reads.find(r=>r.id==='target');
-  assert.equal(target.path,TARGET);
+  assert.equal(target.path,"packet params.audit (id operation.<feature>.<audit>, selectedMatrix) + the audit's interface_audits row (api op-contract)");
   assert.equal(target.mustExist,true);
   assert.equal(AUDIT.graphPolicy.prerequisiteState,'done');
 });
@@ -45,7 +50,7 @@ test('a read path resolves only when one binding spells out every placeholder',(
 
 test('a missing mustExist record is unmet; a present one and an unresolved one admit',t=>{
   const repo=tmpRepo(t);
-  const brief={reads:AUDIT.reads,graphPolicy:{prerequisiteState:'done'}};
+  const brief={reads:[FILE_READ],graphPolicy:{prerequisiteState:'done'}};
   const missing=checkPrerequisites({brief,repo,payload:{records:['.starciwork/features/wspv'],owned_paths:['.starciwork/features/wspv/operations/audit-pay']}});
   assert.deepEqual(missing.unmet,[{kind:'record-missing',read:'target',path:'.starciwork/features/wspv/operations/audit-pay/index.yaml'}]);
   assert.match(prerequisiteDetail({op:'interface.audit',jobId:'job-1',unmet:missing.unmet}),
@@ -97,9 +102,17 @@ test('api dispatch refuses prerequisite-unmet before the packet and before any O
   const env={...process.env,STARCI_ORCA_COMMAND:process.execPath,STARCI_ORCA_ARGS:JSON.stringify([stub]),
     STARCI_FAKE_ORCA_MODE:'healthy',STARCI_FAKE_ORCA_LOG:log,STARCI_FAKE_ORCA_STATE:path.join(root,'state.json'),
     LOCALAPPDATA:path.join(root,'localappdata')};
-  const ledger=openLedger({file:ledgerFileFor(repo)});
-  try{ledger.enqueueJob({jobId:'job-audit-scope',workflowId:'wf-prereq',opId:'interface.audit',kind:'op',
-    payload:{opId:'interface.audit',records:['.starciwork/features/wspv'],owned_paths:['.starciwork/features/wspv/operations/audit-pay'],model:'devin-agent'}});}
+  // interface.audit's mustExist target is a packet/ledger read now, so the file gate no longer applies;
+  // the still-live e2e refusal is graphPolicy.prerequisiteState 'done' over a bound record's dependsOn.
+  write(repo,'.starciwork/workspace.yaml','schema: work/workspace@1\nid: t\n');
+  write(repo,'.starciwork/features/f/arch/index.yaml','schema: work/node@1\nid: arch\nkind: architecture\nrequired: true\nstate: todo\ndescription: arch node\n');
+  write(repo,'.starciwork/features/f/impl/index.yaml','schema: work/node@1\nid: impl\nkind: business\nrequired: true\nstate: todo\ndescription: impl node\ndependsOn: [arch]\n');
+  // ledgerFileFor resolves under env.LOCALAPPDATA — seed the file the spawned api will open.
+  const ledgerFile=ledgerFileFor(repo,{env});
+  const ledger=openLedger({file:ledgerFile});
+  try{seedWorkflow(ledger,{id:'wf-prereq',state:{phase:'running',job:'wf-prereq'},
+    jobs:[{jobId:'job-audit-scope',opId:'interface.audit',kind:'op',
+      payload:{opId:'interface.audit',records:['.starciwork/features/f/impl'],owned_paths:['.starciwork/features/f/impl'],model:'devin-agent'}}]});}
   finally{ledger.close();}
 
   for(const spawn of [[],['--spawn']]){
@@ -107,18 +120,19 @@ test('api dispatch refuses prerequisite-unmet before the packet and before any O
     assert.equal(r.status,1,`${spawn.join(' ')||'dry'}: ${r.stdout}${r.stderr}`);
     const out=JSON.parse(r.stdout);
     assert.equal(out.reason,'prerequisite-unmet');
-    assert.equal(out.unmet[0].path,'.starciwork/features/wspv/operations/audit-pay/index.yaml');
+    assert.equal(out.unmet[0].kind,'dependency-not-done');
+    assert.equal(out.unmet[0].record,'.starciwork/features/f/impl');
     assert.match(out.detail,/then run api dispatch --job job-audit-scope again/);
   }
   assert.equal(fs.existsSync(log)?fs.readFileSync(log,'utf8').trim():'','','nothing reached the host');
-  const inspect=inspectLedger({file:ledgerFileFor(repo)});
+  const inspect=inspectLedger({file:ledgerFile});
   try{
     assert.equal(inspect.db.prepare('SELECT status FROM jobs WHERE job_id=?').get('job-audit-scope').status,'queued');
     assert.equal(inspect.db.prepare('SELECT count(*) n FROM leases').get().n,0);
   }finally{inspect.close();}
 
-  write(repo,'.starciwork/features/wspv/operations/audit-pay/index.yaml','schema: work/node@1\n');
+  write(repo,'.starciwork/features/f/arch/index.yaml','schema: work/node@1\nid: arch\nkind: architecture\nrequired: true\nstate: done\ndescription: arch node\n');
   const dry=spawnSync(process.execPath,[API,'dispatch','--repo',repo,'--job','job-audit-scope','--json'],{cwd:ROOT,encoding:'utf8',windowsHide:true,timeout:120000,env});
   assert.equal(dry.status,0,dry.stdout+dry.stderr);
-  assert.ok(JSON.parse(dry.stdout).packet,'once the record exists the packet renders');
+  assert.ok(JSON.parse(dry.stdout).packet,'once the dependency is done the packet renders');
 });

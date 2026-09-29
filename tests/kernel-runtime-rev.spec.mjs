@@ -6,6 +6,7 @@ import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { FAKE_ORCA } from './helpers/fake-orca.mjs';
 import { inspectLedger, ledgerFileFor, openLedger } from '../engine/ledger-db.mjs';
+import { seedWorkflow } from './_ledger-fixture.mjs';
 import {
   KERNEL_REV_ACKED_EVENT, KERNEL_REV_STALE, REV_DIFF_MAX_FILES, kernelRevState, opRevDrift, opRevStale, revWakeLine, shortRev,
 } from '../scripts/kernel/runtime-rev.mjs';
@@ -121,8 +122,8 @@ test('every Kernel wake carries the runtime rev before its seat identity: wakeKe
   const rt = runtime(t); rt.checkout(rt.B);
   const { l, db, wf, ack } = ledgerFixture(t);
   ack(rt.A, 'boot');
-  l.db.prepare("INSERT INTO signals(scope,key,holder_pid,token,value_json,at,expires_at) VALUES('kernel',?,1,'tok',?,?,NULL)").run(wf, JSON.stringify({ terminal: 'term_k' }), Date.now());
-  l.db.prepare("INSERT INTO jobs(job_id,workflow_id,attempt,generation,kind,role,payload_json,status,worker_id,created_at,updated_at) VALUES(?,?,2,0,'kernel','kernel','{}','running','term_k',?,?)").run(`kernel-${wf}`, wf, Date.now(), Date.now());
+  l.db.prepare("INSERT INTO signals(scope,key,workflow_id,holder_pid,token,value_json,at,expires_at) VALUES('kernel',?,?,1,'tok',?,?,NULL)").run(wf, wf, JSON.stringify({ terminal: 'term_k' }), Date.now());
+  seedWorkflow(l, { id: wf, jobs: [{ jobId: `kernel-${wf}`, kind: 'kernel', status: 'running', workerId: 'term_k', payload: {} }] });
   const prev = process.env.STARCI_KERNEL_REV_ROOT;
   process.env.STARCI_KERNEL_REV_ROOT = rt.root;
   t.after(() => { if (prev == null) delete process.env.STARCI_KERNEL_REV_ROOT; else process.env.STARCI_KERNEL_REV_ROOT = prev; });
@@ -172,10 +173,9 @@ const apiFixture = (t, rt) => {
   const seed = (fn) => { const l = openLedger({ file: ledgerFileFor(repo) }); try { return fn(l); } finally { l.close(); } };
   const read = (fn) => { const l = inspectLedger({ file: ledgerFileFor(repo) }); try { return fn(l.db); } finally { l.close(); } };
   seed((l) => {
-    l.ensureWorkflow({ workflowId: wf, title: wf, ledgerMode: 'durable', sourceRoots: [repo] });
-    l.db.prepare("UPDATE workflows SET phase='running' WHERE workflow_id=?").run(wf);
-    l.db.prepare('INSERT INTO goals(workflow_id,revision,goal_identity,markdown,json,created_at) VALUES(?,?,?,?,?,?)').run(wf, 0, 'goal', '# goal', '{}', Date.now());
-    l.db.prepare("INSERT INTO jobs(job_id,workflow_id,attempt,generation,kind,role,payload_json,status,worker_id,created_at,updated_at) VALUES(?,?,1,0,'kernel','kernel','{}','running','term_k',?,?)").run(`kernel-${wf}`, wf, Date.now(), Date.now());
+    seedWorkflow(l, { id: wf, state: { phase: 'running', job: wf }, goal: { revision: 0, identity: 'goal', markdown: '# goal', json: {} },
+      jobs: [{ jobId: `kernel-${wf}`, kind: 'kernel', status: 'running', workerId: 'term_k', payload: {} }] });
+    l.write.updateWorkflow({ workflowId: wf, ledgerMode: 'durable', sourceRoots: [repo] });
   });
   return { repo, wf, api, ok, seed, read };
 };
@@ -210,8 +210,7 @@ test('api: a stale Kernel is refused kernel-rev-stale for the changed op only, s
   assert.ok(other.job_id, 'a leg of an unchanged op is enqueued');
 
   // dispatch holds a queued leg of the changed op the same way, before any reservation.
-  fx.seed((l) => l.db.prepare("INSERT INTO jobs(job_id,workflow_id,op_id,attempt,generation,kind,role,payload_json,status,created_at,updated_at) VALUES('job-draw',?,'interface.draw',1,0,'op','op',?,'queued',?,?)")
-    .run(fx.wf, JSON.stringify({ opId: 'interface.draw', owned_paths: ['docs/draw'] }), Date.now(), Date.now()));
+  fx.seed((l) => seedWorkflow(l, { id: fx.wf, jobs: [{ jobId: 'job-draw', opId: 'interface.draw', kind: 'op', payload: { opId: 'interface.draw', owned_paths: ['docs/draw'] } }] }));
   const held = fx.api(['dispatch', '--job', 'job-draw']);
   assert.equal(held.status, 1);
   assert.equal(lastJson(held.stderr)?.code, KERNEL_REV_STALE);
@@ -232,10 +231,13 @@ test('api settle WARNs op-rev-drift when the op contract changed after dispatch;
   const fx = apiFixture(t, rt);
   const now = Date.now();
   fx.seed((l) => {
-    l.db.prepare("INSERT INTO jobs(job_id,workflow_id,op_id,attempt,generation,kind,role,payload_json,status,worker_id,created_at,updated_at) VALUES('job-d',?,'interface.draw',1,0,'op','op',?,'running','ctx-d',?,?)")
-      .run(fx.wf, JSON.stringify({ opId: 'interface.draw', owned_paths: ['docs/d'], managed: { dispatchId: 'ctx-d' } }), now, now);
-    l.db.prepare('INSERT INTO contracts(workflow_id,op_id,attempt,dispatch_id,markdown,context_json,created_at) VALUES(?,?,?,?,?,?,?)')
-      .run(fx.wf, 'interface.draw', 1, 'ctx-d', '# contract', JSON.stringify({ contract: { schema: 'starci/contract-version@1', op: 'interface.draw', runtimeSha: rt.A, admittedAt: now } }), now);
+    seedWorkflow(l, { id: fx.wf, jobs: [{ jobId: 'job-d', opId: 'interface.draw', kind: 'op', status: 'running', workerId: 'ctx-d',
+      payload: { opId: 'interface.draw', owned_paths: ['docs/d'], managed: { dispatchId: 'ctx-d' } } }] });
+    l.transaction((db) => {
+      const attemptId = db.prepare("SELECT attempt_id FROM op_attempts WHERE job_id='job-d'").get().attempt_id;
+      db.prepare('INSERT INTO contracts(attempt_id,workflow_id,job_id,markdown,context_json,created_at) VALUES(?,?,?,?,?,?)')
+        .run(attemptId, fx.wf, 'job-d', '# contract', JSON.stringify({ contract: { schema: 'starci/contract-version@1', op: 'interface.draw', runtimeSha: rt.A, admittedAt: now } }), now);
+    });
   });
   const r = fx.api(['settle', '--job', 'job-d', '--verdict', 'fail']);
   assert.equal(r.status, 0, r.stderr || r.stdout);

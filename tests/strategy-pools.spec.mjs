@@ -6,6 +6,7 @@ import path from 'node:path';
 import {spawnSync} from 'node:child_process';
 import {FAKE_ORCA} from './helpers/fake-orca.mjs';
 import {openLedger,inspectLedger,ledgerFileFor} from '../engine/ledger-db.mjs';
+import {seedWorkflow} from './_ledger-fixture.mjs';
 import {parseYaml} from '../engine/yaml.mjs';
 import {kindOrder} from '../scripts/agent/models.mjs';
 
@@ -62,6 +63,9 @@ const fixture=t=>{
     STARCI_FAKE_ORCA_LOG:path.join(root,'calls.jsonl'),
     STARCI_FAKE_ORCA_STATE:path.join(root,'state.json'),
     STARCI_OWNER_ROOT:path.join(root,'owner'),
+    // machineFileFor honours STARCI_TEST_MACHINE_FILE first; without it the spawned api lands on the
+    // shared starci-test-registry file, which the current machine schema refuses (machine-schema-old).
+    STARCI_TEST_MACHINE_FILE:path.join(root,'machine.sqlite'),
   };
   const run=(...args)=>spawnSync(process.execPath,[API,...args],{cwd:ROOT,encoding:'utf8',windowsHide:true,timeout:120000,env});
   const callArgv=()=>fs.existsSync(path.join(root,'calls.jsonl'))
@@ -71,10 +75,12 @@ const fixture=t=>{
     const workflowId=`wf-${jobId}`;
     const ledger=openLedger({file:ledgerFileFor(repo)});
     try{
-      ledger.enqueueJob({jobId:`kernel-${workflowId}`,workflowId,kind:'kernel',role:'kernel',
-        payload:{hierarchy:{schema:'starci/agent-hierarchy@1',nodeId:`agent:kernel:${workflowId}`,parentNodeId:`workflow:${workflowId}`,role:'kernel'}}});
-      ledger.db.prepare("UPDATE jobs SET status='running',worker_id='fake-kernel-terminal' WHERE job_id=?").run(`kernel-${workflowId}`);
-      ledger.enqueueJob({jobId,workflowId,opId,kind:'op',payload:{opId,owned_paths:['docs/'],...payload}});
+      seedWorkflow(ledger,{id:workflowId,state:{phase:'running',job:workflowId},
+        jobs:[
+          {jobId:`kernel-${workflowId}`,kind:'kernel',status:'running',workerId:'fake-kernel-terminal',
+            payload:{hierarchy:{schema:'starci/agent-hierarchy@1',nodeId:`agent:kernel:${workflowId}`,parentNodeId:`workflow:${workflowId}`,role:'kernel'}}},
+          {jobId,opId,kind:'op',payload:{opId,owned_paths:['docs/'],...payload}},
+        ]});
     }finally{ledger.close();}
   };
   const status=jobId=>{

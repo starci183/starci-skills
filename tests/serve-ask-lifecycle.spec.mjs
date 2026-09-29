@@ -17,10 +17,14 @@ const SERVE_ASK=path.join(ROOT,'scripts','kernel','serve-ask.mjs');
 const WORKFLOW='wf-serve-ask';
 
 const seedAskReport=(ledger,{dispatchId,opId='provision.ask',workflowId=WORKFLOW,at=Date.now(),refs=null})=>{
+  // A reports row keys its attempt: the ask rides a reported job's op_attempts row (a3-3 evidence-db-report).
+  const jobId=`ask-${dispatchId}`;
+  seedWorkflow(ledger,{id:workflowId,jobs:[{jobId,opId,status:'reported',dispatchId,createdAt:at}]});
+  const attemptId=ledger.db.prepare('SELECT attempt_id FROM op_attempts WHERE job_id=?').get(jobId).attempt_id;
   ledger.transaction(db=>{
-    db.prepare(`INSERT INTO reports(workflow_id,dispatch_id,op_id,attempt,generation,outcome,report_json,created_at)
-      VALUES(?,?,?,?,?,?,?,?)`)
-      .run(workflowId,dispatchId,opId,1,1,'ask',
+    db.prepare(`INSERT INTO reports(workflow_id,attempt_id,dispatch_id,job_id,outcome,report_json,created_at)
+      VALUES(?,?,?,?,?,?,?)`)
+      .run(workflowId,attemptId,dispatchId,jobId,'ask',
         JSON.stringify({schema:'starci/op-report@1',outcome:'ask',summary:`ask from ${dispatchId}`,
           question:{text:'which way?',options:['a','b'],...(refs?{refs}:{})}}),at);
   });

@@ -13,7 +13,7 @@ import path from 'node:path';
 import { createHash } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 import { parseYaml, stringifyYaml } from '../engine/yaml.mjs';
-import { ledgerFileFor, openLedger } from '../engine/ledger-db.mjs';
+import { ledgerFileFor, openLedger, ensureWorkflow, changeWorkflowPhase, createUnit, enqueueJob, setJobStatus, startAttempt, writeContract, fileReport } from '../engine/ledger-db.mjs';
 import { applyDrawReview, drawReviewQuestion } from '../scripts/work/draw-review.mjs';
 import {
   DRAW_FEEDBACK_UNADDRESSED, DRAW_OWNER_RULING, DRAW_REDRAW_OWED, KNOWLEDGE_CHANGE_REQUESTED, briefBlock, classifyNote, classifyNoteInRecord,
@@ -85,10 +85,26 @@ function product(t) {
     return f;
   };
   const ledger = () => openLedger({ file: ledgerFileFor(repo) });
+  // The ask an interface.draw attempt files: on the migrated schema a reports row keys the dispatch's
+  // op_attempts row, so the whole workflow → unit → job → leased → attempt → reported chain is seeded
+  // through the ledger helpers, then the ask itself filed with fileReport.
   const fileAsk = (l, dispatchId, question) => {
-    l.ensureWorkflow({ workflowId: WF, title: 'draw feedback' });
-    l.db.prepare(`INSERT INTO reports(workflow_id,dispatch_id,op_id,attempt,generation,outcome,report_json,created_at) VALUES(?,?,?,?,0,'ask',?,?)`)
-      .run(WF, dispatchId, 'interface.draw', 1, JSON.stringify({ outcome: 'ask', summary: 'draw review', dispatch: dispatchId, question }), Date.now());
+    const jobId = `job-${dispatchId}`, at = Date.now();
+    l.transaction(db => {
+      ensureWorkflow(db, { workflowId: WF, phase: 'queued', title: 'draw feedback', by: 'test-fixture', reason: 'seed', at });
+      changeWorkflowPhase(db, { workflowId: WF, to: 'running', by: 'test-fixture', reason: 'seed', at });
+      createUnit(db, { workflowId: WF, unitId: `unit-${jobId}`, opId: 'interface.draw', subjectKey: `unit-${jobId}`, goalRevision: 1, createdAt: at });
+      enqueueJob(db, { jobId, workflowId: WF, unitId: `unit-${jobId}`, opId: 'interface.draw', kind: 'op',
+        payload: { opId: 'interface.draw', owned_paths: [], orca: { dispatchId } }, createdAt: at });
+      setJobStatus(db, { jobId, to: 'ready', reason: 'seed', at });
+      setJobStatus(db, { jobId, to: 'leased', reason: 'seed', at });
+      const attempt = startAttempt(db, { workflowId: WF, jobId, dispatchId, dispatchedAt: at, startedAt: at, at });
+      writeContract(db, { attemptId: attempt.attempt_id, markdown: '# contract', context: {}, createdAt: at });
+      setJobStatus(db, { jobId, to: 'running', reason: 'seed', at });
+      setJobStatus(db, { jobId, to: 'reported', reason: 'report-filed:ask', attemptId: attempt.attempt_id, at });
+      fileReport(db, { attemptId: attempt.attempt_id, outcome: 'ask',
+        report: { outcome: 'ask', summary: 'draw review', dispatch: dispatchId, from: jobId, question }, createdAt: at });
+    });
     return l.db.prepare('SELECT * FROM reports WHERE workflow_id=? AND dispatch_id=?').get(WF, dispatchId);
   };
   const answered = (l, report, receiptPath, optionIndex) => l.appendEvent({ workflowId: WF, entityType: 'report', entityId: report.dispatch_id, kind: 'ask-answered',

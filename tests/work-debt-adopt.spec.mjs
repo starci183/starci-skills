@@ -4,7 +4,8 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import {spawnSync} from 'node:child_process';
-import {inspectLedger,ledgerFileFor,openLedger} from '../engine/ledger-db.mjs';
+import {inspectLedger,ledgerFileFor,openLedger,changeWorkflowPhase,writeContract,fileReport} from '../engine/ledger-db.mjs';
+import {seedWorkflow} from './_ledger-fixture.mjs';
 import {WORK_COMMIT_CHANGE} from '../scripts/kernel/settle-landed.mjs';
 import {loadContractChanges} from '../scripts/kernel/contract-version.mjs';
 
@@ -52,18 +53,24 @@ const api=(env,...args)=>{
 const seedJob=(repo,{op,jobId,wf,admittedAt,status='succeeded',owned})=>{
   const ledger=openLedger({file:ledgerFileFor(repo)});
   try{
-    ledger.ensureWorkflow({workflowId:wf,title:wf});
-    ledger.enqueueJob({jobId,workflowId:wf,opId:op,attempt:1,kind:'op',payload:{opId:op,owned_paths:owned,orca:{dispatchId:`ctx-${jobId}`,agentTerminalHandle:`term-${jobId}`},settledAt:admittedAt+1000}});
-    ledger.db.prepare('UPDATE jobs SET status=? WHERE job_id=?').run(status,jobId);
-    ledger.db.prepare('INSERT INTO contracts(workflow_id,op_id,attempt,dispatch_id,markdown,context_json,created_at) VALUES(?,?,?,?,?,?,?)')
-      .run(wf,op,1,`ctx-${jobId}`,'# contract',json({worktree:repo}),admittedAt);
-    ledger.db.prepare('INSERT INTO reports(workflow_id,dispatch_id,op_id,attempt,generation,outcome,report_json,from_terminal,consumed_at,created_at) VALUES(?,?,?,?,?,?,?,?,NULL,?)')
-      .run(wf,`ctx-${jobId}`,op,1,0,'done',json({outcome:'done',summary:jobId}),null,admittedAt+500);
+    seedWorkflow(ledger,{id:wf,state:{phase:'running',job:wf},
+      jobs:[{jobId,opId:op,status,payload:{opId:op,owned_paths:owned,orca:{dispatchId:`ctx-${jobId}`,agentTerminalHandle:`term-${jobId}`},settledAt:admittedAt+1000}}]});
+    ledger.transaction(db=>{
+      const attemptId=db.prepare('SELECT attempt_id FROM op_attempts WHERE job_id=?').get(jobId)?.attempt_id;
+      if(attemptId){
+        writeContract(db,{attemptId,markdown:'# contract',context:{worktree:repo},createdAt:admittedAt});
+        fileReport(db,{attemptId,outcome:'done',report:{outcome:'done',summary:jobId},createdAt:admittedAt+500});
+      }
+    });
   }finally{ledger.close();}
 };
 const finish=(repo,wf,{archive=false}={})=>{const l=openLedger({file:ledgerFileFor(repo)});try{
-  if(archive)l.db.prepare('UPDATE workflows SET archived_at=? WHERE workflow_id=?').run(Date.now(),wf);
-  else l.db.prepare("UPDATE workflows SET phase='finished' WHERE workflow_id=?").run(wf);}finally{l.close();}};
+  l.transaction(db=>{
+    // Phase moves only through lifecycle_changes (workflows_phase_guard): archived is reached finished→archived.
+    if(archive){changeWorkflowPhase(db,{workflowId:wf,to:'finished',by:'seed',reason:'fixture'});
+      changeWorkflowPhase(db,{workflowId:wf,to:'archived',by:'seed',reason:'fixture'});}
+    else changeWorkflowPhase(db,{workflowId:wf,to:'finished',by:'seed',reason:'fixture'});
+  });}finally{l.close();}};
 const payloadOf=(repo,jobId)=>{const l=inspectLedger({file:ledgerFileFor(repo)});try{return JSON.parse(l.db.prepare('SELECT payload_json FROM jobs WHERE job_id=?').get(jobId).payload_json);}finally{l.close();}};
 
 const OP='architecture.decide';

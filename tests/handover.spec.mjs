@@ -12,7 +12,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import {spawnSync} from 'node:child_process';
-import {inspectLedger,ledgerFileFor,openLedger} from '../engine/ledger-db.mjs';
+import {inspectLedger,ledgerFileFor,openLedger,ensureWorkflow,changeWorkflowPhase,insertGoal,createUnit,enqueueJob,setJobStatus,startAttempt,writeContract,reopenUnit,raiseTryBudget,recordJobResult,updateAttempt,markReportConsumed} from '../engine/ledger-db.mjs';
 import {parseYaml} from '../engine/yaml.mjs';
 import {checkOpManifest} from '../scripts/checks/check-op-manifest.mjs';
 import {HANDOVER_DECISIONS,HANDOVER_OP,decisionOf,handoverAskProblem} from '../scripts/kernel/handover.mjs';
@@ -23,6 +23,10 @@ const PLAN=path.join(ROOT,'scripts','route','route-plan.mjs');
 const readYaml=rel=>parseYaml(fs.readFileSync(path.join(ROOT,rel),'utf8'));
 const run=(...args)=>spawnSync(process.execPath,[API,...args],{cwd:ROOT,encoding:'utf8',windowsHide:true,timeout:120000,
   env:{...process.env,ORCA_TERMINAL_HANDLE:'',STARCI_ROLE:''}});
+// The settler's own check recording: a caller-declared green never counts toward a pass (H8), so the
+// spec records the kernel's check the way the runtime settler does — with STARCI_CALLER=runtime-settler.
+const runSettler=(...args)=>spawnSync(process.execPath,[API,...args],{cwd:ROOT,encoding:'utf8',windowsHide:true,timeout:120000,
+  env:{...process.env,ORCA_TERMINAL_HANDLE:'',STARCI_ROLE:'',STARCI_CALLER:'runtime-settler'}});
 const json=r=>{try{return JSON.parse(r.stdout);}catch{const open=r.stdout.indexOf('{'),close=r.stdout.indexOf('\n}');return open<0||close<0?null:JSON.parse(r.stdout.slice(open,close+2));}};
 const OPTIONS=['Duyệt - workflow hoàn tất','Góp ý / báo lỗi - mô tả trong ghi chú','Đặt câu hỏi - ghi trong ghi chú'];
 
@@ -35,36 +39,64 @@ const seed=(repo,fn)=>{const ledger=openLedger({file:ledgerFileFor(repo)});try{r
 const read=(repo,fn)=>{const ledger=inspectLedger({file:ledgerFileFor(repo)});try{return fn(ledger.db);}finally{ledger.close();}};
 
 /** A running workflow whose approved chain is docs.author then the handover, with docs.author settled pass. */
-const seedWorkflow=(repo,wf)=>seed(repo,ledger=>{
+const seedWorkflow=(repo,wf)=>seed(repo,ledger=>ledger.transaction(db=>{
   const at=Date.now();
-  ledger.ensureWorkflow({workflowId:wf,title:'handover spec'});
-  ledger.db.prepare("UPDATE workflows SET phase='running' WHERE workflow_id=?").run(wf);
-  ledger.db.prepare('INSERT INTO goals(workflow_id,revision,goal_identity,markdown,json,created_at) VALUES(?,?,?,?,?,?)')
-    .run(wf,0,'hgoal','# goal',JSON.stringify({opChain:{legs:[{op:'docs.author'},{op:HANDOVER_OP}]}}),at);
-  seedJob(ledger,{wf,jobId:'job-docs',op:'docs.author',attempt:1,status:'succeeded',result:{verdict:'pass'}});
+  ensureWorkflow(db,{workflowId:wf,phase:'queued',title:'handover spec',by:'test-fixture',reason:'seed',at});
+  insertGoal(db,{workflowId:wf,revision:0,goalIdentity:'hgoal',markdown:'# goal',
+    goal:{opChain:{legs:[{op:'docs.author'},{op:HANDOVER_OP}]}},createdAt:at});
+  changeWorkflowPhase(db,{workflowId:wf,to:'running',by:'test-fixture',reason:'seed',at});
+  seedJob(db,{wf,jobId:'job-docs',op:'docs.author',status:'succeeded',result:{verdict:'pass'}});
   ledger.appendEvent({workflowId:wf,entityType:'job',entityId:'job-docs',kind:'op-settled',payload:{verdict:'pass',status:'succeeded'}});
-});
-/** A job row; with dispatchId it is bound to a contract, so api report / check / settle accept it. */
-function seedJob(ledger,{wf,jobId,op,attempt,status='running',dispatchId=null,result=null}){
-  const at=Date.now();
-  ledger.db.prepare(`INSERT INTO jobs(job_id,workflow_id,op_id,attempt,generation,kind,role,payload_json,status,result_json,created_at,updated_at)
-    VALUES(?,?,?,?,0,'op','op',?,?,?,?,?)`).run(jobId,wf,op,attempt,
-    JSON.stringify({opId:op,owned_paths:[`.starciwork/evidence/${wf}.handover`],...(dispatchId?{orca:{dispatchId}}:{})}),
-    status,result?JSON.stringify(result):null,at,at);
-  if(dispatchId)ledger.db.prepare('INSERT INTO contracts(workflow_id,op_id,attempt,dispatch_id,markdown,context_json,created_at) VALUES(?,?,?,?,?,?,?)')
-    .run(wf,op,attempt,dispatchId,'# contract',null,at);
+}));
+/**
+ * One op job of the migrated schema: unit -> queued -> ready -> leased -> a contract-bound open
+ * attempt -> running (the state api report / check / settle accept), or further to reported ->
+ * succeeded with its result on the attempt when `status` says so. Jobs of one `unitKey` are the
+ * tries of one unit: a retry chains retry_of to the failed previous try, a try after a passed one
+ * goes through reopenUnit (H5) — the same lineage api enqueue writes.
+ * Returns {scratch, attemptId}: the attempt's STARCI_JOB_SCRATCH dir (api report reads the report
+ * file only from inside it) and the attempt row id.
+ */
+function seedJob(ledger,{wf,jobId,op,unitKey=null,status='running',dispatchId=null,result=null}){
+  const db=ledger.db??ledger,at=Date.now();
+  const unitId=unitKey??`unit-${jobId}`;
+  const scratch=dispatchId?fs.mkdtempSync(path.join(os.tmpdir(),'starci-ho-scratch-')):null;
+  if(!db.prepare('SELECT 1 FROM work_units WHERE workflow_id=? AND unit_id=?').get(wf,unitId))
+    createUnit(db,{workflowId:wf,unitId,opId:op,subjectKey:unitId,goalRevision:0,createdAt:at});
+  const last=db.prepare('SELECT job_id,try_no,status FROM jobs WHERE workflow_id=? AND unit_id=? ORDER BY try_no DESC LIMIT 1').get(wf,unitId);
+  const tryNo=(last?.try_no??0)+1;
+  const retryOf=last?.status==='failed'?last.job_id:null;
+  if(last&&!retryOf)reopenUnit(db,{workflowId:wf,unitId,reason:`${op} runs again`,by:'test-fixture',to:'queued',at});
+  // Q13: more tries than the default budget of 5 need a recorded raise, the same call the Supervisor makes.
+  const budget=db.prepare('SELECT try_budget FROM work_units WHERE workflow_id=? AND unit_id=?').get(wf,unitId).try_budget;
+  if(tryNo>budget)raiseTryBudget(db,{workflowId:wf,unitId,tryBudget:tryNo,by:'supervisor',ref:'spec: extra handover rounds',at});
+  enqueueJob(db,{jobId,workflowId:wf,unitId,opId:op,kind:'op',tryNo,retryOf,
+    payload:{opId:op,owned_paths:[`.starciwork/evidence/${wf}.handover`],...(dispatchId?{orca:{dispatchId}}:{})},createdAt:at});
+  setJobStatus(db,{jobId,to:'ready',reason:'seed',at});
+  setJobStatus(db,{jobId,to:'leased',reason:'seed',at});
+  const attempt=startAttempt(db,{workflowId:wf,jobId,dispatchId:dispatchId??`ctx-${jobId}`,
+    scratchDir:scratch,dispatchedAt:at,startedAt:at,at});
+  writeContract(db,{attemptId:attempt.attempt_id,markdown:'# contract',createdAt:at});
+  setJobStatus(db,{jobId,to:'running',reason:'seed',at});
+  if(status==='succeeded'){
+    setJobStatus(db,{jobId,to:'reported',reason:'seed',attemptId:attempt.attempt_id,at});
+    setJobStatus(db,{jobId,to:'succeeded',reason:'seed',attemptId:attempt.attempt_id,at});
+    updateAttempt(db,{attemptId:attempt.attempt_id,settledAt:at,verdict:'pass',endState:'settled',at});
+    recordJobResult(db,{jobId,result:result??{verdict:'pass'},at});
+  }
+  return {scratch,attemptId:attempt.attempt_id};
 }
-const writeReport=(repo,name,body)=>{
-  const file=path.join(repo,name);
+const writeReport=(dir,name,body)=>{
+  const file=path.join(dir,name);
   fs.writeFileSync(file,JSON.stringify({schema:'starci/op-report@1',summary:'handover',...body}),'utf8');
   return file;
 };
 const status=(repo,wf)=>{const r=run('status','--repo',repo,'--workflow',wf,'--json');assert.equal(r.status,0,r.stderr);return json(r);};
 /** Files the handover ask of `attempt`, settles it blocked (awaiting-owner) and serves it on a live pid. */
 const handOver=(repo,wf,{attempt,dispatchId})=>{
-  seed(repo,ledger=>seedJob(ledger,{wf,jobId:`job-ho-${attempt}`,op:HANDOVER_OP,attempt,dispatchId}));
+  const {scratch}=seed(repo,ledger=>seedJob(ledger,{wf,jobId:`job-ho-${attempt}`,op:HANDOVER_OP,unitKey:'ho',dispatchId}));
   const filed=run('report','--repo',repo,'--job',`job-ho-${attempt}`,'--report',
-    writeReport(repo,`ask-${attempt}.json`,{outcome:'ask',question:{text:'Bàn giao: ứng dụng đã xong.',options:OPTIONS}}),'--json');
+    writeReport(scratch,`ask-${attempt}.json`,{outcome:'ask',question:{text:'Bàn giao: ứng dụng đã xong.',options:OPTIONS}}),'--json');
   assert.equal(filed.status,0,filed.stderr||filed.stdout);
   const settled=run('settle','--repo',repo,'--job',`job-ho-${attempt}`,'--verdict','blocked','--json');
   assert.equal(settled.status,0,settled.stderr||settled.stdout);
@@ -83,17 +115,19 @@ const answer=(repo,wf,{dispatchId,optionIndex,answeredBy='owner',eventAnsweredBy
 };
 /** The attempt that runs after an approve: it files done, the kernel records its check, then settles pass. */
 const settleApproval=(repo,wf,{attempt,dispatchId})=>{
-  seed(repo,ledger=>seedJob(ledger,{wf,jobId:`job-ho-${attempt}`,op:HANDOVER_OP,attempt,dispatchId}));
-  const filed=run('report','--repo',repo,'--job',`job-ho-${attempt}`,'--report',writeReport(repo,`done-${attempt}.json`,{outcome:'done',summary:'approved by the owner'}),'--json');
+  const {scratch}=seed(repo,ledger=>seedJob(ledger,{wf,jobId:`job-ho-${attempt}`,op:HANDOVER_OP,unitKey:'ho',dispatchId}));
+  const filed=run('report','--repo',repo,'--job',`job-ho-${attempt}`,'--report',writeReport(scratch,`done-${attempt}.json`,{outcome:'done',summary:'approved by the owner'}),'--json');
   assert.equal(filed.status,0,filed.stderr||filed.stdout);
-  const checked=run('check','--repo',repo,'--job',`job-ho-${attempt}`,'--checks',JSON.stringify({checks:[{name:'handover-owner-approval',command:'api status --json',exitCode:0,evidence:'approve by owner'}]}),'--json');
+  const checked=runSettler('check','--repo',repo,'--job',`job-ho-${attempt}`,'--checks',JSON.stringify({checks:[{name:'handover-owner-approval',command:'api status --json',exitCode:0,evidence:'approve by owner'}]}),'--json');
   assert.equal(checked.status,0,checked.stderr||checked.stdout);
   return run('settle','--repo',repo,'--job',`job-ho-${attempt}`,'--verdict','pass','--json');
 };
-/** A refused pass leaves its attempt running on a filed done report; retire it the way a kernel would, failed and consumed. */
+/** A refused pass leaves its attempt reported on a filed done report; retire it the way a kernel would, failed and consumed. */
 const retire=(repo,wf,jobId)=>seed(repo,ledger=>{
-  ledger.db.prepare("UPDATE jobs SET status='failed',result_json=? WHERE job_id=?").run(JSON.stringify({verdict:'fail'}),jobId);
-  ledger.db.prepare('UPDATE reports SET consumed_at=? WHERE workflow_id=? AND consumed_at IS NULL').run(Date.now(),wf);
+  recordJobResult(ledger.db,{jobId,result:{verdict:'fail'}});
+  ledger.db.prepare("UPDATE jobs SET status='failed' WHERE job_id=?").run(jobId);
+  for(const row of ledger.db.prepare('SELECT attempt_id FROM reports WHERE workflow_id=? AND consumed_at IS NULL').all(wf))
+    markReportConsumed(ledger.db,{attemptId:row.attempt_id});
 });
 const approvals=(repo,wf)=>read(repo,db=>db.prepare("SELECT payload_json FROM events WHERE workflow_id=? AND kind='handover-approved' ORDER BY seq").all(wf).map(r=>JSON.parse(r.payload_json)));
 
@@ -127,13 +161,13 @@ test('a handover ask carries exactly the three options approve, feedback, questi
 
   const repo=fixture(t),wf='wf-handover-shape';
   seedWorkflow(repo,wf);
-  seed(repo,ledger=>seedJob(ledger,{wf,jobId:'job-ho-1',op:HANDOVER_OP,attempt:1,dispatchId:'ho-d1'}));
-  const two=run('report','--repo',repo,'--job','job-ho-1','--report',writeReport(repo,'two.json',{outcome:'ask',question:{text:'Bàn giao',options:OPTIONS.slice(0,2)}}),'--json');
+  const {scratch}=seed(repo,ledger=>seedJob(ledger,{wf,jobId:'job-ho-1',op:HANDOVER_OP,unitKey:'ho',dispatchId:'ho-d1'}));
+  const two=run('report','--repo',repo,'--job','job-ho-1','--report',writeReport(scratch,'two.json',{outcome:'ask',question:{text:'Bàn giao',options:OPTIONS.slice(0,2)}}),'--json');
   assert.notEqual(two.status,0,'a two-option handover ask is refused');
   assert.match(two.stderr,/report-invalid/);
   assert.match(two.stderr,/exactly 3 options/);
   assert.equal(read(repo,db=>db.prepare('SELECT count(*) n FROM reports WHERE workflow_id=?').get(wf).n),0,'nothing is filed');
-  const three=run('report','--repo',repo,'--job','job-ho-1','--report',writeReport(repo,'three.json',{outcome:'ask',question:{text:'Bàn giao',options:OPTIONS}}),'--json');
+  const three=run('report','--repo',repo,'--job','job-ho-1','--report',writeReport(scratch,'three.json',{outcome:'ask',question:{text:'Bàn giao',options:OPTIONS}}),'--json');
   assert.equal(three.status,0,three.stderr||three.stdout);
   assert.deepEqual(read(repo,db=>JSON.parse(db.prepare('SELECT report_json FROM reports WHERE workflow_id=?').get(wf).report_json)).question.options,OPTIONS);
 });
@@ -175,7 +209,7 @@ test('finish is refused without the owner approval and allowed after it; a later
 
   // A business job that settles after the approval: the owner approved a package that no longer covers the product.
   seed(repo,ledger=>{
-    seedJob(ledger,{wf,jobId:'job-docs-2',op:'docs.author',attempt:2,status:'succeeded',result:{verdict:'pass'}});
+    seedJob(ledger,{wf,jobId:'job-docs-2',op:'docs.author',status:'succeeded',result:{verdict:'pass'}});
     ledger.appendEvent({workflowId:wf,entityType:'job',entityId:'job-docs-2',kind:'op-settled',payload:{verdict:'pass',status:'succeeded'}});
   });
   s=status(repo,wf);
@@ -207,7 +241,7 @@ test('a non-owner answer never approves a handover',t=>{
   assert.notEqual(refused.status,0,'a delegated approve cannot settle the handover pass');
   assert.match(refused.stderr,/handover-not-approved/);
   assert.match(refused.stderr,/answered by supervisor/);
-  assert.equal(read(repo,db=>db.prepare("SELECT status FROM jobs WHERE job_id='job-ho-2'").get().status),'running','the refused settle writes nothing');
+  assert.equal(read(repo,db=>db.prepare("SELECT status FROM jobs WHERE job_id='job-ho-2'").get().status),'reported','the refused settle writes nothing');
   assert.deepEqual(approvals(repo,wf),[]);
   retire(repo,wf,'job-ho-2');
   assert.match(run('finish','--repo',repo,'--workflow',wf,'--json').stderr,/handover-not-approved/);
@@ -236,7 +270,7 @@ test('feedback and question answers are the Kernel\'s move, and a passed fix mak
   assert.match(settleApproval(repo,wf,{attempt:2,dispatchId:'ho-d2'}).stderr,/not approve/,'feedback is no approval');
   retire(repo,wf,'job-ho-2');
   seed(repo,ledger=>{
-    seedJob(ledger,{wf,jobId:'job-fix',op:'docs.author',attempt:3,status:'succeeded',result:{verdict:'pass'}});
+    seedJob(ledger,{wf,jobId:'job-fix',op:'docs.author',status:'succeeded',result:{verdict:'pass'}});
     ledger.appendEvent({workflowId:wf,entityType:'job',entityId:'job-fix',kind:'op-settled',payload:{verdict:'pass',status:'succeeded'}});
   });
   s=status(repo,wf);

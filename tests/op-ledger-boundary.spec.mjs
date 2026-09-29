@@ -6,6 +6,7 @@ import path from 'node:path';
 import {spawnSync} from 'node:child_process';
 import {FAKE_ORCA} from './helpers/fake-orca.mjs';
 import {openLedger,inspectLedger,ledgerFileFor} from '../engine/ledger-db.mjs';
+import {seedWorkflow} from './_ledger-fixture.mjs';
 import {buildSpawnCommand,envPrefix} from '../scripts/agent/lib.mjs';
 
 // Incident inc-360891316369 (starci-next base-repos, backend.scaffold seam attempt 11): an op worker ran
@@ -26,7 +27,10 @@ const fixture=t=>{
   const stub=path.join(root,'fake-orca.mjs');fs.writeFileSync(stub,FAKE_ORCA);
   const stateFile=path.join(root,'state.json');
   const base={...process.env,STARCI_ORCA_COMMAND:process.execPath,STARCI_ORCA_ARGS:JSON.stringify([stub]),
-    STARCI_FAKE_ORCA_LOG:path.join(root,'calls.jsonl'),STARCI_FAKE_ORCA_STATE:stateFile};
+    STARCI_FAKE_ORCA_LOG:path.join(root,'calls.jsonl'),STARCI_FAKE_ORCA_STATE:stateFile,
+    // machineFileFor honours STARCI_TEST_MACHINE_FILE first; without it the spawned api lands on the
+    // shared starci-test-registry file, which the current machine schema refuses (machine-schema-old).
+    STARCI_TEST_MACHINE_FILE:path.join(root,'machine.sqlite')};
   // The suite may itself run inside an Orca or op terminal: start from a caller with no identity.
   for(const key of ['ORCA_TERMINAL_HANDLE','STARCI_ROLE','STARCI_OP_JOB'])delete base[key];
   const api=(args,env={})=>spawnSync(process.execPath,[API,...args,'--repo',repo,'--json'],{cwd:ROOT,encoding:'utf8',windowsHide:true,timeout:120000,env:{...base,...env}});
@@ -34,15 +38,17 @@ const fixture=t=>{
   const wf='wf-op-boundary',jobId='job-op-boundary',otherJob='job-op-sibling',managedJob='job-op-managed';
   const ledger=openLedger({file:ledgerFileFor(repo)});
   try{
-    ledger.enqueueJob({jobId:`kernel-${wf}`,workflowId:wf,kind:'kernel',role:'kernel',
-      payload:{hierarchy:{schema:'starci/agent-hierarchy@1',nodeId:`agent:kernel:${wf}`,parentNodeId:`workflow:${wf}`,role:'kernel'}}});
-    ledger.db.prepare("UPDATE jobs SET status='running',worker_id='fake-kernel-terminal' WHERE job_id=?").run(`kernel-${wf}`);
-    ledger.enqueueJob({jobId,workflowId:wf,opId:'code.refactor',kind:'op',payload:{opId:'code.refactor',owned_paths:['docs/'],model:'codex-agent',difficulty:'hard'}});
-    ledger.enqueueJob({jobId:otherJob,workflowId:wf,opId:'docs.author',kind:'op',payload:{opId:'docs.author',owned_paths:['notes/']}});
-    // A managed (worker-start) op: its agent terminal handle is on the payload, its env is Orca's.
-    ledger.enqueueJob({jobId:managedJob,workflowId:wf,opId:'docs.author',kind:'op',attempt:2,payload:{opId:'docs.author',owned_paths:['guides/'],
-      managed:{dispatchId:'ctx_managed_1',agentTerminalHandle:'term_managed_1',runId:'run-fake-1'}}});
-    ledger.db.prepare("UPDATE jobs SET status='running',worker_id='ctx_managed_1' WHERE job_id=?").run(managedJob);
+    seedWorkflow(ledger,{id:wf,state:{phase:'running',job:wf},
+      jobs:[
+        {jobId:`kernel-${wf}`,kind:'kernel',status:'running',workerId:'fake-kernel-terminal',
+          payload:{hierarchy:{schema:'starci/agent-hierarchy@1',nodeId:`agent:kernel:${wf}`,parentNodeId:`workflow:${wf}`,role:'kernel'}}},
+        {jobId,opId:'code.refactor',kind:'op',payload:{opId:'code.refactor',owned_paths:['docs/'],model:'codex-agent',difficulty:'hard'}},
+        {jobId:otherJob,opId:'docs.author',kind:'op',payload:{opId:'docs.author',owned_paths:['notes/']}},
+        // A managed (worker-start) op: its agent terminal handle is on the payload, its env is Orca's.
+        {jobId:managedJob,opId:'docs.author',kind:'op',status:'running',workerId:'ctx_managed_1',
+          payload:{opId:'docs.author',owned_paths:['guides/'],
+            managed:{dispatchId:'ctx_managed_1',agentTerminalHandle:'term_managed_1',runId:'run-fake-1'}}},
+      ]});
   }finally{ledger.close();}
   const read=fn=>{const l=inspectLedger({file:ledgerFileFor(repo)});try{return fn(l.db);}finally{l.close();}};
   return {root,repo,wf,jobId,otherJob,managedJob,api,orcaState,read};
@@ -62,7 +68,7 @@ test('the op launch command carries the role marker and the op packet names no l
   const command=fx.orcaState().commands[0];
   assert.match(command,/STARCI_ROLE='op'/);
   assert.ok(command.includes(`STARCI_OP_JOB='${fx.jobId}'`),command);
-  const contract=fx.read(db=>db.prepare('SELECT markdown,context_json FROM contracts WHERE workflow_id=? AND op_id=?').get(fx.wf,'code.refactor'));
+  const contract=fx.read(db=>db.prepare('SELECT markdown,context_json FROM contracts WHERE workflow_id=? AND job_id=?').get(fx.wf,fx.jobId));
   assert.doesNotMatch(contract.markdown,/runtime\.sqlite/,'the op prompt names no ledger file');
   assert.doesNotMatch(contract.context_json,/runtime\.sqlite/,'nor does the packet context');
   assert.match(contract.markdown,/never open, query or copy a ledger file/);
@@ -108,8 +114,12 @@ test('an op caller is refused every kernel verb; reads and its own report pass t
   assert.equal(fx.api(['status','--workflow',fx.wf],asOp).status,0);
   assert.equal(fx.api(['op-contract','--job',fx.jobId],asOp).status,0);
 
-  // report: another job's is refused; its own passes the gate and files.
-  const reportFile=path.join(fx.root,'report.json');
+  // report: another job's is refused; its own passes the gate and files. The envelope is read only
+  // from the attempt's STARCI_JOB_SCRATCH (op_attempts.scratch_dir, created by dispatch).
+  const scratch=fx.read(db=>db.prepare('SELECT scratch_dir FROM op_attempts WHERE job_id=? ORDER BY attempt_id DESC LIMIT 1').get(fx.jobId)?.scratch_dir);
+  assert.ok(scratch,'dispatch records the attempt scratch dir');
+  fs.mkdirSync(scratch,{recursive:true});
+  const reportFile=path.join(scratch,'report.json');
   fs.writeFileSync(reportFile,JSON.stringify({outcome:'failed',summary:'boundary spec',files:[],checks:[]}));
   const foreign=fx.api(['report','--job',fx.otherJob,'--report',reportFile],asOp);
   assert.equal(foreign.status,1);

@@ -4,7 +4,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import {spawnSync} from 'node:child_process';
-import {inspectLedger,ledgerFileFor,openLedger} from '../engine/ledger-db.mjs';
+import {inspectLedger,ledgerFileFor,openLedger,ensureWorkflow,changeWorkflowPhase,insertGoal,createUnit,enqueueJob,setJobStatus,startAttempt,writeContract,fileReport,recordCheckRun} from '../engine/ledger-db.mjs';
 
 // settle's landed proof resolves each owned path against the job's target
 // repository (scripts/kernel/target-repo.mjs): a split be/fe project binding
@@ -68,24 +68,33 @@ const project=t=>{
   return {be,fe,api};
 };
 
-// A running job with a bound contract whose worktree is the ledger repo (where
-// the kernel placed the worker), a filed done report naming `head`, and green
-// recorded checks: everything a pass needs except the landed proof.
+// A running job on a running workflow with a contract-bound open attempt whose
+// contract worktree is the ledger repo (where the kernel placed the worker), a
+// filed done report naming `head`, and a green independent check_runs row:
+// everything a pass needs except the landed proof.
 const seedJob=(repo,{op,owned,head,repository,jobId='op-target-1',wf='wf-target'})=>{
   const ledger=openLedger({file:ledgerFileFor(repo)});
   try{
     const at=Date.now();
-    ledger.ensureWorkflow({workflowId:wf,title:'target'});
-    ledger.enqueueJob({jobId,workflowId:wf,opId:op,kind:'op',payload:{
-      opId:op,owned_paths:owned,...(repository?{repository}:{}),orca:{dispatchId:`ctx-${jobId}`,agentTerminalHandle:`term-${jobId}`},
-    }});
-    ledger.db.prepare("UPDATE jobs SET status='running' WHERE job_id=?").run(jobId);
-    ledger.db.prepare('INSERT INTO contracts(workflow_id,op_id,attempt,dispatch_id,markdown,context_json,created_at) VALUES(?,?,?,?,?,?,?)')
-      .run(wf,op,1,`ctx-${jobId}`,'# contract',json({worktree:repo}),at);
-    ledger.db.prepare('INSERT INTO reports(workflow_id,dispatch_id,op_id,attempt,generation,outcome,report_json,from_terminal,consumed_at,created_at) VALUES(?,?,?,?,?,?,?,?,NULL,?)')
-      .run(wf,`ctx-${jobId}`,op,1,0,'done',json({outcome:'done',summary:'landed',head,branch:'main'}),null,at);
-    ledger.db.prepare('INSERT INTO checks(workflow_id,op_id,attempt,checks_json,created_at) VALUES(?,?,?,?,?)')
-      .run(wf,op,1,json({checks:[{name:'unit',exitCode:0}]}),at);
+    ledger.transaction(db=>{
+      ensureWorkflow(db,{workflowId:wf,phase:'queued',title:'target',by:'test-fixture',reason:'seed',at});
+      insertGoal(db,{workflowId:wf,revision:1,goalIdentity:`goal-${wf}`,markdown:'# goal',goal:{job:op},createdAt:at});
+      changeWorkflowPhase(db,{workflowId:wf,to:'running',by:'test-fixture',reason:'seed',at});
+      createUnit(db,{workflowId:wf,unitId:`unit-${jobId}`,opId:op,subjectKey:`unit-${jobId}`,goalRevision:1,createdAt:at});
+      enqueueJob(db,{jobId,workflowId:wf,unitId:`unit-${jobId}`,opId:op,kind:'op',payload:{
+        opId:op,owned_paths:owned,...(repository?{repository}:{}),orca:{dispatchId:`ctx-${jobId}`,agentTerminalHandle:`term-${jobId}`},
+      },createdAt:at});
+      setJobStatus(db,{jobId,to:'ready',reason:'seed',at});
+      setJobStatus(db,{jobId,to:'leased',reason:'seed',at});
+      const attempt=startAttempt(db,{workflowId:wf,jobId,dispatchId:`ctx-${jobId}`,
+        terminalHandle:`term-${jobId}`,repoRoot:repo,dispatchedAt:at,startedAt:at,at});
+      writeContract(db,{attemptId:attempt.attempt_id,markdown:'# contract',context:{worktree:repo},createdAt:at});
+      setJobStatus(db,{jobId,to:'running',reason:'seed',at});
+      fileReport(db,{attemptId:attempt.attempt_id,outcome:'done',
+        report:{outcome:'done',summary:'landed',head,branch:'main',dispatch:`ctx-${jobId}`,from:jobId},fromTerminal:`term-${jobId}`,createdAt:at});
+      recordCheckRun(db,{attemptId:attempt.attempt_id,name:'unit',phase:'verify',runner:'kernel',authority:'runtime',
+        status:'pass',exitCode:0,command:'unit',createdAt:at});
+    });
   }finally{ledger.close();}
   return jobId;
 };
@@ -166,7 +175,10 @@ test('a path that names its repository is honoured: ../<fe>/… and payload.repo
 test('api enqueue records the resolved target repository; an unbound repository is refused',t=>{
   const {be,api}=project(t);
   const ledger=openLedger({file:ledgerFileFor(be.repo)});
-  try{ledger.ensureWorkflow({workflowId:'wf-enq',title:'enqueue'});}finally{ledger.close();}
+  try{ledger.transaction(db=>{
+    ensureWorkflow(db,{workflowId:'wf-enq',title:'enqueue',by:'test-fixture',reason:'seed'});
+    insertGoal(db,{workflowId:'wf-enq',revision:1,goalIdentity:'goal-wf-enq',markdown:'# goal',goal:{}});
+  });}finally{ledger.close();}
   const enqueue=(...extra)=>api('enqueue','--repo',be.repo,'--workflow','wf-enq','--json',...extra);
   const payloadOf=jobId=>{const l=inspectLedger({file:ledgerFileFor(be.repo)});try{return JSON.parse(l.db.prepare('SELECT payload_json FROM jobs WHERE job_id=?').get(jobId).payload_json);}finally{l.close();}};
 

@@ -6,6 +6,7 @@ import path from 'node:path';
 import {spawnSync} from 'node:child_process';
 import {FAKE_ORCA} from './helpers/fake-orca.mjs';
 import {openLedger,inspectLedger,ledgerFileFor} from '../engine/ledger-db.mjs';
+import {seedWorkflow} from './_ledger-fixture.mjs';
 
 // Orca's `terminal read` lifts the text of an agent's input box out of the frame and answers it as
 // `draft`. terminal-read.mjs dropped it, so no reader saw text waiting unsubmitted: a send without
@@ -189,16 +190,20 @@ const nudgeFixture=t=>{
   const repo=path.join(w.root,'repo');fs.mkdirSync(repo,{recursive:true});
   const run=(args,more={})=>spawnSync(process.execPath,[API,...args],{cwd:ROOT,encoding:'utf8',windowsHide:true,timeout:120000,env:{...w.env,...more}});
   const workflowId='wf-nudge-draft',jobId='job-nudge-draft';
-  const ledger=openLedger({file:ledgerFileFor(repo)});
+  // ledgerFileFor resolves under env.LOCALAPPDATA — seed the file the spawned api will open.
+  const ledgerFile=ledgerFileFor(repo,{env:w.env});
+  const ledger=openLedger({file:ledgerFile});
   try{
-    ledger.enqueueJob({jobId:`kernel-${workflowId}`,workflowId,kind:'kernel',role:'kernel',
-      payload:{hierarchy:{schema:'starci/agent-hierarchy@1',nodeId:`agent:kernel:${workflowId}`,parentNodeId:`workflow:${workflowId}`,role:'kernel'}}});
-    ledger.db.prepare("UPDATE jobs SET status='running',worker_id='fake-kernel-terminal' WHERE job_id=?").run(`kernel-${workflowId}`);
-    ledger.enqueueJob({jobId,workflowId,opId:'code.refactor',kind:'op',payload:{opId:'code.refactor',owned_paths:['docs/'],model:'codex-agent',difficulty:'hard'}});
+    seedWorkflow(ledger,{id:workflowId,state:{phase:'running',job:workflowId},
+      jobs:[
+        {jobId:`kernel-${workflowId}`,kind:'kernel',status:'running',workerId:'fake-kernel-terminal',
+          payload:{hierarchy:{schema:'starci/agent-hierarchy@1',nodeId:`agent:kernel:${workflowId}`,parentNodeId:`workflow:${workflowId}`,role:'kernel'}}},
+        {jobId,opId:'code.refactor',kind:'op',payload:{opId:'code.refactor',owned_paths:['docs/'],model:'codex-agent',difficulty:'hard'}},
+      ]});
   }finally{ledger.close();}
   const d=run(['dispatch','--repo',repo,'--job',jobId,'--model','codex-agent','--spawn','--json']);
   assert.equal(d.status,0,d.stderr||d.stdout);
-  const events=kind=>{const l=inspectLedger({file:ledgerFileFor(repo)});
+  const events=kind=>{const l=inspectLedger({file:ledgerFile});
     try{return l.db.prepare('SELECT payload_json FROM events WHERE entity_id=? AND kind=? ORDER BY seq').all(jobId,kind).map(r=>json(r.payload_json));}finally{l.close();}};
   return {...w,repo,workflowId,jobId,run,events};
 };

@@ -5,6 +5,7 @@ import os from 'node:os';
 import path from 'node:path';
 import {spawnSync} from 'node:child_process';
 import {inspectLedger,ledgerFileFor,openLedger} from '../engine/ledger-db.mjs';
+import {seedWorkflow} from './_ledger-fixture.mjs';
 
 // Cross-workflow peer messages (modules/kernel/api.yaml peers/notify/inbox, driver-loop.yaml peers).
 // One product ledger holds several running workflows that build in the same source: nivo's Collab
@@ -30,32 +31,38 @@ const fixture=t=>{
   const ledger=openLedger({file:ledgerFileFor(repo)});
   try{
     const at=Date.now();
-    const workflow=(workflowId,title,phase,sourceRoots)=>{
-      ledger.ensureWorkflow({workflowId,title,ledgerMode:'durable',sourceRoots});
-      ledger.db.prepare('UPDATE workflows SET phase=? WHERE workflow_id=?').run(phase,workflowId);
-      ledger.db.prepare('INSERT INTO goals(workflow_id,revision,goal_identity,markdown,json,created_at) VALUES(?,?,?,?,?,?)')
-        .run(workflowId,0,`goal-${workflowId}`,'# goal',JSON.stringify({derivedFrom:'peer-spec'}),at);
-    };
-    workflow(LOGIN,'nivo-app-auth','running',[repo]);
-    workflow(COLLAB,'nivo-collab-group-chat','running',[repo]);
-    workflow(DONE,'nivo-finished','finished',[repo]);
-    workflow(ELSEWHERE,'another-product','running',[path.join(root,'other-repo')]);
-    workflow(ROOTLESS,'no-roots-recorded','running',null);
-    const job=(jobId,workflowId,opId,paths,status,updatedAt=at)=>{
-      ledger.enqueueJob({jobId,workflowId,opId,kind:'op',payload:{opId,owned_paths:paths}});
-      ledger.db.prepare('UPDATE jobs SET status=?,updated_at=? WHERE job_id=?').run(status,updatedAt,jobId);
+    // Runtime schema: jobs seed while the workflow still accepts work (queued|running —
+    // jobs_enqueue_guard refuses anything later); a terminal phase moves through the recorded
+    // lifecycle only after them. Jobs are [jobId,opId,ownedPaths,status,updatedAt?].
+    const workflow=(workflowId,title,phase,sourceRoots,jobs=[])=>{
+      seedWorkflow(ledger,{id:workflowId,now:at,state:{phase:'running',job:title},
+        goal:{revision:0,identity:`goal-${workflowId}`,markdown:'# goal',json:{derivedFrom:'peer-spec'}},
+        jobs:jobs.map(([jobId,opId,paths,status,updatedAt])=>({jobId,opId,status,
+          payload:{opId,owned_paths:paths},createdAt:updatedAt??at,updatedAt:updatedAt??at}))});
+      ledger.write.updateWorkflow({workflowId,title,ledgerMode:'durable',sourceRoots:sourceRoots??null});
+      if(phase!=='running')ledger.write.changeWorkflowPhase({workflowId,to:phase,by:'test',reason:`seed ${phase} workflow`});
     };
     // Login: a queued phone job and a leased (in-flight) auth job - the current leg.
-    job('job-login-phone',LOGIN,'interface.implement',['src/auth/phone'],'queued');
-    job('job-login-auth',LOGIN,'code.refactor',['src/auth','nivo-fe/apps/login'],'leased',at+1000);
-    job('job-login-old',LOGIN,'docs.author',['src/auth'],'succeeded');
+    workflow(LOGIN,'nivo-app-auth','running',[repo],[
+      ['job-login-phone','interface.implement',['src/auth/phone'],'queued'],
+      ['job-login-auth','code.refactor',['src/auth','nivo-fe/apps/login'],'leased',at+1000],
+      ['job-login-old','docs.author',['src/auth'],'succeeded'],
+    ]);
     // Collab: one in-flight job, so its frontier is engaged and not actionable on its own.
-    job('job-collab-chat',COLLAB,'code.refactor',['src/chat'],'leased');
+    workflow(COLLAB,'nivo-collab-group-chat','running',[repo],[
+      ['job-collab-chat','code.refactor',['src/chat'],'leased'],
+    ]);
     // Not peers: a finished workflow and a workflow of another source root, both owning src/auth.
-    job('job-done-auth',DONE,'code.refactor',['src/auth'],'queued');
-    job('job-elsewhere-auth',ELSEWHERE,'code.refactor',['src/auth'],'queued');
+    workflow(DONE,'nivo-finished','finished',[repo],[
+      ['job-done-auth','code.refactor',['src/auth'],'queued'],
+    ]);
+    workflow(ELSEWHERE,'another-product','running',[path.join(root,'other-repo')],[
+      ['job-elsewhere-auth','code.refactor',['src/auth'],'queued'],
+    ]);
     // A peer with no recorded roots owns all of src.
-    job('job-rootless-src',ROOTLESS,'code.refactor',['src'],'leased');
+    workflow(ROOTLESS,'no-roots-recorded','running',null,[
+      ['job-rootless-src','code.refactor',['src'],'leased'],
+    ]);
   }finally{ledger.close();}
   const read=fn=>{const l=inspectLedger({file:ledgerFileFor(repo)});try{return fn(l.db);}finally{l.close();}};
   const ok=(args,env)=>{const r=api(args,env);assert.equal(r.status,0,`${args.join(' ')}: ${r.stderr||r.stdout}`);return json(r.stdout);};
@@ -183,8 +190,10 @@ test('a filed report still outranks a pending peer message',t=>{
   fx.ok(['notify','--workflow',LOGIN,'--to',COLLAB,'--kind','request','--subject','s','--body','b']);
   const l=openLedger({file:ledgerFileFor(fx.repo)});
   try{
-    l.db.prepare("INSERT INTO reports(workflow_id,op_id,attempt,dispatch_id,outcome,report_json,created_at) VALUES(?,?,?,?,?,?,?)")
-      .run(COLLAB,'code.refactor',1,'job-collab-chat','done','{}',Date.now());
+    // A reports row keys its dispatch attempt (reports.attempt_id → op_attempts), not the job's columns.
+    const attempt=l.db.prepare('SELECT attempt_id,dispatch_id FROM op_attempts WHERE job_id=?').get('job-collab-chat');
+    l.db.prepare("INSERT INTO reports(workflow_id,attempt_id,dispatch_id,job_id,outcome,report_json,created_at) VALUES(?,?,?,?,'done','{}',?)")
+      .run(COLLAB,attempt.attempt_id,attempt.dispatch_id,'job-collab-chat',Date.now());
   }finally{l.close();}
   const status=fx.ok(['status','--workflow',COLLAB]);
   assert.equal(status.frontier.state,'transition-ready');

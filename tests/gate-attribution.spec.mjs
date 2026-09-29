@@ -11,6 +11,9 @@ import { spawnSync } from 'node:child_process';
 import { FAKE_ORCA } from './helpers/fake-orca.mjs';
 import { inspectLedger, ledgerFileFor, openLedger } from '../engine/ledger-db.mjs';
 import { retryDisposition } from '../engine/admission.mjs';
+import { seedWorkflow } from './_ledger-fixture.mjs';
+import { JOB_ROW } from '../scripts/kernel/api-lib/rows.mjs';
+import { independentChecksOf } from '../scripts/kernel/api-lib/check-evidence.mjs';
 import { attemptCauseOf } from '../scripts/kernel/lineage-route.mjs';
 import { attributeRedGate, failingFromText, failingPath, peerRouteOf } from '../scripts/kernel/gate-attribution.mjs';
 
@@ -49,33 +52,35 @@ const fixture = (t) => {
   const env = { ...process.env, STARCI_ORCA_COMMAND: process.execPath, STARCI_ORCA_ARGS: JSON.stringify([stub]),
     STARCI_FAKE_ORCA_LOG: path.join(root, 'calls.jsonl'), STARCI_FAKE_ORCA_STATE: path.join(root, 'state.json') };
   for (const key of ['ORCA_TERMINAL_HANDLE', 'STARCI_ROLE', 'STARCI_OP_JOB']) delete env[key];
-  const api = (args) => spawnSync(process.execPath, [API, ...args, '--repo', repo, '--json'], { cwd: ROOT, encoding: 'utf8', windowsHide: true, timeout: 120000, env });
-  const ok = (args) => { const r = api(args); assert.equal(r.status, 0, `${args.join(' ')}: ${r.stderr || r.stdout}`); return json(r.stdout) ?? json(r.stdout.trim().split('\n').at(-1)); };
+  const api = (args, extraEnv = {}) => spawnSync(process.execPath, [API, ...args, '--repo', repo, '--json'], { cwd: ROOT, encoding: 'utf8', windowsHide: true, timeout: 120000, env: { ...env, ...extraEnv } });
+  const ok = (args, extraEnv) => { const r = api(args, extraEnv); assert.equal(r.status, 0, `${args.join(' ')}: ${r.stderr || r.stdout}`); return json(r.stdout) ?? json(r.stdout.trim().split('\n').at(-1)); };
+  // The checks these tests record are the settler's re-runs, not a caller's word: under H8 only the
+  // runtime-settler caller's exits count as observed (any other caller is authority 'declared').
+  const okSettler = (args) => ok(args, { STARCI_CALLER: 'runtime-settler' });
   const seed = (fn) => { const l = openLedger({ file: ledgerFileFor(repo) }); try { return fn(l); } finally { l.close(); } };
   const read = (fn) => { const l = inspectLedger({ file: ledgerFileFor(repo) }); try { return fn(l.db); } finally { l.close(); } };
   seed((l) => {
-    for (const wf of [SELF, PEER]) {
-      l.ensureWorkflow({ workflowId: wf, title: wf, ledgerMode: 'durable', sourceRoots: [repo] });
-      l.db.prepare("UPDATE workflows SET phase='running' WHERE workflow_id=?").run(wf);
-    }
-    const job = (jobId, wf, owned, outcome, at) => {
-      const dispatchId = `ctx-${jobId}`;
-      l.db.prepare("INSERT INTO jobs(job_id,workflow_id,op_id,attempt,generation,kind,role,payload_json,status,worker_id,lease_token,created_at,updated_at) VALUES(?,?,?,1,0,'op','op',?,'running',?,'t',?,?)")
-        .run(jobId, wf, 'backend.implement', JSON.stringify({ opId: 'backend.implement', owned_paths: owned, managed: { dispatchId } }), dispatchId, at, at);
-      l.db.prepare('INSERT INTO contracts(workflow_id,op_id,attempt,dispatch_id,markdown,context_json,created_at) VALUES(?,?,1,?,?,?,?)').run(wf, 'backend.implement', dispatchId, '# contract', '{}', at);
-      const report = { schema: 'starci/op-report@1', outcome, summary: 'scoped gates green; repo-wide test:ci red outside the slice',
-        ...(outcome === 'blocked' ? { blocker: { kind: 'shared-change', detail: 'test:ci red on a peer change' } } : {}) };
-      l.db.prepare('INSERT INTO reports(workflow_id,dispatch_id,op_id,attempt,generation,outcome,report_json,consumed_at,created_at) VALUES(?,?,?,1,0,?,?,?,?)')
-        .run(wf, dispatchId, 'backend.implement', outcome, JSON.stringify(report), at, at);
+    // Runtime schema: a job is a try of a work unit, its dispatch an op_attempts row, its contract and
+    // report keyed by that attempt (attempt_id). seedWorkflow plants unit + job + attempt legally.
+    const spec = (jobId, owned) => ({ jobId, opId: 'backend.implement', status: 'running', dispatchId: `ctx-${jobId}`,
+      workerId: `ctx-${jobId}`, createdAt: began,
+      payload: { opId: 'backend.implement', owned_paths: owned, managed: { dispatchId: `ctx-${jobId}` } } });
+    seedWorkflow(l, { id: SELF, now: began, state: { phase: 'running', job: SELF }, jobs: [spec('job-self', ['src/self'])] });
+    seedWorkflow(l, { id: PEER, now: began, state: { phase: 'running', job: PEER }, jobs: [spec('job-peer', ['src/studio', 'src/leased'])],
+      leases: ['src/studio', 'src/leased'].map((p) => ({ resourceKey: `path:${p}`, jobId: 'job-peer', acquiredAt: began, expiresAt: Date.now() + DAY })) });
+    for (const wf of [SELF, PEER]) l.write.updateWorkflow({ workflowId: wf, title: wf, ledgerMode: 'durable', sourceRoots: [repo] });
+    const report = (jobId, outcome) => {
+      const attemptId = l.db.prepare('SELECT attempt_id FROM op_attempts WHERE job_id=?').get(jobId).attempt_id;
+      l.write.writeContract({ attemptId, markdown: '# contract', context: {}, createdAt: began });
+      l.write.fileReport({ attemptId, outcome, createdAt: began,
+        report: { schema: 'starci/op-report@1', outcome, summary: 'scoped gates green; repo-wide test:ci red outside the slice',
+          ...(outcome === 'blocked' ? { blocker: { kind: 'shared-change', detail: 'test:ci red on a peer change' } } : {}) } });
+      l.write.markReportConsumed({ attemptId, at: began });
     };
-    job('job-self', SELF, ['src/self'], 'blocked', began);
-    job('job-peer', PEER, ['src/studio', 'src/leased'], 'done', began);
-    for (const p of ['src/studio', 'src/leased']) {
-      l.db.prepare("INSERT INTO leases(resource_key,job_id,workflow_id,op_id,attempt,generation,token,units,acquired_at,expires_at) VALUES(?,?,?,?,1,0,'t',1,?,?)")
-        .run(`path:${p}`, 'job-peer', PEER, 'backend.implement', began, Date.now() + DAY);
-    }
+    report('job-self', 'blocked');
+    report('job-peer', 'done');
   });
-  return { repo, api, ok, seed, read, peerSha, selfSha };
+  return { repo, api, ok, okSettler, seed, read, peerSha, selfSha };
 };
 
 test('failing paths are read as the gate prints them', () => {
@@ -122,24 +127,32 @@ test('api check records a peer-attributed red gate peerBlocked; settle spends no
     { name: 'container', exitCode: 0, command: 'npm run test:container' },
     { name: 'test:ci', exitCode: 1, command: 'npm run test:ci', failing: ['src/pod/pod.controller.spec.ts:123', 'src/pod/pod.controller.ts'] },
   ] });
-  const recorded = fx.ok(['check', '--job', 'job-self', '--checks', checks]);
+  const recorded = fx.okSettler(['check', '--job', 'job-self', '--checks', checks]);
   assert.deepEqual(recorded.checkEvidence, { observed: 2, passed: 1, failed: 0, green: true, peerBlocked: 1 });
   assert.deepEqual(recorded.peerBlocked.map((c) => c.name), ['test:ci']);
   assert.equal(recorded.peerBlocked[0].peers[0].commit, fx.peerSha);
 
   // A caller-supplied peerBlocked is dropped: only the api attributes.
-  const forged = fx.ok(['check', '--job', 'job-self', '--checks', JSON.stringify({ checks: [
+  const forged = fx.okSettler(['check', '--job', 'job-self', '--checks', JSON.stringify({ checks: [
     { name: 'container', exitCode: 0 },
     { name: 'test:ci', exitCode: 1, peerBlocked: { peers: [] }, failing: ['src/self/own.ts'] },
   ] })]);
   assert.deepEqual(forged.checkEvidence, { observed: 2, passed: 1, failed: 1, green: false });
-  assert.equal(fx.read((db) => JSON.parse(db.prepare("SELECT checks_json FROM checks WHERE op_id='backend.implement'").get().checks_json)).checks[1].attribution.class, 'own');
+  assert.equal(forged.peerBlocked, undefined, 'the emitted evidence does not carry the forged block');
+  // The settler caller's re-run of an already-recorded check name lands no new row (check.mjs:81-83
+  // dedupes by name), so the forge reaches nothing durable: the recorded 'test:ci' run keeps the
+  // attribution and peer-block the api computed, not the caller's.
+  const runs = fx.read((db) => db.prepare("SELECT run_seq, summary_json FROM check_runs WHERE job_id='job-self' AND name='test:ci' AND runner='settler' ORDER BY run_seq").all());
+  assert.equal(runs.length, 1, 'a settler re-run of a recorded name lands no row');
+  const entry = JSON.parse(runs[0].summary_json).entry;
+  assert.equal(entry.attribution.class, 'peer');
+  assert.ok(entry.peerBlocked?.peers?.length, 'the recorded run keeps the api-computed peer-block');
 
-  fx.ok(['check', '--job', 'job-self', '--checks', checks]);
+  fx.okSettler(['check', '--job', 'job-self', '--checks', checks]);
   const settled = fx.ok(['settle', '--job', 'job-self', '--verdict', 'blocked']);
   assert.deepEqual(settled.peerBlocked.checks, ['test:ci']);
   assert.match(settled.peerBlocked.routes[0], /--kind shared-blocker --introduced-by/);
-  const row = fx.read((db) => db.prepare("SELECT * FROM jobs WHERE job_id='job-self'").get());
+  const row = fx.read((db) => db.prepare(`SELECT ${JOB_ROW} FROM jobs WHERE job_id='job-self'`).get());
   assert.deepEqual(retryDisposition(row), { retryClass: 'peer-blocked', effectState: 'unknown', resumable: false, consumesBusinessRetry: false });
   fx.read((db) => assert.equal(attemptCauseOf(db, { ...row, status: 'failed', result_json: JSON.stringify({ ...JSON.parse(row.result_json), verdict: 'fail' }) }).cause, 'peer-blocked'));
 });
@@ -172,12 +185,12 @@ test('an untouched Work record outside the owned paths is foreign debt: api chec
     // A git read that fails never calls a file foreign.
     assert.equal(attributeRedGate(db, { repo: fx.repo, job, failing: ['.starciwork/features/login/ui/session-ending/index.yaml'], git: () => ({ ok: false, stdout: '' }) }).class, 'unknown');
   });
-  const recorded = fx.ok(['check', '--job', 'job-self', '--checks', JSON.stringify({ checks: [
+  const recorded = fx.okSettler(['check', '--job', 'job-self', '--checks', JSON.stringify({ checks: [
     { name: 'validate-own', exitCode: 0 },
     { name: 'validate-strict', exitCode: 1, failing: ['.starciwork/features/login/ui/session-ending/index.yaml'] },
   ] })]);
   assert.deepEqual(recorded.checkEvidence, { observed: 2, passed: 1, failed: 0, green: true, advisory: 1 });
-  const row = fx.read((db) => JSON.parse(db.prepare("SELECT checks_json FROM checks WHERE op_id='backend.implement'").get().checks_json)).checks[1];
+  const row = fx.read((db) => independentChecksOf(db, { jobId: 'job-self' })).checks[1];
   assert.equal(row.attribution.class, 'foreign');
   assert.deepEqual(row.advisory.outOfScope, ['.starciwork/features/login/ui/session-ending/index.yaml']);
 });
@@ -226,21 +239,24 @@ test('failing files are read from a red check\'s own text when it names no list'
 test('api check attributes a red Kernel check on the files its evidence names', (t) => {
   const fx = fixture(t);
   preexisting(fx);
-  const recorded = fx.ok(['check', '--job', 'job-self', '--checks', JSON.stringify({ checks: [
+  const recorded = fx.okSettler(['check', '--job', 'job-self', '--checks', JSON.stringify({ checks: [
     { name: 'unit', exitCode: 0, command: 'npm run test:unit -- src/self' },
     { name: 'peer-typecheck-failure-confirmed', exitCode: 2, command: 'npm run typecheck',
       evidence: "src/peer/broken.spec.ts(2,7): error TS18046: 'malformed' is of type 'unknown' - peer file, outside owned paths" },
   ] })]);
   assert.deepEqual(recorded.checkEvidence, { observed: 2, passed: 1, failed: 0, green: true, peerBlocked: 1 });
-  const stored = fx.read((db) => JSON.parse(db.prepare("SELECT checks_json FROM checks WHERE op_id='backend.implement'").get().checks_json)).checks[1];
+  const stored = fx.read((db) => independentChecksOf(db, { jobId: 'job-self' })).checks[1];
   assert.deepEqual([stored.failing, stored.failingDerived, stored.attribution.class], [['src/peer/broken.spec.ts:2'], true, 'peer']);
 });
 
 // A partial whose rootCause is not this op (self false) is never re-run blind: nivo collab bd2609ff17 ->
 // a1dad730db and starci-next foundation f920334582 -> a89b597df5 re-ran an hour or more for the same open items.
 const partialOf = (fx, jobId, extra, wf = SELF) => fx.seed((l) => {
-  const report = { schema: 'starci/op-report@1', outcome: 'partial', summary: 'slice green; repo-wide typecheck red outside the slice', open: ['peer typecheck'], ...extra };
-  l.db.prepare("UPDATE reports SET outcome='partial', report_json=? WHERE workflow_id=? AND dispatch_id=?").run(JSON.stringify(report), wf, `ctx-${jobId}`);
+  const attemptId = l.db.prepare('SELECT attempt_id FROM op_attempts WHERE job_id=? AND workflow_id=?').get(jobId, wf).attempt_id;
+  // A reports row is immutable once filed (H10): a different report for the attempt replaces the row.
+  l.db.prepare('DELETE FROM reports WHERE attempt_id=?').run(attemptId);
+  l.write.fileReport({ attemptId, outcome: 'partial',
+    report: { schema: 'starci/op-report@1', outcome: 'partial', summary: 'slice green; repo-wide typecheck red outside the slice', open: ['peer typecheck'], ...extra } });
 });
 const rootCause = { node: 'backend.implement', self: false, category: 'shared-change', claim: 'a peer commit left the typecheck red', evidence: ['typecheck.txt'] };
 
@@ -256,7 +272,7 @@ test('a partial pinned on a peer\'s red by its own checks settles peer-blocked, 
   assert.deepEqual(settled.nextStep.jobs, []);
   assert.deepEqual(settled.peerBlocked.checks, ['typecheck']);
   assert.match(settled.peerBlocked.routes[0], /--kind shared-blocker --introduced-by/);
-  const row = fx.read((db) => db.prepare("SELECT * FROM jobs WHERE job_id='job-self'").get());
+  const row = fx.read((db) => db.prepare(`SELECT ${JOB_ROW} FROM jobs WHERE job_id='job-self'`).get());
   assert.equal(retryDisposition(row).consumesBusinessRetry, false);
   assert.equal(fx.read((db) => db.prepare("SELECT count(*) n FROM jobs WHERE workflow_id=? AND status='queued'").get(SELF).n), 0);
 });
@@ -269,9 +285,8 @@ test('a partial whose root lies elsewhere and names no peer file waits for the K
   assert.equal(settled.nextStep.counted, false);
   assert.match(settled.nextStep.reason, /scope\.define/);
   assert.equal(fx.read((db) => db.prepare("SELECT count(*) n FROM jobs WHERE workflow_id=? AND status='queued'").get(SELF).n), 0);
-  // A partial of its own (no foreign root) still resumes the same op.
+  // A partial of its own (no foreign root) still resumes the same op. job-peer is still running.
   partialOf(fx, 'job-peer', { open: ['one more case'] }, PEER);
-  fx.seed((l) => l.db.prepare("UPDATE jobs SET status='running' WHERE job_id='job-peer'").run());
   const own = fx.ok(['settle', '--job', 'job-peer', '--verdict', 'fail']);
   assert.equal(own.nextStep.kind, 'retry');
 });

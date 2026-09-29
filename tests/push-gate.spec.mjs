@@ -4,7 +4,8 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import {spawnSync} from 'node:child_process';
-import {inspectLedger,ledgerFileFor,openLedger} from '../engine/ledger-db.mjs';
+import {inspectLedger,ledgerFileFor,openLedger,writeContract,fileReport,recordCheckRun} from '../engine/ledger-db.mjs';
+import {seedWorkflow} from './_ledger-fixture.mjs';
 import {changedFilesOf,declaredPushGateLint,parseEslintCommand,patternReaches,pushGateProof,shellWords} from '../scripts/kernel/push-gate.mjs';
 
 // settle's push-gate half (modules/kernel/api.yaml commands.settle, push-gate-red): a committing
@@ -76,17 +77,15 @@ const checkout=(t,{hook='npm run lint:check && npm run test:unit\n',lintCheck='e
 const seedJob=(repo,{head,files,admittedAt=Date.now(),jobId='op-gate-1',wf='wf-gate'})=>{
   const ledger=openLedger({file:ledgerFileFor(repo)});
   try{
-    ledger.ensureWorkflow({workflowId:wf,title:'gate'});
-    ledger.enqueueJob({jobId,workflowId:wf,opId:'backend.implement',kind:'op',payload:{
-      opId:'backend.implement',owned_paths:['src/'],orca:{dispatchId:`ctx-${jobId}`,agentTerminalHandle:`term-${jobId}`},
-    }});
-    ledger.db.prepare("UPDATE jobs SET status='running' WHERE job_id=?").run(jobId);
-    ledger.db.prepare('INSERT INTO contracts(workflow_id,op_id,attempt,dispatch_id,markdown,context_json,created_at) VALUES(?,?,?,?,?,?,?)')
-      .run(wf,'backend.implement',1,`ctx-${jobId}`,'# contract',json({worktree:repo}),admittedAt);
-    ledger.db.prepare('INSERT INTO reports(workflow_id,dispatch_id,op_id,attempt,generation,outcome,report_json,from_terminal,consumed_at,created_at) VALUES(?,?,?,?,?,?,?,?,NULL,?)')
-      .run(wf,`ctx-${jobId}`,'backend.implement',1,0,'done',json({outcome:'done',summary:'landed',head,branch:'main',...(files?{files}:{})}),null,admittedAt);
-    ledger.db.prepare('INSERT INTO checks(workflow_id,op_id,attempt,checks_json,created_at) VALUES(?,?,?,?,?)')
-      .run(wf,'backend.implement',1,json({checks:[{name:'unit',exitCode:0}]}),admittedAt);
+    seedWorkflow(ledger,{id:wf,state:{phase:'running',job:'gate'},
+      jobs:[{jobId,opId:'backend.implement',status:'running',
+        payload:{opId:'backend.implement',owned_paths:['src/'],orca:{dispatchId:`ctx-${jobId}`,agentTerminalHandle:`term-${jobId}`}}}]});
+    ledger.transaction(db=>{
+      const attemptId=db.prepare('SELECT attempt_id FROM op_attempts WHERE job_id=?').get(jobId).attempt_id;
+      writeContract(db,{attemptId,markdown:'# contract',context:{worktree:repo},createdAt:admittedAt});
+      fileReport(db,{attemptId,outcome:'done',report:{outcome:'done',summary:'landed',head,branch:'main',...(files?{files}:{})},createdAt:admittedAt});
+      recordCheckRun(db,{attemptId,name:'unit',phase:'verify',runner:'kernel',status:'pass',exitCode:0,createdAt:admittedAt});
+    });
   }finally{ledger.close();}
   return jobId;
 };

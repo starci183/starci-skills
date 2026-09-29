@@ -8,6 +8,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { ledgerFileFor, openLedger } from '../engine/ledger-db.mjs';
+import { seedWorkflow } from './_ledger-fixture.mjs';
 import { recordVersion } from '../scripts/work/work-graph-store.mjs';
 
 const ROOT = path.resolve(import.meta.dirname, '..');
@@ -30,17 +31,15 @@ function world(t, legs) {
   t.after(() => fs.rmSync(repo, { recursive: true, force: true, maxRetries: 20, retryDelay: 25 }));
   const seed = (fn) => { const ledger = openLedger({ file: ledgerFileFor(repo) }); try { return fn(ledger); } finally { ledger.close(); } };
   seed((ledger) => {
-    ledger.ensureWorkflow({ workflowId: WF, title: 'graph runtime' });
-    ledger.db.prepare("UPDATE workflows SET phase='running' WHERE workflow_id=?").run(WF);
-    ledger.db.prepare('INSERT INTO goals(workflow_id,revision,goal_identity,markdown,json,created_at) VALUES(?,?,?,?,?,?)')
-      .run(WF, 0, 'g0', '# goal', json({ derivedPlan: { legs: legs.map((op) => ({ op })) } }), Date.now());
+    seedWorkflow(ledger, { id: WF, state: { phase: 'running', job: 'graph runtime' },
+      goal: { revision: 0, identity: 'g0', markdown: '# goal', json: { derivedPlan: { legs: legs.map((op) => ({ op })) } } } });
   });
   const job = (jobId, op, status, paths) => seed((ledger) => {
-    ledger.enqueueJob({ jobId, workflowId: WF, opId: op, kind: 'op', payload: { opId: op, records: [], owned_paths: paths } });
-    ledger.db.prepare('UPDATE jobs SET status=?, updated_at=? WHERE job_id=?').run(status, Date.now(), jobId);
+    seedWorkflow(ledger, { id: WF, jobs: [{ jobId, opId: op, kind: 'op', status, payload: { opId: op, records: [], owned_paths: paths } }] });
   });
   const status = () => {
-    const r = spawnSync(process.execPath, [API, 'status', '--workflow', WF, '--repo', repo, '--json'], { cwd: ROOT, encoding: 'utf8', windowsHide: true, timeout: 120000 });
+    const env = { ...process.env, STARCI_TEST_MACHINE_FILE: path.join(repo, 'machine.sqlite') };
+    const r = spawnSync(process.execPath, [API, 'status', '--workflow', WF, '--repo', repo, '--json'], { cwd: ROOT, encoding: 'utf8', windowsHide: true, timeout: 120000, env });
     assert.equal(r.status, 0, r.stderr);
     return JSON.parse(r.stdout);
   };

@@ -5,6 +5,8 @@ import os from 'node:os';
 import path from 'node:path';
 import {spawnSync} from 'node:child_process';
 import {FAKE_ORCA} from './helpers/fake-orca.mjs';
+import {seedWorkflow} from './_ledger-fixture.mjs';
+import {jobResultSql} from '../scripts/kernel/api-lib/rows.mjs';
 
 const ROOT=path.resolve(import.meta.dirname,'..');
 const API=path.join(ROOT,'scripts','kernel','api.mjs');
@@ -43,12 +45,16 @@ const fixture=t=>{
       STARCI_FAKE_ORCA_MODE:mode,
       STARCI_FAKE_ORCA_LOG:path.join(root,'calls.jsonl'),
       STARCI_FAKE_ORCA_STATE:path.join(root,'state.json'),
+      // machineFileFor honours STARCI_TEST_MACHINE_FILE first; without it the spawned api lands on the
+      // shared starci-test-registry file, which the current machine schema refuses (machine-schema-old).
+      STARCI_TEST_MACHINE_FILE:path.join(root,'machine.sqlite'),
     };
     const jobId=`job-${mode}`;
     const ledger=openLedger({file:ledgerFileFor(repo)});
     try{
-      ledger.enqueueJob({jobId,workflowId:'wf-dispatch',opId:'code.refactor',kind:'op',
-        payload:{opId:'code.refactor',owned_paths:['docs/']}});
+      seedWorkflow(ledger,{id:'wf-dispatch',state:{phase:'running',job:'wf-dispatch'},
+        jobs:[{jobId,opId:'code.refactor',kind:'op',
+          payload:{opId:'code.refactor',owned_paths:['docs/']}}]});
     }finally{ledger.close();}
     return {root,repo,env,jobId};
   };
@@ -69,7 +75,7 @@ const liveTerminals=fx=>Object.values(orcaState(fx).terminals??{}).filter(term=>
 
 const jobRow=(fx,jobId)=>{
   const ledger=inspectLedger({file:ledgerFileFor(fx.repo)});
-  try{return ledger.db.prepare('SELECT status,worker_id,result_json FROM jobs WHERE job_id=?').get(jobId);}
+  try{return ledger.db.prepare(`SELECT status,worker_id,${jobResultSql('jobs')} AS result_json FROM jobs WHERE job_id=?`).get(jobId);}
   finally{ledger.close();}
 };
 

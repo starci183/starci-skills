@@ -5,6 +5,7 @@ import os from 'node:os';
 import path from 'node:path';
 import {spawnSync} from 'node:child_process';
 import {ledgerFileFor,openLedger} from '../engine/ledger-db.mjs';
+import {seedWorkflow} from './_ledger-fixture.mjs';
 import {allocationMs} from '../engine/config.mjs';
 import {classifyAgentScreen,staleAwareState} from '../scripts/kernel/terminal-liveness.mjs';
 
@@ -77,16 +78,14 @@ const watchdogOnce=(t,{screen,outputAgeMs})=>{
   const ledger=openLedger({file:ledgerFileFor(dir)});
   try{
     const at=Date.now();
-    ledger.ensureWorkflow({workflowId:wf,title:'stale active'});
-    ledger.db.prepare('INSERT INTO goals(workflow_id,revision,goal_identity,markdown,json,created_at) VALUES(?,?,?,?,?,?)')
-      .run(wf,0,'stale','# goal','{}',at);
+    seedWorkflow(ledger,{id:wf,state:{phase:'running',job:'stale active'},goal:{revision:0,identity:'stale',markdown:'# goal',json:{}}});
     ledger.db.prepare("INSERT INTO signals(scope,key,holder_pid,token,value_json,at,expires_at) VALUES('kernel',?,NULL,?,?,?,NULL)")
       .run(wf,'kernel-test',JSON.stringify({terminal:'kern-term-1',host:'orca',agent:'codex'}),at);
   }finally{ledger.close();}
   const stub=path.join(dir,'orca-stub.cjs'),sendLog=path.join(dir,'sends.jsonl');
   fs.writeFileSync(stub,STUB);
   const r=spawnSync(process.execPath,[WATCHDOG,'--repo',dir,'--workflow',wf,'--once','--repair','--json'],{cwd:ROOT,encoding:'utf8',windowsHide:true,timeout:120000,
-    env:{...process.env,STARCI_ORCA_COMMAND:process.execPath,STARCI_ORCA_ARGS:JSON.stringify([stub]),STARCI_ORCA_SKIP_LIVE_CHECK:'1',
+    env:{...process.env,STARCI_TEST_MACHINE_FILE:path.join(dir,'machine.sqlite'),STARCI_ORCA_COMMAND:process.execPath,STARCI_ORCA_ARGS:JSON.stringify([stub]),STARCI_ORCA_SKIP_LIVE_CHECK:'1',
       STARCI_TEST_SCREEN:screen,STARCI_TEST_LAST_OUTPUT_AT:String(Date.now()-outputAgeMs),STARCI_TEST_SEND_LOG:sendLog}});
   const result=JSON.parse(r.stdout.trim().split('\n').at(-1));
   const sends=fs.existsSync(sendLog)?fs.readFileSync(sendLog,'utf8').trim().split('\n').filter(Boolean):[];

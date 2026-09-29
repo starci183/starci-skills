@@ -5,7 +5,7 @@ import os from 'node:os';
 import path from 'node:path';
 import {spawnSync} from 'node:child_process';
 import {FAKE_ORCA} from './helpers/fake-orca.mjs';
-import {openLedger,inspectLedger,ledgerFileFor} from '../engine/ledger-db.mjs';
+import {openLedger,inspectLedger,ledgerFileFor,ensureWorkflow,changeWorkflowPhase,insertGoal,createUnit,enqueueJob,setJobStatus} from '../engine/ledger-db.mjs';
 import {wakeDeliveryOf} from '../scripts/kernel/terminal-liveness.mjs';
 import {sendWakeWithProof,sendEnterWithProof} from '../scripts/kernel/wake-delivery.mjs';
 
@@ -91,17 +91,29 @@ const fixture=t=>{
   const stubFile=path.join(root,'fake-orca.mjs');fs.writeFileSync(stubFile,FAKE_ORCA);
   const stateFile=path.join(root,'state.json'),logFile=path.join(root,'calls.jsonl');
   const env={...process.env,STARCI_ORCA_COMMAND:process.execPath,STARCI_ORCA_ARGS:JSON.stringify([stubFile]),
-    STARCI_FAKE_ORCA_LOG:logFile,STARCI_FAKE_ORCA_STATE:stateFile};
+    STARCI_FAKE_ORCA_LOG:logFile,STARCI_FAKE_ORCA_STATE:stateFile,
+    STARCI_TEST_MACHINE_FILE:path.join(root,'machine.db')};  // every fixture registers a repo named 'repo' — isolate the registry
   const run=(args,more={})=>spawnSync(process.execPath,[API,...args],{cwd:ROOT,encoding:'utf8',windowsHide:true,timeout:120000,env:{...env,...more}});
   const orcaState=()=>json(fs.readFileSync(stateFile,'utf8'))??{};
   const writeState=fn=>{const s=orcaState();fn(s);fs.writeFileSync(stateFile,JSON.stringify(s));};
   const workflowId='wf-nudge-proof',jobId='job-nudge-proof';
   const ledger=openLedger({file:ledgerFileFor(repo)});
   try{
-    ledger.enqueueJob({jobId:`kernel-${workflowId}`,workflowId,kind:'kernel',role:'kernel',
-      payload:{hierarchy:{schema:'starci/agent-hierarchy@1',nodeId:`agent:kernel:${workflowId}`,parentNodeId:`workflow:${workflowId}`,role:'kernel'}}});
-    ledger.db.prepare("UPDATE jobs SET status='running',worker_id='fake-kernel-terminal' WHERE job_id=?").run(`kernel-${workflowId}`);
-    ledger.enqueueJob({jobId,workflowId,opId:'code.refactor',kind:'op',payload:{opId:'code.refactor',owned_paths:['docs/'],model:'codex-agent',difficulty:'hard'}});
+    const at=Date.now();
+    ledger.transaction(db=>{
+      ensureWorkflow(db,{workflowId,phase:'queued',title:'nudge-proof',by:'test-fixture',reason:'seed',at});
+      insertGoal(db,{workflowId,revision:1,goalIdentity:`goal-${workflowId}`,markdown:'# goal',goal:{},createdAt:at});
+      changeWorkflowPhase(db,{workflowId,to:'running',by:'test-fixture',reason:'seed',at});
+      enqueueJob(db,{jobId:`kernel-${workflowId}`,workflowId,kind:'kernel',role:'kernel',
+        payload:{hierarchy:{schema:'starci/agent-hierarchy@1',nodeId:`agent:kernel:${workflowId}`,parentNodeId:`workflow:${workflowId}`,role:'kernel'}},createdAt:at});
+      setJobStatus(db,{jobId:`kernel-${workflowId}`,to:'ready',reason:'seed',at});
+      setJobStatus(db,{jobId:`kernel-${workflowId}`,to:'leased',reason:'seed',at});
+      setJobStatus(db,{jobId:`kernel-${workflowId}`,to:'running',reason:'seed',at,workerId:'fake-kernel-terminal'});
+      const unitId=`unit-${jobId}`;
+      createUnit(db,{workflowId,unitId,opId:'code.refactor',subjectKey:unitId,goalRevision:1,createdAt:at});
+      enqueueJob(db,{jobId,workflowId,unitId,opId:'code.refactor',kind:'op',
+        payload:{opId:'code.refactor',owned_paths:['docs/'],model:'codex-agent',difficulty:'hard'},createdAt:at});
+    });
   }finally{ledger.close();}
   const events=kind=>{
     const l=inspectLedger({file:ledgerFileFor(repo)});

@@ -6,6 +6,8 @@ import path from 'node:path';
 import {spawnSync} from 'node:child_process';
 import {FAKE_ORCA} from './helpers/fake-orca.mjs';
 import {openLedger,inspectLedger,ledgerFileFor} from '../engine/ledger-db.mjs';
+import {seedWorkflow} from './_ledger-fixture.mjs';
+import {jobResultSql} from '../scripts/kernel/api-lib/rows.mjs';
 import {parseYaml} from '../engine/yaml.mjs';
 import {buildSpawnCommand} from '../scripts/agent/lib.mjs';
 
@@ -54,6 +56,9 @@ const fixture=(t,{mode='healthy'}={})=>{
     STARCI_FAKE_ORCA_MODE:mode,
     STARCI_FAKE_ORCA_LOG:path.join(root,'calls.jsonl'),
     STARCI_FAKE_ORCA_STATE:path.join(root,'state.json'),
+    // machineFileFor honours STARCI_TEST_MACHINE_FILE first; without it the spawned api lands on the
+    // shared starci-test-registry file, which the current machine schema refuses (machine-schema-old).
+    STARCI_TEST_MACHINE_FILE:path.join(root,'machine.sqlite'),
   };
   const run=(script,...args)=>spawnSync(process.execPath,[script,...args],{cwd:ROOT,encoding:'utf8',windowsHide:true,timeout:120000,env});
   const callArgv=()=>fs.existsSync(path.join(root,'calls.jsonl'))
@@ -67,15 +72,17 @@ const fixture=(t,{mode='healthy'}={})=>{
 const seed=(fx,{workflowId,jobId,payload})=>{
   const ledger=openLedger({file:ledgerFileFor(fx.repo)});
   try{
-    ledger.enqueueJob({jobId:`kernel-${workflowId}`,workflowId,kind:'kernel',role:'kernel',
-      payload:{hierarchy:{schema:'starci/agent-hierarchy@1',nodeId:`agent:kernel:${workflowId}`,parentNodeId:`workflow:${workflowId}`,role:'kernel'}}});
-    ledger.db.prepare("UPDATE jobs SET status='running',worker_id='fake-kernel-terminal' WHERE job_id=?").run(`kernel-${workflowId}`);
-    ledger.enqueueJob({jobId,workflowId,opId:'code.refactor',kind:'op',payload});
+    seedWorkflow(ledger,{id:workflowId,state:{phase:'running',job:workflowId},
+      jobs:[
+        {jobId:`kernel-${workflowId}`,kind:'kernel',status:'running',workerId:'fake-kernel-terminal',
+          payload:{hierarchy:{schema:'starci/agent-hierarchy@1',nodeId:`agent:kernel:${workflowId}`,parentNodeId:`workflow:${workflowId}`,role:'kernel'}}},
+        {jobId,opId:'code.refactor',kind:'op',payload},
+      ]});
   }finally{ledger.close();}
 };
 const jobRow=(repo,jobId)=>{
   const ledger=inspectLedger({file:ledgerFileFor(repo)});
-  try{return ledger.db.prepare('SELECT status,worker_id,payload_json,result_json FROM jobs WHERE job_id=?').get(jobId);}
+  try{return ledger.db.prepare(`SELECT status,worker_id,payload_json,${jobResultSql('jobs')} AS result_json FROM jobs WHERE job_id=?`).get(jobId);}
   finally{ledger.close();}
 };
 
@@ -180,7 +187,14 @@ test('a Codex op dispatches as an unattended command terminal: Task, preamble, a
   assert.equal(payload?.orca?.agentTerminalHandle,'fake-terminal-1');
   assert.equal(payload?.managed,undefined,'not a managed worker');
 
-  const report=path.join(fx.repo,'report.json');fs.writeFileSync(report,JSON.stringify({
+  // api report reads the envelope only from the attempt's STARCI_JOB_SCRATCH (op_attempts.scratch_dir).
+  const ledger=inspectLedger({file:ledgerFileFor(fx.repo)});
+  let scratch;
+  try{scratch=ledger.db.prepare('SELECT scratch_dir FROM op_attempts WHERE job_id=? ORDER BY attempt_id DESC LIMIT 1').get(jobId)?.scratch_dir;}
+  finally{ledger.close();}
+  assert.ok(scratch,'dispatch must record the attempt scratch dir');
+  fs.mkdirSync(scratch,{recursive:true});
+  const report=path.join(scratch,'report.json');fs.writeFileSync(report,JSON.stringify({
     schema:'starci/op-report@1',outcome:'done',summary:'codex op completed',head:'abc1234def',
     files:['docs/codex-result.md'],checks:[{name:'self-check',command:'true',exitCode:0}],
   }));
@@ -190,6 +204,14 @@ test('a Codex op dispatches as an unattended command terminal: Task, preamble, a
     checks:[{name:'validator',command:'codex validation',exitCode:0,evidence:'green'}],
   }),'--json');
   assert.equal(checked.status,0,`check failed: ${checked.stderr||checked.stdout}`);
+  // H8: a pass needs independently recorded green checks. 'codex validation' is a foreign command the runtime
+  // cannot re-run, so api check records it authority 'declared' — evidence, never the green a verdict reads.
+  // The settler's own runtime observation rides in as a kernel check_runs row on the same attempt.
+  const writer=openLedger({file:ledgerFileFor(fx.repo)});
+  try{
+    const attemptId=writer.db.prepare('SELECT max(attempt_id) id FROM op_attempts WHERE job_id=?').get(jobId).id;
+    writer.write.recordCheckRun({attemptId,name:'unit',phase:'verify',runner:'kernel',status:'pass',exitCode:0});
+  }finally{writer.close();}
   const s=fx.run(API,'settle','--repo',fx.repo,'--job',jobId,'--verdict','pass','--json');
   assert.equal(s.status,0,`settle failed: ${s.stderr||s.stdout}`);
   assert.equal(jobRow(fx.repo,jobId)?.status,'succeeded');
@@ -198,9 +220,11 @@ test('a Codex op dispatches as an unattended command terminal: Task, preamble, a
   // receipt stays on the job (two nivo strays were traced only by reading them).
   assert.deepEqual(fx.orcaState().closedTabs,['fake-terminal-1']);
   // custody: the receipt proves the worker gone, never infers it (inc-eb9a21769d69).
-  assert.deepEqual(JSON.parse(jobRow(fx.repo,jobId).payload_json).terminalClosed,{handle:'fake-terminal-1',ok:true,tab:'tab-fake-terminal-1',quit:{sent:true,exited:true,command:'/quit'},custody:{state:'released',proof:'release-ok'}});
-  // The agent quits itself before the close, so no hidden Codex process is left behind.
-  assert.deepEqual(fx.orcaState().quits,[{handle:'fake-terminal-1',text:'/quit'}]);
+  assert.deepEqual(JSON.parse(jobRow(fx.repo,jobId).payload_json).terminalClosed,{handle:'fake-terminal-1',ok:true,custody:{state:'released',proof:'release-ok'},verified:{ok:true,proof:'release-ok'},tree:{checked:true,lingering:0,killed:0,remaining:0}});
+  // No hidden Codex process is left behind: the close receipt above carries the process-tree sweep
+  // (tree.checked with lingering/killed/remaining all zero), which replaced the old '/quit' self-exit.
+  assert.ok(!fx.find('terminal send').some(argv=>argv.includes('/quit')),
+    'no /quit self-exit: the process-tree sweep (tree in terminalClosed) is the custody proof now');
   assert.deepEqual(fx.find('orchestration worker-stop'),[],'no managed worker to stop');
 });
 

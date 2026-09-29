@@ -5,7 +5,7 @@ import os from 'node:os';
 import path from 'node:path';
 import {spawnSync} from 'node:child_process';
 import {FAKE_ORCA} from './helpers/fake-orca.mjs';
-import {openLedger,inspectLedger,ledgerFileFor} from '../engine/ledger-db.mjs';
+import {openLedger,inspectLedger,ledgerFileFor,ensureWorkflow,bindKernelJob,createUnit,enqueueJob} from '../engine/ledger-db.mjs';
 import {allocationMs} from '../engine/config.mjs';
 
 // nivo inc-f1b576fb6006 (2026-09-25, wf-nivo-collab-group-chat-mudqjp5g): Codex op
@@ -43,18 +43,27 @@ const fixture=t=>{
   // STARCI_ORCA_SKIP_LIVE_CHECK: this spec is about liveness, not the host-contract listing (orca-call-contract
   // covers that). Left on, every mutation first spawns the fake orca's agent-context under calls.yaml's 15s
   // timeout; under full-suite load that read can miss it and dispatch comes back host-contract-drift.
+  // STARCI_TEST_MACHINE_FILE gives this test its own machine registry: every fixture's repo is named 'repo',
+  // and machine.ledgers.name is UNIQUE, so the shared test registry would collide across fixtures.
+  const machineFile=path.join(root,'machine.sqlite');
+  const savedRegistry=process.env.STARCI_TEST_MACHINE_FILE;
+  process.env.STARCI_TEST_MACHINE_FILE=machineFile;
+  t.after(()=>{if(savedRegistry===undefined)delete process.env.STARCI_TEST_MACHINE_FILE;else process.env.STARCI_TEST_MACHINE_FILE=savedRegistry;});
   const env={...process.env,STARCI_ORCA_COMMAND:process.execPath,STARCI_ORCA_ARGS:JSON.stringify([stub]),
-    STARCI_ORCA_SKIP_LIVE_CHECK:'1',STARCI_FAKE_ORCA_LOG:logFile,STARCI_FAKE_ORCA_STATE:stateFile};
+    STARCI_ORCA_SKIP_LIVE_CHECK:'1',STARCI_FAKE_ORCA_LOG:logFile,STARCI_FAKE_ORCA_STATE:stateFile,STARCI_TEST_MACHINE_FILE:machineFile};
   const api=args=>spawnSync(process.execPath,[API,...args,'--repo',repo,'--json'],{cwd:ROOT,encoding:'utf8',windowsHide:true,timeout:120000,env});
   const orcaState=()=>json(fs.readFileSync(stateFile,'utf8'))??{};
   const writeState=fn=>{const s=orcaState();fn(s);fs.writeFileSync(stateFile,JSON.stringify(s));};
   const workflowId='wf-stale-unreachable',jobId='job-stale-unreachable';
   const ledger=openLedger({file:ledgerFileFor(repo)});
   try{
-    ledger.enqueueJob({jobId:`kernel-${workflowId}`,workflowId,kind:'kernel',role:'kernel',
-      payload:{hierarchy:{schema:'starci/agent-hierarchy@1',nodeId:`agent:kernel:${workflowId}`,parentNodeId:`workflow:${workflowId}`,role:'kernel'}}});
-    ledger.db.prepare("UPDATE jobs SET status='running',worker_id='fake-kernel-terminal' WHERE job_id=?").run(`kernel-${workflowId}`);
-    ledger.enqueueJob({jobId,workflowId,opId:'code.refactor',kind:'op',payload:{opId:'code.refactor',owned_paths:['docs/'],model:'codex-agent',difficulty:'hard'}});
+    ledger.transaction(db=>{
+      ensureWorkflow(db,{workflowId,phase:'queued',title:'stale-unreachable',by:'test-fixture',reason:'seed'});
+      bindKernelJob(db,{workflowId,workerId:'fake-kernel-terminal',
+        payload:{hierarchy:{schema:'starci/agent-hierarchy@1',nodeId:`agent:kernel:${workflowId}`,parentNodeId:`workflow:${workflowId}`,role:'kernel'}}});
+      createUnit(db,{workflowId,unitId:`unit-${jobId}`,opId:'code.refactor',subjectKey:`unit-${jobId}`,goalRevision:1});
+      enqueueJob(db,{jobId,workflowId,unitId:`unit-${jobId}`,opId:'code.refactor',kind:'op',payload:{opId:'code.refactor',owned_paths:['docs/'],model:'codex-agent',difficulty:'hard'}});
+    });
   }finally{ledger.close();}
   const read=fn=>{const l=inspectLedger({file:ledgerFileFor(repo)});try{return fn(l.db);}finally{l.close();}};
   const events=kind=>read(db=>db.prepare('SELECT payload_json FROM events WHERE entity_id=? AND kind=? ORDER BY seq').all(jobId,kind).map(r=>json(r.payload_json)));
@@ -63,8 +72,13 @@ const fixture=t=>{
   assert.equal(d.status,0,d.stderr||d.stdout);
   const handle=read(db=>{const p=json(db.prepare('SELECT payload_json FROM jobs WHERE job_id=?').get(jobId).payload_json);
     return p.managed?.agentTerminalHandle??p.orca?.agentTerminalHandle??p.hierarchy?.runtime?.terminalHandle;});
+  // Age the dispatch past any launch grace. events are append-only in the migrated schema
+  // (events_append_only trigger), so the backdate suspends the trigger for this one write and
+  // restores it verbatim — the ledger ends in the same shape the runtime left it.
   const l=openLedger({file:ledgerFileFor(repo)});
-  try{l.db.prepare("UPDATE events SET created_at=created_at-3600000 WHERE entity_id=? AND kind='op-dispatched'").run(jobId);}finally{l.close();}
+  try{l.db.exec(`DROP TRIGGER events_append_only;
+    UPDATE events SET created_at=created_at-3600000 WHERE entity_id='${jobId}' AND kind='op-dispatched';
+    CREATE TRIGGER events_append_only BEFORE UPDATE ON events BEGIN SELECT RAISE(ABORT,'events are append-only'); END;`);}finally{l.close();}
   writeState(s=>{Object.assign(s.terminals[handle],{screen:FROZEN_CODEX,lastOutputAt:Date.now()-19*60000,sendRefused:'terminal_not_writable'});});
   const status=()=>{const out=json(api(['status','--workflow',workflowId]).stdout);return {out,worker:out.workers.find(w=>w.jobId===jobId)};};
   return {api,workflowId,jobId,handle,orcaState,writeState,read,events,status};

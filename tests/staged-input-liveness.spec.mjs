@@ -7,6 +7,7 @@ import {spawnSync} from 'node:child_process';
 import {pathToFileURL} from 'node:url';
 import {FAKE_ORCA} from './helpers/fake-orca.mjs';
 import {openLedger,inspectLedger,ledgerFileFor} from '../engine/ledger-db.mjs';
+import {seedWorkflow} from './_ledger-fixture.mjs';
 import {classifyAgentScreen,stagedInputRegion,stagedInputRow} from '../scripts/kernel/terminal-liveness.mjs';
 
 // Incident inc-06aeecf432f1 (starci-next base-repos, backend.scaffold cut ordinal 5): a Devin
@@ -116,7 +117,10 @@ const opFixture=(t,extra={})=>{
   const stub=path.join(root,'fake-orca.mjs');fs.writeFileSync(stub,FAKE_ORCA);
   const stateFile=path.join(root,'state.json'),logFile=path.join(root,'calls.jsonl');
   const env={...process.env,STARCI_ORCA_COMMAND:process.execPath,STARCI_ORCA_ARGS:JSON.stringify([stub]),
-    STARCI_FAKE_ORCA_LOG:logFile,STARCI_FAKE_ORCA_STATE:stateFile,STARCI_FAKE_ORCA_PREAMBLE:PREAMBLE,...extra};
+    STARCI_FAKE_ORCA_LOG:logFile,STARCI_FAKE_ORCA_STATE:stateFile,STARCI_FAKE_ORCA_PREAMBLE:PREAMBLE,
+    // machineFileFor honours STARCI_TEST_MACHINE_FILE first; without it the spawned api lands on the
+    // shared starci-test-registry file, which the current machine schema refuses (machine-schema-old).
+    STARCI_TEST_MACHINE_FILE:path.join(root,'machine.sqlite'),...extra};
   const run=(args,more={})=>spawnSync(process.execPath,[API,...args],{cwd:ROOT,encoding:'utf8',windowsHide:true,timeout:120000,env:{...env,...more}});
   const orcaState=()=>json(fs.readFileSync(stateFile,'utf8'))??{};
   const writeState=fn=>{const s=orcaState();fn(s);fs.writeFileSync(stateFile,JSON.stringify(s));};
@@ -124,10 +128,12 @@ const opFixture=(t,extra={})=>{
   const workflowId='wf-staged-input',jobId='job-staged-input';
   const ledger=openLedger({file:ledgerFileFor(repo)});
   try{
-    ledger.enqueueJob({jobId:`kernel-${workflowId}`,workflowId,kind:'kernel',role:'kernel',
-      payload:{hierarchy:{schema:'starci/agent-hierarchy@1',nodeId:`agent:kernel:${workflowId}`,parentNodeId:`workflow:${workflowId}`,role:'kernel'}}});
-    ledger.db.prepare("UPDATE jobs SET status='running',worker_id='fake-kernel-terminal' WHERE job_id=?").run(`kernel-${workflowId}`);
-    ledger.enqueueJob({jobId,workflowId,opId:'code.refactor',kind:'op',payload:{opId:'code.refactor',owned_paths:['docs/'],model:'codex-agent',difficulty:'hard'}});
+    seedWorkflow(ledger,{id:workflowId,state:{phase:'running',job:workflowId},
+      jobs:[
+        {jobId:`kernel-${workflowId}`,kind:'kernel',status:'running',workerId:'fake-kernel-terminal',
+          payload:{hierarchy:{schema:'starci/agent-hierarchy@1',nodeId:`agent:kernel:${workflowId}`,parentNodeId:`workflow:${workflowId}`,role:'kernel'}}},
+        {jobId,opId:'code.refactor',kind:'op',payload:{opId:'code.refactor',owned_paths:['docs/'],model:'codex-agent',difficulty:'hard'}},
+      ]});
   }finally{ledger.close();}
   const dispatch=()=>run(['dispatch','--repo',repo,'--job',jobId,'--model','codex-agent','--spawn','--json']);
   const events=kind=>{

@@ -6,6 +6,7 @@ import path from 'node:path';
 import {spawnSync} from 'node:child_process';
 import {FAKE_ORCA} from './helpers/fake-orca.mjs';
 import {openLedger,inspectLedger,ledgerFileFor} from '../engine/ledger-db.mjs';
+import {seedWorkflow} from './_ledger-fixture.mjs';
 import {bindWorkflowRun,staleTasks} from '../scripts/kernel/orca-runs.mjs';
 
 // After the 2026-09-24 reboot every restarted Kernel was rejected at
@@ -28,13 +29,20 @@ const fixture=(t,runs)=>{
   const stateFile=path.join(root,'state.json');
   fs.writeFileSync(stateFile,JSON.stringify({sends:0,runs}));
   const env={...process.env,STARCI_ORCA_COMMAND:process.execPath,STARCI_ORCA_ARGS:JSON.stringify([stub]),
-    STARCI_FAKE_ORCA_LOG:path.join(root,'calls.jsonl'),STARCI_FAKE_ORCA_STATE:stateFile};
+    STARCI_FAKE_ORCA_LOG:path.join(root,'calls.jsonl'),STARCI_FAKE_ORCA_STATE:stateFile,
+    // op_attempts.dispatch_id is unique per workflow: two jobs cannot share one terminal handle.
+    STARCI_FAKE_ORCA_UNIQUE_TERMINALS:'1',
+    // machineFileFor honours STARCI_TEST_MACHINE_FILE first; without it the spawned api lands on the
+    // shared starci-test-registry file, which the current machine schema refuses (machine-schema-old).
+    STARCI_TEST_MACHINE_FILE:path.join(root,'machine.sqlite')};
   const ledger=openLedger({file:ledgerFileFor(repo)});
   try{
-    for(const id of ['job-a','job-b'])ledger.enqueueJob({jobId:id,workflowId:WF,opId:'code.refactor',kind:'op',payload:{opId:'code.refactor',owned_paths:[`docs/${id}/`]}});
-    const now=Date.now();
-    ledger.db.prepare("INSERT INTO jobs(job_id,workflow_id,op_id,attempt,generation,kind,role,payload_json,status,worker_id,created_at,updated_at) VALUES(?,?,NULL,2,0,'kernel','kernel',?,'running',?,?,?)")
-      .run(`kernel-${WF}`,WF,JSON.stringify({orca:{runId:'run-fake-1'},hierarchy:{runtime:{runId:'run-fake-1',terminalHandle:'term-new'}}}),'term-new',now,now);
+    seedWorkflow(ledger,{id:WF,state:{phase:'running',job:WF},
+      jobs:[
+        ...['job-a','job-b'].map(id=>({jobId:id,opId:'code.refactor',kind:'op',payload:{opId:'code.refactor',owned_paths:[`docs/${id}/`]}})),
+        {jobId:`kernel-${WF}`,kind:'kernel',status:'running',workerId:'term-new',
+          payload:{orca:{runId:'run-fake-1'},hierarchy:{runtime:{runId:'run-fake-1',terminalHandle:'term-new'}}}},
+      ]});
   }finally{ledger.close();}
   const state=()=>JSON.parse(fs.readFileSync(stateFile,'utf8'));
   const dispatch=jobId=>spawnSync(process.execPath,[API,'dispatch','--repo',repo,'--job',jobId,'--spawn','--json'],

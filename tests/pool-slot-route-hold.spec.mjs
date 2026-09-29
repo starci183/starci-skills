@@ -14,6 +14,7 @@ import path from 'node:path';
 import { spawn } from 'node:child_process';
 import { parseYaml } from '../engine/yaml.mjs';
 import { inspectLedger, ledgerFileFor, openLedger } from '../engine/ledger-db.mjs';
+import { seedWorkflow } from './_ledger-fixture.mjs';
 import { FAKE_ORCA } from './helpers/fake-orca.mjs';
 
 const ROOT = path.resolve(import.meta.dirname, '..');
@@ -47,27 +48,34 @@ const fixture = (t, occupants) => {
     LOCALAPPDATA: path.join(root, 'localappdata'), STARCI_STATUS_MEMO: 'off' };
   for (const key of ['ORCA_TERMINAL_HANDLE', 'STARCI_ROLE', 'STARCI_OP_JOB']) delete env[key];
   const now = Date.now();
-  const ledger = openLedger({ file: ledgerFileFor(repo) });
+  // ledgerFileFor resolves under env.LOCALAPPDATA — seed the file the spawned api will open.
+  const ledgerFile = ledgerFileFor(repo, { env });
+  const ledger = openLedger({ file: ledgerFile });
   try {
-    ledger.enqueueJob({ jobId: `kernel-${WF}`, workflowId: WF, kind: 'kernel', role: 'kernel',
-      payload: { hierarchy: { schema: 'starci/agent-hierarchy@1', nodeId: `agent:kernel:${WF}`, parentNodeId: `workflow:${WF}`, role: 'kernel' } } });
-    ledger.db.prepare("UPDATE jobs SET status='running',worker_id='fake-kernel-terminal' WHERE job_id=?").run(`kernel-${WF}`);
-    ledger.enqueueJob({ jobId: 'route-me', workflowId: WF, opId: 'interface.implement', kind: 'op',
-      payload: { opId: 'interface.implement', owned_paths: ['apps/web/src/features/route-me/'], difficulty: 'medium' } });
-    ledger.ensureWorkflow({ workflowId: OTHER, title: 'another workflow on the same fleet' });
+    seedWorkflow(ledger, { id: WF, state: { phase: 'running', job: WF },
+      jobs: [
+        { jobId: `kernel-${WF}`, kind: 'kernel', status: 'running', workerId: 'fake-kernel-terminal',
+          payload: { hierarchy: { schema: 'starci/agent-hierarchy@1', nodeId: `agent:kernel:${WF}`, parentNodeId: `workflow:${WF}`, role: 'kernel' } } },
+        { jobId: 'route-me', opId: 'interface.implement', kind: 'op',
+          payload: { opId: 'interface.implement', owned_paths: ['apps/web/src/features/route-me/'], difficulty: 'medium' } },
+      ] });
+    seedWorkflow(ledger, { id: OTHER, state: { phase: 'running', job: OTHER },
+      jobs: occupants.map((o, n) => {
+        const routedAt = o.routedAgoMs == null ? null : now - o.routedAgoMs;
+        return { jobId: `occupant-${n + 1}`, opId: 'interface.implement', kind: 'op', status: o.status,
+          payload: { opId: 'interface.implement', owned_paths: [`apps/web/src/features/o${n + 1}/`], model: POOL, ...(o.via === 'payload' && routedAt ? { routedAt } : {}) } };
+      }) });
     occupants.forEach((o, n) => {
       const jobId = `occupant-${n + 1}`, routedAt = o.routedAgoMs == null ? null : now - o.routedAgoMs;
-      const payload = { opId: 'interface.implement', owned_paths: [`apps/web/src/features/o${n + 1}/`], model: POOL, ...(o.via === 'payload' && routedAt ? { routedAt } : {}) };
-      ledger.enqueueJob({ jobId, workflowId: OTHER, opId: 'interface.implement', kind: 'op', payload });
-      ledger.db.prepare('UPDATE jobs SET status=?,created_at=?,updated_at=? WHERE job_id=?').run(o.status, now - 3 * 3600000, now - 3 * 3600000, jobId);
+      ledger.db.prepare('UPDATE jobs SET created_at=?,updated_at=? WHERE job_id=?').run(now - 3 * 3600000, now - 3 * 3600000, jobId);
       if (o.via === 'event' && routedAt) {
-        ledger.transaction(() => ledger.appendEvent({ workflowId: OTHER, entityType: 'job', entityId: jobId, kind: 'route-decided', payload: { kind: 'interface.implement', model: POOL }, createdAt: routedAt }));
+        ledger.appendEvent({ workflowId: OTHER, entityType: 'job', entityId: jobId, kind: 'route-decided', payload: { kind: 'interface.implement', model: POOL }, createdAt: routedAt });
       }
     });
   } finally { ledger.close(); }
-  const db = (fn) => { const l = inspectLedger({ file: ledgerFileFor(repo) }); try { return fn(l.db); } finally { l.close(); } };
+  const db = (fn) => { const l = inspectLedger({ file: ledgerFile }); try { return fn(l.db); } finally { l.close(); } };
   return {
-    repo, db,
+    repo, db, ledgerFile,
     status: async () => { const r = await runApi(env, 'status', '--repo', repo, '--workflow', WF, '--json'); assert.equal(r.status, 0, r.stderr || r.stdout); return r.value; },
     route: (jobId = 'route-me') => runApi(env, 'route', '--repo', repo, '--job', jobId, '--json'),
   };
@@ -111,10 +119,10 @@ test('routing stamps routedAt, so a re-routed queued job holds its slot again fr
   const pool = payload.model;
   assert.equal((await fx.status()).poolLoad.running[pool], 1, 'the freshly routed queued job holds its slot');
   // Age it past the hold: the slot frees; a re-route stamps it again (and does not count itself while routing).
-  const l = openLedger({ file: ledgerFileFor(fx.repo) });
+  const l = openLedger({ file: fx.ledgerFile });
   try {
+    // events are append-only — the hold reads payload.routedAt first (poolLoadOf), so aging the payload ages the hold.
     l.db.prepare("UPDATE jobs SET payload_json=? WHERE job_id='route-me'").run(JSON.stringify({ ...payload, routedAt: before - HOLD - 1000 }));
-    l.db.prepare("UPDATE events SET created_at=? WHERE entity_id='route-me' AND kind='route-decided'").run(before - HOLD - 1000);
   } finally { l.close(); }
   assert.equal((await fx.status()).poolLoad.running[pool] ?? 0, 0, 'past routeHoldMs the parked job frees its slot');
   const again = await fx.route();

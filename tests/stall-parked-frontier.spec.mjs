@@ -42,7 +42,8 @@ const fixture=t=>{
   try{
     for(const workflowId of [WORK,PEER]){
       ledger.ensureWorkflow({workflowId,title:workflowId,ledgerMode:'durable',sourceRoots:[repo]});
-      ledger.db.prepare("UPDATE workflows SET phase='running' WHERE workflow_id=?").run(workflowId);
+      // workflows_phase_guard: phase moves only through lifecycle_changes + event (changeWorkflowPhase).
+      ledger.write.changeWorkflowPhase({workflowId,to:'running',by:'fixture',reason:'seed'});
       ledger.db.prepare('INSERT INTO goals(workflow_id,revision,goal_identity,markdown,json,created_at) VALUES(?,?,?,?,?,?)')
         .run(workflowId,0,`goal-${workflowId}`,'# goal',JSON.stringify({derivedFrom:'stall-parked-spec'}),Date.now());
     }
@@ -118,8 +119,9 @@ const WSPV='wf-nivo-workspace-provision-mudqjokb';
 const NOW=Date.now();
 const orphaned=()=>({ok:true,frontier:{state:'orphaned-frontier',actionable:true,queued:[],queuedCauses:{},reason:'workflow is running but has no open operation and no unconsumed report'},workers:[]});
 const seedWspv=ledger=>{
+  // seedWorkflow already lands the workflow in 'running'; the guard no-ops a same-phase write.
   seedWorkflow(ledger,{id:WSPV,now:NOW-2000*MIN,events:[{kind:'op-settled',payload:{},created_at:NOW-966*MIN}]});
-  ledger.db.prepare("UPDATE workflows SET phase='running'").run();
+  ledger.write.changeWorkflowPhase({workflowId:WSPV,to:'running',by:'fixture',reason:'seed'});
 };
 
 test('inc-b1435cb9c2b9: a Kernel mid-turn is the workflow moving - no STALLED "the Kernel has not moved"; at its prompt it still is one',t=>withLedger(t,({repoRoot,ledger})=>{
@@ -152,7 +154,7 @@ const engagedOn=worker=>()=>({ok:true,frontier:{state:'engaged',actionable:false
 
 test('inc-3a0e90528cbc: a worker whose output or heartbeat api status aged fresh is mid-turn whatever its frame classified as',t=>withLedger(t,({repoRoot,ledger})=>{
   seedWorkflow(ledger,{id:AGENTOS,now:NOW-600*MIN,events:[{kind:'op-dispatched',payload:{jobId:JOB},created_at:NOW-94*MIN}]});
-  ledger.db.prepare("UPDATE workflows SET phase='running'").run();
+  ledger.write.changeWorkflowPhase({workflowId:AGENTOS,to:'running',by:'fixture',reason:'seed'});
   const stalled=worker=>stallFindings(ledger.db,{repo:repoRoot,now:NOW,stallMinutes:30,frontierOf:engagedOn(worker),kernelTurnOf:()=>'turn-idle'}).filter(f=>f.type==='STALLED');
   assert.equal(stalled({liveness:'failed',screenState:'failed',outputAgeMs:4000}).length,0,'the defect: fresh output on a running worker alerted STALLED idle 94m');
   assert.equal(stalled({liveness:'unknown',outputAgeMs:null,heartbeatAgeMs:60_000}).length,0,'a fresh dispatch heartbeat is the worker moving too');
