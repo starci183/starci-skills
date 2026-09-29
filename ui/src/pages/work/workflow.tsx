@@ -15,6 +15,7 @@ import { ReasonLine } from '../../components/reason-line';
 import { ConceptBlock, type Concept } from '../../components/concept';
 import { LifecycleBar, type UnitState } from '../../components/lifecycle-bar';
 import type { WorkGraph } from '../../components/work/graph';
+import { Advanced, Stagger, StaggerItem } from '../../components/motion';
 import { useRoute, type WorkflowTab } from '../../router';
 
 export const concept: Concept = 'C2';
@@ -32,7 +33,7 @@ type Rca = { at: number; attempts24h: number; clusters: { cause: string; count: 
 type Worktree = { kind: string; branch: string | null; path: string | null; ui: 'bad' | 'warn' | 'running' | 'waiting' | 'ok' | 'done' | 'unknown'; createdAt: number; removedAt: number | null };
 
 function Panel({ title, children, concept }: { title: string; children: React.ReactNode; concept: 'C1' | 'C2' | 'C4' | 'C5' | 'C12' | 'C15' | 'C17' | 'C11' | 'C7' }) {
-  return <ConceptBlock concept={concept} as="section" className="min-w-0 rounded-xl border bg-card p-4 shadow-sm sm:p-5"><h2 className="mb-3 font-semibold">{title}</h2>{children}</ConceptBlock>;
+  return <ConceptBlock concept={concept} as="section" className="min-w-0 rounded-xl border bg-card p-4 shadow-sm md:p-6"><h2 className="mb-4 font-semibold">{title}</h2>{children}</ConceptBlock>;
 }
 
 function UnitDetail({ project, wf, selected, state }: { project: string; wf: string; selected: string | null; state: string | null }) {
@@ -73,15 +74,15 @@ function AttemptsTab({ project, wf }: { project: string; wf: string }) {
 function DecisionsTab({ project, wf }: { project: string; wf: string }) {
   const open = useApiQuery<DecisionRow[]>(`/api/decisions?project=${encodeURIComponent(project)}&wf=${encodeURIComponent(wf)}&limit=200`, { topics: ['decisions'], intervalMs: 20_000 });
   const log = useApiQuery<DecisionLog[]>(`/api/decisions/log?project=${encodeURIComponent(project)}&wf=${encodeURIComponent(wf)}&limit=200`, { topics: [`wf:${project}:${wf}`], intervalMs: 60_000 });
-  return <div className="space-y-4"><Panel title="Chờ quyết" concept="C12"><div className="divide-y">{open.data?.map(item => <a key={item.id} href={`#/decisions?id=${encodeURIComponent(item.id)}`} className="flex min-w-0 items-center gap-2 py-3 text-sm hover:text-primary"><StatusDot status={statusFromUi(item.ui)} /><span className="min-w-0 flex-1 truncate">{item.summary}</span><span className="text-xs text-muted-foreground">{item.decider}</span><ArrowRight className="size-4 shrink-0" /></a>)}</div>{!open.data?.length && <p className="text-sm text-muted-foreground">Không có quyết định đang chờ.</p>}</Panel>
+  return <div className="flex flex-col gap-4"><Panel title="Chờ quyết" concept="C12"><div className="divide-y">{open.data?.map(item => <a key={item.id} href={`#/decisions?id=${encodeURIComponent(item.id)}`} className="flex min-w-0 items-center gap-2 py-3 text-sm hover:text-primary"><StatusDot status={statusFromUi(item.ui)} /><span className="min-w-0 flex-1 truncate">{item.summary}</span><span className="text-xs text-muted-foreground">{item.decider}</span><ArrowRight className="size-4 shrink-0" /></a>)}</div>{!open.data?.length && <p className="text-sm text-muted-foreground">Không có quyết định đang chờ.</p>}</Panel>
     <Panel title="Nhật ký quyết định" concept="C5"><div className="divide-y">{log.data?.map(item => <div key={item.id} className="py-3 text-sm"><div className="flex flex-wrap justify-between gap-2"><strong>{item.choice}</strong><span className="text-xs text-muted-foreground">{item.decider} · {formatAbsolute(item.at)}</span></div>{item.rationale && <p className="mt-1 text-muted-foreground">{item.rationale}</p>}{item.di && <a href={item.di.href} className="text-xs text-primary hover:underline">Mở quyết định</a>}</div>)}</div>{!log.data?.length && <p className="text-sm text-muted-foreground">Chưa có quyết định đã chốt.</p>}</Panel></div>;
 }
 
 function WhyTab({ project, wf }: { project: string; wf: string }) {
   const rca = useApiQuery<Rca | null>(`/api/workflows/${encodeURIComponent(project)}/${encodeURIComponent(wf)}/rca`, { topics: [`wf:${project}:${wf}`], intervalMs: 60_000 });
   return <Panel title="Vì sao · phân tích nguyên nhân" concept="C2">{rca.data ? <><p className="mb-4 text-xs text-muted-foreground">{rca.data.attempts24h} lần thử trong 24 giờ · cập nhật {formatAbsolute(rca.data.at)}</p>
-    <div className="space-y-3">{rca.data.clusters.map((cluster, index) => <div key={`${cluster.cause}-${index}`} className="rounded-lg border p-3"><div className="flex justify-between gap-2 text-sm"><strong>{cluster.cause}</strong><span>{cluster.open}/{cluster.count} đang mở</span></div><ReasonLine reason={cluster.reason} className="mt-2" /></div>)}</div>
-    {rca.data.actions.length > 0 && <h3 className="mb-2 mt-5 text-sm font-semibold">Hành động gợi ý</h3>}{rca.data.actions.map(action => <div key={action.key} className="flex gap-3 border-t py-3 text-sm"><span className="font-mono text-muted-foreground">{action.rank}</span><span className="min-w-0"><strong>{action.key}</strong><span className="block text-muted-foreground">{formatReason(action.reason)} · gỡ {action.unblocks}</span></span></div>)}
+    <div className="flex flex-col gap-3">{rca.data.clusters.map((cluster, index) => <div key={`${cluster.cause}-${index}`} className="rounded-lg border p-3"><div className="flex justify-between gap-2 text-sm"><strong>{cluster.cause}</strong><span>{cluster.open}/{cluster.count} đang mở</span></div><ReasonLine reason={cluster.reason} className="mt-2" /></div>)}</div>
+    {rca.data.actions.length > 0 && <h3 className="mb-2 mt-6 text-sm font-semibold">Hành động gợi ý</h3>}{rca.data.actions.map(action => <div key={action.key} className="flex gap-3 border-t py-3 text-sm"><span className="font-mono text-muted-foreground">{action.rank}</span><span className="min-w-0"><strong>{action.key}</strong><span className="block text-muted-foreground">{formatReason(action.reason)} · gỡ {action.unblocks}</span></span></div>)}
   </> : <p className="text-sm text-muted-foreground">Chưa có bản phân tích.</p>}</Panel>;
 }
 
@@ -119,24 +120,29 @@ export function WorkflowPage({ project, wf, tab = 'units' }: { project: string; 
     if (!params.get('tab')) params.set('tab', tab);
     window.location.hash = `${rootHref(project, wf)}?${params}`;
   };
-  if (detail.error) return <div className="mx-auto max-w-6xl p-6"><a href="#/" className="text-sm hover:underline">← Tổng quan</a><p role="alert" className="mt-4 rounded-xl border p-5">{detail.error}</p></div>;
+  if (detail.error) return <div className="mx-auto max-w-6xl p-6"><a href="#/" className="text-sm hover:underline">← Tổng quan</a><p role="alert" className="mt-4 rounded-xl border p-6">{detail.error}</p></div>;
   if (!row) return <div className="mx-auto max-w-6xl p-6 text-sm text-muted-foreground">Đang đọc workflow…</div>;
   const tabActive = (id: WorkflowTab) => tab === id || (id === 'units' && tab === 'graph');
-  return <div className="mx-auto flex w-full max-w-[1600px] min-w-0 flex-col gap-5 p-4 pb-24 sm:p-6 lg:p-8">
-    <WorkflowHeader row={row} pipeline={pipe} />
-    <Panel title="Chuỗi op" concept="C4">
-      <p className="-mt-2 mb-3 text-xs text-muted-foreground">Mỗi ô là một chặng của kế hoạch. Cột là thứ tự, ô xếp dọc chạy song song. Bấm vào ô để xem chi tiết.</p>
+  const advancedSummary = `hạ tầng & chi phí · lần thử theo chặng · lát cắt · ${row.counts.decisionsOpen} chờ quyết · ${row.blockedBy.length} đang chặn`;
+  return <Stagger className="mx-auto flex w-full max-w-[1600px] min-w-0 flex-col gap-6 p-4 pb-24 md:gap-8 md:p-6 lg:p-8">
+    <StaggerItem><WorkflowHeader row={row} pipeline={pipe} /></StaggerItem>
+    <StaggerItem><Panel title="Chuỗi op" concept="C4">
+      <p className="-mt-2 mb-4 text-xs text-muted-foreground">Mỗi ô là một chặng của kế hoạch. Cột là thứ tự, ô xếp dọc chạy song song. Bấm vào ô để xem chi tiết.</p>
       {pipe ? <PipelineGraph pipeline={pipe} selected={legOp} onSelect={leg => withLeg(legOp === leg.op ? null : leg.op)} /> : <p className="text-sm text-muted-foreground">{pipeline.error ?? 'Đang đọc chuỗi op…'}</p>}
-    </Panel>
+      <Advanced className="mt-4" summary={advancedSummary}>
+        <div className="flex min-w-0 flex-col gap-6">
+          <WorkflowInfraCard where={row.where} usage={row.usage} />
+          {pipe && <div className="grid min-w-0 gap-6"><Panel title="Lần thử theo chặng" concept="C7"><AttemptGantt pipeline={pipe} now={now} /></Panel><Panel title="Lát cắt công việc" concept="C4"><WorkGraphSlices graph={pipe.workGraph} /></Panel></div>}
+          <div className="grid min-w-0 gap-6 lg:grid-cols-2">
+            <Panel title={`Chờ quyết · ${row.counts.decisionsOpen}`} concept="C12"><div className="divide-y">{decisions.data?.map(item => <a key={item.id} href={`#/decisions?id=${encodeURIComponent(item.id)}`} className="flex min-w-0 items-center gap-2 py-3 text-sm hover:text-primary"><StatusDot status={statusFromUi(item.ui)} /><span className="min-w-0 flex-1 truncate">{item.summary}</span><span className="hidden text-xs text-muted-foreground sm:block">{item.decider}{item.overdue ? ' · quá hạn' : ''}</span><ArrowRight className="size-4 shrink-0" /></a>)}</div>{!decisions.data?.length && <p className="text-sm text-muted-foreground">Không có quyết định đang chờ.</p>}</Panel>
+            <Panel title={`Đang chặn · ${row.blockedBy.length}`} concept="C4"><div className="divide-y">{row.blockedBy.map((item, index) => <a key={`${item.ref.kind}-${item.ref.id}-${index}`} href={item.ref.href} className="flex min-w-0 items-start gap-3 py-3 text-sm hover:text-primary"><span className="text-xs tabular-nums text-muted-foreground">{index + 1}.</span><StatusDot status={statusFromUi(item.ui)} /><span className="min-w-0 flex-1 break-words">{formatReason(item.reason)}<span className="block text-xs text-muted-foreground">{item.who} · từ {formatAbsolute(item.since)}</span></span><ArrowRight className="size-4 shrink-0" /></a>)}</div>{row.blockedBy.length === 0 && <p className="text-sm text-muted-foreground">Không có chặn được ghi nhận.</p>}</Panel>
+          </div>
+        </div>
+      </Advanced>
+    </Panel></StaggerItem>
     {selectedLeg && pipe && <LegDrawer project={project} wf={wf} leg={selectedLeg} pipeline={pipe} onClose={() => withLeg(null)} />}
-    <WorkflowInfraCard where={row.where} usage={row.usage} />
-    {pipe && <div className="grid min-w-0 gap-5"><Panel title="Lần thử theo chặng" concept="C7"><AttemptGantt pipeline={pipe} now={now} /></Panel><Panel title="Lát cắt công việc" concept="C4"><WorkGraphSlices graph={pipe.workGraph} /></Panel></div>}
-    <div className="grid min-w-0 gap-5 lg:grid-cols-2">
-      <Panel title={`Chờ quyết · ${row.counts.decisionsOpen}`} concept="C12"><div className="divide-y">{decisions.data?.map(item => <a key={item.id} href={`#/decisions?id=${encodeURIComponent(item.id)}`} className="flex min-w-0 items-center gap-2 py-3 text-sm hover:text-primary"><StatusDot status={statusFromUi(item.ui)} /><span className="min-w-0 flex-1 truncate">{item.summary}</span><span className="hidden text-xs text-muted-foreground sm:block">{item.decider}{item.overdue ? ' · quá hạn' : ''}</span><ArrowRight className="size-4 shrink-0" /></a>)}</div>{!decisions.data?.length && <p className="text-sm text-muted-foreground">Không có quyết định đang chờ.</p>}</Panel>
-      <Panel title={`Đang chặn · ${row.blockedBy.length}`} concept="C4"><div className="divide-y">{row.blockedBy.map((item, index) => <a key={`${item.ref.kind}-${item.ref.id}-${index}`} href={item.ref.href} className="flex min-w-0 items-start gap-3 py-3 text-sm hover:text-primary"><span className="text-xs tabular-nums text-muted-foreground">{index + 1}.</span><StatusDot status={statusFromUi(item.ui)} /><span className="min-w-0 flex-1 break-words">{formatReason(item.reason)}<span className="block text-xs text-muted-foreground">{item.who} · từ {formatAbsolute(item.since)}</span></span><ArrowRight className="size-4 shrink-0" /></a>)}</div>{row.blockedBy.length === 0 && <p className="text-sm text-muted-foreground">Không có chặn được ghi nhận.</p>}</Panel>
-    </div>
-    <nav aria-label="Nội dung workflow" className="flex gap-1 overflow-x-auto border-b pb-2">{tabs.map(item => <a key={item.id} href={`${rootHref(project, wf)}?tab=${item.id}${legOp ? `&leg=${encodeURIComponent(legOp)}` : ''}`} data-concept={item.concept} aria-current={tabActive(item.id) ? 'page' : undefined} className={`shrink-0 rounded-lg px-3 py-2 text-sm font-medium hover:bg-muted ${tabActive(item.id) ? 'bg-muted text-foreground' : 'text-muted-foreground'}`}>{item.label}{item.id === 'units' && ` ${row.units.total}`}{item.id === 'attempts' && ` ${row.counts.attempts24h}`}</a>)}</nav>
-    <div id="workflow-tab-panel" className="scroll-mt-4">
+    <StaggerItem><nav aria-label="Nội dung workflow" className="flex gap-1 overflow-x-auto border-b pb-2">{tabs.map(item => <a key={item.id} href={`${rootHref(project, wf)}?tab=${item.id}${legOp ? `&leg=${encodeURIComponent(legOp)}` : ''}`} data-concept={item.concept} aria-current={tabActive(item.id) ? 'page' : undefined} className={`shrink-0 rounded-lg px-3 py-2 text-sm font-medium hover:bg-muted ${tabActive(item.id) ? 'bg-muted text-foreground' : 'text-muted-foreground'}`}>{item.label}{item.id === 'units' && ` ${row.units.total}`}{item.id === 'attempts' && ` ${row.counts.attempts24h}`}</a>)}</nav></StaggerItem>
+    <StaggerItem><div id="workflow-tab-panel" className="scroll-mt-4">
       {(tab === 'units' || tab === 'graph') && <UnitsTab project={project} wf={wf} graph={graph.data} />}
       {tab === 'attempts' && <AttemptsTab project={project} wf={wf} />}
       {tab === 'decisions' && <DecisionsTab project={project} wf={wf} />}
@@ -144,8 +150,8 @@ export function WorkflowPage({ project, wf, tab = 'units' }: { project: string; 
       {tab === 'timeline' && <TimelineTab project={project} wf={wf} />}
       {tab === 'evidence' && <EvidenceTab project={project} wf={wf} />}
       {tab === 'infra' && <InfraTab project={project} wf={wf} />}
-    </div>
-  </div>;
+    </div></StaggerItem>
+  </Stagger>;
 }
 
 export default function WorkflowRoutePage() {

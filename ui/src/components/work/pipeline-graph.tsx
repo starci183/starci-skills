@@ -1,5 +1,7 @@
 import { useEffect, useRef, useState, type KeyboardEvent } from 'react';
+import { motion } from 'motion/react';
 import type { LegRow, PipelineView } from '../../contract';
+import { EASE, Stagger, StaggerItem } from '../motion';
 import type { Concept } from '../concept';
 import { StatusChip } from '../status-chip';
 import { statusLabels, statusTone, toneVar, type Status } from '../status';
@@ -85,6 +87,7 @@ function PipelineSvg({ pipeline, selected, onSelect }: { pipeline: PipelineView;
         return <g key={leg.op} transform={`translate(${x},${y})`} data-tone={tone} data-leg={leg.op} data-status={leg.status} role="button" tabIndex={0} className="group cursor-pointer outline-none"
           aria-label={`${name} (${leg.op}): ${statusLabels[leg.status]}, ${legSummary(leg)}${leg.current ? ', chặng hiện tại' : ''}`} aria-pressed={isSel}
           onClick={() => onSelect(leg)} onKeyDown={activate(leg, onSelect)}>
+          <motion.g initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} whileHover={{ y: -2 }} transition={{ duration: 0.2, ease: EASE, delay: 0.04 * (placed.get(leg.op)?.col ?? 0) }}>
           <title>{`${name} (${leg.op}) · ${statusLabels[leg.status]}${leg.deferred ? ` · ${leg.deferred}` : ''}${goal ? `
 ${goal}` : ''}`}</title>
           {leg.current && <rect x={-4} y={-4} width={nodeW + 8} height={NODE_H + 8} rx={12} fill="none" stroke={toneVar('running')} strokeWidth={2.5} />}
@@ -97,6 +100,7 @@ ${goal}` : ''}`}</title>
           <text x={8} y={87} fontSize="11.5" className="fill-muted-foreground">{clip(legSummary(leg), chars)}</text>
           {leg.attempts.length > 0 && <AttemptDotsSvg attempts={leg.attempts} x={4} y={104} max={Math.max(2, Math.floor((nodeW - 8) / 12) - 4)} />}
           {agents.length > 0 && <foreignObject x={nodeW - 8 - 2 * 20 - 30} y={NODE_H - 28} width={2 * 20 + 30} height={22}><div className="flex h-full items-center justify-end"><AgentStack agents={agents} max={3} size={20} /></div></foreignObject>}
+          </motion.g>
         </g>;
       })}
     </svg>
@@ -107,11 +111,11 @@ ${goal}` : ''}`}</title>
 
 function PipelineList({ pipeline, selected, onSelect }: { pipeline: PipelineView; selected: string | null; onSelect: (leg: LegRow) => void }) {
   const columns = buildColumns(pipeline.legs);
-  return <ol className="space-y-4" data-pipeline-list>{columns.map(col => <li key={col.level}>
-    <p className="mb-1.5 text-[11px] font-semibold tracking-wider text-muted-foreground">{col.index + 1}. {col.label}{col.legs.length > 1 && <span className="font-normal normal-case tracking-normal"> · song song</span>}</p>
-    <ul className="space-y-2">{col.legs.map(leg => <li key={leg.op}>
+  return <div data-pipeline-list><Stagger as="ol" className="flex flex-col gap-4">{columns.map(col => <StaggerItem as="li" key={col.level}>
+    <p className="mb-2 text-[11px] font-semibold tracking-wider text-muted-foreground">{col.index + 1}. {col.label}{col.legs.length > 1 && <span className="font-normal normal-case tracking-normal"> · song song</span>}</p>
+    <ul className="flex flex-col gap-2">{col.legs.map(leg => <li key={leg.op}>
       <button type="button" data-tone={statusTone[leg.status]} data-leg={leg.op} aria-pressed={selected === leg.op} onClick={() => onSelect(leg)}
-        className={`flex w-full min-w-0 items-center gap-3 rounded-lg border bg-[var(--tone-bg)] px-3 py-2.5 text-left ${dashed(leg.status) ? 'border-dashed' : ''} ${leg.current ? 'ring-2 ring-[var(--status-running)]' : ''} ${selected === leg.op ? 'border-primary' : 'border-[var(--tone-line)]'}`}>
+        className={`flex w-full min-w-0 items-center gap-3 rounded-lg border bg-[var(--tone-bg)] px-3 py-3 text-left ${dashed(leg.status) ? 'border-dashed' : ''} ${leg.current ? 'ring-2 ring-[var(--status-running)]' : ''} ${selected === leg.op ? 'border-primary' : 'border-[var(--tone-line)]'}`}>
         <span className="min-w-0 flex-1"><span className="block truncate text-sm font-semibold" title={legGoal(leg) ?? undefined}>{legName(leg)}</span>
           <span className="block truncate font-mono text-[11px] text-muted-foreground">{leg.op}</span>
           <span className="block truncate text-xs text-muted-foreground">{legSummary(leg)}</span></span>
@@ -120,5 +124,5 @@ function PipelineList({ pipeline, selected, onSelect }: { pipeline: PipelineView
         <StatusChip status={leg.status} />
       </button>
     </li>)}</ul>
-  </li>)}</ol>;
+  </StaggerItem>)}</Stagger></div>;
 }

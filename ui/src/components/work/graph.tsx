@@ -59,7 +59,7 @@ export function GraphView({ graph, onUnit, onGroupSelect, selectionInInspector =
   };
   return <ConceptBlock concept="C4" className="min-w-0 space-y-3">
     <div className="flex items-center gap-2 text-sm text-muted-foreground"><GitBranch className="size-4" aria-hidden="true" /> Đồ thị theo Op · {graph.nodes.length} đơn vị</div>
-    {layout.groups.length === 0 && <p className="rounded-xl border p-5 text-sm text-muted-foreground">Chưa có đơn vị trong đồ thị.</p>}
+    {layout.groups.length === 0 && <p className="rounded-xl border p-6 text-sm text-muted-foreground">Chưa có đơn vị trong đồ thị.</p>}
     {layout.groups.length > 0 && <>
       <div className="hidden max-w-full overflow-x-auto rounded-xl border bg-muted/15 p-2 md:block" aria-label="Đồ thị Op có mũi tên phụ thuộc">
         <div className="relative" style={{ width: layout.width, height: layout.height }}>

@@ -1,4 +1,6 @@
+import { motion } from 'motion/react';
 import { unitStateLabels } from '../i18n/vi';
+import { EASE } from './motion';
 import type { Concept } from './concept';
 
 export const concept: Concept = 'C4';
@@ -16,7 +18,7 @@ export function LifecycleBar({ counts, onSelect, selected }: {
   if (total === 0) return <div className="empty-state">Chưa có đơn vị trong đồ thị.</div>;
   return <div className="lifecycle" data-concept="C4">
     <div className="lifecycle-track" role="img" aria-label={unitStates.map((state) => `${unitStateLabels[state]} ${counts[state] ?? 0}`).join(', ')}>
-      {unitStates.filter((state) => (counts[state] ?? 0) > 0).map((state) => <span key={state} data-unit-state={state} style={{ width: `${100 * (counts[state] ?? 0) / total}%` }} />)}
+      {unitStates.filter((state) => (counts[state] ?? 0) > 0).map((state) => <motion.span key={state} data-unit-state={state} style={{ width: `${100 * (counts[state] ?? 0) / total}%`, transformOrigin: 'left center' }} initial={{ scaleX: 0 }} animate={{ scaleX: 1 }} transition={{ duration: 0.36, ease: EASE }} />)}
     </div>
     <div className="lifecycle-legend">
       {unitStates.filter((state) => (counts[state] ?? 0) > 0).map((state) => {

@@ -36,7 +36,7 @@ export function WorkGraphSlices({ graph }: { graph: WorkGraphView | null }) {
   const width = PAD * 2 + cols.length * NODE_W + Math.max(0, cols.length - 1) * GAP_X;
   const height = PAD * 2 + Math.max(1, ...cols.map(c => c?.length ?? 0)) * (NODE_H + GAP_Y) - GAP_Y;
   const trunc = (s: string, n: number) => s.length > n ? `${s.slice(0, n - 1)}…` : s;
-  return <div className="space-y-3">
+  return <div className="flex flex-col gap-3">
     <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
       <strong className="text-foreground">Phiên bản {graph.version}</strong><span>sự kiện: {graph.event}</span><span>op tác giả: {graph.authorOp}</span><span>{formatDayTime(graph.at)}</span>
       <span>{graph.nodes.length} lát cắt · {edges.length} cạnh</span>
