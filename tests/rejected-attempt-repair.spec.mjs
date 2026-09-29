@@ -76,21 +76,21 @@ test('the readers: a refused, dead or cancelled attempt is not running; only an 
   const base={dispatched_at:1,settled_at:null,end_state:null,reported_at:null,report_outcome:null,verdict:null};
   assert.equal(attemptStatus(base),'running');assert.equal(attemptOpen(base),true);
   assert.equal(attemptStatus({...base,reported_at:2}),'settling');
-  for(const [end,status] of [['requeued','retry'],['worker-dead','failed'],['effect-unknown','blocked'],['cancelled','dropped']]){
+  for(const [end,status] of [['requeued','rejected'],['worker-dead','failed'],['effect-unknown','blocked'],['cancelled','dropped']]){
     assert.equal(attemptOpen({...base,end_state:end}),false,end);
     assert.equal(attemptStatus({...base,end_state:end}),status,end);
   }
-  assert.equal(attemptStatus({...base,end_state:'requeued',settled_at:3}),'retry','a sealed refusal reads retry, never unknown');
+  assert.equal(attemptStatus({...base,end_state:'requeued',settled_at:3}),'rejected','a sealed refusal reads rejected, never unknown');
 });
 
-test('the pipeline leg reads a refused attempt as retry, closed, never running',t=>withLedger(t,({ledger})=>{
+test('the pipeline leg reads a refused attempt as rejected, closed, never running',t=>withLedger(t,({ledger})=>{
   const {legacy}=seed(ledger);
   const r=inspectLedger({file:ledger.file});
   try{
     const view=pipelineOf(r.db,'proj',wf);
     const leg=view.legs.find(x=>x.op==='scope.define');
     const byId=Object.fromEntries(leg.attempts.map(a=>[a.id,a]));
-    assert.equal(byId[legacy.attemptId].status,'retry');
+    assert.equal(byId[legacy.attemptId].status,'rejected');
     assert.equal(byId[legacy.attemptId].open,false);
     assert.equal(byId[legacy.attemptId].endState,'requeued');
   }finally{r.close();}
