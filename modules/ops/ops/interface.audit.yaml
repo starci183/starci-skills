@@ -263,7 +263,7 @@ steps:
         intercept exists at its app/ path - and compare each capture's chrome with the layout captures
         at the same breakpoint and theme; a missing route file, a screen-local sidebar, header or logo, or
         copy outside the productLocale is bounded drift routed to interface.implement as
-        `shell.conformance` or `layout.structure`. A layout tree that is absent, legacy, unsettled above
+        `shell.conformance` or `layout.structure`. A layout tree that is absent, unsettled above
         the audited routes or stale against app/ blocks the lens as APP_SHELL_UNSETTLED rather than letting
         either side stand in for it."
   - reads:
@@ -500,7 +500,7 @@ blockers:
         and draw/capture hashes.
   - code: APP_SHELL_UNSETTLED
     condition:
-      en: The layout tree the audited screens sit in is absent, still work/app-shell@1, unsettled above an
+      en: The layout tree the audited screens sit in is absent, unsettled above an
         audited route, or stale against the frontend's app/, so neither the direction nor the capture can
         be compared with the real layouts. Report `blocked` with blocker `brand-gap` naming the record.
   - code: AUDIT_INPUT_CHANGED

@@ -583,7 +583,7 @@ proofs:
 blockers:
   - code: APP_SHELL_UNSETTLED
     condition:
-      en: The layout tree is absent or still a work/app-shell@1 record, or an accepted ui record in scope
+      en: The layout tree is absent, or an accepted ui record in scope
         declares no route or surface, so there is no app/ path to build at. Report `blocked` with blocker
         `brand-gap` naming the record; never build a chrome or pick a route of the screen's own to
         proceed.

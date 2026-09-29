@@ -139,21 +139,6 @@ schemas:
       whenNot: Never per feature and never per drawing — one record per tree, re-scanned and re-captured by brand.decide when app/ changes.
       selectedBy: brand.decide scans and captures it (or plans it before a frontend exists); interface.scaffold re-scans it after creating app/.
 
-  - id: work/app-shell@1
-    file: modules/schemas/work-app-shell.schema.yaml
-    dialect: json-schema
-    subsystem: work-tree
-    governs: "SUPERSEDED by work/layout-tree@1 at the same path. The single hand-written app shell record (layout component, top bar, nav registry, productLocale, demo persona, captures), kept compilable so a record an earlier brand.decide wrote still validates until `node scripts/work/layout-tree.mjs convert` rewrites it."
-    binds: .starciwork/shell/index.yaml (legacy)
-    usedBy:
-      - "scripts/work/layout-tree.mjs convert (carries its locale, persona and lockup into the layout tree)"
-      - "scripts/checks/shell-conformance.mjs (SHELL_RECORD_LEGACY - refused by op proofs, a suspect in starci validate)"
-    business:
-      question: "Which record did the product's chrome live in before the layout tree?"
-      whenNeeded: Only to read and convert a record written before the layout tree existed.
-      whenNot: Never written anew.
-      selectedBy: Nothing selects it; brand.decide converts it on its next run.
-
   - id: work/business-rule@1
     file: modules/schemas/work-business-rule.schema.yaml
     dialect: json-schema

@@ -789,7 +789,7 @@ blockers:
     condition:
       en: After step 1 the layout tree still cannot be settled by this op because an INPUT is missing - no brand record to
         follow, no accepted journey or SDS to plan a layout from, no seed for a persona, no way to render the frontend
-        (RENDER_TOOL_UNAVAILABLE). A tree that is merely absent, todo, legacy, stale (LAYOUT_TREE_STALE), lockup-less
+        (RENDER_TOOL_UNAVAILABLE). A tree that is merely absent, todo, stale (LAYOUT_TREE_STALE), lockup-less
         (SHELL_LOCKUP_MISSING) or unsettled is NOT this blocker - this op scans, draws or captures and settles it. Report
         `blocked` with blocker `brand-gap` naming the missing input and the failing check.
         Never draw, describe or invent chrome to proceed. One exception - the drawing of a planned visible

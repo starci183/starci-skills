@@ -91,8 +91,7 @@ reads:
     path: .starciwork/shell/index.yaml
     purpose:
       en: "The product's layout tree (work/layout-tree@1) with its rev, nodes, per-layout revs and captures
-        (cited blobs, scripts/lib/blob-lookup.mjs), or a work/app-shell@1 record an earlier revision of this op wrote, which is
-        converted. Absent until the tree is first scanned or planned; this op then writes it at rev 1."
+        (cited blobs, scripts/lib/blob-lookup.mjs). Absent until the tree is first scanned or planned; this op then writes it at rev 1."
   - id: shellSource
     path: repository:<repo-id>/<bound-paths>
     purpose:
@@ -194,8 +193,7 @@ writes:
       en: "The one layout tree (schema work/layout-tree@1, id shell), generated, never hand-listed: `node
         scripts/work/layout-tree.mjs scan --work .starciwork --write` writes app, source digest, i18n
         catalogs and one node per app/ segment with its special files and digests, the component each
-        layout renders and the navigation it imports with labels per locale and its findings; `convert`
-        does the same over a work/app-shell@1 record, carrying its locale, persona and lockup. This op then
+        layout renders and the navigation it imports with labels per locale and its findings. This op then
         decides each layout's `chrome` (visible or passthrough), captures every visible layout with
         `layout-tree.mjs capture` (which measures the slot and bumps the layout rev on a changed capture),
         writes `personas` (one per role, one default, from the seed or fixture data the app demos with),
@@ -368,7 +366,7 @@ steps:
       en: "Write the layout tree (not exclusively: interface.draw scans, draws or captures it itself when it starts from a
         todo shell, and only one workflow at a time draws the shared shell foundation - a tree another workflow's draw is
         settling is left to it). When the frontend exists, run `node scripts/work/layout-tree.mjs scan --work
-        .starciwork --write` (`convert` when the record is still work/app-shell@1) and read what it
+        .starciwork --write` and read what it
         reports: every node, every layout's component and chrome guess, and the navigation findings - a
         destination with no route, a route no page answers, a label a catalog lacks, a top-level route no
         destination reaches. Report each finding as it is; never edit the navigation to hide one, and never
@@ -382,9 +380,7 @@ steps:
         user is (an active sidebar destination, an active tab) is also captured once per active state, with
         that state active, into layout.destinations: `layout-tree.mjs capture ... --destination <nav or tab
         key> [--route <node-id>]...` (a nav key defaults to its item's target node; a tab names the nodes it is
-        active for) - compose-direction places each page into its own destination's render. A tree that kept
-        these in extensions.destinationCaptures moves them with `layout-tree.mjs destinations --work
-        .starciwork --promote --write`; crop the brand lockup from
+        active for) - compose-direction places each page into its own destination's render. Crop the brand lockup from
         the same render into brand.lockups with `layout-tree.mjs lockup --work .starciwork --from
         shell/<capture path> --rect x,y,w,h --write`. On a greenfield product (planned tree, nothing renders
         a lockup) the order is: plan the visible layout with --design; interface.draw draws that layout

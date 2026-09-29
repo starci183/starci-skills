@@ -48,10 +48,6 @@ const SCHEMA_FILES = Object.fromEntries((catalog?.schemas ?? [])
 // work/acceptance-criterion@1 any more. work-layout.yaml still declares the ac family folder, so the
 // schema stays and this is the one family the tree encodes inline rather than as its own record.
 const INLINED_FAMILIES = new Set(['work/acceptance-criterion@1']);
-// A superseded family stays catalogued only so a record written before its successor still validates until it
-// is converted (work/app-shell@1 -> work/layout-tree@1, scripts/work/layout-tree.mjs convert); no example
-// writes one anew.
-const SUPERSEDED_FAMILIES = new Set(['work/app-shell@1']);
 // A UAT run manifest is agent data (shape.agentData): its bytes live in the blob store and the flow's
 // evidence.yaml cites it by {artifact?, name, sha256}, so no manifest file is ever part of a .starciwork tree.
 // The schema is still the authority for that blob's payload and stays catalogued for it.
@@ -93,7 +89,7 @@ test('every record family named in the example has a schema, and every schema is
   assert.deepEqual(unparseable, [], 'these example records are not valid YAML, so no schema can accept them');
   const unknown = [...named].filter(family => !SCHEMA_FILES[family]);
   assert.deepEqual(unknown, [], 'the example names these schemas and no schema file defines them');
-  const unused = Object.keys(SCHEMA_FILES).filter(family => !named.has(family) && !INLINED_FAMILIES.has(family) && !SUPERSEDED_FAMILIES.has(family) && !BLOB_PAYLOAD_FAMILIES.has(family));
+  const unused = Object.keys(SCHEMA_FILES).filter(family => !named.has(family) && !INLINED_FAMILIES.has(family) && !BLOB_PAYLOAD_FAMILIES.has(family));
   assert.deepEqual(unused, [], 'these schemas are defined and no example record exercises them');
 });
 

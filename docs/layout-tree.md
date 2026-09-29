@@ -5,9 +5,9 @@ Product UI design follows the Next.js App Router layout architecture (owner-appr
 tree** at `.starciwork/shell/index.yaml` (schema `work/layout-tree@1`). Every drawing is composited into that
 tree's real captures, and every build lands its files at that tree's paths.
 
-It replaced the single hand-written app shell (`work/app-shell@1`, lane S 807195bed). That record described one
-chrome in prose and checked the wording of drawing prompts. Parallel draw workers still redrew the chrome
-themselves, and its navigation list could disagree with the routes that actually exist.
+It replaced a single hand-written app shell that described one chrome in prose and checked the wording of
+drawing prompts. Parallel draw workers still redrew the chrome themselves, and its navigation list could
+disagree with the routes that actually exist.
 
 ## The record
 
@@ -40,7 +40,7 @@ waits as `foundation-wait`, and a stalled owner opens a Supervisor Decision Item
 sets the brand identity and direction and may capture layouts. Keeping one writer at a time is what stops parallel
 workers from inventing chrome. The work, whichever op does it:
 
-1. Scan (or `convert` a `work/app-shell@1` record).
+1. Scan.
 2. Decide each `chrome: unknown`.
 3. Capture every visible layout at desktop and mobile in the light theme (dark is optional - kept where the
    tree already has it, never demanded). For each capture it renders a route under the
@@ -105,7 +105,7 @@ A popover, dropdown, toast or tooltip is not a surface. It is a state in the `ui
 prompt text it reads is the `Product locale: <default>` line.
 
 - **Tree:**
-  - the record is a layout tree (a `work/app-shell@1` record is refused as `SHELL_RECORD_LEGACY`);
+  - the record is a layout tree (any other schema is refused as `SHELL_RECORD_NOT_TREE`);
   - nodes are consistent; lockups and personas are present;
   - the tree declares desktop, mobile and light (`SHELL_BREAKPOINT_MISSING`, `SHELL_THEME_MISSING`);
   - every visible layout is captured with its slot at desktop and mobile, light (dark optional);
@@ -124,13 +124,5 @@ prompt text it reads is the `Product locale: <default>` line.
   intercept.
 
 `starci validate` runs the ui half without pixel re-derivation. It reports records drawn before the layout tree
-(no binding, no route, a stale rev, a legacy shell) as suspects, never as refusals. `interface.audit` applies
+(no binding, no route, a stale rev) as suspects, never as refusals. `interface.audit` applies
 the same check as its layout lens, classifying findings as `layout.structure` or `shell.conformance`.
-
-## Migration
-
-`work/app-shell@1` stays catalogued, so a record written earlier still validates. It is superseded, and
-`node scripts/work/layout-tree.mjs convert --work .starciwork --write` rewrites it into a layout tree over a fresh
-scan. The conversion carries over the product locale, persona (as role `primary`), lockup and breakpoint/theme
-matrix, marks the legacy layout visible, and leaves the tree `todo`: the old captures have no measured slot, so
-the next `interface.draw` (or `brand.decide`) re-captures them.

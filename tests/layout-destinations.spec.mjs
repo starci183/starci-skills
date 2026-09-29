@@ -6,7 +6,7 @@ import { createRequire } from 'node:module';
 import { parseYaml, stringifyYaml } from '../engine/yaml.mjs';
 import { checkShellConformance } from '../scripts/checks/shell-conformance.mjs';
 import {
-  addCapture, baseLayoutFor, captureFileOf, destinationFor, destinationsOf, layoutTreeMain, mergeScan, nodeById, promoteDestinations, scanAppDir,
+  addCapture, baseLayoutFor, captureFileOf, destinationFor, destinationsOf, layoutTreeMain, mergeScan, nodeById, scanAppDir,
 } from '../scripts/work/layout-tree.mjs';
 import { decodePng, encodePng } from '../scripts/work/png.mjs';
 import { drawUi, layoutCapture, settledProduct, uiSkeleton } from './fixtures/layout-tree.mjs';
@@ -160,50 +160,12 @@ test('shell-conformance holds destinations to the layout: known nodes below it, 
   assert.ok(result.refused.some((l) => /is active for \/\[locale\]\/\(auth\)\/sign-in, which is not a node at or below the layout/.test(l)));
 });
 
-test('a legacy extensions.destinationCaptures block is read (nav keys and targetLayouts tabRoutes), then promoted', async (t) => {
+test('an extensions.destinationCaptures block is refused; destinations live on the layout node only', async (t) => {
   const p = await settledProduct(t);
-  const items = [];
-  for (const bp of ['desktop', 'mobile']) {
-    for (const [key, chrome] of [['photos', PHOTOS_CHROME], ['console-reports', REPORTS_CHROME]]) {
-      const rel = `assets/layouts/${key}--${bp}--light.png`;
-      const bytes = fs.readFileSync(capturePng(p, key, bp, chrome));
-      fs.mkdirSync(path.dirname(path.join(p.shellDir, rel)), { recursive: true });
-      fs.writeFileSync(path.join(p.shellDir, rel), bytes);
-      const { createHash } = await import('node:crypto');
-      items.push({ key, breakpoint: bp, path: rel, sha256: createHash('sha256').update(bytes).digest('hex') });
-    }
-  }
-  items.push({ key: 'unclaimed', breakpoint: 'desktop', path: 'assets/layouts/photos--desktop--light.png', sha256: items[0].sha256 });
-  p.tree.extensions = {
-    targetLayouts: { console: { node: CONSOLE, tabRoutes: ['/[locale]/reports'] } },
-    destinationCaptures: { note: 'one capture per destination, light theme', items },
-  };
-  p.save(p.tree);
   assert.equal(validateTree(p.tree), true, JSON.stringify(validateTree.errors));
-  assert.deepEqual(destinationsOf(p.tree, nodeById(p.tree, CONSOLE)).map((d) => [d.key, d.routes, d.legacy]), [['photos', [PHOTOS], true], ['console-reports', [REPORTS], true]]);
-  const board = await drawUi(p, 'reports/ui/board', uiSkeleton('ui.reports.board', { route: REPORTS, surface: 'page', shell: bound(p) }), both);
-  const desktop = board.record.assets.find((a) => a.composite?.breakpoint === 'desktop');
-  assert.equal(desktop.composite.layout.capture, 'shell/assets/layouts/console-reports--desktop--light.png');
-  assert.deepEqual(desktop.composite.rect, DESKTOP_SLOT, 'the legacy capture slot is measured from its PNG');
-  const legacy = checkShellConformance(board.dir);
-  assert.deepEqual(legacy.refused, []);
-  assert.ok(suspects(legacy).includes('LAYOUT_DESTINATIONS_LEGACY'), 'read, and reported as still to promote');
-  // Promote: dry run first, then written; the composite stays valid (same paths, same bytes).
-  const dry = layoutTreeMain(['destinations', '--work', p.work, '--promote']);
-  assert.match(dry.text, /promoted \/\[locale\]\/\(console\): console-reports, photos[\s\S]*UNMAPPED unclaimed desktop[\s\S]*dry run/);
-  assert.ok(parseYaml(fs.readFileSync(path.join(p.shellDir, 'index.yaml'), 'utf8')).extensions.destinationCaptures.items.length === 5, 'a dry run writes nothing');
-  const wet = layoutTreeMain(['destinations', '--work', p.work, '--promote', '--write']);
-  assert.equal(wet.exitCode, 0, wet.text);
-  const promoted = parseYaml(fs.readFileSync(path.join(p.shellDir, 'index.yaml'), 'utf8'));
-  assert.equal(validateTree(promoted), true, JSON.stringify(validateTree.errors));
-  assert.equal(promoted.rev, p.tree.rev + 1);
-  assert.deepEqual(promoted.extensions.destinationCaptures.items.map((i) => i.key), ['unclaimed'], 'what no layout claims stays where it was');
-  assert.deepEqual(promoted.extensions.targetLayouts, p.tree.extensions.targetLayouts);
-  const dests = nodeById(promoted, CONSOLE).layout.destinations;
-  assert.deepEqual(dests.map((d) => d.key), ['console-reports', 'photos']);
-  assert.deepEqual(dests[0].captures.find((c) => c.breakpoint === 'desktop').slot, DESKTOP_SLOT);
-  const after = checkShellConformance(board.dir);
-  assert.deepEqual(after.refused, []);
-  assert.equal(suspects(after).includes('LAYOUT_DESTINATIONS_LEGACY'), false, 'promoted: no legacy suspect');
-  assert.equal(promoteDestinations(promoted, p.shellDir).promoted.length, 0, 'promotion is idempotent');
+  const legacy = structuredClone(p.tree);
+  legacy.extensions = { destinationCaptures: { note: 'one capture per destination', items: [{ key: 'photos', breakpoint: 'desktop', path: 'assets/layouts/photos--desktop--light.png', sha256: 'a'.repeat(64) }] } };
+  assert.equal(validateTree(legacy), false, 'the retired block is not a valid extension');
+  assert.deepEqual(destinationsOf(legacy, nodeById(legacy, CONSOLE)), [], 'it is never read as destinations');
+  assert.equal('promoteDestinations' in await import('../scripts/work/layout-tree.mjs'), false, 'there is no promote path');
 });

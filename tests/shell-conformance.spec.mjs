@@ -192,18 +192,17 @@ test('the product-locale rule is kept: every content prompt states it', async (t
   assert.equal(productLocaleFor(null), null);
 });
 
-test('starci validate lists records drawn before the layout tree as suspects, and a legacy shell as a suspect', async (t) => {
+test('starci validate lists records drawn before the layout tree as suspects, and a shell that is not a layout tree as a refusal', async (t) => {
   const p = await settledProduct(t);
   const legacyUi = path.join(p.work, 'features', 'old', 'ui', 'screen');
   fs.mkdirSync(legacyUi, { recursive: true });
   fs.writeFileSync(path.join(legacyUi, 'index.yaml'), stringifyYaml(uiSkeleton('ui.old.screen')));
   const findings = shellBindingFindings(p.work);
   assert.deepEqual(findings.map((f) => [f.level, f.code]).sort(), [['suspect', 'SHELL_BINDING_MISSING'], ['suspect', 'UI_ROUTE_MISSING']]);
-  fs.writeFileSync(path.join(p.work, 'shell', 'index.yaml'), stringifyYaml({ schema: 'work/app-shell@1', id: 'shell', productLocale: { default: 'vi', fallback: 'vi', locales: ['vi'] } }));
-  const legacy = shellBindingFindings(p.work).map((f) => [f.level, f.code]);
-  assert.ok(legacy.some(([l, c]) => l === 'suspect' && c === 'SHELL_RECORD_LEGACY'));
-  assert.ok(legacy.every(([l]) => l !== 'refuse'), 'nothing written before the layout tree is refused by validate');
-  assert.deepEqual(codes(checkShellConformance(path.join(p.work, 'shell'))), ['SHELL_RECORD_LEGACY'], 'the op proof refuses it until converted');
+  fs.writeFileSync(path.join(p.work, 'shell', 'index.yaml'), stringifyYaml({ schema: 'work/other-shell@1', id: 'shell', productLocale: { default: 'vi', fallback: 'vi', locales: ['vi'] } }));
+  const notTree = shellBindingFindings(p.work).map((f) => [f.level, f.code]);
+  assert.ok(notTree.some(([l, c]) => l === 'refuse' && c === 'SHELL_RECORD_NOT_TREE'), 'one refusal: the shell record is not a layout tree');
+  assert.deepEqual(codes(checkShellConformance(path.join(p.work, 'shell'))), ['SHELL_RECORD_NOT_TREE'], 'the op proof refuses it');
   assert.match(read('scripts/checks/work-validate.mjs'), /shellBindingFindings\(root, enclosingWorkRoot\)/);
 });
 
@@ -212,7 +211,6 @@ test('the contracts wire the layout tree: owner op, draw, implement, audit, scaf
   const records = readYaml('modules/models/records.yaml');
   assert.equal(records.records.shell.schema, 'work/layout-tree@1');
   assert.ok(kinds.vocabularies.schemas.includes('work/layout-tree@1'));
-  assert.ok(kinds.vocabularies.schemas.includes('work/app-shell@1'), 'the legacy family stays readable');
   for (const kind of ['interface.draw', 'interface.implement', 'interface.audit']) {
     assert.ok(kinds.kinds[kind].reads.includes('shell'), `${kind} reads shell`);
     assert.ok(kinds.kinds[kind].checks.includes('scripts/checks/shell-conformance.mjs'), `${kind} runs the check`);
@@ -222,7 +220,6 @@ test('the contracts wire the layout tree: owner op, draw, implement, audit, scaf
   assert.match(read('modules/models/kinds.yaml'), /LAYOUTS FIRST, ENFORCED/);
   const catalog = readYaml('modules/schemas/index.yaml').schemas;
   assert.ok(catalog.some((s) => s.id === 'work/layout-tree@1' && s.file === 'modules/schemas/work-layout-tree.schema.yaml'));
-  assert.ok(catalog.some((s) => s.id === 'work/app-shell@1' && /SUPERSEDED/.test(s.governs)));
 
   const draw = readYaml('modules/ops/ops/interface.draw.yaml');
   for (const field of ['route', 'surface', 'direction', 'routed', 'host']) assert.ok(draw.writes.find((w) => w.id === 'node').fields.includes(field), `draw writes ${field}`);

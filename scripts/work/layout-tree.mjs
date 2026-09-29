@@ -3,11 +3,10 @@
 //
 //   node scripts/work/layout-tree.mjs scan    --work <.starciwork> [--app-dir <dir>] [--write] [--json]
 //   node scripts/work/layout-tree.mjs scan    --app-dir <dir> [--repo-root <dir>] [--json]
-//   node scripts/work/layout-tree.mjs convert --work <.starciwork> [--write] [--json]
 //   node scripts/work/layout-tree.mjs capture --work <.starciwork> --node <id> --breakpoint <bp> --theme <t> --file <png> [--url <u>] [--provenance <text>] --write
 //   node scripts/work/layout-tree.mjs capture --work <.starciwork> --node <id> --destination <key> [--route <node-id>]... --breakpoint <bp> --theme <t> --file <png> --write
 //   node scripts/work/layout-tree.mjs lockup  --work <.starciwork> --from <shell/<capture> | <ui-id>:<layout composite>> --rect x,y,w,h [--theme t] --write
-//   node scripts/work/layout-tree.mjs destinations --work <.starciwork> [--promote] [--route <node-id> [--active-nav <key>]] [--write] [--json]
+//   node scripts/work/layout-tree.mjs destinations --work <.starciwork> [--route <node-id> [--active-nav <key>]] [--write] [--json]
 //   node scripts/work/layout-tree.mjs plan    --work <.starciwork> --node <id> [--files layout,page] [--design <ui-id>] --write
 //   node scripts/work/layout-tree.mjs slot    <png> [--key ff00ff] [--tolerance 8]
 //
@@ -40,7 +39,6 @@ import {
 export { REQUIRED_BREAKPOINTS, REQUIRED_THEMES };
 
 export const TREE_SCHEMA = 'work/layout-tree@1';
-export const LEGACY_SHELL_SCHEMA = 'work/app-shell@1';
 export const SCANNER = 'scripts/work/layout-tree.mjs';
 export const SPECIAL_FILES = ['layout', 'template', 'page', 'loading', 'error', 'not-found', 'default', 'route'];
 export const DEFAULT_BREAKPOINTS = [{ name: 'desktop', width: 1440, height: 900 }, { name: 'mobile', width: 390, height: 844 }];
@@ -422,9 +420,7 @@ export function scanAppDir(appDir, { repoRoot = null, appRoot = null, repository
     productLocale,
     nodes,
   };
-  // Not part of the record: the code digest parts (to re-derive a pre-keyed whole-file digest) and the parsed
-  // catalogs (to digest the keys a merged record uses).
-  Object.defineProperty(scan, 'codeParts', { value: digests, enumerable: false });
+  // Not part of the record: the parsed catalogs (to digest the keys a merged record uses).
   Object.defineProperty(scan, 'catalogs', { value: catalogs, enumerable: false });
   return scan;
 }
@@ -476,18 +472,16 @@ export function keyedI18n(catalogs, keys) {
 const catalogSet = (catalogs) => list(catalogs).map((c) => `${c.locale} ${c.path}`).sort();
 
 /**
- * Whether app/ drifted from what the tree recorded, judged against a fresh scan. Returns {stale, changed,
- * legacy}: `changed` names what moved; `legacy` is true when the record still carries the whole-file catalog
- * digest (it stays valid until the next re-scan and is judged by the keys it uses).
+ * Whether app/ drifted from what the tree recorded, judged against a fresh scan. Returns {stale, changed}:
+ * `changed` names what moved. A record with catalogs but no keyed digest (`i18n.used.keys`) is stale until
+ * re-scanned.
  */
 export function sourceDrift(record, scan) {
   const changed = [];
   const recorded = list(record?.i18n?.catalogs);
   const used = record?.i18n?.used;
-  const legacy = recorded.length > 0 && !Array.isArray(used?.keys);
-  // A pre-keyed digest folded the catalog files in: re-derive it from the fresh code and the RECORDED catalog
-  // digests, so only code moves it.
-  const code = legacy ? digestOfParts([...list(scan.codeParts), ...recorded.map((c) => [c.path, c.sha256])]) : scan.source?.digest;
+  const unkeyed = recorded.length > 0 && !Array.isArray(used?.keys);
+  const code = scan.source?.digest;
   const nodes = nodesOf(record);
   const now = new Map(list(scan.nodes).map((n) => [n.id, n]));
   if (record?.source?.digest && code !== record.source.digest) {
@@ -519,23 +513,19 @@ export function sourceDrift(record, scan) {
     }
     for (const key of after.keys()) if (!before.has(key)) changed.push(`${n.id} nav ${key} added`);
   }
-  // Every used key (titles, capture keys, labels): the keyed digest per locale. A pre-keyed record recorded no
-  // value for a key outside the nav, so a catalog change with such a key in use is stale until re-scanned.
+  // Every used key (titles, capture keys, labels): the keyed digest per locale. A record without the keyed
+  // digest is stale: re-scan writes it.
   const parsed = list(scan.catalogs);
-  if (!legacy && Array.isArray(used?.keys)) {
+  if (unkeyed) changed.push('the tree records no keyed i18n digest (i18n.used.keys) - re-scan it');
+  else if (Array.isArray(used?.keys)) {
     for (const c of parsed) {
       const was = list(used.locales).find((l) => l?.locale === c.locale)?.sha256;
       if (!was || keyedDigest(c.messages, used.keys) === was) continue;
       const gone = used.keys.filter((k) => getPath(c.messages, k) === undefined);
       changed.push(`${c.locale} used key values${gone.length ? ` (absent now: ${gone.slice(0, 4).join(', ')})` : ''}`);
     }
-  } else if (legacy) {
-    const navKeys = new Set(nodes.flatMap((n) => list(n.layout?.nav?.items)).map((i) => i?.i18nKey).filter(Boolean));
-    const other = usedI18nKeys(record).filter((k) => !navKeys.has(k));
-    const moved = recorded.some((c) => freshCatalogs.find((f) => f.path === c.path)?.sha256 !== c.sha256);
-    if (moved && other.length) changed.push(`the catalogs changed and ${other.slice(0, 4).join(', ')} ha${other.length === 1 ? 's' : 've'} no recorded value to compare`);
   }
-  return { stale: changed.length > 0, changed: [...new Set(changed)], legacy };
+  return { stale: changed.length > 0, changed: [...new Set(changed)] };
 }
 
 // ---------------------------------------------------------------------------------------------------------
@@ -663,7 +653,7 @@ export function layoutSettlement(record, node, { shellDir = null, uiLoader = nul
         for (const bp of breakpoints) for (const theme of themes) {
           const capture = d.captures.find((c) => c?.breakpoint === bp && c?.theme === theme);
           if (!capture) { reasons.push(`${node.id} destination ${d.key} has no capture at ${bp}/${theme}`); continue; }
-          if (!capture.slot && !d.legacy) reasons.push(`${node.id} destination ${d.key} capture ${captureRelOf(capture)} has no measured slot`);
+          if (!capture.slot) reasons.push(`${node.id} destination ${d.key} capture ${captureRelOf(capture)} has no measured slot`);
           if (shellDir) {
             const file = captureFileOf(shellDir, capture);
             if (!file || !fs.existsSync(file)) reasons.push(`${node.id} destination ${d.key} capture ${captureRelOf(capture)} is neither in the blob store nor on disk`);
@@ -692,47 +682,14 @@ export function designCaptureOf(design, bp, theme) {
 // `layout.destinations` holds one entry per active state: {key, routes: [node ids under the layout], captures}.
 // A page composite takes the destination whose route is the ui record's route or its nearest ancestor (the
 // longest match); an explicit `shell.layouts[].destination` binding overrides the route, and `shell.activeNav`
-// decides when no route matches. A tree written before destinations were in the schema kept them as
-// `extensions.destinationCaptures` ({note, items: [{key, breakpoint, path, sha256}]}); that block is still read
-// (light theme, keys resolved against the layout's nav items and extensions.targetLayouts tabRoutes) until
-// `layout-tree.mjs destinations --promote` moves it into the nodes.
+// decides when no route matches.
 
 /** Whether node id `route` is `base` or sits below it. */
 const underNode = (route, base) => route === base || String(route).startsWith(base === '/' ? '/' : `${base}/`);
 
-/** The legacy extensions.destinationCaptures of a tree mapped onto one layout node: [{key, routes, captures, legacy}]. */
-export function legacyDestinationsOf(record, node) {
-  const items = list(record?.extensions?.destinationCaptures?.items).filter((i) => i && typeof i.key === 'string' && i.path);
-  if (!items.length || !node?.layout) return [];
-  const routesByKey = new Map();
-  for (const item of list(node.layout.nav?.items)) if (item?.key && typeof item.target === 'string') routesByKey.set(item.key, [item.target]);
-  const nodes = nodesOf(record);
-  for (const [name, entry] of Object.entries(record?.extensions?.targetLayouts ?? {})) {
-    if (!entry || typeof entry !== 'object' || entry.node !== node.id) continue;
-    for (const url of list(entry.tabRoutes)) {
-      const target = nodes.find((n) => n.url === url && underNode(n.id, node.id));
-      if (!target) continue;
-      const key = url === node.url ? name : `${name}-${urlParts(url).pop()}`;
-      if (!routesByKey.has(key)) routesByKey.set(key, [target.id]);
-    }
-  }
-  const byKey = new Map();
-  for (const item of items) {
-    const routes = routesByKey.get(item.key);
-    if (!routes) continue;
-    if (!byKey.has(item.key)) byKey.set(item.key, { key: item.key, routes, captures: [], legacy: true });
-    byKey.get(item.key).captures.push({
-      breakpoint: item.breakpoint, theme: item.theme ?? 'light', ...(item.locale ? { locale: item.locale } : {}), path: item.path, sha256: item.sha256,
-      ...(item.width ? { width: item.width } : {}), ...(item.height ? { height: item.height } : {}), ...(item.slot ? { slot: item.slot } : {}), kind: 'render',
-    });
-  }
-  return [...byKey.values()];
-}
-
-/** The destinations of one layout node: `layout.destinations`, else the tree's legacy extension block. */
+/** The destinations of one layout node: `layout.destinations`. */
 export function destinationsOf(record, node) {
-  const own = list(node?.layout?.destinations).filter((d) => d && typeof d.key === 'string');
-  return own.length ? own.map((d) => ({ ...d, routes: list(d.routes), captures: list(d.captures) })) : legacyDestinationsOf(record, node);
+  return list(node?.layout?.destinations).filter((d) => d && typeof d.key === 'string').map((d) => ({ ...d, routes: list(d.routes), captures: list(d.captures) }));
 }
 
 /**
@@ -782,7 +739,7 @@ export function capturesAt(record, node, bp, theme) {
   return out;
 }
 
-/** A capture's slot and size: as recorded, else measured from the PNG on disk (legacy destination captures). */
+/** A capture's slot and size: as recorded, else measured from the PNG on disk. */
 function measuredCapture(shellDir, capture) {
   if (capture.slot && capture.width && capture.height) return capture;
   const file = captureFileOf(shellDir, capture);
@@ -833,7 +790,7 @@ export function baseLayoutFor(record, route, bp, theme, { shellDir, uiLoader = n
 }
 
 // ---------------------------------------------------------------------------------------------------------
-// Writing: merge a scan into the record, convert app-shell@1, add captures and planned nodes
+// Writing: merge a scan into the record, add captures and planned nodes
 // ---------------------------------------------------------------------------------------------------------
 
 /** Where the frontend's app/ directory is for a Work tree: --app-dir, the record's app.appDir, or a search. */
@@ -939,15 +896,10 @@ export function mergeScan(existing, scan, { at = now() } = {}) {
   };
   // The keys the merged tree uses (scanned nav keys plus a carried title or capture key), digested per locale.
   if (record.i18n && scan.catalogs) record.i18n = { ...record.i18n, used: keyedI18n(scan.catalogs, usedI18nKeys(record)) };
-  // A catalog file's own digest is not structural, only the used keys are (nivo inc-13f6af8494bf). A record
-  // that still carries the whole-file digest is judged through sourceDrift, so recording the keyed digest for
-  // the first time does not by itself bump the rev every binding names.
+  // A catalog file's own digest is not structural, only the used keys are (nivo inc-13f6af8494bf).
   const i18nShape = (r) => ({ catalogs: list(r?.i18n?.catalogs).map((c) => [c.locale, c.path]), used: r?.i18n?.used ?? null });
   const structural = (r) => JSON.stringify({ nodes: r?.nodes, source: r?.source?.digest, i18n: i18nShape(r) });
-  const legacyBase = Boolean(base && list(base.i18n?.catalogs).length && !Array.isArray(base.i18n?.used?.keys));
-  const changed = !base || (legacyBase
-    ? JSON.stringify(base.nodes) !== JSON.stringify(record.nodes) || sourceDrift(base, scan).stale
-    : structural(base) !== structural(record));
+  const changed = !base || structural(base) !== structural(record);
   if (changed && base) {
     record.rev = (base.rev ?? 1) + 1;
     record.change = { rev: record.rev, kind: 'clarifying', at, reason: `Re-scanned app/ (${notes.length ? notes.slice(0, 6).join('; ') : 'source digests changed'}).` };
@@ -967,52 +919,6 @@ export function orderNodes(nodes) {
   visit('');
   const placed = new Set(out.map((n) => n.id));
   return [...out, ...nodes.filter((n) => !placed.has(n.id))];
-}
-
-const breakpointOfViewport = (viewport) => {
-  const m = String(viewport ?? '').match(/([a-z][\w-]*)?\s*(\d+)\s*x\s*(\d+)/i);
-  return m ? { name: (m[1] ?? (Number(m[2]) >= 1024 ? 'desktop' : 'mobile')).toLowerCase(), width: Number(m[2]), height: Number(m[3]) } : null;
-};
-
-/** Convert a work/app-shell@1 record into a layout tree over a fresh scan. Returns {record, notes}. */
-export function convertAppShell(legacy, scan, { at = now() } = {}) {
-  const { record } = mergeScan(null, scan, { at });
-  const notes = [];
-  const assets = list(legacy?.assets);
-  if (legacy?.productLocale?.default) record.productLocale = legacy.productLocale;
-  if (legacy?.persona) record.personas = [{ role: 'primary', default: true, ...legacy.persona }];
-  const lockups = assets.filter((a) => a?.role === 'brand-lockup').map((a) => ({ name: a.path ?? a.name, sha256: a.sha256, ...(a.theme ? { theme: a.theme } : {}), ...(a.width ? { width: a.width } : {}), ...(a.height ? { height: a.height } : {}), ...(a.provenance ? { provenance: a.provenance } : {}) }));
-  if (lockups.length) record.brand = { ...(legacy.topBar?.brand?.component ? { component: legacy.topBar.brand.component } : {}), ...(legacy.topBar?.brand?.path ? { path: legacy.topBar.brand.path } : {}), lockups };
-  const shots = assets.filter((a) => a?.role === 'shell-capture');
-  const bps = [];
-  for (const s of shots) { const bp = breakpointOfViewport(s.viewport); if (bp && !bps.some((b) => b.name === bp.name)) bps.push(bp); }
-  if (bps.length) record.breakpoints = bps;
-  const themes = [...new Set([...REQUIRED_THEMES, ...shots.map((s) => s.theme).filter((t) => THEMES.includes(t))])];
-  if (themes.length) record.themes = themes;
-  // The layout the legacy record named is the visible chrome: by its route-layout file, else by component.
-  const legacyFiles = [legacy?.source?.layout, ...list(legacy?.source?.files)].filter(Boolean);
-  const shellNode = record.nodes.find((n) => n.files?.layout && legacyFiles.some((f) => f.path === n.files.layout.path))
-    ?? record.nodes.find((n) => n.layout?.component && n.layout.component === legacy?.source?.layout?.component)
-    ?? record.nodes.find((n) => n.layout?.component && n.layout.component === legacy?.topBar?.component);
-  if (shellNode) {
-    shellNode.layout.chrome = 'visible';
-    shellNode.layout.state = 'todo';
-    shellNode.layout.blockers = [
-      ...shots.map((s) => `Legacy capture ${s.path} (${s.viewport ?? 'viewport unrecorded'}, ${s.theme ?? 'theme unrecorded'}) has no measured page slot; re-capture with the slot keyed #FF00FF and record it with \`node scripts/work/layout-tree.mjs capture\`.`),
-    ];
-    if (!shellNode.layout.blockers.length) shellNode.layout.blockers = ['No capture yet; brand.decide captures this layout at desktop and mobile in the light theme (dark optional).'];
-    notes.push(`${shellNode.id}: the legacy shell's layout; chrome visible, awaiting slot-keyed captures`);
-    const legacyNav = list(legacy?.nav?.items).map((i) => i?.key).join(',');
-    const derived = list(shellNode.layout.nav?.items).map((i) => i.key).join(',');
-    if (legacyNav && legacyNav !== derived) notes.push(`${shellNode.id}: legacy nav [${legacyNav}] differs from the derived nav [${derived}] - the derived one is kept`);
-  } else notes.push('no scanned layout matches the legacy shell layout - every visible layout is decided by brand.decide');
-  record.state = 'todo';
-  record.rev = (legacy?.rev ?? 0) + 1;
-  record.refs = list(legacy?.refs).length ? legacy.refs : undefined;
-  if (!record.refs) delete record.refs;
-  record.blockers = ['Converted from work/app-shell@1: every visible layout needs slot-keyed captures at desktop and mobile in the light theme (dark optional), and every layout with chrome unknown needs brand.decide to decide it, before anything draws under it.'];
-  record.change = { rev: record.rev, kind: 'breaking', at, reason: `Converted from work/app-shell@1 rev ${legacy?.rev ?? '?'} into the layout tree scanned from ${record.app.appDir}.` };
-  return { record, notes };
 }
 
 /** Upsert one capture for a layout node from a PNG (slot measured from the key colour). Mutates `record`. */
@@ -1063,7 +969,6 @@ export function addDestinationCapture(record, shellDir, { node: id, destination,
     if (!THEMES.includes(theme)) throw new Error(`${theme}: not a theme (${THEMES.join(', ')})`);
     record.themes = [...matrixOf(record).themes, theme];
   }
-  if (!list(node.layout.destinations).length && legacyDestinationsOf(record, node).length) throw new Error(`${id} still keeps its destinations in extensions.destinationCaptures - run layout-tree.mjs destinations --promote first`);
   const dests = list(node.layout.destinations);
   let entry = dests.find((d) => d.key === destination);
   const navTarget = list(node.layout.nav?.items).find((i) => i?.key === destination)?.target ?? null;
@@ -1080,48 +985,6 @@ export function addDestinationCapture(record, shellDir, { node: id, destination,
   node.layout.chrome = 'visible';
   if (prior && prior.sha256 !== capture.sha256) node.layout.rev = (node.layout.rev ?? 1) + 1;
   return { destination, ...capture };
-}
-
-/**
- * Move a tree's legacy extensions.destinationCaptures into `layout.destinations` of the nodes they belong to,
- * measuring each capture's slot and size from its PNG. Items no layout claims stay in the extension and are
- * returned as `unmapped`. Mutates `record`; layout revs do not move (the bytes are the same).
- */
-export function promoteDestinations(record, shellDir) {
-  const promoted = [], problems = [];
-  const claimed = new Set();
-  for (const node of nodesOf(record).filter((n) => n.layout)) {
-    const legacy = legacyDestinationsOf(record, node);
-    if (!legacy.length) continue;
-    if (list(node.layout.destinations).length) { problems.push(`${node.id} already records destinations; the legacy block is not merged into them`); continue; }
-    const out = [];
-    for (const d of legacy) {
-      const captures = [];
-      for (const c of d.captures) {
-        const file = path.join(shellDir, c.path);
-        if (!fs.existsSync(file)) { problems.push(`${node.id} ${d.key}: ${c.path} is not on disk`); continue; }
-        try {
-          const m = readCaptureFile(file);
-          // alpha.3: the promoted capture is a blob citation {name, sha256}; the legacy file's bytes move into the store.
-          putBlob(fs.readFileSync(file), { mediaType: 'image/png' });
-          if (c.sha256 && m.sha256 !== c.sha256) problems.push(`${node.id} ${d.key}: ${c.path} no longer hashes to its recorded sha256 (recorded as it is now)`);
-          const twin = list(node.layout.captures).find((x) => x.breakpoint === c.breakpoint && x.theme === c.theme);
-          captures.push({ breakpoint: c.breakpoint, theme: c.theme, ...(c.locale ?? twin?.locale ? { locale: c.locale ?? twin.locale } : {}), name: c.path, sha256: m.sha256, width: m.width, height: m.height, slot: m.slot, kind: 'render', provenance: 'promoted from extensions.destinationCaptures' });
-          claimed.add(`${d.key}\0${c.breakpoint}\0${c.path}`);
-        } catch (error) { problems.push(`${node.id} ${d.key}: ${error.message}`); }
-      }
-      if (captures.length) out.push({ key: d.key, routes: d.routes, captures: captures.sort((a, b) => `${a.breakpoint}/${a.theme}`.localeCompare(`${b.breakpoint}/${b.theme}`)) });
-    }
-    if (out.length) { node.layout.destinations = out.sort((a, b) => a.key.localeCompare(b.key)); promoted.push({ node: node.id, keys: out.map((d) => d.key) }); }
-  }
-  const block = record.extensions?.destinationCaptures;
-  const unmapped = list(block?.items).filter((i) => !claimed.has(`${i?.key}\0${i?.breakpoint}\0${i?.path}`));
-  if (block && promoted.length) {
-    if (unmapped.length) record.extensions.destinationCaptures = { ...block, items: unmapped };
-    else delete record.extensions.destinationCaptures;
-    if (!Object.keys(record.extensions).length) delete record.extensions;
-  }
-  return { promoted, unmapped: unmapped.map((i) => `${i?.key} ${i?.breakpoint} ${i?.path}`), problems };
 }
 
 // ---------------------------------------------------------------------------------------------------------
@@ -1236,7 +1099,7 @@ export function summarize(record) {
     const depth = (chainOf(record, n.id)?.length ?? 1) - 1;
     const files = Object.keys(n.files ?? {}).join(',');
     const dests = n.layout ? destinationsOf(record, n) : [];
-    const extra = n.layout ? ` LAYOUT ${n.layout.component ?? '(no component)'} chrome=${n.layout.chrome} state=${n.layout.state} rev=${n.layout.rev} captures=${list(n.layout.captures).length}${dests.length ? ` destinations=${dests.map((d) => d.key).join(',')}${dests[0].legacy ? ' (legacy extension)' : ''}` : ''}` : '';
+    const extra = n.layout ? ` LAYOUT ${n.layout.component ?? '(no component)'} chrome=${n.layout.chrome} state=${n.layout.state} rev=${n.layout.rev} captures=${list(n.layout.captures).length}${dests.length ? ` destinations=${dests.map((d) => d.key).join(',')}` : ''}` : '';
     lines.push(`${'  '.repeat(depth)}${n.segment} [${n.segmentKind}] url=${n.url}${files ? ` {${files}}` : ''}${n.intercepts ? ` intercepts=${n.intercepts}` : ''}${extra}`);
     for (const item of list(n.layout?.nav?.items)) lines.push(`${'  '.repeat(depth + 2)}nav ${item.key} -> ${item.route ?? 'null'} target=${item.target ?? 'NONE'} ${Object.entries(item.labels ?? {}).map(([l, v]) => `${l}:"${v}"`).join(' ')}`);
     for (const f of list(n.layout?.nav?.findings)) lines.push(`${'  '.repeat(depth + 2)}! ${f.code} ${f.detail}`);
@@ -1267,8 +1130,8 @@ export function layoutTreeMain(argv = []) {
       const { record } = mergeScan(null, scan);
       return out(record, summarize(record));
     }
-    if (!['scan', 'convert', 'capture', 'plan', 'destinations', 'lockup'].includes(command) || !work) {
-      return { exitCode: 2, text: 'Usage: node scripts/work/layout-tree.mjs <scan|convert|capture|plan|destinations|lockup|slot> --work <.starciwork> [...] [--write] [--json]\n' };
+    if (!['scan', 'capture', 'plan', 'destinations', 'lockup'].includes(command) || !work) {
+      return { exitCode: 2, text: 'Usage: node scripts/work/layout-tree.mjs <scan|capture|plan|destinations|lockup|slot> --work <.starciwork> [...] [--write] [--json]\n' };
     }
     const workRoot = path.resolve(work);
     const shell = readShellRecord(workRoot);
@@ -1304,21 +1167,11 @@ export function layoutTreeMain(argv = []) {
         }));
         return out({ ok: true, route, picks }, picks.map((p) => `${p.breakpoint}/${p.theme}: ${p.missing ? `MISSING ${p.missing}` : p.canvas ? 'blank canvas (no visible layout)' : `${p.capture} (${p.node}${p.destination ? ` destination ${p.destination} by ${p.by}` : ' default'})`}`).join('\n'));
       }
-      if (!args.includes('--promote')) {
-        const rows = nodesOf(record).filter((n) => n.layout).flatMap((n) => destinationsOf(record, n).map((d) => ({ node: n.id, key: d.key, routes: d.routes, cells: d.captures.map((c) => `${c.breakpoint}/${c.theme}`), legacy: d.legacy === true })));
-        return out({ ok: true, destinations: rows }, rows.length ? rows.map((r) => `${r.node} ${r.key}${r.legacy ? ' (legacy extension)' : ''} routes=${r.routes.join(',')} cells=${r.cells.join(',')}`).join('\n') : 'no layout records destinations');
-      }
-      const result = promoteDestinations(record, shellDir);
-      if (result.promoted.length && write) {
-        record.rev = (record.rev ?? 1) + 1;
-        record.change = { rev: record.rev, kind: 'clarifying', at: now(), reason: `Promoted extensions.destinationCaptures into layout.destinations (${result.promoted.map((p) => `${p.node}: ${p.keys.join(', ')}`).join('; ')}); the capture bytes are unchanged.` };
-        save(record);
-      }
-      const text = [...result.promoted.map((p) => `promoted ${p.node}: ${p.keys.join(', ')}`), ...result.unmapped.map((u) => `UNMAPPED ${u} (left in extensions.destinationCaptures)`), ...result.problems.map((p) => `PROBLEM ${p}`), result.promoted.length ? (write ? `wrote ${slash(shellFileOf(workRoot))}` : '(dry run - pass --write to write the record)') : 'nothing to promote'].join('\n');
-      return { exitCode: result.problems.length ? 1 : 0, text: json ? `${JSON.stringify({ ok: !result.problems.length, written: write && result.promoted.length > 0, ...result }, null, 2)}\n` : `${text}\n` };
+      const rows = nodesOf(record).filter((n) => n.layout).flatMap((n) => destinationsOf(record, n).map((d) => ({ node: n.id, key: d.key, routes: d.routes, cells: d.captures.map((c) => `${c.breakpoint}/${c.theme}`) })));
+      return out({ ok: true, destinations: rows }, rows.length ? rows.map((r) => `${r.node} ${r.key} routes=${r.routes.join(',')} cells=${r.cells.join(',')}`).join("\n") : 'no layout records destinations');
     }
     if (command === 'capture' || command === 'plan') {
-      if (!isLayoutTree(existing) && command === 'capture') return { exitCode: 1, text: 'capture needs a work/layout-tree@1 record - scan or convert first\n' };
+      if (!isLayoutTree(existing) && command === 'capture') return { exitCode: 1, text: 'capture needs a work/layout-tree@1 record - scan first\n' };
       if (command === 'plan' && !flags(args, '--node').length) return { exitCode: 2, text: 'Usage: layout-tree.mjs plan --work <.starciwork> --node <id> [--node <id>]... [--files layout,page] [--design <ui-id>] --write\n' };
       const record = isLayoutTree(existing) ? existing : { schema: TREE_SCHEMA, id: 'shell', kind: 'shell', state: 'todo', rev: 1, origin: 'planned', app: { root: '.', appDir: 'app', framework: 'next-app-router' }, productLocale: { default: 'en', fallback: 'en', locales: ['en'] }, breakpoints: DEFAULT_BREAKPOINTS, themes: [...REQUIRED_THEMES], nodes: [] };
       let result;
@@ -1332,15 +1185,12 @@ export function layoutTreeMain(argv = []) {
       if (write) save(record);
       return out({ ok: true, written: write, result }, `${write ? 'wrote' : 'would write'} ${slash(shellFileOf(workRoot))}: ${JSON.stringify(result)}`);
     }
-    const located = locateAppDir(workRoot, isLayoutTree(existing) ? existing : existing?.app ? { app: { repository: existing.app.repository, root: existing.app.root } } : null, flag(args, '--app-dir'));
+    if (existing && !isLayoutTree(existing)) return { exitCode: 1, text: `${slash(shellFileOf(workRoot))} names schema ${existing.schema}, not ${TREE_SCHEMA}; SHELL_RECORD_NOT_TREE - remove the record and scan again
+` };
+    const located = locateAppDir(workRoot, existing, flag(args, '--app-dir'));
     if (!located.appDir) return { exitCode: 1, text: `no app/ directory found for ${slash(workRoot)} (repository ${located.repository ?? '(none)'}) - pass --app-dir\n` };
     const scan = scanAppDir(located.appDir, { repoRoot: located.repoRoot, repository: located.repository });
-    let record, notes;
-    if (command === 'convert' || existing?.schema === LEGACY_SHELL_SCHEMA) {
-      if (existing && existing.schema !== LEGACY_SHELL_SCHEMA && !isLayoutTree(existing)) return { exitCode: 1, text: `${slash(shellFileOf(workRoot))} names schema ${existing.schema}; nothing to convert\n` };
-      if (isLayoutTree(existing)) ({ record, notes } = mergeScan(existing, scan));
-      else ({ record, notes } = convertAppShell(existing ?? {}, scan));
-    } else ({ record, notes } = mergeScan(existing, scan));
+    const { record, notes } = mergeScan(existing, scan);
     if (write) save(record);
     return out({ ok: true, written: write, notes, record }, `${summarize(record)}\n${notes.map((n) => `- ${n}`).join('\n')}\n${write ? `wrote ${slash(shellFileOf(workRoot))}` : '(dry run - pass --write to write the record)'}`);
   } catch (error) {

@@ -136,8 +136,7 @@ fields:
       sample datum a product user reads, in a drawing prompt, a message file
       or a rendered screen. It is the Work tree's shell record - the layout
       tree - productLocale.default (.starciwork/shell/index.yaml,
-      work/layout-tree@1; a not yet converted work/app-shell@1 is read the
-      same way), else the brand record's voice.locales default, with the source it was
+      work/layout-tree@1), else the brand record's voice.locales default, with the source it was
       read from; null when the tree has neither. It is not owner_language:
       that is who reads the logs, this is who uses the product.
     enforcedBy: >-

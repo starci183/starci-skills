@@ -149,7 +149,7 @@ The audit applies `node scripts/checks/shell-conformance.mjs` in two directions 
   capture's chrome must match the layout captures at the same breakpoint and theme. A drift here is bounded and
   routed to `interface.implement`.
 
-A layout tree that is absent, legacy, unsettled above an audited route or stale against `app/` blocks the lens as
+A layout tree that is absent, unsettled above an audited route or stale against `app/` blocks the lens as
 `APP_SHELL_UNSETTLED` (`brand-gap`, routed to `brand.decide`).
 
 ## Finding and routing contract

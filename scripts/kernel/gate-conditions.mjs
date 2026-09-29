@@ -219,7 +219,7 @@ const git = (repo, args) => {
 };
 /**
  * A record's OWN revision, the way the work-record schemas define it: the top-level `rev` where the
- * family declares one (work/brand@1, work/layout-tree@1, work/app-shell@1), otherwise the latest change
+ * family declares one (work/brand@1, work/layout-tree@1), otherwise the latest change
  * entry's `change.rev` (every work record: ui-screen, contract, feature, ...). A nested object's `rev`
  * is a BINDING to another record, never this record's revision - ui-screen `brand.rev` / `shell.rev` /
  * `shell.layouts[].rev`, layout-tree `nodes[].rev`, contract `blockedBy[].rev` / `conflictsWith[].rev`

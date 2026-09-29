@@ -5,7 +5,7 @@ import path from 'node:path';
 import { createRequire } from 'node:module';
 import { parseYaml, stringifyYaml } from '../engine/yaml.mjs';
 import {
-  addCapture, addPlanned, captureFileOf, chainOf, convertAppShell, layoutChainOf, layoutTreeMain, mergeScan, nodeById, resolveNavRoute,
+  addCapture, addPlanned, captureFileOf, chainOf, layoutChainOf, layoutTreeMain, mergeScan, nodeById, resolveNavRoute,
   scanAppDir, segmentKindOf,
 } from '../scripts/work/layout-tree.mjs';
 import { blankImage, decodePng, drawOver, encodePng, keyRect } from '../scripts/work/png.mjs';
@@ -118,37 +118,6 @@ test('a fresh app with no message catalogs scans to a record that compiles witho
   assert.equal(validateTree({ ...record, source: undefined }), false, 'a scanned tree still names what it scanned');
 });
 
-test('convert turns a work/app-shell@1 record into the layout tree, carrying locale, persona and lockup', (t) => {
-  const p = buildProduct(t);
-  const legacy = {
-    schema: 'work/app-shell@1', id: 'shell', kind: 'shell', state: 'done', rev: 1, origin: 'repository', app: { repository: 'web', root: 'apps/app' },
-    source: { layout: { component: 'ConsoleLayout', path: 'apps/app/src/shell/ConsoleLayout.tsx', sha256: 'b'.repeat(64) }, files: [{ path: 'apps/app/src/app/[locale]/(console)/layout.tsx', role: 'route-layout', sha256: 'c'.repeat(64) }] },
-    topBar: { component: 'ConsoleTopBar', brand: { component: 'NivoBrand', path: 'packages/ui/NivoBrand.tsx', asset: 'assets/lockup-light.png' }, slots: [] },
-    nav: { component: 'Sidebar', items: [{ key: 'chat', route: '/chat', labels: { vi: 'Trò chuyện' } }] },
-    productLocale: { default: 'vi', fallback: 'vi', locales: ['vi', 'en'] },
-    persona: { workspace: 'Support', user: 'An Nguyen', currency: 'VND', dateFormat: 'd MMM y' },
-    assets: [
-      { path: 'assets/shell-desktop-light.png', role: 'shell-capture', sha256: 'd'.repeat(64), viewport: 'desktop 1440x900', theme: 'light' },
-      { path: 'assets/shell-mobile-dark.png', role: 'shell-capture', sha256: 'e'.repeat(64), viewport: 'mobile 390x844', theme: 'dark' },
-      { path: 'assets/lockup-light.png', role: 'brand-lockup', sha256: 'f'.repeat(64), theme: 'light', width: 115, height: 40 },
-    ],
-  };
-  const { record, notes } = convertAppShell(legacy, scanOf(p), { at: '2026-09-24T00:00:00Z' });
-  assert.equal(validateTree(record), true, JSON.stringify(validateTree.errors));
-  assert.equal(record.schema, 'work/layout-tree@1');
-  assert.equal(record.state, 'todo', 'a converted tree has no slot-measured captures yet');
-  assert.equal(record.rev, 2);
-  assert.deepEqual(record.personas, [{ role: 'primary', default: true, workspace: 'Support', user: 'An Nguyen', currency: 'VND', dateFormat: 'd MMM y' }]);
-  assert.deepEqual(record.brand.lockups.map((l) => l.name), ['assets/lockup-light.png']);
-  assert.deepEqual(record.breakpoints, [{ name: 'desktop', width: 1440, height: 900 }, { name: 'mobile', width: 390, height: 844 }]);
-  assert.deepEqual(record.themes, ['light', 'dark']);
-  const consoleLayout = nodeById(record, '/[locale]/(console)').layout;
-  assert.equal(consoleLayout.chrome, 'visible', 'the legacy shell layout is the visible chrome');
-  assert.equal(consoleLayout.state, 'todo');
-  assert.match(consoleLayout.blockers[0], /no measured page slot/);
-  assert.ok(notes.some((n) => /legacy nav \[chat\] differs from the derived nav \[photos,billing,help\]/.test(n)), 'a hand-written nav that disagrees with the source is reported');
-});
-
 test('capture measures the #FF00FF slot, stores the bytes and bumps the layout rev on a changed capture', (t) => {
   const p = buildProduct(t);
   const record = mergeScan(null, scanOf(p)).record;
@@ -196,13 +165,15 @@ test('the CLI scans read-only by default and writes the record only with --write
   assert.equal(written.schema, 'work/layout-tree@1');
   assert.equal(written.app.repository, 'web');
   assert.equal(layoutTreeMain(['slot', p.put('s.png', encodePng(layoutCapture(20, 20, { x: 2, y: 3, width: 4, height: 5 })))]).text.trim(), JSON.stringify({ ok: true, slot: { x: 2, y: 3, width: 4, height: 5 }, fill: 1 }));
-  fs.writeFileSync(path.join(p.work, 'shell', 'index.yaml'), stringifyYaml({ schema: 'work/app-shell@1', id: 'shell', productLocale: { default: 'vi', fallback: 'vi', locales: ['vi'] } }));
-  assert.equal(layoutTreeMain(['convert', '--work', p.work, '--write']).exitCode, 0);
-  assert.equal(parseYaml(fs.readFileSync(path.join(p.work, 'shell', 'index.yaml'), 'utf8')).schema, 'work/layout-tree@1');
+  fs.writeFileSync(path.join(p.work, 'shell', 'index.yaml'), stringifyYaml({ schema: 'work/other-shell@1', id: 'shell', productLocale: { default: 'vi', fallback: 'vi', locales: ['vi'] } }));
+  const refused = layoutTreeMain(['scan', '--work', p.work, '--write']);
+  assert.equal(refused.exitCode, 1, 'a shell record that is not a layout tree is refused');
+  assert.match(refused.text, /SHELL_RECORD_NOT_TREE/);
+  assert.equal(layoutTreeMain(['convert', '--work', p.work, '--write']).exitCode, 2, 'convert is gone');
   assert.equal(layoutTreeMain(['bogus']).exitCode, 2);
 });
 
-test('the todo example carries an honestly unsettled, converted layout tree', () => {
+test('the todo example carries an honestly unsettled layout tree', () => {
   const example = parseYaml(fs.readFileSync(path.join(ROOT, 'examples/todo-app-backend/.starciwork/shell/index.yaml'), 'utf8'));
   assert.equal(validateTree(example), true, JSON.stringify(validateTree.errors));
   assert.equal(example.state, 'todo');

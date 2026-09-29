@@ -63,5 +63,5 @@ test('a settled layout or a scanned node still refuses a design pointer nothing 
 test('plannedDesignPointers reads only planned, unsettled layout nodes of a layout tree', () => {
   assert.deepEqual(plannedDesignPointers(tree()), [DESIGN]);
   assert.deepEqual(plannedDesignPointers(tree({ state: 'done' })), []);
-  assert.deepEqual(plannedDesignPointers({ ...tree(), schema: 'work/app-shell@1' }), []);
+  assert.deepEqual(plannedDesignPointers({ ...tree(), schema: 'work/other-shell@1' }), []);
 });

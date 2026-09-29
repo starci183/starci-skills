@@ -42,3 +42,4 @@ retired:
   - {path: ui/op-proofs.mjs, retiredAt: 2026-09-29, removedIn: ui-13-cleanup, replacedBy: 'ui/api/routes/attempt.mjs and the attempt evidence view'}
   - {path: ui/agent-monitor.mjs, retiredAt: 2026-09-29, removedIn: ui-13-cleanup, replacedBy: 'ui/src/pages/work/workflow.tsx and ui/src/pages/attempt/attempt.tsx'}
   - {path: ui/agent-changes.mjs, retiredAt: 2026-09-29, removedIn: ui-13-cleanup, replacedBy: 'ui/api/routes/attempt.mjs diff endpoint'}
+  - {path: modules/schemas/work-app-shell.schema.yaml, retiredAt: 2026-09-29, removedIn: layout-tree-no-legacy, replacedBy: 'modules/schemas/work-layout-tree.schema.yaml (work/layout-tree@1)'}

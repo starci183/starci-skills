@@ -1,6 +1,5 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 import { createRequire } from 'node:module';
@@ -23,15 +22,12 @@ const editCatalog = (p, locale, mutate) => {
   mutate(doc);
   fs.writeFileSync(catalogFile(p, locale), JSON.stringify(doc, null, 2));
 };
-const sha = (text) => crypto.createHash('sha256').update(text).digest('hex');
 
-/** The record as the pre-keyed scanner wrote it: catalogs folded into source.digest, no i18n.used. */
-function legacyOf(record, scan) {
-  const parts = [...scan.codeParts, ...record.i18n.catalogs.map((c) => [c.path, c.sha256])].sort((a, b) => a[0].localeCompare(b[0]));
-  const legacy = structuredClone(record);
-  legacy.source.digest = sha(parts.map(([p, s]) => `${p}\0${s}`).join('\n'));
-  delete legacy.i18n.used;
-  return legacy;
+/** The record without the keyed digest (no i18n.used): a whole-file catalog record is no longer read. */
+function unkeyedOf(record) {
+  const unkeyed = structuredClone(record);
+  delete unkeyed.i18n.used;
+  return unkeyed;
 }
 
 test('the scan records the used keys and a digest of their values per locale, and keeps catalogs out of source.digest', (t) => {
@@ -99,31 +95,17 @@ test('a layout title and a key a capture names are used keys too, and survive a 
   assert.ok(gone.changed.some((c) => /vi used key values \(absent now: console\.empty/.test(c)), gone.changed.join('; '));
 });
 
-test('a pre-keyed whole-file digest stays valid until the next re-scan, judged by the keys the tree uses', (t) => {
+test('a tree without the keyed i18n digest is stale until it is re-scanned', (t) => {
   const p = buildProduct(t);
   const scan = scanOf(p);
-  const legacy = legacyOf(mergeScan(null, scan, { at: '2026-09-25T00:00:00Z' }).record, scan);
-  const clean = sourceDrift(legacy, scanOf(p));
-  assert.deepEqual([clean.stale, clean.legacy], [false, true], clean.changed.join('; '));
-
-  editCatalog(p, 'vi', (d) => { d.modules = { chatbot: { title: 'Trợ lý' } }; });
-  assert.equal(sourceDrift(legacy, scanOf(p)).stale, false, 'an unrelated key does not stale a pre-keyed tree');
-  const rescan = mergeScan(legacy, scanOf(p), { at: '2026-09-25T00:00:01Z' });
-  assert.equal(rescan.changed, false, 'recording the keyed digest does not bump the rev every binding names');
-  assert.equal(rescan.record.rev, legacy.rev);
+  const unkeyed = unkeyedOf(mergeScan(null, scan, { at: '2026-09-25T00:00:00Z' }).record);
+  const drift = sourceDrift(unkeyed, scanOf(p));
+  assert.equal(drift.stale, true);
+  assert.ok(drift.changed.some((c) => /no keyed i18n digest/.test(c)), drift.changed.join('; '));
+  assert.equal('legacy' in drift, false, 'there is no legacy verdict any more');
+  const rescan = mergeScan(unkeyed, scanOf(p), { at: '2026-09-25T00:00:01Z' });
   assert.ok(Array.isArray(rescan.record.i18n.used.keys), 'the re-scan records the keyed digest');
-  assert.equal(sourceDrift(rescan.record, scanOf(p)).legacy, false);
-
-  editCatalog(p, 'en', (d) => { d.console.nav.photos = 'Pictures'; });
-  assert.equal(sourceDrift(legacy, scanOf(p)).stale, true, 'a nav label edit stales a pre-keyed tree');
-  editCatalog(p, 'en', (d) => { d.console.nav.photos = 'Photos'; delete d.console.nav.help; });
-  assert.equal(sourceDrift(legacy, scanOf(p)).stale, true, 'a used key removed stales a pre-keyed tree');
-  editCatalog(p, 'en', (d) => { d.console.nav.help = 'Help'; });
-  assert.equal(sourceDrift(legacy, scanOf(p)).stale, false);
-  fs.appendFileSync(path.join(p.appDir, '[locale]', '(console)', 'layout.tsx'), '// edited\n');
-  const code = sourceDrift(legacy, scanOf(p));
-  assert.equal(code.stale, true, 'a code change still stales a pre-keyed tree');
-  assert.ok(code.changed.includes(`${CONSOLE} layout`), code.changed.join('; '));
+  assert.equal(sourceDrift(rescan.record, scanOf(p)).stale, false);
 });
 
 test('shell-conformance: LAYOUT_TREE_STALE only for a used key, never for an unrelated catalog key', async (t) => {
@@ -142,10 +124,10 @@ test('shell-conformance: LAYOUT_TREE_STALE only for a used key, never for an unr
   editCatalog(p, 'en', (d) => { delete d.console.nav.photos; });
   assert.equal(stale().length, 1, 'a used key removed is stale');
 
-  // A tree written by the pre-keyed scanner: info, not stale, while no used key moved.
+  // A tree without the keyed digest is refused as stale: the re-scan writes it.
   editCatalog(p, 'en', (d) => { d.console.nav.photos = 'Photos'; });
-  p.save(legacyOf(p.tree, scanOf(p)));
+  p.save(unkeyedOf(p.tree));
   const result = checkShellConformance(shellDir);
-  assert.deepEqual(result.refused.filter((s) => s.includes('[LAYOUT_TREE_STALE]')), []);
-  assert.ok(result.info.some((s) => s.includes('[LAYOUT_TREE_I18N_UNKEYED]')), result.info.join('\n'));
+  assert.ok(result.refused.some((s) => s.includes('[LAYOUT_TREE_STALE]') && /no keyed i18n digest/.test(s)), result.refused.join('\n'));
+  assert.equal([...result.info, ...result.refused].some((s) => s.includes('LAYOUT_TREE_I18N_UNKEYED')), false);
 });

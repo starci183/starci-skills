@@ -11,7 +11,7 @@
 // pixels, never the wording of a prompt, with one exception kept on purpose: a content prompt states
 // `Product locale: <default>`, because UI copy follows productLocale and not owner_language.
 //
-//   shell record   a layout tree (an app-shell@1 record is SHELL_RECORD_LEGACY: convert it), nodes whole,
+//   shell record   a layout tree (any other schema is SHELL_RECORD_NOT_TREE), nodes whole,
 //                  lockups and captures on disk with their digests, every visible layout settled, nav
 //                  labels in the default locale and nav routes that land on a page, and (origin repository)
 //                  a re-scan of app/ that still matches the recorded source digest (message catalogs judged
@@ -40,14 +40,14 @@
 //
 // Exit 0 clean, 1 lists refusals, 2 is a bad argument. `starci validate` runs the ui half through
 // shellBindingFindings() without the pixel re-derivation, and reports what records drawn before this model
-// lack (no binding, no route, a stale rev, a legacy shell) as suspects, never refusals.
+// lack (no binding, no route, a stale rev) as suspects, never refusals.
 import fs from 'node:fs';
 import { capturesOf } from '../work/impl-captures.mjs';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import {
-  DRAWER_DIRECTIONS, LEGACY_SHELL_SCHEMA, OVERLAY_SURFACES, SURFACES, SURFACE_FILE, TREE_SCHEMA, baseLayoutFor,
+  DRAWER_DIRECTIONS, OVERLAY_SURFACES, SURFACES, SURFACE_FILE, TREE_SCHEMA, baseLayoutFor,
   captureFileOf, capturesAt, destinationFor, destinationsOf, directionAt, isLayoutTree, lockupSourceOf, isOverlayRecord, layoutChainOf, layoutSettlement, loadUiRecords, locateAppDir, matrixOf,
   nodeById, nodesOf, readShellRecord as readShell, requiredMatrixOf, resolveNavRoute, scanAppDir, sourceDrift, surfaceAt, surfaceValues,
 } from '../work/layout-tree.mjs';
@@ -94,7 +94,6 @@ export function isPlannedLayoutDrawing(tree, record) {
   return Boolean(node && node.origin === 'planned' && node.layout?.chrome === 'visible' && node.layout.design === record.id);
 }
 const shown = (workRoot, file) => slash(path.relative(path.dirname(workRoot), file)) || slash(file);
-const CONVERT_HINT = 'convert it: node scripts/work/layout-tree.mjs convert --work <.starciwork> --write';
 
 // ---------------------------------------------------------------------------------------------------------
 // The tree record
@@ -106,8 +105,7 @@ export function checkShellRecord(workRoot, shell, { verifySource = true, driftLe
   const at = shown(workRoot, shell.file);
   if (shell.error) return [finding('refuse', 'SHELL_RECORD_INVALID', at, `the shell record ${shell.error}`)];
   const r = shell.record;
-  if (r.schema === LEGACY_SHELL_SCHEMA) return [finding('refuse', 'SHELL_RECORD_LEGACY', at, `the shell record is ${LEGACY_SHELL_SCHEMA}, a single hand-written shell - the layout tree (${TREE_SCHEMA}) replaces it; ${CONVERT_HINT}`)];
-  if (r.schema !== TREE_SCHEMA) return [finding('refuse', 'SHELL_RECORD_INVALID', at, `names schema ${r.schema ?? '(none)'}, not ${TREE_SCHEMA}`)];
+  if (r.schema !== TREE_SCHEMA) return [finding('refuse', 'SHELL_RECORD_NOT_TREE', at, `names schema ${r.schema ?? '(none)'}, not ${TREE_SCHEMA} - the shell record is a layout tree`)];
   if (requireAll && r.state !== 'done') out.push(finding('refuse', 'SHELL_UNSETTLED', at, `the layout tree is ${r.state ?? 'stateless'}, not done`));
   const nodes = nodesOf(r);
   const ids = new Set();
@@ -153,8 +151,7 @@ export function checkShellRecord(workRoot, shell, { verifySource = true, driftLe
       const { settled, reasons } = layoutSettlement(r, node, { shellDir: shell.dir, uiLoader: loader });
       if (!settled) out.push(finding('refuse', 'LAYOUT_UNSETTLED', at, reasons.join('; ')));
     }
-    // Destinations: one key each, active for nodes at or below the layout; a legacy extension block is read
-    // until promoted, and says so.
+    // Destinations: one key each, active for nodes at or below the layout.
     const dests = destinationsOf(r, node);
     const seenKeys = new Set();
     for (const d of dests) {
@@ -164,7 +161,6 @@ export function checkShellRecord(workRoot, shell, { verifySource = true, driftLe
       for (const route of d.routes) if (!nodeById(r, route) || !(route === node.id || String(route).startsWith(node.id === '/' ? '/' : `${node.id}/`))) out.push(finding('refuse', 'LAYOUT_DESTINATION_INVALID', at, `${node.id} destination ${d.key} is active for ${route}, which is not a node at or below the layout`));
       if (node.layout.chrome !== 'visible') out.push(finding('refuse', 'LAYOUT_DESTINATION_INVALID', at, `${node.id} is ${node.layout.chrome}, and only a visible layout has destinations`));
     }
-    if (dests.some((d) => d.legacy)) out.push(finding('suspect', 'LAYOUT_DESTINATIONS_LEGACY', at, `${node.id} destinations (${dests.map((d) => d.key).join(', ')}) are read from extensions.destinationCaptures - promote them into layout.destinations: node scripts/work/layout-tree.mjs destinations --work <.starciwork> --promote --write`));
     // Navigation mismatches are the frontend's own defects: reported on every run for the owner (the
     // capture shows exactly what the product renders), never refused here and never patched in the record.
     for (const item of list(node.layout.nav?.items)) {
@@ -187,7 +183,6 @@ export function checkShellRecord(workRoot, shell, { verifySource = true, driftLe
       // string another workflow adds is not drift (nivo inc-13f6af8494bf).
       const drift = scan ? sourceDrift(r, scan) : null;
       if (drift?.stale) out.push(finding(driftLevel, 'LAYOUT_TREE_STALE', at, `app/ changed since the scan (${drift.changed.slice(0, 6).join(', ')}) - brand.decide re-runs node scripts/work/layout-tree.mjs scan --work <.starciwork> --write and re-captures what moved`));
-      else if (drift?.legacy) out.push(finding('info', 'LAYOUT_TREE_I18N_UNKEYED', at, 'the tree still records whole-file catalog digests; judged by the message keys it uses - the next layout-tree.mjs scan --write records the keyed digest (i18n.used)'));
     }
   }
   return out;
@@ -199,8 +194,8 @@ export function checkShellRecord(workRoot, shell, { verifySource = true, driftLe
 
 /** Levels for the two callers: the op proof (`op`) refuses what `validate` only lists. */
 const LEVELS = {
-  op: { missing: 'refuse', stale: 'refuse', legacy: 'refuse' },
-  validate: { missing: 'suspect', stale: 'suspect', legacy: 'suspect' },
+  op: { missing: 'refuse', stale: 'refuse' },
+  validate: { missing: 'suspect', stale: 'suspect' },
 };
 
 /** The binding half (lane S shape, kept): {ref: shell, rev, activeNav, layouts} or {chromeless, because}. */
@@ -227,7 +222,7 @@ export function checkUiRecord(workRoot, uiFile, record, shell, { mode = 'op', ui
   const out = checkBinding(ctx, at, record);
   const tree = shell && !shell.error && isLayoutTree(shell.record) ? shell.record : null;
   if (shell && !shell.error && !tree && record?.shell?.chromeless !== true) {
-    if (shell.record.schema === LEGACY_SHELL_SCHEMA) out.push(finding(level.legacy, 'SHELL_RECORD_LEGACY', at, `the shell record is still ${LEGACY_SHELL_SCHEMA}; the ui record cannot be placed in a layout tree until it is converted`));
+    out.push(finding(level.missing, 'SHELL_RECORD_NOT_TREE', at, `the shell record names schema ${shell.record?.schema ?? '(none)'}, not ${TREE_SCHEMA}; the ui record cannot be placed in a layout tree`));
     return out;
   }
   const records = uiRecords ?? loadUiRecords(workRoot);
@@ -456,7 +451,7 @@ export function checkImplementationRecord(workRoot, implFile, record, shell) {
   const at = shown(workRoot, implFile);
   if (!shell) return [finding('refuse', 'SHELL_RECORD_MISSING', at, 'the tree has no shell/index.yaml layout tree to build routes into')];
   if (shell.error) return [];
-  if (!isLayoutTree(shell.record)) return [finding('refuse', 'SHELL_RECORD_LEGACY', at, `the shell record is not a layout tree - ${CONVERT_HINT}`)];
+  if (!isLayoutTree(shell.record)) return [finding('refuse', 'SHELL_RECORD_NOT_TREE', at, `the shell record is not a layout tree (${TREE_SCHEMA})`)];
   const tree = shell.record;
   const records = loadUiRecords(workRoot);
   const ids = [...new Set([...list(record.proves), ...list(record.refs), ...list(record.dependsOn)].filter((id) => typeof id === 'string' && id.startsWith('ui.')))];
@@ -540,7 +535,7 @@ const uiRecordsUnder = (root) => indexFilesUnder(root).map((file) => ({ file, re
 
 /**
  * What `starci validate` reports for every ui record under `root`: records drawn before the layout tree (no
- * binding, no route, a stale rev, a legacy shell) are suspects; a declared route/surface/overlay that does not
+ * binding, no route, a stale rev) are suspects; a declared route/surface/overlay that does not
  * hold together is refused. Composite pixels are not re-derived here - that is the op proof's.
  */
 export function shellBindingFindings(root, workRoot = workRootOf(root)) {
@@ -548,7 +543,7 @@ export function shellBindingFindings(root, workRoot = workRootOf(root)) {
   const uiRecords = loadUiRecords(workRoot);
   const out = uiRecordsUnder(root).flatMap(({ file, record }) => checkUiRecord(workRoot, file, record, shell, { mode: 'validate', uiRecords }));
   const shellInScope = shell && path.resolve(shell.file).startsWith(path.resolve(root));
-  if (shellInScope && shell.record?.schema === LEGACY_SHELL_SCHEMA) out.push(finding('suspect', 'SHELL_RECORD_LEGACY', shown(workRoot, shell.file), `${LEGACY_SHELL_SCHEMA} is superseded by the layout tree (${TREE_SCHEMA}); ${CONVERT_HINT}`));
+  if (shellInScope && shell.record && !shell.error && !isLayoutTree(shell.record)) out.push(finding('refuse', 'SHELL_RECORD_NOT_TREE', shown(workRoot, shell.file), `the shell record names schema ${shell.record.schema ?? '(none)'}, not ${TREE_SCHEMA}`));
   return out;
 }
 
@@ -578,7 +573,7 @@ export function checkShellConformance(target, { advisoryCodes = [] } = {}) {
     mode = 'implementation';
     findings.push(...checkImplementationRecord(workRoot, indexFile, own, shell));
     findings.push(...implementationPaletteFindings(workRoot, indexFile));
-  } else if (own?.schema === TREE_SCHEMA || own?.schema === LEGACY_SHELL_SCHEMA) {
+  } else if (own?.schema === TREE_SCHEMA) {
     mode = 'shell';
     findings.push(...checkShellRecord(workRoot, shell, { uiRecords }));
     findings.push(...shellPaletteFindings(workRoot, shell));
