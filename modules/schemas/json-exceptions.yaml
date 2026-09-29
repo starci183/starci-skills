@@ -22,9 +22,6 @@ exceptions:
   - path: examples/ecommerce-app-be/.starcistacks/dev/infra/metadata.json
     reason: >
       Resolved runtime projection (port map) for the ecommerce product; JSON by the example tooling contract.
-  - path: examples/ecommerce-app-be/.starciwork/_derived/deep-baseline.json
-    reason: >
-      Derived deep-check baseline written by the work-tree checker for ecommerce-app-be; generated evidence, JSON by the checker writer contract.
   - path: examples/ecommerce-app-be/apps/identity/package.json
     reason: >
       npm package manifest inside the ecommerce-app-be project; the npm toolchain requires JSON.
@@ -64,6 +61,9 @@ exceptions:
   - path: examples/ecommerce-app-fe/architecture.json
     reason: >
       Rendered architecture document for the ecommerce-app-fe example project; JSON by the renderer contract.
+  - path: examples/ecommerce-app-fe/e2e/tsconfig.json
+    reason: >
+      TypeScript toolchain config for the ecommerce-app-fe Playwright harness; tsc reads JSON (with comments).
   - path: examples/ecommerce-app-fe/package-lock.json
     reason: >
       npm lockfile inside the ecommerce-app-fe project; npm writes JSON by contract.
@@ -73,21 +73,18 @@ exceptions:
   - path: examples/ecommerce-app-fe/packages/shared/package.json
     reason: >
       npm workspace manifest for the built ecommerce-app-fe shared package; npm requires JSON.
-  - path: examples/ecommerce-app-fe/packages/shared/tsconfig.build.json
-    reason: >
-      TypeScript build config for the ecommerce-app-fe shared package; tsc reads JSON.
   - path: examples/ecommerce-app-fe/packages/shared/src/messages/en.json
     reason: >
       i18n message catalog inside the ecommerce-app-fe app source; the app i18n loader consumes JSON.
   - path: examples/ecommerce-app-fe/packages/shared/src/messages/vi.json
     reason: >
       i18n message catalog inside the ecommerce-app-fe app source; the app i18n loader consumes JSON.
+  - path: examples/ecommerce-app-fe/packages/shared/tsconfig.build.json
+    reason: >
+      TypeScript build config for the ecommerce-app-fe shared package; tsc reads JSON.
   - path: examples/ecommerce-app-fe/tsconfig.json
     reason: >
       TypeScript toolchain config inside the ecommerce-app-fe project; tsc reads JSON (with comments).
-  - path: examples/ecommerce-app-fe/e2e/tsconfig.json
-    reason: >
-      TypeScript toolchain config for the ecommerce-app-fe Playwright harness; tsc reads JSON (with comments).
   - path: examples/shape-slot/architecture.json
     reason: Next.js architecture config for the shape-slot example; the architecture checker reads starci/architecture-config@1 as JSON.
   - path: examples/shape-slot/messages/vi.json
@@ -117,6 +114,8 @@ exceptions:
       Captured grammar review asset for the ui list feature; JSON is the reviewer output format.
   - path: examples/todo-app-backend/architecture.json
     reason: NestJS architecture config for the real todo-app-backend example; the architecture checker reads starci/architecture-config@1 as JSON.
+  - path: examples/todo-app-backend/nest-cli.json
+    reason: Nest CLI configuration for the real todo-app-backend example; the nest toolchain reads JSON.
   - path: examples/todo-app-backend/package-lock.json
     reason: npm lockfile for the real todo-app-backend example; package managers require JSON filename and syntax.
   - path: examples/todo-app-backend/package.json
@@ -206,46 +205,6 @@ exceptions:
       npm package manifest inside the packages workspace project; the npm toolchain requires JSON.
   - path: ui/components.json
     reason: shadcn component registry config for the StarCi Status console; the shadcn CLI requires JSON.
-  - path: ui/fixtures/agent-changes.json
-    reason: Captured API fixture for the StarCi Status console, validated by ui/contract-shapes.mjs; JSON by the API contract.
-  - path: ui/fixtures/agent-log.json
-    reason: Captured API fixture for the StarCi Status console, validated by ui/contract-shapes.mjs; JSON by the API contract.
-  - path: ui/fixtures/agents.json
-    reason: Captured API fixture for the StarCi Status console, validated by ui/contract-shapes.mjs; JSON by the API contract.
-  - path: ui/fixtures/artifacts.json
-    reason: Captured API fixture for the StarCi Status console, validated by ui/contract-shapes.mjs; JSON by the API contract.
-  - path: ui/fixtures/contract.json
-    reason: Captured API fixture for the StarCi Status console, validated by ui/contract-shapes.mjs; JSON by the API contract.
-  - path: ui/fixtures/coverage.json
-    reason: Captured API fixture for the StarCi Status console, validated by ui/contract-shapes.mjs; JSON by the API contract.
-  - path: ui/fixtures/diff.json
-    reason: Captured API fixture for the StarCi Status console, validated by ui/contract-shapes.mjs; JSON by the API contract.
-  - path: ui/fixtures/evidence.json
-    reason: Captured API fixture for the StarCi Status console, validated by ui/contract-shapes.mjs; JSON by the API contract.
-  - path: ui/fixtures/history-commit.json
-    reason: Captured API fixture for the StarCi Status console, validated by ui/contract-shapes.mjs; JSON by the API contract.
-  - path: ui/fixtures/history.json
-    reason: Captured API fixture for the StarCi Status console, validated by ui/contract-shapes.mjs; JSON by the API contract.
-  - path: ui/fixtures/logs-stream.json
-    reason: Captured API fixture for the StarCi Status console, validated by ui/contract-shapes.mjs; JSON by the API contract.
-  - path: ui/fixtures/logs.json
-    reason: Captured API fixture for the StarCi Status console, validated by ui/contract-shapes.mjs; JSON by the API contract.
-  - path: ui/fixtures/proofs.json
-    reason: Captured API fixture for the StarCi Status console, validated by ui/contract-shapes.mjs; JSON by the API contract.
-  - path: ui/fixtures/snapshot.json
-    reason: Captured API fixture for the StarCi Status console, validated by ui/contract-shapes.mjs; JSON by the API contract.
-  - path: ui/fixtures/supervisor-logs-stream.json
-    reason: Captured API fixture for the StarCi Status console, validated by ui/contract-shapes.mjs; JSON by the API contract.
-  - path: ui/fixtures/supervisor-logs.json
-    reason: Captured API fixture for the StarCi Status console, validated by ui/contract-shapes.mjs; JSON by the API contract.
-  - path: ui/fixtures/supervisor-state.json
-    reason: Captured API fixture for the StarCi Status console, validated by ui/contract-shapes.mjs; JSON by the API contract.
-  - path: ui/fixtures/verify-proofs.json
-    reason: Captured API fixture for the StarCi Status console, validated by ui/contract-shapes.mjs; JSON by the API contract.
-  - path: ui/fixtures/workflow-events-stream.json
-    reason: Captured API fixture for the StarCi Status console, validated by ui/contract-shapes.mjs; JSON by the API contract.
-  - path: ui/fixtures/workflow-events.json
-    reason: Captured API fixture for the StarCi Status console, validated by ui/contract-shapes.mjs; JSON by the API contract.
   - path: ui/package-lock.json
     reason: npm lockfile for the StarCi Status console; the npm toolchain requires JSON.
   - path: ui/package.json

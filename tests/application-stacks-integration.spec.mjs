@@ -22,7 +22,7 @@ test('installed stack contract reaches replacing op modes and ships runnable exa
   }
   for(const file of ['scripts/checks/stacks.mjs','modules/schemas/application-stacks.schema.yaml','knowledge/application-stacks.yaml',
     'docs/application-stacks.md','docs/application-stacks-vps.md',
-    ...['gateway/nginx.conf','scripts/prepare.sh','scripts/prepare.ps1','.gitignore',
+    ...['.starcistacks/vps/infra/compose/nginx.conf','scripts/prepare.sh','scripts/prepare.ps1','.gitignore',
       '.starcistacks/application-stacks.yaml','.starcistacks/dev/README.md','.starcistacks/dev/infra/compose/compose.yaml',
       '.starcistacks/vps/README.md','.starcistacks/vps/infra/stack.yaml']
       .map(name=>'examples/todo-app-backend/'+name)])assert.ok(files.has(file),file);

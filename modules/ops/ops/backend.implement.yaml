@@ -151,6 +151,7 @@ writes:
         Standalone source-only work records runtime not requested instead of claiming readiness.
 steps:
   - reads:
+      - application-stacks
       - repo
     writes: [source]
     action:

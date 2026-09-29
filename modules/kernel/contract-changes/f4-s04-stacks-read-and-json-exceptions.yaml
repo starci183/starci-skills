@@ -1,0 +1,14 @@
+id: f4-s04-stacks-read-and-json-exceptions
+effectiveAt: '2026-09-29T20:00:00+07:00'
+summary: >-
+  backend.implement and interface.implement read application-stacks in their first step again
+  (the contract-first seam step had been inserted ahead of the step that carried the read), and
+  the json-exceptions allowlist drops entries whose files no longer exist (retired status UI
+  fixtures, derived deep-baseline), registers examples/todo-app-backend/nest-cli.json and is
+  re-sorted. No API verb, YAML key, check or finding code changes.
+reach: new-legs
+paths:
+  - modules/ops/ops/backend.implement.yaml
+  - modules/ops/ops/interface.implement.yaml
+  - modules/schemas/json-exceptions.yaml
+  - modules/kernel/contract-changes/f4-s04-stacks-read-and-json-exceptions.yaml
