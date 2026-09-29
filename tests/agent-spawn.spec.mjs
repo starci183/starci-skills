@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
-import {buildSpawnCommand,hostIdentityEnv,loadAdapter} from '../scripts/agent/lib.mjs';
+import {buildSpawnCommand,loadAdapter} from '../scripts/agent/lib.mjs';
 import {parseYaml} from '../engine/yaml.mjs';
 
 const ROOT=path.resolve(import.meta.dirname,'..');
@@ -12,15 +12,6 @@ const profileCommand=target=>parseYaml(fs.readFileSync(path.join(ROOT,'modules',
 // test: agent differences are DATA (modules/models/agents/<name>.yaml) and
 // the card's bypass flags (devin --permission-mode dangerous) can
 // never be forgotten because no caller assembles an agent command by hand.
-
-test('a card hostIdentity.env renders its <label> to the op job, else the card agent; no card, no variables',()=>{
-  const card={agent:'sample',hostIdentity:{env:{TAB_TITLE:'<label> - sample'}}};
-  assert.deepEqual(hostIdentityEnv(card,{STARCI_OP_JOB:'job-1'}),{TAB_TITLE:'job-1 - sample'});
-  assert.deepEqual(hostIdentityEnv(card),{TAB_TITLE:'sample - sample'});
-  assert.deepEqual(hostIdentityEnv({agent:'sample'}),{});
-  for(const provider of ['devin','codex','claude'])
-    assert.doesNotMatch(buildSpawnCommand({provider}).command,/CLI_TITLE/,`${provider}: only cards that declare hostIdentity get it`);
-});
 
 test('devin on Windows runs with a copy of its config whose Orca hook path Git Bash can execute',()=>{
   // Orca writes the devin-hook as a bare backslash path; Devin runs hook commands through Git Bash, which

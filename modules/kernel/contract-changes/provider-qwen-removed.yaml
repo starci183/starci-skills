@@ -16,9 +16,8 @@ summary: >-
   the workers agent set; the qwen CHECK values of the machine and runtime 0001-init schemas. The defaultOperation
   target is devin-agent. A config.yaml that still names qwen (allocation.preferredProvider, allocation.shares,
   allocation.grants, kernel.agent, kernel.group agent, supervisor.kernel.agent) is refused with "Qwen đã bị
-  gỡ; dùng claude, codex hoặc devin"; a leftover quota key is refused as an unknown key. Provider-agnostic card
-  hooks (credentialRefresh, hostPrerequisites, gateAutoAnswer, hostIdentity) stay; no shipped card declares
-  them. History (earlier contract-change entries, benchmark snapshots and findings, CHANGELOG) keeps its
+  gỡ; dùng claude, codex hoặc devin"; a leftover quota key is refused as an unknown key. The card hooks only Qwen declared - credentialRefresh, hostPrerequisites (scripts/agent/trust.mjs ensureHostSettings) and
+  hostIdentity - are deleted with their readers; gateAutoAnswer stays (the claude and codex cards declare it). History (earlier contract-change entries, benchmark snapshots and findings, CHANGELOG) keeps its
   mentions; the deleted files it cites are listed in modules/kernel/retired-paths.yaml.
 safetyCritical: false
 reach: new-legs

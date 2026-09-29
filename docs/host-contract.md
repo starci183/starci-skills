@@ -50,8 +50,6 @@ commandPrefix:                   # env prep + auth probe, per platform
   win32: '…'
   posix: 'command -v devin >/dev/null && env -u ACP_BACKEND devin models list … && '
 hostLaunchPrefix: {win32: '&', posix: 'command'}  # codex/claude: keep Orca's create on the runtime-owned PTY path
-hostIdentity: {env: {<VAR>: '<label>'}}  # vars that let Orca name the agent in its tab;
-                                 # <label> = the op job id, else the card agent (lib.mjs hostIdentityEnv)
 environmentStrip:                # vars removed INSIDE the terminal command
   - {name: ACP_BACKEND, reason: "…"}
 
@@ -116,7 +114,7 @@ called by `api dispatch`:
 
 ```text
 loadAdapter(provider)            → parse modules/models/agents/<agent>.yaml
-buildSpawnCommand(...)           → env + hostIdentity.env + commandPrefix[plat] + hostLaunchPrefix[plat]
+buildSpawnCommand(...)           → env + commandPrefix[plat] + hostLaunchPrefix[plat]
                                    + command | commandRequirements
                                    (kernel → kernelCommandRequirements;
                                     native-managed → terminalFallback.command + bypassFlag)

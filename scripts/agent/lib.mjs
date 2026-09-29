@@ -43,8 +43,8 @@ export function loadAdapter(provider) {
 }
 
 // Build the terminal command for a provider. Composition:
-//   launchEnv + env + hostIdentity.env                     ← card launch env (claude DISABLE_AUTOUPDATER), the
-//                                                            caller's launch env, Orca tab identity
+//   launchEnv + env                                        ← card launch env (claude DISABLE_AUTOUPDATER), the
+//                                                            caller's launch env
 //   + commandPrefix[plat]                                  ← card-owned env prep (ACP strip, auth probe)
 //   + hostLaunchPrefix[plat]                               ← keeps the launch on Orca's runtime-owned PTY path
 //   + explicit `command` (e.g. a model profile's launch.orca.command carrying model+tuning flags)
@@ -93,18 +93,6 @@ export const cwdCommand = (dir, plat = process.platform === 'win32' ? 'win32' : 
   if (typeof dir !== 'string' || !dir.trim() || /['"\r\n]/.test(dir)) return null;
   return plat === 'win32' ? `Set-Location -LiteralPath '${dir}' -ErrorAction Stop;` : `cd '${dir}' || exit 1;`;
 };
-// A card's hostIdentity.env: variables that let Orca recognise the agent in
-// its tab (logo + working spinner). Orca names a pane's agent from agent hooks,
-// the foreground process, or the pane title; an agent whose process is a bare
-// `node` and that has no Orca hook is only recognisable by title.
-// `<label>` renders to the op job id when the launch carries STARCI_OP_JOB,
-// otherwise to the card's agent name.
-export function hostIdentityEnv(card, env = null) {
-  const vars = card?.hostIdentity?.env;
-  if (!vars || typeof vars !== 'object' || Array.isArray(vars)) return {};
-  const label = String(env?.STARCI_OP_JOB || card?.agent || 'agent');
-  return Object.fromEntries(Object.entries(vars).map(([key, value]) => [key, String(value).replaceAll('<label>', label)]));
-}
 // `pathPrefix` is a directory put FIRST on the agent's PATH inside the same
 // shell: the op launch puts the shared-checkout guard shims there (git, npm:
 // scripts/guards/install.mjs guardLaunch), so the worker's `git` is the guard.
@@ -127,7 +115,7 @@ export function buildSpawnCommand({ provider, kernel = false, command = null, mo
   // for terminal handle after creation" while the tab still spawns later,
   // untracked. A leading shell call operator runs the same binary on the
   // runtime-owned PTY path devin already uses (agent card reason).
-  const prefix = [envPrefix(card?.launchEnv, plat), envPrefix(env, plat), pathPrefixCommand(pathPrefix, plat), envPrefix(hostIdentityEnv(card, env), plat), card?.commandPrefix?.[plat], card?.hostLaunchPrefix?.[plat]]
+  const prefix = [envPrefix(card?.launchEnv, plat), envPrefix(env, plat), pathPrefixCommand(pathPrefix, plat), card?.commandPrefix?.[plat], card?.hostLaunchPrefix?.[plat]]
     .filter((s) => typeof s === 'string' && s.trim()).map((s) => s.trim()).join(' ');
   const requirementList = (kernel && Array.isArray(card?.kernelCommandRequirements)
     ? card.kernelCommandRequirements
