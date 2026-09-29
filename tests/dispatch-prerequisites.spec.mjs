@@ -12,7 +12,7 @@ import {checkPrerequisites,prerequisiteDetail,resolveReadPath} from '../scripts/
 
 // api dispatch refuses `prerequisite-unmet` from data only: a manifest read
 // marked mustExist that the job binding resolves but the repository lacks, and
-// a layout chain the shell record leaves unsettled.
+// the design gate (an implementation record whose proved ui record has no settled interface.draw).
 // Unknown is never unmet.
 const ROOT=path.resolve(import.meta.dirname,'..');
 const API=path.join(ROOT,'scripts','kernel','api.mjs');
@@ -55,7 +55,7 @@ test('a missing mustExist record is unmet; a present one and an unresolved one a
   assert.match(prerequisiteDetail({op:'interface.audit',jobId:'job-1',unmet:missing.unmet}),
     /reads \.starciwork\/features\/wspv\/operations\/audit-pay\/index\.yaml \(reads\.target, mustExist\).*api dispatch --job job-1 again.*stays queued/);
 
-  write(repo,'.starciwork/features/wspv/operations/audit-pay/index.yaml','schema: work/node@1\n');
+  write(repo,'.starciwork/features/wspv/operations/audit-pay/index.yaml','schema: work/implementation@1\n');
   assert.deepEqual(checkPrerequisites({brief,repo,payload:{owned_paths:['.starciwork/features/wspv/operations/audit-pay']}}).unmet,[]);
 
   const unbound=checkPrerequisites({brief,repo,payload:{owned_paths:['.starciwork/features/login/operations']}});
@@ -71,14 +71,16 @@ test('api dispatch refuses prerequisite-unmet before the packet and before any O
   const env={...process.env,STARCI_ORCA_COMMAND:process.execPath,STARCI_ORCA_ARGS:JSON.stringify([stub]),
     STARCI_FAKE_ORCA_MODE:'healthy',STARCI_FAKE_ORCA_LOG:log,STARCI_FAKE_ORCA_STATE:path.join(root,'state.json'),
     LOCALAPPDATA:path.join(root,'localappdata')};
-  // interface.draw's fixed-path shell read is mustExist: with no layout tree in the repository the job is refused.
+  // interface.implement's designDrawn read: the implementation record proves a ui record no interface.draw ever settled,
+  // so the job is refused with DESIGN_NOT_SETTLED before anything reaches the host.
+  write(repo,'.starciwork/features/f/impl/fe/home/index.yaml','schema: work/implementation@1\nid: impl.f.home\nproves:\n  - ui.f.home\n');
   write(repo,'.starciwork/workspace.yaml','schema: work/workspace@1\nid: t\n');
   // ledgerFileFor resolves under env.LOCALAPPDATA — seed the file the spawned api will open.
   const ledgerFile=ledgerFileFor(repo,{env});
   const ledger=openLedger({file:ledgerFile});
   try{seedWorkflow(ledger,{id:'wf-prereq',state:{phase:'running',job:'wf-prereq'},
-    jobs:[{jobId:'job-audit-scope',opId:'interface.draw',kind:'op',
-      payload:{opId:'interface.draw',records:['.starciwork/features/f/ui/home'],owned_paths:['.starciwork/features/f/ui/home'],model:'devin-agent'}}]});}
+    jobs:[{jobId:'job-audit-scope',opId:'interface.implement',kind:'op',
+      payload:{opId:'interface.implement',records:['.starciwork/features/f/impl/fe/home'],owned_paths:['.starciwork/features/f/impl/fe/home'],model:'devin-agent'}}]});}
   finally{ledger.close();}
 
   for(const spawn of [[],['--spawn']]){
@@ -86,8 +88,9 @@ test('api dispatch refuses prerequisite-unmet before the packet and before any O
     assert.equal(r.status,1,`${spawn.join(' ')||'dry'}: ${r.stdout}${r.stderr}`);
     const out=JSON.parse(r.stdout);
     assert.equal(out.reason,'prerequisite-unmet');
-    assert.equal(out.unmet[0].kind,'record-missing');
-    assert.equal(out.unmet[0].path,'.starciwork/shell/index.yaml');
+    assert.equal(out.unmet[0].kind,'design-not-settled');
+    assert.equal(out.unmet[0].code,'DESIGN_NOT_SETTLED');
+    assert.equal(out.unmet[0].ui,'ui.f.home');
     assert.match(out.detail,/then run api dispatch --job job-audit-scope again/);
   }
   assert.equal(fs.existsSync(log)?fs.readFileSync(log,'utf8').trim():'','','nothing reached the host');

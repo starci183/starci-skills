@@ -103,7 +103,7 @@ provenance:
     - path: "packages/grammar/src/common/registry.tsx"
       sha256: "b640a2809a3bcc97e4a7646adb4610d0ef7b1ed6796caf98ec8761d75a407f78"
     - path: "packages/grammar/src/common/styles.css"
-      sha256: "7e720e8fa104c0af12aaf08a2c09074536510c11bc0b7f9552fc7f7e4de1f158"
+      sha256: "3a4c35a1ff9d308180234e58eedf0b0244481bb08a0f18cb7f4829d4513939d4"
     - path: "packages/grammar/src/common/components-forms.css"
       sha256: "040d8eaf37ec3339f66d36ac6e1f5ff6a5818a95a68091b40509a642cf0a6229"
     - path: "packages/grammar/src/common/components-overlays.css"
@@ -180,12 +180,12 @@ identity:
     navigation: "19 renderers, COMMON_NAVIGATION_COMPONENTS in src/common/renderers-navigation.ts"
   counts:
     renderers: 96
-    tokens: 162
+    tokens: 157
     tokensAssignedByCommon: 97
     tokensAssignedAndAlsoReadByCommon: 63
     tokensWrittenByRenderers: 2
-    tokensReadOnlyByCommon: 65
-    tokensReadByCommon: 128
+    tokensReadOnlyByCommon: 60
+    tokensReadByCommon: 123
     claimEntries: 408
     distinctClaimIds: 90
     emittedClasses: 398
@@ -540,27 +540,27 @@ tokens:
   - name: "--grammar-inline-gap"
     value: "0.5rem"
     assignedBy: "common"
-    alsoReadBy: 17
+    alsoReadBy: 23
     source: "packages/grammar/src/common/styles.css:9"
   - name: "--grammar-page-inset"
     value: "clamp(1rem, 3vw, 2rem)"
     assignedBy: "common"
-    alsoReadBy: 14
+    alsoReadBy: 15
     source: "packages/grammar/src/common/styles.css:13"
   - name: "--grammar-region-gap"
     value: "1.5rem"
     assignedBy: "common"
-    alsoReadBy: 4
+    alsoReadBy: 11
     source: "packages/grammar/src/common/styles.css:12"
   - name: "--grammar-row-gap"
     value: "0.75rem"
     assignedBy: "common"
-    alsoReadBy: 9
+    alsoReadBy: 12
     source: "packages/grammar/src/common/styles.css:10"
   - name: "--grammar-section-gap"
     value: "1rem"
     assignedBy: "common"
-    alsoReadBy: 8
+    alsoReadBy: 11
     source: "packages/grammar/src/common/styles.css:11"
   - name: "--info"
     value: "var(--accent)"
@@ -815,12 +815,6 @@ tokens:
     commonFallback: "0"
     uses: 1
     source: "packages/grammar/src/common/styles.css:777"
-  - name: "--starci-core-inline-gap"
-    assignedBy: "family"
-    readBy: "common"
-    commonFallback: "0.5rem"
-    uses: 6
-    source: "packages/grammar/src/common/styles.css:679"
   - name: "--starci-core-motion-duration"
     assignedBy: "family"
     readBy: "common"
@@ -850,12 +844,6 @@ tokens:
     assignedBy: "common"
     alsoReadBy: 6
     source: "packages/grammar/src/common/components-overlays.css:12"
-  - name: "--starci-core-page-inset"
-    assignedBy: "family"
-    readBy: "common"
-    commonFallback: "clamp(1rem, 3vw, 2rem)"
-    uses: 1
-    source: "packages/grammar/src/common/styles.css:242"
   - name: "--starci-core-page-measure"
     assignedBy: "family"
     readBy: "common"
@@ -916,18 +904,6 @@ tokens:
     commonFallback: "72ch"
     uses: 1
     source: "packages/grammar/src/common/styles.css:246"
-  - name: "--starci-core-region-gap"
-    assignedBy: "family"
-    readBy: "common"
-    commonFallback: "1.5rem"
-    uses: 7
-    source: "packages/grammar/src/common/styles.css:259"
-  - name: "--starci-core-row-gap"
-    assignedBy: "family"
-    readBy: "common"
-    commonFallback: "0.75rem"
-    uses: 3
-    source: "packages/grammar/src/common/styles.css:1230"
   - name: "--starci-core-row-gap-compact"
     assignedBy: "family"
     readBy: "common"
@@ -940,12 +916,6 @@ tokens:
     commonFallback: "1rem"
     uses: 2
     source: "packages/grammar/src/common/styles.css:1231"
-  - name: "--starci-core-section-gap"
-    assignedBy: "family"
-    readBy: "common"
-    commonFallback: "0.75rem"
-    uses: 3
-    source: "packages/grammar/src/common/styles.css:486"
   - name: "--starci-core-separator"
     value: "var(--grammar-ink-band-separator)"
     assignedBy: "common"

@@ -5,7 +5,7 @@ import os from 'node:os';
 import path from 'node:path';
 import Ajv2020 from 'ajv/dist/2020.js';
 import { parseYaml } from '../engine/yaml.mjs';
-import { sha256 } from '../engine/index.mjs';
+import { sha256 } from '../engine/digest.mjs';
 import { putBundle } from '../scripts/lib/blob-lookup.mjs';
 import { DRAW_LOOP_MISSING, LOOP_SCHEMA, loopCoverageFindings } from '../scripts/checks/draw-loop-coverage.mjs';
 
