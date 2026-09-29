@@ -1,7 +1,7 @@
 import "server-only"
 import { ORDER_API_URL } from "../config"
-import { postGraphql } from "./graphql"
-import type { GraphqlResult } from "./graphql"
+import { postGraphql } from "./client"
+import type { GraphqlResult } from "./outcome"
 
 /** One cart line as the order service's `cart` query answers it. */
 export type CartLine = {

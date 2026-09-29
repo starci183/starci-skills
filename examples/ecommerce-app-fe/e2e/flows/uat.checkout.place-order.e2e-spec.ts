@@ -1,7 +1,7 @@
 import { test, type Page } from '@playwright/test';
-import { currentRunId, IDENTITY_API_URL, LIVE_LOGIN_AUTHORIZED, ORDER_API_URL, passwordFor } from '../lib/run-context';
-import { readAccounts } from '../lib/flow-records';
-import { recordAssertion, recordResource, walkStep } from '../lib/steps';
+import { currentRunId, IDENTITY_API_URL, LIVE_LOGIN_AUTHORIZED, ORDER_API_URL, passwordFor } from '../support/run-context';
+import { readAccounts } from '../support/flow-records';
+import { recordAssertion, recordResource, walkStep } from '../support/steps';
 
 /**
  * uat.checkout.place-order - the record's own walk, against the running product.

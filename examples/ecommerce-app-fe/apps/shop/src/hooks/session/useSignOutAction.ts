@@ -1,6 +1,6 @@
 import { useState } from "react"
 import { useTranslations } from "next-intl"
-import { useRouter } from "@ecommerce/shared/hooks/i18n"
+import { useRouter } from "../../modules/i18n"
 import { closeSession } from "../../modules/api/session"
 
 /** Owns the sign-out press and refreshes the server account view after the session door answers. */

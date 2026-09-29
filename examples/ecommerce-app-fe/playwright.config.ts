@@ -1,12 +1,12 @@
 import os from 'node:os';
 import path from 'node:path';
 import { defineConfig, devices } from '@playwright/test';
-import { BASE_URL } from './e2e/lib/run-context';
+import { BASE_URL } from './e2e/support/run-context';
 
 /**
  * ops/uat.verify/operator.yaml's "recording: screenshots-and-real-video" and the run's own
  * `runs/<runId>/` folder are two different things: Playwright writes its raw per-test artifacts
- * (screenshots, `.webm` video, trace) into `outputDir` below, and `./lib/run-writer.ts` (the
+ * (screenshots, `.webm` video, trace) into `outputDir` below, and `./e2e/support/run-writer.ts` (the
  * `reporter`) copies the finalized ones out into the owning `.starciwork` node once each test settles.
  * `outputDir` therefore lives outside this repository, in the OS temp directory, so a crashed run never
  * leaves half-written bytes inside a tracked tree.
@@ -16,12 +16,12 @@ const RAW_OUTPUT_DIR = path.join(os.tmpdir(), 'ecommerce-app-uat-raw');
 export default defineConfig({
   testDir: './e2e/flows',
   testMatch: '**/*.e2e-spec.ts',
-  globalSetup: './e2e/global-setup.ts',
+  globalSetup: './e2e/support/global-setup.ts',
   outputDir: RAW_OUTPUT_DIR,
   timeout: 30_000,
   fullyParallel: false,
   workers: 1,
-  reporter: [['list'], ['./e2e/lib/run-writer.ts']],
+  reporter: [['list'], ['./e2e/support/run-writer.ts']],
   use: {
     baseURL: BASE_URL,
     video: 'on',

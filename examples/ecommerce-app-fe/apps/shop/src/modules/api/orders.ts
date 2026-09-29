@@ -1,6 +1,6 @@
 import "server-only"
 import { ORDER_API_URL } from "../config"
-import { postGraphql } from "./graphql"
+import { postGraphql } from "./client"
 
 /** The confirmation the order service answers for a placed - or idempotently replayed - order. */
 export type OrderConfirmation = {

@@ -1,8 +1,8 @@
 import { expect, test } from '@playwright/test';
 import type { BrowserContext, Page } from '@playwright/test';
-import { readAccounts } from '../lib/flow-records';
-import { currentRunId, IDENTITY_API_URL, LIVE_LOGIN_AUTHORIZED, passwordFor } from '../lib/run-context';
-import { recordAssertion, recordResource, walkStep } from '../lib/steps';
+import { readAccounts } from '../support/flow-records';
+import { currentRunId, IDENTITY_API_URL, LIVE_LOGIN_AUTHORIZED, passwordFor } from '../support/run-context';
+import { recordAssertion, recordResource, walkStep } from '../support/steps';
 
 const FEATURE = 'identity';
 const FLOW = 'sign-in';
@@ -104,7 +104,7 @@ const signedInLine = (email: string) => `Signed in as ${email}.`;
  * nothing here fakes a callback or writes the store directly.
  *
  * Every step writes a person row and session rows on the dev Postgres/Redis, so the whole walk is
- * gated on LIVE_LOGIN_AUTHORIZED (../lib/run-context.ts): without it the assertions are recorded
+ * gated on LIVE_LOGIN_AUTHORIZED (../support/run-context.ts): without it the assertions are recorded
  * `not-run` rather than attempted against infrastructure this run does not own. The record's own
  * cleanup note says the product exposes no account deletion, so the run-scoped person row
  * (`uat-person-<runId>@ecommerce.dev`, namespaced per _common.md) and the still-live final session

@@ -7,7 +7,7 @@ import { readSessionToken } from "../../../modules/session"
 import { CartPageBase } from "./component"
 import type { CartLineRow, CartPageState } from "./component"
 import type { CartView } from "../../../modules/api/cart"
-import type { GraphqlResult } from "../../../modules/api/graphql"
+import type { GraphqlResult } from "../../../modules/api/outcome"
 import { collectionSlot } from "@ecommerce/shared/modules/slot"
 
 /** Props for the connected cart page: the route mounts it empty and it reads its own world. */

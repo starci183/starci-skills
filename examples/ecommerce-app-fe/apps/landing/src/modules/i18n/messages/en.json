@@ -1,0 +1,70 @@
+{
+  "app": {
+    "landing": {
+      "title": "Northwind Supply — everyday objects, built to be kept",
+      "description": "The public storefront for Northwind Supply. Browse the catalogue, then continue to the shop."
+    }
+  },
+  "display": {
+    "label": "Display and language",
+    "theme": {
+      "toLight": "Switch to light",
+      "toDark": "Switch to dark"
+    },
+    "locale": {
+      "en": "English",
+      "vi": "Tiếng Việt"
+    }
+  },
+  "landing": {
+    "shell": {
+      "brand": "Northwind Supply",
+      "navLabel": "Site",
+      "catalogue": "Catalogue",
+      "about": "About",
+      "enterShop": "Enter shop",
+      "tagline": "Northwind Supply — everyday objects, built to be kept.",
+      "shopCta": "Shop the full catalogue →"
+    },
+    "hero": {
+      "title": "Everyday objects, built to be kept.",
+      "lede": "Northwind Supply makes a small, opinionated catalogue: things you reach for daily and expect to still have in ten years. No endless scroll, no filler.",
+      "startShopping": "Start shopping",
+      "seePicks": "See the picks"
+    },
+    "catalogue": {
+      "title": "This season’s picks",
+      "description": "A curated slice of the catalogue - the full feed lives in the shop.",
+      "viewFull": "View the full catalogue →"
+    },
+    "pillars": {
+      "title": "Why Northwind",
+      "repairable": {
+        "title": "Repairable by design",
+        "copy": "Every item ships with the parts and the manual to fix it."
+      },
+      "onePrice": {
+        "title": "One price, no games",
+        "copy": "The number you see is the number you pay — no timers, no dark patterns."
+      },
+      "carbonNeutral": {
+        "title": "Carbon-neutral delivery",
+        "copy": "Offset on every parcel, measured and reported each quarter."
+      }
+    }
+  },
+  "notFound": {
+    "title": "Page not found",
+    "home": "Back to the home page"
+  },
+  "errors": {
+    "page": {
+      "title": "Something went wrong",
+      "retry": "Try again"
+    },
+    "global": {
+      "title": "A serious error occurred",
+      "retry": "Try again"
+    }
+  }
+}

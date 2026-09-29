@@ -2,7 +2,7 @@
 
 import type { ReactNode } from "react"
 import { useLocale, useTranslations } from "next-intl"
-import { usePathname } from "@ecommerce/shared/hooks/i18n"
+import { usePathname } from "../../../modules/i18n"
 import { useTheme } from "@starci-examples/fe-kit/theme/theme-context"
 import { ROUTES } from "../../../modules/routes"
 import { ShopLayoutBase } from "./component"

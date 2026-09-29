@@ -5,7 +5,7 @@ import { readSessionToken } from "../../../modules/session"
 import { BrowsePageBase } from "./component"
 import type { BrowsePageState } from "./component"
 import type { Product } from "../../../modules/api/catalog"
-import type { GraphqlResult } from "../../../modules/api/graphql"
+import type { GraphqlResult } from "../../../modules/api/outcome"
 import { collectionSlot } from "@ecommerce/shared/modules/slot"
 
 /** Props for the connected browse page: the route mounts it empty and it reads its own world. */

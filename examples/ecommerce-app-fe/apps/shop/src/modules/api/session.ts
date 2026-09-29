@@ -1,4 +1,4 @@
-import type { Result } from "./result"
+import type { Result } from "./outcome"
 
 /** Which account act a submit is for: an existing pair, or a fresh registration. */
 export type SessionMode = "sign-in" | "register"

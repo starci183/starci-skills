@@ -1,6 +1,6 @@
 import "server-only"
 import { fetchCart } from "./cart"
-import type { GraphqlResult } from "./graphql"
+import type { GraphqlResult } from "./outcome"
 
 /**
  * A catalogue row as the shop renders it. The order service serves catalog data on the

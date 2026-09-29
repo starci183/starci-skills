@@ -2,9 +2,8 @@ import { dirname, join } from "node:path"
 import { fileURLToPath } from "node:url"
 import createNextIntlPlugin from "next-intl/plugin"
 
-// One request config serves the whole product: the shared module in `packages/shared/` holds the
-// single source of messages both apps consume, so the plugin points at it rather than a per-app copy.
-const withNextIntl = createNextIntlPlugin("../../packages/shared/dist/modules/i18n/request.js")
+// The request config lives in this app's i18n module; next-intl compiles it from source.
+const withNextIntl = createNextIntlPlugin("./src/modules/i18n/request.ts")
 
 // fe-kit compiles from source and shared is built in this workspace, so
 // their bare peer imports walk node_modules upward from .claude/packages/ - landing on whichever

@@ -8,7 +8,7 @@ import { readSessionToken } from "../../../modules/session"
 import { CheckoutPageBase } from "./component"
 import type { CheckoutLineRow, CheckoutPageState } from "./component"
 import type { CartView } from "../../../modules/api/cart"
-import type { GraphqlResult } from "../../../modules/api/graphql"
+import type { GraphqlResult } from "../../../modules/api/outcome"
 import { collectionSlot } from "@ecommerce/shared/modules/slot"
 
 /** Props for the connected checkout page: the route mounts it empty and it reads its own world. */

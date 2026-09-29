@@ -1,0 +1,70 @@
+{
+  "app": {
+    "landing": {
+      "title": "Northwind Supply — vật dụng mỗi ngày, làm để dùng lâu",
+      "description": "Sân trước công khai của Northwind Supply. Duyệt danh mục, rồi tiếp tục đến cửa hàng."
+    }
+  },
+  "display": {
+    "label": "Hiển thị và ngôn ngữ",
+    "theme": {
+      "toLight": "Chuyển sang sáng",
+      "toDark": "Chuyển sang tối"
+    },
+    "locale": {
+      "en": "English",
+      "vi": "Tiếng Việt"
+    }
+  },
+  "landing": {
+    "shell": {
+      "brand": "Northwind Supply",
+      "navLabel": "Trang",
+      "catalogue": "Danh mục",
+      "about": "Giới thiệu",
+      "enterShop": "Vào cửa hàng",
+      "tagline": "Northwind Supply — vật dụng mỗi ngày, làm để dùng lâu.",
+      "shopCta": "Xem toàn bộ danh mục →"
+    },
+    "hero": {
+      "title": "Vật dụng mỗi ngày, làm để dùng lâu.",
+      "lede": "Northwind Supply làm một danh mục nhỏ, có chọn lọc: những thứ bạn với tới mỗi ngày và mong còn dùng được mười năm nữa. Không cuộn vô tận, không thứ lấp chỗ.",
+      "startShopping": "Bắt đầu mua sắm",
+      "seePicks": "Xem lựa chọn"
+    },
+    "catalogue": {
+      "title": "Lựa chọn mùa này",
+      "description": "Một phần danh mục được tuyển chọn - toàn bộ nguồn dữ liệu nằm trong cửa hàng.",
+      "viewFull": "Xem toàn bộ danh mục →"
+    },
+    "pillars": {
+      "title": "Vì sao chọn Northwind",
+      "repairable": {
+        "title": "Sửa được ngay từ thiết kế",
+        "copy": "Mỗi món đều đi kèm phụ tùng và hướng dẫn để bạn tự sửa."
+      },
+      "onePrice": {
+        "title": "Một giá, không mánh khóe",
+        "copy": "Con số bạn thấy là con số bạn trả — không đếm ngược, không thủ thuật giá."
+      },
+      "carbonNeutral": {
+        "title": "Giao hàng trung hòa carbon",
+        "copy": "Bù trừ phát thải cho mỗi kiện hàng, đo lường và công khai mỗi quý."
+      }
+    }
+  },
+  "notFound": {
+    "title": "Không tìm thấy trang",
+    "home": "Về trang chủ"
+  },
+  "errors": {
+    "page": {
+      "title": "Đã xảy ra lỗi",
+      "retry": "Thử lại"
+    },
+    "global": {
+      "title": "Đã xảy ra lỗi nghiêm trọng",
+      "retry": "Thử lại"
+    }
+  }
+}

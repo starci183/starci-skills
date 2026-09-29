@@ -4,7 +4,7 @@ import { IDENTITY_API_URL } from "../../../modules/config"
 import { AccountPageBase } from "./component"
 import type { AccountPageState } from "./component"
 import type { CurrentUser } from "../../../modules/api/identity"
-import type { Result } from "../../../modules/api/result"
+import type { Result } from "../../../modules/api/outcome"
 import type { Slot } from "@ecommerce/shared/modules/slot"
 
 /** Props for the connected account page: the route mounts it empty and it reads its own world. */

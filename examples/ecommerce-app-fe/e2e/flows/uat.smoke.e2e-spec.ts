@@ -1,13 +1,13 @@
 import { test } from '@playwright/test';
-import { ORDER_API_URL } from '../lib/run-context';
-import { recordAssertion, walkStep } from '../lib/steps';
+import { ORDER_API_URL } from '../support/run-context';
+import { recordAssertion, walkStep } from '../support/steps';
 
 /**
  * uat.smoke.browse - this harness's own rig proof, NOT the `uat.checkout.place-order` walk.
  *
  * The spec exists to prove the ported run-writer rig end-to-end: one real browser visit against the
  * shop app's `/browse` route (the entry `uat.checkout.place-order` declares and the one shop route
- * already wired to a live service read - `apps/shop/src/app/[lang]/browse/page.tsx` renders
+ * already wired to a live service read - `apps/shop/src/app/[locale]/browse/page.tsx` renders
  * `BrowsePage`, which fetches `${ORDER_API_URL}/products` server-side on every request). Its run
  * lands under that record's node because that is where the surface it exercises is owned.
  *

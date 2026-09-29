@@ -1,6 +1,6 @@
 import { useState } from "react"
 import { useLocale, useTranslations } from "next-intl"
-import { useRouter } from "@ecommerce/shared/hooks/i18n"
+import { useRouter } from "../../modules/i18n"
 import { openSession } from "../../modules/api/session"
 import { ROUTES } from "../../modules/routes"
 
