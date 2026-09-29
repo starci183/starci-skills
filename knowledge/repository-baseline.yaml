@@ -272,10 +272,11 @@ shapes:
       start: nest start
       start:dev: nest start --watch
       start:prod: node dist/apps/<app>/src/main
-      test: jest
-      test:unit: jest
-      test:ci: jest --ci --coverage --coverageReporters=lcov --coverageReporters=text-summary
-      test:affected: jest --changedSince=origin/main --passWithNoTests
+      test: jest --selectProjects unit
+      test:unit: jest --selectProjects unit
+      test:e2e: jest --selectProjects e2e --runInBand
+      test:ci: jest --selectProjects unit --ci --coverage --coverageReporters=lcov --coverageReporters=text-summary
+      test:affected: jest --selectProjects unit --changedSince=origin/main --passWithNoTests
     sonar:
       sources: apps,src
       tests: apps,src
@@ -377,16 +378,24 @@ shapes:
         const { compilerOptions } = require("./tsconfig.json")
 
         /** @type {import("jest").Config} */
-        module.exports = {
+        const shared = {
             preset: "ts-jest",
             testEnvironment: "node",
-            testMatch: ["**/*.spec.ts"],
             moduleNameMapper: pathsToModuleNameMapper(compilerOptions.paths, { prefix: `${__dirname}/` }),
             transform: {
                 "^.+\\.ts$": ["ts-jest", { tsconfig: "tsconfig.json", diagnostics: true }],
             },
             clearMocks: true,
-            collectCoverageFrom: ["apps/**/*.ts", "src/**/*.ts", "!**/*.spec.ts", "!**/*.d.ts", "!**/main.ts", "!**/*.module.ts", "!**/index.ts"],
+        }
+
+        // Exactly two test kinds: unit `<name>.spec.ts` beside its subject and e2e `*.e2e-spec.ts` under
+        // src/tests/e2e/ (environment code in src/tests/e2e/setup/, data in src/tests/fixtures/).
+        module.exports = {
+            projects: [
+                { ...shared, displayName: "unit", testMatch: ["**/*.spec.ts"], testPathIgnorePatterns: ["/node_modules/", "\\.e2e-spec\\.ts$"] },
+                { ...shared, displayName: "e2e", testMatch: ["**/*.e2e-spec.ts"], testTimeout: 120000 },
+            ],
+            collectCoverageFrom: ["apps/**/*.ts", "src/**/*.ts", "!**/*.spec.ts", "!**/*.e2e-spec.ts", "!src/tests/**", "!**/*.d.ts", "!**/main.ts", "!**/*.module.ts", "!**/index.ts"],
             coverageDirectory: "<coverage.reportsDirectory>",
             coverageThreshold: {
                 global: {

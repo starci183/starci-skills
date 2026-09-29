@@ -68,6 +68,13 @@ rules:
         kind: exception
         when: "A one-part visual unit"
         write: "Keep one focused spec when behavior/risk warrants it; do not create a twin only to justify another spec."
+      - id: case-9
+        when: "Browser-driven end-to-end proof"
+        write: >
+          Exactly two test kinds exist (owner ruling 2026-09-29): unit <name>.spec.ts(x) beside its subject (vitest)
+          and e2e *.e2e-spec.ts (Playwright) under the root e2e/ folder, run by one root playwright.config.ts whose
+          testMatch is **/*.e2e-spec.ts and by the script test:e2e. Playwright specs are never named .spec.ts and
+          no second Playwright config exists. HFS_TEST_KIND_RETIRED flags any violation.
     verification:
       automated: []
       manual:

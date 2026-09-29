@@ -557,7 +557,7 @@ sections:
     blocks:
       - "Owner rule 2026-09-28 (\"speed up development; test later when asked\"): the owner config.yaml root
         `specs: {unit, e2e}` switches product testing off per class; absent or true is the normal contract.
-        unit covers product unit and integration tests (jest, vitest, test:ci, coverage gates, Sonar
+        unit covers product unit tests (*.spec.ts; jest, vitest, test:ci, coverage gates, Sonar
         coverage); e2e covers product e2e tests (e2e.verify, backend e2e, Playwright and *.e2e-spec.* files).
         UAT is neither: uat.verify keeps its own owner deferral until credentials."
       - "What an op does when a class is off is its brief's policy.specsToggle (scripts/kernel/spec-deferral.mjs):

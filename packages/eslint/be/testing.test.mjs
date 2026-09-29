@@ -35,9 +35,9 @@ const tester = new RuleTester({
 const UNIT = "D:/repo/src/features/api/core/graphql/mutations/courses/add-to-cart/add-to-cart.handler.spec.ts"
 const E2E = "D:/repo/src/tests/e2e/course-enroll.e2e-spec.ts"
 const SRC = "D:/repo/src/features/api/core/graphql/mutations/courses/add-to-cart/add-to-cart.handler.ts"
-const HARNESS = "D:/repo/src/tests/harness/challenge-grading.harness-spec.ts"
-const HARNESS_HELPER = "D:/repo/src/tests/helpers/harness-credentials.ts"
-const STRUCTURAL_SPEC = fileURLToPath(new URL("./fixtures/src/tests/harness/jest-module-map.spec.ts", import.meta.url))
+const HARNESS = "D:/repo/src/tests/e2e/live/challenge-grading.e2e-spec.ts"
+const HARNESS_HELPER = "D:/repo/src/tests/e2e/live/harness-credentials.ts"
+const STRUCTURAL_SPEC = fileURLToPath(new URL("./fixtures/src/tests/e2e/setup/jest-module-map.spec.ts", import.meta.url))
 
 test("every rule this law declares is exported under its published name", () => {
   for (const [name, rule] of Object.entries(rules)) {

@@ -66,8 +66,8 @@ observations:
       Additional inspection: add-to-cart.module.ts registers its resolver, bus service and
       handler; module-definition.ts uses ConfigurableModuleBuilder with isGlobal:false.
       CourseNotFoundException extends AbstractException with one typed metadata object.
-      jest.config.ts separates unit and integration suffixes and delegates E2E/harness to their
-      own configs. These examples do not prove every module/filter/test topic has been rescanned.
+      the extraction's jest.config.ts split unit and integration suffixes and delegated E2E/harness to their
+      own configs; the current standard is one jest.config.js with unit and e2e projects (BE-TEST-1). These examples do not prove every module/filter/test topic has been rescanned.
   - id: be-graphql-chain
     lane: backend
     kind: observation

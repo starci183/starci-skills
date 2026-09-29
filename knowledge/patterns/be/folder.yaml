@@ -116,9 +116,10 @@ rules:
   - id: BE-FOLDER-7
     title: Tests belong to behavior
     kind: mandatory
-    requirement: Colocate unit/integration tests with their owner; keep shared fixtures and app/DB harnesses in
-      src/tests or the equivalent declared test root. Select boot, contract, concurrency and crash tests from
-      actual effects. Do not create empty tests for every conventional filename.
+    requirement: Colocate unit tests (<name>.spec.ts) with their owner; keep every e2e spec (*.e2e-spec.ts) under
+      src/tests/e2e/, its environment code (containers, app boot, datastore helpers) in src/tests/e2e/setup/ and
+      shared data in src/tests/fixtures/. There is no integration or harness test kind or folder. Select boot,
+      contract, concurrency and crash tests from actual effects. Do not create empty tests for every conventional filename.
     rationale: Useful evidence checks invariants at their real boundary.
     verification:
       automated: []

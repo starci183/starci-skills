@@ -43,21 +43,17 @@
 import { statSync } from "node:fs"
 import { normalizePath } from "./lib/path.mjs"
 
-/** The fast lane: a plain unit spec, excluding every other suffix that also ends in `spec.ts`. */
-const isUnitSpec = (filename) => {
-  const file = normalizePath(filename)
-  if (!/\.spec\.ts$/.test(file)) return false
-  return !/\.(?:e2e|int|harness)-spec\.ts$/.test(file)
-}
+/** Test kind 1 of exactly two: a unit spec, `<name>.spec.ts` beside its subject. */
+const isUnitSpec = (filename) => /\.spec\.ts$/.test(normalizePath(filename))
 
-/** The flow lane. */
+/** Test kind 2 of exactly two: `*.e2e-spec.ts`. `.int-spec` and `.harness-spec` are retired kinds. */
 const isE2eSpec = (filename) => /\.e2e-spec\.ts$/.test(normalizePath(filename))
 
-/** The paid model-quality lane. */
-const isHarnessSpec = (filename) => /\.harness-spec\.ts$/.test(normalizePath(filename))
+/** The opt-in live e2e filter (`test:e2e:live`): e2e specs under `src/tests/e2e/live/` that need live third-party accounts. */
+const isLiveE2eSpec = (filename) => isE2eSpec(filename) && /\/src\/tests\/e2e\/live\//.test(normalizePath(filename))
 
-/** Test-only helpers whose only authority is the harness lane. */
-const isHarnessHelper = (filename) => /\/src\/tests\/helpers\//.test(normalizePath(filename))
+/** Test-only environment helpers whose only authority is the live e2e filter. */
+const isLiveE2eHelper = (filename) => /\/src\/tests\/e2e\/live\//.test(normalizePath(filename)) && !isE2eSpec(filename)
 
 /**
  * Matchers that assert a CALL happened rather than what came out of it.
@@ -136,7 +132,7 @@ export const noCallOnlySpec = {
 // -- TESTING-7 -------------------------------------------------------------------------------------
 
 const UNIT_TEST_BUCKET = /\/(?:src\/tests|tests?\/unit)(?:\/|$)/
-const HFS_TEST_CATEGORY = /\/src\/tests\/(?:integration|fixtures|harness|e2e)\//
+const HFS_TEST_CATEGORY = /\/src\/tests\/(?:fixtures|e2e)\//
 const SUBJECT_EXTENSIONS = [".ts", ".tsx", ".mts", ".cts", ".js", ".mjs", ".cjs"]
 
 /** A structural test in an HFS test category may test a source file beside it. */
@@ -219,7 +215,7 @@ const PROVIDER_PACKAGES = /^(?:@anthropic-ai\/|openai$|openai\/|ollama$|@google\
  */
 const HARNESS_MODEL_HELPERS = /helpers\/models(?:\.service)?$/
 
-/** An e2e never calls a model; the harness is the only lane that does. */
+/** An e2e never calls a model; only a live e2e (src/tests/e2e/live/) may reach a provider. */
 export const noModelCallInE2e = {
   meta: {
     type: "problem",
@@ -227,11 +223,12 @@ export const noModelCallInE2e = {
     schema: [],
     messages: {
       provider:
-        "`{{source}}` reaches a model provider from an e2e. A model call costs money, takes seconds and answers differently every time - so this makes the flow suite expensive, slow and flaky at once, and the assertion has to be loosened until it stops catching anything. Stub the model and assert what can actually break: the entitlement, the quota, the persisted answer. Judging the answer itself belongs in the harness.",
+        "`{{source}}` reaches a model provider from an e2e. A model call costs money, takes seconds and answers differently every time - so this makes the flow suite expensive, slow and flaky at once, and the assertion has to be loosened until it stops catching anything. Stub the model and assert what can actually break: the entitlement, the quota, the persisted answer. Judging the answer itself belongs in a live e2e under src/tests/e2e/live/.",
     },
   },
   create(context) {
-    if (!isE2eSpec(context.filename || context.getFilename())) return {}
+    const filename = context.filename || context.getFilename()
+    if (!isE2eSpec(filename) || isLiveE2eSpec(filename)) return {}
     return {
       ImportDeclaration(node) {
         const source = node.source && node.source.value
@@ -298,8 +295,8 @@ export const harnessCallsProviderDirectly = {
   },
   create(context) {
     const filename = context.filename || context.getFilename()
-    const harness = isHarnessSpec(filename)
-    const authScope = harness || isHarnessHelper(filename)
+    const harness = isLiveE2eSpec(filename)
+    const authScope = harness || isLiveE2eHelper(filename)
     if (!authScope) return {}
 
     let hasProviderImport = false

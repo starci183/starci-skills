@@ -13,7 +13,7 @@ never checks anything out there.
 
 `proofPlan(op,{changedFiles})` reads the operation's real changed files (from `changedFiles`, which comes from
 `git status --porcelain` filtered to the allowlist - never from `report.files`) and keeps the ones matching
-`/\.(spec|test|e2e-spec|container-spec)\.[cm]?[jt]sx?$/`. Then it keeps the declared checks that actually run
+`/\.(spec|test|e2e-spec)\.[cm]?[jt]sx?$/`. Then it keeps the declared checks that actually run
 one of those specs: the command names the path, or names the file, or the check's `scope` covers it.
 
 The plan is `mode:'fail-before'` only when `PROOF_POLICY` asks for the contrast for this operation kind

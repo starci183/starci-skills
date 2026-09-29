@@ -182,7 +182,7 @@ windowHours:24, grants:null}` in memory: the `runtimes.yaml` default policy and 
 ## Product test switches (`specs.unit`, `specs.e2e`)
 
 Owner ruling 2026-09-28: "speed up development; test later when asked". `specs.unit: false` switches off product
-unit/integration tests in workflows (jest, vitest, test:ci, coverage gates, Sonar coverage); `specs.e2e: false`
+unit tests in workflows (jest, vitest, test:ci, coverage gates, Sonar coverage); `specs.e2e: false`
 switches off product e2e tests (e2e.verify, Playwright and `*.e2e-spec.*` specs). uat.verify is neither: it is
 owner-deferred separately until credentials. Absent or true keeps the normal contract. The switches are read per
 call (`scripts/kernel/spec-deferral.mjs` `ownerSpecs`), so the route plan and a Kernel pick a flip up on the next

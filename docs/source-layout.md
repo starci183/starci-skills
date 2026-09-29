@@ -49,15 +49,15 @@ root Markdown drafts, package-manager drift and README links to private hosts. R
 ├── packages/<pkg>/                  # optional: real separately-built packages with explicit exports
 ├── scripts/                         # optional: repository tooling (*.mjs + colocated specs) only
 ├── docs/                            # optional: human docs
-├── e2e/                             # optional: repository-level Playwright specs (old uat/ moves here)
+├── e2e/                             # optional: repository-level Playwright *.e2e-spec.ts specs (old uat/ moves here)
 └── .editorconfig, .npmrc, .dockerignore, .nvmrc   # optional
 ```
 
 A **backend** repository additionally requires `src/` (the shared feature and
 module source roots - see [backend source pattern](backend-source-pattern.md)),
-`nest-cli.json`, `jest.config.js`, `.starciwork/`, `.starcistacks/` and
+`nest-cli.json`, `jest.config.js` (projects `unit` and `e2e`), `.starciwork/`, `.starcistacks/` and
 `.sops.yaml`. A **frontend** repository additionally allows `vitest.config.ts`,
-`vitest.setup.ts`, `turbo.json` and `playwright*.config.ts`, forbids a root
+`vitest.setup.ts`, `turbo.json` and one root `playwright.config.ts`, forbids a root
 `src/` (all product source lives under `apps/<app>/src`; see
 `knowledge/patterns/fe/folder.yaml`), and forbids `.starciwork/` and
 `.starcistacks/` and `.sops.yaml`.
@@ -88,7 +88,7 @@ apps/<app>/                          # frontend: one workspace package
 │   ├── domain/<capability>/         # business invariants and owned state
 │   ├── platform/<capability>/       # config, databases, logging, health, runtime facilities
 │   └── integrations/<provider>/     # external protocol clients, failure translation
-└── tests/{integration,fixtures,harness,e2e}/
+└── tests/{fixtures,e2e}/            # e2e/<area>/*.e2e-spec.ts, e2e/setup/, e2e/live/ (opt-in)
 ```
 
 Only the three module tiers exist - `bussiness`, `business`, `core`, `shared`,

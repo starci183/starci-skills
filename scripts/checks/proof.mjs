@@ -21,8 +21,8 @@ export const CANDIDATE_PROOF='starci/verify-proof@1';
 export const PROOF_VERDICTS=['pass','fail','inconclusive','unavailable'];
 /** What a proof is worth per operation kind. `fail-before` demands the contrast; `checks-only` accepts the re-run. */
 export const PROOF_POLICY={'backend.implement':'fail-before','interface.implement':'fail-before',default:'checks-only'};
-/** A spec/test file in any of the suites this runtime drives (unit, e2e, container). */
-export const SPEC_PATTERN=/\.(spec|test|e2e-spec|container-spec)\.[cm]?[jt]sx?$/;
+/** A spec/test file in any of the suites this runtime drives (unit, e2e). */
+export const SPEC_PATTERN=/\.(spec|test|e2e-spec)\.[cm]?[jt]sx?$/;
 export const PROOF_TIMEOUT_MS=20*60*1000;
 export const VERDICTS=['proven','weak','contradiction','checks-only'];
 

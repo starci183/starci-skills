@@ -28,7 +28,7 @@ import { normalizePath } from "./lib/path.mjs"
 /** The spec family and the test tree may build a deliberately wrong value on purpose. */
 const isTestFile = (filename) => {
   const file = normalizePath(filename)
-  return /\.(?:spec|test|e2e-spec|int-spec|harness-spec)\.ts$/.test(file) || file.includes("/src/tests/")
+  return /\.(?:spec|test|e2e-spec)\.ts$/.test(file) || file.includes("/src/tests/")
 }
 
 /** A parameter property (`private readonly x: T`) wraps the parameter it declares. */

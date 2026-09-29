@@ -91,7 +91,7 @@ const proof=project=>runAtBase({worktree:project.dir,baseHead:project.baseHead,o
   specs:['lib.spec.mjs'],commands,exec:clean,timeoutMs:120000});
 
 test('a spec path is recognized across the suites the runtime drives',()=>{
-  for(const file of ['lib.spec.mjs','src/app.test.ts','a/b.e2e-spec.ts','x.container-spec.js','c.spec.tsx','d.spec.cjs'])
+  for(const file of ['lib.spec.mjs','src/app.test.ts','a/b.e2e-spec.ts','x.e2e-spec.js','c.spec.tsx','d.spec.cjs'])
     assert.equal(isSpecPath(file),true,file);
   for(const file of ['lib.mjs','docs/spec.md','src/specify.ts','spec.ts'])assert.equal(isSpecPath(file),false,file);
 });

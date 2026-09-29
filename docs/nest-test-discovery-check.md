@@ -42,8 +42,8 @@ lane does not supply discovery evidence for the tests it omitted.
   precedence is unavailable coverage. Explicit `ts-jest` project overrides must
   agree with the selected compiler project; inline/disabled overrides are
   unavailable. This does not prove behavior of a custom resolver or transformer.
-- `NEST_TEST_DISCOVERY` compares authored `*.spec.*`, `*.test.*`, and lane forms
-  such as `*.container-spec.ts` against the union returned by actual Jest
+- `NEST_TEST_DISCOVERY` compares authored `*.spec.*`, `*.test.*`, and the e2e form
+  `*.e2e-spec.ts` against the union returned by actual Jest
   `--listTests`. It scans source/test roots, including nested `dist`-named folders;
   missing paths are findings. No count of specs proves that assertions are useful.
 - Pure `discoverNestMetadataInputs` resolves configuration inputs before running

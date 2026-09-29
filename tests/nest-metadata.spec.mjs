@@ -72,10 +72,10 @@ test('discovers config helper and inherited TypeScript inputs before execution',
 
 test('reports hidden specs even inside a nested directory named dist', t => {
   const f = fixture(t);
-  f.write('src/modules/dist/hidden.int-spec.ts', 'export {};');
+  f.write('src/modules/dist/hidden.e2e-spec.ts', 'export {};');
   const result = checkNestMetadata(f.input);
   assert.deepEqual(result.errors, []);
-  assert.ok(result.violations.some(item => item.ruleId === 'NEST_TEST_DISCOVERY' && item.relatedPath === 'src/modules/dist/hidden.int-spec.ts'));
+  assert.ok(result.violations.some(item => item.ruleId === 'NEST_TEST_DISCOVERY' && item.relatedPath === 'src/modules/dist/hidden.e2e-spec.ts'));
 });
 
 test('requires aliases to preserve fallback order and detects specific mock shadow', t => {

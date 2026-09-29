@@ -33,7 +33,7 @@ src/
     domain/<capability>/          # reusable business invariants and owned state
     platform/<capability>/        # configuration, database, logging, health, runtime facilities
     integrations/<provider>/     # external protocol/client, validation, failure translation
-  tests/{integration,fixtures,harness,e2e}/
+  tests/{fixtures,e2e}/            # e2e/<area>/*.e2e-spec.ts, e2e/setup/ (containers, boot), e2e/live/ (opt-in)
 ```
 
 Within a module use a narrow `index.ts`, `<name>.module.ts` when Nest registration is needed, meaningful services/policies/contracts, and colocated tests. An independently configurable module may add `<name>.module-definition.ts`. A pure TypeScript library does not need a Nest module. A database module can own `entities/` and `migrations/`; another persistence layout must still identify one connection, schema/migration owner, and transaction owner. Do not scatter schema ownership among feature transports.

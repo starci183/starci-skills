@@ -35,11 +35,11 @@ rules:
       README.md follows REPO-FOLDER-6. Optional on both: packages/ (only real separately-built packages with explicit exports),
       scripts/ (repository tooling only - *.mjs plus colocated specs; no product code, no agent
       output), docs/ (human docs; loose *.md beyond README.md move here or into .starciwork
-      records), e2e/ (repository-level Playwright specs; old uat/ folders move here),
+      records), e2e/ (repository-level Playwright *.e2e-spec.ts specs; old uat/ folders move here),
       .editorconfig, .npmrc, .dockerignore, .nvmrc. A backend repository additionally requires
-      src/ (the shared feature/module source roots), nest-cli.json, jest.config.js, .starciwork/,
+      src/ (the shared feature/module source roots), nest-cli.json, jest.config.js (projects unit and e2e), .starciwork/,
       .starcistacks/ and .sops.yaml. A frontend repository additionally allows vitest.config.ts,
-      vitest.setup.ts, turbo.json and playwright*.config.ts, and forbids src/ at the root
+      vitest.setup.ts, turbo.json and one root playwright.config.ts, and forbids src/ at the root
       (REPO-FOLDER-2). package.json declares npm workspaces ("workspaces": ["apps/*",
       "packages/*"]) whenever the repository holds more than one package. Never tracked
       (.gitignore must cover them): node_modules/, dist/, .next/, coverage/, .scannerwork/,
