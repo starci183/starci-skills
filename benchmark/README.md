@@ -27,7 +27,7 @@ benchmark/
   retrieval date. Never invent, estimate or recall a number.
 - **snapshots/** hold the raw `node scripts/agent/model-scorecard.mjs --json` shape, unchanged: repos, window,
   job count, duration sources, errors, and per pool x op kind the jobs, pass/fail/blocked rates, rework
-  and median duration. Qwen token counts are machine-wide. Snapshots are **append-only**. A snapshot is
+  and median duration. Snapshots are **append-only**. A snapshot is
   never edited, re-generated or deleted, even when it later proves misleading. The correction goes into a
   new snapshot or a findings note.
 - **findings/** hold the supervisor's written analysis of one snapshot: per-pool figures, same-kind
@@ -62,6 +62,6 @@ benchmark/
 A routing or profile change built on this evidence cites it in the changed file's comment and in its
 `modules/kernel/contract-changes/<id>.yaml` entry. Name the snapshot file, the findings note and the specific
 figure, for example:
-`benchmark/snapshots/2026-09-25-72h.json: backend.scaffold qwen 92% pass (36 jobs) vs devin 73% (45) vs codex 43% (23); benchmark/findings/2026-09-25.md`.
+`benchmark/snapshots/2026-09-25-72h.json: backend.scaffold devin 73% pass (45 jobs) vs codex 43% (23); benchmark/findings/2026-09-25.md`.
 A claim with no snapshot behind it is marked `INFERRED`, as the profiles already do. Public benchmark figures
 are cited only through `expectations.yaml` `publicBenchmarks` sources, never inline from memory.

@@ -11,7 +11,6 @@ files:
   agents:
     codex: ../../models/agents/codex.yaml
     claude: ../../models/agents/claude.yaml
-    qwen: ../../models/agents/qwen.yaml
     devin: ../../models/agents/devin.yaml
 purpose: |-
   Canonical Orca API call templates for StarCi orchestrated execution. These calls are the
@@ -86,7 +85,6 @@ operationAgent:
       - creates-canonical-operation-task-once-per-invocation
       - tries-only-the-allocated-candidate-or-walks-the-whole-resolved-chain-in-order
       - starts-fresh-native-agent-in-exact-workflow-worktree
-      - omits-model-for-native-qwen-code
       - proves-prompt-delivery-before-attestation
       - attests-effective-agent-model-and-worktree
       - canonicalizes-and-verifies-terminal-title
@@ -129,28 +127,6 @@ operationAgent:
   createTask:
     api: orchestration.task-create
     cli: 'orca orchestration task-create --run <run-id> --task-title "<concise-operation-title>" --display-name "[Op] <operation>" --spec "<one-operation-contract>" --json'
-  qwen:
-    agent: qwen
-    model: deepseek-v4.1-flash
-    modelAuthority: rendered-terminal-footer
-    launch: command-terminal
-    nestedAgents: forbidden
-    calls:
-      createTerminal:
-        api: terminal.create
-        cli: 'orca terminal create --worktree <exact-workflow-worktree-selector> --title "[Op] <operation> a<attempt> · <Workflow>" --command "<credential-refresh><declared-qwen-command>" --json'
-      awaitPrompt:
-        api: terminal.read
-        cli: 'orca terminal read --terminal <terminal-handle> --screen --json'
-      returnPreamble:
-        api: orchestration.dispatch
-        cli: 'orca orchestration dispatch --task <operation-task-id> --to <terminal-handle> --from <kernel-terminal> --run <workflow-run-id> --return-preamble --json'
-      submitPrompt:
-        api: terminal.send
-        cli: 'orca terminal send --terminal <terminal-handle> --text "<preamble>" --enter --json'
-      attestAssignee:
-        api: orchestration.dispatch-show
-        cli: 'orca orchestration dispatch-show --task <operation-task-id> --json'
   devin:
     agent: devin
     model: devin-agent

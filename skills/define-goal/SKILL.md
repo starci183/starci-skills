@@ -37,8 +37,8 @@ Executables: `.claude/scripts/goal/assess.mjs` (cold scan) ·
    repository owns the ledger. The two flags are mutually exclusive.
 2. **Extract routing bias** — read the owner prompt yourself and write
    `{prefer:[], avoid:[]}` from its intent (e.g. "prefer codex", "use claude",
-   "don't use qwen" → prefer/avoid those pools, in whatever language the owner
-   wrote it; aliases: codex/claude/qwen/devin → `<name>-agent`). Then
+   "don't use codex" → prefer/avoid those pools, in whatever language the owner
+   wrote it; aliases: codex/claude/devin → `<name>-agent`). Then
    normalize it through the canonicalizer (casing/aliases cleaned, `avoid`
    wins conflicts):
 

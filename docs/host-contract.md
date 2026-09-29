@@ -31,7 +31,7 @@ entry names a real, allowed command from `api.yaml`.
 The contract an op or kernel is spawned through is the **agent card**:
 `modules/models/agents/<agent>.yaml` (schema `starci/agent-card@1`) — the
 Orca adapter-card fields at top level plus an optional `capabilities:`
-key for agent-specific facts. Shipped cards: `devin`, `qwen`,
+key for agent-specific facts. Shipped cards: `devin`,
 `claude`, `codex`.
 
 The invariant: **no caller ever assembles an agent command by hand.**
@@ -49,11 +49,8 @@ model: devin-agent               # logical model label (never inferred)
 commandPrefix:                   # env prep + auth probe, per platform
   win32: '…'
   posix: 'command -v devin >/dev/null && env -u ACP_BACKEND devin models list … && '
-credentialRefresh: {win32: '…', posix: '…', secretsFile?: '.secrets/<file>.env'}   # optional card-owned credential step;
-                                 # <secrets-file> in a step is the runtime-root path of secretsFile (lib.mjs credentialRefreshCommand),
-                                 # read inside the terminal's shell so no secret value enters the command
 hostLaunchPrefix: {win32: '&', posix: 'command'}  # codex/claude: keep Orca's create on the runtime-owned PTY path
-hostIdentity: {env: {CLI_TITLE: '<label> - qwen-code'}}  # vars that let Orca name the agent in its tab (qwen: pane title);
+hostIdentity: {env: {<VAR>: '<label>'}}  # vars that let Orca name the agent in its tab;
                                  # <label> = the op job id, else the card agent (lib.mjs hostIdentityEnv)
 environmentStrip:                # vars removed INSIDE the terminal command
   - {name: ACP_BACKEND, reason: "…"}
@@ -119,7 +116,7 @@ called by `api dispatch`:
 
 ```text
 loadAdapter(provider)            → parse modules/models/agents/<agent>.yaml
-buildSpawnCommand(...)           → env + hostIdentity.env + credentialRefresh[plat] + commandPrefix[plat] + hostLaunchPrefix[plat]
+buildSpawnCommand(...)           → env + hostIdentity.env + commandPrefix[plat] + hostLaunchPrefix[plat]
                                    + command | commandRequirements
                                    (kernel → kernelCommandRequirements;
                                     native-managed → terminalFallback.command + bypassFlag)

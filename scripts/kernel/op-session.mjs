@@ -3,7 +3,7 @@
 // Host housekeeping ("per-op session release at settle", STORAGE-PROMPT item
 // 8): when `api settle` closes an op, that op's own agent session files move
 // to the session archive root right away instead of piling up under
-// ~/.claude/projects, the Codex session homes and ~/.qwen.
+// ~/.claude/projects and the Codex session homes.
 //
 // The dispatch record already identifies the agent — payload
 // provider/agent/model, the orca/managed agentTerminalHandle, the contract's
@@ -45,21 +45,17 @@ export const DEFAULT_SESSION_ARCHIVE_ROOT = 'D:/starci-archive';
 // The agent provider of a job payload — the same read api.mjs agentOfJob
 // makes, kept local so the module is usable without the api's bindings.
 export const sessionAgentOf = (payload) =>
-  /^(claude|codex|devin|qwen)/i.exec(String(payload?.provider ?? payload?.agent ?? payload?.model ?? payload?.route?.agent ?? ''))?.[1]?.toLowerCase()
+  /^(claude|codex|devin)/i.exec(String(payload?.provider ?? payload?.agent ?? payload?.model ?? payload?.route?.agent ?? ''))?.[1]?.toLowerCase()
   ?? (payload?.managed ? 'claude' : null);
 
-/** The project-dir slug an agent CLI derives from a cwd: every non-alphanumeric becomes '-'; Qwen lowercases it. */
-export const sessionProjectSlug = (cwd, { lower = false } = {}) => {
-  const slug = String(path.resolve(cwd)).replace(/[^A-Za-z0-9]/g, '-');
-  return lower ? slug.toLowerCase() : slug;
-};
+/** The project-dir slug an agent CLI derives from a cwd: every non-alphanumeric becomes '-'. */
+export const sessionProjectSlug = (cwd) => String(path.resolve(cwd)).replace(/[^A-Za-z0-9]/g, '-');
 
 /**
  * The session homes the runtime already knows, re-rooted the way
  * scripts/agent/trust.mjs trustTargets re-roots them for specs
  * (STARCI_AGENT_TRUST_HOME): claude <home>/.claude (or CLAUDE_CONFIG_DIR),
- * codex CODEX_HOME + <home>/.codex + Orca's codex-runtime-home, qwen
- * <home>/.qwen. Under NODE_TEST_CONTEXT without the re-root the lookup is
+ * codex CODEX_HOME + <home>/.codex + Orca's codex-runtime-home. Under NODE_TEST_CONTEXT without the re-root the lookup is
  * refused — a spec process never scans the owner's real sessions.
  */
 export function sessionHomes({ env = process.env, platform = process.platform, home = os.homedir() } = {}) {
@@ -76,17 +72,12 @@ export function sessionHomes({ env = process.env, platform = process.platform, h
   return {
     claude: !root && env.CLAUDE_CONFIG_DIR ? path.resolve(env.CLAUDE_CONFIG_DIR) : path.join(h, '.claude'),
     codex: codexHomes,
-    qwen: path.join(h, '.qwen'),
   };
 }
 
-/** Directories an agent's session files for `cwd` live under (claude and qwen key sessions by project dir). */
+/** Directories an agent's session files for `cwd` live under (claude keys sessions by project dir). */
 export function sessionDirsFor(agent, cwd, homes) {
   if (agent === 'claude') return [{ dir: path.join(homes.claude, 'projects', sessionProjectSlug(cwd)), match: (f) => f.endsWith('.jsonl') }];
-  if (agent === 'qwen') {
-    const slug = sessionProjectSlug(cwd, { lower: true });
-    return ['projects', 'tmp'].map((base) => ({ dir: path.join(homes.qwen, base, slug, 'chats'), match: (f) => f.endsWith('.jsonl') }));
-  }
   return [];
 }
 
@@ -240,11 +231,6 @@ export async function releaseSettledSession({ db, job, payload, repo, env = proc
   // The identity observe already learned stands too (session files are stable once created).
   for (const f of Array.isArray(payload?.session?.files) ? payload.session.files : [])
     if (f?.matched && typeof f.file === 'string') { try { if (fs.existsSync(f.file)) attributed.add(f.file); } catch { /* gone */ } }
-  // A qwen chat's sidecar travels with its session file.
-  for (const file of [...attributed]) {
-    const sidecar = file.replace(/\.jsonl$/i, '.runtime.json');
-    if (agent === 'qwen' && sidecar !== file && !attributed.has(sidecar) && fs.existsSync(sidecar)) attributed.add(sidecar);
-  }
   const files = [...attributed];
   if (!files.length) return skip(identity.files.length ? 'unattributed-session' : 'no-session-file', { cwds: identity.cwds, candidates: identity.files.length });
   const root = env.STARCI_SESSION_ARCHIVE_ROOT ?? archiveRoot ?? DEFAULT_SESSION_ARCHIVE_ROOT;

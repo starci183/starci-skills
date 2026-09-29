@@ -32,7 +32,7 @@ const SCAN_EXT = /\.(mjs|yaml)$/;
 const SKIP_FILES = new Set([CATALOG_FILE, 'scripts/checks/failure-codes.mjs']);
 
 /** UPPER_SNAKE literals that are not codes: environment variables, Node/SQLite error names, settings and key names. */
-const NOT_CODE_PREFIX = /^(ORCA|NODE|CODEX|CLAUDE|OPENAI|DASHSCOPE|BAILIAN|CLOUDFLARE|TELEGRAM|SONAR|ANTHROPIC|GITHUB|GIT|DEVIN|QWEN|LOCALAPPDATA|APPDATA|USERPROFILE|HTTP|SQLITE|ERR)_/;
+const NOT_CODE_PREFIX = /^(ORCA|NODE|CODEX|CLAUDE|OPENAI|CLOUDFLARE|TELEGRAM|SONAR|ANTHROPIC|GITHUB|GIT|DEVIN|LOCALAPPDATA|APPDATA|USERPROFILE|HTTP|SQLITE|ERR)_/;
 const NOT_CODES_FILE = 'scripts/checks/failure-codes.not-codes';
 const readNotCodes = (base) => new Set(fs.readFileSync(path.join(base, NOT_CODES_FILE), 'utf8').split(/\r?\n/).filter((l) => l.trim() && !l.startsWith('#')).map((l) => l.split(/\t/)[0].trim()));
 

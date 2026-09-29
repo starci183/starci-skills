@@ -4,7 +4,7 @@ import { jobPayloadOf, jobRowOf } from '../api-lib/rows.mjs';
 import { sendEnterWithProof, sendWakeWithProof, deliveryFieldsOf } from '../wake-delivery.mjs';
 import { answerAllowlistedGate } from '../../agent/lib.mjs';
 import { probeDraft } from '../clear-draft.mjs';
-import { draftOwnership, ghostSuggestionOf } from '../terminal-liveness.mjs';
+import { draftOwnership } from '../terminal-liveness.mjs';
 
 export default {
   verb: 'nudge',
@@ -168,7 +168,7 @@ export default {
   // painted placeholder nor the runtime's own (a staged paste marker, the dispatched contract, or
   // this same wake left staged) is foreign input: appending the wake would submit words this job
   // never wrote - the Supervisor's ruling on inc-f1d014518dc3, where 'continue to cut 6' sat in a
-  // Qwen worker's input row at its session-turn limit. Nothing is typed.
+  // worker's input row at its session-turn limit. Nothing is typed.
   // The frame the observation already read: the foreign-input check judges the same screen and
   // draft the liveness classification did, not a second read that could have moved on (L-6).
   const nudgeFrame = typeof worker.screen === 'string' ? worker.screen : null;
@@ -194,11 +194,7 @@ export default {
     }
   }
   const inputText = nudgeFrame == null ? null : workerInputRowText(nudgeFrame);
-  // A card-declared ghost suggestion (Qwen Code paints a model-written follow-up in the empty input
-  // row after a turn, "* settle op-..."; modules/models/agents/qwen.yaml liveness.ghostSuggestion) is
-  // not typed input: the wake is typed over it.
-  const ghost = nudgeFrame == null ? null : ghostSuggestionOf(nudgeFrame, stagedEvidence.provider);
-  if (inputText && inputText !== ghost && !INPUT_ROW_PLACEHOLDER.test(inputText) && !runtimeOwnedInput(inputText, stagedEvidence, prompt)) {
+  if (inputText && !INPUT_ROW_PLACEHOLDER.test(inputText) && !runtimeOwnedInput(inputText, stagedEvidence, prompt)) {
     const out = { ok: false, jobId, nudged: false, reason: 'foreign-input', input: inputText.slice(0, 200), worker };
     emit(out, `nudge REFUSED for ${jobId}: foreign-input — the input row holds '${inputText.length > 80 ? `${inputText.slice(0, 80)}…` : inputText}' that is neither a staged paste nor the runtime's own delivered text; the wake was not typed, no event is appended`, args.json);
     process.exit(1);

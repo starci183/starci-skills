@@ -54,7 +54,7 @@ seats:
 # idleWaitMs bounds the wait for the turn to end before the ring. sameTurnSlackMs: two readings of the spinner timer
 # whose implied turn starts differ by less than this are the same turn.
 turnBudget:
-  interruptKeys: {claude: [esc], codex: [esc], qwen: [esc], devin: [esc, esc]}
+  interruptKeys: {claude: [esc], codex: [esc], devin: [esc, esc]}
   idleWaitMs: 20000
   sameTurnSlackMs: 180000
   probeTimeoutMs: 60000

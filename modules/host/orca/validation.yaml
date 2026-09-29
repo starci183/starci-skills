@@ -21,13 +21,6 @@ receipts:
     - agent-terminal-handle
     - worktree-id
     - parent-worktree-id
-  qwenAdditional:
-    - one-terminal-created-per-attempt-with-declared-command
-    - rendered-input-prompt-before-dispatch
-    - dispatch-return-preamble-context
-    - submission-verified-on-screen
-    - dispatch-show-assignee-equals-created-terminal
-    - rendered-model-deepseek-v4.1-flash
   devinAdditional:
     - explicit-positive-workflow-slot
     - stored-cli-auth-proven-by-read-only-model-inventory-before-launch

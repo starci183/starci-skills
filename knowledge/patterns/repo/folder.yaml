@@ -144,7 +144,7 @@ rules:
       code (`__generated__/`, Nest schema.gql) produced by `codegen`. External, meaning they must not exist in the working
       tree at all, are: tool caches (.eslintcache, .turbo, .scannerwork, .jest-cache, .cache, .tools), which the canon presets
       redirect to %LOCALAPPDATA%/StarCi/cache/<repo>/<tool>/; worktrees (.worktrees, worktrees), which live under
-      D:/starci-lanes/<project>/<lane>/; agent output (report*.json, *.tmp.json, %*% names, nul, .qwen*, .artifacts, .tmp-*,
+      D:/starci-lanes/<project>/<lane>/; agent output (report*.json, *.tmp.json, %*% names, nul, .artifacts, .tmp-*,
       *-lint.json, design-plans/, draw rounds, UAT captures), which lives in the scratchpad or the blob store and is cited by
       `{name, sha256}`; and plaintext secrets (.env*, .secrets/, *.pem, runtime/files/*). An entry that is ignored but must be
       external is still a finding.

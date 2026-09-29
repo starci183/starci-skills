@@ -6,12 +6,11 @@ import {spawnSync} from 'node:child_process';
 import {parseYaml} from '../engine/yaml.mjs';
 import {FAKE_ORCA} from './helpers/fake-orca.mjs';
 import {withLedger,seedWorkflow} from './_ledger-fixture.mjs';
-import {classifyAgentScreen,ghostSuggestionOf,cardLivenessPatterns} from '../scripts/kernel/terminal-liveness.mjs';
+import {classifyAgentScreen,cardLivenessPatterns} from '../scripts/kernel/terminal-liveness.mjs';
 
-// "job qwen xong/treo cũng không ai nhắn" (owner, 2026-09-25). Five defects, one spec each:
+// "job xong/treo cũng không ai nhắn" (owner, 2026-09-25). Four defects, one spec each:
 //  A. busy frames read turn-idle: a wrapped Devin spinner block, Claude's effort row under its spinner
 //     (mia inc-1b82f657a6a8, inc-fcd1c1c10d8a; nivo inc-266976b75b25) - the patterns live on the cards;
-//  B. a finished Qwen frame read active-unclassified, and its ghost suggestion was foreign input;
 //  C. one long bounded command read wedged (nivo inc-d8f08b77ca8b);
 //  D. a DONE worker stayed leased with its terminal open through a whole typed peer-wait
 //     (nivo op-integration.verify-25532858e7 under peer-wait inc-8cce1cf1b330);
@@ -33,12 +32,7 @@ const DEVIN_DONE=[' The dispatch is settled; returning to idle.','────�
   'SWE-2 Max                             Context: 35k / 262k tokens (13%)','4 shells · ↓ select'].join('\n');
 const CLAUDE_CHROME=['──────────────────────────────────────────────────────────────────────','❯ ',
   '──────────────────────────────────────────────────────────────────────','  ⏵⏵ bypass permissions on (shift+tab to cycle)'];
-const QWEN_RULE='──────────────────────────────────────────────────────────────────────';
-const QWEN_FOOT=['  ➜ nivo-backend · git:(main) · deepseek-v4.1-flash (Token Plan','  Singapore) · 1.0m Context 26.6% used',
-  '  YOLO mode (tab to cycle) · 2 tasks done','  26.6% used'];
-const QWEN_DONE=['    Nothing further to do — the dispatch is closed: report filed','    (done), node-local evidence committed at head 010a320d, and the',
-  '     single worker_done already sent.',QWEN_RULE,'* settle op-integration.verify-25532858e7',QWEN_RULE,...QWEN_FOOT].join('\n');
-const QWEN_IDLE=['  ◆︎ Report filed.',QWEN_RULE,'*   Type your message or @path/to/file',QWEN_RULE,...QWEN_FOOT].join('\n');
+const CODEX_DONE=['  Nothing further to do — the dispatch is closed: report filed (done) and the single worker_done already sent.','','› ','  gpt-6-sol high · 62% left'].join('\n');
 const SONAR=[' ● Read shell 65471a',' │ Timeout: 4m40s',' └ No output yet (still running)',
   '⠋ Running tools · 45m 3s (esc twice to interrupt)',...DEVIN_FOOT].join('\n');
 
@@ -69,21 +63,6 @@ test('A: a Claude spinner above its effort row and an empty ❯ input is active 
   // The effort row is chrome, not an answer: a finished answer below the spinner still ends the turn.
   assert.equal(classifyAgentScreen(['* Galloping… (8s · ↓ 288 tokens)','● Report filed with outcome done.','◐ medium · /effort',...CLAUDE_CHROME].join('\n')).state,'turn-idle');
   assert.equal(classifyAgentScreen(['✻ Cogitated for 15s · done 12:15 AM',...CLAUDE_CHROME].join('\n')).state,'turn-idle');
-});
-
-/* ------------------------------------------------------------------ B */
-test('B: a finished Qwen frame reads turn-idle, and its card-declared ghost suggestion is not typed input', () => {
-  const qwen=card('qwen').liveness;
-  assert.ok(qwen.inputRow?.pattern && qwen.ghostSuggestion,'the card declares its input row and its ghost suggestion');
-  assert.equal(classifyAgentScreen(QWEN_DONE).state,'turn-idle','was unknown, so active-unclassified while the footer redrew');
-  assert.equal(classifyAgentScreen(QWEN_IDLE).state,'turn-idle','the empty input box too');
-  assert.equal(ghostSuggestionOf(QWEN_DONE,'qwen'),'settle op-integration.verify-25532858e7');
-  assert.equal(ghostSuggestionOf(QWEN_IDLE,'qwen'),null,'the placeholder is no suggestion');
-  assert.equal(ghostSuggestionOf(QWEN_DONE,'codex'),null,'only a card that declares it has a ghost');
-  // A Qwen spinner above the box is a running turn.
-  assert.equal(classifyAgentScreen(['⠏ Considering the options… (esc to cancel, 1m 3s)',QWEN_RULE,'*   Type your message or @path/to/file',QWEN_RULE,...QWEN_FOOT].join('\n')).state,'active');
-  // A bullet in the transcript is not the input row: only a row framed by rules is.
-  assert.equal(classifyAgentScreen(['* a markdown bullet','  more prose'].join('\n')).state,'unknown');
 });
 
 /* ------------------------------------------------------------------ C */
@@ -138,21 +117,6 @@ const world=(t,fn,{screen,provider,dispatchedAgo=HOUR}={})=>withLedger(t,({root,
 });
 const status=run=>{const r=run('status','--workflow',WF);assert.equal(r.status,0,r.stderr||r.stdout);return out(r);};
 
-test('B: a finished Qwen worker with a ghost suggestion is nudge-ready and the wake is typed over the suggestion',t=>world(t,({run,orcaState})=>{
-  const s=status(run);
-  assert.equal(s.workers[0].liveness,'turn-idle','not active-unclassified');
-  assert.deepEqual(s.frontier.nudgeReadyJobs,[JOB]);
-  const nudge=out(run('nudge','--job',JOB));
-  assert.notEqual(nudge?.reason,'foreign-input',JSON.stringify(nudge));
-  assert.ok(orcaState().sends>=1,'the wake was typed (the stub never repaints, so its delivery stays unproven here)');
-},{screen:QWEN_DONE,provider:'qwen'}));
-
-test('B: the same input row on a card with no ghost suggestion stays foreign input',t=>world(t,({run,orcaState})=>{
-  const r=run('nudge','--job',JOB);
-  assert.equal(out(r)?.reason,'foreign-input',r.stdout);
-  assert.equal(orcaState().sends??0,0,'nothing typed');
-},{screen:QWEN_DONE.replace('* settle','› settle'),provider:'codex'}));
-
 test('C: a worker polling one long bounded scan reads active; the frontier is engaged, not actionable',t=>world(t,({run})=>{
   const s=status(run);
   assert.equal(s.workers[0].liveness,'active');
@@ -201,7 +165,7 @@ test('D: a done worker held by a peer-wait is released - terminal closed, lease 
   assert.deepEqual([orcaState().quits.length,orcaState().closed.length],[quits,closed],'nothing is quit or closed again');
   const proof=out(run('reconcile','--job',JOB,'--release-worker'));
   assert.deepEqual([proof.ok,proof.alreadyReleased],[true,true],'the release proof accepts an already-released worker');
-},{screen:QWEN_DONE,provider:'qwen'}));
+},{screen:CODEX_DONE,provider:'codex'}));
 
 test('D: --release-worker refuses a running job no wait holds, and a job whose report is not consumed',t=>world(t,({run,job,orcaState})=>{
   const r=run('reconcile','--job',JOB,'--release-worker');
@@ -209,7 +173,7 @@ test('D: --release-worker refuses a running job no wait holds, and a job whose r
   assert.match(r.stdout+r.stderr,/release-worker-not-settled/);
   assert.equal(job().status,'running');
   assert.equal((orcaState().quits??[]).length,0);
-},{screen:QWEN_DONE,provider:'qwen'}));
+},{screen:CODEX_DONE,provider:'codex'}));
 
 test('E: /status lists each held settle per workflow: done, waiting on <peer workflow>/<job>, with its age', async (t) => {
   const {workflowProgress,progressMessages,settleHoldsOf}=await import('../scripts/supervisor/progress-report.mjs');

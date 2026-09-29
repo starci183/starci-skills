@@ -151,17 +151,17 @@ test('api: dispatch takes the canonical lease, a prefixed spelling of the same c
   });
   const leases=jobId=>{const l=inspectLedger({file:ledgerFileFor(be)});try{return l.db.prepare('SELECT resource_key FROM leases WHERE job_id=?').all(jobId).map(r=>r.resource_key);}finally{l.close();}};
 
-  const first=api('dispatch','--job','modules-vi','--model','qwen-agent','--spawn');
+  const first=api('dispatch','--job','modules-vi','--model','devin-agent','--spawn');
   assert.equal(first.r.status,0,first.r.stderr||first.r.stdout);
   assert.deepEqual(leases('modules-vi'),[`path:repository:fe/${VI}`],'the lease is taken repository-qualified');
 
-  const second=api('dispatch','--job','debt-messages','--model','qwen-agent','--spawn');
+  const second=api('dispatch','--job','debt-messages','--model','devin-agent','--spawn');
   assert.notEqual(second.r.status,0,'the prefixed spelling of the same catalog is fenced');
   assert.equal(second.body?.reason,'path-lease',second.r.stdout);
   assert.equal(second.body.holders[0].jobId,'modules-vi');
   assert.deepEqual(leases('debt-messages'),[]);
 
-  const third=api('dispatch','--job','be-vi','--model','qwen-agent','--spawn');
+  const third=api('dispatch','--job','be-vi','--model','devin-agent','--spawn');
   assert.equal(third.r.status,0,`the owner repository's own apps/app/src/messages/vi.json is another file: ${third.r.stderr||third.r.stdout}`);
   assert.deepEqual(leases('be-vi'),[`path:repository:be/${VI}`]);
 });

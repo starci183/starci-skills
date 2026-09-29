@@ -140,7 +140,7 @@ export default {
     ? (() => { try { return auditAuthorOf(db, job, { runtimes: rtDoc }); } catch { return null; } })()
     : null;
   // A cut slice of a fan-out (payload.cut, ordinal of total >= 2) is small bounded work: hands-on slices walk
-  // the fan-out order (runtimes.yaml allocation.preference.scaffold, Qwen first; owner decision 2026-09-25).
+  // the fan-out order (runtimes.yaml allocation.preference.scaffold, Devin first; owner decision 2026-09-25).
   const fanOut = isFanOutSlice(payload);
   // A redesign leg (api redesign; runtimes.yaml allocation.redesign) routes as its strong-reasoning alias, so the op
   // that re-cuts, re-scopes or re-plans from an RCA reasons on the plan/think pools whatever its usual order.

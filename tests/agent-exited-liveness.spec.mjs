@@ -30,14 +30,13 @@ const DEAD_CODEX=['','• Ran node \'D:\\Repositories\\starci-academy-backend\\.
   '    }•ng1 runing · /ps to view · /stop to close ng g •g g     W W · Running hook W W Wo Wo Wo','',
   '    }Wo Wo Wor6 Wor Wor or Work Work Work Worki WorkiWorkiWorki · Running hookWokiWorkinWorkin•Workinorkingorking',
   'PS D:\\Repositories\\mia-mia-backend>'].join('\n');
-// Captured 2026-09-24 from a live Qwen op (nivo-backend) running a shell tool, with the PowerShell rows a
-// shell tool prints in the transcript; the frame still ends in Qwen's own input box and footer.
-const LIVE_QWEN=['  ✓ Shell cd /d D:\\Repositories\\nivo-backend && npm test -- --runInBand src/modules/integrations/mail/',
+// A live Devin op running a shell tool, with the PowerShell rows a shell tool prints in the transcript; the frame
+// still ends in Devin's own input box and footer.
+const LIVE_DEVIN=['  ✓ Shell cd /d D:\\Repositories\\nivo-backend && npm test -- --runInBand src/modules/integrations/mail/',
   '    PS D:\\Repositories\\nivo-backend> npm test','    PS D:\\Repositories\\nivo-backend>',
-  '  ⠙ Following the white rabbit... (12m 48s · ↑ 78k tokens · esc to cancel)','─'.repeat(40),
-  '*   Type your message or @path/to/file','─'.repeat(40),
-  '  ➜ nivo-backend · git:(main) · deepseek-v4.1-flash (Token Plan Singapore) · 1.0m Context 18.6% used',
-  '  Enter to steer · Ctrl+Q to queue · YOLO mode (tab to cycle) · 1 task done'].join('\n');
+  '⠙ Running tools · 12m 48s (esc twice to interrupt)','─'.repeat(40),
+  '❭ Guide Devin while it works','─'.repeat(40),
+  'SWE-2 Max                             Context: 35k / 262k tokens (13%)'].join('\n');
 // Captured 2026-09-24 from a Claude Kernel (term_1a4f3026) at rest, plus a Bash tool row that printed a prompt.
 const IDLE_CLAUDE=['● Bash(pwsh -c "Get-Location")','  ⎿  PS D:\\Repositories\\nivo-backend>',
   '✻ Sautéed for 19s · done 3:12 AM','─'.repeat(40),'❯','─'.repeat(40),'  ⏵⏵ bypass permissions on (shift+tab to cycle) · ← for agents'].join('\n');
@@ -49,9 +48,9 @@ test('only a frame that ends in a bare shell prompt is agent-exited',()=>{
   assert.equal(exitedAgentPromptRow(DEAD_CODEX),'PS D:\\Repositories\\mia-mia-backend>');
   // The classifier alone calls it unknown, which api liveness turned into live-idle - and nudge typed into it.
   assert.equal(classifyAgentScreen(DEAD_CODEX).state,'unknown');
-  for(const frame of [LIVE_QWEN,IDLE_CLAUDE,IDLE_CODEX]) assert.equal(exitedAgentPromptRow(frame),null,frame.split('\n').at(-1));
+  for(const frame of [LIVE_DEVIN,IDLE_CLAUDE,IDLE_CODEX]) assert.equal(exitedAgentPromptRow(frame),null,frame.split('\n').at(-1));
   // A launch still starting shows the command after the prompt: not an exit.
-  assert.equal(exitedAgentPromptRow('PS D:\\x> qwen --yolo --model deepseek-v4.1-flash'),null);
+  assert.equal(exitedAgentPromptRow('PS D:\\x> devin --model swe-2-max --permission-mode dangerous'),null);
   for(const prompt of ['PS D:\\Repositories\\x>','PS C:\\>','D:\\Repositories\\x>','$','Hi@DESKTOP MINGW64 /d/x (main)\n$ ',
     'user@host:~/repo$','user@host ~ %','bash-5.2$','(venv) user@host:~/x$','root@box:/#'])
     assert.ok(exitedAgentPromptRow(`some output\n${prompt}\n\n`),prompt);
@@ -188,7 +187,7 @@ test('nivo 03:56: a Codex frame frozen at Working with a shell prompt under its 
   // So is one whose line sets the launch env first (agents/claude.yaml launchEnv).
   assert.equal(exitedAgentPromptRow([...NIVO_TRANSCRIPT,`${NIVO_PS} $env:DISABLE_AUTOUPDATER='1'; & claude --model 'claude-opus-5-5' --dangerously-skip-permissions`].join('\n')),null);
   assert.equal(exitedAgentPromptRow([...NIVO_TRANSCRIPT,`${NIVO_PS} $env:DISABLE_AUTOUPDATER='1'; Get-ChildItem`].join('\n')),`${NIVO_PS} $env:DISABLE_AUTOUPDATER='1'; Get-ChildItem`,'an env statement alone is no launch');
-  for(const frame of [LIVE_QWEN,IDLE_CLAUDE,IDLE_CODEX,NIVO_FROZEN]) assert.equal(exitedAgentPromptRow(frame),null);
+  for(const frame of [LIVE_DEVIN,IDLE_CLAUDE,IDLE_CODEX,NIVO_FROZEN]) assert.equal(exitedAgentPromptRow(frame),null);
   assert.equal(shellPromptPrefix('PS D:\\Repositories\\nivo-backend> Operation liveness'),NIVO_PS);
   assert.equal(shellPromptPrefix('  └ PS D:\\x> git status'),null,'a transcript row is not the shell');
 });

@@ -121,8 +121,6 @@ $defs:
               agent: {type: string, minLength: 1}
               startup:
                 enum: [direct-native-worker-start]
-              modelAuthority:
-                enum: [verified-qwen-runtime-configuration]
               supervision:
                 enum: [worker-start-agent]
           - type: object

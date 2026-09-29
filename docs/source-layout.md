@@ -139,7 +139,7 @@ Storage states. Ignored (may exist, must be gitignored): `node_modules/`,
 `schema.gql`). External (must not exist in the working tree): tool caches
 (redirected to `%LOCALAPPDATA%/StarCi/cache/<repo>/<tool>/` by the canon
 presets), worktrees (`D:/starci-lanes/<project>/<lane>/`), agent output
-(reports, logs, `nul`, `.qwen*`, `.artifacts`, draw rounds, UAT captures: the
+(reports, logs, `nul`, `.artifacts`, draw rounds, UAT captures: the
 scratchpad or the blob store, cited by `{name, sha256}`) and plaintext secrets
 (`.env*`, `.secrets/`, `*.pem`, `runtime/files/*`). Anything else at the root
 moves to its owner: infrastructure, compose, docker and env templates plus

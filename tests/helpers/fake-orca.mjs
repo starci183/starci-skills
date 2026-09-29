@@ -10,14 +10,11 @@
 // started operation-worker agent/model).
 //
 // Env knobs:
-//   STARCI_FAKE_ORCA_MODE  'healthy' (default): terminal read shows the qwen
-//                          prompt, worker-start returns a ready dispatch.
+//   STARCI_FAKE_ORCA_MODE  'healthy' (default): terminal read shows the
+//                          agent prompt, worker-start returns a ready dispatch.
 //                          'auth': terminal read shows the observed
 //                          '401 Invalid API-key' death screen and
 //                          worker-start fails at stage 'auth'.
-//                          'quota': terminal read shows Qwen Code's rendered
-//                          plan-quota error row ("[API Error: 429
-//                          Throttling.AllocationQuota ...]") under its prompt.
 //                          'auth-partial': worker-start reports an auth failure
 //                          plus a residual Dispatch that cleanup can settle.
 //                          'auth-unknown': worker-start reports outcome_unknown;
@@ -97,10 +94,8 @@
 //                          terminals[h].gateKeys and never count as a prompt.
 //   STARCI_FAKE_ORCA_GATE_STICKY='1' the gate ignores every key (it persists).
 //   A spec may also seed terminals[h].gate = {kind, cursor, cleared:false} (and gateKeys: [])
-//                          on a running terminal: 'qwen-loop' is Qwen Code's boxed
-//                          loop-detection menu, whose accept option is
-//                          '2. Disable loop detection for this session'. Once cleared
-//                          the terminal shows terminals[h].screen again.
+//                          on a running terminal. Once cleared the terminal shows
+//                          terminals[h].screen again.
 //
 //   STARCI_FAKE_ORCA_BOOT_SCREEN 'claude-hint': a Claude terminal, until its first
 //                          prompt send, shows Claude Code 2.1's fresh frame whose
@@ -177,11 +172,6 @@ const menuGates = {
     ['1. Yes, continue', '2. No, quit'], 0, '  Press enter to continue', '›'],
   'claude-onboarding': ["Let's get started.\n\nChoose the text style that looks best with your terminal\nTo change this later, run /theme\n",
     ['1. Dark mode ✔', '2. Light mode'], 0, '', '❯'],
-  // Qwen Code 0.24.5 LoopDetectionConfirmation, drawn in a round box (boxed: every row behind a rail).
-  'qwen-loop': ['?  A potential loop was detected\n\nThis can happen due to repetitive tool calls or other model behavior. Do you want to keep\nloop detection enabled or disable it for this session?\n',
-    ['1. Keep loop detection enabled (esc)', '2. Disable loop detection for this session'], 1,
-    'Note: Setting "model.skipLoopDetection" to true in your settings.json disables only the heuristic loop\nchecks for future sessions; the always-on guards (consecutive identical tool calls, repeated shell\ninspection commands, and the per-turn tool-call cap) are not affected by it. The cap is tunable via\n"model.maxToolCallsPerTurn" (0 disables it). Disabling for this session above suppresses everything.',
-    '›', true],
 };
 const menuGate = process.env.STARCI_FAKE_ORCA_GATE_SCREEN || '';
 const menuSticky = process.env.STARCI_FAKE_ORCA_GATE_STICKY === '1';
@@ -208,14 +198,13 @@ const uniqueTerminals = process.env.STARCI_FAKE_ORCA_UNIQUE_TERMINALS === '1';
 const closeFails = new Set((process.env.STARCI_FAKE_ORCA_CLOSE_FAILS || '').split(',').map(s => s.trim()).filter(Boolean));
 const record = handle => (state.terminals || {})[handle] || null;
 const renderedModel = handle => effectiveModelOverride || record(handle)?.model || state.terminalModel || 'gpt-6-sol';
-const isQwen = handle => /(?:^|\s)qwen(?:\.exe)?(?:\s|$)/i.test(String(record(handle)?.command ?? state.terminalCommand ?? ''));
-const PROMPT = h => (isQwen(h) ? 'Qwen\nmodel: ' + renderedModel(h) + '\nType your message\n> ' : 'Codex\nmodel: ' + renderedModel(h) + '\nEnter a prompt\n> ');
-const DEAD = h => (isQwen(h) ? 'Qwen\nmodel: ' + renderedModel(h) + '\nType your message' : 'Codex\nmodel: ' + renderedModel(h) + '\nEnter a prompt') + '\n\nERROR 401 Invalid API-key — key rejected upstream\n';
-const QUOTA = h => 'Qwen\nmodel: ' + renderedModel(h) + '\n✕ [API Error: 429 Throttling.AllocationQuota: Allocated quota exceeded, please increase your quota limit.]\nType your message\n> ';
-const LIVE = h => (isQwen(h) ? 'Qwen' : 'Codex') + '\nmodel: ' + renderedModel(h) + '\nThinking hard\nesc to interrupt\ntokens 96\n';
+const isDevin = handle => /(?:^|\s)devin(?:\.exe)?(?:\s|$)/i.test(String(record(handle)?.command ?? state.terminalCommand ?? ''));
+const PROMPT = h => (isDevin(h) ? 'Devin\nmodel: ' + renderedModel(h) + '\nAsk Devin to build features...\n> ' : 'Codex\nmodel: ' + renderedModel(h) + '\nEnter a prompt\n> ');
+const DEAD = h => (isDevin(h) ? 'Devin\nmodel: ' + renderedModel(h) + '\nAsk Devin to build features...' : 'Codex\nmodel: ' + renderedModel(h) + '\nEnter a prompt') + '\n\nERROR 401 Invalid API-key — key rejected upstream\n';
+const LIVE = h => (isDevin(h) ? 'Devin' : 'Codex') + '\nmodel: ' + renderedModel(h) + '\nThinking hard\nesc to interrupt\ntokens 96\n';
 // A spec may mark one terminal record dead; mode 'dead-terminal' kills them all.
 const isDead = handle => mode === 'dead-terminal' || record(handle)?.connected === false;
-const commandProvider = handle => (String(record(handle)?.command ?? state.terminalCommand ?? '').match(/(?:^|[\s"'\\/])(claude|codex|qwen|devin)(?:\.exe|\.cmd)?(?=[\s"']|$)/i)?.[1] ?? '').toLowerCase();
+const commandProvider = handle => (String(record(handle)?.command ?? state.terminalCommand ?? '').match(/(?:^|[\s"'\\/])(claude|codex|devin)(?:\.exe|\.cmd)?(?=[\s"']|$)/i)?.[1] ?? '').toLowerCase();
 const gatedProviderOf = handle => { const p = commandProvider(handle); return p && gatedProviders.has(p) && gateScreens[p] ? p : null; };
 const hasSent = handle => { const r = record(handle); return r ? !!r.sent : state.sends > 0; };
 const createTimeout = process.env.STARCI_FAKE_ORCA_CREATE_TIMEOUT || '';
@@ -318,7 +307,7 @@ else if (verb === 'terminal read')
   isDead(arg('terminal'))
     ? fail({ ok: false, error: { code: 'terminal_gone', message: 'terminal is not connected' } })
     : out({ ok: true, result: { terminal: { handle: arg('terminal'), connected: true, writable: true,
-      screen: mode === 'auth' ? DEAD(arg('terminal')) : mode === 'quota' ? QUOTA(arg('terminal')) : (record(arg('terminal'))?.staged ? STAGED(arg('terminal'))
+      screen: mode === 'auth' ? DEAD(arg('terminal')) : (record(arg('terminal'))?.staged ? STAGED(arg('terminal'))
         : (hasSent(arg('terminal')) ? LIVE(arg('terminal')) : PROMPT(arg('terminal')))) } } });
 // STARCI_FAKE_ORCA_OLD_HOST: a CLI that lists --wait-submit in front of a host without prompt receipts
 // refuses it before any input.
@@ -637,7 +626,7 @@ else if (verb === 'account list') {
   //   result.rateLimits.<provider> = {status, weekly:{usedPercent,...}, error,
   //   usageMetadata:{failureKind}} — 'unavailable' / missing-credentials → dead.
   const rateLimits = {};
-  for (const p of ['claude', 'codex', 'qwen', 'devin'])
+  for (const p of ['claude', 'codex', 'devin'])
     rateLimits[p] = deadProviders.has(p)
       ? { status: 'unavailable', error: 'not authenticated',
           weekly: { usedPercent: null, windowMinutes: null, resetsAt: null },

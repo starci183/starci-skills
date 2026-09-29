@@ -44,8 +44,8 @@ export const VERIFY_MS = 6000;
 export const VERIFY_INTERVAL_MS = 500;
 export const SELF_CLOSE_DELAY_MS = 2500;
 const RUNTIME_SCRIPT = /[\\/](?:scripts[\\/](?:supervisor|kernel|lib|api|work|route|agent)|engine)[\\/][\w.-]+\.mjs/i;
-const AGENT_IMAGE = /^(?:codex|claude|devin|qwen)(?:\.exe)?$/i;
-const AGENT_NODE_CLI = /(?:@openai[\\/]codex|@anthropic-ai[\\/]claude-code|qwen-code|[\\/]codex(?:\.js)?\s|[\\/]claude(?:\.js)?\s)/i;
+const AGENT_IMAGE = /^(?:codex|claude|devin)(?:\.exe)?$/i;
+const AGENT_NODE_CLI = /(?:@openai[\\/]codex|@anthropic-ai[\\/]claude-code|[\\/]codex(?:\.js)?\s|[\\/]claude(?:\.js)?\s)/i;
 /** An agent CLI process (the image, or node running the CLI), never a runtime script. Pure. */
 export const isAgentProcess = (p) => !RUNTIME_SCRIPT.test(String(p?.cmd ?? ''))
   && (AGENT_IMAGE.test(String(p?.name ?? '')) || (/^node(?:\.exe)?$/i.test(String(p?.name ?? '')) && AGENT_NODE_CLI.test(String(p?.cmd ?? ''))));

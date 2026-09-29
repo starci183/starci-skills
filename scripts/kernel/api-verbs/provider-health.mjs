@@ -6,9 +6,7 @@ import { credentialRotated } from '../../agent/credential-fingerprint.mjs';
 
 const quotaProbeDue = (circuit, now, everyMs) => {
   const last = Number(circuit?.quotaProbe?.at) || 0;
-  const resetAt = Number(circuit?.resetAt) || 0;
   if (!last) return { due: true, why: 'first-probe' };
-  if (resetAt && now >= resetAt && last < resetAt) return { due: true, why: 'after-reset' };
   if (now - last >= everyMs) return { due: true, why: 'interval' };
   return { due: false, why: 'throttled', nextAt: last + everyMs };
 };
@@ -26,7 +24,7 @@ const refuseProviderRecover = (out, human) => {
   process.exit(1);
 };
 async function quotaProbe(ledger, args, emit, internals) {
-  const { normalizeProviderId, providerHealthOf, quotaResetAtOf } = internals;
+  const { normalizeProviderId, providerHealthOf } = internals;
   const db = ledger.db, now = Date.now();
   const providers = args.provider ? [normalizeProviderId(args.provider)] : quotaProbeProviders();
   const { probeProviderQuota } = await import('../../agent/credential-probe.mjs');
@@ -46,8 +44,7 @@ async function quotaProbe(ledger, args, emit, internals) {
     const workflowId = args.workflow
       ?? (circuit.jobId ? db.prepare('SELECT workflow_id FROM jobs WHERE job_id=?').get(circuit.jobId)?.workflow_id : null) ?? null;
     const previous = { status: circuit.status, failureKind: circuit.failureKind, jobId: circuit.jobId ?? null, step: circuit.step ?? null,
-      signal: circuit.signal ?? null, detail: circuit.detail ?? null, observedAt: circuit.observedAt ?? null, expiresAt: circuit.expiresAt ?? null,
-      resetAt: circuit.resetAt ?? null };
+      signal: circuit.signal ?? null, detail: circuit.detail ?? null, observedAt: circuit.observedAt ?? null, expiresAt: circuit.expiresAt ?? null };
     const { at: _at, expiresAt: _exp, ...stored } = circuit;
     ledger.transaction(() => {
       if (probe.ok) {
@@ -58,11 +55,9 @@ async function quotaProbe(ledger, args, emit, internals) {
           payload: { provider: key, reason: 'quota probe passed', probe: summary, previous } });
         return;
       }
-      // Still spent past the recorded reset: the plan did not come back, hold it to the next reset.
-      const rolled = probe.state === 'quota-exhausted' && circuit.resetAt && now >= Number(circuit.resetAt)
-        ? quotaResetAtOf(key, now) : null;
-      const expiresAt = rolled ? rolled + spec.probe.everyMs : circuit.expiresAt;
-      writeProviderCircuit(key, { value: { ...stored, quotaProbe: summary, ...(rolled ? { resetAt: rolled } : {}) }, expiresAt: expiresAt ?? null });
+      // Still spent: the circuit keeps its own expiry.
+      const expiresAt = circuit.expiresAt;
+      writeProviderCircuit(key, { value: { ...stored, quotaProbe: summary }, expiresAt: expiresAt ?? null });
       if (workflowId) ledger.appendEvent({ workflowId, entityType: 'provider', entityId: key, kind: 'provider-quota-probe-failed',
         payload: { provider: key, probe: summary, circuitUntil: expiresAt ?? null } });
     });

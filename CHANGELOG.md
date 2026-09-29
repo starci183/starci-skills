@@ -7,6 +7,7 @@ All notable changes to StarCi are documented here. The project is pre-publicatio
 
 ## [1.0.0-alpha.4] — in preparation
 
+- The Qwen provider is removed entirely (owner ruling 2026-09-29): its agent card, pool (`qwen-agent`), profiles (`qwen-agent`, `qwen3.8-max`, `deepseek-v4-pro`), quota probe (`scripts/api/quota/qwen.mjs`), the `quota` config key (Qwen was its only member), the Orca host recipe, the loop-detection gate, the input-row/ghost-suggestion card fields, the Qwen token adapter and session sweep, and the base-pool line of the supervisor status block. Only claude, codex and devin remain; `agent: qwen`, `qwen-agent` in `config.yaml` is refused with "Qwen đã bị gỡ; dùng claude, codex hoặc devin". No backward compatibility. Contract entry `provider-qwen-removed`; deleted paths are in `modules/kernel/retired-paths.yaml`.
 - The op evidence directory is `evidence/` (was `E/`): op manifests, the shared op prompt, schemas, docs and every consumer (artifact subkind, write families, agent-data boundary, verify-failure, context pack, api proof segments) use only `evidence/`; the `E/` form is removed with no legacy fallback (contract change `evidence-dir`).
 - The comeback concept is removed: `scripts/supervisor/comeback.mjs` is deleted and listed in
   `modules/kernel/retired-paths.yaml`; `COMEBACK_HINT` and every comeback pointer are gone from

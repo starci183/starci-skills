@@ -2,7 +2,7 @@
 // from its own lineage (scripts/kernel/lineage-route.mjs).
 //
 // Live defect (starci-next wf-sn-foundation, owner decision 2026-09-25): the Kernel routed
-// op-interface.implement-c3bcc0d5e4 with --avoid qwen-agent,devin-agent; route-decided carried the avoid
+// op-interface.implement-c3bcc0d5e4 with --avoid devin-agent,devin-agent; route-decided carried the avoid
 // and the job went to codex gpt-6-luna, defeating the evidence routing that sends implementation to Devin
 // first. Now a Kernel's per-route bias is ignored with a warning and recorded as biasIgnored; the router
 // skips pools with an open provider-health circuit, demotes a pool the retry's lineage failed on once for a
@@ -106,12 +106,12 @@ const openCircuit = (repo, provider, failureKind = 'auth') => {
 test('a Kernel --avoid/--prefer is ignored with a warning and recorded as biasIgnored; the job goes to Devin', (t) => {
   const repo = tmp(t, 'starci-route-ignored-');
   seedWorkflow(repo);
-  const r = route(t, repo, ['--avoid', 'qwen-agent,devin-agent', '--prefer', 'codex-agent']);
+  const r = route(t, repo, ['--avoid', 'devin-agent,devin-agent', '--prefer', 'codex-agent']);
   assert.equal(r.decision.model, 'devin-agent', 'implementation routes to Devin first, whatever the Kernel asked');
   assert.deepEqual(r.bias, { prefer: [], avoid: [] }, 'no Kernel bias is applied');
-  assert.match(r.stderr, /api route WARNING: --prefer codex-agent --avoid qwen-agent,devin-agent ignored: kernel per-route bias is not accepted/);
+  assert.match(r.stderr, /api route WARNING: --prefer codex-agent --avoid devin-agent,devin-agent ignored: kernel per-route bias is not accepted/);
   const ev = routeDecided(repo);
-  assert.deepEqual([ev.biasIgnored.prefer, ev.biasIgnored.avoid], [['codex-agent'], ['qwen-agent', 'devin-agent']]);
+  assert.deepEqual([ev.biasIgnored.prefer, ev.biasIgnored.avoid], [['codex-agent'], ['devin-agent', 'devin-agent']]);
   assert.match(ev.biasIgnored.reason, /the router decides/);
   assert.equal(ev.model, 'devin-agent');
   assert.equal(ev.lineageAdjust, undefined, 'a first attempt has no lineage');
@@ -210,7 +210,7 @@ test('product or environment failures never move a pool', (t) => {
 test('attempt causes: model-quality fails count, a failed report or a first red check does not', (t) => {
   const repo = tmp(t, 'starci-route-causes-');
   seedWorkflow(repo, { prior: [
-    { pool: 'qwen-agent', result: { verdict: 'fail' }, outcome: 'partial', red: ['typecheck'] },
+    { pool: 'devin-agent', result: { verdict: 'fail' }, outcome: 'partial', red: ['typecheck'] },
     { pool: 'devin-agent', result: { verdict: 'fail' }, outcome: 'partial', red: ['typecheck', 'e2e'] },
   ] });
   read(repo, (l) => {
@@ -239,8 +239,8 @@ test('attempt causes: model-quality fails count, a failed report or a first red 
 test('the goal routing_bias (the owner\'s) is always honoured', (t) => {
   const repo = tmp(t, 'starci-route-goal-');
   seedWorkflow(repo, { goalBias: { prefer: [], avoid: ['devin-agent'] } });
-  const r = route(t, repo, ['--avoid', 'qwen-agent']);
+  const r = route(t, repo, ['--avoid', 'devin-agent']);
   assert.notEqual(r.decision.model, 'devin-agent');
   assert.deepEqual(r.bias.avoid, ['devin-agent'], 'the owner\'s avoid applies; the Kernel\'s does not');
-  assert.deepEqual(routeDecided(repo).biasIgnored.avoid, ['qwen-agent']);
+  assert.deepEqual(routeDecided(repo).biasIgnored.avoid, ['devin-agent']);
 });

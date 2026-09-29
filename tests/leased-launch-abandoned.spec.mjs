@@ -42,7 +42,7 @@ const fixture=(t,{deadline,launchTerminal=null})=>{
       {jobId:`kernel-${workflowId}`,kind:'kernel',role:'kernel',status:'running',workerId:'fake-kernel-terminal',
         payload:{hierarchy:{schema:'starci/agent-hierarchy@1',nodeId:`agent:kernel:${workflowId}`,parentNodeId:`workflow:${workflowId}`,role:'kernel'}}},
       {jobId,opId:'code.refactor',status:launchTerminal?'leased':'ready',leaseToken:'tok-killed',
-        payload:{opId:'code.refactor',owned_paths:['docs/'],model:'qwen-agent',difficulty:'medium'}}]});
+        payload:{opId:'code.refactor',owned_paths:['docs/'],model:'devin-agent',difficulty:'medium'}}]});
     // What the killed dispatch left: leased (ready→leased is the lease transition), its path lease
     // taken, no worker, no terminal, no contract.
     const at=Date.now()-40*60000;
@@ -116,7 +116,7 @@ test('spawnAgent hands the caller the terminal handle before it waits on the lau
   const r=spawnSync(process.execPath,['--input-type=module','-e',`
     import {spawnAgent} from ${JSON.stringify(new URL('../scripts/agent/lib.mjs',import.meta.url).href)};
     const seen=[];
-    const out=spawnAgent({provider:'qwen',worktree:${JSON.stringify(root)},title:'t',dispatchId:'j1',onCreated:(h)=>seen.push(h)});
+    const out=spawnAgent({provider:'devin',worktree:${JSON.stringify(root)},title:'t',dispatchId:'j1',onCreated:(h)=>seen.push(h)});
     console.log(JSON.stringify({seen,ok:out.ok,step:out.step,terminal:out.terminal}));`],
     {cwd:ROOT,encoding:'utf8',windowsHide:true,timeout:180000,env:{...process.env,STARCI_ORCA_COMMAND:process.execPath,STARCI_ORCA_ARGS:JSON.stringify([stub]),
       STARCI_FAKE_ORCA_LOG:path.join(root,'calls.jsonl'),STARCI_FAKE_ORCA_STATE:path.join(root,'state.json'),STARCI_FAKE_ORCA_MODE:'auth'}});

@@ -802,7 +802,7 @@ Bỏ hẳn `gpt-6-astra`, Claude Fable (pool `claude-fable`, `fable-astra`), m�
 | Claude Opus 5.5 | `claude-opus-5-5` | $4 / $20 | platform.claude.com models overview; 1M ctx, 128K out, adaptive thinking luôn bật, effort mặc định API `medium` |
 
 Codex pool: easy/medium `gpt-6-luna`, hard/insane `gpt-6-sol`. Claude pool mọi tier
-`claude-opus-5-5`. Devin, qwen giữ nguyên. Catalog không lưu giá. Lane N làm, kèm danh sách key
+`claude-opus-5-5`. Devin giữ nguyên. Catalog không lưu giá. Lane N làm, kèm danh sách key
 trong `config.yaml` local của thầy cần đổi.
 
 ## supervisor night log 2026-09-23
@@ -878,7 +878,7 @@ WSPV `wf-nivo-workspace-provision-mub1hxxt`.
 - 05:20 Lane Q (routing theo độ khó của phiên fork) xanh nhưng HOÃN merge tới sáng: nó đổi route của mọi op
   cho hai kernel đang chạy; việc suy nghĩ sẽ thử claude-agent trước, mà Claude Code trên máy chưa xong
   onboarding (probe quota vẫn báo ok, không thấy màn onboarding) → mỗi dispatch think bị readiness từ
-  chối, nghỉ 5 phút, rồi vẫn sang codex; implement medium chuyển sang qwen3.8-flash giữa các vòng sửa
+  chối, nghỉ 5 phút, rồi vẫn sang codex; implement medium chuyển sang pool khác giữa các vòng sửa
   audit. Sáng: thầy xong onboarding Claude Code → merge lane Q (trial merge chỉ conflict
   tests/config.spec.mjs) → thầy quyết pin kernel.
 

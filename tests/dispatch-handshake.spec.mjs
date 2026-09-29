@@ -97,8 +97,8 @@ test('healthy stub: dispatch --spawn attests and marks the job running',t=>{
   assert.equal(create?.[create.indexOf('--title')+1],'[Op] Chỉnh sửa mã nguồn · docs · wf-dispatch',
     'a command terminal is a flat sidebar row: it carries the semantic name at creation, not the provider auto-summary');
   const command=create?.[create.indexOf('--command')+1]??'';
-  assert.match(command,/--yolo\b/,'the real API dispatch path must inject Qwen yolo into the profile command');
-  assert.match(command,/--exclude-tools agent\b/,'the real API dispatch path must preserve the nested-agent exclusion');
+  assert.match(command,/--permission-mode dangerous/,'the real API dispatch path must inject the Devin bypass mode into the profile command');
+  assert.match(command,/--model swe-2-max/,'the real API dispatch path must pin the profile model');
 });
 
 // The 401 screen still carries the readiness pattern (the TUI renders its

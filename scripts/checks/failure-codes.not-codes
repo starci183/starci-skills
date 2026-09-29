@@ -6,7 +6,6 @@ ASSET_PROMPT_ATTR	HTML attribute name constant
 ASSET_SHA_ATTR	HTML attribute name constant
 ASSET_SLOT_ATTR	HTML attribute name constant
 BAND_TOKEN_NAMES	export name of a token table in the grammar knowledge
-BASE_POOL	constant naming the base runtime pool
 BASE_VIEW_ENV	environment variable name
 BLOCK_FOLDED	YAML scalar type name, not an error code
 BLOCK_LITERAL	YAML scalar type name, not an error code

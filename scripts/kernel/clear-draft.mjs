@@ -5,7 +5,7 @@
 // leaves it out of the frame (scripts/api/orca/lib.mjs draftText). Anything typed next is appended to
 // that text: on the nivo collab Kernel (2026-09-25) a dropped Enter left a wake in the box and each
 // later wake piled onto it. Ctrl+U deletes one input row back to its start in the Claude, Codex and
-// Qwen TUIs, so a multi-row draft needs several; the draft is re-read after each and the helper stops
+// Devin TUIs, so a multi-row draft needs several; the draft is re-read after each and the helper stops
 // the moment it reads empty, after `attempts` Ctrl+U at most.
 //
 // A draft can also be STALE on Orca's side. Orca blanks the input row of every screen read that

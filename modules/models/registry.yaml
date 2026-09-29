@@ -2,14 +2,10 @@ schema: starci/profile-registry@1
 runtimes:
   - codex
   - claude
-  - qwen
   - devin
 aliases:
   openai: codex
   anthropic: claude
-  qwencloud: qwen
-  alibaba: qwen
-  deepseek: qwen
   cognition: devin
 executionModel:
   # Two agent levels, one host. A chat submits the goal and then monitors; it is
@@ -31,7 +27,7 @@ executionModel:
 orchestration:
   runtime: orca
   owner: source-host
-  defaultOperationTarget: qwen-agent
+  defaultOperationTarget: devin-agent
   workspaceRouting: .workspaces/projects/<project>/work.json
   # Owner ruling: the only owner gates are the entry skills' exact-`ok`
   # (define-goal, start-kernel) plus settle-time evidence verdicts — there is no
@@ -48,9 +44,6 @@ defaults:
   claude:
     working: opus
     reasoning: opus-reviewer
-  qwen:
-    working: deepseek-v4.1-flash-worker
-    reasoning: deepseek-v4.1-flash-reviewer
   devin:
     working: devin-worker
     reasoning: devin-reviewer
@@ -101,43 +94,6 @@ targets:
     orcaLaunch:
       kind: managed-agent
       agent: claude
-  qwen-agent:
-    runtime: qwen
-    requestedModel: deepseek-v4.1-flash
-    profiles:
-      working: deepseek-v4.1-flash-worker
-      reasoning: deepseek-v4.1-flash-reviewer
-    orcaLaunch:
-      kind: command-terminal
-      command: qwen --model deepseek-v4.1-flash --yolo --exclude-tools agent --max-wall-time 90m --max-tool-calls 600 --chat-recording false
-      reasoningCommand: qwen --model deepseek-v4.1-flash --yolo --exclude-tools agent --max-wall-time 90m --max-tool-calls 600 --chat-recording false
-      dispatch: return-preamble-and-send
-      adapter: qwen
-      nestedAgents: forbidden
-  qwen3.8-max:
-    runtime: qwen
-    requestedModel: qwen3.8-max
-    profiles:
-      working: qwen3.8-max-worker
-      reasoning: qwen3.8-max-reviewer
-    orcaLaunch:
-      kind: command-terminal
-      command: qwen --model qwen3.8-max --yolo --exclude-tools agent --max-wall-time 90m --max-tool-calls 600 --chat-recording false
-      dispatch: return-preamble-and-send
-      adapter: qwen
-      nestedAgents: forbidden
-  deepseek-v4-pro:
-    runtime: qwen
-    requestedModel: deepseek-v4-pro
-    profiles:
-      working: deepseek-v4-pro-worker
-      reasoning: deepseek-v4-pro-reviewer
-    orcaLaunch:
-      kind: command-terminal
-      command: qwen --model deepseek-v4-pro --yolo --exclude-tools agent --max-wall-time 90m --max-tool-calls 600 --chat-recording false
-      dispatch: return-preamble-and-send
-      adapter: qwen
-      nestedAgents: forbidden
   devin-agent:
     runtime: devin
     requestedModel: swe-2-max
@@ -154,14 +110,8 @@ targets:
       nestedAgents: forbidden
       capacityGate: explicit-workflow-quota
 targetAliases:
-  qwen-deepseek-v4.1-flash-worker: qwen-agent
-  qwen-deepseek-v4.1-flash-reviewer: qwen-agent
   codex-gpt-6-sol: codex-agent
   codex-gpt-6-luna: codex-agent
-  qwen-qwen3.8-max-worker: qwen3.8-max
-  qwen-qwen3.8-max-reviewer: qwen3.8-max
-  qwen-deepseek-v4-pro-worker: deepseek-v4-pro
-  qwen-deepseek-v4-pro-reviewer: deepseek-v4-pro
   devin-devin-worker: devin-agent
   devin-devin-reviewer: devin-agent
   # Bare model ids that are not targets resolve to the provider-window pool that carries them, so workflow
@@ -169,13 +119,11 @@ targetAliases:
   # names the window.
   claude-opus: claude-agent
   claude-opus-5-5: claude-agent
-  deepseek-v4.1-flash: qwen-agent
 skills:
   starci:
     chains:
       working:
         - devin-agent
-        - qwen-agent
         - codex-agent
         - claude-agent
       reasoning:
@@ -184,13 +132,13 @@ skills:
 # An operator whose kind runtimes.yaml roleOfKind marks think work with no declared order carries the
 # think order of runtimes.yaml allocation.preference.think (Opus, then Sol) and nothing else;
 # scripts/route/route-model.mjs refuses any other pool for it. A kind's declared order wins: owner routing
-# 2026-09-26 gives the ui order (Codex, then Devin and Qwen) to interface.audit, e2e.verify,
-# security.verify and uat.assisted.verify, the implement order (Devin, Qwen, Codex, Opus) to the
+# 2026-09-26 gives the ui order (Codex, then Devin) to interface.audit, e2e.verify,
+# security.verify and uat.assisted.verify, the implement order (Devin, Codex, Opus) to the
 # mechanical ops provision.ask, workspace.manage, task.execute and knowledge.repair, and sol-think (Sol,
 # Opus overflow) to the kernel's own model calls, which carry no operator entry. Owner decision 2026-09-25
 # (72h scripts/agent/model-scorecard.mjs evidence):
-# hands-on implementation chains lead with Devin then Qwen; scaffold, docs, content and grammar chains (the
-# roleOfKind order scaffold) lead with Qwen; the image-tool chains are Codex alone.
+# hands-on implementation chains lead with Devin; scaffold, docs, content and grammar chains (the
+# roleOfKind order scaffold) lead with Devin; the image-tool chains are Codex alone.
 operators:
   architecture.decide:
     skill: starci
@@ -200,10 +148,9 @@ operators:
       - {environment: codex, profiles: [codex-agent]}
   backend.implement:
     skill: starci
-    chain: [devin-agent, qwen-agent, codex-agent, claude-agent]
+    chain: [devin-agent, codex-agent, claude-agent]
     environments:
       - {environment: devin, profiles: [devin-agent]}
-      - {environment: qwen, profiles: [qwen-agent]}
       - {environment: codex, profiles: [codex-agent]}
       - {environment: claude, profiles: [claude-agent]}
   brand.decide:
@@ -225,9 +172,8 @@ operators:
   docs.author:
     skill: starci
     # Authoring reference docs is write-role work over the record tree: the full writing chain.
-    chain: [qwen-agent, devin-agent, codex-agent, claude-agent]
+    chain: [devin-agent, codex-agent, claude-agent]
     environments:
-      - {environment: qwen, profiles: [qwen-agent]}
       - {environment: devin, profiles: [devin-agent]}
       - {environment: codex, profiles: [codex-agent]}
       - {environment: claude, profiles: [claude-agent]}
@@ -235,10 +181,9 @@ operators:
     skill: starci
     # Asking for a provision is naming it exactly and waiting: a mechanical op the hands take — the
     # implement order (owner routing 2026-09-26).
-    chain: [devin-agent, qwen-agent, codex-agent, claude-agent]
+    chain: [devin-agent, codex-agent, claude-agent]
     environments:
       - {environment: devin, profiles: [devin-agent]}
-      - {environment: qwen, profiles: [qwen-agent]}
       - {environment: codex, profiles: [codex-agent]}
       - {environment: claude, profiles: [claude-agent]}
   business.decide:
@@ -249,47 +194,42 @@ operators:
       - {environment: codex, profiles: [codex-agent]}
   content.generate:
     skill: starci
-    chain: [qwen-agent, devin-agent, codex-agent, claude-agent]
+    chain: [devin-agent, codex-agent, claude-agent]
     environments:
-      - {environment: qwen, profiles: [qwen-agent]}
       - {environment: devin, profiles: [devin-agent]}
       - {environment: codex, profiles: [codex-agent]}
       - {environment: claude, profiles: [claude-agent]}
   code.refactor:
     skill: starci
     # Restructuring code under a behaviour invariant is implementation work: the full coding chain.
-    chain: [devin-agent, qwen-agent, codex-agent, claude-agent]
+    chain: [devin-agent, codex-agent, claude-agent]
     environments:
       - {environment: devin, profiles: [devin-agent]}
-      - {environment: qwen, profiles: [qwen-agent]}
       - {environment: codex, profiles: [codex-agent]}
       - {environment: claude, profiles: [claude-agent]}
   e2e.verify:
     skill: starci
     # End-to-end proof is UI verification: the ui order, Sol first with the hands as fallback
     # (owner routing 2026-09-26).
-    chain: [codex-agent, devin-agent, qwen-agent]
+    chain: [codex-agent, devin-agent]
     environments:
       - {environment: codex, profiles: [codex-agent]}
       - {environment: devin, profiles: [devin-agent]}
-      - {environment: qwen, profiles: [qwen-agent]}
   integration.verify:
     skill: starci
     # A live call to a real provider is the same kind of work as the API proof: run code, read the response
     # back, keep the output. Its hard floor starts the chain at Devin.
-    chain: [devin-agent, qwen-agent, claude-agent, codex-agent]
+    chain: [devin-agent, claude-agent, codex-agent]
     environments:
       - {environment: devin, profiles: [devin-agent]}
-      - {environment: qwen, profiles: [qwen-agent]}
       - {environment: claude, profiles: [claude-agent]}
       - {environment: codex, profiles: [codex-agent]}
   grammar.update:
     skill: starci
     # Growing the installed grammar is code, stories, tests, a published version and a canon entry: hands-on
-    # work at a hard floor on the scaffold order, Qwen first (owner decision 2026-09-25).
-    chain: [qwen-agent, devin-agent, codex-agent, claude-agent]
+    # work at a hard floor on the scaffold order, Devin first (owner decision 2026-09-25).
+    chain: [devin-agent, codex-agent, claude-agent]
     environments:
-      - {environment: qwen, profiles: [qwen-agent]}
       - {environment: devin, profiles: [devin-agent]}
       - {environment: codex, profiles: [codex-agent]}
       - {environment: claude, profiles: [claude-agent]}
@@ -318,55 +258,49 @@ operators:
       - {environment: codex, profiles: [codex-agent]}
   interface.implement:
     skill: starci
-    chain: [devin-agent, qwen-agent, codex-agent, claude-agent]
+    chain: [devin-agent, codex-agent, claude-agent]
     environments:
       - {environment: devin, profiles: [devin-agent]}
-      - {environment: qwen, profiles: [qwen-agent]}
       - {environment: codex, profiles: [codex-agent]}
       - {environment: claude, profiles: [claude-agent]}
   interface.audit:
     skill: starci
     # Visual/Grammar conformance is an independent verdict about quality: the ui order, Sol first
     # (owner routing 2026-09-26). Its browser-dom host tool (route.riskHints) admits only a pool
-    # whose agent card lists it (capabilities.hostTools): Devin and Codex; Qwen is passed over.
-    chain: [codex-agent, devin-agent, qwen-agent]
+    # whose agent card lists it (capabilities.hostTools): Devin and Codex; Claude is passed over.
+    chain: [codex-agent, devin-agent]
     environments:
       - {environment: codex, profiles: [codex-agent]}
       - {environment: devin, profiles: [devin-agent]}
-      - {environment: qwen, profiles: [qwen-agent]}
   knowledge.repair:
     skill: starci
     # Repairing a canonical rule file is a mechanical op: the implement order (owner routing 2026-09-26).
-    chain: [devin-agent, qwen-agent, codex-agent, claude-agent]
+    chain: [devin-agent, codex-agent, claude-agent]
     environments:
       - {environment: devin, profiles: [devin-agent]}
-      - {environment: qwen, profiles: [qwen-agent]}
       - {environment: codex, profiles: [codex-agent]}
       - {environment: claude, profiles: [claude-agent]}
   unit.verify:
     skill: starci
     # Running the whole unit suite is mechanical, hands-on verify work: the same chain as the performance run.
-    chain: [devin-agent, qwen-agent, claude-agent, codex-agent]
+    chain: [devin-agent, claude-agent, codex-agent]
     environments:
       - {environment: devin, profiles: [devin-agent]}
-      - {environment: qwen, profiles: [qwen-agent]}
       - {environment: claude, profiles: [claude-agent]}
       - {environment: codex, profiles: [codex-agent]}
   perf.verify:
     skill: starci
     # Measuring a performance budget runs the product and reads numbers back: the hands-on verify chain.
-    chain: [devin-agent, qwen-agent, claude-agent, codex-agent]
+    chain: [devin-agent, claude-agent, codex-agent]
     environments:
       - {environment: devin, profiles: [devin-agent]}
-      - {environment: qwen, profiles: [qwen-agent]}
       - {environment: claude, profiles: [claude-agent]}
       - {environment: codex, profiles: [codex-agent]}
   release.deliver:
     skill: starci
-    chain: [devin-agent, qwen-agent, codex-agent, claude-agent]
+    chain: [devin-agent, codex-agent, claude-agent]
     environments:
       - {environment: devin, profiles: [devin-agent]}
-      - {environment: qwen, profiles: [qwen-agent]}
       - {environment: codex, profiles: [codex-agent]}
       - {environment: claude, profiles: [claude-agent]}
   request.analyze:
@@ -378,36 +312,32 @@ operators:
       - {environment: codex, profiles: [codex-agent]}
   review.verify:
     skill: starci
-    chain: [devin-agent, qwen-agent, claude-agent, codex-agent]
+    chain: [devin-agent, claude-agent, codex-agent]
     environments:
       - {environment: devin, profiles: [devin-agent]}
-      - {environment: qwen, profiles: [qwen-agent]}
       - {environment: claude, profiles: [claude-agent]}
       - {environment: codex, profiles: [codex-agent]}
   handover.review:
     skill: starci
     # Writing the owner's handover is judging what was delivered and what was not proven: a verdict the hands
     # give (owner decision 2026-09-25 review-hands), Opus and Sol as overflow.
-    chain: [devin-agent, qwen-agent, claude-agent, codex-agent]
+    chain: [devin-agent, claude-agent, codex-agent]
     environments:
       - {environment: devin, profiles: [devin-agent]}
-      - {environment: qwen, profiles: [qwen-agent]}
       - {environment: claude, profiles: [claude-agent]}
       - {environment: codex, profiles: [codex-agent]}
   runtime.operate:
     skill: starci
-    chain: [devin-agent, qwen-agent, codex-agent, claude-agent]
+    chain: [devin-agent, codex-agent, claude-agent]
     environments:
       - {environment: devin, profiles: [devin-agent]}
-      - {environment: qwen, profiles: [qwen-agent]}
       - {environment: codex, profiles: [codex-agent]}
       - {environment: claude, profiles: [claude-agent]}
   scope.finish:
     skill: starci
-    chain: [devin-agent, qwen-agent, codex-agent, claude-agent]
+    chain: [devin-agent, codex-agent, claude-agent]
     environments:
       - {environment: devin, profiles: [devin-agent]}
-      - {environment: qwen, profiles: [qwen-agent]}
       - {environment: codex, profiles: [codex-agent]}
       - {environment: claude, profiles: [claude-agent]}
   scope.define:
@@ -421,75 +351,67 @@ operators:
     skill: starci
     # Auditing code against the security baseline is a verdict about quality: the ui order, Sol first
     # (owner routing 2026-09-26).
-    chain: [codex-agent, devin-agent, qwen-agent]
+    chain: [codex-agent, devin-agent]
     environments:
       - {environment: codex, profiles: [codex-agent]}
       - {environment: devin, profiles: [devin-agent]}
-      - {environment: qwen, profiles: [qwen-agent]}
   task.execute:
     skill: starci
     # A bounded, evidence-grounded workflow selection is a mechanical op: the implement order
     # (owner routing 2026-09-26).
-    chain: [devin-agent, qwen-agent, codex-agent, claude-agent]
+    chain: [devin-agent, codex-agent, claude-agent]
     environments:
       - {environment: devin, profiles: [devin-agent]}
-      - {environment: qwen, profiles: [qwen-agent]}
       - {environment: codex, profiles: [codex-agent]}
       - {environment: claude, profiles: [claude-agent]}
   test.author:
     skill: starci
     # Authoring the regression check a behaviour-invariant change is measured against is implementation work:
     # the full coding chain.
-    chain: [devin-agent, qwen-agent, codex-agent, claude-agent]
+    chain: [devin-agent, codex-agent, claude-agent]
     environments:
       - {environment: devin, profiles: [devin-agent]}
-      - {environment: qwen, profiles: [qwen-agent]}
       - {environment: codex, profiles: [codex-agent]}
       - {environment: claude, profiles: [claude-agent]}
   uat.verify:
     skill: starci
-    chain: [devin-agent, qwen-agent, claude-agent, codex-agent]
+    chain: [devin-agent, claude-agent, codex-agent]
     environments:
       - {environment: devin, profiles: [devin-agent]}
-      - {environment: qwen, profiles: [qwen-agent]}
       - {environment: claude, profiles: [claude-agent]}
       - {environment: codex, profiles: [codex-agent]}
   uat.assisted.prepare:
     skill: starci
     # Preparation authors deterministic scripts/evidence but performs no product journey.
-    chain: [devin-agent, qwen-agent, codex-agent, claude-agent]
+    chain: [devin-agent, codex-agent, claude-agent]
     environments:
       - {environment: devin, profiles: [devin-agent]}
-      - {environment: qwen, profiles: [qwen-agent]}
       - {environment: codex, profiles: [codex-agent]}
       - {environment: claude, profiles: [claude-agent]}
   uat.assisted.verify:
     skill: starci
     # Receipt acceptance is an elevated verdict over evidence: the ui order, Sol first
     # (owner routing 2026-09-26).
-    chain: [codex-agent, devin-agent, qwen-agent]
+    chain: [codex-agent, devin-agent]
     environments:
       - {environment: codex, profiles: [codex-agent]}
       - {environment: devin, profiles: [devin-agent]}
-      - {environment: qwen, profiles: [qwen-agent]}
   work.author:
     skill: starci
     # Authoring the Work records - a node's scope and checks, a whole feature's drafts - is authoring the hands
     # do (owner decision 2026-09-25 review-hands: "work.author" with test/UAT authoring); the kernel's cut
     # decision (implementation.plan) stays on the think order.
-    chain: [devin-agent, qwen-agent, claude-agent, codex-agent]
+    chain: [devin-agent, claude-agent, codex-agent]
     environments:
       - {environment: devin, profiles: [devin-agent]}
-      - {environment: qwen, profiles: [qwen-agent]}
       - {environment: claude, profiles: [claude-agent]}
       - {environment: codex, profiles: [codex-agent]}
   workspace.manage:
     skill: starci
     # Workspace bookkeeping is a mechanical op: the implement order (owner routing 2026-09-26).
-    chain: [devin-agent, qwen-agent, codex-agent, claude-agent]
+    chain: [devin-agent, codex-agent, claude-agent]
     environments:
       - {environment: devin, profiles: [devin-agent]}
-      - {environment: qwen, profiles: [qwen-agent]}
       - {environment: codex, profiles: [codex-agent]}
       - {environment: claude, profiles: [claude-agent]}
 fallback:
@@ -511,27 +433,24 @@ selection: |-
   operator chain from top to bottom, choosing the first ready runtime/profile. Fall through only
   after an allowed failure with verified no-effect state. This policy never installs an agent,
   authenticates a provider, grants tools or expands the workflow authority. The Claude and Codex pools use
-  managed-agent launch (worker-start). The Qwen pool uses the command-terminal launch declared on
-  its target: the canonical launcher creates one terminal per attempt running the declared `qwen`
+  managed-agent launch (worker-start). The Devin pool uses the command-terminal launch declared on
+  its target: the canonical launcher creates one terminal per attempt running the declared `devin`
   command, waits for the rendered input prompt, obtains the Task preamble with `dispatch
   --return-preamble`, submits it with `terminal send` and verifies the submission, then attests the
-  Dispatch assignee and the rendered model; Orca 1.4.188's native qwen-code adapter cannot deliver a
-  prompt to Qwen Code 0.23.3. Qwen 3.8 Max and DeepSeek command terminals stay out of automatic
-  chains; every command excludes the Qwen `agent` tool.
+  Dispatch assignee and the rendered model.
 costPolicy: |-
   Runtime pools are provider quota windows: the Codex pool carries gpt-6-luna for easy and medium work and
-  gpt-6-sol for hard and insane work, the Claude pool carries claude-opus-5-5 for every role, the Qwen pool
-  carries deepseek-v4.1-flash (DeepSeek V4.1 Flash on the QwenCloud Token Plan) for easy, medium and hard work,
+  gpt-6-sol for hard and insane work, the Claude pool carries claude-opus-5-5 for every role,
   and Devin opens through the owner's default grant (config.yaml allocation.grants). modules/models/runtimes.yaml
   roleOfKind splits the kinds: strategy (decide, plan and every other think kind that is not a verdict, a
   kernel call or a mechanical op) runs the Claude pool, then the Codex pool on Sol; the kernel's own model
   calls walk sol-think - the Codex pool first, the Claude pool as overflow (owner routing 2026-09-26);
   review - the verify kinds still on the review order and work.author (owner decision 2026-09-25
-  review-hands) - runs the Devin and Qwen pools, each reviewing the other's work, with Claude and Codex as
-  overflow only; the ui order leads interface.audit, e2e.verify, security.verify and uat.assisted.verify
-  with the Codex pool, Devin and Qwen behind it; the mechanical ops - provision.ask, workspace.manage,
+  review-hands) - runs the Devin pool, with Claude and Codex as
+  overflow only (the cross-family rule sends a review of Devin's work to them); the ui order leads interface.audit, e2e.verify, security.verify and uat.assisted.verify
+  with the Codex pool, Devin behind it; the mechanical ops - provision.ask, workspace.manage,
   task.execute and knowledge.repair - walk the implement order the hands serve whatever their kind role;
-  hands-on work runs the Devin, Qwen and Codex pools with the Claude pool as overflow. brand.decide is think work that also generates a placeholder mascot when the product has none;
+  hands-on work runs the Devin and Codex pools with the Claude pool as overflow. brand.decide is think work that also generates a placeholder mascot when the product has none;
   the Claude pool decides the identity and defers that artwork with a concrete brief, and the Codex pool, the
   only one with an image generator, generates it when it takes the launch.
   interface.draw token-renders its shapes (HTML/CSS in the Grammar's tokens, Playwright capture) and walks the
@@ -544,10 +463,7 @@ costPolicy: |-
   is irreversible, so the chain is limited to declared coding runtimes. knowledge.repair rewrites a canonical
   rule of this runtime and is think work the hands serve on the implement order. Every automatic chain contains only managed-agent or return-preamble
   command-terminal candidates and
-  advances only after a verified no-effect failure. DeepSeek V4 Pro and Qwen 3.8 Max remain installed
-  explicit or user-approved exception targets but are excluded from automatic chains; Orca
-  worker-start cannot carry a Qwen model override, so a Qwen candidate always inherits the verified
-  runtime configuration. Command-terminal agents disable nested agents and have explicit turn,
+  advances only after a verified no-effect failure. Command-terminal agents disable nested agents and have explicit turn,
   wall-time and tool-call ceilings; a ceiling stop is a failed attempt and never proof of completion.
   Never infer price or quality superiority from a subscription label; benchmark bounded
   representative operations before proposing another routing change. A native worker is released
@@ -556,7 +472,7 @@ costPolicy: |-
   does, by role preference - so every operator's `environments` must declare every runtime that carries
   that operation's role and owns a profile for it, and the chain lists exactly those targets so
   `candidateFor` can answer with a launch shape for whichever runtime the allocator picked. A pool
-  whose roles do not cover an operation's role (Qwen and Devin carry no `decide`, so they cannot take an
+  whose roles do not cover an operation's role (Devin carries no `decide`, so they cannot take an
   `architecture.decide`) stays out of that operator and is excluded from allocation by the roles gate
   (scripts/agent/models.mjs poolRejectionReasons). The one widening: an order that names a role -
   `implement` - lets a pool that serves the order take its kinds whatever the kind's own role, which is how
@@ -581,7 +497,6 @@ examples:
     availableRuntimes:
       - codex
       - claude
-      - qwen
 examplesNote: Examples of frontend context.execution only. Set availability from observed host
   tools, never copy true as proof. Declared exact models still require effective runtime attestation.
   Orca resolves ordered skill/operator candidates from observed readiness instead.

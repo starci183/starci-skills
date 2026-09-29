@@ -561,7 +561,7 @@ function releaseManagedWorker(dispatchId) {
   try { workerRelease({ dispatch: dispatchId }); } catch { /* best-effort */ }
 }
 
-// A stale command-terminal kernel (launch: terminal — the Devin/Codex/Qwen
+// A stale command-terminal kernel (launch: terminal — the Devin/Codex
 // seat) leaves a live Orca terminal behind: clearing the signal removes the
 // ledger's handle on it, not the PTY. That is how one workflow grew two
 // [Kernel] rows in the sidebar (docs/fable.md orca-hierarchy, root cause 2). The

@@ -17,7 +17,7 @@
 //   avoid:  "tránh X", "tranh X", "avoid X", "không dùng X", "khong dung X"
 // where X is a pool alias:
 //   codex|codex-agent -> codex-agent   claude|claude-agent -> claude-agent
-//   qwen|qwen-agent -> qwen-agent      devin|devin-agent -> devin-agent
+//   devin|devin-agent -> devin-agent
 //
 // CLI: node scripts/agent/bias.mjs "<text>"            -> extracted JSON
 //      node scripts/agent/bias.mjs --normalize '<json>' -> normalized JSON
@@ -27,7 +27,6 @@ import { parseJson } from '../lib/json.mjs';
 const ALIASES = {
   'codex': 'codex-agent', 'codex-agent': 'codex-agent',
   'claude': 'claude-agent', 'claude-agent': 'claude-agent',
-  'qwen': 'qwen-agent', 'qwen-agent': 'qwen-agent',
   'devin': 'devin-agent', 'devin-agent': 'devin-agent',
 };
 

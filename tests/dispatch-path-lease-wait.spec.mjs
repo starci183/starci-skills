@@ -9,7 +9,7 @@ import {inspectLedger,ledgerFileFor,openLedger,releaseTwoPhase,reserveTwoPhase} 
 import {isLeaseOverlapRefusal,patternFindings} from '../scripts/supervisor/owed.mjs';
 import {withLedger,seedWorkflow} from './_ledger-fixture.mjs';
 
-// nivo wf-nivo-modules-agentos-mudqjov6 (repeat-reject cae2e44b): the Kernel dispatched a qwen job
+// nivo wf-nivo-modules-agentos-mudqjov6 (repeat-reject cae2e44b): the Kernel dispatched a devin job
 // twice and both were rejected at step `reserve` — "resource path:apps/app/src/messages/en.json
 // overlaps durable lease …" — behind op-interface.implement-f291042a12, a running job of the SAME
 // workflow holding en.json/vi.json for ~20 more minutes. A write set another job's live lease owns is
@@ -96,13 +96,13 @@ test('dispatch and route wait on a live path lease of the same workflow: queued 
     return leading(r.stdout).job_id;
   };
   const holder=enqueue([EN,VI,'apps/app/src/accounting']);
-  const first=fx.run('dispatch','--job',holder,'--model','qwen-agent','--spawn');
+  const first=fx.run('dispatch','--job',holder,'--model','devin-agent','--spawn');
   assert.equal(first.status,0,`the holder dispatches: ${first.stderr||first.stdout}`);
 
   const waiter=enqueue([EN,'apps/app/src/other']);
   const events=()=>fx.inspect(db=>db.prepare("SELECT kind FROM events WHERE entity_id=? AND kind IN ('dispatch-rejected','route-decided','op-dispatched')").all(waiter).map(r=>r.kind));
   for(const attempt of [1,2]){
-    const d=fx.run('dispatch','--job',waiter,'--model','qwen-agent','--spawn');
+    const d=fx.run('dispatch','--job',waiter,'--model','devin-agent','--spawn');
     assert.notEqual(d.status,0,`dispatch ${attempt} does not launch over a live lease`);
     const body=leading(d.stdout);
     assert.equal(body.reason,'path-lease');
@@ -136,7 +136,7 @@ test('dispatch and route wait on a live path lease of the same workflow: queued 
     releaseTwoPhase(l,null,{jobId:holder,status:'succeeded'});
   });
   assert.equal(status().queued.find(item=>item.jobId===waiter).queuedBecause,'ready');
-  const now=fx.run('dispatch','--job',waiter,'--model','qwen-agent','--spawn');
+  const now=fx.run('dispatch','--job',waiter,'--model','devin-agent','--spawn');
   assert.equal(now.status,0,`released, the job dispatches: ${now.stderr||now.stdout}`);
   assert.deepEqual(events().filter(k=>k==='dispatch-rejected'),[]);
 });
@@ -146,10 +146,10 @@ test('an expired lease row is no wait: reserve still refuses it as a recovery si
   const enqueue=paths=>{const r=fx.run('enqueue','--workflow',WORKFLOW,'--op',OP,'--paths',paths.join(','));
     assert.equal(r.status,0,r.stderr||r.stdout);return leading(r.stdout).job_id;};
   const holder=enqueue([EN]);
-  assert.equal(fx.run('dispatch','--job',holder,'--model','qwen-agent','--spawn').status,0);
+  assert.equal(fx.run('dispatch','--job',holder,'--model','devin-agent','--spawn').status,0);
   fx.withWrite(l=>l.db.prepare('UPDATE leases SET acquired_at=0,expires_at=1 WHERE job_id=?').run(holder));
   const waiter=enqueue([EN,'apps/app/src/other']);
-  const d=fx.run('dispatch','--job',waiter,'--model','qwen-agent','--spawn');
+  const d=fx.run('dispatch','--job',waiter,'--model','devin-agent','--spawn');
   assert.notEqual(d.status,0);
   const body=leading(d.stdout);
   assert.equal(body.rejected,'dispatch-rejected');
@@ -168,8 +168,8 @@ test('repeat-reject never counts a lease-overlap refusal; real launcher failures
   assert.equal(isLeaseOverlapRefusal({step:'reserve',error:`resource path:${EN} overlaps durable lease path:${EN} held by j1; resource path:x has no declared capacity`}),false,'a mixed refusal still counts');
   assert.equal(isLeaseOverlapRefusal({step:'task-create',error:overlap}),false);
   seedWorkflow(ledger,{id:WF,now:NOW-300*MIN,events:[
-    ...[1,2].map(n=>({kind:'dispatch-rejected',entityType:'job',entityId:'op-code.refactor-qwen00000001',payload:{provider:'qwen',step:'reserve',error:overlap},created_at:NOW-n*10*MIN})),
-    ...[1,2].map(n=>({kind:'dispatch-rejected',entityType:'job',entityId:`op-x-000000000${n}`,payload:{provider:'qwen',step:'reserve',error:'machine arbiter unavailable: EBUSY'},created_at:NOW-n*10*MIN})),
+    ...[1,2].map(n=>({kind:'dispatch-rejected',entityType:'job',entityId:'op-code.refactor-devin0000001',payload:{provider:'devin',step:'reserve',error:overlap},created_at:NOW-n*10*MIN})),
+    ...[1,2].map(n=>({kind:'dispatch-rejected',entityType:'job',entityId:`op-x-000000000${n}`,payload:{provider:'devin',step:'reserve',error:'machine arbiter unavailable: EBUSY'},created_at:NOW-n*10*MIN})),
   ]});
   ledger.db.prepare("UPDATE workflows SET phase='running'").run();
   const rejects=patternFindings(ledger.db,{repo:repoRoot,now:NOW,staleOf:()=>[]}).filter(f=>f.pattern==='repeat-reject');

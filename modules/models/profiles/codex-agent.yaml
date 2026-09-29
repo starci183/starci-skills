@@ -35,7 +35,7 @@ launch:
     sandbox flag, so a managed Codex worker ran on Orca's default approval policy and every tool
     call became an owner "Allow Codex to make changes" notification. A command terminal carries the
     card command (model + effort + bypassArgs) and joins the Run through orchestration dispatch
-    --return-preamble, like the Qwen and Devin pools. image_gen and browser use are Codex CLI
+    --return-preamble, like the Devin pool. image_gen and browser use are Codex CLI
     built-ins (codex features: image_generation, browser_use), not Orca features, so the
     command terminal keeps both host tools.
   hostTools: >-
@@ -51,11 +51,11 @@ business:
     codex-agent, on gpt-6-sol for every think kind, the sole image route and the draw fallback.
   whenNeeded:
     - Strategy (the think/decide/plan orders) when claude-agent is unavailable — its hard floor pins gpt-6-sol.
-    - Review overflow only (owner decision 2026-09-25 review-hands; runtimes.yaml allocation.overflowByOrder) - and interface.audit of what Devin implemented, since Qwen and Claude lack its browser-dom tool.
+    - Review overflow only (owner decision 2026-09-25 review-hands; runtimes.yaml allocation.overflowByOrder) - and interface.audit of what Devin implemented, since Claude lacks its browser-dom tool.
     - "interface.asset — the ONLY route (image_gen.imagegen); interface.draw when the Devin pool cannot draw (owner ruling 2026-09-27: Devin draws, Codex critiques)."
-    - Hands-on overflow after the Devin and Qwen pools.
+    - Hands-on overflow after the Devin pool.
   whenNot:
-    - As first pick for hands-on work — the declared order spends Qwen/Devin capacity first.
+    - As first pick for hands-on work — the declared order spends Devin capacity first.
     - For anything where image output is needed but the observed host tools lack it — availability is observed, never assumed (registry.yaml examplesNote).
   pickedBy: >-
     Allocator work/role order + tier lists; the image routes are where it

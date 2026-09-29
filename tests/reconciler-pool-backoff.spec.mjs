@@ -46,7 +46,7 @@ test('persistence: at the floor and still rate limited for persistMs', () => {
 
 test('capsOf: only backed-off pools of a fresh publication', () => {
   const row = (pool, e) => { const r = poolRowOf(pool, e, { now: T, staleMs: 10 * MIN }); return { pool: r.pool, until_at: r.untilAt, strikes: r.strikes, reason: r.reason }; };
-  const rows = [row('devin-agent', { cap: 5, max: 10, halvings: 1 }), row('qwen-agent', { cap: 10, max: 10 })];
+  const rows = [row('devin-agent', { cap: 5, max: 10, halvings: 1 }), row('codex-agent', { cap: 10, max: 10 })];
   assert.deepEqual(capsOf(rows, { now: T + MIN }), { 'devin-agent': 5 });
   assert.deepEqual(capsOf(rows, { now: T + 11 * MIN }), {}, 'stale: a dead engine never pins a pool');
   assert.equal(entriesOfRows(rows)['devin-agent'].halvings, 1, 'strikes carry the halvings');
@@ -54,13 +54,13 @@ test('capsOf: only backed-off pools of a fresh publication', () => {
 
 test('route: a pool at its backed-off cap is rejected and the next eligible pool takes the job', () => {
   const runtimes = parseYaml(fs.readFileSync(path.join(import.meta.dirname, '..', 'modules', 'models', 'runtimes.yaml'), 'utf8'));
-  const capacity = { 'devin-agent': { running: 5, auth: 'ok' }, 'qwen-agent': { running: 1, auth: 'ok' } };
+  const capacity = { 'devin-agent': { running: 5, auth: 'ok' }, 'codex-agent': { running: 1, auth: 'ok' } };
   const base = { kind: 'backend.implement', difficulty: 'medium', runtimes, capacity };
   const free = selectPool({ ...base, backoff: {} });
   const backed = selectPool({ ...base, backoff: { 'devin-agent': 5 } });
   if (free.error) { assert.fail(`fixture route failed: ${free.error}`); }
   assert.equal(free.target, 'devin-agent');
-  assert.equal(backed.target, 'qwen-agent', 'devin at 5/5 backed off: qwen takes it');
+  assert.equal(backed.target, 'codex-agent', 'devin at 5/5 backed off: codex takes it');
   assert.ok((backed.rejected ?? []).some((r) => r.target === 'devin-agent' && /backed off/.test(r.reason)));
 });
 
@@ -78,7 +78,7 @@ function setup({ events = [], health = [], logs = [] } = {}) {
   const env = { ...process.env, STARCI_TEST_MACHINE_FILE: path.join(poolDir, 'machine.sqlite') };
   // The Job controller's rate-limit rows live in machine_logs (actor reconciler).
   if (logs.length) withMachine((m) => m.log(logs.map((l) => ({ actor: 'reconciler', kind: 'reconciler.provider-rate-limited', msg: 'rate limited', at: l.at, data: JSON.parse(l.d) }))), { env });
-  const c = createResourceController({ env, pools: async () => [{ target: 'devin-agent', provider: 'devin', maxParallel: 10 }, { target: 'qwen-agent', provider: 'qwen', maxParallel: 10 }] });
+  const c = createResourceController({ env, pools: async () => [{ target: 'devin-agent', provider: 'devin', maxParallel: 10 }, { target: 'codex-agent', provider: 'codex', maxParallel: 10 }] });
   const calls = { api: [], log: [] };
   const src = { events, health, logs };
   let now = T;
@@ -143,6 +143,6 @@ test('resource:pools reads the Job controller reconciler.provider-rate-limited l
   const r = await s.c.reconcile(POOLS_KEY, s.ctxOf('shadow'));
   assert.deepEqual(r.caps, { 'devin-agent': 5 });
   // By provider only (no pool target named): every pool of that provider.
-  const p = setup({ logs: [{ seq: 3, at: T - 5_000, d: JSON.stringify({ provider: 'qwen' }) }] });
-  assert.deepEqual((await p.c.reconcile(POOLS_KEY, p.ctxOf('shadow'))).caps, { 'qwen-agent': 5 });
+  const p = setup({ logs: [{ seq: 3, at: T - 5_000, d: JSON.stringify({ provider: 'codex' }) }] });
+  assert.deepEqual((await p.c.reconcile(POOLS_KEY, p.ctxOf('shadow'))).caps, { 'codex-agent': 5 });
 });

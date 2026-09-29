@@ -1,25 +1,6 @@
 schema: starci/orca-recipes@1
 api: api.yaml
 recipes:
-  start-qwen-operation:
-    mode: orchestrated
-    actor: canonical-launcher
-    sequence:
-      - assert-expected-active-dag-operation
-      - resolve-operation-provider-chain
-      - orchestration.task-create
-      - assert-canonical-task-display-name
-      - terminal.create-declared-qwen-command-with-credential-refresh
-      - terminal.read-screen-until-input-prompt
-      - orchestration.dispatch-return-preamble
-      - terminal.send-preamble-with-enter
-      - terminal.read-screen-verify-submission-or-one-more-enter
-      - orchestration.dispatch-show-attest-assignee-and-rendered-model
-    terminalName: "[Op] <operation> a<attempt> · <Workflow>"
-    taskCardinality: one
-    dispatchCardinality: one
-    agentCardinality: one
-    environmentBinding: current-runtime-by-omitting---on
   start-devin-operation:
     mode: orchestrated
     actor: canonical-launcher
@@ -92,7 +73,7 @@ recipes:
       - terminal.read-screen-detect-permission-menu
       - terminal.send-bypass-choice-with-enter
       - terminal.read-screen-confirm-moving
-    note: 'Devin TUI: send "5" (Switch to bypass mode). Qwen without --yolo: respawn instead — per-kind allows never generalize. Never answer individual allow options; they re-prompt per command kind.'
+    note: 'Devin TUI: send "5" (Switch to bypass mode). Never approve per command kind — per-kind allows never generalize. Never answer individual allow options; they re-prompt per command kind.'
   respawn-dead-agent-child:
     mode: direct
     actor: launcher-or-kernel
@@ -111,7 +92,6 @@ forbiddenSequences:
   - chat-runs-the-kernel-loop
   - kernel-implements-an-operation-itself
   - operation-calls-another-operation
-  - qwen-op-uses-agent-tool
   - devin-op-uses-provider-native-subagent-or-cloud-handoff
   - devin-op-launched-without-explicit-workflow-slot
   - devin-underlying-model-inferred-from-account-default

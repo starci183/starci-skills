@@ -508,8 +508,8 @@ export default {
   }
   // Command-terminal agents still join the workflow's Orca Run. Create the
   // operation Task first, then create/attest the terminal, dispatch that Task
-  // to the exact handle and submit Orca's returned preamble. This gives Qwen,
-  // Devin and Codex the same durable Kernel → Task → Dispatch hierarchy as managed
+  // to the exact handle and submit Orca's returned preamble. This gives Devin
+  // and Codex the same durable Kernel → Task → Dispatch hierarchy as managed
   // workers without pretending Orca owns their process lifecycle.
   if (cardLaunch?.error) {
     const error = `${model.target} has no launch model: ${cardLaunch.error}`;

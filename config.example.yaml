@@ -15,7 +15,7 @@ effort: medium
 #     interactive gate, an auth screen, a readiness or model-attestation
 #     failure) falls through to the next member in the same boot.
 #   single pin: {agent?, model?, effort?} — agent is an execution-agent id
-#     (claude|codex|qwen|devin), model a modules/models/runtimes.yaml model id
+#     (claude|codex|devin), model a modules/models/runtimes.yaml model id
 #     (without agent, the pool that carries it supplies the agent). A pin is
 #     authoritative: a dead probe, unknown model, unsupported CLI flag or
 #     model-attestation mismatch fails closed instead of substituting.
@@ -54,10 +54,6 @@ supervisor:
   repos: []
   # frozenMinutes: <n>   # Host seat check: a busy frame unchanged this long is frozen, not busy
   # landGate: {mode: shared|exclusive, push: true}
-# quota — plan figures a provider has no API for (scripts/api/quota/qwen.mjs), e.g.
-#   quota: {qwen: {resetAt: <ISO>}}
-#   Qwen is the base pool and is not metered: only resetAt is read - an open qwen quota circuit lasts until that
-#   reset (rolled forward a month at a time) and its recovery probe runs right after it.
 # delegation — while the owner is away, a named delegate (e.g. the supervisor chat) may
 # answer owner asks until the given time; excluded classes stay owner-only. null = none.
 #   delegation: {asks: supervisor, until: 2026-09-23T09:00:00+07:00,
@@ -88,7 +84,7 @@ allocation:
   mode: adaptive
   preferredProvider: null
   policy: balanced
-  shares: {devin-agent: 35, qwen-agent: 35, claude-agent: 20, codex-agent: 10}
+  shares: {devin-agent: 35, claude-agent: 20, codex-agent: 10}
   windowHours: 24
   grants: [devin-agent=10@implement+verify+write]
 # Non-operation models are a quota-aware peer pool over the provider-window runtime pools of

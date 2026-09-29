@@ -2,7 +2,7 @@
 // usage-record.mjs — measured token usage of every op attempt, every Kernel seat and the Supervisor seat.
 //
 // The numbers come from the agent CLI's own session file (scripts/lib/llm-usage.mjs holds one extractor per adapter:
-// Claude Code JSONL, Codex rollout JSONL, Qwen chat JSONL); an agent without an adapter is 'unavailable', never a guess.
+// Claude Code JSONL, Codex rollout JSONL); an agent without an adapter is 'unavailable', never a guess.
 // A session file is found by CONTENT, the way scripts/kernel/op-session.mjs attributes a session to its job: the first
 // user message of an op worker names its dispatch id, task id and job id (the Orca worker preamble + the op prompt); a
 // Kernel session opens with `You are [Kernel] <workflow>`, the Supervisor's with `You are the [Supervisor]`. Both the
@@ -63,7 +63,7 @@ export function readSessionHead(agent, head) {
     else if (agent === 'codex' && o.type === 'response_item' && o.payload?.role === 'user') {
       const t = textOf(o.payload.content);
       if (!t.trimStart().startsWith('<environment_context>')) firstUser = t;
-    } else if (agent === 'qwen' && o.type === 'user') firstUser = textOf(o.message?.parts);
+    }
   }
   return { startMs, firstUser };
 }
@@ -112,7 +112,6 @@ export function listSessionFiles({ agents = USAGE_AGENTS, sinceMs, env = process
         jsonlIn(path.join(base, String(d.getUTCFullYear()), String(d.getUTCMonth() + 1).padStart(2, '0'), String(d.getUTCDate()).padStart(2, '0')), sinceMs, out, 'live', 'codex', 4);
       }
     }
-    if (agents.includes('qwen')) jsonlIn(path.join(homes.qwen, 'projects'), sinceMs, out, 'live', 'qwen');
   }
   for (const agent of agents) {
     const dir = path.join(root, agent);
@@ -302,7 +301,7 @@ export async function sweepUsage({ env = process.env, home = os.homedir(), now =
       perLedger.push({ ledger: l, pending, workflows });
     } catch (error) { out.errors.push(`${l.name}: ${message(error).slice(0, 160)}`); } finally { try { db?.close(); } catch { /* closed */ } }
   }
-  const wantedAgents = new Set(['claude', 'codex', 'qwen']);
+  const wantedAgents = new Set(['claude', 'codex']);
   const index = indexSessions({ agents: [...wantedAgents], sinceMs: Math.min(since, ...perLedger.flatMap((p) => p.pending.map((a) => (a.dispatched_at ?? since) - SESSION_LEAD_MS)).concat(since)), env, home, archiveRoot });
 
   for (const { ledger: l, pending, workflows } of perLedger) {

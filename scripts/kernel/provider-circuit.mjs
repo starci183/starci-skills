@@ -8,7 +8,7 @@
 import { openMachine, openMachineReader, providerHealth, setProviderHealth } from '../../engine/machine-db.mjs';
 import { parseJsonOr } from '../lib/json.mjs';
 
-export const CIRCUIT_PROVIDERS = Object.freeze(['devin', 'codex', 'claude', 'qwen']);
+export const CIRCUIT_PROVIDERS = Object.freeze(['devin', 'codex', 'claude']);
 export const providerKeyOf = (provider) => String(provider ?? '').trim().toLowerCase().replace(/-agent$/, '');
 const STATUS_OF = { unavailable: 'unavailable', recovered: 'recovered', healthy: 'healthy', striking: 'striking' };
 

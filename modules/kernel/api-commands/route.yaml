@@ -18,18 +18,16 @@ route:
     clears it with api provider-health --provider <p> --recover --reason <text>
     --probe)". An auth circuit records the non-reversible fingerprint of the
     credential it rejected (scripts/agent/credential-fingerprint.mjs: first 12 hex
-    of sha256 over the key the card's credentialRefresh step resolves, or the Orca
-    host account id for claude/codex) and reads CLOSED once the credential in
+    of sha256 over the Orca host account id for claude/codex) and reads CLOSED once the credential in
     effect has a different fingerprint. Otherwise only expiry or provider-health
     --recover closes it; resolving an incident never does. A QUOTA circuit
-    (failureKind quota, the base pool Qwen: modules/models/agents/qwen.yaml
-    quotaExhausted) reads "...; its quota probe clears it (api provider-health
-    --provider qwen --quota-probe, run by the watchdog ...)" and needs no Kernel.
+    (failureKind quota: a card's quotaExhausted) reads "...; its quota probe clears it (api provider-health
+    --provider <p> --quota-probe, run by the watchdog ...)" and needs no Kernel.
     A CAPACITY circuit (failureKind capacity: modules/models/agents/devin.yaml
     capacityExhausted) expires after allocation.cooldownMs.capacity
   kernelBias: >-
     a Kernel does not bias a route (owner decision 2026-09-25: starci-next wf-sn-foundation routed
-    op-interface.implement-c3bcc0d5e4 with --avoid qwen-agent,devin-agent and it went to codex,
+    op-interface.implement-c3bcc0d5e4 with --avoid devin-agent and it went to codex,
     defeating the evidence routing that sends implementation to Devin first). --prefer and --avoid
     are still accepted so older prompts parse, and IGNORED: stderr reads "api route WARNING: --avoid
     <pools> ignored: kernel per-route bias is not accepted; ...", routing runs as if they were absent,
@@ -64,15 +62,15 @@ route:
     workflow does (scripts/kernel/waiter-priority.mjs): advisory, route never refuses on it; the
     Kernel dispatches the outranking job first (driver-loop.yaml tick.drive.waiterPriority)
   order: >-
-    the pool order is the kind's runtimes.yaml roleOfKind order (scaffold: Qwen first; draw: Codex
-    only; review: Devin and Qwen, Opus and Sol overflow only), else the think order (Opus, Sol) for
-    think work, else the role's order (implementation: Devin, then Qwen); a hands-on cut slice
+    the pool order is the kind's runtimes.yaml roleOfKind order (scaffold: Devin first; draw: Devin then Codex;
+    review: Devin, Opus and Sol overflow only), else the think order (Opus, Sol) for
+    think work, else the role's order (implementation: Devin, then Codex, then Claude); a hands-on cut slice
     (payload.cut, total >= 2) walks the scaffold order unless its kind is pinned to draw or review. Under
     the balanced policy the first eligible pool of that order still below its config.yaml
     allocation.shares target takes the job; when all are at or over their share, the least over does
     (owner decision 2026-09-25, 72h model-scorecard evidence). A verify kind is routed away from the
     family of the op whose output it reviews (scripts/agent/balance.mjs auditAuthorOf; routeCrossFamily
-    on the route): Qwen reviews Devin's work and Devin Qwen's (owner decision 2026-09-25 review-hands)
+    on the route): a review of Devin's work goes to Opus or Sol (owner decision 2026-09-25 review-hands)
   writes: >-
     jobs.payload_json gains {model, modelId, effort, routeChain, routeOrder,
     routeRejected, routeBalance, difficulty} — the PERSISTED route dispatch then launches

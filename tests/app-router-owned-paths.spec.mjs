@@ -217,7 +217,7 @@ test('api: enqueue -> dispatch leases -> overlap refusal -> report -> landed-che
     assert.equal(r.status,0,r.stderr||r.stdout);
     return leading(r.stdout).job_id;
   };
-  const dispatch=jobId=>fx.run('dispatch','--job',jobId,'--model','qwen-agent','--spawn');
+  const dispatch=jobId=>fx.run('dispatch','--job',jobId,'--model','devin-agent','--spawn');
   const leases=jobId=>fx.inspect(db=>db.prepare('SELECT resource_key FROM leases WHERE job_id=? ORDER BY resource_key').all(jobId).map(r=>r.resource_key));
 
   const routes=enqueue(ALL_DIRS.map(d=>`${d}/**`));

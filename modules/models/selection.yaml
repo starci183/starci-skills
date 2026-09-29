@@ -296,8 +296,8 @@ allocationFacts:
       pool remains, under either policy - the review order's Opus and Sol (owner decision 2026-09-25
       review-hands). A verify kind reviewing another op's output (scripts/agent/balance.mjs auditAuthorOf)
       first narrows the eligible pools to another audit family than the author's (allocation.frontier and
-      allocation.hands, thinkAuditCrossFamily): Qwen reviews what Devin implemented and Devin what Qwen
-      implemented; the author's own family is taken only when no other family is eligible.
+      allocation.hands, thinkAuditCrossFamily): a review of what Devin implemented goes to Opus or Sol;
+      the author's own family is taken only when no other family is eligible.
     eligibility: >-
       Per candidate, in order: pool exists in runtimes.yaml; role ∈ pool.roles OR the kind's order names a role the pool serves (the implement order carries the mechanical ops whatever their kind role — owner routing 2026-09-26); an explicit-workflow-quota
       pool holds an owner grant covering the role with running < granted slots (when config.yaml declares

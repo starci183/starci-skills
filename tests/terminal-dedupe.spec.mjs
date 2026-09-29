@@ -8,7 +8,7 @@ import {openLedger,ledgerFileFor} from '../engine/ledger-db.mjs';
 import {seedWorkflow} from './_ledger-fixture.mjs';
 
 // After the 2026-09-24 reboot Orca restored its previous tabs: old nivo Claude
-// kernel sessions with their history and bare PowerShell tabs of old qwen ops.
+// kernel sessions with their history and bare PowerShell tabs of old op tabs.
 // The watchdogs started new kernels beside them, so every workflow had two
 // kernel sessions. resume-all now closes, once Orca answers and before any
 // watchdog starts, every terminal of the resumed repos that no ledger binds and
@@ -38,7 +38,7 @@ const world=({leased=false}={})=>{
     'term-restored-kernel':term('term-restored-kernel',{tabTitle:'[Kernel] wf-a',title:'✳ Nivo app auth kernel workflow',agentIdentity:'claude',
       screen:CLAUDE_IDLE('● AUTH kernel: yielding; waiting on op-backend.implement-ed43628b07 report.')}),
     'term-restored-shell':term('term-restored-shell',{tabTitle:'Terminal 10',title:'Terminal 10',screen:PS(repo)}),
-    'term-qwen-op-shell':term('term-qwen-op-shell',{tabTitle:'[Op] backend.scaffold a3 · wf-a',title:'qwen-code',screen:PS(repo)}),
+    'term-old-op-shell':term('term-old-op-shell',{tabTitle:'[Op] backend.scaffold a3 · wf-a',title:'devin',screen:PS(repo)}),
     'term-owner-claude':term('term-owner-claude',{tabTitle:'Claude',title:'✳ Fix login bug',agentIdentity:'claude',screen:CLAUDE_IDLE('● Here is the fix for the login form.')}),
     'term-other-repo':{...term('term-other-repo',{tabTitle:'[Kernel] wf-z',title:'kernel',screen:PS(other)}),worktree:other},
   };
@@ -61,19 +61,19 @@ test('restored StarCi sessions and bare shells no ledger binds are quit and clos
   const w=world();
   const dry=dedupeTerminals({repos:[w.repo],dryRun:true});
   assert.equal(dry.ok,true,JSON.stringify(dry));
-  assert.deepEqual(dry.closed.map(c=>c.handle).sort(),['term-qwen-op-shell','term-restored-kernel','term-restored-shell']);
+  assert.deepEqual(dry.closed.map(c=>c.handle).sort(),['term-old-op-shell','term-restored-kernel','term-restored-shell']);
   assert.equal(w.state().closed,undefined,'a dry run closes nothing');
 
   const r=dedupeTerminals({repos:[w.repo]});
   assert.equal(r.ok,true,JSON.stringify(r));
   const byHandle=Object.fromEntries(r.closed.map(c=>[c.handle,c]));
-  assert.deepEqual(Object.keys(byHandle).sort(),['term-qwen-op-shell','term-restored-kernel','term-restored-shell']);
+  assert.deepEqual(Object.keys(byHandle).sort(),['term-old-op-shell','term-restored-kernel','term-restored-shell']);
   assert.equal(byHandle['term-restored-kernel'].kind,'agent');
   assert.equal(byHandle['term-restored-kernel'].marker,'[Kernel]');
   assert.equal(byHandle['term-restored-shell'].reason,'bare-shell');
   const state=w.state();
   assert.deepEqual(state.quits,[{handle:'term-restored-kernel',text:'\u0003\u0003'}],'a Claude session gets its double Ctrl+C; a bare shell is never typed into');
-  assert.deepEqual([...state.closedTabs].sort(),['term-qwen-op-shell','term-restored-kernel','term-restored-shell'],'each closes with its tab');
+  assert.deepEqual([...state.closedTabs].sort(),['term-old-op-shell','term-restored-kernel','term-restored-shell'],'each closes with its tab');
   for(const h of ['term-kernel-new','term-op-live','term-owner-claude','term-other-repo'])assert.notEqual(state.terminals[h].closed,true,`${h} must stay`);
   assert.deepEqual(r.kept.map(k=>[k.handle,k.reason]),[['term-owner-claude','no-starci-marker']]);
 });
@@ -91,7 +91,6 @@ test('classifyStrayTerminal: markers in titles or frame, never the owner\'s unma
   const idle=CLAUDE_IDLE('● done');
   assert.equal(classifyStrayTerminal({titles:['✳ Nivo app auth kernel workflow'],screen:idle}).marker,'kernel');
   assert.equal(classifyStrayTerminal({titles:['Codex'],screen:CLAUDE_IDLE('● settled op-interface.draw-edd3451af8')}).action,'close');
-  assert.equal(classifyStrayTerminal({titles:['qwen-code'],screen:idle}).action,'close');
   assert.equal(classifyStrayTerminal({titles:['✳ Refactor notes'],screen:idle}).action,'keep');
   assert.equal(classifyStrayTerminal({titles:['[Kernel] wf-a'],screen:null}).reason,'unreadable');
   assert.equal(classifyStrayTerminal({titles:['anything'],screen:'PS C:\\Users\\Hi> '}).reason,'bare-shell');

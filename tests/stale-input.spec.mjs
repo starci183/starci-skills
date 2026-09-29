@@ -120,9 +120,9 @@ test('dispatch records Source and Work digests by kind; settle re-baselines Work
   fx.work('features/task/fr/list/index.yaml','fr: v1\n');
   fx.work('features/task/fr/list/evidence/run.txt','noise\n');
   withLedger(fx,ledger=>{
-    enqueueSeed(ledger,{jobId:'job-refactor',workflowId:WORKFLOW,opId:OP,kind:'op',payload:{opId:OP,owned_paths:['src/refactor/'],model:'qwen-agent',records:[FR_DIR,'src/refactor/a.ts']}});
+    enqueueSeed(ledger,{jobId:'job-refactor',workflowId:WORKFLOW,opId:OP,kind:'op',payload:{opId:OP,owned_paths:['src/refactor/'],model:'devin-agent',records:[FR_DIR,'src/refactor/a.ts']}});
   });
-  const dispatched=fx.run('dispatch','--job','job-refactor','--model','qwen-agent','--spawn');
+  const dispatched=fx.run('dispatch','--job','job-refactor','--model','devin-agent','--spawn');
   assert.equal(dispatched.status,0,dispatched.stderr||dispatched.stdout);
   const inputsOf=()=>inspect(fx,db=>JSON.parse(db.prepare('SELECT context_json FROM contracts WHERE workflow_id=?').get(WORKFLOW).context_json).inputs);
   const inputs=inputsOf();
@@ -371,7 +371,7 @@ const legacyLedger=file=>{
     ]});
     for(const row of ledger.db.prepare('SELECT attempt_id,job_id,op_id FROM op_attempts WHERE workflow_id=?').all(WORKFLOW))
       ledger.db.prepare('INSERT INTO contracts(attempt_id,workflow_id,job_id,markdown,context_json,created_at) VALUES(?,?,?,?,?,?)')
-        .run(row.attempt_id,WORKFLOW,row.job_id,'# contract',JSON.stringify({packet:{op:row.op_id},worktree:'.',model:'qwen-agent'}),at);
+        .run(row.attempt_id,WORKFLOW,row.job_id,'# contract',JSON.stringify({packet:{op:row.op_id},worktree:'.',model:'devin-agent'}),at);
   }finally{ledger.close();}
 };
 const schemaOf=file=>{
@@ -410,9 +410,9 @@ test('an existing ledger: no schema change, legacy rows never stale, new dispatc
 
   withLedger(fx,ledger=>{
     ledger.write.createUnit({workflowId:WORKFLOW,unitId:'job-new',opId:OP,subjectKey:'job-new',goalRevision:1});
-    enqueueSeed(ledger,{jobId:'job-new',workflowId:WORKFLOW,unitId:'job-new',opId:OP,kind:'op',payload:{opId:OP,owned_paths:['src/new/'],model:'qwen-agent'}});
+    enqueueSeed(ledger,{jobId:'job-new',workflowId:WORKFLOW,unitId:'job-new',opId:OP,kind:'op',payload:{opId:OP,owned_paths:['src/new/'],model:'devin-agent'}});
   });
-  const dispatched=fx.run('dispatch','--job','job-new','--model','qwen-agent','--spawn');
+  const dispatched=fx.run('dispatch','--job','job-new','--model','devin-agent','--spawn');
   assert.equal(dispatched.status,0,dispatched.stderr||dispatched.stdout);
   const reopened=inspect(fx,db=>db.prepare('SELECT a.op_id,a.try_no,c.context_json FROM contracts c JOIN op_attempts a ON a.attempt_id=c.attempt_id WHERE c.workflow_id=? ORDER BY a.op_id,a.attempt_id').all(WORKFLOW)
     .map(r=>[r.op_id,r.try_no,JSON.parse(r.context_json).inputs?.schema??null]));

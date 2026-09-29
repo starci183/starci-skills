@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
-import {buildSpawnCommand,loadAdapter} from '../scripts/agent/lib.mjs';
+import {buildSpawnCommand,hostIdentityEnv,loadAdapter} from '../scripts/agent/lib.mjs';
 import {parseYaml} from '../engine/yaml.mjs';
 
 const ROOT=path.resolve(import.meta.dirname,'..');
@@ -10,27 +10,16 @@ const profileCommand=target=>parseYaml(fs.readFileSync(path.join(ROOT,'modules',
 
 // Lane m13: pure command assembly — no real orca spawn. The contract under
 // test: agent differences are DATA (modules/models/agents/<name>.yaml) and
-// the card's bypass flags (qwen --yolo, devin --permission-mode dangerous) can
+// the card's bypass flags (devin --permission-mode dangerous) can
 // never be forgotten because no caller assembles an agent command by hand.
 
-test('qwen op command carries the credential-refresh prefix and --yolo',()=>{
-  const r=buildSpawnCommand({provider:'qwen'});
-  assert.ok(!r.error,r.error);
-  // The env-key name is platform-proof: win32 says Remove-Item Env:NAME, posix says unset NAME.
-  assert.match(r.command,/BAILIAN_TOKEN_PLAN_API_KEY/,'credentialRefresh prefix missing — a stale key 401s qwen');
-  assert.match(r.command,/--yolo\b/,'qwen without --yolo stalls on per-kind permission menus');
-  assert.equal(r.commandSource,'modules/models/agents/qwen.yaml');
-});
-
-test('qwen names itself to Orca through its pane title, labelled with the op job',()=>{
-  // Orca 1.4.209 has no qwen hook and does not map `node cli-entry.js` to qwen-code; a pane title ending
-  // " - qwen-code" is what gives the tab the Qwen logo and spinner (agents/qwen.yaml hostIdentity).
-  const op=buildSpawnCommand({provider:'qwen',env:{STARCI_ROLE:'op',STARCI_OP_JOB:'job-q1'}});
-  assert.ok(!op.error,op.error);
-  assert.ok(op.command.includes(process.platform==='win32'?"$env:CLI_TITLE='job-q1 - qwen-code';":"export CLI_TITLE='job-q1 - qwen-code';"),op.command.slice(0,200));
-  assert.ok(op.command.indexOf('CLI_TITLE')<op.command.indexOf('qwen --'),'the title is set before qwen starts');
-  assert.match(buildSpawnCommand({provider:'qwen'}).command,/CLI_TITLE='qwen - qwen-code'/);
-  assert.doesNotMatch(buildSpawnCommand({provider:'devin'}).command,/CLI_TITLE/,'only cards that declare hostIdentity get it');
+test('a card hostIdentity.env renders its <label> to the op job, else the card agent; no card, no variables',()=>{
+  const card={agent:'sample',hostIdentity:{env:{TAB_TITLE:'<label> - sample'}}};
+  assert.deepEqual(hostIdentityEnv(card,{STARCI_OP_JOB:'job-1'}),{TAB_TITLE:'job-1 - sample'});
+  assert.deepEqual(hostIdentityEnv(card),{TAB_TITLE:'sample - sample'});
+  assert.deepEqual(hostIdentityEnv({agent:'sample'}),{});
+  for(const provider of ['devin','codex','claude'])
+    assert.doesNotMatch(buildSpawnCommand({provider}).command,/CLI_TITLE/,`${provider}: only cards that declare hostIdentity get it`);
 });
 
 test('devin on Windows runs with a copy of its config whose Orca hook path Git Bash can execute',()=>{
@@ -59,12 +48,10 @@ test('devin op command is unattended and uses commandRequirements (dangerous)',(
 });
 
 test('every supported terminal launch shape is unattended',()=>{
-  const qwen=buildSpawnCommand({provider:'qwen'});
   const devin=buildSpawnCommand({provider:'devin'});
   const codex=buildSpawnCommand({provider:'codex',model:'gpt-6-sol',effort:'high'});
   const claude=buildSpawnCommand({provider:'claude',model:'claude-opus-5-5',effort:'high'});
-  for(const launch of [qwen,devin,codex,claude]) assert.ok(!launch.error,launch.error);
-  assert.match(qwen.command,/--yolo\b/);
+  for(const launch of [devin,codex,claude]) assert.ok(!launch.error,launch.error);
   assert.match(devin.command,/--permission-mode dangerous\b/);
   assert.match(codex.command,/--ask-for-approval never\b/);
   assert.match(codex.command,/--sandbox danger-full-access\b/);
@@ -84,12 +71,6 @@ test('an explicit command override still gets the card prefix and unattended req
 });
 
 test('every command-terminal profile keeps its card-owned unattended mode',()=>{
-  for(const target of ['qwen-agent','qwen3.8-max','deepseek-v4-pro']){
-    const r=buildSpawnCommand({provider:'qwen',command:profileCommand(target)});
-    assert.ok(!r.error,`${target}: ${r.error}`);
-    assert.match(r.command,/--yolo\b/,`${target}: explicit profile command bypassed Qwen yolo`);
-    assert.match(r.command,/--exclude-tools agent\b/,`${target}: nested-agent exclusion was dropped`);
-  }
   const devin=buildSpawnCommand({provider:'devin',command:profileCommand('devin-agent')});
   assert.ok(!devin.error,devin.error);
   assert.match(devin.command,/--permission-mode dangerous\b/);
@@ -120,7 +101,7 @@ test('every Claude terminal launch - kernel, op, explicit command - carries DISA
     assert.ok(at>=0,launch.command);
     assert.ok(at<launch.command.indexOf('claude --'),'the variable is set before claude starts: '+launch.command);
   }
-  assert.doesNotMatch(buildSpawnCommand({provider:'qwen'}).command,/DISABLE_AUTOUPDATER/,'only the claude card declares it');
+  assert.doesNotMatch(buildSpawnCommand({provider:'devin'}).command,/DISABLE_AUTOUPDATER/,'only the claude card declares it');
   assert.deepEqual(loadAdapter('claude').card.launchEnv,{DISABLE_AUTOUPDATER:'1'});
 });
 
@@ -132,8 +113,8 @@ test('unknown provider returns a typed error, never a partial command',()=>{
 });
 
 test('loadAdapter names the card file it parsed',()=>{
-  const r=loadAdapter('qwen');
+  const r=loadAdapter('devin');
   assert.ok(!r.error,r.error);
-  assert.equal(r.file,'modules/models/agents/qwen.yaml');
+  assert.equal(r.file,'modules/models/agents/devin.yaml');
   assert.equal(r.card.kind,'command-terminal-agent');
 });

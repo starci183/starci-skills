@@ -60,7 +60,7 @@ const publicBaseOf = (config) => {
 /**
  * Jobs of one workflow that are DONE but held: the worker filed its report, the Kernel consumed it,
  * and an open peer-wait or owner-gate incident naming the job (--holds, else --op) keeps its settle
- * open - api status frontier.heldSettleJobs. The owner saw nothing of them: "job qwen xong/treo cũng
+ * open - api status frontier.heldSettleJobs. The owner saw nothing of them: "job xong/treo cũng
  * không ai nhắn" (2026-09-25; nivo op-integration.verify-25532858e7 sat done behind peer-wait
  * inc-8cce1cf1b330). Each: {jobId, op, outcome, heldBecause, incident, peer, peerJob, since, doneAt,
  * workerReleased}; `since` is when the hold began (the later of the wait and the consumed report).
@@ -241,7 +241,7 @@ async function main() {
   for (let i = 0; i < argv.length; i += 1) if (argv[i] === '--repo') repos.push(argv[++i]);
   const rows = collectProgress(reportRepos(repos));
   const messages = progressMessages(rows);
-  // One model-scorecard line (pool shares/pass rates, qwen tokens) over the same repos, last 24h; a failure adds nothing.
+  // One model-scorecard line (pool shares/pass rates) over the same repos, last 24h; a failure adds nothing.
   try {
     const sc = await import('../agent/model-scorecard.mjs');
     const line = `\n📊 ${esc(sc.summaryLine(sc.scorecardFor({ repos: reportRepos(repos), sinceHours: 24 })))}`;

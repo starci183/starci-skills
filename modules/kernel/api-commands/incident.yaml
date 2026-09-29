@@ -214,7 +214,7 @@ incident:
     provider-health --quota-probe
   outageCircuits: >-
     a worker whose screen shows a row matching its provider card's
-    quotaExhausted.screen (Qwen: "Quota exhausted: ..." or an "[API Error: ...]"
+    quotaExhausted.screen (a "Quota exhausted: ..." row or an "[API Error: ...]"
     row naming a quota code) or capacityExhausted.screen (Devin: "Protocol error
     (...): We are currently experiencing capacity issues ..."), while its turn is
     not active, carries providerOutage {provider, failureKind, source, match} in

@@ -43,8 +43,8 @@ test('--plan --kind code.refactor --difficulty hard walks the tier in declared o
   assert.ok(body,`expected JSON stdout, got: ${r.stdout}`);
   assert.equal(body.plan,true);
   // roleOfKind pins code.refactor -> implement; the hard tier's implement chain is the contract.
-  // Owner decision 2026-09-25 (72h scorecard): Devin leads hands-on implementation, Qwen seconds it.
-  assert.deepEqual(body.tier?.chain,['devin-agent','qwen-agent','codex-agent','claude-agent'],'plan must walk runtimes.yaml allocation.tiers.hard.implement in order');
+  // Owner decision 2026-09-25 (72h scorecard): Devin leads hands-on implementation, Codex seconds it.
+  assert.deepEqual(body.tier?.chain,['devin-agent','codex-agent','claude-agent'],'plan must walk runtimes.yaml allocation.tiers.hard.implement in order');
   assert.ok(Array.isArray(body.candidates)&&body.candidates.length===body.tier.chain.length);
   // qualifications.yaml ships empty: every candidate must carry an evidence annotation, not a silent pass.
   for(const c of body.candidates)
@@ -62,10 +62,10 @@ test('--plan honours config.yaml allocation.preferredProvider as a pick bias',t=
   const body=out(r);
   assert.ok(body,`expected JSON stdout, got: ${r.stdout}`);
   assert.equal(body.config?.preferredProvider,'codex','the bias must be reported, never hidden');
-  assert.deepEqual(body.tier?.chain,['devin-agent','qwen-agent','codex-agent','claude-agent'],'bias permutes the pick, never the declared tier chain');
+  assert.deepEqual(body.tier?.chain,['devin-agent','codex-agent','claude-agent'],'bias permutes the pick, never the declared tier chain');
   assert.equal(body.pick?.primary?.target,'codex-agent','preferredProvider hoists the first pickable candidate of that provider');
   // Bias is bounded: the non-preferred tier members remain as fallbacks, never removed.
-  assert.deepEqual(body.pick?.fallbacks?.map(f=>f.target),['devin-agent','qwen-agent','claude-agent']);
+  assert.deepEqual(body.pick?.fallbacks?.map(f=>f.target),['devin-agent','claude-agent']);
 });
 
 // The kernel route is the sol-think order: GPT-6 Sol first, Claude Opus 5.5 as overflow (owner routing
@@ -136,21 +136,18 @@ test('draw order and host-tool gate: interface.draw walks Devin then Codex; a po
   const ownerRoot=fixture(t).dir();
   // interface.draw walks the draw order (runtimes.yaml allocation.preference.draw; owner ruling 2026-09-27): Devin,
   // then Codex - claude-agent is not on its chain at all, whatever the prefer bias.
-  const r=run(['--kind','interface.draw','--difficulty','medium','--prefer','devin-agent,claude-agent','--plan','--json'],ROOT,{STARCI_OWNER_ROOT:ownerRoot});
+  const r=run(['--kind','interface.draw','--difficulty','medium','--prefer','claude-agent','--plan','--json'],ROOT,{STARCI_OWNER_ROOT:ownerRoot});
   assert.equal(r.status,0,r.stderr||r.error?.message);
   const body=out(r);
   assert.ok(body,`expected JSON stdout, got: ${r.stdout}`);
   assert.deepEqual((body.candidates??[]).map(c=>c.target),['devin-agent','codex-agent'],'the draw order is Devin then Codex');
   assert.equal(body.pick?.primary?.target,'devin-agent','Devin leads the draw order; a prefer for claude-agent cannot reach it');
   // A chain with a pool that lacks the tool rejects it by name: interface.audit needs browser-dom. It walks the
-  // ui order (owner routing 2026-09-26) - Codex, Devin, Qwen - where Devin and Codex carry the tool and
+  // ui order (owner routing 2026-09-26) - Codex, Devin - where both carry the tool and
   // claude-agent is not on the order at all.
-  const audit=out(run(['--kind','interface.audit','--difficulty','hard','--prefer','qwen-agent,claude-agent','--plan','--json'],ROOT,{STARCI_OWNER_ROOT:ownerRoot}));
+  const audit=out(run(['--kind','interface.audit','--difficulty','hard','--prefer','claude-agent','--plan','--json'],ROOT,{STARCI_OWNER_ROOT:ownerRoot}));
   assert.ok(!(audit.candidates??[]).some(x=>x.target==='claude-agent'),'claude-agent is not on the ui order');
-  const qwen=(audit.candidates??[]).find(x=>x.target==='qwen-agent');
-  assert.ok(qwen,'qwen-agent must appear in the walked chain');
-  assert.equal(qwen.status,'rejected');
-  assert.ok((qwen.reasons??[]).some(x=>/browser-dom/.test(x)),`qwen-agent rejection must name the browser-dom capability, got ${JSON.stringify(qwen.reasons)}`);
+  assert.deepEqual((audit.candidates??[]).map(x=>x.target).sort(),['codex-agent','devin-agent'],'the ui order is Codex then Devin, both carry browser-dom');
   assert.equal(audit.pick?.primary?.target,'codex-agent','Sol leads the ui order and carries the tool');
 });
 
@@ -234,13 +231,13 @@ test('the unpinned kernel route resolves to GPT-6 Sol',t=>{
   assert.equal(body.workload.work,'think');
 });
 
-test('backend.implement measured medium routes to Qwen or Devin, and grammar.update at its hard floor starts at Qwen',t=>{
+test('backend.implement measured medium routes to Devin, and grammar.update at its hard floor starts at Devin',t=>{
   const body=pick(t,['--kind','backend.implement','--difficulty','medium']);
-  assert.ok(['qwen-agent','devin-agent'].includes(body.pick.target),body.pick.target);
+  assert.equal(body.pick.target,'devin-agent');
   assert.deepEqual(body.fallbackChain.slice(-2).map(f=>f.target),['codex-agent','claude-agent']);
   const hard=pick(t,['--kind','grammar.update','--difficulty','easy']);
-  assert.deepEqual([hard.pick.target,hard.pick.model],['qwen-agent','deepseek-v4.1-flash']);
-  assert.equal(hard.fallbackChain[0]?.target,'devin-agent','Devin follows Qwen on the scaffold order');
+  assert.deepEqual([hard.pick.target,hard.pick.model],['devin-agent','swe-2-max']);
+  assert.equal(hard.fallbackChain[0]?.target,'codex-agent','Codex follows Devin on the scaffold order');
 });
 
 test('preferredProvider never moves strategy work onto a non-frontier pool',t=>{
@@ -250,8 +247,8 @@ test('preferredProvider never moves strategy work onto a non-frontier pool',t=>{
   assert.deepEqual([body.pick.target,body.pick.model],['claude-agent','claude-opus-5-5']);
   const devin=body.rejected.find(r=>r.target==='devin-agent');
   assert.match(devin?.reasons?.[0]??'',/think work runs only on runtimes.yaml allocation.preference.think/);
-  // A verdict walks the review order (owner decision 2026-09-25 review-hands): the hands are on it.
+  // A verdict walks the review order (owner decision 2026-09-25 review-hands): the review chain lists the hands first, so the preferred Devin leads it.
   const review=pick(t,['--kind','review.verify','--difficulty','easy'],config);
-  assert.ok(['devin-agent','qwen-agent'].includes(review.pick.target),review.pick.target);
+  assert.equal(review.pick.target,'devin-agent');
   assert.match(review.orderSource,/registry.yaml operators.review.verify.chain/);
 });

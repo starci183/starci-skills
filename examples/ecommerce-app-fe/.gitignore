@@ -8,7 +8,6 @@ coverage/
 test-results/
 .turbo/
 .tools/
-.qwen*/
 .artifacts/
 .tmp-*
 report*.json

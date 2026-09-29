@@ -103,7 +103,7 @@ Each view that shows an entity carries its `ui` state.
 | Usage | `tokens_in` (fresh + cache read + cache write), `tokens_out`, `cost_usd`, `usage_source` (`cli-transcript` measured, `unavailable` with `usage_reason`; per-model detail in `llm_usage`; NULL only until an ended attempt is decided, never estimated) |
 
 Token metering (`scripts/kernel/usage-record.mjs`, `api usage`): the numbers come from the agent CLI's own session file - Claude
-Code JSONL `message.usage`, Codex rollout `token_count`, Qwen `usageMetadata` (`scripts/lib/llm-usage.mjs`); devin and any other
+Code JSONL `message.usage`, Codex rollout `token_count` (`scripts/lib/llm-usage.mjs`); devin and any other
 agent are unavailable, and a terminal scrollback is never a source. `llm_usage` rows are normalized: `input_tokens` is fresh
 (non-cached) input, `output_tokens` includes reasoning, `reasoning_tokens` is that subset. An op attempt gets one row per model when it
 settles (`recordAttemptUsage`, idempotent); a Kernel session gets `kernel-turn` rows and the Supervisor seat `supervisor-turn` rows

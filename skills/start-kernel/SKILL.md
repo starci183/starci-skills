@@ -60,7 +60,7 @@ Executable: `.claude/scripts/kernel/start-workflow.mjs`
 - **Topology**: Codex/Claude/Devin chats are ingress launchers; Orca is the
   execution host; the Kernel is one dedicated Orca terminal. Codex/Claude
   managed workers run ops; the Kernel is never booted on one.
-- **Identity**: `agent` means execution adapter (`codex|claude|devin|qwen`),
+- **Identity**: `agent` means execution adapter (`codex|claude|devin`),
   `model` means a concrete model id, `profile` means a StarCi routing target,
   and `runtimePool` means a quota/capacity window. Do not call all four a provider.
 - **Fail closed**: an explicit Kernel pin never falls through to another agent.

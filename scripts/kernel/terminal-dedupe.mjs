@@ -3,7 +3,7 @@
 // After the 2026-09-24 reboot Orca 1.4.209 restored its previous tabs: four
 // old nivo Claude kernel sessions with their conversation history (idle
 // prompts, one still showing the old AUTH kernel's last message) and six bare
-// PowerShell tabs (old qwen op tabs). The watchdogs found the ledger's kernel
+// PowerShell tabs (old op tabs). The watchdogs found the ledger's kernel
 // terminals gone and started eight new kernels, so every workflow had two
 // kernel sessions, and a restored one would have acted as a duplicate kernel
 // the moment anything woke it. The supervisor closed ten terminals by hand.
@@ -19,7 +19,7 @@
 //   - and it is either a bare shell prompt (the agent exited:
 //     terminal-liveness.mjs exitedAgentPromptRow) or an agent session carrying
 //     a StarCi marker: a [Kernel]/[Op] tab or pane title, "kernel" in its
-//     title, an op-<kind>-<hex> job id or a qwen-code title or frame.
+//     title, an op-<kind>-<hex> job id.
 // An agent session with no StarCi marker is the owner's own and is never
 // touched; an unreadable frame is left alone. An agent session gets its CLI's
 // own quit first (quit-agent.mjs: Claude a double Ctrl+C), then the tab close.
@@ -35,8 +35,8 @@ import { withLedgerRead } from '../connectors/lib.mjs';
 import { kernelSignalRows, ledgerJobs, jobTerminalHandles, pathUnder, WORKER_HOLDING_STATUSES } from '../lib/terminal-ledger.mjs';
 
 // A StarCi title or frame: [Kernel]/[Op] names, an operation job id
-// (op-backend.implement-ed43628b07), a qwen-code session.
-export const STARCI_MARKER = /\[(?:Kernel|Op)\]|\bop-[a-z][a-z0-9-]*(?:\.[a-z0-9-]+)+-[0-9a-f]{6,}\b|\bqwen(?:[- ]?code)?\b/i;
+// (op-backend.implement-ed43628b07).
+export const STARCI_MARKER = /\[(?:Kernel|Op)\]|\bop-[a-z][a-z0-9-]*(?:\.[a-z0-9-]+)+-[0-9a-f]{6,}\b/i;
 // "kernel" counts in a title only: a Claude kernel's pane title reads
 // "✳ Nivo app auth kernel workflow"; a frame may mention the word anywhere.
 const KERNEL_TITLE = /\bkernel\b/i;

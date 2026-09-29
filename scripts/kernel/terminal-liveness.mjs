@@ -6,7 +6,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { parseYaml } from '../../engine/yaml.mjs';
-import { INPUT_GLYPH, INPUT_GLYPH_BOXED_CLASS, INPUT_GLYPH_CLASS, AGENT_GLYPH_CLASS } from '../lib/input-glyph.mjs';
+import { INPUT_GLYPH, INPUT_GLYPH_CLASS, AGENT_GLYPH_CLASS } from '../lib/input-glyph.mjs';
 
 // What a provider's frame looks like is declared on its card (modules/models/agents/<agent>.yaml
 // `liveness`), not guessed here:
@@ -21,18 +21,13 @@ import { INPUT_GLYPH, INPUT_GLYPH_BOXED_CLASS, INPUT_GLYPH_CLASS, AGENT_GLYPH_CL
 //                   notice rows ("✘ Auto-update failed: claude.exe in use … · Run claude doctor",
 //                   "✔ Update installed · Restart to apply", IDE and MCP notices; sn-learn-content
 //                   term_2cd5a276 read turn-idle under a live spinner, 2026-09-25).
-//   inputRow        {pattern, framedBy}: an input row drawn without a > › ❯ ❭ glyph, told from a
-//                   transcript bullet by the rule rows framing it (Qwen Code's "* ..." box).
-//   ghostSuggestion {maxChars}: after a turn the provider paints a model-written suggestion in the
-//                   empty input row (Qwen Code's grey "* settle op-..."); a single row of it is not
-//                   typed input (nivo op-integration.verify-25532858e7, 2026-09-25).
 // Every caller that has no provider at hand (the Kernel watchdog, the supervisor) classifies with
 // the union of all cards; each card pattern is specific to its provider's frame.
 const AGENTS_DIR = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..', 'modules', 'models', 'agents');
 const compile = (source) => { try { return new RegExp(String(source), 'u'); } catch { return null; } };
 const compileAll = (list) => (Array.isArray(list) ? list : []).map(compile).filter(Boolean);
 let cardCache = null;
-/** Every agent card's compiled liveness patterns: Map<agent, {busy, chrome, inputRow, ghost, liveness, stagedPattern}>.
+/** Every agent card's compiled liveness patterns: Map<agent, {busy, chrome, liveness, stagedPattern}>.
  * `liveness` is the card's own liveness block (its activeStaleMs/quietMs overrides); `stagedPattern` the raw
  * submission.stagedPattern source - both cached here so the hot liveness path never re-reads the card file. */
 export function cardLivenessPatterns({ dir = AGENTS_DIR, refresh = false } = {}) {
@@ -45,13 +40,9 @@ export function cardLivenessPatterns({ dir = AGENTS_DIR, refresh = false } = {})
     try { cardDoc = parseYaml(fs.readFileSync(path.join(dir, file), 'utf8')) ?? null; } catch { cardDoc = null; }
     const liveness = cardDoc?.liveness ?? null;
     if (!liveness || typeof liveness !== 'object') continue;
-    const inputPattern = compile(liveness.inputRow?.pattern ?? '(?!)'), framedBy = liveness.inputRow?.framedBy ? compile(liveness.inputRow.framedBy) : null;
     cards.set(file.replace(/\.yaml$/, ''), {
       busy: compileAll(liveness.busyPatterns),
       chrome: compileAll(liveness.chromePatterns),
-      inputRow: liveness.inputRow?.pattern && inputPattern ? { pattern: inputPattern, framedBy } : null,
-      ghost: liveness.ghostSuggestion && typeof liveness.ghostSuggestion === 'object'
-        ? { maxChars: Number(liveness.ghostSuggestion.maxChars) > 0 ? Number(liveness.ghostSuggestion.maxChars) : 160 } : null,
       liveness,
       stagedPattern: typeof cardDoc?.submission?.stagedPattern === 'string' && cardDoc.submission.stagedPattern.trim()
         ? cardDoc.submission.stagedPattern : null,
@@ -67,32 +58,8 @@ const patternsFor = (provider) => {
   return {
     busy: chosen.flatMap((card) => card.busy),
     chrome: chosen.flatMap((card) => card.chrome),
-    inputRows: chosen.map((card) => card.inputRow).filter(Boolean),
   };
 };
-const RULE_ROW = /^\s*[─━═]{8,}\s*$/u;
-/** True when rows[i] is a card-declared input row: its pattern, framed above and below by rule rows. */
-const cardInputRowAt = (rows, i, inputRows) => inputRows.some(({ pattern, framedBy }) => pattern.test(rows[i])
-  && (framedBy ?? RULE_ROW).test(rows[i - 1] ?? '') && (framedBy ?? RULE_ROW).test(rows[i + 1] ?? ''));
-/**
- * The text of a card-declared ghost suggestion in `screen`'s input row, or null: the provider's card
- * declares ghostSuggestion, its framed input row is the LAST input row of the frame, it holds one row
- * of text no longer than maxChars, and that text is not the provider's empty-row placeholder.
- * The screen has no colours, so the card's declaration is the proof: the runtime is the only typist
- * of an unattended worker, and what it typed is recognised separately (a staged paste, its own wake).
- */
-export function ghostSuggestionOf(screen, provider) {
-  const card = provider ? cardLivenessPatterns().get(String(provider).toLowerCase()) : null;
-  if (!card?.ghost || !card.inputRow) return null;
-  const rows = String(screen ?? '').split(/\r?\n/).filter(Boolean).slice(-TRAILING_ROWS);
-  for (let i = rows.length - 1; i >= 0; i -= 1) {
-    if (!cardInputRowAt(rows, i, [card.inputRow])) continue;
-    const text = collapse(rows[i].replace(INPUT_GLYPH, ''));
-    if (!text || /^type your message\b/i.test(text) || text.length > card.ghost.maxChars) return null;
-    return text;
-  }
-  return null;
-}
 
 // Screens that wait for a human answer before any turn can run. The runtime
 // names the gate and stops; answering it (directory trust, first-run setup,
@@ -121,15 +88,6 @@ const INTERACTIVE_GATES = [
   // model, never show it again.
   { gate: 'codex-rate-limit-model-nudge', pattern: /approaching rate limits[\s\S]*keep current model/i,
     remedy: "pick 'Keep current model (never show again)', or set [notice] hide_rate_limit_model_nudge = true in its config.toml" },
-  // Qwen Code's heuristic loop check halts the turn at a boxed menu (LoopDetectionConfirmation, Qwen Code
-  // 0.24.5): "A potential loop was detected" / "› 1. Keep loop detection enabled (esc)" / "  2. Disable loop
-  // detection for this session" (starci-next inc-af01e1cedbf4). Every row sits behind the box's `│` rail, so it
-  // is matched on rail-stripped rows (framed); the two option labels are its own (in either order: Orca may
-  // lift the cursor row out of the frame as a draft) and stay in the last rows when the title has scrolled
-  // out. modules/models/agents/qwen.yaml pins model.skipLoopDetection and allowlists the answer
-  // (gateAutoAnswer); api nudge picks it.
-  { gate: 'qwen-loop-detection', framed: true, pattern: /^(?=[\s\S]*keep loop detection enabled)(?=[\s\S]*disable loop detection for this session)/i,
-    remedy: "pick '2. Disable loop detection for this session' in that terminal; set model.skipLoopDetection true in ~/.qwen/settings.json so later sessions skip the heuristic check" },
   { gate: 'workspace-trust', pattern: /trust the authors/i,
     remedy: 'open a terminal in <cwd>, start the same agent CLI once, answer its workspace-trust prompt, then quit it' },
   // An agent CLI's own multiple-choice question (Devin's ask dialog, Claude's
@@ -156,10 +114,7 @@ export function gateRemedy(gate, { cwd = null } = {}) {
 // Every classifier reads the frame's last TRAILING_ROWS non-empty rows.
 export const TRAILING_ROWS = 14;
 export const DEFAULT_STAGED_PATTERN = /Pasted Content|\[Pasted text/i;
-// Qwen Code 0.24.4 draws its input row as "*   Type your message or @path/to/file" and echoes each sent
-// message into the transcript as "> <text>"; without `*` that echo became the last glyph row, the spinner
-// under it was not "above" the input, and awaitSubmission closed a working worker as prompt-stuck.
-// The glyph set itself is scripts/lib/input-glyph.mjs INPUT_GLYPH (boxed: `*` counts here).
+// The glyph set itself is scripts/lib/input-glyph.mjs INPUT_GLYPH.
 /** `text` as one row: whitespace runs collapsed to one space, trimmed. */
 export const collapse = (text) => String(text ?? '').replace(/\s+/g, ' ').trim();
 /** A draft as one row of at most DRAFT_CLIP_CHARS, for receipts and events. */
@@ -213,7 +168,7 @@ export function stagedInputRow(screen, stagedPattern = DEFAULT_STAGED_PATTERN, {
 // input box unseen: the frame read turn-idle with an empty '❯', the next wake was typed onto it, and
 // the texts piled up (nivo collab Kernel, 2026-09-25). A reader puts the draft back where the agent
 // shows it before any classification.
-const DRAFT_GLYPH_ROW = new RegExp(`^(\\s*(?:[│┃]\\s?)?\\s*${INPUT_GLYPH_BOXED_CLASS})(?:\\s|$)`, 'u');
+const DRAFT_GLYPH_ROW = new RegExp(`^(\\s*(?:[│┃]\\s?)?\\s*${INPUT_GLYPH_CLASS})(?:\\s|$)`, 'u');
 /**
  * `screen` with `draft` written into its LAST input-glyph row (within the last 14 rows), or appended
  * as a '› <draft>' row when the frame shows none. The draft is collapsed to one row: every classifier
@@ -268,7 +223,7 @@ export function draftOwnership(draft, { texts = [], stagedPattern = DEFAULT_STAG
 // A nudge typed there on 2026-09-24 02:23 (term_8a556567, a dead mm-work op) was run by PowerShell as a
 // command. Agents that run shell tools print "PS D:\x> cmd" rows in their transcript too, but an agent TUI
 // always ends its frame with its own input box or footer, so only a bare prompt as the LAST non-empty row
-// counts - and only a bare one: "PS D:\x> qwen ..." is a launch still starting, not an exit.
+// counts - and only a bare one: "PS D:\x> claude ..." is a launch still starting, not an exit.
 const SHELL_PROMPT_ROWS = [
   /^PS(?:\s+\S[^>]*)?>$/,                    // PowerShell: "PS D:\Repositories\x>"
   /^[A-Za-z]:\\[^<>|*?"\r\n]*>$/,           // cmd.exe: "D:\Repositories\x>"
@@ -287,13 +242,12 @@ export function shellPromptPrefix(row) {
   for (const pattern of SHELL_PROMPT_PREFIXES) { const match = pattern.exec(text); if (match) return match[0]; }
   return null;
 }
-// The rows an agent TUI draws at the foot of its frame: its input row (Codex "›", Claude "❯", Qwen's
-// "*   Type your message") and footers (Codex "gpt-6-sol high · 62% left", Claude "bypass permissions").
-const AGENT_FOOT_ROW = new RegExp(`^\\s*${AGENT_GLYPH_CLASS}(?:\\s|$)|^\\s*\\*\\s{2,}Type your message|\\bAsk Codex\\b|\\bMessage Devin\\b|bypass permissions|\\d+% (?:context )?left\\b|esc to (?:interrupt|cancel)`, 'iu');
+// The rows an agent TUI draws at the foot of its frame: its input row (Codex "›", Claude "❯") and footers (Codex "gpt-6-sol high · 62% left", Claude "bypass permissions").
+const AGENT_FOOT_ROW = new RegExp(`^\\s*${AGENT_GLYPH_CLASS}(?:\\s|$)|\\bAsk Codex\\b|\\bMessage Devin\\b|bypass permissions|\\d+% (?:context )?left\\b|esc to (?:interrupt|cancel)`, 'iu');
 // An agent command typed after a prompt: a launch still starting, never an exit. The launch line may open
 // with shell statements before the agent (`$env:DISABLE_AUTOUPDATER='1'; & claude ...`, agents/claude.yaml
-// launchEnv; qwen's CLI_TITLE and key refresh): any `;`-separated statement that runs an agent makes it a launch.
-const AGENT_LAUNCH = /^(?:&\s*)?["']?[\w:\\/.~-]*?\b(?:claude|codex|qwen|devin)(?:\.exe|\.cmd|\.ps1)?["']?(?:\s|$)/i;
+// launchEnv): any `;`-separated statement that runs an agent makes it a launch.
+const AGENT_LAUNCH = /^(?:&\s*)?["']?[\w:\\/.~-]*?\b(?:claude|codex|devin)(?:\.exe|\.cmd|\.ps1)?["']?(?:\s|$)/i;
 export const isAgentLaunch = (text) => String(text ?? '').split(';').some((statement) => AGENT_LAUNCH.test(statement.trim()));
 /**
  * The shell prompt row a frame ends in because its agent exited, or null. Two shapes:
@@ -449,13 +403,9 @@ export function classifyAgentScreen(screen, { stagedPattern = DEFAULT_STAGED_PAT
   // The prompt row may contain a provider message (for example Orca's
   // "You have orchestration messages") rather than "Ask ...". Any non-empty
   // prompt row is turn-idle unless a current activity marker above wins. This row set is the
-  // provider-agnostic floor; a card adds its own rows through liveness.inputRow (a card's
-  // readiness.screenPattern is the launcher's readiness check, scripts/agent/lib.mjs).
+  // provider-agnostic floor (a card's readiness.screenPattern is the launcher's readiness check, scripts/agent/lib.mjs).
   const readyPrompt = new RegExp(`(?:^|\\n)\\s*${INPUT_GLYPH_CLASS}\\s*(?:\\S|$)|(?:^|\\n)\\s*(?:Ask Codex|Ask Claude|Message Devin|Enter a prompt)\\b`, 'im');
-  // A card-declared input row (Qwen Code's "*   Type your message" or its ghost suggestion "* settle
-  // op-...", framed by rule rows) is a prompt row too: without it a finished Qwen worker read
-  // unknown - active-unclassified while its footer redrew - and nothing ever reached it.
-  const promptAt = (rows, i) => readyPrompt.test(rows[i]) || cardInputRowAt(rows, i, card.inputRows);
+  const promptAt = (rows, i) => readyPrompt.test(rows[i]);
 
   // A boxed dialog (a `framed` gate) is drawn behind the same rail a quoted child transcript uses, so it is
   // matched on the recent rows with the box's rails stripped. Its wrapped note rows can outnumber the

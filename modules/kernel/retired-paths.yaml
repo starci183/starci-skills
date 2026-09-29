@@ -52,3 +52,12 @@ retired:
   - {path: modules/schemas/work.schema.yaml, retiredAt: 2026-09-29, removedIn: wp56-leftovers, replacedBy: 'work-workspace.schema.yaml, work-resource.schema.yaml and work-evidence.schema.yaml (one file per record kind); the monolith had no runtime reader'}
   - {path: knowledge/repository-baseline.yaml, retiredAt: 2026-09-29, removedIn: hfs2-sync, replacedBy: 'packages/hfs/templates rendered by hfs sync (husky, ci and e2e workflows, .gitignore, sonar, codecov, .starciwork/.gitignore) and the @starci presets; no baseline shape or copied config remains'}
   - {path: tests/repository-baseline.spec.mjs, retiredAt: 2026-09-29, removedIn: hfs2-sync, replacedBy: 'tests/hfs-sync.spec.mjs'}
+  - {path: modules/models/agents/qwen.yaml, retiredAt: 2026-09-29, removedIn: drop-qwen, replacedBy: 'none: the Qwen provider is removed (owner ruling 2026-09-29); claude, codex and devin remain'}
+  - {path: modules/models/profiles/qwen-agent.yaml, retiredAt: 2026-09-29, removedIn: drop-qwen, replacedBy: 'none: the Qwen provider is removed (modules/models/profiles/devin-agent.yaml leads hands-on work)'}
+  - {path: modules/models/profiles/qwen3.8-max.yaml, retiredAt: 2026-09-29, removedIn: drop-qwen, replacedBy: 'none: the Qwen provider is removed'}
+  - {path: modules/models/profiles/deepseek-v4-pro.yaml, retiredAt: 2026-09-29, removedIn: drop-qwen, replacedBy: 'none: it ran through the Qwen CLI'}
+  - {path: scripts/api/quota/qwen.mjs, retiredAt: 2026-09-29, removedIn: drop-qwen, replacedBy: 'none: the Qwen provider and its quota.qwen config block are removed'}
+  - {path: tests/quota-qwen.spec.mjs, retiredAt: 2026-09-29, removedIn: drop-qwen, replacedBy: 'none: it tested the retired Qwen quota probe'}
+  - {path: tests/qwen-base-pool.spec.mjs, retiredAt: 2026-09-29, removedIn: drop-qwen, replacedBy: 'tests/allocation-balance.spec.mjs and tests/route-model.spec.mjs cover routing over claude, codex and devin'}
+  - {path: tests/qwen-launch-ceilings.spec.mjs, retiredAt: 2026-09-29, removedIn: drop-qwen, replacedBy: 'none: it tested the retired Qwen launch ceilings'}
+  - {path: tests/qwen-loop-gate.spec.mjs, retiredAt: 2026-09-29, removedIn: drop-qwen, replacedBy: 'none: it tested the retired Qwen loop-detection gate'}

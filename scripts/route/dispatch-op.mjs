@@ -22,7 +22,7 @@
 //   orca terminal create --worktree <selector> --title "[Op] <id>" --command "<text>" --json
 //     -> result.terminal.handle   (modules/host/orca/calls.yaml terminal-create)
 //   orca terminal send --terminal <handle> --text "<prompt>" --enter --json
-//   Command-terminal launch only (qwen/devin/codex profiles); managed-agent
+//   Command-terminal launch only (devin/codex profiles); managed-agent
 //   profiles (claude) launch through `orca orchestration worker-start` and
 //   refuse --spawn here — see modules/host/orca/index.yaml managedFallback.
 //   A command-terminal profile without a static command (codex) is composed
@@ -272,7 +272,7 @@ function main() {
   // Spawn sequence per modules/kernel/dispatch.yaml spawnMechanics. The
   // terminal command is composed by the agent layer: profile launch command
   // (model+tuning) with the provider card's env prefix injected — devin's
-  // ACP strip and qwen's credential refresh can no longer be forgotten.
+  // ACP strip can no longer be forgotten.
   const cardLaunch = model.kind === 'command-terminal' && !model.command
     ? resolveCardLaunchModel({ target: model.target, requestedModel: model.requestedModel, modelsDir })
     : null;

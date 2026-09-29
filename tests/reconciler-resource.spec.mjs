@@ -38,7 +38,7 @@ function controller({ pct = () => 50, ops = () => [], priorities = null, env = n
   const c = createResourceController({ settings: async () => settings, maxParallelOps: async () => 20, env: machineEnv,
     host: async () => ({ totalRamBytes: 100 * GB, freeRamBytes: pct() * GB, freeRamPct: pct(), lowDisk: false }),
     load: async () => 0.2, census: async () => ({ ops: ops(), kernels: 0 }), footprints: async () => [], owners: async () => [],
-    recordFootprint: async (p) => footprints.push(p), queuedReady: async (ctx, wf) => ready(wf), providerOf: async () => (pool) => ({ 'qwen-agent': 'qwen', 'codex-agent': 'codex' })[pool] ?? null, providerCircuits });
+    recordFootprint: async (p) => footprints.push(p), queuedReady: async (ctx, wf) => ready(wf), providerOf: async () => (pool) => ({ 'devin-agent': 'devin', 'codex-agent': 'codex' })[pool] ?? null, providerCircuits });
   return { c, env: machineEnv, footprints };
 }
 
@@ -129,8 +129,8 @@ test('cap-starved: the reserve workflow short of its slots for 15 min opens one 
 
 test('quota: probe every 5 min while a quota circuit is open; quota-exhausted when every pool of a waiting kind is out', async () => {
   // The circuits are machine.sqlite provider_health rows (scripts/kernel/provider-circuit.mjs providerCircuits).
-  const circuits = [{ provider: 'qwen', value: { provider: 'qwen', status: 'unavailable', failureKind: 'quota' }, expiresAt: T + 3_600_000 }];
-  const jobs = [{ op: 'interface.draw', status: 'queued', pool: 'qwen-agent' }, { op: 'interface.draw', status: 'queued', pool: 'qwen-agent' }, { op: 'code.refactor', status: 'queued', pool: 'codex-agent' }];
+  const circuits = [{ provider: 'devin', value: { provider: 'devin', status: 'unavailable', failureKind: 'quota' }, expiresAt: T + 3_600_000 }];
+  const jobs = [{ op: 'interface.draw', status: 'queued', pool: 'devin-agent' }, { op: 'interface.draw', status: 'queued', pool: 'devin-agent' }, { op: 'code.refactor', status: 'queued', pool: 'codex-agent' }];
   const read = (id, fn) => fn({ prepare: () => ({ all: () => jobs }) });
   const { c } = controller({ providerCircuits: () => circuits });
   const { ctx, calls, advance } = ctxOf('shadow', { read });
@@ -144,7 +144,7 @@ test('quota: probe every 5 min while a quota circuit is open; quota-exhausted wh
   advance(5 * 60_000);
   assert.equal((await c.reconcile('resource:quota:nivo-backend', ctx)).probed, true);
   assert.deepEqual(await c.list(ctx), [HOST_KEY, 'resource:pools', 'resource:quota:nivo-backend']);
-  assert.deepEqual(quotaExhausted({ jobs: [{ op: 'a', status: 'queued', pool: null }], openProviders: ['qwen'], providerOf: () => 'qwen' }), [], 'an unrouted kind is never judged');
+  assert.deepEqual(quotaExhausted({ jobs: [{ op: 'a', status: 'queued', pool: null }], openProviders: ['devin'], providerOf: () => 'devin' }), [], 'an unrouted kind is never judged');
 });
 
 test('hostThrottle reads the mode the Resource controller published and writes nothing', async () => {

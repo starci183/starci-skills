@@ -44,8 +44,8 @@ export function loadAdapter(provider) {
 
 // Build the terminal command for a provider. Composition:
 //   launchEnv + env + hostIdentity.env                     ← card launch env (claude DISABLE_AUTOUPDATER), the
-//                                                            caller's launch env, Orca tab identity (qwen CLI_TITLE)
-//   + credentialRefresh[plat] + commandPrefix[plat]        ← card-owned env prep (ACP strip, stale-key unset)
+//                                                            caller's launch env, Orca tab identity
+//   + commandPrefix[plat]                                  ← card-owned env prep (ACP strip, auth probe)
 //   + hostLaunchPrefix[plat]                               ← keeps the launch on Orca's runtime-owned PTY path
 //   + explicit `command` (e.g. a model profile's launch.orca.command carrying model+tuning flags)
 //     AND any missing card requirements (kernel → kernelCommandRequirements)
@@ -93,24 +93,10 @@ export const cwdCommand = (dir, plat = process.platform === 'win32' ? 'win32' : 
   if (typeof dir !== 'string' || !dir.trim() || /['"\r\n]/.test(dir)) return null;
   return plat === 'win32' ? `Set-Location -LiteralPath '${dir}' -ErrorAction Stop;` : `cd '${dir}' || exit 1;`;
 };
-// A card's credentialRefresh step for one platform, with `<secrets-file>`
-// replaced by the absolute path of credentialRefresh.secretsFile under this
-// runtime root. The step reads the secret from that file inside the terminal's
-// own shell, so no value ever enters the command, a receipt or a log.
-export function credentialRefreshCommand(card, plat = process.platform === 'win32' ? 'win32' : 'posix') {
-  const step = card?.credentialRefresh?.[plat];
-  if (typeof step !== 'string' || !step.trim()) return null;
-  if (!step.includes('<secrets-file>')) return step;
-  const rel = card?.credentialRefresh?.secretsFile;
-  if (typeof rel !== 'string' || !rel.trim() || path.isAbsolute(rel) || rel.split(/[\\/]/).includes('..')) return null;
-  const file = path.join(skillRoot, rel).replace(/\\/g, '/');
-  if (/['\r\n]/.test(file)) return null;
-  return step.replaceAll('<secrets-file>', file);
-}
 // A card's hostIdentity.env: variables that let Orca recognise the agent in
 // its tab (logo + working spinner). Orca names a pane's agent from agent hooks,
 // the foreground process, or the pane title; an agent whose process is a bare
-// `node` and that has no Orca hook (Qwen Code) is only recognisable by title.
+// `node` and that has no Orca hook is only recognisable by title.
 // `<label>` renders to the op job id when the launch carries STARCI_OP_JOB,
 // otherwise to the card's agent name.
 export function hostIdentityEnv(card, env = null) {
@@ -140,8 +126,8 @@ export function buildSpawnCommand({ provider, kernel = false, command = null, mo
   // for the UI to publish a handle and otherwise answers "Timed out waiting
   // for terminal handle after creation" while the tab still spawns later,
   // untracked. A leading shell call operator runs the same binary on the
-  // runtime-owned PTY path qwen and devin already use (agent card reason).
-  const prefix = [envPrefix(card?.launchEnv, plat), envPrefix(env, plat), pathPrefixCommand(pathPrefix, plat), envPrefix(hostIdentityEnv(card, env), plat), credentialRefreshCommand(card, plat), card?.commandPrefix?.[plat], card?.hostLaunchPrefix?.[plat]]
+  // runtime-owned PTY path devin already uses (agent card reason).
+  const prefix = [envPrefix(card?.launchEnv, plat), envPrefix(env, plat), pathPrefixCommand(pathPrefix, plat), envPrefix(hostIdentityEnv(card, env), plat), card?.commandPrefix?.[plat], card?.hostLaunchPrefix?.[plat]]
     .filter((s) => typeof s === 'string' && s.trim()).map((s) => s.trim()).join(' ');
   const requirementList = (kernel && Array.isArray(card?.kernelCommandRequirements)
     ? card.kernelCommandRequirements
@@ -290,7 +276,7 @@ function answerGate(handle, rule, screen) {
 /**
  * Answer an allowlisted gate that appears MID-RUN (the Kernel's `api nudge` on an op worker): the card's
  * gateAutoAnswer rule for `gate`, the same walk-and-Enter answerGate does at readiness, then up to settleMs
- * for the gate to leave the screen. Qwen Code's loop-detection dialog halts a worker's turn this way
+ * for the gate to leave the screen. A loop-detection dialog can halt a worker turn this way
  * (starci-next inc-af01e1cedbf4). Returns {gate, select, answered, cleared, keystroke, reason?}; a gate the
  * card does not allowlist returns answered:false with no keystroke. `io` {read, sleep, now} is the spec seam.
  */
@@ -326,7 +312,7 @@ export function answerAllowlistedGate(handle, adapter, gate, { screen = null, io
 // an option label (`❯ 1. Dark mode`) is still not a prompt. Claude separates the
 // glyph from the hint with a NO-BREAK SPACE (U+00A0), not a space: the second
 // launch after the first fix still timed out on exactly that byte.
-export const DEFAULT_READY_PATTERN = String.raw`(?:Ask|Message|Type your message|Enter a prompt|(^|\n)[ \t\u00a0]*` + INPUT_GLYPH_CLASS + String.raw`(?:[ \t\u00a0]+Try "[^\n]*)?[ \t\u00a0]*(\r?\n|$))`;
+export const DEFAULT_READY_PATTERN = String.raw`(?:Ask|Message|Enter a prompt|(^|\n)[ \t\u00a0]*` + INPUT_GLYPH_CLASS + String.raw`(?:[ \t\u00a0]+Try "[^\n]*)?[ \t\u00a0]*(\r?\n|$))`;
 
 // The tail of a terminal frame, kept on a failed launch so its cause is
 // visible after the terminal is gone: the last `rows` non-empty rows, capped.
@@ -347,8 +333,8 @@ export function cpuSample() {
 const busyShare = (from, to) => (from && to && to.total > from.total ? Math.min(1, Math.max(0, 1 - (to.idle - from.idle) / (to.total - from.total))) : null);
 
 // An agent frame row (never a shell prompt row): its input glyph, banner or footer.
-const AGENT_FRAME_ROW = new RegExp(`^\\s*${AGENT_GLYPH_CLASS}(?:\\s|$)|Claude Code|OpenAI Codex|\\bQwen\\b|\\bDevin\\b|bypass permissions|esc to (?:interrupt|cancel)`, 'iu');
-const AGENT_LAUNCH_ROW = /^\s*(?:&\s*|command\s+)?["']?[\w:\\/.~-]*?\b(?:claude|codex|qwen|devin)(?:\.exe|\.cmd|\.ps1)?["']?(?:\s|$)/i;
+const AGENT_FRAME_ROW = new RegExp(`^\\s*${AGENT_GLYPH_CLASS}(?:\\s|$)|Claude Code|OpenAI Codex|\\bDevin\\b|bypass permissions|esc to (?:interrupt|cancel)`, 'iu');
+const AGENT_LAUNCH_ROW = /^\s*(?:&\s*|command\s+)?["']?[\w:\\/.~-]*?\b(?:claude|codex|devin)(?:\.exe|\.cmd|\.ps1)?["']?(?:\s|$)/i;
 const screenRows = (screen) => String(screen ?? '').split(/\r?\n/).map((row) => row.trim()).filter(Boolean);
 // The frame ends in a bare shell prompt: the launched agent command returned.
 function bareShellPrompt(screen) {
@@ -553,7 +539,7 @@ export function awaitSubmission(handle, adapter, { sentText = null, onWait = nul
   let staged = DEFAULT_STAGED_PATTERN;
   if (typeof spec.stagedPattern === 'string' && spec.stagedPattern.trim())
     staged = regexp(`${DEFAULT_STAGED_PATTERN.source}|${spec.stagedPattern}`, DEFAULT_STAGED_PATTERN.source);
-  const input = regexp(adapter?.readiness?.screenPattern, `(?:Ask|Message|Type your message|Enter a prompt|(^|\\n)\\s*${INPUT_GLYPH_CLASS})`);
+  const input = regexp(adapter?.readiness?.screenPattern, `(?:Ask|Message|Enter a prompt|(^|\\n)\\s*${INPUT_GLYPH_CLASS})`);
   const timeoutMs = submissionTimeoutMs(adapter);
   const settleMs = Math.max(250, Number(spec.settleMs) || 1000);
   const maxEnter = Math.max(1, Number(spec.maxEnter) || 2);

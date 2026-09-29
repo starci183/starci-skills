@@ -281,7 +281,7 @@ function cmdStatus(ledger, args, repo, { emit, internals, ext }) {
   // A held settle's worker has nothing left to do: its report is consumed and only the wait holds the
   // job. Its terminal and path lease go back now (reconcile --release-worker; the watchdog runs it under
   // --repair), the job stays unsettled for the settle the wait releases (nivo op-integration.verify-
-  // 25532858e7 sat leased with its Qwen terminal open through the whole peer-wait inc-8cce1cf1b330).
+  // 25532858e7 sat leased with its terminal open through the whole peer-wait inc-8cce1cf1b330).
   for (const item of heldSettle) {
     const worker = workers.find((w) => w.jobId === item.jobId) ?? null;
     item.worker = worker?.liveness === 'released' ? 'released' : worker?.terminalHandle ? 'held' : 'none';

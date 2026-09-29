@@ -137,8 +137,7 @@ import {
 import { selectPool, providerCircuitOf, defaultOperationTarget } from '../agent/models.mjs';
 import { readProviderCircuit, writeProviderCircuit as storeProviderCircuit } from './provider-circuit.mjs';
 import { credentialFingerprintOf, credentialRotated } from '../agent/credential-fingerprint.mjs';
-import { QUOTA_FAILURE_KIND, quotaSpecOf, outageSpecsOf, outageInText, outageOnScreen } from '../agent/provider-outage.mjs';
-import { nextResetAt as qwenNextResetAt } from '../api/quota/qwen.mjs';
+import { QUOTA_FAILURE_KIND, outageSpecsOf, outageInText, outageOnScreen } from '../agent/provider-outage.mjs';
 import { kindRoute as kindRouteOf, isFanOutSlice } from '../agent/models.mjs';
 import { recentDispatchCounts, auditAuthorOf } from '../agent/balance.mjs';
 import { configuredAllocationPolicy } from '../../engine/config.mjs';
@@ -591,7 +590,7 @@ const stagedInputEvidenceOf = (db, job, payload = jobPayloadOf(job)) => {
 // The text the last provider input-glyph row holds (rails stripped) - what an Enter would submit.
 // The screen cannot tell the agent's real input buffer from painted placeholder chrome; the caller
 // decides which it is.
-const INPUT_ROW_GLYPH = /^\s*[>›❯❭*]\s*/u;
+const INPUT_ROW_GLYPH = /^\s*[>›❯❭]\s*/u;
 const workerInputRowText = (screen) => {
   const rows = String(screen ?? '').split(/\r?\n/).filter(Boolean).slice(-TRAILING_ROWS)
     .map((line) => line.replace(/^\s*[│┃]\s?/u, ''));
@@ -603,9 +602,9 @@ const workerInputRowText = (screen) => {
   return null;
 };
 // What a provider paints in an EMPTY input row: Codex 'Ask Codex to do anything', Devin
-// 'Ask/Guide/Message Devin ...', Qwen 'Type your message ...', Claude's rotating 'Try "..."' hint,
+// 'Ask/Guide/Message Devin ...', Claude's rotating 'Try "..."' hint,
 // the queued-message Enter prompts. Painted placeholder is not input text.
-const INPUT_ROW_PLACEHOLDER = /^(?:ask (?:codex|claude|devin)\b|message devin\b|guide devin\b|type your message\b|enter a prompt\b|press enter to send queued messages\b|press up to (?:edit|select) (?:a )?queued messages?\b|you have \d+ orchestration messages?\b|try\s*["'“])/iu;
+const INPUT_ROW_PLACEHOLDER = /^(?:ask (?:codex|claude|devin)\b|message devin\b|guide devin\b|enter a prompt\b|press enter to send queued messages\b|press up to (?:edit|select) (?:a )?queued messages?\b|you have \d+ orchestration messages?\b|try\s*["'“])/iu;
 // Input text the runtime itself put there: a paste marker the provider's card declares, or a
 // verbatim piece of a text the runtime sent this terminal (the dispatched contract, or the same
 // wake left staged by a dropped send).
@@ -630,7 +629,7 @@ const DEAD_WORKER_LIVENESS = ['disconnected', 'gone', 'agent-exited', 'quiet', '
 // attempt (the gate's maxPerAttempt, default GATE_ANSWER_LIMIT) the gate is a loop, not a prompt: the
 // worker reads `gate-loop`, nudge refuses it, and it recovers like a wedged worker through
 // reconcile --dead-worker --settle-failed, so repeats across attempts become a retry-loop finding
-// (starci-next inc-af01e1cedbf4: Qwen Code's "A potential loop was detected" menu).
+// (starci-next inc-af01e1cedbf4: a provider's "A potential loop was detected" menu).
 const GATE_ANSWERED_EVENT = 'op-worker-gate-answered';
 const GATE_ANSWER_LIMIT = 2;
 const workerCardOf = (job) => {
@@ -734,7 +733,7 @@ const observeOperationWorker = (job, now = Date.now(), db = null, { frame = fals
     const beating = heartbeatAgeMs != null && heartbeatAgeMs <= activeStaleMs;
     const unwritable = refused && !(heartbeatAt > refusedAt);
     const writable = shownWritable && !unwritable;
-    // A host dialog the worker's card allowlists (Qwen Code's loop-detection menu) is the runtime's to
+    // A host dialog the worker's card allowlists (a loop-detection menu) is the runtime's to
     // answer: api nudge picks it. Answered maxPerAttempt times on this attempt, it is a loop (gate-loop).
     const gateAnswer = screenState === 'interactive-gate' && connected && writable ? workerGateAnswerOf(db, job, screenGate) : null;
     // 'gone' is a running Orca's typed answer that the handle names no
@@ -1853,15 +1852,11 @@ const writeProviderCircuit = (db, { provider, model, jobId, step, signal, error,
 /* -------------------------------------------------------- outage circuits */
 // A provider whose agent card declares an outage key (scripts/agent/provider-outage.mjs) opens its
 // circuit on the evidence of a launch failure text (rejectDispatch) or a worker screen row (api status /
-// api observe). quotaExhausted opens failureKind quota: the circuit lasts until the plan reset
-// (config.yaml quota.qwen.resetAt, rolled forward) - without one, allocation.cooldownMs.quota - and
+// api observe). quotaExhausted opens failureKind quota: the circuit lasts for
+// allocation.cooldownMs.quota and
 // `api provider-health --quota-probe` clears it earlier on a passing 1-token completion.
 // capacityExhausted opens failureKind capacity for allocation.cooldownMs.capacity (circuitBackoff on a reopen).
 const providerQuotaProbeCommand = (provider) => `api provider-health --provider ${provider} --quota-probe`;
-const quotaResetAtOf = (provider, now = Date.now()) => {
-  if (normalizeProviderId(provider) !== 'qwen') return null;
-  try { return qwenNextResetAt({ root: ownerRoot, now }); } catch { return null; }
-};
 const jobProviderOf = (job) => {
   const payload = jobPayloadOf(job);
   const declared = payload?.hierarchy?.runtime?.provider ?? null;
@@ -1875,15 +1870,9 @@ const workerOutageEvidence = (job, screen) => {
   if (!provider || !outageSpecsOf(provider).length) return null;
   return outageOnScreen(provider, String(screen ?? ''));
 };
-// The circuit outlives the reset by one probe interval, so the first probe after the reset (due at
-// once, whatever the hourly throttle) decides whether the plan really came back. The provider card's
-// probe.everyMs wins; absent one the quota cooldown is the interval (runtimes.yaml
-// allocation.cooldownMs.quota — a literal here would be a second authority).
-const quotaProbeEveryMs = (provider) => quotaSpecOf(provider)?.probe?.everyMs ?? allocationMs('cooldownMs.quota');
 const openQuotaCircuit = (db, { provider, model = null, jobId = null, step, signal = null, error = null, evidence, now }) => {
-  const resetAt = quotaResetAtOf(provider, now);
   return writeProviderCircuit(db, { provider, model, jobId, step, signal, error, now, failureKind: QUOTA_FAILURE_KIND,
-    fixedExpiresAt: resetAt ? resetAt + quotaProbeEveryMs(provider) : null, extra: { evidence: evidence ?? null, resetAt: resetAt ?? null } });
+    fixedExpiresAt: null, extra: { evidence: evidence ?? null } });
 };
 // The circuit an outage evidence opens: its failureKind decides quota (plan reset) or cooldown.
 const openOutageCircuit = (db, { evidence, ...fields }) => evidence?.failureKind === QUOTA_FAILURE_KIND
@@ -1953,7 +1942,7 @@ function recordWorkerOutageEvidence(ledger, workers, now = Date.now()) {
 // (define-goal). A Kernel's --prefer/--avoid is accepted for compatibility and
 // IGNORED with a warning, recorded as biasIgnored on route-decided (owner decision
 // 2026-09-25: starci-next op-interface.implement-c3bcc0d5e4 was routed around
-// qwen-agent and devin-agent onto codex on a hunch). The router itself skips a
+// devin-agent onto codex on a hunch). The router itself skips a
 // pool whose provider-health circuit is open (capacity below) and, for a retry,
 // demotes or excludes the pools its lineage failed on (scripts/kernel/lineage-route.mjs).
 // Difficulty: --difficulty > job payload.difficulty > 'medium'.
@@ -2230,7 +2219,7 @@ const opLeaseRequests = (payload, canon = null, op = null) => (canon
   ? canon.requests(payload, op ?? payload?.opId ?? null)
   : ownedPathLeaseRequests((payload.owned_paths ?? []).filter(Boolean)));
 
-// A write set another job's LIVE lease still owns is a wait, never a launch failure. A nivo qwen job
+// A write set another job's LIVE lease still owns is a wait, never a launch failure. A nivo job
 // was dispatched twice and rejected at `reserve` both times behind its own workflow's running
 // interface.implement (en.json/vi.json); each refusal was recorded dispatch-rejected and fed
 // repeat-reject OWED. Now route and dispatch answer path-lease and leave the job queued: status
@@ -2642,7 +2631,7 @@ const EVIDENCE_CAP = 40;
 // A terminal Orca refuses writes to ('unwritable') takes no quit input: it is closed at once.
 const closeQuietTerminal = (job, handle, liveness = 'quiet') => bestEffort(() => {
   // A gate-loop worker still shows its host dialog, where a typed quit command is not read: Esc closes the
-  // dialog first (Qwen's loop menu takes Esc as 'Keep', which leaves the request halted at the prompt).
+  // dialog first (a loop menu that takes Esc as 'Keep' leaves the request halted at the prompt).
   if (liveness === 'gate-loop') { bestEffort(() => terminalSend({ terminal: handle, text: '\x1b', enter: false })); sleepSync(500); }
   const quit = liveness === 'unwritable' ? null : quitAgent({ handle, agent: agentOfJob(jobPayloadOf(job)) });
   const closed = closeOperationTerminal(handle);
@@ -4522,7 +4511,7 @@ function attributeChecks(db, { repo, job, checks }) {
 // stopped (scripts/kernel/reap-agent-process.mjs).
 // The worker's own agent CLI: its routed provider/model, else Claude for a managed Dispatch (the
 // managed pool's agent). A managed worker used to get Claude's quit input whatever it ran.
-const agentOfJob = (payload) => /^(claude|codex|devin|qwen)/i.exec(String(payload?.provider ?? payload?.agent ?? payload?.model ?? payload?.route?.agent ?? ''))?.[1]?.toLowerCase()
+const agentOfJob = (payload) => /^(claude|codex|devin)/i.exec(String(payload?.provider ?? payload?.agent ?? payload?.model ?? payload?.route?.agent ?? ''))?.[1]?.toLowerCase()
   ?? (payload?.managed ? 'claude' : null);
 // The launches of every OTHER live agent this host's ledgers know - running, answering or leased
 // ops (their latest op-dispatched time; a leased one is launching now) and running kernels (their
@@ -4644,7 +4633,7 @@ const API_INTERNALS = Object.freeze({
   handoverProofGate, reportFiledWake, releaseWorkerOnReport,
   isCheckResultEnvelope, attributeChecks, buildOpsOf, markMeasured, isPeerBlockedCheck,
   summarizeCheckEvidence,
-  normalizeProviderId, quotaResetAtOf, providerQuotaProbeCommand, providerRecoverCommand,
+  normalizeProviderId, providerQuotaProbeCommand, providerRecoverCommand,
   currentCredentialOf,
   accountsOnceOf: () => accountsOnce,
   refuseDecisionsFirst, goalLegOf, workflowFinished, workDebtOf, workflowScopeOf,

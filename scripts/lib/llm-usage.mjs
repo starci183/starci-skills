@@ -8,9 +8,6 @@
 //   codex   Codex CLI    <home>/.codex/sessions/YYYY/MM/DD/rollout-*.jsonl — `event_msg` token_count events carry the
 //                        session's cumulative total_token_usage {input_tokens (cached included), cached_input_tokens,
 //                        output_tokens (reasoning included), reasoning_output_tokens}; `turn_context` names the model.
-//   qwen    Qwen Code    <home>/.qwen/projects/<slug>/chats/*.jsonl — `assistant` records carry model and
-//                        usageMetadata {promptTokenCount (cached included), candidatesTokenCount, thoughtsTokenCount,
-//                        cachedContentTokenCount}.
 //   devin   Devin CLI    keeps its sessions in sessions.db, which no adapter reads: usage is 'unavailable'.
 // Every other agent is 'unavailable' too. A terminal scrollback (op_attempts.transcript_sha) is rendered screen text,
 // not a token record, so it is not a source.
@@ -25,7 +22,7 @@ import { readYamlFile } from './yaml.mjs';
 
 export const USAGE_SOURCE = 'cli-transcript';
 export const USAGE_UNAVAILABLE = 'unavailable';
-export const USAGE_AGENTS = Object.freeze(['claude', 'codex', 'qwen']);
+export const USAGE_AGENTS = Object.freeze(['claude', 'codex']);
 export const PRICES_FILE = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', '..', 'modules', 'models', 'prices.yaml');
 
 const COUNT_FIELDS = ['inputTokens', 'outputTokens', 'cacheReadTokens', 'cacheWriteTokens'];
@@ -148,35 +145,8 @@ export function codexUsage(lines) {
   return { agent: 'codex', sessionId, models: [...rows.values()].filter(hasActivity), turns };
 }
 
-/** Qwen Code chat lines -> {agent, models:[row], turns, sessionId}: one usageMetadata per assistant record. */
-export function qwenUsage(lines) {
-  const rows = new Map();
-  const seen = new Set();
-  let sessionId = null, turns = 0;
-  for (const line of lines) {
-    if (!line.includes('"usageMetadata"')) continue;
-    const o = parse(line);
-    const u = o?.type === 'assistant' ? o.usageMetadata : null;
-    if (!u || (o.uuid && seen.has(o.uuid))) continue;
-    if (o.uuid) seen.add(o.uuid);
-    sessionId ??= o.sessionId ?? null;
-    const model = o.model ?? 'unknown';
-    if (!rows.has(model)) rows.set(model, emptyRow(model, { toolErrors: false }));
-    const row = rows.get(model);
-    const cached = int(u.cachedContentTokenCount);
-    row.cacheReadTokens += cached;
-    row.inputTokens += Math.max(0, int(u.promptTokenCount) - cached);
-    row.outputTokens += int(u.candidatesTokenCount) + int(u.thoughtsTokenCount);
-    row.reasoningTokens += int(u.thoughtsTokenCount);
-    row.turns += 1;
-    turns += 1;
-    if (Array.isArray(o.message?.parts)) row.toolCalls += o.message.parts.filter((p) => p?.functionCall).length;
-  }
-  return { agent: 'qwen', sessionId, models: [...rows.values()].filter(hasActivity), turns };
-}
-
 const hasActivity = (row) => COUNT_FIELDS.some((f) => row[f] > 0) || row.turns > 0;
-const EXTRACTORS = { claude: claudeUsage, codex: codexUsage, qwen: qwenUsage };
+const EXTRACTORS = { claude: claudeUsage, codex: codexUsage };
 const UNAVAILABLE_REASON = {
   devin: 'no usage adapter for devin: it keeps its sessions in sessions.db, which no adapter reads',
 };

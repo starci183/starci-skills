@@ -38,7 +38,6 @@ const tmp = (t, prefix) => {
 test('the Devin card classifies its capacity error as a capacity outage, from text and from an anchored screen row only', () => {
   assert.deepEqual(outageSpecsOf('devin-agent').map((s) => s.failureKind), ['capacity']);
   assert.equal(quotaSpecOf('devin'), null, 'Devin declares no quota outage');
-  assert.deepEqual(outageSpecsOf('qwen').map((s) => s.failureKind), ['quota'], 'Qwen keeps its quota outage');
   assert.deepEqual(outageInText('devin', [`ACP: agent error (Internal): ${CAPACITY_ROW}`]),
     { provider: 'devin', failureKind: 'capacity', source: 'text', match: 'experiencing capacity issues with this serving model' });
   const screen = ['  ⎿ Read .starciwork/features/profiles/ui/index.yaml', CAPACITY_ROW, '❭ Ask Devin to build features...'].join('\n');
@@ -143,8 +142,8 @@ test('a failed attempt with no report and no outage of its pool is still the wor
       status:'failed',createdAt:at-60000,updatedAt:at-1000,payload:{model:'devin-agent'},result:{verdict:'fail',report:null}}]});
     // An outage of ANOTHER pool, a devin launch-path strike, and a devin outage after this attempt settled
     // prove nothing about it.
-    l.appendEvent({ workflowId: WF, entityType: 'provider', entityId: 'qwen', kind: 'provider-unavailable',
-      payload: { provider: 'qwen', model: 'qwen-agent', failureKind: 'quota' },createdAt:at-30000 });
+    l.appendEvent({ workflowId: WF, entityType: 'provider', entityId: 'codex', kind: 'provider-unavailable',
+      payload: { provider: 'codex', model: 'codex-agent', failureKind: 'quota' },createdAt:at-30000 });
     l.appendEvent({ workflowId: WF, entityType: 'provider', entityId: 'devin', kind: 'provider-unavailable',
       payload: { provider: 'devin', model: 'devin-agent', failureKind: 'readiness' },createdAt:at-30000 });
     l.appendEvent({ workflowId: WF, entityType: 'provider', entityId: 'devin', kind: 'provider-unavailable',

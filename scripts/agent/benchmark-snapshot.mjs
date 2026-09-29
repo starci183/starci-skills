@@ -104,7 +104,7 @@ export function formatDelta({ file, snapshot, previous, delta }) {
  * Returns { file, snapshot, previous, delta }.
  */
 export function takeSnapshot({ repos = null, sinceHours, now = Date.now(), date = localDate(now), dir = SNAPSHOTS_DIR,
-  sourceRoot = sourceRootOf(), qwenHome } = {}) {
+  sourceRoot = sourceRootOf() } = {}) {
   if (!(Number(sinceHours) > 0)) throw Object.assign(Error('--since-hours needs a positive number'), { code: 'EUSAGE' });
   if (!DATE.test(date)) throw Object.assign(Error(`--date needs YYYY-MM-DD, got ${date}`), { code: 'EUSAGE' });
   const name = snapshotName(date, Number(sinceHours));
@@ -112,7 +112,7 @@ export function takeSnapshot({ repos = null, sinceHours, now = Date.now(), date 
   if (fs.existsSync(file)) throw Object.assign(Error(`${file} exists: snapshots are append-only and never overwritten`), { code: 'EEXIST' });
   const targets = repos?.length ? repos : boundRepos({ sourceRoot });
   if (!targets.length) throw Object.assign(Error(`no bound project repo with a ledger under ${sourceRoot}/.workspaces/projects; pass --repo`), { code: 'EUSAGE' });
-  const snapshot = scorecardFor({ repos: targets, sinceHours: Number(sinceHours), now, ...(qwenHome ? { qwenHome } : {}) });
+  const snapshot = scorecardFor({ repos: targets, sinceHours: Number(sinceHours), now });
   const previous = previousSnapshot(dir, name, Number(sinceHours));
   fs.mkdirSync(dir, { recursive: true });
   fs.writeFileSync(file, `${JSON.stringify(snapshot)}\n`, { flag: 'wx' });

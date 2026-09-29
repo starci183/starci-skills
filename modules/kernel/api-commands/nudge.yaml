@@ -16,8 +16,8 @@ nudge:
     text, action submit-staged-input: typing a wake on top of the paste
     would bury it (inc-06aeecf432f1). A worker at a host dialog its agent
     card allowlists (liveness interactive-gate with worker.gateAutoAnswer;
-    modules/models/agents/<agent>.yaml gateAutoAnswer.gates, e.g. Qwen Code's
-    "A potential loop was detected" menu, gate qwen-loop-detection) gets the
+    modules/models/agents/<agent>.yaml gateAutoAnswer.gates, e.g. a loop-detection
+    menu) gets the
     card's option picked with arrow keys and Enter, no wake text, action
     answer-gate {gate,select,answered,cleared,keystroke,answers,limit}, and one
     op-worker-gate-answered event (starci-next inc-af01e1cedbf4). Answered
@@ -31,11 +31,7 @@ nudge:
     verbatim piece of the dispatched contract, or this same wake left
     staged) is foreign input, and the nudge refuses `foreign-input` typing
     nothing - the wake never appends to words this job did not write
-    (Supervisor ruling, inc-f1d014518dc3). A ghost suggestion the worker's
-    card declares (modules/models/agents/<agent>.yaml liveness.ghostSuggestion:
-    Qwen Code paints a model-written follow-up such as "* settle op-..." in
-    its empty input row after a turn) is not typed input: the wake is typed
-    over it.
+    (Supervisor ruling, inc-f1d014518dc3).
     The input box's draft counts as its input row. Orca lifts the text of an
     agent's input box out of the frame and answers it as `draft`
     (scripts/api/orca/terminal-read.mjs); read without it, a send whose Enter

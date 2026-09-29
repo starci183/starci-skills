@@ -13,7 +13,7 @@ import { launchSupervisor, stopSupervisor, planSupervisorDedupe, doctrineOf, sea
 import { withSupervisor, readSupervisor, seatOf, enabledOf, writeSeat, supervisorEvent, SUPERVISOR_ID, SKILL_ROOT } from '../scripts/supervisor/home.mjs';
 import {
   adaptiveCap, createJob, spawnWorkers, createStaging, removeStaging, fileReport, jobOf, stagingPathOf, leaseConflicts, pickWorkerPool, cancelJob, ackReport,
-  stageSelf, workerLaunchCommand, workerGuard, READINESS_FAILS_PER_HOUR, openWorkerHandles,
+  stageSelf, workerGuard, READINESS_FAILS_PER_HOUR, openWorkerHandles,
 } from '../scripts/supervisor/workers.mjs';
 import { landCommits, land, contractCoverage, governedPaths, specsTouching, specPlan, runChecks, describe, acquireLand, landQueue, specTimeoutMs, LAND_WAIT_MS } from '../scripts/supervisor/land.mjs';
 import { scanDiff, defaultPushRepos, boundRepos } from '../scripts/supervisor/push-mains.mjs';
@@ -161,7 +161,7 @@ test('workers: one job per cluster, launches stop at the cap, a leased file wait
   const spawned = [];
   const deps = {
     load: () => ({ cpuBusy: 0.99, freeMem: 0.5 }),
-    route: async () => ({ pool: 'qwen-agent', agent: 'qwen', model: 'm', effort: null }),
+    route: async () => ({ pool: 'devin-agent', agent: 'devin', model: 'm', effort: null }),
     staging: ({ jobId }) => ({ ok: true, path: `/tmp/${jobId}`, branch: `sup/${jobId}`, base: 'abc' }),
     unstage: () => ({}),
     spawn: (opts) => { spawned.push(opts); return { ok: true, terminal: `term_${spawned.length}` }; },
@@ -185,24 +185,21 @@ test('workers: one job per cluster, launches stop at the cap, a leased file wait
 
 test('worker routing: the balanced pick skips an unavailable provider and prefers the furthest below its share', async () => {
   const runtimes = parseYaml(fs.readFileSync(new URL('../modules/models/runtimes.yaml', import.meta.url), 'utf8'));
-  const shares = { 'claude-agent': 25, 'codex-agent': 25, 'devin-agent': 25, 'qwen-agent': 25 };
-  const pick = await pickWorkerPool({ shares, runtimes, recent: { 'claude-agent': 5, 'codex-agent': 5, 'devin-agent': 5, 'qwen-agent': 0 } });
-  assert.equal(pick.agent, 'qwen');
-  const skip = await pickWorkerPool({ shares, runtimes, recent: { 'qwen-agent': 0, 'claude-agent': 9, 'codex-agent': 9, 'devin-agent': 1 },
-    availabilityOf: (p) => (p === 'qwen' ? { state: 'unavailable', reason: 'circuit open' } : { state: 'available' }) });
-  assert.equal(skip.agent, 'devin');
-  assert.ok(skip.skipped.some((s) => s.pool === 'qwen-agent'));
+  const shares = { 'claude-agent': 25, 'codex-agent': 25, 'devin-agent': 25 };
+  const pick = await pickWorkerPool({ shares, runtimes, recent: { 'claude-agent': 5, 'codex-agent': 5, 'devin-agent': 0 } });
+  assert.equal(pick.agent, 'devin');
+  const skip = await pickWorkerPool({ shares, runtimes, recent: { 'devin-agent': 0, 'claude-agent': 9, 'codex-agent': 1 },
+    availabilityOf: (p) => (p === 'devin' ? { state: 'unavailable', reason: 'circuit open' } : { state: 'available' }) });
+  assert.equal(skip.agent, 'codex');
+  assert.ok(skip.skipped.some((s) => s.pool === 'devin-agent'));
 });
 
-test('worker readiness: a qwen worker launches its profile command (routed --model), and a readiness failure excludes the provider', async (t) => {
-  const qwen = workerLaunchCommand({ pool: 'qwen-agent', provider: 'qwen', model: 'deepseek-v4.1-flash' });
-  assert.match(qwen ?? '', /^qwen --model deepseek-v4\.1-flash .*--yolo/, 'a bare `qwen` starts on the host default model and never shows the card identity');
-  assert.equal(workerLaunchCommand({ pool: 'claude-agent', provider: 'claude', model: 'm' }), null, 'a card with terminalFallback pins the model itself');
+test('worker readiness: a readiness failure excludes the provider', async (t) => {
   const env = envOf(t);
   const m = machineOf(t, env);
   const runtimes = parseYaml(fs.readFileSync(new URL('../modules/models/runtimes.yaml', import.meta.url), 'utf8'));
-  const shares = { 'claude-agent': 25, 'codex-agent': 25, 'qwen-agent': 25 };
-  const recent = { 'claude-agent': 9, 'codex-agent': 5, 'qwen-agent': 0 };
+  const shares = { 'claude-agent': 25, 'codex-agent': 25, 'devin-agent': 25 };
+  const recent = { 'claude-agent': 9, 'codex-agent': 5, 'devin-agent': 0 };
   const a = createJob(m, { cluster: 'r1', files: ['scripts/r1.mjs'] });
   const b = createJob(m, { cluster: 'r2', files: ['scripts/r2.mjs'] });
   const routed = [], spawned = [];
@@ -211,61 +208,60 @@ test('worker readiness: a qwen worker launches its profile command (routed --mod
     route: async ({ prefer, avoid }) => { routed.push({ prefer, avoid }); return pickWorkerPool({ shares, runtimes, recent, prefer, avoid }); },
     staging: ({ jobId }) => ({ ok: true, path: `/tmp/${jobId}`, branch: `sup/${jobId}`, base: 'abc' }),
     unstage: () => ({}),
-    spawn: (opts) => { spawned.push(opts); return opts.provider === 'qwen' ? { ok: false, step: 'readiness', error: 'terminal readiness timeout after 120000ms' } : { ok: true, terminal: `term_${spawned.length}` }; },
+    spawn: (opts) => { spawned.push(opts); return opts.provider === 'devin' ? { ok: false, step: 'readiness', error: 'terminal readiness timeout after 120000ms' } : { ok: true, terminal: `term_${spawned.length}` }; },
   };
   const r = await spawnWorkers(m, { settings, deps, env });
-  assert.equal(spawned[0].provider, 'qwen', 'qwen is furthest below its share');
-  assert.match(spawned[0].command ?? '', /--model deepseek-v4\.1-flash/);
+  assert.equal(spawned[0].provider, 'devin', 'devin is furthest below its share');
   assert.equal(spawned[1].provider, 'codex', 'the rest of the pass skips the provider that just failed readiness');
   assert.deepEqual(r.failed.map((f) => f.jobId), [a.job.job_id]);
   const requeued = jobOf(m, a.job.job_id);
   assert.equal(requeued.status, 'queued');
-  assert.deepEqual(requeued.payload.avoidAgents, ['qwen']);
+  assert.deepEqual(requeued.payload.avoidAgents, ['devin']);
   assert.equal(requeued.payload.agent, null, 'the requeued job keeps its own agent request, not the provider routed to it');
   assert.ok(m.latestSupAttempt(a.job.job_id).cancelled_at, 'the failed spawn attempt is closed');
   const r2 = await spawnWorkers(m, { settings, deps, env });
   assert.equal(r2.launched[0].jobId, a.job.job_id);
-  assert.notEqual(r2.launched[0].agent, 'qwen', 'a requeued job is never re-routed to the provider that failed it');
-  assert.ok(routed.at(-1).avoid.includes('qwen'));
+  assert.notEqual(r2.launched[0].agent, 'devin', 'a requeued job is never re-routed to the provider that failed it');
+  assert.ok(routed.at(-1).avoid.includes('devin'));
   assert.equal(jobOf(m, b.job.job_id).status, 'running');
   // READINESS_FAILS_PER_HOUR failures in the hour exclude the provider for every job, fresh ones included.
-  for (let i = 0; i < READINESS_FAILS_PER_HOUR; i += 1) supervisorEvent(m, { entityType: 'job', entityId: `x${i}`, kind: 'worker-spawn-failed', payload: { agent: 'devin', step: 'readiness' } });
+  for (let i = 0; i < READINESS_FAILS_PER_HOUR; i += 1) supervisorEvent(m, { entityType: 'job', entityId: `x${i}`, kind: 'worker-spawn-failed', payload: { agent: 'claude', step: 'readiness' } });
   createJob(m, { cluster: 'r3', files: ['scripts/r3.mjs'] });
   await spawnWorkers(m, { settings, deps, env });
-  assert.ok(routed.at(-1).avoid.includes('devin'), JSON.stringify(routed.at(-1)));
+  assert.ok(routed.at(-1).avoid.includes('claude'), JSON.stringify(routed.at(-1)));
 });
 
-test('worker quota: an attestation refused for quota exhaustion excludes the provider like a readiness failure', async (t) => {
+test('worker outage: an attestation refused for a provider capacity outage excludes the provider like a readiness failure', async (t) => {
   const env = envOf(t);
   const m = machineOf(t, env);
   const runtimes = parseYaml(fs.readFileSync(new URL('../modules/models/runtimes.yaml', import.meta.url), 'utf8'));
-  const shares = { 'claude-agent': 25, 'codex-agent': 25, 'qwen-agent': 25 };
-  const recent = { 'claude-agent': 9, 'codex-agent': 5, 'qwen-agent': 0 };
+  const shares = { 'claude-agent': 25, 'codex-agent': 25, 'devin-agent': 25 };
+  const recent = { 'claude-agent': 9, 'codex-agent': 5, 'devin-agent': 0 };
   const a = createJob(m, { cluster: 'q1', files: ['scripts/q1.mjs'] });
   const b = createJob(m, { cluster: 'q2', files: ['scripts/q2.mjs'] });
   const routed = [], spawned = [];
-  const quota = 'attestation rejected: Quota exhausted: |Throttling\.AllocationQuota|insufficient_quota|free allocated quota exceeded';
+  const quota = 'attestation rejected: We are currently experiencing capacity issues with this serving model';
   const deps = {
     load: () => ({ cpuBusy: 0, freeMem: 1 }),
     route: async ({ prefer, avoid }) => { routed.push({ prefer, avoid }); return pickWorkerPool({ shares, runtimes, recent, prefer, avoid }); },
     staging: ({ jobId }) => ({ ok: true, path: `/tmp/${jobId}`, branch: `sup/${jobId}`, base: 'abc' }),
     unstage: () => ({}),
-    spawn: (opts) => { spawned.push(opts); return opts.provider === 'qwen' ? { ok: false, step: 'attestation', error: quota } : { ok: true, terminal: `term_${spawned.length}` }; },
+    spawn: (opts) => { spawned.push(opts); return opts.provider === 'devin' ? { ok: false, step: 'attestation', error: quota } : { ok: true, terminal: `term_${spawned.length}` }; },
   };
   await spawnWorkers(m, { settings, deps, env });
-  assert.equal(spawned[0].provider, 'qwen', 'qwen is furthest below its share');
-  assert.equal(spawned[1].provider, 'codex', 'the rest of the pass skips the quota-exhausted provider');
+  assert.equal(spawned[0].provider, 'devin', 'devin is furthest below its share');
+  assert.equal(spawned[1].provider, 'codex', 'the rest of the pass skips the provider in outage');
   const requeued = jobOf(m, a.job.job_id);
   assert.equal(requeued.status, 'queued');
-  assert.deepEqual(requeued.payload.avoidAgents, ['qwen']);
+  assert.deepEqual(requeued.payload.avoidAgents, ['devin']);
   const r2 = await spawnWorkers(m, { settings, deps, env });
   assert.equal(r2.launched[0]?.jobId, a.job.job_id, JSON.stringify(r2));
-  assert.notEqual(r2.launched[0].agent, 'qwen', 'the requeued job is never re-routed to the quota-exhausted provider');
-  assert.ok(routed.at(-1).avoid.includes('qwen'));
+  assert.notEqual(r2.launched[0].agent, 'devin', 'the requeued job is never re-routed to the provider in outage');
+  assert.ok(routed.at(-1).avoid.includes('devin'));
   assert.equal(jobOf(m, b.job.job_id).status, 'running');
   // An attestation failure that is no outage (a wrong model on screen) excludes nothing.
   const c = createJob(m, { cluster: 'q3', files: ['scripts/q3.mjs'] });
-  const other = { ...deps, route: async () => pickWorkerPool({ shares, runtimes, recent, prefer: 'qwen' }), spawn: () => ({ ok: false, step: 'attestation', error: 'attestation rejected: model mismatch' }) };
+  const other = { ...deps, route: async () => pickWorkerPool({ shares, runtimes, recent, prefer: 'devin' }), spawn: () => ({ ok: false, step: 'attestation', error: 'attestation rejected: model mismatch' }) };
   await spawnWorkers(m, { settings, deps: other, env, jobId: c.job.job_id });
   assert.equal(jobOf(m, c.job.job_id).payload.avoidAgents, undefined);
 });

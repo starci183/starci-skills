@@ -325,7 +325,7 @@ CREATE TABLE IF NOT EXISTS op_attempts(
   span_id           TEXT NOT NULL CHECK(length(span_id)=16),
   parent_span_id    TEXT,                        -- span của decision / lượt Kernel đã dispatch
   -- ai chạy
-  agent             TEXT CHECK(agent IS NULL OR agent IN ('devin','codex','claude','qwen')),
+  agent             TEXT CHECK(agent IS NULL OR agent IN ('devin','codex','claude')),
   provider          TEXT,
   model             TEXT,                        -- model id đã chứng thực trên màn hình (gen_ai.response.model)
   request_model     TEXT,                        -- model đã yêu cầu (gen_ai.request.model)

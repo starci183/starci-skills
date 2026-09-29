@@ -75,8 +75,6 @@ Optional keys:
   the owner did not ask to review is accepted without the owner)
 - `uat` — `{maxConcurrent?}` or null: the machine-wide ceiling of concurrent UAT runs (`scripts/uat/uat-slots.mjs`;
   default `engine/config.mjs` `UAT_DEFAULTS`)
-- `quota` — `{qwen: {resetAt, ...}}` or null: plan figures a provider has no API for; only `qwen.resetAt` is read
-  (`scripts/api/quota/qwen.mjs`)
 
 ## Kernel group
 
@@ -143,22 +141,22 @@ record (SRS, SDS, scope, goal, decision, brand, UI, Work, workspace, rule) or a 
 runs only on `allocation.preference.think`, Claude Opus 5.5 and GPT-6 Sol, at a hard floor where
 `codex-agent` pins Sol, and neither `allocation.preferredProvider` nor `--prefer` can add a pool to that
 order; under `balanced` Opus takes it until it reaches its share and Sol after. Review is the exception:
-the verify kinds still declared on it and `work.author` walk the `review` order - Devin
-and Qwen, with Opus and Sol as overflow only (`allocation.overflowByOrder`, under either policy) - and a
+the verify kinds still declared on it and `work.author` walk the `review` order - Devin,
+with Opus and Sol as overflow only (`allocation.overflowByOrder`, under either policy) - and a
 verify kind goes to another audit family than the op whose output it reads (`allocation.frontier` and
-`allocation.hands`): Qwen reviews what Devin implemented, Devin what Qwen implemented. Owner routing
+`allocation.hands`): what Devin implemented is reviewed by Opus or Sol. Owner routing
 2026-09-26 adds two more orders: the UI verifications (`interface.audit`, `e2e.verify`, `security.verify`,
-`uat.assisted.verify`) walk `ui` - Sol first, Devin then Qwen behind it - and the mechanical ops
+`uat.assisted.verify`) walk `ui` - Sol first, Devin behind it - and the mechanical ops
 (`provision.ask`, `workspace.manage`, `task.execute`, `knowledge.repair`) walk `implement`, which the hands
 serve whatever the kind's role. `interface.draw` and
 `interface.asset` walk the `draw` order, Codex only (the image tool). Hands-on work — implementing, testing,
 refactoring, running and measuring under a settled record — walks the `allocation.tiers` implement, write
-and verify orders: Devin first, then Qwen (DeepSeek V4.1 Flash) and Codex at medium and hard, Qwen first at
+and verify orders: Devin first, then Codex, at medium and hard, Codex first at
 easy, Opus as overflow. Scaffold, docs, content and grammar work and every hands-on cut slice walk the
-`scaffold` order, Qwen first. Source setup (`backend.scaffold`, `interface.scaffold`, `package.scaffold`) keeps the difficulty
+`scaffold` order, Devin first. Source setup (`backend.scaffold`, `interface.scaffold`, `package.scaffold`) keeps the difficulty
 its scope measures. A floor raises a measured difficulty and never lowers it
 (`scripts/agent/models.mjs` `selectPool`). The non-operation pool lists its members in route order; with no
-`kernel` key the kernel's own model calls walk `sol-think`, Sol first, and Qwen and Devin carry neither
+`kernel` key the kernel's own model calls walk `sol-think`, Sol first, and Devin carries neither
 `plan` nor `decide`, so those functions never reach them. Functions
 retain separate typed inputs and independent contexts even though they share a pool.
 

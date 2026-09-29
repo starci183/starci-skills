@@ -78,7 +78,7 @@ CREATE TABLE IF NOT EXISTS repositories(
 
 -- agents / models: HÌNH CHIẾU modules/models/*.yaml (YAML vẫn là hợp đồng), viết lại mỗi lần engine khởi động.
 CREATE TABLE IF NOT EXISTS agents(
-  agent      TEXT PRIMARY KEY CHECK(agent IN ('devin','codex','claude','qwen')),
+  agent      TEXT PRIMARY KEY CHECK(agent IN ('devin','codex','claude')),
   provider   TEXT, spawn_card TEXT, cli_name TEXT,
   source_rev TEXT NOT NULL, loaded_at INTEGER NOT NULL) STRICT;
 CREATE TABLE IF NOT EXISTS models(
@@ -144,7 +144,7 @@ CREATE TABLE IF NOT EXISTS sup_attempts(
   job_id         TEXT NOT NULL REFERENCES sup_jobs(job_id) ON DELETE CASCADE,
   dispatch_seq   INTEGER NOT NULL DEFAULT 1,
   span_id        TEXT NOT NULL CHECK(length(span_id)=16), parent_span_id TEXT,
-  agent          TEXT CHECK(agent IS NULL OR agent IN ('devin','codex','claude','qwen')),
+  agent          TEXT CHECK(agent IS NULL OR agent IN ('devin','codex','claude')),
   provider TEXT, model TEXT, effort TEXT, terminal_handle TEXT, worker_pid INTEGER,
   runtime_rev TEXT, cli_name TEXT, cli_version TEXT,
   prompt_sha     TEXT REFERENCES blobs(sha256), transcript_sha TEXT REFERENCES blobs(sha256),
@@ -547,7 +547,7 @@ CREATE UNIQUE INDEX IF NOT EXISTS ux_claims_live ON claims(resource_path) WHERE 
 
 CREATE TABLE IF NOT EXISTS agent_sessions(
   session_id      TEXT PRIMARY KEY,
-  agent           TEXT NOT NULL CHECK(agent IN ('devin','codex','claude','qwen')),
+  agent           TEXT NOT NULL CHECK(agent IN ('devin','codex','claude')),
   terminal_handle TEXT, ledger_id TEXT, workflow_id TEXT, job_id TEXT, attempt_id INTEGER, sup_attempt_id INTEGER, seat_id TEXT,
   started_at INTEGER, ended_at INTEGER,
   transcript_sha  TEXT REFERENCES blobs(sha256), archive_ref TEXT, bytes INTEGER, archived_at INTEGER) STRICT;
@@ -604,7 +604,7 @@ CREATE TABLE IF NOT EXISTS host_samples(
   detail_json TEXT CHECK(detail_json IS NULL OR json_valid(detail_json))) STRICT;           -- giữ 14 ngày
 CREATE INDEX IF NOT EXISTS ix_host_samples ON host_samples(kind,at);
 CREATE TABLE IF NOT EXISTS provider_health(
-  provider TEXT PRIMARY KEY CHECK(provider IN ('devin','codex','claude','qwen')),
+  provider TEXT PRIMARY KEY CHECK(provider IN ('devin','codex','claude')),
   status TEXT NOT NULL CHECK(status IN ('healthy','striking','unavailable','recovered')),
   failure_kind TEXT, strikes INTEGER NOT NULL DEFAULT 0, strike_limit INTEGER,
   circuit_open_until INTEGER, recovered_at INTEGER, reason TEXT, updated_at INTEGER NOT NULL,

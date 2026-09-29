@@ -161,7 +161,7 @@ export function seedWorkflow(ledger,{id,state=null,events=[],jobs=[],leases=[],g
           agent,model,pool,managed,run_id,task_id,terminal_handle,dispatched_at,started_at,settled_at,verdict,settle_json,end_state)
           VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`).run(id,jobId,unitId,opId??'test.op',tryNo,1,
             job.dispatchId??job.dispatch_id??`seed:${jobId}`,digest(`span:${jobId}`).slice(0,16),
-            ['devin','codex','claude','qwen'].includes(agent)?agent:null,job.payload?.modelId??null,pool,
+            ['devin','codex','claude'].includes(agent)?agent:null,job.payload?.modelId??null,pool,
             job.payload?.managed?1:0,job.payload?.managed?.runId??null,job.payload?.managed?.taskId??null,
             job.terminalHandle??job.terminal_handle??job.payload?.managed?.agentTerminalHandle??job.payload?.orca?.agentTerminalHandle??null,
             dispatched,dispatched,settled,verdict,json(result),settled?'settled':null);

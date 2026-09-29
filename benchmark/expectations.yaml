@@ -56,6 +56,16 @@ history:
       interfaceAudit: review order; browser-dom holders are devin and codex, so a Devin-implemented UI is audited by codex (overflow)
       draw: codex-agent (unchanged)
     followUp: node scripts/agent/benchmark-snapshot.mjs --since-hours 48
+  - id: provider-qwen-removed
+    date: 2026-09-29
+    decidedBy: owner ("xóa qwen đi quá lỏ!! không mua nữa đâu, devin codex claude đủ r")
+    amends: routing-review-hands
+    landed: {contractChange: provider-qwen-removed}
+    shares: {devin-agent: 35, claude-agent: 20, codex-agent: 10}
+    routing:
+      hands: [devin-agent]                        # allocation.hands
+      implement: devin-agent, codex-agent, claude-agent   # scaffold too; codex-agent first at easy (Devin pins no easy model)
+      review: [devin-agent, claude-agent, codex-agent]    # claude/codex overflow only; a review of Devin's work goes to claude/codex (cross-family)
 
 pools:
   claude-agent:
@@ -68,7 +78,7 @@ pools:
     expected:
       role: >-
         The strategy seat. First in every think/decide/plan tier order and the [Kernel] seat. Review only as
-        overflow, when Devin and Qwen are both unavailable (runtimes.yaml allocation.overflowByOrder.review); hands-on
+        overflow, when Devin is unavailable (runtimes.yaml allocation.overflowByOrder.review); hands-on
         work only as overflow below insane (allocation.balanced.overflowOnly).
       strengths:
         - strategy kinds: request.analyze, scope.define, business.decide, architecture.decide, brand.decide, decision.prepare, implementation.plan, workspace.manage
@@ -99,8 +109,8 @@ pools:
       role: >-
         Sol is the second strategy seat after Opus. Codex is the fleet's ONLY image generator, so interface.draw and
         interface.asset route nowhere else. Review is overflow only; the exception is the interface.audit of a
-        Devin-implemented UI, which Codex takes because Qwen and Claude lack browser-dom. Hands-on work is overflow
-        after Devin and Qwen.
+        Devin-implemented UI, which Codex takes because Claude lacks browser-dom. Hands-on work is overflow
+        after Devin.
       strengths:
         - interface.draw / interface.asset (sole route; image_gen.imagegen host tool)
         - strategy kinds on Sol, second after claude-agent in every hard/insane think order
@@ -133,12 +143,12 @@ pools:
     hands: true                              # runtimes.yaml allocation.hands — an audit family since routing-review-hands
     expected:
       role: >-
-        The owner-granted executor. First in the medium and hard implement/write/verify orders and second on the
-        scaffold order. First on the review order at medium and hard (every verify kind, work.author), and the
-        reviewer of what Qwen implemented (cross-family). An experiment since 2026-09-25.
+        The owner-granted executor. First in the medium and hard implement/write/verify orders and first on the
+        scaffold order. First on the review order at medium and hard (every verify kind, work.author). An experiment
+        since 2026-09-25.
       strengths:
         - backend.implement 70% and interface.implement 68% pass over the 72h snapshot
-        - review of Qwen's work (routing-review-hands, unmeasured: benchmark/findings/2026-09-25-review-hands.md)
+        - review (routing-review-hands, unmeasured: benchmark/findings/2026-09-25-review-hands.md)
         - browser-dom host tool (interface.audit)
       notExpectedFor:
         - strategy: decide/plan and every think kind outside the review order (roles gate)
@@ -154,61 +164,6 @@ pools:
       terminalBench: null
       sources: []
 
-  qwen-agent:
-    model: deepseek-v4.1-flash               # DeepSeek V4.1 Flash on the QwenCloud Token Plan, every difficulty
-    modelSince: 2026-09-24                   # replaced qwen3.8-flash (owner 2026-09-24); earlier ledger rows ran qwen3.8-flash
-    provider: qwen
-    roles: [implement, verify, write]        # no decide, no plan since routing-by-evidence
-    maxParallel: 10
-    share: 35
-    frontier: false
-    hands: true                              # runtimes.yaml allocation.hands — an audit family since routing-review-hands
-    expected:
-      role: >-
-        The cheap hands-on pool. First on scaffold, docs, content, grammar.update and every hands-on cut slice, and
-        second behind Devin on implementation (first at easy). On the review order beside Devin, first at easy and
-        insane, and the reviewer of what Devin implemented (cross-family). An experiment since 2026-09-25. Blocked
-        only while its Token Plan quota circuit is open.
-      strengths:
-        - backend.scaffold 92% pass over the 72h snapshot (36 jobs)
-        - cheap bounded execution and fan-out
-        - review of Devin's work (routing-review-hands, unmeasured: benchmark/findings/2026-09-25-review-hands.md)
-      notExpectedFor:
-        - strategy: decide/plan and every think kind outside the review order (no think evidence)
-        - host-tool routes, interface.audit included (agents/qwen.yaml hostTools is empty)
-        - nested/sub agents (the agent tool is excluded)
-        - kernel-function model calls (not in allocation.frontier)
-      cites: [modules/models/profiles/qwen-agent.yaml, modules/models/runtimes.yaml, config.example.yaml]
-    publicBenchmarks:
-      sweBenchVerified: null
-      sweBenchPro: null
-      terminalBench: null
-      sources: []
-
 # Installed targets that no automatic chain reaches (registry.yaml costPolicy). They run only on an explicit
 # owner selection or a benchmark, so no routing expectation applies and no ledger row is expected for them.
-excludedTargets:
-  deepseek-v4-pro:
-    model: deepseek-v4-pro
-    provider: qwen
-    automaticChains: excluded
-    expected:
-      role: explicit/owner-approved exception or benchmark only; deep independent review when the owner chooses it
-    cites: [modules/models/profiles/deepseek-v4-pro.yaml, modules/models/registry.yaml]
-    publicBenchmarks:
-      sweBenchVerified: null
-      sweBenchPro: null
-      terminalBench: null
-      sources: []
-  qwen3.8-max:
-    model: qwen3.8-max
-    provider: qwen
-    automaticChains: excluded
-    expected:
-      role: explicit/owner-approved exception or benchmark only; never a silent upgrade after a failed flash attempt
-    cites: [modules/models/profiles/qwen3.8-max.yaml, modules/models/registry.yaml]
-    publicBenchmarks:
-      sweBenchVerified: null
-      sweBenchPro: null
-      terminalBench: null
-      sources: []
+excludedTargets: {}

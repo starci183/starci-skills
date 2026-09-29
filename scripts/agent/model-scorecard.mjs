@@ -5,7 +5,7 @@
 //
 // Reads <repo>/.starciwork/runtime.sqlite READ-ONLY (never migrates, never writes). One row per
 // pool x op kind over `jobs` rows with kind='op':
-//   pool      payload.model (claude-agent | codex-agent | devin-agent | qwen-agent | ...); a job that was
+//   pool      payload.model (claude-agent | codex-agent | devin-agent | ...); a job that was
 //             never routed (no payload.model: dropped or queued before a route) is reported as
 //             '(unrouted)' so the shares add up to 100%.
 //   outcome   pass = verdict 'pass' (or succeeded with no verdict); blocked = verdict blocked|awaiting-owner;
@@ -14,13 +14,8 @@
 //             of ALL jobs that are a retry (payload.retry.retryOf set).
 //   duration  median over succeeded|failed jobs: first `op-dispatched` -> last `op-settled` event when both
 //             exist, else created_at -> updated_at. `durationSource` counts which was used.
-//   tokens    the ledger records no token usage for any pool (checked: payload/result carry none), so
-//             'n/a' — except qwen-agent, whose Qwen Code CLI writes ~/.qwen/usage/token-usage-YYYY-MM.jsonl
-//             (one line per request) or, failing that, ~/.qwen/usage_record.jsonl (one line per session).
-//             Those counts are machine-wide (every qwen session on this host), not per repo.
-// Missing ledgers or usage files never crash: they are reported as errors / 'n/a'.
+// Missing ledgers never crash: they are reported as errors.
 import fs from 'node:fs';
-import os from 'node:os';
 import path from 'node:path';
 import { createRequire } from 'node:module';
 import { fileURLToPath } from 'node:url';
@@ -111,10 +106,9 @@ const finish = (cell, total) => ({
 });
 
 /**
- * The scorecard over flat job rows (pure). `tokens` maps pool -> token summary (e.g. {'qwen-agent': {...}});
- * a pool with no entry reports tokens 'n/a'. A pool that has tokens but no jobs still appears (jobs 0).
+ * The scorecard over flat job rows (pure).
  */
-export function buildScorecard(jobs, { repos = [], window = { sinceMs: null, label: 'all' }, tokens = {}, errors = [] } = {}) {
+export function buildScorecard(jobs, { repos = [], window = { sinceMs: null, label: 'all' }, errors = [] } = {}) {
   const pools = new Map();
   const durationSource = { events: 0, row: 0 };
   for (const job of jobs) {
@@ -128,7 +122,6 @@ export function buildScorecard(jobs, { repos = [], window = { sinceMs: null, lab
     p.kinds.set(job.opId, k);
     addJob(k, job, outcome, duration);
   }
-  for (const pool of Object.keys(tokens)) if (tokens[pool] && !pools.has(pool)) pools.set(pool, { total: emptyCell(), kinds: new Map() });
   const total = jobs.length;
   const out = {};
   const order = [...pools.entries()].sort((a, b) => b[1].total.jobs - a[1].total.jobs || byName(a[0], b[0]));
@@ -136,72 +129,16 @@ export function buildScorecard(jobs, { repos = [], window = { sinceMs: null, lab
     const kinds = {};
     for (const [kind, cell] of [...p.kinds.entries()].sort((a, b) => b[1].jobs - a[1].jobs || byName(a[0], b[0])))
       kinds[kind] = finish(cell, p.total.jobs);
-    out[pool] = { ...finish(p.total, total), tokens: tokens[pool] ?? 'n/a', kinds };
+    out[pool] = { ...finish(p.total, total), kinds };
   }
   return { repos, window, jobs: total, durationSource, errors, pools: out };
 }
 
-// --- Qwen Code token usage (machine-wide) --------------------------------------------------------
-const qwenHomeDefault = () => path.join(os.homedir(), '.qwen');
-const addTok = (acc, input, output, total) => {
-  acc.input += Number(input) || 0; acc.output += Number(output) || 0;
-  acc.total += Number(total) || (Number(input) || 0) + (Number(output) || 0);
-  acc.requests += 1;
-};
-const emptyTok = () => ({ input: 0, output: 0, total: 0, requests: 0 });
-const readLines = (file) => fs.readFileSync(file, 'utf8').split(/\r?\n/).filter(Boolean);
 export const localDay = (ms) => { const d = new Date(ms); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; };
 
-/**
- * Qwen Code's token counts: last 24h, all history, and per local day x model. Only numeric token fields,
- * the model name and the timestamp are read; nothing else from the file is kept or printed.
- * Returns null when no usage file exists.
- */
-export function readQwenTokens({ home = qwenHomeDefault(), now = Date.now() } = {}) {
-  const records = [];
-  let source = null;
-  const usageDir = path.join(home, 'usage');
-  const monthly = fs.existsSync(usageDir) ? fs.readdirSync(usageDir).filter((f) => /^token-usage-.*\.jsonl$/.test(f)).sort() : [];
-  if (monthly.length) {
-    source = path.join(usageDir, 'token-usage-*.jsonl');
-    for (const f of monthly) {
-      let lines;
-      try { lines = readLines(path.join(usageDir, f)); } catch { continue; }
-      for (const line of lines) {
-        const r = parse(line);
-        if (!r) continue;
-        const at = typeof r.timestamp === 'number' ? r.timestamp : Date.parse(r.timestamp);
-        if (!Number.isFinite(at)) continue;
-        records.push({ at, day: r.localDate ?? localDay(at), model: String(r.model ?? 'unknown'), input: r.inputTokens, output: r.outputTokens, total: r.totalTokens });
-      }
-    }
-  } else if (fs.existsSync(path.join(home, 'usage_record.jsonl'))) {
-    source = path.join(home, 'usage_record.jsonl');
-    let lines = [];
-    try { lines = readLines(source); } catch { /* unreadable */ }
-    for (const line of lines) {
-      const r = parse(line);
-      if (!r || !r.models || typeof r.models !== 'object') continue;
-      const at = Number(r.timestamp ?? r.startTime);
-      if (!Number.isFinite(at)) continue;
-      for (const [model, m] of Object.entries(r.models))
-        records.push({ at, day: localDay(at), model, input: m?.inputTokens, output: m?.outputTokens, total: m?.totalTokens });
-    }
-  }
-  if (!source) return null;
-  const last24h = emptyTok(), total = emptyTok(), byDay = {};
-  for (const r of records) {
-    addTok(total, r.input, r.output, r.total);
-    if (r.at >= now - DAY_MS && r.at <= now) addTok(last24h, r.input, r.output, r.total);
-    const day = (byDay[r.day] ??= {});
-    addTok((day[r.model] ??= emptyTok()), r.input, r.output, r.total);
-  }
-  return { source, scope: 'machine', last24h, total, byDay };
-}
-
 // --- composition -----------------------------------------------------------------------------------
-/** The scorecard for real repos: reads each ledger read-only and qwen usage; a failure is an error entry, never a throw. */
-export function scorecardFor({ repos, sinceHours = null, now = Date.now(), qwenHome = qwenHomeDefault() } = {}) {
+/** The scorecard for real repos: reads each ledger read-only; a failure is an error entry, never a throw. */
+export function scorecardFor({ repos, sinceHours = null, now = Date.now() } = {}) {
   const sinceMs = sinceHours == null ? null : now - Number(sinceHours) * 3600000;
   const window = { sinceMs, label: sinceHours == null ? 'all' : `${sinceHours}h` };
   const jobs = [], errors = [], seen = [];
@@ -209,24 +146,18 @@ export function scorecardFor({ repos, sinceHours = null, now = Date.now(), qwenH
     try { jobs.push(...readLedgerJobs(ledgerFileFor(repo), { sinceMs })); seen.push(repo); }
     catch (error) { errors.push({ repo, error: String(error?.message ?? error) }); }
   }
-  let qwen = null;
-  try { qwen = readQwenTokens({ home: qwenHome, now }); } catch { qwen = null; }
-  return buildScorecard(jobs, { repos: seen, window, tokens: qwen ? { 'qwen-agent': qwen } : {}, errors });
+  return buildScorecard(jobs, { repos: seen, window, errors });
 }
 
 // --- rendering -------------------------------------------------------------------------------------
 export const shortPool = (pool) => (pool === UNROUTED ? 'unrouted' : pool.replace(/-agent$/, ''));
 export const pctText = (x) => (x == null ? '-' : `${Math.round(x * 100)}%`);
-/** 1234 -> '1.2k', 1234567 -> '1.2M'. */
-export const compact = (n) => (n >= 1e9 ? `${(n / 1e9).toFixed(1)}B` : n >= 1e6 ? `${(n / 1e6).toFixed(1)}M` : n >= 1e3 ? `${(n / 1e3).toFixed(1)}k` : String(n));
 const minutes = (ms) => (ms == null ? '-' : (ms / 60000).toFixed(1));
 
-/** ONE short line for the supervisor digest: each pool's share of jobs (and pass rate; none for never-routed jobs), then qwen's 24h tokens. */
+/** ONE short line for the supervisor digest: each pool's share of jobs (and pass rate; none for never-routed jobs). */
 export function summaryLine(sc) {
   const parts = Object.entries(sc.pools).filter(([, p]) => p.jobs > 0)
     .map(([pool, p]) => `${shortPool(pool)} ${pctText(p.share)}${p.passRate == null || pool === UNROUTED ? '' : ` (p${pctText(p.passRate)})`}`);
-  const qwen = sc.pools['qwen-agent']?.tokens;
-  if (qwen && typeof qwen === 'object') parts.push(`qwen tokens 24h ${compact(qwen.last24h.total)}`);
   return `pools ${sc.window.label}: ${parts.length ? parts.join(' · ') : 'no op jobs'}`;
 }
 
@@ -244,9 +175,7 @@ export function formatTable(sc) {
     fmt(head), ...rows.map(fmt), '',
   ];
   for (const [pool, p] of Object.entries(sc.pools)) {
-    const t = p.tokens;
-    const tok = t && typeof t === 'object' ? `tokens 24h ${compact(t.last24h.total)} (in ${compact(t.last24h.input)}/out ${compact(t.last24h.output)}), total ${compact(t.total.total)} (in ${compact(t.total.input)}/out ${compact(t.total.output)}) [machine-wide, totalTokens incl. cached]` : 'tokens n/a';
-    lines.push(`TOTAL ${shortPool(pool)}: ${p.jobs} jobs (${pctText(p.share)}), pass ${p.pass} fail ${p.fail} blocked ${p.blocked} cancelled ${p.cancelled} open ${p.open}, pass% ${pctText(p.passRate)} rework% ${pctText(p.reworkRate)} median ${minutes(p.medianMs)} min, ${tok}`);
+    lines.push(`TOTAL ${shortPool(pool)}: ${p.jobs} jobs (${pctText(p.share)}), pass ${p.pass} fail ${p.fail} blocked ${p.blocked} cancelled ${p.cancelled} open ${p.open}, pass% ${pctText(p.passRate)} rework% ${pctText(p.reworkRate)} median ${minutes(p.medianMs)} min`);
   }
   lines.push(`rates over settled jobs; rework over all jobs; median over succeeded|failed via op-dispatched->op-settled events (${sc.durationSource.events}) else created->updated (${sc.durationSource.row}); '${UNROUTED}' = never routed`);
   for (const e of sc.errors) lines.push(`ERROR ${e.repo}: ${e.error}`);

@@ -10,7 +10,7 @@ import {boundRepos,previousSnapshot,snapshotDelta,formatDelta,takeSnapshot,snaps
 
 // benchmark-snapshot runs the model scorecard over the bound project ledgers and writes one append-only file
 // under benchmark/snapshots/. Every ledger here is a fixture (withLedger: temp dir, LOCALAPPDATA repointed) and
-// every snapshot dir, source root and qwen home is a temp dir, so no real ledger or benchmark file is touched.
+// every snapshot dir, source root is a temp dir, so no real ledger or benchmark file is touched.
 const SCRIPT=path.resolve(path.dirname(fileURLToPath(import.meta.url)),'..','scripts','agent','benchmark-snapshot.mjs');
 const T=Date.UTC(2026,8,24,12,0,0);
 const H=3600000,MIN=60000;
@@ -22,7 +22,7 @@ const job=(jobId,{op,pool,status,verdict=null,createdAt,updatedAt=createdAt+10*M
 const DAY1=[
   job('c1',{op:'business.decide',pool:'claude-agent',status:'succeeded',verdict:'pass',createdAt:T-5*H}),
   job('c2',{op:'business.decide',pool:'claude-agent',status:'failed',verdict:'fail',createdAt:T-4*H,updatedAt:T-4*H+30*MIN}),
-  job('q1',{op:'backend.scaffold',pool:'qwen-agent',status:'succeeded',verdict:'pass',createdAt:T-2*H}),
+  job('q1',{op:'backend.scaffold',pool:'codex-agent',status:'succeeded',verdict:'pass',createdAt:T-2*H}),
 ];
 const DAY2=[
   job('c3',{op:'business.decide',pool:'claude-agent',status:'succeeded',verdict:'pass',createdAt:T+20*H}),
@@ -34,7 +34,6 @@ const tmp=(t,prefix)=>{
   t.after(()=>fs.rmSync(dir,{recursive:true,force:true}));
   return dir;
 };
-const emptyQwen=t=>tmp(t,'starci-bench-qwen-');
 const bind=(sourceRoot,project,pathFromSource,ownerRole='be')=>{
   const dir=path.join(sourceRoot,'.workspaces','projects',project);
   fs.mkdirSync(dir,{recursive:true});
@@ -58,11 +57,11 @@ test('bound repos come from .workspaces bindings: the Work owner, once, only wit
 }));
 
 test('first snapshot from the bindings is the baseline; the next one of the same window prints a per-pool delta',t=>withLedger(t,({repoRoot,ledger})=>{
-  const sourceRoot=tmp(t,'starci-bench-src-'),dir=tmp(t,'starci-bench-snap-'),qwenHome=emptyQwen(t);
+  const sourceRoot=tmp(t,'starci-bench-src-'),dir=tmp(t,'starci-bench-snap-');
   bind(sourceRoot,'alpha',repoRoot);
   seedWorkflow(ledger,{id:'wf-day1',jobs:DAY1,now:T});
 
-  const first=takeSnapshot({sinceHours:24,now:T,date:'2026-09-24',dir,sourceRoot,qwenHome});
+  const first=takeSnapshot({sinceHours:24,now:T,date:'2026-09-24',dir,sourceRoot});
   assert.equal(first.file,path.join(dir,'2026-09-24-24h.json'));
   assert.equal(first.previous,null);
   assert.equal(first.delta,null);
@@ -78,7 +77,7 @@ test('first snapshot from the bindings is the baseline; the next one of the same
   // A snapshot of another window never serves as the previous one.
   fs.writeFileSync(path.join(dir,'2026-09-24-72h.json'),JSON.stringify({...written,window:{sinceMs:0,label:'72h'},jobs:999}));
   seedWorkflow(ledger,{id:'wf-day2',jobs:DAY2,now:T+23*H});
-  const second=takeSnapshot({sinceHours:24,now:T+24*H,date:'2026-09-25',dir,sourceRoot,qwenHome});
+  const second=takeSnapshot({sinceHours:24,now:T+24*H,date:'2026-09-25',dir,sourceRoot});
   assert.equal(second.previous.file,'2026-09-24-24h.json');
   assert.equal(second.snapshot.jobs,3);
   const d=second.delta;
@@ -87,25 +86,25 @@ test('first snapshot from the bindings is the baseline; the next one of the same
   assert.equal(d.pools['claude-agent'].medianMinDelta,-10);   // [10,30] -> [10,10] min
   assert.equal(d.pools['devin-agent'].isNew,true);
   assert.equal(d.pools['devin-agent'].blockedPp,null);
-  assert.equal(d.pools['qwen-agent'].isGone,true);
+  assert.equal(d.pools['codex-agent'].isGone,true);
   const text=formatDelta(second);
   assert.match(text,/delta vs 2026-09-24-24h\.json: jobs 3 \(0\)/);
   assert.match(text,/ {2}claude: 2 jobs \(0\) pass 100% \(\+50pp\) fail -50pp blk 0pp med 10m \(-10m\)/);
   assert.match(text,/ {2}devin: 1 jobs \(\+1\) pass 0% \(-\) fail - blk - med 10m \(-\) \[new\]/);
-  assert.match(text,/ {2}qwen: absent now \(was present\)/);
+  assert.match(text,/ {2}codex: absent now \(was present\)/);
 }));
 
 test('a snapshot is never overwritten: an existing file refuses the run and stays byte-identical',t=>withLedger(t,({repoRoot,ledger})=>{
-  const dir=tmp(t,'starci-bench-snap-'),qwenHome=emptyQwen(t);
+  const dir=tmp(t,'starci-bench-snap-');
   seedWorkflow(ledger,{id:'wf-day1',jobs:DAY1,now:T});
   const file=path.join(dir,'2026-09-24-24h.json');
   fs.writeFileSync(file,'{"frozen":true}\n');
-  assert.throws(()=>takeSnapshot({repos:[repoRoot],sinceHours:24,now:T,date:'2026-09-24',dir,qwenHome}),
+  assert.throws(()=>takeSnapshot({repos:[repoRoot],sinceHours:24,now:T,date:'2026-09-24',dir}),
     e=>e.code==='EEXIST'&&/append-only/.test(e.message));
   assert.equal(fs.readFileSync(file,'utf8'),'{"frozen":true}\n');
-  assert.throws(()=>takeSnapshot({repos:[repoRoot],sinceHours:0,dir,qwenHome}),e=>e.code==='EUSAGE');
-  assert.throws(()=>takeSnapshot({repos:[repoRoot],sinceHours:24,date:'25-09-2026',dir,qwenHome}),e=>e.code==='EUSAGE');
-  assert.throws(()=>takeSnapshot({sinceHours:24,dir,sourceRoot:tmp(t,'starci-bench-src-'),qwenHome}),e=>e.code==='EUSAGE'&&/--repo/.test(e.message));
+  assert.throws(()=>takeSnapshot({repos:[repoRoot],sinceHours:0,dir}),e=>e.code==='EUSAGE');
+  assert.throws(()=>takeSnapshot({repos:[repoRoot],sinceHours:24,date:'25-09-2026',dir}),e=>e.code==='EUSAGE');
+  assert.throws(()=>takeSnapshot({sinceHours:24,dir,sourceRoot:tmp(t,'starci-bench-src-')}),e=>e.code==='EUSAGE'&&/--repo/.test(e.message));
 }));
 
 test('previousSnapshot takes the newest earlier file of the same window only',t=>{

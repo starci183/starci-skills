@@ -3,7 +3,7 @@
 // workers, docs/supervisor.md). One job per root-cause cluster, never one per incident.
 //
 //   node scripts/supervisor/workers.mjs create --cluster <id> --title <t> --files <csv> [--incidents <csv>]
-//        [--specs <csv>] [--brief <text> | --brief-file <f>] [--agent <claude|codex|devin|qwen>]
+//        [--specs <csv>] [--brief <text> | --brief-file <f>] [--agent <claude|codex|devin>]
 //   node scripts/supervisor/workers.mjs spawn [--job <id>] [--dry-run]     launch queued jobs up to the cap
 //   node scripts/supervisor/workers.mjs stage --self --name <slug> --files <csv>   the Supervisor's own checkout
 //   node scripts/supervisor/workers.mjs report --job <id> --outcome done|diagnosed|blocked|failed [--commit <sha>]
@@ -34,9 +34,6 @@
 // outageInText: e.g. an attestation rejected for "Quota exhausted") - for the rest of that spawn pass, for the
 // requeued job it failed (payload.avoidAgents), and for every job once it failed READINESS_FAILS_PER_HOUR times
 // in the last hour.
-// A card that cannot pin a model itself (no terminalFallback: qwen) launches its profile's launch.orca.command,
-// as op dispatch does (scripts/route/dispatch-op.mjs): a bare `qwen` started on the host's default model, never
-// showed the card's identityPattern, and every qwen worker timed out at readiness.
 import '../lib/hide-child-windows.mjs';
 import fs from 'node:fs';
 import os from 'node:os';
@@ -55,7 +52,6 @@ import { closeSelfSafe } from '../lib/close-verify.mjs';
 import { sleepSync } from '../lib/sleep-sync.mjs';
 import { parseJsonOr } from '../lib/json.mjs';
 import { gitSpawn } from '../lib/git.mjs';
-import { readYamlFile } from '../lib/yaml.mjs';
 import { posixPath } from '../lib/path-key.mjs';
 import { guardLaunch } from '../guards/install.mjs';
 import { outageInText } from '../agent/provider-outage.mjs';
@@ -86,10 +82,10 @@ export const LIVE_STATUSES = Object.freeze(['spawning', 'running', 'reported']);
 export const ACTIVE_STATUSES = Object.freeze(['spawning', 'running']);
 export const FINAL_STATUSES = Object.freeze(['succeeded', 'failed', 'cancelled']);
 /** sup_attempts.agent is one of these (0001-init CHECK); any other provider is recorded as null. */
-const ATTEMPT_AGENTS = new Set(['devin', 'codex', 'claude', 'qwen']);
+const ATTEMPT_AGENTS = new Set(['devin', 'codex', 'claude']);
 export const MAX_SPAWN_ATTEMPTS = 3;
 export const READINESS_FAILS_PER_HOUR = 2;
-export const AGENTS = Object.freeze({ 'claude-agent': 'claude', 'codex-agent': 'codex', 'devin-agent': 'devin', 'qwen-agent': 'qwen' });
+export const AGENTS = Object.freeze({ 'claude-agent': 'claude', 'codex-agent': 'codex', 'devin-agent': 'devin' });
 const PROMPT_FILE = path.join(SKILL_ROOT, 'modules', 'supervisor', 'worker-prompt.md');
 
 const parse = parseJsonOr;
@@ -354,20 +350,6 @@ export function readinessFailedProviders(m, { since, min = READINESS_FAILS_PER_H
   return Object.keys(counts).filter((a) => counts[a] >= min);
 }
 
-/**
- * The launch command of a worker on `pool`: its profile's launch.orca.command when the agent card cannot pin a
- * model itself (no terminalFallback), else null and the card composes it. Its `--model` becomes the routed `model`.
- */
-export function workerLaunchCommand({ pool, provider, model = null, modelsDir = path.join(SKILL_ROOT, 'modules', 'models') }) {
-  const card = readYamlFile(path.join(modelsDir, 'agents', `${provider}.yaml`));
-  if (!card || card.terminalFallback) return null;
-  const profile = readYamlFile(path.join(modelsDir, 'profiles', `${pool}.yaml`));
-  const orca = profile?.launch?.orca ?? {};
-  if (orca.kind !== 'command-terminal' || typeof orca.command !== 'string' || !orca.command.trim()) return null;
-  const command = orca.command.trim();
-  return model && /--model\s+\S+/.test(command) ? command.replace(/--model\s+\S+/, `--model ${model}`) : command;
-}
-
 /* ------------------------------------------------------------ spawn */
 
 export function renderWorkerPrompt(job, staging, { template = null, skillRoot = SKILL_ROOT } = {}) {
@@ -425,10 +407,9 @@ export async function spawnWorkers(m, { jobId = null, dryRun = false, settings =
     }
     const prompt = renderWorkerPrompt(job, staging);
     const title = `${WORKER_TITLE_PREFIX} ${job.payload.cluster}`.slice(0, 80);
-    const command = (deps.command ?? workerLaunchCommand)({ pool: route.pool, provider: route.agent, model: route.model });
     const guard = (deps.guard ?? workerGuard)(job.job_id, { root, staging: staging.path, files: job.payload.files ?? [] });
     if (!guard.pathPrefix) supervisorEvent(m, { entityType: 'job', entityId: job.job_id, kind: 'worker-guard-missing', payload: { receipt: guard.receipt }, now: now() });
-    const spawned = (deps.spawn ?? (await import('../agent/lib.mjs')).spawnAgent)({ provider: route.agent, model: route.model, effort: route.effort, worktree: root, fallbackWorktree: path.dirname(root), cwd: staging.path, title, prompt, kernel: true, dispatchId: job.job_id, command,
+    const spawned = (deps.spawn ?? (await import('../agent/lib.mjs')).spawnAgent)({ provider: route.agent, model: route.model, effort: route.effort, worktree: root, fallbackWorktree: path.dirname(root), cwd: staging.path, title, prompt, kernel: true, dispatchId: job.job_id,
       env: guard.env, pathPrefix: guard.pathPrefix });
     const payload = { ...job.payload, pool: route.pool, agent: route.agent, model: route.model, staging: { path: staging.path, branch: staging.branch, base: staging.base },
       spawnAttempts: (job.payload.spawnAttempts ?? 0) + 1, guard: guard.receipt };

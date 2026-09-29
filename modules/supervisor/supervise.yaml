@@ -302,7 +302,7 @@ kernelSeat:
 workers:
   purpose: |
     Fix agents spawned on demand, one per root-cause cluster, never one per incident. Agents come from the
-    balanced allocator over config.yaml allocation.shares (claude, codex/chatgpt, devin, qwen/DeepSeek),
+    balanced allocator over config.yaml allocation.shares (claude, codex/chatgpt, devin),
     counting the machine's recent dispatches and this ledger's workers, skipping a provider whose quota probe
     is dead or whose provider-health circuit is open.
   cap: |

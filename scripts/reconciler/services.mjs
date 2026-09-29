@@ -502,7 +502,7 @@ export function turnMinutesOf(screen) {
 
 export const KEY_BYTES = Object.freeze({ esc: '\u001b', 'ctrl+c': '\u0003' });
 
-const SEAT_AGENTS = ['claude', 'codex', 'qwen', 'devin'];
+const SEAT_AGENTS = ['claude', 'codex', 'devin'];
 /**
  * The agent a seat terminal runs, from a terminal-list entry {agentIdentity, title} and its frame: Orca's
  * agentIdentity first, then the title ("⠼ Devin", "✳ Claude Code"), then the frame's own interrupt hint (Devin asks
@@ -512,7 +512,7 @@ export function seatAgentOf(entry, screen = '', fallback = null) {
   const named = String(entry?.agentIdentity ?? entry?.agent ?? '').toLowerCase();
   if (SEAT_AGENTS.includes(named)) return named;
   const title = String(entry?.title ?? entry?.tabTitle ?? '');
-  for (const a of ['devin', 'qwen', 'codex', 'claude']) if (new RegExp(`\\b${a}\\b`, 'i').test(title)) return a;
+  for (const a of ['devin', 'codex', 'claude']) if (new RegExp(`\\b${a}\\b`, 'i').test(title)) return a;
   if (/esc\s+twice\s+to\s+interrupt|Ask Devin\b/i.test(String(screen ?? ''))) return 'devin';
   return fallback ? fallback(entry, 'claude') : 'claude';
 }

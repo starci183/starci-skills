@@ -72,16 +72,6 @@ const orcaHome = (env, home, platform = process.platform) => {
 
 /* --------------------------------------------------------------- the roots */
 
-// Qwen keeps sessions in a few known subdirs and a lot of unrelated state beside
-// them (memories, extension-store, file-history, settings). The include predicates
-// pass only a file's posix path relative to the listed dir when it sits under a
-// known session/log subdir — anything else is not even a candidate.
-//   projects/<slug>/chats/<file>           — per-project chat sessions
-//   tmp/<hash>/logs.json                   — per-run log file
-//   tmp/<hash>/chats/<file>                — the older qwen/gemini-cli layout
-const qwenProjectInclude = (rel) => { const s = rel.split('/'); return s.length > 2 && s[1] === 'chats'; };
-const qwenTmpInclude = (rel) => { const s = rel.split('/'); return (s.length === 2 && s[1] === 'logs.json') || (s.length > 2 && s[1] === 'chats'); };
-
 /**
  * Every root the sweep archives out of, all resolved from `env` — nothing is
  * hardcoded to this machine. Each entry is {agent, home, dir, include?}: `home`
@@ -105,11 +95,6 @@ export function sessionSweepRoots(env = process.env) {
     add('codex', codexHome, 'sessions');
     add('codex', codexHome, 'archived_sessions');
   }
-  const qwen = path.join(home, '.qwen');
-  add('qwen', qwen, 'sessions');
-  add('qwen', qwen, 'debug');
-  add('qwen', qwen, 'projects', qwenProjectInclude);
-  add('qwen', qwen, 'tmp', qwenTmpInclude);
   const orca = orcaHome(env, home);
   add('orca-codex', orca, 'sessions');
   add('orca-codex', orca, 'generated_images');

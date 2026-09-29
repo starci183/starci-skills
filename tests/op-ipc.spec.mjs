@@ -75,7 +75,7 @@ const enqueue=(fx,jobId='job-op-ipc-1')=>{
       .run(WORKFLOW,1,goalIdentity ?? WORKFLOW,'op IPC fixture goal','{}',Date.now());
     ledger.write.createUnit({workflowId:WORKFLOW,unitId:jobId,opId:OP,subjectKey:jobId,goalRevision:1});
     ledger.write.enqueueJob({jobId,workflowId:WORKFLOW,unitId:jobId,opId:OP,kind:'op',
-      payload:{opId:OP,owned_paths:OWNED,model:'qwen-agent'}});
+      payload:{opId:OP,owned_paths:OWNED,model:'devin-agent'}});
     // start-workflow.mjs enrols a workflow at phase 'queued' and dispatch's
     // transitionQueuedToRunning is guarded on it — reproduce the precondition.
   }finally{ledger.close();}
@@ -94,7 +94,7 @@ const leaseRows=(fx,jobId)=>inspect(fx,db=>db.prepare('SELECT * FROM leases WHER
 const eventKinds=(fx,wf=WORKFLOW)=>inspect(fx,db=>db.prepare('SELECT kind FROM events WHERE workflow_id=? ORDER BY seq').all(wf).map(r=>r.kind));
 const phaseOf=(fx,wf=WORKFLOW)=>inspect(fx,db=>db.prepare('SELECT phase FROM workflows WHERE workflow_id=?').get(wf)?.phase??null);
 
-const dispatch=(fx,jobId)=>fx.run(API,'dispatch','--repo',fx.repo,'--job',jobId,'--model','qwen-agent','--spawn','--json');
+const dispatch=(fx,jobId)=>fx.run(API,'dispatch','--repo',fx.repo,'--job',jobId,'--model','devin-agent','--spawn','--json');
 const independentCheck=(fx,jobId,checks)=>{
   fx.env.STARCI_CALLER='runtime-settler';
   try{return fx.run(API,'check','--repo',fx.repo,'--job',jobId,'--checks',JSON.stringify(checks),'--json');}

@@ -807,21 +807,18 @@ const seedGoalBias=(fx,workflowId,routingBias)=>{
   }finally{ledger.close();}
 };
 
-test('route admits only agents that carry the op host tool; none at the difficulty refuses tool-unavailable',t=>{
+test('route admits only agents that carry the op host tool; with every carrier excluded the route refuses and persists nothing',t=>{
   const fx=fixture(t);
   fx.writeConfig();
   const wf='wf-host-tools';
-  // interface.audit walks the ui order (codex, devin, then qwen; owner routing 2026-09-26); the devin and
-  // codex cards list browser-dom, the qwen card does not, and claude-agent is not on the order at all.
-  // Prefer qwen so it is walked first - the host-tool gate must still pass it over.
-  seedGoalBias(fx,wf,{prefer:['qwen-agent'],avoid:['devin-agent']});
+  // interface.audit walks the ui order (codex, then devin; owner routing 2026-09-26); the devin and codex cards
+  // list browser-dom, and claude-agent is not on the order at all: a prefer for it never puts it there.
+  seedGoalBias(fx,wf,{prefer:['claude-agent'],avoid:['devin-agent']});
   seedOp(fx,wf,'job-audit-medium','interface.audit');
   const audit=fx.run(API,'route','--repo',fx.repo,'--job','job-audit-medium','--difficulty','medium','--json');
   assert.equal(audit.status,0,audit.stderr||audit.stdout);
   const decided=json(audit.stdout);
   assert.equal(decided.decision.model,'codex-agent','the ui order leads with the pool that carries browser-dom');
-  assert.ok(decided.rejected.some(r=>r.target==='qwen-agent'&&/lacks host tool 'browser-dom'/.test(r.reason)),
-    `qwen-agent must be rejected for the tool, got ${JSON.stringify(decided.rejected)}`);
   assert.ok(!decided.rejected.some(r=>r.target==='claude-agent'),'claude-agent is off the ui order entirely');
 
   seedOp(fx,wf,'job-draw','interface.draw');
@@ -834,27 +831,23 @@ test('route admits only agents that carry the op host tool; none at the difficul
   const avoid=fx.run(API,'route','--repo',fx.repo,'--job','job-audit-avoid','--json');
   assert.equal(avoid.status,1);
   const refusal=json(avoid.stdout);
-  assert.equal(refusal.reason,'tool-unavailable');
-  assert.deepEqual(refusal.tools,['browser-dom']);
-  assert.match(refusal.detail,/codex-agent, devin-agent has it and is excluded by the goal's routing_bias avoid \(the owner's\)\. Only the owner changes that bias\./);
+  assert.equal(refusal.ok,false);
+  assert.match(String(refusal.error),/./,'the ui order [codex-agent, devin-agent] is fully excluded by the goal bias: no pool is left');
   assert.equal(json(jobRow(fx.repo,'job-audit-avoid').payload_json).model,undefined,'a refused route persists no decision');
 });
 
-test('dispatch --spawn refuses tool-unavailable before any Orca call when the routed agent lacks the tool',t=>{
+test('dispatch --spawn refuses before any Orca call when the routed agent is outside the op order (claude-agent carries no browser-dom)',t=>{
   const fx=fixture(t);
   fx.writeConfig();
-  // qwen-agent is on the ui order but carries no browser-dom: the dispatch reaches the host-tool gate.
-  seedOp(fx,'wf-host-tools-dispatch','job-audit-codex','interface.audit',{model:'qwen-agent'});
+  seedOp(fx,'wf-host-tools-dispatch','job-audit-codex','interface.audit',{model:'claude-agent'});
   const r=fx.run(API,'dispatch','--repo',fx.repo,'--job','job-audit-codex','--spawn','--json');
   assert.equal(r.status,1);
   const out=json(r.stdout);
-  assert.equal(out.reason,'tool-unavailable');
-  assert.deepEqual(out.tools,['browser-dom']);
-  assert.match(out.detail,/Re-run api route --job job-audit-codex/);
+  assert.equal(out.reason,'model-outside-order');
   assert.deepEqual(fx.calls(),[],'nothing reached the host');
   assert.equal(jobRow(fx.repo,'job-audit-codex').status,'queued');
   const dry=json(fx.run(API,'dispatch','--repo',fx.repo,'--job','job-audit-codex','--json').stdout);
-  assert.match(dry.toolUnavailable,/spawn will refuse tool-unavailable/,'the dry run warns instead of refusing');
+  assert.match(dry.modelOutsideOrder,/outside/,'the dry run warns instead of refusing');
 });
 
 // Mia Mia inc-eb9a21769d69, inc-a253fdf2deda, inc-fbff1e65b60f, inc-d1c5a963c8bb: settle released the
@@ -900,5 +893,5 @@ test('a managed worker quits with its own agent CLI, not always Claude\'s input'
   const src=fs.readFileSync(API,'utf8');
   assert.doesNotMatch(src,/quitAgent\(\{ handle: managed\.agentTerminalHandle \?\? null, agent: 'claude' \}\)/);
   assert.match(src,/quitAgent\(\{ handle: managed\.agentTerminalHandle \?\? null, agent: agentOfJob\(settledPayload\) \?\? 'claude' \}\)/);
-  assert.match(src,/const agentOfJob = \(payload\) => \/\^\(claude\|codex\|devin\|qwen\)\/i\.exec\(String\(payload\?\.provider \?\? payload\?\.agent/);
+  assert.match(src,/const agentOfJob = \(payload\) => \/\^\(claude\|codex\|devin\)\/i\.exec\(String\(payload\?\.provider \?\? payload\?\.agent/);
 });

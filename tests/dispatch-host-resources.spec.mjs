@@ -88,7 +88,7 @@ test('a low disk refuses the spawn as a typed wait: host-resources-low, queued, 
   const events=()=>fx.inspect(db=>db.prepare("SELECT kind FROM events WHERE entity_id=? AND kind IN ('dispatch-rejected','route-decided','op-dispatched')").all(job).map(r=>r.kind));
 
   for(const attempt of [1,2]){
-    const d=fx.run({[HOST_ENV]:LOW_DISK},'dispatch','--job',job,'--model','qwen-agent','--spawn');
+    const d=fx.run({[HOST_ENV]:LOW_DISK},'dispatch','--job',job,'--model','devin-agent','--spawn');
     assert.notEqual(d.status,0,`dispatch ${attempt} does not launch on a starved host`);
     const body=leading(d.stdout);
     assert.equal(body.reason,'host-resources-low');
@@ -108,7 +108,7 @@ test('a low disk refuses the spawn as a typed wait: host-resources-low, queued, 
   assert.deepEqual(fx.inspect(db=>db.prepare('SELECT resource_key FROM leases WHERE job_id=?').all(job)),[],'a waiting job holds nothing');
 
   // Auto-recovery is just the next dispatch: the probe sees room again and the job launches.
-  const now=fx.run({[HOST_ENV]:ROOMY},'dispatch','--job',job,'--model','qwen-agent','--spawn');
+  const now=fx.run({[HOST_ENV]:ROOMY},'dispatch','--job',job,'--model','devin-agent','--spawn');
   assert.equal(now.status,0,`room again, the same job dispatches: ${now.stderr||now.stdout}`);
   assert.equal(fx.inspect(db=>db.prepare('SELECT status FROM jobs WHERE job_id=?').get(job).status),'running');
   assert.deepEqual(events().filter(k=>k==='dispatch-rejected'),[]);
@@ -117,7 +117,7 @@ test('a low disk refuses the spawn as a typed wait: host-resources-low, queued, 
 test('a low RAM refuses with lowRam in the probe numbers',t=>{
   const fx=fixture(t);
   const job=leading(fx.run({},'enqueue','--workflow',WORKFLOW,'--op',OP,'--paths','apps/app/src/messages').stdout).job_id;
-  const d=fx.run({[HOST_ENV]:LOW_RAM},'dispatch','--job',job,'--model','qwen-agent','--spawn');
+  const d=fx.run({[HOST_ENV]:LOW_RAM},'dispatch','--job',job,'--model','devin-agent','--spawn');
   assert.notEqual(d.status,0);
   const body=leading(d.stdout);
   assert.equal(body.reason,'host-resources-low');
@@ -133,7 +133,7 @@ test('a low RAM refuses with lowRam in the probe numbers',t=>{
 test('a host with room proceeds: the packet, leases and spawn all land',t=>{
   const fx=fixture(t);
   const job=leading(fx.run({},'enqueue','--workflow',WORKFLOW,'--op',OP,'--paths','apps/app/src/messages').stdout).job_id;
-  const d=fx.run({[HOST_ENV]:ROOMY},'dispatch','--job',job,'--model','qwen-agent','--spawn');
+  const d=fx.run({[HOST_ENV]:ROOMY},'dispatch','--job',job,'--model','devin-agent','--spawn');
   assert.equal(d.status,0,`a roomy host dispatches: ${d.stderr||d.stdout}`);
   const body=leading(d.stdout);
   assert.equal(body.ok,true);
@@ -150,7 +150,7 @@ const RAM_AT=(pct,extra={})=>JSON.stringify({freeDiskGb:500,totalRamBytes:68.6*G
 test('under 10% free RAM a heavy op waits with a dispatch-throttled event; a light op still launches',t=>{
   const fx=fixture(t);
   const heavy=leading(fx.run({},'enqueue','--workflow',WORKFLOW,'--op',OP,'--paths','apps/app/src/messages').stdout).job_id;
-  const d=fx.run({[HOST_ENV]:RAM_AT(8)},'dispatch','--job',heavy,'--model','qwen-agent','--spawn');
+  const d=fx.run({[HOST_ENV]:RAM_AT(8)},'dispatch','--job',heavy,'--model','devin-agent','--spawn');
   assert.notEqual(d.status,0);
   const body=leading(d.stdout);
   assert.equal(body.reason,'host-resources-low');
@@ -170,18 +170,18 @@ test('under 10% free RAM a heavy op waits with a dispatch-throttled event; a lig
   const held=fx.machine(m=>m.db.prepare('SELECT job_id,reason,released_at FROM throttle_decisions').all());
   assert.deepEqual(held.map(r=>[r.job_id,r.reason,r.released_at]),[[heavy,'heavy-paused',null]],'the held op is an open throttle_decisions row');
   fx.machine(m=>publishThrottle(m,{mode:'heavy-paused',why:'free RAM 8% < 10%',writer:'reconciler/resource'}));
-  const again=fx.run({[HOST_ENV]:RAM_AT(13)},'dispatch','--job',heavy,'--model','qwen-agent','--spawn');
+  const again=fx.run({[HOST_ENV]:RAM_AT(13)},'dispatch','--job',heavy,'--model','devin-agent','--spawn');
   assert.notEqual(again.status,0);
   assert.equal(leading(again.stdout).throttle.reason,'heavy-paused');
 
   const light=leading(fx.run({},'enqueue','--workflow',LIGHT_WORKFLOW,'--op','docs.author','--paths','docs').stdout).job_id;
-  const l=fx.run({[HOST_ENV]:RAM_AT(8)},'dispatch','--job',light,'--model','qwen-agent','--spawn');
+  const l=fx.run({[HOST_ENV]:RAM_AT(8)},'dispatch','--job',light,'--model','devin-agent','--spawn');
   assert.equal(l.status,0,`a light op launches under the heavy pause: ${l.stderr||l.stdout}`);
   assert.equal(fx.inspect(db=>db.prepare('SELECT status FROM jobs WHERE job_id=?').get(light).status),'running');
 
   // At 20%, above the 15% resume line, the controller publishes normal again and the heavy op launches.
   fx.machine(m=>publishThrottle(m,{mode:'normal',why:'free RAM 20%',writer:'reconciler/resource'}));
-  const back=fx.run({[HOST_ENV]:RAM_AT(20)},'dispatch','--job',heavy,'--model','qwen-agent','--spawn');
+  const back=fx.run({[HOST_ENV]:RAM_AT(20)},'dispatch','--job',heavy,'--model','devin-agent','--spawn');
   assert.equal(back.status,0,`above the resume line the heavy op dispatches: ${back.stderr||back.stdout}`);
   const decisions=fx.machine(m=>m.db.prepare('SELECT job_id,released_at,waited_ms FROM throttle_decisions').all());
   assert.equal(decisions.length,1,'one row per held job, however often it re-probed');

@@ -144,7 +144,6 @@ const identityOf = (p) => {
   const wf = WORKFLOW.exec(cmd); if (wf) return /watchdog\.mjs/i.test(cmd) ? `watchdog:${wf[1]}` : `workflow:${wf[1]}`;
   const lane = LANE.exec(cmd); if (lane) return `lane:${lane[1]}`;
   if (/[\\/]scripts[\\/]supervisor[\\/]/i.test(cmd)) return 'supervisor';
-  if (/qwen-code/i.test(cmd)) return 'agent:qwen';
   for (const [name, re] of AGENTS) if (re.test(p.exe ?? '') || re.test(String(p.name ?? ''))) return `agent:${name}`;
   return null;
 };

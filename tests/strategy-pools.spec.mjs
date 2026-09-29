@@ -106,21 +106,19 @@ const refused=(fx,r,jobId,{model,allowed=FRONTIER})=>{
 
 test('api dispatch --model refuses a hand pool for a decide kind and names the allowed pools',t=>{
   const fx=fixture(t);
-  fx.seed({jobId:'job-decide-qwen',payload:{model:'claude-agent',modelId:'claude-opus-5-5',difficulty:'medium'}});
-  const dry=fx.run('dispatch','--repo',fx.repo,'--job','job-decide-qwen','--model','qwen-agent','--json');
+  fx.seed({jobId:'job-decide-hand',payload:{model:'claude-agent',modelId:'claude-opus-5-5',difficulty:'medium'}});
+  const dry=fx.run('dispatch','--repo',fx.repo,'--job','job-decide-hand','--model','devin-agent','--json');
   assert.equal(dry.status,0,dry.stderr||dry.stdout);
-  assert.match(json(dry.stdout)?.modelOutsideOrder??'',/--model qwen-agent is outside/,'a dry run says the spawn will refuse');
-  const out=refused(fx,fx.run('dispatch','--repo',fx.repo,'--job','job-decide-qwen','--model','qwen-agent','--spawn','--json'),'job-decide-qwen',{model:'qwen-agent'});
-  assert.match(out.detail,/--model qwen-agent is outside business\.decide's think order at hard \[claude-agent, codex-agent\]/);
-  // A named profile target of a hand provider is refused the same way.
-  refused(fx,fx.run('dispatch','--repo',fx.repo,'--job','job-decide-qwen','--model','qwen3.8-max','--spawn','--json'),'job-decide-qwen',{model:'qwen3.8-max'});
+  assert.match(json(dry.stdout)?.modelOutsideOrder??'',/--model devin-agent is outside/,'a dry run says the spawn will refuse');
+  const out=refused(fx,fx.run('dispatch','--repo',fx.repo,'--job','job-decide-hand','--model','devin-agent','--spawn','--json'),'job-decide-hand',{model:'devin-agent'});
+  assert.match(out.detail,/--model devin-agent is outside business\.decide's think order at hard \[claude-agent, codex-agent\]/);
 });
 
 test('api dispatch refuses the unrouted default and a persisted route outside the order',t=>{
   const fx=fixture(t);
   fx.seed({jobId:'job-unrouted',opId:'request.analyze',payload:{}});
-  const unrouted=refused(fx,fx.run('dispatch','--repo',fx.repo,'--job','job-unrouted','--spawn','--json'),'job-unrouted',{model:'qwen-agent'});
-  assert.match(unrouted.detail,/the unrouted default qwen-agent .*re-run api route --job job-unrouted/);
+  const unrouted=refused(fx,fx.run('dispatch','--repo',fx.repo,'--job','job-unrouted','--spawn','--json'),'job-unrouted',{model:'devin-agent'});
+  assert.match(unrouted.detail,/the unrouted default devin-agent .*re-run api route --job job-unrouted/);
   fx.seed({jobId:'job-stale-route',opId:'scope.define',payload:{model:'devin-agent',modelId:'swe-2-max',difficulty:'hard'}});
   const stale=refused(fx,fx.run('dispatch','--repo',fx.repo,'--job','job-stale-route','--spawn','--json'),'job-stale-route',{model:'devin-agent'});
   assert.match(stale.detail,/the persisted route devin-agent .*re-run api route --job job-stale-route/);

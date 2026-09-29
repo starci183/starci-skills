@@ -65,7 +65,7 @@ export function kindRoute(kind, runtimes) {
 }
 
 // The fan-out order (runtimes.yaml allocation.preference.scaffold): every cut
-// slice of hands-on work walks it, whatever its kind - small bounded work, Qwen
+// slice of hands-on work walks it, whatever its kind - small bounded work, Devin
 // first (owner decision 2026-09-25).
 export const FAN_OUT_ORDER = 'scaffold';
 // A job payload that is one cut slice of a fan-out (payload.cut, ordinal of total >= 2).
@@ -118,7 +118,7 @@ function loadRuntimes(modelsDir = DEFAULT_MODELS_DIR) {
 }
 
 // The unrouted operation target is declared, never a literal: modules/models/registry.yaml
-// orchestration.defaultOperationTarget (GQ-02; the 'qwen-agent' literal callers used to restate).
+// orchestration.defaultOperationTarget (GQ-02).
 // A registry that cannot be read or does not declare it fails loudly.
 export function defaultOperationTarget(modelsDir = DEFAULT_MODELS_DIR) {
   const value = parseYaml(fs.readFileSync(path.join(modelsDir, 'registry.yaml'), 'utf8'))?.orchestration?.defaultOperationTarget;
@@ -309,8 +309,8 @@ export function balanceDeficits(pools, { shares = {}, recent = {} } = {}) {
 
 // The audit family a pool belongs to (its provider), for the cross-family
 // audit rule. The pools of runtimes.yaml allocation.frontier (the think order
-// when it is absent) and allocation.hands have one: Opus and Sol, Devin and
-// Qwen (owner decision 2026-09-25 review-hands - the hands review each other).
+// when it is absent) and allocation.hands have one: Opus and Sol, and Devin
+// (owner decision 2026-09-25 review-hands).
 export function auditFamilyOf(rt, target) {
   const frontier = rt?.allocation?.frontier ?? rt?.allocation?.preference?.think ?? [];
   const hands = Array.isArray(rt?.allocation?.hands) ? rt.allocation.hands : [];
@@ -336,8 +336,8 @@ export function auditFamilyOf(rt, target) {
 //   Cross-family audit (runtimes.yaml allocation.thinkAuditCrossFamily): a
 //     verify kind auditing another op's output (`auditOf` = the author's
 //     pool) goes to an eligible pool of another audit family (auditFamilyOf:
-//     frontier or hands) when one exists, under either policy - Qwen reviews
-//     Devin's work and Devin Qwen's.
+//     frontier or hands) when one exists, under either policy - Opus or Sol
+//     review Devin's work.
 //   Order overflow (runtimes.yaml allocation.overflowByOrder): a pool the
 //     order lists there is taken only when no other candidate is eligible,
 //     under either policy - the review order's Opus and Sol.

@@ -1,0 +1,115 @@
+id: provider-qwen-removed
+effectiveAt: '2026-09-29T22:00:00+07:00'
+summary: >-
+  The Qwen provider is removed from the runtime entirely (owner ruling 2026-09-29: "xóa qwen đi quá lỏ!! không
+  mua nữa đâu, devin codex claude đủ r"). Only claude, codex and devin remain. Gone: the qwen agent card and the
+  qwen-agent, qwen3.8-max and deepseek-v4-pro profiles; the qwen-agent runtime pool and its place in every
+  allocation tier, preference and audit order (allocation.hands is [devin-agent]; the easy tier lists the pools
+  that pin an easy model, so Devin, which pins none, is absent there; a review of what Devin implemented goes to
+  Opus or Sol under the cross-family rule); registry targets, aliases, operator chains and environments;
+  scripts/api/quota/qwen.mjs and the config.yaml quota key (Qwen was its only member); the Qwen credential
+  probes (openai-models, openai-chat) in scripts/agent/credential-probe.mjs; the qwen-loop-detection gate, the
+  card inputRow and ghostSuggestion liveness fields and the boxed "*" input glyph in the terminal readers; the Qwen
+  token adapter (scripts/lib/llm-usage.mjs USAGE_AGENTS is claude and codex), session-directory and
+  housekeeping sweeps; the model-scorecard token block; the base-pool line of the supervisor status block; the
+  Orca qwen agent, recipe and receipt list; qwen in provider-circuit, quit-agent, reconciler seat detection and
+  the workers agent set; the qwen CHECK values of the machine and runtime 0001-init schemas. The defaultOperation
+  target is devin-agent. A config.yaml that still names qwen (allocation.preferredProvider, allocation.shares,
+  allocation.grants, kernel.agent, kernel.group agent, supervisor.kernel.agent) is refused with "Qwen đã bị
+  gỡ; dùng claude, codex hoặc devin"; a leftover quota key is refused as an unknown key. Provider-agnostic card
+  hooks (credentialRefresh, hostPrerequisites, gateAutoAnswer, hostIdentity) stay; no shipped card declares
+  them. History (earlier contract-change entries, benchmark snapshots and findings, CHANGELOG) keeps its
+  mentions; the deleted files it cites are listed in modules/kernel/retired-paths.yaml.
+safetyCritical: false
+reach: new-legs
+paths:
+  - CHANGELOG.md
+  - benchmark/README.md
+  - benchmark/expectations.yaml
+  - config.example.yaml
+  - docs/config-format.md
+  - docs/fable.md
+  - docs/host-contract.md
+  - docs/ledger-db.md
+  - docs/source-layout.md
+  - engine/config.mjs
+  - engine/migrations/machine/0001-init.sql
+  - engine/migrations/runtime/0001-init.sql
+  - examples/ecommerce-app-fe/.gitignore
+  - examples/todo-app-frontend/.gitignore
+  - knowledge/patterns/repo/folder.yaml
+  - modules/host/orca/index.yaml
+  - modules/host/orca/recipes.yaml
+  - modules/host/orca/validation.yaml
+  - modules/kernel/api-commands/dispatch.yaml
+  - modules/kernel/api-commands/incident.yaml
+  - modules/kernel/api-commands/nudge.yaml
+  - modules/kernel/api-commands/provider-health.yaml
+  - modules/kernel/api-commands/route.yaml
+  - modules/kernel/api-commands/status.yaml
+  - modules/kernel/api-commands/usage.yaml
+  - modules/kernel/dispatch.yaml
+  - modules/kernel/driver-loop.yaml
+  - modules/kernel/owner-rulings.yaml
+  - modules/kernel/retired-paths.yaml
+  - modules/kernel/start-workflow.yaml
+  - modules/models/agents/claude.yaml
+  - modules/models/agents/codex.yaml
+  - modules/models/agents/qwen.yaml
+  - modules/models/index.yaml
+  - modules/models/prices.yaml
+  - modules/models/profiles/claude-agent.yaml
+  - modules/models/profiles/codex-agent.yaml
+  - modules/models/profiles/deepseek-v4-pro.yaml
+  - modules/models/profiles/devin-agent.yaml
+  - modules/models/profiles/qwen-agent.yaml
+  - modules/models/profiles/qwen3.8-max.yaml
+  - modules/models/registry.yaml
+  - modules/models/runtimes.yaml
+  - modules/models/selection.yaml
+  - modules/reconciler/host.yaml
+  - modules/schemas/index.yaml
+  - modules/schemas/profile-registry.schema.yaml
+  - modules/supervisor/supervise.yaml
+  - scripts/agent/benchmark-snapshot.mjs
+  - scripts/agent/bias.mjs
+  - scripts/agent/credential-fingerprint.mjs
+  - scripts/agent/credential-probe.mjs
+  - scripts/agent/lib.mjs
+  - scripts/agent/model-scorecard.mjs
+  - scripts/agent/models.mjs
+  - scripts/agent/provider-outage.mjs
+  - scripts/agent/trust.mjs
+  - scripts/api/quota/index.mjs
+  - scripts/api/quota/qwen.mjs
+  - scripts/checks/failure-codes.mjs
+  - scripts/checks/failure-codes.not-codes
+  - scripts/kernel/api-verbs/dispatch.mjs
+  - scripts/kernel/api-verbs/nudge.mjs
+  - scripts/kernel/api-verbs/provider-health.mjs
+  - scripts/kernel/api-verbs/route.mjs
+  - scripts/kernel/api-verbs/status.mjs
+  - scripts/kernel/api.mjs
+  - scripts/kernel/clear-draft.mjs
+  - scripts/kernel/lineage-route.mjs
+  - scripts/kernel/op-session.mjs
+  - scripts/kernel/provider-circuit.mjs
+  - scripts/kernel/quit-agent.mjs
+  - scripts/kernel/start-workflow.mjs
+  - scripts/kernel/terminal-dedupe.mjs
+  - scripts/kernel/terminal-liveness.mjs
+  - scripts/kernel/usage-record.mjs
+  - scripts/lib/close-verify.mjs
+  - scripts/lib/hk-sessions.mjs
+  - scripts/lib/input-glyph.mjs
+  - scripts/lib/llm-usage.mjs
+  - scripts/reconciler/services.mjs
+  - scripts/route/dispatch-op.mjs
+  - scripts/route/route-model.mjs
+  - scripts/supervisor/host-health.mjs
+  - scripts/supervisor/progress-report.mjs
+  - scripts/supervisor/status-block.mjs
+  - scripts/supervisor/workers.mjs
+  - skills/define-goal/SKILL.md
+  - skills/start-kernel/SKILL.md
+  - modules/kernel/contract-changes/provider-qwen-removed.yaml

@@ -24,7 +24,7 @@ import { captureTerminal } from './transcripts.mjs';
 // prompt sat staged in the input box, `/exit` + Enter submitted that prompt and
 // restarted a settled op (three leaked op terminals, 2026-09-24). The first
 // Ctrl+C clears the input box, the second exits.
-export const QUIT_COMMAND = { claude: '\u0003\u0003', codex: '/quit', qwen: '/quit' };
+export const QUIT_COMMAND = { claude: '\u0003\u0003', codex: '/quit' };
 const QUIT_ENTER = { claude: false };
 // modules/models/runtimes.yaml allocation.quitAgent.waitMs.
 export const QUIT_WAIT_MS = allocationMs('quitAgent.waitMs');
@@ -33,11 +33,11 @@ export const QUIT_WAIT_MS = allocationMs('quitAgent.waitMs');
 // has no entry for it: recognising it keeps Claude's double Ctrl+C out of a Devin TUI's input box
 // (quitAgent returns null, the close still runs - the alternative, falling through to 'claude',
 // typed \u0003\u0003 into the wrong CLI).
-export const KNOWN_TERMINAL_AGENTS = Object.freeze(['claude', 'codex', 'qwen', 'devin']);
+export const KNOWN_TERMINAL_AGENTS = Object.freeze(['claude', 'codex', 'devin']);
 
 /**
  * The agent a terminal entry runs: Orca's agentIdentity when it names a known provider, else a
- * title heuristic (tab title first, then pane title - 'qwen' outranks 'codex' either way), else
+ * title heuristic (tab title first, then pane title), else
  * the caller's fallback ('claude' when none is given: restored old tabs were mostly Claude).
  * `entry`: {agent?, tabTitle?, paneTitle?} - the shape terminal-dedupe and start-supervisor build.
  */
@@ -45,7 +45,7 @@ export function agentOfTerminal(entry, fallback = 'claude') {
   const named = String(entry?.agent ?? '').toLowerCase();
   if (KNOWN_TERMINAL_AGENTS.includes(named)) return named;
   const text = `${entry?.tabTitle ?? ''} ${entry?.paneTitle ?? ''}`;
-  return /qwen/i.test(text) ? 'qwen' : /codex/i.test(text) ? 'codex' : fallback;
+  return /codex/i.test(text) ? 'codex' : fallback;
 }
 
 /**

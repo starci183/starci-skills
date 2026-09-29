@@ -177,7 +177,7 @@ test('the third no-report death of one op raises one pattern incident, and only 
 // and every worker answered terminal_handle_stale in the same second. Each worker with partial effects
 // settled failed-no-report as a spent business attempt, demoted its pool for the retry, and three of
 // them raised [worker-died-no-report-pattern] (nivo inc-ceb153dfd2cf: 3x devin, starci-next
-// inc-65666fb85763: 2x qwen + 1x devin). A worker gone together with its workflow's Kernel terminal died
+// inc-65666fb85763: 3x devin). A worker gone together with its workflow's Kernel terminal died
 // of the host: the retry continues the tree, spends no business attempt, blames no pool, counts in no
 // pattern.
 const KERNEL_HANDLE='term-kernel-self-heal';

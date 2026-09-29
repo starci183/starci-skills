@@ -1,7 +1,7 @@
 // lineage-route.mjs — retry-aware routing: a retry learns from its own lineage's failed attempts.
 //
 // Owner decision 2026-09-25 (starci-next wf-sn-foundation): the Kernel routed
-// op-interface.implement-c3bcc0d5e4 with `api route --avoid qwen-agent,devin-agent` and the job went to
+// op-interface.implement-c3bcc0d5e4 with `api route --avoid devin-agent` and the job went to
 // codex gpt-6-luna, defeating the evidence routing (implementation goes to Devin first). A Kernel no
 // longer biases a route (api route ignores --prefer/--avoid); the ROUTER decides, from ledger facts:
 //   - a pool whose provider-health circuit is open is rejected by capacity (unchanged);

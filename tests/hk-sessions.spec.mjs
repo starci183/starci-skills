@@ -81,30 +81,6 @@ test("orca's codex-runtime-home sessions and generated_images are swept too", as
   assert.ok(!exists(roll) && !exists(img));
 });
 
-test('qwen: only files under the known session/log subdirs are candidates', async (t) => {
-  const fx = fixture(t);
-  const qwen = path.join(fx.profile, '.qwen');
-  const ses = file(path.join(qwen, 'sessions', '1.json'), { ageMs: 5 * DAY });
-  const chat = file(path.join(qwen, 'projects', 'c-slug', 'chats', 'chat.json'), { ageMs: 5 * DAY });
-  const log = file(path.join(qwen, 'tmp', 'abc123', 'logs.json'), { ageMs: 5 * DAY });
-  const dbg = file(path.join(qwen, 'debug', 'run.txt'), { ageMs: 5 * DAY });
-  // Real qwen state that is NOT session/log data must be left alone.
-  const memory = file(path.join(qwen, 'projects', 'c-slug', 'memory', 'm.json'), { ageMs: 5 * DAY });
-  const meta = file(path.join(qwen, 'projects', 'c-slug', 'meta.json'), { ageMs: 5 * DAY });
-  const shells = file(path.join(qwen, 'tmp', 'abc123', 'background-shells', 'pid'), { ageMs: 5 * DAY });
-  const settings = file(path.join(qwen, 'settings.json'), { ageMs: 5 * DAY });
-  const run = await sweepAgentSessions({ apply: true, env: fx.env, allocation: allocation(fx.archiveRoot) });
-  const dests = run.moved.map((m) => m.to);
-  for (const dest of [
-    path.join(fx.archiveRoot, 'qwen', 'sessions', '1.json'),
-    path.join(fx.archiveRoot, 'qwen', 'projects', 'c-slug', 'chats', 'chat.json'),
-    path.join(fx.archiveRoot, 'qwen', 'tmp', 'abc123', 'logs.json'),
-    path.join(fx.archiveRoot, 'qwen', 'debug', 'run.txt'),
-  ]) assert.ok(dests.includes(dest), `expected ${dest}`);
-  for (const kept of [memory, meta, shells, settings]) assert.ok(exists(kept), `kept ${kept}`);
-  for (const gone of [ses, chat, log, dbg]) assert.ok(!exists(gone), `moved ${gone}`);
-});
-
 test('links are never moved or descended: a junction candidate is skipped, a junction root refuses', async (t) => {
   const fx = fixture(t);
   const elsewhere = path.join(fx.root, 'elsewhere');
@@ -156,7 +132,6 @@ test('missing roots are reported, never errors', async (t) => {
   assert.ok(run.skipped.some((s) => s.path === path.join(fx.profile, '.codex', 'sessions') && s.reason === 'missing'));
   const dirs = sessionSweepRoots(fx.env).map((r) => r.dir);
   assert.ok(dirs.includes(path.join(fx.appData, 'orca', 'codex-runtime-home', 'home', 'sessions')));
-  assert.ok(dirs.includes(path.join(fx.profile, '.qwen', 'sessions')));
 });
 
 test('archiveSessionFiles: the settle-time contract', async (t) => {

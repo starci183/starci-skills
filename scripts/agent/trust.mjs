@@ -17,8 +17,7 @@
 //              (CODEX_HOME, ~/.codex, Orca's codex-runtime-home) for the launch
 //              cwd and the git root Codex keys trust by, in the key forms Codex
 //              writes (win32: 'd:\lower\case' literal and "D:\\Exact" basic).
-//     any    → the agent card's hostPrerequisites (qwen: ~/.qwen/settings.json
-//              model.maxSessionTurns -1, model.skipLoopDetection true) are pinned
+//     any    → the agent card's hostPrerequisites (settings the agent CLI must carry) are pinned
 //              and verified (ensureHostSettings): a missing or different value is
 //              written in place, every other key kept.
 //   Returns the receipt the launch event records:
@@ -406,9 +405,7 @@ export function writeCodexNoModelNudge({ file, hooks }) {
 /* ----------------------------------------------------------- host settings */
 
 // An agent card's hostPrerequisites: settings the agent CLI must carry on the host
-// (modules/models/agents/qwen.yaml: model.maxSessionTurns -1, model.skipLoopDetection true).
-// A dialog those settings keep away is one no unattended worker can answer (Qwen Code's
-// "A potential loop was detected" menu, starci-next inc-af01e1cedbf4).
+// A dialog those settings keep away is one no unattended worker can answer.
 const AGENTS_DIR = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..', 'modules', 'models', 'agents');
 const cardOf = (agent) => {
   if (!/^[a-z][a-z0-9-]*$/i.test(String(agent ?? ''))) return null;
@@ -499,7 +496,7 @@ export function launchDirectory(worktree) {
  * an agent with no trust prompt.
  */
 export function ensureLaunchTrust({ agent, cwd, env = process.env, platform = process.platform, hooks, card = undefined } = {}) {
-  // The card's host settings are pinned for every agent that declares them (qwen), before any trust step.
+  // The card's host settings are pinned for every agent that declares them, before any trust step.
   const prerequisites = hostPrerequisitesOf(card === undefined ? cardOf(agent) : card);
   let hostPrerequisites = null;
   if (prerequisites) {

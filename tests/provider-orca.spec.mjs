@@ -37,10 +37,8 @@ test('Orca host index fixes hierarchy names and exact native API calls',()=>{
   assert.equal(contract.operationAgent.canonicalLauncher.module,'scripts/kernel/api.mjs');
   assert.equal(contract.operationAgent.canonicalLauncher.command,'dispatch');
   assert.equal(contract.operationAgent.canonicalLauncher.authority,'exclusive-effectful-construction-path');
-  assert.equal(contract.operationAgent.qwen.launch,'command-terminal');
-  assert.equal(contract.operationAgent.qwen.agent,'qwen');
-  assert.equal(contract.operationAgent.qwen.model,'deepseek-v4.1-flash');
-  assert.equal(contract.operationAgent.qwen.nestedAgents,'forbidden');
+  assert.equal(contract.operationAgent.qwen,undefined,'the Qwen agent is removed from the host contract');
+  assert.equal(contract.operationAgent.devin.nestedAgents,'forbidden');
   assert.equal(contract.operationAgent.devin.launch,'command-terminal');
   assert.equal(contract.operationAgent.devin.capacityAuthority,'explicit-workflow-quota');
   assert.equal(contract.operationAgent.devin.quotaTelemetry,'launch-status');
@@ -53,11 +51,11 @@ test('Orca host index fixes hierarchy names and exact native API calls',()=>{
   assert.equal(contract.operationAgent.admission.afterWorkerStart.runtimeTitleDrift.whenImmutableIdentityRemainsExact,'recanonicalize-without-fencing');
   assert.equal(contract.operationAgent.admission.architectureSidearm.onlyTrigger,'active implementation secondary_request');
   assert.equal(contract.operationAgent.admission.architectureSidearm.exactReason,'sds-technical-gap');
-  assert.match(contract.operationAgent.qwen.calls.createTerminal.cli,/terminal create .*--command/);
-  assert.match(contract.operationAgent.qwen.calls.returnPreamble.cli,/orchestration dispatch .*--return-preamble/);
-  assert.doesNotMatch(contract.operationAgent.qwen.calls.returnPreamble.cli,/--inject/);
-  assert.match(contract.operationAgent.qwen.calls.submitPrompt.cli,/terminal send .*--enter/);
-  assert.match(contract.operationAgent.qwen.calls.createTerminal.cli,/--title "\[Op\] <operation> a<attempt> · <Workflow>"/);
+  assert.match(contract.operationAgent.devin.calls.createTerminal.cli,/terminal create .*--command/);
+  assert.match(contract.operationAgent.devin.calls.returnPreamble.cli,/orchestration dispatch .*--return-preamble/);
+  assert.doesNotMatch(contract.operationAgent.devin.calls.returnPreamble.cli,/--inject/);
+  assert.match(contract.operationAgent.devin.calls.submitPrompt.cli,/terminal send .*--enter/);
+  assert.match(contract.operationAgent.devin.calls.createTerminal.cli,/--title "\[Op\] <operation> a<attempt> · <Workflow>"/);
   assert.match(contract.operationAgent.admission.afterWorkerStart.canonicalizeTitle.renameCli,/--title "\[Op\] <operation>"/);
   assert.equal(contract.routing.operationToOperation,'forbidden');
   assert.match(contract.routing.kernelToOperation.cli,/terminal send .*--enter/);
@@ -83,18 +81,6 @@ test('agent cards carry the spawn contract the host drives',()=>{
     assert.equal(card.start?.api,'orchestration.worker-start',`${name} start api`);
     assert.equal(typeof card.terminalFallback?.command,'string',`${name} terminalFallback.command`);
   }
-  const qwen=agentCard('qwen');
-  assert.equal(qwen.schema,'starci/agent-card@1');
-  assert.equal(qwen.kind,'command-terminal-agent');
-  assert.equal(qwen.start[0].api,'terminal.create');
-  assert.equal(qwen.start[2].api,'orchestration.dispatch');
-  assert.equal(qwen.start[2].binding,'return-preamble');
-  assert.equal(qwen.start[3].api,'terminal.send');
-  assert.equal(qwen.start[5].api,'orchestration.dispatch-show');
-  assert.equal(qwen.credentialRefresh.envKey,'BAILIAN_TOKEN_PLAN_API_KEY');
-  assert.doesNotMatch(qwen.credentialRefresh.win32+qwen.credentialRefresh.posix,/sk-/);
-  assert.ok(qwen.forbidden.includes('dispatch-inject'));
-  assert.ok(qwen.forbidden.includes('qwen-agent-tool'));
   const devin=agentCard('devin');
   assert.equal(devin.schema,'starci/agent-card@1');
   assert.equal(devin.kind,'command-terminal-agent');

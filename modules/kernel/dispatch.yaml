@@ -398,8 +398,7 @@ spawnMechanics:
     rendering surface, not the relationship source.
   spawnLines: >-
     The agent card injects the permission-gate answer into the
-    spawn line — `qwen -i "<prompt>" --yolo`, or Devin
-    `--permission-mode dangerous`. Both Kernel and Op seats are unattended;
+    spawn line — Devin `--permission-mode dangerous`. Both Kernel and Op seats are unattended;
     their distinct authority comes from the Kernel packet versus the exact
     operation contract + owned-path lease, not from a per-command UI menu.
     Verify the spawn actually landed with

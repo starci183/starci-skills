@@ -15,20 +15,18 @@
 //     resetsAt: ISO string | null — the next quota reset the probe saw; /status shows it
 //     detail: human-readable reason string
 //     opts: per-probe injectables (endpoint/credentials for devin, env/home/config
-//       for qwen); production callers pass nothing and get the defaults.
+//       for the others); production callers pass nothing and get the defaults.
 //
 // Provider names are normalized: lowercase, '-agent' suffix stripped.
 import { pathToFileURL } from 'node:url';
 import { probe as probeClaude } from './claude.mjs';
 import { probe as probeCodex } from './codex.mjs';
 import { probe as probeDevin } from './devin.mjs';
-import { probe as probeQwen } from './qwen.mjs';
 
 const PROBES = {
   claude: probeClaude,
   codex: probeCodex,
   devin: probeDevin,
-  qwen: probeQwen,
 };
 
 export function normalizeProvider(provider) {

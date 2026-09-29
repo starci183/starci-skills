@@ -12,7 +12,7 @@ const EXAMPLE_NON_OPERATION={...parseYaml(fs.readFileSync(new URL('../config.exa
 const EXAMPLE_CONNECTORS=parseYaml(fs.readFileSync(new URL('../config.example.yaml',import.meta.url),'utf8')).connectors;
 // reconciler is its own closed block too (controller shadow modes are reconciler specs' contract); read it shipped.
 const EXAMPLE_RECONCILER=parseYaml(fs.readFileSync(new URL('../config.example.yaml',import.meta.url),'utf8')).reconciler;
-const expected=()=>({language:'vi',model:null,effort:'medium',kernel:{group:[{agent:'claude',model:'claude-opus-5-5'},{agent:'codex',model:'gpt-6-sol'}],effort:'high'},parallel:{gear:1},supervisor:{pollIntervalMs:null,repos:[]},delegation:null,budgets:{maxOps:null},allocation:{mode:'adaptive',preferredProvider:null,policy:'balanced',shares:{'devin-agent':35,'qwen-agent':35,'claude-agent':20,'codex-agent':10},windowHours:24,grants:['devin-agent=10@implement+verify+write']},models:{selection:'quota-aware',pools:structuredClone(DEFAULT_MODEL_POOLS),nonOperation:{...EXAMPLE_NON_OPERATION}},connectors:structuredClone(EXAMPLE_CONNECTORS),asks:{autoAcceptRecommended:false,excludes:['credential','irreversible-confirmation','handover']},uat:{maxConcurrent:10},reconciler:structuredClone(EXAMPLE_RECONCILER)});
+const expected=()=>({language:'vi',model:null,effort:'medium',kernel:{group:[{agent:'claude',model:'claude-opus-5-5'},{agent:'codex',model:'gpt-6-sol'}],effort:'high'},parallel:{gear:1},supervisor:{pollIntervalMs:null,repos:[]},delegation:null,budgets:{maxOps:null},allocation:{mode:'adaptive',preferredProvider:null,policy:'balanced',shares:{'devin-agent':35,'claude-agent':20,'codex-agent':10},windowHours:24,grants:['devin-agent=10@implement+verify+write']},models:{selection:'quota-aware',pools:structuredClone(DEFAULT_MODEL_POOLS),nonOperation:{...EXAMPLE_NON_OPERATION}},connectors:structuredClone(EXAMPLE_CONNECTORS),asks:{autoAcceptRecommended:false,excludes:['credential','irreversible-confirmation','handover']},uat:{maxConcurrent:10},reconciler:structuredClone(EXAMPLE_RECONCILER)});
 test('local config initializes the three canonical quota-aware non-operation roles and rejects unknown roles, models and shapes',()=>{const root=fs.mkdtempSync(path.join(os.tmpdir(),'starci-config-'));try{fs.copyFileSync(new URL('../config.example.yaml',import.meta.url),path.join(root,'config.example.yaml'));assert.deepEqual(loadConfig(root,{initialize:true}),expected());assert.deepEqual(effectiveNonOperationModels(loadConfig(root)).kernelManager,{pool:'sol-opus',runtimes:['claude-agent','codex-agent'],selection:'quota-aware'});const badRole=expected();badRole.models.nonOperation.rescuer='sol-opus';assert.throws(()=>validateConfig(badRole),/closed quota-aware/);fs.writeFileSync(path.join(root,'config.yaml'),stringifyYaml(badRole));assert.throws(()=>loadConfig(root),/closed quota-aware/,'loadConfig must not reinterpret an unknown non-operation role');const badModel=expected();badModel.models.pools['sol-opus']=['unknown-model','codex-agent'];assert.throws(()=>validateConfig(badModel),/sol-opus/);const reordered=expected();reordered.models.pools['sol-opus']=['codex-agent','claude-agent'];assert.deepEqual(effectiveNonOperationModels(reordered).validator.runtimes,['codex-agent','claude-agent'],'member order is the owner route order');const duplicate=expected();duplicate.models.pools['sol-opus']=['claude-agent','claude-agent'];assert.throws(()=>validateConfig(duplicate),/canonical pair/);assert.throws(()=>nonOperationModels('ownerAuthority',expected()),/Unknown non-operation/);const custom={...expected(),language:'en',model:'test-host-model'};fs.writeFileSync(path.join(root,'config.yaml'),stringifyYaml(custom));assert.deepEqual(loadConfig(root),custom);fs.writeFileSync(path.join(root,'config.yaml'),'null\n');assert.throws(()=>loadConfig(root),/Invalid config/);}finally{fs.rmSync(root,{recursive:true,force:true});}});
 test('top-level supervisor/validator/critique sections are refused as unknown keys',()=>{const root=fs.mkdtempSync(path.join(os.tmpdir(),'starci-config-old-'));try{const old=expected();old.supervisor={runtimes:['codex-agent','claude-agent']};old.critique={runtimes:['claude-agent','codex-agent']};fs.writeFileSync(path.join(root,'config.yaml'),stringifyYaml(old));assert.throws(()=>loadConfig(root),/Invalid config/);}finally{fs.rmSync(root,{recursive:true,force:true});}});
 test('six-role nonOperation drafts are refused by the closed schema',()=>{const draft=expected();draft.models.nonOperation={goalAssessment:['claude-agent','codex-agent'],operationPlanner:['claude-agent','codex-agent'],kernelManager:['claude-agent','codex-agent'],technicalDecision:['claude-agent','codex-agent'],goalCritic:['claude-agent','codex-agent'],validator:['claude-agent','codex-agent']};assert.throws(()=>validateConfig(draft),/Invalid config/);});
@@ -56,8 +56,8 @@ test('adaptive capacity is the default and the owner may prefer one declared pro
     fs.copyFileSync(new URL('../config.example.yaml',import.meta.url),path.join(root,'config.example.yaml'));
     const base=loadConfig(root,{initialize:true});
     assert.deepEqual(configuredAllocationPolicy(base),{mode:'adaptive',preferredProvider:null,policy:'balanced',
-      shares:{'devin-agent':35,'qwen-agent':35,'claude-agent':20,'codex-agent':10},windowHours:24,
-      grants:{'devin-agent':{slots:10,roles:['implement','verify','write']}},source:'allocation'},'the shipped default balances four pools, Devin and Qwen at 35, Opus 20, Codex 10, and grants Devin');
+      shares:{'devin-agent':35,'claude-agent':20,'codex-agent':10},windowHours:24,
+      grants:{'devin-agent':{slots:10,roles:['implement','verify','write']}},source:'allocation'},'the shipped default balances three pools, Devin at 35, Opus 20, Codex 10, and grants Devin');
     const explicit={...base,allocation:{mode:'adaptive',preferredProvider:'codex'}};
     fs.writeFileSync(path.join(root,'config.yaml'),stringifyYaml(explicit));
     assert.deepEqual(configuredAllocationPolicy(loadConfig(root)),{mode:'adaptive',preferredProvider:'codex',policy:null,shares:null,windowHours:24,grants:null,source:'allocation'});
@@ -153,13 +153,22 @@ test('uat.maxConcurrent is the machine-wide UAT ceiling: a positive integer, def
   for(const uat of [{maxConcurrent:0},{maxConcurrent:2.5},{maxConcurrent:'10'},{slots:4},[]])assert.throws(()=>validateConfig({...base,uat}),/uat/);
 });
 
-test('quota.qwen and supervisor.frozenMinutes are accepted; malformed shapes are refused',()=>{
-  const ok={...expected(),supervisor:{pollIntervalMs:null,repos:[],frozenMinutes:10,landGate:{mode:'exclusive'}},quota:{qwen:{resetAt:'2026-10-11T23:00:00+07:00'}}};
+test('supervisor.frozenMinutes is accepted, malformed shapes are refused, and the retired quota key is unknown',()=>{
+  const ok={...expected(),supervisor:{pollIntervalMs:null,repos:[],frozenMinutes:10,landGate:{mode:'exclusive'}}};
   assert.doesNotThrow(()=>validateConfig(ok));
-  assert.throws(()=>validateConfig({...ok,quota:{codex:{}}}),/quota must be/);
-  assert.throws(()=>validateConfig({...ok,quota:{qwen:{planQuota:180000,resetAt:'2026-10-11T23:00:00+07:00'}}}),/quota.qwen/);
-  assert.throws(()=>validateConfig({...ok,quota:{qwen:{}}}),/quota.qwen/);
+  assert.throws(()=>validateConfig({...ok,quota:{}}),/expected language/);
   assert.throws(()=>validateConfig({...ok,supervisor:{...ok.supervisor,frozenMinutes:0}}),/frozenMinutes/);
+});
+
+test('a config that still names the removed Qwen provider is refused with the owner wording',()=>{
+  const ok=expected();
+  const gone=/Qwen đã bị gỡ; dùng claude, codex hoặc devin/;
+  assert.throws(()=>validateConfig({...ok,kernel:{agent:'qwen'}}),gone);
+  assert.throws(()=>validateConfig({...ok,kernel:{group:[{agent:'qwen'},{agent:'codex'}],effort:'high'}}),gone);
+  assert.throws(()=>validateConfig({...ok,allocation:{mode:'adaptive',preferredProvider:'qwen'}}),gone);
+  assert.throws(()=>validateConfig({...ok,allocation:{mode:'adaptive',policy:'balanced',shares:{'qwen-agent':35,'devin-agent':35}}}),gone);
+  assert.throws(()=>validateConfig({...ok,allocation:{mode:'adaptive',grants:['qwen-agent=2@implement']}}),gone);
+  assert.throws(()=>validateConfig({...ok,supervisor:{pollIntervalMs:null,repos:[],kernel:{agent:'qwen'}}}),gone);
 });
 
 test('root specs is a map of family switches {harness, unit, e2e}, each at its default (harness off, unit on, e2e off)',async()=>{

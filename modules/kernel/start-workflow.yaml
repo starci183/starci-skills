@@ -281,7 +281,7 @@ returns:
   kernel_terminal: handle
   workflow_id: bound
   host: orca
-  agent: codex|claude|devin|qwen
+  agent: codex|claude|devin
   model: concrete model id
   model_attested: true
   replaced: true|false

@@ -6,7 +6,7 @@ import { fileURLToPath } from 'node:url';
 import { kindOrder } from '../scripts/agent/models.mjs';
 
 // Owner routing, 2026-09-26: Opus brainstorms/decides; Sol draws, audits the UI and verifies e2e;
-// Devin/Qwen implement and do the mechanical ops; the kernel's own model calls go to Sol first.
+// Devin implements and does the mechanical ops; the kernel's own model calls go to Sol first.
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const chain = (kind, difficulty = 'hard') => kindOrder({ kind, difficulty, modelsDir: path.join(root, 'modules/models') }).chain;
 const first = (kind, difficulty) => chain(kind, difficulty)[0];
