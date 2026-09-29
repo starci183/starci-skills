@@ -134,7 +134,7 @@ writes:
         feature, fix, contract, schema or configuration change rides inside a refactor; a needed
         behavior change is a separate selected operation, never an edit hidden in this one.
   - id: evidence
-    path: E/**
+    path: evidence/**
     fields: [id, nodeId, inputDigest, outcome, assertions, assets, provenance, codeRefs, extensions]
     artifacts:
       - manifest.yaml
@@ -153,7 +153,7 @@ writes:
         sanitized output for the before run and for the after run - the same command on both sides
         of the change. Store the same machine-check reports before and after where the slice lives
         in a checked repository. Map every moved or renamed symbol to its destination and record the
-        full diff summary. Operator-specific observed result in E/result.md: the before/after parity
+        full diff summary. Operator-specific observed result in evidence/result.md: the before/after parity
         statement with the observed outputs, and any behavior difference found - which is a failure,
         not a refactor outcome."
 steps:
@@ -327,7 +327,7 @@ proofs:
         either side is a failure, and no coverage at all is the `test-gap` blocker, never a silent pass."
   - id: canon-conformance
     requirement:
-      en: When params.canonFamilies is set, E/canon-before.json and E/canon-after.json hold the same
+      en: When params.canonFamilies is set, evidence/canon-before.json and evidence/canon-after.json hold the same
         canon-scan command over the owned paths; the after report has status ok (every machine ran,
         zero findings of the selected families) except for findings the report lists as owedToWire,
         each naming the exact shared-root or consumer path outside the slice it waits on; the canon-wire

@@ -56,7 +56,7 @@ writes:
     content:
       en: Bind only the selected mode completion profile and its actual evidence.
   - id: evidence
-    path: E/**
+    path: evidence/**
     fields: [id, nodeId, inputDigest, outcome, assertions, assets, provenance, codeRefs, extensions]
     artifacts: [manifest.yaml, result.json]
     content:
@@ -153,12 +153,12 @@ policy:
               refs/dependencies/acceptance require a reported gap or separately selected scope
               update; never add/remove them to obtain pass.
         - id: evidence
-          path: E/manifest.yaml + E/git-publication.json + E/lineage.json + E/result.md
+          path: evidence/manifest.yaml + evidence/git-publication.json + evidence/lineage.json + evidence/result.md
           fields: [id, nodeId, inputDigest, outcome, assertions, assets, provenance, codeRefs, extensions]
           content:
             en: "Record observed local/remote refs before/after, exact command/exit, verified diff/ancestry and
               checks at the actual integrated head. Operator-specific observed result in
-              E/result.md: Record original, integrated and published full SHAs separately, target
+              evidence/result.md: Record original, integrated and published full SHAs separately, target
               ref and actual publication result; no worktree cleanup implied."
       steps:
         - reads:
@@ -288,12 +288,12 @@ policy:
             en: Keep immutable artifact identity and actual deployment evidence on the work/resource@1 record;
               do not retag/rebuild and call it the same release.
         - id: evidence
-          path: E/manifest.yaml + E/deployment.json + E/probes.json + E/recovery.json + E/result.md
+          path: evidence/manifest.yaml + evidence/deployment.json + evidence/probes.json + evidence/recovery.json + evidence/result.md
           fields: [id, nodeId, inputDigest, outcome, assertions, assets, provenance, codeRefs, extensions]
           content:
             en: "Retain actual target generation/digest before/after, requested command/tool outcome, probe
               observations over declared stability interval and bounded recovery/rollback effects.
-              Operator-specific observed result in E/result.md: Name actual deployed/restored
+              Operator-specific observed result in evidence/result.md: Name actual deployed/restored
               identity and unresolved acceptance; rollback success is not delivery of the rejected
               release."
       steps:
@@ -407,13 +407,13 @@ policy:
           content:
             en: Read the existing selected scope, expected assertions and .starciwork graph unchanged.
         - id: evidence
-          path: E/manifest.yaml + E/migrations-before.json + E/migrations-after.json
-            + E/replay.json + E/result.md
+          path: evidence/manifest.yaml + evidence/migrations-before.json + evidence/migrations-after.json
+            + evidence/replay.json + evidence/result.md
           fields: [id, nodeId, inputDigest, outcome, assertions, assets, provenance, codeRefs, extensions]
           content:
             en: "Keep migration checksums, actual runner/command, redacted output, before/after
               migration-history/data checks and safe no-op replay/inspect result; no credentials in
-              logs. Operator-specific observed result in E/result.md: Pin exact target/schema/source
+              logs. Operator-specific observed result in evidence/result.md: Pin exact target/schema/source
               migration identity and expected postconditions. Production mutation is allowed only by
               explicit scoped authority, never by completion of code tests."
       steps:

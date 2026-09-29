@@ -83,14 +83,14 @@ writes:
         the runner's own manifest stay untouched; a product change the tests need is a reported
         finding for a separate operation, never an edit hidden beside a test.
   - id: evidence
-    path: E/**
+    path: evidence/**
     fields: [id, nodeId, inputDigest, outcome, assertions, assets, provenance, codeRefs, extensions]
     artifacts: [manifest.yaml, authored-tests.json, collection.txt, result.md]
     content:
       en: "Map each covered assertion to the authored test file and cases that exercise it, and keep the
         real runner's collection/listing output proving the new tests are discovered. Record
         command, cwd, tested tree/commit, exit code and sanitized output of the collection check.
-        Operator-specific observed result in E/result.md: report tests authored and collected - the
+        Operator-specific observed result in evidence/result.md: report tests authored and collected - the
         pass/fail judgement of the product is the verify op's, and this evidence never claims it."
 steps:
   - reads:

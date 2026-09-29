@@ -16,8 +16,8 @@ The only runner is:
 
 ```text
 node <Source>/.claude/scripts/uat/assisted-runner.mjs <command> \
-  --request <absolute E/assisted-uat/request.yaml> \
-  --receipt <absolute E/assisted-uat/receipts/<new-run-id>.yaml>
+  --request <absolute evidence/assisted-uat/request.yaml> \
+  --receipt <absolute evidence/assisted-uat/receipts/<new-run-id>.yaml>
 ```
 
 `<Source>` is the host that owns this skill. The request and receipt arguments are always explicit and

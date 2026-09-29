@@ -80,13 +80,13 @@ writes:
       en: Only exact owned paths in the approved code-scope, with smallest required caller/integration
         changes; record actual diff and commit mapping, not proposed changes as delivered.
   - id: evidence
-    path: E/**
+    path: evidence/**
     fields: [id, nodeId, inputDigest, outcome, assertions, assets, provenance, codeRefs, extensions]
     artifacts: [manifest.yaml, lineage.json, result.md]
     content:
       en: "Store actual command, cwd/repo, source commit/tree, environment, exit code, counts and
         expected/actual per required proof, with raw sanitized output attached from STARCI_JOB_SCRATCH through api report. Operator-specific
-        observed result in E/result.md: Map each AC/operation to delivered repo/path/symbol and
+        observed result in evidence/result.md: Map each AC/operation to delivered repo/path/symbol and
         actual commit. Preserve business and architecture authority; unknown rules are blockers, not
         implementation defaults. This implement op owns lint, typecheck, relevant tests/coverage,
         affected builds and Sonar. Resolve real repository scripts and CI thresholds; record
@@ -140,7 +140,7 @@ writes:
         and starci-next foundation f920334582 filed partial for exactly this and were re-run for
         hours on files they may not touch."
   - id: apiDelivery
-    path: E/**
+    path: evidence/**
     fields: [operations, request, response, errors, authorization, codeRefs, servedVersions, endpoint, probeEvidence]
     artifacts: [api-contract.json, runtime.json]
     content:

@@ -73,7 +73,7 @@ reads:
         model's ability to click as proof that a checkpoint is safe to automate.
 writes:
   - id: request
-    path: E/assisted-uat/request.yaml
+    path: evidence/assisted-uat/request.yaml
     fields:
       - schema
       - requestId
@@ -104,7 +104,7 @@ writes:
         starci/assisted-uat-receipt@1, a run-id path template and immutable true. No pass field or
         owner approval is written.
   - id: session
-    path: E/assisted-uat/session-manifest.yaml
+    path: evidence/assisted-uat/session-manifest.yaml
     fields: [schema, sessionId, request, bindings, playwright, launch, scripts, humanGateIds, artifacts, receipt]
     content:
       en: Write one starci/assisted-uat-session-manifest@1 document after request.yaml is final. request
@@ -115,7 +115,7 @@ writes:
         script hashes, ordered humanGateIds, required artifact/media policy and the write-once
         receipt template.
   - id: playwright
-    path: E/assisted-uat/playwright/<flow-id>.spec.ts
+    path: evidence/assisted-uat/playwright/<flow-id>.spec.ts
     fields: [deterministic Playwright source]
     content:
       en: Generate one deterministic script per accepted flow in request order. Pin stable locators,
@@ -126,7 +126,7 @@ writes:
         human ok as an assertion. These scripts are operation evidence, not product source and not
         automatic uat.verify scenarios.
   - id: redaction
-    path: E/assisted-uat/redaction.yaml
+    path: evidence/assisted-uat/redaction.yaml
     fields: [schema, sensitiveSources, prohibitedContent, captureRules, inspection, failurePolicy]
     content:
       en: Write the exact capture and sanitization policy before the run. Exclude credentials, cookies,
@@ -135,7 +135,7 @@ writes:
         checks; redaction failure prevents a receipt from being accepted and never authorizes silent
         deletion of failure evidence. Test credentials a script, fixture or driver needs are generated per run (node:crypto randomBytes) or, only when they must stay stable across runs, kept the way the repo keeps every credential - .starcistacks/<stack>/secrets/test/<name>, stored with the repo's own stack-secret set command (npm run secret:set) so only the sops .enc twin is committed, read with testSecret(<name>, {repo}) (scripts/lib/test-secrets.mjs; owner:push-scan-test-secrets-encrypted) - never written as a literal; the push secret scan refuses a plaintext test password.
   - id: cleanup
-    path: E/assisted-uat/cleanup.yaml
+    path: evidence/assisted-uat/cleanup.yaml
     fields: [schema, ownership, actions, order, verification, resume]
     content:
       en: Write an idempotent finally-style plan for the exact selected effects before the first later
@@ -145,7 +145,7 @@ writes:
         prefix/age and never mistake local metadata removal for provider cleanup. The runner records
         actual IDs; preparation never invents them.
   - id: evidence
-    path: E/**
+    path: evidence/**
     fields: [id, nodeId, inputDigest, outcome, assertions, assets, provenance, codeRefs, extensions]
     artifacts: [manifest.yaml, assisted-uat/result.md]
     content:

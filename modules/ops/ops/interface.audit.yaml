@@ -44,7 +44,7 @@ reads:
         accepted-draw-lineage is authoritative for this audit; do not rewrite older records or let
         an older canonical/generated direction silently win.
   - id: accepted-draw-lineage
-    path: selected interface.draw E/response.yaml + E/manifest.yaml + E/draws.yaml + retained direction
+    path: selected interface.draw evidence/response.yaml + evidence/manifest.yaml + evidence/draws.yaml + retained direction
       images/prompts + append-only owner acceptance receipts/events in the selected workflow lineage
     purpose:
       en: Enumerate the applicable interface.draw receipts and explicit owner acceptance events without
@@ -59,8 +59,8 @@ reads:
         hashes, incomparable/conflicting latest acceptances or an acceptance that does not identify
         one draw receipt is ambiguous and blocks the audit.
   - id: realization-map
-    path: selected interface.draw E/realization-map.json + selected interface.implement
-      E/realization-check.json
+    path: selected interface.draw evidence/realization-map.json + selected interface.implement
+      evidence/realization-check.json
     purpose:
       en: Bind every accepted direction region to its declared `raster-asset` or `code-native` mode and
         the actual implementation evidence.
@@ -96,13 +96,13 @@ reads:
         and asset imports to attribute a measured delta. Repository access is read-only and
         authorizes no repair or commit.
   - id: implementation-captures
-    path: selected interface.implement E/screens/**/*.png with E/runtime.json
+    path: selected interface.implement evidence/screens/**/*.png with evidence/runtime.json
     purpose:
       en: Fresh real route x state x viewport x theme captures produced by interface.implement for this
         delivered revision, with the served origin, environment revision, driver, route/state,
         viewport/theme and probe result of each one.
   - id: producer-measurements
-    path: selected interface.implement E/measurements.json
+    path: selected interface.implement evidence/measurements.json
     purpose:
       en: "The producer's own DOM and computed-style numbers for its captures: a self-report about the
         same revision, read as context."
@@ -116,7 +116,7 @@ reads:
     purpose:
       en: Resolve an authorized actor and sealed custody, or explicit anonymous access; retain no secrets.
   - id: previous
-    path: selected prior E/audit-summary.json + E/findings.json + E/matrix.json + E/routing.json
+    path: selected prior evidence/audit-summary.json + evidence/findings.json + evidence/matrix.json + evidence/routing.json
     purpose:
       en: For every round after the first, the immediate predecessor and its ancestry.
   - id: workflow
@@ -147,7 +147,7 @@ writes:
         Never a record under .starciwork. Completion says the selected matrix has no actionable drift; it never
         completes UI, implementation, UAT or review nodes.
   - id: evidence
-    path: E/**
+    path: evidence/**
     fields: [id, nodeId, inputDigest, outcome, assertions, assets, provenance, codeRefs, extensions]
     artifacts:
       - manifest.yaml
@@ -383,7 +383,7 @@ proofs:
         primitive anatomy (button/icon-button shape, radius, fill, border), brand tokens (colour,
         type), shared registries (module/app icons) or wording the ui record or message catalogue
         declares. Where the capture follows the system source and the direction pixels differ,
-        record a `direction-artifact` note (signature, source, cells) in E/findings.json with
+        record a `direction-artifact` note (signature, source, cells) in evidence/findings.json with
         status resolved; it never blocks no-actionable-drift and never opens a deviation case or
         owner ask. A capture that departs from the system source stays a hard finding.
   - id: deterministic-coverage

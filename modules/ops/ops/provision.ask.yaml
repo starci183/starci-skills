@@ -56,7 +56,7 @@ reads:
         and api report refuses the ask (ask-declared-in-stack).
 writes:
   - id: report
-    path: E/manifest.yaml
+    path: evidence/manifest.yaml
     fields: [summary]
     content:
       en: The report of the attempt itself - the fact that the provision is present, and nothing else;

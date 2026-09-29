@@ -31,7 +31,7 @@ test('subkind rules: name conventions, op ids and paths; unknown stays null', ()
   const sk = (kind, p, opId = null, origin = null) => subkindOf({ kind, path: p, opId, origin });
   assert.equal(sk('patch', '.starciwork/kernel-evidence/w/jobs/j/j.patch'), 'patch');
   assert.equal(sk('file', '.starciwork/kernel-evidence/w/jobs/j/j.patch.json'), 'patch-json');
-  assert.equal(sk('diff', '.starciwork/features/f/impl/x/E/attempt-1/a.diff'), 'diff');
+  assert.equal(sk('diff', '.starciwork/features/f/impl/x/evidence/attempt-1/a.diff'), 'diff');
   assert.equal(sk('trace', '.starciwork/kernel-evidence/w/jobs/j/files/ab-trace.zip'), 'playwright-trace');
   assert.equal(sk('file', '.starciwork/features/f/ui/s/assets/directions/draw-loop/X--a/round-2/critique.json'), 'critique');
   assert.equal(sk('file', '.starciwork/features/f/ui/s/assets/directions/draw-loop/X--a/round-2/metrics.json'), 'metrics');
@@ -44,9 +44,9 @@ test('subkind rules: name conventions, op ids and paths; unknown stays null', ()
   assert.equal(sk('image', '.starciwork/features/f/ui/s/assets/hero.png', 'interface.asset'), 'asset-gen');
   assert.equal(sk('image', '.starciwork/features/login/uat/pw/runs/run-1/screens/a.png', 'scope.define'), 'uat-capture', 'a UAT record path whatever the op');
   assert.equal(sk('image', '.starciwork/evidence/wf-a.e2e/renders/a.png', 'e2e.verify'), 'e2e-capture');
-  assert.equal(sk('image', '.starciwork/features/f/impl/fe/view/E/screens/a-1440.png', 'interface.draw'), 'app-capture', 'a served-render capture under an impl record');
-  assert.equal(sk('image', '.starciwork/features/f/operations/audit/E/live/a.png', 'work.author'), 'app-capture');
-  assert.equal(sk('image', '.starciwork/kernel-evidence/w/interface-audit/E/calibration/a.png', 'interface.audit'), 'app-capture', 'an audit capture directory');
+  assert.equal(sk('image', '.starciwork/features/f/impl/fe/view/evidence/screens/a-1440.png', 'interface.draw'), 'app-capture', 'a served-render capture under an impl record');
+  assert.equal(sk('image', '.starciwork/features/f/operations/audit/evidence/live/a.png', 'work.author'), 'app-capture');
+  assert.equal(sk('image', '.starciwork/kernel-evidence/w/interface-audit/evidence/calibration/a.png', 'interface.audit'), 'app-capture', 'an audit capture directory');
   assert.equal(sk('image', '.starciwork/features/f/impl/be/evidence/r1/coverage/lcov-report/sort.png', 'backend.implement'), null, 'a coverage report icon is no capture');
   assert.equal(sk('image', '.starciwork/features/f/impl/fe/view/assets/a.png', 'interface.implement'), null, 'an unproven asset stays null');
   assert.equal(sk('image', '.starciwork/brand/assets/mascot/a.png', 'brand.decide'), null);

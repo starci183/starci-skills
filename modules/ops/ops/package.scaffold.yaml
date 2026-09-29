@@ -55,7 +55,7 @@ writes:
       en: "The new package tree only: package.json with declared name/scope/exports, toolchain configs
         inheriting house kits, declared layout, minimal public surface and its harness."
   - id: evidence
-    path: E/**
+    path: evidence/**
     fields:
       - request
       - scope

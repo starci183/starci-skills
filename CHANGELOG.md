@@ -7,6 +7,7 @@ All notable changes to StarCi are documented here. The project is pre-publicatio
 
 ## [1.0.0-alpha.4] — in preparation
 
+- The op evidence directory is `evidence/` (was `E/`): op manifests, the shared op prompt, schemas, docs and every consumer (artifact subkind, write families, agent-data boundary, verify-failure, context pack, api proof segments) use only `evidence/`; the `E/` form is removed with no legacy fallback (contract change `evidence-dir`).
 - The comeback concept is removed: `scripts/supervisor/comeback.mjs` is deleted and listed in
   `modules/kernel/retired-paths.yaml`; `COMEBACK_HINT` and every comeback pointer are gone from
   `engine/ledger-db.mjs`, `engine/machine-db.mjs`, the reconciler schedules, the supervisor home, the

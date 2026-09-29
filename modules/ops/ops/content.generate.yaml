@@ -66,7 +66,7 @@ writes:
       en: Only exact owned paths in the approved code-scope, with smallest required caller/integration
         changes; record actual diff and commit mapping, not proposed changes as delivered.
   - id: evidence
-    path: E/**
+    path: evidence/**
     fields: [id, nodeId, inputDigest, outcome, assertions, assets, provenance, codeRefs, extensions]
     artifacts:
       - manifest.yaml
@@ -78,7 +78,7 @@ writes:
     content:
       en: "Record factual source checks, edition completeness and actual requested build/example
         execution. Keep generated media actual tool provenance and inspected visual quality.
-        Operator-specific observed result in E/result.md: Link actual authored content paths and
+        Operator-specific observed result in evidence/result.md: Link actual authored content paths and
         source/rights provenance; content-complete is not learning outcomes observed in production
         or publication."
 steps:

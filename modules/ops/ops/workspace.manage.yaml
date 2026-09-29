@@ -48,7 +48,7 @@ writes:
     content:
       en: "N, the completion target of every mode, is the root catalog .starciwork/index.yaml
         (work/catalog@1), and the mode's record is its entry extensions.work3.setup.<workflow>.<mode>,
-        typed by modules/schemas/work-catalog.schema.yaml $defs.setup; E is
+        typed by modules/schemas/work-catalog.schema.yaml $defs.setup; the evidence directory is
         .starciwork/evidence/<workflow>.<mode>/ beside it (work-layout.yaml shape.setup). The catalog
         carries it because a prepare, import or stacks scope spans the whole product rather than one
         feature, the catalog is the product-wide index work-layout.yaml declares at the tree root, and a
@@ -58,7 +58,7 @@ writes:
         checks it rests on. An existing root-level work/node record from an earlier import is read-only
         input that workspace.canonicalization retires; this op never edits or deletes it."
   - id: evidence
-    path: E/**
+    path: evidence/**
     fields: [id, nodeId, inputDigest, outcome, assertions, assets, provenance, codeRefs, extensions]
     artifacts: [manifest.yaml, result.yaml]
     content:
@@ -220,7 +220,7 @@ policy:
               so a source-free purpose lists only it. No _resources repository record exists
               (work-layout.yaml shape.resources admits environments, identities and fixtures only);
               remote, HEAD, default ref and dirty state are observations for
-              E/repository-observation.yaml. Never invent repository/environment resources merely
+              evidence/repository-observation.yaml. Never invent repository/environment resources merely
               to satisfy setup."
         - id: node
           path: .starciwork/index.yaml (catalog + extensions.work3.setup.<workflow>.prepare) +
@@ -265,11 +265,11 @@ policy:
               without implementation completion. Do not introduce preparation for already-ready
               scope or require product-wide scaffolding."
         - id: evidence
-          path: E/manifest.yaml + E/scope-review.md + E/repository-observation.yaml
+          path: evidence/manifest.yaml + evidence/scope-review.md + evidence/repository-observation.yaml
           fields: [id, nodeId, inputDigest, outcome, assertions, assets, provenance, codeRefs, extensions]
           content:
             en: Retain source-intent citations and actual scope/coverage review in the setup entry's own
-              bundle E only. The entry's review reaches pass only after real review evidence and
+              bundle evidence/ only. The entry's review reaches pass only after real review evidence and
               validation; initial scaffolding has no review. No code/UAT pass.
       steps:
         - reads:
@@ -483,7 +483,7 @@ policy:
           content:
             en: Record source mappings in details on the import work/resource@1 record, naming the source
               repository by its workspace.yaml repositories[] name; inspected repository
-              root/identity/full commits stay in E/inventory.yaml. Keep observed versus inferred
+              root/identity/full commits stay in evidence/inventory.yaml. Keep observed versus inferred
               facts explicit. Preserve
               selected nonsecret source/design documents and images in imports assets with files
               relative paths. A source image is not product screenshot evidence. Preserve original
@@ -492,8 +492,8 @@ policy:
               selected imported node refs before computing review digest. Do not copy whole source
               repositories or credentials into .starciwork.
         - id: evidence
-          path: E/manifest.yaml + E/inventory.yaml + E/source-map.md + E/preservation.yaml +
-            E/import-review.md + E/cleanup.yaml
+          path: evidence/manifest.yaml + evidence/inventory.yaml + evidence/source-map.md + evidence/preservation.yaml +
+            evidence/import-review.md + evidence/cleanup.yaml
           fields: [id, nodeId, inputDigest, outcome, assertions, assets, provenance, codeRefs, extensions]
           content:
             en: "Inventory each selected path: origin repository/commit, tracked/dirty/untracked/ignored status,
@@ -715,7 +715,7 @@ policy:
             en: N is the catalog's stacks setup entry (the op-level writes.node says why); its review names
               the stacks check run per environment and its outcome.
         - id: evidence
-          path: E/manifest.yaml
+          path: evidence/manifest.yaml
           fields: [id, nodeId, inputDigest, outcome, assertions, assets, provenance, codeRefs, extensions]
           content:
             en: The rendered deployment models, the exact stacks check commands and outputs, and every

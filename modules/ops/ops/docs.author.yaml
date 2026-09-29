@@ -66,13 +66,13 @@ writes:
         correct sections and declared exclusions; record open questions honestly instead of filling
         them.
   - id: evidence
-    path: E/**
+    path: evidence/**
     fields: [id, nodeId, inputDigest, outcome, assertions, assets, provenance, extensions]
     artifacts: [manifest.yaml, docs-map.json, result.md]
     content:
       en: "Map every documented claim to the record id or source path/line it was read from, list the
         documents authored or updated with their before/after, and record what stayed undocumented
-        with its reason. Operator-specific observed result in E/result.md: coverage of the declared
+        with its reason. Operator-specific observed result in evidence/result.md: coverage of the declared
         documentation scope and the open questions that remain."
 steps:
   - reads:

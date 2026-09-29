@@ -80,7 +80,7 @@ writes:
         declared directory layout, the minimal runnable skeleton (entrypoint + health surface) and
         its harness. Nothing outside the declared source root."
   - id: evidence
-    path: E/**
+    path: evidence/**
     fields:
       - request
       - scope

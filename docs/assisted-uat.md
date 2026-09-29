@@ -33,13 +33,13 @@ behavior.
 The prepare operation owns these paths under its evidence root:
 
 ```text
-E/assisted-uat/request.yaml
-E/assisted-uat/session-manifest.yaml
-E/assisted-uat/playwright/<flow-id>.spec.ts
-E/assisted-uat/redaction.yaml
-E/assisted-uat/cleanup.yaml
-E/assisted-uat/receipts/<run-id>.yaml
-E/assisted-uat/runs/<run-id>/**
+evidence/assisted-uat/request.yaml
+evidence/assisted-uat/session-manifest.yaml
+evidence/assisted-uat/playwright/<flow-id>.spec.ts
+evidence/assisted-uat/redaction.yaml
+evidence/assisted-uat/cleanup.yaml
+evidence/assisted-uat/receipts/<run-id>.yaml
+evidence/assisted-uat/runs/<run-id>/**
 ```
 
 The first five are finalized by `uat.assisted.prepare`. The controlled runner adds one new run directory and

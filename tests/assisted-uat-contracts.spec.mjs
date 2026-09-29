@@ -48,9 +48,9 @@ test('assisted preparation freezes exact artifacts and classifies real human gat
   const session=contract.writes.find(write=>write.id==='session');
   const scripts=contract.writes.find(write=>write.id==='playwright');
 
-  assert.equal(request.path,'E/assisted-uat/request.yaml');
-  assert.equal(session.path,'E/assisted-uat/session-manifest.yaml');
-  assert.equal(scripts.path,'E/assisted-uat/playwright/<flow-id>.spec.ts');
+  assert.equal(request.path,'evidence/assisted-uat/request.yaml');
+  assert.equal(session.path,'evidence/assisted-uat/session-manifest.yaml');
+  assert.equal(scripts.path,'evidence/assisted-uat/playwright/<flow-id>.spec.ts');
   assert.deepEqual(request.fields,[
     'schema','requestId','nodeId','preparedAt','bindings','build','environment','flows','humanGates','scripts',
     'sessionManifest','redaction','cleanup','receipt','limits',
@@ -81,8 +81,8 @@ test('assisted verification derives pass from immutable current proof and never 
   const receipt=contract.reads.find(read=>read.id==='receipt');
   const verification=contract.writes.find(write=>write.id==='verification');
 
-  assert.equal(receipt.path,'selected uat.assisted.prepare E/assisted-uat/receipts/<run-id>.yaml');
-  assert.equal(verification.path,'E/assisted-uat/verification.yaml');
+  assert.equal(receipt.path,'selected uat.assisted.prepare evidence/assisted-uat/receipts/<run-id>.yaml');
+  assert.equal(verification.path,'evidence/assisted-uat/verification.yaml');
   assert.equal(contract.policy.assistedUatVerifyPolicy.inputSelection,'explicit-paths-only');
   assert.equal(contract.policy.assistedUatVerifyPolicy.latestRunDiscovery,'forbidden');
   assert.equal(contract.policy.assistedUatVerifyPolicy.completionSignal,'execution-finished-only');

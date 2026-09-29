@@ -85,7 +85,7 @@ function readTokens(rawPath) {
  *   template carries a `<placeholder>` — resolved by the agent against the
  *            bound records (declared only)
  *   prose    free-text fragment inside a declared path (declared only)
- *   instance `N/...`, `E/...` — per-op-instance node/evidence paths (declared)
+ *   instance `N/...`, `evidence/...` — per-op-instance node/evidence paths (declared)
  */
 function resolveReadToken(token, { root, stateDir }) {
   const rel = token.replaceAll('\\', '/');
@@ -94,7 +94,7 @@ function resolveReadToken(token, { root, stateDir }) {
   // Prose fragments ride inside declared paths ("the slice's existing
   // regression suite and its real runner") — declared, never a missing path.
   if (/\s/.test(rel)) return { token, kind: 'prose', resolved: [], missing: [] };
-  if (/^(N|E)\//.test(rel)) return { token, kind: 'instance', resolved: [], missing: [] };
+  if (/^(N|evidence)\//.test(rel)) return { token, kind: 'instance', resolved: [], missing: [] };
   if (rel === '.starciwork' || rel.startsWith('.starciwork/')) {
     if (!stateDir) return { token, kind: 'state', resolved: [], missing: [] };
     const abs = path.join(path.resolve(stateDir), rel.replace(/^\.starciwork\/?/, ''));

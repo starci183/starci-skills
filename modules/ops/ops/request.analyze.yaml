@@ -46,11 +46,11 @@ writes:
         delivered as report evidence; the kernel's run state (runtime.sqlite
         goals/jobs/inbox/reports/events rows) is never op output.
   - id: evidence
-    path: E/**
+    path: evidence/**
     fields: [request, scope, criteria, status, outputs, observations, effects, evidenceRefs, remaining]
     artifacts: [intake.json, result.json, artifacts]
     content:
-      en: E is an explicit request-owned durable output directory for this intake, outside unrelated
+      en: The evidence directory is an explicit request-owned durable output directory for this intake, outside unrelated
         user-owned docs/sites and unrelated source. Record the analysis - inspected context, the
         selection rationale, the rejected candidates with reasons and the unresolved items - and the
         fact that no source, runtime, publication, deployment or data effect occurred.

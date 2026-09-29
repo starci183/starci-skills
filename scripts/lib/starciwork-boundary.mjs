@@ -43,8 +43,8 @@ export const PRODUCT_PATTERNS = Object.freeze([
 ].map(Object.freeze));
 
 // Agent output that is refused even where a pattern above would admit it: draw rounds inside a ui record's
-// assets, stray report copies, evidence bundles, E/ captures and UAT runs anywhere, temp JSON.
-const DENY_SEGMENT = /^(draw-loop|E|evidence|runs|kernel-evidence|kernel-strays|kernel-approvals)$/;
+// assets, stray report copies, evidence bundles, evidence/ captures and UAT runs anywhere, temp JSON.
+const DENY_SEGMENT = /^(draw-loop|evidence|runs|kernel-evidence|kernel-strays|kernel-approvals)$/;
 const DENY_FILE = /^(report.*\.json|.*\.tmp\.json)$/;
 
 const segs = (rel) => String(rel ?? '').replace(/\\/g, '/').split('/').filter((s) => s && s !== '.');
@@ -94,7 +94,7 @@ const ROOT_CACHE_FILE = /^(.*\.tmp\.json|tmp-.*\.json|scan-i18n.*\.json|runtime-
 /**
  * The §5.2 category of a KNOWN agent-data path, or null when the path is not one. Known agent data — the
  * categories scripts/checks/check-example-work.mjs refuses in a .starciwork tree [STARCIWORK_AGENT_DATA]:
- * ledger, logs-db, worktrees, kernel-evidence, kernel-strays, evidence-bundle, capture (E/ and impl captures),
+ * ledger, logs-db, worktrees, kernel-evidence, kernel-strays, evidence-bundle, capture (impl captures),
  * layout-capture (shell/assets), uat-run, draw-round, interface-audit (features/<f>/operations/), stray-report,
  * cache, legacy-import (root import-cv-*). A path that is neither known agent data nor on the §5.1 list
  * (isProductPath) is drift: product records in a legacy layout, kept and reported, never removed by a script.
@@ -115,7 +115,6 @@ export function agentDataCategory(rel, { dir = false } = {}) {
   if (/^import-cv-/.test(top)) return 'legacy-import';
   if (dirs.includes('draw-loop')) return 'draw-round';
   if (dirs.includes('runs') && dirs[0] === 'features' && dirs.includes('uat')) return 'uat-run';
-  if (dirs.includes('E')) return 'capture';
   if (dirs.includes('evidence')) return 'evidence-bundle';
   if (dirs[0] === 'features' && dirs.includes('operations')) return 'interface-audit';
   if (dirs[0] === 'features' && dirs.includes('impl') && dirs.includes('assets')) return 'capture';
@@ -142,7 +141,7 @@ export const STARCIWORK_GITIGNORE = Object.freeze([
   '/_resources/*', '!/_resources/environments/', '!/_resources/identities/', '!/_resources/fixtures/',
   '!/_resources/runtimes/', '!/_resources/grammar-captures/',
   '/_derived/*', '!/_derived/index.yaml', '!/_derived/frontier.md', '!/_derived/critique.yaml', '!/_derived/critique.md',
-  'E/', 'evidence/', 'runs/', 'draw-loop/', 'operations/', 'report*.json', '*.tmp.json',
+  'evidence/', 'runs/', 'draw-loop/', 'operations/', 'report*.json', '*.tmp.json',
   '/features/**/impl/**/assets/', '/shell/assets/',
 ]);
 export const starciworkGitignoreText = () => `${STARCIWORK_GITIGNORE.join('\n')}\n`;

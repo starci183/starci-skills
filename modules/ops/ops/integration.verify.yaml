@@ -102,7 +102,7 @@ writes:
         findings belong to the evidence result. Missing refs/dependencies/assertions require a
         reported gap or a separately selected scope update; never add or remove them to obtain pass.
   - id: evidence
-    path: E/**
+    path: evidence/**
     fields: [id, nodeId, inputDigest, outcome, assertions, assets, provenance, codeRefs, proof, extensions]
     artifacts: [manifest.yaml, scenario.yaml, exchange.json, readback.json, result.md]
     content:

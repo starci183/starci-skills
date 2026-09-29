@@ -65,7 +65,7 @@ writes:
         purpose, grounding[], dependsOn[]; dep from, to, reason; exclusion subject, path, reason); the
         schema closes every object, so an invented key makes the record invalid.
   - id: work-graph
-    path: E/work-graph.json
+    path: evidence/work-graph.json
     schema: starci/work-graph@1
     fields: [domains, nodes, edges]
     content:
@@ -79,7 +79,7 @@ writes:
     content:
       en: The work/catalog@1 entry of a feature the request introduces.
   - id: evidence
-    path: E/**
+    path: evidence/**
     fields: [id, nodeId, inputDigest, outcome, assertions, assets, provenance, extensions]
     artifacts: [manifest.yaml, scope.json, result.md]
     content:

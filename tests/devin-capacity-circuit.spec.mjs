@@ -95,7 +95,7 @@ const fixture = (t) => {
 test('a Devin worker screen showing the capacity error opens the devin capacity circuit; the retry routes around Devin and counts the outage against it', async (t) => {
   const fx = fixture(t);
   fx.writeState((s) => { s.terminals = { 'term-devin-worker': { handle: 'term-devin-worker', connected: true, writable: true, command: 'devin', lastOutputAt: Date.now() - 60000,
-    screen: ['  ⎿ Wrote .starciwork/features/profiles/operations/audit/E/draw-lineage.json', CAPACITY_ROW, '─'.repeat(20), '❭ Ask Devin to build features...'].join('\n') } }; });
+    screen: ['  ⎿ Wrote .starciwork/features/profiles/operations/audit/evidence/draw-lineage.json', CAPACITY_ROW, '─'.repeat(20), '❭ Ask Devin to build features...'].join('\n') } }; });
   const before = Date.now();
   const status = await fx.run('status', '--repo', fx.repo, '--workflow', WF, '--json');
   assert.equal(status.status, 0, status.stderr || status.stdout);

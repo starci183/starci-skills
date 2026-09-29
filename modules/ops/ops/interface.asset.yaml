@@ -92,7 +92,7 @@ writes:
         (that file's sha256) and data-asset-prompt (its prompt.txt) change. Nothing else in the render source
         is edited - its composition is the drawing's."
   - id: evidence
-    path: E/**
+    path: evidence/**
     fields: [id, nodeId, inputDigest, outcome, assertions, assets, provenance, extensions]
     artifacts: [manifest.yaml, artwork-slots.yaml, prompt.txt]
     content:

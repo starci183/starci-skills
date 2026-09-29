@@ -23,35 +23,35 @@ reads:
         for final reconciliation; it is not authority to write state done, completion, evidence
         pointers or blockers.
   - id: request
-    path: selected uat.assisted.prepare E/assisted-uat/request.yaml
+    path: selected uat.assisted.prepare evidence/assisted-uat/request.yaml
     purpose:
       en: Read the exact explicitly selected starci/assisted-uat-request@1 path. Do not search for latest,
         newest, successful or convenient preparation. Verify its schema, finite ordered flows, human
         gates, effect ceiling, receipt template and input/build/environment/flow bindings.
   - id: session
-    path: selected uat.assisted.prepare E/assisted-uat/session-manifest.yaml
+    path: selected uat.assisted.prepare evidence/assisted-uat/session-manifest.yaml
     purpose:
       en: Read the exact starci/assisted-uat-session-manifest@1 path selected with the request. Recompute
         the request sha256, script hashes/digest, cleanupPlanDigest, redactionPolicyDigest and
         browser/launch bindings. A changed script, policy, request or manifest makes the run
         unverifiable rather than repairable here.
   - id: scripts
-    path: selected uat.assisted.prepare E/assisted-uat/playwright/<flow-id>.spec.ts
+    path: selected uat.assisted.prepare evidence/assisted-uat/playwright/<flow-id>.spec.ts
     purpose:
       en: Recompute every ordered script hash and inspect that receipt events map to the exact scripted
         flow/step and declared gate IDs.
   - id: policies
-    path: selected uat.assisted.prepare E/assisted-uat/redaction.yaml + E/assisted-uat/cleanup.yaml
+    path: selected uat.assisted.prepare evidence/assisted-uat/redaction.yaml + evidence/assisted-uat/cleanup.yaml
     purpose:
       en: Recompute exact policy digests and read the declared prohibited content, artifact inspections,
         owned cleanup actions and absence/restoration probes.
   - id: receipt
-    path: selected uat.assisted.prepare E/assisted-uat/receipts/<run-id>.yaml
+    path: selected uat.assisted.prepare evidence/assisted-uat/receipts/<run-id>.yaml
     purpose:
       en: Read one explicitly selected immutable starci/assisted-uat-receipt@1. The receipt contains no
         accepted pass verdict and cannot supply one by prose.
   - id: runArtifacts
-    path: selected uat.assisted.prepare E/assisted-uat/runs/<run-id>/**
+    path: selected uat.assisted.prepare evidence/assisted-uat/runs/<run-id>/**
     purpose:
       en: Recompute sha256, media type/signature, size and required playability/decodability; verify
         flow/step/gate linkage, timestamps and finalized state. Unlisted nearby files, generated
@@ -92,7 +92,7 @@ reads:
       en: Resolve available read-only verification tools.
 writes:
   - id: verification
-    path: E/assisted-uat/verification.yaml
+    path: evidence/assisted-uat/verification.yaml
     fields: [schema, request, sessionManifest, receipt, bindings, checks, derived, disposition, verifiedAt]
     content:
       en: Write one schema-valid starci/assisted-uat-verification@1 document from current machine
@@ -104,7 +104,7 @@ writes:
         pass only when every derived boolean is true; otherwise fail or blocked, with exact findings
         in evidence. verifiedAt records the independent observation time.
   - id: evidence
-    path: E/**
+    path: evidence/**
     fields: [id, nodeId, inputDigest, outcome, assertions, assets, provenance, codeRefs, extensions]
     artifacts:
       - manifest.yaml

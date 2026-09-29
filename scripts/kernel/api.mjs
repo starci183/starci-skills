@@ -3870,7 +3870,7 @@ function reconcileOrcaTasks(ledger, args) {
 // commit. nivo workspace-provision's DEFERRED SETTLE gates (inc-a158db5dc9b7: 687 predecessor files) waited
 // on exactly this, with no one but the owner to do it.
 const DEBRIS_COMMIT_CHUNK = 200;
-const PROOF_SEGMENT = /^(?:E|E-[\w.-]+|evidence|assets|runs|observed|captures|kernel-reports)$/;
+const PROOF_SEGMENT = /^(?:evidence|assets|runs|observed|captures|kernel-reports)$/;
 const debrisClassOf = (rel) => {
   const parts = slash(rel).split('/');
   const at = parts.indexOf('.starciwork');

@@ -92,8 +92,8 @@ native SVG can represent faithfully.
 
 The draw remains a visual baseline for both modes, but it is not permission to flatten code-native UI into a
 screenshot. Conversely, matching the silhouette with CSS does not authorize replacing required branded/media
-artwork. `interface.implement` records the actual binding for each region in `E/realization-check.json`, and the
-audit records its verdict in `E/realization.json`. A mode substitution is a hard `realization.mode` finding, not a
+artwork. `interface.implement` records the actual binding for each region in `evidence/realization-check.json`, and the
+audit records its verdict in `evidence/realization.json`. A mode substitution is a hard `realization.mode` finding, not a
 creative preference.
 
 ## A symbol is a product claim
@@ -185,7 +185,7 @@ It does not own what a system source defines:
 - wording declared by the ui record or message catalogue.
 
 An image model often draws a square button where Grammar renders a pill. When the capture follows the system
-source and the direction differs, the audit records a resolved `direction-artifact` note in `E/findings.json`.
+source and the direction differs, the audit records a resolved `direction-artifact` note in `evidence/findings.json`.
 It does not raise a finding, open a deviation case or ask the owner. A capture that departs from the system source
 is still a hard finding (see the border example above).
 
@@ -193,8 +193,8 @@ is still a hard finding (see the border example above).
 
 A visible difference from the accepted `interface.draw` remains drift even when the implementer or auditor says
 it was intentional. The audit cannot turn its own design opinion, a taste score, green technical checks or owner
-silence into acceptance. It writes an append-only deviation case in `E/deviations.json` with a readable companion
-at `E/deviation-brief.md`, bound to the exact accepted-draw hash, implementation-capture hash and matrix cell.
+silence into acceptance. It writes an append-only deviation case in `evidence/deviations.json` with a readable companion
+at `evidence/deviation-brief.md`, bound to the exact accepted-draw hash, implementation-capture hash and matrix cell.
 
 The case must make the disagreement inspectable later. It records the exact affected regions and measurements,
 why the departure is claimed to be necessary, the user/product benefit, rules preserved and violated, the

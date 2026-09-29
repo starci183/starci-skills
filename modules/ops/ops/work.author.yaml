@@ -156,7 +156,7 @@ writes:
         first and alone and the rest fan out behind it. Never author a child outside the feature's
         own impl/<repository>/ folder and never write product code."
   - id: evidence
-    path: E/**
+    path: evidence/**
     fields: [id, nodeId, inputDigest, outcome, assertions, provenance, extensions]
     artifacts: [manifest.yaml, result.json]
     content:
@@ -165,7 +165,7 @@ writes:
         and every scope question that stayed open. Record an honest not-run or failed validator
         result.
   - id: work-graph
-    path: E/work-graph.json
+    path: evidence/work-graph.json
     schema: starci/work-graph@1
     fields: [domains, nodes, edges]
     content:

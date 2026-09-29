@@ -68,7 +68,7 @@ test('globs, placeholders and runtime state are skipped rather than reported dea
     'modules/kernel/fixture.yaml': [
       'a:',
       '  citation: "scripts/checks/spec/*.mjs; modules/ops/ops/<opId>.yaml; .starciwork/runtime.sqlite"',
-      '  prose: "evidence lands at E/manifest.yaml inside the record"',
+      '  prose: "evidence lands at evidence/manifest.yaml inside the record"',
       '',
     ].join('\n'),
   });

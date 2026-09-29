@@ -60,13 +60,13 @@ writes:
         direct edit that leaves no diff, a rev jump other than +1, or a done block the kernel cannot
         evaluate is not a revision.
   - id: evidence
-    path: E/**
+    path: evidence/**
     fields: [id, nodeId, inputDigest, outcome, assertions, assets, provenance, extensions]
     artifacts: [manifest.yaml, goal-diff.json, result.md]
     content:
       en: "Record the explicit diff - per section: unchanged, changed with old and new value, added,
         removed - the reason for each change, the derivations each changed section affects, and the
-        authority classification of every edit. Operator-specific observed result in E/result.md:
+        authority classification of every edit. Operator-specific observed result in evidence/result.md:
         the rev transition, the section-level diff summary and the invalidation surface the kernel
         applies."
 steps:

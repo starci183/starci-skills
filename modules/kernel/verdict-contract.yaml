@@ -74,7 +74,7 @@ returns:
   evidence:
     meaning: >-
       The paths the verdict stands on — report.files plus the artifacts the
-      op's brief declared (E/result.json, E/effects.json, E/manifest.yaml,
+      op's brief declared (evidence/result.json, evidence/effects.json, evidence/manifest.yaml,
       captures, recordings, sonar exports — whatever the op's writes: block
       names, e.g. modules/ops/ops/task.execute.yaml writes.evidence).
     mustPass: >-

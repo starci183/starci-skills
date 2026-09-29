@@ -88,7 +88,7 @@ writes:
         blocker rather than a wider write. The consumer's version binding is either inside this
         allowlist or a reported shared change; it is never edited silently."
   - id: evidence
-    path: E/**
+    path: evidence/**
     fields: [id, nodeId, inputDigest, outcome, assertions, assets, provenance, codeRefs, extensions]
     artifacts: [manifest.yaml, composition-attempt.md, unit.json, gates.json, publish.json, result.md]
     content:
@@ -99,7 +99,7 @@ writes:
         and counts that show them red before and green after, every gate of the grammar repository
         with its real output, the exact published version with the registry read-back that proves it
         is visible, and the canon entries that now name the unit. Operator-specific observed result
-        in E/result.md: the gap, the attempt, the unit, the version and the consumer binding. An
+        in evidence/result.md: the gap, the attempt, the unit, the version and the consumer binding. An
         unpublished version, an unread registry or an unrecorded canon entry is blocked or not-run,
         never pass."
 steps:

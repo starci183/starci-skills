@@ -402,8 +402,8 @@ test('scan runs the repository scanner against the local host, mints the project
   const {host,state}=await fakeSonar(t);
   const custody=fakeCustody(root);
   const repo=fakeRepo(root);
-  const out=path.join(root,'E','sonar.json');
-  const log=path.join(root,'E','sonar.txt');
+  const out=path.join(root,'evidence','sonar.json');
+  const log=path.join(root,'evidence','sonar.txt');
   const {exitCode,report}=await sonarLocalMain(['scan','--cwd',repo,'--wait','--out',out,'--log',log],{config:configFor(host,custody)});
   assert.equal(exitCode,0,JSON.stringify(report));
   assert.equal(report.outcome,'pass');

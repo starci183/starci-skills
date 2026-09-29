@@ -57,7 +57,7 @@ test('salvage: the newest op-report@1 written since dispatch and stamped for thi
   write(root, 'fr/b/report.json', report('blocked', { from: 'op-other-2' }), since + 2_000);    // stamped for another
   write(root, 'fr/c/report.json', '{not json', since + 3_000);
   const mine = write(root, 'fr/d/report.op-me-1.json', report('partial'), since + 4_000);
-  const plain = write(root, 'fr/e/E/report.json', report('done'), since + 5_000);
+  const plain = write(root, 'fr/e/evidence/report.json', report('done'), since + 5_000);
   const found = unfiledReportCandidates({ scratch: root, sinceMs: since, jobId: 'op-me-1', dispatchId: 'ctx_1' });
   assert.deepEqual(found.map((c) => c.file), [plain, mine]);
   const filed = [];
@@ -71,7 +71,7 @@ test('salvage: the newest op-report@1 written since dispatch and stamped for thi
 test('resume context: a retry of a failed-no-report attempt carries its evidence and op log tail; any other retry carries nothing', t => withLedger(t,({ledger})=>{
   seedWorkflow(ledger,{id:'wf',jobs:[
     {jobId:'op-x-9',opId:'x',status:'failed',result:{reason:'failed-no-report',effectState:'partial',environment:'host-terminal-wipe',
-      worker:{liveness:'disconnected'},evidence:['dirty:.starciwork/features/collab/impl/x/E/build.txt','commit:abc123']}},
+      worker:{liveness:'disconnected'},evidence:['dirty:.starciwork/features/collab/impl/x/evidence/build.txt','commit:abc123']}},
     {jobId:'op-x-8',opId:'x',status:'failed',result:{verdict:'fail',reason:'routed'}},
   ]});
   const db=ledger.db;
@@ -96,13 +96,13 @@ test('settle debris: a file written before admission and not in the report never
   write(repo, 'README.md', 'x');
   git(repo, 'add', '-A'); git(repo, 'commit', '-q', '-m', 'init');
   const admitted = Date.now() - 60_000;
-  write(repo, '.starciwork/features/wp/impl/E/manifest.yaml', 'old', admitted - 3_600_000);    // predecessor debris
+  write(repo, '.starciwork/features/wp/impl/evidence/manifest.yaml', 'old', admitted - 3_600_000);    // predecessor debris
   const base = { base: repo, ownedPaths: ['.starciwork/features/wp'], pushes: false, head: git(repo, 'rev-parse', 'HEAD') };
   const clean = landedProof({ ...base, debris: { sinceMs: admitted, own: [] } });
   assert.equal(clean.ok, true, JSON.stringify(clean.detail));
   assert.equal(clean.detail.debrisCount, 1);
   assert.equal(landedProof(base).ok, false, 'without the debris rule the old refusal stands');
-  const named = landedProof({ ...base, debris: { sinceMs: admitted, own: [path.join(repo, '.starciwork/features/wp/impl/E/manifest.yaml')] } });
+  const named = landedProof({ ...base, debris: { sinceMs: admitted, own: [path.join(repo, '.starciwork/features/wp/impl/evidence/manifest.yaml')] } });
   assert.equal(named.ok, false, 'a file the report names is the job\'s own');
   write(repo, '.starciwork/features/wp/fr/new/index.yaml', 'mine');                               // written after admission
   const fresh = landedProof({ ...base, debris: { sinceMs: admitted, own: [] } });
@@ -110,7 +110,7 @@ test('settle debris: a file written before admission and not in the report never
   assert.deepEqual(fresh.detail.dirty, ['.starciwork/features/wp/fr/new/index.yaml']);
   const effects = ownedPathEffects({ base: repo, ownedPaths: ['.starciwork/features/wp'], sinceMs: admitted });
   assert.deepEqual(effects.dirty, ['.starciwork/features/wp/fr/new/index.yaml']);
-  assert.deepEqual(effects.preexisting, ['.starciwork/features/wp/impl/E/manifest.yaml']);
+  assert.deepEqual(effects.preexisting, ['.starciwork/features/wp/impl/evidence/manifest.yaml']);
 });
 
 test('a long owned-path list is written to owned-paths.txt and the prompt names the file, never the 993 paths', (t) => {

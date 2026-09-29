@@ -3,7 +3,7 @@ $id: urn:starci:realization-check:1
 type: object
 additionalProperties: false
 description: "How interface.implement realized each region of an accepted direction
-  (E/realization-check.json), and the evidence for the choice. interface.audit reads this file as
+  (evidence/realization-check.json), and the evidence for the choice. interface.audit reads this file as
   its realization map: rich authored imagery binds a retained raster asset, and layout, controls,
   typography, system icons and representable effects bind semantic DOM plus installed Grammar. A
   flattened screenshot standing in for a code-native region is visible here before it is visible

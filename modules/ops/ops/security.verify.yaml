@@ -81,7 +81,7 @@ writes:
         not semantic node prose. Missing refs/dependencies/acceptance require a reported gap or
         separately selected scope update; never add/remove them to obtain pass.
   - id: evidence
-    path: E/**
+    path: evidence/**
     fields: [id, nodeId, inputDigest, outcome, assertions, assets, provenance, codeRefs, extensions]
     artifacts: [manifest.yaml, findings.json, result.md]
     content:
@@ -90,7 +90,7 @@ writes:
         commit. Record each declared check with command, cwd, exit code and sanitized output, and
         each surface not inspected with its reason. Redact secrets and personal data before assets
         are hashed; a finding never contains a usable credential. Operator-specific observed result
-        in E/result.md: findings first, then inspected surface and not-run items - no verdict the
+        in evidence/result.md: findings first, then inspected surface and not-run items - no verdict the
         evidence does not carry."
 steps:
   - reads:

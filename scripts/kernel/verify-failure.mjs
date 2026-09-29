@@ -188,7 +188,7 @@ export function findRecord(repo, id) {
     let entries = [];
     try { entries = fs.readdirSync(dir, { withFileTypes: true }); } catch { continue; }
     for (const e of entries) {
-      if (e.isDirectory() && !/^(E|runs|assets|node_modules)$/.test(e.name)) stack.push(path.join(dir, e.name));
+      if (e.isDirectory() && !/^(evidence|runs|assets|node_modules)$/.test(e.name)) stack.push(path.join(dir, e.name));
       else if (e.isFile() && e.name === 'index.yaml') {
         seen += 1;
         const file = path.join(dir, e.name);

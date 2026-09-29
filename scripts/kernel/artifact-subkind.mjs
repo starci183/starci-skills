@@ -20,7 +20,7 @@
 //   uat-capture        an image of a uat.* job, or under a features/<f>/uat/ record
 //   e2e-capture        an image of an e2e.verify job, or under a features/<f>/e2e/ record
 //   app-capture        an image of the running app: under features/<f>/(impl|operations)/ in a capture directory
-//                      (E, E-*, evidence, screens, captures, live, observed, renders, calibration, tools), or any
+//                      (evidence, screens, captures, live, observed, renders, calibration, tools), or any
 //                      capture-directory image of an interface.implement / interface.audit / interface.scaffold job
 //   uat-video          a video of a uat.* job, or under a features/<f>/uat/ record
 //   e2e-video          a video of an e2e.verify job, or under a features/<f>/e2e/ record
@@ -34,7 +34,7 @@ export const DRAW_RENDER_SCHEMA = 'starci/draw-render@1';
 const UAT_OPS = new Set(['uat.verify', 'uat.assisted.prepare', 'uat.assisted.verify']);
 const E2E_OPS = new Set(['e2e.verify']);
 const APP_OPS = new Set(['interface.implement', 'interface.audit', 'interface.scaffold']);
-const CAPTURE_SEG = /^(?:e|e-[^/]+|evidence|screens|captures|live|observed|renders|calibration|tools)$/i;
+const CAPTURE_SEG = /^(?:evidence|screens|captures|live|observed|renders|calibration|tools)$/i;
 const TOKEN_DIR = /^(?:token-render(?:-.+)?|token-redraw(?:-.+)?|token-draft|token-\d[^/]*)$/i;
 
 const slashed = (p) => String(p ?? '').replace(/\\/g, '/');

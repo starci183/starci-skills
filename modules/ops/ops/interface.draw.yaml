@@ -218,7 +218,7 @@ writes:
         shapes only, one per XBase#state of ui.shapes, never a retired data-status image. Reference inputs
         stay under their existing owner and are cited rather than copied."
   - id: evidence
-    path: E/**
+    path: evidence/**
     fields: [id, nodeId, inputDigest, outcome, assertions, assets, provenance, codeRefs, extensions]
     artifacts: [manifest.yaml, direction.png, prompt.txt, visual-review.md, symbol-review.json, realization-map.json]
     content:
@@ -233,7 +233,7 @@ writes:
         `code-native` with its rationale, responsive/state behavior, asset/artwork-slot binding when
         raster, and Grammar component plus CSS/SVG/DOM anatomy when code-native."
   - id: draws
-    path: E/draws.yaml
+    path: evidence/draws.yaml
     fields: [draws, coverage]
     content:
       en: "The readable mapping of representative directions, prompt artifacts and complete remaining
@@ -245,7 +245,7 @@ writes:
         scripts/kernel/serve-ask.mjs and scripts/connectors/telegram-media.mjs read it and show the owner
         each draw's part (then `content`, then `image` on an older draws.yaml), never the composite."
   - id: work-graph
-    path: E/work-graph.json
+    path: evidence/work-graph.json
     schema: starci/work-graph@1
     fields: [domains, nodes, edges]
     content:

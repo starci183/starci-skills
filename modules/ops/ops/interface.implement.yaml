@@ -177,7 +177,7 @@ writes:
       en: The markup rendered by that same inspected surface - agent data, kept in scratch (never under
         the impl node's assets/) and filed by api report with captures/.
   - id: evidence
-    path: E/**
+    path: evidence/**
     fields: [id, nodeId, inputDigest, outcome, assertions, assets, provenance, codeRefs, extensions]
     artifacts: [result.md, screens/**/*.png, runtime.json, measurements.json]
     content:
@@ -191,7 +191,7 @@ writes:
         regression against unchanged expectations. Retain real test output and screenshot from the
         implemented surface, actually opened/inspected. Include viewport/theme, observed
         route/state, driver, served build and limitations; no fixture screenshot labelled product
-        proof. Operator-specific observed result in E/result.md: Map delivered
+        proof. Operator-specific observed result in evidence/result.md: Map delivered
         components/routes/client calls to ACs and state coverage; record actual source revision
         separately from served render revision. This implement op owns lint, typecheck, relevant
         tests/coverage, affected builds and Sonar. Resolve real repository scripts and CI
@@ -232,16 +232,16 @@ writes:
         is blocked/not-run, never pass and never an owner credential ask; do not move this
         responsibility to architecture, business or UAT. Reuse existing authorization and keep
         secrets outside evidence. Every delivered surface
-        must additionally emit the runtime evidence bundle interface.audit reads: E/screens/**/*.png
+        must additionally emit the runtime evidence bundle interface.audit reads: evidence/screens/**/*.png
         captures one real served render per delivered route x state x viewport x theme cell;
-        E/runtime.json records per capture the served origin/environment revision, driver,
+        evidence/runtime.json records per capture the served origin/environment revision, driver,
         route/state actually opened, viewport/theme, probe result and limitations (HEAD is not
-        served proof); E/measurements.json records per capture the DOM/accessibility and
+        served proof); evidence/measurements.json records per capture the DOM/accessibility and
         computed-style measurements used to prove rendered geometry, breakpoints, tokens and
         interactive affordances. PNG-only handoff is incomplete evidence: cells without runtime and
         measurement entries keep this op's outcome partial/blocked, never done."
   - id: flows
-    path: E/flows.json
+    path: evidence/flows.json
     fields: [flows, codeRefs, runtime, assets]
     content:
       en: "Always return the FE handoff JSON, including standalone execution: flows with stable
@@ -253,7 +253,7 @@ writes:
         artwork stays explicitly deferred. Validate with the selected execution profile and complete
         input draw IDs."
   - id: assetManifest
-    path: E/assets.json
+    path: evidence/assets.json
     schema: starci/asset-manifest@1
     fields:
       - reviewedDrawIds
@@ -265,7 +265,7 @@ writes:
         retained artifact and its provenance, and — while deferred — the brief a later operation
         needs."
   - id: realizationCheck
-    path: E/realization-check.json
+    path: evidence/realization-check.json
     schema: starci/realization-check@1
     content:
       en: Each accepted direction region mapped to its actual implementation, with the evidence that
@@ -403,7 +403,7 @@ steps:
         verified matching asset or create/generate the required asset, inspect it and integrate its
         actual source file. Claude with no image-generation capability may reserve a blank
         decorative slot with a deferred brief; never use invented URLs, broken images or label
-        pending art complete. Functional asset requirements remain blocking. Record E/assets.json
+        pending art complete. Functional asset requirements remain blocking. Record evidence/assets.json
         even when the reviewed draws need no distinct assets. Write the frontend source summary only
         to the owning impl/<repository>/<name>/index.yaml record. Running-page screenshots are cited
         in that record's assets[] (blobs filed from STARCI_JOB_SCRATCH/captures); design PNGs remain in
@@ -500,11 +500,11 @@ steps:
         per-repository commit references. Preserve unrelated local changes; never stage everything,
         bypass hooks, push or invent an empty commit. If no code changed, return the verified
         existing commit and explain no change. Missing commit proof prevents a passing delivery.
-        Always write E/flows.json as the ready UAT handoff, even outside a named workflow; preserve
+        Always write evidence/flows.json as the ready UAT handoff, even outside a named workflow; preserve
         accepted journey order and expected results, bind source paths, real commits and the
         observed served build. Validate with validateFEHandoff against the selected accepted
         journeys before delivery. This handoff is conditional and does not change standalone or
-        named frontend response contracts. Include assets in E/flows.json and FE outputs alongside
+        named frontend response contracts. Include assets in evidence/flows.json and FE outputs alongside
         flows/codeRefs/runtime; pass the exact manifest to UAT. The assets-accounted-for criterion
         requires full draw coverage and real ready assets or explicitly allowed decorative
         deferrals.
@@ -568,17 +568,17 @@ proofs:
     check: scripts/checks/shell-conformance.mjs
   - id: asset-coverage
     requirement:
-      en: "Every artwork slot the accepted directions declared has an entry in E/assets.json, that file
+      en: "Every artwork slot the accepted directions declared has an entry in evidence/assets.json, that file
         carries `schema: starci/asset-manifest@1` and holds the shape
         modules/schemas/asset-manifest.schema.yaml declares, and no entry required for a business or
         UX criterion is deferred."
   - id: realization-fidelity
     requirement:
-      en: "E/realization-check.json covers every accepted direction region. `raster-asset` regions bind
+      en: "evidence/realization-check.json covers every accepted direction region. `raster-asset` regions bind
         exact retained bytes/provenance and actual rendered placement; `code-native` regions bind
         semantic DOM, installed Grammar, responsive CSS and repository-native SVG where applicable.
         Any mode substitution is an explicit unresolved design conflict and cannot earn done.
-        E/realization-check.json carries `schema: starci/realization-check@1` and holds the shape
+        evidence/realization-check.json carries `schema: starci/realization-check@1` and holds the shape
         modules/schemas/realization-check.schema.yaml declares."
 blockers:
   - code: APP_SHELL_UNSETTLED

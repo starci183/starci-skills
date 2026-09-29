@@ -110,7 +110,7 @@ shape:
     - features/<feature>/uat/<flow>/{index.yaml,accounts.yaml,fixtures.yaml,seed.sql,cleanup.sql}
     - "<name>, <rule>, <screen> and <flow> may nest by name segment where a group needs it (br/title/required,
       fr/cart/add, ui/<group>/<screen>, impl/<repository>/<group>/<name>); a nesting folder is never assets/ or an
-      agentData folder (E, evidence, runs, draw-loop, kernel-*), so agent output never passes as a record."
+      agentData folder (evidence, runs, draw-loop, kernel-*), so agent output never passes as a record."
     - features/<feature>/<family>/<name>/evidence.yaml - work/evidence@1, citing artifacts by id + sha256
   agentData:
     - "Agent output is never product content. It lives in the project ledger (reports, check_runs, job_artifacts,
@@ -120,11 +120,11 @@ shape:
       refuses in a .starciwork tree [STARCIWORK_AGENT_DATA], and shape.starciworkIgnore keeps them out of git."
     - kernel-evidence/**, kernel-strays/**, kernel-approvals/** (retired custody)
     - evidence/<workflow>.<mode>/** and any <node>/evidence/<id>/** bundle
-    - any E/** capture, impl/<repository>/<name>/assets/** capture, shell/assets/** layout capture
+    - any evidence/** capture, impl/<repository>/<name>/assets/** capture, shell/assets/** layout capture
     - uat/<flow>/runs/<runId>/**, ui/<screen>/assets/**/draw-loop/** rounds, features/<feature>/operations/**
     - report*.json copies, *.tmp.json, settle-parity/, settle-tail/, runtime/, canon-seams/, root import-cv-*
     - the ledger and log files (runtime.sqlite*, logs.sqlite*) and worktrees/ (op worktrees live at D:/starci-wt)
-    - "E/** bundles, UAT runs and interface.audit verdicts are filed from STARCI_JOB_SCRATCH with api report --attach
+    - "evidence/** bundles, UAT runs and interface.audit verdicts are filed from STARCI_JOB_SCRATCH with api report --attach
       (modules/ops/_common.yaml Path and field contract): artifacts of the attempt, the audit an interface_audits row.
       Draw-loop rounds are one blob bundle generation.loop cites {sha256, round}; impl running-page captures are blobs
       the implementation record's assets[] cites {artifact?, name, role, sha256}; layout captures and lockups are blobs
@@ -140,7 +140,7 @@ shape:
     - "/brand/* !/brand/index.yaml !/brand/evidence.yaml !/brand/assets/ /shell/* !/shell/index.yaml !/shell/evidence.yaml"
     - "/_resources/* !/_resources/{environments,identities,fixtures,runtimes,grammar-captures}/"
     - "/_derived/* !/_derived/index.yaml !/_derived/frontier.md !/_derived/critique.yaml !/_derived/critique.md"
-    - "E/ evidence/ runs/ draw-loop/ operations/ report*.json *.tmp.json /features/**/impl/**/assets/ /shell/assets/"
+    - "evidence/ runs/ draw-loop/ operations/ report*.json *.tmp.json /features/**/impl/**/assets/ /shell/assets/"
   workflowRunState: one SQLite file per project ledger, %LOCALAPPDATA%/StarCi/projects/<ledger_id>/runtime.sqlite
     (decision Q1; engine/ledger-db.mjs ledgerFileFor resolves it through machine.ledgers), outside every repository. Untracked, never product content (shape.agentData). It holds workflows, units, jobs,
     op attempts, contracts, reports, check runs, artifacts, blobs, events, logs, conditions, leases, inbox and

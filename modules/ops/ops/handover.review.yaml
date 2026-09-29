@@ -43,10 +43,10 @@ reads:
         a live proof ran against the real provider or runtime (proof.boundary, fakes, blocked environment).
 writes:
   - id: package
-    path: E/**
+    path: evidence/**
     artifacts: [handover-<attempt>.md, handover-<attempt>.json]
     content:
-      en: "E is .starciwork/evidence/<workflow>.handover/ beside the root catalog - the workflow-level bundle
+      en: "The evidence directory is .starciwork/evidence/<workflow>.handover/ beside the root catalog - the workflow-level bundle
         the setup record uses as precedent (work-layout.yaml shape.setup): a handover spans the whole
         workflow, not one feature record, and the kernel grants exactly this directory as the job's owned
         path. Each attempt adds its own handover-<attempt>.md, the package the owner reads, written in

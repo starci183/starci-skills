@@ -106,8 +106,8 @@ test('a .enc passes only as a sops envelope, judged on the whole file when the s
 const scanDiffWith = (diff, encText) => { const s = diffScanner([], { encText }); for (const l of diff.split('\n')) s.line(l); return s.findings; };
 
 test('an allow entry pinned to a committed range is spent once origin/main holds it', () => {
-  const entries = [{ repo: 'nivo-backend', file: 'E/capture.mjs', pattern: 'assigned-secret', approvedBy: 'owner', until: 'abc123' }];
-  const findings = [{ file: 'E/capture.mjs', line: 67, pattern: 'assigned-secret' }];
+  const entries = [{ repo: 'nivo-backend', file: 'evidence/capture.mjs', pattern: 'assigned-secret', approvedBy: 'owner', until: 'abc123' }];
+  const findings = [{ file: 'evidence/capture.mjs', line: 67, pattern: 'assigned-secret' }];
   const ancestor = (status) => () => ({ ok: status === 0, status, stdout: '', stderr: '' });
   assert.equal(applyScanAllow('D:/Repositories/nivo-backend', findings, entries, { run: ancestor(1) }).exempted.length, 1, 'not pushed yet: exempt');
   assert.equal(applyScanAllow('D:/Repositories/nivo-backend', findings, entries, { run: ancestor(0) }).findings.length, 1, 'range pushed: spent');

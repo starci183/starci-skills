@@ -103,7 +103,7 @@ writes:
         under proof, no in-process shortcut around its public entry point, no assertion weakened or
         scenario skipped to reach green, and no generated record of a run that did not happen.
   - id: evidence
-    path: E/**
+    path: evidence/**
     fields: [id, nodeId, inputDigest, outcome, assertions, assets, provenance, codeRefs, extensions]
     artifacts: [manifest.yaml, scenarios.json, stack.json, readback.json, result.md, screens/*.png]
     content:
@@ -111,7 +111,7 @@ writes:
         expected observable effect and the observed response. Record the exact commands, cwd, tested
         tree/commit, container services with their observed identity, exit codes, counts and
         sanitized output, including every attempt when a scenario was retried. Operator-specific
-        observed result in E/result.md - report per assertion pass, fail with the observed response,
+        observed result in evidence/result.md - report per assertion pass, fail with the observed response,
         or not-run with the reason. An unrun, skipped or partial scenario stays not-run outside the
         pass column, a green run whose stack never started is recorded as a spec defect, and
         credentials or personal data are redacted before the assets are hashed. Test credentials a script, fixture or driver needs are generated per run (node:crypto randomBytes) or, only when they must stay stable across runs, kept the way the repo keeps every credential - .starcistacks/<stack>/secrets/test/<name>, stored with the repo's own stack-secret set command (npm run secret:set) so only the sops .enc twin is committed, read with testSecret(<name>, {repo}) (scripts/lib/test-secrets.mjs; owner:push-scan-test-secrets-encrypted) - never written as a literal; the push secret scan refuses a plaintext test password.
@@ -219,7 +219,7 @@ steps:
     action:
       en: Report done exactly once, and only with a green run - every assertion covered by a scenario that
         ran on the real stack, the verbatim check commands with their exit codes, the run output, the
-        spec paths and the E/screens images of the run (a browser run adds its video and trace, recorded
+        spec paths and the evidence/screens images of the run (a browser run adds its video and trace, recorded
         through uat-slots.mjs run --record-dir), all named in report.files, bound to the exact tested tree. A red scenario is failed, naming the
         assertion and the observed response; a stack that cannot start is failed with the exact
         reason; blocked with reason environment only when the cause is provably unfixable from the

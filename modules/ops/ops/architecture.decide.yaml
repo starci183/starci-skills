@@ -123,7 +123,7 @@ writes:
         and source symbols. Preserve business and shared design through stable IDs and exact owning
         Work refs."
   - id: work-graph
-    path: E/work-graph.json
+    path: evidence/work-graph.json
     schema: starci/work-graph@1
     fields: [domains, nodes, edges]
     content:

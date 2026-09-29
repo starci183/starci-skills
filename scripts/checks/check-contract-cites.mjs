@@ -147,9 +147,9 @@ export function checkContractCites(root = DEFAULT_ROOT, scan = DEFAULT_SCAN) {
       if (seen.has(key)) continue;
       seen.add(key);
       // Outside a cite key, only a token rooted at a real top-level entry is
-      // a reference to this tree; `E/manifest.yaml` names a record artifact.
+      // a reference to this tree; `evidence/manifest.yaml` names a record artifact.
       // A cite key must name a repo-relative path; elsewhere only a token
-      // rooted at a real top-level entry refers to this tree (`E/manifest.yaml`
+      // rooted at a real top-level entry refers to this tree (`evidence/manifest.yaml`
       // names a record artifact, not a file here).
       if (cite.kind === 'path' && cite.form !== 'cite value'
         && !fs.existsSync(path.join(root, cite.target.split('/')[0]))) continue;

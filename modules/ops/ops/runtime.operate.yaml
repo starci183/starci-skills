@@ -56,7 +56,7 @@ writes:
     content:
       en: Bind only the selected mode completion profile and its actual evidence.
   - id: evidence
-    path: E/**
+    path: evidence/**
     fields: [id, nodeId, inputDigest, outcome, assertions, assets, provenance, codeRefs, extensions]
     artifacts: [manifest.yaml, result.json]
     content:
@@ -165,12 +165,12 @@ policy:
               refs/dependencies/acceptance require a reported gap or separately selected scope
               update; never add/remove them to obtain pass.
         - id: evidence
-          path: E/manifest.yaml + E/readiness.json + E/result.md
+          path: evidence/manifest.yaml + evidence/readiness.json + evidence/result.md
           fields: [id, nodeId, inputDigest, outcome, assertions, assets, provenance, codeRefs, extensions]
           content:
             en: "Collect all safely inspectable checks, with observed timestamp and source/config/environment
               revision; dependent checks unavailable due to earlier blocker remain not-run.
-              Operator-specific observed result in E/result.md: One row per scoped prerequisite:
+              Operator-specific observed result in evidence/result.md: One row per scoped prerequisite:
               needed capability, declaration, actual observation, ready/blocked/not-needed, owner
               and exact remedy. Readiness is time-bound evidence, not lasting global green."
       steps:
@@ -292,12 +292,12 @@ policy:
               record. Record local PID/session handles in ignored local state or bounded evidence,
               not durable identity.
         - id: evidence
-          path: E/manifest.yaml + E/runtime.json + E/probes.json + E/effects.json + E/result.md
+          path: evidence/manifest.yaml + evidence/runtime.json + evidence/probes.json + evidence/effects.json + evidence/result.md
           fields: [id, nodeId, inputDigest, outcome, assertions, assets, provenance, codeRefs, extensions]
           content:
             en: "Record before/after generation, target/process ownership, actual build command and summary; attach raw build output from STARCI_JOB_SCRATCH at api report. Record full
               source refs, immutable served artifact, endpoint probes and effect status.
-              Operator-specific observed result in E/result.md: Keep code/build/served identity
+              Operator-specific observed result in evidence/result.md: Keep code/build/served identity
               distinct and no UAT/release readiness claim from a healthy process."
       steps:
         - reads:
@@ -410,11 +410,11 @@ policy:
             en: Update only service-owned observation/declaration fields on the work/resource@1 record included
               in scope; do not grant new authority by editing allowed effects.
         - id: evidence
-          path: E/manifest.yaml + E/service-probes.json + E/effects.json + E/result.md
+          path: evidence/manifest.yaml + evidence/service-probes.json + evidence/effects.json + evidence/result.md
           fields: [id, nodeId, inputDigest, outcome, assertions, assets, provenance, codeRefs, extensions]
           content:
             en: "Retain actual holder and before/after health/stop evidence with selected command outcome and
-              bounded recovery. Operator-specific observed result in E/result.md: Record one service
+              bounded recovery. Operator-specific observed result in evidence/result.md: Record one service
               outcome and partial effects; no product runtime or quality acceptance inferred."
       steps:
         - reads:

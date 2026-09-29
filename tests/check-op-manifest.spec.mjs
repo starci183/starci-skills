@@ -17,7 +17,7 @@ const validOp = () => ({
   sideEffects: ['writes the sample evidence bundle'],
   graphPolicy: { mode: 'read-only' },
   reads: [{ id: 'target', path: '.starciwork/features/<feature>/index.yaml', purpose: { en: 'Read the selected record, its scope and its refs.' } }],
-  writes: [{ id: 'evidence', path: 'E/**', content: { en: 'Retain the observed bytes and their provenance.' } }],
+  writes: [{ id: 'evidence', path: 'evidence/**', content: { en: 'Retain the observed bytes and their provenance.' } }],
   steps: [{ reads: ['target'], writes: ['evidence'], action: { en: 'Read the selected record and retain what was observed.' } }],
   proofs: [{ id: 'binding', requirement: { en: '`starci validate` passes and every cited path exists.' } }],
   blockers: [{ code: 'DECLARED_DEPENDENCY_UNMET', condition: { en: 'A declared prerequisite is absent.' } }],
@@ -128,11 +128,11 @@ test('a rule inside a read purpose is RULE_IN_DATA at warn level', () => {
 
 test('a writes path that joins several paths is PATH_JOINED', () => {
   const op = validOp();
-  op.writes[0].path = 'E/manifest.yaml + E/result.md + E/screens/*.png';
+  op.writes[0].path = 'evidence/manifest.yaml + evidence/result.md + evidence/screens/*.png';
   assert.ok(codes(checkFixture(op)).includes('PATH_JOINED'));
 
   const globbed = validOp();
-  globbed.writes[0].path = 'E/screens/**/*.png';
+  globbed.writes[0].path = 'evidence/screens/**/*.png';
   assert.ok(!codes(checkFixture(globbed)).includes('PATH_JOINED'));
 });
 
@@ -160,7 +160,7 @@ test('the cli exits 1 with a per-code tally and 0 when clean', () => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'op-manifest-cli-'));
   try {
     const op = validOp();
-    op.writes[0].path = 'E/a.yaml + E/b.yaml';
+    op.writes[0].path = 'evidence/a.yaml + evidence/b.yaml';
     fs.writeFileSync(path.join(dir, 'sample.op.yaml'), JSON.stringify(op, null, 2));
     const failed = opManifestMain(['--opsDir', dir]);
     assert.equal(failed.exitCode, 1);

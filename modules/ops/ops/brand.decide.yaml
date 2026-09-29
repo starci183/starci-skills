@@ -222,7 +222,7 @@ writes:
         brand.lockups[].source), and re-cropped from a real render (`--from shell/<capture path>`) once
         the frontend renders it; a capture is named shell/<name> in --from."
   - id: evidence
-    path: E/**
+    path: evidence/**
     fields: [id, nodeId, inputDigest, outcome, assertions, assets, provenance, extensions]
     artifacts: [manifest.yaml, token-trace.md]
     content:

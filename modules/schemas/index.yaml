@@ -354,7 +354,7 @@ schemas:
     file: modules/schemas/interface-audit-operation.yaml
     dialect: prose-contract
     subsystem: work-tree
-    governs: "One interface.audit scope record: id operation.<feature>.<name>, state, the frozen matrix, the draw baseline and the completion binding to its E/ bundle."
+    governs: "One interface.audit scope record: id operation.<feature>.<name>, state, the frozen matrix, the draw baseline and the completion binding to its evidence/ bundle."
     binds: .starciwork/features/<feature>/operations/<name>/index.yaml
     usedBy: [modules/ops/ops/interface.audit.yaml (reads.target, writes.node)]
     business:
@@ -492,7 +492,7 @@ schemas:
     dialect: json-schema
     subsystem: kernel
     governs: "One version of a workflow's work graph: domains, foundation/slice/task nodes (owned paths, reads, rollback target, size, FRs, shapes) and data/contract/order edges."
-    binds: "ledger table work_graph_versions (one row per version) and the E/work-graph.json candidate an op proposes"
+    binds: "ledger table work_graph_versions (one row per version) and the evidence/work-graph.json candidate an op proposes"
     usedBy:
       - scripts/work/work-graph-model.mjs (shape, validator, diff, colour rule, frontier)
       - scripts/work/work-graph.mjs (show, validate, diff, propose)
@@ -507,7 +507,7 @@ schemas:
     dialect: json-schema
     subsystem: kernel
     governs: "interface.implement's asset inventory for one delivered interface scope: one entry per asset the accepted direction asked for, reused, produced or deferred, with the brief a deferred entry owes."
-    binds: E/assets.json under an impl node's evidence bundle
+    binds: evidence/assets.json under an impl node's evidence bundle
     usedBy:
       - modules/ops/ops/interface.implement.yaml (the assetManifest write names this const; its asset-coverage proof is measured against this shape)
       - modules/ops/ops/interface.asset.yaml (reads the deferred briefs it has to satisfy)
@@ -522,7 +522,7 @@ schemas:
     dialect: json-schema
     subsystem: kernel
     governs: "How each region of an accepted direction was realized — raster-asset or code-native — and the evidence for the choice."
-    binds: E/realization-check.json under an impl node's evidence bundle
+    binds: evidence/realization-check.json under an impl node's evidence bundle
     usedBy:
       - modules/ops/ops/interface.implement.yaml (the realizationCheck write names this const)
       - modules/ops/ops/interface.audit.yaml (reads it as the realization map a hard realization.mode finding is measured against)
@@ -794,7 +794,7 @@ schemas:
     dialect: json-schema
     subsystem: gate
     governs: "Frozen assisted-UAT intent, current input/build/environment/flow bindings, genuine human gates, scripts, policies, receipt template and limits."
-    binds: "uat.assisted.prepare E/assisted-uat/request.yaml"
+    binds: "uat.assisted.prepare evidence/assisted-uat/request.yaml"
     usedBy: [modules/ops/ops/uat.assisted.prepare.yaml, scripts/uat/assisted-runner.mjs]
     business: {question: "Exactly what controlled journey may the user perform?", whenNeeded: "Before opening the assisted browser session.", whenNot: "Not a pass receipt or canonical Work state.", selectedBy: "Exact --request path; latest-run discovery is forbidden."}
 
@@ -803,7 +803,7 @@ schemas:
     dialect: json-schema
     subsystem: gate
     governs: "Digest-bound runner/browser identity, launch, ordered scripts, human-gate IDs, artifact policy and write-once receipt target."
-    binds: "uat.assisted.prepare E/assisted-uat/session-manifest.yaml"
+    binds: "uat.assisted.prepare evidence/assisted-uat/session-manifest.yaml"
     usedBy: [modules/ops/ops/uat.assisted.prepare.yaml, scripts/uat/assisted-runner.mjs]
     business: {question: "Which exact prepared bytes and browser contract form this session?", whenNeeded: "At assisted-run admission and later verification.", whenNot: "Never a mutable latest-session pointer.", selectedBy: "Request-selected exact manifest path and sha256."}
 
@@ -812,7 +812,7 @@ schemas:
     dialect: json-schema
     subsystem: gate
     governs: "Closed cleanup actions plus mandatory read-back probes for run-owned effects."
-    binds: "uat.assisted.prepare E/assisted-uat/cleanup.yaml"
+    binds: "uat.assisted.prepare evidence/assisted-uat/cleanup.yaml"
     usedBy: [scripts/uat/assisted-runner.mjs, modules/ops/ops/uat.assisted.verify.yaml]
     business: {question: "How are this run's effects removed/restored and proved clean?", whenNeeded: "Every assisted run that can create or mutate state.", whenNot: "Not authority to delete unrelated or unbound resources.", selectedBy: "The prepared request's cleanup path and digest."}
 
@@ -821,7 +821,7 @@ schemas:
     dialect: json-schema
     subsystem: gate
     governs: "Closed evidence redaction rules and deterministic inspection commands."
-    binds: "uat.assisted.prepare E/assisted-uat/redaction.yaml"
+    binds: "uat.assisted.prepare evidence/assisted-uat/redaction.yaml"
     usedBy: [scripts/uat/assisted-runner.mjs, modules/ops/ops/uat.assisted.verify.yaml]
     business: {question: "Which prohibited values must be removed and how is that verified?", whenNeeded: "Before receipt finalization and during independent verification.", whenNot: "Never permission to place a secret in chat or source.", selectedBy: "The prepared request's redaction path and digest."}
 
@@ -830,7 +830,7 @@ schemas:
     dialect: json-schema
     subsystem: gate
     governs: "One append-only controlled-run record with exact bindings, ordered flow/gate completion, checks, artifacts, postconditions, cleanup and redaction."
-    binds: "E/assisted-uat/receipts/<run-id>.yaml"
+    binds: "evidence/assisted-uat/receipts/<run-id>.yaml"
     usedBy: [scripts/uat/assisted-runner.mjs, modules/ops/ops/uat.assisted.verify.yaml]
     business: {question: "What exactly happened in this one human-assisted run?", whenNeeded: "After controlled execution finishes.", whenNot: "completionSignal ok is never an acceptance verdict.", selectedBy: "Explicit absolute --receipt path; write once."}
 
@@ -839,7 +839,7 @@ schemas:
     dialect: json-schema
     subsystem: gate
     governs: "Independent current binding/check/evidence/postcondition/cleanup/redaction result and machine-derived disposition."
-    binds: "uat.assisted.verify E/assisted-uat/verification.yaml"
+    binds: "uat.assisted.verify evidence/assisted-uat/verification.yaml"
     usedBy: [modules/ops/ops/uat.assisted.verify.yaml]
     business: {question: "Does the exact immutable assisted run still prove the current accepted flow?", whenNeeded: "In the separate acceptance workflow before final reconciliation.", whenNot: "Not a receipt rewrite or direct Work completion.", selectedBy: "Exact request/session/receipt inputs and current read-only probes."}
 

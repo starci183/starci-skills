@@ -107,7 +107,7 @@ rules:
       content only - exactly the paths scripts/lib/starciwork-boundary.mjs isProductPath accepts -
       and .starciwork/.gitignore is exactly starciworkGitignoreText(). Agent data (evidence,
       reports, checks, captures, draw rounds, UAT runs, logs, kernel-evidence, kernel-strays,
-      runtime.sqlite files, operations, E/) is not repository content and is archived out, not
+      runtime.sqlite files, operations, evidence/) is not repository content and is archived out, not
       committed.
     rationale: |
       One canonical Work tree per project keeps product records authoritative; agent data is

@@ -3,7 +3,7 @@ $id: urn:starci:asset-manifest:1
 type: object
 additionalProperties: false
 description: "The asset inventory interface.implement emits for one delivered interface scope
-  (E/assets.json). One entry per asset the accepted direction asked for, whether it was reused,
+  (evidence/assets.json). One entry per asset the accepted direction asked for, whether it was reused,
   produced or deferred — so a reader counts what the scope owes and what it still lacks without
   reading the op's prose. A deferred entry carries a brief and null bytes; it never carries a
   fabricated file."

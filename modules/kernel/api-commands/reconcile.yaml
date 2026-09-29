@@ -4,7 +4,7 @@ reconcile:
     `--job <id> --debris [--commit]`: the debris a job found in its owned paths - dirty files last written
     before its admission that its report does not name (scripts/kernel/settle-landed.mjs landedProof
     debris; api settle lists them in result.landed.debris and never refuses not-landed on them). Each is
-    classed proof (a report*.json, a file under an E/, evidence/, assets/, runs/, observed/ or captures/
+    classed proof (a report*.json, a file under an evidence/, assets/, runs/, observed/ or captures/
     folder, or an operations/ record under .starciwork: kept, never deleted) or source (anything else:
     a lineage's uncommitted code, listed and never committed here). Read-only by default; --commit
     commits the proof files per checkout in chunks of 200 through a pathspec list file (only those

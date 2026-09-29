@@ -36,7 +36,7 @@ reads:
         providers, invent tools or dispatch agents solely from a profile.
 writes:
   - id: evidence
-    path: E/**
+    path: evidence/**
     fields:
       - request
       - scope
@@ -51,7 +51,7 @@ writes:
       - recovery
     artifacts: [result.json, effects.json, verification.json, artifacts]
     content:
-      en: E is an explicit request-owned durable output directory for this direct job, outside unrelated
+      en: The evidence directory is an explicit request-owned durable output directory for this direct job, outside unrelated
         user-owned docs/sites and unrelated source. It may use existing selected Work evidence, and
         a valid Work tree is required before effects. Record actual outputs and per-criterion proof,
         exact target/effects and unresolved or partially completed work. Store sanitized logs and

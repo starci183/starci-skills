@@ -39,7 +39,7 @@ reads:                           # the CLOSED read set — DATA, one entry per s
 
 writes:                          # the CLOSED write set — DATA, one path per entry
   - id: evidence
-    path: E/**                   # one path, or one glob; never `a + b + c`
+    path: evidence/**                   # one path, or one glob; never `a + b + c`
     schema: starci/asset-manifest@1   # the const a structured write carries
     fields: [id, nodeId, inputDigest, outcome, assertions, assets]
     artifacts: [manifest.yaml, tests.json, result.md]   # what a bundle holds

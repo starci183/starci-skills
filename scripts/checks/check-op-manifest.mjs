@@ -96,7 +96,7 @@ const flatten = (s) => String(s).replace(/\s+/g, ' ').trim();
 const normalize = (s) => flatten(s).toLowerCase().replace(/[^a-z0-9 ]+/g, ' ').replace(/\s+/g, ' ').trim();
 const wordCount = (s) => (s ? s.split(' ').length : 0);
 
-/** Sentences of a prose blob. Abbreviated ids (`1..5`, `E/x.json`) keep their
+/** Sentences of a prose blob. Abbreviated ids (`1..5`, `evidence/x.json`) keep their
  *  dots, so the split needs a following space and a capital or backtick. */
 const sentencesOf = (text) => flatten(text)
   .split(/(?<=[.!?])\s+(?=[A-Z`])/)

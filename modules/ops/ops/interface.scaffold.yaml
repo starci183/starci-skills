@@ -88,7 +88,7 @@ writes:
         theme/token wiring, the minimal first shell (root route renders), and its test/build
         harness."
   - id: evidence
-    path: E/**
+    path: evidence/**
     fields:
       - request
       - scope

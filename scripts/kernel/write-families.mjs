@@ -10,7 +10,7 @@
 //
 // familyGuardOf(brief) -> {families:Set, overview:boolean} | null
 //   For an op whose every `writes[].path` is either a .starciwork/features/<feature>/{...} family
-//   pattern or an evidence/graph path (E/..., under .starciwork), the literal families it may author.
+//   pattern or an evidence/graph path (evidence/..., under .starciwork), the literal families it may author.
 //   An op that also writes source (repository:...), node-relative (N/...) or unfamilied paths is not
 //   guarded (null): its grants are not family-shaped.
 // familyViolations(guard, ownedPaths) -> [{path, family|null, why}]
@@ -18,7 +18,7 @@
 //   overview when the op may not write it, or a path outside .starciwork altogether (source).
 // familyOwners(briefs) -> Map family -> [op]: who may author a family, for the refusal's hint.
 const FEATURE_WRITE = /^\.starciwork\/features\/<feature>\/(.+)$/;
-const EVIDENCE_WRITE = /^E\//;
+const EVIDENCE_WRITE = /^evidence\//;
 
 const expandBraces = (text) => {
   const m = /\{([^{}]*)\}/.exec(text);

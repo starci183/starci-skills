@@ -136,7 +136,7 @@ const collectRecordMap = (scopeRoot) => {
 export const BOUNDARY_TRANSITIONAL = Object.freeze([]);
 /**
  * The .starciwork boundary (ARCHITECTURE-DB §5.1, scripts/lib/starciwork-boundary.mjs): every file under the tree is
- * product content (isProductPath) or it is refused. Known agent data - E/ and impl captures, uat runs, evidence
+ * product content (isProductPath) or it is refused. Known agent data - evidence/ and impl captures, uat runs, evidence
  * bundles, operations/ audits, kernel custody, stray report copies, caches, ledgers - is REFUSED
  * [STARCIWORK_AGENT_DATA], one line per agent-data directory (draw-loop rounds included: the loop is a blob bundle); its home is the project ledger and the blob store
  * (api report --attach). A path that is neither (a record in a legacy layout) is WARNED [STARCIWORK_DRIFT].
@@ -149,8 +149,8 @@ export function checkStarciworkBoundary(workRoot, problems, warnings = [], resol
     if (!rel || rel.startsWith('../') || isProductPath(rel)) continue;
     const category = agentDataCategory(rel);
     const parts = rel.split('/');
-    // Group a directory of agent data under its first denied segment (runs/<id>, E, assets, draw-loop, operations/<name>).
-    const at = category ? parts.findIndex((seg, i) => i < parts.length - 1 && /^(E|evidence|runs|draw-loop|operations|assets|kernel-evidence|kernel-strays|kernel-approvals|worktrees|settle-parity|settle-tail|runtime|canon-seams)$/.test(seg)) : -1;
+    // Group a directory of agent data under its first denied segment (runs/<id>, evidence, assets, draw-loop, operations/<name>).
+    const at = category ? parts.findIndex((seg, i) => i < parts.length - 1 && /^(evidence|runs|draw-loop|operations|assets|kernel-evidence|kernel-strays|kernel-approvals|worktrees|settle-parity|settle-tail|runtime|canon-seams)$/.test(seg)) : -1;
     const cut = at < 0 ? parts.length : at + (['runs', 'operations', 'evidence'].includes(parts[at]) ? 2 : 1);
     const key = `${category ?? 'drift'}|${parts.slice(0, Math.min(cut, parts.length)).join('/')}`;
     groups.set(key, (groups.get(key) ?? 0) + 1);

@@ -51,7 +51,7 @@ test('interface.implement realizes each region the way the direction said, and p
 
   const check = writeOf(implement, 'realizationCheck');
   assert.ok(check, 'interface.implement writes no realization check');
-  assert.equal(check.path, 'E/realization-check.json');
+  assert.equal(check.path, 'evidence/realization-check.json');
   assert.equal(check.schema, 'starci/realization-check@1');
   assert.ok(proof(implement, 'realization-fidelity'));
   assert.ok(blocker(implement, 'REALIZATION_MODE_CONFLICT'));
@@ -62,7 +62,7 @@ test('interface.implement realizes each region the way the direction said, and p
 
 test('interface.implement owes an asset inventory with a declared shape', () => {
   const manifest = writeOf(implement, 'assetManifest');
-  assert.equal(manifest.path, 'E/assets.json');
+  assert.equal(manifest.path, 'evidence/assets.json');
   assert.equal(manifest.schema, 'starci/asset-manifest@1');
   const coverage = proof(implement, 'asset-coverage');
   assert.ok(coverage, 'no asset-coverage proof');

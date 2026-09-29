@@ -1,0 +1,53 @@
+id: evidence-dir
+effectiveAt: '2026-09-29T07:50:55+00:00'
+summary: "The op evidence directory convention is renamed from E/ to evidence/ (owner: E/ is unreadable). Every op manifest write path, the shared op prompt, the schemas that bind evidence files (work-graph, assets, realization-check, assisted-uat) and the kernel prompt now say evidence/ (evidence/manifest.yaml, evidence/result.md, evidence/work-graph.json, attachments/evidence/<path>); the E/ form is removed with no legacy fallback. Attempts dispatched after this change write <scratch>/evidence/ and file it with api report --attach <scratch>/evidence."
+reach: new-legs
+paths:
+  - scripts/kernel/op-prompt.mjs
+  - knowledge/patterns/repo/folder.yaml
+  - knowledge/repository-baseline.yaml
+  - modules/kernel/api-commands/reconcile.yaml
+  - modules/kernel/kernel-prompt.md
+  - modules/kernel/verdict-contract.yaml
+  - modules/ops/_common.yaml
+  - modules/ops/ops/architecture.decide.yaml
+  - modules/ops/ops/backend.implement.yaml
+  - modules/ops/ops/backend.scaffold.yaml
+  - modules/ops/ops/brand.decide.yaml
+  - modules/ops/ops/business.decide.yaml
+  - modules/ops/ops/code.refactor.yaml
+  - modules/ops/ops/content.generate.yaml
+  - modules/ops/ops/docs.author.yaml
+  - modules/ops/ops/e2e.verify.yaml
+  - modules/ops/ops/goal.revise.yaml
+  - modules/ops/ops/grammar.update.yaml
+  - modules/ops/ops/handover.review.yaml
+  - modules/ops/ops/integration.verify.yaml
+  - modules/ops/ops/interface.asset.yaml
+  - modules/ops/ops/interface.audit.yaml
+  - modules/ops/ops/interface.draw.yaml
+  - modules/ops/ops/interface.implement.yaml
+  - modules/ops/ops/interface.scaffold.yaml
+  - modules/ops/ops/knowledge.repair.yaml
+  - modules/ops/ops/package.scaffold.yaml
+  - modules/ops/ops/perf.verify.yaml
+  - modules/ops/ops/provision.ask.yaml
+  - modules/ops/ops/release.deliver.yaml
+  - modules/ops/ops/request.analyze.yaml
+  - modules/ops/ops/review.verify.yaml
+  - modules/ops/ops/runtime.operate.yaml
+  - modules/ops/ops/scope.define.yaml
+  - modules/ops/ops/scope.finish.yaml
+  - modules/ops/ops/security.verify.yaml
+  - modules/ops/ops/task.execute.yaml
+  - modules/ops/ops/test.author.yaml
+  - modules/ops/ops/uat.assisted.prepare.yaml
+  - modules/ops/ops/uat.assisted.verify.yaml
+  - modules/ops/ops/uat.verify.yaml
+  - modules/ops/ops/work.author.yaml
+  - modules/ops/ops/workspace.manage.yaml
+  - modules/schemas/asset-manifest.schema.yaml
+  - modules/schemas/index.yaml
+  - modules/schemas/interface-audit-operation.yaml
+  - modules/schemas/realization-check.schema.yaml
+  - modules/schemas/work-layout.yaml

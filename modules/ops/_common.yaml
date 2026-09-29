@@ -195,8 +195,8 @@ sections:
         resource/files within the existing graph, but may not attach new consumers.
       - "The work graph (domains, slices, nodes and edges; modules/schemas/work-graph.schema.yaml) changes
         only through an op whose brief sets graphPolicy.workGraph: write the whole candidate to
-        E/work-graph.json and record it with `node scripts/work/work-graph.mjs propose --repo <target-repo>
-        --job <job-id> --file E/work-graph.json --reason <why>` (a cut adds `--slice <slice-id>`). A refusal
+        evidence/work-graph.json and record it with `node scripts/work/work-graph.mjs propose --repo <target-repo>
+        --job <job-id> --file evidence/work-graph.json --reason <why>` (a cut adds `--slice <slice-id>`). A refusal
         lists the validator findings to fix; the report names the recorded version. An op without the
         permission reports a graph change it needs as a finding, never edits the graph."
   - title: Path and field contract
@@ -208,20 +208,20 @@ sections:
         for each raw file the job needs retained. The API stores the report in the ledger and the
         attachments as content-addressed blobs, then removes scratch. `report.files` names authored
         owned paths, not scratch attachments. Never put operational output in `.starciwork`."
-      - "`E/` in an op brief is the attempt's evidence folder INSIDE STARCI_JOB_SCRATCH (`<scratch>/E/`), never a
-        folder in `.starciwork` (ARCHITECTURE-DB §5.1: E/ is agent data). Write the proof manifest and its assets
-        there and file them with `api report --attach <scratch>/E` (a directory attaches every file under it); each
-        becomes the artifact `attachments/E/<path>` of this attempt (blob + job_artifacts). The same holds for a
+      - "`evidence/` in an op brief is the attempt's evidence folder INSIDE STARCI_JOB_SCRATCH (`<scratch>/evidence/`), never a
+        folder in `.starciwork` (ARCHITECTURE-DB §5.1: evidence/ is agent data). Write the proof manifest and its assets
+        there and file them with `api report --attach <scratch>/evidence` (a directory attaches every file under it); each
+        becomes the artifact `attachments/evidence/<path>` of this attempt (blob + job_artifacts). The same holds for a
         UAT run (`<scratch>/runs/<runId>/**`, artifacts role uat-run with the run id), app and render captures
         (`<scratch>/captures/**`, role capture/dom) and an interface.audit verdict (`<scratch>/interface-audit.json`,
         the ledger's interface_audits row). The record's sibling evidence.yaml cites each file by sha256 (and its
         artifact name) - `{artifact?, sha256, role?, label?}` - never by a path; api report returns every artifact
-        {id, name, sha256}, and the settle binds the citations (work_citations). A read of another op's `E/<file>`
-        reads that attempt's artifact `attachments/E/<file>` (`api artifacts --workflow <wf> --job <job>`)."
+        {id, name, sha256}, and the settle binds the citations (work_citations). A read of another op's `evidence/<file>`
+        reads that attempt's artifact `attachments/evidence/<file>` (`api artifacts --workflow <wf> --job <job>`)."
       - Paths below are templates, not discovered locations. Resolve `<feature>`, `<family>`,
         `<name>`, resource slugs and repository IDs from the selected workspace. Never persist
         literal angle-bracket placeholders or guess a path by similar name. `N` means the selected
-        record directory, `E` means `N/evidence/<unique-evidence-id>`, `R` means
+        record directory, `evidence` means `N/evidence/<unique-evidence-id>`, `R` means
         `.starciwork/_resources/<category>/<slug>`. Resolve symlinks and keep writes within the
         authorized roots.
       - Work metadata uses YAML 1.2 in workspace.yaml, index.yaml, resource.yaml and
@@ -259,12 +259,12 @@ sections:
         local paths relative to the resource directory; the core hashes actual bytes. No authored
         `sha256` field inside `files`. Update only owned source fields; runtime observations belong
         in evidence. |"
-      - "| `E/manifest.yaml` | `schema: work/evidence@1`, `id`, `nodeId`, `inputDigest`, `outcome`,
+      - "| `evidence/manifest.yaml` | `schema: work/evidence@1`, `id`, `nodeId`, `inputDigest`, `outcome`,
         `assertions:[{id,outcome,observation}]`, `assets:[{path,sha256}]`; applicable `provenance`,
         `codeRefs`, `extensions` | Write actual outcomes `pass`, `fail`, `not-run`, `inconclusive`.
-        Every required assertion needs an actual observation. Assets use paths inside E and hash
+        Every required assertion needs an actual observation. Assets use paths inside evidence/ and hash
         actual final bytes. |"
-      - "| `E/*` | Indispensable Work-record proof and cited assets required by work-layout.yaml |
+      - "| `evidence/*` | Indispensable Work-record proof and cited assets required by work-layout.yaml |
         Keep the proof needed by the selected record, not raw operation output. Send full logs and
         machine output through STARCI_JOB_SCRATCH and api report --attach. Do not overwrite a sealed
         Work-proof bundle. Keep failures needed to explain current defects.
@@ -373,7 +373,7 @@ sections:
       - Treat the node description and semantic metadata as specification inputs. A consumer op does
         not rewrite the selected scope/graph even before verification. After freezing the
         investigation/verification digest, write observations, current defects, commit mapping,
-        untested assertions and cleanup results into `E/result.md` and operator evidence, never back
+        untested assertions and cleanup results into `evidence/result.md` and operator evidence, never back
         into semantic node prose. Post-proof operational writes are limited to state, activity,
         blockers, investigation, completion and history. A changed expected outcome is a separately
         selected specification update requiring new verification. Planning/specification ops finish
@@ -441,7 +441,7 @@ sections:
         `.starciwork` repository, not imaginary product commits."
       - "Keep origin commit, integration/cherry-pick commit, tested commit and deployed immutable
         artifact distinct. `completion.codeRefs` binds the delivered code; detailed mapping belongs
-        in `E/lineage.json` or `E/result.md`, with evidence-level `extensions.work3.lineage`
+        in `evidence/lineage.json` or `evidence/result.md`, with evidence-level `extensions.work3.lineage`
         references when useful. Verify mapping with actual Git diff/ancestry and changed-path tests;
         ancestry alone does not prove later changes preserved behavior. A commit cannot contain its
         own SHA in its own bytes: commit the implementation, then update `.starciwork` metadata in a
@@ -469,7 +469,7 @@ sections:
         assertion describing the actual runtime-version check. Include all
         environment/actor/repository resources in consuming node `refs`; include other input
         resources such as fixtures/design explicitly because links inside `details` are not
-        transitive core dependencies. Store additional observations in `E/runtime.json` / evidence
+        transitive core dependencies. Store additional observations in `evidence/runtime.json` / evidence
         extensions, not unknown root fields. HEAD in a source checkout is not proof that the browser
         loaded that build. Check declared health/version evidence and actual page/network behavior;
         a successful redirect to a 404 or sign-in screen is not successful product login.

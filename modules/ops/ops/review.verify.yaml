@@ -66,7 +66,7 @@ writes:
     content:
       en: Bind only the selected mode completion profile and its actual evidence.
   - id: evidence
-    path: E/**
+    path: evidence/**
     fields: [id, nodeId, inputDigest, outcome, assertions, assets, provenance, codeRefs, extensions]
     artifacts: [manifest.yaml, result.json]
     content:
@@ -180,7 +180,7 @@ policy:
               refs/dependencies/acceptance require a reported gap or separately selected scope
               update; never add/remove them to obtain pass.
         - id: evidence
-          path: E/manifest.yaml + E/coverage.json + E/result.md
+          path: evidence/manifest.yaml + evidence/coverage.json + evidence/result.md
           fields: [id, nodeId, inputDigest, outcome, assertions, assets, provenance, codeRefs, extensions]
           content:
             en: Record review findings and references to the actual implementation-produced gate evidence. No
@@ -301,7 +301,7 @@ policy:
               applicable and return partial or blocked. Findings, commit mappings and remaining
               cleanup belong to evidence, never rewritten record prose.
         - id: evidence
-          path: E/manifest.yaml + E/reconciliation.json + E/result.md
+          path: evidence/manifest.yaml + evidence/reconciliation.json + evidence/result.md
           fields:
             - id
             - nodeId
@@ -317,7 +317,7 @@ policy:
           content:
             en: "Record requirement IDs, source/evidence refs, actual verification and discrepancy list;
               preserve deferred and untested work explicitly. Operator-specific observed result in
-              E/result.md: For each AC list expected, enforcing source, proving evidence, actual,
+              evidence/result.md: For each AC list expected, enforcing source, proving evidence, actual,
               freshness and gap owner; no business done/implemented flag is copied over an
               incomplete tree. The manifest's primary nodeId/inputDigest plus bindings[] cover every
               selected leaf, and sourceIdentity binds the exact tested commits/build represented by
@@ -440,11 +440,11 @@ policy:
           content:
             en: Read the existing selected scope, expected assertions and .starciwork graph unchanged.
         - id: evidence
-          path: E/manifest.yaml + E/portfolio-review.json + E/result.md
+          path: evidence/manifest.yaml + evidence/portfolio-review.json + evidence/result.md
           fields: [id, nodeId, inputDigest, outcome, assertions, assets, provenance, codeRefs, extensions]
           content:
             en: "Retain source/evidence identity checks and task-to-piece coverage; no invented delivery receipt
-              or automatic follow-up message. Operator-specific observed result in E/result.md: Map
+              or automatic follow-up message. Operator-specific observed result in evidence/result.md: Map
               task done-when to selected peer node IDs and actual repository delivery. Record
               missing peer proof, conflicting ownership and integration gaps without modifying their
               states."
@@ -556,14 +556,14 @@ policy:
           content:
             en: Read the existing selected scope, expected assertions and .starciwork graph unchanged.
         - id: evidence
-          path: E/manifest.yaml + E/<screen>.png + E/measurements.json + E/runtime.json + E/review.md +
-            E/result.md
+          path: evidence/manifest.yaml + evidence/<screen>.png + evidence/measurements.json + evidence/runtime.json + evidence/review.md +
+            evidence/result.md
           fields: [id, nodeId, inputDigest, outcome, assertions, assets, provenance, codeRefs, extensions]
           content:
             en: "Capture real image bytes, viewport/theme/route/state and actual DOM/computed measurements.
               Provenance includes environment, actor or anonymous, servedVersions, tool, capturedAt,
               servedVersionEvidence assertion. Images must be opened and inspected.
-              Operator-specific observed result in E/result.md: Bind environment, actor or anonymous
+              Operator-specific observed result in evidence/result.md: Bind environment, actor or anonymous
               and all served repositories in refs. Record current findings without restyling source
               or altering acceptance."
       steps:
@@ -694,13 +694,13 @@ policy:
           content:
             en: Read the existing selected scope, expected assertions and .starciwork graph unchanged.
         - id: evidence
-          path: E/manifest.yaml + E/api-result.json + E/readback.json + E/runtime.json +
-            E/result.md
+          path: evidence/manifest.yaml + evidence/api-result.json + evidence/readback.json + evidence/runtime.json +
+            evidence/result.md
           fields: [id, nodeId, inputDigest, outcome, assertions, assets, provenance, codeRefs, extensions]
           content:
             en: "Store actual suite cases and result output, status/error/schema checks, read-back and lifecycle
               observations, namespace effects and runtime provenance. API proof is not UI proof.
-              Operator-specific observed result in E/result.md: Bind actor/environment/repositories,
+              Operator-specific observed result in evidence/result.md: Bind actor/environment/repositories,
               preserve selected API expectations and name untested or failed cases."
       steps:
         - reads:
@@ -802,7 +802,7 @@ policy:
               behavioral correctness.
       writes:
         - id: evidence
-          path: E/stales-command.json
+          path: evidence/stales-command.json
           fields: [command, exitCode, runtimeDigest, inputBindings, report, coverage, limitations]
           content:
             en: Retain command arguments excluding credentials, exit code and runtime/input identities
@@ -884,7 +884,7 @@ policy:
               report.
       writes:
         - id: evidence
-          path: E/lint-commands.json
+          path: evidence/lint-commands.json
           fields: [commands, exitCodes, runtimeDigest, inputBindings, reports, coverage, limitations]
           content:
             en: Store selected checker commands, identities and summaries in the Work proof, preserving
