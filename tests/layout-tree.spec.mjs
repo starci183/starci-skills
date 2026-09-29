@@ -5,7 +5,7 @@ import path from 'node:path';
 import { createRequire } from 'node:module';
 import { parseYaml, stringifyYaml } from '../engine/yaml.mjs';
 import {
-  addCapture, addPlanned, chainOf, convertAppShell, layoutChainOf, layoutTreeMain, mergeScan, nodeById, resolveNavRoute,
+  addCapture, addPlanned, captureFileOf, chainOf, convertAppShell, layoutChainOf, layoutTreeMain, mergeScan, nodeById, resolveNavRoute,
   scanAppDir, segmentKindOf,
 } from '../scripts/work/layout-tree.mjs';
 import { blankImage, decodePng, drawOver, encodePng, keyRect } from '../scripts/work/png.mjs';
@@ -84,7 +84,8 @@ test('a scanned record compiles, and a re-scan keeps decisions but re-opens a la
   const consoleNode = nodeById(first, '/[locale]/(console)');
   consoleNode.layout.chrome = 'visible';
   consoleNode.layout.state = 'done';
-  consoleNode.layout.captures = [{ breakpoint: 'desktop', theme: 'light', path: 'assets/layouts/x.png', sha256: 'a'.repeat(64), width: 40, height: 30, slot: { x: 1, y: 1, width: 5, height: 5 }, kind: 'render' }];
+  // A recorded capture is a blob citation: the schema field is `name` (assets/layouts/...png), never `path`.
+  consoleNode.layout.captures = [{ breakpoint: 'desktop', theme: 'light', name: 'assets/layouts/x.png', sha256: 'a'.repeat(64), width: 40, height: 30, slot: { x: 1, y: 1, width: 5, height: 5 }, kind: 'render' }];
   addPlanned(first, { node: '/[locale]/(console)/settings', files: ['page'] });
   const again = mergeScan(first, scanOf(p), { at: '2026-09-24T00:00:01Z' });
   assert.equal(again.changed, false, 'nothing moved under app/');
@@ -133,6 +134,9 @@ test('convert turns a work/app-shell@1 record into the layout tree, carrying loc
     ],
   };
   const { record, notes } = convertAppShell(legacy, scanOf(p), { at: '2026-09-24T00:00:00Z' });
+  // RUNTIME-BUG: convertAppShell (scripts/work/layout-tree.mjs) carries a legacy lockup's `path`
+  // verbatim, but work-layout-tree@1 requires `name` (a blob citation) — the converted record fails
+  // its own schema. The assertion stays: conversion must produce a valid tree.
   assert.equal(validateTree(record), true, JSON.stringify(validateTree.errors));
   assert.equal(record.schema, 'work/layout-tree@1');
   assert.equal(record.state, 'todo', 'a converted tree has no slot-measured captures yet');
@@ -157,8 +161,11 @@ test('capture measures the #FF00FF slot, stores the bytes and bumps the layout r
   const file = p.put('shot.png', encodePng(layoutCapture(40, 30, { x: 10, y: 5, width: 28, height: 22 })));
   const capture = addCapture(record, shellDir, { node: '/[locale]/(console)', breakpoint: 'desktop', theme: 'light', file, url: '/vi/reports' });
   assert.deepEqual(capture.slot, { x: 10, y: 5, width: 28, height: 22 });
-  assert.equal(capture.path, 'assets/layouts/locale-console--desktop--light.png');
-  assert.ok(fs.existsSync(path.join(shellDir, capture.path)));
+  // The capture names the bytes by their blob-store name; the PNG itself is a blob the sha256 cites,
+  // not a file under shell/assets (captureFileOf resolves the citation).
+  assert.equal(capture.name, 'assets/layouts/locale-console--desktop--light.png');
+  const stored = captureFileOf(shellDir, capture);
+  assert.ok(stored && fs.existsSync(stored), 'the capture bytes are readable out of the blob store');
   assert.equal(nodeById(record, '/[locale]/(console)').layout.chrome, 'visible');
   const second = p.put('shot2.png', encodePng(layoutCapture(40, 30, { x: 12, y: 5, width: 26, height: 22 })));
   addCapture(record, shellDir, { node: '/[locale]/(console)', breakpoint: 'desktop', theme: 'light', file: second });
@@ -202,6 +209,8 @@ test('the todo example carries an honestly unsettled, converted layout tree', ()
   const example = parseYaml(fs.readFileSync(path.join(ROOT, 'examples/todo-app-backend/.starciwork/shell/index.yaml'), 'utf8'));
   assert.equal(validateTree(example), true, JSON.stringify(validateTree.errors));
   assert.equal(example.state, 'todo');
-  assert.equal(example.app.appDir, 'src/app');
+  // appDir names the App Router directory relative to the repository root (the example's web app
+  // lives in apps/web, so app/, not the bare src/app an app at the repo root would record).
+  assert.equal(example.app.appDir, 'apps/web/src/app');
   assert.ok(nodeById(example, '/[lang]/tasks'), 'the scan holds the example frontend routes');
 });

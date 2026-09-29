@@ -6,6 +6,7 @@ import path from 'node:path';
 import {spawnSync} from 'node:child_process';
 import {FAKE_ORCA} from './helpers/fake-orca.mjs';
 import {openLedger,inspectLedger,ledgerFileFor} from '../engine/ledger-db.mjs';
+import {seedWorkflow} from './_ledger-fixture.mjs';
 
 // nivo inc-c1d5bdbea173 (2026-09-25, Collab): the Kernel wrapped `api dispatch --job
 // op-backend.implement-dd957e8395 --spawn` in a shell `timeout 115`, which killed the api mid-spawn. The row
@@ -34,18 +35,24 @@ const fixture=(t,{deadline,launchTerminal=null})=>{
   const workflowId='wf-leased-abandoned',jobId='job-leased-abandoned';
   const ledger=openLedger({file:ledgerFileFor(repo)});
   try{
-    ledger.enqueueJob({jobId:`kernel-${workflowId}`,workflowId,kind:'kernel',role:'kernel',
-      payload:{hierarchy:{schema:'starci/agent-hierarchy@1',nodeId:`agent:kernel:${workflowId}`,parentNodeId:`workflow:${workflowId}`,role:'kernel'}}});
-    ledger.db.prepare("UPDATE jobs SET status='running',worker_id='fake-kernel-terminal' WHERE job_id=?").run(`kernel-${workflowId}`);
-    ledger.enqueueJob({jobId,workflowId,opId:'code.refactor',kind:'op',payload:{opId:'code.refactor',owned_paths:['docs/'],model:'qwen-agent',difficulty:'medium'}});
-    // What the killed dispatch left: leased, its path lease taken, no worker, no terminal, no contract.
+    // The kernel worker runs; the op job is seeded 'ready' (the attempt row is written only after
+    // spawnAgent returns a terminal, so a dispatch killed mid-spawn leaves none) — or 'leased' when
+    // the kill came after fileContract, which a settle path must read as dispatched.
+    seedWorkflow(ledger,{id:workflowId,jobs:[
+      {jobId:`kernel-${workflowId}`,kind:'kernel',role:'kernel',status:'running',workerId:'fake-kernel-terminal',
+        payload:{hierarchy:{schema:'starci/agent-hierarchy@1',nodeId:`agent:kernel:${workflowId}`,parentNodeId:`workflow:${workflowId}`,role:'kernel'}}},
+      {jobId,opId:'code.refactor',status:launchTerminal?'leased':'ready',leaseToken:'tok-killed',
+        payload:{opId:'code.refactor',owned_paths:['docs/'],model:'qwen-agent',difficulty:'medium'}}]});
+    // What the killed dispatch left: leased (ready→leased is the lease transition), its path lease
+    // taken, no worker, no terminal, no contract.
     const at=Date.now()-40*60000;
     ledger.db.prepare("INSERT OR IGNORE INTO resources(resource_key,capacity) VALUES('path:docs/',1)").run();
-    ledger.db.prepare("UPDATE jobs SET status='leased',lease_token='tok-killed',deadline=?,updated_at=? WHERE job_id=?").run(deadline,at,jobId);
+    ledger.db.prepare("UPDATE jobs SET status='leased',deadline=?,updated_at=? WHERE job_id=?").run(deadline,at,jobId);
     if(launchTerminal)ledger.db.prepare("UPDATE jobs SET payload_json=json_set(payload_json,'$.launchTerminal',json(?)) WHERE job_id=?").run(JSON.stringify({handle:launchTerminal,at}),jobId);
     const job=ledger.db.prepare('SELECT * FROM jobs WHERE job_id=?').get(jobId);
-    ledger.db.prepare('INSERT INTO leases(resource_key,job_id,workflow_id,op_id,attempt,generation,token,units,acquired_at,expires_at,machine_ref) VALUES(?,?,?,?,?,?,?,?,?,?,NULL)')
-      .run('path:docs/',jobId,workflowId,'code.refactor',job.attempt,job.generation,'tok-killed',1,at,deadline);
+    // leases_match_job: the row carries the job's identity (try_no, generation, token).
+    ledger.db.prepare('INSERT INTO leases(resource_key,job_id,workflow_id,op_id,try_no,generation,token,units,acquired_at,expires_at) VALUES(?,?,?,?,?,?,?,?,?,?)')
+      .run('path:docs/',jobId,workflowId,'code.refactor',job.try_no,job.generation,'tok-killed',1,at,deadline);
   }finally{ledger.close();}
   const read=fn=>{const l=inspectLedger({file:ledgerFileFor(repo)});try{return fn(l.db);}finally{l.close();}};
   const status=()=>{const out=json(api(['status','--workflow',workflowId]).stdout);return {out,worker:out.workers.find(w=>w.jobId===jobId)};};

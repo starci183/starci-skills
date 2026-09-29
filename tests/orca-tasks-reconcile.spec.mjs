@@ -5,7 +5,8 @@ import os from 'node:os';
 import path from 'node:path';
 import {spawnSync} from 'node:child_process';
 import {FAKE_ORCA} from './helpers/fake-orca.mjs';
-import {openLedger,inspectLedger,ledgerFileFor} from '../engine/ledger-db.mjs';
+import {openLedger,inspectLedger,ledgerFileFor,jobResult} from '../engine/ledger-db.mjs';
+import {seedWorkflow} from './_ledger-fixture.mjs';
 
 // After the 2026-09-24 reboot the Orca sidebar kept the dead ops of every
 // workflow as open Tasks under Runs whose coordinator was a pre-reboot
@@ -36,21 +37,17 @@ const world=t=>{
     STARCI_FAKE_ORCA_LOG:path.join(root,'calls.jsonl'),STARCI_FAKE_ORCA_STATE:stateFile};
   const ledger=openLedger({file:ledgerFileFor(repo)});
   try{
-    const now=Date.now();
-    const job=(jobId,workflowId,status,payload,kind='op',worker=null)=>{
-      ledger.enqueueJob({jobId,workflowId,opId:kind==='op'?'backend.implement':null,kind,payload});
-      ledger.db.prepare('UPDATE jobs SET status=?,worker_id=? WHERE job_id=?').run(status,worker,jobId);
-    };
-    job('kernel-wf-a','wf-a','running',{orca:{runId:'run-a'}},'kernel','term-kernel');
-    job('op-live','wf-a','running',{orca:{runId:'run-a',taskId:'task_live'}});
-    job('op-dead','wf-a','succeeded',{orca:{runId:'run-a',taskId:'task_dead'}});
-    job('op-old','wf-a','failed',{orca:{runId:'run-old',taskId:'task_x'}});
-    job('op-gone','wf-a','succeeded',{orca:{runId:'run-old',taskId:'task_y'}});
-    job('kernel-wf-f','wf-f','running',{},'kernel','term-f');
-    ledger.db.prepare("UPDATE workflows SET phase='running' WHERE workflow_id='wf-a'").run();
-    ledger.db.prepare("UPDATE workflows SET phase='finished' WHERE workflow_id='wf-f'").run();
-    ledger.db.prepare("INSERT INTO signals(scope,key,holder_pid,token,value_json,at,expires_at) VALUES('kernel','wf-f',NULL,'kernel-old',?,?,NULL)")
-      .run(JSON.stringify({terminal:'term-f'}),now);
+    // wf-a running with a live kernel; wf-f finished with its kernel job orphaned (still 'running').
+    // Op jobs seed units + op_attempts and walk the job_transitions chain (queued→ready→leased→running).
+    seedWorkflow(ledger,{id:'wf-a',jobs:[
+      {jobId:'kernel-wf-a',kind:'kernel',role:'kernel',status:'running',workerId:'term-kernel',payload:{orca:{runId:'run-a'}}},
+      {jobId:'op-live',opId:'backend.implement',status:'running',payload:{orca:{runId:'run-a',taskId:'task_live'}}},
+      {jobId:'op-dead',opId:'backend.implement',status:'succeeded',payload:{orca:{runId:'run-a',taskId:'task_dead'}}},
+      {jobId:'op-old',opId:'backend.implement',status:'failed',payload:{orca:{runId:'run-old',taskId:'task_x'}}},
+      {jobId:'op-gone',opId:'backend.implement',status:'succeeded',payload:{orca:{runId:'run-old',taskId:'task_y'}}}]});
+    seedWorkflow(ledger,{id:'wf-f',state:{phase:'finished'},
+      jobs:[{jobId:'kernel-wf-f',kind:'kernel',role:'kernel',status:'running',workerId:'term-f'}],
+      signals:[{scope:'kernel',key:'wf-f',token:'kernel-old',value:{terminal:'term-f'}}]});
   }finally{ledger.close();}
   const api=(...args)=>{const r=spawnSync(process.execPath,[API,'reconcile','--repo',repo,...args,'--json'],{cwd:ROOT,encoding:'utf8',windowsHide:true,timeout:120000,env});
     return {...r,out:(()=>{try{return JSON.parse(r.stdout);}catch{return null;}})()};};
@@ -90,7 +87,8 @@ test('--orca-tasks re-binds the running Run to the live Kernel and closes only o
 test('--orca-tasks closes nothing while a dispatch is in flight (a leased job whose Task is not yet on the ledger)',t=>{
   const w=world(t);
   const l=openLedger({file:ledgerFileFor(w.repo)});
-  try{l.enqueueJob({jobId:'op-flight',workflowId:'wf-a',opId:'backend.implement',kind:'op',payload:{}});l.db.prepare("UPDATE jobs SET status='leased' WHERE job_id='op-flight'").run();}
+  // A dispatch in flight: the job is leased before it can name its Task (the attempt row may not exist yet).
+  try{seedWorkflow(l,{id:'wf-a',jobs:[{jobId:'op-flight',opId:'backend.implement',status:'leased'}]});}
   finally{l.close();}
   const r=w.api('--orca-tasks');
   assert.equal(r.status,0,r.stderr);
@@ -108,7 +106,8 @@ test('--orphan-kernel-jobs settles the kernel job of a finished workflow and rel
   assert.equal(r.status,0,r.stderr);
   assert.equal(r.out.reconciled[0].signalReleased,true);
   const rows=w.read(db=>({
-    f:db.prepare("SELECT status,worker_id,json_extract(result_json,'$.reason') reason FROM jobs WHERE job_id='kernel-wf-f'").get(),
+    // The result no longer lives on the job row: recordJobResult filed it as a job-result event.
+    f:{...db.prepare("SELECT status,worker_id FROM jobs WHERE job_id='kernel-wf-f'").get(),reason:jobResult(db,'kernel-wf-f')?.reason},
     a:db.prepare("SELECT status FROM jobs WHERE job_id='kernel-wf-a'").get().status,
     signal:db.prepare("SELECT count(*) n FROM signals WHERE key='wf-f'").get().n,
     event:db.prepare("SELECT count(*) n FROM events WHERE kind='orphan-kernel-job-reconciled'").get().n}));

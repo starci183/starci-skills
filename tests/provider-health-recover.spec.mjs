@@ -15,10 +15,13 @@ import http from 'node:http';
 import os from 'node:os';
 import path from 'node:path';
 import { spawn } from 'node:child_process';
-import { inspectLedger, ledgerFileFor, openLedger } from '../engine/ledger-db.mjs';
+import { inspectLedger, ledgerFileFor, openLedger, PROJECTS_ROOT_ENV } from '../engine/ledger-db.mjs';
+import { openMachine, TEST_REGISTRY_ENV } from '../engine/machine-db.mjs';
 import { parseYaml, stringifyYaml } from '../engine/yaml.mjs';
 import { providerCircuitOf } from '../scripts/agent/models.mjs';
 import { credentialFingerprintOf, fingerprintOf } from '../scripts/agent/credential-fingerprint.mjs';
+import { writeProviderCircuit } from '../scripts/kernel/provider-circuit.mjs';
+import { seedWorkflow } from './_ledger-fixture.mjs';
 import { FAKE_ORCA } from './helpers/fake-orca.mjs';
 
 const ROOT = path.resolve(import.meta.dirname, '..');
@@ -36,11 +39,37 @@ const tmp = (t, prefix) => {
 };
 const seed = (repo, fn) => { const l = openLedger({ file: ledgerFileFor(repo) }); try { return fn(l); } finally { l.close(); } };
 const read = (repo, fn) => { const l = inspectLedger({ file: ledgerFileFor(repo) }); try { return fn(l); } finally { l.close(); } };
-const putCircuit = (db, provider, value, { at = Date.now(), ttl = 24 * 3600000 } = {}) => db.prepare(
-  `INSERT OR REPLACE INTO signals(scope,key,holder_pid,token,value_json,at,expires_at) VALUES('provider-health',?,NULL,NULL,?,?,?)`)
-  .run(provider, json({ schema: 'starci/provider-health@1', provider, status: 'unavailable', failureKind: 'auth', strikeLimit: 1,
-    model: `${provider}-agent`, jobId: 'op-backend.implement-seeded', step: 'attestation', signal: "generic failure signature '401'",
-    detail: "attestation rejected: generic failure signature '401'", failures: 1, trips: 1, cooldownMs: ttl, ...value }), at, at + ttl);
+// The provider-health circuit is a machine.sqlite provider_health row now (scripts/kernel/provider-circuit.mjs):
+// the runtime signals table only takes kernel|stop|launch|decision-doorbell. The kernel-facing value rides in
+// detail_json and the cooldown in circuit_open_until; the spec pins one file through STARCI_TEST_MACHINE_FILE so
+// seeding, the api subprocess and the spec's reads all share it.
+const machineFileFor = (t) => path.join(tmp(t, 'starci-machine-'), 'machine.sqlite');
+// A repo's runtime.sqlite resolves under STARCI_PROJECTS_ROOT (engine/ledger-db.mjs ledgerFileFor —
+// projects/<ledgerId>/runtime.sqlite, never <repo>/.starciwork). Pin one per test so the spec's
+// seed/read and every spawned api subprocess resolve the same file however LOCALAPPDATA is faked.
+const projectsRoot = (t) => {
+  const dir = path.join(tmp(t, 'starci-projects-'), 'projects');
+  const saved = process.env[PROJECTS_ROOT_ENV];
+  process.env[PROJECTS_ROOT_ENV] = dir;
+  t.after(() => { if (saved === undefined) delete process.env[PROJECTS_ROOT_ENV]; else process.env[PROJECTS_ROOT_ENV] = saved; });
+  return dir;
+};
+const putCircuit = (machineFile, provider, value, { ttl = 24 * 3600000 } = {}) => {
+  const m = openMachine({ file: machineFile });
+  try {
+    writeProviderCircuit(provider, { machine: m, expiresAt: Date.now() + ttl,
+      value: { schema: 'starci/provider-health@1', provider, status: 'unavailable', failureKind: 'auth', strikeLimit: 1,
+        model: `${provider}-agent`, jobId: 'op-backend.implement-seeded', step: 'attestation', signal: "generic failure signature '401'",
+        detail: "attestation rejected: generic failure signature '401'", failures: 1, trips: 1, cooldownMs: ttl, ...value } });
+  } finally { m.close(); }
+};
+const circuitRow = (machineFile, provider) => {
+  const m = openMachine({ file: machineFile });
+  try {
+    const row = m.db.prepare('SELECT * FROM provider_health WHERE provider=?').get(provider);
+    return row ? { ...row, detail: JSON.parse(row.detail_json ?? 'null') } : null;
+  } finally { m.close(); }
+};
 
 // A credential root whose .secrets/models.env holds `key` (the card's secretName), and a home
 // whose ~/.qwen/settings.json points the card's model at `baseUrl`.
@@ -103,42 +132,37 @@ const modelsServer = async (t, goodKey) => {
   return { baseUrl: `http://127.0.0.1:${server.address().port}/v1`, seen };
 };
 const KERNEL_TERMINAL = 'term_kernel-provider-health';
-const seedWorkflow = (repo, wf) => seed(repo, (l) => {
-  const at = Date.now();
-  l.ensureWorkflow({ workflowId: wf, title: 'provider health' });
-  l.db.prepare('INSERT INTO goals(workflow_id,revision,goal_identity,markdown,json,created_at) VALUES(?,?,?,?,?,?)')
-    .run(wf, 0, 'phgoal', '# goal', json({}), at);
-  l.db.prepare(`INSERT INTO jobs(job_id,workflow_id,op_id,attempt,generation,kind,role,payload_json,status,worker_id,created_at,updated_at)
-    VALUES(?,?,NULL,1,0,'kernel','kernel',?,'running',?,?,?)`)
-    .run(`kernel-${wf}`, wf, json({ hierarchy: { runtime: { terminalHandle: KERNEL_TERMINAL } } }), KERNEL_TERMINAL, at, at);
-  l.db.prepare(`INSERT INTO jobs(job_id,workflow_id,op_id,attempt,generation,kind,role,payload_json,status,created_at,updated_at)
-    VALUES(?,?,?,1,0,'op','op',?,'queued',?,?)`).run('op-docs-queued', wf, 'docs.author', json({ opId: 'docs.author', owned_paths: ['docs/'] }), at, at);
-  l.db.prepare(`INSERT INTO jobs(job_id,workflow_id,op_id,attempt,generation,kind,role,payload_json,status,worker_id,created_at,updated_at)
-    VALUES(?,?,?,1,0,'op','op',?,'running',?,?,?)`).run('op-docs-running', wf, 'docs.author', json({ opId: 'docs.author' }), 'term_op-running', at, at);
-});
+const seedPhWorkflow = (repo, wf) => seed(repo, (l) => seedWorkflow(l, { id: wf,
+  state: { job: 'provider health' },
+  jobs: [
+    { jobId: `kernel-${wf}`, kind: 'kernel', role: 'kernel', status: 'running', workerId: KERNEL_TERMINAL,
+      payload: { hierarchy: { runtime: { terminalHandle: KERNEL_TERMINAL } } } },
+    { jobId: 'op-docs-queued', opId: 'docs.author', payload: { opId: 'docs.author', owned_paths: ['docs/'] } },
+    { jobId: 'op-docs-running', opId: 'docs.author', status: 'running', workerId: 'term_op-running', payload: { opId: 'docs.author' } },
+  ] }));
 const qwenRejection = (route) => (out(route)?.rejected ?? []).find((r) => r.target === 'qwen-agent');
 
 test('an auth circuit reads closed once the credential in effect has a different fingerprint', (t) => {
-  const repo = tmp(t, 'starci-ph-unit-');
-  seed(repo, (l) => {
-    putCircuit(l.db, 'qwen', { credentialFingerprint: sha12('old-key') });
-    putCircuit(l.db, 'codex', {});
-    putCircuit(l.db, 'claude', { credentialFingerprint: sha12('claude:acct-1'), failureKind: 'readiness' });
-  });
-  read(repo, (l) => {
-    assert.equal(providerCircuitOf(l.db, 'qwen', Date.now(), { credential: { fingerprint: sha12('new-key') } }), null,
-      'a rotated credential closes the auth circuit');
-    assert.ok(providerCircuitOf(l.db, 'qwen-agent', Date.now(), { credential: { fingerprint: sha12('old-key') } }),
-      'the same credential keeps it open');
-    assert.ok(providerCircuitOf(l.db, 'qwen', Date.now(), { credential: { fingerprint: null } }),
-      'an unresolvable current credential proves nothing and keeps it open');
-    assert.equal(providerCircuitOf(l.db, 'qwen', Date.now(), { credential: () => ({ fingerprint: sha12('new-key') }) }), null,
-      'a lazy resolver is honoured');
-    assert.ok(providerCircuitOf(l.db, 'codex', Date.now(), { credential: { fingerprint: sha12('anything') } }),
-      'a circuit that recorded no fingerprint (the live qwen row) waits for expiry or --recover');
-    assert.ok(providerCircuitOf(l.db, 'claude', Date.now(), { credential: { fingerprint: sha12('claude:acct-2') } }),
-      'only auth circuits are credential facts; a readiness circuit is not closed by a new account');
-  });
+  const machineFile = machineFileFor(t);
+  const saved = process.env[TEST_REGISTRY_ENV];
+  process.env[TEST_REGISTRY_ENV] = machineFile;
+  t.after(() => { if (saved === undefined) delete process.env[TEST_REGISTRY_ENV]; else process.env[TEST_REGISTRY_ENV] = saved; });
+  putCircuit(machineFile, 'qwen', { credentialFingerprint: sha12('old-key') });
+  putCircuit(machineFile, 'codex', {});
+  putCircuit(machineFile, 'claude', { credentialFingerprint: sha12('claude:acct-1'), failureKind: 'readiness' });
+  // providerCircuitOf keeps its (db, ...) signature for callers but reads the machine row now.
+  assert.equal(providerCircuitOf(null, 'qwen', Date.now(), { credential: { fingerprint: sha12('new-key') } }), null,
+    'a rotated credential closes the auth circuit');
+  assert.ok(providerCircuitOf(null, 'qwen-agent', Date.now(), { credential: { fingerprint: sha12('old-key') } }),
+    'the same credential keeps it open');
+  assert.ok(providerCircuitOf(null, 'qwen', Date.now(), { credential: { fingerprint: null } }),
+    'an unresolvable current credential proves nothing and keeps it open');
+  assert.equal(providerCircuitOf(null, 'qwen', Date.now(), { credential: () => ({ fingerprint: sha12('new-key') }) }), null,
+    'a lazy resolver is honoured');
+  assert.ok(providerCircuitOf(null, 'codex', Date.now(), { credential: { fingerprint: sha12('anything') } }),
+    'a circuit that recorded no fingerprint (the live qwen row) waits for expiry or --recover');
+  assert.ok(providerCircuitOf(null, 'claude', Date.now(), { credential: { fingerprint: sha12('claude:acct-2') } }),
+    'only auth circuits are credential facts; a readiness circuit is not closed by a new account');
 });
 
 test('the qwen fingerprint follows the credentialRefresh resolution and never exposes the key', (t) => {
@@ -172,10 +196,11 @@ test('the qwen fingerprint follows the credentialRefresh resolution and never ex
 });
 
 test('a rotated qwen key closes the circuit for route; the unchanged key keeps qwen-agent rejected', async (t) => {
-  const repo = tmp(t, 'starci-ph-route-'), wf = 'wf-ph-rotation';
-  seedWorkflow(repo, wf);
-  seed(repo, (l) => putCircuit(l.db, 'qwen', { credentialFingerprint: sha12('sk-stale') }));
-  const env = (key) => ({ ...baseEnv(), ...fakeOrcaEnv(t), STARCI_OWNER_ROOT: ownerRoot(t), STARCI_CREDENTIAL_ROOT: credentialRoot(t, key),
+  const repo = tmp(t, 'starci-ph-route-'), wf = 'wf-ph-rotation', machineFile = machineFileFor(t);
+  projectsRoot(t);
+  seedPhWorkflow(repo, wf);
+  putCircuit(machineFile, 'qwen', { credentialFingerprint: sha12('sk-stale') });
+  const env = (key) => ({ ...baseEnv(), ...fakeOrcaEnv(t), [TEST_REGISTRY_ENV]: machineFile, STARCI_OWNER_ROOT: ownerRoot(t), STARCI_CREDENTIAL_ROOT: credentialRoot(t, key),
     BAILIAN_TOKEN_PLAN_API_KEY: 'quota-presence-only' });
 
   const stale = await runApi(env('sk-stale'), 'route', '--repo', repo, '--job', 'op-docs-queued', '--prefer', 'qwen-agent', '--json');
@@ -196,10 +221,11 @@ test('a rotated qwen key closes the circuit for route; the unchanged key keeps q
 });
 
 test('provider-health --recover refuses an op and any caller not proven to be the Kernel', async (t) => {
-  const repo = tmp(t, 'starci-ph-roles-'), wf = 'wf-ph-roles';
-  seedWorkflow(repo, wf);
-  seed(repo, (l) => putCircuit(l.db, 'qwen', {}));
-  const base = { ...baseEnv(), STARCI_CREDENTIAL_ROOT: credentialRoot(t, 'sk-any') };
+  const repo = tmp(t, 'starci-ph-roles-'), wf = 'wf-ph-roles', machineFile = machineFileFor(t);
+  projectsRoot(t);
+  seedPhWorkflow(repo, wf);
+  putCircuit(machineFile, 'qwen', {});
+  const base = { ...baseEnv(), [TEST_REGISTRY_ENV]: machineFile, STARCI_CREDENTIAL_ROOT: credentialRoot(t, 'sk-any') };
   const recover = ['provider-health', '--repo', repo, '--provider', 'qwen', '--recover', '--reason', 'key rotated', '--json'];
   const cases = [
     [{ STARCI_ROLE: 'op', STARCI_OP_JOB: 'op-docs-running' }, 'op-context-refused'],
@@ -220,22 +246,23 @@ test('provider-health --recover refuses an op and any caller not proven to be th
   assert.equal(out(supervisorRead)?.open, true);
   const noReason = await runApi({ ...base, ORCA_TERMINAL_HANDLE: KERNEL_TERMINAL }, 'provider-health', '--repo', repo, '--provider', 'qwen', '--recover', '--json');
   assert.equal(noReason.status, 2, '--recover without --reason is a usage error');
-  const held = read(repo, (l) => ({
-    row: JSON.parse(l.db.prepare("SELECT value_json FROM signals WHERE scope='provider-health' AND key='qwen'").get().value_json),
-    recovered: l.db.prepare("SELECT count(*) n FROM events WHERE kind='provider-health-recovered'").get().n,
-  }));
+  const held = {
+    row: circuitRow(machineFile, 'qwen'),
+    recovered: read(repo, (l) => l.db.prepare("SELECT count(*) n FROM events WHERE kind='provider-health-recovered'").get().n),
+  };
   assert.equal(held.row.status, 'unavailable', 'every refused caller left the circuit open');
   assert.equal(held.recovered, 0);
 });
 
 test('the Kernel recovers only behind a passing probe, and route then admits the pool', async (t) => {
-  const repo = tmp(t, 'starci-ph-recover-'), wf = 'wf-ph-recover';
-  seedWorkflow(repo, wf);
-  seed(repo, (l) => putCircuit(l.db, 'qwen', {})); // the live shape: no recorded fingerprint
+  const repo = tmp(t, 'starci-ph-recover-'), wf = 'wf-ph-recover', machineFile = machineFileFor(t);
+  projectsRoot(t);
+  seedPhWorkflow(repo, wf);
+  putCircuit(machineFile, 'qwen', {}); // the live shape: no recorded fingerprint
   const server = await modelsServer(t, 'sk-good');
   const home = qwenHome(t, server.baseUrl);
   const fake = fakeOrcaEnv(t), owner = ownerRoot(t);
-  const env = (key, extra = {}) => ({ ...baseEnv(), ...fake, STARCI_OWNER_ROOT: owner, STARCI_CREDENTIAL_ROOT: credentialRoot(t, key),
+  const env = (key, extra = {}) => ({ ...baseEnv(), ...fake, [TEST_REGISTRY_ENV]: machineFile, STARCI_OWNER_ROOT: owner, STARCI_CREDENTIAL_ROOT: credentialRoot(t, key),
     USERPROFILE: home, HOME: home, BAILIAN_TOKEN_PLAN_API_KEY: 'quota-presence-only', ...extra });
   const kernel = { ORCA_TERMINAL_HANDLE: KERNEL_TERMINAL };
   const recover = ['provider-health', '--repo', repo, '--provider', 'qwen', '--recover', '--reason', 'key rotated in .secrets/models.env', '--probe', '--json'];
@@ -249,10 +276,10 @@ test('the Kernel recovers only behind a passing probe, and route then admits the
   assert.equal(errOf(refused)?.code, 'probe-failed');
   assert.equal(errOf(refused)?.probe?.status, 401);
   assert.equal(server.seen.at(-1)?.url, '/v1/models', 'the probe is GET <baseUrl>/models for the card model');
-  const afterRefusal = read(repo, (l) => ({
-    status: JSON.parse(l.db.prepare("SELECT value_json FROM signals WHERE scope='provider-health' AND key='qwen'").get().value_json).status,
-    refusedEvents: l.db.prepare("SELECT workflow_id FROM events WHERE kind='provider-health-recover-refused'").all(),
-  }));
+  const afterRefusal = {
+    status: circuitRow(machineFile, 'qwen')?.status,
+    refusedEvents: read(repo, (l) => l.db.prepare("SELECT workflow_id FROM events WHERE kind='provider-health-recover-refused'").all()),
+  };
   assert.equal(afterRefusal.status, 'unavailable', 'a failed probe leaves the circuit open');
   assert.deepEqual(afterRefusal.refusedEvents.map((e) => e.workflow_id), [wf]);
 
@@ -262,15 +289,16 @@ test('the Kernel recovers only behind a passing probe, and route then admits the
   assert.equal(out(recovered)?.probe?.status, 200);
   assert.equal(server.seen.at(-1)?.auth, true, 'the probe presented the credentialRefresh key');
   const ledger = read(repo, (l) => ({
-    row: l.db.prepare("SELECT value_json,expires_at FROM signals WHERE scope='provider-health' AND key='qwen'").get(),
     event: l.db.prepare("SELECT workflow_id,payload_json FROM events WHERE kind='provider-health-recovered'").get(),
   }));
-  const row = JSON.parse(ledger.row.value_json);
-  assert.equal(row.status, 'recovered');
-  assert.equal(row.reason, 'key rotated in .secrets/models.env');
-  assert.equal(row.previous.jobId, 'op-backend.implement-seeded');
-  assert.equal(row.credentialFingerprint, sha12('sk-good'));
-  assert.ok(ledger.row.expires_at <= Date.now());
+  // The recovered row: columns carry status/strikes/circuit_open_until; detail_json the kernel value
+  // (reason, previous, credentialFingerprint) — the same shape the old provider-health signal held.
+  const machineRow = circuitRow(machineFile, 'qwen');
+  assert.equal(machineRow.status, 'recovered');
+  assert.equal(machineRow.detail.reason, 'key rotated in .secrets/models.env');
+  assert.equal(machineRow.detail.previous.jobId, 'op-backend.implement-seeded');
+  assert.equal(machineRow.detail.credentialFingerprint, sha12('sk-good'));
+  assert.ok(machineRow.circuit_open_until <= Date.now());
   assert.equal(ledger.event.workflow_id, wf, 'the recovery event lands on the proving Kernel workflow');
   assert.equal(JSON.parse(ledger.event.payload_json).reason, 'key rotated in .secrets/models.env');
 

@@ -6,7 +6,8 @@ import path from 'node:path';
 import crypto from 'node:crypto';
 import {spawnSync} from 'node:child_process';
 import {FAKE_ORCA} from './helpers/fake-orca.mjs';
-import {inspectLedger,ledgerFileFor,openLedger} from '../engine/ledger-db.mjs';
+import {inspectLedger,ledgerFileFor,openLedger,PROJECTS_ROOT_ENV,writeContract} from '../engine/ledger-db.mjs';
+import {seedWorkflow} from './_ledger-fixture.mjs';
 import {claimFoundation,writeFoundation} from '../scripts/kernel/foundations.mjs';
 import {baselineWorkInputs,inputDrift,peerDriftSummaryOf,recordInputs,staleOperationsOf} from '../scripts/kernel/input-digests.mjs';
 import {changeNoteOf,committedMatches,committedReader,createOwnership,ownerDeclarationFor} from '../scripts/kernel/work-ownership.mjs';
@@ -51,6 +52,12 @@ const scopeIndex=(feature,workflow,nodes)=>['schema: work/feature@1',`id: ${feat
 const world=t=>{
   const root=fs.mkdtempSync(path.join(os.tmpdir(),'starci-peer-drift-'));
   t.after(()=>fs.rmSync(root,{recursive:true,force:true,maxRetries:20,retryDelay:25}));
+  // runtime.sqlite resolves under STARCI_PROJECTS_ROOT (ledgerFileFor): pin one root per world so the
+  // in-process seed/read and every spawned api subprocess (whose LOCALAPPDATA is faked) share a file.
+  const projectsRoot=path.join(root,'projects');
+  const savedRoot=process.env[PROJECTS_ROOT_ENV];
+  process.env[PROJECTS_ROOT_ENV]=projectsRoot;
+  t.after(()=>{if(savedRoot===undefined)delete process.env[PROJECTS_ROOT_ENV];else process.env[PROJECTS_ROOT_ENV]=savedRoot;});
   const repo=path.join(root,'repo');fs.mkdirSync(repo,{recursive:true});
   const work=(rel,text)=>{const file=path.join(repo,rel);fs.mkdirSync(path.dirname(file),{recursive:true});fs.writeFileSync(file,text);};
   git(repo,['init','-q']);
@@ -72,25 +79,29 @@ const world=t=>{
   const api=(...args)=>spawnSync(process.execPath,[API,...args,'--repo',repo,'--json'],{cwd:ROOT,encoding:'utf8',windowsHide:true,timeout:120000,env});
   const seed=fn=>{const l=openLedger({file:ledgerFileFor(repo)});try{return fn(l);}finally{l.close();}};
   const read=fn=>{const l=inspectLedger({file:ledgerFileFor(repo)});try{return fn(l.db);}finally{l.close();}};
-  const settle=(l,{wf,jobId,op,attempt=1,cut=null,owned,records=SHARED,at=T0})=>{
-    l.enqueueJob({jobId,workflowId:wf,opId:op,attempt,kind:'op',payload:{opId:op,owned_paths:owned,records,...(cut?{cut}:{}),settledAt:at}});
-    l.db.prepare("UPDATE jobs SET status='succeeded',updated_at=? WHERE job_id=?").run(at,jobId);
+  // A settled leg (op job + its attempt + the contract it read under). Every leg is its own unit's
+  // first try (try_no=1): the old `attempt` argument named the leg's place in the cut, which the
+  // payload's cut ordinal already carries; contracts key by the seeded attempt's attempt_id now.
+  const settle=(l,{wf,jobId,op,cut=null,owned,records=SHARED,at=T0})=>{
+    seedWorkflow(l,{id:wf,jobs:[{jobId,opId:op,status:'succeeded',createdAt:at,updatedAt:at,
+      payload:{opId:op,owned_paths:owned,records,...(cut?{cut}:{}),settledAt:at}}]});
     const inputs=baselineWorkInputs(recordInputs(ROOT,[],undefined,{repo,workPaths:records}),repo,{now:at});
-    l.db.prepare('INSERT INTO contracts(workflow_id,op_id,attempt,dispatch_id,markdown,context_json,created_at) VALUES(?,?,?,?,?,?,?)')
-      .run(wf,op,attempt,`dispatch-${jobId}`,'# contract',JSON.stringify({packet:{op},worktree:'.',inputs}),at);
+    const attemptId=l.db.prepare('SELECT max(attempt_id) id FROM op_attempts WHERE job_id=?').get(jobId).id;
+    writeContract(l.db,{attemptId,markdown:'# contract',context:{packet:{op},worktree:'.',inputs},createdAt:at});
   };
   seed(l=>{
-    for(const [i,wf] of [F,L,S,DONE].entries()){
-      l.ensureWorkflow({workflowId:wf,title:wf,ledgerMode:'durable',sourceRoots:[repo]});
-      l.db.prepare("UPDATE workflows SET phase=?,created_at=? WHERE workflow_id=?").run(wf===DONE?'finished':'running',T0-100000+i,wf);
-      l.db.prepare('INSERT INTO goals(workflow_id,revision,goal_identity,markdown,json,created_at) VALUES(?,?,?,?,?,?)').run(wf,1,`goal-${wf}`,'# goal','{}',T0);
-    }
+    for(const [i,wf] of [F,L,S].entries())
+      seedWorkflow(l,{id:wf,now:T0-100000+i,state:{job:wf},goal:{markdown:'# goal',json:{}}});
+    // DONE is finished: its one queued leg is admitted while the seed's in-transaction phase is
+    // still 'running' (jobs_enqueue_guard), then the fixture walks running→finished.
+    seedWorkflow(l,{id:DONE,now:T0-100000+3,state:{job:DONE,phase:'finished'},goal:{markdown:'# goal',json:{}},
+      jobs:[{jobId:'done-commerce',opId:'business.decide',payload:{opId:'business.decide',owned_paths:['.starciwork/features/profiles']}}]});
     writeFoundation(l.db,claimFoundation(null,{name:'learner-progress-contract',workflowId:F,ownerRunning:false,kind:'contract',now:T0}).record,T0);
     const own={[F]:[LPC],[L]:[CH],[S]:[SUB]};
     for(const wf of [F,L,S]){
       const short=wf.split('-').at(-1);
       settle(l,{wf,jobId:`${short}-scope`,op:'scope.define',owned:[`.starciwork/evidence/${wf}.scope`]});
-      for(const ordinal of [1,2,3])settle(l,{wf,jobId:`${short}-business-${ordinal}`,op:'business.decide',attempt:ordinal,cut:{id:`${short}-business-r1`,ordinal,total:3},owned:own[wf]});
+      for(const ordinal of [1,2,3])settle(l,{wf,jobId:`${short}-business-${ordinal}`,op:'business.decide',cut:{id:`${short}-business-r1`,ordinal,total:3},owned:own[wf]});
     }
   });
   let n=0;
@@ -100,14 +111,14 @@ const world=t=>{
     const at=Date.now()+(n++);
     seed(l=>{
       const jobId=`${wf.split('-').at(-1)}-rewrite-${n}`;
-      l.enqueueJob({jobId,workflowId:wf,opId:'business.revise',attempt:n,kind:'op',payload:{opId:'business.revise',owned_paths:edits.map(([rel])=>rel),...(status==='succeeded'?{settledAt:at}:{})}});
-      l.db.prepare('UPDATE jobs SET status=?,updated_at=? WHERE job_id=?').run(status,at,jobId);
+      seedWorkflow(l,{id:wf,jobs:[{jobId,opId:'business.revise',status,createdAt:at,updatedAt:at,
+        payload:{opId:'business.revise',owned_paths:edits.map(([rel])=>rel),...(status==='succeeded'?{settledAt:at}:{})}}]});
     });
     if(commit){git(repo,['add','-A']);git(repo,['commit','-q','-m',`${wf} rewrite ${n}`]);}
   };
   const drift=wf=>read(db=>inputDrift(db,wf,{root:ROOT,repo}));
   /** A running leg with no terminal keeps the frontier `engaged`, so its reason is the stale one (tests/stale-input.spec.mjs holdEngaged). */
-  const engage=wf=>seed(l=>{l.enqueueJob({jobId:`${wf}-engaged`,workflowId:wf,opId:'docs.author',kind:'op',payload:{opId:'docs.author',owned_paths:['docs/engaged/']}});l.db.prepare("UPDATE jobs SET status='running' WHERE job_id=?").run(`${wf}-engaged`);});
+  const engage=wf=>seed(l=>seedWorkflow(l,{id:wf,jobs:[{jobId:`${wf}-engaged`,opId:'docs.author',status:'running',payload:{opId:'docs.author',owned_paths:['docs/engaged/']}}]}));
   const status=wf=>{const r=api('status','--workflow',wf);assert.equal(r.status,0,r.stderr||r.stdout);return json(r.stdout);};
   return {repo,work,api,seed,read,settle,rewrite,drift,status,engage};
 };
@@ -123,12 +134,11 @@ test('ownership: foundation, scope record, scope node, cut, then the repo owner;
     assert.deepEqual(of('.starciwork/features/profiles/data/skill-evidence/index.yaml'),[F,'repo-owner'],'nothing names it: the repo owner (oldest live workflow here)');
     assert.equal(ownerOf.repoOwner().workflowId,F);
   });
-  w.seed(l=>{
-    l.enqueueJob({jobId:'l-profiles',workflowId:L,opId:'business.decide',attempt:9,kind:'op',payload:{opId:'business.decide',owned_paths:['.starciwork/features/profiles/data']}});
-    l.enqueueJob({jobId:'done-commerce',workflowId:DONE,opId:'business.decide',attempt:9,kind:'op',payload:{opId:'business.decide',owned_paths:['.starciwork/features/profiles']}});
-  });
+  // done-commerce was seeded on DONE while the fixture's phase was still 'running' — a queued job of a
+  // finished workflow cannot be inserted otherwise (jobs_enqueue_guard: workflow-not-accepting-work).
+  w.seed(l=>seedWorkflow(l,{id:L,jobs:[{jobId:'l-profiles',opId:'business.decide',payload:{opId:'business.decide',owned_paths:['.starciwork/features/profiles/data']}}]}));
   w.read(db=>assert.deepEqual(createOwnership(db,{repo:w.repo})('.starciwork/features/profiles/data/skill-evidence/index.yaml'),{workflowId:L,by:'cut',detail:'its jobs own it'},'one live workflow\'s jobs own it; a finished workflow\'s never count'));
-  w.seed(l=>l.db.prepare("UPDATE workflows SET phase='finished' WHERE workflow_id=?").run(S));
+  w.seed(l=>l.write.changeWorkflowPhase({workflowId:S,to:'finished',by:'test-fixture',reason:'seed'}));
   w.read(db=>assert.deepEqual(createOwnership(db,{repo:w.repo})(`${SUB}/index.yaml`).workflowId,F,'a finished scope owner owns nothing: the next rule (foundation\'s scope node) decides'));
 });
 

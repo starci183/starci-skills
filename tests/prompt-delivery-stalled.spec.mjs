@@ -16,6 +16,8 @@ import { spawnSync } from 'node:child_process';
 import { pathToFileURL } from 'node:url';
 import { FAKE_ORCA } from './helpers/fake-orca.mjs';
 import { openLedger, inspectLedger, ledgerFileFor } from '../engine/ledger-db.mjs';
+import { openMachine, TEST_REGISTRY_ENV } from '../engine/machine-db.mjs';
+import { seedWorkflow } from './_ledger-fixture.mjs';
 import { deliverPrompt, loadAdapter, PROMPT_DELIVERY_STALLED, TERMINAL_INCARNATION_STALE } from '../scripts/agent/lib.mjs';
 
 const ROOT = path.resolve(import.meta.dirname, '..');
@@ -103,17 +105,25 @@ const opFixture = (t, extra = {}) => {
   const repo = path.join(root, 'repo'); fs.mkdirSync(repo, { recursive: true });
   const stub = path.join(root, 'fake-orca.mjs'); fs.writeFileSync(stub, FAKE_ORCA);
   const stateFile = path.join(root, 'state.json'), logFile = path.join(root, 'calls.jsonl');
+  // The provider-health circuit is a machine.sqlite row now (runtime signals only take
+  // kernel|stop|launch|decision-doorbell): the dispatch subprocess and the spec read one isolated file.
+  const machineFile = path.join(root, 'machine.sqlite');
+  // Two dispatches of one workflow are two op_attempts rows: op_attempts is UNIQUE on
+  // (workflow_id, dispatch_id) and the orchestration dispatch id is the terminal handle — a reused
+  // fake-terminal-1 collides on the second job. UNIQUE_TERMINALS gives each launch its own handle.
   const env = { ...process.env, STARCI_ORCA_COMMAND: process.execPath, STARCI_ORCA_ARGS: JSON.stringify([stub]),
-    STARCI_FAKE_ORCA_LOG: logFile, STARCI_FAKE_ORCA_STATE: stateFile, STARCI_FAKE_ORCA_PREAMBLE: PREAMBLE, ...extra };
+    STARCI_FAKE_ORCA_LOG: logFile, STARCI_FAKE_ORCA_STATE: stateFile, STARCI_FAKE_ORCA_PREAMBLE: PREAMBLE,
+    STARCI_FAKE_ORCA_UNIQUE_TERMINALS: '1',
+    [TEST_REGISTRY_ENV]: machineFile, ...extra };
   const workflowId = 'wf-prompt-stalled';
   const ledger = openLedger({ file: ledgerFileFor(repo) });
   try {
-    ledger.enqueueJob({ jobId: `kernel-${workflowId}`, workflowId, kind: 'kernel', role: 'kernel',
-      payload: { hierarchy: { schema: 'starci/agent-hierarchy@1', nodeId: `agent:kernel:${workflowId}`, parentNodeId: `workflow:${workflowId}`, role: 'kernel' } } });
-    ledger.db.prepare("UPDATE jobs SET status='running',worker_id='fake-kernel-terminal' WHERE job_id=?").run(`kernel-${workflowId}`);
-    for (const n of [1, 2])
-      ledger.enqueueJob({ jobId: `job-ps-${n}`, workflowId, opId: 'code.refactor', kind: 'op',
-        payload: { opId: 'code.refactor', owned_paths: [`docs/ps-${n}/`], model: 'codex-agent', difficulty: 'hard' } });
+    seedWorkflow(ledger, { id: workflowId, jobs: [
+      { jobId: `kernel-${workflowId}`, kind: 'kernel', role: 'kernel', status: 'running', workerId: 'fake-kernel-terminal',
+        payload: { hierarchy: { schema: 'starci/agent-hierarchy@1', nodeId: `agent:kernel:${workflowId}`, parentNodeId: `workflow:${workflowId}`, role: 'kernel' } } },
+      ...[1, 2].map((n) => ({ jobId: `job-ps-${n}`, opId: 'code.refactor',
+        payload: { opId: 'code.refactor', owned_paths: [`docs/ps-${n}/`], model: 'codex-agent', difficulty: 'hard' } })),
+    ] });
   } finally { ledger.close(); }
   const dispatch = (jobId) => spawnSync(process.execPath, [API, 'dispatch', '--repo', repo, '--job', jobId, '--model', 'codex-agent', '--spawn', '--json'],
     { cwd: ROOT, encoding: 'utf8', windowsHide: true, timeout: 120000, env });
@@ -124,7 +134,7 @@ const opFixture = (t, extra = {}) => {
       && !(extra.STARCI_FAKE_ORCA_OLD_HOST === '1' && e.argv.includes('--wait-submit')));
   const enterSends = () => fs.readFileSync(logFile, 'utf8').trim().split('\n').map(json)
     .filter((e) => e?.argv?.[0] === 'terminal' && e.argv[1] === 'send' && e.argv.includes('--text') && e.argv[e.argv.indexOf('--text') + 1] === '');
-  return { dispatch, read, textSends, enterSends };
+  return { dispatch, read, textSends, enterSends, machineFile };
 };
 
 test('dispatch on an old host: a Codex prompt lost once is re-delivered and the job runs', (t) => {
@@ -137,20 +147,26 @@ test('dispatch on an old host: a Codex prompt lost once is re-delivered and the 
 
 test('dispatch on an old host: a Codex prompt lost twice is refused prompt-delivery-stalled at send, a provider strike, not a submission timeout', (t) => {
   const fx = opFixture(t, { STARCI_FAKE_ORCA_OLD_HOST: '1', STARCI_FAKE_ORCA_PROMPT_LOST: '2' });
-  const health = () => fx.read((db) => json(db.prepare("SELECT value_json FROM signals WHERE scope='provider-health' AND key='codex'").get()?.value_json ?? 'null'));
+  // provider_health carries status/failure_kind in columns; the kernel value (with its `failures`
+  // strike count) rides in detail_json.
+  const health = () => { const m = openMachine({ file: fx.machineFile }); try {
+    const row = m.db.prepare('SELECT * FROM provider_health WHERE provider=?').get('codex');
+    return row ? { ...row, detail: json(row.detail_json) } : null;
+  } finally { m.close(); } };
   const first = fx.dispatch('job-ps-1');
   assert.notEqual(first.status, 0);
   const [rejected] = fx.read((db) => db.prepare("SELECT payload_json FROM events WHERE entity_id='job-ps-1' AND kind='dispatch-rejected'").all()).map((e) => json(e.payload_json));
   assert.deepEqual([rejected?.step, rejected?.signal], ['send', PROMPT_DELIVERY_STALLED]);
   assert.match(rejected?.screenTail ?? '', /Ask Codex to do anything/);
   assert.equal(fx.textSends().length, 2);
-  assert.equal(fx.read((db) => db.prepare("SELECT status FROM jobs WHERE job_id='job-ps-1'").get().status), 'queued', 'no effect: the attempt is reusable');
+  // The migrated job machine returns a rejected dispatch to 'ready' (leased→ready), the reusable state.
+  assert.equal(fx.read((db) => db.prepare("SELECT status FROM jobs WHERE job_id='job-ps-1'").get().status), 'ready', 'no effect: the attempt is reusable');
   assert.equal(rejected?.providerHealth, null, 'one lost prompt is a strike, not an outage');
-  assert.deepEqual([health()?.status, health()?.failureKind, health()?.failures], ['striking', PROMPT_DELIVERY_STALLED, 1]);
+  assert.deepEqual([health()?.status, health()?.failure_kind, health()?.detail?.failures], ['striking', PROMPT_DELIVERY_STALLED, 1]);
   const second = fx.dispatch('job-ps-2');
   assert.notEqual(second.status, 0);
   assert.equal(json(second.stdout)?.rejection?.providerHealth?.failureKind, PROMPT_DELIVERY_STALLED, 'the repeat opens the codex circuit');
-  assert.deepEqual([health()?.status, health()?.failures], ['unavailable', 2]);
+  assert.deepEqual([health()?.status, health()?.detail?.failures], ['unavailable', 2]);
 });
 
 /* ------------------------------------------------- the host's prompt receipt */

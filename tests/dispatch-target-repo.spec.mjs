@@ -6,6 +6,7 @@ import path from 'node:path';
 import {spawnSync} from 'node:child_process';
 import {FAKE_ORCA} from './helpers/fake-orca.mjs';
 import {inspectLedger,ledgerFileFor,openLedger} from '../engine/ledger-db.mjs';
+import {seedWorkflow} from './_ledger-fixture.mjs';
 
 // api dispatch resolves each owned path against its target repository
 // (scripts/kernel/target-repo.mjs) before the packet reaches the worker: a
@@ -44,31 +45,41 @@ const fixture=(t,{bound=true}={})=>{
   const env={...process.env,STARCI_SOURCE_ROOT:source,
     STARCI_ORCA_COMMAND:process.execPath,STARCI_ORCA_ARGS:JSON.stringify([stub]),
     STARCI_FAKE_ORCA_MODE:'healthy',
-    STARCI_FAKE_ORCA_LOG:path.join(dir,'calls.jsonl'),STARCI_FAKE_ORCA_STATE:path.join(dir,'state.json')};
+    STARCI_FAKE_ORCA_LOG:path.join(dir,'calls.jsonl'),STARCI_FAKE_ORCA_STATE:path.join(dir,'state.json'),
+    LOCALAPPDATA:path.join(dir,'localappdata'),STARCI_PROJECTS_ROOT:path.join(dir,'projects'),
+    STARCI_TEST_MACHINE_FILE:path.join(dir,'machine.sqlite')};
   const api=(...args)=>{
     const r=spawnSync(process.execPath,[API,...args],{cwd:ROOT,encoding:'utf8',windowsHide:true,timeout:120000,env});
     let body=null;try{body=JSON.parse(r.stdout);}catch{}
     return {r,body};
   };
   const enqueue=(jobId,op,owned)=>{
-    const ledger=openLedger({file:ledgerFileFor(be)});
-    try{ledger.enqueueJob({jobId,workflowId:'wf-dispatch-target',opId:op,kind:'op',payload:{opId:op,owned_paths:owned}});}
+    const ledger=openLedger({file:ledgerFileFor(be,{env})});
+    // Op jobs are unit tries now: the fixture seeds the unit and keeps the workflow running for dispatch.
+    try{seedWorkflow(ledger,{id:'wf-dispatch-target',jobs:[{jobId,opId:op,payload:{opId:op,owned_paths:owned}}]});}
     finally{ledger.close();}
     return jobId;
   };
   const contractOf=jobId=>{
-    const l=inspectLedger({file:ledgerFileFor(be)});
+    const l=inspectLedger({file:ledgerFileFor(be,{env})});
     try{
-      const job=l.db.prepare('SELECT op_id,attempt,status FROM jobs WHERE job_id=?').get(jobId);
-      const row=l.db.prepare('SELECT markdown,context_json FROM contracts WHERE op_id=? AND attempt=?').get(job.op_id,job.attempt);
+      const job=l.db.prepare('SELECT op_id,status FROM jobs WHERE job_id=?').get(jobId);
+      // Contracts are keyed by attempt_id (each redispatch keeps its own); job_id reads the newest.
+      const row=l.db.prepare('SELECT markdown,context_json FROM contracts WHERE job_id=? ORDER BY attempt_id DESC').get(jobId);
       return {status:job.status,markdown:row.markdown,packet:JSON.parse(row.context_json).packet};
     }finally{l.close();}
   };
-  return {be,fe,api,enqueue,contractOf};
+  // api report reads the envelope only from the attempt's STARCI_JOB_SCRATCH (op_attempts.scratch_dir).
+  const scratchOf=jobId=>{
+    const l=inspectLedger({file:ledgerFileFor(be,{env})});
+    try{return l.db.prepare('SELECT scratch_dir FROM op_attempts WHERE job_id=? ORDER BY attempt_id DESC LIMIT 1').get(jobId)?.scratch_dir;}
+    finally{l.close();}
+  };
+  return {be,fe,api,enqueue,contractOf,scratchOf};
 };
 
 test('an owner-repo path spelled <owner-name>/… reaches the worker bare, and its report is accepted',t=>{
-  const {be,api,enqueue,contractOf}=fixture(t);
+  const {be,api,enqueue,contractOf,scratchOf}=fixture(t);
   const jobId=enqueue('op-owner-name','backend.scaffold',['shop-next/src/main.ts','.starciwork/features/base/assets/r2']);
   const d=api('dispatch','--repo',be,'--job',jobId,'--spawn','--json');
   assert.equal(d.r.status,0,d.r.stderr||d.r.stdout);
@@ -82,7 +93,10 @@ test('an owner-repo path spelled <owner-name>/… reaches the worker bare, and i
   assert.doesNotMatch(markdown,/owned_paths: [^\n]*shop-next\/src/,'the owner repo gets no <repo>/ prefix');
   assert.match(markdown,new RegExp(`writes_in: ${esc(be)} \\(repository be\\)`));
 
-  const file=path.join(be,'..','report.json');
+  const scratch=scratchOf(jobId);
+  assert.ok(scratch,'dispatch records the attempt scratch dir');
+  fs.mkdirSync(scratch,{recursive:true});
+  const file=path.join(scratch,'report.json');
   fs.writeFileSync(file,json({outcome:'blocked',summary:'needs more',files:['src/main.ts'],blocker:{kind:'authority',detail:'more files'}}));
   const rep=api('report','--repo',be,'--job',jobId,'--report',file,'--json');
   assert.equal(rep.r.status,0,rep.r.stderr||rep.r.stdout);

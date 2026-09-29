@@ -447,21 +447,23 @@ test('the machine scan counts registered product ledgers only: never a fixture p
   withLedger(t,({root,ledger,ledgerFile,machine,machineFile,track})=>{
     const tempRoot=fs.mkdtempSync(path.join(os.tmpdir(),'starci-balance-temp-'));
     t.after(()=>fs.rmSync(tempRoot,{recursive:true,force:true,maxRetries:20,retryDelay:25}));
+    // A ledger opened by file path (not ledgerFileFor) seeds no meta.repo_root; registerLedger refuses a
+    // new row without one (registry-no-repo-root), so the fixture names its root at open.
     const other=(dir,id,pool)=>{
       const file=path.join(dir,'.starciwork','runtime.sqlite');
       fs.mkdirSync(path.dirname(file),{recursive:true});
-      const handle=track(openLedger({file,machine}));
+      const handle=track(openLedger({file,machine,repoRoot:dir}));
       seedWorkflow(handle,{id,now:T,jobs:[job(`${id}-1`,{op:'backend.implement',pool,createdAt:T-H})]});
       return file;
     };
     const product=other(path.join(root,'product'),'wf-product','qwen-agent');
     const fixture=other(path.join(root,'fixture'),'wf-fixture','codex-agent');
-    const temp=other(path.join(tempRoot,'repo'),'wf-temp','codex-agent');
-    machine.registerLedger({file:path.join(root,'gone','.starciwork','runtime.sqlite'),ledgerId:'ledger-gone'});
+    const temp=other(path.join(tempRoot,'temp-repo'),'wf-temp','codex-agent');
+    machine.registerLedger({file:path.join(root,'gone','.starciwork','runtime.sqlite'),ledgerId:'ledger-gone',repoRoot:path.join(root,'gone')});
     seedWorkflow(ledger,{id:'wf-repo',now:T,jobs:[job('r-1',{op:'backend.implement',pool:'devin-agent',createdAt:T-H})]});
 
     const registered=machine.db.prepare('SELECT file FROM ledgers').all().map(row=>path.resolve(row.file));
-    assert.equal(registered.length,4,'product, fixture, temp and the missing ledger are all registered');
+    assert.equal(registered.length,5,'the repo ledger, product, fixture, temp and the missing ledger are all registered');
     const scanned=machineLedgerFiles({machineFile,exclude:[ledgerFile]}).map(file=>path.resolve(file).toLowerCase());
     assert.deepEqual(scanned,[fs.realpathSync(product).toLowerCase()]);
     assert.equal(scanned.includes(path.resolve(fixture).toLowerCase()),false,'a fixture directory never counts');

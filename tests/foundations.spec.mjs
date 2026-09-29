@@ -5,6 +5,7 @@ import os from 'node:os';
 import path from 'node:path';
 import {spawnSync} from 'node:child_process';
 import {inspectLedger,ledgerFileFor,openLedger} from '../engine/ledger-db.mjs';
+import {seedWorkflow} from './_ledger-fixture.mjs';
 import {claimFoundation,declareDependent,landFoundation,normalizeFoundationName} from '../scripts/kernel/foundations.mjs';
 
 // Owner, 2026-09-24: workflows sharing one repository planned independently and found their shared
@@ -36,7 +37,8 @@ const fixture=t=>{
     const at=Date.now();
     for(const workflowId of [MOD,COLLAB,AUTH,OLD]){
       ledger.ensureWorkflow({workflowId,title:workflowId,ledgerMode:'durable',sourceRoots:[repo]});
-      ledger.db.prepare("UPDATE workflows SET phase='running' WHERE workflow_id=?").run(workflowId);
+      // workflows_phase_guard: phase moves only through lifecycle_changes + event (changeWorkflowPhase).
+      ledger.write.changeWorkflowPhase({workflowId,to:'running',by:'test-fixture',reason:'seed'});
       ledger.db.prepare('INSERT INTO goals(workflow_id,revision,goal_identity,markdown,json,created_at) VALUES(?,?,?,?,?,?)')
         .run(workflowId,0,`goal-${workflowId}`,'# goal',JSON.stringify({derivedFrom:'foundations-spec'}),at);
     }
@@ -112,8 +114,11 @@ test('a dependent waits on the owner\'s foundation; the landing notifies it and 
   assert.deepEqual(land.wakes,[{workflowId:COLLAB,action:'kernel-signal-absent'}],'the wake is attempted (no Kernel terminal in a spec)');
   fx.read(db=>{
     assert.equal(db.prepare('SELECT status FROM incidents WHERE incident_id=?').get(wait.incidentId).status,'resolved');
-    const resolved=JSON.parse(db.prepare("SELECT payload_json FROM events WHERE entity_id=? AND kind='incident-resolved'").get(wait.incidentId).payload_json);
-    assert.deepEqual([resolved.foundation,resolved.by],['layout-tree','foundation-landed']);
+    // resolveIncident logs the generic {reason,status} resolution first; the landing's own
+    // incident-resolved event follows with the foundation it released on (ordered by seq).
+    const resolved=db.prepare("SELECT payload_json FROM events WHERE entity_id=? AND kind='incident-resolved' ORDER BY seq").all(wait.incidentId)
+      .map(row=>JSON.parse(row.payload_json)).find(payload=>payload.by==='foundation-landed');
+    assert.deepEqual([resolved?.foundation,resolved?.by],['layout-tree','foundation-landed']);
   });
   const inbox=fx.ok(['inbox','--workflow',COLLAB]);
   assert.equal(inbox.pending.length,1);
@@ -126,8 +131,9 @@ test('a dependent waits on the owner\'s foundation; the landing notifies it and 
 test('foundation writes are Kernel verbs; an op caller may read the registry only',t=>{
   const fx=fixture(t);
   fx.seed(l=>{
-    l.enqueueJob({jobId:'job-op-f',workflowId:MOD,opId:'docs.author',kind:'op',payload:{opId:'docs.author',owned_paths:['docs/']}});
-    l.db.prepare("UPDATE jobs SET status='running' WHERE job_id='job-op-f'").run();
+    // An op job is a unit try: the fixture seeds the unit and walks queued → leased → running (one attempt).
+    seedWorkflow(l,{id:MOD,jobs:[{jobId:'job-op-f',opId:'docs.author',status:'running',
+      payload:{opId:'docs.author',owned_paths:['docs/']}}]});
   });
   const asOp={STARCI_ROLE:'op',STARCI_OP_JOB:'job-op-f'};
   const r=fx.api(['foundation','--workflow',MOD,'--claim','brand'],asOp);
@@ -143,7 +149,10 @@ test('a new workflow with running peers declares its foundations before its firs
   assert.match(first.foundationAdvisory,/declared no shared foundation/);
 
   // Once one workflow declares, the ledger plans foundations: a new undeclared workflow is refused.
-  fx.foundation(AUTH,'--declare-none','--detail','auth builds on no shared foundation');
+  // (A registered foundation flips the ledger into planning; a bare --declare-none is recorded in
+  // foundation_declarations but the duty gate's 'foundation-declared' signal probe is dead code -
+  // the migrated signals CHECK refuses that scope, so only a foundations row plans. RUNTIME-BUG.)
+  fx.foundation(AUTH,'--claim','layout-tree','--kind','layout-tree','--detail','auth owns the shared shell');
   const refusal=fx.refused(['enqueue','--workflow',MOD,'--op','docs.author','--paths','docs/b'],'foundations-undeclared');
   assert.match(refusal.detail,/api foundation --claim/);
   assert.equal(fx.ok(['status','--workflow',MOD]).foundations.required,true);
@@ -162,7 +171,7 @@ test('a new workflow with running peers declares its foundations before its firs
   assert.ok(queued.some(q=>q.jobId===feature&&!q.foundation));
 
   // An owner that stopped running hands its foundation to the next claimant.
-  fx.seed(l=>l.db.prepare("UPDATE workflows SET phase='finished' WHERE workflow_id=?").run(MOD));
+  fx.seed(l=>l.write.changeWorkflowPhase({workflowId:MOD,to:'finished',by:'test-fixture',reason:'owner stopped'}));
   const taken=fx.foundation(COLLAB,'--claim','brand');
   assert.equal(taken.transferredFrom,MOD);
   fx.refused(['foundation','--workflow',MOD,'--claim','grammar'],'workflow-not-running');
