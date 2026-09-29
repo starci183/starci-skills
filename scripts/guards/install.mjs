@@ -240,7 +240,9 @@ exit $status
  * Writes the reference-transaction hook into the repository's effective hooks
  * directory (core.hooksPath, e.g. husky's .husky/_, else .git/hooks). A foreign
  * hook of that name is never overwritten; a hooks directory whose new file git
- * would offer for tracking is left alone (no foreign file in a product repo).
+ * would offer for tracking is left alone (no foreign file in a product repo),
+ * except an absent, untracked one (husky's .husky/_ in a linked worktree), which
+ * gets husky's own self-ignoring `.gitignore` of `*`.
  */
 export function ensureHistoryHook(repoRoot, { skillRoot = path.resolve(here, '..', '..'), nodePath = process.execPath } = {}) {
   const top = git(repoRoot, ['rev-parse', '--show-toplevel']);
@@ -253,8 +255,26 @@ export function ensureHistoryHook(repoRoot, { skillRoot = path.resolve(here, '..
   const inside = (parent, child) => { const rel = path.relative(parent, child); return !rel.startsWith('..') && !path.isAbsolute(rel); };
   const inWorktree = inside(root, hooksDir) && !inside(path.join(root, '.git'), hooksDir);
   if (inWorktree && !fs.existsSync(file)) {
-    const ignored = git(root, ['check-ignore', '-q', '--no-index', '--', path.relative(root, file).replace(/\\/g, '/')]);
-    if (ignored.status !== 0) return { installed: false, reason: 'hooks-dir-tracked', path: file };
+    const rel = path.relative(root, file).replace(/\\/g, '/');
+    const isIgnored = () => git(root, ['check-ignore', '-q', '--no-index', '--', rel]).status === 0;
+    if (!isIgnored()) {
+      // A relative core.hooksPath (husky's .husky/_) resolves per checkout: husky generates that directory, with
+      // its own `.gitignore` of `*`, only where `npm install` ran, so a linked worktree has none (nivo-fe
+      // wf-nivo-collab-mum8xsop). A hooks directory that does not exist yet, holds no file and has nothing tracked
+      // is given husky's own self-ignoring layout; anything else stays refused.
+      const relDir = path.relative(root, hooksDir).replace(/\\/g, '/');
+      const absent = !fs.existsSync(hooksDir);
+      const empty = absent || (fs.statSync(hooksDir).isDirectory() && fs.readdirSync(hooksDir).length === 0);
+      const tracked = git(root, ['ls-files', '--', relDir]);
+      if (!empty || tracked.status !== 0 || tracked.stdout.trim()) return { installed: false, reason: 'hooks-dir-tracked', path: file };
+      fs.mkdirSync(hooksDir, { recursive: true });
+      fs.writeFileSync(path.join(hooksDir, '.gitignore'), '*\n');
+      if (!isIgnored()) {
+        if (absent) fs.rmSync(hooksDir, { recursive: true, force: true });
+        else fs.rmSync(path.join(hooksDir, '.gitignore'), { force: true });
+        return { installed: false, reason: 'hooks-dir-tracked', path: file };
+      }
+    }
   }
   const branches = [];
   const list = git(root, ['worktree', 'list', '--porcelain']);
