@@ -4,7 +4,7 @@
     "moduleResolution": "node",
     "target": "ES2021",
     "lib": [
-      "ES2021"
+      "ES2022"
     ],
     "declaration": false,
     "removeComments": true,
@@ -26,6 +26,15 @@
       "jest"
     ],
     "paths": {
+      "@apollo/client": [
+        "./node_modules/@apollo/client"
+      ],
+      "axios": [
+        "./node_modules/axios"
+      ],
+      "graphql": [
+        "./node_modules/graphql"
+      ],
       "@e2e-kit/*": [
         "../../packages/e2e-kit/src/*"
       ],

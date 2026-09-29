@@ -17,6 +17,8 @@ const shared = {
     '^.+\.ts$': ['ts-jest', { tsconfig: '<rootDir>/tsconfig.json' }],
   },
   moduleFileExtensions: ['ts', 'js', 'json'],
+  // The shared e2e-kit source lives outside this repository root; its axios/graphql/apollo imports resolve here.
+  modulePaths: ['<rootDir>/node_modules'],
   moduleNameMapper: {
     '^@e2e-kit/(.*)$': '<rootDir>/../../packages/e2e-kit/src/$1',
     '^@modules/(.*)$': '<rootDir>/src/modules/$1',
