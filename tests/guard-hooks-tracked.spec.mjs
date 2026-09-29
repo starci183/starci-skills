@@ -12,6 +12,7 @@ import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { ensureHistoryHook } from '../scripts/guards/install.mjs';
 import { mkdtemp } from './helpers/tmpdir.mjs';
+import { WORKTREES_EXCLUDE_LINE } from '../scripts/lib/worktree-exclude.mjs';
 
 for (const key of ['GIT_DIR', 'GIT_COMMON_DIR', 'GIT_WORK_TREE', 'GIT_INDEX_FILE', 'GIT_OBJECT_DIRECTORY', 'GIT_CONFIG_PARAMETERS', 'GIT_CONFIG_COUNT', 'GIT_PREFIX']) delete process.env[key];
 
@@ -31,6 +32,10 @@ const huskyRepo = (t) => {
   // what `husky` (npm prepare) generates in the main checkout only
   fs.mkdirSync(path.join(repo, '.husky', '_'));
   fs.writeFileSync(path.join(repo, '.husky', '_', '.gitignore'), '*');
+  // what product-worktree ensureRepoSetup does in a real product repo: the worktrees dir is git-excluded, so the main
+  // checkout's status stays about the hooks dir, not the op worktrees living under it
+  fs.appendFileSync(path.join(repo, '.git', 'info', 'exclude'), `${WORKTREES_EXCLUDE_LINE}
+`);
   const wt = path.join(repo, '.starciwork', 'worktrees', 'wf', 'op1');
   assert.equal(sh(repo, ['worktree', 'add', '-q', '-b', 'op/op1', wt]).status, 0);
   return { repo, wt };
