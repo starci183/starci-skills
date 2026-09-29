@@ -62,6 +62,15 @@ module source roots - see [backend source pattern](backend-source-pattern.md)),
 `knowledge/patterns/fe/folder.yaml`), and forbids `.starciwork/` and
 `.starcistacks/` and `.sops.yaml`.
 
+**Tests: two kinds, e2e manual only** (owner ruling 2026-09-29; `knowledge/patterns/be/test.yaml` BE-TEST-1,
+`knowledge/patterns/fe/test.yaml` FE-TEST-1). Unit specs (`<name>.spec.ts(x)` beside the subject) are the only
+tests any automatic gate runs. E2E (`*.e2e-spec.ts`: backend `src/tests/e2e/**`, frontend root `e2e/**`) never
+joins husky (pre-commit, pre-push, lint-staged, or the `typecheck`/lint they call), coverage/Codecov, or an
+automatic CI trigger: the default `tsconfig.json`/`typecheck` and lint exclude the e2e tree, a dedicated
+`tsconfig.e2e.json` backs a manual `typecheck:e2e`, `test:ci` collects coverage from unit runs only, and a kept
+e2e CI job sits in its own workflow with `on: workflow_dispatch` only. Routine gates are unit + typecheck +
+lint + canon + build; `test:e2e` runs only when explicitly asked.
+
 ```text
 apps/<app>/                          # backend: composition only
 └── src/

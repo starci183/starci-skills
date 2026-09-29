@@ -38,6 +38,8 @@ src/
 
 Within a module use a narrow `index.ts`, `<name>.module.ts` when Nest registration is needed, meaningful services/policies/contracts, and colocated tests. An independently configurable module may add `<name>.module-definition.ts`. A pure TypeScript library does not need a Nest module. A database module can own `entities/` and `migrations/`; another persistence layout must still identify one connection, schema/migration owner, and transaction owner. Do not scatter schema ownership among feature transports.
 
+Tests come in two kinds (`knowledge/patterns/be/test.yaml` BE-TEST-1): unit `<name>.spec.ts` beside its subject, and e2e `*.e2e-spec.ts` under `src/tests/e2e/` with environment code in `src/tests/e2e/setup/`. E2E runs manually only (owner ruling 2026-09-29): the default `tsconfig.json`, `typecheck`, lint, lint-staged and husky exclude `src/tests/e2e/**`; `typecheck:e2e` (`tsconfig.e2e.json`) and `test:e2e` are run by hand; coverage and `test:ci` read the jest `unit` project only; any e2e CI job is `workflow_dispatch` only. The unit project maps no module into `src/tests/e2e/`.
+
 Every backend repository is an `apps/<app>/` monorepo, including a
 single-application one: each deployable process composes in `apps/<app>/src`
 (`main.ts`, `app.module.ts`, an optional composition spec) and nothing else

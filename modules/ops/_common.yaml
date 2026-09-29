@@ -538,7 +538,7 @@ sections:
         naming each failing file and the source file it points at (`path[:line]`), never a
         shared-change blocker and never a repair outside owned paths; the Kernel's api check
         attributes it to the peer whose change it is. A proof this op's own brief requires
-        (backend.implement's scoped unit and backend E2E gates for its selected operations, its
+        (backend.implement's scoped unit gate for its selected operations - backend E2E is e2e.verify's, run manually - its
         commit) is never another leg's. A required gate that no run inside the grant can execute is
         `blocked` `environment` with its evidence, never `partial`."
       - Reuse matching current resources; inspect before changing uncertain state. Stop after

@@ -49,7 +49,12 @@ rules:
       src/tests/e2e/live/ (suites needing live third-party accounts) out of plain test:e2e. Verify discovery
       using the consuming project's actual Jest config and test listing (--listTests per project). Mock-only
       API routing tests do not prove database integration or end-to-end behavior. Record which transport,
-      service, database and external boundary actually ran.
+      service, database and external boundary actually ran. E2E runs MANUALLY only (owner ruling
+      2026-09-29): no e2e spec, src/tests/e2e/ code or e2e-only dependency joins husky (pre-commit, pre-push,
+      lint-staged, or the typecheck/lint they call), coverage/Codecov, or an automatic CI trigger. The default
+      tsconfig and lint exclude src/tests/e2e/**, a dedicated tsconfig.e2e.json backs a manual typecheck:e2e,
+      coverage and test:ci collect from the unit project only, and a kept e2e CI job is workflow_dispatch only.
+      Routine gates are unit + typecheck + lint + canon + build; e2e runs only when explicitly asked.
     rationale: ""
     cases:
       - id: case-1
@@ -80,6 +85,13 @@ rules:
       - id: case-7
         when: Runner
         write: 'jest with ts-jest (diagnostics: false), testEnvironment: "node"'
+      - id: case-8
+        when: Hooks, typecheck, coverage and CI
+        write: 'tsconfig.json "exclude": ["node_modules", "dist", "coverage", "src/tests/e2e/**"];
+          tsconfig.e2e.json extends it with "include": ["src/tests/e2e/**/*.ts"]; scripts typecheck (default,
+          no e2e) and typecheck:e2e (tsc -p tsconfig.e2e.json, manual); husky pre-push = typecheck/lint +
+          test:unit or test:affected on --selectProjects unit; test:ci = --selectProjects unit --coverage; an e2e
+          workflow is on: workflow_dispatch only; unit jest config maps no module into src/tests/e2e/'
     verification:
       automated:
         - unit-test-colocated

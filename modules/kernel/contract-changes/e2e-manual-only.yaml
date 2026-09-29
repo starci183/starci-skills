@@ -1,0 +1,30 @@
+id: e2e-manual-only
+effectiveAt: '2026-09-29T13:30:00+07:00'
+summary: >-
+  Owner ruling 2026-09-29: e2e runs MANUALLY only. No e2e spec, e2e setup code or e2e-only dependency joins husky
+  (pre-commit or pre-push, including the typecheck/lint they run), coverage/Codecov, or an automatic CI trigger.
+  BE-TEST-1 (case-8) and FE-TEST-1 (case-10) now state it: the default tsconfig, typecheck, eslint target and
+  lint-staged exclude src/tests/e2e/** (backend) or e2e/** and playwright.config.ts (frontend); a dedicated
+  tsconfig.e2e.json backs a manual typecheck:e2e; test:ci and coverage read unit runs only; an e2e CI job is its own
+  workflow_dispatch-only workflow. Routine gates are unit + typecheck + lint + canon + build; e2e runs only in an
+  explicitly selected e2e.verify leg (uat.* for UAT). backend.implement no longer runs or requires backend E2E
+  (its checks become lint, typecheck, unit, canon, coverage, build, sonar and its backendE2EGate becomes
+  manual-only-e2e-verify-leg-when-goal-asks); review.verify records e2e and UAT rows as not-selected unless the plan
+  selected such a leg; the common operator rule cites backend E2E as e2e.verify's; e2e.verify states it is
+  manual and only present when the goal asked. docs/source-layout.md, docs/backend-source-pattern.md,
+  docs/verify-proof.md and docs/ops.md say the same. Companion changes: e2e-manual-planner (the planner),
+  e2e-manual-examples-baseline (examples, baseline, runtime CI) and e2e-manual-hfs-check (the checker). Adds no
+  code of its own.
+reach: new-legs
+paths:
+  - modules/kernel/contract-changes/e2e-manual-only.yaml
+  - knowledge/patterns/be/test.yaml
+  - knowledge/patterns/fe/test.yaml
+  - docs/source-layout.md
+  - docs/backend-source-pattern.md
+  - docs/verify-proof.md
+  - docs/ops.md
+  - modules/ops/_common.yaml
+  - modules/ops/ops/backend.implement.yaml
+  - modules/ops/ops/review.verify.yaml
+  - modules/ops/ops/e2e.verify.yaml

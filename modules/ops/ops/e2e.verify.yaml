@@ -2,7 +2,9 @@ schema: starci/op@1
 id: e2e.verify
 goal:
   en: Prove one selected delivered slice through its public API on a real stack the suite starts
-    itself, with one scenario per assertion and the listed checks run verbatim.
+    itself, with one scenario per assertion and the listed checks run verbatim. E2E runs MANUALLY only
+    (owner ruling 2026-09-29) - this leg exists only when the goal explicitly asked for e2e, and no hook,
+    default typecheck, coverage run or automatic CI job ever runs it.
 nodeKinds: [implementation]
 completionProfile: implementation
 sideEffects:

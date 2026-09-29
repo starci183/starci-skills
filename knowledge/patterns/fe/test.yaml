@@ -75,6 +75,14 @@ rules:
           and e2e *.e2e-spec.ts (Playwright) under the root e2e/ folder, run by one root playwright.config.ts whose
           testMatch is **/*.e2e-spec.ts and by the script test:e2e. Playwright specs are never named .spec.ts and
           no second Playwright config exists. HFS_TEST_KIND_RETIRED flags any violation.
+      - id: case-10
+        when: "Hooks, typecheck, coverage and CI for e2e"
+        write: >
+          E2E runs MANUALLY only (owner ruling 2026-09-29). The default tsconfig/typecheck, eslint target and
+          lint-staged exclude e2e/** and playwright.config.ts; a dedicated tsconfig.e2e.json backs a manual
+          typecheck:e2e. Husky runs no Playwright and no e2e typecheck; vitest coverage and test:ci read unit
+          runs only; a kept e2e CI job is on: workflow_dispatch only. Routine gates are unit + typecheck + lint +
+          canon + build; test:e2e runs only when explicitly asked.
     verification:
       automated: []
       manual:

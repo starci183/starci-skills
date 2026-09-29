@@ -235,13 +235,13 @@ steps:
       en: Add or repair scoped unit tests - for a todo target work.author wrote in planned mode, create
         exactly the owner paths and test paths its owners and checks name - then execute the
         repository's backend unit gate and retain
-        command, exit code, counts and sanitized output. Next execute the relevant backend E2E gate
-        against the actual backend contract, persistence and authorization boundary;
-        browser/frontend UAT is not backend E2E. Positive, denial, invalid-input and applicable
-        race/reload cases must map to the selected operations. Unit success cannot substitute for
-        E2E, and an unavailable runner, dependency, environment or required case is blocked/not-run
-        rather than pass. After both gates pass, run required lint, typecheck, coverage, build and
-        Sonar checks against the same source revision. Preserve failures, repair only within the
+        command, exit code, counts and sanitized output. Positive, denial, invalid-input and applicable
+        race/reload cases must map to the selected operations in the unit specs. E2E runs MANUALLY
+        only (owner ruling 2026-09-29) - this operator does not run the e2e suite, typecheck:e2e or any
+        src/tests/e2e/ code; backend E2E proof belongs to a separately selected e2e.verify leg that the
+        goal explicitly asked for. After the unit gate passes, run the routine gates - typecheck, lint,
+        canon, build - plus required coverage (unit runs only) and Sonar against the same source
+        revision; an unavailable runner or not-run required gate is blocked/not-run rather than pass. Preserve failures, repair only within the
         approved goal, rerun affected gates, and never delegate this responsibility to frontend or
         UAT.
   - reads:
@@ -250,13 +250,13 @@ steps:
     writes: [node, evidence, apiDelivery]
     action:
       en: Review the diff and verify no unrelated changes. A passing backend delivery requires scoped unit
-        and backend E2E evidence, every applicable quality gate, the exact tested source tree, API
+        evidence, every applicable routine quality gate, the exact tested source tree, API
         contract, authorization/error behavior, and runtime identity when the consumer requires a
         runnable API. Commit only when authorized, then read back the full SHA/diff and prove the
         tested tree corresponds to that commit; otherwise report uncommitted or no-change honestly.
         A frontend support response must return codeRefs, changedPaths, apiContract, runtime,
-        qualityEvidence and testedCommit bound to the caller request. Missing or not-run unit/E2E
-        proof, commit mismatch, or unavailable required served runtime blocks the handoff, so
+        qualityEvidence and testedCommit bound to the caller request. Missing or not-run unit or
+        routine-gate proof, commit mismatch, or unavailable required served runtime blocks the handoff, so
         frontend cannot consume it as verified backend. Never bypass hooks, push, stage unrelated
         files or invent proof.
 proofs:
@@ -271,15 +271,16 @@ proofs:
         separately retain integration/tested mappings. Report uncommitted or no-change honestly.
   - id: behavior
     requirement:
-      en: Scoped unit tests and backend E2E tests both pass for each declared operation facet, including
-        negative authorization and persistent state when promised. Compile-only, mocked-unit-only,
-        frontend browser UAT, missing-runner or not-run output cannot certify backend behavior.
+      en: Scoped unit tests pass for each declared operation facet, including negative authorization and
+        persistent state when promised. Compile-only, missing-runner or not-run output cannot certify
+        backend behavior. Backend E2E (real boundary, persistence, authorization) is proven only by an
+        explicitly selected e2e.verify leg, run manually; it is never a routine gate of this operator.
   - id: implementation-quality
     requirement:
-      en: This operator owns separate scoped unit and backend E2E gates plus lint, typecheck, coverage,
-        affected builds and Sonar. Evidence records command, environment, tested source tree/full
-        commit, exit and counts for each gate. Backend E2E must exercise the actual backend boundary
-        and cannot be replaced by frontend browser UAT. Sonar passes only as the sonar-local.mjs
+      en: This operator owns the routine gates - scoped unit, typecheck, lint, canon, affected builds -
+        plus coverage from unit runs only and Sonar. Evidence records command, environment, tested
+        source tree/full commit, exit and counts for each gate. No e2e suite, e2e typecheck or e2e
+        coverage runs here (E2E is manual only, e2e.verify). Sonar passes only as the sonar-local.mjs
         attached sonar.json summary with scope slice and outcome pass for the tested commit, scanned after
         a fresh coverage run of the same attempt; the whole-project gate is a note, never a
         block. Scanner submission
@@ -324,10 +325,10 @@ policy:
     noChange: return-existing-verified-commit-no-empty-commit
   qualityPolicy:
     owner: backend.implement
-    checks: [lint, typecheck, unit, backend-e2e, coverage, build, sonar]
+    checks: [lint, typecheck, unit, canon, coverage, build, sonar]
     requiredResult: pass
     unitGate: scoped-unit-pass-for-tested-revision
-    backendE2EGate: scoped-backend-e2e-pass-for-tested-revision
+    backendE2EGate: manual-only-e2e-verify-leg-when-goal-asks
     handoffBinding: api-contract-runtime-quality-evidence-and-tested-commit
     sonarGate: slice-new-code-pass-for-tested-revision
     sonarProjectGate: note-never-block

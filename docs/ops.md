@@ -52,7 +52,7 @@ steps:                           # the RULES, each one written exactly once
 
 proofs:                          # what settle verifies
   - id: behavior
-    requirement: {en: "Scoped unit tests and backend E2E tests both pass …"}
+    requirement: {en: "Scoped unit tests pass; backend E2E runs only in an explicitly selected e2e.verify leg …"}
     check: scripts/checks/check-work-deep.mjs    # the executable, when one exists
 
 blockers:                        # typed escape hatches, not free text

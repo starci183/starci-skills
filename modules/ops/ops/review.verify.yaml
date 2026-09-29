@@ -165,7 +165,9 @@ policy:
           purpose:
             en: Read actual commands, thresholds, test scopes and applicable product-change proof. Explicit task
               scope may authorize normal tests; do not impose a new blanket E2E approval. Shared
-              destructive tests still need scoped authority.
+              destructive tests still need scoped authority. Routine gates are unit + typecheck + lint
+              + canon + build; E2E runs manually only (owner ruling 2026-09-29), so this review never
+              runs the e2e suite itself.
       writes:
         - id: node
           path: N/index.yaml
@@ -369,7 +371,9 @@ policy:
         - id: reconciliation
           requirement:
             en: Every selected required AC and SDS mapping is genuinely supported by current implementation,
-              test/E2E and UAT evidence at the same delivery revision. Unresolved, stale, skipped or
+              test/E2E and UAT evidence at the same delivery revision. E2E and UAT rows are required only
+              when the plan selected an e2e.verify or uat.* leg (the goal explicitly asked for it);
+              otherwise they are recorded not-selected, never a gap. Unresolved, stale, skipped or
               cross-revision rows remain visible, keep the leaves todo and cannot certify the parent
               complete.
       blockers:

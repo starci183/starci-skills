@@ -21,6 +21,10 @@ The plan is `mode:'fail-before'` only when `PROOF_POLICY` asks for the contrast 
 changed spec, and some check runs it. Otherwise it is `mode:'checks-only'` with a `reason`, so a downgrade is
 recorded rather than assumed.
 
+The declared checks of a routine operation are unit + typecheck + lint + canon + build. E2E runs manually only
+(owner ruling 2026-09-29): an `*.e2e-spec.ts` is re-run only by an operation that explicitly owns e2e
+(`e2e.verify`, or `uat.*` for UAT), never by the routine proof of `backend.implement` or `interface.implement`.
+
 ## The base worktree
 
 `runAtBase` builds the "before" out of git, not out of a stash:
