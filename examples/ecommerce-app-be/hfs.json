@@ -5,6 +5,8 @@
   "optionalSlots": ["repo.docs"],
   "apps": [
     { "name": "identity", "kind": "api" },
-    { "name": "order", "kind": "api" }
-  ]
+    { "name": "order", "kind": "api" },
+    { "name": "migrate", "kind": "migrate" }
+  ],
+  "connections": ["identity-postgresql", "order-postgresql"]
 }

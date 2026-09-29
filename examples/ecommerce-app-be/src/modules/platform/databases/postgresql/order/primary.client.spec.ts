@@ -5,8 +5,8 @@ import {
     getDataSourceToken 
 } from "@nestjs/typeorm"
 import {
-    POSTGRESQL_PRIMARY 
-} from "./constants/connection"
+    CONNECTION 
+} from "./persistence"
 import {
     PostgresPrimaryClient 
 } from "./primary.client"
@@ -18,7 +18,7 @@ describe("PostgresPrimaryClient (order) - the named-connection liveness probe",
                 providers: [
                     PostgresPrimaryClient,
                     {
-                        provide: getDataSourceToken(POSTGRESQL_PRIMARY), useValue: {
+                        provide: getDataSourceToken(CONNECTION), useValue: {
                             query 
                         } 
                     },
@@ -29,7 +29,7 @@ describe("PostgresPrimaryClient (order) - the named-connection liveness probe",
             }
         }
 
-        it("issues select 1 on the POSTGRESQL_PRIMARY data source",
+        it("issues select 1 on the CONNECTION data source",
             async () => {
                 const query = jest.fn().mockResolvedValue([{
                     "?column?": 1 

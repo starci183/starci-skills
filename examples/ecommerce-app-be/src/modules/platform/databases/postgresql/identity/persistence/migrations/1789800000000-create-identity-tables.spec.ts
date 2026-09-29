@@ -5,6 +5,9 @@ import {
     QueryRunner 
 } from "typeorm"
 import {
+    mock 
+} from "@starci/jest-preset/mock"
+import {
     CreateIdentityTables1789800000000 
 } from "./1789800000000-create-identity-tables"
 
@@ -17,9 +20,9 @@ describe("CreateIdentityTables1789800000000 - the identity schema bootstrap",
 
         beforeEach(async () => {
             query = jest.fn().mockResolvedValue(undefined)
-            runner = {
+            runner = mock<QueryRunner>({
                 query 
-            } as unknown as QueryRunner
+            })
             moduleRef = await Test.createTestingModule({
                 providers: [CreateIdentityTables1789800000000],
             }).compile()

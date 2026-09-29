@@ -5,6 +5,9 @@ import {
     QueryRunner 
 } from "typeorm"
 import {
+    mock 
+} from "@starci/jest-preset/mock"
+import {
     CreateOrderTables1789800001000 
 } from "./1789800001000-create-order-tables"
 
@@ -17,9 +20,9 @@ describe("CreateOrderTables1789800001000 - the order schema bootstrap",
 
         beforeEach(async () => {
             query = jest.fn().mockResolvedValue(undefined)
-            runner = {
+            runner = mock<QueryRunner>({
                 query 
-            } as unknown as QueryRunner
+            })
             moduleRef = await Test.createTestingModule({
                 providers: [CreateOrderTables1789800001000],
             }).compile()

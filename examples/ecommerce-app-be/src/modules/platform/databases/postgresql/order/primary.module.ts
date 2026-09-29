@@ -5,32 +5,14 @@ import {
     TypeOrmModule 
 } from "@nestjs/typeorm"
 import {
-    join 
-} from "node:path"
-import {
     AppConfigService 
 } from "ecommerce-app-be/modules/platform/config/order"
 import {
-    POSTGRESQL_PRIMARY 
-} from "./constants/connection"
+    CONNECTION, entities 
+} from "./persistence"
 import {
     PostgresPrimaryClient 
 } from "./primary.client"
-import {
-    CartItemEntity 
-} from "./entities/cart-item.entity"
-import {
-    OrderEntity 
-} from "./entities/order.entity"
-import {
-    OrderLineEntity 
-} from "./entities/order-line.entity"
-import {
-    PaymentEntity 
-} from "./entities/payment.entity"
-import {
-    ProductEntity 
-} from "./entities/product.entity"
 import {
     ConfigurableModuleClass, OPTIONS_TYPE 
 } from "./primary.module-definition"
@@ -51,20 +33,13 @@ export class PostgresqlPrimaryModule extends ConfigurableModuleClass {
             ...base,
             imports: [
                 TypeOrmModule.forRootAsync({
-                    name: POSTGRESQL_PRIMARY,
+                    name: CONNECTION,
                     inject: [AppConfigService],
                     useFactory: (config: AppConfigService) => ({
                         type: "postgres" as const,
                         url: config.getDatabaseUrl(),
-                        entities: [ProductEntity,
-                            CartItemEntity,
-                            OrderEntity,
-                            OrderLineEntity,
-                            PaymentEntity],
-                        migrations: [join(__dirname,
-                            "migrations",
-                            "*.{js,ts}")],
-                        migrationsRun: true,
+                        entities,
+                        migrationsRun: false,
                         synchronize: false,
                         retryAttempts: 2,
                     }),

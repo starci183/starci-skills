@@ -6,26 +6,14 @@ import {
     getDataSourceToken, getEntityManagerToken 
 } from "@nestjs/typeorm"
 import {
-    AppConfigService 
-} from "@modules/platform/config/order/app-config.service"
+    OrderConfigService 
+} from "@modules/platform/config/index"
 import {
-    POSTGRESQL_PRIMARY 
-} from "./constants/connection"
+    mock 
+} from "@starci/jest-preset/mock"
 import {
-    CartItemEntity 
-} from "./entities/cart-item.entity"
-import {
-    OrderEntity 
-} from "./entities/order.entity"
-import {
-    OrderLineEntity 
-} from "./entities/order-line.entity"
-import {
-    PaymentEntity 
-} from "./entities/payment.entity"
-import {
-    ProductEntity 
-} from "./entities/product.entity"
+    CONNECTION, entities 
+} from "./persistence"
 import {
     PostgresPrimaryClient 
 } from "./primary.client"
@@ -36,7 +24,7 @@ import {
 /**
  * Compiling PostgresqlPrimaryModule in a unit spec would open a real Postgres connection, so this
  * spec asserts on the shape its register() declares instead: the named TypeOrmCoreModule sitting
- * in its imports, the AppConfigService injection boundary, and the options its useFactory
+ * in its imports, the OrderConfigService injection boundary, and the options its useFactory
  * produces.
  */
 describe("PostgresqlPrimaryModule (order)",
@@ -63,7 +51,7 @@ describe("PostgresqlPrimaryModule (order)",
                     typeof candidate === "object" &&
         candidate !== null &&
         "useFactory" in candidate &&
-        ((candidate as FactoryProvider).inject ?? []).includes(AppConfigService),
+        ((candidate as FactoryProvider).inject ?? []).includes(OrderConfigService),
             )
             if (!provider) throw new Error("TypeOrmModule options factory provider not found")
             return provider
@@ -75,42 +63,36 @@ describe("PostgresqlPrimaryModule (order)",
                 expect(registered.exports ?? []).toContain(PostgresPrimaryClient)
             })
 
-        it("threads the POSTGRESQL_PRIMARY name into the data-source and entity-manager tokens",
+        it("threads the CONNECTION name into the data-source and entity-manager tokens",
             () => {
                 const tokens = (findCoreModule().providers ?? []).map((provider: Provider) =>
                     typeof provider === "object" && provider !== null && "provide" in provider ? provider.provide : provider,
                 )
 
-                expect(tokens).toContain(getDataSourceToken(POSTGRESQL_PRIMARY))
-                expect(tokens).toContain(getEntityManagerToken(POSTGRESQL_PRIMARY))
-                expect(getDataSourceToken(POSTGRESQL_PRIMARY)).toBe("ECOMMERCE_ORDER_POSTGRESQL_PRIMARYDataSource")
+                expect(tokens).toContain(getDataSourceToken(CONNECTION))
+                expect(tokens).toContain(getEntityManagerToken(CONNECTION))
+                expect(getDataSourceToken(CONNECTION)).toBe("ECOMMERCE_ORDER_CONNECTIONDataSource")
             })
 
-        it("injects AppConfigService into the options factory",
+        it("injects OrderConfigService into the options factory",
             () => {
-                expect(findOptionsProvider(findCoreModule()).inject).toEqual([AppConfigService])
+                expect(findOptionsProvider(findCoreModule()).inject).toEqual([OrderConfigService])
             })
 
-        it("builds TypeORM options from the configured URL with the order schema, migrations on, synchronize off",
+        it("builds TypeORM options from the configured URL with the order schema, migrations never run at boot, synchronize off",
             () => {
                 const provider = findOptionsProvider(findCoreModule())
-                const config = {
+                const config = mock<OrderConfigService>({
                     getDatabaseUrl: () => "postgres://spec-host:5432/specdb" 
-                } as AppConfigService
+                })
 
                 const options = provider.useFactory(config) as Record<string, unknown>
 
                 expect(options.type).toBe("postgres")
                 expect(options.url).toBe("postgres://spec-host:5432/specdb")
-                expect(options.entities).toEqual([
-                    ProductEntity,
-                    CartItemEntity,
-                    OrderEntity,
-                    OrderLineEntity,
-                    PaymentEntity,
-                ])
-                expect(String((options.migrations as Array<unknown>)?.[0])).toMatch(/migrations[/\\]\*\.\{js,ts\}$/)
-                expect(options.migrationsRun).toBe(true)
+                expect(options.entities).toBe(entities)
+                expect(options.migrations).toBeUndefined()
+                expect(options.migrationsRun).toBe(false)
                 expect(options.synchronize).toBe(false)
                 expect(options.retryAttempts).toBe(2)
             })

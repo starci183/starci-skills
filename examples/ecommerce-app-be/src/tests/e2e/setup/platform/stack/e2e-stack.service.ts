@@ -152,6 +152,10 @@ export class E2EStackService implements OnModuleInit, OnApplicationShutdown, OnM
                 60_000,
                 async () => this.redisIsReady()))
 
+            // The schema comes only from apps/migrate (an api never runs migrations): it applies both
+            // connections once against this run's fresh volume, and the apis start after it exits cleanly.
+            this.migrate()
+
             // Dependency ordering: identity boots and answers /health BEFORE the order process is even
             // spawned. Order's /health then re-proves the link itself (its identity check is a live call).
             const identity = this.spawnApi("identity",
@@ -207,7 +211,7 @@ export class E2EStackService implements OnModuleInit, OnApplicationShutdown, OnM
         }
     }
 
-    /** Both apps' dist entries must exist before any docker work starts; build once if they do not. */
+    /** Both apps' and the migrate app's dist entries must exist before any docker work starts; build once if they do not. */
     private ensureBuilt(): void {
         const entries = [
             join(BACKEND_ROOT,
@@ -220,6 +224,12 @@ export class E2EStackService implements OnModuleInit, OnApplicationShutdown, OnM
                 "dist",
                 "apps",
                 "order",
+                "src",
+                "main.js"),
+            join(BACKEND_ROOT,
+                "dist",
+                "apps",
+                "migrate",
                 "src",
                 "main.js"),
         ]
@@ -236,6 +246,45 @@ export class E2EStackService implements OnModuleInit, OnApplicationShutdown, OnM
         }
     }
 
+    /** The environment every compiled child shares: the metadata file, and tsconfig-paths pointed at dist (tsc does not rewrite the @modules/@features specifiers, so baseUrl dist resolves them to dist/src/**). */
+    private baseEnv(): NodeJS.ProcessEnv {
+        return {
+            ...process.env,
+            ECOMMERCE_APP_BE_METADATA: join(BACKEND_ROOT,
+                ".starcistacks",
+                "dev",
+                "infra",
+                "metadata.json"),
+            TS_NODE_BASEURL: join(BACKEND_ROOT,
+                "dist"),
+        }
+    }
+
+    /** Runs the compiled migrate app once: identity's and order's migrations against this run's Postgres. */
+    private migrate(): void {
+        const result = spawnSync(process.execPath,
+            ["-r",
+                "tsconfig-paths/register",
+                join(BACKEND_ROOT,
+                    "dist",
+                    "apps",
+                    "migrate",
+                    "src",
+                    "main.js")],
+            {
+                cwd: BACKEND_ROOT,
+                encoding: "utf8",
+                env: {
+                    ...this.baseEnv(), IDENTITY_DATABASE_URL: this.databaseUrl, ORDER_DATABASE_URL: this.databaseUrl 
+                },
+            })
+        if (result.error) throw result.error
+        if (result.status !== 0) {
+            throw new Error(`migrate failed (exit ${result.status}):
+${result.stderr || result.stdout}`)
+        }
+    }
+
     private spawnApi(name: E2EServiceName, port: number, peerPort: number): SpawnedApi {
         const logDir = join(tmpdir(),
             this.project)
@@ -245,18 +294,7 @@ export class E2EStackService implements OnModuleInit, OnApplicationShutdown, OnM
             })
         const logPath = join(logDir,
             `${name}.log`)
-        const env: NodeJS.ProcessEnv = {
-            ...process.env,
-            ECOMMERCE_APP_BE_METADATA: join(BACKEND_ROOT,
-                ".starcistacks",
-                "dev",
-                "infra",
-                "metadata.json"),
-            // The emitted dist keeps @modules/@features specifiers verbatim (tsc does not rewrite
-            // paths); pointing tsconfig-paths' baseUrl at dist resolves them to dist/src/**.
-            TS_NODE_BASEURL: join(BACKEND_ROOT,
-                "dist"),
-        }
+        const env = this.baseEnv()
         if (name === "identity") {
             env.IDENTITY_PORT = String(port)
             env.IDENTITY_DATABASE_URL = this.databaseUrl

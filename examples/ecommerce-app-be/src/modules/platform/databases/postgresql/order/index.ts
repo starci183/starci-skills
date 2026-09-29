@@ -1,25 +1,5 @@
-import {
-    CartItemEntity
-} from "./entities/cart-item.entity"
-import {
-    OrderLineEntity
-} from "./entities/order-line.entity"
-import {
-    OrderEntity
-} from "./entities/order.entity"
-import {
-    PaymentEntity
-} from "./entities/payment.entity"
-import {
-    ProductEntity
-} from "./entities/product.entity"
-import {
-    PostgresPrimaryClient
-} from "./primary.client"
-import {
-    InjectPrimaryEntityManager
-} from "./primary.decorators"
-import {
-    PostgresqlPrimaryModule
-} from "./primary.module"
-export { CartItemEntity, OrderLineEntity, OrderEntity, PaymentEntity, ProductEntity, PostgresPrimaryClient, InjectPrimaryEntityManager, PostgresqlPrimaryModule }
+export { PostgresPrimaryClient } from "./primary.client"
+export { InjectPrimaryEntityManager } from "./primary.decorators"
+export { runOrderMigrations } from "./migrate.runner"
+export { PostgresqlPrimaryModule } from "./primary.module"
+export { CartItemEntity, CONNECTION, entities, migrations, OrderEntity, OrderLineEntity, PaymentEntity, ProductEntity } from "./persistence"

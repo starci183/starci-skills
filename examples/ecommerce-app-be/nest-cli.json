@@ -16,6 +16,12 @@
       "root": "apps/order",
       "entryFile": "main",
       "sourceRoot": "apps/order/src"
+    },
+    "migrate": {
+      "type": "application",
+      "root": "apps/migrate",
+      "entryFile": "main",
+      "sourceRoot": "apps/migrate/src"
     }
   }
 }

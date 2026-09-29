@@ -8,15 +8,16 @@ import {
     DataSource 
 } from "typeorm"
 import {
-    POSTGRESQL_PRIMARY 
-} from "./constants/connection"
+    CONNECTION, pingDatabase 
+} from "./persistence"
 
 @Injectable()
-/** The health-probe handle over the named primary DataSource - `ping` proves the connection answers. */
+/** The health-probe handle over the named DataSource - `ping` proves the connection answers. */
 export class PostgresPrimaryClient {
-    constructor(@InjectDataSource(POSTGRESQL_PRIMARY) private readonly dataSource: DataSource) {}
+    constructor(@InjectDataSource(CONNECTION) private readonly dataSource: DataSource) {}
 
+    /** Resolves when the database answers, rejects with the driver's failure when it does not. */
     async ping(): Promise<void> {
-        await this.dataSource.query("select 1")
+        await pingDatabase(this.dataSource)
     }
 }

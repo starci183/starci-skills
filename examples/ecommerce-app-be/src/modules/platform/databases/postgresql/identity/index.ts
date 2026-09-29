@@ -1,13 +1,5 @@
-import {
-    PersonEntity
-} from "./entities/person.entity"
-import {
-    PostgresPrimaryClient
-} from "./primary.client"
-import {
-    InjectPrimaryEntityManager
-} from "./primary.decorators"
-import {
-    PostgresqlPrimaryModule
-} from "./primary.module"
-export { PersonEntity, PostgresPrimaryClient, InjectPrimaryEntityManager, PostgresqlPrimaryModule }
+export { PostgresPrimaryClient } from "./primary.client"
+export { InjectPrimaryEntityManager } from "./primary.decorators"
+export { runIdentityMigrations } from "./migrate.runner"
+export { PostgresqlPrimaryModule } from "./primary.module"
+export { CONNECTION, entities, migrations, PersonEntity } from "./persistence"
