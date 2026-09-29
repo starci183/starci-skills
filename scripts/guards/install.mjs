@@ -22,6 +22,7 @@ import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { gitSpawn } from '../lib/git.mjs';
+import { safeRemoveTree } from '../lib/safe-remove.mjs';
 import { allocationMs } from '../../engine/config.mjs';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
@@ -270,7 +271,7 @@ export function ensureHistoryHook(repoRoot, { skillRoot = path.resolve(here, '..
       fs.mkdirSync(hooksDir, { recursive: true });
       fs.writeFileSync(path.join(hooksDir, '.gitignore'), '*\n');
       if (!isIgnored()) {
-        if (absent) fs.rmSync(hooksDir, { recursive: true, force: true });
+        if (absent) safeRemoveTree(hooksDir);
         else fs.rmSync(path.join(hooksDir, '.gitignore'), { force: true });
         return { installed: false, reason: 'hooks-dir-tracked', path: file };
       }
