@@ -140,7 +140,7 @@ export function defaultLevel(kind, data = {}) {
   return 'info';
 }
 
-// Redaction is scripts/lib/redact.mjs (the one module); ui/contract-capture.mjs imports SECRET_KEY/redactData from here.
+// Redaction is scripts/lib/redact.mjs (the one module); this module re-exports its symbols.
 export { SECRET_KEY, redactData, redactText, redactPath } from '../lib/redact.mjs';
 
 // ------------------------------------------------------------------------------------------- clipping

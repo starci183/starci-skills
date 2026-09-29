@@ -35,7 +35,7 @@
 // do nothing.
 //
 // Per-op RAM estimates: the opRam table of runtimes.yaml (allocation.resources.opRam) is the prior; the
-// op-ram-footprint history (one per supervisor tick sample, scripts/supervisor/tick.mjs: the RAM of the agent
+// op-ram-footprint history (one per resource controller sample: the RAM of the agent
 // process trees minus the kernels', shared across the running ops in proportion to their priors) replaces a kind's
 // prior once it has historyMinObservations observations (machine.sqlite host_samples kind 'op-footprint'), clamped to [0.5x, 3x] of the prior so one noisy sample
 // cannot admit or starve a kind. The worker-footprint events of scripts/guards/footprint-scan.mjs are the FILE

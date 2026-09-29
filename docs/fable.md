@@ -18,17 +18,6 @@ vào câu đầu của context.
 **Cách nhận ra.** Từ ghép với `-less`/`no-`/`former`/`legacy`/`không còn` ở vị trí định
 nghĩa, mà thứ bị phủ định không xuất hiện ở đâu khác trong tree.
 
-**Nơi còn ghost-context cần rà.**
-
-- [ ] `CONTEXT.md:1` `distless`
-- [ ] `CONTEXT.md:35`, `README.md:53`, `docs/runtime-distribution.md:3` "no build step"
-      (giữ được nếu viết thành khẳng định, ví dụ "the source is the runtime")
-- [ ] `CONTRIBUTING.md:48` "former top-level dirs (`kernel/`, `core/`, `cli/`, ...)"
-- [ ] `modules/kernel/api.yaml:315,316,479` `legacy`
-- [ ] `docs/architecture-check.md:65,89,100`, `docs/backend-source-pattern.md:130`,
-      `docs/source-layout.md:75` `legacy` (cần đọc từng chỗ, có thể là legacy của dự án
-      đích chứ không phải của runtime)
-
 ## feedback-sediment
 
 **Định nghĩa.** Mỗi lần feedback đắp thêm một lớp luật lên file mà không gỡ hay gộp lớp
@@ -608,9 +597,6 @@ path storybook không có trên đĩa).
 
 Việc rơi sang lane khác:
 
-- E: `knowledge/code-examples/index.yaml:1` phải đổi stamp thành `starci/code-example-catalog@1`
-  (alias đã bỏ); `CONTEXT.md:1` `distless`; `CONTEXT.md:31` live agent-context (lane I đang
-  làm cho nó thành thật, E viết lại câu); `supervise.yaml:8` "theo dõi" (Devin/G).
 - B: `driver-loop.yaml:289` cite `maxParallelOps` không ai enforce, hoặc enforce hoặc bỏ cite;
   `driver-loop.yaml:484`, `verdict-contract.yaml:115` còn `cấn cấn`; `engine/config.mjs` 6
   string `config.json` (đã trong brief B).
@@ -670,7 +656,6 @@ Còn lại cho lane chốt K (sau H, G, F2):
 - `config.example.yaml:37` `model/runtimes.yaml` → `modules/models/runtimes.yaml`.
 - `scripts/example/example-render-proof.mjs:9` cite `docs/examples/todo-app-grit.md`;
   `scripts/checks/check-example-work.mjs:484,504` cite `docs/kinds.md` (F2 có thể đã sửa).
-- `engine/schema.sql:118` cite `ledger-db.mjs:46-51` sai dòng → cite tên symbol, không số dòng.
 - `.gitignore:2` `/.dist*/` ghost.
 - `readDistJson` đổi tên + `check-scoped-lint.mjs:7,186`.
 - `check-contract-cites --scan modules --scan docs --scan CONTEXT.md --scan skills` phải sạch;

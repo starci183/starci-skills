@@ -626,7 +626,7 @@ async function main() {
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) main();
 
 /**
- * The owner push (moved from the retired scripts/supervisor/stall-alert.mjs). One message to the owner's Telegram chat: {ok, skipped?, messageId?, status?, error?}. `text` is a string or
+ * The owner push. One message to the owner's Telegram chat: {ok, skipped?, messageId?, status?, error?}. `text` is a string or
  * language => string (connectors.telegram language). STARCI_CONNECTORS_OFF, a node --test process on the real Bot
  * API and an off telegram connector skip it (ok, with the reason).
  */

@@ -1,6 +1,5 @@
 // patch-json.mjs — a job's .patch (git format-patch, job-artifacts.mjs writeJobPatch) pre-structured for the
-// status console: <patch>.json beside it, written once at artifact index time and by the backfill
-// (scripts/work/backfill-patch-json.mjs), so the UI renders a file tree and hunks without parsing text.
+// status console: <patch>.json beside it, written once at artifact index time, so the UI renders a file tree and hunks without parsing text.
 //
 //   {schema, base, head, landed, unlanded, commits:[{sha, subject}], totals:{files, added, removed},
 //    files:[{path, oldPath, status A|M|D|R, added, removed, language, binary, image, touches,

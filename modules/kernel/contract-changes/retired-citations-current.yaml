@@ -1,0 +1,12 @@
+id: retired-citations-current
+effectiveAt: '2026-09-29T20:00:00+07:00'
+summary: >-
+  Live comments and contract text no longer cite deleted paths (stall-alert, supervisor tick, progress-watch,
+  restart-all, engine/schema.sql, backfill and migrate scripts, ui/contract-capture); each names the current
+  owner from retired-paths.yaml. The fable ghost-context checklist is finished and CONTRIBUTING and
+  source-layout state the present rule. Text only; no API verb, YAML key, check or finding code changes.
+reach: new-legs
+paths:
+  - modules/reconciler/workflow.yaml
+  - modules/supervisor/supervise.yaml
+  - modules/kernel/contract-changes/retired-citations-current.yaml

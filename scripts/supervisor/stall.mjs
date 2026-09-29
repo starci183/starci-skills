@@ -45,7 +45,7 @@
 //                                                  has been idle past the threshold too
 //
 // modules/supervisor/supervise.yaml (step stall) is the contract for what the
-// supervisor does with each; scripts/supervisor/stall-alert.mjs routes them with no chat
+// supervisor does with each; the workflow controller (modules/reconciler/workflow.yaml) routes them with no chat
 // (the owning Kernel first, the supervisor when that fails, the owner only for owner waits),
 // reading the structured fields each finding carries beside its line.
 

@@ -1,5 +1,5 @@
 // artifact-hold.mjs — the retention exemption for job proofs. A path an indexed job artifact lives at
-// (job_artifacts, engine/schema.sql), a tree holding one, and the evidence directory around one (never a shared root:
+// (job_artifacts, engine/migrations/runtime/0001-init.sql), a tree holding one, and the evidence directory around one (never a shared root:
 // the repository, .starciwork, .starciwork/evidence or .starciwork/kernel-evidence itself) are never
 // removed by housekeeping, whatever the workflow's phase (running, finished, archived); nor is the repository's
 // ledger .starciwork/runtime.sqlite (it holds the typed logs since 2026-09-27, scripts/kernel/typed-logs.mjs), nor the

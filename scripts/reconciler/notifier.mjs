@@ -6,7 +6,7 @@
 //            gates, units/hour, ETA, why slow), what was fixed, what is being handled, what waits on the owner (only
 //            credentials at the end and the handover), the GC line, open invariant violations by code, the AUTO lands
 //            of the day, and the latest `supervisor-judgement` lines the Supervisor wrote (`judge --text`). Built on
-//            scripts/supervisor/actions.mjs digestText; sent with scripts/supervisor/stall-alert.mjs ownerPush.
+//            scripts/supervisor/actions.mjs digestText; sent with scripts/connectors/telegram.mjs ownerPush.
 //   urgent   key-deduped, at most once per URGENT_KEY_MS (6 h) per key, only for URGENT_CLASSES (DESIGN §19): an owner
 //            service quarantined, a crash loop, RAM critical, a corrupt ledger, a Supervisor DI overdue x3.
 // Each send is one machine.sqlite sup_events row (notifier-digest-sent | notifier-urgent-sent), which is also the

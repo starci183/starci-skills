@@ -21,7 +21,7 @@ const NUMBERS = { pollMs: 2000, leaseMs: 30000, renewMs: 10000, heartbeatStaleMs
 const noLock = () => ({ ok: true, release() {} });
 const allShadow = () => ({ enabled: true, controllers: { job: { mode: 'shadow' }, host: { mode: 'shadow' } } });
 
-/** A minimal ledger file with the events table of engine/schema.sql (the columns sources.mjs reads). */
+/** A minimal ledger file with the events table of engine/migrations/runtime/0001-init.sql (the columns sources.mjs reads). */
 function eventsLedger(dir, name = 'ledger.sqlite') {
   const file = path.join(dir, name);
   const db = new DatabaseSync(file);

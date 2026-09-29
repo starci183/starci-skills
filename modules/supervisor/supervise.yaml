@@ -398,9 +398,8 @@ chat:
 
 scheduledTick:
   role: |
-    Retired 2026-09-28 (owner ruling "có lỗi xóa luôn": the reconciler is the only loop). The supervisor tick
-    (scripts/supervisor/tick.mjs, tick-duties.mjs) and its task StarCi-Supervisor-Every30m are gone; every duty it ran
-    belongs to an active reconciler controller (modules/reconciler/reconciler.yaml; the task StarCi-Reconciler runs the
+    Retired 2026-09-28 (owner ruling "có lỗi xóa luôn": the reconciler is the only loop). There is no supervisor tick
+    and no task StarCi-Supervisor-Every30m; every duty it ran belongs to an active reconciler controller (modules/reconciler/reconciler.yaml; the task StarCi-Reconciler runs the
     engine): host, orca and statusApp to the Host controller; the digest's push of main, OWED clusters, the land queue
     and the owner alerts to the Fleet controller and its Notifier; workflows, progress and stuck waits to the Workflow
     controller; sample, census and the RAM throttle to the Resource controller; gc to the GC controller. Their
@@ -505,9 +504,9 @@ loop:
         classification on every pass (scripts/supervisor/stall.mjs stallFindings): the
         kernel-routed findings open as Kernel Decision Items with the evidence and the api action,
         a stall past allocation.progress.supervisorGraceMs escalates to a Supervisor DI, and what
-        waits on the owner reaches the owner only through the Fleet Notifier's digest. The old
-        headless stall check (stall-alert.mjs, its `[stall]` wakes and STALL-ALERT inbox messages)
-        is retired (owner ruling 2026-09-28 "có lỗi xóa luôn").
+        waits on the owner reaches the owner only through the Fleet Notifier's digest. No
+        headless stall check, `[stall]` wake or STALL-ALERT inbox message runs; the workflow controller owns stall
+        DIs and escalation (owner ruling 2026-09-28 "có lỗi xóa luôn").
     - step: owed
       mandatory: true
       do: |

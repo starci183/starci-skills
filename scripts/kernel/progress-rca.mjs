@@ -18,7 +18,7 @@
 //               tried it (a failed try sinks, it is never offered as new).
 //
 // Read-only over the ledger. `api status` exposes `progress` and `rca` (scripts/kernel/api-status/*.mjs); the
-// Supervisor reuses it as the backstop (scripts/supervisor/progress-watch.mjs).
+// workflow controller (modules/reconciler/workflow.yaml) reuses it for the progress-stall DI and escalation.
 import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';

@@ -17,9 +17,8 @@
 #   decisions  one DI per finding, idempotency key `<kind>:<workflowId>:<subject>` (decisionKinds below), carrying
 #              the evidence line and the first rca action not yet tried; then the Kernel seat's doorbell
 #              (scripts/reconciler/decisions.mjs ringDoorbell, lane rc-decisions; a would-row until it lands and
-#              in shadow). This replaces the [stall] wake of scripts/supervisor/stall-alert.mjs and the
-#              progress-stall owed action of the retired progress-watch.mjs once the controller is active
-#              (the old loops are deleted).
+#              in shadow). This is the only stall wake and progress-stall owed action: the controller owns
+#              both, and no separate loop runs them.
 #   escalate   a stall older than runtimes.yaml allocation.progress.supervisorGraceMs -> the same DI escalated to
 #              the Supervisor (idempotency key suffixed `@supervisor`).
 #   asks       an open owner ask whose poll digest tag (scripts/supervisor/poll.mjs askLiveness) is in

@@ -138,9 +138,8 @@ migrations and schemas move to the owning `src/modules/platform/<db>` or
 `.starciwork` records or `docs/`; code generators move to `scripts/` or a real
 `packages/<pkg>`.
 
-The host bootstrap files must route to `.claude/CONTEXT.md`. Historical runtime
-names such as `.claude-v3`, `.claude_legacy`, `.claude-vip` and
-`.claude-starci-ultimate` are forbidden. A routed source duplicates host
+The host bootstrap files must route to `.claude/CONTEXT.md`. The runtime directory
+is named `.claude`; no other runtime directory name is valid. A routed source duplicates host
 identity only when it carries a `.claude/CONTEXT.md` runtime marker or a
 `.workspaces/projects` / `.workspaces/local/routes` registry marker. Routed
 backends also forbid historical Work roots such as `.work`, `.starci` and

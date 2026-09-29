@@ -1,4 +1,4 @@
-// host-health.mjs — the process table the supervisor tick reads (scripts/supervisor/tick.mjs): node.exe and git.exe
+// host-health.mjs — the process table the reconciler host and resource controllers read: node.exe and git.exe
 // counts, the runaway guard-shim chains it may stop on its own, and the per-owner grouping each bottleneck sample
 // records.
 //
