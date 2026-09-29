@@ -13,6 +13,7 @@ published to a registry.** A product repository (and its CI) installs them from 
 | [`@starci/playwright-preset`](playwright-preset) | front end | the hand-copied `playwright.config.ts` |
 | [`@starci/hfs`](hfs) | both | the ad-hoc structure checks: `hfs check`, `hfs init`, `hfs explain` |
 | [`@starci/eslint-canon-be`](eslint/be), [`-fe`](eslint/fe) | be / fe | the lint rules |
+| [`@starci/stylelint-canon`](stylelint) | front end | hand-written CSS: raw colour, spacing and `!important` |
 | [`@starci/grammar`](grammar) | front end | the design system |
 
 The exact version of each, and of every framework a repository pins, is

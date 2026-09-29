@@ -25,12 +25,14 @@ properties:
       - '@starci/grammar'
       - '@starci/eslint-canon-be'
       - '@starci/eslint-canon-fe'
+      - '@starci/stylelint-canon'
       - '@starci/tsconfig'
       - '@starci/prettier-config'
       - '@starci/jest-preset'
       - '@starci/vitest-preset'
       - '@starci/playwright-preset'
       - typescript
+      - stylelint
       - prettier
       - jest
       - ts-jest

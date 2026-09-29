@@ -1,0 +1,45 @@
+{
+  "name": "@starci/stylelint-canon",
+  "version": "1.0.0",
+  "description": "The StarCi CSS lint canon (HFS R61): grammar tokens only, raw brand values only in brand.css, no !important, a global sheet that only imports and declares tokens, and no token redefined in a CSS module.",
+  "type": "module",
+  "license": "UNLICENSED",
+  "private": false,
+  "exports": {
+    ".": "./index.mjs"
+  },
+  "main": "./index.mjs",
+  "files": [
+    "*.mjs",
+    "lib/*.mjs",
+    "!*.test.mjs",
+    "!testing.mjs",
+    "!lib/write-vocabulary.mjs",
+    "CHANGELOG.md",
+    "README.md"
+  ],
+  "engines": {
+    "node": ">=22.13.0"
+  },
+  "peerDependencies": {
+    "stylelint": ">=17",
+    "postcss-value-parser": ">=4"
+  },
+  "devDependencies": {
+    "stylelint": "17.15.0",
+    "postcss-value-parser": "4.2.0"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "scripts": {
+    "test": "node --test \"*.test.mjs\"",
+    "vocabulary": "node lib/write-vocabulary.mjs"
+  },
+  "keywords": [
+    "stylelint",
+    "stylelint-plugin",
+    "starci",
+    "canon"
+  ]
+}
