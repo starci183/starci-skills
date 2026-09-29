@@ -5,8 +5,8 @@ import path from 'node:path';
 import test from 'node:test';
 import {spawnSync} from 'node:child_process';
 import {fileURLToPath,pathToFileURL} from 'node:url';
-import {openLedger} from '../engine/ledger-db.mjs';
-import {TEST_REGISTRY_ENV,isUnderTempDir,machineFileFor,openMachine} from '../engine/machine-db.mjs';
+import {openLedger,projectsRootFor,PROJECTS_ROOT_ENV} from '../engine/ledger-db.mjs';
+import {TEST_REGISTRY_ENV,isUnderTempDir,LOCAL_ROOT_ENV,machineFileFor,openMachine,starciLocalRoot} from '../engine/machine-db.mjs';
 
 /**
  * The host's machine registry (%LOCALAPPDATA%/StarCi/runtime/machine.sqlite `ledgers`) once held 7,829 rows,
@@ -60,6 +60,23 @@ test('npm test and the land gate load the per-run registry preload',()=>{
   assert.equal(probe.status,0,probe.stderr);
   assert.ok(isUnderTempDir(probe.stdout)&&probe.stdout.endsWith('machine.sqlite'),probe.stdout);
   assert.equal(fs.existsSync(path.dirname(probe.stdout)),false,'the run removes its registry when it exits');
+});
+
+test('STARCI_LOCAL_ROOT overrides the per-host state base wholesale, ahead of LOCALAPPDATA but behind the narrower seams',()=>{
+  const home=path.join(os.homedir(),'AppData','Local'),override=path.join(os.tmpdir(),'starci-local-root-spec');
+  // No override: the historical %LOCALAPPDATA%/StarCi behavior is unchanged.
+  assert.equal(starciLocalRoot({LOCALAPPDATA:home}),path.join(home,'StarCi'));
+  // The override wins over LOCALAPPDATA, and machineFileFor (which resolves through starciLocalRoot) follows it.
+  assert.equal(starciLocalRoot({LOCALAPPDATA:home,[LOCAL_ROOT_ENV]:override}),path.resolve(override));
+  assert.equal(machineFileFor({LOCALAPPDATA:home,[LOCAL_ROOT_ENV]:override}),path.join(path.resolve(override),'machine.sqlite'));
+  // A relative override resolves against the current working directory, same as every other *_ROOT env seam.
+  assert.equal(starciLocalRoot({[LOCAL_ROOT_ENV]:'rel/local-root'}),path.resolve('rel/local-root'));
+  // The narrower TEST_REGISTRY_ENV (an exact file) still wins over LOCAL_ROOT_ENV when both are set.
+  assert.equal(machineFileFor({LOCALAPPDATA:home,[LOCAL_ROOT_ENV]:override,[TEST_REGISTRY_ENV]:'x/machine.sqlite'}),path.resolve('x/machine.sqlite'));
+  // engine/ledger-db.mjs re-exports the same function; the projects root it derives (PROJECTS_ROOT_ENV unset) moves too.
+  assert.equal(projectsRootFor({LOCALAPPDATA:home,[LOCAL_ROOT_ENV]:override}),path.join(path.resolve(override),'projects'));
+  // The narrower STARCI_PROJECTS_ROOT still wins over LOCAL_ROOT_ENV for the ledger projects root specifically.
+  assert.equal(projectsRootFor({LOCALAPPDATA:home,[LOCAL_ROOT_ENV]:override,[PROJECTS_ROOT_ENV]:'y/projects'}),path.resolve('y/projects'));
 });
 
 test('the live registry refuses a temp-directory ledger; a test registry enrols it',t=>{

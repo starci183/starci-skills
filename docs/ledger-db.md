@@ -22,6 +22,13 @@ decisions and the invariants; when it disagrees with the SQL files, the SQL wins
   no backfill and no read fallback. A fresh store is created on first use — a project ledger by `openLedger`
   at the file `ledgerFileFor(<repo root>)` resolves, the host store by `openMachine` at `machineFileFor` —
   once the refused file is moved aside.
+- `STARCI_LOCAL_ROOT` overrides the per-host state base (`%LOCALAPPDATA%/StarCi` itself, one shared helper:
+  `engine/machine-db.mjs` `starciLocalRoot`/`LOCAL_ROOT_ENV`, re-exported and honored by `engine/ledger-db.mjs`
+  `projectsRootFor`) — both `projects/` and `machine.sqlite` move under it. Narrower seams still win when set:
+  `STARCI_PROJECTS_ROOT` (just the `projects/` directory), `STARCI_TEST_MACHINE_FILE` (the exact `machine.sqlite`
+  file), `STARCI_ARTIFACT_ROOT` (the blob store, independent of the state base). A debug probe or throwaway repo
+  that would otherwise leave a fake ledger in the real store (`skills/claude-debug/SKILL.md` §5) must set
+  `STARCI_LOCAL_ROOT` to a temp directory for its whole process tree.
 
 ## 2. One writer per database
 

@@ -8,9 +8,9 @@ import {sha256} from './digest.mjs';
 import {SETTLED_JOB_LIST} from './admission.mjs';
 import {putBlob,blobPath} from '../scripts/lib/artifact-store.mjs';
 import {redactData,redactText} from '../scripts/lib/redact.mjs';
-import {isUnderTempDir,machineFileFor,readMachine,TEST_REGISTRY_ENV,withMachine} from './machine-db.mjs';
+import {isUnderTempDir,machineFileFor,readMachine,starciLocalRoot,TEST_REGISTRY_ENV,withMachine} from './machine-db.mjs';
 // The machine-side path helpers have one definition (engine/machine-db.mjs); re-exported for the ledger's callers.
-export {isUnderTempDir,machineFileFor,TEST_REGISTRY_ENV};
+export {isUnderTempDir,machineFileFor,starciLocalRoot,TEST_REGISTRY_ENV};
 const require=createRequire(import.meta.url);
 
 /*
@@ -73,14 +73,13 @@ const parseJson=text=>text===null||text===undefined?null:JSON.parse(text);
 const RUNTIME_MARKER=root=>fs.existsSync(path.join(root,'bin','starci.mjs'))
   &&fs.existsSync(path.join(root,'engine','ledger-db.mjs'));
 export const isRuntimeRoot=root=>RUNTIME_MARKER(path.resolve(root));
-const localStateRoot=(env=process.env)=>path.join(env.LOCALAPPDATA||path.join(os.homedir(),'.local','state'),'StarCi');
-/** Overrides the projects root (the directory holding <ledger_id>/runtime.sqlite) for this process tree. */
+/** Overrides the projects root (the directory holding <ledger_id>/runtime.sqlite) for this process tree; narrower than machine-db.mjs LOCAL_ROOT_ENV, which this still honors through starciLocalRoot when unset. */
 export const PROJECTS_ROOT_ENV='STARCI_PROJECTS_ROOT';
 const normDir=file=>path.resolve(String(file)).replace(/\\/g,'/').replace(/\/+$/,'').toLowerCase();
-/** %LOCALAPPDATA%/StarCi/projects (a node --test process tree gets one under the OS temp directory). */
+/** %LOCALAPPDATA%/StarCi/projects (starciLocalRoot, itself overridable by STARCI_LOCAL_ROOT; a node --test process tree gets one under the OS temp directory). */
 export const projectsRootFor=(env=process.env)=>{
   if(env[PROJECTS_ROOT_ENV])return path.resolve(env[PROJECTS_ROOT_ENV]);
-  const root=path.join(localStateRoot(env),'projects');
+  const root=path.join(starciLocalRoot(env),'projects');
   if(env.NODE_TEST_CONTEXT&&!isUnderTempDir(root,{env}))return path.join(os.tmpdir(),'starci-test-projects');
   return root;
 };

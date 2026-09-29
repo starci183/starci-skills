@@ -51,8 +51,18 @@ export const CONTROLLERS = Object.freeze(['job', 'workflow', 'resource', 'host',
 // ---------------------------------------------------------------------------------------------------------------------
 // Paths
 // ---------------------------------------------------------------------------------------------------------------------
-/** %LOCALAPPDATA%/StarCi (or ~/.local/state/StarCi): the per-host state base. */
-export const starciLocalRoot = (env = process.env) => path.join(env.LOCALAPPDATA || path.join(os.homedir(), '.local', 'state'), 'StarCi');
+/**
+ * Overrides the per-host state base itself (machine.sqlite, projects/, archive/), the one seam starciLocalRoot and
+ * engine/ledger-db.mjs (which re-exports starciLocalRoot for its own projectsRootFor) both read. Debug probes and
+ * throwaway repos (skills/claude-debug) point this at a temp directory so they never touch the real
+ * %LOCALAPPDATA%/StarCi and leak fake ledgers/workflows into it (2026-09-30 incident: probe-*, dbg-ask-*, dbg-env*
+ * repos left six fake-worker ledgers in the live store). STARCI_PROJECTS_ROOT (ledger-db.mjs) and
+ * STARCI_TEST_MACHINE_FILE (TEST_REGISTRY_ENV) are narrower overrides that still win over this one when set.
+ */
+export const LOCAL_ROOT_ENV = 'STARCI_LOCAL_ROOT';
+/** %LOCALAPPDATA%/StarCi (or ~/.local/state/StarCi): the per-host state base. LOCAL_ROOT_ENV overrides it wholesale. */
+export const starciLocalRoot = (env = process.env) =>
+  env[LOCAL_ROOT_ENV] ? path.resolve(env[LOCAL_ROOT_ENV]) : path.join(env.LOCALAPPDATA || path.join(os.homedir(), '.local', 'state'), 'StarCi');
 /** <local root>/projects: one directory per ledger (decision Q1). */
 export const projectsRootFor = (env = process.env) => path.join(starciLocalRoot(env), 'projects');
 /** The runtime.sqlite of one ledger (decision Q1): %LOCALAPPDATA%/StarCi/projects/<ledger_id>/runtime.sqlite. */

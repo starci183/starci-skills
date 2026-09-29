@@ -23,6 +23,7 @@ IO_DRIFT	only named in a comment in kinds.yaml; no emit site found in scripts/en
 LEADER_NAME	constant naming the reconciler leader row, not a code
 LEDGER_SCHEMA	schema id constant, not a code
 LEDGER_VERSION	schema version constant, not a code
+LOCAL_ROOT_ENV	constant naming the STARCI_LOCAL_ROOT env var
 LOG_TRUNCATED	typed log row kind (log.truncated), not a failure code
 MACHINE_SCHEMA	schema id constant, not a code
 MACHINE_VERSION	schema version constant, not a code
@@ -43,6 +44,7 @@ STARCI_ENGINE_START_REASON	env var name
 STARCI_HOST_RESOURCES_JSON	env var name (resource probe override)
 STARCI_HOST_WAIT_MS	env var name (timing setting)
 STARCI_KERNEL_DEATH_SETTLE_MS	env var name (timing setting)
+STARCI_LOCAL_ROOT	env var name (overrides the whole %LOCALAPPDATA%/StarCi state base)
 STARCI_PROJECTS_ROOT	env var name
 STARCI_RELOADED_AT	env var name
 STARCI_RELOAD_HANDOVER_FROM	env var name

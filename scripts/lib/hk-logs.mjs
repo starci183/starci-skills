@@ -5,7 +5,10 @@
 //   sweepStarciLogs({ apply, now, env, allocation })
 //
 // Roots:
-//   <LOCALAPPDATA>/StarCi     (starciLocalRoot: machine.sqlite, projects/, archive/)
+//   <LOCALAPPDATA>/StarCi     (starciLocalRoot: machine.sqlite, projects/, archive/ — STARCI_LOCAL_ROOT
+//                             overrides this whole base for one process tree, e.g. a claude-debug probe
+//                             that must never leak a throwaway ledger into the real store; engine/machine-db.mjs
+//                             LOCAL_ROOT_ENV, also honored by engine/ledger-db.mjs projectsRootFor)
 //   <USERPROFILE>/.starci     (redundancy handoffs, backups; lanes/ and supervisor staging/land
 //                             are git worktrees — skipped on the .git marker, the lanes lane
 //                             owns them). The Supervisor writes no text logs: its log rows are
