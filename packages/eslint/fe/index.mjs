@@ -27,9 +27,12 @@ import {
   recommended as grammarBoundaryRecommended,
   rules as grammarBoundaryRules,
 } from "./grammar-boundary.mjs"
+import { recommended as formattingRecommended, rules as formattingRules } from "./formatting.mjs"
 import { recommended as hooksFolderRecommended, rules as hooksFolderRules } from "./hooks-folder.mjs"
+import { recommended as hygieneRecommended, rules as hygieneRules } from "./hygiene.mjs"
 import { recommended as iconRecommended, rules as iconRules } from "./icon.mjs"
 import { recommended as landmarkRecommended, rules as landmarkRules } from "./landmark.mjs"
+import { recommended as listsRecommended, rules as listsRules } from "./lists.mjs"
 import { recommended as loadingRecommended, rules as loadingRules } from "./loading.mjs"
 import {
   LAYOUT_GLOBS,
@@ -79,9 +82,12 @@ const CONTRIBUTIONS = [
     recommended: grammarBoundaryRecommended,
     audits: grammarBoundaryAudits,
   },
+  { law: "formatting", rules: formattingRules, recommended: formattingRecommended },
   { law: "hooks-folder", rules: hooksFolderRules, recommended: hooksFolderRecommended },
+  { law: "hygiene", rules: hygieneRules, recommended: hygieneRecommended },
   { law: "icon", rules: iconRules, recommended: iconRecommended },
   { law: "landmark", rules: landmarkRules, recommended: landmarkRecommended },
+  { law: "lists", rules: listsRules, recommended: listsRecommended },
   { law: "loading", rules: loadingRules, recommended: loadingRecommended },
   {
     law: "lint-adoption",

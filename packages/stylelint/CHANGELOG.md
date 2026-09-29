@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.1.0
+
+- `starci/brand-layer-shape` admits the grammar family root as a brand scope: `.grammar-common-root[data-grammar-family="<family>"]` for light, the same root with `[data-grammar-theme="dark"]` (or `.dark`, or an ancestor `.dark`) for dark, and the same root with `[data-grammar-theme="system"]` inside `@media (prefers-color-scheme: dark)`. The grammar re-declares its tokens on the family root, so a brand written on `:root` is inherited and loses; light and dark still carry the same token set.
+
 ## 1.0.0
 
 First release. HFS R61 `FE_STYLE_TOKEN_ONLY` for CSS.

@@ -12,6 +12,7 @@
  * control. If the grammar lacks the control, the fix is to add it to the grammar, not to draw one here.
  */
 
+import { attribute } from "./lib/ast.mjs"
 import { isSpecFile } from "./lib/scope.mjs"
 
 /** Intrinsic elements a reader operates, that the grammar renders for the product. */
@@ -39,9 +40,72 @@ export const noNativeFormControl = {
   },
 }
 
+// -- NATIVE-2 --------------------------------------------------------------------------------------
+
+/** No bare `<img>`; the framework's image owns size, format, lazy loading and layout shift. */
+export const noNativeImg = {
+  meta: {
+    type: "problem",
+    docs: { description: "Use `next/image`, never a bare `<img>`." },
+    schema: [],
+    messages: {
+      img:
+        "A bare `<img>` ships the original file at its original size, reserves no space (the page jumps when it loads) and is never lazy by policy. Use `Image` from `next/image` with `width` and `height`, or `fill` and `sizes`, and an `alt` from the message catalogue.",
+    },
+  },
+  create(context) {
+    if (isSpecFile(context.filename || context.getFilename())) return {}
+    return {
+      JSXOpeningElement(node) {
+        if (node.name.type === "JSXIdentifier" && node.name.name === "img") context.report({ node, messageId: "img" })
+      },
+    }
+  },
+}
+
+// -- NATIVE-3 --------------------------------------------------------------------------------------
+
+/** Every `next/image` reserves its space: a size, or `fill` inside a sized parent with `sizes`. */
+export const imageHasSize = {
+  meta: {
+    type: "problem",
+    docs: { description: "`next/image` carries `width` and `height`, or `fill` with `sizes`." },
+    schema: [],
+    messages: {
+      size:
+        "This `Image` has no `width` and `height` and is not `fill`. The browser cannot reserve its space, so the page shifts when it loads and the layout score falls. Give it both dimensions, or `fill` inside a sized parent.",
+      sizes:
+        "This `Image` is `fill` with no `sizes`. Next then assumes the image is as wide as the viewport and downloads the largest variant on every screen. State the rendered width: `sizes=\"(min-width: 768px) 33vw, 100vw\"`.",
+    },
+  },
+  create(context) {
+    if (isSpecFile(context.filename || context.getFilename())) return {}
+    const locals = new Set()
+    return {
+      ImportDeclaration(node) {
+        if (node.source.value !== "next/image") return
+        for (const specifier of node.specifiers) if (specifier.type === "ImportDefaultSpecifier") locals.add(specifier.local.name)
+      },
+      JSXOpeningElement(node) {
+        if (node.name.type !== "JSXIdentifier" || !locals.has(node.name.name)) return
+        // A spread may carry the size; the rule judges what it can read.
+        if (node.attributes.some((entry) => entry.type === "JSXSpreadAttribute")) return
+        const fill = attribute(node, "fill")
+        if (fill) {
+          if (!attribute(node, "sizes")) context.report({ node, messageId: "sizes" })
+          return
+        }
+        if (!attribute(node, "width") || !attribute(node, "height")) context.report({ node, messageId: "size" })
+      },
+    }
+  },
+}
+
 /** The rules this law contributes to the plugin. */
 export const rules = {
   "no-native-form-control": noNativeFormControl,
+  "no-native-img": noNativeImg,
+  "image-has-size": imageHasSize,
 }
 
 /** Every rule is an error. */

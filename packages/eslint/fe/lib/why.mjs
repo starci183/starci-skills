@@ -8,7 +8,7 @@
  * that contract: `code` is the finding code, `vi` the headline with `<file>` / `<what>` placeholders
  * the reader fills from the ESLint location, `fixVi` the one sentence "what do I do now".
  *
- * Every rule that carries a catalogue id (R18, R49-R52, R55, R56, R58, R60-R62, R65-R67) has an entry;
+ * Every rule that carries a catalogue id (R18, R22, R49-R59, R60-R62, R65-R67) has an entry;
  * the twin test refuses a rule of those laws with no entry and an entry for a rule that does not exist.
  */
 
@@ -185,5 +185,120 @@ export const why = {
     code: "HFS_INLINE_SUPPRESSION",
     vi: "Có chú thích tắt luật ở `<file>:<line>`. HFS không cho tắt tại chỗ — sửa code, hoặc đề xuất đổi luật.",
     fixVi: "Xóa `eslint-disable`, `@ts-ignore`, `@ts-expect-error` hoặc `vn-ok` và sửa nguyên nhân.",
+  },
+  "no-double-cast": {
+    code: "FE_TYPE_ESCAPE",
+    vi: "`<file>` ép kiểu qua `unknown` (`as unknown as T`): trình biên dịch quên mọi thứ nó biết ngay tại chỗ dữ liệu đi vào.",
+    fixVi: "Thu hẹp từ `unknown` bằng type guard hoặc parser; không ép kiểu.",
+  },
+  "no-type-assertion": {
+    code: "FE_TYPE_ESCAPE",
+    vi: "`<file>` dùng `as T` hoặc `<T>x`: một lời khẳng định trình biên dịch không kiểm được. Sai thì lỗi rơi vào trình duyệt của người dùng.",
+    fixVi: "Thu hẹp bằng type guard, `in`, discriminant hoặc parser tại nơi dữ liệu đi vào; dùng `satisfies` nếu chỉ muốn kiểm một literal.",
+  },
+  "no-non-null-assertion": {
+    code: "FE_TYPE_ESCAPE",
+    vi: "`<file>` dùng `x!`: khẳng định giá trị có mặt mà không chứng minh.",
+    fixVi: "Xử lý nhánh vắng mặt (`if`, `??`, return sớm) hoặc sửa kiểu để giá trị không thể vắng.",
+  },
+  "no-explicit-any": {
+    code: "FE_TYPE_ESCAPE",
+    vi: "`<file>` dùng `any`: tắt kiểm kiểu cho giá trị đó và mọi thứ suy ra từ nó.",
+    fixVi: "Dùng kiểu thật, generic, hoặc `unknown` rồi thu hẹp tại chỗ dùng.",
+  },
+  "list-item-has-key": {
+    code: "FE_LIST_KEY",
+    vi: "Phần tử trả từ `.map` ở `<file>` không có `key`, nên React nhận diện hàng theo vị trí và hàng bị đổi state khi xoá hoặc sắp xếp lại.",
+    fixVi: "Thêm `key` lấy từ id của dữ liệu; với fragment dùng `<Fragment key={...}>`.",
+  },
+  "no-index-key": {
+    code: "FE_LIST_KEY",
+    vi: "`key` ở `<file>` lấy từ chỉ số của `.map` hoặc giá trị sinh ngẫu nhiên; chỉ số là vị trí, không phải danh tính.",
+    fixVi: "Dùng id mà dữ liệu mang (`key={row.id}`); không dùng index, `Math.random`, `Date.now`.",
+  },
+  "no-inline-literal-prop-in-list": {
+    code: "FE_LIST_KEY",
+    vi: "Component trong `.map` ở `<file>` nhận object hoặc array literal làm prop: mỗi hàng mỗi lần render một giá trị mới, memo không bao giờ trúng.",
+    fixVi: "Nâng hằng số ra ngoài component hoặc dựng một lần trước `.map`.",
+  },
+  "timer-needs-effect-cleanup": {
+    code: "FE_EFFECT_CLEANUP",
+    vi: "`<timer>` ở `<file>` chạy ngoài effect hoặc trong effect không có cleanup gọi `clearTimeout`/`clearInterval`.",
+    fixVi: "Đặt timer trong `useEffect` và trả `() => clearTimeout(id)`; hoặc chuyển vào một hook làm việc đó.",
+  },
+  "no-data-fetch-in-effect": {
+    code: "FE_EFFECT_FETCH",
+    vi: "`useEffect` ở `<file>` tải dữ liệu (`await`, `fetch`, `.then`): không cache, không gộp request, không trạng thái loading/lỗi, không huỷ.",
+    fixVi: "Đọc phía client bằng SWR gọi client của app (`hooks/`), phía route bằng server reader `modules/api/<domain>/read-*.ts`.",
+  },
+  "no-empty-catch": {
+    code: "FE_SWALLOWED_ERROR",
+    vi: "`catch` hoặc `.catch` ở `<file>` không làm gì: lỗi biến mất, không thông báo, không dấu vết.",
+    fixVi: "Trả một outcome có kiểu mang nguyên nhân, hiển thị trạng thái lỗi, hoặc ném lại.",
+  },
+  "no-console": {
+    code: "FE_CONSOLE_CALL",
+    vi: "`console.<method>` ở `<file>`: không vào pipeline log nào và lộ chi tiết nội bộ cho người dùng.",
+    fixVi: "Trả outcome có kiểu, hiển thị trạng thái lỗi, hoặc để lỗi tới `error.tsx`.",
+  },
+  "page-exports-metadata": {
+    code: "FE_PAGE_METADATA_MISSING",
+    vi: "`<file>` là `page.tsx` nhưng không export `metadata` hoặc `generateMetadata`; mọi trang trong nhánh mang cùng một tiêu đề.",
+    fixVi: "Export `metadata` (hoặc `generateMetadata` khi tiêu đề lấy từ dữ liệu) với tiêu đề và mô tả lấy từ catalog thông điệp.",
+  },
+  "no-null-suspense-fallback": {
+    code: "FE_SUSPENSE_NULL_FALLBACK",
+    vi: "`<Suspense>` ở `<file>` có `fallback` rỗng: người dùng thấy khoảng trống thay vì trạng thái đang tải.",
+    fixVi: "Truyền skeleton (trạng thái loading) của đúng thứ đang tải làm `fallback`.",
+  },
+  "navigation-from-intl": {
+    code: "FE_I18N_NAVIGATION",
+    vi: "`<file>` nhập `Link`, `useRouter`, `usePathname` hoặc `redirect` từ Next, không biết locale: đường dẫn mất tiền tố `[locale]`.",
+    fixVi: "Nhập từ `modules/i18n/navigation`, được next-intl dựng từ `routing.ts`.",
+  },
+  "no-native-anchor": {
+    code: "FE_I18N_NAVIGATION",
+    vi: "`<a>` ở `<file>` trỏ route nội bộ (tải lại cả trang, mất locale, mất prefetch) hoặc mở tab mới mà không có `rel`.",
+    fixVi: "Dùng `Link` từ `modules/i18n/navigation` với href dựng bởi `modules/routes`; liên kết `_blank` thêm `rel=\"noopener noreferrer\"`.",
+  },
+  "use-intl-formatter": {
+    code: "FE_I18N_FORMATTER",
+    vi: "`<file>` định dạng số, tiền hoặc ngày bằng `toLocale*String`, `new Intl.*`, `toFixed`, ký hiệu tiền dán vào template hoặc thư viện ngày, thay vì formatter của next-intl.",
+    fixVi: "Dùng `useFormatter()` (hoặc `getFormatter()` ở server): `number(...)`, `dateTime(...)`, `relativeTime(...)`.",
+  },
+  "no-hardcoded-route": {
+    code: "FE_ROUTE_HARDCODED",
+    vi: "`<file>` viết thẳng đường dẫn route ở nơi gọi; route đổi chỗ thì bản sao trỏ vào 404.",
+    fixVi: "Dựng href bằng hàm của `modules/routes` và dùng đúng hàm đó ở mọi nơi.",
+  },
+  "client-no-server-import": {
+    code: "FE_CLIENT_SERVER_IMPORT",
+    vi: "Client component ở `<file>` nhập mã chỉ tồn tại ở server (`server-only`, `next/headers`, module Node, server reader).",
+    fixVi: "Đọc dữ liệu ở server component hoặc server reader rồi truyền xuống bằng props; hoặc dùng SWR gọi client của app.",
+  },
+  "web-storage-only-in-modules": {
+    code: "FE_STORAGE_OUTSIDE_MODULES",
+    vi: "`<file>` dùng `localStorage`/`sessionStorage` ngoài `modules/`; storage không có ở server và ném lỗi khi đầy hạn mức.",
+    fixVi: "Đặt đọc/ghi sau một hook hoặc module trong `modules/` có bảo vệ (`typeof window`, try/catch) rồi gọi từ block.",
+  },
+  "no-dangerous-html": {
+    code: "FE_DANGEROUS_HTML",
+    vi: "`dangerouslySetInnerHTML` trên `<tag>` ở `<file>`: chuỗi bất kỳ trở thành HTML chạy được.",
+    fixVi: "Render nội dung thành phần tử; chỉ `<script>` mang JSON-LD hoặc mã theme từ hằng số của app mới được dùng.",
+  },
+  "no-native-img": {
+    code: "FE_NATIVE_IMAGE",
+    vi: "`<img>` thô ở `<file>`: tải ảnh gốc, không giữ chỗ nên trang nhảy khi ảnh tải xong.",
+    fixVi: "Dùng `Image` của `next/image` với `width` và `height` (hoặc `fill` và `sizes`) và `alt` từ catalog.",
+  },
+  "image-has-size": {
+    code: "FE_NATIVE_IMAGE",
+    vi: "`Image` ở `<file>` thiếu `width` và `height` (hoặc `fill` mà thiếu `sizes`): trình duyệt không giữ chỗ được.",
+    fixVi: "Cho đủ `width` và `height`, hoặc `fill` trong khung có kích thước kèm `sizes`.",
+  },
+  "outcome-kinds-exhaustive": {
+    code: "FE_OUTCOME_KIND_UNHANDLED",
+    vi: "`switch` trên `kind` ở `<file>` có nhánh `ok` nhưng thiếu một trong refused, invalid, not-found, unavailable.",
+    fixVi: "Viết đủ năm nhánh của `Outcome<T>`, mỗi nhánh một màn; không dựa vào `default`.",
   },
 }

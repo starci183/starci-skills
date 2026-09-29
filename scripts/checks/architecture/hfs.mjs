@@ -17,6 +17,7 @@ export const HFS_RULE_IDS = [
   'HFS_APPS_REQUIRED',
   'HFS_APP_LAYOUT_INVALID',
   'HFS_E2E_IN_AUTOMATIC_GATE',
+  'HFS_HOOKS_PATH_REDIRECTED',
   'HFS_MODULE_TIER_INVALID',
   'HFS_PACKAGE_MANAGER_MIXED',
   'HFS_README_BADGE_NOT_LIVE',
@@ -249,6 +250,22 @@ function readText(root, relative) {
   try { return fs.readFileSync(path.join(root, ...relative.split('/')), 'utf8'); } catch { return null; }
 }
 
+// A repository-local core.hooksPath that points anywhere but husky's own directory switches the commit and push
+// hooks off for that clone (a lane once redirected it to skip husky), so the gate every other clone runs never ran.
+// Husky itself sets core.hooksPath to .husky/_ ; that value and .husky are the only ones allowed.
+const HUSKY_HOOKS_PATH = /^\.husky(?:\/_)?\/?$/u;
+
+function hooksPathNotRedirected({ root, finding }) {
+  let value = '';
+  try {
+    value = execFileSync('git', ['config', '--local', '--get', 'core.hooksPath'], {
+      cwd: root, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'],
+    }).trim();
+  } catch { return; } // key not set, or not a Git work tree: nothing is redirected
+  if (value && !HUSKY_HOOKS_PATH.test(value.replaceAll('\\', '/')))
+    finding('HFS_HOOKS_PATH_REDIRECTED', '.git/config', `core.hooksPath is set to ${value} in this clone. Unset it (git config --local --unset core.hooksPath) and let husky own the hooks; a redirected path skips the pre-commit and pre-push gates.`);
+}
+
 function e2eInAutomaticGate({ root, tree, backend, frontend, finding }) {
   const rule = 'HFS_E2E_IN_AUTOMATIC_GATE';
   let pkg = null;
@@ -398,6 +415,7 @@ export function checkHfs(config) {
   }
 
   e2eInAutomaticGate({ root: config.root, tree, backend, frontend, finding });
+  hooksPathNotRedirected({ root: config.root, finding });
 
   return {
     violations,

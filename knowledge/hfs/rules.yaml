@@ -144,11 +144,12 @@ rules:
   - id: R13
     code: "HFS_CI_MISSING_CANON"
     title_vi: "CI thiếu bước canon"
-    law: "CI runs the pinned `@starci/hfs check`; pre-push runs typecheck and lint."
+    law: "CI runs the pinned `@starci/hfs check`; pre-push runs typecheck and lint; a clone never redirects `core.hooksPath` away from husky."
     kinds: [check, codemod]
     gates: [pre-push, land, ci]
-    failureCodes: ["HFS_CI_MISSING_CANON"]
+    failureCodes: ["HFS_CI_MISSING_CANON", "HFS_HOOKS_PATH_REDIRECTED"]
     enforcers:
+      - {kind: machine, id: hooks-path-not-redirected, at: scripts/checks/architecture/hfs.mjs}
       - {kind: hfs, id: ci-missing-canon, status: planned}
   - id: R14
     code: "HFS_DEP_VERSION_SKEW"
@@ -230,11 +231,14 @@ rules:
   - id: R22
     code: "HFS_TS_STRICT"
     title_vi: "tsconfig hạ cờ strict"
-    law: "tsconfig extends `@starci/tsconfig` and lowers no flag."
-    kinds: [codemod, design]
-    gates: [pre-push, land, ci]
-    failureCodes: ["HFS_TS_STRICT"]
+    law: "tsconfig extends `@starci/tsconfig` and lowers no flag; no assertion, `!` or `any` in product source."
+    kinds: [codemod, design, lint]
+    gates: [pre-commit, pre-push, settle, land, ci]
+    failureCodes: ["HFS_TS_STRICT", "FE_TYPE_ESCAPE"]
     enforcers:
+      - {kind: eslint-fe, id: no-type-assertion}
+      - {kind: eslint-fe, id: no-non-null-assertion}
+      - {kind: eslint-fe, id: no-explicit-any}
       - {kind: hfs, id: ts-strict, status: planned}
   - id: R23
     code: "HFS_CONTRACT_SNAPSHOT_DRIFT"
@@ -502,11 +506,12 @@ rules:
     law: "One `fetch` in `modules/api/client.ts`, with timeout and abort."
     kinds: [check, lint, design]
     gates: [settle, land, ci]
-    failureCodes: ["FE_TRANSPORT_OWNER"]
+    failureCodes: ["FE_TRANSPORT_OWNER", "FE_EFFECT_FETCH"]
     enforcers:
       - {kind: eslint-fe, id: fetch-only-in-api-client}
       - {kind: eslint-fe, id: client-fetch-has-signal}
       - {kind: eslint-fe, id: no-shared-transport-state}
+      - {kind: eslint-fe, id: no-data-fetch-in-effect}
       - {kind: machine, id: transport-owner, status: planned}
   - id: R51
     code: "FE_HTTP_STATUS_COLLAPSE"
@@ -514,10 +519,11 @@ rules:
     law: "One `Outcome<T>`; 401 and 403 become `refused`."
     kinds: [lint, design]
     gates: [settle, land, ci]
-    failureCodes: ["FE_HTTP_STATUS_COLLAPSE"]
+    failureCodes: ["FE_HTTP_STATUS_COLLAPSE", "FE_OUTCOME_KIND_UNHANDLED"]
     enforcers:
       - {kind: eslint-fe, id: client-maps-auth-to-refused}
       - {kind: eslint-fe, id: no-http-status-collapse}
+      - {kind: eslint-fe, id: outcome-kinds-exhaustive}
   - id: R52
     code: "FE_WIRE_GENERATED"
     title_vi: "Kiểu wire gõ tay"
@@ -532,20 +538,22 @@ rules:
     code: "FE_ERROR_BOUNDARY_MISSING"
     title_vi: "Thiếu error boundary"
     law: "Global, locale error, not-found and loading boundaries exist."
-    kinds: [check, codemod]
+    kinds: [check, codemod, lint]
     gates: [settle, land, ci]
-    failureCodes: ["FE_ERROR_BOUNDARY_MISSING"]
+    failureCodes: ["FE_ERROR_BOUNDARY_MISSING", "FE_SUSPENSE_NULL_FALLBACK"]
     enforcers:
+      - {kind: eslint-fe, id: no-null-suspense-fallback}
       - {kind: machine, id: error-boundary-missing, status: planned}
   - id: R54
     code: "FE_ROUTE_FILES_THIN"
     title_vi: "Tệp route không mỏng"
     law: "Route files mount one owner; Next conventions (`proxy.ts`, metadata)."
-    kinds: [check]
+    kinds: [check, lint]
     gates: [settle, land, ci]
-    failureCodes: ["FE_ROUTE_FILES_THIN", "FE_NEXT_CONVENTIONS"]
+    failureCodes: ["FE_ROUTE_FILES_THIN", "FE_NEXT_CONVENTIONS", "FE_PAGE_METADATA_MISSING"]
     enforcers:
       - {kind: eslint-fe, id: no-middleware-file}
+      - {kind: eslint-fe, id: page-exports-metadata}
       - {kind: machine, id: route-files-thin, status: planned}
   - id: R55
     code: "FE_CLIENT_BOUNDARY"
@@ -553,9 +561,12 @@ rules:
     law: "Server first; `\"use client\"` only where allowed."
     kinds: [lint]
     gates: [pre-commit, pre-push, settle, land, ci]
-    failureCodes: ["FE_CLIENT_BOUNDARY"]
+    failureCodes: ["FE_CLIENT_BOUNDARY", "FE_CLIENT_SERVER_IMPORT", "FE_STORAGE_OUTSIDE_MODULES", "FE_DANGEROUS_HTML"]
     enforcers:
       - {kind: eslint-fe, id: use-client-only-at-boundary}
+      - {kind: eslint-fe, id: client-no-server-import}
+      - {kind: eslint-fe, id: web-storage-only-in-modules}
+      - {kind: eslint-fe, id: no-dangerous-html}
   - id: R56
     code: "FE_HOOKS_ARE_HOOKS"
     title_vi: "hooks/ chứa thứ không phải hook"
@@ -570,10 +581,11 @@ rules:
     code: "FE_OWNER_REACHABLE"
     title_vi: "Owner không được route nào mount"
     law: "Every owner is mounted; every href resolves to a route."
-    kinds: [check, design]
-    gates: [land, ci]
-    failureCodes: ["FE_OWNER_REACHABLE"]
+    kinds: [check, design, lint]
+    gates: [settle, land, ci]
+    failureCodes: ["FE_OWNER_REACHABLE", "FE_ROUTE_HARDCODED"]
     enforcers:
+      - {kind: eslint-fe, id: no-hardcoded-route}
       - {kind: machine, id: owner-reachable, status: planned}
   - id: R58
     code: "FE_I18N_LITERAL"
@@ -589,12 +601,15 @@ rules:
     code: "FE_I18N_PLACEMENT"
     title_vi: "i18n sai chuẩn next-intl"
     law: "`next-intl`, `[locale]`, `modules/i18n/`."
-    kinds: [check, codemod]
+    kinds: [check, codemod, lint]
     gates: [settle, land, ci]
-    failureCodes: ["FE_I18N_PLACEMENT"]
+    failureCodes: ["FE_I18N_PLACEMENT", "FE_I18N_NAVIGATION", "FE_I18N_FORMATTER"]
     enforcers:
       - {kind: eslint-fe, id: locale-segment-is-locale}
       - {kind: eslint-fe, id: no-second-i18n-stack}
+      - {kind: eslint-fe, id: navigation-from-intl}
+      - {kind: eslint-fe, id: no-native-anchor}
+      - {kind: eslint-fe, id: use-intl-formatter}
       - {kind: hfs, id: i18n-placement, status: planned}
   - id: R60
     code: "FE_I18N_CATALOG"
@@ -623,9 +638,11 @@ rules:
     law: "No raw form controls in product tiers."
     kinds: [lint, design]
     gates: [pre-commit, pre-push, settle, land, ci]
-    failureCodes: ["FE_NATIVE_FORM_CONTROL"]
+    failureCodes: ["FE_NATIVE_FORM_CONTROL", "FE_NATIVE_IMAGE"]
     enforcers:
       - {kind: eslint-fe, id: no-native-form-control}
+      - {kind: eslint-fe, id: no-native-img}
+      - {kind: eslint-fe, id: image-has-size}
   - id: R63
     code: "FE_PACKAGE_SHAPE"
     title_vi: "Gói dùng chung sai hình dạng"
@@ -647,14 +664,20 @@ rules:
   - id: R65
     code: "FE_SIZE_AND_STATE_BUDGET"
     title_vi: "Vượt ngân sách hook và state"
-    law: "Hook and state budgets; no hand-written poll loop."
+    law: "Hook and state budgets; no hand-written poll loop; keyed lists; timers cleared; no swallowed error or console."
     kinds: [lint, design]
     gates: [settle, land, ci]
-    failureCodes: ["FE_SIZE_AND_STATE_BUDGET"]
+    failureCodes: ["FE_SIZE_AND_STATE_BUDGET", "FE_LIST_KEY", "FE_EFFECT_CLEANUP", "FE_SWALLOWED_ERROR", "FE_CONSOLE_CALL"]
     enforcers:
       - {kind: eslint-fe, id: component-line-budget}
       - {kind: eslint-fe, id: unit-hook-budget}
       - {kind: eslint-fe, id: no-hand-rolled-polling}
+      - {kind: eslint-fe, id: list-item-has-key}
+      - {kind: eslint-fe, id: no-index-key}
+      - {kind: eslint-fe, id: no-inline-literal-prop-in-list}
+      - {kind: eslint-fe, id: timer-needs-effect-cleanup}
+      - {kind: eslint-fe, id: no-empty-catch}
+      - {kind: eslint-fe, id: no-console}
   - id: R66
     code: "FE_E2E_SHAPE"
     title_vi: "Spec e2e sai hình dạng"

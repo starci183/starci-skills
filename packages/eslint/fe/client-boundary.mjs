@@ -71,9 +71,118 @@ export const useClientOnlyAtBoundary = {
   },
 }
 
+// -- FE-CLIENT-2 -----------------------------------------------------------------------------------
+
+/** Node built-ins a browser bundle cannot carry. */
+const NODE_BUILTINS = /^(?:node:.+|fs|fs\/promises|path|os|net|tls|http|https|http2|child_process|cluster|crypto|stream|zlib|dns|worker_threads)$/
+
+/** A server-only source: the marker package, the request-scoped Next APIs, a Node built-in, a server reader. */
+const serverOnlyReason = (source) => {
+  if (source === "server-only") return "`server-only`"
+  if (source === "next/headers") return "`next/headers`"
+  if (source === "next/server") return "`next/server`"
+  if (NODE_BUILTINS.test(source)) return `\`${source}\``
+  if (/(?:^|\/)modules\/api\/(?:.+\/)?read-[^/]+$/.test(source)) return `the server reader \`${source}\``
+  return null
+}
+
+/** A client component imports nothing that only exists on the server. */
+export const clientNoServerImport = {
+  meta: {
+    type: "problem",
+    docs: { description: "A `\"use client\"` file does not import `server-only`, `next/headers`, a Node built-in or a server reader." },
+    schema: [],
+    messages: {
+      server:
+        "This client component imports {{what}}, which exists only on the server. The build either fails or, worse, pulls server code and its secrets toward the browser bundle. Read the data in a server component or a server reader and pass the result down as props, or call the app client through SWR.",
+    },
+  },
+  create(context) {
+    const file = normalizePath(context.filename || context.getFilename())
+    if (isSpecFile(file)) return {}
+    let client = false
+    return {
+      Program(program) {
+        client = clientDirective(program) !== null
+      },
+      ImportDeclaration(node) {
+        if (!client || node.importKind === "type") return
+        const what = serverOnlyReason(String(node.source.value))
+        if (what) context.report({ node, messageId: "server", data: { what } })
+      },
+    }
+  },
+}
+
+// -- FE-CLIENT-3 -----------------------------------------------------------------------------------
+
+/** Web storage exists only in the browser and only under `modules/`, which guards it. */
+const STORAGE = new Set(["localStorage", "sessionStorage"])
+
+/** Web storage is read and written only inside `modules/`. */
+export const webStorageOnlyInModules = {
+  meta: {
+    type: "problem",
+    docs: { description: "`localStorage` and `sessionStorage` are touched only inside `modules/`." },
+    schema: [],
+    messages: {
+      storage:
+        "`{{name}}` here, outside `modules/`. Storage does not exist on the server and throws in private windows and when the quota is full, so a block that reads it during render breaks server rendering and hydrates differently from the HTML it received. Put the read and write behind a hook or a module that guards both (`typeof window`, try/catch) and let the block call that.",
+    },
+  },
+  create(context) {
+    const file = normalizePath(context.filename || context.getFilename())
+    if (isSpecFile(file) || !file.includes("/src/") || /\/modules\//.test(file)) return {}
+    return {
+      MemberExpression(node) {
+        if (node.computed || node.property.type !== "Identifier" || !STORAGE.has(node.property.name)) return
+        if (node.object.type !== "Identifier" || (node.object.name !== "window" && node.object.name !== "globalThis")) return
+        context.report({ node, messageId: "storage", data: { name: node.property.name } })
+      },
+      Identifier(node) {
+        if (!STORAGE.has(node.name)) return
+        const parent = node.parent
+        if (parent.type === "MemberExpression" && parent.property === node) return
+        if (parent.type === "Property" && parent.key === node && !parent.shorthand) return
+        if (parent.type === "TSPropertySignature" || parent.type === "TSTypeAnnotation") return
+        context.report({ node, messageId: "storage", data: { name: node.name } })
+      },
+    }
+  },
+}
+
+// -- FE-CLIENT-4 -----------------------------------------------------------------------------------
+
+/** Raw HTML is set only on a `<script>`, where the framework has no other way to inline JSON-LD or the theme bootstrap. */
+export const noDangerousHtml = {
+  meta: {
+    type: "problem",
+    docs: { description: "`dangerouslySetInnerHTML` only on `<script>`; never on a visible element." },
+    schema: [],
+    messages: {
+      html:
+        "`dangerouslySetInnerHTML` on `<{{tag}}>` writes a string into the page as markup, so any text from a user, a provider or a message catalogue becomes script. Render the content as elements. The one legitimate use is a `<script>` carrying JSON-LD or the theme bootstrap, from a constant this app wrote.",
+    },
+  },
+  create(context) {
+    if (isSpecFile(context.filename || context.getFilename())) return {}
+    return {
+      JSXAttribute(node) {
+        if (node.name.type !== "JSXIdentifier" || node.name.name !== "dangerouslySetInnerHTML") return
+        const opening = node.parent
+        const tag = opening.name.type === "JSXIdentifier" ? opening.name.name : "element"
+        if (tag !== "script") context.report({ node, messageId: "html", data: { tag } })
+      },
+    }
+  },
+}
+
 /** The rules this law contributes to the plugin. */
 export const rules = {
   "use-client-only-at-boundary": useClientOnlyAtBoundary,
+  "client-no-server-import": clientNoServerImport,
+  "web-storage-only-in-modules": webStorageOnlyInModules,
+  "no-dangerous-html": noDangerousHtml,
 }
 
 /** Every rule is an error. */

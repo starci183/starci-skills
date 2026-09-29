@@ -48,3 +48,34 @@ test("only judges brand.css", async () => {
   assert.deepEqual(await rule(".card { color: red; }", FILES.module), [])
   assert.deepEqual(await rule(":root { --nv-ink: #fff; }", FILES.globals), [])
 })
+
+const FAMILY = '.grammar-common-root[data-grammar-family="offset-pop"]'
+
+test("accepts the grammar family root as the light and the dark scope, and the system block in the media query", async () => {
+  const code = `
+${FAMILY} { --offset-pop-accent: oklch(68% 0.255 352); --offset-pop-danger: oklch(55% 0.18 37.78); }
+${FAMILY}[data-grammar-theme="dark"] { --offset-pop-accent: oklch(68% 0.255 352); --offset-pop-danger: oklch(80% 0.13 37.78); }
+@media (prefers-color-scheme: dark) {
+  ${FAMILY}[data-grammar-theme="system"] { --offset-pop-accent: oklch(68% 0.255 352); --offset-pop-danger: oklch(80% 0.13 37.78); }
+}
+`
+  assert.deepEqual(await rule(code), [])
+})
+
+test("accepts the family root with a .dark class or an ancestor .dark as the dark scope", async () => {
+  assert.deepEqual(await rule(`${FAMILY} { --offset-pop-accent: #fff; } ${FAMILY}.dark { --offset-pop-accent: #000; }`), [])
+  assert.deepEqual(await rule(`${FAMILY}[data-grammar-theme="light"] { --offset-pop-accent: #fff; } .dark ${FAMILY} { --offset-pop-accent: #000; }`), [])
+})
+
+test("a family-root brand still needs the same token set in light and dark", async () => {
+  const warnings = await rule(`${FAMILY} { --offset-pop-accent: #fff; --offset-pop-danger: #f00; } ${FAMILY}[data-grammar-theme="dark"] { --offset-pop-accent: #000; }`)
+  assert.equal(warnings.length, 1)
+  assert.match(warnings[0].text, /--offset-pop-danger.*no dark value/)
+})
+
+test("a family-root selector with anything else attached is still not the brand layer", async () => {
+  const warnings = await rule(`${FAMILY} .card { --offset-pop-accent: #fff; } ${FAMILY}[data-grammar-theme="dark"] { --offset-pop-accent: #000; }`)
+  assert.equal(warnings.length, 1)
+  assert.match(warnings[0].text, /in brand\.css/)
+  assert.equal((await rule(`.grammar-common-root { --offset-pop-accent: #fff; } .dark { --offset-pop-accent: #000; }`)).length, 1)
+})

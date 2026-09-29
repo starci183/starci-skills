@@ -12334,6 +12334,16 @@ FE_E2E_SHAPE:
   owner: op-retry
   kind: check-finding
 
+HFS_HOOKS_PATH_REDIRECTED:
+  title: "A clone redirects core.hooksPath away from husky"
+  title_vi: "core.hooksPath bị đổi hướng khỏi husky"
+  meaning_vi: "Cấu hình Git cục bộ của bản clone đặt `core.hooksPath` trỏ ra ngoài `.husky`, nên hook pre-commit và pre-push không chạy và cổng mà mọi clone khác phải qua đã bị bỏ qua."
+  causes_vi:
+    - "Vi phạm luật R13: pre-push chạy typecheck và lint, và không clone nào được đổi `core.hooksPath` để né husky; giá trị duy nhất được phép là `.husky` hoặc `.husky/_` do chính husky đặt."
+  nextStep_vi: "Gỡ cấu hình bằng `git config --local --unset core.hooksPath` rồi commit lại qua hook; không dùng `--no-verify` và không đổi đường dẫn hook để né kiểm tra."
+  owner: op-retry
+  kind: check-finding
+
 FE_SPEC_QUALITY:
   title: "No class pinning, no barrel specs, axe per connected screen"
   title_vi: "Spec component kém chất lượng"
@@ -12341,6 +12351,166 @@ FE_SPEC_QUALITY:
   causes_vi:
     - "Vi phạm luật R67: Không pin chuỗi class trong spec component; spec chỉ test đúng chủ thể bên cạnh; không spec cho barrel; không `as unknown as`; mỗi màn connected có một assert axe."
   nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra và mục của luật trong tiêu chuẩn HFS; nợ cũ cần quyết định thiết kế nên op không thêm ngoại lệ, chỉ tách hoặc chuyển về đúng chủ."
+  owner: op-retry
+  kind: check-finding
+
+FE_TYPE_ESCAPE:
+  title: "No type assertion, non-null assertion or any in product source"
+  title_vi: "Ép kiểu, `!` hoặc `any` trong mã sản phẩm"
+  meaning_vi: "`<file>` dùng `as T`, `x!` hoặc `any`: trình biên dịch bị bảo tin một điều nó không kiểm được, và lỗi dời sang trình duyệt của người dùng."
+  causes_vi:
+    - "Vi phạm luật R22: Không ép kiểu (`as T`, `<T>x`), không `!`, không `any` trong mã sản phẩm; thu hẹp bằng type guard, discriminant hoặc parser tại nơi dữ liệu đi vào. Ngoại lệ duy nhất là `as const` và `as unknown`."
+  nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra; nợ cũ được chia thành các lane sửa cơ học, op không thêm ngoại lệ và không tắt luật."
+  owner: op-retry
+  kind: check-finding
+
+FE_EFFECT_FETCH:
+  title: "No data loading inside useEffect"
+  title_vi: "Tải dữ liệu trong useEffect"
+  meaning_vi: "`useEffect` ở `<file>` gọi `await`, `fetch` hoặc `.then`. Effect không có cache, không gộp request, không có trạng thái loading/lỗi và không huỷ được."
+  causes_vi:
+    - "Vi phạm luật R50: Đọc dữ liệu ở client bằng SWR gọi client của app (thư mục `hooks/`); đọc dữ liệu cho route bằng server reader `modules/api/<domain>/read-*.ts`."
+  nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra; nợ cũ được chia thành các lane sửa cơ học, op không thêm ngoại lệ và không tắt luật."
+  owner: op-retry
+  kind: check-finding
+
+FE_OUTCOME_KIND_UNHANDLED:
+  title: "A switch over an Outcome names every kind"
+  title_vi: "Switch trên Outcome thiếu nhánh"
+  meaning_vi: "`switch` trên `kind` ở `<file>` có nhánh `ok` nhưng thiếu `<kinds>`. Mỗi kind là một màn người dùng có thể gặp: refused, invalid, not-found, unavailable."
+  causes_vi:
+    - "Vi phạm luật R51: Mọi `switch` trên `Outcome<T>` liệt kê đủ `ok`, `refused`, `invalid`, `not-found`, `unavailable`; không dựa vào `default`."
+  nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra; nợ cũ được chia thành các lane sửa cơ học, op không thêm ngoại lệ và không tắt luật."
+  owner: op-retry
+  kind: check-finding
+
+FE_SUSPENSE_NULL_FALLBACK:
+  title: "Suspense fallback renders something"
+  title_vi: "Suspense có fallback rỗng"
+  meaning_vi: "`<Suspense>` ở `<file>` có `fallback={null}` hoặc không có fallback: người dùng thấy một khoảng trống, không biết trang đang tải."
+  causes_vi:
+    - "Vi phạm luật R53: `Suspense fallback={null}` bị cấm; fallback là trạng thái loading (skeleton) của đúng thứ đang tải."
+  nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra; nợ cũ được chia thành các lane sửa cơ học, op không thêm ngoại lệ và không tắt luật."
+  owner: op-retry
+  kind: check-finding
+
+FE_PAGE_METADATA_MISSING:
+  title: "Every page exports metadata"
+  title_vi: "Trang không khai báo metadata"
+  meaning_vi: "`<file>` là `page.tsx` nhưng không export `metadata` hoặc `generateMetadata`, nên mọi trang cùng một tiêu đề trên tab, lịch sử, liên kết chia sẻ và kết quả tìm kiếm."
+  causes_vi:
+    - "Vi phạm luật R54: Mỗi `page.tsx` export `metadata` (hoặc `generateMetadata` khi tiêu đề lấy từ dữ liệu), tiêu đề và mô tả lấy từ catalog thông điệp."
+  nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra; nợ cũ được chia thành các lane sửa cơ học, op không thêm ngoại lệ và không tắt luật."
+  owner: op-retry
+  kind: check-finding
+
+FE_CLIENT_SERVER_IMPORT:
+  title: "A client component imports nothing server-only"
+  title_vi: "Client component nhập mã chỉ chạy ở server"
+  meaning_vi: "Tệp `\"use client\"` ở `<file>` nhập `<what>` (`server-only`, `next/headers`, module Node hoặc server reader), thứ chỉ tồn tại ở server."
+  causes_vi:
+    - "Vi phạm luật R55: Client component không nhập `server-only`, `next/headers`, module Node hay `modules/api/**/read-*`; đọc dữ liệu ở server component rồi truyền xuống bằng props, hoặc gọi client của app qua SWR."
+  nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra; nợ cũ được chia thành các lane sửa cơ học, op không thêm ngoại lệ và không tắt luật."
+  owner: op-retry
+  kind: check-finding
+
+FE_STORAGE_OUTSIDE_MODULES:
+  title: "Web storage only inside modules"
+  title_vi: "Dùng localStorage/sessionStorage ngoài modules/"
+  meaning_vi: "`<file>` đọc hoặc ghi `localStorage`/`sessionStorage` ngoài `modules/`. Storage không tồn tại ở server và ném lỗi khi đầy hạn mức, nên render server và hydrate lệch nhau."
+  causes_vi:
+    - "Vi phạm luật R55: Chỉ `modules/**` được chạm web storage, sau một hook hoặc module có bảo vệ (`typeof window`, try/catch); block gọi hook đó."
+  nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra; nợ cũ được chia thành các lane sửa cơ học, op không thêm ngoại lệ và không tắt luật."
+  owner: op-retry
+  kind: check-finding
+
+FE_DANGEROUS_HTML:
+  title: "dangerouslySetInnerHTML only on script"
+  title_vi: "dangerouslySetInnerHTML trên phần tử hiển thị"
+  meaning_vi: "`<tag>` ở `<file>` dùng `dangerouslySetInnerHTML`: chuỗi bất kỳ (của người dùng, nhà cung cấp, catalog) trở thành mã HTML chạy được."
+  causes_vi:
+    - "Vi phạm luật R55: Chỉ được `dangerouslySetInnerHTML` trên `<script>` mang JSON-LD hoặc mã khởi tạo theme từ hằng số do app viết; nội dung khác render thành phần tử."
+  nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra; nợ cũ được chia thành các lane sửa cơ học, op không thêm ngoại lệ và không tắt luật."
+  owner: op-retry
+  kind: check-finding
+
+FE_ROUTE_HARDCODED:
+  title: "A route is built by modules/routes"
+  title_vi: "Đường dẫn route viết tay"
+  meaning_vi: "`<path>` ở `<file>` là route viết thẳng ở nơi gọi. Route đổi chỗ thì mọi bản sao trỏ vào 404 mà không kiểm tra kiểu nào bắt được."
+  causes_vi:
+    - "Vi phạm luật R57: Mọi href và lời gọi điều hướng (`router.push`, `redirect`) dùng hàm dựng href của `modules/routes`, không viết chuỗi đường dẫn ở nơi gọi."
+  nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra; nợ cũ được chia thành các lane sửa cơ học, op không thêm ngoại lệ và không tắt luật."
+  owner: op-retry
+  kind: check-finding
+
+FE_I18N_NAVIGATION:
+  title: "Navigation from modules/i18n/navigation"
+  title_vi: "Điều hướng không đi qua next-intl"
+  meaning_vi: "`<file>` dùng `next/link`, `useRouter`, `usePathname`, `redirect` của Next hoặc thẻ `<a>` cho route nội bộ: mất tiền tố `[locale]`, mất prefetch, tải lại cả trang."
+  causes_vi:
+    - "Vi phạm luật R59: `Link`, `useRouter`, `usePathname`, `redirect` lấy từ `modules/i18n/navigation`; liên kết ngoài mở tab mới phải có `rel=\"noopener noreferrer\"`."
+  nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra; nợ cũ được chia thành các lane sửa cơ học, op không thêm ngoại lệ và không tắt luật."
+  owner: op-retry
+  kind: check-finding
+
+FE_I18N_FORMATTER:
+  title: "Numbers, money and dates through the next-intl formatter"
+  title_vi: "Định dạng số, tiền, ngày ngoài formatter của next-intl"
+  meaning_vi: "`<file>` định dạng bằng `<what>` (`toLocale*String`, `new Intl.*`, `toFixed` hiển thị, ký hiệu tiền dán vào template hoặc thư viện ngày) thay vì formatter của next-intl, nên locale và múi giờ lệch giữa server và trình duyệt."
+  causes_vi:
+    - "Vi phạm luật R59: Số, tiền, ngày dùng `useFormatter()` / `getFormatter()` của next-intl; định dạng dùng chung khai báo một lần trong `modules/i18n`."
+  nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra; nợ cũ được chia thành các lane sửa cơ học, op không thêm ngoại lệ và không tắt luật."
+  owner: op-retry
+  kind: check-finding
+
+FE_NATIVE_IMAGE:
+  title: "next/image with a reserved size"
+  title_vi: "Ảnh thô hoặc next/image thiếu kích thước"
+  meaning_vi: "`<file>` dùng `<img>` thô, hoặc `Image` không có `width` và `height` (hay `fill` mà không có `sizes`): trình duyệt không giữ chỗ nên trang nhảy khi ảnh tải xong."
+  causes_vi:
+    - "Vi phạm luật R62: Ảnh dùng `Image` của `next/image` với `width`+`height` hoặc `fill`+`sizes`; alt lấy từ catalog thông điệp."
+  nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra; nợ cũ được chia thành các lane sửa cơ học, op không thêm ngoại lệ và không tắt luật."
+  owner: op-retry
+  kind: check-finding
+
+FE_LIST_KEY:
+  title: "List rows have a stable key and stable props"
+  title_vi: "Danh sách thiếu key ổn định"
+  meaning_vi: "`.map` ở `<file>` trả phần tử không có `key`, dùng chỉ số hoặc giá trị ngẫu nhiên làm `key`, hoặc truyền object/array literal cho component trong danh sách; hàng bị đổi state khi xoá hoặc sắp xếp lại, và memo không bao giờ trúng."
+  causes_vi:
+    - "Vi phạm luật R65: Phần tử trong `.map` có `key` lấy từ id của dữ liệu (không dùng index, `Math.random`, `Date.now`), và không truyền object/array literal cho component trong danh sách; hằng số được nâng ra ngoài."
+  nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra; nợ cũ được chia thành các lane sửa cơ học, op không thêm ngoại lệ và không tắt luật."
+  owner: op-retry
+  kind: check-finding
+
+FE_EFFECT_CLEANUP:
+  title: "Timers live in an effect that clears them"
+  title_vi: "Timer không được dọn"
+  meaning_vi: "`<timer>` ở `<file>` chạy ngoài effect hoặc trong effect không trả hàm dọn `clearTimeout`/`clearInterval`, nên nó nổ sau khi component đã gỡ và set state vào chỗ không còn."
+  causes_vi:
+    - "Vi phạm luật R65: `setTimeout`/`setInterval` nằm trong `useEffect` hoặc hook, và cleanup gọi `clearTimeout`/`clearInterval`."
+  nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra; nợ cũ được chia thành các lane sửa cơ học, op không thêm ngoại lệ và không tắt luật."
+  owner: op-retry
+  kind: check-finding
+
+FE_SWALLOWED_ERROR:
+  title: "No empty catch"
+  title_vi: "catch rỗng nuốt lỗi"
+  meaning_vi: "`catch` hoặc `.catch(() => {})` ở `<file>` không làm gì: lỗi biến mất, người dùng không thấy thông báo, đội không có dấu vết."
+  causes_vi:
+    - "Vi phạm luật R65: Mỗi `catch` trả một outcome có kiểu mang nguyên nhân, hiển thị trạng thái lỗi hoặc ném lại."
+  nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra; nợ cũ được chia thành các lane sửa cơ học, op không thêm ngoại lệ và không tắt luật."
+  owner: op-retry
+  kind: check-finding
+
+FE_CONSOLE_CALL:
+  title: "No console in product source"
+  title_vi: "console.* trong mã sản phẩm"
+  meaning_vi: "`console.<method>` ở `<file>` không đi vào pipeline log nào, lộ chi tiết nội bộ trong devtools của người dùng và che mất việc xử lý thật."
+  causes_vi:
+    - "Vi phạm luật R65: Không `console.*` trong mã sản phẩm; trả outcome có kiểu, hiển thị trạng thái lỗi, hoặc để lỗi tới `error.tsx`."
+  nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra; nợ cũ được chia thành các lane sửa cơ học, op không thêm ngoại lệ và không tắt luật."
   owner: op-retry
   kind: check-finding
 

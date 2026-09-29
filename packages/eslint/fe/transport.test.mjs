@@ -17,6 +17,7 @@ import {
   noHandTypedWire,
   noHttpStatusCollapse,
   noSharedTransportState,
+  outcomeKindsExhaustive,
   rules,
 } from "./transport.mjs"
 
@@ -155,6 +156,41 @@ test("FE-WIRE-1: wire types are generated, not typed or cast by hand", () => {
       { filename: READER, code: "const q = \"mutation Save { save { id } }\"", errors: [{ messageId: "document" }] },
       { filename: READER, code: "export interface CourseResponse { id: string }", errors: [{ messageId: "declared" }] },
       { filename: CLIENT, code: "export type LoginPayload = { email: string }", errors: [{ messageId: "declared" }] },
+    ],
+  })
+})
+
+test("TRANSPORT-7: a switch over an Outcome names every kind", () => {
+  tester.run("outcome-kinds-exhaustive", outcomeKindsExhaustive, {
+    valid: [
+      {
+        filename: HOOK,
+        code: "switch (outcome.kind) { case 'ok': return a; case 'refused': return b; case 'invalid': return c; case 'not-found': return d; case 'unavailable': return e }",
+      },
+      // a switch over some other discriminant is not an Outcome
+      { filename: HOOK, code: "switch (shape.kind) { case 'circle': return 1; case 'square': return 2 }" },
+      { filename: HOOK, code: "switch (state) { case 'ok': return 1 }" },
+      {
+        filename: "D:/repo/src/hooks/course/useCourse.test.ts",
+        code: "switch (outcome.kind) { case 'ok': return a }",
+      },
+    ],
+    invalid: [
+      {
+        filename: HOOK,
+        code: "switch (outcome.kind) { case 'ok': return a; default: return b }",
+        errors: [{ messageId: "missing" }],
+      },
+      {
+        filename: HOOK,
+        code: "switch (outcome.kind) { case 'ok': return a; case 'unavailable': return e }",
+        errors: [{ messageId: "missing" }],
+      },
+      {
+        filename: HOOK,
+        code: "switch (result.outcome.kind) { case 'ok': return a; case 'refused': return b; case 'invalid': return c; case 'not-found': return d }",
+        errors: [{ messageId: "missing" }],
+      },
     ],
   })
 })

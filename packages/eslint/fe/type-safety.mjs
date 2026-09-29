@@ -1,11 +1,11 @@
 /**
  * The rules that hold `type-safety.md`.
  *
- * ONE RULE HERE, AND TWO ELSEWHERE. `any` is refused by the TypeScript plugin's own rule and the
- * array spelling by its formatter rule, so neither is reimplemented - a second copy of somebody
- * else's rule is a second thing to keep in step, and the one nobody edits is the one that stops
- * matching. What is left is the double cast, which no off-the-shelf rule refuses because most
- * codebases consider it a legitimate escape.
+ * FOUR RULES, ONE IDEA: the compiler is told the truth or it is not told at all. The double cast, the
+ * plain assertion, the non-null assertion and `any` are the four spellings of "trust me". They live
+ * here rather than in a repository's own `eslint.config.mjs` because a repository carries no rule of
+ * its own: a rule that exists only in one repository's config is a rule the next repository forgets.
+ * The array spelling is a formatting question and stays with the formatter.
  *
  * THE EXEMPTION IS A PATH, and it has to be. Proving a closed API refuses bad input means building
  * bad input, and there is no way to construct a value the types forbid without telling the compiler
@@ -54,9 +54,92 @@ export const noDoubleCast = {
   },
 }
 
+// -- TYPE-SAFETY-2 ---------------------------------------------------------------------------------
+
+/** True for `as const`, the one assertion that narrows without claiming anything. */
+const isConstAssertion = (type) => type.type === "TSTypeReference" && type.typeName.type === "Identifier" && type.typeName.name === "const"
+
+/**
+ * A type assertion is a claim the compiler cannot check, made at the place it was going to check.
+ *
+ * WHAT IS LEFT ALLOWED. `as const` (it narrows), `as unknown` (it widens, and everything is assignable
+ * to it), and `satisfies` (it checks). The cast through `unknown` to a real type is refused by
+ * `no-double-cast`, so this rule leaves the outer half of that pair to it and reports each once.
+ */
+export const noTypeAssertion = {
+  meta: {
+    type: "problem",
+    docs: { description: "No `as T` or `<T>x`; narrow with a check, a guard or a parser." },
+    schema: [],
+    messages: {
+      assertion:
+        "`as {{type}}` tells the compiler to believe something it could not verify. When the claim is wrong the type system keeps saying it is right and the failure moves to a reader. Narrow with a check the compiler can follow (a type guard, `in`, a discriminant), parse the value where it enters, or use `satisfies` when the goal is only to check a literal.",
+    },
+  },
+  create(context) {
+    if (!isGoverned(context.filename || context.getFilename())) return {}
+    const source = context.sourceCode ?? context.getSourceCode()
+    const report = (node) =>
+      context.report({ node, messageId: "assertion", data: { type: source.getText(node.typeAnnotation) } })
+    return {
+      TSAsExpression(node) {
+        if (isConstAssertion(node.typeAnnotation) || isUnknown(node.typeAnnotation)) return
+        const inner = node.expression
+        if (inner && inner.type === "TSAsExpression" && isUnknown(inner.typeAnnotation)) return
+        report(node)
+      },
+      TSTypeAssertion(node) {
+        if (isConstAssertion(node.typeAnnotation)) return
+        report(node)
+      },
+    }
+  },
+}
+
+// -- TYPE-SAFETY-3 ---------------------------------------------------------------------------------
+
+/** `x!` says a value is present without proving it. */
+export const noNonNullAssertion = {
+  meta: {
+    type: "problem",
+    docs: { description: "No non-null assertion (`x!`); prove the value is there." },
+    schema: [],
+    messages: {
+      bang:
+        "`!` asserts the value is not null or undefined and proves nothing: the day it is one, the failure is a TypeError in a reader's browser rather than a branch in the code. Handle the absent case (`if`, `??`, an early return) or make the type say it cannot be absent.",
+    },
+  },
+  create(context) {
+    if (!isGoverned(context.filename || context.getFilename())) return {}
+    return { TSNonNullExpression: (node) => context.report({ node, messageId: "bang" }) }
+  },
+}
+
+// -- TYPE-SAFETY-4 ---------------------------------------------------------------------------------
+
+/** `any` switches checking off for everything it touches. */
+export const noExplicitAny = {
+  meta: {
+    type: "problem",
+    docs: { description: "No `any`; use a real type or `unknown` and narrow." },
+    schema: [],
+    messages: {
+      any:
+        "`any` turns type checking off for this value and everything derived from it, silently. Use the real type, a generic, or `unknown` and narrow it where it is used.",
+    },
+  },
+  create(context) {
+    if (!isGoverned(context.filename || context.getFilename())) return {}
+    return { TSAnyKeyword: (node) => context.report({ node, messageId: "any" }) }
+  },
+}
+
 /** The rules this law contributes to the plugin. */
 export const rules = {
   "no-double-cast": noDoubleCast,
+  "no-type-assertion": noTypeAssertion,
+  "no-non-null-assertion": noNonNullAssertion,
+  "no-explicit-any": noExplicitAny,
 }
 
 /**

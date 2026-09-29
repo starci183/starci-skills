@@ -138,3 +138,31 @@ import type { CourseQuery } from "../__generated__/graphql"
 **Vì sao (why):** `<file>` tự gõ kiểu wire hoặc ép kiểu phản hồi. Dùng kiểu sinh từ `contract/`.
 
 **Cách sửa:** Chạy codegen từ bản sao hợp đồng ở `modules/api/contract/` và nhập kiểu sinh ra; đưa tài liệu GraphQL vào tệp `.graphql`.
+
+## `starci-fe/outcome-kinds-exhaustive`
+
+A `switch` over an Outcome's `kind` has a case for every kind (catalogue R51, sub-check `FE_OUTCOME_KIND_UNHANDLED`).
+
+**Invalid** (`src/hooks/course/useCourse.ts`)
+
+```tsx
+switch (outcome.kind) { case "ok": return outcome.data; default: return null }
+```
+
+**Valid** (`src/hooks/course/useCourse.ts`)
+
+```tsx
+switch (outcome.kind) {
+  case "ok": return outcome.data
+  case "refused": return goToSignIn()
+  case "invalid": return showIssues(outcome.issues)
+  case "not-found": return notFoundState()
+  case "unavailable": return retryState(outcome.retryable)
+}
+```
+
+**Finding code:** `FE_OUTCOME_KIND_UNHANDLED`
+
+**Vì sao (why):** `switch` trên `kind` ở `<file>` có nhánh `ok` nhưng thiếu một trong refused, invalid, not-found, unavailable.
+
+**Cách sửa:** Viết đủ năm nhánh của `Outcome<T>`, mỗi nhánh một màn; không dựa vào `default`.

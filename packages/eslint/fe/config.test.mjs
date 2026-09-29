@@ -133,9 +133,23 @@ const CATALOGUED_LAWS = [
   "e2e-shape",
   "spec-quality",
   "lint-escape-hatch",
+  "type-safety",
+  "lists",
+  "hygiene",
+  "formatting",
 ]
 /** The rules of laws that mix catalogued and older rules. */
-const CATALOGUED_RULES = ["no-hardcoded-copy"]
+const CATALOGUED_RULES = [
+  "no-hardcoded-copy",
+  "page-exports-metadata",
+  "no-null-suspense-fallback",
+  "navigation-from-intl",
+  "no-native-anchor",
+  "no-hardcoded-route",
+  "no-native-img",
+  "image-has-size",
+  "outcome-kinds-exhaustive",
+]
 
 test("every catalogued rule has a why with a code, a Vietnamese headline and a Vietnamese next step", () => {
   const needed = Object.entries(ruleOwners)
@@ -157,7 +171,7 @@ test("no why names a rule that does not exist", () => {
   assert.deepEqual(orphans, [])
 })
 
-test("the codes are the catalogue's codes for R18, R49-R52, R55, R56, R58, R60-R62, R65-R67", () => {
+test("the codes are the catalogue's codes for R18, R22, R49-R52, R55, R56, R58, R60-R62, R65-R67", () => {
   const codes = new Set(Object.values(why).map((entry) => entry.code))
   for (const code of [
     "FE_ENV_OWNER",
@@ -173,6 +187,22 @@ test("the codes are the catalogue's codes for R18, R49-R52, R55, R56, R58, R60-R
     "FE_E2E_SHAPE",
     "FE_SPEC_QUALITY",
     "HFS_INLINE_SUPPRESSION",
+    "FE_TYPE_ESCAPE",
+    "FE_LIST_KEY",
+    "FE_EFFECT_CLEANUP",
+    "FE_EFFECT_FETCH",
+    "FE_SWALLOWED_ERROR",
+    "FE_CONSOLE_CALL",
+    "FE_PAGE_METADATA_MISSING",
+    "FE_SUSPENSE_NULL_FALLBACK",
+    "FE_I18N_NAVIGATION",
+    "FE_I18N_FORMATTER",
+    "FE_ROUTE_HARDCODED",
+    "FE_CLIENT_SERVER_IMPORT",
+    "FE_STORAGE_OUTSIDE_MODULES",
+    "FE_DANGEROUS_HTML",
+    "FE_NATIVE_IMAGE",
+    "FE_OUTCOME_KIND_UNHANDLED",
   ]) {
     assert.ok(codes.has(code), `no rule reports under ${code}`)
   }

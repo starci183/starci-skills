@@ -6,6 +6,13 @@
  * declarations, on tokens the grammar publishes, in a light block (`:root`, `.light`, `[data-theme="light"]`) and
  * a dark block (`.dark`, `[data-theme="dark"]`, or `:root` inside `@media (prefers-color-scheme: dark)`), with
  * `color-scheme` allowed beside them. Every token has a value in both, so a brand can never be half a theme.
+ *
+ * THE FAMILY ROOT IS A SCOPE TOO. The grammar re-declares its tokens on
+ * `.grammar-common-root[data-grammar-family="<family>"]` itself, so a value written on `:root` is inherited and loses
+ * to that re-declaration. A brand that has to win writes its light block on the family root, its dark block on the same
+ * root with `[data-grammar-theme="dark"]` (or `.dark`), and the follow-the-system block inside
+ * `@media (prefers-color-scheme: dark)` on the root with `[data-grammar-theme="system"]`. Light and dark still carry
+ * the same token set.
  */
 import { makeRule } from "./lib/make-rule.mjs"
 import { fileKind, fileOf } from "./lib/scope.mjs"
@@ -14,13 +21,19 @@ import { isGrammarToken } from "./lib/vocabulary.mjs"
 const quoted = `["']?`
 const LIGHT = new RegExp(`^(?::root|html|\\.light|\\[data-theme=${quoted}light${quoted}\\]|:root\\[data-theme=${quoted}light${quoted}\\]|:root\\.light)$`)
 const DARK = new RegExp(`^(?:\\.dark|\\[data-theme=${quoted}dark${quoted}\\]|:root\\[data-theme=${quoted}dark${quoted}\\]|:root\\.dark|html\\.dark)$`)
-const DARK_MEDIA = /^\(\s*prefers-color-scheme\s*:\s*dark\s*\)$/
+/** The grammar's family root: the element that re-declares the family tokens on itself. */
+const FAMILY_ROOT = `\\.grammar-common-root\\[data-grammar-family=${quoted}[a-z][a-z0-9-]*${quoted}\\]`
+const theme = (name) => `\\[data-grammar-theme=${quoted}${name}${quoted}\\]`
+const FAMILY_LIGHT = new RegExp(`^${FAMILY_ROOT}(?:${theme("light")})?$`)
+const FAMILY_DARK = new RegExp(`^(?:\\.dark\\s+${FAMILY_ROOT}|${FAMILY_ROOT}(?:\\.dark|${theme("dark")}))$`)
+const FAMILY_SYSTEM = new RegExp(`^${FAMILY_ROOT}(?:${theme("system")})?$`)
+const DARK_MEDIA =/^\(\s*prefers-color-scheme\s*:\s*dark\s*\)$/
 
 export const brandLayerShape = makeRule(
   "brand-layer-shape",
   {
     selector: (selector) =>
-      `\`${selector}\` in brand.css. The brand layer has a light block (\`:root\`) and a dark block (\`.dark\`, \`[data-theme="dark"]\` or \`@media (prefers-color-scheme: dark)\`) and nothing else.`,
+      `\`${selector}\` in brand.css. The brand layer has a light block (\`:root\`) and a dark block (\`.dark\`, \`[data-theme="dark"]\` or \`@media (prefers-color-scheme: dark)\`) and nothing else. The grammar family root (\`.grammar-common-root[data-grammar-family="<family>"]\`, with \`[data-grammar-theme="dark"]\` for dark) is admitted as the same two scopes.`,
     atRule: (name) => `\`@${name}\` in brand.css. The only at-rule the brand layer has is \`@media (prefers-color-scheme: dark)\`.`,
     property: (prop) => `\`${prop}\` in brand.css is not a token. The brand layer only declares grammar tokens (and \`color-scheme\`).`,
     foreign: (name) => `\`${name}\` in brand.css is not a token the grammar publishes. The brand is set only on the grammar's tokens.`,
@@ -47,7 +60,9 @@ export const brandLayerShape = makeRule(
 
     const checkRule = (rule, into) => {
       const selectors = rule.selectors.map((selector) => selector.trim())
-      const mode = selectors.every((selector) => LIGHT.test(selector)) ? light : selectors.every((selector) => DARK.test(selector)) ? dark : null
+      const isLight = (selector) => LIGHT.test(selector) || FAMILY_LIGHT.test(selector)
+      const isDark = (selector) => DARK.test(selector) || FAMILY_DARK.test(selector)
+      const mode = selectors.every(isLight) ? light : selectors.every(isDark) ? dark : null
       const target = into ?? mode
       if (!target) return report(rule, "selector", [rule.selector], { word: rule.selector })
       checkBlock(rule, target)
@@ -59,7 +74,7 @@ export const brandLayerShape = makeRule(
       if (node.type === "atrule" && node.name.toLowerCase() === "media" && DARK_MEDIA.test(node.params.trim())) {
         return node.each((child) => {
           if (child.type === "comment") return
-          if (child.type !== "rule" || !child.selectors.every((selector) => /^(?::root|html)$/.test(selector.trim()))) {
+          if (child.type !== "rule" || !child.selectors.every((selector) => /^(?::root|html)$/.test(selector.trim()) || FAMILY_SYSTEM.test(selector.trim()))) {
             return report(child, "selector", [child.type === "rule" ? child.selector : `@${child.name ?? child.prop}`])
           }
           checkBlock(child, dark)

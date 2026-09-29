@@ -93,3 +93,114 @@ import { useTranslations } from "next-intl"
 **Vì sao (why):** `<html lang>` ở `<file>` là chữ cứng. Thuộc tính `lang` phải lấy từ segment `[locale]`.
 
 **Cách sửa:** Dùng `lang={locale}` từ tham số của layout `[locale]`.
+
+## `starci-fe/page-exports-metadata`
+
+Every `page.tsx` exports `metadata` or `generateMetadata` (catalogue R54, sub-check `FE_PAGE_METADATA_MISSING`).
+
+**Invalid** (`src/app/[locale]/courses/page.tsx`)
+
+```tsx
+export default function Page() { return <CoursesPage /> }
+```
+
+**Valid** (`src/app/[locale]/courses/page.tsx`)
+
+```tsx
+export async function generateMetadata() { return { title: t("courses.title") } }
+export default function Page() { return <CoursesPage /> }
+```
+
+**Finding code:** `FE_PAGE_METADATA_MISSING`
+
+**Vì sao (why):** `<file>` là `page.tsx` nhưng không export `metadata` hoặc `generateMetadata`; mọi trang trong nhánh mang cùng một tiêu đề.
+
+**Cách sửa:** Export `metadata` (hoặc `generateMetadata` khi tiêu đề lấy từ dữ liệu) với tiêu đề và mô tả lấy từ catalog thông điệp.
+
+## `starci-fe/no-null-suspense-fallback`
+
+`<Suspense>` has a fallback that renders something; `fallback={null}` is forbidden (catalogue R53, sub-check `FE_SUSPENSE_NULL_FALLBACK`).
+
+**Invalid** (`src/components/blocks/Feed/component.tsx`)
+
+```tsx
+<Suspense fallback={null}><Feed /></Suspense>
+```
+
+**Valid** (`src/components/blocks/Feed/component.tsx`)
+
+```tsx
+<Suspense fallback={<FeedSkeleton />}><Feed /></Suspense>
+```
+
+**Finding code:** `FE_SUSPENSE_NULL_FALLBACK`
+
+**Vì sao (why):** `<Suspense>` ở `<file>` có `fallback` rỗng: người dùng thấy khoảng trống thay vì trạng thái đang tải.
+
+**Cách sửa:** Truyền skeleton (trạng thái loading) của đúng thứ đang tải làm `fallback`.
+
+## `starci-fe/navigation-from-intl`
+
+`Link`, `useRouter`, `usePathname` and `redirect` come from `modules/i18n/navigation`, not from Next (catalogue R59, sub-check `FE_I18N_NAVIGATION`).
+
+**Invalid** (`src/components/blocks/Feed/component.tsx`)
+
+```tsx
+import { useRouter } from "next/navigation"
+```
+
+**Valid** (`src/components/blocks/Feed/component.tsx`)
+
+```tsx
+import { useRouter } from "@/modules/i18n/navigation"
+```
+
+**Finding code:** `FE_I18N_NAVIGATION`
+
+**Vì sao (why):** `<file>` nhập `Link`, `useRouter`, `usePathname` hoặc `redirect` từ Next, không biết locale: đường dẫn mất tiền tố `[locale]`.
+
+**Cách sửa:** Nhập từ `modules/i18n/navigation`, được next-intl dựng từ `routing.ts`.
+
+## `starci-fe/no-native-anchor`
+
+An internal link is `Link` from `modules/i18n/navigation`; an external `_blank` link carries `rel` (catalogue R59, sub-check `FE_I18N_NAVIGATION`).
+
+**Invalid** (`src/components/blocks/Feed/component.tsx`)
+
+```tsx
+<a href="/courses">{t("courses")}</a>
+```
+
+**Valid** (`src/components/blocks/Feed/component.tsx`)
+
+```tsx
+<Link href={routes.courses()}>{t("courses")}</Link>
+```
+
+**Finding code:** `FE_I18N_NAVIGATION`
+
+**Vì sao (why):** `<a>` ở `<file>` trỏ route nội bộ (tải lại cả trang, mất locale, mất prefetch) hoặc mở tab mới mà không có `rel`.
+
+**Cách sửa:** Dùng `Link` từ `modules/i18n/navigation` với href dựng bởi `modules/routes`; liên kết `_blank` thêm `rel="noopener noreferrer"`.
+
+## `starci-fe/no-hardcoded-route`
+
+A route path is built by `modules/routes`, never written as a literal at a link or a navigation call (catalogue R57, sub-check `FE_ROUTE_HARDCODED`).
+
+**Invalid** (`src/components/blocks/Feed/component.tsx`)
+
+```tsx
+router.push("/agentos/workspaces/new")
+```
+
+**Valid** (`src/components/blocks/Feed/component.tsx`)
+
+```tsx
+router.push(routes.newWorkspace())
+```
+
+**Finding code:** `FE_ROUTE_HARDCODED`
+
+**Vì sao (why):** `<file>` viết thẳng đường dẫn route ở nơi gọi; route đổi chỗ thì bản sao trỏ vào 404.
+
+**Cách sửa:** Dựng href bằng hàm của `modules/routes` và dùng đúng hàm đó ở mọi nơi.

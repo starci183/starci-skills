@@ -358,6 +358,37 @@ export const noHandTypedWire = {
   },
 }
 
+// -- TRANSPORT-7 -----------------------------------------------------------------------------------
+
+/** The kinds of `Outcome<T>` (HFS section 6.2): a reader is owed a screen for each. */
+const OUTCOME_KINDS = ["ok", "refused", "invalid", "not-found", "unavailable"]
+
+/** A switch over an Outcome names every kind, so a failure never falls into the success branch or a blank one. */
+export const outcomeKindsExhaustive = {
+  meta: {
+    type: "problem",
+    docs: { description: "A `switch` over an Outcome's `kind` has a case for every kind." },
+    schema: [],
+    messages: {
+      missing:
+        "This `switch` handles `ok` but not {{missing}}. Each kind is a screen a reader can land on: refused sends them to sign in, invalid shows what to fix, not-found says it is gone, unavailable says try again. A missing case is a blank page, or a `default` that shows the wrong one. Write every case; do not rely on `default`.",
+    },
+  },
+  create(context) {
+    if (isSpecFile(context.filename || context.getFilename())) return {}
+    return {
+      SwitchStatement(node) {
+        const subject = node.discriminant
+        if (subject.type !== "MemberExpression" || subject.computed || subject.property.type !== "Identifier" || subject.property.name !== "kind") return
+        const cases = new Set(node.cases.filter((entry) => entry.test && entry.test.type === "Literal").map((entry) => entry.test.value))
+        if (!cases.has("ok")) return
+        const missing = OUTCOME_KINDS.filter((kind) => !cases.has(kind))
+        if (missing.length > 0) context.report({ node, messageId: "missing", data: { missing: missing.map((kind) => `\`${kind}\``).join(", ") } })
+      },
+    }
+  },
+}
+
 /** The rules this law contributes to the plugin. */
 export const rules = {
   "fetch-only-in-api-client": fetchOnlyInApiClient,
@@ -366,6 +397,7 @@ export const rules = {
   "client-maps-auth-to-refused": clientMapsAuthToRefused,
   "no-http-status-collapse": noHttpStatusCollapse,
   "no-hand-typed-wire": noHandTypedWire,
+  "outcome-kinds-exhaustive": outcomeKindsExhaustive,
 }
 
 /** Every rule is an error: a second transport or a status collapse is the defect, not a style. */
