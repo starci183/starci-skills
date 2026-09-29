@@ -118,7 +118,7 @@ const fail = (code, message, details) => { throw new HfsSlotsError(code, message
 function manifestShapeProblems(m) {
   const bad = [];
   if (!isMap(m)) return ['the manifest is not a map'];
-  const allowed = new Set(['schema', 'version', 'versioning', 'presenceValues', 'trackedValues', 'testValues', 'appKinds', 'tiers', 'crossOwner', 'crossApp', 'slots', 'consumers']);
+  const allowed = new Set(['schema', 'version', 'versioning', 'presenceValues', 'trackedValues', 'testValues', 'appKinds', 'tiers', 'ruleParams', 'crossOwner', 'crossApp', 'slots', 'consumers']);
   for (const key of Object.keys(m)) if (!allowed.has(key)) bad.push(`unknown top-level key ${key}`);
   if (m.schema !== 'starci/hfs-slots@2' && !/^starci\/hfs-slots@\d+$/.test(String(m.schema))) bad.push('schema must be starci/hfs-slots@<major>');
   if (!SEMVER.test(String(m.version))) bad.push('version must be MAJOR.MINOR.PATCH');
@@ -142,6 +142,13 @@ function manifestShapeProblems(m) {
       if (!isMap(def) || !Array.isArray(def.mayImport) || !def.mayImport.every((t) => NAME.test(String(t)))) bad.push(`tiers.${profile}.${tier}.mayImport must be a list of tier names`);
       for (const key of Object.keys(def ?? {})) if (!['mayImport', 'acyclic', 'lowerLayerOnly'].includes(key)) bad.push(`tiers.${profile}.${tier}.${key} is not a tier field`);
     }
+  }
+  const fileLinesOk = (v) => isMap(v) && Number.isInteger(v.soft) && v.soft >= 1 && typeof v.hardGrowth === 'boolean' && Object.keys(v).length === 2;
+  const rp = m.ruleParams;
+  if (!isMap(rp) || Object.keys(rp).some((k) => !PROFILES.includes(k)) || !PROFILES.every((p) => isMap(rp[p]))) bad.push('ruleParams must be a map with be and fe');
+  else {
+    if (!(strList(rp.be.globalModules) && new Set(rp.be.globalModules).size === rp.be.globalModules.length) || !fileLinesOk(rp.be.fileLines) || Object.keys(rp.be).length !== 2) bad.push('ruleParams.be needs globalModules (unique paths) and fileLines {soft, hardGrowth}');
+    if (!fileLinesOk(rp.fe.fileLines) || typeof rp.fe.clientModule !== 'string' || !rp.fe.clientModule || Object.keys(rp.fe).length !== 2) bad.push('ruleParams.fe needs fileLines {soft, hardGrowth} and clientModule');
   }
   if (!Array.isArray(m.slots) || !m.slots.length) { bad.push('slots must be a non-empty list'); return bad; }
   const slotKeys = new Set(['id', 'profiles', 'path', 'presence', 'tracked', 'tier', 'tests', 'owner', 'appKind', 'minInstances', 'requiredWhen', 'requiredInstances', 'requires', 'allows', 'forbids', 'layers', 'budget', 'managedBy', 'rules', 'goesTo', 'why', 'since', 'retiredIn', 'successor']);
@@ -520,8 +527,16 @@ export function createSlotResolver(manifest, repo) {
     requiredPaths,
     trackingOf,
     isTracked,
+    ruleParams: () => ruleParams(manifest, profile),
     allowedImports: (tier) => manifest.tiers[profile][tier]?.mayImport ?? null,
   });
+}
+
+/** The rule parameters of one profile (be: globalModules, fileLines; fe: fileLines, clientModule), as a frozen deep copy. */
+export function ruleParams(manifest, profile) {
+  if (!PROFILES.includes(profile)) fail('HFS_MANIFEST_INVALID', `ruleParams has no profile ${profile}`, { profile });
+  const deepFreeze = (v) => { if (v && typeof v === 'object') Object.values(v).forEach(deepFreeze); return Object.freeze(v); };
+  return deepFreeze(structuredClone(manifest.ruleParams[profile]));
 }
 
 /** The manifest of this runtime plus the resolver for the repository at `repoRoot` (or for an already-parsed declaration). */

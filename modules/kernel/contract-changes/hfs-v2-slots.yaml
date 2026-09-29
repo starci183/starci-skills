@@ -10,7 +10,8 @@ summary: >-
   whether a path is tracked. Failure codes HFS_PATH_NO_SLOT, HFS_MANIFEST_MAJOR_MISMATCH, HFS_MANIFEST_INVALID and
   HFS_DECLARATION_INVALID join the catalog with Vietnamese text. The loader is not wired into any existing check yet
   and architecture.json support is untouched: later Phase 0 lanes (0.3 and 0.4) wire consumers and retire it. A major
-  mismatch is refused outright, with no compatibility window.
+  mismatch is refused outright, with no compatibility window. The manifest also carries ruleParams (be:
+  globalModules, fileLines; fe: fileLines, clientModule) and indexExports 60 on be.feature, read through ruleParams(profile).
 reach: new-legs
 paths:
   - knowledge/hfs/slots.yaml

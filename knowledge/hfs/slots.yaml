@@ -80,6 +80,19 @@ tiers:
 crossOwner: every import across owners targets the owner's public entry (index.ts or index.tsx); never export *.
 crossApp: apps never import each other; shared code is a packages/<pkg> slot.
 
+# Parameters the lint factories and checks read per profile (through ruleParams(profile) in scripts/lib/hfs-slots.mjs).
+ruleParams:
+  be:
+    # BE_MODULE_SHAPE: the only modules that may be @Global(); directories under src/modules/platform/.
+    globalModules: [src/modules/platform/config/, src/modules/platform/logging/, src/modules/platform/database/]
+    # HFS_SIZE_GROWTH: a file above soft may not grow against its parent commit; a new file stays within soft.
+    fileLines: {soft: 500, hardGrowth: true}
+  fe:
+    # Slot budgets (component.tsx 300, hooks 200, modules 400) are stricter than this cap where they apply.
+    fileLines: {soft: 500, hardGrowth: true}
+    # FE_TRANSPORT_OWNER: the one module per app that may call fetch.
+    clientModule: "apps/<app>/src/modules/api/client.ts"
+
 slots:
 
   # ----- repository root (both profiles) ---------------------------------------------------------------
@@ -394,7 +407,7 @@ slots:
     requires: [index.ts, "<feature>.module.ts", application/]
     allows: [index.ts, "<feature>.module.ts", application/, transport/]   # nothing else at feature root
     tests: unit-beside
-    budget: {files: 250}          # a feature above 250 source files must be split by product capability
+    budget: {files: 250, indexExports: 60}   # a feature above 250 source files must be split by product capability
     rules: [BE_FEATURE_SHAPE, BE_FEATURE_IMPORTS_FEATURE, BE_PUBLIC_SURFACE, BE_FEATURE_NOT_COMPOSED]
   - id: be.feature.application
     profiles: [be]

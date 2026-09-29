@@ -6,7 +6,7 @@ import path from 'node:path';
 import { createRequire } from 'node:module';
 import { parseYaml } from '../engine/yaml.mjs';
 import { braceVariants } from '../scripts/lib/glob.mjs';
-import { HfsSlotsError, loadSlotManifest, openHfs, readRepoDeclaration, resolveRepoDeclaration } from '../scripts/lib/hfs-slots.mjs';
+import { HfsSlotsError, loadSlotManifest, ruleParams, openHfs, readRepoDeclaration, resolveRepoDeclaration } from '../scripts/lib/hfs-slots.mjs';
 
 const root = path.resolve(import.meta.dirname, '..');
 const manifestText = fs.readFileSync(path.join(root, 'knowledge/hfs/slots.yaml'), 'utf8');
@@ -317,5 +317,30 @@ test('the failure catalog explains the new codes in Vietnamese', () => {
   for (const code of ['HFS_PATH_NO_SLOT', 'HFS_MANIFEST_MAJOR_MISMATCH', 'HFS_MANIFEST_INVALID', 'HFS_DECLARATION_INVALID']) {
     assert.ok(catalog[code], `${code} has no catalog entry`);
     for (const field of ['title_vi', 'meaning_vi', 'nextStep_vi']) assert.match(catalog[code][field], /[À-ỹ]/, `${code}.${field} is not Vietnamese`);
+  }
+});
+
+test('ruleParams: the parameters the canon lint lanes read', () => {
+  const manifest = loadSlotManifest();
+  const be = ruleParams(manifest, 'be');
+  assert.deepEqual(be.globalModules, ['src/modules/platform/config/', 'src/modules/platform/logging/', 'src/modules/platform/database/']);
+  assert.deepEqual(be.fileLines, { soft: 500, hardGrowth: true });
+  const fe = ruleParams(manifest, 'fe');
+  assert.deepEqual(fe.fileLines, { soft: 500, hardGrowth: true });
+  assert.equal(fe.clientModule, 'apps/<app>/src/modules/api/client.ts');
+  assert.equal(manifest.slots.find((s) => s.id === 'be.domain').budget.indexExports, 60);
+  assert.equal(manifest.slots.find((s) => s.id === 'be.feature').budget.indexExports, 60);
+  assert.deepEqual(openHfs({ declaration: BE }).ruleParams(), be);
+  assert.deepEqual(openHfs({ declaration: FE }).ruleParams(), fe);
+  assert.throws(() => { ruleParams(manifest, 'be').fileLines.soft = 1; }, TypeError);
+  // each global module is a directory a slot owns; the FE client module resolves to the api module
+  const openBe = openHfs({ declaration: BE });
+  for (const dir of be.globalModules) assert.equal(openBe.classifyPath(dir).slot, 'be.platform');
+  assert.equal(openHfs({ declaration: FE }).classifyPath(fe.clientModule.replace('<app>', 'web')).slot, 'fe.modules.api');
+  // schema and loader agree that ruleParams is required and closed
+  for (const mutate of [(d) => { delete d.ruleParams; }, (d) => { d.ruleParams.be.fileLines.soft = 0; }, (d) => { d.ruleParams.fe.extra = 1; }, (d) => { delete d.ruleParams.fe.clientModule; }]) {
+    const doc = parseYaml(manifestText); mutate(doc);
+    assert.equal(validateManifestSchema(doc), false);
+    refusal(() => loadSlotManifest({ text: JSON.stringify(doc) }), 'HFS_MANIFEST_INVALID');
   }
 });
