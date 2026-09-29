@@ -224,8 +224,8 @@ rules:
       - id: case-4
         when: Live model output, in e2e
         write: no provider call in e2e (no-model-call-in-e2e); only a live e2e under src/tests/e2e/live/ owns it
-          (harness-calls-provider-directly judges only a model harness: an LLM SDK import, a house model helper or
-          gateway symbol, or @harness-kind model; an identity-provider live e2e is not one)
+          (harness-calls-provider-directly judges only a model harness (an LLM SDK import, a house model helper or
+          gateway symbol, or @harness-kind model); an identity-provider live e2e is not one)
       - id: case-5
         when: A branch inside one step
         write: one step proves one outcome (lint no-branch-in-flow-step)
