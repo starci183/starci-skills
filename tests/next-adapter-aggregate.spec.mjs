@@ -7,6 +7,7 @@ import {createRequire} from 'node:module';
 import Ajv2020 from 'ajv/dist/2020.js';
 import {parseYaml} from '../engine/yaml.mjs';
 import {checkScopedLint} from '../scripts/checks/check-scoped-lint.mjs';
+import {trackHfsTree,writeHfsTree} from './_hfs-tree-fixture.mjs';
 import {checkArchitecture} from '../scripts/checks/architecture/index.mjs';
 
 const require=createRequire(import.meta.url);
@@ -31,47 +32,47 @@ function fixture(t,obligations){
     const target=path.join(root,'node_modules',name);fs.mkdirSync(path.dirname(target),{recursive:true});
     fs.symlinkSync(path.dirname(require.resolve(`${name}/package.json`)),target,'junction');
   };
-  link('typescript');
-  const manifest={private:true};
+  link('typescript');writeHfsTree(root,'frontend');
+  const manifest={private:true,workspaces:['apps/*']};
   write('package.json',manifest);write('package-lock.json',{lockfileVersion:3});
-  write('architecture.scope.json',{schema:'starci/architecture-config@1',kinds:['frontend'],tsconfig:'tsconfig.scope.json'});
-  write('tsconfig.scope.json',{compilerOptions:{module:'ESNext',moduleResolution:'Bundler',target:'ES2022',strict:true},include:['src/**/*.ts']});
+  write('architecture.json',{schema:'starci/architecture-config@1',kinds:['frontend'],tsconfig:'tsconfig.json'});
+  write('tsconfig.json',{compilerOptions:{module:'ESNext',moduleResolution:'Bundler',target:'ES2022',strict:true},include:['apps/web/src/**/*.ts']});
   const profileCatalog={schema:'starci/code-pattern-profile@1',profiles:{next:{
     title:'Next adapter integration',canon:{package:'@starci/eslint-canon-fe',version:'1.0.0',contentDigest:{algorithm:'sha256',include:['**/*.mjs'],exclude:[],framing:'sorted-posix-relative-path-null-raw-bytes-null',value:digest,files:1}},
-    sourceRuleRoots:['knowledge/patterns/fe'],expectedSourceRuleIds:['FE-ERROR-2'],sourceGlobs:['src/**/*.ts'],
-    inputGlobs:['package.json','package-lock.json','architecture.scope.json','tsconfig.scope.json'],obligations,semanticOnly:[],
+    sourceRuleRoots:['knowledge/patterns/fe'],expectedSourceRuleIds:['FE-ERROR-2'],sourceGlobs:['apps/web/src/**/*.ts'],
+    inputGlobs:['package.json','package-lock.json','architecture.json','tsconfig.json'],obligations,semanticOnly:[],
   }}};
   // This ESLint stub isolates aggregate binding. TypeScript, architecture and selected script adapters are real.
   const runtime={package:{name:'@starci/eslint-canon-fe',version:'1.0.0',digest,files:1},canon:{rules:{},recommended:{}},builtinRules:new Map(),typescriptRules:{},eslintVersion:'fixture',eslint:{
     isPathIgnored:async()=>false,calculateConfigForFile:async()=>({linterOptions:{noInlineConfig:true},rules:{},plugins:{}}),
     lintFiles:async files=>files.map(filePath=>({filePath,messages:[],suppressedMessages:[],errorCount:0,warningCount:0,fatalErrorCount:0})),
   }};
-  const options={profile:'next',profileCatalog,runtime,all:true,architectureConfig:'architecture.scope.json'};
-  return {root,write,link,manifest,profileCatalog,runtime,options,check:overrides=>checkScopedLint(root,[],{...options,...overrides})};
+  const options={profile:'next',profileCatalog,runtime,all:true,architectureConfig:'architecture.json'};
+  return {root,write,link,manifest,profileCatalog,runtime,options,check:overrides=>{trackHfsTree(root);return checkScopedLint(root,[],{...options,...overrides});}};
 }
 
 test('aggregate executes real SWR identity checks, rejects omitted metadata, and accepts proven absence',async t=>{
   const f=fixture(t,[obligation('DATA','architecture',swrRules)]);f.link('swr');
   f.manifest.starci={codePatterns:{next:{schema:'starci/next-code-pattern-contract@1',owners:[],closedVocabularies:[],dataLifecycle:{
-    schema:'starci/next-data-lifecycle@1',swr:{package:'swr',major:2},hooks:[{id:'item',path:'src/hooks/item/useItem.ts',export:'useItem',kind:'query',identities:[{id:'item',binding:'id',gatesRequest:true,resource:true}]}],
+    schema:'starci/next-data-lifecycle@1',swr:{package:'swr',major:2},hooks:[{id:'item',path:'apps/web/src/hooks/item/useItem.ts',export:'useItem',kind:'query',identities:[{id:'item',binding:'id',gatesRequest:true,resource:true}]}],
   }}}};
   f.write('package.json',f.manifest);
   const source="import useSWR from 'swr'; export const useItem=(id?:string)=>useSWR(id===undefined?null:['item',id],async()=>null);";
-  f.write('src/hooks/item/useItem.ts',source);
+  f.write('apps/web/src/hooks/item/useItem.ts',source);
   let report=await f.check();assert.equal(report.status,'clean',JSON.stringify(report.issues));
   assert.equal(report.machineResults[0].coverage.frontendDataLifecycle.status,'checked');
-  f.write('src/hooks/item/useItem.ts',source.replace("['item',id]","['item']"));
+  f.write('apps/web/src/hooks/item/useItem.ts',source.replace("['item',id]","['item']"));
   report=await f.check();assert.equal(report.status,'findings',JSON.stringify(report.issues));
   assert.ok(report.issues.some(item=>item.ruleId==='FE_SWR_KEY_IDENTITY'));
   delete f.manifest.starci.codePatterns.next.dataLifecycle;f.write('package.json',f.manifest);
   report=await f.check();assert.equal(report.status,'unavailable');
-  f.write('src/hooks/item/useItem.ts','export const item=1;');
+  f.write('apps/web/src/hooks/item/useItem.ts','export const item=1;');
   report=await f.check();assert.equal(report.status,'clean',JSON.stringify(report.issues));
   assert.equal(report.machineResults[0].coverage.frontendDataLifecycle.status,'not-applicable');
 });
 
 test('aggregate rejects claimed SWR rule IDs without matching lifecycle coverage',async t=>{
-  const f=fixture(t,[obligation('DATA','architecture',swrRules)]);f.write('src/item.ts','export const item=1;');
+  const f=fixture(t,[obligation('DATA','architecture',swrRules)]);f.write('apps/web/src/item.ts','export const item=1;');
   const architecture=args=>{
     const report=checkArchitecture(args);report.coverage.frontendDataLifecycle={status:'unavailable'};
     report.coverage.checkedRuleIds.push(...swrRules);return report;
@@ -82,24 +83,24 @@ test('aggregate rejects claimed SWR rule IDs without matching lifecycle coverage
 
 test('Next error adapter receives canonical project config and mixed overlapping source/metadata context',async t=>{
   const f=fixture(t,[obligation('SOURCE','architecture',['ARCH_SYNTAX_INVALID']),obligation('ENVELOPE','script',['FE_ERROR_ENVELOPE_POLICY'])]);
-  f.manifest.starci={codePatterns:{next:{errorState:{schema:'starci/next-error-state@1',sourceRoots:['src'],worldMappings:[],writes:[],boundaries:[],
-    transports:[{root:'src/modules/api',mode:'envelope',envelopeIds:['read']}],envelopes:[{id:'read',type:{path:'src/modules/api/envelope.ts',export:'Envelope'},discriminator:{field:'ok',success:true},dataField:'data',errorFields:['error'],readers:[{path:'src/modules/api/read.ts',export:'read',emptyData:'valid'}]}],
+  f.manifest.starci={codePatterns:{next:{errorState:{schema:'starci/next-error-state@1',sourceRoots:['apps/web/src'],worldMappings:[],writes:[],boundaries:[],
+    transports:[{root:'apps/web/src/modules/api',mode:'envelope',envelopeIds:['read']}],envelopes:[{id:'read',type:{path:'apps/web/src/modules/api/envelope.ts',export:'Envelope'},discriminator:{field:'ok',success:true},dataField:'data',errorFields:['error'],readers:[{path:'apps/web/src/modules/api/read.ts',export:'read',emptyData:'valid'}]}],
   }}}};f.write('package.json',f.manifest);
-  f.write('src/modules/api/envelope.ts',"export type Envelope={readonly ok:true;readonly data:string|null;readonly error?:never}|{readonly ok:false;readonly data:null;readonly error:string};");
+  f.write('apps/web/src/modules/api/envelope.ts',"export type Envelope={readonly ok:true;readonly data:string|null;readonly error?:never}|{readonly ok:false;readonly data:null;readonly error:string};");
   const source="import type {Envelope} from './envelope'; export function read(result:Envelope){if(!result.ok)throw new Error(result.error);return result.data??null;}";
-  f.write('src/modules/api/read.ts',source);
+  f.write('apps/web/src/modules/api/read.ts',source);
   let report=await f.check();assert.equal(report.status,'clean',JSON.stringify(report.issues));
   const result=report.machineResults.find(item=>item.obligation==='ENVELOPE');
-  assert.equal(result.compiler.architectureConfig,'architecture.scope.json');
+  assert.equal(result.compiler.architectureConfig,'architecture.json');
   assert.deepEqual(result.checkedRuleIds,['FE_ERROR_ENVELOPE_POLICY']);
-  f.write('src/modules/api/read.ts',source.replace('if(!result.ok)throw new Error(result.error);',''));
+  f.write('apps/web/src/modules/api/read.ts',source.replace('if(!result.ok)throw new Error(result.error);',''));
   report=await f.check();assert.equal(report.status,'findings',JSON.stringify(report.issues));
   assert.ok(report.issues.some(item=>item.ruleId==='FE_ERROR_ENVELOPE_POLICY'));
 });
 
 test('Grammar execution evidence survives the aggregate and guard regression fails the same gate',async t=>{
   const f=fixture(t,[obligation('GRAMMAR','script',['FE_GRAMMAR_GUARD_BEHAVIOR'],['package.json'])]);
-  f.write('src/item.ts','export const item=1;');
+  f.write('apps/web/src/item.ts','export const item=1;');
   f.manifest.starci={codePatterns:{next:{grammarGuards:{schema:'starci/grammar-guard-contract@1',package:'@starci/grammar',entry:'./common',source:{kind:'installed'},vectorProfile:'starci/grammar-guards-v1'}}}};
   f.write('package.json',f.manifest);
   f.write('node_modules/@starci/grammar/package.json',{name:'@starci/grammar',version:'1.0.0',type:'module',files:['dist'],exports:{'./common':'./dist/common.js'}});

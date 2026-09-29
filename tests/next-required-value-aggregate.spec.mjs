@@ -4,6 +4,7 @@ import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
 import {createRequire} from 'node:module';
+import {trackHfsTree,writeHfsTree} from './_hfs-tree-fixture.mjs';
 import {checkScopedLint} from '../scripts/checks/check-scoped-lint.mjs';
 
 const require=createRequire(import.meta.url);
@@ -30,26 +31,27 @@ function fixture(t){
     const target=path.join(root,relative);fs.mkdirSync(path.dirname(target),{recursive:true});
     fs.writeFileSync(target,typeof value==='string'?value:JSON.stringify(value));
   };
+  writeHfsTree(root,'frontend');
   fs.mkdirSync(path.join(root,'node_modules'),{recursive:true});
   fs.symlinkSync(path.dirname(require.resolve('typescript/package.json')),path.join(root,'node_modules','typescript'),'junction');
   const contract={
-    schema:'starci/next-error-state@1',sourceRoots:['src'],worldMappings:[],writes:[],boundaries:[],
-    transports:[{root:'src/modules/api',mode:'envelope',envelopeIds:['read']}],
-    envelopes:[{id:'read',type:{path:'src/modules/api/envelope.ts',export:'ReadEnvelope'},discriminator:{field:'ok',success:true},dataField:'data',errorFields:['error'],readers:[{path:'src/modules/api/read.ts',export:'readCourse',emptyData:'valid'}]}],
-    requiredValues:[{id:'course',owner:{path:'src/modules/api/required.ts',export:'requireCourse'},binding:'value',absence:'undefined'}],
+    schema:'starci/next-error-state@1',sourceRoots:['apps/web/src'],worldMappings:[],writes:[],boundaries:[],
+    transports:[{root:'apps/web/src/modules/api',mode:'envelope',envelopeIds:['read']}],
+    envelopes:[{id:'read',type:{path:'apps/web/src/modules/api/envelope.ts',export:'ReadEnvelope'},discriminator:{field:'ok',success:true},dataField:'data',errorFields:['error'],readers:[{path:'apps/web/src/modules/api/read.ts',export:'readCourse',emptyData:'valid'}]}],
+    requiredValues:[{id:'course',owner:{path:'apps/web/src/modules/api/required.ts',export:'requireCourse'},binding:'value',absence:'undefined'}],
   };
-  const manifest={private:true,starci:{codePatterns:{next:{errorState:contract}}}};
+  const manifest={private:true,workspaces:['apps/*'],starci:{codePatterns:{next:{errorState:contract}}}};
   write('package.json',manifest);write('package-lock.json',{lockfileVersion:3});
-  write('architecture.scope.json',{schema:'starci/architecture-config@1',kinds:['frontend'],tsconfig:'tsconfig.json'});
-  write('tsconfig.json',{compilerOptions:{module:'ESNext',moduleResolution:'Bundler',target:'ES2022',strict:true},include:['src/**/*.ts']});
-  write('jest.config.ts',`import type {ReadEnvelope} from './src/modules/api/envelope';
+  write('architecture.json',{schema:'starci/architecture-config@1',kinds:['frontend'],tsconfig:'tsconfig.json'});
+  write('tsconfig.json',{compilerOptions:{module:'ESNext',moduleResolution:'Bundler',target:'ES2022',strict:true},include:['apps/web/src/**/*.ts']});
+  write('vitest.config.ts',`import type {ReadEnvelope} from './apps/web/src/modules/api/envelope';
 export function uncheckedMetadata(value:ReadEnvelope){return value.data}`);
-  write('src/modules/api/envelope.ts',`export type ReadEnvelope=
+  write('apps/web/src/modules/api/envelope.ts',`export type ReadEnvelope=
   |{readonly ok:true;readonly data:string|null;readonly error?:never}
   |{readonly ok:false;readonly data:null;readonly error:string};`);
-  write('src/modules/api/read.ts',`import type {ReadEnvelope} from './envelope';
+  write('apps/web/src/modules/api/read.ts',`import type {ReadEnvelope} from './envelope';
 export function readCourse(result:ReadEnvelope){if(!result.ok)throw new Error(result.error);return result.data??null}`);
-  write('src/modules/api/required.ts',`export function requireCourse(value:string|undefined):string{
+  write('apps/web/src/modules/api/required.ts',`export function requireCourse(value:string|undefined):string{
   if(value===undefined)throw new Error('Course is required');return value
 }`);
   const obligations=[architectureObligation,
@@ -60,7 +62,7 @@ export function readCourse(result:ReadEnvelope){if(!result.ok)throw new Error(re
     title:'Required-value aggregate integration',
     canon:{package:'@starci/eslint-canon-fe',version:'1.0.0',contentDigest:{algorithm:'sha256',include:['**/*.mjs'],exclude:[],framing:'sorted-posix-relative-path-null-raw-bytes-null',value:digest,files:1}},
     sourceRuleRoots:['knowledge/patterns/fe'],expectedSourceRuleIds:['FE-ARCHITECTURE-1','FE-ERROR-2','FE-ERROR-3'],
-    sourceGlobs:['src/**/*.ts'],inputGlobs:['package.json','package-lock.json','architecture.scope.json','tsconfig.json','jest.config.ts'],
+    sourceGlobs:['apps/web/src/**/*.ts'],inputGlobs:['package.json','package-lock.json','architecture.json','tsconfig.json','vitest.config.ts'],
     obligations,semanticOnly:[],
   }}};
   // ESLint is isolated; checkScopedLint's default script dispatcher and TypeScript programs remain real.
@@ -68,35 +70,35 @@ export function readCourse(result:ReadEnvelope){if(!result.ok)throw new Error(re
     isPathIgnored:async()=>false,calculateConfigForFile:async()=>({linterOptions:{noInlineConfig:true},rules:{},plugins:{}}),
     lintFiles:async files=>files.map(filePath=>({filePath,messages:[],suppressedMessages:[],errorCount:0,warningCount:0,fatalErrorCount:0})),
   }};
-  const options={profile:'next',profileCatalog,runtime,architectureConfig:'architecture.scope.json',all:true};
-  return {root,write,contract,manifest,check:()=>checkScopedLint(root,[],options)};
+  const options={profile:'next',profileCatalog,runtime,architectureConfig:'architecture.json',all:true};
+  return {root,write,contract,manifest,check:()=>{trackHfsTree(root);return checkScopedLint(root,[],options);}};
 }
 
 test('default Next dispatcher proves required values while sourceOnly excludes bound Jest metadata',async t=>{
   const f=fixture(t),report=await f.check();
   assert.equal(report.status,'clean',JSON.stringify(report.issues));
-  assert.ok(report.coverage.expectedFiles.includes('jest.config.ts'));
-  assert.ok(report.inputs.before.files.includes('jest.config.ts'));
-  assert.ok(!report.coverage.lintedFiles.includes('jest.config.ts'));
+  assert.ok(report.coverage.expectedFiles.includes('vitest.config.ts'));
+  assert.ok(report.inputs.before.files.includes('vitest.config.ts'));
+  assert.ok(!report.coverage.lintedFiles.includes('vitest.config.ts'));
   for(const id of ['REQUIRED','ENVELOPE']){
     const selected=report.obligations.find(item=>item.id===id).files;
-    assert.ok(selected.includes('src/modules/api/required.ts'));
-    assert.ok(!selected.includes('jest.config.ts'));
+    assert.ok(selected.includes('apps/web/src/modules/api/required.ts'));
+    assert.ok(!selected.includes('vitest.config.ts'));
   }
   const required=report.machineResults.find(item=>item.obligation==='REQUIRED');
   assert.deepEqual(required.checkedRuleIds,['FE_REQUIRED_VALUE_FAILURE']);
-  assert.equal(required.compiler.architectureConfig,'architecture.scope.json');
+  assert.equal(required.compiler.architectureConfig,'architecture.json');
 });
 
 test('missing required-value guard reaches the aggregate as a finding',async t=>{
-  const f=fixture(t);f.write('src/modules/api/required.ts',`export function requireCourse(value:string|undefined):string{return value??'fallback'}`);
+  const f=fixture(t);f.write('apps/web/src/modules/api/required.ts',`export function requireCourse(value:string|undefined):string{return value??'fallback'}`);
   const report=await f.check();
   assert.equal(report.status,'findings',JSON.stringify(report.issues));
   assert.ok(report.issues.some(item=>item.code==='SCRIPT_PATTERN_VIOLATION'&&item.ruleId==='FE_REQUIRED_VALUE_FAILURE'));
 });
 
 test('a cast Error lookalike cannot produce a clean aggregate result',async t=>{
-  const f=fixture(t);f.write('src/modules/api/required.ts',`class LocalLookalike{}
+  const f=fixture(t);f.write('apps/web/src/modules/api/required.ts',`class LocalLookalike{}
 const Spoofed=LocalLookalike as typeof Error;
 export function requireCourse(value:string|undefined):string{if(value===undefined)throw new Spoofed();return value}`);
   const report=await f.check();
@@ -105,7 +107,7 @@ export function requireCourse(value:string|undefined):string{if(value===undefine
 });
 
 test('an opaque undeclared envelope consumer makes the aggregate unavailable',async t=>{
-  const f=fixture(t);f.write('src/modules/api/opaque.ts',`import type {ReadEnvelope} from './envelope';
+  const f=fixture(t);f.write('apps/web/src/modules/api/opaque.ts',`import type {ReadEnvelope} from './envelope';
 export class StoredEnvelope{constructor(readonly value:ReadEnvelope){}}`);
   const report=await f.check();
   assert.equal(report.status,'unavailable',JSON.stringify(report.issues));

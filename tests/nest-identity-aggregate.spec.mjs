@@ -4,6 +4,7 @@ import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
 import { createRequire } from 'node:module';
+import { trackHfsTree, writeHfsTree } from './_hfs-tree-fixture.mjs';
 import { checkScopedLint } from '../scripts/checks/check-scoped-lint.mjs';
 
 const require = createRequire(import.meta.url);
@@ -23,12 +24,12 @@ const legacyRules = [
 const capabilityContract = {
   schema: 'starci/nest-error-identity@1',
   profile: 'capability',
-  throwRoots: ['src', 'server'],
+  throwRoots: ['src', 'apps'],
   families: [{
     id: 'capability',
-    path: 'src/errors/capability-error.ts',
+    path: 'src/modules/platform/errors/capability-error.ts',
     export: 'CapabilityError',
-    declarationRoots: ['src/errors'],
+    declarationRoots: ['src/modules/platform/errors'],
     codeProperty: 'code',
     causeProperties: ['cause'],
   }],
@@ -37,12 +38,12 @@ const capabilityContract = {
 const academyContract = {
   schema: 'starci/nest-error-identity@1',
   profile: 'academy-abstract-exception',
-  throwRoots: ['src', 'server'],
+  throwRoots: ['src', 'apps'],
   families: [{
     id: 'academy',
-    path: 'src/errors/abstract.ts',
+    path: 'src/modules/platform/errors/abstract.ts',
     export: 'AbstractException',
-    declarationRoots: ['src/errors'],
+    declarationRoots: ['src/modules/platform/errors'],
     codeProperty: 'code',
     causeProperties: ['originalError'],
     academy: { classSuffix: 'Exception', codeArgument: 1, metadataArgument: 2 },
@@ -69,37 +70,38 @@ function fixture(t, { profile = 'capability', legacy = 'off' } = {}) {
   write('architecture.json', { schema: 'starci/architecture-config@1', kinds: ['backend'], tsconfig: 'tsconfig.json' });
   write('tsconfig.json', {
     compilerOptions: { target: 'ES2022', module: 'ESNext', moduleResolution: 'Bundler', strict: true },
-    include: ['src/**/*.ts', 'server/**/*.ts'],
+    include: ['src/**/*.ts', 'apps/**/*.ts'],
   });
-  write('jest.config.ts', "export default { setup: () => { throw new Error('configuration only'); } };\n");
+  write('jest.config.js', "export default { setup: () => { throw new Error('configuration only'); } };\n");
 
   if (profile === 'academy-abstract-exception') {
-    write('src/errors/abstract.ts', `export interface AbstractExceptionMetadata { originalError?: unknown }
+    write('src/modules/platform/errors/abstract.ts', `export interface AbstractExceptionMetadata { originalError?: unknown }
 export class AbstractException extends Error {
   readonly code: string;
   constructor(message: string, code: string, readonly metadata: AbstractExceptionMetadata) { super(message); this.code = code; }
 }`);
-    write('src/errors/user-missing.ts', `import { AbstractException, AbstractExceptionMetadata } from './abstract';
+    write('src/modules/platform/errors/user-missing.ts', `import { AbstractException, AbstractExceptionMetadata } from './abstract';
 export interface UserMissingExceptionMetadata extends AbstractExceptionMetadata { id?: string }
 export class UserMissingException extends AbstractException {
   constructor({ id, originalError }: UserMissingExceptionMetadata) {
     super('User missing', 'USER_MISSING_EXCEPTION', { id, originalError });
   }
 }`);
-    write('server/modules/execute.ts', `import { UserMissingException } from '../../src/errors/user-missing';
+    write('src/features/run/application/execute.use-case.ts', `import { UserMissingException } from '../../../modules/platform/errors/user-missing';
 export function execute(): never { throw new UserMissingException({}); }`);
   } else {
-    write('src/errors/capability-error.ts', `export class CapabilityError extends Error {
+    write('src/modules/platform/errors/capability-error.ts', `export class CapabilityError extends Error {
   readonly code = 'CAPABILITY_ERROR';
   constructor(readonly metadata: { cause?: unknown } = {}) { super('failed'); }
 }`);
-    write('src/errors/widget-error.ts', `import { CapabilityError } from './capability-error';
+    write('src/modules/platform/errors/widget-error.ts', `import { CapabilityError } from './capability-error';
 export class WidgetError extends CapabilityError {}`);
-    write('server/modules/execute.ts', `import { WidgetError } from '../../src/errors/widget-error';
+    write('src/features/run/application/execute.use-case.ts', `import { WidgetError } from '../../../modules/platform/errors/widget-error';
 export function execute(): never { throw new WidgetError({}); }`);
   }
-  write('src/disposition.ts', "export function disposition(): { status: 'refused' } { return { status: 'refused' }; }\n");
+  write('src/modules/platform/disposition/disposition.ts', "export function disposition(): { status: 'refused' } { return { status: 'refused' }; }\n");
 
+  writeHfsTree(root, 'backend');
   fs.mkdirSync(path.join(root, 'node_modules'), { recursive: true });
   fs.symlinkSync(path.dirname(require.resolve('typescript/package.json')), path.join(root, 'node_modules/typescript'), 'junction');
 
@@ -113,7 +115,7 @@ export function execute(): never { throw new WidgetError({}); }`);
     sourceRuleRoots: ['knowledge/patterns/be'],
     expectedSourceRuleIds: ['BE-ERROR-1', 'BE-ERROR-2', 'BE-ERROR-3', 'BE-NAMING-3'],
     sourceGlobs: ['src/**/*.ts'],
-    inputGlobs: ['package.json', 'architecture.json', 'tsconfig.json', 'jest.config.ts'],
+    inputGlobs: ['package.json', 'architecture.json', 'tsconfig.json', 'jest.config.js'],
     obligations: [
       {
         id: 'NEST-EXCEPTION-IDENTITY', sourceRuleIds: ['BE-ERROR-1', 'BE-ERROR-2', 'BE-ERROR-3', 'BE-NAMING-3'],
@@ -146,7 +148,7 @@ export function execute(): never { throw new WidgetError({}); }`);
     },
   };
   const options = { profile: 'nest', profileCatalog, runtime, architectureConfig: 'architecture.json', all: true };
-  return { root, write, manifest, profileCatalog, options, check: overrides => checkScopedLint(root, [], { ...options, ...overrides }) };
+  return { root, write, manifest, profileCatalog, options, check: overrides => { trackHfsTree(root); return checkScopedLint(root, [], { ...options, ...overrides }); } };
 }
 
 test('capability identity checks all canonical source roots while metadata remains context only', async t => {
@@ -155,16 +157,16 @@ test('capability identity checks all canonical source roots while metadata remai
   assert.equal(report.status, 'clean', JSON.stringify(report.issues));
   const identity = report.machineResults.find(item => item.obligation === 'NEST-EXCEPTION-IDENTITY');
   assert.deepEqual(identity.checkedRuleIds, [...identityRules].sort());
-  assert.ok(identity.files.includes('server/modules/execute.ts'));
-  assert.ok(!identity.files.includes('jest.config.ts'));
-  assert.ok(report.inputs.before.files.includes('jest.config.ts'));
-  assert.ok(report.obligations.find(item => item.id === 'NEST-LEGACY-EXCEPTION-IDENTITY-GUARD').files.includes('server/modules/execute.ts'));
-  assert.ok(!report.obligations.find(item => item.id === 'NEST-LEGACY-EXCEPTION-IDENTITY-GUARD').files.includes('jest.config.ts'));
+  assert.ok(identity.files.includes('src/features/run/application/execute.use-case.ts'));
+  assert.ok(!identity.files.includes('jest.config.js'));
+  assert.ok(report.inputs.before.files.includes('jest.config.js'));
+  assert.ok(report.obligations.find(item => item.id === 'NEST-LEGACY-EXCEPTION-IDENTITY-GUARD').files.includes('src/features/run/application/execute.use-case.ts'));
+  assert.ok(!report.obligations.find(item => item.id === 'NEST-LEGACY-EXCEPTION-IDENTITY-GUARD').files.includes('jest.config.js'));
 
-  f.write('server/modules/execute.ts', "export function execute(): never { throw new Error('bare'); }\n");
+  f.write('src/features/run/application/execute.use-case.ts', "export function execute(): never { throw new Error('bare'); }\n");
   report = await f.check();
   assert.equal(report.status, 'findings', JSON.stringify(report.issues));
-  assert.ok(report.issues.some(issue => issue.ruleId === 'NEST_THROWN_ERROR_IDENTITY' && issue.path === 'server/modules/execute.ts'));
+  assert.ok(report.issues.some(issue => issue.ruleId === 'NEST_THROWN_ERROR_IDENTITY' && issue.path === 'src/features/run/application/execute.use-case.ts'));
 
   f.write('package.json', { private: true });
   report = await f.check();
@@ -181,8 +183,8 @@ test('Academy identity accepts its exact constructor and rejects a mismatched cl
   const f = fixture(t, { profile: 'academy-abstract-exception' });
   let report = await f.check();
   assert.equal(report.status, 'clean', JSON.stringify(report.issues));
-  const child = fs.readFileSync(path.join(f.root, 'src/errors/user-missing.ts'), 'utf8');
-  f.write('src/errors/user-missing.ts', child.replace('USER_MISSING_EXCEPTION', 'UNRELATED_CODE'));
+  const child = fs.readFileSync(path.join(f.root, 'src/modules/platform/errors/user-missing.ts'), 'utf8');
+  f.write('src/modules/platform/errors/user-missing.ts', child.replace('USER_MISSING_EXCEPTION', 'UNRELATED_CODE'));
   report = await f.check();
   assert.equal(report.status, 'findings', JSON.stringify(report.issues));
   assert.ok(report.issues.some(issue => issue.ruleId === 'NEST_ERROR_DECLARATION_IDENTITY'));
