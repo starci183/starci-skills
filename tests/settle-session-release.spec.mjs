@@ -113,7 +113,7 @@ test('settle archives the settled op\'s own claude session file', t => {
   const fx = fixture(t), wf = 'wf-sess-archive', jobId = 'op-sess-archive-a1';
   seedOpJob(fx.ledgerFile, { wf, jobId, handle: 'term-sess1', worktree: fx.repo });
   seedOrcaTerminal(fx.stateFile, { handle: 'term-sess1', connected: true, writable: true, command: 'claude', tabId: 'tab-1', title: '[Op] docs.author' });
-  const session = claudeSessionFile(fx.trustHome, fx.repo, 'aaaaaaaa-1111-4111-8111-aaaaaaaaaaaa.jsonl', `[Op] docs.author — (job ${jobId}, attempt 1)`);
+  const session = claudeSessionFile(fx.trustHome, fx.repo, 'aaaaaaaa-1111-4111-8111-aaaaaaaaaaaa.jsonl', `[Op] docs.author — (job ${jobId}, attempt 1, dispatch ctx-${jobId})`);
   // The session's own usage record: settle reads it before the file moves (scripts/kernel/usage-record.mjs).
   fs.appendFileSync(session, json({ type: 'assistant', sessionId: 'aaaaaaaa', message: { id: 'msg_1', model: 'claude-opus-5-5', content: [], usage: { input_tokens: 7, output_tokens: 11, cache_read_input_tokens: 100, cache_creation_input_tokens: 13 } } }) + '\n');
 

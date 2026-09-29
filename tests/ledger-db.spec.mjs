@@ -417,7 +417,8 @@ test('recordAttemptUsage writes llm_usage rows and the attempt summary once; rec
   for(const to of ['ready','leased'])ledger.write.setJobStatus({jobId:'j1',to,reason:'test'});
   const {attempt_id:attemptId}=ledger.write.startAttempt({workflowId:'wf',jobId:'j1',dispatchId:'ctx_usage',provider:'claude'});
   const row={model:'claude-opus-5-5',inputTokens:10,outputTokens:20,cacheReadTokens:300,cacheWriteTokens:40,reasoningTokens:5,turns:3,toolCalls:2,toolErrors:0,costUsd:null};
-  assert.deepEqual(ledger.write.recordAttemptUsage({attemptId,rows:[row]}),{recorded:true,rows:1});
+  assert.deepEqual(ledger.write.recordAttemptUsage({attemptId,rows:[row],sessions:[{session:'s1',matchedBy:'dispatch-id+task-id',where:'live'}]}),{recorded:true,rows:1});
+  assert.deepEqual(JSON.parse(ledger.db.prepare("SELECT payload_json FROM events WHERE kind='attempt-usage-recorded'").get().payload_json).sessions,[{session:'s1',matchedBy:'dispatch-id+task-id',where:'live'}],'the event names the exact session link');
   assert.deepEqual(ledger.write.recordAttemptUsage({attemptId,rows:[row]}),{recorded:false,rows:0},'a second recording adds nothing');
   const a=ledger.getAttempt(attemptId);
   assert.equal(a.tokens_in,350,'tokens_in = fresh + cache read + cache write');assert.equal(a.tokens_out,20);assert.equal(a.cost_usd,null,'a row without a costUsd leaves cost NULL');assert.equal(a.usage_source,'cli-transcript');

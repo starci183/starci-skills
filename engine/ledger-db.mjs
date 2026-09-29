@@ -896,7 +896,7 @@ const USAGE_COLUMNS=r=>({responseModel:r.model??null,inputTokens:r.inputTokens??
  * usage_source) and one 'attempt-usage-recorded' event. An attempt that already has llm_usage rows is left alone, so a
  * re-run never double counts. Returns {recorded, rows}.
  */
-export function recordAttemptUsage(db,{attemptId,rows,source='cli-transcript',provider=null,requestModel=null,at=nowMs()}){
+export function recordAttemptUsage(db,{attemptId,rows,source='cli-transcript',provider=null,requestModel=null,sessions=null,at=nowMs()}){
   const a=db.prepare('SELECT * FROM op_attempts WHERE attempt_id=?').get(attemptId);
   need(a,`attempt ${attemptId} not found`,'STARCI_ATTEMPT_NOT_FOUND');
   need(Array.isArray(rows)&&rows.length,'recordAttemptUsage needs at least one usage row');
@@ -908,7 +908,7 @@ export function recordAttemptUsage(db,{attemptId,rows,source='cli-transcript',pr
   const costUsd=rows.every(r=>typeof r.costUsd==='number')?Math.round(rows.reduce((n,r)=>n+r.costUsd,0)*1e6)/1e6:null;
   updateAttempt(db,{attemptId,at,tokensIn,tokensOut,costUsd,usageSource:source,usageReason:null});
   appendEvent(db,{workflowId:a.workflow_id,entityType:'attempt',entityId:String(attemptId),attemptId,spanId:a.span_id,kind:'attempt-usage-recorded',
-    payload:{attemptId,source,models:rows.map(r=>r.model),tokensIn,tokensOut,costUsd},createdAt:at});
+    payload:{attemptId,source,models:rows.map(r=>r.model),tokensIn,tokensOut,costUsd,...(sessions?{sessions}:{})},createdAt:at});   // sessions: [{session id, matchedBy, where}] - the exact link
   return {recorded:true,rows:rows.length};
 }
 /**

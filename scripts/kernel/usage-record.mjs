@@ -30,7 +30,6 @@ export const DEFAULT_LOOKBACK_MS = 3 * DAY_MS;
 /** A session file is created a little before its op's dispatch row lands (the terminal launches first). */
 export const SESSION_LEAD_MS = 30 * 60 * 1000;
 
-const JOB_ID = /\bop-[a-z0-9.]+(?:-[a-z0-9.]+)*-[0-9a-f]{10}\b/;
 const message = (e) => String(e?.message ?? e);
 
 /* --------------------------------------------------------------------------------------------------- session index */
@@ -69,7 +68,7 @@ export function readSessionHead(agent, head) {
   return { startMs, firstUser };
 }
 
-/** What a session is: {role:'kernel', workflowId} | {role:'supervisor'} | {role:'op', dispatchId, taskId, jobId} | {role:'other'}. */
+/** What a session is: {role:'kernel', workflowId} | {role:'supervisor'} | {role:'op', dispatchId, taskId} | {role:'other'}. */
 export function classifySession(firstUser) {
   const text = String(firstUser ?? '');
   const top = text.slice(0, 800);
@@ -78,8 +77,7 @@ export function classifySession(firstUser) {
   if (/You are the \[Supervisor\]/.test(top)) return { role: 'supervisor' };
   const dispatchId = /--dispatch-id (ctx_[0-9a-f]+)/.exec(text)?.[1] ?? /\bctx_[0-9a-f]{12}\b/.exec(text)?.[0] ?? null;
   const taskId = /Your task ID is: (task_[0-9a-f]+)/.exec(text)?.[1] ?? null;
-  const jobId = JOB_ID.exec(text)?.[0] ?? null;
-  return dispatchId || taskId || jobId ? { role: 'op', dispatchId, taskId, jobId } : { role: 'other' };
+  return dispatchId || taskId ? { role: 'op', dispatchId, taskId } : { role: 'other' };
 }
 
 const jsonlIn = (dir, sinceMs, out, where, agent, depth = 0) => {
@@ -121,8 +119,26 @@ export function listSessionFiles({ agents = USAGE_AGENTS, sinceMs, env = process
     if (agent === 'claude') jsonlIn(dir, sinceMs, out, 'archive', agent, 3);
     else jsonlIn(dir, sinceMs, out, 'archive', agent);
   }
-  const seen = new Set();
-  return out.filter((f) => { const k = path.resolve(f.file).toLowerCase(); if (seen.has(k)) return false; seen.add(k); return true; });
+  return dedupeSessions(out);
+}
+
+const UUID = /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/gi;
+/** The CLI's own session id: the last UUID of the file name (`rollout-<time>-<uuid>.jsonl`, `<uuid>.jsonl`, an archive's `<slug>__<uuid>.jsonl`), else the path. */
+export const sessionKeyOf = (file) => (path.basename(file).match(UUID)?.pop() ?? path.resolve(file)).toLowerCase();
+
+/**
+ * One entry per session. The session archive can hold the same session under two names (a Codex rollout as `<DD>__rollout-...` and
+ * `rollout-...`, a Claude file with and without its `<slug>__` prefix) and a session can sit live and archived at once; counting each
+ * file would count that session twice. The live copy wins, then the larger (later) one.
+ */
+export function dedupeSessions(files) {
+  const best = new Map();
+  for (const f of files) {
+    const k = `${f.agent}:${sessionKeyOf(f.file)}`;
+    const cur = best.get(k);
+    if (!cur || (f.where === 'live') > (cur.where === 'live') || (f.where === cur.where && f.size > cur.size)) best.set(k, f);
+  }
+  return [...best.values()];
 }
 
 /** listSessionFiles with each file's head classified: [{file, agent, where, startMs, ...classification}]. */
@@ -139,17 +155,18 @@ export function indexSessions(options = {}) {
 export const attemptAgent = (a) => sessionAgentOf({ agent: a?.agent, provider: a?.provider, model: a?.model });
 
 /**
- * The session entries of one attempt: the entry naming its dispatch id or task id (exact); failing that, the entries
- * naming its job id when the job has ONE attempt (a retried job's sessions are told apart by dispatch id only).
+ * The session entries of one attempt, by EXACT id only: the entry whose first user message names this attempt's dispatch id
+ * (op_attempts.dispatch_id, the Orca worker preamble's --dispatch-id) or task id. Both are unique per attempt, so a sibling that
+ * shares the checkout, the job or the time window never matches; nothing is matched by cwd, time window or job id.
  */
-export function entriesOfAttempt(index, attempt, { attemptsOfJob = 1 } = {}) {
+export function entriesOfAttempt(index, attempt) {
   const agent = attemptAgent(attempt);
-  const ops = index.filter((e) => e.role === 'op' && e.agent === agent);
-  const exact = ops.filter((e) => (e.dispatchId && e.dispatchId === attempt.dispatch_id) || (e.taskId && attempt.task_id && e.taskId === attempt.task_id));
-  if (exact.length) return exact;
-  if (attemptsOfJob === 1 && attempt.job_id) return ops.filter((e) => e.jobId === attempt.job_id);
-  return [];
+  return index.filter((e) => e.role === 'op' && e.agent === agent
+    && ((e.dispatchId && e.dispatchId === attempt.dispatch_id) || (e.taskId && attempt.task_id && e.taskId === attempt.task_id)));
 }
+
+/** Which id linked a session to the attempt: 'dispatch-id', 'task-id' or both. */
+export const matchedBy = (entry, attempt) => [entry.dispatchId && entry.dispatchId === attempt.dispatch_id ? 'dispatch-id' : null, entry.taskId && attempt.task_id && entry.taskId === attempt.task_id ? 'task-id' : null].filter(Boolean).join('+');
 
 const mergeRows = (lists) => {
   const by = new Map();
@@ -175,7 +192,8 @@ export function planAttemptUsage(attempt, entries, { prices = loadPrices(), extr
   const ok = got.filter((g) => g.ok);
   if (!ok.length) return { ...base, ok: false, source: USAGE_UNAVAILABLE, reason: got[0]?.reason ?? 'session file holds no usage record' };
   const rows = mergeRows(ok.map((g) => g.models)).map((r) => ({ ...r, costUsd: costOfRow(r, prices) }));
-  return { ...base, ok: true, source: USAGE_SOURCE, rows, files: ok.map((g) => g.file) };
+  return { ...base, ok: true, source: USAGE_SOURCE, rows, files: ok.map((g) => g.file),
+    sessions: entries.filter((e) => ok.some((g) => g.file === e.file)).map((e) => ({ session: sessionKeyOf(e.file), matchedBy: matchedBy(e, attempt), where: e.where ?? null })) };
 }
 
 /** How long after an attempt ended a missing session file stays 'not found yet' (the file may still be archived) before it is recorded unavailable. */
@@ -192,12 +210,12 @@ export function applyAttemptUsage(ledger, plan, { at = Date.now() } = {}) {
     if (!plan.definitive && !settled) return { recorded: false, reason: plan.reason, pending: true };
     return { recorded: false, reason: plan.reason, ...ledger.write.markAttemptUsageUnavailable({ attemptId: plan.attemptId, reason: plan.reason, at }) };
   }
-  return ledger.write.recordAttemptUsage({ attemptId: plan.attemptId, rows: plan.rows, source: plan.source, provider: plan.provider, at });
+  return ledger.write.recordAttemptUsage({ attemptId: plan.attemptId, rows: plan.rows, source: plan.source, provider: plan.provider, sessions: plan.sessions, at });
 }
 
-/** Settled attempts with no usage yet since `sinceMs`, each with the number of attempts its job has. */
+/** Settled attempts with no usage yet since `sinceMs`. */
 export function attemptsMissingUsage(db, { sinceMs = 0 } = {}) {
-  return db.prepare(`SELECT a.*, (SELECT count(*) FROM op_attempts b WHERE b.job_id=a.job_id) AS attempts_of_job
+  return db.prepare(`SELECT a.*
     FROM op_attempts a
     WHERE (a.settled_at IS NOT NULL OR a.end_state IS NOT NULL) AND a.dispatched_at >= ?
       AND NOT EXISTS (SELECT 1 FROM llm_usage u WHERE u.subject_type='attempt' AND u.attempt_id=a.attempt_id)
@@ -217,18 +235,14 @@ export function recordSettledAttemptUsage(ledger, { jobId, agent, files, extract
     if (!attempt) return { recorded: false, reason: 'no attempt row' };
     const withAgent = { ...attempt, agent: agent ?? attempt.agent };
     const family = attemptAgent(withAgent);
-    // The files were attributed by job id; a retried job has several attempts, so keep the ones this attempt's own dispatch names.
-    const index = files.map((file) => {
-      const { firstUser } = readSessionHead(family, readHead(file));
-      const text = String(firstUser ?? '');
-      // op-session.mjs attributed these files by job id, so the head names the job (or this attempt's own dispatch/task id) by content.
-      return { file, agent: family, ...classifySession(firstUser), role: 'op',
-        jobId: text.includes(jobId) ? jobId : null,
+    // op-session.mjs attributed these files by job id; a retried job has several attempts, so only a file whose first message names THIS attempt's dispatch/task id counts.
+    const index = dedupeSessions(files.map((file) => {
+      const text = String(readSessionHead(family, readHead(file)).firstUser ?? '');
+      return { file, agent: family, where: 'live', size: fs.statSync(file).size, role: 'op',
         dispatchId: attempt.dispatch_id && text.includes(attempt.dispatch_id) ? attempt.dispatch_id : null,
         taskId: attempt.task_id && text.includes(attempt.task_id) ? attempt.task_id : null };
-    });
-    const attemptsOfJob = ledger.db.prepare('SELECT count(*) n FROM op_attempts WHERE job_id=?').get(jobId).n;
-    return applyAttemptUsage(ledger, planAttemptUsage(withAgent, entriesOfAttempt(index, withAgent, { attemptsOfJob }), { extract }));
+    }));
+    return applyAttemptUsage(ledger, planAttemptUsage(withAgent, entriesOfAttempt(index, withAgent), { extract }));
   } catch (error) { return { recorded: false, reason: message(error).slice(0, 200) }; }
 }
 
@@ -296,7 +310,7 @@ export async function sweepUsage({ env = process.env, home = os.homedir(), now =
     const kernelEntries = index.filter((e) => e.role === 'kernel' && workflows.has(e.workflowId));
     let handle = null;
     try {
-      const plans = pending.map((a) => planAttemptUsage(a, entriesOfAttempt(index, a, { attemptsOfJob: a.attempts_of_job })));
+      const plans = pending.map((a) => planAttemptUsage(a, entriesOfAttempt(index, a)));
       const seatPlans = [];
       if (kernelEntries.length) {
         const dbr = openLedgerReader(l.file);
