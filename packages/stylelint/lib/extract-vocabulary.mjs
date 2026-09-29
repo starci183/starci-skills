@@ -28,16 +28,29 @@ export const GRAMMAR_CSS = [
 
 const inFamily = (name) => FAMILY_PREFIXES.some((prefix) => name.startsWith(prefix))
 
-/** `{ declared, vendor }`: sorted un-prefixed names the grammar declares, and reads without declaring. */
+/** The width breakpoints (as `<n>rem`, ascending) the grammar's media queries use: the one scale app CSS may cite. */
+function extractBreakpoints(texts) {
+  const found = new Set()
+  for (const text of texts) {
+    for (const media of text.matchAll(/@media([^{]*)\{/g)) {
+      for (const width of media[1].matchAll(/(?:min|max)-width\s*:\s*([\d.]+)(?:rem|em)/g)) found.add(Number(width[1]))
+    }
+  }
+  return [...found].sort((a, b) => a - b).map((value) => `${value}rem`)
+}
+
+/** `{ declared, vendor, breakpoints }`: sorted un-prefixed names the grammar declares, and reads without declaring. */
 export function extractVocabulary(grammarSrcDir) {
   const declared = new Set()
   const referenced = new Set()
+  const texts = []
   for (const file of GRAMMAR_CSS) {
     const text = fs.readFileSync(path.join(grammarSrcDir, file), "utf8").replace(/\/\*[\s\S]*?\*\//g, "")
+    texts.push(text)
     for (const match of text.matchAll(/(?:^|[;{\s])(--[\w-]+)\s*:/g)) declared.add(match[1])
     for (const match of text.matchAll(/var\(\s*(--[\w-]+)/g)) referenced.add(match[1])
   }
   const own = [...declared].filter((name) => !inFamily(name)).sort()
   const vendor = [...referenced].filter((name) => !declared.has(name) && !inFamily(name)).sort()
-  return { declared: own, vendor }
+  return { declared: own, vendor, breakpoints: extractBreakpoints(texts) }
 }

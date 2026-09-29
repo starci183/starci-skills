@@ -7,7 +7,7 @@ import path from "node:path"
 import test from "node:test"
 import { fileURLToPath } from "node:url"
 import { extractVocabulary, FAMILY_PREFIXES } from "./lib/extract-vocabulary.mjs"
-import { DECLARED, VENDOR } from "./lib/vocabulary.generated.mjs"
+import { BREAKPOINTS, DECLARED, VENDOR } from "./lib/vocabulary.generated.mjs"
 import { isGrammarToken, isKnownToken } from "./lib/vocabulary.mjs"
 
 const here = path.dirname(fileURLToPath(import.meta.url))
@@ -17,6 +17,7 @@ test("the generated vocabulary equals what the grammar CSS declares and reads", 
   const fresh = extractVocabulary(grammarSrc)
   assert.deepEqual(DECLARED, fresh.declared, "DECLARED is stale: run `npm run vocabulary` in packages/stylelint")
   assert.deepEqual(VENDOR, fresh.vendor, "VENDOR is stale: run `npm run vocabulary` in packages/stylelint")
+  assert.deepEqual(BREAKPOINTS, fresh.breakpoints, "BREAKPOINTS is stale: run `npm run vocabulary` in packages/stylelint")
 })
 
 test("the four family namespaces and the semantic layer are grammar tokens", () => {

@@ -95,3 +95,14 @@ export const VENDOR = [
   "--starci-font-sans",
   "--trigger-width",
 ]
+
+/** Width breakpoints of the grammar's media queries, ascending. */
+export const BREAKPOINTS = [
+  "30rem",
+  "40rem",
+  "47.99rem",
+  "47.999rem",
+  "48rem",
+  "69.999rem",
+  "70rem",
+]

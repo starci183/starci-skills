@@ -10,6 +10,11 @@
  * refuses a config that does.
  */
 import { brandLayerShape } from "./brand-layer-shape.mjs"
+import { breakpointScale } from "./breakpoint-scale.mjs"
+import { globalsImportOrder } from "./globals-import-order.mjs"
+import { noClassSelector } from "./no-class-selector.mjs"
+import { noCssModule } from "./no-css-module.mjs"
+import { sourceResolves } from "./source-resolves.mjs"
 import { globalsShape } from "./globals-shape.mjs"
 import { noApplyRaw } from "./no-apply-raw.mjs"
 import { noImportant } from "./no-important.mjs"
@@ -34,6 +39,11 @@ export const rules = {
   "no-token-redefinition": noTokenRedefinition,
   "brand-layer-shape": brandLayerShape,
   "no-inline-lint-config": noInlineLintConfig,
+  "no-css-module": noCssModule,
+  "no-class-selector": noClassSelector,
+  "breakpoint-scale": breakpointScale,
+  "source-resolves": sourceResolves,
+  "globals-import-order": globalsImportOrder,
 }
 
 /** The stylelint plugin objects, in rule order. */

@@ -2582,6 +2582,30 @@ FE_SPEC_SUBJECT_AND_DESCRIBE:
   owner: other-op:test.author
   kind: check-finding
 
+FE_STYLE_SOURCE_UNRESOLVED:
+  title: "Tailwind @source path does not resolve"
+  title_vi: "Đường dẫn @source của Tailwind không tồn tại"
+  meaning_vi: "Một dòng @source trong CSS trỏ tới thư mục hoặc tệp không có thật, nên Tailwind không quét được gì và lặng lẽ làm mất các utility mà component dùng."
+  causes_vi:
+    - "Đường dẫn tới node_modules tính sai so với vị trí của tệp CSS"
+    - "Thư mục được trỏ tới đã đổi tên hoặc bị chuyển đi"
+  nextStep_vi: "Op interface.implement sửa đường dẫn @source cho trỏ tới thư mục có thật, tính từ chính tệp CSS, rồi kiểm tra lại."
+  owner: other-op:interface.implement
+  kind: check-finding
+FE_STYLE_TOKEN_ONLY:
+  title: "CSS bypasses grammar tokens"
+  title_vi: "CSS không đi qua token của grammar"
+  meaning_vi: "CSS của app dùng giá trị màu, khoảng cách, bo góc hoặc chữ viết thẳng, giá trị thô ngoài brand.css, !important, selector class, CSS module, khai lại token của grammar, breakpoint ngoài thang, hoặc globals.css sai hình dạng và sai thứ tự import."
+  causes_vi:
+    - "Hex, rgb, hsl, oklch hoặc px viết trong CSS ngoài modules/brand/brand.css"
+    - "Biến --tên-riêng thay cho token grammar, hoặc khai lại token của grammar ngoài brand.css"
+    - "Có tệp *.module.css hoặc selector class trong CSS của app"
+    - "globals.css chứa thứ ngoài @import, @source và khối token, hoặc import sai thứ tự"
+    - "@media dùng breakpoint ngoài thang của grammar"
+  nextStep_vi: "Op interface.implement bỏ CSS riêng, dùng component và token của grammar; giá trị màu thương hiệu chỉ khai ở modules/brand/brand.css cho cả sáng và tối."
+  owner: other-op:interface.implement
+  kind: check-finding
+
 FE_SWR_KEY_IDENTITY:
   title: "SWR key misses an identity"
   title_vi: "Khóa SWR thiếu thông tin định danh"
@@ -2929,9 +2953,9 @@ HFS_INIT_UNDETECTED:
 HFS_INLINE_SUPPRESSION:
   title: "Inline lint or type suppression"
   title_vi: "Chú thích tắt luật tại chỗ"
-  meaning_vi: "Có chú thích eslint-disable, eslint-enable, @ts-ignore, @ts-expect-error, @ts-nocheck hoặc vn-ok trong mã. HFS không cho tắt luật hay bỏ kiểm tra kiểu tại chỗ."
+  meaning_vi: "Có chú thích eslint-disable, eslint-enable, stylelint-disable, @ts-ignore, @ts-expect-error, @ts-nocheck hoặc vn-ok trong mã. HFS không cho tắt luật hay bỏ kiểm tra kiểu tại chỗ."
   causes_vi:
-    - "eslint-disable (dòng, dòng kế tiếp hoặc cả tệp) để qua một luật"
+    - "eslint-disable hoặc stylelint-disable (dòng, dòng kế tiếp hoặc cả tệp) để qua một luật"
     - "@ts-ignore hoặc @ts-expect-error để qua lỗi kiểu"
     - "vn-ok để miễn luật ngôn ngữ"
   nextStep_vi: "Sửa mã cho đúng luật, hoặc đề xuất đổi luật trong canon; op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra."

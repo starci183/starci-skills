@@ -52,4 +52,29 @@ export const why = {
     vi: "Có chú thích tắt luật ở `<file>:<line>`. HFS không cho tắt tại chỗ — sửa code, hoặc đề xuất đổi luật.",
     fixVi: "Xóa `stylelint-disable` và sửa nguyên nhân.",
   },
+  "no-css-module": {
+    code: "FE_STYLE_TOKEN_ONLY",
+    vi: "`<file>` là CSS module. HFS cấm `*.module.css`: một stylesheet riêng cho từng component là nơi hệ thiết kế thứ hai bắt đầu.",
+    fixVi: "Xóa file; tạo kiểu bằng component và token của grammar, phần grammar còn thiếu thì bổ sung vào grammar.",
+  },
+  "no-class-selector": {
+    code: "FE_STYLE_TOKEN_ONLY",
+    vi: "CSS ở `<file>` có selector class (`<what>`). CSS của app không định nghĩa component; kiểu đi qua component và token của grammar.",
+    fixVi: "Xóa rule; dùng component grammar hoặc token thay cho class riêng.",
+  },
+  "breakpoint-scale": {
+    code: "FE_STYLE_TOKEN_ONLY",
+    vi: "`@media` ở `<file>` dùng breakpoint `<what>` ngoài thang của grammar, nên bố cục đổi ở độ rộng khác các component khác.",
+    fixVi: "Dùng một breakpoint của thang grammar (30rem, 40rem, 48rem, 70rem), hoặc px tương đương ở 16px/rem.",
+  },
+  "source-resolves": {
+    code: "FE_STYLE_SOURCE_UNRESOLVED",
+    vi: "`@source` ở `<file>` trỏ tới đường dẫn không tồn tại (`<what>`). Tailwind không quét file nào và lặng lẽ làm mất các utility mà component dùng.",
+    fixVi: "Sửa đường dẫn `@source` để trỏ tới thư mục có thật, tính từ chính file CSS.",
+  },
+  "globals-import-order": {
+    code: "FE_STYLE_TOKEN_ONLY",
+    vi: "`globals.css` (`<file>`) import sai thứ tự hoặc import ngoài danh sách chuẩn (`<what>`). Thứ tự chuẩn: tailwindcss, @heroui/styles/css, stylesheet family của grammar, modules/brand/brand.css, rồi `@source`.",
+    fixVi: "Sắp lại `@import` theo thứ tự chuẩn và bỏ import ngoài danh sách; `@source` đặt sau cùng.",
+  },
 }

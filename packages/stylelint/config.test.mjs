@@ -4,7 +4,7 @@
 import assert from "node:assert/strict"
 import test from "node:test"
 import { assertEveryRuleOn, plugins, ruleNames, rules, starciStylelintConfig, why } from "./index.mjs"
-import { lint } from "./testing.mjs"
+import { FILES, lint } from "./testing.mjs"
 
 test("the config runs every rule of the canon at error and ignores inline disables", () => {
   const config = starciStylelintConfig()
@@ -64,7 +64,7 @@ test("assertEveryRuleOn refuses a rule that is off, downgraded, missing or hidde
 })
 
 test("the config lints a clean stylesheet with no finding and no unknown-rule error", async () => {
-  assert.deepEqual(await lint(".card { color: var(--accent); padding: var(--grammar-inline-gap); }"), [])
+  assert.deepEqual(await lint('[data-state="open"] { color: var(--accent); padding: var(--grammar-inline-gap); }', FILES.css), [])
 })
 
 test("every rule fires through the factory config on a stylesheet that breaks it", async () => {
@@ -78,6 +78,10 @@ test("every rule fires through the factory config on a stylesheet that breaks it
     [".a { --accent: var(--muted); }", undefined],
     [":root { --accent: #fff; }", "D:/repo/src/modules/brand/brand.css"],
     ["/* stylelint-disable */", undefined],
+    [".a { color: var(--accent); }", FILES.css],
+    ["@media (min-width: 500px) { [data-a] { color: var(--accent); } }", FILES.css],
+    ["@source \"./nowhere-at-all\";", FILES.globals],
+    ["@import \"other.css\";", FILES.globals],
   ]
   for (const [code, file] of cases) for (const warning of await lint(code, file)) fired.add(warning.rule)
   assert.deepEqual([...fired].sort(), [...ruleNames].sort())
@@ -95,9 +99,11 @@ test("every rule has a why with a code, a Vietnamese headline and a Vietnamese n
   }
 })
 
-test("no why names a rule that does not exist, and the tokens rules share the R61 code", () => {
+const CODES = { "no-inline-lint-config": "HFS_INLINE_SUPPRESSION", "source-resolves": "FE_STYLE_SOURCE_UNRESOLVED" }
+
+test("no why names a rule that does not exist, and the rules share the R61 code except suppression and unresolved @source", () => {
   assert.deepEqual(Object.keys(why).sort(), Object.keys(rules).sort())
   for (const name of Object.keys(rules)) {
-    assert.equal(why[name].code, name === "no-inline-lint-config" ? "HFS_INLINE_SUPPRESSION" : "FE_STYLE_TOKEN_ONLY", name)
+    assert.equal(why[name].code, CODES[name] ?? "FE_STYLE_TOKEN_ONLY", name)
   }
 })

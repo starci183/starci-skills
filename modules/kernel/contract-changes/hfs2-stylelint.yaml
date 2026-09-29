@@ -2,15 +2,20 @@ id: hfs2-stylelint
 effectiveAt: '2026-09-30T00:30:00+07:00'
 summary: >-
   HFS v2 Phase 0 item 0.7: the new package @starci/stylelint-canon 1.0.0 (packages/stylelint), rule R61
-  FE_STYLE_TOKEN_ONLY for CSS. starciStylelintConfig() runs eight rules at error with no switch, no ignored file and
+  FE_STYLE_TOKEN_ONLY for CSS, all of R61: no *.module.css, no class selector in app CSS, width breakpoints only from the
+  grammar's scale, every @source resolves (new code FE_STYLE_SOURCE_UNRESOLVED), globals.css imports in the standard
+  order. failure-codes.yaml gains FE_STYLE_TOKEN_ONLY and FE_STYLE_SOURCE_UNRESOLVED and widens HFS_INLINE_SUPPRESSION to
+  stylelint-disable. starciStylelintConfig() runs thirteen rules at error with no switch, no ignored file and
   inline stylelint-disable ignored: token-only, raw-brand-value (the same notion of a raw brand value as
   eslint-canon-fe no-raw-brand-value), no-apply-raw, no-important, globals-shape, no-token-redefinition,
-  brand-layer-shape, no-inline-lint-config. The token vocabulary is read from the grammar package's CSS. knowledge/hfs/canon-pins.yaml
+  brand-layer-shape, no-inline-lint-config, no-css-module, no-class-selector, breakpoint-scale, source-resolves,
+  globals-import-order. The token vocabulary is read from the grammar package's CSS. knowledge/hfs/canon-pins.yaml
   pins @starci/stylelint-canon 1.0.0, stylelint 17.15.0 and postcss-value-parser 4.2.0 (fe), and
   modules/schemas/canon-pins.schema.yaml requires the first two. Each rule carries a Vietnamese why (lib/why.mjs).
 reach: new-legs
 paths:
   - modules/kernel/contract-changes/hfs2-stylelint.yaml
   - modules/schemas/canon-pins.schema.yaml
+  - modules/kernel/failure-codes.yaml
   - knowledge/hfs/canon-pins.yaml
   - packages/stylelint

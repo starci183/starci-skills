@@ -35,6 +35,11 @@ value. Everywhere else CSS uses the grammar's tokens.
 | `starci/no-token-redefinition` | A grammar token declared (or `@property`-registered) anywhere but `brand.css`, CSS modules included. Local custom properties are fine. |
 | `starci/brand-layer-shape` | `brand.css` with a selector other than a light or dark block, a non-token property, a token the grammar does not publish, or a token that lacks its light or its dark value. |
 | `starci/no-inline-lint-config` | `stylelint-disable`, `-enable` and `-disable-next-line` comments. |
+| `starci/no-css-module` | Any `*.module.css`. |
+| `starci/no-class-selector` | A class selector in a plain app stylesheet (`globals.css`, `brand.css` have their own shape rules). |
+| `starci/breakpoint-scale` | A width in `@media` that is not on the grammar's scale (rem, or px at 16px to the rem). |
+| `starci/source-resolves` | A Tailwind `@source` path that does not exist, resolved from the stylesheet's folder (finding `FE_STYLE_SOURCE_UNRESOLVED`). |
+| `starci/globals-import-order` | In `globals.css`: an import outside, or out of, the order `tailwindcss`, `@heroui/styles/css`, a grammar family stylesheet, `modules/brand/brand.css`, then `@source`. |
 
 The file kind comes from the path: `**/modules/brand/brand.css` is the brand layer, `globals.css` the global sheet,
 `*.module.css` a CSS module, anything else a plain stylesheet. There is no per-file override to turn a rule off.
@@ -47,10 +52,10 @@ The tokens the rules accept are the grammar's own, read from `packages/grammar/s
 the vendor tokens it reads (`--radius-md`, `--font-mono`). `lib/vocabulary.generated.mjs` is the committed result;
 `npm run vocabulary` regenerates it and `vocabulary.test.mjs` fails when it is stale.
 
-## Not covered (R61 asks, this release does not)
+## Not covered
 
-Class selectors in app CSS, a ban on `*.module.css`, the breakpoint scale, `@source` resolution and the order of
-`globals.css` imports. `raw-brand-value` reads declarations only: a `px` inside an `@media` query is not reported.
+`raw-brand-value` reads declarations only: a `px` in an `@media` query is judged by `breakpoint-scale` instead. Height
+queries are not judged.
 
 ## Why
 
