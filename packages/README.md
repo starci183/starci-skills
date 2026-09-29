@@ -72,7 +72,7 @@ paired with the test that proves it fires on the code it refuses.
 
 | Package | Rules | Tests |
 |---|---|---|
-| [`@starci/eslint-canon-fe`](packages/fe) | 18 law modules | **101 passing** |
+| [`@starci/eslint-canon-fe`](packages/fe) | 29 law modules | **137 passing** |
 | [`@starci/eslint-canon-be`](packages/be) | 15 law modules | 54 passing, **3 failing** |
 
 The laws these enforce live in the trust tree at `gates/{fe,be}/lints`, one module per law, which state

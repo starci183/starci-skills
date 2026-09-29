@@ -1,27 +1,25 @@
 /**
  * The rules that hold `comments.md`.
  *
- * All three reach further than their names suggest, and deliberately. A language rule that read
- * only comments would leave the same sentence legal one line lower as an identifier or a diagnostic
- * string; an emoji rule that read only JSX would miss the one in a log message. So each walks
- * comments, identifiers, string literals, template chunks and JSX text alike - everywhere prose can
- * hide in a source file.
+ * Both reach further than their names suggest, and deliberately. An emoji rule that read only JSX
+ * would miss the one in a log message, so it walks comments, identifiers, string literals, template
+ * chunks and JSX text alike - everywhere prose can hide in a source file.
  *
- * The exceptions are paths, not judgements, and that is on purpose: a locale dictionary IS the other
- * language, and a fixture reproducing a real string has to reproduce it exactly. A judgement-based
- * exception would be argued per file forever.
+ * THE SECOND-LANGUAGE RULE IS GONE. It carried a `vn-ok: <reason>` pragma, an escape hatch that was
+ * used 490 times in one repository, and one escape is enough to turn a rule into a comment
+ * convention. Its job is now held by `no-hardcoded-copy` in `translation.mjs`, which has no
+ * pragma: user-facing text comes from a `next-intl` catalogue, and the catalogue is the only place
+ * a second language is content.
+ *
+ * The exceptions that remain are paths, not judgements, and that is on purpose: a locale dictionary
+ * IS the other language, and a fixture reproducing a real string has to reproduce it exactly. A
+ * judgement-based exception would be argued per file forever.
  */
 
 import { normalizePath } from "./lib/path.mjs"
 
-/** The letters that mark the second language this source is kept free of. */
+/** The letters that mark the second language a source string must not carry outside a catalogue. */
 export const SECOND_LANGUAGE_LETTER = /[À-ÃÈ-ÊÌÍÒ-ÕÙÚÝà-ãè-êìíò-õùúýĂăĐđĨĩŨũƠơƯưẠ-ỿ]/
-
-/** The endonym a language picker must be able to render in its own script. */
-const ENDONYM = /Tiếng Việt/
-
-/** A functional literal, marked with the reason it stays. */
-const OK_PRAGMA = /\bvn-ok:/
 
 /**
  * Extended pictographs, or a regional-indicator pair.
@@ -37,12 +35,13 @@ export const hasEmoji = (text) =>
 /**
  * Paths whose second-language text or emoji is CONTENT rather than authoring.
  *
- * Two kinds only: the locale dictionaries, which are the product's other language, and fixtures,
- * which reproduce real strings and would be testing something else if they translated them.
+ * Two kinds only: the locale dictionaries (`messages/<locale>.json`), which are the product's other
+ * language, and fixtures and specs, which reproduce real strings and would be testing something else
+ * if they translated them. There is no "copy module" path: a `resources/` folder of strings is
+ * copy that skipped the catalogue.
  */
 export const CONTENT_PATHS = [
   /\/messages\/[a-z-]+\.json$/i,
-  /\/src\/resources\//,
   /\/__fixtures?__\//,
   /\/fixtures?\//,
   /\.fixture\.(ts|tsx|js|mjs|cjs)$/i,
@@ -108,49 +107,6 @@ export const requireExportJsdoc = {
   },
 }
 
-// -- COMMENTS-2 · COMMENTS-3 -----------------------------------------------------------------------
-
-/** The source is English, and the exceptions are paths plus one marked pragma. */
-export const noSecondLanguageInSource = {
-  meta: {
-    type: "problem",
-    docs: { description: "Source authoring is English; locale content and marked literals are exempt." },
-    schema: [],
-    messages: {
-      second:
-        "Second-language prose in source authoring. The bar is a stranger who joins in a year and does not share the first language of whoever wrote this line - a codebase with two languages has two populations of readers, and the smaller one stops reading the parts it cannot. If this is a literal the running program matches on or emits, keep it and mark the line with `vn-ok: <reason>`.",
-    },
-  },
-  create(context) {
-    if (isContentFile(context.filename || context.getFilename())) return {}
-    const source = context.sourceCode || context.getSourceCode()
-    /*
-     * Lines carrying the pragma, gathered once.
-     *
-     * The message tells the author to "mark the LINE", and until this existed
-     * that was not true of a literal: the exemption tested the node's OWN text,
-     * which for a string is its value, so `"Học viện Mộc" // vn-ok: ...` still
-     * reported and no phrasing could satisfy it. The rule's own valid fixture
-     * only passed because its string carried no diacritics at all.
-     *
-     * A marked line exempts the node ON it and the statement BELOW it, which are
-     * the two placements the message's wording admits.
-     */
-    const marked = new Set()
-    for (const comment of source.getAllComments()) {
-      if (!OK_PRAGMA.test(comment.value)) continue
-      marked.add(comment.loc.start.line)
-      marked.add(comment.loc.end.line + 1)
-    }
-    return proseVisitors(context, (node, text) => {
-      if (!text || !SECOND_LANGUAGE_LETTER.test(text)) return
-      if (ENDONYM.test(text) || OK_PRAGMA.test(text)) return
-      if (marked.has(node.loc.start.line)) return
-      context.report({ node, messageId: "second" })
-    })
-  },
-}
-
 // -- COMMENTS-4 ------------------------------------------------------------------------------------
 
 /** No Unicode emoji in source: stable product reactions use attributed checked-in SVG artwork. */
@@ -175,7 +131,6 @@ export const noEmojiInSource = {
 /** The rules this law contributes to the plugin. */
 export const rules = {
   "require-export-jsdoc": requireExportJsdoc,
-  "no-second-language-in-source": noSecondLanguageInSource,
   "no-emoji-in-source": noEmojiInSource,
 }
 

@@ -194,8 +194,9 @@ rules:
       - id: case-1
         when: "A second language"
         write: >
-          English only in source (lint no-second-language-in-source, no-second-language-in-path);
-          user copy lives in src/messages/{en,vi}.json
+          English only in source (lint no-hardcoded-copy, no-second-language-in-path);
+          user copy lives in the next-intl catalogs (messages/<locale>.json) and is read through t(); there is no
+          vn-ok pragma or any other suppression marker
       - id: case-2
         when: "Emoji"
         write: "none (lint no-emoji-in-source)"
@@ -209,7 +210,7 @@ rules:
           /** The page owns only the route-level composition; CartBlock owns cart state and actions. */
     verification:
       automated:
-        - no-second-language-in-source
+        - no-hardcoded-copy
         - no-second-language-in-path
         - no-emoji-in-source
       manual: []

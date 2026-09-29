@@ -1,32 +1,47 @@
 # @starci/eslint-canon-fe
 
-The StarCi front-end lint canon for traditional React and TypeScript applications. It keeps
+The StarCi front-end lint canon for Next.js and TypeScript applications. It keeps
 component ownership, accessibility, loading behavior, vendor boundaries, translations, naming,
 and colocated class-name composition consistent without prescribing a custom rendering protocol.
 
 ```bash
-npm i -D @starci/eslint-canon-fe
+npm i -D @starci/eslint-canon-fe eslint-plugin-react-hooks
 ```
 
 ```js
-import starciFe, { recommended, linterOptions, starciFeConfig } from "@starci/eslint-canon-fe"
+import { starciFeConfig } from "@starci/eslint-canon-fe"
 
-export default [starciFeConfig({
-  layout: "single-app",
-  plugin: starciFe,
-  recommended,
-  linterOptions,
-})]
+export default [...starciFeConfig({ layout: "single-app" })]
 ```
 
-The `single-app` layout governs `src/**`; `monorepo` governs shared package and app source trees.
-The package publishes the plugin, recommended levels, repository audits, and layout helper from
-the root entry point.
+The factory returns two flat-config blocks and owns everything about the law: which rules are on
+(every one, at `error` - nothing is off and nothing is a warning), the React Hooks rules
+(`eslint-plugin-react-hooks` 7, its recommended set lifted to `error`, including
+`set-state-in-effect` and `refs`), and the inline-directive fence (`noInlineConfig` plus
+`reportUnusedDisableDirectives`). A repository names its layout and nothing else.
+
+- The **source** block governs `src/**` (`single-app`) or `packages/ui/src/**` and `apps/*/src/**`
+  (`monorepo`).
+- The **e2e** block governs `e2e/**` and `playwright.config.*` with the e2e rules and the
+  escape-hatch fence.
+
+`recommended`, `sourceRecommended`, `e2eRecommended`, `why`, `audits` and the plugin itself are also
+exported. `sourceRecommended` is the map to compare against a production probe file with
+`audits["effective-config"]`; `why[rule]` is `{ code, vi, fixVi }`, the finding code and the
+Vietnamese why the harness quotes.
 
 ## Rules
 
-Rules cover comments, file layout, icons and vendor ownership, landmarks, loading states, naming,
-props, served locales, component splits, design tokens, translations, type safety, typography, and
+Each law has a page under [`docs/`](docs) with, for every rule, an invalid and a valid example and
+its Vietnamese why. New in 5.0: [env-owner](docs/env-owner.md), [transport](docs/transport.md),
+[client-boundary](docs/client-boundary.md), [hooks-folder](docs/hooks-folder.md),
+[next-conventions](docs/next-conventions.md), [translation](docs/translation.md) (no literal copy at any
+tier, no `vn-ok`), [brand-values](docs/brand-values.md), [native-controls](docs/native-controls.md),
+[size-and-state-budget](docs/size-and-state-budget.md), [e2e-shape](docs/e2e-shape.md),
+[spec-quality](docs/spec-quality.md) and [lint-escape-hatch](docs/lint-escape-hatch.md).
+
+Older laws cover comments, file layout, icons and vendor ownership, landmarks, loading states,
+naming, props, served locales, component splits, design tokens, type safety, typography, and
 class-name ownership. Reusable class names belong in a colocated `classNames.ts` module and should
 be composed with HeroUI `cn` using one utility token per argument.
 
@@ -37,9 +52,12 @@ shapes and never a data status (`no-data-status-shape`), and a block renders eac
 loading/forbidden/error/empty through `SlotView` (`slot-status-through-slotview`). Reference tree:
 `.claude/examples/shape-slot`.
 
+The one locale pattern everywhere is `next-intl`, a `[locale]` segment, default `vi`,
+`localePrefix: "as-needed"`, and `proxy.ts` instead of `middleware.ts`.
+
 Grammar is a business-neutral HeroUI-backed component package. Its components accept ordinary
 typed React props and children.
 
 ## Requirements
 
-ESLint 9+ (flat config) and Node.js 20.9+.
+ESLint 9+ (flat config), `eslint-plugin-react-hooks` 7+, and Node.js 20.9+.

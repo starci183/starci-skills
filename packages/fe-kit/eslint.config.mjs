@@ -4,11 +4,7 @@
  * the tree this package ships. Peer modules (react, next-intl, @starci/grammar) are not
  * resolved during lint - the canon rules are AST rules and never ask the resolver.
  */
-import starciFe, {
-    recommended as starciRecommended,
-    linterOptions as starciLinterOptions,
-    starciFeConfig,
-} from "@starci/eslint-canon-fe"
+import { starciFeConfig } from "@starci/eslint-canon-fe"
 
 import js from "@eslint/js"
 import globals from "globals"
@@ -43,10 +39,5 @@ export default defineConfig([
             "no-unused-vars": "off",
         },
     },
-    starciFeConfig({
-        layout: "single-app",
-        plugin: starciFe,
-        recommended: starciRecommended,
-        linterOptions: starciLinterOptions,
-    }),
+    ...starciFeConfig({ layout: "single-app" }),
 ])

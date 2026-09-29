@@ -43,6 +43,25 @@ test("LINT-ESCAPE-1: product source cannot change its own lint policy", () => {
       },
     ],
     invalid: [
+      // the other spellings of "not here": the compiler's own switches, and the retired second-language pragma
+      { filename: SOURCE, code: "// @ts-ignore\nconst value: number = 'x'", errors: [{ messageId: "typescript" }] },
+      { filename: SOURCE, code: "// @ts-expect-error - legacy\nconst value: number = 'x'", errors: [{ messageId: "typescript" }] },
+      { filename: SOURCE, code: "// @ts-nocheck\nconst value = 1", errors: [{ messageId: "typescript" }] },
+      { filename: SOURCE, code: "// vn-ok: the server sends this verbatim\nconst value = 1", errors: [{ messageId: "pragma" }] },
+      { filename: SOURCE, code: "const value = 'x' // vn-ok: one academy's own name", errors: [{ messageId: "pragma" }] },
+      // the e2e tree and specs are governed too
+      { filename: "D:/repo/e2e/course/play.e2e-spec.ts", code: "// @ts-ignore\nconst value = 1", errors: [{ messageId: "typescript" }] },
+      { filename: "D:/repo/src/components/blocks/Feed/index.test.tsx", code: "// @ts-ignore\nconst value = 1", errors: [{ messageId: "typescript" }] },
+      {
+        filename: SOURCE,
+        code: "/* eslint-env browser */\nconst value = 1",
+        errors: [{ message: /has no effect/ }, { messageId: "directive" }],
+      },
+      {
+        filename: SOURCE,
+        code: "/* eslint no-console: \"off\" */\nconst value = 1",
+        errors: [{ message: /has no effect/ }, { messageId: "directive" }],
+      },
       {
         filename: SOURCE,
         code: "/* eslint-disable */\nconst value = 1",
@@ -60,6 +79,10 @@ test("LINT-ESCAPE-1: product source cannot change its own lint policy", () => {
       },
     ],
   })
+})
+
+test("the fence also reports a disable directive that suppresses nothing", () => {
+  assert.deepEqual(linterOptions, { noInlineConfig: true, reportUnusedDisableDirectives: "error" })
 })
 
 test("LINT-ESCAPE-2: the directive cannot silence its own guard", () => {

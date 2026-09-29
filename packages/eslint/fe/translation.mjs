@@ -1,50 +1,141 @@
 /**
- * The rules that hold `translation.md`.
+ * The rules that hold `translation.md` (HFS R58, `FE_I18N_LITERAL`).
  *
- * TWO RULES, AND THE SECOND ONE IS THE INTERESTING ONE. Forbidding a translation call below a block
- * is easy and mostly redundant - the split rule already stops the drawing half reaching for the
- * runtime. What nothing else catches is a literal that a reader can SEE, sitting in a tier that is
- * supposed to receive every word it renders.
+ * TWO RULES. The first forbids a translation call below a block - easy and mostly redundant, since
+ * the split rule already stops the drawing half reaching for the runtime. The second is the law:
+ * NO LITERAL COPY AT ANY TIER, IN ANY LANGUAGE, AND NO PRAGMA.
+ *
+ * WHAT CHANGED FROM V1, AND WHY. The previous rule scanned only the vocabulary tiers (leaves,
+ * composites, branches), so a block or a page holding every word of a screen was exempt, and the
+ * companion language rule carried a `vn-ok: <reason>` pragma that was used 490 times in one
+ * repository. One escape is enough to turn a rule into a comment convention. There is now no tier
+ * exemption and no pragma: a word a reader can see or hear comes from `t()` over a `next-intl`
+ * catalogue, and the catalogue (`messages/<locale>.json`) is the only place a second language is
+ * content.
  *
  * THE ATTRIBUTES MATTER MORE THAN THE MARKUP. Copy hides in `aria-label`, `placeholder`, `title`
  * and `alt` precisely because none of them reads as a sentence when you scan the file - and an
  * `aria-label` is not a small case: a screen reader treats it as the primary text, so an English
  * one on a translated surface is the loudest defect on the page for the reader least able to work
- * around it.
+ * around it. It also hides in object copy (`{ title: "..." }`), which is how a page's metadata
+ * ends up in one language regardless of the URL.
  *
- * The prose test is deliberately crude - a space and a leading capital - because the alternative is
- * a rule that argues about whether a given string is a sentence. A crude test that fires on real
- * copy and spares tokens is worth more than a clever one nobody trusts.
+ * TWO STRENGTHS OF TEST, ON PURPOSE. JSX text and the attributes a reader hears (`label`, `title`,
+ * `alt`, `placeholder`, the `aria-*` set) are copy whatever they say, so ANY word reports: `Save` is
+ * copy, `logo` is copy. An object property or a generic prop (`description`, `hint`) may carry a
+ * token (`{ title: "sm" }`), so those need to look like prose - a space, a non-ASCII letter or a
+ * leading capital. A crude test that fires on real copy
+ * and spares tokens is worth more than a clever one nobody trusts.
  */
 
+import { SECOND_LANGUAGE_LETTER, isContentFile } from "./comments.mjs"
 import { normalizePath } from "./lib/path.mjs"
 
 /** Tiers that receive every word they render: they know no domain, so they can know no sentence. */
 const VOCABULARY_DIRS = ["leaves", "shells", "composites", "branches"]
 
-/** True when a file sits in a tier that must not hold copy. */
+/** True when a file sits in a tier that must not resolve copy. */
 const isVocabularyFile = (filename) => {
   const file = normalizePath(filename)
   return VOCABULARY_DIRS.some((dir) => file.includes(`/src/components/${dir}/`))
 }
 
-/** Attributes a reader sees or hears, none of which looks like a sentence in the markup. */
-const VISIBLE_ATTRS = new Set(["aria-label", "placeholder", "title", "alt", "aria-description"])
+/** Attributes a reader sees or hears: any word in them is copy. */
+const STRICT_ATTRS = new Set([
+  "label",
+  "aria-label",
+  "aria-description",
+  "aria-roledescription",
+  "aria-valuetext",
+  "aria-placeholder",
+  "placeholder",
+  "title",
+  "alt",
+])
+
+/** Props that usually carry a sentence but may carry a token (a variant, an id). */
+const PROSE_ATTRS = new Set([
+  "description",
+  "helperText",
+  "hint",
+  "tooltip",
+  "caption",
+  "heading",
+  "subtitle",
+  "errorMessage",
+  "emptyText",
+  "loadingText",
+  "confirmLabel",
+  "cancelLabel",
+])
+
+/** Object keys whose value is shown to a reader. */
+const COPY_KEYS = new Set([
+  "title",
+  "label",
+  "description",
+  "placeholder",
+  "message",
+  "heading",
+  "subtitle",
+  "caption",
+  "tooltip",
+  "hint",
+  "cta",
+  "text",
+  "alt",
+  "ariaLabel",
+  "helperText",
+  "emptyText",
+  "errorMessage",
+  "successMessage",
+])
 
 /** Calls that resolve a word at render time. */
 const RESOLVES_COPY = /^(?:useTranslations|useLocale|useFormatter|getTranslations)$/
 
-/** Prose rather than a token: it has a space and it starts like a sentence. */
-const looksLikeProse = (text) => typeof text === "string" && /\s/.test(text) && /^[A-Z]/.test(text)
+/**
+ * True when the text contains a word: two or more letters in any script.
+ *
+ * TWO LETTERS, NOT ONE, AND THE SAME AS THE REPOSITORY GATE. A lone letter is a unit, a separator or a
+ * key cap (`x`, `k`, `A`); a word is where copy starts. nivo-fe's `scripts/check-i18n-catalog.mjs`
+ * draws the line at two letters for JSX text and copy attributes, and this rule draws it in the same
+ * place so the lint and the gate never disagree about what a literal is. Neither has a suppression
+ * marker.
+ */
+const hasLetter = (text) => typeof text === "string" && /\p{L}{2,}/u.test(text)
 
-/** Static string carried by a JSX attribute. */
+/** Prose rather than a token: it has a space, a non-ASCII letter, or it starts like a sentence. */
+const looksLikeProse = (text) =>
+  hasLetter(text) && (/\s/.test(text) || /[^\x00-\x7F]/.test(text) || /^[A-Z]/.test(text))
+
+/** Static string carried by a literal or an expression-free template, else null. */
+const staticString = (node) => {
+  if (!node) return null
+  if (node.type === "Literal" && typeof node.value === "string") return node.value
+  if (node.type === "TemplateLiteral" && node.expressions.length === 0) {
+    return node.quasis.map((quasi) => quasi.value.cooked ?? "").join("")
+  }
+  return null
+}
+
+/** Static string carried by a JSX attribute value, else null. */
 const attributeText = (node) => {
   const value = node && node.value
   if (!value) return null
-  if (value.type === "Literal" && typeof value.value === "string") return value.value
-  if (value.type === "JSXExpressionContainer" && value.expression.type === "Literal") {
-    return typeof value.expression.value === "string" ? value.expression.value : null
-  }
+  if (value.type === "JSXExpressionContainer") return staticString(value.expression)
+  return staticString(value)
+}
+
+/** The value node behind a JSX attribute, for de-duplication against the second-language walk. */
+const attributeValueNode = (node) =>
+  node.value && node.value.type === "JSXExpressionContainer" ? node.value.expression : node.value
+
+/** The name of an object property key, else null. */
+const keyName = (property) => {
+  if (property.computed) return null
+  if (property.key.type === "Identifier") return property.key.name
+  if (property.key.type === "Literal" && typeof property.key.value === "string") return property.key.value
   return null
 }
 
@@ -75,31 +166,80 @@ export const noCopyResolutionBelowBlock = {
 
 // -- COPY-2 ----------------------------------------------------------------------------------------
 
-/** A component below a block holds no literal a reader can see or hear. */
-export const noHardcodedCopyInVocabulary = {
+/** No literal copy at any tier, in any language, and no pragma to allow one. */
+export const noHardcodedCopy = {
   meta: {
     type: "problem",
-    docs: { description: "No visible or spoken literal in a tier that receives its words." },
+    docs: { description: "User-facing text comes from a `next-intl` catalogue through `t()`, at every tier." },
     schema: [],
     messages: {
-      hardcoded:
-        "`{{attr}}=\"{{text}}\"` is copy, hardcoded in a tier that receives every word it renders - so one reader in another language sees English here. It also does not read as a sentence when scanning this file, which is why this attribute is where copy hides. Take a resolved string through `props`.",
       text:
-        "`{{text}}` is copy written into a tier that receives its words. A reader in another language sees this exactly as written. Take a resolved string through `props`.",
+        "`{{text}}` is copy written into source. A reader in another language sees it exactly as written, and there is no tier or comment that makes that acceptable: take the sentence from the catalogue with `t(\"key\")`.",
+      attribute:
+        "`{{attr}}=\"{{text}}\"` is copy, hardcoded. One reader in another language sees it verbatim - and `{{attr}}` is where copy hides, because it does not read as a sentence when scanning the file. Use `t(\"key\")`.",
+      property:
+        "`{{key}}: \"{{text}}\"` is copy in an object, so whatever displays this object (a page title, an empty state, a toast) shows it in one language. Use `t(\"key\")`, or build the object where `t` is in scope.",
+      second:
+        "A second-language string in source. Text in another language is content, and content lives in `messages/<locale>.json` behind `t()`; there is no pragma that lets it stay here.",
+      comment:
+        "A second-language comment. Source is English so that every reader can read all of it; the product's other language belongs in the catalogue.",
     },
   },
   create(context) {
-    if (!isVocabularyFile(context.filename || context.getFilename())) return {}
+    if (isContentFile(context.filename || context.getFilename())) return {}
+    const source = context.sourceCode || context.getSourceCode()
+    /** Value nodes already reported through their owner (attribute, property), so a string reports once. */
+    const claimed = new WeakSet()
+
     return {
-      JSXAttribute(node) {
-        const attr = node.name && node.name.type === "JSXIdentifier" ? node.name.name : null
-        if (!attr || !VISIBLE_ATTRS.has(attr)) return
-        const text = attributeText(node)
-        if (looksLikeProse(text)) context.report({ node, messageId: "hardcoded", data: { attr, text } })
+      Program() {
+        for (const comment of source.getAllComments()) {
+          if (SECOND_LANGUAGE_LETTER.test(comment.value)) context.report({ node: comment, messageId: "comment" })
+        }
       },
       JSXText(node) {
         const text = String(node.value || "").trim()
-        if (looksLikeProse(text)) context.report({ node, messageId: "text", data: { text } })
+        if (hasLetter(text)) context.report({ node, messageId: "text", data: { text } })
+      },
+      JSXExpressionContainer(node) {
+        // `<p>{"Hello"}</p>`: a literal in child position is JSX text with braces around it.
+        const parent = node.parent
+        if (!parent || (parent.type !== "JSXElement" && parent.type !== "JSXFragment")) return
+        const text = staticString(node.expression)
+        if (text === null || !hasLetter(text.trim())) return
+        claimed.add(node.expression)
+        context.report({ node, messageId: "text", data: { text: text.trim() } })
+      },
+      JSXAttribute(node) {
+        const attr = node.name && node.name.type === "JSXIdentifier" ? node.name.name : null
+        if (!attr) return
+        const strict = STRICT_ATTRS.has(attr)
+        if (!strict && !PROSE_ATTRS.has(attr)) return
+        const text = attributeText(node)
+        if (text === null) return
+        if (strict ? !hasLetter(text) : !looksLikeProse(text)) return
+        claimed.add(attributeValueNode(node))
+        context.report({ node, messageId: "attribute", data: { attr, text } })
+      },
+      Property(node) {
+        const key = keyName(node)
+        if (!key || !COPY_KEYS.has(key)) return
+        const text = staticString(node.value)
+        if (text === null || !looksLikeProse(text)) return
+        claimed.add(node.value)
+        context.report({ node, messageId: "property", data: { key, text } })
+      },
+      Literal(node) {
+        if (claimed.has(node) || typeof node.value !== "string") return
+        if (SECOND_LANGUAGE_LETTER.test(node.value)) context.report({ node, messageId: "second" })
+      },
+      TemplateElement(node) {
+        if (SECOND_LANGUAGE_LETTER.test((node.value && node.value.cooked) || "")) {
+          context.report({ node, messageId: "second" })
+        }
+      },
+      Identifier(node) {
+        if (SECOND_LANGUAGE_LETTER.test(node.name)) context.report({ node, messageId: "second" })
       },
     }
   },
@@ -108,14 +248,15 @@ export const noHardcodedCopyInVocabulary = {
 /** The rules this law contributes to the plugin. */
 export const rules = {
   "no-copy-resolution-below-block": noCopyResolutionBelowBlock,
-  "no-hardcoded-copy-in-vocabulary": noHardcodedCopyInVocabulary,
+  "no-hardcoded-copy": noHardcodedCopy,
 }
 
 /**
  * The level this law asks for, as the plugin's own opinion.
  *
- * The second rule is the one a repository with history should expect a count from, and every report
- * is a real move: the string has to be lifted to a connected half and given a key, which is work
- * rather than a deletion.
+ * `no-hardcoded-copy` is the one a repository with history should expect a large count from, and
+ * every report is a real move: the string has to be lifted into a catalogue key and read through
+ * `t()`, which is work rather than a deletion. That is the reason there is no `warn` rollout and no
+ * pragma - a repository burns the count down before it adopts, it does not live beside it.
  */
 export const recommended = Object.fromEntries(Object.keys(rules).map((name) => [`starci-fe/${name}`, "error"]))

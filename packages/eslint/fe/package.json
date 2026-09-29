@@ -1,7 +1,7 @@
 {
   "name": "@starci/eslint-canon-fe",
-  "version": "4.0.0",
-  "description": "The StarCi front-end lint canon: every rule its laws publish, gathered as one flat-config plugin.",
+  "version": "5.0.0",
+  "description": "The StarCi front-end lint canon: every rule its laws publish, gathered as one flat-config plugin and attached by one factory.",
   "type": "module",
   "license": "UNLICENSED",
   "private": false,
@@ -12,15 +12,18 @@
   "files": [
     "*.mjs",
     "lib/*.mjs",
+    "docs/*.md",
     "*.ts",
     "!*.test.mjs",
+    "CHANGELOG.md",
     "README.md"
   ],
   "engines": {
     "node": ">=20.9.0"
   },
   "peerDependencies": {
-    "eslint": ">=9"
+    "eslint": ">=9",
+    "eslint-plugin-react-hooks": ">=7"
   },
   "publishConfig": {
     "access": "public"

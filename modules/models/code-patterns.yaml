@@ -583,7 +583,7 @@ profiles:
           check:
             kind: eslint
             sourceOnly: true
-            ruleIds: [starci-fe/require-export-jsdoc, starci-fe/no-second-language-in-source, starci-fe/no-second-language-in-path, starci-fe/no-emoji-in-source, starci-fe/no-inline-lint-config]
+            ruleIds: [starci-fe/require-export-jsdoc, starci-fe/no-hardcoded-copy, starci-fe/no-second-language-in-path, starci-fe/no-emoji-in-source, starci-fe/no-inline-lint-config]
             expected: { severity: error }
         semantic:
           guidance: knowledge/patterns/fe/comment.yaml
@@ -639,7 +639,7 @@ profiles:
           check:
             kind: eslint
             sourceOnly: true
-            ruleIds: [starci-fe/cn-arguments-are-single-tokens, starci-fe/no-arbitrary-value, starci-fe/no-fractional-step, starci-fe/no-unresolved-token-class, starci-fe/no-off-scale-glyph-size, starci-fe/no-decorative-icon-in-metric-cell, starci-fe/no-copy-resolution-below-block, starci-fe/no-hardcoded-copy-in-vocabulary]
+            ruleIds: [starci-fe/cn-arguments-are-single-tokens, starci-fe/no-arbitrary-value, starci-fe/no-fractional-step, starci-fe/no-unresolved-token-class, starci-fe/no-off-scale-glyph-size, starci-fe/no-decorative-icon-in-metric-cell, starci-fe/no-copy-resolution-below-block]
             expected: { severity: error }
         semantic:
           guidance: knowledge/ui

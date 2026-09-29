@@ -4,17 +4,12 @@
  * starci-academy-fe/eslint.config.mjs, with every block scoped to APP_GLOBS - this example tree
  * also holds out-of-lane scratch (root *.mjs harnesses, uat/) that lint must not govern.
  */
-import starciFe, {
-    recommended as starciRecommended,
-    linterOptions as starciLinterOptions,
-    starciFeConfig,
-} from "@starci/eslint-canon-fe"
+import { starciFeConfig } from "@starci/eslint-canon-fe"
 
 import js from "@eslint/js"
 import globals from "globals"
 import tseslint from "typescript-eslint"
 import pluginReact from "eslint-plugin-react"
-import pluginReactHooks from "eslint-plugin-react-hooks"
 import { defineConfig } from "eslint/config"
 import jsxA11y from "eslint-plugin-jsx-a11y"
 
@@ -47,14 +42,12 @@ export default defineConfig([
     },
     {
         files: APP_GLOBS,
-        plugins: { "react-hooks": pluginReactHooks },
         settings: { react: { version: "detect" } },
         rules: {
             "react/display-name": "off",
             "react/react-in-jsx-scope": "off",
             "react/no-unescaped-entities": "off",
             indent: ["error", 4],
-            "react-hooks/exhaustive-deps": "off",
             "linebreak-style": "off",
             quotes: ["error", "double"],
             semi: ["error", "never"],
@@ -68,20 +61,7 @@ export default defineConfig([
             "react/prop-types": "off",
         },
     },
-    starciFeConfig({
-        layout: "single-app",
-        plugin: starciFe,
-        recommended: starciRecommended,
-        linterOptions: starciLinterOptions,
-    }),
-    {
-        // Locale dictionaries are the one place a second language is content, not authoring.
-        // i18n code beside the dictionaries stays policed; specs never get this exemption.
-        files: ["**/messages/**", "**/locale*/**", "**/lang/**", "**/*.lang.*"],
-        rules: {
-            "starci-fe/no-second-language-in-source": "off",
-        },
-    },
+    ...starciFeConfig({ layout: "single-app" }),
     {
         // A connected block and its pure twin are an architectural boundary, not a local lint
         // preference. Inline config is disabled in both halves so neither `eslint-disable` nor

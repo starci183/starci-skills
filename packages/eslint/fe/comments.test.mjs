@@ -3,15 +3,14 @@
  *
  *   node --test comments.test.mjs
  *
- * The cases that earn their place are the ones where prose has MOVED: out of a comment and into an
- * identifier, a diagnostic string or a template chunk. A language rule that only reads comments
- * looks like it works, and the sentence it was written for simply relocates one line.
+ * The second-language rule that lived here is gone (its job is `no-hardcoded-copy`, with no pragma).
+ * What stays is the export documentation rule and the emoji rule, which walks every place prose hides.
  */
 import assert from "node:assert/strict"
 import test from "node:test"
 import { RuleTester } from "eslint"
 import tsParser from "@typescript-eslint/parser"
-import { noEmojiInSource, noSecondLanguageInSource, requireExportJsdoc, rules } from "./comments.mjs"
+import { isContentFile, noEmojiInSource, requireExportJsdoc, rules } from "./comments.mjs"
 
 const tester = new RuleTester({
   languageOptions: {
@@ -23,14 +22,8 @@ const tester = new RuleTester({
 })
 
 const SRC = "D:/repo/src/components/leaves/Text/index.tsx"
-/**
- * A content path that PARSES. The dictionaries themselves are `.json`, which the TypeScript parser
- * refuses outright, so the allowlist entry covering them cannot be exercised from here - eslint
- * does not lint JSON by default either, and that entry is a guard rather than a live path. The
- * resources folder is the content path a rule actually meets.
- */
-const LOCALE = "D:/repo/src/resources/copy.ts"
-const FIXTURE = "D:/repo/src/components/leaves/Text/index.test.tsx"
+/** A fixture path that parses: the dictionaries themselves are `.json`, which the TypeScript parser refuses. */
+const LOCALE = "D:/repo/src/components/leaves/Text/fixtures/copy.ts"
 
 test("every rule this law declares is exported under its published name", () => {
   for (const [name, rule] of Object.entries(rules)) {
@@ -57,34 +50,6 @@ test("COMMENTS-1: an export opens with a documentation block", () => {
   })
 })
 
-test("COMMENTS-2: the source is English, wherever the prose hides", () => {
-  tester.run("no-second-language-in-source", noSecondLanguageInSource, {
-    valid: [
-      { filename: SRC, code: "// the reason this exists\nconst x = 1" },
-      // the endonym: a language picker must render its own name
-      { filename: SRC, code: "const LABEL = \"Tiếng Việt\"" },
-      // a functional literal, marked with why it stays
-      { filename: SRC, code: "// vn-ok: the server sends this verbatim\nconst S = \"Da huy\"" },
-      // the same, with the diacritics the previous fixture happens to lack --
-      // without them it passes for the wrong reason and proves nothing
-      { filename: SRC, code: "// vn-ok: the server sends this verbatim\nconst S = \"Đã huỷ\"" },
-      // and marked where an author actually writes it: at the end of the line
-      { filename: SRC, code: "const NAME = \"Học viện Mộc\" // vn-ok: one academy's own name" },
-      // locale content IS the other language
-      { filename: LOCALE, code: "const t = \"Tiếp tục học\"" },
-      // a fixture reproduces a real string, or it tests something else
-      { filename: FIXTURE, code: "const t = \"Tiếp tục học\"" },
-    ],
-    invalid: [
-      { filename: SRC, code: "// hạn cuối đã qua\nconst x = 1", errors: [{ messageId: "second" }] },
-      // the same sentence, relocated into a string
-      { filename: SRC, code: "const message = \"hạn cuối đã qua\"", errors: [{ messageId: "second" }] },
-      // and into a template chunk
-      { filename: SRC, code: "const message = `hạn cuối đã qua ${x}`", errors: [{ messageId: "second" }] },
-    ],
-  })
-})
-
 test("COMMENTS-4: no emoji in source, and content files are exempt", () => {
   tester.run("no-emoji-in-source", noEmojiInSource, {
     valid: [
@@ -98,4 +63,11 @@ test("COMMENTS-4: no emoji in source, and content files are exempt", () => {
       { filename: SRC, code: "const s = \"🇻🇳\"", errors: [{ messageId: "emoji" }] },
     ],
   })
+})
+
+test("there is no copy-module exemption: a resources folder is authoring, and the dictionaries are content", () => {
+  assert.equal(isContentFile("D:/repo/src/resources/copy.ts"), false)
+  assert.equal(isContentFile("D:/repo/src/modules/i18n/messages/vi.json"), true)
+  assert.equal(isContentFile("D:/repo/src/components/leaves/Text/index.test.tsx"), true)
+  assert.equal(rules["no-second-language-in-source"], undefined)
 })

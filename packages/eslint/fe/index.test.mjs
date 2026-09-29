@@ -78,8 +78,14 @@ test("every FE canon rule is strict - no warn or off rollout", () => {
   assert.deepEqual(loose, [], "FE canon contains a rule that is not an error")
 })
 
-test("the gathered config refuses inline lint directives", () => {
-  assert.deepEqual(linterOptions, { noInlineConfig: true })
+test("the gathered config refuses inline lint directives and reports dead ones", () => {
+  assert.deepEqual(linterOptions, { noInlineConfig: true, reportUnusedDisableDirectives: "error" })
+})
+
+test("the retired second-language rule and the vocabulary-only copy rule no longer exist", () => {
+  assert.equal(rules["no-second-language-in-source"], undefined)
+  assert.equal(rules["no-hardcoded-copy-in-vocabulary"], undefined)
+  assert.equal(typeof rules["no-hardcoded-copy"]?.create, "function")
 })
 
 test("every rule is a rule, and the plugin exposes them all", () => {

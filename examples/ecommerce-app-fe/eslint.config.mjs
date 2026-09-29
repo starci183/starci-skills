@@ -6,17 +6,12 @@
  * layout "monorepo" - its component tree lives at `apps/<app>/src/**`, which is exactly the
  * glob the monorepo branch governs. "single-app" would match nothing here.
  */
-import starciFe, {
-    recommended as starciRecommended,
-    linterOptions as starciLinterOptions,
-    starciFeConfig,
-} from "@starci/eslint-canon-fe"
+import { starciFeConfig } from "@starci/eslint-canon-fe"
 
 import js from "@eslint/js"
 import globals from "globals"
 import tseslint from "typescript-eslint"
 import pluginReact from "eslint-plugin-react"
-import pluginReactHooks from "eslint-plugin-react-hooks"
 import { defineConfig } from "eslint/config"
 import jsxA11y from "eslint-plugin-jsx-a11y"
 
@@ -50,14 +45,12 @@ export default defineConfig([{
     files: APP_GLOBS,
 }, {
     files: APP_GLOBS,
-    plugins: { "react-hooks": pluginReactHooks },
     settings: { react: { version: "detect" } },
     rules: {
         "react/display-name": "off",
         "react/react-in-jsx-scope": "off",
         "react/no-unescaped-entities": "off",
         indent: ["error", 4],
-        "react-hooks/exhaustive-deps": "off",
         "linebreak-style": "off",
         quotes: ["error", "double"],
         semi: ["error", "never"],
@@ -68,12 +61,7 @@ export default defineConfig([{
         "@typescript-eslint/array-type": ["error", { default: "generic", readonly: "generic" }],
         "react/prop-types": "off",
     },
-}, starciFeConfig({
-    layout: "monorepo",
-    plugin: starciFe,
-    recommended: starciRecommended,
-    linterOptions: starciLinterOptions,
-}), {
+}, ...starciFeConfig({ layout: "monorepo" }), {
     /*
      * Lang/dictionary files are the ONE place Vietnamese and non-ASCII content belongs. The
      * exemption lives in the config (not inline comments, which noInlineConfig refuses) so a
@@ -81,7 +69,6 @@ export default defineConfig([{
      */
     files: ["**/messages/**", "**/locale*/**", "**/lang/**", "**/*.lang.*"],
     rules: {
-        "starci-fe/no-second-language-in-source": "off",
         "starci-fe/no-emoji-in-source": "off",
     },
 }, {
