@@ -9,7 +9,8 @@ boundary: The queue holds a delivery attempt while it waits to be dispatched or 
 credential:
   name: REDIS_URL
   providedBy: owner
-  where: .starcistacks/dev/runtime/env/app.env.enc
+  custody: identity:redis-url
+  # was where: .starcistacks/dev/runtime/env/app.env.enc
 sandbox: The dev stack already runs a real Redis (component redis, port 6379 in application-stacks.yaml)
   for cache and session use; reusing it as a queue backend is a design choice this record makes, not
   infrastructure this lane added.

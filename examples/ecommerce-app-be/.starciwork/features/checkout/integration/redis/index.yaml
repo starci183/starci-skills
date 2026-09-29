@@ -10,7 +10,8 @@ endpoints:
 credential:
   name: IDENTITY_REDIS_URL
   providedBy: owner
-  where: .starcistacks/dev - the local dev container is open on loopback (demo-only), so there is no secret to custody yet
+  custody: identity:identity-redis-url
+  # was where: .starcistacks/dev - the local dev container is open on loopback (demo-only), so there is no secret to custody yet
 sandbox: The dev environment runs Redis 7 in Compose on 6448.
 refs: [br.checkout.place-order, sds.checkout.order-flow]
 

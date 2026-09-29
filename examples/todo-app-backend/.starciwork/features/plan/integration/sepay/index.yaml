@@ -13,7 +13,8 @@ endpoints:
 credential:
   name: SEPAY_API_KEY_FILE
   providedBy: owner
-  where: .starcistacks/dev/runtime/files/sepay-api-key.key.enc
+  custody: identity:sepay-api-key-file
+  # was where: .starcistacks/dev/runtime/files/sepay-api-key.key.enc
 sandbox: SePay's own sandbox merchant account, called for real from the dev environment; not a stub.
 refs: [br.plan.payment.idempotent, sds.plan.subscription-lifecycle]
 

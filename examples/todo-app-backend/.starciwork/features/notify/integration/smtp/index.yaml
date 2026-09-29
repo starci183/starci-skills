@@ -11,7 +11,8 @@ endpoints:
 credential:
   name: SMTP_API_KEY_FILE
   providedBy: owner
-  where: .starcistacks/dev/runtime/files/smtp-api-key.key.enc
+  custody: identity:smtp-api-key-file
+  # was where: .starcistacks/dev/runtime/files/smtp-api-key.key.enc
 sandbox: Undecided. The secret already exists in the stack (see KEYS.md, purpose currently reads "task
   reminders", a different feature's placeholder) but no compose component, no port and no dev host for
   an SMTP server exist in application-stacks.yaml at this commit; this lane added no infra.

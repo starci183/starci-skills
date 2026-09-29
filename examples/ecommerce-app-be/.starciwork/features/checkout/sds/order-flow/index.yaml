@@ -26,14 +26,16 @@ extensions:
         credential:
           name: ORDER_DATABASE_URL
           providedBy: owner
-          where: .starcistacks/dev - the dev container runs with trust authentication, so the credential is the URL itself
+          custody: identity:order-database-url
+          # was where: .starcistacks/dev - the dev container runs with trust authentication, so the credential is the URL itself
         sandbox: true
       - id: redis
         provider: redis
         credential:
           name: IDENTITY_REDIS_URL
           providedBy: owner
-          where: .starcistacks/dev - same trust posture, this example's session store
+          custody: identity:identity-redis-url
+          # was where: .starcistacks/dev - same trust posture, this example's session store
         sandbox: true
 
 stateMachine:

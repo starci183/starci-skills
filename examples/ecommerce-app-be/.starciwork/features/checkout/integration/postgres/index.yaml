@@ -11,7 +11,8 @@ endpoints:
 credential:
   name: ORDER_DATABASE_URL
   providedBy: owner
-  where: .starcistacks/dev - the local dev container runs with trust authentication (demo-only), so there is no secret to custody yet
+  custody: identity:order-database-url
+  # was where: .starcistacks/dev - the local dev container runs with trust authentication (demo-only), so there is no secret to custody yet
 sandbox: The dev environment runs PostgreSQL 16 in Compose on 5501, seeded by the services' own migrations.
 refs: [sds.checkout.order-flow]
 

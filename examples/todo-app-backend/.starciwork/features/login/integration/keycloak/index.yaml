@@ -11,7 +11,8 @@ endpoints:
 credential:
   name: KEYCLOAK_ADMIN_PASSWORD_FILE
   providedBy: owner
-  where: .starcistacks/dev/runtime/files/keycloak-admin-password.key.enc
+  custody: identity:keycloak-admin-password-file
+  # was where: .starcistacks/dev/runtime/files/keycloak-admin-password.key.enc
 sandbox: The dev environment runs its own Keycloak on 8089 with an imported realm; it is a real Keycloak,
   not a stub, which is why a run against it counts.
 refs: [br.login.password.sign-in]
