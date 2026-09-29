@@ -29,6 +29,6 @@ paths:
   - examples/todo-app-backend/tsconfig.json
   - examples/todo-app-backend/tsconfig.e2e.json
   - examples/todo-app-backend/README.md
-  - examples/todo-app-backend/docs/TESTING.md
+  - examples/todo-app-backend/docs/guides/testing.md
   - examples/todo-app-frontend/package.json
   - examples/todo-app-frontend/README.md
