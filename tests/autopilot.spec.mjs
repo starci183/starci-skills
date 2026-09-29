@@ -13,6 +13,7 @@ import { createHash } from 'node:crypto';
 import { spawnSync } from 'node:child_process';
 import { stringifyYaml, parseYaml } from '../engine/yaml.mjs';
 import { inspectLedger, ledgerFileFor, openLedger } from '../engine/ledger-db.mjs';
+import {seedWorkflow} from './_ledger-fixture.mjs';
 import { AUTOPILOT_BY, SUPERVISOR_GATE, autopilotAskClass, autopilotOf, autopilotSettings, drawGateEvidence, routeCapUnderAutopilot } from '../scripts/kernel/autopilot.mjs';
 import { ownerAnswerProof } from '../scripts/kernel/owner-claim.mjs';
 import { applyDrawReview, drawReviewQuestion, drawReviewStatus } from '../scripts/work/draw-review.mjs';
@@ -36,23 +37,23 @@ const world = (t, legs = [{ op: 'backend.implement' }, { op: 'e2e.verify' }, { o
   t.after(() => fs.rmSync(repo, { recursive: true, force: true, maxRetries: 20, retryDelay: 25 }));
   seed(repo, (l) => {
     l.ensureWorkflow({ workflowId: WF, title: 'autopilot spec' });
-    l.db.prepare("UPDATE workflows SET phase='running' WHERE workflow_id=?").run(WF);
+    l.write.changeWorkflowPhase({workflowId:WF,to:'running',by:'test',reason:'seed autopilot workflow'});
     l.db.prepare('INSERT INTO goals(workflow_id,revision,goal_identity,markdown,json,created_at) VALUES(?,?,?,?,?,?)')
       .run(WF, 0, 'agoal', '# goal', JSON.stringify({ opChain: { legs } }), Date.now());
   });
   return repo;
 };
-const seedJob = (l, { jobId, op, attempt = 1, status = 'failed', result = null, params = null, retryOf = null }) => {
+const seedJob = (l, { jobId, op, attempt = 1, status = 'failed', result = null, params = null, retryOf = null, dispatchId = null }) => {
   const at = Date.now();
-  l.db.prepare(`INSERT INTO jobs(job_id,workflow_id,op_id,attempt,generation,kind,role,payload_json,status,result_json,created_at,updated_at)
-    VALUES(?,?,?,?,0,'op','op',?,?,?,?,?)`).run(jobId, WF, op, attempt, JSON.stringify({ opId: op, owned_paths: [`.starciwork/evidence/${WF}.${op}`], ...(params ? { params } : {}), ...(retryOf ? { retry: { retryOf } } : {}) }),
-    status, result ? JSON.stringify(result) : null, at, at);
+  seedWorkflow(l,{id:WF,jobs:[{jobId,opId:op,status,result,dispatchId:dispatchId??`seed:${jobId}`,createdAt:at,
+    payload:{opId:op,owned_paths:[`.starciwork/evidence/${WF}.${op}`],...(params?{params}:{}),...(retryOf?{retry:{retryOf}}:{})}}]});
 };
 /** A settled ask: the job failed awaiting the owner and its filed ask report. */
 const seedAsk = (repo, { jobId, op, dispatchId, question, params = null }) => seed(repo, (l) => {
-  seedJob(l, { jobId, op, params, result: { verdict: 'awaiting-owner', kernelVerdict: 'blocked', askDispatchId: dispatchId } });
-  l.db.prepare('INSERT INTO reports(workflow_id,dispatch_id,op_id,attempt,generation,outcome,report_json,from_terminal,consumed_at,created_at) VALUES(?,?,?,?,0,?,?,NULL,?,?)')
-    .run(WF, dispatchId, op, 1, 'ask', JSON.stringify({ schema: 'starci/op-report@1', outcome: 'ask', from: jobId, summary: 'ask', question }), Date.now(), Date.now());
+  seedJob(l, { jobId, op, params, dispatchId, result: { verdict: 'awaiting-owner', kernelVerdict: 'blocked', askDispatchId: dispatchId } });
+  const attemptId=l.db.prepare('SELECT attempt_id FROM op_attempts WHERE job_id=?').get(jobId).attempt_id;
+  l.db.prepare('INSERT INTO reports(workflow_id,attempt_id,dispatch_id,job_id,outcome,report_json,consumed_at,created_at) VALUES(?,?,?,?,?,?,?,?)')
+    .run(WF, attemptId, dispatchId, jobId, 'ask', JSON.stringify({ schema: 'starci/op-report@1', outcome: 'ask', from: jobId, summary: 'ask', question }), Date.now(), Date.now());
 });
 const status = (repo, env = {}) => { const r = run(env, 'status', '--repo', repo, '--workflow', WF, '--json'); assert.equal(r.status, 0, r.stderr); return json(r); };
 
@@ -140,7 +141,7 @@ test('an owner gate is the Supervisor\'s under autopilot: raised or older gates 
   assert.equal(raised.kind, SUPERVISOR_GATE);
   // An owner-gate row from before autopilot is re-routed by the next status.
   seed(repo, (l) => {
-    l.db.prepare("INSERT INTO incidents(incident_id,workflow_id,op_id,attempts,model_calls,tokens,elapsed_ms,last_progress,status,updated_at) VALUES('inc-old',?,?,0,0,0,0,'[owner-gate] retry cap 3 of 3','open',?)").run(WF, 'backend.implement', Date.now());
+    l.db.prepare("INSERT INTO incidents(incident_id,workflow_id,op_id,kind,owner,last_progress,status,created_at,updated_at) VALUES('inc-old',?,?,'owner-ask','owner','[owner-gate] retry cap 3 of 3','open',?,?)").run(WF, 'backend.implement', Date.now(), Date.now());
     l.appendEvent({ workflowId: WF, entityType: 'incident', entityId: 'inc-old', kind: 'incident-raised', payload: { kind: 'owner-gate', detail: 'retry cap 3 of 3', holds: ['job-be'] } });
   });
   const s = status(repo);

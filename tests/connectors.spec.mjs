@@ -94,6 +94,16 @@ test('secrets resolve from the env var, its _FILE pointer or connectors.secretsF
 /* ------------------------------------------------------------- gateway */
 
 const NONCE='a-0123456789abcdef01',CRED='a-fedcba98765432100f';
+const seedAskReport=(ledger,{workflowId,dispatchId,question,title=null})=>{
+  if(!ledger.db.prepare('SELECT 1 FROM workflows WHERE workflow_id=?').get(workflowId))
+    seedWorkflow(ledger,{id:workflowId,state:{phase:'running',job:title}});
+  const jobId=`op-provision.ask-${dispatchId}`;
+  seedWorkflow(ledger,{id:workflowId,jobs:[{jobId,opId:'provision.ask',status:'answering',dispatchId,
+    payload:{opId:'provision.ask',owned_paths:[]}}]});
+  const attemptId=ledger.db.prepare('SELECT attempt_id FROM op_attempts WHERE job_id=?').get(jobId).attempt_id;
+  ledger.db.prepare("INSERT INTO reports(workflow_id,attempt_id,dispatch_id,job_id,outcome,report_json,created_at) VALUES(?,?,?,?,'ask',?,?)")
+    .run(workflowId,attemptId,dispatchId,jobId,JSON.stringify({schema:'starci/op-report@1',outcome:'ask',question}),Date.now());
+};
 const fakeForm=async t=>{
   const seen=[];
   const server=http.createServer((req,res)=>{
@@ -159,9 +169,7 @@ test('the gateway proxies a served nonce (page, asset, POST, redirect) and forwa
 });
 
 const seedServing=(ledger,{workflowId,dispatchId,url,fields={files:[],vars:[]},question,title=null,extra=[]})=>{
-  seedWorkflow(ledger,{id:workflowId,state:{phase:'running',job:title}});
-  ledger.db.prepare(`INSERT INTO reports(workflow_id,dispatch_id,op_id,attempt,generation,outcome,report_json,created_at) VALUES(?,?,?,?,?,?,?,?)`)
-    .run(workflowId,dispatchId,'provision.ask',1,1,'ask',JSON.stringify({schema:'starci/op-report@1',outcome:'ask',question}),Date.now());
+  seedAskReport(ledger,{workflowId,dispatchId,question,title});
   ledger.appendEvent({workflowId,entityType:'report',entityId:dispatchId,kind:'ask-serving',payload:{dispatchId,url,pid:process.pid,fields,ttlMs:4*60*60*1000}});
   for(const kind of extra)ledger.appendEvent({workflowId,entityType:'report',entityId:dispatchId,kind,payload:{dispatchId}});
 };
@@ -263,9 +271,7 @@ const deps=(machineHome,extra={})=>({config:telegramConfig(),env:{LOCALAPPDATA:m
 // Owner, 2026-09-24: the question goes to Telegram with a "Generate URL" button; the form is served
 // only when the owner presses it (telegram-bridge.spec.mjs covers the press).
 const seedAsk=(ledger,{workflowId,dispatchId,question,title=null})=>{
-  if(!ledger.db.prepare('SELECT 1 FROM workflows WHERE workflow_id=?').get(workflowId))seedWorkflow(ledger,{id:workflowId,state:{phase:'running',job:title}});
-  ledger.db.prepare(`INSERT INTO reports(workflow_id,dispatch_id,op_id,attempt,generation,outcome,report_json,created_at) VALUES(?,?,?,?,?,?,?,?)`)
-    .run(workflowId,dispatchId,'provision.ask',1,1,'ask',JSON.stringify({schema:'starci/op-report@1',outcome:'ask',question}),Date.now());
+  seedAskReport(ledger,{workflowId,dispatchId,question,title});
 };
 
 test('a parked ask is told once: workflow, question, numbered options and a Generate URL button, no link, in config language',async t=>{
@@ -289,7 +295,7 @@ test('a parked ask is told once: workflow, question, numbered options and a Gene
     assert.equal(call.body.chat_id,'4242');
     assert.equal(call.body.link_preview_options?.is_disabled,true);
     const text=call.body.text;
-    assert.match(text,/^\[StarCi\] Có câu hỏi cần thầy trả lời\nWorkflow: miamia-pricing \(wf-miamia-pricing-x1\)\n\nCâu hỏi:\nChốt giá gói Pro\?/);
+    assert.match(text,/^\[StarCi\] Có câu hỏi cần thầy trả lời\nWorkflow: miamia-pricing \(wf-miamia-pricing-x1\)\nViệc: Xin thông tin · miamia-pricing\n\nCâu hỏi:\nChốt giá gói Pro\?/);
     assert.match(text,/Lựa chọn:\n1\. 99\.000đ\/tháng\n2\. Để sau/);
     assert.match(text,/Form trả lời chưa mở\. Khi thầy muốn trả lời, bấm "Tạo link trả lời"/);
     assert.ok(!/https?:\/\//.test(text),'no form is served yet, so no link of any kind');
@@ -314,7 +320,7 @@ test('parkAsk records ask-notified with the ask fields when the owner is told, a
     seedAsk(ledger,{workflowId:'wf-park',dispatchId:'ctx_old',question:{text:'Cổng thanh toán? VNPAY_TMN_CODE',options:['VNPay','MoMo'],refs:['decision.pay']}});
     seedAsk(ledger,{workflowId:'wf-park',dispatchId:'ctx_new',question:{text:'Cổng thanh toán? VNPAY_TMN_CODE',options:['VNPay','MoMo'],refs:['decision.pay']}});
     const rows=()=>ledger.db.prepare("SELECT kind,payload_json FROM events WHERE workflow_id='wf-park' AND kind IN ('ask-notified','ask-notify-failed','ask-superseded','ask-message-closed') ORDER BY seq").all().map(r=>[r.kind,JSON.parse(r.payload_json)]);
-    const report=id=>ledger.db.prepare("SELECT * FROM reports WHERE workflow_id='wf-park' AND dispatch_id=?").get(id);
+    const report=id=>ledger.db.prepare("SELECT r.*,a.op_id,a.try_no AS attempt FROM reports r JOIN op_attempts a ON a.attempt_id=r.attempt_id WHERE r.workflow_id='wf-park' AND r.dispatch_id=?").get(id);
     const bot=fakeBot();
     const notify=a=>notifyAsk(a,deps(machineHome,{fetchImpl:bot.fetchImpl}));
     const close=a=>markAskClosed(a,deps(machineHome,{fetchImpl:bot.fetchImpl}));
@@ -408,7 +414,7 @@ test('the one send point is the kernel api\'s parkAsk; serve-ask binding and the
     assert.doesNotMatch(read(p),/connectors\/telegram|api\.telegram\.org/,`${p} must not notify`);
   const api=read('scripts/kernel/api.mjs');
   assert.doesNotMatch(api,/sendMessage\(|api\.telegram\.org|connectors\/telegram\.mjs/,'the kernel api reaches Telegram only through serve-ask.mjs parkAsk/closeAskMessages');
-  assert.match(api,/await parkAsk\(\{ ledger, ledgerFile: ledgerFileFor\(repo\), repo, workflowId, report \}\)/);
+  assert.match(read('scripts/kernel/api-verbs/serve-ask.mjs'),/await parkAsk\(\{ ledger, ledgerFile: ledgerFileFor\(repo\), repo, workflowId, report \}\)/);
 });
 
 // Owner, 2026-09-24: "trả lời xong xóa" — an answered or retired ask leaves the chat.

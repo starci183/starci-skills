@@ -47,10 +47,11 @@ const world=(t,fn,{screen=IDLE,dispatchedAgo=30*SEC,managed=true,nudgeAgo=null}=
       orca:{dispatchId:HANDLE,agentTerminalHandle:HANDLE},
       hierarchy:{runtime:{host:'orca',agent:'codex',dispatchId:HANDLE,terminalHandle:HANDLE}}};
   seedWorkflow(ledger,{id:WF,state:{phase:'running'},
-    jobs:[{jobId:JOB,opId:OP,kind:'op',status:'running',attempt:1,workerId:managed?DISPATCH:HANDLE,leaseToken:'tok-launch-grace',createdAt:dispatchedAt,payload}]});
-  ledger.db.prepare("UPDATE workflows SET phase='running' WHERE workflow_id=?").run(WF);
-  ledger.db.prepare('INSERT INTO contracts(workflow_id,op_id,attempt,dispatch_id,markdown,context_json,created_at) VALUES(?,?,?,?,?,?,?)')
-    .run(WF,OP,1,managed?DISPATCH:HANDLE,'# launch-grace contract','{}',dispatchedAt);
+    jobs:[{jobId:JOB,opId:OP,kind:'op',status:'running',attempt:1,dispatchId:managed?DISPATCH:HANDLE,
+      workerId:managed?DISPATCH:HANDLE,leaseToken:'tok-launch-grace',createdAt:dispatchedAt,payload}]});
+  const attemptId=ledger.db.prepare('SELECT attempt_id FROM op_attempts WHERE job_id=?').get(JOB).attempt_id;
+  ledger.db.prepare('INSERT INTO contracts(attempt_id,workflow_id,job_id,markdown,context_json,created_at) VALUES(?,?,?,?,?,?)')
+    .run(attemptId,WF,JOB,'# launch-grace contract','{}',dispatchedAt);
   ledger.appendEvent({workflowId:WF,entityType:'job',entityId:JOB,kind:'op-dispatched',
     payload:{op:OP,dispatch:managed?DISPATCH:HANDLE,...(managed?{managed:true}:{terminal:HANDLE})},createdAt:dispatchedAt});
   if(nudgeAgo!=null)ledger.appendEvent({workflowId:WF,entityType:'job',entityId:JOB,kind:'op-worker-nudged',payload:{opId:OP,attempt:1},createdAt:Date.now()-nudgeAgo});

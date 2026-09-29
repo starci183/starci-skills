@@ -10,6 +10,7 @@ import {spawnSync} from 'node:child_process';
 import {FAKE_ORCA} from './helpers/fake-orca.mjs';
 import {withLedger,seedWorkflow} from './_ledger-fixture.mjs';
 import {runningWorkflows} from '../scripts/kernel/managed-repos.mjs';
+import {jobResult} from '../engine/ledger-db.mjs';
 
 const ROOT=path.resolve(import.meta.dirname,'..');
 const API=path.join(ROOT,'scripts','kernel','api.mjs');
@@ -31,7 +32,7 @@ const world=(t,fn)=>withLedger(t,({root,repoRoot,machineHome,ledger})=>{
   const at=Date.now();
   for(const id of [WF,PEER]){
     seedWorkflow(ledger,{id,state:{phase:'running'}});
-    ledger.db.prepare("UPDATE workflows SET phase='running',source_roots_json=? WHERE workflow_id=?").run(JSON.stringify([repoRoot]),id);
+    ledger.db.prepare("UPDATE workflows SET source_roots_json=? WHERE workflow_id=?").run(JSON.stringify([repoRoot]),id);
   }
   seedWorkflow(ledger,{id:WF,jobs:[
     {jobId:`kernel-${WF}`,kind:'kernel',role:'kernel',status:'running',workerId:KERNEL_TERM,
@@ -40,12 +41,15 @@ const world=(t,fn)=>withLedger(t,({root,repoRoot,machineHome,ledger})=>{
       payload:{opId:'docs.author',owned_paths:['docs/'],orca:{dispatchId:OP_TERM,agentTerminalHandle:OP_TERM,taskId:'task-running',runId:'run-archive'}}},
     {jobId:'job-queued',opId:'docs.author',kind:'op',status:'queued',attempt:2,payload:{opId:'docs.author',owned_paths:['src/']}},
     {jobId:'job-done',opId:'docs.author',kind:'op',status:'succeeded',attempt:3,payload:{opId:'docs.author'},result:{verdict:'pass'}},
+    {jobId:'job-ask',opId:'business.decide',kind:'op',status:'failed',dispatchId:'ask-open',
+      payload:{opId:'business.decide',owned_paths:[]},result:{verdict:'awaiting-owner'}},
   ],leases:[{resourceKey:'path:docs/',jobId:'job-running',expiresAt:at+HOUR}]});
   ledger.db.prepare("INSERT INTO signals(scope,key,holder_pid,token,value_json,at,expires_at) VALUES('kernel',?,NULL,'tok-k',?,?,NULL)")
     .run(WF,JSON.stringify({terminal:KERNEL_TERM}),at);
   ledger.db.prepare("INSERT INTO inbox(workflow_id,kind,key,payload_json,status,created_at) VALUES(?,'goal',?,'{}','claimed',?)").run(WF,WF,at);
-  ledger.db.prepare("INSERT INTO reports(workflow_id,dispatch_id,op_id,attempt,outcome,report_json,created_at) VALUES(?,?,?,?,'ask',?,?)")
-    .run(WF,'ask-open','business.decide',1,JSON.stringify({outcome:'ask',question:{text:'Which?',options:['a','b']}}),at);
+  const attemptId=ledger.db.prepare("SELECT attempt_id FROM op_attempts WHERE job_id='job-ask'").get().attempt_id;
+  ledger.db.prepare("INSERT INTO reports(workflow_id,attempt_id,dispatch_id,job_id,outcome,report_json,created_at) VALUES(?,?,?,?,'ask',?,?)")
+    .run(WF,attemptId,'ask-open','job-ask',JSON.stringify({outcome:'ask',question:{text:'Which?',options:['a','b']}}),at);
   const events=(kind,wf=WF)=>ledger.db.prepare('SELECT payload_json FROM events WHERE workflow_id=? AND kind=? ORDER BY seq').all(wf,kind).map(r=>JSON.parse(r.payload_json));
   return fn({repoRoot,ledger,run,calls,events,env});
 });
@@ -60,21 +64,21 @@ test('archive stops a running workflow: asks retired, open jobs dropped, Kernel 
   const db=ledger.db;
   const wf=db.prepare('SELECT phase,archived_at FROM workflows WHERE workflow_id=?').get(WF);
   assert.ok(wf.archived_at>0,'archived_at is set');
-  assert.equal(wf.phase,'running','archive keeps the phase; archived_at is what ends it');
+  assert.equal(wf.phase,'archived','archive records the terminal lifecycle phase');
   const [archivedEvent]=events('workflow-archived');
   assert.deepEqual([archivedEvent.archived.reason,archivedEvent.archived.by,archivedEvent.archived.at],['replaced by the canon-conformance workflow','owner',wf.archived_at]);
   assert.equal(db.prepare("SELECT count(*) n FROM inbox WHERE workflow_id=? AND status NOT IN ('done','applied')").get(WF).n,0,'the goal row is closed');
   for(const jobId of ['job-running','job-queued']){
-    const job=db.prepare('SELECT status,result_json FROM jobs WHERE job_id=?').get(jobId);
+    const job=db.prepare('SELECT status FROM jobs WHERE job_id=?').get(jobId);
     assert.equal(job.status,'cancelled');
-    assert.deepEqual([JSON.parse(job.result_json).verdict,JSON.parse(job.result_json).reason],['dropped','workflow-archived']);
+    assert.deepEqual([jobResult(db,jobId).verdict,jobResult(db,jobId).reason],['dropped','workflow-archived']);
   }
   assert.equal(db.prepare("SELECT status FROM jobs WHERE job_id='job-done'").get().status,'succeeded','a settled job is untouched');
   assert.equal(db.prepare('SELECT count(*) n FROM leases WHERE workflow_id=?').get(WF).n,0,'leases released');
   assert.deepEqual(events('job-dropped').map(e=>e.reason),['workflow-archived','workflow-archived']);
   assert.equal(db.prepare("SELECT count(*) n FROM signals WHERE scope='kernel' AND key=?").get(WF).n,0,'the Kernel signal is deleted');
-  const kernel=db.prepare('SELECT status,worker_id,result_json FROM jobs WHERE job_id=?').get(`kernel-${WF}`);
-  assert.deepEqual([kernel.status,kernel.worker_id,JSON.parse(kernel.result_json).reason],['cancelled',null,'workflow-archived']);
+  const kernel=db.prepare('SELECT status,worker_id FROM jobs WHERE job_id=?').get(`kernel-${WF}`);
+  assert.deepEqual([kernel.status,kernel.worker_id,jobResult(db,`kernel-${WF}`).reason],['cancelled',null,'workflow-archived']);
   assert.deepEqual(events('ask-superseded').map(e=>[e.dispatchId,e.reason,e.retired]),[['ask-open','workflow-archived',true]]);
   const running=JSON.parse(db.prepare("SELECT payload_json FROM jobs WHERE job_id='job-running'").get().payload_json);
   assert.equal(running.terminalClosed?.handle,OP_TERM,'the dropped worker terminal is released and recorded');
@@ -124,7 +128,7 @@ test('finish is still refused for open jobs and for a handover the owner never a
   const open=run('finish','--workflow',WF);
   assert.notEqual(open.status,0);
   assert.match(open.stderr,/workflow-open-jobs/);
-  ledger.db.prepare("UPDATE jobs SET status='cancelled' WHERE workflow_id=? AND kind<>'kernel' AND status<>'succeeded'").run(WF);
+  ledger.db.prepare("UPDATE jobs SET status='cancelled' WHERE workflow_id=? AND kind<>'kernel' AND status NOT IN ('succeeded','failed')").run(WF);
   const unapproved=run('finish','--workflow',WF);
   assert.notEqual(unapproved.status,0);
   assert.match(unapproved.stderr,/handover-not-approved/);

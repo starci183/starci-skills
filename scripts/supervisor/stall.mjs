@@ -153,12 +153,8 @@ export const queuedJobs = (db, workflowId) => db.prepare(
  */
 export const settleOwedJobs = (db, workflowId) => db.prepare(
   `SELECT j.job_id, j.op_id, j.status, j.payload_json, j.created_at, j.updated_at FROM jobs j
-    WHERE j.workflow_id=? AND j.kind<>'kernel' AND j.status IN ('running','answering') AND EXISTS (
-      SELECT 1 FROM reports r WHERE r.workflow_id=j.workflow_id AND r.consumed_at IS NOT NULL AND (
-        r.dispatch_id=j.job_id OR r.dispatch_id=j.worker_id
-        OR r.dispatch_id=json_extract(j.payload_json,'$.orca.dispatchId')
-        OR r.dispatch_id=json_extract(j.payload_json,'$.managed.dispatchId')
-        OR r.dispatch_id=json_extract(j.payload_json,'$.hierarchy.runtime.dispatchId')))
+    WHERE j.workflow_id=? AND j.kind<>'kernel' AND j.status IN ('running','answering','reported') AND EXISTS (
+      SELECT 1 FROM reports r WHERE r.job_id=j.job_id AND r.consumed_at IS NOT NULL)
     ORDER BY j.created_at, j.job_id`).all(workflowId);
 
 export const heldBy = (gate, job) => (gate.kind === 'supervisor-gate' && gate.holds.includes('*'))

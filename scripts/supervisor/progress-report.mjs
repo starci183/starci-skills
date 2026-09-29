@@ -85,9 +85,8 @@ export function settleHoldsOf(db, workflowId, { now = Date.now() } = {}) {
     const wait = waits.find((w) => w.holds.includes(job.job_id) || (job.op_id && w.holds.includes(job.op_id)));
     if (!wait) continue;
     const payload = parseJson(job.payload_json, {}) ?? {};
-    const dispatchIds = [payload.managed?.dispatchId, payload.orca?.dispatchId, payload.hierarchy?.runtime?.dispatchId, job.job_id].filter(Boolean);
-    const report = db.prepare(`SELECT outcome, consumed_at FROM reports WHERE workflow_id=? AND consumed_at IS NOT NULL AND (dispatch_id IN (${dispatchIds.map(() => '?').join(',')})
-      OR dispatch_id=(SELECT worker_id FROM jobs WHERE job_id=?)) ORDER BY created_at DESC LIMIT 1`).get(workflowId, ...dispatchIds, job.job_id);
+    const report = db.prepare('SELECT outcome, consumed_at FROM reports WHERE workflow_id=? AND job_id=? AND consumed_at IS NOT NULL ORDER BY created_at DESC LIMIT 1')
+      .get(workflowId, job.job_id);
     if (!report) continue;
     out.push({ jobId: job.job_id, op: job.op_id, outcome: report.outcome, heldBecause: wait.heldBecause, incident: wait.incident,
       peer: wait.peer, peerJob: wait.peerJob, since: Math.max(wait.since ?? 0, report.consumed_at ?? 0), doneAt: report.consumed_at,
@@ -120,7 +119,7 @@ export function workflowProgress(db, wf, { now = Date.now(), publicBase = null, 
   const total = counted.length;
 
   const closed = new Set(db.prepare("SELECT json_extract(payload_json,'$.dispatchId') d FROM events WHERE workflow_id=? AND kind IN ('ask-answered','ask-superseded')").all(wf.workflow_id).map((r) => r.d));
-  const asks = db.prepare("SELECT dispatch_id, op_id, report_json FROM reports WHERE workflow_id=? AND outcome='ask' ORDER BY report_id").all(wf.workflow_id)
+  const asks = db.prepare("SELECT r.dispatch_id, a.op_id, r.report_json FROM reports r JOIN op_attempts a ON a.attempt_id=r.attempt_id WHERE r.workflow_id=? AND r.outcome='ask' ORDER BY r.report_id").all(wf.workflow_id)
     .filter((r) => !closed.has(r.dispatch_id))
     .map((r) => {
       const q = parseJson(r.report_json, {})?.question ?? {};
@@ -138,7 +137,7 @@ export function workflowProgress(db, wf, { now = Date.now(), publicBase = null, 
   const holds = settleHoldsOf(db, wf.workflow_id, { now }).map((h) => (h.peer ? { ...h, peerName: displayName(h.peer, names) } : h));
   const runtime = incidents.filter((i) => RUNTIME_INCIDENT.test(i.last_progress ?? ''));
   const ownerGates = incidents.filter((i) => /^\[owner-gate/.test(i.last_progress ?? ''));
-  const last = db.prepare('SELECT op_id, outcome, report_json, created_at FROM reports WHERE workflow_id=? ORDER BY report_id DESC LIMIT 1').get(wf.workflow_id);
+  const last = db.prepare('SELECT a.op_id, r.outcome, r.report_json, r.created_at FROM reports r JOIN op_attempts a ON a.attempt_id=r.attempt_id WHERE r.workflow_id=? ORDER BY r.report_id DESC LIMIT 1').get(wf.workflow_id);
   const elapsed = Math.max(0, now - Number(wf.created_at));
   const etaMs = done > 0 && total > done ? Math.round((elapsed / done) * (total - done)) : (total > 0 && done >= total ? 0 : null);
   // Jobs of this workflow other workflows wait on (scripts/kernel/waiter-priority.mjs).

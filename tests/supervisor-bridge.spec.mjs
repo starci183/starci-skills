@@ -10,6 +10,7 @@ import { HUB_STUCK_MS, RECORD_CHANGE_REFUSED, dependencyGraph, foundationAliasKe
 import { createOwnership } from '../scripts/kernel/work-ownership.mjs';
 import { approvalOf, commandFor, main } from '../scripts/supervisor/bridge.mjs';
 import { readMachine } from '../engine/machine-db.mjs';
+import { seedWorkflow } from './_ledger-fixture.mjs';
 
 // Owner mandate 2026-09-28: the [Supervisor] adds supplementary (bridging) workflows when two workflows depend on
 // each other and reorganizes workflows. Fixture ledgers reproduce the three shapes it must find - a circular wait,
@@ -26,28 +27,40 @@ const fixture = (t, { workflows = [WSPV, STUDIO, COLLAB, MOD, AUTH, OLD] } = {})
   t.after(() => fs.rmSync(root, { recursive: true, force: true, maxRetries: 20, retryDelay: 25 }));
   const repo = path.join(root, 'repo');
   fs.mkdirSync(repo, { recursive: true });
-  const env = { ...process.env, STARCI_TEST_MACHINE_FILE: path.join(root, 'machine.sqlite') };
+  const env = { ...process.env, STARCI_TEST_MACHINE_FILE: path.join(root, 'machine.sqlite'), STARCI_PROJECTS_ROOT: path.join(root, 'projects') };
+  const priorProjectsRoot = process.env.STARCI_PROJECTS_ROOT;
+  process.env.STARCI_PROJECTS_ROOT = env.STARCI_PROJECTS_ROOT;
+  t.after(() => { if (priorProjectsRoot === undefined) delete process.env.STARCI_PROJECTS_ROOT; else process.env.STARCI_PROJECTS_ROOT = priorProjectsRoot; });
   for (const key of ['ORCA_TERMINAL_HANDLE', 'STARCI_ROLE', 'STARCI_OP_JOB']) delete env[key];
-  const seed = (fn) => { const l = openLedger({ file: ledgerFileFor(repo) }); try { return l.transaction(() => fn(l)); } finally { l.close(); } };
-  const read = (fn) => { const l = inspectLedger({ file: ledgerFileFor(repo) }); try { return fn(l.db); } finally { l.close(); } };
+  const seed = (fn) => { const l = openLedger({ file: ledgerFileFor(repo, { env }) }); try { return l.transaction(() => fn(l)); } finally { l.close(); } };
+  const read = (fn) => { const l = inspectLedger({ file: ledgerFileFor(repo, { env }) }); try { return fn(l.db); } finally { l.close(); } };
   seed((ledger) => {
     const at = Date.now() - 10 * 3_600_000;
     workflows.forEach((workflowId, i) => {
       ledger.ensureWorkflow({ workflowId, title: workflowId.replace(/^wf-/, ''), ledgerMode: 'durable', sourceRoots: [repo] });
+      const from = ledger.db.prepare('SELECT phase FROM workflows WHERE workflow_id=?').get(workflowId).phase;
+      if (from !== 'running') ledger.db.prepare('INSERT INTO lifecycle_changes(workflow_id,from_phase,to_phase,by,reason,at) VALUES(?,?,?,?,?,?)')
+        .run(workflowId, from, 'running', 'test-fixture', 'seed', at + i * 1000);
       ledger.db.prepare("UPDATE workflows SET phase='running',created_at=? WHERE workflow_id=?").run(at + i * 1000, workflowId);
       ledger.db.prepare('INSERT INTO goals(workflow_id,revision,goal_identity,markdown,json,created_at) VALUES(?,?,?,?,?,?)')
         .run(workflowId, 0, `goal-${workflowId}`, '# goal', JSON.stringify({ derivedFrom: 'bridge-spec' }), at);
     });
   });
-  const job = (workflowId, jobId, { status = 'queued', paths = [], ago = 0 } = {}) => seed((ledger) => {
+  const job = (workflowId, jobId, { status = 'queued', paths = [], ago = 0 } = {}) => {
     const at = Date.now() - ago;
-    ledger.db.prepare("INSERT INTO jobs(job_id,workflow_id,op_id,attempt,generation,kind,payload_json,status,created_at,updated_at) VALUES(?,?,?,1,0,'op',?,?,?,?)")
-      .run(jobId, workflowId, jobId.replace(/^op-/, '').replace(/-[0-9a-f]{10}$/, ''), JSON.stringify({ owned_paths: paths, title: `${jobId} title` }), status, at, at);
-  });
+    const opId = jobId.replace(/^op-/, '').replace(/-[0-9a-f]{10}$/, '');
+    const ledger = openLedger({ file: ledgerFileFor(repo, { env }) });
+    try { seedWorkflow(ledger, { id: workflowId, now: at, jobs: [{ jobId, opId, status, createdAt: at, updatedAt: at,
+      payload: { opId, owned_paths: paths, title: `${jobId} title` } }] }); } finally { ledger.close(); }
+  };
   const api = (args) => spawnSync(process.execPath, [API, ...args, '--repo', repo, '--json'], { cwd: ROOT, encoding: 'utf8', windowsHide: true, timeout: 120000, env });
   const ok = (args) => { const r = api(args); assert.equal(r.status, 0, `${args.join(' ')}: ${r.stderr || r.stdout}`); return json(r.stdout); };
   const bridge = (argv) => main([...argv, '--repo', repo, '--no-notify'], { env });
-  const ago = (incidentId, ms) => seed((ledger) => ledger.db.prepare("UPDATE events SET created_at=? WHERE entity_type='incident' AND entity_id=?").run(Date.now() - ms, incidentId));
+  const ago = (incidentId, ms) => seed((ledger) => {
+    const raised = ledger.db.prepare("SELECT workflow_id,payload_json FROM events WHERE entity_type='incident' AND entity_id=? AND kind='incident-raised' ORDER BY seq DESC LIMIT 1").get(incidentId);
+    ledger.appendEvent({ workflowId: raised.workflow_id, entityType: 'incident', entityId: incidentId, kind: 'incident-raised',
+      payload: JSON.parse(raised.payload_json), createdAt: Date.now() - ms });
+  });
   return { root, repo, env, seed, read, job, api, ok, bridge, ago };
 };
 
@@ -82,7 +95,7 @@ test('circular wait: found, designated, and the lead side released', async (t) =
   fx.read((db) => {
     assert.equal(db.prepare('SELECT status FROM incidents WHERE incident_id=?').get(a.incidentId).status, 'resolved');
     assert.equal(db.prepare('SELECT status FROM incidents WHERE incident_id=?').get(b.incidentId).status, 'open', 'the waiter keeps waiting on the lead');
-    const resolved = json(db.prepare("SELECT payload_json FROM events WHERE entity_id=? AND kind='incident-resolved'").get(a.incidentId).payload_json);
+    const resolved = json(db.prepare("SELECT payload_json FROM events WHERE entity_id=? AND kind='incident-resolved' ORDER BY seq DESC LIMIT 1").get(a.incidentId).payload_json);
     assert.equal(resolved.by, 'supervisor');
     const [rec] = readBridges(db);
     assert.deepEqual([rec.action, rec.state, rec.provisional, rec.approvedBy, rec.owner, rec.waiter], ['designate', 'applied', true, 'supervisor-autopilot', STUDIO, WSPV]);
@@ -185,7 +198,12 @@ test('hub blocker: two workflows on one stuck job -> a bridging workflow owns it
   });
 
   // start-workflow would flip it to running; the spec stands in for the Kernel boot.
-  fx.seed((ledger) => ledger.db.prepare("UPDATE workflows SET phase='running' WHERE workflow_id=?").run(bridgeWf));
+  fx.seed((ledger) => {
+    const from = ledger.db.prepare('SELECT phase FROM workflows WHERE workflow_id=?').get(bridgeWf).phase;
+    ledger.db.prepare('INSERT INTO lifecycle_changes(workflow_id,from_phase,to_phase,by,reason,at) VALUES(?,?,?,?,?,?)')
+      .run(bridgeWf, from, 'running', 'test-fixture', 'start-workflow', Date.now());
+    ledger.db.prepare("UPDATE workflows SET phase='running' WHERE workflow_id=?").run(bridgeWf);
+  });
   const rewired = await fx.bridge(['rewire', '--bridge', out.bridgeId]);
   assert.equal(rewired.ok, true, JSON.stringify(rewired));
   assert.equal(rewired.record.state, 'rewired');

@@ -11,6 +11,7 @@ import {
   assertClaudeBypassConsent,ensureLaunchTrust,trustTargets,orcaCodexHome,assertClaudeSettingsEnv,claudeLaunchEnv,
 } from '../scripts/agent/trust.mjs';
 import {gateMenuPosition} from '../scripts/agent/lib.mjs';
+import {seedWorkflow} from './_ledger-fixture.mjs';
 
 // Owner instruction 2026-09-23: the owner never approves a launch prompt; the runtime does. Layer 1 pre-trusts
 // the launch directory in ~/.claude.json and every Codex config.toml; layer 2 answers an allowlisted launch gate
@@ -234,6 +235,11 @@ test('the menu cursor is read from the screen, not assumed',()=>{
 
 const opFixture=(t,extra={})=>{
   const root=tmp(t,'starci-gate-op-');
+  const savedMachine=process.env.STARCI_TEST_MACHINE_FILE,savedProjects=process.env.STARCI_PROJECTS_ROOT;
+  process.env.STARCI_TEST_MACHINE_FILE=path.join(root,'machine.sqlite');
+  process.env.STARCI_PROJECTS_ROOT=path.join(root,'projects');
+  t.after(()=>{if(savedMachine===undefined)delete process.env.STARCI_TEST_MACHINE_FILE;else process.env.STARCI_TEST_MACHINE_FILE=savedMachine;
+    if(savedProjects===undefined)delete process.env.STARCI_PROJECTS_ROOT;else process.env.STARCI_PROJECTS_ROOT=savedProjects;});
   const repo=path.join(root,'repo');fs.mkdirSync(repo,{recursive:true});
   const trustHome=path.join(root,'trust-home');fs.mkdirSync(path.join(trustHome,'.codex'),{recursive:true});
   const stub=path.join(root,'fake-orca.mjs');fs.writeFileSync(stub,FAKE_ORCA);
@@ -245,10 +251,11 @@ const opFixture=(t,extra={})=>{
   const workflowId='wf-gate',jobId='job-gate';
   const ledger=openLedger({file:ledgerFileFor(repo)});
   try{
-    ledger.enqueueJob({jobId:`kernel-${workflowId}`,workflowId,kind:'kernel',role:'kernel',
-      payload:{hierarchy:{schema:'starci/agent-hierarchy@1',nodeId:`agent:kernel:${workflowId}`,parentNodeId:`workflow:${workflowId}`,role:'kernel'}}});
-    ledger.db.prepare("UPDATE jobs SET status='running',worker_id='fake-kernel-terminal' WHERE job_id=?").run(`kernel-${workflowId}`);
-    ledger.enqueueJob({jobId,workflowId,opId:'code.refactor',kind:'op',payload:{opId:'code.refactor',owned_paths:['docs/'],model:'codex-agent',difficulty:'hard'}});
+    seedWorkflow(ledger,{id:workflowId,goal:{revision:1,markdown:'Trust gate fixture',json:{}},jobs:[
+      {jobId:`kernel-${workflowId}`,kind:'kernel',role:'kernel',status:'running',workerId:'fake-kernel-terminal',
+        payload:{hierarchy:{schema:'starci/agent-hierarchy@1',nodeId:`agent:kernel:${workflowId}`,parentNodeId:`workflow:${workflowId}`,role:'kernel'}}},
+      {jobId,opId:'code.refactor',status:'queued',payload:{opId:'code.refactor',owned_paths:['docs/'],model:'codex-agent',difficulty:'hard'}},
+    ]});
   }finally{ledger.close();}
   const dispatch=()=>run('dispatch','--repo',repo,'--job',jobId,'--model','codex-agent','--spawn','--json');
   const events=kind=>{
@@ -288,7 +295,7 @@ test('a gate that persists after its one answer is refused and the terminal clos
   assert.deepEqual(fx.orcaState().terminals['fake-terminal-1'].gateKeys,['\r'],'answered exactly once, never hammered');
   const [approved]=fx.events('gate-auto-approved');
   assert.deepEqual([approved?.keystroke,approved?.cleared],['enter',false]);
-  assert.equal(fx.job()?.status,'queued');
+  assert.equal(fx.job()?.status,'ready');
 });
 
 /* ----------------------------------------------- gate auto-answer: kernel */

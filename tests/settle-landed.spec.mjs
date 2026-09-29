@@ -7,6 +7,7 @@ import {spawnSync} from 'node:child_process';
 import {inspectLedger,ledgerFileFor,openLedger} from '../engine/ledger-db.mjs';
 import {foreignLandedPaths,landedProof,policyCommits,policyPushes} from '../scripts/kernel/settle-landed.mjs';
 import {validateOpReport} from '../scripts/kernel/report-envelope.mjs';
+import {seedWorkflow} from './_ledger-fixture.mjs';
 
 // settle's landed proof (modules/kernel/api.yaml commands.settle refuses
 // not-landed / landed-unverifiable). A tmp clone of a local bare origin is the
@@ -15,6 +16,7 @@ const ROOT=path.resolve(import.meta.dirname,'..');
 const API=path.join(ROOT,'scripts','kernel','api.mjs');
 const runApi=(...args)=>spawnSync(process.execPath,[API,...args],{cwd:ROOT,encoding:'utf8',windowsHide:true,timeout:120000});
 const json=v=>JSON.stringify(v??null);
+const scratchFor=(repo,jobId)=>{const dir=path.join(path.dirname(repo),'scratch',jobId);fs.mkdirSync(dir,{recursive:true});return dir;};
 const git=(cwd,...args)=>{
   const r=spawnSync('git',['-C',cwd,...args],{encoding:'utf8',windowsHide:true});
   assert.equal(r.status,0,`git ${args.join(' ')}: ${r.stderr}`);
@@ -53,17 +55,13 @@ const seedJob=(repo,{op,head,jobId='op-landed-1',wf='wf-landed',filed=true})=>{
   const ledger=openLedger({file:ledgerFileFor(repo)});
   try{
     const at=Date.now();
-    ledger.ensureWorkflow({workflowId:wf,title:'landed'});
-    ledger.enqueueJob({jobId,workflowId:wf,opId:op,kind:'op',payload:{
-      opId:op,owned_paths:['src/'],orca:{dispatchId:`ctx-${jobId}`,agentTerminalHandle:`term-${jobId}`},
-    }});
-    ledger.db.prepare("UPDATE jobs SET status='running' WHERE job_id=?").run(jobId);
-    ledger.db.prepare('INSERT INTO contracts(workflow_id,op_id,attempt,dispatch_id,markdown,context_json,created_at) VALUES(?,?,?,?,?,?,?)')
-      .run(wf,op,1,`ctx-${jobId}`,'# contract',json({worktree:repo}),at);
-    if(filed)ledger.db.prepare('INSERT INTO reports(workflow_id,dispatch_id,op_id,attempt,generation,outcome,report_json,from_terminal,consumed_at,created_at) VALUES(?,?,?,?,?,?,?,?,NULL,?)')
-      .run(wf,`ctx-${jobId}`,op,1,0,'done',json({outcome:'done',summary:'landed',...(head?{head,branch:'main'}:{})}),null,at);
-    ledger.db.prepare('INSERT INTO checks(workflow_id,op_id,attempt,checks_json,created_at) VALUES(?,?,?,?,?)')
-      .run(wf,op,1,json({checks:[{name:'unit',exitCode:0}]}),at);
+    seedWorkflow(ledger,{id:wf,now:at,jobs:[{jobId,opId:op,status:'running',dispatchId:`ctx-${jobId}`,
+      terminalHandle:`term-${jobId}`,payload:{opId:op,owned_paths:['src/'],orca:{dispatchId:`ctx-${jobId}`,agentTerminalHandle:`term-${jobId}`}}}]});
+    const attemptId=ledger.db.prepare('SELECT attempt_id FROM op_attempts WHERE job_id=?').get(jobId).attempt_id;
+    ledger.write.updateAttempt({attemptId,scratchDir:scratchFor(repo,jobId)});
+    ledger.write.writeContract({attemptId,markdown:'# contract',context:{worktree:repo},createdAt:at});
+    if(filed)ledger.write.fileReport({attemptId,outcome:'done',report:{outcome:'done',summary:'landed',...(head?{head,branch:'main'}:{})},createdAt:at});
+    ledger.write.recordCheckRun({attemptId,name:'unit',phase:'verify',runner:'kernel',status:'pass',exitCode:0,createdAt:at});
   }finally{ledger.close();}
   return jobId;
 };
@@ -162,8 +160,7 @@ test('validateOpReport: a committing op owes head on done|partial; others and as
 test('api report resolves the op commitPolicy: headless done refused for backend.implement, accepted for docs.author',t=>{
   const {repo,commit}=checkout(t);
   const head=commit('src/a.ts','export const a = 2;\n');
-  const file=path.join(repo,'..','report.json');
-  const fileReport=(jobId,body)=>{fs.writeFileSync(file,json(body));return runApi('report','--repo',repo,'--job',jobId,'--report',file,'--json');};
+  const fileReport=(jobId,body)=>{const file=path.join(scratchFor(repo,jobId),'report.json');fs.writeFileSync(file,json(body));return runApi('report','--repo',repo,'--job',jobId,'--report',file,'--json');};
   const implement=seedJob(repo,{op:'backend.implement',head:null,filed:false,jobId:'op-landed-impl'});
   const refused=fileReport(implement,{outcome:'done',summary:'shipped'});
   assert.equal(refused.status,1,refused.stdout);
@@ -346,7 +343,8 @@ test('--accept-foreign settles only on a resolved foreign-file-committed inciden
   const legacyId=JSON.parse(legacy.stdout).incidentId;
   const l=openLedger({file:ledgerFileFor(repo)});
   try{
-    l.db.prepare("UPDATE incidents SET status='resolved' WHERE incident_id=?").run(legacyId);
+    l.db.prepare("UPDATE incidents SET status='resolved',resolved_at=?,resolved_reason=? WHERE incident_id=?")
+      .run(Date.now(),'answered',legacyId);
     l.appendEvent({workflowId:'wf-landed',entityType:'incident',entityId:legacyId,kind:'incident-resolved',payload:{detail:'Owner confirmed: peer.ts is adopted debt'}});
   }finally{l.close();}
   const fake=settleAccept(`peer.ts,incident:${legacyId}`);
@@ -395,12 +393,15 @@ test('settle unbinds the worker terminal guard of a worker released while its se
 test('a report path that resolves but cannot be read is a typed refusal, not a crash',t=>{
   const {repo,commit}=checkout(t);
   const head=commit('src/a.ts','export const a = 2;\n');
-  const jobId=seedJob(repo,{op:'backend.implement',head});
-  const r=runApi('settle','--repo',repo,'--job',jobId,'--verdict','pass','--report',path.join(repo,'src'),'--json');
+  const jobId=seedJob(repo,{op:'backend.implement',head,filed:false});
+  const unreadable=path.join(scratchFor(repo,jobId),'unreadable');
+  fs.mkdirSync(unreadable,{recursive:true});
+  const r=runApi('settle','--repo',repo,'--job',jobId,'--verdict','pass','--report',unreadable,'--json');
   assert.equal(r.status,1,r.stdout);
-  assert.match(r.stderr,/"code":"report-unreadable"/);
+  assert.match(r.stderr,/--report .* is ignored; settle reads the report the job filed/);
+  assert.match(r.stderr,/"code":"pass-report-missing"/);
   assert.equal(statusOf(repo,jobId),'running','a refused settle writes nothing');
-  const reported=runApi('report','--repo',repo,'--job',jobId,'--report',path.join(repo,'src'),'--json');
+  const reported=runApi('report','--repo',repo,'--job',jobId,'--report',unreadable,'--json');
   assert.equal(reported.status,1,reported.stdout);
-  assert.match(reported.stderr,/"code":"report-unreadable"/);
+  assert.match(reported.stderr,/"code":"report-missing"/);
 });

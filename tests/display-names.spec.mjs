@@ -163,11 +163,12 @@ test('the orca-tree check knows a [Kernel] tab by its display name; a name no wo
 
 test('a Telegram ask names the workflow by its display name and the asking job by its name', (t) => withLedger(t, ({ ledger }) => {
   seedWorkflow(ledger, { id: 'wf-ask-named', state: { phase: 'running', job: 'ask-slug' }, jobs: [
-    { jobId: 'op-interface.draw-1', opId: 'interface.draw', kind: 'op', status: 'answering', payload: { opId: 'interface.draw', displayWhat: 'Mô-đun đã cài đặt' } },
+    { jobId: 'op-interface.draw-1', opId: 'interface.draw', kind: 'op', status: 'answering', dispatchId: 'ask-1', payload: { opId: 'interface.draw', displayWhat: 'Mô-đun đã cài đặt' } },
   ] });
   ledger.db.prepare("UPDATE workflows SET display_name='Nivo · Mô-đun AgentOS' WHERE workflow_id='wf-ask-named'").run();
-  ledger.db.prepare("INSERT INTO reports(workflow_id,dispatch_id,op_id,attempt,outcome,report_json,created_at) VALUES(?,?,?,?,'ask',?,?)")
-    .run('wf-ask-named', 'ask-1', 'interface.draw', 1, JSON.stringify({ outcome: 'ask', question: { text: 'Duyệt?', options: ['ok'] } }), Date.now());
+  const attemptId=ledger.db.prepare('SELECT attempt_id FROM op_attempts WHERE job_id=?').get('op-interface.draw-1').attempt_id;
+  ledger.db.prepare("INSERT INTO reports(workflow_id,attempt_id,dispatch_id,job_id,outcome,report_json,created_at) VALUES(?,?,?,?,'ask',?,?)")
+    .run('wf-ask-named', attemptId, 'ask-1', 'op-interface.draw-1', JSON.stringify({ outcome: 'ask', question: { text: 'Duyệt?', options: ['ok'] } }), Date.now());
   const view = askState(ledger.db, 'wf-ask-named', 'ask-1');
   assert.equal(view.title, 'Nivo · Mô-đun AgentOS');
   assert.equal(view.jobName, 'Vẽ giao diện · Mô-đun đã cài đặt · Nivo · Mô-đun AgentOS');

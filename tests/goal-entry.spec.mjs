@@ -5,6 +5,8 @@ import os from 'node:os';
 import path from 'node:path';
 import {spawnSync} from 'node:child_process';
 import {inspectLedger,ledgerFileFor,openLedger} from '../engine/ledger-db.mjs';
+import {seedWorkflow} from './_ledger-fixture.mjs';
+import {JOB_ROW} from '../scripts/kernel/api-lib/rows.mjs';
 
 const ROOT=path.resolve(import.meta.dirname,'..');
 const DEFINE_GOAL=path.join(ROOT,'scripts','goal','define-goal.mjs');
@@ -72,11 +74,12 @@ test('goal revision preview is read-only, identity-preserving and approval-gated
   const queuedJobId='op-old-plan-queued';
   try{
     const now=Date.now();
-    ledger.db.prepare("UPDATE workflows SET phase='running' WHERE workflow_id=?").run(workflowId);
+    ledger.write.changeWorkflowPhase({workflowId,to:'running',by:'test-fixture',reason:'live revision preview'});
     ledger.db.prepare("UPDATE inbox SET status='claimed',applied_at=? WHERE workflow_id=? AND kind='goal'").run(now,workflowId);
     ledger.db.prepare("INSERT INTO signals(scope,key,holder_pid,token,value_json,at,expires_at) VALUES('kernel',?,?,?,?,?,?)")
       .run(workflowId,process.pid,'kernel-test',JSON.stringify({state:'running'}),now,now+60000);
-    ledger.enqueueJob({jobId:queuedJobId,workflowId,opId:'work.author',kind:'op',payload:{opId:'work.author',owned_paths:['docs/old-plan']}});
+    seedWorkflow(ledger,{id:workflowId,jobs:[{jobId:queuedJobId,opId:'work.author',kind:'op',goalRevision:0,
+      payload:{opId:'work.author',owned_paths:['docs/old-plan']}}]});
   }finally{ledger.close();}
 
   const before=read(repo,l=>({
@@ -132,7 +135,7 @@ test('goal revision preview is read-only, identity-preserving and approval-gated
     goalInbox:l.db.prepare("SELECT count(*) n FROM inbox WHERE workflow_id=? AND kind='goal'").get(workflowId).n,
     revisionInbox:l.db.prepare("SELECT status,payload_json FROM inbox WHERE workflow_id=? AND kind='goal-revision'").get(workflowId),
     event:l.db.prepare("SELECT payload_json FROM events WHERE workflow_id=? AND kind='goal-revised' ORDER BY seq DESC LIMIT 1").get(workflowId),
-    superseded:l.db.prepare('SELECT status,result_json FROM jobs WHERE job_id=?').get(queuedJobId),
+    superseded:l.db.prepare(`SELECT ${JOB_ROW} FROM jobs WHERE job_id=?`).get(queuedJobId),
     supersededEvent:l.db.prepare("SELECT payload_json FROM events WHERE workflow_id=? AND entity_id=? AND kind='job-superseded-by-goal-revision'").get(workflowId,queuedJobId),
   }));
   assert.equal(rows.workflowCount,1,'revision must not create a duplicate workflow');
@@ -170,8 +173,9 @@ test('goal revision refuses jobs whose operation effects may still exist',t=>{
 
   const ledger=openLedger({file:ledgerFileFor(repo)});
   try{
-    ledger.enqueueJob({jobId:'op-live',workflowId,opId:'interface.implement',kind:'op',payload:{opId:'interface.implement',owned_paths:['apps/landing']}});
-    ledger.db.prepare("UPDATE jobs SET status='running',worker_id='worker-live' WHERE job_id='op-live'").run();
+    ledger.write.changeWorkflowPhase({workflowId,to:'running',by:'test-fixture',reason:'live operation'});
+    seedWorkflow(ledger,{id:workflowId,jobs:[{jobId:'op-live',opId:'interface.implement',kind:'op',goalRevision:0,
+      status:'running',workerId:'worker-live',payload:{opId:'interface.implement',owned_paths:['apps/landing']}}]});
   }finally{ledger.close();}
 
   const apply=spawnSync(preview.approval.command.executable,preview.approval.command.args,{
@@ -229,7 +233,8 @@ test('start-workflow on a finished workflow exits nonzero',t=>{
   const workflowId=out(def)?.workflowId;
   assert.ok(workflowId);
   const ledger=openLedger({file:ledgerFileFor(repo)});
-  try{ledger.db.prepare("UPDATE workflows SET phase='finished' WHERE workflow_id=?").run(workflowId);}
+  try{ledger.write.changeWorkflowPhase({workflowId,to:'running',by:'test-fixture',reason:'seed finished workflow'});
+    ledger.write.changeWorkflowPhase({workflowId,to:'finished',by:'test-fixture',reason:'seed finished workflow'});}
   finally{ledger.close();}
   const r=run(START_WORKFLOW,'--repo',repo,'--goal',workflowId,'--json');
   assert.notEqual(r.status,0,'a finished workflow never restarts — starting it again must be refused');

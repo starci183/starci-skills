@@ -5,7 +5,8 @@ import os from 'node:os';
 import path from 'node:path';
 import {spawnSync} from 'node:child_process';
 import {FAKE_ORCA} from './helpers/fake-orca.mjs';
-import {inspectLedger,ledgerFileFor,openLedger} from '../engine/ledger-db.mjs';
+import {seedWorkflow} from './_ledger-fixture.mjs';
+import {inspectLedger,ledgerFileFor,openLedger,jobResult} from '../engine/ledger-db.mjs';
 import {
   admittedBeforeChange,advisoryCodesFor,carriesChange,contractFollowUpsOf,frozenChangesFor,laterChangesFor,loadContractChanges,loadContractFreeze,
   releasedChangesOf,withheldChangesFor,
@@ -83,6 +84,14 @@ const fixture=t=>{
   const f=files(t);
   const root=fs.mkdtempSync(path.join(os.tmpdir(),'starci-contract-freeze-wf-'));
   t.after(()=>fs.rmSync(root,{recursive:true,force:true,maxRetries:20,retryDelay:25}));
+  if(process.env.STARCI_TEST_TEMP_DIR)t.after(()=>fs.rmSync(path.join(process.env.STARCI_TEST_TEMP_DIR,'starci-job-scratch'),{recursive:true,force:true,maxRetries:20,retryDelay:25}));
+  const savedMachine=process.env.STARCI_TEST_MACHINE_FILE,savedProjects=process.env.STARCI_PROJECTS_ROOT;
+  process.env.STARCI_TEST_MACHINE_FILE=path.join(root,'machine.sqlite');
+  process.env.STARCI_PROJECTS_ROOT=path.join(root,'projects');
+  t.after(()=>{
+    if(savedMachine===undefined)delete process.env.STARCI_TEST_MACHINE_FILE;else process.env.STARCI_TEST_MACHINE_FILE=savedMachine;
+    if(savedProjects===undefined)delete process.env.STARCI_PROJECTS_ROOT;else process.env.STARCI_PROJECTS_ROOT=savedProjects;
+  });
   const repo=path.join(root,'repo');fs.mkdirSync(repo,{recursive:true});
   const stub=path.join(root,'fake-orca.mjs');fs.writeFileSync(stub,FAKE_ORCA);
   const env={...process.env,STARCI_CONTRACT_CHANGES:f.registry,STARCI_CONTRACT_FREEZE:f.freeze,STARCI_ORCA_COMMAND:process.execPath,STARCI_ORCA_ARGS:JSON.stringify([stub]),
@@ -95,18 +104,26 @@ const fixture=t=>{
   const wf='wf-contract-freeze';
   seed(l=>{
     l.ensureWorkflow({workflowId:wf,title:wf,ledgerMode:'durable',sourceRoots:[repo],at:T0});
-    l.db.prepare("UPDATE workflows SET phase='running',created_at=? WHERE workflow_id=?").run(T0,wf);
+    l.write.changeWorkflowPhase({workflowId:wf,to:'running',by:'test',reason:'seed contract workflow',at:T0});
+    l.db.prepare("UPDATE workflows SET created_at=? WHERE workflow_id=?").run(T0,wf);
     l.db.prepare('INSERT INTO goals(workflow_id,revision,goal_identity,markdown,json,created_at) VALUES(?,?,?,?,?,?)').run(wf,0,'goal','# goal','{}',T0);
   });
   // One leg of `op` at `admittedAt` (a contracts row unless status queued), with a done report when it ran.
   const leg=(jobId,op,admittedAt,{status='succeeded',attempt=1,payload={},withheld=null}={})=>seed(l=>{
     const dispatchId=`ctx-${jobId}`;
-    l.db.prepare("INSERT INTO jobs(job_id,workflow_id,op_id,attempt,generation,kind,role,payload_json,status,worker_id,created_at,updated_at) VALUES(?,?,?,?,0,'op','op',?,?,?,?,?)")
-      .run(jobId,wf,op,attempt,JSON.stringify({opId:op,owned_paths:[`docs/${op}`],...(status==='queued'?{}:{managed:{dispatchId}}),...payload}),status,status==='queued'?null:dispatchId,admittedAt,admittedAt);
-    if(status==='queued')return;
+    const jobPayload={opId:op,owned_paths:[`docs/${op}`],...(status==='queued'?{}:{managed:{dispatchId}}),...payload};
+    if(!l.db.prepare('SELECT 1 FROM jobs WHERE job_id=?').get(jobId))
+      seedWorkflow(l,{id:wf,jobs:[{jobId,opId:op,status,dispatchId,payload:jobPayload,createdAt:admittedAt,updatedAt:admittedAt}]});
+    else if(status==='running'){
+      for(const to of ['ready','leased'])l.write.setJobStatus({jobId,to,reason:'test dispatch',at:admittedAt});
+      l.write.startAttempt({workflowId:wf,jobId,dispatchId,at:admittedAt});
+      l.write.setJobStatus({jobId,to:'running',reason:'test dispatch',at:admittedAt});
+    }
+    if(status==='queued'||status==='cancelled')return;
+    const attemptId=l.db.prepare('SELECT attempt_id FROM op_attempts WHERE job_id=? ORDER BY attempt_id DESC LIMIT 1').get(jobId).attempt_id;
     const context=withheld?{contract:{schema:'starci/contract-version@1',op,admittedAt,withheld}}:{};
-    l.db.prepare('INSERT INTO contracts(workflow_id,op_id,attempt,dispatch_id,markdown,context_json,created_at) VALUES(?,?,?,?,?,?,?)').run(wf,op,attempt,dispatchId,'# contract',JSON.stringify(context),admittedAt);
-    l.db.prepare("INSERT INTO reports(workflow_id,dispatch_id,op_id,attempt,generation,outcome,report_json,consumed_at,created_at) VALUES(?,?,?,?,0,'done','{}',?,?)").run(wf,dispatchId,op,attempt,admittedAt,admittedAt);
+    l.db.prepare('INSERT INTO contracts(attempt_id,workflow_id,job_id,markdown,context_json,created_at) VALUES(?,?,?,?,?,?)').run(attemptId,wf,jobId,'# contract',JSON.stringify(context),admittedAt);
+    l.db.prepare("INSERT INTO reports(workflow_id,attempt_id,dispatch_id,job_id,outcome,report_json,consumed_at,created_at) VALUES(?,?,?,?,'done','{}',?,?)").run(wf,attemptId,dispatchId,jobId,admittedAt,admittedAt);
   });
   return {f,repo,wf,api,ok,seed,read,leg,registry:load(f)};
 };
@@ -164,13 +181,13 @@ test('dispatch withholds the frozen changes; api check reads their codes advisor
   const first=fx.ok(['enqueue','--workflow',fx.wf,'--op','code.refactor','--paths','docs/']).job_id;
   const d=fx.api(['dispatch','--job',first,'--model','codex-agent','--spawn']);
   assert.equal(d.status,0,d.stderr||d.stdout);
-  const context=fx.read(db=>JSON.parse(db.prepare('SELECT context_json FROM contracts WHERE workflow_id=? AND op_id=?').get(fx.wf,'code.refactor').context_json));
+  const context=fx.read(db=>JSON.parse(db.prepare('SELECT c.context_json FROM contracts c JOIN op_attempts a ON a.attempt_id=c.attempt_id WHERE c.workflow_id=? AND a.op_id=? ORDER BY c.created_at DESC LIMIT 1').get(fx.wf,'code.refactor').context_json));
   assert.deepEqual(context.contract.withheld,['refactor-gate-one','refactor-gate-two']);
   const admission=fx.ok(['op-contract','--job',first]).admission;
   assert.deepEqual(admission.withheld,['refactor-gate-one','refactor-gate-two']);
   assert.deepEqual(admission.advisoryCodes,['REFACTOR_ONE','REFACTOR_TWO']);
-  const dispatchId=fx.read(db=>db.prepare('SELECT dispatch_id FROM contracts WHERE workflow_id=? AND op_id=?').get(fx.wf,'code.refactor').dispatch_id);
-  fx.seed(l=>l.db.prepare("INSERT INTO reports(workflow_id,dispatch_id,op_id,attempt,generation,outcome,report_json,created_at) VALUES(?,?,?,?,0,'done','{}',?)").run(fx.wf,dispatchId,'code.refactor',1,Date.now()));
+  const attempt=fx.read(db=>db.prepare('SELECT a.attempt_id,a.dispatch_id,a.job_id FROM op_attempts a WHERE a.workflow_id=? AND a.op_id=? ORDER BY a.attempt_id DESC LIMIT 1').get(fx.wf,'code.refactor'));
+  fx.seed(l=>l.db.prepare("INSERT INTO reports(workflow_id,attempt_id,dispatch_id,job_id,outcome,report_json,created_at) VALUES(?,?,?,?,'done','{}',?)").run(fx.wf,attempt.attempt_id,attempt.dispatch_id,attempt.job_id,Date.now()));
   const checked=fx.ok(['check','--job',first,'--checks',JSON.stringify({checks:[{name:'refactor-gate',exitCode:1,codes:['REFACTOR_TWO']}]})]);
   assert.deepEqual(checked.advisory,[{name:'refactor-gate',changes:['refactor-gate-two']}],'a code of a withheld change is a suspect, not a refusal');
 
@@ -180,9 +197,9 @@ test('dispatch withholds the frozen changes; api check reads their codes advisor
   const rel=fx.ok(['contract-release','--family','code.refactor']);
   assert.deepEqual([rel.workflows[0].restamped,rel.workflows[0].dropped,rel.workflows[0].running],[['job-q2'],['job-q1'],[first]]);
   fx.read(db=>{
-    const q1=db.prepare('SELECT status,result_json FROM jobs WHERE job_id=?').get('job-q1');
+    const q1=db.prepare('SELECT status FROM jobs WHERE job_id=?').get('job-q1');
     assert.equal(q1.status,'cancelled');
-    assert.equal(JSON.parse(q1.result_json).reason,'superseded-by-contract-release');
+    assert.equal(jobResult(db,'job-q1').reason,'superseded-by-contract-release');
     assert.deepEqual(JSON.parse(db.prepare('SELECT payload_json FROM jobs WHERE job_id=?').get('job-q2').payload_json).contractRelease.changes,['refactor-gate-one','refactor-gate-two']);
     assert.equal(db.prepare("SELECT COUNT(*) n FROM events WHERE kind='contract-release'").get().n,1);
   });

@@ -3,11 +3,10 @@ import os from 'node:os';
 import path from 'node:path';
 import crypto from 'node:crypto';
 import {ledgerFileFor,openLedger} from '../engine/ledger-db.mjs';
-import {TEST_REGISTRY_ENV,machineFileFor,openMachine} from '../engine/machine-db.mjs';
+import {TEST_REGISTRY_ENV,openMachine} from '../engine/machine-db.mjs';
 
 const digest=value=>crypto.createHash('sha256').update(value).digest('hex');
-/* Inlined from the removed kernel/store.mjs: the seed's goal identity only has to be the same stable
- * digest the old store wrote, so the fixture keeps the formula verbatim instead of importing a survivor. */
+/* Keep a stable identity for fixture goals; the ledger no longer stores state snapshots. */
 const stateGoalIdentity=state=>String(state?.goalDigest??state?.approval?.goalDigest??state?.approvalDigest??state?.goal?.digest??digest(json({job:state?.job??null,inputs:state?.inputs??state?.goal?.inputs??null,scope:state?.scope??state?.goal?.scope??null,definitionOfDone:state?.definitionOfDone??state?.goal?.definitionOfDone??null,ledgerMode:state?.ledgerMode??state?.goal?.ledgerMode??null})));
 /** The §4 event chain: digest = sha256((prev_digest ?? '') + event_id + kind + payload_json + created_at). */
 const eventDigest=(prev,row)=>digest(`${prev??''}${row.event_id}${row.kind}${row.payload_json}${row.created_at}`);
@@ -76,16 +75,20 @@ export function withLedger(t,fn,{parentDir=os.tmpdir()}={}){
   fs.mkdirSync(path.join(repoRoot,'.starciwork'),{recursive:true});
   const machineHome=path.join(root,'machine');
   fs.mkdirSync(machineHome,{recursive:true});
-  const ledgerFile=ledgerFileFor(repoRoot),machineFile=machineFileFor({LOCALAPPDATA:machineHome});
-  const ledger=openLedger({file:ledgerFile}),machine=openMachine({file:machineFile,env:{...process.env,[TEST_REGISTRY_ENV]:machineFile}});
+  const saved=process.env.LOCALAPPDATA,savedRegistry=process.env[TEST_REGISTRY_ENV];
+  const savedProjects=process.env.STARCI_PROJECTS_ROOT;
+  process.env.LOCALAPPDATA=machineHome;
+  process.env.STARCI_PROJECTS_ROOT=path.join(root,'projects');
+  const machineFile=path.join(machineHome,'machine.sqlite');
+  process.env[TEST_REGISTRY_ENV]=machineFile;
+  const ledgerFile=ledgerFileFor(repoRoot);
+  const machine=openMachine({file:machineFile}),ledger=openLedger({file:ledgerFile});
   const tracked=[];
   const track=handle=>{tracked.push(handle);return handle;};
-  const saved=process.env.LOCALAPPDATA,savedRegistry=process.env[TEST_REGISTRY_ENV];
-  process.env.LOCALAPPDATA=machineHome;
-  process.env[TEST_REGISTRY_ENV]=machineFile;
   t.after(()=>{
     if(saved===undefined)delete process.env.LOCALAPPDATA;else process.env.LOCALAPPDATA=saved;
     if(savedRegistry===undefined)delete process.env[TEST_REGISTRY_ENV];else process.env[TEST_REGISTRY_ENV]=savedRegistry;
+    if(savedProjects===undefined)delete process.env.STARCI_PROJECTS_ROOT;else process.env.STARCI_PROJECTS_ROOT=savedProjects;
     for(const handle of tracked.reverse())try{handle?.close();}catch{}
     try{ledger.close();}catch{}
     try{machine.close();}catch{}
@@ -105,13 +108,16 @@ export function seedWorkflow(ledger,{id,state=null,events=[],jobs=[],leases=[],g
   const db=ledger.db,at=typeof now==='function'?now():now;
   const gen=generation??state?.engine?.generation??1,identity=goalIdentity??(state?stateGoalIdentity(state):digest(id));
   ledger.transaction(inner=>{
-    inner.prepare(`INSERT OR IGNORE INTO workflows(workflow_id,title,created_at,updated_at,generation,goal_identity,phase)
-      VALUES(?,?,?,?,?,?,?)`).run(id,state?.job??null,at,at,gen,identity,state?.phase??null);
-    if(state)inner.prepare(`INSERT INTO state_snapshots(checkpoint_id,workflow_id,generation,goal_identity,state_json,created_at)
-      VALUES(?,?,?,?,?,?)`).run(`seed:${id}:${gen}:${digest(json(state)).slice(0,16)}`,id,gen,identity,json(state),at);
+    const requestedPhase=state?.phase??'running';
+    const hasOpJobs=jobs.some(job=>(job.kind??'op')!=='kernel');
+    const initialPhase=hasOpJobs&&!['queued','running'].includes(requestedPhase)?'running':requestedPhase;
+    const inserted=inner.prepare(`INSERT OR IGNORE INTO workflows(workflow_id,trace_id,title,created_at,updated_at,generation,goal_identity,phase)
+      VALUES(?,?,?,?,?,?,?,?)`).run(id,digest(`trace:${id}`).slice(0,32),state?.job??null,at,at,gen,identity,initialPhase);
+    if(inserted.changes)inner.prepare('INSERT INTO lifecycle_changes(workflow_id,from_phase,to_phase,by,reason,at) VALUES(?,NULL,?,?,?,?)')
+      .run(id,initialPhase,'test-fixture','seed',at);
     if(goal)inner.prepare(`INSERT INTO goals(workflow_id,revision,goal_identity,markdown,json,created_at) VALUES(?,?,?,?,?,?)`)
       .run(id,goal.revision??1,goal.identity??identity,goal.markdown??'',json(goal.json??goal),at);
-    let prev=null;
+    let prev=inner.prepare('SELECT digest FROM events WHERE workflow_id=? ORDER BY seq DESC LIMIT 1').get(id)?.digest??null;
     for(const [index,event] of events.entries()){
       const kind=event.kind??event.event;
       const payload=event.payload_json!==undefined?event.payload_json
@@ -121,29 +127,77 @@ export function seedWorkflow(ledger,{id,state=null,events=[],jobs=[],leases=[],g
         workflow_id:id,generation:event.generation??gen,entity_type:event.entity_type??event.entityType??'workflow',
         entity_id:event.entity_id??event.entityId??id,kind,payload_json:payload,created_at:event.created_at??event.createdAt??event.at??at};
       row.prev_digest=prev;row.digest=eventDigest(prev,row);
-      inner.prepare(`INSERT INTO events(event_id,workflow_id,generation,entity_type,entity_id,kind,payload_json,prev_digest,digest,created_at)
-        VALUES(?,?,?,?,?,?,?,?,?,?)`).run(row.event_id,row.workflow_id,row.generation,row.entity_type,row.entity_id,row.kind,row.payload_json,row.prev_digest,row.digest,row.created_at);
+      inner.prepare(`INSERT INTO events(event_id,workflow_id,generation,entity_type,entity_id,kind,payload_json,prev_digest,digest,occurred_at,created_at)
+        VALUES(?,?,?,?,?,?,?,?,?,?,?)`).run(row.event_id,row.workflow_id,row.generation,row.entity_type,row.entity_id,row.kind,row.payload_json,row.prev_digest,row.digest,
+          event.occurred_at??event.occurredAt??row.created_at,row.created_at);
       prev=row.digest;
     }
     for(const job of jobs){
-      inner.prepare(`INSERT INTO jobs(job_id,workflow_id,op_id,attempt,generation,kind,role,payload_json,status,priority_json,
-        lease_token,worker_id,deadline,result_json,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`)
-        .run(job.jobId??job.job_id,id,job.opId??job.op_id??null,job.attempt??1,job.generation??gen,job.kind??'operation',job.role??null,
-          json(job.payload),job.status??'queued',json(job.priority),job.leaseToken??job.lease_token??null,job.workerId??job.worker_id??null,
-          job.deadline??null,json(job.result),job.createdAt??job.created_at??at,job.updatedAt??job.updated_at??at);
+      const jobId=job.jobId??job.job_id,opId=job.opId??job.op_id??job.payload?.opId??null;
+      const kind=job.kind==='kernel'?'kernel':'op',status=job.status??'queued';
+      // Legacy fixture `attempt` named an observation; a new unit always starts at try 1.
+      const tryNo=Math.max(1,job.tryNo??job.try_no??1),unitId=kind==='op'?(job.unitId??job.unit_id??jobId):null;
+      const created=job.createdAt??job.created_at??at,updated=job.updatedAt??job.updated_at??created;
+      const leaseToken=job.leaseToken??job.lease_token??leases.find(lease=>(lease.jobId??lease.job_id)===jobId)?.token??`seed:${jobId}`;
+      if(unitId&&!inner.prepare('SELECT 1 FROM work_units WHERE workflow_id=? AND unit_id=?').get(id,unitId))
+        inner.prepare(`INSERT INTO work_units(workflow_id,unit_id,op_id,subject_key,goal_revision,state,current_job_id,tries,created_at,updated_at)
+          VALUES(?,?,?,?,?,?,?,?,?,?)`).run(id,unitId,opId??'test.op',job.subjectKey??job.subject_key??unitId,
+            job.goalRevision??job.goal_revision??goal?.revision??1,'queued',jobId,tryNo,created,updated);
+      const needsAttempt=kind==='op'&&!['queued','ready','cancelled'].includes(status);
+      const initialStatus=needsAttempt?'leased':status;
+      inner.prepare(`INSERT INTO jobs(job_id,workflow_id,unit_id,op_id,try_no,retry_of,resume_of,generation,kind,role,payload_json,status,priority_json,
+        lease_token,worker_id,deadline,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`)
+        .run(jobId,id,unitId,opId,tryNo,job.retryOf??job.retry_of??null,job.resumeOf??job.resume_of??null,
+          job.generation??gen,kind,job.role??null,json(job.payload??(kind==='op'?{opId,owned_paths:[]}:{})),initialStatus,json(job.priority),
+          leaseToken,job.workerId??job.worker_id??null,job.deadline??null,created,updated);
+      if(needsAttempt){
+        const pool=job.pool??job.payload?.model??null;
+        const agent=pool?String(pool).replace(/-agent$/,''):null;
+        const result=job.result??(job.result_json?JSON.parse(job.result_json):null);
+        const verdict=result?.verdict==='awaiting-owner'?'blocked':result?.verdict??null;
+        const dispatched=job.dispatchedAt??job.dispatched_at??created;
+        const settled=['succeeded','failed'].includes(status)?updated:null;
+        inner.prepare(`INSERT INTO op_attempts(workflow_id,job_id,unit_id,op_id,try_no,dispatch_seq,dispatch_id,span_id,
+          agent,model,pool,managed,run_id,task_id,terminal_handle,dispatched_at,started_at,settled_at,verdict,settle_json,end_state)
+          VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`).run(id,jobId,unitId,opId??'test.op',tryNo,1,
+            job.dispatchId??job.dispatch_id??`seed:${jobId}`,digest(`span:${jobId}`).slice(0,16),
+            ['devin','codex','claude','qwen'].includes(agent)?agent:null,job.payload?.modelId??null,pool,
+            job.payload?.managed?1:0,job.payload?.managed?.runId??null,job.payload?.managed?.taskId??null,
+            job.terminalHandle??job.terminal_handle??job.payload?.managed?.agentTerminalHandle??job.payload?.orca?.agentTerminalHandle??null,
+            dispatched,dispatched,settled,verdict,json(result),settled?'settled':null);
+        for(const next of status==='leased'?[]:status==='running'?['running']:status==='answering'?['running','answering']:
+          status==='reported'?['running','reported']:status==='deciding'?['running','reported','deciding']:
+          status==='succeeded'?['running','reported','succeeded']:status==='failed'?['running','failed']:
+          status==='effect_unknown'?['running','effect_unknown']:[])
+          inner.prepare('UPDATE jobs SET status=? WHERE job_id=?').run(next,jobId);
+      }
+      if(unitId)inner.prepare('UPDATE work_units SET state=?,done_at=?,updated_at=?,tries=max(tries,?),current_job_id=? WHERE workflow_id=? AND unit_id=?')
+        .run(status==='succeeded'?'done':status==='failed'?'failed':status==='cancelled'?'dropped':
+          status==='reported'?'reported':status==='deciding'?'deciding':status==='queued'||status==='ready'?'queued':'running',
+          status==='succeeded'?updated:null,updated,tryNo,jobId,id,unitId);
     }
     for(const lease of leases){
       const jobId=lease.jobId??lease.job_id,job=inner.prepare('SELECT * FROM jobs WHERE job_id=?').get(jobId);
       if(!job)throw Error(`seedWorkflow lease names job ${jobId}, which was not seeded`);
-      inner.prepare(`INSERT INTO leases(resource_key,job_id,workflow_id,op_id,attempt,generation,token,units,acquired_at,expires_at,machine_ref)
-        VALUES(?,?,?,?,?,?,?,?,?,?,?)`)
-        .run(lease.resourceKey??lease.resource_key,jobId,job.workflow_id,job.op_id,job.attempt,job.generation,job.lease_token,
-          lease.units??1,lease.acquiredAt??lease.acquired_at??at,lease.expiresAt??lease.expires_at??at+60000,lease.machineRef??lease.machine_ref??null);
+      inner.prepare(`INSERT INTO leases(resource_key,job_id,workflow_id,op_id,try_no,generation,token,units,acquired_at,expires_at)
+        VALUES(?,?,?,?,?,?,?,?,?,?)`)
+        .run(lease.resourceKey??lease.resource_key,jobId,job.workflow_id,job.op_id,job.try_no,job.generation,job.lease_token,
+          lease.units??1,lease.acquiredAt??lease.acquired_at??at,lease.expiresAt??lease.expires_at??at+60000);
     }
     for(const signal of signals){
-      inner.prepare(`INSERT OR REPLACE INTO signals(scope,key,holder_pid,token,value_json,at,expires_at) VALUES(?,?,?,?,?,?,?)`)
-        .run(signal.scope??id,signal.key,signal.pid??signal.holder_pid??null,signal.token??null,
+      inner.prepare(`INSERT OR REPLACE INTO signals(scope,key,workflow_id,holder_pid,token,value_json,at,expires_at) VALUES(?,?,?,?,?,?,?,?)`)
+        .run(signal.scope??'kernel',signal.key,id,signal.pid??signal.holder_pid??null,signal.token??null,
           signal.value_json??json(signal.value),signal.at??at,signal.expiresAt??signal.expires_at??null);
+    }
+    if(inserted.changes&&initialPhase!==requestedPhase){
+      const phases=requestedPhase==='archived'?['finished','archived']:[requestedPhase];
+      let from=initialPhase;
+      for(const to of phases){
+        inner.prepare('INSERT INTO lifecycle_changes(workflow_id,from_phase,to_phase,by,reason,at) VALUES(?,?,?,?,?,?)')
+          .run(id,from,to,'test-fixture','seed',at);
+        inner.prepare('UPDATE workflows SET phase=?,updated_at=? WHERE workflow_id=?').run(to,at,id);
+        from=to;
+      }
     }
   });
   return {id,generation:gen,goalIdentity:identity,events:events.length,jobs:jobs.length,leases:leases.length};

@@ -32,6 +32,8 @@ const write=(root,rel,body)=>{const abs=path.join(root,...rel.split('/'));fs.mkd
 const fixture=t=>{
   const root=fs.mkdtempSync(path.join(os.tmpdir(),'starci-lease-wait-'));
   t.after(()=>fs.rmSync(root,{recursive:true,force:true,maxRetries:20,retryDelay:25}));
+  if(process.env.STARCI_TEST_TEMP_DIR)t.after(()=>fs.rmSync(path.join(process.env.STARCI_TEST_TEMP_DIR,'starci-job-scratch'),
+    {recursive:true,force:true,maxRetries:20,retryDelay:25}));
   const repo=path.join(root,'repo');
   fs.mkdirSync(repo,{recursive:true});
   git(repo,'init','--quiet');
@@ -50,17 +52,19 @@ const fixture=t=>{
     STARCI_ORCA_COMMAND:process.execPath,
     STARCI_ORCA_ARGS:JSON.stringify([stub]),
     STARCI_FAKE_ORCA_MODE:'healthy',
+    STARCI_FAKE_ORCA_UNIQUE_TERMINALS:'1',
     STARCI_FAKE_ORCA_LOG:path.join(root,'calls.jsonl'),
     STARCI_FAKE_ORCA_STATE:path.join(root,'state.json'),
     LOCALAPPDATA:path.join(root,'localappdata'),
+    STARCI_PROJECTS_ROOT:path.join(root,'projects'),
+    STARCI_TEST_MACHINE_FILE:path.join(root,'machine.sqlite'),
   };
   const run=(...args)=>spawnSync(process.execPath,[API,...args,'--repo',repo,'--json'],{cwd:ROOT,encoding:'utf8',windowsHide:true,timeout:180000,env});
-  const withWrite=fn=>{const l=openLedger({file:ledgerFileFor(repo)});try{return fn(l);}finally{l.close();}};
+  const withWrite=fn=>{const l=openLedger({file:ledgerFileFor(repo,{env})});try{return fn(l);}finally{l.close();}};
   withWrite(l=>{
-    l.ensureWorkflow({workflowId:WORKFLOW,title:'lease wait'});
-    l.db.prepare("UPDATE workflows SET phase='queued' WHERE workflow_id=?").run(WORKFLOW);
+    seedWorkflow(l,{id:WORKFLOW,state:{phase:'queued',job:'lease wait'},goal:{revision:1,json:{}}});
   });
-  const inspect=fn=>{const l=inspectLedger({file:ledgerFileFor(repo)});try{return fn(l.db);}finally{l.close();}};
+  const inspect=fn=>{const l=inspectLedger({file:ledgerFileFor(repo,{env})});try{return fn(l.db);}finally{l.close();}};
   return {root,repo,run,inspect,withWrite};
 };
 const leading=stdout=>{
@@ -69,6 +73,10 @@ const leading=stdout=>{
 };
 
 test('reserveTwoPhase names the conflicting leases on its refusal so a caller can tell a wait from a failure',t=>withLedger(t,({ledger,machine})=>{
+  seedWorkflow(ledger,{id:'wf',jobs:[
+    {jobId:'holder',opId:'interface.implement',status:'queued',payload:{opId:'interface.implement',owned_paths:[EN,VI]}},
+    {jobId:'waiter',opId:'code.refactor',status:'queued',payload:{opId:'code.refactor',owned_paths:[EN]}},
+  ]});
   for(const key of [`path:${EN}`,`path:${VI}`])ledger.db.prepare('INSERT INTO resources(resource_key,capacity) VALUES(?,1)').run(key);
   assert.equal(reserveTwoPhase(ledger,machine,{job:{jobId:'holder',workflowId:'wf',opId:'interface.implement',generation:1,kind:'op'},
     leases:[{resourceKey:`path:${EN}`,units:1},{resourceKey:`path:${VI}`,units:1}],ttlMs:20*60_000}).ok,true);
@@ -123,7 +131,10 @@ test('dispatch and route wait on a live path lease of the same workflow: queued 
   assert.match(waiting.detail,/becomes ready when .* settles and releases it/);
 
   // The holder settles: its lease rows go (settle's releaseTwoPhase), and the job reads ready.
-  fx.withWrite(l=>releaseTwoPhase(l,null,{jobId:holder,status:'succeeded'}));
+  fx.withWrite(l=>{
+    l.write.setJobStatus({jobId:holder,to:'reported',reason:'test-fixture'});
+    releaseTwoPhase(l,null,{jobId:holder,status:'succeeded'});
+  });
   assert.equal(status().queued.find(item=>item.jobId===waiter).queuedBecause,'ready');
   const now=fx.run('dispatch','--job',waiter,'--model','qwen-agent','--spawn');
   assert.equal(now.status,0,`released, the job dispatches: ${now.stderr||now.stdout}`);
@@ -132,16 +143,19 @@ test('dispatch and route wait on a live path lease of the same workflow: queued 
 
 test('an expired lease row is no wait: reserve still refuses it as a recovery signal',t=>{
   const fx=fixture(t);
-  const enqueue=paths=>leading(fx.run('enqueue','--workflow',WORKFLOW,'--op',OP,'--paths',paths.join(',')).stdout).job_id;
+  const enqueue=paths=>{const r=fx.run('enqueue','--workflow',WORKFLOW,'--op',OP,'--paths',paths.join(','));
+    assert.equal(r.status,0,r.stderr||r.stdout);return leading(r.stdout).job_id;};
   const holder=enqueue([EN]);
   assert.equal(fx.run('dispatch','--job',holder,'--model','qwen-agent','--spawn').status,0);
-  fx.withWrite(l=>l.db.prepare('UPDATE leases SET expires_at=1 WHERE job_id=?').run(holder));
-  const waiter=enqueue([EN]);
+  fx.withWrite(l=>l.db.prepare('UPDATE leases SET acquired_at=0,expires_at=1 WHERE job_id=?').run(holder));
+  const waiter=enqueue([EN,'apps/app/src/other']);
   const d=fx.run('dispatch','--job',waiter,'--model','qwen-agent','--spawn');
   assert.notEqual(d.status,0);
   const body=leading(d.stdout);
   assert.equal(body.rejected,'dispatch-rejected');
-  assert.equal(body.rejection.status,'queued','a no-effect reserve refusal keeps the job queued');
+  assert.equal(body.rejection.status,'ready','a no-effect reserve refusal leaves the job ready for recovery');
+  assert.equal(body.rejection.attemptConsumed,false);
+  assert.equal(fx.inspect(db=>db.prepare('SELECT status FROM jobs WHERE job_id=?').get(waiter).status),'ready');
   assert.match(fx.inspect(db=>db.prepare("SELECT payload_json FROM events WHERE entity_id=? AND kind='dispatch-rejected'").get(waiter).payload_json),/overlaps durable lease/);
 });
 

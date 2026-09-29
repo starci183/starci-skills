@@ -23,8 +23,8 @@ function fixture(ledger, holds, extraJobs = []) {
     jobs: [{ jobId: 'job-held', opId: 'backend.implement', status: 'queued', createdAt: NOW - 90 * MIN, updatedAt: NOW - 90 * MIN }, ...extraJobs]
       .map((job) => ({ ...job, payload: { opId: job.opId, owned_paths: [`.starciwork/evidence/${WF}.${job.opId}`] } })),
   });
-  ledger.db.prepare("INSERT INTO incidents(incident_id,workflow_id,op_id,last_progress,status,updated_at) VALUES(?,?,?,?,?,?)")
-    .run('inc-supervisor-hold', WF, 'backend.implement', '[supervisor-gate] runtime repair pending', 'open', NOW - 80 * MIN);
+  ledger.db.prepare("INSERT INTO incidents(incident_id,workflow_id,op_id,kind,owner,last_progress,status,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?)")
+    .run('inc-supervisor-hold', WF, 'backend.implement', 'runtime-defect', 'supervisor', '[supervisor-gate] runtime repair pending', 'open', NOW - 80 * MIN, NOW - 80 * MIN);
 }
 
 function status(repo) {

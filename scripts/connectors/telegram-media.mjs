@@ -469,7 +469,7 @@ function readSettle(ledgerFile, { workflowId, op, attempt, dispatchId }) {
   try {
     const db = handle.db;
     const row = (dispatchId && db.prepare('SELECT report_json FROM reports WHERE workflow_id=? AND dispatch_id=? ORDER BY report_id DESC LIMIT 1').get(workflowId, dispatchId))
-      || db.prepare('SELECT report_json FROM reports WHERE workflow_id=? AND op_id=? AND attempt=? ORDER BY report_id DESC LIMIT 1').get(workflowId, op, Number(attempt));
+      || db.prepare('SELECT r.report_json FROM reports r JOIN op_attempts a ON a.attempt_id=r.attempt_id WHERE r.workflow_id=? AND a.op_id=? AND a.try_no=? ORDER BY r.report_id DESC LIMIT 1').get(workflowId, op, Number(attempt));
     const title = db.prepare('SELECT title FROM workflows WHERE workflow_id=?').get(workflowId)?.title ?? null;
     return { report: parse(row?.report_json, null), workflow: { id: workflowId, title } };
   } finally { try { handle.close(); } catch { /* closed */ } }

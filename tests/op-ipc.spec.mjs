@@ -6,6 +6,7 @@ import path from 'node:path';
 import {spawnSync} from 'node:child_process';
 import {FAKE_ORCA} from './helpers/fake-orca.mjs';
 import {openLedger,inspectLedger,ledgerFileFor} from '../engine/ledger-db.mjs';
+import {jobRowOf} from '../scripts/kernel/api-lib/rows.mjs';
 
 const ROOT=path.resolve(import.meta.dirname,'..');
 const API=path.join(ROOT,'scripts','kernel','api.mjs');
@@ -39,7 +40,12 @@ process.env.STARCI_AUTOPILOT ??= 'off';
 
 const fixture=(t,{mode='healthy'}={})=>{
   const root=fs.mkdtempSync(path.join(os.tmpdir(),'starci-op-ipc-'));
+  const savedProjects=process.env.STARCI_PROJECTS_ROOT;
+  process.env.STARCI_PROJECTS_ROOT=path.join(root,'projects');
+  t.after(()=>{if(savedProjects===undefined)delete process.env.STARCI_PROJECTS_ROOT;else process.env.STARCI_PROJECTS_ROOT=savedProjects;});
   t.after(()=>fs.rmSync(root,{recursive:true,force:true,maxRetries:20,retryDelay:25}));
+  if(process.env.STARCI_TEST_TEMP_DIR)t.after(()=>fs.rmSync(path.join(process.env.STARCI_TEST_TEMP_DIR,'starci-job-scratch'),
+    {recursive:true,force:true,maxRetries:20,retryDelay:25}));
   const repo=path.join(root,'repo');fs.mkdirSync(repo,{recursive:true});
   const stub=path.join(root,'fake-orca.mjs');fs.writeFileSync(stub,FAKE_ORCA);
   const env={...process.env,
@@ -51,6 +57,8 @@ const fixture=(t,{mode='healthy'}={})=>{
     // machine.sqlite (the settle path's best-effort paired release) stays inside
     // the temp world — never the real arbiter.
     LOCALAPPDATA:path.join(root,'localappdata'),
+    STARCI_PROJECTS_ROOT:path.join(root,'projects'),
+    STARCI_TEST_MACHINE_FILE:path.join(root,'machine.sqlite'),
   };
   const run=(script,...args)=>spawnSync(process.execPath,[script,...args],{cwd:ROOT,encoding:'utf8',windowsHide:true,timeout:180000,env});
   return {root,repo,env,run};
@@ -61,11 +69,15 @@ const fixture=(t,{mode='healthy'}={})=>{
 const enqueue=(fx,jobId='job-op-ipc-1')=>{
   const ledger=openLedger({file:ledgerFileFor(fx.repo)});
   try{
-    ledger.enqueueJob({jobId,workflowId:WORKFLOW,opId:OP,kind:'op',
+    ledger.ensureWorkflow({workflowId:WORKFLOW,phase:'queued'});
+    const goalIdentity=ledger.db.prepare('SELECT goal_identity FROM workflows WHERE workflow_id=?').get(WORKFLOW).goal_identity;
+    ledger.db.prepare('INSERT INTO goals(workflow_id,revision,goal_identity,markdown,json,created_at) VALUES(?,?,?,?,?,?)')
+      .run(WORKFLOW,1,goalIdentity ?? WORKFLOW,'op IPC fixture goal','{}',Date.now());
+    ledger.write.createUnit({workflowId:WORKFLOW,unitId:jobId,opId:OP,subjectKey:jobId,goalRevision:1});
+    ledger.write.enqueueJob({jobId,workflowId:WORKFLOW,unitId:jobId,opId:OP,kind:'op',
       payload:{opId:OP,owned_paths:OWNED,model:'qwen-agent'}});
     // start-workflow.mjs enrols a workflow at phase 'queued' and dispatch's
     // transitionQueuedToRunning is guarded on it — reproduce the precondition.
-    ledger.db.prepare("UPDATE workflows SET phase='queued' WHERE workflow_id=?").run(WORKFLOW);
   }finally{ledger.close();}
   return jobId;
 };
@@ -73,15 +85,21 @@ const inspect=(fx,fn)=>{
   const ledger=inspectLedger({file:ledgerFileFor(fx.repo)});
   try{return fn(ledger.db);}finally{ledger.close();}
 };
-const jobRow=(fx,jobId)=>inspect(fx,db=>db.prepare('SELECT * FROM jobs WHERE job_id=?').get(jobId));
-const contractRows=(fx,wf=WORKFLOW)=>inspect(fx,db=>db.prepare('SELECT * FROM contracts WHERE workflow_id=?').all(wf));
+const jobRow=(fx,jobId)=>inspect(fx,db=>jobRowOf(db,jobId));
+const contractRows=(fx,wf=WORKFLOW)=>inspect(fx,db=>db.prepare('SELECT c.*,a.op_id,a.try_no AS attempt,a.dispatch_id FROM contracts c JOIN op_attempts a ON a.attempt_id=c.attempt_id WHERE c.workflow_id=?').all(wf));
 const reportRows=(fx,wf=WORKFLOW)=>inspect(fx,db=>db.prepare('SELECT * FROM reports WHERE workflow_id=?').all(wf));
-const checkRows=(fx,wf=WORKFLOW)=>inspect(fx,db=>db.prepare('SELECT * FROM checks WHERE workflow_id=?').all(wf));
+const scratchPath=(fx,name)=>path.join(inspect(fx,db=>db.prepare('SELECT scratch_dir FROM op_attempts ORDER BY attempt_id DESC LIMIT 1').get().scratch_dir),name);
+const checkRows=(fx,wf=WORKFLOW)=>inspect(fx,db=>db.prepare("SELECT * FROM check_runs WHERE workflow_id=? AND runner='kernel' ORDER BY check_id").all(wf));
 const leaseRows=(fx,jobId)=>inspect(fx,db=>db.prepare('SELECT * FROM leases WHERE job_id=?').all(jobId));
 const eventKinds=(fx,wf=WORKFLOW)=>inspect(fx,db=>db.prepare('SELECT kind FROM events WHERE workflow_id=? ORDER BY seq').all(wf).map(r=>r.kind));
 const phaseOf=(fx,wf=WORKFLOW)=>inspect(fx,db=>db.prepare('SELECT phase FROM workflows WHERE workflow_id=?').get(wf)?.phase??null);
 
 const dispatch=(fx,jobId)=>fx.run(API,'dispatch','--repo',fx.repo,'--job',jobId,'--model','qwen-agent','--spawn','--json');
+const independentCheck=(fx,jobId,checks)=>{
+  fx.env.STARCI_CALLER='runtime-settler';
+  try{return fx.run(API,'check','--repo',fx.repo,'--job',jobId,'--checks',JSON.stringify(checks),'--json');}
+  finally{delete fx.env.STARCI_CALLER;}
+};
 const dispatchRunning=(fx,jobId)=>{
   const r=dispatch(fx,jobId);
   assert.equal(r.status,0,`command-terminal dispatch against healthy fake-orca must succeed: ${r.stderr||r.stdout}`);
@@ -93,7 +111,9 @@ const dispatchRunning=(fx,jobId)=>{
 // The report file is a starci/op-report@1 JSON envelope — api report validates
 // it and stamps run/task/dispatch/from from the job row.
 const writeEnvelope=(fx,{outcome='done',sentinel='SENTINEL-ALPHA',name='report-1.json',extra={},files=['src/op-ipc.txt']}={})=>{
-  const file=path.join(fx.repo,name);
+  const scratch=inspect(fx,db=>db.prepare('SELECT scratch_dir FROM op_attempts ORDER BY attempt_id DESC LIMIT 1').get()?.scratch_dir);
+  const file=path.join(scratch??fx.repo,name);
+  fs.mkdirSync(path.dirname(file),{recursive:true});
   fs.writeFileSync(file,JSON.stringify({
     schema:'starci/op-report@1',outcome,summary:`op ${outcome} — ${sentinel}`,
     files,checks:[{name:'self-check',command:'true',exitCode:0}],
@@ -153,13 +173,14 @@ test('op-IPC dispatch: contracts row, one path: lease per owned_path, phase=runn
 
   assert.equal(phaseOf(fx), 'running', 'dispatch claims phase=running on the workflow');
   const kinds=eventKinds(fx);
-  assert.ok(kinds.includes('phase-transition'),`dispatch must emit a phase-transition event — saw: ${kinds.join(', ')}`);
+  assert.ok(inspect(fx,db=>db.prepare("SELECT 1 FROM lifecycle_changes WHERE workflow_id=? AND to_phase='running'").get(WORKFLOW)),
+    `dispatch must record a running lifecycle transition — saw: ${kinds.join(', ')}`);
   assert.ok(kinds.includes('op-dispatched'),`the dispatch receipt event is still required — saw: ${kinds.join(', ')}`);
 });
 
 /* ------------------------------------------------ worker → kernel: report */
 
-test('api report upserts the dispatch report; api op-contract prints the stored markdown',t=>{
+test('api report keeps the first dispatch report immutable; api op-contract prints the stored markdown',t=>{
   const fx=fixture(t);
   const jobId=enqueue(fx);
   dispatchRunning(fx,jobId);
@@ -174,14 +195,16 @@ test('api report upserts the dispatch report; api op-contract prints the stored 
   assert.match(rows[0].report_json??'',/SENTINEL-ALPHA/,'report_json carries the filed report body');
   assert.equal(rows[0].consumed_at,null,'a fresh report is unconsumed');
 
-  // UNIQUE(workflow_id,dispatch_id): a second report for the same dispatch is
-  // an upsert — one row, new content.
-  fileReport(fx,jobId,{outcome:'partial',sentinel:'SENTINEL-BETA',name:'report-2.md'});
+  // One dispatch may file only one immutable report. A different second body
+  // is refused without replacing the worker's original claim.
+  const second=fx.run(API,'report','--repo',fx.repo,'--job',jobId,'--report',writeEnvelope(fx,{outcome:'partial',sentinel:'SENTINEL-BETA',name:'report-2.md'}),'--json');
+  assert.notEqual(second.status,0);
+  assert.match(second.stdout+second.stderr,/report-already-filed/);
   rows=reportRows(fx);
-  assert.equal(rows.length,1,'a second report for the same dispatch must upsert, not append');
-  assert.equal(rows[0].outcome,'partial');
-  assert.match(rows[0].report_json,/SENTINEL-BETA/);
-  assert.doesNotMatch(rows[0].report_json,/SENTINEL-ALPHA/,'the upserted row holds the new body, not the old');
+  assert.equal(rows.length,1);
+  assert.equal(rows[0].outcome,'done');
+  assert.match(rows[0].report_json,/SENTINEL-ALPHA/);
+  assert.doesNotMatch(rows[0].report_json,/SENTINEL-BETA/);
   assert.ok(eventKinds(fx).includes('report-filed'),'api report must emit the report-filed event');
 
   // api op-contract is the worker's read of its own contract: the row markdown.
@@ -217,7 +240,7 @@ test('api report immediately wakes an idle Kernel after committing the durable r
 
 /* ------------------------------------- consume-report + checks durability */
 
-test('api consume-report marks the dispatch report consumed; api check upserts the checks row',t=>{
+test('api consume-report marks the dispatch report consumed; api check records each check run',t=>{
   const fx=fixture(t);
   const jobId=enqueue(fx);
   const {job}=dispatchRunning(fx,jobId);
@@ -234,12 +257,12 @@ test('api consume-report marks the dispatch report consumed; api check upserts t
   const k1=fx.run(API,'check','--repo',fx.repo,'--job',jobId,'--checks',JSON.stringify(first),'--json');
   assert.equal(k1.status,0,`api check failed: ${k1.stderr||k1.stdout}`);
   let rows=checkRows(fx);
-  assert.equal(rows.length,1,'api check writes one checks row per attempt');
-  assert.equal(rows[0].op_id,OP);
-  assert.equal(rows[0].attempt,job.attempt,'checks key to the job attempt');
-  assert.deepEqual(JSON.parse(rows[0].checks_json),first);
+  assert.equal(rows.length,2,'api check records one row per check');
+  assert.deepEqual(rows.map(r=>r.name).sort(),['lint','tests']);
+  assert.ok(rows.every(r=>r.job_id===jobId && r.attempt_id===reportRows(fx)[0].attempt_id));
+  assert.ok(rows.every(r=>r.authority==='declared'),'unrerunnable commands remain declared evidence');
 
-  // Same PK (workflow_id,op_id,attempt): a re-run check upserts.
+  // A rerun appends new run rows so both observations remain auditable.
   const rerun=checkEnvelope(
     {name:'lint',command:'npm run lint',exitCode:0,evidence:'lint passed'},
     {name:'tests',command:'npm test',exitCode:1,evidence:'tests failed'},
@@ -247,8 +270,8 @@ test('api consume-report marks the dispatch report consumed; api check upserts t
   const k2=fx.run(API,'check','--repo',fx.repo,'--job',jobId,'--checks',JSON.stringify(rerun),'--json');
   assert.equal(k2.status,0,`api check (re-run) failed: ${k2.stderr||k2.stdout}`);
   rows=checkRows(fx);
-  assert.equal(rows.length,1,'a second check for the same attempt must upsert, not append');
-  assert.equal(JSON.parse(rows[0].checks_json).checks[1].exitCode,1);
+  assert.equal(rows.length,4,'a second check run appends without erasing the first');
+  assert.equal(rows.filter(r=>r.name==='tests').at(-1).declared_exit_code,1);
   assert.ok(eventKinds(fx).includes('checks-recorded'),'api check must emit the checks-recorded event');
 });
 
@@ -270,8 +293,8 @@ test('api check rejects scalar and double-encoded payloads before recording evid
   assert.equal(accepted.status,0,accepted.stderr||accepted.stdout);
   const body=JSON.parse(accepted.stdout);
   assert.equal(body.checks,1);
-  assert.deepEqual(body.checkEvidence,{observed:1,passed:1,failed:0,green:true});
-  assert.deepEqual(JSON.parse(checkRows(fx)[0].checks_json),valid);
+  assert.deepEqual(body.checkEvidence,{observed:1,passed:0,failed:0,green:false,declared:1});
+  assert.equal(checkRows(fx)[0].declared_exit_code,0);
 });
 
 test('queued jobs cannot self-file reports, record green checks, or settle pass without an operation dispatch',t=>{
@@ -287,12 +310,12 @@ test('queued jobs cannot self-file reports, record green checks, or settle pass 
 
   const checked=fx.run(API,'check','--repo',fx.repo,'--job',jobId,'--checks',checks,'--json');
   assert.notEqual(checked.status,0,'Kernel checks cannot manufacture a worker report boundary');
-  assert.match(`${checked.stderr}${checked.stdout}`,/report-job-not-active/);
+  assert.match(`${checked.stderr}${checked.stdout}`,/checks-report-missing/);
   assert.equal(checkRows(fx).length,0,'a refused queued check must not create check evidence');
 
   const settled=fx.run(API,'settle','--repo',fx.repo,'--job',jobId,'--verdict','pass','--json');
   assert.notEqual(settled.status,0,'an undispatched queued job cannot settle pass');
-  assert.match(`${settled.stderr}${settled.stdout}`,/report-job-not-active/);
+  assert.match(`${settled.stderr}${settled.stdout}`,/job-not-dispatched/);
   assert.equal(jobRow(fx,jobId)?.status,'queued');
 });
 
@@ -307,7 +330,7 @@ test('settle consumes the dispatch report and releases every owned-path lease',t
 
   const verdictReport=path.join(fx.repo,'verdict-report.md');
   fs.writeFileSync(verdictReport,'# verdict\npass\n');
-  const checked=fx.run(API,'check','--repo',fx.repo,'--job',jobId,'--checks',JSON.stringify(checkEnvelope({name:'validator',exitCode:0})),'--json');
+  const checked=independentCheck(fx,jobId,checkEnvelope({name:'validator',exitCode:0}));
   assert.equal(checked.status,0,`api check failed: ${checked.stderr||checked.stdout}`);
   const s=fx.run(API,'settle','--repo',fx.repo,'--job',jobId,'--verdict','pass','--report',verdictReport,'--json');
   assert.equal(s.status,0,`settle failed: ${s.stderr||s.stdout}`);
@@ -325,7 +348,7 @@ test('dispatch-rejected regression: a dead provider claims no contract, no lease
   assert.notEqual(r.status,0,'a dead provider screen must reject the dispatch');
 
   const job=jobRow(fx,jobId);
-  assert.equal(job?.status,'queued','a proven no-effect rejection returns the same durable attempt to the queue');
+  assert.equal(job?.status,'ready','a proven no-effect rejection leaves the same durable job ready');
   assert.equal(job?.attempt,1,'a no-effect infrastructure rejection reuses the logical operation attempt');
   assert.match(job?.result_json??'',/dispatch-rejected/);
   assert.equal(JSON.parse(job.result_json).attemptConsumed,false,'infrastructure rejection does not consume business retry budget');
@@ -343,22 +366,22 @@ test('api report enforces the starci/op-report@1 envelope',t=>{
   dispatchRunning(fx,jobId);
 
   // A bare markdown dump is not an answer — the envelope is the only shape.
-  const bad=path.join(fx.repo,'bad.md');fs.writeFileSync(bad,'# op report\nlooks done\n');
+  const bad=scratchPath(fx,'bad.md');fs.writeFileSync(bad,'# op report\nlooks done\n');
   let r=fx.run(API,'report','--repo',fx.repo,'--job',jobId,'--report',bad,'--json');
   assert.notEqual(r.status,0,'a non-envelope report must be refused');
   assert.match(`${r.stderr}${r.stdout}`,/report-invalid/);
 
   // Conditional payloads: partial without open[], files outside owned_paths.
-  const noOpen=path.join(fx.repo,'noopen.json');fs.writeFileSync(noOpen,JSON.stringify({outcome:'partial',summary:'x'}));
+  const noOpen=scratchPath(fx,'noopen.json');fs.writeFileSync(noOpen,JSON.stringify({outcome:'partial',summary:'x'}));
   r=fx.run(API,'report','--repo',fx.repo,'--job',jobId,'--report',noOpen,'--json');
   assert.notEqual(r.status,0);assert.match(`${r.stderr}${r.stdout}`,/report-invalid/);assert.match(`${r.stderr}${r.stdout}`,/open\[\]/);
 
-  const escaped=path.join(fx.repo,'escaped.json');fs.writeFileSync(escaped,JSON.stringify({outcome:'done',summary:'x',files:['../outside.txt']}));
+  const escaped=scratchPath(fx,'escaped.json');fs.writeFileSync(escaped,JSON.stringify({outcome:'done',summary:'x',files:['../outside.txt']}));
   r=fx.run(API,'report','--repo',fx.repo,'--job',jobId,'--report',escaped,'--json');
   assert.notEqual(r.status,0);assert.match(`${r.stderr}${r.stdout}`,/report-invalid/);assert.match(`${r.stderr}${r.stdout}`,/outside owned_paths/);
 
   // Identity is the job's, not the worker's claim.
-  const forged=path.join(fx.repo,'forged.json');fs.writeFileSync(forged,JSON.stringify({outcome:'done',summary:'x',dispatch:'someone-else'}));
+  const forged=scratchPath(fx,'forged.json');fs.writeFileSync(forged,JSON.stringify({outcome:'done',summary:'x',dispatch:'someone-else'}));
   r=fx.run(API,'report','--repo',fx.repo,'--job',jobId,'--report',forged,'--json');
   assert.notEqual(r.status,0);assert.match(`${r.stderr}${r.stdout}`,/report-invalid/);assert.match(`${r.stderr}${r.stdout}`,/identity 'dispatch'/);
 
@@ -397,7 +420,7 @@ test('api status projects filed reports; settle works row-first without --report
   assert.notEqual(bad.status,0,'verdict blocked cannot settle a done report');
   assert.match(`${bad.stderr}${bad.stdout}`,/verdict-outcome-mismatch/);
 
-  const checked=fx.run(API,'check','--repo',fx.repo,'--job',jobId,'--checks',JSON.stringify(checkEnvelope({name:'validator',exitCode:0})),'--json');
+  const checked=independentCheck(fx,jobId,checkEnvelope({name:'validator',exitCode:0}));
   assert.equal(checked.status,0,checked.stderr||checked.stdout);
 
   // Settle consumes the row — no --report needed; the row is the verdict.
@@ -468,14 +491,13 @@ test('A7: a report binds to the contracts row, never to a dispatch that was reje
     summary:'claiming the dead dispatch',files:['src/op-ipc.txt'],
     checks:[{name:'self-check',command:'true',exitCode:0}],dispatch:'ctx_rejected_A'}));
   const refused=fx.run(API,'report','--repo',fx.repo,'--job',jobId,'--report',forged,'--json');
-  assert.notEqual(refused.status,0,'a rejected dispatch is evidence, never an identity to file under');
-  assert.match(`${refused.stderr}${refused.stdout}`,/report-invalid/);
-  assert.match(`${refused.stderr}${refused.stdout}`,/identity 'dispatch'/);
-  assert.equal(reportRows(fx).length,1,'the refused claim never reaches the row');
+  assert.equal(refused.status,0,'an already filed attempt replays its immutable report');
+  assert.equal(emitted(refused.stdout)?.replayed,true);
+  assert.equal(reportRows(fx).length,1,'the rejected claim never creates another row');
+  assert.equal(reportRows(fx)[0].dispatch_id,live);
 
   // check and settle resolve the same binding, so the attempt can finish.
-  const checked=fx.run(API,'check','--repo',fx.repo,'--job',jobId,
-    '--checks',JSON.stringify(checkEnvelope({name:'validator',exitCode:0})),'--json');
+  const checked=independentCheck(fx,jobId,checkEnvelope({name:'validator',exitCode:0}));
   assert.equal(checked.status,0,`api check must bind to the live dispatch: ${checked.stderr||checked.stdout}`);
   const settled=fx.run(API,'settle','--repo',fx.repo,'--job',jobId,'--verdict','pass','--json');
   assert.equal(settled.status,0,`api settle must bind to the live dispatch: ${settled.stderr||settled.stdout}`);
@@ -488,7 +510,7 @@ test('A7: a job whose only dispatch was rejected binds nothing at all',t=>{
   const jobId=enqueue(fx,'job-op-ipc-a7-unbound');
   const ledger=openLedger({file:ledgerFileFor(fx.repo)});
   try{
-    ledger.db.prepare("UPDATE jobs SET status='running' WHERE job_id=?").run(jobId);
+    for(const to of ['ready','leased','running'])ledger.write.setJobStatus({jobId,to,reason:'rejected dispatch fixture'});
   }finally{ledger.close();}
   patchPayload(fx,jobId,{
     managed:{dispatchId:'ctx_rejected_only'},
@@ -534,12 +556,14 @@ test('an ask settles awaiting-owner: no business attempt spent, projected apart 
   finally{ledger.close();}
   st=status();
   assert.equal(st.awaitingOwner[0].answer,'answered','the answered ask tells the Kernel to re-enqueue');
+  assert.equal(inspect(fx,db=>db.prepare('SELECT MAX(revision) AS revision FROM goals WHERE workflow_id=?').get(WORKFLOW).revision),1);
 
-  const again=fx.run(API,'enqueue','--repo',fx.repo,'--workflow',WORKFLOW,'--op',OP,'--paths','docs/','--json');
+  const again=fx.run(API,'enqueue','--repo',fx.repo,'--workflow',WORKFLOW,'--op',OP,'--paths','docs/','--retry-of',jobId,'--json');
   assert.equal(again.status,0,again.stderr||again.stdout);
-  const next=JSON.parse(jobRow(fx,JSON.parse(again.stdout).job_id).payload_json);
-  assert.equal(next.retry.attempt,2,'the answered ask runs as a new durable attempt');
-  assert.equal(next.retry.retryClass,'owner-answer');
+  const next=jobRow(fx,JSON.parse(again.stdout).job_id);
+  assert.equal(next.try_no,2,'the answered ask runs as a new durable try');
+  assert.equal(next.retry_of,jobId);
+  assert.equal(next.retry_class,'follow-up','owner answers use the durable follow-up try class');
   assert.deepEqual(status().awaitingOwner,[],'a re-enqueued op no longer waits');
 });
 
@@ -550,10 +574,12 @@ test('a blocked verdict on an ask report settled before awaiting-owner existed r
   fileReport(fx,jobId,{outcome:'ask',name:'old-ask.json'});
   const ledger=openLedger({file:ledgerFileFor(fx.repo)});
   try{
-    ledger.db.prepare("UPDATE jobs SET status='failed',result_json=? WHERE job_id=?").run(JSON.stringify({verdict:'blocked'}),jobId);
+    ledger.write.recordJobResult({jobId,result:{verdict:'blocked'}});
+    ledger.write.setJobStatus({jobId,to:'failed',reason:'legacy blocked ask fixture'});
   }finally{ledger.close();}
   const st=JSON.parse(fx.run(API,'status','--repo',fx.repo,'--workflow',WORKFLOW,'--json').stdout);
   assert.deepEqual(st.failures,{failed:0,awaitingOwner:1});
+  assert.equal(inspect(fx,db=>db.prepare('SELECT MAX(revision) AS revision FROM goals WHERE workflow_id=?').get(WORKFLOW).revision),1);
   const again=fx.run(API,'enqueue','--repo',fx.repo,'--workflow',WORKFLOW,'--op',OP,'--paths','docs/','--json');
   assert.equal(again.status,0,again.stderr||again.stdout);
 });

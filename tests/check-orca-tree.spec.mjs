@@ -119,6 +119,7 @@ test('TASK_OUTSIDE_RUN: an open Task in a Run the workflow no longer uses',t=>{
 test('a Task the settle already closed is out of the tree, not a finding',t=>{
   withLedger(t,({ledger})=>{
     healthy(ledger);
+    ledger.db.prepare("UPDATE jobs SET status='reported' WHERE job_id='job-op-1'").run();
     ledger.db.prepare("UPDATE jobs SET status='succeeded',worker_id=NULL,payload_json=? WHERE job_id='job-op-1'")
       .run(JSON.stringify({managed:{runId:'run-0',taskId:'task-old'},taskClosed:{taskId:'task-old',status:'done',ok:true}}));
     assert.deepEqual(orcaTreeFindings(ledger.db,seen(term(KERNEL,'[Kernel] wf-tree'))),[]);
@@ -128,8 +129,9 @@ test('a Task the settle already closed is out of the tree, not a finding',t=>{
 test('a finished workflow owes Orca nothing',t=>{
   withLedger(t,({ledger})=>{
     healthy(ledger);
-    ledger.db.prepare("UPDATE workflows SET phase='finished' WHERE workflow_id='wf-tree'").run();
+    ledger.db.prepare("UPDATE jobs SET status='reported'").run();
     ledger.db.prepare("UPDATE jobs SET status='succeeded'").run();
+    ledger.write.changeWorkflowPhase({workflowId:'wf-tree',to:'finished',by:'test-fixture',reason:'complete'});
     assert.deepEqual(orcaTreeFindings(ledger.db,seen()),[],'no DEAD_KERNEL for a workflow that is over');
   });
 });

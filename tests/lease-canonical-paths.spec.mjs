@@ -27,11 +27,17 @@ const git=(cwd,...args)=>{
 const fixture=t=>{
   const dir=fs.realpathSync.native(fs.mkdtempSync(path.join(os.tmpdir(),'starci-lease-canon-')));
   t.after(()=>fs.rmSync(dir,{recursive:true,force:true,maxRetries:20,retryDelay:25}));
+  if(process.env.STARCI_TEST_TEMP_DIR)t.after(()=>fs.rmSync(path.join(process.env.STARCI_TEST_TEMP_DIR,'starci-job-scratch'),
+    {recursive:true,force:true,maxRetries:20,retryDelay:25}));
   const be=path.join(dir,'nivo-backend'),fe=path.join(dir,'nivo-fe'),source=path.join(dir,'source');
   for(const repo of [be,fe]){
     fs.mkdirSync(path.join(repo,'apps','app','src','messages'),{recursive:true});
     fs.writeFileSync(path.join(repo,VI),'{}\n');
-    git(repo,'init','--quiet');
+    git(repo,'init','--quiet','-b','main');
+    git(repo,'config','user.email','fixture@example.test');
+    git(repo,'config','user.name','Fixture');
+    git(repo,'add',VI);
+    git(repo,'commit','--quiet','-m','seed');
   }
   fs.mkdirSync(path.join(source,'.workspaces','projects','nivo'),{recursive:true});
   fs.writeFileSync(path.join(source,'.workspaces','projects','nivo','work.json'),JSON.stringify({
@@ -43,20 +49,33 @@ const fixture=t=>{
     work:{ownerRole:'be',pathFromRepository:'.starciwork'},
   }));
   const prior=process.env.STARCI_SOURCE_ROOT;
+  const priorProjects=process.env.STARCI_PROJECTS_ROOT;
+  const priorMachine=process.env.STARCI_TEST_MACHINE_FILE;
   process.env.STARCI_SOURCE_ROOT=source;
-  t.after(()=>{if(prior===undefined)delete process.env.STARCI_SOURCE_ROOT;else process.env.STARCI_SOURCE_ROOT=prior;});
+  process.env.STARCI_PROJECTS_ROOT=path.join(dir,'projects');
+  process.env.STARCI_TEST_MACHINE_FILE=path.join(dir,'machine.sqlite');
+  t.after(()=>{
+    if(prior===undefined)delete process.env.STARCI_SOURCE_ROOT;else process.env.STARCI_SOURCE_ROOT=prior;
+    if(priorProjects===undefined)delete process.env.STARCI_PROJECTS_ROOT;else process.env.STARCI_PROJECTS_ROOT=priorProjects;
+    if(priorMachine===undefined)delete process.env.STARCI_TEST_MACHINE_FILE;else process.env.STARCI_TEST_MACHINE_FILE=priorMachine;
+  });
   return {dir,be,fe,source};
 };
 const withLedger=(repo,fn)=>{const l=openLedger({file:ledgerFileFor(repo)});try{return fn(l);}finally{l.close();}};
-const enqueue=(ledger,{jobId,workflowId,opId='code.refactor',owned,repository})=>ledger.enqueueJob({jobId,workflowId,opId,kind:'op',
-  payload:{opId,owned_paths:owned,...(repository?{repository}:{})}});
+const enqueue=(ledger,{jobId,workflowId,opId='code.refactor',owned,repository})=>{
+  ledger.ensureWorkflow({workflowId,title:workflowId});
+  ledger.write.createUnit({workflowId,unitId:jobId,opId,subjectKey:jobId,goalRevision:1});
+  return ledger.enqueueJob({jobId,workflowId,unitId:jobId,tryNo:1,opId,kind:'op',
+    payload:{opId,owned_paths:owned,...(repository?{repository}:{})}});
+};
 const holdLegacy=(ledger,jobId,key)=>{
   // A lease taken before canonical keys: stored in the spelling its job used.
   const job=ledger.db.prepare('SELECT * FROM jobs WHERE job_id=?').get(jobId);
   ledger.db.prepare('INSERT OR IGNORE INTO resources(resource_key,capacity) VALUES(?,1)').run(key);
-  ledger.db.prepare("UPDATE jobs SET status='leased',lease_token=? WHERE job_id=?").run(`tok-${jobId}`,jobId);
-  ledger.db.prepare(`INSERT INTO leases(resource_key,job_id,workflow_id,op_id,attempt,generation,token,units,acquired_at,expires_at,machine_ref)
-    VALUES(?,?,?,?,?,?,?,1,?,?,NULL)`).run(key,jobId,job.workflow_id,job.op_id,job.attempt,job.generation,`tok-${jobId}`,Date.now(),Date.now()+20*60_000);
+  ledger.db.prepare('UPDATE jobs SET lease_token=? WHERE job_id=?').run(`tok-${jobId}`,jobId);
+  for(const to of ['ready','leased'])ledger.write.setJobStatus({jobId,to,reason:'test-fixture'});
+  ledger.db.prepare(`INSERT INTO leases(resource_key,job_id,workflow_id,op_id,try_no,generation,token,units,acquired_at,expires_at)
+    VALUES(?,?,?,?,?,?,?,1,?,?)`).run(key,jobId,job.workflow_id,job.op_id,job.try_no,job.generation,`tok-${jobId}`,Date.now(),Date.now()+20*60_000);
 };
 
 test('every spelling of a bound path is one repository-qualified lease path; an unbound repository keeps its own',t=>{

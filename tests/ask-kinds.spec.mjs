@@ -62,8 +62,11 @@ const fakeBot = () => {
 const telegramConfig = () => ({ ...structuredClone(EXAMPLE), language: 'vi', connectors: { secretsFile: null, cloudflare: { mode: 'named', hostname: 'response.example.org' }, telegram: { enabled: true, chatId: String(OWNER) } } });
 const seedAsk = (ledger, { workflowId, dispatchId, opId = 'provision.ask', question }) => {
   if (!ledger.db.prepare('SELECT 1 FROM workflows WHERE workflow_id=?').get(workflowId)) seedWorkflow(ledger, { id: workflowId, state: { phase: 'running' } });
-  ledger.db.prepare('INSERT INTO reports(workflow_id,dispatch_id,op_id,attempt,generation,outcome,report_json,created_at) VALUES(?,?,?,?,?,?,?,?)')
-    .run(workflowId, dispatchId, opId, 1, 1, 'ask', JSON.stringify({ schema: 'starci/op-report@1', outcome: 'ask', summary: 'ask', question: { refs: [dispatchId], ...question } }), Date.now());
+  const jobId=`ask-${dispatchId}`;
+  seedWorkflow(ledger,{id:workflowId,jobs:[{jobId,opId,status:'reported',dispatchId}]});
+  const attemptId=ledger.db.prepare('SELECT attempt_id FROM op_attempts WHERE job_id=?').get(jobId).attempt_id;
+  ledger.db.prepare('INSERT INTO reports(workflow_id,attempt_id,dispatch_id,job_id,outcome,report_json,created_at) VALUES(?,?,?,?,?,?,?)')
+    .run(workflowId, attemptId, dispatchId, jobId, 'ask', JSON.stringify({ schema: 'starci/op-report@1', outcome: 'ask', summary: 'ask', question: { refs: [dispatchId], ...question } }), Date.now());
 };
 
 test('parkAsk pushes an approval ask at once and only lists a credential ask (ask-notified via creds, no message)', async (t) => {
@@ -72,7 +75,7 @@ test('parkAsk pushes an approval ask at once and only lists a credential ask (as
     seedAsk(ledger, { workflowId: 'wf-pay', dispatchId: 'ctx_price', opId: 'business.decide', question: PRICING });
     const bot = fakeBot();
     const notify = (a) => notifyAsk(a, { config: telegramConfig(), env: { LOCALAPPDATA: machineHome, TELEGRAM_BOT_TOKEN: TOKEN }, apiBase: 'http://bot.invalid', fetchImpl: bot.fetchImpl, sleepImpl: async () => {}, warn: () => {} });
-    const report = (id) => ledger.db.prepare("SELECT * FROM reports WHERE workflow_id='wf-pay' AND dispatch_id=?").get(id);
+    const report = (id) => ledger.db.prepare("SELECT r.*,a.op_id FROM reports r JOIN op_attempts a ON a.attempt_id=r.attempt_id WHERE r.workflow_id='wf-pay' AND r.dispatch_id=?").get(id);
     const cred = await parkAsk({ ledger, ledgerFile, repo: repoRoot, workflowId: 'wf-pay', report: report('ctx_vnpay'), notify, close: async () => null });
     assert.deepEqual([cred.notified, cred.askClass, cred.telegram.listed], [true, 'credential', true]);
     assert.equal(bot.sends().length, 0, 'a credential ask is never pushed');
@@ -94,18 +97,15 @@ const seed = (repo, fn) => { const ledger = openLedger({ file: ledgerFileFor(rep
 const LEGS = ['request.analyze', 'business.decide', 'provision.ask', 'backend.implement', 'integration.verify', 'uat.verify'];
 const seedPlan = (repo, wf) => seed(repo, (ledger) => {
   const at = Date.now();
-  ledger.ensureWorkflow({ workflowId: wf, title: 'ask kinds' });
-  ledger.db.prepare("UPDATE workflows SET phase='running' WHERE workflow_id=?").run(wf);
+  seedWorkflow(ledger,{id:wf,now:at,state:{phase:'running'},jobs:[{jobId:'bd-1',opId:'business.decide',status:'succeeded',result:{verdict:'pass'},createdAt:at}]});
   ledger.db.prepare('INSERT INTO goals(workflow_id,revision,goal_identity,markdown,json,created_at) VALUES(?,?,?,?,?,?)').run(wf, 0, 'g', '# goal', json({ opChain: { legs: LEGS } }), at);
-  ledger.db.prepare(`INSERT INTO jobs(job_id,workflow_id,op_id,attempt,generation,kind,role,payload_json,status,result_json,created_at,updated_at)
-    VALUES('bd-1',?,'business.decide',1,0,'op','op',?,'succeeded',?,?,?)`).run(wf, json({ opId: 'business.decide' }), json({ verdict: 'pass' }), at, at);
 });
 const seedOwnerWait = (repo, wf, { jobId, opId, dispatchId, question }) => seed(repo, (ledger) => {
   const at = Date.now();
-  ledger.db.prepare(`INSERT INTO jobs(job_id,workflow_id,op_id,attempt,generation,kind,role,payload_json,status,result_json,created_at,updated_at)
-    VALUES(?,?,?,1,0,'op','op',?,'failed',?,?,?)`).run(jobId, wf, opId, json({ opId }), json({ verdict: 'awaiting-owner', askDispatchId: dispatchId }), at, at);
-  ledger.db.prepare("INSERT INTO reports(workflow_id,dispatch_id,op_id,attempt,generation,outcome,report_json,consumed_at,created_at) VALUES(?,?,?,1,0,'ask',?,?,?)")
-    .run(wf, dispatchId, opId, json({ outcome: 'ask', summary: 'ask', question }), at, at);
+  seedWorkflow(ledger,{id:wf,jobs:[{jobId,opId,status:'failed',dispatchId,result:{verdict:'awaiting-owner',askDispatchId:dispatchId},createdAt:at}]});
+  const attemptId=ledger.db.prepare('SELECT attempt_id FROM op_attempts WHERE job_id=?').get(jobId).attempt_id;
+  ledger.db.prepare("INSERT INTO reports(workflow_id,attempt_id,dispatch_id,job_id,outcome,report_json,consumed_at,created_at) VALUES(?,?,?,?,'ask',?,?,?)")
+    .run(wf, attemptId, dispatchId, jobId, json({ outcome: 'ask', summary: 'ask', question }), at, at);
   ledger.appendEvent({ workflowId: wf, entityType: 'report', entityId: dispatchId, kind: 'ask-notified', payload: { dispatchId, onDemand: true, via: 'creds' } });
 });
 const frontierOf = (repo, wf) => { const r = runApi('status', '--repo', repo, '--workflow', wf, '--json'); assert.equal(r.status, 0, r.stderr); return JSON.parse(r.stdout).frontier; };
@@ -121,8 +121,7 @@ test('an unanswered credential ask never parks the main line: next-ready while a
   assert.doesNotMatch(f.reason, /request\.analyze/, 'an intake leg with no job before the reached legs is never owed');
   seed(repo, (ledger) => {
     const at = Date.now();
-    ledger.db.prepare(`INSERT INTO jobs(job_id,workflow_id,op_id,attempt,generation,kind,role,payload_json,status,result_json,created_at,updated_at)
-      VALUES('bi-1',?,'backend.implement',1,0,'op','op',?,'succeeded',?,?,?)`).run(wf, json({ opId: 'backend.implement' }), json({ verdict: 'pass' }), at, at);
+    seedWorkflow(ledger,{id:wf,jobs:[{jobId:'bi-1',opId:'backend.implement',status:'succeeded',result:{verdict:'pass'},createdAt:at}]});
   });
   f = frontierOf(repo, wf);
   assert.deepEqual([f.state, f.actionable, f.credentialAskDispatches], ['awaiting-owner', false, ['ctx_vnpay']], 'only integration.verify and uat.verify are left: they wait on the value');
@@ -235,7 +234,6 @@ test('/creds batches every credential ask into ONE message with one button each;
 test('stallFindings marks a workflow parked on credential asks alone credentialOnly', (t) => withLedger(t, ({ ledger, repoRoot }) => {
   const NOW = Date.now();
   seedWorkflow(ledger, { id: 'wf-pay', now: NOW - 600 * 60000, events: [{ kind: 'op-settled', payload: {}, created_at: NOW - 120 * 60000 }] });
-  ledger.db.prepare("UPDATE workflows SET phase='running'").run();
   const status = (credentialAskDispatches, pending) => ({ ok: true, workers: [], awaitingOwner: pending.map((d) => ({ dispatchId: d, answer: 'pending' })),
     frontier: { state: 'awaiting-owner', actionable: false, queued: [], queuedCauses: {}, reason: 'owner', credentialAskDispatches } });
   const find = (s) => stallFindings(ledger.db, { repo: repoRoot, now: NOW, stallMinutes: 30, frontierOf: () => s }).find((f) => f.type === 'STALLED');

@@ -8,6 +8,8 @@ import {inspectLedger,ledgerFileFor,openLedger} from '../engine/ledger-db.mjs';
 import {parseYaml} from '../engine/yaml.mjs';
 import {WORK_COMMIT_CHANGE,admittedCommitPolicy,commitPolicyOf,ownedPathsDirty,policyCommits,specBatches} from '../scripts/kernel/settle-landed.mjs';
 import {loadContractChanges} from '../scripts/kernel/contract-version.mjs';
+import {seedWorkflow} from './_ledger-fixture.mjs';
+import {jobRowOf} from '../scripts/kernel/api-lib/rows.mjs';
 
 // Authored Work lands like code (contract changes authoring-ops-commit-work and
 // work-writing-ops-commit-work, reach new-legs): every op that writes canonical Work - the five
@@ -66,24 +68,30 @@ const api=(env,...args)=>{
   return {r,body};
 };
 const OWNED='.starciwork/features/collab/';
+const scratchFor=(repo,jobId)=>{const dir=path.join(path.dirname(repo),'scratch',jobId);fs.mkdirSync(dir,{recursive:true});return dir;};
+const reportFile=(repo,jobId,body)=>{const file=path.join(scratchFor(repo,jobId),'report.json');fs.writeFileSync(file,json(body));return file;};
 // A job of `op` owning the collab feature record, admitted at `admittedAt`, with (optionally) a
 // filed done report and green recorded checks.
 const seedJob=(repo,{op='scope.define',jobId='op-work-1',wf='wf-work',admittedAt=Date.now()-60_000,report,status='running',attempt=1,owned=[OWNED]})=>{
   const ledger=openLedger({file:ledgerFileFor(repo)});
   try{
-    ledger.ensureWorkflow({workflowId:wf,title:'work'});
-    ledger.enqueueJob({jobId,workflowId:wf,opId:op,attempt,kind:'op',payload:{opId:op,owned_paths:owned,orca:{dispatchId:`ctx-${jobId}`,agentTerminalHandle:`term-${jobId}`},...(status==='succeeded'?{settledAt:admittedAt+1000}:{})}});
-    ledger.db.prepare('UPDATE jobs SET status=? WHERE job_id=?').run(status,jobId);
-    ledger.db.prepare('INSERT INTO contracts(workflow_id,op_id,attempt,dispatch_id,markdown,context_json,created_at) VALUES(?,?,?,?,?,?,?)')
-      .run(wf,op,attempt,`ctx-${jobId}`,'# contract',json({worktree:repo}),admittedAt);
-    if(report)ledger.db.prepare('INSERT INTO reports(workflow_id,dispatch_id,op_id,attempt,generation,outcome,report_json,from_terminal,consumed_at,created_at) VALUES(?,?,?,?,?,?,?,?,NULL,?)')
-      .run(wf,`ctx-${jobId}`,op,attempt,0,'done',json(report),null,admittedAt);
-    ledger.db.prepare('INSERT INTO checks(workflow_id,op_id,attempt,checks_json,created_at) VALUES(?,?,?,?,?)')
-      .run(wf,op,attempt,json({checks:[{name:'starci-validate',exitCode:0}]}),admittedAt);
+    const first=!ledger.db.prepare('SELECT 1 FROM goals WHERE workflow_id=?').get(wf);
+    seedWorkflow(ledger,{id:wf,now:admittedAt,goal:first?{revision:1,markdown:'Work landed fixture goal',json:{}}:null,jobs:[{jobId,opId:op,status,
+      createdAt:admittedAt,updatedAt:status==='succeeded'?admittedAt+1000:admittedAt,
+      dispatchId:`ctx-${jobId}`,terminalHandle:`term-${jobId}`,
+      payload:{opId:op,owned_paths:owned,orca:{dispatchId:`ctx-${jobId}`,agentTerminalHandle:`term-${jobId}`},
+        ...(status==='succeeded'?{settledAt:admittedAt+1000}:{})}}]});
+    if(status!=='queued'){
+      const attemptId=ledger.db.prepare('SELECT attempt_id FROM op_attempts WHERE job_id=?').get(jobId).attempt_id;
+      ledger.write.updateAttempt({attemptId,scratchDir:scratchFor(repo,jobId)});
+      ledger.write.writeContract({attemptId,markdown:'# contract',context:{worktree:repo},createdAt:admittedAt});
+      if(report)ledger.write.fileReport({attemptId,outcome:'done',report,createdAt:admittedAt});
+      ledger.write.recordCheckRun({attemptId,name:'starci-validate',phase:'verify',runner:'kernel',status:'pass',exitCode:0,createdAt:admittedAt});
+    }
   }finally{ledger.close();}
   return jobId;
 };
-const jobRow=(repo,jobId)=>{const l=inspectLedger({file:ledgerFileFor(repo)});try{return l.db.prepare('SELECT * FROM jobs WHERE job_id=?').get(jobId);}finally{l.close();}};
+const jobRow=(repo,jobId)=>{const l=inspectLedger({file:ledgerFileFor(repo)});try{return jobRowOf(l.db,jobId);}finally{l.close();}};
 
 test('every canonical-Work-writing op declares a committing commitPolicy and a landed proof; the live registry governs them',()=>{
   for(const op of WORK_WRITING){
@@ -141,15 +149,14 @@ test('api settle and report: a leg admitted before the change settles and report
   assert.equal(settled.r.status,0,settled.r.stderr||settled.r.stdout);
   assert.equal(settled.body.landed,undefined,'no landed proof for an older authoring leg');
 
-  const file=path.join(dir,'report.json');
-  fs.writeFileSync(file,json({outcome:'done',summary:'authored'}));
   const olderReport=seedJob(repo,{op:'work.author',jobId:'op-work-2',wf:'wf-work-2'});
+  const file=reportFile(repo,olderReport,{outcome:'done',summary:'authored'});
   const accepted=api(env,'report','--repo',repo,'--job',olderReport,'--report',file,'--json');
   assert.equal(accepted.r.status,0,accepted.r.stderr);
 
   const newer=registryAt(dir,Date.now()-3_600_000);
   const newReport=seedJob(repo,{op:'work.author',jobId:'op-work-3',wf:'wf-work-3'});
-  const refused=api(newer,'report','--repo',repo,'--job',newReport,'--report',file,'--json');
+  const refused=api(newer,'report','--repo',repo,'--job',newReport,'--report',reportFile(repo,newReport,{outcome:'done',summary:'authored'}),'--json');
   assert.equal(refused.r.status,1,refused.r.stdout);
   assert.match(refused.r.stderr,/git rev-parse HEAD/,'a new authoring leg owes head');
 });
@@ -177,16 +184,14 @@ test('api settle: a new decision.prepare leg whose decision record is untracked 
 
 test('api report: a newly governed op (provision.ask) owes head; a leg admitted before the change does not',t=>{
   const {dir,repo}=checkout(t);
-  const file=path.join(dir,'report.json');
-  fs.writeFileSync(file,json({outcome:'done',summary:'asked'}));
   const before=registryAt(dir,Date.now()+3_600_000);
   const older=seedJob(repo,{op:'provision.ask',jobId:'op-ask-1',wf:'wf-ask-1'});
-  const accepted=api(before,'report','--repo',repo,'--job',older,'--report',file,'--json');
+  const accepted=api(before,'report','--repo',repo,'--job',older,'--report',reportFile(repo,older,{outcome:'done',summary:'asked'}),'--json');
   assert.equal(accepted.r.status,0,accepted.r.stderr,'an older leg of a newly governed op reports as it was admitted');
 
   const after=registryAt(dir,Date.now()-3_600_000);
   const newer=seedJob(repo,{op:'provision.ask',jobId:'op-ask-2',wf:'wf-ask-2'});
-  const refused=api(after,'report','--repo',repo,'--job',newer,'--report',file,'--json');
+  const refused=api(after,'report','--repo',repo,'--job',newer,'--report',reportFile(repo,newer,{outcome:'done',summary:'asked'}),'--json');
   assert.equal(refused.r.status,1,refused.r.stdout);
   assert.match(refused.r.stderr,/git rev-parse HEAD/,'a newly governed leg owes head');
 });
@@ -254,13 +259,15 @@ const armForSettle=(repo,jobId,{head,admittedAt=Date.now()-60_000})=>{
     const job=ledger.db.prepare('SELECT * FROM jobs WHERE job_id=?').get(jobId);
     const payload=JSON.parse(job.payload_json);
     payload.orca={dispatchId:`ctx-${jobId}`,agentTerminalHandle:`term-${jobId}`};
-    ledger.db.prepare("UPDATE jobs SET status='running',payload_json=? WHERE job_id=?").run(json(payload),jobId);
-    ledger.db.prepare('INSERT INTO contracts(workflow_id,op_id,attempt,dispatch_id,markdown,context_json,created_at) VALUES(?,?,?,?,?,?,?)')
-      .run(job.workflow_id,job.op_id,job.attempt,`ctx-${jobId}`,'# contract',json({worktree:repo}),admittedAt);
-    ledger.db.prepare('INSERT INTO reports(workflow_id,dispatch_id,op_id,attempt,generation,outcome,report_json,from_terminal,consumed_at,created_at) VALUES(?,?,?,?,?,?,?,?,NULL,?)')
-      .run(job.workflow_id,`ctx-${jobId}`,job.op_id,job.attempt,0,'done',json({outcome:'done',summary:'committed',head,branch:'main'}),null,admittedAt);
-    ledger.db.prepare('INSERT INTO checks(workflow_id,op_id,attempt,checks_json,created_at) VALUES(?,?,?,?,?)')
-      .run(job.workflow_id,job.op_id,job.attempt,json({checks:[{name:'starci-validate',exitCode:0}]}),admittedAt);
+    ledger.write.updateJob({jobId,payload});
+    ledger.write.setJobStatus({jobId,to:'ready',reason:'fixture admission'});
+    ledger.write.setJobStatus({jobId,to:'leased',reason:'fixture admission',leaseToken:`lease-${jobId}`});
+    const {attempt_id:attemptId}=ledger.write.startAttempt({workflowId:job.workflow_id,jobId,dispatchId:`ctx-${jobId}`});
+    ledger.write.setJobStatus({jobId,to:'running',reason:'fixture dispatch'});
+    ledger.write.updateAttempt({attemptId,scratchDir:scratchFor(repo,jobId)});
+    ledger.write.writeContract({attemptId,markdown:'# contract',context:{worktree:repo},createdAt:admittedAt});
+    ledger.write.fileReport({attemptId,outcome:'done',report:{outcome:'done',summary:'committed',head,branch:'main'},createdAt:admittedAt});
+    ledger.write.recordCheckRun({attemptId,name:'starci-validate',phase:'verify',runner:'kernel',status:'pass',exitCode:0,createdAt:admittedAt});
   }finally{ledger.close();}
 };
 // Settled `op` jobs of wf-batch, each having written `files` (backdated before it settled) and left them untracked.
@@ -313,8 +320,6 @@ test('batched repair: reconcile prints one --commit-only-work-debt per op; the b
 
   git(repo,'add','--',`${OWNED}business/c/c.yaml`);
   git(repo,'commit','--quiet','-m','commit the rest');
-  const ledger=openLedger({file:ledgerFileFor(repo)});
-  try{ledger.db.prepare('UPDATE reports SET report_json=? WHERE dispatch_id=?').run(json({outcome:'done',summary:'committed',head:git(repo,'rev-parse','HEAD'),branch:'main'}),`ctx-${enq.body.job_id}`);}finally{ledger.close();}
   const landed=api(env,'settle','--repo',repo,'--job',enq.body.job_id,'--verdict','pass','--json');
   assert.equal(landed.r.status,0,landed.r.stderr||landed.r.stdout);
   assert.equal(jobRow(repo,enq.body.job_id).status,'succeeded');
@@ -366,7 +371,7 @@ test('a batch of hundreds of long exact paths is read in bounded git calls (Wind
 
 // A file's mtime pinned at `at`.
 const touch=(repo,rel,at)=>fs.utimesSync(path.join(repo,rel),new Date(at),new Date(at));
-const finish=(repo,wf)=>{const l=openLedger({file:ledgerFileFor(repo)});try{l.ensureWorkflow({workflowId:wf,title:wf});l.db.prepare("UPDATE workflows SET phase='finished' WHERE workflow_id=?").run(wf);}finally{l.close();}};
+const finish=(repo,wf)=>{const l=openLedger({file:ledgerFileFor(repo)});try{l.ensureWorkflow({workflowId:wf,phase:'running',title:wf});l.write.changeWorkflowPhase({workflowId:wf,to:'finished',by:'test-fixture',reason:'finished for adoption'});}finally{l.close();}};
 
 test('attribution: the report files first, then the run window; a file neither names is unattributed and never batched',t=>{
   const {dir,repo,write}=checkout(t);

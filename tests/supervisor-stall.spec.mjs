@@ -33,13 +33,15 @@ const seedCollab=(ledger,{progressAgoMin=120,gateAgoMin=180,gateText=GATE_TEXT,q
     ],
     jobs:HELD.map(jobId=>({jobId,opId:'interface.implement',status:'queued',createdAt:NOW-queuedAgoMin*MIN,updatedAt:NOW-queuedAgoMin*MIN}))});
   seedWorkflow(ledger,{id:PEER,now:NOW-600*MIN,events:[{kind:'op-settled',payload:{},created_at:NOW-5*MIN}]});
-  ledger.db.prepare("UPDATE workflows SET phase='running'").run();
-  ledger.db.prepare("INSERT INTO incidents(incident_id,workflow_id,op_id,last_progress,status,updated_at) VALUES(?,?,?,?,?,?)")
-    .run('inc-48bc556d89a6',WF,'interface.implement',`[owner-gate] ${gateText}`,'open',NOW-gateAgoMin*MIN);
+  ledger.db.prepare("INSERT INTO incidents(incident_id,workflow_id,op_id,kind,owner,last_progress,status,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?)")
+    .run('inc-48bc556d89a6',WF,'interface.implement','owner-ask','owner',`[owner-gate] ${gateText}`,'open',NOW-gateAgoMin*MIN,NOW-gateAgoMin*MIN);
 };
 const addAsk=(ledger,{workflowId=PEER,dispatchId='ctx_aaaaaaaaaaaa',answered=false,at=NOW-200*MIN}={})=>{
-  ledger.db.prepare("INSERT INTO reports(workflow_id,dispatch_id,op_id,attempt,generation,outcome,report_json,created_at) VALUES(?,?,?,?,?,?,?,?)")
-    .run(workflowId,dispatchId,'interface.scaffold',1,1,'ask','{}',at);
+  const jobId=`ask-${dispatchId}`;
+  seedWorkflow(ledger,{id:workflowId,jobs:[{jobId,opId:'interface.scaffold',status:'reported',dispatchId,createdAt:at}]});
+  const attemptId=ledger.db.prepare('SELECT attempt_id FROM op_attempts WHERE job_id=?').get(jobId).attempt_id;
+  ledger.db.prepare("INSERT INTO reports(workflow_id,attempt_id,dispatch_id,job_id,outcome,report_json,created_at) VALUES(?,?,?,?,?,?,?)")
+    .run(workflowId,attemptId,dispatchId,jobId,'ask','{}',at);
   ledger.appendEvent({workflowId,entityType:'workflow',entityId:workflowId,kind:'ask-notified',payload:{dispatchId},createdAt:at+MIN});
   if(answered)ledger.appendEvent({workflowId,entityType:'workflow',entityId:workflowId,kind:'ask-answered',payload:{dispatchId},createdAt:at+30*MIN});
 };
@@ -204,7 +206,8 @@ test('wakeKernel: no seat, a busy or gated Kernel and a shell refuse; an idle Ke
   assert.equal(r.delivered,true);
   assert.deepEqual(sends[0],{terminal:'term_k',text,enter:true});
   // A seated Kernel job: the wake ends with the seat's identity, which api status (kernel.attempt, kernel.you) proves.
-  ledger.db.prepare("INSERT INTO jobs(job_id,workflow_id,op_id,attempt,generation,kind,role,payload_json,status,worker_id,created_at,updated_at) VALUES(?,?,NULL,2,0,'kernel','kernel','{}','running','term_k',?,?)").run(`kernel-${WF}`,WF,NOW,NOW);
+  ledger.enqueueJob({jobId:`kernel-${WF}`,workflowId:WF,kind:'kernel',role:'kernel',status:'running',payload:{hierarchy:{attempt:2}},createdAt:NOW});
+  ledger.db.prepare('UPDATE jobs SET worker_id=? WHERE job_id=?').run('term_k',`kernel-${WF}`);
   sends.length=0;
   assert.equal(wakeKernel({db:ledger.db,workflowId:WF,text,deps:deps([IDLE,IDLE,ACTIVE])}).action,'kernel-woken');
   // Between them the runtime-rev sentence (scripts/kernel/runtime-rev.mjs): this seat never acked a rev, so it is asked for one full re-read.
@@ -232,13 +235,14 @@ test('the supervisor digest prints the stall findings, one line each, under the 
 test('a peer-dependency gate names no ask, so a closed ask is no evidence, and the job that settled before it is its cause, not its release',t=>withLedger(t,({repoRoot,ledger})=>{
   const text="Peer dependency (not an owner step, but the only holding mechanism): Collab's interface.draw op-interface.draw-da76af80ce settled blocked brand-gap. Holds the redraw until Modules' new shell rev lands.";
   seedCollab(ledger,{gateText:text});
-  seedWorkflow(ledger,{id:'wf-cause',jobs:[{jobId:'op-interface.draw-da76af80ce',opId:'interface.draw',status:'failed',updatedAt:NOW-181*MIN}]});
+  seedWorkflow(ledger,{id:'wf-cause',jobs:[{jobId:'op-interface.draw-da76af80ce',opId:'interface.draw',status:'running',updatedAt:NOW-181*MIN}]});
   const found=stallFindings(ledger.db,{repo:repoRoot,now:NOW,stallMinutes:30,frontierOf:()=>frontier()});
   assert.equal(byType(found,'STALE-GATE').length,0);
   assert.match(byType(found,'GATE')[0].line,/justified: no checkable condition, waits on: Peer dependency/);
   assert.equal(byType(found,'STALLED').length,1,'the stall itself is still reported');
 
   // The same named job settling after the gate is evidence the gate can go.
+  ledger.db.prepare('UPDATE jobs SET status=?,updated_at=? WHERE job_id=?').run('reported',NOW-20*MIN,'op-interface.draw-da76af80ce');
   ledger.db.prepare('UPDATE jobs SET status=?,updated_at=? WHERE job_id=?').run('succeeded',NOW-20*MIN,'op-interface.draw-da76af80ce');
   const [stale]=byType(stallFindings(ledger.db,{repo:repoRoot,now:NOW,stallMinutes:30,frontierOf:()=>frontier()}),'STALE-GATE');
   assert.match(stale.line,/named job\(s\) settled after the gate: op-interface\.draw-da76af80ce succeeded \d\d:\d\d/);
@@ -257,9 +261,8 @@ test('a gate naming a record is not released by a peer heads-up while the record
     {kind:'op-settled',payload:{},created_at:NOW-120*MIN},
     {kind:'incident-raised',entityType:'incident',entityId:'inc-55060d946270',payload:{kind:'owner-gate',detail:text,holds:['interface.scaffold']},created_at:NOW-180*MIN}]});
   seedWorkflow(ledger,{id:WORK,now:NOW-600*MIN,events:[{kind:'op-dispatched',payload:{},created_at:NOW-5*MIN}]});
-  ledger.db.prepare("UPDATE workflows SET phase='running'").run();
-  ledger.db.prepare("INSERT INTO incidents(incident_id,workflow_id,op_id,last_progress,status,updated_at) VALUES(?,?,?,?,?,?)")
-    .run('inc-55060d946270',BASE,'interface.scaffold',`[owner-gate] ${text}`,'open',NOW-180*MIN);
+  ledger.db.prepare("INSERT INTO incidents(incident_id,workflow_id,op_id,kind,owner,last_progress,status,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?)")
+    .run('inc-55060d946270',BASE,'interface.scaffold','owner-ask','owner',`[owner-gate] ${text}`,'open',NOW-180*MIN,NOW-180*MIN);
   ledger.db.prepare("INSERT INTO inbox(workflow_id,kind,key,payload_json,status,created_at) VALUES(?,?,?,?,?,?)")
     .run(BASE,'peer-message','pm-a34aec2c6891',JSON.stringify({from:WORK,kind:'heads-up',subject:'Brand job admitted after Grammar 0.5.0 proof'}),'pending',NOW-20*MIN);
   const run=()=>stallFindings(ledger.db,{repo:repoRoot,now:NOW,stallMinutes:30,frontierOf:()=>frontier({state:'peer-message',actionable:true})});
@@ -282,4 +285,3 @@ test('a gate naming a record is not released by a peer heads-up while the record
   assert.match(stale.line,/\.starciwork\/brand\/index\.yaml exists \(done\)/);
   assert.doesNotMatch(stale.line,/pm-a34aec2c6891/,'the heads-up is not the evidence');
 }));
-

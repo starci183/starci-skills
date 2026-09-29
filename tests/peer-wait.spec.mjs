@@ -4,7 +4,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import {spawnSync} from 'node:child_process';
-import {inspectLedger,ledgerFileFor,openLedger} from '../engine/ledger-db.mjs';
+import {changeWorkflowPhase,inspectLedger,ledgerFileFor,openLedger} from '../engine/ledger-db.mjs';
 import {withLedger,seedWorkflow} from './_ledger-fixture.mjs';
 import {stallFindings,peerWaits,judgePeerWait} from '../scripts/supervisor/stall.mjs';
 // These specs exercise the owner-flow contract; autopilot (scripts/kernel/autopilot.mjs, owner ruling 2026-09-28) is
@@ -38,7 +38,8 @@ const fixture=t=>{
     const at=Date.now();
     for(const [workflowId,phase] of [[WORK,'running'],[BASE,'running'],[DONE,'finished'],[OTHER,'running']]){
       ledger.ensureWorkflow({workflowId,title:workflowId,ledgerMode:'durable',sourceRoots:[repo]});
-      ledger.db.prepare('UPDATE workflows SET phase=? WHERE workflow_id=?').run(phase,workflowId);
+      changeWorkflowPhase(ledger.db,{workflowId,to:'running',by:'test-fixture',reason:'seed',at});
+      if(phase==='finished')changeWorkflowPhase(ledger.db,{workflowId,to:'finished',by:'test-fixture',reason:'seed',at});
       ledger.db.prepare('INSERT INTO goals(workflow_id,revision,goal_identity,markdown,json,created_at) VALUES(?,?,?,?,?,?)')
         .run(workflowId,0,`goal-${workflowId}`,'# goal',JSON.stringify({derivedFrom:'peer-wait-spec'}),at);
     }
@@ -120,7 +121,7 @@ test('a message from the awaited peer resolves an --until-message wait and wakes
   fx.read(db=>{
     assert.equal(db.prepare("SELECT status FROM incidents WHERE incident_id=?").get(until).status,'resolved');
     assert.equal(db.prepare("SELECT status FROM incidents WHERE incident_id=?").get(holding).status,'open','a wait without --until-message stays for the Kernel to resolve');
-    const resolved=JSON.parse(db.prepare("SELECT payload_json FROM events WHERE kind='incident-resolved' AND entity_id=?").get(until).payload_json);
+    const resolved=JSON.parse(db.prepare("SELECT payload_json FROM events WHERE kind='incident-resolved' AND entity_id=? ORDER BY seq DESC LIMIT 1").get(until).payload_json);
     assert.equal(resolved.peerMessage,sent.sent[0].key);
     assert.equal(resolved.by,'peer-message');
   });
@@ -131,7 +132,7 @@ test('a message from the awaited peer resolves an --until-message wait and wakes
 test('a peer-wait on a peer that stopped running can never be met: the frontier is actionable and names it',t=>{
   const fx=fixture(t);
   const {incidentId}=fx.wait();
-  fx.seed(l=>l.db.prepare("UPDATE workflows SET phase='finished' WHERE workflow_id=?").run(BASE));
+  fx.seed(l=>changeWorkflowPhase(l.db,{workflowId:BASE,to:'finished',by:'test-fixture',reason:'peer-stopped'}));
   const front=fx.frontier(WORK);
   assert.equal(front.state,'peer-wait');
   assert.equal(front.actionable,true);
@@ -145,11 +146,12 @@ test('a peer-wait on a peer that stopped running can never be met: the frontier 
 // peer-wait inc-9f2e1e7ff1f6 --holds <that job>. Status still read settle-ready ACTIONABLE (a wait held
 // only queued jobs), so the watchdog re-woke the Kernel every tick and stall.mjs alerted STALLED.
 const SETTLE_JOB='op-backend.implement-86ff31372a',OTHER_SETTLE='op-backend.implement-1234567890';
-const seedConsumed=(ledger,workflowId,jobId,{op='backend.implement',attempt=25,at=Date.now()}={})=>{
-  ledger.db.prepare(`INSERT INTO jobs(job_id,workflow_id,op_id,attempt,generation,kind,role,payload_json,status,created_at,updated_at)
-    VALUES(?,?,?,?,0,'op','op',?,'running',?,?)`).run(jobId,workflowId,op,attempt,JSON.stringify({opId:op}),at,at);
-  ledger.db.prepare(`INSERT INTO reports(workflow_id,dispatch_id,op_id,attempt,generation,outcome,report_json,consumed_at,created_at)
-    VALUES(?,?,?,?,0,'done',?,?,?)`).run(workflowId,jobId,op,attempt,JSON.stringify({outcome:'done',summary:'done'}),at,at);
+const seedConsumed=(ledger,workflowId,jobId,{op='backend.implement',at=Date.now()}={})=>{
+  seedWorkflow(ledger,{id:workflowId,jobs:[{jobId,opId:op,tryNo:1,status:'reported',createdAt:at,updatedAt:at,
+    dispatchId:jobId,payload:{opId:op,owned_paths:[]}}]});
+  const attemptId=ledger.db.prepare('SELECT attempt_id FROM op_attempts WHERE job_id=?').get(jobId).attempt_id;
+  ledger.db.prepare(`INSERT INTO reports(workflow_id,attempt_id,dispatch_id,job_id,outcome,report_json,consumed_at,created_at)
+    VALUES(?,?,?,?,'done',?,?,?)`).run(workflowId,attemptId,jobId,jobId,JSON.stringify({outcome:'done',summary:'done'}),at,at);
 };
 
 test('a consumed-but-unsettled job a peer-wait holds is a deferred settle: heldSettleJobs, frontier peer-wait, not actionable',t=>{
@@ -162,16 +164,16 @@ test('a consumed-but-unsettled job a peer-wait holds is a deferred settle: heldS
   assert.deepEqual([held.state,held.actionable,held.settleReadyJobs],['peer-wait',false,[]],'a settle the Kernel deferred behind a recorded wait is not work it can do');
   assert.equal(held.heldSettleJobs.length,1);
   const [row]=held.heldSettleJobs;
-  assert.deepEqual([row.jobId,row.opId,row.attempt,row.heldBecause,row.blockedBy],[SETTLE_JOB,'backend.implement',25,'peer-wait',{incident:incidentId,peer:BASE}]);
+  assert.deepEqual([row.jobId,row.opId,row.attempt,row.heldBecause,row.blockedBy],[SETTLE_JOB,'backend.implement',1,'peer-wait',{incident:incidentId,peer:BASE}]);
   assert.match(row.detail,new RegExp(`peer-wait incident ${incidentId} holds its settle until peer ${BASE}`));
   assert.match(held.reason,new RegExp(`the settle of ${SETTLE_JOB} \\(${incidentId}\\) is deferred behind its wait`));
   const env={...process.env};
   for(const key of ['ORCA_TERMINAL_HANDLE','STARCI_ROLE','STARCI_OP_JOB'])delete env[key];
   const plain=spawnSync(process.execPath,[API,'status','--workflow',WORK,'--repo',fx.repo],{cwd:ROOT,encoding:'utf8',windowsHide:true,timeout:120000,env}).stdout;
-  assert.match(plain,new RegExp(`held-settle: ${SETTLE_JOB} \\(backend.implement a25\\) peer-wait ${incidentId}`));
+  assert.match(plain,new RegExp(`held-settle: ${SETTLE_JOB} \\(backend.implement a1\\) peer-wait ${incidentId}`));
 
   // A settle the wait does not name is still the Kernel's move.
-  fx.seed(l=>seedConsumed(l,WORK,OTHER_SETTLE,{attempt:26}));
+  fx.seed(l=>seedConsumed(l,WORK,OTHER_SETTLE));
   const mixed=fx.frontier(WORK);
   assert.deepEqual([mixed.state,mixed.actionable,mixed.settleReadyJobs,mixed.heldSettleJobs.map(h=>h.jobId)],['settle-ready',true,[OTHER_SETTLE],[SETTLE_JOB]]);
   assert.match(mixed.reason,new RegExp(`^${OTHER_SETTLE} filed a report you consumed but never settled`));
@@ -220,10 +222,9 @@ const seedPair=(ledger,{waitAgoMin=120,peerMovedAgoMin=5,waiterIdleMin=120,peerP
     {kind:'incident-raised',entityType:'incident',entityId:'inc-0aebf976e625',payload:{kind:'peer-wait',detail:DETAIL,opId:'brand.decide',peer:BASE,untilMessage:false,refs:['pm-ab67deff28d8'],...extra},created_at:NOW-waitAgoMin*MIN},
   ]});
   seedWorkflow(ledger,{id:BASE,now:NOW-600*MIN,events:[{kind:'op-settled',payload:{},created_at:NOW-peerMovedAgoMin*MIN}]});
-  ledger.db.prepare("UPDATE workflows SET phase='running' WHERE workflow_id=?").run(WORK);
-  ledger.db.prepare("UPDATE workflows SET phase=? WHERE workflow_id=?").run(peerPhase,BASE);
-  ledger.db.prepare("INSERT INTO incidents(incident_id,workflow_id,op_id,last_progress,status,updated_at) VALUES(?,?,?,?,?,?)")
-    .run('inc-0aebf976e625',WORK,'brand.decide',`[peer-wait] ${DETAIL}`,'open',NOW-waitAgoMin*MIN);
+  if(peerPhase==='finished')changeWorkflowPhase(ledger.db,{workflowId:BASE,to:'finished',by:'test-fixture',reason:'peer-stopped',at:NOW});
+  ledger.db.prepare("INSERT INTO incidents(incident_id,workflow_id,op_id,kind,owner,last_progress,status,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?)")
+    .run('inc-0aebf976e625',WORK,'brand.decide','owner-ask','supervisor',`[peer-wait] ${DETAIL}`,'open',NOW-waitAgoMin*MIN,NOW-waitAgoMin*MIN);
 };
 const parked=()=>({ok:true,frontier:{state:'peer-wait',actionable:false,queued:[],queuedCauses:{},reason:'peer-wait'},workers:[]});
 const byType=(found,type)=>found.filter(f=>f.type===type&&f.workflowId===WORK);
@@ -288,11 +289,10 @@ test('stall: a peer-wait holding a deferred settle is justified like one holding
   assert.deepEqual([stalled.alert,stalled.justifiedPeerWait],[false,true],'a Kernel parked on a deferred settle behind a justified wait is not stalled');
 
   // The same wait with an idle peer is still STALE-PEER-WAIT, and the stall alerts again.
-  ledger.db.prepare("UPDATE events SET created_at=? WHERE workflow_id=? AND kind='op-settled'").run(NOW-90*MIN,BASE);
-  const stale=stallFindings(ledger.db,{repo:repoRoot,now:NOW,stallMinutes:30,frontierOf:held});
+  const stale=stallFindings(ledger.db,{repo:repoRoot,now:NOW+90*MIN,stallMinutes:30,frontierOf:held});
   const [staleLine]=byType(stale,'STALE-PEER-WAIT');
   assert.ok(staleLine);
-  assert.match(staleLine.line,new RegExp(`defers the settle of ${SETTLE_JOB} for 120m: peer ${BASE} is idle too`));
+  assert.match(staleLine.line,new RegExp(`defers the settle of ${SETTLE_JOB} for 210m: peer ${BASE} is idle too`));
   assert.equal(byType(stale,'STALLED')[0].alert,true);
 }));
 
@@ -301,9 +301,8 @@ test('stall: an owner gate naming a deferred settle reports it in its GATE line 
     {kind:'op-settled',payload:{},created_at:NOW-120*MIN},
     {kind:'incident-raised',entityType:'incident',entityId:'inc-ownerhold01',payload:{kind:'owner-gate',detail:'owner signs the release',opId:'backend.implement',holds:[SETTLE_JOB]},created_at:NOW-120*MIN},
   ]});
-  ledger.db.prepare("UPDATE workflows SET phase='running' WHERE workflow_id=?").run(WORK);
-  ledger.db.prepare("INSERT INTO incidents(incident_id,workflow_id,op_id,last_progress,status,updated_at) VALUES(?,?,?,?,?,?)")
-    .run('inc-ownerhold01',WORK,'backend.implement','[owner-gate] owner signs the release','open',NOW-120*MIN);
+  ledger.db.prepare("INSERT INTO incidents(incident_id,workflow_id,op_id,kind,owner,last_progress,status,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?)")
+    .run('inc-ownerhold01',WORK,'backend.implement','owner-ask','owner','[owner-gate] owner signs the release','open',NOW-120*MIN,NOW-120*MIN);
   seedConsumed(ledger,WORK,SETTLE_JOB,{at:NOW-130*MIN});
   const found=stallFindings(ledger.db,{repo:repoRoot,now:NOW,stallMinutes:30,
     frontierOf:()=>({ok:true,frontier:{state:'awaiting-owner',actionable:false,queued:[],queuedCauses:{},reason:'owner'},workers:[]})});
@@ -314,14 +313,19 @@ test('stall: an owner gate naming a deferred settle reports it in its GATE line 
   assert.doesNotMatch(stalled.line,/ACTIONABLE/);
 }));
 
-test('judgePeerWait: a finished peer is stale; a message from the peer is UNREAD-PEER, never staleness; a young wait and an unknown peer',t=>withLedger(t,({ledger})=>{
+test('judgePeerWait: a finished peer is stale; a message from the peer is UNREAD-PEER, never staleness; a young wait and an unknown peer',t=>{
+  withLedger(t,({ledger})=>{
   seedPair(ledger,{peerPhase:'finished'});
   const dbOf=wf=>ledger.db.prepare('SELECT 1 FROM workflows WHERE workflow_id=?').get(wf)?ledger.db:null;
   const [wait]=peerWaits(ledger.db,WORK);
   const finished=judgePeerWait({db:ledger.db,workflowId:WORK,wait,dbOf,now:NOW});
   assert.equal(finished.stale,true);
   assert.match(finished.reasons[0],/is phase finished, so it will land nothing more/);
-  ledger.db.prepare("UPDATE workflows SET phase='running' WHERE workflow_id=?").run(BASE);
+  });
+  withLedger(t,({ledger})=>{
+  seedPair(ledger);
+  const dbOf=wf=>ledger.db.prepare('SELECT 1 FROM workflows WHERE workflow_id=?').get(wf)?ledger.db:null;
+  const [wait]=peerWaits(ledger.db,WORK);
   ledger.db.prepare("INSERT INTO inbox(workflow_id,kind,key,payload_json,status,created_at) VALUES(?,?,?,?,?,?)")
     .run(WORK,'peer-message','pm-proof00000001',JSON.stringify({from:BASE,kind:'reply',subject:'installed 0.5.0'}),'pending',NOW-10*MIN);
   const messaged=judgePeerWait({db:ledger.db,workflowId:WORK,wait,dbOf,now:NOW});
@@ -338,16 +342,19 @@ test('judgePeerWait: a finished peer is stale; a message from the peer is UNREAD
   assert.equal(judgePeerWait({db:ledger.db,workflowId:WORK,wait:{...wait,raisedAt:NOW-2*MIN},dbOf,now:NOW}).stale,false,'a young wait is not judged');
   const unknown=judgePeerWait({db:ledger.db,workflowId:WORK,wait:{...wait,peer:'wf-elsewhere'},dbOf,now:NOW});
   assert.deepEqual([unknown.stale,unknown.unknown],[false,true]);
-}));
+  });
+});
 
 /* sn-subscription inc-6156f4a868e9: judgePeerWait read the job ids in the wait's text and refs, never its
  * typed until set, and followed no retry lineage - a wait whose until-job already followed the running retry
  * head read STALE-PEER-WAIT once the named attempt settled failed. */
 const FAILED_JOB='op-backend.implement-fa50f7be16',RETRY_JOB='op-backend.implement-77798b1b10';
 const seedLineage=(ledger,{retryStatus='running'}={})=>{
-  const insert=ledger.db.prepare("INSERT INTO jobs(job_id,workflow_id,op_id,attempt,generation,kind,payload_json,status,created_at,updated_at) VALUES(?,?,?,?,1,'op',?,?,?,?)");
-  insert.run(FAILED_JOB,BASE,'backend.implement',1,'{}','failed',NOW-200*MIN,NOW-60*MIN);
-  insert.run(RETRY_JOB,BASE,'backend.implement',2,JSON.stringify({retry:{retryOf:FAILED_JOB}}),retryStatus,NOW-55*MIN,NOW-(retryStatus==='running'?50:10)*MIN);
+  seedWorkflow(ledger,{id:BASE,jobs:[
+    {jobId:FAILED_JOB,opId:'backend.implement',tryNo:1,status:'failed',createdAt:NOW-200*MIN,updatedAt:NOW-60*MIN,payload:{opId:'backend.implement',owned_paths:[]}},
+    {jobId:RETRY_JOB,unitId:FAILED_JOB,opId:'backend.implement',tryNo:2,retryOf:FAILED_JOB,status:retryStatus,createdAt:NOW-55*MIN,
+      updatedAt:NOW-(retryStatus==='running'?50:10)*MIN,payload:{opId:'backend.implement',owned_paths:[],retry:{retryOf:FAILED_JOB}}},
+  ]});
 };
 test('judgePeerWait judges a typed wait by its until set at the retry lineage head; text job ids only for a wait with no until',t=>withLedger(t,({repoRoot,ledger})=>{
   seedPair(ledger,{extra:{until:[{type:'job',jobId:FAILED_JOB,want:'succeeded'}]}});
@@ -362,7 +369,7 @@ test('judgePeerWait judges a typed wait by its until set at the retry lineage he
   const [line]=byType(stallFindings(ledger.db,{repo:repoRoot,now:NOW,stallMinutes:30,frontierOf:parked}),'PEER-WAIT');
   assert.ok(line.line.includes(`waits on: until job ${FAILED_JOB}:succeeded (`),line.line);
   // The retry head succeeds: the until set holds, and a wait the runtime has not resolved yet is stale.
-  ledger.db.prepare("UPDATE jobs SET status='succeeded',updated_at=? WHERE job_id=?").run(NOW-10*MIN,RETRY_JOB);
+  for(const to of ['reported','succeeded'])ledger.write.setJobStatus({jobId:RETRY_JOB,to,reason:'test-fixture',at:NOW-10*MIN});
   const met=judgePeerWait({db:ledger.db,workflowId:WORK,wait,repo:repoRoot,dbOf,now:NOW});
   assert.equal(met.stale,true);
   assert.match(met.reasons[0],/^every until condition holds: job .*:succeeded: .* succeeded/);
@@ -376,7 +383,7 @@ test('judgePeerWait: an untyped wait follows each named job to its lineage head;
   const [wait]=peerWaits(ledger.db,WORK);
   const live=judgePeerWait({db:ledger.db,workflowId:WORK,wait,repo:repoRoot,dbOf,now:NOW});
   assert.deepEqual([live.stale,live.until],[false,null],'the named attempt failed but its retry runs');
-  ledger.db.prepare("UPDATE jobs SET status='succeeded',updated_at=? WHERE job_id=?").run(NOW-10*MIN,RETRY_JOB);
+  for(const to of ['reported','succeeded'])ledger.write.setJobStatus({jobId:RETRY_JOB,to,reason:'test-fixture',at:NOW-10*MIN});
   const settled=judgePeerWait({db:ledger.db,workflowId:WORK,wait,repo:repoRoot,dbOf,now:NOW});
   assert.equal(settled.stale,true);
   assert.ok(settled.reasons[0].startsWith(`named job(s) settled after the wait: ${FAILED_JOB} -> ${RETRY_JOB} succeeded`),settled.reasons[0]);

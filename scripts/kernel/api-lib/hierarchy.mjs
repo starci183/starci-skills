@@ -3,7 +3,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { parseYaml } from '../../../engine/yaml.mjs';
 import { AWAITING_OWNER } from '../../../engine/admission.mjs';
-import { jobPayloadOf, getWorkflow, jobResultOf } from './rows.mjs';
+import { jobPayloadOf, getWorkflow, jobResultOf, JOB_ROW } from './rows.mjs';
 import { workflowDisplayName } from '../../lib/display-names.mjs';
 import { isAwaitingOwner } from '../failure-steps.mjs';
 
@@ -71,7 +71,7 @@ export const agentHierarchyFor = (db, workflowId, skillRoot) => {
     title: workflowDisplayName(workflow) ?? workflowId, status: workflow.phase ?? null,
     generation: workflow.generation ?? 0,
   };
-  const nodes = db.prepare('SELECT * FROM jobs WHERE workflow_id=? ORDER BY created_at,job_id').all(workflowId)
+  const nodes = db.prepare(`SELECT ${JOB_ROW} FROM jobs WHERE workflow_id=? ORDER BY created_at,job_id`).all(workflowId)
     .map((row) => ({ ...hierarchyNodeOf(row, skillRoot), verdict: isAwaitingOwner(db, row) ? AWAITING_OWNER : (jobResultOf(row).verdict ?? null) }));
   const edges = nodes.map((node) => ({
     parentNodeId: node.parentNodeId,

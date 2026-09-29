@@ -5,6 +5,7 @@ import os from 'node:os';
 import path from 'node:path';
 import {spawnSync} from 'node:child_process';
 import {FAKE_ORCA} from './helpers/fake-orca.mjs';
+import {seedWorkflow} from './_ledger-fixture.mjs';
 import {inspectLedger,ledgerFileFor,openLedger} from '../engine/ledger-db.mjs';
 import {
   CONTRACT_VERSION_SCHEMA,advisoryCodesFor,classifyChecks,contractFilesOf,contractVersionOf,laterChangesFor,loadContractChanges,runtimeShaOf,
@@ -122,28 +123,34 @@ test('shell-conformance demotes the codes added after a leg\'s admission to susp
 const fixture=t=>{
   const root=fs.mkdtempSync(path.join(os.tmpdir(),'starci-contract-rollout-'));
   t.after(()=>fs.rmSync(root,{recursive:true,force:true,maxRetries:20,retryDelay:25}));
+  if(process.env.STARCI_TEST_TEMP_DIR)t.after(()=>fs.rmSync(path.join(process.env.STARCI_TEST_TEMP_DIR,'starci-job-scratch'),
+    {recursive:true,force:true,maxRetries:20,retryDelay:25}));
   const repo=path.join(root,'repo');fs.mkdirSync(repo,{recursive:true});
   const stub=path.join(root,'fake-orca.mjs');fs.writeFileSync(stub,FAKE_ORCA);
   const base={...process.env,STARCI_CONTRACT_CHANGES:registryFile(t),STARCI_ORCA_COMMAND:process.execPath,STARCI_ORCA_ARGS:JSON.stringify([stub]),
-    STARCI_FAKE_ORCA_LOG:path.join(root,'calls.jsonl'),STARCI_FAKE_ORCA_STATE:path.join(root,'state.json')};
+    STARCI_FAKE_ORCA_LOG:path.join(root,'calls.jsonl'),STARCI_FAKE_ORCA_STATE:path.join(root,'state.json'),
+    STARCI_TEST_MACHINE_FILE:path.join(root,'machine.sqlite'),STARCI_PROJECTS_ROOT:path.join(root,'projects'),LOCALAPPDATA:path.join(root,'localappdata')};
   for(const key of ['ORCA_TERMINAL_HANDLE','STARCI_ROLE','STARCI_OP_JOB'])delete base[key];
   const api=args=>spawnSync(process.execPath,[API,...args,'--repo',repo,'--json'],{cwd:ROOT,encoding:'utf8',windowsHide:true,timeout:120000,env:base});
   const ok=args=>{const r=api(args);assert.equal(r.status,0,`${args.join(' ')}: ${r.stderr||r.stdout}`);return json(r.stdout);};
   const wf='wf-contract-rollout';
-  const seed=fn=>{const l=openLedger({file:ledgerFileFor(repo)});try{return fn(l);}finally{l.close();}};
-  const read=fn=>{const l=inspectLedger({file:ledgerFileFor(repo)});try{return fn(l.db);}finally{l.close();}};
+  const seed=fn=>{const l=openLedger({file:ledgerFileFor(repo,{env:base})});try{return fn(l);}finally{l.close();}};
+  const read=fn=>{const l=inspectLedger({file:ledgerFileFor(repo,{env:base})});try{return fn(l.db);}finally{l.close();}};
   seed(l=>{
     l.ensureWorkflow({workflowId:wf,title:wf,ledgerMode:'durable',sourceRoots:[repo]});
-    l.db.prepare("UPDATE workflows SET phase='running' WHERE workflow_id=?").run(wf);
+    l.write.changeWorkflowPhase({workflowId:wf,to:'running',by:'test-fixture',reason:'seed'});
     l.db.prepare('INSERT INTO goals(workflow_id,revision,goal_identity,markdown,json,created_at) VALUES(?,?,?,?,?,?)').run(wf,0,'goal','# goal','{}',Date.now());
   });
   // One dispatched leg of `op` admitted at `admittedAt`, with its done report filed (a managed dispatch: no terminal to probe).
-  const leg=(jobId,op,admittedAt,{status='running',attempt=1}={})=>seed(l=>{
+  const leg=(jobId,op,admittedAt,{status='running'}={})=>seed(l=>{
     const dispatchId=`ctx-${jobId}`;
-    l.db.prepare("INSERT INTO jobs(job_id,workflow_id,op_id,attempt,generation,kind,role,payload_json,status,worker_id,created_at,updated_at) VALUES(?,?,?,?,0,'op','op',?,?,?,?,?)")
-      .run(jobId,wf,op,attempt,JSON.stringify({opId:op,owned_paths:[`docs/${jobId}`],managed:{dispatchId}}),status,dispatchId,admittedAt,admittedAt);
-    l.db.prepare('INSERT INTO contracts(workflow_id,op_id,attempt,dispatch_id,markdown,context_json,created_at) VALUES(?,?,?,?,?,?,?)').run(wf,op,attempt,dispatchId,'# contract','{}',admittedAt);
-    l.db.prepare("INSERT INTO reports(workflow_id,dispatch_id,op_id,attempt,generation,outcome,report_json,consumed_at,created_at) VALUES(?,?,?,?,0,'done','{}',?,?)").run(wf,dispatchId,op,attempt,admittedAt,admittedAt);
+    seedWorkflow(l,{id:wf,jobs:[{jobId,opId:op,status,dispatchId,workerId:dispatchId,createdAt:admittedAt,updatedAt:admittedAt,
+      payload:{opId:op,owned_paths:[`docs/${jobId}`],managed:{dispatchId}}}]});
+    const attemptId=l.db.prepare('SELECT attempt_id FROM op_attempts WHERE job_id=?').get(jobId).attempt_id;
+    l.db.prepare('INSERT INTO contracts(attempt_id,workflow_id,job_id,markdown,context_json,created_at) VALUES(?,?,?,?,?,?)')
+      .run(attemptId,wf,jobId,'# contract','{}',admittedAt);
+    l.db.prepare("INSERT INTO reports(workflow_id,attempt_id,dispatch_id,job_id,outcome,report_json,consumed_at,created_at) VALUES(?,?,?,?,'done','{}',?,?)")
+      .run(wf,attemptId,dispatchId,jobId,admittedAt,admittedAt);
   });
   return {repo,wf,api,ok,seed,read,leg};
 };
@@ -151,15 +158,15 @@ const fixture=t=>{
 test('api check records a later-added red check advisory for an older leg and red for a current one; op-contract names the admission',t=>{
   const fx=fixture(t);
   fx.leg('job-old-draw','interface.draw',T_TREE+60_000);
-  fx.leg('job-new-draw','interface.draw',Date.now(),{attempt:2});
+  fx.leg('job-new-draw','interface.draw',Date.now());
   const checks=JSON.stringify({checks:[{name:'unit',exitCode:0},{name:'shell-conformance',exitCode:1,codes:['DRAW_MATRIX_INCOMPLETE'],evidence:'desktop only'}]});
   const old=fx.ok(['check','--job','job-old-draw','--checks',checks]);
-  assert.deepEqual(old.checkEvidence,{observed:2,passed:1,failed:0,green:true,advisory:1});
+  assert.deepEqual(old.checkEvidence,{observed:2,passed:0,failed:0,green:false,declared:1,advisory:1});
   assert.deepEqual(old.advisory,[{name:'shell-conformance',changes:['part-review-matrix']}]);
-  const stored=fx.read(db=>JSON.parse(db.prepare('SELECT checks_json FROM checks WHERE op_id=? AND attempt=1').get('interface.draw').checks_json));
-  assert.match(stored.checks[1].advisory.reason,/added by part-review-matrix after this leg was admitted/);
+  const stored=fx.read(db=>JSON.parse(db.prepare("SELECT summary_json FROM check_runs WHERE job_id=? AND name='shell-conformance' ORDER BY check_id DESC LIMIT 1").get('job-old-draw').summary_json).entry);
+  assert.match(stored.advisory.reason,/added by part-review-matrix after this leg was admitted/);
   const current=fx.ok(['check','--job','job-new-draw','--checks',checks]);
-  assert.deepEqual(current.checkEvidence,{observed:2,passed:1,failed:1,green:false},'a leg admitted after the change is held to it');
+  assert.deepEqual(current.checkEvidence,{observed:2,passed:0,failed:1,green:false,declared:1},'a leg admitted after the change is held to it');
   assert.equal(current.advisory,undefined);
 
   const contract=fx.ok(['op-contract','--job','job-old-draw']);
@@ -173,7 +180,7 @@ test('dispatch records the contract version the leg is admitted under',t=>{
   const job=fx.ok(['enqueue','--workflow',fx.wf,'--op','code.refactor','--paths','docs/']).job_id;
   const d=fx.api(['dispatch','--job',job,'--model','codex-agent','--spawn']);
   assert.equal(d.status,0,d.stderr||d.stdout);
-  const context=fx.read(db=>JSON.parse(db.prepare('SELECT context_json FROM contracts WHERE workflow_id=? AND op_id=?').get(fx.wf,'code.refactor').context_json));
+  const context=fx.read(db=>JSON.parse(db.prepare('SELECT context_json FROM contracts WHERE job_id=?').get(job).context_json));
   assert.equal(context.contract.schema,CONTRACT_VERSION_SCHEMA);
   assert.equal(context.contract.op,'code.refactor');
   assert.match(context.contract.digest,/^[0-9a-f]{64}$/);

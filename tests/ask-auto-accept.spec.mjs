@@ -11,6 +11,7 @@ import {parseYaml} from '../engine/yaml.mjs';
 import {autoAcceptAsk,wakeAskAnswered} from '../scripts/kernel/serve-ask.mjs';
 import {autoAcceptedMessage,notifyAutoAccepted} from '../scripts/connectors/telegram.mjs';
 import {openAsks} from '../scripts/supervisor/poll.mjs';
+import {isBlobFile} from '../scripts/kernel/ask-receipts.mjs';
 // These specs exercise the owner-flow contract; autopilot (scripts/kernel/autopilot.mjs, owner ruling 2026-09-28) is
 // on by default, so they run with it off - tests/autopilot.spec.mjs covers the autopilot flow.
 process.env.STARCI_AUTOPILOT ??= 'off';
@@ -32,12 +33,15 @@ const RECOMMENDED={text:'Mời thành viên bằng cách nào?',options:['Mời 
 const TEXT_MARKED={text:'Hoàn tiền khi huỷ gói?',options:['Tự động hoàn tiền đầy đủ (khuyến nghị): khách không phải chờ','Hoàn tiền thủ công']};
 
 const seedAsk=(ledger,{dispatchId,question,opId='provision.ask',workflowId=WORKFLOW})=>{
+  const jobId=`ask-${dispatchId}`;
+  seedWorkflow(ledger,{id:workflowId,jobs:[{jobId,opId,status:'reported',dispatchId}]});
+  const attemptId=ledger.db.prepare('SELECT attempt_id FROM op_attempts WHERE job_id=?').get(jobId).attempt_id;
   ledger.transaction(db=>{
-    db.prepare(`INSERT INTO reports(workflow_id,dispatch_id,op_id,attempt,generation,outcome,report_json,created_at)
-      VALUES(?,?,?,?,?,?,?,?)`).run(workflowId,dispatchId,opId,1,1,'ask',
+    db.prepare(`INSERT INTO reports(workflow_id,attempt_id,dispatch_id,job_id,outcome,report_json,created_at)
+      VALUES(?,?,?,?,?,?,?)`).run(workflowId,attemptId,dispatchId,jobId,'ask',
       JSON.stringify({schema:'starci/op-report@1',outcome:'ask',summary:`ask ${dispatchId}`,question}),Date.now());
   });
-  return ledger.db.prepare('SELECT * FROM reports WHERE workflow_id=? AND dispatch_id=?').get(workflowId,dispatchId);
+  return ledger.db.prepare('SELECT r.*,a.op_id FROM reports r JOIN op_attempts a ON a.attempt_id=r.attempt_id WHERE r.workflow_id=? AND r.dispatch_id=?').get(workflowId,dispatchId);
 };
 const events=(ledger,kind)=>ledger.db.prepare('SELECT payload_json FROM events WHERE workflow_id=? AND kind=? ORDER BY seq').all(WORKFLOW,kind).map(r=>JSON.parse(r.payload_json));
 const spies=()=>{
@@ -153,7 +157,7 @@ test('an auto-accepted ask writes the serve-ask receipt, ask-answered by auto-re
     assert.match(answered.note,/email đã có sẵn luồng xác thực/,'the note cites the recommendedReason');
 
     const receipt=JSON.parse(fs.readFileSync(answered.receiptPath,'utf8'));
-    assert.ok(answered.receiptPath.startsWith(path.join(repoRoot,'.starciwork','kernel-evidence',WORKFLOW,'serve-ask')),'the receipt lives where serve-ask writes it');
+    assert.ok(isBlobFile(answered.receiptPath),'the receipt lives in the artifact blob store');
     for(const key of ['schema','workflowId','dispatchId','opId','option','optionIndex','picks','answeredBy','custodyWritten','envWritten','pointersWritten','bridge','errors','note','at'])
       assert.ok(Object.hasOwn(receipt,key),`the receipt keeps serve-ask's shape: ${key}`);
     assert.equal(receipt.schema,'starci/ask-answer@1');

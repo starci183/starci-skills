@@ -54,8 +54,8 @@ export const INPUT_KINDS = ['source', 'work'];
 const SOURCE_ROOTS = ['knowledge/', 'modules/schemas/'];
 const SOURCE_FILES = ['modules/models/code-patterns.yaml'];
 export const WORK_PREFIX = '.starciwork/';
-// The runtime ledger lives outside .starciwork (engine/ledger-db.mjs ledgerFileFor): no Work file is excluded by name.
-const WORK_EXCLUDED = [];
+// A leftover pre-migration ledger path is agent data, never a product input.
+const WORK_EXCLUDED = ['.starciwork/runtime.sqlite'];
 const WORK_EXCLUDED_ROOTS = ['.starciwork/kernel-evidence/', '.starciwork/kernel-strays/', '.starciwork/kernel-approvals/'];
 const WORK_RECORD_FILES = new Set(['index.yaml', 'resource.yaml']);
 const WORK_SKIP_DIRS = new Set(['evidence', 'assets']);

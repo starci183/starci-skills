@@ -9,6 +9,7 @@ import { DatabaseSync } from 'node:sqlite';
 import { FAKE_ORCA } from './helpers/fake-orca.mjs';
 import { ledgerFileFor, openLedger } from '../engine/ledger-db.mjs';
 import { KERNEL_REV_ACKED_EVENT } from '../scripts/kernel/runtime-rev.mjs';
+import { seedWorkflow } from './_ledger-fixture.mjs';
 
 // api status took 26-31 s per workflow under load (8 s idle) on the live nivo ledger: nearly all of it process
 // starts. runtime-rev.mjs re-resolved the current runtime rev once per running job and re-diffed the same commit
@@ -60,7 +61,7 @@ const fixture = (t) => {
   git(rt, 'add', '-A'); git(rt, 'commit', '-qm', 'A');
   const A = git(rt, 'rev-parse', 'HEAD');
   write(rt, 'modules/ops/ops/interface.draw.yaml', 'id: interface.draw\nnew: rule\n');
-  write(rt, 'modules/kernel/contract-changes.yaml', `schema: starci/contract-changes@1\nchanges:\n  - id: draw-new-rule\n    effectiveAt: '2026-09-27T20:00:00+07:00'\n    summary: "The draw brief gained a rule"\n    ops: [interface.draw]\n`);
+  write(rt, 'modules/kernel/contract-changes.yaml', `schema: starci/contract-changes@1\nchanges:\n  - id: draw-new-rule\n    effectiveAt: '2026-09-27T20:00:00+07:00'\n    summary: "The draw brief gained a rule"\n    reach: new-legs\n    ops: [interface.draw]\n`);
   git(rt, 'add', '-A'); git(rt, 'commit', '-qm', 'B');
   const B = git(rt, 'rev-parse', 'HEAD');
 
@@ -77,7 +78,8 @@ const fixture = (t) => {
   const at = Date.now() - 5 * 60_000;
   fs.writeFileSync(orcaState, JSON.stringify({ terminals: { term_w1: { handle: 'term_w1', lastOutputAt: at }, term_w2: { handle: 'term_w2', lastOutputAt: at } } }));
   const baseEnv = { ...process.env, STARCI_KERNEL_REV_ROOT: rt, STARCI_ORCA_COMMAND: process.execPath, STARCI_ORCA_ARGS: JSON.stringify([stub]),
-    STARCI_FAKE_ORCA_LOG: orcaLog, STARCI_FAKE_ORCA_STATE: orcaState, STARCI_GIT_MEMO_DIR: memo, SPEC_SPAWN_LOG: spawnLog };
+    STARCI_FAKE_ORCA_LOG: orcaLog, STARCI_FAKE_ORCA_STATE: orcaState, STARCI_GIT_MEMO_DIR: memo, SPEC_SPAWN_LOG: spawnLog,
+    LOCALAPPDATA: path.join(dir,'localappdata'), STARCI_PROJECTS_ROOT: path.join(dir,'projects'), STARCI_TEST_MACHINE_FILE: path.join(dir,'machine.sqlite') };
   for (const key of ['ORCA_TERMINAL_HANDLE', 'STARCI_ROLE', 'STARCI_OP_JOB', 'STARCI_STATUS_MEMO']) delete baseEnv[key];
   const wf = 'wf-status-perf';
   const api = (args, env = {}) => spawnSync(process.execPath, ['--import', pathToFileURL(tracer).href, API, ...args, '--repo', repo, '--json'],
@@ -92,27 +94,30 @@ const fixture = (t) => {
     return { out, spawns, git: spawns.filter((s) => /^git(\.exe)?$/i.test(path.basename(s.command))).map((s) => s.argv.join(' ')), orca: readLog(orcaLog) };
   };
   const now = Date.now();
-  const seed = (fn) => { const l = openLedger({ file: ledgerFileFor(repo) }); try { return fn(l); } finally { l.close(); } };
+  const ledgerFile=ledgerFileFor(repo,{env:baseEnv});
+  const seed = (fn) => { const l = openLedger({ file: ledgerFile }); try { return fn(l); } finally { l.close(); } };
   seed((l) => {
-    l.ensureWorkflow({ workflowId: wf, title: wf, ledgerMode: 'durable', sourceRoots: [repo] });
-    l.db.prepare("UPDATE workflows SET phase='running' WHERE workflow_id=?").run(wf);
+    seedWorkflow(l,{id:wf,state:{phase:'running',job:wf},jobs:[
+      {jobId:`kernel-${wf}`,kind:'kernel',status:'running',workerId:'term_k',createdAt:now},
+      ...[1,2].map(n=>({jobId:`job-d${n}`,unitId:`unit-d${n}`,opId:'interface.draw',kind:'op',status:'running',
+        workerId:`ctx-d${n}`,dispatchId:`ctx-d${n}`,createdAt:now+n,
+        payload:{opId:'interface.draw',owned_paths:[`docs/d${n}`],managed:{dispatchId:`ctx-d${n}`,agentTerminalHandle:`term_w${n}`}}}))
+    ]});
     l.db.prepare('INSERT INTO goals(workflow_id,revision,goal_identity,markdown,json,created_at) VALUES(?,?,?,?,?,?)').run(wf, 0, 'goal', '# goal', '{}', now);
-    l.db.prepare("INSERT INTO jobs(job_id,workflow_id,attempt,generation,kind,role,payload_json,status,worker_id,created_at,updated_at) VALUES(?,?,1,0,'kernel','kernel','{}','running','term_k',?,?)").run(`kernel-${wf}`, wf, now, now);
-    l.transaction(() => l.appendEvent({ workflowId: wf, entityType: 'kernel', entityId: wf, kind: KERNEL_REV_ACKED_EVENT, payload: { rev: A, files: [], source: 'ack' } }));
+    l.transaction(() => l.appendEvent({ workflowId: wf, entityType: 'kernel', entityId: wf, kind: KERNEL_REV_ACKED_EVENT,
+      payload: { rev: A, files: [], source: 'ack' }, createdAt: now-31*60_000 }));
     for (const n of [1, 2]) {
-      l.db.prepare("INSERT INTO jobs(job_id,workflow_id,op_id,attempt,generation,kind,role,payload_json,status,worker_id,created_at,updated_at) VALUES(?,?,'interface.draw',?,0,'op','op',?,'running',?,?,?)")
-        .run(`job-d${n}`, wf, n, JSON.stringify({ opId: 'interface.draw', owned_paths: [`docs/d${n}`], managed: { dispatchId: `ctx-d${n}`, agentTerminalHandle: `term_w${n}` } }), `ctx-d${n}`, now + n, now + n);
-      l.db.prepare('INSERT INTO contracts(workflow_id,op_id,attempt,dispatch_id,markdown,context_json,created_at) VALUES(?,?,?,?,?,?,?)')
-        .run(wf, 'interface.draw', n, `ctx-d${n}`, '# contract', JSON.stringify({ contract: { schema: 'starci/contract-version@1', op: 'interface.draw', runtimeSha: A, admittedAt: now } }), now);
+      const attemptId=l.db.prepare('SELECT attempt_id FROM op_attempts WHERE job_id=?').get(`job-d${n}`).attempt_id;
+      l.write.writeContract({attemptId,markdown:'# contract',context:{contract:{schema:'starci/contract-version@1',op:'interface.draw',runtimeSha:A,admittedAt:now}}});
     }
   });
   const gates = [1, 2].map(() => ok(['incident', '--workflow', wf, '--kind', 'owner-gate', '--op', 'brand.decide', '--until-commit', `${other}:app/layout.tsx`, '--detail', 'FE app router']).incidentId);
   // The ledger as the fixture left it, restorable so each compared status reads the same state.
   const snapshot = path.join(dir, 'snapshot.sqlite');
-  { const db = new DatabaseSync(ledgerFileFor(repo)); db.exec(`VACUUM INTO '${snapshot.replace(/'/g, "''")}'`); db.close(); }
+  { const db = new DatabaseSync(ledgerFile); db.exec(`VACUUM INTO '${snapshot.replace(/'/g, "''")}'`); db.close(); }
   const restore = () => {
-    for (const suffix of ['-wal', '-shm']) fs.rmSync(`${ledgerFileFor(repo)}${suffix}`, { force: true });
-    fs.copyFileSync(snapshot, ledgerFileFor(repo));
+    for (const suffix of ['-wal', '-shm']) fs.rmSync(`${ledgerFile}${suffix}`, { force: true });
+    fs.copyFileSync(snapshot, ledgerFile);
   };
   return { dir, rt, A, B, repo, other, memo, wf, gates, api, ok, status, seed, restore };
 };
@@ -132,7 +137,8 @@ test('api status runs no git read twice in one call, and a repeat call runs none
   assert.equal(cold.out.kernelRev.stale, true, 'the fixture is a stale Kernel: runtime-rev diffs A..B');
   assert.deepEqual(cold.out.runningOpRevDrift.map((w) => [w.jobId, w.from, w.to, w.files]),
     [['job-d1', fx.A, fx.B, ['modules/ops/ops/interface.draw.yaml']], ['job-d2', fx.A, fx.B, ['modules/ops/ops/interface.draw.yaml']]]);
-  assert.deepEqual(duplicates(cold.git), [], `one status call repeated these git reads:\n${cold.git.join('\n')}`);
+  // Each cat-file --batch call has a different revision on stdin, which the spawn tracer cannot display.
+  assert.deepEqual(duplicates(cold.git.filter((read)=>read!=='cat-file --batch')), [], `one status call repeated these git reads:\n${cold.git.join('\n')}`);
   assert.ok(pinnedGitReads(cold.git).length > 0, 'the cold call reads the commit pair from git');
 
   const warm = fx.status();

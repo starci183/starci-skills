@@ -227,8 +227,8 @@ test('run stops when telegram is not ready, when another bridge owns the updates
 
   const conflict = setup(t, bot);
   const claim = claimManager(BRIDGE_NAME, { env: conflict.env });
-  t.after(claim.release);
   assert.deepEqual(await conflict.bridge.run({ ownPid: process.pid + 1, maxRounds: 3 }), { stopped: 'another bridge polls this bot' });
+  claim.release();
 
   const waits = [];
   const flaky = await fakeBot(t, { failGetUpdates: { status: 500, json: { ok: false, description: 'Internal' } } });
@@ -269,10 +269,10 @@ test('ensureTelegramBridge leaves a live bridge alone, skips when off or unregis
   assert.deepEqual(ensureTelegramBridge({ env: ready, config, spawn }), { ok: true, launched: 4321 });
   assert.deepEqual(spawned, [['telegram-bridge.mjs', 'run']]);
   const claim = claimManager(BRIDGE_NAME, { env: ready });
-  t.after(claim.release);
   assert.deepEqual(ensureTelegramBridge({ env: ready, config, spawn }), { ok: true, already: true, pid: process.pid });
   assert.equal(spawned.length, 1);
   assert.ok(!JSON.stringify(ensureTelegramBridge({ env: ready, config: withConnectors({ secretsFile: null, telegram: { token: TOKEN } }), spawn })).includes(TOKEN));
+  claim.release();
 });
 
 test('the registry heartbeats, validates ids, and ignores files that are not supervisors', (t) => {
@@ -303,8 +303,11 @@ test('the registry heartbeats, validates ids, and ignores files that are not sup
 const WF = 'wf-ask';
 const seedAskReport = (ledger, { dispatchId, question }) => {
   if (!ledger.db.prepare('SELECT 1 FROM workflows WHERE workflow_id=?').get(WF)) seedWorkflow(ledger, { id: WF, state: { phase: 'running' } });
-  ledger.db.prepare('INSERT INTO reports(workflow_id,dispatch_id,op_id,attempt,generation,outcome,report_json,created_at) VALUES(?,?,?,?,?,?,?,?)')
-    .run(WF, dispatchId, 'provision.ask', 1, 1, 'ask', JSON.stringify({ schema: 'starci/op-report@1', outcome: 'ask', summary: 'ask', question: { refs: [dispatchId], ...question } }), Date.now());
+  const jobId=`ask-${dispatchId}`;
+  seedWorkflow(ledger,{id:WF,jobs:[{jobId,opId:'provision.ask',status:'reported',dispatchId}]});
+  const attemptId=ledger.db.prepare('SELECT attempt_id FROM op_attempts WHERE job_id=?').get(jobId).attempt_id;
+  ledger.db.prepare('INSERT INTO reports(workflow_id,attempt_id,dispatch_id,job_id,outcome,report_json,created_at) VALUES(?,?,?,?,?,?,?)')
+    .run(WF, attemptId, dispatchId, jobId, 'ask', JSON.stringify({ schema: 'starci/op-report@1', outcome: 'ask', summary: 'ask', question: { refs: [dispatchId], ...question } }), Date.now());
 };
 const askEvents = (ledger, kind) => ledger.db.prepare('SELECT payload_json FROM events WHERE workflow_id=? AND kind=? ORDER BY seq').all(WF, kind).map((r) => JSON.parse(r.payload_json));
 const exited = async (pid, ms = 30000) => {

@@ -8,6 +8,7 @@ import {FAKE_ORCA} from './helpers/fake-orca.mjs';
 import {openLedger,inspectLedger,ledgerFileFor} from '../engine/ledger-db.mjs';
 import {classifyAgentScreen,exitedAgentPromptRow,shellPromptPrefix,shellReceivedText} from '../scripts/kernel/terminal-liveness.mjs';
 import {sendWakeWithProof,sendEnterWithProof} from '../scripts/kernel/wake-delivery.mjs';
+import {seedWorkflow} from './_ledger-fixture.mjs';
 
 // 2026-09-24 02:23: a nudge was typed into a DEAD op terminal (term_8a556567, mm-work
 // op-architecture.decide-9203b3dcd7). Its agent had exited and left a bare PowerShell prompt, and
@@ -81,6 +82,11 @@ test('no wake and no Enter is typed into an exited agent',()=>{
 const opFixture=t=>{
   const root=fs.mkdtempSync(path.join(os.tmpdir(),'starci-agent-exited-'));
   t.after(()=>fs.rmSync(root,{recursive:true,force:true,maxRetries:20,retryDelay:25}));
+  const savedMachine=process.env.STARCI_TEST_MACHINE_FILE,savedProjects=process.env.STARCI_PROJECTS_ROOT;
+  process.env.STARCI_TEST_MACHINE_FILE=path.join(root,'machine.sqlite');
+  process.env.STARCI_PROJECTS_ROOT=path.join(root,'projects');
+  t.after(()=>{if(savedMachine===undefined)delete process.env.STARCI_TEST_MACHINE_FILE;else process.env.STARCI_TEST_MACHINE_FILE=savedMachine;
+    if(savedProjects===undefined)delete process.env.STARCI_PROJECTS_ROOT;else process.env.STARCI_PROJECTS_ROOT=savedProjects;});
   const repo=path.join(root,'repo');fs.mkdirSync(repo,{recursive:true});
   const stubFile=path.join(root,'fake-orca.mjs');fs.writeFileSync(stubFile,FAKE_ORCA);
   const stateFile=path.join(root,'state.json'),logFile=path.join(root,'calls.jsonl');
@@ -93,10 +99,11 @@ const opFixture=t=>{
   const workflowId='wf-agent-exited',jobId='job-agent-exited';
   const ledger=openLedger({file:ledgerFileFor(repo)});
   try{
-    ledger.enqueueJob({jobId:`kernel-${workflowId}`,workflowId,kind:'kernel',role:'kernel',
-      payload:{hierarchy:{schema:'starci/agent-hierarchy@1',nodeId:`agent:kernel:${workflowId}`,parentNodeId:`workflow:${workflowId}`,role:'kernel'}}});
-    ledger.db.prepare("UPDATE jobs SET status='running',worker_id='fake-kernel-terminal' WHERE job_id=?").run(`kernel-${workflowId}`);
-    ledger.enqueueJob({jobId,workflowId,opId:'code.refactor',kind:'op',payload:{opId:'code.refactor',owned_paths:['docs/'],model:'codex-agent',difficulty:'hard'}});
+    seedWorkflow(ledger,{id:workflowId,goal:{revision:1,markdown:'Agent liveness fixture',json:{}},jobs:[
+      {jobId:`kernel-${workflowId}`,kind:'kernel',role:'kernel',status:'running',workerId:'fake-kernel-terminal',
+        payload:{hierarchy:{schema:'starci/agent-hierarchy@1',nodeId:`agent:kernel:${workflowId}`,parentNodeId:`workflow:${workflowId}`,role:'kernel'}}},
+      {jobId,opId:'code.refactor',status:'queued',payload:{opId:'code.refactor',owned_paths:['docs/'],model:'codex-agent',difficulty:'hard'}},
+    ]});
   }finally{ledger.close();}
   const events=kind=>{
     const l=inspectLedger({file:ledgerFileFor(repo)});

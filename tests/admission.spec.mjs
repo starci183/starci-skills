@@ -5,7 +5,7 @@ import path from 'node:path';
 import {admitOpSlot,normalizeOwnedPath,normalizeOwnedPaths,opSlotCeiling,ownedPathLeaseKey,ownedPathsIntersect,retryDisposition} from '../engine/admission.mjs';
 import {reserveTwoPhase} from '../engine/ledger-db.mjs';
 import {parseYaml} from '../engine/yaml.mjs';
-import {withLedger} from './_ledger-fixture.mjs';
+import {withLedger,seedWorkflow} from './_ledger-fixture.mjs';
 
 test('owned paths normalize to concrete workspace-relative prefixes',()=>{
   assert.equal(normalizeOwnedPath('.\\nivo-fe//apps/landing/**'),'nivo-fe/apps/landing');
@@ -49,6 +49,9 @@ test('admitOpSlot refuses max-ops at the ceiling and never above or below it',()
 });
 
 test('durable prefix leases serialize parent and child scopes across workflows while disjoint scopes run together',t=>withLedger(t,({ledger,machine})=>{
+  seedWorkflow(ledger,{id:'wf-landing',jobs:[{jobId:'landing',opId:'interface.implement'}]});
+  seedWorkflow(ledger,{id:'wf-other',jobs:[{jobId:'landing-child',opId:'test.author'}]});
+  seedWorkflow(ledger,{id:'wf-canonicalize',jobs:[{jobId:'canonicalize',opId:'workspace.manage'}]});
   for(const key of ['path:nivo-fe/apps/landing','path:nivo-fe/apps/landing/src','path:.starciwork/migration'])
     ledger.db.prepare('INSERT INTO resources(resource_key,capacity) VALUES(?,1)').run(key);
   const landing=reserveTwoPhase(ledger,machine,{job:{jobId:'landing',workflowId:'wf-landing',opId:'interface.implement',generation:1,kind:'op'},
@@ -64,11 +67,13 @@ test('durable prefix leases serialize parent and child scopes across workflows w
 }));
 
 test('an expired path lease stays a fence until its attempt is explicitly settled',t=>withLedger(t,({ledger,machine})=>{
+  seedWorkflow(ledger,{id:'wf-old',jobs:[{jobId:'old',opId:'op'}]});
+  seedWorkflow(ledger,{id:'wf-next',jobs:[{jobId:'next',opId:'op'}]});
   for(const key of ['path:nivo-fe/apps/landing','path:nivo-fe/apps/landing/src'])
     ledger.db.prepare('INSERT INTO resources(resource_key,capacity) VALUES(?,1)').run(key);
   assert.equal(reserveTwoPhase(ledger,machine,{job:{jobId:'old',workflowId:'wf-old',opId:'op',generation:1,kind:'op'},
     leases:[{resourceKey:'path:nivo-fe/apps/landing',units:1}],ttlMs:1}).ok,true);
-  ledger.db.prepare("UPDATE leases SET expires_at=0 WHERE job_id='old'").run();
+  ledger.db.prepare("UPDATE leases SET acquired_at=0,expires_at=1 WHERE job_id='old'").run();
   const next=reserveTwoPhase(ledger,machine,{job:{jobId:'next',workflowId:'wf-next',opId:'op',generation:1,kind:'op'},
     leases:[{resourceKey:'path:nivo-fe/apps/landing/src',units:1}]});
   assert.equal(next.ok,false);

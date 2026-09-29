@@ -25,11 +25,16 @@ const job=(n,{status,agoMin,after=null,retry=true})=>({jobId:id(n),opId:OP,attem
 const settled=(n,agoMin)=>({kind:'op-settled',entityType:'job',entityId:id(n),payload:{status:'failed',verdict:'fail'},created_at:NOW-agoMin*MIN});
 // A worker ran each failed attempt (a job settled with no dispatch is no failure of its chain).
 const dispatched=(n,agoMin)=>({kind:'op-dispatched',entityType:'job',entityId:id(n),payload:{op:OP},created_at:NOW-agoMin*MIN});
-const checkRow=(ledger,{attempt,name})=>ledger.db.prepare('INSERT INTO checks(workflow_id,op_id,attempt,checks_json,created_at) VALUES(?,?,?,?,?)')
-  .run(WF,OP,attempt,JSON.stringify({checks:[{name,exitCode:1,evidence:'x'}]}),NOW);
+const checkRow=(ledger,{attempt,name})=>{
+  const row=ledger.db.prepare(`SELECT a.attempt_id,a.job_id,a.span_id FROM op_attempts a JOIN jobs j ON j.job_id=a.job_id
+    WHERE a.workflow_id=? AND a.op_id=? AND json_extract(j.payload_json,'$.retry.attempt')=? LIMIT 1`).get(WF,OP,attempt);
+  ledger.db.prepare(`INSERT INTO check_runs(workflow_id,attempt_id,job_id,op_id,span_id,name,phase,runner,authority,
+    exit_code,status,created_at) VALUES(?,?,?,?,?,?,'verify','settler','runtime',1,'fail',?)`)
+    .run(WF,row.attempt_id,row.job_id,OP,row.span_id,name,NOW);
+};
 const incident=(ledger,{incidentId,kind,text,holds,agoMin=60})=>{
-  ledger.db.prepare("INSERT INTO incidents(incident_id,workflow_id,op_id,last_progress,status,updated_at) VALUES(?,?,?,?,?,?)")
-    .run(incidentId,WF,null,`[${kind}] ${text}`,'open',NOW-agoMin*MIN);
+  ledger.db.prepare("INSERT INTO incidents(incident_id,workflow_id,op_id,kind,owner,last_progress,status,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?)")
+    .run(incidentId,WF,null,'owner-ask','owner',`[${kind}] ${text}`,'open',NOW-agoMin*MIN,NOW-agoMin*MIN);
   ledger.appendEvent({workflowId:WF,entityType:'incident',entityId:incidentId,kind:'incident-raised',payload:{kind,detail:text,holds},createdAt:NOW-agoMin*MIN});
 };
 // a1-a4 failed (brand-checks failed on a2 and a3), a5 is the queued tail.
@@ -83,8 +88,11 @@ test('a lineage whose newest job is queued behind an owner gate or an owner ask 
 test('an owner ask filed by a job the tail waits --after is the owner\'s too; a merely queued tail stays OWED',t=>withLedger(t,({repoRoot,ledger})=>{
   const DRAW='op-interface.draw-0000000001';
   seedLoop(ledger,{tail:{status:'queued',agoMin:30,after:[DRAW]},extraJobs:[{jobId:DRAW,opId:'interface.draw',attempt:4,status:'failed',createdAt:NOW-50*MIN,updatedAt:NOW-40*MIN,payload:{owned_paths:['ui']}}]});
-  const asked=()=>ledger.db.prepare("INSERT INTO reports(workflow_id,dispatch_id,op_id,attempt,generation,outcome,report_json,created_at) VALUES(?,?,?,?,?,?,?,?)")
-    .run(WF,'ctx_63a0b41fe32d','interface.draw',4,0,'ask','{}',NOW-40*MIN);
+  const asked=()=>{
+    const row=ledger.db.prepare('SELECT attempt_id FROM op_attempts WHERE job_id=?').get(DRAW);
+    ledger.db.prepare("INSERT INTO reports(workflow_id,attempt_id,dispatch_id,job_id,outcome,report_json,created_at) VALUES(?,?,?,?,?,?,?)")
+      .run(WF,row.attempt_id,'ctx_63a0b41fe32d',DRAW,'ask','{}',NOW-40*MIN);
+  };
   assert.equal(findings(ledger.db,repoRoot).owed.some(i=>i.key===LOOP),true,'no ask yet: OWED');
   asked();
   const loop=patternFindings(ledger.db,{repo:repoRoot,now:NOW,staleOf:()=>[]}).find(f=>f.key===LOOP);

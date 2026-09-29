@@ -5,6 +5,7 @@ import path from 'node:path';
 import {spawnSync} from 'node:child_process';
 import {FAKE_ORCA} from './helpers/fake-orca.mjs';
 import {withLedger,seedWorkflow} from './_ledger-fixture.mjs';
+import {jobResult} from '../engine/ledger-db.mjs';
 
 // A host shutdown kills every Orca terminal while the ledger still says an op
 // is running. These specs pin the saga recovery:
@@ -52,13 +53,13 @@ const world=(t,fn,{terminal={connected:false,writable:false}}={})=>withLedger(t,
   const run=(...args)=>spawnSync(process.execPath,[API,...args,'--repo',repoRoot,'--json'],{cwd:ROOT,encoding:'utf8',windowsHide:true,timeout:120000,env});
   const dispatchedAt=Date.now()-60000;
   seedWorkflow(ledger,{id:WF,state:{phase:'running'},
-    jobs:[{jobId:JOB,opId:OP,kind:'op',status:'running',attempt:1,workerId:HANDLE,leaseToken:'tok-dead-worker',createdAt:dispatchedAt,
+    jobs:[{jobId:JOB,opId:OP,kind:'op',status:'running',attempt:1,dispatchId:HANDLE,workerId:HANDLE,leaseToken:'tok-dead-worker',createdAt:dispatchedAt,
       payload:{opId:OP,owned_paths:['docs/'],orca:{dispatchId:HANDLE,agentTerminalHandle:HANDLE},
         hierarchy:{runtime:{host:'orca',agent:'codex',dispatchId:HANDLE,terminalHandle:HANDLE}}}}],
     leases:[{resourceKey:'path:docs/',jobId:JOB,expiresAt:Date.now()+HOUR}]});
-  ledger.db.prepare("UPDATE workflows SET phase='running' WHERE workflow_id=?").run(WF);
-  ledger.db.prepare('INSERT INTO contracts(workflow_id,op_id,attempt,dispatch_id,markdown,context_json,created_at) VALUES(?,?,?,?,?,?,?)')
-    .run(WF,OP,1,HANDLE,'# dead worker contract','{}',dispatchedAt);
+  const attemptId=ledger.db.prepare('SELECT attempt_id FROM op_attempts WHERE job_id=?').get(JOB).attempt_id;
+  ledger.db.prepare('INSERT INTO contracts(attempt_id,workflow_id,job_id,markdown,context_json,created_at) VALUES(?,?,?,?,?,?)')
+    .run(attemptId,WF,JOB,'# dead worker contract','{}',dispatchedAt);
   const job=()=>ledger.db.prepare('SELECT * FROM jobs WHERE job_id=?').get(JOB);
   const leases=()=>ledger.db.prepare('SELECT count(*) n FROM leases WHERE job_id=?').get(JOB).n;
   const events=kind=>ledger.db.prepare('SELECT payload_json FROM events WHERE workflow_id=? AND entity_id=? AND kind=?').all(WF,JOB,kind);
@@ -97,7 +98,7 @@ test('a live worker keeps the frontier engaged and --dead-worker refuses it with
   assert.equal(leases(),1);
 },{terminal:null}));
 
-test('a dead worker with no effect returns to queued at the same attempt, leases released, no business attempt spent',t=>world(t,({run,job,leases,events})=>{
+test('a dead worker with no effect returns to queued at the same attempt, leases released, no business attempt spent',t=>world(t,({run,ledger,job,leases,events})=>{
   const r=run('reconcile','--job',JOB,'--dead-worker');
   assert.equal(r.status,0,r.stderr||r.stdout);
   const body=out(r);
@@ -106,7 +107,7 @@ test('a dead worker with no effect returns to queued at the same attempt, leases
   assert.equal(body.effectState,'none');
   const row=job();
   assert.equal(row.status,'queued');
-  assert.equal(row.attempt,1,'same attempt');
+  assert.equal(row.try_no,1,'same try');
   assert.equal(row.worker_id,null);
   assert.equal(leases(),0);
   const payload=JSON.parse(row.payload_json);
@@ -114,7 +115,7 @@ test('a dead worker with no effect returns to queued at the same attempt, leases
   assert.equal(payload.hierarchy.runtime.terminalHandle,undefined);
   assert.equal(payload.deadWorkers.length,1);
   assert.equal(payload.deadWorkers[0].recovery,'requeued');
-  const result=JSON.parse(row.result_json);
+  const result=jobResult(ledger.db,JOB);
   assert.equal(result.reason,'dead-worker-requeued');
   assert.equal(result.proof.paths.provable,true);
   assert.equal(events('dead-worker-requeued').length,1);
@@ -128,8 +129,9 @@ test('a dead worker with no effect returns to queued at the same attempt, leases
 }));
 
 test('a dead worker that filed a report goes the consume/check/settle route and nothing is written',t=>world(t,({run,ledger,job,leases,events})=>{
-  ledger.db.prepare('INSERT INTO reports(workflow_id,dispatch_id,op_id,attempt,outcome,report_json,created_at) VALUES(?,?,?,?,?,?,?)')
-    .run(WF,HANDLE,OP,1,'done','{"outcome":"done"}',Date.now());
+  const attemptId=ledger.db.prepare('SELECT attempt_id FROM op_attempts WHERE job_id=?').get(JOB).attempt_id;
+  ledger.db.prepare('INSERT INTO reports(workflow_id,attempt_id,dispatch_id,job_id,outcome,report_json,created_at) VALUES(?,?,?,?,?,?,?)')
+    .run(WF,attemptId,HANDLE,JOB,'done','{"outcome":"done"}',Date.now());
   const body=status(run);
   assert.equal(body.frontier.state,'transition-ready','the report outranks the dead worker');
   assert.deepEqual(body.frontier.deadWorkerJobs,[],'a job with a filed report is not dead-worker work');
@@ -151,7 +153,7 @@ test('an uncommitted change on the owned paths fences the job effect_unknown wit
   assert.equal(body.effectState,'partial');
   assert.ok(body.evidence.includes('dirty:docs/half-written.md'),JSON.stringify(body.evidence));
   assert.equal(job().status,'effect_unknown');
-  assert.equal(job().attempt,1);
+  assert.equal(job().try_no,1);
   assert.equal(leases(),1,'the fence keeps the owned-path lease');
   assert.equal(events('dead-worker-fenced').length,1);
   const plain=run('reconcile','--job',JOB);
@@ -237,8 +239,10 @@ test('a job requeued before the close existed has its recorded shell closed by t
   const payload=JSON.parse(job().payload_json);
   delete payload.orca;delete payload.hierarchy.runtime.terminalHandle;
   payload.deadWorkers=[{attempt:1,dispatchId:HANDLE,terminal:HANDLE,liveness:'agent-exited',recovery:'requeued',at:Date.now()}];
-  ledger.db.prepare("UPDATE jobs SET status='queued',worker_id=NULL,payload_json=?,result_json=? WHERE job_id=?")
-    .run(JSON.stringify(payload),JSON.stringify({reason:'dead-worker-requeued'}),JOB);
+  ledger.db.prepare("UPDATE jobs SET status='ready' WHERE job_id=?").run(JOB);
+  ledger.db.prepare("UPDATE jobs SET status='queued',worker_id=NULL,payload_json=? WHERE job_id=?")
+    .run(JSON.stringify(payload),JOB);
+  ledger.write.recordJobResult({jobId:JOB,result:{reason:'dead-worker-requeued'}});
   const body=out(run('reconcile','--job',JOB,'--dead-worker'));
   assert.equal(body.alreadyRecovered,true);
   assert.deepEqual([body.terminalClosed.handle,body.terminalClosed.closed,body.terminalClosed.proof],[HANDLE,true,'shell-prompt']);

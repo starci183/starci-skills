@@ -20,12 +20,16 @@ const WORKFLOW='wf-supervisor-poll';
 
 const seedReports=(ledger,count,{workflowId=WORKFLOW}={})=>{
   const at=Date.now();
+  const jobs=Array.from({length:count},(_,i)=>({jobId:`report-${workflowId}-${i+1}`,opId:'code.refactor',
+    status:'reported',dispatchId:`ctx_${workflowId}_${String(i+1).padStart(4,'0')}`,createdAt:at+i+1}));
+  seedWorkflow(ledger,{id:workflowId,jobs});
   ledger.transaction(db=>{
-    for(let i=1;i<=count;i++){
-      db.prepare(`INSERT INTO reports(workflow_id,dispatch_id,op_id,attempt,generation,outcome,report_json,created_at)
-        VALUES(?,?,?,?,?,?,?,?)`)
-        .run(workflowId,`ctx_${String(i).padStart(4,'0')}`,'code.refactor',1,1,'done',
-          JSON.stringify({schema:'starci/op-report@1',outcome:'done',summary:`r${i}`}),at+i);
+    for(const [i,job] of jobs.entries()){
+      const attemptId=db.prepare('SELECT attempt_id FROM op_attempts WHERE job_id=?').get(job.jobId).attempt_id;
+      db.prepare(`INSERT INTO reports(workflow_id,attempt_id,dispatch_id,job_id,outcome,report_json,created_at)
+        VALUES(?,?,?,?,?,?,?)`)
+        .run(workflowId,attemptId,job.dispatchId,job.jobId,'done',
+          JSON.stringify({schema:'starci/op-report@1',outcome:'done',summary:`r${i+1}`}),at+i+1);
     }
   });
 };
@@ -75,7 +79,6 @@ test('reportsSince honours the --workflow filter',t=>{
 test('poll.mjs runs from scripts/supervisor and prints one digest per --once cycle',t=>{
   withLedger(t,({repoRoot,ledger})=>{
     seedWorkflow(ledger,{id:WORKFLOW,state:{phase:'running'}});
-    ledger.db.prepare("UPDATE workflows SET phase='running' WHERE workflow_id=?").run(WORKFLOW);
     seedReports(ledger,2);
 
     const r=spawnSync(process.execPath,[POLL,'--repo',repoRoot,'--once'],
@@ -92,10 +95,13 @@ test('poll.mjs runs from scripts/supervisor and prints one digest per --once cyc
 
 const seedAsk=(ledger,{dispatchId,events=[],workflowId=WORKFLOW})=>{
   const at=Date.now();
+  const jobId=`ask-${workflowId}-${dispatchId}`;
+  seedWorkflow(ledger,{id:workflowId,jobs:[{jobId,opId:'owner.ask',status:'reported',dispatchId,createdAt:at}]});
   ledger.transaction(db=>{
-    db.prepare(`INSERT INTO reports(workflow_id,dispatch_id,op_id,attempt,generation,outcome,report_json,created_at)
-      VALUES(?,?,?,?,?,?,?,?)`)
-      .run(workflowId,dispatchId,'owner.ask',1,1,'ask',
+    const attemptId=db.prepare('SELECT attempt_id FROM op_attempts WHERE job_id=?').get(jobId).attempt_id;
+    db.prepare(`INSERT INTO reports(workflow_id,attempt_id,dispatch_id,job_id,outcome,report_json,created_at)
+      VALUES(?,?,?,?,?,?,?)`)
+      .run(workflowId,attemptId,dispatchId,jobId,'ask',
         JSON.stringify({schema:'starci/op-report@1',outcome:'ask',summary:'pick one',
           question:{text:'which way?',options:['a','b']}}),at);
   });
@@ -246,9 +252,8 @@ test('a cycle reports runtime incidents of running workflows and a launch-failur
   assert.ok(RUNTIME_INCIDENT.test('[source-runtime-defect] x') && RUNTIME_INCIDENT.test('[runtime-api-unloadable] x') && !RUNTIME_INCIDENT.test('[owner-gate] x'));
   await withLedger(t, async ({ repoRoot, ledger }) => {
     seedWorkflow(ledger, { id: 'wf-health-a1b2c3d4', state: { phase: 'running' } });
-    ledger.db.prepare("UPDATE workflows SET phase='running' WHERE workflow_id='wf-health-a1b2c3d4'").run();
     const now = Date.now();
-    ledger.db.prepare("INSERT INTO incidents(incident_id,workflow_id,op_id,status,last_progress,updated_at) VALUES('inc-rt','wf-health-a1b2c3d4',NULL,'open','[environment] codex launches fail',?)").run(now);
+    ledger.db.prepare("INSERT INTO incidents(incident_id,workflow_id,kind,owner,status,last_progress,created_at,updated_at) VALUES('inc-rt','wf-health-a1b2c3d4','infra-provider','supervisor','open','[environment] codex launches fail',?,?)").run(now,now);
     for (let n = 0; n < 3; n++) ledger.appendEvent({ workflowId: 'wf-health-a1b2c3d4', entityType: 'job', entityId: `j${n}`, kind: 'dispatch-rejected', payload: { provider: 'codex', step: 'readiness', error: 'terminal readiness timeout' } });
     const out = await cycle(ledger.db, { repo: repoRoot, state: { first: true, lastReportId: 0, lastArtifacts: now } });
     assert.doesNotMatch(out.text, /WATCHDOG-DEAD/, 'there are no watchdog processes to miss');
@@ -261,12 +266,11 @@ test('orphanKernelJobs names a running kernel job of a finished or archived work
   seedWorkflow(ledger,{id:'wf-live',state:{phase:'running'}});
   seedWorkflow(ledger,{id:'wf-done',state:{phase:'finished'}});
   seedWorkflow(ledger,{id:'wf-shelved',state:{phase:'running'}});
-  ledger.db.prepare("UPDATE workflows SET phase='running' WHERE workflow_id IN ('wf-live','wf-shelved')").run();
-  ledger.db.prepare("UPDATE workflows SET phase='finished' WHERE workflow_id='wf-done'").run();
   ledger.db.prepare("UPDATE workflows SET archived_at=? WHERE workflow_id='wf-shelved'").run(Date.now());
   for(const wf of ['wf-live','wf-done','wf-shelved']){
     ledger.enqueueJob({jobId:`kernel-${wf}`,workflowId:wf,kind:'kernel'});
-    ledger.db.prepare("UPDATE jobs SET status='running',worker_id=? WHERE job_id=?").run(`term-${wf}`,`kernel-${wf}`);
+    for(const status of ['ready','leased','running'])
+      ledger.db.prepare('UPDATE jobs SET status=?,worker_id=? WHERE job_id=?').run(status,`term-${wf}`,`kernel-${wf}`);
   }
   assert.deepEqual(orphanKernelJobs(ledger.db).map(o=>[o.job_id,o.phase,Boolean(o.archived_at)]),
     [['kernel-wf-done','finished',false],['kernel-wf-shelved','running',true]]);

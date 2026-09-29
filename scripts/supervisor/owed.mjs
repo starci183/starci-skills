@@ -380,9 +380,8 @@ function openAskJobs(db, wf) {
   const out = new Map();
   try {
     for (const a of openAskDispatches(db, wf)) {
-      const r = db.prepare('SELECT op_id, attempt FROM reports WHERE workflow_id=? AND dispatch_id=?').get(wf, a.dispatch_id);
-      const jobs = r ? db.prepare("SELECT job_id FROM jobs WHERE workflow_id=? AND op_id=? AND attempt=? AND kind<>'kernel'").all(wf, r.op_id, r.attempt) : [];
-      for (const j of jobs) out.set(j.job_id, a.dispatch_id);
+      const r = db.prepare('SELECT job_id FROM reports WHERE workflow_id=? AND dispatch_id=?').get(wf, a.dispatch_id);
+      if(r)out.set(r.job_id,a.dispatch_id);
     }
   } catch { /* no reports */ }
   return out;
@@ -403,7 +402,9 @@ export function patternFindings(db, { repo = null, now = Date.now(), wanted = ne
     if (wanted.size && !wanted.has(wf)) continue;
     // Retry chains (payload.retry.retryOf): a chain whose tail is still unfinished work.
     try {
-      const jobs = db.prepare("SELECT job_id, op_id, attempt, status, payload_json, result_json, created_at, updated_at FROM jobs WHERE workflow_id=? AND kind<>'kernel' ORDER BY created_at, job_id").all(wf)
+      const jobs = db.prepare(`SELECT job_id, op_id, try_no AS attempt, status, payload_json,
+        (SELECT settle_json FROM op_attempts a WHERE a.job_id=jobs.job_id ORDER BY attempt_id DESC LIMIT 1) AS result_json,
+        created_at, updated_at FROM jobs WHERE workflow_id=? AND kind='op' ORDER BY created_at, job_id`).all(wf)
         .map((j) => withPayload(j));
       // An attempt settled peer-blocked (api settle: every red check was a peer's change) is not a failure of the chain,
       // nor one whose settle spent no business retry (engine/admission.mjs retryDisposition: a host terminal wipe's
@@ -417,9 +418,17 @@ export function patternFindings(db, { repo = null, now = Date.now(), wanted = ne
       for (const r of db.prepare("SELECT DISTINCT entity_id FROM events WHERE workflow_id=? AND kind='op-settled'").all(wf)) if (!dispatched.has(r.entity_id)) notAFailure.add(r.entity_id);
       const byId = new Map(jobs.map((j) => [j.job_id, j]));
       const retried = new Set(jobs.map((j) => j.payload?.retry?.retryOf).filter(Boolean));
-      const checks = new Map(db.prepare('SELECT op_id, attempt, checks_json FROM checks WHERE workflow_id=?').all(wf).map((c) => [`${c.op_id}\0${c.attempt}`, parse(c.checks_json)]));
+      const checks=new Map();
+      for(const c of db.prepare(`SELECT c.job_id,c.name,c.exit_code,c.status,c.attribution_json
+        FROM check_runs c JOIN op_attempts a ON a.attempt_id=c.attempt_id WHERE c.workflow_id=?`).all(wf)){
+        const key=c.job_id;
+        if(!checks.has(key))checks.set(key,{checks:[]});
+        checks.get(key).checks.push({name:c.name,exitCode:c.exit_code??(c.status==='fail'?1:null),
+          peerBlocked:parse(c.attribution_json)?.peerBlocked??false});
+      }
       // An attempt that filed an ask waited on the owner; it is not a failure of the chain.
-      const askAttempts = new Set(db.prepare("SELECT op_id, attempt FROM reports WHERE workflow_id=? AND outcome='ask'").all(wf).map((r) => `${r.op_id}\0${r.attempt}`));
+      const askReports = new Set(db.prepare("SELECT job_id FROM reports WHERE workflow_id=? AND outcome='ask'").all(wf)
+        .map((r) => r.job_id));
       // Chains branch (one job retried by several successors) and pass through successes (a redo of
       // settled work): what counts is the failure streak since the chain's last success, reported
       // once per streak however many tails share it.
@@ -443,7 +452,7 @@ export function patternFindings(db, { repo = null, now = Date.now(), wanted = ne
         }
         const streak = [];
         for (let j = tail, guard = 0; j && j.status !== 'succeeded' && guard < 200; j = byId.get(j.payload?.retry?.retryOf), guard++) {
-          if (j.status !== 'cancelled' && !askAttempts.has(`${j.op_id}\0${j.attempt}`) && !notAFailure.has(j.job_id)) streak.unshift(j);
+          if (j.status !== 'cancelled' && !askReports.has(j.job_id) && !notAFailure.has(j.job_id)) streak.unshift(j);
         }
         const failed = streak.filter((j) => j.status === 'failed');
         if (failed.length >= RETRY_LOOP_MIN - 1 && streak.length >= RETRY_LOOP_MIN) {
@@ -454,7 +463,7 @@ export function patternFindings(db, { repo = null, now = Date.now(), wanted = ne
           loops.set(id, loop);
         }
         for (const j of failed) {
-          for (const c of checks.get(`${j.op_id}\0${j.attempt}`)?.checks ?? []) {
+          for (const c of checks.get(j.job_id)?.checks ?? []) {
             const code = c?.exitCode;
             if (code === 0 || code === null || code === undefined || !c?.name || c.peerBlocked) continue;
             const id = `${streak[0].job_id}:${c.name}`;

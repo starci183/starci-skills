@@ -3391,7 +3391,8 @@ function settleFailedNoReport(ledger, job, { workerProof = null, evidence = [], 
         ...(environment ? { environment, attemptConsumed: false, hostWipe: workerProof.hostWipe } : {}) } });
     settledPayload = next;
     nextStep = enqueueNextStep(ledger, { ...job, payload_json: JSON.stringify(next) }, { shape: failureShapeOf({ reportFiled: false }), environment: Boolean(environment), liveness, repo });
-    const retried = nextStep.kind === 'retry' ? db.prepare('SELECT job_id,try_no,unit_id FROM jobs WHERE job_id=?').get(nextStep.jobs[0]) : null;
+    const retried = nextStep.kind === 'retry' && nextStep.jobs?.[0]
+      ? db.prepare('SELECT job_id,try_no,unit_id FROM jobs WHERE job_id=?').get(nextStep.jobs[0]) : null;
     retry = retried
       ? { enqueued: true, jobId: retried.job_id, tryNo: retried.try_no, unitId: retried.unit_id }
       : { enqueued: false, reason: nextStep.kind === 'owner-gate' ? 'route-limit' : nextStep.reason, ...(nextStep.incidentId ? { incidentId: nextStep.incidentId } : {}) };

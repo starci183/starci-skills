@@ -4,6 +4,7 @@ import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
 import {openLedger} from '../engine/ledger-db.mjs';
+import {seedWorkflow} from './_ledger-fixture.mjs';
 
 /**
  * `workflows` is the parent of the ledger. Everything that belongs to a workflow hangs off it by
@@ -22,7 +23,12 @@ import {openLedger} from '../engine/ledger-db.mjs';
 // The parent itself is not in this list: it carries workflow_id as its own primary key.
 // log_cursors (2026-09-27, logs-into-ledger): how far the typed-log sync has read the events and each job's log.jsonl -
 // operational bookkeeping of the ledger's own sync, keyed by ledger and job, holding no content.
-const LEDGER_WIDE=['budget_reservations','budgets','log_cursors','meta','resources','signals'];
+// Blob metadata and Work citations outlive individual workflows so the artifact GC can
+// account for shared/pinned bytes. The other entries are operational registries,
+// schema metadata, or join tables whose owner is reached through another FK.
+const LEDGER_WIDE=['artifact_proofs','blob_ref_columns','blobs','foundations','job_transitions','log_cursors',
+  'logs_fts','logs_fts_config','logs_fts_data','logs_fts_docsize','logs_fts_idx','meta','path_transfers',
+  'report_attachments','resources','schema_migrations','ui_state_map','ui_states','work_citations','workflow_transitions'];
 // workflow_purges carries the workflow_id of a workflow the owner-approved purge DELETED: it is the tombstone naming the
 // verified evidence archive (path, sha256, events head), so it must outlive its workflow - the one deliberate exception.
 const TOMBSTONES=['workflow_purges'];
@@ -41,9 +47,9 @@ test('every workflow-owned table reaches workflows, directly or through its job'
   for(const table of tablesOf(ledger)){
     if(table==='workflows'||TOMBSTONES.includes(table)||!columnsOf(ledger,table).includes('workflow_id'))continue;
     const parents=parentsOf(ledger,table);
-    // `leases` reaches the parent through `jobs`, and the `leases_match_job` trigger makes the two identities
-    // equal on every insert and update - a second foreign key would restate what the trigger already refuses.
-    if(!parents.includes('workflows')&&!(table==='leases'&&parents.includes('jobs')))orphans.push(table);
+    // unit_edges reaches workflows through work_units; leases reaches it through jobs.
+    if(!parents.includes('workflows')&&!(table==='leases'&&parents.includes('jobs'))
+      &&!(table==='unit_edges'&&parents.includes('work_units')))orphans.push(table);
   }
   assert.deepEqual(orphans,[],'these tables carry a workflow_id with no path to workflows; a child of a workflow dies with it');
 }));
@@ -56,14 +62,18 @@ test('the ledger-wide tables are a closed list, so a second root cannot appear q
 
 test('a workflow takes its children with it', ()=>withLedger(ledger=>{
   const at=Date.now();
+  seedWorkflow(ledger,{id:'wf-parent',state:{phase:'queued',job:'parent'}});
   ledger.transaction(db=>{
-    db.prepare('INSERT INTO workflows(workflow_id,title,created_at,updated_at) VALUES(?,?,?,?)').run('wf-parent','parent',at,at);
-    db.prepare('INSERT INTO inputs(workflow_id,key,goal_revision,sha256,size,media_type,origin,bytes,created_at) VALUES(?,?,?,?,?,?,?,?,?)')
-      .run('wf-parent','1-handoff.md',1,'a'.repeat(64),7,'text/markdown','D:/owner/handoff.md',Buffer.from('content'),at);
+    db.prepare('INSERT INTO blobs(sha256,bytes,media_type,file_uri,created_at) VALUES(?,?,?,?,?)')
+      .run('a'.repeat(64),7,'text/markdown','D:/owner/handoff.md',at);
+    db.prepare('INSERT INTO goal_inputs(workflow_id,key,goal_revision,sha256,origin,created_at) VALUES(?,?,?,?,?,?)')
+      .run('wf-parent','1-handoff.md',1,'a'.repeat(64),'D:/owner/handoff.md',at);
   });
-  assert.equal(ledger.db.prepare('SELECT COUNT(*) n FROM inputs WHERE workflow_id=?').get('wf-parent').n,1);
+  assert.equal(ledger.db.prepare('SELECT COUNT(*) n FROM goal_inputs WHERE workflow_id=?').get('wf-parent').n,1);
 
   // The child cannot outlive the parent, and it cannot be created without one either.
-  assert.throws(()=>ledger.db.prepare('INSERT INTO inputs(workflow_id,key,goal_revision,sha256,size,media_type,origin,bytes,created_at) VALUES(?,?,?,?,?,?,?,?,?)')
-    .run('wf-absent','1-orphan.md',1,'b'.repeat(64),1,'text/markdown','D:/owner/orphan.md',Buffer.from('x'),at),/FOREIGN KEY/);
+  assert.throws(()=>ledger.db.prepare('INSERT INTO goal_inputs(workflow_id,key,goal_revision,sha256,origin,created_at) VALUES(?,?,?,?,?,?)')
+    .run('wf-absent','1-orphan.md',1,'a'.repeat(64),'D:/owner/orphan.md',at),/FOREIGN KEY/);
+  ledger.db.prepare('DELETE FROM workflows WHERE workflow_id=?').run('wf-parent');
+  assert.equal(ledger.db.prepare('SELECT COUNT(*) n FROM goal_inputs WHERE workflow_id=?').get('wf-parent').n,0);
 }));

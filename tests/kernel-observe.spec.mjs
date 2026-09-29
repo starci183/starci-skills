@@ -6,6 +6,7 @@ import path from 'node:path';
 import {spawnSync} from 'node:child_process';
 import {inspectLedger,ledgerFileFor,openLedger} from '../engine/ledger-db.mjs';
 import {FAKE_ORCA} from './helpers/fake-orca.mjs';
+import {seedWorkflow as seedLedgerWorkflow} from './_ledger-fixture.mjs';
 
 const ROOT=path.resolve(import.meta.dirname,'..');
 const API=path.join(ROOT,'scripts','kernel','api.mjs');
@@ -33,7 +34,16 @@ const fixture=(t,{mode='healthy',sends=0}={})=>{
     STARCI_FAKE_ORCA_LOG:path.join(root,'calls.jsonl'),
     STARCI_FAKE_ORCA_STATE:stateFile,
     LOCALAPPDATA:path.join(root,'localappdata'),
+    STARCI_PROJECTS_ROOT:path.join(root,'projects'),
+    STARCI_TEST_MACHINE_FILE:path.join(root,'machine.sqlite'),
   };
+  const priorProjects=process.env.STARCI_PROJECTS_ROOT,priorMachine=process.env.STARCI_TEST_MACHINE_FILE;
+  process.env.STARCI_PROJECTS_ROOT=env.STARCI_PROJECTS_ROOT;
+  process.env.STARCI_TEST_MACHINE_FILE=env.STARCI_TEST_MACHINE_FILE;
+  t.after(()=>{
+    if(priorProjects===undefined)delete process.env.STARCI_PROJECTS_ROOT;else process.env.STARCI_PROJECTS_ROOT=priorProjects;
+    if(priorMachine===undefined)delete process.env.STARCI_TEST_MACHINE_FILE;else process.env.STARCI_TEST_MACHINE_FILE=priorMachine;
+  });
   const run=(...args)=>spawnSync(process.execPath,[API,...args],{cwd:ROOT,encoding:'utf8',windowsHide:true,timeout:120000,env});
   const calls=()=>fs.existsSync(path.join(root,'calls.jsonl'))
     ?fs.readFileSync(path.join(root,'calls.jsonl'),'utf8').trim().split('\n').filter(Boolean).map(l=>JSON.parse(l).argv.slice(0,2).join(' '))
@@ -44,16 +54,18 @@ const fixture=(t,{mode='healthy',sends=0}={})=>{
 const seed=(repo,fn)=>{const ledger=openLedger({file:ledgerFileFor(repo)});try{fn(ledger);}finally{ledger.close();}};
 const read=(repo,fn)=>{const ledger=inspectLedger({file:ledgerFileFor(repo)});try{return fn(ledger.db);}finally{ledger.close();}};
 const json=v=>JSON.stringify(v??null);
-const seedWorkflow=(repo,workflowId)=>seed(repo,ledger=>ledger.ensureWorkflow({workflowId,title:'observe spec'}));
+const seedWorkflow=(repo,workflowId)=>seed(repo,ledger=>seedLedgerWorkflow(ledger,{id:workflowId,state:{phase:'running',job:'observe spec'}}));
 // A running op exactly as `api dispatch` leaves it: worker_id is the exact
 // terminal handle, payload.orca/hierarchy carry the same binding, and the
 // contracts row names the Dispatch it was written for.
 const seedRunningOp=(repo,{workflowId,jobId,handle,dispatchId})=>seed(repo,ledger=>{
   const at=Date.now();
-  ledger.db.prepare("INSERT INTO jobs(job_id,workflow_id,op_id,attempt,generation,kind,role,payload_json,status,worker_id,created_at,updated_at) VALUES(?,?,?,1,0,'op','op',?,'running',?,?,?)")
-    .run(jobId,workflowId,'ex-test.probe',json({opId:'ex-test.probe',owned_paths:['docs/'],orca:{dispatchId,agentTerminalHandle:handle},hierarchy:{runtime:{host:'orca',agent:'devin',dispatchId,terminalHandle:handle}}}),handle,at,at);
-  ledger.db.prepare('INSERT INTO contracts(workflow_id,op_id,attempt,dispatch_id,markdown,context_json,created_at) VALUES(?,?,?,?,?,?,?)')
-    .run(workflowId,'ex-test.probe',1,dispatchId,'# observe contract',json({}),at);
+  seedLedgerWorkflow(ledger,{id:workflowId,jobs:[{jobId,opId:'ex-test.probe',status:'running',dispatchId,workerId:handle,terminalHandle:handle,
+    createdAt:at,updatedAt:at,payload:{opId:'ex-test.probe',owned_paths:['docs/'],orca:{dispatchId,agentTerminalHandle:handle},
+      hierarchy:{runtime:{host:'orca',agent:'devin',dispatchId,terminalHandle:handle}}}}]});
+  const attemptId=ledger.db.prepare('SELECT attempt_id FROM op_attempts WHERE job_id=?').get(jobId).attempt_id;
+  ledger.db.prepare('INSERT INTO contracts(attempt_id,workflow_id,job_id,markdown,context_json,created_at) VALUES(?,?,?,?,?,?)')
+    .run(attemptId,workflowId,jobId,'# observe contract',json({}),at);
 });
 const lastEvent=(repo,wf,jobId)=>read(repo,db=>db.prepare("SELECT kind,payload_json FROM events WHERE workflow_id=? AND entity_id=? ORDER BY seq DESC LIMIT 1").get(wf,jobId));
 
@@ -67,7 +79,7 @@ test('observe on a running op returns the screen tail and typed turnState, mutat
     jobs:db.prepare('SELECT count(*) n FROM jobs WHERE workflow_id=?').get(wf).n,
     contracts:db.prepare('SELECT count(*) n FROM contracts WHERE workflow_id=?').get(wf).n,
     reports:db.prepare('SELECT count(*) n FROM reports WHERE workflow_id=?').get(wf).n,
-    checks:db.prepare('SELECT count(*) n FROM checks WHERE workflow_id=?').get(wf).n,
+    checks:db.prepare('SELECT count(*) n FROM check_runs WHERE workflow_id=?').get(wf).n,
     leases:db.prepare('SELECT count(*) n FROM leases WHERE job_id=?').get(jobId).n,
     status:db.prepare('SELECT status FROM jobs WHERE job_id=?').get(jobId).status,
   }));
@@ -115,7 +127,10 @@ test('observe --lines bounds the returned tail while turnState still classifies 
 test('observe refuses no-live-worker for a job with no bound terminal and job-not-found for an unknown job',t=>{
   const fx=fixture(t),wf='wf-observe-none';
   seedWorkflow(fx.repo,wf);
-  seed(fx.repo,ledger=>ledger.enqueueJob({jobId:'op-observe-queued',workflowId:wf,opId:'ex-test.probe',kind:'op',payload:{opId:'ex-test.probe',owned_paths:['docs/']}}));
+  seed(fx.repo,ledger=>{
+    ledger.write.createUnit({workflowId:wf,unitId:'op-observe-queued',opId:'ex-test.probe',subjectKey:'op-observe-queued',goalRevision:1});
+    ledger.enqueueJob({jobId:'op-observe-queued',workflowId:wf,unitId:'op-observe-queued',tryNo:1,opId:'ex-test.probe',kind:'op',payload:{opId:'ex-test.probe',owned_paths:['docs/']}});
+  });
 
   const r=fx.run('observe','--repo',fx.repo,'--job','op-observe-queued','--json');
   assert.notEqual(r.status,0,'a job with no live worker binding must refuse');
@@ -154,8 +169,11 @@ test('observe never consumes or alters a filed report',t=>{
   seedRunningOp(fx.repo,{workflowId:wf,jobId,handle:'term-observe-report',dispatchId:'ctx-observe-report'});
   const envelope={schema:'starci/op-report@1',outcome:'done',summary:'observe must not touch this',files:['docs/'],
     checks:[{name:'self-check',command:'true',exitCode:0}],run:'run-x',task:'task-x',dispatch:'ctx-observe-report',from:jobId};
-  seed(fx.repo,ledger=>ledger.db.prepare('INSERT INTO reports(workflow_id,dispatch_id,op_id,attempt,generation,outcome,report_json,from_terminal,consumed_at,created_at) VALUES(?,?,?,?,?,?,?,?,NULL,?)')
-    .run(wf,'ctx-observe-report','ex-test.probe',1,0,'done',json(envelope),'term-observe-report',Date.now()));
+  seed(fx.repo,ledger=>{
+    const attemptId=ledger.db.prepare('SELECT attempt_id FROM op_attempts WHERE job_id=?').get(jobId).attempt_id;
+    ledger.db.prepare("INSERT INTO reports(workflow_id,attempt_id,dispatch_id,job_id,outcome,report_json,from_terminal,consumed_at,created_at) VALUES(?,?,?,?,'done',?,?,NULL,?)")
+      .run(wf,attemptId,'ctx-observe-report',jobId,json(envelope),'term-observe-report',Date.now());
+  });
 
   const r=fx.run('observe','--repo',fx.repo,'--job',jobId,'--json');
   assert.equal(r.status,0,r.stderr||r.stdout);

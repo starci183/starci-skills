@@ -37,8 +37,11 @@ const put=(root,rel,content='x')=>{const file=path.join(root,rel);fs.mkdirSync(p
 const sized=(root,rel,bytes)=>{const file=put(root,rel,'');fs.truncateSync(file,bytes);return file;};
 const seedReport=(ledger,{workflowId='wf-shop-x1',title='shop-checkout',dispatchId,op,attempt=1,summary,files})=>{
   if(!ledger.db.prepare('SELECT 1 FROM workflows WHERE workflow_id=?').get(workflowId))seedWorkflow(ledger,{id:workflowId,state:{phase:'running',job:title}});
-  ledger.db.prepare('INSERT INTO reports(workflow_id,dispatch_id,op_id,attempt,generation,outcome,report_json,created_at) VALUES(?,?,?,?,?,?,?,?)')
-    .run(workflowId,dispatchId,op,attempt,1,'done',JSON.stringify({schema:'starci/op-report@1',outcome:'done',summary,files}),Date.now());
+  const jobId=op==='interface.draw'?`job-draw-${attempt}`:`job-uat-${attempt}`;
+  seedWorkflow(ledger,{id:workflowId,jobs:[{jobId,opId:op,status:'succeeded',dispatchId}]});
+  const attemptId=ledger.db.prepare('SELECT attempt_id FROM op_attempts WHERE job_id=?').get(jobId).attempt_id;
+  ledger.db.prepare('INSERT INTO reports(workflow_id,attempt_id,dispatch_id,job_id,outcome,report_json,created_at) VALUES(?,?,?,?,?,?,?)')
+    .run(workflowId,attemptId,dispatchId,jobId,'done',JSON.stringify({schema:'starci/op-report@1',outcome:'done',summary,files}),Date.now());
 };
 
 const UI='.starciwork/features/shop/ui/cart';
@@ -284,11 +287,12 @@ test('settle never fails because Telegram failed: the hook is synchronous, never
     assert.ok(!warned.join('\n').includes(TOKEN));
     const noLedger=await sendSettleMedia({ledgerFile:path.join(machineHome,'missing.sqlite'),repo:repoRoot,...DRAW},deps(machineHome,{warn:w=>warned.push(w)}));
     assert.deepEqual([noLedger.ok,noLedger.error],[false,'ledger unreadable']);
-    // The kernel's settle queues the send after the settled state is written, inside its own try.
+    // The settle tail queues the send after the settled state is written, inside its own try.
     const api=fs.readFileSync(new URL('../scripts/kernel/api.mjs',import.meta.url),'utf8');
     const hook=api.indexOf('try { queueSettleMedia(');
-    assert.ok(hook>api.indexOf('function cmdSettle(')&&hook>api.indexOf('const taskClosed = closeOperationTask(db, job, settledPayload);'),'cmdSettle queues media after the settle');
-    assert.ok(hook<api.indexOf("emit(out, `settled ${jobId}",api.indexOf('function cmdSettle(')),'before the settle reports');
+    assert.ok(hook>api.indexOf('async function runSettleTail('),'the settle tail queues media');
+    const settle=fs.readFileSync(new URL('../scripts/kernel/api-verbs/settle.mjs',import.meta.url),'utf8');
+    assert.ok(settle.indexOf('await runSettleTail(')<settle.indexOf('emit(out, `settled ${jobId}'),'the synchronous test tail finishes before the settle reports');
   });
 });
 

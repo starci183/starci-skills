@@ -32,9 +32,8 @@
 //            transfer, revise or designate, with clearCut true only when the evidence leaves no
 //            judgement (the rule is stated on the proposal).
 //
-// Bridging records live in the ledger's `signals` table (no schema migration), scope
-// 'supervisor-bridge', key <bridgeId>, value BRIDGE_SCHEMA; a path/record ownership transfer is scope
-// 'ownership-transfer', key <normalized path> (read by work-ownership.mjs ownerOf, rule 0).
+// Bridging records live in namespaced ledger metadata; signals are reserved for process fences.
+// Path/record ownership transfers live in path_transfers (work-ownership.mjs ownerOf, rule 0).
 import { blockingJobs } from './waiter-priority.mjs';
 import { typedIncidents } from './gate-conditions.mjs';
 import { readFoundations } from './foundations.mjs';
@@ -74,14 +73,14 @@ export function foundationAliasKey(name) {
   return FOUNDATION_SYNONYMS[stripped] ?? stripped;
 }
 
-const readScope = (db, scope, schema) => db.prepare('SELECT key,value_json FROM signals WHERE scope=? ORDER BY key').all(scope)
-  .map((row) => parseJson(row.value_json)).filter((value) => value?.schema === schema);
+const bridgeKey = (id) => `${BRIDGE_SCOPE}:${id}`;
 /** Every bridging record of the ledger, oldest first. */
-export const readBridges = (db) => readScope(db, BRIDGE_SCOPE, BRIDGE_SCHEMA).sort((a, b) => (a.at ?? 0) - (b.at ?? 0));
-export const readBridge = (db, id) => { const v = parseJson(db.prepare('SELECT value_json FROM signals WHERE scope=? AND key=?').get(BRIDGE_SCOPE, id)?.value_json); return v?.schema === BRIDGE_SCHEMA ? v : null; };
+export const readBridges = (db) => db.prepare('SELECT value FROM meta WHERE key LIKE ? ORDER BY key').all(`${BRIDGE_SCOPE}:%`)
+  .map((row) => parseJson(row.value)).filter((value) => value?.schema === BRIDGE_SCHEMA).sort((a, b) => (a.at ?? 0) - (b.at ?? 0));
+export const readBridge = (db, id) => { const v = parseJson(db.prepare('SELECT value FROM meta WHERE key=?').get(bridgeKey(id))?.value); return v?.schema === BRIDGE_SCHEMA ? v : null; };
 export const writeBridge = (db, record, now = Date.now()) => db.prepare(
-  'INSERT OR REPLACE INTO signals(scope,key,holder_pid,token,value_json,at,expires_at) VALUES(?,?,NULL,NULL,?,?,NULL)',
-).run(BRIDGE_SCOPE, record.id, JSON.stringify(record), now);
+  'INSERT INTO meta(key,value) VALUES(?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value',
+).run(bridgeKey(record.id), JSON.stringify({ ...record, updatedAt: now }));
 export const writeTransfer = (db, record, now = Date.now()) => recordPathTransfer(db, { path: record.path, fromWorkflow: record.from ?? null,
   toWorkflow: record.to ?? null, bridgeId: record.bridgeId ?? null, state: 'applied', detail: record, at: now });
 

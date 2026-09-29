@@ -6,6 +6,18 @@ import path from 'node:path';
 import {spawnSync} from 'node:child_process';
 import {FAKE_ORCA} from './helpers/fake-orca.mjs';
 import {openLedger,inspectLedger,ledgerFileFor} from '../engine/ledger-db.mjs';
+import {openMachine,openMachineReader} from '../engine/machine-db.mjs';
+import {jobRowOf} from '../scripts/kernel/api-lib/rows.mjs';
+
+// Build the workflow and logical unit required by the current ledger before
+// exercising dispatch. Each fixture op job represents a distinct unit.
+const enqueueFixtureJob=(ledger,args)=>{
+  ledger.ensureWorkflow({workflowId:args.workflowId});
+  if(args.kind==='op')ledger.write.createUnit({workflowId:args.workflowId,unitId:args.jobId,
+    opId:args.opId,subjectKey:args.jobId,goalRevision:1});
+  return ledger.write.enqueueJob({...args,unitId:args.kind==='op'?args.jobId:null,
+    status:args.kind==='kernel'?'running':args.status??'queued'});
+};
 
 const ROOT=path.resolve(import.meta.dirname,'..');
 const API=path.join(ROOT,'scripts','kernel','api.mjs');
@@ -22,7 +34,12 @@ const json=text=>{try{return JSON.parse(text);}catch{return null;}};
 
 const fixture=(t,{dead=[],stale=[]}={})=>{
   const root=fs.mkdtempSync(path.join(os.tmpdir(),'starci-managed-'));
+  const savedProjects=process.env.STARCI_PROJECTS_ROOT;
+  process.env.STARCI_PROJECTS_ROOT=path.join(root,'projects');
+  t.after(()=>{if(savedProjects===undefined)delete process.env.STARCI_PROJECTS_ROOT;else process.env.STARCI_PROJECTS_ROOT=savedProjects;});
   t.after(()=>fs.rmSync(root,{recursive:true,force:true,maxRetries:20,retryDelay:25}));
+  if(process.env.STARCI_TEST_TEMP_DIR)t.after(()=>fs.rmSync(path.join(process.env.STARCI_TEST_TEMP_DIR,'starci-job-scratch'),
+    {recursive:true,force:true,maxRetries:20,retryDelay:25}));
   const repo=path.join(root,'repo');fs.mkdirSync(repo,{recursive:true});
   const stub=path.join(root,'fake-orca.mjs');fs.writeFileSync(stub,FAKE_ORCA);
   const ownerRoot=path.join(root,'owner');fs.mkdirSync(ownerRoot,{recursive:true});
@@ -35,6 +52,9 @@ const fixture=(t,{dead=[],stale=[]}={})=>{
     STARCI_FAKE_ORCA_DEAD:dead.join(','),
     STARCI_FAKE_ORCA_STALE:stale.join(','),
     STARCI_OWNER_ROOT:ownerRoot,
+    LOCALAPPDATA:path.join(root,'localappdata'),
+    STARCI_PROJECTS_ROOT:path.join(root,'projects'),
+    STARCI_TEST_MACHINE_FILE:path.join(root,'machine.sqlite'),
   };
   // ownerRoot holds a config.yaml seeded from the shipped example; `kernel`
   // callers may rewrite the pin line.
@@ -63,7 +83,7 @@ const defineGoal=(fx,text='managed dispatch smoke goal')=>{
 
 const jobRow=(repo,jobId)=>{
   const ledger=inspectLedger({file:ledgerFileFor(repo)});
-  try{return ledger.db.prepare('SELECT status,worker_id,payload_json,result_json FROM jobs WHERE job_id=?').get(jobId);}
+  try{return jobRowOf(ledger.db,jobId);}
   finally{ledger.close();}
 };
 const kernelSignal=(repo,workflowId)=>{
@@ -76,6 +96,21 @@ const kernelSignal=(repo,workflowId)=>{
 const ledgerRead=(repo,fn)=>{
   const ledger=inspectLedger({file:ledgerFileFor(repo)});
   try{return fn(ledger.db);}finally{ledger.close();}
+};
+const providerHealthRow=(fx,provider)=>{
+  const machine=openMachineReader({file:fx.env.STARCI_TEST_MACHINE_FILE});
+  try{
+    const row=machine.db.prepare('SELECT status,failure_kind,strikes,circuit_open_until,detail_json FROM provider_health WHERE provider=?').get(provider);
+    if(!row)return null;
+    return {value_json:JSON.stringify({...json(row.detail_json),status:row.status,failureKind:row.failure_kind,strikes:row.strikes}),
+      expires_at:row.circuit_open_until};
+  }finally{machine.close();}
+};
+const reportFile=(repo,jobId)=>{
+  const scratch=ledgerRead(repo,db=>db.prepare('SELECT scratch_dir FROM op_attempts WHERE job_id=? ORDER BY attempt_id DESC LIMIT 1').get(jobId)?.scratch_dir);
+  assert.ok(scratch,`dispatched job ${jobId} has no scratch directory`);
+  fs.mkdirSync(scratch,{recursive:true});
+  return path.join(scratch,'report.json');
 };
 
 /* ------------------------------------------------ kernel pin precedence */
@@ -137,10 +172,10 @@ test('managed dispatch: route persists the decision, spawn marks the job running
   const jobId='job-managed-1';
   const ledger=openLedger({file:ledgerFileFor(fx.repo)});
   try{
-    ledger.enqueueJob({jobId:'kernel-wf-managed',workflowId:'wf-managed',kind:'kernel',role:'kernel',
+    enqueueFixtureJob(ledger,{jobId:'kernel-wf-managed',workflowId:'wf-managed',kind:'kernel',role:'kernel',
       payload:{route:{host:'orca',agent:'codex',model:'gpt-6-sol'},hierarchy:{schema:'starci/agent-hierarchy@1',nodeId:'agent:kernel:wf-managed',parentNodeId:'workflow:wf-managed',role:'kernel'}}});
     ledger.db.prepare("UPDATE jobs SET status='running',worker_id='fake-kernel-terminal' WHERE job_id='kernel-wf-managed'").run();
-    ledger.enqueueJob({jobId,workflowId:'wf-managed',opId:'code.refactor',kind:'op',
+    enqueueFixtureJob(ledger,{jobId,workflowId:'wf-managed',opId:'code.refactor',kind:'op',
       payload:{opId:'code.refactor',owned_paths:['docs/'],model:'claude-agent'}});
   }finally{ledger.close();}
 
@@ -194,15 +229,17 @@ test('managed dispatch: route persists the decision, spawn marks the job running
   // A pass is earned from the worker's filed done claim plus an independent
   // green Kernel check. Settle then closes the managed worker through the
   // contract's two-step worker-stop/worker-release lifecycle.
-  const report=path.join(fx.repo,'report.json');fs.writeFileSync(report,JSON.stringify({
+  const report=reportFile(fx.repo,jobId);fs.writeFileSync(report,JSON.stringify({
     schema:'starci/op-report@1',outcome:'done',summary:'managed dispatch completed',head:'abc1234def',
     files:['docs/managed-result.md'],checks:[{name:'self-check',command:'true',exitCode:0}],
   }));
   const filed=fx.run(API,'report','--repo',fx.repo,'--job',jobId,'--report',report,'--json');
   assert.equal(filed.status,0,`report failed: ${filed.stderr||filed.stdout}`);
+  fx.env.STARCI_CALLER='runtime-settler';
   const checked=fx.run(API,'check','--repo',fx.repo,'--job',jobId,'--checks',JSON.stringify({
     checks:[{name:'validator',command:'managed validation',exitCode:0,evidence:'green'}],
   }),'--json');
+  delete fx.env.STARCI_CALLER;
   assert.equal(checked.status,0,`check failed: ${checked.stderr||checked.stdout}`);
   const s=fx.run(API,'settle','--repo',fx.repo,'--job',jobId,'--verdict','pass','--json');
   assert.equal(s.status,0,`settle failed: ${s.stderr||s.stdout}`);
@@ -233,18 +270,20 @@ for(const unknown of [1,2]) test(`managed settle: release_unknown ${unknown}x re
   const jobId='job-managed-release';
   const ledger=openLedger({file:ledgerFileFor(fx.repo)});
   try{
-    ledger.enqueueJob({jobId:'kernel-wf-release',workflowId:'wf-release',kind:'kernel',role:'kernel',
+    enqueueFixtureJob(ledger,{jobId:'kernel-wf-release',workflowId:'wf-release',kind:'kernel',role:'kernel',
       payload:{route:{host:'orca',agent:'codex',model:'gpt-6-sol'},hierarchy:{schema:'starci/agent-hierarchy@1',nodeId:'agent:kernel:wf-release',parentNodeId:'workflow:wf-release',role:'kernel'}}});
     ledger.db.prepare("UPDATE jobs SET status='running',worker_id='fake-kernel-terminal' WHERE job_id='kernel-wf-release'").run();
-    ledger.enqueueJob({jobId,workflowId:'wf-release',opId:'code.refactor',kind:'op',payload:{opId:'code.refactor',owned_paths:['docs/'],model:'claude-agent'}});
+    enqueueFixtureJob(ledger,{jobId,workflowId:'wf-release',opId:'code.refactor',kind:'op',payload:{opId:'code.refactor',owned_paths:['docs/'],model:'claude-agent'}});
   }finally{ledger.close();}
   const d=fx.run(API,'dispatch','--repo',fx.repo,'--job',jobId,'--model','claude-agent','--spawn','--json');
   assert.equal(d.status,0,d.stderr||d.stdout);
   assert.equal(json(jobRow(fx.repo,jobId)?.payload_json)?.managed?.agentTerminalHandle,'fake-terminal-1');
-  const report=path.join(fx.repo,'report.json');fs.writeFileSync(report,JSON.stringify({
+  const report=reportFile(fx.repo,jobId);fs.writeFileSync(report,JSON.stringify({
     schema:'starci/op-report@1',outcome:'done',summary:'done',head:'abc1234def',files:['docs/r.md'],checks:[{name:'self',command:'true',exitCode:0}]}));
   assert.equal(fx.run(API,'report','--repo',fx.repo,'--job',jobId,'--report',report,'--json').status,0);
+  fx.env.STARCI_CALLER='runtime-settler';
   assert.equal(fx.run(API,'check','--repo',fx.repo,'--job',jobId,'--checks',JSON.stringify({checks:[{name:'v',command:'v',exitCode:0,evidence:'green'}]}),'--json').status,0);
+  delete fx.env.STARCI_CALLER;
   const s=fx.run(API,'settle','--repo',fx.repo,'--job',jobId,'--verdict','pass','--json');
   assert.equal(s.status,0,s.stderr||s.stdout);
   const releases=fx.calls().filter(c=>c==='orchestration worker-release').length;
@@ -265,14 +304,14 @@ test('finish closes the kernel terminal and every Task the Run still holds open'
   const jobId='job-finish-tree';
   const ledger=openLedger({file:ledgerFileFor(fx.repo)});
   try{
-    ledger.enqueueJob({jobId:`kernel-${workflowId}`,workflowId,kind:'kernel',role:'kernel',payload:{}});
+    enqueueFixtureJob(ledger,{jobId:`kernel-${workflowId}`,workflowId,kind:'kernel',role:'kernel',payload:{}});
     ledger.db.prepare("UPDATE jobs SET status='running',worker_id='fake-kernel-terminal' WHERE job_id=?").run(`kernel-${workflowId}`);
     // An op whose Task was opened and whose attempt never reached settle.
-    ledger.enqueueJob({jobId,workflowId,opId:'code.refactor',kind:'op',
+    enqueueFixtureJob(ledger,{jobId,workflowId,opId:'code.refactor',kind:'op',
       payload:{opId:'code.refactor',owned_paths:['docs/'],managed:{runId:'run-fake-1',taskId:'task-orphan-1',dispatchId:'dispatch-fake-1'}}});
     ledger.db.prepare("UPDATE jobs SET status='cancelled' WHERE job_id=?").run(jobId);
     // Only a running workflow finishes (api-lib/lifecycle.mjs: running -> finished).
-    ledger.db.prepare("UPDATE workflows SET phase='running' WHERE workflow_id=?").run(workflowId);
+    ledger.write.changeWorkflowPhase({workflowId,to:'running',by:'test-fixture',reason:'finish precondition'});
     // Finish needs the owner's handover approval (tests/handover.spec.mjs owns that gate).
     ledger.appendEvent({workflowId,entityType:'job',entityId:'job-finish-handover',kind:'handover-approved',payload:{jobId:'job-finish-handover',dispatchId:'ask-finish',answeredBy:'owner'}});
   }finally{ledger.close();}
@@ -301,12 +340,12 @@ test('Claude auth rejection circuits the shared-auth provider for every job and 
   const siblingJobId='job-claude-prerouted-sibling';
   const ledger=openLedger({file:ledgerFileFor(fx.repo)});
   try{
-    ledger.enqueueJob({jobId:'kernel-wf-claude-auth',workflowId:'wf-claude-auth',kind:'kernel',role:'kernel',
+    enqueueFixtureJob(ledger,{jobId:'kernel-wf-claude-auth',workflowId:'wf-claude-auth',kind:'kernel',role:'kernel',
       payload:{route:{host:'orca',agent:'codex',model:'gpt-6-sol'}}});
     ledger.db.prepare("UPDATE jobs SET status='running',worker_id='fake-kernel-terminal' WHERE job_id='kernel-wf-claude-auth'").run();
-    ledger.enqueueJob({jobId,workflowId:'wf-claude-auth',opId:'architecture.decide',kind:'op',
+    enqueueFixtureJob(ledger,{jobId,workflowId:'wf-claude-auth',opId:'architecture.decide',kind:'op',
       payload:{opId:'architecture.decide',owned_paths:['docs/'],difficulty:'hard'}});
-    ledger.enqueueJob({jobId:siblingJobId,workflowId:'wf-claude-auth',opId:'architecture.decide',kind:'op',
+    enqueueFixtureJob(ledger,{jobId:siblingJobId,workflowId:'wf-claude-auth',opId:'architecture.decide',kind:'op',
       payload:{opId:'architecture.decide',owned_paths:['docs/sibling/'],difficulty:'hard'}});
   }finally{ledger.close();}
 
@@ -323,12 +362,12 @@ test('Claude auth rejection circuits the shared-auth provider for every job and 
   const rejected=fx.run(API,'dispatch','--repo',fx.repo,'--job',jobId,'--spawn','--json');
   assert.notEqual(rejected.status,0,'the fake Claude OAuth rejection must reject the candidate');
   const afterReject=ledgerRead(fx.repo,db=>({
-    job:db.prepare('SELECT status,attempt,result_json FROM jobs WHERE job_id=?').get(jobId),
-    health:db.prepare("SELECT value_json,expires_at FROM signals WHERE scope='provider-health' AND key='claude'").get(),
+    job:jobRowOf(db,jobId),
+    health:providerHealthRow(fx,'claude'),
     leases:db.prepare('SELECT COUNT(*) n FROM leases WHERE job_id=?').get(jobId).n,
   }));
   assert.equal(afterReject.job?.attempt,1,'provider rejection must not mint a second logical operation attempt');
-  assert.equal(afterReject.job?.status,'queued','a proven no-effect auth rejection is safe to route again');
+  assert.equal(afterReject.job?.status,'ready','a proven no-effect auth rejection is safe to route again');
   assert.equal(afterReject.leases,0,'no-effect fallback releases the rejected candidate lease');
   assert.equal(json(afterReject.job?.result_json)?.attemptConsumed,false);
   assert.equal(json(afterReject.health?.value_json)?.status,'unavailable','the shared provider circuit is durable');
@@ -340,7 +379,7 @@ test('Claude auth rejection circuits the shared-auth provider for every job and 
 
   const siblingRejected=fx.run(API,'dispatch','--repo',fx.repo,'--job',siblingJobId,'--spawn','--json');
   assert.notEqual(siblingRejected.status,0,'a persisted sibling route must re-check provider health before launch');
-  assert.equal(json(siblingRejected.stdout)?.rejection?.status,'queued');
+  assert.equal(json(siblingRejected.stdout)?.rejection?.status,'ready');
   assert.equal(fx.calls().filter(call=>call==='orchestration worker-start').length,1,
     'the circuit rejects the already-routed sibling before a second Claude worker-start');
 
@@ -353,7 +392,7 @@ test('Claude auth rejection circuits the shared-auth provider for every job and 
   assert.equal(decision?.model,'codex-agent','fallback must cross the failed auth provider boundary');
   const rejectedTargets=new Set((decision?.routeRejected??[]).map(item=>item.target));
   assert.ok(rejectedTargets.has('claude-agent'),'the Claude pool is excluded by the provider circuit');
-  assert.equal(ledgerRead(fx.repo,db=>db.prepare('SELECT attempt FROM jobs WHERE job_id=?').get(jobId)?.attempt),1);
+  assert.equal(ledgerRead(fx.repo,db=>db.prepare('SELECT try_no AS attempt FROM jobs WHERE job_id=?').get(jobId)?.attempt),1);
 });
 
 test('historical workflow incident text cannot poison provider routing',t=>{
@@ -362,16 +401,16 @@ test('historical workflow incident text cannot poison provider routing',t=>{
   const jobId='job-incident-routing';
   const ledger=openLedger({file:ledgerFileFor(fx.repo)});
   try{
-    ledger.enqueueJob({jobId:`kernel-${workflowId}`,workflowId,kind:'kernel',role:'kernel',payload:{}});
+    enqueueFixtureJob(ledger,{jobId:`kernel-${workflowId}`,workflowId,kind:'kernel',role:'kernel',payload:{}});
     ledger.db.prepare("UPDATE jobs SET status='running',worker_id='fake-kernel-terminal' WHERE job_id=?")
       .run(`kernel-${workflowId}`);
-    ledger.enqueueJob({jobId,workflowId,opId:'scope.define',kind:'op',
+    enqueueFixtureJob(ledger,{jobId,workflowId,opId:'scope.define',kind:'op',
       payload:{opId:'scope.define',owned_paths:['docs/'],difficulty:'medium'}});
     ledger.db.prepare(`INSERT INTO incidents(
-      incident_id,workflow_id,op_id,attempts,model_calls,tokens,elapsed_ms,last_progress,status,updated_at
-    ) VALUES(?,?,?,0,0,0,0,?,'open',?)`).run(
+      incident_id,workflow_id,op_id,kind,owner,last_progress,status,created_at,updated_at
+    ) VALUES(?,?,?,'other','kernel',?,'open',?,?)`).run(
       'inc-historical-provider-names',workflowId,'scope.define',
-      'Recovered dispatch attempts mentioned codex and claude; no provider outage remains.',Date.now(),
+      'Recovered dispatch attempts mentioned codex and claude; no provider outage remains.',Date.now(),Date.now(),
     );
   }finally{ledger.close();}
 
@@ -389,9 +428,9 @@ test('Claude auth fallback advances only after partial effects reconcile and nev
     const jobId=`job-claude-${suffix}`;
     const ledger=openLedger({file:ledgerFileFor(fx.repo)});
     try{
-      ledger.enqueueJob({jobId:`kernel-${workflowId}`,workflowId,kind:'kernel',role:'kernel',payload:{}});
+      enqueueFixtureJob(ledger,{jobId:`kernel-${workflowId}`,workflowId,kind:'kernel',role:'kernel',payload:{}});
       ledger.db.prepare('UPDATE jobs SET status=\'running\',worker_id=\'fake-kernel-terminal\' WHERE job_id=?').run(`kernel-${workflowId}`);
-      ledger.enqueueJob({jobId,workflowId,opId:'architecture.decide',kind:'op',
+      enqueueFixtureJob(ledger,{jobId,workflowId,opId:'architecture.decide',kind:'op',
         payload:{opId:'architecture.decide',owned_paths:['docs/'],difficulty:'hard'}});
     }finally{ledger.close();}
     const routed=fx.run(API,'route','--repo',fx.repo,'--job',jobId,'--difficulty','hard','--json');
@@ -399,13 +438,13 @@ test('Claude auth fallback advances only after partial effects reconcile and nev
     const rejected=fx.run(API,'dispatch','--repo',fx.repo,'--job',jobId,'--spawn','--json');
     assert.notEqual(rejected.status,0);
     return {fx,jobId,result:ledgerRead(fx.repo,db=>({
-      job:db.prepare('SELECT status,attempt,result_json FROM jobs WHERE job_id=?').get(jobId),
+      job:jobRowOf(db,jobId),
       leases:db.prepare('SELECT COUNT(*) n FROM leases WHERE job_id=?').get(jobId).n,
     }))};
   };
 
   const partial=exercise('auth-partial','partial');
-  assert.equal(partial.result.job.status,'queued','settled residual resources reduce partial to proven no-effect');
+  assert.equal(partial.result.job.status,'ready','settled residual resources reduce partial to proven no-effect');
   assert.equal(json(partial.result.job.result_json)?.effectState,'none');
   assert.equal(partial.result.leases,0);
   assert.ok(partial.fx.calls().includes('orchestration worker-stop'));
@@ -435,9 +474,9 @@ test('a dispatch refused after the worker exists closes that worker in the same 
   const jobId='job-reject-closes';
   const ledger=openLedger({file:ledgerFileFor(fx.repo)});
   try{
-    ledger.enqueueJob({jobId:`kernel-${workflowId}`,workflowId,kind:'kernel',role:'kernel',payload:{}});
+    enqueueFixtureJob(ledger,{jobId:`kernel-${workflowId}`,workflowId,kind:'kernel',role:'kernel',payload:{}});
     ledger.db.prepare("UPDATE jobs SET status='running',worker_id='fake-kernel-terminal' WHERE job_id=?").run(`kernel-${workflowId}`);
-    ledger.enqueueJob({jobId,workflowId,opId:'code.refactor',kind:'op',
+    enqueueFixtureJob(ledger,{jobId,workflowId,opId:'code.refactor',kind:'op',
       payload:{opId:'code.refactor',owned_paths:['docs/'],model:'claude-agent'}});
   }finally{ledger.close();}
 
@@ -475,10 +514,10 @@ test('managed prompt stall with exact exited worker is retried as the same logic
   const jobId='job-prompt-stalled';
   const ledger=openLedger({file:ledgerFileFor(fx.repo)});
   try{
-    ledger.enqueueJob({jobId:`kernel-${workflowId}`,workflowId,kind:'kernel',role:'kernel',payload:{}});
+    enqueueFixtureJob(ledger,{jobId:`kernel-${workflowId}`,workflowId,kind:'kernel',role:'kernel',payload:{}});
     ledger.db.prepare("UPDATE jobs SET status='running',worker_id='fake-kernel-terminal' WHERE job_id=?")
       .run(`kernel-${workflowId}`);
-    ledger.enqueueJob({jobId,workflowId,opId:'architecture.decide',kind:'op',
+    enqueueFixtureJob(ledger,{jobId,workflowId,opId:'architecture.decide',kind:'op',
       payload:{opId:'architecture.decide',owned_paths:['docs/'],difficulty:'hard'}});
   }finally{ledger.close();}
 
@@ -487,11 +526,11 @@ test('managed prompt stall with exact exited worker is retried as the same logic
   const rejected=fx.run(API,'dispatch','--repo',fx.repo,'--job',jobId,'--spawn','--json');
   assert.notEqual(rejected.status,0,'the launch still reports a rejected dispatch to the Kernel');
   const state=ledgerRead(fx.repo,db=>({
-    job:db.prepare('SELECT status,attempt,worker_id,result_json FROM jobs WHERE job_id=?').get(jobId),
+    job:jobRowOf(db,jobId),
     leases:db.prepare('SELECT COUNT(*) n FROM leases WHERE job_id=?').get(jobId).n,
     contracts:db.prepare('SELECT COUNT(*) n FROM contracts WHERE workflow_id=?').get(workflowId).n,
   }));
-  assert.equal(state.job.status,'queued','exact exited prompt-stall is a reusable infrastructure launch');
+  assert.equal(state.job.status,'ready','exact exited prompt-stall is a reusable infrastructure launch');
   assert.equal(state.job.attempt,1,'retry preserves the logical attempt');
   assert.equal(state.job.worker_id,null);
   assert.equal(json(state.job.result_json)?.effectState,'none');
@@ -508,17 +547,17 @@ test('reconcile converts a fenced effect_unknown prompt stall into the same queu
   const jobId='job-late-reconcile';
   const ledger=openLedger({file:ledgerFileFor(fx.repo)});
   try{
-    ledger.enqueueJob({jobId:`kernel-${workflowId}`,workflowId,kind:'kernel',role:'kernel',payload:{}});
+    enqueueFixtureJob(ledger,{jobId:`kernel-${workflowId}`,workflowId,kind:'kernel',role:'kernel',payload:{}});
     ledger.db.prepare("UPDATE jobs SET status='running',worker_id='fake-kernel-terminal' WHERE job_id=?")
       .run(`kernel-${workflowId}`);
-    ledger.enqueueJob({jobId,workflowId,opId:'architecture.decide',kind:'op',
+    enqueueFixtureJob(ledger,{jobId,workflowId,opId:'architecture.decide',kind:'op',
       payload:{opId:'architecture.decide',owned_paths:['docs/'],difficulty:'hard'}});
   }finally{ledger.close();}
 
   fx.env.STARCI_FAKE_ORCA_MODE='auth-unknown';
   assert.equal(fx.run(API,'route','--repo',fx.repo,'--job',jobId,'--difficulty','hard','--json').status,0);
   assert.notEqual(fx.run(API,'dispatch','--repo',fx.repo,'--job',jobId,'--spawn','--json').status,0);
-  const fenced=ledgerRead(fx.repo,db=>db.prepare('SELECT status,attempt,worker_id FROM jobs WHERE job_id=?').get(jobId));
+  const fenced=ledgerRead(fx.repo,db=>db.prepare('SELECT status,try_no AS attempt,worker_id FROM jobs WHERE job_id=?').get(jobId));
   assert.equal(fenced.status,'effect_unknown');
   assert.equal(fenced.attempt,1);
 
@@ -527,10 +566,10 @@ test('reconcile converts a fenced effect_unknown prompt stall into the same queu
   assert.equal(reconciled.status,0,reconciled.stderr||reconciled.stdout);
   assert.equal(json(reconciled.stdout)?.reconciled,true);
   const state=ledgerRead(fx.repo,db=>({
-    job:db.prepare('SELECT status,attempt,worker_id,result_json FROM jobs WHERE job_id=?').get(jobId),
+    job:jobRowOf(db,jobId),
     leases:db.prepare('SELECT COUNT(*) n FROM leases WHERE job_id=?').get(jobId).n,
   }));
-  assert.equal(state.job.status,'queued');
+  assert.equal(state.job.status,'ready');
   assert.equal(state.job.attempt,1);
   assert.equal(state.job.worker_id,null);
   assert.equal(json(state.job.result_json)?.reason,'dispatch-reconciled');
@@ -617,11 +656,11 @@ test('an unclassified worker-start refusal is a strike; the second one opens the
   const workflowId='wf-worker-start-strikes';
   const ledger=openLedger({file:ledgerFileFor(fx.repo)});
   try{
-    ledger.enqueueJob({jobId:`kernel-${workflowId}`,workflowId,kind:'kernel',role:'kernel',payload:{}});
+    enqueueFixtureJob(ledger,{jobId:`kernel-${workflowId}`,workflowId,kind:'kernel',role:'kernel',payload:{}});
     ledger.db.prepare("UPDATE jobs SET status='running',worker_id='fake-kernel-terminal' WHERE job_id=?")
       .run(`kernel-${workflowId}`);
     for(const n of [1,2,3])
-      ledger.enqueueJob({jobId:`job-ws-${n}`,workflowId,opId:'architecture.decide',kind:'op',
+      enqueueFixtureJob(ledger,{jobId:`job-ws-${n}`,workflowId,opId:'architecture.decide',kind:'op',
         payload:{opId:'architecture.decide',owned_paths:[`docs/ws-${n}/`],difficulty:'hard'}});
   }finally{ledger.close();}
 
@@ -631,8 +670,7 @@ test('an unclassified worker-start refusal is a strike; the second one opens the
     return {routed:json(routed.stdout)?.decision?.model,
       dispatched:fx.run(API,'dispatch','--repo',fx.repo,'--job',jobId,'--spawn','--json')};
   };
-  const health=()=>ledgerRead(fx.repo,db=>json(
-    db.prepare("SELECT value_json FROM signals WHERE scope='provider-health' AND key='claude'").get()?.value_json??'null'));
+  const health=()=>json(providerHealthRow(fx,'claude')?.value_json??'null');
   const unavailableEvents=()=>ledgerRead(fx.repo,db=>db.prepare(
     "SELECT COUNT(*) n FROM events WHERE workflow_id=? AND kind='provider-unavailable'").get(workflowId).n);
 
@@ -640,7 +678,7 @@ test('an unclassified worker-start refusal is a strike; the second one opens the
   assert.equal(first.routed,'claude-agent','precondition: the pool is healthy before the first refusal');
   assert.notEqual(first.dispatched.status,0,'a refused worker-start rejects the dispatch');
   const firstReject=json(first.dispatched.stdout);
-  assert.equal(firstReject?.rejection?.status,'queued','effectState none keeps the candidate reusable');
+  assert.equal(firstReject?.rejection?.status,'ready','effectState none keeps the candidate reusable');
   assert.equal(firstReject?.rejection?.providerHealth,null,'one refusal is a strike, not an outage');
   assert.equal(health()?.status,'striking','the strike is durable so the next refusal can count it');
   assert.equal(health()?.failureKind,'worker-start');
@@ -653,12 +691,11 @@ test('an unclassified worker-start refusal is a strike; the second one opens the
   const secondReject=json(second.dispatched.stdout);
   assert.equal(secondReject?.rejection?.providerHealth?.failureKind,'worker-start',
     'the second refusal opens the typed circuit under its own failure kind');
-  assert.equal(secondReject?.rejection?.status,'queued','opening a circuit never consumes the attempt');
+  assert.equal(secondReject?.rejection?.status,'ready','opening a circuit never consumes the attempt');
   assert.equal(health()?.status,'unavailable');
   assert.equal(health()?.failures,2);
   assert.equal(unavailableEvents(),1,'the open circuit is announced exactly once');
-  const cooldown=ledgerRead(fx.repo,db=>db.prepare(
-    "SELECT expires_at FROM signals WHERE scope='provider-health' AND key='claude'").get()?.expires_at);
+  const cooldown=providerHealthRow(fx,'claude')?.expires_at;
   assert.ok(cooldown>Date.now(),'the worker-start circuit carries its declared cooldown');
   assert.ok(cooldown<=Date.now()+120000,'runtimes.yaml allocation.cooldownMs.worker-start owns the number');
 
@@ -679,11 +716,11 @@ test('a circuit that reopens for the same failure waits longer each time (circui
   const workflowId='wf-worker-start-backoff';
   const ledger=openLedger({file:ledgerFileFor(fx.repo)});
   try{
-    ledger.enqueueJob({jobId:`kernel-${workflowId}`,workflowId,kind:'kernel',role:'kernel',payload:{}});
+    enqueueFixtureJob(ledger,{jobId:`kernel-${workflowId}`,workflowId,kind:'kernel',role:'kernel',payload:{}});
     ledger.db.prepare("UPDATE jobs SET status='running',worker_id='fake-kernel-terminal' WHERE job_id=?")
       .run(`kernel-${workflowId}`);
     for(const n of [1,2,3,4])
-      ledger.enqueueJob({jobId:`job-bo-${n}`,workflowId,opId:'architecture.decide',kind:'op',
+      enqueueFixtureJob(ledger,{jobId:`job-bo-${n}`,workflowId,opId:'architecture.decide',kind:'op',
         payload:{opId:'architecture.decide',owned_paths:[`docs/bo-${n}/`],difficulty:'hard'}});
   }finally{ledger.close();}
   const refuse=jobId=>{
@@ -691,18 +728,18 @@ test('a circuit that reopens for the same failure waits longer each time (circui
     assert.equal(routed.status,0,routed.stderr||routed.stdout);
     fx.run(API,'dispatch','--repo',fx.repo,'--job',jobId,'--spawn','--json');
   };
-  const health=()=>ledgerRead(fx.repo,db=>{
-    const row=db.prepare("SELECT value_json,expires_at FROM signals WHERE scope='provider-health' AND key='claude'").get();
+  const health=()=>{
+    const row=providerHealthRow(fx,'claude');
     return row?{...json(row.value_json),expiresAt:row.expires_at}:null;
-  });
+  };
   refuse('job-bo-1');refuse('job-bo-2');
   const first=health();
   assert.equal(first.status,'unavailable');
   assert.equal(first.trips,1);
   assert.ok(first.cooldownMs<=120000,'the first open circuit waits the base worker-start cooldown');
   // the cooldown passes and the same failure comes back
-  const w=openLedger({file:ledgerFileFor(fx.repo)});
-  try{w.db.prepare("UPDATE signals SET expires_at=? WHERE scope='provider-health' AND key='claude'").run(Date.now()-1);}finally{w.close();}
+  const machine=openMachine({file:fx.env.STARCI_TEST_MACHINE_FILE,env:fx.env});
+  try{machine.db.prepare('UPDATE provider_health SET circuit_open_until=? WHERE provider=?').run(Date.now()-1,'claude');}finally{machine.close();}
   refuse('job-bo-3');refuse('job-bo-4');
   const second=health();
   assert.equal(second.status,'unavailable');
@@ -717,10 +754,10 @@ test('A7: a rejected managed launch is recorded as evidence, never as the job bi
   const jobId='job-a7-rejected-evidence';
   const ledger=openLedger({file:ledgerFileFor(fx.repo)});
   try{
-    ledger.enqueueJob({jobId:`kernel-${workflowId}`,workflowId,kind:'kernel',role:'kernel',payload:{}});
+    enqueueFixtureJob(ledger,{jobId:`kernel-${workflowId}`,workflowId,kind:'kernel',role:'kernel',payload:{}});
     ledger.db.prepare("UPDATE jobs SET status='running',worker_id='fake-kernel-terminal' WHERE job_id=?")
       .run(`kernel-${workflowId}`);
-    ledger.enqueueJob({jobId,workflowId,opId:'architecture.decide',kind:'op',
+    enqueueFixtureJob(ledger,{jobId,workflowId,opId:'architecture.decide',kind:'op',
       payload:{opId:'architecture.decide',owned_paths:['docs/'],difficulty:'hard'}});
   }finally{ledger.close();}
 
@@ -744,7 +781,7 @@ test('A7: a rejected managed launch is recorded as evidence, never as the job bi
   assert.equal(json(reconciled.stdout)?.dispatchId,'dispatch-fake-1',
     'reconcile resolves the launch it must prove from rejectedDispatches[]');
   const after=jobRow(fx.repo,jobId);
-  assert.equal(after?.status,'queued');
+  assert.equal(after?.status,'ready');
   const afterPayload=json(after.payload_json);
   assert.equal(afterPayload.rejectedDispatches[0].effectState,'none',
     'a reconciled rejection stays on the record, settled — evidence outlives the state it proved');
@@ -755,7 +792,7 @@ test('A7: a rejected managed launch is recorded as evidence, never as the job bi
 // pools whose agent card lists the tool under capabilities.hostTools.
 const seedOp=(fx,workflowId,jobId,opId,payload={})=>{
   const ledger=openLedger({file:ledgerFileFor(fx.repo)});
-  try{ledger.enqueueJob({jobId,workflowId,opId,kind:'op',payload:{opId,owned_paths:[`.starciwork/features/x/${jobId}`],...payload}});}
+  try{enqueueFixtureJob(ledger,{jobId,workflowId,opId,kind:'op',payload:{opId,owned_paths:[`.starciwork/features/x/${jobId}`],...payload}});}
   finally{ledger.close();}
 };
 // The owner's routing_bias on the workflow goal (define-goal): the only bias api route applies - a Kernel
@@ -828,10 +865,10 @@ test('a dead managed worker settles with custody released from its disconnected 
   const jobId='job-managed-custody';
   const ledger=openLedger({file:ledgerFileFor(fx.repo)});
   try{
-    ledger.enqueueJob({jobId:'kernel-wf-custody',workflowId:'wf-custody',kind:'kernel',role:'kernel',
+    enqueueFixtureJob(ledger,{jobId:'kernel-wf-custody',workflowId:'wf-custody',kind:'kernel',role:'kernel',
       payload:{route:{host:'orca',agent:'codex',model:'gpt-6-sol'},hierarchy:{schema:'starci/agent-hierarchy@1',nodeId:'agent:kernel:wf-custody',parentNodeId:'workflow:wf-custody',role:'kernel'}}});
     ledger.db.prepare("UPDATE jobs SET status='running',worker_id='fake-kernel-terminal' WHERE job_id='kernel-wf-custody'").run();
-    ledger.enqueueJob({jobId,workflowId:'wf-custody',opId:'code.refactor',kind:'op',payload:{opId:'code.refactor',owned_paths:['docs/'],model:'claude-agent'}});
+    enqueueFixtureJob(ledger,{jobId,workflowId:'wf-custody',opId:'code.refactor',kind:'op',payload:{opId:'code.refactor',owned_paths:['docs/'],model:'claude-agent'}});
   }finally{ledger.close();}
   const d=fx.run(API,'dispatch','--repo',fx.repo,'--job',jobId,'--model','claude-agent','--spawn','--json');
   assert.equal(d.status,0,d.stderr||d.stdout);

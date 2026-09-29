@@ -5,6 +5,7 @@ import os from 'node:os';
 import path from 'node:path';
 import {spawnSync} from 'node:child_process';
 import {inspectLedger,ledgerFileFor,openLedger} from '../engine/ledger-db.mjs';
+import {seedWorkflow} from './_ledger-fixture.mjs';
 
 // Incident inc-751dd1ac4492 (starci-next base-repos, backend.scaffold): which cut pass runs the whole-set
 // integration gate. settle used to call ordinal === total "final", but once the seam passes the other
@@ -28,27 +29,35 @@ const seed=(repo,fn)=>{const ledger=openLedger({file:ledgerFileFor(repo)});try{r
 const read=(repo,fn)=>{const ledger=inspectLedger({file:ledgerFileFor(repo)});try{return fn(ledger);}finally{ledger.close();}};
 
 const OP='docs.author',CUT='be-baseline-r1-g2',TOTAL=3;
+const jobsByAttempt=new Map();
 /** One dispatched cut ordinal: running, its contract written, a done report filed. */
 const seedOrdinal=(ledger,wf,ordinal,attempt)=>{
   const jobId=`op-cut-${ordinal}-a${attempt}`,dispatch=`ctx-cut-${ordinal}-a${attempt}`;
-  ledger.enqueueJob({jobId,workflowId:wf,opId:OP,kind:'op',attempt,payload:{
-    opId:OP,owned_paths:[`docs/cut-${ordinal}`],cut:{id:CUT,ordinal,total:TOTAL},orca:{dispatchId:dispatch},
-  }});
+  const goal=ledger.db.prepare('SELECT revision FROM goals WHERE workflow_id=? ORDER BY revision DESC LIMIT 1').get(wf);
+  seedWorkflow(ledger,{id:wf,goal:goal?null:{revision:1,markdown:'Cut set fixture',json:{}},jobs:[{jobId,opId:OP,status:'queued',goalRevision:goal?.revision??1,
+    payload:{opId:OP,owned_paths:[`docs/cut-${ordinal}`],cut:{id:CUT,ordinal,total:TOTAL},orca:{dispatchId:dispatch}}}]});
   return dispatchOrdinal(ledger,wf,jobId,attempt,dispatch);
 };
 /** A queued ordinal dispatched: running, its contract written, a done report filed. */
 const dispatchOrdinal=(ledger,wf,jobId,attempt,dispatch=`ctx-${jobId}`)=>{
-  const at=Date.now();
   const payload=JSON.parse(ledger.db.prepare('SELECT payload_json FROM jobs WHERE job_id=?').get(jobId).payload_json);
-  ledger.db.prepare("UPDATE jobs SET status='running',attempt=?,payload_json=? WHERE job_id=?").run(attempt,json({...payload,orca:{dispatchId:dispatch}}),jobId);
-  ledger.db.prepare('INSERT INTO contracts(workflow_id,op_id,attempt,dispatch_id,markdown,context_json,created_at) VALUES(?,?,?,?,?,?,?)')
-    .run(wf,OP,attempt,dispatch,'# cut contract',json({}),at);
-  ledger.db.prepare('INSERT INTO reports(workflow_id,dispatch_id,op_id,attempt,generation,outcome,report_json,from_terminal,consumed_at,created_at) VALUES(?,?,?,?,?,?,?,?,NULL,?)')
-    .run(wf,dispatch,OP,attempt,0,'done',json({outcome:'done'}),null,at);
+  ledger.write.updateJob({jobId,payload:{...payload,orca:{dispatchId:dispatch}}});
+  const phase=ledger.db.prepare('SELECT phase FROM workflows WHERE workflow_id=?').get(wf).phase;
+  if(phase==='queued')ledger.write.changeWorkflowPhase({workflowId:wf,to:'running',by:'test-fixture',reason:'dispatch cut ordinal'});
+  ledger.write.setJobStatus({jobId,to:'ready',reason:'fixture admission'});
+  ledger.write.setJobStatus({jobId,to:'leased',reason:'fixture admission',leaseToken:`lease-${jobId}`});
+  const {attempt_id:attemptId}=ledger.write.startAttempt({workflowId:wf,jobId,dispatchId:dispatch});
+  ledger.write.setJobStatus({jobId,to:'running',reason:'fixture dispatch'});
+  ledger.write.writeContract({attemptId,markdown:'# cut contract',context:{}});
+  ledger.write.fileReport({attemptId,outcome:'done',report:{outcome:'done'}});
+  jobsByAttempt.set(`${wf}:${attempt}`,jobId);
   return jobId;
 };
-const recordChecks=(repo,wf,attempt,names)=>seed(repo,l=>l.db.prepare('INSERT OR REPLACE INTO checks(workflow_id,op_id,attempt,checks_json,created_at) VALUES(?,?,?,?,?)')
-  .run(wf,OP,attempt,json({checks:names.map(name=>({name,exitCode:0}))}),Date.now()));
+const recordChecks=(repo,wf,attempt,names)=>seed(repo,l=>{
+  const jobId=jobsByAttempt.get(`${wf}:${attempt}`);
+  const attemptId=l.db.prepare('SELECT attempt_id FROM op_attempts WHERE job_id=? ORDER BY attempt_id DESC LIMIT 1').get(jobId).attempt_id;
+  for(const name of names)l.write.recordCheckRun({attemptId,name,phase:'verify',runner:'kernel',status:'pass',exitCode:0});
+});
 const SLICE=['cut-slice-postcondition','cut-regression-inventory'];
 const status=(repo,wf)=>{const r=runApi('status','--repo',repo,'--workflow',wf,'--json');assert.equal(r.status,0,r.stderr);return out(r);};
 const settlePass=(repo,jobId)=>runApi('settle','--repo',repo,'--job',jobId,'--verdict','pass','--json');
@@ -109,8 +118,10 @@ test('a failed sibling keeps the set open; its passing retry is the closing pass
     assert.equal(settlePass(repo,jobId).status,0);
   }
   // A red independent check overrules ordinal 2's done claim to fail (the incident's settle).
-  seed(repo,l=>l.db.prepare('INSERT OR REPLACE INTO checks(workflow_id,op_id,attempt,checks_json,created_at) VALUES(?,?,?,?,?)')
-    .run(wf,OP,2,json({checks:[{name:'cut-slice-postcondition',exitCode:1}]}),Date.now()));
+  seed(repo,l=>{
+    const attemptId=l.db.prepare('SELECT attempt_id FROM op_attempts WHERE job_id=?').get(o2).attempt_id;
+    l.write.recordCheckRun({attemptId,name:'cut-slice-postcondition',phase:'verify',runner:'kernel',status:'fail',exitCode:1});
+  });
   const failed=runApi('settle','--repo',repo,'--job',o2,'--verdict','fail','--json');
   assert.equal(failed.status,0,failed.stderr);
   // The settle queued the ordinal's retry itself (settle.nextStep): it is the set's closing job.

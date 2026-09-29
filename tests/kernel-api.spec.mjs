@@ -7,6 +7,8 @@ import {spawnSync} from 'node:child_process';
 import {inspectLedger,ledgerFileFor,openLedger} from '../engine/ledger-db.mjs';
 import {parseYaml,stringifyYaml} from '../engine/yaml.mjs';
 import {FAKE_ORCA} from './helpers/fake-orca.mjs';
+import {seedWorkflow} from './_ledger-fixture.mjs';
+import {openMachine,TEST_REGISTRY_ENV} from '../engine/machine-db.mjs';
 // These specs exercise the owner-flow contract; autopilot (scripts/kernel/autopilot.mjs, owner ruling 2026-09-28) is
 // on by default, so they run with it off - tests/autopilot.spec.mjs covers the autopilot flow.
 process.env.STARCI_AUTOPILOT ??= 'off';
@@ -38,6 +40,13 @@ const out=r=>{try{return JSON.parse(r.stdout);}catch{return null;}};
 /** One temp Work root per test: a plain directory; openLedger creates .starciwork/runtime.sqlite on demand. */
 const fixture=t=>{
   const dirs=[];
+  const machineRoot=fs.mkdtempSync(path.join(os.tmpdir(),'starci-kapi-machine-'));
+  const savedMachine=process.env[TEST_REGISTRY_ENV],savedProjects=process.env.STARCI_PROJECTS_ROOT;
+  process.env[TEST_REGISTRY_ENV]=path.join(machineRoot,'machine.sqlite');
+  process.env.STARCI_PROJECTS_ROOT=path.join(machineRoot,'projects');
+  t.after(()=>{if(savedMachine===undefined)delete process.env[TEST_REGISTRY_ENV];else process.env[TEST_REGISTRY_ENV]=savedMachine;
+    if(savedProjects===undefined)delete process.env.STARCI_PROJECTS_ROOT;else process.env.STARCI_PROJECTS_ROOT=savedProjects;
+    fs.rmSync(machineRoot,{recursive:true,force:true,maxRetries:20,retryDelay:25});});
   t.after(()=>{for(const dir of dirs)fs.rmSync(dir,{recursive:true,force:true,maxRetries:20,retryDelay:25});});
   return {repo(){const dir=fs.mkdtempSync(path.join(os.tmpdir(),'starci-kapi-'));dirs.push(dir);return dir;}};
 };
@@ -45,6 +54,48 @@ const fixture=t=>{
 const seed=(repo,fn)=>{const ledger=openLedger({file:ledgerFileFor(repo)});try{fn(ledger);}finally{ledger.close();}};
 const read=(repo,fn)=>{const ledger=inspectLedger({file:ledgerFileFor(repo)});try{return fn(ledger);}finally{ledger.close();}};
 const json=v=>JSON.stringify(v??null);
+const setPhase=(ledger,workflowId,to)=>{
+  const phase=ledger.db.prepare('SELECT phase FROM workflows WHERE workflow_id=?').get(workflowId)?.phase;
+  if(phase===to)return;
+  const move=next=>ledger.write.changeWorkflowPhase({workflowId,to:next,by:'test-fixture',reason:'seed lifecycle state'});
+  if(phase==='queued'&&to==='finished')move('running');
+  if(phase==='running'&&to==='queued')move('stopped');
+  move(to);
+};
+const moveJob=(ledger,jobId,to,fields={})=>{
+  const row=()=>ledger.db.prepare('SELECT * FROM jobs WHERE job_id=?').get(jobId);
+  let status=row().status;
+  const move=(next,extra={})=>{ledger.write.setJobStatus({jobId,to:next,reason:'test fixture state',...extra});status=next;};
+  if(status===to){if(Object.keys(fields).length)ledger.write.updateJob({jobId,...fields});return;}
+  if(status==='effect_unknown'&&['reported','succeeded','failed'].includes(to))move('running');
+  if(status==='running'&&to==='queued'){move('ready',{workerId:null,leaseToken:null,deadline:null});move('queued');return;}
+  if(status==='effect_unknown'&&to==='queued'){move('ready',{workerId:null,leaseToken:null,deadline:null});move('queued');return;}
+  if(status==='queued'&&to!=='cancelled')move('ready');
+  if(status==='ready'&&['leased','running','reported','succeeded','failed','effect_unknown'].includes(to))move('leased',{leaseToken:fields.leaseToken??`fixture:${jobId}`});
+  if(status==='leased'&&['running','reported','succeeded','failed','effect_unknown'].includes(to)){
+    const job=row();setPhase(ledger,job.workflow_id,'running');
+    if(!ledger.db.prepare('SELECT 1 FROM op_attempts WHERE job_id=?').get(jobId))ledger.write.startAttempt({workflowId:job.workflow_id,jobId,dispatchId:`fixture:${jobId}`});
+    move('running',fields);
+  }
+  if(status==='running'&&['reported','succeeded'].includes(to))move('reported');
+  if(status!==to)move(to,fields);
+};
+const seedOp=(ledger,wf,{jobId,opId,status='queued',payload={},tryNo=1,unitId=jobId,retryOf=null,result=null,workerId=null,dispatchId=null,createdAt=Date.now()})=>{
+  if(!ledger.db.prepare('SELECT 1 FROM workflows WHERE workflow_id=?').get(wf))ledger.ensureWorkflow({workflowId:wf});
+  if(!['queued','ready','cancelled'].includes(status))setPhase(ledger,wf,'running');
+  seedWorkflow(ledger,{id:wf,jobs:[{jobId,opId,kind:'op',unitId,tryNo,retryOf,status,payload,workerId,dispatchId,createdAt,result}]});
+};
+const fileFixtureReport=(ledger,jobId,{outcome='ask',summary='fixture report',question=null,consumed=false}={})=>{
+  const attemptId=ledger.db.prepare('SELECT attempt_id FROM op_attempts WHERE job_id=? ORDER BY attempt_id DESC LIMIT 1').get(jobId).attempt_id;
+  const row=ledger.write.fileReport({attemptId,outcome,report:{outcome,summary,...(question?{question}:{})}});
+  if(consumed)ledger.write.markReportConsumed({attemptId});
+  return row;
+};
+const writeFixtureContract=(ledger,jobId,markdown='# fixture contract')=>{
+  const attemptId=ledger.db.prepare('SELECT attempt_id FROM op_attempts WHERE job_id=? ORDER BY attempt_id DESC LIMIT 1').get(jobId).attempt_id;
+  ledger.write.writeContract({attemptId,markdown,context:{}});
+  return attemptId;
+};
 
 /** A workflow with a goal revision and a pending inbox goal row — the shape define-goal.mjs writes. */
 const seedGoal=(repo,workflowId)=>{
@@ -66,8 +117,9 @@ test('survey on an empty workflow exits 0 with a sane empty result',t=>{
   const body=out(r);
   assert.ok(body&&typeof body==='object',`survey --json should print a JSON object, got: ${r.stdout}`);
   // Nothing exists yet — whatever summary shape the CLI chose, it must not invent rows.
-  for(const key of ['jobs','events','inbox','incidents','signals'])
+  for(const key of ['jobs','inbox','incidents','signals'])
     if(Array.isArray(body[key]))assert.equal(body[key].length,0,`empty workflow but survey.${key} is non-empty`);
+  if(Array.isArray(body.events))assert.deepEqual(body.events.map(e=>e.kind),['workflow-created']);
 });
 
 test('enqueue writes a queued job row the ledger can see',t=>{
@@ -93,7 +145,7 @@ test('enqueue writes a queued job row the ledger can see',t=>{
 test('status marks a running workflow with no operation frontier as orphaned-frontier',t=>{
   const fx=fixture(t),repo=fx.repo(),wf='wf-k7-orphaned';
   seedGoal(repo,wf);
-  seed(repo,ledger=>ledger.db.prepare("UPDATE workflows SET phase='running' WHERE workflow_id=?").run(wf));
+  seed(repo,ledger=>setPhase(ledger,wf,'running'));
   const r=runApi('status','--repo',repo,'--workflow',wf,'--json');
   assert.equal(r.status,0,r.stderr||r.error?.message);
   assert.deepEqual(out(r)?.frontier,{
@@ -109,7 +161,7 @@ test('status marks a running workflow with no operation frontier as orphaned-fro
 test('status: frontier.actionable is false only when nothing is waiting on the Kernel',t=>{
   const fx=fixture(t),repo=fx.repo(),wf='wf-k7-actionable';
   seedGoal(repo,wf);
-  seed(repo,ledger=>ledger.db.prepare("UPDATE workflows SET phase='running' WHERE workflow_id=?").run(wf));
+  seed(repo,ledger=>setPhase(ledger,wf,'running'));
   const frontier=()=>{
     const r=runApi('status','--repo',repo,'--workflow',wf,'--json');
     assert.equal(r.status,0,r.stderr||r.error?.message);
@@ -127,7 +179,7 @@ test('status: frontier.actionable is false only when nothing is waiting on the K
 
   // The same job, running and owing a report: this is the wait the yield rule
   // exists for.
-  seed(repo,ledger=>ledger.db.prepare("UPDATE jobs SET status='running' WHERE job_id=?").run(jobId));
+  seed(repo,ledger=>moveJob(ledger,jobId,'running'));
   const running=frontier();
   assert.equal(running.state,'engaged');
   assert.equal(running.readyOperations,0);
@@ -135,7 +187,7 @@ test('status: frontier.actionable is false only when nothing is waiting on the K
   assert.equal(running.reason,null);
 
   // A fenced launch needs reconcile before anything else can move.
-  seed(repo,ledger=>ledger.db.prepare("UPDATE jobs SET status='effect_unknown' WHERE job_id=?").run(jobId));
+  seed(repo,ledger=>moveJob(ledger,jobId,'effect_unknown'));
   const fenced=frontier();
   assert.equal(fenced.readyOperations,1,'an effect_unknown launch is the Kernel’s to reconcile');
   assert.equal(fenced.actionable,true);
@@ -143,14 +195,14 @@ test('status: frontier.actionable is false only when nothing is waiting on the K
   // A settled workflow with nothing open is idle, and idle is the Kernel's
   // cue to plan the next leg or finish — never to yield.
   seed(repo,ledger=>{
-    ledger.db.prepare("UPDATE jobs SET status='succeeded' WHERE job_id=?").run(jobId);
-    ledger.db.prepare("UPDATE workflows SET phase='queued' WHERE workflow_id=?").run(wf);
+    moveJob(ledger,jobId,'succeeded');
+    setPhase(ledger,wf,'queued');
   });
   const idle=frontier();
   assert.equal(idle.state,'idle');
   assert.equal(idle.actionable,true);
 
-  seed(repo,ledger=>ledger.db.prepare("UPDATE workflows SET phase='finished' WHERE workflow_id=?").run(wf));
+  seed(repo,ledger=>setPhase(ledger,wf,'finished'));
   assert.deepEqual([frontier().state,frontier().actionable],['finished',false],
     'a finished workflow is the other state with nothing to act on');
 });
@@ -186,11 +238,9 @@ test('status explains every queued job: ready, dependency, path-lease, pool-full
   const second=enq('docs.author','docs/first/nested');
   seed(repo,ledger=>{
     const at=Date.now();
-    ledger.db.prepare('INSERT OR IGNORE INTO resources(resource_key,capacity) VALUES(?,1)').run('path:docs/first');
-    ledger.db.prepare("UPDATE jobs SET status='leased', lease_token='tok-k7-first' WHERE job_id=?").run(first);
-    const job=ledger.db.prepare('SELECT * FROM jobs WHERE job_id=?').get(first);
-    ledger.db.prepare(`INSERT INTO leases(resource_key,job_id,workflow_id,op_id,attempt,generation,token,units,acquired_at,expires_at,machine_ref)
-      VALUES(?,?,?,?,?,?,?,1,?,?,NULL)`).run('path:docs/first',first,wf,job.op_id,job.attempt,job.generation,job.lease_token,at,at+600000);
+    ledger.write.declareResource({resourceKey:'path:docs/first',capacity:1,declaredBy:'test-fixture'});
+    moveJob(ledger,first,'leased',{leaseToken:'tok-k7-first'});
+    ledger.write.acquireLease({resourceKey:'path:docs/first',jobId:first,expiresAt:at+600000,at});
   });
   frontier=statusOf();
   assert.equal(because(second,frontier).queuedBecause,'path-lease');
@@ -208,7 +258,7 @@ test('status explains every queued job: ready, dependency, path-lease, pool-full
   // Release the fence, then saturate the routed pool instead.
   seed(repo,ledger=>{
     ledger.db.prepare('DELETE FROM leases WHERE job_id=?').run(first);
-    ledger.db.prepare("UPDATE jobs SET status='succeeded' WHERE job_id=?").run(first);
+    moveJob(ledger,first,'succeeded');
   });
   assert.equal(because(second,statusOf()).queuedBecause,'ready','a released fence and a settled sibling clear it');
 
@@ -220,19 +270,17 @@ test('status explains every queued job: ready, dependency, path-lease, pool-full
     ledger.db.prepare('UPDATE jobs SET payload_json=? WHERE job_id=?').run(json({...payload,model:pool}),second);
     const at=Date.now();
     ledger.ensureWorkflow({workflowId:'wf-other',title:'another workflow on the same fleet'});
-    for(let n=1;n<=maxParallel;n++) ledger.db.prepare(`INSERT INTO jobs(job_id,workflow_id,op_id,attempt,generation,kind,role,payload_json,status,created_at,updated_at)
-      VALUES(?,?,?,?,0,'op','op',?,'running',?,?)`).run(`occupant-${n}`,'wf-other','docs.author',n,json({opId:'docs.author',model:pool}),at,at);
+    for(let n=1;n<=maxParallel;n++)seedOp(ledger,'wf-other',{jobId:`occupant-${n}`,opId:'docs.author',status:'running',
+      payload:{opId:'docs.author',model:pool},createdAt:at+n});
   });
   const full=because(second,statusOf());
   assert.equal(full.queuedBecause,'pool-full');
   assert.deepEqual(full.blockedBy,{pool,running:maxParallel,maxParallel},'the blocking pool and its declared slot count, read from runtimes.yaml');
 
   // circuit-open outranks pool-full: a dead provider credential is not a wait.
-  seed(repo,ledger=>{
-    const at=Date.now();
-    ledger.db.prepare(`INSERT OR REPLACE INTO signals(scope,key,holder_pid,token,value_json,at,expires_at) VALUES('provider-health',?,NULL,NULL,?,?,?)`)
-      .run('claude',json({schema:'starci/provider-health@1',provider:'claude',status:'unavailable',failureKind:'auth',failures:1,strikeLimit:1}),at,at+600000);
-  });
+  const machine=openMachine({file:process.env[TEST_REGISTRY_ENV]});
+  try{machine.setProviderHealth({provider:'claude',status:'unavailable',failureKind:'auth',strikes:1,strikeLimit:1,circuitOpenUntil:Date.now()+600000});}
+  finally{machine.close();}
   const open=because(second,statusOf());
   assert.equal(open.queuedBecause,'circuit-open');
   assert.deepEqual(open.blockedBy,{provider:'claude',pool},'the provider credential that is parked, and the pool that shares it');
@@ -246,9 +294,7 @@ test('status explains every queued job: ready, dependency, path-lease, pool-full
   // dependency outranks everything once the earlier leg has a job still queued
   // or in flight: no admission check can make this op dispatchable before it settles.
   seed(repo,ledger=>{
-    const at=Date.now();
-    ledger.db.prepare(`INSERT INTO jobs(job_id,workflow_id,op_id,attempt,generation,kind,role,payload_json,status,created_at,updated_at)
-      VALUES(?,?,?,?,0,'op','op',?,'queued',?,?)`).run('earlier-leg-job',wf,'scope.define',1,json({opId:'scope.define'}),at,at);
+    seedOp(ledger,wf,{jobId:'earlier-leg-job',opId:'scope.define',payload:{opId:'scope.define'}});
   });
   const dep=because(second,statusOf());
   assert.equal(dep.queuedBecause,'dependency');
@@ -259,10 +305,8 @@ test('status explains every queued job: ready, dependency, path-lease, pool-full
   // predecessor: the declared edge overrides leg order (inc-df38ecef1927 — a draw
   // held forever by a brand attempt that was itself enqueued --after the draw).
   seed(repo,ledger=>{
-    const at=Date.now();
-    ledger.db.prepare("UPDATE jobs SET status='succeeded' WHERE job_id='earlier-leg-job'").run();
-    ledger.db.prepare(`INSERT INTO jobs(job_id,workflow_id,op_id,attempt,generation,kind,role,payload_json,status,created_at,updated_at)
-      VALUES(?,?,?,?,0,'op','op',?,'queued',?,?)`).run('earlier-after-job',wf,'scope.define',1,json({opId:'scope.define',after:[second]}),at,at);
+    moveJob(ledger,'earlier-leg-job','succeeded');
+    seedOp(ledger,wf,{jobId:'earlier-after-job',opId:'scope.define',payload:{opId:'scope.define',after:[second]}});
   });
   assert.notEqual(because(second,statusOf()).queuedBecause,'dependency',
     'an earlier-leg job enqueued --after this one is not its predecessor');
@@ -305,7 +349,7 @@ test('an owner-gate incident holds the jobs it names until the Kernel resolves i
   }
 
   // with only held jobs queued, nothing is actionable and the watchdog stays quiet
-  seed(repo,ledger=>ledger.db.prepare("UPDATE jobs SET status='succeeded' WHERE job_id=?").run(free));
+  seed(repo,ledger=>moveJob(ledger,free,'succeeded'));
   fr=frontier();
   assert.equal(fr.actionable,false);
   assert.deepEqual(fr.queuedCauses,{'owner-gate':1});
@@ -322,7 +366,7 @@ test('an owner-gate incident holds the jobs it names until the Kernel resolves i
   assert.equal(fr.actionable,true);
   assert.equal(out(api('incident','--workflow',wf,'--resolve',incidentId)).changed,false,'resolving twice is a no-op');
   const kinds=read(repo,ledger=>ledger.db.prepare("SELECT kind FROM events WHERE entity_type='incident' AND entity_id=? ORDER BY seq").all(incidentId).map(r=>r.kind));
-  assert.deepEqual(kinds,['incident-raised','incident-resolved']);
+  assert.deepEqual(kinds,['incident-opened','incident-raised','incident-resolved','incident-resolved']);
 
   // without --holds the incident's own --op is held; any other kind holds nothing
   const plain=out(api('incident','--workflow',wf,'--kind','owner-gate','--op','integration.verify','--detail','consent'));
@@ -341,8 +385,8 @@ test('status lists every concurrent owner wait of one op by subject, and a later
   seedGoal(repo,wf);
   seed(repo,ledger=>{
     const at=Date.now();
-    const job=(id,attempt,subject,status='failed',verdict='awaiting-owner')=>ledger.db.prepare(`INSERT INTO jobs(job_id,workflow_id,op_id,attempt,generation,kind,role,payload_json,status,result_json,created_at,updated_at)
-      VALUES(?,?,?,?,0,'op','op',?,?,?,?,?)`).run(id,wf,'provision.ask',attempt,json({opId:'provision.ask',params:{subject}}),status,json({verdict}),at+attempt,at+attempt);
+    const job=(id,attempt,subject,status='failed',verdict='awaiting-owner')=>seedOp(ledger,wf,{jobId:id,opId:'provision.ask',status,
+      payload:{opId:'provision.ask',params:{subject}},result:verdict?{verdict}:null,createdAt:at+attempt});
     job('ask-chatbot',2,'Chatbot decisions');
     job('ask-shell-old',3,'Shell auth');
     job('ask-accounting',4,'Accounting decisions');
@@ -378,7 +422,7 @@ test('enqueue --after and a cut seam hold siblings as dependency until the prior
 
   // A StarCi Next and a MiaMia workflow stalled behind a seam / --after job
   // that had settled failed: status read engaged and nothing woke the Kernel.
-  seed(repo,ledger=>ledger.db.prepare("UPDATE jobs SET status='failed',result_json=? WHERE job_id IN (?,?)").run(JSON.stringify({verdict:'blocked'}),composition,seam));
+  seed(repo,ledger=>{for(const id of [composition,seam]){moveJob(ledger,id,'failed');ledger.write.recordJobResult({jobId:id,result:{verdict:'blocked'}});}});
   const frontierNow=()=>{const r=api('status','--workflow',wf);assert.equal(r.status,0,r.stderr);return out(r).frontier;};
   let frontier=frontierNow();
   assert.equal(frontier.queued.find(q=>q.jobId===member).queuedBecause,'dependency-failed');
@@ -388,19 +432,20 @@ test('enqueue --after and a cut seam hold siblings as dependency until the prior
   assert.equal(frontier.actionable,true,'a dead dependency is the Kernel\'s to move, so the watchdog wakes it');
   // A retry of the failed --after job is followed through its lineage: a live wait, no re-point by hand
   // (starci-next sn-subscription dropped and re-enqueued its ordinal 6 after each failed attempt it named).
-  const compositionRetry=enq('--op','docs.author','--paths','docs/composition');
+  const compositionRetry=enq('--op','docs.author','--paths','docs/composition','--retry-of',composition);
   assert.equal(because(member).queuedBecause,'dependency');
   assert.deepEqual(because(member).blockedBy,{op:'docs.author',job:compositionRetry});
   assert.match(because(member).detail,new RegExp(`the retry lineage of ${composition}`));
   const afterFailed=api('enqueue','--workflow',wf,'--op','docs.author','--paths','docs/late','--after',composition);
   assert.equal(afterFailed.status,0,`--after a failed job whose retry carries on is accepted: ${afterFailed.stderr}`);
-  seed(repo,ledger=>ledger.db.prepare("UPDATE jobs SET status='succeeded' WHERE job_id=?").run(compositionRetry));
+  seed(repo,ledger=>moveJob(ledger,compositionRetry,'succeeded'));
   assert.equal(because(member).queuedBecause,'ready','the retry succeeding releases the dependant');
   // A retried seam (a later ordinal-1 attempt) is a live wait again.
   enq('--op','docs.author','--paths','docs/cut-1b','--cut-id','c1','--cut-ordinal','1','--cut-total','2');
   assert.equal(frontierNow().queued.find(q=>q.jobId===second).queuedBecause,'dependency');
 
-  seed(repo,ledger=>ledger.db.prepare("UPDATE jobs SET status='succeeded' WHERE job_id=? OR json_extract(payload_json,'$.cut.ordinal')=1").run(composition));
+  seed(repo,ledger=>{for(const row of ledger.db.prepare("SELECT job_id FROM jobs WHERE job_id=? OR json_extract(payload_json,'$.cut.ordinal')=1").all(composition))
+    if(!['succeeded','failed'].includes(ledger.db.prepare('SELECT status FROM jobs WHERE job_id=?').get(row.job_id).status))moveJob(ledger,row.job_id,'succeeded');});
   assert.equal(because(member).queuedBecause,'ready');
   assert.equal(because(second).queuedBecause,'ready');
 });
@@ -424,7 +469,7 @@ test('reconcile --drop retires a never-dispatched queued job and names what wait
   const q=out(s).frontier.queued;
   assert.equal(q.find(x=>x.jobId===third).queuedBecause,'dependency-failed','its dependant is the Kernel\'s to move now');
   assert.equal(q.some(x=>x.jobId===second),false);
-  seed(repo,ledger=>ledger.db.prepare("UPDATE jobs SET status='running',worker_id='w-1' WHERE job_id=?").run(seam));
+  seed(repo,ledger=>moveJob(ledger,seam,'running',{workerId:'w-1'}));
   const refused=api('reconcile','--job',seam,'--drop','--reason','x');
   assert.notEqual(refused.status,0,'a dispatched job settles through settle');
   assert.match(refused.stderr,/drop-not-queued/);
@@ -438,13 +483,12 @@ test('no open operation plus an unanswered ask is awaiting-owner, not actionable
   seedGoal(repo,wf);
   seed(repo,ledger=>{
     const at=Date.now();
-    ledger.db.prepare("UPDATE workflows SET phase='running' WHERE workflow_id=?").run(wf);
-    const job=(id,attempt,status,result)=>ledger.db.prepare(`INSERT INTO jobs(job_id,workflow_id,op_id,attempt,generation,kind,role,payload_json,status,result_json,created_at,updated_at)
-      VALUES(?,?,?,?,0,'op','op',?,?,?,?,?)`).run(id,wf,'business.decide',attempt,json({opId:'business.decide'}),status,json(result),at+attempt,at+attempt);
-    job('bd-tax',12,'failed',{verdict:'awaiting-owner',askDispatchId:'ctx_tax'});
-    job('bd-record',13,'succeeded',{verdict:'pass'});
-    ledger.db.prepare(`INSERT INTO reports(workflow_id,dispatch_id,op_id,attempt,generation,outcome,report_json,consumed_at,created_at) VALUES(?,?,?,?,0,'ask',?,?,?)`)
-      .run(wf,'ctx_tax','business.decide',12,json({outcome:'ask',summary:'tax',question:{text:'tax?'}}),at,at);
+    setPhase(ledger,wf,'running');
+    seedOp(ledger,wf,{jobId:'bd-tax',opId:'business.decide',status:'failed',dispatchId:'ctx_tax',
+      payload:{opId:'business.decide'},result:{verdict:'awaiting-owner',askDispatchId:'ctx_tax'},createdAt:at});
+    seedOp(ledger,wf,{jobId:'bd-record',opId:'business.decide',status:'succeeded',payload:{opId:'business.decide'},
+      result:{verdict:'pass'},createdAt:at+1});
+    fileFixtureReport(ledger,'bd-tax',{outcome:'ask',summary:'tax',question:{text:'tax?'},consumed:true});
     ledger.appendEvent({workflowId:wf,entityType:'report',entityId:'ctx_tax',kind:'ask-serving',payload:{dispatchId:'ctx_tax',url:'http://127.0.0.1:6971/a-x',pid:process.pid}});
   });
   const status=()=>{const r=runApi('status','--repo',repo,'--workflow',wf,'--json');assert.equal(r.status,0,r.stderr);return out(r);};
@@ -454,7 +498,7 @@ test('no open operation plus an unanswered ask is awaiting-owner, not actionable
   assert.deepEqual(s.awaitingOwner.map(a=>[a.jobId,a.answer]),[['bd-tax','pending']],'the pending ask is listed although a later attempt of the op exists');
   seed(repo,ledger=>ledger.appendEvent({workflowId:wf,entityType:'report',entityId:'ctx_tax',kind:'ask-answered',payload:{dispatchId:'ctx_tax'}}));
   s=status();
-  assert.equal(s.frontier.state,'orphaned-frontier','once answered the Kernel owes the next transition');
+  assert.equal(s.frontier.state,'next-ready','once answered the Kernel owes the next transition');
   assert.equal(s.frontier.actionable,true);
 });
 
@@ -464,12 +508,9 @@ test('a consumed report whose job is still running makes the frontier settle-rea
   const fx=fixture(t),repo=fx.repo(),wf='wf-k7-settle-ready';
   seedGoal(repo,wf);
   seed(repo,ledger=>{
-    const at=Date.now();
-    ledger.db.prepare("UPDATE workflows SET phase='running' WHERE workflow_id=?").run(wf);
-    ledger.db.prepare(`INSERT INTO jobs(job_id,workflow_id,op_id,attempt,generation,kind,role,payload_json,status,created_at,updated_at)
-      VALUES('impl-a35',?,'interface.implement',35,0,'op','op',?,'running',?,?)`).run(wf,json({opId:'interface.implement'}),at,at);
-    ledger.db.prepare(`INSERT INTO reports(workflow_id,dispatch_id,op_id,attempt,generation,outcome,report_json,consumed_at,created_at)
-      VALUES(?,'impl-a35','interface.implement',35,0,'done',?,?,?)`).run(wf,json({outcome:'done',summary:'done'}),at,at);
+    setPhase(ledger,wf,'running');
+    seedOp(ledger,wf,{jobId:'impl-a35',opId:'interface.implement',status:'running',dispatchId:'impl-a35',payload:{opId:'interface.implement'}});
+    fileFixtureReport(ledger,'impl-a35',{outcome:'done',summary:'done',consumed:true});
   });
   const r=runApi('status','--repo',repo,'--workflow',wf,'--json');
   assert.equal(r.status,0,r.stderr);
@@ -497,7 +538,7 @@ test('a Work record dependsOn owned by another open job holds the job as depende
   assert.equal(because(base).queuedBecause,'ready');
   assert.deepEqual(because(tasks).blockedBy,{op:'docs.author',job:base});
   assert.equal(because(approval).queuedBecause,'dependency');
-  seed(repo,ledger=>ledger.db.prepare("UPDATE jobs SET status='succeeded' WHERE job_id=?").run(base));
+  seed(repo,ledger=>moveJob(ledger,base,'succeeded'));
   assert.equal(because(tasks).queuedBecause,'ready','the succeeded owner releases its dependents');
   assert.deepEqual(because(approval).blockedBy,{op:'docs.author',job:tasks});
 });
@@ -508,12 +549,10 @@ test('an unanswered ask whose form expired is ask-reserve (actionable); a live f
   const fx=fixture(t),repo=fx.repo(),wf='wf-k7-ask-reserve';
   seedGoal(repo,wf);
   seed(repo,ledger=>{
-    const at=Date.now();
-    ledger.db.prepare("UPDATE workflows SET phase='running' WHERE workflow_id=?").run(wf);
-    ledger.db.prepare(`INSERT INTO jobs(job_id,workflow_id,op_id,attempt,generation,kind,role,payload_json,status,result_json,created_at,updated_at)
-      VALUES('bd-tax',?,'business.decide',1,0,'op','op',?,'failed',?,?,?)`).run(wf,json({opId:'business.decide'}),json({verdict:'awaiting-owner',askDispatchId:'ctx_tax'}),at,at);
-    ledger.db.prepare(`INSERT INTO reports(workflow_id,dispatch_id,op_id,attempt,generation,outcome,report_json,consumed_at,created_at) VALUES(?,'ctx_tax','business.decide',1,0,'ask',?,?,?)`)
-      .run(wf,json({outcome:'ask',summary:'tax',question:{text:'tax?'}}),at,at);
+    setPhase(ledger,wf,'running');
+    seedOp(ledger,wf,{jobId:'bd-tax',opId:'business.decide',status:'failed',dispatchId:'ctx_tax',payload:{opId:'business.decide'},
+      result:{verdict:'awaiting-owner',askDispatchId:'ctx_tax'}});
+    fileFixtureReport(ledger,'bd-tax',{outcome:'ask',summary:'tax',question:{text:'tax?'},consumed:true});
     ledger.appendEvent({workflowId:wf,entityType:'report',entityId:'ctx_tax',kind:'ask-serving',payload:{dispatchId:'ctx_tax',url:'http://127.0.0.1:6971/a-x',pid:process.pid}});
   });
   const frontier=()=>{const r=runApi('status','--repo',repo,'--workflow',wf,'--json');assert.equal(r.status,0,r.stderr);return out(r).frontier;};
@@ -558,7 +597,7 @@ test('an unanswered ask whose form expired is ask-reserve (actionable); a live f
 test('no open operation plus an open owner-gate incident is awaiting-owner',t=>{
   const fx=fixture(t),repo=fx.repo(),wf='wf-k7-gate-no-job';
   seedGoal(repo,wf);
-  seed(repo,ledger=>ledger.db.prepare("UPDATE workflows SET phase='running' WHERE workflow_id=?").run(wf));
+  seed(repo,ledger=>setPhase(ledger,wf,'running'));
   const status=()=>{const r=runApi('status','--repo',repo,'--workflow',wf,'--json');assert.equal(r.status,0,r.stderr);return out(r).frontier;};
   assert.equal(status().state,'orphaned-frontier');
   const raised=runApi('incident','--repo',repo,'--workflow',wf,'--kind','owner-gate','--op','interface.scaffold','--detail','brand missing','--json');
@@ -575,12 +614,10 @@ test('hierarchy projects workflow -> Kernel -> Op from durable job identity',t=>
   const fx=fixture(t),repo=fx.repo(),wf='wf-k7-hierarchy';
   seedGoal(repo,wf);
   seed(repo,ledger=>{
-    const at=Date.now();
-    ledger.db.prepare("INSERT INTO jobs(job_id,workflow_id,op_id,attempt,generation,kind,role,payload_json,status,worker_id,created_at,updated_at) VALUES(?,?,NULL,1,0,'kernel','kernel',?,'running',?,?,?)")
-      .run(`kernel-${wf}`,wf,json({
+    ledger.write.bindKernelJob({workflowId:wf,workerId:'term-kernel',payload:{
         route:{host:'orca',agent:'codex',model:'gpt-6-sol',runtimePool:'codex-agent'},
         hierarchy:{schema:'starci/agent-hierarchy@1',nodeId:`agent:kernel:${wf}`,parentNodeId:`workflow:${wf}`,role:'kernel',runtime:{host:'orca',agent:'codex',model:'gpt-6-sol',terminalHandle:'term-kernel'}},
-      }),'term-kernel',at,at);
+      }});
   });
   const enq=runApi('enqueue','--repo',repo,'--workflow',wf,'--op','docs.author','--paths','docs/','--json');
   assert.equal(enq.status,0,enq.stderr);
@@ -604,11 +641,10 @@ test('status projects exact host liveness and live jobs cannot route or dispatch
   const fx=fixture(t),repo=fx.repo(),wf='wf-k7-liveness',jobId='op-k7-live';
   seedGoal(repo,wf);
   seed(repo,ledger=>{
-    const at=Date.now();
-    ledger.db.prepare("INSERT INTO jobs(job_id,workflow_id,op_id,attempt,generation,kind,role,payload_json,status,worker_id,created_at,updated_at) VALUES(?,?,?,1,0,'op','op',?,'running',?,?,?)")
-      .run(jobId,wf,'docs.author',json({opId:'docs.author',owned_paths:['docs/'],orca:{dispatchId:'ctx-k7-live',agentTerminalHandle:'term-k7-op'},hierarchy:{runtime:{host:'orca',agent:'devin',dispatchId:'ctx-k7-live',terminalHandle:'term-k7-op'}}}),'term-k7-op',at,at);
-    ledger.db.prepare('INSERT INTO contracts(workflow_id,op_id,attempt,dispatch_id,markdown,context_json,created_at) VALUES(?,?,?,?,?,?,?)')
-      .run(wf,'docs.author',1,'ctx-k7-live','# live contract',json({}),at);
+    seedOp(ledger,wf,{jobId,opId:'docs.author',status:'running',workerId:'term-k7-op',dispatchId:'ctx-k7-live',
+      payload:{opId:'docs.author',owned_paths:['docs/'],orca:{dispatchId:'ctx-k7-live',agentTerminalHandle:'term-k7-op'},
+        hierarchy:{runtime:{host:'orca',agent:'devin',dispatchId:'ctx-k7-live',terminalHandle:'term-k7-op'}}}});
+    writeFixtureContract(ledger,jobId,'# live contract');
   });
   const fakeRoot=fs.mkdtempSync(path.join(os.tmpdir(),'starci-kapi-live-'));
   t.after(()=>fs.rmSync(fakeRoot,{recursive:true,force:true,maxRetries:20,retryDelay:25}));
@@ -637,7 +673,7 @@ test('status projects exact host liveness and live jobs cannot route or dispatch
   // queued and its lease dropped although the original exact worker stayed
   // alive. Status must expose that mismatch, duplicate route/dispatch must
   // fail closed, and reconcile reattaches the worker + lease without spawn.
-  seed(repo,ledger=>ledger.db.prepare("UPDATE jobs SET status='queued',worker_id=NULL,lease_token=NULL,deadline=NULL WHERE job_id=?").run(jobId));
+  seed(repo,ledger=>moveJob(ledger,jobId,'queued'));
   const driftStatus=runLive('status','--repo',repo,'--workflow',wf,'--json');
   assert.equal(driftStatus.status,0,driftStatus.stderr);
   const driftWorker=out(driftStatus)?.workers?.find(item=>item.jobId===jobId);
@@ -665,11 +701,10 @@ test('status distinguishes a turn-idle Op and nudge wakes the exact worker witho
   const fx=fixture(t),repo=fx.repo(),wf='wf-k7-nudge',jobId='op-k7-idle';
   seedGoal(repo,wf);
   seed(repo,ledger=>{
-    const at=Date.now();
-    ledger.db.prepare("INSERT INTO jobs(job_id,workflow_id,op_id,attempt,generation,kind,role,payload_json,status,worker_id,created_at,updated_at) VALUES(?,?,?,1,0,'op','op',?,'running',?,?,?)")
-      .run(jobId,wf,'docs.author',json({opId:'docs.author',owned_paths:['docs/'],orca:{dispatchId:'ctx-k7-idle',agentTerminalHandle:'term-k7-idle'},hierarchy:{runtime:{host:'orca',agent:'devin',dispatchId:'ctx-k7-idle',terminalHandle:'term-k7-idle'}}}),'term-k7-idle',at,at);
-    ledger.db.prepare('INSERT INTO contracts(workflow_id,op_id,attempt,dispatch_id,markdown,context_json,created_at) VALUES(?,?,?,?,?,?,?)')
-      .run(wf,'docs.author',1,'ctx-k7-idle','# idle contract',json({}),at);
+    seedOp(ledger,wf,{jobId,opId:'docs.author',status:'running',workerId:'term-k7-idle',dispatchId:'ctx-k7-idle',
+      payload:{opId:'docs.author',owned_paths:['docs/'],orca:{dispatchId:'ctx-k7-idle',agentTerminalHandle:'term-k7-idle'},
+        hierarchy:{runtime:{host:'orca',agent:'devin',dispatchId:'ctx-k7-idle',terminalHandle:'term-k7-idle'}}}});
+    writeFixtureContract(ledger,jobId,'# idle contract');
   });
   const fakeRoot=fs.mkdtempSync(path.join(os.tmpdir(),'starci-kapi-nudge-'));
   t.after(()=>fs.rmSync(fakeRoot,{recursive:true,force:true,maxRetries:20,retryDelay:25}));
@@ -738,14 +773,14 @@ test('budgets.maxOps refuses the second concurrent operation with max-ops and le
   assert.equal(first.status,0,first.stderr);
   const second=runApiAsOwner(owner,'enqueue','--repo',repo,'--workflow',wf,'--op','docs.author','--paths','docs/b','--json');
   assert.equal(second.status,0,second.stderr);
-  const [jobA,jobB]=read(repo,l=>l.db.prepare('SELECT job_id FROM jobs WHERE workflow_id=? ORDER BY attempt').all(wf)).map(r=>r.job_id);
+  const [jobA,jobB]=[out(first).job_id,out(second).job_id];
 
   // Nothing is dispatched yet: two queued jobs hold no slot, so the first one is admitted.
   const admitted=runApiAsOwner(owner,'dispatch','--repo',repo,'--job',jobA,'--json');
   assert.equal(admitted.status,0,admitted.stderr||admitted.stdout);
 
   // The first operation now holds the workflow's one slot.
-  seed(repo,ledger=>ledger.db.prepare("UPDATE jobs SET status='running' WHERE job_id=?").run(jobA));
+  seed(repo,ledger=>moveJob(ledger,jobA,'running'));
   const refused=runApiAsOwner(owner,'dispatch','--repo',repo,'--job',jobB,'--json');
   assert.notEqual(refused.status,0,'a second dispatch at budgets.maxOps:1 must refuse');
   const body=out(refused);
@@ -762,12 +797,14 @@ test('budgets.maxOps refuses the second concurrent operation with max-ops and le
   assert.equal(out(routed)?.reason,'max-ops');
 
   // Free the slot and the same job is admitted with nothing else changed.
-  seed(repo,ledger=>ledger.db.prepare("UPDATE jobs SET status='succeeded' WHERE job_id=?").run(jobA));
+  seed(repo,ledger=>moveJob(ledger,jobA,'succeeded'));
   assert.equal(runApiAsOwner(owner,'dispatch','--repo',repo,'--job',jobB,'--json').status,0,
     'a settled sibling releases the slot');
   // With no owner budget the fleet ceiling (runtimes.yaml maxParallelOps) admits alone.
   const unbounded=ownerConfig(t,{budgets:{maxOps:null}});
-  seed(repo,ledger=>ledger.db.prepare("UPDATE jobs SET status='running' WHERE job_id=?").run(jobA));
+  const third=runApiAsOwner(unbounded,'enqueue','--repo',repo,'--workflow',wf,'--op','docs.author','--paths','docs/c','--json');
+  assert.equal(third.status,0,third.stderr);
+  seed(repo,ledger=>moveJob(ledger,out(third).job_id,'running'));
   assert.equal(runApiAsOwner(unbounded,'dispatch','--repo',repo,'--job',jobB,'--json').status,0,
     'one running operation is nowhere near maxParallelOps');
 });
@@ -779,10 +816,13 @@ test('settle --verdict fail --report marks the job settled and appends an event'
   assert.equal(enq.status,0,enq.stderr);
   const jobId=out(enq)?.jobId??out(enq)?.job_id??read(repo,l=>l.db.prepare('SELECT job_id FROM jobs WHERE workflow_id=?').get(wf))?.job_id;
   assert.ok(jobId);
-  const reportFile=path.join(repo,'k7-report.json');
-  fs.writeFileSync(reportFile,json({outcome:'failed',summary:'k7 settle smoke',checks:[]}));
+  seed(repo,ledger=>{
+    moveJob(ledger,jobId,'running');
+    writeFixtureContract(ledger,jobId);
+    fileFixtureReport(ledger,jobId,{outcome:'failed',summary:'k7 settle smoke'});
+  });
   const before=read(repo,l=>l.db.prepare('SELECT count(*) n FROM events WHERE workflow_id=?').get(wf).n);
-  const r=runApi('settle','--repo',repo,'--workflow',wf,'--job',jobId,'--verdict','fail','--report',reportFile,'--json');
+  const r=runApi('settle','--repo',repo,'--workflow',wf,'--job',jobId,'--verdict','fail','--json');
   assert.equal(r.status,0,r.stderr||r.error?.message);
   const after=read(repo,l=>({
     job:l.db.prepare('SELECT status FROM jobs WHERE job_id=?').get(jobId),
@@ -797,27 +837,21 @@ test('cut pass requires the cut-aware green check names before settlement',t=>{
   const fx=fixture(t),repo=fx.repo(),wf='wf-k7-cut-settle',jobId='op-k7-cut';
   seedGoal(repo,wf);
   seed(repo,ledger=>{
-    const at=Date.now();
-    ledger.enqueueJob({jobId,workflowId:wf,opId:'docs.author',kind:'op',payload:{
-      opId:'docs.author',owned_paths:['docs/'],cut:{id:'cut-a',ordinal:1,total:2},
-      orca:{dispatchId:'ctx-k7-cut',agentTerminalHandle:'term-k7-cut'},
-    }});
-    ledger.db.prepare("UPDATE jobs SET status='running' WHERE job_id=?").run(jobId);
-    ledger.db.prepare('INSERT INTO contracts(workflow_id,op_id,attempt,dispatch_id,markdown,context_json,created_at) VALUES(?,?,?,?,?,?,?)')
-      .run(wf,'docs.author',1,'ctx-k7-cut','# cut contract',json({}),at);
-    ledger.db.prepare('INSERT INTO reports(workflow_id,dispatch_id,op_id,attempt,generation,outcome,report_json,from_terminal,consumed_at,created_at) VALUES(?,?,?,?,?,?,?,?,NULL,?)')
-      .run(wf,'ctx-k7-cut','docs.author',1,0,'done',json({outcome:'done'}),null,at);
-    ledger.db.prepare('INSERT INTO checks(workflow_id,op_id,attempt,checks_json,created_at) VALUES(?,?,?,?,?)')
-      .run(wf,'docs.author',1,json({checks:[{name:'generic-green',exitCode:0}]}),at);
+    seedOp(ledger,wf,{jobId,opId:'docs.author',status:'running',dispatchId:'ctx-k7-cut',
+      payload:{opId:'docs.author',owned_paths:['docs/'],cut:{id:'cut-a',ordinal:1,total:2},
+        orca:{dispatchId:'ctx-k7-cut',agentTerminalHandle:'term-k7-cut'}}});
+    const attemptId=writeFixtureContract(ledger,jobId,'# cut contract');
+    fileFixtureReport(ledger,jobId,{outcome:'done',summary:'cut done'});
+    ledger.write.recordCheckRun({attemptId,name:'generic-green',phase:'verify',runner:'kernel',status:'pass',exitCode:0});
   });
   const refused=runApi('settle','--repo',repo,'--job',jobId,'--verdict','pass','--json');
   assert.notEqual(refused.status,0,'generic green evidence must not settle a cut pass');
   assert.match(`${refused.stdout}${refused.stderr}`,/cut-checks-missing/);
-  seed(repo,ledger=>ledger.db.prepare('UPDATE checks SET checks_json=? WHERE workflow_id=? AND op_id=? AND attempt=1')
-    .run(json({checks:[
-      {name:'cut-slice-postcondition',exitCode:0},
-      {name:'cut-regression-inventory',exitCode:0},
-    ]}),wf,'docs.author'));
+  seed(repo,ledger=>{
+    const attemptId=ledger.db.prepare('SELECT attempt_id FROM op_attempts WHERE job_id=?').get(jobId).attempt_id;
+    for(const name of ['cut-slice-postcondition','cut-regression-inventory'])
+      ledger.write.recordCheckRun({attemptId,name,phase:'verify',runner:'kernel',status:'pass',exitCode:0});
+  });
   const accepted=runApi('settle','--repo',repo,'--job',jobId,'--verdict','pass','--json');
   assert.equal(accepted.status,0,accepted.stderr||accepted.stdout);
   assert.equal(read(repo,ledger=>ledger.db.prepare('SELECT status FROM jobs WHERE job_id=?').get(jobId)?.status),'succeeded');
@@ -842,14 +876,12 @@ test('finish finishes the workflow, closes its inbox and keeps the goals rows',t
   const env={...process.env,STARCI_ORCA_COMMAND:process.execPath,STARCI_ORCA_ARGS:JSON.stringify([stub]),
     STARCI_FAKE_ORCA_LOG:callsFile,STARCI_FAKE_ORCA_STATE:path.join(fakeRoot,'state.json'),LOCALAPPDATA:path.join(fakeRoot,'localappdata')};
   seed(repo,ledger=>{
-    const at=Date.now(),jobId=`kernel-${wf}`;
-    ledger.enqueueJob({jobId,workflowId:wf,kind:'kernel',role:'kernel',payload:{
+    setPhase(ledger,wf,'running');
+    ledger.write.bindKernelJob({workflowId:wf,workerId:'term-k7-kernel',payload:{
       hierarchy:{schema:'starci/agent-hierarchy@1',nodeId:`agent:kernel:${wf}`,parentNodeId:`workflow:${wf}`,
         role:'kernel',runtime:{host:'orca',agent:'codex',model:'gpt-6-sol',terminalHandle:'term-k7-kernel'}},
     }});
-    ledger.db.prepare("UPDATE jobs SET status='running',worker_id='term-k7-kernel' WHERE job_id=?").run(jobId);
-    ledger.db.prepare("INSERT INTO signals(scope,key,holder_pid,token,value_json,at,expires_at) VALUES('kernel',?,NULL,?,?,?,NULL)")
-      .run(wf,'token-k7',json({terminal:'term-k7-kernel',modelAttested:true}),at);
+    ledger.write.setSignal({scope:'kernel',key:wf,workflowId:wf,token:'token-k7',value:{terminal:'term-k7-kernel',modelAttested:true}});
     // Finish needs the owner's handover approval (tests/handover.spec.mjs owns that gate).
     ledger.appendEvent({workflowId:wf,entityType:'job',entityId:'job-k7-handover',kind:'handover-approved',payload:{jobId:'job-k7-handover',dispatchId:'ask-k7',answeredBy:'owner'}});
   });
@@ -987,7 +1019,7 @@ test('enqueue refuses an unbounded grant, an op with no brief, and a finished wo
   assert.deepEqual([refusal(unknown).ok,refusal(unknown).code],[false,'unknown-op']);
   assert.equal(rows(),0);
 
-  seed(repo,ledger=>ledger.db.prepare("UPDATE workflows SET phase='finished' WHERE workflow_id=?").run(wf));
+  seed(repo,ledger=>setPhase(ledger,wf,'finished'));
   const finished=runApi('enqueue','--repo',repo,'--workflow',wf,'--op','docs.author','--paths','docs/','--json');
   assert.equal(finished.status,1,'a finished phase takes no new work');
   assert.deepEqual([refusal(finished).ok,refusal(finished).code],[false,'workflow-finished']);
@@ -1006,7 +1038,7 @@ test('reconcile --reap cleans only a settled job and is a no-op on a dead termin
   const refused=api('reconcile','--job',jobId,'--reap');
   assert.notEqual(refused.status,0);
   assert.match(refused.stderr,/reap-not-settled/);
-  seed(repo,ledger=>ledger.db.prepare("UPDATE jobs SET status='succeeded',worker_id='term_gone' WHERE job_id=?").run(jobId));
+  seed(repo,ledger=>{moveJob(ledger,jobId,'succeeded');ledger.write.updateJob({jobId,workerId:'term_gone'});});
   const env={...process.env,STARCI_ORCA_COMMAND:process.execPath,STARCI_ORCA_ARGS:JSON.stringify(['-e','console.log(JSON.stringify({ok:false,error:{code:"terminal_not_found"}}));process.exit(1)'])};
   const dead=spawnSync(process.execPath,[API,'reconcile','--job',jobId,'--reap','--repo',repo,'--json'],{cwd:ROOT,encoding:'utf8',windowsHide:true,timeout:120000,env:{...env,STARCI_OWNER_ROOT:owner}});
   assert.equal(dead.status,0,dead.stderr);

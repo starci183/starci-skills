@@ -5,6 +5,7 @@ import path from 'node:path';
 import {spawnSync} from 'node:child_process';
 import {FAKE_ORCA} from './helpers/fake-orca.mjs';
 import {withLedger,seedWorkflow} from './_ledger-fixture.mjs';
+import {JOB_ROW} from '../scripts/kernel/api-lib/rows.mjs';
 
 // On 2026-09-23 twenty-nine op workers died or went quiet without a report (codex and claude
 // exited to a bare PowerShell prompt, Mia Mia workers sat nudged and silent), and each became a
@@ -51,17 +52,17 @@ const world=(t,fn,{terminal={connected:false,writable:false},dispatchedAgo=MIN,l
   delete env.ORCA_TERMINAL_HANDLE;delete env.STARCI_ROLE;delete env.STARCI_OP_JOB;
   const run=(...args)=>spawnSync(process.execPath,[API,...args,'--repo',repoRoot,'--json'],{cwd:ROOT,encoding:'utf8',windowsHide:true,timeout:120000,env});
   const dispatchedAt=Date.now()-dispatchedAgo;
-  seedWorkflow(ledger,{id:WF,state:{phase:'running'},
-    jobs:[{jobId:JOB,opId:op,kind:'op',status:'running',attempt:1,workerId:HANDLE,leaseToken:'tok-self-heal',createdAt:dispatchedAt,
+  seedWorkflow(ledger,{id:WF,state:{phase:'running'},goal:{revision:1,markdown:'# self-heal',json:{}},
+    jobs:[{jobId:JOB,opId:op,kind:'op',status:'running',dispatchId:HANDLE,workerId:HANDLE,leaseToken:'tok-self-heal',createdAt:dispatchedAt,
       payload:{opId:op,title:'author the docs',records:['docs/readme.md'],owned_paths:['docs/'],orca:{dispatchId:HANDLE,agentTerminalHandle:HANDLE},
         hierarchy:{runtime:{host:'orca',agent:'codex',dispatchId:HANDLE,terminalHandle:HANDLE}},...payloadExtra}}],
     leases:[{resourceKey:'path:docs/',jobId:JOB,expiresAt:Date.now()+leaseExpiresIn}]});
-  ledger.db.prepare("UPDATE workflows SET phase='running' WHERE workflow_id=?").run(WF);
-  ledger.db.prepare('INSERT INTO contracts(workflow_id,op_id,attempt,dispatch_id,markdown,context_json,created_at) VALUES(?,?,?,?,?,?,?)')
-    .run(WF,op,1,HANDLE,'# self-heal contract','{}',dispatchedAt);
+  const attemptId=ledger.db.prepare('SELECT attempt_id FROM op_attempts WHERE job_id=?').get(JOB).attempt_id;
+  ledger.db.prepare('INSERT INTO contracts(attempt_id,workflow_id,job_id,markdown,context_json,created_at) VALUES(?,?,?,?,?,?)')
+    .run(attemptId,WF,JOB,'# self-heal contract','{}',dispatchedAt);
   ledger.appendEvent({workflowId:WF,entityType:'job',entityId:JOB,kind:'op-dispatched',payload:{op,dispatch:HANDLE,terminal:HANDLE},createdAt:dispatchedAt});
-  const job=(id=JOB)=>ledger.db.prepare('SELECT * FROM jobs WHERE job_id=?').get(id);
-  const jobs=()=>ledger.db.prepare('SELECT * FROM jobs WHERE workflow_id=? ORDER BY attempt').all(WF);
+  const job=(id=JOB)=>ledger.db.prepare(`SELECT ${JOB_ROW} FROM jobs WHERE job_id=?`).get(id);
+  const jobs=()=>ledger.db.prepare(`SELECT ${JOB_ROW} FROM jobs WHERE workflow_id=? ORDER BY created_at`).all(WF);
   const leases=()=>ledger.db.prepare('SELECT * FROM leases WHERE job_id=?').all(JOB);
   const events=kind=>ledger.db.prepare('SELECT entity_id,payload_json FROM events WHERE workflow_id=? AND kind=?').all(WF,kind);
   const incidents=()=>ledger.db.prepare("SELECT * FROM incidents WHERE workflow_id=? AND status='open'").all(WF);
@@ -93,8 +94,8 @@ test('--settle-failed settles a dead worker with owned-path effects failed-no-re
   const payload=JSON.parse(retry.payload_json);
   assert.deepEqual(payload.owned_paths,['docs/']);
   assert.deepEqual(payload.records,['docs/readme.md']);
-  assert.equal(payload.retry.retryOf,JOB);
-  assert.equal(payload.retry.retryClass,'business','a no-report death spends a business attempt');
+  assert.equal(retry.retry_of,JOB);
+  assert.equal(retry.retry_class,'business','a no-report death spends a business attempt');
   assert.equal(payload.retryReason.reason,'failed-no-report');
   const settled=events('op-settled').map(e=>JSON.parse(e.payload_json));
   assert.deepEqual([settled.length,settled[0].reason,settled[0].auto,settled[0].reportFiled],[1,'failed-no-report',true,false]);
@@ -115,14 +116,14 @@ test('--settle-failed settles a dead worker with owned-path effects failed-no-re
 test('a no-report retry chains to the dead attempt, never to a later unrelated job of the same op',t=>world(t,({ledger,repoRoot,run,jobs})=>{
   fs.writeFileSync(path.join(repoRoot,'docs','half-written.md'),'partial\n');
   const other='job-self-heal-other',at=Date.now();
-  ledger.db.prepare(`INSERT INTO jobs(job_id,workflow_id,op_id,attempt,generation,kind,role,payload_json,status,created_at,updated_at)
-    VALUES(?,?,?,2,0,'op','op',?,'queued',?,?)`).run(other,WF,OP,JSON.stringify({opId:OP,title:'another unit',records:['notes/other.md'],owned_paths:['notes/']}),at,at);
+  seedWorkflow(ledger,{id:WF,jobs:[{jobId:other,opId:OP,status:'queued',createdAt:at,
+    payload:{opId:OP,title:'another unit',records:['notes/other.md'],owned_paths:['notes/']}}]});
   const body=out(run('reconcile','--job',JOB,'--dead-worker','--settle-failed'));
   assert.equal(body.recovery,'settled-failed');
   const retry=jobs().find(j=>j.job_id===body.retry.jobId);
   const payload=JSON.parse(retry.payload_json);
-  assert.equal(retry.attempt,3);
-  assert.equal(payload.retry.retryOf,JOB);
+  assert.equal(retry.attempt,2,'the unrelated unit does not advance this unit\'s try number');
+  assert.equal(retry.retry_of,JOB);
 }));
 
 test('without --settle-failed the recovery keeps its fence; --settle-failed later settles that fence',t=>world(t,({repoRoot,run,job,jobs})=>{
@@ -162,7 +163,7 @@ test('the third no-report death of one op raises one pattern incident, and only 
   // A fourth death while it is open adds no second incident.
   ledger.appendEvent({workflowId:WF,entityType:'job',entityId:'job-earlier-3',kind:'worker-failed-no-report',payload:{opId:OP,attempt:1}});
   const second=ledger.db.prepare('SELECT job_id FROM jobs WHERE workflow_id=? AND status=?').get(WF,'queued').job_id;
-  ledger.db.prepare("UPDATE jobs SET status='running',worker_id=? WHERE job_id=?").run(HANDLE,second);
+  for(const to of ['ready','leased','running'])ledger.write.setJobStatus({jobId:second,to,reason:'test retry',...(to==='running'?{workerId:HANDLE}:{})});
   // The retry's own effect: a file the first attempt left, written before this job existed, is debris the
   // retry found (settle-landed.mjs ownedPathEffects preexisting), never this attempt's evidence.
   fs.writeFileSync(path.join(repoRoot,'docs','half-written-again.md'),'partial\n');
@@ -181,8 +182,7 @@ test('the third no-report death of one op raises one pattern incident, and only 
 // pattern.
 const KERNEL_HANDLE='term-kernel-self-heal';
 const seatKernel=(ledger,handle=KERNEL_HANDLE)=>{
-  ledger.enqueueJob({jobId:`kernel-${WF}`,workflowId:WF,kind:'kernel',role:'kernel',payload:{hierarchy:{role:'kernel'}}});
-  ledger.db.prepare("UPDATE jobs SET status='running',worker_id=? WHERE job_id=?").run(handle,`kernel-${WF}`);
+  ledger.write.bindKernelJob({workflowId:WF,workerId:handle,payload:{hierarchy:{role:'kernel'}}});
 };
 const WIPED={stale:true};
 test('a worker gone with its Kernel terminal in a host terminal wipe settles as the environment: no business attempt, no pool demoted, no pattern',t=>world(t,async({ledger,repoRoot,run,job,jobs,events,incidents,writeOrca})=>{
@@ -201,7 +201,6 @@ test('a worker gone with its Kernel terminal in a host terminal wipe settles as 
   const result=JSON.parse(job().result_json);
   assert.deepEqual([result.reason,result.attemptConsumed,result.retryClass,result.environment],['failed-no-report',false,'environment','host-terminal-wipe']);
   const retry=jobs().find(j=>j.job_id!==JOB&&j.kind==='op');
-  const lineage=JSON.parse(retry.payload_json).retry;
   const died=events('worker-failed-no-report').map(e=>JSON.parse(e.payload_json)).find(p=>p.dispatchId);
   assert.deepEqual([died.environment,died.attemptConsumed],['host-terminal-wipe',false]);
   assert.equal(body.pattern.raised,false,'the host death is no pattern of the op');

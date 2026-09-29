@@ -482,7 +482,7 @@ export async function answerDrawReviewByReply({ repo, ledgerFile = null, workflo
   const ledger = openLedger({ file });
   try {
     const db = ledger.db;
-    const report = db.prepare('SELECT * FROM reports WHERE workflow_id=? AND dispatch_id=?').get(workflowId, dispatchId);
+    const report = db.prepare('SELECT r.*,a.op_id FROM reports r JOIN op_attempts a ON a.attempt_id=r.attempt_id WHERE r.workflow_id=? AND r.dispatch_id=?').get(workflowId, dispatchId);
     if (!report) return { ok: false, why: 'no ask report' };
     const question = (parseJson(report.report_json, {}) ?? {}).question ?? null;
     if (askKindOf(question) !== DRAW_REVIEW_KIND || !question?.review) return { ok: false, why: 'not a draw-review ask' };
@@ -625,8 +625,8 @@ export const supersedeEarlierAsks = (ledger, workflowId, report) => {
   const db = ledger.db;
   const newSubject = askSubjectOf(db, report);
   const superseded = db.prepare(
-    `SELECT r.dispatch_id, r.report_json FROM reports r
-      WHERE r.workflow_id=? AND r.outcome='ask' AND r.op_id IS ? AND r.report_id < ?
+    `SELECT r.dispatch_id, r.report_json FROM reports r JOIN op_attempts a ON a.attempt_id=r.attempt_id
+      WHERE r.workflow_id=? AND r.outcome='ask' AND a.op_id IS ? AND r.report_id < ?
         AND NOT EXISTS (SELECT 1 FROM events e WHERE e.workflow_id=r.workflow_id
           AND e.kind IN ('ask-answered','ask-superseded')
           AND json_extract(e.payload_json,'$.dispatchId')=r.dispatch_id)
@@ -789,7 +789,7 @@ const main = async () => {
   const db = ledger.db;
 
   const report = db.prepare(
-    `SELECT * FROM reports WHERE workflow_id=? AND outcome='ask' ${args.dispatch ? 'AND dispatch_id=?' : ''} ORDER BY report_id DESC LIMIT 1`,
+    `SELECT r.*,a.op_id FROM reports r JOIN op_attempts a ON a.attempt_id=r.attempt_id WHERE r.workflow_id=? AND r.outcome='ask' ${args.dispatch ? 'AND r.dispatch_id=?' : ''} ORDER BY r.report_id DESC LIMIT 1`,
   ).get(...(args.dispatch ? [args.workflow, args.dispatch] : [args.workflow]));
   if (!report) { console.error(JSON.stringify({ ok: false, error: `no pending ask report for ${args.workflow}` })); process.exit(1); }
   const answered = db.prepare(

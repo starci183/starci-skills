@@ -605,7 +605,7 @@ else if (verb === 'orchestration worker-read')
 else if (verb === 'orchestration dispatch')
   out({ ok: true, result: { dispatch: { id: arg('to') ?? 'dispatch-fake-1' }, preamble: process.env.STARCI_FAKE_ORCA_PREAMBLE || 'fake dispatch preamble' } });
 else if (verb === 'orchestration dispatch-show')
-  out({ ok: true, result: { dispatch: { id: 'dispatch-fake-1', assignee_handle: 'fake-terminal-1' } } });
+  out({ ok: true, result: { dispatch: { id: 'dispatch-fake-1', assignee_handle: uniqueTerminals ? 'fake-terminal-' + state.counter : 'fake-terminal-1' } } });
 else if (verb === 'orchestration check')
   out({ ok: true, result: { deliveries: [] } });
 else if (verb === 'orchestration send')

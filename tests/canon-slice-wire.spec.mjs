@@ -14,6 +14,7 @@ import { ledgerFileFor, openLedger } from '../engine/ledger-db.mjs';
 import { parseYaml } from '../engine/yaml.mjs';
 import { resolveOpParams } from '../scripts/route/dispatch-op.mjs';
 import { canonCutPlanOf, canonRedispatchOf, relocationOf, canonConformancePolicy } from '../scripts/kernel/cut-seam.mjs';
+import { seedWorkflow } from './_ledger-fixture.mjs';
 
 const ROOT = path.resolve(import.meta.dirname, '..');
 const CUT_SEAM = path.join(ROOT, 'scripts', 'kernel', 'cut-seam.mjs');
@@ -101,10 +102,9 @@ test('a blocked slice is redone from its committed state: --retry-of with its pa
   const owned = [route, `${shells}/ConsoleLayout`, `${shells}/ConsoleTopBar`, `${shells}/Sidebar`];
   const ledger = openLedger({ file: ledgerFileFor(repo) });
   try {
-    const at = Date.now();
-    ledger.ensureWorkflow({ workflowId, title: 'canon' });
-    ledger.db.prepare(`INSERT INTO jobs(job_id,workflow_id,op_id,status,attempt,generation,kind,payload_json,result_json,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?,?)`)
-      .run(jobId, workflowId, 'code.refactor', 'failed', 7, 0, 'op', JSON.stringify({ opId: 'code.refactor', owned_paths: owned, params: { canonFamilies: 'all' }, cut: { id: 'fe-canon', ordinal: 7, total: 34 } }), JSON.stringify({ verdict: 'blocked' }), at, at);
+    seedWorkflow(ledger,{id:workflowId,state:{phase:'running',job:'canon'},jobs:[{jobId,opId:'code.refactor',
+      status:'failed',tryNo:1,result:{verdict:'blocked'},payload:{opId:'code.refactor',owned_paths:owned,
+        params:{canonFamilies:'all'},cut:{id:'fe-canon',ordinal:7,total:34}}}]});
     ledger.appendEvent({ workflowId, entityType: 'job', entityId: jobId, kind: 'artifacts-indexed',
       payload: { jobId, patch: { state: 'unlanded', head: '17297b729069697b405f475754a4cbc829b8dbf1', base: 'e406d812396f841ffa883627c3789039618cfb26', path: `.starciwork/kernel-evidence/${workflowId}/jobs/${jobId}/${jobId}.patch` } } });
     const redo = canonRedispatchOf(ledger.db, jobId, { extraPaths: [`${SRC}/features/layouts/Sidebar`] });

@@ -10,6 +10,9 @@ import os from 'node:os';
 import path from 'node:path';
 import {spawnSync} from 'node:child_process';
 import {inspectLedger,ledgerFileFor,openLedger} from '../engine/ledger-db.mjs';
+import {seedWorkflow} from './_ledger-fixture.mjs';
+import {jobRowOf} from '../scripts/kernel/api-lib/rows.mjs';
+import {unitSubjectKey} from '../engine/admission.mjs';
 // These specs exercise the owner-flow contract; autopilot (scripts/kernel/autopilot.mjs, owner ruling 2026-09-28) is
 // on by default, so they run with it off - tests/autopilot.spec.mjs covers the autopilot flow.
 process.env.STARCI_AUTOPILOT ??= 'off';
@@ -21,34 +24,52 @@ const json=v=>JSON.stringify(v??null);
 const world=(t,{legs=['docs.author'],edges}={})=>{
   const repo=fs.mkdtempSync(path.join(os.tmpdir(),'starci-next-step-'));
   t.after(()=>fs.rmSync(repo,{recursive:true,force:true,maxRetries:20,retryDelay:25}));
+  const env={...process.env,STARCI_PROJECTS_ROOT:path.join(repo,'projects'),STARCI_TEST_MACHINE_FILE:path.join(repo,'machine.sqlite'),LOCALAPPDATA:path.join(repo,'localappdata')};
   const wf='wf-next-step';
-  const seed=fn=>{const ledger=openLedger({file:ledgerFileFor(repo)});try{return fn(ledger);}finally{ledger.close();}};
-  const read=fn=>{const ledger=inspectLedger({file:ledgerFileFor(repo)});try{return fn(ledger.db);}finally{ledger.close();}};
+  const seed=fn=>{const ledger=openLedger({file:ledgerFileFor(repo,{env})});try{return fn(ledger);}finally{ledger.close();}};
+  const read=fn=>{const ledger=inspectLedger({file:ledgerFileFor(repo,{env})});try{return fn(ledger.db);}finally{ledger.close();}};
   seed(ledger=>{
     ledger.ensureWorkflow({workflowId:wf,title:'next step'});
-    ledger.db.prepare("UPDATE workflows SET phase='running' WHERE workflow_id=?").run(wf);
+    ledger.write.changeWorkflowPhase({workflowId:wf,to:'running',by:'test-fixture',reason:'next step'});
     ledger.db.prepare('INSERT INTO goals(workflow_id,revision,goal_identity,markdown,json,created_at) VALUES(?,?,?,?,?,?)')
       .run(wf,0,'g0','# goal',json({derivedPlan:{legs:legs.map(op=>({op})),...(edges?{edges}:{})}}),Date.now());
   });
   const api=(...args)=>{
-    const r=spawnSync(process.execPath,[API,...args,'--repo',repo,'--json'],{cwd:ROOT,encoding:'utf8',windowsHide:true,timeout:120000});
+    const r=spawnSync(process.execPath,[API,...args,'--repo',repo,'--json'],{cwd:ROOT,encoding:'utf8',windowsHide:true,timeout:120000,env});
     let body=null;try{body=JSON.parse(r.stdout);}catch{}
     return {...r,body};
   };
   const job=(jobId,op,{status='running',records=[],paths=['docs/'],extra={}}={})=>seed(ledger=>{
-    ledger.enqueueJob({jobId,workflowId:wf,opId:op,kind:'op',payload:{opId:op,records,owned_paths:paths,...extra}});
-    ledger.db.prepare('UPDATE jobs SET status=? WHERE job_id=?').run(status,jobId);
+    const payload={opId:op,records,owned_paths:paths,...extra};
+    seedWorkflow(ledger,{id:wf,jobs:[{jobId,opId:op,status,payload,goalRevision:0,
+      subjectKey:unitSubjectKey({cut:payload.cut,params:payload.params,records:payload.records,ownedPaths:payload.owned_paths})}]});
   });
   // A filed report row keyed by the job id (no worker bound), as `api report` would file it.
   const report=(jobId,outcome='failed',extra={})=>seed(ledger=>{
-    const row=ledger.db.prepare('SELECT op_id,attempt FROM jobs WHERE job_id=?').get(jobId);
-    ledger.db.prepare("UPDATE jobs SET status='running' WHERE job_id=?").run(jobId);
-    ledger.db.prepare('INSERT INTO reports(workflow_id,dispatch_id,op_id,attempt,generation,outcome,report_json,from_terminal,consumed_at,created_at) VALUES(?,?,?,?,0,?,?,NULL,NULL,?)')
-      .run(wf,jobId,row.op_id,row.attempt,outcome,json({schema:'starci/op-report@1',outcome,summary:`${outcome} on purpose`,...extra}),Date.now());
+    const row=ledger.db.prepare('SELECT status FROM jobs WHERE job_id=?').get(jobId);
+    let attempt=ledger.db.prepare('SELECT attempt_id,dispatch_id FROM op_attempts WHERE job_id=? ORDER BY attempt_id DESC LIMIT 1').get(jobId);
+    if(!attempt){
+      if(row.status==='queued')ledger.write.setJobStatus({jobId,to:'ready',reason:'test dispatch'});
+      ledger.write.setJobStatus({jobId,to:'leased',reason:'test dispatch'});
+      attempt=ledger.write.startAttempt({jobId,dispatchId:`ctx:${jobId}`});
+      ledger.write.setJobStatus({jobId,to:'running',reason:'test dispatch'});
+    }
+    ledger.db.prepare('INSERT INTO reports(workflow_id,attempt_id,dispatch_id,job_id,outcome,report_json,from_terminal,consumed_at,created_at) VALUES(?,?,?,?,?,?,NULL,NULL,?)')
+      .run(wf,attempt.attempt_id,attempt.dispatch_id,jobId,outcome,json({schema:'starci/op-report@1',outcome,summary:`${outcome} on purpose`,...extra}),Date.now());
   });
-  const settleFail=(jobId)=>{const r=api('settle','--job',jobId,'--verdict','fail');assert.equal(r.status,0,r.stderr||r.stdout);return r.body;};
+  const settleFail=(jobId)=>{
+    seed(ledger=>{
+      if(ledger.db.prepare('SELECT 1 FROM op_attempts WHERE job_id=?').get(jobId))return;
+      const current=ledger.db.prepare('SELECT status FROM jobs WHERE job_id=?').get(jobId);
+      if(current.status==='queued')ledger.write.setJobStatus({jobId,to:'ready',reason:'test worker dispatch'});
+      ledger.write.setJobStatus({jobId,to:'leased',reason:'test worker dispatch'});
+      ledger.write.startAttempt({jobId,dispatchId:`ctx:${jobId}`});
+      ledger.write.setJobStatus({jobId,to:'running',reason:'test worker dispatch'});
+    });
+    const r=api('settle','--job',jobId,'--verdict','fail');assert.equal(r.status,0,r.stderr||r.stdout);return r.body;
+  };
   const status=()=>{const r=api('status','--workflow',wf);assert.equal(r.status,0,r.stderr);return r.body;};
-  const row=jobId=>read(db=>{const r=db.prepare('SELECT * FROM jobs WHERE job_id=?').get(jobId);return r&&{...r,payload:JSON.parse(r.payload_json),result:JSON.parse(r.result_json??'null')};});
+  const row=jobId=>read(db=>{const r=jobRowOf(db,jobId);return r&&{...r,payload:JSON.parse(r.payload_json),result:JSON.parse(r.result_json??'null')};});
   return {wf,api,job,report,settleFail,status,row,read,seed};
 };
 
@@ -61,14 +82,14 @@ test('a failed report queues its route: the same op again, pinned to the failed 
   assert.deepEqual([settled.nextStep.firing,settled.nextStep.limit],[1,3]);
   const retry=w.row(settled.nextStep.jobs[0]);
   assert.equal(retry.status,'queued');
-  assert.equal(retry.payload.retry.retryOf,'j1');
+  assert.equal(retry.retry_of,'j1');
   assert.deepEqual(retry.payload.owned_paths,['docs/']);
   assert.equal(retry.payload.routed.route,'failed-retries-the-same-op');
   assert.equal(w.row('j1').result.nextStep.jobs[0],retry.job_id,'the step is recorded on the failed job');
   const s=w.status();
   assert.deepEqual(s.nextActions[0],{kind:'dispatch',op:'docs.author',jobId:retry.job_id,reason:`ready: api route --job ${retry.job_id}, then api dispatch`,
     label:'Viết tài liệu',displayName:'Viết tài liệu · docs · next step'});
-  assert.deepEqual(s.legs,[{op:'docs.author',color:'red',jobId:retry.job_id,status:'queued',label:'Viết tài liệu'}],'a queued retry of a failed attempt is rework');
+  assert.deepEqual(s.legs,[{op:'docs.author',color:'yellow',jobId:retry.job_id,status:'queued',label:'Viết tài liệu'}],'the queued retry is actionable');
 });
 
 test('past the route limit an owner gate holds that job alone; resolving it names the retry',t=>{
@@ -106,7 +127,7 @@ test('past the route limit an owner gate holds that job alone; resolving it name
   const again=w.api('enqueue','--workflow',w.wf,'--op','docs.author','--paths','docs/','--retry-of',last);
   assert.equal(again.status,0,again.stderr);
   w.report(again.body.job_id);
-  assert.equal(w.settleFail(again.body.job_id).nextStep.kind,'retry');
+  assert.equal(w.settleFail(again.body.job_id).nextStep.kind,'owner-gate','the original route limit still applies to a renewed failure');
 });
 
 test('a worker that ended without a report retries twice, then an owner gate (inc-70834a1b8f73)',t=>{
@@ -137,7 +158,7 @@ test('a root-cause claim on another node queues a read-only verify of that node 
   assert.deepEqual([verify.payload.rootVerify.node,verify.payload.rootVerify.of,verify.payload.rootVerify.rootJob],['backend.implement','e2e','build']);
   assert.equal(rerun.op_id,'e2e.verify');
   assert.deepEqual(rerun.payload.after,[verifyId]);
-  assert.equal(rerun.payload.retry.retryOf,'e2e');
+  assert.equal(rerun.retry_of,'e2e');
   const s=w.status();
   assert.deepEqual(s.nextActions[0].kind,'root-verify');
   assert.equal(s.nextActions[0].jobId,verifyId);
@@ -152,7 +173,8 @@ test('a red proof with no root claim repairs the build of its lane, then runs th
   const next=w.settleFail('e2e').nextStep;
   assert.deepEqual([next.kind,next.route],['repair','e2e-red-repairs-the-build']);
   const [repairId,rerunId]=next.jobs;
-  assert.deepEqual([w.row(repairId).op_id,w.row(repairId).payload.retry.retryOf,w.row(repairId).payload.owned_paths],['backend.implement','build',['src/login/']]);
+  assert.deepEqual([w.row(repairId).op_id,w.row(repairId).unit_id,w.row(repairId).try_no,w.row(repairId).payload.owned_paths],
+    ['backend.implement',w.row('build').unit_id,2,['src/login/']],'a passed build is reopened as its next unit try');
   assert.deepEqual(w.row(rerunId).payload.after,[repairId]);
 });
 
@@ -185,14 +207,16 @@ test('with nothing open, the next plan leg whose ancestors succeeded is a dispat
   assert.deepEqual(s.legs.map(l=>[l.op,l.color]),[['request.analyze','gray'],['docs.author','green'],['test.author','gray']]);
 });
 
-test("the Kernel's own enqueue replaces the retry the runtime queued, never doubles it",t=>{
+test("the Kernel's own enqueue is refused while the runtime's retry is open, never doubles it",t=>{
   const w=world(t);
   w.job('j1','docs.author');w.report('j1');
   const auto=w.settleFail('j1').nextStep.jobs[0];
   const mine=w.api('enqueue','--workflow',w.wf,'--op','docs.author','--paths','docs/');
-  assert.equal(mine.status,0,mine.stderr);
-  assert.deepEqual([w.row(auto).status,w.row(auto).result.reason],['cancelled','superseded-by-enqueue']);
-  assert.equal(w.row(mine.body.job_id).payload.retry.retryOf,'j1');
+  assert.equal(mine.status,1);
+  assert.match(mine.stdout+mine.stderr,/unit-in-flight/);
+  assert.match(mine.stdout+mine.stderr,new RegExp(auto));
+  assert.equal(w.row(auto).status,'queued');
+  assert.equal(w.row(auto).retry_of,'j1');
   assert.equal(w.read(db=>db.prepare("SELECT count(*) n FROM jobs WHERE status='queued'").get().n),1);
 });
 
@@ -220,13 +244,22 @@ test('a filed report carrying rootCause passes the envelope, and its node on ano
   const w=world(t,{legs:['backend.implement','e2e.verify']});
   w.job('build','backend.implement',{status:'succeeded',records:['feat.login'],paths:['.starciwork/features/login/','src/login/']});
   w.job('e2e','e2e.verify',{records:['feat.login'],paths:['.starciwork/features/login/evidence/']});
-  // No reports row yet: settle files the --report envelope through validateOpReport, as a worker's filing would.
+  // File the worker envelope through api report before settling its attempt.
   const file=path.join(fs.mkdtempSync(path.join(os.tmpdir(),'starci-root-cause-')),'report.json');
   t.after(()=>fs.rmSync(path.dirname(file),{recursive:true,force:true}));
+  w.seed(ledger=>{
+    const attemptId=ledger.db.prepare('SELECT attempt_id FROM op_attempts WHERE job_id=?').get('e2e').attempt_id;
+    ledger.write.updateAttempt({attemptId,scratchDir:path.dirname(file)});
+    ledger.db.prepare('INSERT INTO contracts(attempt_id,workflow_id,job_id,markdown,created_at) VALUES(?,?,?,?,?)')
+      .run(attemptId,w.wf,'e2e','# e2e contract',Date.now());
+  });
   fs.writeFileSync(file,JSON.stringify({schema:'starci/op-report@1',outcome:'failed',summary:'login e2e fails',rootCause}));
-  const settled=w.api('settle','--job','e2e','--verdict','fail','--report',file);
+  const filedReport=w.api('report','--job','e2e','--report',file);
+  assert.equal(filedReport.status,0,filedReport.stderr||filedReport.stdout);
+  const settled=w.api('settle','--job','e2e','--verdict','fail');
   assert.equal(settled.status,0,settled.stderr||settled.stdout);
-  assert.equal(settled.body.reportFiled,true,'the envelope with rootCause was filed, not refused');
+  assert.equal(w.read(db=>db.prepare("SELECT outcome FROM reports WHERE job_id='e2e'").get()?.outcome),'failed',
+    'the envelope with rootCause was filed, not refused');
   const next=settled.body.nextStep;
   assert.equal(next.kind,'root-verify');
   assert.deepEqual(next.rootCause,{node:'backend.implement',...Object.fromEntries(Object.entries(rootCause).filter(([k])=>k!=='node'))});

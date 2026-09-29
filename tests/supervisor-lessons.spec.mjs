@@ -94,6 +94,8 @@ test('land: a refused change never reaches the gate; a landed one is an experime
 test('revert --apply: a revert lane off main with a contract-changes entry for reverted contract files, landed through the gate', async (t) => {
   const env = envOf(t);
   const root = tmp(t, 'starci-sup-revert-');
+  const lanes = path.join(root, '..', `${path.basename(root)}-lanes`);
+  t.after(() => fs.rmSync(lanes, { recursive: true, force: true, maxRetries: 20, retryDelay: 50 }));
   const git = (...a) => { const r = spawnSync('git', ['-C', root, ...a], { encoding: 'utf8', windowsHide: true }); assert.equal(r.status, 0, r.stderr); return r.stdout.trim(); };
   git('init', '-q', '-b', 'main'); git('config', 'user.email', 'l@t'); git('config', 'user.name', 'l'); git('config', 'core.autocrlf', 'false');
   fs.mkdirSync(path.join(root, 'modules/kernel'), { recursive: true }); fs.mkdirSync(path.join(root, 'modules/supervisor'), { recursive: true });
@@ -106,9 +108,9 @@ test('revert --apply: a revert lane off main with a contract-changes entry for r
   const landed = [];
   const landFn = async (a) => { landed.push(a); return { ok: true }; };
   const exp = await landExperiment({ signature: 'sig-x', commits: [sha], lane: 'exp', env, now: () => NOW, landFn, settings: SETTINGS, filesOf: () => [{ path: 'scripts/work/z.mjs', status: 'M' }] });
-  const plan = await revertExperiment({ id: exp.experiment.id, env, root, lanes: path.join(root, '..', `${path.basename(root)}-lanes`) });
+  const plan = await revertExperiment({ id: exp.experiment.id, env, root, lanes });
   assert.equal(plan.planned, true);
-  const r = await revertExperiment({ id: exp.experiment.id, apply: true, env, now: () => NOW, root, landFn, lanes: path.join(root, '..', `${path.basename(root)}-lanes`) });
+  const r = await revertExperiment({ id: exp.experiment.id, apply: true, env, now: () => NOW, root, landFn, lanes });
   assert.equal(r.ok, true, JSON.stringify(r));
   const show = git('show', '--stat', '--format=%B', r.revertCommit);
   assert.match(show, /revert\(self-learning\): sig-x/);

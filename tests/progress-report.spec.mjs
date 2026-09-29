@@ -13,19 +13,20 @@ import { SKILL_ROOT } from '../scripts/supervisor/home.mjs';
 test('the progress report spells out each workflow in Vietnamese with a finish time', async (t) => {
   await withLedger(t, async ({ ledger }) => {
     const wf = 'wf-nivo-app-auth-mudqjob3';
-    seedWorkflow(ledger, { id: wf, state: { phase: 'running' } });
     const start = Date.now() - 4 * 3600000;
-    ledger.db.prepare("UPDATE workflows SET phase='running', created_at=? WHERE workflow_id=?").run(start, wf);
+    seedWorkflow(ledger, { id: wf, state: { phase: 'running' }, now:start });
+    ledger.db.prepare("UPDATE workflows SET created_at=? WHERE workflow_id=?").run(start, wf);
     ledger.db.prepare('INSERT INTO goals(workflow_id,revision,goal_identity,markdown,json,created_at) VALUES(?,?,?,?,?,?)')
       .run(wf, 1, 'g', 'hoàn thiện đăng nhập', JSON.stringify({ derivedPlan: { legs: ['request.analyze', 'scope.define', 'business.decide', 'architecture.decide', 'work.author'] } }), start);
-    const job = (id, op, status) => ledger.db.prepare(`INSERT INTO jobs(job_id,workflow_id,op_id,attempt,generation,kind,role,payload_json,status,created_at,updated_at)
-      VALUES(?,?,?,1,0,'op','op','{}',?,?,?)`).run(id, wf, op, status, start, start);
-    job('j1', 'scope.define', 'succeeded');
-    job('j2', 'business.decide', 'succeeded');
-    job('j3', 'business.decide', 'running');
-    job('j4', 'architecture.decide', 'queued');
-    ledger.db.prepare(`INSERT INTO reports(workflow_id,dispatch_id,op_id,attempt,generation,outcome,report_json,created_at) VALUES(?,?,?,1,0,'ask',?,?)`)
-      .run(wf, 'ctx_q', 'business.decide', JSON.stringify({ summary: 's', question: { text: 'Chọn cổng thanh toán nào?' } }), start);
+    seedWorkflow(ledger,{id:wf,now:start,jobs:[
+      {jobId:'j1',opId:'scope.define',status:'succeeded',createdAt:start},
+      {jobId:'j2',opId:'business.decide',status:'succeeded',createdAt:start},
+      {jobId:'j3',opId:'business.decide',status:'running',dispatchId:'ctx_q',createdAt:start},
+      {jobId:'j4',opId:'architecture.decide',status:'queued',createdAt:start},
+    ]});
+    const attemptId=ledger.db.prepare("SELECT attempt_id FROM op_attempts WHERE job_id='j3'").get().attempt_id;
+    ledger.db.prepare(`INSERT INTO reports(workflow_id,attempt_id,dispatch_id,job_id,outcome,report_json,created_at) VALUES(?,?,?,?,'ask',?,?)`)
+      .run(wf, attemptId, 'ctx_q', 'j3', JSON.stringify({ summary: 's', question: { text: 'Chọn cổng thanh toán nào?' } }), start);
     ledger.appendEvent({ workflowId: wf, entityType: 'report', entityId: 'ctx_q', kind: 'ask-serving', payload: { dispatchId: 'ctx_q', url: 'http://127.0.0.1:6975/a-0123456789abcdef01' } });
     const row = ledger.db.prepare('SELECT workflow_id, created_at FROM workflows WHERE workflow_id=?').get(wf);
     const p = workflowProgress(ledger.db, row, { publicBase: 'https://response.example.org' });

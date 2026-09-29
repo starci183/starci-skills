@@ -316,7 +316,7 @@ function servingRecord(row, payload, now) {
  * with no live form is healthy, its link is generated on demand from Telegram.
  */
 export function askState(db, workflowId, dispatchId, { now = Date.now() } = {}) {
-  const report = db.prepare("SELECT op_id, attempt, report_json FROM reports WHERE workflow_id=? AND dispatch_id=? AND outcome='ask' ORDER BY report_id DESC LIMIT 1").get(workflowId, dispatchId);
+  const report = db.prepare("SELECT a.op_id,r.job_id,r.report_json FROM reports r JOIN op_attempts a ON a.attempt_id=r.attempt_id WHERE r.workflow_id=? AND r.dispatch_id=? AND r.outcome='ask' ORDER BY r.report_id DESC LIMIT 1").get(workflowId, dispatchId);
   if (!report) return null;
   const last = (kinds) => db.prepare(`SELECT seq, payload_json, created_at FROM events WHERE workflow_id=? AND kind IN (${kinds.map(() => '?').join(',')})
     AND json_extract(payload_json,'$.dispatchId')=? ORDER BY seq DESC LIMIT 1`).get(workflowId, ...kinds, dispatchId) ?? null;
@@ -340,8 +340,8 @@ export function askState(db, workflowId, dispatchId, { now = Date.now() } = {}) 
 /** The display name of the op job that filed an ask report, or null. */
 const askJobName = (db, workflowId, report) => {
   try {
-    const job = db.prepare("SELECT * FROM jobs WHERE workflow_id=? AND op_id=? AND kind<>'kernel' AND (attempt=? OR ? IS NULL) ORDER BY attempt DESC LIMIT 1")
-      .get(workflowId, report.op_id, report.attempt ?? null, report.attempt ?? null);
+    const job = db.prepare("SELECT * FROM jobs WHERE workflow_id=? AND job_id=? AND kind<>'kernel' LIMIT 1")
+      .get(workflowId, report.job_id);
     return job ? jobDisplayNameOf(db, job) : null;
   } catch { return null; }
 };

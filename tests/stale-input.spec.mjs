@@ -8,6 +8,7 @@ import {spawn,spawnSync} from 'node:child_process';
 import {createRequire} from 'node:module';
 import {FAKE_ORCA} from './helpers/fake-orca.mjs';
 import {openLedger,inspectLedger,ledgerFileFor} from '../engine/ledger-db.mjs';
+import {seedWorkflow} from './_ledger-fixture.mjs';
 import {INPUT_DIGEST_SCHEMA,baselineWorkInputs,createDigester,inputKindOf,lawTokens,opInputPaths,recordInputs,workInputPaths} from '../scripts/kernel/input-digests.mjs';
 
 // Stale input: `api dispatch` records the digests of the inputs an op reads
@@ -30,6 +31,10 @@ const sha=text=>crypto.createHash('sha256').update(text).digest('hex');
 const fixture=(t,{registry=null}={})=>{
   const root=fs.mkdtempSync(path.join(os.tmpdir(),'starci-stale-'));
   t.after(()=>fs.rmSync(root,{recursive:true,force:true,maxRetries:20,retryDelay:25}));
+  if(process.env.STARCI_TEST_TEMP_DIR){
+    const scratch=path.join(process.env.STARCI_TEST_TEMP_DIR,'starci-job-scratch');
+    t.after(()=>fs.rmSync(scratch,{recursive:true,force:true,maxRetries:20,retryDelay:25}));
+  }
   const skill=path.join(root,'skill'),repo=path.join(root,'repo');
   for(const dir of ['scripts','engine','modules','bin'])fs.cpSync(path.join(ROOT,dir),path.join(skill,dir),{recursive:true});
   fs.cpSync(path.join(ROOT,'packages','grammar','scripts'),path.join(skill,'packages','grammar','scripts'),{recursive:true});
@@ -39,7 +44,8 @@ const fixture=(t,{registry=null}={})=>{
   const env={...process.env,
     STARCI_ORCA_COMMAND:process.execPath,STARCI_ORCA_ARGS:JSON.stringify([stub]),STARCI_FAKE_ORCA_MODE:'healthy',
     STARCI_FAKE_ORCA_LOG:path.join(root,'calls.jsonl'),STARCI_FAKE_ORCA_STATE:path.join(root,'state.json'),
-    STARCI_OWNER_ROOT:ROOT,LOCALAPPDATA:path.join(root,'localappdata'),...(registry?{STARCI_CONTRACT_CHANGES:registry}:{})};
+    STARCI_OWNER_ROOT:ROOT,LOCALAPPDATA:path.join(root,'localappdata'),STARCI_TEST_MACHINE_FILE:path.join(root,'machine.sqlite'),
+    STARCI_PROJECTS_ROOT:path.join(root,'projects'),...(registry?{STARCI_CONTRACT_CHANGES:registry}:{})};
   if(!registry)delete env.STARCI_CONTRACT_CHANGES;
   const api=path.join(skill,'scripts','kernel','api.mjs');
   const run=(...args)=>spawnSync(process.execPath,[api,...args,'--repo',repo,'--json'],{cwd:skill,encoding:'utf8',windowsHide:true,timeout:180000,env});
@@ -48,24 +54,34 @@ const fixture=(t,{registry=null}={})=>{
   return {root,skill,repo,env,api,run,write,work};
 };
 const json=r=>{try{return JSON.parse(r.stdout);}catch{const at=r.stdout.indexOf('{'),end=r.stdout.indexOf('\n}');return at<0||end<0?null:JSON.parse(r.stdout.slice(at,end+2));}};
-const withLedger=(fx,fn)=>{const ledger=openLedger({file:ledgerFileFor(fx.repo)});try{return fn(ledger);}finally{ledger.close();}};
-const inspect=(fx,fn)=>{const ledger=inspectLedger({file:ledgerFileFor(fx.repo)});try{return fn(ledger.db);}finally{ledger.close();}};
+const withLedger=(fx,fn)=>{const ledger=openLedger({file:ledgerFileFor(fx.repo,{env:fx.env})});try{
+  if(!ledger.db.prepare('SELECT 1 FROM workflows WHERE workflow_id=?').get(WORKFLOW))seedWorkflow(ledger,{id:WORKFLOW});
+  return fn(ledger);
+}finally{ledger.close();}};
+const enqueueSeed=(ledger,args)=>{
+  const unitId=args.unitId??args.jobId;
+  if(!ledger.db.prepare('SELECT 1 FROM work_units WHERE workflow_id=? AND unit_id=?').get(args.workflowId,unitId))
+    ledger.write.createUnit({workflowId:args.workflowId,unitId,opId:args.opId,subjectKey:unitId,goalRevision:1});
+  return ledger.enqueueJob({...args,unitId,tryNo:1});
+};
+const inspect=(fx,fn)=>{const ledger=inspectLedger({file:ledgerFileFor(fx.repo,{env:fx.env})});try{return fn(ledger.db);}finally{ledger.close();}};
 const status=fx=>{const r=fx.run('status','--workflow',WORKFLOW);assert.equal(r.status,0,r.stderr||r.stdout);return json(r);};
 const survey=fx=>{const r=fx.run('survey','--workflow',WORKFLOW);assert.equal(r.status,0,r.stderr||r.stdout);return json(r);};
 
 /** A running operation with no exact terminal keeps the frontier `engaged` and not actionable by itself. */
-const holdEngaged=(ledger,jobId='job-engaged')=>{
-  ledger.enqueueJob({jobId,workflowId:WORKFLOW,opId:'docs.author',kind:'op',payload:{opId:'docs.author',owned_paths:['docs/engaged/']}});
-  ledger.db.prepare("UPDATE jobs SET status='running' WHERE job_id=?").run(jobId);
-  ledger.db.prepare("UPDATE workflows SET phase='running' WHERE workflow_id=?").run(WORKFLOW);
+const holdEngaged=(ledger,jobId='job-engaged',opId='docs.author')=>{
+  ledger.write.createUnit({workflowId:WORKFLOW,unitId:jobId,opId,subjectKey:jobId,goalRevision:1});
+  enqueueSeed(ledger,{jobId,workflowId:WORKFLOW,unitId:jobId,opId,kind:'op',payload:{opId,owned_paths:['docs/engaged/']}});
+  for(const phase of ['ready','leased','running'])ledger.db.prepare('UPDATE jobs SET status=? WHERE job_id=?').run(phase,jobId);
 };
 /** A settled op row plus its contract, written the way a ledger already holds them. */
 const settledRow=(ledger,{jobId,opId=OP,attempt,cut=null,inputs,status='succeeded',owned=null,admittedAt=null})=>{
   const at=admittedAt??Date.now();
-  ledger.enqueueJob({jobId,workflowId:WORKFLOW,opId,attempt,kind:'op',payload:{opId,owned_paths:owned??[`src/${jobId}/`],...(cut?{cut}:{})}});
-  ledger.db.prepare('UPDATE jobs SET status=? WHERE job_id=?').run(status,jobId);
-  ledger.db.prepare('INSERT INTO contracts(workflow_id,op_id,attempt,dispatch_id,markdown,context_json,created_at) VALUES(?,?,?,?,?,?,?)')
-    .run(WORKFLOW,opId,attempt,`dispatch-${jobId}`,'# contract',JSON.stringify({packet:{op:opId},worktree:'.',...(inputs?{inputs}:{})}),at);
+  seedWorkflow(ledger,{id:WORKFLOW,jobs:[{jobId,opId,status,createdAt:at,updatedAt:at,
+    dispatchId:`dispatch-${jobId}`,payload:{opId,owned_paths:owned??[`src/${jobId}/`],...(cut?{cut}:{})}}]});
+  const attemptId=ledger.db.prepare('SELECT attempt_id FROM op_attempts WHERE job_id=?').get(jobId).attempt_id;
+  ledger.db.prepare('INSERT INTO contracts(attempt_id,workflow_id,job_id,markdown,context_json,created_at) VALUES(?,?,?,?,?,?)')
+    .run(attemptId,WORKFLOW,jobId,'# contract',JSON.stringify({packet:{op:opId},worktree:'.',...(inputs?{inputs}:{})}),at);
 };
 
 test('law tokens: knowledge, schema paths and the named data-owned files, never other runtime paths; Work inputs are the .starciwork records',()=>{
@@ -104,8 +120,7 @@ test('dispatch records Source and Work digests by kind; settle re-baselines Work
   fx.work('features/task/fr/list/index.yaml','fr: v1\n');
   fx.work('features/task/fr/list/evidence/run.txt','noise\n');
   withLedger(fx,ledger=>{
-    ledger.enqueueJob({jobId:'job-refactor',workflowId:WORKFLOW,opId:OP,kind:'op',payload:{opId:OP,owned_paths:['src/refactor/'],model:'qwen-agent',records:[FR_DIR,'src/refactor/a.ts']}});
-    ledger.db.prepare("UPDATE workflows SET phase='queued' WHERE workflow_id=?").run(WORKFLOW);
+    enqueueSeed(ledger,{jobId:'job-refactor',workflowId:WORKFLOW,opId:OP,kind:'op',payload:{opId:OP,owned_paths:['src/refactor/'],model:'qwen-agent',records:[FR_DIR,'src/refactor/a.ts']}});
   });
   const dispatched=fx.run('dispatch','--job','job-refactor','--model','qwen-agent','--spawn');
   assert.equal(dispatched.status,0,dispatched.stderr||dispatched.stdout);
@@ -120,10 +135,18 @@ test('dispatch records Source and Work digests by kind; settle re-baselines Work
   assert.equal(recorded[RULES].digest,sha('rules: v1\n'));
   assert.equal(recorded[FR_DIR].digest,sha(`${FR_DIR}/index.yaml\0${sha('fr: v1\n')}\n`),'a record directory counts its record files, never evidence/');
 
-  const report=path.join(fx.repo,'report.json');
+  const report=inspect(fx,db=>path.join(db.prepare('SELECT scratch_dir FROM op_attempts WHERE job_id=?').get('job-refactor').scratch_dir,'report.json'));
   fs.writeFileSync(report,JSON.stringify({schema:'starci/op-report@1',outcome:'done',summary:'refactor done',head:'abc1234def',files:['src/refactor/a.ts'],checks:[{name:'self',command:'true',exitCode:0}]}));
-  assert.equal(fx.run('report','--job','job-refactor','--report',report).status,0);
-  assert.equal(fx.run('check','--job','job-refactor','--checks',JSON.stringify({checks:[{name:'validator',exitCode:0}]})).status,0);
+  const reported=fx.run('report','--job','job-refactor','--report',report);
+  assert.equal(reported.status,0,reported.stderr||reported.stdout);
+  const checked=fx.run('check','--job','job-refactor','--checks',JSON.stringify({checks:[{name:'validator',exitCode:0}]}));
+  assert.equal(checked.status,0,checked.stderr||checked.stdout);
+  withLedger(fx,ledger=>{
+    const attempt=ledger.db.prepare('SELECT attempt_id,span_id FROM op_attempts WHERE job_id=?').get('job-refactor');
+    ledger.db.prepare(`INSERT INTO check_runs(workflow_id,attempt_id,job_id,op_id,span_id,name,phase,runner,authority,exit_code,status,created_at)
+      VALUES(?,?,?,?,?,?,'verify','settler','runtime',0,'pass',?)`)
+      .run(WORKFLOW,attempt.attempt_id,'job-refactor',OP,attempt.span_id,'validator',Date.now());
+  });
   const settled=fx.run('settle','--job','job-refactor','--verdict','pass');
   assert.equal(settled.status,0,settled.stderr||settled.stdout);
   const work=inputsOf().digests.find(d=>d.path===FR_DIR);
@@ -157,7 +180,7 @@ test('dispatch records Source and Work digests by kind; settle re-baselines Work
   assert.equal(loud.frontier.actionable,true);
   assert.match(loud.frontier.reason,/job-refactor.*product records/);
 
-  withLedger(fx,ledger=>ledger.enqueueJob({jobId:'job-refactor-redo',workflowId:WORKFLOW,opId:OP,attempt:2,kind:'op',payload:{opId:OP,owned_paths:['src/refactor/']}}));
+  withLedger(fx,ledger=>enqueueSeed(ledger,{jobId:'job-refactor-redo',workflowId:WORKFLOW,opId:OP,attempt:2,kind:'op',payload:{opId:OP,owned_paths:['src/refactor/']}}));
   const redo=status(fx);
   assert.deepEqual(redo.staleInput,[],'a newer attempt of the same op supersedes the stale one');
   assert.deepEqual(redo.sourceDrift,[],'and its drift');
@@ -171,8 +194,9 @@ test('Work: the job\'s own writes and its workflow\'s later legs are progress, n
     const inputs=baselineWorkInputs(recordInputs(fx.skill,[],undefined,{repo:fx.repo,workPaths:[REC]}),fx.repo,{now:Date.now()-60000});
     // Admitted after every registered interface.draw follow-up change: this spec is about drift, not a contract redo.
     settledRow(ledger,{jobId:'job-draw',opId:'interface.draw',attempt:1,inputs,owned:[REC],admittedAt:Date.parse('2099-01-01T00:00:00Z')});
-    ledger.enqueueJob({jobId:'job-audit',workflowId:WORKFLOW,opId:'interface.audit',kind:'op',payload:{opId:'interface.audit',owned_paths:[`${REC}/index.yaml`]}});
-    ledger.enqueueJob({jobId:'job-peer',workflowId:'wf-peer',opId:'interface.implement',kind:'op',payload:{opId:'interface.implement',owned_paths:[REC]}});
+    enqueueSeed(ledger,{jobId:'job-audit',workflowId:WORKFLOW,opId:'interface.audit',kind:'op',payload:{opId:'interface.audit',owned_paths:[`${REC}/index.yaml`]}});
+    seedWorkflow(ledger,{id:'wf-peer'});
+    enqueueSeed(ledger,{jobId:'job-peer',workflowId:'wf-peer',opId:'interface.implement',kind:'op',payload:{opId:'interface.implement',owned_paths:[REC]}});
     holdEngaged(ledger);
   });
   fx.work('features/task/ui/list/index.yaml','ui: v2 by the draw itself or its audit\n');
@@ -196,7 +220,7 @@ test('a contract without recorded digests never reports stale input and leaves a
   withLedger(fx,ledger=>{
     settledRow(ledger,{jobId:'job-legacy',attempt:1});
     settledRow(ledger,{jobId:'job-legacy-null',opId:'docs.author',attempt:1});
-    ledger.db.prepare("UPDATE contracts SET context_json=NULL WHERE op_id='docs.author'").run();
+    ledger.db.prepare("UPDATE contracts SET context_json=NULL WHERE job_id='job-legacy-null'").run();
     holdEngaged(ledger);
   });
   const before=status(fx);
@@ -215,7 +239,7 @@ test('a finished workflow reports no stale input',t=>{
   fx.write(RULES,'rules: v1\n');
   withLedger(fx,ledger=>{
     settledRow(ledger,{jobId:'job-done',attempt:1,inputs:recordInputs(fx.skill,[RULES])});
-    ledger.db.prepare("UPDATE workflows SET phase='finished' WHERE workflow_id=?").run(WORKFLOW);
+    ledger.write.changeWorkflowPhase({workflowId:WORKFLOW,to:'finished',by:'test',reason:'finished'});
   });
   fx.write(RULES,'rules: v2\n');
   assert.deepEqual(status(fx).staleInput,[]);
@@ -304,10 +328,11 @@ test('cut: Work-stale slices list their ordinals; while the seam redo is open th
     const inputs=baseline();
     for(const ordinal of [1,2,3])settledRow(ledger,{jobId:`job-cut-${ordinal}`,attempt:ordinal,cut:cut(ordinal),inputs});
     settledRow(ledger,{jobId:'job-partial',opId:'docs.author',attempt:1,inputs,status:'failed'});
-    ledger.db.prepare("INSERT INTO reports(workflow_id,dispatch_id,op_id,attempt,generation,outcome,report_json,created_at) VALUES(?,?,?,?,?,?,?,?)")
-      .run(WORKFLOW,'dispatch-job-partial','docs.author',1,1,'partial','{}',Date.now());
+    const partialAttempt=ledger.db.prepare("SELECT attempt_id FROM op_attempts WHERE job_id='job-partial'").get().attempt_id;
+    ledger.db.prepare("INSERT INTO reports(workflow_id,attempt_id,dispatch_id,job_id,outcome,report_json,created_at) VALUES(?,?,?,?,?,?,?)")
+      .run(WORKFLOW,partialAttempt,'dispatch-job-partial','job-partial','partial','{}',Date.now());
     settledRow(ledger,{jobId:'job-failed',opId:'test.author',attempt:1,inputs,status:'failed'});
-    holdEngaged(ledger);
+    holdEngaged(ledger,'job-engaged-cut','business.analyze');
   });
   fx.work('features/task/fr/list/index.yaml','fr: v2\n');
   const all=status(fx);
@@ -316,42 +341,38 @@ test('cut: Work-stale slices list their ordinals; while the seam redo is open th
   assert.deepEqual(all.staleInput.find(s=>s.jobId==='job-cut-2').cut,cut(2));
   assert.equal(all.frontier.actionable,true);
 
-  withLedger(fx,ledger=>ledger.enqueueJob({jobId:'job-cut-1-redo',workflowId:WORKFLOW,opId:OP,attempt:4,kind:'op',payload:{opId:OP,owned_paths:['src/job-cut-1/'],cut:cut(1)}}));
+  withLedger(fx,ledger=>enqueueSeed(ledger,{jobId:'job-cut-1-redo',workflowId:WORKFLOW,opId:OP,attempt:4,kind:'op',payload:{opId:OP,owned_paths:['src/job-cut-1/'],cut:cut(1)}}));
   const seam=status(fx);
   assert.deepEqual(seam.frontier.staleOperations.filter(s=>s.op===OP).map(s=>[s.jobId,s.heldBy]),[['job-cut-2','job-cut-1-redo'],['job-cut-3','job-cut-1-redo']]);
   assert.doesNotMatch(seam.frontier.reason,/job-cut-2/);
 
   withLedger(fx,ledger=>{
-    ledger.db.prepare("UPDATE jobs SET status='succeeded' WHERE job_id='job-cut-1-redo'").run();
-    ledger.db.prepare('INSERT INTO contracts(workflow_id,op_id,attempt,dispatch_id,markdown,context_json,created_at) VALUES(?,?,?,?,?,?,?)')
-      .run(WORKFLOW,OP,4,'dispatch-redo','# contract',JSON.stringify({inputs:baseline()}),Date.now());
+    for(const to of ['ready','leased'])ledger.write.setJobStatus({jobId:'job-cut-1-redo',to,reason:'test-fixture'});
+    const attempt=ledger.write.startAttempt({workflowId:WORKFLOW,jobId:'job-cut-1-redo',dispatchId:'dispatch-redo'});
+    for(const to of ['running','reported','succeeded'])ledger.write.setJobStatus({jobId:'job-cut-1-redo',to,reason:'test-fixture'});
+    ledger.db.prepare('INSERT INTO contracts(attempt_id,workflow_id,job_id,markdown,context_json,created_at) VALUES(?,?,?,?,?,?)')
+      .run(attempt.attempt_id,WORKFLOW,'job-cut-1-redo','# contract',JSON.stringify({inputs:baseline()}),Date.now());
   });
   const rest=status(fx);
   assert.deepEqual(rest.frontier.staleOperations.filter(s=>s.op===OP).map(s=>[s.jobId,s.heldBy??null]),[['job-cut-2',null],['job-cut-3',null]]);
-  assert.match(rest.frontier.reason,/job-cut-2 \(code\.refactor a2 cut root-configs 2\/3\)/);
+  assert.match(rest.frontier.reason,/job-cut-2 \(code\.refactor a1 cut root-configs 2\/3\)/);
 });
 
 /* ------------------------------------------ an existing ledger, as main left it */
 
-// The ledger shape before input digests existed: schema.sql executed directly,
-// no openLedger, contract rows carrying no inputs record.
+// Current migrated ledger with contracts written before input digests were recorded.
 const legacyLedger=file=>{
-  const {DatabaseSync}=require('node:sqlite');
-  fs.mkdirSync(path.dirname(file),{recursive:true});
-  const db=new DatabaseSync(file);
-  db.function('starci_sha256',{deterministic:true},text=>sha(String(text)));
-  db.exec(`BEGIN IMMEDIATE;${fs.readFileSync(path.join(ROOT,'engine','schema.sql'),'utf8')}
-    PRAGMA user_version=1; COMMIT;`);
-  const at=Date.now(),seed=db.prepare('INSERT INTO meta(key,value) VALUES(?,?)');
-  seed.run('ledger_id',crypto.randomUUID());seed.run('schema','starci/ledger-db@1');seed.run('created_at',String(at));
-  db.prepare("INSERT INTO workflows(workflow_id,title,created_at,updated_at,phase) VALUES(?,?,?,?,'running')").run(WORKFLOW,'legacy',at,at);
-  for(const [jobId,opId] of [['job-old-1',OP],['job-old-2','docs.author']]){
-    db.prepare("INSERT INTO jobs(job_id,workflow_id,op_id,attempt,generation,kind,role,payload_json,status,created_at,updated_at) VALUES(?,?,?,1,0,'op','op',?,'succeeded',?,?)")
-      .run(jobId,WORKFLOW,opId,JSON.stringify({opId,owned_paths:[`src/${jobId}/`]}),at,at);
-    db.prepare('INSERT INTO contracts(workflow_id,op_id,attempt,dispatch_id,markdown,context_json,created_at) VALUES(?,?,1,?,?,?,?)')
-      .run(WORKFLOW,opId,jobId,'# contract',JSON.stringify({packet:{op:opId},worktree:'.',model:'qwen-agent'}),at);
-  }
-  db.close();
+  const ledger=openLedger({file});
+  try{
+    const at=Date.now();
+    seedWorkflow(ledger,{id:WORKFLOW,state:{phase:'running',job:'legacy'},now:at,jobs:[
+      {jobId:'job-old-1',opId:OP,status:'succeeded',dispatchId:'job-old-1',payload:{opId:OP,owned_paths:['src/job-old-1/']}},
+      {jobId:'job-old-2',opId:'docs.author',status:'succeeded',dispatchId:'job-old-2',payload:{opId:'docs.author',owned_paths:['src/job-old-2/']}},
+    ]});
+    for(const row of ledger.db.prepare('SELECT attempt_id,job_id,op_id FROM op_attempts WHERE workflow_id=?').all(WORKFLOW))
+      ledger.db.prepare('INSERT INTO contracts(attempt_id,workflow_id,job_id,markdown,context_json,created_at) VALUES(?,?,?,?,?,?)')
+        .run(row.attempt_id,WORKFLOW,row.job_id,'# contract',JSON.stringify({packet:{op:row.op_id},worktree:'.',model:'qwen-agent'}),at);
+  }finally{ledger.close();}
 };
 const schemaOf=file=>{
   const {DatabaseSync}=require('node:sqlite');
@@ -361,12 +382,12 @@ const schemaOf=file=>{
     contracts:db.prepare('PRAGMA table_info(contracts)').all().map(c=>`${c.name}:${c.type}:${c.notnull}`)};}
   finally{db.close();}
 };
-const openRace=(file,root)=>new Promise(resolve=>{
+const openRace=(file,root,env)=>new Promise(resolve=>{
   const code=`import {openLedger} from ${JSON.stringify(new URL('../engine/ledger-db.mjs',import.meta.url).href)};
     import {staleInputs} from ${JSON.stringify(new URL('../scripts/kernel/input-digests.mjs',import.meta.url).href)};
     const l=openLedger({file:${JSON.stringify(file)}});const s=staleInputs(l.db,${JSON.stringify(WORKFLOW)},{root:${JSON.stringify(root)}});l.close();
     process.stdout.write(JSON.stringify(s));`;
-  const child=spawn(process.execPath,['--input-type=module','-e',code],{windowsHide:true});
+  const child=spawn(process.execPath,['--input-type=module','-e',code],{windowsHide:true,env});
   let out='',err='';child.stdout.on('data',d=>{out+=d;});child.stderr.on('data',d=>{err+=d;});
   child.on('close',status=>resolve({status,out,err}));
 });
@@ -374,7 +395,7 @@ const openRace=(file,root)=>new Promise(resolve=>{
 test('an existing ledger: no schema change, legacy rows never stale, new dispatches record digests, concurrent opens succeed',async t=>{
   const fx=fixture(t);
   fx.write(RULES,'rules: v1\n');
-  const file=ledgerFileFor(fx.repo);
+  const file=ledgerFileFor(fx.repo,{env:fx.env});
   legacyLedger(file);
   const pristine=schemaOf(file);
 
@@ -387,14 +408,17 @@ test('an existing ledger: no schema change, legacy rows never stale, new dispatc
   assert.equal(after.frontier.actionable,before.frontier.actionable);
   assert.equal(after.frontier.actionable,false);
 
-  withLedger(fx,ledger=>ledger.enqueueJob({jobId:'job-new',workflowId:WORKFLOW,opId:OP,attempt:2,generation:0,kind:'op',payload:{opId:OP,owned_paths:['src/new/'],model:'qwen-agent'}}));
+  withLedger(fx,ledger=>{
+    ledger.write.createUnit({workflowId:WORKFLOW,unitId:'job-new',opId:OP,subjectKey:'job-new',goalRevision:1});
+    enqueueSeed(ledger,{jobId:'job-new',workflowId:WORKFLOW,unitId:'job-new',opId:OP,kind:'op',payload:{opId:OP,owned_paths:['src/new/'],model:'qwen-agent'}});
+  });
   const dispatched=fx.run('dispatch','--job','job-new','--model','qwen-agent','--spawn');
   assert.equal(dispatched.status,0,dispatched.stderr||dispatched.stdout);
-  const reopened=inspect(fx,db=>db.prepare('SELECT op_id,attempt,context_json FROM contracts WHERE workflow_id=? ORDER BY op_id,attempt').all(WORKFLOW)
-    .map(r=>[r.op_id,r.attempt,JSON.parse(r.context_json).inputs?.schema??null]));
-  assert.deepEqual(reopened,[[OP,1,null],[OP,2,INPUT_DIGEST_SCHEMA],['docs.author',1,null]]);
+  const reopened=inspect(fx,db=>db.prepare('SELECT a.op_id,a.try_no,c.context_json FROM contracts c JOIN op_attempts a ON a.attempt_id=c.attempt_id WHERE c.workflow_id=? ORDER BY a.op_id,a.attempt_id').all(WORKFLOW)
+    .map(r=>[r.op_id,r.try_no,JSON.parse(r.context_json).inputs?.schema??null]));
+  assert.deepEqual(reopened,[[OP,1,null],[OP,1,INPUT_DIGEST_SCHEMA],['docs.author',1,null]]);
 
-  const [a,b]=await Promise.all([openRace(file,fx.skill),openRace(file,fx.skill)]);
+  const [a,b]=await Promise.all([openRace(file,fx.skill,fx.env),openRace(file,fx.skill,fx.env)]);
   assert.equal(a.status,0,a.err);assert.equal(b.status,0,b.err);
   assert.deepEqual(JSON.parse(a.out),[]);assert.deepEqual(JSON.parse(b.out),[]);
   const reopenedSchema=schemaOf(file);

@@ -66,7 +66,7 @@ export function readLedgerJobs(file, { sinceMs = null } = {}) {
     const jobs = db.prepare(`SELECT job_id, op_id, status, created_at, updated_at,
         json_extract(payload_json,'$.model') AS pool, json_extract(payload_json,'$.modelId') AS model_id,
         json_extract(payload_json,'$.difficulty') AS difficulty, json_extract(payload_json,'$.retry.retryOf') AS retry_of,
-        json_extract(result_json,'$.verdict') AS verdict
+        (SELECT verdict FROM op_attempts a WHERE a.job_id=jobs.job_id ORDER BY a.attempt_id DESC LIMIT 1) AS verdict
       FROM jobs WHERE kind='op'${where} ORDER BY created_at, job_id`).all(...args);
     const times = new Map();
     const evWhere = sinceMs == null ? '' : ' AND created_at>=?';

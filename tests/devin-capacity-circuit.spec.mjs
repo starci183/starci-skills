@@ -18,6 +18,10 @@ import { inspectLedger, ledgerFileFor, openLedger } from '../engine/ledger-db.mj
 import { outageInText, outageOnScreen, outageSpecsOf, quotaSpecOf } from '../scripts/agent/provider-outage.mjs';
 import { attemptCauseOf, lineageRouteAdjust } from '../scripts/kernel/lineage-route.mjs';
 import { FAKE_ORCA } from './helpers/fake-orca.mjs';
+import { seedWorkflow } from './_ledger-fixture.mjs';
+import { openMachineReader } from '../engine/machine-db.mjs';
+import { readProviderCircuit } from '../scripts/kernel/provider-circuit.mjs';
+import { JOB_ROW } from '../scripts/kernel/api-lib/rows.mjs';
 
 const ROOT = path.resolve(import.meta.dirname, '..');
 const API = path.join(ROOT, 'scripts', 'kernel', 'api.mjs');
@@ -68,27 +72,24 @@ const fixture = (t) => {
   const stateFile = path.join(root, 'state.json'); fs.writeFileSync(stateFile, '{}');
   const env = { ...process.env, STARCI_ORCA_COMMAND: process.execPath, STARCI_ORCA_ARGS: JSON.stringify([stub]),
     STARCI_FAKE_ORCA_LOG: path.join(root, 'calls.jsonl'), STARCI_FAKE_ORCA_STATE: stateFile, STARCI_FAKE_ORCA_MODE: 'healthy',
-    LOCALAPPDATA: path.join(root, 'localappdata') };
+    LOCALAPPDATA: path.join(root, 'localappdata'), STARCI_PROJECTS_ROOT:path.join(root,'projects'),
+    STARCI_TEST_MACHINE_FILE:path.join(root,'machine.sqlite') };
   for (const key of ['ORCA_TERMINAL_HANDLE', 'STARCI_ROLE', 'STARCI_OP_JOB']) delete env[key];
   const at = Date.now() - 20 * 60000;
-  const ledger = openLedger({ file: ledgerFileFor(repo) });
+  const ledgerFile=ledgerFileFor(repo,{env});
+  const ledger = openLedger({ file: ledgerFile });
   try {
-    ledger.enqueueJob({ jobId: `kernel-${WF}`, workflowId: WF, kind: 'kernel', role: 'kernel',
-      payload: { hierarchy: { schema: 'starci/agent-hierarchy@1', nodeId: `agent:kernel:${WF}`, parentNodeId: `workflow:${WF}`, role: 'kernel' } } });
-    ledger.db.prepare("UPDATE jobs SET status='running',worker_id='fake-kernel-terminal' WHERE job_id=?").run(`kernel-${WF}`);
-    // The running first attempt on Devin, and its retry queued behind it.
-    ledger.enqueueJob({ jobId: 'op-impl-a1', workflowId: WF, opId: 'interface.implement', kind: 'op',
-      payload: { opId: 'interface.implement', owned_paths: ['apps/web/src/features/profile/'], difficulty: 'medium', model: 'devin-agent',
-        hierarchy: { runtime: { terminalHandle: 'term-devin-worker', provider: 'devin', runtimePool: 'devin-agent' } } } });
-    ledger.db.prepare("UPDATE jobs SET status='running',worker_id='term-devin-worker',created_at=? WHERE job_id='op-impl-a1'").run(at);
+    seedWorkflow(ledger,{id:WF,state:{phase:'running',job:'capacity'},jobs:[
+      {jobId:`kernel-${WF}`,kind:'kernel',status:'running',workerId:'fake-kernel-terminal'},
+      {jobId:'op-impl-a1',unitId:'impl-a',opId:'interface.implement',status:'running',workerId:'term-devin-worker',
+        createdAt:at,payload:{opId:'interface.implement',owned_paths:['apps/web/src/features/profile/'],difficulty:'medium',model:'devin-agent',
+          hierarchy:{runtime:{terminalHandle:'term-devin-worker',provider:'devin',runtimePool:'devin-agent'}}}}
+    ]});
   } finally { ledger.close(); }
   const writeState = (fn) => { const s = json(fs.readFileSync(stateFile, 'utf8')) ?? {}; fn(s); fs.writeFileSync(stateFile, JSON.stringify(s)); };
-  const db = (fn) => { const l = inspectLedger({ file: ledgerFileFor(repo) }); try { return fn(l.db); } finally { l.close(); } };
-  const row = () => db((d) => {
-    const r = d.prepare("SELECT value_json,expires_at FROM signals WHERE scope='provider-health' AND key='devin'").get();
-    return r ? { ...json(r.value_json), expiresAt: r.expires_at } : null;
-  });
-  return { repo, env, writeState, db, row, run: (...args) => runApi(env, ...args) };
+  const db = (fn) => { const l = inspectLedger({ file: ledgerFile }); try { return fn(l.db); } finally { l.close(); } };
+  const row = () => {const m=openMachineReader({file:env.STARCI_TEST_MACHINE_FILE});try{const r=readProviderCircuit('devin',{machine:m});return r?{...r.value,expiresAt:r.expiresAt}:null;}finally{m.close();}};
+  return { repo, env, ledgerFile, writeState, db, row, run: (...args) => runApi(env, ...args) };
 };
 
 test('a Devin worker screen showing the capacity error opens the devin capacity circuit; the retry routes around Devin and counts the outage against it', async (t) => {
@@ -111,13 +112,13 @@ test('a Devin worker screen showing the capacity error opens the devin capacity 
   assert.equal(fx.db((d) => d.prepare("SELECT count(*) n FROM events WHERE kind='provider-unavailable'").get().n), 1);
 
   // The Kernel settles the dead attempt failed with no report and enqueues its retry, as it did live.
-  const l = openLedger({ file: ledgerFileFor(fx.repo) });
+  const l = openLedger({ file: fx.ledgerFile });
   try {
-    l.db.prepare("UPDATE jobs SET status='failed',worker_id=NULL,result_json=?,updated_at=? WHERE job_id='op-impl-a1'")
-      .run(JSON.stringify({ verdict: 'fail', report: null, checkEvidence: { observed: 0, passed: 0, failed: 0, green: false } }), Date.now());
+    l.write.recordJobResult({jobId:'op-impl-a1',result:{verdict:'fail',report:null,checkEvidence:{observed:0,passed:0,failed:0,green:false}}});
+    l.write.setJobStatus({jobId:'op-impl-a1',to:'failed',reason:'capacity outage'});
     l.appendEvent({ workflowId: WF, entityType: 'job', entityId: 'op-impl-a1', kind: 'op-settled',
       payload: { verdict: 'fail', status: 'failed', report: null, reportFiled: false, reportOutcome: null } });
-    l.enqueueJob({ jobId: 'op-impl-a2', workflowId: WF, opId: 'interface.implement', kind: 'op',
+    l.enqueueJob({ jobId: 'op-impl-a2', workflowId: WF, unitId:'impl-a',tryNo:2,retryOf:'op-impl-a1',opId: 'interface.implement', kind: 'op',
       payload: { opId: 'interface.implement', owned_paths: ['apps/web/src/features/profile/'], difficulty: 'medium', retry: { retryOf: 'op-impl-a1', businessAttempt: 2 } } });
   } finally { l.close(); }
   const route = await fx.run('route', '--repo', fx.repo, '--job', 'op-impl-a2', '--json');
@@ -126,10 +127,10 @@ test('a Devin worker screen showing the capacity error opens the devin capacity 
   assert.match(route.value.rejected.find((r) => r.target === 'devin-agent')?.reason ?? '', /out of capacity/);
 
   // The lineage counts the outage against Devin, so the retry keeps it last once the circuit expires.
-  const cause = fx.db((d) => attemptCauseOf(d, d.prepare("SELECT * FROM jobs WHERE job_id='op-impl-a1'").get()));
+  const cause = fx.db((d) => attemptCauseOf(d, d.prepare(`SELECT ${JOB_ROW} FROM jobs WHERE job_id='op-impl-a1'`).get()));
   assert.deepEqual([cause.cause, cause.attributable], ['provider-outage', true]);
   assert.match(cause.detail, /devin was out of capacity/);
-  const adjust = fx.db((d) => lineageRouteAdjust(d, d.prepare("SELECT * FROM jobs WHERE job_id='op-impl-a2'").get()));
+  const adjust = fx.db((d) => lineageRouteAdjust(d, d.prepare(`SELECT ${JOB_ROW} FROM jobs WHERE job_id='op-impl-a2'`).get()));
   assert.deepEqual(adjust.demote, ['devin-agent']);
 });
 
@@ -137,22 +138,18 @@ test('a failed attempt with no report and no outage of its pool is still the wor
   const repo = tmp(t, 'starci-devin-cap-none-');
   const l = openLedger({ file: ledgerFileFor(repo) });
   try {
-    l.ensureWorkflow({ workflowId: WF, title: 'no outage' });
     const at = Date.now();
-    l.db.prepare(`INSERT INTO jobs(job_id,workflow_id,op_id,attempt,generation,kind,role,payload_json,result_json,status,created_at,updated_at)
-      VALUES('op-impl-b1',?,'interface.implement',1,0,'op','op',?,?,'failed',?,?)`)
-      .run(WF, JSON.stringify({ model: 'devin-agent' }), JSON.stringify({ verdict: 'fail', report: null }), at - 60000, at - 1000);
+    seedWorkflow(l,{id:WF,state:{phase:'running',job:'no outage'},jobs:[{jobId:'op-impl-b1',opId:'interface.implement',
+      status:'failed',createdAt:at-60000,updatedAt:at-1000,payload:{model:'devin-agent'},result:{verdict:'fail',report:null}}]});
     // An outage of ANOTHER pool, a devin launch-path strike, and a devin outage after this attempt settled
     // prove nothing about it.
     l.appendEvent({ workflowId: WF, entityType: 'provider', entityId: 'qwen', kind: 'provider-unavailable',
-      payload: { provider: 'qwen', model: 'qwen-agent', failureKind: 'quota' } });
-    l.db.prepare("UPDATE events SET created_at=? WHERE kind='provider-unavailable'").run(at - 30000);
+      payload: { provider: 'qwen', model: 'qwen-agent', failureKind: 'quota' },createdAt:at-30000 });
     l.appendEvent({ workflowId: WF, entityType: 'provider', entityId: 'devin', kind: 'provider-unavailable',
-      payload: { provider: 'devin', model: 'devin-agent', failureKind: 'readiness' } });
-    l.db.prepare("UPDATE events SET created_at=? WHERE kind='provider-unavailable' AND entity_id='devin'").run(at - 30000);
+      payload: { provider: 'devin', model: 'devin-agent', failureKind: 'readiness' },createdAt:at-30000 });
     l.appendEvent({ workflowId: WF, entityType: 'provider', entityId: 'devin', kind: 'provider-unavailable',
       payload: { provider: 'devin', model: 'devin-agent', failureKind: 'capacity' } });
-    const cause = attemptCauseOf(l.db, l.db.prepare("SELECT * FROM jobs WHERE job_id='op-impl-b1'").get());
+    const cause = attemptCauseOf(l.db, l.db.prepare(`SELECT ${JOB_ROW} FROM jobs WHERE job_id='op-impl-b1'`).get());
     assert.deepEqual([cause.cause, cause.attributable], ['fail', false]);
   } finally { l.close(); }
 });

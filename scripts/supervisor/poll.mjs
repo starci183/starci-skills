@@ -64,7 +64,8 @@ export const workflows = (db, wanted = new Set()) =>
 // reports would otherwise drop the oldest of them and skip past their ids
 // forever.
 export const reportsSince = (db, sinceId, wanted = new Set()) =>
-  db.prepare('SELECT report_id, workflow_id, op_id, attempt, outcome, created_at FROM reports WHERE report_id > ? ORDER BY report_id')
+  db.prepare(`SELECT r.report_id,r.workflow_id,a.op_id,a.try_no AS attempt,r.outcome,r.created_at
+    FROM reports r JOIN op_attempts a ON a.attempt_id=r.attempt_id WHERE r.report_id > ? ORDER BY r.report_id`)
     .all(sinceId)
     .filter((r) => mine(wanted, r.workflow_id));
 

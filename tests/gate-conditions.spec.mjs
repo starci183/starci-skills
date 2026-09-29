@@ -5,6 +5,7 @@ import os from 'node:os';
 import path from 'node:path';
 import {spawnSync} from 'node:child_process';
 import {inspectLedger,ledgerFileFor,openLedger} from '../engine/ledger-db.mjs';
+import {seedWorkflow} from './_ledger-fixture.mjs';
 import {parseCondition,evaluateCondition,typedIncidents,recordRevision} from '../scripts/kernel/gate-conditions.mjs';
 // These specs exercise the owner-flow contract; autopilot (scripts/kernel/autopilot.mjs, owner ruling 2026-09-28) is
 // on by default, so they run with it off - tests/autopilot.spec.mjs covers the autopilot flow.
@@ -25,6 +26,8 @@ const WORK='wf-gc-work',BASE='wf-gc-base',DONE='wf-gc-finished';
 const fixture=t=>{
   const root=fs.mkdtempSync(path.join(os.tmpdir(),'starci-gate-cond-'));
   t.after(()=>fs.rmSync(root,{recursive:true,force:true,maxRetries:20,retryDelay:25}));
+  if(process.env.STARCI_TEST_TEMP_DIR)t.after(()=>fs.rmSync(path.join(process.env.STARCI_TEST_TEMP_DIR,'starci-git-memo'),
+    {recursive:true,force:true,maxRetries:20,retryDelay:25}));
   const repo=path.join(root,'repo');fs.mkdirSync(repo,{recursive:true});
   const env={...process.env};
   for(const key of ['ORCA_TERMINAL_HANDLE','STARCI_ROLE','STARCI_OP_JOB'])delete env[key];
@@ -34,7 +37,8 @@ const fixture=t=>{
     const at=Date.now();
     for(const [workflowId,phase] of [[WORK,'running'],[BASE,'running'],[DONE,'finished']]){
       ledger.ensureWorkflow({workflowId,title:workflowId,ledgerMode:'durable',sourceRoots:[repo]});
-      ledger.db.prepare('UPDATE workflows SET phase=? WHERE workflow_id=?').run(phase,workflowId);
+      ledger.write.changeWorkflowPhase({workflowId,to:'running',by:'test-fixture',reason:'seed',at});
+      if(phase==='finished')ledger.write.changeWorkflowPhase({workflowId,to:'finished',by:'test-fixture',reason:'seed',at});
       ledger.db.prepare('INSERT INTO goals(workflow_id,revision,goal_identity,markdown,json,created_at) VALUES(?,?,?,?,?,?)')
         .run(workflowId,0,`goal-${workflowId}`,'# goal',JSON.stringify({derivedFrom:'gate-conditions-spec'}),at);
     }
@@ -48,10 +52,14 @@ const fixture=t=>{
   const events=(id,kind)=>read(db=>db.prepare('SELECT payload_json FROM events WHERE entity_id=? AND kind=? ORDER BY seq').all(id,kind).map(r=>JSON.parse(r.payload_json)));
   const seedJob=(workflowId,jobId,{op='backend.implement',status='running',payload={}}={})=>seed(l=>{
     const at=Date.now();
-    l.db.prepare(`INSERT INTO jobs(job_id,workflow_id,op_id,attempt,generation,kind,role,payload_json,status,created_at,updated_at)
-      VALUES(?,?,?,1,0,'op','op',?,?,?,?)`).run(jobId,workflowId,op,JSON.stringify({opId:op,...payload}),status,at,at);
+    seedWorkflow(l,{id:workflowId,jobs:[{jobId,opId:op,status,createdAt:at,updatedAt:at,payload:{opId:op,owned_paths:[],...payload}}]});
   });
-  const setJob=(jobId,status)=>seed(l=>l.db.prepare('UPDATE jobs SET status=?,updated_at=? WHERE job_id=?').run(status,Date.now(),jobId));
+  const setJob=(jobId,status)=>seed(l=>{
+    const current=l.db.prepare('SELECT status FROM jobs WHERE job_id=?').get(jobId).status;
+    const path=current==='queued'&&status==='succeeded'?['ready','leased','running','reported','succeeded']:
+      current==='running'&&status==='succeeded'?['reported','succeeded']:[status];
+    for(const to of path)l.write.setJobStatus({jobId,to,reason:'test-fixture'});
+  });
   return {root,repo,api,ok,refused,read,seed,frontier,incidentStatus,events,seedJob,setJob};
 };
 
@@ -101,7 +109,7 @@ test('--until-job: the status after the awaited job settles resolves the wait, r
   assert.equal(released.queued.find(q=>q.jobId===job).queuedBecause,'ready','the held job is released in the same projection');
   assert.equal(released.actionable,true,'the watchdog wakes the Kernel on this tick');
   assert.equal(released.gateConditions,undefined);
-  const [resolvedEvent]=fx.events(raised.incidentId,'incident-resolved');
+  const resolvedEvent=fx.events(raised.incidentId,'incident-resolved').at(-1);
   assert.equal(resolvedEvent.by,'until-conditions');
   assert.match(resolvedEvent.evidence[0],new RegExp(`job ${PEER_JOB}:settled: ${PEER_JOB} \\(${BASE}\\) succeeded`));
   const [auto]=fx.events(raised.incidentId,'incident-auto-resolved');
@@ -131,8 +139,8 @@ test('--until-job follows the retry lineage: a failed job with a queued retry is
   fx.setJob(PEER_JOB,'failed');
   assert.deepEqual(fx.frontier(WORK).gateConditionsUnmeetable,[incidentId],'a failure with no retry yet is the Kernel\'s to move');
   const RETRY='op-backend.implement-77798b1b10',at=Date.now();
-  fx.seed(l=>l.db.prepare(`INSERT INTO jobs(job_id,workflow_id,op_id,attempt,generation,kind,role,payload_json,status,created_at,updated_at)
-    VALUES(?,?,'backend.implement',2,0,'op','op',?,'queued',?,?)`).run(RETRY,BASE,JSON.stringify({opId:'backend.implement',retry:{retryOf:PEER_JOB}}),at,at));
+  fx.seed(l=>seedWorkflow(l,{id:BASE,jobs:[{jobId:RETRY,unitId:PEER_JOB,opId:'backend.implement',tryNo:2,retryOf:PEER_JOB,status:'queued',createdAt:at,updatedAt:at,
+    payload:{opId:'backend.implement',owned_paths:[],retry:{retryOf:PEER_JOB}}}]}));
   const cond={type:'job',jobId:PEER_JOB,want:'succeeded'};
   const live=fx.read(db=>evaluateCondition(db,cond,{repo:fx.repo,workflowId:WORK}));
   assert.deepEqual([live.met,live.unmeetable],[false,undefined]);
@@ -248,10 +256,10 @@ test('evaluateCondition is read-only and a finished workflow\'s incidents are ne
   const fx=fixture(t);
   fx.seedJob(BASE,PEER_JOB);
   const {incidentId}=fx.ok(['incident','--workflow',WORK,'--kind','owner-gate','--op','x','--until-job',`${PEER_JOB}:succeeded`,'--detail','x']);
-  fx.seed(l=>l.db.prepare("UPDATE workflows SET phase='finished' WHERE workflow_id=?").run(WORK));
+  fx.seed(l=>l.write.changeWorkflowPhase({workflowId:WORK,to:'finished',by:'test-fixture',reason:'workflow-finished'}));
   fx.setJob(PEER_JOB,'succeeded');
   fx.frontier(WORK);fx.frontier(BASE);
-  assert.equal(fx.incidentStatus(incidentId),'open','a finished workflow\'s leftover incident is history, not a wait to release');
+  assert.equal(fx.incidentStatus(incidentId),'resolved','finishing closes the incident; it is no longer a wait to release');
   const cond={type:'job',jobId:PEER_JOB,want:'succeeded'};
   const before=fx.read(db=>db.prepare('SELECT count(*) n FROM events').get().n);
   assert.equal(fx.read(db=>evaluateCondition(db,cond,{repo:fx.repo,workflowId:WORK})).met,true);
@@ -262,8 +270,12 @@ test('--until-job: a cancelled job is not settled; the wait follows its replacem
   const fx=fixture(t);
   const cut={id:'backend-implement-r2',ordinal:3,total:3};
   const at=Date.now();
-  const add=(jobId,attempt,status,payload)=>fx.seed(l=>l.db.prepare(`INSERT INTO jobs(job_id,workflow_id,op_id,attempt,generation,kind,role,payload_json,status,created_at,updated_at)
-    VALUES(?,?,?,?,0,'op','op',?,?,?,?)`).run(jobId,BASE,'backend.implement',attempt,JSON.stringify({opId:'backend.implement',...payload}),status,at,at));
+  const add=(jobId,attempt,status,payload)=>fx.seed(l=>{
+    const parent=jobId==='op-backend.implement-0c103b186e'?'op-backend.implement-3156a882e8':
+      jobId==='op-backend.implement-bbbbbbbbbb'?'op-backend.implement-aaaaaaaaaa':null;
+    seedWorkflow(l,{id:BASE,jobs:[{jobId,unitId:parent??jobId,tryNo:parent?2:1,resumeOf:parent,opId:'backend.implement',status,
+      createdAt:at,updatedAt:at,payload:{opId:'backend.implement',owned_paths:[],...payload}}]});
+  });
   add('op-backend.implement-3156a882e8',31,'cancelled',{cut,retry:{retryOf:'op-backend.implement-7c8f373e93'}});
   const cond={type:'job',jobId:'op-backend.implement-3156a882e8',want:'settled'};
   const evaluate=c=>fx.read(db=>evaluateCondition(db,c,{repo:fx.repo,workflowId:WORK}));

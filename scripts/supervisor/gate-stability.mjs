@@ -41,13 +41,13 @@ export function acceptedLegsOf(ledgerFile, family) {
     const out = [];
     const workflows = db.prepare("SELECT workflow_id FROM workflows WHERE archived_at IS NULL AND (phase IS NULL OR phase<>'finished') ORDER BY created_at").all();
     for (const { workflow_id: workflowId } of workflows) {
-      const jobs = db.prepare("SELECT job_id,op_id,attempt,payload_json FROM jobs WHERE workflow_id=? AND op_id=? AND status='succeeded' ORDER BY attempt DESC").all(workflowId, family);
+      const jobs = db.prepare("SELECT job_id,op_id,try_no AS attempt,payload_json FROM jobs WHERE workflow_id=? AND op_id=? AND status='succeeded' ORDER BY created_at DESC,job_id DESC").all(workflowId, family);
       const job = jobs.find((row) => !parseJson(row.payload_json, {})?.commitOnly);
       if (!job) continue;
       const payload = parseJson(job.payload_json, {}) ?? {};
       const files = [...list(payload.owned_paths)];
-      for (const r of db.prepare('SELECT report_json FROM reports WHERE workflow_id=? AND op_id=? AND attempt=?').all(workflowId, family, job.attempt)) files.push(...list(parseJson(r.report_json, {})?.files));
-      out.push({ workflowId, jobId: job.job_id, attempt: job.attempt, files: [...new Set(files.filter((f) => typeof f === 'string' && f.trim() && !f.includes(':\\') === true ? true : typeof f === 'string' && f.trim()))] });
+      for (const r of db.prepare('SELECT report_json FROM reports WHERE workflow_id=? AND job_id=?').all(workflowId, job.job_id)) files.push(...list(parseJson(r.report_json, {})?.files));
+      out.push({ workflowId, jobId: job.job_id, attempt: job.attempt, files: [...new Set(files.filter((f) => typeof f === 'string' && f.trim()))] });
     }
     return out;
   } catch { return []; } finally { db.close(); }

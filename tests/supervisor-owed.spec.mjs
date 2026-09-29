@@ -17,12 +17,17 @@ const PEER='wf-nivo-collab-group-chat-mudqjp5g';
 const DONE='wf-nivo-old-finished-aaaaaaaa';
 
 const incident=(ledger,{wf=WF,id,kind,text,agoMin=60,payload={}})=>{
-  ledger.db.prepare("INSERT INTO incidents(incident_id,workflow_id,op_id,last_progress,status,updated_at) VALUES(?,?,?,?,?,?)")
-    .run(id,wf,payload.opId??null,`[${kind}] ${text}`,'open',NOW-agoMin*MIN);
+  ledger.db.prepare("INSERT INTO incidents(incident_id,workflow_id,op_id,kind,owner,last_progress,status,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?)")
+    .run(id,wf,payload.opId??null,'other','supervisor',`[${kind}] ${text}`,'open',NOW-agoMin*MIN,NOW-agoMin*MIN);
   ledger.appendEvent({workflowId:wf,entityType:'incident',entityId:id,kind:'incident-raised',payload:{kind,detail:text,...payload},createdAt:NOW-agoMin*MIN});
 };
-const ask=(ledger,{wf=WF,dispatchId})=>ledger.db.prepare("INSERT INTO reports(workflow_id,dispatch_id,op_id,attempt,generation,outcome,report_json,created_at) VALUES(?,?,?,?,?,?,?,?)")
-  .run(wf,dispatchId,'provision.ask',1,1,'ask','{}',NOW-90*MIN);
+const ask=(ledger,{wf=WF,dispatchId})=>{
+  const jobId=`ask-${dispatchId}`;
+  seedWorkflow(ledger,{id:wf,jobs:[{jobId,opId:'provision.ask',status:'running',dispatchId}]});
+  const attemptId=ledger.db.prepare('SELECT attempt_id FROM op_attempts WHERE job_id=?').get(jobId).attempt_id;
+  ledger.db.prepare("INSERT INTO reports(workflow_id,attempt_id,dispatch_id,job_id,outcome,report_json,created_at) VALUES(?,?,?,?,?,?,?)")
+    .run(wf,attemptId,dispatchId,jobId,'ask','{}',NOW-90*MIN);
+};
 const commit=(sha,agoMin,message)=>({sha,at:NOW-agoMin*MIN,subject:message.split('\n')[0],message});
 // A fake `git log`: a generic token (index.yaml) in many commits links nothing.
 const COMMITS=[
@@ -35,9 +40,7 @@ const COMMITS=[
 const seed=(ledger)=>{
   seedWorkflow(ledger,{id:WF,now:NOW-900*MIN,events:[{kind:'op-settled',payload:{},created_at:NOW-3*MIN}]});
   seedWorkflow(ledger,{id:PEER,now:NOW-900*MIN,events:[{kind:'op-settled',payload:{},created_at:NOW-4*MIN}]});
-  seedWorkflow(ledger,{id:DONE,now:NOW-900*MIN});
-  ledger.db.prepare("UPDATE workflows SET phase='running'").run();
-  ledger.db.prepare("UPDATE workflows SET phase='finished' WHERE workflow_id=?").run(DONE);
+  seedWorkflow(ledger,{id:DONE,state:{phase:'finished'},now:NOW-900*MIN});
   incident(ledger,{id:'inc-111111111111',kind:'source-runtime-defect',text:'terminal liveness classifier reads a Claude spinner frame as turn-idle',agoMin:120});
   incident(ledger,{id:'inc-222222222222',kind:'runtime-owned-path-bracket',text:'For the supervisor: engine/admission.mjs GLOB_META=/[*?[\\]{}]/ rejects src/app/[lang] as an owned path',agoMin:100});
   incident(ledger,{id:'inc-333333333333',kind:'plan-note',text:'Cut backend-reconcile ordinal 5 settles after ordinal 6; see .starciwork/features/login/index.yaml'});
@@ -145,8 +148,15 @@ test('fixed-by: a later commit citing the incident, or an incident it escalates;
 
 const job=(jobId,{attempt,status,retryOf=null,agoMin,opId='backend.implement',paths=['src/a.ts']})=>({jobId,opId,attempt,status,createdAt:NOW-agoMin*MIN,updatedAt:NOW-(agoMin-5)*MIN,
   payload:{owned_paths:paths,retry:retryOf?{retryOf,attempt,businessAttempt:attempt}:{retryOf:null,attempt}}});
-const checkRow=(ledger,{attempt,name,exitCode,opId='backend.implement'})=>ledger.db.prepare('INSERT INTO checks(workflow_id,op_id,attempt,checks_json,created_at) VALUES(?,?,?,?,?)')
-  .run(WF,opId,attempt,JSON.stringify({checks:[{name,exitCode,evidence:'x'}]}),NOW);
+const checkRow=(ledger,{attempt,name,exitCode,opId='backend.implement',peerBlocked=false})=>{
+  const row=ledger.db.prepare(`SELECT a.attempt_id,a.job_id,a.span_id FROM op_attempts a JOIN jobs j ON j.job_id=a.job_id
+    WHERE a.workflow_id=? AND a.op_id=? AND json_extract(j.payload_json,'$.retry.attempt')=? LIMIT 1`).get(WF,opId,attempt);
+  if(!row)throw Error(`no seeded attempt for ${opId} a${attempt}`);
+  ledger.db.prepare(`INSERT INTO check_runs(workflow_id,attempt_id,job_id,op_id,span_id,name,phase,runner,authority,
+    exit_code,status,attribution_json,created_at) VALUES(?,?,?,?,?,?,'verify','settler','runtime',?,?,?,?)`)
+    .run(WF,row.attempt_id,row.job_id,opId,row.span_id,name,exitCode,exitCode===0?'pass':'fail',
+      peerBlocked?JSON.stringify({peerBlocked:true}):null,NOW);
+};
 
 test('patterns with no incident: 3+ failures in a row since the last success, the same check failing twice, dying workers, identical rejects, a re-route loop, re-staled work',t=>withLedger(t,({repoRoot,ledger})=>{
   seedWorkflow(ledger,{id:WF,now:NOW-900*MIN,jobs:[
@@ -190,7 +200,9 @@ test('patterns with no incident: 3+ failures in a row since the last success, th
     `pattern:worker-died:${WF}:codex-agent`,
   ].sort(),'a success resets the streak (interface.draw), one claude death and one readiness reject are not patterns');
   const loop=found.find(f=>f.pattern==='retry-loop');
-  assert.match(loop.summary,/3 failed attempt\(s\) in a row since the last success \(a2 failed, a3 failed, a4 failed, a5 queued\)/);
+  assert.match(loop.summary,/3 failed attempt\(s\) in a row since the last success \(a1 failed, a1 failed, a1 failed, a1 queued\)/);
+  assert.deepEqual(loop.jobs,['op-backend.implement-0000000002','op-backend.implement-0000000003',
+    'op-backend.implement-0000000004','op-backend.implement-0000000005']);
   assert.ok(found.every(f=>f.class===CLASSES.supervisor));
   assert.deepEqual(found.find(f=>f.pattern==='stale-input').labels,['knowledge-churn']);
   const {owed}=owedFindings(ledger.db,{repo:repoRoot,now:NOW,commitsOf:()=>[],staleOf});
@@ -208,10 +220,10 @@ test('an attempt settled peer-blocked (a repo-wide gate red on a peer\'s change)
     job('op-backend.implement-0000000005',{attempt:5,status:'queued',retryOf:'op-backend.implement-0000000004',agoMin:100}),
   ]});
   ledger.db.prepare("UPDATE workflows SET phase='running'").run();
-  ledger.db.prepare("UPDATE jobs SET result_json=? WHERE job_id='op-backend.implement-0000000003'").run(JSON.stringify({verdict:'blocked',peerBlocked:{checks:['test:ci']}}));
+  ledger.db.prepare("UPDATE op_attempts SET settle_json=? WHERE job_id='op-backend.implement-0000000003'")
+    .run(JSON.stringify({verdict:'blocked',peerBlocked:{checks:['test:ci']}}));
   checkRow(ledger,{attempt:2,name:'test:ci',exitCode:1});
-  ledger.db.prepare('INSERT INTO checks(workflow_id,op_id,attempt,checks_json,created_at) VALUES(?,?,?,?,?)')
-    .run(WF,'backend.implement',4,JSON.stringify({checks:[{name:'test:ci',exitCode:1,peerBlocked:{peers:[]}}]}),NOW);
+  checkRow(ledger,{attempt:4,name:'test:ci',exitCode:1,peerBlocked:true});
   const keys=patternFindings(ledger.db,{repo:repoRoot,now:NOW,staleOf:()=>[]}).map(f=>f.key);
   assert.deepEqual(keys.filter(k=>/retry-loop|repeat-check/.test(k)),[]);
 }));
@@ -240,10 +252,10 @@ test('an attempt nobody launched, or one settled as the environment, is no step 
   ev(R(1),'dispatch-rejected',259);ev(R(1),'op-settled',258);                // a launcher refusal still counts
   for(const n of [2,3,4])ev(R(n),'op-dispatched',260-40*n);
   const loops=()=>patternFindings(ledger.db,{repo:repoRoot,now:NOW,staleOf:()=>[]}).map(f=>f.key).filter(k=>/retry-loop/.test(k)).sort();
-  ledger.db.prepare('UPDATE jobs SET result_json=? WHERE job_id=?').run(JSON.stringify({verdict:'fail',reason:'failed-no-report',retryClass:'environment',attemptConsumed:false,effectState:'partial'}),K(2));
+  ledger.db.prepare('UPDATE op_attempts SET settle_json=? WHERE job_id=?').run(JSON.stringify({verdict:'fail',reason:'failed-no-report',retryClass:'environment',attemptConsumed:false,effectState:'partial'}),K(2));
   assert.deepEqual(loops(),[`pattern:retry-loop:${R(1)}`],'the undispatched a1 and the environment-settled a2 are no failures of their chains');
   ev(K(3),'op-settled',150);
-  ledger.db.prepare("UPDATE jobs SET result_json=NULL WHERE job_id=?").run(K(2));
+  ledger.db.prepare("UPDATE op_attempts SET settle_json=NULL WHERE job_id=?").run(K(2));
   assert.deepEqual(loops(),[`pattern:retry-loop:${K(1)}`,`pattern:retry-loop:${R(1)}`].sort(),'a dispatched business failure still counts');
 }));
 test('a failed chain the Kernel re-cut into a cut set is history once the cut set passed over every owned path; a partial cover still loops',async t=>{
@@ -289,8 +301,12 @@ test('an attempt that filed an owner ask waited on the owner; it does not count 
     job('op-interface.draw-00000000a4',{opId:'interface.draw',attempt:4,status:'queued',retryOf:'op-interface.draw-00000000a3',agoMin:100,paths:['ui/y']}),
   ]});
   ledger.db.prepare("UPDATE workflows SET phase='running'").run();
-  for(const attempt of [2,3]) ledger.db.prepare("INSERT INTO reports(workflow_id,dispatch_id,op_id,attempt,generation,outcome,report_json,created_at) VALUES(?,?,?,?,?,?,?,?)")
-    .run(WF,`ctx_draw${attempt}`,'interface.draw',attempt,1,'ask','{}',NOW-(260-attempt*50)*MIN);
+  for(const attempt of [2,3]){
+    const jobId=`op-interface.draw-00000000a${attempt}`;
+    const row=ledger.db.prepare('SELECT attempt_id,dispatch_id FROM op_attempts WHERE job_id=?').get(jobId);
+    ledger.db.prepare("INSERT INTO reports(workflow_id,attempt_id,dispatch_id,job_id,outcome,report_json,created_at) VALUES(?,?,?,?,?,?,?)")
+      .run(WF,row.attempt_id,row.dispatch_id,jobId,'ask','{}',NOW-(260-attempt*50)*MIN);
+  }
   const found=patternFindings(ledger.db,{repo:repoRoot,now:NOW,staleOf:()=>[]});
   assert.equal(found.filter(f=>f.pattern==='retry-loop').length,0,'two draw-review asks and one failure are not three failures in a row');
 }));

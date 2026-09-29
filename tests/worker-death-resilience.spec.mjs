@@ -16,6 +16,7 @@ import { salvageUnfiledReport, unfiledReportCandidates } from '../scripts/kernel
 import { resumeContextOf, resumePromptLines } from '../scripts/kernel/resume-context.mjs';
 import { landedProof, ownedPathEffects } from '../scripts/kernel/settle-landed.mjs';
 import { OWNED_INLINE_MAX, ownedPathsFileOf, ownedPathsLine } from '../scripts/kernel/op-prompt.mjs';
+import { withLedger,seedWorkflow } from './_ledger-fixture.mjs';
 
 const tmp = (t, prefix) => { const dir = fs.mkdtempSync(path.join(os.tmpdir(), prefix)); t.after(() => fs.rmSync(dir, { recursive: true, force: true, maxRetries: 20, retryDelay: 25 })); return dir; };
 const git = (repo, ...args) => {
@@ -67,27 +68,27 @@ test('salvage: the newest op-report@1 written since dispatch and stamped for thi
   assert.equal(out.tried[0].ok, false);
 });
 
-test('resume context: a retry of a failed-no-report attempt carries its evidence and op log tail; any other retry carries nothing', () => {
-  const db = new DatabaseSync(':memory:');
-  db.exec(`CREATE TABLE jobs(job_id TEXT, attempt INTEGER, result_json TEXT, workflow_id TEXT, payload_json TEXT);
-    CREATE TABLE logs(seq INTEGER PRIMARY KEY AUTOINCREMENT, workflow_id TEXT, job_id TEXT, actor TEXT, kind TEXT, msg TEXT)`);
-  db.prepare('INSERT INTO jobs VALUES(?,?,?,?,?)').run('op-x-9', 9, JSON.stringify({ reason: 'failed-no-report', effectState: 'partial', environment: 'host-terminal-wipe',
-    worker: { liveness: 'disconnected' }, evidence: ['dirty:.starciwork/features/collab/impl/x/E/build.txt', 'commit:abc123'] }), 'wf', '{}');
-  db.prepare('INSERT INTO jobs VALUES(?,?,?,?,?)').run('op-x-8', 8, JSON.stringify({ verdict: 'fail', reason: 'routed' }), 'wf', '{}');
-  db.prepare('INSERT INTO logs(workflow_id,job_id,actor,kind,msg) VALUES(?,?,?,?,?)').run('wf', 'op-x-9', 'op', 'step.end', 'build green');
-  db.prepare('INSERT INTO logs(workflow_id,job_id,actor,kind,msg) VALUES(?,?,?,?,?)').run('wf', 'op-x-9', 'runtime', 'error', 'died');
-  const retry = { payload_json: JSON.stringify({ retry: { retryOf: 'op-x-9' } }) };
+test('resume context: a retry of a failed-no-report attempt carries its evidence and op log tail; any other retry carries nothing', t => withLedger(t,({ledger})=>{
+  seedWorkflow(ledger,{id:'wf',jobs:[
+    {jobId:'op-x-9',opId:'x',status:'failed',result:{reason:'failed-no-report',effectState:'partial',environment:'host-terminal-wipe',
+      worker:{liveness:'disconnected'},evidence:['dirty:.starciwork/features/collab/impl/x/E/build.txt','commit:abc123']}},
+    {jobId:'op-x-8',opId:'x',status:'failed',result:{verdict:'fail',reason:'routed'}},
+  ]});
+  const db=ledger.db;
+  db.prepare('INSERT INTO logs(at,workflow_id,job_id,actor,level,kind,msg) VALUES(?,?,?,?,?,?,?)').run(Date.now(),'wf','op-x-9','op','info','step.end','build green');
+  db.prepare('INSERT INTO logs(at,workflow_id,job_id,actor,level,kind,msg) VALUES(?,?,?,?,?,?,?)').run(Date.now(),'wf','op-x-9','runtime','error','error','died');
+  const retry = { retry_of:'op-x-9',payload_json:'{}' };
   const resume = resumeContextOf(db, retry);
   assert.equal(resume.of, 'op-x-9');
   assert.equal(resume.environment, 'host-terminal-wipe');
   assert.deepEqual(resume.log, [{ kind: 'step.end', msg: 'build green' }]);
   const lines = resumePromptLines(resume).join('\n');
-  assert.match(lines, /resume_from: attempt 9/);
+  assert.match(lines, /resume_from: attempt 1/);
   assert.match(lines, /commit:abc123/);
-  assert.equal(resumeContextOf(db, { payload_json: JSON.stringify({ retry: { retryOf: 'op-x-8' } }) }), null);
+  assert.equal(resumeContextOf(db, { retry_of:'op-x-8',payload_json:'{}' }), null);
   assert.equal(resumeContextOf(db, { payload_json: '{}' }), null);
   assert.deepEqual(resumePromptLines(null), []);
-});
+}));
 
 test('settle debris: a file written before admission and not in the report never makes the job not-landed; its own file still does', (t) => {
   const repo = tmp(t, 'starci-debris-');
@@ -138,4 +139,3 @@ test('watchdog: three wake misses on one terminal over 10+ minutes with no outpu
   assert.equal(wakeFailuresProveDead([at(15), at(9), at(3)], { now, lastOutputAt: at(10) }).dead, false, 'output after the first miss');
   assert.ok(WAKE_FAIL_WINDOW_MS >= 10 * 60_000);
 });
-

@@ -120,20 +120,20 @@ const world=(t,fn,{screen,provider,dispatchedAgo=HOUR}={})=>withLedger(t,({root,
   const dispatchedAt=Date.now()-dispatchedAgo;
   seedWorkflow(ledger,{id:PEER,state:{phase:'running'},jobs:[{jobId:'job-of-the-peer',opId:'backend.implement',kind:'op',status:'queued',attempt:1,payload:{opId:'backend.implement'}}]});
   seedWorkflow(ledger,{id:WF,state:{phase:'running'},
-    jobs:[{jobId:JOB,opId:OP,kind:'op',status:'running',attempt:1,workerId:HANDLE,leaseToken:'tok-busy',createdAt:dispatchedAt,
+    jobs:[{jobId:JOB,opId:OP,kind:'op',status:'running',attempt:1,workerId:HANDLE,leaseToken:'tok-busy',dispatchId:HANDLE,terminalHandle:HANDLE,createdAt:dispatchedAt,
       payload:{opId:OP,title:'author the docs',records:['docs/readme.md'],owned_paths:['docs/'],provider,agent:provider,
         orca:{dispatchId:HANDLE,agentTerminalHandle:HANDLE},hierarchy:{runtime:{host:'orca',agent:provider,dispatchId:HANDLE,terminalHandle:HANDLE}}}}],
     leases:[{resourceKey:'path:docs/',jobId:JOB,expiresAt:Date.now()+HOUR}]});
-  ledger.db.prepare("UPDATE workflows SET phase='running' WHERE workflow_id IN (?,?)").run(WF,PEER);
-  ledger.db.prepare('INSERT INTO contracts(workflow_id,op_id,attempt,dispatch_id,markdown,context_json,created_at) VALUES(?,?,?,?,?,?,?)')
-    .run(WF,OP,1,HANDLE,'# busy-cards contract','{}',dispatchedAt);
+  const attemptId=ledger.db.prepare('SELECT attempt_id FROM op_attempts WHERE job_id=?').get(JOB).attempt_id;
+  ledger.db.prepare('INSERT INTO contracts(attempt_id,workflow_id,job_id,markdown,context_json,created_at) VALUES(?,?,?,?,?,?)')
+    .run(attemptId,WF,JOB,'# busy-cards contract','{}',dispatchedAt);
   ledger.appendEvent({workflowId:WF,entityType:'job',entityId:JOB,kind:'op-dispatched',payload:{op:OP,dispatch:HANDLE,terminal:HANDLE},createdAt:dispatchedAt});
   const job=()=>ledger.db.prepare('SELECT * FROM jobs WHERE job_id=?').get(JOB);
   const leases=()=>ledger.db.prepare('SELECT * FROM leases WHERE job_id=?').all(JOB);
   const events=kind=>ledger.db.prepare('SELECT entity_id,payload_json FROM events WHERE workflow_id=? AND kind=?').all(WF,kind);
   const orcaState=()=>JSON.parse(fs.readFileSync(stateFile,'utf8'));
-  const consumeReport=(at=Date.now()-30*MIN)=>ledger.db.prepare(`INSERT INTO reports(workflow_id,dispatch_id,op_id,attempt,generation,outcome,report_json,consumed_at,created_at)
-    VALUES(?,?,?,1,0,'done',?,?,?)`).run(WF,HANDLE,OP,JSON.stringify({schema:'starci/op-report@1',outcome:'done',summary:'docs authored'}),at,at-MIN);
+  const consumeReport=(at=Date.now()-30*MIN)=>ledger.db.prepare(`INSERT INTO reports(workflow_id,attempt_id,dispatch_id,job_id,outcome,report_json,consumed_at,created_at)
+    VALUES(?,?,?,?,'done',?,?,?)`).run(WF,attemptId,HANDLE,JOB,JSON.stringify({schema:'starci/op-report@1',outcome:'done',summary:'docs authored'}),at,at-MIN);
   return fn({repoRoot,ledger,run,job,leases,events,orcaState,consumeReport});
 });
 const status=run=>{const r=run('status','--workflow',WF);assert.equal(r.status,0,r.stderr||r.stdout);return out(r);};
@@ -215,18 +215,17 @@ test('E: /status lists each held settle per workflow: done, waiting on <peer wor
   const {workflowProgress,progressMessages,settleHoldsOf}=await import('../scripts/supervisor/progress-report.mjs');
   await withLedger(t, async ({ledger}) => {
     const wf='wf-nivo-app-auth-mudqjob3', peer='wf-nivo-modules-agentos-mudqjov6', job='op-integration.verify-25532858e7';
-    seedWorkflow(ledger,{id:wf,state:{phase:'running'}});
+    seedWorkflow(ledger,{id:wf,state:{phase:'running'},jobs:[{jobId:job,opId:'integration.verify',status:'running',workerId:'term_ddd12bb0',dispatchId:'ctx_47c2cd765a50',createdAt:Date.now()-5*HOUR}]});
     seedWorkflow(ledger,{id:peer,state:{phase:'running'}});
     const now=Date.now(), start=now-5*HOUR;
     ledger.db.prepare("UPDATE workflows SET phase='running', created_at=? WHERE workflow_id=?").run(start,wf);
     ledger.db.prepare('INSERT INTO goals(workflow_id,revision,goal_identity,markdown,json,created_at) VALUES(?,?,?,?,?,?)')
       .run(wf,1,'g','hoàn thiện đăng nhập',JSON.stringify({derivedPlan:{legs:['integration.verify']}}),start);
-    ledger.db.prepare(`INSERT INTO jobs(job_id,workflow_id,op_id,attempt,generation,kind,role,payload_json,status,worker_id,created_at,updated_at)
-      VALUES(?,?,'integration.verify',3,0,'op','op',?,'running','term_ddd12bb0',?,?)`).run(job,wf,JSON.stringify({orca:{dispatchId:'ctx_47c2cd765a50'}}),start,start);
-    ledger.db.prepare(`INSERT INTO reports(workflow_id,dispatch_id,op_id,attempt,generation,outcome,report_json,consumed_at,created_at)
-      VALUES(?,?,'integration.verify',3,0,'done','{"outcome":"done","summary":"verified"}',?,?)`).run(wf,'ctx_47c2cd765a50',now-50*MIN,now-51*MIN);
-    ledger.db.prepare("INSERT INTO incidents(incident_id,workflow_id,op_id,attempts,model_calls,tokens,elapsed_ms,last_progress,status,updated_at) VALUES(?,?,?,0,0,0,0,?,'open',?)")
-      .run('inc-8cce1cf1b330',wf,'integration.verify','[peer-wait] Closing pass waits for the Modules seam',now-40*MIN);
+    const attemptId=ledger.db.prepare('SELECT attempt_id FROM op_attempts WHERE job_id=?').get(job).attempt_id;
+    ledger.db.prepare(`INSERT INTO reports(workflow_id,attempt_id,dispatch_id,job_id,outcome,report_json,consumed_at,created_at)
+      VALUES(?,?,?,?,'done','{"outcome":"done","summary":"verified"}',?,?)`).run(wf,attemptId,'ctx_47c2cd765a50',job,now-50*MIN,now-51*MIN);
+    ledger.db.prepare("INSERT INTO incidents(incident_id,workflow_id,op_id,job_id,attempt_id,kind,owner,last_progress,status,created_at,updated_at) VALUES(?,?,?,?,?,'other','kernel',?,'open',?,?)")
+      .run('inc-8cce1cf1b330',wf,'integration.verify',job,attemptId,'[peer-wait] Closing pass waits for the Modules seam',now-40*MIN,now-40*MIN);
     ledger.appendEvent({workflowId:wf,entityType:'incident',entityId:'inc-8cce1cf1b330',kind:'incident-raised',createdAt:now-40*MIN,
       payload:{kind:'peer-wait',peer,holds:[job],until:[{type:'job',jobId:'op-backend.implement-1747a01ad5',want:'settled'}]}});
     const holds=settleHoldsOf(ledger.db,wf,{now});
@@ -237,7 +236,7 @@ test('E: /status lists each held settle per workflow: done, waiting on <peer wor
     assert.match(text,/⏸ Kiểm thử tích hợp \(op-integration\.verify-25532858e7\): xong, đang chờ Modules \(AgentOS\)\/op-backend\.implement-1747a01ad5 \(inc-8cce1cf1b330\) — đã 40 phút/);
     assert.match(text,/⏸ 1 việc đã xong đang chờ/);
     // Resolved: no hold is listed.
-    ledger.db.prepare("UPDATE incidents SET status='resolved' WHERE incident_id='inc-8cce1cf1b330'").run();
+    ledger.write.resolveIncident({incidentId:'inc-8cce1cf1b330',reason:'fixed'});
     assert.deepEqual(settleHoldsOf(ledger.db,wf,{now}),[]);
   });
 });

@@ -34,7 +34,7 @@ const seedGoal=(repo,workflowId)=>seed(repo,ledger=>{
   const at=Date.now();
   ledger.ensureWorkflow({workflowId,title:'seam'});
   ledger.db.prepare('INSERT INTO goals(workflow_id,revision,goal_identity,markdown,json,created_at) VALUES(?,?,?,?,?,?)').run(workflowId,0,'seamgoal','# goal',json({derivedFrom:'seam-test'}),at);
-  ledger.db.prepare("UPDATE workflows SET phase='running' WHERE workflow_id=?").run(workflowId);
+  ledger.write.changeWorkflowPhase({workflowId,to:'running',by:'test',reason:'seed seam workflow'});
 });
 
 /** A workflow with a 3-ordinal cut: seam src/features/chat/composition + apps/core/src, siblings chat/a and chat/b. */
@@ -53,12 +53,18 @@ function cutWorkflow(t,wf,{maxOps=null}={}){
   return {repo,api,enq,seam,a,b,status,q};
 }
 const setRow=(repo,sql,...args)=>seed(repo,ledger=>ledger.db.prepare(sql).run(...args));
+const settleJob=(repo,jobId,status,result=null)=>seed(repo,ledger=>{
+  const current=ledger.db.prepare('SELECT status FROM jobs WHERE job_id=?').get(jobId).status;
+  const route=['queued','ready','leased','running',...(status==='succeeded'?['reported','succeeded']:['failed'])];
+  for(const next of route.slice(route.indexOf(current)+1))ledger.write.setJobStatus({jobId,to:next,reason:'test settle'});
+  if(result)ledger.write.recordJobResult({jobId,result});
+});
 
 test('the seam is enqueued with cut-seam priority, ranks first and reads "dispatch seam now"',t=>{
   const {repo,seam,a,status}=cutWorkflow(t,'wf-seam-priority');
   const priority=read(repo,l=>JSON.parse(l.db.prepare('SELECT priority_json FROM jobs WHERE job_id=?').get(seam).priority_json));
   assert.deepEqual(priority,{class:'cut-seam',cutId:'chat-impl',siblings:2});
-  assert.equal(read(repo,l=>l.db.prepare('SELECT priority_json FROM jobs WHERE job_id=?').get(a).priority_json),'null','a sibling carries no seam priority');
+  assert.equal(read(repo,l=>l.db.prepare('SELECT priority_json FROM jobs WHERE job_id=?').get(a).priority_json),null,'a sibling carries no seam priority');
   assert.deepEqual(seamPriorityOf({id:'x',ordinal:1,total:1}),null,'an uncut single slice is no seam');
   const s=status();
   assert.equal(s.frontier.queued[0].jobId,seam);
@@ -92,7 +98,7 @@ test('a sibling waits on a queued seam at most maxSiblingWaitMs, then runs on a 
 
 test('a seam that fails or slips releases its siblings to a stub and owes a re-cut plan',t=>{
   const {repo,enq,seam,a,b,q,status}=cutWorkflow(t,'wf-seam-recut');
-  setRow(repo,"UPDATE jobs SET status='failed',result_json=? WHERE job_id=?",json({verdict:'fail'}),seam);
+  settleJob(repo,seam,'failed',{verdict:'fail'});
   assert.equal(q(a).queuedBecause,'ready','a dead seam never holds its siblings');
   assert.equal(q(a).seamStub.mode,'seam-failed');
   // One failure then a live retry: the retry is a live wait again (under the recut threshold).
@@ -100,7 +106,7 @@ test('a seam that fails or slips releases its siblings to a stub and owes a re-c
   assert.equal(q(b).queuedBecause,'dependency');
   assert.equal(q(b).blockedBy.job,retry1);
   // A second failure: the seam slipped (allocation.cutSeam.recutAfterFailures 2) - even its queued retry holds nobody.
-  setRow(repo,"UPDATE jobs SET status='failed',result_json=? WHERE job_id=?",json({verdict:'blocked'}),retry1);
+  settleJob(repo,retry1,'failed',{verdict:'blocked'});
   const retry2=enq('--op','docs.author','--paths','src/features/chat/composition,apps/core/src','--cut-id','chat-impl','--cut-ordinal','1','--cut-total','3');
   assert.equal(q(b).queuedBecause,'ready');
   assert.equal(q(b).seamStub.mode,'seam-slipped');
@@ -158,7 +164,7 @@ test('the Kernel releases a stuck cut; a sibling dispatched on a stub is told st
   const seamLines=seamPromptLines({cut:{id:'chat-impl',ordinal:1,total:3},jobLabel:seam,api:'api.mjs',repoLabel:'R'}).join('\n');
   assert.match(seamLines,/CONTRACT FIRST/);
   assert.match(seamLines,new RegExp(`node api.mjs cut-seam --repo R --publish-interface --job ${seam}`));
-  seed(repo,l=>l.db.prepare("UPDATE jobs SET status='succeeded' WHERE job_id=?").run(seam));
+  settleJob(repo,seam,'succeeded');
   assert.equal(api('cut-seam','--release','--workflow','wf-seam-release','--op','docs.author','--cut-id','chat-impl','--reason','x').stderr.includes('cut-seam-passed'),true);
 });
 
@@ -169,14 +175,15 @@ test('a stub sibling that passed before its seam landed owes one light reconcile
     const row=l.db.prepare('SELECT payload_json FROM jobs WHERE job_id=?').get(a);
     const payload=JSON.parse(row.payload_json);
     payload.cut.seamStub={mode:'timeout',seamJobId:seam,seamStatus:'queued'};
-    l.db.prepare("UPDATE jobs SET status='succeeded',payload_json=? WHERE job_id=?").run(JSON.stringify(payload),a);
+    l.db.prepare("UPDATE jobs SET payload_json=? WHERE job_id=?").run(JSON.stringify(payload),a);
   });
+  settleJob(repo,a,'succeeded');
   assert.match(api('cut-seam','--reconcile','--job',a,'--exit-code','0').stderr,/cut-seam-not-landed/);
   let s=status();
   assert.deepEqual(s.cutSets[0].seam.reconcile.pending.map(x=>x.jobId),[a]);
   assert.equal(s.nextActions.some(x=>x.seamDuty==='reconcile'),false,'nothing to reconcile against before the seam lands');
   // The seam lands: a owes cut-seam-reconcile.
-  setRow(repo,"UPDATE jobs SET status='succeeded' WHERE job_id=?",seam);
+  settleJob(repo,seam,'succeeded');
   s=status();
   assert.deepEqual(s.cutSets[0].seam.reconcile.owed.map(x=>x.jobId),[a]);
   const owed=s.nextActions.find(x=>x.seamDuty==='reconcile');

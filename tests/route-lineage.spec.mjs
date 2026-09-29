@@ -15,6 +15,8 @@ import os from 'node:os';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { inspectLedger, ledgerFileFor, openLedger } from '../engine/ledger-db.mjs';
+import { openMachine } from '../engine/machine-db.mjs';
+import { seedWorkflow as seedLedgerWorkflow } from './_ledger-fixture.mjs';
 import { parseYaml, stringifyYaml } from '../engine/yaml.mjs';
 import { EXCLUDE_AFTER, attemptCauseOf, lineageRouteAdjust } from '../scripts/kernel/lineage-route.mjs';
 import { selectPool } from '../scripts/agent/models.mjs';
@@ -34,8 +36,12 @@ const tmp = (t, prefix) => {
   t.after(() => fs.rmSync(dir, { recursive: true, force: true, maxRetries: 20, retryDelay: 25 }));
   return dir;
 };
-const seed = (repo, fn) => { const l = openLedger({ file: ledgerFileFor(repo) }); try { return fn(l); } finally { l.close(); } };
-const read = (repo, fn) => { const l = inspectLedger({ file: ledgerFileFor(repo) }); try { return fn(l); } finally { l.close(); } };
+const worldEnv = (repo) => ({ ...process.env,
+  STARCI_PROJECTS_ROOT: path.join(repo,'.starciwork','projects'),
+  STARCI_TEST_MACHINE_FILE: path.join(repo,'.starciwork','machine.sqlite'),
+  LOCALAPPDATA: path.join(repo,'.starciwork','localappdata') });
+const seed = (repo, fn) => { const l = openLedger({ file: ledgerFileFor(repo,{env:worldEnv(repo)}) }); try { return fn(l); } finally { l.close(); } };
+const read = (repo, fn) => { const l = inspectLedger({ file: ledgerFileFor(repo,{env:worldEnv(repo)}) }); try { return fn(l); } finally { l.close(); } };
 const ownerRoot = (t, policy) => {
   const dir = tmp(t, 'starci-owner-');
   const example = path.join(ROOT, 'config.example.yaml');
@@ -46,20 +52,20 @@ const ownerRoot = (t, policy) => {
     budgets: { maxOps: null } }));
   return dir;
 };
-const env = (t, policy) => {
+const env = (t, policy, repo) => {
   const dir = tmp(t, 'starci-fake-orca-');
   const stub = path.join(dir, 'fake-orca.mjs'); fs.writeFileSync(stub, FAKE_ORCA);
   fs.writeFileSync(path.join(dir, 'state.json'), '{}');
-  const e = { ...process.env, STARCI_ORCA_COMMAND: process.execPath, STARCI_ORCA_ARGS: JSON.stringify([stub]),
+  const e = { ...worldEnv(repo), STARCI_ORCA_COMMAND: process.execPath, STARCI_ORCA_ARGS: JSON.stringify([stub]),
     STARCI_FAKE_ORCA_LOG: path.join(dir, 'calls.jsonl'), STARCI_FAKE_ORCA_STATE: path.join(dir, 'state.json'),
-    LOCALAPPDATA: path.join(dir, 'localappdata'), STARCI_OWNER_ROOT: ownerRoot(t, policy) };
+    STARCI_OWNER_ROOT: ownerRoot(t, policy) };
   for (const key of ['ORCA_TERMINAL_HANDLE', 'STARCI_ROLE', 'STARCI_OP_JOB']) delete e[key];
   return e;
 };
 // prefer-then-overflow: the walked order alone decides, so a demotion or exclusion is observable.
 const route = (t, repo, args = [], { policy = 'prefer-then-overflow' } = {}) => {
   const r = spawnSync(process.execPath, [API, 'route', '--repo', repo, '--job', JOB, ...args, '--json'],
-    { cwd: ROOT, env: env(t, policy), encoding: 'utf8', windowsHide: true, timeout: 120000 });
+    { cwd: ROOT, env: env(t, policy, repo), encoding: 'utf8', windowsHide: true, timeout: 120000 });
   assert.equal(r.status, 0, r.stderr || r.stdout);
   return { ...JSON.parse(r.stdout), stderr: r.stderr };
 };
@@ -70,29 +76,32 @@ const routeDecided = (repo) => read(repo, (l) => JSON.parse(l.db.prepare(
 // The queued job retries the newest of them.
 const seedWorkflow = (repo, { goalBias = null, prior = [] } = {}) => seed(repo, (l) => {
   const at = Date.now();
-  l.ensureWorkflow({ workflowId: WF, title: 'lineage routing' });
-  l.db.prepare('INSERT INTO goals(workflow_id,revision,goal_identity,markdown,json,created_at) VALUES(?,?,?,?,?,?)')
-    .run(WF, 0, 'lineagegoal', '# goal', json({ routing_bias: goalBias }), at);
-  const insert = (id, attempt, status, payload, result = null) => l.db.prepare(`INSERT INTO jobs(job_id,workflow_id,op_id,attempt,generation,kind,role,payload_json,result_json,status,created_at,updated_at)
-    VALUES(?,?,?,?,0,'op','op',?,?,?,?,?)`).run(id, WF, OP, attempt, json({ opId: OP, owned_paths: ['apps/web/src/features/interface/'], ...payload }),
-    result ? json(result) : null, status, at, at);
   const ids = [P1, P2];
+  const payload=(extra={})=>({opId:OP,owned_paths:['apps/web/src/features/interface/'],...extra});
+  const jobs=prior.map((p,i)=>({jobId:ids[i],unitId:'route-unit',opId:OP,tryNo:i+1,
+    retryOf:i?ids[i-1]:null,status:p.status??'failed',pool:p.pool,payload:payload({model:p.pool}),result:p.result,createdAt:at+i}));
+  jobs.push({jobId:JOB,unitId:'route-unit',opId:OP,tryNo:prior.length+1,
+    retryOf:prior.length?ids[prior.length-1]:null,status:'queued',payload:payload(),createdAt:at+prior.length});
+  seedLedgerWorkflow(l,{id:WF,state:{phase:'running',job:'lineage routing'},goalIdentity:'lineagegoal',
+    goal:{revision:0,identity:'lineagegoal',markdown:'# goal',json:{routing_bias:goalBias}},jobs});
   prior.forEach((p, i) => {
-    insert(ids[i], i + 1, p.status ?? 'failed', { model: p.pool, ...(i ? { retry: { retryOf: ids[i - 1], businessAttempt: i + 1 } } : {}) }, p.result);
     if (p.outcome) l.appendEvent({ workflowId: WF, entityType: 'job', entityId: ids[i], kind: 'op-settled', payload: { verdict: 'fail', status: 'failed', reportOutcome: p.outcome } });
-    if (p.red) l.db.prepare('INSERT INTO checks(workflow_id,op_id,attempt,checks_json,created_at) VALUES(?,?,?,?,?)')
-      .run(WF, OP, i + 1, json({ checks: p.red.map((name) => ({ name, exitCode: 1, evidence: `${name} red` })) }), at);
+    const attempt=l.db.prepare('SELECT attempt_id,dispatch_id FROM op_attempts WHERE job_id=?').get(ids[i]);
+    if(p.outcome)l.db.prepare('INSERT INTO reports(workflow_id,attempt_id,dispatch_id,job_id,outcome,report_json,created_at) VALUES(?,?,?,?,?,?,?)')
+      .run(WF,attempt.attempt_id,attempt.dispatch_id,ids[i],p.outcome,json({outcome:p.outcome,summary:'lineage fixture'}),at+i);
+    for(const name of p.red??[])l.write.recordCheckRun({attemptId:attempt.attempt_id,name,phase:'verify',runner:'kernel',status:'fail',exitCode:1});
     if (p.gateLoop) l.appendEvent({ workflowId: WF, entityType: 'job', entityId: ids[i], kind: 'op-worker-gate-loop', payload: { opId: OP, attempt: i + 1, gate: 'trust' } });
   });
-  insert(JOB, prior.length + 1, 'queued', prior.length ? { retry: { retryOf: ids[prior.length - 1], businessAttempt: prior.length + 1 } } : {});
 });
 const noReport = { verdict: 'fail', reason: 'failed-no-report', reportFiled: false, worker: { liveness: 'exited' } };
-const openCircuit = (repo, provider, failureKind = 'auth') => seed(repo, (l) => {
+const openCircuit = (repo, provider, failureKind = 'auth') => {
   const at = Date.now();
-  l.db.prepare(`INSERT OR REPLACE INTO signals(scope,key,holder_pid,token,value_json,at,expires_at) VALUES('provider-health',?,NULL,NULL,?,?,?)`)
-    .run(provider, json({ schema: 'starci/provider-health@1', provider, status: 'unavailable', failureKind, strikeLimit: 1,
-      model: `${provider}-agent`, jobId: 'op-seeded', step: 'attestation', detail: `${failureKind} rejected`, failures: 1, trips: 1 }), at, at + 3600000);
-});
+  const machine=openMachine({file:worldEnv(repo).STARCI_TEST_MACHINE_FILE,env:worldEnv(repo)});
+  try{machine.setProviderHealth({provider,status:'unavailable',failureKind,strikes:1,strikeLimit:1,circuitOpenUntil:at+3600000,
+    detail:{schema:'starci/provider-health@1',provider,status:'unavailable',failureKind,strikeLimit:1,
+      model:`${provider}-agent`,jobId:'op-seeded',step:'attestation',detail:`${failureKind} rejected`,failures:1,trips:1}});}
+  finally{machine.close();}
+};
 
 test('a Kernel --avoid/--prefer is ignored with a warning and recorded as biasIgnored; the job goes to Devin', (t) => {
   const repo = tmp(t, 'starci-route-ignored-');
@@ -113,7 +122,7 @@ test('api dispatch ignores --prefer/--avoid with the same warning', (t) => {
   seedWorkflow(repo);
   route(t, repo);
   const r = spawnSync(process.execPath, [API, 'dispatch', '--repo', repo, '--job', JOB, '--avoid', 'devin-agent', '--json'],
-    { cwd: ROOT, env: env(t, 'prefer-then-overflow'), encoding: 'utf8', windowsHide: true, timeout: 120000 });
+    { cwd: ROOT, env: env(t, 'prefer-then-overflow', repo), encoding: 'utf8', windowsHide: true, timeout: 120000 });
   assert.match(r.stderr, /api dispatch WARNING: --avoid devin-agent ignored: kernel per-route bias is not accepted.*dispatch launches the persisted route/);
 });
 
@@ -173,7 +182,7 @@ test('two pool-attributable failures in the lineage exclude the pool for the ret
   seed(repo, (l) => l.db.prepare("UPDATE jobs SET status='queued' WHERE job_id=?").run(JOB));
   for (const pool of order.filter((p) => p !== 'devin-agent')) openCircuit(repo, pool.replace(/-agent$/, ''));
   const r = spawnSync(process.execPath, [API, 'route', '--repo', repo, '--job', JOB, '--json'],
-    { cwd: ROOT, env: env(t, 'prefer-then-overflow'), encoding: 'utf8', windowsHide: true, timeout: 120000 });
+    { cwd: ROOT, env: env(t, 'prefer-then-overflow', repo), encoding: 'utf8', windowsHide: true, timeout: 120000 });
   assert.equal(r.status, 1, 'with every other pool down, the excluded pool is not taken either');
   const body = JSON.parse(r.stdout);
   assert.match(body.error, /no eligible pool/);

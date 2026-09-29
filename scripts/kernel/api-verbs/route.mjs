@@ -1,5 +1,6 @@
 // api route: choose and persist one pool for a queued operation.
 import { updateJob } from '../../../engine/ledger-db.mjs';
+import { jobResultOf,jobRowOf } from '../api-lib/rows.mjs';
 export default {
   verb: 'route',
   required: ['job'],
@@ -19,7 +20,10 @@ export default {
   if (!job) throw Object.assign(new Error(`unknown job ${jobId}`), { code: 'job-unknown' });
   if (job.status === 'effect_unknown') throw Object.assign(new Error(`job ${jobId} requires reconcile before it can be routed`), { code: 'job-reconcile-required' });
   if (FINAL_SETTLED.includes(job.status)) throw Object.assign(new Error(`job ${jobId} is already settled (${job.status})`), { code: 'job-settled' });
-  if (job.status !== 'queued') throw Object.assign(new Error(`job ${jobId} cannot be routed while ${job.status}; only queued jobs are routable`), { code: 'job-not-queued' });
+  const lastResult=job.status==='ready'?jobResultOf(jobRowOf(db,jobId)):null;
+  const reusableReady=job.status==='ready'&&['dispatch-rejected','dispatch-reconciled'].includes(lastResult?.reason)
+    &&lastResult.effectState==='none'&&lastResult.attemptConsumed===false;
+  if (job.status !== 'queued'&&!reusableReady) throw Object.assign(new Error(`job ${jobId} cannot be routed while ${job.status}; only queued jobs and proven no-effect launch rejections are routable`), { code: 'job-not-queued' });
   // SETTLE-FIRST (driver-loop.yaml progress.settleFirst): no new route while filed reports wait unconsumed.
   refuseSettleBacklog(db, job.workflow_id, 'route');
   const priorWorker = operationTerminalHandleOf(job) ? observeOperationWorker(job) : null;
