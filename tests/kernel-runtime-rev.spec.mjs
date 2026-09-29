@@ -123,7 +123,8 @@ test('every Kernel wake carries the runtime rev before its seat identity: wakeKe
   const { l, db, wf, ack } = ledgerFixture(t);
   ack(rt.A, 'boot');
   l.db.prepare("INSERT INTO signals(scope,key,workflow_id,holder_pid,token,value_json,at,expires_at) VALUES('kernel',?,?,1,'tok',?,?,NULL)").run(wf, wf, JSON.stringify({ terminal: 'term_k' }), Date.now());
-  seedWorkflow(l, { id: wf, jobs: [{ jobId: `kernel-${wf}`, kind: 'kernel', status: 'running', workerId: 'term_k', payload: {} }] });
+  seedWorkflow(l, { id: wf, jobs: [{ jobId: `kernel-${wf}`, kind: 'kernel', status: 'running', workerId: 'term_k',
+    payload: { hierarchy: { schema: 'starci/agent-hierarchy@1', nodeId: `agent:kernel:${wf}`, parentNodeId: `workflow:${wf}`, role: 'kernel', attempt: 2 } } }] });
   const prev = process.env.STARCI_KERNEL_REV_ROOT;
   process.env.STARCI_KERNEL_REV_ROOT = rt.root;
   t.after(() => { if (prev == null) delete process.env.STARCI_KERNEL_REV_ROOT; else process.env.STARCI_KERNEL_REV_ROOT = prev; });
@@ -174,7 +175,8 @@ const apiFixture = (t, rt) => {
   const read = (fn) => { const l = inspectLedger({ file: ledgerFileFor(repo) }); try { return fn(l.db); } finally { l.close(); } };
   seed((l) => {
     seedWorkflow(l, { id: wf, state: { phase: 'running', job: wf }, goal: { revision: 0, identity: 'goal', markdown: '# goal', json: {} },
-      jobs: [{ jobId: `kernel-${wf}`, kind: 'kernel', status: 'running', workerId: 'term_k', payload: {} }] });
+      jobs: [{ jobId: `kernel-${wf}`, kind: 'kernel', status: 'running', workerId: 'term_k',
+        payload: { hierarchy: { schema: 'starci/agent-hierarchy@1', nodeId: `agent:kernel:${wf}`, parentNodeId: `workflow:${wf}`, role: 'kernel', attempt: 1 } } }] });
     l.write.updateWorkflow({ workflowId: wf, ledgerMode: 'durable', sourceRoots: [repo] });
   });
   return { repo, wf, api, ok, seed, read };

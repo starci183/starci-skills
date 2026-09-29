@@ -149,7 +149,7 @@ test('event-derived rows: dispatch, checks, settle with land, incident, drop - p
 test('syncDerivedLogs derives from a real ledger once: a second sync stores nothing', (t) => {
   const repo = repoDir(t);
   const ledger = track(t, openLedger({ file: ledgerFileFor(repo) }));
-  seedWorkflow(ledger, { id: WF, jobs: [{ jobId: 'op-backend.implement-1', opId: 'backend.implement', kind: 'op' }] });
+  seedWorkflow(ledger, { id: WF, jobs: [{ jobId: 'op-backend.implement-1', opId: 'backend.implement', kind: 'op', status: 'running' }] });
   const attemptId = ledger.db.prepare("SELECT attempt_id FROM op_attempts WHERE job_id='op-backend.implement-1'").get().attempt_id;
   ledger.appendEvent({ workflowId: WF, entityType: 'job', entityId: 'op-backend.implement-1', kind: 'op-dispatched', payload: { op: 'backend.implement', model: 'claude-agent' } });
   // One independent (kernel) check run: the derived rows are its check.result and the cmd.run of its command.
@@ -197,11 +197,16 @@ test('api log: a kernel logs a typed row without a ledger write; an op logs only
 test('housekeeping never removes the ledger holding the logs, nor the retired logs.sqlite (artifact-hold)', (t) => {
   const repo = repoDir(t);
   const logs = openLogs(repo); logs.close();
-  const ledger = path.join(repo, '.starciwork', 'runtime.sqlite');
+  // Q1: the ledger that now holds the logs lives outside .starciwork (ledgerFileFor -> projects root); what
+  // .starciwork still holds is the retired logs.sqlite and its migrated copies, so those stay held.
+  const ledger = ledgerFileFor(repo);
+  assert.ok(fs.existsSync(ledger), 'openLogs created the project ledger');
+  fs.mkdirSync(path.join(repo, '.starciwork'), { recursive: true });
+  fs.writeFileSync(path.join(repo, '.starciwork', 'logs.sqlite'), '');
   const hold = artifactHoldOf(path.join(repo, '.starciwork'), { repos: [{ repo, ledger }] });
   assert.ok(hold);
-  assert.deepEqual(hold.paths, ['.starciwork/runtime.sqlite']);
+  assert.deepEqual(hold.paths, ['.starciwork/logs.sqlite']);
   fs.writeFileSync(path.join(repo, '.starciwork', 'logs.sqlite.migrated-20260927'), '');
-  assert.deepEqual(artifactHoldOf(path.join(repo, '.starciwork'), { repos: [{ repo, ledger }] }).paths, ['.starciwork/runtime.sqlite', '.starciwork/logs.sqlite.migrated-20260927']);
+  assert.deepEqual(artifactHoldOf(path.join(repo, '.starciwork'), { repos: [{ repo, ledger }] }).paths, ['.starciwork/logs.sqlite', '.starciwork/logs.sqlite.migrated-20260927']);
   assert.equal(artifactHoldOf(path.join(repo, 'src'), { repos: [{ repo, ledger }] }), null);
 });

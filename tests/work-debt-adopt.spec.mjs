@@ -53,7 +53,7 @@ const api=(env,...args)=>{
 const seedJob=(repo,{op,jobId,wf,admittedAt,status='succeeded',owned})=>{
   const ledger=openLedger({file:ledgerFileFor(repo)});
   try{
-    seedWorkflow(ledger,{id:wf,state:{phase:'running',job:wf},
+    seedWorkflow(ledger,{id:wf,state:{phase:'running',job:wf},goal:{revision:0,identity:`goal-${wf}`,markdown:'# goal',json:{}},
       jobs:[{jobId,opId:op,status,payload:{opId:op,owned_paths:owned,orca:{dispatchId:`ctx-${jobId}`,agentTerminalHandle:`term-${jobId}`},settledAt:admittedAt+1000}}]});
     ledger.transaction(db=>{
       const attemptId=db.prepare('SELECT attempt_id FROM op_attempts WHERE job_id=?').get(jobId)?.attempt_id;

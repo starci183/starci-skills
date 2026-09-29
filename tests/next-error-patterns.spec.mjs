@@ -245,6 +245,12 @@ test('aggregate-shaped mixed context may overlap selected source while preservin
 test('default architecture authority remains valid when no explicit config path is supplied', t => {
   const f = fixture(t);
   f.write('src/components/static.tsx', 'export const Static = () => <p>static</p>;');
+  // Without a config the kind is inferred from the layout - and frontend source roots are inferred only
+  // under workspace packages, never the repository root itself (HFS layout rule).
+  f.write('package.json', { private: true, workspaces: ['app'], dependencies: { next: '15.5.0' }, starci: { codePatterns: { next: { errorState: f.contract } } } });
+  f.write('app/package.json', { name: 'app', private: true });
+  f.write('app/src/app/layout.tsx', 'export default function Layout() { return <html><body/></html>; }');
+  f.write('app/src/components/badge.tsx', 'export const Badge = () => <span>b</span>;');
   const result = checkNextErrors({ ...f.input, contextFiles: [...f.input.contextFiles, 'src/components/static.tsx', 'package.json', 'tsconfig.json'], architectureConfig: undefined });
   assert.deepEqual(result.errors, []); assert.deepEqual(result.violations, []);
   assert.equal(result.compiler.architectureConfig, null);
@@ -279,6 +285,10 @@ test('canonical architecture route coverage prevents narrow source roots from hi
   Object.assign(f.contract, { sourceRoots: ['src/static'], transports: [{ root: 'src/static/api', mode: 'throwing' }],
     worldMappings: [], envelopes: [], writes: [], boundaries: [], requiredValues: [] });
   f.write('package.json', { private: true, starci: { codePatterns: { next: { errorState: f.contract } } } });
+  // The canonical route roots come from the architecture config: a sourceRoots-narrowed contract cannot
+  // narrow the coverage the route tree owes.
+  f.write('architecture.json', { schema: 'starci/architecture-config@1', kinds: ['frontend'], tsconfig: 'tsconfig.json',
+    frontend: { routes: ['src'], transport: ['src/static/api'] } });
   const result = checkNextErrors({ root: f.root, files: ['src/static/app/page.tsx'],
     contextFiles: ['src/static/api/client.ts', 'package.json', 'architecture.json', 'tsconfig.json'],
     ruleIds: ['FE_NEXT_ERROR_BOUNDARY_LOCATION'], architectureConfig: 'architecture.json' });
@@ -308,6 +318,9 @@ test('empty surface declarations cannot hide resolved world/write calls or reser
   f.contract.writes = [];
   f.contract.boundaries = [];
   f.write('package.json', { private: true, starci: { codePatterns: { next: { errorState: f.contract } } } });
+  // Reserved Next boundaries are the route tree's error files: the architecture config names the route roots.
+  f.write('architecture.json', { schema: 'starci/architecture-config@1', kinds: ['frontend'], tsconfig: 'tsconfig.json',
+    frontend: { routes: ['src/app'], transport: ['src/api'] } });
   const result = checkNextErrors(f.input);
   assert.ok(result.errors.some(item => /absent world-state surface/.test(item.message)), JSON.stringify(result, null, 2));
   assert.ok(result.errors.some(item => /absent write-feedback surface/.test(item.message)), JSON.stringify(result, null, 2));

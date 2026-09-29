@@ -152,7 +152,8 @@ test('dispatch: an inline paste that never left the input box gets one Enter, th
   const [rejected]=fx.events('dispatch-rejected');
   assert.deepEqual([rejected?.step,rejected?.signal],['submission','prompt-stuck']);
   assert.equal(fx.orcaState().terminals['fake-terminal-1'].enters,1,'exactly one Enter-only send');
-  assert.equal(fx.job()?.status,'queued');
+  // leased -> ready on a pre-contract rejection (jobs_transitions): dispatchable again, the try not consumed.
+  assert.equal(fx.job()?.status,'ready');
 });
 
 test('dispatch: an inline paste one Enter submits is a running job',t=>{

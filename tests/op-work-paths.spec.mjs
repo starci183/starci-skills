@@ -125,10 +125,13 @@ export const familyFolders = layout.shape.families.map((f) => {
 });
 const expandFamily = (p) => (p.includes('<family>') ? familyFolders.map((f) => p.replace('<family>', f ?? '<missing-family-entry>')) : [p]);
 
-/** Every .starciwork path token in one string, with its brace alternatives. */
+/** Every .starciwork path token in one string, with its brace alternatives. A token a manifest
+ * explicitly negates ("never .starciwork/…", "not .starciwork/…") names where it does NOT write. */
 function workTokens(text) {
-  return [...String(text ?? '').matchAll(/\.starciwork\//g)]
-    .map((m) => tokenAt(text, m.index)).filter(Boolean);
+  const s = String(text ?? '');
+  return [...s.matchAll(/\.starciwork\//g)]
+    .filter((m) => !/(?:^|[\s(,])(?:never|not|no|without|outside|except)\s*$/i.test(s.slice(0, m.index)))
+    .map((m) => tokenAt(s, m.index)).filter(Boolean);
 }
 
 /** {where, token} for every .starciwork path a manifest reads, writes or proves. */
@@ -165,8 +168,6 @@ export function checkWorkPaths({ file, doc }) {
 const KNOWN = [
   // Documentation under .starciwork has no layout folder (docs belong in the repository or a record's assets/).
   'modules/ops/ops/docs.author.yaml writes.docs PATH_UNADMITTED .starciwork/<docs-dir>/<doc>.md',
-  // Sealed secrets: singular identity/ folder and a secrets file; the identity kind holds only a custody ref.
-  'modules/ops/ops/integration.verify.yaml reads.credential PATH_UNADMITTED .starciwork/_resources/identity/<slug>/secrets.enc.yaml',
   // Resource kinds outside environment|identity|fixture: release, design, runtime, service, import.
   'modules/ops/ops/release.deliver.yaml executionModes.deploy.reads.release PATH_UNADMITTED .starciwork/_resources/releases/<resource>/resource.yaml',
   'modules/ops/ops/release.deliver.yaml executionModes.deploy.writes.resource PATH_UNADMITTED .starciwork/_resources/releases/<resource>/resource.yaml',
@@ -177,11 +178,16 @@ const KNOWN = [
   'modules/ops/ops/runtime.operate.yaml executionModes.service.writes.resource PATH_UNADMITTED .starciwork/_resources/services/<resource>/resource.yaml',
   'modules/ops/ops/workspace.manage.yaml executionModes.import.writes.resources PATH_UNADMITTED .starciwork/_resources/imports/<resource>/resource.yaml',
   'modules/ops/ops/workspace.manage.yaml executionModes.import.writes.resources PATH_UNADMITTED .starciwork/_resources/imports/<resource>/assets/<asset>',
+  // The project ledger moved out of .starciwork (%LOCALAPPDATA%/StarCi/projects/<ledger_id>/runtime.sqlite, decision Q1);
+  // the manifest's prose read-path still names the in-repo file.
+  'modules/ops/ops/interface.audit.yaml reads.workflow PATH_UNADMITTED .starciwork/runtime.sqlite',
 ];
 
 test('the layout and schema catalog parse into path patterns this spec can use', () => {
   const keys = new Set(admitted.map((a) => a.key));
-  for (const k of ['workspace', 'brand', 'featureCatalog', 'feature', 'resources', 'uatFlow', 'uatRun', 'workflowRunState', 'impl', 'ac'])
+  // workflowRunState lives outside every repository now (%LOCALAPPDATA%/StarCi/projects/<ledger_id>/runtime.sqlite,
+  // decision Q1), so its shape entry names no .starciwork path to admit.
+  for (const k of ['workspace', 'brand', 'featureCatalog', 'feature', 'resources', 'uat', 'uatFlow', 'impl', 'ac'])
     assert.ok(keys.has(k), `shape.${k} yields no admitted path`);
   assert.equal(ops.length, 37, 'every op manifest is walked');
   assert.ok(familyFolders.every(Boolean), 'every family in shape.families has its own shape entry');
@@ -197,24 +203,28 @@ test('the matcher refuses the two paths that stalled live kernels and admits the
     '.starciwork/_resources/repositories/<resource>/resource.yaml',
     '.starciwork/import-cv-seam/index.yaml',
     '.starciwork/<docs-dir>/<doc>.md',
+    // Feature operations records and the project ledger are agent data (shape.agentData), not product paths.
+    '.starciwork/features/<feature>/operations/<audit>/index.yaml',
+    '.starciwork/runtime.sqlite',
   ]), [
     'synthetic.yaml writes.w0 PATH_UNADMITTED .starciwork/_resources/repositories/<resource>/resource.yaml',
     'synthetic.yaml writes.w1 PATH_UNADMITTED .starciwork/import-cv-seam/index.yaml',
     'synthetic.yaml writes.w2 PATH_UNADMITTED .starciwork/<docs-dir>/<doc>.md',
+    'synthetic.yaml writes.w3 PATH_UNADMITTED .starciwork/features/<feature>/operations/<audit>/index.yaml',
+    'synthetic.yaml writes.w4 PATH_UNADMITTED .starciwork/runtime.sqlite',
   ]);
   assert.deepEqual(run([
     '.starciwork/workspace.yaml',
     '.starciwork/index.yaml extensions.work3.setup.<workflow>.prepare',
     '.starciwork/features/<feature>/<family>/<name>/index.yaml',
-    '.starciwork/features/<feature>/operations/<audit>/index.yaml',
     '.starciwork/features/<feature>/{sds,contract,integration}/**/index.yaml',
     '.starciwork/features/<feature>/**/index.yaml',
     '.starciwork/_resources/{identities/<identity>,fixtures/<fixture>}/resource.yaml',
     '.starciwork/features/<feature>/impl/<repository>/<name>/assets/running-page.png',
     '.starciwork/features/<feature>/uat/<flow>/runs/<runId>/**',
+    '.starciwork/features/<feature>/uat/<flow>/assets/<capture>',
     '.starciwork/features/<feature>/uat/<name>/accounts.yaml',
     '.starciwork/brand/assets/<asset>',
-    '.starciwork/runtime.sqlite',
   ]), []);
 });
 
