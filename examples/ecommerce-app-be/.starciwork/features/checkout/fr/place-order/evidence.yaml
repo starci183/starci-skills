@@ -133,15 +133,15 @@ assertions:
     outcome: pass
     observation: npx jest -t unknown-product --runInBand exited 0
   - id: e2e
-    command: npx jest --config src/tests/e2e/jest.config.js checkout/checkout-journey
+    command: npx jest --selectProjects e2e checkout/checkout-journey
     exit: 0
     outcome: pass
-    observation: npx jest --config src/tests/e2e/jest.config.js checkout/checkout-journey exited 0
+    observation: npx jest --selectProjects e2e checkout/checkout-journey exited 0
   - id: e2e-refusal-paths
-    command: npx jest --config src/tests/e2e/jest.config.js order-lifecycle checkout/payment-failure
+    command: npx jest --selectProjects e2e order-lifecycle checkout/payment-failure
     exit: 0
     outcome: pass
-    observation: npx jest --config src/tests/e2e/jest.config.js order-lifecycle checkout/payment-failure
+    observation: npx jest --selectProjects e2e order-lifecycle checkout/payment-failure
       exited 0
 provenance:
   actor: example-evidence

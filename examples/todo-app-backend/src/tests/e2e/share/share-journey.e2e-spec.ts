@@ -1,12 +1,12 @@
 import {
     E2EWorld, bootE2EWorld 
-} from "@tests/harness/e2e-world"
+} from "../setup/e2e-world"
 import {
     E2E_BOOT_TIMEOUT_MS 
-} from "@tests/harness/testing-infra.options"
+} from "../setup/testing-infra.options"
 import {
     GraphqlObserved 
-} from "@tests/harness/integrations/http/e2e-http.service"
+} from "../setup/integrations/http/e2e-http.service"
 
 jest.setTimeout(120_000)
 

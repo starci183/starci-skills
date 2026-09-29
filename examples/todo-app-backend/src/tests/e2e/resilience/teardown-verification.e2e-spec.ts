@@ -10,7 +10,7 @@
  */
 import {
     E2EWorld, bootE2EWorld 
-} from "@tests/harness/e2e-world"
+} from "../setup/e2e-world"
 import {
     composeProjectOf,
     dockerAvailable,

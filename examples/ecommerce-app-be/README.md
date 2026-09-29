@@ -57,6 +57,9 @@ From this directory run `npm run typecheck`, `npm run lint:check`, `npm run buil
 and `node scripts/checks/check-starcistacks.mjs examples/ecommerce-app-be`.
 
 `npm run test:e2e` and `node scripts/live-proof.mjs` need the declared Postgres, Redis, and
-application processes. See `docs/TESTING.md` for the suite boundary. Existing Work evidence
+application processes. There are exactly two test kinds: unit `*.spec.ts` beside the source and e2e
+`*.e2e-spec.ts` under `src/tests/e2e/`. Narrow an e2e run with jest arguments, for example
+`npm run test:e2e -- checkout/checkout-journey` or `npm run test:e2e -- resilience`.
+See `docs/TESTING.md` for the suite boundary. Existing Work evidence
 retains its recorded revisions; the derived index reports stale proof where source or records
 changed.

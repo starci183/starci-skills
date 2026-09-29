@@ -1,9 +1,9 @@
 import {
     E2EAuthService, E2ESession 
-} from "@tests/harness/domain/accounts/e2e-auth.service"
+} from "../setup/domain/accounts/e2e-auth.service"
 import {
     E2EGraphqlClient, E2EGraphqlService 
-} from "@tests/harness/integrations/graphql/e2e-graphql.service"
+} from "../setup/integrations/graphql/e2e-graphql.service"
 
 /** Shared view types for the order-lifecycle lane: the response shapes the public doors answer with. */
 export interface ProductView {

@@ -102,10 +102,10 @@ assertions:
     outcome: pass
     observation: npx jest -t fr.identity.sign-in --runInBand exited 0
   - id: e2e
-    command: npx jest --config src/tests/e2e/jest.config.js identity/sign-up-sign-in
+    command: npx jest --selectProjects e2e identity/sign-up-sign-in
     exit: 0
     outcome: pass
-    observation: npx jest --config src/tests/e2e/jest.config.js identity/sign-up-sign-in exited 0
+    observation: npx jest --selectProjects e2e identity/sign-up-sign-in exited 0
 provenance:
   actor: example-evidence
   tool: scripts/example-evidence.mjs

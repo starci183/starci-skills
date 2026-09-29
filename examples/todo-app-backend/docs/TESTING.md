@@ -1,23 +1,23 @@
 # Testing
 
-Two suites, kept apart on purpose:
+Two test kinds, kept apart on purpose - one root `jest.config.js` with exactly two projects, `unit` and `e2e`:
 
 | Suite | Command | What it is |
 |---|---|---|
-| Unit | `npm test` | In-process `TestingModule` specs, colocated `*.spec.ts` beside the source they cover. Fakes at provider boundaries - no docker, no network. |
+| Unit | `npm test` / `npm run test:unit` | In-process `TestingModule` specs, colocated `*.spec.ts` beside the source they cover. Fakes at provider boundaries - no docker, no network. |
 | E2E | `npm run test:e2e` | `*.e2e-spec.ts` journeys under `src/tests/e2e/`. Each spec boots its own run-owned docker compose stack (postgres + keycloak + redis) plus the api child process through `TestingInfraModule`, drives the public doors over HTTP/GraphQL, then tears the stack down and verifies cleanup. |
 
 ## Unit tests
 
 ```bash
-npm test                    # whole unit suite (jest.config.js)
+npm test                    # whole unit suite (jest.config.js, project `unit`)
 npx jest src/modules/domain/task   # one directory
 npx jest -t "refuses"                 # one test name
 ```
 
-- Config: `jest.config.js` (`rootDir: src`, ts-jest, `testRegex: .*\.spec\.ts$`, `@modules/*` / `@features/*` path aliases).
+- Config: `jest.config.js` project `unit` (ts-jest, `testMatch: **/*.spec.ts`, `@modules/*` / `@features/*` path aliases).
 - Convention: `Test.createTestingModule({ providers: [X, { provide: Dep, useValue: mock }] })`, `module.get(X)` - never `new X(deps)`. Mock at provider boundaries (repositories, clients, event emitters, config). See any existing spec for style.
-- `*.e2e-spec.ts` does not match the unit `testRegex`, so e2e files never run here.
+- `*.e2e-spec.ts` is ignored by the `unit` project, so e2e files never run here.
 
 ## Coverage
 
@@ -32,13 +32,13 @@ npm run test:coverage       # jest --coverage -> coverage/lcov.info (+ text summ
 Requires a running Docker daemon (`docker info` must succeed). First run pulls `postgres:16`, `quay.io/keycloak/keycloak:26.0`, `redis:7` if not cached.
 
 ```bash
-npm run test:e2e                            # whole e2e suite, serial (maxWorkers: 1)
-npx jest --config src/tests/e2e/jest.config.ts auth/sign-in   # one spec by path fragment
+npm run test:e2e                            # whole e2e suite, serial (--runInBand)
+npm run test:e2e -- auth/sign-in            # one spec by path fragment
 ```
 
-- Config: `src/tests/e2e/jest.config.ts` (roots `src/tests/e2e`, `testMatch: **/*.e2e-spec.ts`, 120s test timeout).
+- Config: `jest.config.js` project `e2e` (roots `src/tests/e2e`, `testMatch: **/*.e2e-spec.ts`, 120s test timeout); environment code lives in `src/tests/e2e/setup/`, shared data in `src/tests/fixtures/`.
 - Each spec gets an isolated stack: compose project name = hash of the spec path, every host port allocated at run time on `127.0.0.1`, per-run generated secrets. A concurrent dev stack is never touched.
-- Stack assets: `src/tests/harness/platform/stack/compose.e2e.yaml` mounts the dev stack's seed scripts and keycloak realm import read-only, so the e2e schema and demo identities match dev bytes-for-bytes.
+- Stack assets: `src/tests/e2e/setup/platform/stack/compose.e2e.yaml` mounts the dev stack's seed scripts and keycloak realm import read-only, so the e2e schema and demo identities match dev bytes-for-bytes.
 - Teardown is part of the contract: `onApplicationShutdown` runs `compose down -v` for that project only and reports leftover containers/volumes (`E2ETeardownReport`). Closing the module (`afterAll(() => moduleRef.close())`) is what triggers it.
 
 ## Writing an e2e spec
@@ -66,7 +66,7 @@ describe('area/flow - one A->Z journey', () => {
 });
 ```
 
-- Import from the `../../infra` barrel (`src/tests/harness/index.ts`), never deep paths.
+- Import the setup services through the `@tests/e2e/setup/...` alias (for example `@tests/e2e/setup/e2e-world`).
 - Available services: `E2EStackService` (ports/urls/teardown report), `E2EHttpService` (axios clients per user, bearer option), `E2EGraphqlService` (ApolloClient per user - the app's public surface is GraphQL), `E2EAuthService` (register/signIn/revoke/deleteAccount via public doors), `E2EDbService` (out-of-band seed/verify only - never shortcut the flow under test).
 
 ## Observability

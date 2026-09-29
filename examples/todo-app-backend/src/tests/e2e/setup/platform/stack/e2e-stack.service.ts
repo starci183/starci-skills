@@ -31,6 +31,7 @@ const BACKEND_ROOT = resolve(__dirname,
     "..",
     "..",
     "..",
+    "..",
     "..")
 const COMPOSE_FILE = join(__dirname,
     "compose.e2e.yaml")

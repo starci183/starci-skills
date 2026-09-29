@@ -1,9 +1,9 @@
 import {
     E2EWorld, bootE2EWorld 
-} from "@tests/harness/e2e-world"
+} from "../setup/e2e-world"
 import {
     E2E_BOOT_TIMEOUT_MS 
-} from "@tests/harness/testing-infra.options"
+} from "../setup/testing-infra.options"
 
 jest.setTimeout(120_000)
 

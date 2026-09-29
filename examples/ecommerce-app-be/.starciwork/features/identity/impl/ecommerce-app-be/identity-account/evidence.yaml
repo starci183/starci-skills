@@ -104,11 +104,11 @@ assertions:
     observation: npx jest src/modules/domain/account src/modules/domain/session
       src/modules/integrations/order src/features/identity --runInBand exited 0
   - id: e2e
-    command: npx jest --config src/tests/e2e/jest.config.js identity/sign-up-sign-in
+    command: npx jest --selectProjects e2e identity/sign-up-sign-in
       order-lifecycle/cross-service-identity
     exit: 0
     outcome: pass
-    observation: npx jest --config src/tests/e2e/jest.config.js identity/sign-up-sign-in
+    observation: npx jest --selectProjects e2e identity/sign-up-sign-in
       order-lifecycle/cross-service-identity exited 0
 provenance:
   actor: example-evidence

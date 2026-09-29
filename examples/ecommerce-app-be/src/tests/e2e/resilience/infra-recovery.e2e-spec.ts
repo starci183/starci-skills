@@ -12,7 +12,7 @@ import {
 } from "node:process"
 import {
     bootE2eWorld 
-} from "@tests/harness/e2e-world"
+} from "../setup/e2e-world"
 import {
     dockerAvailable,
     httpStatus,

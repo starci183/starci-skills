@@ -24,6 +24,6 @@ requiresProof:
   unit:
     forEach: composes
   e2e:
-    command: npx jest --config src/tests/e2e/jest.config.js identity/sign-up-sign-in
+    command: npx jest --selectProjects e2e identity/sign-up-sign-in
 
 change: {rev: 1, kind: initial, at: 2026-09-19T14:00:00.000Z}

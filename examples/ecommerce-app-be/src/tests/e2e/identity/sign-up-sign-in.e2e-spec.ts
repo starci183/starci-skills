@@ -1,18 +1,18 @@
 import {
     E2EWorld, bootE2eWorld 
-} from "@tests/harness/e2e-world"
+} from "../setup/e2e-world"
 import {
     E2EDbService 
-} from "@tests/harness/platform/databases/e2e-db.service"
+} from "../setup/platform/databases/e2e-db.service"
 import {
     E2EHttpService 
-} from "@tests/harness/integrations/http/e2e-http.service"
+} from "../setup/integrations/http/e2e-http.service"
 import {
     E2EGraphqlService 
-} from "@tests/harness/integrations/graphql/e2e-graphql.service"
+} from "../setup/integrations/graphql/e2e-graphql.service"
 import {
     E2EStackService 
-} from "@tests/harness/platform/stack/e2e-stack.service"
+} from "../setup/platform/stack/e2e-stack.service"
 
 /** The register mutation's payload. */
 interface RegisterPayload { personId: string }
@@ -44,7 +44,7 @@ interface AccountData { account: AccountPayload }
  * inside the exception class) - not on an HTTP status. Only the justified machine doors
  * (/internal/sessions/*) and the /health probe still ride plain HTTP.
  *
- * Run: npx jest --config test/e2e/jest.config.js test/e2e/identity/sign-up-sign-in.e2e-spec.ts
+ * Run: npm run test:e2e -- identity/sign-up-sign-in.e2e-spec.ts
  */
 describe("identity sign-up → sign-in journey",
     () => {

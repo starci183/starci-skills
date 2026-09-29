@@ -1,7 +1,6 @@
 import os from 'node:os';
 import path from 'node:path';
 import { defineConfig, devices } from '@playwright/test';
-import { BASE_URL } from './lib/run-context';
 
 /**
  * ops/uat.verify/operator.yaml's "recording: screenshots-and-real-video" and the run's own
@@ -11,18 +10,19 @@ import { BASE_URL } from './lib/run-context';
  * `outputDir` therefore lives outside this repository, in the OS temp directory, so a crashed run never
  * leaves half-written bytes inside a tracked tree.
  */
-const RAW_OUTPUT_DIR = path.join(os.tmpdir(), 'ecommerce-app-uat-raw');
+const RAW_OUTPUT_DIR = path.join(os.tmpdir(), 'todo-app-uat-raw');
 
 export default defineConfig({
-  testDir: './flows',
-  globalSetup: './global-setup.ts',
+  testDir: './e2e/flows',
+  testMatch: '**/*.e2e-spec.ts',
+  globalSetup: './e2e/global-setup.ts',
   outputDir: RAW_OUTPUT_DIR,
   timeout: 30_000,
   fullyParallel: false,
   workers: 1,
-  reporter: [['list'], ['./lib/run-writer.ts']],
+  reporter: [['list'], ['./e2e/lib/run-writer.ts']],
   use: {
-    baseURL: BASE_URL,
+    baseURL: process.env.UAT_BASE_URL ?? 'http://localhost:3000',
     video: 'on',
     screenshot: 'on',
     trace: 'retain-on-failure',

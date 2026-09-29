@@ -3,16 +3,16 @@ import {
 } from "node:crypto"
 import {
     E2EWorld, bootE2EWorld 
-} from "@tests/harness/e2e-world"
+} from "../setup/e2e-world"
 import {
     holdFor, pollUntil 
-} from "@tests/harness/e2e-poll"
+} from "../setup/e2e-poll"
 import {
     E2E_BOOT_TIMEOUT_MS 
-} from "@tests/harness/testing-infra.options"
+} from "../setup/testing-infra.options"
 import {
     E2EGraphqlResponse, E2EHttpClient 
-} from "@tests/harness/integrations/http/e2e-http.service"
+} from "../setup/integrations/http/e2e-http.service"
 
 /**
  * fr.recur full lifecycle, one A->Z journey through the public GraphQL door only: a fresh account

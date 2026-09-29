@@ -1,24 +1,24 @@
 import {
     E2EWorld, bootE2eWorld 
-} from "@tests/harness/e2e-world"
+} from "../setup/e2e-world"
 import {
     E2EAuthService 
-} from "@tests/harness/domain/accounts/e2e-auth.service"
+} from "../setup/domain/accounts/e2e-auth.service"
 import {
     E2EDbService 
-} from "@tests/harness/platform/databases/e2e-db.service"
+} from "../setup/platform/databases/e2e-db.service"
 import {
     E2EHttpService 
-} from "@tests/harness/integrations/http/e2e-http.service"
+} from "../setup/integrations/http/e2e-http.service"
 import {
     E2EGraphqlService 
-} from "@tests/harness/integrations/graphql/e2e-graphql.service"
+} from "../setup/integrations/graphql/e2e-graphql.service"
 import {
     E2EStackService 
-} from "@tests/harness/platform/stack/e2e-stack.service"
+} from "../setup/platform/stack/e2e-stack.service"
 import {
     retryUntil 
-} from "@tests/harness/platform/stack/e2e-util"
+} from "../setup/platform/stack/e2e-util"
 import {
     AccountData,
     buyerClient,
@@ -45,7 +45,7 @@ import {
  * app's own config knob, and E2EStackService spawns the api children with {...process.env}, so
  * setting it here before compile() reaches the spawned identity process.
  *
- * Run: npx jest --config test/e2e/jest.config.js test/e2e/order-lifecycle/cross-service-identity.e2e-spec.ts
+ * Run: npm run test:e2e -- order-lifecycle/cross-service-identity.e2e-spec.ts
  */
 describe("order lifecycle - identity↔order boundary (e2e)",
     () => {

@@ -25,7 +25,9 @@ under `.starcistacks/dev`.
 
 From this directory run `npm ci`, then `npm run typecheck`, `npm run lint:check`,
 `npm run build` and `npm run test:unit`. The live stack requires provisioned demo secrets;
-see `docs/TESTING.md` before running live checks.
+see `docs/TESTING.md` before running live checks. Tests are exactly two kinds: unit `*.spec.ts` beside the
+source (`npm run test:unit`) and e2e `*.e2e-spec.ts` under `src/tests/e2e/` (`npm run test:e2e`, for example
+`npm run test:e2e -- task/task-lifecycle`).
 
 ## Work
 

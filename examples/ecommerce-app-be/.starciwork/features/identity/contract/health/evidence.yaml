@@ -221,10 +221,10 @@ assertions:
     observation: npx jest src/features/checkout/transport/http/health.controller.spec
       src/modules/integrations/identity/identity.client.spec --runInBand exited 0
   - id: wire
-    command: npx jest --config src/tests/e2e/jest.config.js resilience/infra-recovery
+    command: npx jest --selectProjects e2e resilience/infra-recovery
     exit: 0
     outcome: pass
-    observation: npx jest --config src/tests/e2e/jest.config.js resilience/infra-recovery exited 0
+    observation: npx jest --selectProjects e2e resilience/infra-recovery exited 0
 provenance:
   actor: example-evidence
   tool: scripts/example-evidence.mjs

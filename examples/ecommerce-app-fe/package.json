@@ -26,7 +26,7 @@
     "test:unit": "vitest run",
     "test:coverage": "vitest run --coverage",
     "typecheck": "tsc --noEmit",
-    "test:e2e": "playwright test -c e2e/playwright.config.ts",
+    "test:e2e": "playwright test",
     "e2e:typecheck": "tsc --noEmit -p e2e/tsconfig.json"
   },
   "devDependencies": {

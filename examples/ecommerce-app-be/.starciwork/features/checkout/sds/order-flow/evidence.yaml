@@ -57,10 +57,10 @@ assertions:
     outcome: pass
     observation: npx jest -t t-refuse --runInBand exited 0
   - id: live-sequence
-    command: npx jest --config src/tests/e2e/jest.config.js order-lifecycle
+    command: npx jest --selectProjects e2e order-lifecycle
     exit: 0
     outcome: pass
-    observation: npx jest --config src/tests/e2e/jest.config.js order-lifecycle exited 0
+    observation: npx jest --selectProjects e2e order-lifecycle exited 0
 provenance:
   actor: example-evidence
   tool: scripts/example-evidence.mjs

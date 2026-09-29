@@ -39,10 +39,10 @@ codeDigest:
 outcome: pass
 assertions:
   - id: br.checkout.place-order#ac.checkout.place-order.becomes-a-buyer
-    command: npx jest --config src/tests/e2e/jest.config.js order-lifecycle
+    command: npx jest --selectProjects e2e order-lifecycle
     exit: 0
     outcome: pass
-    observation: npx jest --config src/tests/e2e/jest.config.js order-lifecycle exited 0
+    observation: npx jest --selectProjects e2e order-lifecycle exited 0
   - id: br.checkout.place-order#ac.checkout.place-order.empty-cart-is-refused
     command: npx jest -t ac.checkout.place-order.empty-cart-is-refused --runInBand
     exit: 0

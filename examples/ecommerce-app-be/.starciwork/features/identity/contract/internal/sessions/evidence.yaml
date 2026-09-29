@@ -219,11 +219,11 @@ assertions:
     outcome: pass
     observation: npx jest identity.client.spec session.guard --runInBand exited 0
   - id: wire
-    command: npx jest --config src/tests/e2e/jest.config.js identity/sign-up-sign-in
+    command: npx jest --selectProjects e2e identity/sign-up-sign-in
       order-lifecycle/cross-service-identity
     exit: 0
     outcome: pass
-    observation: npx jest --config src/tests/e2e/jest.config.js identity/sign-up-sign-in
+    observation: npx jest --selectProjects e2e identity/sign-up-sign-in
       order-lifecycle/cross-service-identity exited 0
 provenance:
   actor: example-evidence

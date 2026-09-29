@@ -44,6 +44,6 @@ consumer's `node_modules` sits. The script junctions this app's installed `react
 `@starci/grammar` and their types into the kit so `tsc`, `eslint`, `vitest` and `next build` see exactly
 one copy of each. `.github/workflows/ci.yml` runs the same line.
 
-`npm run uat` drives the Playwright flows in `e2e/` against a served frontend on
+`npm run test:e2e` drives the Playwright `*.e2e-spec.ts` flows in `e2e/` (one root `playwright.config.ts`) against a served frontend on
 `http://localhost:3000` (override with `UAT_BASE_URL`); the config declares no `webServer`, so the backend's
 dev stack and both servers must already be up - the workflow's `live` job is the sequence that does it.

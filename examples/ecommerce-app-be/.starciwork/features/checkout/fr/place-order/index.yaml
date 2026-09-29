@@ -24,7 +24,7 @@ requiresProof:
   unit:
     forEach: composes
   e2e:
-    command: npx jest --config src/tests/e2e/jest.config.js checkout/checkout-journey
+    command: npx jest --selectProjects e2e checkout/checkout-journey
 
 change:
   rev: 2
