@@ -1,7 +1,7 @@
 import { expect, test } from '@playwright/test';
-import { readAccounts } from '../lib/flow-records';
-import { LIVE_LOGIN_AUTHORIZED, passwordFor } from '../lib/run-context';
-import { recordAssertion, walkStep } from '../lib/steps';
+import { readAccounts } from '../support/flow-records';
+import { LIVE_LOGIN_AUTHORIZED, passwordFor } from '../support/run-context';
+import { recordAssertion, walkStep } from '../support/steps';
 
 const API_BASE_URL = process.env.UAT_API_BASE_URL ?? 'http://localhost:3001';
 
@@ -36,7 +36,7 @@ const apiListTasks = async (token: string): Promise<ReadonlyArray<{ taskId: stri
  *   4. Submit a wrong password and read the refusal.
  *
  * Steps 1-3 need a session actually *created* on a backend - a write to Postgres. `LIVE_LOGIN_AUTHORIZED`
- * (../lib/run-context.ts) gates the difference: when false, steps 1-3 are not attempted and their
+ * (../support/run-context.ts) gates the difference: when false, steps 1-3 are not attempted and their
  * assertions are recorded `observed: 'not-run'` rather than skipped silently or faked as passing; when
  * true (this lane's own compose stack, `UAT_LIVE_LOGIN_AUTHORIZED=true`), they are actually walked.
  */

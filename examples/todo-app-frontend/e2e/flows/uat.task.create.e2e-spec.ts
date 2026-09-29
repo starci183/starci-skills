@@ -1,7 +1,7 @@
 import { expect, test } from '@playwright/test';
-import { readAccounts } from '../lib/flow-records';
-import { currentRunId, LIVE_LOGIN_AUTHORIZED, passwordFor } from '../lib/run-context';
-import { recordAssertion, recordResource, walkStep } from '../lib/steps';
+import { readAccounts } from '../support/flow-records';
+import { currentRunId, LIVE_LOGIN_AUTHORIZED, passwordFor } from '../support/run-context';
+import { recordAssertion, recordResource, walkStep } from '../support/steps';
 
 const FEATURE = 'task';
 const FLOW = 'create';
@@ -28,7 +28,7 @@ const signInAs = async (page: import('@playwright/test').Page, email: string, pa
  *   5. See the refusal, and the owner's list unchanged.
  *
  * Every step here needs a session actually created on infrastructure this lane does not own (see
- * lib/run-context.ts's LIVE_LOGIN_AUTHORIZED); this proof session records that honestly instead of
+ * support/run-context.ts's LIVE_LOGIN_AUTHORIZED); this proof session records that honestly instead of
  * either faking a pass or silently doing nothing. `accounts.yaml`'s `owner`/`stranger` usernames are
  * read from the record; their disposable passwords there are never used - see `passwordFor` for how
  * this harness resolves an actual credential for a multi-role flow, and its own caveat.

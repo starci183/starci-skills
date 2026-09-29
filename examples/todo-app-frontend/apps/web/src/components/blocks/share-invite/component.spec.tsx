@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest"
 import { fireEvent, render, screen } from "@testing-library/react"
 import { ShareInviteView } from "./component"
-import type { Collaborator } from "@/modules/api/share"
+import type { Collaborator } from "@/modules/api"
 
 const noop = () => {}
 

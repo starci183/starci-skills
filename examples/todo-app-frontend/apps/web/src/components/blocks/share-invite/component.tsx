@@ -1,8 +1,8 @@
 import type { FormEvent } from "react"
 import { Badge, Button, Input, PageContainer, SurfaceCard, Text, TextAction, WorkspaceShell } from "@starci/grammar/common"
-import type { Collaborator, ShareRole } from "@/modules/api/share"
-import { Heading } from "@/modules/ui/Heading"
-import { Link } from "@/modules/ui/Link"
+import type { Collaborator, ShareRole } from "@/modules/api"
+import { Heading } from "@/components/leaves/Heading"
+import { Link } from "@/components/leaves/Link"
 import {
     SHARE_ACCOUNT_CLASS_NAME,
     SHARE_AVATAR_CLASS_NAME,

@@ -5,7 +5,7 @@ import { getMessages, getTranslations } from "next-intl/server"
 import type { ReactNode } from "react"
 import { LocaleSwitcher } from "@fe-kit/theme/leaves/LocaleSwitcher"
 import { ThemeToggle } from "@fe-kit/theme/leaves/ThemeToggle"
-import { routing } from "@/modules/i18n/routing"
+import { routing } from "@/modules/i18n"
 import { AppProviders } from "./component"
 
 type LocaleShellProps = { readonly lang: string; readonly children: ReactNode }

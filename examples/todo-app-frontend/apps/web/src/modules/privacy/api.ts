@@ -1,5 +1,5 @@
-import { graphql, type Result } from "@/modules/api/graphql"
-import { signOut } from "@/modules/api/auth"
+import { graphql, type Result } from "@/modules/api"
+import { signOut } from "@/modules/api"
 
 /**
  * The privacy screen's transport adapter: the GraphQL documents the audit backend already serves

@@ -1,6 +1,6 @@
 import { useState } from "react"
 import { useRouter } from "next/navigation"
-import { signIn as requestSignIn } from "@/modules/api/auth"
+import { signIn as requestSignIn } from "@/modules/api"
 import { setToken } from "@/modules/session"
 
 /** The submitting/refusal snapshot useSignIn drives around the one sign-in call. */

@@ -4,7 +4,7 @@ import { useState } from "react"
 import { useTranslations } from "next-intl"
 import { useCollaborators, useInviteCollaborator, useRevokeCollaborator, useTaskTitle } from "@/hooks/share"
 import { useSignOut } from "@/hooks/auth"
-import type { ShareRole } from "@/modules/api/share"
+import type { ShareRole } from "@/modules/api"
 import { ShareInviteView, type ShareInviteState } from "./component"
 
 const EMAIL_FIELD_CODES = new Set(["SHARE_INVALID_EMAIL", "SHARE_INVITATION_ALREADY_EXISTS"])

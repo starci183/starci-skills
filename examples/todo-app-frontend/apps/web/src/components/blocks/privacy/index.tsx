@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation"
 import { useTranslations } from "next-intl"
 import { useSessionToken } from "@/hooks/auth"
 import { clearToken } from "@/modules/session"
-import { completeErasure, endSession, exportMyData, requestErasure } from "@/modules/privacy/api"
+import { completeErasure, endSession, exportMyData, requestErasure } from "@/modules/privacy"
 import { PrivacyView, type PrivacyState } from "./component"
 
 /** PrivacyBlock takes no external props; the session and every action lifecycle are its own. */

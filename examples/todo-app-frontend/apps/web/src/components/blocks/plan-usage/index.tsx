@@ -5,7 +5,7 @@ import useSWRMutation from "swr/mutation"
 import { useTranslations } from "next-intl"
 import { useSessionToken } from "@/hooks/auth"
 import { clearToken, endRemoteSession } from "@/modules/session"
-import { readPlanUsage, startPlanCheckout } from "@/modules/plan/api"
+import { readPlanUsage, startPlanCheckout } from "@/modules/plan"
 import { UsageScreenView, type UsageScreenViewState } from "./component"
 
 /** PlanUsageScreen takes no external props; the query, the checkout mutation and the session are its own. */

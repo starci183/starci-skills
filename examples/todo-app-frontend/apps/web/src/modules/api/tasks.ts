@@ -1,4 +1,4 @@
-import { graphql, type Result } from "./graphql"
+import { graphql, type Result } from "./client"
 import { runWrite } from "./write-feedback"
 
 /** The one shape a task takes on the wire and in every product-facing list. */

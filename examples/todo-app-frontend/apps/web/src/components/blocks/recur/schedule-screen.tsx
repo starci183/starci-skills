@@ -1,7 +1,7 @@
 import type { FormEvent } from "react"
 import type { useTranslations } from "next-intl"
 import { Button, Input, SurfaceCard, Text } from "@starci/grammar/common"
-import { Heading } from "@/modules/ui/Heading"
+import { Heading } from "@/components/leaves/Heading"
 import { EndRuleConfirmBase } from "./end-rule-confirm"
 import { UpcomingListBase } from "./upcoming-list"
 import {
@@ -16,7 +16,7 @@ import {
     SUMMARY_STACK_CLASS_NAME,
     UNDER_CONTROL_CLASS_NAME,
 } from "./classNames"
-import { ROUTES } from "./routes"
+import { ROUTES } from "@/modules/routes"
 
 /**
  * ui.recur.schedule states: no-rule, active, ended, refused. Every branch below is one of those

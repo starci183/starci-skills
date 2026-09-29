@@ -8,7 +8,7 @@ vi.mock("next/navigation", () => ({
     useRouter: () => ({ push: pushMock }),
 }))
 
-vi.mock("@/modules/api/auth", () => ({
+vi.mock("@/modules/api", () => ({
     signIn: vi.fn(),
 }))
 
@@ -16,7 +16,7 @@ vi.mock("@/modules/session", () => ({
     setToken: vi.fn(),
 }))
 
-import { signIn as requestSignIn } from "@/modules/api/auth"
+import { signIn as requestSignIn } from "@/modules/api"
 
 describe("useSignIn", () => {
     beforeEach(() => {

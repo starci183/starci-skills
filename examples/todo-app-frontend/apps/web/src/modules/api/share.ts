@@ -1,4 +1,4 @@
-import { graphql, type Result } from "./graphql"
+import { graphql, type Result } from "./client"
 import { runWrite } from "./write-feedback"
 
 /** br.share.role.permissions: a collaborator is a viewer or an editor, never anything else. */

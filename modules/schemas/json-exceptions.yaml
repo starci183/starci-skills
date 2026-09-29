@@ -132,10 +132,10 @@ exceptions:
     reason: TypeScript project config for the real todo-app-backend example; tsc expects a JSON tsconfig file.
   - path: examples/todo-app-frontend/apps/web/package.json
     reason: npm workspace manifest for the todo frontend app; Node/npm require JSON filename and syntax.
-  - path: examples/todo-app-frontend/apps/web/src/messages/en.json
+  - path: examples/todo-app-frontend/apps/web/src/modules/i18n/messages/en.json
     reason: >
       i18n message catalog inside the todo-app-frontend app source; the app i18n loader consumes JSON.
-  - path: examples/todo-app-frontend/apps/web/src/messages/vi.json
+  - path: examples/todo-app-frontend/apps/web/src/modules/i18n/messages/vi.json
     reason: >
       i18n message catalog inside the todo-app-frontend app source; the app i18n loader consumes JSON.
   - path: examples/todo-app-frontend/apps/web/tsconfig.json
@@ -143,12 +143,12 @@ exceptions:
   - path: examples/todo-app-frontend/hfs.json
     reason: >
       HFS v2 repository declaration (modules/schemas/hfs-repo.schema.yaml) for the todo-app-frontend example; the architecture machine reads hfs.json as JSON.
-  - path: examples/todo-app-frontend/e2e/tsconfig.json
-    reason: TypeScript project config for the Playwright uat harness; tsc expects a JSON tsconfig file.
   - path: examples/todo-app-frontend/package-lock.json
     reason: npm lockfile for the real todo-app-frontend example; package managers require JSON filename and syntax.
   - path: examples/todo-app-frontend/package.json
     reason: npm package manifest for the real todo-app-frontend example; Node/npm require JSON filename and syntax.
+  - path: examples/todo-app-frontend/tsconfig.e2e.json
+    reason: TypeScript project config for the Playwright uat harness; tsc expects a JSON tsconfig file.
   - path: examples/todo-app-frontend/tsconfig.json
     reason: TypeScript project config for the real todo-app-frontend example; tsc expects a JSON tsconfig file.
   - path: knowledge/ui/proof/calibration/calibration.json

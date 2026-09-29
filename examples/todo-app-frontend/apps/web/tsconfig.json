@@ -12,9 +12,6 @@
       "@/*": [
         "./src/*"
       ],
-      "@test/*": [
-        "./test/*"
-      ],
       "@fe-kit/*": [
         "../../../../packages/fe-kit/src/*"
       ]
@@ -24,8 +21,6 @@
     "next-env.d.ts",
     "src/**/*.ts",
     "src/**/*.tsx",
-    "test/**/*.ts",
-    "test/**/*.tsx",
     ".next/types/**/*.ts"
   ],
   "exclude": [

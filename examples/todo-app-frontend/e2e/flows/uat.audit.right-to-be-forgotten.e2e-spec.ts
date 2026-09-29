@@ -1,5 +1,5 @@
 import { test } from '@playwright/test';
-import { readFlowRecord, skipReason } from '../lib/flow-records';
+import { readFlowRecord, skipReason } from '../support/flow-records';
 
 const FEATURE = 'audit';
 const FLOW = 'right-to-be-forgotten';

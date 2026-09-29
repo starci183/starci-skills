@@ -1,8 +1,8 @@
 import { execFileSync } from 'node:child_process';
 import { expect, test } from '@playwright/test';
-import { readAccounts, readFlowRecord } from '../lib/flow-records';
-import { currentRunId, LIVE_LOGIN_AUTHORIZED, passwordFor } from '../lib/run-context';
-import { recordAssertion, recordResource, walkStep } from '../lib/steps';
+import { readAccounts, readFlowRecord } from '../support/flow-records';
+import { currentRunId, LIVE_LOGIN_AUTHORIZED, passwordFor } from '../support/run-context';
+import { recordAssertion, recordResource, walkStep } from '../support/steps';
 
 const FEATURE = 'recur';
 const FLOW = 'make-recurring';

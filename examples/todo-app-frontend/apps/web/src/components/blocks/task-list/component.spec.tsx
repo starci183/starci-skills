@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest"
 import { fireEvent, render, screen } from "@testing-library/react"
 import { TaskListView } from "./component"
-import type { Task } from "@/modules/api/tasks"
+import type { Task } from "@/modules/api"
 
 const noop = () => {}
 

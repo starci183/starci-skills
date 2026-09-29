@@ -1,4 +1,4 @@
-import { graphql, type Result } from "@/modules/api/graphql"
+import { graphql, type Result } from "@/modules/api"
 
 /** Send a recurrence operation through the shared GraphQL transport. */
 export const executeRecur = <T,>(

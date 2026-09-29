@@ -10,13 +10,16 @@ const mocks = vi.hoisted(() => ({
 vi.mock("next/navigation", () => ({ useRouter: () => ({ push: mocks.push }) }))
 vi.mock("@/hooks/auth", () => ({ useSessionToken: () => "session-token" }))
 vi.mock("@/modules/session", () => ({ clearToken: mocks.clearToken }))
-vi.mock("@/modules/api/auth", () => ({ signOut: mocks.signOut }))
+vi.mock("@/modules/api", async (importOriginal) => ({
+    ...(await importOriginal<typeof import("@/modules/api")>()),
+    signOut: mocks.signOut,
+}))
 vi.mock("@/components/blocks/task-list", () => ({ TaskListBlock: () => <div data-testid="task-list-block" /> }))
 
 import { TasksPage } from "./index"
 import { NextIntlClientProvider } from "next-intl"
 import type { ReactNode } from "react"
-import messages from "../../../messages/en.json"
+import messages from "@/modules/i18n/messages/en.json"
 
 /** The entry resolves its copy through next-intl, so the spec supplies the en catalogue - the same
  * words an English reader sees, which is what the assertions below are written against. */

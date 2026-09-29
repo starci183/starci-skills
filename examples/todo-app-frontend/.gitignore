@@ -1,19 +1,35 @@
-node_modules
-.next
-/next-env.d.ts
-*.tsbuildinfo
-coverage
-.scannerwork/
+# Build output and tool output the tools need in place.
+node_modules/
+dist/
+coverage/
 test-results/
 playwright-report/
+*.tsbuildinfo
+.scannerwork/
 .turbo/
 .tools/
-*.tmp.json
+# Generated code is rebuilt by prebuild / pretypecheck, never tracked.
+__generated__/
+# Plaintext secrets never enter the tree; the sealed form is .starcistacks/<env>/secrets/<slug>.enc.
+.env
+.env.*
+!.env.example
+.secrets/
+*.pem
+# Agent output lives in the scratchpad and the blob store, never in the repository.
 report*.json
+*.tmp.json
 *-lint.json
 lf.json
 lt.json
 %*%
 nul
+.qwen*/
 .artifacts/
 .tmp-*
+# Worktrees live under D:/starci-lanes, never inside the repository.
+.worktrees/
+# The linked @starci packages, copied in by `starci link`.
+.starci/
+.next/
+next-env.d.ts

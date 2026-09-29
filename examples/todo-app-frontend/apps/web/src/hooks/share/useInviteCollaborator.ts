@@ -1,6 +1,6 @@
 import useSWRMutation from "swr/mutation"
 import { useSessionToken } from "@/hooks/auth/useSessionToken"
-import { inviteCollaboratorAndNotify, type ShareRole } from "@/modules/api/share"
+import { inviteCollaboratorAndNotify, type ShareRole } from "@/modules/api"
 
 type InviteCollaboratorMutationArg = { readonly arg: { readonly email: string; readonly role: ShareRole } };
 

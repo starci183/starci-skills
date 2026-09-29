@@ -1,6 +1,6 @@
 import useSWRMutation from "swr/mutation"
 import { useSessionToken } from "@/hooks/auth/useSessionToken"
-import { revokeCollaboratorAndNotify } from "@/modules/api/share"
+import { revokeCollaboratorAndNotify } from "@/modules/api"
 
 type RevokeCollaboratorMutationArg = { readonly arg: { readonly invitationId: string } };
 

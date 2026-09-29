@@ -6,7 +6,7 @@ import { useTranslations } from "next-intl"
 import useSWR from "swr"
 import { useSessionToken } from "@/hooks/auth"
 import { clearToken } from "@/modules/session"
-import { endSession, readNotificationPreferences, unsubscribeFromEmail, updateNotificationPreferences } from "@/modules/notify/api"
+import { endSession, readNotificationPreferences, unsubscribeFromEmail, updateNotificationPreferences } from "@/modules/notify"
 import { NotifyPreferencesView, type NotifyPreferencesState } from "./component"
 
 /** NotifyPreferencesBlock takes no external props; the query, mutations and draft state are its own. */

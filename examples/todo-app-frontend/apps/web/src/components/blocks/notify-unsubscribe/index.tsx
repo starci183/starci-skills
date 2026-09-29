@@ -3,7 +3,7 @@
 import { useState } from "react"
 import { useSearchParams } from "next/navigation"
 import { useTranslations } from "next-intl"
-import { unsubscribeFromEmail } from "@/modules/notify/api"
+import { unsubscribeFromEmail } from "@/modules/notify"
 import { NotifyUnsubscribeView, type NotifyUnsubscribeState } from "./component"
 
 /** NotifyUnsubscribeBlock takes no external props; the link token and the write lifecycle are its own. */

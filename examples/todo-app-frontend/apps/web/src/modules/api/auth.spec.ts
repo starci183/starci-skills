@@ -1,9 +1,9 @@
 import { describe, expect, it, vi, beforeEach } from "vitest"
-import * as graphqlModule from "./graphql"
+import * as graphqlModule from "./client"
 import { signIn, signOut, SIGN_IN_REFUSAL_MESSAGE } from "./auth"
 
-vi.mock("./graphql", async () => {
-    const actual = await vi.importActual<typeof graphqlModule>("./graphql")
+vi.mock("./client", async () => {
+    const actual = await vi.importActual<typeof graphqlModule>("./client")
     return { ...actual, graphql: vi.fn() }
 })
 

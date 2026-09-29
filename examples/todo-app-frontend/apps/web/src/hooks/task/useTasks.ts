@@ -1,6 +1,6 @@
 import useSWR from "swr"
 import { useSessionToken } from "@/hooks/auth/useSessionToken"
-import { listTasks } from "@/modules/api/tasks"
+import { listTasks } from "@/modules/api"
 
 /**
  * ui.task.list backs its empty/one-task/many-tasks/refused states on this query. The key carries the

@@ -1,6 +1,6 @@
 import useSWRMutation from "swr/mutation"
 import { useSessionToken } from "@/hooks/auth/useSessionToken"
-import { setTaskCompleteAndNotify } from "@/modules/api/tasks"
+import { setTaskCompleteAndNotify } from "@/modules/api"
 
 type SetTaskCompleteMutationArg = { readonly arg: { readonly id: string; readonly complete: boolean } };
 

@@ -13,7 +13,7 @@ import pluginReact from "eslint-plugin-react"
 import { defineConfig } from "eslint/config"
 import jsxA11y from "eslint-plugin-jsx-a11y"
 
-const APP_GLOBS = ["apps/*/src/**/*.{ts,tsx}", "apps/*/test/**/*.{ts,tsx}"]
+const APP_GLOBS = ["apps/*/src/**/*.{ts,tsx}"]
 
 export default defineConfig([
     {

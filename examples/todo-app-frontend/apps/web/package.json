@@ -10,14 +10,14 @@
     "typecheck": "tsc --noEmit --pretty false"
   },
   "dependencies": {
-    "@heroui/react": "^3.2.1",
-    "@heroui/styles": "^3.2.1",
+    "@heroui/react": "3.2.6",
+    "@heroui/styles": "3.2.6",
     "@starci-examples/fe-kit": "file:../../../../packages/fe-kit",
-    "@starci/grammar": "0.4.13",
-    "next": "^15.0.0",
-    "next-intl": "^4.14.5",
-    "react": "^19.0.0",
-    "react-dom": "^19.0.0",
+    "@starci/grammar": "file:../../../../packages/grammar",
+    "next": "16.1.6",
+    "next-intl": "4.13.6",
+    "react": "19.2.3",
+    "react-dom": "19.2.3",
     "swr": "^2.2.5"
   }
 }

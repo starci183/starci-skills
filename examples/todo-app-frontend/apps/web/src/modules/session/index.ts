@@ -1,4 +1,4 @@
-import { signOut } from "@/modules/api/auth"
+import { signOut } from "@/modules/api"
 
 /**
  * The one place the session token is stored. A read that finds no token, or one the backend has already

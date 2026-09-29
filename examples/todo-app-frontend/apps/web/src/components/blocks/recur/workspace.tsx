@@ -2,8 +2,8 @@
 
 import type { useTranslations } from "next-intl"
 import { PageContainer, Text, TextAction, WorkspaceShell } from "@starci/grammar/common"
-import { ROUTES } from "./routes"
-import { Heading } from "@/modules/ui/Heading"
+import { ROUTES } from "@/modules/routes"
+import { Heading } from "@/components/leaves/Heading"
 import { ScheduleBlock } from "./index"
 import {
     ACCOUNT_GROUP_CLASS_NAME,

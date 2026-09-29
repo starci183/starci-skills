@@ -1,9 +1,9 @@
 import { describe, expect, it, vi, beforeEach } from "vitest"
-import * as graphqlModule from "./graphql"
+import * as graphqlModule from "./client"
 import { listTasks, createTask, setTaskComplete, deleteTask } from "./tasks"
 
-vi.mock("./graphql", async () => {
-    const actual = await vi.importActual<typeof graphqlModule>("./graphql")
+vi.mock("./client", async () => {
+    const actual = await vi.importActual<typeof graphqlModule>("./client")
     return { ...actual, graphql: vi.fn() }
 })
 

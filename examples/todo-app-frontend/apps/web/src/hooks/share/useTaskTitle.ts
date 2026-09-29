@@ -1,6 +1,6 @@
 import useSWR from "swr"
 import { useSessionToken } from "@/hooks/auth/useSessionToken"
-import { listTasks } from "@/modules/api/tasks"
+import { listTasks } from "@/modules/api"
 
 /**
  * The task breadcrumb and subtitle on ui.share.invite name the task being shared. The backend exposes

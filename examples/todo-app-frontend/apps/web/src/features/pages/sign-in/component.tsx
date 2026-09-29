@@ -1,6 +1,6 @@
 import { GrammarRoot } from "@starci/grammar/common"
 import { SignInFormBlock } from "@/components/blocks/sign-in-form"
-import { Heading } from "@/modules/ui/Heading"
+import { Heading } from "@/components/leaves/Heading"
 
 type SignInPageBaseProps = { readonly title: string }
 

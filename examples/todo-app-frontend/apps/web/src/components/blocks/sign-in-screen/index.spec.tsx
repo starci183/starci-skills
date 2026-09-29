@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from "vitest"
 import { fireEvent, render, screen, waitFor } from "@testing-library/react"
 import { NextIntlClientProvider } from "next-intl"
 import type { ReactNode } from "react"
-import messages from "../../../messages/en.json"
+import messages from "@/modules/i18n/messages/en.json"
 import { SignInScreenBlock } from "./index"
 
 /**

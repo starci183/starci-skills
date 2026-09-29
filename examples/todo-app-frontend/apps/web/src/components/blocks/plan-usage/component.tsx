@@ -1,5 +1,5 @@
 import { Button, GrammarRoot, Heading, PageContainer, Progress, SurfaceCard, Text, WorkspaceShell } from "@starci/grammar/common"
-import { PlanRoutedAction } from "@/modules/ui/routed-action"
+import { PlanRoutedAction } from "@/components/leaves/routed-action"
 import {
     PLAN_ACCOUNT_CLASS_NAME,
     PLAN_ACTIONS_CLASS_NAME,

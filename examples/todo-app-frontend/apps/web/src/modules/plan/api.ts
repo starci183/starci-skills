@@ -1,8 +1,8 @@
-import { graphql, type Result } from "@/modules/api/graphql"
+import { graphql, type Result } from "@/modules/api"
 
 /**
  * The plan feature's GraphQL surface (fr.plan.usage.view, fr.plan.upgrade), reached through the app's
- * one existing fetcher in modules/api/graphql.ts. The plan capability owns the named calls and uses the shared GraphQL transport.
+ * one existing fetcher in modules/api/client.ts. The plan capability owns the named calls and uses the shared GraphQL transport.
  */
 
 /** The one shape plan usage takes on the wire (fr.plan.usage.view). */

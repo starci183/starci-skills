@@ -3,7 +3,7 @@
 import { useRouter } from "next/navigation"
 import { useTranslations } from "next-intl"
 import { useSessionToken } from "@/hooks/auth"
-import { signOut } from "@/modules/api/auth"
+import { signOut } from "@/modules/api"
 import { clearToken } from "@/modules/session"
 import { TasksPageBase } from "./component"
 

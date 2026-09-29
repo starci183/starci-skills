@@ -2,7 +2,7 @@
 
 import { useState } from "react"
 import { useTranslations } from "next-intl"
-import { SIGN_IN_REFUSAL_MESSAGE } from "@/modules/auth/refusal"
+import { SIGN_IN_REFUSAL_MESSAGE } from "@/modules/auth"
 import { useSignIn } from "@/hooks/auth"
 import { SignInFormView } from "./component"
 

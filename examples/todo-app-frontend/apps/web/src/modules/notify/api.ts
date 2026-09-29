@@ -1,5 +1,5 @@
-import { graphql, type Result } from "@/modules/api/graphql"
-import { signOut } from "@/modules/api/auth"
+import { graphql, type Result } from "@/modules/api"
+import { signOut } from "@/modules/api"
 
 /**
  * The notify feature's transport adapter: the GraphQL documents the backend already serves

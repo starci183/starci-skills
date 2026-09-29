@@ -30,6 +30,10 @@ Next.js, React, TypeScript, npm workspaces, Vitest and Playwright; UI primitives
 Run `npm ci`, `node ../../packages/fe-kit/scripts/link-peers.mjs todo-app-frontend`, then
 `npm run typecheck`, `npm run lint:check`, `npm run build` and `npm run test:unit`.
 
+The app reads one environment variable, `NEXT_PUBLIC_API_GRAPHQL_URL` (the backend's GraphQL endpoint), only through
+`apps/web/src/modules/config`. It has no default: `next dev` and `next start` need it set, and the unit specs set it in
+`vitest.config.ts`.
+
 ## Running the checks
 
 ```sh

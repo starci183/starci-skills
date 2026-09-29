@@ -5,8 +5,7 @@ import { NextIntlClientProvider } from "next-intl"
 import type { ReactNode } from "react"
 import { FeKitI18nProvider } from "@fe-kit/i18n/i18n-context"
 import { ThemeProvider } from "@fe-kit/theme/theme-context"
-import { i18n, PRODUCT_TIME_ZONE } from "@/modules/i18n/config"
-import { Link, usePathname, useRouter } from "@/hooks/i18n/navigation"
+import { i18n, Link, PRODUCT_TIME_ZONE, usePathname, useRouter } from "@/modules/i18n"
 
 /**
  * The three contexts that sit above every route, and nothing else.

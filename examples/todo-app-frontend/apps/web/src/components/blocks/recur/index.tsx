@@ -5,10 +5,10 @@ import { useRouter } from "next/navigation"
 import { useTranslations } from "next-intl"
 import { useSessionToken } from "@/hooks/auth"
 import { clearToken, endRemoteSession } from "@/modules/session"
-import { executeRecur } from "@/modules/recur/api"
+import { executeRecur } from "@/modules/recur"
 import { ScheduleBlockView, RecurWorkspaceView, ScheduleScreenViewView } from "./component"
 import type { RecurWorkspaceProps } from "./workspace"
-import { ROUTES } from "./routes"
+import { ROUTES } from "@/modules/routes"
 import {
     type RecurFrequency,
     type RecurRule,

@@ -1,6 +1,6 @@
-import { graphql } from "./graphql"
-import { SIGN_IN_REFUSAL_MESSAGE } from "@/modules/auth/refusal"
-export { SIGN_IN_REFUSAL_MESSAGE } from "@/modules/auth/refusal"
+import { graphql } from "./client"
+import { SIGN_IN_REFUSAL_MESSAGE } from "@/modules/auth"
+export { SIGN_IN_REFUSAL_MESSAGE } from "@/modules/auth"
 
 /**
  * br.login.password.sign-in: a refusal must not say which half of the pair was wrong. This module

@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react"
 import type { FormEvent } from "react"
 import { Button, Input, MediaFrame, SectionHeader, Text, TextAction } from "@starci/grammar/common"
-import type { Task } from "@/modules/api/tasks"
+import type { Task } from "@/modules/api"
 import turtleMaster from "./turtle-master.png"
 import {
     TASK_LIST_BODY_CLASS_NAME,

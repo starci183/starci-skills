@@ -1,6 +1,6 @@
 import useSWRMutation from "swr/mutation"
 import { useSessionToken } from "@/hooks/auth/useSessionToken"
-import { createTaskAndNotify } from "@/modules/api/tasks"
+import { createTaskAndNotify } from "@/modules/api"
 
 type CreateTaskMutationArg = { readonly arg: { readonly title: string } };
 
