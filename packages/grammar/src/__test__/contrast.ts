@@ -393,14 +393,23 @@ export const hex = (c: Rgba) => `#${[c.r, c.g, c.b].map((v) => Math.round(v * 25
 /**
  * One foreground painted on one background. `under` is what shows through a translucent
  * background (a soft tint sits on a surface or the canvas). `min` is 4.5 for text and 3 for
- * non-text; the note names the rendered place that combines the two.
+ * non-text; a HeroUI soft pair (`--<tone>-soft-foreground` on `--<tone>-soft`, a bare status glyph or
+ * title on a ground) is held to SOFT_MIN, the note names the rendered place that combines the two.
  */
 export type Pair = { readonly fg: string; readonly bg: string; readonly under?: string; readonly min: number; readonly where: string }
 
+/**
+ * HeroUI colours a status tone as a soft pair (Chip/Badge `soft`, Alert title): the tone mixed with the
+ * foreground on a 14-16% tint of the same tone. Owner decision 2026-09-30: that pairing is accepted at 3:1
+ * (AA large text and non-text) and bare status glyphs take the soft foreground instead of a darkened solid
+ * tone. Body text and interactive text stay at 4.5.
+ */
+export const SOFT_MIN = 3
+
 const onGrounds = (fg: string, grounds: ReadonlyArray<string>, where: string, min = 4.5): Array<Pair> =>
     grounds.map((bg) => ({ fg, bg, min, where }))
-const onSoft = (fg: string, soft: string, where: string): Array<Pair> =>
-    ["--surface", "--background", "--overlay"].map((under) => ({ fg, bg: soft, under, min: 4.5, where }))
+const onSoft = (fg: string, soft: string, where: string, min = SOFT_MIN): Array<Pair> =>
+    ["--surface", "--background", "--overlay"].map((under) => ({ fg, bg: soft, under, min, where }))
 
 const alertTint = (tone: string) => `color-mix(in srgb, var(${tone}) 10%, var(--surface))`
 const ALERT_TONES: ReadonlyArray<readonly [string, string | undefined]> = [
@@ -428,10 +437,10 @@ export const PAIRS: ReadonlyArray<Pair> = [
     { fg: "--surface-tertiary-foreground", bg: "--surface-tertiary", min: 4.5, where: "tertiary surface" },
     { fg: "--overlay-foreground", bg: "--overlay", min: 4.5, where: "popover, menu, toast" },
     ...onGrounds("--muted", [...GROUNDS, "--default"], "description, kbd, close button, caption"),
-    ...onSoft("--muted", "--accent-soft", "description inside a selected list option"),
+    ...onSoft("--muted", "--accent-soft", "description inside a selected list option", 4.5),
     // Alert/Toast banner: `color-mix(in srgb, <tone> 10%, var(--surface))`, description in muted, title in the soft foreground.
     ...ALERT_TONES.map(([tone]) => ({ fg: "--muted", bg: alertTint(tone), min: 4.5, where: `Alert description, ${tone} tone` })),
-    ...ALERT_TONES.filter(([, title]) => title !== undefined).map(([tone, title]) => ({ fg: title ?? "", bg: alertTint(tone), min: 4.5, where: `Alert title, ${tone} tone` })),
+    ...ALERT_TONES.filter(([, title]) => title !== undefined).map(([tone, title]) => ({ fg: title ?? "", bg: alertTint(tone), min: SOFT_MIN, where: `Alert title, ${tone} tone` })),
     ...onGrounds("--default-foreground", ["--default", "--default-hover", "--background", "--surface", "--overlay"], "tertiary, ghost and outline buttons, pagination, tag"),
     ...onGrounds("--segment-foreground", ["--segment"], "selected tab, segmented control"),
     ...onGrounds("--accent-soft-foreground", ["--default", "--default-hover", "--background", "--surface", "--overlay"], "secondary button, alert title, calendar nav"),
@@ -446,9 +455,9 @@ export const PAIRS: ReadonlyArray<Pair> = [
     ...onSoft("--warning-soft-foreground", "--warning-soft", "soft warning badge, alert title"),
     ...onSoft("--danger-soft-foreground", "--danger-soft", "danger-soft button, soft danger badge"),
     ...onSoft("--default-soft-foreground", "--default-soft", "soft default badge"),
-    ...onGrounds("--success-soft-foreground", ["--surface", "--overlay"], "success alert or toast title"),
-    ...onGrounds("--warning-soft-foreground", ["--surface", "--overlay"], "warning alert or toast title"),
-    ...onGrounds("--danger-soft-foreground", ["--surface", "--overlay"], "danger alert or toast title"),
+    ...onGrounds("--success-soft-foreground", ["--surface", "--overlay"], "success alert or toast title, bare success glyph", SOFT_MIN),
+    ...onGrounds("--warning-soft-foreground", ["--surface", "--overlay"], "warning alert or toast title, bare warning glyph", SOFT_MIN),
+    ...onGrounds("--danger-soft-foreground", ["--surface", "--overlay"], "danger alert or toast title, bare danger glyph", SOFT_MIN),
     ...onGrounds("--field-foreground", ["--field-background", "--field-hover", "--field-focus"], "typed value"),
     ...onGrounds("--field-placeholder", ["--field-background", "--field-hover"], "placeholder, select value"),
     ...onGrounds("--link", ["--background", "--surface", "--surface-secondary"], "link, breadcrumb current, prose link"),

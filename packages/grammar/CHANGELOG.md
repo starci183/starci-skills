@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.7.1 - 2026-09-30
+
+Test-suite policy only (owner decision 2026-09-30, follow HeroUI): the contrast pairs for a status soft pair (`--<tone>-soft-foreground` on `--<tone>-soft`), the Alert title and a bare status glyph or title on a ground are held to `SOFT_MIN` = 3:1 instead of 4.5:1. Body text, descriptions and interactive text keep 4.5:1. No shipped CSS or API changed.
+
 ## 0.7.0 - 2026-09-28
 
 Additive (minor), plus one fix (owner, 2026-09-28, StarCi Next `SignInBase#signed-out`). Owner approved the publish.

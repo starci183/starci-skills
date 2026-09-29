@@ -1,5 +1,5 @@
 /**
- * The WCAG AA contrast suite every family's `styles.spec.ts` runs against its own scope.
+ * The WCAG contrast suite (AA for text, 3:1 for HeroUI soft pairs) every family's `styles.spec.ts` runs against its own scope.
  *
  * It measures what the scope RESOLVES, light and dark, through `./contrast.ts`: HeroUI's vendor
  * variables included, so a variable the family forgot to re-map shows up as the inherited
