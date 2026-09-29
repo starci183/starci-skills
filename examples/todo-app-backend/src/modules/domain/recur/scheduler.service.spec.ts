@@ -72,7 +72,7 @@ describe("SchedulerService (integration.recur.scheduler)",
                     expect(name).toBe("recur-generation-tick")
                     expect(job).toBeInstanceOf(CronJob)
                     expect(job.cronTime.source).toBe(moduleRef.get(AppConfigService).getRecurTickCron())
-                    expect(job.running).toBe(true)
+                    expect(job.isActive).toBe(true)
                 } finally {
                     job.stop() // the fake registry never owns the job, so the spec stops the real timer it started
                 }

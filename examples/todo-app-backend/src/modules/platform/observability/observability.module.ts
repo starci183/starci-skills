@@ -20,7 +20,7 @@ import {
  * because the feature's probe door resolves MetricsService without importing this module - the
  * eslint no-non-global-module-import rule makes "import a capability module" illegal from a feature
  * module, so app-wide visibility is declared once, at the root, not smuggled per-consumer. The
- * middleware still covers every route: `forRoutes("*")` binds by path, not by module, so the api's
+ * middleware still covers every route: `forRoutes("{*splat}")` binds by path, not by module, so the api's
  * whole surface gets request-ids, the access line and the counter with one registration.
  */
 @Module({
@@ -43,6 +43,6 @@ export class ObservabilityModule extends ConfigurableModuleClass implements Nest
     }
 
     configure(consumer: MiddlewareConsumer): void {
-        consumer.apply(ObservabilityMiddleware).forRoutes("*")
+        consumer.apply(ObservabilityMiddleware).forRoutes("{*splat}")
     }
 }

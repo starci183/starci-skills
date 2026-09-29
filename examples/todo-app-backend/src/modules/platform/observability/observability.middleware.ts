@@ -21,7 +21,7 @@ import {
 } from "./request-context"
 
 /**
- * The request-scoped observability seam, applied to every route (`forRoutes("*")` in the module's
+ * The request-scoped observability seam, applied to every route (`forRoutes("{*splat}")` in the module's
  * configure). Three jobs, in order:
  *
  *  1. Correlation: an inbound `x-request-id` is honoured (proxy/upstream correlation), otherwise a
