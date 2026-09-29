@@ -1,4 +1,4 @@
-// hfs-check.mjs - the HFS v2 repository check, behind `hfs check | init | explain` (packages/hfs) and reusable by any
+// hfs-check.mjs - the HFS repository check, behind `hfs check | init | explain` (packages/hfs) and reusable by any
 // runtime check. It reads three things and nothing else: the repository's hfs.json, the slot manifest
 // (knowledge/hfs/slots.yaml through scripts/lib/hfs-slots.mjs) and the pins (knowledge/hfs/canon-pins.yaml). It never
 // writes to the repository it inspects.

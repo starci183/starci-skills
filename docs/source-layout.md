@@ -17,7 +17,7 @@ Git repository is created inside an app/package. Separate FE/BE repositories
 keep their existing bindings. This does not infer a backend owner for a
 frontend-only project.
 
-## One repository tree (HFS v2)
+## One repository tree (HFS)
 
 Every repository has the same contract, backend and frontend alike. The
 canonical statement is [knowledge/hfs/README.md](../knowledge/hfs/README.md);

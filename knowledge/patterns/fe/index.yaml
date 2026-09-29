@@ -6,7 +6,7 @@ purpose: |
   knowledge/patterns/fe/ decides how the code that produces that interface is written: where a unit lives, what its files are
   called, how a component function is shaped, where a class string sits, how a failure is represented, where the spec goes,
   where data, text and colour come from. A pattern rule never chooses a visual; a ui/ rule never chooses a file name. Read
-  knowledge/hfs/README.md (HFS v2) section 6 first. Follow ../../coding-reference.yaml. Each rule cites the HFS rule ids it
+  knowledge/hfs/README.md (HFS) section 6 first. Follow ../../coding-reference.yaml. Each rule cites the HFS rule ids it
   implements (hfsRules) and the finding codes that judge it (verification.automated).
 appliesTo:
   - frontend

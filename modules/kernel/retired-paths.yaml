@@ -50,8 +50,8 @@ retired:
   - {path: tests/core.spec.mjs, retiredAt: 2026-09-29, removedIn: legacy-wp56, replacedBy: 'none: it tested the retired node validator'}
   - {path: tests/module-spec.spec.mjs, retiredAt: 2026-09-29, removedIn: legacy-wp56, replacedBy: 'none: it tested the retired node validator'}
   - {path: modules/schemas/work.schema.yaml, retiredAt: 2026-09-29, removedIn: wp56-leftovers, replacedBy: 'work-workspace.schema.yaml, work-resource.schema.yaml and work-evidence.schema.yaml (one file per record kind); the monolith had no runtime reader'}
-  - {path: knowledge/repository-baseline.yaml, retiredAt: 2026-09-29, removedIn: hfs2-sync, replacedBy: 'packages/hfs/templates rendered by hfs sync (husky, ci and e2e workflows, .gitignore, sonar, codecov, .starciwork/.gitignore) and the @starci presets; no baseline shape or copied config remains'}
-  - {path: tests/repository-baseline.spec.mjs, retiredAt: 2026-09-29, removedIn: hfs2-sync, replacedBy: 'tests/hfs-sync.spec.mjs'}
+  - {path: knowledge/repository-baseline.yaml, retiredAt: 2026-09-29, removedIn: hfs-sync, replacedBy: 'packages/hfs/templates rendered by hfs sync (husky, ci and e2e workflows, .gitignore, sonar, codecov, .starciwork/.gitignore) and the @starci presets; no baseline shape or copied config remains'}
+  - {path: tests/repository-baseline.spec.mjs, retiredAt: 2026-09-29, removedIn: hfs-sync, replacedBy: 'tests/hfs-sync.spec.mjs'}
   - {path: modules/models/agents/qwen.yaml, retiredAt: 2026-09-29, removedIn: drop-qwen, replacedBy: 'none: the Qwen provider is removed (owner ruling 2026-09-29); claude, codex and devin remain'}
   - {path: modules/models/profiles/qwen-agent.yaml, retiredAt: 2026-09-29, removedIn: drop-qwen, replacedBy: 'none: the Qwen provider is removed (modules/models/profiles/devin-agent.yaml leads hands-on work)'}
   - {path: modules/models/profiles/qwen3.8-max.yaml, retiredAt: 2026-09-29, removedIn: drop-qwen, replacedBy: 'none: the Qwen provider is removed'}

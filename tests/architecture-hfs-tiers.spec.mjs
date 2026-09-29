@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { archFixture, runArch, findings } from './_hfs-arch-fixture.mjs';
 import { stronglyConnected } from '../scripts/checks/architecture/tiers.mjs';
 
-// HFS v2 checks 1 and 2: the tier direction matrix of knowledge/hfs/slots.yaml and owner cycles.
+// HFS checks 1 and 2: the tier direction matrix of knowledge/hfs/slots.yaml and owner cycles.
 
 const beDirection = report => findings(report, 'BE_TIER_DIRECTION');
 

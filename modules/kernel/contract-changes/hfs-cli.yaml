@@ -1,7 +1,7 @@
-id: hfs2-cli
+id: hfs-cli
 effectiveAt: '2026-09-29T23:00:00+07:00'
 summary: >-
-  HFS v2 Phase 0 item 0.3: the @starci/hfs command line (packages/hfs): `hfs check` (every tracked path has a slot,
+  HFS Phase 0 item 0.3: the @starci/hfs command line (packages/hfs): `hfs check` (every tracked path has a slot,
   required files per slot and app, tracked-but-ignored and forbidden paths, canon-pin drift, and the soft-size backlog
   as report-only), `hfs init` (a starter hfs.json by detecting profile, apps and occupied opt-in slots) and `hfs
   explain <path>`; the bin also delegates `sync` and `work-hygiene` to packages/hfs/sync/cli.mjs, and the package `files` ship sync/ and templates/. The logic is scripts/lib/hfs-check.mjs over the slot loader; the package carries a byte-copy
@@ -12,6 +12,6 @@ summary: >-
   no existing key, check or verb changes.
 reach: new-legs
 paths:
-  - modules/kernel/contract-changes/hfs2-cli.yaml
+  - modules/kernel/contract-changes/hfs-cli.yaml
   - modules/kernel/failure-codes.yaml
   - knowledge/hfs/canon-pins.yaml

@@ -18,15 +18,15 @@ import { CLONE_RULE_IDS } from '../scripts/checks/architecture/clones.mjs';
 const require = createRequire(import.meta.url);
 const ts = require('typescript');
 
-// The legacy (v1) architecture rules exercised through hfs.json fixtures. The declaration is hfs.json (profile be|fe plus
+// The architecture rules exercised through hfs.json fixtures. The declaration is hfs.json (profile be|fe plus
 // apps); owners, roots, registration and the Grammar contract are derived, so a rule is exercised by shaping the tree.
-// The v2 machine (tier direction, reachability, dead exports, required files, size growth, duplicate blocks) runs on every
+// The HFS machine (tier direction, reachability, dead exports, required files, size growth, duplicate blocks) runs on every
 // fixture too and has its own specs; check() below drops its findings so this spec judges the rules it is about.
-const V2_RULE_IDS = new Set([...TIER_RULE_IDS, ...REACHABILITY_RULE_IDS, ...DEAD_EXPORT_RULE_IDS, ...REQUIRED_FILE_RULE_IDS,
+const HFS_MACHINE_RULE_IDS = new Set([...TIER_RULE_IDS, ...REACHABILITY_RULE_IDS, ...DEAD_EXPORT_RULE_IDS, ...REQUIRED_FILE_RULE_IDS,
   ...SIZE_GROWTH_RULE_IDS, ...CLONE_RULE_IDS]);
 
 function scoped(report) {
-  const violations = report.violations.filter(item => !V2_RULE_IDS.has(item.ruleId));
+  const violations = report.violations.filter(item => !HFS_MACHINE_RULE_IDS.has(item.ruleId));
   return { ...report, violations, ok: report.errors.length === 0 && violations.length === 0 };
 }
 
@@ -34,7 +34,7 @@ function fixture(t, kind, files = {}, apps = kind === 'backend' ? [{ name: 'core
   const root = fs.mkdtempSync(path.join(os.tmpdir(), `starci-architecture-${kind}-`));
   t.after(() => fs.rmSync(root, { recursive: true, force: true }));
   const app = apps[0].name;
-  const declaration = { hfs: 2, profile: kind === 'backend' ? 'be' : 'fe', project: 'fixture', apps };
+  const declaration = { hfs: 1, profile: kind === 'backend' ? 'be' : 'fe', project: 'fixture', apps };
   const tsconfig = `${JSON.stringify({
     compilerOptions: {
       target: 'ES2022',

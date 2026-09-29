@@ -1,7 +1,7 @@
 // style-why.mjs - the why code of a CSS canon lint rule.
 //
 // The CSS twin of lint-why.mjs. A finding of the code-pattern gate that comes from a stylelint rule of
-// @starci/stylelint-canon carries the catalogued why code of the HFS v2 rule that owns it
+// @starci/stylelint-canon carries the catalogued why code of the HFS rule that owns it
 // (modules/kernel/failure-codes.yaml: title_vi, meaning_vi, causes_vi, nextStep_vi). The map is the single place in
 // the runtime that ties a stylelint rule id to a code; tests/style-why.spec.mjs proves every rule of the plugin is
 // mapped, the map agrees with the plugin's own `why`, and every mapped code is catalogued with Vietnamese text.

@@ -3,7 +3,7 @@ import path from 'node:path';
 import { execFileSync } from 'node:child_process';
 
 /**
- * HFS v2 check 5: the files and directories the slot manifest requires (knowledge/hfs/slots.yaml `requires`,
+ * HFS check 5: the files and directories the slot manifest requires (knowledge/hfs/slots.yaml `requires`,
  * `requiredInstances`, `minInstances`, required app kinds) must exist in the repository tree. Everything is read through the
  * resolver of scripts/lib/hfs-slots.mjs; nothing here names a path.
  *

@@ -1,13 +1,13 @@
-# HFS v2 slot manifest (owner-approved 2026-09-29, decisions 1-10 in HFS-V2-DECISIONS).
+# HFS slot manifest (owner-approved 2026-09-29, decisions 1-10 in the owner decisions record).
 # The one place that says what may exist in a StarCi product repository and where. Every tracked path of every
 # repository must match exactly one slot. Checks, lint factories, the architecture machine, templates and the why
 # catalog READ this file through scripts/lib/hfs-slots.mjs; none of them hardcodes a path.
 # Shape: modules/schemas/hfs-slots.schema.yaml. The repository side is hfs.json: modules/schemas/hfs-repo.schema.yaml.
-schema: starci/hfs-slots@2
-version: 2.0.0
+schema: starci/hfs-slots@1
+version: 1.0.0
 
 versioning:
-  # MAJOR.MINOR.PATCH of this manifest. A repository pins only the MAJOR in hfs.json ("hfs": 2).
+  # MAJOR.MINOR.PATCH of this manifest. A repository pins only the MAJOR in hfs.json ("hfs": 1).
   patch: wording, why text, examples; no check result can change.
   minor: >-
     add a slot (always presence optional or opt-in), add an app kind or protocol slot, add a rule at severity warn,
@@ -476,7 +476,7 @@ slots:
     requires: ["<feature>-websocket.module.ts"]
     allows: ["<channel>.gateway.ts", "dto/*.ts", "*.spec.ts"]
     tests: unit-beside
-    since: 2.0.0
+    since: 1.0.0
 
   # ----- BE: modules (three tiers, closed set) -----------------------------------------------------------
   - id: be.domain

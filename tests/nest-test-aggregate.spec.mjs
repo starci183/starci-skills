@@ -29,7 +29,7 @@ describe('SampleService',
     () => { expect(new SampleService().read()).toBe(1); }); });`;
   const spec=write('src/sample.service.spec.ts',valid);
   write('package.json',{private:true});
-  write('hfs.json',{hfs:2,profile:'be',project:'fixture',apps:[{name:'core',kind:'api'}]});
+  write('hfs.json',{hfs:1,profile:'be',project:'fixture',apps:[{name:'core',kind:'api'}]});
   write('tsconfig.json',{compilerOptions:{target:'ES2022',module:'ESNext',moduleResolution:'Bundler'},include:['src/**/*.ts']});
   for(const packageName of ['typescript','@types/jest']){
     const link=path.join(fixtureRoot,'node_modules',packageName);

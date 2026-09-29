@@ -12,8 +12,8 @@ const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const catalog = parseYaml(fs.readFileSync(path.join(root, 'modules/kernel/failure-codes.yaml'), 'utf8'));
 const profile = parseYaml(fs.readFileSync(path.join(root, 'modules/models/code-patterns.yaml'), 'utf8')).profiles.nest;
 
-/** The rules that belong to HFS v2: every rule added or re-enabled by the back-end canon 1.3.0. */
-const HFS_V2_RULES = [
+/** The rules that belong to HFS: every rule added or re-enabled by the back-end canon 1.3.0. */
+const HFS_LINT_RULES = [
   'catch-must-account', 'error-home', 'no-runtime-schema', 'sql-only-in-repository', 'no-entity-in-contract',
   'no-untyped-body', 'public-needs-reason', 'secret-compare-timing-safe', 'no-direct-env-read', 'no-secret-default',
   'global-module-allowlist', 'typed-module-definition', 'static-module-register', 'no-new-injectable', 'no-module-let',
@@ -21,13 +21,13 @@ const HFS_V2_RULES = [
   'spec-typed-doubles', 'must-deep-module-import', 'no-folder-reexport',
 ].map(name => `starci-be/${name}`);
 
-test('every mapped lint rule exists in the canon plugin and every HFS v2 rule is mapped', () => {
+test('every mapped lint rule exists in the canon plugin and every HFS rule is mapped', () => {
   for (const ruleId of Object.keys(LINT_WHY)) assert.ok(ruleId.slice('starci-be/'.length) in plugin.rules, `${ruleId} is mapped but not published`);
-  for (const ruleId of HFS_V2_RULES) {
+  for (const ruleId of HFS_LINT_RULES) {
     assert.ok(ruleId.slice('starci-be/'.length) in plugin.rules, `${ruleId} is not published`);
     assert.ok(LINT_WHY[ruleId], `${ruleId} has no why code`);
   }
-  assert.deepEqual(Object.keys(LINT_WHY).sort(), [...HFS_V2_RULES].sort());
+  assert.deepEqual(Object.keys(LINT_WHY).sort(), [...HFS_LINT_RULES].sort());
 });
 
 test('every mapped why code is catalogued with Vietnamese text and a next step', () => {
@@ -62,7 +62,7 @@ test('the nest profile names only published rules, holds none off, and pins the 
     if (!id.startsWith('starci-be/')) continue;
     assert.ok(id.slice('starci-be/'.length) in plugin.rules, `${id} is in the profile but not in the canon`);
   }
-  for (const ruleId of HFS_V2_RULES) {
+  for (const ruleId of HFS_LINT_RULES) {
     assert.ok(ids.has(ruleId), `${ruleId} is not held by an obligation`);
   }
   const pkg = JSON.parse(fs.readFileSync(path.join(root, 'packages/eslint/be/package.json'), 'utf8'));

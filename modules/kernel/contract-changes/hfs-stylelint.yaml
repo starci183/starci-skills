@@ -1,7 +1,7 @@
-id: hfs2-stylelint
+id: hfs-stylelint
 effectiveAt: '2026-09-30T00:30:00+07:00'
 summary: >-
-  HFS v2 Phase 0 item 0.7: the new package @starci/stylelint-canon 1.0.0 (packages/stylelint), rule R61
+  HFS Phase 0 item 0.7: the new package @starci/stylelint-canon 1.0.0 (packages/stylelint), rule R61
   FE_STYLE_TOKEN_ONLY for CSS, all of R61: no *.module.css, no class selector in app CSS, width breakpoints only from the
   grammar's scale, every @source resolves (new code FE_STYLE_SOURCE_UNRESOLVED), globals.css imports in the standard
   order. failure-codes.yaml gains FE_STYLE_TOKEN_ONLY and FE_STYLE_SOURCE_UNRESOLVED and widens HFS_INLINE_SUPPRESSION to
@@ -14,7 +14,7 @@ summary: >-
   modules/schemas/canon-pins.schema.yaml requires the first two. Each rule carries a Vietnamese why (lib/why.mjs).
 reach: new-legs
 paths:
-  - modules/kernel/contract-changes/hfs2-stylelint.yaml
+  - modules/kernel/contract-changes/hfs-stylelint.yaml
   - modules/schemas/canon-pins.schema.yaml
   - modules/kernel/failure-codes.yaml
   - knowledge/hfs/canon-pins.yaml

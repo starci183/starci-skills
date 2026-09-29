@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { archFixture, runArch, findings } from './_hfs-arch-fixture.mjs';
 
-// HFS v2 check 3: reachability. BE features and capability modules must be composed into an app root; FE page features must be
+// HFS check 3: reachability. BE features and capability modules must be composed into an app root; FE page features must be
 // mounted by a route; FE string-literal hrefs must resolve to a route.
 
 const reach = report => report.coverage.hfsMachine.reachability;

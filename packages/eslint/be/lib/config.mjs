@@ -7,7 +7,7 @@
  * "replaced by checks" was enforced by nothing when the replacing check ran in no gate. This factory owns the
  * levels, so a repository states only its source globs.
  *
- * NO RULE IS OFF. HFS v2 has no retired-rule list: a rule the standard no longer holds is deleted from the
+ * NO RULE IS OFF. HFS has no retired-rule list: a rule the standard no longer holds is deleted from the
  * plugin, and a rule that stays is on. The factory refuses a recommendation that carries an `off`, so a rule
  * cannot be published switched off and still look adopted.
  */

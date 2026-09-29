@@ -1,7 +1,7 @@
-id: hfs2-patterns
+id: hfs-patterns
 effectiveAt: '2026-09-29T23:00:00+07:00'
 summary: >-
-  HFS v2 Phase 0 item 0.11 (lane hfs2-patterns). The knowledge the agents read now states only HFS v2. New canonical
+  HFS Phase 0 item 0.11 (lane hfs-patterns). The knowledge the agents read now states only HFS. New canonical
   standard knowledge/hfs/README.md (principles, slots and versioning, hfs.json, repository map, backend and frontend trees,
   tests, secrets, tooling, gates, done criteria, rule catalog R01 to R67) beside the slot manifest slots.yaml. Backend patterns
   rewritten (folder, naming, test, error, function, typing, imports, comment, architecture-check) with new topics api-auth,
@@ -15,7 +15,7 @@ summary: >-
   frameworkPinnedRootFiles and frameworkPinnedRootExports are unchanged in content so the framework-pinned readers stay valid.
 reach: new-legs
 paths:
-  - modules/kernel/contract-changes/hfs2-patterns.yaml
+  - modules/kernel/contract-changes/hfs-patterns.yaml
   - knowledge/hfs/README.md
   - knowledge/index.yaml
   - knowledge/patterns/enforcement.yaml

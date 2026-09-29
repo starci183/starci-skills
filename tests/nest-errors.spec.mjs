@@ -77,7 +77,7 @@ function fixture(t, { contractValue = contract(), error = errorSource, filter = 
     fs.writeFileSync(target, typeof value === 'string' ? value : JSON.stringify(value));
   };
   write('package.json', { private: true, starci: { codePatterns: { nest: { transportErrors: contractValue } } } });
-  write('hfs.json', { hfs: 2, profile: 'be', project: 'fixture', apps: [{ name: 'core', kind: 'api' }] });
+  write('hfs.json', { hfs: 1, profile: 'be', project: 'fixture', apps: [{ name: 'core', kind: 'api' }] });
   write('tsconfig.json', { compilerOptions: { target: 'ES2022', module: 'ESNext', moduleResolution: 'Bundler', experimentalDecorators: true }, include: ['src/**/*.ts'] });
   write('src/app-error.ts', error); write('src/app-error.filter.ts', filter); write('src/app.module.ts', moduleSource); write('src/load.ts', cause);
   if (!realNest) {

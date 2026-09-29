@@ -1,7 +1,7 @@
-id: hfs-v2-slots
+id: hfs-slots
 effectiveAt: '2026-09-29T21:30:00+07:00'
 summary: >-
-  HFS v2 Phase 0 item 0.1 (owner-approved decision 1: one slot manifest, repositories pin only its major). Adds
+  HFS Phase 0 item 0.1 (owner-approved decision 1: one slot manifest, repositories pin only its major). Adds
   knowledge/hfs/slots.yaml (versioned 2.0.0: every slot has an id, path pattern, profile, tier, required files, test
   kind, presence, tracked/ignored/external, plus the tier direction matrix and app kinds), the schemas
   modules/schemas/hfs-slots.schema.yaml and modules/schemas/hfs-repo.schema.yaml (hfs.json: pinned major, profile,

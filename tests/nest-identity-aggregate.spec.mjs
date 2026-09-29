@@ -67,7 +67,7 @@ function fixture(t, { profile = 'capability', legacy = 'off' } = {}) {
   const contract = profile === 'academy-abstract-exception' ? academyContract : capabilityContract;
   const manifest = { private: true, starci: { codePatterns: { nest: { errorIdentity: contract } } } };
   write('package.json', manifest);
-  write('hfs.json', { hfs: 2, profile: 'be', project: 'fixture', apps: [{ name: 'api', kind: 'api' }] });
+  write('hfs.json', { hfs: 1, profile: 'be', project: 'fixture', apps: [{ name: 'api', kind: 'api' }] });
   write('tsconfig.json', {
     compilerOptions: { target: 'ES2022', module: 'ESNext', moduleResolution: 'Bundler', strict: true },
     include: ['src/**/*.ts', 'apps/**/*.ts'],

@@ -22,7 +22,7 @@ const project = (t, files) => {
   t.after(() => fs.rmSync(root, { recursive: true, force: true }));
   const put = (relative, text) => { const file = path.join(root, ...relative.split('/')); fs.mkdirSync(path.dirname(file), { recursive: true }); fs.writeFileSync(file, text); };
   put('package.json', '{"private":true}\n');
-  put('hfs.json', `${JSON.stringify({ hfs: 2, profile: 'fe', project: 'fixture', apps: [{ name: 'web', kind: 'next' }] })}\n`);
+  put('hfs.json', `${JSON.stringify({ hfs: 1, profile: 'fe', project: 'fixture', apps: [{ name: 'web', kind: 'next' }] })}\n`);
   put('apps/web/package.json', '{"name":"@fixture/web","private":true}\n');
   put('tsconfig.json', `${JSON.stringify({
     compilerOptions: { target: 'ES2022', module: 'ESNext', moduleResolution: 'Bundler', jsx: 'preserve', resolveJsonModule: true, skipLibCheck: true, noEmit: true, baseUrl: '.', paths: { '@/*': ['src/*'] } },

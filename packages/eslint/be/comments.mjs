@@ -8,7 +8,7 @@
  *     restate the name - which COMMENT-3 forbids. Only declarations with a surface get the check.
  *   - `require-enum-member-jsdoc` can check that a doc EXISTS and never that it states a
  *     consequence. That half is read by a person, and the rule says so rather than pretending.
- *   - `no-non-ascii-source` takes no exemption marker: HFS v2 removed `vn-ok`, so text a program depends on
+ *   - `no-non-ascii-source` takes no exemption marker: HFS removed `vn-ok`, so text a program depends on
  *     lives in a locale or data file, and a fixture lane is exempt for strings only (see the rule).
  *   - `no-restated-name-jsdoc` (law 7) holds the decidable slice of law 3 - a doc block whose only
  *     content is the declared name re-spelled in words teaches nothing beyond the import line, so it

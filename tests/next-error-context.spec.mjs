@@ -27,7 +27,7 @@ function fixture(t) {
       dataField: 'data', errorFields: ['error'], readers: [{ path: 'src/api/read.ts', export: 'readCourse', emptyData: 'valid' }] }],
   };
   write('package.json', { private: true, starci: { codePatterns: { next: { errorState: contract } } } });
-  write('hfs.json', { hfs: 2, profile: 'fe', project: 'fixture', apps: [{ name: 'web', kind: 'next' }] });
+  write('hfs.json', { hfs: 1, profile: 'fe', project: 'fixture', apps: [{ name: 'web', kind: 'next' }] });
   write('tsconfig.json', { compilerOptions: { target: 'ES2022', module: 'ESNext', moduleResolution: 'Bundler', strict: true }, include: ['src/**/*.ts', 'jest.config.ts'] });
   write('src/api/envelope.ts', `export type ReadEnvelope=
   |{readonly ok:true;readonly data:string|null;readonly error?:never}

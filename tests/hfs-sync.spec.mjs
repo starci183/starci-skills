@@ -19,8 +19,8 @@ const require = createRequire(import.meta.url);
 const jestPreset = require('../packages/jest-preset/index.cjs');
 const vitestPreset = await import('../packages/vitest-preset/index.mjs');
 
-const BE = { hfs: 2, profile: 'be', project: 'nivo', apps: [{ name: 'core', kind: 'api' }, { name: 'migrate', kind: 'migrate' }] };
-const FE = { hfs: 2, profile: 'fe', project: 'nivo', apps: [{ name: 'app', kind: 'web' }, { name: 'admin', kind: 'web' }] };
+const BE = { hfs: 1, profile: 'be', project: 'nivo', apps: [{ name: 'core', kind: 'api' }, { name: 'migrate', kind: 'migrate' }] };
+const FE = { hfs: 1, profile: 'fe', project: 'nivo', apps: [{ name: 'app', kind: 'web' }, { name: 'admin', kind: 'web' }] };
 const PRESETS = {
   be: { sonarExclusions: jestPreset.sonarExclusions(), sonarCoverageExclusions: jestPreset.sonarCoverageExclusions() },
   fe: { sonarExclusions: vitestPreset.sonarExclusions(), sonarCoverageExclusions: vitestPreset.sonarCoverageExclusions() },
@@ -59,7 +59,7 @@ describe('hfs.json validation', () => {
   it('accepts the two profiles and refuses everything else', () => {
     assert.doesNotThrow(() => validateHfs(BE));
     assert.doesNotThrow(() => validateHfs(FE));
-    for (const bad of [null, { ...BE, hfs: 1 }, { ...BE, profile: 'mobile' }, { ...BE, project: 'Nivo Backend' }, { ...BE, apps: [] }, { ...BE, apps: [{ name: 'core' }, { name: 'core' }] }, { ...BE, stacks: '../nivo-backend' }, { ...FE, stacks: '/srv/nivo-backend' }, { ...FE, stacks: '' }]) {
+    for (const bad of [null, { ...BE, hfs: 0 }, { ...BE, profile: 'mobile' }, { ...BE, project: 'Nivo Backend' }, { ...BE, apps: [] }, { ...BE, apps: [{ name: 'core' }, { name: 'core' }] }, { ...BE, stacks: '../nivo-backend' }, { ...FE, stacks: '/srv/nivo-backend' }, { ...FE, stacks: '' }]) {
       assert.throws(() => validateHfs(bad), /HFS_SYNC_HFS_INVALID/);
     }
     assert.doesNotThrow(() => validateHfs({ ...FE, stacks: '../nivo-backend' }));
@@ -320,7 +320,7 @@ describe('the drift check', () => {
     const dir = repo(t, BE);
     assert.equal((await run([], dir)).code, 2);
     assert.equal((await run(['--check', '--write'], dir)).code, 2);
-    fs.writeFileSync(path.join(dir, 'hfs.json'), '{"hfs":2,"profile":"be"}');
+    fs.writeFileSync(path.join(dir, 'hfs.json'), '{"hfs":1,"profile":"be"}');
     const bad = await runSync(['--check'], { cwd: dir, out: () => {}, presets: PRESETS.be });
     assert.equal(bad, 1);
   });
@@ -395,7 +395,7 @@ describe('hfs sync --init', () => {
     }
     assert.ok(files.has('src/features/system-health/transport/http/live.controller.spec.ts'));
   });
-  it('the back-end skeleton follows HFS v2: one env reader, an enum-named logger port, the Terminus health shape, per-app options', async t => {
+  it('the back-end skeleton follows HFS: one env reader, an enum-named logger port, the Terminus health shape, per-app options', async t => {
     const { dir } = await skeleton(t, BE);
     const sources = filesUnder(dir).filter(file => file.endsWith('.ts') && !file.endsWith('.spec.ts'));
     assert.deepEqual(sources.filter(file => /process\.env/.test(read(dir, file))), ['src/modules/platform/config/env-source.ts'], 'process.env is read only by platform/config');

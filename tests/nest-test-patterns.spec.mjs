@@ -12,7 +12,7 @@ function fixture(t, subject, spec, name = 'store.handler') {
   const fixtureRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'starci-nest-test-form-'));
   const write = (file, content) => { const target = path.join(fixtureRoot, file); fs.mkdirSync(path.dirname(target), { recursive: true }); fs.writeFileSync(target, typeof content === 'string' ? content : JSON.stringify(content)); };
   write('package.json', { private: true });
-  write('hfs.json', { hfs: 2, profile: 'be', project: 'fixture', apps: [{ name: 'core', kind: 'api' }] });
+  write('hfs.json', { hfs: 1, profile: 'be', project: 'fixture', apps: [{ name: 'core', kind: 'api' }] });
   write('tsconfig.json', { compilerOptions: { target: 'ES2022', module: 'ESNext', moduleResolution: 'Bundler' }, include: ['src/**/*.ts'] });
   write(`src/${name}.ts`, subject); write(`src/${name}.spec.ts`, spec);
   // Resolve against real, lockfile-pinned compiler and Jest declarations, not handwritten API stubs.

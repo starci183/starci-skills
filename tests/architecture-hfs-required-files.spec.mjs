@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { archFixture, runArch, findings } from './_hfs-arch-fixture.mjs';
 
-// HFS v2 check 5: the `requires`, `requiredInstances` and `minInstances` of knowledge/hfs/slots.yaml must exist.
+// HFS check 5: the `requires`, `requiredInstances` and `minInstances` of knowledge/hfs/slots.yaml must exist.
 // BE_REQUIRED_MODULE_MISSING (backend app, feature, domain, integrations, platform), FE_ERROR_BOUNDARY_MISSING
 // (fe.app.next error and loading files) and HFS_REQUIRED_FILE_MISSING (every other file, and the minimums at hfs.json).
 

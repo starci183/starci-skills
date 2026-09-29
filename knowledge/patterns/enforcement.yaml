@@ -2,7 +2,7 @@ schema: starci/knowledge-source@1
 id: patterns.enforcement
 title: Cross-project convention enforcement
 purpose: |
-  Anti-bypass requirements that hold in every repository under HFS v2. One standard, one machine, no exception mechanism.
+  Anti-bypass requirements that hold in every repository under HFS. One standard, one machine, no exception mechanism.
   Use the BE and FE pattern cases, the repository law in patterns/repo, and knowledge/hfs/README.md.
 appliesTo: [backend, frontend]
 family: cross-cutting

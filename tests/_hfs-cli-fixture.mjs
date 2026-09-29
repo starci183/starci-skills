@@ -4,8 +4,8 @@ import path from 'node:path';
 import { execFileSync } from 'node:child_process';
 import { createSlotResolver, loadSlotManifest, resolveRepoDeclaration } from '../scripts/lib/hfs-slots.mjs';
 
-export const BE = { hfs: 2, profile: 'be', project: 'demo', apps: [{ name: 'core', kind: 'api' }] };
-export const FE = { hfs: 2, profile: 'fe', project: 'demo', apps: [{ name: 'web', kind: 'next' }, { name: 'admin', kind: 'next' }] };
+export const BE = { hfs: 1, profile: 'be', project: 'demo', apps: [{ name: 'core', kind: 'api' }] };
+export const FE = { hfs: 1, profile: 'fe', project: 'demo', apps: [{ name: 'web', kind: 'next' }, { name: 'admin', kind: 'next' }] };
 
 /** A clean product repository for `declaration`: every path the manifest requires, plus one BE feature. Not yet a Git repository. */
 export function writeCleanRepo(declaration, { declare = true } = {}) {

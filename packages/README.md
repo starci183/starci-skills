@@ -61,7 +61,7 @@ repository (it replaces the copy) and `npm install`. After pulling a newer runti
 runtime makes peers resolve from the runtime's `node_modules`, and a symlink needs Developer Mode on Windows. A packed
 tarball records an integrity hash that changes with line endings or the zlib version, and `npm ci` then fails.
 
-Proven on 2026-09-29 on a scratch copy of mia-mia-backend (`D:/starci-tmp/hfs2-presets-proof/mia`): `link --side be
+Proven on 2026-09-29 on a scratch copy of mia-mia-backend: `link --side be
 --install`, then a clean `rm -rf node_modules && link && npm ci` (691 packages, four `link: true` lockfile entries), then
 `tsc --noEmit`, `jest --selectProjects unit` and `prettier --check` against the linked packages.
 

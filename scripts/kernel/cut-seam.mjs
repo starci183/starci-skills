@@ -234,7 +234,7 @@ export function seamPromptLines({ cut, jobLabel, api = 'scripts/kernel/api.mjs',
 // (slice 7/34) committed 9 -> 7 findings and blocked on the rest. canonCutPlanOf grants each slice the exact
 // relocation destinations its findings need (modules/ops/ops/code.refactor.yaml policy.canonConformance
 // relocations) unless a sibling or an earlier grant already holds them, and routes the shared-root files
-// (sharedRoots, empty in HFS v2) plus every contested relocation to ONE serial canon-wire leg per wave, enqueued --after every
+// (sharedRoots, empty in HFS) plus every contested relocation to ONE serial canon-wire leg per wave, enqueued --after every
 // ordinal of that wave - the recutPlanOf wire pattern. A blocked slice is redone from its committed state
 // (canonRedispatchOf), never from scratch.
 
@@ -314,7 +314,7 @@ export function canonCutPlanOf(scan, { cutId, op = CANON_OP, policy = null, impo
       wire.reasons.push(`${move.ruleId} ${move.moving} -> ${dest}: held by ordinal ${holder.ordinal}`);
     }
   }
-  // Shared-root files (policy sharedRoots; empty in HFS v2, where owners are derived from slots): the wire's, never a slice's.
+  // Shared-root files (policy sharedRoots; empty in HFS, where owners are derived from slots): the wire's, never a slice's.
   for (const slice of slices) {
     const packages = new Set(findings.filter((finding) => slice.paths.some((root) => within(finding.file, root)))
       .map((finding) => srcRootOf(finding.file)).filter(Boolean).map((src) => src.split('/').slice(0, -1).join('/')));

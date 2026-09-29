@@ -133,7 +133,7 @@ export function checkArchitecture({ repositoryRoot, injectedTypeScript, paths = 
     violations.push(...dataLifecycle.violations);
     frontendDataLifecycle = dataLifecycle.coverage;
   }
-  // HFS v2 machine: the slot-driven graph checks read the whole program, also when the caller asked for one path.
+  // HFS machine: the slot-driven graph checks read the whole program, also when the caller asked for one path.
   const hfsContext = paths.length ? buildTypeScriptContext(config, injectedTypeScript) : context;
   const hfsChecks = { tiers: null, reachability: null, deadExports: null, requiredFiles: null, sizeGrowth: null, clones: null };
   if (hfsContext.program) {

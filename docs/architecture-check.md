@@ -24,7 +24,7 @@ node scripts/checks/architecture.mjs <repo-root> [--base <commit>]
 and programmatically via `checkArchitecture({ repositoryRoot, base })`
 from `scripts/checks/architecture.mjs`.
 
-The checker is the HFS v2 architecture machine: it is driven by `hfs.json` in the checked repository and the slot manifest `knowledge/hfs/slots.yaml` (through `scripts/lib/hfs-slots.mjs`). `architecture.json` is retired; a repository carries only `hfs.json`, and owners, roots and tiers are derived from slots. See the HFS v2 machine section below.
+The checker is the HFS architecture machine: it is driven by `hfs.json` in the checked repository and the slot manifest `knowledge/hfs/slots.yaml` (through `scripts/lib/hfs-slots.mjs`). `architecture.json` is retired; a repository carries only `hfs.json`, and owners, roots and tiers are derived from slots. See the HFS machine section below.
 
 The check produces one `starci/architecture-check@1` JSON object. Exit code
 `0` means `ok: true`; exit code `1` means the record contains violations or
@@ -94,7 +94,7 @@ Local reference evidence is pinned, and includes debt rather than being copied a
 - `starci-academy-fe@44bba218685b7eed2a5d9e479689707ab6381bc8`: redirect-only routes under `[lang]/page.tsx` and `courses/[displayId]/learn/flashcards/page.tsx` are valid zero-visual-owner adapters. `subscriptions/page.tsx` rendering `ShellNav` beside `ProSubscriptionPage` is reference debt. `StarCiAiFab/component.tsx` owns DOM refs, resize handling, drag, and reduced-motion behavior without transport/product-world ownership; forcing a forwarding Base twin would add ceremony without a responsibility boundary.
 - That frontend is one app with `file:packages/grammar` and `file:packages/heroicons`; `nivo-fe@a01a7bd7474fc6b43b831853d9ef870c202f3844` is npm workspaces with `apps/{app,expert,landing}` and `packages/ui`. Both topologies must obey the same ownership and public-export rules.
 
-## HFS v2 machine
+## HFS machine
 
 Slots, tiers and required files come from `knowledge/hfs/slots.yaml`; the repository only names its profile and apps in `hfs.json` (`modules/schemas/hfs-repo.schema.yaml`). A missing or invalid `hfs.json` is the error `HFS_DECLARATION_INVALID`, a pinned major other than the manifest's is `HFS_MANIFEST_MAJOR_MISMATCH`. The result carries `coverage.hfsMachine` with the counts of each check below. Every finding has a catalogued why code with Vietnamese text in `modules/kernel/failure-codes.yaml`.
 

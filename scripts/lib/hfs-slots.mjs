@@ -1,10 +1,10 @@
-// hfs-slots.mjs - the HFS v2 slot manifest and repository declaration, loaded once and asked four questions:
+// hfs-slots.mjs - the HFS slot manifest and repository declaration, loaded once and asked four questions:
 //   which slot owns path P           slotOf(P) / classifyPath(P)   (an unknown path reports its nearest slot)
 //   is import A -> B allowed         importAllowed(A, B)           (tier matrix, cross-owner entry, cross-app, layers)
 //   which files are required         requiredFiles(P) / requiredPaths()
 //   is this path tracked             isTracked(P) / trackingOf(P)
 // The rule catalog (knowledge/hfs/rules.yaml, modules/schemas/hfs-rules.schema.yaml) loads through loadRuleCatalog / rules().
-// Every check and lint rule of HFS v2 reads knowledge/hfs/slots.yaml through this module; none keeps its own path
+// Every check and lint rule of HFS reads knowledge/hfs/slots.yaml through this module; none keeps its own path
 // list. The manifest shape is modules/schemas/hfs-slots.schema.yaml and hfs.json is modules/schemas/hfs-repo.schema.yaml;
 // the installed runtime carries no npm dependency, so this file re-states those shapes instead of loading ajv
 // (tests/hfs-slots.spec.mjs proves the two agree).
@@ -121,7 +121,7 @@ function manifestShapeProblems(m) {
   if (!isMap(m)) return ['the manifest is not a map'];
   const allowed = new Set(['schema', 'version', 'versioning', 'presenceValues', 'trackedValues', 'testValues', 'appKinds', 'tiers', 'ruleParams', 'crossOwner', 'crossApp', 'slots', 'consumers']);
   for (const key of Object.keys(m)) if (!allowed.has(key)) bad.push(`unknown top-level key ${key}`);
-  if (m.schema !== 'starci/hfs-slots@2' && !/^starci\/hfs-slots@\d+$/.test(String(m.schema))) bad.push('schema must be starci/hfs-slots@<major>');
+  if (!/^starci\/hfs-slots@\d+$/.test(String(m.schema))) bad.push('schema must be starci/hfs-slots@<major>');
   if (!SEMVER.test(String(m.version))) bad.push('version must be MAJOR.MINOR.PATCH');
   if (!isMap(m.versioning) || !['patch', 'minor', 'major', 'retire', 'pins'].every((k) => typeof m.versioning[k] === 'string')) bad.push('versioning needs patch, minor, major, retire and pins text');
   if (JSON.stringify(m.presenceValues) !== JSON.stringify(PRESENCE)) bad.push(`presenceValues must be ${PRESENCE.join(', ')}`);
@@ -249,7 +249,7 @@ function declarationShapeProblems(d) {
   const bad = [];
   if (!isMap(d)) return ['hfs.json is not an object'];
   for (const key of Object.keys(d)) if (!['hfs', 'profile', 'project', 'apps', 'optionalSlots', 'connections', 'stacks'].includes(key)) bad.push(`unknown key ${key}`);
-  if (!(Number.isInteger(d.hfs) && d.hfs >= 2)) bad.push('hfs must be the pinned manifest major (an integer, 2 or more)');
+  if (!(Number.isInteger(d.hfs) && d.hfs >= 1)) bad.push('hfs must be the pinned manifest major (an integer, 1 or more)');
   if (!PROFILES.includes(d.profile)) bad.push('profile must be be or fe');
   if (!NAME.test(String(d.project))) bad.push('project must be a project name');
   if (!Array.isArray(d.apps) || !d.apps.length) bad.push('apps must list every apps/<name> with its kind');
@@ -636,7 +636,7 @@ function ruleCatalogProblems(d) {
 const deepFreeze = (v) => { if (v && typeof v === 'object') Object.values(v).forEach(deepFreeze); return Object.freeze(v); };
 
 /**
- * The parsed and validated HFS v2 rule catalog. `text` (or `file`, or `root`) selects the source; the default is the runtime's
+ * The parsed and validated HFS rule catalog. `text` (or `file`, or `root`) selects the source; the default is the runtime's
  * own knowledge/hfs/rules.yaml. A catalog that breaks its shape or a semantic rule is refused whole (HFS_RULES_INVALID), and
  * so is one whose major differs from the slot manifest passed as `manifest` (HFS_MANIFEST_MAJOR_MISMATCH).
  * Answers: rule(id), byCode(code), forGate(gate), forEnforcer(kind, id), planned() and unbuilt().

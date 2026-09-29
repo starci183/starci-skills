@@ -39,7 +39,7 @@ test("every rule this law declares is exported under its published name", () => 
   }
 })
 
-test("LAYERING-1 (HFS v2): another owner is imported through its public entry, never through a path into it", () => {
+test("LAYERING-1 (HFS): another owner is imported through its public entry, never through a path into it", () => {
   tester.run("must-deep-module-import", mustDeepModuleImport, {
     valid: [
       // the owner's index.ts: alias plus owner

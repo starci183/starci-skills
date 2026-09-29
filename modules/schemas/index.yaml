@@ -650,33 +650,33 @@ schemas:
   # CODE-PATTERN ENFORCEMENT — executable rule conformance
   # --------------------------------------------------------------------------
 
-  - id: urn:starci:hfs-slots:2
+  - id: urn:starci:hfs-slots:1
     file: modules/schemas/hfs-slots.schema.yaml
     dialect: json-schema
     subsystem: gate
-    governs: "The HFS v2 slot manifest knowledge/hfs/slots.yaml - versioned slots (id, profiles, path pattern, presence, tracked, tier, requires, tests, budget), the app kinds and the tier direction matrix."
+    governs: "The HFS slot manifest knowledge/hfs/slots.yaml - versioned slots (id, profiles, path pattern, presence, tracked, tier, requires, tests, budget), the app kinds and the tier direction matrix."
     binds: knowledge/hfs/slots.yaml
     usedBy: [scripts/lib/hfs-slots.mjs (loadSlotManifest re-states this shape without ajv; tests/hfs-slots.spec.mjs proves the two agree)]
     business:
       question: "What may exist in a product repository, where, and what may import what?"
       whenNeeded: Every HFS check, lint factory and template that needs a path, tier or required file.
-      whenNot: Not per-repository - a repository declares itself in hfs.json (urn:starci:hfs-repo:2) and never edits the manifest.
-      selectedBy: scripts/lib/hfs-slots.mjs; owner-approved HFS v2 decisions.
+      whenNot: Not per-repository - a repository declares itself in hfs.json (urn:starci:hfs-repo:1) and never edits the manifest.
+      selectedBy: scripts/lib/hfs-slots.mjs; owner-approved HFS decisions.
 
-  - id: urn:starci:hfs-rules:2
+  - id: urn:starci:hfs-rules:1
     file: modules/schemas/hfs-rules.schema.yaml
     dialect: json-schema
     subsystem: gate
-    governs: "The HFS v2 rule catalog knowledge/hfs/rules.yaml - the 67 rules R01-R67 with their finding code, Vietnamese title, gates, failure codes and enforcers (eslint rule ids, architecture machine, hfs, stylelint, sonar and work-validate checks)."
+    governs: "The HFS rule catalog knowledge/hfs/rules.yaml - the 67 rules R01-R67 with their finding code, Vietnamese title, gates, failure codes and enforcers (eslint rule ids, architecture machine, hfs, stylelint, sonar and work-validate checks)."
     binds: knowledge/hfs/rules.yaml
     usedBy: [scripts/lib/hfs-slots.mjs (loadRuleCatalog re-states this shape without ajv; tests/hfs-rules.spec.mjs proves the two agree), scripts/checks/check-hfs-rules.mjs]
     business:
       question: "Which rule is enforced by what, at which gate, and what does its failure say?"
       whenNeeded: Any check, lint factory or gate that needs to know the enforcers, gates or failure codes of an HFS rule.
       whenNot: Not per-repository - a repository never edits the catalog and switches no rule off.
-      selectedBy: scripts/lib/hfs-slots.mjs; owner-approved HFS v2 decisions.
+      selectedBy: scripts/lib/hfs-slots.mjs; owner-approved HFS decisions.
 
-  - id: urn:starci:hfs-repo:2
+  - id: urn:starci:hfs-repo:1
     file: modules/schemas/hfs-repo.schema.yaml
     dialect: json-schema
     subsystem: gate

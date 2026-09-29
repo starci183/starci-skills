@@ -1,6 +1,6 @@
 $schema: https://json-schema.org/draft/2020-12/schema
-$id: urn:starci:hfs-repo:2
-title: HFS v2 repository declaration (hfs.json)
+$id: urn:starci:hfs-repo:1
+title: HFS repository declaration (hfs.json)
 description: >-
   The one file a product repository adds to say which HFS it follows. Owners are derived from slots, so it lists no
   owners, no paths and no switched-off rules. The manifest decides which app kinds and slot ids are legal
@@ -12,7 +12,7 @@ required: [hfs, profile, project, apps]
 properties:
   hfs:
     type: integer
-    minimum: 2
+    minimum: 1
     description: The pinned manifest MAJOR. A repository always follows the latest minor of that major; another major than the manifest's is refused.
   profile: {enum: [be, fe]}
   project:

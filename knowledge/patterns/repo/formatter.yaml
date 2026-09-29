@@ -31,7 +31,7 @@ rules:
       stays small.
     cases:
       - id: case-1
-        when: A repository adopts v2
+        when: A repository adopts the standard
         write: One reformat commit in a quiet window, listed in .git-blame-ignore-revs.
     verification:
       automated:

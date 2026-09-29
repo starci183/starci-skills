@@ -25,7 +25,7 @@ pins:
     group: starci
     side: fe
     source: packages/eslint/fe/package.json
-    why: 'every front-end repository carries 3.0.2 while the runtime source is 5.0.0 (HFS v2 item 0.6, the vn-ok pragma is gone and starciFeConfig enables every rule and the React Hooks rules at error).'
+    why: 'every front-end repository carries 3.0.2 while the runtime source is 5.0.0 (HFS item 0.6, the vn-ok pragma is gone and starciFeConfig enables every rule and the React Hooks rules at error).'
   '@starci/stylelint-canon':
     version: 1.0.0
     group: starci
@@ -181,7 +181,7 @@ pins:
     version: 4.13.6
     group: framework
     side: fe
-    why: every HFS v2 front end uses next-intl with the [locale] segment (hfs sync --init writes it); nivo-fe resolves 4.13.6.
+    why: every HFS front end uses next-intl with the [locale] segment (hfs sync --init writes it); nivo-fe resolves 4.13.6.
   supertest:
     version: 7.3.0
     group: tooling

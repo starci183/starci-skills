@@ -4,7 +4,7 @@
  * Four rules, all reading import specifiers, export specifiers, decorators or a filename against
  * the path of the file being linted. They are cheap and exact -- none of them touches disk -- which
  * is the whole reason they can be `error`:
- *   - `must-deep-module-import` / `no-self-module-alias` hold LAYERING-1 and LAYERING-2. Under HFS v2 the
+ *   - `must-deep-module-import` / `no-self-module-alias` hold LAYERING-1 and LAYERING-2. Under HFS the
  *     first is the cross-owner public-entry rule: an aliased import names the owner and stops there
  *     (`@modules/domain/plan`, `@features/plan`), so it lands on the owner's `index.ts`. A path into a
  *     file of another owner, or an alias root or tier with no owner, is refused.
@@ -67,12 +67,12 @@ const ALIASES = [
 /**
  * An aliased import lands on an owner's public entry: the alias and the owner, nothing deeper.
  *
- * HFS v2 gives every owner (a feature, a domain or platform capability, an integration) one `index.ts` that
+ * HFS gives every owner (a feature, a domain or platform capability, an integration) one `index.ts` that
  * lists what it offers. An import from another owner therefore names the owner and stops
  * (`@modules/domain/plan`, `@features/plan`); `@modules/domain/plan/plan.service` reaches past that entry
  * into a file the owner did not offer, and `@modules/domain` or `@modules` names no owner at all. The
  * rule's published name is older than the standard - it once required the opposite, a path INTO a file -
- * and is kept because the name is what a build log and a manifest cite; the behavior is HFS v2's.
+ * and is kept because the name is what a build log and a manifest cite; the behavior is HFS's.
  *
  * Reaching into one's own owner through its alias is `no-self-module-alias`'s finding, not this one's.
  */
@@ -241,7 +241,7 @@ const isBareFolderSpecifier = (specifier) =>
  *    a storage token; and more than `maxExports` (the `indexExports` budget of the slot manifest) names is not
  *    a public surface but the inside of the owner.
  *
- * What this accepts, because HFS v2 wants it: `export { PlanModule } from "./plan.module"`,
+ * What this accepts, because HFS wants it: `export { PlanModule } from "./plan.module"`,
  * `export type { PlanSummary } from "./plan.contracts"`, and `export { entities, migrations } from
  * "./persistence"` - explicit names from named files. Whether a specifier such as `./persistence` is a
  * file or a folder needs the file system, which no rule in this canon touches.
@@ -397,7 +397,7 @@ export const rules = {
 /**
  * The level this law asks for, as the plugin's own opinion.
  *
- * All four are `error`. HFS v2 keeps no baseline: a repository adopts them after its migration lane has
+ * All four are `error`. HFS keeps no baseline: a repository adopts them after its migration lane has
  * moved its imports onto owner entries, and `starciBeConfig` states them at `error` with none switched off.
  */
 export const recommended = {

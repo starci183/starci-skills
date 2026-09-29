@@ -5,7 +5,7 @@
  * the split rule already stops the drawing half reaching for the runtime. The second is the law:
  * NO LITERAL COPY AT ANY TIER, IN ANY LANGUAGE, AND NO PRAGMA.
  *
- * WHAT CHANGED FROM V1, AND WHY. The previous rule scanned only the vocabulary tiers (leaves,
+ * WHAT CHANGED, AND WHY. The previous rule scanned only the vocabulary tiers (leaves,
  * composites, branches), so a block or a page holding every word of a screen was exempt, and the
  * companion language rule carried a `vn-ok: <reason>` pragma that was used 490 times in one
  * repository. One escape is enough to turn a rule into a comment convention. There is now no tier

@@ -21,7 +21,7 @@ test('scoped architecture matches full findings while building only selected pro
   // TypeScript projects are derived: the root tsconfig.json (src/**) and the tsconfig of every workspace (apps/b).
   const compilerOptions = { target: 'ES2022', module: 'ESNext', moduleResolution: 'Bundler', noEmit: true };
   put('package.json', JSON.stringify({ private: true, workspaces: ['apps/*'] }));
-  put('hfs.json', JSON.stringify({ hfs: 2, profile: 'be', project: 'fixture', apps: [{ name: 'b', kind: 'api' }] }));
+  put('hfs.json', JSON.stringify({ hfs: 1, profile: 'be', project: 'fixture', apps: [{ name: 'b', kind: 'api' }] }));
   put('tsconfig.json', JSON.stringify({ compilerOptions, include: ['src/**/*.ts'] }));
   put('apps/b/package.json', JSON.stringify({ name: '@fixture/b', private: true }));
   put('apps/b/tsconfig.json', JSON.stringify({ compilerOptions, include: ['src/**/*.ts'] }));
@@ -63,7 +63,7 @@ test('scoped architecture includes referenced TypeScript projects but skips unre
   };
   // Every workspace tsconfig is a derived project; apps/a additionally references packages/shared.
   put('package.json', { private: true, workspaces: ['apps/*', 'packages/*'] });
-  put('hfs.json', { hfs: 2, profile: 'be', project: 'fixture', apps: [{ name: 'a', kind: 'api' }, { name: 'b', kind: 'api' }] });
+  put('hfs.json', { hfs: 1, profile: 'be', project: 'fixture', apps: [{ name: 'a', kind: 'api' }, { name: 'b', kind: 'api' }] });
   for (const workspace of ['apps/a', 'apps/b', 'packages/shared']) put(`${workspace}/package.json`, { name: `@fixture/${workspace.split('/')[1]}`, private: true });
   put('apps/a/tsconfig.json', { compilerOptions: { target: 'ES2022', module: 'ESNext', moduleResolution: 'Bundler', noEmit: true }, include: ['src/**/*.ts'], references: [{ path: '../../packages/shared' }] });
   put('apps/b/tsconfig.json', { compilerOptions: { target: 'ES2022', noEmit: true }, include: ['src/**/*.ts'] });
@@ -87,7 +87,7 @@ test('a selected project with a missing tsconfig still fails closed', t => {
   };
   // A project list can no longer be authored, so the missing tsconfig is a project reference of the root tsconfig.
   put('package.json', '{"private":true}');
-  put('hfs.json', JSON.stringify({ hfs: 2, profile: 'be', project: 'fixture', apps: [{ name: 'a', kind: 'api' }] }));
+  put('hfs.json', JSON.stringify({ hfs: 1, profile: 'be', project: 'fixture', apps: [{ name: 'a', kind: 'api' }] }));
   put('tsconfig.json', JSON.stringify({ files: [], references: [{ path: 'apps/a/tsconfig.json' }] }));
   put('apps/a/src/main.ts', 'export const main = 1;');
   const result = checkArchitecture({ repositoryRoot: root, injectedTypeScript: ts, paths: ['apps/a/src/main.ts'] });

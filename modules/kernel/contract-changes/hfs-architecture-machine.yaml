@@ -1,8 +1,8 @@
-id: hfs-v2-architecture-machine
+id: hfs-architecture-machine
 effectiveAt: '2026-09-29T23:30:00+07:00'
 summary: >-
-  HFS v2 Phase 0 item 0.4 (owner-approved decision 1: repositories carry only hfs.json). The architecture checker
-  (scripts/checks/architecture.mjs and scripts/checks/architecture/) becomes the HFS v2 architecture machine, driven by
+  HFS Phase 0 item 0.4 (owner-approved decision 1: repositories carry only hfs.json). The architecture checker
+  (scripts/checks/architecture.mjs and scripts/checks/architecture/) becomes the HFS architecture machine, driven by
   hfs.json and knowledge/hfs/slots.yaml through scripts/lib/hfs-slots.mjs. architecture.json support is removed with no
   dual path: loadArchitectureConfig derives the profile, apps, roots, owners (every directory an owner slot matches that
   has its entry file), the Nest registration selection and the Grammar contract from hfs.json and the slots; the
@@ -16,7 +16,7 @@ summary: >-
   BE_REQUIRED_MODULE_MISSING, HFS_REQUIRED_FILE_MISSING), file-size-growth against the merge-base (HFS_SIZE_GROWTH) and
   token-normalised duplicate blocks across owners (HFS_DUPLICATE_BLOCK, threshold ruleParams duplicateBlockLines 25).
   knowledge/hfs/slots.yaml adds src/app/[locale]/loading.tsx to the fe.app.next required files and duplicateBlockLines to
-  ruleParams; the schema and loader validate the new key. Lead decisions the same day: no legacy - the v1 direction rules
+  ruleParams; the schema and loader validate the new key. Lead decisions the same day: no legacy - the earlier direction rules
   BE_MODULE_IMPORTS_FEATURE, BE_MODULE_IMPORTS_APP, BE_FEATURE_IMPORTS_APP, FE_TIER_IMPORTS_UPWARD,
   FE_FEATURE_DEPENDENCY_DIRECTION, FE_APP_INTERNAL_IMPORT_OUTSIDE_FEATURES, FE_FRAMEWORK_ADAPTER_IMPORT and
   FE_COMPONENT_IMPORTS_TRANSPORT are deleted with their catalog entries, knowledge references (BE_TIER_DIRECTION and

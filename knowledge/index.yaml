@@ -15,9 +15,9 @@ provenance:
     remains unapproved until its owner accepts it.
 guidance:
   - id: load-order
-    requirement: Read hfs/README.md (HFS v2, the one source and storage standard), architecture-rules.yaml,
+    requirement: Read hfs/README.md (HFS, the one source and storage standard), architecture-rules.yaml,
       coding-reference.yaml and the smallest applicable English Nest/Next topic. All projects use Next.js/NestJS
-      under HFS v2. Code patterns are checked by
+      under HFS. Code patterns are checked by
       executable scripts; design patterns and edge cases are reviewed by agents using Markdown guidance.
       Knowledge has no translated mirrors and grants no execution authority. Product requirements, design,
       scope and state belong in .starciwork; execution evidence (captures, runs, logs, reports) lives in the
@@ -49,21 +49,21 @@ branches:
     path: code-examples/index.yaml
     use: Focused extracted examples for applying the rules directly.
   - id: hfs-slots
-    title: HFS v2 slot manifest
+    title: HFS slot manifest
     path: hfs/slots.yaml
     use: The one manifest of what may exist in a repository, where, and which tier may import which; read only
       through scripts/lib/hfs-slots.mjs. A repository carries hfs.json (modules/schemas/hfs-repo.schema.yaml).
   - id: hfs-rules
-    title: HFS v2 rule catalog
+    title: HFS rule catalog
     path: hfs/rules.yaml
-    use: The 67 HFS v2 rules R01-R67 as data - finding code, Vietnamese title, gates, failure codes and every enforcer; read
+    use: The 67 HFS rules R01-R67 as data - finding code, Vietnamese title, gates, failure codes and every enforcer; read
       only through scripts/lib/hfs-slots.mjs (loadRuleCatalog, rules) and held to the packages by scripts/checks/check-hfs-rules.mjs.
   - id: enforcement
     title: Enforcement
     path: patterns/enforcement.yaml
     use: Anti-bypass requirements and explicitly proposed cross-project upgrades.
   - id: hfs
-    title: HFS v2
+    title: HFS
     path: hfs/README.md
     use: The one source and storage standard for every StarCi repository - principles, slots and versioning,
       hfs.json, the repository map, backend and frontend trees, tests, secrets, tooling, gates, done criteria and the
@@ -76,12 +76,12 @@ branches:
   - id: backend-patterns
     title: Backend patterns
     path: patterns/be/index.yaml
-    use: Concrete NestJS code patterns under HFS v2 - tiers, schema authority, errors, logging, configuration,
+    use: Concrete NestJS code patterns under HFS - tiers, schema authority, errors, logging, configuration,
       default-deny authentication and background work; executable code checks and separately scoped semantic review.
   - id: frontend-patterns
     title: Frontend patterns
     path: patterns/fe/index.yaml
-    use: Concrete Next.js and Grammar code patterns under HFS v2 - data transport, boundaries, i18n, CSS tokens,
+    use: Concrete Next.js and Grammar code patterns under HFS - data transport, boundaries, i18n, CSS tokens,
       packages and multiple apps; executable code checks and separately scoped semantic review.
   - id: ui
     title: UI

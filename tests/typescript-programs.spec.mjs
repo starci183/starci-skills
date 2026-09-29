@@ -52,7 +52,7 @@ test('a run shares programs across async work and another run never sees them',a
 test('a run builds the architecture context once and hands every caller its own error list',t=>{
   const {root,write}=project(t);
   write('package.json',{private:true});
-  write('hfs.json',{hfs:2,profile:'fe',project:'fixture',apps:[{name:'web',kind:'next'}]});
+  write('hfs.json',{hfs:1,profile:'fe',project:'fixture',apps:[{name:'web',kind:'next'}]});
   write('tsconfig.json',{compilerOptions:{module:'ESNext',moduleResolution:'Bundler',target:'ES2022',strict:true,noEmit:true},include:['src/**/*.ts']});
   write('src/a.ts',"import {b} from './missing'; export const a=b;");
   const config=loadArchitectureConfig(root);
@@ -87,7 +87,7 @@ module.exports=new Proxy(ts,{get:(target,key)=>key==='createProgram'?(...args)=>
     'sonar-project.properties':'sonar.projectKey=fixture\n','apps/web/package.json':'{"name":"@fixture/web","private":true}\n',
     'apps/web/next.config.ts':'export default {};\n','apps/web/postcss.config.mjs':'export default {};\n',
     'apps/web/tsconfig.json':'{"extends":"../../tsconfig.json","include":["src/**/*"]}\n'}))write(file,text);
-  write('hfs.json',{hfs:2,profile:'fe',project:'fixture',apps:[{name:'web',kind:'next'}]});
+  write('hfs.json',{hfs:1,profile:'fe',project:'fixture',apps:[{name:'web',kind:'next'}]});
   write('tsconfig.json',{compilerOptions:{module:'ESNext',moduleResolution:'Bundler',target:'ES2022',strict:true,noEmit:true},include:['apps/web/src/**/*.ts']});
   write('apps/web/src/modules/api/envelope.ts','export type Envelope={readonly ok:true;readonly data:string|null;readonly error?:never}|{readonly ok:false;readonly data:null;readonly error:string};');
   write('apps/web/src/modules/api/read.ts',"import type {Envelope} from './envelope'; export function read(result:Envelope):string|null{if(!result.ok)throw new Error(result.error);return result.data??null;}");
@@ -106,7 +106,7 @@ module.exports=new Proxy(ts,{get:(target,key)=>key==='createProgram'?(...args)=>
       return files.map(filePath=>({filePath,messages:[],suppressedMessages:[],errorCount:0,warningCount:0,fatalErrorCount:0}));},
   }};
   const report=await checkScopedLint(root,[],{profile:'next',profileCatalog,runtime,all:true});
-  // The v2 machine also reports its own findings on this minimal fixture (required files, reachability), so the architecture entry proves it RAN over the program, not that the fixture is v2-clean.
+  // The HFS machine also reports its own findings on this minimal fixture (required files, reachability), so the architecture entry proves it RAN over the program, not that the fixture is HFS-clean.
   assert.deepEqual(report.machineResults.map(item=>[item.obligation??item.kind,item.kind==='architecture'?item.files>0:item.ok]),[['architecture',true],['NAMES',true],['RETURNS',true],['ENVELOPE',true]],JSON.stringify(report.issues));
   assert.equal(beforeLint,1,'architecture, next.mjs twice and next-errors share the one declared project program');
   assert.notEqual(lintPrograms[0],lintPrograms[1],'the run is released before ESLint');

@@ -42,7 +42,7 @@ function fixture(t){
   };
   const manifest={private:true,workspaces:['apps/*'],starci:{codePatterns:{next:{errorState:contract}}}};
   write('package.json',manifest);write('package-lock.json',{lockfileVersion:3});
-  write('hfs.json',{hfs:2,profile:'fe',project:'fixture',apps:[{name:'web',kind:'next'}]});
+  write('hfs.json',{hfs:1,profile:'fe',project:'fixture',apps:[{name:'web',kind:'next'}]});
   write('tsconfig.json',{compilerOptions:{module:'ESNext',moduleResolution:'Bundler',target:'ES2022',strict:true},include:['apps/web/src/**/*.ts']});
   write('vitest.config.ts',`import type {ReadEnvelope} from './apps/web/src/modules/api/envelope';
 export function uncheckedMetadata(value:ReadEnvelope){return value.data}`);

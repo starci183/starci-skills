@@ -1,5 +1,5 @@
 // A canon-conformance slice is granted the relocation destinations its findings need, contested relocations
-// and config files go to ONE canon-wire leg per wave (HFS v2 has no shared registration file: owners are derived
+// and config files go to ONE canon-wire leg per wave (HFS has no shared registration file: owners are derived
 // from knowledge/hfs/slots.yaml, so policy sharedRoots is empty), and a blocked slice is redone from its commit
 // (scripts/kernel/cut-seam.mjs canonCutPlanOf / canonRedispatchOf; modules/kernel/driver-loop.yaml
 // enqueue.cutExecution). nivo wf-nivo-fe-canon-mujek980: op-code.refactor-7e9f7e20c1 (slice 7/34) committed
@@ -46,7 +46,7 @@ test('a relocation finding names the file that moves and the canon homes it may 
   assert.equal(layout.home, `${shells}/Sidebar`);
   assert.ok(layout.destinations.includes(`${SRC}/features/layouts/Sidebar`));
   assert.equal(relocationOf({ ruleId: 'FE_APP_INTERNAL_IMPORT_OUTSIDE_FEATURES', file: route, related: `${shells}/ConsoleLayout/index.tsx` }, relocations), null, 'a retired rule has no relocation entry: a tier violation is not a relocation');
-  assert.deepEqual(canonConformancePolicy().sharedRoots, [], 'HFS v2 has no shared registration file: owners are derived from slots');
+  assert.deepEqual(canonConformancePolicy().sharedRoots, [], 'HFS has no shared registration file: owners are derived from slots');
   assert.equal(relocationOf({ ruleId: 'starci-fe/naming', file: `${SRC}/components/blocks/sales/Handoff/index.tsx` }, relocations), null, 'a finding fixed in place needs no destination');
 });
 

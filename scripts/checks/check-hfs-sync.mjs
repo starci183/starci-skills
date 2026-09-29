@@ -2,7 +2,7 @@
 // check-hfs-sync.mjs - the generated files of a product repository are the ones `hfs sync` renders, and its tracked
 // .starciwork / .starcistacks trees hold no agent output or plaintext secret. The op and land gates run it so a
 // hand-edited husky hook, workflow, .gitignore, sonar-project.properties, codecov.yml or .starciwork/.gitignore is a
-// finding, not a silent divergence (HFS v2 decision 10; packages/hfs/sync).
+// finding, not a silent divergence (HFS decision 10; packages/hfs/sync).
 //
 //   node scripts/checks/check-hfs-sync.mjs --repo <product repo> [--json]
 //

@@ -17,17 +17,17 @@ const ajv = new Ajv2020({ strict: false, allErrors: true, logger: false });
 const validateManifestSchema = ajv.compile(readSchema('hfs-slots.schema.yaml'));
 const validateRepoSchema = ajv.compile(readSchema('hfs-repo.schema.yaml'));
 
-const BE = { hfs: 2, profile: 'be', project: 'nivo', apps: [{ name: 'core', kind: 'api' }, { name: 'worker', kind: 'worker' }, { name: 'migrate', kind: 'migrate' }], optionalSlots: ['be.transport.schedule', 'be.contract.graphql', 'repo.docs'], connections: ['primary', 'agentos'] };
-const FE = { hfs: 2, profile: 'fe', project: 'nivo', apps: [{ name: 'web', kind: 'next' }, { name: 'admin', kind: 'next' }], optionalSlots: ['repo.packages', 'fe.package.ui'] };
+const BE = { hfs: 1, profile: 'be', project: 'nivo', apps: [{ name: 'core', kind: 'api' }, { name: 'worker', kind: 'worker' }, { name: 'migrate', kind: 'migrate' }], optionalSlots: ['be.transport.schedule', 'be.contract.graphql', 'repo.docs'], connections: ['primary', 'agentos'] };
+const FE = { hfs: 1, profile: 'fe', project: 'nivo', apps: [{ name: 'web', kind: 'next' }, { name: 'admin', kind: 'next' }], optionalSlots: ['repo.packages', 'fe.package.ui'] };
 
 const refusal = (fn, code) => assert.throws(fn, (error) => error instanceof HfsSlotsError && error.code === code, `expected ${code}`);
 
-test('the shipped manifest is 2.0.0 and validates against its JSON schema and the loader', () => {
+test('the shipped manifest is 1.0.0 and validates against its JSON schema and the loader', () => {
   const doc = parseYaml(manifestText);
-  assert.equal(doc.version, '2.0.0');
+  assert.equal(doc.version, '1.0.0');
   assert.equal(validateManifestSchema(doc), true, JSON.stringify(validateManifestSchema.errors));
   const manifest = loadSlotManifest();
-  assert.equal(manifest.major, 2);
+  assert.equal(manifest.major, 1);
   for (const slot of manifest.slots) {
     for (const field of ['id', 'profiles', 'path', 'presence', 'tracked', 'tier', 'tests']) assert.notEqual(slot[field], undefined, `${slot.id} lacks ${field}`);
   }
@@ -58,7 +58,7 @@ test('the loader also refuses what only semantics can see', () => {
   refusal(load((d) => { d.slots[0].tier = 'nowhere'; }), 'HFS_MANIFEST_INVALID');
   refusal(load((d) => { d.tiers.be.app.mayImport.push('ghost'); }), 'HFS_MANIFEST_INVALID');
   refusal(load((d) => { d.appKinds.be.push('lambda'); }), 'HFS_MANIFEST_INVALID');
-  refusal(load((d) => { d.schema = 'starci/hfs-slots@3'; }), 'HFS_MANIFEST_INVALID');
+  refusal(load((d) => { d.schema = 'starci/hfs-slots@2'; }), 'HFS_MANIFEST_INVALID');
   refusal(load((d) => { d.slots.find((s) => s.id === 'be.transport.http').requires = ['<nope>.module.ts']; }), 'HFS_MANIFEST_INVALID');
   refusal(load((d) => { d.slots.push({ ...d.slots.find((s) => s.id === 'repo.readme'), id: 'repo.readme-twin' }); }), 'HFS_MANIFEST_INVALID');
 });
@@ -113,16 +113,16 @@ test('readRepoDeclaration reads hfs.json and refuses a missing one (never "unava
 test('a manifest major mismatch is refused, in either direction, with no compatibility window', () => {
   const manifest = loadSlotManifest();
   try {
-    resolveRepoDeclaration(manifest, { ...BE, hfs: 3 });
-    assert.fail('major 3 was accepted by a 2.x manifest');
+    resolveRepoDeclaration(manifest, { ...BE, hfs: 2 });
+    assert.fail('major 2 was accepted by a 1.x manifest');
   } catch (error) {
     assert.equal(error.code, 'HFS_MANIFEST_MAJOR_MISMATCH');
-    assert.deepEqual([error.details.pinned, error.details.manifestMajor], [3, 2]);
+    assert.deepEqual([error.details.pinned, error.details.manifestMajor], [2, 1]);
   }
-  const next = loadSlotManifest({ text: manifestText.replace('schema: starci/hfs-slots@2', 'schema: starci/hfs-slots@3').replace('version: 2.0.0', 'version: 3.0.0') });
-  assert.equal(next.major, 3);
+  const next = loadSlotManifest({ text: manifestText.replace('schema: starci/hfs-slots@1', 'schema: starci/hfs-slots@2').replace('version: 1.0.0', 'version: 2.0.0') });
+  assert.equal(next.major, 2);
   refusal(() => resolveRepoDeclaration(next, BE), 'HFS_MANIFEST_MAJOR_MISMATCH');           // a repository pinned to the old major
-  assert.equal(resolveRepoDeclaration(next, { ...BE, hfs: 3 }).hfs, 3);
+  assert.equal(resolveRepoDeclaration(next, { ...BE, hfs: 2 }).hfs, 2);
 });
 
 test('BE fixture: which slot owns a path', () => {
@@ -289,7 +289,7 @@ test('an unknown path is reported with its nearest slot and HFS_PATH_NO_SLOT', (
 });
 
 test('growth is a minor: adding a slot changes no existing answer; every slot pattern owns its own sample', () => {
-  const grown = loadSlotManifest({ text: manifestText.replace('version: 2.0.0', 'version: 2.1.0').replace('\n# Checks that read this manifest', `
+  const grown = loadSlotManifest({ text: manifestText.replace('version: 1.0.0', 'version: 1.1.0').replace('\n# Checks that read this manifest', `
   - id: be.transport.grpc
     profiles: [be]
     path: "src/features/<feature>/transport/grpc/"
@@ -297,7 +297,7 @@ test('growth is a minor: adding a slot changes no existing answer; every slot pa
     tracked: tracked
     tier: feature
     tests: unit-beside
-    since: 2.1.0
+    since: 1.1.0
 
 # Checks that read this manifest`) });
   assert.equal(grown.minor, 1);

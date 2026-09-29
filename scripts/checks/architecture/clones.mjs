@@ -1,5 +1,5 @@
 /**
- * HFS v2 check 7, duplicate blocks across owners (knowledge/hfs/slots.yaml ruleParams.<profile>.duplicateBlockLines = N):
+ * HFS check 7, duplicate blocks across owners (knowledge/hfs/slots.yaml ruleParams.<profile>.duplicateBlockLines = N):
  * a token-normalised block of at least N source lines that appears in two files of two different owner units is a
  * helper copied instead of shared. Clones inside one owner are that owner's business and are not judged.
  *

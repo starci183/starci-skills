@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// hfs - the HFS v2 command line of a StarCi product repository.
+// hfs - the HFS command line of a StarCi product repository.
 //   hfs check   [--repo <dir>] [--json]     every tracked path has a slot; required files exist; nothing forbidden or
 //                                            tracked-that-must-be-ignored; pins match; soft-size backlog (report only).
 //                                            Exit 1 on any error-level finding.

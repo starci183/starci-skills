@@ -1,6 +1,6 @@
 $schema: https://json-schema.org/draft/2020-12/schema
-$id: urn:starci:hfs-rules:2
-title: HFS v2 rule catalog
+$id: urn:starci:hfs-rules:1
+title: HFS rule catalog
 description: >-
   The shape of knowledge/hfs/rules.yaml. Semantic rules JSON Schema cannot state (ids R01..R<n> in order, a failure code
   named by one rule only, the first failure code is the rule's own code, an existing non-eslint enforcer names its file,
@@ -11,7 +11,7 @@ type: object
 additionalProperties: false
 required: [schema, version, gates, enforcerKinds, rules]
 properties:
-  schema: {const: starci/hfs-rules@2}
+  schema: {const: starci/hfs-rules@1}
   version:
     type: string
     pattern: '^[0-9]+\.[0-9]+\.[0-9]+$'

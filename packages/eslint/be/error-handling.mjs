@@ -1,5 +1,5 @@
 /**
- * The rules that hold HFS v2 errors and their handling (catalog R38 `BE_ERROR_HOME`, R40 `BE_LOGGER_REQUIRED`).
+ * The rules that hold HFS errors and their handling (catalog R38 `BE_ERROR_HOME`, R40 `BE_LOGGER_REQUIRED`).
  *
  * TWO RULES, ONE HABIT: a failure is either named where its owner lives, or it is visible.
  *
@@ -13,7 +13,7 @@
  *     refused. Expected business results are typed unions, not exceptions, and are outside this rule.
  *
  * This file replaces the Academy `AbstractException` laws: those rules pinned a central exception family that
- * HFS v2 no longer has, and a rule that survives its standard as "off" is a rule nobody can trust.
+ * HFS no longer has, and a rule that survives its standard as "off" is a rule nobody can trust.
  */
 import { some, walk } from "./lib/ast.mjs"
 import { isDeclarationFile, isTestLane, normalizePath } from "./lib/path.mjs"
@@ -200,7 +200,7 @@ export const rules = {
     "error-home": errorHome,
 }
 
-/** Both start at error: HFS v2 has no baseline, and the migration lanes clear the debt before a repository adopts them. */
+/** Both start at error: HFS has no baseline, and the migration lanes clear the debt before a repository adopts them. */
 export const recommended = {
     "starci-be/catch-must-account": "error",
     "starci-be/error-home": "error",

@@ -213,7 +213,7 @@ test('init detects a back-end repository, its apps and the opt-in slots its file
   }, { declare: false });
   const preview = initRepo({ repoRoot: dir, write: false });
   assert.deepEqual(preview.declaration, {
-    hfs: 2,
+    hfs: 1,
     profile: 'be',
     project: 'demo',
     apps: [{ name: 'core', kind: 'api' }, { name: 'jobs-worker', kind: 'worker' }],

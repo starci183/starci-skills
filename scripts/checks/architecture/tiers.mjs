@@ -1,5 +1,5 @@
 /**
- * HFS v2 checks 1 and 2 (knowledge/hfs/slots.yaml `tiers`):
+ * HFS checks 1 and 2 (knowledge/hfs/slots.yaml `tiers`):
  *   1. the tier direction matrix: every import, re-export and type-only import between two owners must go from a tier to
  *      a tier its `mayImport` lists (BE_TIER_DIRECTION / FE_TIER_DIRECTION), feature to feature is never in the list,
  *      an app never imports another app (FE_APP_ISOLATION), and a component layer imports only the layers after it;

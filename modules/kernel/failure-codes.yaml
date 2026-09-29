@@ -11830,14 +11830,14 @@ SEALED_FILE_IN_WORK:
   owner: other-op:work.author
   kind: check-finding
 
-# --- HFS v2 rule catalog (knowledge/hfs/rules.yaml): one code per rule, from R01 to R67 ---
+# --- HFS rule catalog (knowledge/hfs/rules.yaml): one code per rule, from R01 to R67 ---
 
 HFS_SLOT_UNDECLARED:
   title: "Every tracked path matches exactly one slot"
   title_vi: "Đường dẫn không thuộc ô nào"
-  meaning_vi: "Tệp `<path>` không thuộc slot nào của HFS v2. Chuyển nó vào slot đúng chủ, hoặc đề xuất slot mới (bump minor) — không thêm ngoại lệ."
+  meaning_vi: "Tệp `<path>` không thuộc slot nào của HFS. Chuyển nó vào slot đúng chủ, hoặc đề xuất slot mới (bump minor) — không thêm ngoại lệ."
   causes_vi:
-    - "Vi phạm luật R01: Mọi path được track phải khớp đúng một slot trong `knowledge/hfs/slots.yaml` (thay allowlist gốc v1)."
+    - "Vi phạm luật R01: Mọi path được track phải khớp đúng một slot trong `knowledge/hfs/slots.yaml` (thay allowlist gốc)."
   nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra; không cần ai can thiệp thêm."
   owner: op-retry
   kind: check-finding
@@ -11998,7 +11998,7 @@ HFS_DUPLICATE_CODE:
   meaning_vi: "Khối code ở `<a>` trùng `<b>` (`<n>` dòng). Đưa về chủ chung (`platform/primitives`, `<domain>.shared.ts`, `packages/*`)."
   causes_vi:
     - "Vi phạm luật R21: Không lặp khối ≥ 8 dòng/≥ 60 token giữa các tệp (jscpd + Sonar CPD); không định nghĩa lại helper cùng tên (`isRecord`, `useSalesAccessToken`…) ở nhiều tệp."
-  nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra và mục của luật trong tiêu chuẩn HFS v2; nợ cũ cần quyết định thiết kế nên op không thêm ngoại lệ, chỉ tách hoặc chuyển về đúng chủ."
+  nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra và mục của luật trong tiêu chuẩn HFS; nợ cũ cần quyết định thiết kế nên op không thêm ngoại lệ, chỉ tách hoặc chuyển về đúng chủ."
   owner: op-retry
   kind: check-finding
 
@@ -12073,7 +12073,7 @@ BE_FEATURE_IMPORTS_FEATURE:
   meaning_vi: "Feature `<a>` import feature `<b>`. Logic dùng chung phải là một capability domain."
   causes_vi:
     - "Vi phạm luật R28: Feature không import feature khác (kể cả qua `index.ts`); dùng chung thì đưa xuống domain."
-  nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra và mục của luật trong tiêu chuẩn HFS v2; nợ cũ cần quyết định thiết kế nên op không thêm ngoại lệ, chỉ tách hoặc chuyển về đúng chủ."
+  nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra và mục của luật trong tiêu chuẩn HFS; nợ cũ cần quyết định thiết kế nên op không thêm ngoại lệ, chỉ tách hoặc chuyển về đúng chủ."
   owner: op-retry
   kind: check-finding
 
@@ -12135,7 +12135,7 @@ BE_INPUT_BOUNDED:
   meaning_vi: "Input `<field>` ở `<file>` không giới hạn độ dài/định dạng."
   causes_vi:
     - "Vi phạm luật R42: Mọi field string của input có giới hạn (`@MaxLength`/scalar có bound); GraphQL có giới hạn depth/complexity; có rate limit ở cửa auth và webhook."
-  nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra và mục của luật trong tiêu chuẩn HFS v2; nợ cũ cần quyết định thiết kế nên op không thêm ngoại lệ, chỉ tách hoặc chuyển về đúng chủ."
+  nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra và mục của luật trong tiêu chuẩn HFS; nợ cũ cần quyết định thiết kế nên op không thêm ngoại lệ, chỉ tách hoặc chuyển về đúng chủ."
   owner: op-retry
   kind: check-finding
 
@@ -12145,7 +12145,7 @@ BE_BACKGROUND_UNOWNED:
   meaning_vi: "`<method>` là việc nền nhưng không có job/consumer nào chạy nó — 'khôi phục bền' này không bao giờ chạy."
   causes_vi:
     - "Vi phạm luật R46: Công việc nền (outbox, sweep, reconcile, retry) là `transport/schedule/*.job.ts` hoặc `transport/message/*.consumer.ts`, được app `worker` compose; method `sweep*\\|deliver*\\|reconcile*` không có job/consumer gọi = đỏ."
-  nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra và mục của luật trong tiêu chuẩn HFS v2; nợ cũ cần quyết định thiết kế nên op không thêm ngoại lệ, chỉ tách hoặc chuyển về đúng chủ."
+  nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra và mục của luật trong tiêu chuẩn HFS; nợ cũ cần quyết định thiết kế nên op không thêm ngoại lệ, chỉ tách hoặc chuyển về đúng chủ."
   owner: op-retry
   kind: check-finding
 
@@ -12175,7 +12175,7 @@ FE_TRANSPORT_OWNER:
   meaning_vi: "`fetch` ở `<file>` ngoài `modules/api/client.ts` (hoặc state dùng chung dạng `let`)."
   causes_vi:
     - "Vi phạm luật R50: Mỗi app đúng một `fetch` ở `modules/api/client.ts`, có timeout + `AbortSignal`; không singleton `let` giữ token/locale; credential truyền bằng tham số/context."
-  nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra và mục của luật trong tiêu chuẩn HFS v2; nợ cũ cần quyết định thiết kế nên op không thêm ngoại lệ, chỉ tách hoặc chuyển về đúng chủ."
+  nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra và mục của luật trong tiêu chuẩn HFS; nợ cũ cần quyết định thiết kế nên op không thêm ngoại lệ, chỉ tách hoặc chuyển về đúng chủ."
   owner: op-retry
   kind: check-finding
 
@@ -12185,7 +12185,7 @@ FE_HTTP_STATUS_COLLAPSE:
   meaning_vi: "`<file>` gộp mọi mã HTTP thành một nhánh. 401/403 phải thành `refused`."
   causes_vi:
     - "Vi phạm luật R51: Client trả `Outcome<T>` duy nhất (`ok`/`refused`/`invalid`/`not-found`/`unavailable`); 401/403 → `refused`; cấm `if (!response.ok) return null`; không trả nguyên văn lỗi server làm `reason`."
-  nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra và mục của luật trong tiêu chuẩn HFS v2; nợ cũ cần quyết định thiết kế nên op không thêm ngoại lệ, chỉ tách hoặc chuyển về đúng chủ."
+  nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra và mục của luật trong tiêu chuẩn HFS; nợ cũ cần quyết định thiết kế nên op không thêm ngoại lệ, chỉ tách hoặc chuyển về đúng chủ."
   owner: op-retry
   kind: check-finding
 
@@ -12195,7 +12195,7 @@ FE_WIRE_GENERATED:
   meaning_vi: "`<file>` tự gõ kiểu wire/ép kiểu phản hồi. Dùng kiểu sinh từ `contract/`."
   causes_vi:
     - "Vi phạm luật R52: Kiểu wire sinh từ bản hợp đồng (`codegen`); tài liệu GraphQL trong `.graphql`; cấm `as GraphqlResult<T>`; enum wire không phải `string`."
-  nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra và mục của luật trong tiêu chuẩn HFS v2; nợ cũ cần quyết định thiết kế nên op không thêm ngoại lệ, chỉ tách hoặc chuyển về đúng chủ."
+  nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra và mục của luật trong tiêu chuẩn HFS; nợ cũ cần quyết định thiết kế nên op không thêm ngoại lệ, chỉ tách hoặc chuyển về đúng chủ."
   owner: op-retry
   kind: check-finding
 
@@ -12289,7 +12289,7 @@ FE_NATIVE_FORM_CONTROL:
   meaning_vi: "`<tag>` thô ở `<file>`. Dùng renderer của grammar."
   causes_vi:
     - "Vi phạm luật R62: Không `<select>/<input>/<textarea>/<button>` thô ở tầng sản phẩm; dùng renderer grammar."
-  nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra và mục của luật trong tiêu chuẩn HFS v2; nợ cũ cần quyết định thiết kế nên op không thêm ngoại lệ, chỉ tách hoặc chuyển về đúng chủ."
+  nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra và mục của luật trong tiêu chuẩn HFS; nợ cũ cần quyết định thiết kế nên op không thêm ngoại lệ, chỉ tách hoặc chuyển về đúng chủ."
   owner: op-retry
   kind: check-finding
 
@@ -12299,7 +12299,7 @@ FE_PACKAGE_SHAPE:
   meaning_vi: "Package `<p>` export source chưa build (hoặc `export *`, hoặc unit không ai dùng)."
   causes_vi:
     - "Vi phạm luật R63: `packages/*` build ra `dist`, `exports` tường minh, không `export *`, không unit chết; package UI chỉ chứa composites/branches/leaves + CSS token của family."
-  nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra và mục của luật trong tiêu chuẩn HFS v2; nợ cũ cần quyết định thiết kế nên op không thêm ngoại lệ, chỉ tách hoặc chuyển về đúng chủ."
+  nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra và mục của luật trong tiêu chuẩn HFS; nợ cũ cần quyết định thiết kế nên op không thêm ngoại lệ, chỉ tách hoặc chuyển về đúng chủ."
   owner: op-retry
   kind: check-finding
 
@@ -12320,7 +12320,7 @@ FE_SIZE_AND_STATE_BUDGET:
   meaning_vi: "`<unit>` có `<n>` hook dữ liệu / `<m>` useState / vòng poll tự viết."
   causes_vi:
     - "Vi phạm luật R65: Component ≤ 300 dòng, connected unit ≤ 6 hook dữ liệu và ≤ 6 `useState`; không vòng polling tự viết; một cơ chế làm tươi mỗi resource. (Phần kích thước dùng `HFS_SIZE_GROWTH`.)"
-  nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra và mục của luật trong tiêu chuẩn HFS v2; nợ cũ cần quyết định thiết kế nên op không thêm ngoại lệ, chỉ tách hoặc chuyển về đúng chủ."
+  nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra và mục của luật trong tiêu chuẩn HFS; nợ cũ cần quyết định thiết kế nên op không thêm ngoại lệ, chỉ tách hoặc chuyển về đúng chủ."
   owner: op-retry
   kind: check-finding
 
@@ -12340,12 +12340,12 @@ FE_SPEC_QUALITY:
   meaning_vi: "Spec `<file>` vi phạm chất lượng spec của HFS: `<what>` (ghim chuỗi class, không chỉ test chủ thể bên cạnh, spec cho barrel, ép kiểu qua unknown, hoặc màn connected thiếu assert axe)."
   causes_vi:
     - "Vi phạm luật R67: Không pin chuỗi class trong spec component; spec chỉ test đúng chủ thể bên cạnh; không spec cho barrel; không `as unknown as`; mỗi màn connected có một assert axe."
-  nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra và mục của luật trong tiêu chuẩn HFS v2; nợ cũ cần quyết định thiết kế nên op không thêm ngoại lệ, chỉ tách hoặc chuyển về đúng chủ."
+  nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra và mục của luật trong tiêu chuẩn HFS; nợ cũ cần quyết định thiết kế nên op không thêm ngoại lệ, chỉ tách hoặc chuyển về đúng chủ."
   owner: op-retry
   kind: check-finding
 
 FE_NEXT_CONVENTIONS:
-  title: "A Next convention of HFS v2 is broken"
+  title: "A Next convention of HFS is broken"
   title_vi: "Vi phạm quy ước Next của HFS"
   meaning_vi: "Một tệp dùng tên hoặc cách viết cũ của Next: middleware thay vì proxy.ts (từ Next 16), thiếu generateMetadata trên page, turbopack.root sai, hoặc dev và build dùng hai bundler khác nhau. Đây là kiểm tra con của R54 và R02."
   causes_vi:

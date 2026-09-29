@@ -1,5 +1,5 @@
 /**
- * The Vietnamese "why" of each rule the HFS v2 catalogue assigns to this canon.
+ * The Vietnamese "why" of each rule the HFS catalogue assigns to this canon.
  *
  * WHERE IT IS SURFACED. An ESLint message is written for the developer at the terminal, in English,
  * and says what is wrong in the vocabulary of the rule. The agent that reads a failed land gate needs

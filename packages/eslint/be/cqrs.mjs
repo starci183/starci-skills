@@ -159,7 +159,7 @@ export const rules = {
  * 2 of 138 messages carried more than `params`; both were burned down), so both are `error`.
  *
  * The twin-spec count rule and the encoded-failure rule are gone. Test selection follows behavior and
- * risk, not a filename count; and HFS v2 returns an expected refusal as a typed outcome union, so a
+ * risk, not a filename count; and HFS returns an expected refusal as a typed outcome union, so a
  * handler that returns `{ success: false }` is no longer a defect this canon can call by shape.
  */
 export const recommended = {

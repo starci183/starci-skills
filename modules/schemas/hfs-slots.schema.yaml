@@ -1,6 +1,6 @@
 $schema: https://json-schema.org/draft/2020-12/schema
-$id: urn:starci:hfs-slots:2
-title: HFS v2 slot manifest
+$id: urn:starci:hfs-slots:1
+title: HFS slot manifest
 description: >-
   The shape of knowledge/hfs/slots.yaml. Semantic rules JSON Schema cannot state (unique ids, every tier named by a
   slot or mayImport exists in the profile, a retired slot has a successor, an app-kind slot names a declared kind)
@@ -9,7 +9,7 @@ type: object
 additionalProperties: false
 required: [schema, version, versioning, presenceValues, trackedValues, testValues, appKinds, tiers, ruleParams, slots]
 properties:
-  schema: {const: starci/hfs-slots@2}
+  schema: {const: starci/hfs-slots@1}
   version:
     type: string
     pattern: '^[0-9]+\.[0-9]+\.[0-9]+$'

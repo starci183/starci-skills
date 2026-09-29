@@ -2,7 +2,7 @@ schema: starci/knowledge-source@1
 id: repo.index
 title: Repository patterns
 purpose: |-
-  Read knowledge/hfs/README.md (HFS v2) first. These topics state the repository-level law: the root map and storage states,
+  Read knowledge/hfs/README.md (HFS) first. These topics state the repository-level law: the root map and storage states,
   the backend-only `.starciwork` and `.starcistacks`, sealed secrets, shared tooling, the formatter, version pins and size
   budgets. Each rule cites the HFS rule ids it implements (hfsRules) and the finding codes that judge it
   (verification.automated). The backend and frontend source rules inside the tree are in patterns/be and patterns/fe.

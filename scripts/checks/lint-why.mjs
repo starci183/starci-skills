@@ -1,10 +1,10 @@
 // lint-why.mjs - the why code of a back-end canon lint rule.
 //
 // A finding of the code-pattern gate that comes from an ESLint rule of @starci/eslint-canon-be carries the
-// catalogued why code of the HFS v2 rule that owns it (modules/kernel/failure-codes.yaml: title_vi, meaning_vi,
+// catalogued why code of the HFS rule that owns it (modules/kernel/failure-codes.yaml: title_vi, meaning_vi,
 // causes_vi, nextStep_vi), so the agent reads the Vietnamese reason and the next step and not only the rule id.
 // The map is the single place that ties a lint rule id to a catalogue code; tests/lint-why.spec.mjs proves every
-// mapped rule exists in the plugin, every mapped code is in the catalogue, and every HFS v2 rule is mapped.
+// mapped rule exists in the plugin, every mapped code is in the catalogue, and every HFS rule is mapped.
 
 /** Lint rule id -> catalogued why code. Several rules of one HFS rule (R41, R45) share its code. */
 export const LINT_WHY = Object.freeze({

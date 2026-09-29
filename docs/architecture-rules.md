@@ -1,6 +1,6 @@
 # Common architecture rules
 
-These are the shared rules for StarCi projects: TypeScript, Next.js frontend and NestJS backend, under HFS v2 ([the standard](../knowledge/hfs/README.md)) and enterprise design obligations. This is a fixed technology family, not a framework-selection system. The rules fix responsibilities, dependency direction, authority, state and effect invariants. Nest/Next profiles supply concrete code forms inside the one repository topology (`knowledge/hfs/README.md`, `knowledge/patterns/repo/folder.yaml`); that topology fixes the source roots, not per-project mapping. Neither an example nor a historical reference file count can add a mandatory layer.
+These are the shared rules for StarCi projects: TypeScript, Next.js frontend and NestJS backend, under HFS ([the standard](../knowledge/hfs/README.md)) and enterprise design obligations. This is a fixed technology family, not a framework-selection system. The rules fix responsibilities, dependency direction, authority, state and effect invariants. Nest/Next profiles supply concrete code forms inside the one repository topology (`knowledge/hfs/README.md`, `knowledge/patterns/repo/folder.yaml`); that topology fixes the source roots, not per-project mapping. Neither an example nor a historical reference file count can add a mandatory layer.
 
 ## Authority and load order
 

@@ -1,5 +1,5 @@
 /**
- * The rules that hold HFS v2 configuration and secrets (catalog R43 `BE_CONFIG_OWNER`, R44 `BE_SECRET_DEFAULT`,
+ * The rules that hold HFS configuration and secrets (catalog R43 `BE_CONFIG_OWNER`, R44 `BE_SECRET_DEFAULT`,
  * and the secret-comparison half of R41 `BE_DEFAULT_DENY`).
  *
  *   - `no-direct-env-read` keeps `process.env` inside `platform/config`. Everything else receives typed options

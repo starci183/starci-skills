@@ -35,7 +35,7 @@ function fixture(t,obligations){
   link('typescript');writeHfsTree(root,'frontend');
   const manifest={private:true,workspaces:['apps/*']};
   write('package.json',manifest);write('package-lock.json',{lockfileVersion:3});
-  write('hfs.json',{hfs:2,profile:'fe',project:'fixture',apps:[{name:'web',kind:'next'}]});
+  write('hfs.json',{hfs:1,profile:'fe',project:'fixture',apps:[{name:'web',kind:'next'}]});
   write('tsconfig.json',{compilerOptions:{module:'ESNext',moduleResolution:'Bundler',target:'ES2022',strict:true},include:['apps/web/src/**/*.ts']});
   const profileCatalog={schema:'starci/code-pattern-profile@1',profiles:{next:{
     title:'Next adapter integration',canon:{package:'@starci/eslint-canon-fe',version:'1.0.0',contentDigest:{algorithm:'sha256',include:['**/*.mjs'],exclude:[],framing:'sorted-posix-relative-path-null-raw-bytes-null',value:digest,files:1}},

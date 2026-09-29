@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { archFixture, runArch, findings } from './_hfs-arch-fixture.mjs';
 
-// HFS v2 check 4: an export of an owner's public entry that no production file outside the owner imports is dead
+// HFS check 4: an export of an owner's public entry that no production file outside the owner imports is dead
 // (HFS_UNUSED_EXPORT). Specs are not part of the graph, so an export used only by a spec is dead on purpose.
 
 const dead = (report, entry) => findings(report, 'HFS_UNUSED_EXPORT').filter(item => item.path === entry).map(item => item.name).sort();

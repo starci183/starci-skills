@@ -5,7 +5,7 @@ import path from 'node:path';
 import { execFileSync } from 'node:child_process';
 import { archFixture, findings, gitCommit, runArch } from './_hfs-arch-fixture.mjs';
 
-// HFS v2 check 6 (HFS_SIZE_GROWTH): ruleParams.be.fileLines.soft is 500 in the shipped manifest.
+// HFS check 6 (HFS_SIZE_GROWTH): ruleParams.be.fileLines.soft is 500 in the shipped manifest.
 const BIG = 'src/modules/domain/alpha/alpha.service.ts';
 const lines = (count, tag = 'a') => `${Array.from({ length: count }, (_, i) => `export const ${tag}${i} = ${i};`).join('\n')}\n`;
 

@@ -2,7 +2,7 @@ schema: starci/knowledge-source@1
 id: fe.folder
 title: Folder
 purpose: |
-  Given a piece of frontend code, which directory and which file name does it get? Apply the HFS v2 frontend tree
+  Given a piece of frontend code, which directory and which file name does it get? Apply the HFS frontend tree
   (knowledge/hfs/README.md section 6, slots fe.*).
 appliesTo:
   - frontend
@@ -35,7 +35,7 @@ rules:
       source root (the directory holding app/) are the framework-pinned root files listed in frameworkPinnedRootFiles
       below: Next.js loads them from that exact place. Each is a thin framework adapter whose internal imports enter
       modules or a feature public entry only; every other rule still applies to it, except that the export names the
-      framework mandates there (frameworkPinnedRootExports) keep their framework spelling. HFS v2 uses proxy.ts for locale
+      framework mandates there (frameworkPinnedRootExports) keep their framework spelling. HFS uses proxy.ts for locale
       routing; a middleware.* file is refused on Next 16 and later by the Next conventions check and the slot
       fe.source-root-pinned, even though the machine list names it as a file Next loads. Any other file at the source
       root, including a helper folder beside a pinned file, has no owner and is refused.

@@ -2,7 +2,7 @@ schema: starci/knowledge-source@1
 id: repo.folder
 title: Repository folder
 purpose: |
-  The one standard repository tree (HFS v2) for every StarCi repository: which entries the repository root may carry, where
+  The one standard repository tree (HFS) for every StarCi repository: which entries the repository root may carry, where
   application source lives, which roots are backend-only, what is ignored, what may not exist in the working tree at all, and
   the one package manager. knowledge/hfs/README.md section 4 draws the same map; knowledge/hfs/slots.yaml is the machine form;
   the BE and FE pattern topics own the source rules inside it.

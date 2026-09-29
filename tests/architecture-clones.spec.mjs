@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { archFixture, findings, runArch } from './_hfs-arch-fixture.mjs';
 
-// HFS v2 check 7 (HFS_DUPLICATE_BLOCK): ruleParams.<profile>.duplicateBlockLines is 25 in the shipped manifest.
+// HFS check 7 (HFS_DUPLICATE_BLOCK): ruleParams.<profile>.duplicateBlockLines is 25 in the shipped manifest.
 const A = 'src/modules/domain/alpha/alpha.service.ts';
 const B = 'src/modules/domain/beta/beta.service.ts';
 const A2 = 'src/modules/domain/alpha/alpha.contracts.ts';

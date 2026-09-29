@@ -121,6 +121,8 @@ Also: `node scripts/reconciler/boot.mjs --status`, `node scripts/reconciler/star
   deletes through junctions; the live node_modules was emptied twice on 2026-09-29).
 - Live databases are read-only except through their runtime writers (`engine/ledger-db.mjs`, `engine/machine-db.mjs`);
   never edit `machine.sqlite` or a `runtime.sqlite` by hand.
+- A standard, schema or rule set that has not been released is unversioned or version 1 in the runtime; never label runtime
+  content as a second version before a first one has shipped (owner ruling 2026-09-29).
 - Never push, never `--no-verify`, never rewrite landed history. The lane does not land; the lead lands.
 - Report outcomes truthfully: what ran, its exit code and counts, what did not run and why.
 

@@ -1,5 +1,5 @@
 /**
- * The rules that hold the transport half of HFS v2 default-deny (catalog R41 `BE_DEFAULT_DENY`).
+ * The rules that hold the transport half of HFS default-deny (catalog R41 `BE_DEFAULT_DENY`).
  *
  * Every route needs a signed-in principal unless it says otherwise, and every body has a type:
  *

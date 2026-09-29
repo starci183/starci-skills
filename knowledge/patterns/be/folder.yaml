@@ -2,7 +2,7 @@ schema: starci/knowledge-source@1
 id: be.folder
 title: Backend folder
 purpose: |-
-  Given backend code, which directory does it live in? Apply the HFS v2 backend tree. Read knowledge/hfs/README.md
+  Given backend code, which directory does it live in? Apply the HFS backend tree. Read knowledge/hfs/README.md
   section 5 for the tree and docs/backend-source-pattern.md for the code forms.
 appliesTo:
   - backend

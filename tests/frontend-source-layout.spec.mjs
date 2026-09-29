@@ -33,7 +33,7 @@ function fixture(t,files){
   write('apps/web/next.config.ts','export default {};\n');
   write('apps/web/postcss.config.mjs','export default {};\n');
   write('apps/web/tsconfig.json',JSON.stringify({extends:'../../tsconfig.json',include:['src/**/*']}));
-  write('hfs.json',JSON.stringify({hfs:2,profile:'fe',project:'fixture',apps:[{name:'web',kind:'next'}]},null,2));
+  write('hfs.json',JSON.stringify({hfs:1,profile:'fe',project:'fixture',apps:[{name:'web',kind:'next'}]},null,2));
   write('tsconfig.json',JSON.stringify({compilerOptions:{target:'ES2022',module:'ESNext',moduleResolution:'Bundler',jsx:'preserve',baseUrl:'.',paths:{'@/*':['apps/web/src/*']},noEmit:true},include:['apps/web/src/**/*']},null,2));
   for(const [relative,value] of Object.entries(files))write(relative,value);
   execFileSync('git',['init','-q'],{cwd:root});
@@ -57,7 +57,7 @@ const acceptedFiles={
 
 test('accepted Next layout keeps app on feature entries and connected blocks on sibling render owners',t=>{
   const result=fixture(t,acceptedFiles).check();
-  // The v2 machine also emits its own findings (reachability, required files, ...); this spec judges the layout rules.
+  // The HFS machine also emits its own findings (reachability, required files, ...); this spec judges the layout rules.
   assert.deepEqual(result.errors,[],JSON.stringify(result.errors));
   const layoutRules=['FE_SOURCE_LAYOUT_INVALID',
     'FE_CONNECTED_BLOCK_RENDER_PAIR','FE_COMPONENT_WORLD_OWNERSHIP','FE_BLOCK_PRODUCT_HOOK_DEFINITION','FE_CUSTOM_HOOK_LOCATION'];

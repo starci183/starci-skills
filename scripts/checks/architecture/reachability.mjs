@@ -1,5 +1,5 @@
 /**
- * HFS v2 check 3, reachability (knowledge/hfs/slots.yaml rules BE_FEATURE_NOT_COMPOSED, FE_OWNER_REACHABLE):
+ * HFS check 3, reachability (knowledge/hfs/slots.yaml rules BE_FEATURE_NOT_COMPOSED, FE_OWNER_REACHABLE):
  *   BE  every feature owner (be.feature) and every capability owner (be.domain, be.integrations, be.platform) must be
  *       composed into an app root: reachable from an app entry file (apps/<app>/src, the be.app.* owners) through runtime
  *       imports and re-exports. A type-only import composes nothing. A module reached only through a reached module

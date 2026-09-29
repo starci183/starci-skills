@@ -1,6 +1,6 @@
-# StarCi HFS v2 - the one source and storage standard
+# StarCi HFS - the one source and storage standard
 
-HFS v2 is the single standard for the tree, the source ownership, the storage and the
+HFS is the single standard for the tree, the source ownership, the storage and the
 shared tooling of every StarCi product repository, backend and frontend, and of `.claude` itself and every example
 under `examples/`. This file is the canonical statement. Where another runtime document disagrees with it, this file
 wins and the other document is wrong.
@@ -50,7 +50,7 @@ optionally a `tier`, `requires`, `allows`, `forbids`, `tests`, `budget`, `manage
 - **Major**: change or remove a slot, make an optional slot required, raise a rule from `warn` to `error`, change the
   direction matrix. It needs owner approval and one migration lane per repository.
 - A retired slot gets `retiredIn` and a successor id; afterwards a path matching it is `HFS_SLOT_RETIRED`.
-- A repository pins only the major (`"hfs": 2`) and always runs the newest minor of that major.
+- A repository pins only the major (`"hfs": 1`) and always runs the newest minor of that major.
 
 ### 2.2 Adding something without breaking HFS
 
@@ -73,7 +73,7 @@ The only file a repository adds. It declares the profile, the project binding, t
 
 ```json
 {
-  "hfs": 2,
+  "hfs": 1,
   "profile": "be",
   "project": "nivo",
   "apps": [
@@ -355,7 +355,7 @@ e2e/<area>/*.e2e-spec.ts              plus e2e/{support,fixtures}/, playwright.c
 
 A rule's gates are data in `rules.yaml`; adding a rule to a gate edits the manifest, not a repository.
 
-## 11. Done for a repository on v2
+## 11. Done for a repository
 
 1. `hfs check` has zero findings for every rule at the pinned version, and CI runs it.
 2. The composition spec of every app boots the real `AppModule` and is green.

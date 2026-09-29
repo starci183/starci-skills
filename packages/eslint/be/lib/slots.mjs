@@ -1,5 +1,5 @@
 /**
- * The adapter between the HFS v2 slot manifest (`knowledge/hfs/slots.yaml`) and the lint rules that need a
+ * The adapter between the HFS slot manifest (`knowledge/hfs/slots.yaml`) and the lint rules that need a
  * number or a list the manifest owns: which platform capabilities may be `@Global()`, how long a source
  * file may be, how many names a public `index.ts` may export.
  *

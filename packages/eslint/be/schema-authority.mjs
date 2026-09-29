@@ -1,5 +1,5 @@
 /**
- * The rules that hold HFS v2 schema authority and the persistence boundary (catalog R34, R36, R37).
+ * The rules that hold HFS schema authority and the persistence boundary (catalog R34, R36, R37).
  *
  * The schema changes by migration and by nothing else, and the SQL that touches it lives in one place:
  *
@@ -139,7 +139,7 @@ export const rules = {
     "no-entity-in-contract": noEntityInContract,
 }
 
-/** All three start at error: HFS v2 keeps no baseline and the schema migration lanes clear the debt first. */
+/** All three start at error: HFS keeps no baseline and the schema migration lanes clear the debt first. */
 export const recommended = {
     "starci-be/no-runtime-schema": "error",
     "starci-be/sql-only-in-repository": "error",

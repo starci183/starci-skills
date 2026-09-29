@@ -490,7 +490,7 @@ policy:
     # scripts/kernel/cut-seam.mjs canonCutPlanOf reads these: the relocation a finding needs (the file
     # that moves - the finding's own file or its related import target - lands in <src>/<into>/<Owner>; the
     # role is the folder under src) is GRANTED to the slice at enqueue unless a sibling holds it.
-    # sharedRoots is empty: HFS v2 has no shared registration file (owners are derived from slots);
+    # sharedRoots is empty: HFS has no shared registration file (owners are derived from slots);
     # config files and contested relocations belong to the wave's ONE canon-wire leg, never to a slice.
     relocations:
       FE_SOURCE_LAYOUT_INVALID:

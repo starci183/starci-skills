@@ -3,7 +3,7 @@ id: starci/canon-pins@1
 title: Canon dependency pins
 description: >-
   The exact version of every dependency a product repository must pin, one version per dependency for the whole
-  StarCi family (HFS v2 decision 10 and K18). A pin is an exact semver, never a range: `^`, `~`, `>=`, `x` and
+  StarCi family (HFS decision 10 and K18). A pin is an exact semver, never a range: `^`, `~`, `>=`, `x` and
   dist-tags are refused. A `@starci/*` pin names its `source`, the package.json inside this runtime whose version
   it must equal, so a package cannot be bumped without the pin moving in the same change. The document is data
   read by scripts/checks/check-canon-pins.mjs and by the `starci link` installer; it grants no authority to edit a

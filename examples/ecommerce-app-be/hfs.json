@@ -1,5 +1,5 @@
 {
-  "hfs": 2,
+  "hfs": 1,
   "profile": "be",
   "project": "ecommerce-app-be",
   "optionalSlots": ["repo.docs"],

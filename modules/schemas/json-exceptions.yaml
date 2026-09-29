@@ -30,7 +30,7 @@ exceptions:
       npm package manifest inside the ecommerce-app-be project; the npm toolchain requires JSON.
   - path: examples/ecommerce-app-be/hfs.json
     reason: >
-      HFS v2 repository declaration (modules/schemas/hfs-repo.schema.yaml) for the ecommerce-app-be example; the architecture machine reads hfs.json as JSON.
+      HFS repository declaration (modules/schemas/hfs-repo.schema.yaml) for the ecommerce-app-be example; the architecture machine reads hfs.json as JSON.
   - path: examples/ecommerce-app-be/nest-cli.json
     reason: >
       Nest CLI monorepo map inside the ecommerce-app-be project; the nest toolchain reads JSON.
@@ -62,7 +62,7 @@ exceptions:
       TypeScript toolchain config inside the ecommerce-app-fe project; tsc reads JSON (with comments).
   - path: examples/ecommerce-app-fe/hfs.json
     reason: >
-      HFS v2 repository declaration (modules/schemas/hfs-repo.schema.yaml) for the ecommerce-app-fe example; the architecture machine reads hfs.json as JSON.
+      HFS repository declaration (modules/schemas/hfs-repo.schema.yaml) for the ecommerce-app-fe example; the architecture machine reads hfs.json as JSON.
   - path: examples/ecommerce-app-fe/e2e/tsconfig.json
     reason: >
       TypeScript toolchain config for the ecommerce-app-fe Playwright harness; tsc reads JSON (with comments).
@@ -95,7 +95,7 @@ exceptions:
     reason: TypeScript config for the shape-slot example app; tsc requires JSON.
   - path: examples/shape-slot/hfs.json
     reason: >
-      HFS v2 repository declaration (modules/schemas/hfs-repo.schema.yaml) for the shape-slot example; the architecture machine reads hfs.json as JSON.
+      HFS repository declaration (modules/schemas/hfs-repo.schema.yaml) for the shape-slot example; the architecture machine reads hfs.json as JSON.
   - path: examples/shape-slot/package-lock.json
     reason: npm lockfile for the shape-slot example; the npm toolchain requires JSON.
   - path: examples/shape-slot/package.json
@@ -121,7 +121,7 @@ exceptions:
       Captured grammar review asset for the ui list feature; JSON is the reviewer output format.
   - path: examples/todo-app-backend/hfs.json
     reason: >
-      HFS v2 repository declaration (modules/schemas/hfs-repo.schema.yaml) for the todo-app-backend example; the architecture machine reads hfs.json as JSON.
+      HFS repository declaration (modules/schemas/hfs-repo.schema.yaml) for the todo-app-backend example; the architecture machine reads hfs.json as JSON.
   - path: examples/todo-app-backend/nest-cli.json
     reason: Nest CLI configuration for the real todo-app-backend example; the nest toolchain reads JSON.
   - path: examples/todo-app-backend/package-lock.json
@@ -146,7 +146,7 @@ exceptions:
     reason: TypeScript project config for the todo frontend app; tsc expects a JSON tsconfig file.
   - path: examples/todo-app-frontend/hfs.json
     reason: >
-      HFS v2 repository declaration (modules/schemas/hfs-repo.schema.yaml) for the todo-app-frontend example; the architecture machine reads hfs.json as JSON.
+      HFS repository declaration (modules/schemas/hfs-repo.schema.yaml) for the todo-app-frontend example; the architecture machine reads hfs.json as JSON.
   - path: examples/todo-app-frontend/package-lock.json
     reason: npm lockfile for the real todo-app-frontend example; package managers require JSON filename and syntax.
   - path: examples/todo-app-frontend/package.json

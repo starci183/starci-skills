@@ -47,7 +47,7 @@ function fixture(t, { source, contract = lifecycleContract(), extra = {}, versio
   };
   const files = {
     'package.json': `${JSON.stringify(manifest, null, 2)}\n`,
-    'hfs.json': `${JSON.stringify({ hfs: 2, profile: 'fe', project: 'fixture', apps: [{ name: 'web', kind: 'next' }] }, null, 2)}
+    'hfs.json': `${JSON.stringify({ hfs: 1, profile: 'fe', project: 'fixture', apps: [{ name: 'web', kind: 'next' }] }, null, 2)}
 `,
     'tsconfig.json': JSON.stringify({ compilerOptions: { target: 'ES2022', module: 'ESNext', moduleResolution: 'Bundler', strict: true,
       jsx: 'react-jsx', skipLibCheck: true, noEmit: true }, include: ['src/**/*'] }),

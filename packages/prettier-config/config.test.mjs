@@ -5,7 +5,7 @@ import { createRequire } from 'node:module';
 const require = createRequire(import.meta.url);
 const config = require('./index.cjs');
 
-test('the config is the approved dialect (HFS v2 decision 10, K22)', () => {
+test('the config is the approved dialect (HFS decision 10, K22)', () => {
   assert.equal(config.printWidth, 120);
   assert.equal(config.tabWidth, 4);
   assert.equal(config.useTabs, false);

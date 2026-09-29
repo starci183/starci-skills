@@ -15,7 +15,7 @@ function fixture(t, files, contract = {}) {
   };
   const boundary = { schema: 'starci/nest-boundary-contract@1', envParsers: [], cacheOwners: [], jestLifecycleEntries: [], ...contract };
   write('package.json', { private: true, starci: { codePatterns: { nest: { boundaries: boundary } } } });
-  write('hfs.json', { hfs: 2, profile: 'be', project: 'fixture', apps: [{ name: 'core', kind: 'api' }] });
+  write('hfs.json', { hfs: 1, profile: 'be', project: 'fixture', apps: [{ name: 'core', kind: 'api' }] });
   write('tsconfig.json', { compilerOptions: { target: 'ES2022', module: 'ESNext', moduleResolution: 'Bundler', baseUrl: '.', paths: { '@modules/*': ['src/modules/*'] } }, include: ['src/**/*.ts'] });
   for (const [file, content] of Object.entries(files)) write(file, content);
   fs.mkdirSync(path.join(root, 'node_modules'), { recursive: true });

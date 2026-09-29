@@ -1,4 +1,4 @@
-// Hermetic repositories for the HFS v2 architecture machine specs: a temp git repo with hfs.json, a root tsconfig and the
+// Hermetic repositories for the HFS architecture machine specs: a temp git repo with hfs.json, a root tsconfig and the
 // files a spec lists, judged by checkArchitecture with the injected TypeScript compiler. No architecture.json exists any
 // more; the declaration is hfs.json (modules/schemas/hfs-repo.schema.yaml), the direction matrix and slots are
 // knowledge/hfs/slots.yaml.
@@ -43,7 +43,7 @@ export function archFixture(t, { profile = 'be', files = {}, declaration = {}, a
     ? apps.slice(1).map(other => [`apps/${other.name}/package.json`, JSON.stringify({ name: `@fixture/${other.name}`, private: true })]) : []);
   const baseline = {
     ...extraApps,
-    'hfs.json': `${JSON.stringify({ hfs: 2, profile, project: 'fixture', apps, ...declaration }, null, 2)}\n`,
+    'hfs.json': `${JSON.stringify({ hfs: 1, profile, project: 'fixture', apps, ...declaration }, null, 2)}\n`,
     'package.json': JSON.stringify(profile === 'fe' ? { name: 'fixture-fe', private: true, workspaces: ['apps/*'] } : { name: 'fixture-be', private: true }),
     'tsconfig.json': `${JSON.stringify({
       compilerOptions: { target: 'ES2022', module: 'ESNext', moduleResolution: 'Bundler', jsx: 'preserve', allowJs: true, skipLibCheck: true, noEmit: true, experimentalDecorators: true },

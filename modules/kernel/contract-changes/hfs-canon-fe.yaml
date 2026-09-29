@@ -1,7 +1,7 @@
-id: hfs2-canon-fe
+id: hfs-canon-fe
 effectiveAt: '2026-09-29T23:30:00+07:00'
 summary: >-
-  HFS v2 Phase 0 item 0.6: @starci/eslint-canon-fe 5.0.0. The vn-ok pragma and the rules no-second-language-in-source
+  HFS Phase 0 item 0.6: @starci/eslint-canon-fe 5.0.0. The vn-ok pragma and the rules no-second-language-in-source
   and no-hardcoded-copy-in-vocabulary are removed (no-hardcoded-copy replaces both: no literal copy at any tier, no
   suppression marker); starciFeConfig({ layout }) enables every rule and the React Hooks rules at error; new rules for
   R49-R52, R55, R56, R58, R62, R65-R67 and the Next conventions. knowledge/hfs/canon-pins.yaml moves the fe pin to 5.0.0
@@ -10,7 +10,7 @@ summary: >-
   pattern text no longer names the retired rule.
 reach: new-legs
 paths:
-  - modules/kernel/contract-changes/hfs2-canon-fe.yaml
+  - modules/kernel/contract-changes/hfs-canon-fe.yaml
   - modules/models/code-patterns.yaml
   - knowledge/hfs/canon-pins.yaml
   - knowledge/patterns/fe/comment.yaml

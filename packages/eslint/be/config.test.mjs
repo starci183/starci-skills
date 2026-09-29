@@ -5,7 +5,7 @@
  *
  * The failures worth catching: a rule published switched off (a rule the standard no longer holds is deleted, so
  * an `off` is a rule that looks adopted and is not), a repository block that ends up with no rules and lints
- * green, a `warn` that survives into a zero-warning gate, and the two public-surface rules HFS v2 once had to
+ * green, a `warn` that survives into a zero-warning gate, and the two public-surface rules HFS once had to
  * switch off drifting back out of the block.
  */
 import assert from "node:assert/strict"

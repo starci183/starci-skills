@@ -40,7 +40,7 @@ export default [
 ```
 
 It states `warn` as `error` for a zero-warning gate, applies
-`noInlineConfig` and unused-disable reporting, and refuses a recommendation that carries a rule switched `off`. HFS v2
+`noInlineConfig` and unused-disable reporting, and refuses a recommendation that carries a rule switched `off`. HFS
 keeps no retired-rule list: a rule the standard no longer holds is deleted from the plugin, and every rule that ships is on.
 The parameters a rule takes from the slot manifest (the `@Global()` allowlist, the file line budget, the width of an
 `index.ts`) come through `lib/slots.mjs`, which reads `knowledge/hfs/slots.yaml` and falls back to the rule catalog's values.
@@ -93,10 +93,10 @@ pointed at.
 
 ESLint 9+ (flat config), Node 20.9+.
 
-## HFS v2 rules and their why codes
+## HFS rules and their why codes
 
 Each rule below reports through the code-pattern gate with a catalogued Vietnamese reason (`modules/kernel/failure-codes.yaml`,
-mapped by `scripts/checks/lint-why.mjs`). The catalog id is the rule number in `HFS-V2-RULES`.
+mapped by `scripts/checks/lint-why.mjs`). The catalog id is the rule number in `knowledge/hfs/rules.yaml`.
 
 | Rule | Catalog | Why code |
 |---|---|---|

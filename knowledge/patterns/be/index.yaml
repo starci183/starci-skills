@@ -2,7 +2,7 @@ schema: starci/knowledge-source@1
 id: be.index
 title: Backend code patterns
 purpose: |-
-  Read knowledge/hfs/README.md (HFS v2) and docs/backend-source-pattern.md first. The standard defines ownership, the
+  Read knowledge/hfs/README.md (HFS) and docs/backend-source-pattern.md first. The standard defines ownership, the
   tier direction, one schema authority, default-deny, per-capability configuration and background work as a transport,
   then the concrete Nest and TypeScript code forms below. Each rule cites the HFS rule ids it implements (hfsRules) and
   the finding codes that judge it (verification.automated).

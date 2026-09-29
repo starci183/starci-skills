@@ -1,5 +1,5 @@
 /**
- * HFS v2 check 4 (knowledge/hfs/slots.yaml rules HFS_UNUSED_EXPORT on repo.packages and fe.package.ui): an export of an
+ * HFS check 4 (knowledge/hfs/slots.yaml rules HFS_UNUSED_EXPORT on repo.packages and fe.package.ui): an export of an
  * owner's public entry that no production file outside the owner imports is dead.
  *
  * Owner = every graph.ownerRoots unit whose tier is not `app` and whose public entry file is in the graph (index.ts or

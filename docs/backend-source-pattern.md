@@ -1,6 +1,6 @@
 # Backend source pattern
 
-This is the Nest/TypeScript implementation of the [portable responsibility pattern](portable-source-architecture.md) under [HFS v2](../knowledge/hfs/README.md). It is a design decision informed by source and framework contracts, not a claim that one folder tree is an industry standard. SRS owns behavior; SDS selects boundaries and deployment; implementation maps those boundaries to actual files. The rules are in `knowledge/patterns/be/*.yaml` and each cites the HFS rule ids it implements; this document explains how they fit together.
+This is the Nest/TypeScript implementation of the [portable responsibility pattern](portable-source-architecture.md) under [HFS](../knowledge/hfs/README.md). It is a design decision informed by source and framework contracts, not a claim that one folder tree is an industry standard. SRS owns behavior; SDS selects boundaries and deployment; implementation maps those boundaries to actual files. The rules are in `knowledge/patterns/be/*.yaml` and each cites the HFS rule ids it implements; this document explains how they fit together.
 
 ## One ownership model
 

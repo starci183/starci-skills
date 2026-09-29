@@ -38,7 +38,7 @@ function repo(t) {
 /** The minimum a backend project needs for the loader to get as far as reading its dependencies. */
 function project(write, manifest, at, dependencies) {
   manifest(at, {name: path.posix.basename(at) || 'app', version: '0.0.0', dependencies});
-  write(path.posix.join(at, 'hfs.json'), `${JSON.stringify({hfs: 2, profile: 'be', project: 'fixture', apps: [{name: 'core', kind: 'api'}]}, null, 2)}
+  write(path.posix.join(at, 'hfs.json'), `${JSON.stringify({hfs: 1, profile: 'be', project: 'fixture', apps: [{name: 'core', kind: 'api'}]}, null, 2)}
 `);
   write(path.posix.join(at, 'src/modules/thing/thing.service.ts'), 'export class ThingService {}\n');
   write(path.posix.join(at, 'src/features/thing/thing.module.ts'), 'export class ThingModule {}\n');

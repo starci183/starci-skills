@@ -1,5 +1,5 @@
 /**
- * The rules that hold the shape of a Nest module in HFS v2 (catalog R45 `BE_MODULE_SHAPE`).
+ * The rules that hold the shape of a Nest module in HFS (catalog R45 `BE_MODULE_SHAPE`).
  *
  *   - `global-module-allowlist` lets `@Global()` appear only on the platform capabilities the slot manifest
  *     names (`ruleParams.be.globalModules`; read through `lib/slots.mjs`).
@@ -13,7 +13,7 @@
  *     one home.
  *
  * `no-self-global-module` of the earlier canon is gone: it refused `@Global()` everywhere, which also refused
- * the three platform capabilities HFS v2 requires to be global.
+ * the three platform capabilities HFS requires to be global.
  */
 import { decoratorName } from "./lib/ast.mjs"
 import { isDeclarationFile, isTestLane, normalizePath } from "./lib/path.mjs"
@@ -191,7 +191,7 @@ export const rules = {
     "one-module-per-file": oneModulePerFile,
 }
 
-/** All start at error: HFS v2 has one module shape and no baseline. */
+/** All start at error: HFS has one module shape and no baseline. */
 export const recommended = {
     "starci-be/global-module-allowlist": "error",
     "starci-be/typed-module-definition": "error",

@@ -115,7 +115,7 @@ test('real broad TypeScript programs retain explicit configuration roles without
     'README.md':hfsReadme(f.root),'codecov.yml':'coverage: {}\n','eslint.config.mjs':'export default [];\n','nest-cli.json':'{}\n','package-lock.json':'{}\n',
     'sonar-project.properties':'sonar.projectKey=fixture\n','apps/api/package.json':'{"name":"@fixture/api","private":true}\n','apps/api/src/app.module.ts':'export const AppModule=1;\n'}))f.write(file,text);
   f.write('package.json',JSON.stringify({private:true}));
-  f.write('hfs.json',JSON.stringify({hfs:2,profile:'be',project:'fixture',apps:[{name:'api',kind:'api'}]}));
+  f.write('hfs.json',JSON.stringify({hfs:1,profile:'be',project:'fixture',apps:[{name:'api',kind:'api'}]}));
   f.write('tsconfig.json',JSON.stringify({compilerOptions:{target:'ES2022',module:'ESNext',moduleResolution:'Bundler',strict:true,allowJs:true},include:['**/*.ts','jest.config.js']}));
   f.write('apps/api/src/main.ts','export {}');
   f.write('apps/api/jest.config.js','export default {testEnvironment:"node"};');

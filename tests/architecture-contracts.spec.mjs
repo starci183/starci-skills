@@ -26,7 +26,7 @@ function fixture(t, files, { owners = true } = {}) {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'starci-architecture-contracts-'));
   t.after(() => fs.rmSync(root, { recursive: true, force: true }));
   writeFiles(root, {
-    'hfs.json': `${JSON.stringify({ hfs: 2, profile: 'be', project: 'fixture', apps: [{ name: 'core', kind: 'api' }] }, null, 2)}
+    'hfs.json': `${JSON.stringify({ hfs: 1, profile: 'be', project: 'fixture', apps: [{ name: 'core', kind: 'api' }] }, null, 2)}
 `,
     'package.json': '{"private":true}',
     'tsconfig.json': JSON.stringify({ compilerOptions: { target: 'ES2022', module: 'ESNext', moduleResolution: 'Bundler',

@@ -1,14 +1,14 @@
-id: hfs2-presets
+id: hfs-presets
 effectiveAt: '2026-09-29T22:00:00+07:00'
 summary: >-
-  HFS v2 Phase 0 item 0.8: the shared tooling packages a product repository consumes from the runtime checkout
+  HFS Phase 0 item 0.8: the shared tooling packages a product repository consumes from the runtime checkout
   (@starci/tsconfig, prettier-config, jest-preset with the typed mock<T>() helper, vitest-preset, playwright-preset),
   knowledge/hfs/canon-pins.yaml with its schema starci/canon-pins@1 and check-canon-pins.mjs, and `starci link`,
   the installer that copies the pinned packages from STARCI_HOME into a repository (no registry publish). Additive:
   no existing key, check or verb changes.
 reach: new-legs
 paths:
-  - modules/kernel/contract-changes/hfs2-presets.yaml
+  - modules/kernel/contract-changes/hfs-presets.yaml
   - modules/schemas/canon-pins.schema.yaml
   - modules/schemas/index.yaml
   - knowledge/hfs/canon-pins.yaml

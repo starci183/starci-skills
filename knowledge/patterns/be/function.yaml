@@ -2,7 +2,7 @@ schema: starci/knowledge-source@1
 id: be.function
 title: Backend function
 purpose: |-
-  Given backend behavior, which unit executes it and how is that unit shaped? Apply the HFS v2 responsibility pattern.
+  Given backend behavior, which unit executes it and how is that unit shaped? Apply the HFS responsibility pattern.
   Read docs/backend-source-pattern.md for the coherent layout, code forms and verification limits.
 appliesTo:
   - backend

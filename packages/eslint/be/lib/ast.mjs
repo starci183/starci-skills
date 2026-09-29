@@ -1,5 +1,5 @@
 /**
- * Small AST helpers the HFS v2 laws share, so each rule states its question instead of its traversal.
+ * Small AST helpers the HFS laws share, so each rule states its question instead of its traversal.
  *
  * Nothing here touches disk or the type checker: a rule reads one file's syntax and its path.
  */

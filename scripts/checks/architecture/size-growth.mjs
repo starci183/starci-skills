@@ -2,7 +2,7 @@ import fs from 'node:fs';
 import { execFileSync } from 'node:child_process';
 
 /**
- * HFS v2 check 6, file size growth (knowledge/hfs/slots.yaml ruleParams.<profile>.fileLines {soft, hardGrowth}):
+ * HFS check 6, file size growth (knowledge/hfs/slots.yaml ruleParams.<profile>.fileLines {soft, hardGrowth}):
  * a production source file over `soft` lines may not grow against the merge-base, and a file that is new at the base
  * must stay within `soft`. A file at or under `soft` passes, even when it grows, as long as it does not cross `soft`
  * (crossing is growth of an over-budget file: the base had fewer lines than soft). Files are compared to the base file

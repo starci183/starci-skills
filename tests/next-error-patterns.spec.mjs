@@ -67,7 +67,7 @@ export default function GlobalError({ error, reset }: BoundaryProps) {
   };
   const write = (file, content) => { const target = path.join(root, file); fs.mkdirSync(path.dirname(target), { recursive: true }); fs.writeFileSync(target, typeof content === 'string' ? content : JSON.stringify(content)); };
   write('package.json', { private: true, dependencies: { next: '15.5.0' }, starci: { codePatterns: { next: { errorState: contract } } } });
-  write('hfs.json', { hfs: 2, profile: 'fe', project: 'fixture', apps: [{ name: 'web', kind: 'next' }] });
+  write('hfs.json', { hfs: 1, profile: 'fe', project: 'fixture', apps: [{ name: 'web', kind: 'next' }] });
   write('tsconfig.json', { compilerOptions: { target: 'ES2022', module: 'ESNext', moduleResolution: 'Bundler', jsx: 'preserve', strict: true }, include: ['src/**/*'] });
   for (const [file, content] of Object.entries(files)) write(file, content);
   const typescript = path.dirname(require.resolve('typescript/package.json'));

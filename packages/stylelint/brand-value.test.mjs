@@ -14,7 +14,7 @@ const ESLINT_RULE = path.resolve(here, "../eslint/fe/brand-values.mjs")
 const present = fs.existsSync(ESLINT_RULE)
 
 test("HEX_COLOR, COLOR_FUNCTION and PIXEL_LENGTH equal eslint-canon-fe's",
-  { skip: present ? false : "packages/eslint/fe/brand-values.mjs is not in this checkout: lane/hfs2-canon-fe has not landed. The spec runs once it does." },
+  { skip: present ? false : "packages/eslint/fe/brand-values.mjs is not in this checkout: the front-end canon lane has not landed. The spec runs once it does." },
   () => {
     const source = fs.readFileSync(ESLINT_RULE, "utf8")
     const literal = (name) => {

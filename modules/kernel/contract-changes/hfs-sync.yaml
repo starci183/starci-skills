@@ -1,7 +1,7 @@
-id: hfs2-sync
+id: hfs-sync
 effectiveAt: '2026-09-29T23:00:00+07:00'
 summary: >-
-  HFS v2 `hfs sync` (Phase 0 item 0.9, decision 10). knowledge/repository-baseline.yaml, the 1100 lines of copied v1
+  HFS `hfs sync` (Phase 0 item 0.9, decision 10). knowledge/repository-baseline.yaml, the 1100 lines of copied
   toolchain configs and their spec, is retired: there is no baseline shape any more. The files a product repository
   cannot `extends` are generated and verified by content hash from packages/hfs/templates - .husky/pre-commit (staged
   lint, typecheck, unit specs of staged files, work hygiene; never e2e), .github/workflows/ci.yml (hfs sync and hfs
@@ -20,7 +20,7 @@ summary: >-
   @nestjs/terminus, next-intl and supertest join knowledge/hfs/canon-pins.yaml.
 reach: new-legs
 paths:
-  - modules/kernel/contract-changes/hfs2-sync.yaml
+  - modules/kernel/contract-changes/hfs-sync.yaml
   - knowledge/repository-baseline.yaml
   - knowledge/index.yaml
   - modules/models/kinds.yaml
