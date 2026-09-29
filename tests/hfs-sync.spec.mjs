@@ -8,8 +8,10 @@ import { execFileSync } from 'node:child_process';
 import { parseYaml } from '../engine/yaml.mjs';
 import { starciworkGitignoreText } from '../scripts/lib/starciwork-boundary.mjs';
 import {
-  BLOCK_BEGIN, BLOCK_END, TARGETS, checkTargets, hashOf, loadPresets, render, renderTargets, runSync, validateHfs, writeTargets,
+  BLOCK_BEGIN, TARGETS, checkTargets, hashOf, loadPresets, render, renderTargets, runSync, validateHfs, writeTargets,
 } from '../packages/hfs/sync/index.mjs';
+import { declaredPushGateLint } from '../scripts/kernel/push-gate.mjs';
+import { declaredSonarKeys, readDeclaredSonarKey } from '../packages/hfs/sync/sonar-key.mjs';
 import { hygieneFindings, runWorkHygiene } from '../packages/hfs/sync/hygiene.mjs';
 
 const ROOT = path.resolve(import.meta.dirname, '..');
@@ -64,9 +66,9 @@ describe('hfs.json validation', () => {
 });
 
 describe('the generated file set', () => {
-  it('a back end owns seven files including .starciwork/.gitignore and a front end owns the other six', () => {
-    assert.deepEqual(Object.keys(rendered(BE)).sort(), ['.github/workflows/ci.yml', '.github/workflows/e2e.yml', '.gitignore', '.husky/pre-commit', '.starciwork/.gitignore', 'codecov.yml', 'sonar-project.properties']);
-    assert.deepEqual(Object.keys(rendered(FE)).sort(), ['.github/workflows/ci.yml', '.github/workflows/e2e.yml', '.gitignore', '.husky/pre-commit', 'codecov.yml', 'sonar-project.properties']);
+  it('a back end owns eight files including .starciwork/.gitignore and a front end owns the other seven', () => {
+    assert.deepEqual(Object.keys(rendered(BE)).sort(), ['.github/workflows/ci.yml', '.github/workflows/e2e.yml', '.gitignore', '.husky/pre-commit', '.husky/pre-push', '.starciwork/.gitignore', 'codecov.yml', 'sonar-project.properties']);
+    assert.deepEqual(Object.keys(rendered(FE)).sort(), ['.github/workflows/ci.yml', '.github/workflows/e2e.yml', '.gitignore', '.husky/pre-commit', '.husky/pre-push', 'codecov.yml', 'sonar-project.properties']);
   });
   it('every target hashes its own content', () => {
     for (const target of renderTargets(BE, PRESETS.be)) assert.equal(target.hash, hashOf(target.content));
@@ -83,6 +85,26 @@ describe('.husky/pre-commit', () => {
     const hook = rendered(FE)['.husky/pre-commit'];
     for (const step of ['npx lint-staged', 'npm run typecheck', 'npx vitest related --run']) assert.ok(hook.includes(step), step);
     assert.doesNotMatch(hook, /work-hygiene|test:e2e|playwright/);
+  });
+});
+
+describe('.husky/pre-push', () => {
+  for (const hfs of [BE, FE]) {
+    it(`${hfs.profile} runs typecheck, lint, hfs check --fast and the affected unit specs, and never e2e`, () => {
+      const hook = rendered(hfs)['.husky/pre-push'];
+      for (const step of ['npm run typecheck', 'npm run lint:check', 'npx hfs check --fast', 'npm run test:affected']) assert.ok(hook.includes(step), step);
+      assert.doesNotMatch(hook, /test:e2e|typecheck:e2e|playwright/);
+    });
+  }
+  it('lets the settle push gate follow the hook to the repository lint script', t => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'hfs-pushgate-'));
+    t.after(() => fs.rmSync(dir, { recursive: true, force: true }));
+    fs.mkdirSync(path.join(dir, '.husky'));
+    fs.writeFileSync(path.join(dir, '.husky', 'pre-push'), rendered(BE)['.husky/pre-push']);
+    fs.writeFileSync(path.join(dir, 'package.json'), JSON.stringify({ scripts: { 'lint:check': 'eslint . --max-warnings=0', typecheck: 'tsc --noEmit' } }));
+    const declared = declaredPushGateLint(dir);
+    assert.equal(declared.source, '.husky/pre-push');
+    assert.deepEqual(declared.commands.map(command => command.script), ['lint:check']);
   });
 });
 
@@ -157,6 +179,50 @@ describe('sonar-project.properties and codecov.yml', () => {
   });
 });
 
+describe('the Sonar key', () => {
+  const declaration = key => ({ services: { sonar: { projects: [{ repository: 'nivo-backend', key }, { repository: 'other', key: 'other-key' }] } } });
+  const declared = (t, name) => {
+    const dir = repo(t, BE);
+    fs.writeFileSync(path.join(dir, 'package.json'), JSON.stringify({ name }));
+    fs.mkdirSync(path.join(dir, '.starcistacks'));
+    fs.writeFileSync(path.join(dir, '.starcistacks', 'application-stacks.yaml'), 'stack');
+    return dir;
+  };
+  const sync = (mode, dir, parseYaml, out = () => {}) => runSync([mode], { cwd: dir, out, presets: PRESETS.be, parseYaml });
+  it('is derived from hfs.json when no stack declaration names one', () => {
+    assert.match(rendered(BE)['sonar-project.properties'], /^sonar.projectKey=nivo-backend$/m);
+    assert.match(rendered(FE)['sonar-project.properties'], /^sonar.projectKey=nivo-fe$/m);
+  });
+  it('is the key services.sonar declares for this repository, read from .starcistacks', async t => {
+    const dir = declared(t, 'nivo-backend');
+    assert.equal(await sync('--write', dir, () => declaration('gh/starci-lab/nivo-backend')), 0);
+    assert.match(fs.readFileSync(path.join(dir, 'sonar-project.properties'), 'utf8'), /^sonar.projectKey=gh\/starci-lab\/nivo-backend$/m);
+    assert.equal(await sync('--check', dir, () => declaration('gh/starci-lab/nivo-backend')), 0);
+    assert.equal(await sync('--check', dir, () => declaration('changed')), 1, 'a changed declaration is drift');
+  });
+  it('falls back to the derived key when the declaration lists other repositories only', async t => {
+    const dir = declared(t, 'mine');
+    assert.deepEqual(declaredSonarKeys(declaration('k'), 'mine'), []);
+    assert.equal(await sync('--write', dir, () => declaration('k')), 0);
+    assert.match(fs.readFileSync(path.join(dir, 'sonar-project.properties'), 'utf8'), /^sonar.projectKey=nivo-backend$/m);
+  });
+  it('refuses two keys for one repository', async t => {
+    const dir = declared(t, 'mine');
+    const lines = [];
+    const two = { services: { sonar: { projects: [{ repository: 'mine', key: 'a' }, { repository: 'mine', key: 'b' }] } } };
+    assert.equal(await sync('--check', dir, () => two, line => lines.push(line)), 1);
+    assert.match(lines[0], /HFS_SYNC_SONAR_KEY.*a, b/);
+  });
+  it('reads the real stack declaration shape with the yaml package', t => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'hfs-stacks-'));
+    t.after(() => fs.rmSync(dir, { recursive: true, force: true }));
+    fs.mkdirSync(path.join(dir, '.starcistacks'));
+    fs.writeFileSync(path.join(dir, 'package.json'), JSON.stringify({ name: 'nivo-backend' }));
+    fs.copyFileSync(path.join(ROOT, 'examples', 'starcistacks-services', 'nivo-backend.services.yaml'), path.join(dir, '.starcistacks', 'application-stacks.yaml'));
+    return readDeclaredSonarKey(dir, { fail: message => { throw new Error(message); } }).then(key => assert.equal(key, 'nivo-backend'));
+  });
+});
+
 describe('.starciwork/.gitignore', () => {
   it('is the boundary allowlist byte for byte, with no generated-by header', () => {
     assert.equal(rendered(BE)['.starciwork/.gitignore'], starciworkGitignoreText());
@@ -181,10 +247,10 @@ describe('the drift check', () => {
     assert.equal((await run(['--check'], dir)).code, 1, 'nothing is written yet');
     const written = await run(['--write'], dir);
     assert.equal(written.code, 0);
-    assert.match(written.lines.at(-1), /7 written, 0 already in sync/);
+    assert.match(written.lines.at(-1), /8 written, 0 already in sync/);
     const checked = await run(['--check'], dir);
     assert.equal(checked.code, 0);
-    assert.match(checked.lines.at(-1), /7 of 7 in sync/);
+    assert.match(checked.lines.at(-1), /8 of 8 in sync/);
   });
   it('a hand edit fails --check with the file, the hashes and the first differing line, and --write repairs it', async t => {
     const dir = repo(t, BE);
@@ -254,7 +320,7 @@ describe('the drift check', () => {
 
 describe('work-hygiene', () => {
   it('refuses agent output under .starciwork and plaintext secrets under .starcistacks', () => {
-    const ignored = file => file.includes('/evidence/');
+    const ignored = new Set(['.starciwork/features/a/evidence/run.json']);
     const findings = hygieneFindings([
       '.starciwork/features/a/index.yaml', '.starciwork/features/a/evidence/run.json',
       '.starcistacks/dev/secrets/db.enc', '.starcistacks/dev/secrets/db.txt', '.starcistacks/dev/infra/.env', '.starcistacks/dev/infra/.env.example', '.starcistacks/dev/infra/tls.pem',
@@ -281,5 +347,113 @@ describe('work-hygiene', () => {
     assert.match(lines[0], /^HFS_WORK_AGENT_DATA \.starciwork\/features\/login\/evidence\/run\.log/);
     git('rm', '-q', '--cached', '.starciwork/features/login/evidence/run.log');
     assert.equal(runWorkHygiene({ cwd: dir, out: () => {} }), 0);
+  });
+});
+
+describe('hfs sync --init', () => {
+  const skeleton = async (t, hfs) => {
+    const dir = repo(t, hfs);
+    const code = await runSync(['--init'], { cwd: dir, out: () => {}, presets: PRESETS[hfs.profile] });
+    return { dir, code };
+  };
+  const filesUnder = dir => fs.readdirSync(dir, { recursive: true, withFileTypes: true }).filter(entry => entry.isFile()).map(entry => path.relative(dir, path.join(entry.parentPath, entry.name)).split(path.sep).join('/')).sort();
+  const read = (dir, rel) => fs.readFileSync(path.join(dir, rel), 'utf8');
+
+  it('a back end gets platform config, logging and errors, the health feature and one entrypoint per api app', async t => {
+    const { dir, code } = await skeleton(t, BE);
+    assert.equal(code, 0);
+    const files = filesUnder(dir);
+    for (const file of [
+      'apps/core/src/main.ts', 'apps/core/src/app.module.ts', 'apps/core/src/core.options.ts', 'apps/core/src/core.composition.spec.ts',
+      'src/modules/platform/config/env-source.ts', 'src/modules/platform/config/server.config.ts', 'src/modules/platform/config/index.ts',
+      'src/modules/platform/logging/logger.port.ts', 'src/modules/platform/logging/log-id.ts', 'src/modules/platform/logging/logging.module.ts',
+      'src/modules/platform/errors/domain-error.ts', 'src/modules/platform/errors/error.filter.ts',
+      'src/features/system-health/index.ts', 'src/features/system-health/transport/http/live.controller.ts',
+    ]) assert.ok(files.includes(file), file);
+    assert.ok(!files.some(file => file.startsWith('apps/migrate/')), 'only api apps get an entrypoint');
+  });
+  it('every behaviour file of the back-end skeleton has a spec beside it', async t => {
+    const { dir } = await skeleton(t, BE);
+    const files = new Set(filesUnder(dir));
+    for (const file of ['env-source', 'server.config', 'json-logger', 'domain-error', 'error.filter'].flatMap(name => [...files].filter(candidate => candidate.endsWith(`/${name}.ts`)))) {
+      assert.ok(files.has(file.replace(/\.ts$/, '.spec.ts')), `${file} has a spec`);
+    }
+    assert.ok(files.has('src/features/system-health/transport/http/live.controller.spec.ts'));
+  });
+  it('the back-end skeleton follows HFS v2: one env reader, an enum-named logger port, the Terminus health shape, per-app options', async t => {
+    const { dir } = await skeleton(t, BE);
+    const sources = filesUnder(dir).filter(file => file.endsWith('.ts') && !file.endsWith('.spec.ts'));
+    assert.deepEqual(sources.filter(file => /process\.env/.test(read(dir, file))), ['src/modules/platform/config/env-source.ts'], 'process.env is read only by platform/config');
+    assert.ok(sources.every(file => !/console\.|new Error\(|synchronize|@Cron/.test(read(dir, file))));
+    assert.match(read(dir, 'src/modules/platform/logging/log-id.ts'), /export enum LogId/);
+    assert.match(read(dir, 'src/modules/platform/logging/logger.port.ts'), /abstract error\(id: LogId/);
+    assert.match(read(dir, 'src/features/system-health/transport/http/live.controller.ts'), /@Get\("live"\)[\s\S]*health\.check\(\[\]\)/);
+    assert.match(read(dir, 'apps/core/src/core.composition.spec.ts'), /toEqual\(\{ status: "ok", info: \{\}, error: \{\}, details: \{\} \}\)/);
+    assert.match(read(dir, 'apps/core/src/app.module.ts'), /static register\(options: CoreOptions\): DynamicModule/);
+    assert.match(read(dir, 'apps/core/src/app.module.ts'), /APP_FILTER/);
+    assert.match(read(dir, 'apps/core/src/main.ts'), /EnvSource\.fromProcess\(\)/);
+    assert.doesNotMatch(filesUnder(dir).map(file => read(dir, file)).join('\n'), /\{\{[a-zA-Z]/, 'no template placeholder is left');
+  });
+  it('a front end gets the next-intl [locale] shell: vi default, as-needed prefix, proxy.ts, error boundaries and the health route', async t => {
+    const { dir } = await skeleton(t, FE);
+    const files = filesUnder(dir);
+    for (const app of ['app', 'admin']) {
+      for (const file of ['next.config.ts', 'src/proxy.ts', 'src/app/global-error.tsx', 'src/app/globals.css', 'src/app/health/live/route.ts',
+        'src/app/[locale]/layout.tsx', 'src/app/[locale]/page.tsx', 'src/app/[locale]/error.tsx', 'src/app/[locale]/not-found.tsx',
+        'src/modules/i18n/config.ts', 'src/modules/i18n/routing.ts', 'src/modules/i18n/navigation.ts', 'src/modules/i18n/request.ts', 'src/modules/i18n/messages/vi.json']) {
+        assert.ok(files.includes(`apps/${app}/${file}`), `apps/${app}/${file}`);
+      }
+    }
+    assert.ok(!files.some(file => file.endsWith('middleware.ts')), 'Next 16 uses proxy.ts');
+    assert.match(read(dir, 'apps/app/src/modules/i18n/routing.ts'), /defaultLocale: DEFAULT_LOCALE[\s\S]*localePrefix: "as-needed"/);
+    assert.match(read(dir, 'apps/app/src/modules/i18n/config.ts'), /DEFAULT_LOCALE: Locale = "vi"/);
+    assert.match(read(dir, 'apps/app/src/proxy.ts'), /export default createMiddleware\(routing\)/);
+    assert.match(read(dir, 'apps/app/src/app/[locale]/layout.tsx'), /<html lang=\{locale\}>/);
+    assert.match(read(dir, 'apps/app/src/app/health/live/route.ts'), /\{ status: "ok", info: \{\}, error: \{\}, details: \{\} \}/);
+    assert.deepEqual(Object.keys(JSON.parse(read(dir, 'apps/app/src/modules/i18n/messages/vi.json'))).sort(), ['errors', 'home', 'notFound']);
+  });
+  it('never overwrites: a second --init leaves an edited file alone and reports it skipped', async t => {
+    const { dir } = await skeleton(t, BE);
+    const file = path.join(dir, 'apps', 'core', 'src', 'main.ts');
+    fs.writeFileSync(file, '// mine\n');
+    const lines = [];
+    assert.equal(await runSync(['--init'], { cwd: dir, out: line => lines.push(line), presets: PRESETS.be }), 0);
+    assert.equal(fs.readFileSync(file, 'utf8'), '// mine\n');
+    assert.match(lines.at(-1), /^hfs sync --init: 0 created, \d+ already exist and were left alone$/);
+  });
+  it('is exclusive with --check and --write', async t => {
+    assert.equal((await run(['--init', '--check'], repo(t, BE))).code, 2);
+  });
+});
+
+describe('scripts/checks/check-hfs-sync.mjs', () => {
+  it('passes a synced repository, reports drift, and judges tracked .starciwork and .starcistacks files', async t => {
+    const { checkHfsSync, CODES } = await import('../scripts/checks/check-hfs-sync.mjs');
+    const dir = repo(t, BE);
+    await run(['--write'], dir);
+    execFileSync('git', ['init', '-q'], { cwd: dir });
+    assert.deepEqual(await checkHfsSync(dir, { presets: PRESETS.be }), { ok: true, findings: [] });
+
+    fs.writeFileSync(path.join(dir, 'codecov.yml'), '# hand written\n');
+    fs.mkdirSync(path.join(dir, '.starciwork', 'features', 'a', 'evidence'), { recursive: true });
+    fs.writeFileSync(path.join(dir, '.starciwork', 'features', 'a', 'evidence', 'run.log'), 'log\n');
+    fs.mkdirSync(path.join(dir, '.starcistacks', 'dev', 'secrets'), { recursive: true });
+    fs.writeFileSync(path.join(dir, '.starcistacks', 'dev', 'secrets', 'db.txt'), 'x\n');
+    execFileSync('git', ['add', '-f', '.'], { cwd: dir });
+    const result = await checkHfsSync(dir, { presets: PRESETS.be });
+    assert.equal(result.ok, false);
+    assert.deepEqual(result.findings.map(finding => [finding.code, finding.file]).sort(), [
+      ['HFS_STACKS_PLAINTEXT', '.starcistacks/dev/secrets/db.txt'],
+      ['HFS_SYNC_DRIFT', 'codecov.yml'],
+      ['HFS_WORK_AGENT_DATA', '.starciwork/features/a/evidence/run.log'],
+    ]);
+    assert.ok(result.findings.every(finding => CODES.includes(finding.code)));
+  });
+  it('reports a missing or invalid hfs.json as HFS_SYNC_HFS_INVALID', async t => {
+    const { checkHfsSync } = await import('../scripts/checks/check-hfs-sync.mjs');
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'hfs-check-'));
+    t.after(() => fs.rmSync(dir, { recursive: true, force: true }));
+    const result = await checkHfsSync(dir, { presets: PRESETS.be });
+    assert.deepEqual(result.findings.map(finding => finding.code), ['HFS_SYNC_HFS_INVALID']);
   });
 });

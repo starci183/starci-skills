@@ -11,6 +11,7 @@ import { createRequire } from 'node:module';
 import fs from 'node:fs';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
+import { readDeclaredSonarKey } from './sonar-key.mjs';
 
 export const TEMPLATES_DIR = path.join(import.meta.dirname, '..', 'templates');
 export const NODE_MAJOR = 22;
@@ -30,6 +31,7 @@ export class SyncError extends Error {
 // header: whether the generated-by comment leads the content (.starciwork/.gitignore is byte-exact instead).
 export const TARGETS = Object.freeze([
   { path: '.husky/pre-commit', template: { be: 'be/pre-commit', fe: 'fe/pre-commit' }, mode: 'file', header: true },
+  { path: '.husky/pre-push', template: { be: 'common/pre-push', fe: 'common/pre-push' }, mode: 'file', header: true },
   { path: '.github/workflows/ci.yml', template: { be: 'common/ci.yml', fe: 'common/ci.yml' }, mode: 'file', header: true },
   { path: '.github/workflows/e2e.yml', template: { be: 'be/e2e.yml', fe: 'fe/e2e.yml' }, mode: 'file', header: true },
   { path: '.gitignore', template: { be: 'be/gitignore', fe: 'fe/gitignore' }, mode: 'block', header: false },
@@ -87,12 +89,12 @@ export async function loadPresets(root, profile) {
 }
 
 /** Every value a template can name, derived from hfs.json and the presets. */
-export function variables(hfs, presets) {
+export function variables(hfs, presets, sonarKey) {
   const globs = [...presets.sonarExclusions.split(','), ...presets.sonarCoverageExclusions.split(',')];
   return {
     profile: hfs.profile,
     nodeMajor: String(NODE_MAJOR),
-    sonarKey: `${hfs.project}-${hfs.profile === 'be' ? 'backend' : 'fe'}`,
+    sonarKey: sonarKey ?? `${hfs.project}-${hfs.profile === 'be' ? 'backend' : 'fe'}`,
     sonarExclusions: presets.sonarExclusions,
     sonarCoverageExclusions: presets.sonarCoverageExclusions,
     codecovIgnore: globs.map(glob => `  - ${JSON.stringify(glob)}`).join('\n'),
@@ -101,9 +103,10 @@ export function variables(hfs, presets) {
 }
 
 /** The managed content of every target this profile owns: [{ path, mode, content, hash }]. */
-export function renderTargets(hfs, presets, readTemplate = readBundled) {
+/** `sonarKey` is the key the repository's stack declaration names; without one the key is derived from hfs.json. */
+export function renderTargets(hfs, presets, { sonarKey, readTemplate = readBundled } = {}) {
   validateHfs(hfs);
-  const vars = variables(hfs, presets);
+  const vars = variables(hfs, presets, sonarKey);
   return TARGETS.filter(target => target.template[hfs.profile]).map(target => {
     const body = render(readTemplate(target.template[hfs.profile]), vars, readTemplate);
     const content = target.header ? HEADER(hfs.profile) + body : body;
@@ -175,17 +178,25 @@ export function loadHfs(root) {
 }
 
 /** `hfs sync --check | --write [--root <dir>]`; returns the exit code (0 clean, 1 drift or error, 2 usage). */
-export async function runSync(argv, { cwd = process.cwd(), out = line => process.stdout.write(`${line}\n`), presets } = {}) {
-  const check = argv.includes('--check'), write = argv.includes('--write');
+export async function runSync(argv, { cwd = process.cwd(), out = line => process.stdout.write(`${line}\n`), presets, parseYaml } = {}) {
+  const check = argv.includes('--check'), write = argv.includes('--write'), init = argv.includes('--init');
   const rootAt = argv.indexOf('--root');
-  if (check === write) {
-    out('usage: hfs sync (--check | --write) [--root <dir>]');
+  if ([check, write, init].filter(Boolean).length !== 1) {
+    out('usage: hfs sync (--check | --write | --init) [--root <dir>]');
     return 2;
   }
   const root = rootAt >= 0 ? path.resolve(cwd, argv[rootAt + 1] ?? '') : cwd;
   try {
     const hfs = loadHfs(root);
-    const targets = renderTargets(hfs, presets ?? await loadPresets(root, hfs.profile));
+    if (init) {
+      const { initSkeleton } = await import('./skeleton.mjs');
+      const { created, skipped } = initSkeleton(root, hfs);
+      for (const file of created) out(`created ${file}`);
+      out(`hfs sync --init: ${created.length} created, ${skipped.length} already exist and were left alone`);
+      return 0;
+    }
+    const sonarKey = await readDeclaredSonarKey(root, { parseYaml, fail: message => { throw new SyncError('HFS_SYNC_SONAR_KEY', message); } });
+    const targets = renderTargets(hfs, presets ?? await loadPresets(root, hfs.profile), { sonarKey });
     if (write) {
       const written = writeTargets(root, targets);
       for (const file of written) out(`wrote ${file}`);

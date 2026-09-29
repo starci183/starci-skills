@@ -11,7 +11,13 @@ summary: >-
   .starciwork/.gitignore (the one allowlist, now read by scripts/lib/starciwork-boundary.mjs from its template).
   `hfs sync --check` fails on drift and `--write` rewrites it. backend.scaffold and interface.scaffold write the
   manifest and preset stubs, run `hfs sync --write` and require `hfs sync --check`; the repository-baseline knowledge
-  branch is removed from the index and from the scaffold kinds.
+  branch is removed from the index and from the scaffold kinds. Follow-ups: .husky/pre-push (typecheck, lint:check,
+  hfs check --fast, affected unit specs) is generated too; the Sonar key comes from the stack declaration
+  (services.sonar.projects of this repository) and is derived from hfs.json only when none is declared; the skeleton
+  source the baseline carried is now templates/{be,fe}/skeleton written once by `hfs sync --init` (platform config,
+  logging and errors, the { status, info, error, details } health endpoint, and for a front end next-intl [locale]
+  with vi default, as-needed prefix and proxy.ts); the HFS_SYNC_* and HFS_WORK_* failure codes are catalogued;
+  @nestjs/terminus, next-intl and supertest join knowledge/hfs/canon-pins.yaml.
 reach: new-legs
 paths:
   - modules/kernel/contract-changes/hfs2-sync.yaml
@@ -21,3 +27,5 @@ paths:
   - modules/goal/archetypes.yaml
   - modules/ops/ops/backend.scaffold.yaml
   - modules/ops/ops/interface.scaffold.yaml
+  - modules/kernel/failure-codes.yaml
+  - knowledge/hfs/canon-pins.yaml

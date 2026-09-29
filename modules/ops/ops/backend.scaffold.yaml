@@ -134,8 +134,13 @@ steps:
         then run `hfs sync --write`, which generates husky, .github/workflows/ci.yml and e2e.yml, .gitignore,
         sonar-project.properties, codecov.yml and .starciwork/.gitignore, and `hfs sync --check` must pass -
         a generated file is never hand-written or edited, and a value `hfs sync` does not carry is a named gap in the
-        scaffold evidence, never an improvised choice - then the declared layout, then the minimal skeleton — entrypoint plus the
-        baseline liveness surface and any health the settled records add. No business behaviour
+        scaffold evidence, never an improvised choice - then the declared layout, then the first source tree by running `hfs sync --init`
+        (packages/hfs/templates/be/skeleton, never overwriting) - per api app the entrypoint that reads the
+        environment once, AppModule.register(options), its one error filter and a composition spec; platform/config
+        (the only reader of the environment), platform/logging (the logger port with enum identities) and
+        platform/errors (DomainError); and the system-health feature answering GET /health/live with
+        the status-info-error-details shape - plus any health the settled records add. The stubs need the
+        @modules and @features path aliases in tsconfig and the jest moduleNameMapper. No business behaviour
         beyond what the skeleton proves.
   - reads:
       - repo

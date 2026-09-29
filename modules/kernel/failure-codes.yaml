@@ -3243,6 +3243,82 @@ HFS_STACKS_IN_FE:
   nextStep_vi: "Bộ kiểm kiến trúc từ chối; op phải xóa thư mục khỏi repo giao diện và đặt khai báo ở backend."
   owner: op-retry
   kind: check-finding
+HFS_STACKS_PLAINTEXT:
+  title: "Plaintext secret under .starcistacks"
+  title_vi: "Bí mật dạng rõ nằm trong .starcistacks"
+  meaning_vi: "Một tệp được đưa vào commit trong .starcistacks là bí mật dạng rõ (.env, .pem, .key, .identity, .age) hoặc nằm trong secrets/ mà chưa được mã hóa thành <slug>.enc."
+  causes_vi:
+    - "Tệp .env hoặc khóa được git add nhầm"
+    - "Bí mật được đặt trong secrets/ nhưng chưa mã hóa"
+  nextStep_vi: "Mã hóa bí mật thành .starcistacks/<env>/secrets/<slug>.enc và gỡ bản rõ khỏi commit; Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra; không cần ai can thiệp thêm."
+  owner: op-retry
+  kind: check-finding
+
+HFS_SYNC_DRIFT:
+  title: "Generated file drifted from its template"
+  title_vi: "Tệp do hfs sync sinh đã lệch khỏi mẫu"
+  meaning_vi: "Một tệp mà hfs sync sinh (husky, workflow, .gitignore, sonar-project.properties, codecov.yml, .starciwork/.gitignore) có nội dung khác bản sinh từ mẫu và hfs.json, hoặc bị xóa."
+  causes_vi:
+    - "Tệp được sửa tay thay vì sửa mẫu"
+    - "hfs.json đổi (app, profile) mà chưa chạy hfs sync --write"
+    - "Preset jest hoặc vitest đổi danh sách loại trừ độ phủ"
+  nextStep_vi: "Chạy npx hfs sync --write để sinh lại tệp; nếu cần khác mẫu thì đổi mẫu trong .claude, không sửa tay. Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra; không cần ai can thiệp thêm."
+  owner: op-retry
+  kind: check-finding
+
+HFS_SYNC_HFS_INVALID:
+  title: "hfs.json unreadable for sync"
+  title_vi: "hfs.json không đọc được cho hfs sync"
+  meaning_vi: "hfs sync cần hfs.json hợp lệ (hfs là 2, profile be hoặc fe, project kebab-case, ít nhất một app) nhưng tệp thiếu hoặc sai."
+  causes_vi:
+    - "Thiếu hfs.json ở gốc repository"
+    - "profile không phải be hoặc fe"
+    - "Danh sách apps rỗng hoặc trùng tên"
+  nextStep_vi: "Sửa hfs.json cho đúng khuôn rồi chạy lại hfs sync. Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra; không cần ai can thiệp thêm."
+  owner: op-retry
+  kind: check-finding
+
+HFS_SYNC_PRESET_MISSING:
+  title: "Coverage preset not installed"
+  title_vi: "Chưa cài preset độ phủ"
+  meaning_vi: "hfs sync lấy danh sách loại trừ độ phủ từ @starci/jest-preset (back end) hoặc @starci/vitest-preset (front end) nhưng repository chưa cài preset đó."
+  causes_vi:
+    - "Chưa chạy starci link cho phía be hoặc fe"
+    - "node_modules chưa được cài sau khi link"
+  nextStep_vi: "Chạy node $STARCI_HOME/bin/starci.mjs link --side be|fe --install rồi chạy lại hfs sync. Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra; không cần ai can thiệp thêm."
+  owner: op-retry
+  kind: check-finding
+
+HFS_SYNC_SKELETON_MISSING:
+  title: "Skeleton templates missing"
+  title_vi: "Thiếu mẫu khung nguồn"
+  meaning_vi: "hfs sync --init không tìm thấy thư mục mẫu khung nguồn cho profile của repository; bản cài @starci/hfs thiếu templates."
+  causes_vi:
+    - "Gói @starci/hfs được link mà không kèm thư mục templates"
+  nextStep_vi: "Người bảo trì runtime cần sửa danh sách files của gói @starci/hfs và chạy starci link lại; sự cố runtime, không phải lỗi của repository sản phẩm."
+  owner: runtime-core
+  kind: check-finding
+
+HFS_SYNC_SONAR_KEY:
+  title: "Ambiguous Sonar project key"
+  title_vi: "Khóa dự án Sonar không rõ ràng"
+  meaning_vi: "Khai báo stack của repository (services.sonar.projects) liệt kê nhiều hơn một khóa Sonar cho cùng một repository, nên hfs sync không biết dùng khóa nào."
+  causes_vi:
+    - "application-stacks.yaml khai hai project Sonar cho cùng repository"
+  nextStep_vi: "Op quản lý workspace sửa khối services.sonar để mỗi repository chỉ có một khóa, rồi chạy lại hfs sync."
+  owner: other-op:workspace.manage
+  kind: check-finding
+
+HFS_SYNC_TEMPLATE_VARIABLE:
+  title: "Template names an unknown variable"
+  title_vi: "Mẫu dùng biến hfs sync không cung cấp"
+  meaning_vi: "Một mẫu trong templates của hfs sync nhắc tới biến mà hfs sync không sinh ra, nên không thể hiển thị tệp."
+  causes_vi:
+    - "Mẫu được sửa và gõ sai tên biến"
+  nextStep_vi: "Người bảo trì runtime sửa mẫu hoặc thêm biến vào hfs sync; sự cố runtime, không phải lỗi của repository sản phẩm."
+  owner: runtime-core
+  kind: check-finding
+
 HFS_TEST_KIND_RETIRED:
   title: "Retired test kind or extra test config"
   title_vi: "Dùng loại test đã bỏ hoặc cấu hình test thừa"
@@ -3261,6 +3337,16 @@ HFS_TRACKED_MUST_BE_IGNORED:
     - "Thư mục dist, coverage, .next hoặc tệp sinh tự động bị git add"
     - ".gitignore thiếu dòng cho thư mục này"
   nextStep_vi: "Gỡ tệp khỏi Git bằng git rm --cached và thêm vào khối .gitignore chuẩn; không xoá thư mục trên đĩa. Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra; không cần ai can thiệp thêm."
+  kind: check-finding
+
+HFS_WORK_AGENT_DATA:
+  title: "Agent output staged under .starciwork"
+  title_vi: "Dữ liệu agent bị đưa vào .starciwork"
+  meaning_vi: "Một tệp được đưa vào commit dưới .starciwork nhưng .starciwork/.gitignore từ chối nó vì đó là đầu ra của agent (báo cáo, evidence, log, ảnh chụp, vòng vẽ) chứ không phải nội dung sản phẩm."
+  causes_vi:
+    - "Báo cáo, log hoặc ảnh chụp của agent được git add -f"
+    - "Tệp evidence hoặc runs nằm trong thư mục bản ghi"
+  nextStep_vi: "Gỡ tệp khỏi commit; đầu ra của agent nằm trong scratchpad hoặc kho blob và bản ghi chỉ trích dẫn bằng {name, sha256}. Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra; không cần ai can thiệp thêm."
   owner: op-retry
   kind: check-finding
 

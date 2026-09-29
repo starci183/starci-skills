@@ -383,7 +383,7 @@ kinds:
     reads: [srs, sds, decision]
     writes: [code]
     knowledge: [patterns/be/*, architecture-rules, code-pattern-enforcement, application-stacks]
-    checks: [scripts/checks/check-scoped-lint.mjs, scripts/checks/code-patterns/*.mjs, scripts/checks/architecture/*.mjs]
+    checks: [scripts/checks/check-scoped-lint.mjs, scripts/checks/code-patterns/*.mjs, scripts/checks/architecture/*.mjs, scripts/checks/check-hfs-sync.mjs]
     stacks: [modules/schemas/workspace-routing.yaml]
     carries: []
     purpose: Create one new backend source tree - toolchain, house layout, runnable skeleton - proven green.
@@ -404,7 +404,7 @@ kinds:
     reads: [srs, sds, design, brand, shell, grammar]
     writes: [code, asset, shell]
     knowledge: [patterns/fe/*, ui/*, grammars/*, architecture-rules, code-pattern-enforcement]
-    checks: [scripts/checks/check-scoped-lint.mjs, scripts/checks/code-patterns/*.mjs, scripts/checks/architecture/*.mjs, scripts/checks/shell-conformance.mjs]
+    checks: [scripts/checks/check-scoped-lint.mjs, scripts/checks/code-patterns/*.mjs, scripts/checks/architecture/*.mjs, scripts/checks/shell-conformance.mjs, scripts/checks/check-hfs-sync.mjs]
     stacks: [modules/schemas/workspace-routing.yaml, modules/schemas/work-layout-tree.schema.yaml]
     carries: [work/layout-tree@1]
     purpose: Create one new interface source tree - grammar-written shell with tokens wired, realising the planned layout tree - proven by build plus captured first render, and re-scan the layout tree from it.

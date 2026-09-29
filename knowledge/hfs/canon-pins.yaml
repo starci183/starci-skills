@@ -172,6 +172,21 @@ pins:
     version: 11.2.5
     group: framework
     side: be
+  '@nestjs/terminus':
+    version: 11.1.1
+    group: framework
+    side: be
+    why: the health skeleton (hfs sync --init) answers { status, info, error, details } through Terminus; nivo-backend, starci-next and mia-mia-backend all resolve 11.1.1.
+  next-intl:
+    version: 4.13.6
+    group: framework
+    side: fe
+    why: every HFS v2 front end uses next-intl with the [locale] segment (hfs sync --init writes it); nivo-fe resolves 4.13.6.
+  supertest:
+    version: 7.3.0
+    group: tooling
+    side: be
+    why: the composition spec of the back-end skeleton boots the real AppModule and calls /health/live; starci-next and mia-mia-backend resolve 7.3.0, nivo-backend 7.2.2.
   # --- ui
   '@heroui/react':
     version: 3.2.6
