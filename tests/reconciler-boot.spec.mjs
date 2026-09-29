@@ -2,6 +2,7 @@
 // ui build staleness, preflight rows). Every host effect is a seam; nothing here starts or stops a process.
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import os from 'node:os';
 import path from 'node:path';
 import { crashLoopPlan, crashLoopRecord, ensure, isPlannedStart, SPAWNED_KIND } from '../scripts/reconciler/boot.mjs';
 import { PROFILES, REQUIRED_ACTIVE, configuredMode, reconcilerConfig } from '../scripts/reconciler/state.mjs';
@@ -95,11 +96,14 @@ test('preflight: SQLite version, temp and missing ledgers, a model pin the agent
   assert.ok(cmpVersion('3.51.3', '3.51.3') === 0 && cmpVersion('3.50.9', '3.51.3') < 0 && cmpVersion('3.53.4', '3.51.3') > 0);
   assert.equal(sqliteItem('3.51.2').status, 'red');
   assert.equal(sqliteItem('3.53.4').status, 'green');
-  assert.equal(isTempLedger('C:\\Users\\a\\AppData\\Local\\Temp\\prereq-dbg\\runtime.sqlite', { tmp: 'C:\\Users\\a\\AppData\\Local\\Temp' }), true);
+  const tmp = path.join(os.tmpdir(), 'starci-boot-spec'), home = path.join(path.resolve(import.meta.dirname, '..'), 'no-such-ledger-dir');
+  const ledgerAt = (dir, name) => path.join(dir, name);
+  const gone = ledgerAt(home, 'gone.sqlite'), ok = ledgerAt(home, 'ok.sqlite'), gone2 = ledgerAt(home, 'gone2.sqlite'), inTemp = path.join(tmp, 'prereq-dbg', 'runtime.sqlite');
+  assert.equal(isTempLedger(inTemp, { tmp }), true);
   const found = ledgerFindings([
-    { ledgerId: 'a', name: 'a', file: 'C:\\Users\\a\\AppData\\Local\\Temp\\prereq-dbg\\runtime.sqlite' },
-    { ledgerId: 'b', name: 'b', file: 'D:/gone.sqlite' }, { ledgerId: 'c', name: 'c', file: 'D:/ok.sqlite' }, { ledgerId: 'd', name: 'd', file: 'D:/gone2.sqlite', state: 'retired' },
-  ], { exists: (f) => f === 'D:/ok.sqlite', tmp: 'C:\\Users\\a\\AppData\\Local\\Temp' });
+    { ledgerId: 'a', name: 'a', file: inTemp },
+    { ledgerId: 'b', name: 'b', file: gone }, { ledgerId: 'c', name: 'c', file: ok }, { ledgerId: 'd', name: 'd', file: gone2, state: 'retired' },
+  ], { exists: (f) => f === ok, tmp });
   assert.deepEqual(found.map((f) => `${f.ledgerId}:${f.problem}`), ['a:temp', 'b:missing']);
   const card = (agent) => ({ claude: { modelAttestation: { displayNames: { 'claude-opus-5-5': 'Opus 5.5' } } }, codex: { modelAttestation: { mode: 'launch-flag' } } }[agent] ?? null);
   const bad = pinProblems([{ where: 'kernel', agent: 'claude', model: 'claude-sonnet-5-5' }, { where: 'k2', agent: 'claude', model: 'claude-opus-5-5' }, { where: 'k3', agent: 'codex', model: 'gpt' }], { card });
