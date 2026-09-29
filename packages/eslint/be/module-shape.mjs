@@ -2,7 +2,7 @@
  * The rules that hold the shape of a Nest module in HFS v2 (catalog R45 `BE_MODULE_SHAPE`).
  *
  *   - `global-module-allowlist` lets `@Global()` appear only on the platform capabilities the slot manifest
- *     names (`platform/config`, `platform/logging`, `platform/database` by default; read through `lib/slots.mjs`).
+ *     names (`ruleParams.be.globalModules`; read through `lib/slots.mjs`).
  *     A global module hides who depends on whom, so it is reserved for the three every capability needs.
  *   - `typed-module-definition` requires `ConfigurableModuleBuilder<Options>` to state its options type.
  *   - `static-module-register` requires `register`, `registerAsync`, `forRoot` and `forFeature` to be `static`.

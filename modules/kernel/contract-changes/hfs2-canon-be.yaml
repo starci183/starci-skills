@@ -2,10 +2,10 @@ id: hfs2-canon-be
 effectiveAt: '2026-09-29T22:00:00+07:00'
 summary: >-
   HFS v2 back-end lint rules (catalog R18, R20, R34, R36-R38, R40-R45, R48). `@starci/eslint-canon-be` becomes 1.3.0
-  and gains 23 rules: catch-must-account, error-home, no-runtime-schema, sql-only-in-repository, no-entity-in-contract,
+  and gains 22 rules: catch-must-account, error-home, no-runtime-schema, sql-only-in-repository, no-entity-in-contract,
   no-untyped-body, public-needs-reason, no-direct-env-read, no-secret-default, secret-compare-timing-safe,
   global-module-allowlist, typed-module-definition, static-module-register, no-new-injectable, no-module-let,
-  one-module-per-file, no-inline-suppression, file-size-soft-limit, file-size-growth, spec-no-source-read and
+  one-module-per-file, no-inline-suppression, file-size-growth, spec-no-source-read and
   spec-typed-doubles. `must-deep-module-import` and `no-folder-reexport` now hold the HFS v2 owner `index.ts` surface
   (an aliased import names the owner and stops; an index lists a bounded set of named exports) and are on in
   `starciBeConfig`. No rule is off any more: the retired-rule list is gone with the Academy AbstractException rules,

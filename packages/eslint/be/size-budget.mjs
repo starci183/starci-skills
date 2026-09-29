@@ -1,16 +1,14 @@
 /**
  * The rules that hold the file size budget (catalog R20 `HFS_SIZE_GROWTH`, the file-level half).
  *
- * A source file has a soft budget of `fileLines` lines (500 by default, read through `lib/slots.mjs`). Two rules
- * split the work because they answer different questions:
+ * A source file has a hard-growth budget of `fileLines.hardGrowth` lines (`ruleParams.be.fileLines` of the
+ * slot manifest, read through `lib/slots.mjs`). `file-size-growth` is the ratchet and fails only on a file that must not
+ * be this long: a NEW file over the budget, or an existing file over the budget that is longer than its recorded size.
+ * The recorded size is the file's line count at the parent commit (`git show HEAD:<file>`), or an entry of the
+ * `recorded` option. A file may stay as large as it is; it may not grow, and it may not be born large.
  *
- *   - `file-size-soft-limit` is advisory: it WARNS on every file over the budget, so an editor and a review show
- *     where the debt is. The factory keeps this one at `warn`; it is the only warning the canon publishes.
- *   - `file-size-growth` is the ratchet and fails only on a file that must not be this long: a NEW file over the
- *     budget, or an existing file over the budget that is longer than its recorded size. The recorded size is
- *     the file's line count at the parent commit (`git show HEAD:<file>`), or an entry of the `recorded` option.
- *     A file may stay as large as it is; it may not grow, and it may not be born large.
- *
+ * There is no soft-limit lint rule: a warning under a zero-warning gate is an exception in disguise. Listing the
+ * files over the soft budget (`fileLines.soft`) is a report item of the hfs check, never a block.
  * There is no baseline file and no allowlist: the record is the repository's own history. A migration is exempt
  * (it is append-only and generated), and so is every test-lane file.
  */
@@ -65,29 +63,6 @@ const optionSchema = [
     },
 ]
 
-/** Advisory: every governed file over the budget is shown. */
-export const fileSizeSoftLimit = {
-    meta: {
-        type: "suggestion",
-        docs: { description: "A source file over the soft line budget is reported as a warning." },
-        schema: optionSchema,
-        messages: {
-            over: "This file has {{lines}} lines, over the budget of {{max}}. Split it by responsibility before it grows.",
-        },
-    },
-    create(context) {
-        const filename = normalizePath(context.filename || context.getFilename())
-        if (!governed(filename)) return {}
-        const max = context.options[0]?.max ?? hfsParams.fileLines
-        return {
-            "Program:exit"(node) {
-                const lines = lineCount((context.sourceCode || context.getSourceCode()).text)
-                if (lines > max) context.report({ node, loc: { line: 1, column: 0 }, messageId: "over", data: { lines, max } })
-            },
-        }
-    },
-}
-
 /** The ratchet: a file over the budget must not be new and must not grow. */
 export const fileSizeGrowth = {
     meta: {
@@ -103,7 +78,7 @@ export const fileSizeGrowth = {
         const filename = normalizePath(context.filename || context.getFilename())
         if (!governed(filename)) return {}
         const options = context.options[0] ?? {}
-        const max = options.max ?? hfsParams.fileLines
+        const max = options.max ?? hfsParams.fileLines.hardGrowth
         return {
             "Program:exit"(node) {
                 const lines = lineCount((context.sourceCode || context.getSourceCode()).text)
@@ -122,15 +97,10 @@ export const fileSizeGrowth = {
 
 /** The rules this law contributes to the plugin. */
 export const rules = {
-    "file-size-soft-limit": fileSizeSoftLimit,
     "file-size-growth": fileSizeGrowth,
 }
 
-/**
- * The soft limit is the one advisory rule, and `ADVISORY` in `lib/config.mjs` names it so the factory does not
- * lift it to `error`. The ratchet is `error`.
- */
+/** The ratchet is an error. */
 export const recommended = {
-    "starci-be/file-size-soft-limit": "warn",
     "starci-be/file-size-growth": "error",
 }

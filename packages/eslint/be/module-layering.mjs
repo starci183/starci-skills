@@ -238,7 +238,7 @@ const isBareFolderSpecifier = (specifier) =>
  *  - a bare-dot or trailing-slash specifier names a directory by construction, in any file;
  *  - in an `index.*` file: `export *` hides the surface instead of listing it; a specifier ending in
  *    `/types` or `/types/index` exports a whole types folder; an exported name ending in `_STORE` hands out
- *    a storage token; and more than `maxExports` (the manifest's `indexExports`, 60 by default) names is not
+ *    a storage token; and more than `maxExports` (the `indexExports` budget of the slot manifest) names is not
  *    a public surface but the inside of the owner.
  *
  * What this accepts, because HFS v2 wants it: `export { PlanModule } from "./plan.module"`,

@@ -25,7 +25,6 @@ export const LINT_WHY = Object.freeze({
   'starci-be/no-module-let': 'BE_MODULE_SHAPE',
   'starci-be/one-module-per-file': 'BE_MODULE_SHAPE',
   'starci-be/no-inline-suppression': 'HFS_INLINE_SUPPRESSION',
-  'starci-be/file-size-soft-limit': 'HFS_SIZE_GROWTH',
   'starci-be/file-size-growth': 'HFS_SIZE_GROWTH',
   'starci-be/spec-no-source-read': 'BE_SPEC_QUALITY',
   'starci-be/spec-typed-doubles': 'BE_SPEC_QUALITY',

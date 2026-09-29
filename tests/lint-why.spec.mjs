@@ -17,7 +17,7 @@ const HFS_V2_RULES = [
   'catch-must-account', 'error-home', 'no-runtime-schema', 'sql-only-in-repository', 'no-entity-in-contract',
   'no-untyped-body', 'public-needs-reason', 'secret-compare-timing-safe', 'no-direct-env-read', 'no-secret-default',
   'global-module-allowlist', 'typed-module-definition', 'static-module-register', 'no-new-injectable', 'no-module-let',
-  'one-module-per-file', 'no-inline-suppression', 'file-size-soft-limit', 'file-size-growth', 'spec-no-source-read',
+  'one-module-per-file', 'no-inline-suppression', 'file-size-growth', 'spec-no-source-read',
   'spec-typed-doubles', 'must-deep-module-import', 'no-folder-reexport',
 ].map(name => `starci-be/${name}`);
 
@@ -63,7 +63,6 @@ test('the nest profile names only published rules, holds none off, and pins the 
     assert.ok(id.slice('starci-be/'.length) in plugin.rules, `${id} is in the profile but not in the canon`);
   }
   for (const ruleId of HFS_V2_RULES) {
-    if (ruleId === 'starci-be/file-size-soft-limit') continue;
     assert.ok(ids.has(ruleId), `${ruleId} is not held by an obligation`);
   }
   const pkg = JSON.parse(fs.readFileSync(path.join(root, 'packages/eslint/be/package.json'), 'utf8'));

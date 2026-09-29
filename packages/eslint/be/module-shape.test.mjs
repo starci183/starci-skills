@@ -10,7 +10,7 @@ import {
     staticModuleRegister,
     typedModuleDefinition,
 } from "./module-shape.mjs"
-import { CATALOG_PARAMS, hfsParams, paramsFromManifest } from "./lib/slots.mjs"
+import { hfsParams, paramsFromManifest } from "./lib/slots.mjs"
 
 const tester = new RuleTester({
     languageOptions: { parser: tsParser, ecmaVersion: 2022, sourceType: "module" },
@@ -41,16 +41,15 @@ test("@Global is allowed only on the platform allowlist", () => {
     })
 })
 
-test("the allowlist comes from the manifest when the manifest states it, else from the catalog", () => {
-    const stated = paramsFromManifest({ ruleParams: { be: { globalModules: ["platform/config"], fileLines: 400 } }, slots: [{ id: "be.domain", budget: { indexExports: 40 } }] })
+test("the parameters come from the manifest ruleParams and nothing else", () => {
+    const stated = paramsFromManifest({
+        ruleParams: { be: { globalModules: ["src/modules/platform/config/"], fileLines: { soft: 400, hardGrowth: true } } },
+        slots: [{ id: "be.feature", budget: { indexExports: 40 } }],
+    })
     assert.deepEqual([...stated.globalModules], ["platform/config"])
-    assert.equal(stated.fileLines, 400)
+    assert.deepEqual(stated.fileLines, { soft: 400, hardGrowth: 400 })
     assert.equal(stated.indexExports, 40)
-    assert.deepEqual(stated.source, { globalModules: "manifest", fileLines: "manifest", indexExports: "manifest" })
-    const silent = paramsFromManifest({ slots: [] })
-    assert.deepEqual([...silent.globalModules], [...CATALOG_PARAMS.globalModules])
-    assert.equal(silent.fileLines, 500)
-    assert.deepEqual(silent.source, { globalModules: "catalog", fileLines: "catalog", indexExports: "catalog" })
+    assert.throws(() => paramsFromManifest({ slots: [] }), /ruleParams.be.globalModules/)
     assert.ok(hfsParams.globalModules.length > 0)
 })
 

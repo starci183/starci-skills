@@ -12,13 +12,6 @@
  * cannot be published switched off and still look adopted.
  */
 
-/**
- * The advisory rules: the only ones the factory leaves at `warn`. The soft size budget shows where a file is
- * over its budget without failing a file that is merely as large as it always was; the ratchet
- * (`file-size-growth`) is the rule that fails.
- */
-export const ADVISORY = Object.freeze(["starci-be/file-size-soft-limit"])
-
 /** A disable directive is a weakening of lint, and one that suppresses nothing is dead weight. */
 export const linterOptions = Object.freeze({ noInlineConfig: true, reportUnusedDisableDirectives: "error" })
 
@@ -50,7 +43,7 @@ export const starciBeConfig = ({ sources, plugin, recommended }) => {
         throw new Error(`starciBeConfig refuses a recommendation with rules switched off: ${off.join(", ")}`)
     }
     const configured = Object.fromEntries(
-        Object.entries(rules).map(([name, setting]) => [name, ADVISORY.includes(name) ? setting : asError(setting)]),
+        Object.entries(rules).map(([name, setting]) => [name, asError(setting)]),
     )
     return { files: sources, linterOptions: { ...linterOptions }, plugins: { "starci-be": plugin }, rules: configured }
 }

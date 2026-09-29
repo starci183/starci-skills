@@ -6,29 +6,13 @@ import { join } from "node:path"
 import test from "node:test"
 import { RuleTester } from "eslint"
 import tsParser from "@typescript-eslint/parser"
-import { fileSizeGrowth, fileSizeSoftLimit, recordedLines } from "./size-budget.mjs"
+import { fileSizeGrowth, recordedLines } from "./size-budget.mjs"
 
 const tester = new RuleTester({
     languageOptions: { parser: tsParser, ecmaVersion: 2022, sourceType: "module" },
 })
 const SERVICE = "D:/repo/src/modules/domain/plan/plan.service.ts"
 const lines = (n) => Array.from({ length: n }, (_, i) => `export const v${i} = ${i}`).join("\n") + "\n"
-
-test("a file over the soft budget is shown, a file within it is not", () => {
-    tester.run("file-size-soft-limit", fileSizeSoftLimit, {
-        valid: [
-            { filename: SERVICE, options: [{ max: 5 }], code: lines(5) },
-            { filename: "D:/repo/src/modules/domain/plan/plan.service.spec.ts", options: [{ max: 2 }], code: lines(9) },
-            {
-                filename: "D:/repo/src/modules/domain/plan/persistence/migrations/20260929120000-baseline.ts",
-                options: [{ max: 2 }],
-                code: lines(9),
-            },
-            { filename: "D:/repo/src/modules/domain/plan/plan.d.ts", options: [{ max: 2 }], code: lines(9) },
-        ],
-        invalid: [{ filename: SERVICE, options: [{ max: 5 }], code: lines(6), errors: [{ messageId: "over" }] }],
-    })
-})
 
 test("a file over the budget is not born large and does not grow", () => {
     const recorded = (n) => ({ max: 5, recorded: { "src/modules/domain/plan/plan.service.ts": n } })

@@ -118,4 +118,4 @@ export default {
     rules,
 }
 
-export { starciBeConfig, linterOptions, ADVISORY } from "./lib/config.mjs"
+export { starciBeConfig, linterOptions } from "./lib/config.mjs"

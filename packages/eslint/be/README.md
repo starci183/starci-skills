@@ -39,13 +39,13 @@ export default [
 ]
 ```
 
-It states `warn` as `error` for a zero-warning gate (the one advisory rule, `file-size-soft-limit`, stays a warning, named in `ADVISORY`), applies
+It states `warn` as `error` for a zero-warning gate, applies
 `noInlineConfig` and unused-disable reporting, and refuses a recommendation that carries a rule switched `off`. HFS v2
 keeps no retired-rule list: a rule the standard no longer holds is deleted from the plugin, and every rule that ships is on.
 The parameters a rule takes from the slot manifest (the `@Global()` allowlist, the file line budget, the width of an
 `index.ts`) come through `lib/slots.mjs`, which reads `knowledge/hfs/slots.yaml` and falls back to the rule catalog's values.
 
-Also exported: `rules`, `ruleOwners`, `lawOwners`, `starciBeConfig`, `linterOptions`, `ADVISORY`.
+Also exported: `rules`, `ruleOwners`, `lawOwners`, `starciBeConfig`, `linterOptions`.
 
 ## What it actually catches
 
@@ -59,7 +59,7 @@ A sample, not the list:
 | **Default deny** | Typed bodies and arguments, no `GraphQLJSON` tunnel, no `switch (operation)`, and `@Public` carries a reason (`no-untyped-body`, `public-needs-reason`) |
 | **Module shape** | `@Global()` only on the manifest allowlist; typed `ConfigurableModuleBuilder`; static `register`; one module per file; no `new` of a provider; no module-level `let` |
 | **Suppression** | No `eslint-disable`, `@ts-ignore`, `@ts-expect-error`, `@ts-nocheck` or `vn-ok` comment, anywhere (`no-inline-suppression`) |
-| **Size** | A file over its line budget is not new and does not grow past its size at the parent commit (`file-size-growth`), with an advisory warning for every file over the budget (`file-size-soft-limit`) |
+| **Size** | A file over its line budget is not new and does not grow past its size at the parent commit (`file-size-growth`) |
 | **Spec quality** | A spec does not read repository source with `fs`, and doubles are `mock<T>()`, not `as never` (`spec-no-source-read`, `spec-typed-doubles`) |
 | **CQRS** | A handler does not assemble an aggregate inline; reads and writes do not share one path |
 | **Module layering** | Another owner is imported through its public `index.ts` (`@modules/domain/plan`, `@features/plan`), never through a path into it; an `index.ts` lists a bounded set of named exports, with no `export *`, storage token or types folder; self-aliases and tier-only aliases are refused. |
@@ -110,9 +110,11 @@ mapped by `scripts/checks/lint-why.mjs`). The catalog id is the rule number in `
 | `no-secret-default` | R44 | `BE_SECRET_DEFAULT` |
 | `global-module-allowlist`, `typed-module-definition`, `static-module-register`, `no-new-injectable`, `no-module-let`, `one-module-per-file` | R45 | `BE_MODULE_SHAPE` |
 | `no-inline-suppression` | R18 | `HFS_INLINE_SUPPRESSION` |
-| `file-size-soft-limit`, `file-size-growth` | R20 | `HFS_SIZE_GROWTH` |
+| `file-size-growth` | R20 | `HFS_SIZE_GROWTH` |
 | `spec-no-source-read`, `spec-typed-doubles` | R48 | `BE_SPEC_QUALITY` |
 | `must-deep-module-import`, `no-folder-reexport` | R30 | `BE_PUBLIC_SURFACE` |
+
+There is no soft size-limit lint rule: a warning under a zero-warning gate is an exception in disguise. Listing files over the soft budget (`ruleParams.be.fileLines.soft`) is a report item of the hfs check or the architecture machine, as migration backlog, and never blocks.
 
 The tier direction matrix and the feature-imports-feature ban (R26, R28) are owned by the architecture machine
 (`@starci/hfs`), not by a lint rule: they need the whole import graph.

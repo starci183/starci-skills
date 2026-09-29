@@ -10,7 +10,7 @@
  */
 import assert from "node:assert/strict"
 import test from "node:test"
-import plugin, { ADVISORY, linterOptions, recommended, starciBeConfig } from "./index.mjs"
+import plugin, { linterOptions, recommended, starciBeConfig } from "./index.mjs"
 
 const SOURCES = ["apps/**/*.ts", "src/**/*.ts"]
 
@@ -19,27 +19,17 @@ test("no published rule is off", () => {
     assert.deepEqual(off, [])
 })
 
-test("the block carries every recommended rule, none off, and only the advisory rules at warn", () => {
+test("the block carries every recommended rule, none off, and none left at warn", () => {
     const block = starciBeConfig({ sources: SOURCES, plugin, recommended })
     assert.deepEqual(block.files, SOURCES)
     assert.deepEqual(Object.keys(block.rules).sort(), Object.keys(recommended).sort())
     for (const [name, setting] of Object.entries(block.rules)) {
         const level = Array.isArray(setting) ? setting[0] : setting
         assert.notEqual(level, "off", `${name} is off in the block`)
-        if (ADVISORY.includes(name)) assert.equal(level, "warn", `${name} is advisory and stays a warning`)
-        else assert.equal(level, "error", `${name} is not an error in a zero-warning gate`)
+        assert.equal(level, "error", `${name} is not an error in a zero-warning gate`)
     }
     assert.equal(block.plugins["starci-be"], plugin)
     assert.deepEqual(block.linterOptions, linterOptions)
-})
-
-test("the advisory rules name rules that exist and are the only warnings the canon publishes", () => {
-    for (const name of ADVISORY) assert.ok(name in recommended, `${name} is advisory but not published`)
-    const warned = Object.entries(recommended)
-        .filter(([, setting]) => (Array.isArray(setting) ? setting[0] : setting) === "warn")
-        .map(([name]) => name)
-    // the older laws still publish warn while their debt burns down; the factory lifts those to error
-    for (const name of ADVISORY) assert.ok(warned.includes(name))
 })
 
 test("the two public-surface rules are on and accept the HFS index surface", () => {
