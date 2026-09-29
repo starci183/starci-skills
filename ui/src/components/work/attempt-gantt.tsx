@@ -34,7 +34,7 @@ function FadeScroller({ children }: { children: ReactNode }) {
 /** Timeline of every attempt per leg (bar = dispatched → settled/now, colour = status). */
 export function AttemptGantt({ pipeline, now }: { pipeline: PipelineView; now: number }) {
   const rows = pipeline.legs.map(leg => ({ leg, atts: leg.attempts.filter(a => a.dispatchedAt != null) })).filter(r => r.atts.length);
-  if (!rows.length) return <p className="rounded-lg border border-dashed p-4 text-sm text-muted-foreground">Chưa có lần thử nào để vẽ dòng thời gian.</p>;
+  if (!rows.length) return <p className="rounded-lg border p-4 text-sm text-muted-foreground">Chưa có lần thử nào để vẽ dòng thời gian.</p>;
   const all = rows.flatMap(r => r.atts);
   const endOf = (a: AttemptBrief) => a.settledAt ?? (a.open ? Math.max(now, a.dispatchedAt as number) : a.dispatchedAt as number);
   const t0 = Math.floor(Math.min(...all.map(a => a.dispatchedAt as number)) / STEP_MS) * STEP_MS;
@@ -93,7 +93,7 @@ export function AttemptGantt({ pipeline, now }: { pipeline: PipelineView; now: n
         })}
       </g>)}
       <g>
-        <line x1={nowX} x2={nowX} y1={TOP - 6} y2={height - 6} strokeWidth="1.5" strokeDasharray="4 3" style={{ stroke: 'var(--primary)' }} />
+        <line x1={nowX} x2={nowX} y1={TOP - 6} y2={height - 6} strokeWidth="1.5" style={{ stroke: 'var(--chart-muted)' }} />
         <text x={Math.min(nowX + 4, width - 52)} y={TOP + 10} fontSize="10.5" fontWeight="600" style={{ fill: 'var(--primary)' }}>bây giờ</text>
       </g>
     </svg>

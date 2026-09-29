@@ -1,6 +1,6 @@
 import { ArrowRight } from 'lucide-react';
 import type { AttemptBrief } from '../../../contract';
-import { StatusChip } from '../../status-chip';
+import { StatusChip, StatusDot } from '../../status-chip';
 import { statusFromOutcome, statusFromVerdict } from '../../status';
 import type { Concept } from '../../concept';
 import { AgentAvatar, agentOf } from '../../agent/agent-avatar';
@@ -21,12 +21,12 @@ export function AttemptCard({ attempt, now }: { attempt: AttemptBrief; now: numb
   const verdict = statusFromVerdict(attempt.verdict, open, attempt.status);
   const green = Math.max(0, attempt.checks - attempt.checksRed);
   const who = [attempt.model, attempt.agent, attempt.pool].filter(Boolean).join(' · ');
-  return <li className="rounded-lg border bg-card p-4">
+  return <li className="border-b py-4 last:border-b-0">
     <div className="flex flex-wrap items-center gap-x-2 gap-y-2">
       <strong className="text-sm">#{attempt.id}</strong><span className="text-xs text-muted-foreground">lần {attempt.try}{attempt.unit ? ` · ${attempt.unit}` : ''}</span>
-      <span className="ml-auto flex flex-wrap gap-2">
-        <span title="Kết quả Op tự báo"><StatusChip status={outcome} label={attempt.reportOutcome ? outcomeLabel[attempt.reportOutcome] : 'Op chưa báo'} /></span>
+      <span className="ml-auto flex flex-wrap items-center gap-2">
         <span title="Quyết định của Kernel"><StatusChip status={verdict} label={attempt.verdict ? verdictLabel[attempt.verdict] : open ? 'Kernel: chưa chốt' : 'Kernel: chưa rõ'} /></span>
+        <span title="Kết quả Op tự báo" className="inline-flex items-center gap-1.5 text-xs text-muted-foreground"><StatusDot status={outcome} />{attempt.reportOutcome ? outcomeLabel[attempt.reportOutcome] : 'Op chưa báo'}</span>
       </span>
     </div>
     <p className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 break-words text-xs text-muted-foreground">

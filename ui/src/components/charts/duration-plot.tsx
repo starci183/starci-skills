@@ -26,7 +26,7 @@ export function DurationPlot({ rows, now }: { rows: AttemptRow[]; now: number })
     legend={[{ tone: 'success', label: 'Đạt' }, { tone: 'failed', label: 'Hỏng/chặn' }, { tone: 'running', label: 'Còn mở (rỗng)', hollow: true }]}
     empty={!dots.length && 'Chưa có lần thử nào có mốc thời gian trong khoảng này.'}>
     <div ref={ref}><svg width={width} height={height} role="img" aria-label="Thời gian mỗi lần thử theo op" className="block max-w-full">
-      {ticks.map(t => <g key={t}><line x1={x(t)} x2={x(t)} y1={0} y2={ops.length * ROW} className="stroke-border" strokeDasharray={t === 0 ? undefined : '2 3'} />
+      {ticks.map(t => <g key={t}><line x1={x(t)} x2={x(t)} y1={0} y2={ops.length * ROW} className="stroke-border" />
         <text x={x(t)} y={ops.length * ROW + 16} textAnchor="middle" className="fill-muted-foreground text-[11px] tabular-nums">{t}</text></g>)}
       {ops.map(([op, list], i) => <g key={op} transform={`translate(0 ${i * ROW})`}>
         <text x={labelW} y={ROW / 2 + 4} textAnchor="end" className="fill-foreground font-mono text-[11.5px]"><title>{op}</title>{cut(op, Math.floor(labelW / 6.6))}</text>

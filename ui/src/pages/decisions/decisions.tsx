@@ -1,7 +1,8 @@
 import { ArrowRight, CircleAlert, MessageCircleQuestion, ShieldAlert } from 'lucide-react';
-import { useApiQuery } from '../../api/query';
+import { refreshQuery, useApiQuery } from '../../api/query';
 import { ConceptBlock, type Concept } from '../../components/concept';
 import { Advanced, Stagger, StaggerItem } from '../../components/motion';
+import { FeedbackState, PageSkeleton } from '../../components/feedback-state';
 import { StateChip } from '../../components/state-chip';
 import { TimeAgo } from '../../components/time-ago';
 import type { DecisionRow, Ref, UiState } from '../../contract';
@@ -47,7 +48,7 @@ function DecisionCard({ row }: { row: DecisionRow }) {
   return <div className="flex min-w-0 flex-col gap-3 rounded-xl border bg-card p-4 transition-colors hover:border-primary/40 min-[760px]:p-6">
     <a href={href({ id: row.id })} className="group flex min-w-0 flex-col gap-3 rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring sm:flex-row sm:items-center sm:gap-4">
       <StateChip state={row.ui} compact />
-      <span className="flex min-w-0 flex-1 flex-col gap-1"><span className="flex flex-wrap items-center gap-2"><strong className="break-all text-sm">{row.kind}</strong>{row.overdue && <span className="rounded-full bg-destructive/10 px-2 py-1 text-xs font-semibold text-destructive">Quá hạn</span>}</span>
+      <span className="flex min-w-0 flex-1 flex-col gap-1"><span className="flex flex-wrap items-center gap-2"><strong className="break-all text-sm">{row.kind}</strong>{row.overdue && <span className="text-xs font-semibold text-destructive">Quá hạn</span>}</span>
         <span className="block break-words text-sm text-muted-foreground">{credential ? 'Yêu cầu xác thực · nội dung được ẩn.' : row.summary}</span>
         <span className="block break-words text-xs text-muted-foreground">Người quyết: {escalation(row)}</span>
       </span>
@@ -95,22 +96,25 @@ export function DecisionsPage() {
   if (overdue) decisionParams.set('overdue', '1');
   if (params.get('project')) decisionParams.set('project', params.get('project')!);
   if (params.get('wf')) decisionParams.set('wf', params.get('wf')!);
-  const decisions = useApiQuery<DecisionRow[]>(`/api/decisions${decisionParams.size ? `?${decisionParams}` : ''}`, { topics: ['decisions'], intervalMs: 20_000 });
-  const asks = useApiQuery<AskRow[]>('/api/asks?state=open', { topics: ['decisions'], intervalMs: 30_000 });
-  const incidents = useApiQuery<IncidentRow[]>(`/api/incidents?status=${tab === 'incidents' && status ? encodeURIComponent(status) : 'open'}`, { topics: ['decisions'], intervalMs: 30_000 });
+  const decisionsUrl = `/api/decisions${decisionParams.size ? `?${decisionParams}` : ''}`;
+  const asksUrl = '/api/asks?state=open';
+  const incidentsUrl = `/api/incidents?status=${tab === 'incidents' && status ? encodeURIComponent(status) : 'open'}`;
+  const decisions = useApiQuery<DecisionRow[]>(decisionsUrl, { topics: ['decisions'], intervalMs: 20_000 });
+  const asks = useApiQuery<AskRow[]>(asksUrl, { topics: ['decisions'], intervalMs: 30_000 });
+  const incidents = useApiQuery<IncidentRow[]>(incidentsUrl, { topics: ['decisions'], intervalMs: 30_000 });
   const kinds = [...new Set([kind, ...(decisions.data ?? []).map(row => row.kind)].filter(Boolean))].sort();
   const tabs = [
     { key: 'di', label: 'DI', count: decisions.data?.length ?? null, icon: CircleAlert },
     { key: 'asks', label: 'Hỏi thầy', count: asks.data?.length ?? null, icon: MessageCircleQuestion },
     { key: 'incidents', label: 'Sự cố', count: incidents.data?.length ?? null, icon: ShieldAlert },
   ] as const;
-  return <ConceptBlock concept="C12" className="mx-auto flex w-full max-w-6xl min-w-0 flex-col gap-6 p-4 pb-24 sm:p-6 md:gap-8 lg:p-8">
+  return <ConceptBlock concept="C12" className="mx-auto flex w-full max-w-7xl min-w-0 flex-col gap-6 pb-24 md:gap-8">
     <header className="flex flex-col gap-2"><p className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">StarCi / quyết định</p><h1 className="text-2xl font-semibold tracking-tight sm:text-3xl">Quyết định</h1>
       <p className="text-sm text-muted-foreground">Theo dõi việc đang chờ quyết, câu hỏi gửi thầy và sự cố. Trang này chỉ đọc.</p></header>
     <nav aria-label="Mục quyết định" className="flex min-w-0 gap-1 overflow-x-auto border-b">
       {tabs.map(item => <a key={item.key} href={href({ tab: item.key, id: null, status: null, kind: null, overdue: null })} aria-current={tab === item.key ? 'page' : undefined}
         className={`inline-flex shrink-0 items-center gap-2 border-b-2 px-4 py-3 text-sm font-medium ${tab === item.key ? 'border-primary text-foreground' : 'border-transparent text-muted-foreground hover:text-foreground'}`}>
-        <item.icon className="size-4" aria-hidden="true" />{item.label}<span className="rounded-full bg-muted px-2 py-1 text-xs">{item.count ?? '—'}</span>
+        <item.icon className="size-4" aria-hidden="true" />{item.label}<span className="text-xs text-muted-foreground tabular-nums">{item.count ?? '—'}</span>
       </a>)}
     </nav>
     {tab === 'di' && <div className="grid gap-4 rounded-xl border bg-card p-4 min-[760px]:p-6 sm:grid-cols-2 lg:grid-cols-4">
@@ -120,15 +124,15 @@ export function DecisionsPage() {
       <label className="flex items-end gap-2 pb-2 text-sm"><input type="checkbox" checked={overdue} onChange={event => navigate({ overdue: event.target.checked ? '1' : null, id: null })} className="size-4 accent-primary" /><span>Chỉ quá hạn</span></label>
     </div>}
     {tab === 'incidents' && <div className="max-w-xs"><SelectFilter label="Trạng thái sự cố" value={status} options={[{ value: '', label: 'Đang mở' }, { value: 'all', label: 'Tất cả' }, { value: 'open', label: 'Đang mở' }, { value: 'resolved', label: 'Đã giải' }, { value: 'superseded', label: 'Đã thay thế' }]} onChange={value => navigate({ status: value })} /></div>}
-    {tab === 'di' && <div className="grid gap-4" aria-live="polite">{decisions.error && <p role="alert" className="rounded-lg border border-destructive/30 p-3 text-sm text-destructive">{decisions.error}</p>}
+    {tab === 'di' && <div className="grid gap-4" aria-live="polite">{decisions.error && <FeedbackState error onRetry={() => refreshQuery(decisionsUrl)}>{decisions.error}</FeedbackState>}
       <Stagger className="grid gap-4">{decisions.data?.map(row => <StaggerItem key={`${row.project ?? 'machine'}:${row.id}`}><DecisionCard row={row} /></StaggerItem>)}</Stagger>
-      {!decisions.data?.length && <p className="rounded-xl border p-5 text-sm text-muted-foreground">{decisions.loading ? 'Đang đọc quyết định…' : 'Không có quyết định phù hợp.'}</p>}</div>}
-    {tab === 'asks' && <div className="grid gap-4" aria-live="polite">{asks.error && <p role="alert" className="rounded-lg border border-destructive/30 p-3 text-sm text-destructive">{asks.error}</p>}
+      {!decisions.error && !decisions.data?.length && (decisions.loading ? <PageSkeleton label="Đang đọc quyết định…" /> : <FeedbackState>Không có quyết định phù hợp.</FeedbackState>)}</div>}
+    {tab === 'asks' && <div className="grid gap-4" aria-live="polite">{asks.error && <FeedbackState error onRetry={() => refreshQuery(asksUrl)}>{asks.error}</FeedbackState>}
       <Stagger className="grid gap-4">{asks.data?.map(row => <StaggerItem key={row.id}><AskCard row={row} /></StaggerItem>)}</Stagger>
-      {!asks.data?.length && <p className="rounded-xl border p-5 text-sm text-muted-foreground">{asks.loading ? 'Đang đọc câu hỏi…' : 'Không có câu hỏi đang mở.'}</p>}</div>}
-    {tab === 'incidents' && <div className="grid gap-4" aria-live="polite">{incidents.error && <p role="alert" className="rounded-lg border border-destructive/30 p-3 text-sm text-destructive">{incidents.error}</p>}
+      {!asks.error && !asks.data?.length && (asks.loading ? <PageSkeleton label="Đang đọc câu hỏi…" /> : <FeedbackState>Không có câu hỏi đang mở.</FeedbackState>)}</div>}
+    {tab === 'incidents' && <div className="grid gap-4" aria-live="polite">{incidents.error && <FeedbackState error onRetry={() => refreshQuery(incidentsUrl)}>{incidents.error}</FeedbackState>}
       <Stagger className="grid gap-4">{incidents.data?.map(row => <StaggerItem key={`${row.project}:${row.id}`}><IncidentCard row={row} /></StaggerItem>)}</Stagger>
-      {!incidents.data?.length && <p className="rounded-xl border p-5 text-sm text-muted-foreground">{incidents.loading ? 'Đang đọc sự cố…' : 'Không có sự cố phù hợp.'}</p>}</div>}
+      {!incidents.error && !incidents.data?.length && (incidents.loading ? <PageSkeleton label="Đang đọc sự cố…" /> : <FeedbackState>Không có sự cố phù hợp.</FeedbackState>)}</div>}
     <DecisionDrawer id={selectedId} onClose={() => navigate({ id: null })} />
   </ConceptBlock>;
 }

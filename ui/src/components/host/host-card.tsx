@@ -45,12 +45,12 @@ function Spark({ history }: { history: HostView['history'] }) {
   return <div>
     <svg viewBox="0 0 300 60" preserveAspectRatio="none" role="img" aria-label="CPU và RAM trống theo thời gian" className="h-20 w-full">
       {[25, 50, 75].map(g => <line key={g} x1="0" x2="300" y1={58 - g * 0.56} y2={58 - g * 0.56} stroke="var(--border)" strokeWidth="1" vectorEffect="non-scaling-stroke" />)}
-      <polyline fill="none" stroke={toneVar('running')} strokeWidth="2" vectorEffect="non-scaling-stroke" points={line(r => r.cpuPct)} />
-      <polyline fill="none" stroke={toneVar('success')} strokeWidth="2" strokeDasharray="4 3" vectorEffect="non-scaling-stroke" points={line(r => r.freeRamPct)} />
+      <polyline fill="none" stroke="var(--chart-ink)" strokeWidth="2" vectorEffect="non-scaling-stroke" points={line(r => r.cpuPct)} />
+      <polyline fill="none" stroke="var(--chart-muted)" strokeWidth="2" vectorEffect="non-scaling-stroke" points={line(r => r.freeRamPct)} />
     </svg>
     <div className="mt-1 flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
-      <span data-tone="running" className="inline-flex items-center gap-2"><span className="h-0.5 w-4" style={{ background: 'var(--tone)' }} />CPU %</span>
-      <span data-tone="success" className="inline-flex items-center gap-2"><span className="h-0 w-4 border-t-2 border-dashed" style={{ borderColor: 'var(--tone)' }} />RAM trống %</span>
+      <span className="inline-flex items-center gap-2"><span className="h-0.5 w-4" style={{ background: 'var(--chart-ink)' }} />CPU %</span>
+      <span className="inline-flex items-center gap-2"><span className="h-0.5 w-4" style={{ background: 'var(--chart-muted)' }} />RAM trống %</span>
       <span>{history.length} mẫu gần nhất</span>
     </div>
   </div>;

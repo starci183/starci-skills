@@ -4,6 +4,7 @@ import { Button } from './components/ui/button';
 import { Enter } from './components/motion';
 import { Badge } from './components/ui/badge';
 import { SearchBox } from './components/search-box';
+import { FeedbackState, PageSkeleton } from './components/feedback-state';
 import { useApiQuery, useLiveStatus, useQueryHealth } from './api/query';
 import { formatAbsolute, navLabels } from './i18n/vi';
 import { navKind, useRoute, type Route } from './router';
@@ -53,10 +54,10 @@ function routeTitle(route: Route): string {
 
 function PageSlot({ route }: { route: Route }) {
   const path = routePage(route);
-  if (path == null) return <div className="shell-placeholder"><strong>Không tìm thấy trang</strong><span>Kiểm tra lại đường dẫn.</span><a href="#/">Về Tổng quan</a></div>;
+  if (path == null) return <FeedbackState><strong>Không tìm thấy trang</strong> · Kiểm tra lại đường dẫn. <a href="#/" className="underline">Về Tổng quan</a></FeedbackState>;
   const Page = pages[path];
-  if (!Page) return <div className="shell-placeholder"><strong>Trang đang được chuẩn bị</strong><span>Chưa có giao diện cho trang này trong bản build hiện tại.</span></div>;
-  return <Suspense fallback={<div className="shell-placeholder" role="status"><strong>Đang tải trang…</strong></div>}><Enter key={path}><Page /></Enter></Suspense>;
+  if (!Page) return <FeedbackState><strong>Trang đang được chuẩn bị</strong> · Chưa có giao diện cho trang này trong bản build hiện tại.</FeedbackState>;
+  return <Suspense fallback={<PageSkeleton />}><Enter key={path}><Page /></Enter></Suspense>;
 }
 
 function useTheme(): [Theme, () => void] {

@@ -24,13 +24,13 @@ export function Throughput({ rows, since, now }: { rows: AttemptRow[]; since: nu
     legend={[{ neutral: true, label: 'Giao' }, { tone: 'queued', label: 'Chốt' }]} empty={!rows.length && 'Chưa có lần thử nào trong khoảng này.'}>
     <div ref={ref}><svg width={width} height={H} role="img" aria-label="Thông lượng theo thời gian" className="block max-w-full">
       {Array.from({ length: Math.round(top / tick) + 1 }, (_, i) => i * tick).map(v => <g key={v}>
-        <line x1={LEFT} x2={width - 6} y1={y(v)} y2={y(v)} className="stroke-border" strokeDasharray={v === 0 ? undefined : '2 3'} />
+        <line x1={LEFT} x2={width - 6} y1={y(v)} y2={y(v)} className="stroke-border" />
         <text x={LEFT - 6} y={y(v) + 4} textAnchor="end" className="fill-muted-foreground text-[11px] tabular-nums">{v}</text></g>)}
       {buckets.map((b, i) => {
         const cx = LEFT + slot * i + slot / 2, when = `${fmtDayClock(b.start)} → ${fmtClock(b.end)}`;
         return <g key={b.start}>
-          {b.dispatched > 0 ? <motion.rect initial={{ scaleY: 0 }} animate={{ scaleY: 1 }} transition={{ duration: 0.36, ease: EASE }} style={{ transformOrigin: 'bottom', transformBox: 'fill-box' }} x={cx - bw - 0.5} y={y(b.dispatched)} width={bw} height={y(0) - y(b.dispatched)} rx={2} fill="var(--primary)"><title>{`${when} · giao ${b.dispatched}`}</title></motion.rect> : null}
-          {b.settled > 0 ? <motion.rect initial={{ scaleY: 0 }} animate={{ scaleY: 1 }} transition={{ duration: 0.36, ease: EASE }} style={{ transformOrigin: 'bottom', transformBox: 'fill-box' }} x={cx + 0.5} y={y(b.settled)} width={bw} height={y(0) - y(b.settled)} rx={2} fill={toneVar('queued')}><title>{`${when} · chốt ${b.settled}`}</title></motion.rect> : null}
+          {b.dispatched > 0 ? <motion.rect initial={{ scaleY: 0 }} animate={{ scaleY: 1 }} transition={{ duration: 0.24, ease: EASE }} style={{ transformOrigin: 'bottom', transformBox: 'fill-box' }} x={cx - bw - 0.5} y={y(b.dispatched)} width={bw} height={y(0) - y(b.dispatched)} rx={2} fill="var(--primary)"><title>{`${when} · giao ${b.dispatched}`}</title></motion.rect> : null}
+          {b.settled > 0 ? <motion.rect initial={{ scaleY: 0 }} animate={{ scaleY: 1 }} transition={{ duration: 0.24, ease: EASE }} style={{ transformOrigin: 'bottom', transformBox: 'fill-box' }} x={cx + 0.5} y={y(b.settled)} width={bw} height={y(0) - y(b.settled)} rx={2} fill={toneVar('queued')}><title>{`${when} · chốt ${b.settled}`}</title></motion.rect> : null}
           {i % every === 0 ? <text x={cx} y={H - 8} textAnchor="middle" className="fill-muted-foreground text-[11px] tabular-nums">{label(b.start)}</text> : null}
         </g>;
       })}

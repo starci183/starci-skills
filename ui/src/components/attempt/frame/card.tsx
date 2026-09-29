@@ -1,5 +1,6 @@
 import { createContext, useContext, type ReactNode } from 'react';
 import { ConceptBlock, type Concept } from '../../concept';
+import { FeedbackState } from '../../feedback-state';
 
 export const concept: Concept = 'frame';
 
@@ -30,5 +31,5 @@ export function Card({ id, title, hint, right, concept: c, children, className =
 }
 
 export function Empty({ children }: { children: ReactNode }) {
-  return <p className="m-0 rounded-lg border border-dashed p-3 text-sm text-muted-foreground">{children}</p>;
+  return <FeedbackState>{children}</FeedbackState>;
 }

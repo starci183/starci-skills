@@ -91,10 +91,10 @@ export function ResultCard({ attempt }: { attempt: AttemptDetailV3 }) {
           {attempt.reportOutcome ? <StatusChip status={opStatus} label={outcomeLabels[attempt.reportOutcome] ?? attempt.reportOutcome} /> : <StatusChip status="queued" label="Chưa có báo cáo" />}
         </div>
         {summary ? <p className="m-0 max-w-[72ch] whitespace-pre-line break-words rounded-lg border-l-4 border-[var(--tone-line)] bg-[var(--tone-bg)] px-4 py-3 text-[15px] leading-relaxed">{summary}</p>
-          : <p className="m-0 rounded-lg border border-dashed p-3 text-sm text-muted-foreground">Op chưa ghi tóm tắt kết quả.</p>}
+          : <p className="m-0 rounded-lg border p-3 text-sm text-muted-foreground">Op chưa ghi tóm tắt kết quả.</p>}
       </section>
 
-      <section className="min-w-0 rounded-lg border p-4" data-tone={verdictTone}>
+      <section className="min-w-0 border-t pt-6" data-tone={verdictTone}>
         <div className="mb-2 flex flex-wrap items-center gap-2">
           <Gavel className="size-4 text-[var(--tone)]" aria-hidden="true" />
           <h3 className="m-0 text-sm font-medium">Kernel chốt</h3>

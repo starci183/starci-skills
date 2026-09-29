@@ -110,7 +110,7 @@ export function EvidenceBrowser({ files, selected, onSelect }: { files: Evidence
     else if (r.bottom > b.bottom) box.scrollTop += r.bottom - b.bottom;
   }, [current?.artifactId]);
 
-  if (files.length === 0) return <div className="rounded-lg border border-dashed p-4 text-sm text-muted-foreground">Lần thử này chưa có tệp bằng chứng nào.</div>;
+  if (files.length === 0) return <div className="rounded-lg border p-4 text-sm text-muted-foreground">Lần thử này chưa có tệp bằng chứng nào.</div>;
 
   return <div className="grid min-w-0 gap-3 lg:grid-cols-[minmax(260px,340px)_minmax(0,1fr)]" onKeyDown={onKeyDown}>
     <div ref={listRef} role="listbox" aria-label="Tệp bằng chứng" tabIndex={0} className="max-h-[70vh] min-w-0 space-y-4 overflow-auto rounded-lg border bg-card p-2">
@@ -140,7 +140,7 @@ export function EvidenceBrowser({ files, selected, onSelect }: { files: Evidence
         </section>;
       })}
       {org.empty.length ? <section aria-label="Tệp rỗng">
-        <button type="button" aria-expanded={showEmpty} onClick={() => setShowEmpty(v => !v)} className="w-full rounded-md border border-dashed px-2 py-2 text-left text-xs text-muted-foreground hover:bg-muted">{org.empty.length} tệp rỗng {showEmpty ? '· ẩn' : '· xem'}</button>
+        <button type="button" aria-expanded={showEmpty} onClick={() => setShowEmpty(v => !v)} className="w-full rounded-md border px-2 py-2 text-left text-xs text-muted-foreground hover:bg-muted">{org.empty.length} tệp rỗng {showEmpty ? '· ẩn' : '· xem'}</button>
         {showEmpty ? <div className="mt-1 space-y-1">{org.empty.map(f => <Row key={f.artifactId} file={f} active={f.artifactId === current?.artifactId} onPick={() => onSelect(f.artifactId)} />)}</div> : null}
       </section> : null}
     </div>

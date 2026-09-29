@@ -29,7 +29,7 @@ export function OpOutcomes({ rows }: { rows: AttemptRow[] }) {
           {order.map(state => {
             const n = g[state]; if (!n) return null;
             const w = (n / max) * width;
-            const rect = <motion.rect key={state} initial={{ scaleX: 0 }} animate={{ scaleX: 1 }} transition={{ duration: 0.36, ease: EASE, delay: i * 0.04 }} style={{ transformOrigin: 'left', transformBox: 'fill-box' }} x={x} y={22} width={Math.max(w, 2)} height={14} rx={2} fill={toneVar(stateTone[state])}
+            const rect = <motion.rect key={state} initial={{ scaleX: 0 }} animate={{ scaleX: 1 }} transition={{ duration: 0.24, ease: EASE, delay: i * 0.04 }} style={{ transformOrigin: 'left', transformBox: 'fill-box' }} x={x} y={22} width={Math.max(w, 2)} height={14} rx={2} fill={toneVar(stateTone[state])}
               stroke={state === 'dropped' ? toneVar('skipped', '-line') : undefined} strokeDasharray={state === 'dropped' ? '3 2' : undefined}>
               <title>{`${g.op} · ${stateLabel[state]}: ${num(n, 0)}/${num(g.total, 0)} lần thử`}</title></motion.rect>;
             x += w; return rect;

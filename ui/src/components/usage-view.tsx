@@ -95,8 +95,8 @@ export function UsageView({ usage: raw, compact = false }: { usage: Usage; compa
   return <div className="flex flex-col gap-3">
     <TokenBar input={total.input} output={total.output} cache={total.cacheRead + total.cacheWrite} />
     <dl className="m-0 grid grid-cols-2 gap-2 sm:grid-cols-4">
-      {cells.map(([label, value, exact]) => <div key={label} className="min-w-0 rounded-md border border-border bg-muted/40 px-3 py-2">
-        <dt className="text-[11px] text-muted-foreground">{label}</dt><dd className="m-0 truncate font-mono text-sm font-semibold" title={exact}>{value}</dd>
+      {cells.map(([label, value, exact]) => <div key={label} className="min-w-0 px-3 py-2">
+        <dt className="text-xs text-muted-foreground">{label}</dt><dd className="m-0 truncate text-sm font-semibold tabular-nums" title={exact}>{value}</dd>
       </div>)}
     </dl>
     <Sources sources={usage.sources} />

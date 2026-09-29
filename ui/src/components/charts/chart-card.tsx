@@ -4,6 +4,7 @@ import type { ReactNode } from 'react';
 import { motion } from 'motion/react';
 import { DURATION, EASE } from '../motion';
 import { toneVar, type Tone } from '../status';
+import { FeedbackState } from '../feedback-state';
 
 export type LegendItem = { tone?: Tone; label: string; hollow?: boolean; neutral?: boolean };
 
@@ -21,10 +22,10 @@ export function Legend({ items }: { items: LegendItem[] }) {
 /** One analytics chart: title, one-line explanation, legend, body or empty state. */
 export function ChartCard({ title, hint, legend, empty, className = '', children }: { title: string; hint: string; legend?: LegendItem[];
   empty?: string | false; className?: string; children?: ReactNode }) {
-  return <motion.section initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: DURATION.enter, ease: EASE }} className={`min-w-0 rounded-xl bg-card p-4 text-card-foreground ring-1 ring-foreground/10 min-[760px]:p-6 ${className}`} aria-label={title}>
+  return <motion.section initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: DURATION.enter, ease: EASE }} className={`chart-card min-w-0 rounded-xl border bg-card p-4 text-card-foreground min-[760px]:p-6 ${className}`} aria-label={title}>
     <h2 className="text-base font-semibold">{title}</h2>
     <p className="mt-1 text-xs text-muted-foreground">{hint}</p>
     {legend && !empty ? <div className="mt-2"><Legend items={legend} /></div> : null}
-    <div className="mt-4 min-w-0">{empty ? <p className="rounded-lg border border-dashed p-4 text-center text-sm text-muted-foreground">{empty}</p> : children}</div>
+    <div className="mt-4 min-w-0">{empty ? <FeedbackState>{empty}</FeedbackState> : children}</div>
   </motion.section>;
 }

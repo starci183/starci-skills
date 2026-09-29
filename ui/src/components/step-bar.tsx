@@ -20,7 +20,7 @@ export function StepBar({ steps, selected, onSelect }: { steps: StepItem[]; sele
         onClick={() => onSelect(step.key)}>
         <span className="step-marker"><Icon className="size-3.5" aria-hidden="true" /></span>
         <span className="step-copy"><strong>{stepLabels[step.key]}</strong><small>{step.detail ?? (step.at ? new Intl.DateTimeFormat('vi-VN', { timeZone: 'Asia/Bangkok', hour: '2-digit', minute: '2-digit' }).format(step.at) : 'Chưa có mốc')}</small>
-          {step.segments?.length ? <span className="step-segments" aria-hidden="true">{step.segments.filter(s => s.n > 0).map((s, i) => <motion.span key={i} data-tone={s.tone} style={{ flex: s.n, transformOrigin: 'left center' }} initial={{ scaleX: 0 }} animate={{ scaleX: 1 }} transition={{ duration: 0.36, ease: EASE, delay: index * 0.05 + i * 0.04 }} />)}</span> : null}
+          {step.segments?.length ? <span className="step-segments" aria-hidden="true">{step.segments.filter(s => s.n > 0).map((s, i) => <motion.span key={i} data-tone={s.tone} style={{ flex: s.n, transformOrigin: 'left center' }} initial={{ scaleX: 0 }} animate={{ scaleX: 1 }} transition={{ duration: 0.24, ease: EASE, delay: index * 0.05 + i * 0.04 }} />)}</span> : null}
         </span>
         <Grow className="step-stripe" delay={index * 0.05} />
         <span className="sr-only">Bước {index + 1}</span>

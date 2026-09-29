@@ -28,7 +28,7 @@ function TokenRows({ title, rows, name }: { title: string; rows: Group[]; name: 
       {rows.map(row => <li key={row.k} className="min-w-0 text-xs">
         <div className="flex flex-wrap items-baseline justify-between gap-x-2"><span className="min-w-0 max-w-full break-all font-mono" title={name(row.k)}>{name(row.k)}</span>
           <span className="shrink-0 tabular-nums text-muted-foreground">vào {compactVi(row.input)} · ra {compactVi(row.output)} · {costVi(row.costUsd)}</span></div>
-        <motion.div className="mt-1 flex h-2 overflow-hidden rounded-full bg-muted" initial={{ scaleX: 0 }} animate={{ scaleX: 1 }} transition={{ duration: 0.36, ease: EASE }} style={{ width: `${Math.max(4, (tokens(row) / max) * 100)}%`, transformOrigin: 'left center' }} role="img" aria-label={`${name(row.k)}: vào ${compactVi(row.input)}, ra ${compactVi(row.output)}`}>
+        <motion.div className="mt-1 flex h-2 overflow-hidden rounded-full bg-muted" initial={{ scaleX: 0 }} animate={{ scaleX: 1 }} transition={{ duration: 0.24, ease: EASE }} style={{ width: `${Math.max(4, (tokens(row) / max) * 100)}%`, transformOrigin: 'left center' }} role="img" aria-label={`${name(row.k)}: vào ${compactVi(row.input)}, ra ${compactVi(row.output)}`}>
           <span data-tone="running" className="h-full bg-[var(--tone)]" style={{ flex: row.input ?? 0 }} /><span data-tone="success" className="h-full bg-[var(--tone)]" style={{ flex: row.output ?? 0 }} />
         </motion.div>
       </li>)}
@@ -46,7 +46,7 @@ function PerDay({ rows }: { rows: Group[] }) {
     <div className="flex h-32 items-end gap-2" role="img" aria-label="Cột theo ngày">
       {rows.map(r => <div key={r.k} data-tone="running" className="flex min-w-0 flex-1 flex-col items-center justify-end gap-1" title={`${dayLabel(r.k)}: ${hasCost ? costVi(r.costUsd) : compactVi(tokens(r))}`}>
         <span className="text-[10px] tabular-nums text-muted-foreground">{hasCost ? costVi(r.costUsd) : compactVi(tokens(r))}</span>
-        <motion.div className="w-full max-w-10 rounded-t bg-[var(--tone)]" initial={{ scaleY: 0 }} animate={{ scaleY: 1 }} transition={{ duration: 0.36, ease: EASE }} style={{ height: `${Math.max(3, (value(r) / max) * 88)}px`, transformOrigin: 'bottom' }} />
+        <motion.div className="w-full max-w-10 rounded-t bg-[var(--tone)]" initial={{ scaleY: 0 }} animate={{ scaleY: 1 }} transition={{ duration: 0.24, ease: EASE }} style={{ height: `${Math.max(3, (value(r) / max) * 88)}px`, transformOrigin: 'bottom' }} />
         <span className="text-[10px] tabular-nums text-muted-foreground">{dayLabel(r.k)}</span>
       </div>)}
     </div>
@@ -81,7 +81,7 @@ export function UsagePanel({ metrics, window: win, summary }: { metrics: OpsMetr
       </div> : list.length ? <p className="m-0 text-xs text-muted-foreground">Số liệu tóm tắt trên từng lần thử; chi tiết theo model và op chưa có vì llm_usage trống.</p> : null}
       {fromLog && usage!.byProvider.length > 1 ? <TokenRows title="Token theo nhà cung cấp" rows={usage!.byProvider} name={k => k} /> : null}
       {fromLog && usage!.byDay.length ? <PerDay rows={usage!.byDay} /> : null}
-    </div> : <div className="rounded-lg border border-dashed p-4 text-sm"><p className="font-medium">Chưa ghi nhận</p>
+    </div> : <div className="rounded-lg border p-4 text-sm"><p className="font-medium">Chưa ghi nhận</p>
       <p className="mt-1 text-muted-foreground">Chưa có lần thử nào trong khoảng này báo số token hoặc chi phí. Khi nhà cung cấp trả về, số liệu sẽ hiện ở đây.</p>
       {summary?.usage24h && !summary.usage24h.recorded ? <p className="mt-1 text-xs text-muted-foreground">Toàn hệ thống 24 giờ qua cũng chưa có bản ghi sử dụng.</p> : null}</div>}
   </ChartCard>;

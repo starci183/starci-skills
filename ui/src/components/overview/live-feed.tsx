@@ -24,7 +24,7 @@ function FeedRow({ row, fresh }: { row: LogRow; fresh: boolean }) {
   const ref = useRef<HTMLElement>(null);
   useEffect(() => {
     if (fresh && ref.current && !window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
-      ref.current.animate([{ backgroundColor: 'var(--status-running-bg)' }, { backgroundColor: 'transparent' }], { duration: 1600, easing: 'ease-out' });
+      ref.current.animate([{ backgroundColor: 'var(--muted)' }, { backgroundColor: 'transparent' }], { duration: 240, easing: 'ease-out' });
     }
   }, [fresh]);
   const href = logHref(row);

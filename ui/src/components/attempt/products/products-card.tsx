@@ -65,7 +65,7 @@ export function ProductsCard({ project, attempt }: { project: string; attempt: A
         {loading ? <p className="m-0 text-sm text-muted-foreground">Đang đọc tệp của op…</p>
           : products?.error ? <Empty>Không đọc được commit của op: {products.error}</Empty>
             : files.length ? <>
-              {fallback ? <p className="mb-3 mt-0 rounded-lg border border-dashed p-2 text-xs text-muted-foreground" data-tone="warning">Máy chủ chưa có API sản phẩm: chỉ hiện danh sách tệp trong báo cáo và diff từ patch.diff, chưa có nội dung.</p> : null}
+              {fallback ? <p className="mb-3 mt-0 rounded-lg border p-2 text-xs text-muted-foreground" data-tone="warning">Máy chủ chưa có API sản phẩm: chỉ hiện danh sách tệp trong báo cáo và diff từ patch.diff, chưa có nội dung.</p> : null}
               <ul className="m-0 flex list-none flex-col divide-y p-0">{files.map(file => <ProductRow key={file.path} file={file} />)}</ul>
             </> : <Empty>Op không ghi tệp nào vào repo (báo cáo không liệt kê tệp).</Empty>}
         {other.length ? <details className="mt-3 rounded-lg border p-3 text-sm"><summary className="cursor-pointer text-muted-foreground hover:text-foreground">Commit này còn đổi {other.length} tệp khác</summary>

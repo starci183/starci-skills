@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { ArrowUp, Filter, Radio, RefreshCw, SlidersHorizontal, X } from 'lucide-react';
-import { Badge } from '../../components/ui/badge';
+import { FeedbackState, PageSkeleton } from '../../components/feedback-state';
 import { Button } from '../../components/ui/button';
 import { ConceptBlock, type Concept } from '../../components/concept';
 import { Drawer } from '../../components/drawer';
@@ -177,11 +177,11 @@ export default function LogsPage() {
       <div className="flex gap-2"><Button variant="outline" size="sm" className="md:hidden" onClick={() => setFilterOpen(true)}><Filter size={15} /> Bộ lọc{activeCount ? ` (${activeCount})` : ''}</Button><Button variant={follow ? 'default' : 'outline'} size="sm" aria-pressed={follow} disabled={filters.has('q')} title={filters.has('q') ? 'Theo dõi không hỗ trợ tìm toàn văn; xóa từ khóa để bật.' : undefined} onClick={() => setFollow((value) => !value)}><Radio size={15} /> {follow ? streamStatus === 'live' ? 'Đang theo dõi trực tiếp' : 'Đang nối lại' : 'Theo dõi trực tiếp'}</Button></div></div>
     <div className="hidden md:block"><FilterBar filters={filters} onChange={change} contract={contract.data} workflows={workflowList.data ?? []} activeCount={activeCount} onMore={() => setFilterOpen(true)} /></div>
     <div className="flex min-w-0 flex-col gap-3">
-      <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-muted-foreground"><div className="flex flex-wrap items-center gap-2"><Badge variant="outline">{rows.length} dòng đã tải</Badge><span>{sources.length ? sources.map((source) => source === 'machine' ? 'máy' : source).join(' · ') : 'Chưa có nguồn'}</span></div><div className="flex items-center gap-2"><span>{logs.meta ? `Nguồn ${formatAbsolute(logs.meta.at)}` : 'Chưa có thời điểm nguồn'}</span><Button variant="ghost" size="icon" aria-label="Làm mới" onClick={() => refreshQuery(apiUrl)}><RefreshCw size={15} /></Button></div></div>
+      <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-muted-foreground"><div className="flex flex-wrap items-center gap-2"><span>{rows.length} dòng đã tải</span><span>{sources.length ? sources.map((source) => source === 'machine' ? 'máy' : source).join(' · ') : 'Chưa có nguồn'}</span></div><div className="flex items-center gap-2"><span>{logs.meta ? `Nguồn ${formatAbsolute(logs.meta.at)}` : 'Chưa có thời điểm nguồn'}</span><Button variant="ghost" size="icon" aria-label="Làm mới" onClick={() => refreshQuery(apiUrl)}><RefreshCw size={15} /></Button></div></div>
       {pending.length > 0 && <div className="pointer-events-none sticky top-16 z-20 flex justify-center"><Button size="sm" className="pointer-events-auto rounded-full shadow-md" onClick={showPending}><ArrowUp size={14} /> {pending.length} dòng mới</Button></div>}
-      {logs.error && <p className="shell-error" role="status">{logs.data ? 'Nguồn đang lỗi; giữ dòng đã đọc gần nhất. ' : 'Không đọc được nhật ký. '}{logs.error}</p>}
+      {logs.error && <FeedbackState error onRetry={() => refreshQuery(apiUrl)}>{logs.data ? 'Nguồn đang lỗi; giữ dòng đã đọc gần nhất. ' : 'Không đọc được nhật ký. '}{logs.error}</FeedbackState>}
       {logs.meta?.stale?.length ? <p className="shell-error" role="status">Nguồn chậm: {logs.meta.stale.join(', ')}</p> : null}
-      {logs.loading && !logs.data ? <p className="empty-state" role="status">Đang đọc nhật ký…</p> : <LogView rows={rows} freshKeys={fresh} regionRef={regionRef} onRegionScroll={onRegionScroll} />}
+      {logs.loading && !logs.data ? <PageSkeleton label="Đang đọc nhật ký…" /> : <LogView rows={rows} freshKeys={fresh} regionRef={regionRef} onRegionScroll={onRegionScroll} />}
       {moreError && <p className="shell-error" role="status">{moreError}</p>}
       {canLoadMore && <Button variant="outline" className="w-full" disabled={moreBusy} onClick={loadMore}>{moreBusy ? 'Đang tải…' : 'Tải thêm'}</Button>}
     </div>

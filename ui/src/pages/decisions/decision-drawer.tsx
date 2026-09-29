@@ -1,8 +1,9 @@
 import { ArrowUpRight, Check, Clock3, Star } from 'lucide-react';
-import { useApiQuery } from '../../api/query';
+import { refreshQuery, useApiQuery } from '../../api/query';
 import { ConceptBlock, type Concept } from '../../components/concept';
 import { Advanced } from '../../components/motion';
 import { Drawer } from '../../components/drawer';
+import { FeedbackState, PageSkeleton } from '../../components/feedback-state';
 import { StateChip } from '../../components/state-chip';
 import { TimeAgo } from '../../components/time-ago';
 import type { DecisionRow, Ref } from '../../contract';
@@ -39,25 +40,25 @@ export function DecisionDrawer({ id, onClose }: { id: string | null; onClose: ()
   const credential = row?.kind === 'credential-missing';
   return <Drawer open={Boolean(id)} onOpenChange={open => { if (!open) onClose(); }} title={id ? `Quyết định ${id}` : 'Quyết định'} description="Bản ghi chỉ đọc · trả lời qua kênh đang hiển thị">
     <ConceptBlock concept="C12" className="flex flex-col gap-6" aria-live="polite">
-      {detail.loading && <p className="text-sm text-muted-foreground">Đang đọc quyết định…</p>}
-      {detail.error && <p role="alert" className="rounded-lg border border-destructive/30 p-3 text-sm text-destructive">{detail.error}</p>}
+      {detail.loading && <PageSkeleton label="Đang đọc quyết định…" />}
+      {detail.error && <FeedbackState error onRetry={() => refreshQuery(`/api/decisions/${encodeURIComponent(id ?? '')}`)}>{detail.error}</FeedbackState>}
       {row && <>
-        <div className="flex flex-wrap items-center gap-2"><StateChip state={row.ui} /><span className="rounded-full border px-2 py-1 text-xs">{row.kind}</span><span className="text-xs text-muted-foreground">{row.status}</span></div>
+        <div className="flex flex-wrap items-center gap-2"><StateChip state={row.ui} /><span className="text-xs font-medium">{row.kind}</span><span className="text-xs text-muted-foreground">{row.status}</span></div>
         <div><p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Tóm tắt</p>
           <p className="mt-2 break-words text-sm leading-relaxed">{credential ? 'Yêu cầu xác thực · nội dung được ẩn.' : row.summary}</p></div>
-        <dl className="grid grid-cols-1 gap-4 rounded-xl border p-4 text-sm sm:grid-cols-2">
+        <dl className="grid grid-cols-1 gap-4 border-y py-4 text-sm sm:grid-cols-2">
           <div><dt className="text-muted-foreground">Người quyết</dt><dd className="font-medium">{actor(row.decider)}</dd></div>
           <div><dt className="text-muted-foreground">Hạn</dt><dd className={row.overdue ? 'font-medium text-destructive' : ''}>{formatAbsolute(row.dueAt)}</dd></div>
         </dl>
         {row.project && row.wf && <a href={`#/w/${encodeURIComponent(row.project)}/${encodeURIComponent(row.wf)}?tab=decisions`} className="inline-flex items-center gap-1 text-sm text-primary hover:underline">Xem workflow {row.wf}<ArrowUpRight className="size-3.5" aria-hidden="true" /></a>}
         <section className="flex flex-col gap-2"><h3 className="font-semibold">Lựa chọn đã ghi</h3>
-          {row.options?.length ? <ul className="flex flex-col gap-2">{row.options.map((option, index) => <li key={`${option.key}-${index}`} className="flex flex-wrap items-center gap-2 rounded-lg border p-3 text-sm">
-            {option.recommended && <Star className="size-4 text-amber-500" fill="currentColor" aria-label="Đề xuất" />}
+          {row.options?.length ? <ul className="flex flex-col divide-y">{row.options.map((option, index) => <li key={`${option.key}-${index}`} className="flex flex-wrap items-center gap-2 py-3 text-sm">
+            {option.recommended && <Star className="size-4 text-muted-foreground" fill="currentColor" aria-label="Đề xuất" />}
             <span className="font-medium">{option.key}</span><span className="text-muted-foreground">{option.verb}</span>
             {option.recommended && <span className="text-xs text-muted-foreground">Đề xuất</span>}
           </li>)}</ul> : <p className="text-sm text-muted-foreground">Chưa có lựa chọn được ghi.</p>}
         </section>
-        <section className="flex flex-col gap-2"><h3 className="font-semibold">Kết quả</h3>{row.resolution ? <div className="rounded-lg border p-3 text-sm"><p className="flex items-center gap-2 font-medium"><Check className="size-4" aria-hidden="true" />{row.resolution.verb ?? 'Đã quyết'}</p><p className="mt-1 text-muted-foreground">Bởi {actor(row.resolution.by)} · {formatAbsolute(row.resolvedAt)}</p></div>
+        <section className="flex flex-col gap-2"><h3 className="font-semibold">Kết quả</h3>{row.resolution ? <div className="border-l-2 pl-3 text-sm"><p className="flex items-center gap-2 font-medium"><Check className="size-4" aria-hidden="true" />{row.resolution.verb ?? 'Đã quyết'}</p><p className="mt-1 text-muted-foreground">Bởi {actor(row.resolution.by)} · {formatAbsolute(row.resolvedAt)}</p></div>
           : <p className="flex items-center gap-2 text-sm text-muted-foreground"><Clock3 className="size-4" aria-hidden="true" />Đang chờ quyết qua {channel(row.channel)}.</p>}</section>
         <Advanced summary="Kênh, thời điểm mở, bằng chứng và lịch sử">
           <div className="flex flex-col gap-6">

@@ -17,7 +17,7 @@ const statusView: Record<ProductFile['status'], { status: Status; label: string 
 
 function Content({ file }: { file: ProductFile }) {
   if (file.content == null) {
-    return <p className="rounded-lg border border-dashed p-3 text-sm text-muted-foreground">{file.error ?? (file.status === 'deleted' ? 'Tệp đã bị xoá ở commit này nên không còn nội dung.' : 'Máy chủ chưa gửi nội dung tệp này. Xem tab "Thay đổi" để biết op đã sửa gì.')}</p>;
+    return <p className="rounded-lg border p-3 text-sm text-muted-foreground">{file.error ?? (file.status === 'deleted' ? 'Tệp đã bị xoá ở commit này nên không còn nội dung.' : 'Máy chủ chưa gửi nội dung tệp này. Xem tab "Thay đổi" để biết op đã sửa gì.')}</p>;
   }
   return <div className="min-w-0">
     {file.truncated ? <p className="mb-2 text-xs text-muted-foreground">Tệp lớn: chỉ hiện phần đầu.</p> : null}
@@ -26,7 +26,7 @@ function Content({ file }: { file: ProductFile }) {
 }
 
 function Diff({ file }: { file: ProductFile }) {
-  if (!file.diff) return <p className="rounded-lg border border-dashed p-3 text-sm text-muted-foreground">{file.status === 'unchanged' ? 'Tệp này không đổi so với commit cha.' : 'Không có bản so sánh cho tệp này.'}</p>;
+  if (!file.diff) return <p className="rounded-lg border p-3 text-sm text-muted-foreground">{file.status === 'unchanged' ? 'Tệp này không đổi so với commit cha.' : 'Không có bản so sánh cho tệp này.'}</p>;
   return <div className="min-w-0">{file.diffTruncated ? <p className="mb-2 text-xs text-muted-foreground">Diff dài: chỉ hiện phần đầu.</p> : null}<DiffTextView text={file.diff} /></div>;
 }
 
@@ -42,7 +42,7 @@ export function ProductRow({ file, defaultOpen = false, extra }: { file: Product
         <ChevronRight className={`size-4 transition-transform ${open ? 'rotate-90' : ''}`} aria-hidden="true" />
       </button>
       <StatusChip status={view.status} label={view.label} />
-      <span className="min-w-0 max-w-full flex-1 break-all text-sm">{file.hostPath ? <PathLink path={file.hostPath} kind="file" label={file.path} /> : <code className="font-mono text-xs">{file.path}</code>}</span>
+      <span className="order-last min-w-0 basis-full break-all text-sm sm:order-none sm:flex-1 sm:basis-auto">{file.hostPath ? <PathLink path={file.hostPath} kind="file" label={file.path} /> : <code className="font-mono text-xs">{file.path}</code>}</span>
       <FileTypeBadge kind={file.kind} />
       <span className="text-xs tabular-nums text-muted-foreground">{file.bytes == null ? '—' : formatBytes(file.bytes)}</span>
       {extra}

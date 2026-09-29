@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { ArrowRight, ChevronRight, Layers3 } from 'lucide-react';
-import { useApiQuery } from '../../api/query';
+import { refreshQuery, useApiQuery } from '../../api/query';
 import type { AttemptRow, DecisionRow, LegRow, MediaItem, PipelineView, TimelineItem, UnitRow, WorkflowDetailV2 } from '../../contract';
 import { formatAbsolute, formatReason, unitStateLabels } from '../../i18n/vi';
 import { StatusChip, StatusDot } from '../../components/status-chip';
@@ -12,6 +12,7 @@ import { LegDrawer } from '../../components/work/leg-drawer';
 import { WorkflowInfraCard } from '../../components/work/infra-card';
 import { WorkGraphSlices } from '../../components/work/work-graph-slices';
 import { ReasonLine } from '../../components/reason-line';
+import { FeedbackState, PageSkeleton } from '../../components/feedback-state';
 import { ConceptBlock, type Concept } from '../../components/concept';
 import { LifecycleBar, type UnitState } from '../../components/lifecycle-bar';
 import type { WorkGraph } from '../../components/work/graph';
@@ -39,7 +40,7 @@ function Panel({ title, children, concept }: { title: string; children: React.Re
 function UnitDetail({ project, wf, selected, state }: { project: string; wf: string; selected: string | null; state: string | null }) {
   const detail = useApiQuery<{ unit: UnitRow; attempts: AttemptRow[]; blockedBy: { reason: { code: string; params: Record<string, string | number> }; ui: UnitRow['ui'] }[] }>(selected ? `/api/workflows/${encodeURIComponent(project)}/${encodeURIComponent(wf)}/units/${encodeURIComponent(selected)}` : '', { enabled: Boolean(selected), topics: [`wf:${project}:${wf}`], intervalMs: 20_000 });
   if (!selected) return <p className="text-sm text-muted-foreground">Chọn một nhóm Op hoặc đơn vị để xem chi tiết.</p>;
-  return <div className="rounded-lg border bg-muted/30 p-4"><a href={`${rootHref(project, wf)}?tab=units${state ? `&state=${state}` : ''}`} className="text-xs text-muted-foreground hover:underline">Đóng chi tiết</a>
+  return <div className="border-l-2 pl-4"><a href={`${rootHref(project, wf)}?tab=units${state ? `&state=${state}` : ''}`} className="text-xs text-muted-foreground hover:underline">Đóng chi tiết</a>
     {detail.data && <><div className="mt-2 flex flex-wrap items-center gap-2"><strong className="min-w-0 break-words">{detail.data.unit.title}</strong><StatusChip status={statusFromUnit(detail.data.unit.state)} /></div>
       <p className="mt-2 text-sm text-muted-foreground">{detail.data.unit.op} · {unitStateLabels[detail.data.unit.state]} · {detail.data.unit.attempts} lần giao</p>
       {detail.data.blockedBy.map((blocker, i) => <ReasonLine key={i} reason={blocker.reason} className="mt-2" />)}
@@ -81,7 +82,7 @@ function DecisionsTab({ project, wf }: { project: string; wf: string }) {
 function WhyTab({ project, wf }: { project: string; wf: string }) {
   const rca = useApiQuery<Rca | null>(`/api/workflows/${encodeURIComponent(project)}/${encodeURIComponent(wf)}/rca`, { topics: [`wf:${project}:${wf}`], intervalMs: 60_000 });
   return <Panel title="Vì sao · phân tích nguyên nhân" concept="C2">{rca.data ? <><p className="mb-4 text-xs text-muted-foreground">{rca.data.attempts24h} lần thử trong 24 giờ · cập nhật {formatAbsolute(rca.data.at)}</p>
-    <div className="flex flex-col gap-3">{rca.data.clusters.map((cluster, index) => <div key={`${cluster.cause}-${index}`} className="rounded-lg border p-3"><div className="flex justify-between gap-2 text-sm"><strong>{cluster.cause}</strong><span>{cluster.open}/{cluster.count} đang mở</span></div><ReasonLine reason={cluster.reason} className="mt-2" /></div>)}</div>
+    <div className="flex flex-col divide-y">{rca.data.clusters.map((cluster, index) => <div key={`${cluster.cause}-${index}`} className="py-3"><div className="flex justify-between gap-2 text-sm"><strong>{cluster.cause}</strong><span>{cluster.open}/{cluster.count} đang mở</span></div><ReasonLine reason={cluster.reason} className="mt-2" /></div>)}</div>
     {rca.data.actions.length > 0 && <h3 className="mb-2 mt-6 text-sm font-semibold">Hành động gợi ý</h3>}{rca.data.actions.map(action => <div key={action.key} className="flex gap-3 border-t py-3 text-sm"><span className="font-mono text-muted-foreground">{action.rank}</span><span className="min-w-0"><strong>{action.key}</strong><span className="block text-muted-foreground">{formatReason(action.reason)} · gỡ {action.unblocks}</span></span></div>)}
   </> : <p className="text-sm text-muted-foreground">Chưa có bản phân tích.</p>}</Panel>;
 }
@@ -120,11 +121,11 @@ export function WorkflowPage({ project, wf, tab = 'units' }: { project: string; 
     if (!params.get('tab')) params.set('tab', tab);
     window.location.hash = `${rootHref(project, wf)}?${params}`;
   };
-  if (detail.error) return <div className="mx-auto max-w-6xl p-6"><a href="#/" className="text-sm hover:underline">← Tổng quan</a><p role="alert" className="mt-4 rounded-xl border p-6">{detail.error}</p></div>;
-  if (!row) return <div className="mx-auto max-w-6xl p-6 text-sm text-muted-foreground">Đang đọc workflow…</div>;
+  if (detail.error) return <div className="mx-auto max-w-6xl p-6"><a href="#/" className="text-sm hover:underline">← Tổng quan</a><div className="mt-4"><FeedbackState error onRetry={() => refreshQuery(base)}>{detail.error}</FeedbackState></div></div>;
+  if (!row) return <div className="mx-auto max-w-6xl p-6"><PageSkeleton label="Đang đọc workflow…" /></div>;
   const tabActive = (id: WorkflowTab) => tab === id || (id === 'units' && tab === 'graph');
   const advancedSummary = `hạ tầng & chi phí · lần thử theo chặng · lát cắt · ${row.counts.decisionsOpen} chờ quyết · ${row.blockedBy.length} đang chặn`;
-  return <Stagger className="mx-auto flex w-full max-w-[1600px] min-w-0 flex-col gap-6 p-4 pb-24 md:gap-8 md:p-6 lg:p-8">
+  return <Stagger className="mx-auto flex w-full max-w-[1600px] min-w-0 flex-col gap-6 pb-24 md:gap-8">
     <StaggerItem><WorkflowHeader row={row} pipeline={pipe} /></StaggerItem>
     <StaggerItem><Panel title="Chuỗi op" concept="C4">
       <p className="-mt-2 mb-4 text-xs text-muted-foreground">Mỗi ô là một chặng của kế hoạch. Cột là thứ tự, ô xếp dọc chạy song song. Bấm vào ô để xem chi tiết.</p>

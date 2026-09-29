@@ -1,4 +1,9 @@
 import { useState } from 'react';
+import { Advanced } from '../components/motion';
+import { DataTable } from '../components/data-table';
+import { Drawer } from '../components/drawer';
+import { FeedbackState, PageSkeleton } from '../components/feedback-state';
+import { Button } from '../components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import { ConceptBlock, type Concept } from '../components/concept';
 import { LifecycleBar, type UnitState } from '../components/lifecycle-bar';
@@ -36,6 +41,7 @@ const steps = [
 
 export default function KitPage() {
   const [step, setStep] = useState<AttemptStep>('checks');
+  const [drawerOpen, setDrawerOpen] = useState(false);
   return <ConceptBlock concept="frame" className="flex flex-col gap-6 md:gap-8">
     <div><h1 className="text-2xl font-semibold tracking-tight">Bộ thành phần</h1><p className="mt-1 text-sm text-muted-foreground">Mẫu giao diện kiểm tra hai theme. Các con số dưới đây chỉ là dữ liệu minh họa của bộ thành phần.</p></div>
     <div className="kit-grid">
@@ -56,5 +62,19 @@ export default function KitPage() {
       </div>)}
     </div>
     <ConceptBlock concept="C7"><Card><CardHeader><CardTitle>Vòng đời lần thử</CardTitle></CardHeader><CardContent className="flex flex-col gap-4"><StepBar steps={toneSteps} selected={step} onSelect={setStep} /><StepBar steps={[...steps]} selected={step} onSelect={setStep} /></CardContent></Card></ConceptBlock>
+    <div className="kit-grid">
+      <Card><CardHeader><CardTitle>Card và Nâng cao</CardTitle></CardHeader><CardContent className="grid gap-4">
+        <p className="text-sm text-muted-foreground">Một bề mặt, chữ rõ cấp bậc, chi tiết tách bằng đường mảnh.</p>
+        <Advanced summary="Mã và đường dẫn" variant="inline"><PathLink path="D:/Repositories/nivo-backend/src/module.ts" kind="file" /></Advanced>
+        <Button variant="outline" className="justify-self-start" onClick={() => setDrawerOpen(true)}>Xem drawer</Button>
+      </CardContent></Card>
+      <Card><CardHeader><CardTitle>Bảng và trạng thái</CardTitle></CardHeader><CardContent className="grid gap-4">
+        <DataTable rows={[{ name: 'Kiểm chứng', value: '3/3', status: 'success' as Status }, { name: 'Chờ quyết định', value: '1', status: 'awaiting-owner' as Status }]} getKey={row => row.name}
+          columns={[{ key: 'name', header: 'Mục', render: row => row.name }, { key: 'value', header: 'Số lượng', render: row => row.value }, { key: 'status', header: 'Trạng thái', render: row => <StatusChip status={row.status} /> }]} />
+        <FeedbackState>Không có dữ liệu phù hợp.</FeedbackState>
+      </CardContent></Card>
+    </div>
+    <Card><CardHeader><CardTitle>Tải và lỗi</CardTitle></CardHeader><CardContent className="grid gap-4 md:grid-cols-2"><PageSkeleton /><FeedbackState error onRetry={() => undefined}>Không đọc được nguồn dữ liệu.</FeedbackState></CardContent></Card>
+    <Drawer open={drawerOpen} onOpenChange={setDrawerOpen} title="Drawer" description="Chi tiết kỹ thuật chỉ đọc"><div className="grid gap-4"><p>Thông tin giữ một cấp bề mặt.</p><Advanced summary="Mã và đường dẫn"><PathLink path="D:/Repositories/nivo-backend/src/module.ts" kind="file" /></Advanced></div></Drawer>
   </ConceptBlock>;
 }

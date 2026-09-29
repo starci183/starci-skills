@@ -1,8 +1,9 @@
 import { useEffect, useRef, useState } from 'react';
-import { useApiQuery } from '../../api/query';
+import { refreshQuery, useApiQuery } from '../../api/query';
 import type { AttemptDetailV3, EvidenceFile } from '../../contract';
 import { useRoute, type AttemptStep } from '../../router';
 import { StepBar } from '../../components/step-bar';
+import { FeedbackState, PageSkeleton } from '../../components/feedback-state';
 import { ConceptBlock, type Concept } from '../../components/concept';
 import { Advanced, Enter, Stagger, StaggerItem } from '../../components/motion';
 import { AttemptInputContext, AttemptOpGoal, useOpInfo } from '../../components/attempt/io-panels';
@@ -83,8 +84,8 @@ function AttemptDetailPage({ project, attemptId, routeStep }: { project: string;
     if (target) window.requestAnimationFrame(() => document.getElementById(target)?.scrollIntoView({ block: 'start' }));
   }, [data, picked, fileId]);
 
-  if (attempt.error) return <div className="mx-auto max-w-6xl p-6"><a href="#/" className="text-sm hover:underline">← Tổng quan</a><p role="alert" className="mb-0 mt-4 rounded-xl border p-4">{attempt.error}</p></div>;
-  if (!data) return <div className="mx-auto max-w-6xl p-6 text-sm text-muted-foreground">Đang đọc lần thử…</div>;
+  if (attempt.error) return <div className="mx-auto max-w-6xl p-6"><a href="#/" className="text-sm hover:underline">← Tổng quan</a><div className="mt-4"><FeedbackState error onRetry={() => refreshQuery(baseOf(project, attemptId))}>{attempt.error}</FeedbackState></div></div>;
+  if (!data) return <div className="mx-auto max-w-6xl p-6"><PageSkeleton label="Đang đọc lần thử…" /></div>;
 
   const step = picked ?? initialStep(data);
   const selectStep = (value: AttemptStep) => {
@@ -101,7 +102,7 @@ function AttemptDetailPage({ project, attemptId, routeStep }: { project: string;
   const where = data.where;
   const n = (id: string) => nonce[id] ?? 0;
 
-  return <div className="mx-auto flex w-full max-w-6xl min-w-0 flex-col gap-6 p-4 pb-8 min-[760px]:gap-8 sm:p-6 lg:p-8">
+  return <div className="mx-auto flex w-full max-w-7xl min-w-0 flex-col gap-6 pb-8 min-[760px]:gap-8">
     <Stagger className="flex min-w-0 flex-col gap-6 min-[760px]:gap-8">
       <StaggerItem><AttemptHeader attempt={data} project={project} /></StaggerItem>
       <StaggerItem><StepBar steps={stepItems(data)} selected={step} onSelect={selectStep} /></StaggerItem>

@@ -5,7 +5,7 @@ import { formatOpLabel } from '../../../i18n/vi';
 import { compactVi } from '../../usage-view';
 import { formatSpan } from './util';
 import { statusFromOutcome, statusFromVerdict, statusTone, type Tone } from '../../status';
-import { StatusChip } from '../../status-chip';
+import { StatusChip, StatusDot } from '../../status-chip';
 import { isOpen } from './steps';
 import type { Concept } from '../../concept';
 import { Advanced, Swap } from '../../motion';
@@ -62,9 +62,9 @@ export function AttemptHeader({ attempt, project }: { attempt: AttemptDetailV3; 
           </p>
         </div>
       </div>
-      <div className="flex flex-wrap items-center gap-2">
-        <Swap keyValue={outcomeLabel}><StatusChip status={outcome} label={outcomeLabel} /></Swap>
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
         <Swap keyValue={verdictLabel}><StatusChip status={verdict} label={verdictLabel} /></Swap>
+        <span className="inline-flex items-center gap-1.5 text-xs text-muted-foreground"><StatusDot status={outcome} />{outcomeLabel}</span>
       </div>
     </div>
     {attempt.why ? <WhyBlock why={attempt.why} compact className="max-w-[80ch]" /> : null}

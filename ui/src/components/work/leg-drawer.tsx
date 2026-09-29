@@ -56,20 +56,20 @@ export function LegDrawer({ project, wf, leg, pipeline, onClose }: { project: st
           <Section title="Việc tiếp">{next ? <a href={next.href} className="inline-flex items-center gap-2 text-sm font-medium text-primary hover:underline">{next.label} <ArrowRight className="size-3.5" aria-hidden="true" /></a> : <p className="text-sm text-muted-foreground">Chưa có việc nào để làm tiếp.</p>}</Section>
           <Advanced summary={`đầu vào · đầu ra · ${leg.units.length} đơn vị · ${attempts.length} lần thử · token`}>
             <div className="flex flex-col gap-6">
-              {(leg.injected || leg.deferred) && <div className="flex flex-col gap-1 rounded-lg border border-dashed p-3 text-xs">
+              {(leg.injected || leg.deferred) && <div className="flex flex-col gap-1 border-l-2 pl-3 text-xs">
                 {leg.injected && <p><strong>injected:</strong> {leg.injected}</p>}
                 {leg.deferred && <p><strong>deferred:</strong> {leg.deferred}</p>}
               </div>}
               <LegStory project={project} leg={leg} pipeline={pipeline} />
-              <Section title={`Đơn vị · ${leg.units.length}`}>{leg.units.length ? <ul className="divide-y rounded-lg border">{leg.units.map(u => <li key={u.unit} className="flex flex-wrap items-center gap-x-2 gap-y-1 p-3">
+              <Section title={`Đơn vị · ${leg.units.length}`}>{leg.units.length ? <ul className="divide-y">{leg.units.map(u => <li key={u.unit} className="flex flex-wrap items-center gap-x-2 gap-y-1 py-3">
                 <span className="min-w-0 flex-1 break-words text-sm">{u.title}</span>
                 <StatusChip status={statusFromUnit(u.state)} label={unitStateLabels[u.state] ?? u.state} />
                 <span className="text-xs text-muted-foreground">lần {u.tries}/{u.tryBudget}</span>
                 <a href={u.href} className="inline-flex items-center text-primary" aria-label={`Mở ${u.title}`}><ArrowRight className="size-3.5" /></a>
               </li>)}</ul> : none}</Section>
               <Section title={`Lần thử · ${attempts.length}`}>{attempts.length
-                ? <ol className="flex flex-col gap-2">{attempts.map(a => <AttemptCard key={a.id} attempt={a} now={now} />)}</ol>
-                : <p className="rounded-lg border border-dashed p-3 text-xs text-muted-foreground">Chưa có lần thử — chặng này chờ {waiting.length ? waiting.join(', ') : leg.deferred ? 'điều kiện hoãn được gỡ' : 'tới lượt điều phối'}.</p>}</Section>
+                ? <ol className="flex flex-col">{attempts.map(a => <AttemptCard key={a.id} attempt={a} now={now} />)}</ol>
+                : <p className="border-t py-3 text-xs text-muted-foreground">Chưa có lần thử — chặng này chờ {waiting.length ? waiting.join(', ') : leg.deferred ? 'điều kiện hoãn được gỡ' : 'tới lượt điều phối'}.</p>}</Section>
             </div>
           </Advanced>
         </div>

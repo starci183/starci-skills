@@ -15,7 +15,7 @@ export function AttemptWhereCard({ attempt }: { attempt: AttemptDetailV2 }) {
   const w = attempt.where;
   const transcript = attempt.terminal?.transcript ?? null;
   const transcriptHref = `#/a/${encodeURIComponent(attempt.project)}/${encodeURIComponent(String(attempt.id))}?step=run`;
-  return <section className="rounded-lg border border-border bg-card p-4" aria-label="Nơi chạy và tài nguyên">
+  return <section className="min-w-0" aria-label="Nơi chạy và tài nguyên">
     <h3 className="m-0 mb-2 text-sm font-semibold">Nơi chạy &amp; tài nguyên</h3>
     <div className="grid gap-x-8 lg:grid-cols-2">
       <dl className="m-0">

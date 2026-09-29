@@ -19,7 +19,7 @@ const colorTone = (color: string | null): Tone => {
 
 /** The scope's work graph (slices + data edges) from work_graph_versions, layered left to right by longest path. */
 export function WorkGraphSlices({ graph }: { graph: WorkGraphView | null }) {
-  if (!graph) return <p className="rounded-lg border border-dashed p-4 text-sm text-muted-foreground">Chưa có đồ thị lát cắt cho phạm vi này (work graph chưa được ghi).</p>;
+  if (!graph) return <p className="rounded-lg border p-4 text-sm text-muted-foreground">Chưa có đồ thị lát cắt cho phạm vi này (work graph chưa được ghi).</p>;
   const ids = new Set(graph.nodes.map(n => n.id));
   const edges = graph.edges.filter(e => ids.has(e.from) && ids.has(e.to) && e.from !== e.to);
   // Longest-path layering (Kahn-style; nodes left in a cycle fall to layer 0).

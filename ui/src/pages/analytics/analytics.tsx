@@ -3,6 +3,7 @@ import { useApiQuery } from '../../api/query';
 import type { AttemptRow, Envelope, FleetViewV2 } from '../../contract';
 import type { Concept } from '../../components/concept';
 import { Advanced, Ticker } from '../../components/motion';
+import { FeedbackState, PageSkeleton } from '../../components/feedback-state';
 import { counts, fmtDayClock } from '../../components/charts/analytics-data';
 import { DurationPlot } from '../../components/charts/duration-plot';
 import { ModelRates } from '../../components/charts/model-rates';
@@ -37,7 +38,7 @@ function useHashParams() {
 }
 
 /** All attempts of the project(s), following `meta.next` cursors; refreshed every 30 s. */
-function useAllAttempts(project: string): { rows: AttemptRow[] | null; error: string | null } {
+function useAllAttempts(project: string, retryKey: number): { rows: AttemptRow[] | null; error: string | null } {
   const [state, setState] = useState<{ key: string; rows: AttemptRow[] | null; error: string | null }>({ key: project, rows: null, error: null });
   useEffect(() => {
     let cancelled = false;
@@ -65,7 +66,7 @@ function useAllAttempts(project: string): { rows: AttemptRow[] | null; error: st
     void load();
     const timer = setInterval(() => void load(), 30_000);
     return () => { cancelled = true; controller.abort(); clearInterval(timer); };
-  }, [project]);
+  }, [project, retryKey]);
   return { rows: state.key === project ? state.rows : null, error: state.error };
 }
 
@@ -73,7 +74,7 @@ function Segmented({ value, onChange }: { value: Window; onChange: (value: Windo
   const options: { value: Window; label: string }[] = [{ value: '24h', label: '24 giờ' }, { value: '7d', label: '7 ngày' }];
   return <div role="group" aria-label="Khoảng thời gian" className="inline-flex gap-1 rounded-lg border bg-muted/40 p-1">
     {options.map(o => <button key={o.value} type="button" aria-pressed={value === o.value} onClick={() => onChange(o.value)}
-      className={`h-8 rounded-md px-3 text-sm font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${value === o.value ? 'bg-background text-foreground shadow-sm ring-1 ring-foreground/10' : 'text-muted-foreground hover:text-foreground'}`}>{o.label}</button>)}
+      className={`h-8 rounded-md px-3 text-sm font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${value === o.value ? 'border bg-card text-foreground' : 'text-muted-foreground hover:text-foreground'}`}>{o.label}</button>)}
   </div>;
 }
 
@@ -86,9 +87,10 @@ export default function AnalyticsPage() {
   const project = params.get('project') ?? '';
   const win: Window = params.get('window') === '24h' ? '24h' : '7d';
   const [now, setNow] = useState(() => Date.now());
+  const [retryKey, setRetryKey] = useState(0);
   useEffect(() => { const timer = setInterval(() => setNow(Date.now()), 30_000); return () => clearInterval(timer); }, []);
 
-  const attempts = useAllAttempts(project);
+  const attempts = useAllAttempts(project, retryKey);
   const metricsUrl = `/api/metrics/ops?window=${win}${project ? `&project=${encodeURIComponent(project)}` : ''}`;
   const metrics = useApiQuery<OpsMetric[]>(metricsUrl, { topics: ['fleet'], intervalMs: 30_000 });
   const fleet = useApiQuery<FleetViewV2>('/api/fleet', { topics: ['fleet'], intervalMs: 30_000 });
@@ -124,13 +126,13 @@ export default function AnalyticsPage() {
       </div>
     </div>
 
-    {attempts.error && !attempts.rows ? <p role="alert" className="rounded-lg border border-[var(--status-failed-line)] bg-[var(--status-failed-bg)] p-3 text-sm text-[var(--status-failed)]">Không tải được danh sách lần thử ({attempts.error}).</p> : null}
+    {attempts.error && !attempts.rows ? <FeedbackState error onRetry={() => setRetryKey(value => value + 1)}>Không tải được danh sách lần thử ({attempts.error}).</FeedbackState> : null}
 
-    <div className="grid min-w-0 grid-cols-1 items-start gap-4 lg:grid-cols-2 lg:gap-6">
+    {loading ? <PageSkeleton label="Đang tải…" /> : <div className="grid min-w-0 grid-cols-1 items-start gap-4 lg:grid-cols-2 lg:gap-6">
       <OpOutcomes rows={rows} />
       <Throughput rows={rows} since={since} now={now} />
       <WorkflowProgress fleet={fleet.data} project={project} />
-    </div>
+    </div>}
     <Advanced variant="card" title="Phân tích chi tiết" summary="Tỉ lệ theo model, thời lượng, thử lại, token và chi phí">
       <div className="grid min-w-0 grid-cols-1 items-start gap-4 lg:grid-cols-2 lg:gap-6">
         <ModelRates rows={rows} />

@@ -17,7 +17,7 @@ The interface is a read-only operations product. It keeps the operational story 
 - **Card:** one surface and one solid border. Inner groups use spacing or a hairline. A nested card is flattened.
 - **Nâng cao:** inline uses a solid top hairline; standalone card uses one outer surface. Its summary is a compact preview, never an extra status chip.
 - **Status pill:** small dot, short label, semantic ink and soft background. Every other fact in a row is quiet text.
-- **Table/list:** 44px header, 48px body rows, neutral header surface, no zebra fill, subtle hover, right-aligned terminal numeric cell, truncation with title where needed. Mobile lists stack label and value without page overflow.
+- **Table/list:** 44px header, 48px body rows, neutral header surface, no zebra fill, subtle hover, tabular numerals, truncation with title where needed. Mobile lists stack label and value without page overflow; long prose uses a full-width field.
 - **Drawer:** one bounded surface; header and body have consistent padding. Inner sections are separated by space, not more borders.
 - **Pipeline node:** human name first; status and progress second; agent and attempt dots share a footer. The active leg has one clear outline. Edges are quiet and dashed only for deferred semantics. Wide graphs scroll in their container.
 - **Empty/loading/error:** icon, one sentence, optional retry/action. Skeleton blocks match the dimensions of the final content. Error uses the failure tone once, with a direct retry where available.
