@@ -1,16 +1,16 @@
-import { useEffect, useMemo, useState } from 'react';
-import { Filter, Radio, RefreshCw } from 'lucide-react';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { ArrowUp, Filter, Radio, RefreshCw, SlidersHorizontal, X } from 'lucide-react';
 import { Badge } from '../../components/ui/badge';
 import { Button } from '../../components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/card';
 import { ConceptBlock, type Concept } from '../../components/concept';
 import { Drawer } from '../../components/drawer';
 import { Input } from '../../components/ui/input';
 import { LogView } from '../../components/log-view';
+import { kindFamilies } from '../../components/logs/kinds';
 import { useApiQuery, refreshQuery } from '../../api/query';
 import { formatAbsolute } from '../../i18n/vi';
 import { useRoute } from '../../router';
-import type { ContractInfo, Envelope, LogRow } from '../../contract';
+import type { ContractInfo, Envelope, LogRow, WorkflowRow } from '../../contract';
 
 export const concept: Concept = 'C17';
 
@@ -40,12 +40,36 @@ function FilterFields({ filters, onChange, contract }: { filters: URLSearchParam
   </div>;
 }
 
+const chipClass = 'h-8 max-w-full min-w-0 rounded-full border bg-background px-3 text-xs text-foreground data-[active=true]:border-primary data-[active=true]:bg-primary/10';
+const ranges = [['900000', '15 phút qua'], ['3600000', '1 giờ qua'], ['86400000', '24 giờ qua'], ['604800000', '7 ngày qua']] as const;
+
+function FilterBar({ filters, onChange, contract, onMore, activeCount, workflows }: { filters: URLSearchParams; onChange: (name: string, value: string) => void; contract: ContractInfo | null; workflows: Pick<WorkflowRow, 'id' | 'name' | 'project'>[]; onMore: () => void; activeCount: number }) {
+  const level = filters.get('minLevel') === 'warn' ? 'warn+' : filters.get('level') ?? 'all';
+  const customRange = filters.has('since') || filters.has('until');
+  const chip = (active: boolean) => ({ className: chipClass, 'data-active': active });
+  return <div className="flex flex-wrap items-center gap-2" role="group" aria-label="Bộ lọc nhật ký">
+    <select aria-label="Workflow" {...chip(filters.has('wf'))} value={filters.get('wf') ?? ''} onChange={(event) => { const found = workflows.find((item) => item.id === event.target.value); onChange('wf', event.target.value); if (found) onChange('project', found.project); }}><option value="">Workflow: tất cả</option>{filters.get('wf') && !workflows.some((item) => item.id === filters.get('wf')) && <option value={filters.get('wf') ?? ''}>{filters.get('wf')}</option>}{workflows.map((item) => <option key={`${item.project}:${item.id}`} value={item.id}>{item.name}</option>)}</select>
+    <select aria-label="Actor" {...chip(filters.has('actor'))} value={filters.get('actor') ?? ''} onChange={(event) => onChange('actor', event.target.value)}><option value="">Actor: tất cả</option>{contract?.vocab.logActors.map((actor) => <option key={actor} value={actor}>Actor: {actor}</option>)}</select>
+    <select aria-label="Mức tối thiểu" {...chip(level !== 'all')} value={level} onChange={(event) => onChange('levelChoice', event.target.value)}><option value="all">Mọi mức</option><option value="warn+">Mức ≥ cảnh báo</option><option value="error">Chỉ lỗi</option><option value="warn">Chỉ cảnh báo</option><option value="info">Chỉ info</option><option value="debug">Chỉ debug</option></select>
+    <select aria-label="Loại" {...chip(filters.has('kind'))} value={filters.get('kind') ?? ''} onChange={(event) => onChange('kind', event.target.value)}>{kindFamilies.map((item) => <option key={item.value} value={item.value}>{item.value ? `Loại: ${item.label}` : 'Loại: tất cả'}</option>)}{filters.get('kind') && !kindFamilies.some((item) => item.value === filters.get('kind')) && <option value={filters.get('kind') ?? ''}>Loại: {filters.get('kind')}</option>}</select>
+    <select aria-label="Khoảng thời gian" {...chip(customRange)} value={customRange ? 'custom' : ''} onChange={(event) => { const value = event.target.value; if (value === 'custom') return; onChange('until', ''); onChange('since', value ? String(Date.now() - Number(value)) : ''); }}><option value="">Mọi thời gian</option>{ranges.map(([value, label]) => <option key={value} value={value}>{label}</option>)}{customRange && <option value="custom">Khoảng tùy chọn</option>}</select>
+    <div className="relative min-w-[12rem] flex-1 sm:max-w-xs"><Input type="search" className="h-8 rounded-full text-xs" aria-label="Tìm trong nhật ký" value={filters.get('q') ?? ''} onChange={(event) => onChange('q', event.target.value)} placeholder="Tìm trong nhật ký" /></div>
+    <Button variant="ghost" size="sm" className="h-8 text-xs" onClick={onMore}><SlidersHorizontal size={14} /> Thêm bộ lọc</Button>
+    {activeCount > 0 && <Button variant="ghost" size="sm" className="h-8 text-xs" onClick={() => onChange('clear', '')}><X size={14} /> Xóa lọc ({activeCount})</Button>}
+  </div>;
+}
+
 export default function LogsPage() {
   const route = useRoute();
   const filterKey = route.kind === 'logs' ? route.filters.toString() : '';
   const filters = useMemo(() => new URLSearchParams(filterKey), [filterKey]);
   const [filterOpen, setFilterOpen] = useState(false);
-  const [follow, setFollow] = useState(false);
+  const [follow, setFollow] = useState(true);
+  const [pending, setPending] = useState<LogRow[]>([]);
+  const [fresh, setFresh] = useState<ReadonlySet<string>>(new Set());
+  const pausedRef = useRef(false);
+  const knownRef = useRef<Set<string>>(new Set());
+  const workflowList = useApiQuery<WorkflowRow[]>('/api/workflows?phase=all&limit=100', { topics: ['fleet'], intervalMs: 60_000 });
   const [streamStatus, setStreamStatus] = useState<'connecting' | 'live' | 'reconnecting'>('connecting');
   const [streamed, setStreamed] = useState<LogRow[]>([]);
   const [older, setOlder] = useState<LogRow[]>([]);
@@ -54,16 +78,10 @@ export default function LogsPage() {
   const [moreError, setMoreError] = useState<string | null>(null);
   const contract = useApiQuery<ContractInfo>('/api/contract', { topics: ['system'], intervalMs: 60_000 });
 
-  useEffect(() => {
-    if (route.kind !== 'logs' || !window.matchMedia('(max-width: 767px)').matches || filters.has('level') || filters.has('minLevel')) return;
-    const next = new URLSearchParams(filterKey);
-    next.set('minLevel', 'warn');
-    window.location.hash = `#/logs?${next}`;
-  }, [route.kind, filterKey, filters]);
-
   const change = (name: string, value: string) => {
-    const next = new URLSearchParams(filterKey);
-    if (name === 'levelChoice') {
+    const next = new URLSearchParams(window.location.hash.split('?')[1] ?? '');
+    if (name === 'clear') { for (const field of filterFields) next.delete(field); }
+    else if (name === 'levelChoice') {
       next.delete('level'); next.delete('minLevel');
       if (value === 'warn+') next.set('minLevel', 'warn');
       else if (value !== 'all') next.set('level', value);
@@ -88,7 +106,7 @@ export default function LogsPage() {
   const streamUrl = `/api/logs/stream?${streamParams}`;
   const logs = useApiQuery<LogRow[]>(apiUrl, { topics: ['logs'], intervalMs: 30_000 });
 
-  useEffect(() => { setStreamed([]); setOlder([]); setNextCursor(undefined); setMoreError(null); setFollow(false); }, [filterKey]);
+  useEffect(() => { setStreamed([]); setOlder([]); setNextCursor(undefined); setMoreError(null); setPending([]); }, [filterKey]);
   useEffect(() => {
     if (!follow || filters.has('q')) return;
     const stream = new EventSource(streamUrl);
@@ -99,7 +117,12 @@ export default function LogsPage() {
       try {
         const row = JSON.parse(event.data) as LogRow;
         if (!row.key || typeof row.at !== 'number') return;
+        if (knownRef.current.has(row.key)) return;
+        knownRef.current.add(row.key);
+        if (pausedRef.current) { setPending((current) => unique([row, ...current]).slice(0, 200)); return; }
         setStreamed((current) => unique([row, ...current]).slice(0, 200));
+        setFresh((current) => new Set(current).add(row.key));
+        setTimeout(() => setFresh((current) => { const next = new Set(current); next.delete(row.key); return next; }), 2000);
       } catch { /* A malformed frame cannot replace a valid row. */ }
     };
     stream.addEventListener('log', onLog as EventListener);
@@ -107,6 +130,22 @@ export default function LogsPage() {
     return () => stream.close();
   }, [follow, streamUrl, apiUrl, filters]);
 
+  useEffect(() => {
+    const onScroll = () => { pausedRef.current = window.scrollY > 320; if (!pausedRef.current) flushPending(); };
+    window.addEventListener('scroll', onScroll, { passive: true });
+    return () => window.removeEventListener('scroll', onScroll);
+  }, []);
+  const flushPending = () => {
+    setPending((current) => {
+      if (!current.length) return current;
+      const keys = current.map((row) => row.key);
+      setStreamed((old) => unique([...current, ...old]).slice(0, 200));
+      setFresh(new Set(keys));
+      setTimeout(() => setFresh(new Set()), 2000);
+      return [];
+    });
+  };
+  const showPending = () => { window.scrollTo({ top: 0, behavior: 'smooth' }); pausedRef.current = false; flushPending(); };
   const loadMore = async () => {
     const cursor = nextCursor === undefined ? logs.meta?.next : nextCursor;
     if (!cursor || moreBusy) return;
@@ -122,20 +161,23 @@ export default function LogsPage() {
     finally { setMoreBusy(false); }
   };
   const rows = unique([...(logs.data ?? []), ...streamed, ...older]);
+  knownRef.current = new Set(rows.map((row) => row.key));
+  const activeCount = filterFields.filter((field) => filters.has(field)).length;
   const sources = [...new Set(rows.map((row) => row.db))];
   const canLoadMore = (nextCursor === undefined ? logs.meta?.next : nextCursor) != null;
-  return <ConceptBlock concept="C17" className="space-y-5">
-    <div className="flex flex-wrap items-start justify-between gap-3"><div><p className="text-xs text-muted-foreground">StarCi / Quan sát</p><h1 className="mt-1 text-2xl font-semibold tracking-tight">Nhật ký</h1><p className="mt-1 text-sm text-muted-foreground">Dòng sự kiện từ máy và ledger dự án, có bộ lọc lưu trong đường dẫn.</p></div><div className="flex gap-2"><Button variant="outline" size="sm" className="lg:hidden" onClick={() => setFilterOpen(true)}><Filter size={15} /> Bộ lọc</Button><Button variant={follow ? 'default' : 'outline'} size="sm" disabled={filters.has('q')} title={filters.has('q') ? 'Theo dõi không hỗ trợ tìm toàn văn; xóa từ khóa để bật.' : undefined} onClick={() => setFollow((value) => !value)}><Radio size={15} /> {follow ? streamStatus === 'live' ? 'Đang theo dõi' : 'Đang nối lại' : 'Theo dõi'}</Button></div></div>
-    <div className="grid min-w-0 gap-4 lg:grid-cols-[245px_minmax(0,1fr)]">
-      <aside className="hidden lg:block"><Card><CardHeader><CardTitle>Bộ lọc</CardTitle></CardHeader><CardContent><FilterFields filters={filters} onChange={change} contract={contract.data} /></CardContent></Card></aside>
-      <div className="min-w-0 space-y-3"><Card><CardContent className="flex flex-wrap items-center justify-between gap-2 py-3 text-xs text-muted-foreground"><div className="flex flex-wrap items-center gap-2"><Badge variant="outline">{rows.length} dòng đã tải</Badge><span>{sources.length ? sources.map((source) => source === 'machine' ? 'máy' : source).join(' · ') : 'Chưa có nguồn'}</span></div><div className="flex items-center gap-2"><span>{logs.meta ? `Nguồn ${formatAbsolute(logs.meta.at)}` : 'Chưa có thời điểm nguồn'}</span><Button variant="ghost" size="icon" aria-label="Làm mới" onClick={() => refreshQuery(apiUrl)}><RefreshCw size={15} /></Button></div></CardContent></Card>
-        {logs.error && <p className="shell-error" role="status">{logs.data ? 'Nguồn đang lỗi; giữ dòng đã đọc gần nhất. ' : 'Không đọc được nhật ký. '}{logs.error}</p>}
-        {logs.meta?.stale?.length ? <p className="shell-error" role="status">Nguồn chậm: {logs.meta.stale.join(', ')}</p> : null}
-        {logs.loading && !logs.data ? <p className="empty-state" role="status">Đang đọc nhật ký…</p> : <LogView rows={rows} />}
-        {moreError && <p className="shell-error" role="status">{moreError}</p>}
-        {canLoadMore && <Button variant="outline" className="w-full" disabled={moreBusy} onClick={loadMore}>{moreBusy ? 'Đang tải…' : 'Tải thêm dòng cũ'}</Button>}
-      </div>
+  return <ConceptBlock concept="C17" className="space-y-4">
+    <div className="flex flex-wrap items-start justify-between gap-3"><div><p className="text-xs text-muted-foreground">StarCi / Quan sát</p><h1 className="mt-1 text-2xl font-semibold tracking-tight">Nhật ký</h1><p className="mt-1 text-sm text-muted-foreground">Dòng sự kiện từ máy và ledger dự án; bộ lọc lưu trong đường dẫn.</p></div>
+      <div className="flex gap-2"><Button variant="outline" size="sm" className="md:hidden" onClick={() => setFilterOpen(true)}><Filter size={15} /> Bộ lọc{activeCount ? ` (${activeCount})` : ''}</Button><Button variant={follow ? 'default' : 'outline'} size="sm" aria-pressed={follow} disabled={filters.has('q')} title={filters.has('q') ? 'Theo dõi không hỗ trợ tìm toàn văn; xóa từ khóa để bật.' : undefined} onClick={() => setFollow((value) => !value)}><Radio size={15} className={follow && streamStatus === 'live' ? 'animate-pulse' : ''} /> {follow ? streamStatus === 'live' ? 'Đang theo dõi trực tiếp' : 'Đang nối lại' : 'Theo dõi trực tiếp'}</Button></div></div>
+    <div className="hidden md:block"><FilterBar filters={filters} onChange={change} contract={contract.data} workflows={workflowList.data ?? []} activeCount={activeCount} onMore={() => setFilterOpen(true)} /></div>
+    <div className="min-w-0 space-y-3">
+      <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-muted-foreground"><div className="flex flex-wrap items-center gap-2"><Badge variant="outline">{rows.length} dòng đã tải</Badge><span>{sources.length ? sources.map((source) => source === 'machine' ? 'máy' : source).join(' · ') : 'Chưa có nguồn'}</span></div><div className="flex items-center gap-2"><span>{logs.meta ? `Nguồn ${formatAbsolute(logs.meta.at)}` : 'Chưa có thời điểm nguồn'}</span><Button variant="ghost" size="icon" aria-label="Làm mới" onClick={() => refreshQuery(apiUrl)}><RefreshCw size={15} /></Button></div></div>
+      {pending.length > 0 && <div className="pointer-events-none sticky top-16 z-20 flex justify-center"><Button size="sm" className="pointer-events-auto rounded-full shadow-md" onClick={showPending}><ArrowUp size={14} /> {pending.length} dòng mới</Button></div>}
+      {logs.error && <p className="shell-error" role="status">{logs.data ? 'Nguồn đang lỗi; giữ dòng đã đọc gần nhất. ' : 'Không đọc được nhật ký. '}{logs.error}</p>}
+      {logs.meta?.stale?.length ? <p className="shell-error" role="status">Nguồn chậm: {logs.meta.stale.join(', ')}</p> : null}
+      {logs.loading && !logs.data ? <p className="empty-state" role="status">Đang đọc nhật ký…</p> : <LogView rows={rows} freshKeys={fresh} />}
+      {moreError && <p className="shell-error" role="status">{moreError}</p>}
+      {canLoadMore && <Button variant="outline" className="w-full" disabled={moreBusy} onClick={loadMore}>{moreBusy ? 'Đang tải…' : 'Tải thêm dòng cũ'}</Button>}
     </div>
-    <Drawer open={filterOpen} onOpenChange={setFilterOpen} title="Bộ lọc nhật ký" description="Các lựa chọn được lưu trong đường dẫn."><FilterFields filters={filters} onChange={change} contract={contract.data} /><Button className="mt-5 w-full" onClick={() => setFilterOpen(false)}>Xem kết quả</Button></Drawer>
+    <Drawer open={filterOpen} onOpenChange={setFilterOpen} title="Bộ lọc nhật ký" description="Các lựa chọn được lưu trong đường dẫn."><FilterFields filters={filters} onChange={change} contract={contract.data} /><div className="mt-5 grid grid-cols-2 gap-2"><Button variant="outline" onClick={() => change('clear', '')}>Xóa lọc</Button><Button onClick={() => setFilterOpen(false)}>Xem kết quả</Button></div></Drawer>
   </ConceptBlock>;
 }

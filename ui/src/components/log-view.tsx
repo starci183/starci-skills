@@ -3,29 +3,68 @@ import { Badge } from './ui/badge';
 import { Card, CardContent } from './ui/card';
 import { ConceptBlock, type Concept } from './concept';
 import { StateChip } from './state-chip';
+import { JsonTree } from './logs/json-tree';
+import { kindIcon, levelLabels, levelTone } from './logs/kinds';
 import { formatAbsolute } from '../i18n/vi';
-import type { LogRow, TimelineItem, UiState } from '../contract';
+import type { LogRow, TimelineItem } from '../contract';
 
 export const concept: Concept = 'C17';
 
-const levelState: Record<LogRow['level'], UiState> = { debug: 'unknown', info: 'ok', warn: 'warn', error: 'bad' };
+const timeFormat = new Intl.DateTimeFormat('vi-VN', { timeZone: 'Asia/Bangkok', hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false });
+const shortWf = (wf: string) => wf.replace(/^wf-/, '');
 
 function RefLinks({ refs }: { refs: LogRow['refs'] }) {
   if (!refs.length) return <span className="text-muted-foreground">Chưa có liên kết.</span>;
   return <div className="flex flex-wrap gap-2">{refs.map((ref) => <a key={`${ref.kind}:${ref.project ?? ''}:${ref.id}`} href={ref.href} className="inline-flex items-center gap-1 rounded-md border px-2 py-1 text-xs text-primary hover:bg-muted"><Link2 size={12} aria-hidden="true" />{ref.kind} · {ref.id}</a>)}</div>;
 }
 
-export function LogView({ rows, empty = 'Không có dòng nhật ký phù hợp.' }: { rows: LogRow[]; empty?: string }) {
+const linkClass = 'text-primary hover:underline';
+
+export function LogRowItem({ row, fresh = false }: { row: LogRow; fresh?: boolean }) {
+  const tone = levelTone[row.level];
+  const Icon = kindIcon(row.kind);
+  const wfRef = row.refs.find((ref) => ref.kind === 'workflow');
+  const attemptRef = row.refs.find((ref) => ref.kind === 'attempt');
+  return <details className={`group border-b border-l-[3px] border-b-border/60 border-l-transparent last:border-b-0 data-[tone]:border-l-[color:var(--tone)] ${row.level === 'error' ? 'bg-[color:var(--tone-bg)]' : ''} ${fresh ? 'log-row-new' : ''}`} data-tone={tone} data-level={row.level}>
+    <summary className="grid cursor-pointer list-none grid-cols-[3.9rem_minmax(0,1fr)] items-center gap-x-2.5 gap-y-0.5 px-3 py-2 text-[12.5px] hover:bg-muted/40 md:grid-cols-[4.7rem_3.4rem_5.5rem_9.5rem_minmax(0,1fr)_10.5rem] md:gap-x-3 [&::-webkit-details-marker]:hidden">
+      <time className="font-mono text-xs tabular-nums text-muted-foreground" dateTime={new Date(row.at).toISOString()} title={formatAbsolute(row.at)}>{timeFormat.format(row.at)}</time>
+      <span className={`hidden text-[11px] font-semibold md:block ${tone ? 'text-[color:var(--tone)]' : 'text-muted-foreground'}`}>{levelLabels[row.level]}</span>
+      <span className="hidden min-w-0 md:block"><Badge variant="outline" className="max-w-full truncate font-mono text-[10.5px]">{row.actor}</Badge></span>
+      <span className="col-start-2 flex min-w-0 items-center gap-1.5 font-mono text-[11.5px] text-muted-foreground md:col-start-auto">
+        <Icon className="size-3.5 shrink-0" aria-hidden="true" /><span className="truncate" title={row.kind}>{row.kind}</span>
+        {tone && <span className="font-semibold text-[color:var(--tone)] md:hidden">· {levelLabels[row.level]}</span>}
+        <ChevronRight className="ml-auto size-3.5 shrink-0 transition-transform group-open:rotate-90 md:hidden" aria-hidden="true" />
+      </span>
+      <span className="col-start-2 min-w-0 break-words leading-5 md:col-start-auto [overflow-wrap:anywhere]">{row.msg}</span>
+      <span className="hidden min-w-0 truncate font-mono text-[11px] text-muted-foreground md:block" onClick={(event) => { if ((event.target as HTMLElement).closest('a')) event.stopPropagation(); }}>
+        {wfRef ? <a href={wfRef.href} className={linkClass}>{shortWf(wfRef.id)}</a> : row.wf ? shortWf(row.wf) : row.db === 'machine' ? 'máy' : row.db}
+        {attemptRef && <> · <a href={attemptRef.href} className={linkClass}>#{attemptRef.id}</a></>}
+      </span>
+    </summary>
+    <div className="space-y-3 border-t bg-muted/20 px-3 py-3 text-xs md:pl-[5.4rem]">
+      <dl className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
+        <div><dt className="text-muted-foreground">Thời điểm</dt><dd>{formatAbsolute(row.at)}</dd></div>
+        <div><dt className="text-muted-foreground">Mức · Actor</dt><dd>{levelLabels[row.level]} · {row.actor}{row.controller ? ` · ${row.controller}` : ''}</dd></div>
+        <div><dt className="text-muted-foreground">Loại</dt><dd className="font-mono">{row.kind}</dd></div>
+        <div><dt className="text-muted-foreground">Nguồn</dt><dd>{row.db === 'machine' ? 'Máy' : `Dự án ${row.db}`}</dd></div>
+        <div><dt className="text-muted-foreground">Workflow</dt><dd className="break-all font-mono">{row.wf ?? '—'}</dd></div>
+        <div><dt className="text-muted-foreground">Job</dt><dd className="break-all font-mono">{row.job ?? '—'}</dd></div>
+        {row.traceId && <div><dt className="text-muted-foreground">Trace</dt><dd className="break-all font-mono">{row.traceId}</dd></div>}
+        {row.spanId && <div><dt className="text-muted-foreground">Span</dt><dd className="break-all font-mono">{row.spanId}</dd></div>}
+      </dl>
+      <div><h3 className="mb-1.5 font-medium">Tham chiếu</h3><RefLinks refs={row.refs} /></div>
+      {row.data != null && <div><h3 className="mb-1.5 font-medium">Dữ liệu</h3><JsonTree value={row.data} /></div>}
+    </div>
+  </details>;
+}
+
+export function LogView({ rows, empty = 'Không có dòng nhật ký phù hợp.', freshKeys }: { rows: LogRow[]; empty?: string; freshKeys?: ReadonlySet<string> }) {
   if (!rows.length) return <div className="empty-state" role="status">{empty}</div>;
-  return <ConceptBlock concept="C17" className="space-y-2" aria-label="Dòng nhật ký">
-    {rows.map((row) => <Card key={row.key} size="sm"><details className="group"><summary className="flex cursor-pointer list-none items-start gap-3 px-3 py-2.5 [&::-webkit-details-marker]:hidden">
-      <ChevronRight className="mt-1 size-3.5 shrink-0 text-muted-foreground transition-transform group-open:rotate-90" aria-hidden="true" />
-      <time className="w-20 shrink-0 text-xs tabular-nums text-muted-foreground sm:w-36" dateTime={new Date(row.at).toISOString()} title={formatAbsolute(row.at)}>{new Intl.DateTimeFormat('vi-VN', { timeZone: 'Asia/Bangkok', hour: '2-digit', minute: '2-digit', second: '2-digit' }).format(row.at)}<span className="hidden sm:inline"> · {new Intl.DateTimeFormat('vi-VN', { timeZone: 'Asia/Bangkok', day: '2-digit', month: '2-digit' }).format(row.at)}</span></time>
-      <span className="min-w-0 flex-1"><span className="flex flex-wrap items-center gap-2"><StateChip state={levelState[row.level]} label={row.level} compact /><strong className="text-xs font-medium">{row.actor}</strong>{row.controller && <Badge variant="outline" className="text-[10px]">{row.controller}</Badge>}{row.db !== 'machine' && <span className="text-[11px] text-muted-foreground">{row.db}</span>}</span><span className="mt-1 block break-words text-sm leading-5">{row.msg}</span></span>
-    </summary><CardContent className="space-y-3 border-t pt-3 text-xs"><dl className="grid gap-2 sm:grid-cols-2"><div><dt className="text-muted-foreground">Loại</dt><dd>{row.kind}</dd></div><div><dt className="text-muted-foreground">Nguồn</dt><dd>{row.db === 'machine' ? 'Máy' : `Dự án ${row.db}`}</dd></div><div><dt className="text-muted-foreground">Workflow</dt><dd>{row.wf ?? '—'}</dd></div><div><dt className="text-muted-foreground">Job</dt><dd>{row.job ?? '—'}</dd></div></dl>
-      <div><h3 className="mb-2 font-medium">Tham chiếu</h3><RefLinks refs={row.refs} /></div>
-      {row.data != null && <div><h3 className="mb-2 font-medium">Dữ liệu</h3><pre className="blob-text">{JSON.stringify(row.data, null, 2)}</pre></div>}
-    </CardContent></details></Card>)}
+  return <ConceptBlock concept="C17" aria-label="Dòng nhật ký">
+    <style>{'@keyframes log-flash{from{background-color:color-mix(in oklab,var(--primary) 22%,transparent)}to{background-color:transparent}}.log-row-new{animation:log-flash 1.6s ease-out 1}@media (prefers-reduced-motion:reduce){.log-row-new{animation:none}}'}</style>
+    <Card size="sm" className="overflow-hidden py-0"><div className="hidden border-b bg-muted/30 px-3 py-1.5 text-[11px] font-medium uppercase tracking-wider text-muted-foreground md:grid md:grid-cols-[4.7rem_3.4rem_5.5rem_9.5rem_minmax(0,1fr)_10.5rem] md:gap-x-3" aria-hidden="true"><span>Giờ</span><span>Mức</span><span>Actor</span><span>Loại</span><span>Nội dung</span><span>Workflow · lần thử</span></div>
+      {rows.map((row) => <LogRowItem key={row.key} row={row} fresh={freshKeys?.has(row.key)} />)}
+    </Card>
   </ConceptBlock>;
 }
 
