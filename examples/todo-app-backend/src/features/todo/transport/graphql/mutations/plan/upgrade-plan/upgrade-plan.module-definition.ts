@@ -2,7 +2,10 @@ import {
     ConfigurableModuleBuilder 
 } from "@nestjs/common"
 
-export const { ConfigurableModuleClass, OPTIONS_TYPE } = new ConfigurableModuleBuilder().setExtras(
+/** UpgradePlan takes no options beyond the isGlobal extra. */
+export type UpgradePlanOptions = Record<never, never>
+
+export const { ConfigurableModuleClass, OPTIONS_TYPE } = new ConfigurableModuleBuilder<UpgradePlanOptions>().setExtras(
     {
         isGlobal: false 
     },

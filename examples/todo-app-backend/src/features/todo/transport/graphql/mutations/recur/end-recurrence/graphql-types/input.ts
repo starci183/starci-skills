@@ -4,6 +4,9 @@ import {
 import {
     IsString, Matches 
 } from "class-validator"
+import {
+    TODO_MESSAGES 
+} from "../../../../../../messages/index"
 
 @InputType()
 /** endRecurrence's argument: ruleId and the local date the rule ends at. */
@@ -13,7 +16,7 @@ export class EndRecurrenceInput {
       ruleId!: string
 
   @Field({
-      description: "Local calendar date (YYYY-MM-DD) the rule ends effective, in the rule's own time zone." 
+      description: TODO_MESSAGES.get("endRecurrence.input.endedAt") 
   })
   @Matches(/^\d{4}-\d{2}-\d{2}$/)
       endedAt!: string

@@ -25,6 +25,12 @@ import {
 import {
     SignOutCommand, SignOutCommandResult 
 } from "./sign-out.command"
+import {
+    Clock
+} from "@modules/platform/clock/index"
+import {
+    LogEvent, WinstonService
+} from "@modules/platform/logging/index"
 
 /**
  * fr.login.sign-out (composes br.login.session.restores): the session ends and the next request against
@@ -42,6 +48,8 @@ export class SignOutHandler extends AbstractCommandHandler<SignOutCommand, SignO
     private readonly sessionService: SessionService,
     private readonly events: PlatformEventBus,
     private readonly keycloakClient: KeycloakClient,
+        private readonly clock: Clock,
+    private readonly logger: WinstonService,
     ) {
         super()
     }
@@ -50,12 +58,16 @@ export class SignOutHandler extends AbstractCommandHandler<SignOutCommand, SignO
         const session = await this.sessionService.findActive(command.params.sessionToken)
         await this.sessionService.tRevoke(command.params.sessionToken)
         this.events.publish(new SignedOutEvent(session.personId,
-            new Date(),
+            this.clock.now(),
             randomUUID()))
         try {
             await this.keycloakClient.notifySignOut(session.personId)
-        } catch {
+        } catch (error) {
             // Best-effort remote notification; the local revoke already happened and must not be undone by it.
+            this.logger.log(LogEvent.SessionSignOutNotifyFailed,
+                {
+                    reason: String(error)
+                })
         }
         return {
             signedOut: true 

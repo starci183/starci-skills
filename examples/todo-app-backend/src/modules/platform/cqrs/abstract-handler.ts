@@ -1,4 +1,6 @@
-import { ICommand, IQuery } from "@nestjs/cqrs"
+import {
+    ICommand, IQuery 
+} from "@nestjs/cqrs"
 
 /**
  * The template every command handler plugs into: `@nestjs/cqrs` dispatches through `execute`, which
@@ -11,7 +13,7 @@ import { ICommand, IQuery } from "@nestjs/cqrs"
  */
 export abstract class AbstractCommandHandler<TCommand extends ICommand, TResult> {
     /** The bus entry point: hands the command to the handler's process step. */
-    async execute(command: TCommand): Promise<TResult> {
+    execute(command: TCommand): Promise<TResult> {
         return this.process(command)
     }
 
@@ -21,7 +23,7 @@ export abstract class AbstractCommandHandler<TCommand extends ICommand, TResult>
 /** The query-side twin of {@link AbstractCommandHandler}: same template, same rule. */
 export abstract class AbstractQueryHandler<TQuery extends IQuery, TResult> {
     /** The bus entry point: hands the query to the handler's process step. */
-    async execute(query: TQuery): Promise<TResult> {
+    execute(query: TQuery): Promise<TResult> {
         return this.process(query)
     }
 

@@ -19,6 +19,12 @@ import {
 import {
     SchedulerService 
 } from "./scheduler.service"
+import {
+    Clock 
+} from "@modules/platform/clock/index"
+import {
+    FakeClock 
+} from "@starci/jest-preset/clock"
 
 /**
  * integration.recur.scheduler's wiring: onModuleInit registers a started CronJob named
@@ -39,6 +45,9 @@ describe("SchedulerService (integration.recur.scheduler)",
             addCronJob = jest.fn()
             moduleRef = await Test.createTestingModule({
                 providers: [
+                    {
+                        provide: Clock, useValue: new FakeClock() 
+                    },
                     SchedulerService,
                     AppConfigService,
                     WinstonService,

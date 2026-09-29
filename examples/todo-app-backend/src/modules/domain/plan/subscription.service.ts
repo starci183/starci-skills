@@ -9,10 +9,10 @@ import type {
 } from "typeorm"
 import {
     InjectPrimaryEntityManager,
-} from "@modules/platform/databases/postgresql/primary/index"
+} from "@modules/platform/databases/index"
 import {
     SubscriptionEntity,
-} from "@modules/platform/databases/postgresql/primary/index"
+} from "@modules/platform/databases/index"
 import {
     PlanSubscriptionNotFoundException,
 } from "./errors/plan-subscription-not-found"
@@ -106,7 +106,7 @@ export class SubscriptionService {
             row))
     }
 
-    async tRenewalConfirmed(subscriptionId: string, periodEnd: Date): Promise<SubscriptionRecord> {
+    tRenewalConfirmed(subscriptionId: string, periodEnd: Date): Promise<SubscriptionRecord> {
         return this.tGatewayConfirmed(subscriptionId,
             periodEnd)
     }

@@ -8,6 +8,9 @@ import type {
     NextFunction, Request, Response 
 } from "express"
 import {
+    Clock,
+} from "@modules/platform/clock/index"
+import {
     LogEvent,
 } from "@modules/platform/logging/index"
 import {
@@ -41,6 +44,7 @@ export class ObservabilityMiddleware implements NestMiddleware {
     constructor(
     private readonly metrics: MetricsService,
     private readonly winston: WinstonService,
+    private readonly clock: Clock,
     ) {}
 
     use(req: Request, res: Response, next: NextFunction): void {
@@ -48,11 +52,11 @@ export class ObservabilityMiddleware implements NestMiddleware {
         const requestId = (Array.isArray(inbound) ? inbound[0] : inbound) || randomUUID()
         res.setHeader(REQUEST_ID_HEADER,
             requestId)
-        const startedAt = Date.now()
+        const startedAt = this.clock.now().getTime()
         res.on("finish",
             () => {
                 const route = routeLabel(req)
-                const durationMs = Date.now() - startedAt
+                const durationMs = this.clock.now().getTime() - startedAt
                 this.metrics.recordRequest(req.method,
                     route,
                     res.statusCode,

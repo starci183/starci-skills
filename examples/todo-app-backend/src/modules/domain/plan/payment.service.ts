@@ -9,10 +9,10 @@ import type {
 } from "typeorm"
 import {
     InjectPrimaryEntityManager,
-} from "@modules/platform/databases/postgresql/primary/index"
+} from "@modules/platform/databases/index"
 import {
     PaymentIntentEntity,
-} from "@modules/platform/databases/postgresql/primary/index"
+} from "@modules/platform/databases/index"
 import {
     PlanPaymentIntentNotFoundException,
 } from "./errors/plan-payment-intent-not-found"
@@ -20,6 +20,9 @@ import {
 import {
     PaymentIntentRecord, PaymentIntentStatus 
 } from "./types/payment-intent-record"
+import {
+    Clock
+} from "@modules/platform/clock/index"
 
 /**
  * data.plan.payment-intent: the idempotent ledger br.plan.payment.idempotent depends on. `id` is this
@@ -32,7 +35,9 @@ import {
 @Injectable()
 /** Injectable service owning the payment logic the plan capability exposes; wired by the capability's own module. */
 export class PaymentService {
-    constructor(@InjectPrimaryEntityManager() private readonly entityManager: EntityManager) {}
+    constructor(@InjectPrimaryEntityManager() private readonly entityManager: EntityManager,
+        private readonly clock: Clock
+    ) {}
 
     async create(subscriptionId: string, gatewayIntentId: string, amount: number, currency: string): Promise<PaymentIntentRecord> {
         const saved = await this.entityManager.save(PaymentIntentEntity,
@@ -71,7 +76,7 @@ export class PaymentService {
             }
         }
         row.status = "paid"
-        row.appliedAt = new Date()
+        row.appliedAt = this.clock.now()
         const saved = await this.entityManager.save(PaymentIntentEntity,
             row)
         return {

@@ -25,6 +25,9 @@ import {
 import {
     RevokeCollaboratorResponse 
 } from "./graphql-types/response"
+import {
+    TODO_MESSAGES 
+} from "../../../../../messages/index"
 
 @Resolver()
 /** The fr.share.revoke door: flips the invitation to revoked and evicts the collaborator cache entry in the same call - access ends immediately, not by sweep. */
@@ -36,7 +39,7 @@ export class RevokeCollaboratorResolver {
 
   @Mutation(() => RevokeCollaboratorResponse,
       {
-          name: "revokeCollaborator", description: "Revoke a collaborator on one of the caller’s own tasks." 
+          name: "revokeCollaborator", description: TODO_MESSAGES.get("revokeCollaborator.description") 
       })
     async revokeCollaborator(
     @Context("req") req: GraphqlRequestLike,

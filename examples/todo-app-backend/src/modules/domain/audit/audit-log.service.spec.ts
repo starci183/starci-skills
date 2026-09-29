@@ -5,14 +5,11 @@ import {
     getEntityManagerToken 
 } from "@nestjs/typeorm"
 import {
-    EntityManager 
-} from "typeorm"
-import {
     AuditLogLineEntity,
-} from "@modules/platform/databases/postgresql/primary/index"
+} from "@modules/platform/databases/index"
 import {
     POSTGRESQL_PRIMARY,
-} from "@modules/platform/databases/postgresql/primary/index"
+} from "@modules/platform/databases/index"
 import {
     createFakeAuditEntityManager 
 } from "./testing/fake-audit-entity-manager"
@@ -20,31 +17,31 @@ import {
     AuditKeystoreService 
 } from "./audit-keystore.service"
 import {
-    AuditLogService, Clock 
+    AuditLogService
 } from "./audit-log.service"
+import {
+    Clock,
+} from "@modules/platform/clock/index"
+import {
+    FakeClock
+} from "@starci/jest-preset/clock"
 
-const build = async (clock?: Clock) => {
+const build = async (clock: FakeClock = new FakeClock()) => {
     const manager = createFakeAuditEntityManager()
     const moduleRef = await Test.createTestingModule({
         providers: [
             AuditKeystoreService,
-            // The optional Clock is not a Nest-resolvable type, so the spec supplies it through a factory
-            // instead of the class provider - still resolved through the same TestingModule container.
+            AuditLogService,
             {
-                provide: AuditLogService,
-                useFactory: (em: EntityManager, keystore: AuditKeystoreService) => new AuditLogService(em,
-                    keystore,
-                    clock),
-                inject: [getEntityManagerToken(POSTGRESQL_PRIMARY),
-                    AuditKeystoreService],
+                provide: Clock, useValue: clock
             },
             {
-                provide: getEntityManagerToken(POSTGRESQL_PRIMARY), useValue: manager 
+                provide: getEntityManagerToken(POSTGRESQL_PRIMARY), useValue: manager
             },
         ],
     }).compile()
     return {
-        moduleRef, manager, keystore: moduleRef.get(AuditKeystoreService), log: moduleRef.get(AuditLogService) 
+        moduleRef, manager, keystore: moduleRef.get(AuditKeystoreService), log: moduleRef.get(AuditLogService)
     }
 }
 
@@ -250,14 +247,14 @@ describe("AuditLogService",
             () => {
                 it("a line survives its full 400-day retention window untouched, proven with a fake clock, never real elapsed time",
                     async () => {
-                        let now = new Date("2026-01-01T00:00:00.000Z")
-                        const built = await build(() => now)
+                        const clock = new FakeClock("2026-01-01T00:00:00.000Z")
+                        const built = await build(clock)
                         moduleRef = built.moduleRef
 
                         await built.log.append("person-1",
                             "sign-in",
                             null)
-                        now = new Date(now.getTime() + 400 * 24 * 60 * 60 * 1000 + 1000)
+                        clock.advance(400 * 24 * 60 * 60 * 1000 + 1000)
 
                         const swept = await built.log.sweepRetention()
 
@@ -267,15 +264,15 @@ describe("AuditLogService",
 
                 it("retention and erasure are independent axes: past the window, an erased line still exists but no longer decrypts",
                     async () => {
-                        let now = new Date("2026-01-01T00:00:00.000Z")
-                        const built = await build(() => now)
+                        const clock = new FakeClock("2026-01-01T00:00:00.000Z")
+                        const built = await build(clock)
                         moduleRef = built.moduleRef
 
                         const line = await built.log.append("person-1",
                             "sign-in",
                             null)
                         await built.keystore.destroyKey("person-1")
-                        now = new Date(now.getTime() + 400 * 24 * 60 * 60 * 1000 + 1000)
+                        clock.advance(400 * 24 * 60 * 60 * 1000 + 1000)
 
                         const swept = await built.log.sweepRetention()
                         expect(swept.lineCount).toBe(1) // still exists

@@ -22,6 +22,9 @@ import {
 import {
     RequestErasureResponse 
 } from "./graphql-types/response"
+import {
+    TODO_MESSAGES 
+} from "../../../../../messages/index"
 
 /** fr.audit.erasure.request: the caller's own personId, taken from `x-session-token`, is the only
  * subject a person may ever request erasure for - there is no operator-initiated erasure in this
@@ -36,7 +39,7 @@ export class RequestErasureResolver {
 
   @Mutation(() => RequestErasureResponse,
       {
-          name: "requestErasure", description: "Request that everything identifying the caller be erased from the audit log." 
+          name: "requestErasure", description: TODO_MESSAGES.get("requestErasure.description") 
       })
     async requestErasure(@Context("req") req: GraphqlRequestLike): Promise<RequestErasureResponse> {
         const personId = await actorIdFromRequest(req,

@@ -1,12 +1,12 @@
 import {
-    AbstractException,
+    DomainError,
 } from "@modules/platform/errors/index"
 import type {
-    AbstractExceptionMetadata,
+    DomainErrorMetadata,
 } from "@modules/platform/errors/index"
 
 /** Metadata for a complete/skip attempt made by someone other than the occurrence's owner. */
-export interface RecurOccurrenceForbiddenExceptionMetadata extends AbstractExceptionMetadata {
+export interface RecurOccurrenceForbiddenExceptionMetadata extends DomainErrorMetadata {
   /** The occurrence id the actor attempted to mutate. */
   occurrenceId?: string;
   /** The actor who was refused. */
@@ -14,13 +14,15 @@ export interface RecurOccurrenceForbiddenExceptionMetadata extends AbstractExcep
 }
 
 /** br.recur.occurrence.owned-by-rule-owner: only the rule's owner may complete or skip its occurrence. */
-export class RecurOccurrenceForbiddenException extends AbstractException {
+export class RecurOccurrenceForbiddenException extends DomainError {
     constructor({ occurrenceId, actorId, ...metadata }: RecurOccurrenceForbiddenExceptionMetadata = {
     }) {
-        super("Not the owner.",
-            "RECUR_OCCURRENCE_FORBIDDEN_EXCEPTION",
+        super("RECUR_OCCURRENCE_FORBIDDEN_EXCEPTION",
+            "Not the owner.",
             {
-                occurrenceId, actorId, ...metadata 
+                metadata: {
+                    occurrenceId, actorId, ...metadata 
+                } 
             })
     }
 }

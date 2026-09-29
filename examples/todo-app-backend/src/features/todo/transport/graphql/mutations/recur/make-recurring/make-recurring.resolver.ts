@@ -25,6 +25,9 @@ import {
 import {
     MakeRecurringResponse 
 } from "./graphql-types/response"
+import {
+    TODO_MESSAGES 
+} from "../../../../../messages/index"
 
 @Resolver()
 /** The fr.recur.make door: turns a title into a recurrence rule - cadence, time zone, local fire time and start date. */
@@ -37,7 +40,7 @@ export class MakeRecurringResolver {
   @Mutation(() => MakeRecurringResponse,
       {
           name: "makeRecurring",
-          description: "fr.recur.make-recurring: create a recurrence rule owned by the caller.",
+          description: TODO_MESSAGES.get("makeRecurring.description"),
       })
     async makeRecurring(
     @Context("req") req: GraphqlRequestLike,

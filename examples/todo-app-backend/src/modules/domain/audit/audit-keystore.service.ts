@@ -9,10 +9,13 @@ import type {
 } from "typeorm"
 import {
     InjectPrimaryEntityManager,
-} from "@modules/platform/databases/postgresql/primary/index"
+} from "@modules/platform/databases/index"
 import {
     AuditKeyEntity,
-} from "@modules/platform/databases/postgresql/primary/index"
+} from "@modules/platform/databases/index"
+import {
+    Clock
+} from "@modules/platform/clock/index"
 
 const ALGORITHM = "aes-256-gcm"
 const IV_LENGTH_BYTES = 12
@@ -29,10 +32,17 @@ const IV_LENGTH_BYTES = 12
  */
 export const SYSTEM_ACTOR_ID = "system"
 
+/** What `unseal` answers: the plaintext, or the reason the blob could not be opened. */
+export type UnsealOutcome =
+    | { readonly opened: true; readonly plaintext: string }
+    | { readonly opened: false; readonly cause: unknown }
+
 @Injectable()
 /** Injectable service owning the audit keystore logic the audit capability exposes; wired by the capability's own module. */
 export class AuditKeystoreService {
-    constructor(@InjectPrimaryEntityManager() private readonly entityManager: EntityManager) {}
+    constructor(@InjectPrimaryEntityManager() private readonly entityManager: EntityManager,
+        private readonly clock: Clock
+    ) {}
 
     /** Returns the existing key for `personId`, or mints and persists a fresh one on first use. */
     async getOrCreateKey(personId: string): Promise<{ keyId: string; key: Buffer }> {
@@ -53,7 +63,7 @@ export class AuditKeystoreService {
                 personId,
                 keyId,
                 key: key.toString("base64"),
-                createdAt: new Date(),
+                createdAt: this.clock.now(),
             })
         return {
             keyId, key 
@@ -106,15 +116,19 @@ export class AuditKeystoreService {
             ciphertext.toString("base64")].join(".")
     }
 
-    /** The inverse of `seal`. Returns `null` on any failure (wrong key, tampered ciphertext, bad shape)
-   * rather than throwing, so a caller can treat "unreadable" uniformly whether the cause is a destroyed
-   * key or a corrupted blob. */
-    unseal(key: Buffer, sealed: string): string | null {
+    /** The inverse of `seal`. Never throws: a wrong key, a tampered ciphertext or a bad shape comes back as
+   * `{ opened: false, cause }`, so a caller treats "unreadable" uniformly whether the cause is a destroyed
+   * key or a corrupted blob, and the cause stays available to log. */
+    unseal(key: Buffer, sealed: string): UnsealOutcome {
+        const [ivPart,
+            tagPart,
+            ciphertextPart] = sealed.split(".")
+        if (!ivPart || !tagPart || !ciphertextPart) {
+            return {
+                opened: false, cause: new RangeError("sealed text is not iv.tag.ciphertext")
+            }
+        }
         try {
-            const [ivPart,
-                tagPart,
-                ciphertextPart] = sealed.split(".")
-            if (!ivPart || !tagPart || !ciphertextPart) return null
             const decipher = createDecipheriv(ALGORITHM,
                 key,
                 Buffer.from(ivPart,
@@ -124,9 +138,13 @@ export class AuditKeystoreService {
             const plaintext = Buffer.concat([decipher.update(Buffer.from(ciphertextPart,
                 "base64")),
             decipher.final()])
-            return plaintext.toString("utf8")
-        } catch {
-            return null
+            return {
+                opened: true, plaintext: plaintext.toString("utf8")
+            }
+        } catch (error) {
+            return {
+                opened: false, cause: error
+            }
         }
     }
 }

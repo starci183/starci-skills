@@ -6,7 +6,7 @@ import {
 } from "@nestjs/typeorm"
 import {
     POSTGRESQL_PRIMARY,
-} from "@modules/platform/databases/postgresql/primary/index"
+} from "@modules/platform/databases/index"
 import {
     NotifySmtpPort,
 } from "@modules/integrations/notify-smtp/index"
@@ -78,6 +78,32 @@ describe("DeliveryService",
                 expect(attempt?.state).toBe("delivered")
                 expect(attempt?.endedAt).toEqual(now)
                 expect(attempt?.attempt).toBe(1)
+            })
+
+        it("reads the whole batch in one query and dispatches only the queued members, skipping suppressed and unknown ids",
+            async () => {
+                await service.admit("notif-1",
+                    new Date("2026-09-18T06:00:00.000Z"),
+                    false)
+                await service.admit("notif-2",
+                    new Date("2026-09-18T06:00:00.000Z"),
+                    true)
+                await service.admit("notif-3",
+                    new Date("2026-09-18T06:00:00.000Z"),
+                    false)
+
+                const result = await service.dispatchBatch(["notif-3",
+                    "notif-2",
+                    "notif-1",
+                    "notif-missing"],
+                new Date("2026-09-18T06:10:00.000Z"),
+                {
+                    to: "owner@todo.dev", subject: "x", body: "y"
+                })
+
+                expect(result.delivered).toEqual(["notif-3",
+                    "notif-1"])
+                expect(smtp.sent).toHaveLength(1)
             })
 
         it("ac.notify.failure.classified.suppresses-bounced-address: a permanent rejection reaches bounced and does not retry",

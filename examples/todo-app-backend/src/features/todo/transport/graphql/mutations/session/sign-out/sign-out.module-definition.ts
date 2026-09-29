@@ -2,7 +2,10 @@ import {
     ConfigurableModuleBuilder 
 } from "@nestjs/common"
 
-export const { ConfigurableModuleClass, OPTIONS_TYPE } = new ConfigurableModuleBuilder().setExtras(
+/** SignOut takes no options beyond the isGlobal extra. */
+export type SignOutOptions = Record<never, never>
+
+export const { ConfigurableModuleClass, OPTIONS_TYPE } = new ConfigurableModuleBuilder<SignOutOptions>().setExtras(
     {
         isGlobal: false 
     },

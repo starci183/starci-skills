@@ -9,10 +9,10 @@ import type {
 } from "typeorm"
 import {
     InjectPrimaryEntityManager,
-} from "@modules/platform/databases/postgresql/primary/index"
+} from "@modules/platform/databases/index"
 import {
     ShareInvitationEntity,
-} from "@modules/platform/databases/postgresql/primary/index"
+} from "@modules/platform/databases/index"
 import {
     CollaboratorCache 
 } from "./collaborator-cache"
@@ -46,6 +46,14 @@ import {
 import {
     ShareInvitationRevokedException,
 } from "./errors/invitation-revoked"
+import {
+    Clock
+} from "@modules/platform/clock/index"
+
+/** The most accepted invitations the boot-time cache warm-up loads. */
+const MAX_ACCEPTED_INVITATIONS = 100_000
+/** The most invitations one task lists. */
+const MAX_INVITATIONS_PER_TASK = 500
 
 
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
@@ -61,7 +69,7 @@ const ROLES: Array<ShareRole> = ["viewer",
  * SessionService already use for their own transitions.
  *
  * Expiry and revocation are both enforced on read, never by a sweep (br.share.invite.expiry,
- * br.share.revoke.on-read): `liveStatusOf` recomputes a pending row's real status against `Date.now()`
+ * br.share.revoke.on-read): `liveStatusOf` recomputes a pending row's real status against the injected clock
  * every time this service reads it, and `reconcileLiveStatus` persists that recomputation the moment it
  * changes anything - the same "expire while reading" shape SessionService.findActive already uses for
  * session rows.
@@ -72,14 +80,17 @@ export class InvitationService implements OnModuleInit {
     constructor(
     @InjectPrimaryEntityManager() private readonly entityManager: EntityManager,
     private readonly cache: CollaboratorCache,
+        private readonly clock: Clock
     ) {}
 
     /** Hydrates the synchronous CollaboratorCache from Postgres at boot, so a process restart does not
    * lose what accept/revoke already wrote to disk (see collaborator-cache.ts's comment). */
     async onModuleInit(): Promise<void> {
-        const accepted = await this.entityManager.findBy(ShareInvitationEntity,
+        const accepted = await this.entityManager.find(ShareInvitationEntity,
             {
-                status: "accepted" 
+                where: {
+                    status: "accepted" 
+                }, take: MAX_ACCEPTED_INVITATIONS 
             })
         for (const row of accepted) {
             if (row.personId) {
@@ -119,7 +130,7 @@ row.role as ShareRole)
             }
             existing.role = role
             existing.status = "pending"
-            existing.sentAt = new Date()
+            existing.sentAt = this.clock.now()
             existing.acceptedAt = null
             existing.revokedAt = null
             if (existing.personId) {
@@ -140,7 +151,7 @@ row.role as ShareRole)
                 email: normalizedEmail,
                 role,
                 status: "pending",
-                sentAt: new Date(),
+                sentAt: this.clock.now(),
                 acceptedAt: null,
                 revokedAt: null,
                 personId: null,
@@ -183,7 +194,7 @@ row.role as ShareRole)
         }
 
         row.status = "accepted"
-        row.acceptedAt = new Date()
+        row.acceptedAt = this.clock.now()
         row.personId = actorId
         const saved = await this.entityManager.save(ShareInvitationEntity,
             row)
@@ -211,7 +222,7 @@ saved.role as ShareRole)
         }
 
         row.status = "revoked"
-        row.revokedAt = new Date()
+        row.revokedAt = this.clock.now()
         const saved = await this.entityManager.save(ShareInvitationEntity,
             row)
         if (saved.personId) {
@@ -225,9 +236,11 @@ saved.role as ShareRole)
    * live status; anyone else - including a stranger asking about a task with no rows at all - sees
    * nothing, per that record's own exceptionFlow. */
     async listFor(actorId: string, taskId: string): Promise<Array<InvitationRecord>> {
-        const rows = await this.entityManager.findBy(ShareInvitationEntity,
+        const rows = await this.entityManager.find(ShareInvitationEntity,
             {
-                taskId 
+                where: {
+                    taskId 
+                }, take: MAX_INVITATIONS_PER_TASK 
             })
         if (rows.length === 0) {
             return []
@@ -249,7 +262,7 @@ saved.role as ShareRole)
     /** The read-time half of br.share.invite.expiry: a pending row past its fourteen-day window reads
    * (and, from `reconcileLiveStatus`, is persisted) as expired without any sweep ever running. */
     private liveStatusOf(row: ShareInvitationEntity): ShareInvitationStatus {
-        if (row.status === "pending" && Date.now() > row.sentAt.getTime() + EXPIRY_DAYS * MILLISECONDS_PER_DAY) {
+        if (row.status === "pending" && this.clock.now().getTime() > row.sentAt.getTime() + EXPIRY_DAYS * MILLISECONDS_PER_DAY) {
             return "expired"
         }
         return row.status as ShareInvitationStatus

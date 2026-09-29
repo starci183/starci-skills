@@ -12,13 +12,13 @@ import {
 } from "@modules/platform/events/index"
 import {
     POSTGRESQL_PRIMARY,
-} from "@modules/platform/databases/postgresql/primary/index"
+} from "@modules/platform/databases/index"
 import {
     TaskEntity,
-} from "@modules/platform/databases/postgresql/primary/index"
+} from "@modules/platform/databases/index"
 import {
     createFakeEntityManager,
-} from "@modules/platform/databases/postgresql/primary/index"
+} from "@modules/platform/databases/index"
 import {
     TaskCreationPolicy 
 } from "./creation-policy.contracts"
@@ -37,10 +37,23 @@ import {
 import {
     CreateTaskHandler 
 } from "./create-task.handler"
+import {
+    Clock 
+} from "@modules/platform/clock/index"
+import {
+    FakeClock 
+} from "@starci/jest-preset/clock"
+import {
+    OwnershipGuard 
+} from "./ownership.guard"
 
 const compileModule = () =>
     Test.createTestingModule({
         providers: [
+            OwnershipGuard,
+            {
+                provide: Clock, useValue: new FakeClock() 
+            },
             CreateTaskHandler,
             TaskService,
             TaskCreationPolicyRegistry,

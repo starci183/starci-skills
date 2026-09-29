@@ -56,7 +56,7 @@ describe("AuditEventSubscriber",
             await moduleRef.close()
         })
 
-        const eachEvent: Array<{ event: unknown; action: string; actorField: string; target: string | null }> = [
+        const eachEvent: Array<{ event: Parameters<PlatformEventBus["publish"]>[0]; action: string; actorField: string; target: string | null }> = [
             {
                 event: new TaskCreatedEvent("task-1",
                     "owner-1",
@@ -89,7 +89,7 @@ describe("AuditEventSubscriber",
 
         it.each(eachEvent)("fr.audit.log.append: $action is appended for its published event",
             async ({ event, action, actorField, target }) => {
-                bus.publish(event as never)
+                bus.publish(event)
                 await Promise.resolve() // let the fire-and-forget route() microtask settle
 
                 expect(commandBus.dispatched).toHaveLength(1)

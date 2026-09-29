@@ -2,7 +2,10 @@ import {
     ConfigurableModuleBuilder 
 } from "@nestjs/common"
 
-export const { ConfigurableModuleClass, OPTIONS_TYPE } = new ConfigurableModuleBuilder().setExtras(
+/** SepayWebhook takes no options beyond the isGlobal extra. */
+export type SepayWebhookOptions = Record<never, never>
+
+export const { ConfigurableModuleClass, OPTIONS_TYPE } = new ConfigurableModuleBuilder<SepayWebhookOptions>().setExtras(
     {
         isGlobal: false 
     },

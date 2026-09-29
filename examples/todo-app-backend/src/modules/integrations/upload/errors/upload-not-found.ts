@@ -1,24 +1,26 @@
 import {
-    AbstractException,
+    DomainError,
 } from "@modules/platform/errors/index"
 import type {
-    AbstractExceptionMetadata,
+    DomainErrorMetadata,
 } from "@modules/platform/errors/index"
 
 /** Metadata for an upload that cannot be resolved. */
-export interface UploadNotFoundExceptionMetadata extends AbstractExceptionMetadata {
+export interface UploadNotFoundExceptionMetadata extends DomainErrorMetadata {
   /** The upload id looked up. */
   uploadId?: string;
 }
 
 /** House refusal carrying code UPLOAD_NOT_FOUND_EXCEPTION; every throw site attaches a metadata object naming the concrete id the lookup turned on. */
-export class UploadNotFoundException extends AbstractException {
+export class UploadNotFoundException extends DomainError {
     constructor({ uploadId, ...metadata }: UploadNotFoundExceptionMetadata = {
     }) {
-        super("The upload does not exist.",
-            "UPLOAD_NOT_FOUND_EXCEPTION",
+        super("UPLOAD_NOT_FOUND_EXCEPTION",
+            "The upload does not exist.",
             {
-                uploadId, ...metadata 
+                metadata: {
+                    uploadId, ...metadata 
+                } 
             })
     }
 }

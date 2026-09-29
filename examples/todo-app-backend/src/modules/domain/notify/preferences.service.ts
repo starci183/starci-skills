@@ -7,10 +7,10 @@ import type {
 } from "typeorm"
 import {
     InjectPrimaryEntityManager,
-} from "@modules/platform/databases/postgresql/primary/index"
+} from "@modules/platform/databases/index"
 import {
     NotifyPreferenceEntity,
-} from "@modules/platform/databases/postgresql/primary/index"
+} from "@modules/platform/databases/index"
 import {
     PreferencePatch 
 } from "./types/preference-patch"
@@ -50,7 +50,7 @@ export class PreferencesService {
             channel)).unsubscribed
     }
 
-    async setUnsubscribed(personId: string, channel: string, unsubscribed: boolean): Promise<PreferenceRecord> {
+    setUnsubscribed(personId: string, channel: string, unsubscribed: boolean): Promise<PreferenceRecord> {
         return this.update(personId,
             channel,
             {
@@ -58,7 +58,7 @@ export class PreferencesService {
             })
     }
 
-    async setDigestWindowMinutes(personId: string, channel: string, digestWindowMinutes: number | null): Promise<PreferenceRecord> {
+    setDigestWindowMinutes(personId: string, channel: string, digestWindowMinutes: number | null): Promise<PreferenceRecord> {
         return this.update(personId,
             channel,
             {

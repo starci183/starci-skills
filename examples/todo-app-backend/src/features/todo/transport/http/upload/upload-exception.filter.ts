@@ -5,7 +5,7 @@ import type {
     Response 
 } from "express"
 import {
-    AbstractException,
+    DomainError,
 } from "@modules/platform/errors/index"
 
 /**
@@ -29,10 +29,10 @@ const STATUS_BY_CODE: Record<string, number> = {
     TASK_FORBIDDEN_EXCEPTION: HttpStatus.FORBIDDEN,
 }
 
-@Catch(AbstractException)
-/** ExceptionFilter for the upload HTTP door: AbstractException code -> status -> {statusCode, code, message}. */
+@Catch(DomainError)
+/** ExceptionFilter for the upload HTTP door: DomainError code -> status -> {statusCode, code, message}. */
 export class UploadExceptionFilter implements ExceptionFilter {
-    catch(exception: AbstractException, host: ArgumentsHost): void {
+    catch(exception: DomainError, host: ArgumentsHost): void {
         const response = host.switchToHttp().getResponse<Response>()
         const status = STATUS_BY_CODE[exception.code] ?? HttpStatus.INTERNAL_SERVER_ERROR
         response.status(status).json({

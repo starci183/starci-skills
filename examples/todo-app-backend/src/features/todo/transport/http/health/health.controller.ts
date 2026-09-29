@@ -3,7 +3,10 @@ import {
 } from "@nestjs/common"
 import {
     PostgresPrimaryClient,
-} from "@modules/platform/databases/postgresql/primary/index"
+} from "@modules/platform/databases/index"
+import {
+    TODO_MESSAGES 
+} from "../../../messages/index"
 
 
 /**
@@ -24,7 +27,7 @@ export class HealthController {
         try {
             await this.db.ping()
         } catch {
-            throw new HttpException("The database could not be reached.",
+            throw new HttpException(TODO_MESSAGES.get("health.databaseUnreachable"),
                 HttpStatus.SERVICE_UNAVAILABLE)
         }
         return {

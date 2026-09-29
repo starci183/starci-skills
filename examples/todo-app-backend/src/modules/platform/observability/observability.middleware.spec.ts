@@ -22,6 +22,15 @@ import {
 import {
     currentRequestId, REQUEST_ID_HEADER 
 } from "./request-context"
+import {
+    Clock 
+} from "@modules/platform/clock/index"
+import {
+    FakeClock 
+} from "@starci/jest-preset/clock"
+import {
+    mock 
+} from "@starci/jest-preset/mock"
 
 /**
  * The middleware's contract: a presented x-request-id is honoured and echoed; an absent one is minted;
@@ -38,20 +47,22 @@ describe("observability middleware",
 
         const makeRes = () => {
             const emitter = new EventEmitter()
-            const res = emitter as unknown as Response & EventEmitter & { headers: Record<string, string>; statusCode: number }
-            res.headers = {
+            const headers: Record<string, string> = {
             }
-            res.statusCode = 200
-            const mutable = res as unknown as {
-                setHeader: unknown 
+            const res: Response = mock<Response>({
+                statusCode: 200,
+                setHeader: (name: string, value: number | string | ReadonlyArray<string>) => {
+                    headers[name.toLowerCase()] = String(value)
+                    return res
+                },
+                on: emitter.on.bind(emitter) as Response["on"],
+            })
+            return {
+                res, headers, finish: () => emitter.emit("finish")
             }
-            mutable.setHeader = (name: string, value: unknown) => {
-                res.headers[name.toLowerCase()] = String(value)
-            }
-            return res
         }
 
-        const run = (req: Partial<Request>, res: ReturnType<typeof makeRes>) =>
+        const run = (req: Partial<Request>, res: Response) =>
             new Promise<void>((resolve) => {
                 middleware.use(req as Request,
                     res,
@@ -61,7 +72,11 @@ describe("observability middleware",
         beforeEach(async () => {
             logged.length = 0
             moduleRef = await Test.createTestingModule({
-                providers: [MetricsService,
+                providers: [
+                    {
+                        provide: Clock, useValue: new FakeClock() 
+                    },
+                    MetricsService,
                     ObservabilityMiddleware,
                     {
                         provide: WinstonService,
@@ -82,7 +97,7 @@ describe("observability middleware",
 
         it("echoes an inbound x-request-id and exposes it through the request context",
             async () => {
-                const res = makeRes()
+                const { res, headers } = makeRes()
                 const req: Partial<Request> = {
                     headers: {
                         [REQUEST_ID_HEADER]: "req-abc" 
@@ -100,28 +115,28 @@ describe("observability middleware",
                             resolve()
                         }) as NextFunction)
                 })
-                expect(res.headers[REQUEST_ID_HEADER]).toBe("req-abc")
+                expect(headers[REQUEST_ID_HEADER]).toBe("req-abc")
                 expect(seenInside).toBe("req-abc")
                 expect(currentRequestId()).toBeUndefined()
             })
 
         it("mints a request id when the inbound header is absent",
             async () => {
-                const res = makeRes()
+                const { res, headers } = makeRes()
                 const req: Partial<Request> = {
                     headers: {
                     }, method: "GET", baseUrl: "", 
                 }
                 await run(req,
                     res)
-                expect(res.headers[REQUEST_ID_HEADER]).toMatch(/^[0-9a-f-]{36}$/)
+                expect(headers[REQUEST_ID_HEADER]).toMatch(/^[0-9a-f-]{36}$/)
             })
 
         it("on finish records the request under its route template and logs one access line",
             async () => {
-                const res = makeRes()
+                const { res, finish } = makeRes()
                 res.statusCode = 201
-                const req = {
+                const req = mock<Request>({
                     headers: {
                         [REQUEST_ID_HEADER]: "req-1" 
                     },
@@ -130,10 +145,10 @@ describe("observability middleware",
                     route: {
                         path: "/uploads/:uploadId/content" 
                     },
-                } as unknown as Request
+                })
                 await run(req,
                     res)
-                res.emit("finish")
+                finish()
 
                 const text = metrics.renderPrometheus()
                 expect(text).toContain("http_requests_total{method=\"PUT\",route=\"/uploads/:uploadId/content\",status=\"201\"} 1")
@@ -150,15 +165,15 @@ describe("observability middleware",
 
         it("collapses requests that matched no route to the bounded 'unmatched' label",
             async () => {
-                const res = makeRes()
+                const { res, finish } = makeRes()
                 res.statusCode = 404
-                const req = {
+                const req = mock<Request>({
                     headers: {
                     }, method: "GET", baseUrl: "", 
-                } as unknown as Request
+                })
                 await run(req,
                     res)
-                res.emit("finish")
+                finish()
                 expect(metrics.renderPrometheus()).toContain("route=\"unmatched\"")
             })
     })

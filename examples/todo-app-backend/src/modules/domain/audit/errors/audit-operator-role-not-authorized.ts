@@ -1,8 +1,8 @@
 import {
-    AbstractException,
+    DomainError,
 } from "@modules/platform/errors/index"
 import type {
-    AbstractExceptionMetadata,
+    DomainErrorMetadata,
 } from "@modules/platform/errors/index"
 
 /**
@@ -12,13 +12,13 @@ import type {
  * read of fr.audit.log.read: no claim, or a subject the roster does not name, is refused with a stable
  * code before any line is touched, rather than silently widening to a read the caller cannot verify.
  */
-export class AuditOperatorRoleNotAuthorizedException extends AbstractException {
-    constructor(metadata: AbstractExceptionMetadata = {
+export class AuditOperatorRoleNotAuthorizedException extends DomainError {
+    constructor(metadata: DomainErrorMetadata = {
     }) {
-        super(
+        super("AUDIT_OPERATOR_ROLE_NOT_AUTHORIZED_EXCEPTION",
             "Not authorized to read the operator audit view: this actor has no verified operator claim.",
-            "AUDIT_OPERATOR_ROLE_NOT_AUTHORIZED_EXCEPTION",
-            metadata,
-        )
+            {
+                metadata: metadata 
+            })
     }
 }

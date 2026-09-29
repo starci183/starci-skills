@@ -9,16 +9,16 @@ import {
 } from "@modules/platform/config/index"
 import {
     POSTGRESQL_PRIMARY,
-} from "@modules/platform/databases/postgresql/primary/index"
+} from "@modules/platform/databases/index"
 import {
     TaskEntity,
-} from "@modules/platform/databases/postgresql/primary/index"
+} from "@modules/platform/databases/index"
 import {
     UploadEntity,
-} from "@modules/platform/databases/postgresql/primary/index"
+} from "@modules/platform/databases/index"
 import {
     createFakeEntityManager,
-} from "@modules/platform/databases/postgresql/primary/index"
+} from "@modules/platform/databases/index"
 import {
     TaskForbiddenException,
 } from "@modules/domain/task/index"
@@ -52,6 +52,12 @@ import {
 import {
     UPLOAD_TOKEN_HEADER 
 } from "./upload-token"
+import {
+    Clock 
+} from "@modules/platform/clock/index"
+import {
+    FakeClock 
+} from "@starci/jest-preset/clock"
 
 const MAX_BYTES = 16
 const MIMES = ["text/plain"]
@@ -62,21 +68,27 @@ const MIMES = ["text/plain"]
  * UploadEntity and TaskEntity both behave like the real EntityManager calls. Rebuilt per test so no
  * row leaks between cases.
  */
+/** One row shape that both entity tables accept as a filter or a write: each store keeps only its own columns. */
+type Entities = UploadEntity & TaskEntity
+
 const makeFakeEntityManager = () => {
     const uploadsStore = createFakeEntityManager<UploadEntity>("id")
     const tasksStore = createFakeEntityManager<TaskEntity>("id")
     return {
         tasksStore,
         manager: {
-            findOneBy: (target: unknown, where: object) =>
+            findOneBy: (target: unknown, where: Partial<Entities>) =>
                 (target === UploadEntity ? uploadsStore : tasksStore).findOneBy(target,
-                    where as never),
-            findBy: (target: unknown, where: object) =>
+                    where),
+            findBy: (target: unknown, where: Partial<Entities>) =>
                 (target === UploadEntity ? uploadsStore : tasksStore).findBy(target,
-                    where as never),
-            save: (target: unknown, entity: object) =>
+                    where),
+            find: (target: unknown, options: { where?: Partial<Entities>; take?: number }) =>
+                (target === UploadEntity ? uploadsStore : tasksStore).find(target,
+                    options),
+            save: (target: unknown, entity: Partial<Entities>) =>
                 (target === UploadEntity ? uploadsStore : tasksStore).save(target,
-                    entity as never),
+                    entity),
             delete: (target: unknown, criteria: unknown) =>
                 (target === UploadEntity ? uploadsStore : tasksStore).delete(target,
                     criteria),
@@ -134,7 +146,11 @@ describe("upload service",
                 scan: jest.fn(async () => undefined) 
             }
             moduleRef = await Test.createTestingModule({
-                providers: [UploadService,
+                providers: [
+                    {
+                        provide: Clock, useValue: new FakeClock() 
+                    },
+                    UploadService,
                     {
                         provide: getEntityManagerToken(POSTGRESQL_PRIMARY), useValue: fake.manager 
                     },

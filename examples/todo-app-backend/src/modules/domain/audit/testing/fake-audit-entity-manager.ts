@@ -1,12 +1,12 @@
 import {
     AuditErasureRequestEntity,
-} from "@modules/platform/databases/postgresql/primary/index"
+} from "@modules/platform/databases/index"
 import {
     AuditKeyEntity,
-} from "@modules/platform/databases/postgresql/primary/index"
+} from "@modules/platform/databases/index"
 import {
     AuditLogLineEntity,
-} from "@modules/platform/databases/postgresql/primary/index"
+} from "@modules/platform/databases/index"
 
 /**
  * A minimal in-memory stand-in for `EntityManager`, scoped to the three entities this feature owns and
@@ -41,12 +41,12 @@ export const createFakeAuditEntityManager = () => {
     }
 
     return {
-        async findOneBy(target: EntityTarget, where: Row): Promise<Row | null> {
-            return storeFor(target).find(row => matches(row,
-                where)) ?? null
+        findOneBy(target: EntityTarget, where: Row): Promise<Row | null> {
+            return Promise.resolve(storeFor(target).find(row => matches(row,
+                where)) ?? null)
         },
 
-        async find(target: EntityTarget, options: { where?: Row; order?: Record<string, "ASC" | "DESC">; take?: number } = {
+        find(target: EntityTarget, options: { where?: Row; order?: Record<string, "ASC" | "DESC">; take?: number } = {
         }): Promise<Array<Row>> {
             let rows = [...storeFor(target)]
             if (options.where) rows = rows.filter(row => matches(row,
@@ -61,10 +61,10 @@ options.where as Row))
             }
             if (options.take !== undefined) rows = rows.slice(0,
                 options.take)
-            return rows
+            return Promise.resolve(rows)
         },
 
-        async save(target: EntityTarget, entityLike: Row): Promise<Row> {
+        save(target: EntityTarget, entityLike: Row): Promise<Row> {
             const keyField = KEY_FIELD[target.name]
             const rows = storeFor(target)
             const entity: Row = {
@@ -80,15 +80,16 @@ options.where as Row))
             } else {
                 rows.push(entity)
             }
-            return entity
+            return Promise.resolve(entity)
         },
 
-        async delete(target: EntityTarget, criteria: Row): Promise<void> {
+        delete(target: EntityTarget, criteria: Row): Promise<void> {
             const rows = storeFor(target)
             const index = rows.findIndex(row => matches(row,
                 criteria))
             if (index >= 0) rows.splice(index,
                 1)
+            return Promise.resolve()
         },
 
         /** Test-only out-of-band access: the tamper-evidence fuzz mutates/removes rows through this,

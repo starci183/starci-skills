@@ -2,6 +2,9 @@ import {
     Module 
 } from "@nestjs/common"
 import {
+    ClockModule,
+} from "@modules/platform/clock/index"
+import {
     ConfigModule,
 } from "@modules/platform/config/index"
 import {
@@ -9,7 +12,7 @@ import {
 } from "@modules/platform/events/index"
 import {
     PostgresqlPrimaryModule,
-} from "@modules/platform/databases/postgresql/primary/index"
+} from "@modules/platform/databases/index"
 import {
     KeycloakModule,
 } from "@modules/integrations/keycloak/index"
@@ -57,7 +60,7 @@ import {
  * Composition only, under nivo's shape: capability modules (`domain/session`, `domain/task`) and
  * the one owned database module are registered here; the GraphQL transport (`TodoGraphqlModule`) and the
  * one surviving HTTP door (`HealthModule`) are the only feature-level composition. `ConfigModule`,
- * `PlatformEventsModule` and `SessionModule` are registered globally: `AppConfigService` and
+ * `PlatformEventsModule`, `ClockModule` and `SessionModule` are registered globally: `AppConfigService` and
  * `PlatformEventBus` are genuinely app-wide (every capability and integration needs one or the other),
  * and `SessionService` is needed by five separate GraphQL action modules for the same
  * `Authorization: Bearer <token>` -> actor lookup (see `application/session-actor.adapter.ts`'s comment) - each capability module that
@@ -68,6 +71,9 @@ import {
  */
 @Module({
     imports: [
+        ClockModule.register({
+            isGlobal: true
+        }),
         ConfigModule.register({
             isGlobal: true 
         }),

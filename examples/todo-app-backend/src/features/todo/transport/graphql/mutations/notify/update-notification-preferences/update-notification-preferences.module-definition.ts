@@ -2,7 +2,10 @@ import {
     ConfigurableModuleBuilder 
 } from "@nestjs/common"
 
-export const { ConfigurableModuleClass, OPTIONS_TYPE } = new ConfigurableModuleBuilder().setExtras(
+/** UpdateNotificationPreferences takes no options beyond the isGlobal extra. */
+export type UpdateNotificationPreferencesOptions = Record<never, never>
+
+export const { ConfigurableModuleClass, OPTIONS_TYPE } = new ConfigurableModuleBuilder<UpdateNotificationPreferencesOptions>().setExtras(
     {
         isGlobal: false 
     },

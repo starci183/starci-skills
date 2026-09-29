@@ -1,12 +1,12 @@
 import {
-    AbstractException,
+    DomainError,
 } from "@modules/platform/errors/index"
 import type {
-    AbstractExceptionMetadata,
+    DomainErrorMetadata,
 } from "@modules/platform/errors/index"
 
 /** Metadata for an upload the actor may not touch. */
-export interface UploadForbiddenExceptionMetadata extends AbstractExceptionMetadata {
+export interface UploadForbiddenExceptionMetadata extends DomainErrorMetadata {
   /** The upload id the actor reached for. */
   uploadId?: string;
   /** The person who attempted the read/attach/delete. */
@@ -14,13 +14,15 @@ export interface UploadForbiddenExceptionMetadata extends AbstractExceptionMetad
 }
 
 /** House refusal carrying code UPLOAD_FORBIDDEN_EXCEPTION; thrown whenever an actor touches an upload row owned by somebody else. */
-export class UploadForbiddenException extends AbstractException {
+export class UploadForbiddenException extends DomainError {
     constructor({ uploadId, actorId, ...metadata }: UploadForbiddenExceptionMetadata = {
     }) {
-        super("The upload belongs to somebody else.",
-            "UPLOAD_FORBIDDEN_EXCEPTION",
+        super("UPLOAD_FORBIDDEN_EXCEPTION",
+            "The upload belongs to somebody else.",
             {
-                uploadId, actorId, ...metadata 
+                metadata: {
+                    uploadId, actorId, ...metadata 
+                } 
             })
     }
 }

@@ -16,7 +16,8 @@ under `.starcistacks/dev`.
 
 ## Repository layout
 
-- `apps/todo/src`: process startup and Nest module composition.
+- `apps/todo/src`: the api process (startup and Nest module composition).
+- `apps/migrate/src`: the only process that applies migrations; run `npm run migrate` (or `migrate:dev`) before the api starts.
 - `src/features` and `src/modules/{domain,platform,integrations}`: shared backend source.
 - `.starcistacks`: development stack declarations; `docs/`: human verification guidance.
 - `.starciwork`: product records shared with the paired frontend.
@@ -28,6 +29,15 @@ From this directory run `npm ci`, then `npm run typecheck`, `npm run lint:check`
 see `docs/guides/testing.md` before running live checks. Tests are exactly two kinds: unit `*.spec.ts` beside the
 source (`npm run test:unit`) and e2e `*.e2e-spec.ts` under `src/tests/e2e/` (`npm run test:e2e`, for example
 `npm run test:e2e -- task/task-lifecycle`). E2E runs manually only: no hook, default typecheck/lint, coverage or automatic CI job runs it (`npm run typecheck:e2e` is its manual type check).
+
+## Configuration and migrations
+
+`DATABASE_URL`, `REDIS_URL`, `KEYCLOAK_TOKEN_URL` and `SEPAY_BASE_URL` have no default: a missing value stops with an error that names the key.
+A secret comes from a decrypted file named by a `*_FILE` variable (`UPLOAD_SIGNING_SECRET_FILE`, `SEPAY_API_KEY_FILE`,
+`SEPAY_WEBHOOK_SECRET_FILE`); a variable that is set but names an unreadable file also stops with its name. Schema changes only by
+migration under `src/modules/platform/databases/persistence/migrations`, listed explicitly from `persistence/index.ts`.
+Business code reads time through the injected `Clock` (`src/modules/platform/clock`; specs use `FakeClock`) and user-facing
+copy through the messages catalog (`src/modules/platform/i18n` and `src/features/todo/messages`).
 
 ## Work
 

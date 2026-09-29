@@ -25,6 +25,9 @@ import {
 import {
     ReopenTaskRequest
 } from "./graphql-types/request"
+import {
+    TODO_MESSAGES 
+} from "../../../../../messages/index"
 
 @Resolver()
 /** The fr.task.reopen door: flips a completed task back to open and clears its completed timestamp. */
@@ -36,7 +39,7 @@ export class ReopenTaskResolver {
 
   @Mutation(() => ReopenTaskResponse,
       {
-          name: "reopenTask", description: "Reopen a completed task." 
+          name: "reopenTask", description: TODO_MESSAGES.get("reopenTask.description") 
       })
     async reopenTask(
     @Context("req") req: GraphqlRequestLike,

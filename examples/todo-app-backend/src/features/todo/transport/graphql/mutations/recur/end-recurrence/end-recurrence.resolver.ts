@@ -25,6 +25,9 @@ import {
 import {
     EndRecurrenceResponse 
 } from "./graphql-types/response"
+import {
+    TODO_MESSAGES 
+} from "../../../../../messages/index"
 
 @Resolver()
 /** The fr.recur.end door: ends a rule at a date - occurrences on-or-after it orphan, earlier history is preserved. */
@@ -37,7 +40,7 @@ export class EndRecurrenceResolver {
   @Mutation(() => EndRecurrenceResponse,
       {
           name: "endRecurrence",
-          description: "fr.recur.end-rule: stop a rule the caller owns from generating any occurrence dated after the given day.",
+          description: TODO_MESSAGES.get("endRecurrence.description"),
       })
     async endRecurrence(
     @Context("req") req: GraphqlRequestLike,

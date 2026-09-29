@@ -1,12 +1,12 @@
 import {
-    AbstractException,
+    DomainError,
 } from "@modules/platform/errors/index"
 import type {
-    AbstractExceptionMetadata,
+    DomainErrorMetadata,
 } from "@modules/platform/errors/index"
 
 /** Metadata for a permanent SMTP rejection (the provider refuses the address for good, a 5xx). */
-export interface NotifySmtpPermanentRejectionExceptionMetadata extends AbstractExceptionMetadata {
+export interface NotifySmtpPermanentRejectionExceptionMetadata extends DomainErrorMetadata {
   /** The notification id the delivery attempt was for. */
   notificationId?: string;
   /** The reason string the transport reported. */
@@ -17,15 +17,17 @@ export interface NotifySmtpPermanentRejectionExceptionMetadata extends AbstractE
  * br.notify.failure.classified / sds.notify.delivery-lifecycle's t-bounce: the provider permanently
  * rejects the address (a 5xx). Terminal, and does not retry.
  */
-export class NotifySmtpPermanentRejectionException extends AbstractException {
+export class NotifySmtpPermanentRejectionException extends DomainError {
     constructor({ notificationId, reason, ...metadata }: NotifySmtpPermanentRejectionExceptionMetadata = {
     }) {
-        super("The mail host permanently rejected the address.",
-            "NOTIFY_SMTP_PERMANENT_REJECTION_EXCEPTION",
+        super("NOTIFY_SMTP_PERMANENT_REJECTION_EXCEPTION",
+            "The mail host permanently rejected the address.",
             {
-                notificationId,
-                reason,
-                ...metadata,
+                metadata: {
+                    notificationId,
+                    reason,
+                    ...metadata,
+                } 
             })
     }
 }

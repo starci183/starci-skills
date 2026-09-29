@@ -22,6 +22,9 @@ import {
 import {
     DeleteTaskCommand, DeleteTaskCommandResult 
 } from "./delete-task.command"
+import {
+    Clock
+} from "@modules/platform/clock/index"
 
 /**
  * br.task.delete.final: deleting a task removes it; there is no recovery path in this product. The
@@ -37,6 +40,7 @@ export class DeleteTaskHandler extends AbstractCommandHandler<DeleteTaskCommand,
     constructor(
     private readonly taskService: TaskService,
     private readonly events: PlatformEventBus,
+        private readonly clock: Clock
     ) {
         super()
     }
@@ -47,7 +51,7 @@ export class DeleteTaskHandler extends AbstractCommandHandler<DeleteTaskCommand,
             params.actorId)
         this.events.publish(new TaskDeletedEvent(deleted.id,
             deleted.owner,
-            new Date(),
+            this.clock.now(),
             randomUUID()))
         return {
             deleted: true 

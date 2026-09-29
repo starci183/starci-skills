@@ -6,7 +6,7 @@ import {
 } from "@nestjs/typeorm"
 import {
     POSTGRESQL_PRIMARY,
-} from "@modules/platform/databases/postgresql/primary/index"
+} from "@modules/platform/databases/index"
 import {
     createFakeAuditEntityManager 
 } from "./testing/fake-audit-entity-manager"
@@ -23,11 +23,17 @@ import {
     AuditLogHandler 
 } from "./audit-log.handler"
 import {
-    AuditOperatorService 
+    AUDIT_OPERATOR_SUBJECTS, AuditOperatorService
 } from "./audit-operator.service"
 import {
     AuditOperatorRoleNotAuthorizedException,
 } from "./errors/audit-operator-role-not-authorized"
+import {
+    Clock 
+} from "@modules/platform/clock/index"
+import {
+    FakeClock 
+} from "@starci/jest-preset/clock"
 
 /**
  * A short chain across two people, appended in order, using the actions contract.audit.emitted-events
@@ -37,12 +43,15 @@ import {
 async function buildHandler(operatorSubjects: ReadonlyArray<string>) {
     const moduleRef = await Test.createTestingModule({
         providers: [
+            {
+                provide: Clock, useValue: new FakeClock() 
+            },
             AuditLogHandler,
             AuditKeystoreService,
             AuditLogService,
-            // The roster is an @Optional() non-DI constructor arg, so the spec supplies it through a factory.
+            AuditOperatorService,
             {
-                provide: AuditOperatorService, useFactory: () => new AuditOperatorService(operatorSubjects) 
+                provide: AUDIT_OPERATOR_SUBJECTS, useValue: operatorSubjects
             },
             {
                 provide: getEntityManagerToken(POSTGRESQL_PRIMARY), useValue: createFakeAuditEntityManager() 

@@ -4,18 +4,21 @@ import {
 import {
     uploadConfig,
 } from "./upload.config"
+import {
+    mock 
+} from "@starci/jest-preset/mock"
 
 describe("upload config",
     () => {
         it("reads every setting through the platform config reader at access time",
             () => {
-                const source = {
+                const source = mock<AppConfigService>({
                     getUploadStorageDir: jest.fn().mockReturnValue("/data/uploads"),
                     getUploadMaxBytes: jest.fn().mockReturnValue(1024),
                     getUploadAllowedMimes: jest.fn().mockReturnValue(["text/plain"]),
                     getUploadSigningSecret: jest.fn().mockReturnValue("sign"),
                     getUploadPresignTtlMs: jest.fn().mockReturnValue(60000),
-                } as unknown as AppConfigService
+                })
                 const config = uploadConfig(source)
 
                 expect(config.storageDir).toEqual("/data/uploads")

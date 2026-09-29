@@ -4,16 +4,19 @@ import {
 import {
     sepayConfig,
 } from "./sepay.config"
+import {
+    mock 
+} from "@starci/jest-preset/mock"
 
 describe("sepay config",
     () => {
         it("reads every setting through the platform config reader at access time",
             () => {
-                const source = {
+                const source = mock<AppConfigService>({
                     getSepayBaseUrl: jest.fn().mockReturnValue("https://pay.test"),
                     getSepayApiKey: jest.fn().mockReturnValue("key"),
                     getSepayWebhookSecret: jest.fn().mockReturnValue("hook"),
-                } as unknown as AppConfigService
+                })
                 const config = sepayConfig(source)
 
                 expect(config.baseUrl).toEqual("https://pay.test")

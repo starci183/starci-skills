@@ -14,7 +14,7 @@ import {
 } from "@modules/integrations/sepay/index"
 import {
     POSTGRESQL_PRIMARY,
-} from "@modules/platform/databases/postgresql/primary/index"
+} from "@modules/platform/databases/index"
 import {
     createFakePlanEntityManager 
 } from "./testing/fake-plan-entity-manager"
@@ -30,6 +30,12 @@ import {
 import {
     UpgradePlanHandler 
 } from "./upgrade-plan.handler"
+import {
+    Clock 
+} from "@modules/platform/clock/index"
+import {
+    FakeClock 
+} from "@starci/jest-preset/clock"
 
 /** integration.plan.sepay: the in-process fake this handler's own unit tests exercise against, standing
  * in for the real create-intent round-trip without asserting anything about SePay's own implementation -
@@ -61,6 +67,9 @@ describe("UpgradePlanHandler",
             sepayClient = new FakeSepayClient()
             moduleRef = await Test.createTestingModule({
                 providers: [
+                    {
+                        provide: Clock, useValue: new FakeClock() 
+                    },
                     UpgradePlanHandler,
                     SubscriptionService,
                     PaymentService,

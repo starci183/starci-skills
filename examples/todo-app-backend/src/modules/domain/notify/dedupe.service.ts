@@ -9,13 +9,19 @@ import type {
 } from "typeorm"
 import {
     InjectPrimaryEntityManager,
-} from "@modules/platform/databases/postgresql/primary/index"
+} from "@modules/platform/databases/index"
 import {
     NotifyNotificationEntity,
-} from "@modules/platform/databases/postgresql/primary/index"
+} from "@modules/platform/databases/index"
 import {
     NotificationRecord 
 } from "./types/notification-record"
+import {
+    Clock
+} from "@modules/platform/clock/index"
+
+/** The most notifications one digest group can hold. */
+const MAX_DIGEST_GROUP_MEMBERS = 500
 
 /** Contract naming the admit notification params shape domain/notify code and its consumers share; a second site never retypes it inline. */
 export interface AdmitNotificationParams {
@@ -44,7 +50,9 @@ export interface AdmitNotificationResult {
 @Injectable()
 /** Injectable service owning the dedupe logic the notify capability exposes; wired by the capability's own module. */
 export class DedupeService {
-    constructor(@InjectPrimaryEntityManager() private readonly entityManager: EntityManager) {}
+    constructor(@InjectPrimaryEntityManager() private readonly entityManager: EntityManager,
+        private readonly clock: Clock
+    ) {}
 
     async admit(params: AdmitNotificationParams): Promise<AdmitNotificationResult> {
         const dedupeKey = computeDedupeKey(params.kind,
@@ -66,7 +74,7 @@ export class DedupeService {
                 recipientId: params.recipientId,
                 payload: params.payload,
                 digestGroupId: null,
-                createdAt: new Date(),
+                createdAt: this.clock.now(),
             })
         return {
             record: toRecord(saved), isNew: true 
@@ -85,9 +93,11 @@ export class DedupeService {
    * fr.notify.digest's flush must read the group's content in (ac.notify.digest.window.collapses-into-one-message:
    * "in admission order"). */
     async findByDigestGroup(digestGroupId: string): Promise<Array<NotificationRecord>> {
-        const rows = await this.entityManager.findBy(NotifyNotificationEntity,
+        const rows = await this.entityManager.find(NotifyNotificationEntity,
             {
-                digestGroupId 
+                where: {
+                    digestGroupId 
+                }, take: MAX_DIGEST_GROUP_MEMBERS 
             })
         return rows.map(toRecord).sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime())
     }

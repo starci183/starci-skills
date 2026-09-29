@@ -22,6 +22,9 @@ import {
 import {
     CompleteTaskCommand, CompleteTaskCommandResult 
 } from "./complete-task.command"
+import {
+    Clock
+} from "@modules/platform/clock/index"
 
 /**
  * fr.task.complete composes br.task.single-owner (a non-owner attempt is refused, via the
@@ -39,6 +42,7 @@ export class CompleteTaskHandler extends AbstractCommandHandler<CompleteTaskComm
     constructor(
     private readonly taskService: TaskService,
     private readonly events: PlatformEventBus,
+        private readonly clock: Clock
     ) {
         super()
     }
@@ -49,7 +53,7 @@ export class CompleteTaskHandler extends AbstractCommandHandler<CompleteTaskComm
             params.actorId)
         this.events.publish(new TaskCompletedEvent(record.id,
             record.owner,
-            record.completedAt ?? new Date(),
+            record.completedAt ?? this.clock.now(),
             randomUUID()))
         return {
             taskId: record.id, complete: record.complete 

@@ -6,13 +6,13 @@ import {
 } from "@nestjs/typeorm"
 import {
     AuditErasureRequestEntity,
-} from "@modules/platform/databases/postgresql/primary/index"
+} from "@modules/platform/databases/index"
 import {
     AuditLogLineEntity,
-} from "@modules/platform/databases/postgresql/primary/index"
+} from "@modules/platform/databases/index"
 import {
     POSTGRESQL_PRIMARY,
-} from "@modules/platform/databases/postgresql/primary/index"
+} from "@modules/platform/databases/index"
 import {
     createFakeAuditEntityManager 
 } from "./testing/fake-audit-entity-manager"
@@ -25,11 +25,20 @@ import {
 import {
     AuditErasureService 
 } from "./audit-erasure.service"
+import {
+    Clock 
+} from "@modules/platform/clock/index"
+import {
+    FakeClock 
+} from "@starci/jest-preset/clock"
 
 const build = async () => {
     const manager = createFakeAuditEntityManager()
     const moduleRef = await Test.createTestingModule({
         providers: [
+            {
+                provide: Clock, useValue: new FakeClock() 
+            },
             AuditKeystoreService,
             AuditLogService,
             AuditErasureService,
@@ -44,6 +53,23 @@ const build = async () => {
         keystore: moduleRef.get(AuditKeystoreService),
         log: moduleRef.get(AuditLogService),
         erasure: moduleRef.get(AuditErasureService),
+    }
+}
+
+/** Leaves a request row in the `requested` state directly in the store: the state the chained request() passes through before verification. */
+const seedRequested = (manager: ReturnType<typeof createFakeAuditEntityManager>, requestId: string, personId: string): { requestId: string } => {
+    manager._rowsFor(AuditErasureRequestEntity).push({
+        requestId,
+        personId,
+        state: "requested",
+        requestedAt: new Date(),
+        verifiedAt: null,
+        refusedAt: null,
+        executingAt: null,
+        completedAt: null,
+    })
+    return {
+        requestId 
     }
 }
 
@@ -75,9 +101,9 @@ describe("AuditErasureService",
                 await built.log.append("person-1",
                     "sign-in",
                     null) // a line first, so the subject has a key to keep
-                const requested = await (built.erasure as unknown as {
-      tRequest(personId: string): Promise<{ requestId: string }>;
-    }).tRequest("person-1") // the state tRequest leaves behind, before chained verification
+                const requested = seedRequested(built.manager,
+                    "req-pending",
+                    "person-1") // the state a request is left in before its verification round
 
                 const verified = await built.erasure.confirm(requested.requestId,
                     "person-1")
@@ -95,9 +121,9 @@ describe("AuditErasureService",
                 await built.log.append("person-1",
                     "sign-in",
                     null)
-                const requested = await (built.erasure as unknown as {
-      tRequest(personId: string): Promise<{ requestId: string }>;
-    }).tRequest("person-1")
+                const requested = seedRequested(built.manager,
+                    "req-pending",
+                    "person-1") // the state a request is left in before its verification round
                 const keyIdBefore = await built.keystore.getKeyIdForPerson("person-1")
 
                 await expect(built.erasure.confirm(requested.requestId,
@@ -236,7 +262,7 @@ describe("AuditErasureService",
                     completedAt: null,
                 })
 
-                await expect((built.erasure as unknown as { tVerify(id: string, caller: string): Promise<unknown> }).tVerify("req-mismatch",
+                await expect(built.erasure.confirm("req-mismatch",
                     "someone-else"))
                     .rejects.toMatchObject({
                         code: "ERASURE_REQUEST_FORBIDDEN_EXCEPTION" 

@@ -8,6 +8,9 @@ import {
     ConfigurableModuleClass, OPTIONS_TYPE 
 } from "./task.module-definition"
 import {
+    OwnershipGuard 
+} from "./ownership.guard"
+import {
     TaskService 
 } from "./task.service"
 import {
@@ -72,6 +75,7 @@ export class TaskModule extends ConfigurableModuleClass {
             providers: [
                 ...(base.providers ?? []),
                 TaskService,
+                OwnershipGuard,
                 TaskCreationPolicyRegistry,
                 CompletionAuthorityRegistry,
             ],

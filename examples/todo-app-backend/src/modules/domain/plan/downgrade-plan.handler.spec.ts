@@ -6,7 +6,7 @@ import {
 } from "@nestjs/typeorm"
 import {
     POSTGRESQL_PRIMARY,
-} from "@modules/platform/databases/postgresql/primary/index"
+} from "@modules/platform/databases/index"
 import {
     createFakePlanEntityManager 
 } from "./testing/fake-plan-entity-manager"

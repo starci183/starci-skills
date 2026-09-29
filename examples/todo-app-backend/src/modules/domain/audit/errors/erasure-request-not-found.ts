@@ -1,24 +1,26 @@
 import {
-    AbstractException,
+    DomainError,
 } from "@modules/platform/errors/index"
 import type {
-    AbstractExceptionMetadata,
+    DomainErrorMetadata,
 } from "@modules/platform/errors/index"
 
 /** Metadata for an erasure request that cannot be resolved. */
-export interface ErasureRequestNotFoundExceptionMetadata extends AbstractExceptionMetadata {
+export interface ErasureRequestNotFoundExceptionMetadata extends DomainErrorMetadata {
   /** The requestId looked up. */
   requestId?: string;
 }
 
 /** sds.audit.erasure-request: every transition after t-request needs a resolvable request row. */
-export class ErasureRequestNotFoundException extends AbstractException {
+export class ErasureRequestNotFoundException extends DomainError {
     constructor({ requestId, ...metadata }: ErasureRequestNotFoundExceptionMetadata = {
     }) {
-        super("The erasure request does not exist.",
-            "ERASURE_REQUEST_NOT_FOUND_EXCEPTION",
+        super("ERASURE_REQUEST_NOT_FOUND_EXCEPTION",
+            "The erasure request does not exist.",
             {
-                requestId, ...metadata 
+                metadata: {
+                    requestId, ...metadata 
+                } 
             })
     }
 }

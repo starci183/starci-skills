@@ -6,10 +6,10 @@ import {
 } from "@nestjs/typeorm"
 import {
     POSTGRESQL_PRIMARY,
-} from "@modules/platform/databases/postgresql/primary/index"
+} from "@modules/platform/databases/index"
 import {
     TaskEntity,
-} from "@modules/platform/databases/postgresql/primary/index"
+} from "@modules/platform/databases/index"
 import {
     createFakeRecurEntityManager 
 } from "./testing/fake-recur-entity-manager"
@@ -25,6 +25,12 @@ import {
 import {
     UpcomingOccurrencesHandler 
 } from "./upcoming-occurrences.handler"
+import {
+    Clock 
+} from "@modules/platform/clock/index"
+import {
+    FakeClock 
+} from "@starci/jest-preset/clock"
 
 describe("UpcomingOccurrencesHandler (fr.recur.see-upcoming)",
     () => {
@@ -38,6 +44,9 @@ describe("UpcomingOccurrencesHandler (fr.recur.see-upcoming)",
             entityManager = createFakeRecurEntityManager()
             moduleRef = await Test.createTestingModule({
                 providers: [
+                    {
+                        provide: Clock, useValue: new FakeClock() 
+                    },
                     UpcomingOccurrencesHandler,
                     RuleService,
                     OccurrenceService,

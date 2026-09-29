@@ -25,6 +25,9 @@ import {
 import {
     UnsubscribeResponse 
 } from "./graphql-types/response"
+import {
+    TODO_MESSAGES 
+} from "../../../../../messages/index"
 
 @Resolver()
 /** The fr.notify.unsubscribe door: marks the caller's channel unsubscribed so later events are suppressed at admission - before any digest window or transport attempt. */
@@ -36,7 +39,7 @@ export class UnsubscribeResolver {
 
   @Mutation(() => UnsubscribeResponse,
       {
-          name: "unsubscribe", description: "Stop receiving notifications on one channel." 
+          name: "unsubscribe", description: TODO_MESSAGES.get("unsubscribe.description") 
       })
     async unsubscribe(
     @Context("req") req: GraphqlRequestLike,

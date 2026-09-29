@@ -25,6 +25,9 @@ import {
 import {
     CreateTaskCommand, CreateTaskCommandResult 
 } from "./create-task.command"
+import {
+    Clock
+} from "@modules/platform/clock/index"
 
 /**
  * fr.task.create composes br.task.single-owner (the submitter owns the new task) and
@@ -46,6 +49,7 @@ export class CreateTaskHandler extends AbstractCommandHandler<CreateTaskCommand,
     private readonly creationPolicyRegistry: TaskCreationPolicyRegistry,
     private readonly taskService: TaskService,
     private readonly events: PlatformEventBus,
+        private readonly clock: Clock
     ) {
         super()
     }
@@ -62,7 +66,7 @@ export class CreateTaskHandler extends AbstractCommandHandler<CreateTaskCommand,
             params.title)
         this.events.publish(new TaskCreatedEvent(record.id,
             record.owner,
-            new Date(),
+            this.clock.now(),
             randomUUID()))
         return {
             taskId: record.id, title: record.title 

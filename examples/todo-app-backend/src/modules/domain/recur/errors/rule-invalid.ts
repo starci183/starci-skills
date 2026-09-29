@@ -1,12 +1,12 @@
 import {
-    AbstractException,
+    DomainError,
 } from "@modules/platform/errors/index"
 import type {
-    AbstractExceptionMetadata,
+    DomainErrorMetadata,
 } from "@modules/platform/errors/index"
 
 /** Metadata for a rule submission whose frequency-specific fields do not match data.recur.rule's own invariant. */
-export interface RecurRuleInvalidExceptionMetadata extends AbstractExceptionMetadata {
+export interface RecurRuleInvalidExceptionMetadata extends DomainErrorMetadata {
   /** Why the submission is invalid, e.g. "n is required for every-n-days". */
   reason?: string;
 }
@@ -18,13 +18,15 @@ export interface RecurRuleInvalidExceptionMetadata extends AbstractExceptionMeta
  * exist in every month - decision.recur.impossible-date explicitly keeps that case out of creation-time
  * refusal.
  */
-export class RecurRuleInvalidException extends AbstractException {
+export class RecurRuleInvalidException extends DomainError {
     constructor({ reason, ...metadata }: RecurRuleInvalidExceptionMetadata = {
     }) {
-        super("The recurrence rule submission is invalid.",
-            "RECUR_RULE_INVALID_EXCEPTION",
+        super("RECUR_RULE_INVALID_EXCEPTION",
+            "The recurrence rule submission is invalid.",
             {
-                reason, ...metadata 
+                metadata: {
+                    reason, ...metadata 
+                } 
             })
     }
 }

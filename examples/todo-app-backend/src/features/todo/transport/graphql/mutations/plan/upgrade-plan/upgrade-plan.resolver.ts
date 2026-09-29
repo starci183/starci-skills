@@ -22,6 +22,9 @@ import {
 import {
     UpgradePlanResponse 
 } from "./graphql-types/response"
+import {
+    TODO_MESSAGES 
+} from "../../../../../messages/index"
 
 @Resolver()
 /** The fr.plan.upgrade door: starts checkout - writes the pending subscription and payment intent, returns the gateway's checkout URL for the caller to pay through. */
@@ -33,7 +36,7 @@ export class UpgradePlanResolver {
 
   @Mutation(() => UpgradePlanResponse,
       {
-          name: "upgradePlan", description: "Start checkout for the paid plan (fr.plan.upgrade)." 
+          name: "upgradePlan", description: TODO_MESSAGES.get("upgradePlan.description") 
       })
     async upgradePlan(@Context("req") req: GraphqlRequestLike): Promise<UpgradePlanResponse> {
         const ownerId = await actorIdFromRequest(req,

@@ -1,12 +1,12 @@
 import {
-    AbstractException,
+    DomainError,
 } from "@modules/platform/errors/index"
 import type {
-    AbstractExceptionMetadata,
+    DomainErrorMetadata,
 } from "@modules/platform/errors/index"
 
 /** Metadata for a create refused over the free plan's cap. */
-export interface PlanCapExceededExceptionMetadata extends AbstractExceptionMetadata {
+export interface PlanCapExceededExceptionMetadata extends DomainErrorMetadata {
   /** The cap the person is at or over, per br.plan.caps.limit. */
   cap?: number;
   /** Where to go to raise the cap, per fr.plan.upgrade. */
@@ -19,15 +19,15 @@ export interface PlanCapExceededExceptionMetadata extends AbstractExceptionMetad
  * sds.plan.cap-guard's PlanCapGuardPolicy (registered into TaskCreationPolicyRegistry per
  * contract.plan.create-precondition), so a stranded refusal never explains by omission.
  */
-export class PlanCapExceededException extends AbstractException {
+export class PlanCapExceededException extends DomainError {
     constructor({ cap, upgradePath, ...metadata }: PlanCapExceededExceptionMetadata = {
     }) {
-        super(
+        super("PLAN_CAP_EXCEEDED_EXCEPTION",
             `The free plan holds at most ${cap ?? 20} active tasks. Upgrade at ${upgradePath ?? "/plan/upgrade"} to create more.`,
-            "PLAN_CAP_EXCEEDED_EXCEPTION",
             {
-                cap, upgradePath, ...metadata 
-            },
-        )
+                metadata: {
+                    cap, upgradePath, ...metadata 
+                } 
+            })
     }
 }

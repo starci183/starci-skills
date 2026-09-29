@@ -5,7 +5,7 @@ import type {
     Response 
 } from "express"
 import {
-    AbstractException,
+    DomainError,
 } from "@modules/platform/errors/index"
 
 /**
@@ -18,10 +18,10 @@ const STATUS_BY_CODE: Record<string, number> = {
     POSTGRES_PRIMARY_UNAVAILABLE_EXCEPTION: HttpStatus.SERVICE_UNAVAILABLE,
 }
 
-@Catch(AbstractException)
-/** ExceptionFilter for the probe HTTP doors: AbstractException code -> status -> {statusCode, code, message}. */
+@Catch(DomainError)
+/** ExceptionFilter for the probe HTTP doors: DomainError code -> status -> {statusCode, code, message}. */
 export class ProbesExceptionFilter implements ExceptionFilter {
-    catch(exception: AbstractException, host: ArgumentsHost): void {
+    catch(exception: DomainError, host: ArgumentsHost): void {
         const response = host.switchToHttp().getResponse<Response>()
         const status = STATUS_BY_CODE[exception.code] ?? HttpStatus.INTERNAL_SERVER_ERROR
         response.status(status).json({

@@ -1,6 +1,9 @@
 import {
     Field, ID, Int, ObjectType 
 } from "@nestjs/graphql"
+import {
+    TODO_MESSAGES 
+} from "../../../../../../messages/index"
 
 @ObjectType()
 /** The end's outcome: ruleId, endedAt, and how many occurrences the end orphaned. */
@@ -13,7 +16,7 @@ export class EndRecurrenceResponse {
 
   @Field(() => Int,
       {
-          description: "How many materialised occurrences became orphaned by this call." 
+          description: TODO_MESSAGES.get("endRecurrence.response.orphanedCount") 
       })
       orphanedCount!: number
 

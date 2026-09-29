@@ -6,13 +6,13 @@ import {
 } from "@nestjs/typeorm"
 import {
     POSTGRESQL_PRIMARY,
-} from "@modules/platform/databases/postgresql/primary/index"
+} from "@modules/platform/databases/index"
 import {
     TaskEntity,
-} from "@modules/platform/databases/postgresql/primary/index"
+} from "@modules/platform/databases/index"
 import {
     createFakeEntityManager,
-} from "@modules/platform/databases/postgresql/primary/index"
+} from "@modules/platform/databases/index"
 import {
     PlatformEventBus,
 } from "@modules/platform/events/index"
@@ -31,6 +31,15 @@ import {
 import {
     DeleteTaskHandler 
 } from "./delete-task.handler"
+import {
+    Clock 
+} from "@modules/platform/clock/index"
+import {
+    FakeClock 
+} from "@starci/jest-preset/clock"
+import {
+    OwnershipGuard 
+} from "./ownership.guard"
 
 describe("DeleteTaskHandler",
     () => {
@@ -42,6 +51,10 @@ describe("DeleteTaskHandler",
         beforeEach(async () => {
             moduleRef = await Test.createTestingModule({
                 providers: [
+                    OwnershipGuard,
+                    {
+                        provide: Clock, useValue: new FakeClock() 
+                    },
                     DeleteTaskHandler,
                     TaskService,
                     CompletionAuthorityRegistry,

@@ -1,12 +1,12 @@
 import {
-    AbstractException,
+    DomainError,
 } from "@modules/platform/errors/index"
 import type {
-    AbstractExceptionMetadata,
+    DomainErrorMetadata,
 } from "@modules/platform/errors/index"
 
 /** Metadata for a subscription row that cannot be resolved by id. */
-export interface PlanSubscriptionNotFoundExceptionMetadata extends AbstractExceptionMetadata {
+export interface PlanSubscriptionNotFoundExceptionMetadata extends DomainErrorMetadata {
   /** The subscription id looked up. */
   subscriptionId?: string;
 }
@@ -16,13 +16,15 @@ export interface PlanSubscriptionNotFoundExceptionMetadata extends AbstractExcep
  * read/write by SubscriptionService.getOrCreate; this exception guards the narrow internal path where a
  * transition is asked to act on a subscription id that does not (or no longer) resolve to a row.
  */
-export class PlanSubscriptionNotFoundException extends AbstractException {
+export class PlanSubscriptionNotFoundException extends DomainError {
     constructor({ subscriptionId, ...metadata }: PlanSubscriptionNotFoundExceptionMetadata = {
     }) {
-        super("The subscription does not exist.",
-            "PLAN_SUBSCRIPTION_NOT_FOUND_EXCEPTION",
+        super("PLAN_SUBSCRIPTION_NOT_FOUND_EXCEPTION",
+            "The subscription does not exist.",
             {
-                subscriptionId, ...metadata 
+                metadata: {
+                    subscriptionId, ...metadata 
+                } 
             })
     }
 }

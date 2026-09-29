@@ -13,6 +13,12 @@ import {
 import {
     NotifyService 
 } from "./notify.service"
+import {
+    Clock 
+} from "@modules/platform/clock/index"
+import {
+    FakeClock 
+} from "@starci/jest-preset/clock"
 
 describe("NotifyScheduler",
     () => {
@@ -32,6 +38,9 @@ describe("NotifyScheduler",
                 const runDueJobs = jest.fn().mockResolvedValue(undefined)
                 moduleRef = await Test.createTestingModule({
                     providers: [
+                        {
+                            provide: Clock, useValue: new FakeClock() 
+                        },
                         NotifyScheduler,
                         {
                             provide: NotifyService, useValue: {
@@ -64,6 +73,9 @@ describe("NotifyScheduler",
                 const log = jest.fn()
                 moduleRef = await Test.createTestingModule({
                     providers: [
+                        {
+                            provide: Clock, useValue: new FakeClock() 
+                        },
                         NotifyScheduler,
                         {
                             provide: NotifyService, useValue: {

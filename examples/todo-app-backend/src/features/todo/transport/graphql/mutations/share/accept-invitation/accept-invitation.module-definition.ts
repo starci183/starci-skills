@@ -2,7 +2,10 @@ import {
     ConfigurableModuleBuilder 
 } from "@nestjs/common"
 
-export const { ConfigurableModuleClass, OPTIONS_TYPE } = new ConfigurableModuleBuilder().setExtras(
+/** AcceptInvitation takes no options beyond the isGlobal extra. */
+export type AcceptInvitationOptions = Record<never, never>
+
+export const { ConfigurableModuleClass, OPTIONS_TYPE } = new ConfigurableModuleBuilder<AcceptInvitationOptions>().setExtras(
     {
         isGlobal: false 
     },

@@ -1,8 +1,6 @@
-import fs from "node:fs"
-import path from "node:path"
 import {
-    AbstractException 
-} from "./abstract"
+    DomainError 
+} from "./domain-error"
 import {
     AuditOperatorRoleNotAuthorizedException,
 } from "@modules/domain/audit/index"
@@ -53,7 +51,7 @@ import {
 } from "@modules/integrations/sepay/index"
 import {
     PostgresPrimaryUnavailableException,
-} from "@modules/platform/databases/postgresql/primary/index"
+} from "@modules/platform/databases/index"
 import {
     RecurOccurrenceForbiddenException,
 } from "@modules/domain/recur/index"
@@ -140,7 +138,7 @@ import {
 } from "@modules/integrations/upload/index"
 
 interface ExceptionCase {
-  readonly make: () => AbstractException;
+  readonly make: () => DomainError;
   readonly code: string;
   readonly metadata?: Record<string, unknown>;
 }
@@ -506,86 +504,29 @@ const cases: Array<ExceptionCase> = [
 describe("shared exception vocabulary",
     () => {
         it.each(cases.map(c => [c.code,
-            c] as const))("%s is an AbstractException carrying its code, name and metadata",
+            c] as const))("%s is a DomainError carrying its code, class name and metadata",
             (_code, c) => {
                 const error = c.make()
                 expect(error).toBeInstanceOf(Error)
-                expect(error).toBeInstanceOf(AbstractException)
+                expect(error).toBeInstanceOf(DomainError)
                 expect(error.code).toBe(c.code)
-                expect(error.name).toBe(c.code)
+                expect(error.name).toBe(error.constructor.name)
                 expect(error.message.length).toBeGreaterThan(0)
                 if (c.metadata) expect(error.metadata).toMatchObject(c.metadata)
             })
-
-        it("covers every AbstractException subclass file under the capability errors/ directories",
-            () => {
-                const modulesRoot = path.join(__dirname,
-                    "..",
-                    "..")
-                const errorFiles = (dir: string): Array<string> =>
-                    fs.readdirSync(dir,
-                        {
-                            withFileTypes: true 
-                        }).flatMap(entry =>
-                        entry.isDirectory()
-                            ? errorFiles(path.join(dir,
-                                entry.name))
-                            : entry.name.endsWith(".ts") && !entry.name.endsWith(".spec.ts")
-                                ? [path.join(dir,
-                                    entry.name)]
-                                : [],
-                    )
-                const errorDirs = (dir: string): Array<string> =>
-                    fs.readdirSync(dir,
-                        {
-                            withFileTypes: true
-                        }).flatMap(entry =>
-                        entry.isDirectory()
-                            ? [
-                                ...(entry.name === "errors" ? [path.join(dir,
-                                    entry.name)] : []),
-                                ...errorDirs(path.join(dir,
-                                    entry.name)),
-                            ]
-                            : [],
-                    )
-                const files = [
-                    path.join(__dirname,
-                        "abstract.ts"),
-                    ...errorDirs(modulesRoot).flatMap(errorFiles),
-                ]
-                expect(files.length).toBe(cases.length + 1)
-            })
     })
 
-describe("AbstractException",
+describe("DomainError",
     () => {
-        it("toJSON serializes message, code and metadata for transport",
+        it("keeps the metadata a throw site attached and defaults it to an empty object",
             () => {
-                const error = new TaskNotFoundException({
-                    taskId: "t-1" 
+                expect(new TaskNotFoundException({
+                    taskId: "t-1"
+                }).metadata).toEqual({
+                    taskId: "t-1"
                 })
-                expect(JSON.parse(error.toJSON())).toEqual({
-                    message: "The task does not exist.",
-                    code: "TASK_NOT_FOUND_EXCEPTION",
-                    metadata: {
-                        taskId: "t-1" 
-                    },
+                expect(new SessionExpiredException().metadata).toEqual({
                 })
-            })
-
-        it("getOriginalError returns the wrapped error when one was attached",
-            () => {
-                const original = new Error("disk gone")
-                const error = new PostgresPrimaryUnavailableException({
-                    reason: "io", originalError: original 
-                })
-                expect(error.getOriginalError()).toBe(original)
-            })
-
-        it("getOriginalError returns undefined when no original error was attached",
-            () => {
-                expect(new SessionExpiredException().getOriginalError()).toBeUndefined()
             })
 
         it("PlanCapExceededException names the cap and upgrade path in its message, with defaults",

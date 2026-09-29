@@ -9,10 +9,10 @@ import type {
 } from "typeorm"
 import {
     InjectPrimaryEntityManager,
-} from "@modules/platform/databases/postgresql/primary/index"
+} from "@modules/platform/databases/index"
 import {
     RuleEntity,
-} from "@modules/platform/databases/postgresql/primary/index"
+} from "@modules/platform/databases/index"
 import {
     RecurRuleForbiddenException,
 } from "./errors/rule-forbidden"
@@ -29,6 +29,11 @@ import {
 import {
     RuleRecord 
 } from "./types/rule-record"
+
+/** The most rules one owner lists. */
+const MAX_RULES_PER_OWNER = 500
+/** The most active rules one generation tick loads. */
+const MAX_ACTIVE_RULES = 10_000
 
 /** Contract naming the create rule input shape domain/recur code and its consumers share; a second site never retypes it inline. */
 export interface CreateRuleInput {
@@ -142,16 +147,20 @@ export class RuleService {
     }
 
     async listOwnedBy(owner: string): Promise<Array<RuleRecord>> {
-        const rows = await this.entityManager.findBy(RuleEntity,
+        const rows = await this.entityManager.find(RuleEntity,
             {
-                owner 
+                where: {
+                    owner 
+                }, take: MAX_RULES_PER_OWNER 
             })
         return rows.map(toRecord)
     }
 
     async listActive(): Promise<Array<RuleRecord>> {
-        const rows = await this.entityManager.findBy(RuleEntity,
+        const rows = await this.entityManager.find(RuleEntity,
             {
+                where: {
+                }, take: MAX_ACTIVE_RULES 
             })
         return rows.map(toRecord)
     }

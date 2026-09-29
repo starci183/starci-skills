@@ -7,6 +7,9 @@ import {
 import {
     KeycloakClient 
 } from "./keycloak.client"
+import {
+    mock 
+} from "@starci/jest-preset/mock"
 
 /** A syntactically-valid JWT whose payload segment carries the given claims - readSubject only ever
  * decodes that middle segment, so header and signature stay placeholders. */
@@ -15,9 +18,9 @@ function tokenWith(payload: object): string {
 }
 
 function tokenEndpointResponse(status: number, body: unknown): Response {
-    return {
+    return mock<Response>({
         ok: status >= 200 && status < 300, status, json: async () => body 
-    } as unknown as Response
+    })
 }
 
 const config = {
@@ -62,6 +65,7 @@ describe("KeycloakClient.signIn (integration.login.keycloak)",
                         init] = fetchMock.mock.calls[0]
                     expect(url).toBe("http://keycloak.test/realms/todo/protocol/openid-connect/token")
                     expect(init?.method).toBe("POST")
+                    expect(init?.signal).toBeInstanceOf(AbortSignal)
                     expect(init?.headers).toMatchObject({
                         "content-type": "application/x-www-form-urlencoded" 
                     })

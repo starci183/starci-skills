@@ -4,6 +4,9 @@ import {
 import {
     IsIn, IsInt, IsOptional, IsString, Matches, Min, MinLength 
 } from "class-validator"
+import {
+    TODO_MESSAGES 
+} from "../../../../../../messages/index"
 
 /** The cadence choices a rule accepts; each member's doc says what choosing it schedules. */
 export enum RecurFrequencyInput {
@@ -18,7 +21,7 @@ export enum RecurFrequencyInput {
 registerEnumType(RecurFrequencyInput,
     {
         name: "RecurFrequency",
-        description: "data.recur.rule.frequency: every-weekday, every-n-days, or monthly-day.",
+        description: TODO_MESSAGES.get("makeRecurring.input.frequency"),
     })
 
 @InputType()
@@ -35,7 +38,7 @@ export class MakeRecurringInput {
 
   @Field(() => Int,
       {
-          nullable: true, description: "Required only when frequency is every-n-days." 
+          nullable: true, description: TODO_MESSAGES.get("makeRecurring.input.n") 
       })
   @IsOptional()
   @IsInt()
@@ -44,7 +47,7 @@ export class MakeRecurringInput {
 
   @Field(() => Int,
       {
-          nullable: true, description: "Required only when frequency is monthly-day; 1-31." 
+          nullable: true, description: TODO_MESSAGES.get("makeRecurring.input.dayOfMonth") 
       })
   @IsOptional()
   @IsInt()
@@ -52,20 +55,20 @@ export class MakeRecurringInput {
       dayOfMonth?: number
 
   @Field({
-      description: "IANA time zone, e.g. Europe/Berlin." 
+      description: TODO_MESSAGES.get("makeRecurring.input.timeZone") 
   })
   @IsString()
   @MinLength(1)
       timeZone!: string
 
   @Field({
-      description: "Local HH:MM the rule fires at, in timeZone." 
+      description: TODO_MESSAGES.get("makeRecurring.input.time") 
   })
   @Matches(/^([01]\d|2[0-3]):[0-5]\d$/)
       time!: string
 
   @Field({
-      description: "Local calendar date (YYYY-MM-DD) the rule begins." 
+      description: TODO_MESSAGES.get("makeRecurring.input.startDate") 
   })
   @Matches(/^\d{4}-\d{2}-\d{2}$/)
       startDate!: string

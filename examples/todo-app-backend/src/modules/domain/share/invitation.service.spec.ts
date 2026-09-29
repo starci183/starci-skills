@@ -6,19 +6,25 @@ import {
 } from "@nestjs/typeorm"
 import {
     POSTGRESQL_PRIMARY,
-} from "@modules/platform/databases/postgresql/primary/index"
+} from "@modules/platform/databases/index"
 import {
     ShareInvitationEntity,
-} from "@modules/platform/databases/postgresql/primary/index"
+} from "@modules/platform/databases/index"
 import {
     createFakeEntityManager,
-} from "@modules/platform/databases/postgresql/primary/index"
+} from "@modules/platform/databases/index"
 import {
     CollaboratorCache 
 } from "./collaborator-cache"
 import {
     InvitationService 
 } from "./invitation.service"
+import {
+    Clock 
+} from "@modules/platform/clock/index"
+import {
+    FakeClock 
+} from "@starci/jest-preset/clock"
 
 const DAY_MS = 24 * 60 * 60 * 1000
 const PRIMARY_ENTITY_MANAGER = getEntityManagerToken(POSTGRESQL_PRIMARY)
@@ -34,6 +40,9 @@ describe("InvitationService",
             entityManager = createFakeEntityManager<ShareInvitationEntity>("id")
             moduleRef = await Test.createTestingModule({
                 providers: [
+                    {
+                        provide: Clock, useValue: new FakeClock() 
+                    },
                     InvitationService,
                     CollaboratorCache,
                     {

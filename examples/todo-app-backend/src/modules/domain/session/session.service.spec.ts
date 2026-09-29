@@ -9,16 +9,22 @@ import {
 } from "@modules/platform/config/index"
 import {
     POSTGRESQL_PRIMARY,
-} from "@modules/platform/databases/postgresql/primary/index"
+} from "@modules/platform/databases/index"
 import {
     SessionEntity,
-} from "@modules/platform/databases/postgresql/primary/index"
+} from "@modules/platform/databases/index"
 import {
     createFakeEntityManager,
-} from "@modules/platform/databases/postgresql/primary/index"
+} from "@modules/platform/databases/index"
 import {
     SessionService 
 } from "./session.service"
+import {
+    Clock 
+} from "@modules/platform/clock/index"
+import {
+    FakeClock 
+} from "@starci/jest-preset/clock"
 
 describe("SessionService",
     () => {
@@ -28,6 +34,9 @@ describe("SessionService",
         beforeEach(async () => {
             moduleRef = await Test.createTestingModule({
                 providers: [
+                    {
+                        provide: Clock, useValue: new FakeClock() 
+                    },
                     SessionService,
                     AppConfigService,
                     {
@@ -102,6 +111,9 @@ describe("SessionService",
                     "findOneBy")
                 const isolated = await Test.createTestingModule({
                     providers: [
+                        {
+                            provide: Clock, useValue: new FakeClock() 
+                        },
                         SessionService,
                         AppConfigService,
                         {
@@ -116,7 +128,7 @@ describe("SessionService",
                     await expect(isolatedService.findActive("")).rejects.toMatchObject({
                         code: "SESSION_NOT_FOUND_EXCEPTION" 
                     })
-                    await expect(isolatedService.findActive(undefined as unknown as string)).rejects.toMatchObject({
+                    await expect(isolatedService.findActive(undefined as string | undefined as string)).rejects.toMatchObject({
                         code: "SESSION_NOT_FOUND_EXCEPTION" 
                     })
 

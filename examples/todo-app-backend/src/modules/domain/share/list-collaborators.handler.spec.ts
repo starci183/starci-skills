@@ -6,13 +6,13 @@ import {
 } from "@nestjs/typeorm"
 import {
     POSTGRESQL_PRIMARY,
-} from "@modules/platform/databases/postgresql/primary/index"
+} from "@modules/platform/databases/index"
 import {
     ShareInvitationEntity,
-} from "@modules/platform/databases/postgresql/primary/index"
+} from "@modules/platform/databases/index"
 import {
     createFakeEntityManager,
-} from "@modules/platform/databases/postgresql/primary/index"
+} from "@modules/platform/databases/index"
 import {
     CollaboratorCache 
 } from "./collaborator-cache"
@@ -25,6 +25,12 @@ import {
 import {
     ListCollaboratorsHandler 
 } from "./list-collaborators.handler"
+import {
+    Clock 
+} from "@modules/platform/clock/index"
+import {
+    FakeClock 
+} from "@starci/jest-preset/clock"
 
 describe("ListCollaboratorsHandler",
     () => {
@@ -35,6 +41,9 @@ describe("ListCollaboratorsHandler",
         beforeEach(async () => {
             moduleRef = await Test.createTestingModule({
                 providers: [
+                    {
+                        provide: Clock, useValue: new FakeClock() 
+                    },
                     ListCollaboratorsHandler,
                     InvitationService,
                     CollaboratorCache,

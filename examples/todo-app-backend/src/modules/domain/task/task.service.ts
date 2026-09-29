@@ -9,10 +9,10 @@ import type {
 } from "typeorm"
 import {
     InjectPrimaryEntityManager,
-} from "@modules/platform/databases/postgresql/primary/index"
+} from "@modules/platform/databases/index"
 import {
     TaskEntity,
-} from "@modules/platform/databases/postgresql/primary/index"
+} from "@modules/platform/databases/index"
 import {
     OwnershipGuard 
 } from "./ownership.guard"
@@ -28,6 +28,12 @@ import {
 import {
     TaskTitleRequiredException,
 } from "./errors/task-title-required"
+import {
+    Clock
+} from "@modules/platform/clock/index"
+
+/** The most tasks one owner lists. */
+const MAX_TASKS_PER_OWNER = 1_000
 
 
 /**
@@ -50,11 +56,11 @@ import {
 @Injectable()
 /** Injectable service owning the task logic the task capability exposes; wired by the capability's own module. */
 export class TaskService {
-    private readonly guard = new OwnershipGuard()
-
     constructor(
-    @InjectPrimaryEntityManager() private readonly entityManager: EntityManager,
-    private readonly completionAuthorityRegistry: CompletionAuthorityRegistry = new CompletionAuthorityRegistry(),
+        @InjectPrimaryEntityManager() private readonly entityManager: EntityManager,
+        private readonly guard: OwnershipGuard,
+        private readonly completionAuthorityRegistry: CompletionAuthorityRegistry,
+        private readonly clock: Clock,
     ) {}
 
     async create(owner: string, title: string): Promise<TaskRecord> {
@@ -88,9 +94,11 @@ export class TaskService {
     }
 
     async listOwnedBy(owner: string): Promise<Array<TaskRecord>> {
-        const rows = await this.entityManager.findBy(TaskEntity,
+        const rows = await this.entityManager.find(TaskEntity,
             {
-                owner 
+                where: {
+                    owner 
+                }, take: MAX_TASKS_PER_OWNER 
             })
         return rows.map(toRecord)
     }
@@ -155,14 +163,14 @@ export class TaskService {
             return this.tCompleteAgain(row)
         }
         row.complete = true
-        row.completedAt = new Date()
+        row.completedAt = this.clock.now()
         const saved = await this.entityManager.save(TaskEntity,
             row)
         return toRecord(saved)
     }
 
-    private async tCompleteAgain(row: TaskEntity): Promise<TaskRecord> {
-        return toRecord(row)
+    private tCompleteAgain(row: TaskEntity): Promise<TaskRecord> {
+        return Promise.resolve(toRecord(row))
     }
 
     private async tReopen(row: TaskEntity): Promise<TaskRecord> {

@@ -20,6 +20,9 @@ import {
 import {
     ConfirmPaymentCommand, ConfirmPaymentCommandResult 
 } from "./confirm-payment.command"
+import {
+    Clock
+} from "@modules/platform/clock/index"
 
 const DEFAULT_PERIOD_MS = 30 * 24 * 60 * 60 * 1000
 
@@ -38,6 +41,7 @@ export class ConfirmPaymentHandler extends AbstractCommandHandler<ConfirmPayment
     constructor(
     private readonly paymentService: PaymentService,
     private readonly subscriptionService: SubscriptionService,
+        private readonly clock: Clock
     ) {
         super()
     }
@@ -57,7 +61,7 @@ export class ConfirmPaymentHandler extends AbstractCommandHandler<ConfirmPayment
         }
         return this.applyPaid(intent.id,
             intent.subscriptionId,
-            periodEnd ?? new Date(Date.now() + DEFAULT_PERIOD_MS))
+            periodEnd ?? new Date(this.clock.now().getTime() + DEFAULT_PERIOD_MS))
     }
 
     /** t-gateway-abandoned: only fires when the intent had never been applied paid; a failed outcome

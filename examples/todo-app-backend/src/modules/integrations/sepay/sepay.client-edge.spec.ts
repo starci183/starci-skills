@@ -7,14 +7,17 @@ import {
 import {
     SepayClient 
 } from "./sepay.client"
+import {
+    mock 
+} from "@starci/jest-preset/mock"
 
 /** Edge cases for sepay.client.ts beyond the main spec's coverage: exact-match webhook comparison,
  * JSON answers that parse but are not objects, and the shape edges of getTransaction's reply. */
 
 function gatewayResponse(status: number, body: string): Response {
-    return {
+    return mock<Response>({
         ok: status >= 200 && status < 300, status, text: async () => body 
-    } as unknown as Response
+    })
 }
 
 const modules: Array<TestingModule> = []

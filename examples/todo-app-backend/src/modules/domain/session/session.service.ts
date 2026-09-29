@@ -12,10 +12,10 @@ import {
 } from "@modules/platform/config/index"
 import {
     InjectPrimaryEntityManager,
-} from "@modules/platform/databases/postgresql/primary/index"
+} from "@modules/platform/databases/index"
 import {
     SessionEntity,
-} from "@modules/platform/databases/postgresql/primary/index"
+} from "@modules/platform/databases/index"
 import {
     SessionRecord 
 } from "./types/session-record"
@@ -28,6 +28,9 @@ import {
 import {
     SessionNotFoundException,
 } from "./errors/session-not-found"
+import {
+    Clock
+} from "@modules/platform/clock/index"
 
 
 const MILLISECONDS_PER_DAY = 24 * 60 * 60 * 1000
@@ -51,6 +54,7 @@ export class SessionService {
     constructor(
     @InjectPrimaryEntityManager() private readonly entityManager: EntityManager,
     private readonly config: AppConfigService,
+        private readonly clock: Clock
     ) {}
 
     tBegin(email: string): void {
@@ -61,7 +65,7 @@ export class SessionService {
     }
 
     async tAccept(personId: string): Promise<SessionRecord> {
-        const issuedAt = new Date()
+        const issuedAt = this.clock.now()
         const expiresAt = new Date(issuedAt.getTime() + this.config.getSessionTtlDays() * MILLISECONDS_PER_DAY)
         const saved = await this.entityManager.save(SessionEntity,
             {
@@ -106,7 +110,7 @@ export class SessionService {
             throw new SessionNotFoundException({
             })
         }
-        if (row.expiresAt.getTime() <= Date.now()) {
+        if (row.expiresAt.getTime() <= this.clock.now().getTime()) {
             await this.tExpire(token)
             throw new SessionExpiredException({
             })

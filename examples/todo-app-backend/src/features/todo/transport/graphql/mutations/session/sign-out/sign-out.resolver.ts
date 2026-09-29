@@ -17,6 +17,9 @@ import {
 import {
     SignOutResponse 
 } from "./graphql-types/response"
+import {
+    TODO_MESSAGES 
+} from "../../../../../messages/index"
 
 /** GraphQL mutation for signOut. `sessionToken` still travels in the request body (as the original
  * REST `SignOutRequest` did), not as the `Authorization: Bearer <token>` header the task mutations read - sign-out is
@@ -28,7 +31,7 @@ export class SignOutResolver {
 
   @Mutation(() => SignOutResponse,
       {
-          name: "signOut", description: "End a session by its token." 
+          name: "signOut", description: TODO_MESSAGES.get("signOut.description") 
       })
     async signOut(@Args("request") input: SignOutInput): Promise<SignOutResponse> {
         const result = await this.commandBus.execute<SignOutCommand, SignOutCommandResult>(

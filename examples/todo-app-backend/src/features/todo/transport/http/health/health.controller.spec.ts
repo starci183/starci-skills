@@ -6,7 +6,7 @@ import {
 } from "@nestjs/common"
 import {
     PostgresPrimaryClient,
-} from "@modules/platform/databases/postgresql/primary/index"
+} from "@modules/platform/databases/index"
 import {
     HealthController 
 } from "./health.controller"

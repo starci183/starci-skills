@@ -25,6 +25,9 @@ import {
 import {
     UpcomingOccurrencesRequest
 } from "./graphql-types/request"
+import {
+    TODO_MESSAGES 
+} from "../../../../../messages/index"
 
 /** fr.recur.see-upcoming's GraphQL query. Dispatches onto the QueryBus, matching task's own list-tasks
  * query and this codebase's own split of writes (CommandBus) and reads (QueryBus). */
@@ -39,7 +42,7 @@ export class UpcomingOccurrencesResolver {
   @Query(() => UpcomingOccurrencesResponse,
       {
           name: "upcomingOccurrences",
-          description: "fr.recur.see-upcoming: materialised occurrences plus a live preview of the rule's next dates.",
+          description: TODO_MESSAGES.get("upcomingOccurrences.description"),
       })
     async upcomingOccurrences(
     @Context("req") req: GraphqlRequestLike,

@@ -15,10 +15,10 @@ import {
 } from "@modules/domain/task/index"
 import {
     POSTGRESQL_PRIMARY,
-} from "@modules/platform/databases/postgresql/primary/index"
+} from "@modules/platform/databases/index"
 import {
     TaskEntity,
-} from "@modules/platform/databases/postgresql/primary/index"
+} from "@modules/platform/databases/index"
 import {
     createFakeRecurEntityManager 
 } from "./testing/fake-recur-entity-manager"
@@ -31,6 +31,12 @@ import {
 import {
     GeneratorService 
 } from "./generator.service"
+import {
+    Clock 
+} from "@modules/platform/clock/index"
+import {
+    FakeClock 
+} from "@starci/jest-preset/clock"
 
 /** A minimal CommandBus stand-in that only knows CreateTaskCommand, writing directly into the same fake
  * entity manager GeneratorService's own services use - close enough to the real seam (dispatch onto a
@@ -60,6 +66,9 @@ describe("GeneratorService (sds.recur.generation-engine)",
             const entityManager = createFakeRecurEntityManager()
             const moduleRef = await Test.createTestingModule({
                 providers: [
+                    {
+                        provide: Clock, useValue: new FakeClock() 
+                    },
                     RuleService,
                     OccurrenceService,
                     GeneratorService,

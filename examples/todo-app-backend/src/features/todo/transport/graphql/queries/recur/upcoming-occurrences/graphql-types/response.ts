@@ -1,6 +1,9 @@
 import {
     Field, ID, ObjectType 
 } from "@nestjs/graphql"
+import {
+    TODO_MESSAGES 
+} from "../../../../../../messages/index"
 
 @ObjectType()
 /** One materialised occurrence: occurrenceId (the task it spawned), localDate, dueAtUtc, status. */
@@ -36,7 +39,7 @@ export class UpcomingOccurrencesResponse {
 
   @Field(() => [String],
       {
-          description: "Dates the rule will next fire on, computed live. Empty for an ended rule." 
+          description: TODO_MESSAGES.get("upcomingOccurrences.response.previewDates") 
       })
       previewDates!: Array<string>
 

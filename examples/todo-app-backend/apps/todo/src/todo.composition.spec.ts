@@ -77,9 +77,26 @@ import {
 import {
     KeycloakInvalidCredentialsException,
 } from "@modules/integrations/keycloak/index"
+import {
+    WinstonService,
+} from "@modules/platform/logging/index"
 import type {
     KeycloakSignInResult,
 } from "@modules/integrations/keycloak/index"
+import {
+    Clock 
+} from "@modules/platform/clock/index"
+import {
+    FakeClock 
+} from "@starci/jest-preset/clock"
+import {
+    timingSafeEqual 
+} from "node:crypto"
+
+/** Compares two secrets in constant time, the way production code must. */
+const sameSecret = (given: string, expected: string): boolean =>
+    given.length === expected.length && timingSafeEqual(Buffer.from(given),
+        Buffer.from(expected))
 
 
 const DEMO_EMAIL = "demo@todo.dev"
@@ -96,7 +113,8 @@ const DEMO_SUBJECT = "demo-subject"
 @Injectable()
 class FakeKeycloakClient {
     async signIn(email: string, password: string): Promise<KeycloakSignInResult> {
-        if (email.toLowerCase() !== DEMO_EMAIL || password !== DEMO_PASSWORD) {
+        if (email.toLowerCase() !== DEMO_EMAIL || !sameSecret(password,
+            DEMO_PASSWORD)) {
             throw new KeycloakInvalidCredentialsException({
             })
         }
@@ -246,6 +264,9 @@ class FakeTaskService {
         PlatformEventsModule.register()],
     providers: [
         {
+            provide: Clock, useValue: new FakeClock() 
+        },
+        {
             provide: SessionService, useClass: FakeSessionService 
         },
         {
@@ -253,6 +274,7 @@ class FakeTaskService {
         },
         SignInHandler,
         SignOutHandler,
+        WinstonService,
     ],
     exports: [SessionService],
 })
@@ -262,6 +284,9 @@ class FakeSessionModule {}
     imports: [CqrsModule,
         PlatformEventsModule.register()],
     providers: [
+        {
+            provide: Clock, useValue: new FakeClock() 
+        },
         {
             provide: TaskService, useClass: FakeTaskService 
         },

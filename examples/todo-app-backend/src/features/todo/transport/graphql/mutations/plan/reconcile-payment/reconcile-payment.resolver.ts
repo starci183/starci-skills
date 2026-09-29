@@ -25,6 +25,9 @@ import {
 import {
     ReconcilePaymentResponse 
 } from "./graphql-types/response"
+import {
+    TODO_MESSAGES 
+} from "../../../../../messages/index"
 
 /** fr.plan.reconcile's owner-triggered path: "the owner asking the usage screen to check their
  * payment." The scheduled-sweep actor named by the same record has no transport of its own yet - see the
@@ -39,7 +42,7 @@ export class ReconcilePaymentResolver {
 
   @Mutation(() => ReconcilePaymentResponse,
       {
-          name: "reconcilePayment", description: "Poll the gateway for a pending payment intent's status (fr.plan.reconcile)." 
+          name: "reconcilePayment", description: TODO_MESSAGES.get("reconcilePayment.description") 
       })
     async reconcilePayment(
     @Context("req") req: GraphqlRequestLike,

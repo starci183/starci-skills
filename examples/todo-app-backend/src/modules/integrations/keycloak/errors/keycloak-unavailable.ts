@@ -1,23 +1,25 @@
 import {
-    AbstractException,
+    DomainError,
 } from "@modules/platform/errors/index"
 import type {
-    AbstractExceptionMetadata,
+    DomainErrorMetadata,
 } from "@modules/platform/errors/index"
 
 /** Metadata for a Keycloak round-trip that could not be completed. */
-export interface KeycloakUnavailableExceptionMetadata extends AbstractExceptionMetadata {
+export interface KeycloakUnavailableExceptionMetadata extends DomainErrorMetadata {
   /** The underlying transport failure, stringified. */
   detail?: string;
 }
 
 /** House refusal carrying code KEYCLOAK_UNAVAILABLE_EXCEPTION; every throw site attaches a metadata object naming the concrete ids the keycloak unavailable refusal turned on. */
-export class KeycloakUnavailableException extends AbstractException {
+export class KeycloakUnavailableException extends DomainError {
     constructor({ detail, ...metadata }: KeycloakUnavailableExceptionMetadata) {
-        super("Keycloak could not be reached.",
-            "KEYCLOAK_UNAVAILABLE_EXCEPTION",
+        super("KEYCLOAK_UNAVAILABLE_EXCEPTION",
+            "Keycloak could not be reached.",
             {
-                detail, ...metadata 
+                metadata: {
+                    detail, ...metadata 
+                } 
             })
     }
 }

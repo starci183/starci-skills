@@ -6,13 +6,19 @@ import {
 } from "@nestjs/typeorm"
 import {
     POSTGRESQL_PRIMARY,
-} from "@modules/platform/databases/postgresql/primary/index"
+} from "@modules/platform/databases/index"
 import {
     createFakePlanEntityManager 
 } from "./testing/fake-plan-entity-manager"
 import {
     PaymentService 
 } from "./payment.service"
+import {
+    Clock 
+} from "@modules/platform/clock/index"
+import {
+    FakeClock 
+} from "@starci/jest-preset/clock"
 
 describe("PaymentService",
     () => {
@@ -22,6 +28,9 @@ describe("PaymentService",
         beforeEach(async () => {
             moduleRef = await Test.createTestingModule({
                 providers: [
+                    {
+                        provide: Clock, useValue: new FakeClock() 
+                    },
                     PaymentService,
                     {
                         provide: getEntityManagerToken(POSTGRESQL_PRIMARY), useValue: createFakePlanEntityManager() 

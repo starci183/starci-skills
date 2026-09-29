@@ -1,12 +1,12 @@
 import {
-    AbstractException,
+    DomainError,
 } from "@modules/platform/errors/index"
 import type {
-    AbstractExceptionMetadata,
+    DomainErrorMetadata,
 } from "@modules/platform/errors/index"
 
 /** Type alias naming the invalid credentials exception metadata set invalid-credentials switches on; a new member is added here once, not scattered as literals. */
-export type InvalidCredentialsExceptionMetadata = AbstractExceptionMetadata;
+export type InvalidCredentialsExceptionMetadata = DomainErrorMetadata;
 
 /**
  * br.login.password.sign-in requires that a refusal never names which half of the pair was wrong.
@@ -14,11 +14,13 @@ export type InvalidCredentialsExceptionMetadata = AbstractExceptionMetadata;
  * invalid_grant - throws this exact exception, with the same message and the same code, so a transport
  * mapper cannot leak the difference even by accident.
  */
-export class InvalidCredentialsException extends AbstractException {
+export class InvalidCredentialsException extends DomainError {
     constructor(metadata: InvalidCredentialsExceptionMetadata = {
     }) {
-        super("The email or password is incorrect.",
-            "INVALID_CREDENTIALS_EXCEPTION",
-            metadata)
+        super("INVALID_CREDENTIALS_EXCEPTION",
+            "The email or password is incorrect.",
+            {
+                metadata: metadata 
+            })
     }
 }

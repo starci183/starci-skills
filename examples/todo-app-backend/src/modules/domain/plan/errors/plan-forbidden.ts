@@ -1,12 +1,12 @@
 import {
-    AbstractException,
+    DomainError,
 } from "@modules/platform/errors/index"
 import type {
-    AbstractExceptionMetadata,
+    DomainErrorMetadata,
 } from "@modules/platform/errors/index"
 
 /** Metadata for a plan action attempted against somebody else's subscription. */
-export interface PlanForbiddenExceptionMetadata extends AbstractExceptionMetadata {
+export interface PlanForbiddenExceptionMetadata extends DomainErrorMetadata {
   /** The subscription id the actor attempted to act on. */
   subscriptionId?: string;
   /** The actor who was refused. */
@@ -19,13 +19,15 @@ export interface PlanForbiddenExceptionMetadata extends AbstractExceptionMetadat
  * intent or subscription. Mirrors br.task.single-owner's TaskForbiddenException shape for the plan
  * feature's own actions (fr.plan.reconcile, fr.plan.downgrade).
  */
-export class PlanForbiddenException extends AbstractException {
+export class PlanForbiddenException extends DomainError {
     constructor({ subscriptionId, actorId, ...metadata }: PlanForbiddenExceptionMetadata = {
     }) {
-        super("This subscription belongs to somebody else.",
-            "PLAN_FORBIDDEN_EXCEPTION",
+        super("PLAN_FORBIDDEN_EXCEPTION",
+            "This subscription belongs to somebody else.",
             {
-                subscriptionId, actorId, ...metadata 
+                metadata: {
+                    subscriptionId, actorId, ...metadata 
+                } 
             })
     }
 }

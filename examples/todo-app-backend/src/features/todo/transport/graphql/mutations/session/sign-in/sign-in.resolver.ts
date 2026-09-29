@@ -17,6 +17,9 @@ import {
 import {
     SignInResponse 
 } from "./graphql-types/response"
+import {
+    TODO_MESSAGES 
+} from "../../../../../messages/index"
 
 /**
  * GraphQL mutation for signIn. Protocol adaptation only - the resolver dispatches the CQRS command
@@ -31,7 +34,7 @@ export class SignInResolver {
   @Mutation(() => SignInResponse,
       {
           name: "signIn",
-          description: "Sign in with an email + password; returns the session token to send back as \"Authorization: Bearer <token>\".",
+          description: TODO_MESSAGES.get("signIn.description"),
       })
     async signIn(@Args("request") input: SignInInput): Promise<SignInResponse> {
         const result = await this.commandBus.execute<SignInCommand, SignInCommandResult>(

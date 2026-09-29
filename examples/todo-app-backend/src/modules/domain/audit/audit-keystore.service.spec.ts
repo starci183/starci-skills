@@ -6,13 +6,19 @@ import {
 } from "@nestjs/typeorm"
 import {
     POSTGRESQL_PRIMARY,
-} from "@modules/platform/databases/postgresql/primary/index"
+} from "@modules/platform/databases/index"
 import {
     createFakeAuditEntityManager 
 } from "./testing/fake-audit-entity-manager"
 import {
     AuditKeystoreService 
 } from "./audit-keystore.service"
+import {
+    Clock 
+} from "@modules/platform/clock/index"
+import {
+    FakeClock 
+} from "@starci/jest-preset/clock"
 
 describe("AuditKeystoreService",
     () => {
@@ -22,6 +28,9 @@ describe("AuditKeystoreService",
         beforeEach(async () => {
             moduleRef = await Test.createTestingModule({
                 providers: [
+                    {
+                        provide: Clock, useValue: new FakeClock() 
+                    },
                     AuditKeystoreService,
                     {
                         provide: getEntityManagerToken(POSTGRESQL_PRIMARY), useValue: createFakeAuditEntityManager() 
@@ -53,10 +62,12 @@ describe("AuditKeystoreService",
 
                 expect(sealed).not.toContain("person-1")
                 expect(keystore.unseal(key,
-                    sealed)).toBe("person-1")
+                    sealed)).toEqual({
+                    opened: true, plaintext: "person-1"
+                })
             })
 
-        it("unseal returns null, never throws, for a tampered or wrongly-keyed blob",
+        it("unseal reports opened: false with the cause, never throws, for a tampered or wrongly-keyed blob",
             async () => {
                 const { key } = await keystore.getOrCreateKey("person-1")
                 const { key: otherKey } = await keystore.getOrCreateKey("person-2")
@@ -64,9 +75,13 @@ describe("AuditKeystoreService",
                     "person-1")
 
                 expect(keystore.unseal(otherKey,
-                    sealed)).toBeNull()
+                    sealed)).toMatchObject({
+                    opened: false, cause: expect.any(Error)
+                })
                 expect(keystore.unseal(key,
-                    "not-a-sealed-value")).toBeNull()
+                    "not-a-sealed-value")).toMatchObject({
+                    opened: false, cause: expect.any(RangeError)
+                })
             })
 
         it("br.audit.erasure.right / decision.audit.erasure-method: destroyKey removes the key and the personId-to-keyId mapping together",

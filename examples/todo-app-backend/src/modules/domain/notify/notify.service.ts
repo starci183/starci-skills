@@ -25,6 +25,9 @@ import {
 import {
     NotificationRecord 
 } from "./types/notification-record"
+import {
+    Clock
+} from "@modules/platform/clock/index"
 
 const FLUSH_PREFIX = "flush:"
 const RETRY_PREFIX = "retry:"
@@ -68,6 +71,7 @@ export class NotifyService {
     private readonly preferences: PreferencesService,
     private readonly delivery: DeliveryService,
     private readonly queue: NotifyQueuePort,
+        private readonly clock: Clock
     ) {}
 
     /**
@@ -77,7 +81,7 @@ export class NotifyService {
    * unsubscribed recipient's attempt is created already suppressed and never joins a digest window at
    * all, so it can never be batched into a message that would have gone out anyway.
    */
-    async admit(input: AdmitEventInput, now: Date = new Date()): Promise<AdmitEventResult> {
+    async admit(input: AdmitEventInput, now: Date = this.clock.now()): Promise<AdmitEventResult> {
         const { record, isNew } = await this.dedupe.admit(input)
         if (!isNew) {
             const attempt = await this.delivery.findById(record.id)
@@ -114,7 +118,7 @@ export class NotifyService {
     /** Drains every job the queue currently reports as due - a window whose close time has passed, or a
    * retry whose backoff has elapsed - and dispatches it. Called on a real wall-clock tick in production
    * (notify.scheduler.ts) and directly, with an advanced `now`, by specs. */
-    async runDueJobs(now: Date = new Date()): Promise<void> {
+    async runDueJobs(now: Date = this.clock.now()): Promise<void> {
         const jobIds = await this.queue.dequeueDue(now.getTime())
         for (const jobId of jobIds) {
             if (jobId.startsWith(FLUSH_PREFIX)) {

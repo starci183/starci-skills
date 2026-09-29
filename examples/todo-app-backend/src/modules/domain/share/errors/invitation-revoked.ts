@@ -1,23 +1,25 @@
 import {
-    AbstractException,
+    DomainError,
 } from "@modules/platform/errors/index"
 import type {
-    AbstractExceptionMetadata,
+    DomainErrorMetadata,
 } from "@modules/platform/errors/index"
 
 /** Metadata for an accept attempt against a revoked invitation. */
-export interface ShareInvitationRevokedExceptionMetadata extends AbstractExceptionMetadata {
+export interface ShareInvitationRevokedExceptionMetadata extends DomainErrorMetadata {
   invitationId?: string;
 }
 
 /** fr.share.accept exceptionFlows: "Accepting a revoked invitation is refused." */
-export class ShareInvitationRevokedException extends AbstractException {
+export class ShareInvitationRevokedException extends DomainError {
     constructor({ invitationId, ...metadata }: ShareInvitationRevokedExceptionMetadata = {
     }) {
-        super("This invitation was revoked.",
-            "SHARE_INVITATION_REVOKED_EXCEPTION",
+        super("SHARE_INVITATION_REVOKED_EXCEPTION",
+            "This invitation was revoked.",
             {
-                invitationId, ...metadata 
+                metadata: {
+                    invitationId, ...metadata 
+                } 
             })
     }
 }

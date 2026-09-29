@@ -20,6 +20,9 @@ import {
 import {
     GeneratorService 
 } from "./generator.service"
+import {
+    Clock
+} from "@modules/platform/clock/index"
 
 /**
  * integration.recur.scheduler: this product owns the generation logic entirely
@@ -45,6 +48,7 @@ export class SchedulerService implements OnModuleInit {
     private readonly schedulerRegistry: SchedulerRegistry,
     private readonly config: AppConfigService,
     private readonly winstonService: WinstonService,
+        private readonly clock: Clock
     ) {}
 
     onModuleInit(): void {
@@ -65,7 +69,7 @@ export class SchedulerService implements OnModuleInit {
     }
 
     async onTick(): Promise<void> {
-        const summary = await this.generatorService.runOnce(new Date())
+        const summary = await this.generatorService.runOnce(this.clock.now())
         if (summary.materialised.length > 0) {
             this.winstonService.log(LogEvent.RecurGenerationTickMaterialised,
                 {

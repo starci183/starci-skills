@@ -25,6 +25,9 @@ import {
 import {
     NotificationPreferencesRequest
 } from "./graphql-types/request"
+import {
+    TODO_MESSAGES 
+} from "../../../../../messages/index"
 
 /** data.notify.preference's GraphQL read. `channel` defaults to `email`, the only channel this feature
  * sends on today (integration.notify.smtp). */
@@ -38,7 +41,7 @@ export class NotificationPreferencesResolver {
 
   @Query(() => NotificationPreferencesResponse,
       {
-          name: "notificationPreferences", description: "The caller's own notification preferences for one channel." 
+          name: "notificationPreferences", description: TODO_MESSAGES.get("notificationPreferences.description") 
       })
     async notificationPreferences(
     @Context("req") req: GraphqlRequestLike,

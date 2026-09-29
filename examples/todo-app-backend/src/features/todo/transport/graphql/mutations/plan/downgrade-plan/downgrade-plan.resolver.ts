@@ -22,6 +22,9 @@ import {
 import {
     DowngradePlanResponse 
 } from "./graphql-types/response"
+import {
+    TODO_MESSAGES 
+} from "../../../../../messages/index"
 
 @Resolver()
 /** The fr.plan.downgrade door: flips the subscription back to free immediately - accept-and-freeze, so the cap guard simply resumes refusing creates from the real count. */
@@ -33,7 +36,7 @@ export class DowngradePlanResolver {
 
   @Mutation(() => DowngradePlanResponse,
       {
-          name: "downgradePlan", description: "Downgrade to the free plan, effective immediately (fr.plan.downgrade)." 
+          name: "downgradePlan", description: TODO_MESSAGES.get("downgradePlan.description") 
       })
     async downgradePlan(@Context("req") req: GraphqlRequestLike): Promise<DowngradePlanResponse> {
         const ownerId = await actorIdFromRequest(req,

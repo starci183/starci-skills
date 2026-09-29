@@ -25,6 +25,9 @@ import {
 import {
     CollaboratorsRequest
 } from "./graphql-types/request"
+import {
+    TODO_MESSAGES 
+} from "../../../../../messages/index"
 
 /** fr.share.list's GraphQL query. Dispatches onto the QueryBus, matching task's own split of writes
  * (CommandBus) and reads (QueryBus). */
@@ -38,7 +41,7 @@ export class CollaboratorsResolver {
 
   @Query(() => [CollaboratorResponse],
       {
-          name: "collaborators", description: "List a task’s collaborators, visible to the owner and to bound collaborators." 
+          name: "collaborators", description: TODO_MESSAGES.get("collaborators.description") 
       })
     async collaborators(
     @Context("req") req: GraphqlRequestLike,

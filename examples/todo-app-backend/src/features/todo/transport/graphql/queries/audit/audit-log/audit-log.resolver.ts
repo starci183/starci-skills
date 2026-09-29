@@ -22,6 +22,9 @@ import {
 import {
     AuditLogLineResponse 
 } from "./graphql-types/response"
+import {
+    TODO_MESSAGES 
+} from "../../../../../messages/index"
 
 /** fr.audit.log.read's GraphQL entry point. It hands the authenticated subject to the read and lets
  * AuditLogHandler decide the branch from the verified operator claim (AuditOperatorService, per
@@ -40,7 +43,7 @@ export class AuditLogResolver {
 
   @Query(() => [AuditLogLineResponse],
       {
-          name: "auditLog", description: "The caller's own audit log lines, oldest first." 
+          name: "auditLog", description: TODO_MESSAGES.get("auditLog.description") 
       })
     async auditLog(@Context("req") req: GraphqlRequestLike): Promise<Array<AuditLogLineResponse>> {
         const personId = await actorIdFromRequest(req,

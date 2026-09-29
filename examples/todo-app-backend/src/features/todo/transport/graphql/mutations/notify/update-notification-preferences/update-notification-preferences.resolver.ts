@@ -25,6 +25,9 @@ import {
 import {
     UpdateNotificationPreferencesResponse 
 } from "./graphql-types/response"
+import {
+    TODO_MESSAGES 
+} from "../../../../../messages/index"
 
 @Resolver()
 /** The fr.notify.preferences.update door: writes the caller's channel subscription state and optional digest window - honored by the next admission. */
@@ -37,7 +40,7 @@ export class UpdateNotificationPreferencesResolver {
   @Mutation(() => UpdateNotificationPreferencesResponse,
       {
           name: "updateNotificationPreferences",
-          description: "Change the digest window and/or unsubscribed flag for one notification channel.",
+          description: TODO_MESSAGES.get("updateNotificationPreferences.description"),
       })
     async updateNotificationPreferences(
     @Context("req") req: GraphqlRequestLike,

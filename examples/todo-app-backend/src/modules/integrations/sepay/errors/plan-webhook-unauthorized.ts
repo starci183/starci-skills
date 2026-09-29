@@ -1,12 +1,12 @@
 import {
-    AbstractException,
+    DomainError,
 } from "@modules/platform/errors/index"
 import type {
-    AbstractExceptionMetadata,
+    DomainErrorMetadata,
 } from "@modules/platform/errors/index"
 
 /** Type alias naming the plan webhook unauthorized exception metadata set plan-webhook-unauthorized switches on; a new member is added here once, not scattered as literals. */
-export type PlanWebhookUnauthorizedExceptionMetadata = AbstractExceptionMetadata;
+export type PlanWebhookUnauthorizedExceptionMetadata = DomainErrorMetadata;
 
 /**
  * fr.plan.upgrade's exception flow: "The webhook arrives with an invalid signature; it is ignored, the
@@ -16,11 +16,13 @@ export type PlanWebhookUnauthorizedExceptionMetadata = AbstractExceptionMetadata
  * The webhook controller catches this and answers the gateway without applying anything, exactly as an
  * ignored delivery should.
  */
-export class PlanWebhookUnauthorizedException extends AbstractException {
+export class PlanWebhookUnauthorizedException extends DomainError {
     constructor(metadata: PlanWebhookUnauthorizedExceptionMetadata = {
     }) {
-        super("The webhook could not be authenticated.",
-            "PLAN_WEBHOOK_UNAUTHORIZED_EXCEPTION",
-            metadata)
+        super("PLAN_WEBHOOK_UNAUTHORIZED_EXCEPTION",
+            "The webhook could not be authenticated.",
+            {
+                metadata: metadata 
+            })
     }
 }

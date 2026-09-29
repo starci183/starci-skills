@@ -14,10 +14,10 @@ export type TaskCreationPolicyResult = Promise<void>;
 /**
  * sds.plan.cap-guard (appliesTo: fr.task.create) plugs into this seam: a future `plan` feature registers
  * a policy that refuses creation once some capacity limit is reached. `assertMayCreate` throws an
- * AbstractException subclass to refuse; returning (or resolving) means the policy has nothing to say
+ * DomainError subclass to refuse; returning (or resolving) means the policy has nothing to say
  * against this creation. This is an abstract class rather than an interface so a concrete policy is a
  * real, named, `instanceof`-checkable extension point, matching this codebase's own convention for ports
- * (KeycloakClient, AbstractException) over plain interfaces.
+ * (KeycloakClient, DomainError) over plain interfaces.
  */
 export abstract class TaskCreationPolicy {
   abstract assertMayCreate(principal: CreateTaskPrincipalParams, input: CreateTaskInputParams): TaskCreationPolicyResult;

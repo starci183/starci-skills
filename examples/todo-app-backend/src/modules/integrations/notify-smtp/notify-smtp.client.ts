@@ -82,11 +82,29 @@ export class NotifySmtpClient extends NotifySmtpPort {
             await command(socket,
                 body,
                 /^250/)
-            await command(socket,
-                "QUIT",
-                /^221/).catch(() => undefined)
+            await quit(socket)
         } finally {
             socket.destroy()
+        }
+    }
+}
+
+/** The courtesy QUIT after the message was accepted: a failure changes nothing about delivery, so it comes back as an outcome carrying the cause rather than as an error. */
+type QuitOutcome =
+    | { readonly quit: true }
+    | { readonly quit: false; readonly cause: unknown }
+
+async function quit(socket: Socket): Promise<QuitOutcome> {
+    try {
+        await command(socket,
+            "QUIT",
+            /^221/)
+        return {
+            quit: true
+        }
+    } catch (error) {
+        return {
+            quit: false, cause: error
         }
     }
 }
@@ -151,7 +169,7 @@ async function expect(socket: Socket, okPattern: RegExp): Promise<string> {
     return line
 }
 
-async function command(socket: Socket, line: string, okPattern: RegExp): Promise<string> {
+function command(socket: Socket, line: string, okPattern: RegExp): Promise<string> {
     socket.write(`${line}\r\n`)
     return expect(socket,
         okPattern)

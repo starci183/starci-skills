@@ -22,6 +22,9 @@ import {
 import {
     PlanUsageResponse 
 } from "./graphql-types/response"
+import {
+    TODO_MESSAGES 
+} from "../../../../../messages/index"
 
 /** fr.plan.usage.view's GraphQL query. Dispatches onto the QueryBus, matching nivo's own split of writes
  * (CommandBus) and reads (QueryBus). */
@@ -35,7 +38,7 @@ export class PlanUsageResolver {
 
   @Query(() => PlanUsageResponse,
       {
-          name: "planUsage", description: "The caller's usage against the free cap." 
+          name: "planUsage", description: TODO_MESSAGES.get("planUsage.description") 
       })
     async planUsage(@Context("req") req: GraphqlRequestLike): Promise<PlanUsageResponse> {
         const ownerId = await actorIdFromRequest(req,

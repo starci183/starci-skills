@@ -1,5 +1,5 @@
 import {
-    Injectable, Optional 
+    Inject, Injectable
 } from "@nestjs/common"
 import {
     ActorClaims, isOperatorRead 
@@ -20,30 +20,22 @@ import {
  * Fail-closed by construction: an unset, empty or malformed roster lists no subject, so every actor
  * resolves to no claim and `AuditLogHandler` runs the own-lines read - exactly the honest default the
  * gap documented, now reachable in the other direction (a configured operator actually reads the whole
- * chain) rather than a permanently-dead branch. The roster is read once from the environment the
- * process starts with; production leaves `AUDIT_OPERATOR_SUBJECTS` unset (no operators, own-lines only)
- * and a deployment that wants one names its comma-separated subject ids there.
+ * chain) rather than a permanently-dead branch. The roster comes from configuration
+ * (`AppConfigService.getAuditOperatorSubjects`) through the `AUDIT_OPERATOR_SUBJECTS` provider; production
+ * leaves the variable unset (no operators, own-lines only) and a deployment that wants one names its
+ * comma-separated subject ids there.
  */
-const OPERATOR_SUBJECTS_ENV = "AUDIT_OPERATOR_SUBJECTS"
+
+/** The injection token of the operator roster: the subject ids the deployment trusts as operators. */
+export const AUDIT_OPERATOR_SUBJECTS = "AUDIT_OPERATOR_SUBJECTS"
 
 @Injectable()
 /** Injectable service owning the audit operator logic the audit capability exposes; wired by the capability's own module. */
 export class AuditOperatorService {
     private readonly subjects: ReadonlySet<string>
 
-    constructor(@Optional() subjects?: ReadonlyArray<string>) {
-        this.subjects = new Set(subjects ?? AuditOperatorService.subjectsFromEnv())
-    }
-
-    /** The environment's operator roster, split on commas and trimmed; empty (so: no operators) when the
-   * variable is unset or names nothing. A bare, fail-closed read of one env value - the same boundary
-   * AppConfigService reads for every other deployment knob - kept inside the capability that owns the
-   * decision rather than widened across a shared config surface. */
-    static subjectsFromEnv(): ReadonlyArray<string> {
-        return (process.env[OPERATOR_SUBJECTS_ENV] ?? "")
-            .split(",")
-            .map(subject => subject.trim())
-            .filter(Boolean)
+    constructor(@Inject(AUDIT_OPERATOR_SUBJECTS) subjects: ReadonlyArray<string>) {
+        this.subjects = new Set(subjects)
     }
 
     /** The verified claim for an authenticated subject: an operator role only when the trusted roster

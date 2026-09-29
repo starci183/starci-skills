@@ -13,7 +13,7 @@ import {
 } from "@modules/integrations/sepay/index"
 import {
     POSTGRESQL_PRIMARY,
-} from "@modules/platform/databases/postgresql/primary/index"
+} from "@modules/platform/databases/index"
 import {
     createFakePlanEntityManager 
 } from "./testing/fake-plan-entity-manager"
@@ -32,6 +32,12 @@ import {
 import {
     ReconcilePaymentHandler 
 } from "./reconcile-payment.handler"
+import {
+    Clock 
+} from "@modules/platform/clock/index"
+import {
+    FakeClock 
+} from "@starci/jest-preset/clock"
 
 class FakeSepayClient extends SepayClient {
     public nextResult: SepayGetTransactionResult = {
@@ -59,6 +65,9 @@ describe("ReconcilePaymentHandler (fr.plan.reconcile / sds.plan.reconciliation)"
             sepayClient = new FakeSepayClient()
             moduleRef = await Test.createTestingModule({
                 providers: [
+                    {
+                        provide: Clock, useValue: new FakeClock() 
+                    },
                     ReconcilePaymentHandler,
                     ConfirmPaymentHandler,
                     SubscriptionService,

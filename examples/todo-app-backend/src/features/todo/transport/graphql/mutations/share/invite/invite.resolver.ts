@@ -25,6 +25,9 @@ import {
 import {
     InviteResponse 
 } from "./graphql-types/response"
+import {
+    TODO_MESSAGES 
+} from "../../../../../messages/index"
 
 /** fr.share.invite's GraphQL mutation. The caller is trusted as the task's owner exactly as the record's
  * own actor label describes ("owner"); see the final report's note on gap.share.task-ownership-read-seam
@@ -39,7 +42,7 @@ export class InviteResolver {
 
   @Mutation(() => InviteResponse,
       {
-          name: "invite", description: "Invite a collaborator onto one of the caller’s own tasks." 
+          name: "invite", description: TODO_MESSAGES.get("invite.description") 
       })
     async invite(
     @Context("req") req: GraphqlRequestLike,

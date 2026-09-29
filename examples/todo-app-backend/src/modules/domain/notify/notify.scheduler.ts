@@ -10,6 +10,9 @@ import {
 import {
     NotifyService 
 } from "./notify.service"
+import {
+    Clock
+} from "@modules/platform/clock/index"
 
 const TICK_MS = 5_000
 
@@ -30,6 +33,7 @@ export class NotifyScheduler implements OnModuleInit, OnModuleDestroy {
     constructor(
         private readonly notify: NotifyService,
         private readonly winston: WinstonService,
+        private readonly clock: Clock
     ) {}
 
     onModuleInit(): void {
@@ -37,7 +41,7 @@ export class NotifyScheduler implements OnModuleInit, OnModuleDestroy {
             // A rejecting tick (e.g. the primary database being down) must not escape as an
             // unhandled rejection - that kills the api. The tick is fire-and-forget, so the
             // failure is observed here and the next interval retries on its own.
-            void this.notify.runDueJobs(new Date()).catch((reason: unknown) => this.winston.log(LogEvent.NotifyDispatchTickFailed,
+            void this.notify.runDueJobs(this.clock.now()).catch((reason: unknown) => this.winston.log(LogEvent.NotifyDispatchTickFailed,
                 {
                     reason: String(reason) 
                 }))

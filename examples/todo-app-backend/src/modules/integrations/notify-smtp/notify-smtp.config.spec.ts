@@ -4,16 +4,19 @@ import {
 import {
     notifySmtpConfig,
 } from "./notify-smtp.config"
+import {
+    mock 
+} from "@starci/jest-preset/mock"
 
 describe("notify-smtp config",
     () => {
         it("reads every setting through the platform config reader at access time",
             () => {
-                const source = {
+                const source = mock<AppConfigService>({
                     getSmtpHost: jest.fn().mockReturnValue("smtp.test"),
                     getSmtpPort: jest.fn().mockReturnValue(2525),
                     getSmtpFromAddress: jest.fn().mockReturnValue("notify@todo.test"),
-                } as unknown as AppConfigService
+                })
                 const config = notifySmtpConfig(source)
 
                 expect(config.host).toEqual("smtp.test")

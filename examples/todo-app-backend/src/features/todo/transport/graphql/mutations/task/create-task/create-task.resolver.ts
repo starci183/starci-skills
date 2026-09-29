@@ -25,6 +25,9 @@ import {
 import {
     CreateTaskResponse 
 } from "./graphql-types/response"
+import {
+    TODO_MESSAGES 
+} from "../../../../../messages/index"
 
 @Resolver()
 /** The fr.task.create door: creates a task for the caller - refused when the effective plan's active-task cap is already full. */
@@ -36,7 +39,7 @@ export class CreateTaskResolver {
 
   @Mutation(() => CreateTaskResponse,
       {
-          name: "createTask", description: "Create a task owned by the caller." 
+          name: "createTask", description: TODO_MESSAGES.get("createTask.description") 
       })
     async createTask(
     @Context("req") req: GraphqlRequestLike,

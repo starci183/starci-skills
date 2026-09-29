@@ -1,12 +1,12 @@
 import {
-    AbstractException,
+    DomainError,
 } from "@modules/platform/errors/index"
 import type {
-    AbstractExceptionMetadata,
+    DomainErrorMetadata,
 } from "@modules/platform/errors/index"
 
 /** Metadata for a RESP frame the notify queue client could not parse. */
-export interface NotifyQueueProtocolExceptionMetadata extends AbstractExceptionMetadata {
+export interface NotifyQueueProtocolExceptionMetadata extends DomainErrorMetadata {
   /** The unrecognised RESP type byte that tripped the parser. */
   typeByte?: string;
 }
@@ -16,12 +16,14 @@ export interface NotifyQueueProtocolExceptionMetadata extends AbstractExceptionM
  * knows - the connection is speaking a protocol this client does not implement, so the read fails
  * rather than guessing at a frame boundary.
  */
-export class NotifyQueueProtocolException extends AbstractException {
+export class NotifyQueueProtocolException extends DomainError {
     constructor({ typeByte, ...metadata }: NotifyQueueProtocolExceptionMetadata) {
-        super(`unknown RESP type byte: ${typeByte ?? "?"}`,
-            "NOTIFY_QUEUE_PROTOCOL_EXCEPTION",
+        super("NOTIFY_QUEUE_PROTOCOL_EXCEPTION",
+            `unknown RESP type byte: ${typeByte ?? "?"}`,
             {
-                typeByte, ...metadata 
+                metadata: {
+                    typeByte, ...metadata 
+                } 
             })
     }
 }

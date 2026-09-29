@@ -6,7 +6,7 @@ import {
 } from "@nestjs/typeorm"
 import {
     POSTGRESQL_PRIMARY,
-} from "@modules/platform/databases/postgresql/primary/index"
+} from "@modules/platform/databases/index"
 import {
     createFakeRecurEntityManager 
 } from "./testing/fake-recur-entity-manager"
@@ -226,7 +226,7 @@ describe("RuleService (data.recur.rule)",
                         await expect(
                             service.create({
                                 owner: "owner-1", title: "x",
-                                frequency: "fortnightly" as never, timeZone: "UTC", time: "09:00", startDate: "2026-01-01" 
+                                frequency: "fortnightly" as string as Parameters<RuleService["create"]>[0]["frequency"], timeZone: "UTC", time: "09:00", startDate: "2026-01-01" 
                             }),
                         ).rejects.toMatchObject({
                             code: "RECUR_RULE_INVALID_EXCEPTION" 

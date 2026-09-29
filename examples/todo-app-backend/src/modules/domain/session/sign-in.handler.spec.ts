@@ -12,13 +12,13 @@ import {
 } from "./session.service"
 import {
     POSTGRESQL_PRIMARY,
-} from "@modules/platform/databases/postgresql/primary/index"
+} from "@modules/platform/databases/index"
 import {
     SessionEntity,
-} from "@modules/platform/databases/postgresql/primary/index"
+} from "@modules/platform/databases/index"
 import {
     createFakeEntityManager,
-} from "@modules/platform/databases/postgresql/primary/index"
+} from "@modules/platform/databases/index"
 import {
     KeycloakClient,
     KeycloakSignInResult,
@@ -38,6 +38,20 @@ import {
 import {
     SignInHandler 
 } from "./sign-in.handler"
+import {
+    Clock 
+} from "@modules/platform/clock/index"
+import {
+    FakeClock 
+} from "@starci/jest-preset/clock"
+import {
+    timingSafeEqual 
+} from "node:crypto"
+
+/** Compares two secrets in constant time, the way production code must. */
+const sameSecret = (given: string, expected: string): boolean =>
+    given.length === expected.length && timingSafeEqual(Buffer.from(given),
+        Buffer.from(expected))
 
 /**
  * The sign-in handler now exercises only the Keycloak client boundary: this fake stands in for the real
@@ -50,7 +64,9 @@ class FakeKeycloakClient extends KeycloakClient {
 
     async signIn(email: string, password: string): Promise<KeycloakSignInResult> {
         const key = email.toLowerCase()
-        if (this.accepted[key] !== password) {
+        const expected = this.accepted[key]
+        if (expected === undefined || !sameSecret(password,
+            expected)) {
             throw new KeycloakInvalidCredentialsException({
             })
         }
@@ -70,6 +86,9 @@ describe("SignInHandler",
         beforeEach(async () => {
             moduleRef = await Test.createTestingModule({
                 providers: [
+                    {
+                        provide: Clock, useValue: new FakeClock() 
+                    },
                     SignInHandler,
                     SessionService,
                     AppConfigService,
@@ -115,22 +134,12 @@ describe("SignInHandler",
 
         it("ac.login.password.sign-in.refusal-does-not-name-the-half: an unknown email and a wrong password carry the same refusal",
             async () => {
-                let unknownEmailError: unknown
-                let wrongPasswordError: unknown
-                try {
-                    await handler.execute(new SignInCommand({
-                        email: "nobody@example.com", password: "anything" 
-                    }))
-                } catch (error) {
-                    unknownEmailError = error
-                }
-                try {
-                    await handler.execute(new SignInCommand({
-                        email: "person@example.com", password: "wrong-password" 
-                    }))
-                } catch (error) {
-                    wrongPasswordError = error
-                }
+                const unknownEmailError = await handler.execute(new SignInCommand({
+                    email: "nobody@example.com", password: "anything"
+                })).catch((error: unknown) => error)
+                const wrongPasswordError = await handler.execute(new SignInCommand({
+                    email: "person@example.com", password: "wrong-password"
+                })).catch((error: unknown) => error)
                 expect((unknownEmailError as Error).message).toBe((wrongPasswordError as Error).message)
                 expect((unknownEmailError as { code: string }).code).toBe((wrongPasswordError as { code: string }).code)
             })

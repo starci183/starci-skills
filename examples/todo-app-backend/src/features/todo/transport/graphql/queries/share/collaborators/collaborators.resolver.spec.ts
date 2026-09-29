@@ -41,6 +41,9 @@ import {
     CollaboratorResponse 
 } from "./graphql-types/response"
 
+/** The session tokens this spec treats as expired: looked up by membership, never compared for equality. */
+const EXPIRED_TOKENS = new Set(["token-expired"])
+
 describe("CollaboratorsResolver",
     () => {
         let moduleRef: TestingModule
@@ -61,7 +64,7 @@ describe("CollaboratorsResolver",
             }
             sessionService = {
                 findActive: jest.fn(async (token: string) => {
-                    if (token === "token-expired") throw new SessionExpiredException({
+                    if (EXPIRED_TOKENS.has(token)) throw new SessionExpiredException({
                     })
                     if (!token) throw new SessionNotFoundException({
                         reason: "missing-token" 

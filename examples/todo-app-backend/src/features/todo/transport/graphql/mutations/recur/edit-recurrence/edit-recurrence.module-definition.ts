@@ -2,7 +2,10 @@ import {
     ConfigurableModuleBuilder 
 } from "@nestjs/common"
 
-export const { ConfigurableModuleClass, OPTIONS_TYPE } = new ConfigurableModuleBuilder().setExtras(
+/** EditRecurrence takes no options beyond the isGlobal extra. */
+export type EditRecurrenceOptions = Record<never, never>
+
+export const { ConfigurableModuleClass, OPTIONS_TYPE } = new ConfigurableModuleBuilder<EditRecurrenceOptions>().setExtras(
     {
         isGlobal: false 
     },

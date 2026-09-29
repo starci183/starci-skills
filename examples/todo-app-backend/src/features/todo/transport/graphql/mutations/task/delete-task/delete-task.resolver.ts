@@ -25,6 +25,9 @@ import {
 import {
     DeleteTaskRequest
 } from "./graphql-types/request"
+import {
+    TODO_MESSAGES 
+} from "../../../../../messages/index"
 
 @Resolver()
 /** The fr.task.delete door: removes the caller's task row. */
@@ -36,7 +39,7 @@ export class DeleteTaskResolver {
 
   @Mutation(() => DeleteTaskResponse,
       {
-          name: "deleteTask", description: "Delete a task permanently." 
+          name: "deleteTask", description: TODO_MESSAGES.get("deleteTask.description") 
       })
     async deleteTask(
     @Context("req") req: GraphqlRequestLike,

@@ -3,13 +3,13 @@ import {
 } from "@nestjs/testing"
 import {
     PostgresPrimaryClient,
-} from "@modules/platform/databases/postgresql/primary/index"
+} from "@modules/platform/databases/index"
 import {
     MetricsService,
 } from "@modules/platform/observability/index"
 import {
     PostgresPrimaryUnavailableException,
-} from "@modules/platform/databases/postgresql/primary/index"
+} from "@modules/platform/databases/index"
 import {
     ProbesController 
 } from "./probes.controller"

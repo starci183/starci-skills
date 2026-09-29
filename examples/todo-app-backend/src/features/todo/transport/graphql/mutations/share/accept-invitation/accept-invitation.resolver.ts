@@ -25,6 +25,9 @@ import {
 import {
     AcceptInvitationResponse 
 } from "./graphql-types/response"
+import {
+    TODO_MESSAGES 
+} from "../../../../../messages/index"
 
 @Resolver()
 /** The fr.share.accept door: the invitee names its own email, binding personId to the invitation and activating the role in the same call. */
@@ -36,7 +39,7 @@ export class AcceptInvitationResolver {
 
   @Mutation(() => AcceptInvitationResponse,
       {
-          name: "acceptInvitation", description: "Accept a pending invitation addressed to the caller." 
+          name: "acceptInvitation", description: TODO_MESSAGES.get("acceptInvitation.description") 
       })
     async acceptInvitation(
     @Context("req") req: GraphqlRequestLike,

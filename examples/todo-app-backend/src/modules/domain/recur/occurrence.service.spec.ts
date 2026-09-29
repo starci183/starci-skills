@@ -6,19 +6,25 @@ import {
 } from "@nestjs/typeorm"
 import {
     POSTGRESQL_PRIMARY,
-} from "@modules/platform/databases/postgresql/primary/index"
+} from "@modules/platform/databases/index"
 import {
     TaskEntity,
-} from "@modules/platform/databases/postgresql/primary/index"
+} from "@modules/platform/databases/index"
 import {
     OccurrenceEntity,
-} from "@modules/platform/databases/postgresql/primary/index"
+} from "@modules/platform/databases/index"
 import {
     createFakeRecurEntityManager 
 } from "./testing/fake-recur-entity-manager"
 import {
     OccurrenceService 
 } from "./occurrence.service"
+import {
+    Clock 
+} from "@modules/platform/clock/index"
+import {
+    FakeClock 
+} from "@starci/jest-preset/clock"
 
 describe("OccurrenceService (sds.recur.occurrence-lifecycle)",
     () => {
@@ -30,6 +36,9 @@ describe("OccurrenceService (sds.recur.occurrence-lifecycle)",
                 })
             const moduleRef = await Test.createTestingModule({
                 providers: [
+                    {
+                        provide: Clock, useValue: new FakeClock() 
+                    },
                     OccurrenceService,
                     {
                         provide: getEntityManagerToken(POSTGRESQL_PRIMARY), useValue: entityManager 
@@ -183,6 +192,9 @@ describe("OccurrenceService (sds.recur.occurrence-lifecycle)",
                     })
                 const moduleRef = await Test.createTestingModule({
                     providers: [
+                        {
+                            provide: Clock, useValue: new FakeClock() 
+                        },
                         OccurrenceService,
                         {
                             provide: getEntityManagerToken(POSTGRESQL_PRIMARY), useValue: entityManager 
@@ -281,6 +293,9 @@ describe("OccurrenceService (sds.recur.occurrence-lifecycle)",
                         }
                         const moduleRef = await Test.createTestingModule({
                             providers: [
+                                {
+                                    provide: Clock, useValue: new FakeClock() 
+                                },
                                 OccurrenceService,
                                 {
                                     provide: getEntityManagerToken(POSTGRESQL_PRIMARY), useValue: entityManager 
@@ -314,6 +329,9 @@ describe("OccurrenceService (sds.recur.occurrence-lifecycle)",
                         const entityManager = createFakeRecurEntityManager()
                         const moduleRef = await Test.createTestingModule({
                             providers: [
+                                {
+                                    provide: Clock, useValue: new FakeClock() 
+                                },
                                 OccurrenceService,
                                 {
                                     provide: getEntityManagerToken(POSTGRESQL_PRIMARY), useValue: entityManager 

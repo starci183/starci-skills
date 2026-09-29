@@ -6,13 +6,13 @@ import type {
 } from "typeorm"
 import {
     InjectPrimaryEntityManager,
-} from "@modules/platform/databases/postgresql/primary/index"
+} from "@modules/platform/databases/index"
 import {
     OccurrenceEntity,
-} from "@modules/platform/databases/postgresql/primary/index"
+} from "@modules/platform/databases/index"
 import {
     TaskEntity,
-} from "@modules/platform/databases/postgresql/primary/index"
+} from "@modules/platform/databases/index"
 import {
     RecurOccurrenceForbiddenException,
 } from "./errors/occurrence-forbidden"
@@ -23,6 +23,12 @@ import {
 import {
     OccurrenceRecord, OccurrenceStatus 
 } from "./types/occurrence-record"
+import {
+    Clock
+} from "@modules/platform/clock/index"
+
+/** The most occurrences one rule keeps materialised at a time. */
+const MAX_OCCURRENCES_PER_RULE = 1_000
 
 /** Contract naming the materialise occurrence input shape domain/recur code and its consumers share; a second site never retypes it inline. */
 export interface MaterialiseOccurrenceInput {
@@ -43,7 +49,9 @@ export interface MaterialiseOccurrenceInput {
 @Injectable()
 /** Injectable service owning the occurrence logic the recur capability exposes; wired by the capability's own module. */
 export class OccurrenceService {
-    constructor(@InjectPrimaryEntityManager() private readonly entityManager: EntityManager) {}
+    constructor(@InjectPrimaryEntityManager() private readonly entityManager: EntityManager,
+        private readonly clock: Clock
+    ) {}
 
     /** br.recur.generation.once: a second call for a windowKey that already has a row changes nothing and
    * returns that same row untouched - the caller (GeneratorService) is expected to check
@@ -91,9 +99,11 @@ export class OccurrenceService {
     }
 
     async listByRule(ruleId: string): Promise<Array<OccurrenceRecord>> {
-        const rows = await this.entityManager.findBy(OccurrenceEntity,
+        const rows = await this.entityManager.find(OccurrenceEntity,
             {
-                ruleId 
+                where: {
+                    ruleId 
+                }, take: MAX_OCCURRENCES_PER_RULE 
             })
         const records = await Promise.all(rows.map(row => this.toRecord(row)))
         return records.sort((a, b) => (a.localDate < b.localDate ? -1 : a.localDate > b.localDate ? 1 : 0))
@@ -109,7 +119,7 @@ export class OccurrenceService {
             return this.toRecord(occurrenceRow)
         }
         taskRow.complete = true
-        taskRow.completedAt = new Date()
+        taskRow.completedAt = this.clock.now()
         await this.entityManager.save(TaskEntity,
             taskRow)
         occurrenceRow.status = "completed"
@@ -136,9 +146,11 @@ export class OccurrenceService {
    * `ruleId` dated on or after `endedAtLocalDate` that is still `materialised` becomes `orphaned`.
    * Already-completed or already-skipped occurrences are left exactly as they are; nothing is deleted. */
     async orphanEndedOccurrences(ruleId: string, endedAtLocalDate: string): Promise<number> {
-        const rows = await this.entityManager.findBy(OccurrenceEntity,
+        const rows = await this.entityManager.find(OccurrenceEntity,
             {
-                ruleId 
+                where: {
+                    ruleId 
+                }, take: MAX_OCCURRENCES_PER_RULE 
             })
         const toOrphan = rows.filter(row => row.status === "materialised" && row.localDate >= endedAtLocalDate)
         for (const row of toOrphan) {

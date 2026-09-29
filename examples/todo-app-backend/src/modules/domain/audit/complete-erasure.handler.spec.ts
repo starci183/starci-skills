@@ -6,7 +6,7 @@ import {
 } from "@nestjs/typeorm"
 import {
     POSTGRESQL_PRIMARY,
-} from "@modules/platform/databases/postgresql/primary/index"
+} from "@modules/platform/databases/index"
 import {
     createFakeAuditEntityManager 
 } from "./testing/fake-audit-entity-manager"
@@ -31,6 +31,12 @@ import {
 import {
     CompleteErasureHandler 
 } from "./complete-erasure.handler"
+import {
+    Clock 
+} from "@modules/platform/clock/index"
+import {
+    FakeClock 
+} from "@starci/jest-preset/clock"
 
 describe("CompleteErasureHandler",
     () => {
@@ -42,6 +48,9 @@ describe("CompleteErasureHandler",
         beforeEach(async () => {
             moduleRef = await Test.createTestingModule({
                 providers: [
+                    {
+                        provide: Clock, useValue: new FakeClock() 
+                    },
                     CompleteErasureHandler,
                     RequestErasureHandler,
                     AuditKeystoreService,

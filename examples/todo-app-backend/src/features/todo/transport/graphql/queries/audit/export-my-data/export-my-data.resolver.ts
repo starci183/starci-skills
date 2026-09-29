@@ -22,6 +22,9 @@ import {
 import {
     ExportedLineResponse 
 } from "./graphql-types/response"
+import {
+    TODO_MESSAGES 
+} from "../../../../../messages/index"
 
 /** fr.audit.export. Returns an empty list once a completed erasure has destroyed the caller's key. */
 @Resolver()
@@ -34,7 +37,7 @@ export class ExportMyDataResolver {
 
   @Query(() => [ExportedLineResponse],
       {
-          name: "exportMyData", description: "Every log line naming the caller, decrypted, or nothing once the caller's key has been erased." 
+          name: "exportMyData", description: TODO_MESSAGES.get("exportMyData.description") 
       })
     async exportMyData(@Context("req") req: GraphqlRequestLike): Promise<Array<ExportedLineResponse>> {
         const personId = await actorIdFromRequest(req,

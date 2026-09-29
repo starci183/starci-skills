@@ -6,7 +6,7 @@ import {
 } from "@nestjs/typeorm"
 import {
     POSTGRESQL_PRIMARY,
-} from "@modules/platform/databases/postgresql/primary/index"
+} from "@modules/platform/databases/index"
 import {
     TaskService,
 } from "@modules/domain/task/index"
@@ -28,6 +28,15 @@ import {
 import {
     createFakeShareEntityManager 
 } from "./testing/fake-share-entity-manager"
+import {
+    Clock 
+} from "@modules/platform/clock/index"
+import {
+    FakeClock 
+} from "@starci/jest-preset/clock"
+import {
+    OwnershipGuard 
+} from "@modules/domain/task/index"
 
 /**
  * contract.share.completion-guard-for-task's real proof: a real TaskService, wired to a real
@@ -48,6 +57,10 @@ describe("ShareCompletionAuthority (contract.share.completion-guard-for-task)",
         beforeEach(async () => {
             moduleRef = await Test.createTestingModule({
                 providers: [
+                    OwnershipGuard,
+                    {
+                        provide: Clock, useValue: new FakeClock() 
+                    },
                     TaskService,
                     CompletionAuthorityRegistry,
                     InvitationService,

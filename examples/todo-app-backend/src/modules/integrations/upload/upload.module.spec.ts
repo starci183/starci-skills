@@ -12,7 +12,7 @@ import {
 } from "@modules/platform/config/index"
 import {
     POSTGRESQL_PRIMARY,
-} from "@modules/platform/databases/postgresql/primary/index"
+} from "@modules/platform/databases/index"
 import {
     LocalStorageAdapter 
 } from "./local-storage.adapter"
@@ -28,12 +28,21 @@ import {
 import {
     UploadService 
 } from "./upload.service"
+import {
+    Clock 
+} from "@modules/platform/clock/index"
+import {
+    FakeClock 
+} from "@starci/jest-preset/clock"
 
 /** The globally-registered config + entity manager the register() graph resolves against in the real
  * app; stubs stand in for both here, the same seam integrations.modules.spec.ts stubs. */
 @Global()
 @Module({
     providers: [{
+        provide: Clock, useValue: new FakeClock()
+    },
+    {
         provide: AppConfigService, useValue: {
             getUploadStorageDir: () => "unused-in-this-spec" 
         } 
@@ -42,7 +51,8 @@ import {
         provide: getEntityManagerToken(POSTGRESQL_PRIMARY), useValue: {
         } 
     }],
-    exports: [AppConfigService,
+    exports: [Clock,
+        AppConfigService,
         getEntityManagerToken(POSTGRESQL_PRIMARY)],
 })
 class TestGlobalsModule {}

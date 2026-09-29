@@ -26,6 +26,9 @@ import {
 import {
     OccurrenceRecord 
 } from "./types/occurrence-record"
+import {
+    Clock
+} from "@modules/platform/clock/index"
 
 /** Contract naming the generation summary shape domain/recur code and its consumers share; a second site never retypes it inline. */
 export interface GenerationSummary {
@@ -53,9 +56,10 @@ export class GeneratorService {
     private readonly ruleService: RuleService,
     private readonly occurrenceService: OccurrenceService,
     private readonly commandBus: CommandBus,
+        private readonly clock: Clock
     ) {}
 
-    async runOnce(now: Date = new Date()): Promise<GenerationSummary> {
+    async runOnce(now: Date = this.clock.now()): Promise<GenerationSummary> {
         const rules = await this.ruleService.listActive()
         const materialised: Array<OccurrenceRecord> = []
         for (const rule of rules) {

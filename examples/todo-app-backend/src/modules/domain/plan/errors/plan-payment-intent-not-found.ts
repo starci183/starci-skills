@@ -1,12 +1,12 @@
 import {
-    AbstractException,
+    DomainError,
 } from "@modules/platform/errors/index"
 import type {
-    AbstractExceptionMetadata,
+    DomainErrorMetadata,
 } from "@modules/platform/errors/index"
 
 /** Metadata for a payment intent that cannot be resolved. */
-export interface PlanPaymentIntentNotFoundExceptionMetadata extends AbstractExceptionMetadata {
+export interface PlanPaymentIntentNotFoundExceptionMetadata extends DomainErrorMetadata {
   /** The payment intent id looked up (data.plan.payment-intent's own id, the idempotency key). */
   intentId?: string;
 }
@@ -16,13 +16,15 @@ export interface PlanPaymentIntentNotFoundExceptionMetadata extends AbstractExce
  * this product never created has nothing to apply against - refused rather than silently ignored, so a
  * stray or forged reference is visible instead of a false success.
  */
-export class PlanPaymentIntentNotFoundException extends AbstractException {
+export class PlanPaymentIntentNotFoundException extends DomainError {
     constructor({ intentId, ...metadata }: PlanPaymentIntentNotFoundExceptionMetadata = {
     }) {
-        super("The payment intent does not exist.",
-            "PLAN_PAYMENT_INTENT_NOT_FOUND_EXCEPTION",
+        super("PLAN_PAYMENT_INTENT_NOT_FOUND_EXCEPTION",
+            "The payment intent does not exist.",
             {
-                intentId, ...metadata 
+                metadata: {
+                    intentId, ...metadata 
+                } 
             })
     }
 }

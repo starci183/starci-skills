@@ -1,12 +1,12 @@
 import {
-    AbstractException,
+    DomainError,
 } from "@modules/platform/errors/index"
 import type {
-    AbstractExceptionMetadata,
+    DomainErrorMetadata,
 } from "@modules/platform/errors/index"
 
 /** Metadata attached to a ErasureNotConfirmedException throw so the refusal is queryable rather than only readable. */
-export interface ErasureNotConfirmedExceptionMetadata extends AbstractExceptionMetadata {
+export interface ErasureNotConfirmedExceptionMetadata extends DomainErrorMetadata {
   requestId?: string;
 }
 
@@ -16,14 +16,16 @@ export interface ErasureNotConfirmedExceptionMetadata extends AbstractExceptionM
  * the keystore delete did not take effect; the request stays in `executing`, not `complete` or `refused`,
  * so a retry of completeErasure can be attempted rather than the failure being buried as a false success.
  */
-export class ErasureNotConfirmedException extends AbstractException {
+export class ErasureNotConfirmedException extends DomainError {
     constructor({ requestId, ...metadata }: ErasureNotConfirmedExceptionMetadata = {
     }) {
-        super("The subject remains readable after key destruction; completion is refused.",
-            "ERASURE_NOT_CONFIRMED_EXCEPTION",
+        super("ERASURE_NOT_CONFIRMED_EXCEPTION",
+            "The subject remains readable after key destruction; completion is refused.",
             {
-                requestId,
-                ...metadata,
+                metadata: {
+                    requestId,
+                    ...metadata,
+                } 
             })
     }
 }

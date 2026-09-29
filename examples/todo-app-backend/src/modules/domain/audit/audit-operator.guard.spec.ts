@@ -2,6 +2,9 @@ import {
     ExecutionContext 
 } from "@nestjs/common"
 import {
+    mock
+} from "@starci/jest-preset/mock"
+import {
     Test, TestingModule 
 } from "@nestjs/testing"
 import {
@@ -9,7 +12,7 @@ import {
 } from "@nestjs/typeorm"
 import {
     POSTGRESQL_PRIMARY,
-} from "@modules/platform/databases/postgresql/primary/index"
+} from "@modules/platform/databases/index"
 import {
     AuditOperatorGuard 
 } from "./audit-operator.guard"
@@ -32,6 +35,12 @@ import {
 import {
     AuditLogService 
 } from "./audit-log.service"
+import {
+    Clock 
+} from "@modules/platform/clock/index"
+import {
+    FakeClock 
+} from "@starci/jest-preset/clock"
 
 /** gap.audit.operator-role (rev 2): the operator check is real and fail-closed - a missing or unknown
  * role claim is the refusal this gap names, never a fallback grant; operator/operator:* pass. */
@@ -62,14 +71,11 @@ describe("assertOperatorRead (gap.audit.operator-role)",
 
         it("carries a stable refusal code, per contract.login.identity-for-task's typed-refusal rule",
             () => {
-                try {
-                    assertOperatorRead({
-                        personId: "person-1" 
-                    })
-                    throw new Error("assertOperatorRead should have refused")
-                } catch (error) {
-                    expect((error as AuditOperatorRoleNotAuthorizedException).code).toBe("AUDIT_OPERATOR_ROLE_NOT_AUTHORIZED_EXCEPTION")
-                }
+                expect(() => assertOperatorRead({
+                    personId: "person-1"
+                })).toThrow(expect.objectContaining({
+                    code: "AUDIT_OPERATOR_ROLE_NOT_AUTHORIZED_EXCEPTION"
+                }))
             })
 
         it("asks and asserts the same one rule",
@@ -81,15 +87,8 @@ describe("assertOperatorRead (gap.audit.operator-role)",
                     const claims = {
                         personId: "x", role 
                     }
-                    const assertedThrows = (() => {
-                        try {
-                            assertOperatorRead(claims)
-                            return false
-                        } catch {
-                            return true
-                        }
-                    })()
-                    expect(isOperatorRead(claims)).toBe(!assertedThrows)
+                    if (isOperatorRead(claims)) expect(() => assertOperatorRead(claims)).not.toThrow()
+                    else expect(() => assertOperatorRead(claims)).toThrow()
                 }
             })
     })
@@ -112,15 +111,16 @@ describe("AuditOperatorGuard",
             await moduleRef.close()
         })
 
-        const contextFor = (actor?: unknown): ExecutionContext =>
-    ({
-        switchToHttp: () => ({
-            getRequest: () => (actor === undefined ? {
+        const contextFor = (actor?: unknown): ExecutionContext => {
+            const http = mock<ReturnType<ExecutionContext["switchToHttp"]>>()
+            http.getRequest.mockReturnValue(actor === undefined ? {
             } : {
-                actor 
-            }) 
-        }),
-    }) as unknown as ExecutionContext
+                actor
+            })
+            const context = mock<ExecutionContext>()
+            context.switchToHttp.mockReturnValue(http)
+            return context
+        }
 
         it("denies the session-only actor this example resolves today (SessionRecord carries no role)",
             () => {
@@ -203,6 +203,9 @@ describe("operator filter/summary pair (fr.audit.log.read)",
             async () => {
                 moduleRef = await Test.createTestingModule({
                     providers: [
+                        {
+                            provide: Clock, useValue: new FakeClock() 
+                        },
                         AuditKeystoreService,
                         AuditLogService,
                         {

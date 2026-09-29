@@ -12,7 +12,7 @@ import {
 } from "@modules/domain/task/index"
 import {
     POSTGRESQL_PRIMARY,
-} from "@modules/platform/databases/postgresql/primary/index"
+} from "@modules/platform/databases/index"
 import {
     createFakePlanEntityManager 
 } from "./testing/fake-plan-entity-manager"
@@ -25,6 +25,15 @@ import {
 import {
     PlanUsageHandler 
 } from "./plan-usage.handler"
+import {
+    Clock 
+} from "@modules/platform/clock/index"
+import {
+    FakeClock 
+} from "@starci/jest-preset/clock"
+import {
+    OwnershipGuard 
+} from "@modules/domain/task/index"
 
 describe("PlanUsageHandler (fr.plan.usage.view)",
     () => {
@@ -36,6 +45,10 @@ describe("PlanUsageHandler (fr.plan.usage.view)",
         beforeEach(async () => {
             moduleRef = await Test.createTestingModule({
                 providers: [
+                    OwnershipGuard,
+                    {
+                        provide: Clock, useValue: new FakeClock() 
+                    },
                     PlanUsageHandler,
                     TaskService,
                     CompletionAuthorityRegistry,

@@ -1,6 +1,9 @@
 import {
-    Injectable, Optional 
+    Injectable
 } from "@nestjs/common"
+import {
+    Clock,
+} from "@modules/platform/clock/index"
 import {
     sha256Hex,
 } from "@modules/platform/primitives/index"
@@ -9,10 +12,10 @@ import type {
 } from "typeorm"
 import {
     InjectPrimaryEntityManager,
-} from "@modules/platform/databases/postgresql/primary/index"
+} from "@modules/platform/databases/index"
 import {
     AuditLogLineEntity,
-} from "@modules/platform/databases/postgresql/primary/index"
+} from "@modules/platform/databases/index"
 import {
     AuditKeystoreService 
 } from "./audit-keystore.service"
@@ -23,11 +26,12 @@ import type {
     ResolvedAuditLine 
 } from "./types/resolved-audit-line"
 
-const GENESIS = "GENESIS"
+/** The most lines one whole-chain read (verify or resolve) loads: far beyond the 400-day retention volume of this example, so a truncated read means the log outgrew the design, not a normal day. */
+const MAX_CHAIN_LINES = 1_000_000
+/** The most lines one person's own-lines read loads. */
+const MAX_LINES_PER_PERSON = 10_000
 
-/** Injected so a test can advance time without a real 400-day wait (nfr.audit.retention's measurement). */
-export type Clock = () => Date;
-const systemClock: Clock = () => new Date()
+const GENESIS = "GENESIS"
 
 interface ChainBreak {
   index: number;
@@ -55,25 +59,17 @@ const hashContent = (prevHash: string, at: Date, action: string, target: string 
 @Injectable()
 /** Injectable service owning the audit log logic the audit capability exposes; wired by the capability's own module. */
 export class AuditLogService {
-    private readonly clock: Clock
-
     constructor(
-    @InjectPrimaryEntityManager() private readonly entityManager: EntityManager,
-    private readonly keystore: AuditKeystoreService,
-    @Optional() clock?: Clock,
-    ) {
-    // Nest's DI always passes a third argument once the constructor declares one (there is no
-    // provider for the bare `Clock` function type, so `@Optional()` resolves it to `undefined` rather
-    // than throwing) - a JS default parameter never gets the chance to apply in that case, unlike a
-    // plain `new AuditLogService(...)` call in a spec, so the fallback is applied explicitly here.
-        this.clock = clock ?? systemClock
-    }
+        @InjectPrimaryEntityManager() private readonly entityManager: EntityManager,
+        private readonly keystore: AuditKeystoreService,
+        private readonly clock: Clock,
+    ) {}
 
     /** fr.audit.log.append / sds.audit.log-chain's t-append. `actorPersonId` may be the real subject or
    * AuditKeystoreService.SYSTEM_ACTOR_ID for the two lines br.audit.erasure.logged requires. */
     async append(actorPersonId: string, action: string, target: string | null = null): Promise<AuditLogLineRecord> {
         const { keyId, key } = await this.keystore.getOrCreateKey(actorPersonId)
-        const at = this.clock()
+        const at = this.clock.now()
         const sealedActor = this.keystore.seal(key,
             actorPersonId)
         const prevHash = await this.lastHash()
@@ -125,7 +121,7 @@ export class AuditLogService {
             {
                 order: {
                     id: "ASC" 
-                } 
+                }, take: MAX_CHAIN_LINES 
             })
         let expectedPrev = GENESIS
         for (let index = 0; index < rows.length; index++) {
@@ -175,15 +171,15 @@ export class AuditLogService {
                 at: row.at, action: row.action, target: row.target, actor: null, tombstoned: true 
             }
         }
-        const actor = this.keystore.unseal(key,
+        const opened = this.keystore.unseal(key,
             row.actor)
-        if (actor === null) {
+        if (!opened.opened) {
             return {
                 at: row.at, action: row.action, target: row.target, actor: null, tombstoned: true 
             }
         }
         return {
-            at: row.at, action: row.action, target: row.target, actor, tombstoned: false 
+            at: row.at, action: row.action, target: row.target, actor: opened.plaintext, tombstoned: false 
         }
     }
 
@@ -198,7 +194,7 @@ export class AuditLogService {
             {
                 order: {
                     id: "ASC" 
-                } 
+                }, take: MAX_CHAIN_LINES 
             })
         return Promise.all(rows.map(row => this.readLine(row)))
     }
@@ -219,14 +215,14 @@ export class AuditLogService {
                     keyId 
                 }, order: {
                     id: "ASC" 
-                } 
+                }, take: MAX_LINES_PER_PERSON 
             })
         return Promise.all(rows.map(row => this.readLine(row)))
     }
 
     /** fr.audit.export: identical resolution to findLinesForPerson - once a completed erasure destroys the
    * subject's key, this and the own-lines read agree by construction, both finding no keyId to filter on. */
-    async exportForPerson(personId: string): Promise<Array<ResolvedAuditLine>> {
+    exportForPerson(personId: string): Promise<Array<ResolvedAuditLine>> {
         return this.findLinesForPerson(personId)
     }
 }

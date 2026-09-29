@@ -24,7 +24,7 @@ import {
 } from "@modules/platform/events/index"
 import {
     POSTGRESQL_PRIMARY,
-} from "@modules/platform/databases/postgresql/primary/index"
+} from "@modules/platform/databases/index"
 import {
     createFakePlanEntityManager 
 } from "./testing/fake-plan-entity-manager"
@@ -34,6 +34,15 @@ import {
 import {
     PlanCapGuardPolicy 
 } from "./cap-guard.policy"
+import {
+    Clock 
+} from "@modules/platform/clock/index"
+import {
+    FakeClock 
+} from "@starci/jest-preset/clock"
+import {
+    OwnershipGuard 
+} from "@modules/domain/task/index"
 
 /**
  * contract.plan.create-precondition: proves both halves of the contract together, without editing a
@@ -51,6 +60,10 @@ describe("contract.plan.create-precondition",
         const build = async () => {
             const moduleRef = await Test.createTestingModule({
                 providers: [
+                    OwnershipGuard,
+                    {
+                        provide: Clock, useValue: new FakeClock() 
+                    },
                     CreateTaskHandler,
                     TaskService,
                     CompletionAuthorityRegistry,

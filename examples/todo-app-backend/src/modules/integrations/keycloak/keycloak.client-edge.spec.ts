@@ -7,6 +7,9 @@ import {
 import {
     KeycloakClient 
 } from "./keycloak.client"
+import {
+    mock 
+} from "@starci/jest-preset/mock"
 
 /** Edge cases for keycloak.client.ts beyond the main spec's coverage: malformed bodies and the
  * boundary shapes of the access-token payload this client decodes. */
@@ -45,13 +48,13 @@ describe("KeycloakClient.signIn edge cases",
                 // response.json() is not wrapped: the negative path is a rejection either way, pinned here so a
                 // future fix that maps it to the domain exception still satisfies this spec.
                 jest.spyOn(global,
-                    "fetch").mockResolvedValue({
+                    "fetch").mockResolvedValue(mock<Response>({
                         ok: true,
                         status: 200,
                         json: async () => {
                             throw new SyntaxError("Unexpected token < in JSON")
                         },
-                    } as unknown as Response)
+                    }))
                 const client = await boot()
                 await expect(client.signIn("person@example.com",
                     "s3cret")).rejects.toThrow()
@@ -60,7 +63,7 @@ describe("KeycloakClient.signIn edge cases",
         it("refuses an access token whose subject is empty",
             async () => {
                 jest.spyOn(global,
-                    "fetch").mockResolvedValue({
+                    "fetch").mockResolvedValue(mock<Response>({
                         ok: true,
                         status: 200,
                         json: async () => ({
@@ -68,7 +71,7 @@ describe("KeycloakClient.signIn edge cases",
                                 sub: "" 
                             }) 
                         }),
-                    } as unknown as Response)
+                    }))
                 const client = await boot()
                 await expect(client.signIn("person@example.com",
                     "s3cret")).rejects.toThrow(
@@ -83,13 +86,13 @@ describe("KeycloakClient.signIn edge cases",
                 // 'null' parses cleanly - the refusal must come from the missing-subject check, not a parse error.
                 const access_token = `e30.${Buffer.from("null").toString("base64url")}.sig`
                 jest.spyOn(global,
-                    "fetch").mockResolvedValue({
+                    "fetch").mockResolvedValue(mock<Response>({
                         ok: true,
                         status: 200,
                         json: async () => ({
                             access_token 
                         }),
-                    } as unknown as Response)
+                    }))
                 const client = await boot()
                 await expect(client.signIn("person@example.com",
                     "s3cret")).rejects.toThrow(
@@ -103,13 +106,13 @@ describe("KeycloakClient.signIn edge cases",
             async () => {
                 const access_token = `e30.${Buffer.from("[\"person-1\"]").toString("base64url")}.sig`
                 jest.spyOn(global,
-                    "fetch").mockResolvedValue({
+                    "fetch").mockResolvedValue(mock<Response>({
                         ok: true,
                         status: 200,
                         json: async () => ({
                             access_token 
                         }),
-                    } as unknown as Response)
+                    }))
                 const client = await boot()
                 await expect(client.signIn("person@example.com",
                     "s3cret")).rejects.toThrow(

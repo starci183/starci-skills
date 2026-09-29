@@ -2,6 +2,9 @@ import {
     DynamicModule, Module 
 } from "@nestjs/common"
 import {
+    AppConfigService,
+} from "@modules/platform/config/index"
+import {
     CqrsModule 
 } from "@nestjs/cqrs"
 import {
@@ -23,7 +26,7 @@ import {
     AuditOperatorGuard 
 } from "./audit-operator.guard"
 import {
-    AuditOperatorService 
+    AUDIT_OPERATOR_SUBJECTS, AuditOperatorService
 } from "./audit-operator.service"
 import {
     AppendLogLineHandler 
@@ -78,6 +81,11 @@ export class AuditModule extends ConfigurableModuleClass {
                 AuditEventSubscriber,
                 AuditOperatorGuard,
                 AuditOperatorService,
+                {
+                    provide: AUDIT_OPERATOR_SUBJECTS,
+                    inject: [AppConfigService],
+                    useFactory: (config: AppConfigService): ReadonlyArray<string> => config.getAuditOperatorSubjects(),
+                },
             ],
             exports: [AuditLogService,
                 AuditErasureService,

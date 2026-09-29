@@ -1,15 +1,18 @@
 import {
     Injectable 
 } from "@nestjs/common"
+import {
+    In
+} from "typeorm"
 import type {
     EntityManager 
 } from "typeorm"
 import {
     InjectPrimaryEntityManager,
-} from "@modules/platform/databases/postgresql/primary/index"
+} from "@modules/platform/databases/index"
 import {
     NotifyDeliveryAttemptEntity,
-} from "@modules/platform/databases/postgresql/primary/index"
+} from "@modules/platform/databases/index"
 import {
     NotifySmtpMessageParams,
     NotifySmtpPort,
@@ -103,14 +106,16 @@ export class DeliveryService {
    * failed, so a batch that included an already-suppressed member is a no-op for that member.
    */
     async dispatchBatch(notificationIds: Array<string>, now: Date, message: NotifySmtpMessageParams): Promise<DispatchBatchResult> {
-        const rows: Array<NotifyDeliveryAttemptEntity> = []
-        for (const notificationId of notificationIds) {
-            const row = await this.entityManager.findOneBy(NotifyDeliveryAttemptEntity,
+        const found = notificationIds.length === 0
+            ? []
+            : await this.entityManager.find(NotifyDeliveryAttemptEntity,
                 {
-                    notificationId 
+                    where: {
+                        notificationId: In(notificationIds)
+                    },
+                    take: notificationIds.length,
                 })
-            if (row && row.state === "queued") rows.push(row)
-        }
+        const rows = notificationIds.flatMap(notificationId => found.filter(row => row.notificationId === notificationId && row.state === "queued"))
         if (rows.length === 0) {
             return {
                 delivered: [], retried: [], bounced: [] 

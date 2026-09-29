@@ -25,6 +25,9 @@ import {
 import {
     EditRecurrenceResponse 
 } from "./graphql-types/response"
+import {
+    TODO_MESSAGES 
+} from "../../../../../messages/index"
 
 @Resolver()
 /** The fr.recur.edit door: rewrites a rule's cadence/time for future occurrences while already-materialised history stays byte-identical. */
@@ -37,7 +40,7 @@ export class EditRecurrenceResolver {
   @Mutation(() => EditRecurrenceResponse,
       {
           name: "editRecurrence",
-          description: "fr.recur.edit-rule: change a rule the caller owns. Only the caller may edit their own rule.",
+          description: TODO_MESSAGES.get("editRecurrence.description"),
       })
     async editRecurrence(
     @Context("req") req: GraphqlRequestLike,

@@ -6,13 +6,13 @@ import {
 } from "@nestjs/typeorm"
 import {
     POSTGRESQL_PRIMARY,
-} from "@modules/platform/databases/postgresql/primary/index"
+} from "@modules/platform/databases/index"
 import {
     TaskEntity,
-} from "@modules/platform/databases/postgresql/primary/index"
+} from "@modules/platform/databases/index"
 import {
     createFakeEntityManager,
-} from "@modules/platform/databases/postgresql/primary/index"
+} from "@modules/platform/databases/index"
 import {
     CompletionAuthorityRegistry 
 } from "./completion-authority.providers"
@@ -25,6 +25,15 @@ import {
 import {
     ReopenTaskHandler 
 } from "./reopen-task.handler"
+import {
+    Clock 
+} from "@modules/platform/clock/index"
+import {
+    FakeClock 
+} from "@starci/jest-preset/clock"
+import {
+    OwnershipGuard 
+} from "./ownership.guard"
 
 describe("ReopenTaskHandler",
     () => {
@@ -35,6 +44,10 @@ describe("ReopenTaskHandler",
         beforeEach(async () => {
             moduleRef = await Test.createTestingModule({
                 providers: [
+                    OwnershipGuard,
+                    {
+                        provide: Clock, useValue: new FakeClock() 
+                    },
                     ReopenTaskHandler,
                     TaskService,
                     CompletionAuthorityRegistry,

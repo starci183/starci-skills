@@ -25,6 +25,9 @@ import {
 import {
     CompleteTaskRequest
 } from "./graphql-types/request"
+import {
+    TODO_MESSAGES 
+} from "../../../../../messages/index"
 
 @Resolver()
 /** The fr.task.complete door: marks the caller's task complete and stamps its completed timestamp. */
@@ -36,7 +39,7 @@ export class CompleteTaskResolver {
 
   @Mutation(() => CompleteTaskResponse,
       {
-          name: "completeTask", description: "Mark a task complete." 
+          name: "completeTask", description: TODO_MESSAGES.get("completeTask.description") 
       })
     async completeTask(
     @Context("req") req: GraphqlRequestLike,

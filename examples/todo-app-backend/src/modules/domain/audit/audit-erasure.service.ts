@@ -9,10 +9,10 @@ import type {
 } from "typeorm"
 import {
     InjectPrimaryEntityManager,
-} from "@modules/platform/databases/postgresql/primary/index"
+} from "@modules/platform/databases/index"
 import {
     AuditErasureRequestEntity,
-} from "@modules/platform/databases/postgresql/primary/index"
+} from "@modules/platform/databases/index"
 import {
     ErasureNotConfirmedException,
 } from "./errors/erasure-not-confirmed"
@@ -35,6 +35,9 @@ import {
 import {
     AuditErasureRequestRecord 
 } from "./types/audit-erasure-request-record"
+import {
+    Clock
+} from "@modules/platform/clock/index"
 
 const ACTION_ERASURE_REQUESTED = "audit.erasure.requested"
 const ACTION_ERASURE_COMPLETED = "audit.erasure.completed"
@@ -61,6 +64,7 @@ export class AuditErasureService {
     @InjectPrimaryEntityManager() private readonly entityManager: EntityManager,
     private readonly logService: AuditLogService,
     private readonly keystore: AuditKeystoreService,
+        private readonly clock: Clock
     ) {}
 
     /** fr.audit.erasure.request: tRequest then tVerify, chained because the caller is always the subject. */
@@ -77,7 +81,7 @@ export class AuditErasureService {
    * first round). requestErasure always chains request+confirm, so a second confirm of the same
    * pending request hits t-refuse, never a repeat of t-verify.
    */
-    async confirm(requestId: string, callerId: string): Promise<AuditErasureRequestRecord> {
+    confirm(requestId: string, callerId: string): Promise<AuditErasureRequestRecord> {
         return this.tVerify(requestId,
             callerId)
     }
@@ -110,7 +114,7 @@ export class AuditErasureService {
    * together, directly in `requested` - there is no prior state to transition from. */
     private async tRequest(personId: string): Promise<AuditErasureRequestRecord> {
         const requestId = randomUUID()
-        const requestedAt = new Date()
+        const requestedAt = this.clock.now()
         const saved = await this.entityManager.save(AuditErasureRequestEntity,
             {
                 requestId,
@@ -141,7 +145,7 @@ export class AuditErasureService {
             throw new ErasureRequestForbiddenException({
             })
         }
-        row.verifiedAt = new Date()
+        row.verifiedAt = this.clock.now()
         row.state = "verified"
         const saved = await this.entityManager.save(AuditErasureRequestEntity,
             row)
@@ -150,7 +154,7 @@ export class AuditErasureService {
 
     /** t-refuse: nothing about the subject's keys is touched. */
     private async tRefuse(row: AuditErasureRequestEntity): Promise<AuditErasureRequestRecord> {
-        row.refusedAt = new Date()
+        row.refusedAt = this.clock.now()
         row.state = "refused"
         const saved = await this.entityManager.save(AuditErasureRequestEntity,
             row)
@@ -160,7 +164,7 @@ export class AuditErasureService {
     /** t-execute: destroys the subject's key and the keystore's personId-to-keyId mapping. No log line is
    * read, rewritten or deleted. */
     private async tExecute(row: AuditErasureRequestEntity): Promise<void> {
-        row.executingAt = new Date()
+        row.executingAt = this.clock.now()
         row.state = "executing"
         await this.entityManager.save(AuditErasureRequestEntity,
             row)
@@ -171,7 +175,7 @@ export class AuditErasureService {
    * data.audit.erasure-request invariant that keeps this table from becoming a second permanent record
    * of who the subject was. */
     private async tComplete(row: AuditErasureRequestEntity): Promise<AuditErasureRequestRecord> {
-        row.completedAt = new Date()
+        row.completedAt = this.clock.now()
         row.state = "complete"
         row.personId = null
         const saved = await this.entityManager.save(AuditErasureRequestEntity,

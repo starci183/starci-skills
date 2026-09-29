@@ -6,7 +6,7 @@
  * `id`, matching every entity in this schema. Only the methods a capability service actually calls
  * (`findOneBy`, `findBy`, `save`, `delete`) are implemented, each shaped like the real `EntityManager`
  * method it replaces. Not a real TypeORM `EntityManager`, so it is cast through `unknown` at the
- * injection site, matching `platform/databases/postgresql/primary/testing/fake-entity-manager.ts`'s own
+ * injection site, matching `platform/databases/testing/fake-entity-manager.ts`'s own
  * convention for the same reason.
  */
 export const createFakeRecurEntityManager = () => {
@@ -23,28 +23,37 @@ export const createFakeRecurEntityManager = () => {
     }
 
     return {
-        async findOneBy(target: unknown, where: Record<string, unknown>): Promise<Record<string, unknown> | null> {
+        findOneBy(target: unknown, where: Record<string, unknown>): Promise<Record<string, unknown> | null> {
             const table = tableFor(target)
             if (typeof where.id === "string" && Object.keys(where).length === 1) {
-                return table.get(where.id) ?? null
+                return Promise.resolve(table.get(where.id) ?? null)
             }
             for (const row of table.values()) {
                 if (matches(row,
-                    where)) return row
+                    where)) return Promise.resolve(row)
             }
-            return null
+            return Promise.resolve(null)
         },
-        async findBy(target: unknown, where: Record<string, unknown>): Promise<Array<Record<string, unknown>>> {
-            return [...tableFor(target).values()].filter(row => matches(row,
-                where))
+        findBy(target: unknown, where: Record<string, unknown>): Promise<Array<Record<string, unknown>>> {
+            return Promise.resolve([...tableFor(target).values()].filter(row => matches(row,
+                where)))
         },
-        async save(target: unknown, entityLike: Record<string, unknown>): Promise<Record<string, unknown>> {
+        find(target: unknown, options: { where?: Record<string, unknown>; take?: number } = {
+        }): Promise<Array<Record<string, unknown>>> {
+            const found = [...tableFor(target).values()].filter(row => matches(row,
+                options.where ?? {
+                }))
+            return Promise.resolve(options.take === undefined ? found : found.slice(0,
+                options.take))
+        },
+        save(target: unknown, entityLike: Record<string, unknown>): Promise<Record<string, unknown>> {
             tableFor(target).set(entityLike.id as string,
                 entityLike)
-            return entityLike
+            return Promise.resolve(entityLike)
         },
-        async delete(target: unknown, criteria: string): Promise<void> {
+        delete(target: unknown, criteria: string): Promise<void> {
             tableFor(target).delete(criteria)
+            return Promise.resolve()
         },
     }
 }

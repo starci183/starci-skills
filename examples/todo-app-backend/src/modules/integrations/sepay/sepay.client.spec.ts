@@ -7,11 +7,14 @@ import {
 import {
     SepayClient 
 } from "./sepay.client"
+import {
+    mock 
+} from "@starci/jest-preset/mock"
 
 function gatewayResponse(status: number, body: string): Response {
-    return {
+    return mock<Response>({
         ok: status >= 200 && status < 300, status, text: async () => body 
-    } as unknown as Response
+    })
 }
 
 const modules: Array<TestingModule> = []

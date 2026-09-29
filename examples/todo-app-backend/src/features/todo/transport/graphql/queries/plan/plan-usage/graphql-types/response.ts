@@ -1,6 +1,9 @@
 import {
     Field, Int, ObjectType 
 } from "@nestjs/graphql"
+import {
+    TODO_MESSAGES 
+} from "../../../../../../messages/index"
 
 @ObjectType()
 /** The caller's plan snapshot: plan name, active-task cap (null on paid), current activeCount. */
@@ -10,7 +13,7 @@ export class PlanUsageResponse {
 
   @Field(() => Int,
       {
-          nullable: true, description: "null on the paid plan: no cap." 
+          nullable: true, description: TODO_MESSAGES.get("planUsage.response.cap") 
       })
       cap!: number | null
 

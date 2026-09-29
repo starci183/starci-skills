@@ -15,13 +15,13 @@ import {
 } from "./upload.config"
 import {
     InjectPrimaryEntityManager,
-} from "@modules/platform/databases/postgresql/primary/index"
+} from "@modules/platform/databases/index"
 import {
     TaskEntity,
-} from "@modules/platform/databases/postgresql/primary/index"
+} from "@modules/platform/databases/index"
 import {
     UploadEntity,
-} from "@modules/platform/databases/postgresql/primary/index"
+} from "@modules/platform/databases/index"
 import {
     TaskForbiddenException,
 } from "@modules/domain/task/index"
@@ -52,6 +52,12 @@ import {
 import {
     signUploadToken, UPLOAD_TOKEN_HEADER, verifyUploadToken 
 } from "./upload-token"
+import {
+    Clock
+} from "@modules/platform/clock/index"
+
+/** The most uploads one task lists. */
+const MAX_UPLOADS_PER_TASK = 500
 
 type UploadContentToken = string | undefined
 
@@ -83,6 +89,7 @@ export class UploadService {
     private readonly storage: UploadStoragePort,
     private readonly scanner: VirusScanPort,
     private readonly config: AppConfigService,
+        private readonly clock: Clock
     ) {}
 
     /** Opens an upload intent: validates the declared shape, writes the pending row and returns the
@@ -100,12 +107,12 @@ export class UploadService {
                 sizeBytes,
                 storageKey: "",
                 status: "pending",
-                createdAt: new Date(),
+                createdAt: this.clock.now(),
             })
         row.storageKey = storageKeyOf(row.id)
         await this.entityManager.save(UploadEntity,
             row)
-        const expiresAt = new Date(Date.now() + uploadConfig(this.config).presignTtlMs)
+        const expiresAt = new Date(this.clock.now().getTime() + uploadConfig(this.config).presignTtlMs)
         return {
             uploadId: row.id,
             method: "PUT",
@@ -128,7 +135,7 @@ export class UploadService {
         const verdict = verifyUploadToken(uploadId,
             token,
             uploadConfig(this.config).signingSecret,
-            Date.now())
+            this.clock.now().getTime())
         if (verdict !== "ok") {
             throw new UploadTokenInvalidException({
                 uploadId, reason: verdict 
@@ -165,7 +172,7 @@ export class UploadService {
                 sizeBytes: content.length,
                 storageKey: "",
                 status: "pending",
-                createdAt: new Date(),
+                createdAt: this.clock.now(),
             })
         row.storageKey = storageKeyOf(row.id)
         await this.storeAndScan(row,
@@ -225,9 +232,11 @@ export class UploadService {
                 taskId, actorId 
             })
         }
-        const rows = await this.entityManager.findBy(UploadEntity,
+        const rows = await this.entityManager.find(UploadEntity,
             {
-                taskId 
+                where: {
+                    taskId 
+                }, take: MAX_UPLOADS_PER_TASK 
             })
         return rows.filter(row => row.owner === actorId).map(toRecord)
     }
@@ -321,11 +330,30 @@ export class UploadService {
             await this.scanner.scan(row.storageKey,
                 content)
         } catch (error) {
-            await this.storage.delete(row.storageKey).catch(() => undefined)
+            await this.discardStored(row.storageKey)
             throw error
         }
     }
+
+    /** Best-effort removal of refused bytes: a failure to clean up never masks the refusal, so it comes back as an outcome carrying the cause. */
+    private async discardStored(storageKey: string): Promise<DiscardOutcome> {
+        try {
+            await this.storage.delete(storageKey)
+            return {
+                discarded: true
+            }
+        } catch (error) {
+            return {
+                discarded: false, cause: error
+            }
+        }
+    }
 }
+
+/** What a best-effort discard of stored bytes reports. */
+type DiscardOutcome =
+    | { readonly discarded: true }
+    | { readonly discarded: false; readonly cause: unknown }
 
 /** The one place a storage key is minted - from the upload id only, so nothing client-controlled ever
  * reaches the adapter's path handling. */

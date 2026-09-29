@@ -1,24 +1,26 @@
 import {
-    AbstractException,
+    DomainError,
 } from "@modules/platform/errors/index"
 import type {
-    AbstractExceptionMetadata,
+    DomainErrorMetadata,
 } from "@modules/platform/errors/index"
 
 /** Metadata for an invitation that cannot be resolved. */
-export interface ShareInvitationNotFoundExceptionMetadata extends AbstractExceptionMetadata {
+export interface ShareInvitationNotFoundExceptionMetadata extends DomainErrorMetadata {
   /** The invitation id looked up. */
   invitationId?: string;
 }
 
 /** House refusal carrying code SHARE_INVITATION_NOT_FOUND_EXCEPTION; every throw site attaches a metadata object naming the concrete ids the share invitation not found refusal turned on. */
-export class ShareInvitationNotFoundException extends AbstractException {
+export class ShareInvitationNotFoundException extends DomainError {
     constructor({ invitationId, ...metadata }: ShareInvitationNotFoundExceptionMetadata = {
     }) {
-        super("The invitation does not exist.",
-            "SHARE_INVITATION_NOT_FOUND_EXCEPTION",
+        super("SHARE_INVITATION_NOT_FOUND_EXCEPTION",
+            "The invitation does not exist.",
             {
-                invitationId, ...metadata 
+                metadata: {
+                    invitationId, ...metadata 
+                } 
             })
     }
 }

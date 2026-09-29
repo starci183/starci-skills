@@ -22,6 +22,9 @@ import {
 import {
     TaskSummaryResponse 
 } from "./graphql-types/response"
+import {
+    TODO_MESSAGES 
+} from "../../../../../messages/index"
 
 /** br.task.list.owned's GraphQL query. Dispatches onto the QueryBus, matching nivo's own split of
  * writes (CommandBus) and reads (QueryBus) once a scenario is expressed as CQRS. */
@@ -35,7 +38,7 @@ export class ListTasksResolver {
 
   @Query(() => [TaskSummaryResponse],
       {
-          name: "tasks", description: "List the tasks owned by the caller." 
+          name: "tasks", description: TODO_MESSAGES.get("listTasks.description") 
       })
     async tasks(@Context("req") req: GraphqlRequestLike): Promise<Array<TaskSummaryResponse>> {
         const ownerId = await actorIdFromRequest(req,

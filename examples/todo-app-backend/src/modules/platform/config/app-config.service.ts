@@ -2,6 +2,9 @@ import {
     Injectable 
 } from "@nestjs/common"
 import {
+    ConfigError
+} from "./errors/config.error"
+import {
     readFileSync 
 } from "node:fs"
 import {
@@ -12,16 +15,12 @@ import {
 } from "node:path"
 
 const DEFAULT_SESSION_TTL_DAYS = 30
-const DEFAULT_KEYCLOAK_TOKEN_URL = "http://localhost:8089/realms/todo/protocol/openid-connect/token"
 const DEFAULT_KEYCLOAK_CLIENT_ID = "todo-api"
-const DEFAULT_DATABASE_URL = "postgres://postgres:postgres@localhost:5432/todo"
 const DEFAULT_CORS_ORIGIN = "http://localhost:3000"
 const DEFAULT_RECUR_TICK_CRON = "*/5 * * * *"
 const DEFAULT_SMTP_HOST = "localhost"
 const DEFAULT_SMTP_PORT = 1025
 const DEFAULT_SMTP_FROM = "notify@todo.dev"
-const DEFAULT_REDIS_URL = "redis://localhost:6379"
-const DEFAULT_SEPAY_BASE_URL = "https://my.sepay.vn"
 /** integration.upload.local's content ceiling: 10 MiB per object, the same class of bound nivo sets on
  * attachment intake - large enough for task attachments, small enough that a direct upload stays a
  * memory-bounded buffer and a presigned PUT never parks a giant object on the volume. */
@@ -30,10 +29,6 @@ const DEFAULT_UPLOAD_ALLOWED_MIMES = ["text/plain",
     "application/pdf",
     "image/png",
     "image/jpeg"]
-/** integration.upload.local: the signing material behind presigned PUT tokens. DEMO-ONLY fallback - a
- * real deployment names a decrypted file through UPLOAD_SIGNING_SECRET_FILE, same *_FILE convention as
- * the SePay credentials. */
-const DEFAULT_UPLOAD_SIGNING_SECRET = "todo-upload-demo-signing-secret"
 /** integration.upload.local: how long a presigned PUT token stays valid - short-lived on purpose, the
  * same 5-minute window a provider presign would carry. */
 const DEFAULT_UPLOAD_PRESIGN_TTL_MS = 5 * 60 * 1000
@@ -50,7 +45,7 @@ export class AppConfigService {
     }
 
     getKeycloakTokenUrl(): string {
-        return process.env.KEYCLOAK_TOKEN_URL ?? DEFAULT_KEYCLOAK_TOKEN_URL
+        return this.required("KEYCLOAK_TOKEN_URL")
     }
 
     getKeycloakClientId(): string {
@@ -58,7 +53,7 @@ export class AppConfigService {
     }
 
     getDatabaseUrl(): string {
-        return process.env.DATABASE_URL ?? DEFAULT_DATABASE_URL
+        return this.required("DATABASE_URL")
     }
 
     getCorsOrigin(): string {
@@ -95,11 +90,11 @@ export class AppConfigService {
 
     /** integration.notify.queue: the dev stack's own Redis (component `redis`, port 6379). */
     getRedisUrl(): string {
-        return process.env.REDIS_URL ?? DEFAULT_REDIS_URL
+        return this.required("REDIS_URL")
     }
 
     getSepayBaseUrl(): string {
-        return process.env.SEPAY_BASE_URL ?? DEFAULT_SEPAY_BASE_URL
+        return this.required("SEPAY_BASE_URL")
     }
 
     /** integration.upload.local: where the local storage adapter writes objects. Defaults to an
@@ -122,10 +117,14 @@ export class AppConfigService {
         return raw ? raw.split(",").map(mime => mime.trim()).filter(Boolean) : [...DEFAULT_UPLOAD_ALLOWED_MIMES]
     }
 
-    /** Signing material for presigned PUT tokens; DEMO-ONLY literal fallback so the dev/e2e stacks run
-   * without a decrypted file, exactly the graceful-empty shape getSepayApiKey documents. */
+    /** Signing material for presigned PUT tokens: the decrypted file UPLOAD_SIGNING_SECRET_FILE names, same
+   * *_FILE convention as the SePay credentials. There is no fallback secret: without the file, presigning stops
+   * with an error naming the key. */
     getUploadSigningSecret(): string {
-        return this.readSecretFile(process.env.UPLOAD_SIGNING_SECRET_FILE) || DEFAULT_UPLOAD_SIGNING_SECRET
+        const secret = this.readSecretFile("UPLOAD_SIGNING_SECRET_FILE")
+        if (!secret) throw new ConfigError("CONFIG_KEY_MISSING",
+            "UPLOAD_SIGNING_SECRET_FILE")
+        return secret
     }
 
     getUploadPresignTtlMs(): number {
@@ -134,15 +133,16 @@ export class AppConfigService {
     }
 
     /** integration.plan.sepay's credential: SEPAY_API_KEY_FILE names a decrypted file path (see
-   * scripts/with-dev-secrets.mjs), never an inline value. Empty when unset/unreachable, rather than
-   * throwing at construction time, so the app still boots without SePay and the live path fails at the
-   * call site instead - exactly the shape gap.plan.sepay-not-reachable stays open against. */
+   * scripts/with-dev-secrets.mjs), never an inline value. Empty when unset, so the app still
+   * boots without SePay and the live path fails at the call site instead - exactly the shape
+   * gap.plan.sepay-not-reachable stays open against; a set variable whose file cannot be read stops with an
+   * error naming it. */
     getSepayApiKey(): string {
-        return this.readSecretFile(process.env.SEPAY_API_KEY_FILE)
+        return this.readSecretFile("SEPAY_API_KEY_FILE")
     }
 
     getSepayWebhookSecret(): string {
-        return this.readSecretFile(process.env.SEPAY_WEBHOOK_SECRET_FILE)
+        return this.readSecretFile("SEPAY_WEBHOOK_SECRET_FILE")
     }
 
     getPaidPlanPriceMinorUnits(): number {
@@ -150,17 +150,37 @@ export class AppConfigService {
         return raw ? Number(raw) : PAID_PLAN_PRICE_MINOR_UNITS
     }
 
+    /** The deployment's operator roster (`AUDIT_OPERATOR_SUBJECTS`, comma separated, trimmed, blanks dropped); empty - so no operators, own-lines only - when the variable is unset. */
+    getAuditOperatorSubjects(): ReadonlyArray<string> {
+        return (process.env.AUDIT_OPERATOR_SUBJECTS ?? "")
+            .split(",")
+            .map(subject => subject.trim())
+            .filter(Boolean)
+    }
+
     getPaidPlanCurrency(): string {
         return process.env.PLAN_PAID_CURRENCY ?? PAID_PLAN_CURRENCY
     }
 
-    private readSecretFile(filePath: string | undefined): string {
+    /** The value of a required environment key; an unset or empty key stops with an error that names it. */
+    private required(key: string): string {
+        const value = process.env[key]
+        if (!value) throw new ConfigError("CONFIG_KEY_MISSING",
+            key)
+        return value
+    }
+
+    /** The trimmed content of a *_FILE secret: empty when the variable is unset, an error naming the variable when the file cannot be read. */
+    private readSecretFile(key: string): string {
+        const filePath = process.env[key]
         if (!filePath) return ""
         try {
             return readFileSync(filePath,
                 "utf8").trim()
-        } catch {
-            return ""
+        } catch (error) {
+            throw new ConfigError("CONFIG_FILE_UNREADABLE",
+                key,
+                error)
         }
     }
 }

@@ -10,6 +10,9 @@ import {
 import {
     ConfigModule 
 } from "./config.module"
+import {
+    ConfigError
+} from "./errors/config.error"
 
 jest.mock("node:fs",
     () => {
@@ -34,6 +37,8 @@ const ENV_KEYS = [
     "SEPAY_BASE_URL",
     "SEPAY_API_KEY_FILE",
     "SEPAY_WEBHOOK_SECRET_FILE",
+    "UPLOAD_SIGNING_SECRET_FILE",
+    "AUDIT_OPERATOR_SUBJECTS",
     "PLAN_PAID_PRICE_MINOR_UNITS",
     "PLAN_PAID_CURRENCY",
 ] as const
@@ -66,24 +71,35 @@ describe("AppConfigService",
             }
         })
 
-        it("returns the declared defaults when no environment variable is set",
+        it("returns the declared defaults for the optional settings when no environment variable is set",
             () => {
                 expect(service.getSessionTtlDays()).toBe(30)
-                expect(service.getKeycloakTokenUrl()).toBe(
-                    "http://localhost:8089/realms/todo/protocol/openid-connect/token",
-                )
                 expect(service.getKeycloakClientId()).toBe("todo-api")
-                expect(service.getDatabaseUrl()).toBe("postgres://postgres:postgres@localhost:5432/todo")
                 expect(service.getCorsOrigin()).toBe("http://localhost:3000")
                 expect(service.getPort()).toBe(3001)
                 expect(service.getRecurTickCron()).toBe("*/5 * * * *")
                 expect(service.getSmtpHost()).toBe("localhost")
                 expect(service.getSmtpPort()).toBe(1025)
                 expect(service.getSmtpFromAddress()).toBe("notify@todo.dev")
-                expect(service.getRedisUrl()).toBe("redis://localhost:6379")
-                expect(service.getSepayBaseUrl()).toBe("https://my.sepay.vn")
                 expect(service.getPaidPlanPriceMinorUnits()).toBe(99000)
                 expect(service.getPaidPlanCurrency()).toBe("VND")
+            })
+
+        it.each([
+            ["KEYCLOAK_TOKEN_URL",
+                () => service.getKeycloakTokenUrl()],
+            ["DATABASE_URL",
+                () => service.getDatabaseUrl()],
+            ["REDIS_URL",
+                () => service.getRedisUrl()],
+            ["SEPAY_BASE_URL",
+                () => service.getSepayBaseUrl()],
+        ])("stops with an error naming %s when it is unset or empty: infrastructure URLs have no default",
+            (key, read) => {
+                expect(read).toThrow(ConfigError)
+                expect(read).toThrow(key)
+                process.env[key] = ""
+                expect(read).toThrow(key)
             })
 
         it("reads string settings from the environment verbatim",
@@ -109,6 +125,16 @@ describe("AppConfigService",
                 expect(service.getRedisUrl()).toBe("redis://cache.internal:6380")
                 expect(service.getSepayBaseUrl()).toBe("https://sandbox.sepay.vn")
                 expect(service.getPaidPlanCurrency()).toBe("USD")
+            })
+
+        it("reads the audit operator roster from the environment, trimming and dropping blanks; empty when unset",
+            () => {
+                expect(service.getAuditOperatorSubjects()).toEqual([])
+
+                process.env.AUDIT_OPERATOR_SUBJECTS = " op-1 , op-2 ,, "
+
+                expect(service.getAuditOperatorSubjects()).toEqual(["op-1",
+                    "op-2"])
             })
 
         it("parses numeric settings from the environment",
@@ -161,14 +187,24 @@ describe("AppConfigService",
                     "utf8")
             })
 
-        it("returns an empty secret instead of throwing when the secret file cannot be read",
+        it("stops with an error naming the variable when the secret file cannot be read",
             () => {
                 process.env.SEPAY_API_KEY_FILE = "/run/secrets/missing.key"
                 readFileSyncMock.mockImplementation(() => {
                     throw new Error("ENOENT")
                 })
 
-                expect(service.getSepayApiKey()).toBe("")
+                expect(() => service.getSepayApiKey()).toThrow(ConfigError)
+                expect(() => service.getSepayApiKey()).toThrow("SEPAY_API_KEY_FILE")
+            })
+
+        it("has no fallback upload signing secret: it stops with an error naming the file variable",
+            () => {
+                expect(() => service.getUploadSigningSecret()).toThrow("UPLOAD_SIGNING_SECRET_FILE")
+
+                process.env.UPLOAD_SIGNING_SECRET_FILE = "/run/secrets/upload.key"
+                readFileSyncMock.mockReturnValue("  signing-material\n")
+                expect(service.getUploadSigningSecret()).toBe("signing-material")
             })
 
         it("treats an empty-string *_FILE variable as unset without touching the filesystem",

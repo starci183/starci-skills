@@ -22,6 +22,9 @@ import {
 import {
     TaskCountsResponse 
 } from "./graphql-types/response"
+import {
+    TODO_MESSAGES 
+} from "../../../../../messages/index"
 
 /** contract.task.list-for-dashboard's provider surface, on the one door the dashboard can actually
  * reach. Takes no person argument on purpose: the counted person is the session actor
@@ -38,7 +41,7 @@ export class TaskCountsResolver {
   @Query(() => TaskCountsResponse,
       {
           name: "taskCounts",
-          description: "How many of the caller's own tasks are open and complete. Never another person's.",
+          description: TODO_MESSAGES.get("taskCounts.description"),
       })
     async taskCounts(@Context("req") req: GraphqlRequestLike): Promise<TaskCountsResponse> {
         const ownerId = await actorIdFromRequest(req,

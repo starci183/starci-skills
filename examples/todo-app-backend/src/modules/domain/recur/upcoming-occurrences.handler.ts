@@ -26,6 +26,9 @@ import {
 import {
     UpcomingOccurrencesQuery, UpcomingOccurrencesQueryResult 
 } from "./upcoming-occurrences.query"
+import {
+    Clock
+} from "@modules/platform/clock/index"
 
 const DEFAULT_PREVIEW_DAYS = 14
 
@@ -42,6 +45,7 @@ export class UpcomingOccurrencesHandler extends AbstractQueryHandler<UpcomingOcc
     constructor(
     private readonly ruleService: RuleService,
     private readonly occurrenceService: OccurrenceService,
+        private readonly clock: Clock
     ) {
         super()
     }
@@ -66,7 +70,7 @@ export class UpcomingOccurrencesHandler extends AbstractQueryHandler<UpcomingOcc
         let previewDates: Array<string> = []
         if (rule.endedAt === null) {
             const today = localDateInZone(rule.timeZone,
-                new Date())
+                this.clock.now())
             const horizon = addDays(today,
                 (params.previewDays ?? DEFAULT_PREVIEW_DAYS) - 1)
             previewDates = datesForRule(

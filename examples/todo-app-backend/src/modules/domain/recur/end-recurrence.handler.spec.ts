@@ -6,10 +6,10 @@ import {
 } from "@nestjs/typeorm"
 import {
     POSTGRESQL_PRIMARY,
-} from "@modules/platform/databases/postgresql/primary/index"
+} from "@modules/platform/databases/index"
 import {
     TaskEntity,
-} from "@modules/platform/databases/postgresql/primary/index"
+} from "@modules/platform/databases/index"
 import {
     createFakeRecurEntityManager 
 } from "./testing/fake-recur-entity-manager"
@@ -25,6 +25,12 @@ import {
 import {
     EndRecurrenceHandler 
 } from "./end-recurrence.handler"
+import {
+    Clock 
+} from "@modules/platform/clock/index"
+import {
+    FakeClock 
+} from "@starci/jest-preset/clock"
 
 describe("EndRecurrenceHandler (fr.recur.end-rule, br.recur.ending.preserves-history)",
     () => {
@@ -38,6 +44,9 @@ describe("EndRecurrenceHandler (fr.recur.end-rule, br.recur.ending.preserves-his
             entityManager = createFakeRecurEntityManager()
             moduleRef = await Test.createTestingModule({
                 providers: [
+                    {
+                        provide: Clock, useValue: new FakeClock() 
+                    },
                     EndRecurrenceHandler,
                     RuleService,
                     OccurrenceService,

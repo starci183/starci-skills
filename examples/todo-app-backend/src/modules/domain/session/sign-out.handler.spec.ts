@@ -9,13 +9,13 @@ import {
 } from "./session.service"
 import {
     POSTGRESQL_PRIMARY,
-} from "@modules/platform/databases/postgresql/primary/index"
+} from "@modules/platform/databases/index"
 import {
     SessionEntity,
-} from "@modules/platform/databases/postgresql/primary/index"
+} from "@modules/platform/databases/index"
 import {
     createFakeEntityManager,
-} from "@modules/platform/databases/postgresql/primary/index"
+} from "@modules/platform/databases/index"
 import {
     KeycloakClient,
 } from "@modules/integrations/keycloak/index"
@@ -34,6 +34,15 @@ import {
 import {
     SignOutHandler 
 } from "./sign-out.handler"
+import {
+    LogEvent, WinstonService,
+} from "@modules/platform/logging/index"
+import {
+    Clock 
+} from "@modules/platform/clock/index"
+import {
+    FakeClock 
+} from "@starci/jest-preset/clock"
 
 describe("SignOutHandler",
     () => {
@@ -46,7 +55,11 @@ describe("SignOutHandler",
         beforeEach(async () => {
             moduleRef = await Test.createTestingModule({
                 providers: [
+                    {
+                        provide: Clock, useValue: new FakeClock() 
+                    },
                     SignOutHandler,
+                    WinstonService,
                     SessionService,
                     KeycloakClient,
                     AppConfigService,
@@ -79,6 +92,26 @@ describe("SignOutHandler",
 
                 expect(result.signedOut).toBe(true)
                 await expect(sessionService.findActive(session.token)).rejects.toThrow()
+            })
+
+        it("logs the failure and still signs out when the Keycloak notification fails",
+            async () => {
+                const winston = moduleRef.get(WinstonService)
+                const log = jest.spyOn(winston,
+                    "log").mockReturnValue(undefined)
+                jest.spyOn(keycloakClient,
+                    "notifySignOut").mockRejectedValue(new Error("keycloak down"))
+                const session = await sessionService.tAccept("person-1")
+
+                const result = await handler.execute(new SignOutCommand({
+                    sessionToken: session.token
+                }))
+
+                expect(result.signedOut).toBe(true)
+                expect(log).toHaveBeenCalledWith(LogEvent.SessionSignOutNotifyFailed,
+                    {
+                        reason: "Error: keycloak down"
+                    })
             })
 
         it("event.login.signed-out: publishes on the PlatformEventBus after the session is revoked",

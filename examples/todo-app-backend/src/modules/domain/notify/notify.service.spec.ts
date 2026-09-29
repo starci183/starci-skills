@@ -21,7 +21,7 @@ import {
 } from "./delivery.service"
 import {
     POSTGRESQL_PRIMARY,
-} from "@modules/platform/databases/postgresql/primary/index"
+} from "@modules/platform/databases/index"
 import {
     NotifySmtpPort,
 } from "@modules/integrations/notify-smtp/index"
@@ -39,13 +39,22 @@ import {
 } from "@modules/integrations/notify-queue/index"
 import {
     NotifyDeliveryAttemptEntity,
-} from "@modules/platform/databases/postgresql/primary/index"
+} from "@modules/platform/databases/index"
+import {
+    Clock 
+} from "@modules/platform/clock/index"
+import {
+    FakeClock 
+} from "@starci/jest-preset/clock"
 
 async function buildNotify() {
     const smtp = new FakeNotifySmtpClient()
     const queue = new FakeNotifyQueueClient()
     const moduleRef = await Test.createTestingModule({
         providers: [
+            {
+                provide: Clock, useValue: new FakeClock() 
+            },
             NotifyService,
             DedupeService,
             DigestService,

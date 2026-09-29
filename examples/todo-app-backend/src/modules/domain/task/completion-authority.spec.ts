@@ -6,13 +6,13 @@ import {
 } from "@nestjs/typeorm"
 import {
     POSTGRESQL_PRIMARY,
-} from "@modules/platform/databases/postgresql/primary/index"
+} from "@modules/platform/databases/index"
 import {
     TaskEntity,
-} from "@modules/platform/databases/postgresql/primary/index"
+} from "@modules/platform/databases/index"
 import {
     createFakeEntityManager,
-} from "@modules/platform/databases/postgresql/primary/index"
+} from "@modules/platform/databases/index"
 import {
     CompletionAuthority 
 } from "./completion-authority.contracts"
@@ -25,6 +25,12 @@ import {
 import {
     TaskService 
 } from "./task.service"
+import {
+    Clock 
+} from "@modules/platform/clock/index"
+import {
+    FakeClock 
+} from "@starci/jest-preset/clock"
 
 /** A future `share` feature's widened authority: any registered collaborator, not only the owner, may complete/reopen. */
 class WidenedCompletionAuthority extends CompletionAuthority {
@@ -47,6 +53,9 @@ describe("CompletionAuthorityRegistry",
         beforeEach(async () => {
             moduleRef = await Test.createTestingModule({
                 providers: [
+                    {
+                        provide: Clock, useValue: new FakeClock() 
+                    },
                     TaskService,
                     CompletionAuthorityRegistry,
                     {

@@ -25,6 +25,9 @@ import {
 import {
     CompleteErasureRequest
 } from "./graphql-types/request"
+import {
+    TODO_MESSAGES 
+} from "../../../../../messages/index"
 
 /** fr.audit.erasure.complete. In the real journey a worker picks up a verified request; this mutation
  * is that pickup exposed for the caller who requested it to trigger directly, since this example has no
@@ -40,7 +43,7 @@ export class CompleteErasureResolver {
 
   @Mutation(() => CompleteErasureResponse,
       {
-          name: "completeErasure", description: "Complete a verified erasure request: destroy the subject key, then confirm and log completion." 
+          name: "completeErasure", description: TODO_MESSAGES.get("completeErasure.description") 
       })
     async completeErasure(
     @Context("req") req: GraphqlRequestLike,

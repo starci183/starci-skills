@@ -15,6 +15,9 @@ import {
 } from "./errors/keycloak-unavailable"
 
 
+/** How long a round-trip to the realm may take: a provider that accepts the connection and then goes quiet must not hold a sign-in open. */
+const REQUEST_TIMEOUT_MS = 10_000
+
 /** Contract naming the keycloak sign in result shape integrations/keycloak code and its consumers share; a second site never retypes it inline. */
 export interface KeycloakSignInResult {
   readonly subject: string;
@@ -53,6 +56,7 @@ export class KeycloakClient {
                         "content-type": "application/x-www-form-urlencoded" 
                     },
                     body: body.toString(),
+                    signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
                 })
         } catch (error) {
             throw new KeycloakUnavailableException({
@@ -87,6 +91,7 @@ export class KeycloakClient {
                     body: JSON.stringify({
                         action: "sign-out", personId 
                     }),
+                    signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
                 })
         } catch (error) {
             throw new KeycloakUnavailableException({

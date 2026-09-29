@@ -8,6 +8,9 @@ import {
     ConfigurableModuleClass, OPTIONS_TYPE 
 } from "./session.module-definition"
 import {
+    WinstonService,
+} from "@modules/platform/logging/index"
+import {
     SessionService 
 } from "./session.service"
 import {
@@ -46,6 +49,7 @@ export class SessionModule extends ConfigurableModuleClass {
             providers: [
                 ...(base.providers ?? []),
                 SessionService,
+                WinstonService,
             ],
             exports: [SessionService],
         }

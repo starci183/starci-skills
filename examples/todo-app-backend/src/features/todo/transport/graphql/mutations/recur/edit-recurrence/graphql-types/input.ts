@@ -7,6 +7,9 @@ import {
 import {
     RecurFrequencyInput 
 } from "../../make-recurring/graphql-types/input"
+import {
+    TODO_MESSAGES 
+} from "../../../../../../messages/index"
 
 @InputType()
 /** The rule patch: ruleId plus any of frequency/n/dayOfMonth/timeZone/time - absent fields keep their current value. */
@@ -42,13 +45,13 @@ export class EditRecurrenceInput {
       dayOfMonth?: number
 
   @Field({
-      nullable: true, description: "IANA time zone, e.g. Europe/Berlin." 
+      nullable: true, description: TODO_MESSAGES.get("editRecurrence.input.timeZone") 
   })
   @IsOptional()
       timeZone?: string
 
   @Field({
-      nullable: true, description: "Local HH:MM the rule fires at, in timeZone." 
+      nullable: true, description: TODO_MESSAGES.get("editRecurrence.input.time") 
   })
   @IsOptional()
   @Matches(/^([01]\d|2[0-3]):[0-5]\d$/)

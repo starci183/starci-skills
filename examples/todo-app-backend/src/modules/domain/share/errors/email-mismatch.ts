@@ -1,23 +1,25 @@
 import {
-    AbstractException,
+    DomainError,
 } from "@modules/platform/errors/index"
 import type {
-    AbstractExceptionMetadata,
+    DomainErrorMetadata,
 } from "@modules/platform/errors/index"
 
 /** Metadata for an accept attempt whose email does not match the invited one. */
-export interface ShareEmailMismatchExceptionMetadata extends AbstractExceptionMetadata {
+export interface ShareEmailMismatchExceptionMetadata extends DomainErrorMetadata {
   invitationId?: string;
 }
 
 /** fr.share.accept exceptionFlows: "Accepting with an email other than the invited one is refused." */
-export class ShareEmailMismatchException extends AbstractException {
+export class ShareEmailMismatchException extends DomainError {
     constructor({ invitationId, ...metadata }: ShareEmailMismatchExceptionMetadata = {
     }) {
-        super("This invitation was not addressed to that email.",
-            "SHARE_EMAIL_MISMATCH_EXCEPTION",
+        super("SHARE_EMAIL_MISMATCH_EXCEPTION",
+            "This invitation was not addressed to that email.",
             {
-                invitationId, ...metadata 
+                metadata: {
+                    invitationId, ...metadata 
+                } 
             })
     }
 }
