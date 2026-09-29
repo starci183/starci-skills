@@ -14,7 +14,7 @@ import { spawnSync } from 'node:child_process';
 import { stringifyYaml, parseYaml } from '../engine/yaml.mjs';
 import { inspectLedger, ledgerFileFor, openLedger } from '../engine/ledger-db.mjs';
 import {seedWorkflow} from './_ledger-fixture.mjs';
-import { AUTOPILOT_BY, SUPERVISOR_GATE, autopilotAskClass, autopilotOf, autopilotSettings, drawGateEvidence, routeCapUnderAutopilot } from '../scripts/kernel/autopilot.mjs';
+import { AUTOPILOT_BY, SUPERVISOR_GATE, autopilotAnswerAsk, autopilotAskClass, autopilotOf, autopilotSettings, drawGateEvidence, routeCapUnderAutopilot } from '../scripts/kernel/autopilot.mjs';
 import { ownerAnswerProof } from '../scripts/kernel/owner-claim.mjs';
 import { applyDrawReview, drawReviewQuestion, drawReviewStatus } from '../scripts/work/draw-review.mjs';
 import { repeatedAnswerOf } from '../scripts/kernel/owner-answers.mjs';
@@ -121,6 +121,19 @@ test('real money and a shared external system are deferred, never taken on their
   assert.equal(s.autopilot.deferredToHandover[0].deferClass, 'real-money');
   assert.match(s.autopilot.deferredToHandover[0].stubPath, /sandbox/);
   assert.equal(read(repo, (db) => db.prepare("SELECT count(*) n FROM events WHERE kind='ask-answered'").get().n), 0);
+});
+
+test('autopilot answers a recommended ask in one ledger transaction: the receipt joins the open transaction', (t) => {
+  const repo = world(t);
+  seedAsk(repo, { jobId: 'job-rec', op: 'business.decide', dispatchId: 'ctx_rec00001', question: { kind: 'decision', text: 'Which tax?', options: ['A (khuyến nghị)', 'B'] } });
+  const l = openLedger({ file: ledgerFileFor(repo) });
+  try {
+    const report = l.db.prepare("SELECT r.*, a.op_id FROM reports r JOIN op_attempts a ON a.attempt_id=r.attempt_id WHERE r.dispatch_id='ctx_rec00001'").get();
+    const r = autopilotAnswerAsk({ ledger: l, repo, workflowId: WF, report });
+    assert.equal(r.action, 'recommended');
+    assert.equal(l.db.prepare("SELECT count(*) n FROM events WHERE kind='ask-answered'").get().n, 1);
+    assert.equal(l.db.prepare("SELECT count(*) n FROM decisions WHERE workflow_id=?").get(WF).n, 1);
+  } finally { l.close(); }
 });
 
 test('provision.ask opens only as the end-of-flow checklist; a mid-flow need is recorded deferred-to-handover', (t) => {

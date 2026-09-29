@@ -40,10 +40,11 @@ export function fileAskReceipt(db, { workflowId, dispatchId, receipt, blob, at =
   return { receiptPath: blob.fileUri, receiptSha: blob.sha, receiptRef: `blob:${blob.sha}`, artifactId, decisionId };
 }
 
-/** Stage and file one receipt in its own transaction (`ledger.transaction`). */
+/** Stage and file one receipt: in the caller's open ledger transaction, else in its own (`ledger.transaction`). */
 export function writeAskReceipt(ledger, { workflowId, dispatchId, receipt, at = Date.now() }) {
   const blob = stageReceipt(receipt);
-  return ledger.transaction((db) => fileAskReceipt(db, { workflowId, dispatchId, receipt, blob, at }));
+  const file = (db) => fileAskReceipt(db, { workflowId, dispatchId, receipt, blob, at });
+  return ledger.transaction.active() ? file(ledger.db) : ledger.transaction(file);
 }
 
 /** True when `file` is a blob in the store (a receipt's file lives there). */
