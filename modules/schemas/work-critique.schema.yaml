@@ -54,8 +54,12 @@ properties:
           minItems: 1
           uniqueItems: true
           items:
-            $ref: "#/$defs/recordId"
-          description: The records the finding is about, by id. At least one is required because a critique
+            anyOf:
+              - $ref: "#/$defs/recordId"
+              - enum:
+                  - shell
+                  - brand
+          description: The records the finding is about, by id (the shell and brand singletons are their own ids). At least one is required because a critique
             of the tree in general is an opinion; a critique naming records is something a reader can go and
             check.
         because:

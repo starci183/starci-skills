@@ -52,6 +52,7 @@ const scopeIndex=(feature,workflow,nodes)=>['schema: work/feature@1',`id: ${feat
 const world=t=>{
   const root=fs.mkdtempSync(path.join(os.tmpdir(),'starci-peer-drift-'));
   t.after(()=>fs.rmSync(root,{recursive:true,force:true,maxRetries:20,retryDelay:25}));
+  if(process.env.STARCI_TEST_TEMP_DIR)t.after(()=>fs.rmSync(path.join(process.env.STARCI_TEST_TEMP_DIR,'starci-git-memo'),{recursive:true,force:true,maxRetries:20,retryDelay:25}));
   // runtime.sqlite resolves under STARCI_PROJECTS_ROOT (ledgerFileFor): pin one root per world so the
   // in-process seed/read and every spawned api subprocess (whose LOCALAPPDATA is faked) share a file.
   const projectsRoot=path.join(root,'projects');

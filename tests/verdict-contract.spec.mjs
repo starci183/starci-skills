@@ -25,9 +25,10 @@ const {openLedger,inspectLedger,ledgerFileFor,ensureWorkflow,changeWorkflowPhase
 
 const runApi=(args,{env={}}={})=>spawnSync(process.execPath,[API,...args],{cwd:ROOT,encoding:'utf8',windowsHide:true,timeout:120000,env:{...process.env,...env}});
 
+const scratches=[];
 const fixture=t=>{
   const dirs=[];
-  t.after(()=>{for(const dir of dirs)fs.rmSync(dir,{recursive:true,force:true,maxRetries:20,retryDelay:25});});
+  t.after(()=>{for(const dir of [...dirs,...scratches.splice(0)])fs.rmSync(dir,{recursive:true,force:true,maxRetries:20,retryDelay:25});});
   return {repo(){const dir=fs.mkdtempSync(path.join(os.tmpdir(),'starci-verdict-'));dirs.push(dir);return dir;}};
 };
 
@@ -40,6 +41,7 @@ const seedJob=(repo,jobId)=>{
   try{
     const wf='wf-verdict',dispatchId=`ctx-${jobId}`,unitId=`unit-${jobId}`;
     const scratch=fs.mkdtempSync(path.join(os.tmpdir(),'starci-verdict-scratch-'));
+    scratches.push(scratch);
     const at=Date.now();
     ledger.transaction(db=>{
       ensureWorkflow(db,{workflowId:wf,phase:'queued',title:'verdict fixture',by:'test-fixture',reason:'seed',at});

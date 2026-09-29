@@ -122,5 +122,5 @@ never edits the runtime ledger. After its own checks, the surrounding operation 
 `node .claude/scripts/kernel/api.mjs report --repo <bound-repo> --job <current-job> --report <op-report.json> [--attach <path>...]`.
 The API stores the report JSON in the ledger and raw attachments in the external blob store, then clears scratch.
 A canonical Work record may cite an artifact by its durable DB/blob identity; session captures and verification
-evidence remain operational artifacts. The kernel re-runs declared checks before settlement. No separate assisted-UAT ingestion verb or
-direct SQL path exists.
+evidence remain operational artifacts. The kernel re-runs declared checks before settlement. No separate assisted-UAT ingestion
+verb or direct SQL path exists.

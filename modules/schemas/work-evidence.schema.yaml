@@ -177,7 +177,9 @@ properties:
         - sha256
       oneOf:
         - required: [path]
+          properties: {path: true}
         - required: [name]
+          properties: {name: true}
       properties:
         path:
           $ref: "#/$defs/prose"
