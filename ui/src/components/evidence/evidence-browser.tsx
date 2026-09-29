@@ -33,9 +33,11 @@ function Row({ file, active, onPick }: { file: EvidenceFile; active: boolean; on
     className={`flex w-full min-w-0 flex-col gap-0.5 rounded-md border px-2 py-1.5 text-left text-sm ${active ? 'border-primary bg-primary/10' : 'border-transparent hover:bg-muted'}`}>
     <span className="flex min-w-0 items-center gap-2">
       <FileTypeBadge kind={file.kind} />
-      <span className="min-w-0 flex-1 truncate font-medium">{file.label ?? file.base}</span>
-      {!isPlainEncoding(file.encoding) ? <span className="shrink-0 rounded border border-border bg-muted px-1 text-[10.5px]">{encodingLabels[file.encoding as string] ?? file.encoding}</span> : null}
+      <span className="min-w-0 flex-1 truncate font-medium" title={file.label ?? file.base}>{file.label ?? file.base}</span>
+    </span>
+    <span className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-0.5">
       <span className="shrink-0 text-xs text-muted-foreground">{formatBytes(file.bytes)}</span>
+      {!isPlainEncoding(file.encoding) ? <span className="shrink-0 rounded border border-border bg-muted px-1 text-[10.5px]">{encodingLabels[file.encoding as string] ?? file.encoding}</span> : null}
     </span>
     <span className="truncate font-mono text-[11px] text-muted-foreground" title={file.name}>{file.name}</span>
   </button>;
@@ -68,7 +70,13 @@ export function EvidenceBrowser({ files, selected, onSelect }: { files: Evidence
     if (next) onSelect(next.artifactId);
   }, [order, current, onSelect]);
   useEffect(() => {
-    listRef.current?.querySelector('[aria-selected="true"]')?.scrollIntoView({ block: 'nearest' });
+    const box = listRef.current;
+    const row = box?.querySelector<HTMLElement>('[aria-selected="true"]');
+    if (!box || !row) return;
+    // Scroll only inside the tree container, never the window.
+    const b = box.getBoundingClientRect(); const r = row.getBoundingClientRect();
+    if (r.top < b.top) box.scrollTop += r.top - b.top;
+    else if (r.bottom > b.bottom) box.scrollTop += r.bottom - b.bottom;
   }, [current?.artifactId]);
 
   if (files.length === 0) return <div className="rounded-lg border border-dashed p-4 text-sm text-muted-foreground">Lần thử này chưa có tệp bằng chứng nào.</div>;
