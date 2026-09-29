@@ -1,6 +1,6 @@
 // Landing throughput (lane land-throughput, 2026-09-28): the append-only registries lanes used to edit at the same
 // tail are one file per thing, so parallel lanes stop invalidating each other at the land gate.
-//   scripts/kernel/contract-changes-store.mjs - modules/kernel/contract-changes/<id>.yaml + the old list
+//   scripts/kernel/contract-changes-store.mjs - modules/kernel/contract-changes/<id>.yaml, one file per entry
 //   scripts/kernel/api-extensions.mjs         - api verbs, status fields and boolean flags as files
 import test from 'node:test';
 import assert from 'node:assert/strict';
@@ -9,8 +9,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
-import { parseYaml } from '../engine/yaml.mjs';
-import { mergeContractChanges, readContractChangesDoc, readContractChangesDocAt, migrateLegacy, splitLegacy, isContractChangesPath, entryFileOf, CONTRACT_CHANGES_FILE } from '../scripts/kernel/contract-changes-store.mjs';
+import { mergeContractChanges, readContractChangesDoc, readContractChangesDocAt, isContractChangesPath, entryFileOf, CONTRACT_CHANGES_DIR } from '../scripts/kernel/contract-changes-store.mjs';
 import { loadContractChanges } from '../scripts/kernel/contract-version.mjs';
 import { landCommits, runChecks, governedPaths } from '../scripts/supervisor/land.mjs';
 import { loadApiExtensions, statusExtras, readFlagsFile, extensionVerbNames } from '../scripts/kernel/api-extensions.mjs';
@@ -28,7 +27,9 @@ const git = (cwd, ...args) => {
   return r.stdout.trim();
 };
 const write = (root, files) => { for (const [f, c] of Object.entries(files)) { fs.mkdirSync(path.dirname(path.join(root, f)), { recursive: true }); fs.writeFileSync(path.join(root, f), c); } };
-const LEGACY = 'schema: starci/contract-changes@1\nchanges:\n  - id: old\n    effectiveAt: \'2026-01-01T00:00:00Z\'\n    summary: x\n';
+const OLD_ENTRY = "id: old\neffectiveAt: '2026-01-01T00:00:00Z'\nsummary: x\n";
+const CHANGELOG = '# Changelog\n\n';
+const APPEND_ONLY = 'packages/grammar/CHANGELOG.md';
 
 function repoFixture(t) {
   const root = tmp(t, 'sup-k-lt-repo-');
@@ -36,7 +37,7 @@ function repoFixture(t) {
   git(root, 'config', 'user.name', 'Spec');
   git(root, 'config', 'user.email', 'spec@example.invalid');
   git(root, 'config', 'core.autocrlf', 'false');
-  write(root, { 'scripts/a.mjs': 'export const a = 1;\n', [CONTRACT_CHANGES_FILE]: LEGACY, 'modules/kernel/rules.yaml': 'rule: one\n', '.gitattributes': `${CONTRACT_CHANGES_FILE} merge=union\n` });
+  write(root, { 'scripts/a.mjs': 'export const a = 1;\n', [entryFileOf('old')]: OLD_ENTRY, [APPEND_ONLY]: CHANGELOG, 'modules/kernel/rules.yaml': 'rule: one\n', '.gitattributes': `${APPEND_ONLY} merge=union\n` });
   git(root, 'add', '-A');
   git(root, 'commit', '-q', '-m', 'base');
   return root;
@@ -56,48 +57,37 @@ const lightChecks = (opts) => runChecks({ ...opts, runSpecs: false });
 
 /* ------------------------------------------------------------ contract-changes: one file per entry */
 
-test('the registry merges entry files and the old list; an old-list item wins over a file of the same id', () => {
+test('the registry merges entry files; an entry whose id is not its file name is a problem; nothing reads a single-file list', (t) => {
   const entries = [
     { rel: 'modules/kernel/contract-changes/b-new.yaml', text: "id: b-new\neffectiveAt: '2026-09-28T00:00:00Z'\nsummary: from a file\n" },
-    { rel: 'modules/kernel/contract-changes/old.yaml', text: "id: old\neffectiveAt: '2026-01-01T00:00:00Z'\nsummary: stale copy\n" },
+    { rel: 'modules/kernel/contract-changes/old.yaml', text: OLD_ENTRY },
     { rel: 'modules/kernel/contract-changes/wrong-name.yaml', text: 'id: other\n' },
   ];
-  const { doc, problems } = mergeContractChanges({ legacy: LEGACY, entries });
+  const { doc, problems } = mergeContractChanges({ entries });
   assert.deepEqual(doc.changes.map((c) => [c.id, c.summary]), [['b-new', 'from a file'], ['old', 'x']]);
   assert.deepEqual(problems, ['modules/kernel/contract-changes/wrong-name.yaml: id must be its file name (wrong-name)']);
-  assert.equal(mergeContractChanges({ legacy: null, entries: [] }).doc.changes.length, 0, 'no registry registers nothing');
-  assert.ok(isContractChangesPath('modules/kernel/contract-changes/x.yaml') && isContractChangesPath(CONTRACT_CHANGES_FILE) && !isContractChangesPath('modules/kernel/rules.yaml'));
+  assert.equal(mergeContractChanges({ entries: [] }).doc.changes.length, 0, 'no registry registers nothing');
+  assert.ok(isContractChangesPath('modules/kernel/contract-changes/x.yaml') && !isContractChangesPath('modules/kernel/contract-changes.yaml') && !isContractChangesPath('modules/kernel/rules.yaml'));
   assert.equal(entryFileOf('x'), 'modules/kernel/contract-changes/x.yaml');
+  // A single-file list at the old path is not a registry: it registers nothing and is no problem.
+  const dir = tmp(t, 'sup-k-lt-nolist-');
+  write(dir, { 'modules/kernel/contract-changes.yaml': 'schema: starci/contract-changes@1\nchanges:\n  - id: listed\n    summary: ignored\n', [entryFileOf('filed')]: 'id: filed\nsummary: y\n' });
+  const read = readContractChangesDoc(dir);
+  assert.deepEqual(read.doc.changes.map((c) => c.id), ['filed']);
+  assert.deepEqual(read.problems, []);
+  assert.equal(`${CONTRACT_CHANGES_DIR}/`, 'modules/kernel/contract-changes/');
 });
 
-test('loadContractChanges reads the entry files: the live registry is well-formed and carries both forms', () => {
+test('loadContractChanges reads the entry files: the live registry is well-formed and the old list file is gone', () => {
   const live = loadContractChanges(ROOT);
   assert.deepEqual(live.problems, []);
   const ids = new Set(live.changes.map((c) => c.id));
-  assert.ok(ids.has('land-gate-specs-harness-switch'), 'an old-list item');
-  assert.ok(ids.has('land-conflict-free-registries'), 'an entry file');
-  assert.ok(governedPaths(['modules/kernel/contract-changes/x.yaml', CONTRACT_CHANGES_FILE, 'modules/kernel/api.yaml']).length === 1, 'registry files need no entry of their own');
+  assert.ok(ids.has('land-gate-specs-harness-switch') && ids.has('land-conflict-free-registries'), 'entry files');
+  assert.equal(fs.existsSync(path.join(ROOT, 'modules/kernel/contract-changes.yaml')), false, 'no single-file list');
+  assert.ok(governedPaths(['modules/kernel/contract-changes/x.yaml', 'modules/kernel/api.yaml']).length === 1, 'registry files need no entry of their own');
 });
 
-test('the old list migrates losslessly: every item round-trips as its own file', (t) => {
-  const text = fs.readFileSync(path.join(ROOT, CONTRACT_CHANGES_FILE), 'utf8');
-  const listed = parseYaml(text).changes ?? [];
-  const { blocks } = splitLegacy(text);
-  assert.equal(blocks.length, listed.length);
-  blocks.forEach((b, i) => assert.deepEqual(parseYaml(b.text), listed[i], b.id));
-  const dir = tmp(t, 'sup-k-lt-migrate-');
-  write(dir, { [CONTRACT_CHANGES_FILE]: text });
-  const before = readContractChangesDoc(dir).doc.changes;
-  const r = migrateLegacy(dir);
-  assert.equal(r.moved.length, listed.length);
-  assert.equal(parseYaml(fs.readFileSync(path.join(dir, CONTRACT_CHANGES_FILE), 'utf8')).changes ?? null, null, 'the old list is left empty');
-  const after = readContractChangesDoc(dir);
-  assert.deepEqual(after.problems, []);
-  const byId = (list) => Object.fromEntries(list.map((c) => [c.id, c]));
-  assert.deepEqual(byId(after.doc.changes), byId(before), 'same entries, now one file each');
-});
-
-test('the land gate: an entry file covers governed paths; the registry at a revision reads both forms', (t) => {
+test('the land gate: an entry file covers governed paths; the registry at a revision reads entry files', (t) => {
   const env = envOf(t);
   const root = repoFixture(t);
   const bare = sideCommit(root, 'bare', { 'modules/kernel/rules.yaml': 'rule: two\n' });
@@ -106,16 +96,11 @@ test('the land gate: an entry file covers governed paths; the registry at a revi
   assert.match(red.checks.find((c) => c.name === 'contract-changes paths').output, /modules\/kernel\/contract-changes\/<id>\.yaml/);
   const filed = sideCommit(root, 'filed', { 'modules/kernel/rules.yaml': 'rule: two\n',
     'modules/kernel/contract-changes/rules-two.yaml': "id: rules-two\neffectiveAt: '2026-09-28T00:00:00Z'\nsummary: y\nreach: new-legs\npaths: [modules/kernel/rules.yaml]\n" });
-  // A lane branched before the split still appends to the old list: it lands too, the union keeps both.
-  const appended = sideCommit(root, 'appended', { 'modules/kernel/rules.yaml': 'rule: two\n', 'scripts/b.mjs': 'export const b = 1;\n',
-    [CONTRACT_CHANGES_FILE]: `${LEGACY}  - id: rules-legacy\n    effectiveAt: '2026-09-28T00:00:00Z'\n    summary: z\n    paths: [modules/kernel/rules.yaml]\n` });
   const one = landCommits({ commits: [filed], root, env, push: false, deps: { runChecks: lightChecks } });
   assert.ok(one.ok, JSON.stringify(one.checks));
   assert.deepEqual(one.checks.find((c) => c.name === 'contract-changes paths').entries, ['rules-two']);
-  const two = landCommits({ commits: [appended], root, env, push: false, deps: { runChecks: lightChecks } });
-  assert.ok(two.ok, JSON.stringify(two));
   const at = readContractChangesDocAt(root, 'main');
-  assert.deepEqual(at.doc.changes.map((c) => c.id).sort(), ['old', 'rules-legacy', 'rules-two']);
+  assert.deepEqual(at.doc.changes.map((c) => c.id).sort(), ['old', 'rules-two']);
   assert.equal(readContractChangesDocAt(root, 'no-such-rev'), null);
 });
 
@@ -136,7 +121,8 @@ test('a pick that cannot apply is refused before the queue with every file and h
   const root = repoFixture(t);
   const theirs = sideCommit(root, 'theirs', { 'scripts/a.mjs': 'export const a = 2;\n' });
   const mine = sideCommit(root, 'mine', { 'scripts/a.mjs': 'export const a = 3;\n' });
-  const append = sideCommit(root, 'append', { [CONTRACT_CHANGES_FILE]: `${LEGACY}  - id: appended\n    effectiveAt: '2026-09-28T00:00:00Z'\n    summary: z\n` });
+  const append = sideCommit(root, 'append', { [APPEND_ONLY]: `${CHANGELOG}## appended
+` });
   const first = await land({ commits: [theirs], root, env, push: false, deps: { runChecks: lightChecks } });
   assert.ok(first.ok, JSON.stringify(first));
   let locked = false;
@@ -154,7 +140,8 @@ test('a pick that cannot apply is refused before the queue with every file and h
   assert.equal(inGate.reason, 'conflict');
   assert.deepEqual(inGate.conflicts.map((c) => c.file), ['scripts/a.mjs']);
   assert.ok(inGate.conflicts[0].hunks.length === 1);
-  const appended = sideCommit(root, 'append-2', { [CONTRACT_CHANGES_FILE]: `${LEGACY}  - id: appended-2\n    effectiveAt: '2026-09-28T00:00:00Z'\n    summary: z\n` });
+  const appended = sideCommit(root, 'append-2', { [APPEND_ONLY]: `${CHANGELOG}## appended-2
+` });
   assert.ok((await land({ commits: [append], root, env, push: false, deps: { runChecks: lightChecks } })).ok);
   assert.equal(conflictPreflight({ root, commits: [appended] }).ok, true, 'merge=union: two appends never conflict');
   assert.deepEqual(conflictHunks('a\n<<<<<<< x\nb\n=======\nc\n>>>>>>> y\nd\n').map((h) => h.line), [2]);
@@ -199,8 +186,9 @@ test('api.mjs dispatches an extension verb and check-api-surface counts it', () 
   assert.match(help.stdout + help.stderr, /extension verbs[\s\S]*extensions \[--json\]/);
 });
 
-test('the append-only files merge union; ui/CONTRACT.md does not (lanes edit it in place)', () => {
+test('the append-only files merge union (contract-change entries are files, not an append-only list); ui/CONTRACT.md does not (lanes edit it in place)', () => {
   const attrs = fs.readFileSync(path.join(ROOT, '.gitattributes'), 'utf8');
-  for (const f of [CONTRACT_CHANGES_FILE, 'packages/grammar/CHANGELOG.md', 'scripts/kernel/api-boolean-flags.txt']) assert.match(attrs, new RegExp(`^${f.replaceAll('.', '\\.')} merge=union$`, 'm'), f);
+  for (const f of ['packages/grammar/CHANGELOG.md', 'scripts/kernel/api-boolean-flags.txt']) assert.match(attrs, new RegExp(`^${f.replaceAll('.', '\\.')} merge=union$`, 'm'), f);
+  assert.doesNotMatch(attrs, /contract-changes\.yaml/);
   assert.doesNotMatch(attrs, /^ui\/CONTRACT\.md merge=union/m);
 });

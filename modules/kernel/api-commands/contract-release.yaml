@@ -1,7 +1,7 @@
 contract-release:
   args: '--family <op> [--workflow <id>] [--batch <name>] [--reason <text>] [--by supervisor|owner] [--dry-run] [--json]'
   reads: >-
-    modules/kernel/contract-changes.yaml and modules/kernel/contract-freeze.yaml (scripts/kernel/contract-version.mjs);
+    modules/kernel/contract-changes/ and modules/kernel/contract-freeze.yaml (scripts/kernel/contract-version.mjs);
     every live workflows row (archived_at null, phase not finished) or --workflow; their contract-release events,
     jobs and contracts rows
   writes: >-

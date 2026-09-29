@@ -5,7 +5,7 @@ survey:
     the approved shape plan diffs against); all jobs; inbox rows; live
     signals; the tail of events; open incidents; the contracts rows of
     settled jobs and the current bytes of the inputs they recorded
-    (staleInput and sourceDrift below); modules/kernel/contract-changes.yaml; with --deliveries, every settled job's filed report
+    (staleInput and sourceDrift below); modules/kernel/contract-changes/; with --deliveries, every settled job's filed report
     and every handover ask with its answer receipt
   writes: 'nothing — pure projection'
   returns:

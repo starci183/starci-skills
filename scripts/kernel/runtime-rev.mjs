@@ -8,7 +8,7 @@
 //     start-workflow records the boot revision the same way (source boot);
 //   - every Kernel wake carries `Runtime rev <short-sha>` (revWakeLine) and, when the acked revision is
 //     behind, the kernel-relevant files that changed in between (KERNEL_REV_PATHS) plus the
-//     contract-changes.yaml entries added in between, one line each - or, past REV_DIFF_MAX_FILES or
+//     contract-change entry files added in between, one line each - or, past REV_DIFF_MAX_FILES or
 //     for a revision git no longer knows, "re-read kernel-prompt.md and driver-loop.yaml in full";
 //   - until the Kernel acks the current revision, api enqueue / dispatch of a leg whose op contract
 //     (contractFilesOf: its brief, _common, the verdict contract, the schemas and checks it cites, the
@@ -82,7 +82,7 @@ export function resolveRev(root, rev) {
 }
 
 const underRevPaths = (file) => KERNEL_REV_PATHS.some((p) => file === p || file.startsWith(`${p}/`));
-// The registry at a revision: the entry files plus the old single-file list (contract-changes-store.mjs).
+// The registry at a revision: the entry files (contract-changes-store.mjs).
 const registryAt = (root, rev) => { try { return readContractChangesDocAt(root, rev)?.doc?.changes ?? []; } catch { return []; } };
 const changeIdsAt = (root, rev) => registryAt(root, rev).map((c) => c?.id).filter((id) => typeof id === 'string');
 const changesAt = (root, rev) => {
@@ -105,7 +105,7 @@ const changesAt = (root, rev) => {
 const diffMemo = new Map();
 /**
  * What changed for a Kernel between `from` and `to`: {known, files[] (kernel-relevant, every one),
- * changes[] ({id, summary, ops} of contract-changes.yaml entries present at `to` and absent at `from`)}.
+ * changes[] ({id, summary, ops} of contract-change entry files present at `to` and absent at `from`)}.
  * known:false when git cannot compare the two (a revision it no longer has).
  */
 export function revDiff(root, from, to) {

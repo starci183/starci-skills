@@ -99,7 +99,8 @@ test('revert --apply: a revert lane off main with a contract-changes entry for r
   const git = (...a) => { const r = spawnSync('git', ['-C', root, ...a], { encoding: 'utf8', windowsHide: true }); assert.equal(r.status, 0, r.stderr); return r.stdout.trim(); };
   git('init', '-q', '-b', 'main'); git('config', 'user.email', 'l@t'); git('config', 'user.name', 'l'); git('config', 'core.autocrlf', 'false');
   fs.mkdirSync(path.join(root, 'modules/kernel'), { recursive: true }); fs.mkdirSync(path.join(root, 'modules/supervisor'), { recursive: true });
-  fs.writeFileSync(path.join(root, 'modules/kernel/contract-changes.yaml'), 'schema: x\nchanges:\n');
+  fs.mkdirSync(path.join(root, 'modules/kernel/contract-changes'), { recursive: true });
+  fs.writeFileSync(path.join(root, 'modules/kernel/contract-changes/seed.yaml'), 'id: seed\nsummary: seed\n');
   fs.writeFileSync(path.join(root, 'modules/supervisor/supervise.yaml'), 'a: 1\n');
   git('add', '-A'); git('commit', '-qm', 'init');
   fs.writeFileSync(path.join(root, 'modules/supervisor/supervise.yaml'), 'a: 2\n');

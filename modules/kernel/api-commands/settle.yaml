@@ -104,7 +104,7 @@ settle:
     blocked verdict and every op without a committing commitPolicy. A
     proof that ran is recorded as `landed` on the receipt and result_json.
     Once the landed proof passes, a leg admitted at or after contract change
-    settle-push-gate-lint (modules/kernel/contract-changes.yaml) also owes the
+    settle-push-gate-lint (modules/kernel/contract-changes/) also owes the
     target repository's own push gate (scripts/kernel/push-gate.mjs): the eslint
     commands its .husky/pre-push runs (directly or through package scripts), else
     its lint:check script, run with the repository's own ESLint and config over

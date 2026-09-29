@@ -41,6 +41,7 @@ retired:
   - {path: tests/harness-contract.spec.mjs, retiredAt: 2026-09-29, removedIn: ui-13-cleanup, replacedBy: 'owner override: manual UI and API verification; no test files'}
   - {path: ui/op-proofs.mjs, retiredAt: 2026-09-29, removedIn: ui-13-cleanup, replacedBy: 'ui/api/routes/attempt.mjs and the attempt evidence view'}
   - {path: ui/agent-monitor.mjs, retiredAt: 2026-09-29, removedIn: ui-13-cleanup, replacedBy: 'ui/src/pages/work/workflow.tsx and ui/src/pages/attempt/attempt.tsx'}
+  - {path: modules/kernel/contract-changes.yaml, retiredAt: 2026-09-29, removedIn: legacy-wp2, replacedBy: 'one entry file per change under modules/kernel/contract-changes/<id>.yaml (fields: modules/kernel/contract-changes-format.yaml)'}
   - {path: ui/agent-changes.mjs, retiredAt: 2026-09-29, removedIn: ui-13-cleanup, replacedBy: 'ui/api/routes/attempt.mjs diff endpoint'}
   - {path: modules/schemas/work-app-shell.schema.yaml, retiredAt: 2026-09-29, removedIn: layout-tree-no-legacy, replacedBy: 'modules/schemas/work-layout-tree.schema.yaml (work/layout-tree@1)'}
   - {path: engine/index.mjs, retiredAt: 2026-09-29, removedIn: legacy-wp56, replacedBy: 'engine/digest.mjs (sha256, sha256File), engine/plain-object.mjs (isPlainObject), engine/canonical-json.mjs (canonicalJSON); the recursive work/node validator has no replacement - a work/node@N record is refused (WORK_NODE_RETIRED) by scripts/checks/check-example-work.mjs'}

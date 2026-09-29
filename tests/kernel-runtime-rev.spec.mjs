@@ -28,7 +28,7 @@ const git = (cwd, ...args) => {
   return r.stdout.trim();
 };
 const write = (root, rel, text) => { fs.mkdirSync(path.dirname(path.join(root, rel)), { recursive: true }); fs.writeFileSync(path.join(root, rel), text); };
-const REGISTRY = (entries = '') => `schema: starci/contract-changes@1\nchanges:\n${entries}`;
+const SEED = "id: seed\neffectiveAt: '2026-01-01T00:00:00Z'\nsummary: seed\n";
 
 // A runtime root with three revisions: A (base), B (the draw brief, a knowledge file and a draw-scoped
 // contract change), C (more than REV_DIFF_MAX_FILES kernel-relevant files).
@@ -40,7 +40,7 @@ const runtime = (t) => {
   write(root, 'modules/kernel/kernel-prompt.md', 'prompt\n');
   write(root, 'modules/kernel/driver-loop.yaml', 'loop: 1\n');
   write(root, 'modules/kernel/verdict-contract.yaml', 'v: 1\n');
-  write(root, 'modules/kernel/contract-changes.yaml', REGISTRY());
+  write(root, 'modules/kernel/contract-changes/seed.yaml', SEED);
   write(root, 'modules/ops/_common.yaml', 'c: 1\n');
   write(root, 'modules/ops/ops/interface.draw.yaml', 'id: interface.draw\n');
   write(root, 'modules/ops/ops/code.refactor.yaml', 'id: code.refactor\n');
@@ -52,7 +52,7 @@ const runtime = (t) => {
   write(root, 'modules/kernel/driver-loop.yaml', 'loop: 2\n');
   write(root, 'knowledge/ui/rule.yaml', 'rule: 1\n');
   write(root, 'README.md', 'not kernel relevant\n');
-  write(root, 'modules/kernel/contract-changes.yaml', REGISTRY(`  - id: draw-new-rule\n    effectiveAt: '2026-09-27T20:00:00+07:00'\n    summary: "The draw brief gained a rule"\n    reach: new-legs\n    ops: [interface.draw]\n`));
+  write(root, 'modules/kernel/contract-changes/draw-new-rule.yaml', "id: draw-new-rule\neffectiveAt: '2026-09-27T20:00:00+07:00'\nsummary: \"The draw brief gained a rule\"\nreach: new-legs\nops: [interface.draw]\n");
   git(root, 'add', '-A'); git(root, 'commit', '-qm', 'B');
   const B = git(root, 'rev-parse', 'HEAD');
   for (let i = 0; i <= REV_DIFF_MAX_FILES; i += 1) write(root, `modules/kernel/api-commands/k${i}.yaml`, `k: ${i}\n`);
@@ -77,10 +77,10 @@ test('an acked rev behind HEAD is stale: the wake names the rev, the changed ker
   ack(rt.A, 'boot');
   const state = kernelRevState(db, wf, { root: rt.root, ops: ['interface.draw'] });
   assert.deepEqual([state.current, state.acked, state.ackSource, state.stale, state.full ?? false], [rt.B, rt.A, 'boot', true, false]);
-  assert.deepEqual(state.files, ['modules/kernel/contract-changes.yaml', 'modules/kernel/driver-loop.yaml', 'modules/ops/ops/interface.draw.yaml'], 'README.md and knowledge are not this Kernel\'s contract');
+  assert.deepEqual(state.files, ['modules/kernel/contract-changes/draw-new-rule.yaml', 'modules/kernel/driver-loop.yaml', 'modules/ops/ops/interface.draw.yaml'], 'README.md and knowledge are not this Kernel\'s contract');
   assert.deepEqual(state.changes.map((c) => [c.id, c.ops]), [['draw-new-rule', ['interface.draw']]]);
   const line = revWakeLine(state, wf);
-  assert.ok(line.startsWith(`Runtime rev ${shortRev(rt.B)} is newer than your acked rev ${shortRev(rt.A)}: re-read modules/kernel/contract-changes.yaml, modules/kernel/driver-loop.yaml, modules/ops/ops/interface.draw.yaml`), line);
+  assert.ok(line.startsWith(`Runtime rev ${shortRev(rt.B)} is newer than your acked rev ${shortRev(rt.A)}: re-read modules/kernel/contract-changes/draw-new-rule.yaml, modules/kernel/driver-loop.yaml, modules/ops/ops/interface.draw.yaml`), line);
   assert.match(line, /new contract changes: draw-new-rule \(The draw brief gained a rule\)/);
   assert.match(line, new RegExp(`api kernel-ack-rev --workflow ${wf} --rev ${shortRev(rt.B)}`));
   assert.doesNotMatch(line, /\n/, 'one line: a newline would submit half a wake');
@@ -258,7 +258,7 @@ test('runtime churn: a land outside the Kernel contract is silent; an op-contrac
   git(root, 'config', 'user.email', 'spec@example.test'); git(root, 'config', 'user.name', 'spec'); git(root, 'config', 'commit.gpgsign', 'false');
   write(root, 'modules/kernel/kernel-prompt.md', 'prompt\n');
   write(root, 'modules/kernel/driver-loop.yaml', 'loop: 1\n');
-  write(root, 'modules/kernel/contract-changes.yaml', REGISTRY());
+  write(root, 'modules/kernel/contract-changes/seed.yaml', SEED);
   write(root, 'modules/ops/ops/interface.draw.yaml', 'id: interface.draw\n');
   write(root, 'scripts/kernel/op-prompt.mjs', 'export {};\n');
   git(root, 'add', '-A'); git(root, 'commit', '-qm', 'A');

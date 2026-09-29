@@ -868,8 +868,8 @@ moduleLocalDocumentKinds:
     governs: "The tick the kernel agent runs."
     files: [modules/kernel/driver-loop.yaml]
   - id: starci/contract-changes@1
-    governs: "The registry of contract changes: what each added (checks, finding codes), when, and whether it reaches in-flight work (scripts/kernel/contract-version.mjs)."
-    files: [modules/kernel/contract-changes.yaml]
+    governs: "The registry of contract changes (one entry file per change under modules/kernel/contract-changes/, fields in contract-changes-format.yaml): what each added (checks, finding codes), when, and whether it reaches in-flight work (scripts/kernel/contract-version.mjs)."
+    files: [modules/kernel/contract-changes-format.yaml]
   - id: starci/contract-freeze@1
     governs: "The frozen op families and gate paths used to batch contract changes for running workflows."
     files: [modules/kernel/contract-freeze.yaml]

@@ -305,7 +305,10 @@ function repoFixture(t) {
   fs.mkdirSync(path.join(root, 'scripts'), { recursive: true });
   fs.mkdirSync(path.join(root, 'modules', 'kernel'), { recursive: true });
   fs.writeFileSync(path.join(root, 'scripts', 'a.mjs'), 'export const a = 1;\n');
-  fs.writeFileSync(path.join(root, 'modules', 'kernel', 'contract-changes.yaml'), 'schema: starci/contract-changes@1\nchanges:\n  - id: old\n    summary: x\n');
+  fs.mkdirSync(path.join(root, 'modules', 'kernel', 'contract-changes'), { recursive: true });
+  fs.mkdirSync(path.join(root, 'packages', 'grammar'), { recursive: true });
+  fs.writeFileSync(path.join(root, 'modules', 'kernel', 'contract-changes', 'old.yaml'), 'id: old\nsummary: x\n');
+  fs.writeFileSync(path.join(root, 'packages', 'grammar', 'CHANGELOG.md'), '# Changelog\n\n');
   fs.writeFileSync(path.join(root, 'modules', 'kernel', 'rules.yaml'), 'rule: one\n');
   git(root, 'add', '-A');
   git(root, 'commit', '-q', '-m', 'base');
@@ -455,7 +458,7 @@ test('land gate: main moving under the checks reruns the gate on the new main', 
 });
 
 test('contract-change enforcement: a contract file change needs an added or edited entry whose paths cover it', (t) => {
-  assert.deepEqual(governedPaths(['knowledge/a.yaml', 'scripts/x.mjs', 'modules/kernel/contract-changes.yaml', 'modules/ops/o.yaml']), ['knowledge/a.yaml', 'modules/ops/o.yaml']);
+  assert.deepEqual(governedPaths(['knowledge/a.yaml', 'scripts/x.mjs', 'modules/kernel/contract-changes/x.yaml', 'modules/ops/o.yaml']), ['knowledge/a.yaml', 'modules/ops/o.yaml']);
   const before = { changes: [{ id: 'old', paths: ['knowledge/'] }] };
   assert.equal(contractCoverage({ changed: ['knowledge/a.yaml'], before, after: before }).ok, false, 'an old entry does not cover a new edit');
   assert.equal(contractCoverage({ changed: ['knowledge/a.yaml'], before, after: { changes: [...before.changes, { id: 'new', paths: ['knowledge'] }] } }).ok, true, 'a directory covers what is inside it');
@@ -467,10 +470,10 @@ test('contract-change enforcement: a contract file change needs an added or edit
   assert.equal(red.reason, 'checks-red');
   assert.ok(red.checks.some((c) => c.name === 'contract-changes paths' && !c.ok && c.uncovered.includes('modules/kernel/rules.yaml')));
   const registered = sideCommit(root, 'c2', { 'modules/kernel/rules.yaml': 'rule: two\n',
-    'modules/kernel/contract-changes.yaml': 'schema: starci/contract-changes@1\nchanges:\n  - id: rules-two\n    summary: y\n    paths: [modules/kernel/rules.yaml]\n    reach: new-legs\n  - id: old\n    summary: x\n' });
+    'modules/kernel/contract-changes/rules-two.yaml': 'id: rules-two\nsummary: y\npaths: [modules/kernel/rules.yaml]\nreach: new-legs\n' });
   const ok = landCommits({ commits: [registered], root, env, push: false, deps: { runChecks: lightChecks } });
   assert.ok(ok.ok, JSON.stringify(ok.checks));
-  const broken = sideCommit(root, 'c3', { 'modules/kernel/x.yaml': 'a: [unclosed\n', 'modules/kernel/contract-changes.yaml': 'schema: starci/contract-changes@1\nchanges:\n  - id: x\n    paths: [modules/kernel/x.yaml]\n' });
+  const broken = sideCommit(root, 'c3', { 'modules/kernel/x.yaml': 'a: [unclosed\n', 'modules/kernel/contract-changes/x.yaml': 'id: x\npaths: [modules/kernel/x.yaml]\n' });
   const unparsable = landCommits({ commits: [broken], root, env, push: false, deps: { runChecks: lightChecks } });
   assert.ok(unparsable.checks.some((c) => c.name === 'parse modules/kernel/x.yaml' && !c.ok));
   assert.deepEqual(specsTouching(['scripts/supervisor/land.mjs', 'tests/x.spec.mjs'], { specs: [{ file: 'tests/a.spec.mjs', text: "import '../scripts/supervisor/land.mjs'" }, { file: 'tests/b.spec.mjs', text: 'nothing' }] }), ['tests/x.spec.mjs', 'tests/a.spec.mjs']);
@@ -535,27 +538,27 @@ test('a worker job lands end to end: report -> gate -> succeeded, leases release
   assert.equal(cancelJob(after, { jobId: other.job.job_id, root, env }).ok, true);
 });
 
-test('contract-changes.yaml is never leased and two appends to it both land through the gate (merge=union)', async (t) => {
+test('the grammar changelog and contract-change entry files are never leased; two appends to the changelog both land through the gate (merge=union)', async (t) => {
   const env = envOf(t);
   const root = repoFixture(t);
-  fs.writeFileSync(path.join(root, '.gitattributes'), 'modules/kernel/contract-changes.yaml merge=union\n');
+  fs.writeFileSync(path.join(root, '.gitattributes'), 'packages/grammar/CHANGELOG.md merge=union\n');
   git(root, 'add', '-A');
-  git(root, 'commit', '-q', '-m', 'union registry');
+  git(root, 'commit', '-q', '-m', 'union changelog');
   const m = openMachine({ env });
-  const one = stageSelf(m, { name: 'reg-a', files: ['modules/kernel/contract-changes.yaml', 'scripts/a.mjs'], root, env });
-  const two = stageSelf(m, { name: 'reg-b', files: ['modules/kernel/contract-changes.yaml', 'scripts/b.mjs'], root, env });
+  const one = stageSelf(m, { name: 'reg-a', files: ['packages/grammar/CHANGELOG.md', 'modules/kernel/contract-changes/reg-a.yaml', 'scripts/a.mjs'], root, env });
+  const two = stageSelf(m, { name: 'reg-b', files: ['packages/grammar/CHANGELOG.md', 'modules/kernel/contract-changes/reg-a.yaml', 'scripts/b.mjs'], root, env });
   assert.ok(one.ok && two.ok, JSON.stringify({ one, two }));
-  assert.deepEqual(leaseConflicts(m, ['modules/kernel/contract-changes.yaml']), []);
+  assert.deepEqual(leaseConflicts(m, ['packages/grammar/CHANGELOG.md', 'modules/kernel/contract-changes/reg-a.yaml']), []);
   m.close();
-  const registry = fs.readFileSync(path.join(root, 'modules', 'kernel', 'contract-changes.yaml'), 'utf8');
-  const a = sideCommit(root, 'append-a', { 'modules/kernel/contract-changes.yaml': `${registry}  - id: a\n    summary: first\n` });
-  const b = sideCommit(root, 'append-b', { 'modules/kernel/contract-changes.yaml': `${registry}  - id: b\n    summary: second\n` });
+  const log = fs.readFileSync(path.join(root, 'packages', 'grammar', 'CHANGELOG.md'), 'utf8');
+  const a = sideCommit(root, 'append-a', { 'packages/grammar/CHANGELOG.md': `${log}## a\n` });
+  const b = sideCommit(root, 'append-b', { 'packages/grammar/CHANGELOG.md': `${log}## b\n` });
   for (const sha of [a, b]) {
     const out = await land({ commits: [sha], root, env, push: false, deps: { runChecks: lightChecks } });
     assert.ok(out.ok, JSON.stringify(out));
   }
-  const ids = parseYaml(git(root, 'show', 'main:modules/kernel/contract-changes.yaml')).changes.map((c) => c.id);
-  assert.deepEqual(ids, ['old', 'a', 'b']);
+  const sections = git(root, 'show', 'main:packages/grammar/CHANGELOG.md').split(/\r?\n/).filter((l) => l.startsWith('## '));
+  assert.deepEqual(sections, ['## a', '## b']);
 });
 
 test('a self checkout landed with --commit closes its job: succeeded, leases released, checkout and branch removed', async (t) => {

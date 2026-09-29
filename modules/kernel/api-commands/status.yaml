@@ -70,7 +70,7 @@ status:
       (scripts/kernel/runtime-rev.mjs) — current is the runtime root's git HEAD; acked the newest runtime-rev-acked
       event (boot records the boot rev, api kernel-ack-rev the Kernel's). stale: acked is behind and a file under
       modules/kernel, modules/ops, knowledge, modules/models or scripts/kernel/op-prompt.mjs changed in between, or
-      a contract-changes.yaml entry was added (files capped at 12; full: more, or a rev git cannot compare - re-read
+      a contract-changes entry file was added (files capped at 12; full: more, or a rev git cannot compare - re-read
       kernel-prompt.md and driver-loop.yaml in full). unacked: a Kernel that never acked (booted before this): its
       wakes ask for one full re-read and an ack; nothing is gated for it. Every Kernel wake carries the same
       `Runtime rev <short-sha>` sentence (wake-delivery.mjs withWakeIdentity, before the seat identity)
@@ -317,7 +317,7 @@ status:
       seamDuty dispatch-seam and reads "dispatch seam now"
     contractFollowUps: >-
       frontier.contractFollowUps [{change, jobId, op, attempt, status, followUpOp, detail, after}] -
-      for each `reach: follow-up` change in modules/kernel/contract-changes.yaml, the newest leg of
+      for each `reach: follow-up` change in modules/kernel/contract-changes/, the newest leg of
       its followUp.ops (per cut ordinal) that was admitted before the change, runs or succeeded,
       and has no follow-up recorded yet (the key is present only while one is owed). A commit-only leg
       (payload.commitOnly) is never that newest leg while the group has a leg that did the op's work, and

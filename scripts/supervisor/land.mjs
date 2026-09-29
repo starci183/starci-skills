@@ -30,8 +30,8 @@
 //        (engine/config.mjs harnessSpecsEnabled); `--specs none` needs an explicit `--reason` (recorded as specReason on the
 //        land run); `--specs <csv>` adds named specs;
 //      contract-changes: every changed contract/schema/knowledge/op file (CONTRACT_PREFIXES) is covered by
-//        `paths` of an entry the change itself adds or edits - an entry file modules/kernel/contract-changes/<id>.yaml,
-//        or (transition) an item of the old modules/kernel/contract-changes.yaml list (contract-changes-store.mjs);
+//        `paths` of an entry the change itself adds or edits - an entry file modules/kernel/contract-changes/<id>.yaml
+//        (contract-changes-store.mjs);
 //      gate-stability (a REPORT, never a refusal): a land touching a frozen family's gatePaths, or adding/editing
 //        a contract change that adds checks or codes for it (modules/kernel/contract-freeze.yaml), runs the family's
 //        gates as main and as the candidate have them over the latest accepted leg of every live workflow
@@ -66,13 +66,11 @@ import { safeRemoveTree } from '../lib/safe-remove.mjs';
 import { sleepSync } from '../lib/sleep-sync.mjs';
 import { hostThrottle } from '../lib/ram-throttle.mjs';
 import { grammarDistStatus } from '../checks/grammar-dist.mjs';
-import { CONTRACT_CHANGES_FILE, CONTRACT_CHANGES_DIR, isContractChangesPath, readContractChangesDocAt } from '../kernel/contract-changes-store.mjs';
+import { CONTRACT_CHANGES_DIR, isContractChangesPath, readContractChangesDocAt } from '../kernel/contract-changes-store.mjs';
 import { SKILL_ROOT, landRoot, supervisorSettings } from './home.mjs';
 import { specsDirect, changedExports, headRanges } from './land-specs.mjs';
 
 const selfFile = fileURLToPath(import.meta.url);
-/** The old single-file registry (transition: still read); new entries are files under CONTRACT_CHANGES_DIR. */
-export const CONTRACT_CHANGES = CONTRACT_CHANGES_FILE;
 export { CONTRACT_CHANGES_DIR };
 export const CONTRACT_PREFIXES = Object.freeze(['knowledge/', 'modules/schemas/', 'modules/ops/', 'modules/kernel/', 'modules/supervisor/', 'modules/models/code-patterns.yaml']);
 export const TREE_CHECKS = Object.freeze(['scripts/checks/check-module-yaml.mjs', 'scripts/checks/check-contract-cites.mjs', 'scripts/checks/check-api-surface.mjs', 'scripts/checks/check-db-openers.mjs']);

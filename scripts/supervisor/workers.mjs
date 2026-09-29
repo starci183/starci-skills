@@ -174,10 +174,10 @@ function attemptIdOf(m, jobId) {
 
 // Append-only registries every contract job adds an entry to (supervise.yaml landGate step 2). Leasing one
 // serialized every contract job behind whichever held it (2026-09-24: three jobs queued 70 min on
-// contract-changes.yaml alone). They are never leased: .gitattributes merges them `union` at the gate's
+// the grammar CHANGELOG). They are never leased: .gitattributes merges them `union` at the gate's
 // cherry-pick, and the gate still parses the result.
 // Entry files under modules/kernel/contract-changes/ are one per change and never shared, so never leased either.
-export const SHARED_APPEND_FILES = new Set(['modules/kernel/contract-changes.yaml', 'packages/grammar/CHANGELOG.md']);
+export const SHARED_APPEND_FILES = new Set(['packages/grammar/CHANGELOG.md']);
 const leasable = (files) => files.map(normPath).filter((f) => !SHARED_APPEND_FILES.has(f) && !f.startsWith('modules/kernel/contract-changes/'));
 
 /** Leases other open jobs hold on any of `files`: [{file, jobId}]. */

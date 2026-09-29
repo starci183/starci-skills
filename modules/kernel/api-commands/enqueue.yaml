@@ -31,7 +31,7 @@ enqueue:
     only advised (receipt foundationAdvisory, one stderr line) and never held.
   contractFollowUp: >-
     --contract-change <id> --follow-up-of <jobId> records the follow-up leg a
-    `reach: follow-up` contract change owes an older leg (modules/kernel/contract-changes.yaml;
+    `reach: follow-up` contract change owes an older leg (modules/kernel/contract-changes/;
     api status frontier.contractFollowUps): payload.contractChange {id, followUpOf}. Pass
     --after <jobId> while the older leg still runs; it is never held for the change.
   commitOnly: >-

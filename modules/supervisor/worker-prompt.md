@@ -32,8 +32,8 @@ Specs that must pass (done criteria): {specs}
 - Keep every file loadable: `node --check` on each changed .mjs, a YAML/JSON parse of each changed module file.
 - A change to a contract, schema, knowledge or op file (modules/kernel, modules/schemas, modules/ops, knowledge,
   modules/supervisor, modules/models/code-patterns.yaml) registers an entry in the SAME commit as its own file
-  modules/kernel/contract-changes/<id>.yaml (one map: id, effectiveAt, summary, reach, paths; never an append to the
-  old contract-changes.yaml list), with `paths` naming every such file and `reach: new-legs` unless the brief says
+  modules/kernel/contract-changes/<id>.yaml (one map: id, effectiveAt, summary, reach, paths; fields in
+  modules/kernel/contract-changes-format.yaml), with `paths` naming every such file and `reach: new-legs` unless the brief says
   otherwise.
 - Grow the kernel api by files, not by editing its shared lines (scripts/kernel/api-extensions.mjs): a new verb is
   scripts/kernel/api-verbs/<verb>.mjs plus modules/kernel/api-commands/<verb>.yaml, a new status field is

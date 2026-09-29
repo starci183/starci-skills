@@ -335,8 +335,7 @@ landGate:
        check-contract-cites and check-api-surface (red only when not already red the same way on main); the
        specs the worker named plus every spec naming a changed file (--test-concurrency=2, timeout
        runtimes.yaml allocation.landGate specsBaseMs + perSpecMs per spec); and a
-       contract change the change adds or edits (its own file modules/kernel/contract-changes/<id>.yaml, or an item
-       of the old modules/kernel/contract-changes.yaml list during the transition) whose `paths` cover every changed
+       contract change the change adds or edits (its own file modules/kernel/contract-changes/<id>.yaml) whose `paths` cover every changed
        contract, schema, knowledge or op file (knowledge/, modules/schemas/, modules/ops/, modules/kernel/,
        modules/supervisor/, modules/models/code-patterns.yaml).
        Owner, 2026-09-29 (config.yaml specs.harness, default false = touching-only): the gate's spec mode is

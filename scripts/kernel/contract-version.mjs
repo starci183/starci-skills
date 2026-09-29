@@ -1,5 +1,5 @@
 // contract-version.mjs — the contract an operation was ADMITTED under, and the contract changes
-// registered since (modules/kernel/contract-changes.yaml).
+// registered since (modules/kernel/contract-changes/).
 //
 // Owner, 2026-09-24: most blocks came from contract changes rolled onto running workflows
 // mid-flight (the app shell, then the layout tree, then nav, then part review in one night). A
@@ -8,7 +8,7 @@
 //   - dispatch records the version it admitted the leg under in contracts.context_json.contract
 //     (CONTRACT_VERSION_SCHEMA): the runtime's git HEAD, a digest over the op brief, _common, the
 //     verdict contract and every schema/check the brief cites, and the admission time;
-//   - a change registered in contract-changes.yaml names the checks and finding codes it ADDED and
+//   - a change registered as an entry file under modules/kernel/contract-changes/ names the checks and finding codes it ADDED and
 //     when it took effect; for a leg admitted before it those checks and codes are advisory
 //     suspects (api check annotates them, api settle does not count them red), never refusals;
 //   - a change marked `reach: follow-up` is meant to reach in-flight work: api status lists the
@@ -155,9 +155,8 @@ const knownOpsOf = (root) => {
 
 /**
  * Every registered contract change, oldest first: {schema, changes[], problems[]}. The registry is one file per
- * entry under modules/kernel/contract-changes/ plus, during the transition, the old contract-changes.yaml list
- * (scripts/kernel/contract-changes-store.mjs). A missing registry registers none. `file` (or
- * STARCI_CONTRACT_CHANGES, the spec seam) reads one single-file registry instead.
+ * entry under modules/kernel/contract-changes/ (scripts/kernel/contract-changes-store.mjs). A missing registry registers none. `file` (or
+ * STARCI_CONTRACT_CHANGES, the spec seam) reads one fixture document `{schema, changes: [...]}` instead.
  */
 export function loadContractChanges(root, { file = process.env.STARCI_CONTRACT_CHANGES ? path.resolve(process.env.STARCI_CONTRACT_CHANGES) : null, freezeFile = defaultFreezeFile(root) } = {}) {
   let doc = null;

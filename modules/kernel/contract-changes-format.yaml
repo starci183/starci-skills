@@ -1,15 +1,13 @@
-# contract-changes.yaml — legacy header for the per-entry contract change registry.
+# contract-changes-format.yaml — the field documentation of the contract change registry.
 #
-# ONE FILE PER ENTRY from 2026-09-28 (lane land-throughput): a new change is its own file
-# modules/kernel/contract-changes/<id>.yaml holding one map with the keys below (no `- ` item, no
-# `changes:`). Every lane appending to the tail of this list invalidated every queued lane. The migration
-# has emptied this list into the directory. Readers still accept an old-list entry during the transition;
-# new changes belong only in per-entry files.
+# ONE FILE PER ENTRY: a change is its own file modules/kernel/contract-changes/<id>.yaml holding one map with
+# the keys below (no `- ` item, no `changes:`); the id is the file name (scripts/kernel/contract-changes-store.mjs).
+# There is no single-file list.
 #
 # Owner, 2026-09-24: a contract change is never rolled onto running work. A running or already
 # settled leg is judged and checked against the contract it was ADMITTED under (the contracts row
 # api dispatch filed, with its recorded version: scripts/kernel/contract-version.mjs); new legs use
-# the current contract. Each entry here is one change that ADDED checks or finding codes, or that
+# the current contract. Each entry is one change that ADDED checks or finding codes, or that
 # must reach in-flight work:
 #
 #   id             stable slug, cited by api receipts (check advisory, contractFollowUps)
@@ -35,14 +33,15 @@
 #                  advisory sourceDrift naming this change (and, for reach follow-up, the owed legs
 #                  in contractFollowUps). A Source edit no change names shows as UNREGISTERED drift.
 #
-# Every edit to Source knowledge is registered here with its paths and reach, in the same commit
+# Every edit to Source knowledge is registered as an entry file with its paths and reach, in the same commit
 # (modules/supervisor/supervise.yaml guardrails source-knowledge-edits). A settled leg is judged by
 # the knowledge it was admitted under; only a reach follow-up change, or a change to the product
 # records the leg itself read, owes it more work (scripts/kernel/input-digests.mjs).
 #
-# The supervisor batches changes and registers each here in the same commit that lands it
+# The supervisor batches changes and registers each in the same commit that lands it
 # (modules/supervisor/supervise.yaml guardrails contract-rollout); it never tells a Kernel to hold
 # running work for a change unless the change is safetyCritical.
-schema: starci/contract-changes@1
 
-changes:
+# The documentation file itself is stamped so the schema catalog (modules/schemas/index.yaml) has a file for the kind;
+# every entry file is one map of the fields above and has no schema key.
+schema: starci/contract-changes@1
