@@ -30,6 +30,20 @@ import { ARTIFACTS_INDEXED } from './job-artifacts.mjs';
 // The events whose payload chains artifact {id, sha256} (read lazily: job-artifacts.mjs imports this module).
 const chainedArtifactEvents = () => [ARTIFACTS_INDEXED, 'report-filed'];
 
+/**
+ * An events row's whole payload (the reader engine/ledger-db.mjs eventPayload names): an oversized event keeps a stub
+ * {spilled:true, sha256, bytes, count?} for each spilled field - or no payload_json at all when its writer stored the blob
+ * itself - and its payload_sha blob holds the whole payload. A spilled report-filed / artifacts-indexed artifact list
+ * is still chained, never counted unchained. An unreadable blob reads as the inline part (verifyEventChain owns tamper).
+ */
+function wholeEventPayload(row) {
+  const inline = parseJson(row?.payload_json ?? '', null);
+  if (!row?.payload_sha) return inline ?? {};
+  const isStub = (v) => v && typeof v === 'object' && v.spilled === true && v.sha256 === row.payload_sha;
+  if (inline !== null && !isStub(inline) && !(typeof inline === 'object' && Object.values(inline).some(isStub))) return inline;
+  try { return JSON.parse(getBlob(row.payload_sha).toString('utf8')) ?? {}; } catch { return inline ?? {}; }
+}
+
 export const PROOF_COVERAGE_SCHEMA = 'starci/proof-coverage@1';
 /** The contract change that made a handover ask owe its must-have proof (modules/kernel/contract-changes.yaml, reach new-legs). */
 export const PROOF_INTEGRITY_CHANGE = 'proof-integrity';
@@ -315,8 +329,8 @@ export const coverageLines = (cov) => [
 export function verifyProofs(db, workflowId) {
   const chain = verifyEventChain(db, workflowId);
   const chained = new Map();
-  for (const e of db.prepare(`SELECT kind,payload_json FROM events WHERE workflow_id=? AND kind IN (${chainedArtifactEvents().map(() => '?').join(',')}) ORDER BY seq`)
-    .all(workflowId, ...chainedArtifactEvents())) for (const a of list(parseJson(e.payload_json, {})?.artifacts)) if (a?.id != null && a?.sha256) chained.set(Number(a.id), a.sha256);
+  for (const e of db.prepare(`SELECT kind,payload_json,payload_sha FROM events WHERE workflow_id=? AND kind IN (${chainedArtifactEvents().map(() => '?').join(',')}) ORDER BY seq`)
+    .all(workflowId, ...chainedArtifactEvents())) for (const a of list(wholeEventPayload(e)?.artifacts)) if (a?.id != null && a?.sha256) chained.set(Number(a.id), a.sha256);
   const rows = db.prepare('SELECT artifact_id,job_id,name,sha256 FROM job_artifacts WHERE workflow_id=? ORDER BY artifact_id').all(workflowId);
   const tampered = [];
   let unchained = 0;
