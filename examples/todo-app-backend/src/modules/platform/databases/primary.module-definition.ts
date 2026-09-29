@@ -2,6 +2,9 @@ import {
     ConfigurableModuleBuilder 
 } from "@nestjs/common"
 
+/** Primary takes no options beyond the isGlobal extra. */
+export type PrimaryOptions = Record<never, never>
+
 /**
  * Matches nivo's own capability-module convention (see e.g.
  * `agent-workspace-operations.module-definition.ts`): every owned module gets a
@@ -9,7 +12,7 @@ import {
  * option, so registration (global vs. locally imported) is an explicit, uniform choice rather than a
  * hard-coded `@Module({ global: true })`.
  */
-export const { ConfigurableModuleClass, OPTIONS_TYPE } = new ConfigurableModuleBuilder().setExtras(
+export const { ConfigurableModuleClass, OPTIONS_TYPE } = new ConfigurableModuleBuilder<PrimaryOptions>().setExtras(
     {
         isGlobal: false 
     },

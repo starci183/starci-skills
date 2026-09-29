@@ -3,7 +3,19 @@
   "profile": "be",
   "project": "todo-app-backend",
   "apps": [
-    { "name": "todo", "kind": "api" }
+    {
+      "name": "todo",
+      "kind": "api"
+    },
+    {
+      "name": "migrate",
+      "kind": "migrate"
+    }
   ],
-  "optionalSlots": ["repo.docs"]
+  "connections": [
+    "postgresql-primary"
+  ],
+  "optionalSlots": [
+    "repo.docs"
+  ]
 }

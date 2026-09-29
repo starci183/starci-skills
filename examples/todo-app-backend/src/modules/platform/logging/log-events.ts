@@ -4,6 +4,10 @@
  * silently empties a dashboard (observability's log-name law).
  */
 export enum LogEvent {
+    /** The best-effort Keycloak sign-out notification failed; the local revoke already happened, so the line is observation only and the reason rides in data. */
+    SessionSignOutNotifyFailed = "session.sign-out.notify-failed",
+    /** `apps/migrate` finished; the names of the migrations it applied ride in data (an empty list when the schema was already current). */
+    MigrationsApplied = "migrations.applied",
     /** The recur generation tick wrote at least one occurrence during this run. */
     RecurGenerationTickMaterialised = "recur.generation-tick.materialised",
     /** An idle client in the primary pg pool died out from under the pool - the pool evicts it, so the line is observation only; the next ping still decides health on its own. */

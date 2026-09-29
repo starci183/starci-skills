@@ -16,6 +16,9 @@ import {
 import {
     PostgresPrimaryUnavailableException,
 } from "./errors/postgres-primary-unavailable"
+import {
+    pingPrimary
+} from "./persistence/ping.repository"
 
 
 /** How long a probe waits before declaring the database gone - a health check must fail fast, not hang on a dead connection. */
@@ -64,13 +67,13 @@ export class PostgresPrimaryClient implements OnModuleDestroy {
         let timer: ReturnType<typeof setTimeout> | undefined
         try {
             const result = await Promise.race([
-                this.pool.query("SELECT 1"),
+                pingPrimary(this.pool),
                 new Promise<never>((_resolve, reject) => {
                     timer = setTimeout(() => reject(new Error("ping timed out")),
                         PING_TIMEOUT_MS)
                 }),
             ])
-            rowCount = result.rowCount
+            rowCount = result
         } catch (error) {
             throw new PostgresPrimaryUnavailableException({
                 reason: String(error) 

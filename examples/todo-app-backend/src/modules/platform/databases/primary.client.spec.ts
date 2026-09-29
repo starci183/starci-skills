@@ -2,6 +2,9 @@ import {
     Test, TestingModule 
 } from "@nestjs/testing"
 import {
+    mock
+} from "@starci/jest-preset/mock"
+import {
     Pool 
 } from "pg"
 import {
@@ -28,7 +31,7 @@ jest.mock("pg",
 
 describe("PostgresPrimaryClient",
     () => {
-        const poolMock = Pool as unknown as jest.Mock
+        const poolMock = jest.mocked(Pool)
         let query: jest.Mock
         let end: jest.Mock
         let on: jest.Mock
@@ -61,8 +64,8 @@ describe("PostgresPrimaryClient",
             end = jest.fn().mockResolvedValue(undefined)
             on = jest.fn()
             log = jest.fn()
-            poolMock.mockImplementation(() => ({
-                query, end, on 
+            poolMock.mockImplementation(() => mock<Pool>({
+                query, end, on
             }))
         })
 
@@ -233,8 +236,8 @@ describe("PostgresPrimaryClient",
                 try {
                     await expect(boot()).rejects.toThrow()
                 } finally {
-                    poolMock.mockImplementation(() => ({
-                        query, end, on 
+                    poolMock.mockImplementation(() => mock<Pool>({
+                        query, end, on
                     }))
                 }
             })

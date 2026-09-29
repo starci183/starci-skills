@@ -14,8 +14,8 @@ import {
     EntityManager 
 } from "typeorm"
 import {
-    POSTGRESQL_PRIMARY 
-} from "./constants/connection"
+    CONNECTION
+} from "./persistence/connection"
 import {
     InjectPrimaryEntityManager 
 } from "./primary.decorators"
@@ -36,9 +36,9 @@ describe("InjectPrimaryEntityManager",
     }>
 
                 expect(deps).toContainEqual({
-                    index: 0, param: getEntityManagerToken(POSTGRESQL_PRIMARY) 
+                    index: 0, param: getEntityManagerToken(CONNECTION) 
                 })
-                expect(getEntityManagerToken(POSTGRESQL_PRIMARY)).toBe("postgresql-primaryEntityManager")
+                expect(getEntityManagerToken(CONNECTION)).toBe("postgresql-primaryEntityManager")
             })
 
         it("resolves the primary entity manager from the container at the decorated parameter",
@@ -50,7 +50,7 @@ describe("InjectPrimaryEntityManager",
                     providers: [
                         EntityManagerConsumer,
                         {
-                            provide: getEntityManagerToken(POSTGRESQL_PRIMARY), useValue: fakeManager 
+                            provide: getEntityManagerToken(CONNECTION), useValue: fakeManager 
                         },
                     ],
                 }).compile()

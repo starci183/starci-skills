@@ -6,28 +6,31 @@ import {
 } from "typeorm"
 import {
     CreateSessionsTable1758160000000 
-} from "./migrations/1758160000000-create-sessions-table"
+} from "./1758160000000-create-sessions-table"
 import {
     CreateTasksTable1758160000001 
-} from "./migrations/1758160000001-create-tasks-table"
+} from "./1758160000001-create-tasks-table"
 import {
     CreateInvitationsTable1758160000002 
-} from "./migrations/1758160000002-create-invitations-table"
+} from "./1758160000002-create-invitations-table"
 import {
     CreatePlanTables1758160000002 
-} from "./migrations/1758160000002-create-plan-tables"
+} from "./1758160000002-create-plan-tables"
 import {
     CreateNotifyTables1758210000000 
-} from "./migrations/1758210000000-create-notify-tables"
+} from "./1758210000000-create-notify-tables"
 import {
     CreateAuditTables1758246000000 
-} from "./migrations/1758246000000-create-audit-tables"
+} from "./1758246000000-create-audit-tables"
 import {
     CreateRecurTables1758246000000 
-} from "./migrations/1758246000000-create-recur-tables"
+} from "./1758246000000-create-recur-tables"
 import {
     CreateUploadsTable1758300000000 
-} from "./migrations/1758300000000-create-uploads-table"
+} from "./1758300000000-create-uploads-table"
+import {
+    mock 
+} from "@starci/jest-preset/mock"
 
 type MigrationClass = new () => MigrationInterface;
 
@@ -63,9 +66,9 @@ describe("primary migrations",
 
         const issuedSql = async (migration: MigrationInterface, direction: "up" | "down"): Promise<Array<string>> => {
             query.mockReset().mockResolvedValue(undefined)
-            await migration[direction]({
+            await migration[direction](mock<QueryRunner>({
                 query 
-            } as unknown as QueryRunner)
+            }))
             return query.mock.calls.map(([sql]) => String(sql).replace(/\s+/g,
                 " ").trim())
         }

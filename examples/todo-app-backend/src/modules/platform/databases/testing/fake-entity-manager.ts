@@ -1,12 +1,19 @@
+import type {
+    FindOperator
+} from "typeorm"
 import {
     PostgresPrimaryUnavailableException,
 } from "../errors/postgres-primary-unavailable"
 
+/** A filter: each field is a value or a TypeORM find operator such as `IsNull()`, the way a real `where` is written. */
+export type FakeWhere<T extends object> = { [K in keyof T]?: T[K] | FindOperator<T[K]> }
+
 type FakeEntityKey<T extends object> = keyof T | ((row: Partial<T>) => string)
 
 interface FakeEntityManagerResult<T extends object> {
-    findOneBy(target: unknown, where: Partial<T>): Promise<T | null>
-    findBy(target: unknown, where: Partial<T>): Promise<Array<T>>
+    findOneBy(target: unknown, where: FakeWhere<T>): Promise<T | null>
+    findBy(target: unknown, where: FakeWhere<T>): Promise<Array<T>>
+    find(target: unknown, options?: { where?: FakeWhere<T>; take?: number }): Promise<Array<T>>
     save(target: unknown, entityLike: Partial<T>): Promise<T>
     delete(target: unknown, criteria: unknown): Promise<void>
 }
@@ -31,36 +38,45 @@ export const createFakeEntityManager = <T extends object>(keyOf: FakeEntityKey<T
         return raw === undefined ? undefined : String(raw)
     }
     return {
-        async findOneBy(_target: unknown, where: Partial<T>): Promise<T | null> {
-            const key = keyOfPartial(where)
-            if (key !== undefined) return rows.get(key) ?? null
+        findOneBy(_target: unknown, where: FakeWhere<T>): Promise<T | null> {
+            const key = keyOfPartial(plainFields(where))
+            if (key !== undefined) return Promise.resolve(rows.get(key) ?? null)
             for (const row of rows.values()) if (matches(row,
-                where)) return row
-            return null
+                where)) return Promise.resolve(row)
+            return Promise.resolve(null)
         },
-        async findBy(_target: unknown, where: Partial<T>): Promise<Array<T>> {
-            return [...rows.values()].filter(row => matches(row,
-                where))
+        findBy(_target: unknown, where: FakeWhere<T>): Promise<Array<T>> {
+            return Promise.resolve([...rows.values()].filter(row => matches(row,
+                where)))
         },
-        async save(_target: unknown, entityLike: Partial<T>): Promise<T> {
+        find(_target: unknown, options: { where?: FakeWhere<T>; take?: number } = {
+        }): Promise<Array<T>> {
+            const found = [...rows.values()].filter(row => matches(row,
+                options.where ?? {
+                }))
+            return Promise.resolve(options.take === undefined ? found : found.slice(0,
+                options.take))
+        },
+        save(_target: unknown, entityLike: Partial<T>): Promise<T> {
             const entity = entityLike as T
             const key = keyOfPartial(entity)
             if (key === undefined) {
-                throw new PostgresPrimaryUnavailableException({
+                return Promise.reject(new PostgresPrimaryUnavailableException({
                     reason: "createFakeEntityManager: save() called without enough fields to derive a key",
-                })
+                }))
             }
             rows.set(key,
                 entity)
-            return entity
+            return Promise.resolve(entity)
         },
-        async delete(_target: unknown, criteria: unknown): Promise<void> {
+        delete(_target: unknown, criteria: unknown): Promise<void> {
             if (typeof keyOf === "function" && criteria && typeof criteria === "object") {
                 const key = keyOf(criteria as Partial<T>)
                 rows.delete(key)
-                return
+                return Promise.resolve()
             }
             rows.delete(String(criteria))
+            return Promise.resolve()
         },
     }
 }
@@ -72,7 +88,22 @@ function isIsNullOperator(value: unknown): boolean {
     return typeof value === "object" && value !== null && (value as { _type?: unknown })._type === "isNull"
 }
 
-function matches<T extends object>(row: T, where: Partial<T>): boolean {
+/** The fields of a filter that are plain values: an operator such as `IsNull()` cannot name a row by key. */
+function plainFields<T extends object>(where: FakeWhere<T>): Partial<T> {
+    const plain: Partial<T> = {
+    }
+    for (const key of Object.keys(where) as Array<keyof T>) {
+        const criterion = where[key]
+        if (!isOperator(criterion)) plain[key] = criterion as T[keyof T]
+    }
+    return plain
+}
+
+function isOperator(value: unknown): boolean {
+    return typeof value === "object" && value !== null && typeof (value as { _type?: unknown })._type === "string"
+}
+
+function matches<T extends object>(row: T, where: FakeWhere<T>): boolean {
     return (Object.keys(where) as Array<keyof T>).every(key => {
         const criterion = where[key]
         if (isIsNullOperator(criterion)) return row[key] === null || row[key] === undefined

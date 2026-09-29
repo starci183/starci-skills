@@ -1,4 +1,7 @@
 import {
+    mock
+} from "@starci/jest-preset/mock"
+import {
     DynamicModule, FactoryProvider, Provider 
 } from "@nestjs/common"
 import {
@@ -14,59 +17,14 @@ import {
     ConfigModule,
 } from "@modules/platform/config/index"
 import {
-    POSTGRESQL_PRIMARY 
-} from "./constants/connection"
-import {
     PostgresPrimaryClient 
 } from "./primary.client"
 import {
     PostgresqlPrimaryModule 
 } from "./primary.module"
 import {
-    AuditErasureRequestEntity 
-} from "./entities/audit-erasure-request.entity"
-import {
-    AuditKeyEntity 
-} from "./entities/audit-key.entity"
-import {
-    AuditLogLineEntity 
-} from "./entities/audit-log-line.entity"
-import {
-    NotifyDeliveryAttemptEntity 
-} from "./entities/notify-delivery-attempt.entity"
-import {
-    NotifyDigestWindowEntity 
-} from "./entities/notify-digest-window.entity"
-import {
-    NotifyNotificationEntity 
-} from "./entities/notification.entity"
-import {
-    NotifyPreferenceEntity 
-} from "./entities/notify-preference.entity"
-import {
-    OccurrenceEntity 
-} from "./entities/occurrence.entity"
-import {
-    PaymentIntentEntity 
-} from "./entities/payment-intent.entity"
-import {
-    RuleEntity 
-} from "./entities/rule.entity"
-import {
-    SessionEntity 
-} from "./entities/session.entity"
-import {
-    ShareInvitationEntity 
-} from "./entities/share-invitation.entity"
-import {
-    SubscriptionEntity 
-} from "./entities/subscription.entity"
-import {
-    TaskEntity 
-} from "./entities/task.entity"
-import {
-    UploadEntity 
-} from "./entities/upload.entity"
+    CONNECTION, entities
+} from "./persistence"
 
 /**
  * PostgresqlPrimaryModule.register() cannot be compiled in a unit spec - TypeOrmCoreModule would open
@@ -114,16 +72,16 @@ describe("PostgresqlPrimaryModule",
                 }).global).toBe(true)
             })
 
-        it("threads the POSTGRESQL_PRIMARY name into the data-source and entity-manager provider tokens",
+        it("threads the CONNECTION name into the data-source and entity-manager provider tokens",
             () => {
                 const coreModule = findCoreModule(PostgresqlPrimaryModule.register())
                 const tokens = (coreModule.providers ?? []).map(
                     (provider: Provider) => (typeof provider === "object" && provider !== null && "provide" in provider ? provider.provide : provider),
                 )
 
-                expect(tokens).toContain(getDataSourceToken(POSTGRESQL_PRIMARY))
-                expect(tokens).toContain(getEntityManagerToken(POSTGRESQL_PRIMARY))
-                expect(getDataSourceToken(POSTGRESQL_PRIMARY)).toBe("postgresql-primaryDataSource")
+                expect(tokens).toContain(getDataSourceToken(CONNECTION))
+                expect(tokens).toContain(getEntityManagerToken(CONNECTION))
+                expect(getDataSourceToken(CONNECTION)).toBe("postgresql-primaryDataSource")
             })
 
         it("injects AppConfigService into the options factory and imports ConfigModule for it",
@@ -134,37 +92,20 @@ describe("PostgresqlPrimaryModule",
                 expect(findOptionsProvider(coreModule).inject).toEqual([AppConfigService])
             })
 
-        it("builds TypeORM options from the configured database URL with migrations on and synchronize off",
+        it("builds TypeORM options from the configured database URL: no migrations run here, synchronize off, explicit entities",
             () => {
                 const provider = findOptionsProvider(findCoreModule(PostgresqlPrimaryModule.register()))
-                const config = {
-                    getDatabaseUrl: () => "postgres://spec-host:5432/specdb" 
-                } as AppConfigService
+                const config = mock<AppConfigService>({
+                    getDatabaseUrl: () => "postgres://spec-host:5432/specdb"
+                })
 
                 const options = provider.useFactory(config) as TypeOrmModuleOptions & { url?: string }
-                const migrations = options.migrations as unknown as Array<unknown>
 
                 expect(options.type).toBe("postgres")
                 expect(options.url).toBe("postgres://spec-host:5432/specdb")
                 expect(options.synchronize).toBe(false)
-                expect(options.migrationsRun).toBe(true)
-                expect(String(migrations[0])).toMatch(/migrations[/\\]\*\.\{js,ts\}$/)
-                expect(options.entities).toEqual([
-                    SessionEntity,
-                    TaskEntity,
-                    ShareInvitationEntity,
-                    RuleEntity,
-                    OccurrenceEntity,
-                    NotifyNotificationEntity,
-                    NotifyDeliveryAttemptEntity,
-                    NotifyPreferenceEntity,
-                    NotifyDigestWindowEntity,
-                    AuditLogLineEntity,
-                    AuditKeyEntity,
-                    AuditErasureRequestEntity,
-                    SubscriptionEntity,
-                    PaymentIntentEntity,
-                    UploadEntity,
-                ])
+                expect(options.migrationsRun).toBe(false)
+                expect(options.migrations).toBeUndefined()
+                expect(options.entities).toEqual(entities)
             })
     })

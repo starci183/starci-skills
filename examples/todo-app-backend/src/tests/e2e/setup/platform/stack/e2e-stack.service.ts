@@ -14,8 +14,11 @@ import {
     ChildProcess, spawn, spawnSync, SpawnSyncReturns 
 } from "node:child_process"
 import {
-    appendFileSync, existsSync, mkdirSync, readdirSync, statSync 
+    appendFileSync, existsSync, mkdirSync, readdirSync, statSync, writeFileSync 
 } from "node:fs"
+import {
+    randomBytes 
+} from "node:crypto"
 import {
     tmpdir 
 } from "node:os"
@@ -191,6 +194,7 @@ export class E2EStackService implements OnModuleInit, OnApplicationShutdown {
             240_000,
             async () => this.keycloakReady())
 
+        this.migrate()
         this.startApi()
         await retryUntil(`api /health on ${this.baseUrl}`,
             120_000,
@@ -198,16 +202,14 @@ export class E2EStackService implements OnModuleInit, OnApplicationShutdown {
     }
 
     /**
-     * The api child runs the compiled `dist/main.js`, not ts-node: a stale or absent build would make
+     * The api child runs the compiled `dist/apps/todo/src/main.js`, not ts-node: a stale or absent build would make
      * the suite exercise code the tree no longer contains (a fixed ping deadline that never reached
      * dist once produced exactly that false failure). When any compiled source is newer than
-     * `dist/main.js` this rebuilds through the same `npm run build` steps before booting anything;
+     * `dist/apps/todo/src/main.js` this rebuilds through the same `npm run build` steps before booting anything;
      * a compile failure stops boot with the tsc output instead of an api that never answers /health.
      */
     private ensureApiBuild(): void {
-        const distMain = join(BACKEND_ROOT,
-            "dist",
-            "main.js")
+        const distMain = apiMain()
         if (existsSync(distMain) && newestSourceMtimeMs(join(BACKEND_ROOT,
             "src")) <= statSync(distMain).mtimeMs) {
             return
@@ -239,6 +241,35 @@ export class E2EStackService implements OnModuleInit, OnApplicationShutdown {
         }
     }
 
+    /**
+     * The schema comes only from `apps/migrate` (the api never runs migrations): the compiled migrate app
+     * runs once against this boot's fresh volume, and the api starts after it has exited cleanly.
+     */
+    private migrate(): void {
+        const result = spawnSync(process.execPath,
+            ["-r",
+                "tsconfig-paths/register",
+                join(BACKEND_ROOT,
+                    "dist",
+                    "apps",
+                    "migrate",
+                    "src",
+                    "main.js")],
+            {
+                cwd: BACKEND_ROOT,
+                encoding: "utf8",
+                env: {
+                    ...process.env,
+                    DATABASE_URL: this.databaseUrl,
+                },
+            })
+        if (result.error) throw result.error
+        if (result.status !== 0) {
+            throw new Error(`migrate failed (exit ${result.status}):
+${result.stderr || result.stdout}`)
+        }
+    }
+
     private startApi(): void {
         const logDir = join(tmpdir(),
             "todo-e2e",
@@ -249,15 +280,21 @@ export class E2EStackService implements OnModuleInit, OnApplicationShutdown {
             })
         this.apiLogPath = join(logDir,
             "api.log")
+        // Presigned upload tokens need signing material; this run mints its own, in a file, like every *_FILE secret.
+        const signingKeyPath = join(logDir,
+            "upload-signing.key")
+        writeFileSync(signingKeyPath,
+            randomBytes(32).toString("hex"))
         const env: NodeJS.ProcessEnv = {
             ...process.env,
-            // Only the knobs AppConfigService actually reads are set. The schema comes from TypeORM's
-            // migrations (migrationsRun: true in PostgresqlPrimaryModule) on this boot's fresh volume.
+            // Only the knobs AppConfigService actually reads are set. The schema was already migrated by `apps/migrate` (see migrate()) on this boot's fresh volume.
             PORT: String(this.ports.api),
             DATABASE_URL: this.databaseUrl,
             REDIS_URL: this.redisUrl,
             KEYCLOAK_TOKEN_URL: `${this.keycloakUrl}/realms/${REALM}/protocol/openid-connect/token`,
             KEYCLOAK_CLIENT_ID: PUBLIC_CLIENT,
+            SEPAY_BASE_URL: "https://my.sepay.vn",
+            UPLOAD_SIGNING_SECRET_FILE: signingKeyPath,
             RECUR_TICK_CRON: process.env.E2E_RECUR_TICK_CRON ?? "* * * * * *",
             // The one outbound-network effect the app can attempt is pinned to a loopback port nothing
             // listens on, so an accidental send fails locally instead of reaching a real MX.
@@ -268,9 +305,7 @@ export class E2EStackService implements OnModuleInit, OnApplicationShutdown {
         this.apiChild = spawn(process.execPath,
             ["-r",
                 "tsconfig-paths/register",
-                join(BACKEND_ROOT,
-                    "dist",
-                    "main.js")],
+                apiMain()],
             {
                 cwd: BACKEND_ROOT,
                 env,
@@ -399,6 +434,16 @@ export class E2EStackService implements OnModuleInit, OnApplicationShutdown {
     }
 }
 
+/** The compiled api entry: `tsc` keeps the repository layout under `dist/`. */
+function apiMain(): string {
+    return join(BACKEND_ROOT,
+        "dist",
+        "apps",
+        "todo",
+        "src",
+        "main.js")
+}
+
 function sh(command: string, args: Array<string>, env?: NodeJS.ProcessEnv): ShResult {
     const result: SpawnSyncReturns<string> = spawnSync(command,
         args,
@@ -424,7 +469,7 @@ async function httpStatus(url: string): Promise<number> {
 
 /**
  * Newest mtime among the `.ts` files `tsconfig.build.json` compiles under `src` - the freshness
- * watermark `dist/main.js` is compared against. Unit `*.spec.ts` files are excluded from the build,
+ * watermark `dist/apps/todo/src/main.js` is compared against. Unit `*.spec.ts` files are excluded from the build,
  * so they do not count as a reason to rebuild.
  */
 function newestSourceMtimeMs(dir: string): number {

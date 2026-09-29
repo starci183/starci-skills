@@ -1,4 +1,7 @@
 import {
+    IsNull
+} from "typeorm"
+import {
     createFakeEntityManager 
 } from "./fake-entity-manager"
 
@@ -94,6 +97,31 @@ describe("createFakeEntityManager",
                 ])
             })
 
+        it("find filters by where and honors take as the row bound",
+            async () => {
+                const em = createFakeEntityManager<TaskRow>("id")
+                for (const id of ["task-1",
+                    "task-2",
+                    "task-3"]) {
+                    await em.save(null,
+                        {
+                            id, owner: "owner-1", deletedAt: null
+                        })
+                }
+                await em.save(null,
+                    {
+                        id: "task-4", owner: "owner-2", deletedAt: null
+                    })
+
+                await expect(em.find(null,
+                    {
+                        where: {
+                            owner: "owner-1"
+                        }, take: 2
+                    })).resolves.toHaveLength(2)
+                await expect(em.find(null)).resolves.toHaveLength(4)
+            })
+
         it("treats an IsNull()-shaped find operator as matching null or undefined fields",
             async () => {
                 const em = createFakeEntityManager<TaskRow>("id")
@@ -105,13 +133,9 @@ describe("createFakeEntityManager",
                     {
                         id: "task-2", owner: "owner-1", deletedAt: new Date("2026-09-01T00:00:00Z") 
                     })
-                const isNull = {
-                    _type: "isNull" 
-                } as unknown as Date | null
-
                 await expect(em.findBy(null,
                     {
-                        deletedAt: isNull 
+                        deletedAt: IsNull() 
                     })).resolves.toEqual([
                     {
                         id: "task-1", owner: "owner-1", deletedAt: null 
