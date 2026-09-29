@@ -15,6 +15,11 @@ import {seedWorkflow} from './_ledger-fixture.mjs';
 // PowerShell ran the wake text as a command. A frame that ENDS in a bare shell prompt is agent-exited:
 // every wake path refuses to type into it and api status reads the worker dead.
 const ROOT=path.resolve(import.meta.dirname,'..');
+// The card's settle/attestation windows (~25s of pure waiting per dispatch) are counted logically; scale the real sleeps down (scripts/lib/sleep-sync.mjs).
+process.env.STARCI_SLEEP_SCALE??='0.02';
+// This spec is about dispatch delivery/liveness, not the host-contract listing (orca-call-contract covers it): left on,
+// every mutation spawns the fake orca's agent-context under a 15s timeout that misses under full-suite load.
+process.env.STARCI_ORCA_SKIP_LIVE_CHECK??='1';
 const API=path.join(ROOT,'scripts','kernel','api.mjs');
 const json=text=>{try{return JSON.parse(text);}catch{return null;}};
 

@@ -17,6 +17,8 @@ import {allocationMs} from '../engine/config.mjs';
 //  - with no heartbeat, the refused nudge is the writability judgement: the worker reads disconnected,
 //    and reconcile --dead-worker --settle-failed recovers it.
 const ROOT=path.resolve(import.meta.dirname,'..');
+// The card's settle/attestation windows (~25s of pure waiting per dispatch) are counted logically; scale the real sleeps down (scripts/lib/sleep-sync.mjs).
+process.env.STARCI_SLEEP_SCALE??='0.02';
 const API=path.join(ROOT,'scripts','kernel','api.mjs');
 const STALE_MS=allocationMs('liveness.activeStaleMs');
 const json=text=>{try{return JSON.parse(text);}catch{return null;}};

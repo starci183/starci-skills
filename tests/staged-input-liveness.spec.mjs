@@ -18,6 +18,11 @@ import {classifyAgentScreen,stagedInputRegion,stagedInputRow} from '../scripts/k
 // finds the input region by the text the runtime sent and only the rows above it can prove a turn, and
 // nudge submits a staged paste with one Enter-only send.
 const ROOT=path.resolve(import.meta.dirname,'..');
+// The card's settle/attestation windows (~25s of pure waiting per dispatch) are counted logically; scale the real sleeps down (scripts/lib/sleep-sync.mjs).
+process.env.STARCI_SLEEP_SCALE??='0.02';
+// This spec is about dispatch delivery/liveness, not the host-contract listing (orca-call-contract covers it): left on,
+// every mutation spawns the fake orca's agent-context under a 15s timeout that misses under full-suite load.
+process.env.STARCI_ORCA_SKIP_LIVE_CHECK??='1';
 const API=path.join(ROOT,'scripts','kernel','api.mjs');
 const json=text=>{try{return JSON.parse(text);}catch{return null;}};
 
