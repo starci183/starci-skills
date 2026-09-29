@@ -1,26 +1,3 @@
-ACCOUNTS_OWNER:
-  title: "accounts.yaml in wrong place"
-  title_vi: "accounts.yaml đặt sai chỗ"
-  meaning_vi: "Tệp tài khoản dùng thử nằm không đúng nơi hoặc không được nút UAT khai báo."
-  causes_vi:
-    - "accounts.yaml không nằm cạnh index.yaml của nút UAT sở hữu nó"
-    - "Nút UAT chưa khai báo uat.localFiles.accounts"
-  nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra; không cần ai can thiệp thêm."
-  owner: op-retry
-  kind: check-finding
-
-ACCOUNTS_SCHEMA:
-  title: "Disposable accounts file malformed"
-  title_vi: "Tệp tài khoản dùng thử sai định dạng"
-  meaning_vi: "Tệp tài khoản dùng thử không đúng khuôn work/disposable-accounts@1."
-  causes_vi:
-    - "Có thêm trường ngoài vai trò và danh tính, ví dụ tên đăng nhập hay mật khẩu"
-    - "Danh sách tài khoản rỗng hoặc thiếu disposable: true"
-    - "Tệp không đọc được như YAML"
-  nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra; không cần ai can thiệp thêm."
-  owner: op-retry
-  kind: check-finding
-
 ACTIVE_NAV_CONFLICT:
   title: "Active navigation contradicts route"
   title_vi: "Mục điều hướng đang chọn mâu thuẫn với đường dẫn"
@@ -95,17 +72,6 @@ ALIAS_PROPS:
   nextStep_vi: "Tệp YAML sai cú pháp nên không đọc được; op tạo tệp phải sửa lại rồi chạy lại."
   owner: op-retry
   kind: input-invalid
-
-ANCESTOR_NOT_INVESTIGATED:
-  title: "Ancestor node not investigated"
-  title_vi: "Nút cha chưa được khảo sát"
-  meaning_vi: "Công việc bị treo vì một nút cha của nó vẫn ở trạng thái chưa khảo sát."
-  causes_vi:
-    - "Nút cha còn là uninvestigate"
-    - "Chưa ai xem xét phạm vi phía trên"
-  nextStep_vi: "Kernel giữ nút này ở trạng thái treo cho tới khi nút cha được khảo sát; sau đó kết quả cũ mới được xét lại."
-  owner: other-op:scope.define
-  kind: settle-reason
 
 ARCHETYPE_MISSING:
   title: "Brand archetype missing"
@@ -463,17 +429,6 @@ ARGUMENT_INVALID:
   owner: op-retry
   kind: input-invalid
 
-ASSERTION_COVERAGE:
-  title: "Required assertion not covered"
-  title_vi: "Khẳng định bắt buộc chưa có bằng chứng"
-  meaning_vi: "Có khẳng định thiết kế hay nghiệm thu bắt buộc mà chưa có quan sát hoặc bằng chứng đạt."
-  causes_vi:
-    - "Chưa chạy bước kiểm chứng cho khẳng định đó"
-    - "Bằng chứng không đạt"
-  nextStep_vi: "Nút bị coi là cũ tới khi có bằng chứng đạt phủ khẳng định; op kiểm chứng sẽ chạy lại."
-  owner: op-retry
-  kind: check-finding
-
 ASSET_DIGEST:
   title: "Asset citation hash mismatch"
   title_vi: "Băm của ảnh dẫn chứng không khớp"
@@ -492,26 +447,6 @@ ASSET_EMPTY:
   causes_vi:
     - "Tạo ảnh hay chụp màn hình thất bại nhưng vẫn được lưu"
   nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra; không cần ai can thiệp thêm."
-  owner: op-retry
-  kind: check-finding
-
-ASSET_ESCAPE:
-  title: "Asset path escapes its folder"
-  title_vi: "Đường dẫn tệp đính kèm thoát khỏi thư mục"
-  meaning_vi: "Đường dẫn của tệp đính kèm không phải đường dẫn tương đối chuẩn trong thư mục cho phép."
-  causes_vi:
-    - "Dùng đường dẫn tuyệt đối, .. hoặc dấu :"
-  nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra; không cần ai can thiệp thêm."
-  owner: op-retry
-  kind: check-finding
-
-ASSET_HASH:
-  title: "Asset hash stale"
-  title_vi: "Băm tệp đính kèm đã cũ"
-  meaning_vi: "Mã băm ghi trong nút không còn khớp với nội dung tệp hiện tại."
-  causes_vi:
-    - "Tệp đã đổi sau khi ghi mã băm"
-  nextStep_vi: "Nút bị coi là cũ; op sở hữu cần ghi lại mã băm hoặc chạy lại để có bằng chứng mới."
   owner: op-retry
   kind: check-finding
 
@@ -537,16 +472,6 @@ ASSET_MISSING:
   owner: op-retry
   kind: check-finding
 
-ASSET_SCOPE:
-  title: "Unknown asset ownership scope"
-  title_vi: "Phạm vi sở hữu tệp không hợp lệ"
-  meaning_vi: "Tệp đính kèm khai phạm vi sở hữu không phải node hoặc evidence."
-  causes_vi:
-    - "Gõ sai tên phạm vi"
-  nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra; không cần ai can thiệp thêm."
-  owner: op-retry
-  kind: check-finding
-
 ASSET_SLOT_UNFILLED:
   title: "Artwork slot still unfilled"
   title_vi: "Ô ảnh minh hoạ chưa được điền"
@@ -565,17 +490,6 @@ ASSET_STAMP:
   causes_vi:
     - "Ghi tay mã băm sai độ dài hoặc ký tự"
   nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra; không cần ai can thiệp thêm."
-  owner: op-retry
-  kind: check-finding
-
-ASSET_UNREADABLE:
-  title: "Asset unreadable"
-  title_vi: "Không đọc được tệp đính kèm"
-  meaning_vi: "Tệp đính kèm mất, không đọc được, không phải tệp thường hoặc là liên kết tượng trưng."
-  causes_vi:
-    - "Tệp bị xoá"
-    - "Là symlink hay nằm ngoài kho"
-  nextStep_vi: "Nút bị coi là cũ; op sở hữu cần khôi phục hoặc thay tệp rồi chạy lại."
   owner: op-retry
   kind: check-finding
 
@@ -834,66 +748,6 @@ BLOCK_IN_FLOW:
   owner: op-retry
   kind: input-invalid
 
-BRANCH_STATE:
-  title: "Branch stores state"
-  title_vi: "Nhánh lưu trạng thái"
-  meaning_vi: "Một nút nhánh lại ghi state hay completion, mà nhánh không được phép có."
-  causes_vi:
-    - "Sao chép trạng thái từ nút lá vào nhánh"
-  nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra; không cần ai can thiệp thêm."
-  owner: op-retry
-  kind: check-finding
-
-BRAND_ASSET_BINDING:
-  title: "Brand master not bound in assets"
-  title_vi: "Tệp gốc thương hiệu chưa ràng vào assets"
-  meaning_vi: "Một tệp gốc thương hiệu không xuất hiện trong danh sách assets của nút brand."
-  causes_vi:
-    - "Thêm ảnh vào brand/assets nhưng quên khai báo assets"
-  nextStep_vi: "Op quyết định thương hiệu cần sửa bản ghi brand rồi chạy lại kiểm tra."
-  owner: other-op:brand.decide
-  kind: check-finding
-
-BRAND_ASSET_PATH:
-  title: "Brand master path invalid"
-  title_vi: "Đường dẫn tệp gốc thương hiệu sai"
-  meaning_vi: "Tệp gốc thương hiệu không nằm chuẩn dưới brand/assets/."
-  causes_vi:
-    - "Để logo hay mascot ở thư mục khác"
-  nextStep_vi: "Op quyết định thương hiệu cần sửa bản ghi brand rồi chạy lại kiểm tra."
-  owner: other-op:brand.decide
-  kind: check-finding
-
-BRAND_COLOR:
-  title: "Brand color notation invalid"
-  title_vi: "Cách viết màu thương hiệu sai"
-  meaning_vi: "Màu trong bản ghi brand không viết dạng #rrggbb hay oklch(...)."
-  causes_vi:
-    - "Dùng tên màu hay rgb()"
-  nextStep_vi: "Op quyết định thương hiệu cần sửa bản ghi brand rồi chạy lại kiểm tra."
-  owner: other-op:brand.decide
-  kind: check-finding
-
-BRAND_CONTRAST_EXCEPTION:
-  title: "Contrast exceptions malformed"
-  title_vi: "Ngoại lệ tương phản sai"
-  meaning_vi: "color.policy.contrastExceptions không phải danh sách không rỗng các cặp đã được chủ chấp nhận."
-  causes_vi:
-    - "Danh sách trống hoặc không phải mảng"
-  nextStep_vi: "Op quyết định thương hiệu cần sửa bản ghi brand rồi chạy lại kiểm tra."
-  owner: other-op:brand.decide
-  kind: check-finding
-
-BRAND_DECISION:
-  title: "Brand settled by execution receipt"
-  title_vi: "Thương hiệu chốt bằng biên nhận thực thi"
-  meaning_vi: "Một brand phải được chốt bằng bản duyệt đi kèm đúng rev, không phải biên nhận thực thi."
-  causes_vi:
-    - "Ghi trạng thái hoàn thành cho nút brand bằng receipt"
-  nextStep_vi: "Op quyết định thương hiệu cần chốt qua bản duyệt cùng rev."
-  owner: other-op:brand.decide
-  kind: check-finding
-
 BRAND_PALETTE_UNAVAILABLE:
   title: "Brand palette check unavailable"
   title_vi: "Không kiểm được bảng màu thương hiệu"
@@ -905,76 +759,6 @@ BRAND_PALETTE_UNAVAILABLE:
   owner: runtime-core
   kind: check-finding
 
-BRAND_POLICY:
-  title: "Danger color matches primary"
-  title_vi: "Màu nguy hiểm trùng màu chính"
-  meaning_vi: "Token danger lặp lại giá trị màu chính trong khi chính sách không cho phép."
-  causes_vi:
-    - "Chưa quyết định ngoại lệ danger được trùng primary"
-  nextStep_vi: "Op quyết định thương hiệu cần sửa bản ghi brand rồi chạy lại kiểm tra."
-  owner: other-op:brand.decide
-  kind: check-finding
-
-BRAND_REV:
-  title: "Brand rev missing"
-  title_vi: "Thiếu rev của thương hiệu"
-  meaning_vi: "Bản ghi brand không khai rev để các nút giao diện bám vào."
-  causes_vi:
-    - "Quên ghi rev"
-  nextStep_vi: "Op quyết định thương hiệu cần sửa bản ghi brand rồi chạy lại kiểm tra."
-  owner: other-op:brand.decide
-  kind: check-finding
-
-BRAND_SCHEMA:
-  title: "Brand record not canonical"
-  title_vi: "Bản ghi thương hiệu không đúng lược đồ"
-  meaning_vi: "Bản ghi brand phải là nút work/node@1 chuẩn."
-  causes_vi:
-    - "Dùng schema khác"
-  nextStep_vi: "Op quyết định thương hiệu cần sửa bản ghi brand rồi chạy lại kiểm tra."
-  owner: other-op:brand.decide
-  kind: check-finding
-
-BRAND_SINGLETON:
-  title: "More than one brand record"
-  title_vi: "Có nhiều hơn một bản ghi thương hiệu"
-  meaning_vi: "Sản phẩm có nhiều hơn một nút brand nên không có đáp án chuẩn."
-  causes_vi:
-    - "Tạo nút brand thứ hai ngoài brand/index.yaml"
-  nextStep_vi: "Op quyết định thương hiệu cần sửa bản ghi brand rồi chạy lại kiểm tra."
-  owner: other-op:brand.decide
-  kind: check-finding
-
-BRAND_SOURCES:
-  title: "Brand names no sources"
-  title_vi: "Thương hiệu không nêu nguồn"
-  meaning_vi: "Bản ghi brand không khai tệp token hay thành phần thật để đối chiếu."
-  causes_vi:
-    - "Thiếu danh sách sources"
-  nextStep_vi: "Op quyết định thương hiệu cần sửa bản ghi brand rồi chạy lại kiểm tra."
-  owner: other-op:brand.decide
-  kind: check-finding
-
-BRAND_SPEC:
-  title: "Brand node lacks brand key"
-  title_vi: "Nút thương hiệu thiếu khoá brand"
-  meaning_vi: "Nút loại brand không có khoá brand: chứa thông số."
-  causes_vi:
-    - "Nút được tạo nhưng chưa ghi nội dung thương hiệu"
-  nextStep_vi: "Op quyết định thương hiệu cần sửa bản ghi brand rồi chạy lại kiểm tra."
-  owner: other-op:brand.decide
-  kind: check-finding
-
-BRAND_TOKEN:
-  title: "Brand token name invalid"
-  title_vi: "Tên token thương hiệu sai"
-  meaning_vi: "Tên token gắn vào Grammar không bắt đầu bằng --."
-  causes_vi:
-    - "Dùng tên màu rời thay cho tên biến CSS"
-  nextStep_vi: "Op quyết định thương hiệu cần sửa bản ghi brand rồi chạy lại kiểm tra."
-  owner: other-op:brand.decide
-  kind: check-finding
-
 BRAND_UNREADABLE:
   title: "Brand record unreadable"
   title_vi: "Không đọc được bản ghi thương hiệu"
@@ -983,27 +767,6 @@ BRAND_UNREADABLE:
     - "Tệp brand thiếu hoặc hỏng"
   nextStep_vi: "Op quyết định thương hiệu cần khôi phục bản ghi rồi kiểm lại."
   owner: other-op:brand.decide
-  kind: check-finding
-
-BRAND_VALUE_SOURCE:
-  title: "Colour valueSource malformed"
-  title_vi: "Nguồn giá trị màu sai khuôn"
-  meaning_vi: "valueSource của token màu không có đủ path, value và token."
-  causes_vi:
-    - "Đường dẫn thoát khỏi thư mục nguồn"
-    - "Thiếu giá trị"
-  nextStep_vi: "Op quyết định thương hiệu cần sửa bản ghi brand rồi chạy lại kiểm tra."
-  owner: other-op:brand.decide
-  kind: check-finding
-
-CANONICAL_FORMAT:
-  title: "Node metadata not index.yaml"
-  title_vi: "Siêu dữ liệu nút không nằm trong index.yaml"
-  meaning_vi: "Siêu dữ liệu nút chuẩn chỉ được đặt trong index.yaml."
-  causes_vi:
-    - "Dùng tên tệp siêu dữ liệu khác"
-  nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra; không cần ai can thiệp thêm."
-  owner: op-retry
   kind: check-finding
 
 CANON_CONTENT_MISMATCH:
@@ -1228,16 +991,6 @@ CHECK_MISSING:
   nextStep_vi: "Lỗi mức error trong kiểm tra manifest; sửa đường dẫn hoặc thêm tệp rồi chạy lại."
   owner: op-retry
   kind: check-finding
-CHILD_SUSPENDED:
-  title: "A required child is suspended"
-  title_vi: "Có mục con bắt buộc đang bị treo"
-  meaning_vi: "Một nút cha bị treo vì có ít nhất một nút con bắt buộc đang ở trạng thái treo."
-  causes_vi:
-    - "Nút con bị lỗi thời hoặc bị chặn"
-    - "Nút con chưa được điều tra lại"
-  nextStep_vi: "Nút cha tự treo theo; xử lý nút con được nêu trong danh sách rồi nút cha sẽ tự cập nhật."
-  owner: op-retry
-  kind: blocker
 CITATION_UNRESOLVED:
   title: "Cited evidence cannot be resolved"
   title_vi: "Không tìm thấy bằng chứng được trích dẫn"
@@ -1265,36 +1018,6 @@ CODE_DIGEST_STALE:
     - "Mã đã đổi sau khi ghi bằng chứng"
     - "Bằng chứng cũ chưa được làm mới"
   nextStep_vi: "Kiểm tra từ chối trừ khi bản ghi khai rõ là cũ; op chạy lại để ghi mã băm mới."
-  owner: op-retry
-  kind: check-finding
-CODE_EVIDENCE_BINDING:
-  title: "Evidence no longer binds current code"
-  title_vi: "Bằng chứng không còn gắn với mã hiện tại"
-  meaning_vi: "Bằng chứng đã hoàn tất không còn buộc đúng vào phiên bản mã hiện tại nên bị xem là cũ."
-  causes_vi:
-    - "Mã đã thay đổi sau khi có bằng chứng"
-    - "Ràng buộc mã nguồn bị thiếu hoặc sai"
-  nextStep_vi: "Hoàn tất bị coi là cũ; op chạy lại kiểm chứng trên mã mới rồi ghi bằng chứng mới."
-  owner: op-retry
-  kind: check-finding
-CODE_REFS:
-  title: "Code references missing or empty"
-  title_vi: "Tham chiếu mã nguồn thiếu hoặc rỗng"
-  meaning_vi: "Phần codeRefs của hồ sơ hoàn tất phải là danh sách không rỗng gồm kho và mã commit đầy đủ nhưng lại thiếu hoặc sai."
-  causes_vi:
-    - "Bỏ trống codeRefs"
-    - "Không phải mảng"
-  nextStep_vi: "Bộ kiểm hồ sơ báo lỗi; op điền lại codeRefs đúng dạng rồi gửi lại."
-  owner: op-retry
-  kind: input-invalid
-CODE_REFS_COVERAGE_UNKNOWN:
-  title: "Code references declare no coverage"
-  title_vi: "Tham chiếu mã không khai phạm vi"
-  meaning_vi: "codeRefs có gắn commit nhưng không khai phạm vi nguồn, nên bộ quét không thể chứng minh mã hiện tại có bị đổi hay không."
-  causes_vi:
-    - "Thiếu phần coverage của nguồn"
-    - "Chỉ ghi commit mà không ghi đường dẫn"
-  nextStep_vi: "Kết quả là không kiểm chứng được (unverifiable); op bổ sung phạm vi nguồn rồi chạy lại."
   owner: op-retry
   kind: check-finding
 COMMIT_FOREIGN_PATHS:
@@ -1410,15 +1133,6 @@ CONSUME_OVERDUE:
   nextStep_vi: "Mã có trong danh sách đồng hồ nhưng hiện được tính chung vào SETTLE_OVERDUE; nếu xuất hiện, Supervisor cần kiểm tra bộ xử lý chốt."
   owner: supervisor
   kind: runtime-fault
-CONTEXT_CHANGED:
-  title: "Reviewed context has changed"
-  title_vi: "Bối cảnh đã thay đổi sau khi xem"
-  meaning_vi: "Nút này đã từng được điều tra nhưng bối cảnh đã đổi nên phải điều tra lại."
-  causes_vi:
-    - "Nội dung hoặc phụ thuộc đã đổi sau lần xem"
-  nextStep_vi: "Nút được đưa về trạng thái cần điều tra lại; op điều tra lại và ghi lại mã băm bối cảnh mới."
-  owner: op-retry
-  kind: blocker
 CONTRACT_EDGE_MISSING:
   title: "Cross-domain contract edge missing"
   title_vi: "Thiếu cạnh hợp đồng giữa các miền"
@@ -1505,15 +1219,6 @@ COVERAGE_STALE:
   nextStep_vi: "Quét bị từ chối; op chạy lại test:ci có độ phủ trong lần thử này rồi quét lại."
   owner: op-retry
   kind: check-finding
-CURRENT_ONLY:
-  title: "Work node stores history"
-  title_vi: "Nút Work lưu lịch sử"
-  meaning_vi: "Hồ sơ Work chuẩn chỉ giữ đặc tả và trạng thái hiện tại nhưng nút này lại có mục lịch sử."
-  causes_vi:
-    - "Thêm trường history vào hồ sơ"
-  nextStep_vi: "Bộ kiểm cấu trúc báo lỗi; xóa mục history vì lịch sử đã có trong Git."
-  owner: op-retry
-  kind: input-invalid
 DATA_STATUS_DRAWN:
   title: "Data status drawn by hand"
   title_vi: "Trạng thái dữ liệu bị vẽ tay"
@@ -1552,25 +1257,6 @@ DECISION_OVERDUE:
   nextStep_vi: "Đồng hồ SLA mở; cần Supervisor hoặc chủ sở hữu trả lời mục quyết định để công việc tiếp tục."
   owner: owner
   kind: runtime-fault
-DEPENDENCY_NOT_DONE:
-  title: "Prerequisite is not done"
-  title_vi: "Điều kiện tiên quyết chưa xong"
-  meaning_vi: "Nút được đánh dấu xong trong khi các điều kiện tiên quyết của nó chưa thật sự hoàn tất."
-  causes_vi:
-    - "Đánh dấu xong quá sớm"
-    - "Coi N/A là bằng chứng đã có"
-  nextStep_vi: "Nút bị hạ xuống trạng thái treo; cần hoàn tất tiên quyết trước rồi mới đánh dấu xong."
-  owner: op-retry
-  kind: input-invalid
-DEPENDENCY_NOT_INVESTIGATED:
-  title: "Dependency not investigated"
-  title_vi: "Phụ thuộc chưa được điều tra"
-  meaning_vi: "Nút bị treo vì một nút mà nó phụ thuộc chưa được điều tra."
-  causes_vi:
-    - "Nút phụ thuộc còn ở trạng thái chưa điều tra"
-  nextStep_vi: "Nút về trạng thái cần điều tra; điều tra các nút phụ thuộc được nêu rồi điều tra lại nút này."
-  owner: op-retry
-  kind: blocker
 DEPS_DELETE_WHILE_PEER_LEASED:
   title: "Cannot delete node_modules while peers run"
   title_vi: "Không xóa node_modules khi luồng khác đang dùng"
@@ -1626,62 +1312,6 @@ DESIGN_PLANNED:
   nextStep_vi: "Chỉ là cảnh báo; con trỏ sẽ tự khớp khi interface.draw vẽ bố cục."
   owner: op-retry
   kind: check-status
-DESIGN_REVIEW:
-  title: "Design review record malformed"
-  title_vi: "Bản duyệt thiết kế sai dạng"
-  meaning_vi: "Bản duyệt thiết kế nội tuyến thiếu người duyệt, thẩm quyền, thời điểm hợp lệ hoặc sai lược đồ."
-  causes_vi:
-    - "Thiếu reviewer, authority hoặc reviewedAt"
-    - "Sai schema"
-  nextStep_vi: "Bộ kiểm hoàn tất từ chối; sửa bản duyệt đúng dạng rồi gửi lại."
-  owner: op-retry
-  kind: input-invalid
-DESIGN_REVIEW_LIMITATIONS:
-  title: "Review limitations not listed"
-  title_vi: "Bản duyệt thiếu danh sách hạn chế"
-  meaning_vi: "Bản duyệt thiết kế phải có danh sách hạn chế rõ ràng nhưng lại thiếu hoặc có mục rỗng."
-  causes_vi:
-    - "Bỏ trống trường limitations"
-  nextStep_vi: "Bộ kiểm hoàn tất từ chối; ghi rõ các hạn chế đã biết rồi gửi lại."
-  owner: op-retry
-  kind: input-invalid
-DESIGN_REVIEW_MIXED:
-  title: "Design review mixed with evidence"
-  title_vi: "Bản duyệt lẫn với bằng chứng"
-  meaning_vi: "Bản duyệt thiết kế không được trộn với bằng chứng hoặc ràng buộc mã nguồn trong cùng một hoàn tất."
-  causes_vi:
-    - "Gửi cả review lẫn evidence hoặc codeRefs"
-  nextStep_vi: "Bộ kiểm hoàn tất từ chối; tách thành hai hoàn tất riêng."
-  owner: op-retry
-  kind: input-invalid
-DESIGN_REVIEW_OBSERVATION:
-  title: "Review observation invalid"
-  title_vi: "Nhận xét duyệt không hợp lệ"
-  meaning_vi: "Mỗi khẳng định thiết kế phải có đúng một nhận xét đạt và duy nhất, nhưng có nhận xét lạ, trùng, không đạt hoặc rỗng."
-  causes_vi:
-    - "Trùng mã khẳng định"
-    - "Nhận xét ghi kết quả không phải pass"
-  nextStep_vi: "Bộ kiểm hoàn tất từ chối; sửa lại các nhận xét rồi gửi lại."
-  owner: op-retry
-  kind: input-invalid
-DESIGN_REVIEW_OBSERVATIONS:
-  title: "Review has no observations"
-  title_vi: "Bản duyệt không có nhận xét"
-  meaning_vi: "Bản duyệt thiết kế phải có các nhận xét cụ thể cho từng khẳng định hiện tại nhưng danh sách trống."
-  causes_vi:
-    - "Không điền observations"
-  nextStep_vi: "Bộ kiểm hoàn tất từ chối; điền nhận xét cụ thể cho từng khẳng định rồi gửi lại."
-  owner: op-retry
-  kind: input-invalid
-DESIGN_REVIEW_SCOPE:
-  title: "Inline review not allowed here"
-  title_vi: "Không dùng bản duyệt nội tuyến ở đây"
-  meaning_vi: "Bản duyệt nội tuyến chỉ dành cho một số loại hồ sơ nhất định còn hồ sơ này cần bằng chứng thông thường."
-  causes_vi:
-    - "Dùng review cho loại hồ sơ không được hỗ trợ"
-  nextStep_vi: "Bộ kiểm hoàn tất từ chối; dùng bằng chứng chuẩn của loại hồ sơ đó."
-  owner: op-retry
-  kind: input-invalid
 DIRECTION_CHECK:
   title: "Brand direction check found a problem"
   title_vi: "Kiểm tra hướng thương hiệu phát hiện lỗi"
@@ -1728,15 +1358,6 @@ DIRECTION_REV_MOVED:
     - "Direction được sửa sau khi chủ sở hữu duyệt"
   nextStep_vi: "Kiểm tra không đạt; hỏi duyệt lại trên phiên bản direction hiện tại."
   owner: op-retry
-  kind: check-finding
-DIRTY_SNAPSHOT_COMPARISON_UNDEFINED:
-  title: "Dirty snapshot cannot be compared"
-  title_vi: "Không so sánh được bản chụp chưa commit"
-  meaning_vi: "Bằng chứng ghi bản chụp mã chưa commit nhưng bộ quét chưa có cách so sánh định dạng này với mã hiện tại."
-  causes_vi:
-    - "Kiểm thử chạy trên mã chưa commit"
-  nextStep_vi: "Kết quả là không kiểm chứng được; cần commit mã rồi kiểm chứng lại, hoặc lõi bổ sung cách so sánh."
-  owner: runtime-core
   kind: check-finding
 DISK_LOW:
   title: "Host disk space low"
@@ -2029,35 +1650,6 @@ DRAW_RAW_STYLED_HTML:
   nextStep_vi: "Kiểm tra mã nguồn vẽ từ chối; vẽ lại dùng thành phần grammar, HTML chỉ để bố cục."
   owner: other-op:interface.draw
   kind: check-finding
-COMPLETION_BLOCKED:
-  title: "Completion invalidated by blockers"
-  title_vi: "Hoàn tất bị vô hiệu do vướng chặn"
-  meaning_vi: "Một nút từng được đánh dấu xong nhưng nay bị đánh dấu là vướng chặn nên phần hoàn tất không còn hiệu lực."
-  causes_vi:
-    - "Có blocker mới được ghi vào nút"
-    - "Phụ thuộc bị hủy hiệu lực"
-  nextStep_vi: "Nút không còn được coi là xong; cần gỡ blocker rồi hoàn tất lại."
-  owner: op-retry
-  kind: blocker
-COMPLETION_PREVIEW:
-  title: "Completion preview is invalid"
-  title_vi: "Bản xem trước hoàn tất không hợp lệ"
-  meaning_vi: "Bản xem trước hoàn tất không đúng dạng bản đồ hoàn tất nên không có tệp nào bị thay đổi."
-  causes_vi:
-    - "Gửi dữ liệu không phải bản đồ (map)"
-  nextStep_vi: "Bộ kiểm trả lỗi và không ghi gì; gửi lại đúng dạng bản đồ hoàn tất."
-  owner: op-retry
-  kind: input-invalid
-COMPLETION_TARGET:
-  title: "Completion targets a missing node"
-  title_vi: "Hoàn tất trỏ tới nút không có"
-  meaning_vi: "Bản xem trước hoàn tất nhắm tới một mã nút không tồn tại trong cây Work."
-  causes_vi:
-    - "Sai mã nút"
-    - "Nút đã bị xóa hoặc đổi tên"
-  nextStep_vi: "Bộ kiểm từ chối; sửa mã nút mục tiêu rồi gửi lại."
-  owner: op-retry
-  kind: input-invalid
 COMPOSES_PATH_DANGLING:
   title: "Composes path points nowhere"
   title_vi: "Đường dẫn composes trỏ vào khoảng trống"
@@ -2221,28 +1813,6 @@ DRAW_TYPECHECK_FAILED:
   owner: op-retry
   kind: check-finding
 
-DUPLICATE_ASSERTION:
-  title: "Duplicate assertion id in evidence"
-  title_vi: "Trùng mã khẳng định trong bằng chứng"
-  meaning_vi: "Trong một bản bằng chứng có hai khẳng định dùng cùng một mã."
-  causes_vi:
-    - "Sao chép khẳng định mà quên đổi mã"
-    - "Ghép hai kết quả kiểm tra vào cùng một bản bằng chứng"
-  nextStep_vi: "Người ghi bằng chứng đổi mã cho mỗi khẳng định thành duy nhất rồi ghi lại; bằng chứng chưa hợp lệ thì chưa dùng được để chốt việc."
-  owner: op-retry
-  kind: check-finding
-
-DUPLICATE_EVIDENCE_BINDING:
-  title: "Evidence bound to the same node twice"
-  title_vi: "Bằng chứng gắn hai lần vào cùng một nút"
-  meaning_vi: "Một bản bằng chứng gắn vào cùng một nút công việc nhiều lần, kể cả nút chính của nó."
-  causes_vi:
-    - "Danh sách gắn thêm lặp lại nút đã có"
-    - "Gắn lại nút chính trong phần bổ sung"
-  nextStep_vi: "Người ghi bằng chứng xóa các liên kết trùng để mỗi nút chỉ gắn một lần rồi ghi lại."
-  owner: op-retry
-  kind: check-finding
-
 DUPLICATE_FILE_INPUT:
   title: "Same file listed twice"
   title_vi: "Cùng một tập tin được liệt kê hai lần"
@@ -2253,17 +1823,6 @@ DUPLICATE_FILE_INPUT:
   nextStep_vi: "Bên gọi bỏ bản trùng rồi chạy lại; kiểm tra bị từ chối trước khi đọc tập tin nào."
   owner: op-retry
   kind: input-invalid
-
-DUPLICATE_ID:
-  title: "Duplicate stable id in Work tree"
-  title_vi: "Trùng mã định danh trong cây Work"
-  meaning_vi: "Hai bản ghi trong cây Work dùng cùng một mã định danh cố định."
-  causes_vi:
-    - "Sao chép bản ghi mà không đổi mã"
-    - "Hai op cùng tạo một bản ghi"
-  nextStep_vi: "Op work.author đổi hoặc gộp bản ghi để mỗi mã chỉ xuất hiện một lần; cây Work chưa qua kiểm tra khi còn trùng."
-  owner: other-op:work.author
-  kind: check-finding
 
 DUPLICATE_KERNEL:
   title: "More than one live kernel terminal"
@@ -2330,28 +1889,6 @@ EFFECT_UNKNOWN_STUCK:
   nextStep_vi: "Runtime tự chạy đối soát (api reconcile) để xác định kết quả; nếu vẫn kẹt thì mở sự cố cho Supervisor xử lý."
   owner: supervisor
   kind: runtime-fault
-
-EMPTY_SPEC:
-  title: "Work node has no specification"
-  title_vi: "Nút công việc không có mô tả"
-  meaning_vi: "Một nút trong cây Work không có nội dung mô tả hay đặc tả có cấu trúc nào."
-  causes_vi:
-    - "Tạo nút mà quên viết mô tả"
-    - "Phần mô tả bị xóa khi sửa"
-  nextStep_vi: "Op work.author viết mô tả ngắn hoặc đặc tả có cấu trúc cho nút rồi nộp lại."
-  owner: other-op:work.author
-  kind: check-finding
-
-ENVIRONMENT_KIND:
-  title: "UAT environment is not an environment resource"
-  title_vi: "Môi trường kiểm thử nghiệm thu không đúng loại"
-  meaning_vi: "Bằng chứng nghiệm thu trỏ tới một tài nguyên không phải loại môi trường."
-  causes_vi:
-    - "Trỏ nhầm sang tài nguyên khác"
-    - "Tài nguyên môi trường khai sai loại"
-  nextStep_vi: "Người ghi bằng chứng nghiệm thu sửa để trường môi trường trỏ tới đúng tài nguyên loại environment rồi ghi lại."
-  owner: op-retry
-  kind: check-finding
 
 ESLINT_RULE_INVENTORY_UNAVAILABLE:
   title: "ESLint builtin rule list unavailable"
@@ -2452,28 +1989,6 @@ EVIDENCE_ASSERTED_NOT_OBSERVED:
   owner: op-retry
   kind: check-finding
 
-EVIDENCE_BINDING:
-  title: "Malformed extra evidence binding"
-  title_vi: "Liên kết bằng chứng bổ sung sai dạng"
-  meaning_vi: "Một liên kết bổ sung của bằng chứng thiếu mã nút hoặc mã băm đầu vào hợp lệ."
-  causes_vi:
-    - "Thiếu nodeId"
-    - "inputDigest không phải SHA-256 64 ký tự"
-  nextStep_vi: "Người ghi bằng chứng điền đủ nodeId và inputDigest SHA-256 rồi ghi lại."
-  owner: op-retry
-  kind: check-finding
-
-EVIDENCE_BINDINGS:
-  title: "Evidence bindings is not a list"
-  title_vi: "Danh sách liên kết bằng chứng không phải dạng danh sách"
-  meaning_vi: "Phần liên kết bổ sung của bằng chứng phải là một danh sách nhưng lại có dạng khác."
-  causes_vi:
-    - "Viết YAML sai kiểu (một đối tượng thay vì danh sách)"
-    - "Thiếu gạch đầu dòng"
-  nextStep_vi: "Người ghi bằng chứng sửa thành danh sách các cặp nodeId và inputDigest duy nhất rồi ghi lại."
-  owner: op-retry
-  kind: check-finding
-
 EVIDENCE_CONTEXT_MISSING:
   title: "Evidence carries no source stamp"
   title_vi: "Bằng chứng thiếu dấu nguồn"
@@ -2493,17 +2008,6 @@ EVIDENCE_DELETED:
     - "Xóa bằng chứng để làm sạch bản ghi"
     - "Ghi lại bản ghi từ đầu và làm mất phần cũ"
   nextStep_vi: "Op sửa bản ghi khôi phục khối bằng chứng và đánh dấu stale kèm lý do."
-  owner: op-retry
-  kind: check-finding
-
-EVIDENCE_DIGEST:
-  title: "Evidence input digest is not SHA-256"
-  title_vi: "Mã băm đầu vào của bằng chứng không hợp lệ"
-  meaning_vi: "Trường inputDigest của bằng chứng không phải mã SHA-256 hợp lệ."
-  causes_vi:
-    - "Điền tay mã băm sai"
-    - "Dùng thuật toán băm khác hoặc bị cắt ngắn"
-  nextStep_vi: "Người ghi bằng chứng dùng đúng mã SHA-256 (64 ký tự hex) của đầu vào rồi ghi lại."
   owner: op-retry
   kind: check-finding
 
@@ -2529,17 +2033,6 @@ EVIDENCE_DIGEST_MISSING:
   owner: op-retry
   kind: check-finding
 
-EVIDENCE_NOT_PASS:
-  title: "Completion evidence is not passing"
-  title_vi: "Bằng chứng để chốt xong chưa đạt"
-  meaning_vi: "Nút được chốt xong nhưng bằng chứng đi kèm không hợp lệ hoặc có khẳng định không đạt."
-  causes_vi:
-    - "Bằng chứng có khẳng định fail hoặc chưa chạy"
-    - "Bằng chứng không có khẳng định nào"
-  nextStep_vi: "Op chịu trách nhiệm sửa cho đến khi kiểm chứng đạt rồi ghi bằng chứng mới; chưa có bằng chứng đạt thì không chốt được."
-  owner: op-retry
-  kind: check-finding
-
 EVIDENCE_OLDER_THAN_SOURCE:
   title: "Evidence older than the source it covers"
   title_vi: "Bằng chứng cũ hơn mã nguồn mà nó phủ"
@@ -2548,17 +2041,6 @@ EVIDENCE_OLDER_THAN_SOURCE:
     - "Sửa mã sau khi chạy kiểm chứng"
     - "Tệp nằm ngoài danh sách băm của bằng chứng"
   nextStep_vi: "Chạy lại kiểm chứng trên mã mới để ghi bằng chứng mới."
-  owner: op-retry
-  kind: check-finding
-
-EVIDENCE_OWNER:
-  title: "Evidence not bound to this node"
-  title_vi: "Bằng chứng chưa gắn rõ với nút này"
-  meaning_vi: "Nút được chốt xong dựa vào một bằng chứng không có liên kết rõ ràng tới chính nút đó."
-  causes_vi:
-    - "Chọn nhầm bản bằng chứng của nút khác"
-    - "Thiếu liên kết nodeId trong bằng chứng"
-  nextStep_vi: "Người ghi bằng chứng thêm liên kết tới nút này hoặc chọn đúng bằng chứng rồi chốt lại."
   owner: op-retry
   kind: check-finding
 
@@ -3522,46 +3004,6 @@ HOST_FORBIDDEN:
   nextStep_vi: "Bộ kiểm tra khung ứng dụng từ chối; op vẽ hoặc dựng giao diện phải bỏ trường host khỏi bản ghi đó."
   owner: op-retry
   kind: check-finding
-IDENTITY_KIND:
-  title: "UAT actor is not an identity"
-  title_vi: "Tác nhân UAT không phải danh tính"
-  meaning_vi: "Kịch bản UAT chọn một tác nhân, nhưng thứ được trỏ tới không phải tài nguyên loại danh tính."
-  causes_vi:
-    - "Trỏ nhầm tới tài nguyên khác loại"
-    - "Sai mã của danh tính"
-  nextStep_vi: "Bộ kiểm tra Work báo lỗi; op soạn UAT phải trỏ actor tới đúng tài nguyên danh tính rồi chạy lại."
-  owner: op-retry
-  kind: check-finding
-IMPLEMENTATION_LAYOUT:
-  title: "Implementation record in wrong folder"
-  title_vi: "Hồ sơ triển khai đặt sai thư mục"
-  meaning_vi: "Hồ sơ triển khai có cấu trúc nằm ngoài implementation/frontend hoặc implementation/backend."
-  causes_vi:
-    - "Tạo hồ sơ triển khai ở đường dẫn tự đặt"
-    - "Thiếu tầng frontend hoặc backend"
-  nextStep_vi: "Bộ kiểm tra Work báo lỗi; op tác giả phải dời hồ sơ về đúng thư mục rồi kiểm tra lại."
-  owner: op-retry
-  kind: check-finding
-IMPLEMENTATION_PARENT:
-  title: "Implementation parent carries payload"
-  title_vi: "Nút cha triển khai chứa dữ liệu riêng"
-  meaning_vi: "Nút cha implementation phải mỏng và lấy trạng thái từ các nút con, nhưng nút này lại mang dữ liệu triển khai riêng."
-  causes_vi:
-    - "Ghi nội dung triển khai vào nút cha thay vì nút frontend hoặc backend"
-    - "Dời hồ sơ chưa xong"
-  nextStep_vi: "Bộ kiểm tra Work báo lỗi; op tác giả phải chuyển dữ liệu xuống nút con rồi kiểm tra lại."
-  owner: op-retry
-  kind: check-finding
-IMPLEMENTATION_PROOF_MISSING:
-  title: "Implementation lacks completion proof"
-  title_vi: "Phần triển khai chưa có bằng chứng hoàn thành"
-  meaning_vi: "Một phần triển khai bắt buộc hiện chưa có bằng chứng hoàn thành còn hiệu lực, dù điều đó chưa chứng minh mã nguồn bị thiếu."
-  causes_vi:
-    - "Việc triển khai chưa được làm xong"
-    - "Bằng chứng cũ đã hết hiệu lực vì đầu vào thay đổi"
-  nextStep_vi: "Bộ kiểm tra độ cũ đánh dấu thiếu; op triển khai tương ứng phải chạy lại để tạo bằng chứng mới."
-  owner: op-retry
-  kind: check-finding
 IMPL_APP_DIR_UNREADABLE:
   title: "App folder cannot be read"
   title_vi: "Không đọc được thư mục app"
@@ -3662,16 +3104,6 @@ INPUT_BYTES_MOVED:
   nextStep_vi: "Bộ kiểm tra tài sản Work nghi ngờ; op tạo bản vẽ hoặc tài sản phải làm lại từ tệp hiện tại để cập nhật dấu vết."
   owner: op-retry
   kind: check-finding
-INPUT_CHANGED:
-  title: "Node input changed since review"
-  title_vi: "Đầu vào của nút đã đổi"
-  meaning_vi: "Nội dung đầu vào của một nút Work đã thay đổi kể từ lần xem xét trước nên nút bị coi là cũ."
-  causes_vi:
-    - "Tệp nguồn của nút vừa được sửa"
-    - "Một nút mà nó dựa vào vừa đổi"
-  nextStep_vi: "Nút bị treo trạng thái cũ; op sở hữu nút cần xem xét lại và chốt lại kết quả."
-  owner: op-retry
-  kind: check-status
 INPUT_INVALID:
   title: "Scoped lint input is invalid"
   title_vi: "Đầu vào của bộ kiểm lint không hợp lệ"
@@ -3702,36 +3134,6 @@ INVALID_INPUT:
   nextStep_vi: "Bộ quét dừng với lỗi đầu vào; người gọi phải sửa lời gọi rồi chạy lại."
   owner: runtime-core
   kind: input-invalid
-INVALID_REPOSITORY:
-  title: "Repository mapping is invalid"
-  title_vi: "Khai báo repo không hợp lệ"
-  meaning_vi: "Mã repo sai định dạng hoặc thư mục khai báo không phải thư mục gốc của repo git."
-  causes_vi:
-    - "Mã repo chứa ký tự không hợp lệ"
-    - "Đường dẫn trỏ vào thư mục con thay vì gốc git"
-  nextStep_vi: "Bộ quét dừng với lỗi đầu vào; cần sửa khai báo repo rồi chạy lại."
-  owner: runtime-core
-  kind: input-invalid
-INVALID_TARGET:
-  title: "Scan targets are invalid"
-  title_vi: "Danh sách nút cần quét không hợp lệ"
-  meaning_vi: "Các nút đích cần quét không phải danh sách mã nút Work chính xác và không trùng nhau."
-  causes_vi:
-    - "Có mã nút sai định dạng"
-    - "Có mã bị lặp lại"
-  nextStep_vi: "Bộ quét dừng với lỗi đầu vào; người gọi phải sửa danh sách rồi chạy lại."
-  owner: runtime-core
-  kind: input-invalid
-JSON_ARTIFACT:
-  title: "JSON file inside Work tree"
-  title_vi: "Có tệp JSON trong cây Work"
-  meaning_vi: "Hồ sơ Work và kết quả chỉ dùng YAML, nhưng trong cây Work có tệp JSON."
-  causes_vi:
-    - "Worker xuất kết quả dạng JSON vào thư mục Work"
-    - "Tệp công cụ tạo ra bị để lại trong Work"
-  nextStep_vi: "Bộ kiểm tra Work không chấp nhận; op phải đổi sang YAML hoặc dời tệp ra khỏi cây Work."
-  owner: op-retry
-  kind: check-finding
 KERNEL_GATED:
   title: "Kernel seat is gated"
   title_vi: "Ghế Kernel đang bị chặn cổng"
@@ -3932,26 +3334,6 @@ LINT_RUNTIME_UNAVAILABLE:
   nextStep_vi: "Bộ kiểm trả trạng thái không khả dụng; cần cài hoặc sửa môi trường lint của repo đích rồi chạy lại."
   owner: runtime-core
   kind: check-status
-LOCAL_FILE_PATH:
-  title: "UAT local file path invalid"
-  title_vi: "Đường dẫn tệp cục bộ của UAT sai"
-  meaning_vi: "Tệp cục bộ khai báo trong UAT không phải đường dẫn tương đối chuẩn nằm cạnh tệp index.yaml."
-  causes_vi:
-    - "Dùng đường dẫn tuyệt đối hoặc có dấu gạch ngược"
-    - "Đường dẫn chứa .. hoặc thành phần rỗng"
-  nextStep_vi: "Bộ kiểm tra Work báo lỗi; op soạn UAT phải sửa thành đường dẫn tương đối chuẩn."
-  owner: op-retry
-  kind: check-finding
-LOCAL_FILE_UNREADABLE:
-  title: "UAT local file unreadable"
-  title_vi: "Không đọc được tệp cục bộ của UAT"
-  meaning_vi: "Tệp cục bộ được khai báo trong UAT bị thiếu, không đọc được, không phải tệp thường hoặc không an toàn."
-  causes_vi:
-    - "Tệp chưa được tạo hoặc bị xóa"
-    - "Đường dẫn là liên kết hoặc thư mục"
-  nextStep_vi: "Bộ kiểm tra Work báo lỗi; op soạn UAT phải tạo lại tệp thật hoặc sửa khai báo."
-  owner: op-retry
-  kind: check-finding
 LOG_TYPED_MISSING:
   title: "Op settled without typed log rows"
   title_vi: "Op kết thúc mà thiếu dòng nhật ký bắt buộc"
@@ -3962,46 +3344,6 @@ LOG_TYPED_MISSING:
   nextStep_vi: "Chỉ là cảnh báo hiện trong trạng thái workflow; Kernel xem và có thể cho op chạy lại nếu thiếu bằng chứng."
   owner: op-retry
   kind: check-status
-MALFORMED_CODE_REFERENCE:
-  title: "Code reference is malformed"
-  title_vi: "Tham chiếu mã nguồn bị sai dạng"
-  meaning_vi: "Một mục tham chiếu mã trong nút Work thiếu repo hoặc mã commit đầy đủ nên không so sánh được."
-  causes_vi:
-    - "Ghi mã commit rút gọn thay vì đầy đủ"
-    - "Thiếu tên repo"
-  nextStep_vi: "Bộ quét độ cũ đánh dấu không thể xác minh; op sở hữu nút phải sửa lại tham chiếu."
-  owner: op-retry
-  kind: check-finding
-MALFORMED_SOURCE_IDENTITY:
-  title: "Stored source identity is malformed"
-  title_vi: "Danh tính nguồn đã lưu bị sai dạng"
-  meaning_vi: "Danh tính nguồn được lưu cho nút Work bị hỏng nên không thể dùng để so sánh an toàn."
-  causes_vi:
-    - "Tệp bị sửa tay hoặc ghi dở"
-    - "Được tạo bởi phiên bản công cụ khác"
-  nextStep_vi: "Bộ quét độ cũ đánh dấu không thể xác minh; op sở hữu nút phải ghi lại danh tính nguồn đúng."
-  owner: op-retry
-  kind: check-finding
-MALFORMED_SOURCE_REFERENCE:
-  title: "Stored source reference is malformed"
-  title_vi: "Tham chiếu nguồn đã lưu bị sai dạng"
-  meaning_vi: "Một tham chiếu nguồn được lưu trong nút Work sai dạng nên không thể so sánh an toàn."
-  causes_vi:
-    - "Thiếu repo hoặc trường bắt buộc"
-    - "Tệp bị sửa tay sai"
-  nextStep_vi: "Bộ quét độ cũ đánh dấu không thể xác minh; op sở hữu nút phải sửa lại tham chiếu."
-  owner: op-retry
-  kind: check-finding
-MALFORMED_WORKSPACE:
-  title: "Workspace malformed or unreadable"
-  title_vi: "Không đọc được cây Work"
-  meaning_vi: "Cây Work bị sai dạng hoặc không đọc được nên không thể xác nhận hoàn thành."
-  causes_vi:
-    - "Có tệp YAML hỏng làm hỏng cả quá trình đọc"
-    - "Thư mục Work thiếu hoặc bị khóa"
-  nextStep_vi: "Bộ kiểm tra Work không chứng nhận gì cả; cần sửa tệp hỏng rồi kiểm tra lại."
-  owner: op-retry
-  kind: check-finding
 MECHANICAL_CHECK_CONFLICT:
   title: "Mechanical checks conflict"
   title_vi: "Các luật kiểm máy xung đột nhau"
@@ -4032,26 +3374,6 @@ MECHANICAL_COVERAGE_INCOMPLETE:
   nextStep_vi: "Kết quả bị coi là không khả dụng và chặn; cần bổ sung phạm vi kiểm rồi chạy lại."
   owner: op-retry
   kind: check-finding
-METADATA_OBJECT:
-  title: "Node metadata is not an object"
-  title_vi: "Siêu dữ liệu của nút không phải đối tượng"
-  meaning_vi: "Phần siêu dữ liệu của một tệp Work không phải là một khối khai báo dạng khóa và giá trị."
-  causes_vi:
-    - "Tệp trống hoặc chỉ có một dòng chữ"
-    - "Ghi danh sách hay chuỗi thay vì khối khóa giá trị"
-  nextStep_vi: "Bộ kiểm tra Work báo lỗi; op tác giả phải sửa tệp cho đúng cấu trúc."
-  owner: op-retry
-  kind: check-finding
-MISSING_REF:
-  title: "Reference does not resolve"
-  title_vi: "Tham chiếu không trỏ tới đâu cả"
-  meaning_vi: "Một tham chiếu trong hồ sơ Work không tìm thấy nút hoặc tài nguyên đúng loại mà nó trỏ tới."
-  causes_vi:
-    - "Sai mã của nút hoặc tài nguyên"
-    - "Nút được trỏ tới đã bị xóa hoặc đổi tên"
-  nextStep_vi: "Bộ kiểm tra Work báo lỗi; op tác giả phải sửa mã tham chiếu cho đúng."
-  owner: op-retry
-  kind: check-finding
 MISSING_RESULT:
   title: "No lint result for a file"
   title_vi: "Thiếu kết quả lint cho một tệp"
@@ -4061,36 +3383,6 @@ MISSING_RESULT:
     - "Trình lint không xử lý được tệp này"
   nextStep_vi: "Việc phủ kiểm không đầy đủ; cần chạy lại kiểm lint, nếu lặp lại thì đây là lỗi của bộ kiểm."
   owner: runtime-core
-  kind: check-finding
-MISSING_TARGET:
-  title: "Impact target not found"
-  title_vi: "Không tìm thấy mục tiêu cần phân tích ảnh hưởng"
-  meaning_vi: "Mã nút hoặc tài nguyên được yêu cầu phân tích ảnh hưởng không tồn tại trong cây Work."
-  causes_vi:
-    - "Gõ sai mã"
-    - "Nút đã bị xóa hoặc đổi tên"
-  nextStep_vi: "Việc phân tích trả về lỗi; người gọi phải dùng mã nút hoặc tài nguyên có thật."
-  owner: op-retry
-  kind: input-invalid
-MODULE_SPEC:
-  title: "Module holds more than one spec"
-  title_vi: "Một module chứa nhiều hơn một đặc tả"
-  meaning_vi: "Một nút module chỉ được sở hữu một đặc tả, nhưng nút này khai báo nhiều loại cùng lúc."
-  causes_vi:
-    - "Gộp đặc tả nghiệp vụ và giao diện vào cùng một nút"
-    - "Sao chép khối đặc tả sang nút khác"
-  nextStep_vi: "Bộ kiểm tra Work báo lỗi; op tác giả phải tách thành các nút riêng cho từng đặc tả."
-  owner: op-retry
-  kind: check-finding
-MODULE_SPEC_OWNER:
-  title: "Spec placed on wrong node kind"
-  title_vi: "Đặc tả đặt trên sai loại nút"
-  meaning_vi: "Một khối đặc tả nằm trên nút không đúng loại hoặc sai vị trí sở hữu nó."
-  causes_vi:
-    - "Ghi đặc tả nghiệp vụ vào nút kiến trúc hoặc ngược lại"
-    - "Đặt tệp sai thư mục"
-  nextStep_vi: "Bộ kiểm tra Work báo lỗi; op tác giả phải chuyển đặc tả về đúng loại nút."
-  owner: op-retry
   kind: check-finding
 MULTILINE_IMPLICIT_KEY:
   title: "YAML key spans several lines"
@@ -4332,16 +3624,6 @@ NORM_UNRECORDED:
   nextStep_vi: "Kiểm này chỉ chạy khi có mốc chuẩn; sau khi chạy sạch phải ghi lại mốc chuẩn bằng --write-baseline."
   owner: op-retry
   kind: check-finding
-NOT_INVESTIGATED:
-  title: "Node is not yet investigated"
-  title_vi: "Nút chưa được khảo sát"
-  meaning_vi: "Nút Work này ở trạng thái chưa được khảo sát nên các phần phụ thuộc vào nó bị treo."
-  causes_vi:
-    - "Nút mới tạo chưa được xem xét"
-    - "Nút bị đặt lại về chưa khảo sát"
-  nextStep_vi: "Nút và các nút phụ thuộc bị treo cho đến khi op sở hữu khảo sát và chốt trạng thái nút."
-  owner: op-retry
-  kind: check-status
 NO_BASELINE:
   title: "No deep-check baseline recorded"
   title_vi: "Chưa có mốc chuẩn cho kiểm sâu"
@@ -4362,16 +3644,6 @@ NO_EFFECTIVE_CONFIG:
   nextStep_vi: "Phạm vi kiểm bị coi là chưa đầy đủ; op phải sửa cấu hình lint để phủ tệp rồi chạy lại."
   owner: op-retry
   kind: check-finding
-OPEN_DECISION:
-  title: "Open decision awaits the owner"
-  title_vi: "Có quyết định đang chờ chủ"
-  meaning_vi: "Có một quyết định chính sách chưa được chốt, nên nó chưa ràng buộc hay sinh ra điều gì cả."
-  causes_vi:
-    - "Quyết định đã được chuẩn bị nhưng chủ chưa trả lời"
-    - "Chủ chưa xem câu hỏi"
-  nextStep_vi: "Chỉ là cảnh báo; cần chủ đưa ra quyết định thì phần phụ thuộc mới tiếp tục được."
-  owner: owner
-  kind: check-finding
 OPS_ROUTE:
   title: "Route is an ops or probe endpoint"
   title_vi: "Route là cửa kiểm tra vận hành"
@@ -4380,16 +3652,6 @@ OPS_ROUTE:
     - "Đường dẫn như health, ready hoặc metrics"
     - "Cửa dùng cho hệ thống giám sát"
   nextStep_vi: "Chỉ là thông tin, không chặn; không cần làm gì."
-  owner: op-retry
-  kind: check-finding
-OPTIONAL_UNMET:
-  title: "Optional children still unfinished"
-  title_vi: "Còn mục tùy chọn chưa xong"
-  meaning_vi: "Còn các nút con không bắt buộc chưa hoàn thành, nhưng chúng không chặn việc chốt nút cha."
-  causes_vi:
-    - "Mục tùy chọn chưa được làm"
-    - "Mục tùy chọn chưa được đánh dấu bỏ qua"
-  nextStep_vi: "Chỉ là cảnh báo; nút cha vẫn hoàn thành được, không cần làm gì thêm."
   owner: op-retry
   kind: check-finding
 ORPHANED_FRONTIER:
@@ -4689,26 +3951,6 @@ PLACE_TOO_SHALLOW:
   nextStep_vi: "Bộ kiểm tra chỉ chỗ đúng; op ghi bản ghi phải chuyển bản ghi về đúng vị trí và sửa các tham chiếu."
   owner: other-op:work.author
   kind: check-finding
-PLAINTEXT_SECRET:
-  title: "Plaintext credential in record"
-  title_vi: "Mật khẩu hoặc khóa viết thẳng trong bản ghi"
-  meaning_vi: "Một bản ghi chứa trường như mật khẩu hay khóa truy cập dạng chữ thường, điều này bị cấm."
-  causes_vi:
-    - "Dán khóa hoặc mật khẩu vào tệp yaml"
-    - "Dùng tên trường như password, accessToken"
-  nextStep_vi: "Bản ghi bị từ chối; phải thay bằng tham chiếu đã niêm phong, và chủ dự án cần xoay khóa nếu đã lộ."
-  owner: owner
-  kind: check-finding
-PREREQUISITE_NOT_DONE:
-  title: "Prerequisite not done"
-  title_vi: "Việc tiên quyết chưa xong"
-  meaning_vi: "Một nút báo xong nhưng còn việc phải làm trước chưa thực sự xong, nên nút bị treo lại."
-  causes_vi:
-    - "Nút phụ thuộc chưa đạt trạng thái xong"
-    - "Dùng N/A thay cho bằng chứng"
-  nextStep_vi: "Nút chuyển sang tạm dừng cho tới khi các việc tiên quyết xong; sau đó tự hồi phục."
-  owner: other-op:work.author
-  kind: blocker
 PRIMARY_ABSENT:
   title: "Brand primary colour missing"
   title_vi: "Thiếu màu chính của thương hiệu"
@@ -5015,16 +4257,6 @@ READY_UNDISPATCHED:
   nextStep_vi: "Bộ điều phối ghi vi phạm quá hạn; Supervisor kiểm tra vì sao chưa giao."
   owner: supervisor
   kind: runtime-fault
-READ_DIRECTORY:
-  title: "Cannot list a directory"
-  title_vi: "Không liệt kê được thư mục"
-  meaning_vi: "Bộ kiểm tra công việc không đọc được danh sách một thư mục."
-  causes_vi:
-    - "Thiếu quyền truy cập"
-    - "Thư mục bị xóa giữa chừng"
-  nextStep_vi: "Bộ kiểm tra báo lỗi; khắc phục quyền hoặc tệp rồi chạy lại."
-  owner: runtime-core
-  kind: runtime-fault
 READ_WITHOUT_EDGE:
   title: "Read of another node path without edge"
   title_vi: "Đọc đường dẫn của nút khác mà không có liên kết"
@@ -5062,16 +4294,6 @@ RECORD_UNREADABLE:
     - "Tệp yaml hỏng"
     - "Tệp bị xóa"
   nextStep_vi: "Bộ kiểm tra báo lỗi; sửa hoặc khôi phục bản ghi."
-  owner: other-op:work.author
-  kind: check-finding
-REFERENCE_NOT_INVESTIGATED:
-  title: "Reference not investigated"
-  title_vi: "Tham chiếu chưa được điều tra"
-  meaning_vi: "Nút công việc trỏ tới tham chiếu mà điều tra chưa được ghi nhận."
-  causes_vi:
-    - "Bỏ qua bước điều tra"
-    - "Tham chiếu mới thêm"
-  nextStep_vi: "Nút bị coi là không hợp lệ cho tới khi có điều tra; op tác giả phải bổ sung."
   owner: other-op:work.author
   kind: check-finding
 REF_MALFORMED:
@@ -5142,25 +4364,6 @@ RENDER_UI_INPUT_MISSING:
   nextStep_vi: "Bằng chứng không chạy được; cần bản ghi màn hình đã vẽ."
   owner: other-op:interface.draw
   kind: check-finding
-REPOSITORY_KIND:
-  title: "Code binding is not a repository"
-  title_vi: "Ràng buộc mã không trỏ tới kho"
-  meaning_vi: "Ràng buộc mã trỏ tới tài nguyên không phải kiểu kho mã."
-  causes_vi:
-    - "Trỏ nhầm tài nguyên"
-  nextStep_vi: "Bộ kiểm tra báo lỗi; sửa tham chiếu thành kho mã."
-  owner: other-op:work.author
-  kind: check-finding
-REPOSITORY_MAPPING_MISSING:
-  title: "Repository has no mapping"
-  title_vi: "Kho chưa có ánh xạ"
-  meaning_vi: "Nguồn ghi tên một kho nhưng chưa có ánh xạ tới thư mục kho thật."
-  causes_vi:
-    - "Kho chưa được ràng buộc"
-    - "Tên kho sai"
-  nextStep_vi: "Kết quả không xác minh được; cần thêm ánh xạ kho."
-  owner: supervisor
-  kind: check-finding
 REPOSITORY_OBLIGATION_OWED:
   title: "Repo obligation not yet declared"
   title_vi: "Kho chưa khai báo nghĩa vụ"
@@ -5169,16 +4372,6 @@ REPOSITORY_OBLIGATION_OWED:
     - "package.json thiếu starci.codePatterns"
   nextStep_vi: "Chỉ ghi chú với lint theo lát cắt; chủ kho cần bổ sung khai báo."
   owner: owner
-  kind: check-finding
-REPOSITORY_ORIGIN_MISMATCH:
-  title: "Repository origin mismatch"
-  title_vi: "Nguồn gốc kho không khớp"
-  meaning_vi: "Nguồn (origin) của kho thật khác với nguồn khai trong định danh."
-  causes_vi:
-    - "Kho bị đổi remote"
-    - "Khai báo origin sai"
-  nextStep_vi: "Kết quả không xác minh được; sửa origin hoặc ánh xạ."
-  owner: supervisor
   kind: check-finding
 REPOSITORY_UNAVAILABLE:
   title: "Repository path unavailable"
@@ -5189,15 +4382,6 @@ REPOSITORY_UNAVAILABLE:
     - "Không có quyền truy cập"
   nextStep_vi: "Báo cáo không hợp lệ; cần thư mục kho đúng."
   owner: op-retry
-  kind: input-invalid
-REPOSITORY_UNBOUNDED:
-  title: "Too many untracked repo inputs"
-  title_vi: "Kho có quá nhiều tệp chưa theo dõi"
-  meaning_vi: "Kho có hơn 10000 tệp chưa theo dõi nên không lấy dấu vân tay an toàn."
-  causes_vi:
-    - "Thư mục sinh ra hoặc build chưa bị bỏ qua"
-  nextStep_vi: "Bộ quét dừng với lỗi đầu vào; cần dọn hoặc ignore tệp."
-  owner: owner
   kind: input-invalid
 REPO_UNBOUND:
   title: "Repository resolves to nothing"
@@ -5245,24 +4429,6 @@ REQUIRED_RULE_MISSING:
   nextStep_vi: "Lint báo lỗi; bật quy tắc trong cấu hình."
   owner: owner
   kind: check-finding
-RESERVED_DIRECTORY:
-  title: "Reserved directory in canonical Work"
-  title_vi: "Thư mục dành riêng trong cây công việc"
-  meaning_vi: "Cây Work chuẩn chỉ cho phép thư mục tài nguyên _resources ở gốc."
-  causes_vi:
-    - "Đặt thư mục riêng trong Work"
-  nextStep_vi: "Bộ kiểm tra báo lỗi; di chuyển tệp về cạnh nút sở hữu."
-  owner: other-op:work.author
-  kind: check-finding
-RESOURCE_DETAILS:
-  title: "Resource details not an object"
-  title_vi: "Chi tiết tài nguyên không phải đối tượng"
-  meaning_vi: "Trường details của tài nguyên phải là một đối tượng."
-  causes_vi:
-    - "Ghi details dạng chuỗi hoặc danh sách"
-  nextStep_vi: "Bộ kiểm tra báo lỗi; sửa tài nguyên."
-  owner: other-op:work.author
-  kind: check-finding
 RESOURCE_EXHAUSTION:
   title: "YAML parse resource limit"
   title_vi: "Vượt giới hạn tài nguyên khi đọc YAML"
@@ -5272,51 +4438,6 @@ RESOURCE_EXHAUSTION:
   nextStep_vi: "Tệp không đọc được; cần đơn giản hóa tệp."
   owner: op-retry
   kind: input-invalid
-RESOURCE_FIELD:
-  title: "Resource missing required field"
-  title_vi: "Tài nguyên thiếu trường bắt buộc"
-  meaning_vi: "Tài nguyên thiếu kind, owner hoặc revision."
-  causes_vi:
-    - "Quên điền trường"
-  nextStep_vi: "Bộ kiểm tra báo lỗi; điền đủ trường."
-  owner: other-op:work.author
-  kind: check-finding
-RESOURCE_FILE:
-  title: "Resource file entry malformed"
-  title_vi: "Mục tệp tài nguyên sai dạng"
-  meaning_vi: "Mỗi mục tệp tài nguyên cần một đường dẫn tương đối."
-  causes_vi:
-    - "Mục thiếu path"
-  nextStep_vi: "Bộ kiểm tra báo lỗi; sửa mục tệp."
-  owner: other-op:work.author
-  kind: check-finding
-RESOURCE_FILES:
-  title: "Resource files not a list"
-  title_vi: "Danh sách tệp tài nguyên sai dạng"
-  meaning_vi: "Trường files của tài nguyên phải là mảng đối tượng đường dẫn."
-  causes_vi:
-    - "files ghi sai kiểu"
-  nextStep_vi: "Bộ kiểm tra báo lỗi; sửa thành mảng."
-  owner: other-op:work.author
-  kind: check-finding
-RESOURCE_FILE_DUPLICATE:
-  title: "Resource file listed twice"
-  title_vi: "Tệp tài nguyên khai hai lần"
-  meaning_vi: "Một tệp nguồn chỉ được liệt kê một lần."
-  causes_vi:
-    - "Sao chép dòng"
-  nextStep_vi: "Bộ kiểm tra báo lỗi; xóa mục trùng."
-  owner: other-op:work.author
-  kind: check-finding
-RESOURCE_FILE_ESCAPE:
-  title: "Resource file path escapes directory"
-  title_vi: "Đường dẫn tệp tài nguyên ra ngoài thư mục"
-  meaning_vi: "Đường dẫn tệp là tuyệt đối hoặc có .., không nằm trong thư mục tài nguyên."
-  causes_vi:
-    - "Dùng đường dẫn tuyệt đối"
-  nextStep_vi: "Bộ kiểm tra báo lỗi; dùng đường dẫn tương đối chuẩn."
-  owner: other-op:work.author
-  kind: check-finding
 RESOURCE_FILE_MISSING:
   title: "Accounts file missing beside flow"
   title_vi: "Thiếu tệp tài khoản cạnh luồng"
@@ -5325,16 +4446,6 @@ RESOURCE_FILE_MISSING:
     - "Tệp chưa tạo"
   nextStep_vi: "Bộ kiểm tra từ chối; thêm tệp hoặc sửa tên."
   owner: other-op:test.author
-  kind: check-finding
-RESOURCE_FILE_UNREADABLE:
-  title: "Resource file unreadable"
-  title_vi: "Tệp tài nguyên không đọc được"
-  meaning_vi: "Tệp tài nguyên bị thiếu, không đọc được, không phải tệp thường hoặc là liên kết tượng trưng."
-  causes_vi:
-    - "Tệp bị xóa"
-    - "Là symlink"
-  nextStep_vi: "Bộ kiểm tra báo lỗi; không tải từ xa; cần đặt tệp thật."
-  owner: other-op:work.author
   kind: check-finding
 REVIEW_PART_MISSING:
   title: "Reviewed part missing"
@@ -5435,24 +4546,6 @@ RUN_MEDIA_FAKE:
   nextStep_vi: "Lần chạy chốt thì từ chối, không thì nghi ngờ; chạy lại tạo tệp thật."
   owner: other-op:e2e.verify
   kind: check-finding
-SCANNER_FAILURE:
-  title: "Staleness scanner failed unexpectedly"
-  title_vi: "Bộ quét lỗi thời gặp lỗi bất ngờ"
-  meaning_vi: "Bộ quét chạy hỏng ngoài dự kiến, không đổi đầu vào."
-  causes_vi:
-    - "Lỗi trong bộ quét"
-  nextStep_vi: "Trả mã thoát 3; cần sửa bộ quét."
-  owner: runtime-core
-  kind: runtime-fault
-SCAN_INPUT_CHANGED:
-  title: "Input changed during scan"
-  title_vi: "Đầu vào đổi trong lúc quét"
-  meaning_vi: "Kho hoặc cây công việc thay đổi khi đang quét."
-  causes_vi:
-    - "Ai đó sửa tệp khi quét"
-  nextStep_vi: "Kết quả không xác minh được; quét lại."
-  owner: op-retry
-  kind: check-finding
 SCHEMA_INVALID:
   title: "Op manifest fails its schema"
   title_vi: "Bản mô tả op sai lược đồ"
@@ -5492,16 +4585,6 @@ SCHEMA_VALIDATOR_UNAVAILABLE:
   nextStep_vi: "Đây là lỗi của runtime chứ không phải của bản ghi; cần sửa phía lõi rồi chạy lại kiểm tra."
   owner: runtime-core
   kind: check-status
-SCHEMA_VALUE:
-  title: "Metadata value breaks its schema"
-  title_vi: "Giá trị metadata sai schema"
-  meaning_vi: "Một giá trị metadata không đúng kiểu hoặc không khớp hằng số mà schema yêu cầu."
-  causes_vi:
-    - "Sai kiểu dữ liệu (ví dụ chuỗi thay vì số)"
-    - "Giá trị khác hằng số bắt buộc"
-  nextStep_vi: "Bản ghi bị từ chối; op ghi bản ghi phải sửa giá trị theo schema rồi ghi lại."
-  owner: op-retry
-  kind: check-finding
 SCHEMA_VIOLATION:
   title: "Record violates its schema"
   title_vi: "Bản ghi vi phạm schema"
@@ -5562,106 +4645,6 @@ SCRIPT_RESULT_INVALID:
   nextStep_vi: "Nghĩa vụ bị đánh dấu chưa được phủ và kiểm tra chưa xác nhận được; cần sửa bộ kiểm tra rồi chạy lại."
   owner: runtime-core
   kind: check-status
-SDS_AGGREGATE:
-  title: "SDS parent index has extra content"
-  title_vi: "Mục cha của SDS chứa nội dung thừa"
-  meaning_vi: "Một mục cha (chỉ để gom nhóm) của tài liệu thiết kế SDS chứa nội dung ngoài phần metadata gom nhóm cho phép."
-  causes_vi:
-    - "Ghi nội dung thiết kế vào tệp chỉ mục cha"
-    - "Dùng sai lược đồ cho mục cha"
-  nextStep_vi: "Kiểm tra từ chối; op thiết kế kiến trúc phải chuyển nội dung xuống mục con và để mục cha chỉ có metadata gom nhóm."
-  owner: other-op:architecture.decide
-  kind: check-finding
-SDS_BINDING:
-  title: "Design contract binding drifted"
-  title_vi: "Liên kết của thiết kế SDS bị lệch"
-  meaning_vi: "Liên kết giữa tài liệu thiết kế SDS và nguồn của nó không còn khớp, nên thiết kế cần được xác nhận lại."
-  causes_vi:
-    - "Nguồn mà thiết kế dựa vào đã đổi"
-    - "Liên kết thiết kế chưa được khai báo đúng"
-  nextStep_vi: "Kiểm tra độ cũ đánh dấu cần xác nhận lại; op thiết kế kiến trúc phải cập nhật hoặc xác nhận lại liên kết."
-  owner: other-op:architecture.decide
-  kind: check-finding
-SDS_BRANCH_PAYLOAD:
-  title: "SDS branch duplicates child design"
-  title_vi: "SDS nhánh lặp lại thiết kế con"
-  meaning_vi: "Một nhánh của SDS đang chứa nội dung thiết kế riêng trong khi nó chỉ được gom các mục con."
-  causes_vi:
-    - "Chép nội dung thiết kế của mục con lên mục cha"
-    - "Đặt nội dung vào nhầm cấp"
-  nextStep_vi: "Kiểm tra từ chối; op thiết kế kiến trúc phải bỏ nội dung khỏi nhánh và chỉ để ở các lá."
-  owner: other-op:architecture.decide
-  kind: check-finding
-SDS_BUSINESS:
-  title: "SDS business reference invalid"
-  title_vi: "Tham chiếu nghiệp vụ của SDS sai"
-  meaning_vi: "Thiết kế SDS tham chiếu tới yêu cầu, luồng hoặc tiêu chí nghiệp vụ không có trong SRS hoặc khai báo thiếu."
-  causes_vi:
-    - "Tham chiếu tới mã yêu cầu không tồn tại"
-    - "Thiếu mã yêu cầu, luồng hoặc tiêu chí chấp nhận"
-  nextStep_vi: "Kiểm tra từ chối; op thiết kế kiến trúc phải sửa tham chiếu cho khớp với SRS hiện có."
-  owner: other-op:architecture.decide
-  kind: check-finding
-SDS_COMPONENT_MAP:
-  title: "SDS flows lack owned components"
-  title_vi: "Luồng SDS thiếu thành phần sở hữu"
-  meaning_vi: "Tài liệu SDS có luồng xử lý nhưng không có thành phần logic nào sở hữu chúng."
-  causes_vi:
-    - "Mới viết luồng mà chưa mô tả thành phần"
-    - "Thành phần bị xóa hoặc đặt sai thư mục"
-  nextStep_vi: "Kiểm tra từ chối; op thiết kế kiến trúc phải bổ sung các thành phần logic sở hữu luồng."
-  owner: other-op:architecture.decide
-  kind: check-finding
-SDS_DUPLICATE:
-  title: "SDS overview duplicated"
-  title_vi: "Tổng quan SDS bị viết hai lần"
-  meaning_vi: "Mục tổng quan kiến trúc vừa có dạng có cấu trúc vừa có bản đặc tả liền khối, trong khi chỉ được dùng một."
-  causes_vi:
-    - "Giữ cả bản cũ lẫn bản mới khi chuyển định dạng"
-    - "Ghi nhầm hai kiểu nội dung vào cùng một lá"
-  nextStep_vi: "Kiểm tra từ chối; op thiết kế kiến trúc phải giữ một trong hai dạng và xóa dạng còn lại."
-  owner: other-op:architecture.decide
-  kind: check-finding
-SDS_ID:
-  title: "Duplicate SDS id"
-  title_vi: "Mã SDS bị trùng"
-  meaning_vi: "Hai mục trong SDS dùng cùng một mã định danh nên không phân biệt được."
-  causes_vi:
-    - "Sao chép mục mà quên đổi mã"
-    - "Đặt trùng mã khi chia nhỏ thiết kế"
-  nextStep_vi: "Kiểm tra từ chối; op thiết kế kiến trúc phải đổi mã để mỗi mục duy nhất."
-  owner: other-op:architecture.decide
-  kind: check-finding
-SDS_LAYOUT:
-  title: "SDS folder layout wrong"
-  title_vi: "Bố cục thư mục SDS sai"
-  meaning_vi: "Cấu trúc thư mục hoặc loại nút của SDS không đúng quy định (thiếu tệp chỉ mục hoặc sai loại nút)."
-  causes_vi:
-    - "Thiếu index.yaml, overview hoặc sds"
-    - "Nút SDS không thuộc loại kiến trúc"
-  nextStep_vi: "Kiểm tra từ chối; op thiết kế kiến trúc phải dựng lại đúng bố cục thư mục SDS."
-  owner: other-op:architecture.decide
-  kind: check-finding
-SDS_MAP:
-  title: "SDS section content invalid"
-  title_vi: "Nội dung mục SDS sai"
-  meaning_vi: "Một mục của SDS có nội dung không đúng lược đồ dành cho loại mục đó."
-  causes_vi:
-    - "Thiếu trường bắt buộc của mục"
-    - "Trường có giá trị không hợp lệ"
-  nextStep_vi: "Kiểm tra từ chối kèm thông báo cụ thể; op thiết kế kiến trúc phải sửa mục theo lược đồ."
-  owner: other-op:architecture.decide
-  kind: check-finding
-SDS_NOT_ACCEPTED:
-  title: "SDS not accepted yet"
-  title_vi: "SDS chưa được chấp nhận"
-  meaning_vi: "Một mục SDS đã được đánh dấu hoàn tất nhưng trạng thái nội dung chưa phải \"accepted\"."
-  causes_vi:
-    - "Đánh dấu xong khi chưa qua rà soát"
-    - "Quên cập nhật trạng thái sau khi chấp nhận"
-  nextStep_vi: "Kiểm tra từ chối; op thiết kế kiến trúc phải hoàn tất rà soát và đặt trạng thái accepted, hoặc để mục ở trạng thái chưa xong."
-  owner: other-op:architecture.decide
-  kind: check-finding
 SDS_OWNERS_MISSING:
   title: "SDS component has no owners"
   title_vi: "Thành phần SDS chưa có chủ sở hữu"
@@ -5681,46 +4664,6 @@ SDS_OWNERS_PENDING:
     - "Chưa có bước rà soát nào ghi thư mục sở hữu"
   nextStep_vi: "Chỉ là thông tin, không chặn; chủ sở hữu sẽ được ghi khi triển khai xong và được rà soát."
   owner: other-op:review.verify
-  kind: check-finding
-SDS_REF:
-  title: "SDS reference does not resolve"
-  title_vi: "Tham chiếu SDS không trỏ được"
-  meaning_vi: "Một tham chiếu trong SDS không trỏ tới mục đúng loại nào hoặc bị bỏ trống."
-  causes_vi:
-    - "Tham chiếu tới mã không tồn tại"
-    - "Trỏ nhầm loại mục (ví dụ trỏ tới luồng thay vì thành phần)"
-  nextStep_vi: "Kiểm tra từ chối; op thiết kế kiến trúc phải sửa tham chiếu cho trỏ đúng mục."
-  owner: other-op:architecture.decide
-  kind: check-finding
-SDS_SECTION_PATH:
-  title: "SDS section path unsupported"
-  title_vi: "Đường dẫn mục SDS không hỗ trợ"
-  meaning_vi: "Một mục SDS nằm trong thư mục mà quy ước SDS không công nhận."
-  causes_vi:
-    - "Đặt mục vào thư mục tự đặt"
-    - "Gõ sai tên thư mục loại mục"
-  nextStep_vi: "Kiểm tra từ chối; op thiết kế kiến trúc phải chuyển mục vào đúng thư mục loại của SDS."
-  owner: other-op:architecture.decide
-  kind: check-finding
-SDS_SOURCE_MAPPING:
-  title: "Overview carries source refs"
-  title_vi: "Tổng quan SDS mang tham chiếu mã nguồn"
-  meaning_vi: "Mục tổng quan kiến trúc có tham chiếu mã nguồn, vốn chỉ thuộc về phần triển khai."
-  causes_vi:
-    - "Gắn sourceRefs vào mục tổng quan"
-    - "Trộn bằng chứng mã vào thiết kế"
-  nextStep_vi: "Kiểm tra từ chối; op thiết kế kiến trúc phải bỏ tham chiếu mã nguồn khỏi tổng quan và để phần triển khai giữ chúng."
-  owner: other-op:architecture.decide
-  kind: check-finding
-SDS_VERSION:
-  title: "SDS uses old authoring form"
-  title_vi: "SDS dùng cách viết cũ"
-  meaning_vi: "Một mục SDS mới không dùng lược đồ hiện hành mà hệ thống yêu cầu."
-  causes_vi:
-    - "Viết mục cứng thay vì mục có kiểu"
-    - "Dùng lược đồ cũ"
-  nextStep_vi: "Kiểm tra từ chối; op thiết kế kiến trúc phải viết lại bằng lược đồ starci/sds@1 hoặc mục có kiểu."
-  owner: other-op:architecture.decide
   kind: check-finding
 SEAT_DEAF:
   title: "Supervisor seat not hearing input"
@@ -5752,26 +4695,6 @@ SEAT_VACANT:
   nextStep_vi: "Bộ điều phối sẽ tự đặt trước và khởi động lại ghế; nếu kéo dài quá hạn thì cần Supervisor xử lý."
   owner: supervisor
   kind: blocker
-SERVED_ARTIFACT:
-  title: "Served version lacks build identity"
-  title_vi: "Bản đang chạy thiếu định danh bản dựng"
-  meaning_vi: "Bằng chứng kiểm thử người dùng không ghi định danh bản dựng bất biến của phiên bản đã chạy."
-  causes_vi:
-    - "Chỉ ghi mã commit nguồn mà không ghi bản dựng"
-    - "Trường artifact bị bỏ trống"
-  nextStep_vi: "Kiểm tra từ chối; op thu bằng chứng UAT phải ghi lại định danh bản dựng thực sự quan sát được."
-  owner: other-op:uat.verify
-  kind: check-finding
-SERVED_VERSION_PROOF:
-  title: "Missing runtime version proof"
-  title_vi: "Thiếu bằng chứng phiên bản đang chạy"
-  meaning_vi: "Bằng chứng UAT không có phép kiểm chứng đạt cho thấy đúng phiên bản đang chạy."
-  causes_vi:
-    - "Không nêu servedVersionEvidence"
-    - "Phép kiểm chứng phiên bản không đạt hoặc không tồn tại"
-  nextStep_vi: "Kiểm tra từ chối; op UAT phải thêm phép kiểm chứng phiên bản đạt vào bằng chứng rồi nộp lại."
-  owner: other-op:uat.verify
-  kind: check-finding
 SERVICE_DOWN:
   title: "Service is down"
   title_vi: "Một dịch vụ đang ngừng hoạt động"
@@ -6181,36 +5104,6 @@ SLICE_TYPECHECK_UNAVAILABLE:
   nextStep_vi: "Kiểm tra báo chưa xác nhận được; cần truyền tsconfig đúng qua --project hoặc sửa môi trường."
   owner: op-retry
   kind: check-status
-SOURCE_COVERAGE:
-  title: "Source coverage declaration invalid"
-  title_vi: "Khai báo độ phủ nguồn sai"
-  meaning_vi: "Khai báo độ phủ của định danh nguồn không đúng: phải là toàn cây hoặc phạm vi rõ ràng với giới hạn."
-  causes_vi:
-    - "Phạm vi ghi thiếu đường dẫn hoặc giới hạn"
-    - "Dùng đường dẫn không chuẩn hóa"
-  nextStep_vi: "Kiểm tra từ chối; op ghi bằng chứng phải khai báo độ phủ đúng dạng."
-  owner: op-retry
-  kind: check-finding
-SOURCE_COVERAGE_UNREADABLE:
-  title: "Coverage paths cannot be inspected"
-  title_vi: "Không kiểm tra được đường dẫn phủ"
-  meaning_vi: "Các đường dẫn mà bằng chứng nguồn dựa vào không đọc được hoặc không an toàn để kiểm tra."
-  causes_vi:
-    - "Đường dẫn trỏ ra ngoài repo hoặc vào .git"
-    - "Thư mục không đọc được"
-  nextStep_vi: "Kết quả được xem là chưa xác nhận; cần sửa đường dẫn hoặc quyền đọc rồi kiểm tra lại."
-  owner: op-retry
-  kind: check-finding
-SOURCE_EVIDENCE_BINDING:
-  title: "Evidence no longer matches source"
-  title_vi: "Bằng chứng không còn khớp nguồn"
-  meaning_vi: "Bằng chứng của một nút không còn gắn khớp với mã nguồn hiện tại nên bị coi là cũ."
-  causes_vi:
-    - "Mã nguồn đổi sau khi bằng chứng được ghi"
-    - "Liên kết bằng chứng bị sai"
-  nextStep_vi: "Nút bị đánh dấu cũ; op thu bằng chứng phải chạy lại và ghi bằng chứng mới."
-  owner: op-retry
-  kind: check-finding
 SOURCE_FILE_UNCHECKED:
   title: "Source file not covered by check"
   title_vi: "Tệp nguồn chưa được kiểm tra"
@@ -6219,44 +5112,6 @@ SOURCE_FILE_UNCHECKED:
     - "Chạy kiểm tra với danh sách tệp thiếu"
     - "Tệp mới thêm chưa được đưa vào"
   nextStep_vi: "Kiểm tra từ chối; hãy chạy lại kiểm tra để phủ đủ mọi tệp trong phạm vi."
-  owner: op-retry
-  kind: check-finding
-SOURCE_IDENTITY:
-  title: "Direct source identity malformed"
-  title_vi: "Định danh nguồn trực tiếp sai"
-  meaning_vi: "Định danh nguồn trực tiếp thiếu phiên bản schema hoặc danh sách kho mã."
-  causes_vi:
-    - "Thiếu trường schema hoặc repositories"
-    - "Dùng dạng cũ"
-  nextStep_vi: "Kiểm tra từ chối; op ghi bằng chứng phải ghi lại đúng dạng starci/source-identity@1."
-  owner: op-retry
-  kind: check-finding
-SOURCE_IDENTITY_MIXED:
-  title: "Direct and bound source proof mixed"
-  title_vi: "Trộn hai kiểu chứng minh nguồn"
-  meaning_vi: "Bằng chứng vừa có định danh nguồn trực tiếp vừa có codeRefs gắn tài nguyên, trong khi chỉ được dùng một."
-  causes_vi:
-    - "Ghi cả hai kiểu vào cùng bằng chứng"
-  nextStep_vi: "Kiểm tra từ chối; op ghi bằng chứng phải giữ một kiểu chứng minh nguồn và bỏ kiểu còn lại."
-  owner: op-retry
-  kind: check-finding
-SOURCE_IDENTITY_SCOPE:
-  title: "Source identity on wrong node"
-  title_vi: "Định danh nguồn trên nút sai"
-  meaning_vi: "Định danh nguồn trực tiếp chỉ được dùng cho nút triển khai hiện tại nhưng lại xuất hiện ở nút khác."
-  causes_vi:
-    - "Gắn định danh nguồn vào nút không phải triển khai"
-  nextStep_vi: "Kiểm tra từ chối; op ghi bằng chứng phải chuyển định danh nguồn sang nút triển khai hoặc bỏ đi."
-  owner: op-retry
-  kind: check-finding
-SOURCE_INPUTS_CHANGED:
-  title: "Source inputs changed"
-  title_vi: "Đầu vào nguồn đã thay đổi"
-  meaning_vi: "Các tệp đầu vào mà bằng chứng dựa vào đã thay đổi kể từ khi được ghi."
-  causes_vi:
-    - "Mã nguồn được sửa sau khi kiểm chứng"
-    - "Cấu hình thay đổi"
-  nextStep_vi: "Nút cần xác nhận lại; op liên quan phải chạy lại kiểm chứng trên nguồn hiện tại."
   owner: op-retry
   kind: check-finding
 SOURCE_INVENTORY_EMPTY:
@@ -6269,26 +5124,6 @@ SOURCE_INVENTORY_EMPTY:
   nextStep_vi: "Kiểm tra báo chưa xác nhận được; cần sửa profile hoặc phạm vi rồi chạy lại."
   owner: runtime-core
   kind: check-status
-SOURCE_ORIGIN:
-  title: "Repository origin URL invalid"
-  title_vi: "URL gốc của kho mã không hợp lệ"
-  meaning_vi: "URL gốc của kho mã trong định danh nguồn không phải HTTPS hoặc SSH chuẩn hóa, không kèm thông tin đăng nhập."
-  causes_vi:
-    - "URL chứa tên người dùng hoặc mật khẩu"
-    - "URL không chuẩn hóa hoặc sai giao thức"
-  nextStep_vi: "Kiểm tra từ chối; op ghi bằng chứng phải dùng URL HTTPS hoặc SSH sạch."
-  owner: op-retry
-  kind: check-finding
-SOURCE_PATH_MISSING:
-  title: "Source path is missing"
-  title_vi: "Đường dẫn nguồn không còn"
-  meaning_vi: "Một đường dẫn mà bằng chứng dựa vào đã bị xóa hoặc đổi tên."
-  causes_vi:
-    - "Tệp bị xóa hoặc di chuyển"
-    - "Đường dẫn ghi sai"
-  nextStep_vi: "Nút được đánh dấu thiếu; op liên quan phải cập nhật đường dẫn hoặc chạy lại kiểm chứng."
-  owner: op-retry
-  kind: check-finding
 SOURCE_PATH_UNSAFE:
   title: "Unsafe source path"
   title_vi: "Đường dẫn nguồn không an toàn"
@@ -6299,310 +5134,6 @@ SOURCE_PATH_UNSAFE:
   nextStep_vi: "Kiểm tra chặn và báo chưa xác nhận; cần loại bỏ hoặc sửa đường dẫn đó."
   owner: op-retry
   kind: check-status
-SOURCE_REFERENCE_UNREADABLE:
-  title: "Source reference cannot be read"
-  title_vi: "Không đọc được tham chiếu nguồn"
-  meaning_vi: "Đường dẫn được tham chiếu không thể kiểm tra do không an toàn hoặc không đọc được."
-  causes_vi:
-    - "Đường dẫn trỏ vào .git hoặc ngoài kho"
-    - "Quyền đọc bị thiếu"
-  nextStep_vi: "Kết quả chưa xác nhận được; cần sửa tham chiếu rồi kiểm tra lại."
-  owner: op-retry
-  kind: check-finding
-SOURCE_REVISION_UNAVAILABLE:
-  title: "Source revision not found"
-  title_vi: "Không tìm thấy phiên bản nguồn"
-  meaning_vi: "Commit mà bằng chứng nhắc tới không tìm được trong kho mã tương ứng."
-  causes_vi:
-    - "Commit chưa được tải về"
-    - "Mã commit ghi sai"
-  nextStep_vi: "Kết quả chưa xác nhận được; cần tải commit đó hoặc sửa mã commit rồi kiểm tra lại."
-  owner: op-retry
-  kind: check-finding
-SOURCE_SNAPSHOT:
-  title: "Dirty snapshot not verified"
-  title_vi: "Bản chụp mã chưa kiểm chứng"
-  meaning_vi: "Bản chụp mã chưa commit không phải là tài sản bằng chứng đã được kiểm băm."
-  causes_vi:
-    - "Không đính kèm bản chụp vào bằng chứng"
-    - "Mã băm bản chụp không khớp"
-  nextStep_vi: "Kiểm tra từ chối; op ghi bằng chứng phải đính kèm bản chụp có mã băm đúng."
-  owner: op-retry
-  kind: check-finding
-SOURCE_STATE:
-  title: "Source state declaration invalid"
-  title_vi: "Khai báo trạng thái nguồn sai"
-  meaning_vi: "Trạng thái nguồn (đã commit hoặc còn sửa dở) được khai báo sai hoặc thiếu trường."
-  causes_vi:
-    - "Trạng thái đã commit nhưng còn trường của bản sửa dở"
-    - "Trạng thái không biết"
-  nextStep_vi: "Kiểm tra từ chối; op ghi bằng chứng phải khai báo đúng trạng thái và đủ trường."
-  owner: op-retry
-  kind: check-finding
-SPECIFICATION_BUSINESS_DRIFT:
-  title: "Specification drifted from business"
-  title_vi: "Đặc tả lệch khỏi nghiệp vụ"
-  meaning_vi: "Đặc tả không còn khớp với phần nghiệp vụ mà nó dựa vào."
-  causes_vi:
-    - "Yêu cầu nghiệp vụ được sửa sau đặc tả"
-    - "Đặc tả chưa cập nhật"
-  nextStep_vi: "Kiểm tra độ cũ yêu cầu xác nhận lại; op quyết định nghiệp vụ phải cập nhật đặc tả."
-  owner: other-op:business.decide
-  kind: check-finding
-SPECIFICATION_JOURNEY_DRIFT:
-  title: "Journey drifted from specification"
-  title_vi: "Hành trình lệch khỏi đặc tả"
-  meaning_vi: "Hành trình khách hàng không còn khớp với đặc tả liên quan."
-  causes_vi:
-    - "Đặc tả yêu cầu được sửa mà hành trình không đổi"
-    - "Hành trình được sửa riêng"
-  nextStep_vi: "Kiểm tra độ cũ yêu cầu xác nhận lại; op quyết định nghiệp vụ phải đồng bộ lại hành trình."
-  owner: other-op:business.decide
-  kind: check-finding
-SPECIFICATION_JOURNEY_UNBOUND:
-  title: "Journey not bound to specification"
-  title_vi: "Hành trình chưa gắn với đặc tả"
-  meaning_vi: "Hành trình khách hàng chưa được liên kết với yêu cầu hoặc đặc tả tương ứng."
-  causes_vi:
-    - "Chưa khai báo liên kết"
-    - "Yêu cầu được liên kết đã bị xóa"
-  nextStep_vi: "Kiểm tra độ cũ đánh dấu; op quyết định nghiệp vụ phải gắn hành trình vào yêu cầu."
-  owner: other-op:business.decide
-  kind: check-finding
-SPECIFICATION_NOT_ACCEPTED:
-  title: "Specification not accepted"
-  title_vi: "Đặc tả chưa được chấp nhận"
-  meaning_vi: "Một nút được đánh dấu xong nhưng đặc tả của nó còn là bản nháp hoặc đang bị chặn."
-  causes_vi:
-    - "Đánh dấu xong khi đặc tả chưa đạt"
-    - "Đặc tả còn bị chặn"
-  nextStep_vi: "Kiểm tra từ chối; op quyết định phải hoàn tất đặc tả đạt trạng thái pass trước."
-  owner: other-op:business.decide
-  kind: check-finding
-SPECIFICATION_OWNER:
-  title: "Specification on wrong node kind"
-  title_vi: "Đặc tả đặt sai loại nút"
-  meaning_vi: "Đặc tả không thuộc đúng loại nút (nghiệp vụ hoặc kiến trúc) của op tạo ra nó."
-  causes_vi:
-    - "Đặc tả kiến trúc đặt vào nút nghiệp vụ"
-    - "Trường op không khớp loại nút"
-  nextStep_vi: "Kiểm tra từ chối; op quyết định phải đặt đặc tả vào nút đúng loại."
-  owner: other-op:business.decide
-  kind: check-finding
-SPECIFICATION_SOURCE_STALE:
-  title: "Specification source is stale"
-  title_vi: "Nguồn của đặc tả đã cũ"
-  meaning_vi: "Nguồn mà đặc tả tham chiếu đã thay đổi kể từ khi đặc tả được viết."
-  causes_vi:
-    - "Nguồn được sửa sau đặc tả"
-    - "Chưa cập nhật đặc tả"
-  nextStep_vi: "Kiểm tra độ cũ yêu cầu xác nhận lại; op quyết định phải rà lại đặc tả theo nguồn mới."
-  owner: other-op:business.decide
-  kind: check-finding
-SPECIFICATION_SOURCE_UNBOUND:
-  title: "Specification source not bound"
-  title_vi: "Nguồn của đặc tả chưa gắn"
-  meaning_vi: "Đặc tả chưa được gắn với một nguồn cụ thể để theo dõi thay đổi."
-  causes_vi:
-    - "Chưa khai báo sources"
-    - "Liên kết nguồn bị xóa"
-  nextStep_vi: "Kiểm tra độ cũ đánh dấu; op quyết định phải gắn nguồn cho đặc tả."
-  owner: other-op:business.decide
-  kind: check-finding
-SRS_AGGREGATE:
-  title: "SRS parent index has extra content"
-  title_vi: "Mục cha của SRS chứa nội dung thừa"
-  meaning_vi: "Một mục cha của SRS chứa nội dung ngoài metadata gom nhóm được phép."
-  causes_vi:
-    - "Ghi yêu cầu vào chỉ mục cha"
-    - "Sai lược đồ mục cha"
-  nextStep_vi: "Kiểm tra từ chối; op quyết định nghiệp vụ phải chuyển nội dung xuống mục con."
-  owner: other-op:business.decide
-  kind: check-finding
-SRS_BINDING:
-  title: "SRS binding drifted"
-  title_vi: "Liên kết SRS bị lệch"
-  meaning_vi: "Liên kết giữa các mục SRS không còn khớp nhau nên cần xác nhận lại."
-  causes_vi:
-    - "Mục được liên kết đã đổi hoặc bị xóa"
-    - "Liên kết chưa được cập nhật"
-  nextStep_vi: "Kiểm tra độ cũ đánh dấu cần xác nhận; op quyết định nghiệp vụ phải cập nhật liên kết."
-  owner: other-op:business.decide
-  kind: check-finding
-SRS_BRANCH_PAYLOAD:
-  title: "SRS branch carries a specification"
-  title_vi: "SRS nhánh mang đặc tả"
-  meaning_vi: "Một nhánh của SRS mang đặc tả riêng trong khi chỉ các lá mới được mang."
-  causes_vi:
-    - "Đặt đặc tả vào mục cha"
-    - "Nhầm cấp khi chia nhỏ"
-  nextStep_vi: "Kiểm tra từ chối; op quyết định nghiệp vụ phải chuyển đặc tả xuống các lá."
-  owner: other-op:business.decide
-  kind: check-finding
-SRS_CODE_INPUT:
-  title: "SRS carries source refs"
-  title_vi: "SRS mang tham chiếu mã nguồn"
-  meaning_vi: "Mục SRS có tham chiếu mã nguồn, trong khi SRS phải độc lập với mã."
-  causes_vi:
-    - "Gắn sourceRefs vào SRS"
-  nextStep_vi: "Kiểm tra từ chối; op quyết định nghiệp vụ phải bỏ tham chiếu mã nguồn, để phần triển khai giữ chúng."
-  owner: other-op:business.decide
-  kind: check-finding
-SRS_DUPLICATE:
-  title: "SRS duplicated in business"
-  title_vi: "SRS bị lặp trong nghiệp vụ"
-  meaning_vi: "Chi tiết yêu cầu vừa nằm trong mục SRS vừa được ghi lặp ở phần nghiệp vụ."
-  causes_vi:
-    - "Chép nội dung SRS vào trường business"
-  nextStep_vi: "Kiểm tra từ chối; op quyết định nghiệp vụ phải bỏ bản lặp và chỉ giữ mục SRS."
-  owner: other-op:business.decide
-  kind: check-finding
-SRS_GRAPH:
-  title: "SRS references form a broken graph"
-  title_vi: "Đồ thị tham chiếu SRS bị hỏng"
-  meaning_vi: "Các tham chiếu giữa mục SRS thiếu hoặc không khai báo đúng kiểu."
-  causes_vi:
-    - "Thiếu liên kết có kiểu giữa các mục"
-    - "Trỏ tới mục không tồn tại"
-  nextStep_vi: "Kiểm tra từ chối hoặc đánh dấu cần xác nhận; op quyết định nghiệp vụ phải khai báo đủ tham chiếu."
-  owner: other-op:business.decide
-  kind: check-finding
-SRS_ID:
-  title: "Duplicate SRS id"
-  title_vi: "Mã SRS bị trùng"
-  meaning_vi: "Hai mục SRS dùng cùng một mã ngữ nghĩa nên không phân biệt được."
-  causes_vi:
-    - "Sao chép mục mà quên đổi mã"
-  nextStep_vi: "Kiểm tra từ chối; op quyết định nghiệp vụ phải đổi mã cho duy nhất."
-  owner: other-op:business.decide
-  kind: check-finding
-SRS_ITEM_ID:
-  title: "Duplicate SRS item id"
-  title_vi: "Mã mục SRS bị trùng"
-  meaning_vi: "Hai đặc tả SRS trong cây Work dùng cùng một mã mục."
-  causes_vi:
-    - "Sao chép đặc tả mà không đổi mã"
-  nextStep_vi: "Kiểm tra từ chối; op quyết định nghiệp vụ phải đổi mã cho duy nhất."
-  owner: other-op:business.decide
-  kind: check-finding
-SRS_JOURNEY:
-  title: "SRS journey inconsistent"
-  title_vi: "Hành trình SRS không khớp"
-  meaning_vi: "Hành trình khách hàng không khớp với luồng hoặc yêu cầu chức năng mà nó tham chiếu."
-  causes_vi:
-    - "Chặng trỏ sai luồng hoặc yêu cầu"
-    - "Nhánh không khớp điều kiện luồng"
-  nextStep_vi: "Kiểm tra từ chối; op quyết định nghiệp vụ phải sửa hành trình cho khớp yêu cầu."
-  owner: other-op:business.decide
-  kind: check-finding
-SRS_JOURNEY_COVERAGE:
-  title: "Requirement not in any journey"
-  title_vi: "Yêu cầu chưa thuộc hành trình nào"
-  meaning_vi: "Có yêu cầu chức năng chưa tham gia vào hành trình khách hàng nào."
-  causes_vi:
-    - "Thêm yêu cầu mà chưa cập nhật hành trình"
-  nextStep_vi: "Kiểm tra từ chối; op quyết định nghiệp vụ phải đưa yêu cầu vào ít nhất một hành trình."
-  owner: other-op:business.decide
-  kind: check-finding
-SRS_JOURNEY_OWNER:
-  title: "Journey step lacks typed refs"
-  title_vi: "Chặng hành trình thiếu tham chiếu"
-  meaning_vi: "Chặng của hành trình không khai báo tham chiếu có kiểu tới yêu cầu, luồng hoặc NFR cần thiết."
-  causes_vi:
-    - "Thiếu tham chiếu tới yêu cầu chức năng"
-    - "Thiếu tham chiếu luồng"
-  nextStep_vi: "Kiểm tra từ chối; op quyết định nghiệp vụ phải khai báo đủ tham chiếu có kiểu."
-  owner: other-op:business.decide
-  kind: check-finding
-SRS_LAYOUT:
-  title: "SRS folder layout wrong"
-  title_vi: "Bố cục thư mục SRS sai"
-  meaning_vi: "Cấu trúc thư mục SRS không đúng quy định (thiếu tệp chỉ mục hoặc sai loại nút)."
-  causes_vi:
-    - "Thiếu business/index.yaml hoặc srs/index.yaml"
-    - "Nút SRS không thuộc loại nghiệp vụ"
-  nextStep_vi: "Kiểm tra từ chối; op quyết định nghiệp vụ phải dựng lại bố cục SRS đúng."
-  owner: other-op:business.decide
-  kind: check-finding
-SRS_NODE_TYPE:
-  title: "SRS folder and type mismatch"
-  title_vi: "Loại mục SRS không khớp thư mục"
-  meaning_vi: "Loại mục SRS không khớp thư mục chứa nó."
-  causes_vi:
-    - "Đặt yêu cầu chức năng vào thư mục quy tắc nghiệp vụ"
-  nextStep_vi: "Kiểm tra từ chối; op quyết định nghiệp vụ phải chuyển mục vào thư mục đúng loại."
-  owner: other-op:business.decide
-  kind: check-finding
-SRS_NOT_ACCEPTED:
-  title: "SRS section not accepted"
-  title_vi: "Mục SRS chưa được chấp nhận"
-  meaning_vi: "Một mục SRS được đánh dấu hoàn tất nhưng trạng thái nội dung chưa phải \"accepted\"."
-  causes_vi:
-    - "Đánh dấu xong khi chưa rà soát"
-    - "Quên cập nhật trạng thái"
-  nextStep_vi: "Kiểm tra từ chối; op quyết định nghiệp vụ phải hoàn tất rà soát và đặt accepted."
-  owner: other-op:business.decide
-  kind: check-finding
-SRS_OWNER:
-  title: "SRS feature owner path mismatch"
-  title_vi: "Chủ tính năng SRS sai đường dẫn"
-  meaning_vi: "Chủ sở hữu tính năng ghi trong mục SRS không khớp thư mục features chứa nó."
-  causes_vi:
-    - "Đặt mục vào thư mục của tính năng khác"
-    - "Gõ sai tên tính năng"
-  nextStep_vi: "Kiểm tra từ chối; op quyết định nghiệp vụ phải sửa chủ tính năng hoặc đường dẫn."
-  owner: other-op:business.decide
-  kind: check-finding
-SRS_REF:
-  title: "SRS reference does not resolve"
-  title_vi: "Tham chiếu SRS không trỏ được"
-  meaning_vi: "Một tham chiếu trong SRS không trỏ tới mục đúng loại."
-  causes_vi:
-    - "Tham chiếu tới mã không tồn tại"
-    - "Trỏ nhầm loại mục"
-  nextStep_vi: "Kiểm tra từ chối; op quyết định nghiệp vụ phải sửa tham chiếu."
-  owner: other-op:business.decide
-  kind: check-finding
-SRS_SECTION:
-  title: "SRS section content invalid"
-  title_vi: "Nội dung mục SRS sai"
-  meaning_vi: "Một mục SRS có nội dung không đúng quy định cho loại mục đó."
-  causes_vi:
-    - "Thiếu trường bắt buộc"
-    - "Giá trị không hợp lệ"
-  nextStep_vi: "Kiểm tra từ chối kèm thông báo cụ thể; op quyết định nghiệp vụ phải sửa mục."
-  owner: other-op:business.decide
-  kind: check-finding
-SRS_SECTION_PATH:
-  title: "SRS section path unsupported"
-  title_vi: "Đường dẫn mục SRS không hỗ trợ"
-  meaning_vi: "Một mục SRS nằm trong thư mục mà quy ước SRS không công nhận."
-  causes_vi:
-    - "Đặt mục vào thư mục tự đặt"
-    - "Gõ sai tên thư mục"
-  nextStep_vi: "Kiểm tra từ chối; op quyết định nghiệp vụ phải chuyển mục vào thư mục loại đúng."
-  owner: other-op:business.decide
-  kind: check-finding
-SRS_TRACE:
-  title: "SRS traceability mismatch"
-  title_vi: "Truy vết SRS không khớp"
-  meaning_vi: "Liên kết Work của một yêu cầu chức năng không khớp đúng với quy tắc, dữ liệu, NFR và quyết định mà nó nêu."
-  causes_vi:
-    - "Thêm hoặc bỏ tham chiếu mà không cập nhật liên kết Work"
-    - "Thiếu liên kết cho một mục được tham chiếu"
-  nextStep_vi: "Kiểm tra từ chối; op quyết định nghiệp vụ phải đồng bộ lại liên kết Work."
-  owner: other-op:business.decide
-  kind: check-finding
-SRS_VERSION:
-  title: "SRS section has wrong authoring format"
-  title_vi: "Mục SRS dùng sai định dạng"
-  meaning_vi: "Một mục đặc tả yêu cầu mới được viết bằng dạng cũ, không phải dạng tách theo loại mà hệ thống đòi hỏi."
-  causes_vi:
-    - "Mục lá viết tự do, không khai báo phiên bản đặc tả"
-    - "Dùng lược đồ SRS cũ cho phần mới"
-  nextStep_vi: "Bước làm ra mục này phải viết lại nó theo dạng đặc tả chuẩn (specification hoặc srs) rồi nộp lại; Kernel sẽ giao lại khi kiểm tra vẫn từ chối."
-  owner: op-retry
-  kind: check-finding
 STACKS_CI_CONTRADICTION:
   title: "Stack says service off but CI calls it"
   title_vi: "Khai báo tắt dịch vụ nhưng CI vẫn gọi"
@@ -6873,25 +5404,6 @@ STACKS_UNDECLARED_ENVIRONMENT:
     - "Thư mục lạ không phải môi trường"
   nextStep_vi: "Kiểm tra từ chối; khai báo môi trường đó hoặc di chuyển thư mục đi chỗ khác."
   owner: other-op:workspace.manage
-  kind: check-finding
-STALE_COMPLETION:
-  title: "Completion no longer matches inputs"
-  title_vi: "Kết quả hoàn thành không còn khớp đầu vào"
-  meaning_vi: "Đầu vào của một mục đã đổi sau khi mục được đánh dấu hoàn thành, nên bản hoàn thành đó đã cũ."
-  causes_vi:
-    - "Nội dung nguồn hoặc yêu cầu vừa được sửa"
-    - "Mục cha thay đổi"
-  nextStep_vi: "Mục bị coi là cũ và quay lại trạng thái chưa hoàn thành; Kernel sẽ giao lại bước làm để hoàn thành theo đầu vào mới."
-  owner: op-retry
-  kind: check-finding
-STALE_EVIDENCE:
-  title: "Evidence no longer matches inputs"
-  title_vi: "Bằng chứng không còn khớp đầu vào"
-  meaning_vi: "Bằng chứng của một mục được ghi cho đầu vào cũ, không phải đầu vào hiện tại."
-  causes_vi:
-    - "Đầu vào thay đổi sau khi chụp bằng chứng"
-  nextStep_vi: "Mục bị đánh dấu cũ; cần làm lại bằng chứng theo đầu vào hiện hành."
-  owner: op-retry
   kind: check-finding
 STALE_REASON_UNNAMED:
   title: "Stale evidence lacks named reason"
@@ -7334,43 +5846,6 @@ TRANSCRIPT_MISSING:
   nextStep_vi: "Chỉ báo cáo; đồng hồ tự tắt khi bản ghi xuất hiện, còn không thì cần xem lại bước chụp bản ghi."
   owner: runtime-core
   kind: runtime-fault
-UAT_ACTOR:
-  title: "UAT names both actor and anonymous"
-  title_vi: "UAT nêu cả người dùng và ẩn danh"
-  meaning_vi: "Bằng chứng UAT khai báo vừa có người dùng cụ thể vừa là ẩn danh."
-  causes_vi:
-    - "Đặt đồng thời actor và anonymous"
-  nextStep_vi: "Kiểm tra từ chối; chỉ chọn một trong hai."
-  owner: op-retry
-  kind: check-finding
-UAT_BEHAVIOR:
-  title: "UX completion lacks behavior assertion"
-  title_vi: "Thiếu khẳng định hành vi cho UX"
-  meaning_vi: "Hoàn thành giao diện đòi phải có khẳng định hành vi đạt, nhưng chỉ có ảnh chụp."
-  causes_vi:
-    - "Chỉ nộp ảnh màn hình"
-  nextStep_vi: "Kiểm tra từ chối; cần thêm khẳng định loại hành vi đạt rồi nộp lại."
-  owner: op-retry
-  kind: check-finding
-UAT_CAPTURE:
-  title: "UAT lacks tool or valid timestamp"
-  title_vi: "UAT thiếu công cụ hoặc mốc thời gian hợp lệ"
-  meaning_vi: "Bằng chứng UAT không ghi công cụ chụp hoặc thời điểm chụp đúng chuẩn ISO."
-  causes_vi:
-    - "Bỏ trống tool"
-    - "Thời gian sai định dạng"
-  nextStep_vi: "Kiểm tra từ chối; bổ sung tool và mốc thời gian ISO."
-  owner: op-retry
-  kind: check-finding
-UAT_PROVENANCE:
-  title: "UAT provenance incomplete"
-  title_vi: "Nguồn gốc bằng chứng UAT chưa đủ"
-  meaning_vi: "Bằng chứng UAT thiếu thông tin về môi trường, người dùng, phiên bản đã chạy, công cụ hoặc thời điểm."
-  causes_vi:
-    - "Nộp bằng chứng không kèm phần nguồn gốc"
-  nextStep_vi: "Kiểm tra từ chối; bổ sung đầy đủ nguồn gốc rồi nộp lại."
-  owner: op-retry
-  kind: check-finding
 UAT_RUN_AGING:
   title: "UAT run older than code it proves"
   title_vi: "Lượt UAT cũ hơn mã mà nó chứng minh"
@@ -7399,34 +5874,6 @@ UI_APP_UNKNOWN:
     - "Ứng dụng chưa được khai báo trong workspace.yaml hoặc chưa quét lại"
   nextStep_vi: "Kiểm tra từ chối; sửa app hoặc khai báo ứng dụng rồi quét lại cây bố cục."
   owner: other-op:interface.draw
-  kind: check-finding
-UI_ASSET_BINDING:
-  title: "UI asset not bound at top level"
-  title_vi: "Tài nguyên giao diện chưa khai báo ở cấp trên"
-  meaning_vi: "Một tài nguyên trong đặc tả giao diện không có mặt trong danh sách tài nguyên chung nên không bị ràng buộc theo nội dung."
-  causes_vi:
-    - "Thêm asset vào ui mà quên khai báo ở assets"
-  nextStep_vi: "Kiểm tra từ chối; khai báo cùng đường dẫn vào assets cấp trên rồi nộp lại."
-  owner: op-retry
-  kind: check-finding
-UI_CAPTURE:
-  title: "UI completion lacks hashed capture"
-  title_vi: "Hoàn thành giao diện thiếu ảnh chụp có băm"
-  meaning_vi: "Hoàn thành giao diện đòi ảnh chụp cục bộ PNG, JPEG hoặc WebP kèm mã băm nhưng chưa có."
-  causes_vi:
-    - "Chưa nộp ảnh chụp"
-    - "Ảnh sai định dạng"
-  nextStep_vi: "Kiểm tra từ chối; cần nộp ảnh chụp hợp lệ."
-  owner: op-retry
-  kind: check-finding
-UI_LAYOUT:
-  title: "UI spec in wrong location"
-  title_vi: "Đặc tả giao diện đặt sai chỗ"
-  meaning_vi: "Đặc tả giao diện không nằm ở tệp index.yaml của ui hoặc phạm vi con lồng dưới thư mục ui."
-  causes_vi:
-    - "Đặt tệp đặc tả sai đường dẫn"
-  nextStep_vi: "Kiểm tra từ chối; di chuyển đặc tả về đúng vị trí."
-  owner: op-retry
   kind: check-finding
 UI_ROUTE_GHOST:
   title: "Route declared but not served"
@@ -7466,15 +5913,6 @@ UI_ROUTE_UNKNOWN:
   nextStep_vi: "Kiểm tra từ chối; khai báo nút cha gần nhất đúng hoặc thêm route vào cây."
   owner: other-op:interface.scaffold
   kind: check-finding
-UI_STATE_COVERAGE:
-  title: "UI spec misses required state"
-  title_vi: "Đặc tả giao diện thiếu trạng thái bắt buộc"
-  meaning_vi: "Đặc tả giao diện chưa mô tả một trong các trạng thái loading, empty, error hoặc interaction."
-  causes_vi:
-    - "Chỉ vẽ trạng thái bình thường"
-  nextStep_vi: "Kiểm tra từ chối; bổ sung trạng thái còn thiếu."
-  owner: op-retry
-  kind: check-finding
 UI_SURFACE_MISSING:
   title: "Route declares no surface"
   title_vi: "Route chưa khai báo bề mặt"
@@ -7483,24 +5921,6 @@ UI_SURFACE_MISSING:
     - "Quên trường surface"
   nextStep_vi: "Kiểm tra từ chối; khai báo một loại bề mặt hợp lệ."
   owner: other-op:interface.scaffold
-  kind: check-finding
-UNBOUND_PROVENANCE:
-  title: "UAT provenance resource not declared"
-  title_vi: "Tài nguyên nguồn gốc UAT chưa khai báo"
-  meaning_vi: "Bằng chứng UAT dùng môi trường, người dùng hoặc kho mã mà mục không khai báo trong tham chiếu."
-  causes_vi:
-    - "Thiếu tham chiếu tài nguyên trong nút"
-  nextStep_vi: "Kiểm tra từ chối; thêm tài nguyên vào tham chiếu của nút hoặc nút cha."
-  owner: op-retry
-  kind: check-finding
-UNBOUND_REPOSITORY:
-  title: "Completion repository not declared"
-  title_vi: "Kho mã của kết quả hoàn thành chưa khai báo"
-  meaning_vi: "Kết quả hoàn thành nhắc tới một kho mã không có trong tham chiếu của mục."
-  causes_vi:
-    - "Quên thêm kho vào tham chiếu"
-  nextStep_vi: "Kiểm tra từ chối; thêm kho vào tham chiếu của mục."
-  owner: op-retry
   kind: check-finding
 UNCLAIMED_SURFACE:
   title: "Shipped surface has no owner record"
@@ -7559,16 +5979,6 @@ UNKNOWN_DOMAIN:
   nextStep_vi: "Kiểm tra đồ thị báo lỗi; sửa tên miền hoặc khai báo miền."
   owner: other-op:work.author
   kind: check-finding
-UNKNOWN_FIELD:
-  title: "Unknown metadata field"
-  title_vi: "Trường siêu dữ liệu không được biết"
-  meaning_vi: "Một mục có trường siêu dữ liệu dành riêng mà hệ thống không định nghĩa."
-  causes_vi:
-    - "Gõ sai tên trường"
-    - "Đặt dữ liệu mở rộng sai chỗ"
-  nextStep_vi: "Kiểm tra từ chối; sửa chính tả hoặc đưa dữ liệu vào phần extensions."
-  owner: op-retry
-  kind: check-finding
 UNKNOWN_NODE:
   title: "Work graph names a missing node"
   title_vi: "Đồ thị Work trỏ tới nút không tồn tại"
@@ -7588,77 +5998,6 @@ UNKNOWN_SLICE:
     - "Nút được cắt ra từ nút cha ở lát cắt khác"
     - "Nút và lát cắt của nó khai báo hai miền (domain) khác nhau"
   nextStep_vi: "Bộ kiểm tra đồ thị từ chối; op tạo đồ thị phải sửa slice hoặc domain rồi chạy lại."
-  owner: op-retry
-  kind: check-finding
-UNKNOWN_TARGET:
-  title: "Staleness scan target not in Work"
-  title_vi: "Mục tiêu quét không có trong Work"
-  meaning_vi: "Lệnh quét độ cũ của nguồn được yêu cầu quét một nút Work mà không có trong cây Work."
-  causes_vi:
-    - "Mã nút gõ sai hoặc nút đã bị xóa"
-    - "Quét trên cây Work không đúng gốc"
-  nextStep_vi: "Lệnh quét dừng vì đầu vào sai; người gọi phải truyền đúng mã nút rồi chạy lại."
-  owner: op-retry
-  kind: input-invalid
-UNREADABLE_ROOT:
-  title: "Scan root is not a readable directory"
-  title_vi: "Thư mục gốc để quét không đọc được"
-  meaning_vi: "Lệnh quét độ cũ của nguồn không mở được thư mục gốc được chỉ định."
-  causes_vi:
-    - "Đường dẫn không tồn tại hoặc sai"
-    - "Không có quyền đọc thư mục"
-  nextStep_vi: "Lệnh quét dừng; kiểm tra đường dẫn gốc rồi chạy lại, nếu đường dẫn đúng mà vẫn lỗi thì cần lõi runtime xem môi trường."
-  owner: runtime-core
-  kind: input-invalid
-UNREADABLE_WORK:
-  title: "Work node cannot be read"
-  title_vi: "Không đọc được nút Work"
-  meaning_vi: "Lúc quét, một tệp nút Work không mở hoặc không phân tích được, hoặc thiếu so với danh sách nút cần có."
-  causes_vi:
-    - "Tệp Work bị xóa hoặc đang được sửa giữa chừng"
-    - "Tệp YAML hỏng không phân tích được"
-  nextStep_vi: "Lệnh quét dừng an toàn; sửa hoặc khôi phục tệp Work rồi chạy lại."
-  owner: op-retry
-  kind: input-invalid
-UNSAFE_PATH:
-  title: "Unsafe or protected path in scan"
-  title_vi: "Đường dẫn không an toàn khi quét"
-  meaning_vi: "Lệnh quét gặp đường dẫn thoát ra ngoài gốc, đường dẫn được bảo vệ, hoặc liên kết tượng trưng (symlink) nên từ chối đọc."
-  causes_vi:
-    - "Đường dẫn tuyệt đối, có dấu .. hoặc ký tự lạ"
-    - "Cây Work chứa symlink hoặc không phải tệp thật"
-  nextStep_vi: "Lệnh quét dừng; đổi thành đường dẫn tương đối chuẩn và bỏ symlink rồi chạy lại."
-  owner: op-retry
-  kind: input-invalid
-UNSAFE_ROOT:
-  title: "Scan root is a symlink"
-  title_vi: "Thư mục gốc quét không phải thư mục thật"
-  meaning_vi: "Thư mục gốc cần quét là liên kết tượng trưng hoặc không phải thư mục thật nên bị từ chối."
-  causes_vi:
-    - "Gốc là symlink hoặc junction"
-    - "Đường dẫn truyền vào không phải dạng đã chuẩn hóa"
-  nextStep_vi: "Lệnh quét dừng; truyền đường dẫn thật của thư mục rồi chạy lại."
-  owner: op-retry
-  kind: input-invalid
-UNSUPPORTED_METADATA:
-  title: "Work metadata is not valid YAML"
-  title_vi: "Metadata Work không phải YAML hợp lệ"
-  meaning_vi: "Phần metadata của một tệp Work không đọc được theo chuẩn YAML 1.2 mà hệ thống chấp nhận."
-  causes_vi:
-    - "Có khóa bị lặp trong cùng tệp"
-    - "Dùng thẻ tùy biến hoặc alias mà hệ thống cấm"
-    - "Cú pháp YAML hỏng"
-  nextStep_vi: "Bộ kiểm tra Work báo lỗi và bỏ qua tệp; op ghi Work phải sửa cú pháp rồi chạy lại."
-  owner: op-retry
-  kind: check-finding
-UNSUPPORTED_PROFILE:
-  title: "Leaf kind has no verification profile"
-  title_vi: "Loại nút lá chưa có hồ sơ xác minh"
-  meaning_vi: "Một nút lá có loại không được hỗ trợ nên chưa thể được đánh dấu hoàn thành."
-  causes_vi:
-    - "Gõ sai giá trị kind của nút"
-    - "Loại mới chưa được khai báo hồ sơ xác minh"
-  nextStep_vi: "Nút vẫn được giữ nhưng không thể đạt trạng thái done; sửa loại nút hoặc bổ sung hồ sơ xác minh."
   owner: op-retry
   kind: check-finding
 URL_INVALID:
@@ -7783,25 +6122,16 @@ WORKTREE_REMOVE_OVERDUE:
   nextStep_vi: "Bộ điều phối tiếp tục thử dọn; nếu kẹt mãi thì cần lõi runtime xem thư mục bị khóa."
   owner: runtime-core
   kind: runtime-fault
-WORK_NOT_COMPLETE:
-  title: "Required Work node not complete"
-  title_vi: "Nút Work bắt buộc chưa hoàn thành"
-  meaning_vi: "Một nút Work bắt buộc chưa có bản ghi hoàn thành nên chưa thể coi là xong."
+WORK_NODE_RETIRED:
+  title: "Retired work/node record"
+  title_vi: "Bản ghi work/node đã bị loại bỏ"
+  meaning_vi: "Một bản ghi Work dùng phong bì đệ quy work/node, hình thức đã bị loại bỏ hoàn toàn; chỉ còn các bản ghi phẳng theo họ."
   causes_vi:
-    - "Nút chưa được xác minh xong"
-    - "Chưa gắn bản ghi completion cho nút"
-  nextStep_vi: "Báo cáo độ cũ ghi phát hiện thiếu; op phụ trách nút (thường xác minh) phải hoàn tất và ghi completion."
-  owner: other-op:review.verify
-  kind: check-finding
-WORK_RACE:
-  title: "Work changed during scan"
-  title_vi: "Work bị đổi trong lúc đang quét"
-  meaning_vi: "Một nút Work bị thay đổi định danh ngay khi lệnh quét đang đọc nó."
-  causes_vi:
-    - "Có op khác đang sửa Work cùng lúc"
-  nextStep_vi: "Lệnh quét dừng an toàn; chờ việc ghi Work xong rồi chạy quét lại."
+    - "Bản ghi vẫn khai báo schema work/node@N"
+    - "Cây Work cũ chưa được viết lại thành các bản ghi phẳng"
+  nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để viết lại thành bản ghi phẳng theo họ; không cần ai can thiệp thêm."
   owner: op-retry
-  kind: input-invalid
+  kind: check-finding
 WORK_RECORD_MISSING:
   title: "No Work record found"
   title_vi: "Không tìm thấy bản ghi Work"
@@ -7812,16 +6142,6 @@ WORK_RECORD_MISSING:
   nextStep_vi: "Bộ kiểm tra Work từ chối; op ghi Work tạo bản ghi vào đúng thư mục rồi chạy lại."
   owner: op-retry
   kind: check-finding
-WORK_UNBOUNDED:
-  title: "Work too large to fingerprint"
-  title_vi: "Work quá lớn để lấy dấu vân tay"
-  meaning_vi: "Cây Work có quá nhiều tệp hoặc quá nhiều dung lượng nên lệnh quét không xử lý an toàn được."
-  causes_vi:
-    - "Có thư mục dữ liệu lớn lẫn vào cây Work"
-    - "Số tệp Work tăng vượt giới hạn"
-  nextStep_vi: "Lệnh quét dừng; dọn tệp thừa khỏi cây Work, nếu cây hợp lệ mà vẫn vượt thì cần lõi runtime nâng giới hạn."
-  owner: runtime-core
-  kind: input-invalid
 action-incomplete:
   title: "Supervisor action record incomplete"
   title_vi: "Bản ghi hành động của Supervisor thiếu thông tin"
@@ -8545,7 +6865,7 @@ contract-change-unknown:
   causes_vi:
     - "Gõ sai mã thay đổi"
     - "Thay đổi chưa được thêm vào sổ đăng ký"
-  nextStep_vi: "Enqueue bị từ chối; đăng ký thay đổi trong modules/kernel/contract-changes.yaml hoặc dùng đúng mã."
+  nextStep_vi: "Enqueue bị từ chối; đăng ký thay đổi trong modules/kernel/contract-changes/<id>.yaml hoặc dùng đúng mã."
   owner: supervisor
   kind: verb-refusal
 contract-family-unknown:
