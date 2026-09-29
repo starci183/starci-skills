@@ -507,9 +507,16 @@ function registerLedger(m, { ledgerId, name = null, repoRoot = null, file = null
   const target = path.resolve(file ?? projectLedgerFile(ledgerId, m.env));
   if (m.live && isUnderTempDir(target, { env: m.env, tempDirs: m.tempDirs }))
     return { ledgerId, registered: false, refused: `registry-temp-ledger: ${target} is under the OS temp directory and ${m.file} is the live registry; set ${TEST_REGISTRY_ENV}` };
+  // The live registry also refuses a repository under the OS temp directory (a repro or test run outside the isolated
+  // registry would leave a junk workflow in the harness UI): typed refusal, nothing written.
+  const tempRepo = (root) => (m.live && root && isUnderTempDir(String(root), { env: m.env, tempDirs: m.tempDirs })
+    ? { ledgerId, registered: false, code: 'STARCI_REGISTRY_TEMP_REPO',
+      refused: `registry-temp-repo: repo_root ${repoKey(root)} is under the OS temp directory and ${m.file} is the live registry; set ${TEST_REGISTRY_ENV}` } : null);
   return m.transaction((db) => {
     const at = m.now();
     const existing = db.prepare('SELECT * FROM ledgers WHERE ledger_id=?').get(ledgerId);
+    const refusedRepo = tempRepo(repoRoot ?? (existing ? null : ledgerMetaOf(target).repo_root ?? null));
+    if (refusedRepo) return refusedRepo;
     if (existing) {
       updateRow(db, 'ledgers', { file: target, seen_at: at, ...(name ? { name } : {}), ...(repoRoot ? { repo_root: repoKey(repoRoot) } : {}),
         ...(product ? { product } : {}), ...(schemaVersion != null ? { schema_version: int(schemaVersion) } : {}),
@@ -540,7 +547,8 @@ function resolveLedger(m, { ledgerId = null, name = null, repoRoot = null, creat
   if (row || !create) return ledgerRow(row);
   need(repoRoot, 'resolveLedger create needs repoRoot');
   const id = crypto.randomUUID();
-  registerLedger(m, { ledgerId: id, name: name ?? path.basename(path.resolve(repoRoot)), repoRoot, product });
+  const made = registerLedger(m, { ledgerId: id, name: name ?? path.basename(path.resolve(repoRoot)), repoRoot, product });
+  if (made.refused) throw Object.assign(Error(made.refused), { code: made.code ?? 'STARCI_MACHINE_DB' });
   return ledgerRow(db.prepare('SELECT * FROM ledgers WHERE ledger_id=?').get(id));
 }
 function listLedgers(m, { state = null, includeRetired = false } = {}) {

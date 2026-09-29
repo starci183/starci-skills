@@ -73,6 +73,8 @@ test('the live registry refuses a temp-directory ledger; a test registry enrols 
   const refused=live.registerLedger({file:fixture.path,ledgerId:fixture.ledgerId});
   assert.equal(refused.registered,false);
   assert.match(refused.refused,/registry-temp-ledger/);
+  // A repository under the temp directory is refused too, even when the ledger file itself is not there.
+  assert.match(live.registerLedger({file:product.path,ledgerId:product.ledgerId,repoRoot:path.join(fakeTemp,'stray','repo')}).refused,/registry-temp-repo/);
   assert.equal(live.registerLedger({file:product.path,ledgerId:product.ledgerId}).registered,true);
   assert.deepEqual(live.db.prepare('SELECT ledger_id FROM ledgers').all().map(row=>row.ledger_id),[product.ledgerId]);
 
