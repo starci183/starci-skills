@@ -1,0 +1,14 @@
+id: batch-2-catalog-and-snapshots
+effectiveAt: '2026-09-29T21:00:00+07:00'
+summary: >-
+  The failure-code catalog follows the retired work/node validator and SRS/SDS stack (WORK_NODE_RETIRED is the one
+  code left for a work/node record; the 171 codes nothing emits any more are removed), the grammar knowledge
+  snapshots (common and starci DNA) follow the common sheet reading --grammar-* rhythm tokens, and the
+  architecture rules state only the current flat-family records.
+reach: new-legs
+paths:
+  - knowledge/architecture-rules.yaml
+  - knowledge/grammars/common/DNA.yaml
+  - knowledge/grammars/starci/DNA.yaml
+  - modules/kernel/failure-codes.yaml
+  - modules/kernel/contract-changes/batch-2-catalog-and-snapshots.yaml
