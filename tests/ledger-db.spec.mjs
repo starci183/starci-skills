@@ -374,9 +374,9 @@ test('a ledger created before awaiting_owner is upgraded in place on the writer 
   }finally{ledger.close();}
   // A second open changes nothing (idempotent); a fresh ledger already carries the status and is not migrated.
   const again=openLedger({file});
-  try{assert.equal(again.db.prepare('SELECT count(*) n FROM schema_migrations').get().n,2);}finally{again.close();}
+  try{assert.equal(again.db.prepare('SELECT count(*) n FROM schema_migrations').get().n,3);}finally{again.close();}
   const fresh=openLedger({file:path.join(dir,'fresh.sqlite')});
-  try{assert.deepEqual(fresh.db.prepare('SELECT version FROM schema_migrations').all().map(r=>r.version),[1]);}finally{fresh.close();}
+  try{assert.deepEqual(fresh.db.prepare('SELECT version FROM schema_migrations').all().map(r=>r.version),[1,3]);}finally{fresh.close();}
 });
 
 test('awaiting_owner is a settled status reached only from reported|deciding; a retry follows it and it spends no try',t=>{
