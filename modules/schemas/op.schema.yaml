@@ -113,13 +113,21 @@ properties:
             paths spell out every `<placeholder>` of `path`, `api dispatch` refuses prerequisite-unmet
             if nothing is there (scripts/kernel/prerequisites.mjs); an unresolved placeholder is
             unknown and admits."
-        layoutChain:
+        layoutFoundation:
           const: true
-          description: "Set on the read of the layout tree (.starciwork/shell/index.yaml). For every bound ui
-            record that declares a `route`, `api dispatch` refuses prerequisite-unmet (kind layout-unsettled)
-            while any layout above that route is not settled - a page or an overlay is never drawn before
-            the layouts it sits inside (scripts/kernel/prerequisites.mjs layoutChainVerdicts). A record not
-            yet written, or with no route, is unknown and admits."
+          description: "Set on the read of the layout tree (.starciwork/shell/index.yaml) by an op that draws its own
+            parents (interface.draw). It is NEVER a refusal: a shell that is absent, todo or has unsettled layouts above a
+            bound ui record admits. `api dispatch` decides who draws the shared parents (scripts/kernel/shell-foundation.mjs):
+            the first workflow claims foundation `shell` and its op draws or captures them first; a live owner elsewhere
+            defers this dispatch as foundation-wait; a stalled owner opens a Supervisor Decision Item. The result is
+            judged at the op's proof (scripts/checks/shell-conformance.mjs)."
+        designDrawn:
+          const: true
+          description: "Set on the read of the drawing (interface.implement reads.draws): the hard design gate. `api
+            dispatch` refuses prerequisite-unmet (kind design-not-settled, code DESIGN_NOT_SETTLED) while the ui record a
+            bound implementation record proves (`proves`/`dependsOn` ui.<feature>.<name>) does not exist or its
+            interface.draw is not settled pass (state done and the owner-accepted drawing still current) -
+            scripts/kernel/prerequisites.mjs designVerdicts. Code is never built before its design."
         directionArchetype:
           const: true
           description: "Set on the read of the brand record (.starciwork/brand/index.yaml). For every bound ui

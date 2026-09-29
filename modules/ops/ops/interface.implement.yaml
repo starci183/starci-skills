@@ -75,6 +75,7 @@ reads:
         applicable without inventing a defect.
   - id: draws
     path: selected UI node index.yaml + its owned assets/*
+    designDrawn: true
     purpose:
       en: "Resolve each supplied image from its attachment, local asset or existing design resource
         without requiring the user to author metadata. Open and visually inspect every image. The

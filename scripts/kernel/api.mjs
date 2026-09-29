@@ -124,6 +124,7 @@ import {
   clipDraft, TRAILING_ROWS, cardLivenessPatterns, DEFAULT_STAGED_PATTERN,
 } from './terminal-liveness.mjs';
 import { wakeKernelForTransition } from './wake-delivery.mjs';
+import { FOUNDATION_WAIT, SHELL_FOUNDATION, shellFoundationWaitOf } from './shell-foundation.mjs';
 import {
   KERNEL_REV_STALE, OP_REV_DRIFT, currentRuntimeRev, kernelRevState, opRevDrift, opRevStale, revRootOf,
   shortRev,
@@ -833,7 +834,7 @@ const ACTIONABLE_FRONTIER_STATES = ['transition-ready', 'settle-ready', 'worker-
 // 'dependency-failed' is a dependency that can no longer succeed on its own: the
 // seam or --after job it waits on settled failed (not an owner wait), so only
 // the Kernel can move it - retry the blocker, re-point the dependant, or drop it.
-const QUEUED_BECAUSE = ['owner-gate', 'supervisor-gate', 'deferred', 'deferred-to-handover', 'peer-wait', 'dependency', 'dependency-failed', 'max-ops', 'circuit-open', 'path-lease', 'pool-full', 'ready'];
+const QUEUED_BECAUSE = ['owner-gate', 'supervisor-gate', 'deferred', 'deferred-to-handover', 'peer-wait', 'foundation-wait', 'dependency', 'dependency-failed', 'max-ops', 'circuit-open', 'path-lease', 'pool-full', 'ready'];
 /**
  * Open owner-gate incidents of a workflow: a step only the owner can drive
  * (an assisted OAuth run, a consent screen) holds the jobs it names until the
@@ -1003,6 +1004,12 @@ function queuedBecauseInner(db, job, { planAncestors, jobsByOp, slots, rtDoc, po
     };
   }
 
+  // An interface.draw whose workflow is a declared dependent of a claimed foundation `shell` (the layout chain another
+  // live workflow draws) waits for its landing (scripts/kernel/shell-foundation.mjs); it never drafts a second shell.
+  if (opId === 'interface.draw') {
+    const shellFoundation = shellFoundationWaitOf(db, job.workflow_id);
+    if (shellFoundation) return { queuedBecause: FOUNDATION_WAIT, blockedBy: { foundation: SHELL_FOUNDATION, workflow: shellFoundation.owner }, detail: shellFoundation.detail };
+  }
   // A plan ancestor (planAncestorsOf) holds this job only while it has a job still in flight or
   // queued. A leg with no job, or whose jobs all settled, is not a wait: the plan either never
   // enqueued it (intake legs) or already moved past it. Nor is a pending row whose own --after chain

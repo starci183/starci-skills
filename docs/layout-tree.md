@@ -33,9 +33,12 @@ nodes. A layout whose file or navigation changed gets its `rev` bumped and, if v
 
 ## Ownership
 
-`brand.decide` is the only writer of the layout tree. It already reads the frontend source, owns the logo and
-the voice locales, and runs on the image-generation profile before any draw. Keeping one writer is what stops
-parallel workers from inventing chrome. Its work:
+The layout tree is a foundation shared by the workflows of a project, written by one workflow at a time:
+`interface.draw` when it starts from a todo or unsettled shell (owner ruling 2026-09-29: a draw must work from todo;
+`api dispatch` claims foundation `shell` for the first draw that finds parents to draw, a draw of another workflow
+waits as `foundation-wait`, and a stalled owner opens a Supervisor Decision Item), and `brand.decide`, which still
+sets the brand identity and direction and may capture layouts. Keeping one writer at a time is what stops parallel
+workers from inventing chrome. The work, whichever op does it:
 
 1. Scan (or `convert` a `work/app-shell@1` record).
 2. Decide each `chrome: unknown`.
@@ -49,8 +52,8 @@ parallel workers from inventing chrome. Its work:
 On a greenfield product with no frontend yet, it plans the tree from the settled journeys and SDS with
 `layout-tree.mjs plan --node <id> --files layout,page --design <ui-id>`. Each planned visible layout is drawn
 first by its own `surface: layout` ui record in `interface.draw`, the layout leg. `interface.scaffold` creates
-`app/` from the planned tree and re-scans it, which turns those nodes into origin repository. `brand.decide`
-then takes the real captures.
+`app/` from the planned tree and re-scans it, which turns those nodes into origin repository. The next
+`interface.draw` (or `brand.decide`) then takes the real captures.
 
 ## A ui record's place in the tree
 
@@ -67,10 +70,13 @@ A popover, dropdown, toast or tooltip is not a surface. It is a state in the `ui
 
 ## Drawing: layouts first, chrome composited
 
-- A page or overlay is drawn only when every layout above its route is settled. `api dispatch` enforces this
-  (`interface.draw` reads.shell `layoutChain`, refused as `prerequisite-unmet` kind `layout-unsettled`), cut
-  ordering enforces it (the layout job is enqueued first, and slices under it are enqueued `--after` it), and the
-  draw proof enforces it (`LAYOUT_ANCESTOR_UNSETTLED`).
+- `interface.draw` starts from todo: a missing shell or an unsettled layout above its route is never a dispatch
+  refusal. The op scans the tree, draws or captures the missing shell, ancestor layouts and lockup FIRST, settles
+  them, then draws its screens on top. The draw proof judges the result (`LAYOUT_ANCESTOR_UNSETTLED` when a layout is
+  still unsettled after the op), cut ordering keeps the layout job first (slices under it are enqueued `--after` it),
+  and the shell foundation (`scripts/kernel/shell-foundation.mjs`) keeps two workflows from drafting it in parallel.
+  Code is the other way round: `interface.implement` is refused (`DESIGN_NOT_SETTLED`) until the ui record it proves
+  has a settled draw.
 - ImageGen draws only the slot content (page, loading, error, not-found) at the slot's aspect ratio, or the
   panel (modal, drawer), or a layout's own chrome with its slot keyed `#FF00FF`.
 - `node scripts/work/compose-direction.mjs --ui <dir> --content <png> --breakpoint <bp> --theme <t> --state <s>
@@ -127,4 +133,4 @@ the same check as its layout lens, classifying findings as `layout.structure` or
 `node scripts/work/layout-tree.mjs convert --work .starciwork --write` rewrites it into a layout tree over a fresh
 scan. The conversion carries over the product locale, persona (as role `primary`), lockup and breakpoint/theme
 matrix, marks the legacy layout visible, and leaves the tree `todo`: the old captures have no measured slot, so
-`brand.decide` re-captures them.
+the next `interface.draw` (or `brand.decide`) re-captures them.

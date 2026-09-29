@@ -3,7 +3,9 @@ id: brand.decide
 goal:
   en: Settle one product's visual identity in the single brand record - colour tokens traced to the
     real source files, typography, mascot, logo, iconography, imagery rules, voice and motion - and
-    own the product's layout tree in the single shell record - scanned from the frontend's app/
+    write the product's layout tree in the single shell record (interface.draw writes it too when it
+    starts from a todo shell - owner ruling 2026-09-29 draw-from-todo, layout capture is no longer
+    this op's exclusive gate, a draw never waits for it) - scanned from the frontend's app/
     directory (or planned before one exists), each visible layout captured at desktop and mobile in the
     light theme (dark optional) with its page slot measured, navigation labels out of the i18n catalogs, product locale, demo
     personas by role and the brand lockup - so every later drawing is composited into the real chrome
@@ -363,7 +365,9 @@ steps:
       - profile
     writes: [shellNode, shellAssets, evidence]
     action:
-      en: "Own the layout tree. When the frontend exists, run `node scripts/work/layout-tree.mjs scan --work
+      en: "Write the layout tree (not exclusively: interface.draw scans, draws or captures it itself when it starts from a
+        todo shell, and only one workflow at a time draws the shared shell foundation - a tree another workflow's draw is
+        settling is left to it). When the frontend exists, run `node scripts/work/layout-tree.mjs scan --work
         .starciwork --write` (`convert` when the record is still work/app-shell@1) and read what it
         reports: every node, every layout's component and chrome guess, and the navigation findings - a
         destination with no route, a route no page answers, a label a catalog lacks, a top-level route no

@@ -1,14 +1,17 @@
 schema: starci/op@1
 id: interface.draw
 goal:
-  en: Establish the interface direction before frontend implementation by token-render. Select the
-    smallest useful representative set of critical screens, draw each of their shapes (one per
-    `XBase#state`) WITH THE REAL GRAMMAR COMPONENTS - a React `<XBase>.draw.tsx` composing only
+  en: Establish the interface direction before frontend implementation by token-render. Draw EVERY screen
+    of the scope - every declared shape (one per `XBase#state`) at desktop AND mobile - WITH THE REAL GRAMMAR COMPONENTS - a React `<XBase>.draw.tsx` composing only
     @starci/grammar with fixture props, type-checked and rendered in the product's own CSS by Playwright
     (owner ruling 2026-09-27) - from accepted business/SDS, brand, resolved UI knowledge and
     Grammar geometry; retain each brief, render source and self-check, classify every visible region
-    as a reusable raster asset or code-native DOM/CSS/SVG realization, and map every remaining
-    screen/shape/component explicitly.
+    as a reusable raster asset or code-native DOM/CSS/SVG realization, and map every
+    screen/shape/component explicitly. The op STARTS FROM TODO (owner ruling 2026-09-29 - a draw must work from a
+    product with no shell) - when the shell record or a layout above a screen is absent, todo or unsettled, this
+    same op first scans the layout tree, draws or captures the missing shell and ancestor layouts (and the brand
+    lockup), settles them in its own writes, and only then draws the screens on top - one coherent chain that
+    follows the brand direction. Code is never built before this drawing is settled (dispatch design gate).
 params:
   candidatesPerScreen:
     type: integer
@@ -23,15 +26,6 @@ params:
         reaches the owner; above the default only when the owner sets it. Every drawing files its draw-review
         ask and only the owner accepts it (on Telegram - an album of the drawn parts, a reply 'ok'/'duyệt' accepts,
         anything else is feedback and a redraw).
-  representativeScreensMax:
-    type: integer
-    default: 5
-    min: 1
-    max: 12
-    setBy: kernel
-    doc:
-      en: The ceiling on the representative screen set; every remaining screen is accounted for by the
-        coverage map.
 nodeKinds: [ui]
 completionProfile: ui
 grammarContext: required
@@ -74,10 +68,9 @@ reads:
         allocation.drawLoop.directionPrerequisite switches it)."
   - id: shell
     path: .starciwork/shell/index.yaml
-    mustExist: true
-    layoutChain: true
+    layoutFoundation: true
     purpose:
-      en: "The product's layout tree (work/layout-tree@1) with the captures it cites (blobs, scripts/lib/blob-lookup.mjs): one node per
+      en: "May be absent or todo when the op starts (step 1 creates and settles it). The product's layout tree (work/layout-tree@1) with the captures it cites (blobs, scripts/lib/blob-lookup.mjs): one node per
         app/ segment - route groups, parallel slots @x, intercepting routes (.)x, loading/error/not-found
         files - each layout with its chrome (visible or passthrough), rev, navigation with labels per
         locale out of the i18n catalogs, and real captures per breakpoint and theme with the page slot
@@ -133,6 +126,25 @@ reads:
     purpose:
       en: The exact request, outputs and authority when this operation belongs to a named workflow.
 writes:
+  - id: shellNode
+    path: .starciwork/shell/index.yaml
+    schema: work/layout-tree@1
+    content:
+      en: "The one layout tree, when this op is the workflow that owns the shell foundation (api dispatch claims foundation
+        `shell` for the first draw that finds parents to draw; scripts/kernel/shell-foundation.mjs): `node
+        scripts/work/layout-tree.mjs scan --work .starciwork --write` (`convert` over a work/app-shell@1 record) rewrites
+        it from the frontend's app/, and this op decides each layout's chrome, captures every visible repository layout
+        (`layout-tree.mjs capture`), plans each visible layout the frontend does not have yet (`layout-tree.mjs plan --node
+        <id> --files layout,page --design <ui-id>`), writes the personas and, once a layout is captured or its drawing is
+        accepted, the brand lockup (`layout-tree.mjs lockup`). The fields, the ui.<feature>.<layout>-layout naming and the
+        one-writer-per-run rule are brand.decide's shellNode contract, unchanged. A workflow that does not own the shell
+        never writes it: its draw waits (foundation-wait) until the owner lands it."
+  - id: shellAssets
+    path: blob store (+ <STARCI_JOB_SCRATCH>/captures/layouts) - never .starciwork/shell/assets
+    fields: [capture bytes cited by name + sha256 in shell/index.yaml]
+    content:
+      en: Layout captures and the lockup crop are agent data (ARCHITECTURE-DB 5.1) exactly as brand.decide writes them
+        (`layout-tree.mjs capture|lockup --write` puts the bytes in the blob store and the tree cites name + sha256).
   - id: node
     path: .starciwork/features/<feature>/ui/<name>/index.yaml
     schema: work/ui-screen@1
@@ -249,22 +261,42 @@ steps:
       - grammar
       - repo
       - profile
-    writes: [node]
+    writes: [shellNode, shellAssets, node]
     action:
-      en: "Place the record in the layout tree before anything else. Read the tree and write `route`,
+      en: "SETTLE THE PARENTS FIRST (owner rulings 2026-09-29 draw-from-todo: a draw starts from todo; if the parent is not
+        drawn, draw the parent - never wait for a separate brand.decide, never invent chrome). Run `node
+        scripts/work/layout-tree.mjs scan --work .starciwork --write` (`convert` when the record is still work/app-shell@1;
+        with no frontend yet, `layout-tree.mjs plan` the tree from the accepted journeys and SDS) and read the tree. For
+        the record's route, list every layout above it (`node scripts/checks/shell-conformance.mjs <ui-record-dir>` names each
+        unsettled one). When every one is settled, skip to the next step. Otherwise, in THIS op and before drawing any
+        screen: (a) decide each unknown chrome (visible when it draws a rail, bar or frame around its children,
+        passthrough when it renders only document, providers or a guard); (b) a layout the frontend already has is
+        captured from the real render at desktop and mobile in the light theme (dark only where the tree carries it) with
+        its slot keyed #FF00FF and measured, per brand.decide's capture procedure (`layout-tree.mjs capture ... --write`,
+        destinations for an active-nav layout); (c) a planned visible layout is drawn by its own surface-layout ui record
+        (id ui.<feature>.<layout>-layout, `surface: layout`, route the layout node, chrome from the brand direction, the
+        page slot one flat #FF00FF rectangle) through the same draw steps below, parent before child, and settled through its
+        draw-review (`draw-review.mjs status|apply`), the pages under it composited into that drawing; (d) crop the brand
+        lockup when the tree has none (`layout-tree.mjs lockup`, from a capture, or from the accepted layout composite on a
+        greenfield product; the layout drawing itself is exempt from the lockup requirement); (e) write the personas from the
+        seed or fixture data the app demos with (a persona no seed names is a question with candidates, never invented);
+        (f) bump the tree rev and keep `shell-conformance.txt`. The brand direction (brand.decide's direction mode) is what the
+        chrome follows; when the brand record has no direction yet, draw from the brand tokens and file the direction question
+        as brand.decide does. When another workflow owns the shell foundation this dispatch was deferred (foundation-wait) and
+        the job never launched, so an op that runs owns it. Only what the op cannot settle is a blocker (APP_SHELL_UNSETTLED
+        names the missing input, e.g. no brand record, no journey to plan a layout from) - an unsettled layout is work to
+        do here, not a reason to stop. THEN place the record in the layout tree before anything else. Read the tree and write `route`,
         `surface` (per breakpoint where an overlay changes form), `direction` for a drawer, and `routed`
         and `host` for a modal or drawer; a popover, dropdown, toast or tooltip is a flow state of its
         page, not a surface. Layouts are drawn first: a `surface: layout` record draws a planned layout -
-        its chrome with the page slot left as one flat #FF00FF rectangle - and pages or overlays under it
-        wait until it is accepted; a repository layout is never drawn, it is captured by brand.decide. The
-        layout record's id is exactly the planned node's layout.design, the name brand.decide gave it
+        its chrome with the page slot left as one flat #FF00FF rectangle - and the pages or overlays under it
+        are composited into it once it is accepted; a layout the repository already has is captured (the
+        step above), never redrawn. The layout record's id is exactly the planned node's layout.design
         (ui.<feature>.<layout>-layout, so it lives at features/<feature>/ui/<layout>-layout/), with
-        `surface: layout` and `route` the layout node id; never rename it or pick another feature. A
-        planned visible layout with no layout.design is brand.decide's to name: report `blocked` with
-        blocker `brand-gap` naming the node.
-        Every layout above the route must be settled (`node scripts/checks/shell-conformance.mjs
-        <ui-record-dir>` names any that is not) and is bound by its rev in shell.layouts; an unsettled
-        ancestor is LAYOUT_ANCESTOR_UNSETTLED, never a chrome of the worker's own. The chrome, navigation,
+        `surface: layout` and `route` the layout node id; this op plans and names it when the tree has none
+        (`layout-tree.mjs plan --design`). Every layout above the route is settled BY THE END OF THIS OP
+        (`node scripts/checks/shell-conformance.mjs <ui-record-dir>` judges the result) and is bound by its rev in
+        shell.layouts; the layouts this op settled count. The chrome, navigation,
         UI language and demo personas come from the tree and nowhere else. Freeze complete coverage before drawing.
         Draw only shapes: the record's `ui.shapes`, one per `XBase#state` at the viewports it names
         (`examples/shape-slot/README.md`, knowledge/code-examples/frontend/connected-block); a record
@@ -277,14 +309,13 @@ steps:
         rendered by recipe (scripts/checks/ui-shapes.mjs recipeRenderedOf: a loading, error or not-found
         surface, or every state it names a data status) has nothing to draw: write it done with no
         drawing and no owner review.
-        Enumerate every required screen, shape and responsive band from accepted journeys/SDS; map each
+        Enumerate every screen, shape and responsive band of the scope from accepted journeys/SDS; map each
         combination to actual inspected Grammar components. Enumerate the interaction flow with the same
         rigor: every transition's trigger and landing shape, and every reachable edge case. Write that
-        flow map into the ui record. Classify the scope as bounded or large; for a large task choose the
-        representative set of critical screens covering the highest-risk layouts, interactions,
-        brand moments and component anatomy, never exceeding `params.representativeScreensMax`, and
-        derive every remaining screen in the coverage map rather than drawing it.
-        Every representative shape is drawn at desktop AND mobile in the light theme - a drawer's
+        flow map into the ui record. Draw EVERY screen the job's records name - no sampling: coverage
+        `representativeScreens` lists every screen drawn, and only a data status or a variant the rules above derive
+        stays in the coverage map undrawn. A scope too large for one op is cut by the Kernel into more draw jobs (fan-out),
+        never sampled. Every declared shape is drawn at desktop AND mobile in the light theme - a drawer's
         direction per breakpoint as the record declares it; dark is optional and never demanded.
         Draw `params.candidatesPerScreen` directions per screen; when that is more than one,
         park an owner ask so the owner picks - its question.assets list each candidate's PARTS, desktop
@@ -636,6 +667,7 @@ proofs:
       en: "`node scripts/checks/shell-conformance.mjs <ui-record-dir>` exits 0 for every ui record directory
         written: its route is a node of the layout tree (or declared new under an existing routeParent);
         surface, direction, routed and host agree per breakpoint; every layout above the route is settled
+        by the END of the op (the ones this op drew or captured count; nothing is refused at the start)
         and bound at its current rev; every direction is a composite whose recorded layout capture (or
         host composite) is exactly the current one for its breakpoint and theme and whose pixels re-derive
         from its recorded inputs; a routed overlay has both presentations; every drawn state has composites
@@ -755,22 +787,24 @@ proofs:
 blockers:
   - code: APP_SHELL_UNSETTLED
     condition:
-      en: The layout tree is absent, still a work/app-shell@1 record, has no brand lockup or persona, or no
-        longer matches the frontend's app/ (LAYOUT_TREE_STALE). Report `blocked` with blocker `brand-gap`
-        naming the record path and the failing check; brand.decide scans, converts or re-captures it.
+      en: After step 1 the layout tree still cannot be settled by this op because an INPUT is missing - no brand record to
+        follow, no accepted journey or SDS to plan a layout from, no seed for a persona, no way to render the frontend
+        (RENDER_TOOL_UNAVAILABLE). A tree that is merely absent, todo, legacy, stale (LAYOUT_TREE_STALE), lockup-less
+        (SHELL_LOCKUP_MISSING) or unsettled is NOT this blocker - this op scans, draws or captures and settles it. Report
+        `blocked` with blocker `brand-gap` naming the missing input and the failing check.
         Never draw, describe or invent chrome to proceed. One exception - the drawing of a planned visible
         layout (surface layout, route the planned node, the id its layout.design names) does not wait for
-        a lockup - on a greenfield product nothing renders one yet, and brand.decide crops it from this
+        a lockup - on a greenfield product nothing renders one yet, and this op crops it from that
         drawing once it is accepted (shell-conformance reports SHELL_LOCKUP_DEFERRED, info). Its binding is
         shell {ref shell, rev, layouts []} with the layouts list present and empty (no visible layout above it, so the lockup crop's tree rev
         bump never stales it). The prompt draws the wordmark from the brand record's logo, never an
         invented mark.
   - code: LAYOUT_ANCESTOR_UNSETTLED
     condition:
-      en: A layout above the record's route is not settled - chrome undecided, a breakpoint or theme not
-        captured, no measured slot, or a planned layout whose surface-layout ui record is not accepted.
-        Report `blocked` with blocker `brand-gap` naming the layout node; brand.decide captures a
-        repository layout, and the planned layout's own draw comes first.
+      en: A layout above the record's route is STILL not settled at the op's proof, after this op drew or captured it -
+        chrome undecided, a breakpoint or theme not captured, no measured slot, or a planned layout whose
+        surface-layout ui record is not accepted (its owner review is parked as this op's ask). Judged on the result,
+        never at the start. Report `blocked` with blocker `brand-gap` naming the layout node and what step 1 could not do.
   - code: RENDER_TOOL_UNAVAILABLE
     condition:
       en: The draw-render Playwright capture cannot run on this host. Report host-unsupported; do not
@@ -829,5 +863,5 @@ route:
   prerequisites:
     - business.decide settled pass (reviewed SRS seed; Work leaves remain todo)
     - architecture.decide settled pass (reviewed SDS seed; Work leaves remain todo)
-    - brand.decide done
-    - layout tree present (.starciwork/shell/index.yaml, work/layout-tree@1) and every layout above the record's route settled (dispatch refuses layout-unsettled)
+    - brand.decide done (the brand record and its direction, never the layouts, which this op draws)
+    - a todo or absent layout tree is admitted - this op scans it and draws or captures the missing shell and ancestor layouts first

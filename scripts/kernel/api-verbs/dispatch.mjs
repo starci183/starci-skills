@@ -5,7 +5,7 @@ import { spawn } from 'node:child_process';
 import { transitionWorkflowToRunning, setJobStatus, updateAttempt, updateJob } from '../../../engine/ledger-db.mjs';
 import { parseYaml } from '../../../engine/yaml.mjs';
 import { admitOpSlot } from '../../../engine/admission.mjs';
-import { allocationMs } from '../../../engine/config.mjs';
+import { allocationMs, allocationSettings } from '../../../engine/config.mjs';
 import { buildOpPrompt, renderOwnedPath, ensureJobScratch, jobScratchDirOf } from '../op-prompt.mjs';
 import { priorAttemptFailures } from '../prior-failures.mjs';
 import { withLessons } from '../../supervisor/lessons-file.mjs';
@@ -25,6 +25,7 @@ import { resolveCardLaunchModel, resolveLaunchModel, missingHostTools, defaultOp
 import { kindOrder, isFanOutSlice } from '../../agent/models.mjs';
 import { resolveOpParams } from '../../route/dispatch-op.mjs';
 import { checkPrerequisites, prerequisiteDetail } from '../prerequisites.mjs';
+import { FOUNDATION_WAIT, gateShellFoundation, shellFoundationNeed } from '../shell-foundation.mjs';
 import { opInputPaths, recordInputs, workInputPaths } from '../input-digests.mjs';
 import { resumeContextOf } from '../resume-context.mjs';
 import { orchDispatch } from '../../api/orca/orch-dispatch.mjs';
@@ -148,10 +149,24 @@ export default {
   })();
   const prerequisites = briefForAdmission ? checkPrerequisites({ brief: briefForAdmission, payload, repo }) : { unmet: [], unknown: [] };
   if (prerequisites.unmet.length) {
-    const out = { ok: false, jobId, op, reason: 'prerequisite-unmet', unmet: prerequisites.unmet,
+    const designGate = prerequisites.unmet.find((item) => item.kind === 'design-not-settled');
+    const out = { ok: false, jobId, op, reason: 'prerequisite-unmet', ...(designGate ? { code: designGate.code } : {}), unmet: prerequisites.unmet,
       detail: prerequisiteDetail({ op, jobId, unmet: prerequisites.unmet }) };
     emit(out, `dispatch REFUSED for ${jobId} (${op}): prerequisite-unmet — ${out.detail}`, args.json);
     process.exit(1);
+  }
+
+  // The layout chain above an interface.draw is one shared foundation (`shell`), never a refusal: a draw starts from a
+  // todo shell and unsettled ancestors. The first workflow to find parents to draw claims the foundation and draws them
+  // in this op; a live owner elsewhere makes this dispatch wait (foundation-wait) instead of drafting a second shell.
+  const shellNeed = briefForAdmission ? shellFoundationNeed({ brief: briefForAdmission, payload, repo }) : null;
+  if (shellNeed?.needed) {
+    const gate = gateShellFoundation(ledger, { job, need: shellNeed, settings: allocationSettings() });
+    if (gate.action === 'wait') {
+      const out = { ok: false, jobId, op, reason: FOUNDATION_WAIT, foundation: gate.foundation, owner: gate.owner, detail: gate.detail, ...(gate.decision ? { decision: gate.decision } : {}) };
+      emit(out, `dispatch REFUSED for ${jobId} (${op}): ${FOUNDATION_WAIT} — ${gate.detail}${gate.decision ? `; Supervisor Decision Item ${gate.decision} opened (the owner is past its stall limit)` : ''}; job stays queued`, args.json);
+      process.exit(1);
+    }
   }
 
   // Environment pre-step, before any Orca call: a walk on a served stack (uat.verify, uat.assisted.verify,

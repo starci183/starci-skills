@@ -2,10 +2,11 @@
 // evaluated by `api dispatch` before anything is reserved or launched. Only
 // data is read: a manifest read marked `mustExist` whose path the job's binding
 // resolves, and the `dependsOn` of the job's bound Work records when the op's
-// graphPolicy.prerequisiteState is `done`, and - for a read marked `layoutChain`
-// (interface.draw reads.shell) - that every layout above a bound ui record's
-// `route` in the layout tree (.starciwork/shell/index.yaml) is settled, so a
-// page or overlay is never drawn before the layouts it sits inside. Prose (route.prerequisites) is never
+// graphPolicy.prerequisiteState is `done`, and - for a read marked `designDrawn` (interface.implement reads.draws) -
+// that the ui record each bound implementation record proves has a settled interface.draw (the hard design gate:
+// code is never built before its design). There is NO layout gate on interface.draw: a draw starts from a todo
+// shell and unsettled ancestor layouts and draws them itself (scripts/kernel/shell-foundation.mjs decides which
+// workflow draws the shared parents; the result is judged by scripts/checks/shell-conformance.mjs). Prose (route.prerequisites) is never
 // parsed. Anything the data cannot decide — a placeholder the binding does not
 // resolve, a record outside a Work tree, a tree the Work traversal reads as
 // invalid — is unknown, and unknown is not unmet.
@@ -13,12 +14,15 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { parseYaml } from '../../engine/yaml.mjs';
 import { validateWorkspace } from '../../engine/index.mjs';
-import { isLayoutTree, layoutChainOf, layoutSettlement, loadUiRecords, nodeById, readShellRecord } from '../work/layout-tree.mjs';
+import { loadUiRecords } from '../work/layout-tree.mjs';
+import { drawingAcceptance } from '../work/direction-part.mjs';
 import { isGlobSegment } from '../../engine/admission.mjs';
 import { allocationSettings } from '../../engine/config.mjs';
 import { DIRECTION_EXEMPT, archetypeOf, directionReadiness } from '../work/ui-archetype.mjs';
 
 const WORK_ROOT = '.starciwork';
+/** The refusal code of the design gate (unmet kind design-not-settled). */
+export const DESIGN_NOT_SETTLED = 'DESIGN_NOT_SETTLED';
 const PLACEHOLDER = /^<[^<>/]+>$/;
 // A real glob segment. A Next.js App Router name ([lang], [...slug], [[...opt]]) is a literal
 // directory (engine/admission.mjs isGlobSegment), so an owned src/app/[lang] binds a placeholder.
@@ -87,11 +91,12 @@ export function checkPrerequisites({ brief, payload, repo, validate = validateWo
     }
   }
 
-  const chainRead = (Array.isArray(brief?.reads) ? brief.reads : []).find((read) => read?.layoutChain === true);
-  if (chainRead) {
-    for (const verdict of layoutChainVerdicts(repo, bindings)) {
-      if (verdict.unsettled?.length) unmet.push({ kind: 'layout-unsettled', read: chainRead.id, record: verdict.record, route: verdict.route, layouts: verdict.unsettled });
-      else if (verdict.unknown) unknown.push({ kind: 'layout-chain-unknown', read: chainRead.id, record: verdict.record, why: verdict.unknown });
+  // The hard design gate (owner ruling 2026-09-29 "code truoc ve sau la hong"): a frontend implementation is never
+  // dispatched before the interface.draw of the ui record it proves has settled pass.
+  const designRead = (Array.isArray(brief?.reads) ? brief.reads : []).find((read) => read?.designDrawn === true);
+  if (designRead) {
+    for (const verdict of designVerdicts(repo, records)) {
+      if (verdict.unsettled) unmet.push({ kind: 'design-not-settled', code: DESIGN_NOT_SETTLED, read: designRead.id, record: verdict.record, ui: verdict.ui, why: verdict.why });
     }
   }
 
@@ -133,8 +138,8 @@ export function checkPrerequisites({ brief, payload, repo, validate = validateWo
 export function prerequisiteDetail({ op, jobId, unmet }) {
   const lines = unmet.map((item) => (item.kind === 'record-missing'
     ? `${op} reads ${item.path} (reads.${item.read}, mustExist) and it does not exist`
-    : item.kind === 'layout-unsettled'
-      ? `bound ui record ${item.record} sits at ${item.route} under layout(s) not yet settled - ${item.layouts.map((l) => `${l.node}: ${l.reasons.join('; ')}`).join(' | ')} (reads.${item.read}, layoutChain); brand.decide captures a repository layout, and a planned one is drawn by its surface-layout ui record, first`
+    : item.kind === 'design-not-settled'
+      ? `${DESIGN_NOT_SETTLED}: implementation record ${item.record} proves ui record ${item.ui}, whose interface.draw has not settled pass - ${item.why} (reads.${item.read}, designDrawn). Code is never built before its design: enqueue interface.draw for ${item.ui} and dispatch this job --after it. Tiếng Việt: bản vẽ (interface.draw) của ${item.ui} chưa được chốt nên chưa được viết code; vẽ xong và được chấp nhận rồi mới dispatch implement`
       : item.kind === 'direction-unaccepted'
         ? `bound ui record ${item.record} is a ${item.archetype} surface${item.derived ? ' (derived; set ui.archetype to override)' : ''} and its brand.direction archetype is not accepted by the owner - ${item.why ?? `status ${item.status ?? 'absent'}`} (reads.${item.read}, directionArchetype); enqueue brand.decide --param directionArchetype=${item.archetype} (direction mode; it asks the owner, BRAND_DIRECTION_UNACCEPTED until answered) and dispatch this job --after it`
       : `bound record ${item.record} depends on ${item.dependsOn.map((d) => `${d.id} (${d.state})`).join(', ')}, not done, and ${op} graphPolicy.prerequisiteState is done`));
@@ -142,39 +147,30 @@ export function prerequisiteDetail({ op, jobId, unmet }) {
 }
 
 /**
- * For every bound path that is a ui record (.../.starciwork/features/<f>/ui/<name>) carrying a `route`, the
- * layout nodes above that route that are not settled. A record that does not exist yet, declares no route, or
- * names a route the tree does not hold and no existing routeParent is unknown - the draw proof holds those.
+ * For every bound frontend implementation record (.../.starciwork/features/<f>/impl/<repo>/<name>) whose `proves` names
+ * ui records (ui.<feature>.<name>): whether each ui record exists and its interface.draw settled pass (state done and
+ * the owner-accepted drawing still current, direction-part.mjs drawingAcceptance; a record rendered by recipe is done
+ * with nothing to draw). A record that proves no ui record, or is not written yet, is unknown - not unmet. [{record, ui, unsettled, why}]
  */
-export function layoutChainVerdicts(repo, bindings) {
+export function designVerdicts(repo, records) {
   const verdicts = [];
-  const seen = new Set();
-  for (const binding of bindings) {
+  for (const binding of records) {
     const parts = segments(plainPath(binding));
     const at = parts.indexOf(WORK_ROOT);
-    if (at < 0 || !parts.slice(at + 1).includes('ui')) continue;
-    const record = parts.join('/');
-    if (seen.has(record)) continue;
-    seen.add(record);
-    try {
-      const workRoot = path.join(repo, ...parts.slice(0, at + 1));
-      const file = path.join(repo, ...parts, 'index.yaml');
-      if (!fs.existsSync(file)) { verdicts.push({ record, unknown: 'the ui record does not exist yet' }); continue; }
-      const ui = parseYaml(fs.readFileSync(file, 'utf8'));
-      if (typeof ui?.route !== 'string') { verdicts.push({ record, unknown: 'the ui record declares no route' }); continue; }
-      const shell = readShellRecord(workRoot);
-      if (!shell || shell.error) { verdicts.push({ record, unknown: 'no readable shell record' }); continue; }
-      if (!isLayoutTree(shell.record)) { verdicts.push({ record, route: ui.route, unsettled: [{ node: '(shell)', reasons: [`the shell record is ${shell.record.schema ?? 'unknown'}, not work/layout-tree@1 - node scripts/work/layout-tree.mjs convert --work <.starciwork> --write`] }] }); continue; }
-      const anchor = nodeById(shell.record, ui.route) ? ui.route : (typeof ui.routeParent === 'string' && nodeById(shell.record, ui.routeParent) ? ui.routeParent : null);
-      if (!anchor) { verdicts.push({ record, unknown: `route ${ui.route} is not in the layout tree and names no existing routeParent` }); continue; }
-      const drawingOwn = ui.surface === 'layout' && anchor === ui.route;
-      const records = loadUiRecords(workRoot);
-      const unsettled = (layoutChainOf(shell.record, anchor, { self: !drawingOwn }) ?? [])
-        .map((node) => ({ node: node.id, ...layoutSettlement(shell.record, node, { shellDir: shell.dir, uiLoader: (id) => records.get(id) ?? null }) }))
-        .filter((s) => !s.settled).map(({ node, reasons }) => ({ node, reasons }));
-      verdicts.push({ record, route: ui.route, unsettled });
-    } catch (error) {
-      verdicts.push({ record, unknown: `layout chain unreadable (${String(error?.message ?? error)})` });
+    if (at < 0 || !parts.slice(at + 1).includes('impl')) continue;
+    const file = path.join(repo, ...parts, 'index.yaml');
+    if (!fs.existsSync(file)) continue;
+    let impl = null;
+    try { impl = parseYaml(fs.readFileSync(file, 'utf8')); } catch { continue; }
+    const uiIds = [...new Set([...(Array.isArray(impl?.proves) ? impl.proves : []), ...(Array.isArray(impl?.dependsOn) ? impl.dependsOn : [])]
+      .filter((id) => typeof id === 'string' && /^ui\./.test(id)))];
+    if (!uiIds.length) continue;
+    const uiRecords = loadUiRecords(path.join(repo, ...parts.slice(0, at + 1)));
+    for (const ui of uiIds) {
+      const entry = uiRecords.get(ui);
+      if (!entry) { verdicts.push({ record: parts.join('/'), ui, unsettled: true, why: 'the ui record does not exist - nothing was drawn' }); continue; }
+      const acceptance = drawingAcceptance(entry.record, path.dirname(entry.file));
+      if (!acceptance.accepted) verdicts.push({ record: parts.join('/'), ui, unsettled: true, why: `its state is ${acceptance.reason}` });
     }
   }
   return verdicts;

@@ -191,7 +191,6 @@ id: interface.draw
 goal: {en: ...}                 # một câu
 params:                         # tham số typed, có default, ai được set
   candidatesPerScreen: {type: integer, default: 1, min: 1, max: 3, setBy: owner}
-  representativeScreensMax: {type: integer, default: 5, setBy: kernel}
 context:                        # dữ liệu op được đọc; chỉ mô tả, không chứa luật
   reads: [{id, path, purpose}]
 effects:                        # op được ghi gì

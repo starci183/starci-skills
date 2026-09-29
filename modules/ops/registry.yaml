@@ -156,9 +156,9 @@ ops:
     kindInferred: scaffold
   - id: brand.decide
     family: brand
-    goal: Settle one product's visual identity in the single brand record - colour tokens traced to the
+    goal: "Settle one product's visual identity in the single brand record - colour tokens traced to the
       real source files, typography, mascot, logo, iconography, imagery rules, voice and motion -
-      and own the pr
+      and write the "
     params:
       ownerRulings:
         default: ""
@@ -692,9 +692,6 @@ ops:
       candidatesPerScreen:
         default: 1
         setBy: owner
-      representativeScreensMax:
-        default: 5
-        setBy: kernel
     nodeKinds:
       - ui
     completionProfile: ui
@@ -716,6 +713,8 @@ ops:
       - generatedDirection
       - workflow
     writes:
+      - shellNode
+      - shellAssets
       - node
       - designSource
       - evidence
@@ -735,9 +734,10 @@ ops:
       prerequisites:
         - business.decide settled pass (reviewed SRS seed; Work leaves remain todo)
         - architecture.decide settled pass (reviewed SDS seed; Work leaves remain todo)
-        - brand.decide done
-        - layout tree present (.starciwork/shell/index.yaml, work/layout-tree@1) and every layout
-          above the record's route settled (dispatch refuses layout-unsettled)
+        - brand.decide done (the brand record and its direction, never the layouts, which this op
+          draws)
+        - a todo or absent layout tree is admitted - this op scans it and draws or captures the
+          missing shell and ancestor layouts first
       riskHints:
         - host-tool-required:browser-dom
     lifecyclePosition: direct | pre-implementation

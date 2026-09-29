@@ -6,7 +6,8 @@ import path from 'node:path';
 import { createRequire } from 'node:module';
 import { parseYaml, stringifyYaml } from '../engine/yaml.mjs';
 import { checkShellConformance, productLocaleOf, shellBindingFindings, shellConformanceMain } from '../scripts/checks/shell-conformance.mjs';
-import { checkPrerequisites, prerequisiteDetail, resolveReadPath } from '../scripts/kernel/prerequisites.mjs';
+import { checkPrerequisites, resolveReadPath } from '../scripts/kernel/prerequisites.mjs';
+import { shellFoundationNeed } from '../scripts/kernel/shell-foundation.mjs';
 import { productLocaleFor } from '../scripts/kernel/product-locale.mjs';
 import { nodeById } from '../scripts/work/layout-tree.mjs';
 import { encodePng, blankImage } from '../scripts/work/png.mjs';
@@ -128,32 +129,41 @@ test('a nested visible layout that is not settled blocks only the pages under it
   assert.ok(codes(checkShellConformance(dir)).includes('LAYOUT_ANCESTOR_UNSETTLED'));
 });
 
-test('dispatch refuses a draw under an unsettled layout and admits a layout drawn first (reads.shell layoutChain)', async (t) => {
+test('dispatch admits a draw under an unsettled layout (draw-from-todo) and the result must settle the ancestors', async (t) => {
   const { p } = await drawn(t);
   const draw = readYaml('modules/ops/ops/interface.draw.yaml');
   const read = draw.reads.find((r) => r.id === 'shell');
-  assert.equal(read.mustExist, true);
-  assert.equal(read.layoutChain, true);
+  assert.equal(read.mustExist, undefined, 'the shell may be absent or todo when a draw starts');
+  assert.equal(read.layoutChain, undefined, 'no layout gate at the start of a draw');
+  assert.equal(read.layoutFoundation, true);
+  assert.ok(draw.writes.some((w) => w.id === 'shellNode' && w.schema === 'work/layout-tree@1'), 'the draw writes the layout tree itself');
+  assert.equal(readYaml('modules/models/kinds.yaml').kinds['interface.draw'].writes.includes('shell'), true);
   // The layout chain alone: the brand read's direction gate (directionArchetype) has its own spec (draw-loop-dna.spec.mjs).
   const brief = { reads: draw.reads.filter((r) => !r.directionArchetype), graphPolicy: { prerequisiteState: 'never' } };
   const repo = path.dirname(p.work);
   const admit = (owned) => checkPrerequisites({ brief, repo, payload: { owned_paths: [owned] } });
-  assert.deepEqual(admit('.starciwork/features/reports/ui/board').unmet, []);
+  const board = '.starciwork/features/reports/ui/board';
+  assert.deepEqual(admit(board).unmet, []);
   const tree = structuredClone(p.tree);
   nodeById(tree, CONSOLE).layout.state = 'todo';
   p.save(tree);
-  const refused = admit('.starciwork/features/reports/ui/board').unmet;
-  assert.equal(refused.length, 1);
-  assert.equal(refused[0].kind, 'layout-unsettled');
-  assert.equal(refused[0].layouts[0].node, CONSOLE);
-  assert.match(prerequisiteDetail({ op: 'interface.draw', jobId: 'j1', unmet: refused }), /under layout\(s\) not yet settled/);
-  const frame = path.join(p.work, 'features', 'console', 'ui', 'frame');
-  fs.mkdirSync(frame, { recursive: true });
-  fs.writeFileSync(path.join(frame, 'index.yaml'), stringifyYaml(uiSkeleton('ui.console.frame', { route: CONSOLE, surface: 'layout' })));
-  assert.deepEqual(admit('.starciwork/features/console/ui/frame').unmet, [], 'a surface-layout record waits only on the layouts above its own node - layouts are drawn first');
-  assert.equal(admit('.starciwork/features/new/ui/thing').unknown[0].kind, 'layout-chain-unknown', 'a record not written yet is unknown and admits');
-  fs.writeFileSync(path.join(p.work, 'shell', 'index.yaml'), stringifyYaml({ schema: 'work/app-shell@1', id: 'shell' }));
-  assert.match(admit('.starciwork/features/reports/ui/board').unmet[0].layouts[0].reasons[0], /not work\/layout-tree@1/);
+  assert.deepEqual(admit(board).unmet, [], 'a todo layout above the record no longer refuses the dispatch');
+  const need = shellFoundationNeed({ brief, repo, payload: { owned_paths: [board] } });
+  assert.equal(need.needed, true);
+  assert.match(need.reasons[0], /console/);
+  // The RESULT is judged at the op's proof: the ancestor is still unsettled, so the draw's conformance refuses.
+  assert.ok(codes(checkShellConformance(path.join(p.work, 'features', 'reports', 'ui', 'board'))).includes('LAYOUT_ANCESTOR_UNSETTLED'));
+  // Once the op settled the ancestor (this op's own writes), the same result passes and nothing is owed.
+  p.save(p.tree);
+  assert.equal(shellFoundationNeed({ brief, repo, payload: { owned_paths: [board] } }).needed, false);
+  assert.deepEqual(codes(checkShellConformance(path.join(p.work, 'features', 'reports', 'ui', 'board'))), []);
+  // A shell that does not exist yet (todo product) is admitted too and is the foundation's to write.
+  const bare = fs.mkdtempSync(path.join(os.tmpdir(), 'starci-bare-'));
+  t.after(() => fs.rmSync(bare, { recursive: true, force: true }));
+  assert.deepEqual(checkPrerequisites({ brief, repo: bare, payload: { owned_paths: [board] } }).unmet, []);
+  const bareNeed = shellFoundationNeed({ brief, repo: bare, payload: { owned_paths: [board] } });
+  assert.equal(bareNeed.needed, true);
+  assert.match(bareNeed.reasons[0], /does not exist/);
   assert.deepEqual(resolveReadPath('.starciwork/shell/index.yaml', []), ['.starciwork/shell/index.yaml']);
 });
 
@@ -235,7 +245,7 @@ test('the contracts wire the layout tree: owner op, draw, implement, audit, scaf
   const common = readYaml('modules/ops/_common.yaml');
   assert.ok(common.sections.some((s) => /productLocale/.test(s.title) && s.blocks.some((b) => /App Router/.test(b)) && s.blocks.some((b) => /composited, never drawn/.test(b))));
   assert.match(read('modules/kernel/dispatch.yaml'), /product_locale:/);
-  assert.match(read('modules/schemas/op.schema.yaml'), /layoutChain:/);
+  assert.match(read('modules/schemas/op.schema.yaml'), /layoutFoundation:/);
 });
 
 test('the CLI exits 2 on a bad argument', () => {

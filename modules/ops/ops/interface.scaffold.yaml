@@ -117,7 +117,7 @@ writes:
         scripts/work/layout-tree.mjs scan --work .starciwork --write` - so the planned nodes become origin
         repository with their files' digests, the navigation is read back out of the created registry and
         catalogs, and each layout keeps its decided chrome and rev. The scan writes nothing else: the
-        layout captures remain brand.decide's to take against the running app."
+        layout captures are taken against the running app by the next interface.draw (or brand.decide)."
 steps:
   - reads:
       - target
@@ -176,7 +176,7 @@ steps:
       en: Re-scan the layout tree from the source just created with `node scripts/work/layout-tree.mjs scan
         --work .starciwork --write` and keep its output as evidence - planned nodes turn origin repository,
         and every planned node the tree still holds is one this scaffold did not create. The visible
-        layouts then need brand.decide's real captures before any page is drawn under them.
+        layouts are then captured against the running app by the next interface.draw, before it draws the pages under them.
   - reads:
       - target
     writes: [node, evidence, firstRender]
