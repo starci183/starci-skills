@@ -118,7 +118,7 @@ const wfRoute = (ev) => (ev?.ledgerId === SUPERVISOR_LEDGER ? null : ev?.workflo
 const parse = (text) => { try { return JSON.parse(text); } catch { return null; } };
 /** Everything the planner needs about one job, from a read-only handle. Null when the job is not an op job. */
 export function jobFacts(db, jobId, { now = Date.now(), settings = jobSettings() } = {}) {
-  const row = db.prepare("SELECT job_id, workflow_id, op_id, attempt, status, worker_id, payload_json, created_at, updated_at FROM jobs WHERE job_id=? AND kind='op'").get(jobId);
+  const row = db.prepare("SELECT job_id, workflow_id, op_id, try_no AS attempt, status, worker_id, payload_json, created_at, updated_at FROM jobs WHERE job_id=? AND kind='op'").get(jobId);
   if (!row) return null;
   const payload = parse(row.payload_json) ?? {};
   const reported = reportedJobs(db, { jobId })[0] ?? null;
