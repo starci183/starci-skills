@@ -15,6 +15,7 @@ import tsParser from "@typescript-eslint/parser"
 import {
   mustInjectEntityManager,
   noEagerRelation,
+  noExternalCallInTransaction,
   noInjectedRepository,
   noOuterManagerInTransaction,
   requireEntityTableName,
@@ -177,6 +178,39 @@ test("DATA-5 (Rule 6): a relation carries no eager: true", () => {
       {
         code: "class C { @OneToMany(() => ItemEntity, (i) => i.course, { eager: true }) items: ItemEntity[] }",
         errors: [{ messageId: "eager" }],
+      },
+    ],
+  })
+})
+
+test("R82: no transaction spans an external call", () => {
+  tester.run("no-external-call-in-transaction", noExternalCallInTransaction, {
+    valid: [
+      // only domain writes through the transactional manager
+      "class C { save() { return this.manager.transaction(async (tx) => { await tx.save(Entity, row) }) } }",
+      // fetch outside a transaction is fine
+      "async function run() { await fetch(url) }",
+      // commit first, then call out
+      "class C { save() { return this.manager.transaction(async (tx) => { await tx.save(Entity, row) }).then(() => this.paymentSdk.charge(id)) } }",
+      // a plain domain service call is not an external call
+      "class C { save() { return this.manager.transaction(async (tx) => { await this.pricingService.apply(tx) }) } }",
+    ],
+    invalid: [
+      {
+        code: "class C { save() { return this.manager.transaction(async (tx) => { await tx.save(Entity, row); await fetch(url) }) } }",
+        errors: [{ messageId: "external" }],
+      },
+      {
+        code: "class C { save() { return this.manager.transaction(async (tx) => { await this.paymentSdk.charge(id) }) } }",
+        errors: [{ messageId: "external" }],
+      },
+      {
+        code: "class C { save() { return this.manager.transaction(async (tx) => { await this.httpService.post(url, body) }) } }",
+        errors: [{ messageId: "external" }],
+      },
+      {
+        code: "class C { save() { return this.manager.transaction(function (tx) { return axios.post(url, body) }) } }",
+        errors: [{ messageId: "external" }],
       },
     ],
   })

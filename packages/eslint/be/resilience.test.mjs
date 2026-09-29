@@ -7,7 +7,7 @@ import assert from "node:assert/strict"
 import test from "node:test"
 import { RuleTester } from "eslint"
 import tsParser from "@typescript-eslint/parser"
-import { httpNeedsTimeout, jsonParseNeedsGuard, rules } from "./resilience.mjs"
+import { httpNeedsTimeout, jsonParseNeedsGuard, noHandRolledRetry, rules } from "./resilience.mjs"
 
 const tester = new RuleTester({
   languageOptions: { parser: tsParser, ecmaVersion: 2022, sourceType: "module" },
@@ -62,6 +62,40 @@ test("R76: JSON.parse of outside text fails inside a guard", () => {
       { filename: SRC, code: "try { items.map((text) => JSON.parse(text)) } catch (error) { throw error }", errors: [{ messageId: "unguarded" }] },
       // the catch block is not the guarded block
       { filename: SRC, code: "try { run() } catch (error) { JSON.parse(text) }", errors: [{ messageId: "unguarded" }] },
+    ],
+  })
+})
+
+const RETRY_SRC = "D:/repo/src/modules/platform/retry/retry.ts"
+
+test("R81: a loop that catches an error and waits goes through platform/retry", () => {
+  tester.run("no-hand-rolled-retry", noHandRolledRetry, {
+    valid: [
+      // a polling loop with no catch is not a retry
+      { filename: SRC, code: "while (!isReady()) { await sleep(POLL_MS) }" },
+      // a catch with no wait just handles the error once
+      { filename: SRC, code: "for (const id of ids) { try { run(id) } catch (error) { report(error) } }" },
+      // the shared helper itself
+      { filename: RETRY_SRC, code: "for (let i = 0; i < max; i++) { try { return await fn() } catch (e) { await sleep(backoff(i)) } }" },
+      // a spec drives its own fake timers
+      { filename: SPEC, code: "for (let i = 0; i < max; i++) { try { return await fn() } catch (e) { await sleep(1) } }" },
+    ],
+    invalid: [
+      {
+        filename: SRC,
+        code: "for (let i = 0; i < max; i++) { try { return await fn() } catch (e) { await sleep(backoffMs(i)) } }",
+        errors: [{ messageId: "handRolled" }],
+      },
+      {
+        filename: SRC,
+        code: "while (true) { try { return await fn() } catch (e) { await new Promise((resolve) => setTimeout(resolve, delayMs)) } }",
+        errors: [{ messageId: "handRolled" }],
+      },
+      {
+        filename: SRC,
+        code: "do { try { return await fn() } catch (e) { await delay(backoffMs) } } while (attempts++ < max)",
+        errors: [{ messageId: "handRolled" }],
+      },
     ],
   })
 })

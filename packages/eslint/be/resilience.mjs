@@ -5,11 +5,13 @@
  *   with no deadline holds a request, a connection and a worker slot for as long as the far side sleeps.
  * - `json-parse-needs-guard` (R76 `BE_JSON_PARSE_UNGUARDED`): `JSON.parse` of text that came from outside the
  *   function sits inside a `try`. A corrupt row or a hostile payload then becomes a typed outcome instead of a 500.
+ * - `no-hand-rolled-retry` (R81 `BE_HAND_ROLLED_RETRY`): a loop that catches an error and waits before trying
+ *   again re-implements retry by hand, outside `platform/retry`'s bounded, jittered, abortable helper.
  *
  * A call whose options are not an object literal cannot be judged from syntax, so it is left alone.
  */
-import { keyName } from "./lib/ast.mjs"
-import { isDeclarationFile, isTestLane } from "./lib/path.mjs"
+import { keyName, walk } from "./lib/ast.mjs"
+import { isDeclarationFile, isTestLane, normalizePath } from "./lib/path.mjs"
 
 const HTTP_METHODS = new Set(["get", "post", "put", "patch", "delete", "head", "request"])
 
@@ -122,14 +124,55 @@ export const jsonParseNeedsGuard = {
   },
 }
 
+const PLATFORM_RETRY = /\/src\/modules\/platform\/retry\//
+const DELAY_NAMES = /^(?:sleep|delay|wait|backoff)$/i
+const LOOP_TYPES = new Set(["ForStatement", "WhileStatement", "DoWhileStatement"])
+
+/** Whether `node` is a call shaped like a delay: `sleep(ms)`, `x.delay(ms)`, or `setTimeout(...)`. */
+const isDelayCall = (node) => {
+  if (node.type !== "CallExpression") return false
+  const { callee } = node
+  if (callee.type === "Identifier") return DELAY_NAMES.test(callee.name) || callee.name === "setTimeout"
+  return callee.type === "MemberExpression" && !callee.computed && callee.property.type === "Identifier" && DELAY_NAMES.test(callee.property.name)
+}
+
+/** A loop that both catches an error and waits is retrying by hand. */
+export const noHandRolledRetry = {
+  meta: {
+    type: "problem",
+    docs: { description: "A loop that catches an error and waits before trying again goes through `platform/retry`, not a hand-written loop." },
+    schema: [],
+    messages: {
+      handRolled:
+        "This loop catches an error and waits before trying again - a hand-rolled retry with no attempt bound visible here, no jitter and no way to honor an abort signal. Retry through the shared `platform/retry` helper (bounded attempts, exponential backoff with jitter, an abort signal) instead of a loop written at the call site.",
+    },
+  },
+  create(context) {
+    const filename = normalizePath(context.filename || context.getFilename())
+    if (isTestLane(filename) || isDeclarationFile(filename) || PLATFORM_RETRY.test(filename)) return {}
+    const check = (node) => {
+      let hasCatch = false
+      let hasDelay = false
+      walk(node.body, (child) => {
+        if (child.type === "CatchClause") hasCatch = true
+        else if (isDelayCall(child)) hasDelay = true
+      }, { intoFunctions: false })
+      if (hasCatch && hasDelay) context.report({ node, messageId: "handRolled" })
+    }
+    return Object.fromEntries([...LOOP_TYPES].map((type) => [type, check]))
+  },
+}
+
 /** The rules this law contributes to the plugin. */
 export const rules = {
   "http-needs-timeout": httpNeedsTimeout,
   "json-parse-needs-guard": jsonParseNeedsGuard,
+  "no-hand-rolled-retry": noHandRolledRetry,
 }
 
-/** Both start at error: no baseline exists, and the repositories' fix lanes clear the debt. */
+/** All three start at error: no baseline exists, and the repositories' fix lanes clear the debt. */
 export const recommended = {
   "starci-be/http-needs-timeout": "error",
   "starci-be/json-parse-needs-guard": "error",
+  "starci-be/no-hand-rolled-retry": "error",
 }

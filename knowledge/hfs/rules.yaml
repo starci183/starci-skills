@@ -797,3 +797,48 @@ rules:
     failureCodes: ["BE_QUERY_IN_LOOP"]
     enforcers:
       - {kind: eslint-be, id: no-query-in-loop}
+  - id: R78
+    code: "BE_USER_COPY_LITERAL"
+    title_vi: "Chữ hiển thị cho người dùng viết thẳng trong mã nguồn"
+    law: "A literal exception message, notification text or response copy comes from the per-capability messages catalog through the typed MessageCatalog port, not from source."
+    kinds: [lint, codemod]
+    gates: [pre-commit, pre-push, settle, land, ci]
+    failureCodes: ["BE_USER_COPY_LITERAL"]
+    enforcers:
+      - {kind: eslint-be, id: user-copy-through-catalog}
+  - id: R79
+    code: "BE_AMBIENT_CLOCK"
+    title_vi: "Đọc đồng hồ hệ thống trực tiếp"
+    law: "Date.now(), a bare new Date() and performance.now() are read only inside platform/clock; business code asks the injected Clock port."
+    kinds: [lint, codemod]
+    gates: [pre-commit, pre-push, settle, land, ci]
+    failureCodes: ["BE_AMBIENT_CLOCK"]
+    enforcers:
+      - {kind: eslint-be, id: no-ambient-clock}
+  - id: R80
+    code: "BE_INBOX_DEDUPE_MISSING"
+    title_vi: "Thiếu chống trùng lặp qua inbox"
+    law: "Every @Public webhook handler and outbox/queue consumer claims the event through the shared inbox, keyed by (source, event id), before it acts."
+    kinds: [lint, design]
+    gates: [pre-commit, pre-push, settle, land, ci]
+    failureCodes: ["BE_INBOX_DEDUPE_MISSING"]
+    enforcers:
+      - {kind: eslint-be, id: inbox-dedupe-required}
+  - id: R81
+    code: "BE_HAND_ROLLED_RETRY"
+    title_vi: "Tự viết vòng lặp thử lại thay vì dùng bộ trợ giúp chung"
+    law: "A loop that catches an error and waits before trying again goes through the shared platform/retry helper (bounded attempts, exponential backoff with jitter, an abort signal), never a hand-written loop."
+    kinds: [lint, codemod]
+    gates: [pre-commit, pre-push, settle, land, ci]
+    failureCodes: ["BE_HAND_ROLLED_RETRY"]
+    enforcers:
+      - {kind: eslint-be, id: no-hand-rolled-retry}
+  - id: R82
+    code: "BE_TRANSACTION_EXTERNAL_CALL"
+    title_vi: "Giao dịch cơ sở dữ liệu bao trùm một lệnh gọi ra ngoài"
+    law: "No transaction spans an external call; commit first and call out after, or write an outbox message inside the transaction."
+    kinds: [lint, design]
+    gates: [pre-commit, pre-push, settle, land, ci]
+    failureCodes: ["BE_TRANSACTION_EXTERNAL_CALL"]
+    enforcers:
+      - {kind: eslint-be, id: no-external-call-in-transaction}

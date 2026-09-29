@@ -22,8 +22,15 @@
  *
  * Both remaining gaps are read by a person; a rule that guessed at either would fire on correct
  * code, which is how a correct rule gets disabled.
+ *
+ * `no-external-call-in-transaction` (R82 `BE_TRANSACTION_EXTERNAL_CALL`) refuses `fetch`, an HTTP
+ * client call or any method of a `*Client`/`*Sdk` receiver written inside `.transaction(async (tx) =>
+ * ...)`. Holding the transaction open for as long as the external call takes means a failure after
+ * partial commit, or a success the rollback then reverses with no way back; the fix is to commit
+ * first and call out after, or to write an outbox message inside the transaction instead.
  */
 
+import { walk } from "./lib/ast.mjs"
 import { normalizePath } from "./lib/path.mjs"
 
 /** A parameter property (`private readonly x: T`) wraps the parameter it declares. */
@@ -274,6 +281,74 @@ export const noEagerRelation = {
   },
 }
 
+// -- DATA-6 (R82) ------------------------------------------------------------------------------------
+
+const HTTP_RECEIVER = /^(?:axios|http|httpService|httpClient|axiosInstance)$/
+const HTTP_METHODS = new Set(["get", "post", "put", "patch", "delete", "head", "request"])
+/** A receiver named for an integration client or SDK: `stripeClient`, `this.paymentSdk`. */
+const EXTERNAL_RECEIVER = /(?:Client|Sdk)$/
+
+const calleeMethodName = (callee) =>
+  callee.type === "MemberExpression" && !callee.computed && callee.property.type === "Identifier" ? callee.property.name : null
+
+const calleeReceiverName = (callee) => {
+  if (callee.type !== "MemberExpression") return null
+  const object = callee.object
+  if (object.type === "Identifier") return object.name
+  if (object.type === "MemberExpression" && !object.computed && object.property.type === "Identifier") return object.property.name
+  return null
+}
+
+/** Whether `node` is a call this law treats as reaching an external system: `fetch`, an HTTP client, or any method of a `*Client`/`*Sdk`. */
+const isExternalCall = (node) => {
+  if (node.type !== "CallExpression") return false
+  const { callee } = node
+  if (callee.type === "Identifier" && callee.name === "fetch") return true
+  const method = calleeMethodName(callee)
+  const receiver = calleeReceiverName(callee)
+  if (!method || !receiver) return false
+  if (HTTP_RECEIVER.test(receiver) && HTTP_METHODS.has(method)) return true
+  return EXTERNAL_RECEIVER.test(receiver)
+}
+
+/** A short label for a reported call: `stripeClient.charge`, `fetch`. */
+const describeCall = (node) => {
+  const { callee } = node
+  if (callee.type === "Identifier") return callee.name
+  const method = calleeMethodName(callee) ?? "?"
+  const receiver = calleeReceiverName(callee) ?? "?"
+  return `${receiver}.${method}`
+}
+
+/** No transaction spans an external call: commit first, then call out (or write an outbox message inside the transaction). */
+export const noExternalCallInTransaction = {
+  meta: {
+    type: "problem",
+    docs: {
+      description: "An HTTP or SDK call does not run inside `.transaction(async (tx) => ...)`.",
+    },
+    schema: [],
+    messages: {
+      external:
+        "`{{call}}` runs inside `.transaction(...)`. A database transaction held open for as long as an external call takes means: the call fails after the transaction already did its work and now has to be undone by hand, or the call succeeds and the transaction then rolls back, and the two systems disagree with no way back. Commit the transaction, then make the call - or write an outbox message inside the transaction and let a worker deliver it after commit.",
+    },
+  },
+  create(context) {
+    return {
+      CallExpression(node) {
+        const callee = node.callee
+        if (callee.type !== "MemberExpression" || callee.computed) return
+        if (callee.property.type !== "Identifier" || callee.property.name !== "transaction") return
+        const callback = node.arguments[0]
+        if (!callback || (callback.type !== "ArrowFunctionExpression" && callback.type !== "FunctionExpression")) return
+        walk(callback.body, (child) => {
+          if (isExternalCall(child)) context.report({ node: child, messageId: "external", data: { call: describeCall(child) } })
+        })
+      },
+    }
+  },
+}
+
 /** The rules this law contributes to the plugin. */
 export const rules = {
   "must-inject-entity-manager": mustInjectEntityManager,
@@ -281,6 +356,7 @@ export const rules = {
   "require-entity-table-name": requireEntityTableName,
   "no-outer-manager-in-transaction": noOuterManagerInTransaction,
   "no-eager-relation": noEagerRelation,
+  "no-external-call-in-transaction": noExternalCallInTransaction,
 }
 
 /**
@@ -300,6 +376,7 @@ export const recommended = {
   "starci-be/require-entity-table-name": "error",
   "starci-be/no-outer-manager-in-transaction": "error",
   "starci-be/no-eager-relation": "error",
+  "starci-be/no-external-call-in-transaction": "error",
 }
 
 /** Path helper shared with the other backend law modules. */

@@ -12892,3 +12892,60 @@ BE_QUERY_IN_LOOP:
   nextStep_vi: "Đọc một lần trước vòng lặp bằng find({ where: { khóa: In(danhSachKhoa) }, take }) hoặc WHERE khóa = ANY($1), dựng Map theo khóa rồi tra trong vòng lặp; op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra."
   owner: op-retry
   kind: check-finding
+
+BE_USER_COPY_LITERAL:
+  title: "User-facing copy written in source"
+  title_vi: "Chữ hiển thị cho người dùng viết thẳng trong mã nguồn"
+  meaning_vi: "Một chuỗi chữ cố định xuất hiện ở nơi người dùng đọc được nó - tham số message của một *Error/*Exception, thuộc tính subject/title/body/text/message truyền vào notify/send/publish, hoặc thuộc tính message/description/title của một object trả về trong tầng transport - thay vì được tra theo khóa từ bộ danh mục messages theo từng capability qua cổng MessageCatalog kiểu platform/i18n."
+  causes_vi:
+    - "throw new PlanNotFoundError('Plan not found for this account')"
+    - "this.notifier.send({ subject: 'Your plan has changed', templateId: 'plan-x' })"
+    - "return { message: 'Plan updated successfully' }"
+  nextStep_vi: "Thêm khóa vào catalog messages (vi và en) của capability hoặc feature liên quan, rồi gọi qua cổng MessageCatalog (messages.get('<khóa>', { ...tham số })) thay vì viết chuỗi tại chỗ; op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra."
+  owner: op-retry
+  kind: check-finding
+
+BE_AMBIENT_CLOCK:
+  title: "Ambient clock read directly"
+  title_vi: "Đọc đồng hồ hệ thống trực tiếp"
+  meaning_vi: "Mã nghiệp vụ gọi Date.now(), new Date() không tham số hoặc performance.now() ở ngoài platform/clock, nên không có cách nào thay đồng hồ trong một spec hoặc lái một job theo lịch tới một thời điểm chọn trước."
+  causes_vi:
+    - "const startedAt = Date.now()"
+    - "const at = new Date()"
+    - "const mark = performance.now()"
+  nextStep_vi: "Tiêm cổng Clock (đọc thời gian qua clock.now()) thay vì đọc đồng hồ hệ thống trực tiếp; một spec lái thời gian bằng FakeClock của @starci/jest-preset. op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra."
+  owner: op-retry
+  kind: check-finding
+
+BE_INBOX_DEDUPE_MISSING:
+  title: "Webhook or consumer with no inbox dedupe"
+  title_vi: "Thiếu chống trùng lặp qua inbox"
+  meaning_vi: "Một handler webhook mang @Public() hoặc một consumer hàng đợi/outbox không có tham chiếu nào tới cổng inbox hoặc dedupe, nên khi bên gửi gửi lại (webhook không thấy phản hồi kịp, hàng đợi giao lại một thông điệp chưa được xác nhận) hành động sẽ chạy lại lần nữa thay vì là một no-op."
+  causes_vi:
+    - "@Public({ reason: 'external' }) handle() { return this.service.charge() }"
+    - "class PaymentCapturedConsumer { handle() { return this.service.capture() } }"
+  nextStep_vi: "Xác nhận sự kiện qua bảng inbox chung theo khóa (source, event id) trước khi xử lý, để một lượt giao lại trở thành no-op; op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra."
+  owner: op-retry
+  kind: check-finding
+
+BE_HAND_ROLLED_RETRY:
+  title: "Hand-rolled retry loop"
+  title_vi: "Tự viết vòng lặp thử lại thay vì dùng bộ trợ giúp chung"
+  meaning_vi: "Một vòng lặp bắt lỗi rồi chờ trước khi thử lại được viết tay tại chỗ, không có giới hạn số lần thử mà bộ kiểm tra nhìn thấy được, không có jitter, và không có cách nào tôn trọng một abort signal."
+  causes_vi:
+    - "for (let i = 0; i < max; i++) { try { return await fn() } catch (e) { await sleep(backoffMs(i)) } }"
+    - "while (true) { try { return await fn() } catch (e) { await new Promise((r) => setTimeout(r, delayMs)) } }"
+  nextStep_vi: "Thử lại qua bộ trợ giúp chung platform/retry (giới hạn số lần thử, backoff theo cấp số nhân có jitter, nhận abort signal) thay vì viết vòng lặp tại chỗ; op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra."
+  owner: op-retry
+  kind: check-finding
+
+BE_TRANSACTION_EXTERNAL_CALL:
+  title: "Transaction spans an external call"
+  title_vi: "Giao dịch cơ sở dữ liệu bao trùm một lệnh gọi ra ngoài"
+  meaning_vi: "Một lệnh gọi fetch, HTTP client hoặc SDK tích hợp chạy bên trong .transaction(async (tx) => ...), nên giao dịch giữ kết nối mở trong suốt thời gian lệnh gọi ra ngoài chạy; nếu lệnh gọi thất bại sau khi giao dịch đã ghi một phần, hoặc thành công nhưng giao dịch sau đó rollback, hai hệ thống lệch nhau và không có đường quay lại."
+  causes_vi:
+    - "this.manager.transaction(async (tx) => { await tx.save(Entity, row); await fetch(url) })"
+    - "this.manager.transaction(async (tx) => { await this.paymentSdk.charge(id) })"
+  nextStep_vi: "Commit giao dịch trước rồi mới gọi ra ngoài, hoặc ghi một thông điệp outbox bên trong giao dịch để một worker gửi đi sau khi commit; op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra."
+  owner: op-retry
+  kind: check-finding

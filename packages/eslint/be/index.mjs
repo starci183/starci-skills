@@ -27,6 +27,7 @@ import { recommended as defaultDenyRecommended, rules as defaultDenyRules } from
 import { recommended as e2eFlowRecommended, rules as e2eFlowRules } from "./e2e-flow.mjs"
 import { recommended as errorHandlingRecommended, rules as errorHandlingRules } from "./error-handling.mjs"
 import { recommended as eventDeliveryRecommended, rules as eventDeliveryRules } from "./event-delivery.mjs"
+import { recommended as idempotencyRecommended, rules as idempotencyRules } from "./idempotency.mjs"
 import { recommended as inputBoundsRecommended, rules as inputBoundsRules } from "./input-bounds.mjs"
 import { recommended as logSafetyRecommended, rules as logSafetyRules } from "./log-safety.mjs"
 import { recommended as moduleLayeringRecommended, rules as moduleLayeringRules } from "./module-layering.mjs"
@@ -39,9 +40,11 @@ import { recommended as schemaAuthorityRecommended, rules as schemaAuthorityRule
 import { recommended as sizeBudgetRecommended, rules as sizeBudgetRules } from "./size-budget.mjs"
 import { recommended as specQualityRecommended, rules as specQualityRules } from "./spec-quality.mjs"
 import { recommended as suppressionRecommended, rules as suppressionRules } from "./suppression.mjs"
+import { recommended as temporalRecommended, rules as temporalRules } from "./temporal.mjs"
 import { recommended as testingRecommended, rules as testingRules } from "./testing.mjs"
 import { recommended as transportRecommended, rules as transportRules } from "./transport.mjs"
 import { recommended as typeSafetyRecommended, rules as typeSafetyRules } from "./type-safety.mjs"
+import { recommended as userCopyRecommended, rules as userCopyRules } from "./user-copy.mjs"
 
 /** Each law's contribution, kept separate so a duplicate name is detectable rather than silent. */
 const CONTRIBUTIONS = [
@@ -56,6 +59,7 @@ const CONTRIBUTIONS = [
     { law: "e2e-flow", rules: e2eFlowRules, recommended: e2eFlowRecommended },
     { law: "error-handling", rules: errorHandlingRules, recommended: errorHandlingRecommended },
     { law: "event-delivery", rules: eventDeliveryRules, recommended: eventDeliveryRecommended },
+    { law: "idempotency", rules: idempotencyRules, recommended: idempotencyRecommended },
     { law: "input-bounds", rules: inputBoundsRules, recommended: inputBoundsRecommended },
     { law: "log-safety", rules: logSafetyRules, recommended: logSafetyRecommended },
     { law: "module-layering", rules: moduleLayeringRules, recommended: moduleLayeringRecommended },
@@ -68,9 +72,11 @@ const CONTRIBUTIONS = [
     { law: "size-budget", rules: sizeBudgetRules, recommended: sizeBudgetRecommended },
     { law: "spec-quality", rules: specQualityRules, recommended: specQualityRecommended },
     { law: "suppression", rules: suppressionRules, recommended: suppressionRecommended },
+    { law: "temporal", rules: temporalRules, recommended: temporalRecommended },
     { law: "testing", rules: testingRules, recommended: testingRecommended },
     { law: "transport", rules: transportRules, recommended: transportRecommended },
     { law: "type-safety", rules: typeSafetyRules, recommended: typeSafetyRecommended },
+    { law: "user-copy", rules: userCopyRules, recommended: userCopyRecommended },
 ]
 
 /** Every gathered law. */
