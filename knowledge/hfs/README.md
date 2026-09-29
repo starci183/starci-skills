@@ -237,14 +237,21 @@ inside a `try` (R76). Each has an `eslint-be` enforcer in `@starci/eslint-canon-
 
 Text a user reads - an exception's message, a notification's subject or body, a response's `message` or
 `description` - comes from a per-capability `messages` catalog (Vietnamese and English) through the typed
-`platform/i18n` `MessageCatalog` port, never a literal in source (R78). The ambient clock (`Date.now()`, a bare
-`new Date()`, `performance.now()`) is read only inside `platform/clock`; business code asks the injected `Clock`
-port, so a spec can drive time with a `FakeClock` (R79). Delivery that can repeat - a webhook a sender resends, an
-outbox or queue redelivering a message - is claimed through a shared inbox keyed by `(source, event id)` before it
-acts, so a repeat is a no-op (R80). A loop that catches an error and waits before trying again goes through the
-shared `platform/retry` helper (bounded attempts, exponential backoff with jitter, an abort signal), never a loop
-written at the call site (R81). No transaction spans an external call: commit first and call out after, or write an
-outbox message inside the transaction (R82). Each has an `eslint-be` enforcer in `@starci/eslint-canon-be`.
+`platform/i18n` `MessageCatalog` port, never a literal in source (R78). The catalog lookup takes an explicit
+locale: `platform/i18n`'s `RequestLocale` provider resolves it inside a request (the authenticated user's stored
+preference, else the first of `vi`/`en` named in `Accept-Language`, else `vi`) and a job resolves it from the
+message's recipient (their stored preference, else `vi`) - never a call-site guess (knowledge/patterns/be/
+messages.yaml). The ambient clock (`Date.now()`, a bare `new Date()`, `performance.now()`) is read only inside
+`platform/clock`; business code asks the injected `Clock` port, so a spec can drive time with a `FakeClock` (R79).
+Delivery that can repeat - a webhook a sender resends, an outbox or queue redelivering a message - is claimed
+through a shared inbox (`inbox_claims`, unique on `(source, event id)`, owned by `platform/inbox`) keyed by
+`(source, event id)` before it acts, so a repeat is a no-op; a consumer is recognized by a decorated handler
+(`@EventPattern`, `@MessagePattern`, `@OnEvent`, `@Process`) or a `*Consumer`/`*OutboxConsumer` class name as well
+as the `<event>.consumer.ts` filename, and an outbox producer that only publishes is not asked for a claim (R80).
+A loop that catches an error and waits before trying again goes through the shared `platform/retry` helper
+(bounded attempts, exponential backoff with jitter, an abort signal), never a loop written at the call site (R81).
+No transaction spans an external call: commit first and call out after, or write an outbox message inside the
+transaction (R82). Each has an `eslint-be` enforcer in `@starci/eslint-canon-be`.
 
 ## 6. Frontend
 

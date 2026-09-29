@@ -137,3 +137,32 @@ rules:
       manual:
         - Test a crash between the local commit and the publish acknowledgement.
     relatedExamples: []
+  - id: BE-PERSISTENCE-6
+    title: No transaction spans an external call
+    kind: mandatory
+    hfsRules: [R82]
+    requirement: |-
+      `.transaction(async (tx) => ...)` never contains `fetch`, an HTTP client call or any method of a
+      `*Client`/`*Sdk` receiver. Every database write happens inside the callback exactly as before; the
+      transaction is awaited to commit; the external call happens after, using values read or returned from inside
+      the transaction. When the call's effect must happen exactly once together with the write - not merely
+      sometime after it - a row is written to the nearest outbox table inside the transaction instead of calling out
+      directly, and the existing outbox publisher (BE-PERSISTENCE-5) delivers it.
+    rationale: |-
+      Holding a transaction open for as long as an external call takes means a failure after partial commit, or a
+      success the rollback then reverses with no way back: the database has moved on inside a lock the external
+      party has no idea it is blocking. Committing first (or writing an outbox row) makes the database change
+      durable independently of how long, or how badly, the outside world behaves.
+    cases:
+      - id: case-1
+        when: A write followed by a notification
+        write: 'const order = await this.db.transaction(async (tx) => tx.getRepository(OrderEntity).save(entity)); await this.notifier.send(...) runs after the transaction, using the saved order.'
+      - id: case-2
+        when: The effect must be exactly-once with the write
+        write: 'await this.db.transaction(async (tx) => { await tx.getRepository(OrderEntity).save(entity); await tx.getRepository(OutboxEntity).insert({ topic: "order.placed", payload }) }); the OutboxPublishJob (background.yaml) delivers the message later.'
+    verification:
+      automated:
+        - BE_TRANSACTION_EXTERNAL_CALL
+      manual:
+        - Confirm the chosen option (commit-then-call vs. outbox) matches whether the caller needs the effect to happen exactly once with the write or merely after it.
+    relatedExamples: []

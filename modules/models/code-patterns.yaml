@@ -4,14 +4,14 @@ profiles:
     title: StarCi NestJS code pattern
     canon:
       package: '@starci/eslint-canon-be'
-      version: 1.5.0
+      version: 1.6.1
       contentDigest:
         algorithm: sha256
         include: ['**/*.mjs', '**/*.json', '**/*.md', '**/*.ts']
         exclude: ['**/*.test.mjs']
         framing: sorted-posix-relative-path-null-raw-bytes-null
-        value: 62152b5a74e18f28bd9b88f9447388c8ef10519e8e6b9b4068016a8e25fbbf49
-        files: 34
+        value: e3479ad9ca32eae82d60396c085446de69faf11c59537613f74149b139a2de68
+        files: 37
     sourceRuleRoots:
       - knowledge/patterns/be
     expectedSourceRuleIds:
@@ -48,6 +48,8 @@ profiles:
       - BE-FUNCTION-6
       - BE-FUNCTION-7
       - BE-FUNCTION-8
+      - BE-IDEMPOTENCY-1
+      - BE-IDEMPOTENCY-2
       - BE-IMPORTS-1
       - BE-IMPORTS-2
       - BE-IMPORTS-3
@@ -55,6 +57,8 @@ profiles:
       - BE-IMPORTS-5
       - BE-IMPORTS-6
       - BE-IMPORTS-7
+      - BE-MESSAGES-1
+      - BE-MESSAGES-2
       - BE-NAMING-1
       - BE-NAMING-2
       - BE-NAMING-3
@@ -63,6 +67,9 @@ profiles:
       - BE-NAMING-6
       - BE-NAMING-7
       - BE-NAMING-8
+      - BE-PERSISTENCE-6
+      - BE-RESILIENCE-1
+      - BE-TEMPORAL-1
       - BE-TEST-1
       - BE-TEST-2
       - BE-TEST-3
@@ -298,6 +305,34 @@ profiles:
           guidance: knowledge/patterns/be/persistence.yaml
           review: Verify a chosen bound cannot silently truncate a result the caller treats as complete, and that a masked log value cannot be reversed.
         status: implemented
+      - id: NEST-USER-COPY-CATALOG
+        sourceRuleIds: [BE-MESSAGES-1]
+        applicability: { include: ['src/**/*.ts', 'apps/**/*.ts', 'libs/**/*.ts'], exclude: ['**/*.d.ts', '**/*.spec.ts', 'src/tests/**', 'libs/*/src/tests/**'] }
+        mechanical:
+          requirement: A literal exception message, notification text or transport response copy comes from the per-capability or per-feature messages catalog through the MessageCatalog port, not from source.
+          check:
+            kind: eslint
+            sourceOnly: true
+            ruleIds: [starci-be/user-copy-through-catalog]
+            expected: { severity: error }
+        semantic:
+          guidance: knowledge/patterns/be/messages.yaml
+          review: Confirm the resolved locale follows the decided RequestLocale rule (stored preference, then Accept-Language, then vi; a recipient's own preference outside a request) rather than a call-site guess.
+        status: implemented
+      - id: NEST-RESILIENT-DELIVERY
+        sourceRuleIds: [BE-TEMPORAL-1, BE-IDEMPOTENCY-1, BE-RESILIENCE-1, BE-PERSISTENCE-6]
+        applicability: { include: ['src/**/*.ts', 'apps/**/*.ts', 'libs/**/*.ts'], exclude: ['**/*.d.ts', '**/*.spec.ts', 'src/tests/**', 'libs/*/src/tests/**'] }
+        mechanical:
+          requirement: The ambient clock is read only inside platform/clock; a webhook or outbox/queue consumer, detected by filename or by decorator/class-name shape, claims the event through the shared inbox before it acts; a loop that catches and waits goes through platform/retry; no transaction spans an external call.
+          check:
+            kind: eslint
+            sourceOnly: true
+            ruleIds: [starci-be/no-ambient-clock, starci-be/inbox-dedupe-required, starci-be/no-hand-rolled-retry, starci-be/no-external-call-in-transaction]
+            expected: { severity: error }
+        semantic:
+          guidance: knowledge/patterns/be/idempotency.yaml
+          review: Trace that an inbox claim actually runs before the side effect on every path, that a retried operation is safe to run more than once, and that the commit-then-call vs. outbox choice matches whether the effect must be exactly-once with the write.
+        status: implemented
       - id: NEST-PERSISTENCE-SHAPE
         sourceRuleIds: [BE-FOLDER-6, BE-FUNCTION-3, BE-FUNCTION-5, BE-TYPING-7]
         applicability: { include: ['src/**/*.ts', 'apps/*/src/**/*.ts', 'libs/*/src/**/*.ts'], exclude: ['**/*.spec.ts'] }
@@ -532,6 +567,14 @@ profiles:
         sourceRuleIds: [BE-IMPORTS-3, BE-IMPORTS-5]
         rationale: Import order is explicitly observational; selected execution form and ownership decide imports.
         guidance: knowledge/patterns/be/imports.yaml
+      - id: NEST-LOCALE-RESOLUTION
+        sourceRuleIds: [BE-MESSAGES-2]
+        rationale: No lint rule can see which stored field is a locale preference, whether an Accept-Language parse fell back correctly, or whether a job resolved the recipient's own preference instead of the operator's; this is reviewed against the accepted SRS and a real request or job run.
+        guidance: knowledge/patterns/be/messages.yaml
+      - id: NEST-INBOX-CLAIM-STORAGE
+        sourceRuleIds: [BE-IDEMPOTENCY-2]
+        rationale: A lint rule cannot see a migration's column types, whether the unique constraint actually exists on (source, event_id), or whether an adapter claims by insert-and-catch rather than a racy check-then-insert; this is reviewed against the actual migration and adapter.
+        guidance: knowledge/patterns/be/idempotency.yaml
 
   next:
     title: StarCi Next.js code pattern

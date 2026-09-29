@@ -1,0 +1,90 @@
+schema: starci/knowledge-source@1
+id: be.messages
+title: Messages catalog and locale
+purpose: |-
+  Given text a user reads - an exception's message, a notification's subject or body, a response's `message` or
+  `description` - where does it live, how is it looked up, and which locale does a lookup resolve to? User-facing
+  copy lives in a per-capability or per-feature vi/en catalog, reached through the typed `platform/i18n`
+  `MessageCatalog` port by a key with named interpolation; the same port owns locale resolution so no call site
+  re-derives it.
+appliesTo:
+  - backend
+family: be
+provenance:
+  reviewedAt: 2026-09-30
+  sources:
+    - knowledge/hfs/README.md
+    - knowledge/hfs/slots.yaml
+    - packages/eslint/be/user-copy.mjs
+    - docs/backend-source-pattern.md
+  limitations: |-
+    Static checks find a literal written where copy belongs and refuse it. They cannot judge translation quality,
+    whether a key is reused correctly across capabilities, or whether the resolved locale matches the product
+    decision for a given caller; those are reviewed against the accepted SRS and a real request or job run.
+rules:
+  - id: BE-MESSAGES-1
+    title: One keyed catalog per capability or feature, read through MessageCatalog
+    kind: mandatory
+    hfsRules: [R78]
+    requirement: |-
+      Text a user reads never sits in source as a literal: an exception's message, a `subject`/`title`/`body`/
+      `text`/`message` property of a `notify`/`send`/`publish` call, and a `message`/`description`/`title` property
+      of a `transport/` response all come from a `<capability>.messages.ts` (`src/modules/{domain,integrations}/
+      <capability>/messages/`) or `<feature>.messages.ts` (`src/features/<feature>/messages/`) catalog - one keyed
+      entry per message, `vi` and `en` maps, named `{{param}}` interpolation for anything the original literal built
+      with `+` or a template. A call site reads the catalog through an injected `MessageCatalog` from
+      `platform/i18n` (`private readonly messages: MessageCatalog`), never by importing a catalog file directly. A
+      short code-shaped literal (`UPPER_SNAKE`, a single bare word) is a code or an enum value, not copy, and stays
+      in source.
+    rationale: |-
+      A literal cannot be translated, cannot be found by the key a test asserts on, and drifts the moment one call
+      site is edited and its sibling is not. One port gives every capability and feature the same lookup and
+      interpolation shape instead of each hand-rolling its own.
+    cases:
+      - id: case-1
+        when: An exception message
+        write: 'throw new PlanNotFoundError({ message: this.messages.get("plan.not-found", { planId }) })'
+      - id: case-2
+        when: A notification
+        write: 'this.notifier.send({ subject: this.messages.get("billing.invoice-subject", { number }), body: this.messages.get("billing.invoice-body", { amount }) })'
+      - id: case-3
+        when: The catalog file
+        write: 'src/modules/domain/billing/messages/billing.messages.ts exports one keyed map, `{ "billing.invoice-subject": { vi: "...", en: "..." } }`, composed into the platform MessageCatalog at startup alongside every other capability and feature catalog.'
+    verification:
+      automated:
+        - BE_USER_COPY_LITERAL
+      manual:
+        - Confirm the vi and en text carry the same meaning and that an interpolated value cannot leak a secret or an internal id a client should not see.
+    relatedExamples: []
+  - id: BE-MESSAGES-2
+    title: Locale resolution is one port, never guessed at the call site
+    kind: mandatory
+    hfsRules: [R78]
+    requirement: |-
+      `platform/i18n` exposes a `RequestLocale` provider that resolves the locale a `MessageCatalog.get` lookup
+      reads; no call site derives a locale itself. Inside a request (HTTP or GraphQL): the authenticated user's
+      stored locale preference when the principal carries one; else the first of `vi`/`en` the `Accept-Language`
+      header names; else `vi`. Outside a request (a scheduled job, a queue consumer building a notification, a
+      sweep): the message's recipient's own stored locale preference when it is known; else `vi`. A non-request
+      caller passes the resolved locale to `MessageCatalog.get(key, params, { locale })` explicitly; `RequestLocale`
+      is injected only where a request context exists.
+    rationale: |-
+      Locale is a fact about who receives the text, resolved once by one owner from the evidence that context
+      actually has - a request carries a header and a signed-in principal, a job carries only the recipient row -
+      so the port names both paths explicitly instead of leaving the non-request path to whatever a call site
+      guesses, which is how one job ships in Vietnamese and the next in English for the same recipient.
+    cases:
+      - id: case-1
+        when: An HTTP or GraphQL handler
+        write: 'RequestLocale resolves req.user?.localePreference, else the first of vi|en named in Accept-Language, else "vi"; the injected MessageCatalog reads that resolved value with no extra argument at the call site.'
+      - id: case-2
+        when: A notification job or queue consumer
+        write: 'the job loads the recipient row, resolves recipient.localePreference ?? "vi", and calls this.messages.get(key, params, { locale }) with that value.'
+      - id: case-3
+        when: No preference and no header
+        write: 'both paths fall back to "vi"; the default is never silently English, and a header naming a language other than vi/en is treated as absent.'
+    verification:
+      automated: []
+      manual:
+        - Confirm a job resolves the recipient's own preference, never the acting operator's or a fixed default; confirm a header outside vi/en falls back to vi rather than throwing or reading undefined.
+    relatedExamples: []

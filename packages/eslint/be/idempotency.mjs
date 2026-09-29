@@ -7,8 +7,13 @@
  * instead of a second charge, a second email or a second state transition.
  *
  *   - `inbox-dedupe-required` refuses a `@Public()` webhook controller method, or an outbox/queue
- *     consumer (`<event>.consumer.ts`, the `be.transport.message` slot), whose file shows no
- *     reference to an inbox or dedupe port.
+ *     consumer, whose file shows no reference to an inbox or dedupe port. A consumer is recognized
+ *     by more than its filename: `<event>.consumer.ts` under `transport/message/` (the
+ *     `be.transport.message` slot) still counts, and so does a method decorated `@EventPattern`,
+ *     `@MessagePattern`, `@OnEvent` or `@Process`, or a class whose name ends `Consumer` or
+ *     `OutboxConsumer`, wherever that file sits. A class that only PUBLISHES - the producer half of
+ *     an outbox, typically `*-outbox.service.ts` / `*OutboxService` - carries none of those shapes
+ *     and is not flagged: it has no repeat delivery to dedupe unless it also consumes.
  *
  * This reads one file's text for the shape of a claim (`inbox`, `dedupe`, `idempoten*` naming a
  * port, a field or a call) - it cannot see whether the call actually runs before the side effect,
@@ -21,6 +26,10 @@ import { isTestLane, normalizePath } from "./lib/path.mjs"
 const INBOX_REFERENCE = /inbox|dedupe|idempoten/i
 const CONSUMER_FILE = /\/transport\/message\/[^/]+\.consumer\.ts$/
 const WEBHOOK_FILE = /\/transport\/http\/[^/]*webhook[^/]*\.controller\.ts$/i
+/** A class whose name alone says it consumes a delivery, regardless of where the file sits. */
+const CONSUMER_CLASS_NAME = /(?:Outbox)?Consumer$/
+/** A method decorator that binds a handler to an incoming message or event, not just a filename convention. */
+const CONSUMER_DECORATORS = new Set(["EventPattern", "MessagePattern", "OnEvent", "Process"])
 
 /** The route or reason text a `@Public()` decorator's argument carries, lower-cased. */
 const publicReason = (node) => {
@@ -51,11 +60,19 @@ export const inboxDedupeRequired = {
     create(context) {
         const filename = normalizePath(context.filename || context.getFilename())
         if (isTestLane(filename)) return {}
-        const isConsumer = CONSUMER_FILE.test(filename)
+        let isConsumer = CONSUMER_FILE.test(filename)
         const publicDecorators = []
         return {
             Decorator(node) {
-                if (decoratorName(node) === "Public") publicDecorators.push(node)
+                const name = decoratorName(node)
+                if (name === "Public") publicDecorators.push(node)
+                else if (CONSUMER_DECORATORS.has(name)) isConsumer = true
+            },
+            ClassDeclaration(node) {
+                if (node.id && CONSUMER_CLASS_NAME.test(node.id.name)) isConsumer = true
+            },
+            ClassExpression(node) {
+                if (node.id && CONSUMER_CLASS_NAME.test(node.id.name)) isConsumer = true
             },
             "Program:exit"(node) {
                 const sourceCode = context.sourceCode || context.getSourceCode()

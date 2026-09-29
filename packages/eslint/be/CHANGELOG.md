@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.6.1 - 2026-09-30
+
+- Fixed: `inbox-dedupe-required` (R80 `BE_INBOX_DEDUPE_MISSING`) no longer relies only on `<event>.consumer.ts` under `transport/message/` to recognize a consumer. A method decorated `@EventPattern`, `@MessagePattern`, `@OnEvent` or `@Process`, or a class whose name ends `Consumer` or `OutboxConsumer`, is now a consumer wherever the file sits. The producer half of an outbox (typically `*-outbox.service.ts` / `*OutboxService`, which reads pending rows and publishes) carries none of those shapes and stays unflagged unless it also consumes.
+
 ## 1.6.0 - 2026-09-30
 
 Round 3 back-end rules (catalog R78 to R82), each with RuleTester specs and a why code in `modules/kernel/failure-codes.yaml`.

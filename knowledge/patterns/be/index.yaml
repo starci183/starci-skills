@@ -84,10 +84,30 @@ topics:
   - id: be.persistence
     title: Persistence and migrations
     path: persistence.yaml
-    decides: Migrations as the only schema authority, apps/migrate, persistence per capability, SQL in repositories, the outbox
-    rules: BE-PERSISTENCE-1 … BE-PERSISTENCE-5
+    decides: Migrations as the only schema authority, apps/migrate, persistence per capability, SQL in repositories, the outbox, no transaction spanning an external call
+    rules: BE-PERSISTENCE-1 … BE-PERSISTENCE-6
   - id: be.background
     title: Background work
     path: background.yaml
     decides: Jobs and consumers as transports, worker apps, runners for every sweep, lease and fencing
     rules: BE-BACKGROUND-1 … BE-BACKGROUND-4
+  - id: be.messages
+    title: Messages catalog and locale
+    path: messages.yaml
+    decides: User-facing copy through a per-capability or per-feature vi/en catalog, the MessageCatalog port, request and non-request locale resolution
+    rules: BE-MESSAGES-1, BE-MESSAGES-2
+  - id: be.temporal
+    title: The injected clock
+    path: temporal.yaml
+    decides: Clock as the only reader of the ambient clock, FakeClock in specs
+    rules: BE-TEMPORAL-1
+  - id: be.idempotency
+    title: Inbox dedupe
+    path: idempotency.yaml
+    decides: A webhook or consumer claims the event through the shared inbox before it acts, consumer detection by shape not only filename, the inbox_claims table
+    rules: BE-IDEMPOTENCY-1, BE-IDEMPOTENCY-2
+  - id: be.resilience
+    title: Retry through the shared helper
+    path: resilience.yaml
+    decides: A retried operation goes through platform/retry, never a hand-written loop
+    rules: BE-RESILIENCE-1
