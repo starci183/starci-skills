@@ -15,10 +15,6 @@ const DEMO = {
     email: "demo@todo.dev", password: "todo-demo-pass" 
 }
 
-interface CountRow {
-  count: number;
-}
-
 /**
  * fr.login.sign-out end to end: a session that answers calls ends by its own token through the
  * public signOut door (t-revoke deletes the row, so the next bearer read is SESSION_NOT_FOUND and a
@@ -46,7 +42,7 @@ describe("session sign-out (e2e)",
         it("sign-in → session serves calls → sign-out → token refused and row gone → re-sign-in recovers",
             async () => {
                 const {
-                    http, auth, dataSource 
+                    http, auth, data: dataSource 
                 } = world
                 const { sessionToken, personId } = await auth.signIn(DEMO.email,
                     DEMO.password)
@@ -58,11 +54,8 @@ describe("session sign-out (e2e)",
                 expect(live.errors).toBeNull()
                 expect(Array.isArray(live.data?.tasks)).toBe(true)
 
-                const beforeRows = await dataSource.query<Array<CountRow>>(
-                    "SELECT COUNT(*)::int AS count FROM sessions WHERE token = $1",
-                    [sessionToken],
-                )
-                expect(beforeRows[0].count).toBe(1)
+                const beforeRows = await dataSource.sessions.countByToken(sessionToken)
+                expect(beforeRows).toBe(1)
 
                 const signedOut = await http
                     .client()
@@ -79,11 +72,8 @@ describe("session sign-out (e2e)",
                 expect(refused.errorCode).toBe("SESSION_NOT_FOUND")
                 expect(refused.data).toBeNull()
 
-                const afterRows = await dataSource.query<Array<CountRow>>(
-                    "SELECT COUNT(*)::int AS count FROM sessions WHERE token = $1",
-                    [sessionToken],
-                )
-                expect(afterRows[0].count).toBe(0)
+                const afterRows = await dataSource.sessions.countByToken(sessionToken)
+                expect(afterRows).toBe(0)
 
                 // Revocation is not idempotent at the door: signOut on a dead token is the same refusal a
                 // forged or expired one gets.

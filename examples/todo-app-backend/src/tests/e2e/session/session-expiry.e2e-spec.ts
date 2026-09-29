@@ -14,10 +14,6 @@ const DEMO = {
     email: "demo@todo.dev", password: "todo-demo-pass" 
 }
 
-interface CountRow {
-  count: number;
-}
-
 /**
  * Session expiry end to end (the api exposes no token-refresh door, so expiry is the session's
  * terminal journey). sds.login.session-store enforces expiry on read rather than by a sweeper: an
@@ -46,7 +42,7 @@ describe("session expiry (e2e)",
         it("live session → expiry passes → SESSION_EXPIRED → row reaped → SESSION_NOT_FOUND → re-sign-in recovers",
             async () => {
                 const {
-                    http, auth, db, dataSource 
+                    http, auth, data: dataSource 
                 } = world
                 const { sessionToken, personId } = await auth.signIn(DEMO.email,
                     DEMO.password)
@@ -59,11 +55,8 @@ describe("session expiry (e2e)",
 
                 // DML with RETURNING stays on db.query: TypeORM answers a [rows, affected] tuple and
                 // the service unwraps it; plain reads go through the DataSource itself.
-                const aged = await db.query<{ token: string }>(
-                    "UPDATE sessions SET expires_at = now() - interval '1 second' WHERE token = $1 RETURNING token",
-                    [sessionToken],
-                )
-                expect(aged).toHaveLength(1)
+                const aged = await dataSource.sessions.expireNow(sessionToken)
+                expect(aged).toBe(1)
 
                 const expired = await asSession.graphql(TASKS)
                 expect(expired.errorCode).toBe("SESSION_EXPIRED")
@@ -71,11 +64,8 @@ describe("session expiry (e2e)",
 
                 // The refusing read itself reaps the row - expiry is enforced where the session is looked up,
                 // so a stopped sweeper can never leave a session alive past its time.
-                const reaped = await dataSource.query<Array<CountRow>>(
-                    "SELECT COUNT(*)::int AS count FROM sessions WHERE token = $1",
-                    [sessionToken],
-                )
-                expect(reaped[0].count).toBe(0)
+                const reaped = await dataSource.sessions.countByToken(sessionToken)
+                expect(reaped).toBe(0)
 
                 const gone = await asSession.graphql(TASKS)
                 expect(gone.errorCode).toBe("SESSION_NOT_FOUND")

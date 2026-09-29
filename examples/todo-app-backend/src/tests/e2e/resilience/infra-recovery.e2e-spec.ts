@@ -36,7 +36,7 @@ describeE2E("resilience: infra recovery",
                 const world = await bootE2EWorld("resilience/infra-recovery")
                 try {
                     const {
-                        stack, dataSource 
+                        stack, data: dataSource 
                     } = world
                     const project = composeProjectOf(stack)
                     expect(project).not.toBeNull()
@@ -45,8 +45,8 @@ describeE2E("resilience: infra recovery",
                     expect(apis.length).toBeGreaterThan(0)
 
                     // Baseline: the out-of-band data channel answers before the chaos begins.
-                    const baseline = await dataSource.query<Array<{ ok: number }>>("select 1 as ok")
-                    expect(baseline[0].ok).toBe(1)
+                    const baseline = await dataSource.schema.ping()
+                    expect(baseline).toBe(true)
 
                     const killed = killService(project!,
                         /postgres/i)
@@ -69,10 +69,10 @@ describeE2E("resilience: infra recovery",
 
                     // Persisted-state evidence: postgres itself answers real queries again - the api's 200
                     // proves its pool reconnected, this proves the data tier's own surface is back.
-                    const recovered = await dataSource.query<Array<{ ok: number }>>("select 1 as ok")
-                    expect(recovered[0].ok).toBe(1)
+                    const recovered = await dataSource.schema.ping()
+                    expect(recovered).toBe(true)
                 } finally {
-                    await world.moduleRef.close().catch(() => undefined)
+                    await world.moduleRef.close().catch((error: unknown) => error)
                 }
             })
     })

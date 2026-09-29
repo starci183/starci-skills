@@ -5,14 +5,38 @@ import {
     Test, TestingModule 
 } from "@nestjs/testing"
 import {
-    DataSource 
-} from "typeorm"
-import {
     E2EAuthService 
 } from "./domain/accounts/e2e-auth.service"
 import {
     E2EHttpService 
 } from "./integrations/http/e2e-http.service"
+import {
+    E2EAuditRepository 
+} from "./platform/databases/persistence/e2e-audit.repository"
+import {
+    E2ENotifyRepository 
+} from "./platform/databases/persistence/e2e-notify.repository"
+import {
+    E2EPlanRepository 
+} from "./platform/databases/persistence/e2e-plan.repository"
+import {
+    E2ERecurRepository 
+} from "./platform/databases/persistence/e2e-recur.repository"
+import {
+    E2ESchemaRepository 
+} from "./platform/databases/persistence/e2e-schema.repository"
+import {
+    E2ESessionsRepository 
+} from "./platform/databases/persistence/e2e-sessions.repository"
+import {
+    E2EShareRepository 
+} from "./platform/databases/persistence/e2e-share.repository"
+import {
+    E2ETasksRepository 
+} from "./platform/databases/persistence/e2e-tasks.repository"
+import {
+    E2EUploadsRepository 
+} from "./platform/databases/persistence/e2e-uploads.repository"
 import {
     E2EDbService 
 } from "./platform/databases/e2e-db.service"
@@ -26,6 +50,19 @@ import {
     TestContext 
 } from "./testing-infra.options"
 
+/** The out-of-band, read-mostly views of the run-owned postgres, one repository per capability. */
+export interface E2EData {
+  readonly audit: E2EAuditRepository;
+  readonly notify: E2ENotifyRepository;
+  readonly plan: E2EPlanRepository;
+  readonly recur: E2ERecurRepository;
+  readonly schema: E2ESchemaRepository;
+  readonly sessions: E2ESessionsRepository;
+  readonly share: E2EShareRepository;
+  readonly tasks: E2ETasksRepository;
+  readonly uploads: E2EUploadsRepository;
+}
+
 /**
  * The running world a journey spec drives: the testing module ref (whose close() is the spec's only
  * teardown - it disposes the compose stack and verifies nothing is left) plus the resolved door
@@ -37,7 +74,7 @@ export interface E2EWorld {
   readonly http: E2EHttpService;
   readonly auth: E2EAuthService;
   readonly db: E2EDbService;
-  readonly dataSource: DataSource;
+  readonly data: E2EData;
 }
 
 /**
@@ -59,6 +96,16 @@ export async function bootE2EWorld(specId?: string): Promise<E2EWorld> {
         http: moduleRef.get(E2EHttpService),
         auth: moduleRef.get(E2EAuthService),
         db,
-        dataSource: await db.getDataSource(),
+        data: {
+            audit: moduleRef.get(E2EAuditRepository),
+            notify: moduleRef.get(E2ENotifyRepository),
+            plan: moduleRef.get(E2EPlanRepository),
+            recur: moduleRef.get(E2ERecurRepository),
+            schema: moduleRef.get(E2ESchemaRepository),
+            sessions: moduleRef.get(E2ESessionsRepository),
+            share: moduleRef.get(E2EShareRepository),
+            tasks: moduleRef.get(E2ETasksRepository),
+            uploads: moduleRef.get(E2EUploadsRepository),
+        },
     }
 }

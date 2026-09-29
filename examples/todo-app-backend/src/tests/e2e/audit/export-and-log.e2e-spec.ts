@@ -40,20 +40,6 @@ const TRACKED_ACTIONS = ["login.signed-in",
 /** The `iv.tag.ciphertext` shape a sealed actor keeps - the plaintext personId must never appear. */
 const SEALED_BLOB = /^[A-Za-z0-9+/]+={0,2}\.[A-Za-z0-9+/]+={0,2}\.[A-Za-z0-9+/]+={0,2}$/
 
-interface KeyRow {
-  key_id: string;
-}
-interface ChainRow {
-  id: string;
-  prev_hash: string;
-  hash: string;
-}
-interface StoredLine {
-  action: string;
-  target: string | null;
-  actor: string;
-}
-
 /**
  * fr.audit.log.append + fr.audit.export + fr.audit.log.read as one A->Z journey: tracked actions
  * through the public doors emit audit lines off the event bus, the subject's export returns those
@@ -79,7 +65,7 @@ describe("export-and-log (e2e)",
         it("tracked activity -> audit lines appended -> exportMyData returns them -> auditLog agrees",
             async () => {
                 const {
-                    http, auth, dataSource 
+                    http, auth, data: dataSource 
                 } = world
                 const marker = `e2e-export-${Date.now()}`
                 const owner = await auth.signIn(OWNER.email,
@@ -158,13 +144,9 @@ describe("export-and-log (e2e)",
 
                 // Out-of-band: every line the door returned exists as a stored row under the subject's keyId,
                 // with the actor sealed and action/target in the clear exactly as the door reported them.
-                const keys = await dataSource.query<Array<KeyRow>>("SELECT key_id FROM audit_keys WHERE person_id = $1",
-                    [owner.personId])
+                const keys = await dataSource.audit.keysOfPerson(owner.personId)
                 expect(keys).toHaveLength(1)
-                const stored = await dataSource.query<Array<StoredLine>>(
-                    "SELECT action, target, actor FROM audit_log_lines WHERE key_id = $1 ORDER BY id",
-                    [keys[0].key_id],
-                )
+                const stored = await dataSource.audit.linesUnderKey(keys[0].key_id)
                 expect(stored).toHaveLength(lines.length)
                 expect(stored.map((line) => ({
                     action: line.action, target: line.target 
@@ -180,7 +162,7 @@ describe("export-and-log (e2e)",
 
                 // Append-only means chain-consistent: recompute the linkage across the whole table, which on
                 // this run-owned stack also contains the system actor's lines.
-                const chain = await dataSource.query<Array<ChainRow>>("SELECT id, prev_hash, hash FROM audit_log_lines ORDER BY id")
+                const chain = await dataSource.audit.chain()
                 expect(chain.length).toBeGreaterThanOrEqual(stored.length)
                 expect(chain[0].prev_hash).toBe("GENESIS")
                 for (let i = 1; i < chain.length; i++) {

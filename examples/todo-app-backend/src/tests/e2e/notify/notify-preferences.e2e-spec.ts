@@ -40,18 +40,6 @@ interface Preferences {
   digestWindowMinutes: number | null;
 }
 
-interface NotificationRow {
-  id: string;
-  digest_group_id: string | null;
-}
-
-interface AttemptRow {
-  state: string;
-  attempt: number;
-  failure_class: string | null;
-  history: Array<{ state: string; at: string; failureClass?: string | null }>;
-}
-
 describe("notify preferences journey (e2e)",
     () => {
         let world: E2EWorld
@@ -85,7 +73,7 @@ describe("notify preferences journey (e2e)",
         it("update prefs → task-complete event notifies → dispatch attempted on window close → unsubscribe → later events suppressed at admission",
             async () => {
                 const {
-                    http, auth, dataSource 
+                    http, auth, data: dataSource 
                 } = world
                 const me = await auth.persona("owner")
                 const token = me.token
@@ -167,12 +155,8 @@ describe("notify preferences journey (e2e)",
                 const firstTaskId = await completeFreshTask(`${RUN}-first`)
                 const notification = await pollUntil("task-complete notification joined its digest group",
                     async () => {
-                        const rows = await dataSource.query<Array<NotificationRow>>(
-                            `select id, digest_group_id from notify_notifications
-               where recipient_id = $1 and kind = 'task-complete' and payload->>'taskId' = $2`,
-                            [me.personId,
-                                firstTaskId],
-                        )
+                        const rows = await dataSource.notify.taskCompleteNotifications(me.personId,
+                            firstTaskId)
                         return rows.filter(row => row.digest_group_id !== null)[0] ?? null
                     },
                     20_000,
@@ -183,11 +167,7 @@ describe("notify preferences journey (e2e)",
                 // t-dispatch runs - observed as the attempt row leaving its initial admission state.
                 const attempt = await pollUntil("delivery attempt row past admission",
                     async () => {
-                        const rows = await dataSource.query<Array<AttemptRow>>(
-                            `select state, attempt, failure_class, history from notify_delivery_attempts
-               where notification_id = $1`,
-                            [notification.id],
-                        )
+                        const rows = await dataSource.notify.attemptsOf(notification.id)
                         return rows.filter(row => row.attempt >= 1)[0] ?? null
                     },
                     95_000,
@@ -221,14 +201,8 @@ describe("notify preferences journey (e2e)",
                 const secondTaskId = await completeFreshTask(`${RUN}-second`)
                 const suppressed = await pollUntil("suppressed notification row for the post-unsubscribe event",
                     async () => {
-                        const rows = await dataSource.query<Array<NotificationRow & AttemptRow>>(
-                            `select n.id, n.digest_group_id, a.state, a.attempt, a.failure_class, a.history
-               from notify_notifications n
-               join notify_delivery_attempts a on a.notification_id = n.id
-               where n.recipient_id = $1 and n.kind = 'task-complete' and n.payload->>'taskId' = $2`,
-                            [me.personId,
-                                secondTaskId],
-                        )
+                        const rows = await dataSource.notify.taskCompleteWithAttempt(me.personId,
+                            secondTaskId)
                         return rows[0] ?? null
                     })
                 expect(suppressed.digest_group_id).toBeNull()

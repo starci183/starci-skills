@@ -46,13 +46,6 @@ interface PlanUsage {
   activeCount: number;
 }
 
-interface PaymentIntentRow {
-  id: string;
-  subscription_id: string;
-  gateway_intent_id: string;
-  status: string;
-}
-
 interface WebhookOutcome {
   applied?: boolean;
   ignored?: boolean;
@@ -234,21 +227,15 @@ describe("plan journey (e2e)",
         async function applyGatewayOutcome(webhookBody: WebhookOutcome,
             owner: E2ESession): Promise<void> {
             const {
-                db, dataSource 
+                data: dataSource 
             } = world
             if (webhookBody.ignored === true) {
-                const pending = await dataSource.query<Array<{ status: string }>>(
-                    "select status from subscriptions where person_id = $1",
-                    [owner.personId],
-                )
+                const pending = await dataSource.plan.subscriptionsOf(owner.personId)
                 expect(pending[0]?.status).toBe("pending")
                 // No public door can produce t-gateway-confirmed in this stack: stand in for the gateway by
                 // writing the row exactly as ConfirmPaymentHandler would have.
-                await db.query(
-                    "update subscriptions set status = 'active', plan = 'paid', period_end = $2 where person_id = $1",
-                    [owner.personId,
-                        new Date(Date.now() + 30 * 86_400_000)],
-                )
+                await dataSource.plan.activatePaid(owner.personId,
+                    new Date(Date.now() + 30 * 86_400_000))
             } else {
                 expect(webhookBody).toMatchObject({
                     applied: true, subscriptionStatus: "active" 
@@ -264,7 +251,7 @@ describe("plan journey (e2e)",
    */
         async function startCheckout(owner: E2ESession): Promise<string> {
             const {
-                http, db, dataSource 
+                http, data: dataSource 
             } = world
             const upgrade = await http.graphql<{
       upgradePlan: {
@@ -281,10 +268,7 @@ describe("plan journey (e2e)",
             const intentId = upgrade.data?.upgradePlan?.paymentIntentId
             if (intentId) {
                 expect(upgrade.data?.upgradePlan?.status).toBe("pending")
-                const rows = await dataSource.query<Array<PaymentIntentRow>>(
-                    "select id, subscription_id, gateway_intent_id, status from payment_intents where id = $1",
-                    [intentId],
-                )
+                const rows = await dataSource.plan.intentById(intentId)
                 expect(rows).toHaveLength(1)
                 expect(rows[0].status).toBe("pending")
                 return rows[0].gateway_intent_id
@@ -292,40 +276,20 @@ describe("plan journey (e2e)",
 
             // Gateway refused the call: the handler's ordering (intent before t-checkout-started) means no
             // pending subscription and no payment_intents row may exist for this person.
-            const intents = await dataSource.query<Array<PaymentIntentRow>>(
-                `select pi.id, pi.subscription_id, pi.gateway_intent_id, pi.status
-       from payment_intents pi join subscriptions s on s.id = pi.subscription_id
-       where s.person_id = $1`,
-                [owner.personId],
-            )
+            const intents = await dataSource.plan.intentsOfPerson(owner.personId)
             expect(intents).toHaveLength(0)
-            const subscriptions = await dataSource.query<Array<{ id: string; status: string }>>(
-                "select id, status from subscriptions where person_id = $1",
-                [owner.personId],
-            )
+            const subscriptions = await dataSource.plan.subscriptionsOf(owner.personId)
             for (const subscription of subscriptions) {
                 expect(subscription.status).toBe("free")
             }
 
             const gatewayIntentId = `e2e-${randomUUID()}`
-            await db.query(
-                `insert into subscriptions (id, person_id, plan, status, period_end, gateway_customer_id)
-       values ($1, $2, 'free', 'pending', null, null)
-       on conflict (person_id) do update set status = 'pending'`,
-                [randomUUID(),
-                    owner.personId],
-            )
-            const [subscription] = await dataSource.query<Array<{ id: string }>>(
-                "select id from subscriptions where person_id = $1",
-                [owner.personId],
-            )
-            await db.query(
-                `insert into payment_intents (id, subscription_id, gateway, gateway_intent_id, amount, currency, status, applied_at)
-       values ($1, $2, 'sepay', $3, 99000, 'VND', 'pending', null)`,
-                [randomUUID(),
-                    subscription.id,
-                    gatewayIntentId],
-            )
+            await dataSource.plan.seedPendingSubscription(randomUUID(),
+                owner.personId)
+            const [subscription] = await dataSource.plan.subscriptionsOf(owner.personId)
+            await dataSource.plan.seedPendingIntent(randomUUID(),
+                subscription.id,
+                gatewayIntentId)
             return gatewayIntentId
         }
     })

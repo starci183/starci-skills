@@ -33,28 +33,6 @@ const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/
 /** The `iv.tag.ciphertext` shape a sealed actor keeps - the plaintext personId must never appear. */
 const SEALED_BLOB = /^[A-Za-z0-9+/]+={0,2}\.[A-Za-z0-9+/]+={0,2}\.[A-Za-z0-9+/]+={0,2}$/
 
-interface KeyRow {
-  person_id: string;
-  key_id: string;
-}
-interface ErasureRow {
-  request_id: string;
-  person_id: string | null;
-  state: string;
-  verified_at: string | null;
-  executing_at: string | null;
-  completed_at: string | null;
-}
-interface CountRow {
-  count: number;
-}
-interface StoredLine {
-  action: string;
-  target: string | null;
-  key_id: string;
-  actor: string;
-}
-
 /**
  * fr.audit.erasure.request + fr.audit.erasure.complete as one A->Z journey: the subject produces
  * readable audit lines, requests erasure (tRequest chains tVerify on the same caller), completes
@@ -85,7 +63,7 @@ describe("erasure journey (e2e)",
         it("request-erasure -> verified row -> complete-erasure -> subject anonymized (api + db) -> system lines appended",
             async () => {
                 const {
-                    http, auth, dataSource 
+                    http, auth, data: dataSource 
                 } = world
                 const marker = `e2e-erasure-${Date.now()}`
                 const subjectEmail = `${marker}@todo.dev`
@@ -138,17 +116,11 @@ describe("erasure journey (e2e)",
                 expect(beforeExport.some((line) => line.action === "task.created" && line.target === subjectTaskId)).toBe(true)
 
                 // Out-of-band: the subject's sealing key exists, so their lines are readable today.
-                const keysBefore = await dataSource.query<Array<KeyRow>>("SELECT person_id, key_id FROM audit_keys WHERE person_id = $1",
-                    [
-                        subject.personId,
-                    ])
+                const keysBefore = await dataSource.audit.keysOfPerson(subject.personId)
                 expect(keysBefore).toHaveLength(1)
                 const subjectKeyId = keysBefore[0].key_id
-                const subjectLinesBefore = await dataSource.query<Array<CountRow>>(
-                    "SELECT COUNT(*)::int AS count FROM audit_log_lines WHERE key_id = $1",
-                    [subjectKeyId],
-                )
-                expect(subjectLinesBefore[0].count).toBeGreaterThan(0)
+                const subjectLinesBefore = await dataSource.audit.lineCountUnderKey(subjectKeyId)
+                expect(subjectLinesBefore).toBeGreaterThan(0)
 
                 // tRequest + tVerify: the door returns the already-verified request.
                 const requested = await asSubject.graphql<{ requestErasure: { requestId: string; state: string } }>(REQUEST_ERASURE)
@@ -157,10 +129,7 @@ describe("erasure journey (e2e)",
                 expect(requestId).toMatch(UUID)
                 expect(requested.data!.requestErasure.state).toBe("verified")
 
-                const requestedRow = await dataSource.query<Array<ErasureRow>>(
-                    "SELECT request_id, person_id, state, verified_at::text, executing_at::text, completed_at::text FROM audit_erasure_requests WHERE request_id = $1",
-                    [requestId],
-                )
+                const requestedRow = await dataSource.audit.erasureRequest(requestId)
                 expect(requestedRow).toHaveLength(1)
                 expect(requestedRow[0].state).toBe("verified")
                 expect(requestedRow[0].person_id).toBe(subject.personId)
@@ -187,16 +156,10 @@ describe("erasure journey (e2e)",
                 expect(logAfter.data!.auditLog).toEqual([])
 
                 // Anonymized out-of-band: the key row and the person_id on the request are both gone.
-                const keysAfter = await dataSource.query<Array<KeyRow>>(
-                    "SELECT person_id, key_id FROM audit_keys WHERE person_id = $1 OR key_id = $2",
-                    [subject.personId,
-                        subjectKeyId],
-                )
+                const keysAfter = await dataSource.audit.keysOfPersonOrKey(subject.personId,
+                    subjectKeyId)
                 expect(keysAfter).toEqual([])
-                const completedRow = await dataSource.query<Array<ErasureRow>>(
-                    "SELECT request_id, person_id, state, verified_at::text, executing_at::text, completed_at::text FROM audit_erasure_requests WHERE request_id = $1",
-                    [requestId],
-                )
+                const completedRow = await dataSource.audit.erasureRequest(requestId)
                 expect(completedRow[0].state).toBe("complete")
                 expect(completedRow[0].person_id).toBeNull()
                 expect(completedRow[0].executing_at).not.toBeNull()
@@ -204,15 +167,9 @@ describe("erasure journey (e2e)",
 
                 // Crypto-shred, not deletion: the subject's stored lines survive untouched under the orphaned
                 // keyId, each actor still a sealed blob that no longer resolves to anyone.
-                const subjectLinesAfter = await dataSource.query<Array<CountRow>>(
-                    "SELECT COUNT(*)::int AS count FROM audit_log_lines WHERE key_id = $1",
-                    [subjectKeyId],
-                )
-                expect(subjectLinesAfter[0].count).toBe(subjectLinesBefore[0].count)
-                const orphaned = await dataSource.query<Array<StoredLine>>(
-                    "SELECT action, target, key_id, actor FROM audit_log_lines WHERE key_id = $1",
-                    [subjectKeyId],
-                )
+                const subjectLinesAfter = await dataSource.audit.lineCountUnderKey(subjectKeyId)
+                expect(subjectLinesAfter).toBe(subjectLinesBefore)
+                const orphaned = await dataSource.audit.linesUnderKey(subjectKeyId)
                 for (const line of orphaned) {
                     expect(line.actor).toMatch(SEALED_BLOB)
                     expect(line.actor).not.toContain(subject.personId)
@@ -220,17 +177,10 @@ describe("erasure journey (e2e)",
 
                 // br.audit.erasure.logged: both transitions appended lines naming the requestId, sealed under
                 // the system key - which survives, so the audit trail itself never orphans.
-                const systemLines = await dataSource.query<Array<StoredLine>>(
-                    `SELECT action, target, key_id, actor FROM audit_log_lines
-       WHERE action IN ('audit.erasure.requested', 'audit.erasure.completed') AND target = $1 ORDER BY id`,
-                    [requestId],
-                )
+                const systemLines = await dataSource.audit.erasureLinesOfRequest(requestId)
                 expect(systemLines.map((line) => line.action)).toEqual(["audit.erasure.requested",
                     "audit.erasure.completed"])
-                const systemKey = await dataSource.query<Array<KeyRow>>("SELECT person_id, key_id FROM audit_keys WHERE key_id = $1",
-                    [
-                        systemLines[0].key_id,
-                    ])
+                const systemKey = await dataSource.audit.keyById(systemLines[0].key_id)
                 expect(systemKey).toEqual([{
                     person_id: "system", key_id: systemLines[0].key_id 
                 }])

@@ -27,7 +27,7 @@ describe("auth/sign-in",
         it("create account -> sign in -> use session -> refuse wrong pairs -> delete account",
             async () => {
                 const {
-                    stack, http, auth, dataSource 
+                    stack, http, auth, data: dataSource 
                 } = world
                 const email = `e2e-${Date.now()}@todo.dev`
                 const password = "e2e-pass-1"
@@ -47,10 +47,7 @@ describe("auth/sign-in",
                 expect(first.personId).toBeTruthy()
 
                 // Out-of-band verify: the session the door handed out is a real row in this run's postgres.
-                const sessionRows = await dataSource.query<Array<{ token: string; person_id: string }>>(
-                    "select token, person_id from sessions where token = $1",
-                    [first.sessionToken],
-                )
+                const sessionRows = await dataSource.sessions.byToken(first.sessionToken)
                 expect(sessionRows).toHaveLength(1)
                 expect(sessionRows[0].person_id).toBe(first.personId)
 

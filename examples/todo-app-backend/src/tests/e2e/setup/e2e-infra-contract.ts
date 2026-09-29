@@ -27,8 +27,14 @@ export function dockerLines(args: Array<string>): Array<string> {
     return out ? out.split(/\r?\n/).map((line) => line.trim()).filter(Boolean) : []
 }
 
-/** True when the docker daemon answers `docker version`; the resilience specs skip when it cannot. */
-export function dockerAvailable(): boolean {
+/** Whether the docker daemon answered `docker version`, and the error it failed with when it did not. */
+export interface DockerProbe {
+  available: boolean;
+  cause?: unknown;
+}
+
+/** Asks the daemon for its version; the outcome carries the failure instead of swallowing it. */
+export function dockerProbe(): DockerProbe {
     try {
         execFileSync("docker",
             ["version",
@@ -37,10 +43,19 @@ export function dockerAvailable(): boolean {
             {
                 stdio: "pipe", timeout: 20_000 
             })
-        return true
-    } catch {
-        return false
+        return {
+            available: true 
+        }
+    } catch (cause) {
+        return {
+            available: false, cause 
+        }
     }
+}
+
+/** True when the docker daemon answers `docker version`; the resilience specs skip when it cannot. */
+export function dockerAvailable(): boolean {
+    return dockerProbe().available
 }
 
 /** Every compose project label currently present on the daemon -- the ground truth the stack's own
@@ -97,17 +112,54 @@ export function loopbackUrlsOf(stack: unknown): Array<string> {
     return [...urls]
 }
 
-/** The HTTP status `GET url` answers with, or null when the door never answered inside timeoutMs. */
-export async function httpStatus(url: string, timeoutMs = 5_000): Promise<number | null> {
+/** What `GET url` answered: the status, or null plus the error when the door never answered inside timeoutMs. */
+export interface HttpProbe {
+  status: number | null;
+  cause?: unknown;
+}
+
+/** GET `url` and report the outcome, carrying the failure instead of swallowing it. */
+export async function httpProbe(url: string, timeoutMs = 5_000): Promise<HttpProbe> {
     try {
         const response = await fetch(url,
             {
                 signal: AbortSignal.timeout(timeoutMs) 
             })
-        await response.arrayBuffer().catch(() => undefined)
-        return response.status
-    } catch {
-        return null
+        await response.arrayBuffer().catch((cause: unknown) => cause)
+        return {
+            status: response.status 
+        }
+    } catch (cause) {
+        return {
+            status: null, cause 
+        }
+    }
+}
+
+/** The HTTP status `GET url` answers with, or null when the door never answered inside timeoutMs. */
+export async function httpStatus(url: string, timeoutMs = 5_000): Promise<number | null> {
+    return (await httpProbe(url,
+        timeoutMs)).status
+}
+
+/** `GET base/health` answered `{status:"ok"}`; anything else (no answer, keycloak, another door) is an outcome, not an error. */
+async function isApiDoor(base: string): Promise<{ api: boolean; cause?: unknown }> {
+    try {
+        const response = await fetch(`${base}/health`,
+            {
+                signal: AbortSignal.timeout(4_000) 
+            })
+        if (response.status !== 200) return {
+            api: false 
+        }
+        const body = (await response.json()) as { status?: string }
+        return {
+            api: body?.status === "ok" 
+        }
+    } catch (cause) {
+        return {
+            api: false, cause 
+        }
     }
 }
 
@@ -115,17 +167,7 @@ export async function httpStatus(url: string, timeoutMs = 5_000): Promise<number
 export async function apiHealthUrls(stack: unknown): Promise<Array<string>> {
     const apis: Array<string> = []
     for (const base of loopbackUrlsOf(stack)) {
-        try {
-            const response = await fetch(`${base}/health`,
-                {
-                    signal: AbortSignal.timeout(4_000) 
-                })
-            if (response.status !== 200) continue
-            const body = (await response.json()) as { status?: string }
-            if (body?.status === "ok") apis.push(base)
-        } catch {
-            // Not an api door (keycloak, etc.) -- ignore.
-        }
+        if ((await isApiDoor(base)).api) apis.push(base)
     }
     return apis
 }
@@ -185,6 +227,19 @@ export function startContainer(id: string): void {
         id])
 }
 
+/** One probe run: whether the state arrived, and the error the probe failed with when it threw. */
+async function attemptOnce(probe: () => Promise<boolean>): Promise<{ done: boolean; error?: unknown }> {
+    try {
+        return {
+            done: await probe() 
+        }
+    } catch (error) {
+        return {
+            done: false, error 
+        }
+    }
+}
+
 /**
  * Polls `probe` until it answers true or the deadline passes - the one wait a resilience spec may
  * do: a state (the api answering 503, the api answering 200 again), never a guessed duration. The
@@ -199,11 +254,9 @@ export async function retryUntil(
     const deadline = Date.now() + timeoutMs
     let last: unknown
     while (Date.now() < deadline) {
-        try {
-            if (await probe()) return
-        } catch (e) {
-            last = e
-        }
+        const attempt = await attemptOnce(probe)
+        if (attempt.done) return
+        last = attempt.error
         await new Promise((resolve) => setTimeout(resolve,
             intervalMs))
     }

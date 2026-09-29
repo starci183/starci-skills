@@ -22,19 +22,6 @@ interface TaskCounts {
   complete: number;
 }
 
-interface TaskRow {
-  id: string;
-  owner: string;
-  title: string;
-  complete: boolean;
-  completed_at: Date | null;
-}
-
-interface SessionRow {
-  token: string;
-  person_id: string;
-}
-
 /**
  * br.task.single-owner end to end: two signed-in people on one stack, and one person's task
  * stays invisible and untouchable to the other through every door the schema offers - list,
@@ -61,7 +48,7 @@ describe("task isolation (e2e)",
         it("two users on one stack: one user's task is invisible and untouchable to the other",
             async () => {
                 const {
-                    http, auth, dataSource 
+                    http, auth, data: dataSource 
                 } = world
                 const title = `e2e isolation ${Date.now()}`
 
@@ -88,11 +75,8 @@ describe("task isolation (e2e)",
                 }
 
                 // Out-of-band: two live session rows, one per distinct person - the identities are real.
-                const sessions = await dataSource.query<Array<SessionRow>>(
-                    "SELECT token, person_id FROM sessions WHERE token = ANY($1)",
-                    [[alice.token,
-                        bob.token]],
-                )
+                const sessions = await dataSource.sessions.byTokens([alice.token,
+                    bob.token])
                 expect(sessions).toHaveLength(2)
                 expect(sessions.map((row) => row.person_id).sort()).toEqual([alice.personId,
                     bob.personId].sort())
@@ -132,10 +116,7 @@ describe("task isolation (e2e)",
                 }
 
                 // Out-of-band: the row still exists, still Alice's, still open - the refusals wrote nothing.
-                const afterRefusals = await dataSource.query<Array<TaskRow>>(
-                    "SELECT id, owner, title, complete, completed_at FROM tasks WHERE id = $1",
-                    [taskId],
-                )
+                const afterRefusals = await dataSource.tasks.byId(taskId)
                 expect(afterRefusals).toEqual([
                     {
                         id: taskId, owner: alice.personId, title, complete: false, completed_at: null 
@@ -163,10 +144,7 @@ describe("task isolation (e2e)",
                     })
                 expect(bobReopen.errorCode).toBe("TASK_FORBIDDEN")
 
-                const finalRows = await dataSource.query<Array<TaskRow>>(
-                    "SELECT owner, complete, completed_at FROM tasks WHERE id = $1",
-                    [taskId],
-                )
+                const finalRows = await dataSource.tasks.stateById(taskId)
                 expect(finalRows[0].owner).toBe(alice.personId)
                 expect(finalRows[0].complete).toBe(true)
                 expect(finalRows[0].completed_at).not.toBeNull()
@@ -189,11 +167,8 @@ describe("task isolation (e2e)",
                     {
                         token: alice.token 
                     })).errorCode).toBe("SESSION_NOT_FOUND")
-                const remaining = await dataSource.query<Array<SessionRow>>("SELECT token FROM sessions WHERE token = ANY($1)",
-                    [
-                        [alice.token,
-                            bob.token],
-                    ])
+                const remaining = await dataSource.sessions.byTokens([alice.token,
+                    bob.token])
                 expect(remaining).toHaveLength(0)
             })
     })

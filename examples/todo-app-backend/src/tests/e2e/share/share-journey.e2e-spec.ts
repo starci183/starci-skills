@@ -61,7 +61,7 @@ describe("share journey (e2e)",
         it("invite → accept → collaborator sees and edits the task → revoke → access gone",
             async () => {
                 const {
-                    http, auth, dataSource 
+                    http, auth, data: dataSource 
                 } = world
                 const owner = await auth.persona("owner")
                 const collaborator = await auth.persona("other")
@@ -241,10 +241,7 @@ describe("share journey (e2e)",
 
                 // Out-of-band verify: the row persisted as revoked, personId intact (only a fresh invite for
                 // the same pair clears it), revoked_at stamped.
-                const rows = await dataSource.query<Array<{ status: string; person_id: string | null; revoked_at: string | null }>>(
-                    "select status, person_id, revoked_at from invitations where id = $1",
-                    [invitation.invitationId],
-                )
+                const rows = await dataSource.share.invitationById(invitation.invitationId)
                 expect(rows).toHaveLength(1)
                 expect(rows[0].status).toBe("revoked")
                 expect(rows[0].person_id).toBe(collaborator.personId)

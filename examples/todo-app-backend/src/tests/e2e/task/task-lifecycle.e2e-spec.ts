@@ -27,18 +27,6 @@ interface TaskCounts {
   complete: number;
 }
 
-interface TaskRow {
-  id: string;
-  owner: string;
-  title: string;
-  complete: boolean;
-  completed_at: Date | null;
-}
-
-interface CountRow {
-  count: number;
-}
-
 /**
  * fr.task.* as one A->Z journey over the real stack: sign in, create a task, read it back out
  * of the list, complete it, reopen it, watch taskCounts track each transition, then sign out
@@ -65,7 +53,7 @@ describe("task lifecycle (e2e)",
         it("sign-in → create → list → complete → reopen → counts → sign-out",
             async () => {
                 const {
-                    http, auth, dataSource 
+                    http, auth, data: dataSource 
                 } = world
                 const title = `e2e lifecycle ${Date.now()}`
                 const session = await auth.signIn(DEMO.email,
@@ -130,10 +118,7 @@ describe("task lifecycle (e2e)",
                 })
 
                 // Out-of-band: the row itself carries the owner, the flag and a real completed_at.
-                const doneRows = await dataSource.query<Array<TaskRow>>(
-                    "SELECT id, owner, title, complete, completed_at FROM tasks WHERE id = $1",
-                    [taskId],
-                )
+                const doneRows = await dataSource.tasks.byId(taskId)
                 expect(doneRows).toHaveLength(1)
                 expect(doneRows[0]).toMatchObject({
                     id: taskId, owner: personId, title, complete: true 
@@ -165,19 +150,13 @@ describe("task lifecycle (e2e)",
                     title,
                     complete: false,
                 })
-                const reopenedRows = await dataSource.query<Array<TaskRow>>(
-                    "SELECT complete, completed_at FROM tasks WHERE id = $1",
-                    [taskId],
-                )
+                const reopenedRows = await dataSource.tasks.stateById(taskId)
                 expect(reopenedRows[0].complete).toBe(false)
                 expect(reopenedRows[0].completed_at).toBeNull()
 
                 // The session row exists while the journey uses it; sign-out must take it away.
-                const liveSessions = await dataSource.query<Array<CountRow>>(
-                    "SELECT COUNT(*)::int AS count FROM sessions WHERE token = $1",
-                    [token],
-                )
-                expect(liveSessions[0].count).toBe(1)
+                const liveSessions = await dataSource.sessions.countByToken(token)
+                expect(liveSessions).toBe(1)
 
                 const signedOut = await http.graphql<{ signOut: { signedOut: boolean } }>("signOut",
                     {
@@ -196,10 +175,7 @@ describe("task lifecycle (e2e)",
                     })
                 expect(after.errorCode).toBe("SESSION_NOT_FOUND")
                 expect(after.data).toBeNull()
-                const deadSessions = await dataSource.query<Array<CountRow>>(
-                    "SELECT COUNT(*)::int AS count FROM sessions WHERE token = $1",
-                    [token],
-                )
-                expect(deadSessions[0].count).toBe(0)
+                const deadSessions = await dataSource.sessions.countByToken(token)
+                expect(deadSessions).toBe(0)
             })
     })

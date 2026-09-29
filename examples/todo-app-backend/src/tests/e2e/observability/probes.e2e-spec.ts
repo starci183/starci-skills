@@ -1,7 +1,6 @@
-/* eslint-disable starci-be/e2e-asserts-persisted-state -- what this journey reads back is the
-   in-process Prometheus registry itself: /metrics counters for the requests the suite just made,
-   observed through the same public endpoint an operator would scrape. Request correlation and the
-   access log leave no database row to SELECT. */
+/* What this journey reads back is the in-process Prometheus registry itself: /metrics counters for the
+   requests the suite just made, observed through the same public endpoint an operator would scrape.
+   Request correlation and the access log leave no database row to SELECT. */
 import {
     E2EWorld, bootE2EWorld 
 } from "../setup/e2e-world"
@@ -34,11 +33,14 @@ describe("observability probes (e2e)",
 
         it("ready answers ok, metrics counts the suite's own traffic, and x-request-id round-trips",
             async () => {
+                const { data: dataSource } = world
                 const api = world.http.anonymous()
 
                 const ready = await api.get<{ status: string }>("/ready")
                 expect(ready.status).toBe(200)
                 expect(ready.body.status).toBe("ok")
+                // Readiness is dependency-checked, so the data tier it vouches for must itself answer.
+                expect(await dataSource.schema.ping()).toBe(true)
 
                 // Correlation: a presented id is honoured and echoed verbatim.
                 const correlated = await api.get("/health",

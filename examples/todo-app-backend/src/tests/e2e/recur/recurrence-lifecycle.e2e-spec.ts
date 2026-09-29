@@ -152,7 +152,7 @@ describe("recur: recurrence lifecycle (e2e)",
         it("create task -> make recurring -> occurrences -> edit rule -> occurrences reflect edit -> end rule -> no new occurrences",
             async () => {
                 const {
-                    http, auth, dataSource 
+                    http, auth, data: dataSource 
                 } = world
                 const runId = randomUUID().slice(0,
                     8)
@@ -315,17 +315,11 @@ describe("recur: recurrence lifecycle (e2e)",
 
                 // Out-of-band verify on the run-owned postgres: the rule row is ended and no occurrence row
                 // exists past the end date (seed/verify only - the flow above never touched the database).
-                const ruleRows = await dataSource.query<Array<{ ended_at: string }>>(
-                    "select ended_at from recurrence_rules where id = $1",
-                    [ruleId],
-                )
+                const ruleRows = await dataSource.recur.endedAtOfRule(ruleId)
                 expect(ruleRows).toEqual([{
                     ended_at: today 
                 }])
-                const statusRows = await dataSource.query<Array<{ status: string; count: number }>>(
-                    "select status, count(*)::int as count from occurrences where rule_id = $1 group by status order by status",
-                    [ruleId],
-                )
+                const statusRows = await dataSource.recur.occurrenceCountsByStatus(ruleId)
                 expect(statusRows).toEqual([
                     {
                         status: "materialised", count: frozenCount - 1 
@@ -334,12 +328,9 @@ describe("recur: recurrence lifecycle (e2e)",
                         status: "orphaned", count: 1 
                     },
                 ])
-                const pastEnd = await dataSource.query<Array<{ count: number }>>(
-                    "select count(*)::int as count from occurrences where rule_id = $1 and local_date > $2",
-                    [ruleId,
-                        today],
-                )
-                expect(pastEnd[0].count).toBe(0)
+                const pastEnd = await dataSource.recur.occurrenceCountAfter(ruleId,
+                    today)
+                expect(pastEnd).toBe(0)
             },
             300_000)
     })

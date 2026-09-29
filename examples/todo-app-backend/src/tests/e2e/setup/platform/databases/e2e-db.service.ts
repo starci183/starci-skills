@@ -52,20 +52,6 @@ export class E2EDbService implements OnModuleInit, OnApplicationShutdown {
         return rows as Array<T>
     }
 
-    /** Distinct table names in the public schema - what the api's own migrations created. */
-    async tableNames(): Promise<Array<string>> {
-        const rows = await this.query<{ table_name: string }>(
-            "select table_name from information_schema.tables where table_schema = 'public' order by table_name",
-        )
-        return rows.map((row) => row.table_name)
-    }
-
-    async countRows(table: string): Promise<number> {
-        if (!/^[a-z_][a-z0-9_]*$/i.test(table)) throw new Error(`unsafe table name ${table}`)
-        const rows = await this.query<{ count: string }>(`select count(*) as count from "${table}"`)
-        return Number(rows[0]?.count ?? 0)
-    }
-
     private async source(): Promise<DataSource> {
     // Provider onModuleInit hooks run concurrently, so the stack may still be booting; whenReady
     // gates this on the compose services actually being up.

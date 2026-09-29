@@ -28,7 +28,7 @@ const describeE2E = runnable ? describe : describe.skip
  * so double-closing on failure would mask which close actually ran.
  */
 async function ensureWorldClosed(world: E2EWorld, alreadyClosed: boolean): Promise<void> {
-    if (!alreadyClosed) await world.moduleRef.close().catch(() => undefined)
+    if (!alreadyClosed) await world.moduleRef.close().catch((error: unknown) => error)
 }
 
 /** The stack's own teardown self-report must agree with the daemon-level observation. */
@@ -49,15 +49,15 @@ describeE2E("resilience: teardown verification",
                 let closed = false
                 try {
                     const {
-                        stack, dataSource 
+                        stack, data: dataSource 
                     } = world
                     const project = composeProjectOf(stack)
                     expect(project).not.toBeNull() // stack must expose its run-scoped compose project name
 
                     // Baseline: the stack really did stand a live data tier up before teardown is asked to
                     // remove it - the DataSource answers a real query against this run's postgres.
-                    const baseline = await dataSource.query<Array<{ ok: number }>>("select 1 as ok")
-                    expect(baseline[0].ok).toBe(1)
+                    const baseline = await dataSource.schema.ping()
+                    expect(baseline).toBe(true)
 
                     const containers = dockerLines([
                         "ps",

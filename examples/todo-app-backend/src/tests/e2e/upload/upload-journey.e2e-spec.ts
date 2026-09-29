@@ -31,21 +31,6 @@ interface UploadRecord {
   status: string;
 }
 
-interface UploadRow {
-  id: string;
-  owner: string;
-  task_id: string | null;
-  filename: string;
-  mime: string;
-  size_bytes: number;
-  storage_key: string;
-  status: string;
-}
-
-interface CountRow {
-  count: number;
-}
-
 /**
  * The upload slice's journey over the real stack: sign in, open a presigned intent for a text file,
  * fulfil it on the api's own PUT door with the signed token, attach the now-ready upload to a task
@@ -71,7 +56,7 @@ describe("upload journey (e2e)",
         it("intent → presigned PUT → attach → list → download → delete",
             async () => {
                 const {
-                    http, auth, dataSource 
+                    http, auth, data: dataSource 
                 } = world
                 const session = await auth.signIn(DEMO.email,
                     DEMO.password)
@@ -160,10 +145,7 @@ describe("upload journey (e2e)",
                 expect(attached.body.taskId).toBe(taskId)
 
                 // Out-of-band: the metadata row carries owner, task link, mime, real size and ready.
-                const rows = await dataSource.query<Array<UploadRow>>(
-                    "SELECT id, owner, task_id, filename, mime, size_bytes, storage_key, status FROM uploads WHERE id = $1",
-                    [intent.body.uploadId],
-                )
+                const rows = await dataSource.uploads.byId(intent.body.uploadId)
                 expect(rows).toHaveLength(1)
                 expect(rows[0]).toMatchObject({
                     id: intent.body.uploadId,
@@ -188,7 +170,7 @@ describe("upload journey (e2e)",
                 const download = await api.get<string>(`/uploads/${intent.body.uploadId}/content`)
                 expect(download.status).toBe(200)
                 expect(download.headers["content-type"]).toContain("text/plain")
-                expect(Buffer.from(download.body as unknown as string,
+                expect(Buffer.from(download.body,
                     "utf8").equals(content)).toBe(true)
 
                 // The direct intake answers the same ready record in one step.
@@ -210,11 +192,8 @@ describe("upload journey (e2e)",
                 expect(removed.status).toBe(200)
                 expect(removed.body.deleted).toBe(true)
 
-                const gone = await dataSource.query<Array<CountRow>>(
-                    "SELECT COUNT(*)::int AS count FROM uploads WHERE id = $1",
-                    [intent.body.uploadId],
-                )
-                expect(gone[0].count).toBe(0)
+                const gone = await dataSource.uploads.countById(intent.body.uploadId)
+                expect(gone).toBe(0)
                 const goneRead = await api.get(`/uploads/${intent.body.uploadId}/content`)
                 expect(goneRead.status).toBe(404)
             })

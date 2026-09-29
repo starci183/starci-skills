@@ -326,7 +326,7 @@ ${result.stderr || result.stdout}`)
         const leftovers: Array<string> = []
         // A sibling provider's init failure rejects the module while boot is still in flight; wait for
         // it to settle first so a mid-flight `compose up` cannot create containers after `down` ran.
-        if (this.bootPromise) await this.bootPromise.catch(() => undefined)
+        if (this.bootPromise) await this.bootPromise.catch((error: unknown) => error)
         if (this.apiChild && this.apiChild.exitCode === null) {
             const signalSent = this.apiChild.kill("SIGTERM")
             if (!signalSent && this.apiChild.pid) {
@@ -494,7 +494,7 @@ function newestSourceMtimeMs(dir: string): number {
 function currentSpecPath(): string {
     try {
         return expect.getState().testPath ?? "unknown-spec"
-    } catch {
-        return "unknown-spec"
+    } catch (error) {
+        return `unknown-spec (${String(error)})`
     }
 }
