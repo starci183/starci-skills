@@ -26,12 +26,12 @@ export function AgentAvatar({ agent, size = 20, withLabel = false, live = false,
     <AgentMark family={agent.family} initial={(agent.label[0] ?? '?').toUpperCase()} />
   </span>;
   const inner = <>{circle}{withLabel ? <span className="min-w-0 truncate text-xs">{agent.label}</span> : null}</>;
-  const cls = 'inline-flex min-w-0 items-center gap-1.5';
+  const cls = 'inline-flex min-w-0 items-center gap-2';
   return target ? <a href={target} className={`${cls} hover:opacity-80`} title={tooltip(agent)} aria-label={tooltip(agent)}>{inner}</a>
     : <span className={cls} title={tooltip(agent)}>{inner}</span>;
 }
 
 /** Several agents (one per attempt/unit), overlapping, with "+N". */
 export function AgentStack({ agents, max = 4, size = 20 }: { agents: LinkedAgent[]; max?: number; size?: number }) {
-  return <span className="inline-flex items-center"><span className="inline-flex -space-x-1.5">{agents.slice(0, max).map((a, i) => <span key={i} className="rounded-full ring-2 ring-card"><AgentAvatar agent={a} size={size} /></span>)}</span>{agents.length > max ? <span className="pl-2 text-xs text-muted-foreground">+{agents.length - max}</span> : null}</span>;
+  return <span className="inline-flex items-center"><span className="inline-flex -space-x-2">{agents.slice(0, max).map((a, i) => <span key={i} className="rounded-full ring-2 ring-card"><AgentAvatar agent={a} size={size} /></span>)}</span>{agents.length > max ? <span className="pl-2 text-xs text-muted-foreground">+{agents.length - max}</span> : null}</span>;
 }

@@ -330,3 +330,11 @@ button.lifecycle-label:hover, button.lifecycle-label[aria-pressed=true] { backgr
 ::-webkit-scrollbar-thumb { background-color: var(--scroll-thumb); border-radius: 999px; border: 1px solid transparent; background-clip: padding-box; }
 ::-webkit-scrollbar-thumb:hover, ::-webkit-scrollbar-thumb:active { background-color: var(--scroll-thumb-hover); border-width: 0; }
 *:not(:hover):not(:focus-within)::-webkit-scrollbar-thumb:horizontal { background-color: transparent; }
+
+/* U1: shell chrome on the 4/8/12/16/24/32 spacing scale (header, content padding, nav). */
+.shell-header { gap: 16px; padding: 0 32px; }
+.shell-header-left, .shell-header-right { gap: 12px; }
+.shell-live { gap: 8px; }
+.shell-main { padding: 32px; }
+@media (max-width: 1050px) { .shell-header { padding: 0 24px; } .shell-main { padding: 24px; } }
+@media (max-width: 760px) { .shell-header { padding: 0 16px; } .shell-main { padding: 24px 16px 96px; } .shell-bottom-nav a { gap: 4px; } }

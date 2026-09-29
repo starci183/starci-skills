@@ -2,31 +2,45 @@ import type { FleetSummary } from '../../contract';
 import type { Tone } from '../status';
 import type { Concept } from '../concept';
 import { compactVi, costVi } from '../usage-view';
+import { Stagger, StaggerItem, Ticker } from '../motion';
 
 export const concept: Concept = 'C2';
 
-const number = (value: number) => new Intl.NumberFormat('vi-VN').format(value);
+type Kpi = { tone: Tone; value: number; label: string; note: string };
 
-type Kpi = { tone: Tone; value: number | string; label: string; note: string; muted?: boolean };
-
-/** Fleet summary strip: six big tabular numbers, each with a one-line explanation. */
-export function KpiStrip({ summary }: { summary: FleetSummary | undefined }) {
-  const usage = summary?.usage24h;
-  const tokens = usage?.recorded ? usage.inputTokens + usage.outputTokens : null;
+/** Essentials: four big numbers (ops running, workflows needing attention, passed / failed in 24 h) that count up on first view. */
+export function KpiStrip({ summary, needsAttention }: { summary: FleetSummary | undefined; needsAttention: number | undefined }) {
   const items: Kpi[] = summary ? [
     { tone: 'running', value: summary.opsRunning, label: 'op đang chạy', note: 'Lần thử đã giao, agent chưa báo kết quả.' },
-    { tone: 'running', value: summary.opsSettling, label: 'đang chốt', note: 'Agent đã báo, đang chờ Kernel chốt.' },
-    { tone: 'queued', value: summary.unitsQueued, label: 'unit đang chờ', note: 'Chưa tới lượt hoặc chờ slot, ở workflow đang chạy.' },
-    { tone: 'failed', value: summary.failed24h, label: 'hỏng / chặn 24 giờ', note: 'Lần thử đã chốt với kết quả không đạt.' },
+    { tone: 'failed', value: needsAttention ?? 0, label: 'workflow cần xử lý', note: 'Workflow đang kẹt hoặc chậm, cần người xem.' },
     { tone: 'success', value: summary.passed24h, label: 'đạt 24 giờ', note: 'Lần thử đã chốt với kết quả đạt.' },
-    tokens != null ? { tone: 'queued', value: compactVi(tokens), label: 'Token 24 giờ', note: `vào ${compactVi(usage!.inputTokens)} · ra ${compactVi(usage!.outputTokens)} · ${costVi(usage!.costUsd)}` }
-      : { tone: 'queued', value: 'chưa ghi nhận', label: 'Token 24 giờ', note: 'Runtime chưa ghi token vào llm_usage trong 24 giờ qua.', muted: true },
+    { tone: 'failed', value: summary.failed24h, label: 'hỏng / chặn 24 giờ', note: 'Lần thử đã chốt với kết quả không đạt.' },
   ] : [];
-  return <section aria-label="Số liệu toàn hệ thống" className="grid grid-cols-2 gap-3 lg:grid-cols-6">
-    {summary ? items.map(item => <div key={item.label} data-tone={item.tone} className="min-w-0 rounded-xl border bg-card p-4 shadow-sm">
-      <div className={item.muted ? 'text-lg font-semibold leading-tight text-muted-foreground' : 'text-3xl font-semibold tabular-nums leading-none'} style={item.muted ? undefined : { color: 'var(--tone)' }}>{typeof item.value === 'number' ? number(item.value) : item.value}</div>
-      <div className="mt-2 text-sm font-medium">{item.label}</div>
-      <p className="mt-1 text-xs leading-snug text-muted-foreground">{item.note}</p>
-    </div>) : Array.from({ length: 6 }, (_, index) => <div key={index} className="h-28 animate-pulse rounded-xl border bg-muted/40" />)}
+  if (!summary) return <section aria-label="Số liệu toàn hệ thống" className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+    {Array.from({ length: 4 }, (_, index) => <div key={index} className="h-28 animate-pulse rounded-xl border bg-muted/40" />)}
   </section>;
+  return <Stagger className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+    {items.map(item => <StaggerItem key={item.label} className="min-w-0"><div data-tone={item.tone} className="flex h-full min-w-0 flex-col gap-1 rounded-xl border bg-card p-4 shadow-sm sm:p-6" aria-label={item.label}>
+      <div className="text-3xl font-semibold tabular-nums leading-none" style={{ color: 'var(--tone)' }}><Ticker value={item.value} /></div>
+      <div className="mt-2 text-sm font-medium">{item.label}</div>
+      <p className="text-xs leading-snug text-muted-foreground">{item.note}</p>
+    </div></StaggerItem>)}
+  </Stagger>;
+}
+
+/** Secondary numbers (settling ops, queued units, 24 h tokens) shown inside "Nâng cao". */
+export function KpiExtras({ summary }: { summary: FleetSummary | undefined }) {
+  if (!summary) return null;
+  const usage = summary.usage24h;
+  const tokens = usage.recorded ? usage.inputTokens + usage.outputTokens : null;
+  const number = (value: number) => new Intl.NumberFormat('vi-VN').format(value);
+  const items = [
+    { label: 'đang chốt', value: number(summary.opsSettling), note: 'Agent đã báo, đang chờ Kernel chốt.' },
+    { label: 'unit đang chờ', value: number(summary.unitsQueued), note: 'Chưa tới lượt hoặc chờ slot, ở workflow đang chạy.' },
+    tokens != null ? { label: 'Token 24 giờ', value: compactVi(tokens), note: `vào ${compactVi(usage.inputTokens)} · ra ${compactVi(usage.outputTokens)} · ${costVi(usage.costUsd)}` }
+      : { label: 'Token 24 giờ', value: 'chưa ghi nhận', note: 'Runtime chưa ghi token vào llm_usage trong 24 giờ qua.' },
+  ];
+  return <dl className="grid gap-3 sm:grid-cols-3">{items.map(item => <div key={item.label} className="flex min-w-0 flex-col gap-1 rounded-lg border p-3">
+    <dt className="text-xs text-muted-foreground">{item.label}</dt><dd className="text-lg font-semibold tabular-nums leading-tight">{item.value}</dd><p className="text-xs leading-snug text-muted-foreground">{item.note}</p>
+  </div>)}</dl>;
 }
