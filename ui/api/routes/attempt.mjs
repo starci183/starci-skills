@@ -195,6 +195,7 @@ function attemptDetail(store, ledger, db, row) {
     input: inputOf(payload, job),
     files: filesOf(db, artifactRows, checks, ledger.name),
     usage: usageOf(db, { attempt: row.attempt_id }),
+    tryBudget: row.unit_id ? one(db, 'SELECT try_budget FROM work_units WHERE workflow_id=? AND unit_id=?', row.workflow_id, row.unit_id)?.try_budget ?? null : null,
     land: latestLand(db, row.workflow_id),
     report: report ? { id: report.report_id, outcome: report.outcome, json: parse(report.report_json),
       attachments: many(db, 'SELECT m.* FROM v_media m JOIN report_attachments ra ON ra.artifact_id=m.artifact_id WHERE ra.report_id=?', report.report_id).map(m => mediaItem(m, ledger.name)) } : null,

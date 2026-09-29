@@ -126,7 +126,7 @@ export type LogRow = { key: string; db: 'machine'|string; seq: number; at: numbe
 export type TimelineItem = { at: number; source: 'event'|'log'|'attempt'|'check'|'decision'|'violation'|'action'; kind: string; ui: UiState; title: string; ref: Ref | null; detail: unknown };
 
 /* ---- v2 (2026-09-29): pipeline, transparency, evidence. Served by ui/api/pipeline.mjs and routes. ---- */
-export type LegStatus = 'success'|'running'|'settling'|'queued'|'retry'|'failed'|'blocked'|'planned'|'deferred'|'external'|'dropped'|'unknown';
+export type LegStatus = 'success'|'running'|'settling'|'queued'|'retry'|'failed'|'blocked'|'planned'|'deferred'|'external'|'dropped'|'warning'|'unknown';
 export type AttemptBrief = { id: number; unit: string | null; job: string; try: number; status: LegStatus;
   reportOutcome: AttemptRow['reportOutcome']; verdict: AttemptRow['verdict']; model: string | null; agent: string | null; pool: string | null;
   dispatchedAt: number | null; reportedAt: number | null; settledAt: number | null; checks: number; checksRed: number;
@@ -164,7 +164,7 @@ export type EvidenceFile = { artifactId: number; name: string; base: string; gro
   mediaType: string; bytes: number; sha: string; href: `/api/blob/${string}`; hostPath: string | null; encoding: 'utf-8'|'utf-8-bom'|'utf-16le'|'utf-16be'|null;
   redaction: string | null; origin: string; label: string | null; scopeRef: string | null; round: number | null;
   check: { id: number | null; name: string; status: CheckRow['status'] | null; ui: UiState } | null; archived: boolean; createdAt: number; project: string };
-export type AttemptDetailV2 = Omit<AttemptDetail, 'where'> & { where: AttemptWhere; input: AttemptInput | null; files: EvidenceFile[]; usage: Usage };
+export type AttemptDetailV2 = Omit<AttemptDetail, 'where'> & { where: AttemptWhere; input: AttemptInput | null; files: EvidenceFile[]; usage: Usage; tryBudget: number | null };
 export type WorkflowRowV2 = WorkflowRow & { pipeline: MiniPipeline };
 export type WorkflowDetailV2 = WorkflowDetail & { pipeline: MiniPipeline; where: WorkflowWhere; usage: Usage };
 export type FleetViewV2 = Omit<FleetView, 'workflows'> & { workflows: WorkflowRowV2[]; summary: FleetSummary };

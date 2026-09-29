@@ -9,7 +9,6 @@ export const concept: Concept = 'C6';
 
 const verdictWords: Record<string, string> = { pass: 'đạt', fail: 'hỏng', partial: 'một phần', blocked: 'bị chặn', dropped: 'đã bỏ', cancelled: 'đã huỷ' };
 const outcomeWords: Record<string, string> = { done: 'xong', partial: 'một phần', failed: 'hỏng', ask: 'cần hỏi', blocked: 'bị chặn' };
-const TRY_BUDGET = 5;
 
 function Crumb({ href, children }: { href: string; children: React.ReactNode }) {
   return <a className="hover:text-foreground hover:underline" href={href}>{children}</a>;
@@ -39,7 +38,7 @@ export function AttemptHeader({ attempt, project }: { attempt: AttemptDetailV2; 
     </nav>
     <div className="flex flex-wrap items-start justify-between gap-x-4 gap-y-3">
       <div className="min-w-0 space-y-1.5">
-        <h1 className="text-2xl font-semibold tracking-tight sm:text-3xl">{attempt.op} · lần {attempt.attempt}/{TRY_BUDGET}</h1>
+        <h1 className="text-2xl font-semibold tracking-tight sm:text-3xl">{attempt.op} · lần {attempt.attempt}/{attempt.tryBudget ?? 5}</h1>
         <p className="break-all font-mono text-xs text-muted-foreground">{attempt.job} · attempt {attempt.id} · giao #{attempt.dispatchSeq}</p>
       </div>
       <div className="flex flex-wrap items-center gap-2">
