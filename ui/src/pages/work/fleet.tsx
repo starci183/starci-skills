@@ -11,6 +11,7 @@ import { KpiStrip } from '../../components/overview/kpi-strip';
 import { WorkflowCard } from '../../components/overview/workflow-card';
 import { LiveFeed } from '../../components/overview/live-feed';
 import { ModelsPanel } from '../../components/overview/models-panel';
+import { HostCard } from '../../components/host/host-card';
 
 export const concept: Concept = 'C2';
 
@@ -40,6 +41,7 @@ export function FleetPage() {
           {data && visibleWorkflows.length === 0 && <p className="rounded-xl border p-5 text-sm text-muted-foreground">Không có workflow phù hợp.</p>}</div>
       </ConceptBlock>
       <div className="grid min-w-0 content-start gap-6">
+        <HostCard compact />
         <section className="min-w-0 rounded-xl border bg-card shadow-sm"><div className="flex items-center justify-between border-b px-4 py-3"><h2 className="font-semibold">Đang diễn ra</h2><span data-tone="success" className="inline-flex items-center gap-1.5 text-xs" style={{ color: 'var(--tone)' }}><span className="status-dot" aria-hidden="true" />trực tiếp</span></div><LiveFeed /></section>
         <section className="min-w-0 rounded-xl border bg-card shadow-sm"><div className="flex items-center justify-between border-b px-4 py-3"><h2 className="font-semibold">Mô hình đang dùng</h2><span className="text-xs text-muted-foreground">op đang chạy</span></div><ModelsPanel summary={data?.summary} /></section>
       </div>

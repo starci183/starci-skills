@@ -9,8 +9,9 @@ import { handleDecisions } from './routes/decisions.mjs';
 import { handleSystem } from './routes/system.mjs';
 import { handleLogs } from './routes/logs.mjs';
 import { handleLive } from './routes/live.mjs';
+import { handleHost } from './routes/host.mjs';
 
-export function createApiHandler({ handlers = [handleWork, handleAttempt, handleDecisions, handleSystem, handleLogs, handleLive], env = process.env } = {}) {
+export function createApiHandler({ handlers = [handleWork, handleAttempt, handleDecisions, handleSystem, handleLogs, handleLive, handleHost], env = process.env } = {}) {
   const store = openUiDb({ env });
   initializeReadRedaction(store.projects());
 

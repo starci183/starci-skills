@@ -11,6 +11,7 @@ import { StateChip } from '../../components/state-chip';
 import { useApiQuery, type QuerySnapshot } from '../../api/query';
 import { formatAbsolute, formatRelative, learningKindLabels, learningStateLabels } from '../../i18n/vi';
 import { useRoute, systemTabs, type SystemTab } from '../../router';
+import { HostCard } from '../../components/host/host-card';
 import type { ActionRow, BlobLink, HealthSummary, LandRun, ReconcilerView, Ref, ResourcesView, UiState } from '../../contract';
 
 export const concept: Concept = 'C13';
@@ -133,7 +134,7 @@ function Sparkline({ values }: { values: number[] }) {
 function ResourcesTab() {
   const resources = useApiQuery<ResourcesView>('/api/resources', { topics: ['system'], intervalMs: 15_000 });
   const samples = useApiQuery<{ at: number; ramMb: number | null; cpuPct: number | null; freeRamMb: number | null; freeRamPct: number | null; freeDiskGb: number | null; subject: string | null }[]>('/api/resources/samples?kind=host&step=5', { topics: ['system'], intervalMs: 60_000 });
-  return <ConceptBlock concept="C14" className="space-y-4"><QueryView query={resources}>{(data) => <>
+  return <ConceptBlock concept="C14" className="space-y-4"><HostCard /><QueryView query={resources}>{(data) => <>
     <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4"><Metric label="Chế độ giới hạn" value={<StateChip state={data.throttle.ui} label={data.throttle.mode} />} help={data.throttle.reason ?? undefined} /><Metric label="Giới hạn thực" value={number(data.throttle.effectiveCap)} /><Metric label="Đang chạy" value={number(data.throttle.running)} /><Metric label="RAM trống" value={data.throttle.freeRamPct == null ? '—' : `${number(data.throttle.freeRamPct, 1)}%`} /></div>
     <div className="mt-4 grid gap-4 xl:grid-cols-2"><Panel title="CPU máy" concept="C14" summary="Mẫu từ host_samples"><QueryView query={samples}>{(rows) => <Sparkline values={rows.map((row) => row.cpuPct).filter((value): value is number => value != null)} />}</QueryView><div className="mt-2 text-xs text-muted-foreground">{data.throttle.cpuPct == null ? 'Chưa có số đo CPU' : `${number(data.throttle.cpuPct, 1)}% ở quan sát gần nhất`}</div></Panel><Panel title="RAM máy" concept="C14" summary="Mẫu từ host_samples"><QueryView query={samples}>{(rows) => <Sparkline values={rows.map((row) => row.freeRamPct).filter((value): value is number => value != null)} />}</QueryView></Panel></div>
     <div className="mt-4 space-y-4">

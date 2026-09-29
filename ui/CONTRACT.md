@@ -65,6 +65,7 @@ Every JSON success has `{data,meta:{at,etag,sources,stale,next}}`. The public re
 | `/api/services` and `/api/services/:name/probes` | `v_services`, `service_probes`, `service_events` | System Services |
 | `/api/seats` and `/api/terminals` | `v_seats`, `v_deaf_seats`, seat snapshots, `terminals` | System Services/Resources |
 | `/api/resources` and `/samples` | throttle, provider, pool, quota, lease, budget and `host_samples` | System Resources |
+| `/api/host` | Node `os`, `nvidia-smi`, `Get-CimInstance` (cached), machine `host_samples` | Overview host card, System Resources |
 | `/api/gc/runs` and `/api/gc/runs/:id` | `gc_runs`, `gc_items` | System Cleanup |
 | `/api/leaks` | `v_leaks` and each ledger's `v_ledger_leaks` | System Cleanup |
 | `/api/land`, `/api/land/runs`, `/api/lanes` | `land_queue`, `land_runs`, `pushes`, `lanes` | System Land |
