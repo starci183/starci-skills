@@ -4,6 +4,8 @@ import type { LogRow } from '../../contract';
 import { statusTone, type Status } from '../status';
 import { TimeAgo } from '../time-ago';
 import type { Concept } from '../concept';
+import { AgentAvatar } from '../agent/agent-avatar';
+import { attemptAgent, useAttemptAgents } from '../agent/use-running-agents';
 
 export const concept: Concept = 'C7';
 
@@ -17,6 +19,8 @@ export function logHref(row: LogRow): string | null {
 }
 
 function FeedRow({ row, fresh }: { row: LogRow; fresh: boolean }) {
+  const { forJob } = useAttemptAgents();
+  const attempt = forJob(row.project, row.job);
   const ref = useRef<HTMLElement>(null);
   useEffect(() => {
     if (fresh && ref.current && !window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
@@ -26,6 +30,7 @@ function FeedRow({ row, fresh }: { row: LogRow; fresh: boolean }) {
   const href = logHref(row);
   const body = <>
     <span className="w-14 shrink-0 text-xs text-muted-foreground"><TimeAgo at={row.at} /></span>
+    {attempt ? <AgentAvatar agent={attemptAgent(attempt)} size={20} /> : null}
     <span className="min-w-0 flex-1">
       <span className="line-clamp-2 break-words text-[13px]">{row.msg}</span>
       <span className="block truncate text-[11.5px] text-muted-foreground">{[row.project, row.wf, row.job, row.actor].filter(Boolean).join(' · ')}</span>

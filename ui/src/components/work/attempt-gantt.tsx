@@ -1,6 +1,9 @@
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import type { AttemptBrief, PipelineView } from '../../contract';
 import { statusLabels, statusTone, toneVar } from '../status';
 import type { Concept } from '../concept';
+import { AgentMark, familyTint, tintStyle } from '../agent/agent-marks';
+import { agentOf } from '../agent/agent-avatar';
 import { formatDayTime, formatDuration, formatHm } from './leg/time';
 
 export const concept: Concept = 'C7';
@@ -8,6 +11,25 @@ export const concept: Concept = 'C7';
 const LABEL_W = 190; const ROW_PAD = 6; const BAR_H = 16; const LANE_H = 22; const TOP = 26; const RIGHT = 24;
 const STEP_MS = 5 * 60_000;
 const ladder = [1, 2, 3, 6, 12, 24, 48, 96];
+
+/** Horizontal scroller with edge fades that show only while more content exists in that direction. */
+function FadeScroller({ children }: { children: ReactNode }) {
+  const box = useRef<HTMLDivElement>(null);
+  const [edge, setEdge] = useState({ left: false, right: false });
+  useEffect(() => {
+    const el = box.current; if (!el) return;
+    const update = () => setEdge({ left: el.scrollLeft > 2, right: el.scrollLeft + el.clientWidth < el.scrollWidth - 2 });
+    update();
+    el.addEventListener('scroll', update, { passive: true });
+    const observer = new ResizeObserver(update); observer.observe(el); if (el.firstElementChild) observer.observe(el.firstElementChild);
+    return () => { el.removeEventListener('scroll', update); observer.disconnect(); };
+  }, []);
+  return <div className="relative max-w-full rounded-lg border bg-card">
+    <div ref={box} className="max-w-full overflow-x-auto rounded-lg" tabIndex={0} aria-label="Dòng thời gian, cuộn ngang">{children}</div>
+    <span aria-hidden="true" className={`pointer-events-none absolute inset-y-0 left-0 w-10 rounded-l-lg bg-gradient-to-r from-card to-transparent transition-opacity ${edge.left ? 'opacity-100' : 'opacity-0'}`} />
+    <span aria-hidden="true" className={`pointer-events-none absolute inset-y-0 right-0 w-10 rounded-r-lg bg-gradient-to-l from-card to-transparent transition-opacity ${edge.right ? 'opacity-100' : 'opacity-0'}`} />
+  </div>;
+}
 
 /** Timeline of every attempt per leg (bar = dispatched → settled/now, colour = status). */
 export function AttemptGantt({ pipeline, now }: { pipeline: PipelineView; now: number }) {
@@ -40,7 +62,7 @@ export function AttemptGantt({ pipeline, now }: { pipeline: PipelineView; now: n
   const ticks: number[] = [];
   for (let t = t0; t <= t1; t += STEP_MS * mult) ticks.push(t);
   const nowX = x(now);
-  return <div className="max-w-full overflow-x-auto rounded-lg border bg-card">
+  return <FadeScroller>
     <svg width={width} height={height} role="img" aria-label="Dòng thời gian các lần thử theo chặng" className="block text-foreground" style={{ minWidth: width }}>
       <defs>
         {(['running', 'warning', 'failed', 'success', 'queued', 'skipped'] as const).map(tone => <pattern key={tone} id={`hatch-${tone}`} width="6" height="6" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
@@ -65,7 +87,8 @@ export function AttemptGantt({ pipeline, now }: { pipeline: PipelineView; now: n
             <rect x={bx} y={by} width={bw} height={BAR_H} rx="4" strokeWidth="1.5" style={{ fill: open ? `url(#hatch-${tone})` : toneVar(tone, '-bg'), stroke: toneVar(tone) }}>
               {open && <animate attributeName="opacity" values="1;0.55;1" dur="1.8s" repeatCount="indefinite" />}
             </rect>
-            {bw >= 26 && <text x={bx + 5} y={by + 12} fontSize="10.5" fontWeight="600" style={{ fill: toneVar(tone) }}>#{a.id}</text>}
+            {bw >= 20 && <foreignObject x={bx + 2} y={by + 1} width={14} height={14}><span className="grid size-3.5 place-items-center rounded-full border p-px" style={tintStyle(familyTint[agentOf(a).family].tone)}><AgentMark family={agentOf(a).family} initial="?" /></span></foreignObject>}
+            {bw >= 44 && <text x={bx + 19} y={by + 12} fontSize="10.5" fontWeight="600" style={{ fill: toneVar(tone) }}>#{a.id}</text>}
           </g></a>;
         })}
       </g>)}
@@ -74,5 +97,5 @@ export function AttemptGantt({ pipeline, now }: { pipeline: PipelineView; now: n
         <text x={Math.min(nowX + 4, width - 52)} y={TOP + 10} fontSize="10.5" fontWeight="600" style={{ fill: 'var(--primary)' }}>bây giờ</text>
       </g>
     </svg>
-  </div>;
+  </FadeScroller>;
 }

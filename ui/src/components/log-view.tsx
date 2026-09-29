@@ -8,6 +8,8 @@ import { JsonTree } from './logs/json-tree';
 import { kindIcon, levelLabels, levelTone } from './logs/kinds';
 import { formatAbsolute } from '../i18n/vi';
 import type { LogRow, TimelineItem } from '../contract';
+import { AgentAvatar } from './agent/agent-avatar';
+import { attemptAgent, useAttemptAgents } from './agent/use-running-agents';
 
 export const concept: Concept = 'C17';
 
@@ -26,11 +28,13 @@ export function LogRowItem({ row, fresh = false }: { row: LogRow; fresh?: boolea
   const Icon = kindIcon(row.kind);
   const wfRef = row.refs.find((ref) => ref.kind === 'workflow');
   const attemptRef = row.refs.find((ref) => ref.kind === 'attempt');
+  const { rows: attempts, forJob } = useAttemptAgents();
+  const linked = row.actor === 'op' ? (attemptRef ? attempts.find((item) => String(item.id) === attemptRef.id && item.project === (attemptRef.project ?? row.project)) : forJob(row.project, row.job)) : undefined;
   return <details className={`group border-b border-l-[3px] border-b-border/60 border-l-transparent last:border-b-0 data-[tone]:border-l-[color:var(--tone)] ${row.level === 'error' ? 'bg-[color:var(--tone-bg)]' : ''} ${fresh ? 'log-row-new' : ''}`} data-tone={tone} data-level={row.level}>
     <summary className="grid cursor-pointer list-none grid-cols-[3.9rem_minmax(0,1fr)] items-center gap-x-2.5 gap-y-0.5 px-3 py-2 text-[12.5px] hover:bg-muted/40 md:grid-cols-[4.7rem_3.4rem_5.5rem_9.5rem_minmax(0,1fr)_10.5rem] md:gap-x-3 [&::-webkit-details-marker]:hidden">
       <time className="font-mono text-xs tabular-nums text-muted-foreground" dateTime={new Date(row.at).toISOString()} title={formatAbsolute(row.at)}>{timeFormat.format(row.at)}</time>
       <span className={`hidden text-[11px] font-semibold md:block ${tone ? 'text-[color:var(--tone)]' : 'text-muted-foreground'}`}>{levelLabels[row.level]}</span>
-      <span className="hidden min-w-0 md:block"><Badge variant="outline" className="max-w-full truncate font-mono text-[10.5px]">{row.actor}</Badge></span>
+      <span className="hidden min-w-0 md:block"><span className="inline-flex max-w-full items-center gap-1">{linked ? <AgentAvatar agent={attemptAgent(linked)} size={18} /> : null}<Badge variant="outline" className="min-w-0 max-w-full truncate font-mono text-[10.5px]">{row.actor}</Badge></span></span>
       <span className="col-start-2 flex min-w-0 items-center gap-1.5 font-mono text-[11.5px] text-muted-foreground md:col-start-auto">
         <Icon className="size-3.5 shrink-0" aria-hidden="true" /><span className="truncate" title={row.kind}>{row.kind}</span>
         {tone && <span className="font-semibold text-[color:var(--tone)] md:hidden">· {levelLabels[row.level]}</span>}

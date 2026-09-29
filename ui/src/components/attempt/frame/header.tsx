@@ -4,6 +4,7 @@ import { statusFromOutcome, statusFromVerdict, statusTone, type Tone } from '../
 import { StatusChip } from '../../status-chip';
 import { isOpen } from './steps';
 import type { Concept } from '../../concept';
+import { AgentAvatar, agentOf } from '../../agent/agent-avatar';
 
 export const concept: Concept = 'C6';
 
@@ -30,6 +31,7 @@ export function AttemptHeader({ attempt, project }: { attempt: AttemptDetailV2; 
   const verdictLabel = attempt.verdict ? `Kernel chốt: ${verdictWords[attempt.verdict] ?? attempt.verdict}` : open && attempt.reportedAt ? 'Kernel chốt: đang chốt' : 'Kernel chưa chốt';
   const tone: Tone = statusTone[verdict === 'unknown' ? outcome : verdict];
   const enc = encodeURIComponent;
+  const agent = agentOf(attempt);
   return <header className="space-y-3" data-tone={tone}>
     <nav aria-label="Đường dẫn" className="flex flex-wrap items-center gap-x-1.5 text-xs text-muted-foreground">
       <Crumb href="#/">Tổng quan</Crumb><span aria-hidden="true">/</span>
@@ -37,9 +39,13 @@ export function AttemptHeader({ attempt, project }: { attempt: AttemptDetailV2; 
       <span>{attempt.op}</span><span aria-hidden="true">/</span><span className="text-foreground">lần thử #{attempt.id}</span>
     </nav>
     <div className="flex flex-wrap items-start justify-between gap-x-4 gap-y-3">
-      <div className="min-w-0 space-y-1.5">
+      <div className="flex min-w-0 items-start gap-3">
+        <AgentAvatar agent={agent} size={52} live={open && !attempt.reportedAt} />
+        <div className="min-w-0 space-y-1.5">
         <h1 className="text-2xl font-semibold tracking-tight sm:text-3xl">{attempt.op} · lần {attempt.attempt}/{attempt.tryBudget ?? 5}</h1>
         <p className="break-all font-mono text-xs text-muted-foreground">{attempt.job} · attempt {attempt.id} · giao #{attempt.dispatchSeq}</p>
+        <p className="text-xs text-muted-foreground">Agent chạy: <strong className="font-medium text-foreground">{agent.label}</strong>{[attempt.pool, attempt.effort ? `effort ${attempt.effort}` : null].filter(Boolean).map(part => <span key={part}> · {part}</span>)}</p>
+        </div>
       </div>
       <div className="flex flex-wrap items-center gap-2">
         <StatusChip status={outcome} label={outcomeLabel} />

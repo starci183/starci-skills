@@ -5,8 +5,16 @@ import { toneVar } from '../status';
 import { attemptState, fmtMin, groupBy, median, minutes, num } from './analytics-data';
 import { ChartCard } from './chart-card';
 import { useWidth } from './use-width';
+import { AgentMark, familyTint, tintStyle } from '../agent/agent-marks';
+import { agentOf } from '../agent/agent-avatar';
 
 const ROW = 76;
+
+function AgentGlyph({ model, pool }: { model: string; pool: string | null }) {
+  const agent = agentOf({ model, pool });
+  const tint = familyTint[agent.family];
+  return <foreignObject x={0} y={-3} width={22} height={22}><span className="grid size-5 place-items-center rounded-full border p-[3px]" style={tintStyle(tint.tone)} title={[tint.name, pool, model].filter(Boolean).join(' · ')}><AgentMark family={agent.family} initial={model[0]?.toUpperCase()} /></span></foreignObject>;
+}
 
 export function ModelRates({ rows }: { rows: AttemptRow[] }) {
   const [ref, width] = useWidth();
@@ -15,13 +23,13 @@ export function ModelRates({ rows }: { rows: AttemptRow[] }) {
     const pass = first.filter(r => r.verdict === 'pass').length;
     const running = list.filter(r => attemptState(r) === 'run').length;
     const p50 = median(list.map(r => r.cycleMs).filter((v): v is number => v != null));
-    return { model, total: list.length, settled: list.length - running, running, first: first.length, pass, rate: first.length ? pass / first.length : null, p50 };
+    return { model, pool: list.find(r => r.pool)?.pool ?? null, total: list.length, settled: list.length - running, running, first: first.length, pass, rate: first.length ? pass / first.length : null, p50 };
   }).sort((a, b) => b.total - a.total);
   return <ChartCard title="Mô hình: đạt ở lần đầu" hint="Tỉ lệ lần thử đầu tiên của mỗi đơn vị được chốt là đạt, theo từng mô hình."
     legend={[{ tone: 'success', label: 'Đạt ở lần đầu' }, { label: 'Phần còn lại' }]} empty={!models.length && 'Chưa có lần thử nào trong khoảng này.'}>
     <div ref={ref}><svg width={width} height={models.length * ROW} role="img" aria-label="Tỉ lệ đạt ở lần đầu theo mô hình" className="block max-w-full">
       {models.map((m, i) => <g key={m.model} transform={`translate(0 ${i * ROW})`}>
-        <text x={0} y={14} className="fill-foreground font-mono text-[12px]">{m.model}</text>
+        <AgentGlyph model={m.model} pool={m.pool} /><text x={26} y={14} className="fill-foreground font-mono text-[12px]">{m.model}</text>
         <text x={width} y={14} textAnchor="end" className="fill-foreground text-[13px] font-semibold tabular-nums">{m.rate == null ? '—' : `${num(m.rate * 100, 0)}%`}</text>
         <rect x={0} y={22} width={width} height={14} rx={4} className="fill-muted">
           <title>{m.rate == null ? `${m.model}: chưa có lần đầu nào được chốt` : `${m.model}: ${m.pass}/${m.first} lần đầu đạt`}</title></rect>
