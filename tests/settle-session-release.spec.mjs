@@ -10,7 +10,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { spawnSync } from 'node:child_process';
-import { inspectLedger, ledgerFileFor, openLedger } from '../engine/ledger-db.mjs';
+import { inspectLedger, ledgerFileFor, openLedger, ensureWorkflow, changeWorkflowPhase, insertGoal, createUnit, enqueueJob, setJobStatus, startAttempt, writeContract, appendEvent } from '../engine/ledger-db.mjs';
 import { FAKE_ORCA } from './helpers/fake-orca.mjs';
 import { sessionCandidates, sessionHomes, sessionProjectSlug, releaseSettledSession } from '../scripts/kernel/op-session.mjs';
 
@@ -61,25 +61,36 @@ export function archiveSessionFiles(paths, { archiveRoot, agent, apply } = {}) {
   delete env.ORCA_TERMINAL_HANDLE;
   delete env.STARCI_ROLE;
   delete env.STARCI_OP_JOB;
-  return { root, repo, trustHome, archiveRoot, stateFile, env };
+  env.STARCI_TEST_MACHINE_FILE = path.join(root, 'machine.sqlite');  // fleet registry of this fixture only
+  return { root, repo, trustHome, archiveRoot, stateFile, env, ledgerFile: ledgerFileFor(repo, { env }) };
 };
 
-const seed = (repo, fn) => { const ledger = openLedger({ file: ledgerFileFor(repo) }); try { fn(ledger); } finally { ledger.close(); } };
-const read = (repo, fn) => { const ledger = inspectLedger({ file: ledgerFileFor(repo) }); try { return fn(ledger); } finally { ledger.close(); } };
+const seed = (file, fn) => { const ledger = openLedger({ file }); try { fn(ledger); } finally { ledger.close(); } };
+const read = (file, fn) => { const ledger = inspectLedger({ file }); try { return fn(ledger); } finally { ledger.close(); } };
 
-/** A running op job bound to a worker terminal, with its dispatch contract and op-dispatched event. */
-const seedOpJob = (repo, { wf, jobId, handle, worktree }) => {
-  seed(repo, (ledger) => {
-    ledger.ensureWorkflow({ workflowId: wf, title: 'session release' });
+/** A running op job bound to a worker terminal, with its unit, attempt, contract and op-dispatched event. */
+const seedOpJob = (file, { wf, jobId, handle, worktree }) => {
+  seed(file, (ledger) => {
     const at = Date.now();
-    ledger.enqueueJob({ jobId, workflowId: wf, opId: 'docs.author', kind: 'op', payload: {
-      opId: 'docs.author', owned_paths: ['docs/'], provider: 'claude', agent: 'claude',
-      orca: { dispatchId: `ctx-${jobId}`, agentTerminalHandle: handle },
-    } });
-    ledger.db.prepare("UPDATE jobs SET status='running', worker_id=? WHERE job_id=?").run(handle, jobId);
-    ledger.db.prepare('INSERT INTO contracts(workflow_id,op_id,attempt,dispatch_id,markdown,context_json,created_at) VALUES(?,?,?,?,?,?,?)')
-      .run(wf, 'docs.author', 1, `ctx-${jobId}`, '# contract', json({ worktree }), at);
-    ledger.appendEvent({ workflowId: wf, entityType: 'job', entityId: jobId, kind: 'op-dispatched', payload: { terminal: handle } });
+    ledger.transaction((db) => {
+      ensureWorkflow(db, { workflowId: wf, phase: 'queued', title: 'session release', by: 'test-fixture', reason: 'seed', at });
+      insertGoal(db, { workflowId: wf, revision: 1, goalIdentity: `goal-${wf}`, markdown: '# goal', goal: {}, createdAt: at });
+      changeWorkflowPhase(db, { workflowId: wf, to: 'running', by: 'test-fixture', reason: 'seed', at });
+      const unitId = `unit-${jobId}`;
+      createUnit(db, { workflowId: wf, unitId, opId: 'docs.author', subjectKey: unitId, goalRevision: 1, createdAt: at });
+      enqueueJob(db, { jobId, workflowId: wf, unitId, opId: 'docs.author', kind: 'op', role: 'op', payload: {
+        opId: 'docs.author', owned_paths: ['docs/'], provider: 'claude', agent: 'claude',
+        orca: { dispatchId: `ctx-${jobId}`, agentTerminalHandle: handle },
+      }, createdAt: at });
+      setJobStatus(db, { jobId, to: 'ready', reason: 'dispatch', at });
+      setJobStatus(db, { jobId, to: 'leased', reason: 'dispatch', at });
+      const attempt = startAttempt(db, { workflowId: wf, jobId, dispatchId: `ctx-${jobId}`, terminalHandle: handle,
+        worktreePath: worktree, dispatchedAt: at, startedAt: at, at });
+      writeContract(db, { attemptId: attempt.attempt_id, markdown: '# contract', context: { worktree }, createdAt: at });
+      setJobStatus(db, { jobId, to: 'running', reason: 'worker live', at, workerId: handle });
+      appendEvent(db, { workflowId: wf, entityType: 'job', entityId: jobId, kind: 'op-dispatched',
+        payload: { terminal: handle, dispatch: `ctx-${jobId}` }, createdAt: at });
+    });
   });
 };
 
@@ -100,7 +111,7 @@ const seedOrcaTerminal = (stateFile, terminal) => {
 
 test('settle archives the settled op\'s own claude session file', t => {
   const fx = fixture(t), wf = 'wf-sess-archive', jobId = 'op-sess-archive-a1';
-  seedOpJob(fx.repo, { wf, jobId, handle: 'term-sess1', worktree: fx.repo });
+  seedOpJob(fx.ledgerFile, { wf, jobId, handle: 'term-sess1', worktree: fx.repo });
   seedOrcaTerminal(fx.stateFile, { handle: 'term-sess1', connected: true, writable: true, command: 'claude', tabId: 'tab-1', title: '[Op] docs.author' });
   const session = claudeSessionFile(fx.trustHome, fx.repo, 'aaaaaaaa-1111-4111-8111-aaaaaaaaaaaa.jsonl', `[Op] docs.author — (job ${jobId}, attempt 1)`);
 
@@ -115,7 +126,7 @@ test('settle archives the settled op\'s own claude session file', t => {
   const moved = path.join(fx.archiveRoot, 'claude', path.basename(session));
   assert.equal(fs.existsSync(moved), true, `no archived copy at ${moved}`);
   // The receipt is kept on the job payload with the other settle receipts.
-  const stored = read(fx.repo, (l) => JSON.parse(l.db.prepare('SELECT payload_json FROM jobs WHERE job_id=?').get(jobId)?.payload_json ?? '{}'));
+  const stored = read(fx.ledgerFile, (l) => JSON.parse(l.db.prepare('SELECT payload_json FROM jobs WHERE job_id=?').get(jobId)?.payload_json ?? '{}'));
   assert.equal(stored?.sessionReleased?.released, true);
   assert.equal(stored?.session, undefined, 'observe-time identity is not written by settle');
 });
@@ -124,7 +135,7 @@ test('a session whose worker terminal is still open is skipped with a recorded r
   const fx = fixture(t), wf = 'wf-sess-live', jobId = 'op-sess-live-a1';
   // The handle is nowhere in Orca's state: the fake still answers
   // terminal-show connected — a session with a live terminal is never moved.
-  seedOpJob(fx.repo, { wf, jobId, handle: 'term-live', worktree: fx.repo });
+  seedOpJob(fx.ledgerFile, { wf, jobId, handle: 'term-live', worktree: fx.repo });
   const session = claudeSessionFile(fx.trustHome, fx.repo, 'bbbbbbbb-2222-4222-8222-bbbbbbbbbbbb.jsonl', `(job ${jobId}, attempt 1)`);
 
   const r = runApi(fx.env, 'settle', '--repo', fx.repo, '--job', jobId, '--verdict', 'fail', '--json');
@@ -139,7 +150,7 @@ test('a session whose worker terminal is still open is skipped with a recorded r
 
 test('the kernel\'s own session file in the same project dir is never moved', t => {
   const fx = fixture(t), wf = 'wf-sess-kernel', jobId = 'op-sess-kernel-a1';
-  seedOpJob(fx.repo, { wf, jobId, handle: 'term-sess3', worktree: fx.repo });
+  seedOpJob(fx.ledgerFile, { wf, jobId, handle: 'term-sess3', worktree: fx.repo });
   seedOrcaTerminal(fx.stateFile, { handle: 'term-sess3', connected: true, writable: true, command: 'claude', tabId: 'tab-3', title: '[Op] docs.author' });
   const opSession = claudeSessionFile(fx.trustHome, fx.repo, 'cccccccc-3333-4333-8333-cccccccccccc.jsonl', `(job ${jobId}, attempt 1)`);
   // The live kernel's own session for the same checkout: it carries no op job id.
@@ -155,7 +166,7 @@ test('the kernel\'s own session file in the same project dir is never moved', t 
 
 test('settle succeeds when the op has no session file', t => {
   const fx = fixture(t), wf = 'wf-sess-none', jobId = 'op-sess-none-a1';
-  seedOpJob(fx.repo, { wf, jobId, handle: 'term-sess4', worktree: fx.repo });
+  seedOpJob(fx.ledgerFile, { wf, jobId, handle: 'term-sess4', worktree: fx.repo });
   seedOrcaTerminal(fx.stateFile, { handle: 'term-sess4', connected: true, writable: true, command: 'claude', tabId: 'tab-4' });
 
   const r = runApi(fx.env, 'settle', '--repo', fx.repo, '--job', jobId, '--verdict', 'fail', '--json');
@@ -164,19 +175,19 @@ test('settle succeeds when the op has no session file', t => {
   assert.equal(body?.ok, true);
   assert.equal(body?.sessionReleased?.released, false);
   assert.equal(body?.sessionReleased?.reason, 'no-session-file');
-  const status = read(fx.repo, (l) => l.db.prepare('SELECT status FROM jobs WHERE job_id=?').get(jobId)?.status);
+  const status = read(fx.ledgerFile, (l) => l.db.prepare('SELECT status FROM jobs WHERE job_id=?').get(jobId)?.status);
   assert.equal(status, 'failed');
 });
 
 test('observe records the worker\'s session identity on the job payload', t => {
   const fx = fixture(t), wf = 'wf-sess-observe', jobId = 'op-sess-observe-a1';
-  seedOpJob(fx.repo, { wf, jobId, handle: 'term-sess5', worktree: fx.repo });
+  seedOpJob(fx.ledgerFile, { wf, jobId, handle: 'term-sess5', worktree: fx.repo });
   seedOrcaTerminal(fx.stateFile, { handle: 'term-sess5', connected: true, writable: true, command: 'claude', tabId: 'tab-5', title: '[Op] docs.author' });
   const session = claudeSessionFile(fx.trustHome, fx.repo, 'eeeeeeee-5555-4555-8555-eeeeeeeeeeee.jsonl', `(job ${jobId}, attempt 1)`);
 
   const r = runApi(fx.env, 'observe', '--repo', fx.repo, '--job', jobId, '--json');
   assert.equal(r.status, 0, r.stderr || r.stdout);
-  const stored = read(fx.repo, (l) => JSON.parse(l.db.prepare('SELECT payload_json FROM jobs WHERE job_id=?').get(jobId)?.payload_json ?? '{}'));
+  const stored = read(fx.ledgerFile, (l) => JSON.parse(l.db.prepare('SELECT payload_json FROM jobs WHERE job_id=?').get(jobId)?.payload_json ?? '{}'));
   assert.equal(stored?.session?.agent, 'claude');
   const files = stored?.session?.files ?? [];
   const mine = files.find((f) => f.file === session);

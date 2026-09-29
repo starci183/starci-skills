@@ -4,7 +4,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import {spawnSync} from 'node:child_process';
-import {inspectLedger,ledgerFileFor,openLedger} from '../engine/ledger-db.mjs';
+import {inspectLedger,ledgerFileFor,openLedger,ensureWorkflow,changeWorkflowPhase,insertGoal,setJobStatus} from '../engine/ledger-db.mjs';
 import {BLOCKING_HEADS_UP_MS,blockingJobs,blockingLines,orderQueuedByBlocking} from '../scripts/kernel/waiter-priority.mjs';
 import {workflowProgress,workflowSection} from '../scripts/supervisor/progress-report.mjs';
 // These specs exercise the owner-flow contract; autopilot (scripts/kernel/autopilot.mjs, owner ruling 2026-09-28) is
@@ -26,26 +26,31 @@ const fixture=t=>{
   const root=fs.mkdtempSync(path.join(os.tmpdir(),'starci-waiter-prio-'));
   t.after(()=>fs.rmSync(root,{recursive:true,force:true,maxRetries:20,retryDelay:25}));
   const repo=path.join(root,'repo');fs.mkdirSync(repo,{recursive:true});
-  const env={...process.env};
+  const env={...process.env,STARCI_TEST_MACHINE_FILE:path.join(root,'machine.db')};
   for(const key of ['ORCA_TERMINAL_HANDLE','STARCI_ROLE','STARCI_OP_JOB'])delete env[key];
   const api=args=>spawnSync(process.execPath,[API,...args,'--repo',repo,'--json'],{cwd:ROOT,encoding:'utf8',windowsHide:true,timeout:120000,env});
-  const ledger=openLedger({file:ledgerFileFor(repo)});
+  const ledger=openLedger({file:ledgerFileFor(repo,{env})});
   try{
     const at=Date.now();
-    for(const workflowId of [WAITER,OWNER,THIRD]){
-      ledger.ensureWorkflow({workflowId,title:workflowId,ledgerMode:'durable',sourceRoots:[repo]});
-      ledger.db.prepare("UPDATE workflows SET phase='running' WHERE workflow_id=?").run(workflowId);
-      ledger.db.prepare('INSERT INTO goals(workflow_id,revision,goal_identity,markdown,json,created_at) VALUES(?,?,?,?,?,?)')
-        .run(workflowId,0,`goal-${workflowId}`,'# goal',JSON.stringify({derivedFrom:'waiter-priority-spec'}),at);
-    }
+    ledger.transaction(db=>{
+      for(const workflowId of [WAITER,OWNER,THIRD]){
+        ensureWorkflow(db,{workflowId,phase:'queued',title:workflowId,ledgerMode:'durable',sourceRoots:[repo],by:'test-fixture',reason:'seed',at});
+        insertGoal(db,{workflowId,revision:1,goalIdentity:`goal-${workflowId}`,markdown:'# goal',goal:{derivedFrom:'waiter-priority-spec'},createdAt:at});
+        changeWorkflowPhase(db,{workflowId,to:'running',by:'test-fixture',reason:'seed',at});
+      }
+    });
   }finally{ledger.close();}
-  const read=fn=>{const l=inspectLedger({file:ledgerFileFor(repo)});try{return fn(l.db);}finally{l.close();}};
-  const seed=fn=>{const l=openLedger({file:ledgerFileFor(repo)});try{return fn(l);}finally{l.close();}};
+  const read=fn=>{const l=inspectLedger({file:ledgerFileFor(repo,{env})});try{return fn(l.db);}finally{l.close();}};
+  const seed=fn=>{const l=openLedger({file:ledgerFileFor(repo,{env})});try{return fn(l);}finally{l.close();}};
   const ok=args=>{const r=api(args);assert.equal(r.status,0,`${args.join(' ')}: ${r.stderr||r.stdout}`);return json(r.stdout);};
   const status=wf=>ok(['status','--workflow',wf]);
   const enqueue=(wf,op,paths,extra=[])=>ok(['enqueue','--workflow',wf,'--op',op,'--paths',paths,...extra]).job_id;
   // Age an incident's raise (and so its waiters) by `ms`.
-  const age=(incidentId,ms)=>seed(l=>l.db.prepare("UPDATE events SET created_at=created_at-? WHERE entity_id=? AND kind='incident-raised'").run(ms,incidentId));
+  // events are append-only in the migrated schema (events_append_only trigger): the backdate suspends
+  // the trigger for this one write and restores it verbatim.
+  const age=(incidentId,ms)=>seed(l=>l.db.exec(`DROP TRIGGER events_append_only;
+    UPDATE events SET created_at=created_at-${Number(ms)} WHERE entity_id='${incidentId}' AND kind='incident-raised';
+    CREATE TRIGGER events_append_only BEFORE UPDATE ON events BEGIN SELECT RAISE(ABORT,'events are append-only'); END;`));
   return {repo,api,ok,read,seed,status,enqueue,age};
 };
 
@@ -82,10 +87,14 @@ test('an --until-job wait on a failed job blocks through its retry: the open ret
   const fx=fixture(t);
   const awaited=fx.enqueue(OWNER,'backend.implement','src/b');
   const {incidentId}=fx.ok(['incident','--workflow',WAITER,'--kind','peer-wait','--peer',OWNER,'--op','brand.decide','--until-job',awaited,'--detail','needs the owner module']);
-  fx.seed(l=>l.db.prepare("UPDATE jobs SET status='failed' WHERE job_id=?").run(awaited));
+  fx.seed(l=>l.transaction(db=>{
+    const at=Date.now();
+    // queued→failed is not a job_transitions edge: walk the job to running, then fail it.
+    for(const to of ['ready','leased','running','failed'])setJobStatus(db,{jobId:awaited,to,reason:'seed',at});
+  }));
   const first=fx.enqueue(OWNER,'backend.scaffold','src/a');
   const retry=fx.enqueue(OWNER,'backend.implement','src/b');
-  assert.equal(fx.read(db=>JSON.parse(db.prepare('SELECT payload_json FROM jobs WHERE job_id=?').get(retry).payload_json).retry?.retryOf),awaited);
+  assert.equal(fx.read(db=>db.prepare('SELECT retry_of FROM jobs WHERE job_id=?').get(retry).retry_of),awaited);
   const owner=fx.status(OWNER).frontier;
   assert.deepEqual(owner.queued.map(q=>q.jobId),[retry,first]);
   assert.deepEqual(owner.blockingOthers.map(b=>[b.jobId,b.via.map(v=>v.ref)]),[[retry,[incidentId]]]);
@@ -126,7 +135,10 @@ test('a queued job blocking another workflow past the threshold gets its Kernel 
   const second=fx.ok(['incident','--workflow',THIRD,'--kind','owner-gate','--op','x','--until-job',awaited,'--detail','x']).incidentId;
   fx.age(second,BLOCKING_HEADS_UP_MS+60_000);
   assert.equal(fx.status(OWNER).peerMessages.length,2);
-  fx.seed(l=>l.db.prepare("UPDATE jobs SET status='running' WHERE job_id=?").run(awaited));
+  fx.seed(l=>l.transaction(db=>{
+    const at=Date.now();
+    for(const to of ['ready','leased','running'])setJobStatus(db,{jobId:awaited,to,reason:'seed',at});
+  }));
   const third=fx.ok(['incident','--workflow',WAITER,'--kind','owner-gate','--op','y','--until-job',awaited,'--detail','y']).incidentId;
   fx.age(third,BLOCKING_HEADS_UP_MS+60_000);
   assert.equal(fx.status(OWNER).peerMessages.length,2);

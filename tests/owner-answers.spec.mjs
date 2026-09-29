@@ -4,7 +4,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import {spawnSync} from 'node:child_process';
-import {inspectLedger,ledgerFileFor,openLedger} from '../engine/ledger-db.mjs';
+import {inspectLedger,ledgerFileFor,openLedger,ensureWorkflow,changeWorkflowPhase,insertGoal,createUnit,enqueueJob,setJobStatus,startAttempt,writeContract,fileReport,markReportConsumed,recordJobResult,appendEvent} from '../engine/ledger-db.mjs';
 import {lineageJobsOf,ownerAnswersOf,repeatedAnswerOf} from '../scripts/kernel/owner-answers.mjs';
 
 // starci-next wf-starci-next-work-and-stacks-mud4qamv: ordinal 1 of business.decide asked the owner
@@ -36,10 +36,12 @@ const fixture=t=>{
   return {root,repo,seed,read};
 };
 const seedGoal=(fx,wf)=>fx.seed(l=>{
-  l.ensureWorkflow({workflowId:wf,title:'owner answers'});
-  l.db.prepare("UPDATE workflows SET phase='running' WHERE workflow_id=?").run(wf);
-  l.db.prepare('INSERT INTO goals(workflow_id,revision,goal_identity,markdown,json,created_at) VALUES(?,?,?,?,?,?)')
-    .run(wf,0,'owner-answers-goal','# goal',json({derivedFrom:'owner-answers-test'}),Date.now());
+  const at=Date.now();
+  l.transaction(db=>{
+    ensureWorkflow(db,{workflowId:wf,phase:'queued',title:'owner answers',by:'test-fixture',reason:'seed',at});
+    insertGoal(db,{workflowId:wf,revision:1,goalIdentity:'owner-answers-goal',markdown:'# goal',goal:{derivedFrom:'owner-answers-test'},createdAt:at});
+    changeWorkflowPhase(db,{workflowId:wf,to:'running',by:'test-fixture',reason:'seed',at});
+  });
 });
 const enqueue=(fx,wf,cut=CUT)=>{
   const r=runApi('enqueue','--repo',fx.repo,'--workflow',wf,'--op',OP,'--paths',`docs/biz-${cut.ordinal}`,
@@ -56,13 +58,24 @@ const answeredAsk=(fx,wf,jobId,{dispatchId='ctx_3074731253e3',question=QUESTION,
   fs.writeFileSync(receiptPath,json({schema:'starci/ask-answer@1',workflowId:wf,dispatchId,opId:OP,option:question.options[optionIndex],
     optionIndex,picks:null,answeredBy,note:'auto-accepted by config.yaml asks.autoAcceptRecommended',at:'2026-09-24T01:02:03.000Z'}));
   fx.seed(l=>{
-    const {attempt}=l.db.prepare('SELECT attempt FROM jobs WHERE job_id=?').get(jobId);
-    l.db.prepare("UPDATE jobs SET status='failed',result_json=? WHERE job_id=?").run(json({verdict:'awaiting-owner',kernelVerdict:'blocked',askDispatchId:dispatchId}),jobId);
     const at=Date.now();
-    l.db.prepare(`INSERT INTO reports(workflow_id,dispatch_id,op_id,attempt,generation,outcome,report_json,consumed_at,created_at) VALUES(?,?,?,?,0,'ask',?,?,?)`)
-      .run(wf,dispatchId,OP,attempt,json({outcome:'ask',summary:'owner decision needed',from:jobId,dispatch:dispatchId,question}),at,at);
-    l.appendEvent({workflowId:wf,entityType:'report',entityId:dispatchId,kind:'ask-answered',
-      payload:{dispatchId,receiptPath,answeredBy,optionIndex,option:question.options[optionIndex],note:'auto-accepted'}});
+    l.transaction(db=>{
+      // The ask attempt the settle recorded: leased → dispatched → running, ask report filed and
+      // consumed, then reported → deciding → failed with the awaiting-owner result on the attempt.
+      setJobStatus(db,{jobId,to:'ready',reason:'dispatch',at});
+      setJobStatus(db,{jobId,to:'leased',reason:'dispatch',at});
+      const attempt=startAttempt(db,{workflowId:wf,jobId,dispatchId,dispatchedAt:at,startedAt:at,at});
+      setJobStatus(db,{jobId,to:'running',reason:'worker live',at});
+      fileReport(db,{attemptId:attempt.attempt_id,outcome:'ask',
+        report:{outcome:'ask',summary:'owner decision needed',from:jobId,dispatch:dispatchId,question},createdAt:at});
+      markReportConsumed(db,{attemptId:attempt.attempt_id,at});
+      setJobStatus(db,{jobId,to:'reported',reason:'report filed',at});
+      setJobStatus(db,{jobId,to:'deciding',reason:'settle',at});
+      setJobStatus(db,{jobId,to:'failed',reason:'awaiting owner',at});
+      recordJobResult(db,{jobId,result:{verdict:'awaiting-owner',kernelVerdict:'blocked',askDispatchId:dispatchId},at});
+      appendEvent(db,{workflowId:wf,entityType:'report',entityId:dispatchId,kind:'ask-answered',
+        payload:{dispatchId,receiptPath,answeredBy,optionIndex,option:question.options[optionIndex],note:'auto-accepted'},createdAt:at});
+    });
   });
   return receiptPath;
 };
@@ -77,16 +90,26 @@ test('ownerAnswersOf: an owner-answer retry carries the answered ask of its line
   answeredAsk(fx,wf,sibling,{dispatchId:'ctx_sibling',question:{text:'Sibling slice question?',options:['a','b']}});
   const retry=enqueue(fx,wf);
   const retryRow=jobOf(fx,retry);
-  assert.equal(JSON.parse(retryRow.payload_json).retry.retryClass,'owner-answer');
+  // The retry is the next try of the SAME work unit (H4): jobs.retry_of names the ask try and the
+  // owner-answer settle result maps to a free 'follow-up' retry class (engine/admission.mjs).
+  assert.equal(retryRow.retry_of,ask);
+  assert.equal(retryRow.retry_class,'follow-up');
   fx.read(db=>{
     assert.deepEqual(lineageJobsOf(db,retryRow).map(r=>r.job_id),[ask]);
     assert.deepEqual(ownerAnswersOf(db,retryRow),[{
-      dispatchId:'ctx_3074731253e3',jobId:ask,attempt:jobOf(fx,ask).attempt,question:QUESTION.text,options:QUESTION.options,
+      dispatchId:'ctx_3074731253e3',jobId:ask,attempt:jobOf(fx,ask).try_no,question:QUESTION.text,options:QUESTION.options,
       chosen:{index:0,label:QUESTION.options[0]},note:'auto-accepted',answeredBy:'auto-recommended',answeredAt:'2026-09-24T01:02:03.000Z',receipt}]);
     assert.deepEqual(ownerAnswersOf(db,jobOf(fx,sibling)),[],'a first attempt has no lineage');
   });
   // A second retry (a business retry of the owner-answer retry) still carries the lineage's answer.
-  fx.seed(l=>l.db.prepare("UPDATE jobs SET status='failed',result_json=? WHERE job_id=?").run(json({verdict:'fail'}),retry));
+  fx.seed(l=>l.transaction(db=>{
+    const at=Date.now();
+    setJobStatus(db,{jobId:retry,to:'ready',reason:'dispatch',at});
+    setJobStatus(db,{jobId:retry,to:'leased',reason:'dispatch',at});
+    setJobStatus(db,{jobId:retry,to:'running',reason:'worker live',at});
+    setJobStatus(db,{jobId:retry,to:'failed',reason:'business fail',at});
+    recordJobResult(db,{jobId:retry,result:{verdict:'fail'},at});
+  }));
   const again=enqueue(fx,wf);
   fx.read(db=>assert.deepEqual(ownerAnswersOf(db,jobOf(fx,again)).map(a=>a.dispatchId),['ctx_3074731253e3']));
 });
@@ -132,14 +155,19 @@ test('api report refuses an ask that repeats an answered ask of the lineage, and
   const ask=enqueue(fx,wf);
   answeredAsk(fx,wf,ask);
   const retry=enqueue(fx,wf);
-  // Bind the retry the way dispatch does: a contract row for its attempt and a running job.
-  fx.seed(l=>{
-    const row=l.db.prepare('SELECT * FROM jobs WHERE job_id=?').get(retry);
-    l.db.prepare('INSERT INTO contracts(workflow_id,op_id,attempt,dispatch_id,markdown,context_json,created_at) VALUES(?,?,?,?,?,?,?)')
-      .run(wf,OP,row.attempt,'ctx_cc73a111de44','# contract',json({}),Date.now());
-    l.db.prepare("UPDATE jobs SET status='running',worker_id='term_retry' WHERE job_id=?").run(retry);
-  });
-  const file=path.join(fx.root,'report.json');
+  // Bind the retry the way dispatch does: an op_attempts row with its scratch dir, a contract row
+  // bound to that attempt, and the job running (H10: api report reads only the attempt's scratch).
+  const scratch=fs.mkdtempSync(path.join(os.tmpdir(),'starci-owner-answers-scratch-'));
+  fx.seed(l=>l.transaction(db=>{
+    const at=Date.now();
+    setJobStatus(db,{jobId:retry,to:'ready',reason:'dispatch',at});
+    setJobStatus(db,{jobId:retry,to:'leased',reason:'dispatch',at});
+    const attempt=startAttempt(db,{workflowId:wf,jobId:retry,dispatchId:'ctx_cc73a111de44',
+      terminalHandle:'term_retry',scratchDir:scratch,dispatchedAt:at,startedAt:at,at});
+    writeContract(db,{attemptId:attempt.attempt_id,markdown:'# contract',context:{},createdAt:at});
+    setJobStatus(db,{jobId:retry,to:'running',reason:'worker live',at,workerId:'term_retry'});
+  }));
+  const file=path.join(scratch,'report.json');
   const file_=(question)=>{fs.writeFileSync(file,json({outcome:'ask',summary:'owner decision needed',question}));return file;};
 
   const refused=runApi('report','--repo',fx.repo,'--job',retry,'--report',file_(QUESTION),'--json');
@@ -172,13 +200,17 @@ test('api report still files a genuinely new ask on an owner-answer retry',t=>{
   const ask=enqueue(fx,wf);
   answeredAsk(fx,wf,ask);
   const retry=enqueue(fx,wf);
-  fx.seed(l=>{
-    const row=l.db.prepare('SELECT * FROM jobs WHERE job_id=?').get(retry);
-    l.db.prepare('INSERT INTO contracts(workflow_id,op_id,attempt,dispatch_id,markdown,context_json,created_at) VALUES(?,?,?,?,?,?,?)')
-      .run(wf,OP,row.attempt,'ctx_new','# contract',json({}),Date.now());
-    l.db.prepare("UPDATE jobs SET status='running',worker_id='term_new' WHERE job_id=?").run(retry);
-  });
-  const file=path.join(fx.root,'report.json');
+  const scratch=fs.mkdtempSync(path.join(os.tmpdir(),'starci-owner-answers-scratch-'));
+  fx.seed(l=>l.transaction(db=>{
+    const at=Date.now();
+    setJobStatus(db,{jobId:retry,to:'ready',reason:'dispatch',at});
+    setJobStatus(db,{jobId:retry,to:'leased',reason:'dispatch',at});
+    const attempt=startAttempt(db,{workflowId:wf,jobId:retry,dispatchId:'ctx_new',
+      terminalHandle:'term_new',scratchDir:scratch,dispatchedAt:at,startedAt:at,at});
+    writeContract(db,{attemptId:attempt.attempt_id,markdown:'# contract',context:{},createdAt:at});
+    setJobStatus(db,{jobId:retry,to:'running',reason:'worker live',at,workerId:'term_new'});
+  }));
+  const file=path.join(scratch,'report.json');
   fs.writeFileSync(file,json({outcome:'ask',summary:'a follow-up the answer left open',question:{text:'Does a lesson completed offline count on the day it syncs?',options:['yes','no']}}));
   const filed=runApi('report','--repo',fx.repo,'--job',retry,'--report',file,'--json');
   assert.equal(filed.status,0,filed.stderr);
@@ -189,17 +221,33 @@ test('api report still files a genuinely new ask on an owner-answer retry',t=>{
 test('ownerAnswersOf keeps to the job\'s own params.subject: another subject\'s answered ask is not its answer',t=>{
   const fx=fixture(t),wf='wf-owner-answers-subject';
   seedGoal(fx,wf);
-  fx.seed(l=>{
-    const ins=(jobId,attempt,payload)=>l.db.prepare(`INSERT INTO jobs(job_id,workflow_id,op_id,attempt,generation,kind,role,payload_json,status,result_json,created_at,updated_at)
-      VALUES(?,?,?,?,0,'op','op',?,'failed',?,1,1)`).run(jobId,wf,'provision.ask',attempt,json(payload),json({verdict:'awaiting-owner'}));
-    ins('job-tax',1,{params:{subject:'tax'}});
-    l.db.prepare(`INSERT INTO reports(workflow_id,dispatch_id,op_id,attempt,generation,outcome,report_json,created_at) VALUES(?,?,?,?,0,'ask',?,1)`)
-      .run(wf,'ctx_tax','provision.ask',1,json({from:'job-tax',question:{text:'Which tax regime?',options:['VAT','none']}}));
-    l.appendEvent({workflowId:wf,entityType:'report',entityId:'ctx_tax',kind:'ask-answered',payload:{dispatchId:'ctx_tax',optionIndex:0,answeredBy:'owner'}});
-  });
-  const retryOf=(subject)=>({job_id:`job-${subject}-2`,workflow_id:wf,payload_json:json({params:{subject},retry:{retryOf:'job-tax'}})});
+  // params.subject is the unit subject key (admission.unitSubjectKey): the tax ask lives on unit-tax
+  // as try 1, the chatbot unit never asked. A job is bound to its answers by jobs.unit_id, never by
+  // a retry_of spelled across units.
+  fx.seed(l=>l.transaction(db=>{
+    const at=Date.now();
+    createUnit(db,{workflowId:wf,unitId:'unit-tax',opId:'provision.ask',subjectKey:'subject:tax',goalRevision:1,createdAt:at});
+    createUnit(db,{workflowId:wf,unitId:'unit-chatbot',opId:'provision.ask',subjectKey:'subject:chatbot',goalRevision:1,createdAt:at});
+    enqueueJob(db,{jobId:'job-tax',workflowId:wf,unitId:'unit-tax',opId:'provision.ask',kind:'op',role:'op',
+      payload:{opId:'provision.ask',params:{subject:'tax'}},createdAt:at});
+    setJobStatus(db,{jobId:'job-tax',to:'ready',reason:'dispatch',at});
+    setJobStatus(db,{jobId:'job-tax',to:'leased',reason:'dispatch',at});
+    const attempt=startAttempt(db,{workflowId:wf,jobId:'job-tax',dispatchId:'ctx_tax',dispatchedAt:at,startedAt:at,at});
+    setJobStatus(db,{jobId:'job-tax',to:'running',reason:'worker live',at});
+    fileReport(db,{attemptId:attempt.attempt_id,outcome:'ask',
+      report:{outcome:'ask',summary:'tax decision needed',from:'job-tax',dispatch:'ctx_tax',question:{text:'Which tax regime?',options:['VAT','none']}},createdAt:at});
+    markReportConsumed(db,{attemptId:attempt.attempt_id,at});
+    setJobStatus(db,{jobId:'job-tax',to:'reported',reason:'report filed',at});
+    setJobStatus(db,{jobId:'job-tax',to:'deciding',reason:'settle',at});
+    setJobStatus(db,{jobId:'job-tax',to:'failed',reason:'awaiting owner',at});
+    recordJobResult(db,{jobId:'job-tax',result:{verdict:'awaiting-owner'},at});
+    appendEvent(db,{workflowId:wf,entityType:'report',entityId:'ctx_tax',kind:'ask-answered',
+      payload:{dispatchId:'ctx_tax',optionIndex:0,answeredBy:'owner'},createdAt:at});
+  }));
+  const retryOf=(subject)=>({job_id:`job-${subject}-2`,workflow_id:wf,unit_id:`unit-${subject}`,
+    payload_json:json({params:{subject},retry:{retryOf:'job-tax'}})});
   fx.read(db=>{
     assert.deepEqual(ownerAnswersOf(db,retryOf('tax')).map(a=>[a.dispatchId,a.chosen]),[['ctx_tax',{index:0,label:'VAT'}]]);
-    assert.deepEqual(ownerAnswersOf(db,retryOf('chatbot')),[],'the op\'s latest attempt was about tax, not the chatbot');
+    assert.deepEqual(ownerAnswersOf(db,retryOf('chatbot')),[],'the chatbot unit\'s earlier tries never asked about tax');
   });
 });

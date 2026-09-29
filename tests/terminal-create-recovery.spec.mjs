@@ -5,7 +5,7 @@ import os from 'node:os';
 import path from 'node:path';
 import {spawnSync} from 'node:child_process';
 import {FAKE_ORCA} from './helpers/fake-orca.mjs';
-import {openLedger,inspectLedger,ledgerFileFor} from '../engine/ledger-db.mjs';
+import {openLedger,inspectLedger,ledgerFileFor,ensureWorkflow,changeWorkflowPhase,insertGoal,createUnit,enqueueJob,setJobStatus} from '../engine/ledger-db.mjs';
 import {buildSpawnCommand} from '../scripts/agent/lib.mjs';
 import {stagedInputRow,gateRemedy} from '../scripts/kernel/terminal-liveness.mjs';
 
@@ -67,25 +67,38 @@ const opFixture=(t,extra={})=>{
   const repo=path.join(root,'repo');fs.mkdirSync(repo,{recursive:true});
   const stub=path.join(root,'fake-orca.mjs');fs.writeFileSync(stub,FAKE_ORCA);
   const env={...process.env,STARCI_ORCA_COMMAND:process.execPath,STARCI_ORCA_ARGS:JSON.stringify([stub]),
-    STARCI_FAKE_ORCA_LOG:path.join(root,'calls.jsonl'),STARCI_FAKE_ORCA_STATE:path.join(root,'state.json'),...extra};
+    STARCI_FAKE_ORCA_LOG:path.join(root,'calls.jsonl'),STARCI_FAKE_ORCA_STATE:path.join(root,'state.json'),
+    STARCI_TEST_MACHINE_FILE:path.join(root,'machine.db'),  // every fixture registers a repo named 'repo'
+    ...extra};
   const run=(...args)=>spawnSync(process.execPath,[API,...args],{cwd:ROOT,encoding:'utf8',windowsHide:true,timeout:120000,env});
   const orcaState=()=>json(fs.readFileSync(path.join(root,'state.json'),'utf8'))??{};
   const workflowId='wf-create-recovery',jobId='job-create-recovery';
-  const ledger=openLedger({file:ledgerFileFor(repo)});
+  const ledger=openLedger({file:ledgerFileFor(repo,{env})});
   try{
-    ledger.enqueueJob({jobId:`kernel-${workflowId}`,workflowId,kind:'kernel',role:'kernel',
-      payload:{hierarchy:{schema:'starci/agent-hierarchy@1',nodeId:`agent:kernel:${workflowId}`,parentNodeId:`workflow:${workflowId}`,role:'kernel'}}});
-    ledger.db.prepare("UPDATE jobs SET status='running',worker_id='fake-kernel-terminal' WHERE job_id=?").run(`kernel-${workflowId}`);
-    ledger.enqueueJob({jobId,workflowId,opId:'code.refactor',kind:'op',payload:{opId:'code.refactor',owned_paths:['docs/'],model:'codex-agent',difficulty:'hard'}});
+    const at=Date.now();
+    ledger.transaction(db=>{
+      ensureWorkflow(db,{workflowId,phase:'queued',title:'create-recovery',by:'test-fixture',reason:'seed',at});
+      insertGoal(db,{workflowId,revision:1,goalIdentity:`goal-${workflowId}`,markdown:'# goal',goal:{},createdAt:at});
+      changeWorkflowPhase(db,{workflowId,to:'running',by:'test-fixture',reason:'seed',at});
+      enqueueJob(db,{jobId:`kernel-${workflowId}`,workflowId,kind:'kernel',role:'kernel',createdAt:at,
+        payload:{hierarchy:{schema:'starci/agent-hierarchy@1',nodeId:`agent:kernel:${workflowId}`,parentNodeId:`workflow:${workflowId}`,role:'kernel'}}});
+      setJobStatus(db,{jobId:`kernel-${workflowId}`,to:'ready',reason:'seed',at});
+      setJobStatus(db,{jobId:`kernel-${workflowId}`,to:'leased',reason:'seed',at});
+      setJobStatus(db,{jobId:`kernel-${workflowId}`,to:'running',reason:'seed',at,workerId:'fake-kernel-terminal'});
+      const unitId=`unit-${jobId}`;
+      createUnit(db,{workflowId,unitId,opId:'code.refactor',subjectKey:unitId,goalRevision:1,createdAt:at});
+      enqueueJob(db,{jobId,workflowId,unitId,opId:'code.refactor',kind:'op',createdAt:at,
+        payload:{opId:'code.refactor',owned_paths:['docs/'],model:'codex-agent',difficulty:'hard'}});
+    });
   }finally{ledger.close();}
   const dispatch=()=>run('dispatch','--repo',repo,'--job',jobId,'--model','codex-agent','--spawn','--json');
   const events=kind=>{
-    const l=inspectLedger({file:ledgerFileFor(repo)});
+    const l=inspectLedger({file:ledgerFileFor(repo,{env})});
     try{return l.db.prepare('SELECT payload_json FROM events WHERE entity_id=? AND kind=? ORDER BY seq').all(jobId,kind).map(r=>json(r.payload_json));}
     finally{l.close();}
   };
   const job=()=>{
-    const l=inspectLedger({file:ledgerFileFor(repo)});
+    const l=inspectLedger({file:ledgerFileFor(repo,{env})});
     try{return l.db.prepare('SELECT status,worker_id FROM jobs WHERE job_id=?').get(jobId);}finally{l.close();}
   };
   const live=()=>Object.values(orcaState().terminals??{}).filter(term=>!term.closed).map(term=>term.handle);
@@ -115,7 +128,7 @@ test('create-timeout-then-close: a dead terminal the create made is closed and t
   assert.equal(rejected.createRecovery?.action,'closed');
   assert.deepEqual(rejected.createRecovery.closed,[{handle:'fake-terminal-1',ok:true}]);
   assert.equal(rejected.effectState,'none');
-  assert.equal(fx.job()?.status,'queued','the attempt is not consumed');
+  assert.equal(fx.job()?.status,'ready','the attempt is not consumed');
   assert.deepEqual(fx.live(),[],'no untracked terminal is left behind');
 });
 
@@ -154,7 +167,7 @@ test('stuck-paste-then-reject: a paste that survives the Enter is refused and it
   assert.equal(rejected.terminalClosed,true);
   assert.equal(fx.orcaState().terminals['fake-terminal-1'].enters,1,'Enter is sent once, never hammered');
   assert.deepEqual(fx.live(),[]);
-  assert.equal(fx.job()?.status,'queued');
+  assert.equal(fx.job()?.status,'ready');
 });
 
 /* ------------------------------------------------------------ kernel boot */
@@ -170,14 +183,14 @@ const kernelFixture=(t,kernelLine,extra={})=>{
   fs.writeFileSync(fake,FAKE_ORCA);
   const env={...process.env,STARCI_ORCA_COMMAND:process.execPath,STARCI_ORCA_ARGS:JSON.stringify([fake]),
     STARCI_FAKE_ORCA_STATE:state,STARCI_FAKE_ORCA_LOG:path.join(root,'calls.jsonl'),STARCI_FAKE_ORCA_UNIQUE_TERMINALS:'1',
-    STARCI_OWNER_ROOT:ownerRoot,...extra};
+    STARCI_OWNER_ROOT:ownerRoot,STARCI_TEST_MACHINE_FILE:path.join(root,'machine.db'),...extra};
   const run=(script,args)=>spawnSync(process.execPath,[script,...args],{cwd:ROOT,encoding:'utf8',windowsHide:true,timeout:120000,env});
   const defined=run(DEFINE_GOAL,['--repo',repo,'--text','boot the kernel','--json']);
   assert.equal(defined.status,0,defined.stderr);
   const workflowId=json(defined.stdout)?.workflowId;
   const boot=()=>{const r=run(START_WORKFLOW,['--repo',repo,'--goal',workflowId,'--json']);return {r,body:json(r.stdout)};};
   const events=()=>{
-    const l=inspectLedger({file:ledgerFileFor(repo)});
+    const l=inspectLedger({file:ledgerFileFor(repo,{env})});
     try{return l.db.prepare("SELECT kind,payload_json FROM events WHERE workflow_id=? AND kind LIKE 'kernel-%' ORDER BY seq").all(workflowId)
       .map(row=>({kind:row.kind,payload:json(row.payload_json)}));}finally{l.close();}
   };

@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { withLedger, seedWorkflow } from './_ledger-fixture.mjs';
+import { createUnit, enqueueJob, setJobStatus, startAttempt, fileReport, changeWorkflowPhase } from '../engine/ledger-db.mjs';
 import controller, { reconcileWorkflow, listWorkflows, planWorkflow, workflowSettings, keyOf } from '../scripts/reconciler/controllers/workflow.mjs';
 import { slaPass, clocksOf } from '../scripts/reconciler/sla.mjs';
 import { TEST_REGISTRY_ENV } from '../engine/machine-db.mjs';
@@ -29,9 +30,8 @@ function seed(ledger, { goal = GOAL, progressAgoMin = 120 } = {}) {
     ],
     jobs: HELD.map((jobId) => ({ jobId, opId: 'interface.implement', status: 'queued', createdAt: NOW - 180 * MIN, updatedAt: NOW - 180 * MIN })) });
   seedWorkflow(ledger, { id: PEER, now: NOW - 600 * MIN, goal: GOAL, events: [{ kind: 'op-settled', payload: {}, created_at: NOW - 5 * MIN }] });
-  ledger.db.prepare("UPDATE workflows SET phase='running'").run();
-  ledger.db.prepare('INSERT INTO incidents(incident_id,workflow_id,op_id,last_progress,status,updated_at) VALUES(?,?,?,?,?,?)')
-    .run('inc-48bc556d89a6', WF, 'interface.implement', `[owner-gate] ${GATE_TEXT}`, 'open', NOW - 180 * MIN);
+  ledger.db.prepare('INSERT INTO incidents(incident_id,workflow_id,op_id,kind,owner,last_progress,status,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?)')
+    .run('inc-48bc556d89a6', WF, 'interface.implement', 'owner-ask', 'owner', `[owner-gate] ${GATE_TEXT}`, 'open', NOW - 180 * MIN, NOW - 180 * MIN);
 }
 const writeShell = (repoRoot) => {
   const file = path.join(repoRoot, '.starciwork', 'shell', 'index.yaml');
@@ -125,8 +125,19 @@ test('a running workflow with a null goal text gets a critical GOAL_TEXT_MISSING
 test('asks: dead / stale / unserved are re-parked through api serve-ask (a would-row in shadow); on-demand is untouched', (t) => withLedger(t, async ({ repoRoot, ledger, ledgerFile }) => {
   seed(ledger, { progressAgoMin: 5 });
   const addAsk = (dispatchId, notified) => {
-    ledger.db.prepare('INSERT INTO reports(workflow_id,dispatch_id,op_id,attempt,generation,outcome,report_json,created_at) VALUES(?,?,?,?,?,?,?,?)')
-      .run(WF, dispatchId, 'interface.scaffold', 1, 1, 'ask', '{}', NOW - 60 * MIN);
+    // An open ask is a filed ask report on an attempt (poll.mjs openAsks): one job, one dispatch.
+    const at = NOW - 60 * MIN, jobId = `job-ask-${dispatchId}`, unitId = `unit-${jobId}`;
+    ledger.transaction((db) => {
+      createUnit(db, { workflowId: WF, unitId, opId: 'interface.scaffold', subjectKey: unitId, goalRevision: 1, createdAt: at });
+      enqueueJob(db, { jobId, workflowId: WF, unitId, opId: 'interface.scaffold', kind: 'op', role: 'op',
+        payload: { opId: 'interface.scaffold' }, createdAt: at });
+      setJobStatus(db, { jobId, to: 'ready', reason: 'dispatch', at });
+      setJobStatus(db, { jobId, to: 'leased', reason: 'dispatch', at });
+      const attempt = startAttempt(db, { workflowId: WF, jobId, dispatchId, dispatchedAt: at, startedAt: at, at });
+      setJobStatus(db, { jobId, to: 'running', reason: 'worker live', at });
+      fileReport(db, { attemptId: attempt.attempt_id, outcome: 'ask',
+        report: { outcome: 'ask', summary: 'owner decision needed', from: jobId, dispatch: dispatchId }, createdAt: at });
+    });
     if (notified) ledger.appendEvent({ workflowId: WF, entityType: 'workflow', entityId: WF, kind: 'ask-notified', payload: { dispatchId }, createdAt: NOW - 59 * MIN });
   };
   addAsk('ctx_unserved00001', false);
@@ -151,7 +162,7 @@ test('finish-ready (every job settled, handover approved) is api finish; an ende
     clocks: [{ entity: `workflow:${LEDGER}:${WF}`, state: 'REV_ACK_OVERDUE', enteredAt: NOW - workflowSettings().revAckMs - 1 }] });
   assert.deepEqual(overdue.decisions.filter((d) => d.kind === 'rev-ack').map((d) => d.idempotencyKey), [`rev-ack:${WF}:runtime-rev`], 'overdue: one DI per workflow, whatever the rev');
 
-  ledger.db.prepare("UPDATE workflows SET phase='finished' WHERE workflow_id=?").run(WF);
+  ledger.transaction((db) => changeWorkflowPhase(db, { workflowId: WF, to: 'finished', by: 'kernel', reason: 'all settled', at: NOW }));
   const r = await reconcileWorkflow(key, ctx);
   assert.equal(r.ended, 'finished');
   assert.equal(clocksOf(ctx, { prefixes: [`workflow:${LEDGER}:${WF}`] }).length, 0, 'every clock of the ended workflow is cleared');

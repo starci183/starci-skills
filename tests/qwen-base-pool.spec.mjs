@@ -15,7 +15,9 @@ import path from 'node:path';
 import { spawn } from 'node:child_process';
 import { parseYaml, stringifyYaml } from '../engine/yaml.mjs';
 import { configuredAllocationPolicy, validateConfig } from '../engine/config.mjs';
-import { openLedger, inspectLedger, ledgerFileFor } from '../engine/ledger-db.mjs';
+import { openLedger, inspectLedger, ledgerFileFor, ensureWorkflow, changeWorkflowPhase, insertGoal, createUnit, enqueueJob, setJobStatus, updateJob } from '../engine/ledger-db.mjs';
+import { openMachine } from '../engine/machine-db.mjs';
+import { readProviderCircuit, writeProviderCircuit } from '../scripts/kernel/provider-circuit.mjs';
 import { selectPool, kindRoute, providerCircuitOf } from '../scripts/agent/models.mjs';
 import { quotaSpecOf, quotaExhaustedInText, outageOnScreen, quotaProbeProviders } from '../scripts/agent/provider-outage.mjs';
 import { probeProviderQuota, orcaAccountQuota } from '../scripts/agent/credential-probe.mjs';
@@ -224,24 +226,42 @@ const fixture = (t, { mode = 'healthy' } = {}) => {
   const env = { ...process.env, STARCI_ORCA_COMMAND: process.execPath, STARCI_ORCA_ARGS: JSON.stringify([stub]),
     STARCI_FAKE_ORCA_LOG: path.join(root, 'calls.jsonl'), STARCI_FAKE_ORCA_STATE: stateFile, STARCI_FAKE_ORCA_MODE: mode,
     STARCI_OWNER_ROOT: ownerRoot(t), LOCALAPPDATA: path.join(root, 'localappdata'), BAILIAN_TOKEN_PLAN_API_KEY: 'presence-only' };
+  // The fleet registry + project dir of this fixture only: ledgers resolve through STARCI_TEST_MACHINE_FILE
+  // and the provider-health circuit lives in that machine.sqlite's provider_health (DBTREE §4.5 B4).
+  const machineFile = path.join(root, 'machine.db');
+  env.STARCI_TEST_MACHINE_FILE = machineFile;
   for (const key of ['ORCA_TERMINAL_HANDLE', 'STARCI_ROLE', 'STARCI_OP_JOB']) delete env[key];
   const workflowId = 'wf-qwen-base';
-  const ledger = openLedger({ file: ledgerFileFor(repo) });
+  const ledger = openLedger({ file: ledgerFileFor(repo, { env }) });
   try {
-    ledger.enqueueJob({ jobId: `kernel-${workflowId}`, workflowId, kind: 'kernel', role: 'kernel',
-      payload: { hierarchy: { schema: 'starci/agent-hierarchy@1', nodeId: `agent:kernel:${workflowId}`, parentNodeId: `workflow:${workflowId}`, role: 'kernel' } } });
-    ledger.db.prepare("UPDATE jobs SET status='running',worker_id='fake-kernel-terminal' WHERE job_id=?").run(`kernel-${workflowId}`);
-    ledger.enqueueJob({ jobId: 'job-qwen-a', workflowId, opId: 'code.refactor', kind: 'op', payload: { opId: 'code.refactor', owned_paths: ['docs/a/'], difficulty: 'medium' } });
-    ledger.enqueueJob({ jobId: 'job-qwen-b', workflowId, opId: 'code.refactor', kind: 'op', payload: { opId: 'code.refactor', owned_paths: ['docs/b/'], difficulty: 'medium' } });
+    const at = Date.now();
+    ledger.transaction((db) => {
+      ensureWorkflow(db, { workflowId, phase: 'queued', title: 'qwen-base', by: 'test-fixture', reason: 'seed', at });
+      insertGoal(db, { workflowId, revision: 1, goalIdentity: `goal-${workflowId}`, markdown: '# goal', goal: {}, createdAt: at });
+      changeWorkflowPhase(db, { workflowId, to: 'running', by: 'test-fixture', reason: 'seed', at });
+      enqueueJob(db, { jobId: `kernel-${workflowId}`, workflowId, kind: 'kernel', role: 'kernel', createdAt: at,
+        payload: { hierarchy: { schema: 'starci/agent-hierarchy@1', nodeId: `agent:kernel:${workflowId}`, parentNodeId: `workflow:${workflowId}`, role: 'kernel' } } });
+      setJobStatus(db, { jobId: `kernel-${workflowId}`, to: 'ready', reason: 'seed', at });
+      setJobStatus(db, { jobId: `kernel-${workflowId}`, to: 'leased', reason: 'seed', at });
+      setJobStatus(db, { jobId: `kernel-${workflowId}`, to: 'running', reason: 'seed', at, workerId: 'fake-kernel-terminal' });
+      // One unit per job: distinct owned paths are distinct subject keys (admission.unitSubjectKey).
+      for (const suffix of ['a', 'b']) {
+        const unitId = `unit-qwen-${suffix}`;
+        createUnit(db, { workflowId, unitId, opId: 'code.refactor', subjectKey: unitId, goalRevision: 1, createdAt: at });
+        enqueueJob(db, { jobId: `job-qwen-${suffix}`, workflowId, unitId, opId: 'code.refactor', kind: 'op', createdAt: at,
+          payload: { opId: 'code.refactor', owned_paths: [`docs/${suffix}/`], difficulty: 'medium' } });
+      }
+    });
   } finally { ledger.close(); }
   const orcaState = () => json(fs.readFileSync(stateFile, 'utf8')) ?? {};
   const writeState = (fn) => { const s = orcaState(); fn(s); fs.writeFileSync(stateFile, JSON.stringify(s)); };
-  const db = (fn) => { const l = inspectLedger({ file: ledgerFileFor(repo) }); try { return fn(l.db); } finally { l.close(); } };
-  const row = () => db((d) => {
-    const r = d.prepare("SELECT value_json,expires_at FROM signals WHERE scope='provider-health' AND key='qwen'").get();
-    return r ? { ...json(r.value_json), expiresAt: r.expires_at } : null;
-  });
-  return { repo, env, workflowId, orcaState, writeState, db, row, run: (...args) => runApi(env, ...args) };
+  const db = (fn) => { const l = inspectLedger({ file: ledgerFileFor(repo, { env }) }); try { return fn(l.db); } finally { l.close(); } };
+  const machine = (fn) => { const m = openMachine({ file: machineFile }); try { return fn(m); } finally { m.close(); } };
+  const row = () => {
+    const c = machine((m) => readProviderCircuit('qwen', { machine: m }));
+    return c ? { ...c.value, expiresAt: c.expiresAt } : null;
+  };
+  return { repo, env, workflowId, orcaState, writeState, db, row, machine, run: (...args) => runApi(env, ...args) };
 };
 
 test('a dispatch refused on a quota screen opens the qwen quota circuit until the plan reset, and route skips Qwen', async (t) => {
@@ -254,7 +274,7 @@ test('a dispatch refused on a quota screen opens the qwen quota circuit until th
   assert.equal(circuit.resetAt, Date.parse(RESET));
   assert.equal(circuit.expiresAt, Date.parse(RESET) + 3600000, 'held until the plan reset plus one probe interval');
   assert.match(circuit.recover, /provider-health --provider qwen --quota-probe/);
-  assert.equal(fx.db((x) => x.prepare("SELECT status FROM jobs WHERE job_id='job-qwen-a'").get().status), 'queued', 'no-effect: the attempt is kept');
+  assert.equal(fx.db((x) => x.prepare("SELECT status FROM jobs WHERE job_id='job-qwen-a'").get().status), 'ready', 'no-effect: leased→ready on a refusal before the contract — the attempt is kept (H13)');
   assert.equal(fx.db((x) => x.prepare("SELECT count(*) n FROM incidents WHERE last_progress LIKE '[infra-provider]%'").get().n), 0, 'no incident for a quota circuit');
   assert.equal(fx.db((x) => x.prepare("SELECT count(*) n FROM events WHERE kind='provider-auth-unavailable'").get().n), 0, 'not an auth circuit');
 
@@ -272,11 +292,16 @@ test('a worker screen showing the quota row opens the circuit from api status on
   const fx = fixture(t);
   const at = Date.now() - 60000;
   fx.db(() => null);
-  const ledger = openLedger({ file: ledgerFileFor(fx.repo) });
+  const ledger = openLedger({ file: ledgerFileFor(fx.repo, { env: fx.env }) });
   try {
-    ledger.db.prepare("UPDATE jobs SET status='running',worker_id='term-qwen-worker',payload_json=? WHERE job_id='job-qwen-a'")
-      .run(JSON.stringify({ opId: 'code.refactor', owned_paths: ['docs/a/'], difficulty: 'medium', model: 'qwen-agent',
-        hierarchy: { runtime: { terminalHandle: 'term-qwen-worker', provider: 'qwen', runtimePool: 'qwen-agent' } } }));
+    const at = Date.now();
+    ledger.transaction((db) => {
+      updateJob(db, { jobId: 'job-qwen-a', at, payload: { opId: 'code.refactor', owned_paths: ['docs/a/'], difficulty: 'medium', model: 'qwen-agent',
+        hierarchy: { runtime: { terminalHandle: 'term-qwen-worker', provider: 'qwen', runtimePool: 'qwen-agent' } } } });
+      setJobStatus(db, { jobId: 'job-qwen-a', to: 'ready', reason: 'dispatch', at });
+      setJobStatus(db, { jobId: 'job-qwen-a', to: 'leased', reason: 'dispatch', at });
+      setJobStatus(db, { jobId: 'job-qwen-a', to: 'running', reason: 'worker live', at, workerId: 'term-qwen-worker' });
+    });
   } finally { ledger.close(); }
   fx.writeState((s) => { s.terminals = { 'term-qwen-worker': { handle: 'term-qwen-worker', connected: true, writable: true, command: 'qwen --yolo', lastOutputAt: at,
     screen: ['  ✓ Shell npm test', '✕ [API Error: 429 insufficient_quota: Free allocated quota exceeded.]', '─'.repeat(20), '*   Type your message or @path/to/file',
@@ -295,11 +320,8 @@ test('a worker screen showing the quota row opens the circuit from api status on
   assert.equal(fx.row().observedAt, first.observedAt);
   assert.equal(fx.db((x) => x.prepare("SELECT count(*) n FROM events WHERE kind='provider-unavailable'").get().n), 1);
   // After a recovery the same old frame reopens nothing; only newer output counts.
-  const ledger2 = openLedger({ file: ledgerFileFor(fx.repo) });
-  try {
-    ledger2.db.prepare("UPDATE signals SET value_json=?, expires_at=? WHERE scope='provider-health' AND key='qwen'")
-      .run(JSON.stringify({ status: 'recovered', recoveredAt: Date.now(), previous: { failureKind: 'quota', observedAt: first.observedAt } }), Date.now());
-  } finally { ledger2.close(); }
+  fx.machine((m) => writeProviderCircuit('qwen', { machine: m, expiresAt: Date.now(),
+    value: { status: 'recovered', recoveredAt: Date.now(), previous: { failureKind: 'quota', observedAt: first.observedAt } } }));
   const recovered = await fx.run('status', '--repo', fx.repo, '--workflow', fx.workflowId, '--json');
   assert.equal(recovered.value.outageCircuits, undefined, 'the frame printed before the recovery is old evidence');
   // An active turn is getting completions: an old error row above it proves nothing.
@@ -316,14 +338,9 @@ test('provider-health --quota-probe: throttled hourly, due after the reset, a pa
   const home = qwenHome(t, server.baseUrl);
   Object.assign(fx.env, { STARCI_CREDENTIAL_ROOT: credentialRoot(t, 'sk-quota-probe'), USERPROFILE: home, HOME: home });
   const now = Date.now();
-  const seedCircuit = (value, expiresAt) => {
-    const l = openLedger({ file: ledgerFileFor(fx.repo) });
-    try {
-      l.db.prepare(`INSERT OR REPLACE INTO signals(scope,key,holder_pid,token,value_json,at,expires_at) VALUES('provider-health','qwen',NULL,NULL,?,?,?)`)
-        .run(JSON.stringify({ schema: 'starci/provider-health@1', provider: 'qwen', status: 'unavailable', failureKind: 'quota', strikeLimit: 1,
-          jobId: 'job-qwen-a', step: 'worker-screen', observedAt: now - 1000, failures: 1, trips: 1, ...value }), now - 1000, expiresAt);
-    } finally { l.close(); }
-  };
+  const seedCircuit = (value, expiresAt) => fx.machine((m) => writeProviderCircuit('qwen', { machine: m, expiresAt,
+    value: { schema: 'starci/provider-health@1', provider: 'qwen', status: 'unavailable', failureKind: 'quota', strikeLimit: 1,
+      jobId: 'job-qwen-a', step: 'worker-screen', observedAt: now - 1000, failures: 1, trips: 1, ...value } }));
   seedCircuit({ resetAt: now + 86400000 }, now + 90000000);
 
   const spent = await fx.run('provider-health', '--repo', fx.repo, '--quota-probe', '--workflow', fx.workflowId, '--json');
@@ -353,9 +370,9 @@ test('provider-health --quota-probe: throttled hourly, due after the reset, a pa
     'the recovery event lands on the circuit job workflow');
   // code.refactor is implementation work (Devin first); the owner's goal routing_bias avoiding Devin makes Qwen
   // the order's first pool (a Kernel --avoid is ignored, owner decision 2026-09-25).
-  { const l = openLedger({ file: ledgerFileFor(fx.repo) });
-    try { l.db.prepare('INSERT INTO goals(workflow_id,revision,goal_identity,markdown,json,created_at) VALUES(?,?,?,?,?,?)')
-      .run(fx.workflowId, 0, 'qwen-goal', '# goal', JSON.stringify({ routing_bias: { prefer: [], avoid: ['devin-agent'] } }), Date.now()); }
+  { const l = openLedger({ file: ledgerFileFor(fx.repo, { env: fx.env }) });
+    try { l.transaction((db) => insertGoal(db, { workflowId: fx.workflowId, revision: 2, goalIdentity: 'qwen-goal',
+      markdown: '# goal', goal: { routing_bias: { prefer: [], avoid: ['devin-agent'] } }, createdAt: Date.now() })); }
     finally { l.close(); } }
   const route = await fx.run('route', '--repo', fx.repo, '--job', 'job-qwen-b', '--json');
   assert.equal(route.value?.decision?.model, 'qwen-agent', route.stderr || route.stdout);
@@ -389,16 +406,13 @@ test('a Codex quota circuit clears through the orca-account probe once the weekl
   // End to end on a fake Orca whose account list reads codex weekly 12% used.
   const fx = fixture(t);
   const now = Date.now();
-  const l = openLedger({ file: ledgerFileFor(fx.repo) });
-  try {
-    l.db.prepare(`INSERT INTO signals(scope,key,holder_pid,token,value_json,at,expires_at) VALUES('provider-health','codex',NULL,NULL,?,?,?)`)
-      .run(JSON.stringify({ schema: 'starci/provider-health@1', provider: 'codex', status: 'unavailable', failureKind: 'quota', strikeLimit: 1,
-        jobId: 'job-qwen-a', step: 'launch', observedAt: now - 1000, failures: 1, trips: 1 }), now - 1000, now + 3600000);
-  } finally { l.close(); }
+  fx.machine((m) => writeProviderCircuit('codex', { machine: m, expiresAt: now + 3600000,
+    value: { schema: 'starci/provider-health@1', provider: 'codex', status: 'unavailable', failureKind: 'quota', strikeLimit: 1,
+      jobId: 'job-qwen-a', step: 'launch', observedAt: now - 1000, failures: 1, trips: 1 } }));
   const r = await fx.run('provider-health', '--repo', fx.repo, '--provider', 'codex', '--quota-probe', '--json');
   assert.equal(r.status, 0, r.stderr || r.stdout);
   assert.deepEqual(r.value.results.map((x) => [x.provider, x.probed, x.recovered, x.probe?.state]), [['codex', true, true, 'ok']]);
-  const row = fx.db((d) => json(d.prepare("SELECT value_json FROM signals WHERE scope='provider-health' AND key='codex'").get().value_json));
+  const row = fx.machine((m) => readProviderCircuit('codex', { machine: m }))?.value;
   assert.deepEqual([row.status, row.reason, row.previous.failureKind], ['recovered', 'quota probe passed', 'quota']);
 });
 
@@ -411,12 +425,8 @@ test('a still-spent plan past its reset rolls the circuit to the next reset', as
   const past = new Date(Date.now() - 3 * 86400000);
   fs.writeFileSync(path.join(fx.env.STARCI_OWNER_ROOT, 'config.yaml'),
     stringifyYaml({ ...read('config.example.yaml'), quota: { qwen: { planQuota: 1, resetAt: past.toISOString() } } }));
-  const l = openLedger({ file: ledgerFileFor(fx.repo) });
-  try {
-    l.db.prepare(`INSERT INTO signals(scope,key,holder_pid,token,value_json,at,expires_at) VALUES('provider-health','qwen',NULL,NULL,?,?,?)`)
-      .run(JSON.stringify({ provider: 'qwen', status: 'unavailable', failureKind: 'quota', jobId: 'job-qwen-a', resetAt: past.getTime(), observedAt: past.getTime() - 1000 }),
-        past.getTime() - 1000, Date.now() + 600000);
-  } finally { l.close(); }
+  fx.machine((m) => writeProviderCircuit('qwen', { machine: m, expiresAt: Date.now() + 600000,
+    value: { provider: 'qwen', status: 'unavailable', failureKind: 'quota', jobId: 'job-qwen-a', resetAt: past.getTime(), observedAt: past.getTime() - 1000 } }));
   const r = await fx.run('provider-health', '--repo', fx.repo, '--provider', 'qwen', '--quota-probe', '--json');
   assert.equal(r.value.results[0].probe.state, 'quota-exhausted');
   const row = fx.row();
