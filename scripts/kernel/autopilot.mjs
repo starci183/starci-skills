@@ -35,7 +35,7 @@
 // Every runtime decision is an `autopilot-*` event `by: autopilot`; nothing here ever writes answeredBy owner.
 import fs from 'node:fs';
 import { loopFileOfRef, loopLabelOf } from '../checks/draw-loop-coverage.mjs';
-import { writeAskReceipt } from './ask-receipts.mjs';
+import { fileAskReceipt, stageReceipt } from './ask-receipts.mjs';
 import path from 'node:path';
 import { allocationSettings } from '../../engine/config.mjs';
 import { openIncident, updateIncident } from '../../engine/ledger-db.mjs';
@@ -278,7 +278,11 @@ export function deferralOf(db, workflowId, dispatchId) {
 const STALE_CODES = new Set(['DIRECTION_REV_MOVED', 'REVIEW_PART_REDRAWN', 'GOLDEN_CHANGED']);
 const redrawsOf = (db, workflowId, record) => db.prepare(`SELECT count(*) n FROM events WHERE workflow_id=? AND kind=? AND json_extract(payload_json,'$.record')=? AND COALESCE(json_extract(payload_json,'$.stale'),0)=0`).get(workflowId, AUTOPILOT_EVENTS.redraw, record)?.n ?? 0;
 
-/** Write one autopilot answer receipt (blob + decisions row, ask-receipts.mjs) and its ask-answered event; returns the receipt file. Never answeredBy owner. */
+/**
+ * Write one autopilot answer receipt (blob + decisions row, ask-receipts.mjs) and its ask-answered event; returns the receipt file. Never answeredBy owner.
+ * Runs INSIDE the caller's ledger transaction (autopilotAnswerAsk), so it indexes the receipt with fileAskReceipt on that
+ * transaction's db - writeAskReceipt opens a transaction of its own and threw ledger-nested-transaction here.
+ */
 function writeAnswer(ledger, { workflowId, report, question, optionIndex, note, extra = {}, now = Date.now() }) {
   const at = now;
   const option = optionIndex == null ? null : (() => { const o = list(question?.options)[optionIndex]; return o == null ? null : (typeof o === 'string' ? o : o.label ?? null); })();
@@ -288,7 +292,7 @@ function writeAnswer(ledger, { workflowId, report, question, optionIndex, note, 
     custodyWritten: [], envWritten: [], pointersWritten: [], bridge: null, errors: [], note, at: new Date(at).toISOString(),
     ...extra, ...(question?.review ? { review: question.review } : {}),
   };
-  const { receiptPath, receiptSha, decisionId } = writeAskReceipt(ledger, { workflowId, dispatchId: report.dispatch_id, receipt, at });
+  const { receiptPath, receiptSha, decisionId } = fileAskReceipt(ledger.db, { workflowId, dispatchId: report.dispatch_id, receipt, blob: stageReceipt(receipt), at });
   ledger.appendEvent({ workflowId, entityType: 'report', entityId: report.dispatch_id, kind: 'ask-answered',
     payload: { dispatchId: report.dispatch_id, receiptPath, receiptSha, decisionId, answeredBy: AUTOPILOT_BY, optionIndex: optionIndex ?? null, option, note, custodyWritten: [], envWritten: [], pointersWritten: [], errors: [], ...(extra.provisional ? { provisional: true } : {}) } });
   return receiptPath;
