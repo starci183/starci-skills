@@ -66,6 +66,29 @@ function gitPaths(root) {
   }
 }
 
+/**
+ * Product repository name from repository identity, not from the checkout folder, so a git worktree and
+ * the main checkout of the same repository require the same README title: the git common dir's owning
+ * folder, else the origin remote's name, else package.json name, else the root folder name.
+ */
+export function repositoryName(root) {
+  const git = args => execFileSync('git', args, { cwd: root, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim();
+  try {
+    const common = path.resolve(root, git(['rev-parse', '--git-common-dir']));
+    if (path.basename(common) === '.git') return path.basename(path.dirname(common));
+  } catch { /* Not a Git work tree; fall through to the next identity source. */ }
+  try {
+    const remote = git(['remote', 'get-url', 'origin']).replace(/[\\/]+$/u, '').replace(/\.git$/iu, '');
+    const name = remote.split(/[\\/:]/u).pop();
+    if (name) return name;
+  } catch { /* No origin remote. */ }
+  try {
+    const pkg = JSON.parse(fs.readFileSync(path.join(root, 'package.json'), 'utf8'));
+    if (typeof pkg.name === 'string' && pkg.name) return pkg.name.replace(/^@[^/]+\//u, '');
+  } catch { /* No readable package.json. */ }
+  return path.basename(root);
+}
+
 function fsHasDir(root, relative) {
   try { return fs.statSync(path.join(root, ...relative.split('/'))).isDirectory(); } catch { return false; }
 }
@@ -151,7 +174,7 @@ export function checkRepoPresentation({ root, runtime = false, tree = treeView(r
     return { violations, coverage: { status: 'checked', source: tree.source } };
   }
   const lines = readme.split(/\r?\n/u);
-  const name = runtime ? 'StarCi' : path.basename(root);
+  const name = runtime ? 'StarCi' : repositoryName(root);
   if (lines[0].trim().toLowerCase() !== `# ${name}`.toLowerCase())
     finding('HFS_README_TITLE_INVALID', 'README.md', `README.md must start with # ${name}.`);
   const description = lines.slice(1).find(line => line.trim());
