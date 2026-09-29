@@ -39,7 +39,8 @@ rules:
   - id: BE-TEST-1
     title: Placement and test kinds
     kind: mandatory
-    requirement: A backend repository has exactly two test kinds (owner ruling 2026-09-29). Unit is
+    requirement: >-
+      A backend repository has exactly two test kinds (owner ruling 2026-09-29). Unit is
       <name>.spec.ts beside its subject. E2E is *.e2e-spec.ts under src/tests/e2e/ (subfolders by area),
       with environment code (Testcontainers globalSetup/globalTeardown, application boot, datastore and
       transport helpers) in src/tests/e2e/setup/ and shared data in src/tests/fixtures/. Every
