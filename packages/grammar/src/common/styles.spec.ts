@@ -16,6 +16,15 @@ describe("Common renderer anatomy CSS", () => {
         ]) expect(css).toContain(selector)
     })
 
+    it("reads the universal rhythm tokens, never a family-scoped copy of them", () => {
+        // Spacing rhythm has one common vocabulary (--grammar-*). A family republishes it under its
+        // own prefix (--starci-core-*, --offset-pop-*), and the common sheet must not read that copy.
+        expect(css).not.toMatch(/--(?:starci-[a-z-]+|offset-pop)-(?:page-inset|region-gap|section-gap|row-gap|inline-gap)(?!-)/)
+        for (const token of ["page-inset", "region-gap", "section-gap", "row-gap", "inline-gap"]) {
+            expect(css, token).toContain("var(--grammar-" + token)
+        }
+    })
+
     it("publishes universal geometry without selecting a family palette", () => {
         expect(css).toContain("--grammar-inline-gap: 0.5rem")
         expect(css).toContain("--grammar-page-inset: clamp(1rem, 3vw, 2rem)")

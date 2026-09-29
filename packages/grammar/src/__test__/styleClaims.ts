@@ -81,7 +81,7 @@ const SPACING_RAMP = ["0", "0.25rem", "0.5rem", "0.75rem", "1rem", "1.5rem", "2r
 /**
  * Lengths inside a declaration value, including the fallback of a `var()`.
  *
- * A shipped rule writes `gap: var(--starci-core-row-gap, 0.75rem)`, so the value has to be read for
+ * A shipped rule writes `gap: var(--grammar-row-gap, 0.75rem)`, so the value has to be read for
  * the length it resolves to when the token is absent, which is exactly what a consumer without the
  * token gets.
  */

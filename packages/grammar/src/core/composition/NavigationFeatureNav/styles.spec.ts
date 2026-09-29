@@ -61,7 +61,7 @@ describe("Common NavigationFeatureNav anatomy styles", () => {
             expect(navbarCss.slice(start, navbarCss.indexOf("}", start)), `${slot} must not size the row itself`).not.toMatch(/min-height|min-block-size|height:/)
         }
         expect(navbarCss).toMatch(/\.starci-core-navigation-feature-nav-primary\s*\{[\s\S]*?min-height: 4rem;/)
-        expect(navbarCss).toMatch(/\.starci-core-navigation-feature-nav-primary\s*\{[\s\S]*?padding-block: var\(--starci-core-inline-gap, 0\.5rem\);/)
+        expect(navbarCss).toMatch(/\.starci-core-navigation-feature-nav-primary\s*\{[\s\S]*?padding-block: var\(--grammar-inline-gap, 0\.5rem\);/)
     })
 
     it("gives the identity slot's plain pressable and every route destination the same 44px floor", () => {

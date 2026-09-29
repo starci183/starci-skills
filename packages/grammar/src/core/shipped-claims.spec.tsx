@@ -201,7 +201,7 @@ describe("Shipped Core geometry replaces the utilities it used to spell", () => 
      * that override; only reading every rule that targets `.starci-core-section-header` catches it.
      *
      * `PrimaryRailLayout` and `WorkspaceShell` are the other two GAP-5 region roots in the family,
-     * and both hold `var(--starci-core-region-gap)` across every collapse tier - only the grid
+     * and both hold `var(--grammar-region-gap)` across every collapse tier - only the grid
      * columns/areas change underneath them. A collapsed `SectionHeader` follows the same rule: it
      * may stack to a column, but it stays a region boundary, so its gap must stay GAP-5 too.
      */
