@@ -284,7 +284,7 @@ steps:
     action:
       en: Give every token its role (primary, danger and the rest) and write the policy that governs the
         set - whether danger may match primary, and the minimum contrast every text-on-surface pair
-        must hold. Status tones follow HeroUI: a solid pair (`--<tone>` with its foreground) and a soft
+        must hold. Status tones follow HeroUI - a solid pair (`--<tone>` with its foreground) and a soft
         pair (a token with role `<tone>-soft` carrying its soft foreground), the soft pair and the
         soft foreground as a bare glyph on each surface held to `policy.softMinContrast` (3 by
         default), never a solid tone darkened until it reads as a bare glyph at 4.5. Check the pairs the record itself declares against that floor and against the
