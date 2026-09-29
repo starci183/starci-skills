@@ -117,6 +117,8 @@ Also: `node scripts/reconciler/boot.mjs --status`, `node scripts/reconciler/star
   <specs>`), never the full suite (the full suite runs only in `/push-git`). e2e is manual only.
 - Never `git stash` (it is shared across worktrees). Never delete a `node_modules` junction recursively; remove it with
   `cmd /c rmdir <junction>`.
+- Never `git worktree remove --force` a worktree with a node_modules junction inside; `cmd /c rmdir` the junction first (git
+  deletes through junctions; the live node_modules was emptied twice on 2026-09-29).
 - Live databases are read-only except through their runtime writers (`engine/ledger-db.mjs`, `engine/machine-db.mjs`);
   never edit `machine.sqlite` or a `runtime.sqlite` by hand.
 - Never push, never `--no-verify`, never rewrite landed history. The lane does not land; the lead lands.
