@@ -16,6 +16,7 @@ import { repositoryName } from '../../lib/repo-identity.mjs';
 export const HFS_RULE_IDS = [
   'HFS_APPS_REQUIRED',
   'HFS_APP_LAYOUT_INVALID',
+  'HFS_E2E_IN_AUTOMATIC_GATE',
   'HFS_MODULE_TIER_INVALID',
   'HFS_PACKAGE_MANAGER_MIXED',
   'HFS_README_BADGE_NOT_LIVE',
@@ -40,7 +41,7 @@ const REQUIRED_COMMON = ['.gitattributes', '.github', '.gitignore', '.husky', 'a
   'codecov.yml', 'eslint.config.mjs', 'package-lock.json', 'package.json', 'README.md',
   'sonar-project.properties', 'tsconfig.json'];
 const OPTIONAL_COMMON = new Set(['.dockerignore', '.editorconfig', '.npmrc', '.nvmrc', 'docs', 'e2e',
-  'packages', 'scripts', 'tsconfig.build.json']);
+  'packages', 'scripts', 'tsconfig.build.json', 'tsconfig.e2e.json']);
 const REQUIRED_BACKEND = ['.sops.yaml', '.starcistacks', '.starciwork', 'jest.config.js', 'nest-cli.json', 'src'];
 const OPTIONAL_FRONTEND = new Set(['turbo.json', 'vitest.config.ts', 'vitest.setup.ts']);
 const OPTIONAL_FRONTEND_PATTERN = /^playwright\.config\.ts$/;
@@ -236,6 +237,79 @@ export function checkRepoPresentation({ root, runtime = false, tree = treeView(r
   return { violations, coverage: { status: 'checked', source: tree.source } };
 }
 
+// Owner ruling 2026-09-29: e2e runs MANUALLY only. No hook, default typecheck, coverage run or automatic CI
+// trigger may include the e2e tree or run the e2e project.
+const E2E_COMMAND = /\btest:e2e\b|\btypecheck:e2e\b|\blint:e2e\b|\bplaywright\s+test\b|--selectProjects\s+e2e\b|src\/tests\/e2e\b|jest[^\n|&;]*e2e/u;
+const UNIT_RUN_SCRIPTS = ['test', 'test:unit', 'test:ci', 'test:affected', 'test:coverage', 'test:cov'];
+// An --ignore-pattern names the e2e tree to keep it OUT of a command; it is not a run of e2e.
+const runsE2e = text => E2E_COMMAND.test(String(text).replace(/--ignore-pattern[= ]+(?:"[^"]*"|'[^']*'|\S+)/gu, ''));
+const withoutComments = text => text.split('\n').filter(line => !/^\s*#/u.test(line)).join('\n');
+
+function readText(root, relative) {
+  try { return fs.readFileSync(path.join(root, ...relative.split('/')), 'utf8'); } catch { return null; }
+}
+
+function e2eInAutomaticGate({ root, tree, backend, frontend, finding }) {
+  const rule = 'HFS_E2E_IN_AUTOMATIC_GATE';
+  let pkg = null;
+  try { pkg = JSON.parse(readText(root, 'package.json') ?? ''); } catch { /* the package checks own invalid JSON */ }
+  const scripts = pkg?.scripts ?? {};
+  // 1. Husky hooks and the scripts they call (transitively through `npm run <script>`).
+  const pending = [];
+  for (const hook of ['.husky/pre-commit', '.husky/pre-push']) {
+    const text = readText(root, hook);
+    if (text === null) continue;
+    const body = withoutComments(text);
+    if (runsE2e(body)) finding(rule, hook, `${hook} runs e2e. E2E is manual only; hooks run unit, lint and typecheck.`);
+    for (const match of body.matchAll(/npm\s+run\s+([\w:.-]+)/gu)) pending.push(match[1]);
+  }
+  const lintStaged = pkg?.['lint-staged'];
+  if (lintStaged && runsE2e(Object.values(lintStaged).flat().join('\n'))) finding(rule, 'package.json', 'lint-staged runs an e2e command. E2E is manual only.');
+  const called = new Set();
+  for (const name of pending) {
+    if (called.has(name)) continue;
+    called.add(name);
+    const command = scripts[name];
+    if (typeof command !== 'string') continue;
+    if (runsE2e(command)) finding(rule, 'package.json', `Script ${name} is run by a husky hook and touches e2e. E2E is manual only.`);
+    for (const match of command.matchAll(/npm\s+run\s+([\w:.-]+)/gu)) pending.push(match[1]);
+  }
+  // 2. Unit and coverage scripts on a jest repository select the unit project only and exclude src/tests.
+  if (backend && tree.hasFile('jest.config.js')) {
+    for (const name of UNIT_RUN_SCRIPTS) {
+      const command = scripts[name];
+      if (typeof command === 'string' && /\bjest\b/u.test(command) && !/--selectProjects\s+unit\b/u.test(command))
+        finding(rule, 'package.json', `Script ${name} runs jest without --selectProjects unit and would run the e2e project.`);
+    }
+    const jestConfig = readText(root, 'jest.config.js') ?? '';
+    if (/collectCoverageFrom/u.test(jestConfig) && !/!src\/tests\/(?:\*\*|e2e)/u.test(jestConfig))
+      finding(rule, 'jest.config.js', 'collectCoverageFrom must exclude src/tests/** so no e2e file counts toward coverage.');
+  }
+  // 3. The default tsconfig excludes the e2e tree.
+  const tsconfigText = readText(root, 'tsconfig.json');
+  let tsconfig = null;
+  try { tsconfig = tsconfigText === null ? null : JSON.parse(tsconfigText); } catch { /* the typecheck itself owns parsing */ }
+  if (tsconfig) {
+    const excludesE2e = /e2e/u.test(JSON.stringify(tsconfig.exclude ?? []));
+    const defaultAll = tsconfig.include === undefined && tsconfig.files === undefined;
+    const files = tree.files();
+    if (backend && files.some(file => /^src\/tests\/e2e\/.+\.[cm]?tsx?$/u.test(file)) && !excludesE2e &&
+        (defaultAll || JSON.stringify(tsconfig.include ?? []).includes('src')))
+      finding(rule, 'tsconfig.json', 'The default tsconfig includes src/tests/e2e/**. Exclude it and check it with tsconfig.e2e.json (typecheck:e2e).');
+    if (frontend && !backend && files.some(file => /^e2e\/.+\.[cm]?tsx?$/u.test(file)) && defaultAll && !excludesE2e)
+      finding(rule, 'tsconfig.json', 'The root tsconfig includes e2e/**. Exclude it and check it with tsconfig.e2e.json (typecheck:e2e).');
+  }
+  // 4. A workflow that starts on push or pull_request never runs e2e.
+  for (const file of tree.files().filter(entry => /^\.github\/workflows\/[^/]+\.ya?ml$/u.test(entry))) {
+    const text = readText(root, file);
+    if (text === null) continue;
+    const trigger = /^on:.*(?:\n(?:[ \t]+.*|)$)*/mu.exec(text)?.[0] ?? '';
+    if (!/\b(?:push|pull_request)\b/u.test(trigger)) continue;
+    if (runsE2e(withoutComments(text)))
+      finding(rule, file, `${file} runs e2e on push or pull_request. Move the e2e job to its own workflow with on: workflow_dispatch only.`);
+  }
+}
+
 export function checkHfs(config) {
   const kinds = config.kinds ?? [];
   const backend = kinds.includes('backend');
@@ -322,6 +396,8 @@ export function checkHfs(config) {
     else if (frontend && /^e2e\/.+\.(?:spec|test)\.[cm]?[jt]sx?$/u.test(file))
       finding('HFS_TEST_KIND_RETIRED', file, `${file} is a Playwright spec that is not named *.e2e-spec.ts.`);
   }
+
+  e2eInAutomaticGate({ root: config.root, tree, backend, frontend, finding });
 
   return {
     violations,
