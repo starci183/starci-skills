@@ -159,13 +159,26 @@ properties:
     additionalProperties: false
     required:
       - provider
-      - sealed
+    if:
+      properties:
+        provider:
+          const: none
+      required:
+        - provider
+    then:
+      properties:
+        sealed: false
+    else:
+      required:
+        - sealed
     description: Where an identity's secret actually lives. The record names the sealed file and how to
       open it; it never holds the value, because the tree is tracked and readable and outlives any rotation.
     properties:
       provider:
         $ref: "#/$defs/slug"
-        description: The identity provider that issues this identity.
+        description: "The identity provider that issues this identity. The value `none` is the one form for an
+          identity that holds no secret at all (an anonymous visitor, a non-secret fixture actor): it carries no
+          `sealed` key, and any other provider must name its sealed file."
       realm:
         $ref: "#/$defs/prose"
         description: The provider's own realm or tenant, taken from the file the provider actually imports

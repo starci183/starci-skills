@@ -488,10 +488,14 @@ export function checkWorkArtifacts(workRoot, out = {refuse: [], suspect: [], inf
     const indexFile = path.join(rec.dir, 'index.yaml');
     const ctx = {...ctxFor(rec.dir), repoRoot: repoRootFor(workRoot, data.repository, workspaceDoc)};
     const table = data.schema === 'work/resource@1' ? RESOURCE_DECLARATIONS : RECORD_DECLARATIONS;
-    const sealed = data.schema === 'work/resource@1' ? data.custody?.sealed : undefined;
-    const sealedMisplaced = typeof sealed === 'string' && !SEALED_LOCATION_RE.test(sealed.trim());
+    const custody = data.schema === 'work/resource@1' && data.custody && typeof data.custody === 'object' ? data.custody : null;
+    const sealed = custody?.sealed;
+    // provider: none is the one "holds no secret" form and carries no sealed key; every other provider names its file.
+    const sealedMisplaced = custody
+      ? (custody.provider === 'none' ? sealed !== undefined : typeof sealed !== 'string' || !SEALED_LOCATION_RE.test(sealed.trim()))
+      : false;
     if (sealedMisplaced) {
-      wrapped.refuse(indexFile, 'SEALED_CUSTODY_LOCATION', `custody.sealed is ${JSON.stringify(sealed)}; a sealed secret lives only at .starcistacks/<env>/secrets/<slug>.enc, and the record here names it`);
+      wrapped.refuse(indexFile, 'SEALED_CUSTODY_LOCATION', `custody.sealed is ${sealed === undefined ? 'absent' : JSON.stringify(sealed)}${custody.provider === 'none' ? ' on a provider: none identity, which holds no secret and carries no sealed key;' : '; a sealed secret lives only at .starcistacks/<env>/secrets/<slug>.enc and'} the record here names it`);
     }
     for (const found of declarationsOf(data, table, ctx)) {
       if (sealedMisplaced && found.trail === 'custody.sealed') continue;

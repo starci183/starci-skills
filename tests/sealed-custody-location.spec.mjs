@@ -9,11 +9,11 @@ import { loadCatalog } from '../scripts/kernel/why.mjs';
 
 // Owner ruling 2026-09-29: a sealed secret lives only at .starcistacks/<env>/secrets/<slug>.enc; the Work tree
 // holds the identity record whose custody.sealed points there and never a sealed file. Fixtures hold no values.
-function tree(sealed, extra = {}) {
+function tree(sealed, extra = {}, provider = 'keycloak') {
   const repo = fs.mkdtempSync(path.join(os.tmpdir(), 'starci-sealed-'));
   const files = {
     '.starciwork/index.yaml': 'schema: work/catalog@1\nid: fixture\nfeatures: []\n',
-    '.starciwork/_resources/identities/collab/resource.yaml': `schema: work/resource@1\nid: identity.nivo.collab\nkind: identity\nowner: nivo-be\nrevision: planned@2026-09-29\ndisposable: true\ncustody: {provider: keycloak, sealed: ${JSON.stringify(sealed)}}\nroles: [host]\n`,
+    '.starciwork/_resources/identities/collab/resource.yaml': `schema: work/resource@1\nid: identity.nivo.collab\nkind: identity\nowner: nivo-be\nrevision: planned@2026-09-29\ndisposable: true\ncustody: {provider: ${provider}${sealed === undefined ? '' : `, sealed: ${JSON.stringify(sealed)}`}}\nroles: [host]\n`,
     ...extra,
   };
   for (const [rel, content] of Object.entries(files)) {
@@ -59,6 +59,18 @@ for (const [name, sealed] of [
     assert.ok(strict.refused.some(r => r.includes('SCHEMA_VIOLATION') && r.includes('collab/resource.yaml')), strict.refused.join('\n'));
   });
 }
+
+test('provider: none is the one holds-no-secret form: it carries no sealed key, and a sealed key on it is refused', (t) => {
+  const none = tree(undefined, {}, 'none');
+  const bad = tree('.starcistacks/dev/secrets/collab-uat.enc', {}, 'none');
+  const missing = tree(undefined);
+  t.after(() => { for (const x of [none, bad, missing]) fs.rmSync(x.repo, { recursive: true, force: true }); });
+  for (const strict of [false, true]) {
+    assert.deepEqual(codes(validateWork(none.work, { strict }).refused), []);
+    assert.ok(validateWork(bad.work, { strict }).refused.some(r => strict ? r.includes('SCHEMA_VIOLATION') : r.includes('SEALED_CUSTODY_LOCATION')));
+    assert.ok(validateWork(missing.work, { strict }).refused.some(r => strict ? r.includes('SCHEMA_VIOLATION') : r.includes('SEALED_CUSTODY_LOCATION')));
+  }
+});
 
 test('a sealed file kept under .starciwork is refused with SEALED_FILE_IN_WORK', (t) => {
   const { repo, work } = tree('.starcistacks/dev/secrets/collab-uat.enc', {
