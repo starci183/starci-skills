@@ -31,7 +31,7 @@ test('a frontend Playwright spec must be *.e2e-spec.ts and only one root playwri
 });
 
 const withFiles = (t, files) => {
-  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'hfs-e2e-manual-'));
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'hk-e2e-manual-'));
   t.after(() => fs.rmSync(root, { recursive: true, force: true }));
   for (const [file, content] of Object.entries(files)) {
     fs.mkdirSync(path.dirname(path.join(root, file)), { recursive: true });
