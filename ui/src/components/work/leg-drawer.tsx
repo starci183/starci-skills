@@ -6,7 +6,7 @@ import { StatusChip } from '../status-chip';
 import { statusFromUnit } from '../status';
 import type { Concept } from '../concept';
 import { AttemptCard } from './leg/attempt-card';
-import { OpAbout } from './leg/op-about';
+import { LegStory } from './leg/story';
 import { legName } from './pipeline/node/op-identity';
 import { AgentStack } from '../agent/agent-avatar';
 import { legAgents } from './pipeline/node/op-identity';
@@ -20,12 +20,10 @@ const none = <p className="text-xs text-muted-foreground">Không có.</p>;
 
 /** Side drawer for one leg: needs/produces/edges, units, every attempt with outcome + verdict. */
 export function LegDrawer({ project, wf, leg, pipeline, onClose }: { project: string; wf: string; leg: LegRow | null; pipeline: PipelineView; onClose: () => void }) {
-  void project; void wf;
+  void wf;
   if (!leg) return null;
   const byOp = new Map(pipeline.legs.map(l => [l.op, l]));
   const upstream = pipeline.edges.filter(e => e.to === leg.op).map(e => e.from);
-  const downstream = pipeline.edges.filter(e => e.from === leg.op).map(e => e.to);
-  const chip = (op: string) => <li key={op} className="flex flex-wrap items-center gap-2 text-sm"><StatusChip status={byOp.get(op)?.status ?? 'unknown'} /><span className="min-w-0 break-all font-mono text-xs">{op}</span></li>;
   const attempts = [...leg.attempts].sort((a, b) => b.id - a.id);
   const now = Date.now();
   const waiting = upstream.filter(op => byOp.get(op)?.status !== 'success');
@@ -40,12 +38,7 @@ export function LegDrawer({ project, wf, leg, pipeline, onClose }: { project: st
           {leg.injected && <p><strong>injected:</strong> {leg.injected}</p>}
           {leg.deferred && <p><strong>deferred:</strong> {leg.deferred}</p>}
         </div>}
-        <OpAbout leg={leg} />
-        <Section title="Cần trước">{upstream.length ? <ul className="space-y-1.5">{upstream.map(chip)}</ul> : none}
-          {leg.needs.length > 0 && <ul className="mt-2 space-y-1">{leg.needs.map(n => <li key={n} className="break-all font-mono text-xs text-muted-foreground">{n}</li>)}</ul>}</Section>
-        <Section title="Chặng này đáp ứng">{leg.produces.length ? <ul className="space-y-1">{leg.produces.map(n => <li key={n} className="break-all font-mono text-xs">{n}</li>)}</ul> : none}</Section>
-        <Section title="Điều kiện">{leg.conditions.length ? <ul className="space-y-1">{leg.conditions.map(n => <li key={n} className="break-words text-xs">{n}</li>)}</ul> : none}</Section>
-        <Section title="Mở khoá">{downstream.length ? <ul className="space-y-1.5">{downstream.map(chip)}</ul> : none}</Section>
+        <LegStory project={project} leg={leg} pipeline={pipeline} />
         <Section title={`Đơn vị · ${leg.units.length}`}>{leg.units.length ? <ul className="divide-y rounded-lg border">{leg.units.map(u => <li key={u.unit} className="flex flex-wrap items-center gap-x-2 gap-y-1 p-2.5">
           <span className="min-w-0 flex-1 break-words text-sm">{u.title}</span>
           <StatusChip status={statusFromUnit(u.state)} label={unitStateLabels[u.state] ?? u.state} />
