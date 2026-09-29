@@ -712,7 +712,14 @@ export function checkWorkTree(workRoot, problems, warnings = [], infos = [], res
   for (const [id, rec] of records) {
     if (rec.schema !== 'work/implementation@1' || rec.data?.state !== 'done') continue;
     for (const problem of renderProofProblems({rec, records, workspaceDoc, workRoot})) {
-      problems.push(`${rec.shown}: ${problem}`);
+      // A tree shipped under the runtime's examples/ cites capture blobs its authoring machine filed; the blob store is
+      // machine-local and never distributed with the repository, so a cited-but-absent capture is only a suspect there
+      // (the same rule check-work-artifacts applies to blob citations). Every other tree is refused.
+      const shipped = path.resolve(workRoot).toLowerCase().startsWith(path.join(root, 'examples').toLowerCase() + path.sep);
+      const citesCaptures = (rec.data?.assets ?? []).some(asset => /\.png$/i.test(String(asset?.name ?? '')) && /^[0-9a-f]{64}$/i.test(String(asset?.sha256 ?? '')));
+      const absent = problem.includes('[RENDER_CAPTURE_MISSING]') && shipped && citesCaptures;
+      if (absent) warnings.push(`${rec.shown}: state is done and its assets[] cite running-page capture blobs, none of which is in the local blob store - a shipped example's blobs are not distributed with it, so the render proof cannot run here [RENDER_CAPTURE_MISSING]`);
+      else problems.push(`${rec.shown}: ${problem}`);
     }
   }
 

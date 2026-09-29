@@ -1,0 +1,11 @@
+id: example-render-capture-suspect
+effectiveAt: '2026-09-29T00:00:00+07:00'
+summary: >-
+  A shipped example's implementation records cite running-page capture blobs filed in their authoring machine's blob
+  store, which is never distributed with the repository. check-example-work reported that as the refusal
+  RENDER_CAPTURE_MISSING (7 refusals on examples/todo-app-backend). Under the runtime's own examples/ it is now a
+  suspect with the same code (as check-work-artifacts already treats blob citations); any other tree still refuses.
+reach: new-legs
+paths:
+  - modules/kernel/contract-changes/example-render-capture-suspect.yaml
+  - scripts/checks/check-example-work.mjs
