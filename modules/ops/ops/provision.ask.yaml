@@ -42,11 +42,11 @@ reads:
         provision (credential, account, dataset, authority, irreversible) - before anything is
         printed.
   - id: environment
-    path: repository:<repo-id>/<bound-paths> + .starcistacks/<env>/secrets/<slug>/resource.yaml
+    path: repository:<repo-id>/<bound-paths> + .starciwork/_resources/identities/<slug>/resource.yaml
     purpose:
       en: For a credential, read where the code reads the value - the exact variable name - and which
         identity:<slug> alias in the selected backend Stack environment
-        (.starcistacks/<env>/secrets/<slug>/) will hold it. The resource metadata names the custody and variable.
+        (.starcistacks/<env>/secrets/<slug>.enc) will hold it. The resource metadata names the custody and variable.
   - id: stacks
     path: repository:<repo-id>/.starcistacks/application-stacks.yaml services (the source host's for a shared server)
     purpose:
@@ -69,7 +69,7 @@ steps:
     action:
       en: "Name the provision exactly: a credential names the variable the code reads, the outside system
         it belongs to and the selected Stack environment custody where identity:<slug> resolves
-        (.starcistacks/<env>/secrets/<slug>/); an account, a dataset or an
+        (.starcistacks/<env>/secrets/<slug>.enc); an account, a dataset or an
         authority names what and for which system. Never invent, stub, default or skip it. Never the
         value itself. A quality-service credential is never a provision: a SonarQube token or host,
         a Sonar project, and the GitHub secret or variable that would carry them into CI are

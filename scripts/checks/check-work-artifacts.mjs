@@ -167,6 +167,13 @@ const RESOURCE_DECLARATIONS = [
   {trail: 'custody.sealed', base: 'repo', what: 'input', digestKey: null},
 ];
 
+// The one place a sealed secret lives (owner 2026-09-29): .starcistacks/<env>/secrets/<slug>.enc, a sops (age)
+// file. The Work tree only holds the identity/resource record whose custody.sealed points there. The same shape
+// is the schema pattern of custody.sealed in modules/schemas/work-resource.schema.yaml.
+export const SEALED_LOCATION_RE = /^\.starcistacks\/[a-z0-9]+(?:-[a-z0-9]+)*\/secrets\/[a-z0-9]+(?:-[a-z0-9]+)*\.enc$/;
+// A sealed (sops) file kept inside the Work tree, in any of the retired spellings.
+const SEALED_FILE_RE = /\.enc(?:\.ya?ml|\.json|\.env)?$|\.(?:ya?ml|json|env)\.enc$/i;
+
 /**
  * Every declaration in one document that the tables name, resolved to an absolute path.
  * `ctx` carries the directories the bases can point at plus the records map (for a `named-record` base).
@@ -462,6 +469,13 @@ export function checkWorkArtifacts(workRoot, out = {refuse: [], suspect: [], inf
     return true;
   };
 
+  // ---- no sealed file inside the Work tree: custody lives under .starcistacks, the Work tree only points at it ----
+  for (const file of canonicalWalk(workRoot)) {
+    if (SEALED_FILE_RE.test(path.basename(file))) {
+      wrapped.refuse(file, 'SEALED_FILE_IN_WORK', `a sealed secret file is kept under the Work tree; move it to .starcistacks/<env>/secrets/<slug>.enc and point custody.sealed at it`);
+    }
+  }
+
   // ---- records: their own declarations, plus the prompt beside every generated asset ----
   // A run manifest and a payload that travels inside assets/ carry an `id`/`schema` of their own and are
   // therefore picked up by loadRecords, but they are artifacts of the node beside them, not records (the
@@ -474,7 +488,13 @@ export function checkWorkArtifacts(workRoot, out = {refuse: [], suspect: [], inf
     const indexFile = path.join(rec.dir, 'index.yaml');
     const ctx = {...ctxFor(rec.dir), repoRoot: repoRootFor(workRoot, data.repository, workspaceDoc)};
     const table = data.schema === 'work/resource@1' ? RESOURCE_DECLARATIONS : RECORD_DECLARATIONS;
+    const sealed = data.schema === 'work/resource@1' ? data.custody?.sealed : undefined;
+    const sealedMisplaced = typeof sealed === 'string' && !SEALED_LOCATION_RE.test(sealed.trim());
+    if (sealedMisplaced) {
+      wrapped.refuse(indexFile, 'SEALED_CUSTODY_LOCATION', `custody.sealed is ${JSON.stringify(sealed)}; a sealed secret lives only at .starcistacks/<env>/secrets/<slug>.enc, and the record here names it`);
+    }
     for (const found of declarationsOf(data, table, ctx)) {
+      if (sealedMisplaced && found.trail === 'custody.sealed') continue;
       if (found.digest) counts.digests += 1;
       verifyDeclaration(found, indexFile, ctx, wrapped, counts);
     }

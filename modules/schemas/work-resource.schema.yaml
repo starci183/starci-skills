@@ -172,8 +172,14 @@ properties:
           rather than from the project's name. The two are easy to confuse and a probe against a realm that
           does not exist fails quietly.
       sealed:
-        $ref: "#/$defs/prose"
-        description: The encrypted custody file, by path.
+        type: string
+        pattern: ^\.starcistacks/[a-z0-9]+(?:-[a-z0-9]+)*/secrets/[a-z0-9]+(?:-[a-z0-9]+)*\.enc$
+        description: "The encrypted custody file, by repository-relative path: exactly
+          .starcistacks/<env>/secrets/<slug>.enc, a sops (age) file, where <slug> is the identity or resource
+          slug. This is the only location a sealed secret has; the Work tree holds this record and never the
+          sealed file or any plaintext value. The schema has no not-sealed-yet form: an identity whose secret is
+          not sealed yet still names the path it will be sealed at, and the validator reports the path as an
+          absent input until uat.verify writes it."
       decryptWith:
         $ref: "#/$defs/prose"
         description: How the sealed file is opened, naming the key's own custody and never the key.
@@ -901,7 +907,7 @@ $defs:
                     custody:
                       type: string
                       pattern: "^identity:[a-z0-9]+([-_.][a-z0-9]+)*$"
-                      description: "identity:<slug> - the stable identity alias. Resolve its selected environment from the backend Stack declaration; encrypted custody is .starcistacks/<env>/secrets/<slug>/, outside the Work tree."
+                      description: "identity:<slug> - the stable identity alias. Resolve its selected environment from the backend Stack declaration; encrypted custody is .starcistacks/<env>/secrets/<slug>.enc, outside the Work tree."
                     where:
                       type: string
                       minLength: 1

@@ -12678,3 +12678,26 @@ git-failed:
   nextStep_vi: "Không rebase; đọc phần detail rồi land lại sau khi sửa nguyên nhân."
   owner: supervisor
   kind: verb-refusal
+
+SEALED_CUSTODY_LOCATION:
+  title: "Sealed secret path is not under .starcistacks"
+  title_vi: "Đường dẫn bí mật đã mã hoá không nằm dưới .starcistacks"
+  meaning_vi: "Trường custody.sealed của bản ghi danh tính hoặc tài nguyên không trỏ tới .starcistacks/<môi-trường>/secrets/<slug>.enc, nơi duy nhất được phép giữ bí mật đã mã hoá."
+  causes_vi:
+    - "Đường dẫn trỏ vào .starciwork, ví dụ .starciwork/_resources/identities/<id>/secrets.enc.yaml"
+    - "Đường dẫn dùng thư mục con hoặc đuôi khác thay vì <slug>.enc"
+    - "Ghi 'none' hoặc để trống thay vì nêu đường dẫn sẽ được mã hoá"
+  nextStep_vi: "Đây là lỗi bị từ chối; op work.author hoặc op uat.verify sửa custody.sealed thành .starcistacks/<môi-trường>/secrets/<slug>.enc và chuyển tệp mã hoá (nếu có) tới đó bằng git mv, không đọc nội dung."
+  owner: other-op:work.author
+  kind: check-finding
+
+SEALED_FILE_IN_WORK:
+  title: "Sealed secret file kept inside .starciwork"
+  title_vi: "Tệp bí mật đã mã hoá nằm trong .starciwork"
+  meaning_vi: "Cây Work chứa một tệp mã hoá (.enc); cây Work chỉ được giữ bản ghi danh tính hoặc tài nguyên, còn tệp bí mật phải nằm ở .starcistacks/<môi-trường>/secrets/<slug>.enc."
+  causes_vi:
+    - "Tệp secrets.enc.yaml được đặt cạnh resource.yaml của danh tính"
+    - "Tệp mã hoá được sao vào cây Work để tiện đọc"
+  nextStep_vi: "Đây là lỗi bị từ chối; op work.author hoặc op uat.verify chuyển tệp bằng git mv tới .starcistacks/<môi-trường>/secrets/<slug>.enc và trỏ custody.sealed vào đó, không đọc hay in nội dung."
+  owner: other-op:work.author
+  kind: check-finding
