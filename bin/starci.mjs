@@ -14,6 +14,7 @@ const ROUTES = {
   start: '../scripts/kernel/start-workflow.mjs',
   goal: '../scripts/goal/define-goal.mjs',
   validate: '../scripts/checks/work-validate.mjs',
+  link: '../scripts/install/link-packages.mjs',
 };
 
 const HELP = `starci — kernel-agent workflow runtime
@@ -24,6 +25,8 @@ const HELP = `starci — kernel-agent workflow runtime
   starci goal [args]                  define a goal: assess, plan table, persist to the ledger
   starci validate <work-root>         read-only Work record/layout validation
                   [--strict]          also compile every record against its named JSON schema
+  starci link [--repo <dir>] [--side be|fe] [--install]
+                                      copy the pinned @starci packages from the runtime into a product repo (.starci/packages) and point package.json at them
   starci help                         this text
 `;
 

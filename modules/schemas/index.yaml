@@ -737,6 +737,19 @@ schemas:
       whenNot: status unavailable/invalid is not clean; a missing checker can never be replaced by agent sign-off (per CONTEXT.md).
       selectedBy: pattern-check orchestration; auditors read reportDigest-bound output.
 
+  - id: starci/canon-pins@1
+    file: modules/schemas/canon-pins.schema.yaml
+    dialect: json-schema
+    subsystem: gate
+    governs: "The exact dependency versions every StarCi product repository pins - one exact semver per dependency (no range, no tag), a group and a side each, and for a @starci package the runtime package.json whose version it must equal."
+    binds: knowledge/hfs/canon-pins.yaml
+    usedBy: [scripts/checks/check-canon-pins.mjs, scripts/install/link-packages.mjs (starci link), packages/README.md]
+    business:
+      question: "Which exact version of each shared package and framework must a product repository pin?"
+      whenNeeded: Bumping a @starci package, running starci link, or judging a repository for pin drift.
+      whenNot: Not a lockfile and not a statement that a repository was upgraded; it names the target, the repository proves the result.
+      selectedBy: check-canon-pins and starci link read it; the pin-drift gate compares a repository with it.
+
   # --------------------------------------------------------------------------
   # SPECIFICATION — SRS/SDS payload contracts (bodies under
   # modules/schemas/spec/; validators live in scripts/checks/spec/).
@@ -938,6 +951,7 @@ moduleLocalDocumentKinds:
     files:
       - modules/schemas/agent-hierarchy.yaml
       - modules/schemas/application-stacks.schema.yaml
+      - modules/schemas/canon-pins.schema.yaml
       - modules/schemas/goal-plan.yaml
       - modules/schemas/interface-audit-operation.yaml
 

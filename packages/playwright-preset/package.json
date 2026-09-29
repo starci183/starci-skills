@@ -1,0 +1,26 @@
+{
+  "name": "@starci/playwright-preset",
+  "version": "1.0.0",
+  "description": "The StarCi Playwright config: one Chromium project per ui-screen viewport (desktop 1440x900, tablet 768x1024, mobile 390x844), one worker, list reporter.",
+  "license": "UNLICENSED",
+  "private": false,
+  "main": "index.cjs",
+  "types": "index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./index.d.ts",
+      "default": "./index.cjs"
+    }
+  },
+  "files": [
+    "index.cjs",
+    "index.d.ts",
+    "README.md"
+  ],
+  "peerDependencies": {
+    "@playwright/test": ">=1.51"
+  },
+  "scripts": {
+    "test": "node --test \"*.test.mjs\""
+  }
+}

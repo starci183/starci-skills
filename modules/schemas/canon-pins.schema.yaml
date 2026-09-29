@@ -1,0 +1,70 @@
+schema: starci/schema@1
+id: starci/canon-pins@1
+title: Canon dependency pins
+description: >-
+  The exact version of every dependency a product repository must pin, one version per dependency for the whole
+  StarCi family (HFS v2 decision 10 and K18). A pin is an exact semver, never a range: `^`, `~`, `>=`, `x` and
+  dist-tags are refused. A `@starci/*` pin names its `source`, the package.json inside this runtime whose version
+  it must equal, so a package cannot be bumped without the pin moving in the same change. The document is data
+  read by scripts/checks/check-canon-pins.mjs and by the `starci link` installer; it grants no authority to edit a
+  product repository.
+type: object
+additionalProperties: false
+required: [schema, pins]
+properties:
+  schema:
+    const: starci/canon-pins@1
+  purpose:
+    type: string
+    minLength: 1
+  pins:
+    type: object
+    minProperties: 1
+    additionalProperties: {$ref: '#/$defs/pin'}
+    required:
+      - '@starci/grammar'
+      - '@starci/eslint-canon-be'
+      - '@starci/eslint-canon-fe'
+      - '@starci/tsconfig'
+      - '@starci/prettier-config'
+      - '@starci/jest-preset'
+      - '@starci/vitest-preset'
+      - '@starci/playwright-preset'
+      - typescript
+      - prettier
+      - jest
+      - ts-jest
+      - vitest
+      - '@playwright/test'
+      - next
+      - react
+      - react-dom
+      - '@nestjs/core'
+      - '@heroui/react'
+$defs:
+  exactVersion:
+    type: string
+    pattern: ^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)(-[0-9A-Za-z.-]+)?$
+    description: An exact semantic version. A range, a tag or a wildcard is not a pin.
+  pin:
+    type: object
+    additionalProperties: false
+    required: [version, group, side]
+    properties:
+      version: {$ref: '#/$defs/exactVersion'}
+      group:
+        enum: [starci, tooling, test, framework, ui]
+        description: What the dependency is for. `starci` packages ship from this runtime; the rest come from the npm registry.
+      side:
+        enum: [be, fe, both]
+        description: Which repository kind pins it. `both` is every back-end and front-end repository.
+      source:
+        type: string
+        pattern: ^packages/[a-z0-9/-]+/package\.json$
+        description: >-
+          For a `starci` pin only - the package.json in this runtime whose `version` the pin must equal. A pin
+          with a source is installed by `starci link`; a pin without one comes from the registry.
+      why:
+        type: string
+        minLength: 1
+        description: One sentence naming the repositories that disagreed and which value won.

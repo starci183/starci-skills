@@ -1,0 +1,26 @@
+{
+  "name": "@starci/prettier-config",
+  "version": "1.0.0",
+  "description": "The one StarCi Prettier config: 120 columns, 4 spaces, no semicolons, double quotes, trailing commas everywhere.",
+  "license": "UNLICENSED",
+  "private": false,
+  "main": "index.cjs",
+  "types": "index.d.cts",
+  "exports": {
+    ".": {
+      "types": "./index.d.cts",
+      "default": "./index.cjs"
+    }
+  },
+  "files": [
+    "index.cjs",
+    "index.d.cts",
+    "README.md"
+  ],
+  "peerDependencies": {
+    "prettier": ">=3"
+  },
+  "scripts": {
+    "test": "node --test \"*.test.mjs\""
+  }
+}

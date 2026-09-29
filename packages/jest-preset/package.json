@@ -1,0 +1,33 @@
+{
+  "name": "@starci/jest-preset",
+  "version": "1.0.0",
+  "description": "The StarCi jest config for Nest repositories (unit and e2e projects, ts-jest with diagnostics off, coverage matching the Sonar denominators) and the typed mock<T>() helper.",
+  "license": "UNLICENSED",
+  "private": false,
+  "main": "index.cjs",
+  "types": "index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./index.d.ts",
+      "default": "./index.cjs"
+    },
+    "./mock": {
+      "types": "./mock.d.ts",
+      "default": "./mock.cjs"
+    }
+  },
+  "files": [
+    "*.cjs",
+    "*.d.ts",
+    "!*.test.*",
+    "README.md"
+  ],
+  "peerDependencies": {
+    "@types/jest": ">=29",
+    "jest": ">=29",
+    "ts-jest": ">=29"
+  },
+  "scripts": {
+    "test": "node --test \"*.test.mjs\""
+  }
+}

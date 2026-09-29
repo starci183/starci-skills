@@ -1,0 +1,23 @@
+{
+  "name": "@starci/tsconfig",
+  "version": "1.0.0",
+  "description": "The StarCi TypeScript configs: base, nest (back end), next (front-end app) and e2e. Strict, including noImplicitAny.",
+  "license": "UNLICENSED",
+  "private": false,
+  "exports": {
+    "./base.json": "./base.json",
+    "./nest.json": "./nest.json",
+    "./next.json": "./next.json",
+    "./e2e.json": "./e2e.json"
+  },
+  "files": [
+    "*.json",
+    "README.md"
+  ],
+  "peerDependencies": {
+    "typescript": ">=5.0.0"
+  },
+  "scripts": {
+    "test": "node --test \"*.test.mjs\""
+  }
+}

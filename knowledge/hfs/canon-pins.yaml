@@ -1,0 +1,158 @@
+schema: starci/canon-pins@1
+purpose: >-
+  The exact version of every dependency a StarCi product repository pins. One version per dependency for the whole
+  family. Raising a version is a change to this file first (with the package bump when it is a @starci package),
+  then `starci link` and the repositories' own upgrade lane. Read on 2026-09-29 from the packages under
+  .claude/packages and from the installed node_modules of nivo-backend, nivo-fe, starci-next, starci-next-fe,
+  mia-mia-backend and miamia-fe; where they disagreed the newest version installed in more than one repository
+  won, and the runtime's own version won for @starci packages.
+pins:
+  # --- @starci packages: installed from the runtime checkout by `starci link`, never from a registry.
+  '@starci/grammar':
+    version: 0.7.0
+    group: starci
+    side: fe
+    source: packages/grammar/package.json
+    why: nivo-fe pins 0.4.11 and 0.5.0 in one workspace, starci-next-fe 0.5.1, miamia-fe 0.5.0; the runtime source is 0.7.0.
+  '@starci/eslint-canon-be':
+    version: 1.2.3
+    group: starci
+    side: be
+    source: packages/eslint/be/package.json
+    why: back-end repositories carry 1.2.1 and 1.2.2 while the runtime source is 1.2.3.
+  '@starci/eslint-canon-fe':
+    version: 4.0.0
+    group: starci
+    side: fe
+    source: packages/eslint/fe/package.json
+    why: every front-end repository carries 3.0.2 while the runtime source is 4.0.0.
+  '@starci/tsconfig':
+    version: 1.0.0
+    group: starci
+    side: both
+    source: packages/tsconfig/package.json
+  '@starci/prettier-config':
+    version: 1.0.0
+    group: starci
+    side: both
+    source: packages/prettier-config/package.json
+  '@starci/jest-preset':
+    version: 1.0.0
+    group: starci
+    side: be
+    source: packages/jest-preset/package.json
+  '@starci/vitest-preset':
+    version: 1.0.0
+    group: starci
+    side: fe
+    source: packages/vitest-preset/package.json
+  '@starci/playwright-preset':
+    version: 1.0.0
+    group: starci
+    side: fe
+    source: packages/playwright-preset/package.json
+  # --- tooling
+  typescript:
+    version: 5.9.3
+    group: tooling
+    side: both
+    why: all six repositories resolve 5.9.3 already; the declared ranges (^5, ^5.7.3) become exact.
+  prettier:
+    version: 3.9.6
+    group: tooling
+    side: both
+    why: only nivo-backend has it installed (3.9.6); the other five adopt it with the formatter change.
+  eslint:
+    version: 9.39.5
+    group: tooling
+    side: both
+    why: five repositories resolve 9.39.5, nivo-backend 9.39.4.
+  '@types/node':
+    version: 22.20.4
+    group: tooling
+    side: both
+    why: nivo-fe resolves 20.19.43 and nivo-backend 22.20.0; the package engines are node >=22.
+  # --- test
+  jest:
+    version: 29.7.0
+    group: test
+    side: be
+  ts-jest:
+    version: 29.4.12
+    group: test
+    side: be
+  '@types/jest':
+    version: 29.5.14
+    group: test
+    side: be
+  vitest:
+    version: 3.2.7
+    group: test
+    side: fe
+  '@vitest/coverage-v8':
+    version: 3.2.7
+    group: test
+    side: fe
+  '@playwright/test':
+    version: 1.63.0
+    group: test
+    side: fe
+    why: nivo-fe pins 1.51.1 and starci-next-fe 1.63.0; the newer wins and the viewport projects need no older API.
+  jsdom:
+    version: 29.1.1
+    group: test
+    side: fe
+  '@vitejs/plugin-react':
+    version: 5.2.0
+    group: test
+    side: fe
+  '@testing-library/react':
+    version: 16.3.3
+    group: test
+    side: fe
+    why: nivo-fe resolves 16.3.2, the other two 16.3.3.
+  '@testing-library/jest-dom':
+    version: 7.0.1
+    group: test
+    side: fe
+  # --- framework
+  next:
+    version: 16.1.6
+    group: framework
+    side: fe
+  react:
+    version: 19.2.3
+    group: framework
+    side: fe
+  react-dom:
+    version: 19.2.3
+    group: framework
+    side: fe
+  '@nestjs/core':
+    version: 11.2.5
+    group: framework
+    side: be
+    why: nivo-backend resolves 11.1.27, starci-next and mia-mia-backend 11.2.5.
+  '@nestjs/common':
+    version: 11.2.5
+    group: framework
+    side: be
+  '@nestjs/platform-express':
+    version: 11.2.5
+    group: framework
+    side: be
+  '@nestjs/testing':
+    version: 11.2.5
+    group: framework
+    side: be
+  # --- ui
+  '@heroui/react':
+    version: 3.2.6
+    group: ui
+    side: fe
+    why: nivo-fe resolves 3.2.4, starci-next-fe and miamia-fe 3.2.6.
+  '@heroui/styles':
+    version: 3.2.6
+    group: ui
+    side: fe
+    why: nivo-fe resolves 3.2.4, starci-next-fe and miamia-fe 3.2.6.
