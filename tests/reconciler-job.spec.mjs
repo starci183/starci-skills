@@ -2,6 +2,7 @@
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import crypto from 'node:crypto';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { DatabaseSync } from 'node:sqlite';
@@ -19,13 +20,29 @@ function fixture({ status = 'running', payload = {}, report = null, handover = n
   const file = path.join(dir, 'runtime.sqlite');
   const ledger = openLedger({ file });
   const at = NOW - updatedAgoMs;
-  ledger.db.prepare("INSERT INTO workflows(workflow_id,created_at,updated_at,phase) VALUES('wf-x',?,?,'running')").run(NOW, NOW);
-  ledger.db.prepare("INSERT INTO jobs(job_id,workflow_id,op_id,attempt,generation,kind,payload_json,status,worker_id,created_at,updated_at) VALUES('op-a','wf-x','code.refactor',1,0,'op',?,?,'term_1',?,?)")
-    .run(JSON.stringify({ owned_paths: ['nivo-fe/src/a'], params: { canonFamilies: 'all' }, cut: { id: 'c', ordinal: 2, total: 5 }, ...payload }), status, at, at);
-  if (report) {
-    ledger.db.prepare("INSERT INTO contracts(workflow_id,op_id,attempt,dispatch_id,markdown,created_at) VALUES('wf-x','code.refactor',1,'ctx_1','m',?)").run(NOW);
-    ledger.db.prepare("INSERT INTO reports(workflow_id,dispatch_id,op_id,attempt,outcome,report_json,created_at) VALUES('wf-x','ctx_1','code.refactor',1,?,?,?)")
-      .run(report.outcome ?? 'done', JSON.stringify({ head: 'abc123', checks: [] }), NOW - (report.agoMs ?? 60_000));
+  const sha = (s, n) => crypto.createHash('sha256').update(s).digest('hex').slice(0, n);
+  // The migrated schema (engine/migrations/runtime/0001-init.sql): workflows need a trace_id, an op job
+  // needs its work unit (jobs_enqueue_guard), and a dispatch row goes in only while the job is 'leased'
+  // under a 'running' workflow (op_attempts_dispatch_guard) - then the job walks job_transitions to `status`.
+  const needsAttempt = report != null || !['queued', 'ready', 'cancelled'].includes(status);
+  ledger.db.prepare("INSERT INTO workflows(workflow_id,trace_id,phase,created_at,updated_at) VALUES('wf-x',?,'running',?,?)").run(sha('wf-x', 32), NOW, NOW);
+  ledger.db.prepare("INSERT INTO work_units(workflow_id,unit_id,op_id,subject_key,goal_revision,state,current_job_id,tries,created_at,updated_at) VALUES('wf-x','op-a','code.refactor','op-a',0,'queued','op-a',1,?,?)").run(at, at);
+  ledger.db.prepare("INSERT INTO jobs(job_id,workflow_id,unit_id,op_id,try_no,generation,kind,payload_json,status,worker_id,created_at,updated_at) VALUES('op-a','wf-x','op-a','code.refactor',1,0,'op',?,?,'term_1',?,?)")
+    .run(JSON.stringify({ owned_paths: ['nivo-fe/src/a'], params: { canonFamilies: 'all' }, cut: { id: 'c', ordinal: 2, total: 5 }, ...payload }), needsAttempt ? 'leased' : status, at, at);
+  if (needsAttempt) {
+    const settled = ['succeeded', 'failed'].includes(status) ? at : null;
+    const { lastInsertRowid: attemptId } = ledger.db.prepare(`INSERT INTO op_attempts(workflow_id,job_id,unit_id,op_id,try_no,dispatch_seq,dispatch_id,span_id,
+      dispatched_at,started_at,settled_at,end_state) VALUES('wf-x','op-a','op-a','code.refactor',1,1,'ctx_1',?,?,?,?,?)`)
+      .run(sha('span:op-a', 16), at, at, settled, settled ? 'settled' : null);
+    if (report) {
+      ledger.db.prepare("INSERT INTO contracts(attempt_id,workflow_id,job_id,markdown,created_at) VALUES(?,'wf-x','op-a','m',?)").run(attemptId, NOW);
+      ledger.db.prepare("INSERT INTO reports(workflow_id,attempt_id,dispatch_id,job_id,outcome,report_json,created_at) VALUES('wf-x',?,'ctx_1','op-a',?,?,?)")
+        .run(attemptId, report.outcome ?? 'done', JSON.stringify({ head: 'abc123', checks: [] }), NOW - (report.agoMs ?? 60_000));
+    }
+    const walk = { leased: [], running: ['running'], answering: ['running', 'answering'], reported: ['running', 'reported'],
+      deciding: ['running', 'reported', 'deciding'], succeeded: ['running', 'reported', 'succeeded'],
+      failed: ['running', 'failed'], effect_unknown: ['running', 'effect_unknown'] }[status] ?? [];
+    for (const next of walk) ledger.db.prepare("UPDATE jobs SET status=? WHERE job_id='op-a'").run(next);
   }
   const ev = (kind, p, ago = 0) => ledger.transaction(() => ledger.appendEvent({ workflowId: 'wf-x', entityType: 'job', entityId: 'op-a', kind, payload: p }));
   if (handover) ev(EVENTS.needsKernel, { dispatchId: 'ctx_1', reason: handover.reason, ...(handover.code ? { code: handover.code } : {}) });

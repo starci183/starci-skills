@@ -29,6 +29,9 @@ const world=(t,prefix)=>{
   const stateFile=path.join(root,'state.json'),logFile=path.join(root,'calls.jsonl');
   const env={...process.env,STARCI_ORCA_COMMAND:process.execPath,STARCI_ORCA_ARGS:JSON.stringify([stubFile]),
     STARCI_FAKE_ORCA_LOG:logFile,STARCI_FAKE_ORCA_STATE:stateFile,LOCALAPPDATA:path.join(root,'localappdata')};
+  // The runtime.sqlite every spawned child resolves (projectsRootFor(env)/<ledgerId>/runtime.sqlite);
+  // in-process handles must name the same env or they open a different ledger.
+  const ledgerFile=()=>ledgerFileFor(repo,{env});
   const orcaState=()=>(fs.existsSync(stateFile)?json(fs.readFileSync(stateFile,'utf8')):null)??{sends:0};
   const writeState=fn=>{const s=orcaState();fn(s);fs.writeFileSync(stateFile,JSON.stringify(s));};
   // The Kernel terminal is a Claude frame at its idle prompt until a send changes it.
@@ -38,11 +41,11 @@ const world=(t,prefix)=>{
   const kernelWakes=()=>(fs.existsSync(logFile)?fs.readFileSync(logFile,'utf8').trim().split('\n').filter(Boolean).map(json):[])
     .map(e=>e.argv).filter(a=>a[0]==='terminal'&&a[1]==='send'&&a[a.indexOf('--terminal')+1]===KERNEL)
     .map(a=>({text:a.includes('--text')?a[a.indexOf('--text')+1]:'',enter:a.includes('--enter')}));
-  return {root,repo,env,orcaState,writeState,seedKernelTerminal,kernelWakes};
+  return {root,repo,env,ledgerFile,orcaState,writeState,seedKernelTerminal,kernelWakes};
 };
 
-const signalKernel=(ledger,workflowId)=>ledger.db.prepare("INSERT OR REPLACE INTO signals(scope,key,holder_pid,token,value_json,at,expires_at) VALUES('kernel',?,NULL,?,?,?,NULL)")
-  .run(workflowId,'kernel-token',JSON.stringify({terminal:KERNEL,host:'orca',agent:'claude'}),Date.now());
+const signalKernel=(ledger,workflowId)=>ledger.db.prepare("INSERT OR REPLACE INTO signals(scope,key,workflow_id,holder_pid,token,value_json,at,expires_at) VALUES('kernel',?,?,NULL,?,?,?,NULL)")
+  .run(workflowId,workflowId,'kernel-token',JSON.stringify({terminal:KERNEL,host:'orca',agent:'claude'}),Date.now());
 
 /* --------------------------------------------------------------- units */
 
@@ -73,16 +76,25 @@ const reportWorld=t=>{
   const w=world(t,'starci-transition-wake-');
   const run=(args,more={})=>spawnSync(process.execPath,[API,...args],{cwd:ROOT,encoding:'utf8',windowsHide:true,timeout:120000,env:{...w.env,...more}});
   const workflowId='wf-transition-wake',jobId='job-transition-wake';
-  const ledger=openLedger({file:ledgerFileFor(w.repo)});
+  const ledger=openLedger({file:w.ledgerFile()});
   try{
-    ledger.enqueueJob({jobId,workflowId,opId:'code.refactor',kind:'op',payload:{opId:'code.refactor',owned_paths:['docs/'],model:'codex-agent',difficulty:'hard'}});
-    ledger.db.prepare("UPDATE workflows SET phase='queued' WHERE workflow_id=?").run(workflowId);
+    // jobs_enqueue_guard (migrations/runtime/0001-init.sql:278): an op job needs a workflow that accepts
+    // work and a work unit; op_attempts_dispatch_guard (line 376) wants the workflow already running.
+    ledger.ensureWorkflow({workflowId,title:'transition wake proof'});
+    ledger.write.changeWorkflowPhase({workflowId,to:'running',by:'test-fixture',reason:'seed'});
+    ledger.write.createUnit({workflowId,unitId:jobId,opId:'code.refactor',subjectKey:jobId,goalRevision:1});
+    ledger.enqueueJob({jobId,workflowId,unitId:jobId,opId:'code.refactor',kind:'op',payload:{opId:'code.refactor',owned_paths:['docs/'],model:'codex-agent',difficulty:'hard'}});
     signalKernel(ledger,workflowId);
   }finally{ledger.close();}
   const d=run(['dispatch','--repo',w.repo,'--job',jobId,'--model','codex-agent','--spawn','--json']);
   assert.equal(d.status,0,d.stderr||d.stdout);
   w.seedKernelTerminal();
-  const report=path.join(w.repo,'report.json');
+  // api report reads the envelope only from the attempt's scratch (op_attempts.scratch_dir, H10).
+  const scratch=(()=>{const l=inspectLedger({file:w.ledgerFile()});
+    try{return l.db.prepare('SELECT scratch_dir FROM op_attempts WHERE job_id=? ORDER BY attempt_id DESC').get(jobId)?.scratch_dir;}finally{l.close();}})();
+  assert.ok(scratch,'the dispatch recorded the attempt scratch dir');
+  fs.mkdirSync(scratch,{recursive:true});
+  const report=path.join(scratch,'report.json');
   fs.writeFileSync(report,JSON.stringify({schema:'starci/op-report@1',outcome:'done',summary:'op done',files:['docs/a.md'],
     checks:[{name:'self-check',command:'true',exitCode:0}],head:'abc1234def'}));
   const fileReport=more=>{
@@ -92,7 +104,7 @@ const reportWorld=t=>{
     return JSON.parse(r.stdout.slice(open,close+2));
   };
   const woken=()=>{
-    const l=inspectLedger({file:ledgerFileFor(w.repo)});
+    const l=inspectLedger({file:w.ledgerFile()});
     try{return l.db.prepare("SELECT payload_json FROM events WHERE workflow_id=? AND kind='kernel-transition-woken' ORDER BY seq").all(workflowId).map(r=>json(r.payload_json));}
     finally{l.close();}
   };
@@ -129,9 +141,11 @@ test('transition wake: a stalled send the screen does not show is kernel-wake-fa
 const watchdogWorld=t=>{
   const w=world(t,'starci-watchdog-wake-');
   const workflowId='wf-watchdog-wake';
-  const ledger=openLedger({file:ledgerFileFor(w.repo)});
+  const ledger=openLedger({file:w.ledgerFile()});
   try{
     ledger.ensureWorkflow({workflowId,title:'watchdog wake proof'});
+    // The watchdog only repairs, wakes or relaunches a running workflow's Kernel (watchdog.mjs:264).
+    ledger.write.changeWorkflowPhase({workflowId,to:'running',by:'test-fixture',reason:'seed'});
     ledger.db.prepare('INSERT INTO goals(workflow_id,revision,goal_identity,markdown,json,created_at) VALUES(?,?,?,?,?,?)')
       .run(workflowId,0,'watchdog-wake','# goal','{}',Date.now());
     signalKernel(ledger,workflowId);
@@ -192,13 +206,13 @@ finally{ledger.close();}`;
 test('ask-answered wake: agent_prompt_stalled with the wake landed is kernel-woken with its event; a miss still fails',t=>{
   const w=world(t,'starci-ask-wake-');
   const workflowId='wf-ask-wake';
-  const ledger=openLedger({file:ledgerFileFor(w.repo)});
+  const ledger=openLedger({file:w.ledgerFile()});
   try{ledger.ensureWorkflow({workflowId,title:'ask wake proof'});signalKernel(ledger,workflowId);}finally{ledger.close();}
   w.seedKernelTerminal();
   const woke=askWake(w,workflowId,'landed');
   assert.deepEqual([woke.action,woke.delivery,woke.sendErrorCode],['kernel-woken','delivered','agent_prompt_stalled'],JSON.stringify(woke));
   const events=()=>{
-    const l=inspectLedger({file:ledgerFileFor(w.repo)});
+    const l=inspectLedger({file:w.ledgerFile()});
     try{return l.db.prepare("SELECT payload_json FROM events WHERE workflow_id=? AND kind='kernel-transition-woken'").all(workflowId).map(r=>json(r.payload_json));}
     finally{l.close();}
   };
@@ -315,7 +329,7 @@ const unwritableWorld=t=>{
   const terminal=json(boot.stdout)?.terminal;assert.ok(terminal,'the first kernel booted a terminal');
   const tick=()=>{const r=run(WATCHDOG,['--repo',w.repo,'--workflow',workflowId,'--once','--repair','--json']);
     return {status:r.status,result:json(r.stdout.trim().split('\n').at(-1)),stderr:r.stderr,stdout:r.stdout};};
-  const events=kind=>{const l=inspectLedger({file:ledgerFileFor(w.repo)});
+  const events=kind=>{const l=inspectLedger({file:w.ledgerFile()});
     try{return l.db.prepare("SELECT payload_json FROM events WHERE workflow_id=? AND kind=? ORDER BY seq").all(workflowId,kind).map(r=>json(r.payload_json));}
     finally{l.close();}};
   return {...w,workflowId,terminal,tick,events};
