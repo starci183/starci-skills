@@ -201,6 +201,22 @@ const run = (cmd, args, { cwd, timeout = 1_200_000, env = process.env } = {}) =>
   const r = spawnSync(cmd, args, { cwd, encoding: 'utf8', windowsHide: true, timeout, env, maxBuffer: 64 * 1024 * 1024 });
   return { ok: r.status === 0, status: r.status, stdout: String(r.stdout ?? ''), stderr: String(r.stderr ?? ''), error: r.error?.message ?? null };
 };
+// git's repository-local variables (git rev-parse --local-env-vars). A hook or alias run in a linked worktree exports
+// GIT_DIR=<main>/.git/worktrees/<wt>; a spec inheriting it pointed every fixture git at the LIVE .claude repo and re-inited
+// it core.bare=true (2026-09-29, a6f60352c). tests/setup/isolated-registry.mjs drops the same list.
+export const GIT_LOCAL_ENV_VARS = ['GIT_DIR', 'GIT_COMMON_DIR', 'GIT_WORK_TREE', 'GIT_INDEX_FILE', 'GIT_OBJECT_DIRECTORY', 'GIT_ALTERNATE_OBJECT_DIRECTORIES', 'GIT_IMPLICIT_WORK_TREE', 'GIT_PREFIX', 'GIT_CONFIG', 'GIT_CONFIG_PARAMETERS', 'GIT_CONFIG_COUNT', 'GIT_GRAFT_FILE', 'GIT_NO_REPLACE_OBJECTS', 'GIT_REPLACE_REF_BASE', 'GIT_SHALLOW_FILE'];
+/** `parent` without git's repository-local variables (GIT_CONFIG_KEY_n/VALUE_n go with GIT_CONFIG_COUNT). */
+export function withoutGitLocalEnv(parent = process.env) {
+  const env = { ...parent };
+  for (const key of Object.keys(env)) if (GIT_LOCAL_ENV_VARS.includes(key) || /^GIT_CONFIG_(KEY|VALUE)_\d+$/.test(key)) delete env[key];
+  return env;
+}
+/** The env the gate's spec run gets: no test-runner channel, no git repository-local variables. */
+export function specRunEnv(parent = process.env) {
+  const env = withoutGitLocalEnv(parent);
+  delete env.NODE_TEST_CONTEXT;
+  return env;
+}
 const tail = (text, n = 25) => String(text ?? '').trim().split(/\r?\n/).slice(-n).join('\n');
 
 export function removeScratch(dir, { root }) {
@@ -313,8 +329,7 @@ export function runChecks({ dir, base, head, specs = [], specMode = 'touching', 
   const gate = runSpecs && allSpecs.length ? ramGate() : null;
   if (gate && !gate.ok) checks.push({ name: `specs (${allSpecs.length})`, ok: false, specs: allSpecs, output: `spec run paused: host RAM critical after waiting ${Math.round(gate.waitedMs / 1000)}s - ${gate.why}; land again once free RAM is back above allocation.resources.ramThrottle.landSpecResumeAbovePct` });
   if (runSpecs && allSpecs.length && gate?.ok !== false) {
-    const env = { ...process.env };
-    delete env.NODE_TEST_CONTEXT;
+    const env = specRunEnv();
     // The candidate's own test preload points the machine registry at a per-run temp file, so no spec it
     // runs enrols a ledger on this host's registry (a candidate from before the preload runs without it).
     const preload = path.join(dir, 'tests', 'setup', 'isolated-registry.mjs');
@@ -366,6 +381,9 @@ function livePathGit(root, args, paths) {
  * Returns {ok, reason?, dirty?, moved?}.
  */
 export function fastForwardLive({ root, base, head, rows }) {
+  // A live repo flipped to core.bare=true fails the status/checkout below with a generic error; name it and the fix.
+  const bare = git(['config', '--get', 'core.bare'], { cwd: root, env: withoutGitLocalEnv() }).stdout.toLowerCase();
+  if (bare === 'true') return { ok: false, reason: 'live-repo-bare', detail: `${root} has core.bare=true (a git fixture reached the live repo through a leaked GIT_DIR?) - find the writer, then run: git -C "${root}" config core.bare false` };
   const branch = git(['symbolic-ref', '-q', 'HEAD'], { cwd: root }).stdout;
   if (branch !== 'refs/heads/main') return { ok: false, reason: 'live-not-on-main', detail: branch || 'detached' };
   const live = git(['rev-parse', 'refs/heads/main'], { cwd: root }).stdout;
