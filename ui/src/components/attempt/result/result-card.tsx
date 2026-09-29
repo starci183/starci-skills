@@ -7,6 +7,7 @@ import { Advanced, Grow } from '../../motion';
 import { Card } from '../frame/card';
 import { useManifest } from './manifest';
 import { settleView } from './settle-text';
+import { WhyBlock } from '../../why/why-block';
 
 export const concept: Concept = 'C10';
 
@@ -70,7 +71,7 @@ function Assertions({ manifest }: { manifest: AttemptManifest }) {
 export function ResultCard({ attempt }: { attempt: AttemptDetailV3 }) {
   const manifest = useManifest(attempt);
   const opStatus = statusFromOutcome(attempt.reportOutcome);
-  const verdictStatus = attempt.endState === 'requeued' ? 'rejected' as const : statusFromVerdict(attempt.verdict, attempt.settledAt == null && attempt.endState == null, attempt.reportOutcome);
+  const verdictStatus = statusFromVerdict(attempt.verdict, attempt.settledAt == null && attempt.endState == null, attempt.ui);
   const settle = settleView(attempt);
   const claims = claimsOf(attempt);
   const reportSummary = obj(attempt.report?.json)?.summary;
@@ -100,6 +101,7 @@ export function ResultCard({ attempt }: { attempt: AttemptDetailV3 }) {
           <StatusChip status={verdictStatus} label={attempt.verdict ? (verdictLabels[attempt.verdict] ?? attempt.verdict) : 'Chưa chốt'} />
           {attempt.settledBy ? <span className="text-xs text-muted-foreground">bởi {attempt.settledBy}</span> : null}
         </div>
+        {attempt.why ? <WhyBlock why={attempt.why} className="mb-4 max-w-[80ch]" /> : null}
         {settle.lines.length ? <ul className="m-0 flex max-w-[72ch] list-disc flex-col gap-1 pl-6 text-sm">{settle.lines.map((line, i) => <li key={i} className="break-words">{line}</li>)}</ul>
           : <p className="m-0 text-sm text-muted-foreground">{attempt.verdict ? 'Kernel không ghi thêm lý do nào ngoài kết luận.' : 'Kernel chưa chốt lần thử này.'}</p>}
         <div className="mt-4 flex flex-wrap items-center gap-x-3 gap-y-1 border-t pt-4 text-sm">

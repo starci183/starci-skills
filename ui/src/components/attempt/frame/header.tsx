@@ -10,6 +10,7 @@ import { isOpen } from './steps';
 import type { Concept } from '../../concept';
 import { Advanced, Swap } from '../../motion';
 import { AgentAvatar, agentOf } from '../../agent/agent-avatar';
+import { WhyBlock } from '../../why/why-block';
 
 export const concept: Concept = 'C6';
 
@@ -30,7 +31,7 @@ function SiblingLink({ target, label, dir }: { target: Ref; label: string; dir: 
 export function AttemptHeader({ attempt, project }: { attempt: AttemptDetailV3; project: string }) {
   const open = isOpen(attempt);
   const outcome = statusFromOutcome(attempt.reportOutcome);
-  const verdict = statusFromVerdict(attempt.verdict, open && Boolean(attempt.reportedAt), attempt.reportOutcome);
+  const verdict = statusFromVerdict(attempt.verdict, open && Boolean(attempt.reportedAt), attempt.ui);
   const previous = attempt.retry.retryOf ?? attempt.retry.resumeOf;
   const outcomeLabel = attempt.reportOutcome ? `Op tự báo: ${outcomeWords[attempt.reportOutcome] ?? attempt.reportOutcome}` : attempt.reportedAt ? 'Op tự báo: chưa rõ' : 'Op tự báo: chưa báo cáo';
   const verdictLabel = verdict === 'awaiting-owner' ? 'Kernel chốt: chờ thầy trả lời' : attempt.verdict ? `Kernel chốt: ${verdictWords[attempt.verdict] ?? attempt.verdict}` : open && attempt.reportedAt ? 'Kernel chốt: đang chốt' : 'Kernel chưa chốt';
@@ -42,7 +43,8 @@ export function AttemptHeader({ attempt, project }: { attempt: AttemptDetailV3; 
   const end = attempt.settledAt ?? attempt.reportedAt ?? (open ? Date.now() : null);
   const duration = attempt.dispatchedAt && end ? end - attempt.dispatchedAt : null;
   const total = attempt.usage?.total;
-  const tokens = total ? total.input + total.output : null;
+  const tokens = attempt.tokensIn != null || attempt.tokensOut != null ? (attempt.tokensIn ?? 0) + (attempt.tokensOut ?? 0) : total ? total.input + total.output : null;
+  const tokenText = tokens != null ? `${compactVi(tokens)} token` : attempt.usageSource === 'unavailable' ? `token không đo được${attempt.usageReason ? ` · ${attempt.usageReason}` : ''}` : 'token chưa ghi nhận';
   return <header className="flex min-w-0 flex-col gap-4" data-tone={tone}>
     <nav aria-label="Đường dẫn" className="flex flex-wrap items-center gap-x-2 text-xs text-muted-foreground">
       <Crumb href="#/">Tổng quan</Crumb><span aria-hidden="true">/</span>
@@ -65,11 +67,12 @@ export function AttemptHeader({ attempt, project }: { attempt: AttemptDetailV3; 
         <Swap keyValue={verdictLabel}><StatusChip status={verdict} label={verdictLabel} /></Swap>
       </div>
     </div>
+    {attempt.why ? <WhyBlock why={attempt.why} compact className="max-w-[80ch]" /> : null}
     {previous || attempt.retry.next ? <div className="flex flex-wrap items-center gap-2">
       {previous ? <SiblingLink target={previous} label={attempt.retry.resumeOf && !attempt.retry.retryOf ? 'Tiếp nối từ' : 'Lần trước'} dir="prev" /> : null}
       {attempt.retry.next ? <SiblingLink target={attempt.retry.next} label="Lần sau" dir="next" /> : null}
     </div> : null}
-    <Advanced summary={`${attempt.job} · ${tokens != null ? `${compactVi(tokens)} token` : 'token chưa ghi nhận'}`}>
+    <Advanced summary={`${attempt.job} · ${tokenText}`}>
       <div className="flex min-w-0 flex-col gap-2 text-xs text-muted-foreground">
         <p className="m-0 break-all font-mono">{attempt.op} · {attempt.job} · attempt {attempt.id} · giao #{attempt.dispatchSeq}</p>
         <p className="m-0 flex flex-wrap gap-x-4 gap-y-1">

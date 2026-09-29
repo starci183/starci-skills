@@ -7,6 +7,7 @@ import { StatusChip } from '../../status-chip';
 import { statusLabels, statusTone, type Status } from '../../status';
 import { statusFromUi } from '../../status';
 import { Advanced, Grow, Swap, Ticker } from '../../motion';
+import { WhyBlock } from '../../why/why-block';
 
 const order: Status[] = ['success', 'running', 'settling', 'queued', 'retry', 'failed', 'blocked', 'awaiting-owner', 'planned', 'deferred', 'external', 'dropped', 'unknown'];
 const stuckReasons: Record<string, string> = {
@@ -47,17 +48,26 @@ export function WorkflowHeader({ row, pipeline }: { row: WorkflowDetailV2; pipel
   const action = row.blockedBy[0] ? { href: row.blockedBy[0].ref.href, label: 'Xem chỗ đang chặn' }
     : row.counts.decisionsOpen > 0 ? { href: `${root}?tab=decisions`, label: 'Xem quyết định đang chờ' }
     : currentLeg ? { href: `${root}?leg=${encodeURIComponent(currentLeg.op)}`, label: 'Xem chặng đang chạy' } : null;
+  const legWhy = pipeline?.legs.find(leg => leg.why && (leg.current || ['failed', 'blocked', 'awaiting-owner', 'retry', 'rejected'].includes(leg.status))) ?? null;
+  const notes = pipeline?.kernelNotes ?? [];
   const why = row.reason ? formatReason(row.reason) : row.phase !== 'running' ? row.phaseReason : row.onIt ? `${row.onIt.who} đang lo · ${formatReason(row.onIt.reason)}` : null;
   return <header className="flex flex-col gap-4">
     <nav aria-label="Vị trí" className="flex flex-wrap items-center gap-1 text-sm text-muted-foreground"><a href="#/" className="inline-flex items-center gap-1 hover:text-foreground"><ArrowLeft className="size-4" /> Tổng quan</a><span aria-hidden="true">/</span><span>{row.project}</span></nav>
     <div className="flex flex-col gap-3">
       <div className="flex flex-wrap items-center gap-x-3 gap-y-2"><h1 className="min-w-0 break-words text-2xl font-semibold tracking-tight sm:text-3xl">{row.name}</h1>
         <Swap keyValue={`${phaseStatus}-${phaseText}`}><StatusChip status={phaseStatus} label={phaseText} /></Swap>{healthChip && <StatusChip status={healthChip.status} label={healthChip.text} />}{problems.map(item => <StatusChip key={item.key} status={item.status} label={item.text} />)}</div>
-      {why ? <p className="text-sm text-muted-foreground">{why}</p> : null}
+      {legWhy?.why ? <div className="flex min-w-0 flex-col gap-1"><span className="text-xs text-muted-foreground">Chặng {legWhy.op}</span><WhyBlock why={legWhy.why} compact className="max-w-[80ch]" /></div>
+        : why ? <p className="text-sm text-muted-foreground">{why}</p> : null}
     </div>
     <details className="rounded-lg border bg-card px-4 py-3 text-sm"><summary className="cursor-pointer list-none"><span className="font-medium">Mục tiêu · bản {row.goal.revision}</span><span className="ml-2 text-muted-foreground line-clamp-1 inline">{row.goal.text ? row.goal.text.slice(0, 160) : 'Chưa có mục tiêu được ghi nhận.'}</span></summary>
       <p className="mt-2 whitespace-pre-wrap break-words border-t pt-2 leading-relaxed">{row.goal.text || 'Chưa có mục tiêu được ghi nhận.'}</p></details>
     {pipeline && <div className="flex flex-col gap-4 rounded-xl border bg-card p-4 shadow-sm md:p-6"><LegProgress pipeline={pipeline} eta={row.etaAt != null ? formatAbsolute(row.etaAt) : 'chưa ước tính được'} action={action} />
+      {notes.length ? <Advanced summary={`${notes.length} ghi chú của Kernel`} title="Kernel ghi chú">
+        <ol className="m-0 flex list-none flex-col gap-2 p-0 text-sm">{notes.slice().reverse().map(note => <li key={note.id} className="flex min-w-0 flex-col gap-1 rounded-lg border p-3">
+          <span className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground"><span className="font-medium text-foreground">{note.kind === 'decision' ? 'Quyết định' : 'Đề xuất'}</span><span>{note.status}</span><span>{new Intl.DateTimeFormat('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh', hour: '2-digit', minute: '2-digit', day: '2-digit', month: '2-digit' }).format(note.at)}</span></span>
+          <span className="break-words">{note.headline}</span>{note.observed ? <span className="text-xs text-muted-foreground">Kết quả: {note.observed}</span> : null}
+        </li>)}</ol>
+      </Advanced> : null}
       <Advanced summary="tốc độ · song song · người xử lý · ghế Kernel · số lần thử">
         <div className="flex flex-wrap gap-x-4 gap-y-2 text-xs text-muted-foreground">
           <span>{pipeline.legs.length} chặng trong chuỗi · {pipeline.attempts} lần thử · {pipeline.failures} lần hỏng</span>

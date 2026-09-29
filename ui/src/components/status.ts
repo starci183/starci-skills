@@ -18,8 +18,10 @@ export const statusLabels: Record<Status, string> = {
 /** Statuses that are "live" (animated dot). */
 export const liveStatuses = new Set<Status>(['running', 'settling']);
 
-export function statusFromUi(ui: UiState): Status {
+export function statusFromUi(ui: UiState | 'awaiting-owner' | 'rejected'): Status {
   switch (ui) {
+    case 'awaiting-owner': return 'awaiting-owner';
+    case 'rejected': return 'rejected';
     case 'ok': case 'done': return 'success';
     case 'running': return 'running';
     case 'waiting': return 'queued';
@@ -29,10 +31,12 @@ export function statusFromUi(ui: UiState): Status {
   }
 }
 
-/** A blocked verdict on an op that filed an ask (report outcome 'ask') waits on the owner; it is neither failed nor blocked. */
-export function statusFromVerdict(verdict: string | null | undefined, open = false, reportOutcome?: string | null): Status {
+/** The verdict chip. `ui` is v_op_history.ui (or a brief's status): 'awaiting-owner' / 'rejected' win over the raw verdict (docs/why.md). */
+export function statusFromVerdict(verdict: string | null | undefined, open = false, ui?: string | null): Status {
+  if (ui === 'awaiting-owner') return 'awaiting-owner';
+  if (ui === 'rejected') return 'rejected';
   if (verdict === 'pass') return 'success';
-  if (verdict === 'blocked') return reportOutcome === 'ask' ? 'awaiting-owner' : 'blocked';
+  if (verdict === 'blocked') return 'blocked';
   if (verdict === 'fail' || verdict === 'partial') return 'failed';
   if (verdict === 'dropped' || verdict === 'cancelled') return 'dropped';
   return open ? 'running' : 'unknown';

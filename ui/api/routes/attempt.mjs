@@ -9,6 +9,7 @@ import { redactText } from '../../../scripts/lib/redact.mjs';
 import { parseYaml } from '../../../engine/yaml.mjs';
 import { transcriptWindow } from '../transcript-search.mjs';
 import { sendJson, sendError } from '../envelope.mjs';
+import { whyFor } from '../why.mjs';
 
 const DAY = 86_400_000;
 const slaCatalogue = parseYaml(readFileSync(new URL('../../../modules/reconciler/sla.yaml', import.meta.url), 'utf8'));
@@ -222,7 +223,7 @@ function priorOf(db, raw, project) {
   if (!row) return null;
   const settle = one(db, 'SELECT settle_json,next_step FROM op_attempts WHERE attempt_id=?', row.attempt_id);
   const reason = parse(settle?.settle_json);
-  return { id: row.attempt_id, try: row.try_no, verdict: row.verdict, reportOutcome: row.report_outcome, summary: row.report_summary == null ? null : publicText(String(row.report_summary)),
+  return { id: row.attempt_id, try: row.try_no, verdict: row.verdict, reportOutcome: row.report_outcome, ui: row.ui, why: whyFor(db, row), summary: row.report_summary == null ? null : publicText(String(row.report_summary)),
     settleReason: reason == null ? null : publicJson(reason), nextStep: settle?.next_step == null ? null : publicText(String(settle.next_step)),
     href: ref('attempt', row.attempt_id, project).href };
 }
@@ -265,6 +266,7 @@ function attemptDetail(store, ledger, db, row) {
     files: filesOf(db, artifactRows, checks, ledger.name, manifest),
     manifest: manifest?.manifest ?? null, prior: priorOf(db, raw, ledger.name), checkPairs: checkPairsOf(checks),
     usage: usageDetail(db, { attempt: row.attempt_id }),
+    why: whyFor(db, row), usageSource: raw.usage_source ?? null, usageReason: raw.usage_reason == null ? null : publicText(String(raw.usage_reason)),
     tryBudget: row.unit_id ? one(db, 'SELECT try_budget FROM work_units WHERE workflow_id=? AND unit_id=?', row.workflow_id, row.unit_id)?.try_budget ?? null : null,
     land: latestLand(db, row.workflow_id),
     report: report ? { id: report.report_id, outcome: report.outcome, json: parse(report.report_json),

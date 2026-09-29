@@ -9,6 +9,7 @@ import type { Concept } from '../concept';
 import { AgentAvatar, AgentStack } from '../agent/agent-avatar';
 import { attemptAgent, isRunningAttempt, useAttemptAgents } from '../agent/use-running-agents';
 import { Advanced, Lift, Swap } from '../motion';
+import { WhyOwnerBadge } from '../why/why-block';
 
 export const concept: Concept = 'C2';
 
@@ -39,7 +40,10 @@ export function WorkflowCard({ row }: { row: WorkflowRowV2 }) {
   const troubled = row.ui === 'bad' || row.ui === 'warn';
   const why = row.onIt?.reason ?? row.reason;
   const lead = currentLegs[0];
-  const headline = troubled || row.onIt
+  const legWhy = pipeline?.why ?? null;
+  const headline = legWhy
+    ? <><strong>Vì sao:</strong> {legWhy.headline} <WhyOwnerBadge owner={legWhy.owner} /></>
+    : troubled || row.onIt
     ? <><strong>Vì sao:</strong> {formatReason(why)}</>
     : lead ? <><strong>Đang làm:</strong> <span className="font-mono text-[13px]">{lead.op}</span> {lead.tries > 0 ? `(lần ${lead.tries}/5)` : '(chưa có lần thử)'}</>
       : <><strong>Trạng thái:</strong> {state.label}</>;

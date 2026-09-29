@@ -60,7 +60,7 @@ export type AttemptRow = {
   dispatchedAt: number | null; reportedAt: number | null; settledAt: number | null; cycleMs: number | null;
   reportOutcome: 'done'|'partial'|'failed'|'ask'|'blocked'|null;
   verdict: 'pass'|'fail'|'partial'|'blocked'|'dropped'|'cancelled'|null; settledBy: string | null;
-  failureClass: string | null; endState: string | null; ui: UiState;
+  failureClass: string | null; endState: string | null; ui: UiState | 'awaiting-owner' | 'rejected';
   checks: number; checksRed: number; artifacts: number; tokensIn: number | null; tokensOut: number | null; costUsd: number | null;
   summary: string | null; href: string;
 };
@@ -127,12 +127,12 @@ export type TimelineItem = { at: number; source: 'event'|'log'|'attempt'|'check'
 
 /* ---- v2 (2026-09-29): pipeline, transparency, evidence. Served by ui/api/pipeline.mjs and routes. ---- */
 export type LegStatus = 'success'|'running'|'settling'|'queued'|'retry'|'failed'|'blocked'|'awaiting-owner'|'planned'|'deferred'|'external'|'dropped'|'rejected'|'warning'|'unknown';
-export type AttemptBrief = { id: number; unit: string | null; job: string; try: number; status: LegStatus;
+export type AttemptBrief = { why?: Why | null; usageSource?: string | null; id: number; unit: string | null; job: string; try: number; status: LegStatus;
   reportOutcome: AttemptRow['reportOutcome']; verdict: AttemptRow['verdict']; model: string | null; agent: string | null; pool: string | null;
   dispatchedAt: number | null; reportedAt: number | null; settledAt: number | null; open: boolean; endState: string | null; checks: number; checksRed: number;
   tokensIn: number | null; tokensOut: number | null; costUsd: number | null; summary: string | null; href: string };
 export type LegUnit = { unit: string; title: string; state: UnitRow['state']; tries: number; dispatches: number; tryBudget: number; updatedAt: number; doneAt: number | null; href: string };
-export type LegRow = { seq: number; op: string; status: LegStatus; level: number; external: boolean; deferred: string | null; injected: string | null;
+export type LegRow = { why?: Why | null; seq: number; op: string; status: LegStatus; level: number; external: boolean; deferred: string | null; injected: string | null;
   needs: string[]; produces: string[]; conditions: string[]; manifest: string | null; units: LegUnit[]; attempts: AttemptBrief[]; current: boolean };
 export type WorkGraphView = { version: number; event: string; reason: string; authorOp: string; at: number; domains: { id: string; title?: string }[];
   nodes: { id: string; title: string; domain: string | null; kind: string | null; ownedPaths: string[]; color: string | null }[];
@@ -142,9 +142,10 @@ export type Usage = { recorded: boolean; byModel: { model: string; subject_type:
   total: { input: number; output: number; cacheRead: number; cacheWrite: number; reasoning: number; costUsd: number | null; turns: number; toolCalls: number } | null };
 export type PipelineView = { goalRevision: number | null; chainStatus: string; legs: LegRow[]; edges: { from: string; to: string }[];
   progress: { done: number; total: number; byStatus: Partial<Record<LegStatus, number>> }; current: string[]; waiting: string[];
-  failures: number; attempts: number; lastEventAt: number | null; workGraph: WorkGraphView | null; usage: Usage };
+  failures: number; attempts: number; lastEventAt: number | null; workGraph: WorkGraphView | null; usage: Usage; kernelNotes?: KernelNote[] };
 export type MiniPipeline = { legs: { op: string; status: LegStatus; current: boolean; tries: number; units: number; attempts: number }[];
-  progress: PipelineView['progress']; current: string[]; failures: number; attempts: number; lastEventAt: number | null };
+  progress: PipelineView['progress']; current: string[]; failures: number; attempts: number; lastEventAt: number | null;
+  why?: { op: string; headline: string; owner: string | null } | null };
 export type FleetSummary = { opsRunning: number; opsSettling: number; unitsQueued: number; failed24h: number; passed24h: number;
   models: { model: string | null; pool: string | null; agent: string | null; running: number }[];
   usage24h: { recorded: boolean; inputTokens: number; outputTokens: number; costUsd: number | null } };
@@ -192,7 +193,15 @@ export type AttemptProducts = { head: string | null; parent: string | null; repo
   otherChanged: { path: string; status: string }[]; claims: unknown[]; error: string | null };
 export type EvidenceFileV3 = EvidenceFile & { dupOf: number | null; empty: boolean; key: boolean; schema: string | null };
 export type AttemptManifest = { outcome: string | null; assertions: { id: string; outcome: string; detail?: string }[]; assets: string[]; provenance: unknown };
-export type PriorAttempt = { id: number; try: number; verdict: AttemptRow['verdict']; reportOutcome: AttemptRow['reportOutcome']; summary: string | null;
+export type PriorAttempt = { ui?: string; why?: Why | null; id: number; try: number; verdict: AttemptRow['verdict']; reportOutcome: AttemptRow['reportOutcome']; summary: string | null;
   settleReason: unknown; nextStep: string | null; href: string };
 export type CheckPair = { name: string; op: CheckRow | null; runtime: CheckRow | null };
-export type AttemptDetailV3 = Omit<AttemptDetailV2, 'files'> & { files: EvidenceFileV3[]; manifest: AttemptManifest | null; prior: PriorAttempt | null; checkPairs: CheckPair[] };
+export type AttemptDetailV3 = Omit<AttemptDetailV2, 'files'> & Partial<AttemptWhyFields> & { files: EvidenceFileV3[]; manifest: AttemptManifest | null; prior: PriorAttempt | null; checkPairs: CheckPair[] };
+
+/* ---- why (docs/why.md, starci/why@1) and the token meter: runtime ledger user_version 4. ---- */
+export type WhyRef = { kind: 'check' | 'report' | 'commit' | string; name?: string; runner?: string; status?: string; reportId?: number; sha?: string };
+export type Why = { headline: string; state: string; cause: string | null; disagreement: string | null; next: string | null;
+  owner: string | null; codes: string[]; refs: WhyRef[]; attemptId?: number; opId?: string; tryNo?: number;
+  codeInfo?: { code: string; known: boolean; title: string; meaning: string | null; next: string | null }[] };
+export type KernelNote = { kind: 'decision' | 'proposal'; id: string; at: number; status: string; headline: string; observed?: string | null; evidence?: string | null; tier?: string | null; files?: string[] };
+export type AttemptWhyFields = { why: Why | null; usageSource: string | null; usageReason: string | null };

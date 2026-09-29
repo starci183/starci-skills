@@ -11,6 +11,7 @@ import { AttemptCard } from './leg/attempt-card';
 import { LegAbout, LegStory } from './leg/story';
 import { legName, legAgents } from './pipeline/node/op-identity';
 import { AgentStack } from '../agent/agent-avatar';
+import { WhyBlock } from '../why/why-block';
 
 export const concept: Concept = 'C4';
 
@@ -51,7 +52,7 @@ export function LegDrawer({ project, wf, leg, pipeline, onClose }: { project: st
         </DialogHeader>
         <div className="drawer-body flex flex-col gap-6">
           <Section title="Làm gì"><LegAbout leg={leg} /></Section>
-          <Section title={leg.status === 'success' ? 'Trạng thái' : 'Vì sao dừng'}><p className="text-sm">{why}</p></Section>
+          <Section title={leg.status === 'success' ? 'Trạng thái' : 'Vì sao dừng'}>{leg.why ? <WhyBlock why={leg.why} /> : <p className="text-sm">{why}</p>}</Section>
           <Section title="Việc tiếp">{next ? <a href={next.href} className="inline-flex items-center gap-2 text-sm font-medium text-primary hover:underline">{next.label} <ArrowRight className="size-3.5" aria-hidden="true" /></a> : <p className="text-sm text-muted-foreground">Chưa có việc nào để làm tiếp.</p>}</Section>
           <Advanced summary={`đầu vào · đầu ra · ${leg.units.length} đơn vị · ${attempts.length} lần thử · token`}>
             <div className="flex flex-col gap-6">

@@ -81,7 +81,8 @@ function workflowRow(store, row, db, progress, extra = {}) {
   const pipe = pipelineOf(db, p, wf);
   return {
     pipeline: { legs: pipe.legs.map(l => ({ op: l.op, status: l.status, current: l.current, tries: Math.max(0, ...l.units.map(u => u.tries)), units: l.units.length, attempts: l.attempts.length })),
-      progress: pipe.progress, current: pipe.current, failures: pipe.failures, attempts: pipe.attempts, lastEventAt: pipe.lastEventAt },
+      progress: pipe.progress, current: pipe.current, failures: pipe.failures, attempts: pipe.attempts, lastEventAt: pipe.lastEventAt,
+      why: (() => { const leg = pipe.legs.find(l => l.why && (l.current || ['failed', 'blocked', 'awaiting-owner', 'retry', 'rejected'].includes(l.status))); return leg ? { op: leg.op, headline: leg.why.headline, owner: leg.why.owner } : null; })() },
     project: p, id: wf, name: progress.display_name ?? extra.title ?? wf, phase: progress.phase,
     ui: state.ui, reason: state.reason,
     units: { done: progress.units_done, total: progress.units_total, active: progress.units_active, failed: progress.units_failed }, unitStates,

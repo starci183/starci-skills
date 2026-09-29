@@ -1,6 +1,7 @@
 // Planned op chain (goals.json opChain) joined with the units and attempts that exist, so the
 // UI can draw the whole pipeline in order — including legs that have no unit yet.
 import { opInfo } from './op-catalog.mjs';
+import { kernelNotesFor, whyFor } from './why.mjs';
 const one = (db, sql, ...args) => db.prepare(sql).get(...args) ?? null;
 const many = (db, sql, ...args) => db.prepare(sql).all(...args);
 const parse = (value, fallback = null) => { try { return value == null ? fallback : JSON.parse(value); } catch { return fallback; } };
@@ -11,14 +12,15 @@ export const STATUSES = ['success', 'running', 'settling', 'queued', 'retry', 'f
 /** An attempt is open while it has been dispatched and nothing ended it: no settle (settled_at) and no end state (a refused launch, a dead worker, a cancel). */
 export const attemptOpen = (row) => row.dispatched_at != null && row.settled_at == null && row.end_state == null;
 
-/** How an ended attempt without a verdict reads: a refused launch or a dead worker is a retry, an unknown effect waits on reconcile, a cancel is dropped. */
-// requeued = the launch was refused at submission (settle_json.reason 'dispatch-rejected'): closed, not a try.
-const END_STATE_STATUS = { requeued: 'rejected', 'worker-dead': 'failed', 'effect-unknown': 'blocked', cancelled: 'dropped' };
+/** How an ended attempt without a verdict reads (a plain requeue waits for the next try; an unknown effect waits on reconcile). */
+const END_STATE_STATUS = { requeued: 'retry', 'worker-dead': 'failed', 'effect-unknown': 'blocked', cancelled: 'dropped' };
 
 export function attemptStatus(row) {
+  // v_op_history.ui (docs/why.md): an op that ended with an ask waits on the owner; a launch refused at submission is not a try.
+  if (row.ui === 'awaiting-owner') return 'awaiting-owner';
+  if (row.ui === 'rejected') return 'rejected';
   if (row.verdict === 'pass') return 'success';
-  // An op that ended with an ask waits on the owner: settled, not a failure, not a try of the budget.
-  if (row.verdict === 'blocked') return row.report_outcome === 'ask' || row.job_status === 'awaiting_owner' ? 'awaiting-owner' : 'blocked';
+  if (row.verdict === 'blocked') return 'blocked';
   if (row.verdict === 'fail' || row.verdict === 'partial') return 'failed';
   if (row.verdict === 'dropped' || row.verdict === 'cancelled') return 'dropped';
   if (END_STATE_STATUS[row.end_state]) return END_STATE_STATUS[row.end_state];
@@ -46,15 +48,15 @@ function legStatus(leg, units, attempts) {
   if (open.length) return 'settling';
   // A unit whose latest try asked the owner waits for the answer; it did not fail.
   const latest = attempts[attempts.length - 1];
-  if (latest && latest.verdict === 'blocked' && (latest.report_outcome === 'ask' || latest.job_status === 'awaiting_owner')) return 'awaiting-owner';
+  if (latest && latest.ui === 'awaiting-owner') return 'awaiting-owner';
   if (units.some(u => u.state === 'failed')) return 'failed';
   if (units.some(u => ['running', 'reported', 'deciding'].includes(u.state))) return 'running';
   if (attempts.some(a => a.verdict && a.verdict !== 'pass')) return 'retry';
   return 'queued';
 }
 
-export function attemptBrief(a, project) {
-  return { id: a.attempt_id, unit: a.unit_id, job: a.job_id, try: a.try_no, status: attemptStatus(a),
+export function attemptBrief(a, project, db = null) {
+  return { id: a.attempt_id, why: db ? whyFor(db, a) : null, usageSource: a.usage_source ?? null, unit: a.unit_id, job: a.job_id, try: a.try_no, status: attemptStatus(a),
     open: attemptOpen(a), endState: a.end_state ?? null, reportOutcome: a.report_outcome, verdict: a.verdict, model: a.model, agent: a.agent, pool: a.pool,
     dispatchedAt: a.dispatched_at, reportedAt: a.reported_at, settledAt: a.settled_at,
     checks: a.checks ?? 0, checksRed: a.checks_red ?? 0, tokensIn: a.tokens_in ?? null, tokensOut: a.tokens_out ?? null, costUsd: a.cost_usd ?? null,
@@ -85,7 +87,8 @@ export function pipelineOf(db, project, wf) {
       units: legUnits.map(u => ({ unit: u.unit_id, title: u.title ?? u.unit_id, state: u.state, tries: u.tries, dispatches: u.dispatches,
         tryBudget: u.try_budget, updatedAt: u.updated_at, doneAt: u.done_at,
         href: `#/w/${encodeURIComponent(project)}/${encodeURIComponent(wf)}?tab=units&unit=${encodeURIComponent(u.unit_id)}` })),
-      attempts: legAttempts.map(a => attemptBrief(a, project)),
+      attempts: legAttempts.map(a => attemptBrief(a, project, db)),
+      why: (() => { const latest = legAttempts.filter(a => a.dispatched_at != null).at(-1); return latest && status !== 'success' ? whyFor(db, latest) : null; })(),
       current: ['running', 'settling', 'retry'].includes(status),
       info: opInfo(leg.op, leg.yaml ? String(leg.yaml).split(String.fromCharCode(92)).join('/') : null),
     };
@@ -101,6 +104,7 @@ export function pipelineOf(db, project, wf) {
       byStatus: Object.fromEntries(STATUSES.map(s => [s, legs.filter(l => l.status === s).length]).filter(([, n]) => n)) },
     current: legs.filter(l => l.current).map(l => l.op),
     waiting: legs.filter(l => l.status === 'queued').map(l => l.op),
+    kernelNotes: kernelNotesFor(db, wf),
     failures: attempts.filter(a => a.verdict && a.verdict !== 'pass').length,
     attempts: attempts.length, lastEventAt: lastEvent,
     workGraph: g ? { version: graph.version, event: graph.event, reason: graph.reason, authorOp: graph.author_op, at: graph.created_at,
