@@ -28,6 +28,8 @@ A secret is `{name, where, recipientPolicy, keyCustody}`. `where` is one relativ
 
 `.starcistacks/**/*.key`, `*.pem`, `*.p12`, `*.pfx`, and `id_rsa` are refused as tracked files (`STACKS_PLAINTEXT_SECRET`); only `<name>.enc` may be committed. The checker asks `git ls-files` to tell tracked apart from merely-present-on-this-machine; when it cannot reach a repository (a disposable fixture, a relocated payload with no `.git`) it skips this one check rather than assuming either answer.
 
+Custody files are named `<name>.<fmt>.enc` (fmt inside, `.enc` last), for example `secrets.yaml.enc`, `app.env.enc`, `admin.key.enc`; a name such as `secrets.enc.yaml` is refused (`STACKS_PLAINTEXT_TRACKED`, with a rename hint). sops takes the format of a `.enc` name to be binary, so every read states the input type (`sops decrypt --input-type yaml|json|dotenv`), and `sops exec-env` cannot read such a file because it has no `--input-type` flag. Use the runtime helper `node <Source>/.claude/scripts/lib/sops-exec-env.mjs <file>.<fmt>.enc '<command>'` (or `--get NAME`, `--keys` for names only): it decrypts in memory with the stated format, runs the command with the keys in its environment and writes no plaintext.
+
 ## Directory shape
 
 These are read-only structural findings shared with `modules/schemas/stacks-layout.yaml`, independent of manifest content:

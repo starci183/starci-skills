@@ -355,12 +355,12 @@ $defs:
     type: object
     description: "The custody of a credential is the backend Stack environment selected by
       .starcistacks/application-stacks.yaml: .starcistacks/<env>/secrets/<slug>/resource.yaml
-      (schema work/resource@1, kind identity) beside secrets.enc.yaml. The resource declaration is readable
+      (schema work/resource@1, kind identity) beside secrets.yaml.enc (custody files are `<name>.<fmt>.enc`). The resource declaration is readable
       and carries the alias the product calls this identity by, the subject on the provider (the account,
       sender or merchant - the WHO, never the value), its allowed role and the variable NAMES it holds.
-      The declaration never carries a value: every value lives in secrets.enc.yaml, encrypted with sops
-      under the host's own age or GPG key and read only at the moment of use with `sops exec-env
-      .starcistacks/<env>/secrets/<slug>/secrets.enc.yaml '<command>'`. The value exists inside that process
+      The declaration never carries a value: every value lives in secrets.yaml.enc, encrypted with sops
+      under the host's own age or GPG key and read only at the moment of use with the runtime helper `node <Source>/.claude/scripts/lib/sops-exec-env.mjs
+      .starcistacks/<env>/secrets/<slug>/secrets.yaml.enc '<command>'`, which states the file's format to sops (`sops exec-env` has no --input-type flag and reads a `.enc` name as binary). The value exists inside that process
       only and is never copied into Work, a file, a log, a report or a contract. An operation that cannot
       reach sops, the key or the selected Stack custody reports blocked environment naming the environment,
       slug and variable; it never invents, stubs or defaults a value, and it never prints one."

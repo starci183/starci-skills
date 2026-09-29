@@ -327,12 +327,12 @@ test('canonical v2 accepts typed encrypted identity custody at root _resources w
   write('_resources/identity/service/resource.yaml',
     'schema: work/resource@1\nid: identity:service\nkind: identity\nowner: test-owner\nrevision: "1"\ndetails:\n  custody: sops\n');
   const encrypted=Buffer.from('sops:\n  version: 3.9.0\nservice_token: ENC[AES256_GCM,data:opaque-fixture,iv:fixture,tag:fixture,type:str]\n','utf8');
-  write('_resources/identity/service/secrets.enc.yaml',encrypted);
-  const before=fs.readFileSync(path.join(root,'_resources','identity','service','secrets.enc.yaml'));
+  write('_resources/identity/service/secrets.yaml.enc',encrypted);
+  const before=fs.readFileSync(path.join(root,'_resources','identity','service','secrets.yaml.enc'));
   const result=validateWorkspace(root);
   assert.equal(result.ok,true,JSON.stringify(result.errors));
   assert.deepEqual(result.resources.map(item=>[item.id,item.path,item.kind]),[['identity:service','_resources/identity/service/resource.yaml','identity']]);
-  assert.deepEqual(fs.readFileSync(path.join(root,'_resources','identity','service','secrets.enc.yaml')),before);
+  assert.deepEqual(fs.readFileSync(path.join(root,'_resources','identity','service','secrets.yaml.enc')),before);
   assert.equal(JSON.stringify(result).includes('opaque-fixture'),false,'validation never exposes encrypted payload bytes');
 });
 
