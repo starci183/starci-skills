@@ -36,10 +36,10 @@ jobs:
         app:
           - dir: examples/todo-app-backend
             flag: todo-be
-            run: npx jest --coverage
+            run: npx jest --selectProjects unit --coverage
           - dir: examples/ecommerce-app-be
             flag: ecommerce-be
-            run: npx jest --coverage
+            run: npx jest --selectProjects unit --coverage
           - dir: examples/todo-app-frontend
             flag: todo-fe
             run: npx vitest run --coverage

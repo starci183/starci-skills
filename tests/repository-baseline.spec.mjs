@@ -74,8 +74,8 @@ test('a shape whose ESLint config ignores a path runs lint-staged with --no-warn
     assert.ok(command.includes('--no-warn-ignored'),
       `${profile} ignores ${patterns.join(', ')}; a staged one warns "File ignored" under the zero-warning budget and fails the pre-commit hook`);
   }
-  assert.equal(command, 'eslint --fix --max-warnings=<lint.maxWarnings> --no-warn-ignored',
-    'the staged lint keeps the warning budget and adds the flag that keeps an ignored staged file silent');
+  assert.equal(command, "eslint --fix --max-warnings=<lint.maxWarnings> --no-warn-ignored --ignore-pattern 'src/tests/e2e/**' --ignore-pattern 'e2e/**'",
+    'the staged lint keeps the warning budget, keeps an ignored staged file silent and never lints the manual-only e2e tree');
 });
 
 const SCAFFOLD_KEYS = {

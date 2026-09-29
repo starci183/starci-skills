@@ -46,4 +46,4 @@ one copy of each. `.github/workflows/ci.yml` runs the same line.
 
 `npm run test:e2e` drives the Playwright `*.e2e-spec.ts` flows in `e2e/` (one root `playwright.config.ts`) against a served frontend on
 `http://localhost:3000` (override with `UAT_BASE_URL`); the config declares no `webServer`, so the backend's
-dev stack and both servers must already be up - the workflow's `live` job is the sequence that does it.
+dev stack and both servers must already be up - the manually dispatched `todo-app-live-e2e` workflow is the sequence that does it. E2E runs manually only (owner ruling 2026-09-29): no hook, default typecheck/lint, coverage or automatic CI job runs it; `npm run typecheck:e2e` is its manual type check.

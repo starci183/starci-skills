@@ -21,14 +21,16 @@
     "lint:check": "npm run lint",
     "test:unit": "jest --selectProjects unit --runInBand",
     "typecheck": "tsc --noEmit",
+    "typecheck:e2e": "tsc -p tsconfig.e2e.json",
     "test": "jest --selectProjects unit",
     "test:coverage": "jest --selectProjects unit --coverage",
     "test:e2e": "jest --selectProjects e2e --runInBand",
     "start:identity": "node dist/apps/identity/src/main.js",
     "start:order": "node dist/apps/order/src/main.js",
     "live-proof": "node scripts/live-proof.mjs",
-    "lint": "eslint \"src/**/*.ts\" \"apps/**/*.ts\"",
-    "lint:fix": "eslint \"src/**/*.ts\" \"apps/**/*.ts\" --fix"
+    "lint": "eslint \"src/**/*.ts\" \"apps/**/*.ts\" --ignore-pattern \"src/tests/e2e/**\"",
+    "lint:e2e": "eslint \"src/tests/e2e/**/*.ts\"",
+    "lint:fix": "eslint \"src/**/*.ts\" \"apps/**/*.ts\" --ignore-pattern \"src/tests/e2e/**\" --fix"
   },
   "devDependencies": {
     "@apollo/client": "^4.3.1",

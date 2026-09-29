@@ -22,5 +22,7 @@ The `e2e` project selects `*.e2e-spec.ts` under `src/tests/e2e/` and runs with `
 both Nest processes, call the public GraphQL doors and internal HTTP contracts, then clean up.
 They require an available container runtime and are not part of `test:unit`.
 
+E2E runs MANUALLY only (owner ruling 2026-09-29): husky, `typecheck`, `lint`/`lint:check`, coverage (`test:coverage`, Codecov, Sonar) and automatic CI never touch `src/tests/e2e/**`. `npm run typecheck:e2e` (`tsconfig.e2e.json`), `npm run lint:e2e` and `npm run test:e2e` are run by hand when asked; any e2e CI job is `workflow_dispatch` only.
+
 `node scripts/live-proof.mjs` exercises a live checkout across the identity and order services.
 The dev stack and process instructions are in `.starcistacks/dev/README.md`.

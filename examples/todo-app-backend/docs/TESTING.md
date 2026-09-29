@@ -29,6 +29,8 @@ npm run test:coverage       # jest --coverage -> coverage/lcov.info (+ text summ
 
 ## E2E tests
 
+E2E runs MANUALLY only (owner ruling 2026-09-29): husky, `typecheck`, `lint`/`lint:check`, coverage (`test:coverage`, Codecov, Sonar) and automatic CI never touch `src/tests/e2e/**`. `npm run typecheck:e2e` (`tsconfig.e2e.json`), `npm run lint:e2e` and `npm run test:e2e` are run by hand when asked; any e2e CI job is `workflow_dispatch` only.
+
 Requires a running Docker daemon (`docker info` must succeed). First run pulls `postgres:16`, `quay.io/keycloak/keycloak:26.0`, `redis:7` if not cached.
 
 ```bash
@@ -105,5 +107,6 @@ npm run test:e2e -- src/tests/e2e/upload/upload-journey.e2e-spec.ts
 ```bash
 npm run lint       # eslint "src/**/*.ts" (flat config, typescript-eslint type-checked rules)
 npm run lint:fix   # same with --fix
-npx tsc --noEmit   # strict typecheck over the whole src tree, tests included
+npm run typecheck  # strict typecheck over src and apps (the e2e tree is excluded)
+npm run typecheck:e2e  # manual: type-checks src/tests/e2e/** through tsconfig.e2e.json
 ```

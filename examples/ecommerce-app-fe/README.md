@@ -34,7 +34,7 @@ Next.js, React, TypeScript, npm workspaces, `@starci/grammar`, Vitest and Playwr
 
 - `apps/landing/src`: public marketing app; `apps/shop/src`: authenticated shop app.
 - `packages/shared`: shared UI and runtime configuration package.
-- `scripts/`: repository tooling; `e2e/`: Playwright `*.e2e-spec.ts` flows, run by `npm run test:e2e` through the root `playwright.config.ts`.
+- `scripts/`: repository tooling; `e2e/`: Playwright `*.e2e-spec.ts` flows, run by `npm run test:e2e` through the root `playwright.config.ts`. E2E runs manually only (owner ruling 2026-09-29): no hook, default typecheck/lint, coverage or automatic CI job runs it; `npm run typecheck:e2e` is its manual type check.
 - The paired backend owns `.starciwork` and `.starcistacks` for this product.
 
 ## Development

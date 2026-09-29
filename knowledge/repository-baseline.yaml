@@ -162,7 +162,7 @@ shapes:
         .husky/pre-commit: common.hooks.preCommit
         .husky/pre-push: common.hooks.prePush
       lintStaged:
-        '*.{ts,tsx,mts,cts,js,mjs,cjs}': eslint --fix --max-warnings=<lint.maxWarnings> --no-warn-ignored
+        '*.{ts,tsx,mts,cts,js,mjs,cjs}': eslint --fix --max-warnings=<lint.maxWarnings> --no-warn-ignored --ignore-pattern 'src/tests/e2e/**' --ignore-pattern 'e2e/**'
     ci:
       file: .github/workflows/ci.yml
       triggers:
@@ -277,6 +277,12 @@ shapes:
       test:e2e: jest --selectProjects e2e --runInBand
       test:ci: jest --selectProjects unit --ci --coverage --coverageReporters=lcov --coverageReporters=text-summary
       test:affected: jest --selectProjects unit --changedSince=origin/main --passWithNoTests
+      # E2E runs MANUALLY only (owner ruling 2026-09-29): the default typecheck, lint and lint-staged skip
+      # src/tests/e2e/**; typecheck:e2e and lint:e2e are the manual checks; no hook or automatic CI job runs e2e.
+      lint: eslint . --ignore-pattern "src/tests/e2e/**" --fix --max-warnings=<lint.maxWarnings>
+      lint:check: eslint . --ignore-pattern "src/tests/e2e/**" --max-warnings=<lint.maxWarnings>
+      lint:e2e: eslint src/tests/e2e --max-warnings=<lint.maxWarnings>
+      typecheck:e2e: tsc -p tsconfig.e2e.json --pretty false
     sonar:
       sources: apps,src
       tests: apps,src
@@ -341,12 +347,20 @@ shapes:
               "@modules/*": ["./src/modules/*"]
             }
           },
-          "include": ["apps/**/*", "src/**/*"]
+          "include": ["apps/**/*", "src/**/*"],
+          "exclude": ["node_modules", "dist", "coverage", "src/tests/e2e/**"]
         }
       tsconfig.build.json: |
         {
           "extends": "./tsconfig.json",
-          "exclude": ["node_modules", "dist", "coverage", "**/*.spec.ts"]
+          "exclude": ["node_modules", "dist", "coverage", "**/*.spec.ts", "src/tests/e2e/**"]
+        }
+      tsconfig.e2e.json: |
+        {
+          "extends": "./tsconfig.json",
+          "compilerOptions": { "noEmit": true },
+          "include": ["src/tests/e2e/**/*.ts"],
+          "exclude": ["node_modules", "dist", "coverage"]
         }
       nest-cli.json: |
         {

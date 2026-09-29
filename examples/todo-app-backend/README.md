@@ -27,7 +27,7 @@ From this directory run `npm ci`, then `npm run typecheck`, `npm run lint:check`
 `npm run build` and `npm run test:unit`. The live stack requires provisioned demo secrets;
 see `docs/TESTING.md` before running live checks. Tests are exactly two kinds: unit `*.spec.ts` beside the
 source (`npm run test:unit`) and e2e `*.e2e-spec.ts` under `src/tests/e2e/` (`npm run test:e2e`, for example
-`npm run test:e2e -- task/task-lifecycle`).
+`npm run test:e2e -- task/task-lifecycle`). E2E runs manually only: no hook, default typecheck/lint, coverage or automatic CI job runs it (`npm run typecheck:e2e` is its manual type check).
 
 ## Work
 
@@ -46,7 +46,7 @@ runner rather than a developer's laptop:
   kinds and whose exit code is the verdict: `0` clean, `1` findings, `2` unavailable.
 - **frontend** - `examples/todo-app-frontend`'s type-check, unit tests, lint, production build and the
   same gate on the `next` profile.
-- **live** - brings up this example's real dev stack (Postgres + Keycloak) with the committed DEMO-ONLY
+- **live** (manual: `.github/workflows/todo-app-live-e2e.yml`, `workflow_dispatch` only, e2e) - brings up this example's real dev stack (Postgres + Keycloak) with the committed DEMO-ONLY
   SOPS secrets, builds and runs the real API and the real Next.js production server, proves sign-in,
   the uniform wrong-password/unknown-email refusal, the full task lifecycle, CORS and persistence across an
   API process restart with `curl` against the running services - never a mock - and then runs the
