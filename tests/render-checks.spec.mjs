@@ -55,7 +55,7 @@ const brandSpec=({mascot=true}={})=>({
 function tree(t,{brand=brandSpec(),label='tree'}={}){
   const root=temporary(t,label);
   const work=path.join(root,'.starciwork');
-  write(work,'brand/index.yaml',stringifyYaml({schema:'work/node@1',id:'brand',kind:'brand',required:true,state:'todo',
+  write(work,'brand/index.yaml',stringifyYaml({schema:'work/brand@1',id:'brand',kind:'brand',required:true,state:'todo',
     rev:brand.rev,description:'Product brand record.',brand}));
   write(work,'brand/assets/mascot.svg','<svg xmlns="http://www.w3.org/2000/svg"/>');
   return {repoRoot:root,work};

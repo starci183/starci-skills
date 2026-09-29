@@ -1,0 +1,26 @@
+id: work-node-tolerance-removed
+effectiveAt: '2026-09-29T20:00:00+07:00'
+summary: >-
+  Every tolerance of the retired recursive work/node@N record outside the engine is replaced by a refusal.
+  check-example-work.mjs (the gate behind `starci validate`) refuses a work/node@N record with the finding
+  WORK_NODE_RETIRED and no longer exempts it from the flat-family rules; the brand reader
+  (scripts/checks/brand.mjs readBrandRecord) accepts only work/brand@1 and throws WORK_NODE_RETIRED on a node.
+  The `completion.review` readable clause and the legacy business/ + architecture/ layout tolerance are gone from
+  work-layout.yaml, the `import-cv-*` agent-data class is gone from the starciwork boundary (a root import-cv-*
+  path is drift), and the op text of business.decide, architecture.decide, workspace.manage, scope.finish and
+  _common.yaml no longer describes a read-only legacy record. scripts/example/work-example.mjs writes flat
+  records. Product trees that still carry a work/node@N record are refused until restated.
+reach: new-legs
+paths:
+  - scripts/checks/check-example-work.mjs
+  - scripts/checks/brand.mjs
+  - scripts/checks/check-work-schemas.mjs
+  - scripts/lib/starciwork-boundary.mjs
+  - scripts/example/work-example.mjs
+  - modules/schemas/work-layout.yaml
+  - modules/ops/_common.yaml
+  - modules/ops/ops/business.decide.yaml
+  - modules/ops/ops/architecture.decide.yaml
+  - modules/ops/ops/workspace.manage.yaml
+  - modules/ops/ops/scope.finish.yaml
+  - modules/kernel/contract-changes/work-node-tolerance-removed.yaml

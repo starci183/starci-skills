@@ -43,8 +43,7 @@ import {sha256File} from '../../engine/digest.mjs';
  *     `codeDigest.digest` recomputed over the record's owner directories (CODE_DIGEST_STALE). This script
  *     owns the per-file rows underneath that aggregate, which nothing else opens, and the time edge
  *     between a capture and the source it covers, which nothing else measures.
- *   scripts/checks/check-stales.mjs owns declared freshness in the legacy work/node@1 model; its exit
- *     convention (0 clean, 1 findings, 2 invalid argument or unreadable input) is the one used here.
+ *   Exit convention: 0 clean, 1 findings, 2 invalid argument or unreadable input.
  *
  * Read-only: it opens files, asks git for commit times and writes nothing.
  */

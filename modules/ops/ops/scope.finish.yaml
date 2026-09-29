@@ -59,7 +59,7 @@ writes:
       en: "Write only the explicitly authorized end-of-life decision/scope on the selected record N
         before review - the scope entry that bounds it, a feature record's extensions.work3.scope or a
         catalog extensions.work3.setup entry (work-layout.yaml shape.setup); a root-level
-        .starciwork/<name>/index.yaml record is read-only input, never N.
+        .starciwork/<name>/index.yaml record is outside the layout, never N.
         Preserve stable IDs and obligations. Actual removal/retention observations
         belong in evidence. Graph edits apply only to the explicitly selected approved scope:
         declare real prerequisite node IDs in dependsOn and semantic input node/resource IDs in

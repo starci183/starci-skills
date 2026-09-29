@@ -18,9 +18,8 @@ import {slash} from '../lib/path-key.mjs';
  * with the kept markup beside it as the same basename .html) and the render/brand checks must pass.
  *
  * The check functions are imported from scripts/checks/render.mjs itself and composed here rather than calling
- * its runRenderChecks: that wrapper reads the brand through readBrandRecord, which requires the canonical
- * `work/node@1` node shape, while this example tree authors the readable `work/brand@1` schema (see
- * schemas/work-layout.yaml). The brand's own `brand:` specification - the object every check actually
+ * its runRenderChecks: that wrapper reads the brand through readBrandRecord, while this example tree reads
+ * the `work/brand@1` record itself (see schemas/work-layout.yaml). The brand's own `brand:` specification - the object every check actually
  * consumes - is read here with the same leniency the rest of the example toolkit applies, so the canon
  * mathematics runs unchanged on this tree's records. Anything the canon cannot run stays unproven: a
  * `skip` on one of the three core checks (palette-off-brand, primary-absent, entity-list-in-card) is
@@ -76,8 +75,8 @@ function uiDirsFor(rec, records, workRoot) {
 
 /**
  * The brand specification this tree declares, from `<workRoot>/brand/index.yaml`'s own `brand:` field.
- * Deliberately not scripts/checks/brand.mjs's readBrandRecord: that reader demands schema `work/node@1`, while the
- * example layout authors `work/brand@1` - the specification object itself is identical input for the checks.
+ * Deliberately not scripts/checks/brand.mjs's readBrandRecord: this reads the `brand:` specification object
+ * itself with the leniency the example toolkit applies, as identical input for the checks.
  */
 function readExampleBrand(workRoot) {
   const file = path.join(workRoot, 'brand', 'index.yaml');

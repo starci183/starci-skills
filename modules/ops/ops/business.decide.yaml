@@ -114,15 +114,11 @@ steps:
         next selected implementation slice. Separate what must be decided now from later product
         possibilities and source-local implementation choices; record only consequential unknowns.
         Resolve the execution profile and actual tool availability before selecting instruments;
-        this does not switch the model/runtime or spawn workers. Pre-existing work/node@N records
-        under business/ or architecture/ are read-only legacy inputs the canonicalization sweep
-        retires: this op restates their accepted requirement content faithfully in flat records, the
-        job is not done until the selected slice exists as flat records, and a legacy record is
-        never edited, extended or counted as a flat write. A requirement a revision must change
-        that lives only in a legacy record is revised in the flat fr, nfr, br, decision, data or
-        journey record that restates it; when no flat record restates it yet, this op writes one
-        whose restated legacy content is rev 1 and whose revision is rev 2, and names the
-        superseded legacy record's id and path in change.reason. For an explicitly new target,
+        this does not switch the model/runtime or spawn workers. A work/node@N record is retired and
+        refused (WORK_NODE_RETIRED): it is never read, edited or extended, and the job is not done
+        until the selected slice exists as flat records. A requirement a revision must change is
+        revised in its flat fr, nfr, br, decision, data or journey record; when no flat record
+        holds it yet, this op writes one. For an explicitly new target,
         absence is expected: inspect the nearest existing ancestor/workspace, then create only that
         selected scope."
   - reads:
@@ -245,15 +241,14 @@ proofs:
       en: Every FR has a detailed actor flow and acceptance, every alternative/exception has ordered steps
         and postconditions, and security has observable negative acceptance. Validate flat family
         placement and every authored work/*@1 record's own schema contract; no code/service
-        inventory is required in Business. Existing specification@1 and srs@1 records are readable
-        inputs, never new output.
+        inventory is required in Business.
   - id: revision-decision-log
     requirement:
       en: "Every revision of an already-decided record leaves three things together or it is a defect: the
         flat record changed, its change.rev higher than it was, and exactly one new
         extensions.work3.decisionLog entry naming the gap, the chosen reading, why it is the most
         reasonable one by the records it was read from, and the alternatives that were not taken. A
-        changed record with no entry is a defect, and so is an edited legacy work/node record. A
+        changed record with no entry is a defect, and so is any work/node record (retired, WORK_NODE_RETIRED). A
         reading that changes an observable outcome about money, authority or customer data and was
         taken without a decision record with numbered options and one recommendation is a defect,
         whatever else the revision gets right."

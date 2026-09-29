@@ -16,7 +16,7 @@ const scopeDefine = ops.find(op => op.doc.id === 'scope.define').doc;
 const scopeWrite = scopeDefine.writes.find(w => w.id === 'scope');
 
 test('work-layout forbids authoring work/node records, and no op manifest declares one as its output', () => {
-  assert.match(layout.shape.familiesNote, /ops must never author new work\/node records/);
+  assert.match(layout.shape.familiesNote, /WORK_NODE_RETIRED/);
   const offenders = ops.flatMap(({ file, doc }) => (doc.writes ?? [])
     .filter(w => /work\/node@\d/.test(JSON.stringify([w.path, w.fields, w.content])))
     .map(w => `${file} writes.${w.id}`));

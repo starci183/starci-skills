@@ -9,8 +9,8 @@
 //
 // Membership is the tree walk's own (scripts/checks/check-example-work.mjs): kernel custody roots and
 // _derived projections are skipped, a foreign schema is an artifact payload, an evidence manifest is proof
-// payload checked by check-work-artifacts.mjs, and the retired recursive `work/node@*` envelope keeps its
-// own readers in engine/index.mjs.
+// payload checked by check-work-artifacts.mjs, and a retired recursive `work/node@*` record is refused as
+// WORK_NODE_RETIRED by check-example-work.mjs, not compiled here.
 //
 // ajv is a devDependency of the runtime checkout, not of an installed tree. When it cannot be loaded the
 // strict mode fails closed with one refusal naming why, rather than reporting a green it did not compute.

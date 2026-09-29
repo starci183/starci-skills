@@ -93,9 +93,9 @@ function unify(op, lay) {
 const PAYLOAD = new Set(['assets', 'runs']);
 const isPayload = (s) => s.some((x) => PAYLOAD.has(x));
 
-// familiesNote and designReview are prose about the executable families array
+// familiesNote is prose about the executable families array
 // and legacy fields; their first path is illustrative, not an admission.
-const PROSE_KEYS = new Set(['familiesNote', 'designReview']);
+const PROSE_KEYS = new Set(['familiesNote']);
 const leadingPath = (text) => {
   const lead = tokenAt(text, 0);
   if (lead && (lead.includes('/') || /\.\w+$/.test(lead))) return lead;

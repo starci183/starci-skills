@@ -311,10 +311,10 @@ export function readBrandRecord(tree){
   if(!file)throw Error(`No brand record: expected ${candidates.map(candidate=>slash(path.relative(root,candidate))).join(' or ')}.`);
   const source=readText(file);
   const record=parseYaml(source);
-  // work/brand@1 is the family modules/schemas/work-layout.yaml requires for the brand record; the
-  // node families stay readable for records written before it (mia-mia inc-79bea285865d).
-  const supportedNodeSchemas=new Set(['work/brand@1','work/node@1','work/node@2']);
-  if(!supportedNodeSchemas.has(record?.schema)||record?.kind!=='brand')throw Error('A brand record must be a work/brand@1 record (or a legacy work/node@1|@2 node) of kind brand.');
+  // work/brand@1 is the one family modules/schemas/work-layout.yaml allows for the brand record; the retired
+  // recursive work/node@N envelope is refused, never read.
+  if(/^work[/]node@/.test(record?.schema??''))throw Error('WORK_NODE_RETIRED: the brand record is a retired work/node record; restate it as a work/brand@1 record.');
+  if(record?.schema!=='work/brand@1'||record?.kind!=='brand')throw Error('A brand record must be a work/brand@1 record of kind brand.');
   if(!record.brand||typeof record.brand!=='object'||Array.isArray(record.brand))throw Error('The brand record carries no brand specification.');
   const declared=record.rev??record.revision??record.brand.rev;
   return {file,dir:path.dirname(file),record,brand:record.brand,

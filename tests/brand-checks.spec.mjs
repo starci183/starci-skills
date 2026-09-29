@@ -50,7 +50,7 @@ const brandSpec=()=>({
 });
 
 /** A Work tree carrying one brand record, plus the mascot bytes the record names. */
-function tree(t,{brand=brandSpec(),rev='brand-1',mascot='<svg xmlns="http://www.w3.org/2000/svg"/>',label='tree',schema='work/node@1'}={}){
+function tree(t,{brand=brandSpec(),rev='brand-1',mascot='<svg xmlns="http://www.w3.org/2000/svg"/>',label='tree',schema='work/brand@1'}={}){
   const root=temporary(t,label);
   const work=path.join(root,'.starciwork');
   write(work,'brand/index.yaml',stringifyYaml({schema,id:'brand',kind:'brand',required:true,state:'todo',
@@ -491,15 +491,11 @@ test('runBrandChecks reports every check, resolves the record from a repository 
   assert.equal(fromRepository.brand.record,'.starciwork/brand/index.yaml');
   assert.equal(fromRepository.ok,true,JSON.stringify(fromRepository.checks.filter(entry=>entry.outcome!=='pass'),null,2));
 
-  const current=tree(t,{label:'run-node-2',schema:'work/node@2'});
-  const fromNode2=runBrandChecks({tree:current.work,sourceRoot:source,grammarRoot});
-  assert.equal(fromNode2.ok,true,JSON.stringify(fromNode2.checks.filter(entry=>entry.outcome!=='pass'),null,2));
-
-  // work/brand@1 is the family work-layout.yaml requires for the brand record; the checker threw on
-  // it and parked mia-mia brand.decide (inc-79bea285865d).
-  const brandFamily=tree(t,{label:'run-brand-1',schema:'work/brand@1'});
-  const fromBrand1=runBrandChecks({tree:brandFamily.work,sourceRoot:source,grammarRoot});
-  assert.equal(fromBrand1.ok,true,JSON.stringify(fromBrand1.checks.filter(entry=>entry.outcome!=='pass'),null,2));
+  // The retired recursive work/node envelope is refused, never read: a brand record is work/brand@1.
+  for(const schema of ['work/node@1','work/node@2']){
+    const retired=tree(t,{label:'run-'+schema.replace(/[^a-z0-9]/g,'-'),schema});
+    assert.throws(()=>runBrandChecks({tree:retired.work,sourceRoot:source,grammarRoot}),/WORK_NODE_RETIRED/,schema);
+  }
 
   const withoutSource=runBrandChecks({tree:work,grammarRoot});
   assert.equal(withoutSource.ok,true);
@@ -512,9 +508,9 @@ test('runBrandChecks reports every check, resolves the record from a repository 
 
   const undigested=temporary(t,'no-record');
   assert.throws(()=>runBrandChecks({tree:undigested}),/No brand record/);
-  write(undigested,'brand/index.yaml',stringifyYaml({schema:'work/node@1',id:'brand',kind:'ui',required:true,state:'todo'}));
+  write(undigested,'brand/index.yaml',stringifyYaml({schema:'work/brand@1',id:'brand',kind:'ui',required:true,state:'todo'}));
   assert.throws(()=>runBrandChecks({tree:undigested}),/kind brand/);
-  fs.writeFileSync(path.join(undigested,'brand/index.yaml'),stringifyYaml({schema:'work/node@1',id:'brand',kind:'brand',required:true,state:'todo'}));
+  fs.writeFileSync(path.join(undigested,'brand/index.yaml'),stringifyYaml({schema:'work/brand@1',id:'brand',kind:'brand',required:true,state:'todo'}));
   assert.throws(()=>runBrandChecks({tree:undigested}),/no brand specification/);
 });
 

@@ -190,7 +190,7 @@ export function checkConsistencyTree(workRoot, records, sink) {
       }
     }
     // The current business-rule schema has no acceptanceCriteria reverse list. A criterion's rule id
-    // and its place under that rule's ac/ directory are sufficient; only legacy records that actually
+    // and its place under that rule's ac/ directory are sufficient; only records that actually
     // author a reverse list or explicit pointer can disagree with it.
     const hasReverseLink = Object.hasOwn(owner.data, 'acceptanceCriteria') ||
       INLINE_CRITERION_FIELDS.some(field => Array.isArray(owner.data[field]) &&
@@ -340,14 +340,10 @@ export function checkConsistencyTree(workRoot, records, sink) {
   // directory names to entries, so it stays silent about an entry whose feature directory exists but holds
   // no feature record, and about a record whose title no longer says what the catalog says it says.
   const catalogFile = path.join(workRoot, 'index.yaml');
-  const recursiveCatalogFile = path.join(workRoot, 'features', 'index.yaml');
   let catalog = null;
   try { catalog = parseYaml(fs.readFileSync(catalogFile, 'utf8')); } catch { catalog = null; }
-  let recursiveCatalog = null;
-  try { recursiveCatalog = parseYaml(fs.readFileSync(recursiveCatalogFile, 'utf8')); } catch { recursiveCatalog = null; }
   const catalogShown = path.relative(root, catalogFile).replaceAll('\\', '/');
-  const hasRecursiveCatalog = /^work\/node@\d+$/.test(recursiveCatalog?.schema ?? '');
-  if (!catalog?.features && !hasRecursiveCatalog) {
+  if (!catalog?.features) {
     refuse(catalogShown, 'CATALOG_DIRTY', 'no readable work/catalog@1 features list at the tree root, so nothing here can be reconciled with it');
   } else if (catalog?.features) {
     for (const entry of catalog.features) {

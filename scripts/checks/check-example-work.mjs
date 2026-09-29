@@ -27,14 +27,11 @@ import {isProductPath, agentDataCategory} from '../lib/starciwork-boundary.mjs';
  */
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 export const FAMILIES = new Set(['br', 'ac', 'fr', 'nfr', 'data', 'journey', 'decision', 'sds', 'ui', 'impl', 'uat', 'contract', 'integration', 'gap', 'event']);
-// `work/node@*` is the retired recursive specification envelope from the
-// pre-flat business/srs and architecture/sds layouts.  Existing trees still
-// carry those records during canonicalization, and engine/index.mjs keeps the
-// readers that validate their identity and semantics.  Tolerate them here
-// instead of forcing the flat-family contract onto a retired format; ops must
-// not author new work/node records.
+// `work/node@*` is the retired recursive specification envelope from the pre-flat business/srs and
+// architecture/sds layouts. It has no reader: a record carrying it is refused (WORK_NODE_RETIRED) and
+// must be restated as flat family records.
 const EXEMPT = new Set(['work/catalog@1', 'work/workspace@1', 'work/brand@1', 'work/feature@1', 'work/disposable-accounts@1']);
-const isRecursiveNodeSchema = schema => /^work\/node@\d+$/.test(schema ?? '');
+export const isRetiredNodeSchema = schema => /^work\/node@\d+$/.test(schema ?? '');
 const KERNEL_CUSTODY_ROOTS = new Set(['kernel-evidence', 'kernel-strays', 'kernel-approvals']);
 /** A reference-shaped id: a record family prefix and at least two dot segments. */
 export const ID_RE = /^(br|ac|fr|nfr|data|journey|decision|sds|ui|impl|uat|contract|integration|gap|event)\.[a-z0-9-]+(\.[a-z0-9-]+)+$/;
@@ -123,10 +120,11 @@ const collectRecordMap = (scopeRoot) => {
     if ((record.schema === 'work/evidence@1' && !rel.endsWith('/evidence.yaml'))
       || (path.basename(rel) === 'manifest.yaml' && segments.includes('evidence'))) continue;
     if (rel.endsWith('/evidence.yaml')) continue;
+    if (isRetiredNodeSchema(record.schema)) continue;
     if (record.id) map.set(record.id, {
       schema: record.schema, state: record.state, change: record.change, file,
       shown: path.relative(root, file).replaceAll('\\', '/'), dir: path.dirname(file),
-      data: record, recursiveNode: isRecursiveNodeSchema(record.schema),
+      data: record,
     });
   }
   return map;
@@ -159,7 +157,7 @@ export function checkStarciworkBoundary(workRoot, problems, warnings = [], resol
     const [category, where] = key.split('|');
     const shown = path.relative(root, path.join(resolveRoot, where)).replaceAll('\\', '/');
     const files = count > 1 ? ` (${count} files)` : '';
-    if (category === 'drift') warnings.push(`${shown}${files}: not on the .starciwork product path list (work-layout.yaml shape.productPaths) - a record in a legacy layout or a stray file [STARCIWORK_DRIFT]`);
+    if (category === 'drift') warnings.push(`${shown}${files}: not on the .starciwork product path list (work-layout.yaml shape.productPaths) - a record in a retired layout or a stray file [STARCIWORK_DRIFT]`);
     else if (BOUNDARY_TRANSITIONAL.includes(category)) warnings.push(`${shown}${files}: ${category} is agent data still written in place; it moves to blobs + job_artifacts [STARCIWORK_AGENT_DATA]`);
     else problems.push(`${shown}${files}: ${category} is agent data, not product content - it belongs in the project ledger and the blob store (api report --attach from STARCI_JOB_SCRATCH), cited by artifact id + sha256 [STARCIWORK_AGENT_DATA]`);
   }
@@ -236,7 +234,7 @@ export function checkWorkTree(workRoot, problems, warnings = [], infos = [], res
 
     // Evidence manifests are proof payloads owned by the adjacent record, not
     // independent Work records whose id is derived from a feature family.
-    // The engine and check-work-artifacts validate their evidence contract.
+    // check-work-artifacts validates their evidence contract.
     if ((record.schema === 'work/evidence@1' && !rel.endsWith('/evidence.yaml'))
       || (path.basename(rel) === 'manifest.yaml' && segments.includes('evidence'))) {
       payloads += 1;
@@ -248,9 +246,12 @@ export function checkWorkTree(workRoot, problems, warnings = [], infos = [], res
       evidenceFiles.push({record, shown, dir: path.dirname(file)});
       continue;
     }
-    const recursiveNode = isRecursiveNodeSchema(record.schema);
-    if (record.id) records.set(record.id, {schema: record.schema, state: record.state, change: record.change, file, shown, dir: path.dirname(file), data: record, recursiveNode});
-    if (segments[0] === 'features' && segments.length > 2 && !EXEMPT.has(record.schema) && !recursiveNode) {
+    if (isRetiredNodeSchema(record.schema)) {
+      problems.push(`${shown}: schema ${record.schema} is the retired recursive work/node envelope; restate it as flat family records (${[...FAMILIES].join(', ')}) [WORK_NODE_RETIRED]`);
+      continue;
+    }
+    if (record.id) records.set(record.id, {schema: record.schema, state: record.state, change: record.change, file, shown, dir: path.dirname(file), data: record});
+    if (segments[0] === 'features' && segments.length > 2 && !EXEMPT.has(record.schema)) {
       const want = expectedId(segments);
       if (want && record.id !== want) problems.push(`${shown}: id is ${record.id}, but its place says ${want}`);
       if (!want) problems.push(`${shown}: no record family in its path; ${[...FAMILIES].join(', ')} are the families`);
@@ -398,12 +399,6 @@ export function checkWorkTree(workRoot, problems, warnings = [], infos = [], res
   for (const [id, rec] of records) {
     const data = rec.data;
     const schema = rec.schema;
-    // Legacy recursive specification nodes are checked by engine/index.mjs and
-    // the typed SRS/SDS readers.  The rules below are the canonical flat
-    // work/* family contract and must not impose its lifecycle or identity on
-    // the retired format.
-    if (rec.recursiveNode) continue;
-
     // ---- concept 1: blocker edges ----
     if (Array.isArray(data.blockedBy)) {
       for (const entry of data.blockedBy) {

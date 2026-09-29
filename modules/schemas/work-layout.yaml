@@ -14,12 +14,11 @@ shape:
     business/, architecture/, business/srs/ or architecture/sds/ segment anywhere.
     scripts/checks/check-example-work.mjs reads shape.families from this file at gate time and refuses
     (FAMILIES_DRIFT) the moment its own FAMILIES set and this list disagree, so the two cannot drift apart
-    silently. Retired work/node@N records - under business/{overview,srs} or architecture/{overview,sds},
-    and root-level .starciwork/<name>/index.yaml operations or import records outside features/ (an
-    import-cv-seam folder beside features/, say) - are tolerated by the gate as read-only inputs of the
-    engine's readers. workspace.canonicalization retires the first into these flat families and the second
-    into the catalog's setup entries (shape.setup); nothing edits them in place, and ops must never author
-    new work/node records."
+    silently. A work/node@N record (the retired recursive envelope, e.g. under business/{overview,srs} or
+    architecture/{overview,sds}) is refused by the gate (WORK_NODE_RETIRED): restate it as these flat
+    families. A root-level .starciwork/<name>/index.yaml operations or import record outside features/ is a
+    path outside the product list (drift) and belongs in the catalog's setup entries (shape.setup). Ops
+    never author or edit work/node records."
   br: features/<feature>/br/<name>/index.yaml, schema work/business-rule@1. May carry appliesTo, module
     (a string or list of module-root directory paths - never individual files, see the owners note under
     implementation below) and blockedBy.
@@ -88,9 +87,6 @@ shape:
     cleanup, in uat.verify's own shape. accounts.yaml keeps its work/disposable-accounts@1 schema and
     stays local/synthetic, and each entry names {role, identity} (an _resources identity id);
     a literal password is refused."
-  designReview: Legacy br/fr/nfr/data/journey/decision/sds records may carry completion.review inside
-    their owning index.yaml for compatibility. New delivery authoring keeps reviewed spec records todo;
-    final reconciliation binds execution evidence before those records become done.
   productPaths:
     - "The EXPLICIT list of what a backend repository's .starciwork holds (ARCHITECTURE-DB §5.1); its executable
       form is scripts/lib/starciwork-boundary.mjs (isProductPath). Everything else is agent data or drift."
@@ -122,7 +118,7 @@ shape:
     - evidence/<workflow>.<mode>/** and any <node>/evidence/<id>/** bundle
     - any evidence/** capture, impl/<repository>/<name>/assets/** capture, shell/assets/** layout capture
     - uat/<flow>/runs/<runId>/**, ui/<screen>/assets/**/draw-loop/** rounds, features/<feature>/operations/**
-    - report*.json copies, *.tmp.json, settle-parity/, settle-tail/, runtime/, canon-seams/, root import-cv-*
+    - report*.json copies, *.tmp.json, settle-parity/, settle-tail/, runtime/, canon-seams/
     - the ledger and log files (runtime.sqlite*, logs.sqlite*) and worktrees/ (op worktrees live at D:/starci-wt)
     - "evidence/** bundles, UAT runs and interface.audit verdicts are filed from STARCI_JOB_SCRATCH with api report --attach
       (modules/ops/_common.yaml Path and field contract): artifacts of the attempt, the audit an interface_audits row.
@@ -200,8 +196,8 @@ rules:
     leaves its authored requirement and design records `state: todo`, usable downstream as reviewed
     inputs, while `state: done` is reserved for final reconciliation: current requirements, design,
     code, test/E2E and UAT evidence must bind one delivery revision. A missing or stale link leaves
-    the affected record todo and the workflow partial or blocked. Legacy completion.review is readable
-    for compatibility but new product delivery authoring does not use it to roll up done early."
+    the affected record todo and the workflow partial or blocked. New product delivery authoring
+    never rolls a specification record up to done early."
   - "Implementation, ui and uat keep their own state. They are evidence of a specification AND assets with a
     lifetime of their own: a dependency upgrade, a security patch or a refactor is work on them while every
     specification stays correct. Collapsing them into pure evidence of a record would leave nowhere to
@@ -355,8 +351,8 @@ rules:
     rather than from a record that carries its own archive."
   - "The Work tree holds product content only: shape.productPaths is the whole list. Agent output
     (shape.agentData) lives in the project ledger and the blob store and is cited, never copied in. A path
-    that is neither is drift: product records in a legacy layout (business/, architecture/, deeper nesting),
-    which workspace.canonicalization moves and no script deletes."
+    that is neither is drift: product records in a retired layout (business/, architecture/, deeper nesting),
+    which the owner moves and no script deletes."
   - interface.draw writes one or more selected records at ui/<name>/index.yaml, nesting deeper by
     name segment where a screen group needs it. Store all actual drawings, reference images and
     motion previews in each owning record's assets/**,
@@ -446,8 +442,8 @@ rules:
     half a sentence is not forced to withdraw the whole thing to be honest about what moved. On
     `work/evidence@1`, `stale?: true`, `staleSince?: {record: <id>, rev?: <n>}` and `staleReason?` say a
     passed run no longer speaks for the record beside it. The digest that decides this is the kernel's
-    own: sha256 of the record's `index.yaml` file bytes — the digest `engine/index.mjs`
-    exposes — computed for reconciliation. An `evidence.yaml` whose `recordDigest`
+    own: sha256 of the record's `index.yaml` file bytes — the digest `engine/digest.mjs` sha256File
+    computes — computed for reconciliation. An `evidence.yaml` whose `recordDigest`
     does not equal that digest, computed now, must carry `stale: true`; the gate refuses one that does
     not. Staleness is never cleared by editing `recordDigest` to match - only a fresh run, which is a
     kernel act, clears it."

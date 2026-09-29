@@ -16,14 +16,9 @@ import {isProductPath} from '../lib/starciwork-boundary.mjs';
  * nothing here is authored, and a derived field typed by hand into a record is exactly the lie this script
  * exists to make impossible (enforced separately by scripts/checks/check-example-derived.mjs).
  *
- * `effectiveState`'s staleness rule is the one core/index.mjs already uses for its canonical work/node@1
- * model (validate()'s `roll()`: `n.effectiveState = localInvalid ? 'invalid' : n.stale ? 'suspended' :
- * n.meta.state`) - staleness overrides authored state to `suspended` before anything else is considered.
- * This tree's simpler schema (scripts/checks/check-example-work.mjs's FAMILIES) has no `invalid`/`uninvestigate`
- * concept, but it does have a state core's model does not: `blocked`, for a record whose own `blockedBy`
- * chain is currently unmet. The precedence is the same shape as core's: staleness is checked first (it can
- * turn even a `todo` record's evidence into something no longer trustworthy), then unmet blockers, then the
- * authored state stands as given.
+ * `effectiveState`: staleness is checked first (it can turn even a `todo` record's evidence into something no
+ * longer trustworthy) and yields `suspended`; then unmet blockers (`blocked`, for a record whose own `blockedBy`
+ * chain is currently unmet); then the authored state stands as given.
  */
 
 

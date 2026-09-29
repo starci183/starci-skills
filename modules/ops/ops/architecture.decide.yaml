@@ -150,16 +150,12 @@ steps:
         Repository/file/symbol/call mappings and actual revisions or proof belong to Implementation.
         Never write product code or present a design constraint as deployed behavior. Apply the
         fixed NestJS/Next.js ownership standard and select only patterns triggered by the actual
-        scenario. Pre-existing work/node@N records under business/ or architecture/ are read-only
-        legacy inputs the canonicalization sweep retires: this op restates their accepted content
-        faithfully in flat records, the job is not done until the selected slice exists as flat
-        records, and a legacy record is never edited, extended or counted as a flat write. A design
-        section a revision must change that lives only in a legacy record - a component's
-        deployment, for instance - is revised in the flat record that restates it (the
-        work/sds-component@1 under sds/<name>/ that work-layout.yaml gives deployment, or the
-        contract or integration record for those surfaces); when no flat record restates it yet,
-        this op writes one whose restated legacy content is rev 1 and whose revision is rev 2, and
-        names the superseded legacy record's id and path in change.reason. For an explicitly new
+        scenario. A work/node@N record is retired and refused (WORK_NODE_RETIRED): it is never
+        read, edited or extended, and the job is not done until the selected slice exists as flat
+        records. A design section a revision must change - a component's deployment, for instance -
+        is revised in its flat record (the work/sds-component@1 under sds/<name>/ that
+        work-layout.yaml gives deployment, or the contract or integration record for those
+        surfaces); when no flat record holds it yet, this op writes one. For an explicitly new
         target, absence is expected: inspect the nearest existing ancestor/workspace, then create
         only that selected scope. Inspect only surfaces material to the selected design so targets
         and migration are feasible. The survey informs but never overrides accepted SRS or supplies
@@ -278,8 +274,7 @@ proofs:
     requirement:
       en: Run the record-class validator `starci validate` and, on every record directory it writes, `starci validate --strict`; every cited ID/path exists or is explicitly
         proposed, declared proof demands are covered, input bindings are current, and an honest
-        not-run/fail cannot earn done. The starci/sds@1 record remains a readable input for existing
-        trees, never new authoring output.
+        not-run/fail cannot earn done.
   - id: implementability
     requirement:
       en: Each significant operation resolves logical owner, contract, data/commit boundary,
@@ -301,7 +296,7 @@ proofs:
         flat record changed, its change.rev higher than it was, and exactly one new
         extensions.work3.decisionLog entry naming the gap, the chosen reading, why it is the most
         reasonable one by the records it was read from, and the alternatives that were not taken. A
-        changed record with no entry is a defect, and so is an edited legacy work/node record. A
+        changed record with no entry is a defect, and so is any work/node record (retired, WORK_NODE_RETIRED). A
         reading that changes an observable outcome about money, authority or customer data and was
         taken without a decision record with numbered options and one recommendation is a defect,
         whatever else the revision gets right."

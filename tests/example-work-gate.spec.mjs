@@ -4,7 +4,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import crypto from 'node:crypto';
-import { checkWorkTree, checkFamiliesDrift, FAMILIES } from '../scripts/checks/check-example-work.mjs';
+import { checkWorkTree, checkFamiliesDrift, checkStarciworkBoundary, FAMILIES } from '../scripts/checks/check-example-work.mjs';
 
 /**
  * One fixture tree per new-concept rule in scripts/checks/check-example-work.mjs, proving each rule refuses the
@@ -47,7 +47,7 @@ function refusalsFor(extra) {
   return problems;
 }
 
-test('nested work/node specification records are not forced through compact flat-family identity rules', () => {
+test('a recursive work/node record is refused as WORK_NODE_RETIRED, one refusal per record, and never read as a flat family', () => {
   const problems = refusalsFor({
     'features/chatbot/business/index.yaml': 'schema: work/node@1\nid: chatbot.business\nkind: business\nrequired: true\n',
     'features/chatbot/business/overview/index.yaml': 'schema: work/node@1\nid: chatbot.business.overview\nkind: business-overview\nrequired: true\nstate: todo\n',
@@ -56,7 +56,11 @@ test('nested work/node specification records are not forced through compact flat
     'features/chatbot/implementation/frontend/shell/evidence/proof/manifest.yaml': 'schema: work/evidence@1\nid: proof.chatbot.shell\nnodeId: chatbot.shell\noutcome: pass\nassets: []\n',
     'kernel-strays/retired-copy/features/chatbot/fr/broken/index.yaml': 'schema: work/functional-requirement@1\nid: wrong\nstate: done\n',
   });
-  assert.equal(problems.filter(problem => problem.includes('no record family in its path') || problem.includes('but its place says') || problem.includes('state is done with no sibling evidence.yaml')).length, 0, problems.join('\n'));
+  const retired = problems.filter(problem => problem.includes('[WORK_NODE_RETIRED]'));
+  for (const rel of ['features/chatbot/business/index.yaml', 'features/chatbot/business/overview/index.yaml', 'features/chatbot/business/srs/index.yaml', 'features/chatbot/architecture/sds/components/router/index.yaml'])
+    assert.ok(retired.some(problem => problem.includes(rel)), `${rel} is refused: ${problems.join(' | ')}`);
+  assert.equal(retired.length, 4, problems.join('\n'));
+  assert.equal(problems.filter(problem => problem.includes('no record family in its path') || problem.includes('but its place says')).length, 0, 'a retired node is refused once, not also judged as a flat record\n' + problems.join('\n'));
 });
 
 test('concept 1: blocker edges - prose blockedBy is refused, dangling target is refused, a stale (done) blocker is refused', () => {
@@ -789,4 +793,20 @@ test('scoped record validation resolves tree-level _resources refs via resolveRo
   const wide = [];
   checkWorkTree(recordDir, wide, [], [], workRoot);
   assert.equal(wide.filter(p => p.includes('does not resolve')).length, 0, wide.join('\n'));
+});
+
+test('a root import-cv-* folder is drift, not a known agent-data class', () => {
+  const workRoot = tree({ 'import-cv-seam/index.yaml': 'schema: work/feature@1\nid: import-cv-seam\ntitle: t\ndescription: d\n' });
+  const problems = [], warnings = [];
+  checkStarciworkBoundary(workRoot, problems, warnings);
+  assert.deepEqual(problems, [], 'drift never refuses');
+  assert.ok(warnings.some(w => w.includes('import-cv-seam') && w.includes('[STARCIWORK_DRIFT]')), warnings.join('\n'));
+  assert.ok(!warnings.some(w => w.includes('legacy-import')), warnings.join('\n'));
+});
+
+test('work/node@1 and @2 are each refused at the tree walk', () => {
+  for (const schema of ['work/node@1', 'work/node@2']) {
+    const problems = refusalsFor({ 'features/f/index.yaml': `schema: ${schema}\nid: f\nkind: business\nrequired: true\n` });
+    assert.ok(problems.some(p => p.includes('[WORK_NODE_RETIRED]')), `${schema}: ${problems.join('\n')}`);
+  }
 });

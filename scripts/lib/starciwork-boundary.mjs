@@ -96,8 +96,8 @@ const ROOT_CACHE_FILE = /^(.*\.tmp\.json|tmp-.*\.json|scan-i18n.*\.json|runtime-
  * categories scripts/checks/check-example-work.mjs refuses in a .starciwork tree [STARCIWORK_AGENT_DATA]:
  * ledger, logs-db, worktrees, kernel-evidence, kernel-strays, evidence-bundle, capture (impl captures),
  * layout-capture (shell/assets), uat-run, draw-round, interface-audit (features/<f>/operations/), stray-report,
- * cache, legacy-import (root import-cv-*). A path that is neither known agent data nor on the §5.1 list
- * (isProductPath) is drift: product records in a legacy layout, kept and reported, never removed by a script.
+ * cache. A path that is neither known agent data nor on the §5.1 list
+ * (isProductPath) is drift: product records in a retired layout, kept and reported, never removed by a script.
  */
 export function agentDataCategory(rel, { dir = false } = {}) {
   const parts = segs(rel);
@@ -112,7 +112,6 @@ export function agentDataCategory(rel, { dir = false } = {}) {
   if (top === 'kernel-strays' || top === 'kernel-approvals') return 'kernel-strays';
   if (ROOT_CACHE_DIRS.has(top) && (dir || parts.length > 1)) return 'cache';
   if (parts.length === 1 && !dir && ROOT_CACHE_FILE.test(top)) return 'cache';
-  if (/^import-cv-/.test(top)) return 'legacy-import';
   if (dirs.includes('draw-loop')) return 'draw-round';
   if (dirs.includes('runs') && dirs[0] === 'features' && dirs.includes('uat')) return 'uat-run';
   if (dirs.includes('evidence')) return 'evidence-bundle';
