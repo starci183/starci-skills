@@ -1,4 +1,7 @@
 import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { artifactRoot } from '../../../scripts/lib/artifact-store.mjs';
+import { pipelineOf, usageOf } from '../pipeline.mjs';
 import { getBlob } from '../../../scripts/lib/artifact-store.mjs';
 import { workflowStateOf } from '../../../scripts/kernel/progress-state.mjs';
 import { sendJson, sendError } from '../envelope.mjs';
@@ -29,16 +32,9 @@ function hrefOf(kind, id, project, wf = null) {
   if (kind === 'land') return `#/system/land?id=${key}`;
   return '#/';
 }
-function relativePath(value, root = null) {
-  if (!value) return null;
-  const normalized = String(value).replaceAll('\\', '/');
-  if (!path.isAbsolute(value) && !/^[A-Za-z]:\//.test(normalized)) return normalized;
-  if (root) {
-    const rel = path.relative(root, value).replaceAll('\\', '/');
-    if (rel && rel !== '..' && !rel.startsWith('../') && !path.isAbsolute(rel)) return rel;
-  }
-  return normalized.split('/').filter(Boolean).slice(-2).join('/');
-}
+// Owner ruling 2026-09-29: host paths are public so each record links to its place on the host.
+const hostPath = value => value ? path.normalize(String(value)) : null;
+const RUNTIME_ROOT = fileURLToPath(new URL('../../../', import.meta.url)).replace(/[\\/]$/, '');
 function ledgerRows(store, fn) {
   return store.forEachLedger(({ row, db }) => fn(row, db)).flatMap(entry => entry.error ? [] : entry.result ?? []);
 }
@@ -82,7 +78,10 @@ function workflowRow(store, row, db, progress, extra = {}) {
   const primaryDI = dIs.sort((a, b) => Number(b.ui === 'bad') - Number(a.ui === 'bad') || a.opened_at - b.opened_at)[0];
   const onIt = primaryDI ? { who: primaryDI.decider, ref: ref('di', primaryDI.di_id, p), reason: reason('DECISION_OPEN', { kind: primaryDI.kind ?? 'decision' }) }
     : state.ui === 'warn' || state.ui === 'bad' ? { who: 'kernel', ref: null, reason: state.reason ?? reason('PROGRESS', {}) } : null;
+  const pipe = pipelineOf(db, p, wf);
   return {
+    pipeline: { legs: pipe.legs.map(l => ({ op: l.op, status: l.status, current: l.current, tries: Math.max(0, ...l.units.map(u => u.tries)), units: l.units.length, attempts: l.attempts.length })),
+      progress: pipe.progress, current: pipe.current, failures: pipe.failures, attempts: pipe.attempts, lastEventAt: pipe.lastEventAt },
     project: p, id: wf, name: progress.display_name ?? extra.title ?? wf, phase: progress.phase,
     ui: state.ui, reason: state.reason,
     units: { done: progress.units_done, total: progress.units_total, active: progress.units_active, failed: progress.units_failed }, unitStates,
@@ -137,13 +136,32 @@ function fleet(store, url) {
   const machine = store.machine.db;
   const violationsOpen = one(machine, 'SELECT count(*) AS n FROM invariant_violations WHERE cleared_at IS NULL')?.n ?? 0;
   const health = compactHealth(machine);
-  return { attention: attentionRows, workflows, health, counts: {
+  const summary = fleetSummary(store);
+  return { attention: attentionRows, workflows, health, summary, counts: {
     live: workflows.filter(row => row.phase === 'running').length,
     bad: workflows.filter(row => row.ui === 'bad').length,
     warn: workflows.filter(row => row.ui === 'warn').length,
     ownerDecisions: ledgerRows(store, (_row, db) => [one(db, "SELECT count(*) AS n FROM decision_items WHERE decider='owner' AND status IN ('open','claimed','escalated')")?.n ?? 0]).reduce((a, b) => a + b, 0),
     violationsOpen,
   } };
+}
+function fleetSummary(store) {
+  const since = Date.now() - DAY;
+  const rows = ledgerRows(store, (row, db) => many(db, 'SELECT attempt_id,workflow_id,op_id,model,pool,agent,verdict,report_outcome,reported_at,dispatched_at,settled_at FROM v_op_history WHERE dispatched_at>=? OR settled_at IS NULL', since).map(a => ({ ...a, project: row.name })));
+  const open = rows.filter(a => a.dispatched_at != null && a.settled_at == null);
+  const models = new Map();
+  for (const a of open) { const key = a.model ?? a.pool ?? 'unknown'; const m = models.get(key) ?? { model: a.model, pool: a.pool, agent: a.agent, running: 0 }; m.running++; models.set(key, m); }
+  const unitsQueued = ledgerRows(store, (_row, db) => [one(db, "SELECT count(*) AS n FROM work_units u JOIN workflows w USING(workflow_id) WHERE u.state IN ('planned','queued') AND w.phase='running'")?.n ?? 0]).reduce((a, b) => a + b, 0);
+  const usage = ledgerRows(store, (_row, db) => [one(db, 'SELECT sum(input_tokens) AS i,sum(output_tokens) AS o,sum(cost_usd) AS c,count(*) AS n FROM llm_usage WHERE at>=?', since)]);
+  return {
+    opsRunning: open.filter(a => !(a.reported_at != null || a.report_outcome)).length,
+    opsSettling: open.filter(a => a.reported_at != null || a.report_outcome).length,
+    unitsQueued,
+    failed24h: rows.filter(a => a.settled_at >= since && a.verdict && a.verdict !== 'pass').length,
+    passed24h: rows.filter(a => a.settled_at >= since && a.verdict === 'pass').length,
+    models: [...models.values()].sort((a, b) => b.running - a.running),
+    usage24h: { recorded: usage.some(u => u?.n), inputTokens: usage.reduce((s, u) => s + (u?.i ?? 0), 0), outputTokens: usage.reduce((s, u) => s + (u?.o ?? 0), 0), costUsd: usage.some(u => u?.c != null) ? usage.reduce((s, u) => s + (u?.c ?? 0), 0) : null },
+  };
 }
 function projects(store) {
   const machine = store.machine.db;
@@ -203,7 +221,20 @@ function detail(store, row, db, wf) {
     phaseReason: p.phase_reason ?? lifecycle?.reason ?? null,
     kernelRev: seat ? { current: seat.kernel_rev ?? '', acked: seat.acked_rev ?? null, stale: Boolean(seat.kernel_rev && seat.acked_rev && seat.kernel_rev !== seat.acked_rev) } : null,
     blockedBy: blockedBy(store, row, db, wf), counts,
+    where: whereOf(store, row, wf), usage: usageOf(db, { wf }),
   };
+}
+function whereOf(store, row, wf) {
+  const machine = store.machine.db;
+  const repos = many(machine, 'SELECT name,role,repo_root FROM repositories WHERE ledger_id=? ORDER BY name', row.ledgerId).map(r => ({ name: r.name, role: r.role, root: hostPath(r.repo_root) }));
+  const backend = repos.find(r => r.role === 'backend') ?? repos[0] ?? null;
+  const roots = backend ? backend.root : row.repoRoot ?? null;
+  return { repos, workTree: roots ? path.join(roots, '.starciwork') : null, ledgerFile: row.file ?? null,
+    blobRoot: artifactRoot(), runtimeRoot: RUNTIME_ROOT, kernelSeat: `kernel:${row.name}:${wf}`,
+    terminals: many(machine, 'SELECT handle,role,attempt_id,pid,opened_at,closed_at FROM terminals WHERE ledger_id=? AND workflow_id=? ORDER BY opened_at DESC', row.ledgerId, wf)
+      .map(t => ({ handle: t.handle, role: t.role, attempt: t.attempt_id, pid: t.pid, openedAt: t.opened_at, closedAt: t.closed_at })),
+    worktreesOpen: one(machine, 'SELECT count(*) AS n FROM worktrees WHERE ledger_id=? AND workflow_id=? AND removed_at IS NULL', row.ledgerId, wf)?.n ?? 0,
+    worktreesRemoved: one(machine, 'SELECT count(*) AS n FROM worktrees WHERE ledger_id=? AND workflow_id=? AND removed_at IS NOT NULL', row.ledgerId, wf)?.n ?? 0 };
 }
 function attemptRow(row, project) {
   if (!row) return null;
@@ -305,7 +336,7 @@ export function handleWork(request, response, store, url) {
     sendJson(request, response, result.data, { sources: [source('machine', 'sup_decisions')[0], ...store.projects().flatMap(row => source(row.name, 'decisions'))], stale: staleOf(store), next: result.next });
     return true;
   }
-  const match = /^\/api\/workflows\/([^/]+)\/([^/]+)(?:\/(graph|units|rca|worktrees|coverage|verify)(?:\/([^/]+))?)?$/.exec(pathname);
+  const match = /^\/api\/workflows\/([^/]+)\/([^/]+)(?:\/(graph|pipeline|units|rca|worktrees|coverage|verify)(?:\/([^/]+))?)?$/.exec(pathname);
   if (!match) return false;
   let project, wf, extra;
   try { project = decodeURIComponent(match[1]); wf = decodeURIComponent(match[2]); extra = match[4] ? decodeURIComponent(match[4]) : null; }
@@ -323,6 +354,9 @@ export function handleWork(request, response, store, url) {
   }
   if (route === 'graph') {
     sendJson(request, response, graph(db, row.name, wf), { sources: source(row.name, 'v_units', 'unit_edges', 'v_op_history'), stale: staleOf(store) }); return true;
+  }
+  if (route === 'pipeline') {
+    sendJson(request, response, { ...pipelineOf(db, row.name, wf), usage: usageOf(db, { wf }) }, { sources: source(row.name, 'goals', 'work_units', 'v_op_history', 'work_graph_versions', 'logs', 'events', 'llm_usage'), stale: staleOf(store) }); return true;
   }
   if (route === 'units') {
     if (extra) {
@@ -342,7 +376,7 @@ export function handleWork(request, response, store, url) {
   if (route === 'worktrees') {
     const all = url.searchParams.get('all') === '1';
     const rows = many(store.machine.db, 'SELECT * FROM worktrees WHERE ledger_id=? AND workflow_id=? ORDER BY created_at DESC', row.ledgerId, wf)
-      .filter(item => all || item.removed_at == null).map(item => ({ path: relativePath(item.path, item.repo_root), kind: item.kind,
+      .filter(item => all || item.removed_at == null).map(item => ({ path: hostPath(item.path), repoRoot: hostPath(item.repo_root), lane: item.lane, port: item.port, attempt: item.attempt_id, kind: item.kind,
         branch: item.branch, baseSha: item.base_sha, headSha: item.head_sha, jobId: item.job_id,
         createdAt: item.created_at, removedAt: item.removed_at, removeError: item.remove_error,
         ui: item.remove_error ? 'bad' : item.removed_at ? 'done' : 'running' }));

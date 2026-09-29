@@ -1,24 +1,42 @@
-import path from 'node:path';
 import { Transform } from 'node:stream';
 import { StringDecoder } from 'node:string_decoder';
 import { learnStackSecrets, redactData, redactText } from '../../scripts/lib/redact.mjs';
 
-const OMIT = new Set(['pid', 'worker_pid', 'running_pid', 'cmdline', 'cmdline_digest', 'processes_seen', 'config_json', 'allow_json', 'file_uri', 'form_url', 'command']);
+// Owner ruling 2026-09-29 (option a): the public harness shows host paths, command lines,
+// cwd, pids and file locations so every run is traceable to its place on the host.
+// Secrets stay filtered: fields that carry configuration or credential material are
+// omitted and every string still passes through the shared write-time redactor.
+const OMIT = new Set(['config_json', 'allow_json', 'form_url']);
 export const MAX_BUFFERED_TEXT = 1024 * 1024;
 
 export function initializeReadRedaction(projects) {
   for (const row of projects) if (row.repoRoot) learnStackSecrets(row.repoRoot);
 }
 
-function hideAbsolutePaths(value) {
-  return value
-    .replace(/\b[A-Za-z]:[\\/][^\r\n]*/g, '[redacted:absolute-path]')
-    .replace(/\\\\[^\\\s]+\\[^\\\s]+\\[^\r\n]*/g, '[redacted:absolute-path]')
-    .replace(/(^|[\s(])\/(?:Users|home|tmp|var|etc|opt|mnt|Volumes|private|srv)\/[^\r\n]*/gm, '$1[redacted:absolute-path]');
+/** Text encoding of stored bytes from their byte-order mark; op evidence captured by
+ *  PowerShell redirection is often UTF-16 LE with a BOM. */
+export function textEncodingOf(bytes) {
+  if (bytes.length >= 2 && bytes[0] === 0xff && bytes[1] === 0xfe) return 'utf-16le';
+  if (bytes.length >= 2 && bytes[0] === 0xfe && bytes[1] === 0xff) return 'utf-16be';
+  if (bytes.length >= 3 && bytes[0] === 0xef && bytes[1] === 0xbb && bytes[2] === 0xbf) return 'utf-8-bom';
+  return 'utf-8';
 }
 
-function publicText(value) {
-  return hideAbsolutePaths(redactText(value));
+/** Decodes stored text bytes to a string, removing any BOM. */
+export function decodeText(bytes) {
+  const encoding = textEncodingOf(bytes);
+  if (encoding === 'utf-16le') return bytes.subarray(2).toString('utf16le');
+  if (encoding === 'utf-16be') {
+    const body = Buffer.from(bytes.subarray(2));
+    body.swap16();
+    return body.toString('utf16le');
+  }
+  if (encoding === 'utf-8-bom') return bytes.subarray(3).toString('utf8');
+  return bytes.toString('utf8');
+}
+
+export function publicText(value) {
+  return redactText(value);
 }
 
 export function publicJson(value, key = null) {
@@ -26,22 +44,19 @@ export function publicJson(value, key = null) {
   if (value && typeof value === 'object') {
     return Object.fromEntries(Object.entries(value).filter(([name]) => !OMIT.has(name)).map(([name, item]) => [name, publicJson(item, name)]));
   }
-  // URL paths are root-relative in browsers; on Windows path.isAbsolute also
-  // classifies them as filesystem paths. Keep only the one public blob route.
-  if (typeof value === 'string' && key === 'href' && /^\/api\/blob\/[a-f0-9]{64}$/.test(value)) return redactData(value, key);
-  if (typeof value === 'string' && path.isAbsolute(value)) return '[redacted:absolute-path]';
-  const clean = redactData(value, key);
-  return typeof clean === 'string' ? hideAbsolutePaths(clean) : clean;
+  return redactData(value, key);
 }
 
+/** Stored text bytes -> redacted UTF-8 bytes (decoding UTF-16/BOM first). */
 export function redactUnmarkedText(bytes) {
-  return Buffer.from(publicText(bytes.toString('utf8')));
+  return Buffer.from(publicText(decodeText(bytes)));
 }
 
 // The evidence module currently exposes a text function, so keep complete lines
 // (and complete PEM blocks) together before passing them through that function.
+// The first chunk's BOM selects the decoder so UTF-16 text is redacted as text.
 export function redactTextStream() {
-  const decoder = new StringDecoder('utf8');
+  let decoder = null;
   let pending = '';
   let held = '';
   let pem = false;
@@ -55,6 +70,12 @@ export function redactTextStream() {
   return new Transform({
     transform(chunk, _encoding, callback) {
       if (discarded) { callback(); return; }
+      if (!decoder) {
+        const encoding = textEncodingOf(chunk);
+        decoder = new StringDecoder(encoding.startsWith('utf-16') ? 'utf16le' : 'utf8');
+        if (encoding === 'utf-16be') { chunk = Buffer.from(chunk); chunk.subarray(0, chunk.length - (chunk.length % 2)).swap16(); }
+        chunk = chunk.subarray(encoding === 'utf-8-bom' ? 3 : encoding === 'utf-8' ? 0 : 2);
+      }
       pending += decoder.write(chunk);
       if (pending.length + held.length > MAX_BUFFERED_TEXT) { failClosed(this); callback(); return; }
       let end;
@@ -76,7 +97,7 @@ export function redactTextStream() {
     },
     flush(callback) {
       if (!discarded) {
-        const tail = pending + decoder.end();
+        const tail = pending + (decoder ? decoder.end() : '');
         if (held.length + tail.length > MAX_BUFFERED_TEXT) failClosed(this);
         else if (held || tail) this.push(publicText(held + tail));
       }

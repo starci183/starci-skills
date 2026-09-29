@@ -39,9 +39,18 @@
   --st-warn: #92400e;
   --st-run: #1d4ed8;
   --st-wait: #6d28d9;
-  --st-ok: #047857;
-  --st-done: #52525b;
+  --st-ok: #15803d;
+  --st-done: #15803d;
   --st-unknown: #52525b;
+  /* Semantic status scale (one system for chips, steps, check rows, graph nodes, bars).
+     success = passed/succeeded/đạt; running = blue; queued = neutral; failed/blocked = red;
+     warning = stale/retry; skipped = deferred/external. Contrast >= 4.5:1 on --card. */
+  --status-success: #15803d; --status-success-bg: #e8f6ed; --status-success-line: #9fd9b3;
+  --status-running: #1d5fd6; --status-running-bg: #e8effd; --status-running-line: #a8c3f5;
+  --status-queued: #5b5b6b; --status-queued-bg: #f1f1f4; --status-queued-line: #d0d0d8;
+  --status-failed: #c02626; --status-failed-bg: #fcecec; --status-failed-line: #f0b1b1;
+  --status-warning: #9a5200; --status-warning-bg: #fdf3e1; --status-warning-line: #ecc98a;
+  --status-skipped: #6b6b7b; --status-skipped-bg: transparent; --status-skipped-line: #c6c6d0;
 }
 
 .dark {
@@ -76,9 +85,15 @@
   --st-warn: #fbbf24;
   --st-run: #60a5fa;
   --st-wait: #c4b5fd;
-  --st-ok: #34d399;
-  --st-done: #a1a1aa;
+  --st-ok: #4ade80;
+  --st-done: #4ade80;
   --st-unknown: #a1a1aa;
+  --status-success: #4ade80; --status-success-bg: #0f2a1a; --status-success-line: #1f6b3d;
+  --status-running: #6aa5ff; --status-running-bg: #0f1f3d; --status-running-line: #2a4f8f;
+  --status-queued: #a1a1b0; --status-queued-bg: #1b1b22; --status-queued-line: #3a3a46;
+  --status-failed: #ff7b7b; --status-failed-bg: #2d1113; --status-failed-line: #7a2a2e;
+  --status-warning: #f8c152; --status-warning-bg: #2b1f08; --status-warning-line: #7a5a1a;
+  --status-skipped: #8a8a9c; --status-skipped-bg: transparent; --status-skipped-line: #44444f;
 }
 
 @theme inline {
@@ -248,3 +263,23 @@ button.lifecycle-label:hover, button.lifecycle-label[aria-pressed=true] { backgr
   .step-item { min-height: 51px; }
   .drawer-panel { width: 100vw !important; }
 }
+
+/* Semantic status primitives (components/status.ts). */
+[data-tone] { --tone: var(--status-queued); --tone-bg: var(--status-queued-bg); --tone-line: var(--status-queued-line); }
+[data-tone=success] { --tone: var(--status-success); --tone-bg: var(--status-success-bg); --tone-line: var(--status-success-line); }
+[data-tone=running] { --tone: var(--status-running); --tone-bg: var(--status-running-bg); --tone-line: var(--status-running-line); }
+[data-tone=queued] { --tone: var(--status-queued); --tone-bg: var(--status-queued-bg); --tone-line: var(--status-queued-line); }
+[data-tone=failed] { --tone: var(--status-failed); --tone-bg: var(--status-failed-bg); --tone-line: var(--status-failed-line); }
+[data-tone=warning] { --tone: var(--status-warning); --tone-bg: var(--status-warning-bg); --tone-line: var(--status-warning-line); }
+[data-tone=skipped] { --tone: var(--status-skipped); --tone-bg: var(--status-skipped-bg); --tone-line: var(--status-skipped-line); }
+.status-chip { display: inline-flex; align-items: center; gap: 6px; border: 1px solid var(--tone-line); background: var(--tone-bg); color: var(--tone); border-radius: 999px; padding: 1px 9px 1px 7px; font-size: 12px; font-weight: 550; line-height: 1.5; white-space: nowrap; }
+.status-chip[data-tone=skipped] { border-style: dashed; }
+.status-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--tone); flex: none; }
+.status-chip[data-live=true] .status-dot { animation: status-blink 1.2s ease-in-out infinite; }
+@keyframes status-blink { 50% { opacity: .35; } }
+.path-link { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 4px 6px; max-width: 100%; vertical-align: middle; }
+.path-link > a.path-main { display: inline-flex; gap: 6px; align-items: center; min-width: 0; font-family: var(--font-mono); font-size: 12px; color: var(--primary); text-decoration: none; padding: 2px 7px; border: 1px solid var(--border); border-radius: 6px; background: var(--muted); overflow-wrap: anywhere; }
+.path-link > a.path-main:hover { border-color: var(--primary); background: var(--accent); }
+.path-link .path-action { font-size: 11px; color: var(--muted-foreground); padding: 1px 6px; border: 1px solid var(--border); border-radius: 5px; background: transparent; cursor: pointer; text-decoration: none; }
+.path-link .path-action:hover { color: var(--foreground); }
+@media (prefers-reduced-motion: reduce) { .status-chip[data-live=true] .status-dot { animation: none; } }

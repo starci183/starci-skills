@@ -33,6 +33,7 @@ For source development, `npm run dev` starts Vite and the API preview; see `pack
 | `#/decisions` | Owner, Supervisor and Kernel Decision Items, asks and incidents |
 | `#/system` | Engine, SLA, Resources, Services, Cleanup, Land, Supervisor and Learning |
 | `#/logs` | Filtered machine and project logs with live follow mode |
+| `#/analytics` | Outcomes per op, first-try pass rate per model, durations, throughput and usage |
 | `#/_kit` | UI component and state vocabulary preview |
 
 Workflow tabs include Units, Graph, Attempts, Decisions, Why, Timeline, Evidence and Infrastructure. Equal-op units with the same predecessor set may appear as one graph card with ×N; selecting it reveals each real unit and its edges. A graph card never changes the ledger's unit identity or dependency semantics.
@@ -43,6 +44,6 @@ Old hash routes such as `#/agents`, `#/changes`, `#/proofs` and `#/supervisor` o
 
 ## API contract
 
-The current endpoint and concept-to-source mapping is [CONTRACT.md](CONTRACT.md). JSON uses `{data, meta}` envelopes, ETag/304 and opaque cursors. `/api/live` sends invalidation events so the client refetches only affected queries; hidden tabs pause their polling. Public API routes support GET and HEAD only. Text is redacted again at read time, and absolute paths, PIDs, command lines and credential questions are withheld.
+The current endpoint and concept-to-source mapping is [CONTRACT.md](CONTRACT.md). JSON uses `{data, meta}` envelopes, ETag/304 and opaque cursors. `/api/live` sends invalidation events so the client refetches only affected queries; hidden tabs pause their polling. Public API routes support GET and HEAD only. Text is redacted again at read time and credential questions are withheld; host paths, PIDs and command lines are shown (owner ruling 2026-09-29) and open in VS Code/Cursor from the host.
 
 This README describes the source preview. Deployment and live service lifecycle are handled by the host controller, not by the UI.

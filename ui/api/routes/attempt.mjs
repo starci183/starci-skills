@@ -1,6 +1,9 @@
 import path from 'node:path';
 import { readFileSync } from 'node:fs';
-import { getBlob } from '../../../scripts/lib/artifact-store.mjs';
+import { fileURLToPath } from 'node:url';
+import { artifactRoot, blobPath, getBlob } from '../../../scripts/lib/artifact-store.mjs';
+import { decodeText, textEncodingOf } from '../redact-read.mjs';
+import { usageOf } from '../pipeline.mjs';
 import { redactText } from '../../../scripts/lib/redact.mjs';
 import { parseYaml } from '../../../engine/yaml.mjs';
 import { transcriptWindow } from '../transcript-search.mjs';
@@ -23,16 +26,8 @@ const staleOf = store => [...store.stale];
 const limitOf = url => Math.min(200, Math.max(1, Number(url.searchParams.get('limit')) || 50));
 const cursorOf = url => { try { return Math.max(0, Number(JSON.parse(Buffer.from(url.searchParams.get('cursor') ?? '', 'base64url').toString()).offset) || 0); } catch { return 0; } };
 const page = (rows, url) => { const offset = cursorOf(url), limit = limitOf(url); return { rows: rows.slice(offset, offset + limit), next: offset + limit < rows.length ? Buffer.from(JSON.stringify({ offset: offset + limit })).toString('base64url') : null }; };
-function safePath(value, root = null) {
-  if (!value) return null;
-  const text = String(value).replaceAll('\\', '/');
-  if (!path.isAbsolute(value) && !/^[A-Za-z]:\//.test(text)) return text;
-  if (root) {
-    const rel = path.relative(root, value).replaceAll('\\', '/');
-    if (rel && !rel.startsWith('../') && rel !== '..' && !path.isAbsolute(rel)) return rel;
-  }
-  return text.split('/').filter(Boolean).slice(-2).join('/');
-}
+// Owner ruling 2026-09-29: host paths, commands and cwd are public (secrets stay redacted).
+const safePath = value => value ? String(value) : null;
 function ref(kind, id, project = null) {
   const p = encodeURIComponent(project ?? '');
   const key = encodeURIComponent(String(id));
@@ -65,7 +60,7 @@ function mediaItem(item, project) {
 }
 function checkRow(db, check, root) {
   return { id: check.check_id, name: check.name, phase: check.phase, runner: check.runner, authority: check.authority,
-    runSeq: check.run_seq, command: null, cwd: safePath(check.cwd, root), exitCode: check.exit_code,
+    runSeq: check.run_seq, command: check.command ?? null, cwd: safePath(check.cwd ?? root), exitCode: check.exit_code,
     declaredExitCode: check.declared_exit_code, status: check.status, ui: check.ui,
     startedAt: check.started_at, finishedAt: check.finished_at, wallMs: check.wall_ms,
     stdout: blobLink(db, check.stdout_sha), stderr: blobLink(db, check.stderr_sha), output: blobLink(db, check.output_sha),
@@ -73,7 +68,7 @@ function checkRow(db, check, root) {
 }
 function tail(db, sha) {
   if (!sha || !blobLink(db, sha)) return '';
-  try { return redactText(getBlob(sha).toString('utf8').split(/\r?\n/).slice(-200).join('\n')); } catch { return ''; }
+  try { return redactText(decodeText(getBlob(sha)).split(/\r?\n/).slice(-200).join('\n')); } catch { return ''; }
 }
 function actionRow(machine, action) {
   return { id: action.id, controller: action.controller, duty: action.duty, key: action.key, verb: action.verb,
@@ -106,11 +101,79 @@ function latestLand(db, wf) {
   return land ? { result: land.result, mergedSha: land.merged_sha, reason: land.reason,
     output: blobLink(db, land.output_sha), at: land.finished_at ?? land.started_at } : null;
 }
+const RUNTIME_ROOT = fileURLToPath(new URL('../../../', import.meta.url)).replace(/[\\/]$/, '');
+const joinHost = (root, rel) => root && rel ? path.join(root, rel) : null;
+const hostNorm = value => value ? path.normalize(String(value)) : null;
+function whereOf(ledger, raw, job, payload) {
+  const runtime = payload?.hierarchy?.runtime ?? {};
+  const repoRoot = raw.repo_root ?? ledger.repoRoot ?? null;
+  return { repo: hostNorm(repoRoot), worktree: hostNorm(raw.worktree_path), mainCheckout: !raw.worktree_path || hostNorm(raw.worktree_path) === hostNorm(repoRoot), branch: raw.branch,
+    baseSha: raw.base_sha, headSha: raw.head_sha, integratedSha: raw.integrated_sha, worktreeRemovedAt: raw.worktree_removed_at,
+    ownedPaths: (payload?.owned_paths ?? []).map(rel => ({ rel, abs: joinHost(raw.worktree_path ?? repoRoot, rel) })),
+    ledgerFile: ledger.file ?? null, blobRoot: artifactRoot(), runtimeRoot: RUNTIME_ROOT,
+    host: runtime.host ?? null, agent: runtime.agent ?? null, provider: runtime.provider ?? null, profile: runtime.profile ?? null, pool: runtime.runtimePool ?? null,
+    terminalHandle: runtime.terminalHandle ?? null, runId: runtime.runId ?? null, taskId: runtime.taskId ?? null, dispatchId: runtime.dispatchId ?? null,
+    parentAgent: payload?.hierarchy?.parentNodeId ?? null, agentNode: payload?.hierarchy?.nodeId ?? null,
+    traceSpan: raw.span_id ?? null, job: job?.job_id ?? null, jobStatus: job?.status ?? null };
+}
+function inputOf(payload, job) {
+  if (!payload) return null;
+  return { what: payload.displayWhat ?? payload.title ?? null, op: payload.opId ?? job?.op_id ?? null,
+    records: payload.records ?? [], ownedPaths: payload.owned_paths ?? [], params: payload.params ?? null,
+    goal: payload.goal_binding ?? null, cut: payload.cut ?? null, after: payload.after ?? null, risk: payload.risk ?? null,
+    model: payload.modelId ?? null, profile: payload.model ?? null, effort: payload.effort ?? null, difficulty: payload.difficulty ?? null,
+    route: { chain: payload.routeChain ?? [], rejected: payload.routeRejected ?? [], order: payload.routeOrder ?? null, policy: payload.routePolicy ?? null,
+      balance: payload.routeBalance ?? null, crossFamily: payload.routeCrossFamily ?? null, at: payload.routedAt ?? null } };
+}
+// Evidence files grouped by what they are, not by raw prefix. 'evidence' is the op's submitted
+// evidence folder (attachments/evidence/, formerly attachments/E/).
+function groupOf(name, role) {
+  if (/^attachments\/(evidence|E)\//.test(name)) return 'evidence';
+  if (/^checks\//.test(name) || role.startsWith('check-')) return 'check';
+  if (role === 'patch' || role === 'diff') return 'diff';
+  if (['screenshot', 'capture', 'render', 'video', 'uat-run', 'trace', 'dom', 'direction', 'redline'].includes(role)) return 'media';
+  if (/^attachments\//.test(name) || role === 'report-attachment') return 'op-run';
+  if (role === 'log') return 'log';
+  return 'other';
+}
+function kindOf(name, mediaType) {
+  const ext = (name.match(/\.([a-z0-9]+)$/i)?.[1] ?? '').toLowerCase();
+  if (mediaType.startsWith('image/')) return 'image';
+  if (mediaType.startsWith('video/')) return 'video';
+  if (mediaType.startsWith('audio/')) return 'audio';
+  if (mediaType === 'application/pdf') return 'pdf';
+  if (mediaType.includes('json') || ext === 'json' || ext === 'jsonl') return 'json';
+  if (mediaType.includes('yaml') || ext === 'yaml' || ext === 'yml') return 'yaml';
+  if (mediaType.includes('markdown') || ext === 'md') return 'markdown';
+  if (mediaType.includes('diff') || ext === 'diff' || ext === 'patch') return 'diff';
+  if (mediaType.startsWith('text/') || ['stdout', 'stderr', 'log', 'txt'].includes(ext)) return 'text';
+  return 'binary';
+}
+function encodingOf(sha, mediaType) {
+  if (!/^(text\/|application\/(json|x-yaml|yaml|x-ndjson))/.test(mediaType)) return null;
+  if (!blobPath(sha)) return null;
+  try { return textEncodingOf(getBlob(sha).subarray(0, 4)); } catch { return null; }
+}
+function filesOf(db, artifactRows, checks, project) {
+  const byName = new Map(checks.map(c => [c.name, c]));
+  return artifactRows.map(x => {
+    const group = groupOf(x.name, x.role);
+    const checkName = group === 'check' ? (x.name.match(/^checks\/(?:\d+-)?([^/]+)\//)?.[1] ?? null) : null;
+    const check = checkName ? byName.get(checkName) ?? null : null;
+    const blob = one(db, 'SELECT file_uri,redaction FROM blobs WHERE sha256=?', x.sha256);
+    return { artifactId: x.artifact_id, name: x.name, base: x.name.split('/').pop(), group, role: x.role, kind: kindOf(x.name, x.media_type), subkind: x.subkind,
+      mediaType: x.media_type, bytes: x.bytes, sha: x.sha256, href: `/api/blob/${x.sha256}`, hostPath: hostNorm(blob?.file_uri ?? blobPath(x.sha256)),
+      encoding: encodingOf(x.sha256, x.media_type), redaction: blob?.redaction ?? null, origin: x.origin, label: x.label, scopeRef: x.scope_ref, round: x.round,
+      check: check ? { id: check.id, name: check.name, status: check.status, ui: check.ui } : checkName ? { id: null, name: checkName, status: null, ui: 'unknown' } : null,
+      archived: x.archived_at != null, createdAt: x.created_at, project };
+  });
+}
 function attemptDetail(store, ledger, db, row) {
   const machine = store.machine.db;
   const raw = one(db, 'SELECT * FROM op_attempts WHERE attempt_id=?', row.attempt_id);
   const job = one(db, 'SELECT * FROM jobs WHERE job_id=?', row.job_id);
   const report = one(db, 'SELECT * FROM reports WHERE attempt_id=?', row.attempt_id);
+  const payload = parse(job?.payload_json, {}) ?? {};
   const checks = many(db, 'SELECT * FROM v_checks WHERE attempt_id=? ORDER BY created_at,check_id', row.attempt_id).map(c => checkRow(db, c, raw.repo_root));
   const artifactRows = many(db, 'SELECT x.*,b.http_path,b.archived_at FROM job_artifacts x JOIN blobs b ON b.sha256=x.sha256 WHERE x.attempt_id=? ORDER BY x.created_at,x.artifact_id', row.attempt_id);
   const mediaRows = many(db, 'SELECT * FROM v_media WHERE attempt_id=? ORDER BY created_at,artifact_id', row.attempt_id).map(x => mediaItem(x, ledger.name));
@@ -128,8 +191,10 @@ function attemptDetail(store, ledger, db, row) {
   const next = one(db, 'SELECT attempt_id FROM op_attempts WHERE job_id IN (SELECT job_id FROM jobs WHERE retry_of=? OR resume_of=?) ORDER BY attempt_id LIMIT 1', job?.job_id, job?.job_id);
   return { ...attemptRow(row, ledger.name), timeline: timeline(raw),
     route: { by: raw.routed_by, chain: parse(raw.route_chain_json), rejected: parse(raw.route_rejected_json) },
-    where: { repo: raw.repo_root ? safePath(raw.repo_root) : null, worktree: safePath(raw.worktree_path, raw.repo_root), branch: raw.branch,
-      baseSha: raw.base_sha, headSha: raw.head_sha, integratedSha: raw.integrated_sha, worktreeRemovedAt: raw.worktree_removed_at },
+    where: whereOf(ledger, raw, job, payload),
+    input: inputOf(payload, job),
+    files: filesOf(db, artifactRows, checks, ledger.name),
+    usage: usageOf(db, { attempt: row.attempt_id }),
     land: latestLand(db, row.workflow_id),
     report: report ? { id: report.report_id, outcome: report.outcome, json: parse(report.report_json),
       attachments: many(db, 'SELECT m.* FROM v_media m JOIN report_attachments ra ON ra.artifact_id=m.artifact_id WHERE ra.report_id=?', report.report_id).map(m => mediaItem(m, ledger.name)) } : null,
@@ -282,7 +347,7 @@ export async function handleAttempt(request, response, store, url) {
     const blob = one(db, 'SELECT * FROM blobs WHERE sha256=?', sha);
     if (!blob) { sendError(request, response, 404, 'TRANSCRIPT_MISSING', 'Transcript blob unavailable'); return true; }
     let text;
-    try { text = getBlob(sha).toString('utf8'); } catch { sendError(request, response, 410, 'TRANSCRIPT_ARCHIVED', 'Transcript bytes unavailable'); return true; }
+    try { text = decodeText(getBlob(sha)); } catch { sendError(request, response, 410, 'TRANSCRIPT_ARCHIVED', 'Transcript bytes unavailable'); return true; }
     if (blob.redaction !== 'v1') text = redactText(text);
     let window;
     try { window = await transcriptWindow(text, { q: url.searchParams.get('q'), around: url.searchParams.get('around'),

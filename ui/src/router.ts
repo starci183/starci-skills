@@ -16,6 +16,7 @@ export type Route =
   | { kind: 'decisions'; tab: DecisionTab; decider: string; status: string; kindFilter: string }
   | { kind: 'system'; tab: SystemTab }
   | { kind: 'logs'; filters: URLSearchParams }
+  | { kind: 'analytics'; project: string }
   | { kind: 'kit' }
   | { kind: 'not-found' };
 
@@ -50,6 +51,7 @@ export function parseRoute(hash = window.location.hash): Route {
     return { kind: 'system', tab: oneOf(parts[1] ?? null, systemTabs, 'engine') };
   }
   if (parts[0] === 'logs' && parts.length === 1) return { kind: 'logs', filters: url.searchParams };
+  if (parts[0] === 'analytics' && parts.length === 1) return { kind: 'analytics', project: url.searchParams.get('project') ?? '' };
   return { kind: 'not-found' };
 }
 
@@ -72,6 +74,7 @@ export function routeHref(route: Route): string {
     }
     case 'system': return `#/system/${route.tab}`;
     case 'logs': return `#/logs${route.filters.size ? `?${route.filters}` : ''}`;
+    case 'analytics': return `#/analytics${route.project ? `?project=${enc(route.project)}` : ''}`;
     case 'kit': return '#/_kit';
     case 'not-found': return '#/';
   }
@@ -91,8 +94,8 @@ export function useRoute(): Route {
   return route;
 }
 
-export function navKind(route: Route): 'overview' | 'decisions' | 'system' | 'logs' | null {
+export function navKind(route: Route): 'overview' | 'decisions' | 'system' | 'logs' | 'analytics' | null {
   if (route.kind === 'workflow' || route.kind === 'attempt') return 'overview';
-  if (route.kind === 'overview' || route.kind === 'decisions' || route.kind === 'system' || route.kind === 'logs') return route.kind;
+  if (route.kind === 'overview' || route.kind === 'decisions' || route.kind === 'system' || route.kind === 'logs' || route.kind === 'analytics') return route.kind;
   return null;
 }

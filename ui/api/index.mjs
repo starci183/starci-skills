@@ -1,5 +1,4 @@
 import { openUiDb } from './db.mjs';
-import { createRateLimit } from './rate-limit.mjs';
 import { sendError } from './envelope.mjs';
 import { healthz, contract, search } from './routes/meta.mjs';
 import { blob } from './routes/blob.mjs';
@@ -14,7 +13,6 @@ import { handleLive } from './routes/live.mjs';
 export function createApiHandler({ handlers = [handleWork, handleAttempt, handleDecisions, handleSystem, handleLogs, handleLive], env = process.env } = {}) {
   const store = openUiDb({ env });
   initializeReadRedaction(store.projects());
-  const permit = createRateLimit();
 
   async function handle(request, response, url) {
     if (!['GET', 'HEAD'].includes(request.method)) {
@@ -25,10 +23,6 @@ export function createApiHandler({ handlers = [handleWork, handleAttempt, handle
     const pathname = url.pathname;
     if (pathname !== '/healthz' && !pathname.startsWith('/api/')) return false;
     const isBlob = pathname.startsWith('/api/blob/');
-    if (!permit(request, { blob: isBlob })) {
-      sendError(request, response, 429, 'RATE_LIMITED', 'Rate limit exceeded');
-      return true;
-    }
     if (pathname === '/healthz') { healthz(request, response, store); return true; }
     if (pathname === '/api/contract') { contract(request, response, store); return true; }
     if (pathname === '/api/search') { search(request, response, store, url); return true; }

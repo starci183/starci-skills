@@ -5,6 +5,7 @@ export const navLabels = {
   decisions: 'Quyết định',
   system: 'Hệ thống',
   logs: 'Nhật ký',
+  analytics: 'Phân tích',
 } as const;
 
 export const stateLabels: Record<UiState, string> = {

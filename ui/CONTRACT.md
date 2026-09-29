@@ -31,7 +31,7 @@ The Work DAG groups units only when their operation and predecessor set match. A
 
 ## 1. HTTP API and source map
 
-Every JSON success has `{data,meta:{at,etag,sources,stale,next}}`. Error responses have `{error:{code,message}}`. List cursors are opaque. All API routes accept GET and HEAD only; other methods return 405. The SPA and API share one server, default port 4547. A single `/api/live` SSE channel invalidates selected queries; `/api/logs/stream` emits filtered log rows. Conditional JSON reads use ETag/304. Static assets do not consume the API rate budget.
+Every JSON success has `{data,meta:{at,etag,sources,stale,next}}`. The public read API has no request-rate limit (owner ruling 2026-09-29). Error responses have `{error:{code,message}}`. List cursors are opaque. All API routes accept GET and HEAD only; other methods return 405. The SPA and API share one server, default port 4547. A single `/api/live` SSE channel invalidates selected queries; `/api/logs/stream` emits filtered log rows. Conditional JSON reads use ETag/304. Static assets do not consume the API rate budget.
 
 | Endpoint | Main source | UI consumer |
 | --- | --- | --- |
@@ -45,6 +45,7 @@ Every JSON success has `{data,meta:{at,etag,sources,stale,next}}`. Error respons
 | `/api/workflows` | `v_workflow_progress`, `workflows` | Overview list |
 | `/api/workflows/:p/:wf` | `workflows`, `goals`, progress/RCA snapshots, seats, blockers | Workflow header |
 | `/api/workflows/:p/:wf/graph` | `v_units`, `unit_edges`, `v_op_history` | Workflow DAG |
+| `/api/workflows/:p/:wf/pipeline` | `goals` (opChain legs/edges), `work_units`, `v_op_history`, `work_graph_versions`, `logs`, `events`, `llm_usage` | Workflow pipeline, leg drawer, attempt timeline, Overview mini pipeline |
 | `/api/workflows/:p/:wf/units` and `/units/:unit` | `v_units`, `v_op_history`, `unit_edges`, decisions, blockers | Workflow list and inspector |
 | `/api/workflows/:p/:wf/rca` | `metrics_snapshots` (RCA) | Workflow Why |
 | `/api/workflows/:p/:wf/worktrees` | machine `worktrees` | Workflow Infra |
@@ -76,9 +77,9 @@ The implementation lives in `ui/api/index.mjs` and `ui/api/routes/*.mjs`. The ro
 
 ## 2. Public redaction boundary
 
-Write-time redaction is owned by `scripts/lib/redact.mjs` before text is stored in the blob/log layer. Read-time projection is owned by `ui/api/redact-read.mjs` and `ui/api/routes/blob.mjs`; it reuses the same redaction module for JSON strings and old text blobs lacking a redaction marker. Marked text is checked again for residual secrets and absolute paths: unchanged text keeps its stored-byte ETag, while changed text is served with no-store caching and byte ranges over the safe response. Large text is filtered while streaming. Binary blobs retain bytes, Range and content type. Blob addresses are content SHA references, never filesystem paths.
+Write-time redaction is owned by `scripts/lib/redact.mjs` before text is stored in the blob/log layer. Read-time projection is owned by `ui/api/redact-read.mjs` and `ui/api/routes/blob.mjs`; it reuses the same redaction module for JSON strings and old text blobs lacking a redaction marker. Marked text is checked again for residual secrets (and decoded when stored as UTF-16/BOM): unchanged text keeps its stored-byte ETag, while changed text is served with no-store caching and byte ranges over the safe response. Large text is filtered while streaming. Binary blobs retain bytes, Range and content type. Blob addresses are content SHA references; the attempt API additionally reports each blob's host file location.
 
-Responses omit absolute paths, PID fields, command lines, connector configuration and credential-ask text. Repositories and worktrees are represented by names or relative paths. A credential-related ask exposes its state and decision reference, with its question suppressed. API errors contain generic messages. The UI has no auth or mutation controls; its public exposure requires these server-side boundaries even when source records are sensitive.
+Owner ruling 2026-09-29 (option a): responses show host paths (repository roots, worktrees, owned paths, ledger file, blob store and each blob's file location), check command lines and cwd, terminal handles and PIDs, so each record links to its place on the host. Secrets stay filtered: every string still passes the shared redactor, configuration/credential fields (`config_json`, `allow_json`, `form_url`) are omitted and credential-ask text stays suppressed. Text blobs stored as UTF-16 or with a BOM are decoded before redaction and served as UTF-8 (`X-StarCi-Source-Encoding` names the stored encoding). A credential-related ask exposes its state and decision reference, with its question suppressed. API errors contain generic messages. The UI has no auth or mutation controls; its public exposure requires these server-side boundaries even when source records are sensitive.
 
 The seven UI states are `ok`, `running`, `waiting`, `warn`, `bad`, `done` and `unknown`. `ui/api/state.mjs` computes states from the DB vocabulary when a view has not already supplied one. Reasons carry a code and parameters; Vietnamese display text is in `ui/src/i18n/vi.ts`. Raw source text is an explicit disclosure only where supported.
 

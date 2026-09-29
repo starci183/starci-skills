@@ -3,7 +3,7 @@ import { Transform } from 'node:stream';
 import { pipeline } from 'node:stream/promises';
 import { blobPath, getBlob, statBlob } from '../../../scripts/lib/artifact-store.mjs';
 import { isTextMedia } from '../../../scripts/lib/redact.mjs';
-import { MAX_BUFFERED_TEXT, redactUnmarkedText, redactTextStream, publicJson } from '../redact-read.mjs';
+import { MAX_BUFFERED_TEXT, decodeText, redactUnmarkedText, redactTextStream, publicJson, textEncodingOf } from '../redact-read.mjs';
 import { sendError } from '../envelope.mjs';
 
 function findRow(store, sha) {
@@ -72,14 +72,15 @@ export async function blob(request,response,store,url,sha) {
   let bytes = changedText ? safeText : null;
   const streamingRedaction = readRedaction && !bytes && !mode;
   if (mode) {
-    bytes = unmarked ? redactUnmarkedText(getBlob(sha)) : safeText ?? getBlob(sha);
+    bytes = unmarked ? redactUnmarkedText(getBlob(sha)) : safeText ?? Buffer.from(decodeText(getBlob(sha)));
     const lines = Math.min(2000,Math.max(1,Number(url.searchParams.get('lines'))||200));
     const content = bytes.toString('utf8').split(/\r?\n/);
     bytes = Buffer.from((mode==='head'?content.slice(0,lines):content.slice(-lines)).join('\n'));
   }
   const length = bytes?.length ?? (streamingRedaction && (request.method === 'HEAD' || request.headers.range) ? await redactedLength(file) : metadata.size);
   const etag = readRedaction ? null : `"${sha}"`;
-  const headers = {'Content-Type':mode?'text/plain; charset=utf-8':row.media_type,'Cache-Control':readRedaction?'no-store':'public, max-age=31536000, immutable',...(etag?{'ETag':etag}:{}),'Accept-Ranges':'bytes','Content-Disposition':url.searchParams.get('download')==='1'?`attachment; filename="${sha}.txt"`:'inline','X-Content-Type-Options':'nosniff'};
+  const sourceEncoding = storedText ? textEncodingOf(storedText) : null;
+  const headers = {'Content-Type':mode?'text/plain; charset=utf-8':textMedia&&readRedaction&&!/charset=/i.test(row.media_type)?`${row.media_type}; charset=utf-8`:row.media_type,...(sourceEncoding&&sourceEncoding!=='utf-8'?{'X-StarCi-Source-Encoding':sourceEncoding}:{}),'Cache-Control':readRedaction?'no-store':'public, max-age=31536000, immutable',...(etag?{'ETag':etag}:{}),'Accept-Ranges':'bytes','Content-Disposition':url.searchParams.get('download')==='1'?`attachment; filename="${sha}.txt"`:'inline','X-Content-Type-Options':'nosniff'};
   if (readRedaction) headers['X-StarCi-Redacted']=changedText?'read-v1':'stream-v1';
   if (etag && request.headers['if-none-match']===etag) {response.writeHead(304,headers);response.end();return;}
   const range = rangeOf(request.headers.range,length);

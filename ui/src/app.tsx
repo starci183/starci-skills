@@ -1,5 +1,5 @@
 import { Suspense, lazy, useEffect, useState, type ComponentType } from 'react';
-import { Activity, BookOpen, CircleHelp, Database, Moon, PanelsTopLeft, ScrollText, Sun } from 'lucide-react';
+import { Activity, BarChart3, BookOpen, CircleHelp, Database, Moon, PanelsTopLeft, ScrollText, Sun } from 'lucide-react';
 import { Button } from './components/ui/button';
 import { Badge } from './components/ui/badge';
 import { SearchBox } from './components/search-box';
@@ -19,6 +19,7 @@ const navigation = [
   { kind: 'decisions', href: '#/decisions', label: navLabels.decisions, icon: CircleHelp },
   { kind: 'system', href: '#/system/engine', label: navLabels.system, icon: Activity },
   { kind: 'logs', href: '#/logs', label: navLabels.logs, icon: ScrollText },
+  { kind: 'analytics', href: '#/analytics', label: navLabels.analytics, icon: BarChart3 },
 ] as const;
 
 function routePage(route: Route): string | null {
@@ -29,6 +30,7 @@ function routePage(route: Route): string | null {
     case 'decisions': return './pages/decisions/decisions.tsx';
     case 'system': return './pages/system/system.tsx';
     case 'logs': return './pages/logs/logs.tsx';
+    case 'analytics': return './pages/analytics/analytics.tsx';
     case 'kit': return './pages/kit.tsx';
     case 'not-found': return null;
   }
@@ -42,6 +44,7 @@ function routeTitle(route: Route): string {
     case 'decisions': return 'Quyết định';
     case 'system': return 'Hệ thống';
     case 'logs': return 'Nhật ký';
+    case 'analytics': return 'Phân tích';
     case 'kit': return 'Bộ thành phần';
     case 'not-found': return 'Không tìm thấy trang';
   }
