@@ -117,7 +117,7 @@ async function notify(repo, workflowId, text, args) {
   if (args['no-notify']) return { workflowId, action: 'skipped' };
   try {
     const { notifyKernel } = await import('./notify.mjs');
-    const r = notifyKernel({ repo, workflowId, text, item: args.finding ?? null });
+    const r = await notifyKernel({ repo, workflowId, text, item: args.finding ?? null });
     return { workflowId, action: r.action, delivered: r.delivered === true };
   } catch (error) { return { workflowId, action: 'notify-failed', error: clip(error?.message ?? error, 200) }; }
 }

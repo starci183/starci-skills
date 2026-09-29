@@ -25,9 +25,10 @@ import { actionRow, supLog } from './sup-log.mjs';
 const selfFile = fileURLToPath(import.meta.url);
 export const NOTICE_TAG = '[supervisor]';
 
-export const noticeText = (text) => `${NOTICE_TAG} ${String(text ?? '').replace(/\s+/g, ' ').trim()}`;
+// One tag, even when the caller's text already carries it (seen: "[supervisor] [supervisor] ...").
+export const noticeText = (text) => `${NOTICE_TAG} ${String(text ?? '').replace(/\s+/g, ' ').trim().replace(/^(?:\[supervisor\]\s*)+/i, '')}`;
 
-/** The doorbell over the product ledger (synchronous: bridge.mjs calls notifyKernel inline). */
+/** The doorbell over the product ledger. */
 export function ringKernel({ repo, workflowId, wake = wakeKernel }) {
   const ledger = openLedger({ file: ledgerFileFor(path.resolve(repo)) });
   try { return ringDoorbellWith({ ledger, workflowId, wake }); } finally { ledger.close(); }
@@ -37,12 +38,16 @@ export function ringKernel({ repo, workflowId, wake = wakeKernel }) {
  * Deliver one notice as a supervisor-ruling DI plus a doorbell; {action, delivered, decision, ring, ...}.
  * action: kernel-woken (DI opened, doorbell rung) | queued (DI opened, the seat was busy or rung recently) |
  * decision-open-failed (no DI: delivered false). `open`, `ring` and `wake` replace the DI writer, the doorbell and the
- * terminal wake in specs.
+ * terminal wake in specs. Async: openDecision returns a Promise (the product-ledger child, the supervisor ledger); a
+ * sync `open` double still works.
  */
-export function notifyKernel({ repo, workflowId, text, item = null, entity = null, open = openDecision, ring = ringKernel, wake = wakeKernel, env = process.env }) {
+export async function notifyKernel({ repo, workflowId, text, item = null, entity = null, open = openDecision, ring = ringKernel, wake = wakeKernel, env = process.env }) {
   const body = noticeText(text);
-  const opened = open(path.resolve(repo), { workflowId, kind: 'supervisor-ruling', decider: 'kernel', summary: body,
-    entity: entity ?? { type: 'workflow', id: workflowId }, by: 'supervisor', ...(item ? { item } : {}) }, { env: { ...env, STARCI_ACTOR: 'supervisor' } });
+  let opened;
+  try {
+    opened = await open(path.resolve(repo), { workflowId, kind: 'supervisor-ruling', decider: 'kernel', summary: body,
+      entity: entity ?? { type: 'workflow', id: workflowId }, by: 'supervisor', ...(item ? { item } : {}) }, { env: { ...env, STARCI_ACTOR: 'supervisor' } });
+  } catch (error) { opened = { ok: false, err: String(error?.message ?? error).slice(0, 200) }; }
   const decision = opened?.json?.decision ?? null;
   let result;
   if (!opened?.ok || !decision) {
@@ -74,7 +79,7 @@ if (process.argv[1] && path.resolve(process.argv[1]) === selfFile) {
     console.error('use: notify.mjs --repo <ledger-owner> --workflow <id> (--text <t> | --text-file <f>) [--item <key>] [--entity <type>:<id>] [--json]');
     process.exitCode = 2;
   } else {
-    const r = notifyKernel({ repo: value('repo'), workflowId: value('workflow'), text, item: value('item'), entity });
+    const r = await notifyKernel({ repo: value('repo'), workflowId: value('workflow'), text, item: value('item'), entity });
     supervisorLog('notice', `${value('workflow')}: ${r.action}${r.decision ? ` ${r.decision}` : ''}`);
     console.log(argv.includes('--json') ? JSON.stringify(r) : `${r.workflowId}: ${r.action}${r.delivered ? ' (delivered)' : ''}${r.decision ? ` decision ${r.decision}` : ''}${r.ring ? ` doorbell=${r.ring}` : ''}`);
     if (!r.delivered) process.exitCode = 1;
