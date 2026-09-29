@@ -30,7 +30,7 @@ const json=v=>JSON.stringify(v??null);
 const fixture=t=>{
   const root=fs.mkdtempSync(path.join(os.tmpdir(),'starci-owner-answers-'));
   t.after(()=>fs.rmSync(root,{recursive:true,force:true,maxRetries:20,retryDelay:25}));
-  const repo=path.join(root,'repo');fs.mkdirSync(repo,{recursive:true});
+  const repo=path.join(root,'repo');fs.mkdirSync(path.join(repo,'docs'),{recursive:true});
   const seed=fn=>{const l=openLedger({file:ledgerFileFor(repo)});try{return fn(l);}finally{l.close();}};
   const read=fn=>{const l=inspectLedger({file:ledgerFileFor(repo)});try{return fn(l.db);}finally{l.close();}};
   return {root,repo,seed,read};

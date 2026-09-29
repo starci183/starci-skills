@@ -13,6 +13,7 @@ import { withLessons } from '../../supervisor/lessons-file.mjs';
 import { ownerAnswersOf } from '../owner-answers.mjs';
 import { isAwaitingOwner } from '../failure-steps.mjs';
 import { enqueueRepository, ownedPathPlacements, projectBinding } from '../target-repo.mjs';
+import { checkGrantParents } from '../grant-parents.mjs';
 import { ensureOpWorktree, layoutOf as productLayoutOf, planIsolation, worktreePromptRules } from '../product-worktree.mjs';
 import { grammarContextRequired, grammarInputsOf, resolveGrammarContext, grammarMissingDetail } from '../grammar-context.mjs';
 import { spawnAgent, buildSpawnCommand, deliverPrompt, cleanupDeliveryArtifact, awaitSubmission, awaitAttestation } from '../../agent/lib.mjs';
@@ -83,6 +84,15 @@ export default {
     const out = { ok: false, jobId, op, reason: dispatchTarget.reason, detail: dispatchTarget.detail };
     emit(out, `dispatch REFUSED for ${jobId} (${op}): ${out.reason} — ${out.detail}`, args.json);
     process.exit(1);
+  }
+  // The grant is re-judged at launch: the tree may have moved since enqueue. A commit-only attempt authors nothing.
+  if (!payload.commitOnly) {
+    const grant = checkGrantParents({ op, payload: { ...payload, repository: payload.repository ?? dispatchTarget.repository ?? undefined }, ownedPaths: ownedPathsOf(payload), repo });
+    if (!grant.ok) {
+      const out = { ok: false, jobId, op, reason: grant.reason, violations: grant.violations.map(({ owned, dir, closest }) => ({ owned, dir, closest })), detail: grant.detail };
+      emit(out, `dispatch REFUSED for ${jobId} (${op}): ${out.reason} — ${out.detail}; job stays queued`, args.json);
+      process.exit(1);
+    }
   }
   if (!payload.repository && dispatchTarget.repository) {
     payload.repository = dispatchTarget.repository;

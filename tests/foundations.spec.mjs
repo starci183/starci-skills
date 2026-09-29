@@ -24,7 +24,7 @@ const MOD='wf-nivo-modules',COLLAB='wf-nivo-collab',AUTH='wf-nivo-auth',OLD='wf-
 const fixture=t=>{
   const root=fs.mkdtempSync(path.join(os.tmpdir(),'starci-foundations-'));
   t.after(()=>fs.rmSync(root,{recursive:true,force:true,maxRetries:20,retryDelay:25}));
-  const repo=path.join(root,'repo');fs.mkdirSync(repo,{recursive:true});
+  const repo=path.join(root,'repo');fs.mkdirSync(repo,{recursive:true});for(const d of ["docs"])fs.mkdirSync(path.join(repo,d),{recursive:true});
   // The spec registry: foundation planning took effect on 2026-01-01, so the workflows created here
   // are "new" and OLD (created 2025) predates it.
   const registry=path.join(root,'contract-changes.yaml');

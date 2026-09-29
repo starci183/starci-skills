@@ -25,7 +25,7 @@ const json = (v) => JSON.stringify(v ?? null);
 const fixture = (t) => {
   const dirs = [];
   t.after(() => { for (const dir of dirs) fs.rmSync(dir, { recursive: true, force: true, maxRetries: 20, retryDelay: 25 }); });
-  return { repo() { const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'starci-params-')); dirs.push(dir); return dir; } };
+  return { repo() { const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'starci-params-')); dirs.push(dir); fs.mkdirSync(path.join(dir, 'src')); return dir; } };
 };
 const seed = (repo, fn) => { const ledger = openLedger({ file: ledgerFileFor(repo) }); try { fn(ledger); } finally { ledger.close(); } };
 const read = (repo, fn) => { const ledger = inspectLedger({ file: ledgerFileFor(repo) }); try { return fn(ledger); } finally { ledger.close(); } };

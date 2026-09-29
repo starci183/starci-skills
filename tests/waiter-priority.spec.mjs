@@ -25,7 +25,7 @@ const WAITER='wf-wp-waiter',OWNER='wf-wp-owner',THIRD='wf-wp-third';
 const fixture=t=>{
   const root=fs.mkdtempSync(path.join(os.tmpdir(),'starci-waiter-prio-'));
   t.after(()=>fs.rmSync(root,{recursive:true,force:true,maxRetries:20,retryDelay:25}));
-  const repo=path.join(root,'repo');fs.mkdirSync(repo,{recursive:true});
+  const repo=path.join(root,'repo');fs.mkdirSync(repo,{recursive:true});for(const d of ["src"])fs.mkdirSync(path.join(repo,d),{recursive:true});
   const env={...process.env,STARCI_TEST_MACHINE_FILE:path.join(root,'machine.db')};
   for(const key of ['ORCA_TERMINAL_HANDLE','STARCI_ROLE','STARCI_OP_JOB'])delete env[key];
   const api=args=>spawnSync(process.execPath,[API,...args,'--repo',repo,'--json'],{cwd:ROOT,encoding:'utf8',windowsHide:true,timeout:120000,env});

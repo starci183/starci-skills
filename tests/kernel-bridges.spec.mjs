@@ -25,7 +25,7 @@ const world = (t, { orca = false } = {}) => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'starci-bridges-'));
   t.after(() => fs.rmSync(root, { recursive: true, force: true, maxRetries: 20, retryDelay: 25 }));
   if (process.env.STARCI_TEST_TEMP_DIR) t.after(() => fs.rmSync(path.join(process.env.STARCI_TEST_TEMP_DIR, 'starci-job-scratch'), { recursive: true, force: true, maxRetries: 20, retryDelay: 25 }));
-  const repo = path.join(root, 'repo'); fs.mkdirSync(repo, { recursive: true });
+  const repo = path.join(root, 'repo'); fs.mkdirSync(repo, { recursive: true }); fs.mkdirSync(path.join(repo, 'docs'), { recursive: true });
   // A private machine registry per world: dispatch enrols the ledger and 'repo' collides on
   // ledgers.name in the suite-shared test registry otherwise. LOCALAPPDATA stays: project
   // resolution runs through it.
@@ -264,6 +264,7 @@ test('an uncut retry chains to its own unit of work; --retry-of pins it; the goa
     w.settleTo(l, jobId, 'failed');
     l.write.recordJobResult({ jobId, result: { verdict: 'fail' } });
   });
+  fs.mkdirSync(path.join(w.repo, 'docs', 'collab'), { recursive: true });
   const tasks = enqueue('docs/collab/tasks'); fail(tasks);
   const membership = enqueue('docs/collab/membership'); fail(membership);
   const retry = enqueue('docs/collab/tasks');

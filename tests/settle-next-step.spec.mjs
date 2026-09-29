@@ -25,7 +25,7 @@ const world=(t,{legs=['docs.author'],edges}={})=>{
   const repo=fs.mkdtempSync(path.join(os.tmpdir(),'starci-next-step-'));
   t.after(()=>fs.rmSync(repo,{recursive:true,force:true,maxRetries:20,retryDelay:25}));
   const env={...process.env,STARCI_PROJECTS_ROOT:path.join(repo,'projects'),STARCI_TEST_MACHINE_FILE:path.join(repo,'machine.sqlite'),LOCALAPPDATA:path.join(repo,'localappdata')};
-  const wf='wf-next-step';
+  fs.mkdirSync(path.join(repo,'docs'),{recursive:true});const wf='wf-next-step';
   const seed=fn=>{const ledger=openLedger({file:ledgerFileFor(repo,{env})});try{return fn(ledger);}finally{ledger.close();}};
   const read=fn=>{const ledger=inspectLedger({file:ledgerFileFor(repo,{env})});try{return fn(ledger.db);}finally{ledger.close();}};
   seed(ledger=>{

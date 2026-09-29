@@ -26,7 +26,7 @@ const ownerConfig=(t,patch)=>{
   return dir;
 };
 const out=r=>{try{return JSON.parse(r.stdout);}catch{return null;}};
-const tempRepo=t=>{const dir=fs.mkdtempSync(path.join(os.tmpdir(),'starci-seam-'));t.after(()=>fs.rmSync(dir,{recursive:true,force:true,maxRetries:20,retryDelay:25}));return dir;};
+const tempRepo=t=>{const dir=fs.mkdtempSync(path.join(os.tmpdir(),'starci-seam-'));t.after(()=>fs.rmSync(dir,{recursive:true,force:true,maxRetries:20,retryDelay:25}));for(const d of ['apps/core','docs','src/features/chat'])fs.mkdirSync(path.join(dir,d),{recursive:true});return dir;};
 const seed=(repo,fn)=>{const ledger=openLedger({file:ledgerFileFor(repo)});try{return fn(ledger);}finally{ledger.close();}};
 const read=(repo,fn)=>{const ledger=inspectLedger({file:ledgerFileFor(repo)});try{return fn(ledger);}finally{ledger.close();}};
 const json=v=>JSON.stringify(v??null);

@@ -34,7 +34,7 @@ const WORK='wf-sn-subscription-mufrhhro',PEER='wf-sn-learn-content-mufrhgwz';
 const fixture=t=>{
   const root=fs.mkdtempSync(path.join(os.tmpdir(),'starci-stall-parked-'));
   t.after(()=>fs.rmSync(root,{recursive:true,force:true,maxRetries:20,retryDelay:25}));
-  const repo=path.join(root,'repo');fs.mkdirSync(repo,{recursive:true});
+  const repo=path.join(root,'repo');fs.mkdirSync(repo,{recursive:true});for(const d of ["src/modules/domain"])fs.mkdirSync(path.join(repo,d),{recursive:true});
   const env={...process.env};
   for(const key of ['ORCA_TERMINAL_HANDLE','STARCI_ROLE','STARCI_OP_JOB'])delete env[key];
   const api=args=>spawnSync(process.execPath,[API,...args,'--repo',repo,'--json'],{cwd:ROOT,encoding:'utf8',windowsHide:true,timeout:120000,env});

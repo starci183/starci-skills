@@ -36,6 +36,7 @@ function workspace(t, { services, sourceServices, ci = CI, props = null } = {}) 
   write(path.join(host, '.starcistacks', 'dev', 'runtime', 'files', 'sonarqube-analysis-token.txt.enc'), 'sops: {}\n');
   write(path.join(host, '.starcistacks', DECL), yamlOf({ ...baseDoc, ...(sourceServices === undefined ? { services: { sonar: sonarEntry('product') } } : sourceServices ? { services: sourceServices } : {}) }));
   write(path.join(product, '.starcistacks', DECL), yamlOf({ ...baseDoc, ...(services ? { services } : {}) }));
+  fs.mkdirSync(path.join(product, 'docs'), { recursive: true });
   write(path.join(product, '.gitignore'), '.starcistacks/**\n!.starcistacks/**/\n!.starcistacks/**/*.enc\n');
   if (ci) write(path.join(product, '.github', 'workflows', 'ci.yml'), ci);
   if (props) write(path.join(product, 'sonar-project.properties'), props);
@@ -212,6 +213,7 @@ test('ignore rules that leave an infra value file trackable are refused; the lay
   const { product } = workspace(t);
   const g = (...args) => spawnSync('git', args, { cwd: product, encoding: 'utf8' });
   g('init', '-q'); g('config', 'user.email', 't@t'); g('config', 'user.name', 't');
+  fs.mkdirSync(path.join(product, 'docs'), { recursive: true });
   write(path.join(product, '.gitignore'), '.starcistacks/**\n!.starcistacks/**/\n.env\n.env.*\n!.starcistacks/**/*.enc\n!.starcistacks/application-stacks.yaml\n!.starcistacks/*/infra/compose/**\n');
   write(path.join(product, '.starcistacks', 'dev', 'infra', 'compose', 'compose.yaml'), 'services: {}\n');
   let result = checkStarciStacks(product);

@@ -23,7 +23,7 @@ const out=r=>{try{return JSON.parse(r.stdout);}catch{return null;}};
 const json=v=>JSON.stringify(v??null);
 
 const workRoot=t=>{
-  const dir=fs.mkdtempSync(path.join(os.tmpdir(),'starci-priorfail-'));
+  const dir=fs.mkdtempSync(path.join(os.tmpdir(),'starci-priorfail-'));fs.mkdirSync(path.join(dir,'docs'));
   t.after(()=>fs.rmSync(dir,{recursive:true,force:true,maxRetries:20,retryDelay:25}));
   return dir;
 };

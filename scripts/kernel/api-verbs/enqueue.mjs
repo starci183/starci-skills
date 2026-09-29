@@ -10,6 +10,7 @@ import { AUTOPILOT_RULING, HANDOVER_CREDENTIALS_SUBJECT, provisionAskMidFlow } f
 import { slash } from '../../lib/path-key.mjs';
 import { familyGuardOf, familyViolations, familyOwners } from '../write-families.mjs';
 import { ownedPathPlacements, enqueueRepository } from '../target-repo.mjs';
+import { checkGrantParents } from '../grant-parents.mjs';
 import { lineageHeadById } from '../gate-conditions.mjs';
 import { loadContractChanges, changeById } from '../contract-version.mjs';
 import { normalizeFoundationName, readFoundation } from '../foundations.mjs';
@@ -193,6 +194,17 @@ export default {
     emit(out, `enqueue REFUSED for ${args.op}: ${out.reason} — ${out.detail}`, args.json);
     process.exit(1);
   }
+  // A grant the worker could never satisfy (its directory does not exist in the target repository) is refused here,
+  // unless it is an explicit --new-module grant (scripts/kernel/grant-parents.mjs). A commit-only attempt authors nothing.
+  const newModules = [...new Set(String(args['new-module'] ?? '').split(',').map((s) => s.trim()).filter(Boolean))];
+  if (!commitOnlyBatch && args['commit-only-of'] == null) {
+    const grant = checkGrantParents({ op: args.op, payload: { repository: target.repository ?? undefined, new_modules: newModules }, ownedPaths, repo });
+    if (!grant.ok) {
+      const out = { ok: false, workflowId, op: args.op, reason: grant.reason, violations: grant.violations.map(({ owned, dir, closest }) => ({ owned, dir, closest })), detail: grant.detail };
+      emit(out, `enqueue REFUSED for ${args.op}: ${out.reason} — ${out.detail}`, args.json);
+      process.exit(1);
+    }
+  }
   // --after: jobs of this workflow that must settle succeeded before this one
   // may run (a seam/composition job ahead of its record-level siblings). The
   // order lives in the ledger, so status never calls a held sibling ready.
@@ -271,7 +283,7 @@ export default {
     const self = admitted.unitId ? after.filter((prior) => db.prepare('SELECT unit_id FROM jobs WHERE job_id=?').get(prior)?.unit_id === admitted.unitId) : [];
     if (self.length) throw Object.assign(new Error(`--after names ${self.join(', ')}, a try of this job's own unit ${admitted.unitId}: it would wait on itself; enqueue without that --after - a retry chains through its unit`), { code: 'after-self-lineage' });
     payload = {
-      opId: args.op, records, owned_paths: ownedPaths, title: args.title ?? args.op, risk: args.risk ?? null,
+      opId: args.op, records, owned_paths: ownedPaths, ...(newModules.length ? { new_modules: newModules } : {}), title: args.title ?? args.op, risk: args.risk ?? null,
       // --what: the short human name of the target (Vietnamese, ≤40 chars) the op-job display name shows.
       ...(typeof args.what === 'string' && args.what.trim() ? { displayWhat: args.what.replace(/\s+/g, ' ').trim().slice(0, 60) } : {}),
       ...(target.repository ? { repository: target.repository } : {}),

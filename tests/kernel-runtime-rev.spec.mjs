@@ -164,7 +164,7 @@ const apiFixture = (t, rt) => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'starci-runtime-rev-api-'));
   t.after(() => fs.rmSync(dir, { recursive: true, force: true, maxRetries: 20, retryDelay: 25 }));
   if (process.env.STARCI_TEST_TEMP_DIR) t.after(() => fs.rmSync(path.join(process.env.STARCI_TEST_TEMP_DIR, 'starci-job-scratch'), { recursive: true, force: true, maxRetries: 20, retryDelay: 25 }));
-  const repo = path.join(dir, 'repo'); fs.mkdirSync(repo);
+  const repo = path.join(dir, 'repo'); fs.mkdirSync(repo); fs.mkdirSync(path.join(repo, 'docs'));
   const stub = path.join(dir, 'fake-orca.mjs'); fs.writeFileSync(stub, FAKE_ORCA);
   const env = { ...process.env, STARCI_KERNEL_REV_ROOT: rt.root, STARCI_GIT_MEMO_DIR: path.join(dir, 'git-memo'), STARCI_ORCA_COMMAND: process.execPath, STARCI_ORCA_ARGS: JSON.stringify([stub]),
     STARCI_FAKE_ORCA_LOG: path.join(dir, 'calls.jsonl'), STARCI_FAKE_ORCA_STATE: path.join(dir, 'state.json') };

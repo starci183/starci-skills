@@ -10671,6 +10671,17 @@ path-held-by-other-workflow:
   nextStep_vi: "Không thêm đường dẫn. Nhắn luồng kia (api notify) hoặc chờ nó xong, không được lấy đường dẫn của nó."
   owner: supervisor
   kind: verb-refusal
+grant-parent-missing:
+  title: "Granted directory does not exist"
+  title_vi: "Thư mục được giao ghi không tồn tại trong repo đích"
+  meaning_vi: "Đường dẫn giao cho op trỏ vào một thư mục chưa có trong repo đích, nên op không bao giờ làm đúng được quyền ghi đó. Thông báo nêu thư mục còn thiếu và thư mục gần nhất đang có."
+  causes_vi:
+    - "Kernel đoán sai đường dẫn của repo (ví dụ giao src/app trong khi app router nằm ở apps/app/src/app)"
+    - "Thư mục cha chưa được tạo hoặc đã bị đổi tên/di chuyển"
+    - "Việc tạo module mới nhưng không khai báo --new-module"
+  nextStep_vi: "Bị từ chối, không tạo việc (khi giao việc thì việc vẫn ở hàng đợi). Kernel sửa đường dẫn về thư mục có thật, hoặc khai báo --new-module <thư mục module> nếu việc này chủ đích tạo module mới, rồi xếp việc lại."
+  owner: supervisor
+  kind: input-invalid
 path-kernel-custody:
   title: "Path is kernel custody"
   title_vi: "Đường dẫn thuộc vùng lưu giữ của Kernel"

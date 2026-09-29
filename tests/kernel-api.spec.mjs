@@ -48,7 +48,7 @@ const fixture=t=>{
     if(savedProjects===undefined)delete process.env.STARCI_PROJECTS_ROOT;else process.env.STARCI_PROJECTS_ROOT=savedProjects;
     fs.rmSync(machineRoot,{recursive:true,force:true,maxRetries:20,retryDelay:25});});
   t.after(()=>{for(const dir of dirs)fs.rmSync(dir,{recursive:true,force:true,maxRetries:20,retryDelay:25});});
-  return {repo(){const dir=fs.mkdtempSync(path.join(os.tmpdir(),'starci-kapi-'));dirs.push(dir);return dir;}};
+  return {repo(){const dir=fs.mkdtempSync(path.join(os.tmpdir(),'starci-kapi-'));dirs.push(dir);fs.mkdirSync(path.join(dir,'docs'),{recursive:true});return dir;}};
 };
 /** Seed rows through the ledger API, then close so the spawned CLI never shares the handle. */
 const seed=(repo,fn)=>{const ledger=openLedger({file:ledgerFileFor(repo)});try{fn(ledger);}finally{ledger.close();}};
@@ -226,6 +226,7 @@ test('status explains every queued job: ready, dependency, path-lease, pool-full
     assert.equal(r.status,0,r.stderr);
     return out(r).job_id;
   };
+  fs.mkdirSync(path.join(repo,'docs','first'),{recursive:true});
   const first=enq('docs.author','docs/first');
 
   // Nothing blocks it: queued and dispatchable now.

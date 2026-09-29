@@ -302,6 +302,7 @@ const usage = (code) => {
   plan     --workflow <id> --file <plan.json>
   enqueue  --workflow <id> --op <opId> --paths <csv> [--records <csv>] [--title <t>] [--what <short name>] [--risk <r>] [--retry-of <job>] [--reopen <reason>] [--derived-from <jobs>]
            [--repository <repo-id>] [--params '<json>'] [--cut-id <id> --cut-ordinal <n> --cut-total <n>]
+           [--new-module <repository-relative dir>,...]   the grant creates these module roots (else every granted directory must already exist)
            [--commit-only-of <jobId>,...]   a commit-only attempt for Work settled jobs of the same op never committed
   enqueue  --workflow <id> --op <opId> --commit-only-work-debt [--adopt-from <finishedWf> [--as-repo-owner]]
            one commit-only attempt for all of this op's attributed Work debt (or a finished workflow's, adopted)

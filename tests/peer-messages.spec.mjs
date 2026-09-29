@@ -23,7 +23,7 @@ const LOGIN='wf-a-login',COLLAB='wf-b-collab',DONE='wf-c-done',ELSEWHERE='wf-d-e
 const fixture=t=>{
   const root=fs.mkdtempSync(path.join(os.tmpdir(),'starci-peers-'));
   t.after(()=>fs.rmSync(root,{recursive:true,force:true,maxRetries:20,retryDelay:25}));
-  const repo=path.join(root,'repo');fs.mkdirSync(repo,{recursive:true});
+  const repo=path.join(root,'repo');fs.mkdirSync(repo,{recursive:true});for(const d of ["docs","src/auth/phone/otp","src/auth/phone/sms"])fs.mkdirSync(path.join(repo,d),{recursive:true});
   const base={...process.env};
   // The suite may itself run inside an Orca or op terminal: start from a caller with no identity.
   for(const key of ['ORCA_TERMINAL_HANDLE','STARCI_ROLE','STARCI_OP_JOB'])delete base[key];
