@@ -124,6 +124,21 @@ const api = command => runNodeJson(apiFile, [command, '--repo', path.resolve(rep
 // that is still alive but unbound (step kernel-terminal-alive - a restart that
 // failed during an Orca outage left the job stopped) is adopted back instead of
 // being replaced by a second kernel.
+// A start answer {replaced:false} (the seat's terminal still connected, a startup already reserved) replaced
+// nothing: it is 'already-live', never 'restarted' - the Host counts every 'restarted' against
+// maxReplacementsPerHour (scripts/reconciler/controllers/host.mjs REPLACED), and on 2026-09-29 a timed-out
+// tab close that start-workflow answered "terminal connected" was counted as the 4th and quarantined the seat.
+/** The watchdog answer of a start-workflow run {ok, value, stderr, stdout} past its host-unavailable and adopt steps. Pure. */
+export function startAnswerOf(started, base = {}) {
+  const live = started.ok && started.value?.replaced === false;
+  return {
+    ...base, ok: started.ok && started.value?.ok !== false, action: live ? 'already-live' : started.ok ? 'restarted' : 'restart-failed',
+    ...(live ? { note: started.value?.note ?? null } : {}),
+    replacementTerminal: started.value?.terminal ?? null,
+    ...(started.value?.exitedTerminalsClosed ? { exitedTerminalsClosed: started.value.exitedTerminalsClosed } : {}),
+    detail: started.value ?? started.stderr ?? started.stdout,
+  };
+}
 const replaceKernel = (base) => {
   const started = runNodeJson(startFile, ['--repo', path.resolve(repo), '--goal', workflowId, '--launched-by', 'watchdog', '--json']);
   const step = started.value?.step ?? null;
@@ -133,12 +148,7 @@ const replaceKernel = (base) => {
     return { ...base, ok: adopted.ok && adopted.value?.ok !== false, action: adopted.ok ? 'adopted' : 'adopt-failed',
       adoptedTerminal: started.value.terminal, detail: adopted.value ?? adopted.stderr ?? adopted.stdout };
   }
-  return {
-    ...base, ok: started.ok && started.value?.ok !== false, action: started.ok ? 'restarted' : 'restart-failed',
-    replacementTerminal: started.value?.terminal ?? null,
-    ...(started.value?.exitedTerminalsClosed ? { exitedTerminalsClosed: started.value.exitedTerminalsClosed } : {}),
-    detail: started.value ?? started.stderr ?? started.stdout,
-  };
+  return startAnswerOf(started, base);
 };
 
 // Orca 1.4.209 binds a send to the terminal's process incarnation: a kernel terminal created before
@@ -198,29 +208,48 @@ export function wakeFailuresProveDead(failedAts, { lastOutputAt = null, now = Da
   return { dead: misses.length >= WAKE_FAIL_REPLACE && firstAt != null && now - firstAt >= WAKE_FAIL_WINDOW_MS, misses: misses.length, firstAt };
 }
 // H11: a stall wake the Kernel RECEIVED must lead somewhere. Each delivered wake is recorded kernel-woken {terminal};
-// the Kernel "moved" when the workflow gained a job event of its own (enqueue, dispatch, settle, drop) after that wake.
-// WAKE_IDLE_REPLACE delivered wakes in a row with no move replace the Kernel (a Kernel that reads its wake and does
-// nothing is as stuck as a dead one); a stall that survives a replacement goes to the owner as one Decision Item
-// (progress-stall, decider owner) instead of more wakes.
+// the Kernel "moved" when the workflow gained a job event (enqueue, dispatch, settle, drop) or a record the Kernel wrote
+// itself (a decision, a proposal, an ask superseded, a peer message acked...) after that wake. WAKE_IDLE_REPLACE
+// delivered wakes in a row with no move, the first at least WAKE_IDLE_WINDOW_MS old, replace the Kernel (a Kernel that
+// reads its wake and does nothing is as stuck as a dead one); a stall that survives an idle replacement made within
+// IDLE_REPLACED_WINDOW_MS goes to the owner as one Decision Item (progress-stall, decider owner) instead of another
+// replace. Only a Kernel-authored job move clears that streak: op-dispatched/op-settled come from the dispatch path and
+// the settle tail, and the Kernel's own records (it is responding, e.g. holding behind an ask it cannot serve) reset the
+// wakes only. On 2026-09-29 the nivo-auth Kernel was replaced 5 times while it wrote kernel-decision/kernel-proposal
+// records between wakes that piled up within 90 s, and an op-settled between streaks kept the escalation from firing.
 const KERNEL_WOKEN_EVENT = 'kernel-woken';
 const KERNEL_IDLE_REPLACED_EVENT = 'kernel-replaced-idle';
 export const WAKE_IDLE_REPLACE = 3;
-const KERNEL_MOVES = ['job-enqueued', 'follow-on-enqueued', 'op-dispatched', 'op-settled', 'job-dropped', 'kernel-graph-edit', 'lifecycle', 'phase-transition'];
+export const WAKE_IDLE_WINDOW_MS = WAKE_FAIL_WINDOW_MS;
+export const IDLE_REPLACED_WINDOW_MS = 60 * 60_000;
+// Kernel-authored job moves: reset the wakes and the idle-replaced streak.
+const KERNEL_MOVES = ['job-enqueued', 'follow-on-enqueued', 'job-dropped', 'kernel-graph-edit', 'lifecycle', 'phase-transition'];
+// Progress the Kernel did not author, and the Kernel's own records: reset the wakes only.
+const KERNEL_ACTIVITY = ['op-dispatched', 'op-settled', 'kernel-decision', 'kernel-decision-result', 'kernel-proposal',
+  'autopilot-deferred-to-handover', 'ask-superseded', 'ask-answered', 'peer-message-acked', 'runtime-rev-acked'];
 const recordKernelWoken = (terminal, detail) => withKernelLedger((ledger) => ledger.transaction(() => ledger.appendEvent({
   workflowId, entityType: 'kernel', entityId: workflowId, kind: KERNEL_WOKEN_EVENT, payload: { terminal, ...detail } })));
-/** {wakes, replaced}: delivered wakes and idle replacements since the Kernel's last move. Pure over the ledger rows. */
-export function idleWakesOf(rows) {
-  let wakes = 0, replaced = 0;
+/**
+ * {wakes, firstWakeAt, replaced, due}: delivered wakes since the Kernel's last move or record (firstWakeAt the
+ * created_at of the first), idle replacements within IDLE_REPLACED_WINDOW_MS since its last job move, and whether H11
+ * acts (WAKE_IDLE_REPLACE wakes, the first at least WAKE_IDLE_WINDOW_MS old). Pure over the ledger rows {kind, created_at}.
+ */
+export function idleWakesOf(rows, { now = Date.now() } = {}) {
+  let wakes = 0, firstWakeAt = null, replacedAts = [];
   for (const row of rows) {
-    if (KERNEL_MOVES.includes(row.kind)) { wakes = 0; replaced = 0; }
-    else if (row.kind === KERNEL_WOKEN_EVENT) wakes += 1;
-    else if (row.kind === KERNEL_IDLE_REPLACED_EVENT) { replaced += 1; wakes = 0; }
+    if (KERNEL_MOVES.includes(row.kind)) { wakes = 0; firstWakeAt = null; replacedAts = []; }
+    else if (KERNEL_ACTIVITY.includes(row.kind)) { wakes = 0; firstWakeAt = null; }
+    else if (row.kind === KERNEL_WOKEN_EVENT) { if (wakes === 0) firstWakeAt = Number(row.created_at) || null; wakes += 1; }
+    else if (row.kind === KERNEL_IDLE_REPLACED_EVENT) { replacedAts.push(Number(row.created_at) || 0); wakes = 0; firstWakeAt = null; }
   }
-  return { wakes, replaced };
+  const replaced = replacedAts.filter((at) => now - at < IDLE_REPLACED_WINDOW_MS).length;
+  const due = wakes >= WAKE_IDLE_REPLACE && firstWakeAt != null && now - firstWakeAt >= WAKE_IDLE_WINDOW_MS;
+  return { wakes, firstWakeAt, replaced, due };
 }
+const IDLE_KINDS = [...KERNEL_MOVES, ...KERNEL_ACTIVITY, KERNEL_WOKEN_EVENT, KERNEL_IDLE_REPLACED_EVENT];
 const kernelIdleWakes = () => withKernelLedger((ledger) => idleWakesOf(ledger.db.prepare(
-  `SELECT kind FROM events WHERE workflow_id=? AND kind IN (${[...KERNEL_MOVES, KERNEL_WOKEN_EVENT, KERNEL_IDLE_REPLACED_EVENT].map(() => '?').join(',')}) ORDER BY seq`)
-  .all(workflowId, ...KERNEL_MOVES, KERNEL_WOKEN_EVENT, KERNEL_IDLE_REPLACED_EVENT))) ?? { wakes: 0, replaced: 0 };
+  `SELECT kind, created_at FROM events WHERE workflow_id=? AND kind IN (${IDLE_KINDS.map(() => '?').join(',')}) ORDER BY seq`)
+  .all(workflowId, ...IDLE_KINDS))) ?? { wakes: 0, firstWakeAt: null, replaced: 0, due: false };
 const escalateIdleStall = ({ phase, terminal, idle, outputAgeMs }) => {
   let decision = null;
   try {
@@ -230,15 +259,22 @@ const escalateIdleStall = ({ phase, terminal, idle, outputAgeMs }) => {
   } catch (error) { decision = { error: String(error?.message ?? error).slice(0, 200) }; }
   return { ok: true, workflowId, phase, terminal, action: 'stall-escalated', idle, outputAgeMs, decision: decision?.id ?? decision };
 };
+// A close that failed (terminal_tab_close_timeout on a saturated host) replaced nothing: it answers
+// kernel-terminal-close-failed like replaceUnwritableKernel and never runs start-workflow, and an idle
+// replacement is recorded only once its terminal closed.
+const closeFailed = (base, terminalClosed, what) => ({ ...base, terminalClosed, ok: false, action: 'kernel-terminal-close-failed',
+  error: terminalClosed.error ?? `the ${what} kernel terminal could not be closed` });
 const replaceIdleKernel = ({ phase, terminal, stale, outputAgeMs, idle }) => {
-  withKernelLedger((ledger) => ledger.transaction(() => ledger.appendEvent({ workflowId, entityType: 'kernel', entityId: workflowId, kind: KERNEL_IDLE_REPLACED_EVENT, payload: { terminal, wakes: idle.wakes } })));
   const terminalClosed = closeKernelTerminal(terminal);
+  if (!terminalClosed.ok) return closeFailed({ workflowId, phase, terminal, ...stale, outputAgeMs, idle }, terminalClosed, 'idle');
+  withKernelLedger((ledger) => ledger.transaction(() => ledger.appendEvent({ workflowId, entityType: 'kernel', entityId: workflowId, kind: KERNEL_IDLE_REPLACED_EVENT, payload: { terminal, wakes: idle.wakes } })));
   return replaceKernel({ workflowId, phase, terminal, ...stale, outputAgeMs, terminalClosed,
     deathReason: `kernel ${terminal} received ${idle.wakes} wakes with an actionable frontier and made no move: replaced (H11)` });
 };
 
 const replaceWakeDeadKernel = ({ phase, terminal, stale, outputAgeMs, misses, firstAt }) => {
   const terminalClosed = closeKernelTerminal(terminal);
+  if (!terminalClosed.ok) return closeFailed({ workflowId, phase, terminal, ...stale, outputAgeMs, misses, firstAt }, terminalClosed, 'wake-dead');
   return replaceKernel({ workflowId, phase, terminal, ...stale, outputAgeMs, terminalClosed,
     deathReason: `kernel terminal ${terminal} missed ${misses} wakes since ${new Date(firstAt).toISOString()} with no output: a dead kernel behind a listed terminal` });
 };
@@ -366,7 +402,7 @@ function kernelTick(status, phase) {
     const earlier = wakeFailuresProveDead(kernelWakeFailures(terminal), { lastOutputAt });
     if (earlier.dead) return replaceWakeDeadKernel({ phase, terminal, stale, outputAgeMs, ...earlier });
     const idle = kernelIdleWakes();
-    if (idle.wakes >= WAKE_IDLE_REPLACE) return idle.replaced ? escalateIdleStall({ phase, terminal, idle, outputAgeMs }) : replaceIdleKernel({ phase, terminal, stale, outputAgeMs, idle });
+    if (idle.due) return idle.replaced ? escalateIdleStall({ phase, terminal, idle, outputAgeMs }) : replaceIdleKernel({ phase, terminal, stale, outputAgeMs, idle });
     const proof = sendWakeWithProof({ terminal, text: wakePromptOf(workflowId, status.value), before: String(read.screen ?? '') });
     if (!proof.ok && proof.delivery !== 'agent-exited') recordKernelWakeFailed(terminal, { state: classified.state, sendErrorCode: proof.sendErrorCode ?? null, delivery: proof.delivery ?? null });
     if (proof.ok) recordKernelWoken(terminal, { delivery: proof.delivery ?? null, idleWakes: idle.wakes + 1 });
