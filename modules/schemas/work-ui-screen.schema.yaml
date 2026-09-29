@@ -114,6 +114,13 @@ properties:
       record existed stay valid - `starci validate` lists each of them as SHELL_BINDING_MISSING for a
       redraw - and interface.draw's shell-conformance proof is what requires it on every record the op
       writes from now on (scripts/checks/shell-conformance.mjs)."
+  app:
+    type: string
+    pattern: ^[a-z0-9]+(?:-[a-z0-9]+)*$
+    description: "The frontend app the route belongs to - a name in the layout tree's apps[] (workspace.yaml
+      repositories[role fe].apps[].name). Required when the tree declares several apps and the route alone does not
+      say (a route that exists in one app only is that app); a tree of one app needs none. A route is resolved in
+      this app: the same route in another app is another screen (UI_APP_UNKNOWN, UI_APP_MISSING)."
   route:
     $ref: "#/$defs/layoutNodeId"
     description: "The App Router route this screen is, as the layout tree names the segment - groups, slots and

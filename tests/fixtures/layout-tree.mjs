@@ -57,9 +57,11 @@ export const pngBytes = (image) => encodePng(image);
  * lockup and one persona. Returns the product plus `tree` (the record) and `save(tree)`.
  */
 export async function settledProduct(t, { photosVisible = false } = {}) {
-  const { mergeScan, scanAppDir, addCapture, nodeById } = await import('../../scripts/work/layout-tree.mjs');
+  const { mergeScan, scanAppDir, addCapture, nodeById, recordOf, treeOf } = await import('../../scripts/work/layout-tree.mjs');
   const p = buildProduct(t);
-  const tree = mergeScan(null, scanAppDir(p.appDir, { repoRoot: p.web, repository: 'web' }), { at: '2026-09-24T00:00:00Z' }).record;
+  const record = mergeScan(null, [scanAppDir(p.appDir, { repoRoot: p.web, repository: 'web' })], { at: '2026-09-24T00:00:00Z' }).record;
+  // `tree` is the live view of the product's one app (nodes, source, i18n are the app's, the rest the record's).
+  const tree = treeOf(record, 'app');
   tree.breakpoints = [{ name: 'desktop', width: 40, height: 30 }, { name: 'mobile', width: 20, height: 30 }];
   tree.themes = ['light'];
   const shellDir = path.join(p.work, 'shell');
@@ -77,9 +79,16 @@ export async function settledProduct(t, { photosVisible = false } = {}) {
   tree.brand = { component: 'PhotoBrand', lockups: [{ name: 'assets/lockups/lockup--light.png', sha256: lockupSha, theme: 'light' }] };
   tree.personas = [{ role: 'owner', default: true, workspace: 'Studio', user: 'An Nguyen', currency: 'VND', dateFormat: 'dd/MM/yyyy' }];
   tree.state = 'done';
-  const save = (record) => fs.writeFileSync(path.join(shellDir, 'index.yaml'), stringifyYaml(record));
+  const save = (r) => fs.writeFileSync(path.join(shellDir, 'index.yaml'), stringifyYaml(recordOf(r ?? tree)));
   save(tree);
-  return { ...p, tree, save, shellDir };
+  return { ...p, tree, record, save, shellDir };
+}
+
+/** An independent copy of an app view (or a record): edit it, then `p.save(copy)`. */
+export async function cloneTree(tree) {
+  const { recordOf, treeOf } = await import('../../scripts/work/layout-tree.mjs');
+  const copy = structuredClone(recordOf(tree));
+  return tree.app ? treeOf(copy, tree.app.name) : copy;
 }
 
 /**
@@ -115,13 +124,13 @@ export const uiSkeleton = (id, over = {}) => ({
   ui: { status: 'proposed', intent: 'fixture' }, ...over,
 });
 
-/** Build the product under a fresh temp directory; returns helpers. `t` is the node:test context. */
-export function buildProduct(t, { files = APP_FILES } = {}) {
+/** Build the product under a fresh temp directory; returns helpers. `t` is the node:test context. `apps` is the frontend's workspace.yaml apps declaration. */
+export function buildProduct(t, { files = APP_FILES, apps = null } = {}) {
   const base = fs.mkdtempSync(path.join(os.tmpdir(), 'starci-layout-'));
   t.after(() => fs.rmSync(base, { recursive: true, force: true, maxRetries: 20, retryDelay: 25 }));
   const work = path.join(base, 'backend', '.starciwork');
   const put = (rel, body) => { const file = path.join(base, rel); fs.mkdirSync(path.dirname(file), { recursive: true }); fs.writeFileSync(file, body); return file; };
-  put('backend/.starciwork/workspace.yaml', stringifyYaml({ schema: 'work/workspace@1', id: 'photo', repositories: [{ role: 'be', name: 'backend' }, { role: 'fe', name: 'web' }] }));
+  put('backend/.starciwork/workspace.yaml', stringifyYaml({ schema: 'work/workspace@1', id: 'photo', repositories: [{ role: 'be', name: 'backend' }, { role: 'fe', name: 'web', ...(apps ? { apps } : {}) }] }));
   for (const [rel, body] of Object.entries(files)) put(`web/${rel}`, body);
   return { base, work, web: path.join(base, 'web'), appDir: path.join(base, 'web', 'apps', 'app', 'src', 'app'), put };
 }

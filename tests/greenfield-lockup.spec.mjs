@@ -126,9 +126,9 @@ test('lockup sources: only a recorded real render or an accepted planned-layout 
   assert.match(lockupSourceOf(tree, p.work, `${DESIGN}:${composite.replace('.png', '.content.png')}`).error, /not an accepted layout composite/);
   // A real render: the settled product's recorded console capture.
   const s = await settledProduct(t);
-  const bad = layoutTreeMain(['lockup', '--work', s.work, '--from', 'shell/assets/layouts/locale-console--desktop--light.png', '--rect', '35,25,10,10', '--write']);
+  const bad = layoutTreeMain(['lockup', '--work', s.work, '--from', 'shell/assets/layouts/app--locale-console--desktop--light.png', '--rect', '35,25,10,10', '--write']);
   assert.match(bad.text, /leaves the 40x30 source/);
-  const ok = layoutTreeMain(['lockup', '--work', s.work, '--from', 'shell/assets/layouts/locale-console--desktop--light.png', '--rect', '0,0,4,2', '--write', '--json']);
+  const ok = layoutTreeMain(['lockup', '--work', s.work, '--from', 'shell/assets/layouts/app--locale-console--desktop--light.png', '--rect', '0,0,4,2', '--write', '--json']);
   assert.equal(ok.exitCode, 0, ok.text);
   const written = readTree(s);
   assert.equal(written.brand.lockups.length, 1, 'the light lockup is replaced, not duplicated');

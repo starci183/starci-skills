@@ -6,7 +6,7 @@ import { createRequire } from 'node:module';
 import { parseYaml, stringifyYaml } from '../engine/yaml.mjs';
 import {
   addCapture, addPlanned, captureFileOf, chainOf, layoutChainOf, layoutTreeMain, mergeScan, nodeById, resolveNavRoute,
-  scanAppDir, segmentKindOf,
+  scanAppDir, segmentKindOf, treeOf,
 } from '../scripts/work/layout-tree.mjs';
 import { blankImage, decodePng, drawOver, encodePng, keyRect } from '../scripts/work/png.mjs';
 import { buildProduct, layoutCapture } from './fixtures/layout-tree.mjs';
@@ -79,22 +79,22 @@ test('navigation labels come from the route tree plus the catalogs, and every mi
 
 test('a scanned record compiles, and a re-scan keeps decisions but re-opens a layout whose file changed', (t) => {
   const p = buildProduct(t);
-  const first = mergeScan(null, scanOf(p), { at: '2026-09-24T00:00:00Z' }).record;
+  const first = mergeScan(null, [scanOf(p)], { at: '2026-09-24T00:00:00Z' }).record;
   assert.equal(validateTree(first), true, JSON.stringify(validateTree.errors));
-  const consoleNode = nodeById(first, '/[locale]/(console)');
+  const consoleNode = nodeById(treeOf(first, 'app'), '/[locale]/(console)');
   consoleNode.layout.chrome = 'visible';
   consoleNode.layout.state = 'done';
   // A recorded capture is a blob citation: the schema field is `name` (assets/layouts/...png), never `path`.
   consoleNode.layout.captures = [{ breakpoint: 'desktop', theme: 'light', name: 'assets/layouts/x.png', sha256: 'a'.repeat(64), width: 40, height: 30, slot: { x: 1, y: 1, width: 5, height: 5 }, kind: 'render' }];
-  addPlanned(first, { node: '/[locale]/(console)/settings', files: ['page'] });
-  const again = mergeScan(first, scanOf(p), { at: '2026-09-24T00:00:01Z' });
+  addPlanned(treeOf(first, 'app'), { node: '/[locale]/(console)/settings', files: ['page'] });
+  const again = mergeScan(first, [scanOf(p)], { at: '2026-09-24T00:00:01Z' });
   assert.equal(again.changed, false, 'nothing moved under app/');
-  assert.equal(nodeById(again.record, '/[locale]/(console)').layout.chrome, 'visible');
-  assert.equal(nodeById(again.record, '/[locale]/(console)/settings').origin, 'planned', 'a planned node survives a re-scan');
+  assert.equal(nodeById(treeOf(again.record, 'app'), '/[locale]/(console)').layout.chrome, 'visible');
+  assert.equal(nodeById(treeOf(again.record, 'app'), '/[locale]/(console)/settings').origin, 'planned', 'a planned node survives a re-scan');
   fs.appendFileSync(path.join(p.appDir, '[locale]', '(console)', 'layout.tsx'), '// edited\n');
-  const moved = mergeScan(again.record, scanOf(p), { at: '2026-09-24T00:00:02Z' });
+  const moved = mergeScan(again.record, [scanOf(p)], { at: '2026-09-24T00:00:02Z' });
   assert.equal(moved.changed, true);
-  const layout = nodeById(moved.record, '/[locale]/(console)').layout;
+  const layout = nodeById(treeOf(moved.record, 'app'), '/[locale]/(console)').layout;
   assert.equal(layout.rev, 2, 'the layout rev is bumped, staling every screen composited into it');
   assert.equal(layout.state, 'todo', 'a changed visible layout needs a re-capture');
   assert.equal(moved.record.rev, first.rev + 1);
@@ -110,17 +110,18 @@ test('a fresh app with no message catalogs scans to a record that compiles witho
   const p = buildProduct(t, { files });
   const scan = scanOf(p);
   assert.equal(scan.i18n, undefined, 'no catalog exists, so none is invented');
-  const record = mergeScan(null, scan, { at: '2026-09-24T00:00:00Z' }).record;
+  const record = mergeScan(null, [scan], { at: '2026-09-24T00:00:00Z' }).record;
   assert.equal(record.origin, 'repository');
-  assert.equal('i18n' in record, false);
+  assert.equal('i18n' in record.apps[0], false);
   assert.equal(validateTree(record), true, JSON.stringify(validateTree.errors));
-  assert.equal(validateTree({ ...record, i18n: { catalogs: [] } }), false, 'an i18n block, when present, still names at least one real catalog');
-  assert.equal(validateTree({ ...record, source: undefined }), false, 'a scanned tree still names what it scanned');
+  assert.equal(validateTree({ ...record, apps: [{ ...record.apps[0], i18n: { catalogs: [] } }] }), false, 'an i18n block, when present, still names at least one real catalog');
+  assert.equal(validateTree({ ...record, apps: [{ ...record.apps[0], source: undefined }] }), false, 'a scanned tree still names what each app scanned');
 });
 
 test('capture measures the #FF00FF slot, stores the bytes and bumps the layout rev on a changed capture', (t) => {
   const p = buildProduct(t);
-  const record = mergeScan(null, scanOf(p)).record;
+  const tree = mergeScan(null, [scanOf(p)]).record;
+  const record = treeOf(tree, 'app');
   record.breakpoints = [{ name: 'desktop', width: 40, height: 30 }];
   record.themes = ['light'];
   const shellDir = path.join(p.work, 'shell');
@@ -129,7 +130,7 @@ test('capture measures the #FF00FF slot, stores the bytes and bumps the layout r
   assert.deepEqual(capture.slot, { x: 10, y: 5, width: 28, height: 22 });
   // The capture names the bytes by their blob-store name; the PNG itself is a blob the sha256 cites,
   // not a file under shell/assets (captureFileOf resolves the citation).
-  assert.equal(capture.name, 'assets/layouts/locale-console--desktop--light.png');
+  assert.equal(capture.name, 'assets/layouts/app--locale-console--desktop--light.png');
   const stored = captureFileOf(shellDir, capture);
   assert.ok(stored && fs.existsSync(stored), 'the capture bytes are readable out of the blob store');
   assert.equal(nodeById(record, '/[locale]/(console)').layout.chrome, 'visible');
@@ -144,7 +145,7 @@ test('capture measures the #FF00FF slot, stores the bytes and bumps the layout r
 });
 
 test('a planned tree adds the missing ancestors, and chains resolve outermost first', () => {
-  const record = { schema: 'work/layout-tree@1', app: { appDir: 'src/app' }, nodes: [] };
+  const record = treeOf({ schema: 'work/layout-tree@1', apps: [{ name: 'app', root: '.', appDir: 'src/app', framework: 'next-app-router', nodes: [] }] }, 'app');
   addPlanned(record, { node: '/[locale]/(shop)/cart', files: ['page'] });
   addPlanned(record, { node: '/[locale]/(shop)', files: ['layout'], design: 'ui.shop.frame' });
   assert.deepEqual(chainOf(record, '/[locale]/(shop)/cart').map((n) => n.id), ['/', '/[locale]', '/[locale]/(shop)', '/[locale]/(shop)/cart']);
@@ -163,7 +164,7 @@ test('the CLI scans read-only by default and writes the record only with --write
   assert.equal(layoutTreeMain(['scan', '--work', p.work, '--write']).exitCode, 0);
   const written = parseYaml(fs.readFileSync(path.join(p.work, 'shell', 'index.yaml'), 'utf8'));
   assert.equal(written.schema, 'work/layout-tree@1');
-  assert.equal(written.app.repository, 'web');
+  assert.equal(written.apps[0].repository, 'web');
   assert.equal(layoutTreeMain(['slot', p.put('s.png', encodePng(layoutCapture(20, 20, { x: 2, y: 3, width: 4, height: 5 })))]).text.trim(), JSON.stringify({ ok: true, slot: { x: 2, y: 3, width: 4, height: 5 }, fill: 1 }));
   fs.writeFileSync(path.join(p.work, 'shell', 'index.yaml'), stringifyYaml({ schema: 'work/other-shell@1', id: 'shell', productLocale: { default: 'vi', fallback: 'vi', locales: ['vi'] } }));
   const refused = layoutTreeMain(['scan', '--work', p.work, '--write']);
@@ -179,6 +180,6 @@ test('the todo example carries an honestly unsettled layout tree', () => {
   assert.equal(example.state, 'todo');
   // appDir names the App Router directory relative to the repository root (the example's web app
   // lives in apps/web, so app/, not the bare src/app an app at the repo root would record).
-  assert.equal(example.app.appDir, 'apps/web/src/app');
-  assert.ok(nodeById(example, '/[lang]/tasks'), 'the scan holds the example frontend routes');
+  assert.equal(example.apps[0].appDir, 'apps/web/src/app');
+  assert.ok(nodeById(treeOf(example, 'web'), '/[lang]/tasks'), 'the scan holds the example frontend routes');
 });

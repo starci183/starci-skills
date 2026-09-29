@@ -8,7 +8,7 @@ import { parseYaml, stringifyYaml } from '../engine/yaml.mjs';
 import { readFoundation } from '../scripts/kernel/foundations.mjs';
 import { FOUNDATION_WAIT, SHELL_FOUNDATION, gateShellFoundation, landShellFoundationIfSettled, shellFoundationNeed, shellFoundationWaitOf } from '../scripts/kernel/shell-foundation.mjs';
 import { checkPrerequisites, prerequisiteDetail, DESIGN_NOT_SETTLED } from '../scripts/kernel/prerequisites.mjs';
-import { nodeById } from '../scripts/work/layout-tree.mjs';
+import { nodeById, treeOf } from '../scripts/work/layout-tree.mjs';
 import { settledProduct, uiSkeleton } from './fixtures/layout-tree.mjs';
 
 // Owner ruling 2026-09-29 (draw-from-todo): interface.draw starts from a todo shell; the shell + ancestor layouts are ONE
@@ -94,9 +94,9 @@ test('a passed draw lands the foundation only when the tree is settled, and rele
   const { ledger } = ledgerFixture(t);
   const p = await settledProduct(t);
   const repo = path.dirname(p.work);
-  const tree = structuredClone(p.tree);
-  nodeById(tree, CONSOLE).layout.state = 'todo';
-  p.save(tree);
+  const unsettled = structuredClone(p.record);
+  nodeById(treeOf(unsettled, 'app'), CONSOLE).layout.state = 'todo';
+  p.save(unsettled);
   const jobA = { workflow_id: A, job_id: 'job-a' };
   const gate = gateShellFoundation(ledger, { job: jobA, need: shellFoundationNeed({ brief, repo, payload: { owned_paths: [BOARD] } }), now: 1000 });
   assert.equal(gate.action, 'claimed');

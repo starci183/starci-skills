@@ -11,7 +11,7 @@ import { shellFoundationNeed } from '../scripts/kernel/shell-foundation.mjs';
 import { productLocaleFor } from '../scripts/kernel/product-locale.mjs';
 import { nodeById } from '../scripts/work/layout-tree.mjs';
 import { encodePng, blankImage } from '../scripts/work/png.mjs';
-import { drawUi, settledProduct, uiSkeleton } from './fixtures/layout-tree.mjs';
+import { cloneTree, drawUi, settledProduct, uiSkeleton } from './fixtures/layout-tree.mjs';
 
 // The layout-tree redesign (owner-approved 2026-09-24): design follows the Next.js App Router layout
 // architecture. The shell record is the layout tree scanned from app/, directions are generated slot content
@@ -101,7 +101,7 @@ test('a routed overlay needs both presentations; a non-routed one has no page pr
 
 test('ancestors settled and rev-current; composites on the exact current capture and reproducible', async (t) => {
   const { p, board, rewrite } = await drawn(t);
-  const tree = structuredClone(p.tree);
+  const tree = await cloneTree(p.tree);
   nodeById(tree, CONSOLE).layout.state = 'todo';
   p.save(tree);
   assert.ok(codes(checkShellConformance(board.dir)).includes('LAYOUT_ANCESTOR_UNSETTLED'));
@@ -111,7 +111,7 @@ test('ancestors settled and rev-current; composites on the exact current capture
   assert.ok(codes(checkShellConformance(board.dir)).includes('LAYOUT_REV_STALE'), 'a re-captured layout stales what was composited into it');
   p.save(p.tree);
   assert.ok(codes(checkShellConformance(rewrite(board, (r) => { r.shell = { ref: 'shell', rev: p.tree.rev }; }))).includes('LAYOUT_BINDING_MISSING'));
-  const wrongCapture = rewrite(board, (r) => { r.assets.find((a) => a.composite?.breakpoint === 'desktop').composite.layout.capture = 'shell/assets/layouts/locale-console--mobile--light.png'; });
+  const wrongCapture = rewrite(board, (r) => { r.assets.find((a) => a.composite?.breakpoint === 'desktop').composite.layout.capture = 'shell/assets/layouts/app--locale-console--mobile--light.png'; });
   assert.ok(codes(checkShellConformance(wrongCapture)).includes('COMPOSITE_LAYOUT_MISMATCH'), 'a composite references the capture of its own breakpoint and theme');
   rewrite(board, () => {});
   const png = path.join(board.dir, board.record.assets.find((a) => a.composite?.breakpoint === 'desktop').path);
@@ -144,7 +144,7 @@ test('dispatch admits a draw under an unsettled layout (draw-from-todo) and the 
   const admit = (owned) => checkPrerequisites({ brief, repo, payload: { owned_paths: [owned] } });
   const board = '.starciwork/features/reports/ui/board';
   assert.deepEqual(admit(board).unmet, []);
-  const tree = structuredClone(p.tree);
+  const tree = await cloneTree(p.tree);
   nodeById(tree, CONSOLE).layout.state = 'todo';
   p.save(tree);
   assert.deepEqual(admit(board).unmet, [], 'a todo layout above the record no longer refuses the dispatch');
@@ -257,7 +257,7 @@ test('draw matrix: desktop and mobile light are required per drawn state; dark i
   const { layoutSettlement, addCapture } = await import('../scripts/work/layout-tree.mjs');
   const p = await settledProduct(t);
   // A tree that declares dark but captured only light is settled: dark is never demanded.
-  const withDark = structuredClone(p.tree);
+  const withDark = await cloneTree(p.tree);
   withDark.themes = ['light', 'dark'];
   p.save(withDark);
   assert.deepEqual(layoutSettlement(withDark, nodeById(withDark, CONSOLE), { shellDir: p.shellDir }), { settled: true, reasons: [] });
@@ -278,17 +278,17 @@ test('draw matrix: desktop and mobile light are required per drawn state; dark i
     { path: 'assets/mascot.png', role: 'raster-region', sha256: 'a'.repeat(64), generation: { tool: 'image_gen.imagegen', promptPath: 'assets/mascot.prompt.txt' } }] }));
   assert.ok(!checkShellConformance(board.dir).findings.some((f) => f.code === 'COMPOSITE_MISSING'));
   // A mobile light capture missing leaves the layout unsettled; a missing dark capture never does.
-  const noMobile = structuredClone(withDark);
+  const noMobile = await cloneTree(withDark);
   nodeById(noMobile, CONSOLE).layout.captures = nodeById(noMobile, CONSOLE).layout.captures.filter((c) => c.breakpoint !== 'mobile');
   assert.match(layoutSettlement(noMobile, nodeById(noMobile, CONSOLE), { shellDir: p.shellDir }).reasons.join(';'), /no capture at mobile\/light/);
   // A dark capture may still be added to a light-only tree: the theme joins, it does not become required.
-  const lightOnly = structuredClone(p.tree);
+  const lightOnly = await cloneTree(p.tree);
   const { layoutCapture } = await import('./fixtures/layout-tree.mjs');
   addCapture(lightOnly, p.shellDir, { node: CONSOLE, breakpoint: 'desktop', theme: 'dark', file: p.put('cap-d-dark.png', encodePng(layoutCapture(40, 30, { x: 10, y: 5, width: 28, height: 22 }, [5, 5, 5, 255]))) });
   assert.deepEqual(lightOnly.themes, ['light', 'dark']);
   assert.equal(layoutSettlement(lightOnly, nodeById(lightOnly, CONSOLE), { shellDir: p.shellDir }).settled, true, 'no mobile dark capture is demanded');
   // The tree itself must declare desktop, mobile and light.
-  const noMobileBp = structuredClone(p.tree);
+  const noMobileBp = await cloneTree(p.tree);
   noMobileBp.breakpoints = noMobileBp.breakpoints.filter((b) => b.name !== 'mobile');
   noMobileBp.themes = ['dark'];
   p.save(noMobileBp);

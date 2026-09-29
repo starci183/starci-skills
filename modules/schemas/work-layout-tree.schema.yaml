@@ -20,11 +20,10 @@ required:
   - state
   - rev
   - origin
-  - app
+  - apps
   - productLocale
   - breakpoints
   - themes
-  - nodes
 properties:
   schema:
     const: work/layout-tree@1
@@ -53,52 +52,15 @@ properties:
       digests are that source. `planned` - no frontend exists yet; the nodes are the planned route map from
       the settled design and each visible layout is drawn by its design ui record first. Individual nodes
       carry their own origin, so a repository tree can hold a planned node a feature is about to add."
-  app:
-    type: object
-    additionalProperties: false
-    required:
-      - root
-      - appDir
-      - framework
-    properties:
-      repository:
-        type: string
-        minLength: 1
-        description: The frontend repository as workspace.yaml `repositories[].name` spells it.
-      root:
-        $ref: "#/$defs/prose"
-        description: The application directory relative to the repository root - apps/app.
-      appDir:
-        $ref: "#/$defs/prose"
-        description: The App Router directory relative to the repository root - apps/app/src/app. Every
-          node's files, and every file interface.implement creates, sit under it.
-      framework:
-        const: next-app-router
-      localeParam:
-        type: string
-        pattern: ^[a-z][A-Za-z0-9_]*$
-        description: The dynamic segment that carries the locale ([locale] -> locale), whose value navigation
-          routes leave out.
-  source:
-    type: object
-    additionalProperties: false
-    required:
-      - scanner
-      - digest
-    description: What the scan read. `digest` folds every scanned code file path and sha256 together, so any
-      change under app/ or in a navigation source is one visible drift. Message catalogs are judged by
-      i18n.used instead (a tree scanned before i18n.used folded the catalog files in too).
-    properties:
-      scanner:
-        const: scripts/work/layout-tree.mjs
-      revision:
-        type: string
-        pattern: ^[a-f0-9]{7,64}$
-        description: The frontend commit the scan read, when the repository is a git checkout.
-      digest:
-        $ref: "#/$defs/sha256"
-      scannedAt:
-        $ref: "#/$defs/timestamp"
+  apps:
+    type: array
+    minItems: 1
+    uniqueItems: true
+    description: Every app the workspace declares for the frontend, each with its own tree of app/ segments. A
+      frontend with one app has one entry. The nodes, source digest and message catalogs are per app; brand,
+      personas, locale, breakpoints and themes are the product's and stay at the top level.
+    items:
+      $ref: "#/$defs/appTree"
   productLocale:
     type: object
     additionalProperties: false
@@ -121,65 +83,6 @@ properties:
           $ref: "#/$defs/localeTag"
       source:
         $ref: "#/$defs/prose"
-  i18n:
-    type: object
-    additionalProperties: false
-    required:
-      - catalogs
-    description: The message catalogs navigation labels are read out of, one per locale, with digests. Present
-      only when the scanned app has catalogs; absent on a tree whose app has none yet.
-    properties:
-      catalogs:
-        type: array
-        minItems: 1
-        uniqueItems: true
-        items:
-          type: object
-          additionalProperties: false
-          required:
-            - locale
-            - path
-            - sha256
-          properties:
-            locale:
-              $ref: "#/$defs/localeTag"
-            path:
-              $ref: "#/$defs/prose"
-              description: Relative to the repository root.
-            sha256:
-              $ref: "#/$defs/sha256"
-              description: The whole file's digest, for reference only. A catalog is shared by every workflow, so
-                this digest is never drift by itself - `used` is.
-      used:
-        type: object
-        additionalProperties: false
-        required:
-          - keys
-          - locales
-        description: The message keys the tree uses - nav labels (i18nKey), layout titles (titleKey) and any
-          key a capture names (i18nKeys) - and one digest of their values per locale. A catalog change stales
-          the tree only when a used key's value changed or a used key disappeared (nivo inc-13f6af8494bf). A
-          tree scanned before this field judges its whole-file digests by the keys it uses until the next
-          re-scan records it.
-        properties:
-          keys:
-            type: array
-            uniqueItems: true
-            items:
-              $ref: "#/$defs/prose"
-          locales:
-            type: array
-            items:
-              type: object
-              additionalProperties: false
-              required:
-                - locale
-                - sha256
-              properties:
-                locale:
-                  $ref: "#/$defs/localeTag"
-                sha256:
-                  $ref: "#/$defs/sha256"
   brand:
     type: object
     additionalProperties: false
@@ -259,13 +162,6 @@ properties:
       enum:
         - light
         - dark
-  nodes:
-    type: array
-    minItems: 1
-    uniqueItems: true
-    description: One entry per app/ segment, parents before children. The root app/ directory is `/`.
-    items:
-      $ref: "#/$defs/node"
   review:
     $ref: "#/$defs/review"
   refs:
@@ -328,11 +224,13 @@ allOf:
         - origin
     then:
       type: object
-      required:
-        - source
       properties:
-        source: true
-    description: "A scanned tree names what it scanned. It carries `i18n` exactly when the scan found message
+        apps:
+          items:
+            type: object
+            required:
+              - source
+    description: "A scanned tree names what each of its apps scanned. It carries `i18n` exactly when the scan found message
       catalogs (scripts/work/layout-tree.mjs writes it from messages/ or locales/ under the app root and
       omits it otherwise): a fresh app with no catalogs yet is a valid scanned tree, and a catalog path or
       digest is never invented to fill the field."
@@ -650,6 +548,129 @@ $defs:
         uniqueItems: true
         items:
           $ref: "#/$defs/prose"
+  appTree:
+    type: object
+    additionalProperties: false
+    required:
+      - name
+      - root
+      - appDir
+      - framework
+      - nodes
+    description: One app of the frontend - a monorepo may hold several (apps/app, apps/landing). Its own scanned
+      routes, source digest and message catalogs. A node id is a route within its app, so `/` exists once per app;
+      a ui record names the app it is drawn in with `app` (or the tree holds one app, or only one app holds its
+      route).
+    properties:
+      name:
+        $ref: "#/$defs/slug"
+        description: The app's name, unique in the tree - the value a ui record's `app` carries. It is the
+          workspace.yaml `repositories[role fe].apps[].name`, or the last segment of the app root when the frontend
+          holds one app and declares none.
+      repository:
+        type: string
+        minLength: 1
+        description: The frontend repository as workspace.yaml `repositories[].name` spells it.
+      root:
+        $ref: "#/$defs/prose"
+        description: The application directory relative to the repository root - apps/app.
+      appDir:
+        $ref: "#/$defs/prose"
+        description: The App Router directory relative to the repository root - apps/app/src/app. Every
+          node's files, and every file interface.implement creates, sit under it.
+      framework:
+        const: next-app-router
+      localeParam:
+        type: string
+        pattern: ^[a-z][A-Za-z0-9_]*$
+        description: The dynamic segment that carries the locale ([locale] -> locale), whose value navigation
+          routes leave out.
+      source:
+        type: object
+        additionalProperties: false
+        required:
+          - scanner
+          - digest
+        description: What the scan read. `digest` folds every scanned code file path and sha256 together, so any
+          change under app/ or in a navigation source is one visible drift. Message catalogs are judged by
+          i18n.used instead (a tree scanned before i18n.used folded the catalog files in too).
+        properties:
+          scanner:
+            const: scripts/work/layout-tree.mjs
+          revision:
+            type: string
+            pattern: ^[a-f0-9]{7,64}$
+            description: The frontend commit the scan read, when the repository is a git checkout.
+          digest:
+            $ref: "#/$defs/sha256"
+          scannedAt:
+            $ref: "#/$defs/timestamp"
+      i18n:
+        type: object
+        additionalProperties: false
+        required:
+          - catalogs
+        description: The message catalogs navigation labels are read out of, one per locale, with digests. Present
+          only when the scanned app has catalogs; absent on a tree whose app has none yet.
+        properties:
+          catalogs:
+            type: array
+            minItems: 1
+            uniqueItems: true
+            items:
+              type: object
+              additionalProperties: false
+              required:
+                - locale
+                - path
+                - sha256
+              properties:
+                locale:
+                  $ref: "#/$defs/localeTag"
+                path:
+                  $ref: "#/$defs/prose"
+                  description: Relative to the repository root.
+                sha256:
+                  $ref: "#/$defs/sha256"
+                  description: The whole file's digest, for reference only. A catalog is shared by every workflow, so
+                    this digest is never drift by itself - `used` is.
+          used:
+            type: object
+            additionalProperties: false
+            required:
+              - keys
+              - locales
+            description: The message keys the tree uses - nav labels (i18nKey), layout titles (titleKey) and any
+              key a capture names (i18nKeys) - and one digest of their values per locale. A catalog change stales
+              the tree only when a used key's value changed or a used key disappeared (nivo inc-13f6af8494bf). A
+              tree scanned before this field judges its whole-file digests by the keys it uses until the next
+              re-scan records it.
+            properties:
+              keys:
+                type: array
+                uniqueItems: true
+                items:
+                  $ref: "#/$defs/prose"
+              locales:
+                type: array
+                items:
+                  type: object
+                  additionalProperties: false
+                  required:
+                    - locale
+                    - sha256
+                  properties:
+                    locale:
+                      $ref: "#/$defs/localeTag"
+                    sha256:
+                      $ref: "#/$defs/sha256"
+      nodes:
+        type: array
+        minItems: 1
+        uniqueItems: true
+        description: One entry per app/ segment, parents before children. The root app/ directory is `/`.
+        items:
+          $ref: "#/$defs/node"
   node:
     type: object
     additionalProperties: false

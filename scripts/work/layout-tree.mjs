@@ -1,13 +1,13 @@
 #!/usr/bin/env node
 // layout-tree.mjs — the product's layout tree, scanned out of the frontend's Next.js `app/` directory.
 //
-//   node scripts/work/layout-tree.mjs scan    --work <.starciwork> [--app-dir <dir>] [--write] [--json]
-//   node scripts/work/layout-tree.mjs scan    --app-dir <dir> [--repo-root <dir>] [--json]
-//   node scripts/work/layout-tree.mjs capture --work <.starciwork> --node <id> --breakpoint <bp> --theme <t> --file <png> [--url <u>] [--provenance <text>] --write
-//   node scripts/work/layout-tree.mjs capture --work <.starciwork> --node <id> --destination <key> [--route <node-id>]... --breakpoint <bp> --theme <t> --file <png> --write
+//   node scripts/work/layout-tree.mjs scan    --work <.starciwork> [--app-dir <dir>]... [--write] [--json]   (every app workspace.yaml declares)
+//   node scripts/work/layout-tree.mjs scan    --app-dir <dir> [--app <name>] [--repo-root <dir>] [--json]
+//   node scripts/work/layout-tree.mjs capture --work <.starciwork> [--app <name>] --node <id> --breakpoint <bp> --theme <t> --file <png> [--url <u>] [--provenance <text>] --write
+//   node scripts/work/layout-tree.mjs capture --work <.starciwork> [--app <name>] --node <id> --destination <key> [--route <node-id>]... --breakpoint <bp> --theme <t> --file <png> --write
 //   node scripts/work/layout-tree.mjs lockup  --work <.starciwork> --from <shell/<capture> | <ui-id>:<layout composite>> --rect x,y,w,h [--theme t] --write
-//   node scripts/work/layout-tree.mjs destinations --work <.starciwork> [--route <node-id> [--active-nav <key>]] [--write] [--json]
-//   node scripts/work/layout-tree.mjs plan    --work <.starciwork> --node <id> [--files layout,page] [--design <ui-id>] --write
+//   node scripts/work/layout-tree.mjs destinations --work <.starciwork> [--app <name>] [--route <node-id> [--active-nav <key>]] [--write] [--json]
+//   node scripts/work/layout-tree.mjs plan    --work <.starciwork> [--app <name>] --node <id> [--files layout,page] [--design <ui-id>] --write
 //   node scripts/work/layout-tree.mjs slot    <png> [--key ff00ff] [--tolerance 8]
 //
 // The source of truth for what wraps a screen is the App Router's own file convention, not a sentence in a
@@ -304,11 +304,11 @@ export function resolveNavRoute(nodes, route, localeParam) {
 }
 
 /**
- * Scan an app/ directory. Returns {app, source, i18n, productLocale, nodes} - the record's scanned half.
+ * Scan one app's app/ directory. Returns {app, source, i18n, productLocale, nodes} - the record's scanned half.
  * `repoRoot` is the repository the paths are recorded relative to; `appRoot` the application directory
  * (where tsconfig.json and the i18n catalogs live), defaulting to the parent of src/ or of app/.
  */
-export function scanAppDir(appDir, { repoRoot = null, appRoot = null, repository = null } = {}) {
+export function scanAppDir(appDir, { repoRoot = null, appRoot = null, repository = null, name = null } = {}) {
   const dirAbs = path.resolve(appDir);
   if (!fs.existsSync(dirAbs) || !fs.statSync(dirAbs).isDirectory()) throw new Error(`${appDir}: not an app/ directory`);
   const rootAbs = path.resolve(appRoot ?? (path.basename(path.dirname(dirAbs)) === 'src' ? path.dirname(path.dirname(dirAbs)) : path.dirname(dirAbs)));
@@ -414,7 +414,7 @@ export function scanAppDir(appDir, { repoRoot = null, appRoot = null, repository
   const revision = gitRevision(repoAbs);
   const catalogFiles = catalogs.flatMap((c) => c.files.map((f) => ({ locale: c.locale, path: rel(f), sha256: sha256File(f) })));
   const scan = {
-    app: { ...(repository ? { repository } : {}), root: rel(rootAbs) || '.', appDir: rel(dirAbs), framework: 'next-app-router', ...(localeParam ? { localeParam } : {}) },
+    app: { name: name ?? appNameOf(rel(rootAbs) || '.', repository), ...(repository ? { repository } : {}), root: rel(rootAbs) || '.', appDir: rel(dirAbs), framework: 'next-app-router', ...(localeParam ? { localeParam } : {}) },
     source: { scanner: SCANNER, ...(revision ? { revision } : {}), digest: digestOfParts(digests) },
     i18n: catalogs.length ? { catalogs: catalogFiles, used: keyedI18n(catalogs, usedI18nKeys({ nodes })) } : undefined,
     productLocale,
@@ -424,6 +424,12 @@ export function scanAppDir(appDir, { repoRoot = null, appRoot = null, repository
   Object.defineProperty(scan, 'catalogs', { value: catalogs, enumerable: false });
   return scan;
 }
+
+/** The app's name when nothing declares one: the last segment of its root (apps/landing -> landing), else the repository. */
+export const appNameOf = (root, repository = null) => {
+  const last = String(root ?? '').split('/').filter((p) => p && p !== '.').pop();
+  return (last ?? repository ?? 'app').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'app';
+};
 
 const digestOfParts = (parts) => sha256Of([...parts].sort((a, b) => a[0].localeCompare(b[0])).map(([p, s]) => `${p}\0${s}`).join('\n'));
 
@@ -544,6 +550,70 @@ export function readShellRecord(workRoot) {
 }
 
 export const isLayoutTree = (record) => record?.schema === TREE_SCHEMA;
+
+// ---------------------------------------------------------------------------------------------------------
+// Apps: one tree per app of the frontend (a monorepo may hold several - apps/app, apps/landing)
+// ---------------------------------------------------------------------------------------------------------
+//
+// The record holds `apps[]`: {name, repository?, root, appDir, framework, localeParam?, source, i18n?, nodes}. A node
+// id is a route within its app, so the same id (`/`) may exist in two apps. Everything below that reads nodes -
+// nodeById, chainOf, baseLayoutFor, layoutSettlement, sourceDrift - works on ONE app's tree: `treeOf(record, name)`,
+// a live view whose app/source/i18n/nodes are that app's and whose other fields (brand, personas, themes, rev...)
+// are the record's, so a write through the view lands in the record.
+
+const APP_OWN = new Set(['app', 'source', 'i18n', 'nodes']);
+const recordKey = Symbol('layout-tree.record');
+
+/** The whole record behind an app view (the record itself when given one): what is written to shell/index.yaml. */
+export const recordOf = (tree) => tree?.[recordKey] ?? tree;
+
+/** The apps the record declares. */
+export const appsOf = (record) => list(record?.apps).filter((a) => a && typeof a.name === 'string');
+export const appNamesOf = (record) => appsOf(record).map((a) => a.name);
+
+/** One app's tree as a live view of the record, or null when the record declares no such app. */
+export function treeOf(record, name) {
+  const entry = appsOf(record).find((a) => a.name === name);
+  if (!entry) return null;
+  if (!entry.nodes) entry.nodes = [];
+  const { source, i18n, nodes, ...app } = entry;
+  const own = { app, source, i18n, nodes };
+  return new Proxy(record, {
+    get: (target, key) => (key === recordKey ? target : typeof key === 'string' && APP_OWN.has(key) ? own[key] : target[key]),
+    set: (target, key, value) => {
+      if (typeof key === 'string' && APP_OWN.has(key)) { own[key] = value; if (key !== 'app') entry[key] = value; } else target[key] = value;
+      return true;
+    },
+    has: (target, key) => (typeof key === 'string' && APP_OWN.has(key) ? own[key] !== undefined : key in target),
+    ownKeys: (target) => [...new Set([...Reflect.ownKeys(target).filter((k) => k !== 'apps'), ...APP_OWN])],
+    getOwnPropertyDescriptor: (target, key) => (typeof key === 'string' && APP_OWN.has(key) ? { value: own[key], enumerable: true, configurable: true, writable: true } : Reflect.getOwnPropertyDescriptor(target, key)),
+  });
+}
+
+/**
+ * The app a ui record is drawn in and that app's tree: {app, tree}, or {error: {code, message}}.
+ *   - `ui.app` names it (UI_APP_UNKNOWN when the tree declares no such app);
+ *   - else, when the tree declares exactly one app, that app;
+ *   - else the one app whose tree holds the record's route (or its routeParent);
+ *   - else the record must say (UI_APP_MISSING: no app or several hold the route).
+ */
+export function appOfUi(record, ui) {
+  const apps = appNamesOf(record);
+  if (!apps.length) return { error: { code: 'UI_APP_UNKNOWN', message: 'the layout tree declares no app' } };
+  if (ui?.app !== undefined && ui?.app !== null) {
+    if (typeof ui.app !== 'string' || !apps.includes(ui.app)) return { error: { code: 'UI_APP_UNKNOWN', message: `app ${JSON.stringify(ui.app)} is not an app of the layout tree (${apps.join(', ')})` } };
+    return { app: ui.app, tree: treeOf(record, ui.app) };
+  }
+  if (apps.length === 1) return { app: apps[0], tree: treeOf(record, apps[0]) };
+  const wants = [ui?.route, ui?.routeParent].filter((r) => typeof r === 'string' && r);
+  const holders = apps.filter((name) => wants.some((r) => nodeById(treeOf(record, name), r)));
+  if (holders.length === 1) return { app: holders[0], tree: treeOf(record, holders[0]) };
+  const why = holders.length ? `the route ${wants[0]} exists in ${holders.join(' and ')}` : `no app holds the route ${wants[0] ?? '(none)'}`;
+  return { error: { code: 'UI_APP_MISSING', message: `the layout tree declares ${apps.length} apps (${apps.join(', ')}) and ${why} - name the app with \`app:\`` } };
+}
+
+/** Every node of every app (a lookup by capture or design id, never by route: ids repeat across apps). */
+export const allNodesOf = (record) => appsOf(record).flatMap((a) => list(a.nodes).filter((n) => n && typeof n.id === 'string'));
 export const nodesOf = (record) => list(record?.nodes).filter((n) => n && typeof n.id === 'string');
 export const nodeById = (record, id) => nodesOf(record).find((n) => n.id === id) ?? null;
 
@@ -793,19 +863,41 @@ export function baseLayoutFor(record, route, bp, theme, { shellDir, uiLoader = n
 // Writing: merge a scan into the record, add captures and planned nodes
 // ---------------------------------------------------------------------------------------------------------
 
-/** Where the frontend's app/ directory is for a Work tree: --app-dir, the record's app.appDir, or a search. */
-export function locateAppDir(workRoot, record, explicit = null) {
+/** The frontend repository a Work tree binds: {fe (its workspace.yaml entry), repository (name), repoRoot}. */
+export function frontendOf(workRoot) {
   const workspace = readYamlOrNull(path.join(workRoot, 'workspace.yaml'));
-  const repos = list(workspace?.repositories);
-  const name = record?.app?.repository ?? repos.find((r) => r?.role === 'fe')?.name ?? null;
+  const fe = list(workspace?.repositories).find((r) => r?.role === 'fe') ?? null;
   const backendRoot = path.dirname(workRoot);
-  const entry = repos.find((r) => r?.name === name);
-  const repoRoot = !name || entry?.role === 'be' ? backendRoot : path.join(path.dirname(backendRoot), name);
-  if (explicit) return { repository: name, repoRoot, appDir: path.resolve(explicit) };
-  if (record?.app?.appDir) return { repository: name, repoRoot, appDir: path.join(repoRoot, record.app.appDir) };
-  const hint = record?.app?.root ? [path.join(repoRoot, record.app.root, 'src', 'app'), path.join(repoRoot, record.app.root, 'app')] : [];
-  const found = [...hint, ...findAppDirs(repoRoot)].find((d) => fs.existsSync(d) && fs.statSync(d).isDirectory());
-  return { repository: name, repoRoot, appDir: found ?? null };
+  return { fe, repository: fe?.name ?? null, repoRoot: fe?.name ? path.join(path.dirname(backendRoot), fe.name) : backendRoot };
+}
+
+/**
+ * Where the frontend's app/ directories are for a Work tree: [{name, root, appDir (absolute)}] under `repoRoot`.
+ * The workspace declares them - `repositories[role fe].apps: [{name, root}]`, root relative to the repository, the
+ * App Router directory being <root>/src/app or <root>/app - and nothing else names them: a frontend that declares
+ * none must hold exactly one app/ directory, and one that holds several must declare which are its apps
+ * (`error` says so). `explicit` (--app-dir, repeatable) names directories for a scan of a repository outside a
+ * workspace declaration.
+ */
+export function locateApps(workRoot, explicit = []) {
+  const { fe, repository: name, repoRoot } = frontendOf(workRoot);
+  const appDirOf = (root) => [path.join(repoRoot, root, 'src', 'app'), path.join(repoRoot, root, 'app')].find((d) => fs.existsSync(d) && fs.statSync(d).isDirectory()) ?? null;
+  const rootOfAppDir = (d) => { const abs = path.resolve(d); return path.basename(path.dirname(abs)) === 'src' ? path.dirname(path.dirname(abs)) : path.dirname(abs); };
+  if (list(explicit).length) return { repository: name, repoRoot, apps: list(explicit).map((d) => ({ name: appNameOf(slash(path.relative(repoRoot, rootOfAppDir(d))), name), root: slash(path.relative(repoRoot, rootOfAppDir(d))) || '.', appDir: path.resolve(d) })) };
+  if (list(fe?.apps).length) {
+    const seen = new Set();
+    const apps = [];
+    for (const declared of list(fe.apps)) {
+      if (seen.has(declared?.name)) return { repository: name, repoRoot, apps: [], error: `workspace.yaml declares app ${declared.name} twice` };
+      seen.add(declared?.name);
+      const root = slash(String(declared?.root ?? ''));
+      apps.push({ name: declared?.name, root, appDir: appDirOf(root) });
+    }
+    return { repository: name, repoRoot, apps };
+  }
+  const found = findAppDirs(repoRoot);
+  if (found.length > 1) return { repository: name, repoRoot, apps: [], error: `${slash(repoRoot)} holds ${found.length} app/ directories (${found.map((d) => slash(path.relative(repoRoot, d))).join(', ')}) - declare the frontend's apps in workspace.yaml (repositories[role fe].apps: [{name, root}])` };
+  return { repository: name, repoRoot, apps: found.map((d) => { const dir = path.basename(path.dirname(d)) === 'src' ? path.dirname(path.dirname(d)) : path.dirname(d); return { name: appNameOf(slash(path.relative(repoRoot, dir)) || '.', name), root: slash(path.relative(repoRoot, dir)) || '.', appDir: d }; }) };
 }
 
 function findAppDirs(repoRoot) {
@@ -852,41 +944,59 @@ const carryLayout = (scanned, previous, notes) => {
   return layout;
 };
 
-/** Merge a fresh scan into an existing layout-tree record (or start one). Returns {record, notes, changed}. */
-export function mergeScan(existing, scan, { at = now() } = {}) {
+/**
+ * Merge fresh scans (an array, one per app) into an existing layout-tree record (or start one). Returns {record, notes,
+ * changed}. An app the scans no longer name is dropped with a note; what the owner decided per node (chrome,
+ * captures, planned nodes) is carried per app.
+ */
+export function mergeScan(existing, scans, { at = now() } = {}) {
   const notes = [];
   const base = isLayoutTree(existing) ? existing : null;
-  const previous = new Map(nodesOf(base).map((n) => [n.id, n]));
-  const nodes = scan.nodes.map((n) => {
-    const prev = previous.get(n.id);
-    const node = { ...n };
-    if (n.layout) node.layout = carryLayout(n, prev, notes);
-    else if (prev?.layout && prev.origin === 'planned') node.layout = prev.layout;
-    return node;
+  const scanList = scans;
+  const several = scanList.length > 1 || appsOf(base).length > 1;
+  const said = (name, text) => `${several ? `${name}: ` : ''}${text}`;
+  const entries = scanList.map((scan) => {
+    const name = scan.app.name;
+    const before = appsOf(base).find((x) => x.name === name);
+    const previous = new Map(list(before?.nodes).filter((n) => n && typeof n.id === 'string').map((n) => [n.id, n]));
+    const appNotes = [];
+    const nodes = scan.nodes.map((n) => {
+      const prev = previous.get(n.id);
+      const node = { ...n };
+      if (n.layout) node.layout = carryLayout(n, prev, appNotes);
+      else if (prev?.layout && prev.origin === 'planned') node.layout = prev.layout;
+      return node;
+    });
+    const scannedIds = new Set(nodes.map((n) => n.id));
+    for (const prev of previous.values()) {
+      if (scannedIds.has(prev.id)) continue;
+      if (prev.origin === 'planned') { nodes.push(prev); continue; }
+      appNotes.push(`${prev.id}: no longer in app/ - dropped`);
+    }
+    for (const n of nodes) if (!previous.has(n.id)) appNotes.push(`${n.id}: new ${n.segmentKind} segment`);
+    notes.push(...appNotes.map((t) => said(name, t)));
+    const entry = {
+      ...scan.app,
+      ...(before?.repository && !scan.app.repository ? { repository: before.repository } : {}),
+      source: { ...scan.source, scannedAt: at },
+      ...(scan.i18n ? { i18n: scan.i18n } : {}),
+      nodes: orderNodes(nodes),
+    };
+    return { entry, scan };
   });
-  const scannedIds = new Set(nodes.map((n) => n.id));
-  for (const prev of nodesOf(base)) {
-    if (scannedIds.has(prev.id)) continue;
-    if (prev.origin === 'planned') { nodes.push(prev); continue; }
-    notes.push(`${prev.id}: no longer in app/ - dropped`);
-  }
-  for (const n of nodes) if (!previous.has(n.id)) notes.push(`${n.id}: new ${n.segmentKind} segment`);
-  const ordered = orderNodes(nodes);
+  for (const gone of appsOf(base)) if (!scanList.some((x) => x.app.name === gone.name)) notes.push(`app ${gone.name}: no longer declared - dropped`);
   const record = {
     schema: TREE_SCHEMA, id: 'shell', kind: 'shell',
     state: base?.state ?? 'todo',
     ...(base?.activity ? { activity: base.activity } : {}),
     rev: base?.rev ?? 1,
     origin: 'repository',
-    app: { ...scan.app, ...(base?.app?.repository && !scan.app.repository ? { repository: base.app.repository } : {}) },
-    source: { ...scan.source, scannedAt: at },
-    productLocale: base?.productLocale ?? scan.productLocale ?? { default: 'en', fallback: 'en', locales: ['en'], source: 'no locale configuration found - brand.decide settles it' },
-    ...(scan.i18n ? { i18n: scan.i18n } : {}),
+    productLocale: base?.productLocale ?? scanList[0]?.productLocale ?? { default: 'en', fallback: 'en', locales: ['en'], source: 'no locale configuration found - brand.decide settles it' },
     ...(base?.brand ? { brand: base.brand } : {}),
     ...(base?.personas ? { personas: base.personas } : {}),
     breakpoints: base?.breakpoints ?? DEFAULT_BREAKPOINTS,
     themes: base?.themes ?? [...REQUIRED_THEMES],
-    nodes: ordered,
+    apps: entries.map((e) => e.entry),
     ...(base?.review ? { review: base.review } : {}),
     ...(base?.refs ? { refs: base.refs } : {}),
     ...(base?.blockers ? { blockers: base.blockers } : {}),
@@ -894,18 +1004,21 @@ export function mergeScan(existing, scan, { at = now() } = {}) {
     // The owner's extension blocks are the owner's: a re-scan never drops them.
     ...(base?.extensions ? { extensions: base.extensions } : {}),
   };
-  // The keys the merged tree uses (scanned nav keys plus a carried title or capture key), digested per locale.
-  if (record.i18n && scan.catalogs) record.i18n = { ...record.i18n, used: keyedI18n(scan.catalogs, usedI18nKeys(record)) };
+  // The keys each app's tree uses (scanned nav keys plus a carried title or capture key), digested per locale.
+  for (const { entry, scan } of entries) {
+    if (entry.i18n && scan.catalogs) entry.i18n = { ...entry.i18n, used: keyedI18n(scan.catalogs, usedI18nKeys({ nodes: entry.nodes, brand: record.brand })) };
+  }
   // A catalog file's own digest is not structural, only the used keys are (nivo inc-13f6af8494bf).
-  const i18nShape = (r) => ({ catalogs: list(r?.i18n?.catalogs).map((c) => [c.locale, c.path]), used: r?.i18n?.used ?? null });
-  const structural = (r) => JSON.stringify({ nodes: r?.nodes, source: r?.source?.digest, i18n: i18nShape(r) });
+  const i18nShape = (e) => ({ catalogs: list(e?.i18n?.catalogs).map((c) => [c.locale, c.path]), used: e?.i18n?.used ?? null });
+  const structural = (r) => JSON.stringify(appsOf(r).map((e) => ({ name: e.name, appDir: e.appDir, nodes: e.nodes, source: e.source?.digest, i18n: i18nShape(e) })));
   const changed = !base || structural(base) !== structural(record);
   if (changed && base) {
     record.rev = (base.rev ?? 1) + 1;
     record.change = { rev: record.rev, kind: 'clarifying', at, reason: `Re-scanned app/ (${notes.length ? notes.slice(0, 6).join('; ') : 'source digests changed'}).` };
+    const nodes = entries.flatMap((e) => e.entry.nodes);
     if (nodes.some((n) => n.layout?.chrome === 'visible' && n.layout.state !== 'done') || nodes.some((n) => n.layout?.chrome === 'unknown')) record.state = 'todo';
   } else if (!base) {
-    record.change = { rev: 1, kind: 'initial', at, reason: 'First scan of the frontend app/ directory into the layout tree.' };
+    record.change = { rev: 1, kind: 'initial', at, reason: `First scan of the frontend app/ ${entries.length > 1 ? 'directories' : 'directory'} into the layout tree.` };
   }
   return { record, notes, changed };
 }
@@ -936,7 +1049,7 @@ export function addCapture(record, shellDir, { node: id, breakpoint, theme, file
   const image = decodePng(bytes);
   const key = keyRect(image, SLOT_KEY);
   if (!key || key.fill < SLOT_FILL_MIN) throw new Error(`${file}: no solid #FF00FF slot found (fill ${key ? key.fill.toFixed(3) : 0}) - capture with the page slot emptied and keyed`);
-  const name = storeCapture(bytes, `assets/layouts/${nodeSlug(id)}--${breakpoint}--${theme}.png`);
+  const name = storeCapture(bytes, `assets/layouts/${record.app.name}--${nodeSlug(id)}--${breakpoint}--${theme}.png`);
   const capture = { breakpoint, theme, ...(locale ? { locale } : {}), name, sha256: sha256Of(bytes), width: image.width, height: image.height, slot: key.rect, kind: 'render', ...(url ? { url } : {}), ...(provenance ? { provenance } : {}) };
   const cell = (c) => c.breakpoint === breakpoint && c.theme === theme;
   const prior = list(node.layout.captures).find(cell);
@@ -976,7 +1089,7 @@ export function addDestinationCapture(record, shellDir, { node: id, destination,
   if (!wanted.length) throw new Error(`${destination}: name the node ids it is active for with --route (it is not a nav item of ${id} with a target)`);
   for (const r of wanted) if (!nodeById(record, r) || !underNode(r, id)) throw new Error(`${r}: not a node at or below ${id}`);
   const measured = readCaptureFile(file);
-  const name = storeCapture(measured.bytes, `assets/layouts/${nodeSlug(id)}--${destination}--${breakpoint}--${theme}.png`);
+  const name = storeCapture(measured.bytes, `assets/layouts/${record.app.name}--${nodeSlug(id)}--${destination}--${breakpoint}--${theme}.png`);
   const capture = { breakpoint, theme, ...(locale ? { locale } : {}), name, sha256: measured.sha256, width: measured.width, height: measured.height, slot: measured.slot, kind: 'render', ...(url ? { url } : {}), ...(provenance ? { provenance } : {}) };
   if (!entry) { entry = { key: destination, routes: wanted, captures: [] }; dests.push(entry); } else entry.routes = wanted;
   const prior = list(entry.captures).find((c) => c.breakpoint === breakpoint && c.theme === theme);
@@ -1003,7 +1116,7 @@ export function lockupSourceOf(record, workRoot, ref, uiLoader = null) {
   const ui = parseUiRef(text);
   if (ui) {
     const { id, path: rel } = ui;
-    const node = nodesOf(record).find((n) => n.layout?.design === id && n.layout.chrome === 'visible');
+    const node = allNodesOf(record).find((n) => n.layout?.design === id && n.layout.chrome === 'visible');
     if (!node || node.origin !== 'planned') return { error: `${id} is not the design record of a planned visible layout of this tree - a lockup is cropped from a real render once the frontend renders it` };
     const design = (uiLoader ?? ((x) => loadUiRecords(workRoot).get(x) ?? null))(id);
     if (!design) return { error: `${id} does not exist - interface.draw draws the planned layout first` };
@@ -1021,7 +1134,7 @@ export function lockupSourceOf(record, workRoot, ref, uiLoader = null) {
   const shell = text.match(/^shell\/(.+)$/);
   if (!shell) return { error: `--from names shell/<capture path> or <ui-id>:<layout composite path>, not ${text || '(nothing)'}` };
   const rel = shell[1];
-  for (const node of nodesOf(record).filter((n) => n.layout)) {
+  for (const node of allNodesOf(record).filter((n) => n.layout)) {
     const captures = [...list(node.layout.captures), ...destinationsOf(record, node).flatMap((d) => d.captures)];
     const hit = captures.find((c) => slash(c.path ?? c.name ?? '') === rel);
     if (!hit) continue;
@@ -1091,10 +1204,16 @@ export function addPlanned(record, { node: id, files = [], design = null }) {
 // ---------------------------------------------------------------------------------------------------------
 
 
-/** One-screen summary of a tree: layouts with chrome and captures, nav with findings, special files. */
+/** One-screen summary of a record: every app's tree, layouts with chrome and captures, nav with findings, special files. */
 export function summarize(record) {
-  const lines = [`layout tree ${record.app?.appDir ?? ''} (origin ${record.origin}, rev ${record.rev}, state ${record.state}) - ${nodesOf(record).length} nodes`];
+  const lines = [`layout tree (origin ${record.origin}, rev ${record.rev}, state ${record.state}) - ${appsOf(record).length} app${appsOf(record).length === 1 ? '' : 's'}`];
   lines.push(`productLocale ${record.productLocale?.default} (fallback ${record.productLocale?.fallback}; locales ${list(record.productLocale?.locales).join(', ')})`);
+  for (const name of appNamesOf(record)) lines.push(...summarizeApp(treeOf(record, name)));
+  return lines.join('\n');
+}
+
+function summarizeApp(record) {
+  const lines = [`app ${record.app.name} ${record.app.appDir ?? ''} - ${nodesOf(record).length} nodes`];
   for (const n of nodesOf(record)) {
     const depth = (chainOf(record, n.id)?.length ?? 1) - 1;
     const files = Object.keys(n.files ?? {}).join(',');
@@ -1104,7 +1223,7 @@ export function summarize(record) {
     for (const item of list(n.layout?.nav?.items)) lines.push(`${'  '.repeat(depth + 2)}nav ${item.key} -> ${item.route ?? 'null'} target=${item.target ?? 'NONE'} ${Object.entries(item.labels ?? {}).map(([l, v]) => `${l}:"${v}"`).join(' ')}`);
     for (const f of list(n.layout?.nav?.findings)) lines.push(`${'  '.repeat(depth + 2)}! ${f.code} ${f.detail}`);
   }
-  return lines.join('\n');
+  return lines;
 }
 
 export function layoutTreeMain(argv = []) {
@@ -1112,6 +1231,14 @@ export function layoutTreeMain(argv = []) {
   const json = args.includes('--json');
   const write = args.includes('--write');
   const out = (value, text) => ({ exitCode: 0, text: json ? `${JSON.stringify(value, null, 2)}\n` : `${text}\n` });
+  // The app a command works in: --app, else the record's only app; several apps need --app.
+  const appOf = (record) => {
+    const names = appNamesOf(record);
+    const asked = flag(args, '--app');
+    if (asked) return names.includes(asked) ? { tree: treeOf(record, asked) } : { error: `--app ${asked} is not an app of the layout tree (${names.join(', ') || 'none'})` };
+    if (names.length === 1) return { tree: treeOf(record, names[0]) };
+    return { error: `the layout tree declares ${names.length} apps (${names.join(', ')}) - name one with --app` };
+  };
   try {
     if (command === 'slot') {
       const file = args.find((a) => !a.startsWith('--') && a !== flag(args, '--key') && a !== flag(args, '--tolerance'));
@@ -1126,8 +1253,8 @@ export function layoutTreeMain(argv = []) {
     if (command === 'scan' && !work) {
       const appDir = flag(args, '--app-dir');
       if (!appDir) return { exitCode: 2, text: 'scan needs --work <.starciwork> or --app-dir <dir>\n' };
-      const scan = scanAppDir(appDir, { repoRoot: flag(args, '--repo-root') });
-      const { record } = mergeScan(null, scan);
+      const scan = scanAppDir(appDir, { repoRoot: flag(args, '--repo-root'), name: flag(args, '--app') });
+      const { record } = mergeScan(null, [scan]);
       return out(record, summarize(record));
     }
     if (!['scan', 'capture', 'plan', 'destinations', 'lockup'].includes(command) || !work) {
@@ -1158,27 +1285,33 @@ export function layoutTreeMain(argv = []) {
       const record = existing;
       const route = flag(args, '--route');
       if (route) {
+        const picked = appOf(record);
+        if (picked.error) return { exitCode: 2, text: `layout-tree: ${picked.error}\n` };
+        const tree = picked.tree;
         // Which capture a page at --route composes into, per breakpoint and theme (what compose-direction takes).
         const ui = { route, shell: { activeNav: flag(args, '--active-nav') } };
-        const anchor = nodeById(record, route) ? route : nearestExisting(record, route);
+        const anchor = nodeById(tree, route) ? route : nearestExisting(tree, route);
         const picks = matrixOf(record).breakpoints.flatMap((bp) => matrixOf(record).themes.map((theme) => {
-          const base = baseLayoutFor(record, anchor, bp, theme, { shellDir, ui });
+          const base = baseLayoutFor(tree, anchor, bp, theme, { shellDir, ui });
           return { breakpoint: bp, theme, ...(base ? (base.missing ? { missing: base.missing } : { node: base.node, capture: base.rel, destination: base.destination, by: base.by ?? null, slot: base.slot }) : { canvas: true }) };
         }));
         return out({ ok: true, route, picks }, picks.map((p) => `${p.breakpoint}/${p.theme}: ${p.missing ? `MISSING ${p.missing}` : p.canvas ? 'blank canvas (no visible layout)' : `${p.capture} (${p.node}${p.destination ? ` destination ${p.destination} by ${p.by}` : ' default'})`}`).join('\n'));
       }
-      const rows = nodesOf(record).filter((n) => n.layout).flatMap((n) => destinationsOf(record, n).map((d) => ({ node: n.id, key: d.key, routes: d.routes, cells: d.captures.map((c) => `${c.breakpoint}/${c.theme}`) })));
+      const rows = appNamesOf(record).flatMap((name) => nodesOf(treeOf(record, name)).filter((n) => n.layout).map((n) => ({ name, n }))).flatMap(({ name, n }) => destinationsOf(record, n).map((d) => ({ ...(appsOf(record).length > 1 ? { app: name } : {}), node: n.id, key: d.key, routes: d.routes, cells: d.captures.map((c) => `${c.breakpoint}/${c.theme}`) })));
       return out({ ok: true, destinations: rows }, rows.length ? rows.map((r) => `${r.node} ${r.key} routes=${r.routes.join(',')} cells=${r.cells.join(',')}`).join("\n") : 'no layout records destinations');
     }
     if (command === 'capture' || command === 'plan') {
       if (!isLayoutTree(existing) && command === 'capture') return { exitCode: 1, text: 'capture needs a work/layout-tree@1 record - scan first\n' };
       if (command === 'plan' && !flags(args, '--node').length) return { exitCode: 2, text: 'Usage: layout-tree.mjs plan --work <.starciwork> --node <id> [--node <id>]... [--files layout,page] [--design <ui-id>] --write\n' };
-      const record = isLayoutTree(existing) ? existing : { schema: TREE_SCHEMA, id: 'shell', kind: 'shell', state: 'todo', rev: 1, origin: 'planned', app: { root: '.', appDir: 'app', framework: 'next-app-router' }, productLocale: { default: 'en', fallback: 'en', locales: ['en'] }, breakpoints: DEFAULT_BREAKPOINTS, themes: [...REQUIRED_THEMES], nodes: [] };
+      const record = isLayoutTree(existing) ? existing : { schema: TREE_SCHEMA, id: 'shell', kind: 'shell', state: 'todo', rev: 1, origin: 'planned', productLocale: { default: 'en', fallback: 'en', locales: ['en'] }, breakpoints: DEFAULT_BREAKPOINTS, themes: [...REQUIRED_THEMES], apps: [{ name: flag(args, '--app') ?? 'app', root: '.', appDir: 'app', framework: 'next-app-router', nodes: [] }] };
+      const picked = appOf(record);
+      if (picked.error) return { exitCode: 2, text: `layout-tree: ${picked.error}\n` };
+      const tree = picked.tree;
       let result;
       if (command === 'capture') {
-        result = addCapture(record, shellDir, { node: flag(args, '--node'), breakpoint: flag(args, '--breakpoint'), theme: flag(args, '--theme'), file: flag(args, '--file'), url: flag(args, '--url'), provenance: flag(args, '--provenance'), locale: flag(args, '--locale'), destination: flag(args, '--destination'), routes: flags(args, '--route') });
+        result = addCapture(tree, shellDir, { node: flag(args, '--node'), breakpoint: flag(args, '--breakpoint'), theme: flag(args, '--theme'), file: flag(args, '--file'), url: flag(args, '--url'), provenance: flag(args, '--provenance'), locale: flag(args, '--locale'), destination: flag(args, '--destination'), routes: flags(args, '--route') });
       } else {
-        for (const id of flags(args, '--node')) result = addPlanned(record, { node: id, files: (flag(args, '--files') ?? '').split(',').filter(Boolean), design: flag(args, '--design') });
+        for (const id of flags(args, '--node')) result = addPlanned(tree, { node: id, files: (flag(args, '--files') ?? '').split(',').filter(Boolean), design: flag(args, '--design') });
       }
       record.rev = (record.rev ?? 1) + (isLayoutTree(existing) ? 1 : 0);
       record.change = { rev: record.rev, kind: 'clarifying', at: now(), reason: command === 'capture' ? `Captured ${flag(args, '--node')}${flag(args, '--destination') ? ` destination ${flag(args, '--destination')}` : ''} at ${flag(args, '--breakpoint')}/${flag(args, '--theme')}.` : `Planned ${flags(args, '--node').join(', ')}.` };
@@ -1187,10 +1320,13 @@ export function layoutTreeMain(argv = []) {
     }
     if (existing && !isLayoutTree(existing)) return { exitCode: 1, text: `${slash(shellFileOf(workRoot))} names schema ${existing.schema}, not ${TREE_SCHEMA}; SHELL_RECORD_NOT_TREE - remove the record and scan again
 ` };
-    const located = locateAppDir(workRoot, existing, flag(args, '--app-dir'));
-    if (!located.appDir) return { exitCode: 1, text: `no app/ directory found for ${slash(workRoot)} (repository ${located.repository ?? '(none)'}) - pass --app-dir\n` };
-    const scan = scanAppDir(located.appDir, { repoRoot: located.repoRoot, repository: located.repository });
-    const { record, notes } = mergeScan(existing, scan);
+    const located = locateApps(workRoot, flags(args, '--app-dir'));
+    if (located.error) return { exitCode: 1, text: `layout-tree: ${located.error}\n` };
+    if (!located.apps.length) return { exitCode: 1, text: `no app/ directory found for ${slash(workRoot)} (repository ${located.repository ?? '(none)'}) - pass --app-dir\n` };
+    const unreadable = located.apps.filter((a) => !a.appDir);
+    if (unreadable.length) return { exitCode: 1, text: `layout-tree: app ${unreadable.map((a) => `${a.name} (${a.root})`).join(', ')} has no app/ or src/app/ directory under ${slash(located.repoRoot)}\n` };
+    const scans = located.apps.map((a) => scanAppDir(a.appDir, { repoRoot: located.repoRoot, repository: located.repository, name: a.name }));
+    const { record, notes } = mergeScan(existing, scans);
     if (write) save(record);
     return out({ ok: true, written: write, notes, record }, `${summarize(record)}\n${notes.map((n) => `- ${n}`).join('\n')}\n${write ? `wrote ${slash(shellFileOf(workRoot))}` : '(dry run - pass --write to write the record)'}`);
   } catch (error) {

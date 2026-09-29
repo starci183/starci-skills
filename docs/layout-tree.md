@@ -14,13 +14,34 @@ disagree with the routes that actually exist.
 `node scripts/work/layout-tree.mjs scan --work .starciwork --write` generates the record. It only reads the
 frontend repository, the one `workspace.yaml` binds with role `fe`, and writes nothing there.
 
+### Apps
+
+A frontend monorepo may hold several apps (nivo-fe: `apps/app`, the console, and `apps/landing`, the public
+website). The record holds one tree per app under `apps[]`, and a node id is a route within its app, so `/` exists
+once per app. The workspace declares which apps are the product's:
+
+```yaml
+repositories:
+  - role: fe
+    name: nivo-fe
+    apps:
+      - {name: app, root: apps/app}
+      - {name: landing, root: apps/landing}
+```
+
+The App Router directory of an app is `<root>/src/app` or `<root>/app`. A frontend that declares no `apps` must hold
+exactly one `app/` directory (its name is the last segment of its root); one that holds several is refused by the
+scan until it declares them, since a directory found by search may be a draft or an unrelated site. The scan reads
+every declared app and drops an app the workspace no longer declares. `capture`, `plan` and `destinations --route`
+take `--app <name>` when the tree holds more than one; capture names carry the app (`assets/layouts/<app>--...`).
+
 | Part | What it holds |
 | --- | --- |
-| `app` | repository, app root, `appDir` (e.g. `apps/app/src/app`), `framework: next-app-router`, the locale param |
-| `source` | scanner, frontend git revision, one digest over every scanned code file (routes, nav source); message catalogs are judged by `i18n.used` instead |
-| `nodes[]` | one per `app/` segment, parents first: `id` (the path under app/, e.g. `/[locale]/(console)/agentos`), `segmentKind` (root, static, dynamic, catch-all, group, slot, intercept), `url` (groups and slots removed), `files` (layout, template, page, loading, error, not-found, default, route, each with sha256), `intercepts` (for `@slot/(.)x` pages, the full page they present) |
+| `apps[]` | one per app: `name`, repository, app root, `appDir` (e.g. `apps/app/src/app`), `framework: next-app-router`, the locale param, and that app's own `source`, `i18n` and `nodes[]` below |
+| `apps[].source` | scanner, frontend git revision, one digest over every scanned code file (routes, nav source); message catalogs are judged by `i18n.used` instead |
+| `apps[].nodes[]` | one per `app/` segment, parents first: `id` (the path under app/, e.g. `/[locale]/(console)/agentos`), `segmentKind` (root, static, dynamic, catch-all, group, slot, intercept), `url` (groups and slots removed), `files` (layout, template, page, loading, error, not-found, default, route, each with sha256), `intercepts` (for `@slot/(.)x` pages, the full page they present) |
 | `nodes[].layout` | for a `layout.tsx`: the chrome component it renders, `chrome` (visible, passthrough, unknown), `state`, its own `rev`, `nav` (registry items with labels per locale from the i18n catalogs, plus `findings`), `captures[]` per breakpoint and theme with the measured `slot`, or `design` (the ui record that draws a planned layout) |
-| `productLocale`, `i18n` | the UI copy language, the message catalogs, and `i18n.used`: the message keys the tree uses (nav `i18nKey`, layout `titleKey`, a capture's `i18nKeys`) with one digest of their values per locale |
+| `productLocale`, `apps[].i18n` | the UI copy language, each app's message catalogs, and `i18n.used`: the message keys the tree uses (nav `i18nKey`, layout `titleKey`, a capture's `i18nKeys`) with one digest of their values per locale |
 | `personas[]` | demo personas, one per role, exactly one default |
 | `brand.lockups[]` | the rendered lockup |
 | `breakpoints[]`, `themes[]` | the matrix every visible layout is captured at and every direction is composited at |
@@ -59,7 +80,8 @@ first by its own `surface: layout` ui record in `interface.draw`, the layout leg
 
 | Field | Meaning |
 | --- | --- |
-| `route` | the node id, e.g. `/[locale]/(console)/agentos/[id]/accounting`. A route not in the tree yet names its nearest existing `routeParent`. |
+| `app` | the frontend app the route is in, a name in the tree's `apps[]`. Optional when the tree holds one app, or when only one app holds the route (or its `routeParent`); otherwise required. `UI_APP_UNKNOWN` (not an app of the tree) and `UI_APP_MISSING` (the route does not decide) refuse; a route the named app does not hold is `UI_ROUTE_UNKNOWN`. |
+| `route` | the node id in its app, e.g. `/[locale]/(console)/agentos/[id]/accounting`. A route not in the tree yet names its nearest existing `routeParent`. |
 | `surface` | `layout`, `page`, `modal`, `drawer`, `loading`, `error` or `not-found`. An overlay may differ per breakpoint, e.g. `{desktop: modal, mobile: drawer}`. |
 | `direction` | drawer only: `left`, `right`, `top` or `bottom`, per breakpoint allowed. There is no sheet surface: a bottom sheet is a drawer from the bottom. |
 | `routed` | modal or drawer only. `true` means an intercepting `@modal/(.)x` route plus the full page `x/page.tsx`. `false` means component state with no URL. |

@@ -192,7 +192,7 @@ writes:
     content:
       en: "The one layout tree (schema work/layout-tree@1, id shell), generated, never hand-listed: `node
         scripts/work/layout-tree.mjs scan --work .starciwork --write` writes app, source digest, i18n
-        catalogs and one node per app/ segment with its special files and digests, the component each
+        catalogs and, for each app the workspace declares, one node per app/ segment with its special files and digests, the component each
         layout renders and the navigation it imports with labels per locale and its findings. This op then
         decides each layout's `chrome` (visible or passthrough), captures every visible layout with
         `layout-tree.mjs capture` (which measures the slot and bumps the layout rev on a changed capture),

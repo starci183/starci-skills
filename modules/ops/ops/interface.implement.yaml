@@ -108,8 +108,8 @@ reads:
       en: "The product's layout tree (work/layout-tree@1): the frontend's app/ directory as nodes - layouts
         with the chrome component each renders and their navigation (keys, routes, message keys, labels per
         locale), route groups, @slots, (.)intercepts, loading/error/not-found files - plus productLocale and
-        the demo personas. Every accepted ui record's `route`, `surface` and `routed` say which app/ files
-        this build creates."
+        the demo personas. The tree holds one entry per app the frontend declares (`apps[]`); every accepted ui record's `app`,
+        `route`, `surface` and `routed` say which app's app/ files this build creates (`app` is the app the record names, or the one app of a single-app tree)."
   - id: environment
     path: .starciwork/_resources/environments/<environment>/resource.yaml
     purpose:
@@ -385,7 +385,7 @@ steps:
     writes: [source, assetManifest, realizationCheck]
     action:
       en: Implement the mapped screens and shared layout once using actual installed components, tokens
-        and repository conventions. Every screen lands at its App Router path in the layout tree - a page
+        and repository conventions. Every screen lands at its App Router path in the layout tree, in the app its `app` names - a page
         at app/<route>/page.tsx, a layout at app/<route>/layout.tsx, loading, error and not-found at their
         special files, and a routed modal or drawer as BOTH the full page app/<route>/page.tsx and the
         intercepting app/<parent>/@modal/(.)<segment>/page.tsx with its @modal/default.tsx, while a

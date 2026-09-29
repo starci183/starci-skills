@@ -53,6 +53,29 @@ properties:
           $ref: "#/$defs/slug"
           description: The repository's name, as every other record refers to it. Names rather than paths,
             because a path is a fact about one machine and this record must be true on all of them.
+        apps:
+          type: array
+          minItems: 1
+          uniqueItems: true
+          description: For a frontend repository (role fe) that holds several applications - a monorepo with
+            apps/app and apps/landing - the apps the product is drawn in, one entry each. The layout tree holds one
+            tree per entry, and a ui record names its app with `app`. Omit it when the repository holds exactly one
+            app/ directory; a repository with several must declare which of them are the product's, since a
+            directory found by search (a draft, an unrelated site) is not.
+          items:
+            type: object
+            additionalProperties: false
+            required:
+              - name
+              - root
+            properties:
+              name:
+                $ref: "#/$defs/slug"
+                description: The app's name, unique in the repository - what a ui record's `app` carries.
+              root:
+                $ref: "#/$defs/prose"
+                description: The application directory relative to the repository root (apps/landing). Its App Router
+                  directory is <root>/src/app or <root>/app.
 $defs:
   prose:
     type: string

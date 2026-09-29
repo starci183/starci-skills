@@ -7380,6 +7380,26 @@ UAT_RUN_AGING:
   nextStep_vi: "Cảnh báo nghi ngờ; cần chạy lại UAT cho mã hiện tại."
   owner: other-op:uat.verify
   kind: check-finding
+UI_APP_MISSING:
+  title: "UI record does not say which app it is in"
+  title_vi: "Bản ghi giao diện chưa nói rõ thuộc ứng dụng nào"
+  meaning_vi: "Cây bố cục có nhiều ứng dụng nhưng route của bản ghi không xác định được duy nhất một ứng dụng."
+  causes_vi:
+    - "Route có ở nhiều ứng dụng hoặc không có ở ứng dụng nào"
+    - "Bản ghi chưa khai báo app"
+  nextStep_vi: "Kiểm tra từ chối; khai báo app là một tên trong apps của cây bố cục."
+  owner: other-op:interface.draw
+  kind: check-finding
+UI_APP_UNKNOWN:
+  title: "UI record names an app the layout tree does not declare"
+  title_vi: "Bản ghi giao diện nêu ứng dụng mà cây bố cục không khai báo"
+  meaning_vi: "Giá trị app của bản ghi không phải tên ứng dụng nào trong apps của cây bố cục (workspace.yaml khai báo)."
+  causes_vi:
+    - "Sai tên ứng dụng"
+    - "Ứng dụng chưa được khai báo trong workspace.yaml hoặc chưa quét lại"
+  nextStep_vi: "Kiểm tra từ chối; sửa app hoặc khai báo ứng dụng rồi quét lại cây bố cục."
+  owner: other-op:interface.draw
+  kind: check-finding
 UI_ASSET_BINDING:
   title: "UI asset not bound at top level"
   title_vi: "Tài nguyên giao diện chưa khai báo ở cấp trên"

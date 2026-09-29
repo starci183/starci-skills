@@ -4,16 +4,181 @@ kind: shell
 state: todo
 rev: 3
 origin: repository
-app:
-  repository: todo-app-frontend
-  root: apps/web
-  appDir: apps/web/src/app
-  framework: next-app-router
-  localeParam: lang
-source:
-  scanner: scripts/work/layout-tree.mjs
-  digest: 79249a5ac81f68acdd609633d55c86a0eb973d5a1864fcca46909a96df97448d
-  scannedAt: 2026-09-29T08:02:22Z
+apps:
+  - name: web
+    repository: todo-app-frontend
+    root: apps/web
+    appDir: apps/web/src/app
+    framework: next-app-router
+    localeParam: lang
+    source:
+      scanner: scripts/work/layout-tree.mjs
+      digest: 79249a5ac81f68acdd609633d55c86a0eb973d5a1864fcca46909a96df97448d
+      scannedAt: 2026-09-29T08:02:22Z
+    i18n:
+      catalogs:
+        - locale: en
+          path: apps/web/src/messages/en.json
+          sha256: bbf0efffa6daf4b3aec8f84fb82eaa3f112827f3c8d0c76cb688d545ba394dfe
+        - locale: vi
+          path: apps/web/src/messages/vi.json
+          sha256: 11049ba78f58a8c75f7ec6bf1d41379b5dbdb77a4ecf4129519ab31b8ae3e5b0
+      used:
+        keys: []
+        locales:
+          - locale: en
+            sha256: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+          - locale: vi
+            sha256: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+    nodes:
+      - id: /
+        parent: null
+        segment: /
+        segmentKind: root
+        url: /
+        origin: repository
+      - id: /[lang]
+        parent: /
+        segment: "[lang]"
+        segmentKind: dynamic
+        url: /[lang]
+        origin: repository
+        files:
+          layout:
+            path: apps/web/src/app/[lang]/layout.tsx
+            sha256: d01208bd34fb7585c8a29058aff08a7357c4d29b7c22963ee875118608a029d5
+          page:
+            path: apps/web/src/app/[lang]/page.tsx
+            sha256: b2436e3d57abada26cd532b8084aae2186877d074c8f037430e0617c0ea2eb8b
+        layout:
+          component: LocaleShell
+          chrome: unknown
+          state: todo
+          rev: 2
+      - id: /[lang]/audit
+        parent: /[lang]
+        segment: audit
+        segmentKind: static
+        url: /[lang]/audit
+        origin: repository
+      - id: /[lang]/audit/privacy
+        parent: /[lang]/audit
+        segment: privacy
+        segmentKind: static
+        url: /[lang]/audit/privacy
+        origin: repository
+        files:
+          page:
+            path: apps/web/src/app/[lang]/audit/privacy/page.tsx
+            sha256: 875c234523bd197a8ce03959f6144a1b697e3f1173d9b042de3e32fd6deac288
+      - id: /[lang]/notify
+        parent: /[lang]
+        segment: notify
+        segmentKind: static
+        url: /[lang]/notify
+        origin: repository
+      - id: /[lang]/notify/preferences
+        parent: /[lang]/notify
+        segment: preferences
+        segmentKind: static
+        url: /[lang]/notify/preferences
+        origin: repository
+        files:
+          page:
+            path: apps/web/src/app/[lang]/notify/preferences/page.tsx
+            sha256: 493b4110b0635af487ce607717e5969ed333bb152afdbb284454a9278d2664b8
+      - id: /[lang]/notify/unsubscribe
+        parent: /[lang]/notify
+        segment: unsubscribe
+        segmentKind: static
+        url: /[lang]/notify/unsubscribe
+        origin: repository
+        files:
+          page:
+            path: apps/web/src/app/[lang]/notify/unsubscribe/page.tsx
+            sha256: be09ef5c5d8ece0118ba5529b175eacfef5c40ccbef851fdb6d0471e32708784
+      - id: /[lang]/plan
+        parent: /[lang]
+        segment: plan
+        segmentKind: static
+        url: /[lang]/plan
+        origin: repository
+        files:
+          page:
+            path: apps/web/src/app/[lang]/plan/page.tsx
+            sha256: 4112727bd73c253376ed3f3a0fea0de2cd9fa30af4086db70cae51366729e8f0
+      - id: /[lang]/plan/usage
+        parent: /[lang]/plan
+        segment: usage
+        segmentKind: static
+        url: /[lang]/plan/usage
+        origin: repository
+        files:
+          page:
+            path: apps/web/src/app/[lang]/plan/usage/page.tsx
+            sha256: 1312a0298f1d60e479277852ff52f05f31f2227ef865f6ad58919e0142d01ab7
+      - id: /[lang]/recur
+        parent: /[lang]
+        segment: recur
+        segmentKind: static
+        url: /[lang]/recur
+        origin: repository
+        files:
+          page:
+            path: apps/web/src/app/[lang]/recur/page.tsx
+            sha256: cdf4f5c9b87afd9872c74b723b3777282f895fc737a6d6108637fce82c14e556
+      - id: /[lang]/sign-in
+        parent: /[lang]
+        segment: sign-in
+        segmentKind: static
+        url: /[lang]/sign-in
+        origin: repository
+        files:
+          page:
+            path: apps/web/src/app/[lang]/sign-in/page.tsx
+            sha256: 4521a0287a0f99fafef5ac3e0383da0a0e179032785e796000764ea9e404eea2
+      - id: /[lang]/tasks
+        parent: /[lang]
+        segment: tasks
+        segmentKind: static
+        url: /[lang]/tasks
+        origin: repository
+        files:
+          page:
+            path: apps/web/src/app/[lang]/tasks/page.tsx
+            sha256: 50d39c35bf80e942aafb73de4beb83efb9b90e681f1af0262ec9afb5a5b0606e
+      - id: /[lang]/tasks/[taskId]
+        parent: /[lang]/tasks
+        segment: "[taskId]"
+        segmentKind: dynamic
+        url: /[lang]/tasks/[taskId]
+        origin: repository
+      - id: /[lang]/tasks/[taskId]/share
+        parent: /[lang]/tasks/[taskId]
+        segment: share
+        segmentKind: static
+        url: /[lang]/tasks/[taskId]/share
+        origin: repository
+        files:
+          page:
+            path: apps/web/src/app/[lang]/tasks/[taskId]/share/page.tsx
+            sha256: e72e1b81dd0336e1a429da870ce3ca967c7b5ba1a71ba6fc293ea3c223068204
+      - id: /sign-in
+        parent: /
+        segment: sign-in
+        segmentKind: static
+        url: /sign-in
+        origin: repository
+      - id: /sign-in/turtle-master.png
+        parent: /sign-in
+        segment: turtle-master.png
+        segmentKind: static
+        url: /sign-in/turtle-master.png
+        origin: repository
+        files:
+          route:
+            path: apps/web/src/app/sign-in/turtle-master.png/route.ts
+            sha256: c3f3956bd7ff3b0043c5a93f61451026a8135aba9a0598862c9da3cb3a354a89
 productLocale:
   default: en
   fallback: en
@@ -21,21 +186,6 @@ productLocale:
     - en
     - vi
   source: examples/todo-app-frontend/apps/web/src/modules/i18n/config.ts defaultLocale en, locales [en, vi]
-i18n:
-  catalogs:
-    - locale: en
-      path: apps/web/src/messages/en.json
-      sha256: bbf0efffa6daf4b3aec8f84fb82eaa3f112827f3c8d0c76cb688d545ba394dfe
-    - locale: vi
-      path: apps/web/src/messages/vi.json
-      sha256: 11049ba78f58a8c75f7ec6bf1d41379b5dbdb77a4ecf4129519ab31b8ae3e5b0
-  used:
-    keys: []
-    locales:
-      - locale: en
-        sha256: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
-      - locale: vi
-        sha256: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
 breakpoints:
   - name: desktop
     width: 1440
@@ -46,155 +196,6 @@ breakpoints:
 themes:
   - light
   - dark
-nodes:
-  - id: /
-    parent: null
-    segment: /
-    segmentKind: root
-    url: /
-    origin: repository
-  - id: /[lang]
-    parent: /
-    segment: "[lang]"
-    segmentKind: dynamic
-    url: /[lang]
-    origin: repository
-    files:
-      layout:
-        path: apps/web/src/app/[lang]/layout.tsx
-        sha256: d01208bd34fb7585c8a29058aff08a7357c4d29b7c22963ee875118608a029d5
-      page:
-        path: apps/web/src/app/[lang]/page.tsx
-        sha256: b2436e3d57abada26cd532b8084aae2186877d074c8f037430e0617c0ea2eb8b
-    layout:
-      component: LocaleShell
-      chrome: unknown
-      state: todo
-      rev: 2
-  - id: /[lang]/audit
-    parent: /[lang]
-    segment: audit
-    segmentKind: static
-    url: /[lang]/audit
-    origin: repository
-  - id: /[lang]/audit/privacy
-    parent: /[lang]/audit
-    segment: privacy
-    segmentKind: static
-    url: /[lang]/audit/privacy
-    origin: repository
-    files:
-      page:
-        path: apps/web/src/app/[lang]/audit/privacy/page.tsx
-        sha256: 875c234523bd197a8ce03959f6144a1b697e3f1173d9b042de3e32fd6deac288
-  - id: /[lang]/notify
-    parent: /[lang]
-    segment: notify
-    segmentKind: static
-    url: /[lang]/notify
-    origin: repository
-  - id: /[lang]/notify/preferences
-    parent: /[lang]/notify
-    segment: preferences
-    segmentKind: static
-    url: /[lang]/notify/preferences
-    origin: repository
-    files:
-      page:
-        path: apps/web/src/app/[lang]/notify/preferences/page.tsx
-        sha256: 493b4110b0635af487ce607717e5969ed333bb152afdbb284454a9278d2664b8
-  - id: /[lang]/notify/unsubscribe
-    parent: /[lang]/notify
-    segment: unsubscribe
-    segmentKind: static
-    url: /[lang]/notify/unsubscribe
-    origin: repository
-    files:
-      page:
-        path: apps/web/src/app/[lang]/notify/unsubscribe/page.tsx
-        sha256: be09ef5c5d8ece0118ba5529b175eacfef5c40ccbef851fdb6d0471e32708784
-  - id: /[lang]/plan
-    parent: /[lang]
-    segment: plan
-    segmentKind: static
-    url: /[lang]/plan
-    origin: repository
-    files:
-      page:
-        path: apps/web/src/app/[lang]/plan/page.tsx
-        sha256: 4112727bd73c253376ed3f3a0fea0de2cd9fa30af4086db70cae51366729e8f0
-  - id: /[lang]/plan/usage
-    parent: /[lang]/plan
-    segment: usage
-    segmentKind: static
-    url: /[lang]/plan/usage
-    origin: repository
-    files:
-      page:
-        path: apps/web/src/app/[lang]/plan/usage/page.tsx
-        sha256: 1312a0298f1d60e479277852ff52f05f31f2227ef865f6ad58919e0142d01ab7
-  - id: /[lang]/recur
-    parent: /[lang]
-    segment: recur
-    segmentKind: static
-    url: /[lang]/recur
-    origin: repository
-    files:
-      page:
-        path: apps/web/src/app/[lang]/recur/page.tsx
-        sha256: cdf4f5c9b87afd9872c74b723b3777282f895fc737a6d6108637fce82c14e556
-  - id: /[lang]/sign-in
-    parent: /[lang]
-    segment: sign-in
-    segmentKind: static
-    url: /[lang]/sign-in
-    origin: repository
-    files:
-      page:
-        path: apps/web/src/app/[lang]/sign-in/page.tsx
-        sha256: 4521a0287a0f99fafef5ac3e0383da0a0e179032785e796000764ea9e404eea2
-  - id: /[lang]/tasks
-    parent: /[lang]
-    segment: tasks
-    segmentKind: static
-    url: /[lang]/tasks
-    origin: repository
-    files:
-      page:
-        path: apps/web/src/app/[lang]/tasks/page.tsx
-        sha256: 50d39c35bf80e942aafb73de4beb83efb9b90e681f1af0262ec9afb5a5b0606e
-  - id: /[lang]/tasks/[taskId]
-    parent: /[lang]/tasks
-    segment: "[taskId]"
-    segmentKind: dynamic
-    url: /[lang]/tasks/[taskId]
-    origin: repository
-  - id: /[lang]/tasks/[taskId]/share
-    parent: /[lang]/tasks/[taskId]
-    segment: share
-    segmentKind: static
-    url: /[lang]/tasks/[taskId]/share
-    origin: repository
-    files:
-      page:
-        path: apps/web/src/app/[lang]/tasks/[taskId]/share/page.tsx
-        sha256: e72e1b81dd0336e1a429da870ce3ca967c7b5ba1a71ba6fc293ea3c223068204
-  - id: /sign-in
-    parent: /
-    segment: sign-in
-    segmentKind: static
-    url: /sign-in
-    origin: repository
-  - id: /sign-in/turtle-master.png
-    parent: /sign-in
-    segment: turtle-master.png
-    segmentKind: static
-    url: /sign-in/turtle-master.png
-    origin: repository
-    files:
-      route:
-        path: apps/web/src/app/sign-in/turtle-master.png/route.ts
-        sha256: c3f3956bd7ff3b0043c5a93f61451026a8135aba9a0598862c9da3cb3a354a89
 refs:
   - ui.task.list
 blockers:

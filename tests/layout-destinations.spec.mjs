@@ -6,7 +6,7 @@ import { createRequire } from 'node:module';
 import { parseYaml, stringifyYaml } from '../engine/yaml.mjs';
 import { checkShellConformance } from '../scripts/checks/shell-conformance.mjs';
 import {
-  addCapture, baseLayoutFor, captureFileOf, destinationFor, destinationsOf, layoutTreeMain, mergeScan, nodeById, scanAppDir,
+  addCapture, baseLayoutFor, captureFileOf, destinationFor, destinationsOf, layoutTreeMain, mergeScan, nodeById, scanAppDir, treeOf,
 } from '../scripts/work/layout-tree.mjs';
 import { decodePng, encodePng } from '../scripts/work/png.mjs';
 import { drawUi, layoutCapture, settledProduct, uiSkeleton } from './fixtures/layout-tree.mjs';
@@ -51,18 +51,18 @@ test('destination captures are recorded per key, with the nav target as the defa
   const node = nodeById(p.tree, CONSOLE);
   assert.deepEqual(node.layout.destinations.map((d) => [d.key, d.routes]), [['photos', [PHOTOS]], ['reports', [REPORTS]]]);
   const photosDesktop = node.layout.destinations[0].captures.find((c) => c.breakpoint === 'desktop');
-  assert.equal(photosDesktop.name, 'assets/layouts/locale-console--photos--desktop--light.png', 'a capture is a blob citation, never a file under shell/assets');
+  assert.equal(photosDesktop.name, 'assets/layouts/app--locale-console--photos--desktop--light.png', 'a capture is a blob citation, never a file under shell/assets');
   assert.deepEqual(photosDesktop.slot, DESKTOP_SLOT, 'the slot is measured from the key colour');
   assert.ok(fs.existsSync(captureFileOf(p.shellDir, photosDesktop)));
   assert.equal(node.layout.rev, 1, 'a first destination capture does not move the layout rev');
-  assert.equal(validateTree(p.tree), true, JSON.stringify(validateTree.errors));
+  assert.equal(validateTree(p.record), true, JSON.stringify(validateTree.errors));
   addCapture(p.tree, p.shellDir, { node: CONSOLE, destination: 'photos', breakpoint: 'desktop', theme: 'light', file: capturePng(p, 'photos2', 'desktop', [11, 151, 11, 255]) });
   assert.equal(node.layout.rev, 2, 'a changed destination render re-opens what was drawn under the layout');
   assert.throws(() => addCapture(p.tree, p.shellDir, { node: CONSOLE, destination: 'settings', breakpoint: 'desktop', theme: 'light', file: capturePng(p, 's', 'desktop', PHOTOS_CHROME) }), /name the node ids it is active for/);
   assert.throws(() => addCapture(p.tree, p.shellDir, { node: CONSOLE, destination: 'settings', routes: ['/[locale]/(auth)/sign-in'], breakpoint: 'desktop', theme: 'light', file: capturePng(p, 's', 'desktop', PHOTOS_CHROME) }), /not a node at or below/);
   // A re-scan keeps the destinations the owner captured.
-  const rescanned = mergeScan(p.tree, scanAppDir(p.appDir, { repoRoot: p.web, repository: 'web' }), { at: '2026-09-24T01:00:00Z' }).record;
-  assert.deepEqual(nodeById(rescanned, CONSOLE).layout.destinations, node.layout.destinations);
+  const rescanned = mergeScan(p.record, [scanAppDir(p.appDir, { repoRoot: p.web, repository: 'web' })], { at: '2026-09-24T01:00:00Z' }).record;
+  assert.deepEqual(nodeById(treeOf(rescanned, 'app'), CONSOLE).layout.destinations, node.layout.destinations);
 });
 
 test('the active destination: a bound key, else the longest route at or above the page, else activeNav, else the default', async (t) => {
@@ -75,19 +75,19 @@ test('the active destination: a bound key, else the longest route at or above th
   assert.equal(destinationFor(p.tree, node, { route: PHOTOS, key: 'reports' }).destination.key, 'reports', 'an explicit binding wins');
   assert.deepEqual(destinationFor(p.tree, node, { route: PHOTOS, key: 'nope' }), { unknown: 'nope' });
   const base = baseLayoutFor(p.tree, REPORTS, 'desktop', 'light', { shellDir: p.shellDir, ui: { route: REPORTS } });
-  assert.equal(base.rel, 'shell/assets/layouts/locale-console--reports--desktop--light.png');
+  assert.equal(base.rel, 'shell/assets/layouts/app--locale-console--reports--desktop--light.png');
   assert.equal(base.destination, 'reports');
-  assert.equal(baseLayoutFor(p.tree, CONSOLE, 'desktop', 'light', { shellDir: p.shellDir, ui: { route: CONSOLE } }).rel, 'shell/assets/layouts/locale-console--desktop--light.png', 'no destination active: the default render');
+  assert.equal(baseLayoutFor(p.tree, CONSOLE, 'desktop', 'light', { shellDir: p.shellDir, ui: { route: CONSOLE } }).rel, 'shell/assets/layouts/app--locale-console--desktop--light.png', 'no destination active: the default render');
   const cli = layoutTreeMain(['destinations', '--work', p.work, '--route', REPORTS]);
   assert.equal(cli.exitCode, 0);
-  assert.match(cli.text, /desktop\/light: shell\/assets\/layouts\/locale-console--reports--desktop--light\.png \(\/\[locale\]\/\(console\) destination reports by route\)/);
+  assert.match(cli.text, /desktop\/light: shell\/assets\/layouts\/app--locale-console--reports--desktop--light\.png \(\/\[locale\]\/\(console\) destination reports by route\)/);
 });
 
 test('compose-direction places a page into its destination render, and records which one', async (t) => {
   const p = await withDestinations(t);
   const { dir, record } = await drawUi(p, 'reports/ui/board', uiSkeleton('ui.reports.board', { route: REPORTS, surface: 'page', shell: bound(p) }), both);
   const desktop = record.assets.find((a) => a.composite?.breakpoint === 'desktop');
-  assert.equal(desktop.composite.layout.capture, 'shell/assets/layouts/locale-console--reports--desktop--light.png');
+  assert.equal(desktop.composite.layout.capture, 'shell/assets/layouts/app--locale-console--reports--desktop--light.png');
   assert.equal(desktop.composite.layout.destination, 'reports');
   validateUi(record);
   assert.deepEqual((validateUi.errors ?? []).filter((e) => e.instancePath.includes('/composite/')), [], 'composite.layout.destination is a schema field, so a composed record passes --strict');
@@ -116,7 +116,7 @@ test('shell-conformance: a page drawn into another render of the layout is a des
   p.save(p.tree);
   const stale = checkShellConformance(board.dir);
   assert.deepEqual(refused(stale), ['COMPOSITE_DESTINATION_MISMATCH']);
-  assert.match(stale.refused[0], /shows destination reports active \(by route\) - recompose into shell\/assets\/layouts\/locale-console--reports--desktop--light\.png/);
+  assert.match(stale.refused[0], /shows destination reports active \(by route\) - recompose into shell\/assets\/layouts\/app--locale-console--reports--desktop--light\.png/);
   const advisory = checkShellConformance(board.dir, { advisoryCodes: ['COMPOSITE_DESTINATION_MISMATCH'] });
   assert.equal(advisory.ok, true, 'a leg admitted before the change sees it as an advisory suspect');
   const again = await drawUi(p, 'reports/ui/board', { ...board.record, assets: [] }, both);
@@ -162,10 +162,10 @@ test('shell-conformance holds destinations to the layout: known nodes below it, 
 
 test('an extensions.destinationCaptures block is refused; destinations live on the layout node only', async (t) => {
   const p = await settledProduct(t);
-  assert.equal(validateTree(p.tree), true, JSON.stringify(validateTree.errors));
-  const legacy = structuredClone(p.tree);
+  assert.equal(validateTree(p.record), true, JSON.stringify(validateTree.errors));
+  const legacy = structuredClone(p.record);
   legacy.extensions = { destinationCaptures: { note: 'one capture per destination', items: [{ key: 'photos', breakpoint: 'desktop', path: 'assets/layouts/photos--desktop--light.png', sha256: 'a'.repeat(64) }] } };
   assert.equal(validateTree(legacy), false, 'the retired block is not a valid extension');
-  assert.deepEqual(destinationsOf(legacy, nodeById(legacy, CONSOLE)), [], 'it is never read as destinations');
+  assert.deepEqual(destinationsOf(legacy, nodeById(treeOf(legacy, 'app'), CONSOLE)), [], 'it is never read as destinations');
   assert.equal('promoteDestinations' in await import('../scripts/work/layout-tree.mjs'), false, 'there is no promote path');
 });

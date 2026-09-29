@@ -8,7 +8,7 @@ import { createHash } from 'node:crypto';
 import { parseYaml, stringifyYaml } from '../engine/yaml.mjs';
 import { inspectLedger, ledgerFileFor, openLedger } from '../engine/ledger-db.mjs';
 import { composeDirection } from '../scripts/work/compose-direction.mjs';
-import { layoutTreeMain, lockupSourceOf, layoutSettlement, loadUiRecords, nodeById } from '../scripts/work/layout-tree.mjs';
+import { layoutTreeMain, lockupSourceOf, layoutSettlement, loadUiRecords, nodeById, treeOf } from '../scripts/work/layout-tree.mjs';
 import { blankImage, drawOver, encodePng } from '../scripts/work/png.mjs';
 import { drawingAcceptance, partAssetsOf, reviewPartsOf } from '../scripts/work/direction-part.mjs';
 import { applyDrawReview, drawReviewMain, drawReviewQuestion, drawReviewStatus, drawReviewsOwed } from '../scripts/work/draw-review.mjs';
@@ -35,6 +35,7 @@ const Ajv2020 = (() => { const loaded = createRequire(path.join(ROOT, 'package.j
 const validateUi = new Ajv2020({ strict: false, allErrors: true, logger: false }).compile(parseYaml(fs.readFileSync(path.join(ROOT, 'modules/schemas/work-ui-screen.schema.yaml'), 'utf8')));
 const env = (() => { const e = { ...process.env, STARCI_CONNECTORS_OFF: '1' }; for (const k of ['ORCA_TERMINAL_HANDLE', 'STARCI_ROLE', 'STARCI_OP_JOB']) delete e[k]; return e; })();
 const readTree = (p) => parseYaml(fs.readFileSync(path.join(p.work, 'shell', 'index.yaml'), 'utf8'));
+const readApp = (p) => treeOf(readTree(p), 'app');
 const writeTree = (p, tree) => fs.writeFileSync(path.join(p.work, 'shell', 'index.yaml'), stringifyYaml(tree));
 const readRecord = (dir) => parseYaml(fs.readFileSync(path.join(dir, 'index.yaml'), 'utf8'));
 
@@ -132,8 +133,8 @@ test('greenfield sequence: brand a6 plans, interface.draw draws, the owner accep
   const early = layoutTreeMain(['lockup', '--work', p.work, '--from', from, '--rect', '1,1,6,4', '--write']);
   assert.equal(early.exitCode, 1);
   assert.match(early.text, /is todo, not done - the layout drawing is accepted before its lockup is taken: interface\.draw parks the owner draw-review ask/);
-  const node = () => nodeById(readTree(p), APP);
-  const settledReasons = () => layoutSettlement(readTree(p), { ...node(), layout: { ...node().layout, state: 'done' } }, { uiLoader: (id) => loadUiRecords(p.work).get(id) ?? null }).reasons;
+  const node = () => nodeById(readApp(p), APP);
+  const settledReasons = () => layoutSettlement(readApp(p), { ...node(), layout: { ...node().layout, state: 'done' } }, { uiLoader: (id) => loadUiRecords(p.work).get(id) ?? null }).reasons;
   assert.ok(settledReasons().some((r) => /which is todo, not done - interface\.draw parks the owner draw-review ask/.test(r)));
   // The ask, the owner's accept answer, and the draw op's accept path.
   const q = drawReviewQuestion(dir);
@@ -331,7 +332,7 @@ test('gates: a repository layout drawn by the record is layout-design; only a pl
   const p = greenfield(t);
   const { dir } = drawLayout(p);
   const tree = readTree(p);
-  for (const n of tree.nodes) if (n.id === APP) n.origin = 'repository';
+  for (const n of tree.apps[0].nodes) if (n.id === APP) n.origin = 'repository';
   writeTree(p, tree);
   const gates = drawReviewStatus(dir).gates;
   assert.deepEqual(gates.map((g) => g.kind), ['layout-design']);
@@ -404,8 +405,8 @@ test('an unrequested drawing is never auto-accepted; only the owner’s accept s
     assert.equal(validateUi(record), true, JSON.stringify(validateUi.errors));
     assert.deepEqual(drawReviewsOwed(p.repo, ['.starciwork/features/home/ui/**']).owed, [], 'api report files the done interface.draw');
     assert.deepEqual(drawingAcceptance(record, dir), { accepted: true, reason: null });
-    const node = nodeById(readTree(p), APP);
-    assert.deepEqual(layoutSettlement(readTree(p), { ...node, layout: { ...node.layout, state: 'done' } }, { uiLoader: (id) => loadUiRecords(p.work).get(id) ?? null }).reasons, []);
+    const node = nodeById(readApp(p), APP);
+    assert.deepEqual(layoutSettlement(readApp(p), { ...node, layout: { ...node.layout, state: 'done' } }, { uiLoader: (id) => loadUiRecords(p.work).get(id) ?? null }).reasons, []);
     const crop = layoutTreeMain(['lockup', '--work', p.work, '--from', `${DESIGN}:${composite}`, '--rect', '1,1,6,4', '--write']);
     assert.equal(crop.exitCode, 0, crop.text);
   } finally { l.close(); }

@@ -71,7 +71,8 @@ reads:
     layoutFoundation: true
     purpose:
       en: "May be absent or todo when the op starts (step 1 creates and settles it). The product's layout tree (work/layout-tree@1) with the captures it cites (blobs, scripts/lib/blob-lookup.mjs): one node per
-        app/ segment - route groups, parallel slots @x, intercepting routes (.)x, loading/error/not-found
+        app/ segment of each app the frontend declares (`apps[]`: a monorepo may hold several, apps/app and apps/landing; a node id is a
+        route within its app) - route groups, parallel slots @x, intercepting routes (.)x, loading/error/not-found
         files - each layout with its chrome (visible or passthrough), rev, navigation with labels per
         locale out of the i18n catalogs, and real captures per breakpoint and theme with the page slot
         rectangle measured (desktop and mobile in the light theme are required; dark is optional); the
@@ -155,6 +156,7 @@ writes:
       - state
       - brand
       - shell
+      - app
       - route
       - routeParent
       - surface
@@ -183,7 +185,7 @@ writes:
         source, the assetSlotsOwed the settle records - and every part, brief, render source and raster prompt appears in both ui.assets
         and the node assets list. The record states where it sits in the App Router: `route` (the layout
         tree node id, /[locale]/(console)/agentos/[id]/accounting; a route the tree does not hold yet
-        names its nearest existing `routeParent`), `surface` (layout, page, modal, drawer, or one of the
+        names its nearest existing `routeParent`), `app` (the frontend app the route belongs to, a name in the tree's `apps[]` - required when the tree declares several apps and the route exists in more than one of them or in none; a tree of one app, or a route only one app holds, needs none), `surface` (layout, page, modal, drawer, or one of the
         data-status route files loading, error and not-found; an overlay may vary per breakpoint, {desktop: drawer, mobile: modal}), `direction`
         for a drawer (left, right, top or bottom, per breakpoint allowed - a bottom sheet is a drawer from
         the bottom), and for a modal or drawer `routed` (true - an intercepting @modal/(.)x route plus the

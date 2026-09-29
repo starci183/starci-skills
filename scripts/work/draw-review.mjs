@@ -49,7 +49,7 @@ import { isBlobFile, receiptFileOf, receiptRefOf } from '../kernel/ask-receipts.
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { stringifyYaml } from '../../engine/yaml.mjs';
-import { nodesOf, readShellRecord } from './layout-tree.mjs';
+import { allNodesOf, appOfUi, nodesOf, readShellRecord } from './layout-tree.mjs';
 import { REQUIRED_BREAKPOINTS, REQUIRED_THEMES, ownerAcceptanceOf, partAssetsOf, reviewPartsOf } from './direction-part.mjs';
 import { dataStatusOf, recipeRenderedOf } from '../checks/ui-shapes.mjs';
 import { assetsOf, flag, indexFilesUnder, list, readYaml, sha256File, slash, stateKey, workRootOf, writeRecordFile } from './work-io.mjs';
@@ -125,8 +125,9 @@ export function gatesOf({ workRoot, record }) {
   const shell = readShellRecord(workRoot);
   if (shell?.error) throw new Error(`${slash(shell.file)} ${shell.error}: cannot tell whether a layout waits on ${record.id}`);
   const tree = shell?.record ?? null;
-  const node = nodesOf(tree).find((n) => n.layout?.design === record.id)
-    ?? (record.surface === 'layout' ? nodesOf(tree).find((n) => n.id === record.route && n.origin === 'planned') : null);
+  const ownApp = tree ? appOfUi(tree, record).tree : null;
+  const node = allNodesOf(tree).find((n) => n.layout?.design === record.id)
+    ?? (record.surface === 'layout' && ownApp ? nodesOf(ownApp).find((n) => n.id === record.route && n.origin === 'planned') : null);
   if (node && (node.origin === 'planned' || record.surface === 'layout') && node.layout?.chrome !== 'passthrough') {
     gates.push(node.origin === 'planned'
       ? { kind: 'planned-layout', node: node.id, detail: `draws the planned layout ${node.id}: the pages under it wait for its settlement, and on a greenfield product brand.decide crops the lockup from it` }

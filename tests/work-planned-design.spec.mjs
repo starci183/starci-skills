@@ -15,15 +15,14 @@ import { checkWorkTree, plannedDesignPointers } from '../scripts/checks/check-ex
 const DESIGN = 'ui.learning.app-layout';
 const tree = ({ origin = 'planned', state = 'todo' } = {}) => ({
   schema: 'work/layout-tree@1', id: 'shell', kind: 'shell', state: 'todo', rev: 1, origin: 'planned',
-  app: { root: '.', appDir: 'src/app', framework: 'next-app-router' },
   productLocale: { default: 'vi', fallback: 'vi', locales: ['vi', 'en'] },
   breakpoints: [{ name: 'desktop', width: 1440, height: 900 }, { name: 'mobile', width: 390, height: 844 }],
   themes: ['light'],
-  nodes: [
+  apps: [{ name: 'app', root: '.', appDir: 'src/app', framework: 'next-app-router', nodes: [
     { id: '/', parent: null, segment: '/', segmentKind: 'root', url: '/', origin: 'planned' },
     { id: '/(app)', parent: '/', segment: '(app)', segmentKind: 'group', url: '/', origin, files: { layout: { path: 'src/app/(app)/layout.tsx' } },
       layout: { chrome: 'visible', state, rev: 1, design: DESIGN } },
-  ],
+  ] }],
 });
 const layoutUi = `schema: work/ui-screen@1\nid: ${DESIGN}\ntitle: The student app layout\nstate: todo\nroute: /(app)\nsurface: layout\n`;
 
@@ -45,7 +44,7 @@ test('a planned, unsettled layout may point at the surface-layout record interfa
   const { refused, suspect } = run(t, tree());
   assert.deepEqual(refused, []);
   assert.equal(suspect.length, 1);
-  assert.match(suspect[0], /nodes\.layout\.design names ui\.learning\.app-layout/);
+  assert.match(suspect[0], /apps\.nodes\.layout\.design names ui\.learning\.app-layout/);
   assert.match(suspect[0], /features\/learning\/ui\/app-layout\/index\.yaml with surface: layout/);
   assert.match(suspect[0], /\[DESIGN_PLANNED\]$/);
 });

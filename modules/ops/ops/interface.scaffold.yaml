@@ -220,7 +220,7 @@ proofs:
         re-scanned layout tree are the only Work writes.
   - id: shell-recorded
     requirement:
-      en: The layout tree is a work/layout-tree@1 record re-scanned from the created app/ - every planned
+      en: The layout tree is a work/layout-tree@1 record re-scanned from the created app/ (of the app being scaffolded) - every planned
         node the scaffold realised is origin repository with its files' current digests, and `node
         scripts/checks/shell-conformance.mjs .starciwork/shell/index.yaml` reports no LAYOUT_TREE_STALE (the
         captures it still lacks are brand.decide's).

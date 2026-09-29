@@ -27,7 +27,7 @@ import { fileURLToPath } from 'node:url';
 import { blankImage, cropImage, decodePng, dimImage, drawOver, encodePng, keyRect, resizeImage } from './png.mjs';
 import {
   OVERLAY_SURFACES, SLOT_KEY, baseLayoutFor, directionAt, isLayoutTree, isOverlayRecord, loadUiRecords, matrixOf,
-  captureFileOf, captureRelOf, destinationsOf, nodeById, nodesOf, readShellRecord, surfaceAt,
+  allNodesOf, appOfUi, captureFileOf, captureRelOf, destinationsOf, nodeById, readShellRecord, surfaceAt,
 } from './layout-tree.mjs';
 import { DRAW_TOOL } from '../checks/ui-shapes.mjs';
 import { parseYaml } from '../../engine/yaml.mjs';
@@ -91,7 +91,7 @@ export function resolveImageRef(workRoot, ref, uiRecords = null) {
   if (shellRef) {
     let tree = null;
     try { tree = parseYaml(fs.readFileSync(path.join(workRoot, 'shell', 'index.yaml'), 'utf8')); } catch { tree = null; }
-    const cited = [...nodesOf(tree ?? {}).flatMap((n) => [...list(n.layout?.captures), ...destinationsOf(tree, n).flatMap((d) => d.captures)]), ...list(tree?.brand?.lockups)]
+    const cited = [...allNodesOf(tree ?? {}).flatMap((n) => [...list(n.layout?.captures), ...destinationsOf(tree, n).flatMap((d) => d.captures)]), ...list(tree?.brand?.lockups)]
       .find((c) => captureRelOf(c) === `shell/${shellRef[1]}`);
     if (cited) return captureFileOf(path.join(workRoot, 'shell'), cited);
   }
@@ -133,7 +133,9 @@ function composeOne({ uiDir, content, breakpoint, theme, state = 'default', pres
   if (!workRoot) return { ok: false, error: `${slash(uiAbs)} is not under a .starciwork Work root` };
   const shell = readShellRecord(workRoot);
   if (!shell || shell.error || !isLayoutTree(shell.record)) return { ok: false, error: `${slash(workRoot)}/shell/index.yaml is not a work/layout-tree@1 record (run scripts/work/layout-tree.mjs scan or convert)` };
-  const tree = shell.record;
+  const resolved = appOfUi(shell.record, ui);
+  if (resolved.error) return { ok: false, error: `${ui.id} ${resolved.error.message} (${resolved.error.code})` };
+  const tree = resolved.tree;
   const bpEntry = list(tree.breakpoints).find((b) => b?.name === breakpoint);
   if (!bpEntry) return { ok: false, error: `${breakpoint} is not a breakpoint of the layout tree (${matrixOf(tree).breakpoints.join(', ')})` };
   if (!matrixOf(tree).themes.includes(theme)) return { ok: false, error: `${theme} is not a theme of the layout tree` };

@@ -92,8 +92,8 @@ export const placeDepthFinding = (shown, want) => {
  * layout is not done may point ahead; a settled layout or a scanned (repository) node must resolve.
  */
 export const plannedDesignPointers = (record) => {
-  if (record?.schema !== 'work/layout-tree@1' || !Array.isArray(record.nodes)) return [];
-  return record.nodes
+  if (record?.schema !== 'work/layout-tree@1' || !Array.isArray(record.apps)) return [];
+  return record.apps.flatMap((app) => (Array.isArray(app?.nodes) ? app.nodes : []))
     .filter((node) => node?.origin === 'planned' && node.layout && node.layout.state !== 'done' && typeof node.layout.design === 'string')
     .map((node) => node.layout.design.trim());
 };
@@ -388,7 +388,7 @@ export function checkWorkTree(workRoot, problems, warnings = [], infos = [], res
       }
       continue;
     }
-    if (ref.trail === 'nodes.layout.design' && plannedDesigns.has(`${ref.file}|${ref.id}`)) {
+    if (ref.trail === 'apps.nodes.layout.design' && plannedDesigns.has(`${ref.file}|${ref.id}`)) {
       warnings.push(`${ref.file}: ${ref.trail} names ${ref.id}, the surface-layout ui record interface.draw has not drawn yet - a planned pointer, resolved when interface.draw creates ${placeOfUiId(ref.id)} with surface: layout and route set to the layout node [DESIGN_PLANNED]`);
       continue;
     }

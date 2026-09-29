@@ -18,7 +18,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { parseYaml } from '../../engine/yaml.mjs';
-import { isLayoutTree, layoutChainOf, layoutSettlement, loadUiRecords, nodeById, nodesOf, readShellRecord } from '../work/layout-tree.mjs';
+import { appNamesOf, appOfUi, isLayoutTree, layoutChainOf, layoutSettlement, loadUiRecords, nodeById, nodesOf, readShellRecord, treeOf } from '../work/layout-tree.mjs';
 import { openDecisionRow } from '../reconciler/decisions.mjs';
 import { getWorkflow, workflowRunning } from './api-lib/rows.mjs';
 import { claimFoundation, declareDependent, landFoundation, readDeclaration, readFoundation, writeDeclaration, writeFoundation } from './foundations.mjs';
@@ -56,12 +56,15 @@ export function layoutChainVerdicts(repo, bindings) {
       const shell = readShellRecord(workRoot);
       if (!shell || shell.error) { verdicts.push({ record, unknown: 'no readable shell record' }); continue; }
       if (!isLayoutTree(shell.record)) { verdicts.push({ record, route: ui.route, unsettled: [{ node: '(shell)', reasons: [`the shell record is ${shell.record.schema ?? 'unknown'}, not work/layout-tree@1 - node scripts/work/layout-tree.mjs convert --work <.starciwork> --write`] }] }); continue; }
-      const anchor = nodeById(shell.record, ui.route) ? ui.route : (typeof ui.routeParent === 'string' && nodeById(shell.record, ui.routeParent) ? ui.routeParent : null);
+      const resolved = appOfUi(shell.record, ui);
+      if (resolved.error) { verdicts.push({ record, unknown: `${resolved.error.code}: ${resolved.error.message}` }); continue; }
+      const tree = resolved.tree;
+      const anchor = nodeById(tree, ui.route) ? ui.route : (typeof ui.routeParent === 'string' && nodeById(tree, ui.routeParent) ? ui.routeParent : null);
       if (!anchor) { verdicts.push({ record, unknown: `route ${ui.route} is not in the layout tree and names no existing routeParent` }); continue; }
       const drawingOwn = ui.surface === 'layout' && anchor === ui.route;
       const records = loadUiRecords(workRoot);
-      const unsettled = (layoutChainOf(shell.record, anchor, { self: !drawingOwn }) ?? [])
-        .map((node) => ({ node: node.id, ...layoutSettlement(shell.record, node, { shellDir: shell.dir, uiLoader: (id) => records.get(id) ?? null }) }))
+      const unsettled = (layoutChainOf(tree, anchor, { self: !drawingOwn }) ?? [])
+        .map((node) => ({ node: node.id, ...layoutSettlement(tree, node, { shellDir: shell.dir, uiLoader: (id) => records.get(id) ?? null }) }))
         .filter((s) => !s.settled).map(({ node, reasons }) => ({ node, reasons }));
       verdicts.push({ record, route: ui.route, unsettled });
     } catch (error) {
@@ -98,9 +101,12 @@ export function shellFoundationNeed({ brief, payload, repo }) {
   for (const verdict of verdicts) for (const item of verdict.unsettled ?? []) reasons.push(`${item.node}: ${item.reasons.join('; ')}`);
   if (verdicts.some((verdict) => verdict.unknown) || !verdicts.length) {
     const uiRecords = loadUiRecords(workRoot);
-    for (const node of nodesOf(shell.record).filter((n) => n.layout?.chrome !== 'passthrough' && n.layout)) {
-      const { settled, reasons: why } = layoutSettlement(shell.record, node, { shellDir: shell.dir, uiLoader: (id) => uiRecords.get(id) ?? null });
-      if (!settled) reasons.push(`${node.id}: ${why.join('; ')}`);
+    for (const name of appNamesOf(shell.record)) {
+      const tree = treeOf(shell.record, name);
+      for (const node of nodesOf(tree).filter((n) => n.layout?.chrome !== 'passthrough' && n.layout)) {
+        const { settled, reasons: why } = layoutSettlement(tree, node, { shellDir: shell.dir, uiLoader: (id) => uiRecords.get(id) ?? null });
+        if (!settled) reasons.push(`${appNamesOf(shell.record).length > 1 ? `${name} ` : ''}${node.id}: ${why.join('; ')}`);
+      }
     }
   }
   return { read: read.id, needed: reasons.length > 0, reasons };

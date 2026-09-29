@@ -4,6 +4,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { composeImages, fitInto, panelRect, pixelSha256, recompose } from '../scripts/work/compose-direction.mjs';
 import { blankImage, decodePng, encodePng, resizeImage } from '../scripts/work/png.mjs';
+import { nodesOf } from '../scripts/work/layout-tree.mjs';
 import { drawUi, settledProduct, uiSkeleton } from './fixtures/layout-tree.mjs';
 
 // The drawing never redraws chrome: draw-render token-renders only the slot content (or an overlay panel), and the
@@ -39,7 +40,7 @@ test('a page is composited into the captured layout slot: chrome untouched, slot
   assert.equal(desktop.role, 'direction');
   assert.equal(desktop.generation.mode, 'composite');
   assert.equal(desktop.generation.tool, 'draw-render', 'the compositor records draw-render unless --tool names another');
-  assert.deepEqual(desktop.composite.layout, { node: '/[locale]/(console)', capture: 'shell/assets/layouts/locale-console--desktop--light.png', sha256: p.tree.nodes.find((n) => n.id === '/[locale]/(console)').layout.captures.find((c) => c.breakpoint === 'desktop').sha256 });
+  assert.deepEqual(desktop.composite.layout, { node: '/[locale]/(console)', capture: 'shell/assets/layouts/app--locale-console--desktop--light.png', sha256: nodesOf(p.tree).find((n) => n.id === '/[locale]/(console)').layout.captures.find((c) => c.breakpoint === 'desktop').sha256 });
   assert.deepEqual(desktop.composite.rect, { x: 10, y: 5, width: 28, height: 22 });
   const image = decodePng(fs.readFileSync(path.join(dir, desktop.path)));
   assert.deepEqual(px(image, 0, 0), CHROME, 'the real chrome stays exactly as captured');
