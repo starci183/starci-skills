@@ -168,3 +168,19 @@ export type AttemptDetailV2 = Omit<AttemptDetail, 'where'> & { where: AttemptWhe
 export type WorkflowRowV2 = WorkflowRow & { pipeline: MiniPipeline };
 export type WorkflowDetailV2 = WorkflowDetail & { pipeline: MiniPipeline; where: WorkflowWhere; usage: Usage };
 export type FleetViewV2 = Omit<FleetView, 'workflows'> & { workflows: WorkflowRowV2[]; summary: FleetSummary };
+
+/* ---- v3 (2026-09-29): op identity, agents, host machine. ---- */
+/** From modules/ops/ops/<op>.yaml + the contract op labels (slice A fills it into LegRow.info). */
+export type OpInfo = { op: string; nameVi: string | null; nameEn: string | null; goal: { en: string | null; vi: string | null };
+  reads: { id: string; purpose: string | null }[]; writes: string[]; sideEffects: string[]; manifest: string | null };
+export type LegRowV3 = LegRow & { info: OpInfo | null };
+export type AgentFamily = 'claude' | 'codex' | 'devin' | 'qwen' | 'gemini' | 'unknown';
+export type AgentRef = { family: AgentFamily; pool: string | null; model: string | null; label: string };
+/** /api/host (slice C). Temperatures are null when the OS refuses the sensor read. */
+export type HostView = { at: number; name: string | null; os: string; uptimeSec: number;
+  cpu: { model: string; cores: number; threads: number; loadPct: number | null; tempC: number | null };
+  ram: { totalMb: number; freeMb: number; usedPct: number };
+  gpus: { name: string; tempC: number | null; utilPct: number | null; memUsedMb: number | null; memTotalMb: number | null; powerW: number | null }[];
+  disks: { mount: string; totalGb: number; freeGb: number }[];
+  agentsRamMb: Record<string, number>; running: number | null; throttleMode: string | null;
+  history: { at: number; cpuPct: number | null; freeRamPct: number | null; gpuTempC?: number | null }[] };
