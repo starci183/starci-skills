@@ -81,6 +81,8 @@ if (!Object.hasOwn(LAUNCHERS, launchedBy)) {
 
 const ROUTE_MODEL = path.join(skillRoot, 'scripts', 'route', 'route-model.mjs');
 const KERNEL_ROUTE = { kind: 'model.manageWorkflow', risk: 'high' }; // selection.yaml kernelFunctionKinds
+// The pool difficulty a Kernel seat launches at: kernel functions are think work at the hard floor (runtimes.yaml roleOfKind note); runtimes.yaml pools are keyed by difficulty, not by risk.
+const KERNEL_DIFFICULTY = 'hard';
 // The launch steps that fail before the model took any input — the only ones a
 // group boot falls through on. An unreadable contract falls through on none.
 const FALL_THROUGH_STEPS = (() => {
@@ -172,7 +174,7 @@ async function completeKernelRoute(route) {
   const runtimePool = route.route?.target ?? poolTargetForAgent(route.agent);
   if ((!model || !effort) && runtimePool) {
     try {
-      const resolved = resolveLaunchModel(runtimePool, KERNEL_ROUTE.risk);
+      const resolved = resolveLaunchModel(runtimePool, KERNEL_DIFFICULTY);
       model = model ?? resolved?.modelId ?? null;
       effort = effort ?? resolved?.effort ?? null;
     } catch { /* converted to a typed route error below */ }
