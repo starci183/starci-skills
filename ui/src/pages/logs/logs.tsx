@@ -5,6 +5,7 @@ import { Button } from '../../components/ui/button';
 import { ConceptBlock, type Concept } from '../../components/concept';
 import { Drawer } from '../../components/drawer';
 import { Input } from '../../components/ui/input';
+import { Advanced } from '../../components/motion';
 import { LogView } from '../../components/log-view';
 import { kindFamilies } from '../../components/logs/kinds';
 import { useApiQuery, refreshQuery } from '../../api/query';
@@ -47,15 +48,22 @@ function FilterBar({ filters, onChange, contract, onMore, activeCount, workflows
   const level = filters.get('minLevel') === 'warn' ? 'warn+' : filters.get('level') ?? 'all';
   const customRange = filters.has('since') || filters.has('until');
   const chip = (active: boolean) => ({ className: chipClass, 'data-active': active });
-  return <div className="flex flex-wrap items-center gap-2" role="group" aria-label="Bộ lọc nhật ký">
-    <select aria-label="Workflow" {...chip(filters.has('wf'))} value={filters.get('wf') ?? ''} onChange={(event) => { const found = workflows.find((item) => item.id === event.target.value); onChange('wf', event.target.value); if (found) onChange('project', found.project); }}><option value="">Workflow: tất cả</option>{filters.get('wf') && !workflows.some((item) => item.id === filters.get('wf')) && <option value={filters.get('wf') ?? ''}>{filters.get('wf')}</option>}{workflows.map((item) => <option key={`${item.project}:${item.id}`} value={item.id}>{item.name}</option>)}</select>
-    <select aria-label="Actor" {...chip(filters.has('actor'))} value={filters.get('actor') ?? ''} onChange={(event) => onChange('actor', event.target.value)}><option value="">Actor: tất cả</option>{contract?.vocab.logActors.map((actor) => <option key={actor} value={actor}>Actor: {actor}</option>)}</select>
-    <select aria-label="Mức tối thiểu" {...chip(level !== 'all')} value={level} onChange={(event) => onChange('levelChoice', event.target.value)}><option value="all">Mọi mức</option><option value="warn+">Mức ≥ cảnh báo</option><option value="error">Chỉ lỗi</option><option value="warn">Chỉ cảnh báo</option><option value="info">Chỉ info</option><option value="debug">Chỉ debug</option></select>
-    <select aria-label="Loại" {...chip(filters.has('kind'))} value={filters.get('kind') ?? ''} onChange={(event) => onChange('kind', event.target.value)}>{kindFamilies.map((item) => <option key={item.value} value={item.value}>{item.value ? `Loại: ${item.label}` : 'Loại: tất cả'}</option>)}{filters.get('kind') && !kindFamilies.some((item) => item.value === filters.get('kind')) && <option value={filters.get('kind') ?? ''}>Loại: {filters.get('kind')}</option>}</select>
-    <select aria-label="Khoảng thời gian" {...chip(customRange)} value={customRange ? 'custom' : ''} onChange={(event) => { const value = event.target.value; if (value === 'custom') return; onChange('until', ''); onChange('since', value ? String(Date.now() - Number(value)) : ''); }}><option value="">Mọi thời gian</option>{ranges.map(([value, label]) => <option key={value} value={value}>{label}</option>)}{customRange && <option value="custom">Khoảng tùy chọn</option>}</select>
-    <div className="relative min-w-[12rem] flex-1 sm:max-w-xs"><Input type="search" className="h-8 rounded-full text-xs" aria-label="Tìm trong nhật ký" value={filters.get('q') ?? ''} onChange={(event) => onChange('q', event.target.value)} placeholder="Tìm trong nhật ký" /></div>
-    <Button variant="ghost" size="sm" className="h-8 text-xs" onClick={onMore}><SlidersHorizontal size={14} /> Thêm bộ lọc</Button>
+  const advancedActive = filters.has('wf') || filters.has('actor') || filters.has('kind') || customRange || filters.has('since') || filters.has('until');
+  return <div className="flex flex-col gap-3" role="group" aria-label="Bộ lọc nhật ký">
+    <div className="flex flex-wrap items-center gap-2">
+        <div className="relative min-w-[12rem] flex-1 sm:max-w-sm"><Input type="search" className="h-8 rounded-full text-xs" aria-label="Tìm trong nhật ký" value={filters.get('q') ?? ''} onChange={(event) => onChange('q', event.target.value)} placeholder="Tìm trong nhật ký" /></div>
+        <select aria-label="Mức tối thiểu" {...chip(level !== 'all')} value={level} onChange={(event) => onChange('levelChoice', event.target.value)}><option value="all">Mọi mức</option><option value="warn+">Mức ≥ cảnh báo</option><option value="error">Chỉ lỗi</option><option value="warn">Chỉ cảnh báo</option><option value="info">Chỉ info</option><option value="debug">Chỉ debug</option></select>
     {activeCount > 0 && <Button variant="ghost" size="sm" className="h-8 text-xs" onClick={() => onChange('clear', '')}><X size={14} /> Xóa lọc ({activeCount})</Button>}
+    </div>
+    <Advanced title="Bộ lọc nâng cao" summary="Workflow, actor, loại, khoảng thời gian và các bộ lọc khác" defaultOpen={advancedActive}>
+      <div className="flex flex-wrap items-center gap-2">
+        <select aria-label="Workflow" {...chip(filters.has('wf'))} value={filters.get('wf') ?? ''} onChange={(event) => { const found = workflows.find((item) => item.id === event.target.value); onChange('wf', event.target.value); if (found) onChange('project', found.project); }}><option value="">Workflow: tất cả</option>{filters.get('wf') && !workflows.some((item) => item.id === filters.get('wf')) && <option value={filters.get('wf') ?? ''}>{filters.get('wf')}</option>}{workflows.map((item) => <option key={`${item.project}:${item.id}`} value={item.id}>{item.name}</option>)}</select>
+        <select aria-label="Actor" {...chip(filters.has('actor'))} value={filters.get('actor') ?? ''} onChange={(event) => onChange('actor', event.target.value)}><option value="">Actor: tất cả</option>{contract?.vocab.logActors.map((actor) => <option key={actor} value={actor}>Actor: {actor}</option>)}</select>
+        <select aria-label="Loại" {...chip(filters.has('kind'))} value={filters.get('kind') ?? ''} onChange={(event) => onChange('kind', event.target.value)}>{kindFamilies.map((item) => <option key={item.value} value={item.value}>{item.value ? `Loại: ${item.label}` : 'Loại: tất cả'}</option>)}{filters.get('kind') && !kindFamilies.some((item) => item.value === filters.get('kind')) && <option value={filters.get('kind') ?? ''}>Loại: {filters.get('kind')}</option>}</select>
+        <select aria-label="Khoảng thời gian" {...chip(customRange)} value={customRange ? 'custom' : ''} onChange={(event) => { const value = event.target.value; if (value === 'custom') return; onChange('until', ''); onChange('since', value ? String(Date.now() - Number(value)) : ''); }}><option value="">Mọi thời gian</option>{ranges.map(([value, label]) => <option key={value} value={value}>{label}</option>)}{customRange && <option value="custom">Khoảng tùy chọn</option>}</select>
+    <Button variant="ghost" size="sm" className="h-8 text-xs" onClick={onMore}><SlidersHorizontal size={14} /> Thêm bộ lọc</Button>
+      </div>
+    </Advanced>
   </div>;
 }
 
@@ -164,11 +172,11 @@ export default function LogsPage() {
   const activeCount = filterFields.filter((field) => filters.has(field)).length;
   const sources = [...new Set(rows.map((row) => row.db))];
   const canLoadMore = (nextCursor === undefined ? logs.meta?.next : nextCursor) != null;
-  return <ConceptBlock concept="C17" className="space-y-4">
+  return <ConceptBlock concept="C17" className="flex flex-col gap-6 md:gap-8">
     <div className="flex flex-wrap items-start justify-between gap-3"><div><p className="text-xs text-muted-foreground">StarCi / Quan sát</p><h1 className="mt-1 text-2xl font-semibold tracking-tight">Nhật ký</h1><p className="mt-1 text-sm text-muted-foreground">Dòng sự kiện từ máy và ledger dự án; bộ lọc lưu trong đường dẫn.</p></div>
       <div className="flex gap-2"><Button variant="outline" size="sm" className="md:hidden" onClick={() => setFilterOpen(true)}><Filter size={15} /> Bộ lọc{activeCount ? ` (${activeCount})` : ''}</Button><Button variant={follow ? 'default' : 'outline'} size="sm" aria-pressed={follow} disabled={filters.has('q')} title={filters.has('q') ? 'Theo dõi không hỗ trợ tìm toàn văn; xóa từ khóa để bật.' : undefined} onClick={() => setFollow((value) => !value)}><Radio size={15} className={follow && streamStatus === 'live' ? 'animate-pulse' : ''} /> {follow ? streamStatus === 'live' ? 'Đang theo dõi trực tiếp' : 'Đang nối lại' : 'Theo dõi trực tiếp'}</Button></div></div>
     <div className="hidden md:block"><FilterBar filters={filters} onChange={change} contract={contract.data} workflows={workflowList.data ?? []} activeCount={activeCount} onMore={() => setFilterOpen(true)} /></div>
-    <div className="min-w-0 space-y-3">
+    <div className="flex min-w-0 flex-col gap-3">
       <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-muted-foreground"><div className="flex flex-wrap items-center gap-2"><Badge variant="outline">{rows.length} dòng đã tải</Badge><span>{sources.length ? sources.map((source) => source === 'machine' ? 'máy' : source).join(' · ') : 'Chưa có nguồn'}</span></div><div className="flex items-center gap-2"><span>{logs.meta ? `Nguồn ${formatAbsolute(logs.meta.at)}` : 'Chưa có thời điểm nguồn'}</span><Button variant="ghost" size="icon" aria-label="Làm mới" onClick={() => refreshQuery(apiUrl)}><RefreshCw size={15} /></Button></div></div>
       {pending.length > 0 && <div className="pointer-events-none sticky top-16 z-20 flex justify-center"><Button size="sm" className="pointer-events-auto rounded-full shadow-md" onClick={showPending}><ArrowUp size={14} /> {pending.length} dòng mới</Button></div>}
       {logs.error && <p className="shell-error" role="status">{logs.data ? 'Nguồn đang lỗi; giữ dòng đã đọc gần nhất. ' : 'Không đọc được nhật ký. '}{logs.error}</p>}
@@ -177,6 +185,6 @@ export default function LogsPage() {
       {moreError && <p className="shell-error" role="status">{moreError}</p>}
       {canLoadMore && <Button variant="outline" className="w-full" disabled={moreBusy} onClick={loadMore}>{moreBusy ? 'Đang tải…' : 'Tải thêm'}</Button>}
     </div>
-    <Drawer open={filterOpen} onOpenChange={setFilterOpen} title="Bộ lọc nhật ký" description="Các lựa chọn được lưu trong đường dẫn."><FilterFields filters={filters} onChange={change} contract={contract.data} /><div className="mt-5 grid grid-cols-2 gap-2"><Button variant="outline" onClick={() => change('clear', '')}>Xóa lọc</Button><Button onClick={() => setFilterOpen(false)}>Xem kết quả</Button></div></Drawer>
+    <Drawer open={filterOpen} onOpenChange={setFilterOpen} title="Bộ lọc nhật ký" description="Các lựa chọn được lưu trong đường dẫn."><FilterFields filters={filters} onChange={change} contract={contract.data} /><div className="mt-6 grid grid-cols-2 gap-2"><Button variant="outline" onClick={() => change('clear', '')}>Xóa lọc</Button><Button onClick={() => setFilterOpen(false)}>Xem kết quả</Button></div></Drawer>
   </ConceptBlock>;
 }

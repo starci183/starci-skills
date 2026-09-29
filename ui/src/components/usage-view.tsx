@@ -41,15 +41,15 @@ export function TokenBar({ input, output, cache }: { input: number; output: numb
     <div className="flex h-3 w-full gap-px overflow-hidden rounded-full bg-muted" role="img" aria-label={parts.map(p => `${p.label} ${compactVi(p.value)}`).join(', ')}>
       {parts.filter(p => p.value > 0).map(p => <span key={p.key} data-tone={p.tone} title={`${p.label}: ${vi(p.value, 0)}`} className="h-full bg-[var(--tone)]" style={{ width: `${(p.value / total) * 100}%`, minWidth: 3 }} />)}
     </div>
-    <ul className="m-0 mt-1.5 flex list-none flex-wrap gap-x-4 gap-y-0.5 p-0 text-[11px] text-muted-foreground">
-      {parts.map(p => <li key={p.key} data-tone={p.tone} className="inline-flex items-center gap-1.5"><span className="status-dot" />{p.label} <strong className="font-mono text-foreground">{compactVi(p.value)}</strong> <span className="tabular-nums">({vi((p.value / total) * 100, 0)}%)</span></li>)}
+    <ul className="m-0 mt-2 flex list-none flex-wrap gap-x-4 gap-y-1 p-0 text-[11px] text-muted-foreground">
+      {parts.map(p => <li key={p.key} data-tone={p.tone} className="inline-flex items-center gap-2"><span className="status-dot" />{p.label} <strong className="font-mono text-foreground">{compactVi(p.value)}</strong> <span className="tabular-nums">({vi((p.value / total) * 100, 0)}%)</span></li>)}
     </ul>
   </div>;
 }
 
 function Sources({ sources }: { sources?: string[] }) {
   if (!sources?.length) return null;
-  return <span className="inline-flex flex-wrap items-center gap-1.5 text-[11px] text-muted-foreground">Nguồn số liệu: {sources.map(s => <InfoChip key={s} tone={s === 'provider-report' ? 'success' : 'running'}>{sourceLabel(s)}</InfoChip>)}</span>;
+  return <span className="inline-flex flex-wrap items-center gap-2 text-[11px] text-muted-foreground">Nguồn số liệu: {sources.map(s => <InfoChip key={s} tone={s === 'provider-report' ? 'success' : 'running'}>{sourceLabel(s)}</InfoChip>)}</span>;
 }
 
 const th = 'border-b border-border px-2 py-1 font-medium';
@@ -59,7 +59,7 @@ const cacheOf = (row: UsageRow) => (row.cacheRead ?? 0) + (row.cacheWrite ?? 0);
 
 function UsageTable({ title, first, rows, label }: { title: string; first: string; rows: (UsageRow & { extra?: string })[]; label: (row: never, index: number) => ReactNode }) {
   return <div className="overflow-x-auto">
-    <p className="m-0 mb-1 text-[11px] font-medium text-muted-foreground">{title}</p>
+    <p className="m-0 mb-2 text-[11px] font-medium text-muted-foreground">{title}</p>
     <table className="w-full min-w-[520px] border-collapse text-xs">
       <thead><tr className="text-left text-muted-foreground">{[first, 'Vào', 'Ra', 'Cache', 'Suy luận', 'Chi phí', 'Lượt', 'Công cụ'].map(h => <th key={h} className={th}>{h}</th>)}</tr></thead>
       <tbody>{rows.map((row, index) => <tr key={index} className="border-b border-border last:border-b-0">
@@ -78,7 +78,7 @@ export function UsageView({ usage: raw, compact = false }: { usage: Usage; compa
   if (!usage.recorded || !total) {
     return compact
       ? <span className="inline-flex flex-wrap items-center gap-2 text-xs"><InfoChip tone="warning">chưa ghi nhận</InfoChip><span className="text-muted-foreground">{NOT_RECORDED}</span></span>
-      : <div className="flex flex-col gap-1.5 text-[13px]"><span><InfoChip tone="warning">chưa ghi nhận</InfoChip></span><p className="m-0 text-muted-foreground">{NOT_RECORDED}</p></div>;
+      : <div className="flex flex-col gap-2 text-[13px]"><span><InfoChip tone="warning">chưa ghi nhận</InfoChip></span><p className="m-0 text-muted-foreground">{NOT_RECORDED}</p></div>;
   }
   const toolErrors = total.toolErrors ?? usage.byModel.reduce((sum, row) => sum + (row.toolErrors ?? 0), 0);
   if (compact) {
@@ -95,7 +95,7 @@ export function UsageView({ usage: raw, compact = false }: { usage: Usage; compa
   return <div className="flex flex-col gap-3">
     <TokenBar input={total.input} output={total.output} cache={total.cacheRead + total.cacheWrite} />
     <dl className="m-0 grid grid-cols-2 gap-2 sm:grid-cols-4">
-      {cells.map(([label, value, exact]) => <div key={label} className="min-w-0 rounded-md border border-border bg-muted/40 px-2.5 py-1.5">
+      {cells.map(([label, value, exact]) => <div key={label} className="min-w-0 rounded-md border border-border bg-muted/40 px-3 py-2">
         <dt className="text-[11px] text-muted-foreground">{label}</dt><dd className="m-0 truncate font-mono text-sm font-semibold" title={exact}>{value}</dd>
       </div>)}
     </dl>

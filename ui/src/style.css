@@ -346,3 +346,6 @@ button.lifecycle-label:hover, button.lifecycle-label[aria-pressed=true] { backgr
 .step-stripe { position: absolute; right: -1px; bottom: -1px; left: -1px; height: 3px; border-radius: 0 0 8px 8px; background: var(--state-ink, var(--border)); pointer-events: none; }
 .step-item[data-state=unknown]:not([data-tone]) .step-stripe, .step-item[data-tone=skipped] .step-stripe { background: repeating-linear-gradient(90deg, var(--state-ink, var(--border)) 0 6px, transparent 6px 10px); }
 .step-segments { gap: 4px; margin-top: 4px; }
+
+/* U4: 8px rhythm for mobile table cards */
+.mobile-row-fields { gap: 8px; }

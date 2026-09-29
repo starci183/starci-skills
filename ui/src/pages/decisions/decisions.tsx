@@ -1,6 +1,7 @@
 import { ArrowRight, CircleAlert, MessageCircleQuestion, ShieldAlert } from 'lucide-react';
 import { useApiQuery } from '../../api/query';
 import { ConceptBlock, type Concept } from '../../components/concept';
+import { Advanced, Stagger, StaggerItem } from '../../components/motion';
 import { StateChip } from '../../components/state-chip';
 import { TimeAgo } from '../../components/time-ago';
 import type { DecisionRow, Ref, UiState } from '../../contract';
@@ -43,36 +44,40 @@ function SelectFilter({ label, value, options, onChange }: { label: string; valu
 
 function DecisionCard({ row }: { row: DecisionRow }) {
   const credential = row.kind === 'credential-missing';
-  return <a href={href({ id: row.id })} className="group flex min-w-0 flex-col gap-3 rounded-xl border bg-card p-4 transition-colors hover:border-primary/40 hover:bg-muted/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring sm:flex-row sm:items-center">
-    <StateChip state={row.ui} compact />
-    <span className="min-w-0 flex-1 space-y-1"><span className="flex flex-wrap items-center gap-2"><strong className="break-all text-sm">{row.kind}</strong>{row.overdue && <span className="rounded-full bg-destructive/10 px-2 py-0.5 text-xs font-semibold text-destructive">Quá hạn</span>}</span>
-      <span className="block break-words text-sm text-muted-foreground">{credential ? 'Yêu cầu xác thực · nội dung được ẩn.' : row.summary}</span>
-      <span className="block break-words text-xs text-muted-foreground">{row.project ?? 'Máy'}{row.wf ? ` · ${row.wf}` : ''} · {escalation(row)}</span>
-    </span>
-    <span className="flex shrink-0 flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground sm:flex-col sm:items-end"><span>Mở <TimeAgo at={row.openedAt} /></span>
-      <span className={row.overdue ? 'font-semibold text-destructive' : ''}>Hạn {formatAbsolute(row.dueAt)}</span>
-      <span>Kênh: {channelLabel(row.channel)}</span>
-      {row.escalations > 0 && <span>Leo thang {row.escalations} lần</span>}
-    </span><ArrowRight className="hidden size-4 shrink-0 text-muted-foreground group-hover:text-primary sm:block" aria-hidden="true" />
-  </a>;
+  return <div className="flex min-w-0 flex-col gap-3 rounded-xl border bg-card p-4 transition-colors hover:border-primary/40 min-[760px]:p-6">
+    <a href={href({ id: row.id })} className="group flex min-w-0 flex-col gap-3 rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring sm:flex-row sm:items-center sm:gap-4">
+      <StateChip state={row.ui} compact />
+      <span className="flex min-w-0 flex-1 flex-col gap-1"><span className="flex flex-wrap items-center gap-2"><strong className="break-all text-sm">{row.kind}</strong>{row.overdue && <span className="rounded-full bg-destructive/10 px-2 py-1 text-xs font-semibold text-destructive">Quá hạn</span>}</span>
+        <span className="block break-words text-sm text-muted-foreground">{credential ? 'Yêu cầu xác thực · nội dung được ẩn.' : row.summary}</span>
+        <span className="block break-words text-xs text-muted-foreground">Người quyết: {escalation(row)}</span>
+      </span>
+      <span className={`shrink-0 text-xs text-muted-foreground sm:text-right ${row.overdue ? 'font-semibold text-destructive' : ''}`}>Hạn {formatAbsolute(row.dueAt)}</span>
+      <ArrowRight className="hidden size-4 shrink-0 text-muted-foreground transition-transform group-hover:translate-x-1 group-hover:text-primary sm:block" aria-hidden="true" />
+    </a>
+    <Advanced summary="Dự án, workflow, kênh và thời điểm mở">
+      <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground"><span>{row.project ?? 'Máy'}{row.wf ? ` · ${row.wf}` : ''}</span><span>Mở <TimeAgo at={row.openedAt} /></span><span>Kênh: {channelLabel(row.channel)}</span>{row.escalations > 0 && <span>Leo thang {row.escalations} lần</span>}</div>
+    </Advanced>
+  </div>;
 }
 
 function AskCard({ row }: { row: AskRow }) {
-  return <ConceptBlock concept="C12" as="article" className="rounded-xl border bg-card p-4">
+  return <ConceptBlock concept="C12" as="article" className="flex flex-col gap-3 rounded-xl border bg-card p-4 min-[760px]:p-6">
     <div className="flex flex-wrap items-center justify-between gap-2"><div className="flex items-center gap-2"><MessageCircleQuestion className="size-4 text-primary" aria-hidden="true" /><strong className="text-sm">{row.credential ? 'credential' : 'Hỏi thầy'}</strong></div>
-      <span className="rounded-full border px-2 py-0.5 text-xs">{statusLabel(row.state)}</span></div>
-    <p className="mt-2 break-words text-sm">{row.credential ? 'Có mục xác thực cần xử lý qua kênh riêng. Nội dung được ẩn.' : row.question ?? 'Không có nội dung được phép hiển thị.'}</p>
-    <div className="mt-3 flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground"><span>{row.project ?? 'Máy'}{row.wf ? ` · ${row.wf}` : ''}</span><span>Kênh: {channelLabel(row.channel)}</span><span><TimeAgo at={row.askedAt} /></span></div>
-    {row.di && <a href={row.di.href} className="mt-3 inline-flex items-center gap-1 text-sm text-primary underline-offset-4 hover:underline">Xem quyết định liên quan<ArrowRight className="size-3.5" aria-hidden="true" /></a>}
+      <span className="rounded-full border px-2 py-1 text-xs">{statusLabel(row.state)}</span></div>
+    <p className="break-words text-sm">{row.credential ? 'Có mục xác thực cần xử lý qua kênh riêng. Nội dung được ẩn.' : row.question ?? 'Không có nội dung được phép hiển thị.'}</p>
+    {row.di && <a href={row.di.href} className="inline-flex items-center gap-1 text-sm text-primary underline-offset-4 hover:underline">Xem quyết định liên quan<ArrowRight className="size-3.5" aria-hidden="true" /></a>}
+    <Advanced summary="Dự án, kênh và thời điểm hỏi"><div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground"><span>{row.project ?? 'Máy'}{row.wf ? ` · ${row.wf}` : ''}</span><span>Kênh: {channelLabel(row.channel)}</span><span><TimeAgo at={row.askedAt} /></span></div></Advanced>
   </ConceptBlock>;
 }
 
 function IncidentCard({ row }: { row: IncidentRow }) {
-  return <ConceptBlock concept="C12" as="article" className="flex min-w-0 flex-col gap-3 rounded-xl border bg-card p-4 sm:flex-row sm:items-center">
-    <StateChip state={row.ui} compact /><div className="min-w-0 flex-1"><div className="flex flex-wrap items-center gap-2"><strong className="break-all text-sm">{row.kind}</strong><span className="text-xs text-muted-foreground">{statusLabel(row.status)}</span></div>
-      <p className="mt-1 break-words text-xs text-muted-foreground">{row.project} · {row.wf}{row.op ? ` · ${row.op}` : ''}</p>
-      {row.lastProgress && <p className="mt-2 break-words text-sm text-muted-foreground">{row.lastProgress}</p>}
-    </div><div className="shrink-0 text-xs text-muted-foreground sm:text-right"><p>Phụ trách: {deciderLabel(row.owner)}</p><p>Hạn: {formatAbsolute(row.dueAt)}</p><p>Cập nhật <TimeAgo at={row.updatedAt} /></p></div>
+  return <ConceptBlock concept="C12" as="article" className="flex min-w-0 flex-col gap-3 rounded-xl border bg-card p-4 min-[760px]:p-6">
+    <div className="flex min-w-0 flex-col gap-3 sm:flex-row sm:items-center sm:gap-4">
+      <StateChip state={row.ui} compact /><div className="flex min-w-0 flex-1 flex-col gap-1"><div className="flex flex-wrap items-center gap-2"><strong className="break-all text-sm">{row.kind}</strong><span className="text-xs text-muted-foreground">{statusLabel(row.status)}</span></div>
+        {row.lastProgress && <p className="break-words text-sm text-muted-foreground">{row.lastProgress}</p>}
+      </div><div className="shrink-0 text-xs text-muted-foreground sm:text-right"><p>Phụ trách: {deciderLabel(row.owner)}</p><p>Hạn: {formatAbsolute(row.dueAt)}</p></div>
+    </div>
+    <Advanced summary="Dự án, workflow, op và thời điểm cập nhật"><p className="break-words text-xs text-muted-foreground">{row.project} · {row.wf}{row.op ? ` · ${row.op}` : ''} · Cập nhật <TimeAgo at={row.updatedAt} /></p></Advanced>
   </ConceptBlock>;
 }
 
@@ -99,30 +104,30 @@ export function DecisionsPage() {
     { key: 'asks', label: 'Hỏi thầy', count: asks.data?.length ?? null, icon: MessageCircleQuestion },
     { key: 'incidents', label: 'Sự cố', count: incidents.data?.length ?? null, icon: ShieldAlert },
   ] as const;
-  return <ConceptBlock concept="C12" className="mx-auto flex w-full max-w-6xl min-w-0 flex-col gap-5 p-4 pb-24 sm:p-6 lg:p-8">
-    <header className="space-y-2"><p className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">StarCi / quyết định</p><h1 className="text-2xl font-semibold tracking-tight sm:text-3xl">Quyết định</h1>
+  return <ConceptBlock concept="C12" className="mx-auto flex w-full max-w-6xl min-w-0 flex-col gap-6 p-4 pb-24 sm:p-6 md:gap-8 lg:p-8">
+    <header className="flex flex-col gap-2"><p className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">StarCi / quyết định</p><h1 className="text-2xl font-semibold tracking-tight sm:text-3xl">Quyết định</h1>
       <p className="text-sm text-muted-foreground">Theo dõi việc đang chờ quyết, câu hỏi gửi thầy và sự cố. Trang này chỉ đọc.</p></header>
     <nav aria-label="Mục quyết định" className="flex min-w-0 gap-1 overflow-x-auto border-b">
       {tabs.map(item => <a key={item.key} href={href({ tab: item.key, id: null, status: null, kind: null, overdue: null })} aria-current={tab === item.key ? 'page' : undefined}
-        className={`inline-flex shrink-0 items-center gap-2 border-b-2 px-3 py-3 text-sm font-medium ${tab === item.key ? 'border-primary text-foreground' : 'border-transparent text-muted-foreground hover:text-foreground'}`}>
-        <item.icon className="size-4" aria-hidden="true" />{item.label}<span className="rounded-full bg-muted px-1.5 py-0.5 text-xs">{item.count ?? '—'}</span>
+        className={`inline-flex shrink-0 items-center gap-2 border-b-2 px-4 py-3 text-sm font-medium ${tab === item.key ? 'border-primary text-foreground' : 'border-transparent text-muted-foreground hover:text-foreground'}`}>
+        <item.icon className="size-4" aria-hidden="true" />{item.label}<span className="rounded-full bg-muted px-2 py-1 text-xs">{item.count ?? '—'}</span>
       </a>)}
     </nav>
-    {tab === 'di' && <div className="grid gap-3 rounded-xl border bg-card p-4 sm:grid-cols-2 lg:grid-cols-4">
+    {tab === 'di' && <div className="grid gap-4 rounded-xl border bg-card p-4 min-[760px]:p-6 sm:grid-cols-2 lg:grid-cols-4">
       <SelectFilter label="Người quyết" value={decider} options={[{ value: '', label: 'Tất cả' }, { value: 'kernel', label: 'Kernel' }, { value: 'supervisor', label: 'Supervisor' }, { value: 'owner', label: 'Thầy' }]} onChange={value => navigate({ decider: value, id: null })} />
       <SelectFilter label="Trạng thái" value={status} options={[{ value: '', label: 'Đang mở' }, { value: 'all', label: 'Tất cả' }, ...['open', 'claimed', 'escalated', 'resolved', 'expired', 'superseded'].map(value => ({ value, label: statusLabel(value) }))]} onChange={value => navigate({ status: value, id: null })} />
       <SelectFilter label="Loại" value={kind} options={[{ value: '', label: 'Tất cả' }, ...kinds.map(value => ({ value, label: value }))]} onChange={value => navigate({ kind: value, id: null })} />
       <label className="flex items-end gap-2 pb-2 text-sm"><input type="checkbox" checked={overdue} onChange={event => navigate({ overdue: event.target.checked ? '1' : null, id: null })} className="size-4 accent-primary" /><span>Chỉ quá hạn</span></label>
     </div>}
     {tab === 'incidents' && <div className="max-w-xs"><SelectFilter label="Trạng thái sự cố" value={status} options={[{ value: '', label: 'Đang mở' }, { value: 'all', label: 'Tất cả' }, { value: 'open', label: 'Đang mở' }, { value: 'resolved', label: 'Đã giải' }, { value: 'superseded', label: 'Đã thay thế' }]} onChange={value => navigate({ status: value })} /></div>}
-    {tab === 'di' && <div className="grid gap-3" aria-live="polite">{decisions.error && <p role="alert" className="rounded-lg border border-destructive/30 p-3 text-sm text-destructive">{decisions.error}</p>}
-      {decisions.data?.map(row => <DecisionCard key={`${row.project ?? 'machine'}:${row.id}`} row={row} />)}
+    {tab === 'di' && <div className="grid gap-4" aria-live="polite">{decisions.error && <p role="alert" className="rounded-lg border border-destructive/30 p-3 text-sm text-destructive">{decisions.error}</p>}
+      <Stagger className="grid gap-4">{decisions.data?.map(row => <StaggerItem key={`${row.project ?? 'machine'}:${row.id}`}><DecisionCard row={row} /></StaggerItem>)}</Stagger>
       {!decisions.data?.length && <p className="rounded-xl border p-5 text-sm text-muted-foreground">{decisions.loading ? 'Đang đọc quyết định…' : 'Không có quyết định phù hợp.'}</p>}</div>}
-    {tab === 'asks' && <div className="grid gap-3" aria-live="polite">{asks.error && <p role="alert" className="rounded-lg border border-destructive/30 p-3 text-sm text-destructive">{asks.error}</p>}
-      {asks.data?.map(row => <AskCard key={row.id} row={row} />)}
+    {tab === 'asks' && <div className="grid gap-4" aria-live="polite">{asks.error && <p role="alert" className="rounded-lg border border-destructive/30 p-3 text-sm text-destructive">{asks.error}</p>}
+      <Stagger className="grid gap-4">{asks.data?.map(row => <StaggerItem key={row.id}><AskCard row={row} /></StaggerItem>)}</Stagger>
       {!asks.data?.length && <p className="rounded-xl border p-5 text-sm text-muted-foreground">{asks.loading ? 'Đang đọc câu hỏi…' : 'Không có câu hỏi đang mở.'}</p>}</div>}
-    {tab === 'incidents' && <div className="grid gap-3" aria-live="polite">{incidents.error && <p role="alert" className="rounded-lg border border-destructive/30 p-3 text-sm text-destructive">{incidents.error}</p>}
-      {incidents.data?.map(row => <IncidentCard key={`${row.project}:${row.id}`} row={row} />)}
+    {tab === 'incidents' && <div className="grid gap-4" aria-live="polite">{incidents.error && <p role="alert" className="rounded-lg border border-destructive/30 p-3 text-sm text-destructive">{incidents.error}</p>}
+      <Stagger className="grid gap-4">{incidents.data?.map(row => <StaggerItem key={`${row.project}:${row.id}`}><IncidentCard row={row} /></StaggerItem>)}</Stagger>
       {!incidents.data?.length && <p className="rounded-xl border p-5 text-sm text-muted-foreground">{incidents.loading ? 'Đang đọc sự cố…' : 'Không có sự cố phù hợp.'}</p>}</div>}
     <DecisionDrawer id={selectedId} onClose={() => navigate({ id: null })} />
   </ConceptBlock>;

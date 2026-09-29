@@ -36,11 +36,11 @@ const steps = [
 
 export default function KitPage() {
   const [step, setStep] = useState<AttemptStep>('checks');
-  return <ConceptBlock concept="frame" className="space-y-6">
+  return <ConceptBlock concept="frame" className="flex flex-col gap-6 md:gap-8">
     <div><h1 className="text-2xl font-semibold tracking-tight">Bộ thành phần</h1><p className="mt-1 text-sm text-muted-foreground">Mẫu giao diện kiểm tra hai theme. Các con số dưới đây chỉ là dữ liệu minh họa của bộ thành phần.</p></div>
     <div className="kit-grid">
       {(['dark', 'light'] as const).map((theme) => <div key={theme} className={`kit-preview ${theme}`}>
-        <Card><CardHeader><CardTitle>{theme === 'dark' ? 'Tối' : 'Sáng'}</CardTitle></CardHeader><CardContent className="space-y-5">
+        <Card><CardHeader><CardTitle>{theme === 'dark' ? 'Tối' : 'Sáng'}</CardTitle></CardHeader><CardContent className="flex flex-col gap-4">
           <ConceptBlock concept="frame"><h2 className="mb-2 text-sm font-medium">Bảy trạng thái</h2><div className="flex flex-wrap gap-2">{states.map((state) => <StateChip state={state} key={state} />)}</div></ConceptBlock>
           <ConceptBlock concept="frame"><h2 className="mb-2 text-sm font-medium">Trạng thái ngữ nghĩa</h2>
             <div className="flex flex-wrap gap-2">{allStatuses.map((status) => <StatusChip status={status} key={status} />)}</div>
@@ -48,13 +48,13 @@ export default function KitPage() {
             <div className="mt-3 grid gap-2">{(['success', 'running', 'queued', 'failed', 'warning', 'skipped'] as const).map((tone) => <Progress key={tone} tone={tone} value={tone === 'queued' ? 8 : 64} className="h-2" aria-label={tone} />)}</div>
           </ConceptBlock>
           <ConceptBlock concept="frame"><h2 className="mb-2 text-sm font-medium">Loại tệp và đường dẫn</h2>
-            <div className="mb-3 flex flex-wrap gap-1.5">{fileKinds.map((kind) => <FileTypeBadge kind={kind} key={kind} />)}</div>
+            <div className="mb-3 flex flex-wrap gap-2">{fileKinds.map((kind) => <FileTypeBadge kind={kind} key={kind} />)}</div>
             <div className="grid gap-2"><PathLink path="D:/Repositories/nivo-backend/.starciwork/evidence" kind="dir" /><PathLink path="D:/Repositories/nivo-backend/src/module.ts" kind="file" /></div>
           </ConceptBlock>
           <ConceptBlock concept="C4"><h2 className="mb-2 text-sm font-medium">Phân bố đơn vị</h2><LifecycleBar counts={unitCounts} /></ConceptBlock>
         </CardContent></Card>
       </div>)}
     </div>
-    <ConceptBlock concept="C7"><Card><CardHeader><CardTitle>Vòng đời lần thử</CardTitle></CardHeader><CardContent className="space-y-4"><StepBar steps={toneSteps} selected={step} onSelect={setStep} /><StepBar steps={[...steps]} selected={step} onSelect={setStep} /></CardContent></Card></ConceptBlock>
+    <ConceptBlock concept="C7"><Card><CardHeader><CardTitle>Vòng đời lần thử</CardTitle></CardHeader><CardContent className="flex flex-col gap-4"><StepBar steps={toneSteps} selected={step} onSelect={setStep} /><StepBar steps={[...steps]} selected={step} onSelect={setStep} /></CardContent></Card></ConceptBlock>
   </ConceptBlock>;
 }

@@ -1,5 +1,7 @@
 import type { Concept } from '../concept';
 export const concept: Concept = 'C16';
+import { motion } from 'motion/react';
+import { EASE } from '../motion';
 import type { FleetSummary } from '../../contract';
 import { useApiQuery } from '../../api/query';
 import { ChartCard } from './chart-card';
@@ -14,21 +16,21 @@ const projectOfHash = () => { try { return new URLSearchParams(window.location.h
 const dayLabel = (key: string) => { const [, m, d] = key.split('-'); return `${d}/${m}`; };
 
 function Stat({ label, value, hint }: { label: string; value: string; hint?: string }) {
-  return <div className="min-w-0 rounded-lg bg-muted/50 p-3"><div className="text-xs text-muted-foreground">{label}</div><div className="mt-0.5 truncate text-xl font-semibold tabular-nums" title={hint}>{value}</div></div>;
+  return <div className="min-w-0 rounded-lg bg-muted/50 p-3"><div className="text-xs text-muted-foreground">{label}</div><div className="mt-1 truncate text-xl font-semibold tabular-nums" title={hint}>{value}</div></div>;
 }
 
 /** Horizontal bars: input (blue) and output (green) per row, sorted by the server. */
 function TokenRows({ title, rows, name }: { title: string; rows: Group[]; name: (k: string) => string }) {
   const max = Math.max(1, ...rows.map(tokens));
   return <div className="min-w-0">
-    <h4 className="m-0 mb-1.5 text-xs font-medium text-muted-foreground">{title}</h4>
+    <h4 className="m-0 mb-2 text-xs font-medium text-muted-foreground">{title}</h4>
     <ul className="m-0 flex list-none flex-col gap-2 p-0">
       {rows.map(row => <li key={row.k} className="min-w-0 text-xs">
         <div className="flex flex-wrap items-baseline justify-between gap-x-2"><span className="min-w-0 max-w-full break-all font-mono" title={name(row.k)}>{name(row.k)}</span>
           <span className="shrink-0 tabular-nums text-muted-foreground">vào {compactVi(row.input)} · ra {compactVi(row.output)} · {costVi(row.costUsd)}</span></div>
-        <div className="mt-1 flex h-2 overflow-hidden rounded-full bg-muted" style={{ width: `${Math.max(4, (tokens(row) / max) * 100)}%` }} role="img" aria-label={`${name(row.k)}: vào ${compactVi(row.input)}, ra ${compactVi(row.output)}`}>
+        <motion.div className="mt-1 flex h-2 overflow-hidden rounded-full bg-muted" initial={{ scaleX: 0 }} animate={{ scaleX: 1 }} transition={{ duration: 0.36, ease: EASE }} style={{ width: `${Math.max(4, (tokens(row) / max) * 100)}%`, transformOrigin: 'left center' }} role="img" aria-label={`${name(row.k)}: vào ${compactVi(row.input)}, ra ${compactVi(row.output)}`}>
           <span data-tone="running" className="h-full bg-[var(--tone)]" style={{ flex: row.input ?? 0 }} /><span data-tone="success" className="h-full bg-[var(--tone)]" style={{ flex: row.output ?? 0 }} />
-        </div>
+        </motion.div>
       </li>)}
     </ul>
   </div>;
@@ -40,11 +42,11 @@ function PerDay({ rows }: { rows: Group[] }) {
   const value = (r: Group) => hasCost ? (r.costUsd ?? 0) : tokens(r);
   const max = Math.max(1e-9, ...rows.map(value));
   return <div>
-    <h4 className="m-0 mb-1.5 text-xs font-medium text-muted-foreground">{hasCost ? 'Chi phí theo ngày (USD, giờ Việt Nam)' : 'Token theo ngày (chưa có chi phí do nhà cung cấp báo)'}</h4>
-    <div className="flex h-32 items-end gap-1.5" role="img" aria-label="Cột theo ngày">
+    <h4 className="m-0 mb-2 text-xs font-medium text-muted-foreground">{hasCost ? 'Chi phí theo ngày (USD, giờ Việt Nam)' : 'Token theo ngày (chưa có chi phí do nhà cung cấp báo)'}</h4>
+    <div className="flex h-32 items-end gap-2" role="img" aria-label="Cột theo ngày">
       {rows.map(r => <div key={r.k} data-tone="running" className="flex min-w-0 flex-1 flex-col items-center justify-end gap-1" title={`${dayLabel(r.k)}: ${hasCost ? costVi(r.costUsd) : compactVi(tokens(r))}`}>
         <span className="text-[10px] tabular-nums text-muted-foreground">{hasCost ? costVi(r.costUsd) : compactVi(tokens(r))}</span>
-        <div className="w-full max-w-10 rounded-t bg-[var(--tone)]" style={{ height: `${Math.max(3, (value(r) / max) * 88)}px` }} />
+        <motion.div className="w-full max-w-10 rounded-t bg-[var(--tone)]" initial={{ scaleY: 0 }} animate={{ scaleY: 1 }} transition={{ duration: 0.36, ease: EASE }} style={{ height: `${Math.max(3, (value(r) / max) * 88)}px`, transformOrigin: 'bottom' }} />
         <span className="text-[10px] tabular-nums text-muted-foreground">{dayLabel(r.k)}</span>
       </div>)}
     </div>
@@ -73,7 +75,7 @@ export function UsagePanel({ metrics, window: win, summary }: { metrics: OpsMetr
       </div>
       <TokenBar input={tin} output={tout} cache={cache} />
       {usage?.sources?.length ? <p className="m-0 text-xs text-muted-foreground">Nguồn số liệu: {usage.sources.map(sourceLabel).join(' · ')}</p> : null}
-      {fromLog ? <div className="grid gap-5 lg:grid-cols-2">
+      {fromLog ? <div className="grid gap-6 lg:grid-cols-2">
         <TokenRows title="Token theo model" rows={usage!.byModel} name={k => k ?? 'chưa rõ model'} />
         <TokenRows title="Token theo op" rows={usage!.byOp} name={k => k === 'kernel' ? 'Kernel (lượt điều phối)' : k} />
       </div> : list.length ? <p className="m-0 text-xs text-muted-foreground">Số liệu tóm tắt trên từng lần thử; chi tiết theo model và op chưa có vì llm_usage trống.</p> : null}

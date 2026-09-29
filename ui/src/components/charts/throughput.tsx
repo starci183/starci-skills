@@ -1,6 +1,8 @@
 import type { Concept } from '../concept';
 export const concept: Concept = 'C16';
 import { useMemo } from 'react';
+import { motion } from 'motion/react';
+import { EASE } from '../motion';
 import type { AttemptRow } from '../../contract';
 import { toneVar } from '../status';
 import { fmtClock, fmtDay, fmtDayClock, niceStep, throughput } from './analytics-data';
@@ -27,8 +29,8 @@ export function Throughput({ rows, since, now }: { rows: AttemptRow[]; since: nu
       {buckets.map((b, i) => {
         const cx = LEFT + slot * i + slot / 2, when = `${fmtDayClock(b.start)} → ${fmtClock(b.end)}`;
         return <g key={b.start}>
-          {b.dispatched > 0 ? <rect x={cx - bw - 0.5} y={y(b.dispatched)} width={bw} height={y(0) - y(b.dispatched)} rx={2} fill="var(--primary)"><title>{`${when} · giao ${b.dispatched}`}</title></rect> : null}
-          {b.settled > 0 ? <rect x={cx + 0.5} y={y(b.settled)} width={bw} height={y(0) - y(b.settled)} rx={2} fill={toneVar('queued')}><title>{`${when} · chốt ${b.settled}`}</title></rect> : null}
+          {b.dispatched > 0 ? <motion.rect initial={{ scaleY: 0 }} animate={{ scaleY: 1 }} transition={{ duration: 0.36, ease: EASE }} style={{ transformOrigin: 'bottom', transformBox: 'fill-box' }} x={cx - bw - 0.5} y={y(b.dispatched)} width={bw} height={y(0) - y(b.dispatched)} rx={2} fill="var(--primary)"><title>{`${when} · giao ${b.dispatched}`}</title></motion.rect> : null}
+          {b.settled > 0 ? <motion.rect initial={{ scaleY: 0 }} animate={{ scaleY: 1 }} transition={{ duration: 0.36, ease: EASE }} style={{ transformOrigin: 'bottom', transformBox: 'fill-box' }} x={cx + 0.5} y={y(b.settled)} width={bw} height={y(0) - y(b.settled)} rx={2} fill={toneVar('queued')}><title>{`${when} · chốt ${b.settled}`}</title></motion.rect> : null}
           {i % every === 0 ? <text x={cx} y={H - 8} textAnchor="middle" className="fill-muted-foreground text-[11px] tabular-nums">{label(b.start)}</text> : null}
         </g>;
       })}

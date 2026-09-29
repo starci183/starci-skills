@@ -2,7 +2,8 @@ import { useEffect, useMemo, useState } from 'react';
 import { useApiQuery } from '../../api/query';
 import type { AttemptRow, Envelope, FleetViewV2 } from '../../contract';
 import type { Concept } from '../../components/concept';
-import { counts, fmtDayClock, num } from '../../components/charts/analytics-data';
+import { Advanced, Ticker } from '../../components/motion';
+import { counts, fmtDayClock } from '../../components/charts/analytics-data';
 import { DurationPlot } from '../../components/charts/duration-plot';
 import { ModelRates } from '../../components/charts/model-rates';
 import { OpOutcomes } from '../../components/charts/op-outcomes';
@@ -70,14 +71,14 @@ function useAllAttempts(project: string): { rows: AttemptRow[] | null; error: st
 
 function Segmented({ value, onChange }: { value: Window; onChange: (value: Window) => void }) {
   const options: { value: Window; label: string }[] = [{ value: '24h', label: '24 giờ' }, { value: '7d', label: '7 ngày' }];
-  return <div role="group" aria-label="Khoảng thời gian" className="inline-flex rounded-lg border bg-muted/40 p-0.5">
+  return <div role="group" aria-label="Khoảng thời gian" className="inline-flex gap-1 rounded-lg border bg-muted/40 p-1">
     {options.map(o => <button key={o.value} type="button" aria-pressed={value === o.value} onClick={() => onChange(o.value)}
       className={`h-8 rounded-md px-3 text-sm font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${value === o.value ? 'bg-background text-foreground shadow-sm ring-1 ring-foreground/10' : 'text-muted-foreground hover:text-foreground'}`}>{o.label}</button>)}
   </div>;
 }
 
 function Count({ tone, label, n }: { tone: 'success' | 'failed' | 'running'; label: string; n: number }) {
-  return <span data-tone={tone} className="inline-flex items-center gap-1.5"><span className="status-dot" aria-hidden="true" /><strong className="tabular-nums text-foreground">{num(n, 0)}</strong> {label}</span>;
+  return <span data-tone={tone} className="inline-flex items-center gap-1.5"><span className="status-dot" aria-hidden="true" /><strong className="tabular-nums text-foreground"><Ticker value={n} /></strong> {label}</span>;
 }
 
 export default function AnalyticsPage() {
@@ -101,15 +102,15 @@ export default function AnalyticsPage() {
   const from = times.length ? Math.min(...times) : null, to = times.length ? Math.max(...times) : null;
   const loading = attempts.rows === null && !attempts.error;
 
-  return <main className="page-shell" data-concept="C16">
+  return <main className="page-shell flex flex-col gap-6 md:gap-8" data-concept="C16">
     <div className="flex flex-wrap items-end justify-between gap-3">
       <div className="min-w-0">
         <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Phân tích</p>
-        <h1 className="text-2xl font-semibold tracking-tight">{loading ? 'Đang tải…' : `${num(rows.length, 0)} lần thử · ${num(workflows, 0)} workflow`}</h1>
+        <h1 className="text-2xl font-semibold tracking-tight">{loading ? 'Đang tải…' : <><Ticker value={rows.length} /> lần thử · <Ticker value={workflows} /> workflow</>}</h1>
         <p className="mt-1 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-muted-foreground">
           {from != null && to != null ? <span>{fmtDayClock(from)} → {fmtDayClock(to)}</span> : <span>{win === '24h' ? '24 giờ' : '7 ngày'} qua</span>}
           <Count tone="success" label="đạt" n={c.pass} /><Count tone="failed" label="hỏng/chặn" n={c.bad} /><Count tone="running" label="đang chạy" n={c.run} />
-          {c.dropped > 0 ? <span><strong className="tabular-nums text-foreground">{num(c.dropped, 0)}</strong> đã bỏ</span> : null}
+          {c.dropped > 0 ? <span><strong className="tabular-nums text-foreground"><Ticker value={c.dropped} /></strong> đã bỏ</span> : null}
         </p>
       </div>
       <div className="flex flex-wrap items-center gap-2">
@@ -123,16 +124,20 @@ export default function AnalyticsPage() {
       </div>
     </div>
 
-    {attempts.error && !attempts.rows ? <p role="alert" className="mt-4 rounded-lg border border-[var(--status-failed-line)] bg-[var(--status-failed-bg)] p-3 text-sm text-[var(--status-failed)]">Không tải được danh sách lần thử ({attempts.error}).</p> : null}
+    {attempts.error && !attempts.rows ? <p role="alert" className="rounded-lg border border-[var(--status-failed-line)] bg-[var(--status-failed-bg)] p-3 text-sm text-[var(--status-failed)]">Không tải được danh sách lần thử ({attempts.error}).</p> : null}
 
-    <div className="mt-5 grid min-w-0 grid-cols-1 gap-4 lg:grid-cols-2">
+    <div className="grid min-w-0 grid-cols-1 gap-4 lg:grid-cols-2 lg:gap-6">
       <OpOutcomes rows={rows} />
-      <ModelRates rows={rows} />
-      <DurationPlot rows={rows} now={now} />
       <Throughput rows={rows} since={since} now={now} />
-      <Retries rows={rows} />
-      <UsagePanel metrics={metrics.data} window={win} summary={fleet.data?.summary ?? null} />
       <WorkflowProgress fleet={fleet.data} project={project} />
     </div>
+    <Advanced variant="card" title="Phân tích chi tiết" summary="Tỉ lệ theo model, thời lượng, thử lại, token và chi phí">
+      <div className="grid min-w-0 grid-cols-1 gap-4 lg:grid-cols-2 lg:gap-6">
+        <ModelRates rows={rows} />
+        <DurationPlot rows={rows} now={now} />
+        <Retries rows={rows} />
+        <UsagePanel metrics={metrics.data} window={win} summary={fleet.data?.summary ?? null} />
+      </div>
+    </Advanced>
   </main>;
 }

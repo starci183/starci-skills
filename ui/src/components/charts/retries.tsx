@@ -37,9 +37,9 @@ export function Retries({ rows }: { rows: AttemptRow[] }) {
     legend={[{ tone: 'success', label: 'Lần 1' }, { tone: 'warning', label: 'Lần 2' }, { tone: 'failed', label: 'Lần 3 trở lên / lớp lỗi' }]}
     empty={!tryBars.length && !failBars.length && 'Chưa có đơn vị nào được thử trong khoảng này.'}>
     <div ref={ref}>
-      <h3 className="mb-1 text-sm font-medium">Số lần thử mỗi đơn vị</h3>
+      <h3 className="mb-2 text-sm font-medium">Số lần thử mỗi đơn vị</h3>
       {tryBars.length ? <Bars bars={tryBars} width={width} aria="Phân bố số lần thử mỗi đơn vị" /> : <p className="text-xs text-muted-foreground">Chưa có đơn vị nào.</p>}
-      <h3 className="mb-1 mt-4 text-sm font-medium">Lớp lỗi hay gặp</h3>
+      <h3 className="mb-2 mt-4 text-sm font-medium">Lớp lỗi hay gặp</h3>
       {failBars.length ? <Bars bars={failBars} width={width} aria="Các lớp lỗi hay gặp" /> : <p className="text-xs text-muted-foreground">Không có lớp lỗi nào được ghi nhận.</p>}
     </div>
   </ChartCard>;
