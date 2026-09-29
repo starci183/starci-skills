@@ -8,6 +8,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { stringifyYaml } from '../../engine/yaml.mjs';
 import { blankImage, drawOver, encodePng } from '../../scripts/work/png.mjs';
+import { putBlob } from '../../scripts/lib/artifact-store.mjs';
 
 export const APP_FILES = {
   'apps/app/tsconfig.json': JSON.stringify({ compilerOptions: { paths: { '@/*': ['./src/*'] } } }, null, 2),
@@ -69,10 +70,11 @@ export async function settledProduct(t, { photosVisible = false } = {}) {
   const photos = nodeById(tree, '/[locale]/(console)/photos');
   photos.layout.chrome = photosVisible ? 'visible' : 'passthrough';
   photos.layout.state = photosVisible ? 'todo' : 'done';
-  p.put('backend/.starciwork/shell/assets/lockup.png', encodePng(blankImage(4, 2, [0, 0, 0, 255])));
-  const { createHash } = await import('node:crypto');
-  const lockupSha = createHash('sha256').update(fs.readFileSync(path.join(shellDir, 'assets', 'lockup.png'))).digest('hex');
-  tree.brand = { component: 'PhotoBrand', lockups: [{ path: 'assets/lockup.png', sha256: lockupSha, theme: 'light' }] };
+  fs.mkdirSync(shellDir, { recursive: true });
+  // alpha.3: a lockup is a blob the tree cites {name, sha256, theme}, never a file under shell/assets.
+  const lockupBytes = encodePng(blankImage(4, 2, [0, 0, 0, 255]));
+  const { sha: lockupSha } = putBlob(lockupBytes, { mediaType: 'image/png' });
+  tree.brand = { component: 'PhotoBrand', lockups: [{ name: 'assets/lockups/lockup--light.png', sha256: lockupSha, theme: 'light' }] };
   tree.personas = [{ role: 'owner', default: true, workspace: 'Studio', user: 'An Nguyen', currency: 'VND', dateFormat: 'dd/MM/yyyy' }];
   tree.state = 'done';
   const save = (record) => fs.writeFileSync(path.join(shellDir, 'index.yaml'), stringifyYaml(record));
