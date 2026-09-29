@@ -247,7 +247,7 @@ export function loadSlotManifest({ root = skillRoot, file = path.join(root, HFS_
 function declarationShapeProblems(d) {
   const bad = [];
   if (!isMap(d)) return ['hfs.json is not an object'];
-  for (const key of Object.keys(d)) if (!['hfs', 'profile', 'project', 'apps', 'optionalSlots', 'connections'].includes(key)) bad.push(`unknown key ${key}`);
+  for (const key of Object.keys(d)) if (!['hfs', 'profile', 'project', 'apps', 'optionalSlots', 'connections', 'stacks'].includes(key)) bad.push(`unknown key ${key}`);
   if (!(Number.isInteger(d.hfs) && d.hfs >= 2)) bad.push('hfs must be the pinned manifest major (an integer, 2 or more)');
   if (!PROFILES.includes(d.profile)) bad.push('profile must be be or fe');
   if (!NAME.test(String(d.project))) bad.push('project must be a project name');
@@ -255,6 +255,7 @@ function declarationShapeProblems(d) {
   else d.apps.forEach((app, i) => {
     if (!isMap(app) || !NAME.test(String(app.name)) || !NAME.test(String(app.kind)) || Object.keys(app).some((k) => k !== 'name' && k !== 'kind')) bad.push(`apps[${i}] must be {name, kind}`);
   });
+  if (d.stacks !== undefined && (d.profile !== 'fe' || typeof d.stacks !== 'string' || !d.stacks || /^([a-zA-Z]:)?[\/]/.test(d.stacks))) bad.push('stacks is front end only and must be a relative path to the sibling back-end repository');
   for (const key of ['optionalSlots', 'connections']) {
     if (d[key] === undefined) continue;
     const pattern = key === 'optionalSlots' ? SLOT_ID : NAME;

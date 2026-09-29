@@ -3337,6 +3337,7 @@ HFS_TRACKED_MUST_BE_IGNORED:
     - "Thư mục dist, coverage, .next hoặc tệp sinh tự động bị git add"
     - ".gitignore thiếu dòng cho thư mục này"
   nextStep_vi: "Gỡ tệp khỏi Git bằng git rm --cached và thêm vào khối .gitignore chuẩn; không xoá thư mục trên đĩa. Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra; không cần ai can thiệp thêm."
+  owner: op-retry
   kind: check-finding
 
 HFS_WORK_AGENT_DATA:

@@ -39,6 +39,15 @@ properties:
     uniqueItems: true
     description: Backend only. Named databases; each is the CONNECTION tag of a be.persistence slot and gets one migrate run.
     items: {type: string, pattern: '^[a-z][a-z0-9-]*$'}
+  stacks:
+    type: string
+    minLength: 1
+    pattern: '^(?![a-zA-Z]:)(?![\/])'
+    description: >-
+      Front end only. A relative path to the sibling back-end repository that owns the .starcistacks declaration
+      (for example "../nivo-backend"). hfs sync reads this repository's Sonar key from that declaration, so the key has
+      one source. A back-end repository omits it because it owns its declaration.
 allOf:
   - if: {properties: {profile: {const: fe}}, required: [profile]}
     then: {not: {required: [connections]}}
+    else: {not: {required: [stacks]}}

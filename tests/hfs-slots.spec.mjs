@@ -73,7 +73,11 @@ test('hfs.json: schema and loader agree', () => {
     'no apps': { ...BE, apps: [] },
     'unknown key': { ...BE, owners: ['x'] },
     'bad project name': { ...BE, project: 'Nivo Backend' },
+    'be with stacks': { ...BE, stacks: '../nivo-backend' },
+    'absolute stacks': { ...FE, stacks: '/srv/nivo-backend' },
   };
+  assert.equal(validateRepoSchema({ ...FE, stacks: '../nivo-backend' }), true, JSON.stringify(validateRepoSchema.errors));
+  assert.doesNotThrow(() => resolveRepoDeclaration(manifest, { ...FE, stacks: '../nivo-backend' }));
   for (const [name, declaration] of Object.entries(bad)) {
     assert.equal(validateRepoSchema(JSON.parse(JSON.stringify(declaration))), false, `schema accepted: ${name}`);
     refusal(() => resolveRepoDeclaration(manifest, declaration), 'HFS_DECLARATION_INVALID');

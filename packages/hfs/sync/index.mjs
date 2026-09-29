@@ -52,6 +52,10 @@ export function validateHfs(hfs) {
   if (!PROFILES.includes(hfs.profile)) bad(`profile must be one of ${PROFILES.join(', ')}`);
   if (typeof hfs.project !== 'string' || !KEBAB.test(hfs.project)) bad('project must be a kebab-case name');
   if (!Array.isArray(hfs.apps) || hfs.apps.length === 0) bad('apps must list at least one app');
+  if (hfs.stacks !== undefined) {
+    if (hfs.profile !== 'fe') bad('stacks is a front-end field: a back-end repository owns its own .starcistacks declaration');
+    if (typeof hfs.stacks !== 'string' || !hfs.stacks || path.isAbsolute(hfs.stacks)) bad('stacks must be a relative path to the sibling back-end repository that owns .starcistacks');
+  }
   const seen = new Set();
   for (const app of hfs.apps) {
     if (!app || typeof app.name !== 'string' || !KEBAB.test(app.name)) bad('every app needs a kebab-case name');
@@ -195,7 +199,7 @@ export async function runSync(argv, { cwd = process.cwd(), out = line => process
       out(`hfs sync --init: ${created.length} created, ${skipped.length} already exist and were left alone`);
       return 0;
     }
-    const sonarKey = await readDeclaredSonarKey(root, { parseYaml, fail: message => { throw new SyncError('HFS_SYNC_SONAR_KEY', message); } });
+    const sonarKey = await readDeclaredSonarKey(root, { parseYaml, stacks: hfs.stacks, fail: message => { throw new SyncError('HFS_SYNC_SONAR_KEY', message); } });
     const targets = renderTargets(hfs, presets ?? await loadPresets(root, hfs.profile), { sonarKey });
     if (write) {
       const written = writeTargets(root, targets);

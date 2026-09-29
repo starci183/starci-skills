@@ -59,9 +59,10 @@ describe('hfs.json validation', () => {
   it('accepts the two profiles and refuses everything else', () => {
     assert.doesNotThrow(() => validateHfs(BE));
     assert.doesNotThrow(() => validateHfs(FE));
-    for (const bad of [null, { ...BE, hfs: 1 }, { ...BE, profile: 'mobile' }, { ...BE, project: 'Nivo Backend' }, { ...BE, apps: [] }, { ...BE, apps: [{ name: 'core' }, { name: 'core' }] }]) {
+    for (const bad of [null, { ...BE, hfs: 1 }, { ...BE, profile: 'mobile' }, { ...BE, project: 'Nivo Backend' }, { ...BE, apps: [] }, { ...BE, apps: [{ name: 'core' }, { name: 'core' }] }, { ...BE, stacks: '../nivo-backend' }, { ...FE, stacks: '/srv/nivo-backend' }, { ...FE, stacks: '' }]) {
       assert.throws(() => validateHfs(bad), /HFS_SYNC_HFS_INVALID/);
     }
+    assert.doesNotThrow(() => validateHfs({ ...FE, stacks: '../nivo-backend' }));
   });
 });
 
@@ -213,7 +214,21 @@ describe('the Sonar key', () => {
     assert.equal(await sync('--check', dir, () => two, line => lines.push(line)), 1);
     assert.match(lines[0], /HFS_SYNC_SONAR_KEY.*a, b/);
   });
-  it('reads the real stack declaration shape with the yaml package', t => {
+  it('a front end reads its key from the sibling back end that hfs.json stacks names, under its own repository name', async t => {
+    const parent = fs.mkdtempSync(path.join(os.tmpdir(), 'hfs-stacks-fe-'));
+    t.after(() => fs.rmSync(parent, { recursive: true, force: true }));
+    const fe = path.join(parent, 'nivo-fe'), be = path.join(parent, 'nivo-backend');
+    fs.mkdirSync(fe);
+    fs.mkdirSync(path.join(be, '.starcistacks'), { recursive: true });
+    fs.writeFileSync(path.join(fe, 'package.json'), JSON.stringify({ name: 'nivo-fe' }));
+    fs.writeFileSync(path.join(be, '.starcistacks', 'application-stacks.yaml'), 'stack');
+    const sonar = { services: { sonar: { projects: [{ repository: 'nivo-backend', key: 'be-key' }, { repository: 'nivo-fe', key: 'fe-key' }] } } };
+    const fail = message => { throw new Error(message); };
+    assert.equal(await readDeclaredSonarKey(fe, { parseYaml: () => sonar, fail, stacks: '../nivo-backend' }), 'fe-key');
+    assert.equal(await readDeclaredSonarKey(fe, { parseYaml: () => sonar, fail }), null, 'without stacks the front end has no declaration of its own');
+    await assert.rejects(readDeclaredSonarKey(fe, { parseYaml: () => sonar, fail, stacks: '../missing' }), /stacks points at ../missing/);
+  });
+  it('reads the real stack declaration shape with the YAML parser bundled in the package', t => {
     const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'hfs-stacks-'));
     t.after(() => fs.rmSync(dir, { recursive: true, force: true }));
     fs.mkdirSync(path.join(dir, '.starcistacks'));
