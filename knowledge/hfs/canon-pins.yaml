@@ -9,11 +9,11 @@ purpose: >-
 pins:
   # --- @starci packages: installed from the runtime checkout by `starci link`, never from a registry.
   '@starci/grammar':
-    version: 0.7.0
+    version: 0.7.1
     group: starci
     side: fe
     source: packages/grammar/package.json
-    why: nivo-fe pins 0.4.11 and 0.5.0 in one workspace, starci-next-fe 0.5.1, miamia-fe 0.5.0; the runtime source is 0.7.0.
+    why: nivo-fe pins 0.4.11 and 0.5.0 in one workspace, starci-next-fe 0.5.1, miamia-fe 0.5.0; the runtime source is 0.7.1.
   '@starci/eslint-canon-be':
     version: 1.6.1
     group: starci
