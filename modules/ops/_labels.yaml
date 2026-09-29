@@ -42,6 +42,7 @@ labels:
   integration.verify: { vi: Kiểm thử tích hợp, en: Integration test }
   e2e.verify: { vi: Kiểm thử đầu cuối, en: End-to-end test }
   perf.verify: { vi: Kiểm thử hiệu năng, en: Performance test }
+  unit.verify: { vi: Chạy toàn bộ unit test, en: Full unit test run }
   security.verify: { vi: Soát bảo mật, en: Security review }
   uat.verify: { vi: Kiểm thử UAT, en: UAT test }
   uat.assisted.prepare: { vi: Chuẩn bị UAT có người, en: Prepare assisted UAT }

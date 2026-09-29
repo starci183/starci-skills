@@ -217,7 +217,7 @@ writes:
         through `node <Source>/.claude/scripts/checks/sonar-local.mjs scan --cwd <repo-id> --wait
         --base <source commit recorded before this slice's first edit> --paths <owned paths,
         comma-separated> --out <STARCI_JOB_SCRATCH>/checks/sonar.json --log <STARCI_JOB_SCRATCH>/checks/sonar.txt` right after a fresh coverage run; attach both files at api report
-        (the repository's test:ci) in this same attempt: it scans against the local SonarQube the
+        (the specs of the changed or added source and the specs that import it - never the repository's whole test:ci, owner 2026-09-29) in this same attempt: it scans against the local SonarQube the
         stack declaration names (default the source host's dev stack), takes the project key, host
         and token from that declaration and its custody, creates the project and its analysis
         token when missing, and records the analysis/revision, the slice verdict, issue counts and

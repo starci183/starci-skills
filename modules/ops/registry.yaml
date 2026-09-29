@@ -28,7 +28,7 @@ coarsePhases:
   verify: post-implementation
   release: post-implementation
   operate: cross-cutting
-count: 37
+count: 38
 ops:
   - id: architecture.decide
     family: architecture
@@ -1462,6 +1462,40 @@ ops:
         - verified served build
       riskHints:
         - browser-required
+    lifecyclePosition: verify | post-implementation
+    kindInferred: verify
+  - id: unit.verify
+    family: unit
+    goal: Run the product repository's FULL unit suite (npm run test:unit) against the delivered source
+      and report the observed result - never a subset presented as the whole suite, never a repaired
+      product.
+    nodeKinds:
+      - implementation
+    completionProfile: implementation
+    sideEffects:
+      count: 2
+      summary: the repository's declared full unit run, in a job-private scratch and coverage directory
+    reads:
+      - target
+      - repo
+      - request
+      - profile
+    writes:
+      - node
+      - evidence
+    route:
+      nodeKinds:
+        - implementation
+      phase:
+        - verify
+        - post-implementation
+      intent:
+        - unit
+        - unit-suite
+        - full-unit
+        - verify
+      prerequisites:
+        - implementation done
     lifecyclePosition: verify | post-implementation
     kindInferred: verify
   - id: work.author

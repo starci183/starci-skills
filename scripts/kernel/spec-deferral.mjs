@@ -4,7 +4,8 @@
 //   specs: {unit: false}  product unit/integration tests (jest, vitest, test:ci, coverage gates, Sonar coverage)
 //   specs: {e2e: false}   product e2e tests (e2e.verify, Playwright/e2e specs)
 //
-// Absent or true is the behaviour before the switch. What an op does when its class is off is data in its
+// Defaults (owner 2026-09-29, engine/config.mjs SPEC_DEFAULTS): unit ON, e2e OFF (e2e runs only when the goal or the owner asks). What an op
+// does when its class is off is data in its
 // brief, `policy.specsToggle: {unit?, e2e?}` (modules/ops/ops/<op>.yaml), one of SPECS_TOGGLE_VALUES:
 //   defer-leg    the op's only job is that class of testing: the kernel never dispatches it. Its queued job
 //                settles `succeeded` with result {verdict: 'deferred', deferred: {kind, reason}} and no attempt
@@ -80,7 +81,7 @@ export function opExplicitAskKind({ skillRoot, op }) {
 /** The kinds this goal text explicitly asks for, e.g. ['integration'] (the value the enqueue stamps as payload.explicitAsk). */
 export const explicitAsksOf = ({ skillRoot, text }) => ['integration'].filter((kind) => explicitAsk(kind, text, { skillRoot }));
 
-/** The owner switches {harness, unit, e2e} of the owner config.yaml under `root`, read fresh (an unreadable file reads all on). */
+/** The owner switches {harness, unit, e2e} of the owner config.yaml under `root`, read fresh (an unreadable file reads the defaults: harness off, unit on, e2e off). */
 export const ownerSpecs = (root) => { try { return specsSettings(inspectOwnerConfig(root).config); } catch { return specsSettings(null); } };
 /** The owner switches; `settings` passes a fixed read through (tests, one read per command). */
 export const specsOf = ({ skillRoot, settings = null } = {}) => settings ?? ownerSpecs(skillRoot);
@@ -209,7 +210,21 @@ export function specsBriefLines({ skillRoot, op, settings = null, forced = false
     },
   };
   return [
-    `specs: the owner switched product testing off (config.yaml ${off.map((kind) => `specs.${kind}: false`).join(', ')}; owner 2026-09-28 "speed up development; test later when asked"). This overrides every test, coverage and e2e step, proof and blocker in your brief:`,
+    `specs: product testing is off (config.yaml ${off.map((kind) => (kind === 'e2e' ? 'specs.e2e is not true - its default: e2e runs only when the goal or the owner asks' : `specs.${kind}: false`)).join(', ')}; owner 2026-09-28/29 "speed up development; test later when asked"). This overrides every test, coverage and e2e step, proof and blocker in your brief:`,
     ...off.map((kind) => `  ${kind}: ${say[kind][toggle[kind]]}`),
+  ];
+}
+
+/**
+ * The verification-scope policy every op prompt carries (owner 2026-09-29). A code-writing op writes or updates the unit specs of the
+ * source it adds or changes and runs ONLY those (the specs of the changed or added source plus the specs that import it) with typecheck,
+ * lint, canon-scan and the build scoped as usual; never the repository's whole unit suite (that is unit.verify's, dispatched only when the
+ * goal or the owner asks for it, or the owner's /push-git flow) and never e2e unless the goal or the owner asked (e2e.verify then runs the
+ * FULL e2e suite). With specs.unit off the `specs:` line already forbids writing unit specs, so only the whole-suite rule is stated.
+ */
+export function verificationScopeLines({ settings = null, skillRoot = null } = {}) {
+  const unit = (settings ?? specsOf({ skillRoot })).unit !== false;
+  return [
+    `verification_scope (owner 2026-09-29): ${unit ? "write or update the unit specs of the source you add or change and run ONLY those (the specs of the changed or added source plus the specs that import it) with typecheck, lint, canon-scan and the build scoped to your change" : 'run typecheck, lint, canon-scan and the build scoped to your change'}; never the repository's whole unit suite (unit.verify runs it, dispatched only when the goal or the owner asks; /push-git runs it before a push) and never e2e unless the goal or the owner asked (e2e.verify then runs the full e2e suite). Work inside the .claude runtime follows the same rule: its specs are the ones touching your change.`,
   ];
 }

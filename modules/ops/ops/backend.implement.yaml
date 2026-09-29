@@ -107,7 +107,7 @@ writes:
         --coverageDirectory=<STARCI_JOB_SCRATCH>/coverage --collectCoverageFrom=<owned source
         path>/**` over the slice's test paths (a repository coverageThreshold judged over only the
         slice is a note, never this gate - the Sonar slice verdict is). The repository's full
-        test:ci is the cut set's closing pass and the release checkpoint's, never each attempt's
+        test:ci is never an attempt's run (owner 2026-09-29): this op writes or updates the unit specs of the source it adds or changes and runs only those and the specs that import it; the whole unit suite is unit.verify's or /push-git's
         (CONTEXT.md useful verification). Run Sonar only through
         `node <Source>/.claude/scripts/checks/sonar-local.mjs scan --cwd <absolute repository root>
         --wait --isolate --lcov <that directory>/lcov.info --base <source commit recorded before
@@ -233,8 +233,9 @@ steps:
     writes: [source, evidence]
     action:
       en: Add or repair scoped unit tests - for a todo target work.author wrote in planned mode, create
-        exactly the owner paths and test paths its owners and checks name - then execute the
-        repository's backend unit gate and retain
+        exactly the owner paths and test paths its owners and checks name - then execute only those
+        specs (the specs of the changed or added source and the specs that import it, never the whole
+        repository suite) and retain
         command, exit code, counts and sanitized output. Positive, denial, invalid-input and applicable
         race/reload cases must map to the selected operations in the unit specs. E2E runs MANUALLY
         only (owner ruling 2026-09-29) - this operator does not run the e2e suite, typecheck:e2e or any

@@ -208,7 +208,7 @@ steps:
         a check with `toolError: true`, keep the same command for the after run, prove the slice
         with the machines that did run (canon-scan's lint families, the scoped lint's slice counts,
         the slice-typecheck result) and continue. No existing, covering, runnable check is reported `blocked` with blocker kind
-        `test-gap` and this op stops; it never authors the missing tests itself. Resolve the
+        `test-gap` and this op stops; it never authors the missing tests itself, and it runs only the specs of the code it moved or changed and the specs that import it - never the whole repository suite (owner 2026-09-29). Resolve the
         execution profile and actual tool availability before selecting instruments; this does not
         switch the model/runtime or spawn workers. Never create the target or invent its
         acceptance/graph here. Intent governs the behavior that must be preserved; a needed missing

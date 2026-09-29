@@ -81,6 +81,7 @@ producesVocabulary:
     - "api.X: verified"          # proven through public API on real stack
     - "integration.X: verified"  # live-provider proof w/ owner credential
     - "perf.X: verified"         # measured against declared budget
+    - "unit.X: verified"         # the product repository's whole unit suite ran green (only when the goal or owner asks)
     - "security.X: verified"     # security proof on delivered slice
     - "slice.X: reviewed"        # read-only findings delivered
     - "provision.X: provided"    # owner custody landed
@@ -125,6 +126,7 @@ producesVocabulary:
     e2e.verify:           ["api.X: verified"]
     integration.verify:   ["integration.X: verified"]
     perf.verify:          ["perf.X: verified"]
+    unit.verify:          ["unit.X: verified"]
     security.verify:      ["security.X: verified"]
     review.verify:        ["slice.X: reviewed"]
     provision.ask:        ["provision.X: provided"]
@@ -167,7 +169,7 @@ forwardEdges:
     illegal: "UI work without interface.draw first is ILLEGAL"
 
   - id: verify-after-implement
-    if: "any proof leg is proposed (interface.audit / uat.verify / uat.assisted.verify / e2e.verify / review.verify / perf.verify / security.verify)"
+    if: "any proof leg is proposed (interface.audit / uat.verify / uat.assisted.verify / e2e.verify / review.verify / perf.verify / security.verify / unit.verify)"
     thenBefore: "the implementation it proves must be done first"
     enforcement: lane order — proofs are steps after the build in every lane; a proof that finds nothing built reports 'no delivery to inspect', not a pass
     why: "verification reads a delivered slice; it is not the builder (docs/verify-proof.md)"

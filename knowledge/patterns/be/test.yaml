@@ -35,6 +35,9 @@ provenance:
     Historical filename counts do not decide whether a behavior needs a test. The adopted profile disables
     handler-has-twin-spec and selects proof from the affected behavior and failure risk. Colocation applies
     to a selected unit spec; it does not manufacture a spec for every class.
+
+    Owner policy 2026-09-29: write or update the spec of the source you add or change (the goal need not ask for it) and run only those
+    specs and the specs that import it - never the repository's whole unit suite (unit.verify or /push-git) and never e2e unless asked.
 rules:
   - id: BE-TEST-1
     title: Placement and test kinds

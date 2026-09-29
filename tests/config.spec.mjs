@@ -161,19 +161,19 @@ test('quota.qwen and supervisor.frozenMinutes are accepted; malformed shapes are
   assert.throws(()=>validateConfig({...ok,supervisor:{...ok.supervisor,frozenMinutes:0}}),/frozenMinutes/);
 });
 
-test('root specs is a map of family switches {harness, unit, e2e}, each on unless false',async()=>{
+test('root specs is a map of family switches {harness, unit, e2e}, each at its default (harness off, unit on, e2e off)',async()=>{
   const {specsSettings,harnessSpecsEnabled}=await import('../engine/config.mjs');
   const ok=expected();
   assert.doesNotThrow(()=>validateConfig({...ok,specs:{harness:false,unit:false,e2e:false}}));
   assert.doesNotThrow(()=>validateConfig({...ok,specs:null}));
   for(const specs of [false,'no',{harness:'no'},{lint:false}])assert.throws(()=>validateConfig({...ok,specs}),/specs must be/);
-  assert.deepEqual(specsSettings({}),{harness:true,unit:true,e2e:true});
-  assert.deepEqual(specsSettings({specs:{unit:false}}),{harness:true,unit:false,e2e:true});
+  assert.deepEqual(specsSettings({}),{harness:false,unit:true,e2e:false});
+  assert.deepEqual(specsSettings({specs:{unit:false,e2e:true}}),{harness:false,unit:false,e2e:true});
   const dir=fs.mkdtempSync(path.join(os.tmpdir(),'starci-specs-cfg-'));
   try{
-    assert.equal(harnessSpecsEnabled(dir),true,'no owner file: specs run');
-    fs.writeFileSync(path.join(dir,'config.yaml'),'specs:\n  harness: false\n');
-    assert.equal(harnessSpecsEnabled(dir),false);
+    assert.equal(harnessSpecsEnabled(dir),false,'no owner file: touching-only');
+    fs.writeFileSync(path.join(dir,'config.yaml'),'specs:\n  harness: true\n');
+    assert.equal(harnessSpecsEnabled(dir),true);
   }finally{fs.rmSync(dir,{recursive:true,force:true});}
 });
 

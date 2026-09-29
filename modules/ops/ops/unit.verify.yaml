@@ -1,0 +1,134 @@
+schema: starci/op@1
+id: unit.verify
+goal:
+  en: Run the product repository's FULL unit suite (npm run test:unit) against the delivered source and report the observed
+    result - never a subset presented as the whole suite, never a repaired product. Dispatched only when the goal or the owner
+    explicitly asks for the full unit run.
+nodeKinds: [implementation]
+completionProfile: implementation
+sideEffects:
+  - the repository's declared full unit run, in a job-private scratch and coverage directory
+  - run-owned temporary files, disposed by the same run
+graphPolicy:
+  mode: read-only
+  location: .starciwork node dependsOn/refs with direct sourceRefs and collocated assets
+  prerequisiteState: done
+  dispatch: never
+reads:
+  - id: target
+    path: N/index.yaml
+    purpose:
+      en: "Read the existing selected N/index.yaml, ancestor scope, declared refs/dependencies/assertions
+        and validator freshness. This consumer op requires its target node to exist. An absent
+        target is a scope/graph gap: report it and propose a separately selected scope op; do not
+        create a target or invent its acceptance/graph here."
+  - id: repo
+    path: repository:<repo-id>/<bound-paths>
+    purpose:
+      en: Resolve repository resource, actual checkout/root/HEAD and dirty state; read package.json scripts (the
+        unit command is `test:unit`, the unit project as opposed to e2e), the unit runner configuration and the
+        delivered source. The evidence binds the exact tested tree, so a run without a resolved repository is
+        not a unit result.
+  - id: request
+    path: request goal text + owner instruction
+    purpose:
+      en: The explicit ask for the full unit run ("full unit", "run all unit tests", "chạy toàn bộ unit"); a
+        code-writing op's own scoped specs are a different thing.
+  - id: profile
+    path: modules/models/registry.yaml + selected runtime execution profile + actual host tools/model
+    purpose:
+      en: Resolve this operator's request-bound external-agent chain from the selected StarCi skill and
+        active profiles. Use current host model configuration; historical model names are not
+        availability proof.
+writes:
+  - id: node
+    path: N/index.yaml
+    fields: [state, blocker, completion.inputDigest, completion.evidence, completion.codeRefs]
+    content:
+      en: Write only state/blocker/completion here; the observed counts and failures belong to the evidence
+        result, not node prose. Never add/remove refs/dependencies/acceptance to obtain pass.
+  - id: evidence
+    path: E/**
+    fields: [id, nodeId, inputDigest, outcome, assertions, assets, provenance, codeRefs, extensions]
+    artifacts: [manifest.yaml, unit-run.json, result.md]
+    content:
+      en: "Record the exact command (npm run test:unit), cwd/repo, source commit/tree, environment, exit code, and the
+        observed totals - suites, tests, passed, failed, skipped - with the sanitized raw output attached from
+        STARCI_JOB_SCRATCH through api report. Every failure is listed grouped by spec file with its test name and
+        message, so a repair can be routed per file. The run is the repository's whole unit suite: a filtered run,
+        a single project or a path selection is recorded as partial, never as this proof."
+steps:
+  - reads:
+      - target
+      - request
+      - repo
+      - profile
+    writes: [evidence]
+    action:
+      en: Confirm the request asks for the full unit run and resolve the repository's unit command from its
+        package.json (`test:unit`); a repository without one is a blocker, never an invented runner. Resolve the
+        execution profile and actual tool availability; this does not switch the model/runtime or spawn workers.
+  - reads:
+      - repo
+    writes: [evidence]
+    action:
+      en: Run the full unit command unfiltered, with coverage output (when the runner writes one) and scratch in a
+        job-private directory outside the checkout, and capture stdout, stderr, exit code and duration. Never run
+        e2e, never edit source or specs, never retry to turn a red run green; a flake is re-run once inside the
+        record and both runs are kept.
+  - reads:
+      - target
+      - repo
+    writes: [node, evidence]
+    action:
+      en: Read the result back - totals and failures grouped by spec file - and report done when the whole suite ran
+        and passed, failed (class product, with the failing files named) when a spec failed, blocked when the suite
+        could not run. Never self-advance and never repair the failing source here.
+proofs:
+  - id: binding
+    requirement:
+      en: Run the record-class validator `starci validate` and, on every record directory it writes, `starci validate --strict`; every cited ID/path exists or is explicitly
+        proposed, and an honest fail/not-run cannot earn done.
+  - id: whole-suite
+    requirement:
+      en: The command run is the repository's full unit command unfiltered, its exit code, totals and failures are
+        observed this run against the bound tree, and a partial selection is recorded as partial.
+  - id: scope
+    requirement:
+      en: The run changed no product source and no spec, ran no e2e, and left no run-owned file behind.
+blockers:
+  - code: UNIT_RUNNER_MISSING
+    condition:
+      en: The repository declares no test:unit command or the runner cannot start here and the cause is provably
+        unfixable from the allowlist - report blocked with blocker kind environment naming the missing piece.
+  - code: UNIT_RUN_NOT_REQUESTED
+    condition:
+      en: Neither the goal nor an owner instruction asks for the full unit run - report the exact gap instead of running
+        the suite by default.
+  - code: AUTHORITY_REQUIRED
+    condition:
+      en: The run needs an authority the goal does not grant - report blocked with blocker kind authority, an owner decision.
+  - code: DECLARED_DEPENDENCY_UNMET
+    condition:
+      en: A declared prerequisite is not effectively done, or a required declared input/scope is missing.
+        Report node/resource IDs and propose a separately selected graph update when needed; never
+        run predecessors or weaken dependsOn/refs/required to proceed.
+placeholders:
+  repo-id: Resolved direct repository name or path
+  bound-paths: Inspected source read set
+layoutPolicy:
+  checks: [starci-validate]
+policy:
+  unitPolicy:
+    surface: delivered-source
+    command: test:unit
+    suite: whole-unit-suite-only
+    e2e: never
+    productCode: unchanged
+    dispatch: only-when-the-goal-or-the-owner-asks
+  specsToggle: {unit: defer-leg}
+route:
+  nodeKinds: [implementation]
+  phase: [verify, post-implementation]
+  intent: [unit, unit-suite, full-unit, verify]
+  prerequisites: [implementation done]

@@ -778,6 +778,21 @@ kinds:
     reports:
       outcomes: [done, partial, failed, ask, blocked]
       blockers: [shared-change, environment, authority]
+  unit.verify:
+    family: prove
+    role: verify
+    operator: unit.verify
+    readOnly: false
+    reads: [code]
+    writes: [evidence]
+    knowledge: []
+    checks: [scripts/checks/acceptance.mjs]
+    stacks: [modules/schemas/work.schema.yaml, modules/schemas/work-layout.yaml]
+    carries: [work/evidence@1, starci/evidence-packet@1]
+    purpose: Run the product repository's whole unit suite (npm run test:unit) on the delivered source and report the observed result, only when the goal or the owner explicitly asks for the full unit run; a code-writing op never runs it.
+    reports:
+      outcomes: [done, partial, failed, ask, blocked]
+      blockers: [shared-change, environment, authority]
   perf.verify:
     family: prove
     role: verify
@@ -1084,6 +1099,13 @@ routes:
     limit: 3
     then: reopen
     purpose: A product that misses the performance budget its goal declared is a defect in the build it measured, not in the measurement.
+  - id: unit-red-repairs-the-build
+    on: {outcome: failed, class: product}
+    from: unit.verify
+    to: {kind: lane.build, origin: repair}
+    limit: 3
+    then: reopen
+    purpose: A red full unit suite names the specs of source this build changed or broke; the defect is in the build it ran on, not in the run.
   - id: review-findings-repair-the-build
     on: {verdict: findings}
     from: review.verify

@@ -189,7 +189,7 @@ test('the layout and schema catalog parse into path patterns this spec can use',
   // decision Q1), so its shape entry names no .starciwork path to admit.
   for (const k of ['workspace', 'brand', 'featureCatalog', 'feature', 'resources', 'uat', 'uatFlow', 'impl', 'ac'])
     assert.ok(keys.has(k), `shape.${k} yields no admitted path`);
-  assert.equal(ops.length, 37, 'every op manifest is walked');
+  assert.equal(ops.length, 38, 'every op manifest is walked');
   assert.ok(familyFolders.every(Boolean), 'every family in shape.families has its own shape entry');
   assert.ok(familyFolders.includes('br/<rule>/ac') && familyFolders.includes('impl/<repository>'));
   const resources = admitted.filter((a) => a.key === 'resources').map((a) => a.segs.join('/')).sort();

@@ -49,10 +49,15 @@ Optional keys:
   declared it is the whole set, so a `capacityAuthority: explicit-workflow-quota` pool (Devin) routes only
   for the granted roles and up to the granted running slots
 - `debug` — boolean
-- `specs` — `{harness?, unit?, e2e?}` booleans or null, each true unless set false (owner, 2026-09-28;
-  `engine/config.mjs` `specsSettings`): `harness: false` runs no `.claude` spec by default - the land gate keeps
-  only its cheap checks and runs specs only when asked (`land.mjs --specs <csv|touching|all>`); `unit` and `e2e`
-  switch the product unit and e2e tests of workflows
+- `specs` — `{harness?, unit?, e2e?}` booleans or null (owner, 2026-09-28 and 2026-09-29; `engine/config.mjs`
+  `specsSettings`, defaults in `SPEC_DEFAULTS`); a config without the key gets the defaults, so the shipped example
+  carries no block. `harness` (default **false**, touching-only): `.claude` work writes and runs the specs of new or changed
+  code, the land gate runs only the specs touching the landed files (`land.mjs --specs touching`, its default) and refuses
+  `--specs all` unless `harness: true`; `--specs none` needs `--reason`. The full `.claude` suite runs in exactly one place,
+  the `/push-git` flow (`scripts/supervisor/push-git.mjs`), which needs no key. `unit` (default **true**): a code-writing
+  op writes or updates the unit specs of the source it changes and runs only those; the whole unit suite is `unit.verify`'s
+  (only when the goal asks) or `/push-git`'s. `e2e` (default **false**): e2e runs only when the goal or the owner asks,
+  then `e2e.verify` runs the full e2e suite (see "Product test switches")
 - `connectors` — the public owner-ask channel `{secretsFile?, repos?, gateway?, cloudflare?, telegram?}`,
   all off by default; secrets are named by env var, never stored (docs/connectors.md)
 - `supervisor` — `{mode?, kernel?, pollIntervalMs?, repos?, stallMinutes?, frozenMinutes?, workers?, landGate?}`:
@@ -184,12 +189,17 @@ windowHours:24, grants:null}` in memory: the `runtimes.yaml` default policy and 
 
 ## Product test switches (`specs.unit`, `specs.e2e`)
 
-Owner ruling 2026-09-28: "speed up development; test later when asked". `specs.unit: false` switches off product
-unit tests in workflows (jest, vitest, test:ci, coverage gates, Sonar coverage); `specs.e2e: false`
-switches off product e2e tests (e2e.verify, Playwright and `*.e2e-spec.*` specs). uat.verify is neither: it is
-owner-deferred separately until credentials. Absent or true keeps the normal contract. The switches are read per
-call (`scripts/kernel/spec-deferral.mjs` `ownerSpecs`), so the route plan and a Kernel pick a flip up on the next
-wake with no restart.
+Owner rulings 2026-09-28 ("speed up development; test later when asked") and 2026-09-29. `specs.unit` (default on)
+covers product unit tests in workflows (jest, vitest, coverage gates, Sonar coverage): while on, an op that writes code
+also writes or updates the specs of that code and runs only those - the specs of the changed or added source and the
+specs that import it - plus typecheck, lint, canon-scan and the build, scoped as usual, never the repository's whole
+unit suite; `unit.verify` is the op that runs the whole unit suite (`npm run test:unit`), dispatched only when the goal
+or the owner asks for it ("full unit", "chạy toàn bộ unit"), never by default. `specs.e2e` (default off) covers product
+e2e (e2e.verify, Playwright and `*.e2e-spec.*` specs): it runs only when the goal or the owner asks, and `e2e.verify`
+then runs the full e2e suite. `false` for either family switches that class off for the workflow. uat.verify is neither:
+it is owner-deferred separately until credentials. The switches are read per call
+(`scripts/kernel/spec-deferral.mjs` `ownerSpecs`), so the route plan and a Kernel pick a flip up on the next wake with
+no restart.
 
 What an op does when a class is off is its brief's `policy.specsToggle.<class>`:
 

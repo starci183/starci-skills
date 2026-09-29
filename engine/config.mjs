@@ -281,7 +281,7 @@ export function validateConfig(config){
   if(config?.uat!==undefined)validateUat(config.uat);
   const knownProviders=new Set(Object.values(runtimes).map(runtime=>runtime?.provider).filter(Boolean));
   if(config?.debug!==undefined&&typeof config.debug!=='boolean')throw Error('Invalid config.yaml: debug must be true or false.');
-  // specs (owner 2026-09-28): {harness?, unit?, e2e?} booleans - false switches that spec family off (specsSettings).
+  // specs (owner 2026-09-28): {harness?, unit?, e2e?} booleans - each family a boolean; absent = its default (SPEC_DEFAULTS: harness off, unit on, e2e off; specsSettings).
   if(config?.specs!==undefined&&config.specs!==null&&(!plain(config.specs)||Object.keys(config.specs).some(key=>!SPEC_FAMILIES.includes(key)||typeof config.specs[key]!=='boolean')))throw Error(`Invalid config.yaml: specs must be {${SPEC_FAMILIES.map(k=>`${k}?: boolean`).join(', ')}}, or null.`);
   // reconciler (scripts/reconciler/state.mjs reconcilerConfig): {enabled?: boolean, profile?: operational|observe, controllers?: {<name>: {mode: off|shadow|active}}}, or null.
   if(config?.reconciler!==undefined&&config.reconciler!==null){
@@ -429,15 +429,22 @@ export function inspectOwnerConfig(root=configRoot){
   catch(error){return {file,config:parsed,error:null,invalid:error.message};}
 }
 /**
- * The owner's spec switches (config.yaml root `specs`, owner 2026-09-28), each true unless set false:
- *   harness - .claude's own specs (the land gate, lanes): false = the land gate runs only its cheap checks and
- *             specs run only on an explicit `land.mjs --specs <csv|touching|all>` (scripts/supervisor/land.mjs);
- *   unit, e2e - product unit and e2e tests in workflows.
- * An absent, null or unreadable owner file reads as all on.
+ * The owner's spec switches (config.yaml root `specs`, owner 2026-09-28; defaults set 2026-09-29, none needs a config block):
+ *   harness - .claude's own specs. Default false = touching-only: harness work writes and runs the specs of new or changed code
+ *             and the land gate runs only the specs touching the landed files (`land.mjs --specs touching`, its default);
+ *             the whole suite never runs in a land - `--specs all` is refused unless this is true. The full suite runs in
+ *             the /push-git flow (scripts/supervisor/push-git.mjs), which needs no key. true = `--specs all` may run;
+ *   unit    - product unit specs in workflows. Default on: a code-writing op writes/updates the unit specs of the source it
+ *             adds or changes and runs only those; the full unit suite is unit.verify's or /push-git's. false = the ops'
+ *             policy.specsToggle deferral path (scripts/kernel/spec-deferral.mjs);
+ *   e2e     - product e2e in workflows. Default OFF: e2e runs only when the goal or the owner explicitly asks (set true,
+ *             or `api run-deferred-tests`); e2e.verify then runs the FULL e2e suite.
+ * An absent, null or unreadable owner file reads as the defaults: harness off, unit on, e2e off.
  */
 export const SPEC_FAMILIES=Object.freeze(['harness','unit','e2e']);
-export function specsSettings(config){const specs=plain(config?.specs)?config.specs:{};return Object.fromEntries(SPEC_FAMILIES.map(key=>[key,specs[key]!==false]));}
-/** specs.harness of the owner file under `root` (tolerant read: inspectOwnerConfig). */
+export const SPEC_DEFAULTS=Object.freeze({harness:false,unit:true,e2e:false});
+export function specsSettings(config){const specs=plain(config?.specs)?config.specs:{};return Object.fromEntries(SPEC_FAMILIES.map(key=>[key,typeof specs[key]==='boolean'?specs[key]:SPEC_DEFAULTS[key]]));}
+/** specs.harness of the owner file under `root` (tolerant read: inspectOwnerConfig): true only when the owner opted in to `--specs all`. */
 export function harnessSpecsEnabled(root=configRoot){return specsSettings(inspectOwnerConfig(root).config).harness;}
 export function loadConfig(root=configRoot,{initialize=false}={}){
   const yaml=path.join(root,'config.yaml');

@@ -39,6 +39,7 @@ signalMatching:
     - external-integration
     - assisted-uat-prepare
     - assisted-uat-verify
+    - unit-verify
     - verify-only
     - feature-build-with-ui
     - feature-build-backend
@@ -215,6 +216,14 @@ archetypes:
         "integrate X", "connect to <provider>", "wire up payments/SMS/email/SSO/
         invoicing with Y" — a declared external system the product must reach.
       phrases: [integrat*, connect to*, wire up*, vnpay*, stripe*, paypal*, momo*, sso*, oauth*, payment*, sms*, email provider*, tích hợp, kết nối với, thanh toán, cổng thanh toán]
+
+  # --- unit-verify ---
+  - id: unit-verify
+    signals:
+      note: >-
+        "run the full unit suite", "chạy toàn bộ unit" - an explicit ask for the product repository's whole unit run
+        (unit.verify). A code-writing op's own scoped specs are never this ask, and no other request plans this leg.
+      phrases: [full unit, full unit suite, whole unit suite, entire unit suite, all unit tests, run all unit, toàn bộ unit, tất cả unit test, chạy toàn bộ unit]
 
   # --- verify-only ---
   - id: verify-only

@@ -232,6 +232,11 @@ const ARCHETYPE_STAR = {
     vars: a => [{ family: 'uat', suffix: a.surfaceName, state: 'assisted-verified' }],
     hints: { assistedUat: true, assistedMode: 'verify' },
   },
+  // Only on an explicit ask (modules/goal/archetypes.yaml unit-verify phrases): the full unit run is never a default leg.
+  'unit-verify': {
+    vars: () => [{ family: 'unit', suffix: 'X', state: 'verified' }],
+    hints: {},
+  },
   'verify-only': {
     vars: a => [{ family: 'slice', suffix: a.surfaceName, state: 'reviewed' }],
     hints: {},
@@ -395,7 +400,7 @@ function normalizeTargetVar(spec, args) {
     if (st === 'exists' || st === 'built' || st === 'implemented') {
       out.push({ family: 'impl', suffix, state: 'done', raw: spec });
     } else if (st === 'proven' || st === 'verified') {
-      const fam = ['ui', 'api', 'integration', 'perf', 'security'].includes(family) ? family : surface;
+      const fam = ['ui', 'api', 'integration', 'perf', 'security', 'unit'].includes(family) ? family : surface;
       out.push({ family: fam, suffix, state: 'verified', raw: spec });
     } else if (family === 'feature') {
       out.push({ family: 'impl', suffix, state: st, raw: spec });

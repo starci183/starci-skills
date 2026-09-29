@@ -167,7 +167,8 @@ policy:
               scope may authorize normal tests; do not impose a new blanket E2E approval. Shared
               destructive tests still need scoped authority. Routine gates are unit + typecheck + lint
               + canon + build; E2E runs manually only (owner ruling 2026-09-29), so this review never
-              runs the e2e suite itself.
+              runs the e2e suite itself and runs only the specs the reviewed change affects, never the whole
+              repository suite (owner 2026-09-29; unit.verify or /push-git run it).
       writes:
         - id: node
           path: N/index.yaml

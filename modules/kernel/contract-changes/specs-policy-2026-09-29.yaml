@@ -1,0 +1,29 @@
+id: specs-policy-2026-09-29
+effectiveAt: '2026-09-29T18:00:00+07:00'
+summary: >-
+  Owner policy 2026-09-29 on when specs run. Defaults of config.yaml root `specs` (engine/config.mjs SPEC_DEFAULTS,
+  specsSettings; no config block needed, the `specs:` block and its comment are removed from config.example.yaml):
+  harness false = touching-only, unit true, e2e false. .claude work writes and runs the specs of new or changed code; the
+  land gate's default spec mode is `touching` (named specs plus every spec naming a changed file, red refuses), the old
+  `named` mode and the harness-off `none` default are gone, `--specs all` is refused (specs-all-refused) unless
+  specs.harness is true or the push-git flow passes --full-by-push-git, and `--specs none` needs an explicit --reason
+  (specs-none-needs-reason; the reason is recorded as specReason on the land run). Product workflow ops that write code
+  write or update the unit specs of the source they change and run only those and the specs that import it plus
+  typecheck, lint, canon-scan and build, never the whole unit suite and never e2e: the op prompt carries a
+  verification_scope line (scripts/kernel/spec-deferral.mjs verificationScopeLines, op-prompt.mjs), _common.yaml gains the
+  "Verification scope" section, and backend.implement, interface.implement, code.refactor, review.verify and
+  integration.verify say so in their briefs; knowledge be.test and fe.test carry the same sentence. e2e runs only when the
+  goal or the owner asks (specs.e2e true or api run-deferred-tests) and e2e.verify then runs the full e2e suite. Adds no
+  check or finding code; nothing accepted before is refused.
+reach: new-legs
+paths:
+  - modules/kernel/contract-changes/specs-policy-2026-09-29.yaml
+  - modules/ops/_common.yaml
+  - modules/ops/ops/backend.implement.yaml
+  - modules/ops/ops/interface.implement.yaml
+  - modules/ops/ops/code.refactor.yaml
+  - modules/ops/ops/review.verify.yaml
+  - modules/ops/ops/integration.verify.yaml
+  - modules/supervisor/supervise.yaml
+  - knowledge/patterns/be/test.yaml
+  - knowledge/patterns/fe/test.yaml

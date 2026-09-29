@@ -343,6 +343,15 @@ operators:
       - {environment: qwen, profiles: [qwen-agent]}
       - {environment: codex, profiles: [codex-agent]}
       - {environment: claude, profiles: [claude-agent]}
+  unit.verify:
+    skill: starci
+    # Running the whole unit suite is mechanical, hands-on verify work: the same chain as the performance run.
+    chain: [devin-agent, qwen-agent, claude-agent, codex-agent]
+    environments:
+      - {environment: devin, profiles: [devin-agent]}
+      - {environment: qwen, profiles: [qwen-agent]}
+      - {environment: claude, profiles: [claude-agent]}
+      - {environment: codex, profiles: [codex-agent]}
   perf.verify:
     skill: starci
     # Measuring a performance budget runs the product and reads numbers back: the hands-on verify chain.

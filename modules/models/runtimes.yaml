@@ -583,6 +583,7 @@ allocation:
       uat.assisted.verify: {mb: 3500, class: heavy}
       e2e.verify: {mb: 3500, class: heavy}
       perf.verify: {mb: 3500, class: heavy}
+      unit.verify: {mb: 2500, class: heavy}
       integration.verify: {mb: 2500, class: heavy}
       security.verify: {mb: 1500, class: light}
       review.verify: {mb: 1000, class: light}
@@ -735,6 +736,7 @@ roleOfKind:
   integration.verify: {role: verify, work: hands-on, floor: hard, order: review}
   security.verify: {role: verify, work: think, floor: hard, order: ui}
   perf.verify: {role: verify, work: hands-on, floor: medium, order: review}
+  unit.verify: {role: verify, work: hands-on, floor: medium, order: review}
   uat.verify: {role: verify, work: hands-on, floor: medium, order: review}
   uat.assisted.prepare: {role: write, work: hands-on, floor: medium}
   uat.assisted.verify: {role: verify, work: think, floor: hard, order: ui}

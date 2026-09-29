@@ -18,7 +18,7 @@ import { renderPromptReads } from '../context/pack.mjs';
 import { renderGrammarContext } from './grammar-context.mjs';
 import { cutManifestPromptLines, seamPromptLines } from './cut-seam.mjs';
 import { resumePromptLines } from './resume-context.mjs';
-import { specsBriefLines, specsOf } from './spec-deferral.mjs';
+import { specsBriefLines, specsOf, verificationScopeLines } from './spec-deferral.mjs';
 
 const VERDICT_CONTRACT = 'modules/kernel/verdict-contract.yaml';
 
@@ -158,6 +158,7 @@ export function buildOpPrompt({ skillRoot, packet, jobId = null, repo = null, pr
   `target_repository: ${repoLabel}`,
   `brief: ${brief}  (your contract — never renegotiate it)`,
   ...specsLines,
+  ...verificationScopeLines({ settings: specs }),
   ...(packet.params ? [`params: ${Object.entries(packet.params).map(([k, v]) => `${k}=${JSON.stringify(v)}`).join(' ')} — the resolved tunables for this dispatch; use these values, never a number you read in prose`] : []),
   `workflow: ${packet.context.workflow?.id ?? '(unbound — packet preview)'} goal_revision=${packet.context.workflow?.goal_revision ?? '(unbound)'} goal_identity=${packet.context.workflow?.goal_identity ?? '(unbound)'}`,
   `owner_language: ${packet.context.owner_language ?? 'en'} — every string the owner reads (ask text, option and pick labels, owner-facing summaries) is written in this language in plain words; canonical records stay English`,

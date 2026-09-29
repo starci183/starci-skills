@@ -339,9 +339,11 @@ landGate:
        of the old modules/kernel/contract-changes.yaml list during the transition) whose `paths` cover every changed
        contract, schema, knowledge or op file (knowledge/, modules/schemas/, modules/ops/, modules/kernel/,
        modules/supervisor/, modules/models/code-patterns.yaml).
-       Owner, 2026-09-28: with config.yaml specs.harness false the gate runs NO spec unless the land asks
-       (--specs <csv> those, --specs touching the named-plus-touching set, --specs all every spec); the cheap
-       checks above still refuse.
+       Owner, 2026-09-29 (config.yaml specs.harness, default false = touching-only): the gate's spec mode is
+       `touching` by default - the named specs plus every spec naming a changed file, red refuses; a land never
+       runs the whole suite: `--specs all` is refused unless specs.harness is true or the push-git flow passes
+       --full-by-push-git; `--specs none` needs an explicit `--reason` and records it (specReason). The full suite
+       runs only in /push-git (scripts/supervisor/push-git.mjs) before a main is pushed.
     3. Fast-forward live main by compare-and-swap (git update-ref main <new> <base>) and update the working
        tree and index of exactly the changed paths, which must be clean; main moved -> the gate reruns on the new
        main (3 times at most); a failed tree update rolls the ref and the paths back.

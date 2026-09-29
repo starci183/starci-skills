@@ -23,7 +23,7 @@ import path from 'node:path';
 import { parseYaml } from '../../engine/yaml.mjs';
 import { FAILURE_CLASSES } from './report-envelope.mjs';
 /** The verify ops whose red is, by default, a defect in what they walked or measured - never in the walk. */
-export const VERIFY_OPS = ['uat.verify', 'uat.assisted.verify', 'e2e.verify', 'integration.verify', 'interface.audit', 'review.verify', 'security.verify', 'perf.verify'];
+export const VERIFY_OPS = ['uat.verify', 'uat.assisted.verify', 'e2e.verify', 'integration.verify', 'interface.audit', 'review.verify', 'security.verify', 'perf.verify', 'unit.verify'];
 /** The ops that walk a served stack: `api dispatch` runs the environment pre-step (scripts/uat/env-health.mjs) for them. */
 export const ENV_GATED_OPS = ['uat.verify', 'uat.assisted.verify', 'e2e.verify'];
 /** review.verify modes whose run is a measurement: scripts execute and write reports only (CONTEXT.md). */

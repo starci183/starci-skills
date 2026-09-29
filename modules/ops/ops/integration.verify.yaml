@@ -114,7 +114,8 @@ writes:
         sanitized output, including every attempt when something was retried. The manifest carries
         `proof: {boundary: live, fakes: []}`; a run that stood in for the provider is not this proof
         and is recorded as a spec defect. Every credential, token, personal identifier and provider
-        secret is redacted before the assets are hashed."
+        secret is redacted before the assets are hashed. This op runs only its declared live exchange and
+        the specs its changed files affect, never a whole repository suite or e2e (owner 2026-09-29)."
 steps:
   - reads:
       - official-docs

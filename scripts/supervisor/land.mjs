@@ -3,7 +3,7 @@
 // Serialized by a host lock; a change reaches live main only through all of it, or not at all.
 //
 //   node scripts/supervisor/land.mjs --job <jobId> [--specs <csv>] [--no-push] [--notify] [--json]
-//   node scripts/supervisor/land.mjs --commit <sha>[,<sha>...] [--specs <csv|touching|direct|all>] [--lane <name>] [--no-push] [--notify] [--json]
+//   node scripts/supervisor/land.mjs --commit <sha>[,<sha>...] [--specs <csv|touching|direct|all|none>] [--reason <why>] [--full-by-push-git] [--lane <name>] [--no-push] [--notify] [--json]
 //   node scripts/supervisor/land.mjs --status [--json]
 //
 // 1. The land queue in machine.sqlite (engine/machine-db.mjs land_queue): each waiter files a ticket and only the
@@ -24,9 +24,11 @@
 //      the specs named by the worker/--specs plus every spec that names a changed file (node --test,
 //        --test-concurrency allocation.landGate.specConcurrency, timeout specsBaseMs + perSpecMs per spec; `--specs direct` keeps the
 //        specs that can see the change instead: land-specs.mjs, hub files narrowed to the exports the diff reaches) -
-//        only while config.yaml `specs.harness` is true (the default). With `specs.harness: false` (owner, 2026-09-28) the gate
-//        runs NO spec unless the land asks: --specs <csv> runs those, --specs touching the old set (named plus
-//        every spec naming a changed file), --specs all every tests/*.spec.mjs (engine/config.mjs harnessSpecsEnabled);
+//        default mode `touching` (owner rule 2026-09-29, config.yaml `specs.harness` default false = touching-only): every
+//        named spec plus every spec naming a changed file runs and a red one refuses; the whole suite is never a land's
+//        job - `--specs all` is refused unless `specs.harness: true` or the push-git flow passes `--full-by-push-git`
+//        (engine/config.mjs harnessSpecsEnabled); `--specs none` needs an explicit `--reason` (recorded as specReason on the
+//        land run); `--specs <csv>` adds named specs;
 //      contract-changes: every changed contract/schema/knowledge/op file (CONTRACT_PREFIXES) is covered by
 //        `paths` of an entry the change itself adds or edits - an entry file modules/kernel/contract-changes/<id>.yaml,
 //        or (transition) an item of the old modules/kernel/contract-changes.yaml list (contract-changes-store.mjs);
@@ -128,21 +130,26 @@ export function specsTouching(changed, { specs }) {
   return [...new Set([...own, ...hits])];
 }
 
-/** --specs keywords: `touching` = the named specs plus every spec naming a changed file; `all` = every spec. */
-export const SPEC_KEYWORDS = Object.freeze(['touching', 'direct', 'all']);
+/** --specs keywords: `touching` = the named specs plus every spec naming a changed file (the default); `all` = every spec
+ *  (refused unless specs.harness is true or the push-git flow asks); `direct` = the specs that can see the change (hub files narrowed to the exports reached); `none` = no spec (needs an explicit --reason). */
+export const SPEC_KEYWORDS = Object.freeze(['touching', 'direct', 'all', 'none']);
 /**
- * The gate's spec plan. enabled (config.yaml `specs.harness`, default true): named specs plus every spec touching the
- * change, as before. Disabled: nothing unless the land itself asked (`asked`, the --specs of this land): a csv
- * runs just those, `touching` the enabled set, `all` every spec. Returns {mode: none|named|touching|all, named}.
+ * The gate's spec plan (owner rule 2026-09-29). The default mode is `touching`: the named specs (--specs csv, a job's) plus
+ * every spec touching the change; red refuses. `all` needs `fullAllowed` (config.yaml `specs.harness: true`) or `fullByPushGit`,
+ * else the plan is refused (`refused: specs-all-refused`). `none` needs a non-empty `reason` (`specs-none-needs-reason`).
+ * Returns {mode: none|touching|all, named, refused?, detail?}.
  */
-export function specPlan({ enabled = true, asked = [], named = [] } = {}) {
+export function specPlan({ fullAllowed = false, fullByPushGit = false, asked = [], named = [], reason = null } = {}) {
   const words = asked.filter((s) => SPEC_KEYWORDS.includes(s));
-  const files = [...new Set([...asked.filter((s) => !SPEC_KEYWORDS.includes(s)), ...(enabled ? named : [])])];
+  const files = [...new Set([...asked.filter((s) => !SPEC_KEYWORDS.includes(s)), ...named])];
+  if (words.includes('all') && !(fullAllowed || fullByPushGit)) return { mode: 'touching', named: files, refused: 'specs-all-refused', detail: 'a land never runs the whole suite: config.yaml specs.harness is not true (touching-only); use --specs touching, or /push-git for the full run' };
   if (words.includes('all')) return { mode: 'all', named: files };
-  if (words.includes('touching')) return { mode: 'touching', named: files };
   if (words.includes('direct')) return { mode: 'direct', named: files };
-  if (enabled) return { mode: 'touching', named: files };
-  return files.length ? { mode: 'named', named: files } : { mode: 'none', named: [] };
+  if (words.includes('none')) {
+    if (!String(reason ?? '').trim()) return { mode: 'touching', named: files, refused: 'specs-none-needs-reason', detail: '--specs none needs an explicit --reason "<why no spec touching this change applies>"' };
+    return { mode: 'none', named: [] };
+  }
+  return { mode: 'touching', named: files };
 }
 
 /* ------------------------------------------------------------ conflicts */
@@ -371,7 +378,7 @@ export function runChecks({ dir, base, head, specs = [], specMode = 'touching', 
   else if (specMode === 'touching') extra = specsTouching(changed, { specs: pool });
   else if (specMode === 'direct') { const d = specsDirect(changed, { specs: pool, symbolsOf }); extra = d.files; narrowed = d.narrowed; }
   const allSpecs = specMode === 'none' ? [] : [...new Set([...specs.map(normPath), ...extra])].filter((f) => fs.existsSync(path.join(dir, f)));
-  if (specMode === 'none') checks.push({ name: 'specs skipped', ok: true, advisory: true, output: 'config.yaml specs.harness: false - no spec runs unless the land asks (--specs <csv|touching|direct|all>)' });
+  if (specMode === 'none') checks.push({ name: 'specs skipped', ok: true, advisory: true, output: '--specs none with an explicit --reason: no spec ran (the reason is recorded as specReason on the land run)' });
   const missing = specs.map(normPath).filter((f) => !fs.existsSync(path.join(dir, f)));
   if (missing.length) checks.push({ name: 'named specs exist', ok: false, output: `missing: ${missing.join(', ')}` });
   const gate = runSpecs && allSpecs.length ? ramGate() : null;
@@ -627,7 +634,7 @@ function landOutcomeOf(result, { root = SKILL_ROOT, ticketId = null, lane = null
     scan: p.findings ? { findings: p.findings } : null, stderr: p.error ?? null } : null;
   const run = { ticketId, commitSha: commits[commits.length - 1], commits, landedSha: result.landed ?? null, result: landResultOf(result),
     // an already-landed pick moved nothing: no landed_sha (direct-commit detection keys on the mains the gate produced)
-    reason: result.reason ?? (result.alreadyLanded ? `already-landed ${result.alreadyLanded}` : null), specs: { mode: specMode, failed: (result.checks ?? []).filter((c) => !c.ok).map((c) => c.name) },
+    reason: result.reason ?? (result.alreadyLanded ? `already-landed ${result.alreadyLanded}` : null), specs: { mode: specMode, ...(result.specReason ? { reason: result.specReason } : {}), failed: (result.checks ?? []).filter((c) => !c.ok).map((c) => c.name) },
     stdout: JSON.stringify(result, null, 2), stderr: (result.checks ?? []).filter((c) => !c.ok).map((c) => `## ${c.name}\n${c.output ?? ''}`).join('\n') || null, startedAt, finishedAt: Date.now() };
   const log = { actor: 'land', kind: result.ok ? (pushOwedOf(result) ? 'land.push-owed' : 'land.passed') : result.reason === 'gate-busy' ? 'land.gate-busy' : 'land.failed', level: result.ok ? 'info' : 'warn', msg: describe(result, { jobId }).slice(0, 2000),
     data: { ticketId, lane, jobId, commits, landed: result.landed ?? null, reason: result.reason ?? null }, refs: [...(lane ? [`lane:${lane}`] : []), ...commits.map((c) => `commit:${c}`)] };
@@ -660,7 +667,7 @@ function recordLand(m, { result, root = SKILL_ROOT, env = process.env, ticketId 
 }
 
 /** The full gate for one job or commit list, with the queue, the machine records and the optional inbox notice. */
-export async function land({ jobId = null, commits = null, specs = [], lane = null, push = null, notify = false, waitMs = LAND_WAIT_MS, root = SKILL_ROOT, env = process.env, deps = {} } = {}) {
+export async function land({ jobId = null, commits = null, specs = [], reason = null, fullByPushGit = false, lane = null, push = null, notify = false, waitMs = LAND_WAIT_MS, root = SKILL_ROOT, env = process.env, deps = {} } = {}) {
   const settings = supervisorSettings();
   const doPush = push ?? settings.landGate.push;
   const asked = specs.map((s) => String(s).trim()).filter(Boolean);
@@ -708,9 +715,10 @@ export async function land({ jobId = null, commits = null, specs = [], lane = nu
     try { withMachine((m) => recordLand(m, { result, root, lane, commits, jobId, startedAt }), { env }); } catch { /* the answer carries it */ }
     return result;
   }
-  let enabled = true;
-  try { enabled = (deps.specsEnabled ?? harnessSpecsEnabled)(); } catch { /* an unreadable owner file keeps the default */ }
-  const plan = specPlan({ enabled, asked, named });
+  let fullAllowed = false;
+  try { fullAllowed = (deps.specsEnabled ?? harnessSpecsEnabled)(); } catch { /* an unreadable owner file keeps the default: touching-only */ }
+  const plan = specPlan({ fullAllowed, fullByPushGit, asked, named, reason });
+  if (plan.refused) return { ok: false, commits, lane, reason: plan.refused, preflight: true, detail: plan.detail };
   const lock = (deps.acquireLand ?? acquireLand)({ env, waitMs, lane, commits });
   if (!lock.ok) {
     // MB-10: a busy gate is a visible, recorded outcome that names the lane, its commits, the wait and the holder.
@@ -724,7 +732,7 @@ export async function land({ jobId = null, commits = null, specs = [], lane = nu
     // Records an earlier land could not write (machine-db outbox) are applied first, inside the gate.
     let outbox = null;
     try { outbox = withMachine((m) => m.flushOutbox(), { env }); } catch (error) { outbox = { error: String(error?.message ?? error) }; }
-    const result = { ...landCommits({ commits, specs: plan.named, specMode: plan.mode, root, env, push: doPush, deps }), specMode: plan.mode };
+    const result = { ...landCommits({ commits, specs: plan.named, specMode: plan.mode, root, env, push: doPush, deps }), specMode: plan.mode, ...(plan.mode === 'none' ? { specReason: String(reason).trim() } : {}) };
     if (outbox && (outbox.flushed || outbox.failed || outbox.error || outbox.busy)) result.outbox = outbox;
     if (pushOwedOf(result)) result.outcome = 'landed-push-owed';
     state = result.ok ? 'passed' : 'failed';
@@ -768,9 +776,9 @@ if (process.argv[1] && path.resolve(process.argv[1]) === selfFile) {
   const value = (n) => { const i = argv.indexOf(`--${n}`); return i >= 0 ? argv[i + 1] ?? null : null; };
   const csv = (v) => (v ? v.split(',').map((s) => s.trim()).filter(Boolean) : []);
   if (has('status')) console.log(JSON.stringify(landStatus()));
-  else if (!value('job') && !value('commit')) { console.error('use: land.mjs --job <id> | --commit <sha>[,<sha>] [--specs <csv|touching|direct|all>] [--lane <name>] [--no-push] [--notify] [--json]'); process.exitCode = 2; }
+  else if (!value('job') && !value('commit')) { console.error('use: land.mjs --job <id> | --commit <sha>[,<sha>] [--specs <csv|touching|direct|all|none>] [--reason <why>] [--full-by-push-git] [--lane <name>] [--no-push] [--notify] [--json]'); process.exitCode = 2; }
   else {
-    const r = await land({ jobId: value('job'), commits: value('commit') ? csv(value('commit')) : null, specs: csv(value('specs')), lane: value('lane'),
+    const r = await land({ jobId: value('job'), commits: value('commit') ? csv(value('commit')) : null, specs: csv(value('specs')), reason: value('reason'), fullByPushGit: has('full-by-push-git'), lane: value('lane'),
       push: has('no-push') ? false : null, notify: has('notify'), waitMs: Number(value('wait-ms')) || LAND_WAIT_MS });
     console.log(has('json') ? JSON.stringify(r) : describe(r, { jobId: value('job') }));
     if (!r.ok) process.exitCode = 1;

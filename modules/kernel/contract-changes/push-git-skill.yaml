@@ -1,0 +1,16 @@
+id: push-git-skill
+effectiveAt: '2026-09-29T18:20:00+07:00'
+summary: >-
+  New skill `/push-git` (skills/push-git/SKILL.md, executable scripts/supervisor/push-git.mjs), the only place a full suite
+  runs (owner 2026-09-29): per repository with unpushed main commits (the runtime plus every project-bound product
+  repository, or --repo) it requires a clean main checkout (dirty paths reported, nothing stashed), runs the full suite
+  (.claude: npm test, npm run check; product: typecheck, lint:check, test:unit, build where present, canon-scan; never e2e),
+  prints a failure list grouped by spec file and stops with exit 1 on red (the skill spawns one fixer per group, lands with
+  land.mjs --specs touching, and re-runs), and on green pushes through push-mains.mjs (dry run, hooks-only, push). --check is
+  everything except the push. The push is recorded by push-mains in machine.sqlite pushes; the suite run is printed JSON only.
+  land.mjs gains --reason and --full-by-push-git. No API verb, ledger table or module YAML key changes.
+reach: new-legs
+paths:
+  - modules/kernel/contract-changes/push-git-skill.yaml
+  - skills/push-git/SKILL.md
+  - scripts/supervisor/push-git.mjs

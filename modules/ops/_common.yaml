@@ -390,8 +390,9 @@ sections:
         the new actual inputs; never just replace a digest to clear a stale result."
       - "Choose tests from the changed behavior and affected dependencies.
         Edits, retries and polling use relevant partial tests and applicable static/build checks, not a
-        full repository run each time. A required full suite belongs at the main-publication checkpoint
-        after integration. Reuse a passing run only with verified unchanged covered inputs, its original
+        full repository run each time. The whole unit suite is never a code-writing op's run (owner 2026-09-29):
+        it belongs to unit.verify, dispatched only when the goal or the owner asks for the full unit run, and to the
+        owner's /push-git flow before a main is pushed; e2e runs only on request, and e2e.verify then runs the full e2e suite. Reuse a passing run only with verified unchanged covered inputs, its original
         tested revision and explicit limits; check documentation-only deltas separately. Installing the
         same artifact uses relevant installation/build/import smoke checks unless changed inputs or a
         failure justify broader testing. Preserve required CI gates and never claim a partial run is full."
@@ -555,10 +556,20 @@ sections:
         dies; it never dispatches another op. The kernel settles that verdict and picks the next
         leg, and finishes the workflow when the selected result is reached or a required decision
         blocks progress. Unselected next ops are suggestions for a later plan only.
+  - title: Verification scope - the specs of the change, never the whole suite
+    blocks:
+      - "Owner policy 2026-09-29: an op that writes or changes code also writes or updates the unit specs of that code and
+        runs ONLY those - the specs of the changed or added source plus the specs that import it - together with
+        typecheck, lint, canon-scan and the build scoped as usual. It never runs the repository's whole unit suite:
+        unit.verify runs it (npm run test:unit), dispatched only when the goal or the owner explicitly asks for the full
+        unit run, and the owner's /push-git flow runs it before a main is pushed. e2e runs only when the goal or the
+        owner asks (config.yaml specs.e2e, default off); e2e.verify then runs the FULL e2e suite. The .claude runtime
+        itself follows config.yaml specs.harness (default false = touching-only): changed harness code gets its own
+        spec, the land gate runs only the specs touching the landed files (--specs touching) and never the whole suite."
   - title: Owner testing switches - config.yaml specs.unit and specs.e2e
     blocks:
       - "Owner rule 2026-09-28 (\"speed up development; test later when asked\"): the owner config.yaml root
-        `specs: {unit, e2e}` switches product testing off per class; absent or true is the normal contract.
+        `specs: {unit, e2e}` switches product testing per class; unit is on unless set false, e2e is off unless set true (defaults 2026-09-29).
         unit covers product unit tests (*.spec.ts; jest, vitest, test:ci, coverage gates, Sonar
         coverage); e2e covers product e2e tests (e2e.verify, backend e2e, Playwright and *.e2e-spec.* files).
         UAT is neither: uat.verify keeps its own owner deferral until credentials."
