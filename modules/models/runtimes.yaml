@@ -475,8 +475,6 @@ allocation:
   # archiveMaxAgeMs are deleted outright. lanesRoot is where lane worktrees sit; a landed lane is
   # removed only once its branch reflog, HEAD reflog and directory stayed unchanged for laneGraceMs
   # (a fresh lane with no commit yet reads as landed to git cherry); unset, no lane is removed.
-  # legacyFixturePrefixes: spec fixtures the drive-root starci-tmp still holds from before MB-16 (the specs now
-  # mkdtemp under %TEMP% and remove their root); matched only in <runtime drive>/starci-tmp, same age rule.
   # logMaxAgeMs caps every jsonl and log under %LOCALAPPDATA%/StarCi and ~/.starci.
   # gitIndexLockStaleMs: a product checkout's .git/index.lock older than this, with no git process on
   # that repository (one naming no repository counts as on it), is removed by
@@ -493,8 +491,6 @@ allocation:
       work-index-md-, work-module-spec-, example-critique-, example-derive-, example-evidence-, example-verify-,
       example-work-gate-, work-artifacts-, work-consistency-, work-surfaces-,
       grammar-land-, kernel-replace-close-, nm-link-, rc-job-, rc-health-, seat-titles-, slice-typecheck-]
-    legacyFixturePrefixes: [artifacts-fixture-, gate-fixture-, consistency-fixture-, critique-fixture-, derive-fixture-,
-      evidence-fixture-, verify-fixture-, surfaces-fixture-]
     sessionArchiveAfterMs: 259200000
     claudeTranscriptArchiveAfterMs: 604800000
     archiveMaxAgeMs: 2592000000

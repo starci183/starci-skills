@@ -19,11 +19,6 @@
 //     (.git, HEAD, index, logs/HEAD) changed within tmpMaxAgeMs is live and skipped; one outside the temp root
 //     stays refused by safeRemoveTree.
 //
-// MB-16: spec fixtures once lived at the drive root's starci-tmp (artifacts-fixture-*, gate-fixture-*: 41k entries on
-// 2026-09-28); they now live under %TEMP% and are removed by their spec. Leftovers of the old place are swept too:
-// allocation.housekeeping.legacyFixturePrefixes, matched in <runtime drive>/starci-tmp only (that directory also
-// holds evidence and lane notes, which no fixture prefix matches), same age and link rules as %TEMP%.
-//
 // The seams are injected so the spec never touches the real TEMP: `env` supplies TEMP/TMP, `now` supplies
 // the clock, `remove` supplies the remover (safeRemoveTree with checkoutsUnder the temp root by default),
 // `allocation` supplies the settings.
@@ -32,12 +27,10 @@
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { fileURLToPath } from 'node:url';
 import { allocationSettings } from '../../engine/config.mjs';
 import { isLinkLike, safeRemoveTree } from './safe-remove.mjs';
 import { foldCase } from './path-key.mjs';
 
-const RUNTIME_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 
 // STORAGE-PROMPT 1.tmp declares the two-day age default. An undeclared prefix list matches nothing: the
 // sweep fails safe, never wide.
@@ -95,9 +88,6 @@ export async function sweepTmp({
   env = process.env,
   allocation = allocationSettings()?.housekeeping ?? {},
   remove = null,
-  // A test world (STARCI_TEST_TEMP_DIR, tests/setup/isolated-temp.mjs) never reads the live drive-root starci-tmp: its
-  // tens of thousands of entries made one --once gc pass take minutes. A caller may still pass the root explicitly.
-  legacyFixtureRoot = env?.STARCI_TEST_TEMP_DIR ? null : path.join(path.parse(RUNTIME_ROOT).root, 'starci-tmp'),
 } = {}) {
   const tempRoot = path.resolve(env.TEMP ?? env.TMP ?? os.tmpdir());
   const listOf = (v) => (Array.isArray(v) ? v : []).map((prefix) => foldCase(String(prefix))).filter(Boolean);
@@ -105,8 +95,6 @@ export async function sweepTmp({
   const maxAgeMs = Number.isFinite(declaredAge) && declaredAge > 0 ? declaredAge : DEFAULT_TMP_MAX_AGE_MS;
   const out = { ok: true, freedBytes: 0, deleted: [], skipped: [], errors: [] };
   const roots = [{ root: tempRoot, prefixes: listOf(allocation?.tmpPrefixes) }];
-  const legacy = listOf(allocation?.legacyFixturePrefixes);
-  if (legacyFixtureRoot && legacy.length && fs.existsSync(legacyFixtureRoot) && foldCase(path.resolve(legacyFixtureRoot)) !== foldCase(tempRoot)) roots.push({ root: path.resolve(legacyFixtureRoot), prefixes: legacy, missingOk: true });
   for (const r of roots) sweepRoot(r, { apply, now, maxAgeMs, remove, out });
   if (out.errors.length) out.ok = false;
   return out;
