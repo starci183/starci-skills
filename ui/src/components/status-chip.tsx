@@ -15,3 +15,10 @@ export function StatusChip({ status, label, suffix, className = '' }: { status: 
 export function StatusDot({ status, title }: { status: Status; title?: string }) {
   return <span className="status-dot" data-tone={statusTone[status]} title={title ?? statusLabels[status]} aria-label={title ?? statusLabels[status]} role="img" />;
 }
+
+const kindLabels: Record<string, string> = { json: 'JSON', yaml: 'YAML', markdown: 'MD', text: 'LOG', diff: 'DIFF', image: 'ẢNH', video: 'VIDEO', audio: 'AUDIO', pdf: 'PDF', binary: 'BIN' };
+
+/** File-type badge for evidence rows (S01 refines the per-kind tint). */
+export function FileTypeBadge({ kind }: { kind: string }) {
+  return <span data-kind={kind} className="inline-flex min-w-11 justify-center rounded border border-border bg-muted px-1.5 font-mono text-[10.5px] font-semibold tracking-wide text-muted-foreground">{kindLabels[kind] ?? kind.toUpperCase()}</span>;
+}

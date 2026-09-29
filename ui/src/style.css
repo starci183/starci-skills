@@ -283,3 +283,4 @@ button.lifecycle-label:hover, button.lifecycle-label[aria-pressed=true] { backgr
 .path-link .path-action { font-size: 11px; color: var(--muted-foreground); padding: 1px 6px; border: 1px solid var(--border); border-radius: 5px; background: transparent; cursor: pointer; text-decoration: none; }
 .path-link .path-action:hover { color: var(--foreground); }
 @media (prefers-reduced-motion: reduce) { .status-chip[data-live=true] .status-dot { animation: none; } }
+[data-tone].step-item { --state-ink: var(--tone); }
