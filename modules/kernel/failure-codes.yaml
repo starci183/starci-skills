@@ -5581,6 +5581,16 @@ STARCI_MACHINE_CORRUPT:
   nextStep_vi: "Runtime ghi một sự cố vào machine_logs; cần xử lý hoặc khôi phục từ bản sao lưu."
   owner: supervisor
   kind: runtime-fault
+STARCI_MACHINE_BUSY:
+  title: "Machine database busy"
+  title_vi: "Cơ sở dữ liệu máy đang bận"
+  meaning_vi: "machine.sqlite vẫn bị một tiến trình khác khóa ghi sau busy_timeout và các lần thử lại có giới hạn; thao tác không thay đổi gì."
+  causes_vi:
+    - "Một tiến trình khác giữ giao dịch ghi quá lâu"
+    - "Nhiều land hoặc reconciler cùng ghi"
+  nextStep_vi: "Thử lại sau; land báo gate-busy với why db-busy và không để lại cổng nửa chiếm."
+  owner: supervisor
+  kind: runtime-fault
 STARCI_MACHINE_DB:
   title: "Machine database refused an operation"
   title_vi: "Cơ sở dữ liệu máy từ chối thao tác"

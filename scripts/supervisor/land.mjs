@@ -59,7 +59,7 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 import { parseYaml } from '../../engine/yaml.mjs';
 import { allocationMs, allocationSettings, harnessSpecsEnabled } from '../../engine/config.mjs';
 import { git, normPath, unlinkNodeModulesLink, finishLanded, selfJobsLandedBy, recordLandFailed } from './workers.mjs';
-import { withMachine, readMachine, writeOrDefer, newSpanId } from '../../engine/machine-db.mjs';
+import { withMachine, readMachine, writeOrDefer, newSpanId, isMachineBusy } from '../../engine/machine-db.mjs';
 import { lanesRoot } from '../lib/hk-lanes.mjs';
 import { scanRange, scanHint } from './push-mains.mjs';
 import { safeRemoveTree } from '../lib/safe-remove.mjs';
@@ -594,22 +594,28 @@ export function landQueue({ env = process.env } = {}) {
 
 /**
  * Wait for the gate in request order: a land_queue ticket joins the queue and only the oldest live ticket enters.
- * {ok, ticketId, release(state)} or {ok:false, holder, ahead} (the ticket is cancelled then).
+ * {ok, ticketId, release(state)} or {ok:false, holder, ahead, why} (the ticket is cancelled then). A machine.sqlite that stays
+ * locked past machine-db's busy budget never throws: the poll goes on until waitMs, then {ok:false, why:'db-busy'}. why is
+ * 'gate-held' (another land holds the gate) or 'db-busy'. A claim is one transaction, so a refused one leaves no half-claimed gate.
  */
 export function acquireLand({ env = process.env, waitMs = LAND_WAIT_MS, pollMs = 5000, lane = null, commits = [], sleep = sleepSync } = {}) {
-  const ticketId = withMachine((m) => m.enqueueLand({ lane, commitSha: commits[commits.length - 1] ?? 'unknown', commits: commits.length }), { env });
+  let ticketId;
+  try { ticketId = withMachine((m) => m.enqueueLand({ lane, commitSha: commits[commits.length - 1] ?? 'unknown', commits: commits.length }), { env }); }
+  catch (error) { if (isMachineBusy(error)) return { ok: false, holder: null, ahead: -1, why: 'db-busy', detail: error.message }; throw error; }
   const finish = (state) => { try { withMachine((m) => m.finishLandTicket(ticketId, state), { env }); } catch { /* the reaper cancels it */ } };
   const drop = () => finish('cancelled');
   process.on('exit', drop);
   const end = Date.now() + waitMs;
   try {
     for (;;) {
-      const got = withMachine((m) => m.claimLandGate({ ticketId }), { env });
+      let got;
+      try { got = withMachine((m) => m.claimLandGate({ ticketId }), { env }); }
+      catch (error) { if (!isMachineBusy(error)) throw error; got = { ok: false, dbBusy: error.message }; }
       if (got.ok) return { ok: true, ticketId, release: (state = 'cancelled') => { process.removeListener('exit', drop); finish(state); } };
       if (Date.now() >= end) {
         const queue = landQueue({ env });
         process.removeListener('exit', drop); drop();
-        return { ok: false, holder: queue.find((t) => t.state === 'running') ?? null, ahead: queue.findIndex((t) => t.ticketId === ticketId) };
+        return { ok: false, holder: queue.find((t) => t.state === 'running') ?? null, ahead: queue.findIndex((t) => t.ticketId === ticketId), why: got.dbBusy ? 'db-busy' : 'gate-held', ...(got.dbBusy ? { detail: got.dbBusy } : {}) };
       }
       sleep(pollMs);
     }
@@ -720,8 +726,8 @@ export async function land({ jobId = null, commits = null, specs = [], reason = 
   const lock = (deps.acquireLand ?? acquireLand)({ env, waitMs, lane, commits });
   if (!lock.ok) {
     // MB-10: a busy gate is a visible, recorded outcome that names the lane, its commits, the wait and the holder.
-    const result = { ok: false, commits, lane, reason: 'gate-busy', holder: lock.holder ?? null, ahead: lock.ahead ?? 0, waitedMs: Date.now() - startedAt,
-      detail: `waited ${Math.round((Date.now() - startedAt) / 1000)}s${lock.holder ? ` behind ${lock.holder.lane ?? lock.holder.ticketId ?? 'a land'} (${String(lock.holder.commit ?? '').slice(0, 9)})` : ''}` };
+    const result = { ok: false, commits, lane, reason: 'gate-busy', why: lock.why ?? 'gate-held', holder: lock.holder ?? null, ahead: lock.ahead ?? 0, waitedMs: Date.now() - startedAt,
+      detail: `${lock.why === 'db-busy' ? 'machine.sqlite locked; ' : ''}waited ${Math.round((Date.now() - startedAt) / 1000)}s${lock.holder ? ` behind ${lock.holder.lane ?? lock.holder.ticketId ?? 'a land'} (${String(lock.holder.commit ?? '').slice(0, 9)})` : ''}` };
     try { withMachine((m) => recordLand(m, { result, root, lane, commits, jobId, startedAt }), { env }); } catch { /* the answer carries it */ }
     return result;
   }

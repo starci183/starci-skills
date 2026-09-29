@@ -34,6 +34,7 @@ import path from 'node:path';
 import crypto from 'node:crypto';
 import { createRequire } from 'node:module';
 import { pathToFileURL, fileURLToPath } from 'node:url';
+import { sleepSync as scaledSleepSync } from '../scripts/lib/sleep-sync.mjs';
 import { putBlob as storeBlob, blobPath, artifactRoot, getBlob } from '../scripts/lib/artifact-store.mjs';
 import { redactBytes, redactData, redactText } from '../scripts/lib/redact.mjs';
 
@@ -42,6 +43,8 @@ const ENGINE_DIR = path.dirname(fileURLToPath(import.meta.url));
 export const MACHINE_SCHEMA = 'starci/machine@1';
 export const MACHINE_VERSION = 1;
 export const MACHINE_BUSY_TIMEOUT_MS = 15000;
+/** Test seam: STARCI_MACHINE_BUSY_TIMEOUT_MS (a positive integer) replaces the writer's busy_timeout; unset in production. */
+export const busyTimeoutOf = (env = process.env) => { const n = Number(env?.STARCI_MACHINE_BUSY_TIMEOUT_MS); return Number.isInteger(n) && n > 0 ? n : MACHINE_BUSY_TIMEOUT_MS; };
 export const INIT_SQL_FILE = path.join(ENGINE_DIR, 'migrations', 'machine', '0001-init.sql');
 export const CONTROLLERS = Object.freeze(['job', 'workflow', 'resource', 'host', 'gc', 'fleet', 'learning']);
 
@@ -97,11 +100,21 @@ const int = (v) => (v === undefined || v === null || v === '' ? null : Math.trun
 const bool = (v) => (v === undefined || v === null ? null : v ? 1 : 0);
 const OPEN_RETRY_DELAYS_MS = [0, 300, 900];
 const sleepSync = (ms) => Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms);
-const WRITER_PRAGMAS = Object.freeze({ synchronous: 'NORMAL', busy_timeout: MACHINE_BUSY_TIMEOUT_MS, temp_store: 'MEMORY', cache_size: -16000,
+const writerPragmas = (env) => ({ synchronous: 'NORMAL', busy_timeout: busyTimeoutOf(env), temp_store: 'MEMORY', cache_size: -16000,
   journal_size_limit: 67108864, trusted_schema: 'OFF' });
 const pragma = (db, name) => { const row = db.prepare(`PRAGMA ${name}`).get(); return row ? Object.values(row)[0] : null; };
 /** True while `pid` names a live process (EPERM counts as alive). */
 export const pidAlive = (pid) => { if (!Number.isInteger(pid) || pid <= 0) return false; try { process.kill(pid, 0); return true; } catch (error) { return error?.code === 'EPERM'; } };
+/**
+ * SQLITE_BUSY / SQLITE_LOCKED that survived busy_timeout: the waits before each further attempt (bounded backoff, scaled by
+ * STARCI_SLEEP_SCALE), then STARCI_MACHINE_BUSY. Only an attempt that changed nothing is retried: a BEGIN IMMEDIATE that
+ * was refused, or one autocommit statement outside a transaction.
+ */
+export const BUSY_RETRY_DELAYS_MS = Object.freeze([100, 300, 900, 2000]);
+export const MACHINE_BUSY_CODE = 'STARCI_MACHINE_BUSY';
+export const isMachineBusy = (error) => error?.code === MACHINE_BUSY_CODE;
+const busyError = (file, error, { retries, where }) => Object.assign(Error(`machine-db-busy: ${file} ${where}: database still locked after busy_timeout and ${retries} retries: ${String(error?.message ?? error).slice(0, 200)}`),
+  { code: MACHINE_BUSY_CODE, cause: error, file, retries, where });
 const isBusy = (error) => error?.errcode === 5 || error?.errcode === 6 || /SQLITE_BUSY|database is (?:locked|busy)/i.test(String(error?.message ?? error));
 
 // ---------------------------------------------------------------------------------------------------------------------
@@ -161,12 +174,18 @@ function resilientConnection(openRaw, { file, inTransaction, onRecovered }) {
   let generation = 0;
   const reopen = () => { try { raw.close(); } catch { /* closed */ } raw = openRaw(); generation += 1; };
   const retrying = (where, op) => {
+    let busyRetries = 0;
     for (let retries = 0; ; retries += 1) {
       try {
         const out = op();
         if (retries) onRecovered({ where, retries });
         return out;
       } catch (error) {
+        if (isBusy(error) && !isMachineBusy(error) && !isCorruptError(error)) {
+          if (inTransaction() || raw.isTransaction) throw error;
+          if (busyRetries >= BUSY_RETRY_DELAYS_MS.length) throw busyError(file, error, { retries: busyRetries, where });
+          scaledSleepSync(BUSY_RETRY_DELAYS_MS[busyRetries]); busyRetries += 1; retries -= 1; continue;
+        }
         if (!isCorruptError(error) || error.code === MACHINE_CORRUPT_CODE) throw error;
         if (inTransaction() || raw.isTransaction) throw error;
         if (retries >= CORRUPT_RETRY_DELAYS_MS.length) throw corruptIncident(file, error, { retries, where });
@@ -269,9 +288,11 @@ function openConnection(file, { readOnly = false, env = process.env, now = Date.
   need(typeof file === 'string' && file.trim(), 'openMachine needs a file');
   if (!readOnly) fs.mkdirSync(path.dirname(path.resolve(file)), { recursive: true });
   let lastError;
+  let busyOpens = 0;
   // SQLITE_CANTOPEN (Windows, while another process closes the WAL files) and a transient SQLITE_CORRUPT are retried.
-  for (const delay of OPEN_RETRY_DELAYS_MS) {
-    if (delay) sleepSync(delay);
+  let failures = 0;   // non-busy failures: one attempt per OPEN_RETRY_DELAYS_MS entry; busy ones have their own BUSY_RETRY_DELAYS_MS budget
+  for (;;) {
+    if (failures && OPEN_RETRY_DELAYS_MS[failures]) sleepSync(OPEN_RETRY_DELAYS_MS[failures]);
     let db;
     try {
       if (readOnly) {
@@ -280,13 +301,13 @@ function openConnection(file, { readOnly = false, env = process.env, now = Date.
         checkSchema(db, file);
         return db;
       }
-      db = new DatabaseSync(file, { timeout: MACHINE_BUSY_TIMEOUT_MS });
+      db = new DatabaseSync(file, { timeout: busyTimeoutOf(env) });
       const fresh = Number(pragma(db, 'page_count')) === 0;
       if (fresh) db.exec('PRAGMA page_size=4096; PRAGMA auto_vacuum=INCREMENTAL;');
       const mode = String(pragma(db, 'journal_mode=WAL')).toLowerCase();
       need(mode === 'wal', `machine.sqlite journal_mode is '${mode}', not wal (${file})`, 'STARCI_MACHINE_NOT_WAL');
       db.exec('PRAGMA foreign_keys=ON;');
-      for (const [k, v] of Object.entries(WRITER_PRAGMAS)) db.exec(`PRAGMA ${k}=${v};`);
+      for (const [k, v] of Object.entries(writerPragmas(env))) db.exec(`PRAGMA ${k}=${v};`);
       // Never an automatic checkpoint: the engine leader's fenced checkpoint() is the only one (header, G17).
       db.exec('PRAGMA wal_autocheckpoint=0;');
       if (fresh || Number(pragma(db, 'user_version')) === 0) {
@@ -299,8 +320,11 @@ function openConnection(file, { readOnly = false, env = process.env, now = Date.
       return db;
     } catch (error) {
       try { db?.close(); } catch { /* closed */ }
-      if (!/unable to open/i.test(String(error?.message ?? '')) && !(isCorruptError(error) && error.code !== MACHINE_CORRUPT_CODE)) throw error;
+      const busy = isBusy(error) && !isCorruptError(error);
+      if (!busy && !/unable to open/i.test(String(error?.message ?? '')) && !(isCorruptError(error) && error.code !== MACHINE_CORRUPT_CODE)) throw error;
       lastError = error;
+      if (busy) { if (busyOpens >= BUSY_RETRY_DELAYS_MS.length) throw busyError(path.resolve(file), error, { retries: busyOpens, where: 'open' }); scaledSleepSync(BUSY_RETRY_DELAYS_MS[busyOpens]); busyOpens += 1; }
+      else if ((failures += 1) >= OPEN_RETRY_DELAYS_MS.length) break;
     }
   }
   if (isCorruptError(lastError)) throw corruptIncident(path.resolve(file), lastError, { retries: OPEN_RETRY_DELAYS_MS.length - 1, where: 'open' });
@@ -413,7 +437,7 @@ function makeHandle(openRaw, { file, env, now, live, readOnly, checkpointer, tem
     need(!readOnly, 'machine-db: read-only handle');
     for (let retries = 0; ; retries += 1) {
       try {
-        db.exec('BEGIN IMMEDIATE');
+        db.exec('BEGIN IMMEDIATE');   // a refused BEGIN changed nothing: db.exec backs off (BUSY_RETRY_DELAYS_MS), then throws STARCI_MACHINE_BUSY
         depth += 1;
         let out;
         try { out = fn(db); db.exec('COMMIT'); } catch (error) { try { if (db.isTransaction) db.raw.exec('ROLLBACK'); } catch { /* none */ } throw error; } finally { depth -= 1; }
