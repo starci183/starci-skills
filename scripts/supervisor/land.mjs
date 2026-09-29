@@ -62,7 +62,7 @@ import { git, normPath, unlinkNodeModulesLink, finishLanded, selfJobsLandedBy, r
 import { withMachine, readMachine, writeOrDefer, newSpanId, isMachineBusy } from '../../engine/machine-db.mjs';
 import { lanesRoot } from '../lib/hk-lanes.mjs';
 import { scanRange, scanHint } from './push-mains.mjs';
-import { safeRemoveTree } from '../lib/safe-remove.mjs';
+import { safeRemoveTree, isLinkLike, unlinkOnly } from '../lib/safe-remove.mjs';
 import { sleepSync } from '../lib/sleep-sync.mjs';
 import { hostThrottle } from '../lib/ram-throttle.mjs';
 import { grammarDistStatus } from '../checks/grammar-dist.mjs';
@@ -239,8 +239,10 @@ const tail = (text, n = 25) => String(text ?? '').trim().split(/\r?\n/).slice(-n
  */
 export function removeScratch(dir, { root }) {
   try {
-    // Never remove a scratch whose node_modules link to the live tree is still there.
-    if (!unlinkNodeModulesLink(dir)) return false;
+    // Never remove a scratch whose node_modules link to the live tree is still there: a junction lstat does not
+    // report as a symlink (unlinkNodeModulesLink leaves those) is caught by isLinkLike and unlinked as a link.
+    const nm = path.join(dir, 'node_modules');
+    if (!unlinkNodeModulesLink(dir) || (isLinkLike(nm) && !unlinkOnly(nm))) return false;
     // Never `git worktree remove --force`: it follows junctions (nivo-fe inc-c8fbf76aa499). The tree goes
     // through safeRemoveTree, which never descends into a link; prune drops the registration.
     if (fs.existsSync(dir)) safeRemoveTree(dir);
@@ -537,13 +539,34 @@ export function rebuildLandedGrammar({ root = SKILL_ROOT, changed = [] } = {}) {
 /* ------------------------------------------------------------ the gate */
 
 /**
+ * The live runtime's installed dependencies (live-node-modules-wiped, 2026-09-29 13:29Z: the live node_modules was
+ * found with 0 entries and land run 49 read the missing deps as 6 red spec files). {declared, entries}: declared is
+ * how many dependencies package.json names, entries how many node_modules holds (dot entries such as npm's
+ * .package-lock.json not counted), null when there is no node_modules.
+ */
+export function liveDepsState(root = SKILL_ROOT) {
+  let declared = 0;
+  try { const pkg = JSON.parse(fs.readFileSync(path.join(root, 'package.json'), 'utf8')); declared = Object.keys({ ...pkg.dependencies, ...pkg.devDependencies }).length; } catch { /* no manifest: nothing declared */ }
+  let entries = null;
+  try { entries = fs.readdirSync(path.join(root, 'node_modules')).filter((n) => !n.startsWith('.')).length; } catch { /* absent */ }
+  return { declared, entries };
+}
+const depsMissing = (s) => s.declared > 0 && !s.entries;
+const depsHint = (root) => `the live runtime's node_modules is missing or emptied; restore it (\`npm ci\` in ${root}), find what emptied it (a recursive delete or an npm reify through a scratch/staging node_modules junction), then land again`;
+
+/**
  * Land `commits` (in order) on live main of `root`. `deps.runChecks` / `deps.push` replace the checks and the
- * push in specs. Returns {ok, landed?, base, head?, checks, reason?, push?}.
+ * push in specs. Returns {ok, landed?, base, head?, checks, reason?, push?}. A live runtime without its installed
+ * dependencies is refused before any check (reason live-deps-missing): its specs would fail on ERR_MODULE_NOT_FOUND
+ * and read as the commit's fault. The same reason refuses a land whose checks ran while the live node_modules lost
+ * entries, and result.cleanup.liveDepsLost names a scratch removal after which it had fewer.
  */
 export function landCommits({ commits, specs = [], specMode = 'touching', root = SKILL_ROOT, env = process.env, push = true, deps = {} }) {
   const check = deps.runChecks ?? runChecks;
   // cleanup is shared by reference with every result below: a scratch this land could not remove shows in it.
   const result = { ok: false, commits, attempts: [], cleanup: { left: [] } };
+  const liveDeps = liveDepsState(root);
+  if (depsMissing(liveDeps)) return { ...result, reason: 'live-deps-missing', detail: `${path.join(root, 'node_modules')}: ${liveDeps.entries ?? 'no'} entries, package.json declares ${liveDeps.declared}`, hint: depsHint(root) };
   for (let attempt = 1; attempt <= MAX_MAIN_RETRIES; attempt += 1) {
     const base = git(['rev-parse', 'refs/heads/main'], { cwd: root }).stdout;
     const health = (deps.gitHealth ?? waitGitHealthy)({ root });
@@ -580,6 +603,11 @@ export function landCommits({ commits, specs = [], specMode = 'touching', root =
       const checked = check({ dir: scratch.dir, base, head, specs, specMode, baseline, baseTree: root });
       step.head = head;
       step.checks = checked.checks;
+      const depsAfter = liveDepsState(root);
+      if ((depsAfter.entries ?? 0) < (liveDeps.entries ?? 0)) {
+        result.attempts.push({ ...step, reason: 'live-deps-missing' });
+        return { ...result, base, head, reason: 'live-deps-missing', detail: `${path.join(root, 'node_modules')} went from ${liveDeps.entries} to ${depsAfter.entries ?? 'no'} entries while this land's checks ran in ${scratch.dir}`, hint: depsHint(root), checks: checked.checks };
+      }
       if (!checked.ok) {
         result.attempts.push({ ...step, reason: 'checks-red' });
         return { ...result, base, head, reason: 'checks-red', checks: checked.checks, changed: checked.changed };
@@ -598,7 +626,12 @@ export function landCommits({ commits, specs = [], specMode = 'touching', root =
       }
       if (push) landed.push = (deps.push ?? pushLive)({ root });
       return landed;
-    } finally { if (!removeScratch(scratch.dir, { root })) result.cleanup.left.push(scratch.dir); }
+    } finally {
+      const before = liveDepsState(root).entries ?? 0;
+      if (!removeScratch(scratch.dir, { root })) result.cleanup.left.push(scratch.dir);
+      const after = liveDepsState(root).entries ?? 0;
+      if (after < before) result.cleanup.liveDepsLost = { scratch: scratch.dir, before, after };
+    }
   }
   return { ...result, reason: 'main-moving', detail: `main moved under the gate ${MAX_MAIN_RETRIES} times` };
 }

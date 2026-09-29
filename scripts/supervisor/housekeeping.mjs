@@ -19,11 +19,13 @@
 // both. One area failing (a throwing sweep, a missing module, ok:false) is recorded in its own entry and
 // never stops the remaining areas.
 import '../lib/hide-child-windows.mjs';
+import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { allocationSettings } from '../../engine/config.mjs';
 
 const selfFile = fileURLToPath(import.meta.url);
+const SKILL_ROOT = path.resolve(path.dirname(selfFile), '..', '..');
 export const SCHEMA = 'starci/housekeeping-report@1';
 
 /** The areas a run covers, in sweep order: name -> the lib module and the export that sweeps it. */
@@ -104,15 +106,21 @@ function areaResult(raw) {
   return entry;
 }
 
+/** How many entries `<root>/node_modules` holds (dot entries not counted); 0 when it is absent. */
+export const nodeModulesEntries = (root) => { try { return fs.readdirSync(path.join(root, 'node_modules')).filter((n) => !n.startsWith('.')).length; } catch { return 0; } };
+
 /**
  * One housekeeping run. `only` (area names) restricts the run; `sweeps` replaces the lib modules in specs;
  * `allocation` defaults to the runtimes.yaml allocation block the sweeps read their windows from. Returns the
  * `starci/housekeeping-report@1` report. A failing area lands in its own entry — the run itself always
- * produces a report.
+ * produces a report. `liveDeps` {root, before, after, ok} is the live runtime's node_modules entry count around
+ * the sweeps (`depsRoot`, the runtime by default): a sweep that removed a scratch or lane tree must never reach it
+ * through a node_modules junction (live-node-modules-wiped, 2026-09-29), and a drop fails the run.
  */
-export async function runHousekeeping({ apply = false, only = null, env = process.env, now = Date.now(), sweeps = null, allocation = null } = {}) {
+export async function runHousekeeping({ apply = false, only = null, env = process.env, now = Date.now(), sweeps = null, allocation = null, depsRoot = SKILL_ROOT } = {}) {
   const started = Date.now();
   const names = only ?? AREA_NAMES;
+  const depsBefore = nodeModulesEntries(depsRoot);
   const areas = {};
   for (const name of names) {
     try {
@@ -123,12 +131,15 @@ export async function runHousekeeping({ apply = false, only = null, env = proces
     }
   }
   const totals = Object.values(areas).reduce((acc, a) => ({ freedBytes: acc.freedBytes + a.freedBytes, movedBytes: acc.movedBytes + a.movedBytes }), { freedBytes: 0, movedBytes: 0 });
+  const depsAfter = nodeModulesEntries(depsRoot);
+  const liveDeps = { root: path.join(depsRoot, 'node_modules'), before: depsBefore, after: depsAfter, ok: depsAfter >= depsBefore };
   return {
     schema: SCHEMA,
     generatedAt: new Date(now).toISOString(),
     apply: apply === true,
-    ok: Object.values(areas).every((a) => a.ok),
+    ok: Object.values(areas).every((a) => a.ok) && liveDeps.ok,
     areas,
+    liveDeps,
     totals,
     durationMs: Date.now() - started,
   };
@@ -140,7 +151,8 @@ const mb = (n) => (n >= 1024 ** 3 ? `${(n / 1024 ** 3).toFixed(1)} GB` : `${(n /
 export function describe(report) {
   const failed = Object.entries(report.areas).filter(([, a]) => !a.ok).map(([name]) => name);
   const base = `HOUSEKEEPING ${report.apply ? 'apply' : 'dry-run'}: freed ${mb(report.totals.freedBytes)}, moved ${mb(report.totals.movedBytes)} in ${report.durationMs} ms`;
-  return failed.length ? `${base}; FAILED: ${failed.join(', ')}` : `${base}; all areas ok`;
+  const lost = report.liveDeps && !report.liveDeps.ok ? `; LIVE node_modules lost entries ${report.liveDeps.before} -> ${report.liveDeps.after}` : '';
+  return failed.length ? `${base}; FAILED: ${failed.join(', ')}${lost}` : `${base}; all areas ok${lost}`;
 }
 
 if (process.argv[1] && path.resolve(process.argv[1]) === selfFile) {
