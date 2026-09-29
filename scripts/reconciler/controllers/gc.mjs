@@ -85,6 +85,18 @@ export const ROUTES = Object.freeze({
 
 const liveDeps = {
   gc: () => import('../../supervisor/gc.mjs'),
+  // The sweep is a CHILD process, never runGc in the engine: it walks every lane worktree and Orca terminal with synchronous
+  // git/CLI calls (minutes on a loaded host) and the engine has one thread (ENGINE-STALL: it stalled the lease at the
+  // sweep's due time, three restarts in an hour). {apply, holder} -> the report gc.mjs prints, or throws.
+  sweep: async ({ apply, holder = null }) => {
+    const { runChild } = await import('../services.mjs');
+    const args = [path.join(ROOT, 'scripts', 'supervisor', 'gc.mjs'), ...(apply ? ['--apply', '--holder', holder ?? OWNER, '--trigger', 'sweep'] : ['--plan', '--trigger', 'sweep']), '--json'];
+    const r = await runChild(process.execPath, args, { timeoutMs: 900_000 });
+    let report = null;
+    try { report = JSON.parse(r.stdout); } catch { report = null; }
+    if (!report || !Array.isArray(report.items)) throw new Error(`gc sweep child gave no report: ${r.timedOut ? 'timed out' : String(r.stderr).trim().slice(-300) || `exit ${r.status}`}`);
+    return report;
+  },
   list: async () => (await import('../../api/orca/terminal-list.mjs')).terminalList({ includeVisualLayouts: true }),
   read: async () => (await import('../../api/orca/terminal-read.mjs')).terminalRead,
   hostResources: async () => (await import('../../lib/host-resources.mjs')).hostResourcesFor({}),
@@ -269,7 +281,7 @@ export function createGcController(overrides = {}) {
     if (!claim.due) return { skipped: 'not due', nextAt: claim.nextAt };
     if (ctx.mode !== 'active') {
       // A dry run that writes nothing: no seen-state, no machine-log rows, no lessons; the would-rows are ours.
-      const report = await gc.runGc({ apply: false, now, deps: { ...(deps.gcDeps ?? {}), writeState: () => {}, log: () => {}, lesson: () => null } });
+      const report = await deps.sweep({ apply: false });
       const collect = report.items.filter((i) => i.verdict === 'collect');
       await ctx.run('node', ['scripts/supervisor/gc.mjs', '--apply', '--json'], { timeoutMs: 900_000 });
       ctx.log(WOULD, `sweep: ${report.line}`, { controller: NAME, action: 'gc-sweep', counts: report.counts,
@@ -279,7 +291,7 @@ export function createGcController(overrides = {}) {
       finishDuty(ctx, { controller: NAME, duty: 'sweep', result: 'skipped', now: ctx.now() });
       return { shadow: true, wouldCollect: collect.length, counts: report.counts };
     }
-    const report = await gc.runGc({ apply: true, now, ...(deps.gcDeps ? { deps: { ...deps.gcDeps, holder: OWNER } } : { deps: { holder: OWNER } }) });
+    const report = await deps.sweep({ apply: true, holder: OWNER });
     if (report.busy) {
       claimDue(ctx, { controller: NAME, duty: 'sweep', intervalMs: 120_000, now, force: true }); // retry in 2 min, not a full interval
       finishDuty(ctx, { controller: NAME, duty: 'sweep', result: 'skipped', now: ctx.now() });

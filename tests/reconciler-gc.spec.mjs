@@ -110,9 +110,13 @@ function gcDeps(closes) {
     readState: () => ({ seen: {} }), freemem: () => 0, close: (h) => { closes.push(h); return { ok: true, proof: 'gone' }; }, kill: () => true, reap: () => ({ checked: false }) };
 }
 
+/** The sweep seam (the controller runs gc.mjs as a child): the same runGc, in process, on the spec's fakes. */
+const sweepWith = (gcd, { plan = {}, apply: applyDeps = {} } = {}) => async ({ apply, holder = null }) => runGc({ apply, now: T,
+  deps: apply ? { ...gcd, ...applyDeps, holder } : { ...gcd, writeState: () => {}, log: () => {}, lesson: () => null, ...plan } });
+
 test('the sweep in shadow: zero closes, the would-rows name what a live sweep would collect', async () => {
   const closes = [];
-  const { c } = controller({ deps: { gcDeps: gcDeps(closes), settings: { sweepMs: 1_800_000 } } });
+  const { c } = controller({ deps: { sweep: sweepWith(gcDeps(closes)), settings: { sweepMs: 1_800_000 } } });
   const { ctx, calls } = ctxOf('shadow');
   const r = await c.reconcile('gc:sweep', ctx);
   assert.equal(r.shadow, true);
@@ -128,7 +132,7 @@ test('the sweep in shadow: zero closes, the would-rows name what a live sweep wo
 
 test('the sweep in active applies under the host lock and records the supervisor-gc event', async () => {
   const closes = [], recorded = [];
-  const { c } = controller({ deps: { gcDeps: { ...gcDeps(closes), lock: () => ({ ok: true, release() {} }), settleMs: 0, log: () => {}, writeState: () => {}, lesson: () => null },
+  const { c } = controller({ deps: { sweep: sweepWith(gcDeps(closes), { apply: { lock: () => ({ ok: true, release() {} }), settleMs: 0, log: () => {}, writeState: () => {}, lesson: () => null } }),
     recordSweep: async (rep) => recorded.push(rep) } });
   const { ctx } = ctxOf('active');
   const r = await c.reconcile('gc:sweep', ctx);

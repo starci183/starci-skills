@@ -3,6 +3,12 @@
 // đầy rác thế!!! phải có dọn rác chứ"). Every supervisor tick runs it (tick.mjs, duty gc); an operator runs it by hand.
 //
 //   node scripts/supervisor/gc.mjs [--dry-run] [--apply] [--only agents,shells,lanes,tmp,tasks] [--json]
+//                                  [--plan] [--holder <name>] [--trigger <name>]
+//
+// --plan is a dry run that writes NOTHING (no seen-state, no machine-log rows, no lessons): the reconciler's gc controller
+// runs its shadow sweep this way. --holder names the host-lock holder of an --apply run, --trigger the run's trigger. The
+// controller always runs the sweep as this child process: a sweep walks every lane worktree and Orca terminal with
+// synchronous git and CLI calls (minutes on a loaded host), and in the engine's one thread that stalled the lease.
 //
 // Default is the dry run: every collector reports what it WOULD close or remove and mutates nothing (it only records
 // when it first saw a candidate, so the age rules below can hold). --apply closes and removes.
@@ -699,7 +705,7 @@ export async function runGc({ apply = false, only = null, env = process.env, now
     if (!listed?.ok) { report.ok = false; report.errors.push(`terminal list: ${listed?.error ?? 'Orca did not answer'} - no terminal was touched`); }
     else {
       let procs = null;
-      if (want.has('shells')) { try { procs = (deps.procs ?? (async () => (await import('./host-health.mjs')).listProcesses()))(); procs = await procs; } catch { procs = null; } }
+      if (want.has('shells')) { try { procs = (deps.procs ?? (async () => (await import('./host-health.mjs')).listProcessesAsync()))(); procs = await procs; } catch { procs = null; } }
       const screens = new Map();
       const screenOf = (h) => { if (!screens.has(h)) { let s = null; try { const r = (deps.read ?? terminalRead)({ terminal: h, screen: true }); s = r?.ok ? r.screen ?? '' : null; } catch { s = null; } screens.set(h, s); } return screens.get(h); };
       const decided = classifyTerminals({ terminals: listed.terminals ?? [], titles: tabTitles(listed.visualLayouts), sup, ledgers, screenOf, procs, seen: state.seen, now, minAgeMs: settings.minAgeMs, keepTitles: settings.keepTitles });
@@ -881,15 +887,16 @@ export function describe(report) {
 }
 
 export function parseArgs(argv = []) {
-  const known = ['dry-run', 'apply', 'json', 'only'];
+  const known = ['dry-run', 'apply', 'json', 'only', 'plan', 'holder', 'trigger'];
   const bad = argv.filter((a) => a.startsWith('--') && !known.includes(a.slice(2)));
   if (bad.length) return { ok: false, error: `unknown flag(s): ${bad.join(' ')}` };
   const i = argv.indexOf('--only');
   const only = i >= 0 ? String(argv[i + 1] ?? '').split(',').map((s) => s.trim()).filter(Boolean) : null;
   const unknown = (only ?? []).filter((c) => !COLLECTORS.includes(c));
   if (unknown.length) return { ok: false, error: `unknown collector(s): ${unknown.join(', ')} (known: ${COLLECTORS.join(', ')})` };
-  if (argv.includes('--apply') && argv.includes('--dry-run')) return { ok: false, error: '--apply and --dry-run together' };
-  return { ok: true, apply: argv.includes('--apply'), only, json: argv.includes('--json') };
+  if (argv.includes('--apply') && (argv.includes('--dry-run') || argv.includes('--plan'))) return { ok: false, error: '--apply and --dry-run/--plan together' };
+  const value = (name) => { const j = argv.indexOf(name); return j >= 0 && argv[j + 1] && !argv[j + 1].startsWith('--') ? argv[j + 1] : null; };
+  return { ok: true, apply: argv.includes('--apply'), plan: argv.includes('--plan'), only, json: argv.includes('--json'), holder: value('--holder'), trigger: value('--trigger') };
 }
 
 if (process.argv[1] && path.resolve(process.argv[1]) === selfFile) {
@@ -897,7 +904,9 @@ if (process.argv[1] && path.resolve(process.argv[1]) === selfFile) {
   if (!args.ok) { console.error(`use: gc.mjs [--dry-run|--apply] [--only ${COLLECTORS.join(',')}] [--json] (${args.error})`); process.exit(2); }
   let language = 'vi';
   try { language = (await import('./home.mjs')).supervisorSettings().language ?? 'vi'; } catch { /* vi */ }
-  const report = await runGc({ apply: args.apply, only: args.only, language, trigger: 'manual' });
+  // --plan: no seen-state, no log rows, no lessons; --holder: the host-lock holder of an apply (deps other than holder drop the lock, so name only it)
+  const deps = args.plan ? { writeState: () => {}, log: () => {}, lesson: () => null } : args.holder ? { holder: args.holder } : {};
+  const report = await runGc({ apply: args.apply, only: args.only, language, trigger: args.trigger ?? 'manual', deps });
   console.log(args.json ? JSON.stringify(report, null, 2) : describe(report));
   process.exit(report.ok ? 0 : 1);
 }
