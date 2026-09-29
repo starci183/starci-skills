@@ -14,7 +14,7 @@
  * (TYPE-3, rule 4, extended; see the export below for its `recommended` level and the measurement
  * that set it), the const enum
  * (TYPE-4, rule 5), the unguarded cast off an `unknown` value (TYPE-1's second half, rule 2), and
- * the per-line suppression standing in for a lane (TYPE-6, rule 7). Each is a way of switching the
+ * a way of switching the
  * compiler off -- or of leaving it turned further down than the law asks -- that looks locally
  * reasonable, which is exactly the class a rule is for.
  *
@@ -402,62 +402,6 @@ export const noConstEnum = {
 // past a transport DTO to whether its flags are truly one situation needs the meaning of the code,
 // which is a reader's job, not a decidable question of syntax.
 
-// -- TYPE-6 (rule 7) ----------------------------------------------------------------------------------
-
-/** This law's own published rule names -- the only ones this rule polices. */
-const TYPE_SAFETY_RULE_NAMES = [
-  "no-double-cast",
-  "no-inline-param-type",
-  "no-inline-object-type",
-  "no-const-enum",
-  "no-unguarded-unknown-cast",
-]
-
-const DISABLE_DIRECTIVE = /^eslint-disable(?:-next-line|-line)?\b/
-
-/**
- * A sanctioned exit is declared at the lane, once -- not suppressed per line.
- *
- * `no-double-cast`'s test-lane exemption already lives in `isTestFile`, consulted once, so every
- * place the exit is in force is derivable from that one function. A per-line `eslint-disable` for
- * any rule this law publishes is therefore never the lane speaking -- it is either redundant (the
- * lane already covers the file) or an undeclared second exit (the file needed one and reached for
- * a comment instead of a lane). Either way `type-safety.md` names this exact failure: "a per-line
- * suppression standing in for a lane-wide exit".
- *
- * Deliberately scoped to only the five rule names this law publishes -- a rule that policed every
- * `eslint-disable` in the repository would be reaching into every other family's lane, which is
- * outside this file's boundary.
- */
-export const noLineSuppression = {
-  meta: {
-    type: "problem",
-    docs: {
-      description:
-        "No inline `eslint-disable` for a type-safety rule; the lane is the only sanctioned exit (TYPE-6, law 7).",
-    },
-    schema: [],
-    messages: {
-      suppression:
-        "This comment disables `starci-be/{{name}}` on one line. That rule's only sanctioned exit is declared once, at the lane, inside the rule itself -- a per-line suppression is never that declaration, it is a stand-in for one. Delete the comment; if the file genuinely needs the exemption, it belongs in the lane the rule already recognizes.",
-    },
-  },
-  create(context) {
-    const sourceCode = context.sourceCode || context.getSourceCode()
-    return {
-      "Program:exit"(node) {
-        for (const comment of sourceCode.getAllComments()) {
-          const text = comment.value.trim()
-          if (!DISABLE_DIRECTIVE.test(text)) continue
-          const named = TYPE_SAFETY_RULE_NAMES.find((name) => text.includes(`starci-be/${name}`))
-          if (!named) continue
-          context.report({ node: comment ?? node, messageId: "suppression", data: { name: named } })
-        }
-      },
-    }
-  },
-}
-
 /** The rules this law contributes to the plugin. */
 export const rules = {
   "no-double-cast": noDoubleCast,
@@ -465,7 +409,6 @@ export const rules = {
   "no-inline-object-type": noInlineObjectType,
   "no-const-enum": noConstEnum,
   "no-unguarded-unknown-cast": noUnguardedUnknownCast,
-  "no-line-suppression": noLineSuppression,
 }
 
 /**
@@ -501,7 +444,6 @@ export const recommended = {
   "starci-be/no-inline-object-type": "error",
   "starci-be/no-const-enum": "error",
   "starci-be/no-unguarded-unknown-cast": "warn", // no=3 -- see type-safety.mjs's doc comment
-  "starci-be/no-line-suppression": "error",
   "@typescript-eslint/no-explicit-any": "error",
   "@typescript-eslint/array-type": ["error", {
     default: "generic",

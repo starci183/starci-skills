@@ -1,6 +1,6 @@
 # @starci/eslint-canon-be
 
-**37 ESLint rules, from 15 laws, that hold a NestJS-shaped back end to one way of being written.**
+**67 ESLint rules, from 21 laws, that hold a NestJS-shaped back end to one way of being written.**
 
 Not a style pack. These rules enforce *architecture*: which layer may import which, whether a
 failure carries its own identity, where a query is allowed to be built, what an end-to-end test is
@@ -39,12 +39,13 @@ export default [
 ]
 ```
 
-It states `warn` as `error` for a zero-warning gate, applies `noInlineConfig` and unused-disable reporting, and
-switches off the `RETIRED` legacy heuristics (the exception-identity and barrel rules and the handler twin count) that
-the code-pattern manifest replaces with the architecture check and the error-identity script. Those replacements run
-through `npm run lint:architecture` in a repository's gate, not through ESLint.
+It states `warn` as `error` for a zero-warning gate (the one advisory rule, `file-size-soft-limit`, stays a warning, named in `ADVISORY`), applies
+`noInlineConfig` and unused-disable reporting, and refuses a recommendation that carries a rule switched `off`. HFS v2
+keeps no retired-rule list: a rule the standard no longer holds is deleted from the plugin, and every rule that ships is on.
+The parameters a rule takes from the slot manifest (the `@Global()` allowlist, the file line budget, the width of an
+`index.ts`) come through `lib/slots.mjs`, which reads `knowledge/hfs/slots.yaml` and falls back to the rule catalog's values.
 
-Also exported: `rules`, `ruleOwners`, `lawOwners`, `starciBeConfig`, `linterOptions`, `RETIRED`.
+Also exported: `rules`, `ruleOwners`, `lawOwners`, `starciBeConfig`, `linterOptions`, `ADVISORY`.
 
 ## What it actually catches
 
@@ -52,12 +53,19 @@ A sample, not the list:
 
 | Area | What the rules hold |
 |---|---|
-| **Exceptions** | Every failure carries its own identity and metadata. Concrete exceptions live in their owning feature or module capability's `errors/` folder; the shared abstract base may live at the capability root. |
+| **Errors** | A `catch` rethrows, logs through the logger port or returns an outcome carrying its cause; an error lives in its capability's `errors/`, extends `DomainError`, and no bare `Error` or framework exception escapes (`catch-must-account`, `error-home`) |
+| **Schema authority** | Migrations only: no `synchronize`, no `migrationsRun`, no runtime DDL, no entity glob; raw SQL only in a persistence repository; no ORM entity in a contract (`no-runtime-schema`, `sql-only-in-repository`, `no-entity-in-contract`) |
+| **Config and secrets** | `process.env` only in `platform/config`; no literal default for a secret, password, token, key or URL; secrets compare with `timingSafeEqual` (`no-direct-env-read`, `no-secret-default`, `secret-compare-timing-safe`) |
+| **Default deny** | Typed bodies and arguments, no `GraphQLJSON` tunnel, no `switch (operation)`, and `@Public` carries a reason (`no-untyped-body`, `public-needs-reason`) |
+| **Module shape** | `@Global()` only on the manifest allowlist; typed `ConfigurableModuleBuilder`; static `register`; one module per file; no `new` of a provider; no module-level `let` |
+| **Suppression** | No `eslint-disable`, `@ts-ignore`, `@ts-expect-error`, `@ts-nocheck` or `vn-ok` comment, anywhere (`no-inline-suppression`) |
+| **Size** | A file over its line budget is not new and does not grow past its size at the parent commit (`file-size-growth`), with an advisory warning for every file over the budget (`file-size-soft-limit`) |
+| **Spec quality** | A spec does not read repository source with `fs`, and doubles are `mock<T>()`, not `as never` (`spec-no-source-read`, `spec-typed-doubles`) |
 | **CQRS** | A handler does not assemble an aggregate inline; reads and writes do not share one path |
-| **Module layering** | Cross-capability imports may use an explicit public `index.ts`; self-aliases, tier-only aliases, folder re-exports, and export-star public entries are refused. |
+| **Module layering** | Another owner is imported through its public `index.ts` (`@modules/domain/plan`, `@features/plan`), never through a path into it; an `index.ts` lists a bounded set of named exports, with no `export *`, storage token or types folder; self-aliases and tier-only aliases are refused. |
 | **Data access** | Queries stay where the layer says they may be built |
 | **Transport** | The wire shape is declared, not inferred from whatever a handler happened to return |
-| **Observability** | A failure is logged as a typed exception, so a log line can be traced to the law that names it |
+| **Observability** | A failure is logged through the logger port with a typed identity, so a log line can be traced to the law that names it |
 | **Testing** | Unit specs sit beside their subjects, including structural specs in HFS `src/tests` categories; a model-quality harness (one that imports an LLM SDK, reaches a house model helper or declares `@harness-kind model`) calls its provider directly; other live e2e specs, such as an identity provider, are not judged as model harnesses. |
 | **End-to-end flows** | One file, one flow, named steps, and **never sleep** — poll until the state settles, with a deadline |
 | **CDC · event delivery** | Projections and events follow the declared delivery contract |
@@ -84,3 +92,27 @@ pointed at.
 ## Requirements
 
 ESLint 9+ (flat config), Node 20.9+.
+
+## HFS v2 rules and their why codes
+
+Each rule below reports through the code-pattern gate with a catalogued Vietnamese reason (`modules/kernel/failure-codes.yaml`,
+mapped by `scripts/checks/lint-why.mjs`). The catalog id is the rule number in `HFS-V2-RULES`.
+
+| Rule | Catalog | Why code |
+|---|---|---|
+| `catch-must-account` | R40 | `BE_LOGGER_REQUIRED` |
+| `error-home` | R38 | `BE_ERROR_HOME` |
+| `no-runtime-schema` | R34 | `BE_SCHEMA_AUTHORITY` |
+| `sql-only-in-repository` | R36 | `BE_SQL_OUTSIDE_REPOSITORY` |
+| `no-entity-in-contract` | R37 | `BE_ENTITY_IN_CONTRACT` |
+| `no-untyped-body`, `public-needs-reason`, `secret-compare-timing-safe` | R41 | `BE_DEFAULT_DENY` |
+| `no-direct-env-read` | R43 | `BE_CONFIG_OWNER` |
+| `no-secret-default` | R44 | `BE_SECRET_DEFAULT` |
+| `global-module-allowlist`, `typed-module-definition`, `static-module-register`, `no-new-injectable`, `no-module-let`, `one-module-per-file` | R45 | `BE_MODULE_SHAPE` |
+| `no-inline-suppression` | R18 | `HFS_INLINE_SUPPRESSION` |
+| `file-size-soft-limit`, `file-size-growth` | R20 | `HFS_SIZE_GROWTH` |
+| `spec-no-source-read`, `spec-typed-doubles` | R48 | `BE_SPEC_QUALITY` |
+| `must-deep-module-import`, `no-folder-reexport` | R30 | `BE_PUBLIC_SURFACE` |
+
+The tier direction matrix and the feature-imports-feature ban (R26, R28) are owned by the architecture machine
+(`@starci/hfs`), not by a lint rule: they need the whole import graph.

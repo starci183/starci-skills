@@ -425,27 +425,9 @@ shapes:
         import globals from "globals"
         import tseslint from "typescript-eslint"
         import { defineConfig } from "eslint/config"
-        import starciBe, { recommended as starciRecommended } from "@starci/eslint-canon-be"
+        import starciBe, { recommended, starciBeConfig } from "@starci/eslint-canon-be"
 
         const sources = ["apps/**/*.ts", "src/**/*.ts"]
-
-        // The code-pattern manifest keeps these canon rules off: an architecture or script check replaces each.
-        const replacedByChecks = [
-            "starci-be/exception-name-ends-in-exception",
-            "starci-be/exception-code-matches-class-name",
-            "starci-be/exception-metadata-type-named-for-class",
-            "starci-be/exception-extends-abstract",
-            "starci-be/exception-in-errors-folder",
-            "starci-be/require-exception-object-arg",
-            "starci-be/throw-abstract-exception",
-            "starci-be/no-handler-encoded-failure",
-            "starci-be/must-deep-module-import",
-            "starci-be/no-folder-reexport",
-            "starci-be/handler-has-twin-spec",
-        ]
-        // A warning already fails the zero-warning gate, so the canon's warn level is stated as error.
-        const asError = (setting) => (setting === "warn" ? "error" : Array.isArray(setting) && setting[0] === "warn" ? ["error", ...setting.slice(1)] : setting)
-        const canonRules = Object.fromEntries(Object.entries(starciRecommended).map(([rule, setting]) => [rule, replacedByChecks.includes(rule) ? "off" : asError(setting)]))
 
         export default defineConfig([
             { ignores: ["**/node_modules/**", "**/dist/**", "**/coverage/**", "**/.starciwork/**"] },
@@ -468,11 +450,8 @@ shapes:
                     semi: ["error", "never"],
                 },
             },
-            {
-                files: sources,
-                plugins: { "starci-be": starciBe },
-                rules: canonRules,
-            },
+            // The canon factory owns the rule levels: no rule is off, and a warning is stated as an error.
+            starciBeConfig({ sources, plugin: starciBe, recommended }),
         ])
       architecture.json: |
         {

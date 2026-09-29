@@ -3,57 +3,49 @@
  *
  *   node --test config.test.mjs
  *
- * The failures worth catching: the retired list drifting from the manifest that expects those rules
- * off (a rule then either ships off unrecorded, or the manifest guard fails on a repository that
- * followed the canon), a repository block that ends up with no rules and lints green, and a `warn`
- * that survives into a zero-warning gate.
+ * The failures worth catching: a rule published switched off (a rule the standard no longer holds is deleted, so
+ * an `off` is a rule that looks adopted and is not), a repository block that ends up with no rules and lints
+ * green, a `warn` that survives into a zero-warning gate, and the two public-surface rules HFS v2 once had to
+ * switch off drifting back out of the block.
  */
 import assert from "node:assert/strict"
-import { readFileSync } from "node:fs"
-import { dirname, join } from "node:path"
-import { fileURLToPath } from "node:url"
 import test from "node:test"
-import { parseYaml } from "../../../engine/yaml.mjs"
-import plugin, { RETIRED, linterOptions, recommended, starciBeConfig } from "./index.mjs"
+import plugin, { ADVISORY, linterOptions, recommended, starciBeConfig } from "./index.mjs"
 
-const HERE = dirname(fileURLToPath(import.meta.url))
 const SOURCES = ["apps/**/*.ts", "src/**/*.ts"]
 
-/** Every rule id the manifest guards with `expected: { severity: off }`. */
-const manifestOffRules = () => {
-    const manifest = parseYaml(readFileSync(join(HERE, "..", "..", "..", "modules", "models", "code-patterns.yaml"), "utf8"))
-    const found = new Set()
-    const walk = (node) => {
-        if (Array.isArray(node)) return node.forEach(walk)
-        if (!node || typeof node !== "object") return
-        const check = node.check
-        if (check?.kind === "eslint" && check.expected?.severity === "off") {
-            for (const id of check.ruleIds ?? []) if (id.startsWith("starci-be/")) found.add(id)
-        }
-        Object.values(node).forEach(walk)
-    }
-    walk(manifest)
-    return [...found].sort()
-}
-
-test("the retired list is exactly the set the code-pattern manifest expects off", () => {
-    assert.deepEqual(Object.keys(RETIRED).sort(), manifestOffRules())
+test("no published rule is off", () => {
+    const off = Object.entries(recommended).filter(([, setting]) => (Array.isArray(setting) ? setting[0] : setting) === "off")
+    assert.deepEqual(off, [])
 })
 
-test("every retired rule exists in the recommendation", () => {
-    for (const name of Object.keys(RETIRED)) assert.ok(name in recommended, `${name} is retired but not published`)
-})
-
-test("the block carries every recommended rule, the retired ones off and the rest at error", () => {
+test("the block carries every recommended rule, none off, and only the advisory rules at warn", () => {
     const block = starciBeConfig({ sources: SOURCES, plugin, recommended })
     assert.deepEqual(block.files, SOURCES)
     assert.deepEqual(Object.keys(block.rules).sort(), Object.keys(recommended).sort())
     for (const [name, setting] of Object.entries(block.rules)) {
-        if (name in RETIRED) assert.equal(setting, "off", name)
-        else assert.notEqual(Array.isArray(setting) ? setting[0] : setting, "warn", `${name} keeps warn in a zero-warning gate`)
+        const level = Array.isArray(setting) ? setting[0] : setting
+        assert.notEqual(level, "off", `${name} is off in the block`)
+        if (ADVISORY.includes(name)) assert.equal(level, "warn", `${name} is advisory and stays a warning`)
+        else assert.equal(level, "error", `${name} is not an error in a zero-warning gate`)
     }
     assert.equal(block.plugins["starci-be"], plugin)
     assert.deepEqual(block.linterOptions, linterOptions)
+})
+
+test("the advisory rules name rules that exist and are the only warnings the canon publishes", () => {
+    for (const name of ADVISORY) assert.ok(name in recommended, `${name} is advisory but not published`)
+    const warned = Object.entries(recommended)
+        .filter(([, setting]) => (Array.isArray(setting) ? setting[0] : setting) === "warn")
+        .map(([name]) => name)
+    // the older laws still publish warn while their debt burns down; the factory lifts those to error
+    for (const name of ADVISORY) assert.ok(warned.includes(name))
+})
+
+test("the two public-surface rules are on and accept the HFS index surface", () => {
+    const block = starciBeConfig({ sources: SOURCES, plugin, recommended })
+    assert.equal(block.rules["starci-be/must-deep-module-import"], "error")
+    assert.equal(block.rules["starci-be/no-folder-reexport"], "error")
 })
 
 test("a warn with options stays configured and becomes error", () => {
@@ -65,13 +57,19 @@ test("a warn with options stays configured and becomes error", () => {
     assert.deepEqual(block.rules["starci-be/probe"], ["error", { max: 3 }])
 })
 
+test("a recommendation with a rule switched off is refused, never published", () => {
+    assert.throws(
+        () => starciBeConfig({ sources: SOURCES, plugin, recommended: { ...recommended, "starci-be/probe": "off" } }),
+        /switched off: starci-be\/probe/,
+    )
+    assert.throws(
+        () => starciBeConfig({ sources: SOURCES, plugin, recommended: { ...recommended, "starci-be/probe": ["off"] } }),
+        /switched off/,
+    )
+})
+
 test("an empty recommendation or empty sources is refused, never a silent empty block", () => {
     assert.throws(() => starciBeConfig({ sources: SOURCES, plugin, recommended: {} }), /empty recommendation/)
     assert.throws(() => starciBeConfig({ sources: SOURCES, plugin, recommended: undefined }), /empty recommendation/)
     assert.throws(() => starciBeConfig({ sources: [], plugin, recommended }), /source globs/)
-})
-
-test("a recommendation missing a retired rule is refused", () => {
-    const { "starci-be/no-folder-reexport": _dropped, ...rest } = recommended
-    assert.throws(() => starciBeConfig({ sources: SOURCES, plugin, recommended: rest }), /no-folder-reexport/)
 })

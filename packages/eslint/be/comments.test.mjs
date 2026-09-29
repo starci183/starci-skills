@@ -17,7 +17,6 @@ import {
   noRestatedNameJsdoc,
   requireEnumMemberJsdoc,
   requireExportJsdoc,
-  requireVnOkReason,
   rules,
 } from "./comments.mjs"
 
@@ -105,17 +104,10 @@ test("COMMENT-4: a fixture lane keeps its data and still gives up its prose", ()
   })
 })
 
-test("COMMENT-4: source stays ASCII unless the line is marked as depended-upon data", () => {
+test("COMMENT-4: source prose is English and no marker exempts a line", () => {
   tester.run("no-non-ascii-source", noNonAsciiSource, {
     valid: [
       { filename: SRC, code: "const greeting = 'hello'" },
-      {
-        // the provider sends this exact string; translating it breaks the comparison. The marker
-        // sits on the SAME line as the literal it keeps, which is the whole convention: a marker on
-        // the line above would exempt a line whose contents nobody looked at.
-        filename: SRC,
-        code: "const ok = 'Giao dich th\u00e0nh c\u00f4ng' // vn-ok: the provider returns this exact string",
-      },
       // locale files are product copy, not source prose
       { filename: MESSAGES, code: "export const vi = { hello: 'Xin ch\u00e0o' }" },
     ],
@@ -129,34 +121,6 @@ test("COMMENT-4: source stays ASCII unless the line is marked as depended-upon d
         filename: SRC,
         code: "// done \u2705\nconst x = 1",
         errors: [{ messageId: "nonAscii" }],
-      },
-    ],
-  })
-})
-
-test("law 6: a vn-ok marker carries a reason; a bare marker is not an exemption", () => {
-  tester.run("require-vn-ok-reason", requireVnOkReason, {
-    valid: [
-      // the marker names the fact the next sweep needs: the provider sends this exact string
-      {
-        filename: SRC,
-        code: "const ok = 'Giao dich thanh cong' // vn-ok: the provider returns this exact string",
-      },
-      // a file with no marker at all is not this rule's concern
-      { filename: SRC, code: "const greeting = 'hello'" },
-    ],
-    invalid: [
-      // no colon, no reason - a bare marker used as a silent gate-off switch
-      {
-        filename: SRC,
-        code: "const ok = 'Giao dich thanh cong' // vn-ok",
-        errors: [{ messageId: "bareMarker" }],
-      },
-      // a colon with nothing after it is still bare - the marker states no reason
-      {
-        filename: SRC,
-        code: "const ok = 'Giao dich thanh cong' // vn-ok:",
-        errors: [{ messageId: "bareMarker" }],
       },
     ],
   })

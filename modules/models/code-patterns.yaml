@@ -4,14 +4,14 @@ profiles:
     title: StarCi NestJS code pattern
     canon:
       package: '@starci/eslint-canon-be'
-      version: 1.2.3
+      version: 1.3.0
       contentDigest:
         algorithm: sha256
         include: ['**/*.mjs', '**/*.json', '**/*.md', '**/*.ts']
         exclude: ['**/*.test.mjs']
         framing: sorted-posix-relative-path-null-raw-bytes-null
-        value: c8df5da7c8b7d65eb9218b416b291c35f4e728ae7e7acb1801a70efa42ef6a56
-        files: 20
+        value: 79ae6aedb5b99efe5edae30a030466b50559b2a655d2277a6f61d6d5fa542411
+        files: 29
     sourceRuleRoots:
       - knowledge/patterns/be
     expectedSourceRuleIds:
@@ -138,11 +138,11 @@ profiles:
         sourceRuleIds: [BE-COMMENT-1, BE-COMMENT-2, BE-COMMENT-4, BE-COMMENT-7]
         applicability: { include: ['src/**/*.ts', 'apps/**/*.ts', 'libs/**/*.ts'], exclude: ['**/*.spec.ts'] }
         mechanical:
-          requirement: Require export and enum-member docs, reject restated-name docs and inline suppression/non-ASCII violations under the canon profile.
+          requirement: Require export and enum-member docs, reject restated-name docs and non-ASCII source under the canon profile; inline suppression is its own obligation.
           check:
             kind: eslint
             sourceOnly: true
-            ruleIds: [starci-be/require-export-jsdoc, starci-be/require-enum-member-jsdoc, starci-be/no-restated-name-jsdoc, starci-be/no-non-ascii-source, starci-be/require-vn-ok-reason, starci-be/no-line-suppression]
+            ruleIds: [starci-be/require-export-jsdoc, starci-be/require-enum-member-jsdoc, starci-be/no-restated-name-jsdoc, starci-be/no-non-ascii-source]
             expected: { severity: error }
         semantic:
           guidance: knowledge/patterns/be/comment.yaml
@@ -158,19 +158,117 @@ profiles:
           guidance: docs/nest-error-identity-check.md
           review: Select the error family and genuine protocol health exceptions explicitly; preserve typed normal business dispositions and test transport redaction separately.
         status: implemented
-      - id: NEST-LEGACY-EXCEPTION-POLICY-GUARD
-        sourceRuleIds: [BE-ERROR-1, BE-ERROR-2, BE-ERROR-3, BE-NAMING-3]
-        applicability: { include: ['**/*.{ts,mts,cts,tsx}'], exclude: ['**/*.d.ts', '**/*.d.mts', '**/*.d.cts', '**/*.{spec,test}.{ts,mts,cts,tsx}', '**/*-{spec,test}.{ts,mts,cts,tsx}', '**/__tests__/**', '**/tests/**', '**/test/**'] }
+      - id: NEST-HFS-ERROR-HANDLING
+        sourceRuleIds: [BE-ERROR-1, BE-ERROR-5]
+        applicability: { include: ['src/**/*.ts', 'apps/**/*.ts', 'libs/**/*.ts'], exclude: ['**/*.d.ts'] }
         mechanical:
-          requirement: Keep universal central-folder, constructor-name and return-value heuristics explicitly disabled while the selected error-family identity script enforces the adopted contract.
+          requirement: Every catch rethrows, logs through a logger port or returns an outcome carrying its cause; an error class lives in its capability errors folder and extends DomainError, and no bare or framework error escapes.
+          check:
+            kind: eslint
+            sourceOnly: false
+            ruleIds: [starci-be/catch-must-account, starci-be/error-home]
+            expected: { severity: error }
+        semantic:
+          guidance: knowledge/patterns/be/error.yaml
+          review: Verify that a returned outcome is a typed union the caller handles, and that translated errors keep the original as cause.
+        status: implemented
+      - id: NEST-HFS-SCHEMA-AUTHORITY
+        sourceRuleIds: [BE-FOLDER-6, BE-TYPING-7]
+        applicability: { include: ['src/**/*.ts', 'apps/**/*.ts', 'libs/**/*.ts'], exclude: ['**/*.d.ts'] }
+        mechanical:
+          requirement: The schema changes by migration only; raw SQL and query builders stay in a persistence repository; no ORM entity appears in a contract, DTO, resolver or controller type.
+          check:
+            kind: eslint
+            sourceOnly: false
+            ruleIds: [starci-be/no-runtime-schema, starci-be/sql-only-in-repository, starci-be/no-entity-in-contract]
+            expected: { severity: error }
+        semantic:
+          guidance: docs/backend-source-pattern.md
+          review: Verify the baseline migration against the live schema, and that each projection carries what its consumer needs.
+        status: implemented
+      - id: NEST-HFS-DEFAULT-DENY-CONFIG
+        sourceRuleIds: [BE-IMPORTS-6, BE-ERROR-5]
+        applicability: { include: ['src/**/*.ts', 'apps/**/*.ts', 'libs/**/*.ts'], exclude: ['**/*.d.ts', '**/*.spec.ts'] }
+        mechanical:
+          requirement: Bodies and arguments are typed and no GraphQLJSON tunnel exists; an open door carries a reason; only platform config reads the environment; no secret or URL default in source; secrets compare with timingSafeEqual.
           check:
             kind: eslint
             sourceOnly: true
-            ruleIds: [starci-be/exception-name-ends-in-exception, starci-be/exception-code-matches-class-name, starci-be/exception-metadata-type-named-for-class, starci-be/exception-extends-abstract, starci-be/exception-in-errors-folder, starci-be/require-exception-object-arg, starci-be/throw-abstract-exception, starci-be/no-handler-encoded-failure]
-            expected: { severity: off }
+            ruleIds: [starci-be/no-untyped-body, starci-be/public-needs-reason, starci-be/no-direct-env-read, starci-be/no-secret-default, starci-be/secret-compare-timing-safe]
+            expected: { severity: error }
         semantic:
-          guidance: docs/nest-error-identity-check.md
-          review: The off-state guard never substitutes for the active NEST-EXCEPTION-IDENTITY obligation.
+          guidance: knowledge/patterns/be/error.yaml
+          review: Verify the app registers the identity guard as APP_GUARD and that each public reason is true.
+        status: implemented
+      - id: NEST-HFS-MODULE-SHAPE
+        sourceRuleIds: [BE-ARCHITECTURE-3, BE-FOLDER-3]
+        applicability: { include: ['src/**/*.ts', 'apps/**/*.ts', 'libs/**/*.ts'], exclude: ['**/*.d.ts', '**/*.spec.ts'] }
+        mechanical:
+          requirement: A module is global only on the manifest allowlist, names its options type, has static register methods, is one per file, is never built with new, and no module keeps mutable module-level state.
+          check:
+            kind: eslint
+            sourceOnly: true
+            ruleIds: [starci-be/global-module-allowlist, starci-be/typed-module-definition, starci-be/static-module-register, starci-be/no-new-injectable, starci-be/no-module-let, starci-be/one-module-per-file]
+            expected: { severity: error }
+        semantic:
+          guidance: docs/backend-source-pattern.md
+          review: Verify that each capability exposes one application module and one module per transport.
+        status: implemented
+      - id: NEST-OWNER-ENTRY-LINT
+        sourceRuleIds: [BE-ARCHITECTURE-3, BE-FOLDER-4, BE-IMPORTS-1, BE-IMPORTS-4]
+        applicability: { include: ['src/**/*.ts', 'apps/**/*.ts', 'libs/**/*.ts'], exclude: ['**/*.d.ts', '**/*.spec.ts'] }
+        mechanical:
+          requirement: Another owner is imported through its explicit index entry, never through a path into it; an index lists a bounded set of named exports with no export star, storage token or types folder.
+          check:
+            kind: eslint
+            sourceOnly: true
+            ruleIds: [starci-be/must-deep-module-import, starci-be/no-folder-reexport]
+            expected: { severity: error }
+        semantic:
+          guidance: docs/backend-source-pattern.md
+          review: Confirm the exported surface is a stable capability API.
+        status: implemented
+      - id: NEST-HFS-NO-SUPPRESSION
+        sourceRuleIds: [BE-COMMENT-4]
+        applicability: { include: ['src/**/*.ts', 'apps/**/*.ts', 'libs/**/*.ts'], exclude: ['**/*.d.ts'] }
+        mechanical:
+          requirement: No eslint-disable, ts-ignore, ts-expect-error, ts-nocheck or language marker comment exists.
+          check:
+            kind: eslint
+            sourceOnly: false
+            ruleIds: [starci-be/no-inline-suppression]
+            expected: { severity: error }
+        semantic:
+          guidance: knowledge/patterns/be/comment.yaml
+          review: A missing rule is proposed in the canon, never suppressed in the repository.
+        status: implemented
+      - id: NEST-HFS-FILE-SIZE
+        sourceRuleIds: [BE-FUNCTION-3]
+        applicability: { include: ['src/**/*.ts', 'apps/**/*.ts', 'libs/**/*.ts'], exclude: ['**/*.d.ts', '**/*.spec.ts'] }
+        mechanical:
+          requirement: A source file over its line budget is neither new nor longer than its recorded size at the parent commit; the soft budget is reported as an advisory.
+          check:
+            kind: eslint
+            sourceOnly: true
+            ruleIds: [starci-be/file-size-growth]
+            expected: { severity: error }
+        semantic:
+          guidance: docs/backend-source-pattern.md
+          review: Split by responsibility, not by line count.
+        status: implemented
+      - id: NEST-HFS-SPEC-QUALITY
+        sourceRuleIds: [BE-TEST-1]
+        applicability: { include: ['src/**/*.spec.ts', 'apps/**/*.spec.ts', 'libs/**/*.spec.ts', 'src/tests/**/*.ts'], exclude: ['**/*.d.ts'] }
+        mechanical:
+          requirement: A spec does not read repository source with fs and builds doubles with a typed mock instead of a cast.
+          check:
+            kind: eslint
+            sourceOnly: false
+            ruleIds: [starci-be/spec-no-source-read, starci-be/spec-typed-doubles]
+            expected: { severity: error }
+        semantic:
+          guidance: knowledge/patterns/be/test.yaml
+          review: Verify the double models the real dependency contract.
         status: implemented
       - id: NEST-OBSERVABILITY
         sourceRuleIds: [BE-ERROR-7, BE-IMPORTS-6]
@@ -406,34 +504,6 @@ profiles:
         semantic:
           guidance: knowledge/patterns/be/typing.yaml
           review: Decide whether a value is public, extensible or transport-owned before selecting its type form.
-        status: implemented
-      - id: NEST-LEGACY-BARREL-GUARD
-        sourceRuleIds: [BE-FOLDER-4, BE-IMPORTS-1, BE-IMPORTS-4]
-        applicability: { include: ['src/**/*.ts', 'apps/*/src/**/*.ts', 'libs/*/src/**/*.ts'] }
-        mechanical:
-          requirement: Keep the private-file and no-public-entry heuristics explicitly disabled while the owner public-entry architecture check enforces the adopted boundary.
-          check:
-            kind: eslint
-            sourceOnly: true
-            ruleIds: [starci-be/must-deep-module-import, starci-be/no-folder-reexport]
-            expected: { severity: off }
-        semantic:
-          guidance: docs/backend-source-pattern.md
-          review: Confirm the replacement NEST-OWNER-PUBLIC-ENTRY architecture obligation is configured for every applicable owner.
-        status: implemented
-      - id: NEST-HANDLER-TWIN-COUNT-GUARD
-        sourceRuleIds: [BE-FOLDER-7, BE-TEST-1]
-        applicability: { include: ['src/**/*.handler.ts', 'apps/*/src/**/*.handler.ts', 'libs/*/src/**/*.handler.ts'] }
-        mechanical:
-          requirement: Keep the filename-count twin heuristic explicitly disabled; test selection follows actual behavior and risk.
-          check:
-            kind: eslint
-            sourceOnly: true
-            ruleIds: [starci-be/handler-has-twin-spec]
-            expected: { severity: off }
-        semantic:
-          guidance: knowledge/patterns/be/test.yaml
-          review: Select meaningful handler/use-case proof from effects.
         status: implemented
     semanticOnly:
       - id: NEST-COHESIVE-ORCHESTRATION

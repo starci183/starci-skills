@@ -14,7 +14,6 @@ import {
   mustDeepModuleImport,
   noSelfModuleAlias,
   noFolderReexport,
-  noSelfGlobalModule,
   noRelativeCapabilityEscape,
   rules,
 } from "./module-layering.mjs"
@@ -28,8 +27,6 @@ const tester = new RuleTester({
 })
 
 const IN_AI = "D:/repo/src/modules/domain/ai/ai-invoke.service.ts"
-const IN_AI_MODULE = "D:/repo/src/modules/domain/ai/ai.module.ts"
-const IN_AI_SPEC = "D:/repo/src/modules/domain/ai/ai.module.spec.ts"
 const IN_AI_NESTED = "D:/repo/src/modules/domain/ai/balancer/use-api.service.ts"
 const IN_EXCEPTIONS = "D:/repo/src/modules/platform/exceptions/errors/abstract.ts"
 const IN_FEATURE = "D:/repo/src/features/courses/application/add-to-cart.use-case.ts"
@@ -42,34 +39,37 @@ test("every rule this law declares is exported under its published name", () => 
   }
 })
 
-test("LAYERING-1: a specifier reaches a capability public entry or a file", () => {
+test("LAYERING-1 (HFS v2): another owner is imported through its public entry, never through a path into it", () => {
   tester.run("must-deep-module-import", mustDeepModuleImport, {
     valid: [
+      // the owner's index.ts: alias plus owner
       { filename: IN_FEATURE, code: "import { X } from '@modules/domain/ai'" },
-      // under a tier the capability name is the second segment; a deeper path still names a file
-      { filename: IN_FEATURE, code: "import { X } from '@modules/platform/exceptions/errors/abstract'" },
-      { filename: IN_FEATURE, code: "import { X } from '@features/api'" },
+      { filename: IN_FEATURE, code: "import { X } from '@modules/platform/logging'" },
+      { filename: IN_FEATURE, code: "import { X } from '@modules/integrations/sepay'" },
+      { filename: IN_APP_ROOT, code: "import { PlanModule } from '@features/plan'" },
+      { filename: IN_FEATURE, code: "import { X } from '@modules/domain/ai/index'" },
+      { filename: IN_FEATURE, code: "import type { PlanSummary } from '@modules/domain/plan'" },
+      // a test helper alias names a file under the test tree
       { filename: IN_FEATURE, code: "import { X } from '@tests/helpers/git-mount'" },
       // not an aliased import at all
       { filename: IN_FEATURE, code: "import { X } from './sibling'" },
       { filename: IN_FEATURE, code: "import { X } from '@nestjs/common'" },
+      // reaching one's own owner through its alias is no-self-module-alias's finding, not this rule's
+      { filename: IN_AI, code: "import { X } from '@modules/domain/ai/other'" },
     ],
     invalid: [
       { filename: IN_FEATURE, code: "import { X } from '@modules/'", errors: [{ messageId: "barrel" }] },
-      {
-        // a category folder alone names no capability, let alone a file
-        filename: IN_FEATURE,
-        code: "import { X } from '@modules/domain'",
-        errors: [{ messageId: "barrel" }],
-      },
-      {
-        // another tier alone still names no capability
-        filename: IN_FEATURE,
-        code: "import { X } from '@modules/platform'",
-        errors: [{ messageId: "barrel" }],
-      },
+      { filename: IN_FEATURE, code: "import { X } from '@modules/domain'", errors: [{ messageId: "barrel" }] },
+      { filename: IN_FEATURE, code: "import { X } from '@modules/platform'", errors: [{ messageId: "barrel" }] },
       { filename: IN_FEATURE, code: "import { X } from '@tests/helpers'", errors: [{ messageId: "barrel" }] },
       { filename: IN_FEATURE, code: "export { X } from '@features/'", errors: [{ messageId: "barrel" }] },
+      // a file of another owner is not its public surface
+      { filename: IN_FEATURE, code: "import { X } from '@modules/domain/plan/plan.service'", errors: [{ messageId: "deep" }] },
+      { filename: IN_FEATURE, code: "import { X } from '@modules/platform/exceptions/errors/abstract'", errors: [{ messageId: "deep" }] },
+      { filename: IN_APP_ROOT, code: "import { X } from '@features/plan/application/create-plan.use-case'", errors: [{ messageId: "deep" }] },
+      { filename: IN_FEATURE, code: "export { X } from '@modules/integrations/sepay/sepay.client'", errors: [{ messageId: "deep" }] },
+      // the retired `lib` tier is no tier: `lib` reads as an owner and the rest as a path into it
+      { filename: IN_FEATURE, code: "import { X } from '@modules/lib/ai'", errors: [{ messageId: "deep" }] },
     ],
   })
 })
@@ -138,32 +138,15 @@ test("LAYERING-5 / Law 7: no file re-exports a folder", () => {
         code: "export * from './balancer/ai-balancer.module'",
         errors: [{ messageId: "indexBarrel" }],
       },
-    ],
-  })
-})
-
-test("LAYERING-4 / Law 6 (partial): a capability may not declare itself @Global()", () => {
-  tester.run("no-self-global-module", noSelfGlobalModule, {
-    valid: [
-      // the composition root IS allowed to know this -- it is not inside any capability
-      { filename: IN_APP_ROOT, code: "@Global()\n@Module({})\nclass RootWiring {}" },
-      // a caller-supplied option threaded through, never hardcoded -- out of this rule's scope
-      { filename: IN_AI_MODULE, code: "@Module({ imports: [AiPingModule.register({ isGlobal: false })] })\nclass AiModule {}" },
-      // a spec file building its own throwaway TestingModule graph is not a production capability
-      { filename: IN_AI_SPEC, code: "@Global()\n@Module({})\nclass RedisStubModule {}" },
-      { filename: IN_AI_MODULE, code: "@Module({})\nclass AiModule {}" },
-    ],
-    invalid: [
+      { filename: IN_AI_INDEX, code: "export type { A } from './types'", errors: [{ messageId: "typesFolder" }] },
+      { filename: IN_AI_INDEX, code: "export type { A } from './types/index'", errors: [{ messageId: "typesFolder" }] },
+      { filename: IN_AI_INDEX, code: "export { AI_STORE } from './ai.store'", errors: [{ messageId: "storeToken" }] },
+      { filename: IN_AI_INDEX, code: "export const PLAN_STORE = 1", errors: [{ messageId: "storeToken" }] },
       {
-        filename: IN_AI_MODULE,
-        code: "@Global()\n@Module({})\nclass AiModule {}",
-        errors: [{ messageId: "global" }],
-      },
-      {
-        // any file inside the capability, not just the *.module.ts one
-        filename: IN_AI,
-        code: "@Global()\n@Module({})\nclass SomeNestedThing {}",
-        errors: [{ messageId: "global" }],
+        filename: IN_AI_INDEX,
+        options: [{ maxExports: 2 }],
+        code: "export { A } from './a'\nexport { B, C } from './b'",
+        errors: [{ messageId: "tooWide" }],
       },
     ],
   })

@@ -19,15 +19,21 @@
 import { recommended as authorizationRecommended, rules as authorizationRules } from "./authorization.mjs"
 import { recommended as cdcRecommended, rules as cdcRules } from "./cdc.mjs"
 import { recommended as commentsRecommended, rules as commentsRules } from "./comments.mjs"
+import { recommended as configOwnerRecommended, rules as configOwnerRules } from "./config-owner.mjs"
 import { recommended as cqrsRecommended, rules as cqrsRules } from "./cqrs.mjs"
 import { recommended as dataAccessRecommended, rules as dataAccessRules } from "./data-access.mjs"
+import { recommended as defaultDenyRecommended, rules as defaultDenyRules } from "./default-deny.mjs"
 import { recommended as e2eFlowRecommended, rules as e2eFlowRules } from "./e2e-flow.mjs"
+import { recommended as errorHandlingRecommended, rules as errorHandlingRules } from "./error-handling.mjs"
 import { recommended as eventDeliveryRecommended, rules as eventDeliveryRules } from "./event-delivery.mjs"
-import { recommended as exceptionIdentityRecommended, rules as exceptionIdentityRules } from "./exception-identity.mjs"
-import { recommended as exceptionsRecommended, rules as exceptionsRules } from "./exceptions.mjs"
 import { recommended as moduleLayeringRecommended, rules as moduleLayeringRules } from "./module-layering.mjs"
+import { recommended as moduleShapeRecommended, rules as moduleShapeRules } from "./module-shape.mjs"
 import { recommended as namingRecommended, rules as namingRules } from "./naming.mjs"
 import { recommended as observabilityRecommended, rules as observabilityRules } from "./observability.mjs"
+import { recommended as schemaAuthorityRecommended, rules as schemaAuthorityRules } from "./schema-authority.mjs"
+import { recommended as sizeBudgetRecommended, rules as sizeBudgetRules } from "./size-budget.mjs"
+import { recommended as specQualityRecommended, rules as specQualityRules } from "./spec-quality.mjs"
+import { recommended as suppressionRecommended, rules as suppressionRules } from "./suppression.mjs"
 import { recommended as testingRecommended, rules as testingRules } from "./testing.mjs"
 import { recommended as transportRecommended, rules as transportRules } from "./transport.mjs"
 import { recommended as typeSafetyRecommended, rules as typeSafetyRules } from "./type-safety.mjs"
@@ -37,15 +43,21 @@ const CONTRIBUTIONS = [
     { law: "authorization", rules: authorizationRules, recommended: authorizationRecommended },
     { law: "cdc", rules: cdcRules, recommended: cdcRecommended },
     { law: "comments", rules: commentsRules, recommended: commentsRecommended },
+    { law: "config-owner", rules: configOwnerRules, recommended: configOwnerRecommended },
     { law: "cqrs", rules: cqrsRules, recommended: cqrsRecommended },
     { law: "data-access", rules: dataAccessRules, recommended: dataAccessRecommended },
+    { law: "default-deny", rules: defaultDenyRules, recommended: defaultDenyRecommended },
     { law: "e2e-flow", rules: e2eFlowRules, recommended: e2eFlowRecommended },
+    { law: "error-handling", rules: errorHandlingRules, recommended: errorHandlingRecommended },
     { law: "event-delivery", rules: eventDeliveryRules, recommended: eventDeliveryRecommended },
-    { law: "exception-identity", rules: exceptionIdentityRules, recommended: exceptionIdentityRecommended },
-    { law: "exceptions", rules: exceptionsRules, recommended: exceptionsRecommended },
     { law: "module-layering", rules: moduleLayeringRules, recommended: moduleLayeringRecommended },
+    { law: "module-shape", rules: moduleShapeRules, recommended: moduleShapeRecommended },
     { law: "naming", rules: namingRules, recommended: namingRecommended },
     { law: "observability", rules: observabilityRules, recommended: observabilityRecommended },
+    { law: "schema-authority", rules: schemaAuthorityRules, recommended: schemaAuthorityRecommended },
+    { law: "size-budget", rules: sizeBudgetRules, recommended: sizeBudgetRecommended },
+    { law: "spec-quality", rules: specQualityRules, recommended: specQualityRecommended },
+    { law: "suppression", rules: suppressionRules, recommended: suppressionRecommended },
     { law: "testing", rules: testingRules, recommended: testingRecommended },
     { law: "transport", rules: transportRules, recommended: transportRecommended },
     { law: "type-safety", rules: typeSafetyRules, recommended: typeSafetyRecommended },
@@ -106,4 +118,4 @@ export default {
     rules,
 }
 
-export { starciBeConfig, linterOptions, RETIRED } from "./lib/config.mjs"
+export { starciBeConfig, linterOptions, ADVISORY } from "./lib/config.mjs"

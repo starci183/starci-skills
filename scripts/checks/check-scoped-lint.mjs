@@ -9,6 +9,7 @@ import {readModuleJson} from '../../engine/runtime-root.mjs';
 import {checkArchitecture,GRAMMAR_RULE_IDS,OWNER_RULE_IDS,REGISTRATION_RULE_IDS,SWR_DATA_RULE_IDS} from './architecture/index.mjs';
 import {isGeneratedPath,isToolingModule,loadTargetTypeScript} from './architecture/typescript.mjs';
 import {discoverNestMetadataInputs} from './code-patterns/nest-metadata.mjs';
+import {whyOfLintRule} from './lint-why.mjs';
 import {diffRanges,isLocatedFinding,judgeSliceBaseline,materializeBaseTree,measureBaseTree,resolveSliceBase} from './scoped-lint-baseline.mjs';
 import {resolveNodeOrTypeScriptModule,typeScriptProgramRun} from './typescript-programs.mjs';
 import {isWorktreesPath} from '../lib/worktree-exclude.mjs';
@@ -183,7 +184,7 @@ function lintObligations(profile,expectedFiles,sourceSubjects){
 }
 
 export function inspectLintResults(expectedFiles,results){const expected=new Set(expectedFiles.map(file=>path.resolve(file))),seen=new Set(),issues=[];for(const result of results){const file=path.resolve(result.filePath);if(!expected.has(file))issues.push({file,code:'UNEXPECTED_FILE'});if(seen.has(file))issues.push({file,code:'DUPLICATE_RESULT'});seen.add(file);
-  for(const message of result.messages??[])if(message.fatal||message.severity>0)issues.push({file,code:'LINT_MESSAGE',ruleId:message.ruleId??null,line:message.line??null,message:String(message.message??'')});for(const message of result.suppressedMessages??[])issues.push({file,code:'SUPPRESSED_MESSAGE',ruleId:message.ruleId??null,line:message.line??null});}
+  for(const message of result.messages??[])if(message.fatal||message.severity>0)issues.push({file,code:'LINT_MESSAGE',ruleId:message.ruleId??null,line:message.line??null,message:String(message.message??''),...(whyOfLintRule(message.ruleId)?{why:whyOfLintRule(message.ruleId)}:{})});for(const message of result.suppressedMessages??[])issues.push({file,code:'SUPPRESSED_MESSAGE',ruleId:message.ruleId??null,line:message.line??null});}
   for(const file of expected)if(!seen.has(file))issues.push({file,code:'MISSING_RESULT'});return issues;}
 // The package.json key a script adapter found undeclared (nest-*.mjs missingContract): the repository owes it,
 // the checker is not broken (nivo WSPV inc-900c9199622e).

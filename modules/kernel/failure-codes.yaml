@@ -604,6 +604,54 @@ BE_APP_COMPOSITION_ONLY:
   owner: op-retry
   kind: check-finding
 
+BE_CONFIG_OWNER:
+  title: "Environment read outside platform/config"
+  title_vi: "Đọc biến môi trường ngoài platform/config"
+  meaning_vi: "Một tệp đọc process.env (hoặc gọi readEnvironment() trong factory) ngoài platform/config, nên cấu hình của capability không đi qua bộ phân tích chung và không có kiểu."
+  causes_vi:
+    - "Đọc process.env trực tiếp trong service, module hoặc factory"
+    - "Gọi readEnvironment() trong useFactory thay vì nhận options do main.ts truyền vào AppModule.register"
+  nextStep_vi: "Thêm khóa vào <capability>.config.ts (zod) và lấy giá trị qua <capability>.options.ts; op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra."
+  owner: op-retry
+  kind: check-finding
+
+BE_DEFAULT_DENY:
+  title: "Open or untyped door"
+  title_vi: "Cửa mở hoặc nhận dữ liệu không kiểu"
+  meaning_vi: "Một operation nhận body không kiểu (unknown, any, GraphQLJSON, switch theo operation), công khai mà không có @Public({ reason }), hoặc so sánh bí mật bằng toán tử bằng thay vì timingSafeEqual. Mặc định mọi route phải đăng nhập và mọi đầu vào phải có kiểu."
+  causes_vi:
+    - "@Body() hoặc @Args() không khai kiểu, hoặc khai unknown, any, object"
+    - "GraphQLJSON được dùng để chui dữ liệu không kiểu qua schema"
+    - "@Public() thiếu reason"
+    - "Token, mật khẩu hoặc chữ ký được so sánh bằng === hay !=="
+  nextStep_vi: "Khai DTO hoặc kiểu hợp đồng cho từng operation, thêm reason cho @Public, và so sánh bí mật bằng crypto.timingSafeEqual; op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra."
+  owner: op-retry
+  kind: check-finding
+
+BE_ENTITY_IN_CONTRACT:
+  title: "ORM entity leaks into a contract"
+  title_vi: "Entity ORM lộ ra hợp đồng"
+  meaning_vi: "Một kiểu *Entity của ORM xuất hiện trong hợp đồng (*.contracts.ts), DTO, hoặc kiểu trả về của resolver hay controller, nên cấu trúc bảng bị lộ ra ngoài capability."
+  causes_vi:
+    - "Trả nguyên entity từ resolver hoặc controller"
+    - "Truyền UserEntity xuyên tầng thay vì mã người dùng và vai trò"
+  nextStep_vi: "Trả một projection (kiểu thường của hợp đồng) và truyền principal id cùng role; op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra."
+  owner: op-retry
+  kind: check-finding
+
+BE_ERROR_HOME:
+  title: "Error declared outside its capability"
+  title_vi: "Lỗi không nằm ở capability sở hữu"
+  meaning_vi: "Một lớp lỗi nằm ngoài thư mục errors/ của capability sở hữu nó, kế thừa base đã bỏ (AbstractException) hoặc Error trần, nằm trong exceptions/, hoặc domain ném lỗi của platform; hoặc code ném new Error hay exception của framework."
+  causes_vi:
+    - "Lớp lỗi đặt ở tệp service hoặc thư mục exceptions/ thay vì <capability>/errors/"
+    - "Lớp lỗi kế thừa Error hoặc AbstractException thay vì DomainError"
+    - "throw new Error(...) hoặc throw new NotFoundException(...) thoát ra khỏi capability"
+    - "Domain ném EnvError hay PersistenceError của platform"
+  nextStep_vi: "Chuyển lỗi về <capability>/errors/, kế thừa DomainError, dịch lỗi platform thành lỗi của capability; op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra."
+  owner: op-retry
+  kind: check-finding
+
 BE_FEATURE_IMPORTS_APP:
   title: "Feature imports app root"
   title_vi: "Feature import gốc ứng dụng"
@@ -622,6 +670,18 @@ BE_FEATURE_LAYOUT_INVALID:
     - "Đặt vai trò giao vận trong application/ hoặc ngược lại"
     - "Thiếu tên giao thức dưới transport/"
   nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra; không cần ai can thiệp thêm."
+  owner: op-retry
+  kind: check-finding
+
+BE_LOGGER_REQUIRED:
+  title: "Catch swallows the failure"
+  title_vi: "Catch nuốt lỗi"
+  meaning_vi: "Một catch (hoặc .catch) rỗng, hoặc không ném lại, không ghi log qua logger port, cũng không trả outcome có kiểu mang cause, nên lỗi thật biến mất không để lại dấu vết."
+  causes_vi:
+    - "catch {} rỗng"
+    - "catch chỉ trả null, false hoặc undefined"
+    - "catch chỉ gọi console, vốn không phải logger port"
+  nextStep_vi: "Ném lại lỗi, ghi log bằng logger của platform/logging, hoặc trả outcome có kiểu mang cause; op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra."
   owner: op-retry
   kind: check-finding
 
@@ -666,6 +726,19 @@ BE_MODULE_PROVIDER_REREGISTRATION:
   owner: op-retry
   kind: check-finding
 
+BE_MODULE_SHAPE:
+  title: "Nest module shape invalid"
+  title_vi: "Hình dạng module Nest sai"
+  meaning_vi: "Một module vi phạm hình dạng chuẩn: @Global() ngoài danh sách cho phép của bảng kê, ConfigurableModuleBuilder không khai kiểu options, register không static, nhiều module trong một tệp, new một provider, hoặc biến let ở cấp module."
+  causes_vi:
+    - "@Global() trên module không thuộc platform/config, platform/logging, platform/database"
+    - "new ConfigurableModuleBuilder() không có kiểu options"
+    - "register, registerAsync, forRoot hay forFeature không phải static"
+    - "new XService() hoặc let ở cấp module tạo trạng thái toàn cục"
+  nextStep_vi: "Bỏ @Global, khai kiểu options, đặt phương thức static, tách module, để container dựng provider; op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra."
+  owner: op-retry
+  kind: check-finding
+
 BE_PUBLIC_CONTRACT_FORM:
   title: "Public contract form invalid"
   title_vi: "Dạng hợp đồng công khai sai"
@@ -673,6 +746,18 @@ BE_PUBLIC_CONTRACT_FORM:
   causes_vi:
     - "Viết kiểu ngay tại tham số thay vì khai báo tên riêng"
   nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra; không cần ai can thiệp thêm."
+  owner: op-retry
+  kind: check-finding
+
+BE_PUBLIC_SURFACE:
+  title: "Owner public surface violated"
+  title_vi: "Bề mặt công khai của owner bị vi phạm"
+  meaning_vi: "Một import chui vào tệp bên trong owner khác thay vì đi qua index.ts của owner, hoặc index.ts export * , export cả thư mục types, export token kho (*_STORE), hoặc export quá nhiều tên."
+  causes_vi:
+    - "Import theo đường dẫn sâu như @modules/domain/plan/plan.service"
+    - "index.ts dùng export * hoặc export cả thư mục"
+    - "index.ts export token kho hoặc vượt số export cho phép"
+  nextStep_vi: "Import qua index.ts của owner và liệt kê tường minh những gì owner cung cấp; op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra."
   owner: op-retry
   kind: check-finding
 
@@ -687,6 +772,30 @@ BE_READONLY_BOUNDARY:
   owner: op-retry
   kind: check-finding
 
+BE_SCHEMA_AUTHORITY:
+  title: "Schema defined at runtime"
+  title_vi: "Schema được định nghĩa lúc chạy"
+  meaning_vi: "Một tệp để tiến trình đang chạy quyết định schema: synchronize khác false, gọi dataSource.synchronize(), migrationsRun khác false, chuỗi CREATE/ALTER/DROP TABLE ngoài persistence/migrations/, hoặc tìm entity và migration bằng glob. Schema chỉ đổi bằng migration do apps/migrate chạy."
+  causes_vi:
+    - "synchronize: true, hoặc đọc từ biến môi trường"
+    - "Chuỗi DDL trong .query ngoài migration"
+    - "entities hoặc migrations khai bằng đường dẫn có ký tự *"
+  nextStep_vi: "Viết một migration trong persistence/migrations/ của capability sở hữu bảng và liệt kê entity, migration tường minh; op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra."
+  owner: op-retry
+  kind: check-finding
+
+BE_SECRET_DEFAULT:
+  title: "Literal default for a secret or URL"
+  title_vi: "Giá trị mặc định cố định cho bí mật hoặc URL"
+  meaning_vi: "Một khóa bí mật, mật khẩu, token hoặc URL hạ tầng có giá trị mặc định viết thẳng trong mã, hoặc đường dẫn ghép từ process.cwd() với src hay .starcistacks. Thiếu biến thì app phải dừng khi boot, nêu tên khóa."
+  causes_vi:
+    - "env.X ?? \"...\" hoặc .default(\"...\") cho khóa bí mật hoặc URL"
+    - "Hằng số hoặc thuộc tính tên password, secret, token, key hay url mang giá trị viết sẵn"
+    - "path.join(process.cwd(), \"src\", ...)"
+  nextStep_vi: "Bỏ giá trị mặc định, để phần kiểm tra cấu hình báo lỗi nêu tên khóa khi thiếu; op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra."
+  owner: op-retry
+  kind: check-finding
+
 BE_SOURCE_NAME_INVALID:
   title: "Source file name invalid"
   title_vi: "Tên tệp nguồn sai quy ước"
@@ -694,6 +803,28 @@ BE_SOURCE_NAME_INVALID:
   causes_vi:
     - "Đặt tên tệp không có hậu tố vai trò đúng"
   nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra; không cần ai can thiệp thêm."
+  owner: op-retry
+  kind: check-finding
+
+BE_SPEC_QUALITY:
+  title: "Spec reads source or casts a double"
+  title_vi: "Spec đọc mã nguồn hoặc ép kiểu double"
+  meaning_vi: "Một spec đọc mã nguồn của repo bằng fs để kiểm tra chữ, hoặc dựng double của dependency bằng as never hay as unknown as thay vì mock<T>() có kiểu."
+  causes_vi:
+    - "readFileSync hay readdirSync trên src/, apps/ hoặc __dirname trong spec"
+    - "as never hoặc as unknown as X trong spec hay tệp fixtures"
+  nextStep_vi: "Chuyển luật kiến trúc sang lint hoặc bộ kiểm tra, và dùng mock<T>() cho double; op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra."
+  owner: op-retry
+  kind: check-finding
+
+BE_SQL_OUTSIDE_REPOSITORY:
+  title: "Raw SQL outside a repository"
+  title_vi: "SQL thô ngoài repository"
+  meaning_vi: "Có .query(...) với chuỗi SQL hoặc createQueryBuilder ngoài tệp *.repository.ts trong persistence/, nên use case hoặc service chứa SQL."
+  causes_vi:
+    - "manager.query(\"...\") trong service hoặc use case"
+    - "createQueryBuilder gọi trực tiếp ngoài repository"
+  nextStep_vi: "Chuyển câu truy vấn vào *.repository.ts của persistence/ thuộc capability sở hữu và gọi qua repository; op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra."
   owner: op-retry
   kind: check-finding
 
@@ -2750,6 +2881,18 @@ HFS_E2E_IN_AUTOMATIC_GATE:
   owner: other-op:backend.scaffold
   kind: check-finding
 
+HFS_INLINE_SUPPRESSION:
+  title: "Inline lint or type suppression"
+  title_vi: "Chú thích tắt luật tại chỗ"
+  meaning_vi: "Có chú thích eslint-disable, eslint-enable, @ts-ignore, @ts-expect-error, @ts-nocheck hoặc vn-ok trong mã. HFS không cho tắt luật hay bỏ kiểm tra kiểu tại chỗ."
+  causes_vi:
+    - "eslint-disable (dòng, dòng kế tiếp hoặc cả tệp) để qua một luật"
+    - "@ts-ignore hoặc @ts-expect-error để qua lỗi kiểu"
+    - "vn-ok để miễn luật ngôn ngữ"
+  nextStep_vi: "Sửa mã cho đúng luật, hoặc đề xuất đổi luật trong canon; op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra."
+  owner: op-retry
+  kind: check-finding
+
 HFS_MANIFEST_INVALID:
   title: "HFS slot manifest invalid"
   title_vi: "Bảng kê ô HFS sai định dạng"
@@ -2934,6 +3077,17 @@ HFS_ROOT_SRC_FORBIDDEN_FE:
   nextStep_vi: "Bộ kiểm kiến trúc từ chối; op phải chuyển toàn bộ src vào apps/<app>/src rồi chạy lại."
   owner: op-retry
   kind: check-finding
+HFS_SIZE_GROWTH:
+  title: "File grew past its size budget"
+  title_vi: "Tệp phình vượt ngân sách kích thước"
+  meaning_vi: "Một tệp mới dài hơn ngân sách dòng, hoặc một tệp đã vượt ngân sách lại dài thêm so với commit cha. Tệp đã lớn được giữ nguyên nhưng không được phình thêm."
+  causes_vi:
+    - "Tệp mới được tạo ra đã dài hơn ngân sách"
+    - "Thêm dòng vào một tệp vốn đã vượt ngân sách"
+  nextStep_vi: "Tách phần mới sang tệp riêng theo trách nhiệm; op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra."
+  owner: op-retry
+  kind: check-finding
+
 HFS_SRC_LAYOUT_INVALID:
   title: "Backend src holds unexpected folders"
   title_vi: "Thư mục src của backend có mục lạ"

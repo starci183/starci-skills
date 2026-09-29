@@ -8,11 +8,8 @@
  *     restate the name - which COMMENT-3 forbids. Only declarations with a surface get the check.
  *   - `require-enum-member-jsdoc` can check that a doc EXISTS and never that it states a
  *     consequence. That half is read by a person, and the rule says so rather than pretending.
- *   - `no-non-ascii-source` exempts a marked line, because text a program matches on or emits is
- *     data wearing prose, and translating it breaks the program.
- *   - `require-vn-ok-reason` (law 6) holds the half `no-non-ascii-source` cannot: that marker is a
- *     bare escape hatch unless it says why the line stays, so a bare `vn-ok` is treated the same as
- *     no marker at all.
+ *   - `no-non-ascii-source` takes no exemption marker: HFS v2 removed `vn-ok`, so text a program depends on
+ *     lives in a locale or data file, and a fixture lane is exempt for strings only (see the rule).
  *   - `no-restated-name-jsdoc` (law 7) holds the decidable slice of law 3 - a doc block whose only
  *     content is the declared name re-spelled in words teaches nothing beyond the import line, so it
  *     is COMMENT-3's violation wearing COMMENT-1's shape. It fires only on an exact match between the
@@ -22,9 +19,6 @@
  */
 
 import { normalizePath } from "./lib/path.mjs"
-
-/** The marker that keeps a non-ASCII literal the program depends on. */
-const KEEP_MARKER = /\bvn-ok\b/
 
 /**
  * The character classes this refuses, and why it is NOT simply "ASCII only".
@@ -161,15 +155,15 @@ export const requireEnumMemberJsdoc = {
 
 // -- COMMENT-4 -------------------------------------------------------------------------------------
 
-/** Source is English ASCII, except where a literal is data the program depends on. */
+/** Source prose is English; there is no exemption marker. */
 export const noNonAsciiSource = {
   meta: {
     type: "problem",
-    docs: { description: "Source stays English ASCII; a depended-upon literal is marked instead." },
+    docs: { description: "Source stays English; no exemption marker." },
     schema: [],
     messages: {
       nonAscii:
-        "This line carries {{offence}}. The bar is a reader who does not share the author's first language: a codebase with two languages in it has somebody for whom half the reasoning is unavailable, and it is the half explaining the surprising parts - and an emoji or an ornament carries tone rather than information, which reads differently to everybody. If this is text the program MATCHES on or EMITS, it is data rather than prose: keep it and mark the line `vn-ok: <reason>` so the next sweep does not turn it into a bug.",
+        "This line carries {{offence}}. The bar is a reader who does not share the author's first language: a codebase with two languages in it has somebody for whom half the reasoning is unavailable, and it is the half explaining the surprising parts - and an emoji or an ornament carries tone rather than information, which reads differently to everybody. There is no exemption marker: write the text in English, or keep product copy in a locale or data file.",
     },
   },
   create(context) {
@@ -187,8 +181,8 @@ export const noNonAsciiSource = {
      * chuyen khoan" - is feeding it data, and translating it would test a system nobody uses.
      *
      * Measured before it was written: of 92 findings in one back end, 89 were fixture strings and 3
-     * were comments. Demanding `vn-ok` on all 92 would have put a marker on every line of every
-     * conversation fixture, which is noise that teaches a reader to stop seeing the marker.
+     * were comments. Marking all 92 would have put an exemption on every line of every
+     * conversation fixture, which is noise; the whole lane is exempt for strings instead.
      *
      * The exemption is for STRINGS ONLY. A Vietnamese comment in a spec is the same problem it is
      * anywhere else - the next reader still cannot follow the reasoning - so it is still refused.
@@ -207,7 +201,6 @@ export const noNonAsciiSource = {
         const lines = sourceCode.getLines()
         for (let index = 0; index < lines.length; index += 1) {
           const line = lines[index]
-          if (KEEP_MARKER.test(line)) continue
           // in a fixture lane only prose is policed; the data the fixture feeds is the point of it
           if (commentLines && !commentLines.has(index + 1)) continue
           const offence = offenceIn(line)
@@ -222,45 +215,6 @@ export const noNonAsciiSource = {
             data: {
               offence,
             },
-          })
-        }
-      },
-    }
-  },
-}
-
-// -- law 6 -------------------------------------------------------------------------------------
-
-/** The line-level test for law 6: `vn-ok` present, with a colon and at least one reason character after it. */
-const REASON_AFTER_MARKER = /\bvn-ok\s*:\s*\S/
-
-/** Every `vn-ok` marker carries a reason; a bare marker is not an exemption. */
-export const requireVnOkReason = {
-  meta: {
-    type: "problem",
-    docs: {
-      description:
-        "COMMENT-5, law 6: a `vn-ok` marker carries a reason - a bare marker is not an exemption.",
-    },
-    schema: [],
-    messages: {
-      bareMarker:
-        "`vn-ok` on this line has no reason after it. The marker exists so the next sweep can read WHY the line stays instead of \"fixing\" it into a bug - a bare marker is only a way of switching that check off. Write `vn-ok: <reason>` and say what the marker is protecting.",
-    },
-  },
-  create(context) {
-    const sourceCode = context.sourceCode || context.getSourceCode()
-    return {
-      "Program:exit"(node) {
-        const lines = sourceCode.getLines()
-        for (let index = 0; index < lines.length; index += 1) {
-          const line = lines[index]
-          if (!KEEP_MARKER.test(line)) continue
-          if (REASON_AFTER_MARKER.test(line)) continue
-          context.report({
-            node,
-            loc: { line: index + 1, column: 0 },
-            messageId: "bareMarker",
           })
         }
       },
@@ -367,7 +321,6 @@ export const rules = {
   "require-export-jsdoc": requireExportJsdoc,
   "require-enum-member-jsdoc": requireEnumMemberJsdoc,
   "no-non-ascii-source": noNonAsciiSource,
-  "require-vn-ok-reason": requireVnOkReason,
   "no-restated-name-jsdoc": noRestatedNameJsdoc,
 }
 
@@ -383,6 +336,5 @@ export const recommended = {
   "starci-be/require-export-jsdoc": "error",
   "starci-be/require-enum-member-jsdoc": "error",
   "starci-be/no-non-ascii-source": "error",
-  "starci-be/require-vn-ok-reason": "error",
   "starci-be/no-restated-name-jsdoc": "error",
 }

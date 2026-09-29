@@ -39,7 +39,8 @@ provenance:
     Verified at extraction: 294 files under errors/** declare a class that extends AbstractException; the only
     class extending Error directly is AbstractException itself; lint throw-abstract-exception,
     exception-extends-abstract and exception-in-errors-folder are at error for src/** and off only under
-    src/tests/** and apps/*/test/**.
+    src/tests/** and apps/*/test/**. Those Academy rules were removed from the canon in 1.3.0 (HFS v2 has one
+    capability profile); error-home and catch-must-account hold the error home and the no-swallow habit.
 rules:
   - id: BE-ERROR-1
     title: The base

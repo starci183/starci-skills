@@ -32,8 +32,8 @@ provenance:
     patterns do not approve them.
 
 
-    Historical filename counts do not decide whether a behavior needs a test. The adopted profile disables
-    handler-has-twin-spec and selects proof from the affected behavior and failure risk. Colocation applies
+    Historical filename counts do not decide whether a behavior needs a test. The canon has no
+    handler-twin count rule (removed in 1.3.0) and selects proof from the affected behavior and failure risk. Colocation applies
     to a selected unit spec; it does not manufacture a spec for every class.
 
     Owner policy 2026-09-29: write or update the spec of the source you add or change (the goal need not ask for it) and run only those
@@ -65,8 +65,8 @@ rules:
         write: <name>.spec.ts beside <name>.ts (875 at extraction; lint unit-test-colocated)
       - id: case-2
         when: Selected handler behavior
-        write: add-to-cart.handler.spec.ts beside the handler; the historical handler-has-twin-spec count rule
-          is disabled in the adopted profile
+        write: add-to-cart.handler.spec.ts beside the handler; the historical handler twin count rule
+          was removed from the canon in 1.3.0
       - id: case-3
         when: Service twin
         write: 271 of 396 services under src/modules at extraction

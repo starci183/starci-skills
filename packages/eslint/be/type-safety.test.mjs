@@ -16,7 +16,6 @@ import {
   noDoubleCast,
   noInlineObjectType,
   noInlineParamType,
-  noLineSuppression,
   noUnguardedUnknownCast,
   rules,
 } from "./type-safety.mjs"
@@ -27,10 +26,6 @@ const tester = new RuleTester({
     ecmaVersion: 2022,
     sourceType: "module",
   },
-  // the other rules this law publishes are registered (not enabled) so a disable comment naming
-  // one of them resolves to a real rule instead of tripping ESLint's own "rule not found" check --
-  // a concern of the test harness, not of `no-line-suppression` itself
-  plugins: { "starci-be": { rules } },
 })
 
 const SRC = "D:/repo/src/modules/bussiness/user/user.service.ts"
@@ -233,24 +228,3 @@ test("TYPE-1 (law 2): a value declared unknown is narrowed before it is cast", (
 // reference backend as this canon's own standard requires, and both of its real firings turned
 // out to be independent facts on transport/seed DTOs (GlobalSearchItem, AdvertisementSeedItem) --
 // not a product of states. See the comment in type-safety.mjs where TYPE-5 would sit.
-
-test("TYPE-6 (law 7): a per-line suppression of a type-safety rule is never the lane speaking", () => {
-  tester.run("no-line-suppression", noLineSuppression, {
-    valid: [
-      // no suppression comment at all
-      "const row = raw as EnrollmentEntity",
-      // a disable for a rule outside this family is not this rule's business
-      "// eslint-disable-next-line no-console\nconsole.log(1)",
-    ],
-    invalid: [
-      {
-        code: "// eslint-disable-next-line starci-be/no-double-cast\nconst row = raw as unknown as EnrollmentEntity",
-        errors: [{ messageId: "suppression" }],
-      },
-      {
-        code: "/* eslint-disable starci-be/no-const-enum */\nexport const enum Verdict { Pass, Fail }",
-        errors: [{ messageId: "suppression" }],
-      },
-    ],
-  })
-})
