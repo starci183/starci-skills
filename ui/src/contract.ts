@@ -56,7 +56,7 @@ export type UnitRow = { unit: string; op: string; title: string; state: 'planned
 
 export type AttemptRow = {
   project: string; id: number; wf: string; unit: string | null; job: string; op: string; attempt: number; dispatchSeq: number;
-  agent: 'devin'|'codex'|'claude'|'qwen'|null; model: string | null; pool: string | null; effort: string | null;
+  agent: 'devin'|'codex'|'claude'|null; model: string | null; pool: string | null; effort: string | null;
   dispatchedAt: number | null; reportedAt: number | null; settledAt: number | null; cycleMs: number | null;
   reportOutcome: 'done'|'partial'|'failed'|'ask'|'blocked'|null;
   verdict: 'pass'|'fail'|'partial'|'blocked'|'dropped'|'cancelled'|null; settledBy: string | null;
@@ -175,7 +175,7 @@ export type FleetViewV2 = Omit<FleetView, 'workflows'> & { workflows: WorkflowRo
 export type OpInfo = { op: string; nameVi: string | null; nameEn: string | null; goal: { en: string | null; vi: string | null };
   reads: { id: string; purpose: string | null }[]; writes: string[]; sideEffects: string[]; manifest: string | null };
 export type LegRowV3 = LegRow & { info: OpInfo | null };
-export type AgentFamily = 'claude' | 'codex' | 'devin' | 'qwen' | 'gemini' | 'unknown';
+export type AgentFamily = 'claude' | 'codex' | 'devin' | 'unknown';
 export type AgentRef = { family: AgentFamily; pool: string | null; model: string | null; label: string };
 /** /api/host (slice C). Temperatures are null when the OS refuses the sensor read. */
 export type HostView = { at: number; name: string | null; os: string; uptimeSec: number;

@@ -8,7 +8,7 @@ export const concept: Concept = 'C6';
 export function agentOf(input: { agent?: string | null; pool?: string | null; model?: string | null }): AgentRef {
   const text = `${input.agent ?? ''} ${input.pool ?? ''} ${input.model ?? ''}`.toLowerCase();
   const family: AgentFamily = /claude|anthropic|opus|sonnet|haiku|fable/.test(text) ? 'claude' : /codex|gpt|openai/.test(text) ? 'codex'
-    : /devin|swe-|cognition/.test(text) ? 'devin' : /qwen/.test(text) ? 'qwen' : /gemini|gemma/.test(text) ? 'gemini' : 'unknown';
+    : /devin|swe-|cognition/.test(text) ? 'devin' : 'unknown';
   return { family, pool: input.pool ?? null, model: input.model ?? null, label: input.model ?? input.pool ?? input.agent ?? 'chưa rõ' };
 }
 

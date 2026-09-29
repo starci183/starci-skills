@@ -52,8 +52,8 @@
   --status-warning: #9a5200; --status-warning-bg: #fdf3e1; --status-warning-line: #ecc98a;
   --status-skipped: #6b6b7b; --status-skipped-bg: transparent; --status-skipped-line: #c6c6d0;
   --status-owner: #6d28d9; --status-owner-bg: #f1ebfd; --status-owner-line: #c9b5f5;
-  /* Agent brand colours (simple-icons hex): Claude #D97757, Google Gemini #8E75B2. */
-  --brand-claude: #d97757; --brand-gemini: #8e75b2;
+  /* Agent brand colour (simple-icons hex): Claude #D97757. */
+  --brand-claude: #d97757;
 }
 
 .dark {
@@ -98,7 +98,7 @@
   --status-warning: #f8c152; --status-warning-bg: #2b1f08; --status-warning-line: #7a5a1a;
   --status-skipped: #8a8a9c; --status-skipped-bg: transparent; --status-skipped-line: #44444f;
   --status-owner: #c4a6ff; --status-owner-bg: #221638; --status-owner-line: #5b3d99;
-  --brand-claude: #e08a6d; --brand-gemini: #a78fd0;
+  --brand-claude: #e08a6d;
 }
 
 @theme inline {

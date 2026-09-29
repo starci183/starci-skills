@@ -3,28 +3,26 @@ import type { AgentFamily } from '../../contract';
 import type { Concept } from '../concept';
 import claudeSvg from './logos/claude.svg?raw';
 import openaiSvg from './logos/openai.svg?raw';
-import geminiSvg from './logos/googlegemini.svg?raw';
 import devinPng from './logos/devin.png';
 
 export const concept: Concept = 'C6';
 
 // Official marks, bundled with the app (no runtime fetch):
-// claude.svg, openai.svg, googlegemini.svg — simple-icons 13.21.0 (CC0-1.0, jsDelivr), downloaded 2026-09-29;
+// claude.svg, openai.svg — simple-icons 13.21.0 (CC0-1.0, jsDelivr), downloaded 2026-09-29;
 // devin.png — the 48 px image inside https://devin.ai/favicon.ico, downloaded 2026-09-29.
 // Only the vetted <path d> data is rendered; the SVG text is never injected as HTML.
 const pathsOf = (svg: string) => [...svg.matchAll(/\sd="([^"]+)"/g)].map(match => match[1]);
-const marks = { claude: pathsOf(claudeSvg), codex: pathsOf(openaiSvg), gemini: pathsOf(geminiSvg) } as const;
+const marks = { claude: pathsOf(claudeSvg), codex: pathsOf(openaiSvg) } as const;
 
 function PathMark({ paths, fill }: { paths: readonly string[]; fill: string }) {
   return <svg viewBox="0 0 24 24" aria-hidden="true" className="size-full" style={{ fill }}>{paths.map((d, i) => <path key={i} d={d} />)}</svg>;
 }
 
-/** The agent family's official mark; Qwen and unknown fall back to a letter. */
+/** The agent family's official mark (the runtime has exactly Claude, Codex and Devin); unknown falls back to a letter. */
 export function AgentMark({ family, initial = '?' }: { family: AgentFamily; initial?: string }) {
   switch (family) {
     case 'claude': return <PathMark paths={marks.claude} fill="var(--brand-claude)" />;
     case 'codex': return <PathMark paths={marks.codex} fill="var(--foreground)" />;
-    case 'gemini': return <PathMark paths={marks.gemini} fill="var(--brand-gemini)" />;
     case 'devin': return <img src={devinPng} alt="" aria-hidden="true" className="size-full rounded-full object-cover" draggable={false} />;
     default:
       return <svg viewBox="0 0 24 24" aria-hidden="true" className="size-full"><text x="12" y="16.5" textAnchor="middle" fontSize="13" fontWeight="700" style={{ fill: 'currentColor' }} fontFamily="var(--font-mono, monospace)">{initial}</text></svg>;
@@ -35,8 +33,6 @@ export const familyTint: Record<AgentFamily, { name: string; tone: string }> = {
   claude: { name: 'Claude', tone: 'neutral' },
   codex: { name: 'Codex', tone: 'neutral' },
   devin: { name: 'Devin', tone: 'neutral' },
-  qwen: { name: 'Qwen', tone: 'primary' },
-  gemini: { name: 'Gemini', tone: 'neutral' },
   unknown: { name: 'Chưa rõ', tone: 'skipped' },
 };
 
