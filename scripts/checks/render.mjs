@@ -147,11 +147,7 @@ const nearest=(colour,palette)=>palette.reduce((best,entry)=>{
  * the brand's primary is nowhere in the capture - a screen drawn in the brand's neutrals with the brand's
  * primary missing is off-brand exactly as much as one drawn in a foreign purple.
  */
-export function checkPalette(first,second){
-  // The shared interface note spells this call `checkPalette(png, {brand})` and the package spells it as one
-  // options object. Both are accepted: a decoded PNG is recognisable by its pixels, and a caller written
-  // against either spelling should get the check rather than an undefined image.
-  const {png,brand,buckets=DEFAULT_BUCKETS}=first?.data?{png:first,...(second??{})}:(first??{});
+export function checkPalette({png,brand,buckets=DEFAULT_BUCKETS}={}){
   const palette=brandColours(brand);
   const base={tolerance:PALETTE_TOLERANCE,scale:'OKLab delta-E x100',minimumShare:MIN_BUCKET_SHARE,
     brandColours:palette.length,chromaFloor:CHROMA_FLOOR,lightnessBand:[MIN_LIGHTNESS,MAX_LIGHTNESS]};
@@ -512,9 +508,9 @@ export function uiDirOf({op={},files=[]}={}){
 }
 
 /**
- * Compatibility hook for a design node that still carries browser-rendered candidates. New ImageGen direction
- * assets return `null`: their pixels are design input, not exact Grammar render/DOM proof. Actual implementation
- * captures and browser UAT are verified by their downstream operations.
+ * The render-proof hook of a frontend operation's ui node. Design-direction assets (ImageGen) return `null`:
+ * their pixels are design input, not exact Grammar render/DOM proof. Implementation captures and browser UAT are
+ * verified by their downstream operations.
  */
 export function renderChecksFor({op={},state=null,ctx={},files=[]}={}){
   const implementation=['frontend.implement','interface.implement'].includes(op.kind),required=implementation;

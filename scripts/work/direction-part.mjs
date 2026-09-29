@@ -51,7 +51,7 @@ export function uiRecordOf(file, cache = new Map()) {
 /**
  * The owner-facing part for one image. Returns {file, composite, kind}: kind 'part' (the image is a part),
  * 'composite' (a composite whose part was found - `file` is the part, `composite` the original) or 'plain'
- * (anything else - a capture, a legacy direction, a screenshot - shown as it is).
+ * (anything else - a capture, a screenshot - shown as it is).
  */
 export function partOf(file, { cache = new Map() } = {}) {
   const abs = path.resolve(file);

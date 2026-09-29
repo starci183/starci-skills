@@ -97,8 +97,8 @@ export function rubricFor({ workRoot = null, archetype = null, record = null, sh
   return { rubric: withArchetype(structuredClone(DEFAULT_RUBRIC)), source: 'default', archetype: block ? archetype : null, ownerChecks: owner.map((o) => o.id) };
 }
 
-/** The gate check ids of a rubric: every check marked gate (and a legacy rubric-level gate list). */
-export const gateIdsOf = (rubric) => [...new Set([...(rubric.checks ?? []).filter((c) => c?.gate === true).map((c) => String(c.id)), ...(Array.isArray(rubric.gate) ? rubric.gate.map(String) : [])])];
+/** The gate check ids of a rubric: every check marked gate. */
+export const gateIdsOf = (rubric) => [...new Set((rubric.checks ?? []).filter((c) => c?.gate === true).map((c) => String(c.id)))];
 
 /** The critic's instructions. It never sees the drawing brief, the worker's notes or any earlier round. */
 export function criticPrompt({ images, html = 'screen.html', rubricFile = 'rubric.yaml' }) {

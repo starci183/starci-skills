@@ -190,9 +190,6 @@ test('the palette of a capture is the brand tokens, and the primary has to be in
   const onScale=checkPalette({png:decodePng(png([{hex:'#5a2fe0',rows:6},{hex:ACCENT,rows:4}])),brand});
   assert.deepEqual(onScale.map(entry=>entry.outcome),['pass','pass']);
 
-  // Both spellings of the call reach the same check: the options object, and the positional PNG.
-  assert.deepEqual(checkPalette(decodePng(IN_BRAND()),{brand}).map(entry=>entry.outcome),['pass','pass']);
-
   // Nothing to compare against is a skip, never a pass.
   const bare=checkPalette({png:decodePng(IN_BRAND()),brand:{color:{tokens:[{token:'--x',value:'var(--y)',role:'primary'}]}}});
   assert.deepEqual(bare.map(entry=>entry.outcome),['skip','skip']);

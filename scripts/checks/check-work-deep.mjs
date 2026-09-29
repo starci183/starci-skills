@@ -364,7 +364,7 @@ function checkTree(workRoot, out, baseline) {
   }
 
   // CAPABILITY coverage: owning the module is necessary but not sufficient - an impl owning
-  // `src/modules/bussiness/cart` does not mean any record describes what cart DOES. A capability
+  // `src/modules/domain/cart` does not mean any record describes what cart DOES. A capability
   // (graphql cap dir, controller prefix) is "specified" when a spec record's id carries it as a full
   // `.`-segment or its owned path carries it as a path segment - hyphenated lookalikes
   // (empty-cart-is-refused) do not count. Two levels: no spec record at all -> WITHOUT_SPEC; only

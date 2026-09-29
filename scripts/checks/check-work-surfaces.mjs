@@ -617,10 +617,7 @@ export function checkWorkSurfaces(workRoot, out) {
   for (const {subscriptions} of codeByRepo) {
     for (const sub of subscriptions) {
       const owner = ownerOf(sub.file);
-      // modules/bussiness/<feature>/ is the todo backend's module layout - when no record owns the
-      // subscriber file, its path segment still names the feature it answers to
-      const bussiness = /bussiness\/([^/]+)/.exec(sub.file.replaceAll('\\', '/'))?.[1];
-      const feature = owner?.feature ?? (bussiness && subscribesByFeature.has(bussiness) ? bussiness : null);
+      const feature = owner?.feature ?? null;
       for (const cls of sub.classes.filter(c => !recordOfClass.has(c))) {
         suspect(sub.file, 'SUBSCRIPTION_UNDECLARED',
           `${path.basename(sub.file)} handles ${cls}, which maps to no work/event@1 record`);
