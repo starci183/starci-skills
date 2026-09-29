@@ -76,7 +76,7 @@ test('secret scan: encrypted files, references and stand-ins pass; provider toke
   assert.deepEqual(scanSecrets('.starciwork/x/index.yaml', 'password: "hunter2"\n').map((f) => f.code), [WORK_SECRET_LITERAL]);
   assert.deepEqual(scanSecrets('.starciwork/x/notes.md', 'A pair `password: hunter2` in prose is documentation.\n'), []);
   assert.deepEqual(scanSecrets('.starciwork/x/notes.md', `key ghp_${'a1B2c3D4'.repeat(5)}\n`).map((f) => f.code), [WORK_SECRET_PATTERN]);
-  assert.deepEqual(scanSecrets('.starciwork/x/key.txt', '-----BEGIN RSA PRIVATE KEY-----\nabc\n').map((f) => f.code), [WORK_SECRET_PATTERN]);
+  assert.deepEqual(scanSecrets('.starciwork/x/key.txt', `-----BEGIN ${'RSA'} PRIVATE KEY-----\nabc\n`).map((f) => f.code), [WORK_SECRET_PATTERN]);
   assert.deepEqual(scanSecrets('.starcistacks/dev/secrets/db-password', null).map((f) => f.code), [WORK_SECRET_FILE]);
 });
 
