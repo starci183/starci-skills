@@ -6,6 +6,7 @@ import path from 'node:path';
 import {spawnSync} from 'node:child_process';
 import {inspectLedger,openLedger,ledgerFileFor} from '../engine/ledger-db.mjs';
 import {FAKE_ORCA} from './helpers/fake-orca.mjs';
+import {seedWorkflow} from './_ledger-fixture.mjs';
 
 const ROOT=path.resolve(import.meta.dirname,'..');
 const DEFINE_GOAL=path.join(ROOT,'scripts','goal','define-goal.mjs');
@@ -22,9 +23,13 @@ const fixture=t=>{
   const ownerRoot=path.join(root,'owner');fs.mkdirSync(ownerRoot);
   fs.writeFileSync(path.join(ownerRoot,'config.yaml'),'language: vi\neffort: medium\nkernel: {agent: codex, model: gpt-6-sol, effort: high}\n');
   fs.writeFileSync(state,JSON.stringify({sends:0,counter:0,terminals:{},commands:[]}));
-  fs.writeFileSync(fake,FAKE_ORCA);
+  // Real Orca mints a distinct Dispatch id per worker-start; the canned 'dispatch-fake-1' would collide on
+  // op_attempts.UNIQUE(workflow_id,dispatch_id) when a workflow's second managed op dispatches.
+  fs.writeFileSync(fake,FAKE_ORCA.replaceAll("'dispatch-fake-1'","(state.dispatchSeq=(state.dispatchSeq??0)+1,'dispatch-fake-'+state.dispatchSeq)"));
   const env={...process.env,STARCI_ORCA_COMMAND:process.execPath,STARCI_ORCA_ARGS:JSON.stringify([fake]),
-    STARCI_FAKE_ORCA_STATE:state,STARCI_FAKE_ORCA_LOG:log,STARCI_FAKE_ORCA_UNIQUE_TERMINALS:'1',STARCI_OWNER_ROOT:ownerRoot};
+    STARCI_FAKE_ORCA_STATE:state,STARCI_FAKE_ORCA_LOG:log,STARCI_FAKE_ORCA_UNIQUE_TERMINALS:'1',STARCI_OWNER_ROOT:ownerRoot,
+    // The machine registry is fleet-wide: fixture repos all basename to 'repo' and collide on ledgers.name.
+    STARCI_TEST_MACHINE_FILE:path.join(root,'machine.sqlite')};
   const run=(script,...args)=>spawnSync(process.execPath,[script,...args],{cwd:ROOT,encoding:'utf8',windowsHide:true,timeout:120000,env:{...env,...(f.closeFails?{STARCI_FAKE_ORCA_CLOSE_FAILS:f.closeFails}:{})}});
   const f={};
   const callArgv=()=>fs.existsSync(log)
@@ -43,8 +48,8 @@ const killTerminal=(f,handle)=>{
 const enqueueOp=(f,workflowId,jobId,ownedPath)=>{
   const ledger=openLedger({file:ledgerFileFor(f.repo)});
   try{
-    ledger.enqueueJob({jobId,workflowId,opId:'code.refactor',kind:'op',
-      payload:{opId:'code.refactor',owned_paths:[ownedPath],model:'claude-agent'}});
+    seedWorkflow(ledger,{id:workflowId,jobs:[{jobId,opId:'code.refactor',
+      payload:{opId:'code.refactor',owned_paths:[ownedPath],model:'claude-agent'}}]});
   }finally{ledger.close();}
 };
 const payloadOf=(repo,jobId)=>{
@@ -117,7 +122,8 @@ test('a disconnected kernel restarts from the durable ledger with absolute host 
   const ledger=inspectLedger({file:ledgerFileFor(f.repo)});
   try{
     const workflow=ledger.db.prepare('SELECT generation,phase FROM workflows WHERE workflow_id=?').get(workflowId);
-    const job=ledger.db.prepare('SELECT attempt,generation,status,worker_id FROM jobs WHERE job_id=?').get(`kernel-${workflowId}`);
+    const jobRow=ledger.db.prepare('SELECT payload_json,generation,status,worker_id FROM jobs WHERE job_id=?').get(`kernel-${workflowId}`);
+    const job={attempt:json(jobRow?.payload_json)?.hierarchy?.attempt,generation:jobRow?.generation,status:jobRow?.status,worker_id:jobRow?.worker_id};
     const inbox=ledger.db.prepare("SELECT status FROM inbox WHERE workflow_id=? AND kind='goal'").get(workflowId);
     const kinds=ledger.db.prepare("SELECT kind FROM events WHERE workflow_id=? ORDER BY seq").all(workflowId).map(row=>row.kind);
     assert.deepEqual({...workflow},{generation:0,phase:'running'});

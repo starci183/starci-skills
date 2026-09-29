@@ -6,6 +6,8 @@ import path from 'node:path';
 import {spawnSync} from 'node:child_process';
 import {FAKE_ORCA} from './helpers/fake-orca.mjs';
 import {openLedger,inspectLedger,ledgerFileFor} from '../engine/ledger-db.mjs';
+import {openMachine} from '../engine/machine-db.mjs';
+import {writeProviderCircuit} from '../scripts/kernel/provider-circuit.mjs';
 
 // The kernel is a model GROUP: config.yaml `kernel: {group: [...]}` (the shipped default) or the unpinned
 // think-group route. Members are tried in order with the provider availability signals; a single pin keeps
@@ -26,13 +28,14 @@ const fixture=(t,kernelLine)=>{
   fs.writeFileSync(state,JSON.stringify({sends:0,counter:0,terminals:{},commands:[]}));
   fs.writeFileSync(fake,FAKE_ORCA);
   const env={...process.env,STARCI_ORCA_COMMAND:process.execPath,STARCI_ORCA_ARGS:JSON.stringify([fake]),
-    STARCI_FAKE_ORCA_STATE:state,STARCI_FAKE_ORCA_LOG:log,STARCI_FAKE_ORCA_UNIQUE_TERMINALS:'1',STARCI_OWNER_ROOT:ownerRoot};
+    STARCI_FAKE_ORCA_STATE:state,STARCI_FAKE_ORCA_LOG:log,STARCI_FAKE_ORCA_UNIQUE_TERMINALS:'1',STARCI_OWNER_ROOT:ownerRoot,
+    STARCI_TEST_MACHINE_FILE:path.join(root,'machine.sqlite')};
   const run=(script,args,extra={})=>spawnSync(process.execPath,[script,...args],{cwd:ROOT,encoding:'utf8',windowsHide:true,timeout:120000,env:{...env,...extra}});
   const defined=run(DEFINE_GOAL,['--repo',repo,'--text','boot the kernel group','--json']);
   assert.equal(defined.status,0,defined.stderr);
   const workflowId=json(defined.stdout)?.workflowId;assert.ok(workflowId);
   const plan=(extra={})=>{const r=run(START_WORKFLOW,['--repo',repo,'--goal',workflowId,'--plan','--json'],extra);return {r,body:json(r.stdout)};};
-  return {root,repo,state,workflowId,run,plan};
+  return {root,repo,state,workflowId,run,plan,machineFile:env.STARCI_TEST_MACHINE_FILE};
 };
 
 test('the group form plans Claude Opus 5.5 first with GPT-6 Sol behind it',t=>{
@@ -54,12 +57,12 @@ test('the group skips a dead or circuit-open Claude and orders a limited one las
   const limited=f.plan({STARCI_FAKE_ORCA_LIMITED:'claude'});
   assert.equal(limited.r.status,0,limited.r.stderr);
   assert.deepEqual(limited.body.group.map(m=>[m.agent,m.availability]),[['codex','available'],['claude','limited']]);
-  const ledger=openLedger({file:ledgerFileFor(f.repo)});
+  // Provider health is fleet-wide machine state now (the ledger's signals table no longer carries it).
+  const machine=openMachine({file:f.machineFile});
   try{
-    const now=Date.now();
-    ledger.db.prepare("INSERT INTO signals(scope,key,holder_pid,token,value_json,at,expires_at) VALUES('provider-health','claude',NULL,NULL,?,?,?)")
-      .run(JSON.stringify({schema:'starci/provider-health@1',provider:'claude',status:'unavailable',failureKind:'auth'}),now,now+3600000);
-  }finally{ledger.close();}
+    writeProviderCircuit('claude',{machine,expiresAt:Date.now()+3600000,
+      value:{schema:'starci/provider-health@1',provider:'claude',status:'unavailable',failureKind:'auth'}});
+  }finally{machine.close();}
   const circuit=f.plan();
   assert.equal(circuit.r.status,0,circuit.r.stderr);
   assert.deepEqual(circuit.body.group.map(m=>m.agent),['codex']);

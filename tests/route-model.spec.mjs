@@ -5,6 +5,8 @@ import os from 'node:os';
 import path from 'node:path';
 import {spawnSync} from 'node:child_process';
 import {openLedger,ledgerFileFor} from '../engine/ledger-db.mjs';
+import {openMachine} from '../engine/machine-db.mjs';
+import {writeProviderCircuit} from '../scripts/kernel/provider-circuit.mjs';
 import {FAKE_ORCA} from './helpers/fake-orca.mjs';
 
 const ROOT=path.resolve(import.meta.dirname,'..');
@@ -96,13 +98,17 @@ test('Sol limited or dead routes the kernel to Claude Opus 5.5',t=>{
 
 test('an open provider circuit in the --repo ledger routes the kernel to Claude Opus 5.5',t=>{
   const repo=fixture(t).dir();
+  // The provider circuit is fleet-wide machine state (provider-health moved out of the ledger's signals table);
+  // --repo still gates the read on the repo having a ledger.
   const ledger=openLedger({file:ledgerFileFor(repo)});
+  ledger.close();
+  const machineFile=path.join(fixture(t).dir(),'machine.sqlite');
+  const machine=openMachine({file:machineFile});
   try{
-    const now=Date.now();
-    ledger.db.prepare("INSERT INTO signals(scope,key,holder_pid,token,value_json,at,expires_at) VALUES('provider-health','codex',NULL,NULL,?,?,?)")
-      .run(JSON.stringify({schema:'starci/provider-health@1',provider:'codex',status:'unavailable',failureKind:'auth'}),now,now+3600000);
-  }finally{ledger.close();}
-  const {r,body}=kernelRoute(t,{},['--repo',repo]);
+    writeProviderCircuit('codex',{machine,expiresAt:Date.now()+3600000,
+      value:{schema:'starci/provider-health@1',provider:'codex',status:'unavailable',failureKind:'auth'}});
+  }finally{machine.close();}
+  const {r,body}=kernelRoute(t,{STARCI_TEST_MACHINE_FILE:machineFile},['--repo',repo]);
   assert.equal(r.status,0,r.stderr);
   assert.deepEqual([body.pick.target,body.pick.model],['claude-agent','claude-opus-5-5']);
   assert.match(body.rejected.find(x=>x.target==='codex-agent').reasons[0],/provider circuit open \(auth\)/);

@@ -190,10 +190,12 @@ test('released -> worktree-removed: the reap records the transition once; the wo
   ledger.ensureWorkflow({ workflowId: WF, title: 'fe canon' });
   const jobId = 'op-code.refactor-d704825abb';
   const made = ensureOpWorktree({ repoRoot: repo, workflowId: WF, jobId });
-  ledger.enqueueJob({ jobId, workflowId: WF, opId: 'code.refactor', kind: 'op', payload: { opId: 'code.refactor', productWorktree: made.record, terminalClosed: { ok: true, verified: { ok: true, proof: 'spec' } } } });
+  ledger.write.createUnit({ workflowId: WF, unitId: jobId, opId: 'code.refactor', subjectKey: jobId, goalRevision: 1 });
+  ledger.enqueueJob({ jobId, workflowId: WF, unitId: jobId, opId: 'code.refactor', kind: 'op', payload: { opId: 'code.refactor', productWorktree: made.record, terminalClosed: { ok: true, verified: { ok: true, proof: 'spec' } } } });
   const now = Date.now();
   assert.equal(reapJobWorktree({ ledger, ledgerRepo, jobId, now }).skipped, 'job-queued', 'a live job keeps its tree');
-  ledger.db.prepare("UPDATE jobs SET status='succeeded', updated_at=? WHERE job_id=?").run(now, jobId);
+  for (const to of ['ready', 'leased', 'running', 'reported', 'succeeded'])
+    ledger.db.prepare('UPDATE jobs SET status=?, updated_at=? WHERE job_id=?').run(to, now, jobId);
   const r = reapJobWorktree({ ledger, ledgerRepo, jobId, now: now + 1000 });
   assert.equal(r.removed, true, JSON.stringify(r));
   const ev = ledger.db.prepare('SELECT payload_json FROM events WHERE entity_id=? AND kind=?').all(jobId, EVENTS.removed);

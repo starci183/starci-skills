@@ -5,6 +5,7 @@ import os from 'node:os';
 import path from 'node:path';
 import {FAKE_ORCA} from './helpers/fake-orca.mjs';
 import {openLedger,ledgerFileFor} from '../engine/ledger-db.mjs';
+import {seedWorkflow} from './_ledger-fixture.mjs';
 
 // After the 2026-09-24 reboot Orca restored its previous tabs: old nivo Claude
 // kernel sessions with their history and bare PowerShell tabs of old qwen ops.
@@ -47,16 +48,11 @@ const world=({leased=false}={})=>{
   process.env.STARCI_FAKE_ORCA_LOG=path.join(dir,'calls.jsonl');
   const ledger=openLedger({file:ledgerFileFor(repo)});
   try{
-    ledger.enqueueJob({jobId:'kernel-wf-a',workflowId:'wf-a',kind:'kernel'});
-    ledger.enqueueJob({jobId:'op-live',workflowId:'wf-a',opId:'backend.implement',kind:'op',payload:{}});
-    ledger.db.prepare("UPDATE jobs SET status='running',worker_id=? WHERE job_id=?").run('term-kernel-new','kernel-wf-a');
-    ledger.db.prepare("UPDATE jobs SET status='running',worker_id=? WHERE job_id=?").run('term-op-live','op-live');
-    ledger.db.prepare("INSERT INTO signals(scope,key,holder_pid,token,value_json,at,expires_at) VALUES('kernel','wf-a',NULL,'k',?,?,NULL)")
-      .run(JSON.stringify({terminal:'term-kernel-new'}),Date.now());
-    if(leased){
-      ledger.enqueueJob({jobId:'op-flight',workflowId:'wf-a',opId:'backend.implement',kind:'op',payload:{}});
-      ledger.db.prepare("UPDATE jobs SET status='leased' WHERE job_id='op-flight'").run();
-    }
+    seedWorkflow(ledger,{id:'wf-a',state:{phase:'running'},jobs:[
+      {jobId:'kernel-wf-a',kind:'kernel',status:'running',workerId:'term-kernel-new'},
+      {jobId:'op-live',opId:'backend.implement',status:'running',workerId:'term-op-live',payload:{}}],
+      signals:[{scope:'kernel',key:'wf-a',token:'k',value:{terminal:'term-kernel-new'}}]});
+    if(leased)seedWorkflow(ledger,{id:'wf-a',jobs:[{jobId:'op-flight',opId:'backend.implement',status:'leased',payload:{}}]});
   }finally{ledger.close();}
   return {repo,state:()=>JSON.parse(fs.readFileSync(stateFile,'utf8'))};
 };

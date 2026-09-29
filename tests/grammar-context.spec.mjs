@@ -10,6 +10,7 @@ import {parseYaml} from '../engine/yaml.mjs';
 import {grammarContextRequired,resolveGrammarContext,renderGrammarContext} from '../scripts/kernel/grammar-context.mjs';
 import {projectBinding} from '../scripts/kernel/target-repo.mjs';
 import {buildOpPrompt} from '../scripts/kernel/op-prompt.mjs';
+import {seedWorkflow} from './_ledger-fixture.mjs';
 
 // An op manifest with grammarContext: required gets its grammar sources in packet context.grammar at
 // dispatch: the family CSS from the product's brand record and installed @starci/grammar, the StarCi
@@ -109,10 +110,10 @@ test('api dispatch attaches context.grammar and refuses grammar-context-missing 
   const log=path.join(root,'calls.jsonl');
   const env={...process.env,STARCI_ORCA_COMMAND:process.execPath,STARCI_ORCA_ARGS:JSON.stringify([stub]),
     STARCI_FAKE_ORCA_MODE:'healthy',STARCI_FAKE_ORCA_LOG:log,STARCI_FAKE_ORCA_STATE:path.join(root,'state.json'),
-    STARCI_SOURCE_ROOT:root,LOCALAPPDATA:path.join(root,'localappdata')};
-  const ledger=openLedger({file:ledgerFileFor(repo)});
-  try{ledger.enqueueJob({jobId:'job-impl',workflowId:'wf-grammar',opId:'interface.implement',kind:'op',
-    payload:{opId:'interface.implement',records:[],owned_paths:['src/app'],model:'devin-agent'}});}
+    STARCI_SOURCE_ROOT:root,LOCALAPPDATA:path.join(root,'localappdata'),STARCI_TEST_MACHINE_FILE:path.join(root,'machine.sqlite')};
+  const ledger=openLedger({file:ledgerFileFor(repo,{env})});
+  try{seedWorkflow(ledger,{id:'wf-grammar',jobs:[{jobId:'job-impl',opId:'interface.implement',
+    payload:{opId:'interface.implement',records:[],owned_paths:['src/app'],model:'devin-agent'}}]});}
   finally{ledger.close();}
   const run=(...extra)=>spawnSync(process.execPath,[API,'dispatch','--repo',repo,'--job','job-impl',...extra,'--json'],
     {cwd:ROOT,encoding:'utf8',windowsHide:true,timeout:120000,env});
@@ -129,7 +130,7 @@ test('api dispatch attaches context.grammar and refuses grammar-context-missing 
   assert.equal(refused.reason,'grammar-context-missing');
   assert.match(refused.detail,/interface\.implement declares grammarContext: required.*The job stays queued/);
   assert.equal(fs.existsSync(log)?fs.readFileSync(log,'utf8').trim():'','','nothing reached the host');
-  const inspect=inspectLedger({file:ledgerFileFor(repo)});
+  const inspect=inspectLedger({file:ledgerFileFor(repo,{env})});
   try{assert.equal(inspect.db.prepare('SELECT status FROM jobs WHERE job_id=?').get('job-impl').status,'queued');}
   finally{inspect.close();}
 

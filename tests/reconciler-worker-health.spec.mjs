@@ -9,6 +9,7 @@ import { classifyWorker, planHealth, resetHintMs, HEALTH_DEFAULTS, NUDGE } from 
 import job, { _health } from '../scripts/reconciler/controllers/job.mjs';
 import { fakeCtx } from '../scripts/reconciler/testing.mjs';
 import { openLedger } from '../engine/ledger-db.mjs';
+import { seedWorkflow } from './_ledger-fixture.mjs';
 
 const H = HEALTH_DEFAULTS;
 const T0 = 1_800_000_000_000;
@@ -61,8 +62,9 @@ test('the probe over a ledger: shadow would-sends, staggered 15 s apart, a rate-
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'rc-health-'));
   const file = path.join(dir, 'runtime.sqlite');
   const ledger = openLedger({ file });
-  ledger.db.prepare("INSERT INTO workflows(workflow_id,created_at,updated_at,phase) VALUES('wf-x',1,1,'running')").run();
-  for (const [id, h] of [['op-a', 'term_a'], ['op-b', 'term_b']]) ledger.db.prepare("INSERT INTO jobs(job_id,workflow_id,op_id,attempt,generation,kind,payload_json,status,worker_id,created_at,updated_at) VALUES(?, 'wf-x','code.refactor',1,0,'op','{\"provider\":\"devin-agent\"}','running',?,1,1)").run(id, h);
+  seedWorkflow(ledger, { id: 'wf-x', state: { phase: 'running' }, now: () => 1, jobs: [
+    { jobId: 'op-a', opId: 'code.refactor', status: 'running', workerId: 'term_a', payload: { provider: 'devin-agent' } },
+    { jobId: 'op-b', opId: 'code.refactor', status: 'running', workerId: 'term_b', payload: { provider: 'devin-agent' } }] });
   ledger.close();
   const db = new DatabaseSync(file, { readOnly: true });
   try {

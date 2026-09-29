@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import net from 'node:net';
 import path from 'node:path';
 import {spawnSync} from 'node:child_process';
+import {fileReport} from '../engine/ledger-db.mjs';
 import {withLedger,seedWorkflow} from './_ledger-fixture.mjs';
 // These specs exercise the owner-flow contract; autopilot (scripts/kernel/autopilot.mjs, owner ruling 2026-09-28) is
 // on by default, so they run with it off - tests/autopilot.spec.mjs covers the autopilot flow.
@@ -19,13 +20,12 @@ const [BAND_FIRST,BAND_LAST]=[29690,29699];
 const bandRange=(from,to)=>Array.from({length:to-from+1},(_,i)=>from+i);
 
 const seedAskReport=(ledger,{dispatchId,workflowId=WORKFLOW,at=Date.now()})=>{
-  ledger.transaction(db=>{
-    db.prepare(`INSERT INTO reports(workflow_id,dispatch_id,op_id,attempt,generation,outcome,report_json,created_at)
-      VALUES(?,?,?,?,?,?,?,?)`)
-      .run(workflowId,dispatchId,'provision.ask',1,1,'ask',
-        JSON.stringify({schema:'starci/op-report@1',outcome:'ask',summary:`ask from ${dispatchId}`,
-          question:{text:'which way?',options:['a','b']}}),at);
-  });
+  const jobId=`op-ask-${dispatchId}`;
+  seedWorkflow(ledger,{id:workflowId,jobs:[{jobId,opId:'provision.ask',dispatchId,status:'reported'}]});
+  const attemptId=ledger.db.prepare('SELECT attempt_id FROM op_attempts WHERE job_id=?').get(jobId).attempt_id;
+  ledger.transaction(db=>fileReport(db,{attemptId,outcome:'ask',createdAt:at,
+    report:{schema:'starci/op-report@1',outcome:'ask',summary:`ask from ${dispatchId}`,
+      question:{text:'which way?',options:['a','b']}}}));
 };
 
 const serve=(repoRoot,...extra)=>spawnSync(process.execPath,

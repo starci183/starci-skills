@@ -9,6 +9,7 @@ import {openLedger,inspectLedger,ledgerFileFor} from '../engine/ledger-db.mjs';
 import {classifyAgentScreen,gateRemedy} from '../scripts/kernel/terminal-liveness.mjs';
 import {loadAdapter,gateAutoAnswerRule,gateMenuPosition} from '../scripts/agent/lib.mjs';
 import {ensureLaunchTrust,ensureHostSettings,checkHostSettings,hostPrerequisitesOf} from '../scripts/agent/trust.mjs';
+import {seedWorkflow} from './_ledger-fixture.mjs';
 
 // starci-next wf-sn-foundation-mufrhftf inc-af01e1cedbf4: a qwen worker (op-backend.implement-df7282b6ef)
 // stopped at Qwen Code's interactive "A potential loop was detected" menu (Keep / Disable loop detection)
@@ -119,20 +120,20 @@ const fixture=t=>{
   const stubFile=path.join(root,'fake-orca.mjs');fs.writeFileSync(stubFile,FAKE_ORCA);
   const stateFile=path.join(root,'state.json'),logFile=path.join(root,'calls.jsonl');
   const env={...process.env,STARCI_ORCA_COMMAND:process.execPath,STARCI_ORCA_ARGS:JSON.stringify([stubFile]),
-    STARCI_FAKE_ORCA_LOG:logFile,STARCI_FAKE_ORCA_STATE:stateFile,LOCALAPPDATA:path.join(root,'localappdata')};
+    STARCI_FAKE_ORCA_LOG:logFile,STARCI_FAKE_ORCA_STATE:stateFile,LOCALAPPDATA:path.join(root,'localappdata'),STARCI_TEST_MACHINE_FILE:path.join(root,'machine.sqlite')};
   const run=(args,more={})=>spawnSync(process.execPath,[API,...args],{cwd:ROOT,encoding:'utf8',windowsHide:true,timeout:120000,env:{...env,...more}});
   const orcaState=()=>json(fs.readFileSync(stateFile,'utf8'))??{};
   const writeState=fn=>{const s=orcaState();fn(s);fs.writeFileSync(stateFile,JSON.stringify(s));};
   const workflowId='wf-qwen-loop',jobId='job-qwen-loop';
-  const ledger=openLedger({file:ledgerFileFor(repo)});
+  const ledger=openLedger({file:ledgerFileFor(repo,{env})});
   try{
-    ledger.enqueueJob({jobId:`kernel-${workflowId}`,workflowId,kind:'kernel',role:'kernel',
-      payload:{hierarchy:{schema:'starci/agent-hierarchy@1',nodeId:`agent:kernel:${workflowId}`,parentNodeId:`workflow:${workflowId}`,role:'kernel'}}});
-    ledger.db.prepare("UPDATE jobs SET status='running',worker_id='fake-kernel-terminal' WHERE job_id=?").run(`kernel-${workflowId}`);
-    ledger.enqueueJob({jobId,workflowId,opId:'code.refactor',kind:'op',payload:{opId:'code.refactor',owned_paths:['docs/'],model:'qwen-agent',difficulty:'hard'}});
+    seedWorkflow(ledger,{id:workflowId,state:{phase:'running'},jobs:[
+      {jobId:`kernel-${workflowId}`,kind:'kernel',role:'kernel',status:'running',workerId:'fake-kernel-terminal',
+        payload:{hierarchy:{schema:'starci/agent-hierarchy@1',nodeId:`agent:kernel:${workflowId}`,parentNodeId:`workflow:${workflowId}`,role:'kernel'}}},
+      {jobId,opId:'code.refactor',payload:{opId:'code.refactor',owned_paths:['docs/'],model:'qwen-agent',difficulty:'hard'}}]});
   }finally{ledger.close();}
   const events=kind=>{
-    const l=inspectLedger({file:ledgerFileFor(repo)});
+    const l=inspectLedger({file:ledgerFileFor(repo,{env})});
     try{return l.db.prepare('SELECT payload_json FROM events WHERE entity_id=? AND kind=? ORDER BY seq').all(jobId,kind).map(r=>json(r.payload_json));}
     finally{l.close();}
   };

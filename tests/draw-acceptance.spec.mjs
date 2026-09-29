@@ -10,7 +10,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import {spawnSync} from 'node:child_process';
-import {inspectLedger,ledgerFileFor,openLedger} from '../engine/ledger-db.mjs';
+import {fileReport,inspectLedger,ledgerFileFor,openLedger,recordCheckRun,writeContract} from '../engine/ledger-db.mjs';
 import {parseYaml} from '../engine/yaml.mjs';
 import {sha256} from '../engine/index.mjs';
 import {
@@ -19,6 +19,7 @@ import {
 import {committedWorkAdmissionOf,contractFollowUpsOf,loadContractChanges} from '../scripts/kernel/contract-version.mjs';
 import {colorsFromJobs} from '../scripts/work/work-graph-store.mjs';
 import { withRationale } from './_draw-rationale-fixture.mjs';
+import { seedWorkflow } from './_ledger-fixture.mjs';
 
 const ROOT=path.resolve(import.meta.dirname,'..');
 const API=path.join(ROOT,'scripts','kernel','api.mjs');
@@ -128,15 +129,17 @@ const checkout=t=>{
 const seedDraw=(repo,{jobId,wf='wf-draw',files,admittedAt,payload={}})=>{
   const ledger=openLedger({file:ledgerFileFor(repo)});
   try{
-    ledger.ensureWorkflow({workflowId:wf,title:'draw'});
-    ledger.enqueueJob({jobId,workflowId:wf,opId:'interface.draw',kind:'op',payload:{opId:'interface.draw',owned_paths:['src/'],orca:{dispatchId:`ctx-${jobId}`,agentTerminalHandle:`term-${jobId}`},...payload}});
-    ledger.db.prepare("UPDATE jobs SET status='running' WHERE job_id=?").run(jobId);
-    ledger.db.prepare('INSERT INTO contracts(workflow_id,op_id,attempt,dispatch_id,markdown,context_json,created_at) VALUES(?,?,?,?,?,?,?)')
-      .run(wf,'interface.draw',1,`ctx-${jobId}`,'# contract',json({worktree:repo}),admittedAt);
-    ledger.db.prepare('INSERT INTO reports(workflow_id,dispatch_id,op_id,attempt,generation,outcome,report_json,from_terminal,consumed_at,created_at) VALUES(?,?,?,?,?,?,?,?,NULL,?)')
-      .run(wf,`ctx-${jobId}`,'interface.draw',1,0,'done',json({outcome:'done',summary:'adopted 40 inherited interface.draw evidence files unchanged',files}),null,Date.now());
-    ledger.db.prepare('INSERT INTO checks(workflow_id,op_id,attempt,checks_json,created_at) VALUES(?,?,?,?,?)').run(wf,'interface.draw',1,
-      json({checks:[{name:'owned-paths-committed',command:'git show',exitCode:0},{name:'owned-paths-clean',command:'git status',exitCode:0},{name:'head-ancestor',command:'git merge-base',exitCode:0}]}),Date.now());
+    seedWorkflow(ledger,{id:wf,state:{phase:'running',job:'draw'},
+      jobs:[{jobId,opId:'interface.draw',dispatchId:`ctx-${jobId}`,terminalHandle:`term-${jobId}`,status:'running',
+        payload:{opId:'interface.draw',owned_paths:['src/'],orca:{dispatchId:`ctx-${jobId}`,agentTerminalHandle:`term-${jobId}`},...payload}}]});
+    const attemptId=ledger.db.prepare('SELECT attempt_id FROM op_attempts WHERE job_id=?').get(jobId).attempt_id;
+    ledger.transaction(db=>{
+      writeContract(db,{attemptId,markdown:'# contract',context:{worktree:repo},createdAt:admittedAt});
+      fileReport(db,{attemptId,outcome:'done',createdAt:Date.now(),
+        report:{schema:'starci/op-report@1',outcome:'done',summary:'adopted 40 inherited interface.draw evidence files unchanged',files}});
+      for(const check of [{name:'owned-paths-committed',command:'git show'},{name:'owned-paths-clean',command:'git status'},{name:'head-ancestor',command:'git merge-base'}])
+        recordCheckRun(db,{attemptId,name:check.name,phase:'verify',runner:'kernel',authority:'runtime',status:'pass',exitCode:0,command:check.command});
+    });
   }finally{ledger.close();}
   return jobId;
 };
@@ -164,14 +167,16 @@ const followUpWorld=t=>{
   const repo=tmp(t);
   const redo=effectiveOf('draw-redo-token-render-shapes');
   const ledger=openLedger({file:ledgerFileFor(repo)});
-  const job=(wf,jobId,{attempt=1,status='succeeded',admittedAt,payload={}})=>{
-    ledger.enqueueJob({jobId,workflowId:wf,opId:'interface.draw',kind:'op',payload:{opId:'interface.draw',owned_paths:[`${UI}/assets`],...payload}});
-    ledger.db.prepare('UPDATE jobs SET status=?, attempt=? WHERE job_id=?').run(status,attempt,jobId);
-    if(admittedAt!=null)ledger.db.prepare('INSERT INTO contracts(workflow_id,op_id,attempt,dispatch_id,markdown,context_json,created_at) VALUES(?,?,?,?,?,?,?)').run(wf,'interface.draw',attempt,`ctx-${jobId}`,'#',json({}),admittedAt);
+  const job=(wf,jobId,{status='succeeded',admittedAt,payload={}})=>{
+    seedWorkflow(ledger,{id:wf,jobs:[{jobId,opId:'interface.draw',dispatchId:`ctx-${jobId}`,status,
+      payload:{opId:'interface.draw',owned_paths:[`${UI}/assets`],...payload}}]});
+    if(admittedAt!=null){
+      const attemptId=ledger.db.prepare('SELECT attempt_id FROM op_attempts WHERE job_id=?').get(jobId).attempt_id;
+      ledger.transaction(db=>writeContract(db,{attemptId,markdown:'#',context:{},createdAt:admittedAt}));
+    }
   };
-  ledger.ensureWorkflow({workflowId:'wf-old',title:'old'});
-  ledger.ensureWorkflow({workflowId:'wf-live',title:'live'});
-  ledger.db.prepare("UPDATE workflows SET phase='running' WHERE workflow_id='wf-live'").run();
+  seedWorkflow(ledger,{id:'wf-old',state:{phase:'running',job:'old'}});
+  seedWorkflow(ledger,{id:'wf-live',state:{phase:'running',job:'live'}});
   ledger.db.prepare('INSERT INTO goals(workflow_id,revision,goal_identity,markdown,json,created_at) VALUES(?,?,?,?,?,?)')
     .run('wf-live',0,'g0','# goal',json({derivedPlan:{legs:[{op:'interface.draw'}]}}),Date.now());
   const day=24*3600*1000;
@@ -209,8 +214,8 @@ test('a commit-only adoption of pre-contract draws still owes the redo follow-up
   const l2=openLedger({file:ledgerFileFor(repo)});
   try{
     const newest=registry.changes.filter(c=>c.reach==='follow-up'&&c.followUp.op==='interface.draw').sort((a,b)=>b.effectiveAt-a.effectiveAt)[0].id;
-    l2.enqueueJob({jobId:'op-draw-redo',workflowId:'wf-live',opId:'interface.draw',kind:'op',payload:{opId:'interface.draw',owned_paths:[`${UI}/assets`],contractChange:{id:newest,followUpOf:'op-draw-adopt-again'}}});
-    l2.db.prepare("UPDATE jobs SET attempt=3 WHERE job_id='op-draw-redo'").run();
+    seedWorkflow(l2,{id:'wf-live',jobs:[{jobId:'op-draw-redo',opId:'interface.draw',dispatchId:'ctx-op-draw-redo',status:'running',
+      payload:{opId:'interface.draw',owned_paths:[`${UI}/assets`],contractChange:{id:newest,followUpOf:'op-draw-adopt-again'}}}]});
     assert.deepEqual(contractFollowUpsOf(l2.db,'wf-live',registry).owed.filter(o=>o.followUpOp==='interface.draw'),[],'a real redraw leg under the newest draw change is the follow-up for every older one');
   }finally{l2.close();}
 });
