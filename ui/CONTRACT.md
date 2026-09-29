@@ -50,8 +50,9 @@ Every JSON success has `{data,meta:{at,etag,sources,stale,next}}`. The public re
 | `/api/workflows/:p/:wf/rca` | `metrics_snapshots` (RCA) | Workflow Why |
 | `/api/workflows/:p/:wf/worktrees` | machine `worktrees` | Workflow Infra |
 | `/api/workflows/:p/:wf/coverage` and `/verify` | `metrics_snapshots` (coverage, verify) | Workflow Evidence |
-| `/api/attempts` and `/api/attempts/:p/:id` | `v_op_history`, `op_attempts`, jobs, reports, checks, artifacts, decisions, usage | Workflow Attempts and Attempt |
+| `/api/attempts` and `/api/attempts/:p/:id` | `v_op_history`, `op_attempts`, jobs, reports, checks, artifacts, decisions, usage; v3.1 adds `files[].dupOf/empty/key/schema`, `manifest` (evidence `manifest.yaml`), `prior` (previous attempt of the unit), `checkPairs` (op vs runtime per check name) | Workflow Attempts and Attempt |
 | `/api/attempts/:p/:id/checks/:checkId` | `v_checks`, output blobs | Attempt Checks |
+| `/api/attempts/:p/:id/products` | `op_attempts.repo_root`, `reports.report_json` (`head`, `files`, `claims`), read-only `git show/diff/rev-parse` at the commit head (content <= 1 MB, diff <= 512 KB, redacted, paths validated) | Attempt Products (`AttemptProducts`) |
 | `/api/attempts/:p/:id/diff` | `job_artifacts` (patch/diff), patch blob | Attempt Diff |
 | `/api/attempts/:p/:id/transcript` and `/transcript/snapshots` | `op_attempts.transcript_sha`, `attempt_transcript_snapshots`, `blobs` | Attempt Transcript |
 | `/api/media` | `v_media`, `job_artifacts`, `blobs` | Attempt/Workflow Evidence |

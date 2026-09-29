@@ -2,7 +2,8 @@ import path from 'node:path';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { artifactRoot, blobPath, getBlob } from '../../../scripts/lib/artifact-store.mjs';
-import { decodeText, textEncodingOf } from '../redact-read.mjs';
+import { decodeText, textEncodingOf, publicText, publicJson } from '../redact-read.mjs';
+import { attemptProducts } from '../products.mjs';
 import { usageDetail, usageSince, mergeUsage } from './work.mjs';
 import { redactText } from '../../../scripts/lib/redact.mjs';
 import { parseYaml } from '../../../engine/yaml.mjs';
@@ -154,19 +155,86 @@ function encodingOf(sha, mediaType) {
   if (!blobPath(sha)) return null;
   try { return textEncodingOf(getBlob(sha).subarray(0, 4)); } catch { return null; }
 }
-function filesOf(db, artifactRows, checks, project) {
+const textBySha = new Map();
+function blobText(sha, limit) {
+  const key = `${sha}:${limit}`;
+  if (textBySha.has(key)) return textBySha.get(key);
+  let text = null;
+  try { const bytes = getBlob(sha); if (bytes.length <= limit) text = decodeText(bytes); } catch { /* archived or missing blob */ }
+  if (textBySha.size > 300) textBySha.delete(textBySha.keys().next().value);
+  textBySha.set(key, text);
+  return text;
+}
+const schemaBySha = new Map();
+function jsonSchemaOf(sha) {
+  if (schemaBySha.has(sha)) return schemaBySha.get(sha);
+  const text = blobText(sha, 2 * 1024 * 1024);
+  let schema = null;
+  if (text) { const value = parse(text); if (value && typeof value === 'object' && !Array.isArray(value) && typeof value.schema === 'string') schema = value.schema.slice(0, 120); }
+  schemaBySha.set(sha, schema);
+  return schema;
+}
+// attachments/(evidence|E)/manifest.yaml -> { outcome, assertions, assets, provenance } (null when absent or unreadable).
+function manifestOf(artifactRows) {
+  const item = artifactRows.find(x => /^attachments\/(evidence|E)\/manifest\.ya?ml$/.test(x.name));
+  if (!item) return null;
+  const text = blobText(item.sha256, 512 * 1024);
+  if (text == null) return null;
+  let doc;
+  try { doc = parseYaml(publicText(text)); } catch { return null; }
+  if (!doc || typeof doc !== 'object') return null;
+  const outcomeOf = a => a.outcome ?? (a.passed === true ? 'passed' : a.passed === false ? 'failed' : null);
+  return { folder: path.posix.dirname(item.name), manifest: {
+    outcome: doc.outcome ?? null,
+    assertions: (Array.isArray(doc.assertions) ? doc.assertions : []).filter(a => a && typeof a === 'object')
+      .map(a => ({ id: String(a.id ?? ''), outcome: outcomeOf(a), ...(a.detail != null ? { detail: String(a.detail) } : {}) })),
+    assets: (Array.isArray(doc.assets) ? doc.assets : []).map(a => typeof a === 'string' ? a : a?.path).filter(a => typeof a === 'string'),
+    provenance: publicJson(doc.provenance ?? null) } };
+}
+const VALIDATOR_SCHEMA = /validat|starci\/[a-z-]*report@/i;
+function filesOf(db, artifactRows, checks, project, manifestInfo) {
   const byName = new Map(checks.map(c => [c.name, c]));
+  const firstBySha = new Map();
+  const assetNames = manifestInfo ? new Set(manifestInfo.manifest.assets.map(a => path.posix.normalize(`${manifestInfo.folder}/${a.replaceAll('\\', '/')}`))) : null;
   return artifactRows.map(x => {
     const group = groupOf(x.name, x.role);
     const checkName = group === 'check' ? (x.name.match(/^checks\/(?:\d+-)?([^/]+)\//)?.[1] ?? null) : null;
     const check = checkName ? byName.get(checkName) ?? null : null;
     const blob = one(db, 'SELECT file_uri,redaction FROM blobs WHERE sha256=?', x.sha256);
-    return { artifactId: x.artifact_id, name: x.name, base: x.name.split('/').pop(), group, role: x.role, kind: kindOf(x.name, x.media_type), subkind: x.subkind,
+    const kind = kindOf(x.name, x.media_type);
+    const schema = kind === 'json' && x.bytes > 0 && x.bytes <= 2 * 1024 * 1024 && blobPath(x.sha256) ? jsonSchemaOf(x.sha256) : null;
+    const first = firstBySha.get(x.sha256);
+    if (first == null) firstBySha.set(x.sha256, x.artifact_id);
+    const key = group !== 'evidence' ? false
+      : assetNames ? assetNames.has(path.posix.normalize(x.name))
+      : x.bytes > 0 && (kind === 'markdown' || (kind === 'json' && !(schema && VALIDATOR_SCHEMA.test(schema))));
+    return { artifactId: x.artifact_id, name: x.name, base: x.name.split('/').pop(), group, role: x.role, kind, subkind: x.subkind,
       mediaType: x.media_type, bytes: x.bytes, sha: x.sha256, href: `/api/blob/${x.sha256}`, hostPath: hostNorm(blob?.file_uri ?? blobPath(x.sha256)),
       encoding: encodingOf(x.sha256, x.media_type), redaction: blob?.redaction ?? null, origin: x.origin, label: x.label, scopeRef: x.scope_ref, round: x.round,
       check: check ? { id: check.id, name: check.name, status: check.status, ui: check.ui } : checkName ? { id: null, name: checkName, status: null, ui: 'unknown' } : null,
-      archived: x.archived_at != null, createdAt: x.created_at, project };
+      archived: x.archived_at != null, createdAt: x.created_at, project,
+      dupOf: first ?? null, empty: x.bytes === 0, key, schema };
   });
+}
+function priorOf(db, raw, project) {
+  if (!raw.unit_id) return null;
+  const row = one(db, 'SELECT * FROM v_op_history WHERE workflow_id=? AND unit_id=? AND attempt_id<? ORDER BY attempt_id DESC LIMIT 1', raw.workflow_id, raw.unit_id, raw.attempt_id);
+  if (!row) return null;
+  const settle = one(db, 'SELECT settle_json,next_step FROM op_attempts WHERE attempt_id=?', row.attempt_id);
+  const reason = parse(settle?.settle_json);
+  return { id: row.attempt_id, try: row.try_no, verdict: row.verdict, reportOutcome: row.report_outcome, summary: row.report_summary == null ? null : publicText(String(row.report_summary)),
+    settleReason: reason == null ? null : publicJson(reason), nextStep: settle?.next_step == null ? null : publicText(String(settle.next_step)),
+    href: ref('attempt', row.attempt_id, project).href };
+}
+function checkPairsOf(checks) {
+  const pairs = new Map();
+  for (const check of checks) {
+    if (!pairs.has(check.name)) pairs.set(check.name, { name: check.name, op: null, runtime: null });
+    const pair = pairs.get(check.name);
+    if (check.runner === 'op') pair.op ??= check;
+    else if (['settler', 'kernel', 'parity', 'integrate'].includes(check.runner)) pair.runtime ??= check;
+  }
+  return [...pairs.values()];
 }
 function attemptDetail(store, ledger, db, row) {
   const machine = store.machine.db;
@@ -188,12 +256,14 @@ function attemptDetail(store, ledger, db, row) {
   const lessons = many(machine, 'SELECT * FROM sup_learning WHERE kind IN (\'lesson\',\'experiment\',\'experiment-result\') ORDER BY updated_at DESC')
     .filter(item => [item.source_ref, item.item_id, item.title, item.detail_json].some(value => value && [row.op_id, row.failure_class].filter(Boolean).some(key => String(value).includes(key))))
     .map(item => ({ id: item.item_id, title: item.title, state: item.state, landedSha: item.landed_sha }));
+  const manifest = manifestOf(artifactRows);
   const next = one(db, 'SELECT attempt_id FROM op_attempts WHERE job_id IN (SELECT job_id FROM jobs WHERE retry_of=? OR resume_of=?) ORDER BY attempt_id LIMIT 1', job?.job_id, job?.job_id);
   return { ...attemptRow(row, ledger.name), timeline: timeline(raw),
     route: { by: raw.routed_by, chain: parse(raw.route_chain_json), rejected: parse(raw.route_rejected_json) },
     where: whereOf(ledger, raw, job, payload),
     input: inputOf(payload, job),
-    files: filesOf(db, artifactRows, checks, ledger.name),
+    files: filesOf(db, artifactRows, checks, ledger.name, manifest),
+    manifest: manifest?.manifest ?? null, prior: priorOf(db, raw, ledger.name), checkPairs: checkPairsOf(checks),
     usage: usageDetail(db, { attempt: row.attempt_id }),
     tryBudget: row.unit_id ? one(db, 'SELECT try_budget FROM work_units WHERE workflow_id=? AND unit_id=?', row.workflow_id, row.unit_id)?.try_budget ?? null : null,
     land: latestLand(db, row.workflow_id),
@@ -306,7 +376,7 @@ export async function handleAttempt(request, response, store, url) {
   if (pathname === '/api/metrics/ops') {
     sendJson(request, response, metricsOps(store, url), { sources: store.projects().flatMap(ledger => source(ledger.name, 'v_model_scorecard', 'v_op_history')), stale: staleOf(store) }); return true;
   }
-  const match = /^\/api\/attempts\/([^/]+)\/(\d+)(?:\/(checks\/(\d+)|diff|transcript(?:\/snapshots)?))?$/.exec(pathname);
+  const match = /^\/api\/attempts\/([^/]+)\/(\d+)(?:\/(checks\/(\d+)|diff|products|transcript(?:\/snapshots)?))?$/.exec(pathname);
   if (!match) return false;
   let project;
   try { project = decodeURIComponent(match[1]); } catch { sendError(request, response, 400, 'BAD_PATH', 'Invalid project encoding'); return true; }
@@ -328,6 +398,12 @@ export async function handleAttempt(request, response, store, url) {
     const root = one(db, 'SELECT repo_root FROM op_attempts WHERE attempt_id=?', id)?.repo_root;
     sendJson(request, response, { ...checkRow(db, check, root), stdoutTail: tail(db, check.stdout_sha), stderrTail: tail(db, check.stderr_sha) },
       { sources: source(ledger.name, 'v_checks', 'blobs'), stale: staleOf(store) }); return true;
+  }
+  if (route === 'products') {
+    const raw = one(db, 'SELECT repo_root FROM op_attempts WHERE attempt_id=?', id);
+    const report = parse(one(db, 'SELECT report_json FROM reports WHERE attempt_id=?', id)?.report_json);
+    sendJson(request, response, await attemptProducts(raw?.repo_root ?? ledger.repoRoot ?? null, report),
+      { sources: source(ledger.name, 'op_attempts', 'reports'), stale: staleOf(store) }); return true;
   }
   if (route === 'diff') {
     const artifact = one(db, "SELECT * FROM job_artifacts WHERE attempt_id=? AND role='diff' AND subkind='patch-json' ORDER BY artifact_id DESC LIMIT 1", id);
