@@ -27,13 +27,13 @@ const staleIncarnation = (terminal, errorCode) => {
 // observing the prompt for up to that long, and `submitted` is its turn_started stage. An ambiguous
 // failure names orchestrationRequestId: the exact command is re-issued once with it. A host without
 // prompt receipts refuses before any input (the flags absent from its agent-context, or
-// incompatible_runtime with no unknown delivery): null, and the legacy send runs.
+// incompatible_runtime with no unknown delivery): a typed failure, nothing sent, no fallback send.
 function promptSend({ terminal, body, waitSubmit }) {
   const params = { terminal, text: body, enter: true, 'wait-submit': waitSubmit };
   const timeout = waitSubmit * 1000 + 30000;
   let r = orcaCall('terminal-send-prompt', params, { timeout });
-  if (r.reason === 'host-contract-drift') return null;
-  if (codeOf(r) === 'incompatible_runtime' && dataOf(r).deliveryOutcome !== 'unknown') return null;
+  if (r.reason === 'host-contract-drift' || (codeOf(r) === 'incompatible_runtime' && dataOf(r).deliveryOutcome !== 'unknown'))
+    return { ok: false, receipt: r.receipt, errorCode: r.reason === 'host-contract-drift' ? 'host-contract-drift' : codeOf(r), error: r.error, prompt: null, submitted: false };
   let retried = null;
   if (r.exitCode !== 0 && dataOf(r).orchestrationRequestId) {
     retried = dataOf(r).orchestrationRequestId;
@@ -49,8 +49,7 @@ function promptSend({ terminal, body, waitSubmit }) {
 export function terminalSend({ terminal, text, textFile, enter = true, waitSubmit = null }) {
   const body = textFile ? fs.readFileSync(textFile, 'utf8') : (text ?? '');
   if (waitSubmit && enter && body) {
-    const prompt = promptSend({ terminal, body, waitSubmit });
-    if (prompt) return prompt;
+    return promptSend({ terminal, body, waitSubmit });
   }
   const isPrompt = Boolean(body) && Boolean(enter);
   let r = orcaCall('terminal-send', { terminal, text: body, enter: Boolean(enter) });

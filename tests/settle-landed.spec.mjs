@@ -121,17 +121,17 @@ test('push:false op whose report head is not in local history is refused not-lan
   assert.deepEqual(body.detail.missing,[`commit:${head}`]);
 });
 
-test('a legacy headless done report with clean owned paths settles pass, head check skipped',t=>{
+test('a headless done report with clean owned paths is refused not-landed, missing head',t=>{
   const {repo,commit}=checkout(t);
   commit('src/a.ts','export const a = 2;\n');
   const jobId=seedJob(repo,{op:'backend.implement',head:null});
   const {r,body}=settlePass(repo,jobId);
-  assert.equal(r.status,0,r.stderr||r.stdout);
-  assert.equal(body.landed.headCheck,'skipped-legacy-report');
-  assert.equal(statusOf(repo,jobId),'succeeded');
+  assert.equal(r.status,1,r.stderr||r.stdout);
+  assert.equal(body.reason,'not-landed');
+  assert.deepEqual(body.detail.missing,['head']);
 });
 
-test('a legacy headless done report with dirty owned paths is refused not-landed',t=>{
+test('a headless done report with dirty owned paths is refused not-landed',t=>{
   const {repo}=checkout(t);
   fs.writeFileSync(path.join(repo,'src','a.ts'),'export const a = 9;\n');
   const jobId=seedJob(repo,{op:'backend.implement',head:null});
@@ -139,7 +139,7 @@ test('a legacy headless done report with dirty owned paths is refused not-landed
   assert.equal(r.status,1,r.stderr||r.stdout);
   assert.equal(body.reason,'not-landed');
   assert.deepEqual(body.detail.dirty,['src/a.ts']);
-  assert.equal(body.detail.headCheck,'skipped-legacy-report');
+  assert.ok(body.detail.missing.includes('head'));
 });
 
 test('validateOpReport: a committing op owes head on done|partial; others and ask/blocked do not',()=>{

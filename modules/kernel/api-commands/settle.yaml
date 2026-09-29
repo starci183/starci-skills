@@ -93,10 +93,8 @@ settle:
     (each owned path a `:(literal)` pathspec, so src/app/[id] never reads as a glob),
     and the filed done report's `head` must name a commit that exists and
     is HEAD or an ancestor of it â€” a checkout ahead of origin passes. A done
-    report filed before `api report` required `head` carries none: on a
-    non-pushing policy settle skips the head half, still requires clean
-    owned paths, and records landed.headCheck `skipped-legacy-report`
-    (else `verified`). Only
+    report without `head` is refused with `missing: head` under every
+    commit policy (landed.headCheck is `verified`). Only
     when commitPolicy.push is true does settle also run `git fetch origin
     <branch>` (report `branch`, else the checkout's current branch) and
     require origin/<branch> to contain `head`. Git reads use the
@@ -181,7 +179,7 @@ settle:
     otherwise root-elsewhere {rootCause, jobs:[], reason}: nothing is queued, counted:false, and
     status nextActions names the failed job, so the Kernel hands the root to its owner (a
     shared-blocker, a widened owned-paths re-enqueue for a scope gap) before it enqueues the op again
-  returns: '{ok:true, jobId, verdict, status, awaitingOwner, reportFiled, reportOutcome, checkEvidence, claimOverruled, nextStep?, peerBlocked?:{checks[], peers[], routes[]}, cutSet?:{id,total,closesSet,open[]}, leasesReleased, reportsConsumed, terminalClosed, managedWorker?, landed?:{repo, dirty, repos:[{repo, role, paths, dirty}], head, headCheck:verified|skipped-legacy-report, localHead, missing, branch?, originHead?, pushGate?:{repos:[{repo, source, commands, changed, linted, errorCount, warningCount, findings, eslint} | {repo, skipped}]} | {skipped:admitted-before-change, change, admittedAt}}}'
+  returns: '{ok:true, jobId, verdict, status, awaitingOwner, reportFiled, reportOutcome, checkEvidence, claimOverruled, nextStep?, peerBlocked?:{checks[], peers[], routes[]}, cutSet?:{id,total,closesSet,open[]}, leasesReleased, reportsConsumed, terminalClosed, managedWorker?, landed?:{repo, dirty, repos:[{repo, role, paths, dirty}], head, headCheck:verified, localHead, missing, branch?, originHead?, pushGate?:{repos:[{repo, source, commands, changed, linted, errorCount, warningCount, findings, eslint} | {repo, skipped}]} | {skipped:admitted-before-change, change, admittedAt}}}'
   opRevDrift: >-
     WARN, never a refusal: when the op's contract files changed on the runtime between the rev the leg was
     dispatched under (contracts.context_json.contract.runtimeSha) and the current HEAD, settle appends one

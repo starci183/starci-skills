@@ -97,7 +97,7 @@ test('settle debris: a file written before admission and not in the report never
   git(repo, 'add', '-A'); git(repo, 'commit', '-q', '-m', 'init');
   const admitted = Date.now() - 60_000;
   write(repo, '.starciwork/features/wp/impl/E/manifest.yaml', 'old', admitted - 3_600_000);    // predecessor debris
-  const base = { base: repo, ownedPaths: ['.starciwork/features/wp'], pushes: false, head: null };
+  const base = { base: repo, ownedPaths: ['.starciwork/features/wp'], pushes: false, head: git(repo, 'rev-parse', 'HEAD') };
   const clean = landedProof({ ...base, debris: { sinceMs: admitted, own: [] } });
   assert.equal(clean.ok, true, JSON.stringify(clean.detail));
   assert.equal(clean.detail.debrisCount, 1);

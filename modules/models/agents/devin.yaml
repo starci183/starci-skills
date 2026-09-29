@@ -109,7 +109,6 @@ release:
   then: terminal.close
 bypassMode:
   launch: '--permission-mode dangerous — equivalent unattended/yolo mode, injected before Task delivery.'
-  recovery: 'For a legacy already-running accept-edits terminal, send "5" + Enter once, then let the next attempt use the launch flag.'
 knownFailures:
   - signal: 'Unknown model'
     meaning: The --model flag named an id the account cannot run; the CLI exits before the prompt.

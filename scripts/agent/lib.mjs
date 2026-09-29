@@ -50,7 +50,7 @@ export function loadAdapter(provider) {
 //   + explicit `command` (e.g. a model profile's launch.orca.command carrying model+tuning flags)
 //     AND any missing card requirements (kernel → kernelCommandRequirements)
 //   OR the card's own body plus those requirements
-//     or terminalFallback.command + bypassFlag for native-managed agents.
+//     or terminalFallback.command + bypassArgs for native-managed agents.
 // A terminalFallback may additionally declare modelArgs/effortArgs/bypassArgs.
 // Those arrays are the only source of provider-specific CLI flags; placeholder
 // values are shell-quoted before they enter Orca's command string.
@@ -152,9 +152,7 @@ export function buildSpawnCommand({ provider, kernel = false, command = null, mo
   // Kernel and for any explicitly requested command-terminal lane. Their
   // unattended flags therefore apply to explicit profile commands too; an
   // override may choose model/tuning, never permission interactivity.
-  const fallbackBypassArgs = Array.isArray(tf?.bypassArgs)
-    ? tf.bypassArgs.map(String)
-    : [String(tf?.bypassFlag ?? '').match(/^(--?\S+)/)?.[1] ?? ''].filter(Boolean);
+  const fallbackBypassArgs = Array.isArray(tf?.bypassArgs) ? tf.bypassArgs.map(String) : [];
   const explicit = typeof command === 'string' && command.trim() ? command.trim() : null;
   let body = explicit;
   if (body) {
@@ -172,8 +170,6 @@ export function buildSpawnCommand({ provider, kernel = false, command = null, mo
       return { provider, error: `adapter card ${provider}.yaml cannot pin effort '${effort}' (terminalFallback.effortArgs missing)` };
     const modelArgs = model ? renderArgs(tf.modelArgs, { model, effort }) : [];
     const effortArgs = effort ? renderArgs(tf.effortArgs, { model, effort }) : [];
-    // bypassArgs is canonical. bypassFlag remains a compatibility seam for
-    // older installed cards and deliberately keeps only its first CLI token.
     body = [tf.command.trim(), reqs, ...modelArgs, ...effortArgs, ...fallbackBypassArgs].filter(Boolean).join(' ');
   } else if (!body && (prefix || reqs)) {
     body = [card?.agent ?? provider, reqs].filter(Boolean).join(' ');

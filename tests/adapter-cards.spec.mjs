@@ -51,7 +51,7 @@ for(const file of cards){
       assert.equal(typeof card.terminalFallback?.command,'string',`${file}: native-managed agents still need a terminalFallback.command`);
       assert.ok(Array.isArray(card.terminalFallback?.modelArgs),`${file}: Kernel terminal fallback must pin its concrete model`);
       assert.ok(Array.isArray(card.terminalFallback?.effortArgs),`${file}: Kernel terminal fallback must pin its effort`);
-      const bypass=card.terminalFallback?.bypassArgs??[card.terminalFallback?.bypassFlag].filter(Boolean);
+      const bypass=card.terminalFallback?.bypassArgs;
       assert.ok(Array.isArray(bypass)&&bypass.length>0,`${file}: terminal fallback must be unattended`);
     }
   });

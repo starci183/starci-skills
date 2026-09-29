@@ -45,7 +45,8 @@ test('canonical-record and quality-verdict ops are think work with a hard floor;
 test('a floor raises a measured difficulty and never lowers it',()=>{
   assert.equal(raiseToFloor('easy','medium'),'medium');
   assert.equal(raiseToFloor('insane','medium'),'insane');
-  assert.equal(raiseToFloor('M','hard'),'hard');
+  assert.equal(raiseToFloor('easy','hard'),'hard');
+  assert.equal(raiseToFloor('M','hard'),null,'an alias spelling is an unknown difficulty');
   assert.equal(raiseToFloor('hard',null),'hard');
   const decide=selectPool({kind:'business.decide',difficulty:'medium',runtimes});
   assert.deepEqual([decide.measuredDifficulty,decide.floor,decide.difficulty],['medium','hard','hard']);

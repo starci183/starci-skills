@@ -17,13 +17,10 @@ export const isGlobSegment=part=>GLOB_META.test(String(part??''))&&!isAppRouterS
 
 /**
  * The git pathspec for one concrete owned path. Git reads a plain pathspec as a glob, so `src/app/[id]`
- * would also match a sibling `src/app/i`; `:(literal)` pins it to the named directory. A spec that still
- * carries a real glob (a legacy payload that predates admission) keeps git's glob reading.
+ * would also match a sibling `src/app/i`; `:(literal)` pins it to the named directory. Admission
+ * refuses a glob, so every owned path is literal.
  */
-export const ownedPathspec=spec=>{
-  const value=String(spec??'').replace(/\\/g,'/');
-  return value.split('/').some(isGlobSegment)?value:`:(literal)${value||'.'}`;
-};
+export const ownedPathspec=spec=>`:(literal)${String(spec??'').replace(/\\/g,'/')||'.'}`;
 
 const plainPath=value=>typeof value==='string'?value:value?.path;
 

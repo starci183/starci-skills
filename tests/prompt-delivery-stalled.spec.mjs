@@ -6,7 +6,7 @@
 // A lost send is sent once more; lost again, the launch is refused prompt-delivery-stalled, a provider
 // strike like an unclassified worker-start refusal (runtimes.yaml allocation.providerStrikes).
 // On a host with prompt receipts (Orca 1.4.209, --wait-submit) turn_started proves the submit and a
-// receipt without it is the stalled case; an old host keeps the agent_prompt_stalled/screen path.
+// receipt without it is the stalled case; a host without receipts is refused at send (nothing typed).
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -144,42 +144,18 @@ const opFixture = (t, extra = {}) => {
   return { dispatch, read, textSends, enterSends, machineFile };
 };
 
-test('dispatch on an old host: a Codex prompt lost once is re-delivered and the job runs', (t) => {
-  const fx = opFixture(t, { STARCI_FAKE_ORCA_OLD_HOST: '1', STARCI_FAKE_ORCA_PROMPT_LOST: '1' });
-  const r = fx.dispatch('job-ps-1');
-  assert.equal(r.status, 0, r.stderr || r.stdout);
-  assert.equal(fx.read((db) => db.prepare("SELECT status FROM jobs WHERE job_id='job-ps-1'").get().status), 'running');
-  assert.equal(fx.textSends().length, 2, 'the preamble was typed twice: the lost send and its re-delivery');
-});
-
-test('dispatch on an old host: a Codex prompt lost twice is refused prompt-delivery-stalled at send, a provider strike, not a submission timeout', (t) => {
-  const fx = opFixture(t, { STARCI_FAKE_ORCA_OLD_HOST: '1', STARCI_FAKE_ORCA_PROMPT_LOST: '2' });
-  // provider_health carries status/failure_kind in columns; the kernel value (with its `failures`
-  // strike count) rides in detail_json.
-  const health = () => { const m = openMachine({ file: fx.machineFile }); try {
-    const row = m.db.prepare('SELECT * FROM provider_health WHERE provider=?').get('codex');
-    return row ? { ...row, detail: json(row.detail_json) } : null;
-  } finally { m.close(); } };
-  const first = fx.dispatch('job-ps-1');
-  assert.notEqual(first.status, 0);
+test('dispatch on a host without prompt receipts is refused at send and nothing is typed', (t) => {
+  const fx = opFixture(t, { STARCI_FAKE_ORCA_OLD_HOST: '1' });
+  assert.notEqual(fx.dispatch('job-ps-1').status, 0);
   const [rejected] = fx.read((db) => db.prepare("SELECT payload_json FROM events WHERE entity_id='job-ps-1' AND kind='dispatch-rejected'").all()).map((e) => json(e.payload_json));
-  assert.deepEqual([rejected?.step, rejected?.signal], ['send', PROMPT_DELIVERY_STALLED]);
-  assert.match(rejected?.screenTail ?? '', /Ask Codex to do anything/);
-  assert.equal(fx.textSends().length, 2);
-  // The migrated job machine returns a rejected dispatch to 'ready' (leased→ready), the reusable state.
-  assert.equal(fx.read((db) => db.prepare("SELECT status FROM jobs WHERE job_id='job-ps-1'").get().status), 'ready', 'no effect: the attempt is reusable');
-  assert.equal(rejected?.providerHealth, null, 'one lost prompt is a strike, not an outage');
-  assert.deepEqual([health()?.status, health()?.failure_kind, health()?.detail?.failures], ['striking', PROMPT_DELIVERY_STALLED, 1]);
-  const second = fx.dispatch('job-ps-2');
-  assert.notEqual(second.status, 0);
-  assert.equal(json(second.stdout)?.rejection?.providerHealth?.failureKind, PROMPT_DELIVERY_STALLED, 'the repeat opens the codex circuit');
-  assert.deepEqual([health()?.status, health()?.detail?.failures], ['unavailable', 2]);
+  assert.equal(rejected?.step, 'send');
+  assert.equal(fx.textSends().length, 0, 'no legacy send runs on a host without prompt receipts');
 });
 
 /* ------------------------------------------------- the host's prompt receipt */
 // Orca 1.4.209 answers a text+Enter prompt sent with --wait-submit with result.send.prompt: turn_started in
 // its stages proves the submit, so the screen is not polled; a receipt with input_accepted alone is the
-// stalled case and is proven from the frame. A host without receipts (old-host) keeps the screen path.
+// stalled case and is proven from the frame. A host without receipts is refused at send.
 const RECEIPT = (stages, extra = {}) => ({ ok: true, submitted: stages.includes('turn_started'),
   prompt: { requestId: 'req-1', stages, provider: 'codex', observation: 'supported', processIncarnation: 'inc-1', ...extra } });
 

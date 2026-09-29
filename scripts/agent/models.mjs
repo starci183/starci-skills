@@ -20,9 +20,8 @@
 //      with its typed reason — a miss is an exclusion, never a silent swap.
 //   4. The launch model is the pool's models[difficulty] pin (+ effort).
 //
-// Difficulty vocabulary: easy|medium|hard|insane. Alias spellings (s|m|l|xl,
-// small|med|large, 'high' for 'hard') are accepted and normalized everywhere a
-// difficulty enters, including the keys of the pools' models/effort maps.
+// Difficulty vocabulary: easy|medium|hard|insane, and nothing else; any other
+// spelling is unknown and refused where a difficulty enters.
 
 import fs from 'node:fs';
 import path from 'node:path';
@@ -37,18 +36,11 @@ import { poolCapsNow } from '../lib/pool-backoff.mjs';
 const skillRoot = path.resolve(fileURLToPath(new URL('.', import.meta.url)), '..', '..');
 const DEFAULT_MODELS_DIR = path.join(skillRoot, 'modules', 'models');
 
-const DIFFICULTY_ALIASES = {
-  easy: 'easy', s: 'easy', small: 'easy',
-  medium: 'medium', m: 'medium', med: 'medium',
-  hard: 'hard', high: 'hard', l: 'hard', large: 'hard',
-  insane: 'insane', xl: 'insane',
-};
-
 const DIFFICULTY_ORDER = ['easy', 'medium', 'hard', 'insane'];
 
 // 'easy' | 'medium' | 'hard' | 'insane', or null when the spelling is unknown.
 export function normalizeDifficulty(difficulty) {
-  return DIFFICULTY_ALIASES[String(difficulty ?? '').trim().toLowerCase()] ?? null;
+  return DIFFICULTY_ORDER.includes(difficulty) ? difficulty : null;
 }
 
 // The higher of a measured difficulty and a kind's floor. An unknown or absent
@@ -135,17 +127,6 @@ export function defaultOperationTarget(modelsDir = DEFAULT_MODELS_DIR) {
   return value;
 }
 
-// Re-key a models/effort map by normalized difficulty so 'high'/'L' spellings
-// in data read exactly like the canonical keys.
-function difficultyKeyed(map) {
-  const out = {};
-  for (const [k, v] of Object.entries(map ?? {})) {
-    const d = normalizeDifficulty(k);
-    if (d) out[d] = v;
-  }
-  return out;
-}
-
 // The model a pool launches for one difficulty. A missing pin is a typed
 // error (the pool is ineligible at that difficulty) — never a fallback to a
 // neighbouring tier's model.
@@ -155,9 +136,9 @@ export function resolveLaunchModel(target, difficulty, opts = {}) {
   const runtimes = opts.runtimes ?? loadRuntimes(opts.modelsDir);
   const pool = runtimes?.runtimes?.[target];
   if (!pool) return { error: `no runtimes.yaml pool '${target}'` };
-  const modelId = difficultyKeyed(pool.models)[d];
+  const modelId = pool.models?.[d];
   if (!modelId) return { error: `pool '${target}' has no ${d} model` };
-  return { target: pool.target ?? target, modelId, effort: difficultyKeyed(pool.effort)[d] ?? null };
+  return { target: pool.target ?? target, modelId, effort: pool.effort?.[d] ?? null };
 }
 
 // The model + effort a card-composed command terminal launches with (a
@@ -479,7 +460,7 @@ export function selectPool({ kind, role, difficulty, bias, capacity, runtimes, m
   if (toolRefusal) {
     const holders = Object.entries(rt?.runtimes ?? {})
       .filter(([, pool]) => !missingHostTools({ pool, kind, modelsDir, opsDir }).length)
-      .map(([target, pool]) => ({ target: pool.target ?? target, difficulties: Object.keys(difficultyKeyed(pool.models)), roles: pool.roles ?? [] }));
+      .map(([target, pool]) => ({ target: pool.target ?? target, difficulties: Object.keys(pool.models ?? {}), roles: pool.roles ?? [] }));
     const missing = [...new Set(structural.flatMap((target) => missingHostTools({ pool: rt.runtimes[target], kind, modelsDir, opsDir })))];
     return { error: `no ${resolvedRole} pool at ${d} difficulty has host tool ${(missing.length ? missing : tools).join(', ')}`,
       toolUnavailable: { tools: missing.length ? missing : tools, holders }, role: resolvedRole, work: route.work, difficulty: d,

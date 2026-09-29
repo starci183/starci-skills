@@ -91,7 +91,7 @@ test('every App Router segment form is a concrete owned path; real globs stay re
   assert.equal(isGlobSegment('[!a]'),true,'a negated character class is a glob, not a route param name');
   assert.equal(ownedPathspec('src/app/[lang]'),':(literal)src/app/[lang]');
   assert.equal(ownedPathspec('.'),':(literal).');
-  assert.equal(ownedPathspec('docs/*'),'docs/*','a legacy real glob keeps the glob reading');
+  assert.equal(ownedPathspec('docs/*'),':(literal)docs/*','no glob reading: every owned path is literal');
 });
 
 test('App Router prefixes dedupe and intersect literally: parent/child overlap, a glob twin never does',()=>{
