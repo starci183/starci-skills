@@ -3764,16 +3764,6 @@ LAYOUT_BINDING_MISSING:
   nextStep_vi: "Bộ kiểm tra khung ứng dụng báo thiếu; op quyết định thương hiệu phải dựng lại phần gắn cho layout đó."
   owner: other-op:brand.decide
   kind: check-finding
-LAYOUT_DESTINATIONS_LEGACY:
-  title: "Destinations stored in legacy place"
-  title_vi: "Điểm đến còn lưu ở chỗ cũ"
-  meaning_vi: "Các điểm đến của layout vẫn được đọc từ chỗ lưu cũ thay vì từ trường chính thức của layout."
-  causes_vi:
-    - "Hồ sơ được tạo trước khi đổi cách lưu"
-    - "Chưa chạy bước chuyển dữ liệu sang chỗ mới"
-  nextStep_vi: "Chỉ là nghi ngờ, chưa chặn; nên chạy lệnh chuyển điểm đến sang trường chính thức của layout."
-  owner: other-op:brand.decide
-  kind: check-finding
 LAYOUT_DESTINATION_INVALID:
   title: "Layout destination is invalid"
   title_vi: "Điểm đến của layout không hợp lệ"
@@ -3802,16 +3792,6 @@ LAYOUT_SOURCE_DRIFT:
     - "Op triển khai vừa sửa tệp layout"
     - "Cây layout chưa được quét lại sau khi build"
   nextStep_vi: "Bộ kiểm tra khung ứng dụng nghi ngờ; op quyết định thương hiệu sẽ quét lại và chụp lại phần đã đổi."
-  owner: other-op:brand.decide
-  kind: check-finding
-LAYOUT_TREE_I18N_UNKEYED:
-  title: "Layout tree uses whole-file i18n digests"
-  title_vi: "Cây layout còn dùng mã băm cả tệp dịch"
-  meaning_vi: "Cây layout còn ghi mã băm của cả tệp dịch thay vì các khóa thông điệp thực sự dùng."
-  causes_vi:
-    - "Cây được quét bằng phiên bản cũ của công cụ"
-    - "Chưa quét lại từ khi đổi cách ghi"
-  nextStep_vi: "Chỉ là thông tin, hệ thống vẫn xét theo khóa đã dùng; lần quét kế tiếp sẽ ghi mã băm theo khóa."
   owner: other-op:brand.decide
   kind: check-finding
 LAYOUT_TREE_INVALID:
@@ -5964,16 +5944,6 @@ SHELL_RECORD_INVALID:
   nextStep_vi: "Kiểm tra từ chối; op vẽ giao diện phải sửa hoặc tạo lại bản ghi cây bố cục."
   owner: other-op:interface.draw
   kind: check-finding
-SHELL_RECORD_LEGACY:
-  title: "Legacy shell record"
-  title_vi: "Bản ghi shell kiểu cũ"
-  meaning_vi: "Bản ghi shell đang dùng dạng viết tay cũ, đã được thay bằng cây bố cục."
-  causes_vi:
-    - "Dự án cũ chưa chuyển đổi"
-    - "Vẫn dùng lược đồ shell cũ"
-  nextStep_vi: "Kiểm tra từ chối; cần chuyển bản ghi sang cây bố cục theo hướng dẫn chuyển đổi."
-  owner: other-op:interface.draw
-  kind: check-finding
 SHELL_RECORD_MISSING:
   title: "No layout tree in Work"
   title_vi: "Cây Work chưa có cây bố cục"
@@ -5982,6 +5952,16 @@ SHELL_RECORD_MISSING:
     - "Chưa vẽ cây bố cục"
     - "Bản ghi màn hình không được khai báo không khung"
   nextStep_vi: "Kiểm tra từ chối; op vẽ giao diện phải tạo cây bố cục hoặc khai báo màn hình không khung có lý do."
+  owner: other-op:interface.draw
+  kind: check-finding
+SHELL_RECORD_NOT_TREE:
+  title: "Shell record is not a layout tree"
+  title_vi: "Bản ghi shell không phải cây bố cục"
+  meaning_vi: "Bản ghi shell không mang lược đồ cây bố cục; chỉ còn một dạng hợp lệ."
+  causes_vi:
+    - "Bản ghi shell còn ở lược đồ cũ hoặc tên lược đồ khác"
+    - "Tệp bị ghi tay hoặc thiếu trường schema"
+  nextStep_vi: "Kiểm tra từ chối; op vẽ quét lại cây bố cục từ mã giao diện để ghi lại bản ghi đúng lược đồ."
   owner: other-op:interface.draw
   kind: check-finding
 SHELL_REF_UNRESOLVED:
@@ -9965,6 +9945,16 @@ live-paths-dirty:
   nextStep_vi: "Lần land bị từ chối để khỏi ghi đè; xử lý các tệp dở rồi land lại."
   owner: owner
   kind: runtime-fault
+live-repo-bare:
+  title: "Live repo is set bare"
+  title_vi: "Kho chính bị đặt chế độ bare"
+  meaning_vi: "Kho git chính có core.bare=true nên land không thể cập nhật thư mục làm việc."
+  causes_vi:
+    - "Một fixture git đã rò GIT_DIR vào kho chính"
+    - "Có tiến trình ghi cấu hình git của kho chính"
+  nextStep_vi: "Land dừng và không đổi gì; tìm tiến trình đã ghi rồi chạy git config core.bare false trên kho chính, sau đó land lại."
+  owner: supervisor
+  kind: verb-refusal
 live-worker-lease-conflict:
   title: "Live worker cannot recover its lease"
   title_vi: "Thợ đang chạy không lấy lại được quyền giữ tệp"
