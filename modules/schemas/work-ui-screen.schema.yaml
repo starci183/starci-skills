@@ -1753,19 +1753,66 @@ $defs:
               type: object
               additionalProperties: false
               required:
-                - path
                 - round
+              oneOf:
+                - required: [sha256]
+                  properties: {sha256: true}
+                - required: [path]
+                  properties: {path: true}
               description: "The draw loop that produced this part (scripts/work/draw-loop.mjs; owner rulings
                 2026-09-27: draw, shoot, evaluate, fix until every machine metric passes and the independent
-                critic's beauty clears the bar): `path` the loop record (starci/draw-loop@1, relative to the ui
-                record), `round` the best round whose parts `finish` installed. A live part without it, or whose
-                loop did not install its bytes, is DRAW_LOOP_MISSING (scripts/checks/draw-loop-coverage.mjs)."
+                critic's beauty clears the bar): `sha256` the blob bundle `finish` stored the whole loop in
+                (loop.json, every round, critique and metrics - starci/draw-loop@1, never a folder under ui
+                assets), `round` the best round whose parts `finish` installed. A live part without it, or whose
+                loop did not install its bytes, is DRAW_LOOP_MISSING (scripts/checks/draw-loop-coverage.mjs).
+                The `path` form (a loop record relative to the ui record) is the pre-bundle citation, kept
+                valid for records written before it; the coverage check accepts only the bundle."
               properties:
+                sha256:
+                  $ref: "#/$defs/sha256"
+                  description: The manifest digest of the loop's blob bundle (scripts/lib/blob-lookup.mjs putBundle).
                 path:
                   $ref: "#/$defs/prose"
                 round:
                   type: integer
                   minimum: 1
+            grammarSource:
+              description: The grammar the drawn component type-checked against on its best round, as
+                scripts/work/draw-grammar.mjs names it (`product@<version>` or `claude-dist@<version>`); null
+                where the grammar was not resolved. Written by draw-loop finish on a draw-loop-component part.
+              oneOf:
+                - $ref: "#/$defs/prose"
+                - type: "null"
+            grammarUpgradeOwed:
+              type: object
+              additionalProperties: false
+              required:
+                - status
+                - to
+              description: Present when the drawing type-checked only against the runtime's own grammar
+                dist, not the product's installed grammar - the upgrade of the product that is owed
+                (scripts/work/draw-grammar.mjs resolveDrawGrammar upgradeOwed).
+              properties:
+                status:
+                  $ref: "#/$defs/slug"
+                package:
+                  $ref: "#/$defs/prose"
+                from:
+                  oneOf:
+                    - $ref: "#/$defs/prose"
+                    - type: "null"
+                to:
+                  $ref: "#/$defs/prose"
+                range:
+                  oneOf:
+                    - type: string
+                    - type: "null"
+                inRange:
+                  oneOf:
+                    - type: boolean
+                    - type: "null"
+                why:
+                  $ref: "#/$defs/prose"
         width:
           type: integer
           minimum: 1

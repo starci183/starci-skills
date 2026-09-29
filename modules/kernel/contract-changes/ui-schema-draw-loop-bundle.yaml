@@ -1,0 +1,6 @@
+id: ui-schema-draw-loop-bundle
+effectiveAt: '2026-09-29T20:15:00+07:00'
+summary: "Since 7ac4e610f the draw loop is a blob bundle: scripts/work/draw-loop.mjs finishLoop writes generation.loop = {round, sha256} (plus grammarSource and, when owed, grammarUpgradeOwed beside it on a draw-loop-component part), and scripts/checks/draw-loop-coverage.mjs (DRAW_LOOP_MISSING) requires loop.sha256. work-ui-screen still allowed only loop = {path, round} with generation closed, so Ajv refused the block the runtime emits and no record passed both validate --strict and the loop gate. generation.loop now takes {sha256, round} (or the pre-bundle {path, round}, exactly one citation), generation takes grammarSource (string|null) and grammarUpgradeOwed (the draw-grammar.mjs upgradeOwed map); every block stays additionalProperties:false. Adds no new check or finding code - it stops refusing the runtime's own output"
+paths:
+  - modules/schemas/work-ui-screen.schema.yaml
+reach: new-legs
