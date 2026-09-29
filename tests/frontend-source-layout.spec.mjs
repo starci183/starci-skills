@@ -8,6 +8,7 @@ import {execFileSync} from 'node:child_process';
 import {checkArchitecture} from '../scripts/checks/architecture.mjs';
 import {FRAMEWORK_PINNED_KNOWLEDGE,frameworkPinnedRootFiles} from '../scripts/checks/architecture/frontend.mjs';
 import {parseYaml} from '../engine/yaml.mjs';
+import {hfsReadme} from './_hfs-tree-fixture.mjs';
 
 const require=createRequire(import.meta.url);
 const ts=require('typescript');
@@ -22,7 +23,7 @@ function fixture(t,files){
   write('.github/workflows/check.yml','name: check\n');
   write('.gitignore','node_modules/\n');
   write('.husky/pre-commit','exit 0\n');
-  write('README.md','# Fixture\n');
+  write('README.md',hfsReadme(root));
   write('codecov.yml','coverage: {}\n');
   write('eslint.config.mjs','export default [];\n');
   write('package-lock.json','{}\n');
