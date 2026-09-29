@@ -18,8 +18,7 @@ Multiple configs or different compiler projects are declared in the target's
     "codePatterns": {
       "nest": {
         "testProjects": [
-          { "config": "jest.config.ts", "tsconfig": "tsconfig.json" },
-          { "config": "src/tests/e2e/jest-e2e.json", "tsconfig": "tsconfig.json" }
+          { "config": "jest.config.js", "tsconfig": "tsconfig.json" }
         ]
       }
     }

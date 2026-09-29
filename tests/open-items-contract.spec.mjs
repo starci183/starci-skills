@@ -19,7 +19,7 @@ test('the shared op contract separates open items from environment and later-leg
   assert.match(text, /check-scoped-lint repo-wide\s+`status: unavailable`/, 'a repo-wide unavailable lint beside a green scoped run is a note');
   assert.match(text, /e2e\.verify/, 'a proof another leg owns is cited with its op');
   assert.match(text, /sonar-local\.mjs[\s\S]*401 means run it\s+again/, 'Sonar 401 is a rerun, never an open item');
-  assert.match(text, /backend\.implement's scoped unit and backend E2E gates/, "the op's own required proofs stay its own");
+  assert.match(text, /backend\.implement's scoped unit gate for its selected operations/, "the op's own required proofs stay its own");
   assert.match(text, /`blocked`\s+`environment` with its evidence, never `partial`/);
 });
 

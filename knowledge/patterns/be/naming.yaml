@@ -52,7 +52,7 @@ rules:
         write: errors/courses/challenge-not-found.ts — no suffix (289 of 294 at extraction)
       - id: case-5
         when: Spec
-        write: "unit: same basename plus .spec (add-to-cart.handler.spec.ts); e2e: <flow>.e2e-spec.ts under src/tests/e2e/ (schema-builds.e2e-spec.ts); .int-spec and .harness-spec are retired"
+        write: "unit: same basename plus .spec (add-to-cart.handler.spec.ts); e2e: <flow>.e2e-spec.ts under src/tests/e2e/ (schema-builds.e2e-spec.ts)"
       - id: case-6
         when: Migration
         write: 1719200000000-AddIsEnrolledToEnrollments.ts

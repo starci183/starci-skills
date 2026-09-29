@@ -24,7 +24,12 @@ paths:
   - docs/backend-source-pattern.md
   - docs/verify-proof.md
   - docs/ops.md
+  - docs/nest-test-discovery-check.md
+  - knowledge/patterns/be/naming.yaml
+  - packages/eslint/be/testing.mjs
   - modules/ops/_common.yaml
+  - tests/open-items-contract.spec.mjs
+  - modules/schemas/json-exceptions.yaml
   - modules/ops/ops/backend.implement.yaml
   - modules/ops/ops/review.verify.yaml
   - modules/ops/ops/e2e.verify.yaml

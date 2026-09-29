@@ -42,9 +42,8 @@ rules:
     requirement: A backend repository has exactly two test kinds (owner ruling 2026-09-29). Unit is
       <name>.spec.ts beside its subject. E2E is *.e2e-spec.ts under src/tests/e2e/ (subfolders by area),
       with environment code (Testcontainers globalSetup/globalTeardown, application boot, datastore and
-      transport helpers) in src/tests/e2e/setup/ and shared data in src/tests/fixtures/. The former
-      *.int-spec.ts and *.harness-spec.ts kinds, and the src/tests/integration/ and src/tests/harness/
-      folders, are retired - what they covered is e2e. One root jest.config.js declares exactly two projects,
+      transport helpers) in src/tests/e2e/setup/ and shared data in src/tests/fixtures/. Every
+      non-unit spec is e2e. One root jest.config.js declares exactly two projects,
       unit and e2e; scripts are test:unit and test:e2e, plus an optional test:e2e:live that filters
       src/tests/e2e/live/ (suites needing live third-party accounts) out of plain test:e2e. Verify discovery
       using the consuming project's actual Jest config and test listing (--listTests per project). Mock-only
@@ -70,11 +69,11 @@ rules:
       - id: case-4
         when: E2E
         write: "*.e2e-spec.ts under src/tests/e2e/<area>/, Testcontainers, globalSetup/globalTeardown in
-          src/tests/e2e/setup/, testTimeout: 120_000; *.int-spec.ts is retired (HFS_TEST_KIND_RETIRED)"
+          src/tests/e2e/setup/, testTimeout: 120_000"
       - id: case-5
         when: Live third-party e2e
         write: "*.e2e-spec.ts under src/tests/e2e/live/, run only by test:e2e:live and excluded from plain
-          test:e2e; *.harness-spec.ts is retired and is not a kind, suffix or config"
+          test:e2e"
       - id: case-6
         when: Projects
         write: 'one root jest.config.js, projects: [{ displayName: "unit", testMatch: ["**/*.spec.ts"],

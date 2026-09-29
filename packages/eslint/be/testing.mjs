@@ -46,7 +46,7 @@ import { normalizePath } from "./lib/path.mjs"
 /** Test kind 1 of exactly two: a unit spec, `<name>.spec.ts` beside its subject. */
 const isUnitSpec = (filename) => /\.spec\.ts$/.test(normalizePath(filename))
 
-/** Test kind 2 of exactly two: `*.e2e-spec.ts`. `.int-spec` and `.harness-spec` are retired kinds. */
+/** Test kind 2 of exactly two: `*.e2e-spec.ts`. */
 const isE2eSpec = (filename) => /\.e2e-spec\.ts$/.test(normalizePath(filename))
 
 /** The opt-in live e2e filter (`test:e2e:live`): e2e specs under `src/tests/e2e/live/` that need live third-party accounts. */
