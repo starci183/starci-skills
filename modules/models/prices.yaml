@@ -7,19 +7,20 @@ currency: USD
 unit: per-million-tokens
 asOf: '2026-09-29'
 source: >-
-  owner-declared table, not yet filled. The 2026 model ids this host routes (claude-opus-5-5, gpt-6-sol, swe-2-max,
-  qwen3.8-max) have no price recorded in this repository (grep of modules/models and benchmark, 2026-09-29), so every
-  rate is null and every cost_usd stays NULL until the owner sets one. A subscription seat (Claude Max, Codex Pro,
-  Devin plan, Qwen token plan) bills a flat fee, so a filled rate is the API-equivalent list price, a notional cost.
+  Official list prices read 2026-09-29 (WebFetch): claude-* from https://claude.com/pricing (5-minute cache write TTL);
+  gpt-6-* from https://developers.openai.com/api/docs/pricing, Standard processing tier, short context (long context is
+  double, batch/flex half, fast mode double: not applied - the CLI reports no tier). swe-2-max (Devin) and qwen3.8-max have
+  no official per-token price page read, so their rates stay null and cost_usd stays NULL for them. A subscription seat
+  (Claude Max, Codex Pro, Devin plan, Qwen token plan) bills a flat fee, so cost_usd is the API-equivalent list price.
 matching: >-
   scripts/lib/llm-usage.mjs priceOf(model): the exact id first, then the longest entry that is a prefix of the id
   (a dated snapshot id `claude-opus-5-5-20260901` prices as `claude-opus-5-5`). The four rates are USD per 1M tokens:
   input = fresh (non-cached) input, cacheRead = cached input read, cacheWrite = cache creation, output = generated
   tokens including reasoning. A model whose used rate is null gets cost_usd NULL (a partial sum is never written).
 models:
-  claude-opus-5-5:   {provider: claude, input: null, output: null, cacheRead: null, cacheWrite: null, source: unset}
-  claude-sonnet-5-5: {provider: claude, input: null, output: null, cacheRead: null, cacheWrite: null, source: unset}
-  gpt-6-sol:         {provider: codex,  input: null, output: null, cacheRead: null, cacheWrite: null, source: unset}
-  gpt-6-luna:        {provider: codex,  input: null, output: null, cacheRead: null, cacheWrite: null, source: unset}
+  claude-opus-5-5:   {provider: claude, input: 4,    output: 20,  cacheRead: 0.2,  cacheWrite: 5,     source: official}
+  claude-sonnet-5-5: {provider: claude, input: 2,    output: 10,  cacheRead: 0.2,  cacheWrite: 2.5,   source: official}
+  gpt-6-sol:         {provider: codex,  input: 2,    output: 10,  cacheRead: 0.2,  cacheWrite: 2.5,   source: official}
+  gpt-6-luna:        {provider: codex,  input: 0.1,  output: 0.5, cacheRead: 0.01, cacheWrite: 0.125, source: official}
   swe-2-max:         {provider: devin,  input: null, output: null, cacheRead: null, cacheWrite: null, source: unset}
   qwen3.8-max:       {provider: qwen,   input: null, output: null, cacheRead: null, cacheWrite: null, source: unset}

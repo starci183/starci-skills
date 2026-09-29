@@ -133,7 +133,7 @@ test('settle archives the settled op\'s own claude session file', t => {
   assert.equal(stored?.session, undefined, 'observe-time identity is not written by settle');
   // The attempt's measured usage was recorded from the session file before it moved.
   const usage = read(fx.ledgerFile, (l) => ({ attempt: l.db.prepare('SELECT tokens_in, tokens_out, cost_usd, usage_source FROM op_attempts WHERE job_id=?').get(jobId), rows: l.db.prepare("SELECT response_model, input_tokens, output_tokens, cache_read_tokens, cache_write_tokens FROM llm_usage WHERE subject_type='attempt'").all() }));
-  assert.deepEqual({ ...usage.attempt }, { tokens_in: 120, tokens_out: 11, cost_usd: null, usage_source: 'cli-transcript' });
+  assert.deepEqual({ ...usage.attempt }, { tokens_in: 120, tokens_out: 11, cost_usd: 0.000333, usage_source: 'cli-transcript' });
   assert.deepEqual(usage.rows.map((x) => ({ ...x })), [{ response_model: 'claude-opus-5-5', input_tokens: 7, output_tokens: 11, cache_read_tokens: 100, cache_write_tokens: 13 }]);
 });
 

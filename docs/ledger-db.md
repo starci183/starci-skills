@@ -1,8 +1,9 @@
 # Storage: `runtime.sqlite`, `machine.sqlite` and the blob store
 
-The schema is data, not prose. The executed DDL is `engine/migrations/runtime/0001-init.sql`
-(`meta.schema = 'starci/runtime@1'`) and `engine/migrations/machine/0001-init.sql`
-(`machine_meta.schema = 'starci/machine@1'`), both at `user_version = 1`. This page explains the
+The schema is data, not prose. The executed DDL is `engine/migrations/runtime/0001-init.sql` plus its forward migrations
+(`0003-usage-unavailable.sql`; `meta.schema = 'starci/runtime@1'`, `user_version = 3`; an older ledger is migrated on the first writer open after a
+`VACUUM INTO` backup and integrity check, `schema_migrations` records each step) and `engine/migrations/machine/0001-init.sql`
+(`machine_meta.schema = 'starci/machine@1'`, `user_version = 1`). This page explains the
 decisions and the invariants; when it disagrees with the SQL files, the SQL wins.
 
 ## 1. The layout
@@ -99,7 +100,7 @@ Each view that shows an entity carries its `ui` state.
 | Where | `repo_root`, `worktree_path`, `branch`, `base_sha`, `head_sha`, `integrated_sha` |
 | When | `routed_at`, `dispatched_at`, `started_at`, `reported_at`, `checked_at`, `settled_at`, `released_at`, `terminal_closed_at`, `worktree_removed_at`, `wall_ms` |
 | Outcome | `report_outcome` (the op's claim) apart from `verdict` (the runtime's), `settled_by`, `decision_id`, `failure_class`, `end_state` |
-| Usage | `tokens_in` (fresh + cache read + cache write), `tokens_out`, `cost_usd`, `usage_source` (`cli-transcript`; per-model detail in `llm_usage`; NULL when not measured, never estimated - `api usage` reports such a settled attempt as `unavailable`) |
+| Usage | `tokens_in` (fresh + cache read + cache write), `tokens_out`, `cost_usd`, `usage_source` (`cli-transcript` measured, `unavailable` with `usage_reason`; per-model detail in `llm_usage`; NULL only until an ended attempt is decided, never estimated) |
 
 Token metering (`scripts/kernel/usage-record.mjs`, `api usage`): the numbers come from the agent CLI's own session file - Claude
 Code JSONL `message.usage`, Codex rollout `token_count`, Qwen `usageMetadata` (`scripts/lib/llm-usage.mjs`); devin and any other

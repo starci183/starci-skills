@@ -216,7 +216,7 @@ const usageLines = (u) => {
   if (!u?.total) return [];
   const cost = (t) => (t.costUsd == null ? '' : ` ${t.costUsd}`);
   const lines = [`  tokens ${u.total.tokens.toLocaleString('en-US')} all-time, ${u.window.tokens.toLocaleString('en-US')} in 24h${cost(u.total)}; supervisor seat ${(u.supervisor?.tokens ?? 0).toLocaleString('en-US')}; ${u.byModel.slice(0, 4).map((m) => `${m.model} ${m.tokens.toLocaleString('en-US')}`).join(', ') || 'no usage recorded yet'}`];
-  for (const l of u.ledgers) if (!l.error && (l.total.tokens || l.unavailableAttempts)) lines.push(`    ${l.name}: ${l.total.tokens.toLocaleString('en-US')} (attempts ${l.attempts.tokens.toLocaleString('en-US')}, kernels ${l.kernel.tokens.toLocaleString('en-US')})${l.unavailableAttempts ? `; ${l.unavailableAttempts} settled attempt(s) unmeasured` : ''}`);
+  for (const l of u.ledgers) if (!l.error && (l.total.tokens || l.unavailableAttempts || l.pendingAttempts)) lines.push(`    ${l.name}: ${l.total.tokens.toLocaleString('en-US')} (attempts ${l.attempts.tokens.toLocaleString('en-US')}, kernels ${l.kernel.tokens.toLocaleString('en-US')})${l.unavailableAttempts ? `; ${l.unavailableAttempts} attempt(s) unavailable` : ''}${l.pendingAttempts ? `; ${l.pendingAttempts} pending` : ''}`);
   return lines;
 };
 

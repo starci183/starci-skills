@@ -100,8 +100,8 @@ function preMetaLedgerFile(){
 test('the ledger schema carries every contract table, the meta identity, the drift trigger, and version 1',t=>{
   const dir=temporary();t.after(()=>fs.rmSync(dir,{recursive:true,force:true}));
   const ledger=openLedger({file:path.join(dir,'runtime.sqlite')});
-  assert.equal(ledger.schema,LEDGER_SCHEMA);assert.equal(LEDGER_VERSION,1);
-  assert.equal(Number(ledger.db.prepare('PRAGMA user_version').get().user_version),1);
+  assert.equal(ledger.schema,LEDGER_SCHEMA);assert.equal(LEDGER_VERSION,3);
+  assert.equal(Number(ledger.db.prepare('PRAGMA user_version').get().user_version),3);
   assert.equal(ledger.db.prepare('PRAGMA auto_vacuum').get().auto_vacuum,2);
   assert.equal(Number(ledger.db.prepare('PRAGMA foreign_keys').get().foreign_keys),1);
   assert.equal(Number(ledger.db.prepare('PRAGMA synchronous').get().synchronous),1,'synchronous=NORMAL (LEDGER_PRAGMAS, owner ruling 2026-09-27: WAL commits without a per-commit fsync)');
@@ -281,7 +281,7 @@ test('inspectLedger refuses a missing file, and reflects the identity and versio
   assert.throws(()=>inspectLedger({file:path.join(dir,'missing.sqlite')}),/existing file/);
   const ledger=openLedger({file:path.join(dir,'runtime.sqlite')});const id=ledger.ledgerId;ledger.close();
   const inspect=inspectLedger({file:path.join(dir,'runtime.sqlite')});
-  assert.equal(inspect.version,1);assert.equal(inspect.readOnly,true);assert.deepEqual(inspect.listJobs(),[]);
+  assert.equal(inspect.version,3);assert.equal(inspect.readOnly,true);assert.deepEqual(inspect.listJobs(),[]);
   assert.equal(inspect.ledgerId,id);assert.equal(inspect.ledgerId,ledgerIdOf(inspect));
   inspect.close();
 });
@@ -420,12 +420,50 @@ test('recordAttemptUsage writes llm_usage rows and the attempt summary once; rec
   assert.deepEqual(ledger.write.recordAttemptUsage({attemptId,rows:[row]}),{recorded:true,rows:1});
   assert.deepEqual(ledger.write.recordAttemptUsage({attemptId,rows:[row]}),{recorded:false,rows:0},'a second recording adds nothing');
   const a=ledger.getAttempt(attemptId);
-  assert.equal(a.tokens_in,350,'tokens_in = fresh + cache read + cache write');assert.equal(a.tokens_out,20);assert.equal(a.cost_usd,null,'an unpriced model leaves cost NULL');assert.equal(a.usage_source,'cli-transcript');
+  assert.equal(a.tokens_in,350,'tokens_in = fresh + cache read + cache write');assert.equal(a.tokens_out,20);assert.equal(a.cost_usd,null,'a row without a costUsd leaves cost NULL');assert.equal(a.usage_source,'cli-transcript');
   assert.equal(ledger.db.prepare("SELECT count(*) n FROM llm_usage WHERE attempt_id=?").get(attemptId).n,1);
   assert.equal(ledger.db.prepare("SELECT count(*) n FROM events WHERE kind='attempt-usage-recorded'").get().n,1);
   const args={workflowId:'wf',turnRef:'kernel:wf:s1@4',rows:[row],provider:'claude'};
   assert.equal(ledger.write.recordKernelUsage(args).recorded,true);
   assert.equal(ledger.write.recordKernelUsage(args).recorded,false,'the same turn_ref is never counted twice');
   assert.equal(ledger.db.prepare("SELECT count(*) n FROM llm_usage WHERE subject_type='kernel-turn'").get().n,1);
+  ledger.close();
+});
+
+test('an older (user_version 1) ledger is migrated forward on the first writer open: backup, wider usage_source CHECK, usage_reason, recorded migration',t=>{
+  const dir=temporary();t.after(()=>fs.rmSync(dir,{recursive:true,force:true}));
+  const file=path.join(dir,'runtime.sqlite');
+  const seed=openLedger({file});
+  // Put the file back to what 0001-init alone produced.
+  seed.db.enableDefensive(false);
+  seed.db.exec("PRAGMA writable_schema=ON;UPDATE sqlite_master SET sql=replace(sql,',''unavailable'')',')') WHERE name='op_attempts';PRAGMA writable_schema=OFF");
+  seed.db.exec('ALTER TABLE op_attempts DROP COLUMN usage_reason;DELETE FROM schema_migrations WHERE version=3;PRAGMA user_version=1');
+  seed.close();
+  const old=inspectLedger({file});assert.equal(old.version,1);assert.equal(old.db.prepare("SELECT sql FROM sqlite_master WHERE name='op_attempts'").get().sql.includes("'unavailable'"),false);old.close();
+  const ledger=openLedger({file});
+  assert.equal(Number(ledger.db.prepare('PRAGMA user_version').get().user_version),3);
+  assert.equal(ledger.db.prepare('SELECT status FROM schema_migrations WHERE version=3').get().status,'done');
+  assert.equal(fs.existsSync(`${file}.pre-0003-usage-unavailable.bak`),true,'a VACUUM INTO backup precedes the migration');
+  assert.equal(ledger.db.prepare("SELECT sql FROM sqlite_master WHERE name='op_attempts'").get().sql.includes("'unavailable'"),true);
+  assert.ok(ledger.db.prepare('PRAGMA table_info(op_attempts)').all().some(c=>c.name==='usage_reason'));
+  ledger.close();
+  assert.doesNotThrow(()=>openLedger({file}).close(),'a second open migrates nothing');
+});
+
+test('markAttemptUsageUnavailable stores usage_source unavailable with its reason, never over a measured attempt, and a later measurement replaces it',t=>{
+  const dir=temporary();t.after(()=>fs.rmSync(dir,{recursive:true,force:true}));
+  const ledger=openLedger({file:path.join(dir,'runtime.sqlite')});
+  ledger.ensureWorkflow({workflowId:'wf'});
+  ledger.write.changeWorkflowPhase({workflowId:'wf',to:'running',by:'test',reason:'seed'});
+  ledger.write.createUnit({workflowId:'wf',unitId:'u1',opId:'op',subjectKey:'u1',goalRevision:1});
+  ledger.enqueueJob({jobId:'j1',workflowId:'wf',unitId:'u1',opId:'op',tryNo:1,generation:1,kind:'op'});
+  for(const to of ['ready','leased'])ledger.write.setJobStatus({jobId:'j1',to,reason:'test'});
+  const {attempt_id:attemptId}=ledger.write.startAttempt({workflowId:'wf',jobId:'j1',dispatchId:'ctx_u',provider:'devin'});
+  assert.deepEqual(ledger.write.markAttemptUsageUnavailable({attemptId,reason:'no usage adapter for devin'}),{marked:true});
+  assert.deepEqual(ledger.write.markAttemptUsageUnavailable({attemptId,reason:'no usage adapter for devin'}),{marked:false},'the same reason adds no event');
+  let a=ledger.getAttempt(attemptId);assert.equal(a.usage_source,'unavailable');assert.equal(a.usage_reason,'no usage adapter for devin');assert.equal(a.tokens_in,null);
+  ledger.write.recordAttemptUsage({attemptId,rows:[{model:'m',inputTokens:1,outputTokens:2,cacheReadTokens:0,cacheWriteTokens:0,turns:1}]});
+  a=ledger.getAttempt(attemptId);assert.equal(a.usage_source,'cli-transcript');assert.equal(a.usage_reason,null);
+  assert.deepEqual(ledger.write.markAttemptUsageUnavailable({attemptId,reason:'late'}),{marked:false},'a measured attempt is never marked');
   ledger.close();
 });

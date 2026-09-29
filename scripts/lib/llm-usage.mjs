@@ -178,7 +178,7 @@ export function qwenUsage(lines) {
 const hasActivity = (row) => COUNT_FIELDS.some((f) => row[f] > 0) || row.turns > 0;
 const EXTRACTORS = { claude: claudeUsage, codex: codexUsage, qwen: qwenUsage };
 const UNAVAILABLE_REASON = {
-  devin: 'devin keeps its sessions in sessions.db; no adapter reads token counts from it',
+  devin: 'no usage adapter for devin: it keeps its sessions in sessions.db, which no adapter reads',
 };
 
 /**
@@ -188,7 +188,7 @@ const UNAVAILABLE_REASON = {
  */
 export function extractUsage(agent, file) {
   const extractor = EXTRACTORS[agent];
-  if (!extractor) return { ok: false, source: USAGE_UNAVAILABLE, agent: agent ?? null, reason: UNAVAILABLE_REASON[agent] ?? `no usage adapter for agent ${agent ?? 'unknown'}` };
+  if (!extractor) return { ok: false, source: USAGE_UNAVAILABLE, agent: agent ?? null, reason: UNAVAILABLE_REASON[agent] ?? `no usage adapter for agent ${agent ?? 'unknown'}`, definitive: true };
   if (!file || !fs.existsSync(file)) return { ok: false, source: USAGE_UNAVAILABLE, agent, reason: 'session file not found' };
   const out = extractor(fileLines(file));
   if (!out.models.length) return { ok: false, source: USAGE_UNAVAILABLE, agent, reason: 'session file holds no usage record' };

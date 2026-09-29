@@ -168,8 +168,8 @@ const mergeRows = (lists) => {
  */
 export function planAttemptUsage(attempt, entries, { prices = loadPrices(), extract = extractUsage } = {}) {
   const agent = attemptAgent(attempt);
-  const base = { attemptId: attempt.attempt_id, workflowId: attempt.workflow_id, opId: attempt.op_id, agent, provider: attempt.provider ?? agent };
-  if (!agent || !USAGE_AGENTS.includes(agent)) return { ...base, ok: false, source: USAGE_UNAVAILABLE, ...extract(agent, null) };
+  const base = { attemptId: attempt.attempt_id, workflowId: attempt.workflow_id, opId: attempt.op_id, agent, provider: attempt.provider ?? agent, endedAt: attempt.settled_at ?? attempt.dispatched_at ?? null };
+  if (!agent || !USAGE_AGENTS.includes(agent)) return { ...base, ok: false, source: USAGE_UNAVAILABLE, definitive: true, ...extract(agent, null) };
   if (!entries.length) return { ...base, ok: false, source: USAGE_UNAVAILABLE, reason: 'no session file names this attempt (not found live or in the archive)' };
   const got = entries.map((e) => extract(agent, e.file));
   const ok = got.filter((g) => g.ok);
@@ -178,9 +178,20 @@ export function planAttemptUsage(attempt, entries, { prices = loadPrices(), extr
   return { ...base, ok: true, source: USAGE_SOURCE, rows, files: ok.map((g) => g.file) };
 }
 
-/** Write one ok plan through the ledger's typed writer (idempotent). `ledger` is an openLedger handle. */
+/** How long after an attempt ended a missing session file stays 'not found yet' (the file may still be archived) before it is recorded unavailable. */
+export const UNAVAILABLE_GRACE_MS = 30 * 60 * 1000;
+
+/**
+ * Write one plan through the ledger's typed writers (idempotent). An ok plan records the measured usage; a plan that cannot be
+ * measured records usage_source 'unavailable' with its reason - at once when the agent has no adapter, else once the attempt has
+ * been over for UNAVAILABLE_GRACE_MS (until then it stays undecided and the sweep looks again).
+ */
 export function applyAttemptUsage(ledger, plan, { at = Date.now() } = {}) {
-  if (!plan.ok) return { recorded: false, reason: plan.reason };
+  if (!plan.ok) {
+    const settled = plan.endedAt != null && at - plan.endedAt > UNAVAILABLE_GRACE_MS;
+    if (!plan.definitive && !settled) return { recorded: false, reason: plan.reason, pending: true };
+    return { recorded: false, reason: plan.reason, ...ledger.write.markAttemptUsageUnavailable({ attemptId: plan.attemptId, reason: plan.reason, at }) };
+  }
   return ledger.write.recordAttemptUsage({ attemptId: plan.attemptId, rows: plan.rows, source: plan.source, provider: plan.provider, at });
 }
 
@@ -190,6 +201,7 @@ export function attemptsMissingUsage(db, { sinceMs = 0 } = {}) {
     FROM op_attempts a
     WHERE (a.settled_at IS NOT NULL OR a.end_state IS NOT NULL) AND a.dispatched_at >= ?
       AND NOT EXISTS (SELECT 1 FROM llm_usage u WHERE u.subject_type='attempt' AND u.attempt_id=a.attempt_id)
+      AND NOT (COALESCE(a.usage_source,'')='unavailable' AND COALESCE(a.usage_reason,'') LIKE 'no usage adapter%')
     ORDER BY a.attempt_id`).all(sinceMs);
 }
 
@@ -254,16 +266,17 @@ export function planSeatUsage(db, { role, workflowId = null, entry, prices = loa
  * One pass: settled attempts without usage (every registered ledger), every Kernel session (its workflow's ledger) and the
  * Supervisor sessions (machine.sqlite). `dryRun` reads and reports, writes nothing. Returns a summary.
  */
-export async function sweepUsage({ env = process.env, home = os.homedir(), now = Date.now(), lookbackMs = DEFAULT_LOOKBACK_MS, dryRun = false, archiveRoot = null, ledgerName = null, detail = false } = {}) {
+export async function sweepUsage({ env = process.env, home = os.homedir(), now = Date.now(), lookbackMs = DEFAULT_LOOKBACK_MS, dryRun = false, archiveRoot = null, ledgerName = null, detail = false, ledgerFiles = null } = {}) {
   const [{ openMachineReader, withMachine, recordLlmUsage }, { openLedger, openLedgerReader }] = await Promise.all([
     import('../../engine/machine-db.mjs'), import('../../engine/ledger-db.mjs'),
   ]);
   const since = now - lookbackMs;
   const out = { ok: true, dryRun, lookbackMs, attempts: { pending: 0, recorded: 0, unavailable: 0 }, kernels: { sessions: 0, recorded: 0, rows: 0, unmatched: 0 }, supervisor: { sessions: 0, recorded: 0, rows: 0 }, errors: [], unavailable: [], ...(detail ? { detail: { attempts: [], kernels: [], supervisor: [] } } : {}) };
-  const reader = openMachineReader({ env });
-  if (!reader) return { ...out, ok: false, errors: ['machine.sqlite not found'] };
   let ledgers = [];
-  try { ledgers = reader.listLedgers().filter((l) => l.file && fs.existsSync(l.file) && (!ledgerName || l.name === ledgerName)); } finally { reader.close(); }
+  const reader = ledgerFiles ? null : openMachineReader({ env });
+  if (!reader && !ledgerFiles) return { ...out, ok: false, errors: ['machine.sqlite not found'] };
+  if (ledgerFiles) ledgers = ledgerFiles;   // explicit [{name, file}] (a copy of a ledger, a spec): the registry is not consulted
+  else try { ledgers = reader.listLedgers().filter((l) => l.file && fs.existsSync(l.file) && (!ledgerName || l.name === ledgerName)); } finally { reader.close(); }
 
   const perLedger = [];
   for (const l of ledgers) {
@@ -293,9 +306,9 @@ export async function sweepUsage({ env = process.env, home = os.homedir(), now =
       if (detail) for (const p of plans) out.detail.attempts.push({ ledger: l.name, ...p });
       if (detail) for (const s of seatPlans) out.detail.kernels.push({ ledger: l.name, workflowId: s.e.workflowId, ...s.plan });
       for (const p of plans) if (!p.ok) { out.attempts.unavailable += 1; if (out.unavailable.length < 50) out.unavailable.push({ ledger: l.name, attemptId: p.attemptId, agent: p.agent, reason: p.reason }); }
-      const work = plans.filter((p) => p.ok);
+      const work = plans;   // every plan is applied: ok = measured, not ok = unavailable once decided (applyAttemptUsage)
       const seatWork = seatPlans.filter((s) => s.plan.ok && s.plan.rows.length);
-      if (dryRun) { out.attempts.recorded += work.length; out.kernels.recorded += seatWork.length; out.kernels.rows += seatWork.reduce((n, s) => n + s.plan.rows.length, 0); continue; }
+      if (dryRun) { out.attempts.recorded += work.filter((p) => p.ok).length; out.kernels.recorded += seatWork.length; out.kernels.rows += seatWork.reduce((n, s) => n + s.plan.rows.length, 0); continue; }
       if (!work.length && !seatWork.length) continue;
       handle = openLedger({ file: l.file, repoRoot: l.repoRoot ?? null });
       for (const p of work) { try { if (applyAttemptUsage(handle, p, { at: now }).recorded) out.attempts.recorded += 1; } catch (error) { out.errors.push(`${l.name} attempt ${p.attemptId}: ${message(error).slice(0, 160)}`); } }

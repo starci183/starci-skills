@@ -9,15 +9,16 @@ reads: >-
 writes: 'nothing - pure projection'
 returns: >-
   with --workflow: {ok, workflowId, total, byOp[{opId, attempts, ...counts, models[]}], byModel[{model, ...counts}],
-  kernel{...counts, sessions, models[]}, coverage{attempts, measured, open, unavailable, unavailableAttempts[{attemptId,
-  opId, agent, reason}]}, legs?[{attemptId, jobId, opId, unitId, tryNo, agent, model, state: measured|unavailable|open,
-  usageSource, ...counts}]}; without it: {ok, total, attempts, kernel, byModel[], workflows[{workflowId, phase, total, kernel,
+  kernel{...counts, sessions, models[]}, coverage{attempts, measured, open, pending, unavailable, unavailableAttempts[{attemptId,
+  opId, agent, reason}]}, legs?[{attemptId, jobId, opId, unitId, tryNo, agent, model, state: measured|unavailable|pending|open,
+  usageSource, usageReason?, ...counts}]}; without it: {ok, total, attempts, kernel, byModel[], workflows[{workflowId, phase, total, kernel,
   coverage}]}. Counts are {inputTokens (fresh), outputTokens (reasoning included), cacheReadTokens, cacheWriteTokens,
   reasoningTokens, tokens (all four), turns, toolCalls, toolErrors, costUsd (null when any contributing row is unpriced)}
 refuses:
   - workflow-unknown: '--workflow names no workflow of this ledger'
 unavailable: >-
-  a settled attempt with no llm_usage row is counted under coverage.unavailable with its reason (no adapter for its agent,
-  or no session file found live or in the session archive); it is never given a number. usage_source stays NULL on the row
-  because the runtime schema's CHECK admits only cli-transcript and provider-report
+  an attempt whose usage cannot be measured is stored with op_attempts.usage_source 'unavailable' and usage_reason (migration
+  0003-usage-unavailable): at once when its agent has no adapter, else once it has been over 30 minutes with no session file found
+  live or in the session archive. It is never given a number. coverage.pending counts settled attempts not yet decided (their
+  session may still be archived); the sweep looks again until it measures or marks them
 usedBy: 'the Kernel and the Supervisor reading what a workflow spent; `api status` carries the same summary as its `usage` field'

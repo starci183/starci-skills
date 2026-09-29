@@ -33,10 +33,6 @@ const fold = (rows, key) => {
 };
 const tally = (t) => ({ ...finish(t), ...(t.attempts ? { attempts: t.attempts.size } : {}) });
 
-/** 'unavailable' is what a settled attempt without a llm_usage row is; the reason names the adapter gap when it is one. */
-export const unavailableReason = (agentOrProvider) => (/^devin/i.test(String(agentOrProvider ?? ''))
-  ? 'no usage adapter for devin (sessions.db is not read)' : 'no session file found for the attempt (or its agent has no adapter)');
-
 /** Tokens of one workflow: {workflowId, total, byOp[], byModel[], kernel, coverage, legs?}. */
 export function usageOfWorkflow(db, workflowId, { legs = false } = {}) {
   const attemptRows = db.prepare(`SELECT a.op_id AS opId, u.provider AS provider, COALESCE(u.response_model,u.request_model,'unknown') AS model, u.attempt_id AS attemptId, ${SUMS}
@@ -52,22 +48,23 @@ export function usageOfWorkflow(db, workflowId, { legs = false } = {}) {
       sum(CASE WHEN a.settled_at IS NULL AND a.end_state IS NULL THEN 1 ELSE 0 END) AS open,
       sum(CASE WHEN EXISTS(SELECT 1 FROM llm_usage u WHERE u.subject_type='attempt' AND u.attempt_id=a.attempt_id) THEN 1 ELSE 0 END) AS measured
     FROM op_attempts a WHERE a.workflow_id=?`).get(workflowId);
-  const settledNoUsage = db.prepare(`SELECT a.attempt_id AS attemptId, a.op_id AS opId, COALESCE(a.agent,a.provider) AS agent FROM op_attempts a
-    WHERE a.workflow_id=? AND (a.settled_at IS NOT NULL OR a.end_state IS NOT NULL)
-      AND NOT EXISTS(SELECT 1 FROM llm_usage u WHERE u.subject_type='attempt' AND u.attempt_id=a.attempt_id) ORDER BY a.attempt_id`).all(workflowId);
+  const unavailable = db.prepare(`SELECT a.attempt_id AS attemptId, a.op_id AS opId, COALESCE(a.agent,a.provider) AS agent, a.usage_reason AS reason FROM op_attempts a
+    WHERE a.workflow_id=? AND a.usage_source='unavailable' ORDER BY a.attempt_id`).all(workflowId);
+  const pending = Number(db.prepare(`SELECT count(*) n FROM op_attempts a WHERE a.workflow_id=? AND a.usage_source IS NULL AND (a.settled_at IS NOT NULL OR a.end_state IS NOT NULL)
+      AND NOT EXISTS(SELECT 1 FROM llm_usage u WHERE u.subject_type='attempt' AND u.attempt_id=a.attempt_id)`).get(workflowId).n);
   const out = {
     workflowId, total: finish(total), byOp: byOp.sort((a, b) => b.tokens - a.tokens), byModel: byModel.sort((a, b) => b.tokens - a.tokens),
     kernel: { ...finish(kernelTotal), sessions: new Set(kernelRows.map((r) => r.session)).size,
       models: fold(kernelRows, (r) => `${r.provider}/${r.model}`).map((m) => ({ model: m.key, ...tally(m) })) },
     coverage: { attempts: Number(cov.attempts), measured: Number(cov.measured ?? 0), open: Number(cov.open ?? 0),
-      unavailable: settledNoUsage.length, unavailableAttempts: settledNoUsage.slice(0, 20).map((r) => ({ ...r, reason: unavailableReason(r.agent) })) },
+      unavailable: unavailable.length, pending, unavailableAttempts: unavailable.slice(0, 20).map((r) => ({ ...r })) },
   };
   if (legs) {
     out.legs = db.prepare(`SELECT a.attempt_id AS attemptId, a.job_id AS jobId, a.op_id AS opId, a.unit_id AS unitId, a.try_no AS tryNo, COALESCE(a.agent,a.provider) AS agent,
-        COALESCE(u.response_model,a.model) AS model, ${SUMS}, a.usage_source AS usageSource,
-        CASE WHEN count(u.usage_id)>0 THEN 'measured' WHEN a.settled_at IS NULL AND a.end_state IS NULL THEN 'open' ELSE 'unavailable' END AS state
+        COALESCE(u.response_model,a.model) AS model, ${SUMS}, a.usage_source AS usageSource, a.usage_reason AS usageReason,
+        CASE WHEN count(u.usage_id)>0 THEN 'measured' WHEN a.usage_source='unavailable' THEN 'unavailable' WHEN a.settled_at IS NULL AND a.end_state IS NULL THEN 'open' ELSE 'pending' END AS state
       FROM op_attempts a LEFT JOIN llm_usage u ON u.subject_type='attempt' AND u.attempt_id=a.attempt_id WHERE a.workflow_id=? GROUP BY a.attempt_id, model ORDER BY a.attempt_id`).all(workflowId)
-      .map((r) => ({ attemptId: r.attemptId, jobId: r.jobId, opId: r.opId, unitId: r.unitId, tryNo: r.tryNo, agent: r.agent, model: r.model, state: r.state, usageSource: r.usageSource ?? (r.state === 'unavailable' ? 'unavailable' : null),
+      .map((r) => ({ attemptId: r.attemptId, jobId: r.jobId, opId: r.opId, unitId: r.unitId, tryNo: r.tryNo, agent: r.agent, model: r.model, state: r.state, usageSource: r.usageSource ?? null, ...(r.usageReason ? { usageReason: r.usageReason } : {}),
         ...(r.state === 'measured' ? finish(add(blank(), r)) : {}) }));
   }
   return out;
@@ -108,8 +105,9 @@ export function machineUsage({ env = process.env, now = Date.now(), windowMs = 2
     try {
       db = openLedgerReader(l.file);
       const life = usageOfLedger(db), recent = usageOfLedger(db, { sinceMs: now - windowMs });
-      const open = db.prepare("SELECT count(*) n FROM op_attempts WHERE settled_at IS NOT NULL AND NOT EXISTS(SELECT 1 FROM llm_usage u WHERE u.subject_type='attempt' AND u.attempt_id=op_attempts.attempt_id)").get().n;
-      out.ledgers.push({ name: l.name, ledgerId: l.ledgerId, total: life.total, window: recent.total, attempts: life.attempts, kernel: life.kernel, unavailableAttempts: Number(open), byModel: life.byModel });
+      const unavailable = db.prepare("SELECT count(*) n FROM op_attempts WHERE usage_source='unavailable'").get().n;
+      const pending = db.prepare("SELECT count(*) n FROM op_attempts WHERE usage_source IS NULL AND (settled_at IS NOT NULL OR end_state IS NOT NULL) AND NOT EXISTS(SELECT 1 FROM llm_usage u WHERE u.subject_type='attempt' AND u.attempt_id=op_attempts.attempt_id)").get().n;
+      out.ledgers.push({ name: l.name, ledgerId: l.ledgerId, total: life.total, window: recent.total, attempts: life.attempts, kernel: life.kernel, unavailableAttempts: Number(unavailable), pendingAttempts: Number(pending), byModel: life.byModel });
       for (const m of life.byModel) models.push(m);
       add(all, { ...life.total, costUsd: life.total.costUsd ?? 0, unpriced: life.total.costUsd === null && life.total.tokens ? 1 : 0, records: life.total.tokens ? 1 : 0 });
       add(win, { ...recent.total, costUsd: recent.total.costUsd ?? 0, unpriced: recent.total.costUsd === null && recent.total.tokens ? 1 : 0, records: recent.total.tokens ? 1 : 0 });

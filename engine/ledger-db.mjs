@@ -57,7 +57,7 @@ export const JOB_ARTIFACT_ROLES=Object.freeze(['check-output','check-stdout','ch
   'direction','prompt','render','redline','critique','capture','dom','screenshot','video','trace','uat-run','metrics','salvage','scan','other']);
 
 export const LEDGER_SCHEMA='starci/runtime@1';
-export const LEDGER_VERSION=1;
+export const LEDGER_VERSION=3;
 
 const need=(ok,message,code)=>{if(!ok)throw Object.assign(Error(message),code?{code}:{});};
 const json=value=>value===undefined||value===null?null:JSON.stringify(value);
@@ -130,6 +130,8 @@ export const ledgerFileFor=(repoRoot,{env=process.env}={})=>{
 const INIT_SQL_FILE=new URL('./migrations/runtime/0001-init.sql',import.meta.url);
 const INIT_SQL=fs.readFileSync(INIT_SQL_FILE,'utf8');
 const INIT_SQL_SHA=sha256(INIT_SQL);
+/** Forward migrations after 0001-init, in order; each bumps user_version to its `version` (migrateLedger). */
+const FORWARD_MIGRATIONS=Object.freeze([{version:3,name:'0003-usage-unavailable'}]);
 export const LEDGER_BUSY_TIMEOUT_MS=15000;
 /**
  * Writer pragmas. wal_autocheckpoint=0 on EVERY connection except the one checkpointer (openLedger({checkpointer:true}),
@@ -217,8 +219,8 @@ const olderThan=(a,b)=>{const x=versionTuple(a),y=versionTuple(b);for(let i=0;i<
 function verifyLedger(db,{file,sqliteVersion}){
   const version=userVersion(db);
   const legacy=hasTable(db,'meta')?metaOf(db).schema:(hasTable(db,'jobs')||hasTable(db,'events')?'pre-meta':null);
-  need(version===LEDGER_VERSION&&legacy===LEDGER_SCHEMA,
-    `ledger-schema-refused: ${file} is ${legacy??'not a StarCi ledger'} at user_version ${version}, this runtime opens only ${LEDGER_SCHEMA} at user_version ${LEDGER_VERSION}; a fresh runtime.sqlite is created by openLedger on first use at the file ledgerFileFor(<repo root>) resolves — move the refused file aside to let one be created`,'STARCI_LEDGER_SCHEMA_REFUSED');
+  need(version>=1&&version<=LEDGER_VERSION&&legacy===LEDGER_SCHEMA,
+    `ledger-schema-refused: ${file} is ${legacy??'not a StarCi ledger'} at user_version ${version}, this runtime opens only ${LEDGER_SCHEMA} at user_version 1..${LEDGER_VERSION} (an older one is migrated forward on the first writer open); a fresh runtime.sqlite is created by openLedger on first use at the file ledgerFileFor(<repo root>) resolves — move the refused file aside to let one be created`,'STARCI_LEDGER_SCHEMA_REFUSED');
   const recorded=metaOf(db).sqlite_version;
   need(!recorded||!olderThan(sqliteVersion,recorded),`ledger-sqlite-downgrade: ${file} was last opened by SQLite ${recorded}, this process runs ${sqliteVersion}`,'STARCI_LEDGER_SQLITE_DOWNGRADE');
 }
@@ -273,6 +275,43 @@ function upgradeAwaitingOwner(db,{now}){
   }catch(error){try{db.exec('ROLLBACK');}catch{}throw error;}
 }
 
+/**
+ * Bring an older ledger forward: for each FORWARD_MIGRATIONS entry not yet in schema_migrations - integrity_check and a VACUUM INTO
+ * backup (`<file>.pre-<name>.bak`) first, then in one transaction the migration SQL, schema_version+1, user_version, its
+ * schema_migrations row, foreign_key_check and quick_check before COMMIT. Idempotent, safe across processes (re-checked under the lock).
+ */
+function migrateLedger(db,{file,now,runtimeRev:rev=null,backup:wantBackup=true}){
+  const pending=()=>FORWARD_MIGRATIONS.filter(m=>userVersion(db)<m.version&&!db.prepare('SELECT 1 FROM schema_migrations WHERE version=?').get(m.version));
+  if(!pending().length)return [];
+  const check=db.prepare('PRAGMA integrity_check').all();
+  need(check.length===1&&check[0].integrity_check==='ok',`ledger-migrate-refused: ${file} fails integrity_check`,'STARCI_LEDGER_MIGRATE_REFUSED');
+  const applied=[];
+  for(const m of pending()){
+    const sqlFile=new URL(`./migrations/runtime/${m.name}.sql`,import.meta.url),sql=fs.readFileSync(sqlFile,'utf8');
+    const backup=wantBackup?`${path.resolve(file)}.pre-${m.name}.bak`:null;   // a ledger just created holds no rows worth a backup
+    if(backup&&!fs.existsSync(backup))db.exec(`VACUUM INTO '${backup.replace(/'/g,"''")}'`);
+    beginImmediate(db);
+    let relaxed=false;
+    try{
+      if(userVersion(db)>=m.version){db.exec('ROLLBACK');continue;}
+      db.enableDefensive(false);relaxed=true;   // writable_schema is refused while the connection is defensive
+      const started=now();
+      db.exec(sql);
+      db.exec(`PRAGMA schema_version=${Number(db.prepare('PRAGMA schema_version').get().schema_version)+1}`);
+      db.exec('PRAGMA writable_schema=OFF');
+      db.exec(`PRAGMA user_version=${m.version}`);
+      db.prepare("INSERT INTO schema_migrations(version,name,runtime_rev,sql_sha256,backup_path,started_at,finished_at,status) VALUES(?,?,?,?,?,?,?,'done')")
+        .run(m.version,m.name,rev,sha256(sql),backup,started,now());
+      need(db.prepare('PRAGMA foreign_key_check').all().length===0,`ledger-migrate-failed: ${m.name} left a foreign key violation`,'STARCI_LEDGER_MIGRATE_FAILED');
+      const quick=db.prepare('PRAGMA quick_check').all();
+      need(quick.length===1&&quick[0].quick_check==='ok',`ledger-migrate-failed: ${m.name} fails quick_check`,'STARCI_LEDGER_MIGRATE_FAILED');
+      db.exec('COMMIT');applied.push(m.name);
+    }catch(error){try{db.exec('ROLLBACK');}catch{}try{db.exec('PRAGMA writable_schema=OFF');}catch{}throw error;}
+    finally{if(relaxed)db.enableDefensive(true);}
+  }
+  return applied;
+}
+
 /** Create the ledger on an empty file: 0001-init.sql, user_version=1, meta, schema_migrations — one transaction. */
 function initLedger(db,{file,now,sqliteVersion,journalMode,repoRoot=null,product=null,ledgerId=null}){
   const empty=()=>userVersion(db)===0&&!db.prepare("SELECT 1 FROM sqlite_master WHERE name NOT LIKE 'sqlite_%' LIMIT 1").get();
@@ -282,7 +321,7 @@ function initLedger(db,{file,now,sqliteVersion,journalMode,repoRoot=null,product
     if(!empty()){db.exec('ROLLBACK');return false;}
     const at=now();
     db.exec(INIT_SQL);
-    db.exec(`PRAGMA user_version=${LEDGER_VERSION}`);
+    db.exec('PRAGMA user_version=1');
     const dirId=path.basename(path.dirname(path.resolve(file)));
     const id=ledgerId??(UUID.test(dirId)?dirId:crypto.randomUUID());
     const seed=db.prepare('INSERT INTO meta(key,value) VALUES(?,?)');
@@ -867,10 +906,25 @@ export function recordAttemptUsage(db,{attemptId,rows,source='cli-transcript',pr
   const tokensIn=rows.reduce((n,r)=>n+(r.inputTokens??0)+(r.cacheReadTokens??0)+(r.cacheWriteTokens??0),0);
   const tokensOut=rows.reduce((n,r)=>n+(r.outputTokens??0),0);
   const costUsd=rows.every(r=>typeof r.costUsd==='number')?Math.round(rows.reduce((n,r)=>n+r.costUsd,0)*1e6)/1e6:null;
-  updateAttempt(db,{attemptId,at,tokensIn,tokensOut,costUsd,usageSource:source});
+  updateAttempt(db,{attemptId,at,tokensIn,tokensOut,costUsd,usageSource:source,usageReason:null});
   appendEvent(db,{workflowId:a.workflow_id,entityType:'attempt',entityId:String(attemptId),attemptId,spanId:a.span_id,kind:'attempt-usage-recorded',
     payload:{attemptId,source,models:rows.map(r=>r.model),tokensIn,tokensOut,costUsd},createdAt:at});
   return {recorded:true,rows:rows.length};
+}
+/**
+ * An attempt whose usage cannot be measured: usage_source 'unavailable' and usage_reason (no usage adapter for its agent, or no
+ * session file found after the grace window). Never overwrites a measured attempt; a later measurement (recordAttemptUsage) replaces it.
+ * One 'attempt-usage-unavailable' event when the recorded reason changes. Returns {marked}.
+ */
+export function markAttemptUsageUnavailable(db,{attemptId,reason,at=nowMs()}){
+  const a=db.prepare('SELECT * FROM op_attempts WHERE attempt_id=?').get(attemptId);
+  need(a,`attempt ${attemptId} not found`,'STARCI_ATTEMPT_NOT_FOUND');
+  need(reason,'markAttemptUsageUnavailable needs a reason');
+  if(db.prepare("SELECT 1 FROM llm_usage WHERE subject_type='attempt' AND attempt_id=? LIMIT 1").get(attemptId))return {marked:false};
+  if(a.usage_source==='unavailable'&&a.usage_reason===reason)return {marked:false};
+  updateAttempt(db,{attemptId,at,tokensIn:null,tokensOut:null,costUsd:null,usageSource:'unavailable',usageReason:reason});
+  appendEvent(db,{workflowId:a.workflow_id,entityType:'attempt',entityId:String(attemptId),attemptId,spanId:a.span_id,kind:'attempt-usage-unavailable',payload:{attemptId,reason},createdAt:at});
+  return {marked:true};
 }
 /**
  * The usage a Kernel seat's session added since its last recording: one llm_usage row per model, subject 'kernel-turn',
@@ -1102,7 +1156,7 @@ export function deleteWorkflowRows(db,{workflowId}){
 export const LEDGER_WRITES=Object.freeze({recordBlob,storeBlob,appendEvent,createWorkflow,ensureWorkflow,changeWorkflowPhase,updateWorkflow,insertGoal,recordGoalInput,
   createUnit,setUnitState,reopenUnit,raiseTryBudget,addUnitEdge,recordGraphVersion,enqueueJob,setJobStatus,updateJob,startAttempt,updateAttempt,endRejectedAttempt,writeContract,
   declareResource,acquireLease,renewLeases,releaseLeases,idempotent,recordFailedRequest,fileReport,markReportConsumed,recordCheckRun,recordArtifact,attachToReport,
-  recordArtifactProof,citeBlob,recordTranscriptSnapshot,setAttemptTranscript,recordLlmUsage,recordAttemptUsage,recordKernelUsage,appendLog,setLogCursor,setCondition,openIncident,updateIncident,resolveIncident,
+  recordArtifactProof,citeBlob,recordTranscriptSnapshot,setAttemptTranscript,recordLlmUsage,recordAttemptUsage,markAttemptUsageUnavailable,recordKernelUsage,appendLog,setLogCursor,setCondition,openIncident,updateIncident,resolveIncident,
   postInbox,setInboxStatus,setInboxStatusByKey,updateGoalJson,openDecisionItem,updateDecisionItem,recordDecision,setSignal,updateSignal,clearSignal,queueSettleTail,recordJobResult,bindKernelJob,releaseKernelJob,recordPurge,deleteWorkflowRows,markBlobArchived,pruneAttemptSnapshots,upsertFoundation,declareFoundations,recordPathTransfer,recordRecordChange,updateSettleTail,recordProductLand,finishProductLand});
 
 /**
@@ -1120,6 +1174,7 @@ export function openLedger({file,now=Date.now,busyTimeoutMs=LEDGER_BUSY_TIMEOUT_
     created=initLedger(db,{file,now,sqliteVersion,journalMode,repoRoot:repoRoot??repoRootOfFile.get(path.resolve(file))??null,product});
     verifyLedger(db,{file,sqliteVersion});
     upgradeAwaitingOwner(db,{now});
+    migrateLedger(db,{file,now,runtimeRev:runtimeRev(),backup:!created});
     const meta=metaOf(db);
     if(meta.sqlite_version!==sqliteVersion)db.prepare("UPDATE meta SET value=? WHERE key='sqlite_version'").run(sqliteVersion);
   }catch(error){try{db.close();}catch{}throw error;}
@@ -1146,7 +1201,7 @@ export function openLedger({file,now=Date.now,busyTimeoutMs=LEDGER_BUSY_TIMEOUT_
 export function openLedgerConnection(file,{busyTimeoutMs=LEDGER_BUSY_TIMEOUT_MS}={}){
   need(fs.existsSync(file),`openLedgerConnection needs an existing ledger: ${file}`);
   const {db,sqliteVersion}=openDb({file,busyTimeoutMs,journalMode:'WAL',label:'openLedgerConnection'});
-  try{verifyLedger(db,{file,sqliteVersion});}catch(error){try{db.close();}catch{}throw error;}
+  try{verifyLedger(db,{file,sqliteVersion});migrateLedger(db,{file,now:Date.now,runtimeRev:runtimeRev()});}catch(error){try{db.close();}catch{}throw error;}
   return db;
 }
 

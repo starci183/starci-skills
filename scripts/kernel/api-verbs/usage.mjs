@@ -6,7 +6,7 @@ import { tokenLine, usageOfLedger, usageOfWorkflow } from '../usage-report.mjs';
 
 export const usageLines = (u) => {
   const cov = u.coverage;
-  const lines = [`usage ${u.workflowId}: ${tokenLine(u.total)}; ${cov.measured}/${cov.attempts} attempts measured${cov.unavailable ? `, ${cov.unavailable} unavailable` : ''}${cov.open ? `, ${cov.open} open` : ''}`];
+  const lines = [`usage ${u.workflowId}: ${tokenLine(u.total)}; ${cov.measured}/${cov.attempts} attempts measured${cov.unavailable ? `, ${cov.unavailable} unavailable` : ''}${cov.pending ? `, ${cov.pending} pending` : ''}${cov.open ? `, ${cov.open} open` : ''}`];
   for (const o of u.byOp.slice(0, 20)) lines.push(`  op ${o.opId}: ${tokenLine(o)} (${o.attempts} attempt(s); ${o.models.map((m) => m.model).join(', ')})`);
   for (const m of u.byModel.slice(0, 10)) lines.push(`  model ${m.model}: ${tokenLine(m)}`);
   if (u.kernel.sessions) lines.push(`  kernel (${u.kernel.sessions} session(s)): ${tokenLine(u.kernel)} [${u.kernel.models.map((m) => m.model).join(', ')}]`);
