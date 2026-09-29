@@ -24,6 +24,7 @@ const lastErr = (r) => json(String(r.stderr).trim().split('\n').at(-1));
 const world = (t, { orca = false } = {}) => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'starci-bridges-'));
   t.after(() => fs.rmSync(root, { recursive: true, force: true, maxRetries: 20, retryDelay: 25 }));
+  if (process.env.STARCI_TEST_TEMP_DIR) t.after(() => fs.rmSync(path.join(process.env.STARCI_TEST_TEMP_DIR, 'starci-job-scratch'), { recursive: true, force: true, maxRetries: 20, retryDelay: 25 }));
   const repo = path.join(root, 'repo'); fs.mkdirSync(repo, { recursive: true });
   // A private machine registry per world: dispatch enrols the ledger and 'repo' collides on
   // ledgers.name in the suite-shared test registry otherwise. LOCALAPPDATA stays: project

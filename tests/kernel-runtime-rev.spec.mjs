@@ -163,9 +163,10 @@ test('op-rev-drift: the op contract files that moved after dispatch, and its typ
 const apiFixture = (t, rt) => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'starci-runtime-rev-api-'));
   t.after(() => fs.rmSync(dir, { recursive: true, force: true, maxRetries: 20, retryDelay: 25 }));
+  if (process.env.STARCI_TEST_TEMP_DIR) t.after(() => fs.rmSync(path.join(process.env.STARCI_TEST_TEMP_DIR, 'starci-job-scratch'), { recursive: true, force: true, maxRetries: 20, retryDelay: 25 }));
   const repo = path.join(dir, 'repo'); fs.mkdirSync(repo);
   const stub = path.join(dir, 'fake-orca.mjs'); fs.writeFileSync(stub, FAKE_ORCA);
-  const env = { ...process.env, STARCI_KERNEL_REV_ROOT: rt.root, STARCI_ORCA_COMMAND: process.execPath, STARCI_ORCA_ARGS: JSON.stringify([stub]),
+  const env = { ...process.env, STARCI_KERNEL_REV_ROOT: rt.root, STARCI_GIT_MEMO_DIR: path.join(dir, 'git-memo'), STARCI_ORCA_COMMAND: process.execPath, STARCI_ORCA_ARGS: JSON.stringify([stub]),
     STARCI_FAKE_ORCA_LOG: path.join(dir, 'calls.jsonl'), STARCI_FAKE_ORCA_STATE: path.join(dir, 'state.json') };
   for (const key of ['ORCA_TERMINAL_HANDLE', 'STARCI_ROLE', 'STARCI_OP_JOB']) delete env[key];
   const api = (args) => spawnSync(process.execPath, [API, ...args, '--repo', repo, '--json'], { cwd: ROOT, encoding: 'utf8', windowsHide: true, timeout: 120000, env });
