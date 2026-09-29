@@ -1,0 +1,8 @@
+id: f4-s08-blob-citation-assets
+effectiveAt: '2026-09-29T15:00:00+07:00'
+summary: "work-layout.yaml says draw rounds, shell captures, lockups and superseded directions are blob citations {artifact?, name, sha256}, but work-ui-screen (uiAssets, supersededDirection, artworkSlots master) and work-app-shell (assets) still required an on-disk path. Each now accepts either the committed path form (approved final parts kept in git) or the blob citation form. check-work-artifacts.mjs verifies a citation through scripts/lib/blob-lookup.mjs (resolve by sha256 in the local blob store, non-empty, bytes hash to the sha256): a citation whose blob is not in the store is an ASSET_MISSING refusal, except in a tree shipped under the runtime's examples/, whose blobs are machine-local and not distributed, where it is a suspect. Adds no new check or finding code"
+paths:
+  - modules/schemas/work-ui-screen.schema.yaml
+  - modules/schemas/work-app-shell.schema.yaml
+  - scripts/checks/check-work-artifacts.mjs
+reach: new-legs

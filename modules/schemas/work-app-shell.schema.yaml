@@ -284,13 +284,25 @@ properties:
       type: object
       additionalProperties: false
       required:
-        - path
         - role
         - sha256
+      oneOf:
+        - required: [path]
+          properties: {path: true}
+        - required: [name]
+          properties: {name: true}
       properties:
         path:
           $ref: "#/$defs/prose"
           description: The file's path relative to this record's directory.
+        artifact:
+          type: integer
+          minimum: 1
+          description: The job_artifacts id api report returned for the blob (optional; the sha256 is the citation).
+        name:
+          $ref: "#/$defs/prose"
+          description: The artifact name of a blob citation - agent output (a draw round, a capture, a lockup) lives in
+            the blob store, never on disk; scripts/lib/blob-lookup.mjs resolves it by sha256.
         role:
           enum:
             - shell-capture

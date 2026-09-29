@@ -7,6 +7,7 @@ import {sha256File} from '../../engine/index.mjs';
 import {ID_RE, walk} from './check-example-work.mjs';
 import {readWorkspace, repoRootFor, loadRecords, indexInlineCriteria, resolveRecordRef} from '../example/example-ownership.mjs';
 import {slash} from '../lib/path-key.mjs';
+import {resolveBlob} from '../lib/blob-lookup.mjs';
 
 /**
  * The gate verifies declarations, not bytes. check-example-work.mjs asks whether a done uat-flow has a
@@ -199,8 +200,18 @@ function declarationsOf(doc, table, ctx) {
     const {abs, base} = resolve(rule, text, entry);
     found.push({rule, trail, text, abs, base, entry, digest: rule.digestKey ? entry?.[rule.digestKey] ?? null : null});
   };
+  // Agent output (draw rounds, shell captures, lockups, superseded directions) is a blob citation
+  // {artifact?, name, sha256}, never a file on disk (work-layout.yaml): the same entry that would carry
+  // `<x>.path` may instead carry `name` + `sha256`, and that citation is verified against the blob store.
+  const citationTrails = table.filter(rule => rule.what === 'asset' && rule.trail.endsWith('.path')).map(rule => rule.trail.slice(0, -'.path'.length));
+  const citationAt = (node, trail) => !Array.isArray(node) && typeof node === 'object' && typeof node.path !== 'string'
+    && typeof node.name === 'string' && citationTrails.some(pattern => trailMatches(pattern, trail));
   const visit = (node, trail) => {
     if (node == null) return;
+    if (citationAt(node, trail)) {
+      found.push({rule: {trail: `${trail}.name`, what: 'asset', digestKey: 'sha256'}, trail, text: node.name, citation: true, entry: node, digest: node.sha256 ?? null});
+      return;
+    }
     if (Array.isArray(node)) return node.forEach(item => visit(item, `${trail}[]`));
     if (typeof node === 'string') {
       const rule = table.find(candidate => trailMatches(candidate.trail, trail));
@@ -219,6 +230,36 @@ function declarationsOf(doc, table, ctx) {
   return found;
 }
 
+/** A blob citation against the local blob store: resolves by sha256, is not empty, and is the bytes it names. */
+function verifyCitation(found, docFile, ctx, sink, seen) {
+  const {text, entry} = found;
+  const named = `blob citation ${text}`;
+  const stamped = typeof entry.sha256 === 'string' ? entry.sha256.trim().toLowerCase() : '';
+  if (!/^[0-9a-f]{64}$/.test(stamped)) {
+    sink.refuse(docFile, 'ASSET_STAMP', `${found.trail} cites ${named} with sha256 ${JSON.stringify(entry.sha256)}, which is not a sha256 - the citation resolves nothing`);
+    return;
+  }
+  const hit = resolveBlob({sha256: stamped});
+  if (!hit || !fs.existsSync(hit.file)) {
+    const message = `${found.trail} cites ${named} (${stamped.slice(0, 12)}), which is not in the blob store`;
+    // A tree shipped under the runtime's examples/ cites blobs its authoring machine filed; the blob store is
+    // machine-local and never distributed with the repository, so there the absence is only a suspect. Every
+    // other tree (a product's own .starciwork) is refused: its citations must resolve in its own store.
+    const shipped = ctx?.workRoot && path.resolve(ctx.workRoot).toLowerCase().startsWith(path.join(root, 'examples').toLowerCase() + path.sep);
+    if (shipped) sink.suspect(docFile, 'ASSET_MISSING', `${message} - a shipped example's blobs are not distributed with it`);
+    else sink.refuse(docFile, 'ASSET_MISSING', `${message} - declared bytes are not there`);
+    return;
+  }
+  if (seen) { seen.filesOpened += 1; seen.digestsCompared += 1; }
+  const size = fs.statSync(hit.file).size;
+  if (size === 0) {
+    sink.refuse(docFile, 'ASSET_EMPTY', `${found.trail} cites ${named}, which is a 0-byte blob`);
+    return;
+  }
+  const actual = sha256File(hit.file);
+  if (actual !== stamped) sink.refuse(docFile, 'ASSET_DIGEST', `${found.trail} cites ${named} as ${stamped}, but the stored blob hashes to ${actual}`);
+}
+
 /**
  * One declaration against the disk: exists, is a file, is not a placeholder, opens with the bytes its
  * extension claims, and hashes to what was stamped on it. Order is deliberate - each later test assumes
@@ -228,6 +269,7 @@ function verifyDeclaration(found, docFile, ctx, sink, seen) {
   const {rule, text, abs} = found;
   const named = `${rule.what === 'asset' ? 'artifact' : rule.what} ${text}`;
   if (seen) seen.declarations += 1;
+  if (found.citation) return verifyCitation(found, docFile, ctx, sink, seen);
   if (!fs.existsSync(abs)) {
     const message = `${rule.trail} names ${named}, which is not on disk under ${found.base}`;
     if (rule.what === 'input') sink.suspect(docFile, 'EVIDENCE_ARTIFACT_GHOST', `${message} - a declared input the Work tree does not keep`);

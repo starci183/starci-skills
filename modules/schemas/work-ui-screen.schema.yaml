@@ -478,6 +478,14 @@ properties:
                   properties:
                     path:
                       $ref: "#/$defs/prose"
+                    artifact:
+                      type: integer
+                      minimum: 1
+                    name:
+                      $ref: "#/$defs/prose"
+                      description: A blob citation of the master (with sha256), instead of a path.
+                    sha256:
+                      $ref: "#/$defs/sha256"
                     record:
                       type: string
                       pattern: ^(?:[a-z0-9]+(?:-[a-z0-9]+)*)(?:\.[a-z0-9]+(?:-[a-z0-9]+)*)*$
@@ -721,14 +729,24 @@ properties:
         type: object
         additionalProperties: false
         required:
-          - path
           - reason
-        description: The direction this one replaced, kept by path and digest rather than deleted. A
+        oneOf:
+          - required: [path]
+            properties: {path: true}
+          - required: [name, sha256]
+            properties: {name: true, sha256: true}
+        description: The direction this one replaced, kept by path (or blob citation) and digest rather than deleted. A
           replaced drawing is history, and history that is removed cannot answer why the current one looks
           the way it does.
         properties:
           path:
             $ref: "#/$defs/prose"
+          artifact:
+            type: integer
+            minimum: 1
+          name:
+            $ref: "#/$defs/prose"
+            description: The artifact name of the blob the replaced direction is cited by.
           sha256:
             $ref: "#/$defs/sha256"
           revision:
@@ -1652,13 +1670,25 @@ $defs:
       type: object
       additionalProperties: false
       required:
-        - path
         - role
         - sha256
+      oneOf:
+        - required: [path]
+          properties: {path: true}
+        - required: [name]
+          properties: {name: true}
       properties:
         path:
           $ref: "#/$defs/prose"
-          description: The file's path relative to this record's own directory.
+          description: The file's path relative to this record's own directory (an approved final part kept in git).
+        artifact:
+          type: integer
+          minimum: 1
+          description: The job_artifacts id api report returned for the blob (optional; the sha256 is the citation).
+        name:
+          $ref: "#/$defs/prose"
+          description: The artifact name of a blob citation - agent output (a draw round, a capture, a lockup) lives in
+            the blob store, never on disk; scripts/lib/blob-lookup.mjs resolves it by sha256.
         role:
           $ref: "#/$defs/slug"
           description: "What the file is - a direction, the exact prompt beside it, an input a later
