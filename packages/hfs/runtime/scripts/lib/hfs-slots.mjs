@@ -144,12 +144,13 @@ function manifestShapeProblems(m) {
       for (const key of Object.keys(def ?? {})) if (!['mayImport', 'acyclic', 'lowerLayerOnly'].includes(key)) bad.push(`tiers.${profile}.${tier}.${key} is not a tier field`);
     }
   }
+  const blockLinesOk = (v) => Number.isInteger(v) && v >= 2;
   const fileLinesOk = (v) => isMap(v) && Number.isInteger(v.soft) && v.soft >= 1 && typeof v.hardGrowth === 'boolean' && Object.keys(v).length === 2;
   const rp = m.ruleParams;
   if (!isMap(rp) || Object.keys(rp).some((k) => !PROFILES.includes(k)) || !PROFILES.every((p) => isMap(rp[p]))) bad.push('ruleParams must be a map with be and fe');
   else {
-    if (!(strList(rp.be.globalModules) && new Set(rp.be.globalModules).size === rp.be.globalModules.length) || !fileLinesOk(rp.be.fileLines) || Object.keys(rp.be).length !== 2) bad.push('ruleParams.be needs globalModules (unique paths) and fileLines {soft, hardGrowth}');
-    if (!fileLinesOk(rp.fe.fileLines) || typeof rp.fe.clientModule !== 'string' || !rp.fe.clientModule || Object.keys(rp.fe).length !== 2) bad.push('ruleParams.fe needs fileLines {soft, hardGrowth} and clientModule');
+    if (!(strList(rp.be.globalModules) && new Set(rp.be.globalModules).size === rp.be.globalModules.length) || !fileLinesOk(rp.be.fileLines) || !blockLinesOk(rp.be.duplicateBlockLines) || Object.keys(rp.be).length !== 3) bad.push('ruleParams.be needs globalModules (unique paths), fileLines {soft, hardGrowth} and duplicateBlockLines (integer >= 2)');
+    if (!fileLinesOk(rp.fe.fileLines) || typeof rp.fe.clientModule !== 'string' || !rp.fe.clientModule || !blockLinesOk(rp.fe.duplicateBlockLines) || Object.keys(rp.fe).length !== 3) bad.push('ruleParams.fe needs fileLines {soft, hardGrowth}, clientModule and duplicateBlockLines (integer >= 2)');
   }
   if (!Array.isArray(m.slots) || !m.slots.length) { bad.push('slots must be a non-empty list'); return bad; }
   const slotKeys = new Set(['id', 'profiles', 'path', 'presence', 'tracked', 'tier', 'tests', 'owner', 'appKind', 'minInstances', 'requiredWhen', 'requiredInstances', 'requires', 'allows', 'forbids', 'layers', 'budget', 'managedBy', 'rules', 'goesTo', 'why', 'since', 'retiredIn', 'successor']);
@@ -534,7 +535,7 @@ export function createSlotResolver(manifest, repo) {
   });
 }
 
-/** The rule parameters of one profile (be: globalModules, fileLines; fe: fileLines, clientModule), as a frozen deep copy. */
+/** The rule parameters of one profile (be: globalModules, fileLines, duplicateBlockLines; fe: fileLines, clientModule, duplicateBlockLines), as a frozen deep copy. */
 export function ruleParams(manifest, profile) {
   if (!PROFILES.includes(profile)) fail('HFS_MANIFEST_INVALID', `ruleParams has no profile ${profile}`, { profile });
   const deepFreeze = (v) => { if (v && typeof v === 'object') Object.values(v).forEach(deepFreeze); return Object.freeze(v); };

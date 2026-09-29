@@ -70,11 +70,16 @@ tiers:
     fixtures:     {mayImport: [domain, platform, integrations, package]}          # public contracts only
     package:      {mayImport: [package]}
   fe:
-    route:        {mayImport: [feature, modules, package]}                        # app/** adapters
-    feature:      {mayImport: [components, hooks, modules, package]}
-    components:   {mayImport: [components, hooks, package], lowerLayerOnly: true} # blocks, composites, branches, leaves
-    hooks:        {mayImport: [modules, package]}
-    modules:      {mayImport: [modules, package], acyclic: true}
+    route:        {mayImport: [feature, foundation, modules, transport, package]} # app/** adapters
+    feature:      {mayImport: [components, hooks, foundation, modules, transport, package]}
+    # A component never reaches data: config, routes, i18n and types are foundation; every other module and the api
+    # transport are reached through a hook (owner decision 2026-09-29).
+    components:   {mayImport: [components, hooks, foundation, package], lowerLayerOnly: true} # blocks, composites, branches, leaves
+    # Across domains a hook is imported only through the other domain's public index (hooks/<domain>/index.ts), never deep.
+    hooks:        {mayImport: [hooks, foundation, modules, transport, package]}
+    foundation:   {mayImport: [foundation, package], acyclic: true}               # modules/{config,i18n,routes,types}
+    modules:      {mayImport: [foundation, modules, transport, package], acyclic: true}
+    transport:    {mayImport: [foundation, modules, package]}                     # modules/api: the one fetch
     e2e:          {mayImport: [e2e, package]}                                     # black box: no app source
     package:      {mayImport: [package]}
 crossOwner: every import across owners targets the owner's public entry (index.ts or index.tsx); never export *.
@@ -87,11 +92,14 @@ ruleParams:
     globalModules: [src/modules/platform/config/, src/modules/platform/logging/, src/modules/platform/database/]
     # HFS_SIZE_GROWTH: a file above soft may not grow against its parent commit; a new file stays within soft.
     fileLines: {soft: 500, hardGrowth: true}
+    # HFS_DUPLICATE_BLOCK: a token-normalised block of at least this many source lines that appears in two owners.
+    duplicateBlockLines: 25
   fe:
     # Slot budgets (component.tsx 300, hooks 200, modules 400) are stricter than this cap where they apply.
     fileLines: {soft: 500, hardGrowth: true}
     # FE_TRANSPORT_OWNER: the one module per app that may call fetch.
     clientModule: "apps/<app>/src/modules/api/client.ts"
+    duplicateBlockLines: 25
 
 slots:
 
@@ -616,7 +624,7 @@ slots:
     tier: none
     minInstances: 1
     requires: [package.json, next.config.ts, tsconfig.json, postcss.config.mjs, src/app/, src/modules/i18n/, src/modules/api/,
-               "src/app/global-error.tsx", "src/app/[locale]/layout.tsx", "src/app/[locale]/error.tsx", "src/app/[locale]/not-found.tsx"]
+               "src/app/global-error.tsx", "src/app/[locale]/layout.tsx", "src/app/[locale]/error.tsx", "src/app/[locale]/not-found.tsx", "src/app/[locale]/loading.tsx"]
     tests: none
     rules: [FE_APP_ISOLATION, FE_ERROR_BOUNDARY_MISSING, FE_NEXT_CONVENTIONS]
   - id: fe.app-optional
@@ -675,7 +683,9 @@ slots:
     presence: optional
     tracked: tracked
     tier: hooks
-    allows: ["use<name>.ts", "<domain>.shared.ts", "*.spec.ts"]   # React hooks only; <domain>.shared.ts = sanctioned non-hook helpers
+    owner: true                   # a domain is an owner: other domains import it through index.ts only
+    requires: [index.ts]
+    allows: [index.ts, "use<name>.ts", "<domain>.shared.ts", "*.spec.ts"]   # React hooks only; <domain>.shared.ts = sanctioned non-hook helpers
     tests: unit-beside
     budget: {file: 200}
     rules: [FE_HOOKS_ARE_HOOKS, FE_DATA_FRESHNESS]
@@ -696,7 +706,7 @@ slots:
     path: "apps/<app>/src/modules/api/"
     presence: required
     tracked: tracked
-    tier: modules
+    tier: transport
     requires: [index.ts, client.ts, outcome.ts]      # client.ts is the only fetch; outcome.ts the only result vocabulary
     allows: [client.ts, outcome.ts, "<domain>/read-*.ts", "<domain>/*.graphql", "<domain>/<domain>.mapper.ts", contract/, __generated__/, "*.spec.ts"]
     tests: unit-beside
@@ -706,7 +716,7 @@ slots:
     path: "apps/<app>/src/modules/config/"
     presence: required
     tracked: tracked
-    tier: modules
+    tier: foundation
     tests: unit-beside
     why: the only reader of process.env and NEXT_PUBLIC_*; fails fast, no localhost fallback
   - id: fe.modules.i18n
@@ -714,7 +724,7 @@ slots:
     path: "apps/<app>/src/modules/i18n/"
     presence: required
     tracked: tracked
-    tier: modules
+    tier: foundation
     requires: [config.ts, routing.ts, navigation.ts, request.ts, messages/]
     tests: unit-beside
     rules: [FE_I18N_PLACEMENT, FE_I18N_CATALOG]
@@ -732,9 +742,17 @@ slots:
     path: "apps/<app>/src/modules/routes/"
     presence: required
     tracked: tracked
-    tier: modules
+    tier: foundation
     tests: unit-beside
     why: every href builder; FE_HREF_RESOLVES checks each against app/
+  - id: fe.modules.types
+    profiles: [fe]
+    path: "apps/<app>/src/modules/types/"
+    presence: optional
+    tracked: tracked
+    tier: foundation
+    tests: unit-beside
+    why: shared types with no runtime behaviour; a component may import them
   - id: fe.package.ui
     profiles: [fe]
     path: "packages/<family>-ui/"

@@ -537,14 +537,14 @@ profiles:
     title: StarCi Next.js code pattern
     canon:
       package: '@starci/eslint-canon-fe'
-      version: 5.0.0
+      version: 5.1.0
       contentDigest:
         algorithm: sha256
         include: ['**/*.mjs', '**/*.json', '**/*.md', '**/*.ts']
         exclude: ['**/*.test.mjs']
         framing: sorted-posix-relative-path-null-raw-bytes-null
-        value: cc633feddf9f23e2ba2504e4e6e21ebdd938ad9ea83fc1a42b00b0aee0efcc4f
-        files: 48
+        value: d4c881246780b23b76fbe494f1c3cc1cb583e2940fb9a0b8f5ad9ab5eba74a93
+        files: 56
     sourceRuleRoots:
       - knowledge/patterns/fe
     expectedSourceRuleIds:

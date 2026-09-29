@@ -21,13 +21,13 @@ pins:
     source: packages/eslint/be/package.json
     why: back-end repositories carry 1.2.1 and 1.2.2 while the runtime source is 1.3.0.
   '@starci/eslint-canon-fe':
-    version: 5.0.0
+    version: 5.1.0
     group: starci
     side: fe
     source: packages/eslint/fe/package.json
-    why: 'every front-end repository carries 3.0.2 while the runtime source is 5.0.0 (HFS item 0.6, the vn-ok pragma is gone and starciFeConfig enables every rule and the React Hooks rules at error).'
+    why: 'every front-end repository carries 3.0.2 or 4.0.0 while the runtime source is 5.1.0: the vn-ok pragma is gone, starciFeConfig enables every rule and the React Hooks rules at error, and 5.1.0 adds the list, effect, formatter, navigation, metadata and type-safety rules that repositories used to carry in their own config.'
   '@starci/stylelint-canon':
-    version: 1.0.0
+    version: 1.1.0
     group: starci
     side: fe
     source: packages/stylelint/package.json
