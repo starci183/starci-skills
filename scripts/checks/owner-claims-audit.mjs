@@ -4,11 +4,12 @@
 //
 //   node scripts/checks/owner-claims-audit.mjs --repo <repo>[,<repo>...] [--workflow <id>] [--json]
 //
-// Opens each <repo>/.starciwork/runtime.sqlite READ-ONLY and never writes: history is surfaced, never rewritten.
+// Opens each repo's runtime.sqlite (engine/ledger-db.mjs ledgerFileFor) READ-ONLY and never writes: history is surfaced, never rewritten.
 // Exit 0 nothing found, 1 findings listed, 2 usage or an unreadable ledger.
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { ledgerFileFor } from '../../engine/ledger-db.mjs';
 import { ownerClaimAudit, ownerGatesNotOwnerWork } from '../kernel/owner-claim.mjs';
 
 export async function auditLedger(file, { workflowId = null } = {}) {
@@ -29,7 +30,7 @@ async function main(argv) {
   if (!repos.length) { process.stderr.write('use: node scripts/checks/owner-claims-audit.mjs --repo <repo>[,<repo>...] [--workflow <id>] [--json]\n'); return 2; }
   const out = [];
   for (const repo of repos) {
-    const file = path.join(path.resolve(repo), '.starciwork', 'runtime.sqlite');
+    const file = ledgerFileFor(path.resolve(repo));
     if (!fs.existsSync(file)) { process.stderr.write(`no ledger at ${file}\n`); return 2; }
     out.push({ repo: path.resolve(repo), ...(await auditLedger(file, { workflowId })) });
   }
