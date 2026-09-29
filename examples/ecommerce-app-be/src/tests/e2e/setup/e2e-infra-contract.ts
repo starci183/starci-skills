@@ -27,8 +27,8 @@ export function dockerLines(args: Array<string>): Array<string> {
     return out ? out.split(/\r?\n/).map((line) => line.trim()).filter(Boolean) : []
 }
 
-/** Whether a docker daemon answers at all - the skip gate for the resilience lane. */
-export function dockerAvailable(): boolean {
+/** What asking the docker daemon for its version answered: reachable, or the cause it was not. */
+export function dockerProbe(): { available: boolean; cause?: unknown } {
     try {
         execFileSync("docker",
             ["version",
@@ -37,24 +37,43 @@ export function dockerAvailable(): boolean {
             {
                 stdio: "pipe", timeout: 20_000 
             })
-        return true
-    } catch {
-        return false
+        return {
+            available: true 
+        }
+    } catch (cause) {
+        return {
+            available: false, cause 
+        }
     }
 }
 
-/** A loopback URL's HTTP status within `timeoutMs`, or null when nothing answers. */
-export async function httpStatus(url: string, timeoutMs = 5_000): Promise<number | null> {
+/** Whether a docker daemon answers at all - the skip gate for the resilience lane. */
+export function dockerAvailable(): boolean {
+    return dockerProbe().available
+}
+
+/** What a loopback URL answered within `timeoutMs`: its HTTP status, or null plus the cause when nothing answered. */
+export async function httpProbe(url: string, timeoutMs = 5_000): Promise<{ status: number | null; cause?: unknown }> {
     try {
         const response = await fetch(url,
             {
                 signal: AbortSignal.timeout(timeoutMs) 
             })
-        await response.arrayBuffer().catch(() => undefined)
-        return response.status
-    } catch {
-        return null
+        await response.arrayBuffer().catch((error: unknown) => error)
+        return {
+            status: response.status 
+        }
+    } catch (cause) {
+        return {
+            status: null, cause 
+        }
     }
+}
+
+/** A loopback URL's HTTP status within `timeoutMs`, or null when nothing answers. */
+export async function httpStatus(url: string, timeoutMs = 5_000): Promise<number | null> {
+    return (await httpProbe(url,
+        timeoutMs)).status
 }
 
 /** Compose service names this run actually has containers for -- from docker labels, so the spec
@@ -107,6 +126,19 @@ export function startContainer(id: string): void {
         id])
 }
 
+/** One probe run as an outcome: done when it answered true, otherwise the error it threw (if any). */
+async function attempt(probe: () => Promise<boolean>): Promise<{ done: boolean; error?: unknown }> {
+    try {
+        return {
+            done: await probe() 
+        }
+    } catch (error) {
+        return {
+            done: false, error 
+        }
+    }
+}
+
 /** Polls `probe` until it answers true or `timeoutMs` elapses; the last error names the timeout. */
 export async function retryUntil(
     label: string,
@@ -117,11 +149,9 @@ export async function retryUntil(
     const deadline = Date.now() + timeoutMs
     let last: unknown
     while (Date.now() < deadline) {
-        try {
-            if (await probe()) return
-        } catch (e) {
-            last = e
-        }
+        const outcome = await attempt(probe)
+        if (outcome.done) return
+        if (outcome.error !== undefined) last = outcome.error
         await new Promise((resolve) => setTimeout(resolve,
             intervalMs))
     }

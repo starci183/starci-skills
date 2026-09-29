@@ -1,12 +1,9 @@
 import {
-    E2EWorld, bootE2eWorld 
+    E2EData, E2EWorld, bootE2eWorld 
 } from "../setup/e2e-world"
 import {
     E2EAuthService 
 } from "../setup/domain/accounts/e2e-auth.service"
-import {
-    E2EDbService 
-} from "../setup/platform/databases/e2e-db.service"
 import {
     E2EHttpService 
 } from "../setup/integrations/http/e2e-http.service"
@@ -20,33 +17,10 @@ import {
     AccountData,
     buyerClient,
     CartData,
-    CountRow,
     PlaceOrderData,
     ProductView,
     registerBuyer,
 } from "../setup/lifecycle.helpers"
-
-interface OrderRow {
-  id: string;
-  status: string;
-  total_minor_units: number;
-  currency: string;
-  idempotency_key: string | null;
-}
-
-interface OrderLineRow {
-  product_id: string;
-  quantity: number;
-  unit_price_minor_units: number;
-}
-
-interface PaymentRow {
-  id: string;
-  order_id: string;
-  status: string;
-  amount_minor_units: number;
-  idempotency_key: string;
-}
 
 /**
  * The order lifecycle past the first confirmation: one buyer places several orders and the
@@ -71,7 +45,7 @@ describe("order lifecycle - order history (e2e)",
         let world: E2EWorld
         let stack: E2EStackService
         let auth: E2EAuthService
-        let dataSource: E2EDbService
+        let dataSource: E2EData
         let http: E2EHttpService
         let graphql: E2EGraphqlService
 
@@ -82,7 +56,7 @@ describe("order lifecycle - order history (e2e)",
             world = await bootE2eWorld("order-lifecycle/order-history")
             stack = world.stack
             auth = world.auth
-            dataSource = world.dataSource
+            dataSource = world.data
             http = world.http
             graphql = world.graphql
         },
@@ -97,9 +71,7 @@ describe("order lifecycle - order history (e2e)",
         })
 
         async function orderCount(personId: string): Promise<number> {
-            const rows = await dataSource.query<CountRow>("select count(*)::int as count from sales_order where person_id = $1",
-                [personId])
-            return rows[0].count
+            return dataSource.orders.orderCountForPerson(personId)
         }
 
         it("a buyer placing several orders builds a confirmed, paid history both services can read",
@@ -118,7 +90,7 @@ describe("order lifecycle - order history (e2e)",
                 expect(freshBuyer.body).toEqual({
                     personId: buyer.personId, hasOrders: false 
                 })
-                const freshAccount = await identityGql.query<AccountData>("account",
+                const freshAccount = await identityGql.read<AccountData>("account",
                     {
                         variables: {
                             request: {
@@ -130,7 +102,7 @@ describe("order lifecycle - order history (e2e)",
 
                 // The catalog snapshot the confirmations will price against (the cart query is the only
                 // catalog surface checkout has).
-                const browsed = await buyerGql.query<CartData>("cart")
+                const browsed = await buyerGql.read<CartData>("cart")
                 expect(browsed.errorCode).toBeNull()
                 const catalog = new Map<string, ProductView>(browsed.data!.cart.catalog.map((p) => [p.id,
                     p]))
@@ -164,7 +136,7 @@ describe("order lifecycle - order history (e2e)",
                 })
 
                 // The cart cleared itself at confirmation, so order 2 starts from a fresh fill.
-                const emptied = await buyerGql.query<CartData>("cart")
+                const emptied = await buyerGql.read<CartData>("cart")
                 expect(emptied.data?.cart.items).toEqual([])
 
                 // Order 2: sku-notebook x1 + sku-thermos x1.
@@ -200,10 +172,7 @@ describe("order lifecycle - order history (e2e)",
                 expect(second.data!.placeOrder.paymentId).not.toBe(first.data!.placeOrder.paymentId)
 
                 // list: two orders in creation order, each confirmed and priced as answered.
-                const orders = await dataSource.query<OrderRow>(
-                    "select id, status, total_minor_units, currency, idempotency_key from sales_order where person_id = $1 order by created_at, id",
-                    [buyer.personId],
-                )
+                const orders = await dataSource.orders.ordersForPerson(buyer.personId)
                 expect(orders).toHaveLength(2)
                 expect(orders[0]).toMatchObject({
                     id: first.data!.placeOrder.orderId,
@@ -220,17 +189,11 @@ describe("order lifecycle - order history (e2e)",
                 })
 
                 // detail: each order's lines carry the catalog price snapshot taken at confirmation.
-                const firstLines = await dataSource.query<OrderLineRow>(
-                    "select product_id, quantity, unit_price_minor_units from sales_order_line where order_id = $1 order by product_id",
-                    [first.data!.placeOrder.orderId],
-                )
+                const firstLines = await dataSource.orders.linesForOrder(first.data!.placeOrder.orderId)
                 expect(firstLines).toEqual([{
                     product_id: "sku-mug", quantity: 2, unit_price_minor_units: mug.priceMinorUnits 
                 }])
-                const secondLines = await dataSource.query<OrderLineRow>(
-                    "select product_id, quantity, unit_price_minor_units from sales_order_line where order_id = $1 order by product_id",
-                    [second.data!.placeOrder.orderId],
-                )
+                const secondLines = await dataSource.orders.linesForOrder(second.data!.placeOrder.orderId)
                 expect(secondLines).toEqual([
                     {
                         product_id: "sku-notebook", quantity: 1, unit_price_minor_units: notebook.priceMinorUnits 
@@ -241,10 +204,7 @@ describe("order lifecycle - order history (e2e)",
                 ])
 
                 // ...and each order has exactly one captured payment, keyed by the order id.
-                const payments = await dataSource.query<PaymentRow>(
-                    "select id, order_id, status, amount_minor_units, idempotency_key from payment where person_id = $1 order by created_at, id",
-                    [buyer.personId],
-                )
+                const payments = await dataSource.payments.paymentsForPerson(buyer.personId)
                 expect(payments).toHaveLength(2)
                 expect(payments[0]).toMatchObject({
                     id: first.data!.placeOrder.paymentId,
@@ -262,7 +222,7 @@ describe("order lifecycle - order history (e2e)",
                 })
 
                 // The guarded stock moved by exactly the confirmed quantities, and the cart stayed empty.
-                const after = await buyerGql.query<CartData>("cart")
+                const after = await buyerGql.read<CartData>("cart")
                 const afterCatalog = new Map<string, ProductView>(after.data!.cart.catalog.map((p) => [p.id,
                     p]))
                 expect(afterCatalog.get("sku-mug")!.stock).toBe(mug.stock - 2)
@@ -275,7 +235,7 @@ describe("order lifecycle - order history (e2e)",
                 expect(buyerNow.body).toEqual({
                     personId: buyer.personId, hasOrders: true 
                 })
-                const accountNow = await identityGql.query<AccountData>("account",
+                const accountNow = await identityGql.read<AccountData>("account",
                     {
                         variables: {
                             request: {
@@ -348,13 +308,12 @@ describe("order lifecycle - order history (e2e)",
                     replayed: true,
                 })
                 expect(await orderCount(buyer.personId)).toBe(1)
-                const payments = await dataSource.query<CountRow>("select count(*)::int as count from payment where person_id = $1",
-                    [buyer.personId])
-                expect(payments[0].count).toBe(1)
+                const payments = await dataSource.payments.paymentCountForPerson(buyer.personId)
+                expect(payments).toBe(1)
 
                 // Refusal 2: beyond stock. Nothing changes - order count stays 1, the cart keeps its line,
                 // and the catalog's stock did not move.
-                const browsed = await buyerGql.query<CartData>("cart")
+                const browsed = await buyerGql.read<CartData>("cart")
                 const thermos = browsed.data!.cart.catalog.find((p) => p.id === "sku-thermos")!
                 await buyerGql.mutate("addCartItem",
                     {
@@ -376,7 +335,7 @@ describe("order lifecycle - order history (e2e)",
                     code: "CHECKOUT_REFUSAL", reason: "insufficient-stock", productId: "sku-thermos" 
                 })
                 expect(await orderCount(buyer.personId)).toBe(1)
-                const keptCart = await buyerGql.query<CartData>("cart")
+                const keptCart = await buyerGql.read<CartData>("cart")
                 expect(keptCart.data?.cart.items).toEqual([{
                     productId: "sku-thermos", quantity: thermos.stock + 1 
                 }])

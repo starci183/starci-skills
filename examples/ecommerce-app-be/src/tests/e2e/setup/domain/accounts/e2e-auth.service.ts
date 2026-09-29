@@ -2,8 +2,8 @@ import {
     Injectable 
 } from "@nestjs/common"
 import {
-    E2EDbService 
-} from "../../platform/databases/e2e-db.service"
+    E2EIdentityRepository
+} from "../../platform/databases/persistence/e2e-identity.repository"
 import {
     E2EGraphqlService 
 } from "../../integrations/graphql/e2e-graphql.service"
@@ -36,13 +36,13 @@ interface SignInData { signIn?: SignInPayload }
  * Test-account lifecycle for the suite. Accounts are created through the identity service's own
  * public register door - the anonymous `register` mutation on its /graphql transport, the
  * canonical home for the user-facing API (there is no external IdP in this stack - the person IS
- * the identity_person row); deletion is out-of-band through the db service, so a spec can
+ * the identity_person row); deletion is out-of-band through the identity repository, so a spec can
  * guarantee its rows are gone without relying on a delete endpoint the product does not expose.
  */
 export class E2EAuthService {
     constructor(
     private readonly graphql: E2EGraphqlService,
-    private readonly db: E2EDbService,
+    private readonly identity: E2EIdentityRepository,
     ) {}
 
     async register(email: string, password: string): Promise<E2EAccount> {
@@ -87,7 +87,6 @@ export class E2EAuthService {
 
     /** Out-of-band delete of the person row; sessions in redis die with the container anyway. */
     async deleteAccount(personId: string): Promise<void> {
-        await this.db.query("delete from identity_person where id = $1",
-            [personId])
+        await this.identity.deletePerson(personId)
     }
 }

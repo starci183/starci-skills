@@ -1,12 +1,9 @@
 import {
-    E2EWorld, bootE2eWorld 
+    E2EData, E2EWorld, bootE2eWorld 
 } from "../setup/e2e-world"
 import {
     E2EAuthService 
 } from "../setup/domain/accounts/e2e-auth.service"
-import {
-    E2EDbService 
-} from "../setup/platform/databases/e2e-db.service"
 import {
     E2EHttpService 
 } from "../setup/integrations/http/e2e-http.service"
@@ -52,7 +49,7 @@ describe("order lifecycle - identity↔order boundary (e2e)",
         let world: E2EWorld
         let stack: E2EStackService
         let auth: E2EAuthService
-        let dataSource: E2EDbService
+        let dataSource: E2EData
         let http: E2EHttpService
         let graphql: E2EGraphqlService
 
@@ -65,7 +62,7 @@ describe("order lifecycle - identity↔order boundary (e2e)",
             world = await bootE2eWorld("order-lifecycle/cross-service-identity")
             stack = world.stack
             auth = world.auth
-            dataSource = world.dataSource
+            dataSource = world.data
             http = world.http
             graphql = world.graphql
         },
@@ -118,7 +115,7 @@ describe("order lifecycle - identity↔order boundary (e2e)",
                     })
                 expect(verifyDead.status).toBe(401)
                 expect(verifyDead.body.code).toBe("SESSION_INVALID")
-                const refused = await buyerA.query<CartData>("cart")
+                const refused = await buyerA.read<CartData>("cart")
                 expect(refused.errorCode).toBe("SESSION_INVALID")
                 expect(refused.errors?.[0]?.extensions?.code).toBe("SESSION_INVALID")
 
@@ -131,7 +128,7 @@ describe("order lifecycle - identity↔order boundary (e2e)",
                     resumed.sessionToken)
 
                 // Resume: the cart line added under the dead session is person-keyed, so it is still there...
-                const cart = await buyerB.query<CartData>("cart")
+                const cart = await buyerB.read<CartData>("cart")
                 expect(cart.errorCode).toBeNull()
                 expect(cart.data?.cart.items).toEqual([{
                     productId: "sku-notebook", quantity: 1 
@@ -149,12 +146,11 @@ describe("order lifecycle - identity↔order boundary (e2e)",
                 expect(placed.errorCode).toBeNull()
                 expect(placed.data?.placeOrder.status).toBe("confirmed")
 
-                const orders = await dataSource.query<{ status: string }>("select status from sales_order where person_id = $1",
-                    [buyer.personId])
+                const orders = await dataSource.orders.orderStatusesForPerson(buyer.personId)
                 expect(orders).toEqual([{
                     status: "confirmed" 
                 }])
-                const account = await identityGql.query<AccountData>("account",
+                const account = await identityGql.read<AccountData>("account",
                     {
                         variables: {
                             request: {
@@ -176,7 +172,7 @@ describe("order lifecycle - identity↔order boundary (e2e)",
                     buyer.sessionToken)
 
                 // Live while the TTL holds.
-                const live = await expired.query<CartData>("cart")
+                const live = await expired.read<CartData>("cart")
                 expect(live.errorCode).toBeNull()
 
                 // The Redis TTL kills the session in the store itself - wait for the honest expiry rather
@@ -191,7 +187,7 @@ describe("order lifecycle - identity↔order boundary (e2e)",
                         return probe.status === 401
                     })
 
-                const refused = await expired.query<CartData>("cart")
+                const refused = await expired.read<CartData>("cart")
                 expect(refused.errorCode).toBe("SESSION_INVALID")
                 expect(refused.errors?.[0]?.extensions?.code).toBe("SESSION_INVALID")
 
@@ -201,7 +197,7 @@ describe("order lifecycle - identity↔order boundary (e2e)",
                 expect(resumed.personId).toBe(buyer.personId)
                 expect(resumed.sessionToken).not.toBe(buyer.sessionToken)
                 const resumedCart = await buyerClient(graphql,
-                    resumed.sessionToken).query<CartData>("cart")
+                    resumed.sessionToken).read<CartData>("cart")
                 expect(resumedCart.errorCode).toBeNull()
             })
     })

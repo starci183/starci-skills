@@ -30,15 +30,14 @@ describeE2E("resilience: teardown verification",
 
         it("closing the module removes every container and volume the run created",
             async () => {
-                const { moduleRef, stack, dataSource } = await bootE2eWorld("resilience/teardown-verification")
+                const { moduleRef, stack, data: dataSource } = await bootE2eWorld("resilience/teardown-verification")
                 try {
                     const project = stack.project
 
                     // The persisted world is real before teardown: postgres answers out-of-band, and
                     // this run owns the containers and volumes the assertions below prove are gone.
-                    const seeded = await dataSource.query<{ count: number }>(
-                        "SELECT COUNT(*)::int AS count FROM information_schema.tables WHERE table_schema = 'public'")
-                    expect(seeded[0].count).toBeGreaterThan(0)
+                    const seeded = await dataSource.schema.publicTableCount()
+                    expect(seeded).toBeGreaterThan(0)
 
                     const containers = dockerLines([
                         "ps",
@@ -92,7 +91,7 @@ describeE2E("resilience: teardown verification",
                     // The stack's own teardown self-report must agree with the docker observation.
                     expect(stack.cleanupReport?.clean).toBe(true)
                 } finally {
-                    await moduleRef.close().catch(() => undefined)
+                    await moduleRef.close().catch((error: unknown) => error)
                 }
             })
     })

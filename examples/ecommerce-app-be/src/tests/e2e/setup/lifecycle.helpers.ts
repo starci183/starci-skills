@@ -53,11 +53,6 @@ export interface AccountPayload { personId: string; email: string; hasOrders: bo
 /** The account query's data envelope. */
 export interface AccountData { account: AccountPayload }
 
-/** A `SELECT COUNT(*)::int AS count` row for out-of-band persisted-state assertions. */
-export interface CountRow {
-  count: number;
-}
-
 /** The named-refusal body a machine REST door can still answer (401 SESSION_INVALID). */
 export interface RefusalView {
   code?: string;

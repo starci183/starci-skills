@@ -14,8 +14,20 @@ import {
     E2EStackService 
 } from "./platform/stack/e2e-stack.service"
 import {
-    E2EDbService 
-} from "./platform/databases/e2e-db.service"
+    E2ECatalogRepository
+} from "./platform/databases/persistence/e2e-catalog.repository"
+import {
+    E2EIdentityRepository
+} from "./platform/databases/persistence/e2e-identity.repository"
+import {
+    E2EOrdersRepository
+} from "./platform/databases/persistence/e2e-orders.repository"
+import {
+    E2EPaymentsRepository
+} from "./platform/databases/persistence/e2e-payments.repository"
+import {
+    E2ESchemaRepository
+} from "./platform/databases/persistence/e2e-schema.repository"
 import {
     E2EHttpService 
 } from "./integrations/http/e2e-http.service"
@@ -26,6 +38,15 @@ import {
     E2EAuthService 
 } from "./domain/accounts/e2e-auth.service"
 
+/** The out-of-band persisted-state readers a spec asserts through, one repository per capability. */
+export interface E2EData {
+  readonly catalog: E2ECatalogRepository;
+  readonly identity: E2EIdentityRepository;
+  readonly orders: E2EOrdersRepository;
+  readonly payments: E2EPaymentsRepository;
+  readonly schema: E2ESchemaRepository;
+}
+
 /**
  * The world every flow spec boots through (E2E-8): the run-scoped compose stack plus the two api
  * child processes, already past onModuleInit, with the spec-facing services resolved. A spec file
@@ -34,7 +55,7 @@ import {
 export interface E2EWorld {
   moduleRef: TestingModule;
   stack: E2EStackService;
-  dataSource: E2EDbService;
+  data: E2EData;
   http: E2EHttpService;
   graphql: E2EGraphqlService;
   auth: E2EAuthService;
@@ -53,7 +74,13 @@ export async function bootE2eWorld(specId?: string): Promise<E2EWorld> {
     return {
         moduleRef,
         stack: moduleRef.get(E2EStackService),
-        dataSource: moduleRef.get(E2EDbService),
+        data: {
+            catalog: moduleRef.get(E2ECatalogRepository),
+            identity: moduleRef.get(E2EIdentityRepository),
+            orders: moduleRef.get(E2EOrdersRepository),
+            payments: moduleRef.get(E2EPaymentsRepository),
+            schema: moduleRef.get(E2ESchemaRepository),
+        },
         http: moduleRef.get(E2EHttpService),
         graphql: moduleRef.get(E2EGraphqlService),
         auth: moduleRef.get(E2EAuthService),

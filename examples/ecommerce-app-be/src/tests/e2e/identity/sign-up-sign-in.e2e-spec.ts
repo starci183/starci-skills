@@ -1,9 +1,6 @@
 import {
-    E2EWorld, bootE2eWorld 
+    E2EData, E2EWorld, bootE2eWorld 
 } from "../setup/e2e-world"
-import {
-    E2EDbService 
-} from "../setup/platform/databases/e2e-db.service"
 import {
     E2EHttpService 
 } from "../setup/integrations/http/e2e-http.service"
@@ -52,7 +49,7 @@ describe("identity sign-up → sign-in journey",
         let stack: E2EStackService
         let http: E2EHttpService
         let graphql: E2EGraphqlService
-        let dataSource: E2EDbService
+        let dataSource: E2EData
 
         const email = `e2e-${Date.now()}@ecommerce.dev`
         const password = "e2e-journey-pass-1"
@@ -62,7 +59,7 @@ describe("identity sign-up → sign-in journey",
             stack = world.stack
             http = world.http
             graphql = world.graphql
-            dataSource = world.dataSource
+            dataSource = world.data
         },
         300_000)
 
@@ -147,7 +144,7 @@ describe("identity sign-up → sign-in journey",
 
                 // The account view is the cross-service proof: identity reads hasOrders live from order's
                 // GET /internal/buyers/:personId. A brand-new person is not a buyer yet - a reachable order answers so.
-                const account = await identityGql.query<AccountData>("account",
+                const account = await identityGql.read<AccountData>("account",
                     {
                         variables: {
                             request: {
@@ -162,8 +159,7 @@ describe("identity sign-up → sign-in journey",
 
                 // Out-of-band verification: the person really persisted on this run's postgres volume, and
                 // both services' migration sets ran on it.
-                const rows = await dataSource.query<{ id: string; email: string }>("select id, email from identity_person where id = $1",
-                    [personId])
+                const rows = await dataSource.identity.personById(personId)
                 expect(rows).toEqual([{
                     id: personId, email 
                 }])

@@ -33,14 +33,13 @@ describeE2E("resilience: infra recovery",
 
         it("redis outage yields clean api errors and both apis recover when redis returns",
             async () => {
-                const { moduleRef, stack, dataSource } = await bootE2eWorld("resilience/infra-recovery")
+                const { moduleRef, stack, data: dataSource } = await bootE2eWorld("resilience/infra-recovery")
                 try {
                     const project = stack.project
 
                     // The persisted world is real before the outage: postgres answers out-of-band.
-                    const seeded = await dataSource.query<{ count: number }>(
-                        "SELECT COUNT(*)::int AS count FROM product")
-                    expect(seeded[0].count).toBeGreaterThan(0)
+                    const seeded = await dataSource.catalog.productCount()
+                    expect(seeded).toBeGreaterThan(0)
 
                     const apis = [
                         stack.endpoint("identity").baseUrl,
@@ -67,11 +66,11 @@ describeE2E("resilience: infra recovery",
                     }
 
                     // Postgres kept the persisted world through the whole redis outage.
-                    const after = await dataSource.query<{ count: number }>(
-                        "SELECT COUNT(*)::int AS count FROM product")
+                    const after = await dataSource.catalog.productCount()
                     expect(after).toEqual(seeded)
+                    expect(await dataSource.schema.ping()).toBe(true)
                 } finally {
-                    await moduleRef.close().catch(() => undefined)
+                    await moduleRef.close().catch((error: unknown) => error)
                 }
             })
     })

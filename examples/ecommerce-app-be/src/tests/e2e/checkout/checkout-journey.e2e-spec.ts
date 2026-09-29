@@ -1,12 +1,9 @@
 import {
-    E2EWorld, bootE2eWorld 
+    E2EData, E2EWorld, bootE2eWorld 
 } from "../setup/e2e-world"
 import {
     E2EAuthService 
 } from "../setup/domain/accounts/e2e-auth.service"
-import {
-    E2EDbService 
-} from "../setup/platform/databases/e2e-db.service"
 import {
     E2EHttpClient, E2EHttpService 
 } from "../setup/integrations/http/e2e-http.service"
@@ -55,10 +52,6 @@ interface AccountPayload { personId: string; email: string; hasOrders: boolean }
 
 interface AccountData { account: AccountPayload }
 
-interface CountRow {
-  count: number;
-}
-
 /**
  * The happy path of sds.checkout.order-flow end to end: a visitor registers on identity, signs
  * in, browses the catalog through the order service's cart query, fills the cart, confirms with
@@ -77,7 +70,7 @@ describe("checkout journey (e2e)",
     () => {
         let world: E2EWorld | undefined
         let auth: E2EAuthService
-        let dataSource: E2EDbService
+        let dataSource: E2EData
         let http: E2EHttpService
         let graphql: E2EGraphqlService
 
@@ -88,7 +81,7 @@ describe("checkout journey (e2e)",
         beforeAll(async () => {
             world = await bootE2eWorld("checkout/checkout-journey")
             auth = world.auth
-            dataSource = world.dataSource
+            dataSource = world.data
             http = world.http
             graphql = world.graphql
             // The stack counts as up only when both services answer their real dependency-checked /health.
@@ -138,7 +131,7 @@ describe("checkout journey (e2e)",
                     })
 
                 // The catalog is read through the cart query - it is the only catalog surface checkout has.
-                const browsed = await buyer.query<CartData>("cart")
+                const browsed = await buyer.read<CartData>("cart")
                 expect(browsed.errorCode).toBeNull()
                 expect(browsed.data?.cart.items).toEqual([])
                 const mug = browsed.data!.cart.catalog.find((p) => p.id === "sku-mug")
@@ -166,7 +159,7 @@ describe("checkout journey (e2e)",
                     })
                 expect(addedNotebook.errorCode).toBeNull()
 
-                const filled = await buyer.query<CartData>("cart")
+                const filled = await buyer.read<CartData>("cart")
                 expect(filled.data?.cart.items).toEqual([
                     {
                         productId: "sku-mug", quantity: 2 
@@ -211,46 +204,33 @@ describe("checkout journey (e2e)",
                 expect(replayed.data?.placeOrder.paymentId).toBe(placed.data!.placeOrder.paymentId)
                 expect(replayed.data?.placeOrder.replayed).toBe(true)
 
-                const emptied = await buyer.query<CartData>("cart")
+                const emptied = await buyer.read<CartData>("cart")
                 expect(emptied.data?.cart.items).toEqual([])
 
-                const orders = await dataSource.query<{ status: string; total_minor_units: number }>(
-                    "SELECT status, total_minor_units FROM sales_order WHERE id = $1",
-                    [placed.data!.placeOrder.orderId],
-                )
+                const orders = await dataSource.orders.orderSummaryById(placed.data!.placeOrder.orderId)
                 expect(orders).toEqual([{
                     status: "confirmed", total_minor_units: expectedTotal 
                 }])
 
-                const lines = await dataSource.query<CountRow>(
-                    "SELECT COUNT(*)::int AS count FROM sales_order_line WHERE order_id = $1",
-                    [placed.data!.placeOrder.orderId],
-                )
-                expect(lines[0].count).toBe(2)
+                const lines = await dataSource.orders.orderLineCount(placed.data!.placeOrder.orderId)
+                expect(lines).toBe(2)
 
-                const payments = await dataSource.query<{ status: string; amount_minor_units: number }>(
-                    "SELECT status, amount_minor_units FROM payment WHERE person_id = $1",
-                    [personId],
-                )
+                const payments = await dataSource.payments.paymentSummariesForPerson(personId)
                 expect(payments).toEqual([{
                     status: "captured", amount_minor_units: expectedTotal 
                 }])
 
-                const cartRows = await dataSource.query<CountRow>(
-                    "SELECT COUNT(*)::int AS count FROM cart_item WHERE person_id = $1",
-                    [personId],
-                )
-                expect(cartRows[0].count).toBe(0)
+                const cartRows = await dataSource.orders.cartItemCount(personId)
+                expect(cartRows).toBe(0)
 
-                const mugStock = await dataSource.query<{ stock: number }>("SELECT stock FROM product WHERE id = $1",
-                    ["sku-mug"])
-                expect(mugStock[0].stock).toBe(mug!.stock - 2)
+                const mugStock = await dataSource.catalog.stockOf("sku-mug")
+                expect(mugStock).toBe(mug!.stock - 2)
 
                 // contract.checkout.order-for-identity live: order serves identity hasOrders on the
                 // machine door GET /internal/buyers/:personId - the confirmation is what flipped it.
                 const buyerStatus = await http.client("order").get<{ hasOrders: boolean }>(`/internal/buyers/${personId}`)
                 expect(buyerStatus.data.hasOrders).toBe(true)
-                const account = await identityGql.query<AccountData>("account",
+                const account = await identityGql.read<AccountData>("account",
                     {
                         variables: {
                             request: {
@@ -269,7 +249,7 @@ describe("checkout journey (e2e)",
                         sessionToken 
                     })
                 expect(revoked.status).toBe(201)
-                const afterRevoke = await buyer.query<CartData>("cart")
+                const afterRevoke = await buyer.read<CartData>("cart")
                 expect(afterRevoke.errorCode).toBe("SESSION_INVALID")
                 expect(afterRevoke.errors?.[0]?.extensions?.code).toBe("SESSION_INVALID")
             })

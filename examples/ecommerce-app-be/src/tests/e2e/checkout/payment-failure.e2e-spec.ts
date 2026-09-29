@@ -1,12 +1,9 @@
 import {
-    E2EWorld, bootE2eWorld 
+    E2EData, E2EWorld, bootE2eWorld 
 } from "../setup/e2e-world"
 import {
     E2EAuthService 
 } from "../setup/domain/accounts/e2e-auth.service"
-import {
-    E2EDbService 
-} from "../setup/platform/databases/e2e-db.service"
 import {
     E2EHttpService 
 } from "../setup/integrations/http/e2e-http.service"
@@ -42,10 +39,6 @@ interface ClearCartPayload { cleared: boolean }
 
 interface ClearCartData { clearCart: ClearCartPayload }
 
-interface CountRow {
-  count: number;
-}
-
 /**
  * The refusal half of sds.checkout.order-flow (t-refuse). The API contract has no external PSP
  * and no pending/declined order state - payment capture runs inside the same transaction as the
@@ -63,7 +56,7 @@ describe("payment failure (e2e)",
     () => {
         let world: E2EWorld | undefined
         let auth: E2EAuthService
-        let dataSource: E2EDbService
+        let dataSource: E2EData
         let http: E2EHttpService
         let graphql: E2EGraphqlService
 
@@ -86,25 +79,17 @@ describe("payment failure (e2e)",
         }
 
         async function persistedOrderCount(personId: string): Promise<number> {
-            const rows = await dataSource.query<CountRow>(
-                "SELECT COUNT(*)::int AS count FROM sales_order WHERE person_id = $1",
-                [personId],
-            )
-            return rows[0].count
+            return dataSource.orders.orderCountForPerson(personId)
         }
 
         async function persistedPaymentCount(personId: string): Promise<number> {
-            const rows = await dataSource.query<CountRow>(
-                "SELECT COUNT(*)::int AS count FROM payment WHERE person_id = $1",
-                [personId],
-            )
-            return rows[0].count
+            return dataSource.payments.paymentCountForPerson(personId)
         }
 
         beforeAll(async () => {
             world = await bootE2eWorld("checkout/payment-failure")
             auth = world.auth
-            dataSource = world.dataSource
+            dataSource = world.data
             http = world.http
             graphql = world.graphql
             expect((await http.client("order").get<{ status: string }>("/health")).data.status).toBe("ok")
@@ -122,7 +107,7 @@ describe("payment failure (e2e)",
                 const { buyer, personId } = await freshBuyer("retry")
 
                 // sku-thermos seeds at stock 2 on a fresh stack - asking for 3 is a guaranteed refusal.
-                const browsed = await buyer.query<CartData>("cart")
+                const browsed = await buyer.read<CartData>("cart")
                 const thermos = browsed.data?.cart.catalog.find((p) => p.id === "sku-thermos")
                 expect(thermos).toBeDefined()
                 const seededStock = thermos!.stock
@@ -156,15 +141,14 @@ describe("payment failure (e2e)",
                 })
 
                 // The rollback: cart kept, nothing persisted, stock unmoved - a refusal never half-writes.
-                const cartKept = await buyer.query<CartData>("cart")
+                const cartKept = await buyer.read<CartData>("cart")
                 expect(cartKept.data?.cart.items).toEqual([{
                     productId: "sku-thermos", quantity: seededStock + 1 
                 }])
                 expect(await persistedOrderCount(personId)).toBe(0)
                 expect(await persistedPaymentCount(personId)).toBe(0)
-                const stockAfter = await dataSource.query<{ stock: number }>("SELECT stock FROM product WHERE id = $1",
-                    ["sku-thermos"])
-                expect(stockAfter[0].stock).toBe(seededStock)
+                const stockAfter = await dataSource.catalog.stockOf("sku-thermos")
+                expect(stockAfter).toBe(seededStock)
 
                 // Correct the cart and retry with the same key: this time the confirmation lands.
                 await buyer.mutate("clearCart")
@@ -194,24 +178,20 @@ describe("payment failure (e2e)",
                     replayed: false,
                 })
 
-                const payments = await dataSource.query<{ status: string; amount_minor_units: number }>(
-                    "SELECT status, amount_minor_units FROM payment WHERE person_id = $1",
-                    [personId],
-                )
+                const payments = await dataSource.payments.paymentSummariesForPerson(personId)
                 expect(payments).toEqual([{
                     status: "captured", amount_minor_units: thermos!.priceMinorUnits * seededStock 
                 }])
-                expect((await buyer.query<CartData>("cart")).data?.cart.items).toEqual([])
-                const stockSoldOut = await dataSource.query<{ stock: number }>("SELECT stock FROM product WHERE id = $1",
-                    ["sku-thermos"])
-                expect(stockSoldOut[0].stock).toBe(0)
+                expect((await buyer.read<CartData>("cart")).data?.cart.items).toEqual([])
+                const stockSoldOut = await dataSource.catalog.stockOf("sku-thermos")
+                expect(stockSoldOut).toBe(0)
             })
 
         it("a refused confirmation can be abandoned - clearing the cart leaves no order behind",
             async () => {
                 const { buyer, personId } = await freshBuyer("cancel")
 
-                const browsed = await buyer.query<CartData>("cart")
+                const browsed = await buyer.read<CartData>("cart")
                 const thermos = browsed.data?.cart.catalog.find((p) => p.id === "sku-thermos")
                 expect(thermos).toBeDefined()
 
@@ -237,7 +217,7 @@ describe("payment failure (e2e)",
                 const cleared = await buyer.mutate<ClearCartData>("clearCart")
                 expect(cleared.errorCode).toBeNull()
                 expect(cleared.data?.clearCart.cleared).toBe(true)
-                expect((await buyer.query<CartData>("cart")).data?.cart.items).toEqual([])
+                expect((await buyer.read<CartData>("cart")).data?.cart.items).toEqual([])
 
                 // A confirmation with nothing to confirm is the cart-empty refusal, not a silent order.
                 const empty = await buyer.mutate<PlaceOrderData>("placeOrder",
@@ -254,8 +234,7 @@ describe("payment failure (e2e)",
 
                 expect(await persistedOrderCount(personId)).toBe(0)
                 expect(await persistedPaymentCount(personId)).toBe(0)
-                const stockAfter = await dataSource.query<{ stock: number }>("SELECT stock FROM product WHERE id = $1",
-                    ["sku-thermos"])
-                expect(stockAfter[0].stock).toBe(thermos!.stock)
+                const stockAfter = await dataSource.catalog.stockOf("sku-thermos")
+                expect(stockAfter).toBe(thermos!.stock)
             })
     })

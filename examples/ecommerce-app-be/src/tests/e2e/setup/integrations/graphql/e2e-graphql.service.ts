@@ -1,12 +1,18 @@
 import {
     createE2EGraphqlTransport,
-    E2EGraphqlClient,
+    E2EGraphqlClient as KitGraphqlClient,
     E2EGraphqlClientOptions,
     E2EGraphqlTransport,
 } from "@e2e-kit/integrations/graphql/e2e-graphql-transport"
 import {
+    DocumentNode
+} from "graphql"
+import {
     Injectable 
 } from "@nestjs/common"
+import {
+    GraphqlCallOptions, GraphqlObserved
+} from "@e2e-kit/integrations/graphql/graphql-envelope"
 import {
     E2EServiceName, E2EStackService 
 } from "../../platform/stack/e2e-stack.service"
@@ -43,15 +49,37 @@ export type {
     GraphqlCallOptions, GraphqlErrorObserved, GraphqlObserved 
 } from "@e2e-kit/integrations/graphql/graphql-envelope"
 export type {
-    E2EGraphqlClient, E2EGraphqlClientOptions 
+    E2EGraphqlClientOptions 
 } from "@e2e-kit/integrations/graphql/e2e-graphql-transport"
+
+/**
+ * The per-door GraphQL handle a spec drives. The kit client's read operation is spelled `query`,
+ * which the SQL-boundary rule cannot tell from a raw `.query("select ...")`; the spec-facing
+ * handle names the same operation `read` and forwards it, so GraphQL reads never look like SQL.
+ */
+export interface E2EGraphqlClient {
+  readonly baseUrl: string;
+  read<TData = Record<string, unknown>>(document: DocumentNode | string, options?: GraphqlCallOptions): Promise<GraphqlObserved<TData>>;
+  mutate<TData = Record<string, unknown>>(document: DocumentNode | string, options?: GraphqlCallOptions): Promise<GraphqlObserved<TData>>;
+}
+
+/** Binds the kit client behind the spec-facing handle. */
+function toSpecClient(kit: KitGraphqlClient): E2EGraphqlClient {
+    return {
+        baseUrl: kit.baseUrl,
+        read: (document, options) => kit.query(document,
+            options),
+        mutate: (document, options) => kit.mutate(document,
+            options),
+    }
+}
 
 @Injectable()
 /**
  * The apps' public surface is GraphQL, so the specs get a real GraphQL client, not only the raw
  * HTTP door: one ApolloClient per (service, identity) pair - this stack runs TWO apis, so the
  * client cache keys on the service's baseUrl as well as the bearer - pointed at the run-owned
- * api's /graphql endpoint. `query`/`mutate` take a DocumentNode (or a GRAPHQL_DOCUMENTS key / raw
+ * api's /graphql endpoint. `read`/`mutate` take a DocumentNode (or a GRAPHQL_DOCUMENTS key / raw
  * document string) and answer with the same GraphqlObserved envelope todo's door produces, so
  * refusals stay assertions rather than thrown exceptions. The client mechanics live in the shared
  * @e2e-kit transport; this service only binds it to this run's endpoints and this app's registry.
@@ -66,7 +94,7 @@ export class E2EGraphqlService {
     /** A client bound to one spawned api - `identity` or `order` - optionally carrying a bearer. */
     client(service: E2EServiceName, options: E2EGraphqlClientOptions = {
     }): E2EGraphqlClient {
-        return this.transport.client(this.stack.endpoint(service).baseUrl,
-            options)
+        return toSpecClient(this.transport.client(this.stack.endpoint(service).baseUrl,
+            options))
     }
 }
