@@ -3,6 +3,7 @@
 //   is import A -> B allowed         importAllowed(A, B)           (tier matrix, cross-owner entry, cross-app, layers)
 //   which files are required         requiredFiles(P) / requiredPaths()
 //   is this path tracked             isTracked(P) / trackingOf(P)
+// The rule catalog (knowledge/hfs/rules.yaml, modules/schemas/hfs-rules.schema.yaml) loads through loadRuleCatalog / rules().
 // Every check and lint rule of HFS v2 reads knowledge/hfs/slots.yaml through this module; none keeps its own path
 // list. The manifest shape is modules/schemas/hfs-slots.schema.yaml and hfs.json is modules/schemas/hfs-repo.schema.yaml;
 // the installed runtime carries no npm dependency, so this file re-states those shapes instead of loading ajv
@@ -542,5 +543,131 @@ export function ruleParams(manifest, profile) {
 /** The manifest of this runtime plus the resolver for the repository at `repoRoot` (or for an already-parsed declaration). */
 export function openHfs({ root = skillRoot, repoRoot, declaration, manifest = loadSlotManifest({ root }) } = {}) {
   const repo = declaration !== undefined ? resolveRepoDeclaration(manifest, declaration) : readRepoDeclaration(manifest, repoRoot);
-  return { manifest, repo, ...createSlotResolver(manifest, repo) };
+  return { manifest, repo, ...createSlotResolver(manifest, repo), rules: () => loadRuleCatalog({ root, manifest }) };
 }
+
+// ------------------------------------------------------------------------------------------ rule catalog
+
+export const HFS_RULES_FILE = 'knowledge/hfs/rules.yaml';
+export const RULE_GATES = Object.freeze(['pre-commit', 'pre-push', 'settle', 'land', 'ci', 'sonar']);
+export const ENFORCER_FAMILIES = Object.freeze(['eslint-be', 'eslint-fe', 'stylelint', 'machine', 'hfs', 'work-validate', 'sonar']);
+export const RULE_KINDS = Object.freeze(['codemod', 'lint', 'check', 'design']);
+const FINDING_CODE = /^[A-Z][A-Z0-9]*(_[A-Z0-9]+)+$/;
+const ENFORCER_ID = /^[a-z][a-z0-9]*(-[a-z0-9]+)*$/;
+const FILE_ENFORCERS = ['machine', 'hfs', 'work-validate', 'sonar'];
+
+/** Shape and semantic problems of a parsed knowledge/hfs/rules.yaml, in the words of modules/schemas/hfs-rules.schema.yaml. */
+function ruleCatalogProblems(d) {
+  const bad = [];
+  if (!isMap(d)) return ['the rule catalog is not a map'];
+  for (const key of Object.keys(d)) if (!['schema', 'version', 'gates', 'enforcerKinds', 'rules'].includes(key)) bad.push(`unknown top-level key ${key}`);
+  const schemaOk = /^starci\/hfs-rules@\d+$/.test(String(d.schema));
+  if (!schemaOk) bad.push('schema must be starci/hfs-rules@<major>');
+  if (!SEMVER.test(String(d.version))) bad.push('version must be MAJOR.MINOR.PATCH');
+  else if (schemaOk && d.schema.split('@')[1] !== d.version.split('.')[0]) bad.push('the major of version must equal the number after @ in schema');
+  const vocabulary = (key, names) => {
+    if (!isMap(d[key])) { bad.push(`${key} must be a map`); return; }
+    if (JSON.stringify(Object.keys(d[key])) !== JSON.stringify(names)) bad.push(`${key} must list exactly ${names.join(', ')} in that order`);
+    for (const [name, text] of Object.entries(d[key])) if (typeof text !== 'string' || !text.trim()) bad.push(`${key}.${name} needs a description`);
+  };
+  vocabulary('gates', RULE_GATES);
+  vocabulary('enforcerKinds', ENFORCER_FAMILIES);
+  if (!Array.isArray(d.rules) || !d.rules.length) { bad.push('rules must be a non-empty list'); return bad; }
+  const codeOwner = new Map();
+  d.rules.forEach((r, index) => {
+    const at = `rules[${index}]`;
+    if (!isMap(r)) { bad.push(`${at} is not a map`); return; }
+    const label = typeof r.id === 'string' ? r.id : at;
+    for (const key of Object.keys(r)) if (!['id', 'code', 'title_vi', 'law', 'kinds', 'gates', 'failureCodes', 'enforcers'].includes(key)) bad.push(`${label} has unknown key ${key}`);
+    const expectedId = `R${String(index + 1).padStart(2, '0')}`;
+    if (!/^R\d{2}$/.test(String(r.id))) bad.push(`${at}.id must be R<two digits>`);
+    else if (r.id !== expectedId) bad.push(`${label} is out of order: ${at} must be ${expectedId}`);
+    if (!FINDING_CODE.test(String(r.code))) bad.push(`${label}.code must be an UPPER_SNAKE finding code`);
+    for (const key of ['title_vi', 'law']) if (typeof r[key] !== 'string' || !r[key].trim()) bad.push(`${label}.${key} is missing`);
+    if (typeof r.law === 'string' && r.law.includes('\n')) bad.push(`${label}.law must be one line`);
+    const enumList = (key, allowed) => {
+      if (!Array.isArray(r[key]) || !r[key].length) { bad.push(`${label}.${key} must be a non-empty list`); return []; }
+      for (const v of r[key]) if (!allowed.includes(v)) bad.push(`${label}.${key} has ${JSON.stringify(v)}, not one of ${allowed.join(', ')}`);
+      if (new Set(r[key]).size !== r[key].length) bad.push(`${label}.${key} repeats a value`);
+      return r[key];
+    };
+    enumList('kinds', RULE_KINDS);
+    const gates = enumList('gates', RULE_GATES);
+    if (gates.length) {
+      if (!gates.includes('land')) bad.push(`${label} must run at the land gate (every rule does)`);
+      if (gates.includes('pre-commit') && !gates.includes('pre-push')) bad.push(`${label} runs at pre-commit, so it also runs at pre-push`);
+    }
+    if (!Array.isArray(r.failureCodes) || !r.failureCodes.length || !r.failureCodes.every((c) => FINDING_CODE.test(String(c)))) bad.push(`${label}.failureCodes must be a non-empty list of UPPER_SNAKE codes`);
+    else {
+      if (r.failureCodes[0] !== r.code) bad.push(`${label}.failureCodes must start with the rule's own code ${r.code}`);
+      if (new Set(r.failureCodes).size !== r.failureCodes.length) bad.push(`${label}.failureCodes repeats a code`);
+      for (const c of r.failureCodes) {
+        if (codeOwner.has(c) && codeOwner.get(c) !== label) bad.push(`${label} names ${c}, which ${codeOwner.get(c)} already owns`);
+        codeOwner.set(c, label);
+      }
+    }
+    if (!Array.isArray(r.enforcers) || !r.enforcers.length) { bad.push(`${label}.enforcers must name at least one enforcer`); return; }
+    const seen = new Set();
+    r.enforcers.forEach((e, n) => {
+      const eat = `${label}.enforcers[${n}]`;
+      if (!isMap(e)) { bad.push(`${eat} is not a map`); return; }
+      for (const key of Object.keys(e)) if (!['kind', 'id', 'status', 'at'].includes(key)) bad.push(`${eat} has unknown key ${key}`);
+      if (!ENFORCER_FAMILIES.includes(e.kind)) bad.push(`${eat}.kind must be one of ${ENFORCER_FAMILIES.join(', ')}`);
+      if (!ENFORCER_ID.test(String(e.id))) bad.push(`${eat}.id must be kebab-case`);
+      if (seen.has(`${e.kind}:${e.id}`)) bad.push(`${eat} repeats ${e.kind}:${e.id}`);
+      seen.add(`${e.kind}:${e.id}`);
+      if (e.status !== undefined && e.status !== 'planned') bad.push(`${eat}.status is either absent or planned`);
+      if (e.at !== undefined) {
+        if (typeof e.at !== 'string' || !e.at.trim() || e.at.startsWith('/') || e.at.includes('..')) bad.push(`${eat}.at must be a repository-relative path`);
+        if (e.status === 'planned') bad.push(`${eat} is planned, so it has no file yet (at)`);
+        if (!FILE_ENFORCERS.includes(e.kind)) bad.push(`${eat}.at belongs to a machine, hfs, work-validate or sonar enforcer only`);
+      } else if (FILE_ENFORCERS.includes(e.kind) && e.status !== 'planned') bad.push(`${eat} exists, so it names the file (at) that emits its code`);
+    });
+    if (Array.isArray(r.gates)) {
+      const hasSonar = r.enforcers.some((e) => isMap(e) && e.kind === 'sonar');
+      if (r.gates.includes('sonar') !== hasSonar) bad.push(`${label}: the sonar gate and a sonar enforcer go together`);
+    }
+  });
+  return bad;
+}
+
+const deepFreeze = (v) => { if (v && typeof v === 'object') Object.values(v).forEach(deepFreeze); return Object.freeze(v); };
+
+/**
+ * The parsed and validated HFS v2 rule catalog. `text` (or `file`, or `root`) selects the source; the default is the runtime's
+ * own knowledge/hfs/rules.yaml. A catalog that breaks its shape or a semantic rule is refused whole (HFS_RULES_INVALID), and
+ * so is one whose major differs from the slot manifest passed as `manifest` (HFS_MANIFEST_MAJOR_MISMATCH).
+ * Answers: rule(id), byCode(code), forGate(gate), forEnforcer(kind, id), planned() and unbuilt().
+ */
+export function loadRuleCatalog({ root = skillRoot, file = path.join(root, HFS_RULES_FILE), text, manifest } = {}) {
+  let doc;
+  try { doc = parseYaml(text ?? fs.readFileSync(file, 'utf8')); } catch (error) { fail('HFS_RULES_INVALID', `the rule catalog cannot be read (${String(error?.message ?? error).split('\n')[0]})`, { file }); }
+  const problems = ruleCatalogProblems(doc);
+  if (problems.length) fail('HFS_RULES_INVALID', `the rule catalog breaks its schema: ${problems.slice(0, 5).join('; ')}${problems.length > 5 ? `; and ${problems.length - 5} more` : ''}`, { file, problems });
+  const [major, minor, patch] = doc.version.split('.').map(Number);
+  if (manifest && manifest.major !== major) fail('HFS_MANIFEST_MAJOR_MISMATCH', `the rule catalog is major ${major} but the slot manifest is major ${manifest.major}`, { catalog: major, manifest: manifest.major });
+  const list = deepFreeze(doc.rules.map((r) => ({ ...r, enforcers: r.enforcers.map((e) => ({ ...e, planned: e.status === 'planned' })) })));
+  const byId = new Map(list.map((r) => [r.id, r]));
+  const byCode = new Map(list.flatMap((r) => r.failureCodes.map((c) => [c, r])));
+  return Object.freeze({
+    version: doc.version, major, minor, patch,
+    gates: deepFreeze(structuredClone(doc.gates)),
+    enforcerKinds: deepFreeze(structuredClone(doc.enforcerKinds)),
+    rules: list,
+    /** The rule with this id (R01..), or null. */
+    rule: (id) => byId.get(id) ?? null,
+    /** The rule that owns this failure code (its own or a sub-check code), or null. */
+    byCode: (code) => byCode.get(code) ?? null,
+    /** The rules that run at a gate. */
+    forGate: (gate) => list.filter((r) => r.gates.includes(gate)),
+    /** The rules one enforcer judges, e.g. forEnforcer('eslint-be', 'error-home'). */
+    forEnforcer: (kind, id) => list.filter((r) => r.enforcers.some((e) => e.kind === kind && e.id === id)),
+    /** Every enforcer still owed, as {rule, kind, id}. */
+    planned: () => list.flatMap((r) => r.enforcers.filter((e) => e.planned).map((e) => ({ rule: r.id, kind: e.kind, id: e.id }))),
+    /** The rules with no existing enforcer at all. */
+    unbuilt: () => list.filter((r) => r.enforcers.every((e) => e.planned)),
+  });
+}
+
+/** The 67 rules of this runtime's catalog, frozen, in id order. */
+export const rules = (options) => loadRuleCatalog(options).rules;

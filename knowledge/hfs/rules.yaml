@@ -1,0 +1,684 @@
+# knowledge/hfs/rules.yaml - the machine-readable catalog of the 67 HFS v2 rules (R01-R67).
+#
+# One entry per rule: its id, its finding code, a Vietnamese title, the law in one line, how a violation is fixed
+# (`kinds`), the gates it runs at, the failure codes it reports, and every enforcer that judges it. The prose of each
+# rule is knowledge/hfs/README.md (section 12 lists the same ids and codes); this file is the data behind it. Read it only
+# through scripts/lib/hfs-slots.mjs (loadRuleCatalog, rules); its shape is modules/schemas/hfs-rules.schema.yaml.
+#
+# An enforcer is a check that exists or one still owed. `status: planned` marks one owed: the architecture machine, the
+# hfs CLI, stylelint and Sonar lanes fill them, and the entry's `status` is removed the day the check ships (the check
+# refuses a planned enforcer that already exists). An existing eslint enforcer is a rule id of the plugin
+# `@starci/eslint-canon-be` or `@starci/eslint-canon-fe`; an existing machine, hfs or work-validate enforcer names the file
+# (`at`) that emits one of the rule's codes. scripts/checks/check-hfs-rules.mjs holds all of this to the packages, the
+# scripts and modules/kernel/failure-codes.yaml.
+#
+# Every rule is an error from 2.0. There is no baseline, allowlist or suppression file. Codes are quoted: the failure-code
+# scanner reads this file as an emitter of every code it names.
+schema: starci/hfs-rules@2
+version: 2.0.0
+gates:
+  pre-commit: lint-staged on staged files - Prettier, ESLint canon, stylelint, secrets guard; under 10 seconds
+  pre-push: typecheck, lint:check, hfs check --fast and the affected unit specs; runs every pre-commit rule again
+  settle: hfs check --paths <owned paths> and ESLint on the op's paths; a red result does not settle the op
+  land: full hfs check, canon scan, unit and build before a commit enters main; runs every rule
+  ci: GitHub Actions runs the same pinned hfs check, lint, typecheck, unit with coverage, build and prettier --check
+  sonar: Sonar quality gate - duplication, cognitive complexity and coverage on new code
+enforcerKinds:
+  eslint-be: a rule of the plugin @starci/eslint-canon-be (id without the plugin prefix)
+  eslint-fe: a rule of the plugin @starci/eslint-canon-fe (id without the plugin prefix)
+  stylelint: a rule of the @starci/stylelint-canon package
+  machine: a check of the architecture machine (scripts/checks/architecture), which reads the import graph
+  hfs: a check of the hfs CLI that reads the repository tree, configuration, contracts or catalogs
+  work-validate: a check of scripts/checks/work-validate.mjs over a .starciwork tree
+  sonar: a condition of the Sonar quality gate
+rules:
+  - id: R01
+    code: "HFS_SLOT_UNDECLARED"
+    title_vi: "Đường dẫn không thuộc ô nào"
+    law: "Every tracked path matches exactly one slot."
+    kinds: [check]
+    gates: [pre-push, settle, land, ci]
+    failureCodes: ["HFS_SLOT_UNDECLARED"]
+    enforcers:
+      - {kind: hfs, id: slot-undeclared, status: planned}
+  - id: R02
+    code: "HFS_SLOT_REQUIRED_MISSING"
+    title_vi: "Ô thiếu tệp bắt buộc"
+    law: "A slot is missing a required file (feature `index.ts`, app composition spec, FE `global-error.tsx`)."
+    kinds: [check, codemod]
+    gates: [settle, land, ci]
+    failureCodes: ["HFS_SLOT_REQUIRED_MISSING"]
+    enforcers:
+      - {kind: hfs, id: slot-required-missing, status: planned}
+  - id: R03
+    code: "HFS_UNTRACKED_ROOT_ENTRY"
+    title_vi: "Mục lạ ở gốc kho"
+    law: "No untracked or ignored entry outside an `ignored` slot."
+    kinds: [check, codemod]
+    gates: [pre-push, land, ci]
+    failureCodes: ["HFS_UNTRACKED_ROOT_ENTRY"]
+    enforcers:
+      - {kind: hfs, id: untracked-root-entry, status: planned}
+  - id: R04
+    code: "HFS_GITIGNORE_BLOCK_DRIFT"
+    title_vi: "Khối .gitignore lệch bản render"
+    law: "The managed `.gitignore` block equals its render."
+    kinds: [check, codemod]
+    gates: [pre-push, land, ci]
+    failureCodes: ["HFS_GITIGNORE_BLOCK_DRIFT"]
+    enforcers:
+      - {kind: hfs, id: gitignore-block-drift, status: planned}
+  - id: R05
+    code: "HFS_MANAGED_FILE_DRIFT"
+    title_vi: "Tệp do .claude quản lý bị lệch"
+    law: "A managed file equals its template render."
+    kinds: [check, codemod]
+    gates: [pre-push, land, ci]
+    failureCodes: ["HFS_MANAGED_FILE_DRIFT"]
+    enforcers:
+      - {kind: hfs, id: managed-file-drift, status: planned}
+  - id: R06
+    code: "HFS_PLAINTEXT_SECRET"
+    title_vi: "Bí mật dạng rõ trong kho"
+    law: "Secrets exist only as `.starcistacks/<env>/secrets/<slug>.enc`."
+    kinds: [check, design]
+    gates: [pre-commit, pre-push, land, ci]
+    failureCodes: ["HFS_PLAINTEXT_SECRET"]
+    enforcers:
+      - {kind: hfs, id: plaintext-secret, status: planned}
+  - id: R07
+    code: "HFS_AGENT_DATA_TRACKED"
+    title_vi: "Dữ liệu của agent bị track"
+    law: "`.starciwork` holds product records only."
+    kinds: [check, codemod]
+    gates: [pre-commit, pre-push, settle, land, ci]
+    failureCodes: ["HFS_AGENT_DATA_TRACKED"]
+    enforcers:
+      - {kind: work-validate, id: agent-data-tracked, status: planned}
+  - id: R08
+    code: "HFS_WORK_NODE_RETIRED"
+    title_vi: "Còn record work/node đã bỏ"
+    law: "Only flat family records, never `work/node`."
+    kinds: [check, codemod]
+    gates: [settle, land, ci]
+    failureCodes: ["HFS_WORK_NODE_RETIRED"]
+    enforcers:
+      - {kind: work-validate, id: work-node-retired, status: planned}
+  - id: R09
+    code: "HFS_IDENTITY_CUSTODY"
+    title_vi: "Bí mật của identity sai chỗ"
+    law: "An identity points its secret at `secrets/identity-<slug>.enc`; UAT chooses by role."
+    kinds: [check, codemod]
+    gates: [settle, land, ci]
+    failureCodes: ["HFS_IDENTITY_CUSTODY", "SEALED_CUSTODY_LOCATION", "SEALED_FILE_IN_WORK"]
+    enforcers:
+      - {kind: work-validate, id: sealed-custody-location, at: scripts/checks/check-work-artifacts.mjs}
+      - {kind: work-validate, id: identity-custody-role, status: planned}
+  - id: R10
+    code: "HFS_STACKS_SHAPE"
+    title_vi: "Hình dạng .starcistacks sai"
+    law: "`.starcistacks` has the standard shape and the host Sonar owner."
+    kinds: [check, codemod]
+    gates: [settle, land, ci]
+    failureCodes: ["HFS_STACKS_SHAPE"]
+    enforcers:
+      - {kind: hfs, id: stacks-shape, status: planned}
+  - id: R11
+    code: "HFS_SONAR_CONFIG"
+    title_vi: "Cấu hình Sonar lệch"
+    law: "Sonar config is generated, with no host URL and matching coverage exclusions."
+    kinds: [check, codemod]
+    gates: [land, ci]
+    failureCodes: ["HFS_SONAR_CONFIG"]
+    enforcers:
+      - {kind: hfs, id: sonar-config, status: planned}
+  - id: R12
+    code: "HFS_E2E_IN_AUTOMATIC_GATE"
+    title_vi: "e2e chạy trong cổng tự động"
+    law: "e2e never joins husky, coverage or automatic CI."
+    kinds: [check]
+    gates: [pre-push, land, ci]
+    failureCodes: ["HFS_E2E_IN_AUTOMATIC_GATE"]
+    enforcers:
+      - {kind: machine, id: e2e-in-automatic-gate, at: scripts/checks/architecture/hfs.mjs}
+  - id: R13
+    code: "HFS_CI_MISSING_CANON"
+    title_vi: "CI thiếu bước canon"
+    law: "CI runs the pinned `@starci/hfs check`; pre-push runs typecheck and lint."
+    kinds: [check, codemod]
+    gates: [pre-push, land, ci]
+    failureCodes: ["HFS_CI_MISSING_CANON"]
+    enforcers:
+      - {kind: hfs, id: ci-missing-canon, status: planned}
+  - id: R14
+    code: "HFS_DEP_VERSION_SKEW"
+    title_vi: "Một gói nhiều phiên bản"
+    law: "One version per dependency in the workspace."
+    kinds: [check, codemod]
+    gates: [pre-push, land, ci]
+    failureCodes: ["HFS_DEP_VERSION_SKEW"]
+    enforcers:
+      - {kind: hfs, id: dep-version-skew, status: planned}
+  - id: R15
+    code: "HFS_CANON_PIN_DRIFT"
+    title_vi: "Phiên bản canon lệch bản pin"
+    law: "Canon packages and frameworks match `canon-pins.yaml`."
+    kinds: [check, codemod]
+    gates: [pre-push, land, ci]
+    failureCodes: ["HFS_CANON_PIN_DRIFT"]
+    enforcers:
+      - {kind: hfs, id: canon-pin-drift, status: planned}
+  - id: R16
+    code: "HFS_TOOL_CONFIG_LOCAL"
+    title_vi: "Kho tự đặt luật cục bộ"
+    law: "Configs only call the factories; no local rules."
+    kinds: [check, codemod]
+    gates: [land, ci]
+    failureCodes: ["HFS_TOOL_CONFIG_LOCAL"]
+    enforcers:
+      - {kind: hfs, id: tool-config-local, status: planned}
+  - id: R17
+    code: "HFS_RULE_OFF_WITHOUT_REPLACEMENT"
+    title_vi: "Tắt luật mà không có check thay thế"
+    law: "A rule is off only when its replacement check is in a repository gate."
+    kinds: [check]
+    gates: [land, ci]
+    failureCodes: ["HFS_RULE_OFF_WITHOUT_REPLACEMENT"]
+    enforcers:
+      - {kind: hfs, id: rule-off-without-replacement, status: planned}
+  - id: R18
+    code: "HFS_INLINE_SUPPRESSION"
+    title_vi: "Tắt luật tại chỗ"
+    law: "No inline suppression of any kind."
+    kinds: [lint, design]
+    gates: [pre-commit, pre-push, land, ci]
+    failureCodes: ["HFS_INLINE_SUPPRESSION"]
+    enforcers:
+      - {kind: eslint-be, id: no-inline-suppression}
+      - {kind: eslint-fe, id: no-inline-lint-config}
+  - id: R19
+    code: "HFS_FORMAT"
+    title_vi: "Chưa format bằng Prettier"
+    law: "Prettier is the only formatter."
+    kinds: [codemod]
+    gates: [pre-commit, pre-push, land, ci]
+    failureCodes: ["HFS_FORMAT"]
+    enforcers:
+      - {kind: hfs, id: format, status: planned}
+  - id: R20
+    code: "HFS_SIZE_GROWTH"
+    title_vi: "Tệp vượt ngân sách còn phình thêm"
+    law: "Over-budget files do not grow; new files are inside budget."
+    kinds: [check, design]
+    gates: [land, ci, sonar]
+    failureCodes: ["HFS_SIZE_GROWTH"]
+    enforcers:
+      - {kind: eslint-be, id: file-size-growth}
+      - {kind: eslint-fe, id: file-size-growth, status: planned}
+      - {kind: hfs, id: size-growth, status: planned}
+      - {kind: sonar, id: cognitive-complexity, status: planned}
+  - id: R21
+    code: "HFS_DUPLICATE_CODE"
+    title_vi: "Mã trùng lặp"
+    law: "No duplicated blocks or twice-defined helpers."
+    kinds: [check, design]
+    gates: [land, ci, sonar]
+    failureCodes: ["HFS_DUPLICATE_CODE"]
+    enforcers:
+      - {kind: hfs, id: duplicate-code, status: planned}
+      - {kind: sonar, id: duplicated-lines-density, status: planned}
+  - id: R22
+    code: "HFS_TS_STRICT"
+    title_vi: "tsconfig hạ cờ strict"
+    law: "tsconfig extends `@starci/tsconfig` and lowers no flag."
+    kinds: [codemod, design]
+    gates: [pre-push, land, ci]
+    failureCodes: ["HFS_TS_STRICT"]
+    enforcers:
+      - {kind: hfs, id: ts-strict, status: planned}
+  - id: R23
+    code: "HFS_CONTRACT_SNAPSHOT_DRIFT"
+    title_vi: "Bản hợp đồng lệch bản thật"
+    law: "Contract snapshot equals the emit, the FE copy equals the BE."
+    kinds: [check]
+    gates: [land, ci]
+    failureCodes: ["HFS_CONTRACT_SNAPSHOT_DRIFT"]
+    enforcers:
+      - {kind: hfs, id: contract-snapshot-drift, status: planned}
+  - id: R24
+    code: "HFS_ARCH_CONFIG_UNREAD"
+    title_vi: "Máy kiến trúc không đọc được hfs.json"
+    law: "The machine reads `hfs.json`; zero files analysed is red."
+    kinds: [check]
+    gates: [land, ci]
+    failureCodes: ["HFS_ARCH_CONFIG_UNREAD"]
+    enforcers:
+      - {kind: machine, id: arch-config-unread, status: planned}
+  - id: R25
+    code: "HFS_UNUSED_EXPORT"
+    title_vi: "Export công khai không ai dùng"
+    law: "No public export without a consumer."
+    kinds: [check, codemod]
+    gates: [land, ci]
+    failureCodes: ["HFS_UNUSED_EXPORT"]
+    enforcers:
+      - {kind: hfs, id: unused-export, status: planned}
+  - id: R26
+    code: "BE_TIER_DIRECTION"
+    title_vi: "Hướng import giữa các tầng bị cấm"
+    law: "The tier direction matrix."
+    kinds: [check, design]
+    gates: [pre-push, settle, land, ci]
+    failureCodes: ["BE_TIER_DIRECTION"]
+    enforcers:
+      - {kind: machine, id: tier-direction, status: planned}
+  - id: R27
+    code: "ARCH_OWNER_CYCLE"
+    title_vi: "Vòng phụ thuộc giữa các owner"
+    law: "No owner cycles, type-only included."
+    kinds: [check, design]
+    gates: [pre-push, settle, land, ci]
+    failureCodes: ["ARCH_OWNER_CYCLE"]
+    enforcers:
+      - {kind: machine, id: owner-cycle, status: planned}
+  - id: R28
+    code: "BE_FEATURE_IMPORTS_FEATURE"
+    title_vi: "Feature import feature khác"
+    law: "A feature never imports a feature."
+    kinds: [check, design]
+    gates: [settle, land, ci]
+    failureCodes: ["BE_FEATURE_IMPORTS_FEATURE"]
+    enforcers:
+      - {kind: machine, id: feature-imports-feature, status: planned}
+  - id: R29
+    code: "BE_FEATURE_SHAPE"
+    title_vi: "Feature sai hình dạng"
+    law: "Feature root is `index.ts`, module, `application/`, `transport/<protocol>/`."
+    kinds: [check, codemod, design]
+    gates: [settle, land, ci]
+    failureCodes: ["BE_FEATURE_SHAPE"]
+    enforcers:
+      - {kind: machine, id: feature-shape, status: planned}
+  - id: R30
+    code: "BE_PUBLIC_SURFACE"
+    title_vi: "Import sâu qua cổng công khai"
+    law: "Cross-owner imports use `index.ts`; no `export *`; at most 60 exports."
+    kinds: [check, lint, codemod]
+    gates: [pre-push, settle, land, ci]
+    failureCodes: ["BE_PUBLIC_SURFACE", "ARCH_OWNER_EXPORT_BYPASS", "ARCH_OWNER_EXPORT_STAR"]
+    enforcers:
+      - {kind: eslint-be, id: must-deep-module-import}
+      - {kind: eslint-be, id: no-folder-reexport}
+      - {kind: machine, id: owner-export-bypass, at: scripts/checks/architecture/index.mjs}
+      - {kind: machine, id: index-export-count, status: planned}
+  - id: R31
+    code: "BE_FEATURE_NOT_COMPOSED"
+    title_vi: "Feature không được app nào compose"
+    law: "Every feature and transport module is composed by an app."
+    kinds: [check, design]
+    gates: [land, ci]
+    failureCodes: ["BE_FEATURE_NOT_COMPOSED"]
+    enforcers:
+      - {kind: machine, id: feature-not-composed, status: planned}
+  - id: R32
+    code: "BE_APP_COMPOSITION_ONLY"
+    title_vi: "App chứa logic ngoài việc compose"
+    law: "Apps compose only; the composition spec boots the real module."
+    kinds: [check, codemod]
+    gates: [settle, land, ci]
+    failureCodes: ["BE_APP_COMPOSITION_ONLY"]
+    enforcers:
+      - {kind: machine, id: app-composition-only, at: scripts/checks/architecture/backend.mjs}
+      - {kind: machine, id: composition-spec-boots-real-module, status: planned}
+  - id: R33
+    code: "BE_ENTRYPOINT_ONLY_IN_APPS"
+    title_vi: "Entrypoint nằm ngoài apps"
+    law: "Entrypoints only in `apps/*/src`."
+    kinds: [check, codemod]
+    gates: [land, ci]
+    failureCodes: ["BE_ENTRYPOINT_ONLY_IN_APPS"]
+    enforcers:
+      - {kind: machine, id: entrypoint-only-in-apps, status: planned}
+  - id: R34
+    code: "BE_SCHEMA_AUTHORITY"
+    title_vi: "Schema bị định nghĩa lúc chạy"
+    law: "Migrations are the only schema authority; `synchronize` is `false`."
+    kinds: [lint, codemod, design]
+    gates: [pre-commit, pre-push, settle, land, ci]
+    failureCodes: ["BE_SCHEMA_AUTHORITY"]
+    enforcers:
+      - {kind: eslint-be, id: no-runtime-schema}
+  - id: R35
+    code: "BE_SCHEMA_OWNER"
+    title_vi: "Entity hoặc migration sai chủ"
+    law: "Entities and migrations live in the owning capability's `persistence/`."
+    kinds: [check, codemod, design]
+    gates: [settle, land, ci]
+    failureCodes: ["BE_SCHEMA_OWNER"]
+    enforcers:
+      - {kind: machine, id: schema-owner, status: planned}
+  - id: R36
+    code: "BE_SQL_OUTSIDE_REPOSITORY"
+    title_vi: "SQL thô ngoài repository"
+    law: "Raw SQL only in `*.repository.ts`."
+    kinds: [lint, design]
+    gates: [settle, land, ci]
+    failureCodes: ["BE_SQL_OUTSIDE_REPOSITORY"]
+    enforcers:
+      - {kind: eslint-be, id: sql-only-in-repository}
+  - id: R37
+    code: "BE_ENTITY_IN_CONTRACT"
+    title_vi: "Entity ORM lộ ra hợp đồng"
+    law: "No ORM entity in a contract or transport type."
+    kinds: [lint, design]
+    gates: [settle, land, ci]
+    failureCodes: ["BE_ENTITY_IN_CONTRACT"]
+    enforcers:
+      - {kind: eslint-be, id: no-entity-in-contract}
+  - id: R38
+    code: "BE_ERROR_HOME"
+    title_vi: "Lỗi đặt sai nhà"
+    law: "Errors live in the owning capability's `errors/` and extend `DomainError`."
+    kinds: [lint, check, codemod]
+    gates: [settle, land, ci]
+    failureCodes: ["BE_ERROR_HOME"]
+    enforcers:
+      - {kind: eslint-be, id: error-home}
+      - {kind: machine, id: error-home, status: planned}
+  - id: R39
+    code: "BE_ERROR_MASKED"
+    title_vi: "Lỗi nội bộ lộ ra client"
+    law: "One filter per app; undeclared errors are masked."
+    kinds: [check, codemod]
+    gates: [land, ci]
+    failureCodes: ["BE_ERROR_MASKED"]
+    enforcers:
+      - {kind: machine, id: error-masked, status: planned}
+  - id: R40
+    code: "BE_LOGGER_REQUIRED"
+    title_vi: "Catch nuốt lỗi"
+    law: "`platform/logging` exists; every `catch` logs, rethrows or returns a reasoned outcome."
+    kinds: [lint, design]
+    gates: [pre-commit, pre-push, settle, land, ci]
+    failureCodes: ["BE_LOGGER_REQUIRED"]
+    enforcers:
+      - {kind: eslint-be, id: catch-must-account}
+  - id: R41
+    code: "BE_DEFAULT_DENY"
+    title_vi: "Mặc định không chặn truy cập"
+    law: "APP_GUARD plus `@Public({ reason })`; typed bodies; `timingSafeEqual`."
+    kinds: [lint, check, codemod]
+    gates: [pre-commit, pre-push, settle, land, ci]
+    failureCodes: ["BE_DEFAULT_DENY"]
+    enforcers:
+      - {kind: eslint-be, id: no-untyped-body}
+      - {kind: eslint-be, id: public-needs-reason}
+      - {kind: eslint-be, id: secret-compare-timing-safe}
+      - {kind: machine, id: default-deny-app-guard, status: planned}
+  - id: R42
+    code: "BE_INPUT_BOUNDED"
+    title_vi: "Input không giới hạn"
+    law: "Bounded input, depth limits, rate limits."
+    kinds: [lint, design]
+    gates: [settle, land, ci]
+    failureCodes: ["BE_INPUT_BOUNDED"]
+    enforcers:
+      - {kind: eslint-be, id: input-bounded, status: planned}
+  - id: R43
+    code: "BE_CONFIG_OWNER"
+    title_vi: "Đọc process.env ngoài platform/config"
+    law: "Only `platform/config` reads `process.env`; config per capability."
+    kinds: [lint, design]
+    gates: [pre-commit, pre-push, settle, land, ci]
+    failureCodes: ["BE_CONFIG_OWNER"]
+    enforcers:
+      - {kind: eslint-be, id: no-direct-env-read}
+  - id: R44
+    code: "BE_SECRET_DEFAULT"
+    title_vi: "Giá trị mặc định cho bí mật hoặc URL hạ tầng"
+    law: "No default for a secret key or infrastructure URL."
+    kinds: [lint, codemod]
+    gates: [pre-commit, pre-push, land, ci]
+    failureCodes: ["BE_SECRET_DEFAULT"]
+    enforcers:
+      - {kind: eslint-be, id: no-secret-default}
+  - id: R45
+    code: "BE_MODULE_SHAPE"
+    title_vi: "Module sai hình dạng"
+    law: "`@Global` only on config, logging, database; typed options; one module per transport."
+    kinds: [lint, check, codemod]
+    gates: [pre-commit, pre-push, settle, land, ci]
+    failureCodes: ["BE_MODULE_SHAPE"]
+    enforcers:
+      - {kind: eslint-be, id: global-module-allowlist}
+      - {kind: eslint-be, id: typed-module-definition}
+      - {kind: eslint-be, id: static-module-register}
+      - {kind: eslint-be, id: no-new-injectable}
+      - {kind: eslint-be, id: no-module-let}
+      - {kind: eslint-be, id: one-module-per-file}
+      - {kind: machine, id: module-per-transport, status: planned}
+  - id: R46
+    code: "BE_BACKGROUND_UNOWNED"
+    title_vi: "Việc nền không có ai chạy"
+    law: "Every sweep, outbox or retry has a job or consumer run by a worker app."
+    kinds: [check, design]
+    gates: [land, ci]
+    failureCodes: ["BE_BACKGROUND_UNOWNED"]
+    enforcers:
+      - {kind: machine, id: background-unowned, status: planned}
+  - id: R47
+    code: "BE_TEST_TOPOLOGY"
+    title_vi: "Cấu hình test lệch chuẩn"
+    law: "One jest config, projects `unit` and `e2e`, live by folder, `diagnostics: false`."
+    kinds: [check, codemod]
+    gates: [land, ci]
+    failureCodes: ["BE_TEST_TOPOLOGY"]
+    enforcers:
+      - {kind: hfs, id: test-topology, status: planned}
+  - id: R48
+    code: "BE_SPEC_QUALITY"
+    title_vi: "Spec đọc mã nguồn hoặc ép kiểu mock"
+    law: "No source-reading specs, no cast doubles; `lint:e2e` is green."
+    kinds: [lint, design]
+    gates: [settle, land, ci]
+    failureCodes: ["BE_SPEC_QUALITY"]
+    enforcers:
+      - {kind: eslint-be, id: spec-no-source-read}
+      - {kind: eslint-be, id: spec-typed-doubles}
+  - id: R49
+    code: "FE_ENV_OWNER"
+    title_vi: "Đọc biến môi trường ngoài modules/config"
+    law: "Only `modules/config` reads the environment; no localhost fallback."
+    kinds: [lint, codemod]
+    gates: [pre-commit, pre-push, settle, land, ci]
+    failureCodes: ["FE_ENV_OWNER"]
+    enforcers:
+      - {kind: eslint-fe, id: no-env-outside-config}
+      - {kind: eslint-fe, id: no-hardcoded-endpoint-fallback}
+  - id: R50
+    code: "FE_TRANSPORT_OWNER"
+    title_vi: "fetch ngoài client duy nhất"
+    law: "One `fetch` in `modules/api/client.ts`, with timeout and abort."
+    kinds: [check, lint, design]
+    gates: [settle, land, ci]
+    failureCodes: ["FE_TRANSPORT_OWNER"]
+    enforcers:
+      - {kind: eslint-fe, id: fetch-only-in-api-client}
+      - {kind: eslint-fe, id: client-fetch-has-signal}
+      - {kind: eslint-fe, id: no-shared-transport-state}
+      - {kind: machine, id: transport-owner, status: planned}
+  - id: R51
+    code: "FE_HTTP_STATUS_COLLAPSE"
+    title_vi: "Gộp mọi mã HTTP thành một nhánh"
+    law: "One `Outcome<T>`; 401 and 403 become `refused`."
+    kinds: [lint, design]
+    gates: [settle, land, ci]
+    failureCodes: ["FE_HTTP_STATUS_COLLAPSE"]
+    enforcers:
+      - {kind: eslint-fe, id: client-maps-auth-to-refused}
+      - {kind: eslint-fe, id: no-http-status-collapse}
+  - id: R52
+    code: "FE_WIRE_GENERATED"
+    title_vi: "Kiểu wire gõ tay"
+    law: "Wire types generated from the contract copy."
+    kinds: [lint, check, design]
+    gates: [settle, land, ci]
+    failureCodes: ["FE_WIRE_GENERATED"]
+    enforcers:
+      - {kind: eslint-fe, id: no-hand-typed-wire}
+      - {kind: hfs, id: wire-generated, status: planned}
+  - id: R53
+    code: "FE_ERROR_BOUNDARY_MISSING"
+    title_vi: "Thiếu error boundary"
+    law: "Global, locale error, not-found and loading boundaries exist."
+    kinds: [check, codemod]
+    gates: [settle, land, ci]
+    failureCodes: ["FE_ERROR_BOUNDARY_MISSING"]
+    enforcers:
+      - {kind: machine, id: error-boundary-missing, status: planned}
+  - id: R54
+    code: "FE_ROUTE_FILES_THIN"
+    title_vi: "Tệp route không mỏng"
+    law: "Route files mount one owner; Next conventions (`proxy.ts`, metadata)."
+    kinds: [check]
+    gates: [settle, land, ci]
+    failureCodes: ["FE_ROUTE_FILES_THIN", "FE_NEXT_CONVENTIONS"]
+    enforcers:
+      - {kind: eslint-fe, id: no-middleware-file}
+      - {kind: machine, id: route-files-thin, status: planned}
+  - id: R55
+    code: "FE_CLIENT_BOUNDARY"
+    title_vi: "use client sai chỗ"
+    law: "Server first; `\"use client\"` only where allowed."
+    kinds: [lint]
+    gates: [pre-commit, pre-push, settle, land, ci]
+    failureCodes: ["FE_CLIENT_BOUNDARY"]
+    enforcers:
+      - {kind: eslint-fe, id: use-client-only-at-boundary}
+  - id: R56
+    code: "FE_HOOKS_ARE_HOOKS"
+    title_vi: "hooks/ chứa thứ không phải hook"
+    law: "`hooks/` hold hooks and one shared file per domain."
+    kinds: [check, codemod]
+    gates: [settle, land, ci]
+    failureCodes: ["FE_HOOKS_ARE_HOOKS"]
+    enforcers:
+      - {kind: eslint-fe, id: hooks-folder-holds-hooks-only}
+      - {kind: machine, id: hooks-are-hooks, status: planned}
+  - id: R57
+    code: "FE_OWNER_REACHABLE"
+    title_vi: "Owner không được route nào mount"
+    law: "Every owner is mounted; every href resolves to a route."
+    kinds: [check, design]
+    gates: [land, ci]
+    failureCodes: ["FE_OWNER_REACHABLE"]
+    enforcers:
+      - {kind: machine, id: owner-reachable, status: planned}
+  - id: R58
+    code: "FE_I18N_LITERAL"
+    title_vi: "Chữ hiển thị không đi qua t()"
+    law: "No display text at any tier, no escape comment."
+    kinds: [lint, codemod]
+    gates: [pre-commit, pre-push, settle, land, ci]
+    failureCodes: ["FE_I18N_LITERAL"]
+    enforcers:
+      - {kind: eslint-fe, id: no-hardcoded-copy}
+      - {kind: eslint-fe, id: html-lang-from-locale}
+  - id: R59
+    code: "FE_I18N_PLACEMENT"
+    title_vi: "i18n sai chuẩn next-intl"
+    law: "`next-intl`, `[locale]`, `modules/i18n/`."
+    kinds: [check, codemod]
+    gates: [settle, land, ci]
+    failureCodes: ["FE_I18N_PLACEMENT"]
+    enforcers:
+      - {kind: eslint-fe, id: locale-segment-is-locale}
+      - {kind: eslint-fe, id: no-second-i18n-stack}
+      - {kind: hfs, id: i18n-placement, status: planned}
+  - id: R60
+    code: "FE_I18N_CATALOG"
+    title_vi: "Catalog ngôn ngữ lệch key"
+    law: "Same keys in every catalog, real catalog in specs, `pick` for clients."
+    kinds: [check]
+    gates: [land, ci]
+    failureCodes: ["FE_I18N_CATALOG"]
+    enforcers:
+      - {kind: eslint-fe, id: no-mocked-translations}
+      - {kind: hfs, id: i18n-catalog, status: planned}
+  - id: R61
+    code: "FE_STYLE_TOKEN_ONLY"
+    title_vi: "CSS ngoài token"
+    law: "Token-only CSS; colour only in `brand.css`; every `@source` resolves (sub-check `FE_STYLE_SOURCE_UNRESOLVED`)."
+    kinds: [lint, check, design]
+    gates: [pre-commit, pre-push, settle, land, ci]
+    failureCodes: ["FE_STYLE_TOKEN_ONLY", "FE_STYLE_SOURCE_UNRESOLVED"]
+    enforcers:
+      - {kind: stylelint, id: token-only, status: planned}
+      - {kind: eslint-fe, id: no-raw-brand-value}
+      - {kind: hfs, id: style-source-unresolved, status: planned}
+  - id: R62
+    code: "FE_NATIVE_FORM_CONTROL"
+    title_vi: "Control form thô"
+    law: "No raw form controls in product tiers."
+    kinds: [lint, design]
+    gates: [pre-commit, pre-push, settle, land, ci]
+    failureCodes: ["FE_NATIVE_FORM_CONTROL"]
+    enforcers:
+      - {kind: eslint-fe, id: no-native-form-control}
+  - id: R63
+    code: "FE_PACKAGE_SHAPE"
+    title_vi: "Gói dùng chung sai hình dạng"
+    law: "Packages build to `dist` with explicit exports and no dead unit."
+    kinds: [check, design]
+    gates: [land, ci]
+    failureCodes: ["FE_PACKAGE_SHAPE"]
+    enforcers:
+      - {kind: machine, id: package-shape, status: planned}
+  - id: R64
+    code: "FE_APP_ISOLATION"
+    title_vi: "App import app khác"
+    law: "Apps never import apps; ui-screen declares `app`."
+    kinds: [check, codemod]
+    gates: [settle, land, ci]
+    failureCodes: ["FE_APP_ISOLATION"]
+    enforcers:
+      - {kind: machine, id: app-isolation, status: planned}
+  - id: R65
+    code: "FE_SIZE_AND_STATE_BUDGET"
+    title_vi: "Vượt ngân sách hook và state"
+    law: "Hook and state budgets; no hand-written poll loop."
+    kinds: [lint, design]
+    gates: [settle, land, ci]
+    failureCodes: ["FE_SIZE_AND_STATE_BUDGET"]
+    enforcers:
+      - {kind: eslint-fe, id: component-line-budget}
+      - {kind: eslint-fe, id: unit-hook-budget}
+      - {kind: eslint-fe, id: no-hand-rolled-polling}
+  - id: R66
+    code: "FE_E2E_SHAPE"
+    title_vi: "Spec e2e sai hình dạng"
+    law: "Playwright shape, three viewports, no environment coupling."
+    kinds: [lint, codemod]
+    gates: [land, ci]
+    failureCodes: ["FE_E2E_SHAPE"]
+    enforcers:
+      - {kind: eslint-fe, id: e2e-spec-location}
+      - {kind: eslint-fe, id: e2e-no-absolute-path}
+      - {kind: eslint-fe, id: e2e-no-docker}
+      - {kind: eslint-fe, id: e2e-no-cross-repo-write}
+      - {kind: eslint-fe, id: e2e-no-skip}
+      - {kind: eslint-fe, id: e2e-typed-helpers}
+      - {kind: eslint-fe, id: playwright-viewports}
+  - id: R67
+    code: "FE_SPEC_QUALITY"
+    title_vi: "Spec component kém chất lượng"
+    law: "No class pinning, no barrel specs, axe per connected screen."
+    kinds: [lint, design]
+    gates: [settle, land, ci]
+    failureCodes: ["FE_SPEC_QUALITY"]
+    enforcers:
+      - {kind: eslint-fe, id: no-class-string-in-spec}
+      - {kind: eslint-fe, id: spec-tests-its-neighbour}
+      - {kind: eslint-fe, id: no-barrel-spec}
+      - {kind: eslint-fe, id: no-double-cast-in-spec}
+      - {kind: eslint-fe, id: connected-spec-has-axe}

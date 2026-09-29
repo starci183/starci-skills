@@ -48,6 +48,11 @@ branches:
     path: hfs/slots.yaml
     use: The one manifest of what may exist in a repository, where, and which tier may import which; read only
       through scripts/lib/hfs-slots.mjs. A repository carries hfs.json (modules/schemas/hfs-repo.schema.yaml).
+  - id: hfs-rules
+    title: HFS v2 rule catalog
+    path: hfs/rules.yaml
+    use: The 67 HFS v2 rules R01-R67 as data - finding code, Vietnamese title, gates, failure codes and every enforcer; read
+      only through scripts/lib/hfs-slots.mjs (loadRuleCatalog, rules) and held to the packages by scripts/checks/check-hfs-rules.mjs.
   - id: enforcement
     title: Enforcement
     path: patterns/enforcement.yaml

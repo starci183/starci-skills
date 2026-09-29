@@ -25,6 +25,8 @@ export const OWNERS = Object.freeze(['op-retry', 'runtime-core', 'supervisor', '
 /** other-op:<op> is also an owner: the finding is another op's to fix. */
 export const ownerValid = (owner) => OWNERS.includes(owner) || /^other-op:[a-z][a-z0-9.-]*$/.test(String(owner ?? ''));
 const SCAN_DIRS = ['scripts', 'engine', 'modules'];
+// The HFS v2 rule catalog names the code of every rule, including rules whose checker is still owed, so it emits them too.
+const SCAN_FILES = ['knowledge/hfs/rules.yaml'];
 const SCAN_EXT = /\.(mjs|yaml)$/;
 // The scanner does not read its own catalog checker, the catalog, or the ui/ harness.
 const SKIP_FILES = new Set([CATALOG_FILE, 'scripts/checks/failure-codes.mjs']);
@@ -86,7 +88,7 @@ export function emittedCodes(base = root) {
   const NOT_CODES = readNotCodes(base);
   const envNames = new Set();
   const texts = [];
-  for (const d of SCAN_DIRS) for (const file of walk(path.join(base, d))) {
+  for (const file of [...SCAN_DIRS.flatMap((d) => [...walk(path.join(base, d))]), ...SCAN_FILES.map((f) => path.join(base, f)).filter((f) => fs.existsSync(f))]) {
     const rel = path.relative(base, file).split(path.sep).join('/');
     if (SKIP_FILES.has(rel)) continue;
     const text = fs.readFileSync(file, 'utf8');

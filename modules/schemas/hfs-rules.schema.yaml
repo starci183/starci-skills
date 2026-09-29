@@ -1,0 +1,88 @@
+$schema: https://json-schema.org/draft/2020-12/schema
+$id: urn:starci:hfs-rules:2
+title: HFS v2 rule catalog
+description: >-
+  The shape of knowledge/hfs/rules.yaml. Semantic rules JSON Schema cannot state (ids R01..R<n> in order, a failure code
+  named by one rule only, the first failure code is the rule's own code, an existing non-eslint enforcer names its file,
+  every rule runs at land, a pre-commit rule also runs at pre-push, the sonar gate needs a sonar enforcer) are checked by
+  scripts/lib/hfs-slots.mjs loadRuleCatalog. Whether the named eslint rules, files and catalog entries exist is
+  scripts/checks/check-hfs-rules.mjs.
+type: object
+additionalProperties: false
+required: [schema, version, gates, enforcerKinds, rules]
+properties:
+  schema: {const: starci/hfs-rules@2}
+  version:
+    type: string
+    pattern: '^[0-9]+\.[0-9]+\.[0-9]+$'
+    description: MAJOR.MINOR.PATCH. The major equals the number after @ in `schema` and the major of knowledge/hfs/slots.yaml.
+  gates:
+    type: object
+    additionalProperties: false
+    required: [pre-commit, pre-push, settle, land, ci, sonar]
+    properties:
+      pre-commit: {type: string, minLength: 1}
+      pre-push: {type: string, minLength: 1}
+      settle: {type: string, minLength: 1}
+      land: {type: string, minLength: 1}
+      ci: {type: string, minLength: 1}
+      sonar: {type: string, minLength: 1}
+  enforcerKinds:
+    type: object
+    additionalProperties: false
+    required: [eslint-be, eslint-fe, stylelint, machine, hfs, work-validate, sonar]
+    properties:
+      eslint-be: {type: string, minLength: 1}
+      eslint-fe: {type: string, minLength: 1}
+      stylelint: {type: string, minLength: 1}
+      machine: {type: string, minLength: 1}
+      hfs: {type: string, minLength: 1}
+      work-validate: {type: string, minLength: 1}
+      sonar: {type: string, minLength: 1}
+  rules:
+    type: array
+    minItems: 1
+    items: {$ref: '#/$defs/rule'}
+$defs:
+  rule:
+    type: object
+    additionalProperties: false
+    required: [id, code, title_vi, law, kinds, gates, failureCodes, enforcers]
+    properties:
+      id: {type: string, pattern: '^R[0-9]{2}$'}
+      code:
+        type: string
+        pattern: '^[A-Z][A-Z0-9]*(_[A-Z0-9]+)+$'
+        description: The rule's finding code, a key of modules/kernel/failure-codes.yaml.
+      title_vi: {type: string, minLength: 1, description: Short Vietnamese title.}
+      law: {type: string, minLength: 1, description: The rule in one English line.}
+      kinds:
+        type: array
+        minItems: 1
+        uniqueItems: true
+        items: {enum: [codemod, lint, check, design]}
+        description: How a violation is fixed and blocked - codemod, lint (eslint or stylelint), check (machine, hfs or work-validate), design (a person or Opus decides).
+      gates:
+        type: array
+        minItems: 1
+        uniqueItems: true
+        items: {enum: [pre-commit, pre-push, settle, land, ci, sonar]}
+      failureCodes:
+        type: array
+        minItems: 1
+        uniqueItems: true
+        items: {type: string, pattern: '^[A-Z][A-Z0-9]*(_[A-Z0-9]+)+$'}
+        description: The rule's own code first, then any sub-check codes that report the same rule.
+      enforcers:
+        type: array
+        minItems: 1
+        items: {$ref: '#/$defs/enforcer'}
+  enforcer:
+    type: object
+    additionalProperties: false
+    required: [kind, id]
+    properties:
+      kind: {enum: [eslint-be, eslint-fe, stylelint, machine, hfs, work-validate, sonar]}
+      id: {type: string, pattern: '^[a-z][a-z0-9]*(-[a-z0-9]+)*$'}
+      status: {const: planned, description: Present only while the enforcer is owed; absent means it exists.}
+      at: {type: string, minLength: 1, description: Repository-relative file that emits one of the rule's failure codes; only an existing machine, hfs or work-validate enforcer carries it.}

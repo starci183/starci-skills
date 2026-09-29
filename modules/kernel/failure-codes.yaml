@@ -11410,3 +11410,604 @@ SEALED_FILE_IN_WORK:
   nextStep_vi: "Đây là lỗi bị từ chối; op work.author hoặc op uat.verify chuyển tệp bằng git mv tới .starcistacks/<môi-trường>/secrets/<slug>.enc và trỏ custody.sealed vào đó, không đọc hay in nội dung."
   owner: other-op:work.author
   kind: check-finding
+
+# --- HFS v2 rule catalog (knowledge/hfs/rules.yaml): one code per rule, from R01 to R67 ---
+
+HFS_SLOT_UNDECLARED:
+  title: "Every tracked path matches exactly one slot"
+  title_vi: "Đường dẫn không thuộc ô nào"
+  meaning_vi: "Tệp `<path>` không thuộc slot nào của HFS v2. Chuyển nó vào slot đúng chủ, hoặc đề xuất slot mới (bump minor) — không thêm ngoại lệ."
+  causes_vi:
+    - "Vi phạm luật R01: Mọi path được track phải khớp đúng một slot trong `knowledge/hfs/slots.yaml` (thay allowlist gốc v1)."
+  nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra; không cần ai can thiệp thêm."
+  owner: op-retry
+  kind: check-finding
+
+HFS_SLOT_REQUIRED_MISSING:
+  title: "A slot is missing a required file (feature `index.ts`, app composition spec, FE `global-error.tsx`)"
+  title_vi: "Ô thiếu tệp bắt buộc"
+  meaning_vi: "Slot `<slot>` tại `<dir>` thiếu tệp bắt buộc `<file>`."
+  causes_vi:
+    - "Vi phạm luật R02: Slot bắt buộc thiếu tệp `requires` (vd feature thiếu `index.ts`, app thiếu composition spec, FE thiếu `global-error.tsx`)."
+  nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra (nợ hàng loạt có codemod của HFS); không cần ai can thiệp thêm."
+  owner: op-retry
+  kind: check-finding
+
+HFS_UNTRACKED_ROOT_ENTRY:
+  title: "No untracked or ignored entry outside an `ignored` slot"
+  title_vi: "Mục lạ ở gốc kho"
+  meaning_vi: "Có `<name>` ở gốc repo nhưng HFS không cho phép nó tồn tại ở đây (kể cả khi đã ignore). Lưu trữ ra `D:/starci-archive/` rồi xóa."
+  causes_vi:
+    - "Vi phạm luật R03: Thư mục làm việc không được có mục untracked/ignored ngoài slot `ignored` (vd `nul`, `.qwen/`, `.worktrees/`, `design-plans/`, `express`)."
+  nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra (nợ hàng loạt có codemod của HFS); không cần ai can thiệp thêm."
+  owner: op-retry
+  kind: check-finding
+
+HFS_GITIGNORE_BLOCK_DRIFT:
+  title: "The managed `.gitignore` block equals its render"
+  title_vi: "Khối .gitignore lệch bản render"
+  meaning_vi: "Khối .gitignore chuẩn đã bị sửa tay hoặc thiếu dòng `<rule>`. Chạy `hfs sync`."
+  causes_vi:
+    - "Vi phạm luật R04: Khối `.gitignore` do `.claude` quản lý phải trùng bản render (never-tracked list, deny `.env*`, cache)."
+  nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra (nợ hàng loạt có codemod của HFS); không cần ai can thiệp thêm."
+  owner: op-retry
+  kind: check-finding
+
+HFS_MANAGED_FILE_DRIFT:
+  title: "A managed file equals its template render"
+  title_vi: "Tệp do .claude quản lý bị lệch"
+  meaning_vi: "`<file>` do `.claude` quản lý nhưng nội dung lệch template `<id>` v`<ver>`. Chạy `hfs sync`, không sửa tay."
+  causes_vi:
+    - "Vi phạm luật R05: Tệp có `managedBy` (husky, workflows, sonar, codecov, tsconfig/eslint/prettier stub) phải bằng bản render từ template."
+  nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra (nợ hàng loạt có codemod của HFS); không cần ai can thiệp thêm."
+  owner: op-retry
+  kind: check-finding
+
+HFS_PLAINTEXT_SECRET:
+  title: "Secrets exist only as `.starcistacks/<env>/secrets/<slug>.enc`"
+  title_vi: "Bí mật dạng rõ trong kho"
+  meaning_vi: "Tìm thấy bí mật dạng rõ ở `<path>`. Bí mật chỉ được nằm ở `.starcistacks/<env>/secrets/<slug>.enc` (sops). Không đọc, không in giá trị."
+  causes_vi:
+    - "Vi phạm luật R06: Bí mật chỉ tồn tại ở `.starcistacks/<env>/secrets/<slug>.enc`. Mọi `.env*`, `.secrets/`, `*.key\\|*.pem` plaintext, `runtime/files/*` đều bị từ chối, kể cả khi ignore."
+  nextStep_vi: "Không đọc và không in giá trị. Chủ kho mã hoá bí mật bằng sops vào .starcistacks/<môi-trường>/secrets/<slug>.enc, sau đó xoá tệp rõ; agent không tạo hay xoay khoá."
+  owner: owner
+  kind: check-finding
+
+HFS_AGENT_DATA_TRACKED:
+  title: "`.starciwork` holds product records only"
+  title_vi: "Dữ liệu của agent bị track"
+  meaning_vi: "`<path>` là dữ liệu của agent, không phải record sản phẩm. Nó thuộc blob store (trích bằng `{name, sha256}`)."
+  causes_vi:
+    - "Vi phạm luật R07: `.starciwork` chỉ chứa record sản phẩm; evidence, log, report, capture, run, sqlite, `_derived/` không được track."
+  nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra (nợ hàng loạt có codemod của HFS); không cần ai can thiệp thêm."
+  owner: op-retry
+  kind: check-finding
+
+HFS_WORK_NODE_RETIRED:
+  title: "Only flat family records, never `work/node`"
+  title_vi: "Còn record work/node đã bỏ"
+  meaning_vi: "Record `<id>` vẫn dùng dạng `work/node` đã bỏ. Chuyển sang family phẳng `<family>`."
+  causes_vi:
+    - "Vi phạm luật R08: Không còn record `work/node@*`; mọi record là record phẳng `features/<f>/<family>/<name>/index.yaml`."
+  nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra (nợ hàng loạt có codemod của HFS); không cần ai can thiệp thêm."
+  owner: op-retry
+  kind: check-finding
+
+HFS_IDENTITY_CUSTODY:
+  title: "An identity points its secret at `secrets/identity-<slug>.enc`; UAT chooses by role"
+  title_vi: "Bí mật của identity sai chỗ"
+  meaning_vi: "Identity `<id>` trỏ bí mật tới `<path>`; chỉ `.starcistacks/<env>/secrets/*.enc` hợp lệ. UAT chọn tài khoản theo role."
+  causes_vi:
+    - "Vi phạm luật R09: Identity record (`_resources/identities/<slug>/resource.yaml`) trỏ `custody.secret` tới `.starcistacks/<env>/secrets/identity-<slug>.enc`; UAT `accounts.yaml` chọn identity theo role, không theo flow."
+  nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra (nợ hàng loạt có codemod của HFS); không cần ai can thiệp thêm."
+  owner: op-retry
+  kind: check-finding
+
+HFS_STACKS_SHAPE:
+  title: "`.starcistacks` has the standard shape and the host Sonar owner"
+  title_vi: "Hình dạng .starcistacks sai"
+  meaning_vi: "`.starcistacks` có `<path>` ngoài hình dạng chuẩn (hoặc còn trỏ `.stacks`)."
+  causes_vi:
+    - "Vi phạm luật R10: `.starcistacks/<env>/` chỉ có `README.md`, `environment.json`, `infra/{compose,k8s,terraform}`, `runtime/{config,env}`, `secrets/`, `seeds/`; khối sonar là `owner: host` trỏ `.claude/ext/sonar`; không còn gốc `.stacks`."
+  nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra (nợ hàng loạt có codemod của HFS); không cần ai can thiệp thêm."
+  owner: op-retry
+  kind: check-finding
+
+HFS_SONAR_CONFIG:
+  title: "Sonar config is generated, with no host URL and matching coverage exclusions"
+  title_vi: "Cấu hình Sonar lệch"
+  meaning_vi: "Cấu hình Sonar lệch: `<detail>`. Hai con số coverage (Codecov/Sonar) sẽ không khớp."
+  causes_vi:
+    - "Vi phạm luật R11: `sonar-project.properties` do template sinh: không `sonar.host.url`, `sources`/`tests` không chồng, `coverage.exclusions` = đúng danh sách loại trừ coverage của jest/vitest, không nhắc kiểu spec đã bỏ."
+  nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra (nợ hàng loạt có codemod của HFS); không cần ai can thiệp thêm."
+  owner: op-retry
+  kind: check-finding
+
+HFS_CI_MISSING_CANON:
+  title: "CI runs the pinned `@starci/hfs check`; pre-push runs typecheck and lint"
+  title_vi: "CI thiếu bước canon"
+  meaning_vi: "Workflow/husky thiếu bước `<step>`. Cấu trúc chỉ được kiểm khi agent chạy — CI phải tự kiểm."
+  causes_vi:
+    - "Vi phạm luật R13: CI phải chạy `npx @starci/hfs check` (bản pin); pre-push phải có `typecheck` + `lint:check`."
+  nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra (nợ hàng loạt có codemod của HFS); không cần ai can thiệp thêm."
+  owner: op-retry
+  kind: check-finding
+
+HFS_DEP_VERSION_SKEW:
+  title: "One version per dependency in the workspace"
+  title_vi: "Một gói nhiều phiên bản"
+  meaning_vi: "`<pkg>` có `<n>` version trong workspace (`<list>`). Chỉ được một."
+  causes_vi:
+    - "Vi phạm luật R14: Mỗi dependency một version trong workspace; cấm bản sao lồng thứ hai (`apps/*/node_modules/@starci/grammar`)."
+  nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra (nợ hàng loạt có codemod của HFS); không cần ai can thiệp thêm."
+  owner: op-retry
+  kind: check-finding
+
+HFS_CANON_PIN_DRIFT:
+  title: "Canon packages and frameworks match `canon-pins.yaml`"
+  title_vi: "Phiên bản canon lệch bản pin"
+  meaning_vi: "`<pkg>` là `<have>` nhưng HFS 2 pin `<want>`. Lint của repo và canon-scan đang xử theo hai luật khác nhau."
+  causes_vi:
+    - "Vi phạm luật R15: `@starci/*`, TypeScript, Next, React, Nest… đúng version exact trong `knowledge/hfs/canon-pins.yaml`."
+  nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra (nợ hàng loạt có codemod của HFS); không cần ai can thiệp thêm."
+  owner: op-retry
+  kind: check-finding
+
+HFS_TOOL_CONFIG_LOCAL:
+  title: "Configs only call the factories; no local rules"
+  title_vi: "Kho tự đặt luật cục bộ"
+  meaning_vi: "Repo tự định nghĩa/tắt luật `<rule>` ở `<file>`. Luật chung nằm trong `.claude`; đề xuất thay đổi ở đó."
+  causes_vi:
+    - "Vi phạm luật R16: `eslint.config.mjs` chỉ gọi `starciBeConfig`/`starciFeConfig`; cấm luật cục bộ, script kiểm kiến trúc cục bộ (`scripts/check-fe-architecture.mjs`), tắt luật trong repo."
+  nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra (nợ hàng loạt có codemod của HFS); không cần ai can thiệp thêm."
+  owner: op-retry
+  kind: check-finding
+
+HFS_RULE_OFF_WITHOUT_REPLACEMENT:
+  title: "A rule is off only when its replacement check is in a repository gate"
+  title_vi: "Tắt luật mà không có check thay thế"
+  meaning_vi: "Luật `<rule>` bị tắt với lý do 'đã có check thay', nhưng check `<id>` không chạy ở cổng nào của repo."
+  causes_vi:
+    - "Vi phạm luật R17: Factory chỉ tắt một luật canon khi check thay thế được liệt kê VÀ có trong cổng của repo (ENF-MANDATORY-2 thành máy)."
+  nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra; không cần ai can thiệp thêm."
+  owner: op-retry
+  kind: check-finding
+
+HFS_FORMAT:
+  title: "Prettier is the only formatter"
+  title_vi: "Chưa format bằng Prettier"
+  meaning_vi: "`<file>` chưa được format. Chạy `npm run format`."
+  causes_vi:
+    - "Vi phạm luật R19: Prettier (config `@starci/prettier-config`) là formatter duy nhất; ESLint không còn luật định dạng."
+  nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra (nợ hàng loạt có codemod của HFS); không cần ai can thiệp thêm."
+  owner: op-retry
+  kind: check-finding
+
+HFS_DUPLICATE_CODE:
+  title: "No duplicated blocks or twice-defined helpers"
+  title_vi: "Mã trùng lặp"
+  meaning_vi: "Khối code ở `<a>` trùng `<b>` (`<n>` dòng). Đưa về chủ chung (`platform/primitives`, `<domain>.shared.ts`, `packages/*`)."
+  causes_vi:
+    - "Vi phạm luật R21: Không lặp khối ≥ 8 dòng/≥ 60 token giữa các tệp (jscpd + Sonar CPD); không định nghĩa lại helper cùng tên (`isRecord`, `useSalesAccessToken`…) ở nhiều tệp."
+  nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra và mục của luật trong knowledge/hfs/README.md; nợ cũ cần quyết định thiết kế nên op không thêm ngoại lệ, chỉ tách hoặc chuyển về đúng chủ."
+  owner: op-retry
+  kind: check-finding
+
+HFS_TS_STRICT:
+  title: "tsconfig extends `@starci/tsconfig` and lowers no flag"
+  title_vi: "tsconfig hạ cờ strict"
+  meaning_vi: "tsconfig hạ cờ `<flag>`. Các cờ strict do `.claude` quy định."
+  causes_vi:
+    - "Vi phạm luật R22: `tsconfig` extends `@starci/tsconfig/{be,fe}.json`: `strict`, `noUncheckedIndexedAccess`, `noImplicitOverride`, `noFallthroughCasesInSwitch`, `allowJs: false`; repo không hạ cờ."
+  nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra (nợ hàng loạt có codemod của HFS); không cần ai can thiệp thêm."
+  owner: op-retry
+  kind: check-finding
+
+HFS_CONTRACT_SNAPSHOT_DRIFT:
+  title: "Contract snapshot equals the emit, the FE copy equals the BE"
+  title_vi: "Bản hợp đồng lệch bản thật"
+  meaning_vi: "Hợp đồng `<file>` lệch bản thật (`<sha>` ≠ `<sha>`). Chạy `contract:emit` (BE) / `contract:pull` (FE)."
+  causes_vi:
+    - "Vi phạm luật R23: BE: `contracts/<app>/schema.graphql` bằng bản emit. FE: `modules/api/contract/*` bằng bản BE (so hash)."
+  nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra; không cần ai can thiệp thêm."
+  owner: op-retry
+  kind: check-finding
+
+HFS_ARCH_CONFIG_UNREAD:
+  title: "The machine reads `hfs.json`; zero files analysed is red"
+  title_vi: "Máy kiến trúc không đọc được hfs.json"
+  meaning_vi: "Kiểm tra kiến trúc không đọc được `hfs.json` hoặc phân tích 0 tệp — đây là đỏ, không phải 'chưa có dữ liệu'."
+  causes_vi:
+    - "Vi phạm luật R24: Máy kiến trúc tự đọc `hfs.json`; phân tích 0 tệp hay `unavailable` cho một profile đã khai = thất bại."
+  nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra; không cần ai can thiệp thêm."
+  owner: op-retry
+  kind: check-finding
+
+HFS_UNUSED_EXPORT:
+  title: "No public export without a consumer"
+  title_vi: "Export công khai không ai dùng"
+  meaning_vi: "`<symbol>` được export từ `<entry>` nhưng không ai dùng. Xóa, hoặc dùng nó."
+  causes_vi:
+    - "Vi phạm luật R25: Không export công khai nào không có người dùng ngoài spec (knip) — áp cho `index.ts` BE, public entry FE, `packages/*`."
+  nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra (nợ hàng loạt có codemod của HFS); không cần ai can thiệp thêm."
+  owner: op-retry
+  kind: check-finding
+
+BE_TIER_DIRECTION:
+  title: "The tier direction matrix"
+  title_vi: "Hướng import giữa các tầng bị cấm"
+  meaning_vi: "`<from>` (tầng `<t1>`) import `<to>` (tầng `<t2>`) — hướng này bị cấm. Hạ kiểu dùng chung xuống platform, hoặc đảo phụ thuộc qua options/port."
+  causes_vi:
+    - "Vi phạm luật R26: Ma trận hướng: feature → domain/platform/integrations; domain → domain/platform/integrations; integrations → platform; platform → platform. Import `type` cũng tính."
+  nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra và mục của luật trong knowledge/hfs/README.md; nợ cũ cần quyết định thiết kế nên op không thêm ngoại lệ, chỉ tách hoặc chuyển về đúng chủ."
+  owner: op-retry
+  kind: check-finding
+
+ARCH_OWNER_CYCLE:
+  title: "No owner cycles, type-only included"
+  title_vi: "Vòng phụ thuộc giữa các owner"
+  meaning_vi: "Có vòng phụ thuộc: `<a> → <b> → … → <a>`. Cắt một cạnh."
+  causes_vi:
+    - "Vi phạm luật R27: Không có chu trình giữa các owner (kể cả `import type`), BE lẫn FE."
+  nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra và mục của luật trong knowledge/hfs/README.md; nợ cũ cần quyết định thiết kế nên op không thêm ngoại lệ, chỉ tách hoặc chuyển về đúng chủ."
+  owner: op-retry
+  kind: check-finding
+
+BE_FEATURE_IMPORTS_FEATURE:
+  title: "A feature never imports a feature"
+  title_vi: "Feature import feature khác"
+  meaning_vi: "Feature `<a>` import feature `<b>`. Logic dùng chung phải là một capability domain."
+  causes_vi:
+    - "Vi phạm luật R28: Feature không import feature khác (kể cả qua `index.ts`); dùng chung thì đưa xuống domain."
+  nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra và mục của luật trong knowledge/hfs/README.md; nợ cũ cần quyết định thiết kế nên op không thêm ngoại lệ, chỉ tách hoặc chuyển về đúng chủ."
+  owner: op-retry
+  kind: check-finding
+
+BE_FEATURE_SHAPE:
+  title: "Feature root is `index.ts`, module, `application/`, `transport/<protocol>/`"
+  title_vi: "Feature sai hình dạng"
+  meaning_vi: "Feature `<f>` có `<dir>` ngoài hình dạng chuẩn (application/ + transport/<protocol>/)."
+  causes_vi:
+    - "Vi phạm luật R29: Feature gốc chỉ có `index.ts`, `<feature>.module.ts`, `application/`, `transport/<protocol>/` với protocol có slot; không `application/graphql\\|http`, không `infrastructure/`, `composition/`, cây transport-first."
+  nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra (nợ hàng loạt có codemod của HFS); không cần ai can thiệp thêm."
+  owner: op-retry
+  kind: check-finding
+
+BE_FEATURE_NOT_COMPOSED:
+  title: "Every feature and transport module is composed by an app"
+  title_vi: "Feature không được app nào compose"
+  meaning_vi: "Feature `<f>` (transport `<p>`) không được app nào compose — code này không bao giờ chạy trong sản phẩm."
+  causes_vi:
+    - "Vi phạm luật R31: Mọi feature (và mọi transport module) phải được ít nhất một app import; không có capability \"đã build, đã test\" mà app thật không chạy."
+  nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra và mục của luật trong knowledge/hfs/README.md; nợ cũ cần quyết định thiết kế nên op không thêm ngoại lệ, chỉ tách hoặc chuyển về đúng chủ."
+  owner: op-retry
+  kind: check-finding
+
+BE_ENTRYPOINT_ONLY_IN_APPS:
+  title: "Entrypoints only in `apps/*/src`"
+  title_vi: "Entrypoint nằm ngoài apps"
+  meaning_vi: "`<file>` là một entrypoint tiến trình nằm ngoài `apps/`."
+  causes_vi:
+    - "Vi phạm luật R33: Không `main.ts`/`bootstrap()`/top-level `void x()` ngoài `apps/*/src`; migrate là `apps/migrate`."
+  nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra (nợ hàng loạt có codemod của HFS); không cần ai can thiệp thêm."
+  owner: op-retry
+  kind: check-finding
+
+BE_SCHEMA_OWNER:
+  title: "Entities and migrations live in the owning capability's `persistence/`"
+  title_vi: "Entity hoặc migration sai chủ"
+  meaning_vi: "Entity/migration `<file>` không nằm dưới `persistence/` của capability sở hữu (hoặc sai tên)."
+  causes_vi:
+    - "Vi phạm luật R35: Entity + migration nằm trong `<capability>/persistence/` của capability sở hữu bảng, có `connection.ts`; tên migration `<yyyyMMddHHmmss>-<kebab>.ts`; danh sách entity/migration export tường minh, app compose."
+  nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra (nợ hàng loạt có codemod của HFS); không cần ai can thiệp thêm."
+  owner: op-retry
+  kind: check-finding
+
+BE_ERROR_MASKED:
+  title: "One filter per app; undeclared errors are masked"
+  title_vi: "Lỗi nội bộ lộ ra client"
+  meaning_vi: "App `<a>` trả thông điệp lỗi nội bộ ra client (`<where>`). Lỗi lạ phải bị che."
+  causes_vi:
+    - "Vi phạm luật R39: Mỗi app đăng ký đúng một filter/formatError của `platform/errors`; lỗi không khai báo → 500 + thông điệp chung, chi tiết chỉ vào log."
+  nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra (nợ hàng loạt có codemod của HFS); không cần ai can thiệp thêm."
+  owner: op-retry
+  kind: check-finding
+
+BE_INPUT_BOUNDED:
+  title: "Bounded input, depth limits, rate limits"
+  title_vi: "Input không giới hạn"
+  meaning_vi: "Input `<field>` ở `<file>` không giới hạn độ dài/định dạng."
+  causes_vi:
+    - "Vi phạm luật R42: Mọi field string của input có giới hạn (`@MaxLength`/scalar có bound); GraphQL có giới hạn depth/complexity; có rate limit ở cửa auth và webhook."
+  nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra và mục của luật trong knowledge/hfs/README.md; nợ cũ cần quyết định thiết kế nên op không thêm ngoại lệ, chỉ tách hoặc chuyển về đúng chủ."
+  owner: op-retry
+  kind: check-finding
+
+BE_BACKGROUND_UNOWNED:
+  title: "Every sweep, outbox or retry has a job or consumer run by a worker app"
+  title_vi: "Việc nền không có ai chạy"
+  meaning_vi: "`<method>` là việc nền nhưng không có job/consumer nào chạy nó — 'khôi phục bền' này không bao giờ chạy."
+  causes_vi:
+    - "Vi phạm luật R46: Công việc nền (outbox, sweep, reconcile, retry) là `transport/schedule/*.job.ts` hoặc `transport/message/*.consumer.ts`, được app `worker` compose; method `sweep*\\|deliver*\\|reconcile*` không có job/consumer gọi = đỏ."
+  nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra và mục của luật trong knowledge/hfs/README.md; nợ cũ cần quyết định thiết kế nên op không thêm ngoại lệ, chỉ tách hoặc chuyển về đúng chủ."
+  owner: op-retry
+  kind: check-finding
+
+BE_TEST_TOPOLOGY:
+  title: "One jest config, projects `unit` and `e2e`, live by folder, `diagnostics: false`"
+  title_vi: "Cấu hình test lệch chuẩn"
+  meaning_vi: "Cấu hình test lệch chuẩn: `<detail>`."
+  causes_vi:
+    - "Vi phạm luật R47: Một `jest.config.js` (preset `@starci/jest-preset`), đúng hai project `unit`, `e2e`; unit không map gì vào `src/tests/e2e`; `diagnostics: false` + `isolatedModules: true`; `test:e2e` = `typecheck:e2e && jest --selectProjects e2e`; live lọc theo thư mục `live/`; không `testing/` trong `src/modules`; fixtures không import feature."
+  nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra (nợ hàng loạt có codemod của HFS); không cần ai can thiệp thêm."
+  owner: op-retry
+  kind: check-finding
+
+FE_ENV_OWNER:
+  title: "Only `modules/config` reads the environment; no localhost fallback"
+  title_vi: "Đọc biến môi trường ngoài modules/config"
+  meaning_vi: "`<file>` đọc env (hoặc fallback localhost). Chỉ `modules/config` được đọc env."
+  causes_vi:
+    - "Vi phạm luật R49: `process.env`/`NEXT_PUBLIC_*` chỉ trong `modules/config`; không fallback `?? \"http://localhost…\"`; thiếu biến ở production thì ném lỗi khi load."
+  nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra (nợ hàng loạt có codemod của HFS); không cần ai can thiệp thêm."
+  owner: op-retry
+  kind: check-finding
+
+FE_TRANSPORT_OWNER:
+  title: "One `fetch` in `modules/api/client.ts`, with timeout and abort"
+  title_vi: "fetch ngoài client duy nhất"
+  meaning_vi: "`fetch` ở `<file>` ngoài `modules/api/client.ts` (hoặc state dùng chung dạng `let`)."
+  causes_vi:
+    - "Vi phạm luật R50: Mỗi app đúng một `fetch` ở `modules/api/client.ts`, có timeout + `AbortSignal`; không singleton `let` giữ token/locale; credential truyền bằng tham số/context."
+  nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra và mục của luật trong knowledge/hfs/README.md; nợ cũ cần quyết định thiết kế nên op không thêm ngoại lệ, chỉ tách hoặc chuyển về đúng chủ."
+  owner: op-retry
+  kind: check-finding
+
+FE_HTTP_STATUS_COLLAPSE:
+  title: "One `Outcome<T>`; 401 and 403 become `refused`"
+  title_vi: "Gộp mọi mã HTTP thành một nhánh"
+  meaning_vi: "`<file>` gộp mọi mã HTTP thành một nhánh. 401/403 phải thành `refused`."
+  causes_vi:
+    - "Vi phạm luật R51: Client trả `Outcome<T>` duy nhất (`ok`/`refused`/`invalid`/`not-found`/`unavailable`); 401/403 → `refused`; cấm `if (!response.ok) return null`; không trả nguyên văn lỗi server làm `reason`."
+  nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra và mục của luật trong knowledge/hfs/README.md; nợ cũ cần quyết định thiết kế nên op không thêm ngoại lệ, chỉ tách hoặc chuyển về đúng chủ."
+  owner: op-retry
+  kind: check-finding
+
+FE_WIRE_GENERATED:
+  title: "Wire types generated from the contract copy"
+  title_vi: "Kiểu wire gõ tay"
+  meaning_vi: "`<file>` tự gõ kiểu wire/ép kiểu phản hồi. Dùng kiểu sinh từ `contract/`."
+  causes_vi:
+    - "Vi phạm luật R52: Kiểu wire sinh từ bản hợp đồng (`codegen`); tài liệu GraphQL trong `.graphql`; cấm `as GraphqlResult<T>`; enum wire không phải `string`."
+  nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra và mục của luật trong knowledge/hfs/README.md; nợ cũ cần quyết định thiết kế nên op không thêm ngoại lệ, chỉ tách hoặc chuyển về đúng chủ."
+  owner: op-retry
+  kind: check-finding
+
+FE_ERROR_BOUNDARY_MISSING:
+  title: "Global, locale error, not-found and loading boundaries exist"
+  title_vi: "Thiếu error boundary"
+  meaning_vi: "App `<a>` thiếu `<file>` — lỗi render sẽ làm trắng cả trang."
+  causes_vi:
+    - "Vi phạm luật R53: Mỗi app có `app/global-error.tsx`, `[locale]/error.tsx`, `[locale]/not-found.tsx`, `loading.tsx` cho mỗi nhóm route có dữ liệu; `errorState` phải khai envelope khi code có `Outcome`."
+  nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra (nợ hàng loạt có codemod của HFS); không cần ai can thiệp thêm."
+  owner: op-retry
+  kind: check-finding
+
+FE_ROUTE_FILES_THIN:
+  title: "Route files mount one owner; Next conventions (`proxy.ts`, metadata)"
+  title_vi: "Tệp route không mỏng"
+  meaning_vi: "Tệp route `<file>` `<what>`. Route chỉ nhận input framework rồi mount một owner."
+  causes_vi:
+    - "Vi phạm luật R54: Luật route áp cho mọi tệp route (`page/layout/template/loading/not-found`): không component inline, không vẽ, không hook; `force-dynamic` cấm trên page client; redirect cũ nằm ở `next.config` `redirects()`."
+  nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra; không cần ai can thiệp thêm."
+  owner: op-retry
+  kind: check-finding
+
+FE_CLIENT_BOUNDARY:
+  title: "Server first; `\"use client\"` only where allowed"
+  title_vi: "use client sai chỗ"
+  meaning_vi: "`\\\"use client\\\"` ở `<file>` (slot `<slot>` không được là client component)."
+  causes_vi:
+    - "Vi phạm luật R55: Server-first: `\"use client\"` chỉ ở `index.tsx` của block có tương tác, leaf có tương tác nội tại, và `error.tsx`/`global-error.tsx` (Next bắt buộc); layout/page là server component."
+  nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra; không cần ai can thiệp thêm."
+  owner: op-retry
+  kind: check-finding
+
+FE_HOOKS_ARE_HOOKS:
+  title: "`hooks/` hold hooks and one shared file per domain"
+  title_vi: "hooks/ chứa thứ không phải hook"
+  meaning_vi: "`<file>` trong `hooks/` không phải React hook. Reader server về `modules/api`, helper về `<domain>.shared.ts`."
+  causes_vi:
+    - "Vi phạm luật R56: `hooks/<domain>/` chỉ chứa `use*.ts` và một `<domain>.shared.ts` cho helper dùng chung; reader server nằm ở `modules/api/<domain>/read-*.ts` (bọc `cache()`)."
+  nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra (nợ hàng loạt có codemod của HFS); không cần ai can thiệp thêm."
+  owner: op-retry
+  kind: check-finding
+
+FE_OWNER_REACHABLE:
+  title: "Every owner is mounted; every href resolves to a route"
+  title_vi: "Owner không được route nào mount"
+  meaning_vi: "Owner `<o>` không được route nào mount (hoặc href `<h>` không có route)."
+  causes_vi:
+    - "Vi phạm luật R57: Mọi owner page/block/layout được route tree mount; cấm owner `() => null`; mọi href dựng từ `modules/routes` và khớp một route có thật."
+  nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra và mục của luật trong knowledge/hfs/README.md; nợ cũ cần quyết định thiết kế nên op không thêm ngoại lệ, chỉ tách hoặc chuyển về đúng chủ."
+  owner: op-retry
+  kind: check-finding
+
+FE_I18N_LITERAL:
+  title: "No display text at any tier, no escape comment"
+  title_vi: "Chữ hiển thị không đi qua t()"
+  meaning_vi: "Chữ `\\\"<text>\\\"` ở `<file>:<line>` không đi qua `t()`."
+  causes_vi:
+    - "Vi phạm luật R58: Không chữ hiển thị (JSX text, `aria-label`, `title`, `placeholder`, `alt`, object copy) ở MỌI tầng, mọi ngôn ngữ; không `vn-ok`; `<html lang>` lấy từ `[locale]`."
+  nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra (nợ hàng loạt có codemod của HFS); không cần ai can thiệp thêm."
+  owner: op-retry
+  kind: check-finding
+
+FE_I18N_PLACEMENT:
+  title: "`next-intl`, `[locale]`, `modules/i18n/`"
+  title_vi: "i18n sai chuẩn next-intl"
+  meaning_vi: "i18n của app `<a>` không theo chuẩn (`<detail>`)."
+  causes_vi:
+    - "Vi phạm luật R59: `next-intl`, segment `[locale]`, `modules/i18n/{config,routing,navigation,request}.ts` + `modules/i18n/messages/<locale>.json`; app một ngôn ngữ vẫn dùng next-intl với một locale."
+  nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra (nợ hàng loạt có codemod của HFS); không cần ai can thiệp thêm."
+  owner: op-retry
+  kind: check-finding
+
+FE_I18N_CATALOG:
+  title: "Same keys in every catalog, real catalog in specs, `pick` for clients"
+  title_vi: "Catalog ngôn ngữ lệch key"
+  meaning_vi: "Catalog `<locale>` thiếu/thừa key `<k>`."
+  causes_vi:
+    - "Vi phạm luật R60: Catalog các locale cùng tập key; không key thừa/thiếu; spec dùng catalog thật (không mock `useTranslations` trả key); catalog tách namespace, client chỉ nhận `pick`."
+  nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra; không cần ai can thiệp thêm."
+  owner: op-retry
+  kind: check-finding
+
+FE_STYLE_TOKEN_ONLY:
+  title: "Token-only CSS; colour only in `brand.css`; every `@source` resolves (sub-check `FE_STYLE_SOURCE_UNRESOLVED`)"
+  title_vi: "CSS ngoài token"
+  meaning_vi: "CSS ở `<file>` dùng `<what>`. Màu/khoảng cách chỉ đến từ token grammar; brand chỉ ở `brand.css`."
+  causes_vi:
+    - "Vi phạm luật R61: stylelint canon: không hex/oklch/rgb ngoài `modules/brand/brand.css`; không `!important`; không selector class trong CSS của app; cấm `*.module.css`; app không khai `--<family>-*`; breakpoint theo thang grammar; `globals.css` chỉ gồm `@import`/`@source` theo thứ tự chuẩn; mọi `@source` phải resolve."
+  nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra và mục của luật trong knowledge/hfs/README.md; nợ cũ cần quyết định thiết kế nên op không thêm ngoại lệ, chỉ tách hoặc chuyển về đúng chủ."
+  owner: op-retry
+  kind: check-finding
+
+FE_NATIVE_FORM_CONTROL:
+  title: "No raw form controls in product tiers"
+  title_vi: "Control form thô"
+  meaning_vi: "`<tag>` thô ở `<file>`. Dùng renderer của grammar."
+  causes_vi:
+    - "Vi phạm luật R62: Không `<select>/<input>/<textarea>/<button>` thô ở tầng sản phẩm; dùng renderer grammar."
+  nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra và mục của luật trong knowledge/hfs/README.md; nợ cũ cần quyết định thiết kế nên op không thêm ngoại lệ, chỉ tách hoặc chuyển về đúng chủ."
+  owner: op-retry
+  kind: check-finding
+
+FE_PACKAGE_SHAPE:
+  title: "Packages build to `dist` with explicit exports and no dead unit"
+  title_vi: "Gói dùng chung sai hình dạng"
+  meaning_vi: "Package `<p>` export source chưa build (hoặc `export *`, hoặc unit không ai dùng)."
+  causes_vi:
+    - "Vi phạm luật R63: `packages/*` build ra `dist`, `exports` tường minh, không `export *`, không unit chết; package UI chỉ chứa composites/branches/leaves + CSS token của family."
+  nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra và mục của luật trong knowledge/hfs/README.md; nợ cũ cần quyết định thiết kế nên op không thêm ngoại lệ, chỉ tách hoặc chuyển về đúng chủ."
+  owner: op-retry
+  kind: check-finding
+
+FE_APP_ISOLATION:
+  title: "Apps never import apps; ui-screen declares `app`"
+  title_vi: "App import app khác"
+  meaning_vi: "`<file>` của app `<a>` import từ app `<b>`."
+  causes_vi:
+    - "Vi phạm luật R64: App không import app khác; dùng chung qua `packages/*`; mỗi ui-screen record khai `app` (work/ui-screen@2)."
+  nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra (nợ hàng loạt có codemod của HFS); không cần ai can thiệp thêm."
+  owner: op-retry
+  kind: check-finding
+
+FE_SIZE_AND_STATE_BUDGET:
+  title: "Hook and state budgets; no hand-written poll loop"
+  title_vi: "Vượt ngân sách hook và state"
+  meaning_vi: "`<unit>` có `<n>` hook dữ liệu / `<m>` useState / vòng poll tự viết."
+  causes_vi:
+    - "Vi phạm luật R65: Component ≤ 300 dòng, connected unit ≤ 6 hook dữ liệu và ≤ 6 `useState`; không vòng polling tự viết; một cơ chế làm tươi mỗi resource. (Phần kích thước dùng `HFS_SIZE_GROWTH`.)"
+  nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra và mục của luật trong knowledge/hfs/README.md; nợ cũ cần quyết định thiết kế nên op không thêm ngoại lệ, chỉ tách hoặc chuyển về đúng chủ."
+  owner: op-retry
+  kind: check-finding
+
+FE_E2E_SHAPE:
+  title: "Playwright shape, three viewports, no environment coupling"
+  title_vi: "Spec e2e sai hình dạng"
+  meaning_vi: "Spec e2e `<file>` lệch khuôn Playwright của HFS: `<what>` (vị trí, đường dẫn tuyệt đối, docker, ghi sang kho khác, test.skip vì thiếu môi trường, helper không có kiểu, hoặc thiếu một trong ba viewport)."
+  causes_vi:
+    - "Vi phạm luật R66: Playwright, `e2e/<area>/*.e2e-spec.ts`; project viewport 1440x900, 768x1024, 390x844; không đường dẫn tuyệt đối, không docker, không ghi sang repo khác; không `test.skip` vì thiếu môi trường; helper có kiểu."
+  nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra (nợ hàng loạt có codemod của HFS); không cần ai can thiệp thêm."
+  owner: op-retry
+  kind: check-finding
+
+FE_SPEC_QUALITY:
+  title: "No class pinning, no barrel specs, axe per connected screen"
+  title_vi: "Spec component kém chất lượng"
+  meaning_vi: "Spec `<file>` vi phạm chất lượng spec của HFS: `<what>` (ghim chuỗi class, không chỉ test chủ thể bên cạnh, spec cho barrel, ép kiểu qua unknown, hoặc màn connected thiếu assert axe)."
+  causes_vi:
+    - "Vi phạm luật R67: Không pin chuỗi class trong spec component; spec chỉ test đúng chủ thể bên cạnh; không spec cho barrel; không `as unknown as`; mỗi màn connected có một assert axe."
+  nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra và mục của luật trong knowledge/hfs/README.md; nợ cũ cần quyết định thiết kế nên op không thêm ngoại lệ, chỉ tách hoặc chuyển về đúng chủ."
+  owner: op-retry
+  kind: check-finding
+
+FE_NEXT_CONVENTIONS:
+  title: "A Next convention of HFS v2 is broken"
+  title_vi: "Vi phạm quy ước Next của HFS"
+  meaning_vi: "Một tệp dùng tên hoặc cách viết cũ của Next: middleware thay vì proxy.ts (từ Next 16), thiếu generateMetadata trên page, turbopack.root sai, hoặc dev và build dùng hai bundler khác nhau. Đây là kiểm tra con của R54 và R02."
+  causes_vi:
+    - "Đặt tên tệp middleware.ts trên Next 16 trở lên"
+    - "Page không có generateMetadata"
+    - "turbopack.root trỏ sai gốc workspace"
+  nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra; không cần ai can thiệp thêm."
+  owner: op-retry
+  kind: check-finding
+
+FE_STYLE_SOURCE_UNRESOLVED:
+  title: "A CSS @source does not resolve"
+  title_vi: "Đường dẫn @source trong CSS không tồn tại"
+  meaning_vi: "Một dòng @source trong globals.css trỏ tới thư mục hoặc tệp không tồn tại, nên Tailwind không quét được lớp class của gói đó. Đây là kiểm tra con của R61."
+  causes_vi:
+    - "Đổi tên hoặc xoá gói nhưng quên sửa @source"
+    - "Gõ sai đường dẫn tương đối tới packages/*"
+  nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra; không cần ai can thiệp thêm."
+  owner: op-retry
+  kind: check-finding
+
+HFS_RULES_INVALID:
+  title: "HFS rule catalog is invalid"
+  title_vi: "Danh mục luật HFS không hợp lệ"
+  meaning_vi: "Tệp knowledge/hfs/rules.yaml không đúng schema hoặc vi phạm một quy tắc ngữ nghĩa (thứ tự R01 đến R67, một mã lỗi chỉ thuộc một luật, luật chạy ở cổng land, luật pre-commit cũng chạy ở pre-push, cổng sonar đi cùng enforcer sonar), nên không luật nào được nạp."
+  causes_vi:
+    - "Sửa tay rules.yaml và gõ sai một trường"
+    - "Thêm luật mà không đủ enforcer, cổng hoặc mã lỗi"
+    - "Major của rules.yaml khác major của slots.yaml"
+  nextStep_vi: "Người giám sát sửa knowledge/hfs/rules.yaml theo modules/schemas/hfs-rules.schema.yaml qua một lane đã land; kho sản phẩm không sửa danh mục này."
+  owner: supervisor
+  kind: check-finding
+
+HFS_RULE_NO_ENFORCER:
+  title: "HFS rule has no enforcer"
+  title_vi: "Luật HFS không có enforcer"
+  meaning_vi: "Một luật trong danh mục không có enforcer nào, hoặc mang loại lint hoặc check mà không có enforcer thuộc họ đó; luật chỉ nằm trên giấy thì không ai chặn được vi phạm."
+  causes_vi:
+    - "Thêm luật mới mà chưa khai enforcer"
+    - "Xoá enforcer cuối cùng của một luật"
+  nextStep_vi: "Người giám sát khai ít nhất một enforcer cho luật (kể cả status: planned nếu còn nợ) qua một lane đã land; agent không thay thế bằng phê duyệt."
+  owner: supervisor
+  kind: check-finding
+
+HFS_RULE_ENFORCER_MISSING:
+  title: "Named enforcer does not exist"
+  title_vi: "Enforcer được khai không tồn tại"
+  meaning_vi: "Danh mục khai một enforcer là luật ESLint, tệp kiểm tra hoặc tệp phát mã lỗi, nhưng luật ESLint không có trong plugin, hoặc tệp không tồn tại hay không phát mã lỗi nào của luật."
+  causes_vi:
+    - "Đổi tên hoặc xoá luật ESLint trong plugin mà không sửa rules.yaml"
+    - "Khai một enforcer chưa được viết mà quên status: planned"
+    - "Tệp kiểm tra bị di chuyển"
+  nextStep_vi: "Người giám sát sửa rules.yaml cho khớp với plugin và tệp thật, hoặc đánh dấu status: planned cho phần còn nợ, qua một lane đã land."
+  owner: supervisor
+  kind: check-finding
+
+HFS_RULE_ENFORCER_STALE:
+  title: "Planned enforcer already ships"
+  title_vi: "Enforcer đánh dấu còn nợ đã có sẵn"
+  meaning_vi: "Danh mục ghi một luật ESLint là status: planned, nhưng plugin đã có luật đó; danh sách nợ đang sai so với thực tế."
+  causes_vi:
+    - "Lane viết luật ESLint đã land mà không gỡ status: planned"
+  nextStep_vi: "Người giám sát gỡ status: planned của enforcer đó trong knowledge/hfs/rules.yaml qua một lane đã land."
+  owner: supervisor
+  kind: check-finding
+
+HFS_RULE_CODE_UNCATALOGUED:
+  title: "Rule failure code is not explained"
+  title_vi: "Mã lỗi của luật chưa được giải thích"
+  meaning_vi: "Một mã lỗi của luật không có mục trong modules/kernel/failure-codes.yaml, hoặc mục đó thiếu title_vi, meaning_vi hoặc nextStep_vi bằng tiếng Việt, nên agent không đọc được lý do và bước tiếp theo."
+  causes_vi:
+    - "Thêm mã lỗi vào rules.yaml mà quên thêm vào danh mục mã lỗi"
+    - "Viết title_vi, meaning_vi hoặc nextStep_vi bằng tiếng Anh"
+  nextStep_vi: "Người giám sát thêm hoặc sửa mục trong modules/kernel/failure-codes.yaml với đủ tiêu đề, ý nghĩa và bước tiếp theo bằng tiếng Việt, qua một lane đã land."
+  owner: supervisor
+  kind: check-finding
