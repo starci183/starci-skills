@@ -33,7 +33,7 @@ await run(async () => {
 
     // br.login.password.sign-in: wrong password and unknown email refuse identically
     step("signIn wrong password -> INVALID_CREDENTIALS")
-    const wrongPassword = await graphql(SIGN_IN, { input: { email: demoEmail, password: "wrong-password-xyz" } })
+    const wrongPassword = await graphql(SIGN_IN, { input: { email: demoEmail, password: `wrong-${Date.now()}` } })
     assertRefused(wrongPassword, "INVALID_CREDENTIALS")
     pass()
 
