@@ -685,6 +685,32 @@ schemas:
   # CODE-PATTERN ENFORCEMENT — executable rule conformance
   # --------------------------------------------------------------------------
 
+  - id: urn:starci:hfs-slots:2
+    file: modules/schemas/hfs-slots.schema.yaml
+    dialect: json-schema
+    subsystem: gate
+    governs: "The HFS v2 slot manifest knowledge/hfs/slots.yaml - versioned slots (id, profiles, path pattern, presence, tracked, tier, requires, tests, budget), the app kinds and the tier direction matrix."
+    binds: knowledge/hfs/slots.yaml
+    usedBy: [scripts/lib/hfs-slots.mjs (loadSlotManifest re-states this shape without ajv; tests/hfs-slots.spec.mjs proves the two agree)]
+    business:
+      question: "What may exist in a product repository, where, and what may import what?"
+      whenNeeded: Every HFS check, lint factory and template that needs a path, tier or required file.
+      whenNot: Not per-repository - a repository declares itself in hfs.json (urn:starci:hfs-repo:2) and never edits the manifest.
+      selectedBy: scripts/lib/hfs-slots.mjs; owner-approved HFS v2 decisions.
+
+  - id: urn:starci:hfs-repo:2
+    file: modules/schemas/hfs-repo.schema.yaml
+    dialect: json-schema
+    subsystem: gate
+    governs: "The repository-side hfs.json - pinned manifest major, profile, project, apps with kinds, opt-in slots used, database connections."
+    binds: <repository>/hfs.json
+    usedBy: [scripts/lib/hfs-slots.mjs (resolveRepoDeclaration, readRepoDeclaration)]
+    business:
+      question: "Which HFS does this repository follow and which optional slots does it use?"
+      whenNeeded: Any check that has to know a repository's apps, connections or enabled slots.
+      whenNot: Lists no owners, paths or switched-off rules - owners are derived from slots.
+      selectedBy: scripts/lib/hfs-slots.mjs.
+
   - id: starci/code-pattern-profile@1
     file: modules/schemas/code-pattern-profile.schema.yaml
     dialect: json-schema

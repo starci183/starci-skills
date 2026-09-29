@@ -1,0 +1,44 @@
+$schema: https://json-schema.org/draft/2020-12/schema
+$id: urn:starci:hfs-repo:2
+title: HFS v2 repository declaration (hfs.json)
+description: >-
+  The one file a product repository adds to say which HFS it follows. Owners are derived from slots, so it lists no
+  owners, no paths and no switched-off rules. The manifest decides which app kinds and slot ids are legal
+  (scripts/lib/hfs-slots.mjs resolveRepoDeclaration): kinds must exist for the profile, optionalSlots may name only
+  opt-in slots, and a slot that an app kind implies is never listed.
+type: object
+additionalProperties: false
+required: [hfs, profile, project, apps]
+properties:
+  hfs:
+    type: integer
+    minimum: 2
+    description: The pinned manifest MAJOR. A repository always follows the latest minor of that major; another major than the manifest's is refused.
+  profile: {enum: [be, fe]}
+  project:
+    type: string
+    pattern: '^[a-z][a-z0-9-]*$'
+    description: Binds .workspaces/projects/<project>/work.json.
+  apps:
+    type: array
+    minItems: 1
+    description: Every apps/<name>, with its kind. Names are unique.
+    items:
+      type: object
+      additionalProperties: false
+      required: [name, kind]
+      properties:
+        name: {type: string, pattern: '^[a-z][a-z0-9-]*$'}
+        kind: {type: string, pattern: '^[a-z][a-z0-9-]*$'}
+  optionalSlots:
+    type: array
+    uniqueItems: true
+    items: {type: string, pattern: '^(repo|be|fe)\.[a-z0-9-]+(\.[a-z0-9-]+)*$'}
+  connections:
+    type: array
+    uniqueItems: true
+    description: Backend only. Named databases; each is the CONNECTION tag of a be.persistence slot and gets one migrate run.
+    items: {type: string, pattern: '^[a-z][a-z0-9-]*$'}
+allOf:
+  - if: {properties: {profile: {const: fe}}, required: [profile]}
+    then: {not: {required: [connections]}}

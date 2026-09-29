@@ -1,0 +1,23 @@
+id: hfs-v2-slots
+effectiveAt: '2026-09-29T21:30:00+07:00'
+summary: >-
+  HFS v2 Phase 0 item 0.1 (owner-approved decision 1: one slot manifest, repositories pin only its major). Adds
+  knowledge/hfs/slots.yaml (versioned 2.0.0: every slot has an id, path pattern, profile, tier, required files, test
+  kind, presence, tracked/ignored/external, plus the tier direction matrix and app kinds), the schemas
+  modules/schemas/hfs-slots.schema.yaml and modules/schemas/hfs-repo.schema.yaml (hfs.json: pinned major, profile,
+  project, apps with kinds, opt-in slots, connections) and the loader scripts/lib/hfs-slots.mjs that answers which slot
+  owns a path (an unknown path reports its nearest slot), whether an import is allowed, which files are required and
+  whether a path is tracked. Failure codes HFS_PATH_NO_SLOT, HFS_MANIFEST_MAJOR_MISMATCH, HFS_MANIFEST_INVALID and
+  HFS_DECLARATION_INVALID join the catalog with Vietnamese text. The loader is not wired into any existing check yet
+  and architecture.json support is untouched: later Phase 0 lanes (0.3 and 0.4) wire consumers and retire it. A major
+  mismatch is refused outright, with no compatibility window.
+reach: new-legs
+paths:
+  - knowledge/hfs/slots.yaml
+  - knowledge/index.yaml
+  - modules/schemas/hfs-slots.schema.yaml
+  - modules/schemas/hfs-repo.schema.yaml
+  - modules/schemas/index.yaml
+  - modules/kernel/failure-codes.yaml
+  - scripts/lib/hfs-slots.mjs
+  - tests/hfs-slots.spec.mjs

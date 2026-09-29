@@ -3244,6 +3244,19 @@ HFS_APP_LAYOUT_INVALID:
   owner: other-op:backend.scaffold
   kind: check-finding
 
+HFS_DECLARATION_INVALID:
+  title: "hfs.json missing or invalid"
+  title_vi: "hfs.json thiếu hoặc sai định dạng"
+  meaning_vi: "Kho mã không có tệp hfs.json hợp lệ nên không thể biết nó theo chuẩn HFS nào, có những ứng dụng nào và bật những ô tuỳ chọn nào."
+  causes_vi:
+    - "Thiếu tệp hfs.json ở gốc kho, hoặc tệp không đọc được như JSON"
+    - "Loại ứng dụng không có trong bảng kê của HFS, ví dụ một loại ứng dụng do kho tự đặt"
+    - "optionalSlots ghi một ô không phải loại tuỳ chọn, hoặc ghi một ô mà loại ứng dụng đã tự bật"
+    - "Thiếu loại ứng dụng bắt buộc, ví dụ chưa khai ứng dụng api hoặc chưa khai ứng dụng migrate dù đã khai kết nối cơ sở dữ liệu"
+  nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để sửa hfs.json theo lời nhắn của bộ kiểm tra; không cần ai can thiệp thêm."
+  owner: op-retry
+  kind: check-finding
+
 HFS_E2E_IN_AUTOMATIC_GATE:
   title: "E2E runs in automatic gate"
   title_vi: "Kiểm thử e2e nằm trong cổng tự động"
@@ -3253,6 +3266,29 @@ HFS_E2E_IN_AUTOMATIC_GATE:
     - "Script lint:check kéo e2e vào"
   nextStep_vi: "Op backend.scaffold gỡ e2e khỏi hook và script tự động."
   owner: other-op:backend.scaffold
+  kind: check-finding
+
+HFS_MANIFEST_INVALID:
+  title: "HFS slot manifest invalid"
+  title_vi: "Bảng kê ô HFS sai định dạng"
+  meaning_vi: "Tệp knowledge/hfs/slots.yaml của bộ chạy không đọc được hoặc vi phạm lược đồ của nó, nên mọi kiểm tra HFS bị từ chối chứ không chạy trên một bảng kê hỏng."
+  causes_vi:
+    - "Một ô thiếu trường bắt buộc, dùng giá trị ngoài danh sách cho phép hoặc trùng mã với ô khác"
+    - "Ma trận hướng import nhắc tới một tầng không tồn tại"
+    - "Hai ô cùng khai một mẫu đường dẫn, hoặc một ô đã ngừng dùng mà không chỉ ra ô kế nhiệm"
+  nextStep_vi: "Đây là lỗi của bộ chạy, không phải của sản phẩm; người giám sát sửa knowledge/hfs/slots.yaml qua một nhánh đã được duyệt, sản phẩm không tự sửa."
+  owner: supervisor
+  kind: check-finding
+
+HFS_MANIFEST_MAJOR_MISMATCH:
+  title: "hfs.json pins another manifest major"
+  title_vi: "Phiên bản chính của bảng kê không khớp"
+  meaning_vi: "Trường hfs trong hfs.json ghim một phiên bản chính khác với bảng kê ô của bộ chạy. HFS không có giai đoạn tương thích: khi phiên bản chính mới được nạp thì phiên bản chính cũ bị từ chối ngay."
+  causes_vi:
+    - "Bộ chạy đã lên phiên bản chính mới của bảng kê nhưng kho chưa được di chuyển sang"
+    - "hfs.json ghi số phiên bản chính sai hoặc chép từ một kho khác"
+  nextStep_vi: "Chủ sở hữu duyệt một nhánh di chuyển cho kho này rồi mới đổi số hfs; không có cách bỏ qua hay giữ song song hai phiên bản."
+  owner: owner
   kind: check-finding
 
 HFS_MODULE_TIER_INVALID:
@@ -3275,6 +3311,18 @@ HFS_PACKAGE_MANAGER_MIXED:
     - "Còn tệp khóa của trình khác"
   nextStep_vi: "Op dựng khung đưa packageManager về npm rồi kiểm tra lại."
   owner: other-op:backend.scaffold
+  kind: check-finding
+
+HFS_PATH_NO_SLOT:
+  title: "Path matches no HFS slot"
+  title_vi: "Đường dẫn không khớp ô nào của HFS"
+  meaning_vi: "Một tệp hoặc thư mục trong kho không thuộc ô nào trong bảng kê; mọi đường dẫn được theo dõi phải khớp đúng một ô. Bộ kiểm tra báo kèm ô gần nhất để biết tệp lẽ ra thuộc đâu."
+  causes_vi:
+    - "Tệp đặt sai chỗ, ví dụ một tệp không phải *.e2e-spec.ts nằm trong thư mục kiểm thử e2e"
+    - "Thư mục do kho tự đặt ở gốc hoặc trong src mà HFS không có ô cho nó"
+    - "Tên tệp hoặc thư mục viết sai so với mẫu của ô gần nhất"
+  nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để chuyển tệp vào ô gần nhất được báo hoặc xoá nó; nếu thực sự cần một loại nội dung mới thì đó là việc thêm ô vào bảng kê, do người giám sát làm, không phải kho tự thêm."
+  owner: op-retry
   kind: check-finding
 
 HFS_README_BADGE_NOT_LIVE:

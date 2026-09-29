@@ -50,6 +50,11 @@ branches:
     title: Code examples
     path: code-examples/index.yaml
     use: Focused extracted examples for applying the rules directly.
+  - id: hfs-slots
+    title: HFS v2 slot manifest
+    path: hfs/slots.yaml
+    use: The one manifest of what may exist in a repository, where, and which tier may import which; read only
+      through scripts/lib/hfs-slots.mjs. A repository carries hfs.json (modules/schemas/hfs-repo.schema.yaml).
   - id: enforcement
     title: Enforcement
     path: patterns/enforcement.yaml
