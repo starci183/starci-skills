@@ -12,8 +12,8 @@ export const STATUSES = ['success', 'running', 'settling', 'queued', 'retry', 'f
 /** An attempt is open while it has been dispatched and nothing ended it: no settle (settled_at) and no end state (a refused launch, a dead worker, a cancel). */
 export const attemptOpen = (row) => row.dispatched_at != null && row.settled_at == null && row.end_state == null;
 
-/** How an ended attempt without a verdict reads (a plain requeue waits for the next try; an unknown effect waits on reconcile). */
-const END_STATE_STATUS = { requeued: 'retry', 'worker-dead': 'failed', 'effect-unknown': 'blocked', cancelled: 'dropped' };
+/** How an ended attempt without a verdict reads: a requeued launch is not a try (rejected), an unknown effect waits on reconcile. */
+const END_STATE_STATUS = { requeued: 'rejected', 'worker-dead': 'failed', 'effect-unknown': 'blocked', cancelled: 'dropped' };
 
 export function attemptStatus(row) {
   // v_op_history.ui (docs/why.md): an op that ended with an ask waits on the owner; a launch refused at submission is not a try.
