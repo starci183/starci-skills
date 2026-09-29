@@ -50,11 +50,6 @@ export const CONTROLLERS = Object.freeze(['job', 'workflow', 'resource', 'host',
 // ---------------------------------------------------------------------------------------------------------------------
 /** %LOCALAPPDATA%/StarCi (or ~/.local/state/StarCi): the per-host state base. */
 export const starciLocalRoot = (env = process.env) => path.join(env.LOCALAPPDATA || path.join(os.homedir(), '.local', 'state'), 'StarCi');
-/**
- * <local root>/runtime: the OLD store directory (the pre-alpha.3 machine.sqlite, journal.sqlite, reconciler.log,
- * ram-throttle.json, connectors/, env-servers/, uat-slots/, watchdog-logs/). Nothing new is written there.
- */
-export const runtimeRootFor = (env = process.env) => path.join(starciLocalRoot(env), 'runtime');
 /** <local root>/projects: one directory per ledger (decision Q1). */
 export const projectsRootFor = (env = process.env) => path.join(starciLocalRoot(env), 'projects');
 /** The runtime.sqlite of one ledger (decision Q1): %LOCALAPPDATA%/StarCi/projects/<ledger_id>/runtime.sqlite. */

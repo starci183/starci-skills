@@ -130,7 +130,7 @@ test('notify: in shadow the controller only records the notifier run', async () 
 function home(t) {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'starci-rc-notifier-'));
   t.after(() => fs.rmSync(dir, { recursive: true, force: true, maxRetries: 20, retryDelay: 50 }));
-  return { ...process.env, STARCI_SUPERVISOR_HOME: dir, LOCALAPPDATA: dir, STARCI_CONNECTORS_OFF: '1' };
+  return { ...process.env, LOCALAPPDATA: dir, STARCI_CONNECTORS_OFF: '1' };
 }
 const inputs = { progress: [{ workflowId: 'wf-nivo-fe-canon', name: 'Nivo · Chuẩn hoá code FE', progress: { unitsDone: 14, unitsTotal: 36, unitsPerHour: 4, minUnitsPerHour: 3, eta: '2026-09-28T18:00:00Z', stall: { stalled: false } }, why: null }],
   ownerWaits: [], violations: [{ code: 'SETTLE_OVERDUE' }, { code: 'SETTLE_OVERDUE' }], gc: 'Dọn rác: 0 agent, 0 terminal, 3 worktree, 0.4 GB', actions: [], owed: null };

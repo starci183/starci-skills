@@ -1,6 +1,6 @@
 // home.mjs — the Supervisor's durable state, in machine.sqlite (engine/machine-db.mjs, DBTREE.sql B1; decision Q3).
 //
-// There is no supervisor ledger any more (the pre-alpha.3 <supervisor home>/.starciwork/runtime.sqlite is retired).
+// There is no supervisor ledger and no supervisor home directory: every part is a machine.sqlite row.
 // Where each part lives:
 //   seat      seats row 'supervisor' (role supervisor): state booting while a launcher holds the startup reservation
 //             (detail_json.expiresAt), live once spawned; terminal_handle/agent/model/pid; detail_json {token, value}
@@ -8,7 +8,7 @@
 //   jobs      sup_jobs (runtime.fix [Worker] jobs), sup_leases (file leases), sup_attempts, sup_reports
 //   audit     sup_events (the digest-chained audit trail; kinds as before: supervisor-*, worker-*, owed-*, ...)
 //   learning  sup_learning; owed items and their acks sup_owed; owner rulings sup_owner_rulings; messages sup_messages
-//   logs      machine_logs actor 'supervisor' (supervisorLog; no text logs under the supervisor home)
+//   logs      machine_logs actor 'supervisor' (supervisorLog; the Supervisor writes no text logs)
 // Product ledgers are only ever read from here.
 import os from 'node:os';
 import path from 'node:path';
@@ -36,11 +36,6 @@ export const DEFAULTS = Object.freeze({
   pollIntervalMs: 600_000,
 });
 
-/**
- * The supervisor home: STARCI_SUPERVISOR_HOME, else ~/.starci/supervisor. Nothing new is written there (the state is in
- * machine.sqlite); it remains only as the historical location of the pre-alpha.3 supervisor files.
- */
-export const supervisorHome = (env = process.env) => path.resolve(env.STARCI_SUPERVISOR_HOME || path.join(os.homedir(), '.starci', 'supervisor'));
 // The worktrees live under the one lanes root (scripts/lib/hk-lanes.mjs: runtimes.yaml
 // allocation.housekeeping.lanesRoot, STARCI_LANES_ROOT, default D:/starci-lanes), never on C:.
 export const stagingRoot = (env = process.env) => path.join(lanesRoot({ env }), 'staging');

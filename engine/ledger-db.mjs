@@ -8,9 +8,9 @@ import {sha256} from './digest.mjs';
 import {SETTLED_JOB_LIST} from './admission.mjs';
 import {putBlob,blobPath} from '../scripts/lib/artifact-store.mjs';
 import {redactData,redactText} from '../scripts/lib/redact.mjs';
-import {isUnderTempDir,machineFileFor,readMachine,runtimeRootFor,TEST_REGISTRY_ENV,withMachine} from './machine-db.mjs';
+import {isUnderTempDir,machineFileFor,readMachine,TEST_REGISTRY_ENV,withMachine} from './machine-db.mjs';
 // The machine-side path helpers have one definition (engine/machine-db.mjs); re-exported for the ledger's callers.
-export {isUnderTempDir,machineFileFor,runtimeRootFor,TEST_REGISTRY_ENV};
+export {isUnderTempDir,machineFileFor,TEST_REGISTRY_ENV};
 const require=createRequire(import.meta.url);
 
 /*

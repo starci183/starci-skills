@@ -16,9 +16,8 @@ const MIN = 60_000;
 
 function world(t) {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'starci-rc-sla-'));
-  const env = { ...process.env, LOCALAPPDATA: path.join(root, 'la'), STARCI_SUPERVISOR_HOME: path.join(root, 'home'), STARCI_CONNECTORS_OFF: '1',
+  const env = { ...process.env, LOCALAPPDATA: path.join(root, 'la'), STARCI_CONNECTORS_OFF: '1',
     [TEST_REGISTRY_ENV]: path.join(root, 'machine.sqlite') };
-  fs.mkdirSync(env.STARCI_SUPERVISOR_HOME, { recursive: true });
   let now = Date.parse('2026-09-28T10:00:00Z');
   const m = openMachine({ env, now: () => now });
   t.after(() => { m.close(); fs.rmSync(root, { recursive: true, force: true, maxRetries: 20, retryDelay: 50 }); });
@@ -110,7 +109,7 @@ test('the catalogue covers Appendix A and cites runtimes.yaml keys instead of co
 test('no machine.sqlite is a skipped pass, never a throw', async (t) => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'starci-rc-sla-none-'));
   t.after(() => fs.rmSync(root, { recursive: true, force: true }));
-  const r = await slaPass({ now: () => Date.now(), env: { ...process.env, STARCI_SUPERVISOR_HOME: root, [TEST_REGISTRY_ENV]: path.join(root, 'absent.sqlite') }, stateFile: path.join(root, 'absent.sqlite') });
+  const r = await slaPass({ now: () => Date.now(), env: { ...process.env, [TEST_REGISTRY_ENV]: path.join(root, 'absent.sqlite') }, stateFile: path.join(root, 'absent.sqlite') });
   assert.equal(r.ok, true);
   assert.deepEqual(r.skipped, ['no-state-db']);
   assert.equal(fs.existsSync(path.join(root, 'absent.sqlite')), false, 'the read-only pass never creates the store');

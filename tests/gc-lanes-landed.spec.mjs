@@ -26,7 +26,7 @@ function fixture(t) {
   git(root, 'add', '.');
   git(root, 'commit', '-qm', 'base');
   git(root, 'worktree', 'add', '-q', '-b', 'lane/one', lane, 'main');
-  const env = { STARCI_LANES_ROOT: path.join(dir, 'lanes'), STARCI_SUPERVISOR_HOME: path.join(dir, 'supervisor'), STARCI_TEST_MACHINE_FILE: path.join(dir, 'machine.sqlite') };
+  const env = { STARCI_LANES_ROOT: path.join(dir, 'lanes'), STARCI_TEST_MACHINE_FILE: path.join(dir, 'machine.sqlite') };
   const run = (apply = false, options = {}) => collectLanes({ apply, root, env, now: Date.now() + 60_000, settings: { laneGraceMs: 1 }, sup: { jobs: [] }, ...options });
   return { root, lane, env, run };
 }

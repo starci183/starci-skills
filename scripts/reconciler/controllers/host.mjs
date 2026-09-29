@@ -122,10 +122,6 @@ export function turnStep(prev, obs, { now, budgetMs, graceMs, sameTurnSlackMs })
   return { turn, act, overdue, ended: prev != null && !same };
 }
 
-// The clock states before they became sla.yaml codes: cleared once so no pre-code clock stays open.
-const LEGACY_STATE = Object.freeze({ SERVICE_DOWN: 'down', SEAT_VACANT: 'vacant', KERNEL_GATED: 'gated', ORCA_DOWN: 'hostOutage', KERNEL_INPUT_STUCK: 'inputPending',
-  SEAT_QUARANTINED: 'quarantined', ORPHAN_PROCESS: 'orphan', TERMINAL_COUNT_DRIFT: 'drift', LEDGER_CORRUPT: 'corrupt' });
-
 /** The goal problem of a workflow's newest goal text, or null (INV-W4; scripts/goal/goal-text.mjs). */
 export function goalProblem(markdown, refusal) {
   if (markdown == null || !String(markdown).trim()) return 'goal-text-missing';
@@ -223,20 +219,12 @@ export function createHostController(deps = {}) {
     if (state.clocks.get(k) === true) return;
     state.clocks.set(k, true);
     await ctx.clock(entity, st, slaMs, meta);
-    if (LEGACY_STATE[st] && state.clocks.get(`${entity}|${LEGACY_STATE[st]}`) !== false) {
-      state.clocks.set(`${entity}|${LEGACY_STATE[st]}`, false);
-      await ctx.clear(entity, LEGACY_STATE[st]);
-    }
   };
   const clear = async (ctx, entity, st) => {
     const k = `${entity}|${st}`;
     if (state.clocks.get(k) === false) return;
     state.clocks.set(k, false);
     await ctx.clear(entity, st);
-    if (LEGACY_STATE[st] && state.clocks.get(`${entity}|${LEGACY_STATE[st]}`) !== false) {
-      state.clocks.set(`${entity}|${LEGACY_STATE[st]}`, false);
-      await ctx.clear(entity, LEGACY_STATE[st]);
-    }
   };
 
   const productLedgers = (ctx) => (ctx.ledgers ?? []).filter((l) => l.ledgerId !== 'supervisor');
@@ -654,12 +642,11 @@ export function createHostController(deps = {}) {
       const r = checkLedger(ledger.file);
       rec.lastCheckAt = now; rec.lastCheck = r;
       const was = rec.state;
-      const next = !r.ok ? 'corrupt' : r.legacy ? 'legacy' : 'ok';
+      const next = !r.ok ? 'corrupt' : 'ok';
       if (rec.state !== next) { rec.state = next; rec.since = now; }
       if (r.ok) {
-        // A legacy (schema-refused) store passed quick_check: not corrupt, so any LEDGER_CORRUPT episode closes.
+        // The store passed quick_check and the verified open: any LEDGER_CORRUPT episode closes.
         await clear(ctx, key, 'LEDGER_CORRUPT');
-        if (r.legacy && was !== 'legacy') await ctx.log('reconciler.host.ledger-legacy', `${ledgerId}: legacy ledger store (schema refused by this runtime, quick_check ok); not corrupt`, { controller: 'host', ledgerId, state: 'legacy' });
       }
       else {
         await clock(ctx, key, 'LEDGER_CORRUPT', 0, { code: 'LEDGER_CORRUPT', severity: 'critical', owner: 'host-controller', ledgerId, result: r.result.slice(0, 5) });

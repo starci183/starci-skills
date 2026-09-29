@@ -233,7 +233,7 @@ test('lane worktrees: never collected while the owner agent lives or git moved i
   };
   const terminals = [{ handle: 't1', title: '[Worker] slim-api land often', connected: true }, { handle: 't2', title: 'Terminal 4', worktreePath: path.join(dirs.cwd, 'src'), connected: true }];
   const settings = { ...gcSettings({}), laneGraceMs: 1_800_000 };
-  const run = (terms) => collectLanes({ apply: false, env: { STARCI_LANES_ROOT: lanes, STARCI_SUPERVISOR_HOME: path.join(root, 'sup') }, now, settings, sup: { jobs: [] }, root, git, terminals: terms });
+  const run = (terms) => collectLanes({ apply: false, env: { STARCI_LANES_ROOT: lanes }, now, settings, sup: { jobs: [] }, root, git, terminals: terms });
   const by = Object.fromEntries(run(terminals).items.map((i) => [path.basename(i.target), i]));
   assert.equal(by['slim-api'].verdict, 'keep'); assert.match(by['slim-api'].reason, /owner is alive.*\[Worker\] slim-api/);
   assert.equal(by['slim-ui'].verdict, 'keep'); assert.match(by['slim-ui'].reason, /works in it/);

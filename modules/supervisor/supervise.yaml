@@ -294,10 +294,10 @@ kernelSeat:
     the Job controller sweeps [Worker] terminals (sweepWorkers). There is no watchdog loop (retired 2026-09-28).
     In mode chat, or while the seat is DISABLED or was never started, a pass does nothing.
   state: |
-    One ledger under the supervisor home (~/.starci/supervisor, STARCI_SUPERVISOR_HOME), reusing the kernel
-    ledger machinery: workflow wf-supervisor; signals supervisor-seat / supervisor-enabled; jobs of kind
-    runtime.fix; leases file:<path>; reports per job; events supervisor-*, worker-*, land-*, push-*. Outside
-    every repository, so nothing there is committed. Product ledgers are only read.
+    The Supervisor's durable state is machine.sqlite (engine/machine-db.mjs): the seat row, sup_signals
+    (supervisor-enabled), sup_jobs of kind runtime.fix, sup_leases (file:<path>), sup_reports and the
+    digest-chained sup_events (supervisor-*, worker-*, land-*, push-*). There is no supervisor directory on
+    disk. Product ledgers are only read.
 
 workers:
   purpose: |

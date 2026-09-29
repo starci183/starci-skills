@@ -16,7 +16,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { openLedgerReader, ledgerFileFor } from '../../engine/ledger-db.mjs';
-import { supervisorHome, supervisorSettings } from '../supervisor/home.mjs';
+import { supervisorSettings } from '../supervisor/home.mjs';
 
 export const EVENT_BATCH = 1000;
 
@@ -35,7 +35,7 @@ export function ledgersOf({ env = process.env, repos = null } = {}) {
     taken.add(id);
     out.push({ ledgerId: id, repo: root, file });
   }
-  out.push({ ledgerId: 'supervisor', repo: supervisorHome(env), file: null });
+  out.push({ ledgerId: 'supervisor', repo: null, file: null });
   return out;
 }
 

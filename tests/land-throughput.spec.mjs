@@ -52,7 +52,7 @@ function sideCommit(root, name, files) {
   git(root, 'worktree', 'remove', '--force', wt);
   return sha;
 }
-const envOf = (t) => { const r = tmp(t, 'sup-k-lt-env-'); return { LOCALAPPDATA: path.join(r, 'la'), STARCI_SUPERVISOR_HOME: path.join(r, 'home'), STARCI_LANES_ROOT: path.join(r, 'lanes') }; };
+const envOf = (t) => { const r = tmp(t, 'sup-k-lt-env-'); return { LOCALAPPDATA: path.join(r, 'la'), STARCI_LANES_ROOT: path.join(r, 'lanes') }; };
 const lightChecks = (opts) => runChecks({ ...opts, runSpecs: false });
 
 /* ------------------------------------------------------------ contract-changes: one file per entry */

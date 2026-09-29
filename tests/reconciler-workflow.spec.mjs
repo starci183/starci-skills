@@ -47,7 +47,7 @@ function fakeCtx({ repoRoot, ledgerFile, statusOf = () => status(), now = NOW })
   const stateFile = path.join(path.dirname(repoRoot), 'machine.sqlite');
   const rec = { api: [], run: [], decisions: [], logs: [] };
   const ctx = {
-    mode: 'shadow', now: () => now, stateFile, env: { ...process.env, STARCI_SUPERVISOR_HOME: path.join(path.dirname(repoRoot), 'sup'), [TEST_REGISTRY_ENV]: stateFile },
+    mode: 'shadow', now: () => now, stateFile, env: { ...process.env, [TEST_REGISTRY_ENV]: stateFile },
     ledgers: [{ ledgerId: LEDGER, repo: repoRoot, file: ledgerFile }, { ledgerId: 'supervisor', repo: null, file: path.join(path.dirname(repoRoot), 'nope.sqlite') }],
     status: async (_ledgerId, wf) => statusOf(wf),
     api: async (ledgerId, verb, argv) => { rec.api.push({ ledgerId, verb, argv }); return { ok: true, shadow: true }; },

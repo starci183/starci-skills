@@ -1,25 +1,17 @@
 // hk-logs.mjs — the housekeeping sweep's log/transcript cap (STORAGE-PROMPT "StarCi logs"
 // and item 9 "Orca-owned dirs"). One pass, never through a link, never inside a checkout,
-// never into a file family the runtime already rotates.
+// never a file a writer rotates itself.
 //
 //   sweepStarciLogs({ apply, now, env, allocation })
 //
 // Roots:
-//   <LOCALAPPDATA>/StarCi     (runtimeRootFor's parent: runtime/, archive/, runtime-v6/)
+//   <LOCALAPPDATA>/StarCi     (starciLocalRoot: machine.sqlite, projects/, archive/)
 //   <USERPROFILE>/.starci     (redundancy handoffs, backups; lanes/ and supervisor staging/land
 //                             are git worktrees — skipped on the .git marker, the lanes lane
 //                             owns them). The Supervisor writes no text logs: its log rows are
 //                             machine.sqlite machine_logs (actor supervisor), pruned by retention.
 //   <APPDATA>/orca            terminal-history/ and logs/ capped by age; orchestration.db
 //                             is REPORTED ONLY — Orca owns it, never opened/touched.
-//
-// Families that already rotate (rename-to-.1 at a byte cap) are skipped, not given a
-// second mechanism:
-//   runtime/watchdog-logs/*.log(.N)   left by the retired per-workflow watchdog loops
-//                                     and on self-reload (self-reload.mjs reexecSelf)
-//   runtime/connectors/{telegram-bridge,telegram-media,cloudflared,stall-alert}.log(.N)
-//                                     each writer self-rotates (self-reload rotateLog 5 MB;
-//                                     telegram-media.mjs 1 MB; tunnel.mjs 5 MB; stall-alert.mjs 2 MB)
 //
 // Cap for the rest: a covered *.log/*.jsonl (and their .N siblings) older than
 // allocation.housekeeping.logMaxAgeMs is deleted; a younger one past logCapBytes is
@@ -34,11 +26,10 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { allocationSettings } from '../../engine/config.mjs';
-import { runtimeRootFor } from '../../engine/ledger-db.mjs';
+import { starciLocalRoot } from '../../engine/machine-db.mjs';
 import { isLinkLike } from './safe-remove.mjs';
 import { rotateLog, LOG_CAP_BYTES } from './self-reload.mjs';
 import { artifactHoldOf } from './artifact-hold.mjs';
-import { pathKey } from './path-key.mjs';
 
 /** Spec-agreed window and cap. logMaxAgeMs: runtimes.yaml allocation.housekeeping.logMaxAgeMs (14d). */
 export const DEFAULT_LOG_MAX_AGE_MS = 14 * 24 * 60 * 60 * 1000;
@@ -54,14 +45,6 @@ const LIST_MAX = 500;
 const realOf = (p) => { try { return fs.realpathSync.native(p); } catch { return null; } };
 const sizeOf = (p) => { try { return fs.statSync(p).size; } catch { return null; } };
 
-/** The directories whose *.log the runtime already rotates (see header); each entry also owns the .N siblings. */
-export const rotatedLogFamilies = (starciRoot) => [
-  { name: 'watchdog-logs', dir: path.join(starciRoot, 'runtime', 'watchdog-logs'), match: /\.log(\.\d+)?$/i,
-    why: 'rotated by rotateLog on self-reload (scripts/lib/self-reload.mjs reexecSelf); the per-workflow watchdog loops that wrote them are retired' },
-  { name: 'connector-logs', dir: path.join(starciRoot, 'runtime', 'connectors'), match: /^(telegram-bridge|telegram-media|cloudflared|stall-alert)\.log(\.\d+)?$/i,
-    why: 'self-rotated by their writers (telegram-bridge rotateLog 5 MB; telegram-media.mjs 1 MB; tunnel.mjs cloudflared 5 MB; stall-alert.mjs 2 MB)' },
-];
-
 /**
  * Sweep the log roots. `allocation` is the runtimes.yaml allocation block (default: the real one);
  * only housekeeping.logMaxAgeMs / housekeeping.logCapBytes are read from it. With apply=false nothing
@@ -74,14 +57,14 @@ export async function sweepStarciLogs({ apply = false, now = Date.now(), env = p
   const capBytes = Number(hk.logCapBytes) > 0 ? Number(hk.logCapBytes) : DEFAULT_LOG_CAP_BYTES;
   const cutoff = now - maxAgeMs;
   const home = env.USERPROFILE || env.HOME || os.homedir();
-  const starciRoot = path.dirname(runtimeRootFor(env));
+  const starciRoot = starciLocalRoot(env);
   const starciHome = path.join(home, '.starci');
   const orcaRoot = path.join(env.APPDATA || path.join(home, 'AppData', 'Roaming'), 'orca');
 
   const out = { ok: true, apply, freedBytes: 0, deleted: [], truncated: [], skipped: [], errors: [],
     report: { roots: { starci: starciRoot, starciHome, orca: orcaRoot }, logMaxAgeMs: maxAgeMs, logCapBytes: capBytes,
       orchestrationDbBytes: null, orchestrationDbWalBytes: null, orchestrationDbShmBytes: null,
-      rotatedFamilies: [], notes: [] } };
+      notes: [] } };
   const overflow = { deleted: 0, truncated: 0, skipped: 0, errors: 0 };
   const push = (key, entry) => { (out[key].length < LIST_MAX ? out[key].push(entry) : overflow[key] += 1); };
 
@@ -131,15 +114,10 @@ export async function sweepStarciLogs({ apply = false, now = Date.now(), env = p
     walk(resolved, realOf(resolved) ?? resolved, onFile, dirs);
   };
 
-  const families = rotatedLogFamilies(starciRoot).map((f) => ({ ...f, dirKey: pathKey(f.dir) }));
-  out.report.rotatedFamilies = families.map(({ name, dir, why }) => ({ name, dir, why }));
   const starciFile = (p, st) => {
     const name = path.basename(p);
     if (st.isSymbolicLink()) { skip(p, 'link'); return; }
     if (!COVERED.test(name)) return;
-    const dirKey = pathKey(path.dirname(p));
-    const family = families.find((f) => f.dirKey === dirKey);
-    if (family && family.match.test(name)) { skip(p, `rotated:${family.name}`); return; }
     if (st.mtimeMs < cutoff) { unlink(p, st); return; }
     if (BASE.test(name) && st.size > capBytes) rotate(p, st);
   };

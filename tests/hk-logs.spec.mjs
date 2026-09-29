@@ -37,7 +37,7 @@ test('age deletes covered *.log/*.jsonl under the StarCi roots; young files and 
   const home = path.join(env.USERPROFILE, '.starci');
   const old1 = put(path.join(starci, 'runtime', 'deps', '.cache', '_logs', 'npm-debug.log'), 'n'.repeat(100), OLD);
   const old2 = put(path.join(home, 'redundancy', 'handoff-devin', 'land-queue.log'), 'l', OLD);
-  const old3 = put(path.join(starci, 'runtime-v6', 'guards', 'old.jsonl'), '{}\n', OLD);
+  const old3 = put(path.join(starci, 'archive', 'guards', 'old.jsonl'), '{}\n', OLD);
   const young = put(path.join(starci, 'runtime', 'deps', '.cache', '_logs', 'recent.log'), 'y', YOUNG);
   const other = put(path.join(starci, 'runtime', 'machine.sqlite'), 'db', OLD);
   const state = put(path.join(starci, 'runtime', 'connectors', 'tunnel.json'), '{}', OLD);
@@ -58,26 +58,6 @@ test('age deletes covered *.log/*.jsonl under the StarCi roots; young files and 
   assert.equal(fs.existsSync(other), true, 'sqlite is not a covered name');
   assert.equal(fs.existsSync(state), true, '.json is not a covered name');
   assert.equal(r.freedBytes, 104);
-});
-
-test('rotated families are skipped, never deleted by age', async (t) => {
-  const env = envOf(t);
-  const starci = path.join(env.LOCALAPPDATA, 'StarCi');
-  const files = [
-    put(path.join(starci, 'runtime', 'watchdog-logs', 'wf-a.log'), 'w', OLD),
-    put(path.join(starci, 'runtime', 'watchdog-logs', 'wf-a.log.1'), 'w1', OLD),
-    put(path.join(starci, 'runtime', 'watchdog-logs', 'resume-all.log'), 'r', OLD),
-    put(path.join(starci, 'runtime', 'connectors', 'stall-alert.log'), 's', OLD),
-    put(path.join(starci, 'runtime', 'connectors', 'stall-alert.log.1'), 's1', OLD),
-    put(path.join(starci, 'runtime', 'connectors', 'telegram-media.log'), 'm', OLD),
-    put(path.join(starci, 'runtime', 'connectors', 'cloudflared.log'), 'c', OLD),
-    put(path.join(starci, 'runtime', 'connectors', 'telegram-bridge.log'), 'b', OLD),
-  ];
-  const r = await sweepStarciLogs({ apply: true, now: NOW, env, allocation: HK });
-  assert.ok(r.ok);
-  assert.deepEqual(r.deleted, []);
-  for (const file of files) assert.equal(fs.existsSync(file), true, `${file} is a rotated family's file`);
-  assert.equal(r.skipped.filter((e) => /^rotated:/.test(e.reason)).length, files.length);
 });
 
 test('a covered file inside the window but over the cap is rotated to .1 (the rotateLog convention)', async (t) => {

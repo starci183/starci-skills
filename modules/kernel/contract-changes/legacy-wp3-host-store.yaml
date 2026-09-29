@@ -1,0 +1,15 @@
+id: legacy-wp3-host-store
+effectiveAt: '2026-09-29T15:00:00+07:00'
+summary: >-
+  Legacy removal WP3 (owner rule 2026-09-29: .claude keeps no backward compatibility). The Host controller no longer
+  clears the lowercase pre-code SLA clock states (down, vacant, gated, hostOutage, inputPending, quarantined, orphan,
+  drift, corrupt); a ledger store this runtime refuses for its schema is no longer a `legacy` state with the
+  reconciler.host.ledger-legacy log: ledger-health quickCheck reports it not ok and the Host controller opens
+  LEDGER_CORRUPT for it. The old %LOCALAPPDATA%/StarCi/runtime store directory (runtimeRootFor) and the housekeeping
+  log families that pointed into it (watchdog-logs, connectors/*.log) are gone. supervisorHome() and
+  STARCI_SUPERVISOR_HOME are gone: the Supervisor state is machine.sqlite only and the 'supervisor' ledger source has
+  repo null.
+reach: new-legs
+paths:
+  - modules/kernel/contract-changes/legacy-wp3-host-store.yaml
+  - modules/supervisor/supervise.yaml

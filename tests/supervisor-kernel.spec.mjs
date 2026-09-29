@@ -49,7 +49,7 @@ const tmp = (t, prefix) => {
 // These specs exercise the optional [Supervisor] kernel: config.yaml supervisor.mode kernel (the default is chat).
 /** A machine.sqlite writer handle (the Supervisor's store) on the spec's own file, closed after the test. */
 const machineOf = (t, env) => { const m = openMachine({ env }); t.after(() => m.close()); return m; };
-const envOf = (t) => { const root = tmp(t, 'sup-k-'); return { LOCALAPPDATA: path.join(root, 'la'), STARCI_SUPERVISOR_HOME: path.join(root, 'home'), STARCI_LANES_ROOT: path.join(root, 'lanes'), STARCI_SUPERVISOR_MODE: 'kernel', STARCI_TEST_MACHINE_FILE: path.join(root, 'machine.sqlite') }; };
+const envOf = (t) => { const root = tmp(t, 'sup-k-'); return { LOCALAPPDATA: path.join(root, 'la'), STARCI_LANES_ROOT: path.join(root, 'lanes'), STARCI_SUPERVISOR_MODE: 'kernel', STARCI_TEST_MACHINE_FILE: path.join(root, 'machine.sqlite') }; };
 
 /* ------------------------------------------------------------ fake Orca */
 

@@ -8,6 +8,7 @@ import { createHostController, findOrphans, seatStateOf, goalProblem, outputOf, 
 import { parseYaml } from '../engine/yaml.mjs';
 import { hostSettings, memoryStore, turnMinutesOf } from '../scripts/reconciler/services.mjs';
 import { goalTextRefusal } from '../scripts/goal/goal-text.mjs';
+import { quickCheck } from '../scripts/reconciler/ledger-health.mjs';
 
 import { fakeCtx } from '../scripts/reconciler/testing.mjs';
 // A ledger path is never a real-path literal: the fake ctx only names it, so it is built under the temp root.
@@ -415,4 +416,19 @@ test('a service whose port still answers is never restarted, and a degraded pass
   answers = false; ctx.advance(60_000);
   await c.reconcile('service:harness-ui', ctx);
   assert.ok(ctx.calls.run.some((r) => r.args.join(' ') === 'scripts/reconciler/services.mjs --start harness-ui --json'), 'silent on its port: restarted');
+});
+
+test('quickCheck: a store the runtime refuses for its schema is not ok (a corrupt-class finding), never a legacy store', () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'hk-qc-'));
+  try {
+    const file = path.join(dir, 'runtime.sqlite');
+    const db = new DatabaseSync(file); db.exec('CREATE TABLE t(a)'); db.close();
+    assert.deepEqual(quickCheck(file, { verifiedOpen: () => ({ close() {} }) }), { ok: true, result: ['ok'] });
+    const refuse = () => { throw Object.assign(new Error('schema refused'), { code: 'STARCI_LEDGER_SCHEMA_REFUSED' }); };
+    const r = quickCheck(file, { verifiedOpen: refuse });
+    assert.equal(r.ok, false);
+    assert.equal(r.legacy, undefined);
+    assert.match(r.result[0], /schema refused/);
+    assert.equal(quickCheck(path.join(dir, 'absent.sqlite')).ok, false);
+  } finally { fs.rmSync(dir, { recursive: true, force: true }); }
 });

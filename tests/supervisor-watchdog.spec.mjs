@@ -21,7 +21,7 @@ const tmp = (t, prefix) => {
   return dir;
 };
 // The watchdog serves the optional [Supervisor] kernel only: config.yaml supervisor.mode kernel (the default is chat).
-const envOf = (t) => { const root = tmp(t, 'sup-wd-'); return { LOCALAPPDATA: path.join(root, 'la'), STARCI_SUPERVISOR_HOME: path.join(root, 'home'), STARCI_SUPERVISOR_MODE: 'kernel' }; };
+const envOf = (t) => { const root = tmp(t, 'sup-wd-'); return { LOCALAPPDATA: path.join(root, 'la'), STARCI_SUPERVISOR_MODE: 'kernel' }; };
 
 /* ------------------------------------------------------------ fake Orca (launch) */
 

@@ -6,7 +6,7 @@ import test from 'node:test';
 import {spawnSync} from 'node:child_process';
 import {fileURLToPath,pathToFileURL} from 'node:url';
 import {openLedger} from '../engine/ledger-db.mjs';
-import {TEST_REGISTRY_ENV,isUnderTempDir,machineFileFor,openMachine,runtimeRootFor} from '../engine/machine-db.mjs';
+import {TEST_REGISTRY_ENV,isUnderTempDir,machineFileFor,openMachine} from '../engine/machine-db.mjs';
 
 /**
  * The host's machine registry (%LOCALAPPDATA%/StarCi/runtime/machine.sqlite `ledgers`) once held 7,829 rows,
@@ -42,8 +42,6 @@ test('the explicit test registry wins; inside node --test a live runtime root fa
   // A runtime root a spec already moved under the temp directory is its own isolation and is kept.
   const moved=path.join(os.tmpdir(),'la');
   assert.equal(machineFileFor({LOCALAPPDATA:moved,NODE_TEST_CONTEXT:'child-v8'}),path.join(moved,'StarCi','machine.sqlite'));
-  // The old store directory never moves with the registry.
-  assert.equal(runtimeRootFor({LOCALAPPDATA:home,[TEST_REGISTRY_ENV]:'x/machine.sqlite'}),path.join(home,'StarCi','runtime'));
 });
 
 test('this spec, and a process it spawns with the inherited env, resolve a registry under the OS temp directory',()=>{
