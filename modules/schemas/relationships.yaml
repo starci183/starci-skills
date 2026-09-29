@@ -58,9 +58,6 @@ schemaToSchema:
   - {from: work-evidence, to: "(any work record)", type: consumes,
      note: "evidence binds record+source version via recordDigest; expiry computed from it",
      source: "work-evidence.schema.yaml"}
-  - {from: "work-*.schema.yaml (per-record family)", to: work.schema.yaml, type: supersedes,
-     note: "the per-family work/<kind>@1 ids supersede the monolith for the covered families; the monolith remains authority for work/workspace@1, work/resource@1 and work/evidence@1; the recursive work/node@N envelope is retired",
-     source: "work.schema.yaml $defs consts vs work-*.schema.yaml consts"}
 
   # --- kernel chain (the goal is a sqlite row; the plan file is
   #     the only schema'd artifact) ------------------------------------------
@@ -119,12 +116,12 @@ schemaToSchema:
 schemaToSubsystem:
 
   work-tree:        # the .starciwork product record tree
-    schemas: [work-layout, work.schema (v1), work-workspace, work-catalog, work-feature, work-brand,
+    schemas: [work-layout, work-workspace, work-catalog, work-feature, work-brand,
               work-business-rule, work-acceptance-criterion, work-functional-requirement,
               work-non-functional-requirement, work-customer-journey, work-policy-decision,
               work-data, work-sds-component, work-ui-screen, work-implementation,
               work-uat-flow, work-disposable-accounts, work-evidence]
-    note: "19 files — the largest subsystem. per-record family + monolith + layout."
+    note: "18 files — the largest subsystem. per-record families + layout."
 
   kernel:           # workflow kernel boundaries
     schemas: [goal-plan]

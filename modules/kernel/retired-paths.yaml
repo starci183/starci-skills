@@ -49,3 +49,4 @@ retired:
   - {path: docs/source-staleness.md, retiredAt: 2026-09-29, removedIn: legacy-wp56, replacedBy: 'none: the source-staleness scan read work/node source identities and is deleted'}
   - {path: tests/core.spec.mjs, retiredAt: 2026-09-29, removedIn: legacy-wp56, replacedBy: 'none: it tested the retired node validator'}
   - {path: tests/module-spec.spec.mjs, retiredAt: 2026-09-29, removedIn: legacy-wp56, replacedBy: 'none: it tested the retired node validator'}
+  - {path: modules/schemas/work.schema.yaml, retiredAt: 2026-09-29, removedIn: wp56-leftovers, replacedBy: 'work-workspace.schema.yaml, work-resource.schema.yaml and work-evidence.schema.yaml (one file per record kind); the monolith had no runtime reader'}

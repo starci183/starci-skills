@@ -30,7 +30,7 @@ import {sha256File} from '../../engine/digest.mjs';
  *                              scripts/checks/check-example-work.mjs (CODE_DIGEST_STALE) and
  *                              scripts/example/example-derive.mjs. That is a schema gap, not a licence to
  *                              invent: the shape below is the one on disk. The nearest declared shape is
- *                              modules/schemas/work.schema.yaml's `$defs.asset` ({path, sha256}).
+ *                              modules/schemas/work-evidence.schema.yaml's `assets[]` items ({path, sha256}).
  *   The authored-by-nature exemption (work/data@1, work/brand@1, work/policy-decision@1)
  *                              modules/schemas/work-layout.yaml, rule "Done means proven or says so".
  *

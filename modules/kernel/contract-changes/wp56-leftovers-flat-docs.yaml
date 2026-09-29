@@ -1,0 +1,17 @@
+id: wp56-leftovers-flat-docs
+effectiveAt: '2026-09-29T21:00:00+07:00'
+summary: >-
+  Leftovers of the WP5/6 retirement. docs/business-srs.md and docs/architecture-sds.md now describe the
+  flat families (fr, nfr, br, data, journey, decision; sds, contract, integration, event) and no longer
+  the retired business/srs and architecture/sds trees or their starci/srs-* and starci/sds-* leaf
+  schemas. modules/schemas/work.schema.yaml (urn:work:metadata:1) is deleted: nothing read it at runtime,
+  work/workspace@1, work/resource@1 and work/evidence@1 are owned by their own work-*.schema.yaml files,
+  and its index.yaml, relationships.yaml, kinds.yaml and records.yaml references are removed.
+reach: new-legs
+paths:
+  - docs/business-srs.md
+  - docs/architecture-sds.md
+  - modules/schemas
+  - modules/models/kinds.yaml
+  - modules/models/records.yaml
+  - modules/kernel/contract-changes/wp56-leftovers-flat-docs.yaml

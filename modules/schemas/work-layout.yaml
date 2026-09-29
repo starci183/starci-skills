@@ -327,7 +327,7 @@ rules:
   - Repository and environment provenance is written directly in sourceRefs or the owning module
     record. refs and dependsOn remain stable technical node IDs for digest propagation.
   - "UAT accounts.yaml uses schema work/disposable-accounts@1 (the example tree's own convention; the
-    work.schema.yaml monolith shape embedded a literal username/password
+    the retired monolith shape embedded a literal username/password
     pair per entry, which is refused now that _resources/identities/** exists). Each entry is
     {role, identity: <_resources identity resource id>} - a sealed ref, never a synthetic password
     written into the flow's own tree. Images and video remain original binary assets."

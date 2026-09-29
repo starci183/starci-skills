@@ -149,7 +149,7 @@ kinds:
     writes: [decision]
     knowledge: [design-patterns, architecture-rules]
     checks: []
-    stacks: [modules/schemas/work.schema.yaml, modules/schemas/work-layout.yaml]
+    stacks: [modules/schemas/work-layout.yaml]
     carries: [work/policy-decision@1]
     purpose: Prepare one canonical decision question with distinct typed outcomes, analysis and one recommendation, or answer it from already-decided records. Ordinary reversible technical ambiguity may use a recorded recommendation. Decisive product policy about money, authority or customer data waits for an exact owner answer/receipt and is never inferred from the recommendation.
     reports:
@@ -180,7 +180,7 @@ kinds:
     writes: [srs, decision]
     knowledge: []
     checks: []
-    stacks: [modules/schemas/work.schema.yaml, modules/schemas/work-layout.yaml]
+    stacks: [modules/schemas/work-layout.yaml]
     carries: [work/business-rule@1, work/acceptance-criterion@1, work/functional-requirement@1, work/non-functional-requirement@1, work/data@1, work/customer-journey@1, work/policy-decision@1]
     purpose: Settle what the product must do, in the business record, before anything is designed against it.
     reports:
@@ -202,7 +202,7 @@ kinds:
     writes: [srs]
     knowledge: []
     checks: []
-    stacks: [modules/schemas/work.schema.yaml, modules/schemas/work-layout.yaml]
+    stacks: [modules/schemas/work-layout.yaml]
     carries: [work/business-rule@1, work/acceptance-criterion@1, work/functional-requirement@1, work/non-functional-requirement@1, work/data@1, work/customer-journey@1, work/policy-decision@1]
     purpose: Repair a requirement record a builder found silent, confusing or self-contradictory - edit the requirement, rule or journey itself and bump its rev.
     reports:
@@ -218,7 +218,7 @@ kinds:
     writes: [sds, decision]
     knowledge: [architecture-rules, design-patterns, code-pattern-enforcement]
     checks: []
-    stacks: [modules/schemas/work.schema.yaml, modules/schemas/work-layout.yaml]
+    stacks: [modules/schemas/work-layout.yaml]
     carries: [work/sds-component@1, work/contract@1, work/integration@1, work/policy-decision@1]
     purpose: Settle how the product realises a requirement, as a new design decision in the design record.
     reports:
@@ -234,7 +234,7 @@ kinds:
     writes: [sds]
     knowledge: [architecture-rules, design-patterns, code-pattern-enforcement]
     checks: []
-    stacks: [modules/schemas/work.schema.yaml, modules/schemas/work-layout.yaml]
+    stacks: [modules/schemas/work-layout.yaml]
     carries: [work/sds-component@1, work/contract@1, work/integration@1, work/policy-decision@1]
     purpose: Repair a design record that a builder found silent or wrong - edit the text and bump its rev.
     reports:
@@ -265,7 +265,7 @@ kinds:
     writes: [brand, asset, shell]
     knowledge: [grammars/*, ui/*]
     checks: [scripts/checks/shell-conformance.mjs]
-    stacks: [modules/schemas/work.schema.yaml, modules/schemas/work-layout.yaml, modules/schemas/work-layout-tree.schema.yaml]
+    stacks: [modules/schemas/work-layout.yaml, modules/schemas/work-layout-tree.schema.yaml]
     carries: [work/brand@1, work/layout-tree@1]
     purpose: Settle the product's visual identity - colour tokens, typography, mascot, logo, imagery rules - in the one brand record every drawing and build reads, and write the layout tree (interface.draw writes it too, from todo) - app/ scanned into layouts, groups, slots and intercepts, each visible layout captured per breakpoint and theme with its slot measured, navigation labels, product locale, personas, lockup - in the one shell record every direction is composited into.
     reports:
@@ -292,7 +292,7 @@ kinds:
     writes: [design, asset, shell]
     knowledge: [grammars/*, patterns/fe/*, ui/*]
     checks: [scripts/checks/shell-conformance.mjs]
-    stacks: [modules/schemas/work.schema.yaml, modules/schemas/work-layout.yaml, modules/schemas/work-layout-tree.schema.yaml]
+    stacks: [modules/schemas/work-layout.yaml, modules/schemas/work-layout-tree.schema.yaml]
     carries: [work/ui-screen@1]
     purpose: Token-render a small representative direction and map every remaining screen/state/component before interface code exists.
     reports:
@@ -312,7 +312,7 @@ kinds:
     writes: [asset, design, code]
     knowledge: [grammars/*, ui/*]
     checks: []
-    stacks: [modules/schemas/work.schema.yaml, modules/schemas/work-layout.yaml]
+    stacks: [modules/schemas/work-layout.yaml]
     carries: [work/ui-screen@1]
     purpose: Generate the artwork the approved candidate embeds as real repository assets, at the size and format the design record declares.
     reports:
@@ -352,7 +352,7 @@ kinds:
     writes: [evidence]
     knowledge: [patterns/fe/*, ui/*, grammars/*]
     checks: [scripts/checks/acceptance.mjs, scripts/checks/shell-conformance.mjs]
-    stacks: [modules/schemas/work.schema.yaml, modules/schemas/work-layout.yaml]
+    stacks: [modules/schemas/work-layout.yaml]
     carries: [work/evidence@1, starci/evidence-packet@1]
     purpose: Inspect fresh implementation-produced renders against intent, installed Grammar, brand, the app shell and UI proof rules, then report a bounded repair route or no-actionable-drift without repairing anything.
     reports:
@@ -437,7 +437,7 @@ kinds:
     writes: [runtime, code]
     knowledge: [application-stacks]
     checks: []
-    stacks: [.starcistacks/**, modules/schemas/application-stacks.schema.yaml, modules/schemas/work.schema.yaml, modules/schemas/work-layout.yaml]
+    stacks: [.starcistacks/**, modules/schemas/application-stacks.schema.yaml, modules/schemas/work-layout.yaml]
     carries: [work/resource@1, starci/application-stacks@1]
     purpose: Operate the runtime the product needs - migrations, environment, deployment, infrastructure.
     reports:
@@ -457,7 +457,7 @@ kinds:
     writes: [grammar, code]
     knowledge: [grammars/*, ui/*, code-pattern-enforcement]
     checks: [scripts/checks/code-patterns/*.mjs]
-    stacks: [modules/schemas/work.schema.yaml, modules/schemas/work-layout.yaml]
+    stacks: [modules/schemas/work-layout.yaml]
     carries: [work/*]
     purpose: "Grow the installed grammar by one semantic unit the product needs and no composition of existing contracts renders: implement it in the grammar package with its stories and tests, publish it, bump the consumer, and record it in the canon."
     reports:
@@ -477,7 +477,7 @@ kinds:
     writes: [evidence, code]
     knowledge: [patterns/fe/*, ui/*, grammars/*]
     checks: [scripts/checks/acceptance.mjs]
-    stacks: [modules/schemas/work.schema.yaml, modules/schemas/work-layout.yaml]
+    stacks: [modules/schemas/work-layout.yaml]
     carries: [work/evidence@1, starci/evidence-packet@1]
     purpose: Walk one end-to-end scenario on the running product and leave the scenario and its evidence.
     reports:
@@ -494,7 +494,7 @@ kinds:
     writes: [evidence, code]
     knowledge: [patterns/fe/*, ui/*, grammars/*]
     checks: [scripts/uat/assisted-runner.mjs]
-    stacks: [modules/schemas/work.schema.yaml, modules/schemas/work-layout.yaml, modules/schemas/assisted-uat-request.schema.yaml, modules/schemas/assisted-uat-session-manifest.schema.yaml, modules/schemas/assisted-uat-receipt.schema.yaml, modules/schemas/assisted-uat-cleanup.schema.yaml, modules/schemas/assisted-uat-redaction.schema.yaml]
+    stacks: [modules/schemas/work-layout.yaml, modules/schemas/assisted-uat-request.schema.yaml, modules/schemas/assisted-uat-session-manifest.schema.yaml, modules/schemas/assisted-uat-receipt.schema.yaml, modules/schemas/assisted-uat-cleanup.schema.yaml, modules/schemas/assisted-uat-redaction.schema.yaml]
     carries: [work/uat-flow@1, work/evidence@1, starci/assisted-uat-request@1, starci/assisted-uat-session-manifest@1, starci/assisted-uat-receipt@1, starci/assisted-uat-cleanup@1, starci/assisted-uat-redaction@1]
     purpose: Freeze genuine human-gated UAT into deterministic, digest-bound scripts and policies without executing it or claiming acceptance.
     reports:
@@ -511,7 +511,7 @@ kinds:
     writes: [evidence]
     knowledge: [patterns/fe/*, ui/*, grammars/*]
     checks: [scripts/checks/acceptance.mjs]
-    stacks: [modules/schemas/work.schema.yaml, modules/schemas/work-layout.yaml, modules/schemas/assisted-uat-request.schema.yaml, modules/schemas/assisted-uat-session-manifest.schema.yaml, modules/schemas/assisted-uat-receipt.schema.yaml, modules/schemas/assisted-uat-verification.schema.yaml]
+    stacks: [modules/schemas/work-layout.yaml, modules/schemas/assisted-uat-request.schema.yaml, modules/schemas/assisted-uat-session-manifest.schema.yaml, modules/schemas/assisted-uat-receipt.schema.yaml, modules/schemas/assisted-uat-verification.schema.yaml]
     carries: [work/uat-flow@1, work/evidence@1, starci/assisted-uat-receipt@1, starci/assisted-uat-verification@1, starci/evidence-packet@1]
     purpose: Derive acceptance from one exact immutable assisted-run receipt using current bindings, machine postconditions, evidence integrity, redaction and cleanup; human ok is completion only.
     reports:
@@ -529,7 +529,7 @@ kinds:
     writes: [evidence, code]
     knowledge: [patterns/be/*, application-stacks]
     checks: [scripts/checks/acceptance.mjs]
-    stacks: [modules/schemas/work.schema.yaml, modules/schemas/work-layout.yaml]
+    stacks: [modules/schemas/work-layout.yaml]
     carries: [work/evidence@1, starci/evidence-packet@1]
     purpose: Prove one delivered slice through its public API on the real stack, never a screen, and leave the scenario spec and its run output.
     reports:
@@ -548,7 +548,7 @@ kinds:
     writes: [evidence]
     knowledge: [application-stacks]
     checks: [scripts/checks/acceptance.mjs]
-    stacks: [.starcistacks/**, modules/schemas/application-stacks.schema.yaml, modules/schemas/work.schema.yaml, modules/schemas/work-layout.yaml]
+    stacks: [.starcistacks/**, modules/schemas/application-stacks.schema.yaml, modules/schemas/work-layout.yaml]
     carries: [work/evidence@1, starci/evidence-packet@1]
     purpose: Prove one declared external integration against the real provider with the credential the owner supplies, and leave the live run as evidence.
     reports:
@@ -615,7 +615,7 @@ kinds:
     writes: [record, srs, sds, decision, integration]
     knowledge: [application-stacks]
     checks: []
-    stacks: [.starcistacks/**, modules/schemas/work.schema.yaml, modules/schemas/work-layout.yaml]
+    stacks: [.starcistacks/**, modules/schemas/work-layout.yaml]
     carries: [work/*, work/disposable-accounts@1]
     purpose: Complete the authored fields of one Work node - its write scope and its checks - so the kernel can launch it; an intake authors a feature's records and reconciles them against the decided ones as three typed cases (reference, conflict, new), editing no record of another feature and reporting no gap against one; a cut splits a node too big for one operation into child nodes with disjoint write scopes, the seam first, and leaves the node a derived parent whose assertions become the group's acceptance.
     reports:
@@ -657,7 +657,7 @@ kinds:
     writes: [record]
     knowledge: [architecture-rules, design-patterns]
     checks: []
-    stacks: [modules/schemas/work.schema.yaml, modules/schemas/work-layout.yaml]
+    stacks: [modules/schemas/work-layout.yaml]
     carries: [work/*]
     purpose: Cut one Work record that is too big for a single operation into child records with disjoint write scopes - the seam first, then one observable behaviour per child - and leave the record a derived parent whose assertions are the group's acceptance.
     reports:
@@ -772,7 +772,7 @@ kinds:
     writes: [evidence]
     knowledge: [code-pattern-enforcement]
     checks: [scripts/checks/code-patterns/*.mjs]
-    stacks: [modules/schemas/work.schema.yaml, modules/schemas/work-layout.yaml]
+    stacks: [modules/schemas/work-layout.yaml]
     carries: [work/evidence@1, starci/evidence-packet@1]
     purpose: Inspect the delivered code, configuration and shipped assets for vulnerabilities and leave the findings as evidence, repairing nothing.
     reports:
@@ -787,7 +787,7 @@ kinds:
     writes: [evidence]
     knowledge: []
     checks: [scripts/checks/acceptance.mjs]
-    stacks: [modules/schemas/work.schema.yaml, modules/schemas/work-layout.yaml]
+    stacks: [modules/schemas/work-layout.yaml]
     carries: [work/evidence@1, starci/evidence-packet@1]
     purpose: Run the product repository's whole unit suite (npm run test:unit) on the delivered source and report the observed result, only when the goal or the owner explicitly asks for the full unit run; a code-writing op never runs it.
     reports:
@@ -802,7 +802,7 @@ kinds:
     writes: [evidence]
     knowledge: [application-stacks]
     checks: [scripts/checks/acceptance.mjs]
-    stacks: [modules/schemas/work.schema.yaml, modules/schemas/work-layout.yaml]
+    stacks: [modules/schemas/work-layout.yaml]
     carries: [work/evidence@1, starci/evidence-packet@1]
     purpose: Measure the running product against the performance budget the goal declared and leave the measured numbers as evidence.
     reports:
@@ -819,7 +819,7 @@ kinds:
     writes: [record]
     knowledge: [architecture-rules, design-patterns]
     checks: []
-    stacks: [modules/schemas/work.schema.yaml, modules/schemas/work-layout.yaml]
+    stacks: [modules/schemas/work-layout.yaml]
     carries: [work/*]
     purpose: Author or update the product's documentation from the settled records and the delivered code.
     reports:
@@ -890,7 +890,7 @@ kinds:
     writes: [record]
     knowledge: []
     checks: [scripts/checks/check-scoped-lint.mjs]
-    stacks: [modules/schemas/work.schema.yaml, modules/schemas/work-feature.schema.yaml, modules/schemas/work-catalog.schema.yaml, modules/schemas/work-layout.yaml]
+    stacks: [modules/schemas/work-feature.schema.yaml, modules/schemas/work-catalog.schema.yaml, modules/schemas/work-layout.yaml]
     carries: [work/feature@1, work/catalog@1]
     purpose: Retire exactly the selected scope - a scoped metadata decision that preserves live consumers and required evidence, with destructive effects only where separately authorised.
     reports:
@@ -907,7 +907,7 @@ kinds:
     writes: [record]
     knowledge: [application-stacks]
     checks: []
-    stacks: [modules/schemas/work.schema.yaml, modules/schemas/work-catalog.schema.yaml, modules/schemas/work-layout.yaml]
+    stacks: [modules/schemas/work-catalog.schema.yaml, modules/schemas/work-layout.yaml]
     carries: [work/workspace@1, work/catalog@1, work/feature@1, work/resource@1, starci/source-identity@1]
     purpose: Create or reconstruct one canonical workspace from a purpose or a selected existing source - verified bindings, preserved provenance, validated scope.
     reports:
@@ -926,7 +926,7 @@ kinds:
     writes: [record, asset, code]
     knowledge: [coding-reference]
     checks: [scripts/checks/check-scoped-lint.mjs]
-    stacks: [modules/schemas/work.schema.yaml, modules/schemas/work-layout.yaml]
+    stacks: [modules/schemas/work-layout.yaml]
     carries: [work/*]
     purpose: Author or revise one selected content unit from its brief, grounded in the settled records and the selected source.
     reports:

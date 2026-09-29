@@ -44,25 +44,6 @@ schemas:
       selectedBy: Not selected per-workflow — it is the standing spatial contract every Work operation assumes.
     note: "self-defending: check-example-work reads families FROM this file, so the doc and the gate cannot drift silently (see its own familiesNote)."
 
-  - id: urn:work:metadata:1
-    file: modules/schemas/work.schema.yaml
-    dialect: json-schema
-    subsystem: work-tree
-    governs: >-
-      Work metadata monolith: the versioned record kinds work/workspace@1,
-      work/resource@1, work/evidence@1 and work/disposable-accounts@1. The recursive work/node@N
-      envelope is retired: a work/node@N record is refused (WORK_NODE_RETIRED), never read.
-    binds: versioned .starciwork records carrying @-suffixed schema ids
-    usedBy:
-      - modules/models/kinds.yaml (its knowledge-schema list names the monolith kinds verbatim)
-      - scripts/example/work-example.mjs (projected for readers)
-    business:
-      question: "Is a versioned Work record still structurally valid?"
-      whenNeeded: Reading trees that carry @-suffixed record kinds, and the kinds (workspace, resource, evidence) that the per-family files do not re-issue.
-      whenNot: Not for the per-family records — each family's own work-<kind>.schema.yaml is the authority for its kind. Authoring a NEW record under a monolith-only kind is the misuse mode.
-      selectedBy: Record's own `schema:` const — the monolith covers workspace/resource/evidence; family records resolve to work-<kind>.schema.yaml.
-    note: "the monolith and the per-family schemas coexist by design; check each family's own file first."
-
   # --- Work per-record schemas ----------------------------------------------
 
   - id: work/workspace@1
