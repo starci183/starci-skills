@@ -298,7 +298,7 @@ export function jobBoundFiles(db, jobId) {
   let payload = {};
   try { payload = JSON.parse(job.payload_json ?? '{}') ?? {}; } catch { payload = {}; }
   const files = [...list(payload.owned_paths)];
-  const reports = db.prepare('SELECT report_json FROM reports WHERE workflow_id=? AND op_id=? AND attempt=? ORDER BY report_id DESC').all(job.workflow_id, job.op_id, job.attempt);
+  const reports = db.prepare('SELECT report_json FROM reports WHERE job_id=? ORDER BY report_id DESC').all(jobId);
   for (const r of reports) {
     try { files.push(...list(JSON.parse(r.report_json)?.files)); } catch { /* unreadable report */ }
   }
