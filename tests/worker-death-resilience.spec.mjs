@@ -115,13 +115,14 @@ test('settle debris: a file written before admission and not in the report never
 
 test('a long owned-path list is written to owned-paths.txt and the prompt names the file, never the 993 paths', (t) => {
   const repo = tmp(t, 'starci-owned-');
+  const scratchDir = path.join(repo, 'job-scratch');
   const short = ['.starciwork/features/a/fr/x', 'src/a.ts'];
-  assert.equal(ownedPathsLine({ paths: short, repo, workflowId: 'wf', jobId: 'op-1' }), `owned_paths: ${short.join(', ')}`);
+  assert.equal(ownedPathsLine({ paths: short, repo, workflowId: 'wf', jobId: 'op-1', scratchDir }), `owned_paths: ${short.join(', ')}`);
   const many = Array.from({ length: 993 }, (_, i) => `.starciwork/features/workspace-provision/operations/debt-${i}/evidence/file-${i}.json`);
   assert.ok(many.length > OWNED_INLINE_MAX);
-  const line = ownedPathsLine({ paths: many, repo, workflowId: 'wf', jobId: 'op-1' });
+  const line = ownedPathsLine({ paths: many, repo, workflowId: 'wf', jobId: 'op-1', scratchDir });
   assert.ok(line.length < 3000, `line is ${line.length} chars`);
-  const file = ownedPathsFileOf(repo, 'wf', 'op-1');
+  const file = ownedPathsFileOf(repo, 'wf', 'op-1', scratchDir);
   assert.ok(line.includes(file));
   assert.deepEqual(fs.readFileSync(file, 'utf8').trim().split('\n'), many);
   assert.match(ownedPathsLine({ paths: many }), /993 paths/);

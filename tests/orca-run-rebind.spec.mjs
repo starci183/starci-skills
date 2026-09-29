@@ -24,6 +24,8 @@ const WF='wf-rebind';
 const fixture=(t,runs)=>{
   const root=fs.mkdtempSync(path.join(os.tmpdir(),'starci-rebind-'));
   t.after(()=>fs.rmSync(root,{recursive:true,force:true,maxRetries:20,retryDelay:25}));
+  if(process.env.STARCI_TEST_TEMP_DIR)t.after(()=>fs.rmSync(path.join(process.env.STARCI_TEST_TEMP_DIR,'starci-job-scratch'),
+    {recursive:true,force:true,maxRetries:20,retryDelay:25}));
   const repo=path.join(root,'repo');fs.mkdirSync(repo,{recursive:true});
   const stub=path.join(root,'fake-orca.mjs');fs.writeFileSync(stub,FAKE_ORCA);
   const stateFile=path.join(root,'state.json');
