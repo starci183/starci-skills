@@ -57,7 +57,7 @@ export const JOB_ARTIFACT_ROLES=Object.freeze(['check-output','check-stdout','ch
   'direction','prompt','render','redline','critique','capture','dom','screenshot','video','trace','uat-run','metrics','salvage','scan','other']);
 
 export const LEDGER_SCHEMA='starci/runtime@1';
-export const LEDGER_VERSION=3;
+export const LEDGER_VERSION=4;
 
 const need=(ok,message,code)=>{if(!ok)throw Object.assign(Error(message),code?{code}:{});};
 const json=value=>value===undefined||value===null?null:JSON.stringify(value);
@@ -131,7 +131,7 @@ const INIT_SQL_FILE=new URL('./migrations/runtime/0001-init.sql',import.meta.url
 const INIT_SQL=fs.readFileSync(INIT_SQL_FILE,'utf8');
 const INIT_SQL_SHA=sha256(INIT_SQL);
 /** Forward migrations after 0001-init, in order; each bumps user_version to its `version` (migrateLedger). */
-const FORWARD_MIGRATIONS=Object.freeze([{version:3,name:'0003-usage-unavailable'}]);
+const FORWARD_MIGRATIONS=Object.freeze([{version:3,name:'0003-usage-unavailable'},{version:4,name:'0004-attempt-why'}]);
 export const LEDGER_BUSY_TIMEOUT_MS=15000;
 /**
  * Writer pragmas. wal_autocheckpoint=0 on EVERY connection except the one checkpointer (openLedger({checkpointer:true}),
@@ -411,7 +411,7 @@ const columnsOf=(db,table)=>{
 export const REDACTED_COLUMNS=Object.freeze({
   logs:['msg','data_json','refs_json'],reports:['report_json'],check_runs:['command','note','summary_json','attribution_json'],
   incidents:['detail','last_progress'],inbox:['payload_json','disposition_json'],decision_items:['summary','payload_json','evidence_json'],
-  decisions:['rationale','result_json'],contracts:['markdown','context_json'],api_requests:['result_json'],op_attempts:['settle_json'],
+  decisions:['rationale','result_json'],contracts:['markdown','context_json'],api_requests:['result_json'],op_attempts:['settle_json','why_json'],
   conditions:['message'],goals:['markdown','amendment_json'],settle_tails:['last_error'],product_lands:['reason','checks_json'],
   record_changes:['reason'],foundations:['detail'],foundation_declarations:['detail'],interface_audits:['findings_json'],
 });

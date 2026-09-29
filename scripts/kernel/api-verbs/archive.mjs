@@ -1,5 +1,6 @@
 // api archive: stop a workflow while preserving its history.
 import { changeWorkflowPhase, getUnit, recordJobResult, resolveIncident, setInboxStatus, setJobStatus, setUnitState, updateAttempt, updateIncident, updateJob } from '../../../engine/ledger-db.mjs';
+import { recordWhy } from '../why-record.mjs';
 import { parseJson } from '../../lib/json.mjs';
 import { ARCHIVED_BY, JOB_ROW, getWorkflow, jobOpOf, jobPayloadOf, latestAttemptOf } from '../api-lib/rows.mjs';
 import { kernelCustodyOf } from '../api-lib/kernel-seat.mjs';
@@ -69,7 +70,7 @@ export default {
       for (const to of path) setJobStatus(db, { jobId: job.job_id, to, reason: WORKFLOW_ARCHIVED, at: now, ...(to === path.at(-1) ? { leaseToken: null, deadline: null } : {}) });
       recordJobResult(db, { jobId: job.job_id, result: { verdict: 'dropped', reason: WORKFLOW_ARCHIVED, priorStatus: job.status, at: now }, at: now });
       const attempt = latestAttemptOf(db, job.job_id);
-      if (attempt && attempt.end_state == null && attempt.settled_at == null) updateAttempt(db, { attemptId: attempt.attempt_id, endState: 'cancelled', at: now });
+      if (attempt && attempt.end_state == null && attempt.settled_at == null) { updateAttempt(db, { attemptId: attempt.attempt_id, endState: 'cancelled', at: now }); recordWhy(db, attempt.attempt_id, { at: now }); }
       const unit = job.unit_id ? getUnit(db, workflowId, job.unit_id) : null;
       if (unit && !['done', 'dropped'].includes(unit.state) && (unit.current_job_id == null || unit.current_job_id === job.job_id)) {
         setUnitState(db, { workflowId, unitId: job.unit_id, to: 'dropped', reason: WORKFLOW_ARCHIVED, at: now });

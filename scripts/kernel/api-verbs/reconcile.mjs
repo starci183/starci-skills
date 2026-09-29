@@ -1,5 +1,6 @@
 // api reconcile: recover a fenced launch or handle one typed recovery mode.
 import path from 'node:path';
+import { recordWhy } from '../why-record.mjs';
 import { recordJobResult, releaseLeases, setJobStatus, updateAttempt } from '../../../engine/ledger-db.mjs';
 import { parseJson } from '../../lib/json.mjs';
 import { jobPayloadOf, jobRowOf, latestAttemptOf, latestContractOf, operationTerminalHandleOf } from '../api-lib/rows.mjs';
@@ -134,6 +135,7 @@ export default {
     const attempt = latestAttemptOf(db, jobId);
     recordJobResult(db, { jobId, result, at: now });
     if (attempt && attempt.end_state == null && attempt.settled_at == null) updateAttempt(db, { attemptId: attempt.attempt_id, endState: 'requeued', effectState: 'none', settledBy: 'reconcile', at: now });
+    if (attempt) recordWhy(db, attempt.attempt_id, { at: now });
     setJobStatus(db, { jobId, to: 'ready', reason: 'dispatch-reconciled', expect: 'effect_unknown', workerId: null, leaseToken: null, deadline: null, payload: nextPayload, at: now });
     ledger.appendEvent({
       workflowId: job.workflow_id, entityType: 'job', entityId: jobId,

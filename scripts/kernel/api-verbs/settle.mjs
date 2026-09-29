@@ -25,6 +25,7 @@ import { citeRecords } from '../work-citations.mjs';
 import { finalizeAttemptTranscript } from '../transcripts.mjs';
 import { landShellFoundationIfSettled } from '../shell-foundation.mjs';
 import { parseYaml } from '../../../engine/yaml.mjs';
+import { recordWhy } from '../why-record.mjs';
 
 // The job_transitions walk from the job's current status to its settled one. A pass settles only a job whose worker
 // filed a report (running/answering/effect_unknown go through reported); a fail or blocked with a filed report goes
@@ -312,6 +313,11 @@ export default {
       try { nextStep = canonSettleFollowUp(ledger, { ...job, payload_json: JSON.stringify(payload) }, payload, envelope) ?? null; } catch (error) {
         ledger.appendEvent({ workflowId: job.workflow_id, entityType: 'job', entityId: jobId, kind: 'canon-follow-up-failed', payload: { error: String(error?.message ?? error).slice(0, 400) } });
       }
+    }
+    // Why the attempt ended as it did, in the owner's words (scripts/kernel/why.mjs), stored with the settle.
+    if (settledAttemptId != null) {
+      const why = recordWhy(db, settledAttemptId, { at });
+      if (why?.error) ledger.appendEvent({ workflowId: job.workflow_id, entityType: 'job', entityId: jobId, attemptId: settledAttemptId, kind: 'why-failed', payload: { error: why.error } });
     }
     // The owner's approval, recorded after the settle it rides on so it is
     // newer than every business settle (api finish reads it: handoverGateOf).

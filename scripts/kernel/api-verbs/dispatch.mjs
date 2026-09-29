@@ -1,5 +1,6 @@
 // api dispatch: admit and launch an operation from its persisted route.
 import fs from 'node:fs';
+import { recordWhy } from '../why-record.mjs';
 import path from 'node:path';
 import { spawn } from 'node:child_process';
 import { transitionWorkflowToRunning, setJobStatus, updateAttempt, updateJob } from '../../../engine/ledger-db.mjs';
@@ -880,7 +881,7 @@ function runningOrAbandon(commit, { ledger, db, job, jobId, op, dispatchId, atte
     try { cleanup = abandon(); } catch (e) { cleanup = { error: String(e?.message ?? e) }; }
     try {
       ledger.transaction(() => {
-        if (attemptId != null) updateAttempt(db, { attemptId, endState: 'cancelled' });
+        if (attemptId != null) { updateAttempt(db, { attemptId, endState: 'cancelled' }); recordWhy(db, attemptId); }
         ledger.appendEvent({ workflowId: job.workflow_id, entityType: 'job', entityId: jobId, kind: 'dispatch-abandoned',
           payload: { op, dispatch: dispatchId, code: error.code, status: error.status ?? null, phase: error.phase ?? null } });
       });

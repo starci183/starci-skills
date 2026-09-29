@@ -33,6 +33,7 @@ import { openGrammarProposals } from '../../work/grammar-proposal.mjs';
 import { openAssetSlots } from '../../work/asset-slot.mjs';
 import { staleProofsOf } from '../proof-integrity.mjs';
 import { opMetrics, stuckLine, stuckOf } from '../../supervisor/op-metrics.mjs';
+import { kernelNotesOf, whyOf } from '../why.mjs';
 
 function cmdStatus(ledger, args, repo, { emit, internals, ext }) {
   const { ACTIONABLE_FRONTIER_STATES, CUT_SET_CLOSING_CHECK, DEAD_WORKER_LIVENESS, FINAL_SETTLED, LEG_IN_FLIGHT, NEXT_ACTION_MOVES, QUEUED_BECAUSE, approvedLegOps, askFormAlive, cutSeamViewOf, cutSetStateOf, foundationDutyOf, graphProjectionOf, heldSettleText, nextActionLabel, observeOperationWorker, opRevDriftOf, opSlotAdmission, openOwnerGates, ownerGateOf, peerDriftLines, poolLoadOf, queuedBecauseOf, recordDependencies, recordWorkerOutageEvidence, renewLiveWorkerLeases, rereadActionOf, runningOpRevDriftOf, seamActionsOf, skillRoot, sourceDriftLines, staleInputProjection, staleLabel, staleOperationLine, statusWorkerRowsOf, typedLogWarningsOf } = internals;
@@ -600,11 +601,27 @@ function cmdStatus(ledger, args, repo, { emit, internals, ext }) {
     action.label = opLabel(action.op);
     if (action.jobId) { const row = db.prepare(`SELECT ${JOB_ROW} FROM jobs WHERE job_id=?`).get(action.jobId); if (row) action.displayName = jobDisplayNameOf(db, row, { repo, workflowName: title, cache: nameCache }); }
   }
+  // Why each leg that is not green stands where it does, in the owner's words (scripts/kernel/why.mjs, stored in
+  // op_attempts.why_json): leg.why is the latest attempt's, leg.attempts every attempt of the op that needed one (newest
+  // first, at most 6); frontier.why is the most recently ended one. Headline first.
+  let newestWhy = null;
+  for (const leg of graph.legs) {
+    if (['green', 'green-provisional', 'deferred'].includes(leg.color)) continue;
+    const rows = db.prepare('SELECT * FROM op_attempts WHERE workflow_id=? AND op_id=? AND dispatched_at IS NOT NULL ORDER BY attempt_id DESC LIMIT 6').all(workflowId, leg.op);
+    const attempts = rows.map((a) => ({ attemptId: a.attempt_id, tryNo: a.try_no, verdict: a.verdict ?? null, endState: a.end_state ?? null, why: whyOf(db, a) })).filter((a) => a.why);
+    if (!attempts.length) continue;
+    leg.why = attempts[0].why;
+    leg.attempts = attempts;
+    if (!newestWhy || attempts[0].attemptId > newestWhy.attemptId) newestWhy = { op: leg.op, attemptId: attempts[0].attemptId, ...attempts[0].why };
+  }
+  if (newestWhy) frontier.why = { headline: newestWhy.headline, op: newestWhy.op, state: newestWhy.state, next: newestWhy.next, owner: newestWhy.owner, attemptId: newestWhy.attemptId };
+  const kernelNotes = kernelNotesOf(db, workflowId);
   // The owner's "test later" list: every leg the config.yaml specs switches deferred (api run-deferred-tests runs them).
   const specs = ownerSpecs(skillRoot);
   const testsDeferred = { off: specsOff(specs), jobs: deferredTestsOf(db, workflowId), planned: graph.legs.filter((leg) => leg.deferred && !leg.jobId).map((leg) => ({ op: leg.op, reason: leg.deferred })) };
   const out = { ok: true, workflowId, title, slug: wf.title ?? null, phase: wf.phase ?? null, archivedAt: wf.archived_at ?? null, frontier, nextActions: graph.nextActions, legs: graph.legs, testsDeferred, autopilot: autopilotView.view, workGraph: workGraph ? { version: workGraph.version, event: workGraph.event, counts: workGraph.counts, frontier: workGraph.frontier.map(({ id, domain, slice, color, lastOp }) => ({ id, domain, slice, color, lastOp })) } : null, kernel, jobs: byStatus, failures, awaitingOwner, activeLeases: leases, inboxPending, reports, workers, workerQuestions, peerMessages, ...(workerAsks.error ? { workerQuestionsError: workerAsks.error } : {}), cutSets, handover, ...stale, ...(foundations ? { foundations } : {}), ...(outageCircuits.length ? { outageCircuits } : {}), ...(grammarProposals.length ? { grammarProposals } : {}), ...(drawReviews.length ? { drawReviews } : {}), ...(knowledgeChangeRequests.length ? { knowledgeChangeRequests } : {}), ...(logTypedMissing.length ? { logTypedMissing } : {}), ...(assetSlotsOwed.length ? { assetSlotsOwed } : {}), ...(kernelRev ? { kernelRev } : {}), ...(opRevDriftWarnings.length ? { opRevDrift: opRevDriftWarnings } : {}), ...(runningRevDrift.length ? { runningOpRevDrift: runningRevDrift } : {}), ...(frozenContract.length ? { frozenContractChanges: frozenContract } : {}) };
   out.opHealth = opHealth;
+  out.kernelNotes = kernelNotes;
   out.stuck = stuck;
   out.ramThrottle = ramThrottle;
   out.poolLoad = { running: poolLoad.byModel, routeHoldMs: poolLoad.routeHoldMs };
@@ -622,6 +639,9 @@ function cmdStatus(ledger, args, repo, { emit, internals, ext }) {
       ...awaitingOwner.map((item) => `  ${item.jobId} (${item.opId} a${item.attempt}) awaiting-owner — ask ${item.dispatchId ?? '-'} ${item.answer}`),
       `  handover: ${handover.state}${handover.ask ? ` ask ${handover.ask.dispatchId} ${handover.ask.state}${handover.ask.decision ? ` ${handover.ask.decision} by ${handover.ask.answeredBy ?? '-'}` : ''}` : ''}${handover.finishAllowed ? ' — finish allowed' : ' — finish refused until the owner approves'}`,
       ...(frontier.reason ? [`  reason: ${frontier.reason}`] : []),
+      ...(frontier.why ? [`  why: ${frontier.why.headline} -> ${frontier.why.next}`] : []),
+      ...graph.legs.filter((leg) => leg.why).map((leg) => `  why ${leg.op}: ${leg.why.headline}`),
+      ...(kernelNotes.length ? [`  kernel notes: ${kernelNotes.slice(-3).map((n) => `${n.kind} ${n.id} [${n.status}] ${n.headline}`).join(' | ')}`] : []),
       ...(stuck.length ? [`  stuck: ${stuck.length} wait(s), ${stuckPast.length} past SLA (${stuckPast.filter((item) => item.severity === 'critical').length} critical)`] : []),
       ...stuckPast.slice(0, 8).map((item) => `    ${stuckLine(item)}`),
       ...(graph.legs.length ? [`  legs: ${graph.legs.map((leg) => `${leg.op}(${leg.label}):${leg.color}${leg.deferred ? '(deferred)' : ''}`).join(' ')}`] : []),

@@ -60,6 +60,7 @@ import {
   updateJob, updateIncident, resolveIncident, renewLeases, setSignal, clearSignal, setInboxStatus, jobResult, setUnitState, getUnit,
 } from '../../engine/ledger-db.mjs';
 import { machineFileFor, openMachine } from '../../engine/machine-db.mjs';
+import { recordWhy } from './why-record.mjs';
 import { parseYaml } from '../../engine/yaml.mjs';
 import {
   AWAITING_OWNER, RETRY_CLASS_ENVIRONMENT, admitOpSlot,
@@ -2162,6 +2163,7 @@ const rejectDispatch = (ledger, job, jobId, op, model, {
     if (attemptId != null) endRejectedAttempt(db, { attemptId, at: now, endState: reusable ? 'requeued' : 'effect-unknown', effectState,
       releasedAt: reusable ? now : null, taskClosedAt: taskClosed?.ok === true ? now : null });
     recordJobResult(db, { jobId, result, at: now });
+    recordWhy(db, attemptId, { at: now });
     ledger.appendEvent({
       workflowId: job.workflow_id, entityType: 'job', entityId: jobId, ...(attemptId != null ? { attemptId } : {}),
       kind: 'dispatch-rejected',
@@ -2863,6 +2865,7 @@ function reconcileDeadWorker(ledger, args, job, repo) {
         payload: next, workerId: null, leaseToken: null, deadline: null });
       recordJobResult(db, { jobId, result, at: now });
       if (attemptId != null) updateAttempt(db, { attemptId, at: now, endState: 'requeued', effectState: 'none' });
+      recordWhy(db, attemptId, { at: now });
     } else {
       result = { reason: 'dead-worker-fenced', effectState: effectEvidence ? 'partial' : 'unknown', attemptConsumed: false, retryable: false,
         dispatchId, evidence: recorded, worker: workerProof, paths: pathProof, at: now };
@@ -2871,6 +2874,7 @@ function reconcileDeadWorker(ledger, args, job, repo) {
       setJobStatus(db, { jobId, to: 'effect_unknown', reason: 'dead-worker-fenced', attemptId, at: now, payload: next });
       recordJobResult(db, { jobId, result, at: now });
       if (attemptId != null) updateAttempt(db, { attemptId, at: now, endState: 'effect-unknown', effectState: result.effectState });
+      recordWhy(db, attemptId, { at: now });
     }
     ledger.appendEvent({
       workflowId: job.workflow_id, entityType: 'job', entityId: jobId,
@@ -3401,6 +3405,7 @@ function settleFailedNoReport(ledger, job, { workerProof = null, evidence = [], 
     setJobStatus(db, { jobId, to: 'failed', reason: FAILED_NO_REPORT, attemptId, at, payload: next, leaseToken: null, deadline: null });
     recordJobResult(db, { jobId, result, at });
     if (attemptId != null) updateAttempt(db, { attemptId, at, endState: 'worker-dead', effectState, settledAt: at, settledBy: 'reconcile' });
+    recordWhy(db, attemptId, { at });
     if (job.unit_id) setUnitState(db, { workflowId: job.workflow_id, unitId: job.unit_id, to: 'failed', reason: `${jobId} ${FAILED_NO_REPORT}`, at });
     // A question the dead worker asked through Orca has no one left to answer.
     for (const { inbox_id: inboxId } of db.prepare("SELECT inbox_id FROM inbox WHERE workflow_id=? AND kind=? AND status='pending' AND json_extract(payload_json,'$.jobId')=?")

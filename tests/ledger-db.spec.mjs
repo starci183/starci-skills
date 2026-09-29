@@ -100,8 +100,8 @@ function preMetaLedgerFile(){
 test('the ledger schema carries every contract table, the meta identity, the drift trigger, and version 1',t=>{
   const dir=temporary();t.after(()=>fs.rmSync(dir,{recursive:true,force:true}));
   const ledger=openLedger({file:path.join(dir,'runtime.sqlite')});
-  assert.equal(ledger.schema,LEDGER_SCHEMA);assert.equal(LEDGER_VERSION,3);
-  assert.equal(Number(ledger.db.prepare('PRAGMA user_version').get().user_version),3);
+  assert.equal(ledger.schema,LEDGER_SCHEMA);assert.equal(LEDGER_VERSION,4);
+  assert.equal(Number(ledger.db.prepare('PRAGMA user_version').get().user_version),4);
   assert.equal(ledger.db.prepare('PRAGMA auto_vacuum').get().auto_vacuum,2);
   assert.equal(Number(ledger.db.prepare('PRAGMA foreign_keys').get().foreign_keys),1);
   assert.equal(Number(ledger.db.prepare('PRAGMA synchronous').get().synchronous),1,'synchronous=NORMAL (LEDGER_PRAGMAS, owner ruling 2026-09-27: WAL commits without a per-commit fsync)');
@@ -281,7 +281,7 @@ test('inspectLedger refuses a missing file, and reflects the identity and versio
   assert.throws(()=>inspectLedger({file:path.join(dir,'missing.sqlite')}),/existing file/);
   const ledger=openLedger({file:path.join(dir,'runtime.sqlite')});const id=ledger.ledgerId;ledger.close();
   const inspect=inspectLedger({file:path.join(dir,'runtime.sqlite')});
-  assert.equal(inspect.version,3);assert.equal(inspect.readOnly,true);assert.deepEqual(inspect.listJobs(),[]);
+  assert.equal(inspect.version,4);assert.equal(inspect.readOnly,true);assert.deepEqual(inspect.listJobs(),[]);
   assert.equal(inspect.ledgerId,id);assert.equal(inspect.ledgerId,ledgerIdOf(inspect));
   inspect.close();
 });
@@ -364,7 +364,7 @@ test('a ledger created before awaiting_owner is upgraded in place on the writer 
   try{
     const db=ledger.db;
     assert.ok(db.prepare("SELECT sql FROM sqlite_master WHERE name='jobs'").get().sql.includes("'awaiting_owner'"));
-    assert.deepEqual(db.prepare('SELECT version,name FROM schema_migrations ORDER BY version').all().map(r=>[r.version,r.name]),[[1,'0001-init'],[2,'0002-awaiting-owner'],[3,'0003-usage-unavailable']]);
+    assert.deepEqual(db.prepare('SELECT version,name FROM schema_migrations ORDER BY version').all().map(r=>[r.version,r.name]),[[1,'0001-init'],[2,'0002-awaiting-owner'],[3,'0003-usage-unavailable'],[4,'0004-attempt-why']]);
     assert.equal(db.prepare("SELECT count(*) n FROM job_transitions WHERE to_status='awaiting_owner'").get().n,2);
     assert.equal(db.prepare("SELECT ui FROM ui_state_map WHERE entity='job' AND native='awaiting_owner'").get().ui,'waiting');
     assert.deepEqual(db.prepare("SELECT job_id,status FROM jobs ORDER BY job_id").all().map(r=>[r.job_id,r.status]),[['job-ask','awaiting_owner'],['job-red','failed']],'only the ask moves to the new status');
@@ -374,9 +374,9 @@ test('a ledger created before awaiting_owner is upgraded in place on the writer 
   }finally{ledger.close();}
   // A second open changes nothing (idempotent); a fresh ledger already carries the status and is not migrated.
   const again=openLedger({file});
-  try{assert.equal(again.db.prepare('SELECT count(*) n FROM schema_migrations').get().n,3);}finally{again.close();}
+  try{assert.equal(again.db.prepare('SELECT count(*) n FROM schema_migrations').get().n,4);}finally{again.close();}
   const fresh=openLedger({file:path.join(dir,'fresh.sqlite')});
-  try{assert.deepEqual(fresh.db.prepare('SELECT version FROM schema_migrations').all().map(r=>r.version),[1,3]);}finally{fresh.close();}
+  try{assert.deepEqual(fresh.db.prepare('SELECT version FROM schema_migrations').all().map(r=>r.version),[1,3,4]);}finally{fresh.close();}
 });
 
 test('awaiting_owner is a settled status reached only from reported|deciding; a retry follows it and it spends no try',t=>{
@@ -438,11 +438,11 @@ test('an older (user_version 1) ledger is migrated forward on the first writer o
   // Put the file back to what 0001-init alone produced.
   seed.db.enableDefensive(false);
   seed.db.exec("PRAGMA writable_schema=ON;UPDATE sqlite_master SET sql=replace(sql,',''unavailable'')',')') WHERE name='op_attempts';PRAGMA writable_schema=OFF");
-  seed.db.exec('ALTER TABLE op_attempts DROP COLUMN usage_reason;DELETE FROM schema_migrations WHERE version=3;PRAGMA user_version=1');
+  seed.db.exec('DROP VIEW v_op_history;DROP VIEW v_attempt_state;ALTER TABLE op_attempts DROP COLUMN why_json;ALTER TABLE op_attempts DROP COLUMN usage_reason;DELETE FROM schema_migrations WHERE version IN (3,4);PRAGMA user_version=1');
   seed.close();
   const old=inspectLedger({file});assert.equal(old.version,1);assert.equal(old.db.prepare("SELECT sql FROM sqlite_master WHERE name='op_attempts'").get().sql.includes("'unavailable'"),false);old.close();
   const ledger=openLedger({file});
-  assert.equal(Number(ledger.db.prepare('PRAGMA user_version').get().user_version),3);
+  assert.equal(Number(ledger.db.prepare('PRAGMA user_version').get().user_version),4);
   assert.equal(ledger.db.prepare('SELECT status FROM schema_migrations WHERE version=3').get().status,'done');
   assert.equal(fs.existsSync(`${file}.pre-0003-usage-unavailable.bak`),true,'a VACUUM INTO backup precedes the migration');
   assert.equal(ledger.db.prepare("SELECT sql FROM sqlite_master WHERE name='op_attempts'").get().sql.includes("'unavailable'"),true);

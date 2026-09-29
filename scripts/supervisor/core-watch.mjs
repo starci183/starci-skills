@@ -159,7 +159,8 @@ async function workflowFacts(o) {
     for (const leg of j.legs ?? []) {
       const st = leg.status ?? leg.state;
       const lk = `${k}:leg:${leg.op ?? leg.opId}:${leg.jobId ?? ''}`;
-      facts.set(lk, LEG_BAD.test(st ?? '') ? `${leg.op ?? leg.opId} ${st}` : null);
+      // The leg's why (scripts/kernel/why.mjs): the owner-facing headline after the raw state.
+      facts.set(lk, LEG_BAD.test(st ?? '') ? `${leg.op ?? leg.opId} ${st}${leg.why?.headline ? ` - ${leg.why.headline}` : ''}` : null);
     }
     const counts = { wedged: count(f.wedgedJobs), dead: count(f.deadWorkerJobs), stale: count(f.staleOperations), stuck: count(j.stuck), owner: count(j.awaitingOwner), held: count(f.heldSettleJobs) + count(f.heldWorkerJobs) };
     const ids = (a, key) => (Array.isArray(a) ? a.slice(0, 3).map((x) => (typeof x === 'string' ? x : x?.[key] ?? x?.jobId ?? x?.id ?? x?.opId ?? '?')).join(',') : '');
