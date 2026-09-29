@@ -1,38 +1,90 @@
 // hk-orphan-ledgers.mjs — the housekeeping area `orphanledgers`: two ledger-hygiene findings the retention sweep
 // (hk-ledger.mjs, which only prunes debug logs and purges long-ended workflows of ledgers ALREADY known good) and
 // the `/start` preflight (scripts/reconciler/start.mjs ledgerFindings, which only catches a ledger FILE under a
-// temp-looking path or missing) do not catch in full (COOK-BRIEF F4 handover, incident 2026-09-30):
+// temp-looking path or missing) do not catch in full (COOK-BRIEF F4 handover, incident 2026-09-30; follow-up fix
+// 2026-09-30: the first cut only walked machine.sqlite `ledgers`, invisible to a ledger directory the registry no
+// longer names at all — the lead found 6 such directories still sitting in the live state root):
 //
-//   orphan ledgers   a registered, non-retired ledger whose every bound source root (machine.sqlite `repositories`
-//                    rows for it, falling back to the ledger's own `repo_root`) is under the OS temp directory, no
-//                    longer exists on disk, or there is none at all — a debug probe or throwaway repo that
-//                    registered a ledger and never cleaned it up. Six such ledgers (worker ids fake-terminal-1,
-//                    fake-kernel-terminal; workflows stuck 'running') were found in the live
-//                    %LOCALAPPDATA%/StarCi on 2026-09-30, left by probes under the OS temp dir that predate
-//                    STARCI_LOCAL_ROOT (engine/machine-db.mjs; skills/claude-debug/SKILL.md section 5 now requires
-//                    every such probe to set it). LEDGER_ORPHAN_STATE_ROOT is the Vietnamese-catalogued finding
+//   orphan ledgers   EVERY directory under <stateRoot>/projects/, not only the registered ones:
+//                      - registered (any state) and its directory is gone: 'registered-dir-missing'.
+//                      - registered, non-retired: every bound source root (machine.sqlite `repositories` rows for
+//                        it, falling back to the ledger's own `repo_root`) is under the OS temp dir, gone, or none
+//                        at all: 'source-roots-unreachable' / 'no-source-roots'.
+//                      - NOT registered at all (the machine.sqlite row is gone but the directory is not — exactly
+//                        the incident's six probe ledgers): the same two reasons, but the source roots come from
+//                        the orphaned runtime.sqlite's own workflows.source_roots_json (engine/ledger-db.mjs
+//                        inspectLedger, read-only), the only place left to ask once the registry has forgotten it.
+//                    A debug probe or throwaway repo that registered a ledger (or never even got that far) and
+//                    never cleaned it up. LEDGER_ORPHAN_STATE_ROOT is the Vietnamese-catalogued finding
 //                    (modules/kernel/failure-codes.yaml); --apply MOVES the ledger's whole directory (never
-//                    deletes) to <stateRoot>/archive/orphan-ledgers/<YYYYMMDD>/<ledgerId>/ and retires the row
-//                    through engine/machine-db.mjs setLedgerState — the one writer; nothing here opens
-//                    machine.sqlite for write itself.
-//   legacy stores    a bound repository (machine.sqlite `repositories`) that still has an in-repo
-//                    .starciwork/runtime.sqlite (+ -wal/-shm), the pre-decision-Q1 location. LEDGER_LEGACY_WORK_SQLITE.
-//                    Report only, here and in `/start --check` (both call legacyWorkSqliteFindings so the two never
-//                    drift): nothing in this codebase deletes a file inside a product repository; the owner removes
-//                    it once the ledger is confirmed to live only in %LOCALAPPDATA%/StarCi (owner ruling: no legacy).
+//                    deletes) to <stateRoot>/archive/orphan-ledgers/<YYYYMMDD>/<ledgerId>/ and retires its row
+//                    through engine/machine-db.mjs setLedgerState when one exists — the one writer; nothing here
+//                    opens machine.sqlite for write itself.
+//   legacy stores    a repository bound either in machine.sqlite `repositories` OR in any
+//                    .workspaces/projects/*/work.json (every role: be, fe, grammar, ...; pathFromSource "."
+//                    resolves to the Source host itself, e.g. this runtime's own backend) that still has an
+//                    in-repo .starciwork/runtime.sqlite (+ -wal/-shm), the pre-decision-Q1 location.
+//                    LEDGER_LEGACY_WORK_SQLITE. Report only, here and in `/start --check` (both call
+//                    legacyWorkSqliteFindings so the two never drift): nothing in this codebase deletes a file
+//                    inside a product repository; the owner removes it once the ledger is confirmed to live only
+//                    in %LOCALAPPDATA%/StarCi (owner ruling: no legacy).
 //
 //   node scripts/supervisor/housekeeping.mjs --only orphanledgers [--apply] --json
 //   node scripts/checks/ledger-hygiene.mjs [--apply] [--json]                  the standalone report (both findings)
 import fs from 'node:fs';
 import path from 'node:path';
+import { inspectLedger, projectsRootFor } from '../../engine/ledger-db.mjs';
 import { isUnderTempDir, machineFileFor, readMachine, starciLocalRoot, withMachine } from '../../engine/machine-db.mjs';
+import { skillRoot } from '../../engine/runtime-root.mjs';
 
 export const ORPHAN_LEDGER_CODE = 'LEDGER_ORPHAN_STATE_ROOT';
 export const LEGACY_WORK_SQLITE_CODE = 'LEDGER_LEGACY_WORK_SQLITE';
+/** A registered (any state) ledger whose directory is gone entirely — registry drift, distinct from an unreachable source root. */
+export const REGISTERED_DIR_MISSING_REASON = 'registered-dir-missing';
 
 const exists = (p) => { try { return fs.existsSync(p); } catch { return false; } };
+/** Case-insensitive, separator-normalized directory identity, for comparing a disk path against a DB-recorded one. */
+const dirKey = (p) => path.resolve(String(p)).replace(/\\/g, '/').replace(/\/+$/, '').toLowerCase();
+/**
+ * A repo root in the forward-slash form machine.sqlite `repositories.repo_root` already stores (engine/machine-db.mjs
+ * repoKey), so a root discovered on disk (native, backslash on Windows) and one read back from the registry dedupe
+ * as the same string instead of surviving as two `Set` entries that only differ by separator.
+ */
+const canonicalRoot = (p) => path.resolve(String(p)).replace(/\\/g, '/');
 /** YYYYMMDD, the same stamp scripts/supervisor/blob-gc.mjs and scripts/work/purge-workflow.mjs archive folders use. */
 export const dateStamp = (now = Date.now()) => new Date(now).toISOString().slice(0, 10).replace(/-/g, '');
+
+/**
+ * The StarCi Source root (the host containing .claude and .workspaces): STARCI_SOURCE_ROOT overrides it, else the
+ * directory holding this runtime checkout (the same seam scripts/kernel/target-repo.mjs and
+ * scripts/connectors/lib.mjs sourceRootOf compute — reimplemented here, parameterized over `env`, so a spec can
+ * inject a fixture Source without importing either of those heavier modules).
+ */
+export const starciSourceRoot = (env = process.env) => (env.STARCI_SOURCE_ROOT ? path.resolve(env.STARCI_SOURCE_ROOT) : path.dirname(skillRoot));
+
+/**
+ * Every repository root any .workspaces/projects/*\/work.json binds (modules/schemas/workspace-routing.yaml
+ * bindingShape), every role (be, fe, grammar, ...), `pathFromSource` resolved against starciSourceRoot — "."
+ * resolves to the Source host itself. A missing or unreadable .workspaces/projects, or one malformed work.json, is
+ * skipped, never a crash. Deduped, absolute.
+ */
+export function workspaceBoundRepoRoots({ env = process.env } = {}) {
+  const sourceRoot = starciSourceRoot(env);
+  const projectsDir = path.join(sourceRoot, '.workspaces', 'projects');
+  let entries = [];
+  try { entries = fs.readdirSync(projectsDir, { withFileTypes: true }); } catch { return []; }
+  const roots = new Set();
+  for (const entry of entries) {
+    if (!entry.isDirectory()) continue;
+    let doc;
+    try { doc = JSON.parse(fs.readFileSync(path.join(projectsDir, entry.name, 'work.json'), 'utf8')); } catch { continue; }
+    for (const repo of Object.values(doc?.repositories ?? {})) {
+      const pathFromSource = repo?.pathFromSource;
+      if (typeof pathFromSource === 'string' && pathFromSource.trim()) roots.add(canonicalRoot(path.resolve(sourceRoot, pathFromSource)));
+    }
+  }
+  return [...roots];
+}
 
 /** The total bytes under `dir` (files only; missing/unreadable entries count as 0). Pure I/O, no seam needed in specs (tmp fixtures). */
 function dirBytes(dir) {
@@ -54,6 +106,30 @@ export function sourceRootsOf(db, ledger) {
 }
 
 /**
+ * The source roots an ORPHANED ledger directory's own runtime.sqlite still names — the only place left to ask once
+ * machine.sqlite no longer has a `ledgers` row for it at all (the registry forgot it, but the directory and its
+ * workflows did not). Reads every workflow's source_roots_json (engine/ledger-db.mjs inspectLedger, read-only) and
+ * unions them, deduped. A missing file, an unreadable/foreign-schema ledger, or workflows with no source roots at
+ * all yields []; never throws.
+ */
+export function sourceRootsFromLedgerFile(file) {
+  if (!exists(file)) return [];
+  let handle;
+  try { handle = inspectLedger({ file }); } catch { return []; }
+  try {
+    const roots = new Set();
+    for (const row of handle.db.prepare('SELECT source_roots_json FROM workflows').all()) {
+      if (!row.source_roots_json) continue;
+      let parsed;
+      try { parsed = JSON.parse(row.source_roots_json); } catch { continue; }
+      if (Array.isArray(parsed)) for (const root of parsed) if (typeof root === 'string' && root.trim()) roots.add(root);
+    }
+    return [...roots];
+  } catch { return []; }
+  finally { try { handle.close(); } catch { /* closed */ } }
+}
+
+/**
  * null | 'no-source-roots' | 'source-roots-unreachable' for a list of source roots. Pure given `unreachable`
  * (a spec seam; production default is the real isUnderTempDir/fs.existsSync check against `env`).
  */
@@ -63,27 +139,54 @@ export function orphanReason(roots, { env = process.env, unreachable = (root) =>
 }
 
 /**
- * Orphan findings over every non-retired ledger of the registry `env`/`machineFile` resolves:
- * [{code, ledgerId, name, file, sourceRoots, reason}]. reason is 'no-source-roots' (nothing bound at all) or
- * 'source-roots-unreachable' (every bound root is under the OS temp dir or no longer exists).
+ * Orphan findings over EVERY directory under <stateRoot>/projects/, registered or not (follow-up fix 2026-09-30: a
+ * ledger the registry no longer names at all — 6 of the incident's directories — was invisible to a registry-only
+ * scan). [{code, ledgerId, name, file, sourceRoots, reason, registered}]:
+ *   registered:true,  reason 'registered-dir-missing'      the ledger's directory is gone entirely (registry drift)
+ *   registered:true,  reason 'no-source-roots' | 'source-roots-unreachable'   sourceRootsOf (registry-based)
+ *   registered:false, reason 'no-source-roots' | 'source-roots-unreachable'   sourceRootsFromLedgerFile (the
+ *                     orphaned directory's own runtime.sqlite — nothing else still names it)
+ * A directory registered under ANY state (including retired) is never treated as unregistered.
  */
 export function orphanLedgerFindings({ env = process.env, machineFile = null } = {}) {
-  return readMachine((m) => {
-    const out = [];
-    for (const ledger of m.listLedgers()) {
+  const file = machineFile ?? machineFileFor(env);
+  // Everything that needs the open handle (listing ledgers, and each one's `repositories` rows) happens inside this
+  // one readMachine call; `registered` itself is plain data and outlives the (closed) handle for the directory walk below.
+  const { findings: registeredFindings, registered } = readMachine((m) => {
+    const list = m.listLedgers({ includeRetired: true });
+    const findings = [];
+    for (const ledger of list) {
       if (ledger.state === 'retired') continue;
+      const dir = path.dirname(ledger.file);
+      if (!exists(dir)) { findings.push({ code: ORPHAN_LEDGER_CODE, ledgerId: ledger.ledgerId, name: ledger.name, file: ledger.file, sourceRoots: [], reason: REGISTERED_DIR_MISSING_REASON, registered: true }); continue; }
       const roots = sourceRootsOf(m.db, ledger);
       const reason = orphanReason(roots, { env });
-      if (reason) out.push({ code: ORPHAN_LEDGER_CODE, ledgerId: ledger.ledgerId, name: ledger.name, file: ledger.file, sourceRoots: roots, reason });
+      if (reason) findings.push({ code: ORPHAN_LEDGER_CODE, ledgerId: ledger.ledgerId, name: ledger.name, file: ledger.file, sourceRoots: roots, reason, registered: true });
     }
-    return out;
-  }, [], { file: machineFile ?? machineFileFor(env), env });
+    return { findings, registered: list };
+  }, { findings: [], registered: [] }, { file, env });
+
+  const knownDirs = new Set(registered.map((l) => dirKey(path.dirname(l.file))));
+  const out = [...registeredFindings];
+  const projectsDir = projectsRootFor(env);
+  let dirNames = [];
+  try { dirNames = fs.readdirSync(projectsDir, { withFileTypes: true }).filter((e) => e.isDirectory()).map((e) => e.name); } catch { /* no projects/ yet */ }
+  for (const name of dirNames) {
+    const dir = path.join(projectsDir, name);
+    if (knownDirs.has(dirKey(dir))) continue; // registered under some state already handled (or intentionally retired) above
+    const ledgerFile = path.join(dir, 'runtime.sqlite');
+    const roots = sourceRootsFromLedgerFile(ledgerFile);
+    const reason = orphanReason(roots, { env });
+    if (reason) out.push({ code: ORPHAN_LEDGER_CODE, ledgerId: name, name: null, file: ledgerFile, sourceRoots: roots, reason, registered: false });
+  }
+  return out;
 }
 
 /** Every distinct bound repository root the registry knows (machine.sqlite `repositories`). */
 export function boundRepoRoots({ env = process.env, machineFile = null } = {}) {
-  return readMachine((m) => [...new Set(m.db.prepare('SELECT repo_root FROM repositories').all().map((r) => r.repo_root).filter(Boolean))],
+  const registered = readMachine((m) => m.db.prepare('SELECT repo_root FROM repositories').all().map((r) => r.repo_root),
     [], { file: machineFile ?? machineFileFor(env), env });
+  return [...new Set([...registered, ...workspaceBoundRepoRoots({ env })].filter(Boolean).map(canonicalRoot))];
 }
 
 /**
@@ -94,7 +197,7 @@ export function boundRepoRoots({ env = process.env, machineFile = null } = {}) {
  */
 export function legacyWorkSqliteFindings(repoRoots) {
   const out = [];
-  for (const repoRoot of [...new Set((repoRoots ?? []).filter(Boolean))]) {
+  for (const repoRoot of [...new Set((repoRoots ?? []).filter(Boolean).map(canonicalRoot))]) {
     const base = path.join(repoRoot, '.starciwork', 'runtime.sqlite');
     const files = ['', '-wal', '-shm'].map((suffix) => `${base}${suffix}`).filter(exists);
     if (files.length) out.push({ code: LEGACY_WORK_SQLITE_CODE, repoRoot, files });

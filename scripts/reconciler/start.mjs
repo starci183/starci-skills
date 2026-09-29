@@ -27,7 +27,7 @@ import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { parseYaml } from '../../engine/yaml.mjs';
 import { readMachine, withMachine } from '../../engine/machine-db.mjs';
-import { legacyWorkSqliteFindings } from '../lib/hk-orphan-ledgers.mjs';
+import { legacyWorkSqliteFindings, workspaceBoundRepoRoots } from '../lib/hk-orphan-ledgers.mjs';
 import { loadConfig } from '../../engine/config.mjs';
 import { ensure, crashLoopPlan, crashLoopRecord, leaderState, restartEngine, status } from './boot.mjs';
 import { PROFILES, REQUIRED_ACTIVE, SKILL_ROOT, reconcilerConfig, reconcilerNumbers } from './state.mjs';
@@ -295,7 +295,7 @@ export async function gather({ env = process.env, config = safeRun(() => loadCon
   const found = ledgerFindings(ledgers);
   push(found.length ? warn('preflight', 'ledgers', 'registered ledgers', found.map((f) => `${f.name ?? f.ledgerId} (${f.problem}: ${f.file ?? '-'})`).join('; ').slice(0, 400), 'node scripts/reconciler/start.mjs --retire-stale-ledgers (retires temp/test ledgers via the machine-db API)')
     : green('preflight', 'ledgers', 'registered ledgers', 'no temp/test path and no missing file', { required: false }));
-  const legacy = legacyWorkSqliteFindings(ledgers.filter((l) => l.state !== 'retired').map((l) => l.repoRoot));
+  const legacy = legacyWorkSqliteFindings([...ledgers.filter((l) => l.state !== 'retired').map((l) => l.repoRoot), ...workspaceBoundRepoRoots({ env })]);
   push(legacy.length ? warn('preflight', 'legacy-stores', 'legacy in-repo runtime.sqlite', `${legacy.length} store(s): ${legacy.map((f) => f.repoRoot).join(', ').slice(0, 300)}`, 'the ledger lives in %LOCALAPPDATA%/StarCi/projects/<ledger_id>/runtime.sqlite; archive the in-repo copy (LEDGER_LEGACY_WORK_SQLITE, node scripts/checks/ledger-hygiene.mjs)')
     : green('preflight', 'legacy-stores', 'legacy in-repo runtime.sqlite', 'none', { required: false }));
   const pinBad = pinProblems(configuredPins(config));
