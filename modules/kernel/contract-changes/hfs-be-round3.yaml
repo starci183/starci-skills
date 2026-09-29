@@ -1,0 +1,46 @@
+id: hfs-be-round3
+effectiveAt: '2026-09-30T02:00:00+07:00'
+summary: >-
+  HFS back-end round 3 (owner-approved 2026-09-29): five catalog rules R78-R82 (BE_USER_COPY_LITERAL,
+  BE_AMBIENT_CLOCK, BE_INBOX_DEDUPE_MISSING, BE_HAND_ROLLED_RETRY, BE_TRANSACTION_EXTERNAL_CALL), each with a
+  Vietnamese failure code. `@starci/eslint-canon-be` becomes 1.6.0 and gains user-copy-through-catalog and
+  no-ambient-clock and inbox-dedupe-required in three new laws (user-copy, temporal, idempotency), plus
+  no-hand-rolled-retry in resilience and no-external-call-in-transaction in data-access. The slot manifest gains
+  two optional slots inside manifest 1.0.0 (no version bump, both stamped since: 1.0.0):
+  be.domain.messages (src/modules/{domain,integrations}/<capability>/messages/) and be.feature.messages
+  (src/features/<feature>/messages/), each a per-capability or per-feature vi/en messages catalog read through
+  the typed platform/i18n MessageCatalog port; be.domain and be.feature admit a messages/ folder. be.platform's
+  required instances gain clock (the injected Clock port) and i18n (the MessageCatalog port). @starci/jest-preset
+  becomes 1.1.0 and gains a FakeClock test double (./clock) for the Clock port. A repository adopts the canon
+  through its own migration lane; there is no compatibility window. Deferred, no rule: floating promises; core
+  no-await-in-loop is not adopted.
+reach: new-legs
+paths:
+  - modules/kernel/contract-changes/hfs-be-round3.yaml
+  - modules/kernel/failure-codes.yaml
+  - modules/models/code-patterns.yaml
+  - modules/schemas/index.yaml
+  - knowledge/hfs/slots.yaml
+  - knowledge/hfs/rules.yaml
+  - knowledge/hfs/canon-pins.yaml
+  - knowledge/hfs/README.md
+  - knowledge/index.yaml
+  - packages/eslint/be/package.json
+  - packages/eslint/be/README.md
+  - packages/eslint/be/CHANGELOG.md
+  - packages/eslint/be/index.mjs
+  - packages/eslint/be/user-copy.mjs
+  - packages/eslint/be/temporal.mjs
+  - packages/eslint/be/idempotency.mjs
+  - packages/eslint/be/resilience.mjs
+  - packages/eslint/be/data-access.mjs
+  - packages/jest-preset/package.json
+  - packages/jest-preset/clock.cjs
+  - packages/jest-preset/clock.d.ts
+  - packages/jest-preset/README.md
+  - scripts/checks/lint-why.mjs
+  - scripts/checks/check-hfs-rules.mjs
+  - scripts/lib/hfs-slots.mjs
+  - tests/lint-why.spec.mjs
+  - tests/hfs-rules.spec.mjs
+  - tests/hfs-slots.spec.mjs

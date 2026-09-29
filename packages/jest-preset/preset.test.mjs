@@ -151,3 +151,33 @@ test('the mock<T>() types replace `as unknown as`: typed jest.Mock members, assi
     fs.rmSync(dir, { recursive: true, force: true });
   }
 });
+
+const { FakeClock } = require('./clock.cjs');
+
+test('FakeClock starts at a chosen instant and holds still until moved', () => {
+  const clock = new FakeClock('2026-01-01T00:00:00.000Z');
+  assert.equal(clock.now().toISOString(), '2026-01-01T00:00:00.000Z');
+  assert.equal(clock.now().toISOString(), '2026-01-01T00:00:00.000Z');
+});
+
+test('FakeClock.advance moves the clock by a duration, forward or back', () => {
+  const clock = new FakeClock('2026-01-01T00:00:00.000Z');
+  clock.advance(1000);
+  assert.equal(clock.now().toISOString(), '2026-01-01T00:00:01.000Z');
+  clock.advance(-500);
+  assert.equal(clock.now().toISOString(), '2026-01-01T00:00:00.500Z');
+});
+
+test('FakeClock.set moves the clock to a new instant', () => {
+  const clock = new FakeClock('2026-01-01T00:00:00.000Z');
+  clock.set('2030-06-15T12:00:00.000Z');
+  assert.equal(clock.now().toISOString(), '2030-06-15T12:00:00.000Z');
+});
+
+test('FakeClock with no argument starts at the real now, once, at construction', () => {
+  const before = Date.now();
+  const clock = new FakeClock();
+  const after = Date.now();
+  const started = clock.now().getTime();
+  assert.ok(started >= before && started <= after);
+});

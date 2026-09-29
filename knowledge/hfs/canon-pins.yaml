@@ -43,10 +43,11 @@ pins:
     side: both
     source: packages/prettier-config/package.json
   '@starci/jest-preset':
-    version: 1.0.0
+    version: 1.1.0
     group: starci
     side: be
     source: packages/jest-preset/package.json
+    why: gains the FakeClock test double (./clock) for the platform/clock Clock port, used by the R79 no-ambient-clock migration.
   '@starci/vitest-preset':
     version: 1.0.0
     group: starci

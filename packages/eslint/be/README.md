@@ -61,20 +61,23 @@ A sample, not the list:
 | **Suppression** | No `eslint-disable`, `@ts-ignore`, `@ts-expect-error`, `@ts-nocheck` or `vn-ok` comment, anywhere (`no-inline-suppression`) |
 | **Size** | A file over its line budget is not new and does not grow past its size at the parent commit (`file-size-growth`) |
 | **Query safety** | SQL text carries no runtime substitution; a read states `take`, `limit` or `LIMIT` (`no-interpolated-sql`, `query-needs-limit`, `no-query-in-loop`) |
-| **Resilience** | An outbound HTTP call states a timeout or signal; `JSON.parse` of outside text sits in a `try` (`http-needs-timeout`, `json-parse-needs-guard`) |
+| **Resilience** | An outbound HTTP call states a timeout or signal; `JSON.parse` of outside text sits in a `try`; a loop that catches and waits goes through `platform/retry` (`http-needs-timeout`, `json-parse-needs-guard`, `no-hand-rolled-retry`) |
 | **Log safety** | A logger call names no credential and no personal identifier (`no-secret-in-log`) |
 | **Async and types** | An `async` function awaits; no `as never`, no `x!`; handlers and public methods declare a return type (`async-needs-await`, `no-never-cast`, `no-non-null-assertion`, `explicit-handler-return-type`) |
 | **Migrations and input** | A migration's `down()` reverses its `up()`; every property of an input class has a `class-validator` decorator (`migration-down-reversible`, `dto-needs-validator`) |
 | **Spec quality** | A spec does not read repository source with `fs`, and doubles are `mock<T>()`, not `as never` (`spec-no-source-read`, `spec-typed-doubles`) |
 | **CQRS** | A handler does not assemble an aggregate inline; reads and writes do not share one path |
 | **Module layering** | Another owner is imported through its public `index.ts` (`@modules/domain/plan`, `@features/plan`), never through a path into it; an `index.ts` lists a bounded set of named exports, with no `export *`, storage token or types folder; self-aliases and tier-only aliases are refused. |
-| **Data access** | Queries stay where the layer says they may be built |
+| **Data access** | Queries stay where the layer says they may be built; no transaction spans an external call (`no-external-call-in-transaction`) |
 | **Transport** | The wire shape is declared, not inferred from whatever a handler happened to return |
 | **Observability** | A failure is logged through the logger port with a typed identity, so a log line can be traced to the law that names it |
 | **Testing** | Unit specs sit beside their subjects, including structural specs in HFS `src/tests` categories; a model-quality harness (one that imports an LLM SDK, reaches a house model helper or declares `@harness-kind model`) calls its provider directly; other live e2e specs, such as an identity provider, are not judged as model harnesses. |
 | **End-to-end flows** | One file, one flow, named steps, and **never sleep** — poll until the state settles, with a deadline |
 | **CDC · event delivery** | Projections and events follow the declared delivery contract |
 | **Comments · naming · type safety** | Comments say why; no double cast through `unknown` |
+| **User copy** | A literal exception message, notification text or response copy comes from the per-capability messages catalog through the typed `MessageCatalog` port (`user-copy-through-catalog`) |
+| **Temporal** | `Date.now()`, a bare `new Date()` and `performance.now()` are read only inside `platform/clock` (`no-ambient-clock`) |
+| **Idempotency** | A `@Public()` webhook handler and an outbox/queue consumer claim the event through the shared inbox before they act (`inbox-dedupe-required`) |
 
 Every rule names the law that declares it — `ruleOwners` maps rule name to law, so a failing build
 line leads straight to the document that explains why.
@@ -129,6 +132,11 @@ mapped by `scripts/checks/lint-why.mjs`). The catalog id is the rule number in `
 | `migration-down-reversible` | R74 | `BE_MIGRATION_REVERSIBLE` |
 | `explicit-handler-return-type` | R75 | `BE_RETURN_TYPE` |
 | `json-parse-needs-guard` | R76 | `BE_JSON_PARSE_UNGUARDED` |
+| `user-copy-through-catalog` | R78 | `BE_USER_COPY_LITERAL` |
+| `no-ambient-clock` | R79 | `BE_AMBIENT_CLOCK` |
+| `inbox-dedupe-required` | R80 | `BE_INBOX_DEDUPE_MISSING` |
+| `no-hand-rolled-retry` | R81 | `BE_HAND_ROLLED_RETRY` |
+| `no-external-call-in-transaction` | R82 | `BE_TRANSACTION_EXTERNAL_CALL` |
 
 There is no soft size-limit lint rule: a warning under a zero-warning gate is an exception in disguise. Listing files over the soft budget (`ruleParams.be.fileLines.soft`) is a report item of the hfs check or the architecture machine, as migration backlog, and never blocks.
 

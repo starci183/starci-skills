@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.6.0 - 2026-09-30
+
+Round 3 back-end rules (catalog R78 to R82), each with RuleTester specs and a why code in `modules/kernel/failure-codes.yaml`.
+
+- New: `user-copy-through-catalog` (R78 `BE_USER_COPY_LITERAL`, new law `user-copy`): a literal exception message, a `subject`/`title`/`body`/`text`/`message` property of a `notify`/`send`/`publish` call, or a `message`/`description`/`title` property of a `transport/` response comes from the per-capability messages catalog through the typed `MessageCatalog` port; a short code-shaped literal (`UPPER_SNAKE`, a bare word) and a template literal are left alone. `no-ambient-clock` (R79 `BE_AMBIENT_CLOCK`, new law `temporal`): `Date.now()`, a bare `new Date()` and `performance.now()` are read only inside `platform/clock`; `new Date(value)` built from a value the caller already holds is exempt. `inbox-dedupe-required` (R80 `BE_INBOX_DEDUPE_MISSING`, new law `idempotency`): a `@Public()` webhook controller and an outbox/queue consumer (`<event>.consumer.ts`) show a reference to an inbox or dedupe port before they act. `no-hand-rolled-retry` (R81 `BE_HAND_ROLLED_RETRY`, in `resilience`): a `for`, `while` or `do...while` loop that both catches an error and calls something shaped like a delay (`sleep`, `delay`, `wait`, `backoff`, `setTimeout`) goes through `platform/retry`; a polling loop with no `catch` is exempt, same as `no-query-in-loop` exempts a polling `while`. `no-external-call-in-transaction` (R82 `BE_TRANSACTION_EXTERNAL_CALL`, in `data-access`): `fetch`, an HTTP client call or any method of a `*Client`/`*Sdk` receiver does not run inside `.transaction(async (tx) => ...)`.
+- Slot manifest (`knowledge/hfs/slots.yaml`, no version bump, additions stamped `since: 1.0.0`): `be.domain.messages` (`src/modules/{domain,integrations}/<capability>/messages/`) and `be.feature.messages` (`src/features/<feature>/messages/`), each an optional per-capability or per-feature vi/en catalog; `be.platform`'s required instances gain `clock` (the injected `Clock` port) and `i18n` (the `MessageCatalog` port); `be.domain` and `be.feature` allow a `messages/` folder.
+- Deferred (owner ruling, no rule): floating promises; core `no-await-in-loop` is not adopted.
+
 ## 1.5.0 - 2026-09-30
 
 - New: `no-query-in-loop` (R77 `BE_QUERY_IN_LOOP`): a repository, entity-manager or query-builder read (`find`, `findOne`, `count`, `getOne`, a raw `SELECT`) inside a `for`, `for...of`, `for...in` or an array `map`, `forEach`, `flatMap`, `filter`, `reduce`, `some` or `every` callback is one round trip per element (N+1). A polling `while` loop and a write per element are not reported.

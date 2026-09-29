@@ -45,3 +45,23 @@ Every property read yields one stable `jest.fn()`, created on first read. The do
 an async function does not hang; `then`, `toJSON` and Symbol keys read as absent. A value you pass in `overrides` wins. Wrong
 stubs (`repo.find.mockResolvedValue(1)`) and members the type does not have are compile errors. Fixtures use it instead of
 `as never` and `as unknown as`.
+
+## `FakeClock`
+
+The test double for the injected `Clock` port (`platform/clock`). Business code asks `clock.now()` instead of reading
+`Date.now()` or `new Date()` ambiently (`no-ambient-clock`, `@starci/eslint-canon-be` R79 `BE_AMBIENT_CLOCK`); a spec
+drives time explicitly instead of sleeping for real or racing the wall clock.
+
+```ts
+import { FakeClock } from "@starci/jest-preset/clock"
+
+const clock = new FakeClock("2026-01-01T00:00:00.000Z")   // starts at a chosen instant; no argument starts at real now
+const service = new PlanService(clock)
+
+clock.advance(60_000)          // move the clock forward (or back, with a negative value) without a real sleep
+clock.set("2026-06-15T00:00:00.000Z")   // jump to a chosen instant, e.g. to drive a scheduled job
+expect(clock.now().toISOString()).toBe("2026-06-15T00:00:00.000Z")
+```
+
+`FakeClock` satisfies the `Clock` port structurally (`{ now(): Date }`); no cast is needed to inject it in place of the
+real clock.

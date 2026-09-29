@@ -10,7 +10,7 @@ The machine-readable parts live next to this file and are read by every check, l
 | File | Owns |
 | --- | --- |
 | `slots.yaml` | Every kind of content allowed to exist in a repository: path, presence, tracking, tier, required files, tests, budget, managed template. Versioned `MAJOR.MINOR.PATCH`. |
-| `rules.yaml` | The rule catalog `R01` to `R77` with finding code, gates and the Vietnamese why text (catalog below). |
+| `rules.yaml` | The rule catalog `R01` to `R82` with finding code, gates and the Vietnamese why text (catalog below). |
 | `canon-pins.yaml` | The exact versions of every `@starci/*` package and framework this major supports. |
 
 The pattern cases in `knowledge/patterns/{be,fe,repo}/` explain how to write code and structure files inside these
@@ -233,6 +233,19 @@ public method of an Injectable, Resolver or Controller declare their return type
 inside a `try` (R76). Each has an `eslint-be` enforcer in `@starci/eslint-canon-be`; the input classes of R42 carry a
 `class-validator` decorator on every property (`dto-needs-validator`).
 
+### 5.10 Copy, time, delivery and transactions (R78 to R82)
+
+Text a user reads - an exception's message, a notification's subject or body, a response's `message` or
+`description` - comes from a per-capability `messages` catalog (Vietnamese and English) through the typed
+`platform/i18n` `MessageCatalog` port, never a literal in source (R78). The ambient clock (`Date.now()`, a bare
+`new Date()`, `performance.now()`) is read only inside `platform/clock`; business code asks the injected `Clock`
+port, so a spec can drive time with a `FakeClock` (R79). Delivery that can repeat - a webhook a sender resends, an
+outbox or queue redelivering a message - is claimed through a shared inbox keyed by `(source, event id)` before it
+acts, so a repeat is a no-op (R80). A loop that catches an error and waits before trying again goes through the
+shared `platform/retry` helper (bounded attempts, exponential backoff with jitter, an abort signal), never a loop
+written at the call site (R81). No transaction spans an external call: commit first and call out after, or write an
+outbox message inside the transaction (R82). Each has an `eslint-be` enforcer in `@starci/eslint-canon-be`.
+
 ## 6. Frontend
 
 ### 6.1 Source tree
@@ -451,6 +464,11 @@ Every rule is an error from 2.0. Finding code, then the rule. The pattern files 
 | R75 | `BE_RETURN_TYPE` | Handlers and public methods of an Injectable, Resolver or Controller declare their return type. |
 | R76 | `BE_JSON_PARSE_UNGUARDED` | `JSON.parse` sits inside a `try` in its own function and fails as a typed outcome. |
 | R77 | `BE_QUERY_IN_LOOP` | A repository, entity-manager or query-builder read does not run once per element of a loop; read once before the loop by key list. |
+| R78 | `BE_USER_COPY_LITERAL` | A literal exception message, notification text or response copy comes from the per-capability messages catalog through the typed `MessageCatalog` port, not from source. |
+| R79 | `BE_AMBIENT_CLOCK` | `Date.now()`, a bare `new Date()` and `performance.now()` are read only inside `platform/clock`; business code asks the injected `Clock` port. |
+| R80 | `BE_INBOX_DEDUPE_MISSING` | Every `@Public()` webhook handler and outbox/queue consumer claims the event through the shared inbox, keyed by `(source, event id)`, before it acts. |
+| R81 | `BE_HAND_ROLLED_RETRY` | A loop that catches an error and waits before trying again goes through the shared `platform/retry` helper, never a hand-written loop. |
+| R82 | `BE_TRANSACTION_EXTERNAL_CALL` | No transaction spans an external call; commit first and call out after, or write an outbox message inside the transaction. |
 
 **Frontend**
 
