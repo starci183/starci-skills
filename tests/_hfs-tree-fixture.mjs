@@ -9,7 +9,6 @@ const COMMON = {
   '.github/workflows/check.yml': 'name: check\n',
   '.gitignore': 'node_modules/\n',
   '.husky/pre-commit': 'exit 0\n',
-  'README.md': '# Fixture\n',
   'codecov.yml': 'coverage: {}\n',
   'eslint.config.mjs': 'export default [];\n',
   'package-lock.json': '{}\n',
@@ -23,9 +22,46 @@ const BACKEND = {
   'nest-cli.json': '{}\n',
 };
 
+/**
+ * A README that satisfies the HFS presentation contract. The title is the repository name: a fixture is a Git
+ * repository top level without a remote, so its identity is its own folder name.
+ */
+export function hfsReadme(root) {
+  return `# ${path.basename(root)}
+
+Fixture repository for architecture checks.
+
+## Overview
+
+A fixture.
+
+## Stack
+
+TypeScript.
+
+## Repository layout
+
+apps/.
+
+## Development
+
+\`\`\`
+npm ci
+npm run typecheck
+npm run lint:check
+npm run build
+npm run test:unit
+\`\`\`
+
+## Work
+
+Work is tracked in the backend .starciwork tree.
+`;
+}
+
 /** Write the missing HFS root entries and app shell for `kind` ('backend' | 'frontend'). */
 export function writeHfsTree(root, kind, app = kind === 'backend' ? 'api' : 'web') {
-  const files = { ...COMMON, ...(kind === 'backend' ? {
+  const files = { 'README.md': hfsReadme(root), ...COMMON, ...(kind === 'backend' ? {
     ...BACKEND,
     [`apps/${app}/src/main.ts`]: 'void 0;\n',
     [`apps/${app}/src/app.module.ts`]: 'export const AppModule = 1;\n',

@@ -1,4 +1,5 @@
 import test from 'node:test';
+import { hfsReadme } from './_hfs-tree-fixture.mjs';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
@@ -42,7 +43,7 @@ function fixture(t, kind, files) {
     '.github/workflows/check.yml': 'name: check\n',
     '.gitignore': 'node_modules/\n',
     '.husky/pre-commit': 'exit 0\n',
-    'README.md': '# Fixture\n',
+    'README.md': hfsReadme(root),
     'codecov.yml': 'coverage: {}\n',
     'eslint.config.mjs': 'export default [];\n',
     'package-lock.json': '{}\n',

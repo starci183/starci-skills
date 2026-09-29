@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { hfsReadme } from './_hfs-tree-fixture.mjs';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -82,7 +83,7 @@ module.exports=new Proxy(ts,{get:(target,key)=>key==='createProgram'?(...args)=>
   write('package-lock.json',{lockfileVersion:3});
   // HFS v1 frontend tree: an apps/<app>/ monorepo on npm; all source lives under apps/web/src.
   for(const [file,text] of Object.entries({'.gitattributes':'* text=auto eol=lf\n','.github/workflows/check.yml':'name: check\n','.gitignore':'node_modules/\n',
-    '.husky/pre-commit':'exit 0\n','README.md':'# Fixture\n','codecov.yml':'coverage: {}\n','eslint.config.mjs':'export default [];\n',
+    '.husky/pre-commit':'exit 0\n','README.md':hfsReadme(root),'codecov.yml':'coverage: {}\n','eslint.config.mjs':'export default [];\n',
     'sonar-project.properties':'sonar.projectKey=fixture\n','apps/web/package.json':'{"name":"@fixture/web","private":true}\n',
     'apps/web/next.config.ts':'export default {};\n','apps/web/postcss.config.mjs':'export default {};\n',
     'apps/web/tsconfig.json':'{"extends":"../../tsconfig.json","include":["src/**/*"]}\n'}))write(file,text);
