@@ -10,6 +10,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { stageBlob, putArtifact, linkReportAttachment, recordCheck, roleOf, kindOf } from '../evidence-store.mjs';
 import { subkindOf } from '../artifact-subkind.mjs';
+import { safeRemoveTree } from '../../lib/safe-remove.mjs';
 
 const refuse = (message, code, extra = {}) => Object.assign(new Error(message), { code, ...extra });
 const slash = (s) => String(s).replace(/\\/g, '/');
@@ -188,5 +189,5 @@ function interfaceAuditOf(db, { attempt, staged, now }) {
 /** Delete the scratch once the report is durable. Only a directory strictly inside the OS temp directory. */
 export function removeScratch(scratch) {
   if (!scratch || !inside(real(os.tmpdir()), scratch)) return false;
-  try { fs.rmSync(scratch, { recursive: true, force: true, maxRetries: 3 }); return true; } catch { return false; }
+  return safeRemoveTree(scratch).ok;
 }

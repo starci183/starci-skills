@@ -9,6 +9,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { parseYaml } from '../../engine/yaml.mjs';
 import { sha256 } from '../../engine/digest.mjs';
+import { safeRemoveTree } from '../lib/safe-remove.mjs';
 import { OP_REPORT_OUTCOMES, BLOCKER_KINDS } from './report-envelope.mjs';
 import { ownerAnswerLine } from './owner-answers.mjs';
 import { commitPolicyOf, policyCommits } from './settle-landed.mjs';
@@ -68,7 +69,7 @@ export const jobScratchDirOf = (repo, workflowId, jobId) => path.join(os.tmpdir(
 /** The job's scratch, created empty for a new dispatch: what an earlier attempt left there is removed first. */
 export function ensureJobScratch({ repo, workflowId, jobId, fresh = true }) {
   const dir = jobScratchDirOf(repo, workflowId, jobId);
-  if (fresh) fs.rmSync(dir, { recursive: true, force: true, maxRetries: 3 });
+  if (fresh) safeRemoveTree(dir);
   fs.mkdirSync(dir, { recursive: true });
   return dir;
 }

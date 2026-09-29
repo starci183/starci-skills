@@ -26,6 +26,7 @@ import { recordArtifactProofs } from './proof-integrity.mjs';
 import { writePatchJson, patchJsonFileOf, patchAssetsDirOf } from './patch-json.mjs';
 import { kindOf, mediaTypeOf, roleOf, stageBlob, putArtifact, attemptOf, ARTIFACT_KINDS, ARTIFACT_SUBKINDS } from './evidence-store.mjs';
 import { jobScratchDirOf } from './op-prompt.mjs';
+import { safeRemoveTree } from '../lib/safe-remove.mjs';
 
 export { kindOf, mediaTypeOf as mimeOf };
 export const ARTIFACTS_INDEXED = 'artifacts-indexed';
@@ -260,7 +261,7 @@ export function indexJobArtifacts(ledger, { repo, jobId, dispatchId = null, plac
       walk(recordings, found, (file) => kindOf(file) !== 'file');
       for (const abs of found) stage(abs, { name: `recordings/${slashed(path.relative(recordings, abs))}`, role: roleOf(abs) });
     }
-  } finally { fs.rmSync(tmp, { recursive: true, force: true, maxRetries: 3 }); }
+  } finally { safeRemoveTree(tmp); }
   const byKind = {}, bySubkind = {};
   for (const item of staged) { byKind[item.kind] = (byKind[item.kind] ?? 0) + 1; const sk = item.subkind ?? 'unknown'; bySubkind[sk] = (bySubkind[sk] ?? 0) + 1; }
   let added = 0, proofs = 0;
