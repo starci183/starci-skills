@@ -72,6 +72,15 @@ survey:
     decision record with both sides + one recommendation), `new` what no
     decided record covers. The survey is not a memo;
     it is typed cases the chain reads.
+  executedBy: >-
+    scripts/route/route-plan.mjs `--state <work root>` (define-goal passes it on every plan): `surveyS0` reads the flat
+    records (state, feature folder, implementation lane from the workspace repository roles) and `impactOf` matches the
+    goal text to surveyed features - the result is the plan's `impact` block {shape BUILD|EXTEND|REFERENCE, features,
+    reusedDone, open, backendRecords, frontendRecords, settledOutOfScope}. EXTEND makes every goal variable of the touched
+    features delta (never satisfied by a done record), plans backend.implement whenever those features hold backend
+    records, keeps the implement and draw prerequisites planned, and orders backend.implement behind interface.draw.
+    A family-level wildcard never settles a goal variable, and an implement variable is satisfied only by a record of
+    its own lane.
   output: >-
     S₀ = the existing-surface map: {record-id -> {owns: paths, state, evidence,
     extendable: yes|no|unknown}}. Every variable in it is one a later leg can

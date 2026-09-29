@@ -20,7 +20,8 @@
 //   node scripts/route/route-plan.mjs --simulate --target-json '{"sds.X":"decided","ui.X":"verified"}'
 //   node scripts/route/route-plan.mjs --text "build the enrolment screen" [--state <dir>]
 //   [--work <.starciwork dir>] [--opsDir <dir>] [--goalDir <dir>] [--json]
-//   --work reads only the records legality.yaml settledOutOfBand names (a
+//   --state is the impact-analysis SURVEY (define-goal always passes it): a goal naming a surveyed feature is an EXTEND, plans only the
+//   delta and keeps its backend lane; the plan carries an `impact` block. --work reads only the records legality.yaml settledOutOfBand names (a
 //   settled brand record drops brand.decide); --state is the full SURVEY.
 //
 // Output: ordered legs, each {op, producesCovered, needsSatisfiedBy, extends?,
@@ -344,14 +345,17 @@ function applyProofRule(vars, proof, a) {
   return out;
 }
 
+// Words that fill the surface slot of the prompt pattern without naming a unit ("the backend API", "the existing feature").
+const GENERIC_SURFACE_WORDS = new Set(['backend', 'back-end', 'frontend', 'front-end', 'existing', 'new', 'whole', 'entire', 'full', 'main', 'current', 'api', 'app', 'ui']);
+
 function intentToStar(text, args, archetypes) {
   const a = { surfaceName: 'X' };
   const sm = /\b(?:the|for|of)\s+([a-z][a-z0-9-]{2,})\s+(?:screen|page|api|endpoint|service|feature|module)/i.exec(text);
-  if (sm) a.surfaceName = sm[1];
+  if (sm && !GENERIC_SURFACE_WORDS.has(sm[1].toLowerCase())) a.surfaceName = sm[1];
   const matched = matchArchetypes(text, archetypes);
   if (!matched.length) return null;
   const vars = [];
-  const hints = { archetypes: matched.map(m => m.id) };
+  const hints = { archetypes: matched.map(m => m.id), surfaceName: a.surfaceName };
   for (const arch of matched) {
     vars.push(...arch.vars(a, arch, normalizeText(text)));
     Object.assign(hints, arch.hints);
@@ -431,6 +435,22 @@ const UNSETTLED = new Set(['todo', 'inprogress', 'proposed', 'blocked']);
 const walk = dir => (fs.existsSync(dir) ? fs.readdirSync(dir, { withFileTypes: true })
   .flatMap(e => e.isDirectory() ? walk(path.join(dir, e.name)) : [path.join(dir, e.name)]) : []);
 
+/** features/<feature>/... -> <feature>; null for a record outside a feature folder. */
+function featureOf(dir, stateDir) {
+  const parts = path.relative(stateDir, dir).split(path.sep);
+  return parts[0] === 'features' && parts[1] ? parts[1] : null;
+}
+
+/** An implementation record's lane: the workspace role of its repository (fe -> frontend), else backend. */
+function implQualifier(data, workspaceDoc) {
+  const repos = Array.isArray(workspaceDoc?.repositories) ? workspaceDoc.repositories : [];
+  return repos.find(r => r?.name === data?.repository)?.role === 'fe' ? 'frontend' : 'backend';
+}
+
+// Schemas whose records are backend-owned material: a goal whose feature holds one touches the backend.
+const BACKEND_RECORD_SCHEMAS = new Set(['work/sds-component@1', 'work/contract@1', 'work/data@1', 'work/event@1', 'work/business-rule@1']);
+const isBackendRecord = ent => (ent.family === 'impl' ? ent.qualifier === 'backend' : BACKEND_RECORD_SCHEMAS.has(ent.schema));
+
 function surveyS0(stateDir) {
   const s0 = {
     root: stateDir, records: [], vars: new Map(), gaps: [], // vars: key -> {recordId, state, settled}
@@ -443,33 +463,80 @@ function surveyS0(stateDir) {
   for (const [id, rec] of recordsById) {
     const family = SCHEMA_FAMILY[rec.schema] ?? null;
     const state = String(rec.data?.state ?? 'unknown');
-    const entry = { id, schema: rec.schema, family, state, dir: rec.dir };
+    const entry = { id, schema: rec.schema, family, state, dir: rec.dir, feature: featureOf(rec.dir, stateDir),
+      qualifier: family === 'impl' ? implQualifier(rec.data, workspaceDoc) : null };
     s0.records.push(entry);
     if (family === 'gap') { s0.gaps.push({ id, state }); continue; }
     if (!family) continue;
     // var key: family + record id tail (fr.audit.log.read -> business.audit.log.read)
     const suffix = id.split('.').slice(1).join('.');
-    s0.vars.set(`${family}.${suffix}`, { recordId: id, state, settled: SETTLED.has(state) });
+    s0.vars.set(`${family}.${suffix}`, { recordId: id, state, settled: SETTLED.has(state), schema: rec.schema, feature: entry.feature, qualifier: entry.qualifier });
   }
   return s0;
 }
 
-/** Does S0 satisfy var {family,suffix,state}? Suffix 'X'/''/absent = family-level
- *  wildcard ("any settled record of this family"). Otherwise the record id must
- *  contain the suffix tokens. Returns {by, recordId?, recordState?}. */
-function satisfiedByS0(v, s0) {
-  if (!s0) return null;
+/** Does S0 satisfy var {family,suffix,state}? A NAMED suffix needs a settled record whose id
+ *  contains it. An unnamed one (X / '' / absent) is a family-level wildcard: it never settles a GOAL
+ *  variable (the goal names no unit, so nothing on disk proves it done - that wildcard used to drop the
+ *  whole chain, backend.implement included, the moment any impl record was done), and for a prerequisite
+ *  it counts only records of the goal's own features when the survey matched some, and never for the families
+ *  an EXTEND changes (s0.extendFamilies: impl, ui). An impl variable
+ *  carrying a lane (_qual) is satisfied only by a record of that lane: a done frontend record never
+ *  stands in for the backend. An extend variable (the goal changes a unit that exists) is never satisfied.
+ *  Returns {by, recordId?, recordState?}. */
+function satisfiedByS0(v, s0, { goal = false } = {}) {
+  if (!s0 || v.extend) return null;
   const wantSuffix = v.suffix && v.suffix !== 'X' ? v.suffix : null;
+  if (!wantSuffix && (goal || s0.wildcardOff || s0.extendFamilies?.has(v.family))) return null;
+  const scope = s0.scopeFeatures?.size ? s0.scopeFeatures : null;
   let fallback = null;
   for (const [key, ent] of s0.vars) {
     const fam = key.split('.')[0];
     if (fam !== v.family) continue;
+    if (v.family === 'impl' && v._qual && ent.qualifier !== v._qual) continue;
     if (wantSuffix && !key.slice(fam.length + 1).replaceAll('.', '-').includes(wantSuffix)
       && !key.includes(wantSuffix)) continue;
+    if (!wantSuffix && scope && !scope.has(ent.feature)) continue;
     if (ent.settled) return { by: 's0', recordId: ent.recordId, recordState: ent.state };
     fallback ??= { by: 's0-unsettled', recordId: ent.recordId, recordState: ent.state };
   }
   return fallback; // record exists but not done -> still in delta, flagged
+}
+
+/** IMPACT ANALYSIS (modules/goal/existing.yaml survey): which features of S0 the goal text names, what
+ *  exists there and in which state. A goal whose text names a surveyed feature EXTENDS it - its variables
+ *  are delta even where a done record exists (the unit changes), and a feature that holds backend records
+ *  or code brings the backend lane into a build scope that named only the interface. */
+function impactOf(text, s0, archetypeIds) {
+  if (!s0?.records?.length) return null;
+  const norm = normalizeText(text);
+  const features = [...new Set(s0.records.map(r => r.feature).filter(Boolean))]
+    .filter(f => phraseHits(norm, f) || phraseHits(norm, f.replaceAll('-', ' ')));
+  const inScope = s0.records.filter(r => r.family && r.family !== 'gap' && features.includes(r.feature));
+  const build = archetypeIds.some(id => BUILD_SCOPES.has(id));
+  const shape = build && features.length ? 'EXTEND' : build ? 'BUILD' : 'REFERENCE';
+  return {
+    shape, features,
+    settledOutOfScope: s0.records.filter(r => r.family && r.state === 'done' && !features.includes(r.feature)).length,
+    reusedDone: inScope.filter(r => SETTLED.has(r.state)).map(r => r.id),
+    open: inScope.filter(r => !SETTLED.has(r.state)).map(r => ({ id: r.id, state: r.state })),
+    backendRecords: inScope.filter(isBackendRecord).map(r => r.id),
+    frontendRecords: inScope.filter(r => r.family === 'impl' && r.qualifier === 'frontend').map(r => r.id),
+  };
+}
+
+const BUILD_SCOPES = new Set(['feature-build-fullstack', 'feature-build-with-ui', 'feature-build-backend']);
+
+/** An EXTEND goal: every S* variable of the touched features is delta, and a build scope whose features hold
+ *  backend records or code plans the backend lane even when the prompt named only the interface. */
+function applyExtend(vars, impact, a) {
+  if (impact?.shape !== 'EXTEND') return vars;
+  const out = vars.map(v => ({ ...v, extend: true }));
+  const hasBackend = out.some(v => v.family === 'impl' && v._qual === 'backend');
+  if (impact.backendRecords.length && !hasBackend) {
+    out.push({ family: 'impl', suffix: a.surfaceName, state: 'done', _qual: 'backend', strictQualifier: true, extend: true });
+  }
+  return out;
 }
 
 // ------------------------------------------------------------- CHAIN -------
@@ -605,7 +672,7 @@ function planChain({ sstar, s0, ops, prodTable, hints, outOfBand = [] }) {
       return true;
     }
     // 2. satisfied by S0?
-    const s0hit = satisfiedByS0(v, s0);
+    const s0hit = satisfiedByS0(v, s0, { goal: consumerLeg.legId === '(goal)' });
     if (s0hit?.by === 's0') {
       consumerLeg.needsSatisfiedBy.push(`S0:${s0hit.recordId} (${s0hit.recordState})`);
       return true;
@@ -727,7 +794,7 @@ function planChain({ sstar, s0, ops, prodTable, hints, outOfBand = [] }) {
   // brand record) has no leg to carry its note, so it is reported goal-level.
   const goal = { op: '(goal)', legId: '(goal)', needsSatisfiedBy: [], conditions: [], assumed: [] };
   for (const v of sstar) {
-    if (satisfiedByS0(v, s0)?.by === 's0') continue; // already true — delta excludes it
+    if (satisfiedByS0(v, s0, { goal: true })?.by === 's0') continue; // already true — delta excludes it
     // when the produced leg extends a done-but-touched surface, the reverify
     // rule (done-record-reverify) is applied in the legality pass below.
     satisfyVar(v, goal);
@@ -857,6 +924,12 @@ function planChain({ sstar, s0, ops, prodTable, hints, outOfBand = [] }) {
   if (hints.workspaceCanonicalization && legs.has('workspace.manage') && legs.has('review.verify')) {
     edges.push(['workspace.manage', 'review.verify']);
     legs.get('review.verify').needsSatisfiedBy.push('workspace.manage (canonical roots reconstructed)');
+  }
+  // Owner MVP flow: draw the UX/UI first, then code the frontend AND the backend. The backend build waits behind
+  // the same draw gate the frontend build does (DESIGN_NOT_SETTLED), so the two lanes start from one settled design.
+  if (legs.has('interface.draw') && legs.has('backend.implement')) {
+    edges.push(['interface.draw', 'backend.implement']);
+    legs.get('backend.implement').needsSatisfiedBy.push('interface.draw (owner MVP flow: draw first, then code frontend and backend)');
   }
   // handover.review: the owner's acceptance closes every chain, after every
   // other leg (modules/ops/ops/handover.review.yaml; legality.yaml
@@ -1035,6 +1108,18 @@ function main() {
     : args.state ? surveyS0(path.resolve(args.state))
     : null;
 
+  // IMPACT ANALYSIS before planning (existing.yaml survey): a goal that names a surveyed feature EXTENDS it.
+  const impact = args.text && !args.targets.length && !args.targetJson ? impactOf(args.text, s0, hints.archetypes ?? []) : null;
+  if (impact) {
+    s0.scopeFeatures = new Set(impact.features);
+    // The units an EXTEND changes are never "already delivered": their prerequisites (implement, draw) stay planned.
+    // A BUILD names no surveyed feature: nothing existing settles its prerequisites (never-treat-absent-as-clean).
+    if (impact.shape === 'BUILD') s0.wildcardOff = true;
+    if (impact.shape === 'EXTEND') s0.extendFamilies = new Set(['impl', 'ui']);
+    hints.extend = impact.shape === 'EXTEND' ? impact : undefined;
+    sstar = dedupeVars(applyExtend(sstar, impact, { surfaceName: hints.surfaceName ?? 'X' }));
+  }
+
   // INTENT-tier ambiguity: S* cannot be formed -> provision.ask, never guess.
   if (!sstar.length) {
     const result = {
@@ -1055,7 +1140,7 @@ function main() {
   const delta = [];
   const alreadySatisfied = [];
   for (const v of sstar) {
-    const s0hit = satisfiedByS0(v, s0);
+    const s0hit = satisfiedByS0(v, s0, { goal: true });
     if (s0hit?.by === 's0') alreadySatisfied.push({ var: `${varKey(v)}: ${v.state}`, by: s0hit.recordId });
     else delta.push({ ...v, partial: s0hit?.by === 's0-unsettled' ? s0hit : undefined });
   }
@@ -1063,20 +1148,28 @@ function main() {
   // CHAIN
   const { legs, edges, gaps, assumptions, goalAssumed } = planChain({ sstar: delta, s0, ops, prodTable, hints, outOfBand });
 
-  // done-record-reverify: a producing leg whose S0 counterpart record is done
-  // but touched gets extends + the chain keeps a verify leg over the surface.
+  // done-record-reverify: a producing leg whose S0 counterpart record exists gets extends; a settled counterpart
+  // also keeps the re-verification of the touched surface. The counterpart is the record of the leg's own lane
+  // (impl) and, for an unnamed unit, of the goal's own features - never any record of the family.
+  const LEG_QUALIFIER = { 'backend.implement': 'backend', 'interface.implement': 'frontend' };
   for (const leg of legs.values()) {
     for (const cov of leg.producesCovered) {
       const [vk] = cov.split(':');
       const fam = vk.split('.')[0];
       const suffix = vk.split('.').slice(1).join('.');
-      for (const [key, ent] of (s0?.vars ?? new Map())) {
-        if (!key.startsWith(fam + '.')) continue;
-        if (suffix && suffix !== 'X' && !key.includes(suffix)) continue;
-        if (ent.settled && !leg.extends) {
-          leg.extends = ent.recordId;
-          leg.assumed.push(`extends ${ent.recordId} — re-verification of the touched surface required (done-record-reverify)`);
-        }
+      const scope = s0?.scopeFeatures?.size ? s0.scopeFeatures : null;
+      const hits = [...(s0?.vars ?? new Map())].filter(([key, ent]) => {
+        if (!key.startsWith(fam + '.')) return false;
+        if (fam === 'impl' && LEG_QUALIFIER[leg.op] && ent.qualifier !== LEG_QUALIFIER[leg.op]) return false;
+        if (suffix && suffix !== 'X') return key.includes(suffix);
+        return scope ? scope.has(ent.feature) : false;
+      }).map(([, ent]) => ent);
+      const pick = hits.find(e => e.settled) ?? hits[0];
+      if (pick && !leg.extends) {
+        leg.extends = pick.recordId;
+        leg.assumed.push(pick.settled
+          ? `extends ${pick.recordId} — re-verification of the touched surface required (done-record-reverify)`
+          : `extends ${pick.recordId} (${pick.state}) — the unit exists and is not done`);
       }
     }
   }
@@ -1121,6 +1214,7 @@ function main() {
       settled: [...s0.vars.values()].filter(v => v.settled).length,
       openGaps: s0.gaps.map(g => g.id),
     } : 'not surveyed (no --state; use --simulate to pin S0=empty explicitly)',
+    impact: impact ?? undefined,
     alreadySatisfied, delta: delta.map(v => `${varKey(v)}: ${v.state}`),
     legs: order.map((l, i) => ({
       seq: i + 1, op: l.op, instance: l.instance ?? undefined, params: l.params, kernelParams: l.kernelParams, external: l.external,

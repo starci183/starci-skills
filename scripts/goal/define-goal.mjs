@@ -118,13 +118,16 @@ const repo = project ? project.ownerRepo : path.resolve(repoArg ?? process.cwd()
 const scanRepos = project ? project.repos : [{ role: null, path: repo }];
 
 // The owner repository's Work root, when it exists: route-plan --work reads
-// the records that settle a variable out of band (a done brand record).
+// the records that settle a variable out of band (a done brand record), and
+// --state is the impact-analysis SURVEY (modules/goal/existing.yaml): which
+// features and records the goal touches, so a workflow on existing code plans
+// only the delta and an EXTEND keeps its backend lane.
 const workRoot = project ? project.workRoot : path.join(repo, '.starciwork');
 
 // Derive the ideal op chain through the same planner the kernel uses —
 // advisory only; the kernel re-derives at boot and diffs, never trusts blindly.
 function deriveOpChain(prompt) {
-  const work = fs.existsSync(workRoot) ? ['--work', workRoot] : [];
+  const work = fs.existsSync(workRoot) ? ['--work', workRoot, '--state', workRoot] : [];
   const r = spawnSync(process.execPath,
     [path.join(skillRoot, 'scripts', 'route', 'route-plan.mjs'), '--text', prompt, '--json', ...work],
     { encoding: 'utf8', timeout: 60000, cwd: skillRoot });
@@ -379,6 +382,7 @@ if (planOnly) {
     opChain: chain?.legs?.map(l => l.op) ?? null,
     underivable: underivable ?? undefined,
     legs,
+    impact: chain?.impact,
     assumed: outOfBandAssumed.length ? outOfBandAssumed : undefined,
     estimate: { basis: 'cold', minutesPerTier: COLD_MINUTES, totalMinutes },
     assess: assess.available ? assess.data : null,
@@ -400,6 +404,11 @@ if (planOnly) {
     lines.push(`  ${name}  — ${assess.available ? assessLineFor(assess.data, r.path) : 'assess unavailable'}`);
   }
   lines.push('GOAL:', `  ${text}`);
+  if (out.impact) {
+    const im = out.impact;
+    lines.push(`IMPACT (survey of existing Work): ${im.shape}${im.features.length ? ` of ${im.features.join(', ')}` : ''}`);
+    lines.push(`  reused (done, not re-planned): ${im.reusedDone.length}  open: ${im.open.length}  backend records: ${im.backendRecords.length}  frontend records: ${im.frontendRecords.length}  other features settled (out of scope): ${im.settledOutOfScope}`);
+  }
   lines.push(`OP CHAIN (estimate is cold: easy=${COLD_MINUTES.easy}m medium=${COLD_MINUTES.medium}m hard=${COLD_MINUTES.hard}m):`);
   if (legs.length) {
     for (const l of legs) lines.push(`  ${l.seq}. ${l.op}  ~${l.estimateMinutes}m ${l.tier}${l.params ? `  params ${Object.entries(l.params).map(([k, v]) => `${k}=${JSON.stringify(v)}`).join(' ')}` : ''}`);

@@ -74,6 +74,8 @@ Executables: `.claude/scripts/goal/assess.mjs` (cold scan) ·
      <role>  <path>  — <assess line>
    GOAL:
      <enriched goal text, including assess findings>
+   IMPACT (survey of existing Work): <BUILD|EXTEND|REFERENCE> of <features>   (printed when the project has a Work tree)
+     reused (done, not re-planned): <n>  open: <n>  backend records: <n>  frontend records: <n>  other features settled (out of scope): <n>
    OP CHAIN (estimate is cold: easy=…m medium=…m hard=…m):
      1. <op>  ~<est>m <tier>
      total ~<n>m — estimate is cold
@@ -83,6 +85,8 @@ Executables: `.claude/scripts/goal/assess.mjs` (cold scan) ·
    ledger: %LOCALAPPDATA%/StarCi/projects/<ledger_id>/runtime.sqlite
    re-run without --plan to persist
    ```
+
+   The IMPACT line is the planner's survey of the project's `.starciwork` (`route-plan --state`, `modules/goal/existing.yaml`): a goal that names an existing feature is an EXTEND, plans only the delta (done records of other features and specs the feature already settled are not re-planned), and keeps the backend lane when the feature holds backend records.
 
    Add the step-2 bias (`prefer=[…] avoid=[…]`) in your own words — the planner
    does not print it. Per-leg estimate and tier come from the planner

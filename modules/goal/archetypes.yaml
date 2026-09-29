@@ -234,7 +234,7 @@ archetypes:
         refactor verb anywhere means the audit word names the target ("refactor
         the audit module"), not the request.
       phrases: [lint, verify, review, audit, check repo, check the repo, inspect, kiểm tra, rà soát, đánh giá code]
-      excludes: [$canonIntent, build, implement, add, create, code, làm, integrate, refactor, clean up, cleanup, clean-up, restructure, rename, fix, xây, xây dựng, thêm, tạo, sửa, viết, tích hợp, tái cấu trúc, assisted uat, manual uat, human-gated uat, human gated uat]
+      excludes: [$canonIntent, build, implement, add, extend*, expand*, update, modify, create, code, làm, integrate, refactor, clean up, cleanup, clean-up, restructure, rename, fix, xây, xây dựng, thêm, mở rộng, cập nhật, bổ sung, tạo, sửa, viết, tích hợp, tái cấu trúc, assisted uat, manual uat, human-gated uat, human gated uat]
 
   # --- investigate-first ---
   - id: investigate-first

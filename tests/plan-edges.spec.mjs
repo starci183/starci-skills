@@ -50,7 +50,7 @@ test('AUTH: unrelated legs no longer depend on each other', () => {
   const ops = plan.legs.map(l => l.op);
   assert.ok(ops.indexOf('backend.implement') < ops.indexOf('interface.implement'));
   assert.ok(!ancestors.get('interface.implement').includes('backend.implement'), 'UI build does not wait on the backend build');
-  assert.ok(!ancestors.get('backend.implement').includes('interface.draw'), 'backend build does not wait on the drawing');
+  assert.ok(ancestors.get('backend.implement').includes('interface.draw'), 'backend build waits behind the same draw gate as the UI build (owner MVP flow: draw, then code FE and BE)');
   assert.ok(!ancestors.get('work.author').includes('interface.draw'));
   assert.ok(ancestors.get('interface.implement').includes('interface.draw'), 'UI build still waits on its drawing');
   assert.ok(ancestors.get('uat.verify').includes('interface.audit'));
