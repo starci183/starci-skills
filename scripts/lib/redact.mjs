@@ -41,7 +41,7 @@ export const SECRET_KEY = /^(?:password|passwd|pwd|pass|secret|otp|pin|pincode|p
 // ------------------------------------------------------------------------------ declared stack secrets
 // A product repo's .starcistacks/<stack>/stack.yaml `secrets:` block names each secret and the runtime file
 // that holds its value. Both are learned once per repo root per process; values never leave this module.
-const STACK_DIRS = ['.starcistacks', '.stacks'];
+const STACK_DIRS = ['.starcistacks'];
 const learnedRoots = new Set();
 const secretValues = new Set();
 const secretNames = new Set();

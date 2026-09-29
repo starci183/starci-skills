@@ -188,8 +188,6 @@ export function readSonarDeclaration(file,repoRoot=path.dirname(path.dirname(pat
   const isAdmin=c=>/admin/i.test(c.id)||/admin/i.test(path.basename(c.file));
   const analysis=credentials.filter(c=>!isAdmin(c)&&(!c.env||c.env==='SONAR_TOKEN'));
   const forProject=key=>analysis.find(c=>c.id.includes(key)||path.basename(c.file).includes(key))?.file??null;
-  const legacy=plain(sonar.custody)?sonar.custody:{};
-  const where=value=>text(value)??text(value?.where)??text(value?.path);
   for(const p of projects)p.tokenRef=forProject(p.key);
   return {
     file,repoRoot,
@@ -197,11 +195,11 @@ export function readSonarDeclaration(file,repoRoot=path.dirname(path.dirname(pat
     mode:text(sonar.mode)??'local',
     reason:text(sonar.reason),
     stackDir,composeFile,container,
-    hostLocal:text(sonar.host?.local)??text(sonar.hostUrl)??(typeof sonar.host==='string'?text(sonar.host):null),
-    hostPublic:text(sonar.host?.public)??text(sonar.publicUrl),
+    hostLocal:text(sonar.host?.local),
+    hostPublic:text(sonar.host?.public),
     projects,
-    admin:credentials.find(isAdmin)?.file??where(legacy.admin),
-    analysis:analysis.find(c=>!projects.some(p=>p.tokenRef===c.file))?.file??where(legacy.analysis),
+    admin:credentials.find(isAdmin)?.file??null,
+    analysis:analysis.find(c=>!projects.some(p=>p.tokenRef===c.file))?.file??null,
     ci:sonar.ci??null,
     ownerAction:sonar.ownerAction??null,
   };
@@ -279,11 +277,11 @@ const launcher=(bin,args)=>/\.(?:c|m)?js$/i.test(bin)?[process.execPath,[bin,...
 export function readCustody(cfg,ref){
   // A relative reference is a member of the configured stack; an absolute one (a declaration credential,
   // resolved from its repository root) must still sit inside a custody tree - a repository's
-  // .starcistacks/.stacks or the runtime's .claude/ext/<service> extension.
+  // .starcistacks or the runtime's .claude/ext/<service> extension.
   const plainFile=path.resolve(cfg.stackDir,ref);
   const name=String(ref).replace(/\\/g,'/');
   const inside=path.isAbsolute(String(ref))
-    ?/[\\/]\.(?:starcistacks|stacks)[\\/]/.test(plainFile)||/[\\/]\.claude[\\/]ext[\\/]/.test(plainFile)
+    ?/[\\/]\.starcistacks[\\/]/.test(plainFile)||/[\\/]\.claude[\\/]ext[\\/]/.test(plainFile)
     :plainFile.startsWith(cfg.stackDir+path.sep);
   if(!inside)return {present:false,name,reason:`custody reference ${name} is outside a stack custody tree`};
   const enc=`${plainFile}.enc`;
@@ -317,15 +315,15 @@ const custodyView=entry=>({name:entry.name,present:entry.present,...(entry.via?{
 /** The custody member a minted project analysis token lives in: runtime/files/sonarqube-KEY-token.key. */
 export const projectTokenRef=key=>`runtime/files/sonarqube-${String(key).replace(/[^A-Za-z0-9_.-]/g,'_')}-token.key`;
 
-/** The .starcistacks/.stacks root a custody member resolves into - the tree a stack-secret tool manages. */
+/** The .starcistacks root a custody member resolves into - the tree a stack-secret tool manages. */
 const stackRootOf=file=>{
-  const at=/[\\/]\.(starcistacks|stacks)(?=[\\/]|$)/.exec(file);
+  const at=/[\\/]\.starcistacks(?=[\\/]|$)/.exec(file);
   return at?file.slice(0,at.index+at[0].length):null;
 };
 
 /**
  * Store a value as an encrypted custody member through the stack's own tool (scripts/stack-secret.mjs of the
- * repository whose .starcistacks/.stacks holds the member). An absolute reference (a declaration credential
+ * repository whose .starcistacks holds the member). An absolute reference (a declaration credential
  * resolved from its repository root) names that tree directly - a project token minted into the declaring
  * repository while the sonar stack itself is the host extension; a relative one stays a member of the
  * configured stack. Host-extension custody (.claude/ext) has no stack-secret tool: minting there is refused
@@ -336,8 +334,8 @@ function writeCustody(cfg,ref,value){
   const managed=path.isAbsolute(String(ref))?stackRootOf(file):path.dirname(cfg.stackDir);
   const stacksRoot=managed??path.dirname(cfg.stackDir);
   const tool=cfg.stackSecret??path.join(path.dirname(stacksRoot),'scripts','stack-secret.mjs');
-  if((!managed||!/^\.(starcistacks|stacks)$/.test(path.basename(managed)))&&!cfg.stackSecret)
-    return {ok:false,reason:`the custody member ${ref} is not under a .starcistacks/.stacks tree a stack-secret tool manages`};
+  if((!managed||path.basename(managed)!=='.starcistacks')&&!cfg.stackSecret)
+    return {ok:false,reason:`the custody member ${ref} is not under a .starcistacks tree a stack-secret tool manages`};
   if(!fs.existsSync(tool))return {ok:false,reason:`no stack-secret tool at ${tool}`};
   const target=path.relative(stacksRoot,file).replace(/\\/g,'/');
   const tmp=path.join(os.tmpdir(),`sonar-local-${process.pid}-${Date.now().toString(36)}`);
@@ -362,7 +360,7 @@ export async function tokenAccepted(cfg,value){
 }
 
 /** A custody reference writeCustody may store over: a member of the configured stack, or an absolute
- *  declaration credential inside a repository's .starcistacks/.stacks tree (host-extension custody is not). */
+ *  declaration credential inside a repository's .starcistacks tree (host-extension custody is not). */
 const inStack=(cfg,ref)=>{
   const file=path.resolve(cfg.stackDir,ref);
   if(!path.isAbsolute(String(ref))&&!file.startsWith(cfg.stackDir+path.sep))return false;

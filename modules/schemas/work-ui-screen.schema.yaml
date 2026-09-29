@@ -107,8 +107,7 @@ properties:
             $ref: "#/$defs/prose"
             description: Why this screen sits outside the app shell - a pre-auth route, a public page.
     description: "The application shell this screen is drawn inside, bound by revision the way `brand` is -
-      `{ref: shell, rev, layouts}` naming the layout tree (work/layout-tree@1, which superseded
-      work/app-shell@1 at the same path), or `{chromeless: true, because}` for a
+      `{ref: shell, rev, layouts}` naming the layout tree (work/layout-tree@1), or `{chromeless: true, because}` for a
       route the product draws without its persistent chrome. `ui.shell` below is the direction's prose about
       that chrome; this is the edge. It is optional on the schema so ui records drawn before the shell
       record existed stay valid - `starci validate` lists each of them as SHELL_BINDING_MISSING for a
@@ -1461,17 +1460,9 @@ $defs:
                   required:
                     - name
                     - providedBy
-                  anyOf:
-                    - required:
-                        - custody
-                      properties:
-                        custody: true
-                    - required:
-                        - where
-                      properties:
-                        where: true
+                    - custody
                   description: "The credential this product authenticates with, named and never carried. It declares custody;
-                    a declaration with neither custody nor where is refused."
+                    a declaration without it is refused."
                   properties:
                     name:
                       type: string
@@ -1485,10 +1476,6 @@ $defs:
                       type: string
                       pattern: "^identity:[a-z0-9]+([-_.][a-z0-9]+)*$"
                       description: "identity:<slug> - the stable identity alias. Resolve its selected environment from the backend Stack declaration; encrypted custody is .starcistacks/<env>/secrets/<slug>.enc, outside the Work tree."
-                    where:
-                      type: string
-                      minLength: 1
-                      description: Deprecated - names a place, not a custody. Declare custody.
   theme:
     enum:
       - light

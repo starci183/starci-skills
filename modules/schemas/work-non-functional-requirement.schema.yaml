@@ -716,17 +716,9 @@ $defs:
                   required:
                     - name
                     - providedBy
-                  anyOf:
-                    - required:
-                        - custody
-                      properties:
-                        custody: true
-                    - required:
-                        - where
-                      properties:
-                        where: true
+                    - custody
                   description: "The credential this product authenticates with, named and never carried. It declares custody;
-                    a declaration with neither custody nor where is refused."
+                    a declaration without it is refused."
                   properties:
                     name:
                       type: string
@@ -740,7 +732,3 @@ $defs:
                       type: string
                       pattern: "^identity:[a-z0-9]+([-_.][a-z0-9]+)*$"
                       description: "identity:<slug> - the stable identity alias. Resolve its selected environment from the backend Stack declaration; encrypted custody is .starcistacks/<env>/secrets/<slug>.enc, outside the Work tree."
-                    where:
-                      type: string
-                      minLength: 1
-                      description: Deprecated - names a place, not a custody. Declare custody.

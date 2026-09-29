@@ -186,7 +186,7 @@ $defs:
         required: [repository, path]
         properties:
           repository: {type: string, pattern: '^[A-Za-z0-9._-]+$'}
-          path: {type: string, pattern: '^(\.(starcistacks|stacks)/[a-z][a-z0-9-]*/(runtime/files|runtime/env|secrets)/[^\s]+|\.claude/ext/[a-z][a-z0-9-]*/secrets/[^\s]+)$'}
+          path: {type: string, pattern: '^(\.starcistacks/[a-z][a-z0-9-]*/(runtime/files|runtime/env|secrets)/[^\s]+|\.claude/ext/[a-z][a-z0-9-]*/secrets/[^\s]+)$'}
   serviceCi:
     description: >-
       How GitHub CI gets the service. wiring required - CI calls it now and the named secrets and

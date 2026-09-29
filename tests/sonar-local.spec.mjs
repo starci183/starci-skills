@@ -803,3 +803,21 @@ test('--cwd takes a bare repository name as the directory beside or above the cu
   assert.equal(resolveScanCwd(repo,'C:/elsewhere'),repo,'an absolute root as given');
   assert.equal(resolveScanCwd('missing-repo',repo),path.join(repo,'missing-repo'),'nothing found: the value as a path');
 });
+
+test('a declaration is read only in the current form: no hostUrl/publicUrl/string host, no custody block, no .stacks root', t => {
+  const root=temporary(t,'old-forms');
+  const file=write(root,'old.yaml',`schema: starci/application-stacks@1
+services:
+  sonar:
+    provider: sonarqube
+    mode: local
+    hostUrl: http://old-host:1
+    publicUrl: https://old-public.example.invalid
+    custody: {admin: {where: runtime/files/admin.key}, analysis: {path: runtime/files/analysis.key}}
+    ci: {wiring: optional-follow-up}
+    ownerAction: none
+`);
+  const declared=readSonarDeclaration(file);
+  assert.deepEqual([declared.hostLocal,declared.hostPublic,declared.admin,declared.analysis],[null,null,null,null]);
+  assert.equal(readSonarDeclaration(write(root,'string-host.yaml','schema: starci/application-stacks@1\nservices:\n  sonar: {provider: sonarqube, mode: local, host: "http://old-host:1", ci: {wiring: not-used}, ownerAction: none}\n')).hostLocal,null);
+});
