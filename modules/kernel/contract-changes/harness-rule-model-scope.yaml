@@ -1,0 +1,23 @@
+id: harness-rule-model-scope
+effectiveAt: '2026-09-29T00:00:00+07:00'
+summary: >-
+  `starci-be/harness-calls-provider-directly` (TESTING-10) applies only to model/LLM harnesses. A model harness is
+  identified by what the file does - an LLM provider SDK import, a house model helper or production-gateway symbol, or a
+  `@harness-kind model` comment - never by living under `src/tests/e2e/live/`. An identity-provider (Keycloak) or other
+  third-party live e2e in that folder is not reported as a model harness with no LLM SDK. Canon `@starci/eslint-canon-be`
+  becomes 1.2.3 and the nest profile pin (version, content digest, file count) and the repository baseline follow. The
+  e2e-flow rules were checked against the two-kinds standard (unit `*.spec.ts` beside the subject, `*.e2e-spec.ts` under
+  BE `src/tests/e2e/`, FE root `e2e/` Playwright) and already match it; `scripts/goal/assess.mjs` no longer recognizes the
+  retired `jest-harness*.json` config as a jest marker.
+reach: new-legs
+paths:
+  - modules/kernel/contract-changes/harness-rule-model-scope.yaml
+  - modules/models/code-patterns.yaml
+  - knowledge/repository-baseline.yaml
+  - knowledge/patterns/be/test.yaml
+  - packages/eslint/be/testing.mjs
+  - packages/eslint/be/testing.test.mjs
+  - packages/eslint/be/package.json
+  - packages/eslint/be/CHANGELOG.md
+  - packages/eslint/be/README.md
+  - scripts/goal/assess.mjs

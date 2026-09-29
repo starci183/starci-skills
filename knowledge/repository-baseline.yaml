@@ -20,7 +20,7 @@ provenance:
       commit: aae8d15c8097ec767227fcc14bfe231f07f0213b
       files: [package.json, apps/app/package.json, apps/app/tsconfig.json, apps/app/next.config.ts, apps/app/postcss.config.mjs, apps/app/vitest.config.ts, apps/app/src/app/globals.css, eslint.config.mjs, vitest.config.ts, vitest.setup.ts, .husky/pre-push, .github/workflows/ci.yml, codecov.yml, sonar-project.properties, .gitignore]
     - registry: npm
-      packages: ['@starci/eslint-canon-be@1.2.1', '@starci/eslint-canon-fe@3.0.2', '@starci/grammar@0.4.13', 'lint-staged@16.4.0']
+      packages: ['@starci/eslint-canon-be@1.2.3', '@starci/eslint-canon-fe@3.0.2', '@starci/grammar@0.4.13', 'lint-staged@16.4.0']
   limitations: |
     The owner's current repositories are the observed reference, not certification; where they
     differ from each other or from this baseline, the observations below say so and the baseline

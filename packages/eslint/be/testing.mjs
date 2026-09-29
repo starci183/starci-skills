@@ -276,6 +276,16 @@ const aiInvokePickToken = (sourceCode) => {
   return null
 }
 
+/** A file declares itself a model harness with the comment `@harness-kind model`; any other kind is not one. */
+const DECLARED_MODEL_HARNESS = /@harness-kind\s+model\b/
+
+/**
+ * A model harness is identified by what it does, never by where it lives: it imports an LLM provider
+ * SDK, reaches for a house model helper or gateway symbol, or declares `@harness-kind model`. A live
+ * e2e for an identity provider (Keycloak), a payment gateway or any other third party sits in the same
+ * `src/tests/e2e/live/` folder and is not a model harness, so this rule leaves it alone.
+ */
+
 /** A harness calls one explicit provider SDK and never disguises it as `AiInvokeService`. */
 export const harnessCallsProviderDirectly = {
   meta: {
@@ -284,7 +294,7 @@ export const harnessCallsProviderDirectly = {
     schema: [],
     messages: {
       missingProvider:
-        "This harness imports no approved provider SDK. A model-quality harness calls the declared provider client directly; a house helper, tier or gateway override can make it green about a model production does not use.",
+        "This model harness (it reaches for a house model helper or gateway, or declares `@harness-kind model`) imports no approved provider SDK. A model-quality harness calls the declared provider client directly; a house helper, tier or gateway override can make it green about a model production does not use.",
       gateway:
         "`{{name}}` impersonates or replaces the production AI gateway from a harness. Reuse the production prompt builder and parser around a direct provider SDK call instead.",
       helper:
@@ -300,12 +310,14 @@ export const harnessCallsProviderDirectly = {
     if (!authScope) return {}
 
     let hasProviderImport = false
+    let modelSignal = false
     return {
       ImportDeclaration(node) {
         const source = node.source && node.source.value
         if (typeof source !== "string") return
         if (harness && DIRECT_PROVIDER_PACKAGES.test(source)) hasProviderImport = true
         if (harness && FORBIDDEN_HARNESS_HELPERS.test(source.replace(/\.(?:ts|js)$/, ""))) {
+          modelSignal = true
           context.report({ node, messageId: "helper", data: { source } })
         }
         if (!harness) return
@@ -314,6 +326,7 @@ export const harnessCallsProviderDirectly = {
           const local = specifier.local && specifier.local.name
           const name = imported || local
           if (!FORBIDDEN_HARNESS_SYMBOLS.has(name)) continue
+          modelSignal = true
           context.report({ node: specifier, messageId: "gateway", data: { name } })
         }
       },
@@ -338,9 +351,11 @@ export const harnessCallsProviderDirectly = {
         const sourceCode = context.sourceCode || context.getSourceCode()
         const pickToken = aiInvokePickToken(sourceCode)
         if (pickToken) {
+          modelSignal = true
           context.report({ node: pickToken, messageId: "gateway", data: { name: 'Pick<AiInvokeService, "run">' } })
         }
-        if (!hasProviderImport) context.report({ node, messageId: "missingProvider" })
+        const declared = sourceCode.getAllComments().some((comment) => DECLARED_MODEL_HARNESS.test(comment.value))
+        if ((modelSignal || declared) && !hasProviderImport) context.report({ node, messageId: "missingProvider" })
       },
     }
   },

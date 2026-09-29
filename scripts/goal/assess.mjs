@@ -106,7 +106,7 @@ function assessRepo(repoPath) {
   out.sonar.configured = hasFile(/^sonar-project\.properties$|^\.sonarcloud\.properties$/)
     || /\bsonar/.test(pkgScripts);
 
-  const jestCfg = hasFile(/^jest\.config\.|jest-harness.*\.json$/) || !!pkg.jest;
+  const jestCfg = hasFile(/^jest\.config\./) || !!pkg.jest;
   const vitestCfg = hasFile(/^vitest\.config\.|^vitest\.workspace\./);
   const pwCfg = hasFile(/^playwright\.config\./);
   const hasDep = (n) => n in pkgDeps;

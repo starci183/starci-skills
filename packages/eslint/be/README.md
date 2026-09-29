@@ -42,7 +42,7 @@ A sample, not the list:
 | **Data access** | Queries stay where the layer says they may be built |
 | **Transport** | The wire shape is declared, not inferred from whatever a handler happened to return |
 | **Observability** | A failure is logged as a typed exception, so a log line can be traced to the law that names it |
-| **Testing** | Unit specs sit beside their subjects, including structural specs in HFS `src/tests` categories; model-quality harness specs still call providers directly. |
+| **Testing** | Unit specs sit beside their subjects, including structural specs in HFS `src/tests` categories; a model-quality harness (one that imports an LLM SDK, reaches a house model helper or declares `@harness-kind model`) calls its provider directly; other live e2e specs, such as an identity provider, are not judged as model harnesses. |
 | **End-to-end flows** | One file, one flow, named steps, and **never sleep** — poll until the state settles, with a deadline |
 | **CDC · event delivery** | Projections and events follow the declared delivery contract |
 | **Comments · naming · type safety** | Comments say why; no double cast through `unknown` |

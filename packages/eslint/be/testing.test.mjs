@@ -36,6 +36,7 @@ const UNIT = "D:/repo/src/features/api/core/graphql/mutations/courses/add-to-car
 const E2E = "D:/repo/src/tests/e2e/course-enroll.e2e-spec.ts"
 const SRC = "D:/repo/src/features/api/core/graphql/mutations/courses/add-to-cart/add-to-cart.handler.ts"
 const HARNESS = "D:/repo/src/tests/e2e/live/challenge-grading.e2e-spec.ts"
+const KEYCLOAK_LIVE = "D:/repo/src/tests/e2e/live/keycloak-live.e2e-spec.ts"
 const HARNESS_HELPER = "D:/repo/src/tests/e2e/live/harness-credentials.ts"
 const STRUCTURAL_SPEC = fileURLToPath(new URL("./fixtures/src/tests/e2e/setup/jest-module-map.spec.ts", import.meta.url))
 
@@ -158,6 +159,19 @@ test("TESTING-9: an e2e overrides the model with Jest; only the harness reaches 
 test("TESTING-10: a model-quality harness calls the declared provider directly", () => {
   tester.run("harness-calls-provider-directly", harnessCallsProviderDirectly, {
     valid: [
+      // an identity-provider live e2e sits in the same live/ folder and is not a model harness
+      {
+        filename: KEYCLOAK_LIVE,
+        code: `
+          import { KeycloakAdminClient } from "@keycloak/keycloak-admin-client"
+          const admin = new KeycloakAdminClient({ baseUrl: process.env.KEYCLOAK_URL })
+          it("signs a user in through the identity provider", async () => { expect(await admin.users.find()).toBeDefined() })
+        `,
+      },
+      // no LLM SDK, house model helper or declared kind: nothing marks a model harness, whatever the folder
+      { filename: HARNESS, code: `const quality = await grade(prompt)` },
+      // a declared non-model harness kind is left alone
+      { filename: HARNESS, code: `/** @harness-kind identity-provider */ const session = await signIn()` },
       {
         filename: HARNESS,
         code: `
@@ -242,10 +256,17 @@ test("TESTING-10: a model-quality harness calls the declared provider directly",
         code: `type Fake = Pick<AiInvokeService, "run">`,
         errors: [{ messageId: "missingProvider" }, { messageId: "gateway" }],
       },
+      // a harness declared as a model harness that calls no provider SDK is flagged
       {
         filename: HARNESS,
-        code: `const quality = await grade(prompt)`,
+        code: `/** @harness-kind model */ const quality = await grade(prompt)`,
         errors: [{ messageId: "missingProvider" }],
+      },
+      // a real model harness that imports a provider SDK AND a house helper is still flagged for the helper
+      {
+        filename: HARNESS,
+        code: `import OpenAI from "openai"; import { askModel } from "../helpers/models"`,
+        errors: [{ messageId: "helper" }],
       },
     ],
   })
