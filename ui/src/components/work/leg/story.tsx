@@ -77,7 +77,7 @@ export function LegStory({ project, leg, pipeline }: { project: string; leg: Leg
           <StatusChip status={statusFromOutcome(latest.reportOutcome)} label={latest.reportOutcome ? outcomeLabel[latest.reportOutcome] : 'Op chưa báo'} /></p>
         {latest.summary ? <p className="line-clamp-4 whitespace-pre-wrap break-words">{latest.summary}</p> : null}
         <p className="mt-1 text-muted-foreground">{fileCount == null ? (detail.loading ? 'Đang đếm tệp…' : 'Chưa có báo cáo tệp.') : `${fileCount} tệp trong repo đã được ghi`}</p>
-        <a href={latest.href} className="mt-1 inline-flex items-center gap-1 font-medium text-primary hover:underline">Xem Sản phẩm <ArrowRight className="size-3" aria-hidden="true" /></a>
+        <a href={`${latest.href}?step=report`} className="mt-1 inline-flex items-center gap-1 font-medium text-primary hover:underline">Xem Sản phẩm <ArrowRight className="size-3" aria-hidden="true" /></a>
       </div> : null}
       {downstream.length ? <div className="mt-2"><p className="mb-1 text-[11px] text-muted-foreground">Mở khoá</p><ul className="space-y-1">{downstream.map(chip)}</ul></div> : null}
     </Block>
