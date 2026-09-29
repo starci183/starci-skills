@@ -19,10 +19,11 @@
 // only children are read-only verbs, every one with a timeout. Auto-restart made crash-loop safe mode worse; the fix path
 // is a lane (skills/claude-debug). Suitable for a Monitor stream: stdout has lines only on change.
 import path from 'node:path';
-import os from 'node:os';
 import { execFile } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
-import { DatabaseSync } from 'node:sqlite';
+import { readMachine } from '../../engine/machine-db.mjs';
+import { openLedgerReader } from '../../engine/ledger-db.mjs';
+import { CONTROLLER_NAMES, LEADER_NAME, configuredMode, reconcilerConfig, reconcilerNumbers } from '../reconciler/state.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 const HEARTBEAT_STALE_MS = 90_000;
@@ -51,13 +52,6 @@ export function firstJson(text) {
   return null;
 }
 
-const machineFile = () => path.join(process.env.STARCI_HOME ?? path.join(process.env.LOCALAPPDATA ?? path.join(os.homedir(), 'AppData', 'Local'), 'StarCi'), 'machine.sqlite');
-
-function readOnly(file, fn) {
-  let db;
-  try { db = new DatabaseSync(file, { readOnly: true }); db.exec('PRAGMA query_only = ON'); return fn(db); } finally { try { db?.close(); } catch { /* read-only handle */ } }
-}
-
 async function httpProbe(url, timeoutMs) {
   try {
     const r = await fetch(url, { signal: AbortSignal.timeout(timeoutMs) });
@@ -68,22 +62,37 @@ async function httpProbe(url, timeoutMs) {
 
 /* ------------------------------------------------------------ fact collectors: each returns Map<key, alertText|null> */
 
-async function engineFacts(o) {
+/** The leader row, controller modes and failing queue, read through the machine reader (never boot.mjs --status text). */
+function readEngine() {
+  return readMachine((m) => {
+    // One query failing (an older live schema lacks a column a newer reader expects) must not blind the others.
+    const q = (sql, args, one, fallback) => { try { const st = m.db.prepare(sql); return one ? st.get(...args) ?? fallback : st.all(...args); } catch { return fallback; } };
+    const leader = q('SELECT * FROM engine_leader WHERE name=?', [LEADER_NAME], true, null);
+    const run = leader?.process_run_id != null ? q('SELECT start_reason FROM process_runs WHERE run_id=?', [leader.process_run_id], true, null) : null;
+    const safe = q("SELECT controller FROM controller_modes WHERE reason LIKE 'safe mode%'", [], false, []).map((r) => r.controller);
+    const modes = Object.fromEntries(q('SELECT controller, mode FROM controller_modes', [], false, []).map((r) => [r.controller, r.mode]));
+    const failing = q('SELECT controller, COUNT(*) AS n FROM engine_queue WHERE tries>0 GROUP BY controller', [], false, []);
+    return { leader, run, safe, modes, failing };
+  }, undefined);
+}
+
+async function engineFacts() {
   const facts = new Map();
-  const r = await child(['scripts/reconciler/boot.mjs', '--status', '--json'], o);
-  const s = r.ok ? firstJson(r.stdout) : null;
-  if (!s) { facts.set('engine', `status failed (${r.error ?? 'no json'})`); return facts; }
-  const l = s.leader ?? {};
-  const age = l.ageMs == null ? null : Math.round(l.ageMs / 1000);
+  let s;
+  try { s = readEngine(); } catch (e) { s = null; facts.set('engine', `machine.sqlite unreadable: ${String(e.message).slice(0, 120)}`); return facts; }
+  if (!s) { facts.set('engine', 'machine.sqlite missing'); return facts; }
+  const l = s.leader;
+  const ageMs = l ? Date.now() - Number(l.heartbeat_at) : null;
   const problems = [];
-  if (!l.holder) problems.push('NO LEADER');
-  else if (!l.fresh || (l.ageMs ?? Infinity) > HEARTBEAT_STALE_MS) problems.push(`leader STALE heartbeat ${age ?? '?'}s`);
-  if (l.safe) problems.push('SAFE MODE');
-  if (s.ok === false) problems.push(`machine read failed: ${s.error}`);
-  facts.set('engine', problems.length ? `${problems.join(', ')} | leader pid ${l.pid ?? '-'} epoch ${l.epoch ?? '-'} starts24h ${s.starts24h ?? '?'} start_reason ${l.startReason ?? '-'}` : null);
-  const bad = Object.entries(s.modes ?? {}).filter(([, m]) => m.configured === 'active' && m.effective !== 'active');
-  facts.set('engine-controllers', bad.length ? `configured active but running ${bad.map(([n, m]) => `${n}=${m.effective}`).join(' ')}` : null);
-  facts.set('engine-queue', Object.values(s.queue ?? {}).some((q) => q.failing) ? `failing queue items: ${Object.entries(s.queue).filter(([, q]) => q.failing).map(([c, q]) => `${c} ${q.failing}`).join(' ')}` : null);
+  if (!l) problems.push('NO LEADER');
+  else if (ageMs > HEARTBEAT_STALE_MS) problems.push(`leader STALE heartbeat ${Math.round(ageMs / 1000)}s`);
+  if (s.safe.length) problems.push('SAFE MODE');
+  facts.set('engine', problems.length ? `${problems.join(', ')} | leader pid ${l?.pid ?? '-'} epoch ${l?.epoch ?? '-'} start_reason ${s.run?.start_reason ?? '-'} last_pass_ms ${l?.last_pass_ms ?? '-'}` : null);
+  const config = reconcilerConfig();
+  const fresh = l && ageMs <= HEARTBEAT_STALE_MS;
+  const bad = [...new Set([...CONTROLLER_NAMES, ...Object.keys(s.modes)])].map((n) => [n, configuredMode(n, config), fresh ? s.modes[n] ?? 'off' : 'off']).filter(([, c, e]) => c === 'active' && e !== 'active');
+  facts.set('engine-controllers', bad.length ? `configured active but running ${bad.map(([n, , e]) => `${n}=${e}`).join(' ')}` : null);
+  facts.set('engine-queue', s.failing.length ? `failing queue items: ${s.failing.map((q) => `${q.controller} ${q.n}`).join(' ')}` : null);
   return facts;
 }
 
@@ -111,12 +120,14 @@ async function serviceFacts(o) {
 
 function runningWorkflows() {
   const out = [];
-  const ledgers = readOnly(machineFile(), (m) => m.prepare("SELECT ledger_id, name, repo_root, file FROM ledgers WHERE state='active' ORDER BY name").all());
+  const ledgers = readMachine((m) => m.db.prepare("SELECT name, repo_root, file FROM ledgers WHERE state='active' ORDER BY name").all(), []);
   for (const l of ledgers) {
+    let db = null;
     try {
-      const wfs = readOnly(l.file, (db) => db.prepare("SELECT workflow_id, phase FROM workflows WHERE archived_at IS NULL AND phase NOT IN ('finished','archived') ORDER BY workflow_id").all());
-      for (const w of wfs) out.push({ ledger: l.name, repo: l.repo_root, id: w.workflow_id, phase: w.phase });
+      db = openLedgerReader(l.file);
+      for (const w of db.prepare("SELECT workflow_id, phase FROM workflows WHERE archived_at IS NULL AND phase NOT IN ('finished','archived') ORDER BY workflow_id").all()) out.push({ ledger: l.name, repo: l.repo_root, id: w.workflow_id, phase: w.phase });
     } catch { out.push({ ledger: l.name, repo: l.repo_root, id: null, phase: null, error: 'ledger unreadable' }); }
+    finally { try { db?.close(); } catch { /* closed */ } }
   }
   return out;
 }
@@ -163,7 +174,7 @@ function tokenFacts(o) {
   if (!(o.tokenSpike > 0)) return facts;
   try {
     const now = Date.now();
-    const rows = readOnly(machineFile(), (m) => m.prepare('SELECT provider, COALESCE(SUM(COALESCE(input_tokens,0)+COALESCE(output_tokens,0)),0) AS t, COUNT(*) AS n FROM llm_usage WHERE at >= ? GROUP BY provider ORDER BY t DESC').all(now - o.tokenWindowMs));
+    const rows = readMachine((m) => m.db.prepare('SELECT provider, COALESCE(SUM(COALESCE(input_tokens,0)+COALESCE(output_tokens,0)),0) AS t, COUNT(*) AS n FROM llm_usage WHERE at >= ? GROUP BY provider ORDER BY t DESC').all(now - o.tokenWindowMs), []);
     const total = rows.reduce((a, r) => a + Number(r.t), 0);
     facts.set('tokens', total > o.tokenSpike ? `${total} input+output tokens in ${Math.round(o.tokenWindowMs / 60000)} min (limit ${o.tokenSpike}); top ${rows.slice(0, 3).map((r) => `${r.provider} ${r.t}/${r.n} calls`).join(', ')}` : null);
   } catch (e) { facts.set('tokens', `llm_usage unreadable: ${String(e.message).slice(0, 100)}`); }
@@ -185,7 +196,7 @@ export function diffFacts(prev, facts, { first = false } = {}) {
 }
 
 async function collect(o) {
-  const parts = await Promise.all([engineFacts(o), serviceFacts(o), workflowFacts(o), tokenFacts(o)].map((p) => Promise.resolve(p).catch((e) => new Map([['collector', `collector crashed: ${String(e?.message ?? e).slice(0, 120)}`]]))));
+  const parts = await Promise.all([engineFacts(), serviceFacts(o), workflowFacts(o), tokenFacts(o)].map((p) => Promise.resolve(p).catch((e) => new Map([['collector', `collector crashed: ${String(e?.message ?? e).slice(0, 120)}`]]))));
   lastFacts = new Map(parts.flatMap((m) => [...m]));
   return lastFacts;
 }
