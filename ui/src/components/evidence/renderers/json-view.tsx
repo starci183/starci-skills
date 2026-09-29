@@ -1,0 +1,138 @@
+import type { Concept } from '../../concept';
+export const concept: Concept = 'C8';
+import { useState } from 'react';
+import { ChevronDownIcon, ChevronRightIcon } from 'lucide-react';
+import type { Tone } from '../../status';
+import { CopyButton, Frame, Toolbar, toolbarBtn, wordTone } from './common';
+import { TextView } from './text-view';
+
+type Json = null | boolean | number | string | Json[] | { [k: string]: Json };
+type Parsed = { ok: true; docs: Json[]; jsonl: boolean } | { ok: false; error: string };
+type Mode = { m: 'default' | 'all' | 'none'; n: number };
+
+const PAGE = 200;
+const LONG = 300;
+
+function parseJson(text: string): Parsed {
+  const t = text.replace(/^﻿/, '').trim();
+  if (!t) return { ok: false, error: 'Tệp trống.' };
+  let first = '';
+  try { return { ok: true, docs: [JSON.parse(t) as Json], jsonl: false }; } catch (e) { first = e instanceof Error ? e.message : String(e); }
+  const lines = t.split(/\r?\n/).filter(l => l.trim());
+  if (lines.length > 1) {
+    try { return { ok: true, docs: lines.map(l => JSON.parse(l) as Json), jsonl: true }; } catch { /* not JSONL either */ }
+  }
+  return { ok: false, error: first };
+}
+
+const isContainer = (v: Json): v is Json[] | { [k: string]: Json } => v !== null && typeof v === 'object';
+const keyPath = (base: string, k: string | number) => typeof k === 'number' ? `${base}[${k}]` : /^[A-Za-z_$][\w$]*$/.test(k) ? `${base}.${k}` : `${base}[${JSON.stringify(k)}]`;
+
+function leafTone(v: Json): Tone | null {
+  if (v === true) return 'success';
+  if (v === false) return 'failed';
+  if (typeof v === 'string') return wordTone(v);
+  return null;
+}
+
+function Leaf({ v }: { v: Json }) {
+  const [more, setMore] = useState(false);
+  if (v === null) return <span className="italic text-muted-foreground">null</span>;
+  const tone = leafTone(v);
+  if (typeof v === 'string') {
+    const long = v.length > LONG && !more;
+    return (
+      <span data-tone={tone ?? undefined} className={`whitespace-pre-wrap break-words ${tone ? 'font-medium text-[var(--tone)]' : 'text-foreground'}`}>
+        &quot;{long ? v.slice(0, LONG) : v}&quot;
+        {v.length > LONG ? <button type="button" className="ml-1 text-[11px] text-primary underline" onClick={() => setMore(m => !m)}>{more ? 'thu gọn' : `… thêm ${v.length - LONG} ký tự`}</button> : null}
+      </span>
+    );
+  }
+  if (typeof v === 'boolean') return <span data-tone={tone ?? undefined} className="font-medium text-[var(--tone)]">{String(v)}</span>;
+  return <span data-tone="running" className="text-[var(--tone)]">{String(v)}</span>;
+}
+
+function Actions({ value, path }: { value: Json; path: string }) {
+  return (
+    <span className="absolute right-1 top-0 flex shrink-0 gap-1 rounded-md bg-card opacity-0 transition-opacity focus-within:opacity-100 group-hover/row:opacity-100">
+      <CopyButton value={() => typeof value === 'string' ? value : JSON.stringify(value, null, 2)} label="Giá trị" title="Chép giá trị" />
+      <CopyButton value={path} label="Đường dẫn" title={`Chép đường dẫn ${path}`} />
+    </span>
+  );
+}
+
+function Node({ k, v, path, depth, mode }: { k: string | number | null; v: Json; path: string; depth: number; mode: Mode }) {
+  const container = isContainer(v);
+  const [open, setOpen] = useState(() => mode.m === 'all' || (mode.m === 'default' && depth < 2));
+  const [limit, setLimit] = useState(PAGE);
+  const label = k === null ? null : (
+    <span className={typeof k === 'number' ? 'text-muted-foreground' : 'font-medium text-foreground/80'}>{typeof k === 'number' ? k : `"${k}"`}<span className="text-muted-foreground">: </span></span>
+  );
+  if (!container) {
+    return (
+      <div className="group/row relative flex items-start gap-1 py-px pl-4">
+        <span className="min-w-0 break-words">{label}<Leaf v={v} /></span>
+        <Actions value={v} path={path} />
+      </div>
+    );
+  }
+  const isArr = Array.isArray(v);
+  const entries: [string | number, Json][] = isArr ? v.map((x, i) => [i, x]) : Object.entries(v);
+  const shown = entries.slice(0, limit);
+  return (
+    <div>
+      <div className="group/row relative flex items-start gap-1 py-px">
+        <button type="button" onClick={() => setOpen(o => !o)} aria-expanded={open} className="flex min-w-0 items-start gap-0.5 rounded text-left hover:bg-muted focus-visible:outline-2 focus-visible:outline-ring">
+          {open ? <ChevronDownIcon className="mt-0.5 size-3.5 shrink-0" /> : <ChevronRightIcon className="mt-0.5 size-3.5 shrink-0" />}
+          <span>{label}<span className="text-muted-foreground">{isArr ? '[' : '{'}{open ? '' : ` ${entries.length} ${isArr ? 'phần tử' : 'khoá'} ${isArr ? ']' : '}'}`}</span></span>
+        </button>
+        <Actions value={v} path={path} />
+      </div>
+      {open ? (
+        <div className="ml-[7px] border-l pl-3">
+          {entries.length === 0 ? <div className="py-px pl-4 text-muted-foreground">{isArr ? 'mảng rỗng' : 'đối tượng rỗng'}</div> : null}
+          {shown.map(([ck, cv]) => <Node key={ck} k={ck} v={cv} path={keyPath(path, ck)} depth={depth + 1} mode={mode} />)}
+          {entries.length > limit ? (
+            <button type="button" className={`${toolbarBtn} my-1 ml-4`} onClick={() => setLimit(l => l + PAGE)}>thêm {Math.min(PAGE, entries.length - limit)} (còn {entries.length - limit})</button>
+          ) : null}
+          <div className="py-px pl-4 text-muted-foreground">{isArr ? ']' : '}'}</div>
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+/** JSON / JSONL as a collapsible coloured tree. Invalid JSON falls back to text with a warning. */
+export function JsonView({ text }: { text: string }) {
+  const [mode, setMode] = useState<Mode>({ m: 'default', n: 0 });
+  const [raw, setRaw] = useState(false);
+  const parsed = parseJson(text);
+  if (!parsed.ok) {
+    return (
+      <div className="space-y-2">
+        <div data-tone="warning" className="rounded-lg border border-[var(--tone-line)] bg-[var(--tone-bg)] px-3 py-2 text-xs text-[var(--tone)]">Không phải JSON hợp lệ ({parsed.error}). Hiển thị dạng văn bản.</div>
+        <TextView text={text} query="" />
+      </div>
+    );
+  }
+  const single = !parsed.jsonl;
+  return (
+    <Frame>
+      <Toolbar right={<span>{parsed.jsonl ? `JSONL · ${parsed.docs.length} dòng` : 'JSON'}</span>}>
+        {!raw ? <>
+          <button type="button" className={toolbarBtn} onClick={() => setMode(s => ({ m: 'all', n: s.n + 1 }))}>Mở hết</button>
+          <button type="button" className={toolbarBtn} onClick={() => setMode(s => ({ m: 'none', n: s.n + 1 }))}>Thu hết</button>
+        </> : null}
+        <button type="button" className={toolbarBtn} aria-pressed={raw} onClick={() => setRaw(r => !r)}>{raw ? 'Xem cây' : 'Xem thô'}</button>
+        <CopyButton value={text} label="Chép hết" />
+      </Toolbar>
+      {raw ? <TextView text={text} query="" className="rounded-none border-0" /> : (
+        <div key={mode.n} className="max-h-[70vh] overflow-auto bg-background p-3 font-mono text-xs leading-5">
+          {single
+            ? <Node k={null} v={parsed.docs[0]} path="$" depth={0} mode={mode} />
+            : parsed.docs.map((d, i) => <Node key={i} k={`dòng ${i + 1}`} v={d} path={`$[${i}]`} depth={0} mode={mode} />)}
+        </div>
+      )}
+    </Frame>
+  );
+}
