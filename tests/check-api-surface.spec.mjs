@@ -24,7 +24,7 @@ const fixtureTree = (edit) => {
     if (!fs.existsSync(source)) continue;
     fs.cpSync(source, path.join(root, dir), { recursive: true });
   }
-  edit?.(root);
+  try { edit?.(root); } catch (error) { fs.rmSync(root, { recursive: true, force: true }); throw error; }
   return root;
 };
 
@@ -40,10 +40,12 @@ test('the real tree agrees on one verb surface across code, contract and CLI hel
 
 test('a verb dropped from the contract is reported against api.mjs and exits 1', () => {
   const root = fixtureTree((tree) => {
-    const file = path.join(tree, 'modules/kernel/api.yaml');
+    // Every verb's contract is its own file under modules/kernel/api-commands (api.yaml keeps `commands: {}`).
+    const file = path.join(tree, 'modules/kernel/api-commands/estimate.yaml');
     const text = fs.readFileSync(file, 'utf8');
-    assert.match(text, /^ {2}estimate:$/m);
-    fs.writeFileSync(file, text.replace(/^ {2}estimate:$/m, '  estimate-renamed:'));
+    assert.match(text, /^estimate:$/m);
+    fs.writeFileSync(path.join(tree, 'modules/kernel/api-commands/estimate-renamed.yaml'), text.replace(/^estimate:$/m, 'estimate-renamed:'));
+    fs.rmSync(file);
   });
   try {
     const result = checkApiSurfaceMain(['--root', root]);
@@ -64,7 +66,9 @@ test('a verb dropped from usage() or from the starci help line is drift too', ()
     assert.match(text, /^ {2}observe\s+--job <job_id> \[--lines <n>\]$/m);
     fs.writeFileSync(api, text.replace(/^ {2}observe(\s+--job <job_id> \[--lines <n>\])$/m, '  observed$1'));
     const bin = path.join(tree, 'bin/starci.mjs');
-    fs.writeFileSync(bin, fs.readFileSync(bin, 'utf8').replace('|reconcile|nudge', '|nudge'));
+    // An extension verb is listed on the help line by its api-verbs file, so a verb the help names that no code
+    // implements is the help-line drift.
+    fs.writeFileSync(bin, fs.readFileSync(bin, 'utf8').replace('|reconcile|nudge', '|reconcile|ghost|nudge'));
   });
   try {
     const result = checkApiSurfaceMain(['--root', root, '--json']);
@@ -74,7 +78,7 @@ test('a verb dropped from usage() or from the starci help line is drift too', ()
     assert.deepEqual(usage.missing, ['observe']);
     assert.deepEqual(usage.extra, ['observed']);
     const help = report.drift.find((d) => d.source === 'bin/starci.mjs help');
-    assert.deepEqual(help.missing, ['reconcile']);
+    assert.deepEqual(help.extra, ['ghost']);
   } finally {
     fs.rmSync(root, { recursive: true, force: true });
   }

@@ -2,12 +2,17 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
 import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
 import { createHostController, findOrphans, seatStateOf, goalProblem, outputOf, NEEDS_REPAIR, turnStep } from '../scripts/reconciler/controllers/host.mjs';
 import { parseYaml } from '../engine/yaml.mjs';
 import { hostSettings, memoryStore, turnMinutesOf } from '../scripts/reconciler/services.mjs';
 import { goalTextRefusal } from '../scripts/goal/goal-text.mjs';
 
 import { fakeCtx } from '../scripts/reconciler/testing.mjs';
+// A ledger path is never a real-path literal: the fake ctx only names it, so it is built under the temp root.
+const fixtureRepo = (name) => path.join(os.tmpdir(), 'starci-fixture-repos', name);
+const fixtureLedger = (name) => path.join(fixtureRepo(name), '.starciwork', 'runtime.sqlite');
 // Lane D rc-host: the Host controller over a fake ctx (the shared contract of LANES.md: mode, now, ledgers, read,
 // run, api, clock, clear, openDecision, log). ctx.run and ctx.api only record, as shadow does; an active spec
 // answers them with a canned child output. Nothing here touches Orca, a process or a real ledger.
@@ -37,7 +42,7 @@ function hostCtx({ mode = 'shadow', now = T0, ledgers, dbs, runAnswer = null } =
   const ctx = fakeCtx({
     mode, calls,
     now: () => t, advance: (ms) => { t += ms; },
-    ledgers: ledgers ?? [{ ledgerId: 'nivo-backend', repo: 'D:/Repositories/nivo-backend', file: 'D:/Repositories/nivo-backend/.starciwork/runtime.sqlite' }],
+    ledgers: ledgers ?? [{ ledgerId: 'nivo-backend', repo: fixtureRepo('nivo-backend'), file: fixtureLedger('nivo-backend') }],
     read: (id, fn) => fn(dbs[id]),
     run: async (cmd, args, o) => { calls.run.push({ cmd, args, o }); return mode === 'shadow' ? { ok: true, shadow: true } : (runAnswer?.(cmd, args) ?? { ok: true, stdout: '{}' }); },
     api: async (id, verb, argv) => { calls.api.push({ id, verb, argv }); return { ok: true, shadow: mode === 'shadow' }; },
@@ -95,7 +100,7 @@ test('shadow: probe action=restart-needed -> the --repair replace is recorded, n
   assert.equal(r.replaced, true);
   const runs = repairRuns(ctx);
   assert.equal(runs.length, 1);
-  assert.deepEqual(runs[0].args, ['scripts/kernel/watchdog.mjs', '--repo', 'D:/Repositories/nivo-backend', '--workflow', 'wf-nivo-fe-canon', '--once', '--repair', '--json']);
+  assert.deepEqual(runs[0].args, ['scripts/kernel/watchdog.mjs', '--repo', fixtureRepo('nivo-backend'), '--workflow', 'wf-nivo-fe-canon', '--once', '--repair', '--json']);
   assert.equal(store.get(SEAT).restarts.length, 1);
   assert.equal(store.get(SEAT).state, 'suspect');
   assert.ok(ctx.calls.clock.some((c) => c.entity === SEAT && c.code === 'SEAT_VACANT'));
@@ -241,7 +246,7 @@ test('a service that keeps failing: its start goes through ctx.run, then a quara
 });
 
 test('ledger health: a failed quick_check is LEDGER_CORRUPT + one DI; the nightly backup is recorded once a day', async () => {
-  const ledgers = [{ ledgerId: 'nivo-backend', repo: 'D:/r', file: 'D:/r/.starciwork/runtime.sqlite' }];
+  const ledgers = [{ ledgerId: 'nivo-backend', repo: fixtureRepo('r'), file: fixtureLedger('r') }];
   let ok = false;
   const c = controller({ quickCheck: () => (ok ? { ok: true, result: ['ok'] } : { ok: false, result: ['*** in database main ***', 'page 7: btree'] }), backupDue: () => true });
   const ctx = hostCtx({ ledgers, dbs: { 'nivo-backend': ledgerDb() } });
@@ -257,7 +262,7 @@ test('ledger health: a failed quick_check is LEDGER_CORRUPT + one DI; the nightl
   assert.ok(ctx.calls.clear.some((x) => x.entity === 'ledger:nivo-backend' && x.state === 'LEDGER_CORRUPT'));
   const backups = ctx.calls.run.filter((r) => r.args[0] === 'scripts/reconciler/ledger-health.mjs');
   assert.equal(backups.length, 1);
-  assert.deepEqual(backups[0].args, ['scripts/reconciler/ledger-health.mjs', '--backup', '--ledger-id', 'nivo-backend', '--file', 'D:/r/.starciwork/runtime.sqlite', '--json']);
+  assert.deepEqual(backups[0].args, ['scripts/reconciler/ledger-health.mjs', '--backup', '--ledger-id', 'nivo-backend', '--file', fixtureLedger('r'), '--json']);
   ctx.advance(60_000);
   await c.reconcile('ledger:nivo-backend', ctx);
   assert.equal(ctx.calls.run.filter((r) => r.args[0] === 'scripts/reconciler/ledger-health.mjs').length, 1, 'once a day');
@@ -329,7 +334,7 @@ test('active Kernel seat: a 25-minute turn -> interrupt key + doorbell + re-wake
   const r1 = await c.reconcile(SEAT, ctx);
   assert.equal(r1.turn.act, 'interrupt');
   const argsOf = () => ctx.calls.run.map((x) => x.args.join(' '));
-  assert.ok(argsOf().includes('scripts/reconciler/services.mjs --turn-interrupt --terminal term_k --agent devin --repo D:/Repositories/nivo-backend --workflow wf-nivo-fe-canon --json'));
+  assert.ok(argsOf().includes(`scripts/reconciler/services.mjs --turn-interrupt --terminal term_k --agent devin --repo ${fixtureRepo('nivo-backend')} --workflow wf-nivo-fe-canon --json`));
   assert.equal(argsOf().filter((a) => a.startsWith('scripts/kernel/watchdog.mjs')).length, 2, 'the seat pass, then the re-wake pass');
   const overdue = ctx.calls.clock.find((x) => x.state === 'KERNEL_TURN_OVERDUE');
   assert.equal(overdue.entity, SEAT);
