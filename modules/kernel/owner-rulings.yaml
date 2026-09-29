@@ -56,6 +56,10 @@ rulings:
     date: '2026-09-27'
     ruling: The low contrast of a secondary input's fill is accepted (COLOR-3 case-6).
     enforcedBy: [knowledge/ui/proof/contrast.yaml]
+  - id: status-tones-follow-heroui
+    date: '2026-09-30'
+    ruling: Status tones follow HeroUI - a solid pair and a soft pair per tone. The soft foreground on its soft tint is accepted (about 3:1, not extreme contrast) and a bare status glyph takes the soft foreground instead of a darkened solid tone; body and interactive text keep 4.5:1.
+    enforcedBy: [scripts/checks/brand.mjs, knowledge/ui/proof/contrast.yaml, packages/grammar/src/__test__/contrast.ts]
   - id: nivo-main-colour-ink
     date: '2026-09-27'
     ruling: The Nivo main colour is ink black #040d1c, not red; red is for artwork and danger only.

@@ -82,6 +82,13 @@ properties:
             propertyNames:
               $ref: "#/$defs/openKey"
             properties:
+              softMinContrast:
+                type: number
+                minimum: 1
+                description: The floor for a HeroUI status soft pair (a token with role success-soft,
+                  warning-soft, info-soft or danger-soft and its foreground) and for that soft foreground as
+                  a bare glyph on a declared surface. 3 when absent; policy.minContrast (4.5) still holds
+                  body and interactive text.
               contrastExceptions:
                 type: array
                 minItems: 1

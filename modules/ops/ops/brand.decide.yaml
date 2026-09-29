@@ -284,7 +284,10 @@ steps:
     action:
       en: Give every token its role (primary, danger and the rest) and write the policy that governs the
         set - whether danger may match primary, and the minimum contrast every text-on-surface pair
-        must hold. Check the pairs the record itself declares against that floor and against the
+        must hold. Status tones follow HeroUI: a solid pair (`--<tone>` with its foreground) and a soft
+        pair (a token with role `<tone>-soft` carrying its soft foreground), the soft pair and the
+        soft foreground as a bare glyph on each surface held to `policy.softMinContrast` (3 by
+        default), never a solid tone darkened until it reads as a bare glyph at 4.5. Check the pairs the record itself declares against that floor and against the
         policy, and record the measured ratios. A token set that cannot satisfy the owner's ruling
         and the floor at the same time is reported with both numbers, never quietly adjusted to
         pass. When the owner accepts named pairs below the floor, keep `policy.minContrast` at the
@@ -405,8 +408,8 @@ steps:
     writes: [node, evidence]
     action:
       en: "Run the brand checks against the real frontend repository and keep their output: token values
-        match their declared sources, every declared text pair holds the contrast floor or an
-        owner-receipted contrast exception, primary and danger are distinct unless the policy permits
+        match their declared sources, every declared text pair holds the contrast floor (a status soft pair and its glyph, the
+        soft floor) or an owner-receipted contrast exception, primary and danger are distinct unless the policy permits
         otherwise, every declared mascot asset exists
         with its recorded hash, and the icon set is the only one named; run `node
         scripts/checks/shell-conformance.mjs .starciwork/shell/index.yaml` and keep its output as

@@ -60,6 +60,11 @@ rules:
         when: Normal text renders
         observe: |-
           The computed `color` measured against the composed background, after transparency, overlays, and any state opacity such as `[data-grammar-state="unavailable"]`, is at least `4.5:1`. A token that looks dark enough on its own, with no composed background captured, proves nothing and is recorded as missing proof
+      - id: case-1a
+        when: |-
+          A HeroUI status soft pair renders (`--<tone>-soft-foreground` on `--<tone>-soft`, a Chip or Badge `soft` or `flat` variant, an Alert title), or a bare status glyph or status title sits on a page ground
+        observe: |-
+          The soft foreground measured against the composed soft tint, and against the ground for the bare glyph, is at least `3:1`. Owner decision 2026-09-30: HeroUI's soft pairing is accepted and the requirement is lowered to `3:1` for it. A bare status glyph uses the tone's soft foreground; a solid status tone darkened until it reaches `4.5:1` as a bare glyph falsifies it, because the solid tone is a fill colour with its own foreground. Body text and interactive text on the same surface stay under case-1
       - id: case-2
         when: |-
           Large text renders, at least `24px`, or `18.66px` at bold weight

@@ -115,6 +115,10 @@ guidance:
       another is a contrast finding, not a preference, and it is measured against the composed background
       rather than the intended one.
       The application changes the surface, never the token, when contrast fails.
+      Status tones come as a solid pair (`--<tone>` with `--<tone>-foreground`) and a soft pair
+      (`--<tone>-soft` with `--<tone>-soft-foreground`), the HeroUI model. A bare status glyph or title on a
+      page ground takes the soft foreground and is measured at `3:1` (CONTRAST COLOR-5 case-1a); the solid
+      tone is not darkened to reach `4.5:1` as a glyph.
 rules:
   - id: TONE-1
     title: '`tone="default"`'

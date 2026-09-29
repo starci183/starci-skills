@@ -30,6 +30,15 @@ export const CHECK_IDS=['tokens-match-source','contrast-aa','primary-danger-dist
 export const DEFAULT_MIN_CONTRAST=4.5;
 export const NON_TEXT_MIN_CONTRAST=3;
 /**
+ * HeroUI status tones: a solid pair (`--<tone>` + `--<tone>-foreground`) and a soft pair (`--<tone>-soft` +
+ * `--<tone>-soft-foreground`, the Chip/Badge/Alert `soft` and `flat` variants). Owner decision 2026-09-30: the
+ * soft foreground on its own soft tint is accepted at 3:1, and a bare status glyph on a page ground takes the
+ * soft foreground instead of a darkened solid tone. A soft pair is a token with role `<tone>-soft`.
+ */
+export const SOFT_MIN_CONTRAST=3;
+export const STATUS_TONES=['success','warning','info','danger'];
+const softToneOf=token=>{const match=/^(success|warning|info|danger)-soft$/.exec(token.role??'');return match?match[1]:null;};
+/**
  * Every OKLab distance in this module is reported on the x100 scale (Euclidean distance in OKLab times
  * 100), so black against white is 100 and a just-noticeable difference is roughly 2. A destructive colour
  * must be 20 apart from the primary - a fifth of the whole perceptual range - or a user reads "delete" as
@@ -567,6 +576,9 @@ function readContrastExceptions({brand,tokens,brandDir}){
 /**
  * 2. A colour pair the brand itself declares must be legible. Text pairs are held to `policy.minContrast`
  * (WCAG AA, 4.5 by default); the primary against a declared surface is a non-text indicator and needs 3:1.
+ * A HeroUI status soft pair (a token with role `<tone>-soft` and its `foreground`) and that foreground as a
+ * bare glyph on each declared surface/background/canvas are held to `policy.softMinContrast` (3 by default),
+ * so a status tone is never darkened to reach 4.5 as a bare glyph.
  * A pair below its floor passes only through `policy.contrastExceptions` - one owner-accepted pair, named by
  * its exact tokens and bound to its measured ratio and the owner's receipt; every other pair still fails and
  * a refused exception fails the check. An exception pair no token declares as a fill (muted text on a
@@ -575,24 +587,37 @@ function readContrastExceptions({brand,tokens,brandDir}){
 export function checkContrastAa({brand,brandDir=null}){
   const id='contrast-aa';
   const tokens=brandTokens(brand);
-  const minimum=Number.isFinite(brand?.color?.policy?.minContrast)?Number(brand.color.policy.minContrast):DEFAULT_MIN_CONTRAST;
+  const textMinimum=Number.isFinite(brand?.color?.policy?.minContrast)?Number(brand.color.policy.minContrast):DEFAULT_MIN_CONTRAST;
+  const minimum=textMinimum;
   const byName=new Map(tokens.map(token=>[token.token,token]));
   /** The declared token a fill's foreground value is: `<token>-foreground` or the `<role>-foreground` role. */
   const foregroundNameOf=(token,colour)=>{
     const names=[`${token.token}-foreground`,...tokens.filter(other=>token.role&&other.role===`${token.role}-foreground`).map(other=>other.token)];
     return names.find(name=>{const value=byName.has(name)?parseColor(byName.get(name).value):null;return value&&deltaEOk(value,colour)<=TOKEN_TOLERANCE;})??null;
   };
+  const softMinimum=Number.isFinite(brand?.color?.policy?.softMinContrast)?Number(brand.color.policy.softMinContrast):SOFT_MIN_CONTRAST;
   const pairs=[];
   for(const token of tokens){
     if(token.foreground===undefined||token.foreground===null)continue;
+    const soft=softToneOf(token)!==null;
+    const minimum=soft?softMinimum:textMinimum;
     const background=parseColor(token.value),foreground=parseColor(token.foreground);
     if(!background||!foreground){
       pairs.push({kind:'text',token:token.token,background:token.value??null,foreground:token.foreground,minimum,outcome:'unparseable'});
       continue;
     }
     const ratio=round(contrastRatio(background,foreground),2);
-    pairs.push({kind:'text',token:token.token,foregroundToken:foregroundNameOf(token,foreground),background:token.value,foreground:token.foreground,ratio,minimum,
+    pairs.push({kind:soft?'soft':'text',token:token.token,foregroundToken:foregroundNameOf(token,foreground),background:token.value,foreground:token.foreground,ratio,minimum,
       outcome:ratio>=minimum?'pass':'fail',_bg:token.token,_fg:foreground});
+    if(soft){
+      // A bare status glyph or title takes the soft foreground; it must read as a non-text mark on every ground the brand declares.
+      for(const ground of tokens.filter(other=>other.role==='surface'||other.role==='background'||other.role==='canvas')){
+        const groundColor=parseColor(ground.value);
+        if(!groundColor)continue;
+        const glyphRatio=round(contrastRatio(groundColor,foreground),2);
+        pairs.push({kind:'status-glyph',token:token.token,against:ground.token,ratio:glyphRatio,minimum:softMinimum,outcome:glyphRatio>=softMinimum?'pass':'fail'});
+      }
+    }
   }
   const primary=byRole(tokens,'primary'),surface=byRole(tokens,'surface');
   if(primary&&surface){
@@ -628,7 +653,7 @@ export function checkContrastAa({brand,brandDir=null}){
   const reported=exceptions.map(({fgColor,bgColor,...rest})=>rest);
   if(!pairs.length&&!refused.length)return check(id,'skip','No brand token declares a foreground and no surface is declared, so no contrast pair exists to measure.',{minimum});
   const bad=pairs.filter(pair=>pair.outcome!=='pass');
-  const evidence={minimum,nonTextMinimum:NON_TEXT_MIN_CONTRAST,exceptionTolerance:CONTRAST_EXCEPTION_TOLERANCE,pairs,
+  const evidence={minimum,nonTextMinimum:NON_TEXT_MIN_CONTRAST,softMinimum,exceptionTolerance:CONTRAST_EXCEPTION_TOLERANCE,pairs,
     ...(exceptions.length?{exceptions:reported}:{})};
   const named=pair=>pair.declaredBy?`${pair.foregroundToken} on ${pair.token}`:`${pair.token}${pair.against?` on ${pair.against}`:''}`;
   const failures=[
@@ -637,7 +662,7 @@ export function checkContrastAa({brand,brandDir=null}){
   const accepted=applied.length?` ${applied.length} of them below it by an owner-accepted exception: ${applied.map(pair=>`${pair.exception.foreground} on ${pair.exception.background} ${pair.ratio}:1 (${pair.exception.acceptedBy})`).join(', ')}.`:'';
   return failures.length
     ?check(id,'fail',failures.join(' '),evidence)
-    :check(id,'pass',`All ${pairs.length} declared colour pairs meet their contrast floor (text ${minimum}:1, non-text ${NON_TEXT_MIN_CONTRAST}:1).${accepted}`,evidence);
+    :check(id,'pass',`All ${pairs.length} declared colour pairs meet their contrast floor (text ${minimum}:1, non-text ${NON_TEXT_MIN_CONTRAST}:1, status soft pair and glyph ${softMinimum}:1).${accepted}`,evidence);
 }
 
 /**

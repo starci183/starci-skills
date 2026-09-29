@@ -99,7 +99,14 @@ sha256. The token is looked up in the declared sources as usual - never in the r
 
 Every token that declares a `foreground` is a text pair and must reach `policy.minContrast`, defaulting to
 the WCAG AA floor of 4.5:1. The `primary` token against a declared `surface` token is a non-text indicator
-and must reach 3:1. Both ratios are reported per pair, with the floor they were held to, so a near-miss is
+and must reach 3:1. Status tones follow HeroUI, which colours them as a solid pair (`--<tone>` plus
+`--<tone>-foreground`) and a soft pair (`--<tone>-soft` plus `--<tone>-soft-foreground`, the Chip, Badge and
+Alert `soft` and `flat` variants). A token with role `success-soft`, `warning-soft`, `info-soft` or
+`danger-soft` and a `foreground` is a soft pair and must reach `policy.softMinContrast`, defaulting to 3:1
+(evidence `kind: soft`); its foreground is also measured as a bare status glyph against every token with role
+`surface`, `background` or `canvas` at the same floor (`kind: status-glyph`). A bare status glyph therefore
+uses the soft foreground and a solid tone is never darkened to reach 4.5:1 as a glyph. Body text and
+interactive text keep `policy.minContrast`. Both ratios are reported per pair, with the floor they were held to, so a near-miss is
 visible rather than just failed. The check skips when the brand declares no `foreground` anywhere and no
 surface — there is then no pair to measure.
 

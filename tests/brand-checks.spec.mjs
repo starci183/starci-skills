@@ -254,6 +254,38 @@ test('contrast-aa measures declared text pairs and the primary on its surface',(
   assert.equal(checkContrastAa({brand:{color:{tokens:[{token:'--starci-core-accent',value:ACCENT,role:'primary'}]}}}).outcome,'skip');
 });
 
+test('contrast-aa holds a HeroUI status soft pair and its bare glyph at 3:1, not 4.5:1',()=>{
+  // HeroUI Chip soft/flat: the tone's soft foreground on its own soft tint. Owner decision 2026-09-30.
+  const withSoft=(foreground,background='#dff3e6')=>{
+    const brand=brandSpec();
+    brand.color.tokens.push({token:'--starci-core-success-soft',value:background,foreground,role:'success-soft'});
+    return brand;
+  };
+  const MID='#4a8a5f';
+  const ratio=measure(MID,'#dff3e6');
+  assert.ok(ratio>=3&&ratio<4.5,`fixture must sit between the floors, measured ${ratio}`);
+  const accepted=checkContrastAa({brand:withSoft(MID)});
+  assert.equal(accepted.outcome,'pass',JSON.stringify(accepted.detail));
+  const soft=accepted.evidence.pairs.find(pair=>pair.kind==='soft');
+  assert.equal(soft.minimum,3);
+  assert.equal(accepted.evidence.softMinimum,3);
+  const glyph=accepted.evidence.pairs.find(pair=>pair.kind==='status-glyph');
+  assert.equal(glyph.against,'--starci-core-surface');
+  assert.equal(glyph.minimum,3);
+  // The same ratio on a solid, non-soft token is still text and still needs 4.5.
+  const solid=brandSpec();
+  solid.color.tokens.push({token:'--starci-core-success',value:'#dff3e6',foreground:MID,role:'success'});
+  assert.equal(checkContrastAa({brand:solid}).outcome,'fail');
+  // Below 3:1 a soft pair or a glyph still fails; a bare solid tone is not accepted as a glyph.
+  const faint=checkContrastAa({brand:withSoft('#9bd0ac')});
+  assert.equal(faint.outcome,'fail');
+  assert.match(faint.detail,/miss their contrast floor/);
+  assert.match(faint.detail,/< 3:1/);
+  const raised=withSoft(MID);
+  raised.color.policy.softMinContrast=4.5;
+  assert.equal(checkContrastAa({brand:raised}).outcome,'fail','softMinContrast is the brand own policy');
+});
+
 // starci-next inc-4e3944371445: the owner accepted three Academy tones below AA (ask ctx_eb5a945a39ea), and
 // contrast-aa had only the global floor, so the record had to drop minContrast to the lowest accepted pair.
 const ASK='ctx_eb5a945a39ea';
