@@ -292,7 +292,7 @@ function listedAttempts(store, url) {
     endState: url.searchParams.get('endState'), ui: url.searchParams.get('ui'), since: Number(url.searchParams.get('since')) || null,
     until: Number(url.searchParams.get('until')) || null };
   const rows = allLedgers(store, filters.project, (ledger, db) => many(db, active
-    ? 'SELECT * FROM v_op_history WHERE dispatched_at IS NOT NULL AND settled_at IS NULL ORDER BY attempt_id DESC'
+    ? 'SELECT * FROM v_op_history WHERE dispatched_at IS NOT NULL AND settled_at IS NULL AND end_state IS NULL ORDER BY attempt_id DESC'
     : 'SELECT * FROM v_op_history ORDER BY attempt_id DESC').map(row => attemptRow(row, ledger.name)));
   return rows.filter(row => (!filters.wf || row.wf === filters.wf) && (!filters.unit || row.unit === filters.unit)
     && (!filters.op || row.op === filters.op) && (!filters.agent || row.agent === filters.agent)

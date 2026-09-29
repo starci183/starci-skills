@@ -126,10 +126,10 @@ export type LogRow = { key: string; db: 'machine'|string; seq: number; at: numbe
 export type TimelineItem = { at: number; source: 'event'|'log'|'attempt'|'check'|'decision'|'violation'|'action'; kind: string; ui: UiState; title: string; ref: Ref | null; detail: unknown };
 
 /* ---- v2 (2026-09-29): pipeline, transparency, evidence. Served by ui/api/pipeline.mjs and routes. ---- */
-export type LegStatus = 'success'|'running'|'settling'|'queued'|'retry'|'failed'|'blocked'|'planned'|'deferred'|'external'|'dropped'|'warning'|'unknown';
+export type LegStatus = 'success'|'running'|'settling'|'queued'|'retry'|'failed'|'blocked'|'planned'|'deferred'|'external'|'dropped'|'rejected'|'warning'|'unknown';
 export type AttemptBrief = { id: number; unit: string | null; job: string; try: number; status: LegStatus;
   reportOutcome: AttemptRow['reportOutcome']; verdict: AttemptRow['verdict']; model: string | null; agent: string | null; pool: string | null;
-  dispatchedAt: number | null; reportedAt: number | null; settledAt: number | null; checks: number; checksRed: number;
+  dispatchedAt: number | null; reportedAt: number | null; settledAt: number | null; open: boolean; endState: string | null; checks: number; checksRed: number;
   tokensIn: number | null; tokensOut: number | null; costUsd: number | null; summary: string | null; href: string };
 export type LegUnit = { unit: string; title: string; state: UnitRow['state']; tries: number; dispatches: number; tryBudget: number; updatedAt: number; doneAt: number | null; href: string };
 export type LegRow = { seq: number; op: string; status: LegStatus; level: number; external: boolean; deferred: string | null; injected: string | null;

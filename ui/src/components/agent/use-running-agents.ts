@@ -3,7 +3,7 @@ import type { AttemptRow } from '../../contract';
 import { agentOf, type LinkedAgent } from './agent-avatar';
 
 export const attemptHref = (row: Pick<AttemptRow, 'project' | 'id'>) => `#/a/${encodeURIComponent(row.project)}/${row.id}`;
-export const isRunningAttempt = (row: AttemptRow) => row.settledAt == null && row.verdict == null && row.endState !== 'requeued' && row.endState !== 'settled';
+export const isRunningAttempt = (row: AttemptRow) => row.dispatchedAt != null && row.settledAt == null && row.endState == null;
 export const attemptAgent = (row: AttemptRow, live = false): LinkedAgent => ({ ...agentOf(row), href: attemptHref(row), live });
 
 /** Recent attempts from /api/attempts (shared cache); helpers to look up agents by job and list running ones. */

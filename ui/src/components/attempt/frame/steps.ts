@@ -6,7 +6,7 @@ import { formatSpan } from './util';
 const stateOf = (tone: Tone): UiState => tone === 'success' ? 'done' : tone === 'failed' ? 'bad' : tone === 'running' ? 'running' : tone === 'warning' ? 'warn' : 'waiting';
 
 export function isOpen(attempt: AttemptDetailV2): boolean {
-  return attempt.verdict == null && attempt.endState !== 'worker-dead' && attempt.endState !== 'settled';
+  return attempt.verdict == null && attempt.endState == null;
 }
 
 /** The six lifecycle steps with a semantic tone each; the checks step also carries a pass/fail bar. */
@@ -15,7 +15,7 @@ export function stepItems(attempt: AttemptDetailV2): StepItem[] {
   const open = isOpen(attempt);
   const startedAt = at('started') ?? attempt.dispatchedAt;
   const runMs = attempt.reportedAt && startedAt ? attempt.reportedAt - startedAt : null;
-  const runTone: Tone = attempt.endState === 'worker-dead' ? 'failed' : attempt.reportedAt ? 'success' : attempt.dispatchedAt ? 'running' : 'queued';
+  const runTone: Tone = attempt.endState === 'worker-dead' ? 'failed' : attempt.endState != null && !attempt.reportedAt ? 'skipped' : attempt.reportedAt ? 'success' : attempt.dispatchedAt ? 'running' : 'queued';
   const reportTone = attempt.reportedAt ? statusTone[statusFromOutcome(attempt.reportOutcome)] : 'queued';
   const ok = attempt.checks.filter(check => check.status === 'pass').length;
   const red = attempt.checks.filter(check => check.status === 'fail' || check.status === 'error').length;

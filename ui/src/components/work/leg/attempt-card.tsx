@@ -15,7 +15,7 @@ const fmt = (n: number | null) => n == null ? '–' : n.toLocaleString('vi-VN');
 
 /** One attempt inside the leg drawer: who ran it, what the Op said, what the Kernel decided. */
 export function AttemptCard({ attempt, now }: { attempt: AttemptBrief; now: number }) {
-  const open = attempt.settledAt == null;
+  const open = attempt.open;
   const end = attempt.settledAt ?? now;
   const outcome = statusFromOutcome(attempt.reportOutcome);
   const verdict = statusFromVerdict(attempt.verdict, open);
@@ -34,7 +34,7 @@ export function AttemptCard({ attempt, now }: { attempt: AttemptBrief; now: numb
       {attempt.tokensIn != null || attempt.tokensOut != null ? <span className="font-mono" title="token vào / ra">· {fmt(attempt.tokensIn)} vào · {fmt(attempt.tokensOut)} ra</span> : null}
     </p>
     <p className="mt-1 text-xs">
-      {attempt.dispatchedAt == null ? 'Chưa giao' : <>{formatDayTime(attempt.dispatchedAt)} → {attempt.settledAt == null ? <span className="text-[var(--status-running)]">đang chạy</span> : formatDayTime(attempt.settledAt)}</>}
+      {attempt.dispatchedAt == null ? 'Chưa giao' : <>{formatDayTime(attempt.dispatchedAt)} → {attempt.open ? <span className="text-[var(--status-running)]">đang chạy</span> : attempt.settledAt != null ? formatDayTime(attempt.settledAt) : 'đã dừng'}</>}
       {attempt.dispatchedAt != null && <span className="text-muted-foreground"> · {open ? `đang chạy ${Math.max(0, Math.round((end - attempt.dispatchedAt) / 60000))} phút` : formatDuration(end - attempt.dispatchedAt)}</span>}
     </p>
     {attempt.checks > 0 && <div className="mt-2 flex items-center gap-2" title={`${green} đạt, ${attempt.checksRed} đỏ`}>

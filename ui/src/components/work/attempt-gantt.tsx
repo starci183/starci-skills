@@ -36,7 +36,7 @@ export function AttemptGantt({ pipeline, now }: { pipeline: PipelineView; now: n
   const rows = pipeline.legs.map(leg => ({ leg, atts: leg.attempts.filter(a => a.dispatchedAt != null) })).filter(r => r.atts.length);
   if (!rows.length) return <p className="rounded-lg border border-dashed p-4 text-sm text-muted-foreground">Chưa có lần thử nào để vẽ dòng thời gian.</p>;
   const all = rows.flatMap(r => r.atts);
-  const endOf = (a: AttemptBrief) => a.settledAt ?? Math.max(now, a.dispatchedAt as number);
+  const endOf = (a: AttemptBrief) => a.settledAt ?? (a.open ? Math.max(now, a.dispatchedAt as number) : a.dispatchedAt as number);
   const t0 = Math.floor(Math.min(...all.map(a => a.dispatchedAt as number)) / STEP_MS) * STEP_MS;
   const t1 = Math.ceil(Math.max(...all.map(endOf), now) / STEP_MS) * STEP_MS + STEP_MS;
   const span = t1 - t0;
@@ -77,7 +77,7 @@ export function AttemptGantt({ pipeline, now }: { pipeline: PipelineView; now: n
         {i % 2 === 1 && <rect x={0} y={top} width={width} height={h} style={{ fill: 'var(--muted)' }} opacity="0.35" />}
         <text x={8} y={top + h / 2 + 4} fontSize="12" fontFamily="var(--font-mono, monospace)" style={{ fill: 'var(--foreground)' }}>{leg.op.length > 26 ? `${leg.op.slice(0, 25)}…` : leg.op}<title>{leg.op}</title></text>
         {bars.map(({ a, lane }) => {
-          const open = a.settledAt == null;
+          const open = a.open;
           const tone = statusTone[a.status];
           const bx = x(a.dispatchedAt as number); const bw = Math.max(6, x(endOf(a)) - bx);
           const by = top + ROW_PAD + lane * LANE_H + (LANE_H - BAR_H) / 2;

@@ -1,7 +1,7 @@
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { artifactRoot } from '../../../scripts/lib/artifact-store.mjs';
-import { pipelineOf } from '../pipeline.mjs';
+import { attemptOpen, pipelineOf } from '../pipeline.mjs';
 import { getBlob } from '../../../scripts/lib/artifact-store.mjs';
 import { workflowStateOf } from '../../../scripts/kernel/progress-state.mjs';
 import { sendJson, sendError } from '../envelope.mjs';
@@ -186,8 +186,8 @@ export function mergeUsage(lists) {
 }
 function fleetSummary(store) {
   const since = Date.now() - DAY;
-  const rows = ledgerRows(store, (row, db) => many(db, 'SELECT attempt_id,workflow_id,op_id,model,pool,agent,verdict,report_outcome,reported_at,dispatched_at,settled_at FROM v_op_history WHERE dispatched_at>=? OR settled_at IS NULL', since).map(a => ({ ...a, project: row.name })));
-  const open = rows.filter(a => a.dispatched_at != null && a.settled_at == null);
+  const rows = ledgerRows(store, (row, db) => many(db, 'SELECT attempt_id,workflow_id,op_id,model,pool,agent,verdict,report_outcome,reported_at,dispatched_at,settled_at,end_state FROM v_op_history WHERE dispatched_at>=? OR (settled_at IS NULL AND end_state IS NULL)', since).map(a => ({ ...a, project: row.name })));
+  const open = rows.filter(attemptOpen);
   const models = new Map();
   for (const a of open) { const key = a.model ?? a.pool ?? 'unknown'; const m = models.get(key) ?? { model: a.model, pool: a.pool, agent: a.agent, running: 0 }; m.running++; models.set(key, m); }
   const unitsQueued = ledgerRows(store, (_row, db) => [one(db, "SELECT count(*) AS n FROM work_units u JOIN workflows w USING(workflow_id) WHERE u.state IN ('planned','queued') AND w.phase='running'")?.n ?? 0]).reduce((a, b) => a + b, 0);

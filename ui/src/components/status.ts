@@ -1,18 +1,18 @@
 import type { UiState } from '../contract';
 
 /** Status vocabulary produced by ui/api/pipeline.mjs and used by every surface. */
-export type Status = 'success' | 'running' | 'settling' | 'queued' | 'retry' | 'failed' | 'blocked' | 'planned' | 'deferred' | 'external' | 'dropped' | 'warning' | 'unknown';
+export type Status = 'success' | 'running' | 'settling' | 'queued' | 'retry' | 'failed' | 'blocked' | 'planned' | 'deferred' | 'external' | 'dropped' | 'rejected' | 'warning' | 'unknown';
 /** Colour family. One tone = one token set in style.css ([data-tone=…]). */
 export type Tone = 'success' | 'running' | 'queued' | 'failed' | 'warning' | 'skipped';
 
 export const statusTone: Record<Status, Tone> = {
   success: 'success', running: 'running', settling: 'running', queued: 'queued', retry: 'warning',
-  failed: 'failed', blocked: 'failed', planned: 'queued', deferred: 'skipped', external: 'skipped', dropped: 'skipped', warning: 'warning', unknown: 'queued',
+  failed: 'failed', blocked: 'failed', planned: 'queued', deferred: 'skipped', external: 'skipped', dropped: 'skipped', rejected: 'skipped', warning: 'warning', unknown: 'queued',
 };
 
 export const statusLabels: Record<Status, string> = {
   success: 'Đạt', running: 'Đang chạy', settling: 'Đang chốt', queued: 'Đang chờ', retry: 'Chờ thử lại',
-  failed: 'Hỏng', blocked: 'Bị chặn', planned: 'Chưa tới', deferred: 'Hoãn', external: 'Ngoài workflow', dropped: 'Đã bỏ', warning: 'Cảnh báo', unknown: 'Chưa rõ',
+  failed: 'Hỏng', blocked: 'Bị chặn', planned: 'Chưa tới', deferred: 'Hoãn', external: 'Ngoài workflow', dropped: 'Đã bỏ', rejected: 'Bị từ chối khi giao', warning: 'Cảnh báo', unknown: 'Chưa rõ',
 };
 
 /** Statuses that are "live" (animated dot). */

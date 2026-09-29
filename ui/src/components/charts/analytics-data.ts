@@ -10,6 +10,9 @@ export const attemptState = (row: AttemptRow): AttemptState => {
   if (row.verdict === 'pass') return 'pass';
   if (row.verdict === 'fail' || row.verdict === 'partial' || row.verdict === 'blocked') return 'bad';
   if (row.verdict === 'dropped' || row.verdict === 'cancelled') return 'dropped';
+  // Ended without a verdict (refused launch, dead worker, unknown effect) is not running.
+  if (row.endState === 'worker-dead') return 'bad';
+  if (row.endState != null && row.endState !== 'settled') return 'dropped';
   return 'run';
 };
 export const stateTone: Record<AttemptState, Tone> = { pass: 'success', bad: 'failed', run: 'running', dropped: 'skipped' };

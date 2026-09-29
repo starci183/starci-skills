@@ -6,14 +6,22 @@ const many = (db, sql, ...args) => db.prepare(sql).all(...args);
 const parse = (value, fallback = null) => { try { return value == null ? fallback : JSON.parse(value); } catch { return fallback; } };
 
 /** Semantic status shared by every UI surface (see ui/src/components/status.ts). */
-export const STATUSES = ['success', 'running', 'settling', 'queued', 'retry', 'failed', 'blocked', 'planned', 'deferred', 'external', 'dropped', 'unknown'];
+export const STATUSES = ['success', 'running', 'settling', 'queued', 'retry', 'failed', 'blocked', 'planned', 'deferred', 'external', 'dropped', 'rejected', 'unknown'];
+
+/** An attempt is open while it has been dispatched and nothing ended it: no settle (settled_at) and no end state (a refused launch, a dead worker, a cancel). */
+export const attemptOpen = (row) => row.dispatched_at != null && row.settled_at == null && row.end_state == null;
+
+/** How an ended attempt without a verdict reads: a refused launch or a dead worker is a retry, an unknown effect waits on reconcile, a cancel is dropped. */
+// requeued = the launch was refused at submission (settle_json.reason 'dispatch-rejected'): closed, not a try.
+const END_STATE_STATUS = { requeued: 'rejected', 'worker-dead': 'failed', 'effect-unknown': 'blocked', cancelled: 'dropped' };
 
 export function attemptStatus(row) {
   if (row.verdict === 'pass') return 'success';
   if (row.verdict === 'blocked') return 'blocked';
   if (row.verdict === 'fail' || row.verdict === 'partial') return 'failed';
   if (row.verdict === 'dropped' || row.verdict === 'cancelled') return 'dropped';
-  if (row.settled_at == null && row.dispatched_at != null) return row.reported_at != null || row.report_outcome ? 'settling' : 'running';
+  if (END_STATE_STATUS[row.end_state]) return END_STATE_STATUS[row.end_state];
+  if (attemptOpen(row)) return row.reported_at != null || row.report_outcome ? 'settling' : 'running';
   return 'unknown';
 }
 
@@ -32,7 +40,7 @@ function legStatus(leg, units, attempts) {
   if (!units.length) return leg.external ? 'external' : 'planned';
   if (units.every(u => u.state === 'done')) return 'success';
   if (units.every(u => u.state === 'dropped')) return 'dropped';
-  const open = attempts.filter(a => a.settled_at == null && a.dispatched_at != null);
+  const open = attempts.filter(attemptOpen);
   if (open.some(a => !(a.reported_at != null || a.report_outcome))) return 'running';
   if (open.length) return 'settling';
   if (units.some(u => u.state === 'failed')) return 'failed';
@@ -43,7 +51,7 @@ function legStatus(leg, units, attempts) {
 
 export function attemptBrief(a, project) {
   return { id: a.attempt_id, unit: a.unit_id, job: a.job_id, try: a.try_no, status: attemptStatus(a),
-    reportOutcome: a.report_outcome, verdict: a.verdict, model: a.model, agent: a.agent, pool: a.pool,
+    open: attemptOpen(a), endState: a.end_state ?? null, reportOutcome: a.report_outcome, verdict: a.verdict, model: a.model, agent: a.agent, pool: a.pool,
     dispatchedAt: a.dispatched_at, reportedAt: a.reported_at, settledAt: a.settled_at,
     checks: a.checks ?? 0, checksRed: a.checks_red ?? 0, tokensIn: a.tokens_in ?? null, tokensOut: a.tokens_out ?? null, costUsd: a.cost_usd ?? null,
     summary: a.report_summary ?? null, href: `#/a/${encodeURIComponent(project)}/${a.attempt_id}` };

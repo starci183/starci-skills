@@ -23,7 +23,7 @@ export function TranscriptSection({ project, attemptId, attempt }: { project: st
   const terminal = attempt.terminal;
   return <Card id="attempt-step-run" concept="C7" title="Chạy · transcript" hint="scrollback đã che dữ liệu nhạy cảm, không phải ảnh chụp màn hình terminal"
     right={terminal ? <span className="font-mono text-[11px] text-muted-foreground">{terminal.handle} · {terminal.snapshots} snapshot{terminal.live ? ' · đang mở' : ''}</span> : null}>
-    <TranscriptViewer project={project} attemptId={attemptId} live={attempt.verdict == null} />
+    <TranscriptViewer project={project} attemptId={attemptId} live={attempt.verdict == null && attempt.endState == null} />
     <details className="mt-5"><summary className="cursor-pointer text-sm font-medium">Nhật ký hệ thống của job · {logs.data?.length ?? 0}</summary>
       <div className="mt-2 divide-y">{logs.data?.map(item => <div key={item.key} className="py-2 text-xs"><span className="text-muted-foreground">{formatAbsolute(item.at)} · {item.level} · {item.actor}</span><p className="break-words">{item.msg}</p></div>)}</div>
       {logs.data && !logs.data.length ? <Empty>Không có dòng nhật ký nào cho job này.</Empty> : null}
