@@ -6,7 +6,7 @@ goal:
 params:
   mode:
     type: enum
-    enum: [select, delivery, business, workflow, visual, api, stales, lint]
+    enum: [select, delivery, business, workflow, visual, api, lint]
     default: select
     setBy: kernel
     doc:
@@ -18,7 +18,7 @@ params:
     default: auto
     setBy: kernel
     doc:
-      en: "For mode lint or stales, whether this run MEASURES (its findings are its result and the input of
+      en: "For mode lint, whether this run MEASURES (its findings are its result and the input of
         the legs after it; it completes done) or GATES (its findings fail it and route one repair of the
         build that owns them). auto: a measurement until a build op of the workflow settled before this job
         was enqueued, a gate after (scripts/kernel/verify-failure.mjs isMeasurementLeg)."
@@ -767,86 +767,6 @@ policy:
         fixture: Selected fixture resource slug
         resource: Selected owned resource slug
         screen: Selected surface/state slug
-    stales:
-      id: review.verify
-      goal:
-        en: Run the deterministic source and Work freshness script and return reproducible findings without
-          repairing or blessing inputs.
-      nodeKinds: [operations]
-      completionProfile: operations
-      sideEffects:
-        - Write only the selected attempt's audit report; inspected source, Work, stacks, published
-          evidence and baselines remain read-only.
-      graphPolicy:
-        mode: read-only
-        location: .starciwork node dependsOn/refs with direct sourceRefs and collocated assets
-        prerequisiteState: done
-        dispatch: never
-      reads:
-        - id: request
-          path: selected audit request + resolved host project binding
-          purpose:
-            en: Bind the exact target IDs, source roots, accepted baseline and report destination. Inspected
-              stale subjects are data, not prerequisites required to be done before the audit.
-              Actual authorization and unrelated workflow prerequisites remain unchanged.
-        - id: scanner
-          path: scripts/checks/check-stales.mjs + docs/source-staleness.md
-          purpose:
-            en: Read the installed script's supported arguments, report schema, exit codes and coverage limits.
-              Use the same sealed runtime before and after a later authorized repair.
-        - id: subjects
-          path: bound canonical Work + repository source identities + declared stack and evidence bindings
-          purpose:
-            en: Read actual bytes, stable semantic links, covered source paths and source revisions. A stored
-              done, changed commit, fresh hash or model assertion alone cannot establish current
-              behavioral correctness.
-      writes:
-        - id: evidence
-          path: evidence/stales-command.json
-          fields: [command, exitCode, runtimeDigest, inputBindings, report, coverage, limitations]
-          content:
-            en: Retain command arguments excluding credentials, exit code and runtime/input identities
-              in the selected Work proof; attach exact machine output from STARCI_JOB_SCRATCH through api report. No canonical completion,
-              baseline or source write is authorized.
-      steps:
-        - reads:
-            - request
-            - scanner
-            - subjects
-          writes: [evidence]
-          action:
-            en: Run node scripts/checks/check-stales.mjs --work WORK --repo ID=ROOT with the actual canonical Work root, explicit
-              repository bindings and optional --target IDs for the selected closure. Capture stdout
-              JSON and exit code. Do not replace execution with a model-written report, auto-refresh
-              a baseline, translate unavailable input into clean, or rewrite completion hashes.
-              Nonzero means findings or a scanner/input failure, not permission to repair. Bind
-              every proposed repair to its actual owner and an existing effect grant; never
-              auto-dispatch it. After a separately authorized repair an independent review operation
-              runs the same script against current inputs and verifies the implementation's required
-              tests. Script cleanliness alone does not complete product behavior or semantic review.
-      proofs:
-        - id: executed-scanner
-          requirement:
-            en: The report comes from an actual script execution on the stated roots and immutable baseline,
-              with original JSON and exit code retained; all requested targets and unavailable
-              coverage are accounted for.
-        - id: acceptance-boundary
-          requirement:
-            en: Completing an audit means findings were measured and reported. A workflow freshness gate passes
-              only when the script's exit code is zero and its required coverage is complete;
-              unresolved findings block affected delivery.
-      blockers:
-        - code: SCANNER_UNAVAILABLE
-          condition:
-            en: The declared script or runtime cannot execute; report unavailable instead of claiming clean.
-        - code: INPUT_UNVERIFIABLE
-          condition:
-            en: A required repository, baseline, source identity, Work link or evidence artifact cannot be
-              verified.
-        - code: SOURCE_CHANGED
-          condition:
-            en: Inputs change during the scan; retain the failed observation and rerun at a stable checkpoint.
-      placeholders: {}
     lint:
       id: review.verify
       goal:

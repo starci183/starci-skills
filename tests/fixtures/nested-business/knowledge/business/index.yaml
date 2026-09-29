@@ -1,5 +1,0 @@
-schema: work/node@1
-required: true
-id: example.business
-kind: business
-description: Aggregate of readable overview and detailed SRS. Synthetic only.

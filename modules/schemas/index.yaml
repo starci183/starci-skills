@@ -2,9 +2,7 @@
 # modules/schemas/ — the schema catalog (catalog + analysis, no schema bodies)
 # ============================================================================
 # This file is the index of the authored schema tree: every schema in live
-# use lives under `modules/schemas/`, and the five
-# specification schema bodies live under `modules/schemas/spec/` with
-# normalized `*.schema.yaml` names.
+# use lives under `modules/schemas/`.
 #
 # The authored YAML under modules/schemas/ is the authority: every consumer
 # reads these files directly. The same holds for knowledge/**/*.yaml, so the
@@ -51,19 +49,18 @@ schemas:
     dialect: json-schema
     subsystem: work-tree
     governs: >-
-      Work metadata monolith: the versioned record kinds work/workspace@1, work/node@1,
-      work/resource@1, work/evidence@1, work/disposable-accounts@1 plus starci/source-identity@1
-      and starci/design-review@1.
+      Work metadata monolith: the versioned record kinds work/workspace@1,
+      work/resource@1, work/evidence@1 and work/disposable-accounts@1. The recursive work/node@N
+      envelope is retired: a work/node@N record is refused (WORK_NODE_RETIRED), never read.
     binds: versioned .starciwork records carrying @-suffixed schema ids
     usedBy:
-      - engine/index.mjs (metadataSchema — reads modules/schemas/work.schema.yaml)
       - modules/models/kinds.yaml (its knowledge-schema list names the monolith kinds verbatim)
       - scripts/example/work-example.mjs (projected for readers)
     business:
       question: "Is a versioned Work record still structurally valid?"
-      whenNeeded: Reading trees that carry @-suffixed record kinds, and the auxiliary kinds (source-identity, design-review, evidence-packet) that the per-family files do not re-issue.
+      whenNeeded: Reading trees that carry @-suffixed record kinds, and the kinds (workspace, resource, evidence) that the per-family files do not re-issue.
       whenNot: Not for the per-family records — each family's own work-<kind>.schema.yaml is the authority for its kind. Authoring a NEW record under a monolith-only kind is the misuse mode.
-      selectedBy: Record's own `schema:` const — the monolith covers node/workspace/resource plus the auxiliary kinds; family records resolve to work-<kind>.schema.yaml.
+      selectedBy: Record's own `schema:` const — the monolith covers workspace/resource/evidence; family records resolve to work-<kind>.schema.yaml.
     note: "the monolith and the per-family schemas coexist by design; check each family's own file first."
 
   # --- Work per-record schemas ----------------------------------------------
@@ -118,7 +115,7 @@ schemas:
       question: "What does the product look and sound like, once, for everyone?"
       whenNeeded: UI design and render-proof lanes read it as shared context.
       whenNot: Never duplicated per feature; not a state-carrying leaf.
-      selectedBy: Implicit — source-staleness calls it 'implicit brand context' input.
+      selectedBy: Implicit — the brand record is read as implicit brand context by the checks that judge a record's look.
 
   - id: work/layout-tree@1
     file: modules/schemas/work-layout-tree.schema.yaml
@@ -548,19 +545,6 @@ schemas:
       whenNot: Never infer ownership from paneKey, parentPaneKey, terminal titles or tab order; those are presentation/runtime hints only.
       selectedBy: Workflow id; the command reads persisted workflow/job hierarchy metadata and derives missing provider metadata from the selected profile.
 
-  - id: starci/source-staleness-report@1
-    file: modules/schemas/source-staleness.schema.yaml
-    dialect: json-schema
-    subsystem: gate
-    governs: "The deterministic staleness report — workRoot, targets, baselineDigest, clean, coverage{mode:canonical-work,closure,selectedNodeIds,sourceBindings}, limitations, impactGraph, currentInputs{work,repositories[head/dirty/originDigest/snapshotDigest]}, subjects, findings, reportDigest."
-    binds: stdout/report of `node scripts/checks/check-stales.mjs`
-    usedBy: [scripts/checks/check-stales.mjs (emits the report; exit 0 clean / 1 findings / 2,3 errors), the kernel agent and review.verify ops (interpret exit codes — nonzero never authorizes writes)]
-    business:
-      question: "Which declared inputs went stale — so repair is chosen on evidence, not vibes?"
-      whenNeeded: Before choosing repairs on existing source; changed input = revalidation, not mandated rewrite.
-      whenNot: Proves declared structural freshness ONLY — no semantic SRS/SDS conformance, no runtime/browser behavior (its own limitations[] say so).
-      selectedBy: review.verify modes stales/lint; repair lanes read findings.
-
   # --------------------------------------------------------------------------
   # HOST / PROVIDER — Orca call contract
   # --------------------------------------------------------------------------
@@ -733,7 +717,7 @@ schemas:
     usedBy: [scripts/checks/check-scoped-lint.mjs (CODE_PATTERN_REPORT const); checker scripts emit the sibling starci/code-pattern-script@1 per-file results it aggregates]
     business:
       question: "Did mechanical code-pattern conformance run clean, with what coverage and what limits?"
-      whenNeeded: review.verify lint/stales modes; enforcement needs executable coverage, not agent approval.
+      whenNeeded: review.verify lint mode; enforcement needs executable coverage, not agent approval.
       whenNot: status unavailable/invalid is not clean; a missing checker can never be replaced by agent sign-off (per CONTEXT.md).
       selectedBy: pattern-check orchestration; auditors read reportDigest-bound output.
 
@@ -749,80 +733,6 @@ schemas:
       whenNeeded: Bumping a @starci package, running starci link, or judging a repository for pin drift.
       whenNot: Not a lockfile and not a statement that a repository was upgraded; it names the target, the repository proves the result.
       selectedBy: check-canon-pins and starci link read it; the pin-drift gate compares a repository with it.
-
-  # --------------------------------------------------------------------------
-  # SPECIFICATION — SRS/SDS payload contracts (bodies under
-  # modules/schemas/spec/; validators live in scripts/checks/spec/).
-  # CURRENT: CONTEXT.md sends all new authoring to business/srs/ and
-  # architecture/sds/, and these schemas are what those payloads validate
-  # against. The work-* family schemas and the check-work-* gate stack govern
-  # the .starciwork work/* record tree — a different axis, not a replacement.
-  # --------------------------------------------------------------------------
-
-  - id: starci/specification-contract@1
-    file: modules/schemas/spec/contract.schema.yaml
-    dialect: prose-contract
-    subsystem: spec
-    governs: "The specification contract meta-record — required sections, row shapes, statuses (draft|blocked|pass), preserved-English rules, and pointers to the current SRS/SDS contracts (srs-sections.schema.yaml, sds-map.schema.yaml, sds.schema.yaml, srs.schema.yaml)."
-    binds: cohesive starci/specification@1 records + the split SRS/SDS layout rules
-    usedBy: [scripts/checks/spec/validate.mjs (loads it as the section contract; cohesive detail checks live in scripts/checks/spec/specification.mjs), work-*/index.yaml extensions.work3.specification|srs|sds payloads]
-    business:
-      question: "Which sections must a specification carry, in which language, under which lifecycle?"
-      whenNeeded: Authoring or validating any SRS/SDS record; the umbrella contract the section schemas hang under.
-      whenNot: Not the section schemas themselves — srs-sections/sds-map own the typed payloads.
-      selectedBy: spec validators + decide ops' declared reads (compatibility inputs).
-
-  - id: starci/sds@1
-    file: modules/schemas/spec/sds.schema.yaml
-    dialect: json-schema
-    subsystem: spec
-    governs: "The source-independent SDS record — purpose, businessRefs, designRefs, views, decisions, checks, references, limitations; op const architecture.decide."
-    binds: SDS records authored under the sds@1 payload (extensions.work3.sds / architecture trees)
-    usedBy: [scripts/checks/spec/sds.mjs (SDS_SCHEMA), contract.schema.yaml architecture.schema, tests/sds.spec.mjs]
-    business:
-      question: "Is this SDS structurally a source-independent design record?"
-      whenNeeded: architecture.decide output validation; compatibility reads of existing SDS records.
-      whenNot: New authoring uses the component-based sds-map sections over the cohesive monolith.
-      selectedBy: The record's own schema const starci/sds@1.
-
-  - id: starci/sds-map@1
-    file: modules/schemas/spec/sds-map.schema.yaml
-    dialect: prose-contract
-    subsystem: spec
-    governs: "The filesystem-split SDS map — overview (starci/sds-overview@1) plus typed sections flows/components/contracts/data/quality/deployment/decisions/verification with their per-section required fields; aggregate starci/sds-aggregate@1."
-    binds: architecture/{overview,sds/**}/index.yaml payloads (extensions.work3.sds)
-    usedBy: [scripts/checks/spec/sds-map.mjs (SDS_MAP_CONTRACT, classifySDSPath/validateSDSMap), contract.schema.yaml currentArchitectureMapContract]
-    business:
-      question: "Does the SDS map trace every accepted business flow through logical components to verification?"
-      whenNeeded: Authoring/validating split SDS sections — the current canonical SDS shape.
-      whenNot: Source paths/symbols/revisions never belong here — implementation owns code mapping.
-      selectedBy: SDS map section files; architecture.decide lanes.
-
-  - id: starci/srs-sections@1
-    file: modules/schemas/spec/srs-sections.schema.yaml
-    dialect: prose-contract
-    subsystem: spec
-    governs: "The typed split-SRS section contracts — aggregate starci/srs-aggregate@1 with allowedSections, plus per-section records (functional-requirement, nfr, business-rule, policy-decision, data, customer-journey) with required fields."
-    binds: business/srs/**/index.yaml payloads (extensions.work3.srs) — the canonical split-SRS tree
-    usedBy: [scripts/checks/spec/srs-sections.mjs (SRS_SECTION_CONTRACT), contract.schema.yaml semantics.layout]
-    business:
-      question: "Does each split SRS leaf carry exactly the fields its section type owns?"
-      whenNeeded: Authoring/validating the current canonical SRS tree.
-      whenNot: Aggregate parents hold no specification payload — leaves own the items.
-      selectedBy: SRS section files; business.decide lanes.
-
-  - id: starci/srs@1
-    file: modules/schemas/spec/srs.schema.yaml
-    dialect: json-schema
-    subsystem: spec
-    governs: "The compatibility SRS record — id, nodeType, name, summary, refs, content; op const business.decide."
-    binds: business/srs leaves authored against the cohesive record (compatibility/recovery reads)
-    usedBy: [scripts/checks/spec/srs.mjs (SRS_SCHEMA compat reader), contract.schema.yaml compatibilityBusiness.schema, tests/srs.spec.mjs]
-    business:
-      question: "Is a pre-split SRS record still readable under its original checks?"
-      whenNeeded: Compatibility reads of existing SRS records.
-      whenNot: Never for new authoring — new SRS uses srs-sections.schema.yaml.
-      selectedBy: The record's schema const starci/srs@1.
 
   # --------------------------------------------------------------------------
   # ASSISTED UAT — immutable human-checkpoint package and derived verification
@@ -883,21 +793,8 @@ schemas:
     business: {question: "Does the exact immutable assisted run still prove the current accepted flow?", whenNeeded: "In the separate acceptance workflow before final reconciliation.", whenNot: "Not a receipt rewrite or direct Work completion.", selectedBy: "Exact request/session/receipt inputs and current read-only probes."}
 
   # --------------------------------------------------------------------------
-  # PROFILES / REGISTRY — evidence profiles and runtime registry
+  # PROFILES / REGISTRY — runtime profile registry
   # --------------------------------------------------------------------------
-
-  - id: "(evidence profiles map — no schema: const; file modules/schemas/profiles.yaml)"
-    file: modules/schemas/profiles.yaml
-    dialect: prose-data
-    subsystem: gate
-    governs: "Completion-evidence capability per node kind — business/architecture/implementation/uat/uat.ui/uat.ux/release each declare which proof kinds they support (assertions, code, uat, image, behavior)."
-    binds: Work node completion profiles (what proof a done leaf of each kind needs)
-    usedBy: [engine/index.mjs (profiles export — reads modules/schemas/profiles.yaml; UNSUPPORTED_PROFILE warning when a leaf kind has no profile; inline design-review restricted to listed kinds)]
-    business:
-      question: "What evidence may complete a done claim for this kind of node?"
-      whenNeeded: preflightCompletion / completion review — the proof ceiling per kind.
-      whenNot: Distinct from profile-registry (runtime/model profiles) — same word, different axis; do not conflate.
-      selectedBy: core validation when a node kind asserts completion.
 
   - id: starci/profile-registry@1
     file: modules/schemas/profile-registry.schema.yaml
@@ -1109,8 +1006,8 @@ moduleLocalDocumentKinds:
 gaps:
   - "starci/goal@1 (kernel goal.json) has no dedicated schema file — the workflow goal is a sqlite row written by `api enqueue`/define-goal; its contract lives in modules/goal/define-goal.yaml."
   - "starci/code-pattern-script@1 is emitted by every scripts/checks/code-patterns/*.mjs script and consumed by check-scoped-lint.mjs, but has no schema file — only the aggregate starci/code-pattern-check@1 is schematized."
-  - "starci/evidence-packet@1 is named in modules/models/kinds.yaml but has no schema file; work/node@1 lives only inside the work.schema.yaml monolith."
+  - "starci/evidence-packet@1 is named in modules/models/kinds.yaml but has no schema file;"
 
 coverage:
-  tree: "modules/schemas/ + modules/schemas/spec/ + index.yaml + relationships.yaml"
+  tree: "modules/schemas/ + index.yaml + relationships.yaml"
   authority: the authored YAML in this tree, read directly by its consumers

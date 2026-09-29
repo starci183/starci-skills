@@ -220,8 +220,7 @@ forwardEdges:
       a canon-conformance cleanup (code.refactor params.canonFamilies) takes a
       review.verify lint scan before test.author instead, and no remap
     why: >-
-      Evidence pins source identity (sourceIdentity,
-      scripts/checks/source-staleness.mjs). A refactor that moves code without
+      Evidence pins source identity (sourceIdentity). A refactor that moves code without
       remapping the record leaves evidence certifying a tree that no longer
       exists — the stale-evidence rule. The regression-coverage prerequisite
       is enforced by the test-gap route (blocker test-gap -> test.author).

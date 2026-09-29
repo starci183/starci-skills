@@ -1,19 +1,16 @@
 // prerequisites.mjs — the machine-checkable half of an op's prerequisites,
 // evaluated by `api dispatch` before anything is reserved or launched. Only
 // data is read: a manifest read marked `mustExist` whose path the job's binding
-// resolves, and the `dependsOn` of the job's bound Work records when the op's
-// graphPolicy.prerequisiteState is `done`, and - for a read marked `designDrawn` (interface.implement reads.draws) -
+// resolves, and - for a read marked `designDrawn` (interface.implement reads.draws) -
 // that the ui record each bound implementation record proves has a settled interface.draw (the hard design gate:
 // code is never built before its design). There is NO layout gate on interface.draw: a draw starts from a todo
 // shell and unsettled ancestor layouts and draws them itself (scripts/kernel/shell-foundation.mjs decides which
 // workflow draws the shared parents; the result is judged by scripts/checks/shell-conformance.mjs). Prose (route.prerequisites) is never
 // parsed. Anything the data cannot decide — a placeholder the binding does not
-// resolve, a record outside a Work tree, a tree the Work traversal reads as
-// invalid — is unknown, and unknown is not unmet.
+// resolve, a layout tree that cannot be read — is unknown, and unknown is not unmet.
 import fs from 'node:fs';
 import path from 'node:path';
 import { parseYaml } from '../../engine/yaml.mjs';
-import { validateWorkspace } from '../../engine/index.mjs';
 import { loadUiRecords } from '../work/layout-tree.mjs';
 import { drawingAcceptance } from '../work/direction-part.mjs';
 import { isGlobSegment } from '../../engine/admission.mjs';
@@ -57,27 +54,11 @@ export function resolveReadPath(pattern, bindings) {
   return [...resolved];
 }
 
-/** The index.yaml files a record's effective dependsOn is drawn from: its own and every ancestor's up to the Work root. */
-const declaredDependsOn = (workRoot, recordDir) => {
-  const declared = [];
-  for (let dir = recordDir; ; dir = path.dirname(dir)) {
-    const file = path.join(dir, 'index.yaml');
-    if (fs.existsSync(file)) {
-      try {
-        const deps = parseYaml(fs.readFileSync(file, 'utf8'))?.dependsOn;
-        if (Array.isArray(deps)) declared.push(...deps.filter((dep) => typeof dep === 'string' && dep));
-      } catch { /* an unreadable record declares nothing this check can read */ }
-    }
-    if (path.resolve(dir) === path.resolve(workRoot) || path.dirname(dir) === dir) break;
-  }
-  return declared;
-};
-
 /**
  * Evaluate one job's data prerequisites against the target repository.
  * Returns {unmet:[...], unknown:[...]} — an empty `unmet` admits.
  */
-export function checkPrerequisites({ brief, payload, repo, validate = validateWorkspace }) {
+export function checkPrerequisites({ brief, payload, repo }) {
   const unmet = [], unknown = [];
   const records = (Array.isArray(payload?.records) ? payload.records : []).map(plainPath).filter(Boolean);
   const bindings = [...(Array.isArray(payload?.owned_paths) ? payload.owned_paths : []), ...records];
@@ -110,27 +91,6 @@ export function checkPrerequisites({ brief, payload, repo, validate = validateWo
     }
   }
 
-  if (brief?.graphPolicy?.prerequisiteState === 'done') {
-    const trees = new Map();
-    for (const record of records) {
-      const parts = segments(record);
-      const at = parts.indexOf(WORK_ROOT);
-      if (at < 0 || at === parts.length - 1) { if (at < 0) unknown.push({ kind: 'record-outside-work', record }); continue; }
-      const workRoot = path.join(repo, ...parts.slice(0, at + 1));
-      const nodePath = `${parts.slice(at + 1).join('/')}/index.yaml`;
-      if (!declaredDependsOn(workRoot, path.join(repo, ...parts)).length) continue;
-      if (!trees.has(workRoot)) trees.set(workRoot, validate(workRoot));
-      const nodes = trees.get(workRoot)?.nodes ?? [];
-      const node = nodes.find((n) => n.path === nodePath);
-      if (!node) { unknown.push({ kind: 'record-not-a-node', record }); continue; }
-      const states = new Map(nodes.map((n) => [n.id, n.effectiveState]));
-      const notDone = (node.dependsOn ?? []).map((id) => ({ id, state: states.get(id) ?? 'missing' }))
-        .filter(({ state }) => state !== 'done');
-      const decidable = notDone.filter(({ state }) => state !== 'invalid' && state !== 'missing');
-      if (decidable.length) unmet.push({ kind: 'dependency-not-done', record, dependsOn: decidable });
-      if (decidable.length < notDone.length) unknown.push({ kind: 'dependency-state-unknown', record, dependsOn: notDone.filter((d) => !decidable.includes(d)) });
-    }
-  }
   return { unmet, unknown };
 }
 
@@ -142,7 +102,7 @@ export function prerequisiteDetail({ op, jobId, unmet }) {
       ? `${DESIGN_NOT_SETTLED}: implementation record ${item.record} proves ui record ${item.ui}, whose interface.draw has not settled pass - ${item.why} (reads.${item.read}, designDrawn). Code is never built before its design: enqueue interface.draw for ${item.ui} and dispatch this job --after it. Tiếng Việt: bản vẽ (interface.draw) của ${item.ui} chưa được chốt nên chưa được viết code; vẽ xong và được chấp nhận rồi mới dispatch implement`
       : item.kind === 'direction-unaccepted'
         ? `bound ui record ${item.record} is a ${item.archetype} surface${item.derived ? ' (derived; set ui.archetype to override)' : ''} and its brand.direction archetype is not accepted by the owner - ${item.why ?? `status ${item.status ?? 'absent'}`} (reads.${item.read}, directionArchetype); enqueue brand.decide --param directionArchetype=${item.archetype} (direction mode; it asks the owner, BRAND_DIRECTION_UNACCEPTED until answered) and dispatch this job --after it`
-      : `bound record ${item.record} depends on ${item.dependsOn.map((d) => `${d.id} (${d.state})`).join(', ')}, not done, and ${op} graphPolicy.prerequisiteState is done`));
+      : `${op} has an unmet prerequisite (${item.kind})`));
   return `${lines.join('; ')}. Produce the missing record or finish the dependency through the op that owns it, then run api dispatch --job ${jobId} again; if the job binds the wrong record, enqueue a corrected job and settle this one --verdict blocked. The job stays queued and nothing was reserved or launched.`;
 }
 

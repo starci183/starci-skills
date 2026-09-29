@@ -27,7 +27,7 @@ export const VERIFY_OPS = ['uat.verify', 'uat.assisted.verify', 'e2e.verify', 'i
 /** The ops that walk a served stack: `api dispatch` runs the environment pre-step (scripts/uat/env-health.mjs) for them. */
 export const ENV_GATED_OPS = ['uat.verify', 'uat.assisted.verify', 'e2e.verify'];
 /** review.verify modes whose run is a measurement: scripts execute and write reports only (CONTEXT.md). */
-export const MEASUREMENT_MODES = ['lint', 'stales'];
+export const MEASUREMENT_MODES = ['lint'];
 export const ENV_HEALTH_CHECK = 'env-health';
 
 // Exit-code semantics of the checkers a measurement runs. `error` codes mean the tool did not measure;
@@ -38,7 +38,6 @@ const MEASURING_TOOLS = [
   // check-scoped-lint: 1 findings, 2 unavailable|invalid. `--all` reports a repository obligation the
   // repository has not declared as unavailable - owed by the repository owner, measured, not a crash.
   { id: 'check-scoped-lint', match: /check-scoped-lint(\.mjs)?\b/i, error: [], invalid: /status\s*=\s*invalid|ARGUMENT_INVALID/i },
-  { id: 'check-stales', match: /check-stales(\.mjs)?\b/i, error: [2, 3] },
   { id: 'starci-validate', match: /starci(\.mjs)?\s+validate\b|\bvalidate\b.*\.starciwork/i, error: [2] },
   { id: 'eslint', match: /\beslint\b|\blint(:check)?\b/i, error: [2] },
   { id: 'tsc', match: /\btsc\b|typecheck/i, error: [] },

@@ -89,7 +89,6 @@ node scripts/checks/check-scoped-lint.mjs --profile <nest|next> --root <repo> \
                                                            # aggregate: architecture + code patterns;
                                                            # a scoped run exits on report.slice: its NEW findings against
                                                            # --base (owed repo contracts and debt already there at base are notes)
-node scripts/checks/check-stales.mjs --work <work-root> --repo <id>=<git-root> [--target <node>]
 node scripts/checks/acceptance.mjs ...                     # evidence-packet verdicts
 node scripts/checks/proof.mjs ...                          # proof verification
 node scripts/checks/check-entry.mjs <host>                 # installed-entry sanity

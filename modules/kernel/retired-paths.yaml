@@ -43,3 +43,8 @@ retired:
   - {path: ui/agent-monitor.mjs, retiredAt: 2026-09-29, removedIn: ui-13-cleanup, replacedBy: 'ui/src/pages/work/workflow.tsx and ui/src/pages/attempt/attempt.tsx'}
   - {path: ui/agent-changes.mjs, retiredAt: 2026-09-29, removedIn: ui-13-cleanup, replacedBy: 'ui/api/routes/attempt.mjs diff endpoint'}
   - {path: modules/schemas/work-app-shell.schema.yaml, retiredAt: 2026-09-29, removedIn: layout-tree-no-legacy, replacedBy: 'modules/schemas/work-layout-tree.schema.yaml (work/layout-tree@1)'}
+  - {path: engine/index.mjs, retiredAt: 2026-09-29, removedIn: legacy-wp56, replacedBy: 'engine/digest.mjs (sha256, sha256File), engine/plain-object.mjs (isPlainObject), engine/canonical-json.mjs (canonicalJSON); the recursive work/node validator has no replacement - a work/node@N record is refused (WORK_NODE_RETIRED) by scripts/checks/check-example-work.mjs'}
+  - {path: modules/schemas/profiles.yaml, retiredAt: 2026-09-29, removedIn: legacy-wp56, replacedBy: 'none: only the retired node validator read it'}
+  - {path: docs/source-staleness.md, retiredAt: 2026-09-29, removedIn: legacy-wp56, replacedBy: 'none: the source-staleness scan read work/node source identities and is deleted'}
+  - {path: tests/core.spec.mjs, retiredAt: 2026-09-29, removedIn: legacy-wp56, replacedBy: 'none: it tested the retired node validator'}
+  - {path: tests/module-spec.spec.mjs, retiredAt: 2026-09-29, removedIn: legacy-wp56, replacedBy: 'none: it tested the retired node validator'}

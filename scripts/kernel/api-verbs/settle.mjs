@@ -156,7 +156,7 @@ export default {
     let status = verdict === 'pass' ? 'succeeded' : 'failed';
     // The independent checks of the attempt (check_runs of the kernel/settler/parity runners; H8: raw exits).
     const checksEnvelope = independentChecksOf(db, { jobId });
-    // A measurement leg (review.verify lint|stales before any build: verify-failure.mjs isMeasurementLeg)
+    // A measurement leg (review.verify lint before any build: verify-failure.mjs isMeasurementLeg)
     // completes when its checkers ran: findings they measured are its result, never its failure.
     const measurementLeg = isMeasurementLeg(db, job, { buildOps: buildOpsOf() });
     const recordedChecks = (Array.isArray(checksEnvelope?.checks) ? checksEnvelope.checks : []).map((check) => (measurementLeg ? markMeasured(check) : check));

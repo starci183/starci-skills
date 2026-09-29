@@ -1,0 +1,29 @@
+id: work-node-envelope-retired
+effectiveAt: '2026-09-29T20:00:00+07:00'
+summary: >-
+  The recursive work/node@N envelope and the SRS/SDS specification validator stack are retired with no
+  backward compatibility. engine/index.mjs (validateWorkspace, impactWorkspace, staleWorkspace,
+  previewCompletion, authoredWorkspace), scripts/checks/spec/*, modules/schemas/spec/*,
+  modules/schemas/profiles.yaml, the source-staleness scan (check-stales.mjs, source-staleness.mjs,
+  source-staleness.schema.yaml, docs/source-staleness.md) and the review.verify mode `stales` are deleted; the
+  node definition and every definition reachable only through it are gone from work.schema.yaml, along with
+  the schema-index, relationships and kinds entries for them. sha256/sha256File, isPlainObject and
+  canonicalJSON now live in engine/digest.mjs, engine/plain-object.mjs and engine/canonical-json.mjs, and
+  readDistJson is renamed readModuleJson (it reads an authored file, not a dist). checkPrerequisites no longer
+  walks a Work tree: `api dispatch` refuses prerequisite-unmet only for a mustExist read, a layout chain or an
+  unaccepted direction archetype, never for an undone dependsOn. Admission and verify no longer run a legacy
+  validator.
+reach: new-legs
+paths:
+  - engine/index.mjs
+  - engine/runtime-root.mjs
+  - engine/canonical-json.mjs
+  - scripts/checks/spec
+  - modules/schemas
+  - modules/models/kinds.yaml
+  - modules/ops/ops/review.verify.yaml
+  - modules/kernel/api-commands/dispatch.yaml
+  - modules/kernel/api-commands/settle.yaml
+  - scripts/kernel/prerequisites.mjs
+  - scripts/kernel/verify-failure.mjs
+  - modules/kernel/contract-changes/work-node-envelope-retired.yaml

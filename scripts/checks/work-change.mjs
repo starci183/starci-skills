@@ -29,8 +29,7 @@ import {slash} from '../lib/path-key.mjs';
  * changed or withdrawn content, with a reason naming the revision and the clause. History is what
  * lets somebody later ask whether a rule was ever proven; deleting it answers with silence.
  *
- * This check reports and never repairs. `check-stales` set that precedent, and the reason is that a
- * script which judges and repairs is wrong twice when it is wrong.
+ * This check reports and never repairs. A script which judges and repairs is wrong twice when it is wrong.
  */
 export const RESULT='starci/work-change@1';
 export const CHANGE_KINDS=['initial','editorial','clarifying','breaking'];

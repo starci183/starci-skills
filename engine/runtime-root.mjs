@@ -19,7 +19,7 @@ export const skillRoot = moduleRoot;
 
 /**
  * Read a runtime contract document. `parts` are path segments under `skillRoot`
- * (e.g. readModuleJson('modules', 'schemas', 'profiles.yaml')).
+ * (e.g. readModuleJson('modules', 'models', 'kinds.yaml')).
  */
 export function readModuleJson(...parts) {
   const rel = parts.join('/');

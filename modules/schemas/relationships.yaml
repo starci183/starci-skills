@@ -59,7 +59,7 @@ schemaToSchema:
      note: "evidence binds record+source version via recordDigest; expiry computed from it",
      source: "work-evidence.schema.yaml"}
   - {from: "work-*.schema.yaml (per-record family)", to: work.schema.yaml, type: supersedes,
-     note: "the per-family work/<kind>@1 ids supersede the monolith for the covered families; the monolith remains authority for work/node@1, work/resource@1, starci/source-identity@1, starci/design-review@1, starci/evidence-packet@1",
+     note: "the per-family work/<kind>@1 ids supersede the monolith for the covered families; the monolith remains authority for work/workspace@1, work/resource@1 and work/evidence@1; the recursive work/node@N envelope is retired",
      source: "work.schema.yaml $defs consts vs work-*.schema.yaml consts"}
 
   # --- kernel chain (the goal is a sqlite row; the plan file is
@@ -70,29 +70,6 @@ schemaToSchema:
   - {from: goal-plan, to: "modules/ops/ops/<op>.yaml", type: delegates,
      note: "each leg's `op` names a catalog op; enqueue refuses unknown-op",
      source: "modules/schemas/goal-plan.yaml rules; modules/kernel/api.yaml enqueue"}
-  - {from: source-staleness, to: "work-layout + work-*", type: consumes,
-     note: "the staleness scan walks canonical Work records the layout/family schemas govern (coverage.mode: canonical-work)",
-     source: "scripts/checks/source-staleness.mjs report shape"}
-
-  # --- spec subsystem --------------------------------------------------------
-  - {from: specification-contract, to: srs-sections, type: delegates,
-     note: "contract.schema.yaml semantics.layout: 'the typed split SRS contract in srs-sections.schema.yaml'",
-     source: "modules/schemas/spec/contract.schema.yaml"}
-  - {from: specification-contract, to: sds-map, type: delegates,
-     note: "currentArchitectureMapContract names modules/schemas/spec/sds-map.schema.yaml",
-     source: "modules/schemas/spec/contract.schema.yaml"}
-  - {from: specification-contract, to: sds, type: delegates,
-     note: "architecture.schema names modules/schemas/spec/sds.schema.yaml",
-     source: "modules/schemas/spec/contract.schema.yaml"}
-  - {from: specification-contract, to: srs, type: delegates,
-     note: "compatibilityBusiness.schema names modules/schemas/spec/srs.schema.yaml — compat only",
-     source: "modules/schemas/spec/contract.schema.yaml"}
-  - {from: sds-map, to: srs-sections, type: consumes,
-     note: "sds sections trace businessRefs back to the SRS items the split-SRS contract defines",
-     source: "modules/schemas/spec/sds-map.schema.yaml businessRefs"}
-  - {from: srs, to: srs-sections, type: supersedes,
-     note: "split SRS sections supersede the compatibility record for new authoring",
-     source: "modules/schemas/spec/contract.schema.yaml compatibilityBusiness.compatibility"}
 
   # --- providers -------------------------------------------------------------
   - {from: orca-call, to: "modules/host/orca/calls.yaml", type: governs,
@@ -153,12 +130,8 @@ schemaToSubsystem:
     schemas: [goal-plan]
     note: "the api plan-file contract is the only kernel record schema — the goal itself is a sqlite row + modules/goal/define-goal.yaml."
 
-  spec:             # SRS/SDS payload contracts
-    schemas: [specification-contract, sds, sds-map, srs-sections, srs]
-    note: "modules/schemas/spec/*.schema.yaml — umbrella contract + split-section maps + two compat monoliths; executables live in scripts/checks/spec/."
-
   gate:             # executable checks / verification reports
-    schemas: [source-staleness, code-pattern-profile, code-pattern-check, profiles,
+    schemas: [code-pattern-profile, code-pattern-check,
               assisted-uat-request, assisted-uat-session-manifest, assisted-uat-cleanup,
               assisted-uat-redaction, assisted-uat-receipt, assisted-uat-verification]
     note: "report shapes + the per-kind proof ceiling + immutable assisted-UAT package; nonzero findings never authorize writes."

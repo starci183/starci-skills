@@ -192,7 +192,6 @@ rules:
     rationale: A green check is meaningful only for what it actually measured.
     verification:
       automated:
-        - scripts/checks/check-stales.mjs
         - scripts/checks/check-scoped-lint.mjs
       manual:
         - Match each claimed invariant to the real command, source revision and exercised boundary.
@@ -205,7 +204,7 @@ rules:
     rationale: Source observation, product intent and execution progress are different facts.
     verification:
       automated:
-        - scripts/checks/check-stales.mjs
+        - scripts/checks/check-example-work.mjs
       manual:
         - Review canonical ownership, actual scope and impact closure; use the canonical Work validator.
   - id: ARCH-DEPLOYMENT

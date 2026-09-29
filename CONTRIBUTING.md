@@ -45,8 +45,8 @@ record and is worse than a red check.
 - **One authority per concept.** A rule lives in exactly one file; other surfaces cite it. If you
   find yourself maintaining the same fact twice, one copy is stale — delete it or generate it.
 - **Canonical import roots.** Mechanism comes from `engine/`, contract data from `modules/`
-  (schemas from `modules/schemas/`), spec validators from `scripts/checks/spec/`, executables from
-  `scripts/`. An import that resolves outside those four roots is the bug.
+  (schemas from `modules/schemas/`), executables from
+  `scripts/`. An import that resolves outside those three roots is the bug.
 - **YAML contracts are data.** `modules/**/*.yaml` files are read by agents and scripts alike;
   keep them declarative — no code, no comments restating the field name.
 - **Code style:** plain `.mjs`, node builtins preferred, no comments unless the reason is not

@@ -67,8 +67,8 @@ state/completion. Detailed leaves use `extensions.work3.sds`:
 
 The overview leaf carries `starci/sds-overview@1`: accepted SRS IDs, goals, scope, actors, system
 context, quality strategy, constraints, topology references, implementation handoff and design
-decisions. The machine-readable contract is `modules/schemas/spec/sds-map.schema.yaml`. Earlier
-source-independent `starci/sds@1` remains readable; it is not the new authoring format.
+decisions. The machine-readable contracts are the flat family schemas `modules/schemas/work-sds-component.schema.yaml`,
+`work-contract` and `work-integration`. The retired `starci/sds@1` record is not read.
 
 ## Flows and components
 

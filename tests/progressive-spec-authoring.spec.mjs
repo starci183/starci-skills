@@ -42,13 +42,7 @@ test('implementation feedback is classified before it is allowed to move a spec'
   states(assert, tests, ['suite-local']);
 });
 
-test('the Work lifecycle keeps its closed state enum and shows progress through activity', () => {
-  const schema = parseYaml(readFile('modules/schemas/work.schema.yaml'));
-  const nodeState = schema.$defs.node.allOf.find((rule) => rule?.if?.properties?.schema?.const === 'work/node@1')
-    .then.properties.state.enum;
-  assert.deepEqual(nodeState, ['uninvestigate', 'todo', 'done']);
-  assert.deepEqual(schema.$defs.node.properties.activity.enum, ['idle', 'investigating', 'implementing', 'verifying']);
-
+test('the Work lifecycle shows progress through activity, never an inprogress state', () => {
   const layout = readFile('modules/schemas/work-layout.yaml');
   assert.match(layout, /todo \+ activity: idle/);
   assert.match(layout, /Never add an inprogress state/);

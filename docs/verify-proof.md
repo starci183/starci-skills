@@ -95,7 +95,7 @@ where `workspace.yaml` places them. `--json` emits `{findings:[{code,node,path,d
 | `EVIDENCE_ASSERTED_NOT_OBSERVED` | a `done` leaf rests on `verificationSource: authored-claim`, so nothing observed it. The three schemas `modules/schemas/work-layout.yaml` declares true by authorship - `work/data@1`, `work/brand@1`, `work/policy-decision@1` - are exempt |
 
 Exit 0 is clean, 1 reports findings, 2 means invalid arguments or an unreadable declared input - the
-convention `scripts/checks/check-stales.mjs` uses.
+convention the other read-only checks use.
 
 Evidence that carries `stale: true` is passed over: it has already said it no longer describes the current
 product, and refusing it for pointing at the past would punish the tree for being honest. Declared artifacts
