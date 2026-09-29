@@ -34,6 +34,8 @@ const FROZEN_CODEX=[
 const fixture=t=>{
   const root=fs.mkdtempSync(path.join(os.tmpdir(),'starci-stale-unreachable-'));
   t.after(()=>fs.rmSync(root,{recursive:true,force:true,maxRetries:20,retryDelay:25}));
+  if(process.env.STARCI_TEST_TEMP_DIR)t.after(()=>fs.rmSync(path.join(process.env.STARCI_TEST_TEMP_DIR,'starci-job-scratch'),
+    {recursive:true,force:true,maxRetries:20,retryDelay:25}));
   const repo=path.join(root,'repo');fs.mkdirSync(path.join(repo,'docs'),{recursive:true});
   fs.writeFileSync(path.join(repo,'docs','a.md'),'# a\n');fs.writeFileSync(path.join(repo,'.gitignore'),'.starciwork/\n');
   const git=(...a)=>spawnSync('git',['-C',repo,'-c','user.email=spec@starci','-c','user.name=spec',...a],{encoding:'utf8',windowsHide:true,env:{...process.env,GIT_AUTHOR_DATE:'2026-01-01T00:00:00Z',GIT_COMMITTER_DATE:'2026-01-01T00:00:00Z'}});

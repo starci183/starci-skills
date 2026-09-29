@@ -82,6 +82,8 @@ test('no wake and no Enter is typed into an exited agent',()=>{
 const opFixture=t=>{
   const root=fs.mkdtempSync(path.join(os.tmpdir(),'starci-agent-exited-'));
   t.after(()=>fs.rmSync(root,{recursive:true,force:true,maxRetries:20,retryDelay:25}));
+  if(process.env.STARCI_TEST_TEMP_DIR)t.after(()=>fs.rmSync(path.join(process.env.STARCI_TEST_TEMP_DIR,'starci-job-scratch'),
+    {recursive:true,force:true,maxRetries:20,retryDelay:25}));
   const savedMachine=process.env.STARCI_TEST_MACHINE_FILE,savedProjects=process.env.STARCI_PROJECTS_ROOT;
   process.env.STARCI_TEST_MACHINE_FILE=path.join(root,'machine.sqlite');
   process.env.STARCI_PROJECTS_ROOT=path.join(root,'projects');

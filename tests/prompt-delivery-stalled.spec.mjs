@@ -102,6 +102,8 @@ test('awaitSubmission reads the input-box draft: a paste Orca lifted out of a ba
 const opFixture = (t, extra = {}) => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'starci-prompt-stalled-'));
   t.after(() => fs.rmSync(root, { recursive: true, force: true, maxRetries: 20, retryDelay: 25 }));
+  if(process.env.STARCI_TEST_TEMP_DIR)t.after(()=>fs.rmSync(path.join(process.env.STARCI_TEST_TEMP_DIR,'starci-job-scratch'),
+    {recursive:true,force:true,maxRetries:20,retryDelay:25}));
   const repo = path.join(root, 'repo'); fs.mkdirSync(repo, { recursive: true });
   const stub = path.join(root, 'fake-orca.mjs'); fs.writeFileSync(stub, FAKE_ORCA);
   const stateFile = path.join(root, 'state.json'), logFile = path.join(root, 'calls.jsonl');

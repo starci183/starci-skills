@@ -235,6 +235,8 @@ test('the menu cursor is read from the screen, not assumed',()=>{
 
 const opFixture=(t,extra={})=>{
   const root=tmp(t,'starci-gate-op-');
+  if(process.env.STARCI_TEST_TEMP_DIR)t.after(()=>fs.rmSync(path.join(process.env.STARCI_TEST_TEMP_DIR,'starci-job-scratch'),
+    {recursive:true,force:true,maxRetries:20,retryDelay:25}));
   const savedMachine=process.env.STARCI_TEST_MACHINE_FILE,savedProjects=process.env.STARCI_PROJECTS_ROOT;
   process.env.STARCI_TEST_MACHINE_FILE=path.join(root,'machine.sqlite');
   process.env.STARCI_PROJECTS_ROOT=path.join(root,'projects');
