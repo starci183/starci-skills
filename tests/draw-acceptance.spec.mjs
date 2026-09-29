@@ -122,7 +122,7 @@ const checkout=t=>{
   const repo=tmp(t);
   const git=(...args)=>{const r=spawnSync('git',['-C',repo,...args],{encoding:'utf8',windowsHide:true});assert.equal(r.status,0,`git ${args.join(' ')}: ${r.stderr}`);return r.stdout.trim();};
   git('init','--quiet','-b','main');git('config','user.email','lane@starci.test');git('config','user.name','lane');git('config','core.autocrlf','false');
-  put(repo,'src/a.ts','export const a = 1;\n');put(repo,'.gitignore','.starciwork/\n');
+  put(repo,'src/a.ts','export const a = 1;\n');fs.appendFileSync(path.join(repo,'.git','info','exclude'),'.starciwork/\n');
   git('add','.');git('commit','--quiet','-m','init');
   return repo;
 };
@@ -136,7 +136,7 @@ const seedDraw=(repo,{jobId,wf='wf-draw',files,admittedAt,payload={}})=>{
     ledger.transaction(db=>{
       writeContract(db,{attemptId,markdown:'# contract',context:{worktree:repo},createdAt:admittedAt});
       fileReport(db,{attemptId,outcome:'done',createdAt:Date.now(),
-        report:{schema:'starci/op-report@1',outcome:'done',summary:'adopted 40 inherited interface.draw evidence files unchanged',files}});
+        report:{schema:'starci/op-report@1',outcome:'done',summary:'adopted 40 inherited interface.draw evidence files unchanged',files,head:spawnSync('git',['-C',repo,'rev-parse','HEAD'],{encoding:'utf8',windowsHide:true}).stdout.trim(),branch:'main'}});
       for(const check of [{name:'owned-paths-committed',command:'git show'},{name:'owned-paths-clean',command:'git status'},{name:'head-ancestor',command:'git merge-base'}])
         recordCheckRun(db,{attemptId,name:check.name,phase:'verify',runner:'kernel',authority:'runtime',status:'pass',exitCode:0,command:check.command});
     });

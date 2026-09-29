@@ -374,7 +374,7 @@ test('api settle re-measures the drawn parts itself: a loop-passed draw the runt
   git('init', '--quiet', '-b', 'main'); git('config', 'user.email', 'lane@starci.test'); git('config', 'user.name', 'lane'); git('config', 'core.autocrlf', 'false');
   fs.mkdirSync(path.join(p.repo, 'src'), { recursive: true });
   fs.writeFileSync(path.join(p.repo, 'src', 'a.ts'), 'export const a = 1;\n');
-  fs.writeFileSync(path.join(p.repo, '.gitignore'), '.starciwork/\n');
+  fs.appendFileSync(path.join(p.repo, '.git', 'info', 'exclude'), '.starciwork/\n');
   git('add', '.'); git('commit', '--quiet', '-m', 'init');
   const r = await runRound({ ui: p.ui, html: p.source, base: 'LedgerBase', state: 'installed', viewports: VIEWPORTS, repo: p.repo, render: p.render, probes: p.probes, criticRunner: p.critic(9) });
   const done = finishLoop({ out: r.out });
@@ -396,7 +396,7 @@ test('api settle re-measures the drawn parts itself: a loop-passed draw the runt
       ledger.transaction((db) => {
         writeContract(db, { attemptId, markdown: '# contract', context: { worktree: p.repo }, createdAt: admittedAt });
         fileReport(db, { attemptId, outcome: 'done', createdAt: Date.now(),
-          report: { schema: 'starci/op-report@1', outcome: 'done', summary: 'drawn through the loop', files } });
+          report: { schema: 'starci/op-report@1', outcome: 'done', summary: 'drawn through the loop', files, head: git('rev-parse', 'HEAD'), branch: 'main' } });
         for (const check of [{ name: 'owned-paths-committed', command: 'git show' }, { name: 'owned-paths-clean', command: 'git status' }, { name: 'head-ancestor', command: 'git merge-base' }])
           recordCheckRun(db, { attemptId, name: check.name, phase: 'verify', runner: 'kernel', authority: 'runtime', status: 'pass', exitCode: 0, command: check.command });
       });
