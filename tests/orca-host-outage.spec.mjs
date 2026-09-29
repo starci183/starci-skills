@@ -4,7 +4,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import {spawnSync} from 'node:child_process';
-import {inspectLedger,openLedger,ledgerFileFor} from '../engine/ledger-db.mjs';
+import {inspectLedger,openLedger,ledgerFileFor,releaseKernelJob,recordJobResult,openIncident} from '../engine/ledger-db.mjs';
 import {FAKE_ORCA,MISSING_ORCA_COMMAND} from './helpers/fake-orca.mjs';
 import {hostUnavailableOf} from '../scripts/api/orca/lib.mjs';
 import {kernelTerminalVerdict,settledKernelVerdict,awaitOrcaHost} from '../scripts/kernel/host-outage.mjs';
@@ -95,26 +95,41 @@ const fixture=t=>{
   // The kernel sits at its idle Codex prompt, alive.
   writeState(s=>{s.terminals[kernel].screen='• Yielding - waiting on the op report.\n› Ask Codex to do anything\n  gpt-6-sol high · repo';});
   const ledgerRows=()=>{
-    const ledger=inspectLedger({file:ledgerFileFor(repo)});
+    // The spawned verbs resolve the ledger under the fixture's LOCALAPPDATA; the
+    // same env must name the file here or this process lands on the host's root
+    // (engine/ledger-db.mjs ledgerFileFor/projectsRootFor).
+    const ledger=inspectLedger({file:ledgerFileFor(repo,{env})});
     try{
+      const jobRow=ledger.db.prepare('SELECT status,worker_id,payload_json FROM jobs WHERE job_id=?').get(`kernel-${workflowId}`);
       return {
         signal:json(ledger.db.prepare("SELECT value_json FROM signals WHERE scope='kernel' AND key=?").get(workflowId)?.value_json??'null'),
-        job:{...ledger.db.prepare('SELECT status,worker_id,attempt FROM jobs WHERE job_id=?').get(`kernel-${workflowId}`)},
+        // jobs has no attempt column: the kernel seat's boot count lives in
+        // payload.hierarchy.attempt (start-workflow.mjs kernelAttemptOf).
+        job:jobRow?{status:jobRow.status,worker_id:jobRow.worker_id,attempt:json(jobRow.payload_json)?.hierarchy?.attempt??null}:{},
         kinds:ledger.db.prepare('SELECT kind FROM events WHERE workflow_id=? ORDER BY seq').all(workflowId).map(r=>r.kind),
         incidents:ledger.db.prepare('SELECT incident_id,status FROM incidents WHERE workflow_id=?').all(workflowId).map(r=>({...r})),
       };
     }finally{ledger.close();}
   };
   // The state the 02:37 watchdogs left: the seat cleared as if the kernel were
-  // dead (signal deleted, job stopped, an unclosed-residue incident) while its
+  // dead (signal deleted, job released, an unclosed-residue incident) while its
   // terminal kept running.
   const loseSeat=()=>{
-    const ledger=openLedger({file:ledgerFileFor(repo)});
+    const ledger=openLedger({file:ledgerFileFor(repo,{env})});
+    const at=Date.now();
     try{
-      ledger.db.prepare("DELETE FROM signals WHERE scope='kernel' AND key=?").run(workflowId);
-      ledger.db.prepare("UPDATE jobs SET status='stopped',result_json=? WHERE job_id=?").run(JSON.stringify({reason:'spawnSync orca.exe ENOENT',terminal:kernel}),`kernel-${workflowId}`);
-      ledger.db.prepare("INSERT INTO incidents(incident_id,workflow_id,op_id,attempts,model_calls,tokens,elapsed_ms,last_progress,status,updated_at) VALUES(?,?,NULL,0,0,0,0,?,'open',?)")
-        .run('inc-unclosed-1',workflowId,`[orca-tree] ${JSON.stringify({code:'kernel-stale-terminal-unclosed',handle:kernel,ok:false})}`,Date.now());
+      ledger.transaction(()=>{
+        ledger.db.prepare("DELETE FROM signals WHERE scope='kernel' AND key=?").run(workflowId);
+        // The migrated schema has no 'stopped' status and no result_json: a cleared kernel seat is
+        // running -> ready with its worker dropped (releaseKernelJob, engine/ledger-db.mjs) and the
+        // result on a job-result event — the pair start-workflow writes on kernel-stale-cleared.
+        releaseKernelJob(ledger.db,{workflowId,reason:'kernel-stopped',at});
+        recordJobResult(ledger.db,{jobId:`kernel-${workflowId}`,result:{reason:'spawnSync orca.exe ENOENT',terminal:kernel},at});
+        // incidents now require kind/owner/created_at; the runtime files this residue as a
+        // supervisor-owned runtime-defect (start-workflow.mjs openIncident kernel-stale-terminal-unclosed).
+        openIncident(ledger.db,{incidentId:'inc-unclosed-1',workflowId,kind:'runtime-defect',owner:'supervisor',at,
+          lastProgress:`[orca-tree] ${JSON.stringify({code:'kernel-stale-terminal-unclosed',handle:kernel,ok:false})}`});
+      });
     }finally{ledger.close();}
   };
   return {repo,run,calls,readState,writeState,workflowId,kernel,ledgerRows,loseSeat};
@@ -128,7 +143,7 @@ test('start-workflow refuses to replace a kernel while Orca answers runtime_unav
   const out=lastJson(r.stdout);
   assert.deepEqual([out.ok,out.step,out.terminal],[false,'host-unavailable',f.kernel]);
   assert.match(out.error,/runtime_unavailable|Start the Orca app first/);
-  assert.deepEqual(f.ledgerRows(),before,'no signal deleted, no job stopped, no event, no incident');
+  assert.deepEqual(f.ledgerRows(),before,'no signal deleted, no job released, no event, no incident');
   assert.equal(f.calls().filter(c=>c==='terminal create').length,creates,'no second kernel');
 });
 
@@ -156,7 +171,7 @@ test('a kernel whose seat was lost is never duplicated: start-workflow refuses, 
   assert.equal(adopted.status,0,adopted.stderr||adopted.stdout);
   const out=lastJson(adopted.stdout);
   assert.deepEqual([out.ok,out.adopted,out.terminal,out.agent,out.model,out.screenState,out.previousJobStatus],
-    [true,true,f.kernel,'codex','gpt-6-sol','turn-idle','stopped']);
+    [true,true,f.kernel,'codex','gpt-6-sol','turn-idle','ready']);
   assert.deepEqual(out.resolvedIncidents,['inc-unclosed-1']);
   const rows=f.ledgerRows();
   assert.equal(rows.signal.terminal,f.kernel);assert.equal(rows.signal.adopted,true);assert.equal(rows.signal.model,'gpt-6-sol');
@@ -183,7 +198,7 @@ test('--adopt refuses a terminal that is not this kernel and a bare shell; re-ad
   f.writeState(s=>{s.terminals[f.kernel].screen='PS D:\\repo>';});
   const shell=f.run(START_WORKFLOW,['--repo',f.repo,'--goal',f.workflowId,'--adopt',f.kernel,'--json']);
   assert.equal(shell.status,1);assert.equal(lastJson(shell.stdout)?.step,'adopt-terminal-agent-exited','a bare shell is an exited kernel, not one to adopt');
-  assert.equal(f.ledgerRows().job.status,'stopped','a refused adopt changes nothing');
+  assert.equal(f.ledgerRows().job.status,'ready','a refused adopt changes nothing');
 });
 
 test('--adopt never binds a second kernel over a live one: the duplicate is quit and closed first',t=>{
@@ -334,7 +349,7 @@ test('--adopt refuses a kernel terminal whose agent exited',t=>{
   assert.equal(r.status,1);
   const out=lastJson(r.stdout);
   assert.deepEqual([out.step,out.screenState,out.shellPrompt],['adopt-terminal-agent-exited','agent-exited','PS D:\\Repositories\\mia-mia-backend>']);
-  assert.equal(f.ledgerRows().job.status,'stopped','a refused adopt changes nothing');
+  assert.equal(f.ledgerRows().job.status,'ready','a refused adopt changes nothing');
   assert.equal(f.readState().closed,undefined);
 });
 
