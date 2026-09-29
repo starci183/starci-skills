@@ -3,8 +3,8 @@ import {
     Test, TestingModule 
 } from "@nestjs/testing"
 import {
-    AppConfigService 
-} from "@modules/platform/config/identity/app-config.service"
+    IdentityConfigService 
+} from "@modules/platform/config/index"
 import {
     SessionRepository 
 } from "./session.repository"
@@ -29,7 +29,7 @@ describe("SessionService - br.identity.sign-in session lifecycle",
                         provide: SessionRepository, useValue: sessions 
                     },
                     {
-                        provide: AppConfigService, useValue: {
+                        provide: IdentityConfigService, useValue: {
                             getSessionTtlSeconds: () => SESSION_TTL 
                         } 
                     },

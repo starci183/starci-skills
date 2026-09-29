@@ -7,6 +7,9 @@ import {
 import {
     RequestInvalidException
 } from "ecommerce-app-be/modules/platform/errors"
+import {
+    IDENTITY_MESSAGES 
+} from "../messages/index"
 
 @Injectable()
 /**
@@ -20,7 +23,7 @@ export class RevokeSessionUseCase {
         const token = typeof sessionToken === "string" ? sessionToken : ""
         if (!token) {
             throw new RequestInvalidException({
-                message: "sessionToken is required."
+                message: IDENTITY_MESSAGES.get("session.tokenRequired")
             })
         }
         await this.sessions.revoke(token)

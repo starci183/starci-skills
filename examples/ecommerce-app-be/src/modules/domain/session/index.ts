@@ -1,7 +1,3 @@
-import {
-    SessionModule
-} from "./session.module"
-import {
-    SessionService
-} from "./session.service"
-export { SessionModule, SessionService }
+export { SessionModule } from "./session.module"
+export { SessionRepository } from "./session.repository"
+export { SessionService } from "./session.service"

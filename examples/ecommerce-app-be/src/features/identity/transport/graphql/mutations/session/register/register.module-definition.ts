@@ -2,7 +2,10 @@ import {
     ConfigurableModuleBuilder 
 } from "@nestjs/common"
 
-export const { ConfigurableModuleClass, OPTIONS_TYPE } = new ConfigurableModuleBuilder().setExtras(
+/** Register takes no options beyond the isGlobal extra. */
+export type RegisterOptions = Record<never, never>
+
+export const { ConfigurableModuleClass, OPTIONS_TYPE } = new ConfigurableModuleBuilder<RegisterOptions>().setExtras(
     {
         isGlobal: false 
     },

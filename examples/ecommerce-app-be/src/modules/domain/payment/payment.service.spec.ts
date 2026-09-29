@@ -2,11 +2,14 @@ import {
     Test 
 } from "@nestjs/testing"
 import {
+    mock 
+} from "@starci/jest-preset/mock"
+import {
     EntityManager 
 } from "typeorm"
 import {
     PaymentEntity 
-} from "@modules/platform/databases/postgresql/order/entities/payment.entity"
+} from "@modules/platform/databases/index"
 import {
     PaymentService 
 } from "./payment.service"
@@ -16,9 +19,9 @@ describe("PaymentService - sds.checkout.order-flow t-pay",
         const paymentRepository = {
             save: jest.fn() 
         }
-        const manager = {
-            getRepository: jest.fn((entity: unknown) => (entity === PaymentEntity ? paymentRepository : undefined)),
-        } as unknown as EntityManager
+        const manager = mock<EntityManager>({
+            getRepository: jest.fn().mockImplementation((entity: unknown) => (entity === PaymentEntity ? paymentRepository : undefined)),
+        })
         let service: PaymentService
 
         beforeEach(async () => {

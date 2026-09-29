@@ -11,6 +11,9 @@ import {
     IdentityContractMismatchException 
 } from "ecommerce-app-be/modules/platform/errors"
 import {
+    LogId, Logger 
+} from "ecommerce-app-be/modules/platform/logging"
+import {
     IDENTITY_PROBE_TIMEOUT_MS, IDENTITY_VERIFY_TIMEOUT_MS
 } from "./identity.config"
 
@@ -31,7 +34,7 @@ export type VerifiedSessionPersonResult = SessionPersonResult | null
  * unreachable identity answers a typed 503 - never a pass-through.
  */
 export class IdentityApiClient {
-    constructor(private readonly config: AppConfigService) {}
+    constructor(private readonly config: AppConfigService, private readonly logger: Logger) {}
 
     async verifySession(sessionToken: string): Promise<VerifiedSessionPersonResult> {
         let response: Response
@@ -82,7 +85,11 @@ export class IdentityApiClient {
                     signal: AbortSignal.timeout(IDENTITY_PROBE_TIMEOUT_MS) 
                 })
             return response.ok
-        } catch {
+        } catch (error) {
+            this.logger.warn(LogId.DependencyProbeFailed,
+                {
+                    dependency: "identity", message: error instanceof Error ? error.message : String(error) 
+                })
             return false
         }
     }

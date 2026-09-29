@@ -7,6 +7,9 @@ import {
 import {
     SessionInvalidException 
 } from "ecommerce-app-be/modules/platform/errors"
+import {
+    CHECKOUT_MESSAGES 
+} from "../../messages/index"
 
 import {
     ActorParams 
@@ -31,7 +34,7 @@ export const SessionActor = createParamDecorator(
         const request = GqlExecutionContext.create(context).getContext<SessionActorContext>().req
         if (!request?.actor) {
             throw new SessionInvalidException({
-                message: "No actor on a guarded request." 
+                message: CHECKOUT_MESSAGES.get("session.noActor") 
             })
         }
         return request.actor

@@ -1,16 +1,20 @@
 import {
-    BuyerStatusResult, OrderService
-} from "ecommerce-app-be/modules/domain/order"
+    mock 
+} from "@starci/jest-preset/mock"
+import {
+    OrderService 
+} from "@modules/domain/order/index"
+import type {
+    BuyerStatusResult 
+} from "@modules/domain/order/index"
 import {
     BuyerStatusUseCase
 } from "./buyer-status.use-case"
 
 describe("BuyerStatusUseCase",
     () => {
-        const orders = {
-            buyerStatus: jest.fn()
-        }
-        const useCase = new BuyerStatusUseCase(orders as unknown as OrderService)
+        const orders = mock<OrderService>()
+        const useCase = new BuyerStatusUseCase(orders)
 
         it("answers what the order capability answers for the person",
             async () => {

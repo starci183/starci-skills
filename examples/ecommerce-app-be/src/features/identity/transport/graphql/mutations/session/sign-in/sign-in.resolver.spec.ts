@@ -1,25 +1,25 @@
 import "reflect-metadata"
 import {
-    HttpException 
-} from "@nestjs/common"
-import {
     Test, TestingModule 
 } from "@nestjs/testing"
 import {
-    AppConfigService 
-} from "@modules/platform/config/identity/app-config.service"
+    mock 
+} from "@starci/jest-preset/mock"
+import {
+    IdentityConfigService 
+} from "@modules/platform/config/index"
 import {
     RedisPrimaryClient 
-} from "@modules/platform/caches/redis/primary/redis.client"
+} from "@modules/platform/caches/index"
 import {
     AccountService 
-} from "@modules/domain/account/account.service"
+} from "@modules/domain/account/index"
 import {
-    SessionRepository 
-} from "@modules/domain/session/session.repository"
+    SessionRepository, SessionService 
+} from "@modules/domain/session/index"
 import {
-    SessionService 
-} from "@modules/domain/session/session.service"
+    InvalidCredentialsException 
+} from "@modules/platform/errors/index"
 
 import {
     SignInInput 
@@ -37,25 +37,19 @@ import {
  */
 function inMemoryRedis(): RedisPrimaryClient {
     const store = new Map<string, string>()
-    return {
-        async store(key: string, value: string): Promise<void> {
+    return mock<RedisPrimaryClient>({
+        store: jest.fn(async (key: string, value: string): Promise<void> => {
             store.set(key,
                 value)
-        },
-        async lookup(key: string): Promise<string | null> {
-            return store.get(key) ?? null
-        },
-        async forget(key: string): Promise<void> {
+        }),
+        lookup: jest.fn(async (key: string): Promise<string | null> => store.get(key) ?? null),
+        forget: jest.fn(async (key: string): Promise<void> => {
             store.delete(key)
-        },
-    } as unknown as RedisPrimaryClient
+        }),
+    })
 }
 
-interface AccountBoundary {
-  verifyCredentials: jest.Mock;
-}
-
-async function signInModule(accounts: AccountBoundary): Promise<{ resolver: SignInResolver }> {
+async function signInModule(accounts: AccountService): Promise<{ resolver: SignInResolver }> {
     const module: TestingModule = await Test.createTestingModule({
         providers: [
             SignInResolver,
@@ -65,9 +59,9 @@ async function signInModule(accounts: AccountBoundary): Promise<{ resolver: Sign
                 provide: RedisPrimaryClient, useValue: inMemoryRedis() 
             },
             {
-                provide: AppConfigService, useValue: {
+                provide: IdentityConfigService, useValue: mock<IdentityConfigService>({
                     getSessionTtlSeconds: () => 60 
-                } 
+                })
             },
             {
                 provide: AccountService, useValue: accounts 
@@ -79,10 +73,10 @@ async function signInModule(accounts: AccountBoundary): Promise<{ resolver: Sign
     }
 }
 
-function accountsBoundary(verifyAnswer: string | null): AccountBoundary {
-    return {
+function accountsBoundary(verifyAnswer: string | null): AccountService {
+    return mock<AccountService>({
         verifyCredentials: jest.fn().mockResolvedValue(verifyAnswer) 
-    }
+    })
 }
 
 describe("SignInResolver - br.identity.sign-in",
@@ -103,7 +97,7 @@ describe("SignInResolver - br.identity.sign-in",
         it("ac.identity.sign-in.wrong-pair-is-refused-alike",
             async () => {
                 const { resolver } = await signInModule(accountsBoundary(null))
-                const refusals: Array<{ status: number; body: unknown }> = []
+                const refusals: Array<unknown> = []
                 for (const input of [
                     {
                         email: "demo@ecommerce.dev", password: "wrong-password" 
@@ -112,41 +106,26 @@ describe("SignInResolver - br.identity.sign-in",
                         email: "nobody@ecommerce.dev", password: "ecommerce-demo" 
                     },
                 ]) {
-                    try {
-                        await resolver.signIn(input as SignInInput)
-                        throw new Error("sign-in should have been refused")
-                    } catch (error) {
-                        expect(error).toBeInstanceOf(HttpException)
-                        const http = error as HttpException
-                        refusals.push({
-                            status: http.getStatus(), body: http.getResponse() 
-                        })
-                    }
+                    refusals.push(await resolver.signIn(input as SignInInput).catch((error: unknown) => error))
                 }
-                // Unknown email and wrong password refuse indistinguishably - same status, same body.
-                expect(refusals[0]).toEqual(refusals[1])
-                expect(refusals[0].status).toBe(401)
-                expect(refusals[0].body).toEqual({
+                // Unknown email and wrong password refuse indistinguishably - same code, same sentence.
+                expect(refusals[0]).toBeInstanceOf(InvalidCredentialsException)
+                expect(refusals[1]).toBeInstanceOf(InvalidCredentialsException)
+                expect(refusals[0]).toMatchObject({
                     code: "INVALID_CREDENTIALS_EXCEPTION", message: "The email and password pair is not recognized." 
                 })
+                expect(refusals[1]).toMatchObject(refusals[0] as object)
             })
 
         it("fr.identity.sign-in refuses a request missing a half before any credential check",
             async () => {
                 const accounts = accountsBoundary("person-1")
                 const { resolver } = await signInModule(accounts)
-                try {
-                    await resolver.signIn({
-                        email: "demo@ecommerce.dev" 
-                    } as SignInInput)
-                    throw new Error("the request should have been refused")
-                } catch (error) {
-                    expect(error).toBeInstanceOf(HttpException)
-                    expect((error as HttpException).getStatus()).toBe(400)
-                    expect((error as HttpException).getResponse()).toEqual({
-                        code: "REQUEST_INVALID_EXCEPTION", message: "email and password are required." 
-                    })
-                }
+                await expect(resolver.signIn({
+                    email: "demo@ecommerce.dev" 
+                } as SignInInput)).rejects.toMatchObject({
+                    code: "REQUEST_INVALID_EXCEPTION", message: "email and password are required." 
+                })
                 expect(accounts.verifyCredentials).not.toHaveBeenCalled()
             })
     })

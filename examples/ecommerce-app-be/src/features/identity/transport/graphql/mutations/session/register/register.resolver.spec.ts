@@ -1,13 +1,13 @@
 import "reflect-metadata"
 import {
-    HttpException 
-} from "@nestjs/common"
-import {
     Test, TestingModule 
 } from "@nestjs/testing"
 import {
+    mock 
+} from "@starci/jest-preset/mock"
+import {
     AccountService 
-} from "@modules/domain/account/account.service"
+} from "@modules/domain/account/index"
 
 import {
     RegisterInput 
@@ -25,9 +25,7 @@ import {
 describe("RegisterResolver - the demo signup mutation",
     () => {
         let resolver: RegisterResolver
-        const accounts = {
-            register: jest.fn() 
-        }
+        const accounts = mock<AccountService>()
 
         beforeEach(async () => {
             jest.clearAllMocks()
@@ -57,18 +55,11 @@ describe("RegisterResolver - the demo signup mutation",
         it("a taken address is EMAIL_TAKEN, nothing else",
             async () => {
                 accounts.register.mockResolvedValue(null)
-                try {
-                    await resolver.register({
-                        email: "demo@ecommerce.dev", password: "ecommerce-demo" 
-                    } as RegisterInput)
-                    throw new Error("the request should have been refused")
-                } catch (error) {
-                    expect(error).toBeInstanceOf(HttpException)
-                    expect((error as HttpException).getStatus()).toBe(409)
-                    expect((error as HttpException).getResponse()).toEqual({
-                        code: "EMAIL_TAKEN_EXCEPTION", message: "An account already answers this email." 
-                    })
-                }
+                await expect(resolver.register({
+                    email: "demo@ecommerce.dev", password: "ecommerce-demo" 
+                } as RegisterInput)).rejects.toMatchObject({
+                    code: "EMAIL_TAKEN_EXCEPTION", message: "An account already answers this email." 
+                })
             })
 
         it.each([
@@ -86,17 +77,10 @@ describe("RegisterResolver - the demo signup mutation",
         ])("refuses an implausible register input %j before any account work",
             async (input) => {
                 accounts.register.mockResolvedValue("person-new")
-                try {
-                    await resolver.register(input as RegisterInput)
-                    throw new Error("the request should have been refused")
-                } catch (error) {
-                    expect(error).toBeInstanceOf(HttpException)
-                    expect((error as HttpException).getStatus()).toBe(400)
-                    expect((error as HttpException).getResponse()).toEqual({
-                        code: "REQUEST_INVALID_EXCEPTION",
-                        message: "A plausible email and a password of at least 8 characters are required.",
-                    })
-                }
+                await expect(resolver.register(input as RegisterInput)).rejects.toMatchObject({
+                    code: "REQUEST_INVALID_EXCEPTION",
+                    message: "A plausible email and a password of at least 8 characters are required.",
+                })
                 expect(accounts.register).not.toHaveBeenCalled()
             })
     })

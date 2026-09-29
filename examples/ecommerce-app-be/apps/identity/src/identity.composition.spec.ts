@@ -9,8 +9,11 @@ import {
     getDataSourceToken, getEntityManagerToken 
 } from "@nestjs/typeorm"
 import {
-    DataSource 
+    DataSource, EntityManager 
 } from "typeorm"
+import {
+    mock 
+} from "@starci/jest-preset/mock"
 import {
     AppModule 
 } from "./app.module"
@@ -18,44 +21,29 @@ import {
     Logger 
 } from "@modules/platform/logging"
 import {
-    AppConfigService 
-} from "@modules/platform/config/identity/app-config.service"
+    Clock, SystemClock 
+} from "@modules/platform/clock/index"
 import {
-    PostgresPrimaryClient 
-} from "@modules/platform/databases/postgresql/identity/primary.client"
+    IdentityConfigService 
+} from "@modules/platform/config/index"
 import {
-    POSTGRESQL_PRIMARY 
-} from "@modules/platform/databases/postgresql/identity/constants/connection"
+    IdentityPostgresPrimaryClient, IDENTITY_POSTGRESQL 
+} from "@modules/platform/databases/index"
 import {
     RedisPrimaryClient 
-} from "@modules/platform/caches/redis/primary/redis.client"
+} from "@modules/platform/caches/index"
 import {
     AccountService 
-} from "@modules/domain/account/account.service"
+} from "@modules/domain/account/index"
 import {
-    SessionRepository 
-} from "@modules/domain/session/session.repository"
-import {
-    SessionService 
-} from "@modules/domain/session/session.service"
+    SessionRepository, SessionService 
+} from "@modules/domain/session/index"
 import {
     OrderApiClient 
-} from "@modules/integrations/order/order.client"
+} from "@modules/integrations/order/index"
 import {
-    HealthController 
-} from "@features/identity/transport/http/health.controller"
-import {
-    SessionController 
-} from "@features/identity/transport/http/session.controller"
-import {
-    AccountResolver 
-} from "@features/identity/transport/graphql/queries/account/account/account.resolver"
-import {
-    RegisterResolver 
-} from "@features/identity/transport/graphql/mutations/session/register/register.resolver"
-import {
-    SignInResolver 
-} from "@features/identity/transport/graphql/mutations/session/sign-in/sign-in.resolver"
+    HealthController, SessionController, AccountResolver, RegisterResolver, SignInResolver 
+} from "@features/identity/index"
 
 /**
  * The identity deployable's DI smoke: AppModule must compile with the platform boundary - the
@@ -64,11 +52,11 @@ import {
  * A missing export, a wrong connection name or a provider declared nowhere fails here before
  * any behavior spec runs.
  */
-function postgresBoundary(): { dataSource: DataSource; manager: { findOneBy: jest.Mock; save: jest.Mock } } {
-    const manager = {
+function postgresBoundary(): { dataSource: DataSource; manager: EntityManager } {
+    const manager = mock<EntityManager>({
         findOneBy: jest.fn(), save: jest.fn() 
-    }
-    const dataSource = {
+    })
+    const dataSource = mock<DataSource>({
         isInitialized: false,
         entityMetadatas: [],
         options: {
@@ -78,31 +66,25 @@ function postgresBoundary(): { dataSource: DataSource; manager: { findOneBy: jes
         getRepository: jest.fn(),
         query: jest.fn(),
         destroy: jest.fn(),
-    } as unknown as DataSource
+    })
     return {
         dataSource, manager 
     }
 }
 
-function configBoundary(): AppConfigService {
-    return {
+function configBoundary(): IdentityConfigService {
+    return mock<IdentityConfigService>({
         getProject: () => "ecommerce-app-be",
         getPort: () => 0,
         getDatabaseUrl: () => "postgres://postgres@localhost:0/ecommerce",
         getRedisUrl: () => "redis://localhost:0/0",
         getOrderApiBaseUrl: () => "http://localhost:0",
         getSessionTtlSeconds: () => 3600,
-    } as unknown as AppConfigService
+    })
 }
 
 function redisBoundary(): RedisPrimaryClient {
-    return {
-        ping: jest.fn(),
-        store: jest.fn(),
-        lookup: jest.fn(),
-        forget: jest.fn(),
-        close: jest.fn(),
-    } as unknown as RedisPrimaryClient
+    return mock<RedisPrimaryClient>()
 }
 
 describe("identity AppModule - module boot",
@@ -117,17 +99,17 @@ describe("identity AppModule - module boot",
             module = await Test.createTestingModule({
                 imports: [AppModule] 
             })
-                .overrideProvider(getDataSourceToken(POSTGRESQL_PRIMARY))
+                .overrideProvider(getDataSourceToken(IDENTITY_POSTGRESQL))
                 .useValue(postgres.dataSource)
             // forRootAsync's options carry no `name`, so shutdown would look up the default DataSource
             // token and throw; naming the options double keeps module.close() honest.
                 .overrideProvider("TypeOrmModuleOptions")
                 .useValue({
-                    name: POSTGRESQL_PRIMARY, type: "postgres" 
+                    name: IDENTITY_POSTGRESQL, type: "postgres" 
                 })
                 .overrideProvider(RedisPrimaryClient)
                 .useValue(redis)
-                .overrideProvider(AppConfigService)
+                .overrideProvider(IdentityConfigService)
                 .useValue(config)
                 .compile()
         })
@@ -146,7 +128,7 @@ describe("identity AppModule - module boot",
                 for (const token of [AccountService,
                     SessionService,
                     SessionRepository,
-                    PostgresPrimaryClient,
+                    IdentityPostgresPrimaryClient,
                     OrderApiClient]) {
                     expect(module.get(token)).toBeDefined()
                 }
@@ -165,15 +147,16 @@ describe("identity AppModule - module boot",
 
         it("binds the named TypeORM connection and its EntityManager to the doubled DataSource",
             () => {
-                expect(module.get(getDataSourceToken(POSTGRESQL_PRIMARY))).toBe(postgres.dataSource)
-                expect(module.get(getEntityManagerToken(POSTGRESQL_PRIMARY))).toBe(postgres.manager)
+                expect(module.get(getDataSourceToken(IDENTITY_POSTGRESQL))).toBe(postgres.dataSource)
+                expect(module.get(getEntityManagerToken(IDENTITY_POSTGRESQL))).toBe(postgres.manager)
             })
 
         it("resolves the global platform providers as the boundary doubles",
             () => {
-                expect(module.get(AppConfigService)).toBe(config)
+                expect(module.get(IdentityConfigService)).toBe(config)
                 expect(module.get(RedisPrimaryClient)).toBe(redis)
                 expect(module.get(Logger)).toBeInstanceOf(Logger)
+                expect(module.get(Clock)).toBeInstanceOf(SystemClock)
             })
 
         it("registers no global guard or interceptor - every identity door is intentionally open",

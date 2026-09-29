@@ -1,10 +1,5 @@
-import {
-    CheckoutRefusalReason
-} from "./checkout.policy"
-import {
-    OrderModule
-} from "./order.module"
-import {
-    BuyerStatusResult, OrderService
-} from "./order.service"
-export { CheckoutRefusalReason, OrderModule, BuyerStatusResult, OrderService }
+export { CheckoutPolicy } from "./checkout.policy"
+export type { CheckoutRefusalReason } from "./checkout.policy"
+export { OrderModule } from "./order.module"
+export { OrderService } from "./order.service"
+export type { BuyerStatusResult } from "./order.service"

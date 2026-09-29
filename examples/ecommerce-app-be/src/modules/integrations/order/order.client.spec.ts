@@ -9,14 +9,14 @@ import {
     once 
 } from "node:events"
 import {
-    HttpException 
-} from "@nestjs/common"
-import {
     Test, TestingModule 
 } from "@nestjs/testing"
 import {
-    AppConfigService 
-} from "@modules/platform/config/identity/app-config.service"
+    mock 
+} from "@starci/jest-preset/mock"
+import {
+    IdentityConfigService 
+} from "@modules/platform/config/index"
 import {
     OrderApiClient 
 } from "./order.client"
@@ -24,7 +24,7 @@ import {
 /**
  * The consumer half of contract.checkout.order-for-identity against a real HTTP server on a real
  * loopback socket - not a mocked fetch. The base URL travels exactly the way production's does
- * (through AppConfigService.getOrderApiBaseUrl(), resolved from metadata.json or its env override).
+ * (through IdentityConfigService.getOrderApiBaseUrl(), resolved from metadata.json or its env override).
  */
 describe("OrderApiClient - contract.checkout.order-for-identity consumer",
     () => {
@@ -46,9 +46,9 @@ describe("OrderApiClient - contract.checkout.order-for-identity consumer",
                     OrderApiClient,
                     // Reads the variable at call time so each test can point the client at a different URL.
                     {
-                        provide: AppConfigService, useValue: {
+                        provide: IdentityConfigService, useValue: mock<IdentityConfigService>({
                             getOrderApiBaseUrl: () => baseUrl 
-                        } 
+                        })
                     },
                 ],
             }).compile()
@@ -160,40 +160,26 @@ describe("OrderApiClient - contract.checkout.order-for-identity consumer",
 
         it("contract.checkout.order-for-identity consumer: an answer outside the surface is refused, not trusted",
             async () => {
-                await expect(client.getBuyerStatus("person-lies")).rejects.toBeInstanceOf(HttpException)
-                try {
-                    await client.getBuyerStatus("person-lies")
-                    throw new Error("the call should have failed")
-                } catch (error) {
-                    const body = (error as HttpException).getResponse() as { code: string }
-                    expect(body.code).toBe("ORDER_CONTRACT_MISMATCH_EXCEPTION")
-                }
+                await expect(client.getBuyerStatus("person-lies")).rejects.toMatchObject({
+                    code: "ORDER_CONTRACT_MISMATCH_EXCEPTION" 
+                })
             })
 
-        it("contract.checkout.order-for-identity consumer: a non-ok provider answer is 503 ORDER_SERVICE_UNAVAILABLE",
+        it("contract.checkout.order-for-identity consumer: a non-ok provider answer is a typed ORDER_SERVICE_UNAVAILABLE",
             async () => {
-                try {
-                    await client.getBuyerStatus("person-broken")
-                    throw new Error("the call should have failed")
-                } catch (error) {
-                    expect(error).toBeInstanceOf(HttpException)
-                    const body = (error as HttpException).getResponse() as { code: string; message: string }
-                    expect(body.code).toBe("ORDER_SERVICE_UNAVAILABLE_EXCEPTION")
-                    expect(body.message).toContain("500")
-                }
+                await expect(client.getBuyerStatus("person-broken")).rejects.toMatchObject({
+                    code: "ORDER_SERVICE_UNAVAILABLE_EXCEPTION", message: expect.stringContaining("500") 
+                })
             })
 
-        it("contract.checkout.order-for-identity consumer: an unreachable provider is 503 ORDER_SERVICE_UNAVAILABLE, never hasOrders false",
+        it("contract.checkout.order-for-identity consumer: an unreachable provider is a typed ORDER_SERVICE_UNAVAILABLE, never hasOrders false",
             async () => {
                 // Port 1 on loopback: connection refused, the exact shape of the provider being down.
                 baseUrl = "http://127.0.0.1:1"
                 try {
-                    await client.getBuyerStatus("person-1")
-                    throw new Error("the call should have failed")
-                } catch (error) {
-                    expect(error).toBeInstanceOf(HttpException)
-                    const body = (error as HttpException).getResponse() as { code: string }
-                    expect(body.code).toBe("ORDER_SERVICE_UNAVAILABLE_EXCEPTION")
+                    await expect(client.getBuyerStatus("person-1")).rejects.toMatchObject({
+                        code: "ORDER_SERVICE_UNAVAILABLE_EXCEPTION" 
+                    })
                 } finally {
                     baseUrl = `http://127.0.0.1:${(server.address() as AddressInfo).port}`
                 }
@@ -208,51 +194,30 @@ describe("OrderApiClient - contract.checkout.order-for-identity consumer",
 
         it("contract.checkout.order-for-identity consumer: a 200 answering under a different person is ORDER_CONTRACT_MISMATCH",
             async () => {
-                try {
-                    await client.getBuyerStatus("person-echo")
-                    throw new Error("the call should have failed")
-                } catch (error) {
-                    expect(error).toBeInstanceOf(HttpException)
-                    const body = (error as HttpException).getResponse() as { code: string }
-                    expect(body.code).toBe("ORDER_CONTRACT_MISMATCH_EXCEPTION")
-                }
+                await expect(client.getBuyerStatus("person-echo")).rejects.toMatchObject({
+                    code: "ORDER_CONTRACT_MISMATCH_EXCEPTION" 
+                })
             })
 
         it("contract.checkout.order-for-identity consumer: a 200 whose hasOrders is not a boolean is ORDER_CONTRACT_MISMATCH",
             async () => {
-                try {
-                    await client.getBuyerStatus("person-fuzzy")
-                    throw new Error("the call should have failed")
-                } catch (error) {
-                    expect(error).toBeInstanceOf(HttpException)
-                    const body = (error as HttpException).getResponse() as { code: string }
-                    expect(body.code).toBe("ORDER_CONTRACT_MISMATCH_EXCEPTION")
-                }
+                await expect(client.getBuyerStatus("person-fuzzy")).rejects.toMatchObject({
+                    code: "ORDER_CONTRACT_MISMATCH_EXCEPTION" 
+                })
             })
 
         it("contract.checkout.order-for-identity consumer: a 200 with an unreadable body is ORDER_CONTRACT_MISMATCH, not a raw parse failure",
             async () => {
-                try {
-                    await client.getBuyerStatus("person-garbage")
-                    throw new Error("the call should have failed")
-                } catch (error) {
-                    expect(error).toBeInstanceOf(HttpException)
-                    const body = (error as HttpException).getResponse() as { code: string }
-                    expect(body.code).toBe("ORDER_CONTRACT_MISMATCH_EXCEPTION")
-                }
+                await expect(client.getBuyerStatus("person-garbage")).rejects.toMatchObject({
+                    code: "ORDER_CONTRACT_MISMATCH_EXCEPTION" 
+                })
             })
 
-        it("contract.checkout.order-for-identity consumer: a provider that never answers inside the client deadline is a typed 503, not an infinite wait",
+        it("contract.checkout.order-for-identity consumer: a provider that never answers inside the client deadline is a typed ORDER_SERVICE_UNAVAILABLE error, not an infinite wait",
             async () => {
-                try {
-                    await client.getBuyerStatus("person-hangs")
-                    throw new Error("the call should have failed")
-                } catch (error) {
-                    expect(error).toBeInstanceOf(HttpException)
-                    expect((error as HttpException).getStatus()).toBe(503)
-                    const body = (error as HttpException).getResponse() as { code: string }
-                    expect(body.code).toBe("ORDER_SERVICE_UNAVAILABLE_EXCEPTION")
-                }
+                await expect(client.getBuyerStatus("person-hangs")).rejects.toMatchObject({
+                    code: "ORDER_SERVICE_UNAVAILABLE_EXCEPTION" 
+                })
             },
             10000)
     })

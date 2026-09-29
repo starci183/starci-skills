@@ -39,8 +39,8 @@ export class SessionService {
         }
     }
 
-    async verify(sessionToken: string): Promise<VerifiedSessionResult> {
-        if (!sessionToken) return null
+    verify(sessionToken: string): Promise<VerifiedSessionResult> {
+        if (!sessionToken) return Promise.resolve(null)
         return this.sessions.lookup(sessionToken)
     }
 

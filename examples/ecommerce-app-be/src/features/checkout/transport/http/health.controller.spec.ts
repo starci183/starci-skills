@@ -1,27 +1,30 @@
 import {
+    HttpStatus 
+} from "@nestjs/common"
+import {
     Test 
 } from "@nestjs/testing"
 import {
-    HttpException, HttpStatus 
-} from "@nestjs/common"
-import {
-    PostgresPrimaryClient 
-} from "@modules/platform/databases/postgresql/order/primary.client"
+    mock 
+} from "@starci/jest-preset/mock"
 import {
     IdentityApiClient 
-} from "@modules/integrations/identity/identity.client"
+} from "@modules/integrations/identity/index"
+import {
+    OrderPostgresPrimaryClient 
+} from "@modules/platform/databases/index"
+import {
+    LogId, Logger 
+} from "@modules/platform/logging/index"
 import {
     HealthController 
 } from "./health.controller"
 
 describe("HealthController - dependency-gated liveness",
     () => {
-        const postgres = {
-            ping: jest.fn() 
-        }
-        const identityApi = {
-            isHealthy: jest.fn() 
-        }
+        const postgres = mock<OrderPostgresPrimaryClient>()
+        const identityApi = mock<IdentityApiClient>()
+        const logger = mock<Logger>()
         let controller: HealthController
 
         beforeEach(async () => {
@@ -30,10 +33,13 @@ describe("HealthController - dependency-gated liveness",
                 providers: [
                     HealthController,
                     {
-                        provide: PostgresPrimaryClient, useValue: postgres 
+                        provide: OrderPostgresPrimaryClient, useValue: postgres 
                     },
                     {
                         provide: IdentityApiClient, useValue: identityApi 
+                    },
+                    {
+                        provide: Logger, useValue: logger 
                     },
                 ],
             }).compile()
@@ -44,6 +50,7 @@ describe("HealthController - dependency-gated liveness",
             async () => {
                 postgres.ping.mockResolvedValue(undefined)
                 identityApi.isHealthy.mockResolvedValue(true)
+
                 expect(await controller.check()).toEqual({
                     status: "ok",
                     service: "order",
@@ -51,28 +58,31 @@ describe("HealthController - dependency-gated liveness",
                         postgres: "ok", identity: "ok" 
                     },
                 })
+                expect(logger.warn).not.toHaveBeenCalled()
             })
 
-        it("postgres down answers 503 DEPENDENCY_UNAVAILABLE naming postgres",
+        it("postgres down answers 503 DEPENDENCY_UNAVAILABLE naming postgres, and logs the probe failure",
             async () => {
                 postgres.ping.mockRejectedValue(new Error("connection refused"))
                 identityApi.isHealthy.mockResolvedValue(true)
-                try {
-                    await controller.check()
-                    throw new Error("the call should have failed")
-                } catch (error) {
-                    expect(error).toBeInstanceOf(HttpException)
-                    expect((error as HttpException).getStatus()).toBe(HttpStatus.SERVICE_UNAVAILABLE)
-                    expect((error as HttpException).getResponse()).toMatchObject({
-                        code: "DEPENDENCY_UNAVAILABLE" 
+
+                await expect(controller.check()).rejects.toMatchObject({
+                    status: HttpStatus.SERVICE_UNAVAILABLE,
+                    response: expect.objectContaining({
+                        code: "DEPENDENCY_UNAVAILABLE", message: expect.stringContaining("\"postgres\":\"unreachable\"") 
+                    }),
+                })
+                expect(logger.warn).toHaveBeenCalledWith(LogId.DependencyProbeFailed,
+                    {
+                        dependency: "postgres", message: "connection refused" 
                     })
-                }
             })
 
         it("identity unreachable answers 503 DEPENDENCY_UNAVAILABLE even when postgres is fine",
             async () => {
                 postgres.ping.mockResolvedValue(undefined)
                 identityApi.isHealthy.mockResolvedValue(false)
+
                 await expect(controller.check()).rejects.toMatchObject({
                     status: HttpStatus.SERVICE_UNAVAILABLE,
                     response: expect.objectContaining({

@@ -1,6 +1,9 @@
 import {
     Field, InputType 
 } from "@nestjs/graphql"
+import {
+    IsOptional, IsString, MaxLength
+} from "class-validator"
 
 @InputType()
 /** The place-order payload: the replay key the retired REST door read off the `Idempotency-Key`
@@ -10,5 +13,8 @@ export class PlaceOrderInput {
   @Field({
       nullable: true 
   })
+  @IsOptional()
+  @IsString()
+  @MaxLength(200)
       idempotencyKey?: string
 }

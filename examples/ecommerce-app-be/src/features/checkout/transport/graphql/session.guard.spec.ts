@@ -1,25 +1,28 @@
 import {
+    ExecutionContext 
+} from "@nestjs/common"
+import {
     Test 
 } from "@nestjs/testing"
-import {
-    ExecutionContext, HttpException, HttpStatus 
-} from "@nestjs/common"
 import {
     Request 
 } from "express"
 import {
+    mock 
+} from "@starci/jest-preset/mock"
+import {
     IdentityApiClient 
-} from "@modules/integrations/identity/identity.client"
-
+} from "@modules/integrations/identity/index"
+import {
+    IdentityServiceUnavailableException, SessionInvalidException 
+} from "@modules/platform/errors/index"
 import {
     ActorParams, SessionGuard 
 } from "./session.guard"
 
 describe("SessionGuard - order -> identity verify-session in front of every resolver",
     () => {
-        const identityApi = {
-            verifySession: jest.fn() 
-        }
+        const identityApi = mock<IdentityApiClient>()
         let guard: SessionGuard
 
         beforeEach(async () => {
@@ -34,11 +37,11 @@ describe("SessionGuard - order -> identity verify-session in front of every reso
         })
 
         /** A GraphQL ExecutionContext the way Apollo hands it to a guard: the context object
-         * carrying the HTTP request sits at argument index 2. */
+     * carrying the HTTP request sits at argument index 2. */
         const contextFor = (headers: Record<string, unknown>) => {
-            const request = {
-                headers 
-            } as unknown as Request & { actor?: ActorParams }
+            const request = mock<Request & { actor?: ActorParams }>({
+                headers: headers as Request["headers"] 
+            })
             class ProbeClass {}
             const handler = (): void => undefined
             const args: Array<unknown> = [{
@@ -50,16 +53,13 @@ describe("SessionGuard - order -> identity verify-session in front of every reso
             },
             {
             }]
-            const context = {
-                getType: () => "graphql",
-                getArgs: () => args,
-                getArgByIndex: (index: number) => args[index],
-                getClass: () => ProbeClass,
-                getHandler: () => handler,
-                switchToHttp: () => ({
-                    getRequest: () => request 
-                }),
-            } as unknown as ExecutionContext
+            const context = mock<ExecutionContext>({
+                getType: jest.fn().mockReturnValue("graphql"),
+                getArgs: jest.fn().mockReturnValue(args),
+                getArgByIndex: jest.fn().mockImplementation((index: number) => args[index]),
+                getClass: jest.fn().mockReturnValue(ProbeClass),
+                getHandler: jest.fn().mockReturnValue(handler),
+            })
             return {
                 context, request 
             }
@@ -81,65 +81,73 @@ describe("SessionGuard - order -> identity verify-session in front of every reso
                 })
             })
 
-        it.each([
-            [{
-            }],
-            [{
-                authorization: "Basic dTpw" 
-            }],
-            [{
-                authorization: "Bearer " 
-            }],
-            [{
-                authorization: "Bearer    " 
-            }],
-        ])("a request with %j is this service's own 401 without calling identity",
+        it.each([[{
+        }],
+        [{
+            authorization: "Basic dTpw" 
+        }],
+        [{
+            authorization: "Bearer " 
+        }],
+        [{
+            authorization: "Bearer    " 
+        }]])(
+            "a request with %j is this service's own SESSION_INVALID without calling identity",
             async (headers) => {
                 const { context } = contextFor(headers)
-                try {
-                    await guard.canActivate(context)
-                    throw new Error("the call should have failed")
-                } catch (error) {
-                    expect(error).toBeInstanceOf(HttpException)
-                    expect((error as HttpException).getStatus()).toBe(HttpStatus.UNAUTHORIZED)
-                    expect((error as HttpException).getResponse()).toMatchObject({
-                        code: "SESSION_INVALID_EXCEPTION" 
-                    })
-                }
-                expect(identityApi.verifySession).not.toHaveBeenCalled()
-            })
 
-        it("a token identity refuses is this service's own 401, never an invented actor",
+                await expect(guard.canActivate(context)).rejects.toMatchObject({
+                    name: "SessionInvalidException",
+                    code: "SESSION_INVALID_EXCEPTION",
+                    message: "A Bearer session token is required.",
+                })
+                expect(identityApi.verifySession).not.toHaveBeenCalled()
+            },
+        )
+
+        it("a token identity refuses is this service's own SESSION_INVALID, never an invented actor",
             async () => {
                 identityApi.verifySession.mockResolvedValue(null)
                 const { context, request } = contextFor({
                     authorization: "Bearer stale-token" 
                 })
-                await expect(guard.canActivate(context)).rejects.toMatchObject({
-                    status: HttpStatus.UNAUTHORIZED,
-                    response: expect.objectContaining({
-                        code: "SESSION_INVALID_EXCEPTION" 
-                    }),
-                })
+
+                await expect(guard.canActivate(context)).rejects.toBeInstanceOf(SessionInvalidException)
                 expect(request.actor).toBeUndefined()
             })
 
-        it("an unreachable identity stays the typed 503 the client raised",
+        it("an unreachable identity stays the typed unavailable error the client raised",
             async () => {
-                identityApi.verifySession.mockRejectedValue(
-                    new HttpException({
-                        code: "IDENTITY_SERVICE_UNAVAILABLE_EXCEPTION" 
-                    },
-                    HttpStatus.SERVICE_UNAVAILABLE),
-                )
+                identityApi.verifySession.mockRejectedValue(new IdentityServiceUnavailableException({
+                    message: "The identity service could not be reached." 
+                }))
                 const { context } = contextFor({
                     authorization: "Bearer live-token" 
                 })
+
                 await expect(guard.canActivate(context)).rejects.toMatchObject({
-                    status: HttpStatus.SERVICE_UNAVAILABLE,
-                    response: expect.objectContaining({
-                        code: "IDENTITY_SERVICE_UNAVAILABLE_EXCEPTION" 
-                    }),
+                    code: "IDENTITY_SERVICE_UNAVAILABLE_EXCEPTION" 
+                })
+            })
+
+        it("a GraphQL context that carries no HTTP request is refused with the no-request sentence",
+            async () => {
+                const args: Array<unknown> = [{
+                },
+                {
+                },
+                {
+                },
+                {
+                }]
+                const context = mock<ExecutionContext>({
+                    getType: jest.fn().mockReturnValue("graphql"),
+                    getArgs: jest.fn().mockReturnValue(args),
+                    getArgByIndex: jest.fn().mockImplementation((index: number) => args[index]),
+                })
+
+                await expect(guard.canActivate(context)).rejects.toMatchObject({
+                    code: "SESSION_INVALID_EXCEPTION", message: "GraphQL context carries no HTTP request." 
                 })
             })
     })

@@ -2,7 +2,10 @@ import {
     ConfigurableModuleBuilder 
 } from "@nestjs/common"
 
-export const { ConfigurableModuleClass, OPTIONS_TYPE } = new ConfigurableModuleBuilder().setExtras(
+/** ClearCart takes no options beyond the isGlobal extra. */
+export type ClearCartOptions = Record<never, never>
+
+export const { ConfigurableModuleClass, OPTIONS_TYPE } = new ConfigurableModuleBuilder<ClearCartOptions>().setExtras(
     {
         isGlobal: false 
     },

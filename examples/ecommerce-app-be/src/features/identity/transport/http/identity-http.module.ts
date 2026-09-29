@@ -14,11 +14,11 @@ import {
     SessionController
 } from "./session.controller"
 
-/** The HTTP transport of the identity feature: the internal session doors and the /health probe. */
 @Module({
     controllers: [SessionController,
         HealthController],
     providers: [VerifySessionUseCase,
         RevokeSessionUseCase],
 })
+/** The HTTP transport of the identity feature: the internal session doors and the /health probe. */
 export class IdentityHttpModule {}

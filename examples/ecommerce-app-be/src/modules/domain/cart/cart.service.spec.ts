@@ -5,11 +5,8 @@ import {
     getEntityManagerToken 
 } from "@nestjs/typeorm"
 import {
-    CartItemEntity 
-} from "@modules/platform/databases/postgresql/order/entities/cart-item.entity"
-import {
-    POSTGRESQL_PRIMARY 
-} from "@modules/platform/databases/postgresql/order/constants/connection"
+    CartItemEntity, ORDER_POSTGRESQL 
+} from "@modules/platform/databases/index"
 import {
     CartService 
 } from "./cart.service"
@@ -31,7 +28,7 @@ describe("CartService - sds.checkout.order-flow t-add",
                 providers: [
                     CartService,
                     {
-                        provide: getEntityManagerToken(POSTGRESQL_PRIMARY), useValue: entityManager 
+                        provide: getEntityManagerToken(ORDER_POSTGRESQL), useValue: entityManager 
                     },
                 ],
             }).compile()

@@ -5,6 +5,9 @@ import {
     PostgresPrimaryClient 
 } from "ecommerce-app-be/modules/platform/databases/postgresql/identity"
 import {
+    LogId, Logger 
+} from "ecommerce-app-be/modules/platform/logging"
+import {
     RedisPrimaryClient 
 } from "ecommerce-app-be/modules/platform/caches/redis/primary"
 
@@ -31,6 +34,7 @@ export class HealthController {
     constructor(
     private readonly postgres: PostgresPrimaryClient,
     private readonly redis: RedisPrimaryClient,
+    private readonly logger: Logger,
     ) {}
 
   @Get()
@@ -40,12 +44,20 @@ export class HealthController {
         }
         try {
             await this.postgres.ping()
-        } catch {
+        } catch (error) {
+            this.logger.warn(LogId.DependencyProbeFailed,
+                {
+                    dependency: "postgres", message: error instanceof Error ? error.message : String(error) 
+                })
             checks.postgres = "unreachable"
         }
         try {
             await this.redis.ping()
-        } catch {
+        } catch (error) {
+            this.logger.warn(LogId.DependencyProbeFailed,
+                {
+                    dependency: "redis", message: error instanceof Error ? error.message : String(error) 
+                })
             checks.redis = "unreachable"
         }
         if (checks.postgres !== "ok" || checks.redis !== "ok") {

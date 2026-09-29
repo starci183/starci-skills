@@ -26,7 +26,7 @@ export class SessionRepository {
             ttlSeconds)
     }
 
-    async lookup(token: string): Promise<string | null> {
+    lookup(token: string): Promise<string | null> {
         return this.redis.lookup(this.keyFor(token))
     }
 

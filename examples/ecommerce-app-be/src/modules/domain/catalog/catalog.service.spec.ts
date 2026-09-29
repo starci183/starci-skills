@@ -8,11 +8,8 @@ import {
     In 
 } from "typeorm"
 import {
-    POSTGRESQL_PRIMARY 
-} from "@modules/platform/databases/postgresql/order/constants/connection"
-import {
-    ProductEntity 
-} from "@modules/platform/databases/postgresql/order/entities/product.entity"
+    ORDER_POSTGRESQL, ProductEntity 
+} from "@modules/platform/databases/index"
 import {
     CatalogService 
 } from "./catalog.service"
@@ -31,7 +28,7 @@ describe("CatalogService - the read side of the catalog",
                 providers: [
                     CatalogService,
                     {
-                        provide: getEntityManagerToken(POSTGRESQL_PRIMARY), useValue: entityManager 
+                        provide: getEntityManagerToken(ORDER_POSTGRESQL), useValue: entityManager 
                     },
                 ],
             }).compile()

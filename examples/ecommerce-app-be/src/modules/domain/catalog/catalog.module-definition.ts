@@ -2,12 +2,15 @@ import {
     ConfigurableModuleBuilder 
 } from "@nestjs/common"
 
+/** Catalog takes no options beyond the isGlobal extra. */
+export type CatalogOptions = Record<never, never>
+
 /**
  * The isGlobal knob every house module carries: whether this capability is app-wide is a fact
  * about the APPLICATION, so it is declared at the composition root (`apps/<service>`) as
  * `.register({ isGlobal: true })` - never as a `@Global()` the module declares about itself.
  */
-export const { ConfigurableModuleClass, OPTIONS_TYPE } = new ConfigurableModuleBuilder().setExtras(
+export const { ConfigurableModuleClass, OPTIONS_TYPE } = new ConfigurableModuleBuilder<CatalogOptions>().setExtras(
     {
         isGlobal: false 
     },

@@ -2,6 +2,9 @@ import {
     Module 
 } from "@nestjs/common"
 import {
+    ClockModule 
+} from "ecommerce-app-be/modules/platform/clock"
+import {
     LoggingModule 
 } from "ecommerce-app-be/modules/platform/logging"
 import {
@@ -34,6 +37,9 @@ import {
 
 @Module({
     imports: [
+        ClockModule.register({
+            isGlobal: true 
+        }),
         LoggingModule,
         ConfigModule.register({
             isGlobal: true 

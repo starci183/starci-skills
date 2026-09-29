@@ -11,6 +11,9 @@ import {
     InjectPrimaryEntityManager 
 } from "ecommerce-app-be/modules/platform/databases/postgresql/order"
 
+/** The most products one catalog list returns: the demo catalog is a few SKUs, so a bound this size is never reached in practice. */
+const CATALOG_LIST_LIMIT = 500
+
 /** A catalog product as the door answers it: id, name, the minor-unit price and live stock. */
 export interface ProductResult {
   id: string;
@@ -39,7 +42,7 @@ export class CatalogService {
             {
                 order: {
                     id: "ASC" 
-                } 
+                }, take: CATALOG_LIST_LIMIT 
             })
         return rows.map((row) => ({
             id: row.id, name: row.name, priceMinorUnits: row.priceMinorUnits, stock: row.stock 

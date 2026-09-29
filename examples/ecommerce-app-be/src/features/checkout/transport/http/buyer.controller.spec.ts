@@ -3,7 +3,7 @@ import {
 } from "@nestjs/testing"
 import {
     OrderService, BuyerStatusResult 
-} from "@modules/domain/order/order.service"
+} from "@modules/domain/order/index"
 import {
     BuyerStatusUseCase 
 } from "../../application/buyer-status.use-case"

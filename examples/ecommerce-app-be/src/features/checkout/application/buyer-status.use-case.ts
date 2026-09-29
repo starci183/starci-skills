@@ -13,7 +13,7 @@ import {
 export class BuyerStatusUseCase {
     constructor(private readonly orders: OrderService) {}
 
-    async execute(personId: string): Promise<BuyerStatusResult> {
+    execute(personId: string): Promise<BuyerStatusResult> {
         return this.orders.buyerStatus(personId)
     }
 }

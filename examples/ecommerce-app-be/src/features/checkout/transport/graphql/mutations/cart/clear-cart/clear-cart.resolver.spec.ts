@@ -3,10 +3,10 @@ import {
 } from "@nestjs/testing"
 import {
     CartService 
-} from "@modules/domain/cart/cart.service"
+} from "@modules/domain/cart/index"
 import {
     IdentityApiClient 
-} from "@modules/integrations/identity/identity.client"
+} from "@modules/integrations/identity/index"
 
 import {
     ClearCartResolver 

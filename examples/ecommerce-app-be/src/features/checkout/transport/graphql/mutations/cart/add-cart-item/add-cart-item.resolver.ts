@@ -12,6 +12,9 @@ import {
 } from "ecommerce-app-be/modules/platform/errors"
 
 import {
+    CHECKOUT_MESSAGES 
+} from "../../../../../messages/index"
+import {
     AddCartItemInput 
 } from "./graphql-types/input"
 import {
@@ -48,7 +51,7 @@ export class AddCartItemResolver {
         const quantity = typeof request?.quantity === "number" && Number.isInteger(request.quantity) ? request.quantity : 0
         if (!productId || quantity <= 0) {
             throw new RequestInvalidException({
-                message: "productId and a positive integer quantity are required." 
+                message: CHECKOUT_MESSAGES.get("addCartItem.invalid") 
             })
         }
         const item = await this.cart.add(actor.personId,

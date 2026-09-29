@@ -12,6 +12,9 @@ import {
 } from "ecommerce-app-be/modules/platform/errors"
 
 import {
+    IDENTITY_MESSAGES 
+} from "../../../../../messages/index"
+import {
     RegisterInput 
 } from "./graphql-types/input"
 import {
@@ -32,14 +35,14 @@ export class RegisterResolver {
   @Mutation(() => RegisterResponse,
       {
           name: "register",
-          description: "Register a fresh visitor with an email + password; answers the new person id, or EMAIL_TAKEN for a taken address.",
+          description: IDENTITY_MESSAGES.get("register.description"),
       })
     async register(@Args("request") request: RegisterInput): Promise<RegisterResponse> {
         const email = typeof request?.email === "string" ? request.email : ""
         const password = typeof request?.password === "string" ? request.password : ""
         if (!email.includes("@") || password.length < 8) {
             throw new RequestInvalidException({
-                message: "A plausible email and a password of at least 8 characters are required." 
+                message: IDENTITY_MESSAGES.get("register.invalid") 
             })
         }
         const personId = await this.accounts.register(email,

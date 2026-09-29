@@ -11,8 +11,18 @@ import {
     InjectPrimaryEntityManager 
 } from "ecommerce-app-be/modules/platform/databases/postgresql/identity"
 import {
+    isRecord 
+} from "ecommerce-app-be/modules/platform/primitives"
+import {
     PasswordPolicy 
 } from "./password.policy"
+
+/** Postgres' SQLSTATE for a unique-constraint violation: the one save failure that means "this address is taken". */
+const UNIQUE_VIOLATION = "23505"
+
+/** Whether a failed save was the unique-email constraint (TypeORM copies the driver's fields onto its error and also keeps the driver error). */
+const isUniqueViolation = (error: unknown): boolean =>
+    isRecord(error) && (error.code === UNIQUE_VIOLATION || (isRecord(error.driverError) && error.driverError.code === UNIQUE_VIOLATION))
 
 /**
  * The account read model a door answers: the person id and the email they registered with -
@@ -53,7 +63,8 @@ export class AccountService {
 
     /**
      * The signup door: a visitor becomes a person here, and a buyer at checkout confirmation.
-     * Returns null for a taken address (the caller answers 409; no timing side channel matters
+     * Returns null for a taken address - the unique-email violation only; any other failure is
+     * rethrown so a dead database never reads as "taken" (the caller answers 409; no timing side channel matters
      * for a public door, but the row is never half-written - one insert or none).
      */
     async register(email: string, password: string): Promise<CredentialPersonResult> {
@@ -63,8 +74,9 @@ export class AccountService {
         try {
             const saved = await this.entityManager.save(person)
             return saved.id
-        } catch {
-            return null
+        } catch (error) {
+            if (isUniqueViolation(error)) return null
+            throw error
         }
     }
 

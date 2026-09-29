@@ -2,17 +2,17 @@ import {
     Test 
 } from "@nestjs/testing"
 import {
-    HttpException, HttpStatus 
-} from "@nestjs/common"
+    mock 
+} from "@starci/jest-preset/mock"
 import {
     OrderService 
-} from "@modules/domain/order/order.service"
+} from "@modules/domain/order/index"
 import {
     CheckoutRefusalException 
-} from "@modules/platform/errors/checkout/checkout-refusal"
+} from "@modules/platform/errors/index"
 import {
     IdentityApiClient 
-} from "@modules/integrations/identity/identity.client"
+} from "@modules/integrations/identity/index"
 
 import {
     PlaceOrderInput 
@@ -21,11 +21,13 @@ import {
     PlaceOrderResolver 
 } from "./place-order.resolver"
 
+const PLACED = {
+    orderId: "order-1", status: "confirmed" as const, totalMinorUnits: 2598, currency: "USD" as const, paymentId: "payment-1", replayed: false 
+}
+
 describe("PlaceOrderResolver - sds.checkout.order-flow t-confirm mutation",
     () => {
-        const orderService = {
-            place: jest.fn() 
-        }
+        const orderService = mock<OrderService>()
         let resolver: PlaceOrderResolver
 
         beforeEach(async () => {
@@ -38,9 +40,7 @@ describe("PlaceOrderResolver - sds.checkout.order-flow t-confirm mutation",
                     },
                     // The class-level @UseGuards binding instantiates the guard through DI; its own suite is session-guard.wiring.spec.ts.
                     {
-                        provide: IdentityApiClient, useValue: {
-                            verifySession: jest.fn() 
-                        } 
+                        provide: IdentityApiClient, useValue: mock<IdentityApiClient>()
                     },
                 ],
             }).compile()
@@ -49,9 +49,7 @@ describe("PlaceOrderResolver - sds.checkout.order-flow t-confirm mutation",
 
         it("places the order for the verified person when no idempotency key arrives",
             async () => {
-                orderService.place.mockResolvedValue({
-                    orderId: "order-1", status: "confirmed", totalMinorUnits: 2598, currency: "USD", paymentId: "payment-1", replayed: false 
-                })
+                orderService.place.mockResolvedValue(PLACED)
                 const result = await resolver.placeOrder({
                     personId: "person-1" 
                 },
@@ -65,7 +63,7 @@ describe("PlaceOrderResolver - sds.checkout.order-flow t-confirm mutation",
         it("forwards a trimmed input idempotencyKey to the service",
             async () => {
                 orderService.place.mockResolvedValue({
-                    orderId: "order-1", replayed: true 
+                    ...PLACED, replayed: true 
                 })
                 await resolver.placeOrder({
                     personId: "person-1" 
@@ -86,9 +84,7 @@ describe("PlaceOrderResolver - sds.checkout.order-flow t-confirm mutation",
             }],
         ])("treats %j as no key at all",
             async (input) => {
-                orderService.place.mockResolvedValue({
-                    orderId: "order-1" 
-                })
+                orderService.place.mockResolvedValue(PLACED)
                 await resolver.placeOrder({
                     personId: "person-1" 
                 },
@@ -104,19 +100,14 @@ describe("PlaceOrderResolver - sds.checkout.order-flow t-confirm mutation",
                         ok: false, reason: "insufficient-stock", productId: "sku-thermos", requested: 5, available: 2 
                     }),
                 )
-                try {
-                    await resolver.placeOrder({
-                        personId: "person-1" 
-                    },
-                    {
-                    } as PlaceOrderInput)
-                    throw new Error("the call should have failed")
-                } catch (error) {
-                    expect(error).toBeInstanceOf(HttpException)
-                    expect((error as HttpException).getStatus()).toBe(HttpStatus.CONFLICT)
-                    expect((error as HttpException).getResponse()).toMatchObject({
-                        code: "CHECKOUT_REFUSAL_EXCEPTION", reason: "insufficient-stock" 
-                    })
-                }
+                await expect(resolver.placeOrder({
+                    personId: "person-1" 
+                },
+                {
+                } as PlaceOrderInput)).rejects.toMatchObject({
+                    code: "CHECKOUT_REFUSAL_EXCEPTION", metadata: expect.objectContaining({
+                        reason: "insufficient-stock" 
+                    }) 
+                })
             })
     })

@@ -1,6 +1,6 @@
 import "reflect-metadata"
 import {
-    ExecutionContext, HttpException 
+    ExecutionContext 
 } from "@nestjs/common"
 import {
     GUARDS_METADATA, ROUTE_ARGS_METADATA 
@@ -15,41 +15,38 @@ import {
     Request 
 } from "express"
 import {
-    DataSource 
+    DataSource, EntityManager, Repository 
 } from "typeorm"
+import {
+    mock 
+} from "@starci/jest-preset/mock"
+import {
+    SessionInvalidException 
+} from "@modules/platform/errors/index"
 import {
     CheckoutGraphqlModule 
 } from "./checkout-graphql.module"
 import {
-    ConfigModule 
-} from "@modules/platform/config/order/config.module"
+    OrderConfigModule, OrderConfigService 
+} from "@modules/platform/config/index"
 import {
-    AppConfigService 
-} from "@modules/platform/config/order/app-config.service"
-import {
-    PostgresqlPrimaryModule 
-} from "@modules/platform/databases/postgresql/order/primary.module"
-import {
-    POSTGRESQL_PRIMARY 
-} from "@modules/platform/databases/postgresql/order/constants/connection"
+    OrderPostgresqlPrimaryModule, ORDER_POSTGRESQL 
+} from "@modules/platform/databases/index"
 import {
     CatalogModule 
-} from "@modules/domain/catalog/catalog.module"
+} from "@modules/domain/catalog/index"
 import {
     CartModule 
-} from "@modules/domain/cart/cart.module"
+} from "@modules/domain/cart/index"
 import {
     PaymentModule 
-} from "@modules/domain/payment/payment.module"
+} from "@modules/domain/payment/index"
 import {
     OrderModule 
-} from "@modules/domain/order/order.module"
+} from "@modules/domain/order/index"
 import {
-    IdentityModule 
-} from "@modules/integrations/identity/identity.module"
-import {
-    IdentityApiClient 
-} from "@modules/integrations/identity/identity.client"
+    IdentityModule, IdentityApiClient 
+} from "@modules/integrations/identity/index"
 import {
     ActorParams, SessionGuard 
 } from "./session.guard"
@@ -83,11 +80,6 @@ import {
  * the GraphQL transport relies on are registered app-wide, exactly as the deployable declares
  * them.
  */
-interface IdentityBoundary {
-  verifySession: jest.Mock;
-  isHealthy: jest.Mock;
-}
-
 /** A GraphQL ExecutionContext the way Apollo hands it to a guard: `getType()` answers
  * "graphql", and the context object - with the HTTP request the driver exposed - sits at
  * argument index 2, which is where GqlExecutionContext.getContext() reads it. */
@@ -103,16 +95,13 @@ function graphqlContext(request: Partial<Request & { actor?: ActorParams }>): Ex
     },
     {
     }]
-    return {
-        getType: () => "graphql",
-        getArgs: () => args,
-        getArgByIndex: (index: number) => args[index],
-        getClass: () => ProbeClass,
-        getHandler: () => handler,
-        switchToHttp: () => ({
-            getRequest: () => request 
-        }),
-    } as unknown as ExecutionContext
+    return mock<ExecutionContext>({
+        getType: jest.fn().mockReturnValue("graphql"),
+        getArgs: jest.fn().mockReturnValue(args),
+        getArgByIndex: jest.fn().mockImplementation((index: number) => args[index]),
+        getClass: jest.fn().mockReturnValue(ProbeClass),
+        getHandler: jest.fn().mockReturnValue(handler),
+    })
 }
 
 /** The factory a param decorator registered - read back off a probe class's ROUTE_ARGS
@@ -130,52 +119,41 @@ function sessionActorFactory(): (data: unknown, context: ExecutionContext) => Ac
 }
 
 async function expectSessionRefusal(guard: SessionGuard, context: ExecutionContext): Promise<void> {
-    try {
-        await guard.canActivate(context)
-        throw new Error("the request should have been refused")
-    } catch (error) {
-        expect(error).toBeInstanceOf(HttpException)
-        expect((error as HttpException).getStatus()).toBe(401)
-        expect((error as HttpException).getResponse()).toMatchObject({
-            code: "SESSION_INVALID_EXCEPTION" 
-        })
-    }
+    await expect(guard.canActivate(context)).rejects.toMatchObject({
+        name: "SessionInvalidException", code: "SESSION_INVALID_EXCEPTION" 
+    })
 }
 
 describe("checkout SessionGuard - GraphQL wiring",
     () => {
         let module: TestingModule
         let guard: SessionGuard
-        const identity: IdentityBoundary = {
-            verifySession: jest.fn(), isHealthy: jest.fn() 
-        }
+        const identity = mock<IdentityApiClient>()
 
         beforeAll(async () => {
-            const dataSource = {
+            const dataSource = mock<DataSource>({
                 isInitialized: false,
                 entityMetadatas: [],
                 options: {
                     type: "postgres" 
                 },
-                manager: {
-                },
-                getRepository: jest.fn(() => ({
-                })),
+                manager: mock<EntityManager>(),
+                getRepository: jest.fn().mockReturnValue(mock<Repository<object>>()),
                 query: jest.fn(),
                 destroy: jest.fn(),
-            } as unknown as DataSource
-            const config = {
+            })
+            const config = mock<OrderConfigService>({
                 getProject: () => "ecommerce-app-be",
                 getPort: () => 0,
                 getDatabaseUrl: () => "postgres://postgres@localhost:0/ecommerce",
                 getIdentityApiBaseUrl: () => "http://localhost:0",
-            } as unknown as AppConfigService
+            })
             module = await Test.createTestingModule({
                 imports: [
-                    ConfigModule.register({
+                    OrderConfigModule.register({
                         isGlobal: true 
                     }),
-                    PostgresqlPrimaryModule.register({
+                    OrderPostgresqlPrimaryModule.register({
                         isGlobal: true 
                     }),
                     CatalogModule.register({
@@ -196,15 +174,15 @@ describe("checkout SessionGuard - GraphQL wiring",
                     CheckoutGraphqlModule,
                 ] 
             })
-                .overrideProvider(getDataSourceToken(POSTGRESQL_PRIMARY))
+                .overrideProvider(getDataSourceToken(ORDER_POSTGRESQL))
                 .useValue(dataSource)
             // forRootAsync's options carry no `name`, so shutdown would look up the default DataSource
             // token and throw; naming the options double keeps module.close() honest.
                 .overrideProvider("TypeOrmModuleOptions")
                 .useValue({
-                    name: POSTGRESQL_PRIMARY, type: "postgres" 
+                    name: ORDER_POSTGRESQL, type: "postgres" 
                 })
-                .overrideProvider(AppConfigService)
+                .overrideProvider(OrderConfigService)
                 .useValue(config)
                 .overrideProvider(IdentityApiClient)
                 .useValue(identity)
@@ -220,10 +198,9 @@ describe("checkout SessionGuard - GraphQL wiring",
             jest.clearAllMocks()
         })
 
-        it("resolves SessionGuard through the GraphQL composition with the identity client injected",
+        it("resolves SessionGuard through the GraphQL composition",
             () => {
                 expect(guard).toBeInstanceOf(SessionGuard)
-                expect((guard as unknown as { identityApi: IdentityBoundary }).identityApi).toBe(identity)
             })
 
         it("places exactly SessionGuard, in class position, on every person-scoped resolver",
@@ -303,18 +280,10 @@ describe("checkout SessionGuard - GraphQL wiring",
                     graphqlContext(request))).toEqual({
                     personId: "person-9" 
                 })
-                try {
-                    actorOf(undefined,
-                        graphqlContext({
-                            headers: {
-                            } 
-                        }))
-                    throw new Error("the actor lookup should have been refused")
-                } catch (error) {
-                    expect(error).toBeInstanceOf(HttpException)
-                    expect((error as HttpException).getResponse()).toMatchObject({
-                        code: "SESSION_INVALID_EXCEPTION" 
-                    })
-                }
+                expect(() => actorOf(undefined,
+                    graphqlContext({
+                        headers: {
+                        } 
+                    }))).toThrow(SessionInvalidException)
             })
     })

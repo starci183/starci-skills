@@ -9,8 +9,11 @@ import {
     getDataSourceToken, getEntityManagerToken 
 } from "@nestjs/typeorm"
 import {
-    DataSource 
+    DataSource, EntityManager 
 } from "typeorm"
+import {
+    mock 
+} from "@starci/jest-preset/mock"
 import {
     AppModule 
 } from "./app.module"
@@ -18,53 +21,32 @@ import {
     Logger 
 } from "@modules/platform/logging"
 import {
-    AppConfigService 
-} from "@modules/platform/config/order/app-config.service"
+    Clock, SystemClock 
+} from "@modules/platform/clock/index"
 import {
-    PostgresPrimaryClient 
-} from "@modules/platform/databases/postgresql/order/primary.client"
+    OrderConfigService 
+} from "@modules/platform/config/index"
 import {
-    POSTGRESQL_PRIMARY 
-} from "@modules/platform/databases/postgresql/order/constants/connection"
+    OrderPostgresPrimaryClient, ORDER_POSTGRESQL 
+} from "@modules/platform/databases/index"
 import {
     CartService 
-} from "@modules/domain/cart/cart.service"
+} from "@modules/domain/cart/index"
 import {
     CatalogService 
-} from "@modules/domain/catalog/catalog.service"
+} from "@modules/domain/catalog/index"
 import {
-    CheckoutPolicy 
-} from "@modules/domain/order/checkout.policy"
-import {
-    OrderService 
-} from "@modules/domain/order/order.service"
+    CheckoutPolicy, OrderService 
+} from "@modules/domain/order/index"
 import {
     PaymentService 
-} from "@modules/domain/payment/payment.service"
+} from "@modules/domain/payment/index"
 import {
     IdentityApiClient 
-} from "@modules/integrations/identity/identity.client"
+} from "@modules/integrations/identity/index"
 import {
-    SessionGuard 
-} from "@features/checkout/transport/graphql/session.guard"
-import {
-    BuyerController 
-} from "@features/checkout/transport/http/buyer.controller"
-import {
-    HealthController 
-} from "@features/checkout/transport/http/health.controller"
-import {
-    CartResolver 
-} from "@features/checkout/transport/graphql/queries/cart/cart/cart.resolver"
-import {
-    AddCartItemResolver 
-} from "@features/checkout/transport/graphql/mutations/cart/add-cart-item/add-cart-item.resolver"
-import {
-    ClearCartResolver 
-} from "@features/checkout/transport/graphql/mutations/cart/clear-cart/clear-cart.resolver"
-import {
-    PlaceOrderResolver 
-} from "@features/checkout/transport/graphql/mutations/order/place-order/place-order.resolver"
+    SessionGuard, BuyerController, HealthController, CartResolver, AddCartItemResolver, ClearCartResolver, PlaceOrderResolver 
+} from "@features/checkout/index"
 
 /**
  * The order deployable's DI smoke, sibling of apps/identity's: AppModule must compile with the
@@ -72,11 +54,11 @@ import {
  * capability service, the identity integration client, the session guard and all transport
  * doors must resolve. This is the test that catches a DI misconfig before behavior specs run.
  */
-function postgresBoundary(): { dataSource: DataSource; manager: { findOneBy: jest.Mock; save: jest.Mock } } {
-    const manager = {
+function postgresBoundary(): { dataSource: DataSource; manager: EntityManager } {
+    const manager = mock<EntityManager>({
         findOneBy: jest.fn(), save: jest.fn() 
-    }
-    const dataSource = {
+    })
+    const dataSource = mock<DataSource>({
         isInitialized: false,
         entityMetadatas: [],
         options: {
@@ -86,19 +68,19 @@ function postgresBoundary(): { dataSource: DataSource; manager: { findOneBy: jes
         getRepository: jest.fn(),
         query: jest.fn(),
         destroy: jest.fn(),
-    } as unknown as DataSource
+    })
     return {
         dataSource, manager 
     }
 }
 
-function configBoundary(): AppConfigService {
-    return {
+function configBoundary(): OrderConfigService {
+    return mock<OrderConfigService>({
         getProject: () => "ecommerce-app-be",
         getPort: () => 0,
         getDatabaseUrl: () => "postgres://postgres@localhost:0/ecommerce",
         getIdentityApiBaseUrl: () => "http://localhost:0",
-    } as unknown as AppConfigService
+    })
 }
 
 describe("order AppModule - module boot",
@@ -112,15 +94,15 @@ describe("order AppModule - module boot",
             module = await Test.createTestingModule({
                 imports: [AppModule] 
             })
-                .overrideProvider(getDataSourceToken(POSTGRESQL_PRIMARY))
+                .overrideProvider(getDataSourceToken(ORDER_POSTGRESQL))
                 .useValue(postgres.dataSource)
             // forRootAsync's options carry no `name`, so shutdown would look up the default DataSource
             // token and throw; naming the options double keeps module.close() honest.
                 .overrideProvider("TypeOrmModuleOptions")
                 .useValue({
-                    name: POSTGRESQL_PRIMARY, type: "postgres" 
+                    name: ORDER_POSTGRESQL, type: "postgres" 
                 })
-                .overrideProvider(AppConfigService)
+                .overrideProvider(OrderConfigService)
                 .useValue(config)
                 .compile()
         })
@@ -142,7 +124,7 @@ describe("order AppModule - module boot",
                     OrderService,
                     CheckoutPolicy,
                     PaymentService,
-                    PostgresPrimaryClient,
+                    OrderPostgresPrimaryClient,
                     IdentityApiClient,
                 ]) {
                     expect(module.get(token)).toBeDefined()
@@ -164,14 +146,15 @@ describe("order AppModule - module boot",
 
         it("binds the named TypeORM connection and its EntityManager to the doubled DataSource",
             () => {
-                expect(module.get(getDataSourceToken(POSTGRESQL_PRIMARY))).toBe(postgres.dataSource)
-                expect(module.get(getEntityManagerToken(POSTGRESQL_PRIMARY))).toBe(postgres.manager)
+                expect(module.get(getDataSourceToken(ORDER_POSTGRESQL))).toBe(postgres.dataSource)
+                expect(module.get(getEntityManagerToken(ORDER_POSTGRESQL))).toBe(postgres.manager)
             })
 
         it("resolves the global config provider as the boundary double",
             () => {
-                expect(module.get(AppConfigService)).toBe(config)
+                expect(module.get(OrderConfigService)).toBe(config)
                 expect(module.get(Logger)).toBeInstanceOf(Logger)
+                expect(module.get(Clock)).toBeInstanceOf(SystemClock)
             })
 
         it("registers no global guard or interceptor - session enforcement lives at the resolver doors",

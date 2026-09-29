@@ -1,6 +1,9 @@
 import {
-    SessionService
-} from "ecommerce-app-be/modules/domain/session"
+    mock 
+} from "@starci/jest-preset/mock"
+import {
+    SessionService 
+} from "@modules/domain/session/index"
 import {
     RequestInvalidException
 } from "ecommerce-app-be/modules/platform/errors"
@@ -10,10 +13,8 @@ import {
 
 describe("RevokeSessionUseCase",
     () => {
-        const sessions = {
-            revoke: jest.fn()
-        }
-        const useCase = new RevokeSessionUseCase(sessions as unknown as SessionService)
+        const sessions = mock<SessionService>()
+        const useCase = new RevokeSessionUseCase(sessions)
 
         beforeEach(() => {
             jest.clearAllMocks()

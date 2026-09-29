@@ -15,6 +15,9 @@ import {
 } from "ecommerce-app-be/modules/platform/errors"
 
 import {
+    IDENTITY_MESSAGES 
+} from "../../../../../messages/index"
+import {
     SignInInput 
 } from "./graphql-types/input"
 import {
@@ -39,14 +42,14 @@ export class SignInResolver {
   @Mutation(() => SignInResponse,
       {
           name: "signIn",
-          description: "Sign in with an email + password; returns the session token to send back as \"Authorization: Bearer <token>\".",
+          description: IDENTITY_MESSAGES.get("signIn.description"),
       })
     async signIn(@Args("request") request: SignInInput): Promise<SignInResponse> {
         const email = typeof request?.email === "string" ? request.email : ""
         const password = typeof request?.password === "string" ? request.password : ""
         if (!email || !password) {
             throw new RequestInvalidException({
-                message: "email and password are required." 
+                message: IDENTITY_MESSAGES.get("signIn.invalid") 
             })
         }
         const personId = await this.accounts.verifyCredentials(email,

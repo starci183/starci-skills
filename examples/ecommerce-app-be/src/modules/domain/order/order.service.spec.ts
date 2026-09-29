@@ -2,29 +2,17 @@ import {
     Test 
 } from "@nestjs/testing"
 import {
+    mock 
+} from "@starci/jest-preset/mock"
+import {
     getEntityManagerToken 
 } from "@nestjs/typeorm"
 import {
     EntityManager 
 } from "typeorm"
 import {
-    CartItemEntity 
-} from "@modules/platform/databases/postgresql/order/entities/cart-item.entity"
-import {
-    OrderEntity 
-} from "@modules/platform/databases/postgresql/order/entities/order.entity"
-import {
-    OrderLineEntity 
-} from "@modules/platform/databases/postgresql/order/entities/order-line.entity"
-import {
-    PaymentEntity 
-} from "@modules/platform/databases/postgresql/order/entities/payment.entity"
-import {
-    ProductEntity 
-} from "@modules/platform/databases/postgresql/order/entities/product.entity"
-import {
-    POSTGRESQL_PRIMARY 
-} from "@modules/platform/databases/postgresql/order/constants/connection"
+    CartItemEntity, OrderEntity, OrderLineEntity, PaymentEntity, ProductEntity, ORDER_POSTGRESQL 
+} from "@modules/platform/databases/index"
 import {
     CartService 
 } from "ecommerce-app-be/modules/domain/cart"
@@ -39,7 +27,7 @@ import {
 } from "./checkout.policy"
 import {
     CheckoutRefusalException 
-} from "@modules/platform/errors/checkout/checkout-refusal"
+} from "@modules/platform/errors/index"
 import {
     OrderService 
 } from "./order.service"
@@ -83,9 +71,9 @@ describe("OrderService - sds.checkout.order-flow t-stock, t-pay, t-confirm",
             [CartItemEntity,
                 cartItemTx],
         ])
-        const manager = {
-            getRepository: jest.fn((entity: object) => txRepositories.get(entity)) 
-        } as unknown as EntityManager
+        const manager = mock<EntityManager>({
+            getRepository: jest.fn().mockImplementation((entity: object) => txRepositories.get(entity)) 
+        })
 
         const ordersRepository = {
             findOneBy: jest.fn(), findOneByOrFail: jest.fn(), countBy: jest.fn() 
@@ -114,7 +102,7 @@ describe("OrderService - sds.checkout.order-flow t-stock, t-pay, t-confirm",
                     OrderService,
                     CheckoutPolicy,
                     {
-                        provide: getEntityManagerToken(POSTGRESQL_PRIMARY), useValue: entityManager 
+                        provide: getEntityManagerToken(ORDER_POSTGRESQL), useValue: entityManager 
                     },
                     {
                         provide: CartService, useValue: cartService 

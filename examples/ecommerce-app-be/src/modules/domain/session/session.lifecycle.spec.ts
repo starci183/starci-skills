@@ -3,11 +3,11 @@ import {
     Test, TestingModule 
 } from "@nestjs/testing"
 import {
-    AppConfigService 
-} from "@modules/platform/config/identity/app-config.service"
+    IdentityConfigService 
+} from "@modules/platform/config/index"
 import {
     RedisPrimaryClient 
-} from "@modules/platform/caches/redis/primary/redis.client"
+} from "@modules/platform/caches/index"
 import {
     SessionRepository 
 } from "./session.repository"
@@ -48,7 +48,7 @@ describe("SessionService over the real SessionRepository - issue/verify/revoke",
                         provide: RedisPrimaryClient, useValue: redis 
                     },
                     {
-                        provide: AppConfigService, useValue: {
+                        provide: IdentityConfigService, useValue: {
                             getSessionTtlSeconds: () => 3600 
                         } 
                     },

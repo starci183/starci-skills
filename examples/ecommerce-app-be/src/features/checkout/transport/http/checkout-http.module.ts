@@ -11,10 +11,10 @@ import {
     HealthController
 } from "./health.controller"
 
-/** The HTTP transport of the checkout feature: the internal buyer door and the /health probe. */
 @Module({
     controllers: [BuyerController,
         HealthController],
     providers: [BuyerStatusUseCase],
 })
+/** The HTTP transport of the checkout feature: the internal buyer door and the /health probe. */
 export class CheckoutHttpModule {}

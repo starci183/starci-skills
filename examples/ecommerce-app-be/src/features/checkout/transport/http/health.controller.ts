@@ -5,6 +5,9 @@ import {
     PostgresPrimaryClient 
 } from "ecommerce-app-be/modules/platform/databases/postgresql/order"
 import {
+    LogId, Logger 
+} from "ecommerce-app-be/modules/platform/logging"
+import {
     IdentityApiClient 
 } from "ecommerce-app-be/modules/integrations/identity"
 
@@ -31,6 +34,7 @@ export class HealthController {
     constructor(
     private readonly postgres: PostgresPrimaryClient,
     private readonly identityApi: IdentityApiClient,
+    private readonly logger: Logger,
     ) {}
 
   @Get()
@@ -40,7 +44,11 @@ export class HealthController {
         }
         try {
             await this.postgres.ping()
-        } catch {
+        } catch (error) {
+            this.logger.warn(LogId.DependencyProbeFailed,
+                {
+                    dependency: "postgres", message: error instanceof Error ? error.message : String(error) 
+                })
             checks.postgres = "unreachable"
         }
         if (!(await this.identityApi.isHealthy())) {

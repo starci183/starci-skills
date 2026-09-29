@@ -2,14 +2,14 @@ import {
     Test 
 } from "@nestjs/testing"
 import {
-    HttpException, HttpStatus 
-} from "@nestjs/common"
+    mock 
+} from "@starci/jest-preset/mock"
 import {
     CartService 
-} from "@modules/domain/cart/cart.service"
+} from "@modules/domain/cart/index"
 import {
     IdentityApiClient 
-} from "@modules/integrations/identity/identity.client"
+} from "@modules/integrations/identity/index"
 
 import {
     AddCartItemInput 
@@ -20,9 +20,7 @@ import {
 
 describe("AddCartItemResolver - the person-scoped add-to-cart mutation",
     () => {
-        const cartService = {
-            add: jest.fn() 
-        }
+        const cartService = mock<CartService>()
         let resolver: AddCartItemResolver
 
         beforeEach(async () => {
@@ -35,9 +33,7 @@ describe("AddCartItemResolver - the person-scoped add-to-cart mutation",
                     },
                     // The class-level @UseGuards binding instantiates the guard through DI; its own suite is session-guard.wiring.spec.ts.
                     {
-                        provide: IdentityApiClient, useValue: {
-                            verifySession: jest.fn() 
-                        } 
+                        provide: IdentityApiClient, useValue: mock<IdentityApiClient>()
                     },
                 ],
             }).compile()
@@ -81,19 +77,12 @@ describe("AddCartItemResolver - the person-scoped add-to-cart mutation",
             }],
         ])("input %j refuses REQUEST_INVALID without touching the cart",
             async (body) => {
-                try {
-                    await resolver.addCartItem({
-                        personId: "person-1" 
-                    },
-                    body as AddCartItemInput)
-                    throw new Error("the call should have failed")
-                } catch (error) {
-                    expect(error).toBeInstanceOf(HttpException)
-                    expect((error as HttpException).getStatus()).toBe(HttpStatus.BAD_REQUEST)
-                    expect((error as HttpException).getResponse()).toMatchObject({
-                        code: "REQUEST_INVALID_EXCEPTION" 
-                    })
-                }
+                await expect(resolver.addCartItem({
+                    personId: "person-1" 
+                },
+                body as AddCartItemInput)).rejects.toMatchObject({
+                    name: "RequestInvalidException", code: "REQUEST_INVALID_EXCEPTION" 
+                })
                 expect(cartService.add).not.toHaveBeenCalled()
             })
     })

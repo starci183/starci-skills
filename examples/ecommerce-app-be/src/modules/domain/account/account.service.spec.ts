@@ -6,11 +6,8 @@ import {
     getEntityManagerToken 
 } from "@nestjs/typeorm"
 import {
-    PersonEntity 
-} from "@modules/platform/databases/postgresql/identity/entities/person.entity"
-import {
-    POSTGRESQL_PRIMARY 
-} from "@modules/platform/databases/postgresql/identity/constants/connection"
+    PersonEntity, IDENTITY_POSTGRESQL 
+} from "@modules/platform/databases/index"
 import {
     AccountService 
 } from "./account.service"
@@ -46,7 +43,7 @@ describe("AccountService - br.identity.sign-in credentials",
                     AccountService,
                     PasswordPolicy,
                     {
-                        provide: getEntityManagerToken(POSTGRESQL_PRIMARY), useValue: entityManager 
+                        provide: getEntityManagerToken(IDENTITY_POSTGRESQL), useValue: entityManager 
                     },
                 ],
             }).compile()
@@ -97,11 +94,34 @@ describe("AccountService - br.identity.sign-in credentials",
                     persisted.passwordHash)).toBe(true)
             })
 
-        it("returns null on a refused insert (taken address) - one insert or none, never half-written",
+        it("returns null on a unique-email violation (taken address) - one insert or none, never half-written",
             async () => {
-                entityManager.save.mockRejectedValue(new Error("duplicate key value violates unique constraint"))
+                entityManager.save.mockRejectedValue(Object.assign(new Error("duplicate key value violates unique constraint"),
+                    {
+                        code: "23505" 
+                    }))
                 await expect(service.register("demo@ecommerce.dev",
                     "ecommerce-demo")).resolves.toBeNull()
+            })
+
+        it("recognises the violation when only the wrapped driver error carries the SQLSTATE",
+            async () => {
+                entityManager.save.mockRejectedValue(Object.assign(new Error("query failed"),
+                    {
+                        driverError: {
+                            code: "23505" 
+                        } 
+                    }))
+                await expect(service.register("demo@ecommerce.dev",
+                    "ecommerce-demo")).resolves.toBeNull()
+            })
+
+        it("rethrows any other save failure so a dead database never reads as a taken address",
+            async () => {
+                const outage = new Error("connection refused")
+                entityManager.save.mockRejectedValue(outage)
+                await expect(service.register("fresh@ecommerce.dev",
+                    "fresh-password")).rejects.toBe(outage)
             })
 
         it("answers the account view for a known person, null for an unknown id",

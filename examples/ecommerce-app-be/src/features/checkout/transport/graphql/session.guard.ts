@@ -13,6 +13,9 @@ import {
 import {
     SessionInvalidException 
 } from "ecommerce-app-be/modules/platform/errors"
+import {
+    CHECKOUT_MESSAGES 
+} from "../../messages/index"
 
 /** The actor a verified request carries - the person the identity service named for the token. */
 export interface ActorParams {
@@ -43,13 +46,13 @@ export class SessionGuard implements CanActivate {
         const sessionToken = header.startsWith("Bearer ") ? header.slice("Bearer ".length).trim() : ""
         if (!sessionToken) {
             throw new SessionInvalidException({
-                message: "A Bearer session token is required." 
+                message: CHECKOUT_MESSAGES.get("session.tokenRequired") 
             })
         }
         const verified = await this.identityApi.verifySession(sessionToken)
         if (!verified) {
             throw new SessionInvalidException({
-                message: "No live session answers this token." 
+                message: CHECKOUT_MESSAGES.get("session.noLiveSession") 
             })
         }
         request.actor = {
@@ -63,7 +66,7 @@ export class SessionGuard implements CanActivate {
         const request = GqlExecutionContext.create(context).getContext<GraphqlContextShape>().req
         if (!request) {
             throw new SessionInvalidException({
-                message: "GraphQL context carries no HTTP request." 
+                message: CHECKOUT_MESSAGES.get("session.noHttpRequest") 
             })
         }
         return request

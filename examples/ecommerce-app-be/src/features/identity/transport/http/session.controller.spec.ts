@@ -1,13 +1,13 @@
 import "reflect-metadata"
 import {
-    HttpException 
-} from "@nestjs/common"
-import {
     Test, TestingModule 
 } from "@nestjs/testing"
 import {
+    mock 
+} from "@starci/jest-preset/mock"
+import {
     SessionService 
-} from "@modules/domain/session/session.service"
+} from "@modules/domain/session/index"
 import {
     RevokeSessionUseCase 
 } from "../../application/revoke-session.use-case"
@@ -25,12 +25,10 @@ import {
 describe("SessionController - sessions verify/revoke surface",
     () => {
         let controller: SessionController
-        let sessions: { verify: jest.Mock; revoke: jest.Mock }
+        let sessions: ReturnType<typeof mock<SessionService>>
 
         beforeEach(async () => {
-            sessions = {
-                verify: jest.fn(), revoke: jest.fn() 
-            }
+            sessions = mock<SessionService>()
             const module: TestingModule = await Test.createTestingModule({
                 controllers: [SessionController],
                 providers: [VerifySessionUseCase,
@@ -53,21 +51,14 @@ describe("SessionController - sessions verify/revoke surface",
                 expect(sessions.verify).toHaveBeenCalledWith("token-abc")
             })
 
-        it("answers a dead or unknown token as a typed 401 SESSION_INVALID",
+        it("answers a dead or unknown token as a typed SESSION_INVALID refusal",
             async () => {
                 sessions.verify.mockResolvedValue(null)
-                try {
-                    await controller.verify({
-                        sessionToken: "token-gone" 
-                    })
-                    throw new Error("the request should have been refused")
-                } catch (error) {
-                    expect(error).toBeInstanceOf(HttpException)
-                    expect((error as HttpException).getStatus()).toBe(401)
-                    expect((error as HttpException).getResponse()).toEqual({
-                        code: "SESSION_INVALID_EXCEPTION", message: "No live session answers this token." 
-                    })
-                }
+                await expect(controller.verify({
+                    sessionToken: "token-gone" 
+                })).rejects.toMatchObject({
+                    name: "SessionInvalidException", code: "SESSION_INVALID_EXCEPTION", message: "No live session answers this token." 
+                })
             })
 
         it.each([[{
@@ -81,13 +72,9 @@ describe("SessionController - sessions verify/revoke surface",
             "a body without a usable token %j verifies as an empty token, never crashes",
             async (body) => {
                 sessions.verify.mockResolvedValue(null)
-                try {
-                    await controller.verify(body)
-                    throw new Error("the request should have been refused")
-                } catch (error) {
-                    expect(error).toBeInstanceOf(HttpException)
-                    expect((error as HttpException).getStatus()).toBe(401)
-                }
+                await expect(controller.verify(body)).rejects.toMatchObject({
+                    code: "SESSION_INVALID_EXCEPTION" 
+                })
                 expect(sessions.verify).toHaveBeenCalledWith("")
             },
         )
@@ -106,18 +93,11 @@ describe("SessionController - sessions verify/revoke surface",
         }],
         [{
             sessionToken: 42 
-        }]])("refuses revoke without a token %j as 400 before touching the store",
+        }]])("refuses revoke without a token %j as REQUEST_INVALID before touching the store",
             async (body) => {
-                try {
-                    await controller.revoke(body)
-                    throw new Error("the request should have been refused")
-                } catch (error) {
-                    expect(error).toBeInstanceOf(HttpException)
-                    expect((error as HttpException).getStatus()).toBe(400)
-                    expect((error as HttpException).getResponse()).toEqual({
-                        code: "REQUEST_INVALID_EXCEPTION", message: "sessionToken is required." 
-                    })
-                }
+                await expect(controller.revoke(body)).rejects.toMatchObject({
+                    code: "REQUEST_INVALID_EXCEPTION", message: "sessionToken is required." 
+                })
                 expect(sessions.revoke).not.toHaveBeenCalled()
             })
     })

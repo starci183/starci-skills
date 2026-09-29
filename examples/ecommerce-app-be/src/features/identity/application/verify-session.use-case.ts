@@ -7,6 +7,9 @@ import {
 import {
     SessionInvalidException
 } from "ecommerce-app-be/modules/platform/errors"
+import {
+    IDENTITY_MESSAGES 
+} from "../messages/index"
 
 /** The person a live session belongs to. */
 export interface VerifiedSessionResult {
@@ -27,7 +30,7 @@ export class VerifySessionUseCase {
         const personId = await this.sessions.verify(token)
         if (!personId) {
             throw new SessionInvalidException({
-                message: "No live session answers this token."
+                message: IDENTITY_MESSAGES.get("session.noLiveSession")
             })
         }
         return {

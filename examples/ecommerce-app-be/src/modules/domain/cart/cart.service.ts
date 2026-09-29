@@ -11,6 +11,9 @@ import {
     InjectPrimaryEntityManager 
 } from "ecommerce-app-be/modules/platform/databases/postgresql/order"
 
+/** The most lines one cart read returns: a cart is a handful of products, so a bound this size is never reached in practice. */
+const CART_LINES_LIMIT = 200
+
 /** One cart line as the door answers it: the product and how many of it the person holds. */
 export interface CartLineResult {
   productId: string;
@@ -35,7 +38,7 @@ export class CartService {
                     personId 
                 }, order: {
                     productId: "ASC" 
-                } 
+                }, take: CART_LINES_LIMIT 
             })
         return rows.map((row) => ({
             productId: row.productId, quantity: row.quantity 

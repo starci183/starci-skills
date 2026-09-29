@@ -12,6 +12,9 @@ import {
 } from "ecommerce-app-be/modules/platform/errors"
 
 import {
+    IDENTITY_MESSAGES 
+} from "../../../../../messages/index"
+import {
     AccountResponse 
 } from "./graphql-types/response"
 import {
@@ -36,7 +39,7 @@ export class AccountResolver {
   @Query(() => AccountResponse,
       {
           name: "account",
-          description: "Read one account: the person and whether the order service reports them a buyer.",
+          description: IDENTITY_MESSAGES.get("account.description"),
       })
     async account(@Args("request") request: AccountRequest): Promise<AccountResponse> {
         const personId = request.personId

@@ -4,7 +4,7 @@ import {
 } from "@nestjs/testing"
 import {
     RedisPrimaryClient 
-} from "@modules/platform/caches/redis/primary/redis.client"
+} from "@modules/platform/caches/index"
 import {
     SessionRepository 
 } from "./session.repository"
