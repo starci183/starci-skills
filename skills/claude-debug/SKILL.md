@@ -121,6 +121,16 @@ Also: `node scripts/reconciler/boot.mjs --status`, `node scripts/reconciler/star
   deletes through junctions; the live node_modules was emptied twice on 2026-09-29).
 - Live databases are read-only except through their runtime writers (`engine/ledger-db.mjs`, `engine/machine-db.mjs`);
   never edit `machine.sqlite` or a `runtime.sqlite` by hand.
+- Every probe or debug script that creates a throwaway repo or ledger (a `repro`, a fake terminal, a one-off `api`/`kernel`
+  call against a scratch checkout) must set `STARCI_LOCAL_ROOT` to a temp directory before it runs and remove/unset that
+  env var when it exits, success or failure, so the probe's ledger and workflow rows land in the temp state root and
+  never in the real `%LOCALAPPDATA%/StarCi` (`engine/machine-db.mjs` `starciLocalRoot`/`LOCAL_ROOT_ENV`, also honored by
+  `engine/ledger-db.mjs` `projectsRootFor`). Incident 2026-09-30: probes under the OS temp dir (`probe-*`, `dbg-ask-*`,
+  `dbg-env*`) left six fake-worker ledgers with workflows stuck `running` in the live store because they never set this.
+  A probe that only needs the machine registry (not a project ledger too) may instead set the narrower
+  `STARCI_TEST_MACHINE_FILE`; a probe that needs a specific ledger location without moving the whole state root may
+  instead set `STARCI_PROJECTS_ROOT`. Verify before finishing: the probe's ledger id must not appear in
+  `node engine/machine-db.mjs ledgers --file "$LOCALAPPDATA/StarCi/machine.sqlite"`.
 - A standard, schema or rule set that has not been released is unversioned or version 1 in the runtime; never label runtime
   content as a second version before a first one has shipped (owner ruling 2026-09-29).
 - Never push, never `--no-verify`, never rewrite landed history. The lane does not land; the lead lands.
