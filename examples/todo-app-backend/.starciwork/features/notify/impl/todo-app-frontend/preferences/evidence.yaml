@@ -51,10 +51,10 @@ assertions:
     outcome: pass
     observation: npm run build exited 0
   - id: architecture
-    command: node ../../cli/main.mjs architecture check . --config architecture.json
+    command: node ../../cli/main.mjs architecture check .
     exit: 1
     outcome: fail
-    observation: node ../../cli/main.mjs architecture check . --config architecture.json exited 1
+    observation: node ../../cli/main.mjs architecture check . exited 1
   - id: rendered-captures
     command: node -e "const
       fs=require('fs'),p='../todo-app-backend/.starciwork/features/notify/impl/todo-app-frontend/preferences/assets/';const

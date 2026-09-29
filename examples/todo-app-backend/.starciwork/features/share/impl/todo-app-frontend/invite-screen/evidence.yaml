@@ -78,19 +78,19 @@ assertions:
     outcome: pass
     observation: npx eslint . exited 0
   - id: architecture
-    command: node ../../cli/main.mjs architecture check . --config architecture.json
+    command: node ../../cli/main.mjs architecture check .
     exit: 1
     outcome: fail
-    observation: node ../../cli/main.mjs architecture check . --config architecture.json exited 1
+    observation: node ../../cli/main.mjs architecture check . exited 1
   - id: scoped-lint
     command: node -e "require('fs').rmSync('.next',{recursive:true,force:true})" && node
-      ../../scripts/check-scoped-lint.mjs --profile next --root . --architecture-config
-      architecture.json --all
+      ../../scripts/check-scoped-lint.mjs --profile next --root .
+      --all
     exit: 1
     outcome: fail
     observation: node -e "require('fs').rmSync('.next',{recursive:true,force:true})" && node
-      ../../scripts/check-scoped-lint.mjs --profile next --root . --architecture-config
-      architecture.json --all exited 1
+      ../../scripts/check-scoped-lint.mjs --profile next --root .
+      --all exited 1
   - id: captures
     command: node verify-captures.mjs assets
     exit: 0

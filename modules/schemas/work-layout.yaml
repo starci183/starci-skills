@@ -496,9 +496,9 @@ rules:
     `path`."
   - "Two topologies host the same record tree. In a multi-repository product, `.starciwork` lives in the
     bound backend repository and `.workspaces/projects/<project>/{be,fe}.json` at the host routes each side
-    to its repository and its `architecture.json` roots (`examples/todo-app-backend` paired with
+    to its repository and its `hfs.json` apps (`examples/todo-app-backend` paired with
     `examples/todo-app-frontend` demonstrates this shape). In a monorepo, `.starciwork` lives at the
-    repository root and `architecture.json` names `apps/*`/`packages/*` as its roots instead of a second
+    repository root and `hfs.json` names its `apps/<app>` entries instead of a second
     repository. Both host the identical flat `features/<feature>/<family>/<name>/index.yaml`
     tree; only where `.starciwork` sits and how its roots are declared differ, and a project does
     not run both shapes for the same product at once."

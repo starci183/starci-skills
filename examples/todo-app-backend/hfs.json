@@ -1,0 +1,8 @@
+{
+  "hfs": 2,
+  "profile": "be",
+  "project": "todo-app-backend",
+  "apps": [
+    { "name": "todo", "kind": "api" }
+  ]
+}

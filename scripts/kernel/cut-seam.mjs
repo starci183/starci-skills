@@ -230,11 +230,11 @@ export function seamPromptLines({ cut, jobLabel, api = 'scripts/kernel/api.mjs',
 // Canon-conformance cut (code.refactor params.canonFamilies; nivo wf-nivo-fe-canon-mujek980, 22 of 56 slices
 // failed blocked:shared-change): canon-scan's slices own only the files that hold findings, but a finding
 // such as FE_SOURCE_LAYOUT_INVALID is fixed by MOVING its owner into a canon home (features/layouts/<Owner>)
-// and registering it in the package's architecture config - paths no slice owned. op-code.refactor-7e9f7e20c1
+// - paths no slice owned (owners are derived from knowledge/hfs/slots.yaml; nothing registers one in a shared file). op-code.refactor-7e9f7e20c1
 // (slice 7/34) committed 9 -> 7 findings and blocked on the rest. canonCutPlanOf grants each slice the exact
 // relocation destinations its findings need (modules/ops/ops/code.refactor.yaml policy.canonConformance
 // relocations) unless a sibling or an earlier grant already holds them, and routes the shared-root files
-// (sharedRoots) plus every contested relocation to ONE serial canon-wire leg per wave, enqueued --after every
+// (sharedRoots, empty in HFS v2) plus every contested relocation to ONE serial canon-wire leg per wave, enqueued --after every
 // ordinal of that wave - the recutPlanOf wire pattern. A blocked slice is redone from its committed state
 // (canonRedispatchOf), never from scratch.
 
@@ -314,7 +314,7 @@ export function canonCutPlanOf(scan, { cutId, op = CANON_OP, policy = null, impo
       wire.reasons.push(`${move.ruleId} ${move.moving} -> ${dest}: held by ordinal ${holder.ordinal}`);
     }
   }
-  // Shared-root registrations (a package's architecture config): the wire's, never a slice's.
+  // Shared-root files (policy sharedRoots; empty in HFS v2, where owners are derived from slots): the wire's, never a slice's.
   for (const slice of slices) {
     const packages = new Set(findings.filter((finding) => slice.paths.some((root) => within(finding.file, root)))
       .map((finding) => srcRootOf(finding.file)).filter(Boolean).map((src) => src.split('/').slice(0, -1).join('/')));
@@ -441,7 +441,7 @@ export function cutManifestPromptLines(manifest) {
   ];
 }
 
-const CONFIG_FILE_RE = /(?:^|\/)(?:architecture\.json|tsconfig[^/]*\.json|package\.json|\.eslintrc[^/]*|[^/]+\.config\.[cm]?[jt]s)$/;
+const CONFIG_FILE_RE = /(?:^|\/)(?:hfs\.json|tsconfig[^/]*\.json|package\.json|\.eslintrc[^/]*|[^/]+\.config\.[cm]?[jt]s)$/;
 const PUBLIC_ENTRY_RE = /\/index\.[cm]?[jt]sx?$/;
 /**
  * What settle does with a canon slice (params.canonFamilies, not the canon-wire leg) that settled blocked or
@@ -454,7 +454,7 @@ const PUBLIC_ENTRY_RE = /\/index\.[cm]?[jt]sx?$/;
  *   - `wire`: shared-root/config/public-entry files and destinations a sibling holds - the canon-wire leg's.
  * Pure over its inputs; null when the slice is no canon slice or there is nothing to follow up.
  */
-export function canonSettleFollowUpOf({ payload, report, manifest = null, destinations = [], commit = null, sharedRoots = ['architecture.json'] }) {
+export function canonSettleFollowUpOf({ payload, report, manifest = null, destinations = [], commit = null, sharedRoots = [] }) {
   const params = payload?.params ?? {};
   if (!payload?.cut || !String(params.canonFamilies ?? '').trim() || params.canonWire === true) return null;
   if (!report || !['blocked', 'failed'].includes(String(report.outcome))) return null;
@@ -467,7 +467,7 @@ export function canonSettleFollowUpOf({ payload, report, manifest = null, destin
   // A page surface under components/pages moves to its feature tier (pages is a FEATURE tier, FE_SOURCE_LAYOUT_INVALID,
   // FE_ROUTE_ONE_PAGE): the destination is known from the owned path itself, not only from the report's prose.
   const derived = owned.map((p) => /^(.*\/src)\/components\/pages\/([^/]+)$/.exec(p)).filter(Boolean).map((m) => `${m[1]}/features/pages/${m[2]}`);
-  // A new or moved feature owner is registered in its package's shared root (architecture.json): the wire's.
+  // Shared root config (package.json, lockfile, tsconfig, eslint config, hfs.json) is the wire's; owners are derived, never registered.
   const packages = [...new Set(owned.map((p) => /^(.*)\/src\//.exec(p)?.[1]).filter(Boolean))];
   const sharedNamed = sharedRoots.filter((root) => text.includes(root));
   const sharedWire = (derived.length || sharedNamed.length) ? packages.flatMap((pkg) => (sharedNamed.length ? sharedNamed : sharedRoots).map((root) => `${pkg}/${root}`)) : [];

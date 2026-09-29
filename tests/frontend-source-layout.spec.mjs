@@ -59,7 +59,7 @@ test('accepted Next layout keeps app on feature entries and connected blocks on 
   const result=fixture(t,acceptedFiles).check();
   // The v2 machine also emits its own findings (reachability, required files, ...); this spec judges the layout rules.
   assert.deepEqual(result.errors,[],JSON.stringify(result.errors));
-  const layoutRules=['FE_SOURCE_LAYOUT_INVALID','FE_APP_INTERNAL_IMPORT_OUTSIDE_FEATURES','FE_FEATURE_DEPENDENCY_DIRECTION',
+  const layoutRules=['FE_SOURCE_LAYOUT_INVALID',
     'FE_CONNECTED_BLOCK_RENDER_PAIR','FE_COMPONENT_WORLD_OWNERSHIP','FE_BLOCK_PRODUCT_HOOK_DEFINITION','FE_CUSTOM_HOOK_LOCATION'];
   assert.deepEqual(result.violations.filter(item=>layoutRules.includes(item.ruleId)),[],JSON.stringify(result.violations,null,2));
   for(const id of layoutRules) {
@@ -84,12 +84,11 @@ test('layout, dependency, hook ownership and connected-block pair checks resolve
     'apps/web/src/hooks/ui/use-dynamic-scroll.ts':'import {useEffect} from "react";export const useDynamicScroll=()=>{useEffect(()=>{void import("@/modules/catalog/read-catalog")},[]);return null};',
   };
   const result=fixture(t,files).check(),rules=new Set(result.violations.map(item=>item.ruleId));
-  for(const id of ['FE_SOURCE_LAYOUT_INVALID','FE_APP_INTERNAL_IMPORT_OUTSIDE_FEATURES','FE_FEATURE_DEPENDENCY_DIRECTION',
+  for(const id of ['FE_SOURCE_LAYOUT_INVALID','FE_TIER_DIRECTION',
     'FE_CONNECTED_BLOCK_RENDER_PAIR','FE_COMPONENT_WORLD_OWNERSHIP','FE_BLOCK_PRODUCT_HOOK_DEFINITION','FE_CUSTOM_HOOK_LOCATION']) {
     assert.ok(rules.has(id),`${id}: ${JSON.stringify(result,null,2)}`);
   }
-  assert.ok(result.violations.some(item=>item.ruleId==='FE_APP_INTERNAL_IMPORT_OUTSIDE_FEATURES'&&item.specifier==='@/modules/catalog/types'));
-  assert.ok(result.violations.some(item=>item.ruleId==='FE_APP_INTERNAL_IMPORT_OUTSIDE_FEATURES'&&item.specifier==='@/features/pages/HomePage/internal'));
+  assert.ok(result.violations.some(item=>item.ruleId==='FE_TIER_DIRECTION'&&item.path==='apps/web/src/modules/catalog/types.ts'&&item.specifier==='@/hooks'));
   assert.ok(result.violations.some(item=>item.ruleId==='FE_CONNECTED_BLOCK_RENDER_PAIR'&&item.path.endsWith('/CatalogBlock/index.tsx')));
   assert.ok(result.violations.some(item=>item.ruleId==='FE_CUSTOM_HOOK_LOCATION'&&item.path.endsWith('/Intrinsic/index.tsx')));
   assert.ok(result.violations.some(item=>item.ruleId==='FE_COMPONENT_WORLD_OWNERSHIP'&&item.path.endsWith('/BadUiLeaf/index.tsx')));
@@ -142,8 +141,8 @@ test('framework-pinned files at the source root are thin adapters, not layout fi
     'apps/web/src/modules/telemetry/register.ts':'export const register=()=>undefined;',
   }).check();
   assert.deepEqual(result.errors,[],JSON.stringify(result.errors));
-  assert.deepEqual(result.violations.filter(item=>['FE_FRAMEWORK_ADAPTER_IMPORT','FE_SOURCE_LAYOUT_INVALID'].includes(item.ruleId)),[],JSON.stringify(result.violations,null,2));
-  assert.ok(result.coverage.checkedRuleIds.includes('FE_FRAMEWORK_ADAPTER_IMPORT'));
+  assert.deepEqual(result.violations.filter(item=>item.ruleId==='FE_SOURCE_LAYOUT_INVALID'),[],JSON.stringify(result.violations,null,2));
+  assert.ok(result.coverage.checkedRuleIds.includes('FE_SOURCE_LAYOUT_INVALID'));
   assert.ok(result.coverage.sourceFiles.includes('apps/web/src/middleware.ts'),'the pinned file is in the checked program, not excluded');
 });
 
@@ -165,27 +164,4 @@ test('only the exact pinned names directly in the source root are accepted; ever
   assert.equal(layout.has('apps/web/src/middleware.ts'),false);
   assert.equal(layout.has('apps/web/src/proxy.ts'),false,'proxy.ts is the Next 16 name of middleware (nivo inc-846867b9a34e)');
   assert.equal(layout.has('apps/web/src/app/instrumentation.ts'),false,'a file under app/ is a route-root file, judged as before');
-  assert.equal(result.violations.some(item=>item.ruleId==='FE_FRAMEWORK_ADAPTER_IMPORT'&&item.path==='apps/web/src/app/instrumentation.ts'),false);
-});
-
-test('a pinned adapter importing anything but modules or a feature public entry is FE_FRAMEWORK_ADAPTER_IMPORT',t=>{
-  const result=fixture(t,{...acceptedFiles,
-    'apps/web/src/middleware.ts':[
-      'import {routing} from "./i18n/routing";',
-      'import {selfProxy} from "./middleware/standalone-self-proxy";',
-      'import type {CatalogValue} from "@/components/leaves/CatalogLeaf";',
-      'import {useCatalog} from "@/hooks";',
-      'import {Private} from "@/features/pages/HomePage/internal";',
-      'import {readCatalog} from "@/modules/catalog/read-catalog";',
-      'export default function middleware(){return [routing,selfProxy,useCatalog,Private,readCatalog] as unknown as CatalogValue}',
-    ].join(''),
-    'apps/web/src/i18n/routing.ts':'export const routing=1;',
-    'apps/web/src/middleware/standalone-self-proxy.ts':'export const selfProxy=()=>false;',
-    'apps/web/src/features/pages/HomePage/internal/index.ts':'export const Private=1;',
-  }).check();
-  const adapter=result.violations.filter(item=>item.ruleId==='FE_FRAMEWORK_ADAPTER_IMPORT');
-  assert.deepEqual(adapter.map(item=>item.specifier).sort(),
-    ['./i18n/routing','./middleware/standalone-self-proxy','@/components/leaves/CatalogLeaf','@/features/pages/HomePage/internal','@/hooks'].sort(),JSON.stringify(adapter,null,2));
-  assert.ok(adapter.every(item=>item.path==='apps/web/src/middleware.ts'&&item.resolvedPath&&item.line===1));
-  assert.equal(result.violations.some(item=>item.ruleId==='FE_SOURCE_LAYOUT_INVALID'&&item.path==='apps/web/src/middleware.ts'),false);
 });

@@ -48,10 +48,10 @@ change:
     updateNotificationPreferences request with a GraphQL error, and loading and
     saving were captured while the real requests were held in flight - no state
     is staged in the DOM. Known open conflicts kept visible: `node
-    ../../cli/main.mjs architecture check . --config architecture.json` reports
+    ../../cli/main.mjs architecture check .` reports
     13 violations that are all direct consequences of the lane write ceiling -
     the frontend canon wants src/features/, src/components/{blocks,...}/ and
-    src/hooks/ homes plus an architecture.json owner entry, none of which this
+    src/hooks/ homes plus an owner slot, none of which this
     lane may create (FE_SOURCE_LAYOUT_INVALID x7,
     FE_COMPONENT_IMPORTS_TRANSPORT x2, FE_APP_INTERNAL_IMPORT_OUTSIDE_FEATURES
     x2, FE_ROUTE_ONE_PAGE x2); and the direction's own

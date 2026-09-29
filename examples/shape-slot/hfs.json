@@ -1,0 +1,8 @@
+{
+  "hfs": 2,
+  "profile": "fe",
+  "project": "shape-slot",
+  "apps": [
+    { "name": "shape-slot", "kind": "next" }
+  ]
+}

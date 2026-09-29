@@ -53,7 +53,7 @@ change:
     visible: `starci architecture check` reports 8 violations that are all
     direct consequences of the lane write ceiling - the frontend canon wants
     src/features/pages/, src/components/{blocks,...}/ and src/hooks/ homes plus
-    an architecture.json owner entry, none of which this lane may create
+    an owner slot, none of which this lane may create
     (FE_SOURCE_LAYOUT_INVALID x4, FE_COMPONENT_IMPORTS_TRANSPORT x2,
     FE_APP_INTERNAL_IMPORT_OUTSIDE_FEATURES, FE_ROUTE_ONE_PAGE); and the
     direction's own GRAMMAR_REQUIRED gap stands - installed @starci/grammar

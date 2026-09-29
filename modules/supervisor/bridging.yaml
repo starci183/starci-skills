@@ -40,7 +40,7 @@ detection:
                     when >= 2 of them wait on ONE job of it that has been queued >= dependency-graph.mjs
                     HUB_STUCK_MS (2h). A job that runs is moving: notify the blocker instead
     duplicate-work  two live workflows' open jobs or work-graph nodes own one path (shared wiring - a Nest
-                    root module, package manifests, architecture.json, the Work catalog - excepted), or two
+                    root module, package manifests, hfs.json, the Work catalog - excepted), or two
                     live owners claim one foundation under two names. Proposal revise (the younger
                     workflow parks or merges its duplicating legs); never clear-cut
   surfaces: |

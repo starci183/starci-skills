@@ -418,7 +418,7 @@ tick:
       `owned` (paths + grants, never overlapping a sibling), then per wave `api
       enqueue --op code.refactor --paths <wire> --params
       '{"canonWire":true}' --after <every ordinal of the wave>`, which owns the
-      package architecture.json, the contested relocations and every
+      shared root config (package.json, tsconfig, hfs.json), the contested relocations and every
       owedToWire path a slice reports (a wire still queued when a slice reports
       one outside it is dropped with `api reconcile --drop` and re-enqueued on
       the union). A canon slice that settled blocked or failed after

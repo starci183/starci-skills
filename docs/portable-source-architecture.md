@@ -91,7 +91,7 @@ framework-pinned root files Next.js loads only from there: `middleware` (and `pr
 `knowledge/patterns/fe/folder.yaml` (FE-FOLDER-1 `frameworkPinnedRootFiles`) and the architecture check
 reads it from there (`FE_SOURCE_LAYOUT_INVALID` accepts exactly those basenames at the source root). Each is
 a thin adapter: every resolved internal import enters `modules/` or a feature public entry
-(`FE_FRAMEWORK_ADAPTER_IMPORT`), and every other rule still applies, except that the export names the
+(`FE_TIER_DIRECTION`), and every other rule still applies, except that the export names the
 framework mandates in that file keep their framework spelling (`frameworkPinnedRootExports`: `config`,
 `middleware`/`proxy` and default; `register`, `onRequestError`; `onRouterTransitionStart`), which
 `FE_SOURCE_NAME_SHAPE` accepts there and nowhere else. Locale routing, proxies and request

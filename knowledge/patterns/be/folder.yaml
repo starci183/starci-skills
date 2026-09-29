@@ -47,6 +47,8 @@ rules:
       automated:
         - HFS_SLOT_UNDECLARED
         - HFS_SLOT_REQUIRED_MISSING
+        - BE_TIER_DIRECTION
+        - HFS_APPS_REQUIRED
         - HFS_MODULE_TIER_INVALID
         - HFS_APPS_REQUIRED
         - BE_TIER_DIRECTION
@@ -134,6 +136,7 @@ rules:
       automated:
         - HFS_SLOT_UNDECLARED
         - BE_PUBLIC_SURFACE
+        - BE_TIER_DIRECTION
       manual:
         - Check exported contracts, state owner and lifetime.
     relatedExamples: []

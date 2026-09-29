@@ -155,6 +155,25 @@ test('FE: a component layer imports only the layers after it', t => {
   assert.match(hits[0].message, /leaves component may import only the layers after it; it imports a blocks/);
 });
 
+test('FE: a component may import config but not the api transport; a hook reaches the transport and another domain only through its index', t => {
+  const root = archFixture(t, {
+    profile: 'fe',
+    files: {
+      'apps/web/src/components/leaves/Btn/index.tsx': "import { c } from '../../../modules/config';\nimport { call } from '../../../modules/api';\nexport const Btn = [c, call];\n",
+      'apps/web/src/modules/config/index.ts': 'export const c = 1;\n',
+      'apps/web/src/modules/api/index.ts': 'export const call = 1;\n',
+      'apps/web/src/hooks/orders/index.ts': "import { call } from '../../modules/api';\nimport { useCart } from '../cart';\nimport { deep } from '../cart/useDeep';\nexport const useOrders = [call, useCart, deep];\n",
+      'apps/web/src/hooks/cart/index.ts': 'export const useCart = 1;\n',
+      'apps/web/src/hooks/cart/useDeep.ts': 'export const deep = 1;\n',
+    },
+  });
+  const report = runArch(root);
+  const hits = findings(report, 'FE_TIER_DIRECTION').map(item => `${item.path} -> ${item.resolvedPath}`);
+  assert.deepEqual(hits, ['apps/web/src/components/leaves/Btn/index.tsx -> apps/web/src/modules/api/index.ts']);
+  const bypass = findings(report, 'ARCH_OWNER_EXPORT_BYPASS').map(item => `${item.path} -> ${item.resolvedPath}`);
+  assert.deepEqual(bypass, ['apps/web/src/hooks/orders/index.ts -> apps/web/src/hooks/cart/useDeep.ts']);
+});
+
 test('stronglyConnected finds only multi-node components', () => {
   const graph = new Map([['a', new Set(['b'])], ['b', new Set(['c'])], ['c', new Set(['a', 'd'])], ['d', new Set()], ['e', new Set(['e'])]]);
   const components = stronglyConnected(graph).map(component => [...component].sort());

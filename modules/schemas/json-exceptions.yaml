@@ -28,9 +28,9 @@ exceptions:
   - path: examples/ecommerce-app-be/apps/order/package.json
     reason: >
       npm package manifest inside the ecommerce-app-be project; the npm toolchain requires JSON.
-  - path: examples/ecommerce-app-be/architecture.json
+  - path: examples/ecommerce-app-be/hfs.json
     reason: >
-      Rendered architecture document for the ecommerce-app-be example project; JSON by the renderer contract.
+      HFS v2 repository declaration (modules/schemas/hfs-repo.schema.yaml) for the ecommerce-app-be example; the architecture machine reads hfs.json as JSON.
   - path: examples/ecommerce-app-be/nest-cli.json
     reason: >
       Nest CLI monorepo map inside the ecommerce-app-be project; the nest toolchain reads JSON.
@@ -60,9 +60,9 @@ exceptions:
   - path: examples/ecommerce-app-fe/apps/shop/tsconfig.json
     reason: >
       TypeScript toolchain config inside the ecommerce-app-fe project; tsc reads JSON (with comments).
-  - path: examples/ecommerce-app-fe/architecture.json
+  - path: examples/ecommerce-app-fe/hfs.json
     reason: >
-      Rendered architecture document for the ecommerce-app-fe example project; JSON by the renderer contract.
+      HFS v2 repository declaration (modules/schemas/hfs-repo.schema.yaml) for the ecommerce-app-fe example; the architecture machine reads hfs.json as JSON.
   - path: examples/ecommerce-app-fe/e2e/tsconfig.json
     reason: >
       TypeScript toolchain config for the ecommerce-app-fe Playwright harness; tsc reads JSON (with comments).
@@ -87,8 +87,9 @@ exceptions:
   - path: examples/ecommerce-app-fe/tsconfig.json
     reason: >
       TypeScript toolchain config inside the ecommerce-app-fe project; tsc reads JSON (with comments).
-  - path: examples/shape-slot/architecture.json
-    reason: Next.js architecture config for the shape-slot example; the architecture checker reads starci/architecture-config@1 as JSON.
+  - path: examples/shape-slot/hfs.json
+    reason: >
+      HFS v2 repository declaration (modules/schemas/hfs-repo.schema.yaml) for the shape-slot example; the architecture machine reads hfs.json as JSON.
   - path: examples/shape-slot/messages/vi.json
     reason: next-intl message catalogue for the shape-slot example; next-intl requires JSON.
   - path: examples/shape-slot/package-lock.json
@@ -114,8 +115,9 @@ exceptions:
   - path: examples/todo-app-backend/.starciwork/features/task/ui/list/assets/grammar-reference-review.json
     reason: >
       Captured grammar review asset for the ui list feature; JSON is the reviewer output format.
-  - path: examples/todo-app-backend/architecture.json
-    reason: NestJS architecture config for the real todo-app-backend example; the architecture checker reads starci/architecture-config@1 as JSON.
+  - path: examples/todo-app-backend/hfs.json
+    reason: >
+      HFS v2 repository declaration (modules/schemas/hfs-repo.schema.yaml) for the todo-app-backend example; the architecture machine reads hfs.json as JSON.
   - path: examples/todo-app-backend/nest-cli.json
     reason: Nest CLI configuration for the real todo-app-backend example; the nest toolchain reads JSON.
   - path: examples/todo-app-backend/package-lock.json
@@ -138,8 +140,9 @@ exceptions:
       i18n message catalog inside the todo-app-frontend app source; the app i18n loader consumes JSON.
   - path: examples/todo-app-frontend/apps/web/tsconfig.json
     reason: TypeScript project config for the todo frontend app; tsc expects a JSON tsconfig file.
-  - path: examples/todo-app-frontend/architecture.json
-    reason: Next.js architecture config for the real todo-app-frontend example; the architecture checker reads starci/architecture-config@1 as JSON.
+  - path: examples/todo-app-frontend/hfs.json
+    reason: >
+      HFS v2 repository declaration (modules/schemas/hfs-repo.schema.yaml) for the todo-app-frontend example; the architecture machine reads hfs.json as JSON.
   - path: examples/todo-app-frontend/e2e/tsconfig.json
     reason: TypeScript project config for the Playwright uat harness; tsc expects a JSON tsconfig file.
   - path: examples/todo-app-frontend/package-lock.json

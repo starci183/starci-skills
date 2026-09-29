@@ -102,7 +102,7 @@ profiles:
           requirement: Resolve aliases, relative imports, literals, re-exports and packages before enforcing app to feature to module direction.
           check:
             kind: architecture
-            ruleIds: [BE_MODULE_IMPORTS_FEATURE, BE_MODULE_IMPORTS_APP, BE_FEATURE_IMPORTS_APP, ARCH_PACKAGE_IMPORTS_APP, ARCH_PACKAGE_EXPORT_BYPASS, ARCH_INTERNAL_IMPORT_UNRESOLVED, ARCH_DYNAMIC_DEPENDENCY_UNPROVEN]
+            ruleIds: [BE_TIER_DIRECTION, ARCH_OWNER_CYCLE, ARCH_PACKAGE_IMPORTS_APP, ARCH_PACKAGE_EXPORT_BYPASS, ARCH_INTERNAL_IMPORT_UNRESOLVED, ARCH_DYNAMIC_DEPENDENCY_UNPROVEN]
             externalResult: { schema: 'starci/architecture-check@1', command: 'node scripts/checks/architecture.mjs <repo-root>' }
         semantic:
           guidance: docs/backend-source-pattern.md
@@ -626,7 +626,7 @@ profiles:
           requirement: Resolve real routes, tiers, transports, aliases and package exports before enforcing inward/downward dependencies.
           check:
             kind: architecture
-            ruleIds: [FE_TIER_IMPORTS_UPWARD, FE_COMPONENT_IMPORTS_TRANSPORT, FE_COMPONENT_DEEP_HOOK_IMPORT, FE_FETCH_OUTSIDE_TRANSPORT, ARCH_PACKAGE_IMPORTS_APP, ARCH_PACKAGE_EXPORT_BYPASS, ARCH_INTERNAL_IMPORT_UNRESOLVED, ARCH_DYNAMIC_DEPENDENCY_UNPROVEN]
+            ruleIds: [FE_TIER_DIRECTION, FE_APP_ISOLATION, ARCH_OWNER_CYCLE, FE_COMPONENT_DEEP_HOOK_IMPORT, FE_FETCH_OUTSIDE_TRANSPORT, ARCH_PACKAGE_IMPORTS_APP, ARCH_PACKAGE_EXPORT_BYPASS, ARCH_INTERNAL_IMPORT_UNRESOLVED, ARCH_DYNAMIC_DEPENDENCY_UNPROVEN]
             externalResult: { schema: 'starci/architecture-check@1', command: 'node scripts/checks/architecture.mjs <repo-root>' }
         semantic:
           guidance: docs/portable-source-architecture.md
@@ -807,7 +807,7 @@ profiles:
           check:
             kind: architecture
             sourceOnly: true
-            ruleIds: [FE_SOURCE_LAYOUT_INVALID, FE_FRAMEWORK_ADAPTER_IMPORT, FE_APP_INTERNAL_IMPORT_OUTSIDE_FEATURES, FE_FEATURE_DEPENDENCY_DIRECTION, FE_CONNECTED_BLOCK_RENDER_PAIR, FE_COMPONENT_WORLD_OWNERSHIP, FE_BLOCK_PRODUCT_HOOK_DEFINITION, FE_CUSTOM_HOOK_LOCATION]
+            ruleIds: [FE_SOURCE_LAYOUT_INVALID, FE_TIER_DIRECTION, FE_CONNECTED_BLOCK_RENDER_PAIR, FE_COMPONENT_WORLD_OWNERSHIP, FE_BLOCK_PRODUCT_HOOK_DEFINITION, FE_CUSTOM_HOOK_LOCATION]
         semantic:
           guidance: docs/portable-source-architecture.md
           review: Review cohesion, public API shape and behavior separately; each source root follows the same roles in a single application or monorepo.

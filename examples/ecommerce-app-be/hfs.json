@@ -1,0 +1,9 @@
+{
+  "hfs": 2,
+  "profile": "be",
+  "project": "ecommerce-app-be",
+  "apps": [
+    { "name": "identity", "kind": "api" },
+    { "name": "order", "kind": "api" }
+  ]
+}

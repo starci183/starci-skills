@@ -214,6 +214,8 @@ rules:
       automated:
         - FE_WIRE_GENERATED
         - HFS_CONTRACT_SNAPSHOT_DRIFT
+        - FE_TIER_DIRECTION
+        - FE_PURE_WORLD_IMPORT
       manual:
         - Confirm generated wire types do not become the feature or presentation source of truth.
     relatedExamples: []

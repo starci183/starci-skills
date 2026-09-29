@@ -259,7 +259,7 @@ policy:
     scope: interface.scaffold-cut-sets
     appliesWhen: The dispatch packet carries context.cut {id, ordinal, total} with total >= 2, every cut
       job uses this same approved interface.scaffold leg and goal binding, and the complete pairwise-disjoint path
-      union (shared root config - package.json, lockfile, tsconfig, eslint config, architecture.json -
+      union (shared root config - package.json, lockfile, tsconfig, eslint config, hfs.json -
       in exactly one ordinal, normally the seam) was preflighted before the first slice launched.
     permits: "A repository-wide gate (install, typecheck, lint:check, check-scoped-lint, test, build)
       may remain nonzero after a NON-FINAL ordinal only for findings whose paths belong exclusively to

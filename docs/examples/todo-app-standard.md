@@ -17,15 +17,15 @@ deployment declaration and its environments). `examples/todo-app-frontend` owns 
 This pairing is one of two topologies `modules/schemas/work-layout.yaml` recognizes. In a multi-repository
 product (this example), `.starciwork` lives in the bound backend repository, and
 `.workspaces/projects/<project>/{be,fe}.json` at the host routes each side to its own repository and its own
-`architecture.json` roots. In a monorepo, `.starciwork` lives at the repository root instead, and
-`architecture.json` names `apps/*`/`packages/*` as its roots rather than a second repository. Both topologies
+`hfs.json` apps. In a monorepo, `.starciwork` lives at the repository root instead, and
+`hfs.json` names its `apps/<app>` entries rather than a second repository. Both topologies
 host the identical `features/<feature>/{...}` tree; only where `.starciwork` sits and how its roots are
 declared differ. A project runs one shape or the other for one product, never both at once.
 
 The backend is a NestJS domain-first application (`package.json` calls it "NestJS domain-first example for
 the runtime's architecture checks"); the frontend is a Next.js app consuming an internal `@todo-app/grammar`
 package. Both are checked by the same `node scripts/checks/architecture.mjs` gate against their own
-`architecture.json`, and both are walked by the same `.starciwork` catalog for UAT and evidence.
+`hfs.json`, and both are walked by the same `.starciwork` catalog for UAT and evidence.
 
 ## 2. How to read a feature
 
@@ -253,7 +253,7 @@ secret is ever written into the tracked tree.
 | --- | --- |
 | `node scripts/checks/check-example-yaml.mjs examples` | Any `.yaml`/`.yml` under `examples` the runtime's own strict loader cannot parse — a permissive parser accepting silently-invented keys is exactly the bug this gate exists to catch |
 | `node scripts/checks/check-example-work.mjs` | An id that doesn't match its directory place; a `ref`/`blockedBy`/`conflictsWith`/`appliesTo`/`subscribes`/`extends` pointing at an id nothing owns; a stale `blockedBy` (target already `done` at or past the cited rev); `blockedBy` authored as prose instead of `{record, rev?, because}`; a `work/gap@1` missing `state`/`statement`; a `work/policy-decision@1` with an invented `outcome` or a `chosen` not in `options`, or a `targetModule`; an unclosed `change.kind`; a `done` record with no evidence and no authored-claim declaration; `appliesTo` on the wrong schema or pointing nowhere; a malformed `work/event@1` or a `subscribes`/`extends` pointing at the wrong schema; `work/implementation@1` using `directory`/`files` instead of `owners`; and an `evidence.yaml` whose `recordDigest` no longer matches its sibling's current bytes without `stale: true` |
-| `node scripts/checks/architecture.mjs <repo-root> [--config architecture.json]` | Backend/frontend dependency direction crossing a resolved responsibility boundary (app→feature→module, component/hook/module tiers), thin-app violations, undeclared package exports, unresolved internal imports (errors, not violations) |
+| `node scripts/checks/architecture.mjs <repo-root>` | Backend/frontend dependency direction crossing a resolved responsibility boundary (app→feature→module, component/hook/module tiers), thin-app violations, undeclared package exports, unresolved internal imports (errors, not violations) |
 | `npm test` (backend, jest) / `npm run test:unit` (frontend, vitest) | Any spec whose assertions do not hold against current source |
 | `npm run typecheck` (frontend, `tsc --noEmit`) | Any type error across the checked TypeScript program |
 

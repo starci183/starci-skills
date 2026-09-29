@@ -1,0 +1,9 @@
+{
+  "hfs": 2,
+  "profile": "fe",
+  "project": "ecommerce-app-fe",
+  "apps": [
+    { "name": "landing", "kind": "next" },
+    { "name": "shop", "kind": "next" }
+  ]
+}

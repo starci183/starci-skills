@@ -2,8 +2,8 @@
 // app/), and the export names the framework mandates in them. Authored once in
 // knowledge/patterns/fe/folder.yaml FE-FOLDER-1 (frameworkPinnedRootFiles, frameworkPinnedRootExports),
 // never hard-coded here (supervisor rulings, nivo wf-nivo-fe-debt-mug06w7h inc-2e42a24b74e4 and
-// inc-846867b9a34e). Read by the architecture check (FE_SOURCE_LAYOUT_INVALID,
-// FE_FRAMEWORK_ADAPTER_IMPORT) and the Next name-shape check (FE_SOURCE_NAME_SHAPE).
+// inc-846867b9a34e). Read by the architecture check (FE_SOURCE_LAYOUT_INVALID) and the Next name-shape
+// check (FE_SOURCE_NAME_SHAPE).
 //
 // An unreadable or malformed list is a broken install, not "no pinned files": both readers throw
 // ARCH_KNOWLEDGE_UNAVAILABLE so the caller reports an error instead of judging with a different contract.

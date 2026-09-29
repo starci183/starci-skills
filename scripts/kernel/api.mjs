@@ -3308,8 +3308,8 @@ function canonSettleFollowUp(ledger, job, payload, envelope) {
   const db = ledger.db, op = jobOpOf(job), wf = job.workflow_id;
   const manifest = cutManifestOf(db, { workflowId: wf, op, cut: payload.cut, ownJobId: job.job_id });
   const commit = REPORT_COMMIT_RE.exec([envelope?.summary, envelope?.blocker?.detail].join(' '))?.[1] ?? null;
-  let sharedRoots = ['architecture.json'];
-  try { sharedRoots = canonConformancePolicy().sharedRoots; } catch { /* the default holds */ }
+  let sharedRoots = [];
+  try { sharedRoots = canonConformancePolicy().sharedRoots; } catch { /* no shared roots: the wire carries only contested relocations and config files */ }
   const plan = canonSettleFollowUpOf({ payload, report: envelope, manifest, destinations: destinationsOf(envelope, payload.owned_paths ?? []), commit, sharedRoots });
   if (!plan) return null;
   const record = (step) => {

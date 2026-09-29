@@ -311,7 +311,6 @@ export function checkBackend(config, context) {
   const featureRoots = roots(config.root, config.backend.features);
   const nonAppRoots = [...moduleRoots, ...featureRoots];
   const sourceFiles = new Map(context.files.map(file => [path.resolve(file.fileName), file]));
-  const isApp = file => Boolean(appSource(config, file, nonAppRoots));
   for (const sourceFile of context.files) {
     const fileName = path.resolve(sourceFile.fileName);
     const fromModules = insideAny(moduleRoots, fileName);
@@ -353,16 +352,6 @@ export function checkBackend(config, context) {
         if (reexported) violations.push(finding(config, edge, 'BE_APPLICATION_TRANSPORT_FRAMEWORK', `Feature application code imports protocol surface ${reexported.evidence.detail} through an internal re-export. Keep protocol decorators and types under transport/.`, reexported.chain));
         const transportChain = reachableViolation(context.edges, edge, target => insideFeatureLayer(featureRoots, target, 'transport'));
         if (transportChain) violations.push(finding(config, edge, 'BE_APPLICATION_IMPORTS_TRANSPORT', 'Feature application code cannot depend on transport adapters or DTOs, including through a type import or barrel.', transportChain));
-      }
-      if (fromModules) {
-        const featureChain = reachableViolation(context.edges, edge, target => insideAny(featureRoots, target));
-        if (featureChain) violations.push(finding(config, edge, 'BE_MODULE_IMPORTS_FEATURE', 'A backend module cannot depend on a feature entry surface, including through a type or barrel.', featureChain));
-        const appChain = reachableViolation(context.edges, edge, isApp);
-        if (appChain) violations.push(finding(config, edge, 'BE_MODULE_IMPORTS_APP', 'A backend module cannot depend on an application composition root.', appChain));
-      }
-      if (fromFeatures) {
-        const appChain = reachableViolation(context.edges, edge, isApp);
-        if (appChain) violations.push(finding(config, edge, 'BE_FEATURE_IMPORTS_APP', 'A backend feature cannot depend on an application composition root.', appChain));
       }
     }
   }

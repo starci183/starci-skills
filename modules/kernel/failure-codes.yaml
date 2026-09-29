@@ -161,17 +161,6 @@ ARCHITECTURE_PROFILE_UNAVAILABLE:
   owner: runtime-core
   kind: check-finding
 
-ARCHITECTURE_PROJECT_AUTHORITY_UNAVAILABLE:
-  title: "Architecture project authority unavailable"
-  title_vi: "Không xác định được dự án TypeScript"
-  meaning_vi: "Bộ kiểm tra không đọc được tệp chọn dự án TypeScript làm căn cứ."
-  causes_vi:
-    - "Tệp cấu hình kiến trúc thiếu hoặc lỗi cú pháp"
-    - "Đường dẫn dự án trỏ ra ngoài kho"
-  nextStep_vi: "Bộ kiểm tra kiến trúc không chứng minh được là mã đạt vì thiếu dữ liệu đầu vào; lần kiểm tra này bị coi là chưa đủ, cần sửa hạ tầng kiểm tra rồi chạy lại."
-  owner: runtime-core
-  kind: check-finding
-
 ARCHITECTURE_PUBLIC_CONTRACT_UNAVAILABLE:
   title: "Architecture public contract unavailable"
   title_vi: "Chưa kiểm được dạng hợp đồng công khai"
@@ -652,16 +641,6 @@ BE_ERROR_HOME:
   owner: op-retry
   kind: check-finding
 
-BE_FEATURE_IMPORTS_APP:
-  title: "Feature imports app root"
-  title_vi: "Feature import gốc ứng dụng"
-  meaning_vi: "Một feature backend phụ thuộc vào gốc ghép nối của ứng dụng."
-  causes_vi:
-    - "Import từ app.module hoặc main trong feature"
-  nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra; không cần ai can thiệp thêm."
-  owner: op-retry
-  kind: check-finding
-
 BE_FEATURE_LAYOUT_INVALID:
   title: "Feature folder layout invalid"
   title_vi: "Bố cục thư mục feature sai"
@@ -692,26 +671,6 @@ BE_MODULE_HANDLER_REGISTRATION:
   causes_vi:
     - "Quên đăng ký vào providers"
     - "Đăng ký ở nhiều module"
-  nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra; không cần ai can thiệp thêm."
-  owner: op-retry
-  kind: check-finding
-
-BE_MODULE_IMPORTS_APP:
-  title: "Module imports app root"
-  title_vi: "Module import gốc ứng dụng"
-  meaning_vi: "Một module backend phụ thuộc vào gốc ghép nối của ứng dụng."
-  causes_vi:
-    - "Import từ app.module trong module dùng chung"
-  nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra; không cần ai can thiệp thêm."
-  owner: op-retry
-  kind: check-finding
-
-BE_MODULE_IMPORTS_FEATURE:
-  title: "Module imports feature entry"
-  title_vi: "Module import cổng vào của feature"
-  meaning_vi: "Một module backend phụ thuộc vào bề mặt vào của feature, kể cả qua kiểu hay barrel."
-  causes_vi:
-    - "Module dùng chung import controller hay use case của feature"
   nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra; không cần ai can thiệp thêm."
   owner: op-retry
   kind: check-finding
@@ -2335,17 +2294,6 @@ FEATURE_DONE_INCOMPLETE:
   owner: op-retry
   kind: check-finding
 
-FE_APP_INTERNAL_IMPORT_OUTSIDE_FEATURES:
-  title: "App adapter imports past a feature entry"
-  title_vi: "Lớp app nhập mã trong nhưng không qua cửa của tính năng"
-  meaning_vi: "Tệp app của Next nhập mã nội bộ của dự án mà không đi qua lối vào công khai của tính năng."
-  causes_vi:
-    - "Nhập thẳng thành phần sâu bên trong tính năng"
-    - "Nhập từ thư mục không thuộc features"
-  nextStep_vi: "Op interface.implement sửa lại để nhập qua lối vào công khai của tính năng rồi chạy lại kiểm tra."
-  owner: other-op:interface.implement
-  kind: check-finding
-
 FE_BLOCK_PRODUCT_HOOK_DEFINITION:
   title: "Block defines a product hook"
   title_vi: "Khối giao diện tự định nghĩa hook sản phẩm"
@@ -2376,17 +2324,6 @@ FE_COMPONENT_DEEP_HOOK_IMPORT:
     - "Nhập thẳng tệp hook thay vì qua barrel"
     - "Đường nhập đi vòng qua nhiều tầng"
   nextStep_vi: "Op interface.implement đổi sang nhập qua barrel hooks của nơi sở hữu."
-  owner: other-op:interface.implement
-  kind: check-finding
-
-FE_COMPONENT_IMPORTS_TRANSPORT:
-  title: "Component imports API transport"
-  title_vi: "Thành phần giao diện nhập trực tiếp lớp gọi API"
-  meaning_vi: "Thành phần giao diện nhập lớp truyền tải API ở thời gian chạy, việc này chỉ hook dữ liệu hoặc route máy chủ được làm."
-  causes_vi:
-    - "Gọi API ngay trong thành phần"
-    - "Nhập gián tiếp qua nhiều tệp"
-  nextStep_vi: "Op interface.implement đưa lời gọi vào hook dữ liệu hoặc route adapter."
   owner: other-op:interface.implement
   kind: check-finding
 
@@ -2456,17 +2393,6 @@ FE_ERROR_WORLD_STATE_MAPPING:
   owner: other-op:interface.implement
   kind: check-finding
 
-FE_FEATURE_DEPENDENCY_DIRECTION:
-  title: "Feature depends in the wrong direction"
-  title_vi: "Phụ thuộc giữa các tầng đi sai chiều"
-  meaning_vi: "Một tệp nhập ngược lên tầng cao hơn (app, features, components hay hooks) ngoài hướng cho phép."
-  causes_vi:
-    - "Tầng thấp nhập từ tầng cao"
-    - "Đi vòng qua alias hoặc barrel"
-  nextStep_vi: "Op interface.implement sửa lại phụ thuộc cho đúng chiều của cấu trúc."
-  owner: other-op:interface.implement
-  kind: check-finding
-
 FE_FETCH_OUTSIDE_TRANSPORT:
   title: "Raw fetch outside transport root"
   title_vi: "Gọi fetch thô ngoài lớp truyền tải API"
@@ -2475,17 +2401,6 @@ FE_FETCH_OUTSIDE_TRANSPORT:
     - "Gọi fetch ngay trong thành phần hoặc hook"
     - "Bỏ qua lớp client API của dự án"
   nextStep_vi: "Op interface.implement chuyển lời gọi vào lớp truyền tải API đã cấu hình."
-  owner: other-op:interface.implement
-  kind: check-finding
-
-FE_FRAMEWORK_ADAPTER_IMPORT:
-  title: "Root adapter imports wrong internal code"
-  title_vi: "Tệp gốc của framework nhập mã nội bộ sai chỗ"
-  meaning_vi: "Tệp gốc mà Next.js nạp cố định chỉ được nhập modules hoặc lối vào công khai của tính năng, nhưng đang nhập chỗ khác."
-  causes_vi:
-    - "Nhập thẳng thành phần sâu trong tính năng"
-    - "Nhập thư mục không được phép"
-  nextStep_vi: "Op interface.implement sửa lối nhập về modules hoặc lối vào công khai của tính năng."
   owner: other-op:interface.implement
   kind: check-finding
 
@@ -2719,17 +2634,6 @@ FE_SWR_MUTATION_RESOURCE_IDENTITY:
     - "Mutation dùng khóa chung không chỉ tài nguyên"
     - "Thiếu định danh tài nguyên khi làm mới"
   nextStep_vi: "Op interface.implement gắn định danh tài nguyên vào khóa của thao tác ghi."
-  owner: other-op:interface.implement
-  kind: check-finding
-
-FE_TIER_IMPORTS_UPWARD:
-  title: "Lower tier imports a higher tier"
-  title_vi: "Tầng thấp nhập ngược lên tầng cao"
-  meaning_vi: "Một tầng thành phần nhập từ tầng không được phép, kể cả đi vòng qua alias hoặc barrel."
-  causes_vi:
-    - "Khối nhập ngược lên trang hoặc tầng cao hơn"
-    - "Barrel che giấu phụ thuộc ngược"
-  nextStep_vi: "Op interface.implement sửa lại phụ thuộc theo đúng chiều tầng."
   owner: other-op:interface.implement
   kind: check-finding
 

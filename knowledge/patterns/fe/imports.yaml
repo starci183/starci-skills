@@ -133,10 +133,9 @@ rules:
         write: "never at runtime; component.tsx may use import type from a generated type only through a feature model"
     verification:
       automated:
-        - FE_APP_INTERNAL_IMPORT_OUTSIDE_FEATURES
-        - FE_FEATURE_DEPENDENCY_DIRECTION
         - FE_APP_ISOLATION
         - ARCH_OWNER_CYCLE
+        - FE_TIER_DIRECTION
       manual:
         - Confirm leaves do not import higher tiers or world-reading hooks.
     relatedExamples:

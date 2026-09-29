@@ -54,7 +54,7 @@ rules:
         - FE_ROUTE_DRAWING_DECISION
         - FE_ROUTE_FILES_THIN
         - FE_OWNER_REACHABLE
-        - FE_APP_INTERNAL_IMPORT_OUTSIDE_FEATURES
+        - FE_TIER_DIRECTION
       manual:
         - Confirm a route-level loader does not become product orchestration or duplicate client fetching.
     relatedExamples: []
@@ -86,10 +86,8 @@ rules:
         write: Keep intrinsic focus, disclosure, drag, measurement or reduced-motion behavior local when it has no product-world or transport ownership.
     verification:
       automated:
-        - FE_TIER_IMPORTS_UPWARD
-        - FE_FEATURE_DEPENDENCY_DIRECTION
+        - FE_TIER_DIRECTION
         - FE_SOURCE_LAYOUT_INVALID
-        - FE_FRAMEWORK_ADAPTER_IMPORT
         - ARCH_OWNER_CYCLE
         - ARCH_OWNER_EXPORT_BYPASS
         - ARCH_OWNER_EXPORT_STAR
@@ -127,7 +125,7 @@ rules:
         - FE_CUSTOM_HOOK_LOCATION
         - FE_BLOCK_PRODUCT_HOOK_DEFINITION
         - FE_COMPONENT_DEEP_HOOK_IMPORT
-        - FE_COMPONENT_IMPORTS_TRANSPORT
+        - FE_TIER_DIRECTION
         - FE_PURE_WORLD_HOOK
         - FE_PURE_WORLD_IMPORT
         - FE_PURE_REACHES_DATA
@@ -193,7 +191,7 @@ rules:
         write: Use a feature or view literal union and map it to the transport enum in the data adapter.
     verification:
       automated:
-        - FE_COMPONENT_IMPORTS_TRANSPORT
+        - FE_TIER_DIRECTION
         - FE_PURE_WORLD_IMPORT
         - FE_WIRE_GENERATED
         - FE_TRANSPORT_OWNER

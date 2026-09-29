@@ -1,9 +1,10 @@
-// A canon-conformance slice is granted the relocation destinations its findings need, the shared-root
-// registrations go to ONE canon-wire leg per wave, and a blocked slice is redone from its commit
+// A canon-conformance slice is granted the relocation destinations its findings need, contested relocations
+// and config files go to ONE canon-wire leg per wave (HFS v2 has no shared registration file: owners are derived
+// from knowledge/hfs/slots.yaml, so policy sharedRoots is empty), and a blocked slice is redone from its commit
 // (scripts/kernel/cut-seam.mjs canonCutPlanOf / canonRedispatchOf; modules/kernel/driver-loop.yaml
 // enqueue.cutExecution). nivo wf-nivo-fe-canon-mujek980: op-code.refactor-7e9f7e20c1 (slice 7/34) committed
 // 9 -> 7 findings, then blocked shared-change - the rest needed its product-shells owners MOVED into
-// features/layouts plus apps/app/architecture.json, none of which it owned; 22 of 56 slices failed so.
+// features/layouts, none of which it owned; 22 of 56 slices failed so.
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -13,7 +14,7 @@ import { spawnSync } from 'node:child_process';
 import { ledgerFileFor, openLedger } from '../engine/ledger-db.mjs';
 import { parseYaml } from '../engine/yaml.mjs';
 import { resolveOpParams } from '../scripts/route/dispatch-op.mjs';
-import { canonCutPlanOf, canonRedispatchOf, relocationOf, canonConformancePolicy } from '../scripts/kernel/cut-seam.mjs';
+import { canonCutPlanOf, canonRedispatchOf, canonSettleFollowUpOf, relocationOf, canonConformancePolicy } from '../scripts/kernel/cut-seam.mjs';
 import { seedWorkflow } from './_ledger-fixture.mjs';
 
 const ROOT = path.resolve(import.meta.dirname, '..');
@@ -34,7 +35,7 @@ const scan = ({ seamOwnsFeatures = false } = {}) => ({
     { machine: 'eslint', ruleId: 'starci-fe/shape-slot', family: 'shape-slot', file: `${SRC}/modules/slot/index.ts`, line: 1 },
     { machine: 'architecture', ruleId: 'FE_SOURCE_LAYOUT_INVALID', family: 'architecture', file: `${shells}/Sidebar/component.tsx`, line: 1 },
     { machine: 'architecture', ruleId: 'FE_SOURCE_LAYOUT_INVALID', family: 'architecture', file: `${shells}/ConsoleTopBar/component.tsx`, line: 1 },
-    { machine: 'architecture', ruleId: 'FE_APP_INTERNAL_IMPORT_OUTSIDE_FEATURES', family: 'architecture', file: route, line: 3, related: `${shells}/ConsoleLayout/index.tsx` },
+    { machine: 'architecture', ruleId: 'FE_SOURCE_LAYOUT_INVALID', family: 'architecture', file: `${shells}/ConsoleLayout/index.tsx`, line: 3 },
     { machine: 'eslint', ruleId: 'starci-fe/naming', family: 'naming', file: `${SRC}/components/blocks/sales/Handoff/index.tsx`, line: 1 },
   ],
 });
@@ -44,32 +45,26 @@ test('a relocation finding names the file that moves and the canon homes it may 
   const layout = relocationOf({ ruleId: 'FE_SOURCE_LAYOUT_INVALID', file: `${shells}/Sidebar/component.tsx` }, relocations);
   assert.equal(layout.home, `${shells}/Sidebar`);
   assert.ok(layout.destinations.includes(`${SRC}/features/layouts/Sidebar`));
-  const outside = relocationOf({ ruleId: 'FE_APP_INTERNAL_IMPORT_OUTSIDE_FEATURES', file: route, related: `${shells}/ConsoleLayout/index.tsx` }, relocations);
-  assert.equal(outside.moving, `${shells}/ConsoleLayout/index.tsx`);
-  assert.deepEqual(outside.destinations, ['pages', 'layouts', 'overlays'].map((tier) => `${SRC}/features/${tier}/ConsoleLayout`));
+  assert.equal(relocationOf({ ruleId: 'FE_APP_INTERNAL_IMPORT_OUTSIDE_FEATURES', file: route, related: `${shells}/ConsoleLayout/index.tsx` }, relocations), null, 'a retired rule has no relocation entry: a tier violation is not a relocation');
+  assert.deepEqual(canonConformancePolicy().sharedRoots, [], 'HFS v2 has no shared registration file: owners are derived from slots');
   assert.equal(relocationOf({ ruleId: 'starci-fe/naming', file: `${SRC}/components/blocks/sales/Handoff/index.tsx` }, relocations), null, 'a finding fixed in place needs no destination');
 });
 
-test('a canon slice needing a relocation + a shared file is planned as slice-with-destinations + ONE wire leg', () => {
+test('a canon slice needing a relocation nobody else holds is planned as slice-with-destinations and no wire leg', () => {
   const plan = canonCutPlanOf(scan(), { cutId: 'fe-canon' });
   const slice = plan.slices.find((item) => item.ordinal === 2);
   for (const owner of ['Sidebar', 'ConsoleTopBar', 'ConsoleLayout']) {
     assert.ok(slice.owned.includes(`${SRC}/features/layouts/${owner}`), `slice 2 is granted features/layouts/${owner}`);
   }
-  assert.ok(!slice.owned.some((p) => p.endsWith('architecture.json')), 'no slice owns the shared architecture config');
+  assert.ok(!slice.owned.some((p) => /(?:architecture|hfs)\.json$/.test(p)), 'no slice owns a shared root file');
   // Grants never collide: every owned path of one slice is disjoint from every other slice's.
   const within = (a, b) => a === b || a.startsWith(`${b}/`);
   for (const a of plan.slices) for (const b of plan.slices) {
     if (a === b) continue;
     for (const p of a.owned) assert.ok(!b.owned.some((q) => within(p, q) || within(q, p)), `${p} (ordinal ${a.ordinal}) overlaps ordinal ${b.ordinal}`);
   }
-  const shared = plan.wires.filter((wire) => wire.paths.includes('apps/app/architecture.json'));
-  assert.ok(shared.length >= 1);
-  const wire = plan.wires.find((item) => item.wave === 'shared');
-  assert.deepEqual(wire.paths, ['apps/app/architecture.json'], 'the wave\'s ONE wire leg owns the shared registration');
-  assert.deepEqual(wire.after, [2]);
-  const wireCommand = plan.commands.find((command) => command.includes('"canonWire":true') && command.includes('ordinals 2'));
-  assert.match(wireCommand, /^api enqueue --op code\.refactor --paths apps\/app\/architecture\.json --params '\{"canonWire":true\}' --after /);
+  assert.deepEqual(plan.wires, [], 'no shared registration and no contested destination: nothing for a wire leg to own');
+  assert.ok(!plan.commands.some((command) => command.includes('"canonWire":true')));
   assert.ok(plan.commands.some((command) => command.startsWith(`api enqueue --op code.refactor --paths ${slice.owned.join(',')} --cut-id fe-canon --cut-ordinal 2 --cut-total 3`)));
 });
 
@@ -79,7 +74,18 @@ test('a destination a sibling already owns is never granted: the move goes to th
   assert.ok(!slice.grants.some((p) => p.startsWith(`${SRC}/features/`)), 'ordinal 1 owns apps/app/src/features, so nothing under it is granted to ordinal 2');
   const wire = plan.wires.find((item) => item.wave === 'shared');
   assert.ok(wire.paths.includes(`${SRC}/features/layouts/Sidebar`) && wire.paths.includes(`${shells}/Sidebar`), 'the wire moves the contested owner once the slices land');
-  assert.ok(wire.paths.includes('apps/app/architecture.json'));
+  assert.ok(!wire.paths.some((p) => p.endsWith('architecture.json')), 'the wire carries the contested move, no retired registration file');
+  assert.deepEqual(wire.after, [2]);
+  assert.match(plan.commands.find((command) => command.includes('"canonWire":true')), /^api enqueue --op code\.refactor --paths .*--params '\{"canonWire":true\}' --after /);
+});
+
+test('a blocked slice routes config files to the wire and no registration file is assumed', () => {
+  const payload = { cut: { id: 'fe-canon', ordinal: 2, total: 3 }, params: { canonFamilies: 'all' }, owned_paths: [route, `${shells}/ConsoleLayout`] };
+  const report = { outcome: 'blocked', summary: 'needs apps/app/package.json and hfs.json', blocker: { kind: 'shared-change' } };
+  const plan = canonSettleFollowUpOf({ payload, report, destinations: ['apps/app/package.json', 'apps/app/tsconfig.json', 'hfs.json', `${SRC}/features/layouts/ConsoleLayout`] });
+  assert.deepEqual(plan.wire.sort(), ['apps/app/package.json', 'apps/app/tsconfig.json', 'hfs.json']);
+  assert.deepEqual(plan.grants, [`${SRC}/features/layouts/ConsoleLayout`]);
+  assert.ok(!plan.wire.some((p) => p.endsWith('architecture.json')), 'the default shared roots are empty');
 });
 
 test('the canon-wire and resume params are kernel-set code.refactor params; the owner families stay the owner\'s', () => {
@@ -121,7 +127,7 @@ test('the canon-plan CLI prints the enqueue commands from a canon-scan record', 
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'starci-canon-plan-'));
   t.after(() => fs.rmSync(dir, { recursive: true, force: true }));
   const file = path.join(dir, 'scan.json');
-  fs.writeFileSync(file, JSON.stringify(scan()));
+  fs.writeFileSync(file, JSON.stringify(scan({ seamOwnsFeatures: true })));
   const cli = spawnSync(process.execPath, [CUT_SEAM, 'canon-plan', '--scan', file, '--cut-id', 'fe-canon'], { cwd: ROOT, encoding: 'utf8', windowsHide: true, timeout: 60000 });
   assert.equal(cli.status, 0, cli.stderr);
   const plan = JSON.parse(cli.stdout);

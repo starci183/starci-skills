@@ -89,12 +89,12 @@ jobs:
         run: npx jest --selectProjects unit
 
       # The aggregate gate for this repository. The architecture check is one of its machine kinds, so it
-      # runs here and nowhere else (docs/architecture-check.md); `--architecture-config` is resolved inside
+      # runs here and nowhere else (docs/architecture-check.md); the layout is derived from `hfs.json` inside
       # `--root`. The process exit code is the verdict - 0 `clean`, 1 `findings`, 2 `unavailable` - and the
       # `starci/code-pattern-check@1` report on stdout is the detail, so no second step re-reads it.
       - name: Scoped lint (nest profile)
         working-directory: .
-        run: node scripts/checks/check-scoped-lint.mjs --profile nest --root examples/todo-app-backend --architecture-config architecture.json --all
+        run: node scripts/checks/check-scoped-lint.mjs --profile nest --root examples/todo-app-backend --all
 
   # 3) todo-app-frontend: type-check, unit tests, lint, production build and the scoped-lint gate.
   frontend:
@@ -142,4 +142,4 @@ jobs:
       # run unpiped so the runner sees that exit code rather than `tee`'s.
       - name: Scoped lint (next profile)
         working-directory: .
-        run: node scripts/checks/check-scoped-lint.mjs --profile next --root examples/todo-app-frontend --architecture-config architecture.json --all
+        run: node scripts/checks/check-scoped-lint.mjs --profile next --root examples/todo-app-frontend --all

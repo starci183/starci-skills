@@ -99,6 +99,11 @@ function check(root) {
   return scoped(checkArchitecture({ repositoryRoot: root, injectedTypeScript: ts }));
 }
 
+/** The unfiltered report, tier-direction findings included (check() drops them). */
+function checkAll(root) {
+  return checkArchitecture({ repositoryRoot: root, injectedTypeScript: ts });
+}
+
 /** The derived owner ids of a fixture (slot id and root), the way the loader lists them. */
 function ownerIds(root) {
   return loadArchitectureConfig(root).owners.map(owner => owner.id);
@@ -160,7 +165,7 @@ test('backend accepts inward composition and narrow bootstrap configuration', t 
     'src/features/http/feature.ts',
     'src/modules/domain/catalog/value.ts',
   ]);
-  assert.ok(result.coverage.checkedRuleIds.includes('BE_MODULE_IMPORTS_FEATURE'));
+  assert.ok(result.coverage.checkedRuleIds.includes('BE_TIER_DIRECTION'));
   assert.ok(result.coverage.checkedRuleIds.includes('ARCH_INTERNAL_IMPORT_UNRESOLVED'));
   assert.equal(result.coverage.checkedRuleIds.some(ruleId => ruleId.startsWith('FE_')), false);
 });
@@ -178,13 +183,13 @@ test('backend resolves aliases, relative imports, and re-export barrels before e
   });
   const result = check(root);
   const rules = new Set(result.violations.map(item => item.ruleId));
-  assert.ok(rules.has('BE_MODULE_IMPORTS_FEATURE'), JSON.stringify(result, null, 2));
-  assert.ok(rules.has('BE_FEATURE_IMPORTS_APP'));
   assert.ok(rules.has('BE_APP_BUSINESS_ROLE'));
   assert.ok(rules.has('BE_APP_COMPOSITION_ONLY'));
-  const barrel = result.violations.find(item => item.path.endsWith('consumer.ts') && item.ruleId === 'BE_MODULE_IMPORTS_FEATURE');
-  assert.deepEqual(barrel.dependencyChain.map(item => path.posix.basename(item)), ['consumer.ts', 'barrel.ts', 'feature.ts']);
+  const all = checkAll(root);
+  const barrel = all.violations.find(item => item.ruleId === 'BE_TIER_DIRECTION' && item.path.endsWith('barrel.ts'));
+  assert.ok(barrel, JSON.stringify(all, null, 2));
   assert.ok(barrel.line > 0 && barrel.column > 0);
+  assert.ok(all.violations.some(item => item.ruleId === 'BE_TIER_DIRECTION' && item.path.endsWith('app-link.ts')), JSON.stringify(all, null, 2));
 });
 
 test('frontend accepts a one-page route, downward tiers, connected hook barrel, and hook-owned transport', t => {
@@ -216,7 +221,8 @@ test('frontend catches route drawing, upward tiers, direct/deep data access, bar
   });
   const result = check(root);
   const rules = new Set(result.violations.map(item => item.ruleId));
-  for (const expected of ['FE_ROUTE_ONE_PAGE', 'FE_TIER_IMPORTS_UPWARD', 'FE_COMPONENT_DEEP_HOOK_IMPORT',
+  assert.ok(checkAll(root).violations.some(item => item.ruleId === 'FE_TIER_DIRECTION' && item.path.endsWith('Leaf/index.tsx')), JSON.stringify(result, null, 2));
+  for (const expected of ['FE_ROUTE_ONE_PAGE', 'FE_COMPONENT_DEEP_HOOK_IMPORT',
     'FE_PURE_REACHES_DATA', 'FE_PURE_WORLD_HOOK', 'FE_FETCH_OUTSIDE_TRANSPORT']) assert.ok(rules.has(expected), `${expected}: ${JSON.stringify(result, null, 2)}`);
   assert.ok(result.violations.find(item => item.ruleId === 'FE_PURE_REACHES_DATA').dependencyChain.some(item => item.endsWith('bridge.ts')));
 });
@@ -430,9 +436,9 @@ test('single-application composition root excludes nested feature/module roots f
     'apps/core/src/app.module.ts': 'import { value } from "@features/orders/value"; export const AppModule = value\n',
     'apps/core/src/main.ts': 'import { AppModule } from "./app.module"; void AppModule\n',
   });
-  const result = check(root);
-  assert.equal(result.violations.some(item => item.ruleId === 'BE_MODULE_IMPORTS_APP'), false, JSON.stringify(result, null, 2));
-  assert.ok(result.violations.some(item => item.ruleId === 'BE_MODULE_IMPORTS_FEATURE'), JSON.stringify(result, null, 2));
+  const result = checkAll(root);
+  assert.equal(result.violations.some(item => item.ruleId === 'BE_TIER_DIRECTION' && item.path.endsWith('apps/core/src/app.module.ts')), false, JSON.stringify(result, null, 2));
+  assert.ok(result.violations.some(item => item.ruleId === 'BE_TIER_DIRECTION' && item.path.endsWith('catalog/consumer.ts')), JSON.stringify(result, null, 2));
 });
 
 test('single-application composition root still refuses a business-role file placed directly at its root', t => {
@@ -457,7 +463,7 @@ test('single-application layout derives its composition root from apps/<app>/src
   });
   const result = check(root);
   assert.ok(result.violations.some(item => item.ruleId === 'BE_APP_BUSINESS_ROLE' && item.path.endsWith('/leaky.service.ts')), JSON.stringify(result, null, 2));
-  assert.equal(result.violations.some(item => item.ruleId === 'BE_MODULE_IMPORTS_APP'), false, JSON.stringify(result, null, 2));
+  assert.equal(checkAll(root).violations.some(item => item.ruleId === 'BE_TIER_DIRECTION' && item.path.endsWith('apps/core/src/app.module.ts')), false, JSON.stringify(result, null, 2));
 });
 
 test('backend workspace packages cannot reach executable app packages through type exports', t => {
@@ -483,9 +489,9 @@ test('backend direction traverses multi-hop type-only imports and barrels', t =>
     'src/modules/platform/shared/barrel.ts': 'export type { FeatureContract } from "../../../features/orders/contract"\n',
     'src/modules/domain/catalog/types.ts': 'import type { FeatureContract } from "../../platform/shared/barrel"; export type CatalogContract = FeatureContract\n',
   });
-  const result = check(root), violation = result.violations.find(item => item.ruleId === 'BE_MODULE_IMPORTS_FEATURE');
+  const result = checkAll(root), violation = result.violations.find(item => item.ruleId === 'BE_TIER_DIRECTION' && item.path.endsWith('barrel.ts'));
   assert.ok(violation, JSON.stringify(result, null, 2));
-  assert.deepEqual(violation.dependencyChain.map(item => path.posix.basename(item)), ['types.ts', 'barrel.ts', 'contract.ts']);
+  assert.equal(violation.typeOnly, true);
 });
 
 test('backend direction includes static dynamic imports that use import attributes', t => {
@@ -493,8 +499,8 @@ test('backend direction includes static dynamic imports that use import attribut
     'src/features/orders/contract.ts': 'export const feature = 1\n',
     'src/modules/domain/catalog/load.ts': 'export const load = () => import("@features/orders/contract", { with: { type: "json" } })\n',
   });
-  const result = check(root);
-  assert.ok(result.violations.some(item => item.ruleId === 'BE_MODULE_IMPORTS_FEATURE'), JSON.stringify(result, null, 2));
+  const result = checkAll(root);
+  assert.ok(result.violations.some(item => item.ruleId === 'BE_TIER_DIRECTION'), JSON.stringify(result, null, 2));
 });
 
 test('TypeScript import types join the dependency graph and direct dynamic module names fail coverage', t => {
@@ -504,8 +510,8 @@ test('TypeScript import types join the dependency graph and direct dynamic modul
     'src/modules/domain/dynamic.ts': 'const selected="@features/private"; export const load=()=>import(selected); export const loadCjs=()=>require(selected)\n',
     'src/modules/domain/shadow.ts': 'const require=(value:string)=>value; const selected="local"; export const local=require(selected)\n',
   });
-  const result = check(root);
-  assert.ok(result.violations.some(item => item.ruleId === 'BE_MODULE_IMPORTS_FEATURE' && item.path.endsWith('/import-type.ts')), JSON.stringify(result, null, 2));
+  const result = checkAll(root);
+  assert.ok(result.violations.some(item => item.ruleId === 'BE_TIER_DIRECTION' && item.path.endsWith('/import-type.ts')), JSON.stringify(result, null, 2));
   const dynamic = result.errors.filter(item => item.ruleId === 'ARCH_DYNAMIC_DEPENDENCY_UNPROVEN');
   assert.equal(dynamic.length, 2, JSON.stringify(result, null, 2));
   assert.ok(dynamic.every(item => item.path.endsWith('/dynamic.ts') && item.line > 0 && item.column > 0));
@@ -948,7 +954,7 @@ test('the architecture CLI exits on the record: 0 ok, 1 violations or errors, 2 
   const out = [];
   const main = (check) => architectureMain([root], { check, write: (text) => out.push(text), fail: () => {} });
   assert.equal(main(() => ({ schema: 'starci/architecture-check@1', ok: true, violations: [], errors: [] })), 0);
-  assert.equal(main(() => ({ schema: 'starci/architecture-check@1', ok: false, violations: [{ ruleId: 'FE_TIER_IMPORTS_UPWARD' }], errors: [] })), 1);
+  assert.equal(main(() => ({ schema: 'starci/architecture-check@1', ok: false, violations: [{ ruleId: 'FE_TIER_DIRECTION' }], errors: [] })), 1);
   assert.equal(main(() => { throw Error('boom'); }), 1, 'a crashing check fails closed');
   assert.equal(JSON.parse(out.at(-1)).errors[0].ruleId, 'ARCH_EXECUTION_UNAVAILABLE');
 });

@@ -8,7 +8,7 @@ npm install
 npm run lint                                                       # eslint-canon-fe, kể cả law shape-slot: 0 lỗi
 npm run typecheck                                                  # tsc: 0 lỗi
 npm run test:unit                                                  # audit spec: 27/27
-node ../../scripts/checks/architecture.mjs . --config architecture.json   # architecture check: ok
+node ../../scripts/checks/architecture.mjs .   # architecture check: ok
 ```
 
 ## Hai trục

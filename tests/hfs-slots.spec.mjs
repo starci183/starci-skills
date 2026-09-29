@@ -255,6 +255,16 @@ test('FE multi-app fixture', () => {
   assert.equal(ok('apps/web/src/components/blocks/Header/component.tsx', 'apps/web/src/components/leaves/Button/component.tsx').reason, 'notPublicEntry');
   assert.equal(ok('apps/web/src/hooks/orders/useOrders.ts', 'apps/web/src/modules/api/index.ts').allowed, true);
   assert.equal(ok('apps/web/src/modules/api/client.ts', 'apps/web/src/hooks/orders/useOrders.ts').reason, 'tierDirection');
+  // components reach foundation modules (config, routes, i18n, types) but never the api transport or a data module
+  for (const capability of ['config', 'routes', 'i18n', 'types']) assert.equal(ok('apps/web/src/components/leaves/Button/index.tsx', `apps/web/src/modules/${capability}/index.ts`).allowed, true, capability);
+  assert.equal(ok('apps/web/src/components/leaves/Button/index.tsx', 'apps/web/src/modules/api/index.ts').reason, 'tierDirection');
+  assert.equal(ok('apps/web/src/components/leaves/Button/index.tsx', 'apps/web/src/modules/query/index.ts').reason, 'tierDirection');
+  assert.equal(ok('apps/web/src/features/pages/Home/index.tsx', 'apps/web/src/modules/query/index.ts').allowed, true);
+  // hooks reach another domain only through its public index
+  assert.equal(ok('apps/web/src/hooks/orders/useOrders.ts', 'apps/web/src/hooks/cart/index.ts').allowed, true);
+  assert.equal(ok('apps/web/src/hooks/orders/useOrders.ts', 'apps/web/src/hooks/cart/useCart.ts').reason, 'notPublicEntry');
+  assert.equal(ok('apps/web/src/hooks/orders/useOrders.ts', 'apps/web/src/hooks/orders/useOrderList.ts').reason, 'sameOwner');
+  assert.equal(ok('apps/web/src/modules/config/index.ts', 'apps/web/src/modules/api/index.ts').reason, 'tierDirection');
   assert.equal(ok('apps/web/src/features/pages/Home/index.tsx', 'packages/nivo-ui/src/index.ts').allowed, true);
   assert.equal(ok('packages/nivo-ui/src/button.ts', 'apps/web/src/modules/api/index.ts').reason, 'tierDirection');
   assert.equal(ok('e2e/checkout/pay.e2e-spec.ts', 'apps/web/src/modules/api/index.ts').reason, 'tierDirection');                            // black box: no app source

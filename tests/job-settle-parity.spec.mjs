@@ -210,11 +210,11 @@ test('a specs skip record is not a claim; node --check re-runs; a preload flag i
 
 test('owedToWire: findings left on owned paths pass only when declared, held by a wire leg and present at base', async () => {
   const { root, base } = checkout({ 'src/slice/a.ts': 'export const a = 1;\n' });
-  const list = [{ file: 'src/slice/a.ts', ruleId: 'ARCH_UNREGISTERED' }];
+  const list = [{ file: 'src/slice/a.ts', ruleId: 'CONFIG_UNWIRED' }];
   const canon = async () => ({ exitCode: 1, status: 'findings', findings: 1, list, root, paths: 1 });
   const item = sliceItem(base, RED);
-  item.report.owedToWire = [{ path: `${path.basename(root)}/src/slice/a.ts`, finding: 'architecture.json registration', ruleId: 'ARCH_UNREGISTERED' }];
-  const wire = [{ jobId: 'op-wire', status: 'queued', ownedPaths: ['architecture.json'] }];
+  item.report.owedToWire = [{ path: `${path.basename(root)}/src/slice/a.ts`, finding: 'package.json wiring', ruleId: 'CONFIG_UNWIRED' }];
+  const wire = [{ jobId: 'op-wire', status: 'queued', ownedPaths: ['package.json'] }];
   const atBase = async () => ({ ok: true, findings: list });
   const ok = await canonParityVerdict(item, seams(root, { canon, wireLegs: () => wire, canonBase: atBase }));
   assert.equal(ok.green, true, JSON.stringify(ok));

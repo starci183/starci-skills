@@ -8,12 +8,6 @@ import { isUnshadowedCommonJsRequire, reachableViolation, relativePath, sourceLo
 const FEATURE_TIERS = new Set(['pages', 'layouts', 'overlays']);
 const COMPONENT_TIERS = new Set(['blocks', 'composites', 'branches', 'leaves']);
 const LOWER_COMPONENT_TIERS = new Set(['composites', 'branches', 'leaves']);
-const FORBIDDEN_UPWARD = {
-  leaves: new Set(['branches', 'composites', 'blocks']),
-  branches: new Set(['composites', 'blocks']),
-  composites: new Set(['blocks']),
-  blocks: new Set(),
-};
 const WORLD_NAVIGATION_CALLS = new Set(['useParams', 'usePathname', 'useRouter', 'useSearchParams', 'useSelectedLayoutSegment', 'useSelectedLayoutSegments']);
 const WORLD_INTL_CALLS = new Set(['useLocale', 'useMessages', 'useNow', 'useTimeZone', 'useTranslations']);
 const WORLD_SWR_CALLS = new Set(['default', 'useSWR', 'useSWRConfig', 'useSWRImmutable', 'useSWRMutation']);
@@ -380,55 +374,6 @@ function checkFrontendSourceLayout(config, sourceFile, roots) {
         : 'Every authored custom hook is grouped below a domain folder under hooks; only the root public entry may sit directly under hooks.' }];
 }
 
-function publicFeatureEntry(config, roots, fileName) {
-  const root = rootFor(roots.features, fileName);
-  if (!root) return false;
-  const parts = relativePath(root, fileName).split('/');
-  const shaped = parts.length === 1 ? roleEntry(parts[0])
-    : parts.length === 3 && FEATURE_TIERS.has(parts[0]) && /^index\.[cm]?[jt]sx?$/i.test(parts[2]);
-  if (!shaped) return false;
-  if (config.owners === null) return true;
-  const target = canonical(fileName);
-  return Boolean(config.owners?.some(owner => canonical(path.resolve(config.root, ...owner.entry.split('/'))) === target));
-}
-
-// A framework-pinned root file is a thin adapter: every resolved internal import or re-export, type-only
-// included, enters modules or a feature public entry. Framework and external package imports stay valid.
-function checkFrameworkAdapterImports(config, context, sourceFile, roots) {
-  if (roleFor(roots, sourceFile.fileName) || !frameworkPinnedRoot(roots, sourceFile.fileName)) return [];
-  return importsForSource(context, sourceFile.fileName)
-    .filter(edge => !insideAny(roots.modules, edge.to) && !(insideAny(roots.features, edge.to) && publicFeatureEntry(config, roots, edge.to)))
-    .map(edge => ({ ruleId: 'FE_FRAMEWORK_ADAPTER_IMPORT', path: relativePath(config.root, sourceFile.fileName), line: edge.line, column: edge.column,
-      specifier: edge.specifier, resolvedPath: relativePath(config.root, edge.to),
-      message: `${path.basename(sourceFile.fileName)} is a framework-pinned root adapter: its internal imports enter modules or a feature public entry only; framework and external package imports remain valid.` }));
-}
-
-function checkFrontendDirection(config, context, sourceFile, roots) {
-  const located = roleFor(roots, sourceFile.fileName);
-  if (!located) return [];
-  const violations = [];
-  for (const edge of importsForSource(context, sourceFile.fileName)) {
-    if (located.role === 'routes' && (!insideAny(roots.features, edge.to) || !publicFeatureEntry(config, roots, edge.to))) {
-      violations.push({ ruleId: 'FE_APP_INTERNAL_IMPORT_OUTSIDE_FEATURES', path: relativePath(config.root, sourceFile.fileName), line: edge.line, column: edge.column,
-        specifier: edge.specifier, resolvedPath: relativePath(config.root, edge.to),
-        message: 'Next app adapters may import internal project code only through a feature public entry; framework and external package imports remain valid.' });
-      continue;
-    }
-    const forbidden = located.role === 'features' ? roots.routes
-      : located.role === 'components' ? [...roots.routes, ...roots.features]
-        : located.role === 'hooks' ? [...roots.routes, ...roots.features, ...roots.components]
-          : located.role === 'modules' ? [...roots.routes, ...roots.features, ...roots.components, ...roots.hooks]
-            : [];
-    if (!forbidden.length) continue;
-    const chain = reachableViolation(context.edges, edge, target => insideAny(forbidden, target), { follow: () => true });
-    if (!chain) continue;
-    violations.push({ ruleId: 'FE_FEATURE_DEPENDENCY_DIRECTION', path: relativePath(config.root, sourceFile.fileName), line: edge.line, column: edge.column,
-      specifier: edge.specifier, resolvedPath: relativePath(config.root, chain.at(-1)), dependencyChain: chain.map(item => relativePath(config.root, item)),
-      message: `${located.role} cannot depend upward on app, features, components or hooks outside its allowed responsibility direction.` });
-  }
-  return violations;
-}
-
 function declarationName(ts, declaration) {
   if ((ts.isFunctionDeclaration(declaration) || ts.isMethodDeclaration(declaration) || ts.isVariableDeclaration(declaration))
     && declaration.name && ts.isIdentifier(declaration.name)) return declaration.name;
@@ -481,12 +426,6 @@ function checkPureAndData(config, context, sourceFile, roots) {
   const pure = path.basename(fileName).toLowerCase() === 'component.tsx';
   for (const edge of importsForSource(context, fileName)) {
     if (!edge.runtime) continue;
-    const transportChain = reachableViolation(context.edges, edge, target => insideAny(roots.transport, target), { follow: candidate => candidate.reexport && candidate.runtime });
-    if (transportChain) {
-      violations.push({ ruleId: 'FE_COMPONENT_IMPORTS_TRANSPORT', path: relativePath(config.root, fileName), line: edge.line, column: edge.column,
-        specifier: edge.specifier, resolvedPath: relativePath(config.root, transportChain.at(-1)), dependencyChain: transportChain.map(item => relativePath(config.root, item)),
-        message: 'Components cannot import the API transport at runtime; a data hook or server route adapter owns the request.' });
-    }
     const configuredHookBarrel = insideAny(roots.hooks, edge.to) && /^index\.[cm]?[jt]sx?$/i.test(path.basename(edge.to));
     const hookChain = configuredHookBarrel ? null
       : reachableViolation(context.edges, edge, target => insideAny(roots.hooks, target), { follow: candidate => candidate.reexport && candidate.runtime });
@@ -1030,24 +969,6 @@ function checkWorldRenderBoundaries(config, context, roots) {
   return violations;
 }
 
-function checkTierDirection(config, context, sourceFile, roots) {
-  const violations = [];
-  const source = tierOf(roots.components, sourceFile.fileName);
-  if (!source) return violations;
-  for (const edge of importsForSource(context, sourceFile.fileName)) {
-    const chain = reachableViolation(context.edges, edge, candidate => {
-      const targetTier = tierOf(roots.components, candidate);
-      return targetTier && FORBIDDEN_UPWARD[source.tier].has(targetTier.tier);
-    });
-    if (!chain) continue;
-    const target = tierOf(roots.components, chain.at(-1));
-    violations.push({ ruleId: 'FE_TIER_IMPORTS_UPWARD', path: relativePath(config.root, sourceFile.fileName), line: edge.line, column: edge.column,
-      specifier: edge.specifier, resolvedPath: relativePath(config.root, chain.at(-1)), dependencyChain: chain.map(item => relativePath(config.root, item)),
-      message: `${source.tier} cannot depend on ${target.tier}, including through an alias, package export, or barrel.` });
-  }
-  return violations;
-}
-
 function checkRawFetch(config, context, sourceFile, roots) {
   if (insideAny(roots.transport, sourceFile.fileName) || insideAny(roots.routes, sourceFile.fileName)) return [];
   const { ts } = context;
@@ -1083,11 +1004,8 @@ export function checkFrontend(config, context) {
       violations.push(...checkRoute(config, context, sourceFile, roots));
     }
     violations.push(...checkFrontendSourceLayout(config, sourceFile, roots));
-    violations.push(...checkFrameworkAdapterImports(config, context, sourceFile, roots));
-    violations.push(...checkFrontendDirection(config, context, sourceFile, roots));
     violations.push(...checkCustomHookLocations(config, context, sourceFile, roots));
     violations.push(...checkPureAndData(config, context, sourceFile, roots));
-    violations.push(...checkTierDirection(config, context, sourceFile, roots));
     violations.push(...checkRawFetch(config, context, sourceFile, roots));
   }
   violations.push(...checkWorldRenderBoundaries(config, context, roots));

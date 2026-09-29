@@ -79,7 +79,7 @@ test('a small fixture tree cuts into disjoint slices: seams first, bounded size,
       ...findings(['src/components/pages/OperatePage/component.tsx', 'src/components/leaves/MoneyText/index.tsx']),
       ...findings(['src/hooks/sales/useQueryOrderSwr.ts'], 'naming'),
       ...findings(['src/app/[lang]/(site)/layout.tsx'], 'file-layout'),
-      { machine: 'architecture', ruleId: 'FE_APP_INTERNAL_IMPORT_OUTSIDE_FEATURES', family: 'architecture', file: 'src/app/[lang]/(site)/about/page.tsx', line: 1, fixable: false, related: 'src/components/pages/AboutPage/index.tsx' },
+      { machine: 'architecture', ruleId: 'FE_TIER_DIRECTION', family: 'architecture', file: 'src/app/[lang]/(site)/about/page.tsx', line: 1, fixable: false, related: 'src/components/pages/AboutPage/index.tsx' },
     ];
     const seams = seamPaths(root, list, conformance.seams.next);
     assert.deepEqual(seams.map((seam) => [seam.path, seam.exists]), [

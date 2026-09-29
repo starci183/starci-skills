@@ -57,13 +57,11 @@ rules:
     rationale: A reusable capability must not require its delivery-specific caller to exist.
     verification:
       automated:
-        - BE_MODULE_IMPORTS_FEATURE
-        - BE_MODULE_IMPORTS_APP
-        - BE_FEATURE_IMPORTS_APP
+        - BE_TIER_DIRECTION
         - ARCH_PACKAGE_IMPORTS_APP
         - ARCH_PACKAGE_EXPORT_BYPASS
         - ARCH_INTERNAL_IMPORT_UNRESOLVED
-        - FE_TIER_IMPORTS_UPWARD
+        - FE_TIER_DIRECTION
       manual:
         - Review semantic ownership and cycles beyond the supported static checks.
   - id: ARCH-PUBLIC-API
@@ -100,7 +98,7 @@ rules:
       automated:
         - BE_APPLICATION_IMPORTS_TRANSPORT
         - BE_APPLICATION_TRANSPORT_FRAMEWORK
-        - FE_COMPONENT_IMPORTS_TRANSPORT
+        - FE_TIER_DIRECTION
       manual:
         - Review semantic validation and DTO mapping as design obligations; missing mechanical path/type
           coverage is a code-check gap, not a manual waiver.

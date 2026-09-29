@@ -44,6 +44,11 @@ rules:
       # these basenames directly in a Next source root; FE_FRAMEWORK_ADAPTER_IMPORT keeps them thin). Exact names,
       # case-sensitive, no globs. It lists what the framework loads from the source root. Which of them a repository may
       # keep is decided by the slot fe.source-root-pinned and FE_NEXT_CONVENTIONS, not by this list.
+      # Machine list read by scripts/checks/architecture/framework-pinned.mjs (FE_SOURCE_LAYOUT_INVALID
+      # accepts exactly these basenames directly in a Next source root;
+      # their imports follow the FE_TIER_DIRECTION matrix). Exact names, case-sensitive, no globs. Supervisor rulings for nivo
+      # wf-nivo-fe-debt-mug06w7h inc-2e42a24b74e4 and inc-846867b9a34e (proxy is the Next 16 name of
+      # middleware, listed so the list survives the upgrade).
       - middleware.ts
       - middleware.js
       - middleware.mjs
@@ -104,8 +109,8 @@ rules:
         - HFS_SLOT_UNDECLARED
         - HFS_SLOT_REQUIRED_MISSING
         - FE_SOURCE_LAYOUT_INVALID
-        - FE_FRAMEWORK_ADAPTER_IMPORT
         - FE_NEXT_CONVENTIONS
+        - FE_TIER_DIRECTION
         - FE_CUSTOM_HOOK_LOCATION
         - HFS_APPS_REQUIRED
         - HFS_ROOT_SRC_FORBIDDEN_FE
@@ -190,7 +195,7 @@ rules:
         - FE_ROUTE_FILES_THIN
         - FE_CLIENT_BOUNDARY
         - FE_OWNER_REACHABLE
-        - FE_APP_INTERNAL_IMPORT_OUTSIDE_FEATURES
+        - FE_TIER_DIRECTION
       manual:
         - Confirm visual routes have one page owner and redirect-only routes have no visual tree.
     relatedExamples: []
@@ -230,8 +235,8 @@ rules:
       automated:
         - FE_HOOKS_ARE_HOOKS
         - FE_CUSTOM_HOOK_LOCATION
-        - FE_FEATURE_DEPENDENCY_DIRECTION
         - HFS_DUPLICATE_CODE
+        - FE_TIER_DIRECTION
       manual:
         - Confirm each lifecycle has one feature owner and transport mechanics have one module owner.
     relatedExamples:
