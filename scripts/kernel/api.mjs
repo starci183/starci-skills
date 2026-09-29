@@ -56,7 +56,7 @@ import cp, { spawn, spawnSync } from 'node:child_process';
 import { syncBuiltinESMExports } from 'node:module';
 import {
   openLedger, ledgerFileFor, newToken, JOB_STATUSES, reserveTwoPhase,
-  startAttempt, writeContract, updateContractContext, updateAttempt, setJobStatus, recordJobResult, releaseLeases, openIncident,
+  startAttempt, writeContract, updateContractContext, updateAttempt, endRejectedAttempt, setJobStatus, recordJobResult, releaseLeases, openIncident,
   updateJob, updateIncident, resolveIncident, renewLeases, setSignal, clearSignal, setInboxStatus, jobResult, setUnitState, getUnit,
 } from '../../engine/ledger-db.mjs';
 import { machineFileFor, openMachine } from '../../engine/machine-db.mjs';
@@ -2059,10 +2059,13 @@ const screenTailOf = (screen) => {
   const rows = String(screen ?? '').split(/\r?\n/).map((line) => line.trimEnd()).filter(Boolean).slice(-15);
   return rows.length ? rows.join('\n').slice(-1500) : null;
 };
+// The one human-readable line of a refused launch (op attempt settle_json.message, the UI): what step refused it and why.
+export const dispatchRejectedMessage = ({ step, signal = null, error = null }) =>
+  `dispatch rejected at ${step ?? 'launch'}${signal ? ` (${signal})` : ''}${error ? `: ${String(error).slice(0, 300)}` : ''}; no try spent, the job goes back to ready`;
 const rejectDispatch = (ledger, job, jobId, op, model, {
   step, signal = null, error = null, terminal = null, incident = false, attemptId = null,
   effectState = 'none', details = null, providerHealthEvidence = null,
-  closeTerminal = null, alreadyClosed = false, settled = null, createRecovery = null, trust = null,
+  closeTerminal = null, alreadyClosed = false, settled = null, createRecovery = null, trust = null, task = null,
 }) => {
   // A provider whose card declares an outage key: its outage codes in the failure text, or its outage
   // error row on the refused terminal's screen, open that outage circuit (not the auth one).
@@ -2072,6 +2075,10 @@ const rejectDispatch = (ledger, job, jobId, op, model, {
     : null;
   const authFailure = !outageFailure && (Boolean(providerHealthEvidence) || confirmedAuthFailure({ step, signal, error, details }));
   const { terminalClosed, closed } = closeRejectedLaunch({ model, terminal, closeTerminal, alreadyClosed, settled, effectState });
+  // The Orca Task the refused attempt opened is closed with its terminal (the retry opens its own): a refusal leaves
+  // no open worker-task entry behind. An unknown effect keeps its Task: reconcile proves the state first.
+  const taskClosed = task?.taskId && effectState === 'none'
+    ? closeOperationTask(ledger.db, job, { orca: { taskId: task.taskId, runId: task.runId ?? null } }, task.kernelHandle ?? null) : null;
   // rejectDispatch is reached only before an accepted operation contract or
   // business verdict. Once the host proves effectState:none, the same durable
   // candidate is safe to reroute regardless of whether the infrastructure
@@ -2133,7 +2140,8 @@ const rejectDispatch = (ledger, job, jobId, op, model, {
     const result = {
       reason: 'dispatch-rejected', step, signal, detail: error, provider: model.provider,
       effectState, attemptConsumed: false, retryable: reusable, providerHealth, at: now,
-      terminalClosed, ...(closed ? { closed } : {}),
+      message: dispatchRejectedMessage({ step, signal, error }),
+      terminalClosed, ...(closed ? { closed } : {}), ...(taskClosed ? { taskClosed } : {}),
     };
     const db = ledger.db, current = db.prepare('SELECT status FROM jobs WHERE job_id=?').get(jobId)?.status;
     if (reusable) setJobStatus(db, { jobId, to: 'ready', reason: `dispatch-rejected:${step}`, at: now, payload: priorPayload, workerId: null, leaseToken: null, deadline: null });
@@ -2141,14 +2149,17 @@ const rejectDispatch = (ledger, job, jobId, op, model, {
       if (current === 'leased') setJobStatus(db, { jobId, to: 'running', reason: `dispatch-rejected:${step}`, at: now, workerId: terminal ?? null });
       setJobStatus(db, { jobId, to: 'effect_unknown', reason: `dispatch-rejected:${step}`, at: now, payload: priorPayload });
     }
-    if (attemptId != null) updateAttempt(db, { attemptId, at: now, endState: reusable ? 'requeued' : 'effect-unknown', effectState });
+    // The attempt row ends in the same transaction as the refusal: never left open, never a try of the unit.
+    if (attemptId != null) endRejectedAttempt(db, { attemptId, at: now, endState: reusable ? 'requeued' : 'effect-unknown', effectState,
+      releasedAt: reusable ? now : null, taskClosedAt: taskClosed?.ok === true ? now : null });
     recordJobResult(db, { jobId, result, at: now });
     ledger.appendEvent({
-      workflowId: job.workflow_id, entityType: 'job', entityId: jobId,
+      workflowId: job.workflow_id, entityType: 'job', entityId: jobId, ...(attemptId != null ? { attemptId } : {}),
       kind: 'dispatch-rejected',
       payload: { op, step, signal, error, provider: model.provider, model: model.target, terminal,
         effectState, attemptConsumed: false, retryable: reusable, leasesReleased, providerHealth,
-        terminalClosed, ...(closed ? { closed } : {}), ...(createRecovery ? { createRecovery } : {}), ...(trust ? { trust } : {}),
+        terminalClosed, ...(closed ? { closed } : {}), ...(taskClosed ? { taskClosed } : {}), ...(attemptId != null ? { attemptId } : {}),
+        ...(createRecovery ? { createRecovery } : {}), ...(trust ? { trust } : {}),
         ...(screenTailOf(details?.screen) ? { screenTail: screenTailOf(details.screen) } : {}) },
     });
     if (providerHealth) {
@@ -2168,7 +2179,7 @@ const rejectDispatch = (ledger, job, jobId, op, model, {
     }
   });
   return { status, effectState, attemptConsumed: false, retryable: reusable, providerHealth,
-    terminalClosed, ...(closed ? { closed } : {}) };
+    terminalClosed, ...(closed ? { closed } : {}), ...(taskClosed ? { taskClosed } : {}) };
 };
 
 // gate-auto-approved: one event per launch gate the runtime answered

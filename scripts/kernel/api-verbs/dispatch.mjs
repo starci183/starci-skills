@@ -541,7 +541,7 @@ export default {
       step: spawned.step, signal: spawned.signal ?? null, error: spawned.error ?? null,
       terminal: handle, closeTerminal: handle, alreadyClosed: true,
       incident: spawned.step === 'attestation', details: spawned,
-      createRecovery: spawned.createRecovery ?? null, trust: spawned.trust ?? null,
+      createRecovery: spawned.createRecovery ?? null, trust: spawned.trust ?? null, task: { taskId, runId, kernelHandle },
     });
     const out = { ok: false, jobId, rejected: 'dispatch-rejected', packet, rejection, spawn: { ...spawn, reason } };
     emit(out, `dispatch REJECTED for ${jobId} (${spawned.step}): ${reason} — job status=${rejection.status}, terminal closed`, args.json);
@@ -557,6 +557,7 @@ export default {
     const rejection = rejectDispatch(ledger, job, jobId, op, model, {
       step, signal, error, terminal: dispatchId ?? handle, closeTerminal: handle, attemptId,
       incident, effectState: 'none', details, createRecovery: spawned.createRecovery ?? null, trust: spawned.trust ?? null,
+      task: { taskId, runId, kernelHandle },
     });
     const reason = signal ?? error ?? `command-terminal dispatch failed at ${step}`;
     emit({ ok: false, jobId, rejected: 'dispatch-rejected', packet, rejection, step, dispatchId, terminal: handle, error: reason },

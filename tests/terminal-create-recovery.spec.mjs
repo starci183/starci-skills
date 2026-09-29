@@ -105,7 +105,15 @@ const opFixture=(t,extra={})=>{
     try{return l.db.prepare('SELECT status,worker_id FROM jobs WHERE job_id=?').get(jobId);}finally{l.close();}
   };
   const live=()=>Object.values(orcaState().terminals??{}).filter(term=>!term.closed).map(term=>term.handle);
-  return {repo,dispatch,events,job,live,orcaState};
+  const attempts=()=>{
+    const l=inspectLedger({file:ledgerFileFor(repo,{env})});
+    try{return l.db.prepare('SELECT * FROM op_attempts WHERE job_id=? ORDER BY attempt_id').all(jobId);}finally{l.close();}
+  };
+  const unit=()=>{
+    const l=inspectLedger({file:ledgerFileFor(repo,{env})});
+    try{return l.db.prepare('SELECT tries,dispatches FROM work_units WHERE unit_id=?').get(`unit-${jobId}`);}finally{l.close();}
+  };
+  return {repo,dispatch,events,job,live,orcaState,attempts,unit};
 };
 
 test('create-timeout-then-adopt: the op adopts the terminal the timed-out create made',t=>{
@@ -171,6 +179,26 @@ test('stuck-paste-then-reject: a paste that survives the Enter is refused and it
   assert.equal(fx.orcaState().terminals['fake-terminal-1'].enters,1,'Enter is sent once, never hammered');
   assert.deepEqual(fx.live(),[]);
   assert.equal(fx.job()?.status,'ready');
+});
+
+test('a refused launch closes its attempt in the same transaction: ended, released, its Task closed, no try or dispatch spent',t=>{
+  const fx=opFixture(t,{STARCI_FAKE_ORCA_STUCK_PASTE:'never'});
+  assert.notEqual(fx.dispatch().status,0);
+  const [attempt]=fx.attempts();
+  assert.equal(fx.attempts().length,1);
+  assert.equal(attempt.end_state,'requeued');
+  assert.ok(attempt.settled_at>0&&attempt.released_at>0,'a closed attempt is neither open (settled_at) nor unreleased');
+  assert.equal(attempt.settled_by,'kernel');
+  assert.equal(attempt.verdict,null,'nothing was judged');
+  assert.ok(attempt.task_closed_at>0,'the Orca Task the refusal opened is closed with it');
+  const result=JSON.parse(attempt.settle_json);
+  assert.equal(result.reason,'dispatch-rejected');
+  assert.match(result.message,/dispatch rejected at submission \(prompt-stuck\).*no try spent/);
+  assert.equal(result.taskClosed?.ok,true);
+  const [rejected]=fx.events('dispatch-rejected');
+  assert.equal(rejected.attemptId,attempt.attempt_id);
+  assert.ok(fx.orcaState().taskUpdates?.some(u=>u.status==='completed'&&u.id===result.taskClosed.taskId),'the Task was updated closed');
+  assert.deepEqual({...fx.unit()},{tries:1,dispatches:0},'the refused launch is not a dispatch the unit spent');
 });
 
 /* ------------------------------------------------------------ kernel boot */

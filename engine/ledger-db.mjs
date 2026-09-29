@@ -704,6 +704,24 @@ export function updateAttempt(db,{attemptId,at=nowMs(),...fields}){
     payload:Object.fromEntries(marks),createdAt:at});
   return true;
 }
+/**
+ * A launch the host refused ends its attempt here, in the refusal's own transaction: end_state requeued (nothing ran, the
+ * job goes back to ready) or effect-unknown (a worker may have started; reconcile decides). A requeued attempt is also
+ * settled by the kernel (settled_at, no verdict: nothing was judged) and released, so every reader that asks "still open?"
+ * answers no; task_closed_at is stamped when its Orca Task was closed. A refused launch is never a try of the unit and
+ * never a dispatch it spent: work_units.dispatches (the "attempts" the UI counts) gives the slot back. The legacy shape
+ * (end_state requeued written by the refusal, settled_at and released_at never stamped) is sealed the same way, once.
+ * An attempt that is already sealed or ended otherwise is left alone (returns false).
+ */
+export function endRejectedAttempt(db,{attemptId,endState,effectState,releasedAt=null,taskClosedAt=null,at=nowMs()}){
+  need(['requeued','effect-unknown'].includes(endState),`a refused launch ends requeued or effect-unknown, not ${endState}`);
+  const row=db.prepare('SELECT * FROM op_attempts WHERE attempt_id=?').get(attemptId);
+  need(row,`attempt ${attemptId} not found`,'STARCI_ATTEMPT_NOT_FOUND');
+  if(row.settled_at!=null||!(row.end_state==null||row.end_state==='requeued'))return false;
+  updateAttempt(db,{attemptId,at,endState,effectState,...(releasedAt!=null?{releasedAt,settledAt:releasedAt,settledBy:'kernel'}:{}),...(taskClosedAt!=null?{taskClosedAt}:{})});
+  if(row.unit_id)db.prepare('UPDATE work_units SET dispatches=max(dispatches-1,0),updated_at=? WHERE workflow_id=? AND unit_id=?').run(at,row.workflow_id,row.unit_id);
+  return true;
+}
 /** Re-baseline an attempt's contract context (settle's input digests); the markdown and revision never change. */
 export function updateContractContext(db,{attemptId,context}){
   need(db.prepare('SELECT 1 FROM contracts WHERE attempt_id=?').get(attemptId),`contract of attempt ${attemptId} not found`);
@@ -1043,7 +1061,7 @@ export function deleteWorkflowRows(db,{workflowId}){
 
 /** Every typed write, for the handle's `write` namespace. */
 export const LEDGER_WRITES=Object.freeze({recordBlob,storeBlob,appendEvent,createWorkflow,ensureWorkflow,changeWorkflowPhase,updateWorkflow,insertGoal,recordGoalInput,
-  createUnit,setUnitState,reopenUnit,raiseTryBudget,addUnitEdge,recordGraphVersion,enqueueJob,setJobStatus,updateJob,startAttempt,updateAttempt,writeContract,
+  createUnit,setUnitState,reopenUnit,raiseTryBudget,addUnitEdge,recordGraphVersion,enqueueJob,setJobStatus,updateJob,startAttempt,updateAttempt,endRejectedAttempt,writeContract,
   declareResource,acquireLease,renewLeases,releaseLeases,idempotent,recordFailedRequest,fileReport,markReportConsumed,recordCheckRun,recordArtifact,attachToReport,
   recordArtifactProof,citeBlob,recordTranscriptSnapshot,setAttemptTranscript,recordLlmUsage,appendLog,setLogCursor,setCondition,openIncident,updateIncident,resolveIncident,
   postInbox,setInboxStatus,setInboxStatusByKey,updateGoalJson,openDecisionItem,updateDecisionItem,recordDecision,setSignal,updateSignal,clearSignal,queueSettleTail,recordJobResult,bindKernelJob,releaseKernelJob,recordPurge,deleteWorkflowRows,markBlobArchived,pruneAttemptSnapshots,upsertFoundation,declareFoundations,recordPathTransfer,recordRecordChange,updateSettleTail,recordProductLand,finishProductLand});
