@@ -11,8 +11,7 @@
 // What stays here is what that circuit and this probe need:
 //   probe()       credential presence only: 'dead' with no key, else 'ok'
 //                 (usedPercent null - there is no local meter)
-//   qwenPlan()    the config.yaml quota.qwen block normalized; the validator
-//                 still accepts every documented field, only resetAt is read
+//   qwenPlan()    the config.yaml quota.qwen block normalized: {resetAt}
 //   planWindow()  the plan window around `now`, rolled forward a month at a time
 //   nextResetAt() the next plan reset instant (ms) or null without config: a quota
 //                 circuit expires at it, and the recovery probe runs right after it

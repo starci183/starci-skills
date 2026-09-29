@@ -353,14 +353,13 @@ export function validateConfig(config){
     if(!(repos===undefined||repos===null||(Array.isArray(repos)&&repos.every(repo=>typeof repo==='string'&&repo.trim()))))
       throw Error('Invalid config.yaml: supervisor.repos must be a list of ledger-owner repository paths, or null.');
   }
-  // quota {qwen?: {planQuota, unit?, resetAt, calibratedRemainingPercent?, calibratedAt?}}: the plan figures the
-  // provider exposes no API for. Qwen is the unmetered base pool: only resetAt is read (scripts/api/quota/qwen.mjs
-  // nextResetAt, for the quota circuit); the other fields stay accepted so existing owner configs keep validating.
+  // quota {qwen?: {resetAt}}: the plan reset the provider exposes no API for. Qwen is the unmetered base pool: only
+  // resetAt is read (scripts/api/quota/qwen.mjs nextResetAt, for the quota circuit).
   if(config?.quota!==undefined&&config.quota!==null){
     const quota=config.quota,qwen=quota?.qwen;
     if(!plain(quota)||Object.keys(quota).some(key=>key!=='qwen'))throw Error('Invalid config.yaml: quota must be {qwen?}, or null.');
-    if(!(qwen===undefined||qwen===null||(plain(qwen)&&Object.keys(qwen).every(key=>['planQuota','unit','resetAt','calibratedRemainingPercent','calibratedAt'].includes(key))&&Number(qwen.planQuota)>0&&Number.isFinite(Date.parse(String(qwen.resetAt)))&&(qwen.unit===undefined||['requests','tokens'].includes(qwen.unit)))))
-      throw Error('Invalid config.yaml: quota.qwen must be {planQuota: >0, unit?: requests|tokens, resetAt: <ISO>, calibratedRemainingPercent?, calibratedAt?}, or null.');
+    if(!(qwen===undefined||qwen===null||(plain(qwen)&&Object.keys(qwen).every(key=>key==='resetAt')&&Number.isFinite(Date.parse(String(qwen.resetAt))))))
+      throw Error('Invalid config.yaml: quota.qwen must be {resetAt: <ISO>}, or null.');
   }
   if(config?.delegation!==undefined&&config.delegation!==null){
     const d=config.delegation;

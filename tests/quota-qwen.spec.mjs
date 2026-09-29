@@ -19,9 +19,7 @@ import { validateConfig } from '../engine/config.mjs';
 const tmp = (t, prefix) => { const dir = fs.mkdtempSync(path.join(os.tmpdir(), prefix)); t.after(() => fs.rmSync(dir, { recursive: true, force: true, maxRetries: 20, retryDelay: 25 })); return dir; };
 
 const PLAN = {
-  planQuota: 180000, unit: 'requests',
   resetAt: '2026-10-11T23:00:00+07:00',
-  calibratedRemainingPercent: 86.6, calibratedAt: '2026-09-24T20:35:50+07:00',
 };
 const CFG = { quota: { qwen: PLAN } };
 const NOW = Date.parse('2026-09-24T22:00:00+07:00');
@@ -59,8 +57,6 @@ test('the probe is credential presence only: dead without a key, ok with one, ne
   const dotenv = tmp(t, 'starci-qwen-dotenv-');
   fs.writeFileSync(path.join(dotenv, '.env'), 'DASHSCOPE_API_KEY=spec-dotenv\n');
   assert.equal(qwen.probe({ env: {}, home: dotenv, config: CFG, now: NOW }).state, 'ok', 'the .env file is a credential source too');
-  // A spent-looking calibration in config no longer moves the probe: blocking is the quota circuit's job.
-  assert.equal(qwen.probe({ env: CRED, home, config: { quota: { qwen: { ...PLAN, calibratedRemainingPercent: 0 } } }, now: NOW }).state, 'ok');
   assert.equal(qwen.probe({ env: CRED, home, config: {}, now: NOW }).resetsAt, null);
 });
 
@@ -74,7 +70,7 @@ test('resetAt stays in use: the plan window rolls forward a month at a time', ()
   const plan = qwen.qwenPlan(parseYaml(stringifyYaml(CFG)));
   assert.deepEqual(plan, { resetAt: Date.parse(PLAN.resetAt) });
   assert.equal(qwen.qwenPlan({}), null);
-  assert.equal(qwen.qwenPlan({ quota: { qwen: { planQuota: 1 } } }), null, 'no resetAt, no plan');
+  assert.equal(qwen.qwenPlan({ quota: { qwen: {} } }), null, 'no resetAt, no plan');
   assert.equal(qwen.nextResetAt({ config: CFG, now: NOW }), Date.parse(PLAN.resetAt));
   const after = Date.parse('2026-10-12T00:00:00+07:00');
   assert.equal(qwen.nextResetAt({ config: CFG, now: after }), Date.parse('2026-11-11T23:00:00+07:00'));
@@ -82,10 +78,11 @@ test('resetAt stays in use: the plan window rolls forward a month at a time', ()
   assert.equal(qwen.nextResetAt({ config: {}, now: NOW }), null);
 });
 
-test('the config validator still accepts every documented quota.qwen field', () => {
+test('the config validator accepts quota.qwen {resetAt} only', () => {
   const base = parseYaml(fs.readFileSync(new URL('../config.example.yaml', import.meta.url), 'utf8'));
   assert.doesNotThrow(() => validateConfig({ ...base, quota: CFG.quota }));
-  assert.doesNotThrow(() => validateConfig({ ...base, quota: { qwen: { planQuota: 1, resetAt: PLAN.resetAt } } }));
+  assert.throws(() => validateConfig({ ...base, quota: { qwen: { planQuota: 1, resetAt: PLAN.resetAt } } }), /quota\.qwen/);
+  assert.throws(() => validateConfig({ ...base, quota: { qwen: { resetAt: PLAN.resetAt, calibratedAt: PLAN.resetAt } } }), /quota\.qwen/);
   assert.throws(() => validateConfig({ ...base, quota: { qwen: { resetAt: PLAN.resetAt, meter: 'x' } } }), /quota\.qwen/);
 });
 

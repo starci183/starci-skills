@@ -207,8 +207,7 @@ const RESET = '2099-01-15T00:00:00Z';
 const ownerRoot = (t) => {
   const dir = tmp(t, 'starci-qb-owner-');
   const config = read('config.example.yaml');
-  fs.writeFileSync(path.join(dir, 'config.yaml'), stringifyYaml({ ...config, quota: { qwen: { planQuota: 180000, unit: 'requests', resetAt: RESET,
-    calibratedRemainingPercent: 50, calibratedAt: '2026-09-24T20:35:50+07:00' } } }));
+  fs.writeFileSync(path.join(dir, 'config.yaml'), stringifyYaml({ ...config, quota: { qwen: { resetAt: RESET } } }));
   return dir;
 };
 const runApi = (env, ...args) => new Promise((resolve) => {
@@ -425,7 +424,7 @@ test('a still-spent plan past its reset rolls the circuit to the next reset', as
   // The owner config's resetAt lies in the past: the next reset is the same day-of-month rolled forward.
   const past = new Date(Date.now() - 3 * 86400000);
   fs.writeFileSync(path.join(fx.env.STARCI_OWNER_ROOT, 'config.yaml'),
-    stringifyYaml({ ...read('config.example.yaml'), quota: { qwen: { planQuota: 1, resetAt: past.toISOString() } } }));
+    stringifyYaml({ ...read('config.example.yaml'), quota: { qwen: { resetAt: past.toISOString() } } }));
   fx.machine((m) => writeProviderCircuit('qwen', { machine: m, expiresAt: Date.now() + 600000,
     value: { provider: 'qwen', status: 'unavailable', failureKind: 'quota', jobId: 'job-qwen-a', resetAt: past.getTime(), observedAt: past.getTime() - 1000 } }));
   const r = await fx.run('provider-health', '--repo', fx.repo, '--provider', 'qwen', '--quota-probe', '--json');
