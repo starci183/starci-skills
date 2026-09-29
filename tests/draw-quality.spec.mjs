@@ -9,7 +9,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { sha256 } from '../engine/index.mjs';
+import {sha256} from '../engine/digest.mjs';
 import { blankImage, drawOver, encodePng } from '../scripts/work/png.mjs';
 import { parseArgs as drawRenderArgs, captureBase } from '../scripts/work/draw-render.mjs';
 import { assetStateOf, dataStatusOf } from '../scripts/checks/ui-shapes.mjs';

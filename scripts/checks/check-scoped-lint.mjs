@@ -4,8 +4,8 @@ import path from 'node:path';
 import {spawnSync} from 'node:child_process';
 import {createRequire,isBuiltin} from 'node:module';
 import {fileURLToPath,pathToFileURL} from 'node:url';
-import {canonicalJSON,isPlainObject as plain,sha256,sha256File} from '../../engine/index.mjs';
-import {readDistJson} from '../../engine/runtime-root.mjs';
+import {canonicalJSON} from '../../engine/canonical-json.mjs';import {isPlainObject as plain} from '../../engine/plain-object.mjs';import {sha256, sha256File} from '../../engine/digest.mjs';
+import {readModuleJson} from '../../engine/runtime-root.mjs';
 import {checkArchitecture,GRAMMAR_RULE_IDS,OWNER_RULE_IDS,REGISTRATION_RULE_IDS,SWR_DATA_RULE_IDS} from './architecture/index.mjs';
 import {isGeneratedPath,isToolingModule,loadTargetTypeScript} from './architecture/typescript.mjs';
 import {discoverNestMetadataInputs} from './code-patterns/nest-metadata.mjs';
@@ -289,7 +289,7 @@ function inspectScriptResult(result,{repository,files,ruleIds}){
 
 export async function checkScopedLint(root,inputs,{profile:profileName,profileCatalog=null,runtime=null,architecture=checkArchitecture,architectureConfig=null,scriptChecker=defaultScriptChecker,metadataDiscovery=discoverNestMetadataInputs,configCompiler=null,all=false,base=null,measureOnly=false,obligations=null,sliceBaseline=judgeSliceBaseline}={}){
   let repository;try{repository=fs.realpathSync(root);}catch{return seal({...baseReport(profileName??null,String(root??'')),status:'invalid',issues:[{code:'REPOSITORY_UNAVAILABLE'}]});}let profile;
-  try{profile=checkedProfile(profileCatalog??readDistJson('modules','models','code-patterns.yaml'),profileName);}catch(error){return seal({...baseReport(profileName??null,repository),status:'invalid',issues:[{code:error.code??'INPUT_INVALID',message:String(error.message??error)}]});}
+  try{profile=checkedProfile(profileCatalog??readModuleJson('modules','models','code-patterns.yaml'),profileName);}catch(error){return seal({...baseReport(profileName??null,repository),status:'invalid',issues:[{code:error.code??'INPUT_INVALID',message:String(error.message??error)}]});}
   const wantsArchitecture=profile.obligations.some(item=>item?.status==='implemented'&&(item?.mechanical?.check?.kind==='architecture'||(profileName==='next'&&architectureConfig&&item?.mechanical?.check?.kind==='script')));let architectureResult=null;
   // The architecture check and the script checkers share one TypeScript program per project; released before ESLint.
   const programs=typeScriptProgramRun();

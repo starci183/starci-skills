@@ -8,9 +8,9 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
-import { readDistJson } from '../../../engine/runtime-root.mjs';
+import { readModuleJson } from '../../../engine/runtime-root.mjs';
 
-export const CALLS = readDistJson('modules', 'host', 'orca', 'calls.yaml');
+export const CALLS = readModuleJson('modules', 'host', 'orca', 'calls.yaml');
 
 export const ORCA = (() => {
   if (process.env.STARCI_ORCA_COMMAND) return process.env.STARCI_ORCA_COMMAND;

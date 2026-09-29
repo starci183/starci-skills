@@ -2,7 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import {fileURLToPath} from 'node:url';
 import {parseYaml} from '../../engine/yaml.mjs';
-import {sha256, sha256File} from '../../engine/index.mjs';
+import {sha256, sha256File} from '../../engine/digest.mjs';
 import {bindingRepo, projectBinding} from '../kernel/target-repo.mjs';
 
 /**

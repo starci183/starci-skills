@@ -12,7 +12,7 @@ import path from 'node:path';
 import {spawnSync} from 'node:child_process';
 import {fileReport,inspectLedger,ledgerFileFor,openLedger,recordCheckRun,writeContract} from '../engine/ledger-db.mjs';
 import {parseYaml} from '../engine/yaml.mjs';
-import {sha256} from '../engine/index.mjs';
+import {sha256} from '../engine/digest.mjs';
 import {
   DATA_STATUS_DRAWN,DRAW_ACCEPTANCE_CHANGE,DRAW_ASSET_NOT_TOKEN_RENDERED,DRAW_NOT_REDRAWN,DRAW_NOT_SHAPES,RENDER_RECORD_SCHEMA,drawAcceptanceFindings,
 } from '../scripts/checks/draw-acceptance.mjs';

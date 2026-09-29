@@ -41,7 +41,7 @@ import { fileURLToPath } from 'node:url';
 import { safeRemoveTree } from '../lib/safe-remove.mjs';
 import { getBlob, putBlob } from '../lib/artifact-store.mjs';
 import { redactText } from '../lib/redact.mjs';
-import { sha256 } from '../../engine/index.mjs';
+import {sha256} from '../../engine/digest.mjs';
 import { parseYaml } from '../../engine/yaml.mjs';
 import { git } from './workers.mjs';
 import { projectBinding, sourceRootOf } from '../kernel/target-repo.mjs';

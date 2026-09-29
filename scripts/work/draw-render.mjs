@@ -53,7 +53,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { pathToFileURL, fileURLToPath } from 'node:url';
-import { sha256 } from '../../engine/index.mjs';
+import {sha256} from '../../engine/digest.mjs';
 import { allocationMs } from '../../engine/config.mjs';
 import { findPackage, requirePackage } from '../lib/package-at.mjs';
 import { safeRemoveTree } from '../lib/safe-remove.mjs';

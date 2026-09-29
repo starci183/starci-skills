@@ -3,7 +3,7 @@ import path from 'node:path';
 import module from 'node:module';
 import {pathToFileURL,fileURLToPath} from 'node:url';
 import {parseYaml} from '../../engine/yaml.mjs';
-import {sha256File} from '../../engine/index.mjs';
+import {sha256File} from '../../engine/digest.mjs';
 import {slash} from '../lib/path-key.mjs';
 import {skillRoot} from '../../engine/runtime-root.mjs';
 

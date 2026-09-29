@@ -10,7 +10,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
-import { sha256 } from '../engine/index.mjs';
+import {sha256} from '../engine/digest.mjs';
 import { parseYaml, stringifyYaml } from '../engine/yaml.mjs';
 import { allocationSettings } from '../engine/config.mjs';
 import { blankImage, drawOver, encodePng } from '../scripts/work/png.mjs';

@@ -2,13 +2,13 @@ import fs from 'node:fs';
 import path from 'node:path';
 import {fileURLToPath} from 'node:url';
 import {parseYaml} from '../../engine/yaml.mjs';
-import {readDistJson} from '../../engine/runtime-root.mjs';
+import {readModuleJson} from '../../engine/runtime-root.mjs';
 
 const repository = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 
 /** Read a public contract document under the runtime root; parsed by file extension. */
 export function readPublicJson(...parts) {
-  return readDistJson(...parts);
+  return readModuleJson(...parts);
 }
 
 export function readExample(name) {

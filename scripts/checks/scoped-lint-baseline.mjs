@@ -20,7 +20,7 @@ import os from 'node:os';
 import path from 'node:path';
 import {spawn,spawnSync} from 'node:child_process';
 import {fileURLToPath,pathToFileURL} from 'node:url';
-import {canonicalJSON} from '../../engine/index.mjs';
+import {canonicalJSON} from '../../engine/canonical-json.mjs';
 import {isLinkLike,safeRemoveTree} from '../lib/safe-remove.mjs';
 import {posixPath} from '../lib/path-key.mjs';
 import {unquoteDiffPath} from '../lib/git.mjs';

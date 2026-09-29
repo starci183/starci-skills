@@ -4,7 +4,7 @@
 // never claim another job's dispatch. Contract: modules/kernel/
 // verdict-contract.yaml §2.
 
-import { readDistJson } from '../../engine/runtime-root.mjs';
+import { readModuleJson } from '../../engine/runtime-root.mjs';
 import { policyCommits } from './settle-landed.mjs';
 import { claimsProblems } from './proof-integrity.mjs';
 
@@ -14,7 +14,7 @@ export const OP_REPORT_OUTCOMES = ['done', 'partial', 'failed', 'ask', 'blocked'
 // that dispatches on a blocker kind and the envelope that accepts one read the
 // same list. Missing or misshapen, the envelope refuses to load at all.
 export const BLOCKER_KINDS = (() => {
-  const blockers = readDistJson('modules', 'models', 'kinds.yaml')?.vocabularies?.blockers;
+  const blockers = readModuleJson('modules', 'models', 'kinds.yaml')?.vocabularies?.blockers;
   if (!Array.isArray(blockers) || !blockers.length || blockers.some((k) => typeof k !== 'string' || !k.trim())) {
     throw new Error('modules/models/kinds.yaml vocabularies.blockers must be a non-empty list of kind names');
   }

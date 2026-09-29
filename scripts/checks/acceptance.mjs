@@ -3,7 +3,7 @@ export const ACCEPTANCE_VERDICTS=Object.freeze(['pass','fail','inconclusive','un
 
 import fs from 'node:fs';
 import path from 'node:path';
-import {sha256File} from '../../engine/index.mjs';
+import {sha256File} from '../../engine/digest.mjs';
 
 const list=value=>Array.isArray(value)?value:[];
 const nonempty=value=>typeof value==='string'&&Boolean(value.trim());

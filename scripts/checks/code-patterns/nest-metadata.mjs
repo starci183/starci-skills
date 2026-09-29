@@ -3,7 +3,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { createRequire, isBuiltin } from 'node:module';
 import { spawnSync } from 'node:child_process';
-import { sha256 } from '../../../engine/index.mjs';
+import {sha256} from '../../../engine/digest.mjs';
 import { isInside, slash } from '../architecture/config.mjs';
 import { loadTargetTypeScript } from '../architecture/typescript.mjs';
 import { readTypeScriptProject, resolveNodeOrTypeScriptModule } from '../typescript-programs.mjs';

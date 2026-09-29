@@ -4,7 +4,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { parseYaml } from '../../engine/yaml.mjs';
-import { canonicalJSON, sha256 } from '../../engine/index.mjs';
+import {canonicalJSON} from '../../engine/canonical-json.mjs';import {sha256} from '../../engine/digest.mjs';
 import { normalizeOwnedPath } from '../../engine/admission.mjs';
 import { validateAgainstSchema } from '../checks/check-op-manifest.mjs';
 import { sliceBound } from './slice-estimate.mjs';

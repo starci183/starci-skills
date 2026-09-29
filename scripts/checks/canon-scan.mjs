@@ -27,7 +27,7 @@ import path from 'node:path';
 import { createRequire, register } from 'node:module';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { Worker, isMainThread, parentPort, workerData } from 'node:worker_threads';
-import { readDistJson } from '../../engine/runtime-root.mjs';
+import { readModuleJson } from '../../engine/runtime-root.mjs';
 import { allocationSettings } from '../../engine/config.mjs';
 import { checkArchitecture } from './architecture/index.mjs';
 import { posixPath } from '../lib/path-key.mjs';
@@ -76,7 +76,7 @@ export function parseCanonScanArgs(argv) {
 }
 
 export function loadConformance() {
-  const doc = readDistJson('modules', 'models', 'canon-conformance.yaml');
+  const doc = readModuleJson('modules', 'models', 'canon-conformance.yaml');
   const waves = Array.isArray(doc?.waves) ? doc.waves : [];
   if (!waves.length || waves.some((wave) => !wave?.id || !Array.isArray(wave.roots) || !wave.roots.length)) {
     throw Error('modules/models/canon-conformance.yaml must declare waves[{id, roots[]}]');
@@ -285,7 +285,7 @@ export async function scanCanon(options) {
   const relative = (file) => posixPath(path.relative(root, file));
   const profile = options.profile ?? detectProfile(root);
   const conformance = loadConformance();
-  const catalog = readDistJson('modules', 'models', 'code-patterns.yaml');
+  const catalog = readModuleJson('modules', 'models', 'code-patterns.yaml');
   const packageName = catalog?.profiles?.[profile]?.canon?.package;
   if (!packageName) throw Object.assign(Error(`code-patterns.yaml declares no canon package for ${profile}`), { code: 'CANON_SOURCE_UNAVAILABLE' });
   const source = runtimeCanon(packageName);

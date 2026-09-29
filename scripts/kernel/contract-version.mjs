@@ -39,7 +39,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { parseYaml } from '../../engine/yaml.mjs';
 import { CONTRACT_CHANGES_SCHEMA, readContractChangesDoc } from './contract-changes-store.mjs';
-import { sha256 } from '../../engine/index.mjs';
+import {sha256} from '../../engine/digest.mjs';
 import { normWork } from './work-ownership.mjs';
 import { parseJson, withPayload } from '../lib/json.mjs';
 import { latestContractOf } from './api-lib/rows.mjs';

@@ -2,7 +2,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { parseYaml } from '../../engine/yaml.mjs';
-import { sha256, sha256File } from '../../engine/index.mjs';
+import {sha256, sha256File} from '../../engine/digest.mjs';
 import { list } from '../lib/list.mjs';
 import { renameOver } from '../lib/rename-over.mjs';
 import { slash } from '../lib/path-key.mjs';

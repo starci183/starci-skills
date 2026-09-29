@@ -10,7 +10,7 @@ import os from 'node:os';
 import path from 'node:path';
 import readline from 'node:readline';
 import {spawn, spawnSync} from 'node:child_process';
-import {sha256} from '../../engine/index.mjs';
+import {sha256} from '../../engine/digest.mjs';
 import {fileURLToPath} from 'node:url';
 import {renameOver} from '../lib/rename-over.mjs';
 import {packageAt} from '../lib/package-at.mjs';

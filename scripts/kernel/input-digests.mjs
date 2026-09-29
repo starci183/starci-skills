@@ -42,7 +42,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { JOB_STATUSES } from '../../engine/ledger-db.mjs';
-import { sha256 } from '../../engine/index.mjs';
+import {sha256} from '../../engine/digest.mjs';
 import { admittedContractOf } from './contract-version.mjs';
 import { changeNoteOf, committedMatches, committedReader, createOwnership, inside, normWork, ownedOf, ownerDeclarationFor, readRecordChanges } from './work-ownership.mjs';
 import { parseJson } from '../lib/json.mjs';

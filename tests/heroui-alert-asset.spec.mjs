@@ -11,7 +11,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { DatabaseSync } from 'node:sqlite';
-import { sha256 } from '../engine/index.mjs';
+import {sha256} from '../engine/digest.mjs';
 import { parseYaml } from '../engine/yaml.mjs';
 import {
   DRAW_ALERT_ANATOMY, DRAW_OFF_GRAMMAR_COMPONENT, alertActionVariantFor, DRAW_ASSET_SLOT_UNDECLARED, DRAW_DNA_CODES, DRAW_METER_TRACK, anatomyFindings, dnaFindings, loadDna, surfaceBackground,

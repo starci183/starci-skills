@@ -7,7 +7,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
-import { readDistJson, skillRoot } from '../../engine/runtime-root.mjs';
+import { readModuleJson, skillRoot } from '../../engine/runtime-root.mjs';
 import { readJsonFile } from '../lib/json.mjs';
 import { isDir } from '../lib/fs-kind.mjs';
 
@@ -68,7 +68,7 @@ export function bindingRepo(binding, id) {
 // of that side is `fe`.
 export const FRONTEND_OPS = (() => {
   let doc;
-  try { doc = readDistJson('modules', 'models', 'kinds.yaml'); } catch { return new Set(); }
+  try { doc = readModuleJson('modules', 'models', 'kinds.yaml'); } catch { return new Set(); }
   const sides = new Map();
   for (const lane of doc?.lanes ?? []) {
     const frontend = (lane.match ?? []).length > 0 && lane.match.every((m) => m?.role === 'frontend');

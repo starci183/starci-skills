@@ -3,7 +3,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import {fileURLToPath, pathToFileURL} from 'node:url';
 import {parseYaml} from '../../engine/yaml.mjs';
-import {sha256} from '../../engine/index.mjs';
+import {sha256} from '../../engine/digest.mjs';
 import {ID_RE, walk} from './check-example-work.mjs';
 import {readWorkspace, resolveOwnedDirs, repoRootFor, moduleRootOf, loadRecords, indexInlineCriteria, splitRef, resolveRecordRef} from '../example/example-ownership.mjs';
 

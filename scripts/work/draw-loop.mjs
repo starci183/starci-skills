@@ -52,7 +52,7 @@ import { putBundle } from '../lib/blob-lookup.mjs';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { sha256 } from '../../engine/index.mjs';
+import {sha256} from '../../engine/digest.mjs';
 import { parseYaml } from '../../engine/yaml.mjs';
 import { assetsOf, flag, isFile, list, sha256File, slash, workRootOf } from './work-io.mjs';
 import { readJsonFile } from '../lib/json.mjs';

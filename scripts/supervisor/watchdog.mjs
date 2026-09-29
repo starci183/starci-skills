@@ -23,7 +23,7 @@
 // (start-supervisor --stop) or was never started, a pass does nothing.
 import '../lib/hide-child-windows.mjs';
 import path from 'node:path';
-import { sha256 } from '../../engine/index.mjs';
+import {sha256} from '../../engine/digest.mjs';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { allocationMs } from '../../engine/config.mjs';

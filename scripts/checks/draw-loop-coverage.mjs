@@ -9,7 +9,7 @@ export const loopFileOfRef = (ref) => { const dir = ref?.sha256 ? bundleDir(ref.
 /** How a loop citation is named in findings and gate evidence. */
 export const loopLabelOf = (ref) => (ref?.sha256 ? `blob:${ref.sha256.slice(0, 12)}` : null);
 import path from 'node:path';
-import { sha256 } from '../../engine/index.mjs';
+import {sha256} from '../../engine/digest.mjs';
 import { assetsOf, list, slash } from '../work/work-io.mjs';
 import { isFile } from '../lib/fs-kind.mjs';
 

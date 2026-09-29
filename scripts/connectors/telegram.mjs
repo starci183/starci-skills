@@ -44,7 +44,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { sha256 } from '../../engine/index.mjs';
+import {sha256} from '../../engine/digest.mjs';
 import { inspectLedger, ledgerFileFor } from '../../engine/ledger-db.mjs';
 import { configRoot, connectorEnv, connectorSecret, connectorsConfig } from '../../engine/config.mjs';
 import { readMachine, withMachine } from '../../engine/machine-db.mjs';

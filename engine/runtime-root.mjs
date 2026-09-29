@@ -9,7 +9,7 @@ import {parseYaml} from './yaml.mjs';
  * an install placed on the host.
  *
  * Every workflow, op, schema, knowledge and model contract read at runtime is an authored YAML
- * file (or an authored JSON one where a document is stored that way). `readDistJson` resolves a
+ * file (or an authored JSON one where a document is stored that way). `readModuleJson` resolves a
  * path under `skillRoot` and parses the file by its extension.
  */
 const moduleRoot = path.dirname(fileURLToPath(new URL('../package.json', import.meta.url)));
@@ -19,9 +19,9 @@ export const skillRoot = moduleRoot;
 
 /**
  * Read a runtime contract document. `parts` are path segments under `skillRoot`
- * (e.g. readDistJson('modules', 'schemas', 'profiles.yaml')).
+ * (e.g. readModuleJson('modules', 'schemas', 'profiles.yaml')).
  */
-export function readDistJson(...parts) {
+export function readModuleJson(...parts) {
   const rel = parts.join('/');
   const file = path.join(skillRoot, rel);
   if (!(file.startsWith(skillRoot) && fs.existsSync(file) && fs.statSync(file).isFile()))

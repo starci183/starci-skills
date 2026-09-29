@@ -7,7 +7,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { sha256 } from '../engine/index.mjs';
+import {sha256} from '../engine/digest.mjs';
 import { parseYaml } from '../engine/yaml.mjs';
 import { blankImage, encodePng } from '../scripts/work/png.mjs';
 import {

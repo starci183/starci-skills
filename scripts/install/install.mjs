@@ -12,7 +12,7 @@
 // Every command takes --dir <repo> (default: the current directory). init refuses a non-empty
 // .claude it did not install unless --force; update keeps a file a person changed locally unless
 // --force; neither ever runs a git command.
-import { sha256 } from '../../engine/index.mjs';
+import {sha256} from '../../engine/digest.mjs';
 import { cpSync, existsSync, mkdirSync, readdirSync, readFileSync, rmSync, rmdirSync, statSync, lstatSync, writeFileSync, appendFileSync } from 'node:fs';
 import path from 'node:path';
 import process from 'node:process';

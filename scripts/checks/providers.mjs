@@ -1,4 +1,4 @@
-import {isPlainObject as plain} from '../../engine/index.mjs';
+import {isPlainObject as plain} from '../../engine/plain-object.mjs';
 import {skillRoot} from '../../engine/runtime-root.mjs';
 import {parseYaml} from '../../engine/yaml.mjs';
 import {agentContext} from '../api/orca/agent-context.mjs';

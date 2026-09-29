@@ -261,8 +261,8 @@ export function tscParity({ root, ownedRels, baseBlobs, extraProjects = [], ts: 
 
 /** Owned files the profile lints (its sourceGlobs). */
 export async function lintFilesOf(root, ownedRels, profile) {
-  const { readDistJson } = await import('../../engine/runtime-root.mjs');
-  const globs = (readDistJson('modules', 'models', 'code-patterns.yaml')?.profiles?.[profile]?.sourceGlobs ?? []).flatMap(braceVariants).map(globExpression);
+  const { readModuleJson } = await import('../../engine/runtime-root.mjs');
+  const globs = (readModuleJson('modules', 'models', 'code-patterns.yaml')?.profiles?.[profile]?.sourceGlobs ?? []).flatMap(braceVariants).map(globExpression);
   return ownedFilesOf(root, ownedRels).filter((rel) => globs.some((re) => re.test(rel)));
 }
 

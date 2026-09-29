@@ -1,6 +1,6 @@
 import fs from 'node:fs';
 import path from 'node:path';
-import { isPlainObject } from '../../../engine/index.mjs';
+import {isPlainObject} from '../../../engine/plain-object.mjs';
 import { isInside, slash } from '../architecture/config.mjs';
 
 export const IDENTIFIER = /^[A-Za-z_$][\w$]*$/;

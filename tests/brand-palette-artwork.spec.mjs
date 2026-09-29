@@ -10,7 +10,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
-import { sha256 } from '../engine/index.mjs';
+import {sha256} from '../engine/digest.mjs';
 import { artworkExclusions, brandPalette, mapIntoComposite, paletteFindings, registeredArtwork } from '../scripts/checks/brand-palette.mjs';
 import { artworkDigests } from '../scripts/work/draw-render.mjs';
 import { blankImage, drawOver, encodePng } from '../scripts/work/png.mjs';

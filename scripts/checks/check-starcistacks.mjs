@@ -31,7 +31,7 @@ import { spawnSync } from 'node:child_process';
 import { repositoryName, repositoryHome } from '../lib/repo-identity.mjs';
 import { fileURLToPath } from 'node:url';
 import { skillRoot } from '../../engine/runtime-root.mjs';
-import { isPlainObject as plain } from '../../engine/index.mjs';
+import {isPlainObject as plain} from '../../engine/plain-object.mjs';
 import { parseYaml } from '../../engine/yaml.mjs';
 import { list } from '../lib/list.mjs';
 import { isFile, isDir } from '../lib/fs-kind.mjs';

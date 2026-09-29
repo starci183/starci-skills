@@ -1,7 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import {parseYaml} from '../../engine/yaml.mjs';
-import {canonicalJSON,sha256} from '../../engine/index.mjs';
+import {canonicalJSON} from '../../engine/canonical-json.mjs';import {sha256} from '../../engine/digest.mjs';
 import {slash} from '../lib/path-key.mjs';
 
 /**

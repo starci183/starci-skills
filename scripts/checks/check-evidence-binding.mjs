@@ -9,7 +9,7 @@ import {readWorkspace, repoRootFor, resolveOwnedDirs, loadRecords} from '../exam
 import {slash} from '../lib/path-key.mjs';
 import {sameOrUnder} from './common.mjs';
 import {list} from '../lib/list.mjs';
-import {sha256File} from '../../engine/index.mjs';
+import {sha256File} from '../../engine/digest.mjs';
 
 /**
  * QUALITY-BAR §5 asks for proof rather than assertion. This script is the executable form of two of its

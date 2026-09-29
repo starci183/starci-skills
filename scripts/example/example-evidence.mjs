@@ -3,7 +3,7 @@ import path from 'node:path';
 import {execFileSync} from 'node:child_process';
 import {fileURLToPath, pathToFileURL} from 'node:url';
 import {parseYaml, stringifyYaml} from '../../engine/yaml.mjs';
-import {sha256File} from '../../engine/index.mjs';
+import {sha256File} from '../../engine/digest.mjs';
 import {loadRecords, readWorkspace, resolveOwnedDirs, hashOwnedDirs, resolveRecordRef} from './example-ownership.mjs';
 
 /**

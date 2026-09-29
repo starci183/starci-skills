@@ -2,7 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import {openLedgerReader,ledgerFileFor} from '../../engine/ledger-db.mjs';
 import {receiptsAnswering,receiptFileOf,receiptRefOf} from '../kernel/ask-receipts.mjs';
-import {sha256} from '../../engine/index.mjs';
+import {sha256} from '../../engine/digest.mjs';
 import {fileURLToPath} from 'node:url';
 import {parseYaml} from '../../engine/yaml.mjs';
 import {skillRoot} from '../../engine/runtime-root.mjs';

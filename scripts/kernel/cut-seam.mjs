@@ -26,7 +26,7 @@ import crypto from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 import { allocationMs, allocationSettings } from '../../engine/config.mjs';
 import { retiredBeforeDispatch } from '../../engine/admission.mjs';
-import { readDistJson } from '../../engine/runtime-root.mjs';
+import { readModuleJson } from '../../engine/runtime-root.mjs';
 import { parseJson } from '../lib/json.mjs';
 import { jobResultSql } from './api-lib/rows.mjs';
 import { SETTLED_JOB_LIST } from '../../engine/admission.mjs';
@@ -247,7 +247,7 @@ const srcRootOf = (file) => {
 };
 
 /** policy.canonConformance of the code.refactor brief: {relocations: {<ruleId>: {moves, into: {<role>|'*': [dest]}}}, sharedRoots}. */
-export function canonConformancePolicy(brief = readDistJson('modules', 'ops', 'ops', `${CANON_OP}.yaml`)) {
+export function canonConformancePolicy(brief = readModuleJson('modules', 'ops', 'ops', `${CANON_OP}.yaml`)) {
   const policy = brief?.policy?.canonConformance ?? {};
   if (!policy.relocations || typeof policy.relocations !== 'object' || !Array.isArray(policy.sharedRoots)) {
     throw Error('modules/ops/ops/code.refactor.yaml policy.canonConformance must declare relocations {<ruleId>: {moves, into}} and sharedRoots []');
