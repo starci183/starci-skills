@@ -132,7 +132,7 @@ writes:
     content:
       en: "The one layout tree, when this op is the workflow that owns the shell foundation (api dispatch claims foundation
         `shell` for the first draw that finds parents to draw; scripts/kernel/shell-foundation.mjs): `node
-        scripts/work/layout-tree.mjs scan --work .starciwork --write` (`convert` over a work/app-shell@1 record) rewrites
+        scripts/work/layout-tree.mjs scan --work .starciwork --write` rewrites
         it from the frontend's app/, and this op decides each layout's chrome, captures every visible repository layout
         (`layout-tree.mjs capture`), plans each visible layout the frontend does not have yet (`layout-tree.mjs plan --node
         <id> --files layout,page --design <ui-id>`), writes the personas and, once a layout is captured or its drawing is
@@ -265,8 +265,8 @@ steps:
     action:
       en: "SETTLE THE PARENTS FIRST (owner rulings 2026-09-29 draw-from-todo: a draw starts from todo; if the parent is not
         drawn, draw the parent - never wait for a separate brand.decide, never invent chrome). Run `node
-        scripts/work/layout-tree.mjs scan --work .starciwork --write` (`convert` when the record is still work/app-shell@1;
-        with no frontend yet, `layout-tree.mjs plan` the tree from the accepted journeys and SDS) and read the tree. For
+        scripts/work/layout-tree.mjs scan --work .starciwork --write`
+        (with no frontend yet, `layout-tree.mjs plan` the tree from the accepted journeys and SDS) and read the tree. For
         the record's route, list every layout above it (`node scripts/checks/shell-conformance.mjs <ui-record-dir>` names each
         unsettled one). When every one is settled, skip to the next step. Otherwise, in THIS op and before drawing any
         screen: (a) decide each unknown chrome (visible when it draws a rail, bar or frame around its children,
