@@ -1,27 +1,32 @@
 import { useEffect, useState } from 'react';
-import { ArrowLeft, ArrowRight, ChevronRight, Layers3 } from 'lucide-react';
+import { ArrowRight, ChevronRight, Layers3 } from 'lucide-react';
 import { useApiQuery } from '../../api/query';
-import type { AttemptRow, DecisionRow, MediaItem, TimelineItem, UnitRow, WorkflowDetail } from '../../contract';
+import type { AttemptRow, DecisionRow, LegRow, MediaItem, PipelineView, TimelineItem, UnitRow, WorkflowDetailV2 } from '../../contract';
 import { formatAbsolute, formatReason, unitStateLabels } from '../../i18n/vi';
-import { StateChip } from '../../components/state-chip';
+import { StatusChip, StatusDot } from '../../components/status-chip';
+import { statusFromUi, statusFromUnit } from '../../components/status';
+import { WorkflowHeader } from '../../components/work/pipeline/header';
+import { PipelineGraph } from '../../components/work/pipeline-graph';
+import { AttemptGantt } from '../../components/work/attempt-gantt';
+import { LegDrawer } from '../../components/work/leg-drawer';
+import { WorkflowInfraCard } from '../../components/work/infra-card';
+import { WorkGraphSlices } from '../../components/work/work-graph-slices';
 import { ReasonLine } from '../../components/reason-line';
 import { ConceptBlock, type Concept } from '../../components/concept';
 import { LifecycleBar, type UnitState } from '../../components/lifecycle-bar';
-import { Progress } from '../../components/ui/progress';
-import { GraphView, type GraphGroup, type WorkGraph } from '../../components/work/graph';
+import type { WorkGraph } from '../../components/work/graph';
 import { useRoute, type WorkflowTab } from '../../router';
 
 export const concept: Concept = 'C2';
 
 const tabs: { id: WorkflowTab; label: string; concept: string }[] = [
-  { id: 'units', label: 'Đơn vị', concept: 'C4' }, { id: 'graph', label: 'Đồ thị', concept: 'C4' },
+  { id: 'units', label: 'Đơn vị', concept: 'C4' },
   { id: 'attempts', label: 'Lần thử', concept: 'C7' }, { id: 'decisions', label: 'Quyết định', concept: 'C5' },
   { id: 'why', label: 'Vì sao', concept: 'C2' }, { id: 'timeline', label: 'Diễn biến', concept: 'C17' },
   { id: 'evidence', label: 'Bằng chứng', concept: 'C11' }, { id: 'infra', label: 'Hạ tầng', concept: 'C15' },
 ];
 const rootHref = (project: string, wf: string) => `#/w/${encodeURIComponent(project)}/${encodeURIComponent(wf)}`;
 const query = () => new URL(window.location.hash.slice(1) || '/', window.location.origin).searchParams;
-const formatCount = (value: number) => new Intl.NumberFormat('vi-VN', { maximumFractionDigits: 1 }).format(value);
 type DecisionLog = { id: string; decider: string; choice: string; rationale: string | null; at: number; di: { href: string } | null };
 type Rca = { at: number; attempts24h: number; clusters: { cause: string; count: number; open: number; reason: { code: string; params: Record<string, string | number> } }[]; actions: { rank: number; key: string; unblocks: number; reason: { code: string; params: Record<string, string | number> } }[] };
 type Worktree = { kind: string; branch: string | null; path: string | null; ui: 'bad' | 'warn' | 'running' | 'waiting' | 'ok' | 'done' | 'unknown'; createdAt: number; removedAt: number | null };
@@ -34,14 +39,14 @@ function UnitDetail({ project, wf, selected, state }: { project: string; wf: str
   const detail = useApiQuery<{ unit: UnitRow; attempts: AttemptRow[]; blockedBy: { reason: { code: string; params: Record<string, string | number> }; ui: UnitRow['ui'] }[] }>(selected ? `/api/workflows/${encodeURIComponent(project)}/${encodeURIComponent(wf)}/units/${encodeURIComponent(selected)}` : '', { enabled: Boolean(selected), topics: [`wf:${project}:${wf}`], intervalMs: 20_000 });
   if (!selected) return <p className="text-sm text-muted-foreground">Chọn một nhóm Op hoặc đơn vị để xem chi tiết.</p>;
   return <div className="rounded-lg border bg-muted/30 p-4"><a href={`${rootHref(project, wf)}?tab=units${state ? `&state=${state}` : ''}`} className="text-xs text-muted-foreground hover:underline">Đóng chi tiết</a>
-    {detail.data && <><div className="mt-2 flex flex-wrap items-center gap-2"><strong className="min-w-0 break-words">{detail.data.unit.title}</strong><StateChip state={detail.data.unit.ui} /></div>
+    {detail.data && <><div className="mt-2 flex flex-wrap items-center gap-2"><strong className="min-w-0 break-words">{detail.data.unit.title}</strong><StatusChip status={statusFromUnit(detail.data.unit.state)} /></div>
       <p className="mt-2 text-sm text-muted-foreground">{detail.data.unit.op} · {unitStateLabels[detail.data.unit.state]} · {detail.data.unit.attempts} lần giao</p>
       {detail.data.blockedBy.map((blocker, i) => <ReasonLine key={i} reason={blocker.reason} className="mt-2" />)}
-      {detail.data.attempts.map(attempt => <a key={attempt.id} href={attempt.href} className="mt-2 flex items-center gap-2 text-sm hover:underline"><StateChip state={attempt.ui} compact /> Lần thử {attempt.attempt} · {attempt.agent ?? 'agent chưa rõ'} <ArrowRight className="size-3" /></a>)}
+      {detail.data.attempts.map(attempt => <a key={attempt.id} href={attempt.href} className="mt-2 flex items-center gap-2 text-sm hover:underline"><StatusDot status={statusFromUi(attempt.ui)} /> Lần thử {attempt.attempt} · {attempt.agent ?? 'agent chưa rõ'} <ArrowRight className="size-3" /></a>)}
     </>}{detail.loading && <p className="mt-2 text-sm text-muted-foreground">Đang đọc đơn vị…</p>}</div>;
 }
 
-function UnitsTab({ project, wf, graph, desktopSplit = false }: { project: string; wf: string; graph: WorkGraph | null; desktopSplit?: boolean }) {
+function UnitsTab({ project, wf, graph }: { project: string; wf: string; graph: WorkGraph | null }) {
   const url = `/api/workflows/${encodeURIComponent(project)}/${encodeURIComponent(wf)}/units?limit=200`;
   const units = useApiQuery<UnitRow[]>(url, { topics: [`wf:${project}:${wf}`], intervalMs: 20_000 });
   const state = query().get('state');
@@ -53,28 +58,22 @@ function UnitsTab({ project, wf, graph, desktopSplit = false }: { project: strin
     {counts && <LifecycleBar counts={counts} selected={state as UnitState | null} onSelect={value => { window.location.hash = `${rootHref(project, wf)}?tab=units${state === value ? '' : `&state=${value}`}`; }} />}
     {state && <a className="mt-2 inline-block text-xs text-primary hover:underline" href={`${rootHref(project, wf)}?tab=units`}>Bỏ lọc {unitStateLabels[state as UnitState] ?? state}</a>}
     <div className="mt-4 divide-y">{rows.map(unit => <a key={unit.unit} href={`${rootHref(project, wf)}?tab=units&unit=${encodeURIComponent(unit.unit)}${state ? `&state=${state}` : ''}`} className="flex min-w-0 items-center gap-3 py-3 hover:text-primary">
-      <StateChip state={unit.ui} compact /><span className="min-w-0 flex-1"><span className="block truncate text-sm font-medium">{unit.title}</span><span className="block truncate text-xs text-muted-foreground">{unit.op} · {unitStateLabels[unit.state]} · lần {unit.tries}/{unit.tryBudget}</span></span><ChevronRight className="size-4 shrink-0" aria-hidden="true" />
+      <StatusDot status={statusFromUnit(unit.state)} /><span className="min-w-0 flex-1"><span className="block truncate text-sm font-medium">{unit.title}</span><span className="block truncate text-xs text-muted-foreground">{unit.op} · {unitStateLabels[unit.state]} · lần {unit.tries}/{unit.tryBudget}</span></span><ChevronRight className="size-4 shrink-0" aria-hidden="true" />
     </a>)}</div>
     {!units.loading && !rows.length && <p className="mt-4 text-sm text-muted-foreground">Không có đơn vị phù hợp.</p>}
-    {selected && <div className={desktopSplit ? 'mt-4 lg:hidden' : 'mt-4'}><UnitDetail project={project} wf={wf} selected={selected} state={state} /></div>}
+    {selected && <div className="mt-4"><UnitDetail project={project} wf={wf} selected={selected} state={state} /></div>}
   </Panel>;
-}
-
-function WorkflowInspector({ project, wf, group }: { project: string; wf: string; group: GraphGroup | null }) {
-  const selected = query().get('unit');
-  if (selected) return <Panel title="Chi tiết đơn vị" concept="C4"><UnitDetail project={project} wf={wf} selected={selected} state={query().get('state')} /></Panel>;
-  return <Panel title="Chi tiết nhóm Op" concept="C4">{group ? <><div className="flex items-center gap-2"><strong className="min-w-0 break-words">{group.op} ×{group.nodes.length}</strong><StateChip state={group.ui} compact /></div><p className="mt-2 text-xs text-muted-foreground">{group.incoming.length ? `${group.incoming.length} phụ thuộc đầu vào` : 'Bước đầu'}</p><div className="mt-3 divide-y">{group.nodes.map(node => <a key={node.unit} href={`${rootHref(project, wf)}?tab=units&unit=${encodeURIComponent(node.unit)}`} className="flex min-w-0 items-center gap-2 py-2 text-sm hover:text-primary"><span className="min-w-0 flex-1 truncate">{node.title}</span><StateChip state={node.ui} compact /></a>)}</div></> : <p className="text-sm text-muted-foreground">Chọn một nhóm Op trong đồ thị để xem các đơn vị.</p>}</Panel>;
 }
 
 function AttemptsTab({ project, wf }: { project: string; wf: string }) {
   const attempts = useApiQuery<AttemptRow[]>(`/api/attempts?project=${encodeURIComponent(project)}&wf=${encodeURIComponent(wf)}&limit=200`, { topics: [`wf:${project}:${wf}`], intervalMs: 30_000 });
-  return <Panel title="Lần thử" concept="C7"><div className="divide-y">{attempts.data?.map(item => <a key={item.id} href={item.href} className="flex min-w-0 items-center gap-3 py-3 text-sm hover:text-primary"><StateChip state={item.ui} compact /><span className="min-w-0 flex-1 truncate">{item.op} · {item.unit ?? item.job} · lần {item.attempt}</span><span className="hidden text-muted-foreground sm:block">{item.agent ?? '—'} · {formatAbsolute(item.dispatchedAt)}</span><ArrowRight className="size-4 shrink-0" /></a>)}</div>{!attempts.data?.length && <p className="text-sm text-muted-foreground">Chưa có lần thử.</p>}</Panel>;
+  return <Panel title="Lần thử" concept="C7"><div className="divide-y">{attempts.data?.map(item => <a key={item.id} href={item.href} className="flex min-w-0 items-center gap-3 py-3 text-sm hover:text-primary"><StatusDot status={statusFromUi(item.ui)} /><span className="min-w-0 flex-1 truncate">{item.op} · {item.unit ?? item.job} · lần {item.attempt}</span><span className="hidden text-muted-foreground sm:block">{item.agent ?? '—'} · {formatAbsolute(item.dispatchedAt)}</span><ArrowRight className="size-4 shrink-0" /></a>)}</div>{!attempts.data?.length && <p className="text-sm text-muted-foreground">Chưa có lần thử.</p>}</Panel>;
 }
 
 function DecisionsTab({ project, wf }: { project: string; wf: string }) {
   const open = useApiQuery<DecisionRow[]>(`/api/decisions?project=${encodeURIComponent(project)}&wf=${encodeURIComponent(wf)}&limit=200`, { topics: ['decisions'], intervalMs: 20_000 });
   const log = useApiQuery<DecisionLog[]>(`/api/decisions/log?project=${encodeURIComponent(project)}&wf=${encodeURIComponent(wf)}&limit=200`, { topics: [`wf:${project}:${wf}`], intervalMs: 60_000 });
-  return <div className="space-y-4"><Panel title="Chờ quyết" concept="C12"><div className="divide-y">{open.data?.map(item => <a key={item.id} href={`#/decisions?id=${encodeURIComponent(item.id)}`} className="flex min-w-0 items-center gap-2 py-3 text-sm hover:text-primary"><StateChip state={item.ui} compact /><span className="min-w-0 flex-1 truncate">{item.summary}</span><span className="text-xs text-muted-foreground">{item.decider}</span><ArrowRight className="size-4 shrink-0" /></a>)}</div>{!open.data?.length && <p className="text-sm text-muted-foreground">Không có quyết định đang chờ.</p>}</Panel>
+  return <div className="space-y-4"><Panel title="Chờ quyết" concept="C12"><div className="divide-y">{open.data?.map(item => <a key={item.id} href={`#/decisions?id=${encodeURIComponent(item.id)}`} className="flex min-w-0 items-center gap-2 py-3 text-sm hover:text-primary"><StatusDot status={statusFromUi(item.ui)} /><span className="min-w-0 flex-1 truncate">{item.summary}</span><span className="text-xs text-muted-foreground">{item.decider}</span><ArrowRight className="size-4 shrink-0" /></a>)}</div>{!open.data?.length && <p className="text-sm text-muted-foreground">Không có quyết định đang chờ.</p>}</Panel>
     <Panel title="Nhật ký quyết định" concept="C5"><div className="divide-y">{log.data?.map(item => <div key={item.id} className="py-3 text-sm"><div className="flex flex-wrap justify-between gap-2"><strong>{item.choice}</strong><span className="text-xs text-muted-foreground">{item.decider} · {formatAbsolute(item.at)}</span></div>{item.rationale && <p className="mt-1 text-muted-foreground">{item.rationale}</p>}{item.di && <a href={item.di.href} className="text-xs text-primary hover:underline">Mở quyết định</a>}</div>)}</div>{!log.data?.length && <p className="text-sm text-muted-foreground">Chưa có quyết định đã chốt.</p>}</Panel></div>;
 }
 
@@ -88,7 +87,7 @@ function WhyTab({ project, wf }: { project: string; wf: string }) {
 
 function TimelineTab({ project, wf }: { project: string; wf: string }) {
   const timeline = useApiQuery<TimelineItem[]>(`/api/timeline?project=${encodeURIComponent(project)}&wf=${encodeURIComponent(wf)}&limit=200`, { topics: [`wf:${project}:${wf}`], intervalMs: 30_000 });
-  return <Panel title="Diễn biến" concept="C17"><div className="divide-y">{timeline.data?.map((item, index) => <div key={`${item.at}-${index}`} className="flex min-w-0 items-start gap-3 py-3 text-sm"><StateChip state={item.ui} compact /><div className="min-w-0 flex-1"><p className="break-words">{item.title}</p><p className="text-xs text-muted-foreground">{item.source} · {formatAbsolute(item.at)}</p></div>{item.ref && <a href={item.ref.href} aria-label="Mở chi tiết"><ArrowRight className="size-4" /></a>}</div>)}</div>{!timeline.data?.length && <p className="text-sm text-muted-foreground">Chưa có diễn biến.</p>}</Panel>;
+  return <Panel title="Diễn biến" concept="C17"><div className="divide-y">{timeline.data?.map((item, index) => <div key={`${item.at}-${index}`} className="flex min-w-0 items-start gap-3 py-3 text-sm"><StatusDot status={statusFromUi(item.ui)} /><div className="min-w-0 flex-1"><p className="break-words">{item.title}</p><p className="text-xs text-muted-foreground">{item.source} · {formatAbsolute(item.at)}</p></div>{item.ref && <a href={item.ref.href} aria-label="Mở chi tiết"><ArrowRight className="size-4" /></a>}</div>)}</div>{!timeline.data?.length && <p className="text-sm text-muted-foreground">Chưa có diễn biến.</p>}</Panel>;
 }
 
 function EvidenceTab({ project, wf }: { project: string; wf: string }) {
@@ -100,46 +99,45 @@ function EvidenceTab({ project, wf }: { project: string; wf: string }) {
 
 function InfraTab({ project, wf }: { project: string; wf: string }) {
   const worktrees = useApiQuery<Worktree[]>(`/api/workflows/${encodeURIComponent(project)}/${encodeURIComponent(wf)}/worktrees`, { topics: ['system'], intervalMs: 60_000 });
-  return <Panel title="Hạ tầng · worktree" concept="C15"><div className="divide-y">{worktrees.data?.map((item, index) => <div key={`${item.branch}-${index}`} className="flex min-w-0 items-center gap-3 py-3 text-sm"><StateChip state={item.ui} compact /><div className="min-w-0 flex-1"><p className="truncate font-medium">{item.branch ?? item.kind}</p><p className="truncate text-xs text-muted-foreground">{item.path ?? item.kind} · {formatAbsolute(item.createdAt)}</p></div></div>)}</div>{!worktrees.data?.length && <p className="text-sm text-muted-foreground">Không có worktree được ghi nhận.</p>}</Panel>;
+  return <Panel title="Hạ tầng · worktree" concept="C15"><div className="divide-y">{worktrees.data?.map((item, index) => <div key={`${item.branch}-${index}`} className="flex min-w-0 items-center gap-3 py-3 text-sm"><StatusDot status={statusFromUi(item.ui)} /><div className="min-w-0 flex-1"><p className="truncate font-medium">{item.branch ?? item.kind}</p><p className="truncate text-xs text-muted-foreground">{item.path ?? item.kind} · {formatAbsolute(item.createdAt)}</p></div></div>)}</div>{!worktrees.data?.length && <p className="text-sm text-muted-foreground">Không có worktree được ghi nhận.</p>}</Panel>;
 }
 
 export function WorkflowPage({ project, wf, tab = 'units' }: { project: string; wf: string; tab?: WorkflowTab }) {
-  const [selectedGroup, setSelectedGroup] = useState<GraphGroup | null>(null);
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => { const timer = window.setInterval(() => setNow(Date.now()), 30_000); return () => window.clearInterval(timer); }, []);
   const base = `/api/workflows/${encodeURIComponent(project)}/${encodeURIComponent(wf)}`;
-  const detail = useApiQuery<WorkflowDetail>(base, { topics: [`wf:${project}:${wf}`], intervalMs: 20_000 });
+  const detail = useApiQuery<WorkflowDetailV2>(base, { topics: [`wf:${project}:${wf}`], intervalMs: 20_000 });
+  const pipeline = useApiQuery<PipelineView>(`${base}/pipeline`, { topics: [`wf:${project}:${wf}`], intervalMs: 20_000 });
   const graph = useApiQuery<WorkGraph>(`${base}/graph`, { topics: [`wf:${project}:${wf}`], intervalMs: 30_000, enabled: tab === 'units' || tab === 'graph' });
   const decisions = useApiQuery<DecisionRow[]>(`/api/decisions?project=${encodeURIComponent(project)}&wf=${encodeURIComponent(wf)}&limit=200`, { topics: ['decisions'], intervalMs: 20_000 });
   const row = detail.data;
-  useEffect(() => {
-    if (row && tab === 'graph') document.getElementById('workflow-tab-panel')?.scrollIntoView({ block: 'start' });
-  }, [project, wf, tab, Boolean(row)]);
+  const legOp = query().get('leg');
+  const pipe = pipeline.data ?? null;
+  const selectedLeg: LegRow | null = pipe && legOp ? pipe.legs.find(leg => leg.op === legOp) ?? null : null;
+  const withLeg = (op: string | null) => {
+    const params = query(); params.delete('leg'); if (op) params.set('leg', op);
+    if (!params.get('tab')) params.set('tab', tab);
+    window.location.hash = `${rootHref(project, wf)}?${params}`;
+  };
   if (detail.error) return <div className="mx-auto max-w-6xl p-6"><a href="#/" className="text-sm hover:underline">← Tổng quan</a><p role="alert" className="mt-4 rounded-xl border p-5">{detail.error}</p></div>;
   if (!row) return <div className="mx-auto max-w-6xl p-6 text-sm text-muted-foreground">Đang đọc workflow…</div>;
-  const pct = row.units.total ? Math.round(row.units.done / row.units.total * 100) : 0;
-  const firstDecision = decisions.data?.[0];
-  const firstBlocker = row.blockedBy[0];
-  return <div className="mx-auto flex w-full max-w-7xl min-w-0 flex-col gap-5 p-4 pb-24 sm:p-6 lg:p-8">
-    <header className="space-y-4"><a href="#/" className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground"><ArrowLeft className="size-4" /> Tổng quan</a><div className="flex flex-wrap items-start justify-between gap-3"><div className="min-w-0"><p className="text-xs text-muted-foreground">{row.project} / workflow</p><h1 className="break-words text-2xl font-semibold tracking-tight sm:text-3xl">{row.name}</h1></div><StateChip state={row.ui} label={row.phase === 'paused' ? 'Tạm dừng' : row.phase === 'stopped' ? 'Đã dừng' : row.ui === 'warn' ? 'Chậm' : row.ui === 'bad' ? 'Kẹt' : undefined} /></div></header>
-    <ConceptBlock concept="C2" as="section" className="hidden rounded-xl border bg-card px-5 py-4 shadow-sm lg:block"><div className="grid grid-cols-4 gap-5"><div><p className="text-xs text-muted-foreground">Đơn vị đạt</p><p className="mt-1 text-xl font-semibold tabular-nums">{formatCount(row.units.done)}/{formatCount(row.units.total)}</p></div><div><p className="text-xs text-muted-foreground">Tốc độ</p><p className="mt-1 text-xl font-semibold tabular-nums">{formatCount(row.ratePerHour)}<span className="ml-1 text-xs font-normal text-muted-foreground">/giờ</span></p></div><div><p className="text-xs text-muted-foreground">Đang chạy</p><p className="mt-1 text-xl font-semibold tabular-nums">{row.running}/{row.allowedParallel ?? '—'}</p></div><div><p className="text-xs text-muted-foreground">24 giờ qua</p><p className="mt-1 text-sm font-medium">{row.counts.attempts24h} lần thử · {row.counts.failed24h} hỏng</p></div></div>
-      <Progress className="mt-3" value={pct} aria-label={`${pct}% đơn vị đạt`} /><div className="mt-3 flex min-w-0 items-center gap-4 text-xs text-muted-foreground"><span className="min-w-0 flex-1 truncate" title={row.phase !== 'running' ? row.phaseReason ?? row.phase : row.reason ? formatReason(row.reason) : undefined}>{row.phase !== 'running' ? `${row.phase === 'paused' ? 'Tạm dừng' : row.phase === 'stopped' ? 'Đã dừng' : row.phase}: ${row.phaseReason ?? 'Chưa ghi lý do'}` : row.reason ? formatReason(row.reason) : 'Không có lý do cần chú ý'}</span><span className="shrink-0">{row.onIt ? `${row.onIt.who} đang lo` : 'Chưa ghi người xử lý'}</span><span data-concept="C3" className="shrink-0">Ghế Kernel · {row.seat?.state ?? 'chưa rõ'}</span>{row.etaAt != null && <span className="shrink-0">ETA {formatAbsolute(row.etaAt)}</span>}</div>
-    </ConceptBlock>
-    <div className="lg:hidden"><Panel title="Tiến độ" concept="C2"><div className="flex flex-wrap items-baseline gap-x-5 gap-y-2 text-sm"><span><strong className="text-2xl tabular-nums">{formatCount(row.units.done)}/{formatCount(row.units.total)}</strong> đơn vị đạt</span><span>{formatCount(row.ratePerHour)}/giờ{row.minRatePerHour != null ? ` · tối thiểu ${formatCount(row.minRatePerHour)}` : ''}</span><span>Đang chạy {row.running}/{row.allowedParallel ?? '—'}</span>{row.etaAt != null && <span>ETA {formatAbsolute(row.etaAt)}</span>}</div>
-      <Progress className="mt-4" value={pct} aria-label={`${pct}% đơn vị đạt`} /><div className="mt-3 flex flex-wrap gap-3 text-xs text-muted-foreground"><span>{row.counts.failed24h} hỏng / 24 giờ</span><span>{row.counts.attempts24h} lần thử / 24 giờ</span>{row.counts.costUsd24h != null && <span>{new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(row.counts.costUsd24h)} / 24 giờ</span>}</div>
-      {row.phase !== 'running' ? <p className="mt-3 text-sm">{row.phase === 'paused' ? 'Tạm dừng' : row.phase === 'stopped' ? 'Đã dừng' : row.phase}: {row.phaseReason ?? 'Chưa ghi lý do'}</p> : row.reason && <ReasonLine reason={row.reason} className="mt-3" />}
-      <div className="mt-3 flex flex-wrap items-center gap-3 text-sm"><span>{row.onIt ? `${row.onIt.who} đang lo · ${formatReason(row.onIt.reason)}` : 'Chưa có người xử lý được ghi nhận'}</span><span data-concept="C3" className="inline-flex items-center gap-1 rounded-full border px-2 py-1 text-xs">Ghế Kernel · {row.seat?.state ?? 'chưa rõ'}</span></div>
-    </Panel></div>
-    <div className="hidden min-w-0 gap-3 lg:grid lg:grid-cols-3">
-      <ConceptBlock concept="C1" as="details" className="min-w-0 rounded-xl border bg-card px-4 py-3 shadow-sm"><summary className="cursor-pointer list-none"><span className="block text-xs font-semibold">Mục tiêu · bản {row.goal.revision}</span><span className="mt-1 block truncate text-sm text-muted-foreground">{row.goal.text || 'Chưa có mục tiêu được ghi nhận.'}</span></summary><p className="mt-3 whitespace-pre-wrap break-words border-t pt-3 text-sm leading-relaxed">{row.goal.text || 'Chưa có mục tiêu được ghi nhận.'}</p></ConceptBlock>
-      <ConceptBlock concept="C12" as="section" className="min-w-0 rounded-xl border bg-card px-4 py-3 shadow-sm"><h2 className="text-xs font-semibold">Chờ quyết · {row.counts.decisionsOpen}</h2>{firstDecision ? <a href={`#/decisions?id=${encodeURIComponent(firstDecision.id)}`} className="mt-1 flex min-w-0 items-center gap-2 text-sm hover:text-primary"><StateChip state={firstDecision.ui} compact /><span className="min-w-0 flex-1 truncate">{firstDecision.summary}</span><ArrowRight className="size-4 shrink-0" /></a> : <a href="#/decisions" className="mt-1 block truncate text-sm text-muted-foreground hover:text-primary">{row.counts.decisionsOpen ? 'Mở danh sách quyết định' : 'Không có quyết định đang chờ.'}</a>}{(decisions.data?.length ?? 0) > 1 && <details className="mt-1 text-xs text-muted-foreground"><summary className="cursor-pointer">Xem thêm {decisions.data!.length - 1}</summary><div className="mt-2 space-y-2">{decisions.data!.slice(1).map(item => <a key={item.id} href={`#/decisions?id=${encodeURIComponent(item.id)}`} className="block truncate text-sm hover:text-primary">{item.summary}</a>)}</div></details>}</ConceptBlock>
-      <ConceptBlock concept="C4" as="section" className="min-w-0 rounded-xl border bg-card px-4 py-3 shadow-sm"><h2 className="text-xs font-semibold">Đang chặn · {row.blockedBy.length}</h2>{firstBlocker ? <a href={firstBlocker.ref.href} className="mt-1 flex min-w-0 items-center gap-2 text-sm hover:text-primary"><StateChip state={firstBlocker.ui} compact /><span className="min-w-0 flex-1 truncate">{formatReason(firstBlocker.reason)}</span><ArrowRight className="size-4 shrink-0" /></a> : <p className="mt-1 truncate text-sm text-muted-foreground">Không có chặn được ghi nhận.</p>}{row.blockedBy.length > 1 && <details className="mt-1 text-xs text-muted-foreground"><summary className="cursor-pointer">Xem thêm {row.blockedBy.length - 1}</summary><div className="mt-2 space-y-2">{row.blockedBy.slice(1).map((item, index) => <a key={`${item.ref.kind}-${item.ref.id}-${index}`} href={item.ref.href} className="block truncate text-sm hover:text-primary">{formatReason(item.reason)}</a>)}</div></details>}</ConceptBlock>
+  const tabActive = (id: WorkflowTab) => tab === id || (id === 'units' && tab === 'graph');
+  return <div className="mx-auto flex w-full max-w-[1600px] min-w-0 flex-col gap-5 p-4 pb-24 sm:p-6 lg:p-8">
+    <WorkflowHeader row={row} pipeline={pipe} />
+    <Panel title="Chuỗi op" concept="C4">
+      <p className="-mt-2 mb-3 text-xs text-muted-foreground">Mỗi ô là một chặng của kế hoạch. Cột là thứ tự, ô xếp dọc chạy song song. Bấm vào ô để xem chi tiết.</p>
+      {pipe ? <PipelineGraph pipeline={pipe} selected={legOp} onSelect={leg => withLeg(legOp === leg.op ? null : leg.op)} /> : <p className="text-sm text-muted-foreground">{pipeline.error ?? 'Đang đọc chuỗi op…'}</p>}
+    </Panel>
+    {selectedLeg && pipe && <LegDrawer project={project} wf={wf} leg={selectedLeg} pipeline={pipe} onClose={() => withLeg(null)} />}
+    <WorkflowInfraCard where={row.where} usage={row.usage} />
+    {pipe && <div className="grid min-w-0 gap-5 lg:grid-cols-2"><Panel title="Lần thử theo chặng" concept="C7"><AttemptGantt pipeline={pipe} now={now} /></Panel><Panel title="Lát cắt công việc" concept="C4"><WorkGraphSlices graph={pipe.workGraph} /></Panel></div>}
+    <div className="grid min-w-0 gap-5 lg:grid-cols-2">
+      <Panel title={`Chờ quyết · ${row.counts.decisionsOpen}`} concept="C12"><div className="divide-y">{decisions.data?.map(item => <a key={item.id} href={`#/decisions?id=${encodeURIComponent(item.id)}`} className="flex min-w-0 items-center gap-2 py-3 text-sm hover:text-primary"><StatusDot status={statusFromUi(item.ui)} /><span className="min-w-0 flex-1 truncate">{item.summary}</span><span className="hidden text-xs text-muted-foreground sm:block">{item.decider}{item.overdue ? ' · quá hạn' : ''}</span><ArrowRight className="size-4 shrink-0" /></a>)}</div>{!decisions.data?.length && <p className="text-sm text-muted-foreground">Không có quyết định đang chờ.</p>}</Panel>
+      <Panel title={`Đang chặn · ${row.blockedBy.length}`} concept="C4"><div className="divide-y">{row.blockedBy.map((item, index) => <a key={`${item.ref.kind}-${item.ref.id}-${index}`} href={item.ref.href} className="flex min-w-0 items-start gap-3 py-3 text-sm hover:text-primary"><span className="text-xs tabular-nums text-muted-foreground">{index + 1}.</span><StatusDot status={statusFromUi(item.ui)} /><span className="min-w-0 flex-1 break-words">{formatReason(item.reason)}<span className="block text-xs text-muted-foreground">{item.who} · từ {formatAbsolute(item.since)}</span></span><ArrowRight className="size-4 shrink-0" /></a>)}</div>{row.blockedBy.length === 0 && <p className="text-sm text-muted-foreground">Không có chặn được ghi nhận.</p>}</Panel>
     </div>
-    <div className="grid min-w-0 gap-5 sm:grid-cols-[minmax(0,1.5fr)_minmax(0,1fr)] lg:hidden"><Panel title={`Mục tiêu · bản ${row.goal.revision}`} concept="C1"><div className="whitespace-pre-wrap break-words text-sm leading-relaxed">{row.goal.text || 'Chưa có mục tiêu được ghi nhận.'}</div></Panel><div className="grid min-w-0 gap-5 sm:grid-cols-1">
-      <Panel title={`Chờ quyết · ${row.counts.decisionsOpen}`} concept="C12"><div className="divide-y">{decisions.data?.map(item => <a key={item.id} href={`#/decisions?id=${encodeURIComponent(item.id)}`} className="flex min-w-0 items-center gap-2 py-3 text-sm hover:text-primary"><StateChip state={item.ui} compact /><span className="min-w-0 flex-1 truncate">{item.summary}</span><span className="hidden text-xs text-muted-foreground sm:block">{item.decider}{item.overdue ? ' · quá hạn' : ''}</span><ArrowRight className="size-4 shrink-0" /></a>)}</div>{!decisions.data?.length && <p className="text-sm text-muted-foreground">Không có quyết định đang chờ.</p>}</Panel>
-      <Panel title={`Đang chặn · ${row.blockedBy.length}`} concept="C4"><div className="divide-y">{row.blockedBy.map((item, index) => <a key={`${item.ref.kind}-${item.ref.id}-${index}`} href={item.ref.href} className="flex min-w-0 items-start gap-3 py-3 text-sm hover:text-primary"><span className="text-xs tabular-nums text-muted-foreground">{index + 1}.</span><StateChip state={item.ui} compact /><span className="min-w-0 flex-1 break-words">{formatReason(item.reason)}<span className="block text-xs text-muted-foreground">{item.who} · từ {formatAbsolute(item.since)}</span></span><ArrowRight className="size-4 shrink-0" /></a>)}</div>{row.blockedBy.length === 0 && <p className="text-sm text-muted-foreground">Không có chặn được ghi nhận.</p>}</Panel>
-    </div></div>
-    <nav aria-label="Nội dung workflow" className="flex flex-wrap gap-1 border-b pb-2">{tabs.map(item => <a key={item.id} href={`${rootHref(project, wf)}?tab=${item.id}`} data-concept={item.concept} aria-current={tab === item.id ? 'page' : undefined} className={`rounded-lg px-3 py-2 text-sm font-medium hover:bg-muted ${tab === item.id ? 'bg-muted text-foreground' : 'text-muted-foreground'}`}>{item.label}{item.id === 'units' && ` ${row.units.total}`}{item.id === 'attempts' && ` ${row.counts.attempts24h}`}</a>)}</nav>
-    <div id="workflow-tab-panel" className={tab === 'graph' ? 'min-h-[100vh] scroll-mt-4' : 'scroll-mt-4'}>
-      {(tab === 'units' || tab === 'graph') && <><div className="hidden min-w-0 gap-5 lg:grid lg:grid-cols-[minmax(0,2fr)_minmax(18rem,1fr)]"><div className="min-w-0 space-y-5"><Panel title="Đồ thị công việc" concept="C4">{graph.data ? <GraphView graph={graph.data} onGroupSelect={setSelectedGroup} selectionInInspector onUnit={unit => { window.location.hash = `${rootHref(project, wf)}?tab=units&unit=${encodeURIComponent(unit)}`; }} /> : <p className="text-sm text-muted-foreground">Đang đọc đồ thị…</p>}</Panel><UnitsTab project={project} wf={wf} graph={graph.data} desktopSplit /></div><div className="min-w-0"><div className="sticky top-5"><WorkflowInspector project={project} wf={wf} group={selectedGroup} /></div></div></div><div className="lg:hidden">{tab === 'units' ? <UnitsTab project={project} wf={wf} graph={graph.data} /> : <Panel title="Đồ thị công việc" concept="C4">{graph.data ? <GraphView graph={graph.data} onUnit={unit => { window.location.hash = `${rootHref(project, wf)}?tab=units&unit=${encodeURIComponent(unit)}`; }} /> : <p className="text-sm text-muted-foreground">Đang đọc đồ thị…</p>}</Panel>}</div></>}
+    <nav aria-label="Nội dung workflow" className="flex gap-1 overflow-x-auto border-b pb-2">{tabs.map(item => <a key={item.id} href={`${rootHref(project, wf)}?tab=${item.id}${legOp ? `&leg=${encodeURIComponent(legOp)}` : ''}`} data-concept={item.concept} aria-current={tabActive(item.id) ? 'page' : undefined} className={`shrink-0 rounded-lg px-3 py-2 text-sm font-medium hover:bg-muted ${tabActive(item.id) ? 'bg-muted text-foreground' : 'text-muted-foreground'}`}>{item.label}{item.id === 'units' && ` ${row.units.total}`}{item.id === 'attempts' && ` ${row.counts.attempts24h}`}</a>)}</nav>
+    <div id="workflow-tab-panel" className="scroll-mt-4">
+      {(tab === 'units' || tab === 'graph') && <UnitsTab project={project} wf={wf} graph={graph.data} />}
       {tab === 'attempts' && <AttemptsTab project={project} wf={wf} />}
       {tab === 'decisions' && <DecisionsTab project={project} wf={wf} />}
       {tab === 'why' && <WhyTab project={project} wf={wf} />}
