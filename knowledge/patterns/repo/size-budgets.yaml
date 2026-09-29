@@ -1,0 +1,82 @@
+schema: starci/knowledge-source@1
+id: repo.size-budgets
+title: Repository size budgets
+purpose: |
+  Given a file, function, module or feature, how large may it be, and what happens when it is already larger? Budgets live in
+  the slots. The mechanism is no-growth, not a baseline.
+appliesTo:
+  - backend
+  - frontend
+family: repo
+provenance:
+  reviewedAt: 2026-09-29
+  sources:
+    - knowledge/hfs/README.md
+    - knowledge/hfs/slots.yaml
+    - https://docs.sonarsource.com/sonarqube-server/latest/user-guide/rules/overview/
+  limitations: |
+    A size budget bounds one measurable dimension. It does not prove cohesion; a small file can still mix responsibilities and a
+    large one can still be one responsibility. Review judges the split.
+rules:
+  - id: REPO-BUDGET-1
+    title: The budgets
+    kind: mandatory
+    hfsRules: [R20, R30, R65]
+    requirement: |
+      Backend: source file 500 lines, function 80 lines, `app.module.ts` 250 lines, `main.ts` 80 lines, `index.ts` 60 exports,
+      feature 250 source files. Frontend: component 300 lines, connected `index.tsx` 200 lines, hook 200 lines, module file 400
+      lines, at most 6 data hooks and 6 `useState` per connected unit. Packages: images under docs 500 KB. Budgets are the slot
+      `budget` fields and are read by the checks.
+    rationale: |
+      A unit that does not fit a review is not reviewed, and a feature over 250 files has several product capabilities.
+    cases:
+      - id: case-1
+        when: A feature reaches 250 source files
+        write: Split it by product capability into features and move shared behavior into a domain capability.
+    verification:
+      automated:
+        - HFS_SIZE_GROWTH
+        - FE_SIZE_AND_STATE_BUDGET
+        - BE_PUBLIC_SURFACE
+      manual: []
+    relatedExamples: []
+  - id: REPO-BUDGET-2
+    title: No growth over budget, new files inside budget
+    kind: mandatory
+    hfsRules: [R20]
+    requirement: |
+      A new file is inside its budget. A file already over its budget gains no lines compared with its parent commit; it may
+      shrink. There is no baseline file, no allowlist and no per-file exception: the reference point is the parent commit.
+      The rule is checked at the land gate and by Sonar cognitive complexity as a second gate.
+    rationale: |
+      A hard error would block every commit that touches a large existing file, while a warning is never fixed. No-growth is a
+      ratchet that needs no exception list.
+    cases:
+      - id: case-1
+        when: A change adds a branch to a 900-line service
+        write: Extract the new behavior into its own unit; the service must not grow.
+    verification:
+      automated:
+        - HFS_SIZE_GROWTH
+      manual:
+        - Review that a split follows responsibility, not line count.
+    relatedExamples: []
+  - id: REPO-BUDGET-3
+    title: Duplicated code fails
+    kind: mandatory
+    hfsRules: [R21]
+    requirement: |
+      A block of 8 or more lines (60 or more tokens) duplicated across files, and a helper defined twice under the same name
+      (`isRecord`, a token reader), fail at the land gate and in Sonar. The copy is deleted and imports the owner: a platform
+      primitive, a `<domain>.shared.ts`, or a package.
+    rationale: |
+      Copies drift, and a fix applied to one copy leaves the others broken.
+    cases:
+      - id: case-1
+        when: Two hooks define the same token reader
+        write: Move it to hooks/<domain>/<domain>.shared.ts and import it.
+    verification:
+      automated:
+        - HFS_DUPLICATE_CODE
+      manual: []
+    relatedExamples: []

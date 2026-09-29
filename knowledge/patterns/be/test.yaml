@@ -1,234 +1,185 @@
 schema: starci/knowledge-source@1
 id: be.test
 title: Test
-purpose: >-
-  Given a backend unit, where does its spec live, how is the subject built, what does it assert, and what does
-  it leave alone?
-
-
-  Profile scope: these historical Academy forms apply where that existing profile is selected. The revised
-  docs/backend-source-pattern.md and be.folder/function/typing rules take precedence for ownership and code
-  shape. Counts are evidence, not requirements. Do not add obsolete forwarding classes, expose entities,
-  centralize domain policy or mandate process overrides to reproduce an example. Update conflicting installed
-  lint coherently under authority; never suppress it to claim conformance.
+purpose: |-
+  Given a backend unit, where does its spec live, how is the subject built, what does it assert and what does it leave
+  alone? Two test kinds exist. Unit specs run automatically. E2E runs by hand.
 appliesTo:
   - backend
 family: be
 provenance:
-  extractionCommit: edf72554425f918e80c9205e9c6db10596e722f0
+  reviewedAt: 2026-09-29
   sources:
-    - jest.config.ts
-    - features/api/core/graphql/mutations/courses/add-to-cart/add-to-cart.handler.spec.ts
-    - modules/ai/ai-entitlement.service.spec.ts
-    - modules/ai/ping/classes/abstract-provider-ping.service.spec.ts
-    - src/tests/**
-    - eslint.config.mjs
-  limitations: >-
-    Historical reference-source observations preserved at the extraction commit; not a fresh audit of current
-    repository conformance. Counts and file totals cited in rationale or cases are provenance from that
-    extraction, not claims about today. Inspect the selected repository's actual types/APIs, aliases and
-    lint/test setup; verify reference conformance within approved .starciwork scope. Target existing code does
-    not override the reference. Current business requirements and architecture belong to .starciwork; code
-    patterns do not approve them.
+    - knowledge/hfs/README.md
+    - knowledge/hfs/slots.yaml
+    - knowledge/patterns/be/folder.yaml
+    - https://docs.nestjs.com/fundamentals/testing
+    - https://jestjs.io/docs/configuration
+  limitations: |-
+    A green spec proves what it exercised. A mocked manager is not database isolation, and a stubbed module is not
+    registration evidence. Which behavior needs a test is decided from the effect and the failure risk, never from a
+    file count.
 
-
-    Historical filename counts do not decide whether a behavior needs a test. The canon has no
-    handler-twin count rule (removed in 1.3.0) and selects proof from the affected behavior and failure risk. Colocation applies
-    to a selected unit spec; it does not manufacture a spec for every class.
-
-    Owner policy 2026-09-29: write or update the spec of the source you add or change (the goal need not ask for it) and run only those
-    specs and the specs that import it - never the repository's whole unit suite (unit.verify or /push-git) and never e2e unless asked.
+    Policy 2026-09-29. Write or update the spec of the source you add or change, even when the goal does not ask for it,
+    and run only those specs and the specs that import them. The whole unit suite runs only at push. E2E runs only when
+    asked.
 rules:
   - id: BE-TEST-1
-    title: Placement and test kinds
+    title: Placement, kinds and topology
     kind: mandatory
-    requirement: >-
-      A backend repository has exactly two test kinds (owner ruling 2026-09-29). Unit is
-      <name>.spec.ts beside its subject. E2E is *.e2e-spec.ts under src/tests/e2e/ (subfolders by area),
-      with environment code (Testcontainers globalSetup/globalTeardown, application boot, datastore and
-      transport helpers) in src/tests/e2e/setup/ and shared data in src/tests/fixtures/. Every
-      non-unit spec is e2e. One root jest.config.js declares exactly two projects,
-      unit and e2e; scripts are test:unit and test:e2e, plus an optional test:e2e:live that filters
-      src/tests/e2e/live/ (suites needing live third-party accounts) out of plain test:e2e. Verify discovery
-      using the consuming project's actual Jest config and test listing (--listTests per project). Mock-only
-      API routing tests do not prove database integration or end-to-end behavior. Record which transport,
-      service, database and external boundary actually ran. E2E runs MANUALLY only (owner ruling
-      2026-09-29): no e2e spec, src/tests/e2e/ code or e2e-only dependency joins husky (pre-commit, pre-push,
-      lint-staged, or the typecheck/lint they call), coverage/Codecov, or an automatic CI trigger. The default
-      tsconfig and lint exclude src/tests/e2e/**, a dedicated tsconfig.e2e.json backs a manual typecheck:e2e,
-      coverage and test:ci collect from the unit project only, and a kept e2e CI job is workflow_dispatch only.
-      Routine gates are unit + typecheck + lint + canon + build; e2e runs only when explicitly asked.
-    rationale: ""
+    hfsRules: [R12, R47]
+    requirement: |-
+      Exactly two test kinds exist. Unit is `<name>.spec.ts` beside its subject. E2E is `*.e2e-spec.ts` under
+      `src/tests/e2e/<area>/`, with live third-party suites under `src/tests/e2e/live/<area>/`, environment code
+      (containers, boot of the real AppModule) in `src/tests/e2e/setup/` and shared data in `src/tests/fixtures/`. One root
+      `jest.config.js` uses the preset `@starci/jest-preset` and declares exactly two projects, `unit` and `e2e`. The unit
+      project maps no module into `src/tests/e2e`. Scripts are `test:unit`, `test:e2e` and `test:e2e:live`. `test:e2e`
+      is `npm run typecheck:e2e && jest --selectProjects e2e`. The live suite is separated by the folder `live/` with
+      `E2E_LIVE=1`, never by file name, and `test:e2e:live` differs from `test:e2e`. E2E runs by hand: no e2e spec, e2e
+      code or e2e-only dependency enters husky, lint-staged, the default typecheck, coverage or Codecov, or an
+      automatic CI trigger; a kept e2e workflow is `workflow_dispatch` only. `tsconfig.json` excludes
+      `src/tests/e2e/**`, `tsconfig.e2e.json` backs `typecheck:e2e`, and coverage and `test:ci` read the unit project only.
+    rationale: |-
+      One placement rule makes discovery mechanical, and keeping e2e out of the automatic gates keeps the routine
+      gates fast and deterministic while the manual gate still refuses to run on code that does not type check.
     cases:
       - id: case-1
         when: Unit
-        write: <name>.spec.ts beside <name>.ts (875 at extraction; lint unit-test-colocated)
+        write: place-order.use-case.spec.ts beside place-order.use-case.ts
       - id: case-2
-        when: Selected handler behavior
-        write: add-to-cart.handler.spec.ts beside the handler; the historical handler twin count rule
-          was removed from the canon in 1.3.0
-      - id: case-3
-        when: Service twin
-        write: 271 of 396 services under src/modules at extraction
-      - id: case-4
         when: E2E
-        write: "*.e2e-spec.ts under src/tests/e2e/<area>/, Testcontainers, globalSetup/globalTeardown in
-          src/tests/e2e/setup/, testTimeout: 120_000"
-      - id: case-5
-        when: Live third-party e2e
-        write: "*.e2e-spec.ts under src/tests/e2e/live/, run only by test:e2e:live and excluded from plain
-          test:e2e"
-      - id: case-6
+        write: src/tests/e2e/checkout/place-order.e2e-spec.ts with globalSetup and globalTeardown in src/tests/e2e/setup/
+      - id: case-3
+        when: A live third-party suite
+        write: src/tests/e2e/live/payments/payos-webhook.e2e-spec.ts, run only by `E2E_LIVE=1 jest --selectProjects e2e src/tests/e2e/live`
+      - id: case-4
         when: Projects
-        write: 'one root jest.config.js, projects: [{ displayName: "unit", testMatch: ["**/*.spec.ts"],
-          testPathIgnorePatterns: ["\\.e2e-spec\\.ts$"] }, { displayName: "e2e", testMatch:
-          ["**/*.e2e-spec.ts"], globalSetup/globalTeardown from src/tests/e2e/setup, … }]; scripts test:unit
-          (--selectProjects unit) and test:e2e (--selectProjects e2e --runInBand); no other jest config,
-          runner or per-lane script'
-      - id: case-7
-        when: Runner
-        write: 'jest with ts-jest (diagnostics: false), testEnvironment: "node"'
-      - id: case-8
-        when: Hooks, typecheck, coverage and CI
-        write: 'tsconfig.json "exclude": ["node_modules", "dist", "coverage", "src/tests/e2e/**"];
-          tsconfig.e2e.json extends it with "include": ["src/tests/e2e/**/*.ts"]; scripts typecheck (default,
-          no e2e) and typecheck:e2e (tsc -p tsconfig.e2e.json, manual); husky pre-push = typecheck/lint +
-          test:unit or test:affected on --selectProjects unit; test:ci = --selectProjects unit --coverage; an e2e
-          workflow is on: workflow_dispatch only; unit jest config maps no module into src/tests/e2e/'
+        write: 'jest.config.js is `module.exports = { preset: "@starci/jest-preset", projects: [unit, e2e] }` produced by the preset factory, with no second jest config and no per-lane script.'
+      - id: case-5
+        when: Type checking
+        write: '`typecheck` covers app and unit specs at pre-push and CI; `typecheck:e2e` runs `tsc -p tsconfig.e2e.json` and `test:e2e` depends on it, so e2e never runs on code that does not compile.'
     verification:
       automated:
+        - BE_TEST_TOPOLOGY
+        - HFS_E2E_IN_AUTOMATIC_GATE
+        - HFS_TEST_KIND_RETIRED
         - unit-test-colocated
       manual:
-        - Record which transport, service, database and external boundary actually ran; mock-only routing
-          tests do not prove integration.
-    relatedExamples:
-      - graphql-command
-      - transactional-service
+        - Record which transport, service, database and external boundary an e2e run actually exercised.
+    relatedExamples: []
   - id: BE-TEST-2
     title: Test the real public execution contract
     kind: mandatory
-    requirement: An isolated handler/use-case spec constructs the real subject with focused dependency doubles
-      and exercises its public execution entry. A selected Nest e2e spec may obtain that same subject
-      from a testing module. For an existing ICQRSHandler, test execute rather than bypassing its protected
-      process hook. Prefer typed doubles; narrow documented harness conversions are permitted where the
-      actual dependency contract needs them, but no cast is mandatory and a cast does not validate behavior.
-    rationale: The Academy example calls the inherited public execute method. Historical cast counts describe
-      its test fixtures and do not justify requiring as never or double casts in a new project.
+    hfsRules: [R48]
+    requirement: |-
+      A use-case or handler spec constructs the real subject with typed dependency doubles and calls its public entry
+      (`execute`). Doubles come from `mock<T>()` in `@starci/jest-preset` or typed builders in `src/tests/fixtures/`;
+      `as never`, `as unknown as` and any other cast that pretends a double is the real type are forbidden. A spec never
+      reads source code with `fs` or a regular expression to assert an architecture rule; architecture is lint.
+    rationale: |-
+      A typed double fails to compile when the contract changes, while a cast keeps a stale spec green.
     cases:
       - id: case-1
         when: Subject
-        write: const handler = new AddToCartHandler({ exists } as never) — the entity manager is a bare object of
-          jest.fn()
+        write: 'const orders = mock<OrderRepository>(); const useCase = new PlaceOrderUseCase(orders, mock<CreditPolicy>())'
       - id: case-2
-        when: Message factory
-        write: 'const command = (courseId: string) => new AddToCartCommand({ request: { courseId }, user: { id: "u1" }
-          } as never)'
+        when: Ordered answers
+        write: 'orders.exists.mockResolvedValueOnce(false)'
       - id: case-3
-        when: Ordered mock answers
-        write: const exists = jest.fn().mockResolvedValueOnce(false); later
-          exists.mockResolvedValueOnce(true).mockResolvedValueOnce(true)
-      - id: case-4
-        when: Call through the public door
-        write: handler.execute(command("missing")), never process
+        when: The call
+        write: 'await useCase.execute(input, principal), never a protected hook'
     verification:
-      automated: []
-      manual: []
-    relatedExamples:
-      - graphql-command
+      automated:
+        - BE_SPEC_QUALITY
+      manual:
+        - Review that a double matches the real dependency contract.
+    relatedExamples: []
   - id: BE-TEST-3
     title: Construct according to the boundary under test
     kind: mandatory
-    requirement: Use direct construction for isolated capability behavior. Use the real Test.createTestingModule
-      API when proving Nest registration, injection, named tokens or lifecycle, and retrieve the subject with
-      the appropriate get/resolve API. Reuse focused typed fixtures for shared dependencies. Database mocks
-      establish local behavior only; real transaction, lock and crash claims require the actual store. Keep
-      configuration substitution at the owned config boundary and use the project's resolved aliases.
-    rationale: Nest documents both isolated construction and its testing module. A Service suffix does not
-      make a DI container necessary for every unit test.
+    hfsRules: [R32, R48]
+    requirement: |-
+      Use direct construction for isolated capability behavior. Use `Test.createTestingModule` or the real AppModule
+      when proving registration, injection, named tokens or lifecycle. Every app has `<app>.composition.spec.ts` that
+      boots the real AppModule with stubbed options and resolves real provider tokens. E2E boots the real AppModule and
+      overrides providers; it never assembles a lane module by hand. Database mocks establish local behavior only;
+      transaction, lock and crash claims need the real store. Configuration is substituted at the owned config
+      boundary by passing options, never by patching `process.env`.
+    rationale: |-
+      A hand-assembled module can pass while the real app cannot start, so composition is proved on the real module.
     cases:
       - id: case-1
-        when: Module
-        write: Test.createTestingModule({ … }) with getEntityManagerToken(POSTGRESQL_PRIMARY)
+        when: The composition spec
+        write: 'const moduleRef = await Test.createTestingModule({ imports: [AppModule.register(stubOptions)] }).compile(); expect(moduleRef.get(PlaceOrderUseCase)).toBeDefined()'
       - id: case-2
-        when: Entity manager
-        write: import { makeEntityManagerMock } from "@tests/mocks/entity-manager.mock" with EntityManagerMock,
-          QueryBuilderMock types
+        when: An e2e provider override
+        write: 'Test.createTestingModule({ imports: [AppModule.register(options)] }).overrideProvider(MAILER).useValue(fakeMailer)'
       - id: case-3
         when: Config
-        write: 'jest.mock("@modules/platform/env/config", () => ({ envConfig: () => ({ ai: { ping: mockPingConfig } })
-          }))'
-      - id: case-4
-        when: Abstract class
-        write: "a local subclass: class TestPingService extends AbstractProviderPingService { protected readonly
-          provider = ModelProvider.OpenAI; execute = jest.fn()…; protected executePing(key: string) { return
-          this.execute(key) } }"
-      - id: case-5
-        when: Fixture constants
-        write: "documented UPPER_SNAKE: /** Free base credit caps the mocked quota config hands back (credits per
-          window). */ const BASE_CREDITS_5H = 30"
+        write: 'pass `parseOrdersConfig({ ORDERS_TTL: "900" })` output as options; do not set process.env'
     verification:
-      automated: []
-      manual: []
-    relatedExamples:
-      - transactional-service
+      automated:
+        - BE_APP_COMPOSITION_ONLY
+        - BE_TEST_TOPOLOGY
+      manual:
+        - Confirm the composition spec fails when a module or provider is missing.
+    relatedExamples: []
   - id: BE-TEST-4
     title: What is asserted
     kind: mandatory
-    requirement: Assert exception types, ordering of side effects, returned rows and persisted arguments as
-      relevant to the behavior. Test titles start with a word from NEST_TEST_TITLE_ACTIONS in the shared
-      script (for example accepts, rejects, returns, preserves or should). This lexical action-prefix rule
-      is machine-checked; whether the title and assertions faithfully describe the required behavior is
-      agent review. Adding vocabulary is a reviewed profile change, not a per-file suppression.
-    rationale: "262 specs use rejects.toBeInstanceOf / toThrow( at extraction; 49 match a message string.
-      Verb-first it titles: throws 83, rejects 65, returns 50, refuses 25."
+    hfsRules: [R48]
+    requirement: |-
+      Assert error class and code, ordering of side effects, returned rows and persisted arguments as relevant. Test titles
+      start with a word from `NEST_TEST_TITLE_ACTIONS` (accepts, rejects, returns, preserves, refuses, maps, creates).
+      This action-prefix rule is machine-checked; whether title and assertions describe the required behavior is agent
+      review. Adding vocabulary is a reviewed profile change, never a per-file suppression.
+    rationale: |-
+      Assertions on type, code and state prove behavior. Message strings and call counts alone do not.
     cases:
       - id: case-1
-        when: The exception type
-        write: await expect(handler.execute(command("missing"))).rejects.toBeInstanceOf(CourseNotFoundException)
+        when: The error
+        write: 'await expect(useCase.execute(input, principal)).rejects.toMatchObject({ code: "ORDER_NOT_FOUND" })'
       - id: case-2
         when: Ordering of side effects
-        write: await expect(handler.execute(…)).rejects.toBeInstanceOf(UserNotFoundException);
-          expect(exists).not.toHaveBeenCalled()
+        write: 'expect(reserve).not.toHaveBeenCalled() after a rejected credit check'
       - id: case-3
-        when: The returned row
-        write: 'await expect(handler.execute(command("one"))).resolves.toBe(existing); .resolves.toEqual({ id:
-          "cart-2" })'
+        when: A typed outcome
+        write: 'await expect(useCase.execute(input, principal)).resolves.toEqual({ kind: "refused", reason: "credit-limit" })'
       - id: case-4
-        when: Persisted argument
-        write: 'expect(save).toHaveBeenCalledWith({ id: "draft" })'
-      - id: case-5
-        when: it phrasing
-        write: 'verb first: throws, rejects, returns, refuses, maps, creates — e.g. it("rejects anonymous callers
-          before querying course state", …)'
+        when: Phrasing
+        write: 'it("rejects anonymous callers before querying order state", ...)'
     verification:
-      automated: []
-      manual: []
-    relatedExamples:
-      - graphql-command
+      automated:
+        - NEST_TEST_NAME_FORM
+      manual:
+        - Review that titles and assertions describe the required behavior.
+    relatedExamples: []
   - id: BE-TEST-5
     title: What is not asserted
     kind: mandatory
-    requirement: Do not ship call-only specs, e2e steps that only check success envelopes, sleep-based waits, live
-      model calls in e2e, or branched outcomes inside one flow step.
-    rationale: ""
+    hfsRules: [R48]
+    requirement: |-
+      Do not ship call-only specs, e2e steps that only check a success flag, sleep-based waits, live model calls in
+      e2e, or branched outcomes inside one flow step. The e2e canon rules apply to `src/tests/e2e/**` through `lint:e2e`,
+      which runs by hand and must be green before an e2e conclusion is drawn.
+    rationale: |-
+      A test that cannot fail for the wrong reason is not evidence, and time-based waiting hides races.
     cases:
       - id: case-1
         when: A call alone
-        write: a spec that only proves a mock was invoked (lint no-call-only-spec)
+        write: a spec that only proves a mock was invoked fails no-call-only-spec
       - id: case-2
-        when: Envelope instead of state, in e2e
-        write: "an e2e step asserts the persisted row, not success: true (lint e2e-asserts-persisted-state)"
+        when: Envelope instead of state
+        write: an e2e step asserts the persisted row, not `success true`
       - id: case-3
         when: Elapsed time
-        write: no sleep in a flow; poll for state (lint no-sleep-in-flow)
+        write: poll for state; never sleep in a flow
       - id: case-4
-        when: Live model output, in e2e
-        write: no provider call in e2e (no-model-call-in-e2e); only a live e2e under src/tests/e2e/live/ owns it
-          (harness-calls-provider-directly judges only a model harness (an LLM SDK import, a house model helper or
-          gateway symbol, or @harness-kind model); an identity-provider live e2e is not one)
+        when: A provider call
+        write: only a live e2e under src/tests/e2e/live/ may call a provider
       - id: case-5
-        when: A branch inside one step
-        write: one step proves one outcome (lint no-branch-in-flow-step)
+        when: Branching
+        write: one step proves one outcome
     verification:
       automated:
         - no-call-only-spec
@@ -237,49 +188,48 @@ rules:
         - no-model-call-in-e2e
         - harness-calls-provider-directly
         - no-branch-in-flow-step
+        - BE_SPEC_QUALITY
       manual: []
     relatedExamples: []
   - id: BE-TEST-6
-    title: Names and layout
+    title: Names
     kind: mandatory
-    requirement: "The outer subject suite names the actual exported class/function under test; nested suites
-      may name scenarios or public methods. Callbacks sit on a new line per the selected function-call-argument-newline
-      profile. Imports retain the adopted multiline brace form. Subject-first import order is an Academy
-      observation rather than an additional import-order rule."
-    rationale: 367 …Service, 121 …Handler, 58 …Resolver describe titles at extraction.
+    hfsRules: [R48]
+    requirement: |-
+      The outer suite names the exported class or function under test. Nested suites name scenarios or public methods.
+      Layout of calls and imports is Prettier's concern and is not a test rule.
+    rationale: |-
+      A failure names the subject it measures.
     cases:
       - id: case-1
         when: describe
-        write: describe("AddToCartHandler", () => { … }), describe("AbstractProviderPingService", …)
-      - id: case-2
-        when: Formatting
-        write: |-
-          callbacks on a new line: describe("AddToCartHandler",
-              () => { and it("…",
-                  async () => { — the repo's function-call-argument-newline: always rule
-      - id: case-3
-        when: Imports
-        write: same multi-line brace style as source; subject first, then exceptions, then mocks
+        write: 'describe("PlaceOrderUseCase", () => { ... })'
     verification:
       automated: []
       manual: []
-    relatedExamples:
-      - graphql-command
+    relatedExamples: []
   - id: BE-TEST-7
-    title: Coverage and lint carve-outs
+    title: Coverage and ts-jest
     kind: mandatory
-    requirement: Coverage excludes tests and entrypoints. Double casts, process.env and new Error are allowed only
-      in the documented test lanes.
-    rationale: ""
+    hfsRules: [R11, R47]
+    requirement: |-
+      ts-jest runs with `diagnostics: false` and `isolatedModules: true` in both projects; types are checked once, by
+      `typecheck` and `typecheck:e2e`. Coverage is collected from the unit project only, and its exclusion list is the
+      one list that `sonar.coverage.exclusions` is generated from. Excluded from coverage: tests, fixtures, `main.ts`,
+      declaration files.
+    rationale: |-
+      Checking types twice slows unit runs and jest with diagnostics checks only the files it loads; one typecheck
+      source cannot rot silently, and one exclusion list keeps Codecov and Sonar numbers equal.
     cases:
       - id: case-1
-        when: Coverage denominator
-        write: 'collectCoverageFrom: ["src/**/*.ts", "apps/**/*.ts", "!src/tests/**", "!**/*.spec.ts",
-          "!**/*.e2e-spec.ts", "!**/*.d.ts", "!**/main.ts"]'
+        when: The transform
+        write: 'transform: { "^.+\\.ts$": ["ts-jest", { diagnostics: false, isolatedModules: true }] } supplied by @starci/jest-preset'
       - id: case-2
-        when: Allowed only in specs
-        write: as unknown as X, process.env (under src/tests/**), new Error(…) in src/tests/** and apps/*/test/**
+        when: Coverage denominator
+        write: 'collectCoverageFrom: ["src/**/*.ts", "apps/**/*.ts", "!src/tests/**", "!**/*.spec.ts", "!**/*.e2e-spec.ts", "!**/*.d.ts", "!**/main.ts"]'
     verification:
-      automated: []
+      automated:
+        - BE_TEST_TOPOLOGY
+        - HFS_SONAR_CONFIG
       manual: []
     relatedExamples: []

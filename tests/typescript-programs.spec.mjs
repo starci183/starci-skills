@@ -81,7 +81,7 @@ module.exports=new Proxy(ts,{get:(target,key)=>key==='createProgram'?(...args)=>
   write('package.json',{private:true,starci:{codePatterns:{next:{schema:'starci/next-code-pattern-contract@1',owners:[],closedVocabularies:[],errorState:{schema:'starci/next-error-state@1',sourceRoots:['apps/web/src'],worldMappings:[],writes:[],boundaries:[],
     transports:[{root:'apps/web/src/modules/api',mode:'envelope',envelopeIds:['read']}],envelopes:[{id:'read',type:{path:'apps/web/src/modules/api/envelope.ts',export:'Envelope'},discriminator:{field:'ok',success:true},dataField:'data',errorFields:['error'],readers:[{path:'apps/web/src/modules/api/read.ts',export:'read',emptyData:'valid'}]}]}}}}});
   write('package-lock.json',{lockfileVersion:3});
-  // HFS v1 frontend tree: an apps/<app>/ monorepo on npm; all source lives under apps/web/src.
+  // HFS frontend tree: an apps/<app>/ monorepo on npm; all source lives under apps/web/src.
   for(const [file,text] of Object.entries({'.gitattributes':'* text=auto eol=lf\n','.github/workflows/check.yml':'name: check\n','.gitignore':'node_modules/\n',
     '.husky/pre-commit':'exit 0\n','README.md':hfsReadme(root),'codecov.yml':'coverage: {}\n','eslint.config.mjs':'export default [];\n',
     'sonar-project.properties':'sonar.projectKey=fixture\n','apps/web/package.json':'{"name":"@fixture/web","private":true}\n',

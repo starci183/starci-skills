@@ -2,7 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { execFileSync } from 'node:child_process';
 
-// Minimal HFS v1 repository tree (D:/starci-tmp/hfs/HFS-SPEC.md section 1-3) for fixtures that run the
+// Minimal HFS repository tree (knowledge/hfs/README.md sections 4 to 6) for fixtures that run the
 // architecture check through the aggregate. Entries a spec already wrote are left untouched.
 const COMMON = {
   '.gitattributes': '* text=auto eol=lf\n',

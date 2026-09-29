@@ -1,0 +1,72 @@
+id: hfs2-patterns
+effectiveAt: '2026-09-29T23:00:00+07:00'
+summary: >-
+  HFS v2 Phase 0 item 0.11 (lane hfs2-patterns). The knowledge the agents read now states only HFS v2. New canonical
+  standard knowledge/hfs/README.md (principles, slots and versioning, hfs.json, repository map, backend and frontend trees,
+  tests, secrets, tooling, gates, done criteria, rule catalog R01 to R67) beside the slot manifest slots.yaml. Backend patterns
+  rewritten (folder, naming, test, error, function, typing, imports, comment, architecture-check) with new topics api-auth,
+  config, logging, persistence and background; frontend patterns rewritten with new topics transport, boundaries, i18n
+  (next-intl, [locale], default locale vi, localePrefix as-needed, proxy.ts), css, packages and multi-app; repository
+  patterns gain index, starciwork, starcistacks, secrets, tooling, formatter, pins and size-budgets and folder.yaml is
+  rewritten to slots and storage states. Each rule cites its catalog rule ids (hfsRules) and the finding codes that judge it.
+  docs/source-layout.md and docs/backend-source-pattern.md are rewritten; enforcement.yaml and scan-coverage.yaml carry no
+  earlier-standard wording; knowledge/index.yaml, CONTEXT.md and docs/architecture-rules.md point at the standard. References
+  to the temporary spec copy are replaced by knowledge/hfs/README.md. The FE-FOLDER-1 machine lists
+  frameworkPinnedRootFiles and frameworkPinnedRootExports are unchanged in content so the framework-pinned readers stay valid.
+reach: new-legs
+paths:
+  - modules/kernel/contract-changes/hfs2-patterns.yaml
+  - knowledge/hfs/README.md
+  - knowledge/index.yaml
+  - knowledge/patterns/enforcement.yaml
+  - knowledge/patterns/scan-coverage.yaml
+  - knowledge/patterns/be/index.yaml
+  - knowledge/patterns/be/architecture-check.yaml
+  - knowledge/patterns/be/folder.yaml
+  - knowledge/patterns/be/naming.yaml
+  - knowledge/patterns/be/function.yaml
+  - knowledge/patterns/be/imports.yaml
+  - knowledge/patterns/be/comment.yaml
+  - knowledge/patterns/be/typing.yaml
+  - knowledge/patterns/be/error.yaml
+  - knowledge/patterns/be/test.yaml
+  - knowledge/patterns/be/api-auth.yaml
+  - knowledge/patterns/be/config.yaml
+  - knowledge/patterns/be/logging.yaml
+  - knowledge/patterns/be/persistence.yaml
+  - knowledge/patterns/be/background.yaml
+  - knowledge/patterns/fe/index.yaml
+  - knowledge/patterns/fe/architecture-check.yaml
+  - knowledge/patterns/fe/folder.yaml
+  - knowledge/patterns/fe/naming.yaml
+  - knowledge/patterns/fe/function.yaml
+  - knowledge/patterns/fe/imports.yaml
+  - knowledge/patterns/fe/comment.yaml
+  - knowledge/patterns/fe/typing.yaml
+  - knowledge/patterns/fe/error.yaml
+  - knowledge/patterns/fe/test.yaml
+  - knowledge/patterns/fe/transport.yaml
+  - knowledge/patterns/fe/boundaries.yaml
+  - knowledge/patterns/fe/i18n.yaml
+  - knowledge/patterns/fe/css.yaml
+  - knowledge/patterns/fe/packages.yaml
+  - knowledge/patterns/fe/multi-app.yaml
+  - knowledge/patterns/repo/index.yaml
+  - knowledge/patterns/repo/folder.yaml
+  - knowledge/patterns/repo/starciwork.yaml
+  - knowledge/patterns/repo/starcistacks.yaml
+  - knowledge/patterns/repo/secrets.yaml
+  - knowledge/patterns/repo/tooling.yaml
+  - knowledge/patterns/repo/formatter.yaml
+  - knowledge/patterns/repo/pins.yaml
+  - knowledge/patterns/repo/size-budgets.yaml
+  - docs/source-layout.md
+  - docs/backend-source-pattern.md
+  - docs/architecture-rules.md
+  - CONTEXT.md
+  - scripts/checks/architecture/hfs.mjs
+  - scripts/checks/probe-reference-conventions.mjs
+  - tests/_hfs-tree-fixture.mjs
+  - tests/architecture-input-scope.spec.mjs
+  - tests/frontend-source-layout.spec.mjs
+  - tests/typescript-programs.spec.mjs

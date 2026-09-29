@@ -1,0 +1,90 @@
+schema: starci/knowledge-source@1
+id: be.logging
+title: Backend logging
+purpose: |-
+  Given a backend event worth recording, how is it logged and where does the logger come from? One mandatory Logger
+  port in `platform/logging`, enum identities, structured payloads.
+appliesTo:
+  - backend
+family: be
+provenance:
+  reviewedAt: 2026-09-29
+  sources:
+    - knowledge/hfs/README.md
+    - knowledge/patterns/be/error.yaml
+    - https://docs.nestjs.com/techniques/logger
+  limitations: |-
+    Static checks prove that the port exists, that identities are enum members and that no `catch` swallows an error.
+    They do not prove that a log line carries the right facts or that no secret reaches a payload; review and behavior
+    tests do.
+rules:
+  - id: BE-LOGGING-1
+    title: platform/logging exists and exposes one port
+    kind: mandatory
+    hfsRules: [R40]
+    requirement: |-
+      `platform/logging` is a required platform capability. It exports the `Logger` port (`debug`, `info`, `warn`,
+      `error`, each taking an enum identity and a structured payload object) and a default adapter, and is registered as a
+      global platform module. Rules target the port, never a variable name of one adapter. `console.*` and the Nest
+      `Logger` are forbidden in application source.
+    rationale: |-
+      Without a mandatory logging capability a backend can pass every check and still record nothing when it fails.
+    cases:
+      - id: case-1
+        when: The port
+        write: 'export interface Logger { info(identity: LogIdentity, payload: LogPayload): void; error(identity: LogIdentity, payload: LogPayload): void }'
+      - id: case-2
+        when: Injection
+        write: 'constructor(private readonly logger: Logger) {}'
+    verification:
+      automated:
+        - BE_LOGGER_REQUIRED
+        - HFS_SLOT_REQUIRED_MISSING
+        - no-nest-logger
+        - no-framework-logger
+      manual: []
+    relatedExamples: []
+  - id: BE-LOGGING-2
+    title: Identity is an enum member, payload is structured
+    kind: mandatory
+    hfsRules: [R40]
+    requirement: |-
+      A log call identifies the event with an enum member owned by its capability (`OrderLog.Placed`) and passes a payload
+      object. The identity is never an interpolated string or error wording. A payload carries ids and codes and never a
+      secret, token or personal data.
+    rationale: |-
+      A stable identity is searchable and alertable, and a payload object keeps facts separate from prose.
+    cases:
+      - id: case-1
+        when: A call
+        write: 'this.logger.info(OrderLog.Placed, { orderId, customerId })'
+      - id: case-2
+        when: A failure
+        write: 'this.logger.error(OrderLog.PlacementFailed, { orderId, code: error.code, cause: error })'
+    verification:
+      automated:
+        - no-interpolated-log-message
+        - no-error-wording-as-log-identity
+      manual:
+        - Review payloads for secrets and personal data.
+    relatedExamples: []
+  - id: BE-LOGGING-3
+    title: Every catch handles its error
+    kind: mandatory
+    hfsRules: [R40]
+    requirement: |-
+      Every `catch` rethrows, logs through the port, or returns a typed outcome that carries the cause. An empty `catch {}`
+      and a `catch` that ignores the caught value are findings.
+    rationale: |-
+      A swallowed failure leaves an unexplained state and no trace.
+    cases:
+      - id: case-1
+        when: A recoverable failure
+        write: 'catch (error) { this.logger.warn(PaymentLog.ProviderUnavailable, { cause: error }); return { kind: "unavailable", retryable: true, cause: error } }'
+    verification:
+      automated:
+        - BE_LOGGER_REQUIRED
+        - NEST_FOREIGN_ERROR_CAUSE
+      manual:
+        - Verify the chosen handling is right for the failure.
+    relatedExamples: []

@@ -7,19 +7,17 @@ purpose: |
 appliesTo:
   - knowledge
 provenance:
-  extractionCommit: edf72554425f918e80c9205e9c6db10596e722f0
+  reviewedAt: 2026-09-29
   limitations: |
-    Component names, tokens, ownership tables and source counts describe the reference family
-    at observation time. Verify the actual installed package/source before using them; do not
-    invent missing APIs or substitute a different framework family. A source-derived business
-    description remains unapproved until its owner accepts it. Historical evidence links are
-    pinned Git provenance at the extraction commit, not current instructions or current product
-    proof. If the remote link is unavailable, inspect that exact object with
-    `git show <commit>:<path>` in this skills repository.
+    Component names, tokens and ownership tables describe the installed family and the standard at
+    the review date. Verify the actual installed package and source before using them; do not invent
+    missing APIs or substitute a different framework family. A source-derived business description
+    remains unapproved until its owner accepts it.
 guidance:
   - id: load-order
-    requirement: Read architecture-rules.yaml, coding-reference.yaml and the smallest applicable English Nest/Next
-      topic. All projects use Next.js/NestJS and the owner Academy patterns. Code patterns are checked by
+    requirement: Read hfs/README.md (HFS v2, the one source and storage standard), architecture-rules.yaml,
+      coding-reference.yaml and the smallest applicable English Nest/Next topic. All projects use Next.js/NestJS
+      under HFS v2. Code patterns are checked by
       executable scripts; design patterns and edge cases are reviewed by agents using Markdown guidance.
       Knowledge has no translated mirrors and grants no execution authority. Product requirements, design,
       scope and state belong in .starciwork; execution evidence (captures, runs, logs, reports) lives in the
@@ -59,21 +57,27 @@ branches:
     title: Enforcement
     path: patterns/enforcement.yaml
     use: Anti-bypass requirements and explicitly proposed cross-project upgrades.
+  - id: hfs
+    title: HFS v2
+    path: hfs/README.md
+    use: The one source and storage standard for every StarCi repository - principles, slots and versioning,
+      hfs.json, the repository map, backend and frontend trees, tests, secrets, tooling, gates, done criteria and the
+      rule catalog R01 to R67. The slot manifest hfs/slots.yaml is its machine form.
   - id: repo-patterns
-    title: Repository tree
-    path: patterns/repo/folder.yaml
-    use: The one standard repository root and top-level layout (HFS) - tracked-root allowlist,
-      mandatory apps/<app> on both profiles, backend-only .starciwork/.starcistacks, npm only.
+    title: Repository patterns
+    path: patterns/repo/index.yaml
+    use: The repository-level law - root map and storage states, backend-only .starciwork and .starcistacks, sealed
+      secrets, shared tooling, the formatter, version pins and size budgets.
   - id: backend-patterns
     title: Backend patterns
     path: patterns/be/index.yaml
-    use: Concrete NestJS code patterns derived from Academy; executable code checks and separately scoped semantic
-      review.
+    use: Concrete NestJS code patterns under HFS v2 - tiers, schema authority, errors, logging, configuration,
+      default-deny authentication and background work; executable code checks and separately scoped semantic review.
   - id: frontend-patterns
     title: Frontend patterns
     path: patterns/fe/index.yaml
-    use: Concrete Next.js and Grammar code patterns derived from Academy; executable code checks and separately
-      scoped semantic review.
+    use: Concrete Next.js and Grammar code patterns under HFS v2 - data transport, boundaries, i18n, CSS tokens,
+      packages and multiple apps; executable code checks and separately scoped semantic review.
   - id: ui
     title: UI
     path: ui/index.yaml

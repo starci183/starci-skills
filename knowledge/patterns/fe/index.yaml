@@ -2,69 +2,85 @@ schema: starci/knowledge-source@1
 id: fe
 title: Frontend code patterns
 purpose: |
-  knowledge/ui/ decides what the interface must be: which Grammar object renders, which gap, which
-  tone. knowledge/patterns/fe/ decides how the code that produces that interface is written: where
-  a unit lives, what its files are called, how a component function is shaped, where a class string
-  sits, how a failure is represented, and where the spec goes. A pattern rule never chooses a visual;
-  a ui/ rule never chooses a file name. Every rule below was extracted from
-  the reference application (src/) and its Grammar package (packages/grammar/src/) by opening files and counting,
-  and each table cites the files it was read from. Where the code is split, the file records the
-  historical variant counts. Follow ../../coding-reference.yaml: starci-academy-fe is the required
-  coding reference.
-  Applicability: these are historical reference-source observations preserved at skill commit
-  edf72554425f918e80c9205e9c6db10596e722f0, not universal framework rules or current-project
-  source evidence. Inspect the selected repository's actual types/APIs, aliases and lint/test setup;
-  verify reference conformance within approved .starciwork scope. Resolve incompatibilities explicitly;
-  target existing code does not override the reference. Earlier counts cannot claim a fresh scan.
-  Current business requirements and architecture belong to .starciwork; code patterns do not approve them.
+  knowledge/ui/ decides what the interface must be: which Grammar object renders, which gap, which tone.
+  knowledge/patterns/fe/ decides how the code that produces that interface is written: where a unit lives, what its files are
+  called, how a component function is shaped, where a class string sits, how a failure is represented, where the spec goes,
+  where data, text and colour come from. A pattern rule never chooses a visual; a ui/ rule never chooses a file name. Read
+  knowledge/hfs/README.md (HFS v2) section 6 first. Follow ../../coding-reference.yaml. Each rule cites the HFS rule ids it
+  implements (hfsRules) and the finding codes that judge it (verification.automated).
 appliesTo:
   - frontend
 family: fe
 provenance:
-  extractionCommit: edf72554425f918e80c9205e9c6db10596e722f0
+  reviewedAt: 2026-09-29
   sources:
-    - "Application: the reference application's src/ (976 non-spec TypeScript files, 497 specs)."
-    - "Grammar package: its packages/grammar/src/."
-    - "Lint canon consulted for rule names only: @starci/eslint-canon-fe as installed under node_modules."
+    - knowledge/hfs/README.md
+    - knowledge/hfs/slots.yaml
+    - knowledge/grammars/starci/playbook.yaml
+    - "Lint canon consulted for rule names only: @starci/eslint-canon-fe."
   limitations: |
-    Historical reference-source observations; not a fresh audit of the selected repository.
-    Inspect actual source, manifest/lockfile, aliases and lint/test configuration before use.
-    Verify installed Grammar exports at the public entry @starci/grammar/common; do not revive stale
-    @grammar/* aliases as canonical.
+    Patterns place code and shape it. They do not approve business requirements or architecture, which belong to
+    .starciwork, and static checks do not prove rendered behavior. Inspect actual source, manifest, lockfile, aliases and lint
+    and test configuration in the selected repository. Verify installed Grammar exports at the public entry
+    @starci/grammar/common.
 topics:
   - path: architecture-check.yaml
     title: Architecture check
-    decides: "Enforceable route adapters, responsibility/package direction, and applicable world/presentation boundaries"
+    decides: "Route adapters, responsibility direction, acyclic owners, package and app isolation, world ownership"
     rules: "FE-ARCHITECTURE-1 … FE-ARCHITECTURE-5"
   - path: folder.yaml
     title: Folder
-    decides: "Tier directories, the file set of one unit, what a unit folder may not hold"
+    decides: "Tier directories, the source root, the file set of one unit, route files and mandatory boundaries, what hooks and modules hold"
     rules: "FE-FOLDER-1 … FE-FOLDER-6"
   - path: naming.yaml
     title: Naming
-    decides: "Folder, export, props type, class-name export, hook, constant and spec names"
+    decides: "Folder, export, props type, class-name export, hook, reader, constant and spec names"
     rules: "FE-NAMING-1 … FE-NAMING-7"
   - path: function.yaml
     title: Function
-    decides: "Component shape, the { state, props, on } pure half of atoms (shape-slot), connected ownership and forms, data lifecycle, route files"
+    decides: "Component shape, the { state, props, on } pure half of atoms (shape-slot), server and client connected halves, data lifecycle, route files"
     rules: "FE-FUNCTION-1 … FE-FUNCTION-7"
   - path: imports.yaml
     title: Imports
-    decides: "Source/package paths, Grammar entry, responsibility direction, feature and module public entries"
+    decides: "Source and package paths, Grammar entry, responsibility direction, public entries; layout is Prettier's"
     rules: "FE-IMPORTS-1 … FE-IMPORTS-7"
   - path: comment.yaml
     title: Comment
-    decides: "Export docblocks, field docs, decision prose, // sentences, banned content"
+    decides: "Export docblocks, field docs, decision prose, // sentences, banned content, no suppression"
     rules: "FE-COMMENT-1 … FE-COMMENT-5"
   - path: typing.yaml
     title: Typing
-    decides: "type over interface, readonly, literal unions, arrays, inferred returns, wire/feature/view contracts"
+    decides: "Strict flags, type over interface, readonly, literal unions, arrays, no casts, wire and feature and view contracts"
     rules: "FE-TYPING-1 … FE-TYPING-8"
   - path: error.yaml
     title: Error
-    decides: "Failure as a state, the GraphQL envelope, throw new Error, toasts"
+    decides: "Failure as an Outcome and a slot status, hard stops, propagation and ownership"
     rules: "FE-ERROR-1 … FE-ERROR-5"
   - path: test.yaml
     title: Test
-    decides: "Spec placement, connected versus pure spec, what is asserted, what is not"
-    rules: "FE-TEST-1 … FE-TEST-6"
+    decides: "Spec placement, connected versus pure spec, real catalog, what is asserted, the e2e shape"
+    rules: "FE-TEST-1 … FE-TEST-7"
+  - path: transport.yaml
+    title: Data transport
+    decides: "One client, the Outcome vocabulary, generated wire types from the contract copy, server and client reads, one refresh mechanism"
+    rules: "FE-TRANSPORT-1 … FE-TRANSPORT-5"
+  - path: boundaries.yaml
+    title: Boundaries
+    decides: "Mandatory error, not-found and loading boundaries, Outcome rendering in boundaries, server-first components"
+    rules: "FE-BOUNDARY-1 … FE-BOUNDARY-3"
+  - path: i18n.yaml
+    title: Internationalization
+    decides: "next-intl, [locale], default locale vi, as-needed prefix, proxy.ts, no display text outside catalogs, catalog parity"
+    rules: "FE-I18N-1 … FE-I18N-4"
+  - path: css.yaml
+    title: CSS and tokens
+    decides: "globals.css imports only, colour only in brand.css, forbidden CSS forms, Grammar owns family tokens"
+    rules: "FE-CSS-1 … FE-CSS-4"
+  - path: packages.yaml
+    title: Packages
+    decides: "Built packages with explicit exports, no dead unit, one version of every dependency"
+    rules: "FE-PACKAGES-1 … FE-PACKAGES-3"
+  - path: multi-app.yaml
+    title: Multiple apps
+    decides: "Independent apps under apps/<app>, drafts as branches, ui-screen records that name their app"
+    rules: "FE-APPS-1 … FE-APPS-3"

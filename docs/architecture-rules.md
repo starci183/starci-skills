@@ -1,6 +1,6 @@
 # Common architecture rules
 
-These are the shared rules for StarCi projects: TypeScript, Next.js frontend and NestJS backend, using the owner's Academy code patterns and enterprise design obligations. This is a fixed technology family, not a framework-selection system. The rules fix responsibilities, dependency direction, authority, state and effect invariants. Nest/Next profiles supply concrete code forms inside the one repository topology (`knowledge/patterns/repo/folder.yaml`); that topology fixes the source roots, not per-project mapping. Neither an example nor a historical reference file count can add a mandatory layer.
+These are the shared rules for StarCi projects: TypeScript, Next.js frontend and NestJS backend, under HFS v2 ([the standard](../knowledge/hfs/README.md)) and enterprise design obligations. This is a fixed technology family, not a framework-selection system. The rules fix responsibilities, dependency direction, authority, state and effect invariants. Nest/Next profiles supply concrete code forms inside the one repository topology (`knowledge/hfs/README.md`, `knowledge/patterns/repo/folder.yaml`); that topology fixes the source roots, not per-project mapping. Neither an example nor a historical reference file count can add a mandatory layer.
 
 ## Authority and load order
 
@@ -94,4 +94,4 @@ Read-only `stales`/`lint` audits measure inputs, including unfinished or stale s
 
 ## Research status
 
-These are adopted rules shared by the owner's Nest/Next projects, not a claim that one directory tree is an industry standard. The concrete profiles document read-only Academy FE/BE observations, primary framework sources, rejected historical debt and verification limits. Sources are evidence for a decision, not instructions that override user authority or accepted product intent.
+These are adopted rules shared by the owner's Nest/Next projects, not a claim that one directory tree is an industry standard. The concrete profiles document primary framework sources and verification limits. Sources are evidence for a decision, not instructions that override user authority or accepted product intent.

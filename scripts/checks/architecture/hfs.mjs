@@ -5,7 +5,7 @@ import { isIP } from 'node:net';
 import { repositoryName } from '../../lib/repo-identity.mjs';
 
 /**
- * HFS v1 repository-tree check (D:/starci-tmp/hfs/HFS-SPEC.md): every StarCi repository is an
+ * HFS repository-tree check (knowledge/hfs/README.md): every StarCi repository is an
  * apps/<app>/ monorepo on npm with a fixed root-entry allowlist; backend composition lives in
  * apps/<app>/src and shared source under src/{features,modules,tests} with the three module tiers
  * domain/platform/integrations; frontend source lives only under apps/<app>/src. The judged tree is

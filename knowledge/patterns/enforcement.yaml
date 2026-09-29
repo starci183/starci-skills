@@ -2,79 +2,81 @@ schema: starci/knowledge-source@1
 id: patterns.enforcement
 title: Cross-project convention enforcement
 purpose: |
-  Anti-bypass requirements that are already mandatory across projects, plus explicitly proposed
-  upgrades that are not yet implemented enforcement. Use extracted BE/FE pattern cases and
-  code-examples, not a generic instruction to consult another repository.
+  Anti-bypass requirements that hold in every repository under HFS v2. One standard, one machine, no exception mechanism.
+  Use the BE and FE pattern cases, the repository law in patterns/repo, and knowledge/hfs/README.md.
 appliesTo: [backend, frontend]
 family: cross-cutting
 provenance:
-  extractionCommit: edf72554425f918e80c9205e9c6db10596e722f0
+  reviewedAt: 2026-09-29
   sources:
-    - starci-academy-backend
-    - starci-academy-fe
+    - knowledge/hfs/README.md
+    - knowledge/hfs/slots.yaml
+    - knowledge/patterns/repo/tooling.yaml
   limitations: |
-    These proposals do not authorize editing or publishing external lint packages. Source
-    observations are not automatically best practice: classify a repeated pattern, a sanctioned
-    exception and existing debt separately.
+    These rules do not authorize editing or publishing external lint packages. Consuming the standard neither modifies product
+    source nor refreshes proof.
 rules:
   - id: ENF-MANDATORY-1
     title: Preserve responsibilities across projects
     kind: mandatory
+    hfsRules: [R01]
     requirement: |
-      Use the extracted BE/FE pattern cases, the repository tree law in patterns/repo/folder.yaml
-      and code-examples, not a generic instruction to consult another repository. Preserve the
-      same responsibilities, unit layout, dependency directions and public contracts across
-      projects. Business names, database ownership and
-      actual platform constraints vary; convention consistency does not mean copying one
-      application's behavior or connection token.
+      Use the BE and FE pattern cases, the repository law in patterns/repo and code-examples. Preserve the same responsibilities,
+      unit layout, dependency directions and public contracts across projects. Business names, database ownership and platform
+      constraints vary; consistency means one coding shape, not one application's behavior or connection token.
     rationale: |
       Cross-project consistency is about coding shape, not cloned product behavior.
 
   - id: ENF-MANDATORY-2
     title: No weakening of effective lint
     kind: mandatory
+    hfsRules: [R16, R17, R18]
     requirement: |
-      Do not weaken lint, expand ignores, add suppression directives, move production code into
-      test lanes, alias forbidden dependencies or rename a forbidden persistence facade to obtain
-      a pass. Inspect the effective config for the exact changed files, not only the published
-      plugin's available rules. A declared rule that is absent/off in the consuming config is not
-      enforced.
+      Do not weaken lint, expand ignores, add suppression directives, move production code into test lanes, alias forbidden
+      dependencies or rename a forbidden persistence facade to obtain a pass. Inspect the effective config for the exact changed
+      files, not only the published plugin's available rules. A declared rule that is absent or off in the consuming config is
+      not enforced, and a rule is off only when its replacement check runs in a gate of the repository.
     rationale: |
       Package exports do not prove the consuming repository activates those rules.
+    verification:
+      automated:
+        - HFS_TOOL_CONFIG_LOCAL
+        - HFS_RULE_OFF_WITHOUT_REPLACEMENT
+        - HFS_INLINE_SUPPRESSION
 
   - id: ENF-MANDATORY-3
     title: Lane-aware severity and options
     kind: mandatory
+    hfsRules: [R12, R47, R48]
     requirement: |
-      Separate production, module, unit, integration and E2E lanes. Some rules intentionally
-      differ by lane. Check required rules at their canonical severity and options, then require
-      no warnings/errors on the changed scope. Do not privately inject stronger rules into a
-      wrapper and describe the repository's normal lint as compliant.
+      Separate production, module, unit and e2e lanes. Some rules intentionally differ by lane. Check required rules at their
+      canonical severity and options, then require no warnings or errors on the changed scope. Do not privately inject stronger
+      rules into a wrapper and describe the repository's normal lint as compliant.
     rationale: |
       Private wrappers hide the real gate and misreport repository compliance.
 
   - id: ENF-MANDATORY-4
     title: Inspect ignore, suppressions and test discovery
     kind: mandatory
+    hfsRules: [R03, R18, R47]
     requirement: |
-      Check ignored-file status, actual lint results, suppressed messages and TypeScript
-      ignore/nocheck directives. Verify tests are discovered by the real runner. Directly
-      constructed service tests and mocked transport tests do not establish full application
-      wiring or database behavior.
+      Check ignored-file status, actual lint results, suppressed messages and TypeScript ignore or nocheck directives. Verify
+      tests are discovered by the real runner. Directly constructed service tests and mocked transport tests do not establish full
+      application wiring or database behavior; the composition spec does.
     rationale: |
       Ignored files and undiscovered tests create false green results.
 
   - id: ENF-MANDATORY-5
     title: Scoped lint helper integrity only
     kind: mandatory
+    hfsRules: [R18]
     requirement: |
       The implemented read-only helper is
       `node scripts/checks/check-scoped-lint.mjs <repository> <explicit-owned-file> [...]`.
-      It rejects ignored/missing/duplicate/outside-root inputs and fails reported
-      warnings/errors/suppressed violations. It reports effective rules and inline-config state
-      without changing them. Its success means lint-result integrity only: disabled rules,
-      unused directives, TypeScript directives, semantic aliases and structural omissions still
-      need the separate config/source audit. It never grants code acceptance.
+      It rejects ignored, missing, duplicate and outside-root inputs and fails reported warnings, errors and suppressed
+      violations. It reports effective rules and inline-config state without changing them. Its success means lint-result integrity
+      only: disabled rules, unused directives, TypeScript directives, semantic aliases and structural omissions still need the
+      separate config and source audit. It never grants code acceptance.
     rationale: |
       A scoped lint helper verifies reporting integrity; it is not product acceptance.
     verification:
@@ -84,54 +86,55 @@ rules:
         - Audit disabled rules, aliases and structural omissions separately.
 
   - id: ENF-MANDATORY-6
-    title: Classify patterns, exceptions and debt
+    title: Classify patterns and defects separately
     kind: mandatory
+    hfsRules: [R01]
     requirement: |
-      Source observations are not automatically best practice: classify a repeated pattern, a
-      sanctioned exception and existing debt separately. Do not promote an accidental loophole such
-      as an unrecognized shell directory into a new standard.
+      Source observations are not automatically best practice: separate a repeated pattern from a defect. Do not promote an
+      accidental loophole such as an unrecognized shell directory into a new standard; a new kind of content is a new slot.
     rationale: |
       Accidental loopholes become permanent debt when treated as reusable tiers.
+
+  - id: ENF-MANDATORY-7
+    title: The same machine at every gate
+    kind: mandatory
+    hfsRules: [R13, R24]
+    requirement: |
+      Pre-commit, pre-push, op settle, land gate and CI run the same `@starci/hfs` at the pinned version. A rule that only an
+      agent can run does not exist. A missing checker for an applicable rule is a missing obligation, never replaced by agent
+      approval, and a machine that analysed zero files is a failure.
+    rationale: |
+      A repository green under an old rule while the agent grades under a new one wastes every cycle.
+    verification:
+      automated:
+        - HFS_CI_MISSING_CANON
+        - HFS_ARCH_CONFIG_UNREAD
 
   - id: ENF-PROP-P0-1
     title: Versioned convention set and tested skeletons
     kind: proposal
     priority: P0
     requirement: |
-      Maintain one versioned BE/FE convention set and tested code skeletons. BE covers CQRS
-      feature, capability service, named connection, exception and tests. FE covers leaf,
-      connected/pure pair, page/route, hooks and paired tests. Typecheck and lint those skeletons
-      against the supported package versions before publishing them.
+      Maintain the HFS convention set and tested code skeletons. BE covers a feature with application and transport, a
+      capability service, a persistence owner, an error family and a worker job. FE covers leaf, connected and pure pair, page and
+      route, hooks, a reader and paired tests. Typecheck and lint those skeletons against the pinned package versions before
+      publishing them.
     rationale: |
       Skeletons make mandatory shape executable and reviewable across repositories.
     relatedExamples:
-      - graphql-command
       - transactional-service
       - connected-block
-
-  - id: ENF-PROP-P0-2
-    title: Lane-aware effective-config CI auditing
-    kind: proposal
-    priority: P0
-    requirement: |
-      Add lane-aware effective-config auditing to consuming CI. Use explicit changed files; fail
-      ignored files, missing/lowered applicable rules and suppressions. Record canon version and
-      effective configuration identity. Upgrade the shared lint package rather than independently
-      copying rules into ten repositories.
-    rationale: |
-      Per-repo rule copies drift; CI must enforce the effective config identity.
 
   - id: ENF-PROP-P1-BE
     title: Stronger BE AST and transaction checks
     kind: proposal
     priority: P1
     requirement: |
-      Strengthen AST checks for transaction callback overloads and outer-manager aliases; inspect
-      dependency provenance for custom persistence facades; verify named decorators bind the
-      intended database token. Keep real PostgreSQL rollback/concurrency tests, because AST
-      checks cannot prove transaction semantics.
+      Strengthen AST checks for transaction callback overloads and outer-manager aliases; inspect dependency provenance for custom
+      persistence facades; verify named connections bind the intended database token. Keep real PostgreSQL rollback and
+      concurrency tests, because AST checks cannot prove transaction semantics.
     rationale: |
-      Current checkers miss isolation-level overloads and custom facade architectures.
+      Checkers miss isolation-level overloads and custom facade architectures.
     relatedExamples:
       - transactional-service
 
@@ -140,10 +143,9 @@ rules:
     kind: proposal
     priority: P1
     requirement: |
-      Extend connected/pure structural checks to all sanctioned split tiers and
-      indirect/aliased world access; validate Grammar exports and props through typechecking;
-      require behavioral coverage of both connected mapping and rendering for new split units.
-      The adopted layout puts product shells in features/layouts; product-shells is not a sanctioned tier.
+      Extend connected and pure structural checks to all sanctioned split tiers and indirect or aliased world access; validate
+      Grammar exports and props through typechecking; require behavioral coverage of both connected mapping and rendering for new
+      split units. Product shells live in features/layouts.
     rationale: |
       Block-scoped twin enforcement cannot establish every tier or aliased escape route.
     relatedExamples:
@@ -154,9 +156,8 @@ rules:
     kind: proposal
     priority: P1
     requirement: |
-      Add mutation regression fixtures that deliberately rename a repository, alias a hook,
-      disable a rule, ignore a changed file, omit a required test or use a second-argument
-      transaction callback. The gate must reject each applicable violation; a test of
+      Add mutation regression fixtures that deliberately rename a repository, alias a hook, disable a rule, ignore a changed file,
+      omit a required test or use a second-argument transaction callback. The gate must reject each applicable violation; a test of
       documentation wording is not enforcement.
     rationale: |
       Keyword tests of docs do not prove the gate rejects real bypasses.
@@ -166,9 +167,8 @@ rules:
     kind: proposal
     priority: P2
     requirement: |
-      Report cross-repository conformance in existing CI output: convention version,
-      package/API compatibility, template checks and unresolved deviations. Roll out upgrades by
-      coherent scope without changing accepted product behavior. These proposals do not authorize
-      editing or publishing external lint packages.
+      Report cross-repository conformance in existing CI output: convention version, package and API compatibility, template
+      checks and unresolved deviations. Roll out upgrades by coherent scope without changing accepted product behavior. These
+      proposals do not authorize editing or publishing external lint packages.
     rationale: |
       Visibility of unresolved deviations is required before claiming multi-repo consistency.

@@ -1,108 +1,172 @@
 schema: starci/knowledge-source@1
 id: be.typing
 title: Backend typing
-purpose: Apply the adopted responsibility pattern. Read docs/backend-source-pattern.md for the coherent
-  layout, code forms, source critique and verification limits.
+purpose: |-
+  Given a backend contract, value or boundary, which type expresses it? Types express actual contracts and never stand
+  in for runtime validation. Read docs/backend-source-pattern.md for the layout and code forms.
 appliesTo:
   - backend
 family: be
 provenance:
-  reviewedAt: 2026-09-16
+  reviewedAt: 2026-09-29
   sources:
+    - knowledge/hfs/README.md
     - docs/backend-source-pattern.md
-    - starci-academy-backend@1731b15ba4ed526477e3c572b9d82c31ab64f1d5/src/features/api/core/graphql/mutations/courses/add-to-cart/
-    - starci-academy-backend@1731b15ba4ed526477e3c572b9d82c31ab64f1d5/src/modules/databases/postgresql/primary/primary.module-definition.ts
-    - https://docs.nestjs.com/fundamentals/dynamic-modules
     - https://docs.nestjs.com/techniques/validation
-  limitations: Adopted Nest/TypeScript profile, not universal framework law. Historical Academy examples contain
-    debt and do not override these revised rules. Existing profile-specific lint/source needs an authorized
-    coherent update; runtime installation neither modifies product source nor refreshes proof. Static
-    checks do not establish behavior.
+    - https://www.typescriptlang.org/tsconfig
+  limitations: |-
+    Adopted Nest and TypeScript profile. Static checks do not establish behavior. The compiler flags come from
+    `@starci/tsconfig`; a repository never lowers one.
 rules:
   - id: BE-TYPING-1
     title: Types express actual contracts
     kind: mandatory
-    requirement: Use interface for extensible object contracts and type for unions, intersections and aliases;
-      follow the selected profile for equivalent object syntax. TypeScript types do not validate untrusted
-      runtime data. Contract ownership matters more than interface-versus-type census.
-    rationale: Compile-time shape and runtime validation are distinct.
+    hfsRules: [R22]
+    requirement: |-
+      Use `interface` for extensible object contracts and `type` for unions, intersections and aliases. `tsconfig`
+      extends `@starci/tsconfig/be.json` (`strict`, `noUncheckedIndexedAccess`, `noImplicitOverride`,
+      `noFallthroughCasesInSwitch`, `allowJs: false`) and lowers no flag. TypeScript types do not validate untrusted
+      runtime data; contract ownership matters more than interface-versus-type style.
+    rationale: |-
+      Compile-time shape and runtime validation are distinct, and one flag set makes every repository read the same.
+    cases:
+      - id: case-1
+        when: A tsconfig
+        write: '{ "extends": "@starci/tsconfig/be.json", "compilerOptions": { "paths": {} } } with paths only.'
     verification:
-      automated: []
+      automated:
+        - HFS_TS_STRICT
       manual:
         - Validate external payloads before using narrowed values.
     relatedExamples: []
   - id: BE-TYPING-2
     title: Name public inputs and outputs
     kind: mandatory
-    requirement: Public use-case and capability APIs have explicit input/output contracts; object inputs use a
-      named contract, and simple primitives can be positional. Do not return ORM entities or SDK response
-      objects as the public application contract. Internal inferred locals need no ceremonial interface.
-    rationale: A stable public API makes boundary changes visible.
+    hfsRules: [R37]
+    requirement: |-
+      Public use-case and capability APIs have explicit input and output contracts. Object inputs use a named contract,
+      simple primitives may be positional. No ORM entity, `*Entity` type or SDK response object is a public application
+      contract, a DTO response or a resolver or controller return type; return a projection. Internal inferred locals
+      need no ceremonial interface.
+    rationale: |-
+      A stable public API makes boundary changes visible and keeps persistence shape from leaking.
+    cases:
+      - id: case-1
+        when: A use case result
+        write: 'type PlaceOrderResult = { kind: "placed"; orderId: string } | { kind: "refused"; reason: string }'
     verification:
-      automated: []
+      automated:
+        - BE_ENTITY_IN_CONTRACT
       manual:
         - Review contract semantics and serialization compatibility.
     relatedExamples: []
   - id: BE-TYPING-3
     title: Mutability follows lifecycle
     kind: mandatory
-    requirement: Injected dependencies and message payloads are readonly by default. Deserialization DTO classes
-      may be mutable where installed runtime metadata/transform tooling requires it; decoration alone is not a
-      universal reason to mandate mutability. Never mutate a received command to store execution progress.
-    rationale: Execution state and request data have separate owners.
+    hfsRules: [R45]
+    requirement: |-
+      Injected dependencies and message payloads are `readonly` by default. Deserialization DTO classes may be mutable
+      where installed runtime metadata or transform tooling requires it. Never mutate a received command to store
+      execution progress, and no module-level `let` holds shared state.
+    rationale: |-
+      Execution state and request data have separate owners, and module-level state breaks under several instances.
+    cases:
+      - id: case-1
+        when: A constructor
+        write: 'constructor(private readonly orders: OrderRepository, private readonly credit: CreditPolicy) {}'
     verification:
-      automated: []
+      automated:
+        - BE_MODULE_SHAPE
       manual:
         - Check runtime DTO construction and mutation behavior.
     relatedExamples: []
   - id: BE-TYPING-4
     title: Enumerate stable domain values deliberately
     kind: mandatory
-    requirement: Use explicit serialized values for public enums or discriminated unions. Avoid const enum across
-      package/runtime boundaries. Domain values stay with their domain owner; database-only values stay with
-      persistence. GraphQL exposure is an adapter concern.
-    rationale: Serialization stability and ownership outlast naming conventions.
+    hfsRules: [R35]
+    requirement: |-
+      Use explicit serialized values for public enums or discriminated unions. Avoid `const enum` across package and
+      runtime boundaries. Domain values stay with their domain owner; database-only values stay with persistence.
+      GraphQL exposure is a transport concern and registration happens in the transport.
+    rationale: |-
+      Serialization stability and ownership outlast naming conventions.
+    cases:
+      - id: case-1
+        when: A public enum
+        write: 'export enum OrderStatus { Open = "open", Settled = "settled" } in the domain; persistence stores the string.'
     verification:
-      automated: []
+      automated:
+        - BE_TIER_DIRECTION
       manual:
-        - Verify client/database contract compatibility.
+        - Verify client and database contract compatibility.
     relatedExamples: []
   - id: BE-TYPING-5
     title: Unknown inputs require narrowing
     kind: mandatory
-    requirement: Use unknown for untrusted payloads/errors, then parse or narrow. Do not obtain conformance with
-      any, double casts or TypeScript suppressions. Test doubles may use narrow documented harness conversions
-      without pretending they validate production behavior.
-    rationale: Casts cannot establish the trust or correctness of external data.
+    hfsRules: [R18, R41, R48]
+    requirement: |-
+      Use `unknown` for untrusted payloads and caught errors, then parse or narrow. Do not obtain conformance with `any`,
+      double casts, `@ts-ignore` or `@ts-expect-error`; there is no inline suppression of any kind. A request body is a
+      typed DTO, never `unknown`, and a GraphQL parameter is never `GraphQLJSON`. Test doubles use `mock<T>()`, not
+      casts.
+    rationale: |-
+      Casts cannot establish the trust or correctness of external data.
+    cases:
+      - id: case-1
+        when: A caught error
+        write: 'catch (error: unknown) { throw new OrderStorageError({ operation: "insert", cause: error }) }'
+      - id: case-2
+        when: An external payload
+        write: 'const payload = webhookSchema.parse(body) using the zod schema of the integration.'
     verification:
       automated:
+        - HFS_INLINE_SUPPRESSION
+        - BE_DEFAULT_DENY
         - "@typescript-eslint/no-explicit-any"
       manual:
-        - Inspect suppression changes and unvalidated data flow.
+        - Inspect unvalidated data flow.
     relatedExamples: []
   - id: BE-TYPING-6
     title: Generics preserve meaning
     kind: mandatory
-    requirement: Use descriptive generic parameters only when the abstraction supports more than one meaningful
-      type. Do not create an all-purpose ExecuteParams wrapper carrying unrelated entities, tokens and context
-      fields into every feature.
-    rationale: An oversized generic envelope leaks dependencies and authority.
+    hfsRules: [R37]
+    requirement: |-
+      Use descriptive generic parameters only when the abstraction supports more than one meaningful type. Do not create
+      an all-purpose params wrapper that carries unrelated entities, tokens and context fields into every feature.
+      A use case takes its input and a principal.
+    rationale: |-
+      An oversized generic envelope leaks dependencies and authority.
+    cases:
+      - id: case-1
+        when: Caller context
+        write: 'type Principal = { readonly id: string; readonly role: Role }, passed as its own argument.'
     verification:
-      automated: []
+      automated:
+        - BE_ENTITY_IN_CONTRACT
       manual:
         - Review the smallest data and authority each operation needs.
     relatedExamples: []
   - id: BE-TYPING-7
     title: DTOs are owned protocol representations
     kind: mandatory
-    requirement: Put runtime GraphQL/HTTP DTO classes under the owning feature transport. Apply the installed
-      semantic validation rules; GraphQL ID/string shape alone is insufficient. Keep plain application
-      contracts under application/. Map output deliberately; nullability and error representation follow the
-      accepted API contract, not a universal response wrapper. Name actual entity tables and review
-      query/loading behavior within persistence.
-    rationale: Protocol, application and persistence contracts evolve at different boundaries.
+    hfsRules: [R37, R42]
+    requirement: |-
+      Runtime GraphQL and HTTP DTO classes live under the owning feature `transport/<protocol>/dto/`. Apply the installed
+      semantic validation; a GraphQL `ID` or string shape alone is insufficient. Every string field has a length or
+      format bound (`@MaxLength` or a bounded scalar). Plain application contracts stay under `application/`. Map output
+      deliberately; nullability and error representation follow the accepted API contract, not a universal response
+      wrapper.
+    rationale: |-
+      Protocol, application and persistence contracts evolve at different boundaries, and an unbounded string is an
+      unbounded cost.
+    cases:
+      - id: case-1
+        when: A request DTO
+        write: 'class PlaceOrderRequest { @IsUUID() customerId!: string; @IsString() @MaxLength(200) note!: string }'
     verification:
-      automated: []
+      automated:
+        - BE_INPUT_BOUNDED
+        - BE_ENTITY_IN_CONTRACT
       manual:
-        - Test validation, unknown/nested input handling and safe output fields.
+        - Test validation, unknown and nested input handling and safe output fields.
     relatedExamples: []

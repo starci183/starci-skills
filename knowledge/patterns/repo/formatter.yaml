@@ -1,0 +1,57 @@
+schema: starci/knowledge-source@1
+id: repo.formatter
+title: Repository formatter
+purpose: |
+  Given how source text is laid out (indentation, quotes, semicolons, wrapping), who decides? Prettier decides, with one
+  shared configuration. ESLint does not judge layout.
+appliesTo:
+  - backend
+  - frontend
+family: repo
+provenance:
+  reviewedAt: 2026-09-29
+  sources:
+    - knowledge/hfs/README.md
+    - packages/prettier-config
+    - https://prettier.io/docs/options
+  limitations: |
+    Prettier fixes layout only. It does not decide naming, structure or comments; those remain lint and review rules.
+rules:
+  - id: REPO-FORMAT-1
+    title: Prettier is the only formatter
+    kind: mandatory
+    hfsRules: [R19]
+    requirement: |
+      `@starci/prettier-config` is `{ printWidth: 120, tabWidth: 4, semi: false, singleQuote: false, trailingComma: "all" }` for
+      backend and frontend, referenced as `"prettier": "@starci/prettier-config"` in `package.json`. Pre-commit runs
+      `prettier --write` on staged files, CI and pre-push run `prettier --check`. `.prettierignore` is generated. No other
+      formatter, and no EditorConfig setting that contradicts these values.
+    rationale: |
+      One formatter with one configuration ends style debate, and the values follow the largest repository so a reformat diff
+      stays small.
+    cases:
+      - id: case-1
+        when: A repository adopts v2
+        write: One reformat commit in a quiet window, listed in .git-blame-ignore-revs.
+    verification:
+      automated:
+        - HFS_FORMAT
+      manual: []
+    relatedExamples: []
+  - id: REPO-FORMAT-2
+    title: No formatting rules in ESLint
+    kind: mandatory
+    hfsRules: [R19]
+    requirement: |
+      The ESLint factories contain no layout rule: not `indent`, `quotes`, `semi`, `object-curly-newline`,
+      `array-element-newline`, `function-call-argument-newline`, and no rule that forces one import binding per line. Code is
+      not stretched to satisfy a formatter that a line-break rule fights.
+    rationale: |
+      A linter that argues with the formatter produces churn and inflates code, one token per line.
+    cases: []
+    verification:
+      automated:
+        - HFS_FORMAT
+        - HFS_TOOL_CONFIG_LOCAL
+      manual: []
+    relatedExamples: []

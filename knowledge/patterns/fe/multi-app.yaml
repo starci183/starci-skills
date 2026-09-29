@@ -1,0 +1,80 @@
+schema: starci/knowledge-source@1
+id: fe.multi-app
+title: Frontend multiple apps
+purpose: |-
+  Given a frontend repository that serves several audiences, how are the apps separated and how does a design record
+  name the app it belongs to? Each app is independent under apps/<app>; sharing is through packages.
+appliesTo:
+  - frontend
+family: fe
+provenance:
+  reviewedAt: 2026-09-29
+  sources:
+    - knowledge/hfs/README.md
+    - knowledge/hfs/slots.yaml
+    - modules/schemas/work-layout.yaml
+  limitations: |-
+    Static checks prove isolation between apps and that a ui-screen names an app declared in hfs.json. They do not prove
+    that the split of screens between apps is the right product decision.
+rules:
+  - id: FE-APPS-1
+    title: One independent app per audience
+    kind: mandatory
+    hfsRules: [R64, R01]
+    requirement: |-
+      Each app is `apps/<app>/` with its own `package.json`, `next.config.ts`, `tsconfig.json`, `postcss.config.mjs` and
+      `src/`, declared in `hfs.json` `apps` with kind `next`. An app never imports another app. Code that two apps need is a
+      `packages/<pkg>` (see packages.yaml). Each app has its own `modules/{api,config,i18n,routes}`; a catalog shared across
+      apps is exported by a package, and each app still declares its own default locale in `modules/i18n`.
+    rationale: |-
+      Independent apps build, deploy and fail separately, and a hidden import between apps makes one deploy break another.
+    cases:
+      - id: case-1
+        when: Two apps need the same translated legal text
+        write: Put the catalog namespace in packages/content and import it in each app's modules/i18n/request.ts.
+    verification:
+      automated:
+        - FE_APP_ISOLATION
+        - HFS_SLOT_REQUIRED_MISSING
+      manual: []
+    relatedExamples: []
+  - id: FE-APPS-2
+    title: A draft is a branch, not an app
+    kind: mandatory
+    hfsRules: [R01, R64]
+    requirement: |-
+      A design draft or a preview of an app is a branch or a preview deployment of that app, never a second app folder with
+      the same routes. Two apps that serve the same routes with the same files are one app.
+    rationale: |-
+      A second copy of every route diverges byte by byte and doubles every change.
+    cases:
+      - id: case-1
+        when: A landing redesign in progress
+        write: Work on a branch of apps/landing and use a preview deployment for review.
+    verification:
+      automated:
+        - HFS_DUPLICATE_CODE
+        - FE_APP_ISOLATION
+      manual: []
+    relatedExamples: []
+  - id: FE-APPS-3
+    title: A ui-screen record names its app
+    kind: mandatory
+    hfsRules: [R64]
+    requirement: |-
+      Every `work/ui-screen@2` record declares `app`, a name from `hfs.json` `apps`, and its implementation records point to
+      `repository:<fe>/apps/<app>`. Drawing and implementation read the app from the record and never guess it from the
+      screen name or the route.
+    rationale: |-
+      With several apps in one repository, a screen with no declared app forces the draw and implement operations to guess
+      where it belongs.
+    cases:
+      - id: case-1
+        when: A screen of the console app
+        write: 'a ui-screen record with `app: console` whose implementation cites repository fe/apps/console.'
+    verification:
+      automated:
+        - FE_APP_ISOLATION
+      manual:
+        - Confirm the declared app is the one that serves the screen's route.
+    relatedExamples: []

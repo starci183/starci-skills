@@ -1,0 +1,135 @@
+schema: starci/knowledge-source@1
+id: fe.i18n
+title: Frontend internationalization
+purpose: |-
+  Given text a user can read, where does it live and how does it reach the screen? One pattern in every app, including a
+  single-language app: next-intl, a [locale] route segment, default locale vi, localePrefix as-needed, routing decided in
+  proxy.ts.
+appliesTo:
+  - frontend
+family: fe
+provenance:
+  reviewedAt: 2026-09-29
+  sources:
+    - knowledge/hfs/README.md
+    - knowledge/hfs/slots.yaml
+    - https://next-intl.dev/docs/routing/setup
+    - https://next-intl.dev/docs/routing/middleware
+    - https://nextjs.org/docs/app/api-reference/file-conventions/proxy
+  limitations: |-
+    Static checks prove that no display text is written outside the catalog, that the files exist and that the catalogs
+    have the same key set. They do not prove that translations are correct or idiomatic; the product owner and the UI
+    evidence review copy.
+rules:
+  - id: FE-I18N-1
+    title: One placement in every app
+    kind: mandatory
+    hfsRules: [R59]
+    requirement: |-
+      Every app uses `next-intl` with the route segment `app/[locale]/`, `defaultLocale` `vi` and `localePrefix`
+      `as-needed`, so the default locale is served without a prefix and other locales with one. `modules/i18n/` holds
+      `config.ts` (the locale list and default), `routing.ts` (`defineRouting`), `navigation.ts` (`createNavigation`),
+      `request.ts` (`getRequestConfig`) and `messages/<locale>.json`. `next.config.ts` wraps the config with the next-intl
+      plugin pointing at `modules/i18n/request.ts`. An app with one language still uses `next-intl` with one locale and the
+      same files; there is no copy-module variant.
+    rationale: |-
+      One placement lets tooling, agents and specs find and check every catalog the same way, and a single-language app can
+      add a language without restructuring.
+    cases:
+      - id: case-1
+        when: The routing
+        write: 'export const routing = defineRouting({ locales: ["vi", "en"], defaultLocale: "vi", localePrefix: "as-needed" })'
+      - id: case-2
+        when: The proxy
+        write: 'apps/<app>/src/proxy.ts is `export default createMiddleware(routing)` with `export const config = { matcher: ["/((?!api|_next|.*\\..*).*)"] }`; middleware.ts is not used on Next 16.'
+      - id: case-3
+        when: A layout
+        write: 'app/[locale]/layout.tsx sets `<html lang={locale}>` and wraps children in NextIntlClientProvider with only the needed namespaces.'
+      - id: case-4
+        when: A single-language landing app
+        write: 'routing.locales is ["vi"], messages/vi.json exists, and the same modules/i18n files are present.'
+    verification:
+      automated:
+        - FE_I18N_PLACEMENT
+        - FE_NEXT_CONVENTIONS
+        - HFS_SLOT_REQUIRED_MISSING
+      manual:
+        - Confirm the root path serves the default locale without a redirect to a 404.
+    relatedExamples: []
+  - id: FE-I18N-2
+    title: No display text outside the catalog
+    kind: mandatory
+    hfsRules: [R58]
+    requirement: |-
+      No display text is written in source at any tier: blocks, pages, layouts, composites, branches, leaves, overlays and
+      route files, including JSX text, `aria-label`, `title`, `placeholder`, `alt` and copy objects, in any language. Text
+      comes from `useTranslations` or `getTranslations` (or resolved labels handed down from the connected half). There is
+      no escape annotation and no inline switch. Form validation messages are message keys resolved by the
+      connected half.
+    rationale: |-
+      A single escape hatch turns the rule into a comment convention. With none, every string is translatable and
+      checkable, and the lint has one job.
+    cases:
+      - id: case-1
+        when: JSX text
+        write: 'const t = useTranslations("sales.summary"); <Text>{t("title")}</Text>'
+      - id: case-2
+        when: An attribute
+        write: '<Icon aria-label={t("close")} />'
+      - id: case-3
+        when: A server component
+        write: 'const t = await getTranslations("sales.summary")'
+      - id: case-4
+        when: A schema message
+        write: 'z.string().min(1, "sales.send.errors.fingerprintRequired") and the connected half calls t(key).'
+    verification:
+      automated:
+        - FE_I18N_LITERAL
+        - HFS_INLINE_SUPPRESSION
+      manual:
+        - Review that keys name the meaning, not the current wording.
+    relatedExamples: []
+  - id: FE-I18N-3
+    title: Catalogs share one key set and specs use the real catalog
+    kind: mandatory
+    hfsRules: [R60]
+    requirement: |-
+      The catalogs of all locales have exactly the same keys: no missing and no extra key. Catalogs are split by
+      namespace, and a client component receives only its picked namespaces. Specs render with the real catalog through the
+      next-intl test provider; a mock of `useTranslations` that echoes the key is forbidden.
+    rationale: |-
+      A missing key shows up in production as raw key text, and an echo mock lets a spec pass while the real copy is
+      absent.
+    cases:
+      - id: case-1
+        when: A new string
+        write: Add the key to messages/vi.json and messages/en.json in the same change.
+      - id: case-2
+        when: A spec
+        write: 'render(<NextIntlClientProvider locale="vi" messages={messages}><SalesSummaryBase {...fixture} /></NextIntlClientProvider>)'
+    verification:
+      automated:
+        - FE_I18N_CATALOG
+        - FE_SPEC_QUALITY
+      manual: []
+    relatedExamples: []
+  - id: FE-I18N-4
+    title: Locale-aware navigation and metadata
+    kind: mandatory
+    hfsRules: [R54, R59]
+    requirement: |-
+      Links and redirects use the helpers of `modules/i18n/navigation.ts` (`Link`, `redirect`, `useRouter`) with hrefs from
+      `modules/routes`, so the locale prefix is always right. `generateMetadata` in each page reads its title and description
+      from the catalog for the active locale. Locale switching is a navigation to the same path in another locale.
+    rationale: |-
+      Hand-built hrefs drop the locale prefix and break the as-needed default.
+    cases:
+      - id: case-1
+        when: A link
+        write: 'import { Link } from "@/modules/i18n/navigation"; <Link href={routes.sales.summary()} />'
+    verification:
+      automated:
+        - FE_NEXT_CONVENTIONS
+        - FE_OWNER_REACHABLE
+      manual: []
+    relatedExamples: []

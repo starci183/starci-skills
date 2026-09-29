@@ -1,0 +1,82 @@
+schema: starci/knowledge-source@1
+id: fe.packages
+title: Frontend packages
+purpose: |-
+  Given code shared by several apps of one repository, where does it live and what does it expose? A package is built to
+  dist with explicit named exports and no dead unit.
+appliesTo:
+  - frontend
+family: fe
+provenance:
+  reviewedAt: 2026-09-29
+  sources:
+    - knowledge/hfs/README.md
+    - knowledge/hfs/slots.yaml
+    - https://docs.npmjs.com/cli/v10/using-npm/workspaces
+    - https://nodejs.org/api/packages.html#package-entry-points
+  limitations: |-
+    Static checks prove the package shape, its build output and that exports are used. They do not prove a stable public
+    API design or that a component is genuinely reusable; review decides that.
+rules:
+  - id: FE-PACKAGES-1
+    title: A package builds to dist
+    kind: mandatory
+    hfsRules: [R63]
+    requirement: |-
+      A shared package is `packages/<pkg>/` (a product UI package is `packages/<family>-ui/`), declared in the root npm
+      `workspaces`, with `package.json` (`exports` explicit and pointing at `dist`), `src/index.ts`, `tsconfig.json` and
+      colocated specs. `npm run build` produces `dist`, and consumers import the built output; a package that exports
+      source files is a finding.
+    rationale: |-
+      A package that ships source depends on the consumer's compiler and cannot be versioned or cached as a unit.
+    cases:
+      - id: case-1
+        when: A package manifest
+        write: '{ "name": "@nivo/ui", "type": "module", "exports": { ".": { "types": "./dist/index.d.ts", "import": "./dist/index.js" } }, "scripts": { "build": "tsc -p tsconfig.build.json" } }'
+    verification:
+      automated:
+        - FE_PACKAGE_SHAPE
+        - HFS_SLOT_REQUIRED_MISSING
+      manual: []
+    relatedExamples: []
+  - id: FE-PACKAGES-2
+    title: Explicit named exports and no dead unit
+    kind: mandatory
+    hfsRules: [R63, R25]
+    requirement: |-
+      `src/index.ts` re-exports named symbols only; `export *` is forbidden. Every exported unit has a consumer outside its
+      own spec, so an unused export is a finding and is deleted. A UI package holds composites, branches and leaves only, no
+      block, no colour literal and no world lifecycle.
+    rationale: |-
+      Explicit exports make the surface reviewable, and unused units are copies of a former product that nobody maintains.
+    cases:
+      - id: case-1
+        when: A public entry
+        write: 'export { StatusChip } from "./StatusChip"; export type { StatusChipProps } from "./StatusChip"'
+    verification:
+      automated:
+        - FE_PACKAGE_SHAPE
+        - HFS_UNUSED_EXPORT
+        - ARCH_OWNER_EXPORT_STAR
+      manual: []
+    relatedExamples: []
+  - id: FE-PACKAGES-3
+    title: One version of everything
+    kind: mandatory
+    hfsRules: [R14, R15]
+    requirement: |-
+      A dependency has one version across the workspace, pinned exactly, with root `overrides` for react, next and grammar;
+      a nested copy such as `apps/<app>/node_modules/@starci/grammar` is forbidden. `@starci/*` and framework versions equal
+      `knowledge/hfs/canon-pins.yaml`. Raising a version starts in `.claude`; `hfs sync` then raises the repositories.
+    rationale: |-
+      Two versions of one design system in one bundle produce two behaviors for one component.
+    cases:
+      - id: case-1
+        when: The root manifest
+        write: '"overrides": { "react": "19.2.0", "react-dom": "19.2.0", "@starci/grammar": "0.7.0" }'
+    verification:
+      automated:
+        - HFS_DEP_VERSION_SKEW
+        - HFS_CANON_PIN_DRIFT
+      manual: []
+    relatedExamples: []

@@ -1,0 +1,113 @@
+schema: starci/knowledge-source@1
+id: repo.starciwork
+title: Repository .starciwork
+purpose: |
+  Given content that describes a product (requirements, design, screens, implementation records, UAT), what may live in the
+  backend repository's `.starciwork` and what may not? Product records only, flat families, no agent data.
+appliesTo:
+  - backend
+family: repo
+provenance:
+  reviewedAt: 2026-09-29
+  sources:
+    - knowledge/hfs/README.md
+    - knowledge/hfs/slots.yaml
+    - modules/schemas/work-layout.yaml
+    - scripts/lib/starciwork-boundary.mjs
+  limitations: |
+    The boundary proves which paths are product content. It does not prove that a record is correct or current; the Work
+    validator and the specification review do. Record shape belongs to modules/schemas/work-layout.yaml.
+rules:
+  - id: REPO-WORK-1
+    title: Product records only
+    kind: mandatory
+    hfsRules: [R07]
+    requirement: |
+      `.starciwork/` holds exactly the paths that scripts/lib/starciwork-boundary.mjs `isProductPath` accepts:
+      `workspace.yaml`, `index.yaml`, `brand/`, `shell/index.yaml`, `features/<feature>/index.yaml`, flat records
+      `features/<feature>/<family>/<name>/index.yaml`, `features/<feature>/br/<rule>/ac/<name>/`,
+      `features/<feature>/ui/<name>/assets/<approved-file>`, `features/<feature>/uat/<name>/{index,accounts,fixtures}.yaml` with
+      `seed.sql` and `cleanup.sql`, and `_resources/{identities,environments,fixtures}/<slug>/resource.yaml`.
+      `.starciwork/.gitignore` is exactly `starciworkGitignoreText()`. The tracked image of a ui-screen is the accepted design
+      direction only.
+    rationale: |
+      One canonical Work tree per project keeps product records authoritative and reviewable in a pull request.
+    cases:
+      - id: case-1
+        when: A new requirement
+        write: features/login/br/lockout/index.yaml
+      - id: case-2
+        when: An accepted design direction image
+        write: features/login/ui/sign-in/assets/sign-in-accepted.png
+    verification:
+      automated:
+        - HFS_AGENT_DATA_TRACKED
+        - HFS_SLOT_UNDECLARED
+      manual:
+        - node scripts/checks/work-validate.mjs <repo>/.starciwork passes.
+    relatedExamples: []
+  - id: REPO-WORK-2
+    title: Agent data is never tracked
+    kind: mandatory
+    hfsRules: [R07]
+    requirement: |
+      Evidence, logs, reports, checks, captures, draw rounds (initial and intermediate images, prompt files), UAT runs, kernel
+      evidence, runtime.sqlite files, operation folders and `_derived/` are not repository content. They live in the runtime
+      ledger and the blob store, and a record cites them by `{name, sha256}`. A worktree folder never sits under
+      `.starciwork`.
+    rationale: |
+      Agent data changes every run, bloats history and is reviewed by nobody. Content addressing already gives it identity.
+    cases:
+      - id: case-1
+        when: A UAT run produces screenshots
+        write: They go to the blob store; the uat record cites each by name and sha256.
+      - id: case-2
+        when: A draw loop writes intermediate images
+        write: They stay agent data; only the accepted direction image is copied into the ui record's assets.
+    verification:
+      automated:
+        - HFS_AGENT_DATA_TRACKED
+      manual: []
+    relatedExamples: []
+  - id: REPO-WORK-3
+    title: Flat records, no work/node
+    kind: mandatory
+    hfsRules: [R08]
+    requirement: |
+      Every record is a flat family record `features/<feature>/<family>/<name>/index.yaml` of a family in
+      modules/schemas/work-layout.yaml. There is no `work/node` record. A ui-screen record declares `app`, a name from
+      `hfs.json` `apps`.
+    rationale: |
+      One record vocabulary lets the validators and every agent read a tree the same way.
+    cases:
+      - id: case-1
+        when: A screen for the console app
+        write: features/sales/ui/summary/index.yaml with app console.
+    verification:
+      automated:
+        - HFS_WORK_NODE_RETIRED
+        - FE_APP_ISOLATION
+      manual: []
+    relatedExamples: []
+  - id: REPO-WORK-4
+    title: Identity records name custody, never a secret
+    kind: mandatory
+    hfsRules: [R09, R06]
+    requirement: |
+      `_resources/identities/<slug>/resource.yaml` holds the role, provider and realm and `custody.sealed`, exactly
+      `.starcistacks/<env>/secrets/identity-<slug>.enc`; an identity that holds no secret uses `custody.provider: none` and
+      carries no sealed key. UAT `accounts.yaml` selects an identity by role, so several flows share one identity per role and
+      no identity is created per flow. No identity file holds a value.
+    rationale: |
+      Per-flow identities multiply secrets to seal and rotate, and a value in a tracked file outlives any rotation.
+    cases:
+      - id: case-1
+        when: Two flows sign in as an admin
+        write: Both accounts.yaml files select role admin; one identity record serves both.
+    verification:
+      automated:
+        - HFS_IDENTITY_CUSTODY
+        - HFS_PLAINTEXT_SECRET
+      manual:
+        - The owner seals the file; the agent never reads or writes the value.
+    relatedExamples: []

@@ -1,0 +1,150 @@
+schema: starci/knowledge-source@1
+id: repo.tooling
+title: Repository tooling
+purpose: |
+  Given a tool configuration in a repository (ESLint, TypeScript, Jest, Vitest, Playwright, stylelint, husky, CI, Sonar,
+  Codecov), who owns its content? `.claude` owns it. A repository holds a thin call into a `.claude` package, or a file that
+  `hfs sync` generates and hash-checks.
+appliesTo:
+  - backend
+  - frontend
+family: repo
+provenance:
+  reviewedAt: 2026-09-29
+  sources:
+    - knowledge/hfs/README.md
+    - knowledge/hfs/slots.yaml
+    - knowledge/hfs/canon-pins.yaml
+    - packages/tsconfig
+    - packages/prettier-config
+    - packages/jest-preset
+    - packages/vitest-preset
+    - packages/playwright-preset
+  limitations: |
+    A managed file equal to its render proves the template was applied. It does not prove that a tool runs in the gate the
+    rule names; the gate definitions and the CI run prove that.
+rules:
+  - id: REPO-TOOLING-1
+    title: Configs are thin calls into canon packages
+    kind: mandatory
+    hfsRules: [R16, R22]
+    requirement: |
+      `eslint.config.mjs` calls `starciBeConfig({ hfs })` or `starciFeConfig({ hfs })`. `tsconfig.json` extends
+      `@starci/tsconfig/{be,fe}.json` and adds `paths` only; `tsconfig.e2e.json` extends `@starci/tsconfig/e2e.json`. The jest
+      config calls `@starci/jest-preset`, the vitest config `@starci/vitest-preset`, the Playwright config
+      `@starci/playwright-preset`, stylelint extends `@starci/stylelint-canon`, and the Prettier config is the string
+      `@starci/prettier-config` in `package.json`. A repository defines no local rule, plugin, override, disabled rule or
+      architecture script, and copies no canon config.
+    rationale: |
+      Three copies of an ESLint config are three standards. One package makes every repository answer to the same rules.
+    cases:
+      - id: case-1
+        when: The ESLint config
+        write: 'import { starciBeConfig } from "@starci/eslint-canon-be"; export default starciBeConfig({ hfs: "./hfs.json" })'
+      - id: case-2
+        when: The TypeScript config
+        write: '{ "extends": "@starci/tsconfig/be.json", "compilerOptions": { "paths": { "@modules/*": ["src/modules/*"] } } }'
+    verification:
+      automated:
+        - HFS_TOOL_CONFIG_LOCAL
+        - HFS_MANAGED_FILE_DRIFT
+        - HFS_TS_STRICT
+      manual: []
+    relatedExamples: []
+  - id: REPO-TOOLING-2
+    title: Generated files come from hfs sync
+    kind: mandatory
+    hfsRules: [R04, R05, R11]
+    requirement: |
+      Files that cannot extend a package are rendered by `hfs sync` from templates in `.claude` and hash-checked: `.husky/`,
+      `.github/workflows/ci.yml` (and the optional `e2e.yml`), the managed block of `.gitignore`, `sonar-project.properties`,
+      `codecov.yml`, `.sops.yaml`. Any difference from the render is a finding; the fix is to run `hfs sync`, never to edit the
+      file. A template change is a change in `.claude`, after which `hfs sync` updates the repositories.
+    rationale: |
+      A hand-edited hook or workflow drifts, and drift is how a gate stops running.
+    cases:
+      - id: case-1
+        when: A workflow must change
+        write: Change the template in .claude and run hfs sync in each repository.
+    verification:
+      automated:
+        - HFS_MANAGED_FILE_DRIFT
+        - HFS_GITIGNORE_BLOCK_DRIFT
+        - HFS_SONAR_CONFIG
+      manual: []
+    relatedExamples: []
+  - id: REPO-TOOLING-3
+    title: The same machine at every gate
+    kind: mandatory
+    hfsRules: [R13, R24]
+    requirement: |
+      Pre-commit, pre-push, op settle, land gate and CI run the same `@starci/hfs` at the version pinned in
+      `canon-pins.yaml`. CI runs `npx @starci/hfs check`; pre-push runs `typecheck`, `lint:check` and `hfs check --fast`. There is
+      no rule only agents can run. `@starci/*` packages are consumed from the runtime checkout (`STARCI_HOME`); there is no
+      public registry publish.
+    rationale: |
+      A repository that is green under an old rule while the agent grades it under a new rule wastes every cycle.
+    cases:
+      - id: case-1
+        when: CI
+        write: A step `npx @starci/hfs check` runs after install with the pinned version.
+    verification:
+      automated:
+        - HFS_CI_MISSING_CANON
+        - HFS_ARCH_CONFIG_UNREAD
+      manual: []
+    relatedExamples: []
+  - id: REPO-TOOLING-4
+    title: No inline configuration and no rule off without a replacement
+    kind: mandatory
+    hfsRules: [R17, R18]
+    requirement: |
+      `noInlineConfig` is true in both ESLint factories: no `eslint-disable`, no `@ts-ignore`, no `@ts-expect-error`. A factory
+      turns a rule off only when its replacement check is listed and runs in a gate of the repository. A repository turns off
+      nothing.
+    rationale: |
+      A rule declared covered by a check that no gate runs is a rule that does not exist.
+    cases:
+      - id: case-1
+        when: A rule is superseded by a check
+        write: The factory lists the replacement and the check appears in pre-push or CI, otherwise HFS_RULE_OFF_WITHOUT_REPLACEMENT fails.
+    verification:
+      automated:
+        - HFS_RULE_OFF_WITHOUT_REPLACEMENT
+        - HFS_INLINE_SUPPRESSION
+      manual: []
+    relatedExamples: []
+  - id: REPO-TOOLING-5
+    title: Caches and outputs are redirected by the presets
+    kind: mandatory
+    hfsRules: [R03]
+    requirement: |
+      The canon presets set every tool's cache and working directory outside the repository (`eslint --cache-location`, jest
+      `cacheDirectory`, turbo `cacheDir`, `sonar.working.directory`) under `%LOCALAPPDATA%/StarCi/cache/<repo>/<tool>/`. No cache
+      folder exists in the working tree. Build output stays ignored and in place.
+    rationale: |
+      A cache in the tree is untracked noise that agents and reviewers must keep ignoring.
+    cases: []
+    verification:
+      automated:
+        - HFS_UNTRACKED_ROOT_ENTRY
+      manual: []
+    relatedExamples: []
+  - id: REPO-TOOLING-6
+    title: E2E is outside the automatic gates
+    kind: mandatory
+    hfsRules: [R12]
+    requirement: |
+      No e2e spec, e2e setup or e2e-only dependency joins husky, lint-staged, the default typecheck, coverage or Codecov, or an
+      automatic CI trigger. `typecheck:e2e` and `lint:e2e` exist and are green; `test:e2e` runs `typecheck:e2e` first. A kept e2e
+      workflow is `workflow_dispatch` only.
+    rationale: |
+      E2E is slow and environment-bound, but its code must not rot, so its type check and lint are separate manual gates.
+    cases: []
+    verification:
+      automated:
+        - HFS_E2E_IN_AUTOMATIC_GATE
+        - BE_TEST_TOPOLOGY
+        - FE_E2E_SHAPE
+      manual: []
+    relatedExamples: []

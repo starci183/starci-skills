@@ -1,0 +1,100 @@
+schema: starci/knowledge-source@1
+id: fe.boundaries
+title: Frontend boundaries
+purpose: |-
+  Given a frontend failure or a render mode decision, which boundary handles it? Every app has error, not-found and
+  loading boundaries, and every route is server-first with a client boundary only where interaction needs one.
+appliesTo:
+  - frontend
+family: fe
+provenance:
+  reviewedAt: 2026-09-29
+  sources:
+    - knowledge/hfs/README.md
+    - knowledge/hfs/slots.yaml
+    - https://nextjs.org/docs/app/getting-started/error-handling
+    - https://nextjs.org/docs/app/getting-started/server-and-client-components
+    - https://nextjs.org/docs/app/api-reference/file-conventions/loading
+  limitations: |-
+    Static checks prove that the boundary files exist, that route files are server components and that "use client" sits
+    only where allowed. They do not prove that a boundary recovers correctly or that a loading state is well drawn; the
+    UI evidence and browser checks do.
+rules:
+  - id: FE-BOUNDARY-1
+    title: Mandatory error, not-found and loading boundaries
+    kind: mandatory
+    hfsRules: [R53]
+    requirement: |-
+      Every app has `app/global-error.tsx`, `app/[locale]/error.tsx`, `app/[locale]/not-found.tsx` and
+      `app/[locale]/layout.tsx`, and a `loading.tsx` for every route group that reads data. `error.tsx` and
+      `global-error.tsx` are client components because Next requires it. Their props follow the installed Next contract, and
+      retry re-runs the failed read. `Suspense fallback={null}` is forbidden. `errorState` records declare the Outcome envelope
+      whenever the code has an `Outcome`.
+    rationale: |-
+      Without a boundary a render error blanks the whole page, and a route with no loading file shows nothing while it
+      waits.
+    cases:
+      - id: case-1
+        when: A render error in a route group
+        write: app/[locale]/error.tsx renders the error slot with a retry that calls reset().
+      - id: case-2
+        when: An unknown route
+        write: app/[locale]/not-found.tsx renders the not-found notice with a link built by modules/routes.
+      - id: case-3
+        when: A route group that reads data
+        write: app/[locale]/(console)/loading.tsx draws the skeleton shape of that group.
+    verification:
+      automated:
+        - FE_ERROR_BOUNDARY_MISSING
+        - FE_NEXT_ERROR_BOUNDARY_LOCATION
+      manual:
+        - Trigger a render error and an unknown route and confirm the boundaries render and recover.
+    relatedExamples: []
+  - id: FE-BOUNDARY-2
+    title: Boundaries render an Outcome, not an error status
+    kind: mandatory
+    hfsRules: [R51, R53]
+    requirement: |-
+      A boundary and a connected block turn an `Outcome` or a caught error into a slot through `toSlot(outcome)`; they never
+      read `error.status`. A `refused` outcome shows the forbidden notice or navigates to sign-in, `unavailable` with
+      `retryable` offers a retry that re-runs exactly that read, and copy comes from the i18n catalog by code.
+    rationale: |-
+      One adapter renders every failure the same way, and the recovery action stays explicit.
+    cases:
+      - id: case-1
+        when: A read is refused
+        write: toSlot gives isForbidden true; a primary slot shows the forbidden notice and a secondary slot unmounts.
+    verification:
+      automated:
+        - FE_ERROR_WORLD_STATE_MAPPING
+        - FE_HTTP_STATUS_COLLAPSE
+      manual: []
+    relatedExamples: []
+  - id: FE-BOUNDARY-3
+    title: Server first
+    kind: mandatory
+    hfsRules: [R55]
+    requirement: |-
+      Route files (page, layout, template, loading, not-found) are server components. `"use client"` appears only in the
+      `index.tsx` of a block that has interaction or client data hooks, in a leaf with intrinsic interaction, and in
+      `error.tsx` and `global-error.tsx`. A layout is never a client component. The i18n catalog is split by namespace
+      and a client component receives only the picked part through `NextIntlClientProvider messages`. `force-dynamic` is
+      forbidden on a client page.
+    rationale: |-
+      A client layout ships the whole subtree and the whole catalog to every page, and a server-first tree keeps the client
+      bundle to the interactive parts.
+    cases:
+      - id: case-1
+        when: A page with a static header and one interactive table
+        write: The page and the header are server components; only the table block index.tsx is "use client".
+      - id: case-2
+        when: A client block needs messages
+        write: 'The server layout passes `pick(messages, ["sales"])` to the provider; the block reads only the sales namespace.'
+    verification:
+      automated:
+        - FE_CLIENT_BOUNDARY
+        - FE_ROUTE_CLIENT_BOUNDARY
+        - FE_ROUTE_CLIENT_HOOK
+      manual:
+        - Confirm the client bundle of a page contains only the interactive parts.
+    relatedExamples: []

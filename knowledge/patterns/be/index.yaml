@@ -1,73 +1,93 @@
 schema: starci/knowledge-source@1
 id: be.index
 title: Backend code patterns
-purpose: Read docs/backend-source-pattern.md and docs/portable-source-architecture.md first. The adopted
-  pattern defines ownership, explicit public APIs and concrete Nest/TypeScript code forms.
-  folder/function/typing and architecture-check are current normative topics. Historical
-  naming/import/comment/error/test cases are profile-specific examples subordinate to those revised
-  boundaries. Source counts are not mandatory class/file inventories; current source evidence and behavior are
-  checked separately.
+purpose: |-
+  Read knowledge/hfs/README.md (HFS v2) and docs/backend-source-pattern.md first. The standard defines ownership, the
+  tier direction, one schema authority, default-deny, per-capability configuration and background work as a transport,
+  then the concrete Nest and TypeScript code forms below. Each rule cites the HFS rule ids it implements (hfsRules) and
+  the finding codes that judge it (verification.automated).
 appliesTo:
   - backend
 family: be
 provenance:
-  extractionCommit: edf72554425f918e80c9205e9c6db10596e722f0
+  reviewedAt: 2026-09-29
   sources:
-    - the historical reference backend source
-    - apps/core/src/app.module.ts for filter registration
-    - tsconfig.json
-    - jest.config.ts
-    - eslint.config.mjs
-  limitations: Historical reference-source observations preserved at the extraction commit; not a fresh audit of
-    current repository conformance. Counts and file totals cited in rationale or cases are provenance from
-    that extraction, not claims about today. Inspect the selected repository's actual types/APIs, aliases and
-    lint/test setup; verify reference conformance within approved .starciwork scope. Target existing code does
-    not override the reference. Current business requirements and architecture belong to .starciwork; code
-    patterns do not approve them.
+    - knowledge/hfs/README.md
+    - knowledge/hfs/slots.yaml
+    - docs/backend-source-pattern.md
+    - docs/portable-source-architecture.md
+  limitations: |-
+    Patterns place code and shape it. They do not approve business requirements or architecture, which belong to
+    .starciwork, and static checks do not prove behavior. Inspect the selected repository's installed types, APIs, aliases
+    and lint and test setup.
 topics:
   - id: be.architecture-check
     title: Architecture check
     path: architecture-check.yaml
-    decides: Enforceable modules/features/apps dependency direction and thin application composition roots
-    rules: BE-ARCHITECTURE-1 … BE-ARCHITECTURE-4
+    decides: Tier direction matrix, acyclic owners, thin application composition roots, public owner surface, composed features
+    rules: BE-ARCHITECTURE-1 … BE-ARCHITECTURE-5
   - id: be.folder
     title: Folder
     path: folder.yaml
-    decides: Composition, feature application/transport, reusable capabilities, persistence and test ownership
+    decides: Composition, feature application and transport, reusable capabilities, persistence, errors and test ownership
     rules: BE-FOLDER-1 … BE-FOLDER-7
   - id: be.naming
     title: Naming
     path: naming.yaml
-    decides: Kebab file suffixes, class role suffixes, exception identity, enums, constants, methods
+    decides: Kebab file suffixes per slot, class role suffixes, error identity, enums, constants, methods, GraphQL fields
     rules: BE-NAMING-1 … BE-NAMING-8
   - id: be.function
     title: Function
     path: function.yaml
-    decides: Direct use cases, optional meaningful bus handlers, transport adapters, transaction identity and
-      static/dynamic module selection
+    decides: Direct use cases, transport adapters, transaction identity, concurrency invariants, static and dynamic module selection
     rules: BE-FUNCTION-1 … BE-FUNCTION-8
   - id: be.imports
     title: Imports
     path: imports.yaml
-    decides: "@modules/@features/@tests aliases, brace style, order, layering direction, banned imports"
+    decides: Aliases and public entries, layering direction, banned imports; layout is Prettier's
     rules: BE-IMPORTS-1 … BE-IMPORTS-7
   - id: be.comment
     title: Comment
     path: comment.yaml
-    decides: Docblock after decorators, responsibility over name, enum member docs, // prose, ASCII and vn-ok
+    decides: Docblock after decorators, responsibility over name, enum member docs, prose comments, ASCII, no suppression
     rules: BE-COMMENT-1 … BE-COMMENT-7
   - id: be.typing
     title: Typing
     path: typing.yaml
-    decides: Protocol DTOs, plain application contracts, explicit public types, validation and serialization
+    decides: Strict flags, plain application contracts, protocol DTOs, bounded input, no casts
     rules: BE-TYPING-1 … BE-TYPING-7
   - id: be.error
     title: Error
     path: error.yaml
-    decides: AbstractException shape, metadata, wrapping, the HTTP filter, the GraphQL interceptor and formatError
+    decides: DomainError, capability-owned errors, typed outcomes, the masking HTTP filter and GraphQL formatError
     rules: BE-ERROR-1 … BE-ERROR-7
   - id: be.test
     title: Test
     path: test.yaml
-    decides: Colocated .spec.ts, lanes by suffix, direct construction with as never, what an assertion proves
+    decides: Unit and e2e placement, the jest topology, typed doubles, composition specs, what an assertion proves
     rules: BE-TEST-1 … BE-TEST-7
+  - id: be.api-auth
+    title: API authentication and input bounds
+    path: api-auth.yaml
+    decides: Default deny with APP_GUARD and public reasons, identity-owned verification, signed webhooks, typed operations, bounded input
+    rules: BE-AUTH-1 … BE-AUTH-5
+  - id: be.config
+    title: Configuration and secrets
+    path: config.yaml
+    decides: One environment reader, config per capability, no default secrets or addresses, sealed secrets
+    rules: BE-CONFIG-1 … BE-CONFIG-4
+  - id: be.logging
+    title: Logging
+    path: logging.yaml
+    decides: The mandatory Logger port, enum identities, structured payloads, handled catches
+    rules: BE-LOGGING-1 … BE-LOGGING-3
+  - id: be.persistence
+    title: Persistence and migrations
+    path: persistence.yaml
+    decides: Migrations as the only schema authority, apps/migrate, persistence per capability, SQL in repositories, the outbox
+    rules: BE-PERSISTENCE-1 … BE-PERSISTENCE-5
+  - id: be.background
+    title: Background work
+    path: background.yaml
+    decides: Jobs and consumers as transports, worker apps, runners for every sweep, lease and fencing
+    rules: BE-BACKGROUND-1 … BE-BACKGROUND-4

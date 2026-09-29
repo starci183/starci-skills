@@ -1,0 +1,62 @@
+schema: starci/knowledge-source@1
+id: repo.index
+title: Repository patterns
+purpose: |-
+  Read knowledge/hfs/README.md (HFS v2) first. These topics state the repository-level law: the root map and storage states,
+  the backend-only `.starciwork` and `.starcistacks`, sealed secrets, shared tooling, the formatter, version pins and size
+  budgets. Each rule cites the HFS rule ids it implements (hfsRules) and the finding codes that judge it
+  (verification.automated). The backend and frontend source rules inside the tree are in patterns/be and patterns/fe.
+appliesTo:
+  - backend
+  - frontend
+family: repo
+provenance:
+  reviewedAt: 2026-09-29
+  sources:
+    - knowledge/hfs/README.md
+    - knowledge/hfs/slots.yaml
+    - docs/source-layout.md
+  limitations: |-
+    The tree law governs entries and top-level placement, tooling ownership and budgets. It does not certify behavior, deployment
+    or product completeness.
+topics:
+  - id: repo.folder
+    title: Repository folder
+    path: folder.yaml
+    decides: Every tracked path has a slot, apps/<app> only, npm only, backend-only work and stacks, ignored and external storage, README
+    rules: REPO-FOLDER-1 … REPO-FOLDER-6
+  - id: repo.starciwork
+    title: .starciwork
+    path: starciwork.yaml
+    decides: Product records only, agent data never tracked, flat records, identity custody records
+    rules: REPO-WORK-1 … REPO-WORK-4
+  - id: repo.starcistacks
+    title: .starcistacks
+    path: starcistacks.yaml
+    decides: One shape per environment, host services declared not copied, declarations versus effects
+    rules: REPO-STACKS-1 … REPO-STACKS-3
+  - id: repo.secrets
+    title: Secrets
+    path: secrets.yaml
+    decides: One sealed location, plaintext never in the tree, agents never touch values or keys, the recipient truth
+    rules: REPO-SECRETS-1 … REPO-SECRETS-4
+  - id: repo.tooling
+    title: Tooling
+    path: tooling.yaml
+    decides: Thin configs into canon packages, generated files from hfs sync, one machine at every gate, no inline configuration, e2e outside automatic gates
+    rules: REPO-TOOLING-1 … REPO-TOOLING-6
+  - id: repo.formatter
+    title: Formatter
+    path: formatter.yaml
+    decides: Prettier as the only formatter and no formatting rule in ESLint
+    rules: REPO-FORMAT-1 … REPO-FORMAT-2
+  - id: repo.pins
+    title: Pins
+    path: pins.yaml
+    decides: Exact versions from canon-pins, one version per dependency, packages from the runtime checkout
+    rules: REPO-PINS-1 … REPO-PINS-3
+  - id: repo.size-budgets
+    title: Size budgets
+    path: size-budgets.yaml
+    decides: The budgets, no-growth over budget, duplicated code
+    rules: REPO-BUDGET-1 … REPO-BUDGET-3

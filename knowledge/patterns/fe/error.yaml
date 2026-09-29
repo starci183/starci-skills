@@ -2,67 +2,67 @@ schema: starci/knowledge-source@1
 id: fe.error
 title: Error
 purpose: |
-  Given a failure in the frontend, how is it represented and where does it go?
+  Given a failure in the frontend, how is it represented and where does it go? A failure is an Outcome from the client,
+  becomes a slot status in the connected half, and reaches a boundary only when it is a render failure.
 appliesTo:
   - frontend
 family: fe
 provenance:
-  extractionCommit: edf72554425f918e80c9205e9c6db10596e722f0
+  reviewedAt: 2026-09-29
   sources:
-    - src/components/blocks/**/component.tsx
-    - blocks/commerce/CartBlock/index.spec.tsx
-    - src/modules/toast/api.ts
-    - src/modules/api/graphql/types.ts
-    - src/hooks/swr/*
-    - packages/grammar/src/common/conformance.ts
+    - knowledge/hfs/README.md
+    - knowledge/patterns/fe/transport.yaml
+    - knowledge/patterns/fe/boundaries.yaml
+    - knowledge/grammars/starci/playbook.yaml
+    - https://nextjs.org/docs/app/getting-started/error-handling
   limitations: |
-    Historical reference-source observations at skill commit
-    edf72554425f918e80c9205e9c6db10596e722f0; not a fresh audit. Old counts cannot claim a fresh scan.
+    Static checks prove that failures are mapped through Outcome and slots and that boundaries exist. Whether failure copy
+    and recovery match business policy is reviewed against the accepted SRS and the UI evidence.
 rules:
   - id: FE-ERROR-1
     title: Failure is resolved before presentation
     kind: mandatory
+    hfsRules: [R51, R53]
     requirement: |
-      A read failure is a slot status, never a shape: the connected half folds each query with `toSlot`
-      (403 becomes `isForbidden`, any other failure `isError`), and the pure half renders it through
-      `SlotView` with a retry that re-runs that read (knowledge/grammars/starci/playbook.yaml guidance
-      state-recipes). A command failure is resolved by the connected half into field errors (zod message
-      keys resolved by next-intl) or a toast. XState never holds "failed", "error" or "forbidden".
-      Tests assert the mapping and retry eligibility.
+      A read failure is a slot status, never a shape: the connected half folds each Outcome with `toSlot` (a refused
+      outcome becomes isForbidden, any other failure isError), and the pure half renders it through `SlotView` with a
+      retry that re-runs that read (knowledge/grammars/starci/playbook.yaml guidance state-recipes). A command failure is
+      resolved by the connected half into field errors (zod message keys resolved by next-intl) or a toast. XState never
+      holds failed, error or forbidden. Tests assert the mapping and retry eligibility.
     rationale: |
-      One recipe renders every read failure the same way; transport details stop at the connected half
-      and recovery conditions stay explicit.
+      One recipe renders every read failure the same way; transport details stop at the connected half and recovery
+      conditions stay explicit.
     cases:
       - id: case-1
         when: "A read fails"
         write: >
-          toSlot(order) gives { isError: true }; <SlotView … onRetry={props.on.retryOrder}> renders
-          EmptyNotice with the retry action; the connected half wires retryOrder: () => { void
-          order.mutate() }
+          toSlot(order) gives { isError: true }; SlotView renders EmptyNotice with the retry action, and the connected half
+          wires retryOrder to re-run exactly that read
       - id: case-2
-        when: "A read is refused (403)"
+        when: "A read is refused (401 or 403)"
         write: >
-          toSlot gives { isForbidden: true, isError: false }; a primary slot shows the forbidden notice,
-          a secondary slot unmounts
+          toSlot gives { isForbidden: true, isError: false }; a primary slot shows the forbidden notice, a secondary slot
+          unmounts, and a session refusal navigates to sign-in from the data layer
       - id: case-3
         when: "Failure copy"
         write: >
-          labels.error, labels.forbidden and labels.retry come from useSlotLabels (the shared `slot`
-          message namespace); no failure string is written in component.tsx
+          labels.error, labels.forbidden and labels.retry come from useSlotLabels (the shared slot message namespace); no
+          failure string is written in component.tsx
       - id: case-4
         when: "A command fails"
         write: >
-          the connected half catches the mutation failure and resolves it into a field error or a toast;
-          the pure half receives only the resolved string
+          the connected half resolves the failure into a field error or a toast; the pure half receives only the resolved
+          string
       - id: case-5
         when: "Connected spec"
         write: >
-          asserts the mapping: mocks.query.error = { status: 403 } … expect(mocks.captured?.state).toBe("summary");
-          expect(mocks.captured?.props.status.isForbidden).toBe(true)
+          asserts the mapping: given a refused outcome the captured props.status.isForbidden is true, and the state still
+          names a drawn shape
     verification:
       automated:
         - FE_ERROR_WORLD_STATE_MAPPING
         - FE_WORLD_OWNER_RENDER_BOUNDARY
+        - FE_HTTP_STATUS_COLLAPSE
         - starci-fe/no-data-status-shape
         - starci-fe/slot-status-through-slotview
       manual:
@@ -71,38 +71,32 @@ rules:
       - connected-block
 
   - id: FE-ERROR-2
-    title: The selected transport envelope
+    title: Failures cross the client as an Outcome
     kind: mandatory
+    hfsRules: [R51, R52]
     requirement: |
-      When an application selects an envelope transport, it declares the envelope discriminator,
-      data and failure fields and the readers that unwrap it. A reader handles transport failure
-      before returning data. Valid empty data may remain null; required missing data is rejected.
-      Normal business dispositions such as pending or refused remain typed data. A transport may
-      instead use a throwing client; GraphQL is not required.
+      The one client of the app returns `Outcome<T>` (ok, refused, invalid, not-found, unavailable). A reader or hook
+      handles the outcome before returning data, valid empty data stays a value, and required missing data is `unavailable`
+      or a hard stop (FE-ERROR-3). A GraphQL error is mapped by its extensions code to one of the outcomes; the message is
+      never shown. Normal business dispositions such as pending or refused-by-policy remain typed data of the result.
     rationale: |
-      The selected transport policy keeps failure distinct from valid empty data without imposing
-      one protocol or turning every negative business outcome into an exception.
+      One vocabulary keeps failure distinct from valid empty data and keeps server text out of the interface.
     cases:
       - id: case-1
-        when: "The selected reference GraphQL transport"
-        write: >
-          { success, message, error, data } selected in each document (query Course … { success message
-          error data { … } }) and typed GraphQLResponse<T> in modules/api/graphql/types.ts
-      - id: case-2
         when: "A read allows empty data"
-        write: "handle the envelope failure first; returning result.data ?? null is then valid"
+        write: "handle the outcome first; returning the empty value is then valid"
+      - id: case-2
+        when: "A write with feedback"
+        write: >
+          runWithToast(action, options) returns a boolean after surfacing the refused or unavailable outcome through the
+          toast module; the caller flips local state
       - id: case-3
-        when: "A selected write with feedback"
+        when: "Default copy"
         write: >
-          runGraphQLWithToast(action, options): Promise<boolean> — "Execute one GraphQL write and
-          surface both transport and typed-envelope failures"
-      - id: case-4
-        when: "Localised default copy"
-        write: >
-          const DEFAULT_MESSAGES: ToastMessages = { successTitle: "Success", errorTitle: "Error",
-          unauthorizedTitle: "Unauthorized", … } overridable per call through messages
+          copy comes from the catalog by outcome code (refused, unavailable, invalid); no default English strings in code
     verification:
       automated:
+        - FE_HTTP_STATUS_COLLAPSE
         - FE_ERROR_ENVELOPE_POLICY
         - FE_WRITE_FEEDBACK_OWNER
       manual:
@@ -113,36 +107,29 @@ rules:
   - id: FE-ERROR-3
     title: throw new Error where silence would be wrong
     kind: mandatory
+    hfsRules: [R51]
     requirement: |
-      throw new Error(…) marks transport failures and results the code cannot continue without.
-      It does not replace typed normal business dispositions. A custom Error subclass is residual,
-      not a mandatory pattern.
+      `throw new Error(...)` marks results the code cannot continue without: a required payload that is absent, a slot
+      rendered outside its owner, an environment value missing in production. It does not replace typed normal business
+      dispositions or an Outcome. A custom Error subclass is not required.
     rationale: |
       Hard stops prevent silent null continuation when a required payload or owner context is missing.
     cases:
       - id: case-1
-        when: "Empty payload on a required read"
-        write: "if (value === undefined) throw new Error(\"Course Community returned no data\")"
+        when: "Required value absent"
+        write: "if (value === undefined) throw new Error(\"Sales summary returned no value\")"
       - id: case-2
-        when: "Mutation returned nothing"
-        write: "if (result === null) throw new Error(\"Flashcard review completion returned no result\")"
-      - id: case-3
         when: "Slot used outside its owner"
         write: >
-          if (value === undefined) throw new Error("CourseFoundationCategoryBlock slots must be
-          rendered inside CourseFoundationCategoryBlockBase")
-      - id: case-4
-        when: "Offline"
-        write: "throw new Error(\"offline\") inside a fetcher so SWR records error"
-      - id: case-5
-        kind: residual
-        when: "Custom class"
+          if (value === undefined) throw new Error("SalesBlock slots must be rendered inside SalesBlockBase")
+      - id: case-3
+        when: "Environment value missing in production"
         write: >
-          one exists: class PersonalProjectEnrollmentDeniedError extends Error in
-          useQueryPersonalProjectTaskWorkspaceSwr.ts; not a pattern
+          modules/config throws when it loads if a required NEXT_PUBLIC value is missing; there is no localhost fallback
     verification:
       automated:
         - FE_REQUIRED_VALUE_FAILURE
+        - FE_ENV_OWNER
       manual:
         - Select domain-required bindings and confirm which absence modes must stop continuation.
     relatedExamples: []
@@ -150,32 +137,31 @@ rules:
   - id: FE-ERROR-4
     title: Propagation and ownership
     kind: mandatory
+    hfsRules: [R53]
     requirement: |
-      A selected data owner maps fetch failure to explicit UI state or propagates it through the
-      installed data client contract. Writes that require feedback name one feedback owner and every
-      bound use site; other writes may own local state without a toast. Uncaught render failures go
-      to explicitly selected Next segment/global boundaries whose props follow the installed Next
-      contract. Telemetry lives under config/instrumentation files.
+      A data owner maps a failure to an explicit UI state or lets the data client hold it (a hook does not catch what SWR
+      stores). Writes that need feedback name one feedback owner. An uncaught render failure goes to the mandatory
+      app/[locale]/error.tsx or app/global-error.tsx, whose props follow the installed Next contract (see boundaries.yaml).
+      Telemetry lives in instrumentation files and modules/config.
     rationale: |
-      Propagation stays at the layer that already owns user-visible state or process boundaries.
+      Propagation stays at the layer that already owns user-visible state or the process boundary.
     cases:
       - id: case-1
         when: "Inside a hook"
-        write: >
-          not caught; SWR stores it and the connected half reads query.error (catch ( appears in 3
-          files across src/)
+        write: "not caught; SWR stores the failure and the connected half reads it and calls toSlot"
       - id: case-2
-        when: "Inside the reference application's selected feedback write"
-        write: "runGraphQLWithToast returns false and toasts; the caller flips a local state (payment.hasFailed)"
+        when: "Selected feedback write"
+        write: "runWithToast returns false and toasts; the caller flips a local state"
       - id: case-3
         when: "Render crash"
-        write: "src/app/global-error.tsx"
+        write: "apps/<app>/src/app/global-error.tsx and app/[locale]/error.tsx"
       - id: case-4
         when: "Telemetry"
-        write: "src/config/sentry.ts, src/instrumentation.ts, instrumentation-client.ts"
+        write: "apps/<app>/src/instrumentation.ts, instrumentation-client.ts"
     verification:
       automated:
         - FE_NEXT_ERROR_BOUNDARY_LOCATION
+        - FE_ERROR_BOUNDARY_MISSING
       manual:
         - Verify feedback applicability, recovery safety, copy, redaction and telemetry behavior.
     relatedExamples:
@@ -184,28 +170,23 @@ rules:
   - id: FE-ERROR-5
     title: Grammar package
     kind: mandatory
+    hfsRules: [R63]
     requirement: |
-      Grammar throws TypeError for invalid conformance definitions at module init and for invalid
-      vocabulary values in assertPresentationState.
+      Grammar throws TypeError for invalid conformance definitions at module init and for invalid vocabulary values in
+      assertPresentationState.
     rationale: |
       Package-level TypeError fails fast on invalid family definitions before product composition.
     cases:
       - id: case-1
         when: "Invalid definition at module init"
         write: >
-          throw new TypeError(`Invalid ${definition.familyId} Grammar conformance: missing=[…],
-          unknown=[…]`) in defineGrammarRuleConformance
+          throw new TypeError(`Invalid ${definition.familyId} Grammar conformance: missing=[...], unknown=[...]`) in
+          defineGrammarRuleConformance
       - id: case-2
         when: "Invalid vocabulary value"
-        write: "assertPresentationState(\"unknown\") throws TypeError (common/index.test.mjs)"
+        write: "assertPresentationState(\"unknown\") throws TypeError"
     verification:
       automated: []
       manual:
         - Verify conformance helpers against installed @starci/grammar/common exports.
     relatedExamples: []
-openQuestions:
-  - id: typed-error-class-for-no-data
-    kind: proposal
-    summary: |
-      Whether a typed error class should replace throw new Error("…") for the "no data" cases: one
-      custom class against 52 plain throws, so the plain form is what the code does today.

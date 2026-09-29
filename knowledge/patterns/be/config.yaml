@@ -1,0 +1,113 @@
+schema: starci/knowledge-source@1
+id: be.config
+title: Backend configuration and secrets
+purpose: |-
+  Given a value a backend needs from its environment, who reads it, who parses it and how does it reach the code that
+  uses it? One reader, one parser per capability, options through DI, and no default for a secret or an infrastructure
+  address.
+appliesTo:
+  - backend
+family: be
+provenance:
+  reviewedAt: 2026-09-29
+  sources:
+    - knowledge/hfs/README.md
+    - knowledge/hfs/slots.yaml
+    - knowledge/application-stacks.yaml
+    - https://docs.nestjs.com/fundamentals/dynamic-modules
+    - https://zod.dev
+  limitations: |-
+    Static checks prove where the environment is read and that a secret key has no default. They do not prove that a
+    deployed environment provides the value, that a secret is sealed correctly or that a URL is right; readiness and
+    deployment evidence prove those separately. Agents never read, print or commit a secret value.
+rules:
+  - id: BE-CONFIG-1
+    title: One reader of the environment
+    kind: mandatory
+    hfsRules: [R43]
+    requirement: |-
+      `platform/config` exports `EnvSource`, the only code that touches `process.env`; it also resolves `*_FILE`
+      indirection. `main.ts` reads the environment once through `EnvSource` and passes the result to the capability
+      parsers. Module factories never call an environment reader. `platform/config` imports no domain or integration
+      type.
+    rationale: |-
+      A single reader makes every dependency on the environment visible and keeps platform independent of domain.
+    cases:
+      - id: case-1
+        when: Bootstrap
+        write: 'const env = EnvSource.fromProcess(); const options = { orders: parseOrdersConfig(env), identity: parseIdentityConfig(env) }; const app = await NestFactory.create(AppModule.register(options))'
+    verification:
+      automated:
+        - BE_CONFIG_OWNER
+        - NEST_ENV_ACCESS
+        - BE_TIER_DIRECTION
+      manual: []
+    relatedExamples: []
+  - id: BE-CONFIG-2
+    title: Config per capability
+    kind: mandatory
+    hfsRules: [R43]
+    requirement: |-
+      Each capability or provider that needs configuration has `<name>.config.ts` exporting
+      `parse<Name>Config(env): <Name>Options`, validated with zod, and `<name>.options.ts` exporting the options type.
+      A module receives its options through `register(options)` and DI. There is no central config file that knows every
+      provider, and one config path only: no dotfile env preloader.
+    rationale: |-
+      A central config file imports every domain and integration type and becomes the cause of cycles, and it grows
+      without an owner.
+    cases:
+      - id: case-1
+        when: A parser
+        write: 'export const parseOrdersConfig = (env: EnvSource): OrdersOptions => ordersSchema.parse({ ttlSeconds: env.number("ORDERS_TTL_SECONDS") })'
+      - id: case-2
+        when: A module
+        write: 'OrdersModule.register(options.orders)'
+    verification:
+      automated:
+        - BE_CONFIG_OWNER
+        - BE_MODULE_SHAPE
+      manual: []
+    relatedExamples: []
+  - id: BE-CONFIG-3
+    title: No default for a secret or an infrastructure address
+    kind: mandatory
+    hfsRules: [R44]
+    requirement: |-
+      A key matching `PASSWORD`, `SECRET`, `TOKEN`, `KEY` or `CREDENTIAL` has no default value in code, and neither has an
+      infrastructure URL or host. A missing value stops boot with an error that names the key, never the value. No
+      `process.cwd()` is joined with `src` or `.starcistacks`; paths come from options.
+    rationale: |-
+      A default secret ships to production silently, and a default address points a process at the wrong system.
+    cases:
+      - id: case-1
+        when: A missing database password
+        write: 'boot fails with `Missing environment key ORDERS_DB_PASSWORD` and no fallback string exists in the source.'
+    verification:
+      automated:
+        - BE_SECRET_DEFAULT
+      manual:
+        - Confirm the deployed environment provides every key the parsers require.
+    relatedExamples: []
+  - id: BE-CONFIG-4
+    title: Secrets live only sealed in .starcistacks
+    kind: mandatory
+    hfsRules: [R06, R09, R10]
+    requirement: |-
+      Secrets exist only as sops `*.enc` at `.starcistacks/<env>/secrets/<slug>.enc`. A decrypted value never enters the
+      repository tree, ignored or not, and is passed at runtime by `*_FILE` from `%LOCALAPPDATA%/StarCi/secrets/<project>/<env>/`
+      or memory. `runtime/env/KEYS.md` lists slug names only. An identity or provider record points at its slug and holds no
+      value. Agents never read, print, generate or rotate a secret.
+    rationale: |-
+      One sealed location makes custody auditable and keeps plaintext out of history, caches and agent context.
+    cases:
+      - id: case-1
+        when: A database password
+        write: 'sealed at .starcistacks/dev/secrets/orders-db-password.enc and read by EnvSource from ORDERS_DB_PASSWORD_FILE.'
+    verification:
+      automated:
+        - HFS_PLAINTEXT_SECRET
+        - HFS_STACKS_SHAPE
+        - HFS_IDENTITY_CUSTODY
+      manual:
+        - Owner performs any key operation; verify recipients against the stack declaration.
+    relatedExamples: []

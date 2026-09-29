@@ -1,0 +1,139 @@
+schema: starci/knowledge-source@1
+id: be.persistence
+title: Backend persistence and migrations
+purpose: |-
+  Given a table, entity or SQL statement, who owns it, how does the schema change and which process applies the change?
+  Migrations are the only schema authority. Persistence lives with the capability that owns the table.
+appliesTo:
+  - backend
+family: be
+provenance:
+  reviewedAt: 2026-09-29
+  sources:
+    - knowledge/hfs/README.md
+    - knowledge/hfs/slots.yaml
+    - docs/backend-source-pattern.md
+    - https://typeorm.io/docs/migrations/why
+    - https://www.postgresql.org/docs/16/sql-insert.html
+  limitations: |-
+    Static checks prove where schema code and SQL live and that runtime synchronization is off. They do not prove that a
+    migration is correct, reversible or safe on live data. A migration is exercised against a real database in e2e,
+    which runs the migrations themselves. A production data step (baseline, backfill) is an owner-run operation.
+rules:
+  - id: BE-PERSISTENCE-1
+    title: Migrations are the only schema authority
+    kind: mandatory
+    hfsRules: [R34]
+    requirement: |-
+      `synchronize` is the literal `false` everywhere, including e2e databases, and is never read from the environment.
+      There is no runtime DDL: no `dataSource.synchronize()`, no `migrationsRun` in an api or worker app, no
+      `CREATE`, `ALTER` or `DROP TABLE` string outside `persistence/migrations/**`, and no glob that discovers entities or
+      migrations. E2E runs the real migrations, which is the evidence that they are right.
+    rationale: |-
+      When an ORM diffs the schema at boot, the live schema is whatever the entity graph implies that day, migrations never
+      run, and an enum change can crash a boot.
+    cases:
+      - id: case-1
+        when: The connection options
+        write: 'PlatformDatabaseModule.register({ connection: CONNECTION, entities, migrations, synchronize: false })'
+      - id: case-2
+        when: An e2e database
+        write: 'the setup runs the apps/migrate program against the container before the tests, never synchronize'
+    verification:
+      automated:
+        - BE_SCHEMA_AUTHORITY
+      manual:
+        - Review each migration against the accepted SDS data design and a copy of realistic data.
+    relatedExamples: []
+  - id: BE-PERSISTENCE-2
+    title: apps/migrate is the only migration runner
+    kind: mandatory
+    hfsRules: [R33, R34]
+    requirement: |-
+      An app of kind `migrate` is the only process that runs migrations, once per connection, before any api or worker
+      process starts (a deploy runs it as an init job). It is required as soon as `hfs.json` declares a connection. It has
+      `main.ts` and a composition spec and no `app.module.ts` business code. Api and worker apps never run migrations.
+    rationale: |-
+      Two processes racing to migrate corrupt a schema, and a migration inside a module cannot be scheduled or retried on
+      its own.
+    cases:
+      - id: case-1
+        when: A deploy
+        write: 'run `node dist/apps/migrate/main.js` to completion, then start the api and worker.'
+    verification:
+      automated:
+        - BE_SCHEMA_AUTHORITY
+        - BE_ENTRYPOINT_ONLY_IN_APPS
+        - HFS_SLOT_REQUIRED_MISSING
+      manual:
+        - Confirm the deployment runs the migrate step first and once.
+    relatedExamples: []
+  - id: BE-PERSISTENCE-3
+    title: Persistence per capability
+    kind: mandatory
+    hfsRules: [R35]
+    requirement: |-
+      Entities and migrations sit in `persistence/` of the capability that owns the table (`domain/<capability>/persistence/`
+      or `platform/<capability>/persistence/` for technical tables). `persistence/connection.ts` exports
+      `CONNECTION` equal to one name in `hfs.json` `connections`. Each capability exports explicit `entities` and
+      `migrations` lists from its `index.ts`; `app.module.ts` and `apps/migrate` compose them per connection. Migration files
+      are `<yyyyMMddHHmmss>-<kebab-name>.ts`, entity files `entities/<table>.entity.ts`. Several databases are several
+      connections, each with its own composed lists.
+    rationale: |-
+      Schema ownership by capability keeps platform independent of domain types and gives every table one reviewer.
+    cases:
+      - id: case-1
+        when: A new table
+        write: 'src/modules/domain/orders/persistence/entities/order.entity.ts, migrations/20260929101500-create-orders.ts, and an export from orders/index.ts.'
+      - id: case-2
+        when: Composition
+        write: 'apps/migrate/src/app.module.ts lists [...ordersEntities, ...identityEntities] for the primary connection.'
+    verification:
+      automated:
+        - BE_SCHEMA_OWNER
+      manual:
+        - Verify the data owner and the connection token of each entity.
+    relatedExamples: []
+  - id: BE-PERSISTENCE-4
+    title: SQL only in repositories
+    kind: mandatory
+    hfsRules: [R36, R37]
+    requirement: |-
+      `.query(` and query builders appear only in `<name>.repository.ts` inside `persistence/`. Use cases and services call a
+      repository method. A repository returns plain contracts or projections and translates driver errors into
+      capability errors. No `*Entity` type appears in a contract, DTO or resolver return type.
+    rationale: |-
+      Raw SQL scattered through services cannot be reviewed as a data boundary and couples every layer to the schema.
+    cases:
+      - id: case-1
+        when: A read
+        write: 'OrderRepository.findOpenByCustomer(customerId) returns OrderSummary[] built from a query in order.repository.ts.'
+    verification:
+      automated:
+        - BE_SQL_OUTSIDE_REPOSITORY
+        - BE_ENTITY_IN_CONTRACT
+      manual:
+        - Review query loading behavior, indexes and transaction use.
+    relatedExamples: []
+  - id: BE-PERSISTENCE-5
+    title: Durable effects use an outbox owned by persistence
+    kind: mandatory
+    hfsRules: [R46]
+    requirement: |-
+      When a database change must lead to an external message, the outbox row is written in the same local transaction. A
+      publisher job (see background.yaml) retries with bounded backoff and an effect identity; consumers deduplicate
+      transactionally with their local effect. A publish acknowledgement and a consumed business result are different facts,
+      and an outbox alone is not exactly-once processing. Outbox tables and migrations live in the owning platform
+      capability.
+    rationale: |-
+      An in-process event emission does not prove durable broker delivery.
+    cases:
+      - id: case-1
+        when: An order placed
+        write: 'insert the order and the outbox row in one transaction; OutboxPublishJob delivers the row later.'
+    verification:
+      automated:
+        - BE_BACKGROUND_UNOWNED
+      manual:
+        - Test a crash between the local commit and the publish acknowledgement.
+    relatedExamples: []

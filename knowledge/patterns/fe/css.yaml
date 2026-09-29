@@ -1,0 +1,116 @@
+schema: starci/knowledge-source@1
+id: fe.css
+title: Frontend CSS and tokens
+purpose: |-
+  Given a style in an app, where does its value come from? Only Grammar tokens. Brand colour values live in one file per
+  app. The Common tier reads only Grammar role tokens; a family supplies their values.
+appliesTo:
+  - frontend
+family: fe
+provenance:
+  reviewedAt: 2026-09-29
+  sources:
+    - knowledge/hfs/README.md
+    - knowledge/hfs/slots.yaml
+    - knowledge/grammars/starci/family.yaml
+    - https://stylelint.io/user-guide/configure
+    - https://tailwindcss.com/docs/detecting-classes-in-source-files
+  limitations: |-
+    Stylelint proves what a stylesheet contains. It does not prove that a screen looks right; the interface audit against
+    the installed Grammar anatomy and tokens does. The brand record and brand.css are compared by the brand check.
+rules:
+  - id: FE-CSS-1
+    title: globals.css imports only
+    kind: mandatory
+    hfsRules: [R61]
+    requirement: |-
+      `app/globals.css` contains only `@import` and `@source`, in this order: the Tailwind import, the family stylesheet,
+      `modules/brand/brand.css`, then the `@source` lines. Every `@source` path resolves to a real directory; a path that
+      points at a missing `node_modules` location is a finding. The app declares no other rule in `globals.css`.
+    rationale: |-
+      A fixed order makes brand overrides win deterministically, and an unresolved `@source` silently drops classes from the
+      build.
+    cases:
+      - id: case-1
+        when: A standard globals.css
+        write: |-
+          @import "tailwindcss";
+          @import "@starci/grammar/core.css";
+          @import "../modules/brand/brand.css";
+          @source "../../node_modules/@starci/grammar/dist";
+    verification:
+      automated:
+        - FE_STYLE_TOKEN_ONLY
+        - FE_STYLE_SOURCE_UNRESOLVED
+      manual: []
+    relatedExamples: []
+  - id: FE-CSS-2
+    title: Colour values only in brand.css
+    kind: mandatory
+    hfsRules: [R61]
+    requirement: |-
+      `modules/brand/brand.css` is the only app file that holds colour values (hex, rgb, hsl, oklch). It sets only the brand
+      tokens that Grammar declares, for both light and dark, and is compared with the project's brand record by the brand
+      check. No other stylesheet, CSS-in-JS value or component holds a colour literal.
+    rationale: |-
+      One file makes the brand reviewable and switchable, and a token layer keeps dark mode and contrast the family's
+      responsibility.
+    cases:
+      - id: case-1
+        when: A brand colour
+        write: |-
+          "--starci-core-accent" is one brand token the brand record names, for example:
+          :root { --starci-core-accent: oklch(0.62 0.19 254); }
+          [data-theme="dark"] { --starci-core-accent: oklch(0.72 0.16 254); }
+    verification:
+      automated:
+        - FE_STYLE_TOKEN_ONLY
+        - tokens-match-source
+      manual:
+        - Compare brand.css with the accepted brand record in both themes.
+    relatedExamples: []
+  - id: FE-CSS-3
+    title: Forbidden in app CSS
+    kind: mandatory
+    hfsRules: [R61, R62]
+    requirement: |-
+      In an app, forbidden: `*.module.css`, class selectors in app stylesheets, `!important`, hex, rgb or oklch values outside
+      `brand.css`, declaring `--<family>-*` custom properties, breakpoints outside the Grammar scale, and raw `<select>`,
+      `<input>`, `<textarea>` and `<button>` in product tiers (use the Grammar renderer). `@starci/stylelint-canon`, shipped
+      from `.claude`, enforces these like the ESLint canon.
+    rationale: |-
+      Each of these is a way to fork the design system inside one app, and a forked app drifts from every other app.
+    cases:
+      - id: case-1
+        when: A component needs a spacing or radius
+        write: Use the Grammar scale class or token; if none fits, the direction is wrong or the token belongs to the family.
+      - id: case-2
+        when: A form control
+        write: Use the Grammar field renderer, never a raw input.
+    verification:
+      automated:
+        - FE_STYLE_TOKEN_ONLY
+        - FE_NATIVE_FORM_CONTROL
+      manual: []
+    relatedExamples: []
+  - id: FE-CSS-4
+    title: Family tokens belong to Grammar
+    kind: mandatory
+    hfsRules: [R61, R63]
+    requirement: |-
+      The values of a product family's tokens (for example a shared UI package's family.css) are a family entry of
+      `@starci/grammar`; Grammar is the only owner of tokens. The Common tier of Grammar reads only role tokens and never
+      a token of one family. A shared package holds no colour literal and no `--<family>-*` declaration.
+    rationale: |-
+      Two token owners produce two dark modes and two contrast decisions.
+    cases:
+      - id: case-1
+        when: A product wants its own radius scale
+        write: Add or adjust the family entry in @starci/grammar; apps consume the role tokens.
+    verification:
+      automated:
+        - FE_STYLE_TOKEN_ONLY
+        - FE_PACKAGE_SHAPE
+      manual:
+        - Review the family entry against the Grammar anatomy.
+    relatedExamples: []

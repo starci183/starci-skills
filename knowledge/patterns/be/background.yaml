@@ -1,0 +1,108 @@
+schema: starci/knowledge-source@1
+id: be.background
+title: Backend background work
+purpose: |-
+  Given work that runs without a request (cron, sweep, outbox publish, queue consumption, retry), where does it live and
+  which process runs it? Background work is a transport, run only by an app of kind worker.
+appliesTo:
+  - backend
+family: be
+provenance:
+  reviewedAt: 2026-09-29
+  sources:
+    - knowledge/hfs/README.md
+    - knowledge/hfs/slots.yaml
+    - docs/backend-source-pattern.md
+    - https://docs.nestjs.com/techniques/task-scheduling
+    - https://martin.kleppmann.com/2016/02/08/how-to-do-distributed-locking.html
+  limitations: |-
+    Static checks prove that a background method has a runner and that a worker composes it. They do not prove lease
+    correctness, fencing at the remote resource or crash recovery; those need failure-injection tests against the actual
+    authority.
+rules:
+  - id: BE-BACKGROUND-1
+    title: Background work is a transport
+    kind: mandatory
+    hfsRules: [R46, R29]
+    requirement: |-
+      Scheduled work lives in `transport/schedule/<job>.job.ts` and queue consumption in
+      `transport/message/<event>.consumer.ts`, each with its own module (`<feature>-schedule.module.ts`,
+      `<feature>-message.module.ts`). A job or consumer calls a use case exactly as a controller does and holds no business
+      decision. Mechanisms live in `platform/scheduling` and `platform/messaging`. `@Cron` never appears in a domain
+      service.
+    rationale: |-
+      One shape for every entry protocol keeps use cases reusable and lets the app choose which protocols it serves.
+    cases:
+      - id: case-1
+        when: An outbox publisher
+        write: 'transport/schedule/publish-outbox.job.ts calls PublishOutboxUseCase.execute on each tick.'
+      - id: case-2
+        when: A queue consumer
+        write: 'transport/message/payment-settled.consumer.ts maps the message to SettlePaymentInput and calls SettlePaymentUseCase.'
+    verification:
+      automated:
+        - BE_FEATURE_SHAPE
+        - BE_BACKGROUND_UNOWNED
+      manual: []
+    relatedExamples: []
+  - id: BE-BACKGROUND-2
+    title: Only a worker app runs it
+    kind: mandatory
+    hfsRules: [R46, R31]
+    requirement: |-
+      An app of kind `worker` composes the schedule and message modules; an api app never runs cron or consumes a queue,
+      because cron in an api app runs once per replica. Every schedule or message transport has at least one worker app
+      that composes it, and the worker has a composition spec that boots its real AppModule.
+    rationale: |-
+      A job that no process composes never runs, and a job inside a replicated api runs many times.
+    cases:
+      - id: case-1
+        when: A worker app
+        write: 'apps/worker/src/app.module.ts imports OrdersScheduleModule and PaymentsMessageModule and registers no controller.'
+    verification:
+      automated:
+        - BE_BACKGROUND_UNOWNED
+        - BE_FEATURE_NOT_COMPOSED
+        - BE_APP_COMPOSITION_ONLY
+      manual: []
+    relatedExamples: []
+  - id: BE-BACKGROUND-3
+    title: Every sweep has a runner
+    kind: mandatory
+    hfsRules: [R46]
+    requirement: |-
+      A method named `sweep*`, `deliver*`, `reconcile*` or `retry*` must be called by a job or consumer. A method with no
+      runner is a finding even when it is tested, because durable recovery that nothing invokes does not recover anything.
+    rationale: |-
+      A built and unit-tested outbox, sweep or reconcile that nothing schedules gives the false impression of durable
+      recovery.
+    cases:
+      - id: case-1
+        when: A new sweep
+        write: 'add SweepUnsettledPaymentsJob in transport/schedule and compose it in the worker in the same change.'
+    verification:
+      automated:
+        - BE_BACKGROUND_UNOWNED
+      manual:
+        - Confirm the schedule and the overlap policy fit the recovery contract.
+    relatedExamples: []
+  - id: BE-BACKGROUND-4
+    title: Lease and fencing
+    kind: mandatory
+    hfsRules: [R46]
+    requirement: |-
+      Lease expiry allows a new claimant; it does not stop the old process. A monotonic execution token is checked
+      atomically by the resource that accepts the write. When the provider cannot enforce fencing, use its idempotency or
+      reconciliation contract, constrain overlap, and represent unknown effects explicitly before a retry. A stale worker
+      that resumes after reassignment must have its writes and settlement rejected by the real authority.
+    rationale: |-
+      Updating a local record with a fence after an unfenced external call does not fence the external effect.
+    cases:
+      - id: case-1
+        when: A claim
+        write: 'UPDATE ... SET lease_token = :token WHERE id = :id AND lease_expires_at < now() returning the new token; every write checks the token.'
+    verification:
+      automated: []
+      manual:
+        - Run a paused old worker resuming after reassignment against the actual store and assert its writes are refused.
+    relatedExamples: []

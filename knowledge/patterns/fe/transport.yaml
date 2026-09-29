@@ -1,0 +1,148 @@
+schema: starci/knowledge-source@1
+id: fe.transport
+title: Frontend data transport
+purpose: |-
+  Given a frontend read or write, which code calls the network, what does it return and where do the wire types come
+  from? One client per app, one Outcome vocabulary, types generated from the backend contract, server first.
+appliesTo:
+  - frontend
+family: fe
+provenance:
+  reviewedAt: 2026-09-29
+  sources:
+    - knowledge/hfs/README.md
+    - knowledge/hfs/slots.yaml
+    - https://nextjs.org/docs/app/getting-started/fetching-data
+    - https://swr.vercel.app/docs/getting-started
+    - https://the-guild.dev/graphql/codegen
+  limitations: |-
+    Static checks prove where fetch is called, that statuses are not collapsed and that wire types are generated. They do
+    not prove that the contract matches the running backend beyond the committed copy, or that retry and refresh behavior
+    fits the product. Contract drift is checked by comparing the copy with the backend snapshot hash.
+rules:
+  - id: FE-TRANSPORT-1
+    title: One client per app
+    kind: mandatory
+    hfsRules: [R50]
+    requirement: |-
+      `modules/api/client.ts` is the only `fetch` of the app. It applies a timeout and an `AbortSignal`, takes the token and
+      locale as arguments or context, and keeps no module-level `let` holding a token, locale or session. The base URL comes
+      from `modules/config`. Nothing else in the app calls `fetch`, `axios` or a GraphQL client directly.
+    rationale: |-
+      Several transports produce several result shapes and several ways of failing. One client makes timeout, headers and
+      errors a single decision.
+    cases:
+      - id: case-1
+        when: A request
+        write: 'export const request = async <T>(input: RequestInput, signal?: AbortSignal): Promise<Outcome<T>> => { ... } in modules/api/client.ts, with AbortSignal.timeout(config.requestTimeoutMs) combined with signal.'
+      - id: case-2
+        when: A credential
+        write: Pass the token as an argument of the reader or hook that calls request; never store it in a module variable.
+    verification:
+      automated:
+        - FE_TRANSPORT_OWNER
+        - FE_FETCH_OUTSIDE_TRANSPORT
+      manual: []
+    relatedExamples: []
+  - id: FE-TRANSPORT-2
+    title: One Outcome vocabulary, and 401 and 403 are refused
+    kind: mandatory
+    hfsRules: [R51]
+    requirement: |-
+      The client returns `Outcome<T>` from `modules/api/outcome.ts`: `ok` (value), `refused` (401 or 403, code), `invalid`
+      (issues), `not-found` and `unavailable` (code, retryable). A status is never collapsed into null or into one
+      failure branch, `if (!response.ok) return null` is forbidden, and server text is never returned as a display reason;
+      the reason is a code that i18n turns into copy. The `refused` outcome reaches the session check in the data layer,
+      which navigates to sign-in.
+    rationale: |-
+      When 401 is folded into "unavailable" the signed-out state can never be reached against the real backend, and a stubbed
+      e2e that answers 200 hides the defect.
+    cases:
+      - id: case-1
+        when: The type
+        write: 'export type Outcome<T> = { kind: "ok"; value: T } | { kind: "refused"; status: 401 | 403; code: string } | { kind: "invalid"; issues: ReadonlyArray<Issue> } | { kind: "not-found" } | { kind: "unavailable"; code: string; retryable: boolean }'
+      - id: case-2
+        when: A status mapping
+        write: 'if (response.status === 401 || response.status === 403) return { kind: "refused", status: response.status, code }'
+      - id: case-3
+        when: A block consumes it
+        write: '`toSlot(outcome)` maps ok to data, refused to isForbidden and the rest to isError, and SlotView renders it.'
+    verification:
+      automated:
+        - FE_HTTP_STATUS_COLLAPSE
+        - FE_ERROR_ENVELOPE_POLICY
+      manual:
+        - Confirm every refused outcome leads somewhere the user can act, such as sign-in.
+    relatedExamples: []
+  - id: FE-TRANSPORT-3
+    title: Wire types are generated from the contract copy
+    kind: mandatory
+    hfsRules: [R52, R23]
+    requirement: |-
+      The backend commits `contracts/<app>/schema.graphql` (or `openapi.json`). The frontend keeps a byte copy at
+      `modules/api/contract/<be-app>.graphql`, refreshed by `contract:pull` and compared by hash at the land gate. `codegen`
+      writes the ignored `modules/api/__generated__/` from that copy before `build` and `typecheck`. GraphQL documents live in
+      `.graphql` files. A handwritten wire type, `as GraphqlResult<T>` and an enum typed as `string` are forbidden. The e2e
+      doubles are generated from the same schema.
+    rationale: |-
+      Types written by hand drift from the backend without a signal, and the copy makes the interface between repositories
+      an explicit reviewable artifact.
+    cases:
+      - id: case-1
+        when: A new read
+        write: Add sales/summary.graphql, run codegen, and call the generated typed document from modules/api/sales/read-sales-summary.ts.
+      - id: case-2
+        when: The backend contract changed
+        write: Run contract:pull, review the diff of the copy, then codegen; the land gate fails on a hash mismatch.
+    verification:
+      automated:
+        - FE_WIRE_GENERATED
+        - HFS_CONTRACT_SNAPSHOT_DRIFT
+      manual:
+        - Review contract diffs for breaking changes before regenerating.
+    relatedExamples: []
+  - id: FE-TRANSPORT-4
+    title: Server reads and client reads share the client
+    kind: mandatory
+    hfsRules: [R50, R56]
+    requirement: |-
+      A server read is a reader in `modules/api/<domain>/read-*.ts` that calls the client and maps the outcome, wrapped in
+      React `cache()` when several blocks call it in one request. A client read is a hook `useQuery<X>Swr` in
+      `hooks/<domain>/` that calls the same client. The session check sits in the data layer (a `refused` outcome navigates
+      to sign-in), not only in a layout, because a layout does not run again on client navigation.
+    rationale: |-
+      Server-first rendering ships less client code, and one client keeps both paths consistent.
+    cases:
+      - id: case-1
+        when: A server block
+        write: 'const summary = await readSalesSummary(); return <SalesSummaryBase state={...} props={{ summary: toSlot(summary) }} />'
+      - id: case-2
+        when: A client hook
+        write: 'useSWR(token === undefined ? null : [QUERY_SALES_SUMMARY_SWR_KEY, token], () => request(salesSummaryDocument, { token }))'
+    verification:
+      automated:
+        - FE_HOOKS_ARE_HOOKS
+        - FE_SWR_KEY_IDENTITY
+      manual:
+        - Confirm that a refused outcome reaches sign-in on both server and client paths.
+    relatedExamples: []
+  - id: FE-TRANSPORT-5
+    title: One refresh mechanism per resource
+    kind: mandatory
+    hfsRules: [R65]
+    requirement: |-
+      A resource is refreshed by polling or by a socket, never both, and never by a hand-written poll loop in a component
+      (`setInterval`, recursive `setTimeout`). Polling uses the data client's refresh interval; a socket goes through one
+      module with cleanup on unmount.
+    rationale: |-
+      Duplicate refresh paths cause redundant requests and states that disagree.
+    cases:
+      - id: case-1
+        when: A status that changes on the server
+        write: 'useSWR(key, fetcher, { refreshInterval: 5000 }) in the hook; the component holds no timer.'
+    verification:
+      automated:
+        - FE_SIZE_AND_STATE_BUDGET
+      manual:
+        - Confirm the chosen mechanism and interval fit the product need.
+    relatedExamples: []

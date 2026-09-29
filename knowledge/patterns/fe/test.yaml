@@ -2,46 +2,41 @@ schema: starci/knowledge-source@1
 id: fe.test
 title: Test
 purpose: |
-  Given a frontend unit, where does its spec live, what does it assert, and what does it leave alone?
+  Given a frontend unit, where does its spec live, what does it assert, and what does it leave alone? Two test kinds
+  exist. Unit specs (vitest) run automatically. E2E (Playwright) runs by hand.
 appliesTo:
   - frontend
 family: fe
 provenance:
-  extractionCommit: edf72554425f918e80c9205e9c6db10596e722f0
+  reviewedAt: 2026-09-29
   sources:
-    - src/components/pages/CartPage/index.spec.tsx
-    - pages/CodingDomainPage/component.spec.tsx
-    - blocks/commerce/CartBlock/index.spec.tsx
-    - hooks/index.ts
-    - packages/grammar/src/**/*.spec.tsx
-    - packages/grammar/src/**/*.test.mjs
-    - package.json scripts (vitest run)
-    - https://github.com/starci183/starci-skills/blob/edf72554425f918e80c9205e9c6db10596e722f0/tests/evidence/20260903-consolidation.json
+    - knowledge/hfs/README.md
+    - knowledge/hfs/slots.yaml
+    - knowledge/patterns/fe/i18n.yaml
+    - https://vitest.dev/config/
+    - https://playwright.dev/docs/test-projects
+    - https://playwright.dev/docs/accessibility-testing
   limitations: |
-    Cited counts and notes are historical observations at skill commit
-    edf72554425f918e80c9205e9c6db10596e722f0, not a census of the current project. Inspect actual
-    source, manifest/lockfile, aliases and lint/test configuration in the selected repository before use.
-    Historical links supply provenance, not scripts or execution instructions.
-    One rule is closed here: FE-TEST-7 folded into FE-TEST-1 Case 7, because where a spec lives and
-    which half it measures are one law about one placement. Its number is not reused.
+    A green spec proves what it exercised. Which behavior needs a test is decided from the effect and the failure risk,
+    never from a file count.
 
-    Owner policy 2026-09-29: write or update the spec of the source you add or change (the goal need not ask for it) and run only those
-    specs and the specs that import it - never the repository's whole unit suite (unit.verify or /push-git) and never e2e unless asked.
+    Policy 2026-09-29. Write or update the spec of the source you add or change, even when the goal does not ask for it,
+    and run only those specs and the specs that import them. The whole unit suite runs only at push. E2E runs only when
+    asked.
 rules:
   - id: FE-TEST-1
     title: Placement
     kind: mandatory
+    hfsRules: [R12, R66, R67]
     requirement: |
-      Specs sit beside their subject. Connected-block coverage proves both its sibling render contract and
-      connected mapping; separate component.spec.tsx and index.spec.tsx files may align those responsibilities,
-      while one focused collocated spec may cover both only when it actually exercises both. Feature
-      pages/layouts/overlays and reusable composites/branches/leaves keep the behavior-focused coverage their
-      actual responsibility and risk require; no lower-tier twin or second spec is manufactured for symmetry.
-      Hooks and classNames use matching .spec siblings; no __tests__/ folders. The runner is vitest with
-      @testing-library/react.
+      Specs sit beside their subject. Connected-block coverage proves both its sibling render contract and its connected
+      mapping; separate component.spec.tsx and index.spec.tsx files may align those responsibilities, while one focused
+      collocated spec may cover both only when it exercises both. Feature pages, layouts and overlays and reusable
+      composites, branches and leaves keep the behavior-focused coverage their responsibility and risk require; no lower-tier
+      twin or second spec is manufactured for symmetry. Hooks and classNames use matching .spec siblings; there is no
+      __tests__ folder and no spec for a barrel. The runner is vitest with @testing-library/react.
     rationale: |
-      Colocation makes ownership clear. Tests follow behavior boundaries; file counts never create a
-      second component or a redundant spec.
+      Colocation makes ownership clear, and tests follow behavior boundaries, never file counts.
     cases:
       - id: case-1
         when: "The connected block's render responsibility has its own spec"
@@ -51,43 +46,17 @@ rules:
         write: "index.spec.tsx beside components/blocks/<Block>/index.tsx"
       - id: case-3
         when: "Hook"
-        write: "hooks/course/useQueryCourseSwr.spec.ts beside useQueryCourseSwr.ts"
+        write: "hooks/sales/useQuerySalesSummarySwr.spec.ts beside useQuerySalesSummarySwr.ts"
       - id: case-4
         when: "Class strings"
-        write: "classNames.spec.ts beside classNames.ts (2 in blocks); Grammar CSS proof in styles.spec.ts (6)"
+        write: "classNames.spec.ts beside classNames.ts; Grammar CSS proof in styles.spec.ts"
       - id: case-5
-        when: "Anywhere else"
-        write: "0 of 497 specs live in a __tests__/ folder"
-      - id: case-6
-        when: "Runner"
-        write: "vitest, @testing-library/react; describe/it/expect/vi imported from \"vitest\""
-      - id: case-7
-        when: "A connected block needs proof of both sibling responsibilities"
-        write: >
-          Separate the specs as above when each isolates one responsibility, or keep one collocated spec
-          that directly exercises both connected mapping and render behaviour. A source sibling or file
-          count is not evidence that either responsibility was tested.
-      - id: case-8
         kind: exception
         when: "A one-part visual unit"
-        write: "Keep one focused spec when behavior/risk warrants it; do not create a twin only to justify another spec."
-      - id: case-9
-        when: "Browser-driven end-to-end proof"
-        write: >
-          Exactly two test kinds exist (owner ruling 2026-09-29): unit <name>.spec.ts(x) beside its subject (vitest)
-          and e2e *.e2e-spec.ts (Playwright) under the root e2e/ folder, run by one root playwright.config.ts whose
-          testMatch is **/*.e2e-spec.ts and by the script test:e2e. Playwright specs are never named .spec.ts and
-          no second Playwright config exists. HFS_TEST_KIND_RETIRED flags any violation.
-      - id: case-10
-        when: "Hooks, typecheck, coverage and CI for e2e"
-        write: >
-          E2E runs MANUALLY only (owner ruling 2026-09-29). The default tsconfig/typecheck, eslint target and
-          lint-staged exclude e2e/** and playwright.config.ts; a dedicated tsconfig.e2e.json backs a manual
-          typecheck:e2e. Husky runs no Playwright and no e2e typecheck; vitest coverage and test:ci read unit
-          runs only; a kept e2e CI job is on: workflow_dispatch only. Routine gates are unit + typecheck + lint +
-          canon + build; test:e2e runs only when explicitly asked.
+        write: "Keep one focused spec when behavior or risk warrants it; do not create a twin only to justify another spec."
     verification:
-      automated: []
+      automated:
+        - FE_SPEC_QUALITY
       manual:
         - Confirm each real half is covered; do not infer a violation from a missing twin or test count alone.
     relatedExamples:
@@ -96,50 +65,47 @@ rules:
   - id: FE-TEST-2
     title: "Connected spec: mock the doors, assert the props handed down"
     kind: mandatory
+    hfsRules: [R67, R60]
     requirement: |
-      A connected block's focused spec mocks the selected hooks/<domain> entry and any framework adapter
-      it actually owns, replaces its sibling render unit, and asserts resolved mapping/actions. It never
-      imports a feature or transport module to arrange the test. Other visual tiers do not require a render
-      twin that production does not own.
+      A connected block's focused spec mocks the selected hooks/<domain> entry and any framework adapter it owns, replaces
+      its sibling render unit, and asserts resolved mapping and actions. It never imports a feature or a transport module to
+      arrange the test. Translations come from the real catalog through the next-intl test provider, never from a mock of
+      useTranslations that returns the key. Other visual tiers do not require a render twin that production does not own.
     rationale: |
-      Mocking owned boundaries isolates connected mapping without turning a repository-wide barrel into
-      architecture or manufacturing an extra production file for the test.
+      Mocking owned boundaries isolates connected mapping, and the real catalog proves the keys exist.
     cases:
       - id: case-1
         when: "Hoisted mock state"
         write: >
-          const mocks = vi.hoisted(() => ({ input: undefined as TestInput | undefined, token: "token"
-          as string | undefined, cart: { data: undefined as unknown, error: undefined as unknown,
-          isLoading: false, mutate: vi.fn() }, … }))
+          const mocks = vi.hoisted(() => ({ input: undefined as TestInput | undefined, query: { data: undefined, error:
+          undefined, isLoading: false, mutate: vi.fn() } }))
       - id: case-2
         when: "The hook door"
         write: >
-          vi.mock("@/hooks/cart", …). A modules/api transport is mocked in the hook or transport spec that
-          owns it, not from a connected block or lower visual tier.
+          vi.mock("@/hooks/sales", ...). A modules/api transport is mocked in the hook or transport spec that owns it, not
+          from a connected block or lower visual tier.
       - id: case-3
         when: "Translation and routing"
         write: >
-          vi.mock("next-intl", () => ({ useLocale: () => "en", useTranslations: () => (key: string) =>
-          key })), vi.mock("@/i18n/navigation", () => ({ useRouter: () => ({ push: mocks.push }) }))
+          render inside NextIntlClientProvider with the real messages; vi.mock("@/modules/i18n/navigation", () => ({
+          useRouter: () => ({ push: mocks.push }) }))
       - id: case-4
         when: "A real render unit"
         write: >
-          vi.mock("./component", () => ({ CartBlockBase: (input: TestInput) => { mocks.input = input;
-          return <output data-testid="cart" /> } })). Skip this case when no separate render unit exists.
+          vi.mock("./component", () => ({ SalesBlockBase: (input: TestInput) => { mocks.input = input; return <output
+          data-testid="sales" /> } })). Skip this case when no separate render unit exists.
       - id: case-5
-        when: "Import after mocks"
-        write: "import { CartBlock } from \"./index\" placed after the vi.mock calls"
-      - id: case-6
         when: "Assertion"
         write: >
-          expect(mocks.captured?.state).toBe("summary") while the slot loads (the shape never follows
-          the data status), expect(mocks.captured?.props.status.isForbidden).toBe(true) on 403, act(()
-          => { mocks.captured?.on.retry() }), expect(mocks.query.mutate).toHaveBeenCalledOnce()
-      - id: case-7
+          expect(mocks.captured?.state).toBe("summary") while the slot loads (the shape never follows the data status),
+          expect(mocks.captured?.props.status.isForbidden).toBe(true) on a refused outcome, then call the captured retry
+          inside act and expect the read to run once
+      - id: case-6
         when: "Reset"
-        write: "beforeEach(() => { vi.clearAllMocks(); mocks.input = undefined; … })"
+        write: "beforeEach(() => { vi.clearAllMocks(); mocks.input = undefined })"
     verification:
-      automated: []
+      automated:
+        - FE_SPEC_QUALITY
       manual: []
     relatedExamples:
       - connected-block
@@ -147,39 +113,35 @@ rules:
   - id: FE-TEST-3
     title: "Pure spec: render fixtures, assert what a reader would find"
     kind: mandatory
+    hfsRules: [R67]
     requirement: |
-      Pure specs render fixtures, assert landmarks/text, stub child owners, and may iterate exported
-      state inventories. Feature pages/layouts/overlays that compose without owning assert the connected
-      child presence.
+      Pure specs render fixtures with the real catalog, assert landmarks and text, stub child owners, and may iterate exported
+      state inventories. Each connected screen has one axe assertion. Feature pages, layouts and overlays that compose
+      without owning assert the presence of the connected child.
     rationale: |
-      Reader-facing assertions prove presentation without locking class strings or network behaviour.
+      Reader-facing assertions prove presentation without locking class strings or network behavior, and one axe run per
+      screen keeps accessibility a gate.
     cases:
       - id: case-1
         when: "Render"
-        write: >
-          render(<CodingDomainPageBase domain="arrays" navHome="Home" navPractice="Practice"
-          title="Arrays" />)
+        write: 'render(<SalesSummaryBase state="summary" props={fixture} on={noopActions} />) inside the real catalog provider'
       - id: case-2
         when: "Landmarks and text"
-        write: >
-          expect(screen.getByRole("heading", { name: "Arrays" })).toBeInTheDocument() (185 specs use
-          getByRole, 173 getByText, 60 getByTestId)
+        write: 'expect(screen.getByRole("heading", { name: messages.sales.summary.title })).toBeInTheDocument()'
       - id: case-3
         when: "Child owners stubbed"
         write: >
-          vi.mock("@/components/blocks/coding/CodingDomainStanding", () => ({ CodingDomainStanding:
-          () => <div data-testid="domain-standing" /> })) then
-          expect(screen.getByTestId("domain-standing")).toBeInTheDocument()
+          vi.mock("@/components/blocks/sales/SalesStanding", () => ({ SalesStanding: () => <div data-testid="standing" />
+          })) then expect(screen.getByTestId("standing")).toBeInTheDocument()
       - id: case-4
-        when: "Page composes without owning"
-        write: >
-          it("composes the connected cart block without owning its state", () => { render(<CartPage
-          />); expect(screen.getByTestId("cart-block")).toHaveTextContent("cart-block") })
+        when: "Accessibility"
+        write: 'expect(await axe(container)).toHaveNoViolations() once per connected screen'
       - id: case-5
         when: "State inventory"
         write: "pure specs iterate the exported X_STATES array to render every member"
     verification:
-      automated: []
+      automated:
+        - FE_SPEC_QUALITY
       manual: []
     relatedExamples:
       - connected-block
@@ -187,67 +149,59 @@ rules:
   - id: FE-TEST-4
     title: Names
     kind: mandatory
+    hfsRules: [R67]
     requirement: |
-      describe uses the export under test. it is a sentence about behaviour.
+      describe uses the export under test. it is a sentence about behavior. A describe of a cross-operation spec whose
+      it-blocks exercise several exports names the subject module (its file stem or its module path relative to src). A
+      subject with no own static named export is named by its file stem or its default export's local name.
     rationale: |
       Matching describe to the export ties failures to the half under measurement.
     cases:
       - id: case-1
         when: "describe"
-        write: >
-          the export under test: describe("CodingDomainPageBase", describe("CartBlock",
-          describe("CartPage route" (85 of 97 component.spec use the …Base name; 0 index.spec do)
+        write: 'the export under test: describe("SalesSummaryBase", ...), describe("SalesBlock", ...)'
       - id: case-2
         when: "it"
-        write: >
-          a sentence about behaviour: "keeps topic anatomy while composing connected standing and
-          problem owners", "maps cart states and dispatches browse, clear and checkout actions"
+        write: 'a sentence about behavior: "maps sales states and dispatches retry and export actions"'
       - id: case-3
-        when: "describe of a cross-operation spec whose it-blocks exercise two or more exports of the subject"
-        write: >
-          the subject MODULE: its file stem or its module path relative to src - describe("console"),
-          describe("console.interactions"), describe("modules/api/console"). One exercised export names that export.
-      - id: case-4
-        when: "describe of a subject with no own static named export (default export only; re-exports do not count)"
-        write: >
-          its file stem or its default export's local name - describe("request") for i18n/request.ts. Names
-          destructured from a call (export const { Link, redirect } = createNavigation(routing)) are exports.
+        when: "A module spec with several exports"
+        write: 'describe("modules/api/client", ...)'
     verification:
-      automated: []
+      automated:
+        - FE_SPEC_SUBJECT_AND_DESCRIBE
+        - FE_SPEC_QUALITY
       manual: []
     relatedExamples: []
 
   - id: FE-TEST-5
     title: Not asserted
     kind: mandatory
+    hfsRules: [R67, R60]
     requirement: |
-      Specs do not use snapshots, reach the network, assert translation copy, or pin literal class
-      strings in component/index specs. Class proof lives in classNames.spec.ts or Grammar style specs.
+      Specs do not use snapshots, reach the network, mock translations to return keys, assert copy strings, or pin literal
+      class strings in component and index specs. Class proof lives in classNames.spec.ts or Grammar style specs. A spec never
+      uses `as unknown as`; doubles are typed. A spec does not skip for a missing environment.
     rationale: |
-      Pinning presentation literals duplicates authority and turns correct scale moves into failures.
+      Pinning presentation literals duplicates authority and turns correct scale moves into failures, and casts keep stale
+      specs green.
     cases:
       - id: case-1
         when: "Snapshots"
-        write: "0 toMatchSnapshot / toMatchInlineSnapshot in src/"
+        write: "none; assert roles, text and props"
       - id: case-2
         when: "Network"
         write: >
-          never reached; mock hooks/<domain> in a visual spec, the declared feature public entry in an app
-          wrapper spec, or modules/api in the hook/transport spec that owns the request
+          never reached; mock hooks/<domain> in a visual spec, the declared feature public entry in an app wrapper spec, or
+          modules/api in the hook or transport spec that owns the request
       - id: case-3
-        when: "Translation content"
-        write: "useTranslations: () => (key: string) => key — a spec asserts keys, not copy"
-      - id: case-4
         when: "A literal class string in a component or index spec"
         write: >
-          Nothing. Assert the role, the text, or the prop handed down. A pinned literal duplicates the
-          presentation authority in a second place, so a class that moves onto the closed scale turns a
-          spec red for a correct change, and a class that is off the scale is locked in by the spec that
-          pins it. Class proof has its own homes: classNames.spec.ts beside the classes it proves, and
-          the Grammar package's own style spec. The specs that pin a literal anyway are the open
-          question below, not a second practice
+          Nothing. Assert the role, the text or the prop handed down. Class proof has its own homes: classNames.spec.ts beside
+          the classes it proves and the Grammar package's style spec.
     verification:
-      automated: []
+      automated:
+        - FE_SPEC_NO_SNAPSHOT
+        - FE_SPEC_QUALITY
       manual: []
     relatedExamples:
       - connected-block
@@ -255,44 +209,55 @@ rules:
   - id: FE-TEST-6
     title: Grammar package
     kind: mandatory
+    hfsRules: [R63]
     requirement: |
-      Grammar component behaviour uses collocated index.spec.tsx. Built output and package surface use
-      node:test against dist/. Family-wide proof lives in core/*family*.spec.tsx files.
+      Grammar component behavior uses collocated index.spec.tsx. Built output and package surface use node:test against
+      dist/. Family-wide proof lives in core/*family*.spec.tsx files.
     rationale: |
       Dist and peerDependency proofs keep the public package contract separate from component RTL specs.
     cases:
       - id: case-1
-        when: "Component behaviour"
-        write: "index.spec.tsx beside index.tsx (24)"
+        when: "Component behavior"
+        write: "index.spec.tsx beside index.tsx"
       - id: case-2
         when: "Built output"
-        write: >
-          common/index.test.mjs: import test from "node:test" … assert.equal(COMMON_UI_RULE_IDS.length,
-          117) against ../../dist/common/index.js
+        write: "common/index.test.mjs imports from ../../dist/common/index.js and asserts the exported inventories"
       - id: case-3
         when: "Package surface"
-        write: >
-          package-boundary.test.mjs: assert.deepEqual(Object.keys(packageJson.peerDependencies).sort(),
-          ["@heroui/react", "react"])
-      - id: case-4
-        when: "Family-wide proof"
-        write: "core/family.spec.tsx, core/surface-card-family.spec.tsx, core/scrollable-surfaces.spec.tsx"
+        write: "package-boundary.test.mjs asserts peerDependencies are exactly @heroui/react and react"
     verification:
       automated: []
       manual:
-        - Verify asserted export inventories against installed package dist, not former @grammar paths.
+        - Verify asserted export inventories against the installed package dist.
     relatedExamples: []
-openQuestions:
-  - id: minority-class-literal-pins
-    kind: residual
-    summary: |
-      A minority of component and index specs still pin a class literal. FE-TEST-5 Case 4 records the
-      majority as the rule and treats the rest as a standing debt against it rather than a second
-      practice; this file does not say which of them to delete first. The counts are in
-      https://github.com/starci183/starci-skills/blob/edf72554425f918e80c9205e9c6db10596e722f0/tests/evidence/20260903-consolidation.json.
-  - id: existing-units-single-spec-backlog
-    kind: residual
-    summary: |
-      FE-TEST-1 Case 7 binds meaningful coverage, not a two-file census. One-part units legitimately carry
-      one focused spec, and a connected block may also carry one spec when it actually covers both mapping
-      and render responsibilities. No second spec is inferred from a historical file count.
+
+  - id: FE-TEST-7
+    title: E2E shape
+    kind: mandatory
+    hfsRules: [R12, R66]
+    requirement: |
+      E2E is Playwright only, `*.e2e-spec.ts` under `e2e/<area>/`, with `e2e/{support,fixtures}/`, one root
+      `playwright.config.ts` and `tsconfig.e2e.json`. `testMatch` is `**/*.e2e-spec.ts`. The config defines projects for the
+      three viewports 1440x900, 768x1024 and 390x844. E2E runs by hand: the default tsconfig, lint and lint-staged exclude
+      e2e, husky runs no Playwright, coverage reads unit runs only, and a kept e2e workflow is `workflow_dispatch` only.
+      `typecheck:e2e` (`tsc -p tsconfig.e2e.json`) runs before `test:e2e`. An e2e spec has no absolute path, no docker call, no
+      write to another repository, no `test.skip` for a missing environment and no class-string pinning; helpers are typed.
+      The doubles that stand in for the backend are generated from the contract copy, and a double never answers 200 where the
+      real backend refuses.
+    rationale: |
+      E2E code that nobody type checks rots, and a double that hides a refused response hides the defect it should reveal.
+    cases:
+      - id: case-1
+        when: "A flow"
+        write: "e2e/sign-in/sign-in-refused.e2e-spec.ts asserts the refused state at the three viewports"
+      - id: case-2
+        when: "Scripts"
+        write: '"test:e2e": "npm run typecheck:e2e && playwright test"'
+    verification:
+      automated:
+        - FE_E2E_SHAPE
+        - HFS_E2E_IN_AUTOMATIC_GATE
+        - HFS_TEST_KIND_RETIRED
+      manual:
+        - Record which routes, viewports and backend the e2e run actually exercised.
+    relatedExamples: []

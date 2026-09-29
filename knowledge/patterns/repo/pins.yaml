@@ -1,0 +1,77 @@
+schema: starci/knowledge-source@1
+id: repo.pins
+title: Repository version pins
+purpose: |
+  Given a dependency version, who decides it? `knowledge/hfs/canon-pins.yaml` decides for every `@starci/*` package and every
+  core framework tool. A repository has one version of each dependency, pinned exactly.
+appliesTo:
+  - backend
+  - frontend
+family: repo
+provenance:
+  reviewedAt: 2026-09-29
+  sources:
+    - knowledge/hfs/README.md
+    - knowledge/hfs/canon-pins.yaml
+    - https://docs.npmjs.com/cli/v10/configuring-npm/package-json#overrides
+  limitations: |
+    A pin proves which versions are installed. It does not prove that the upgrade is safe for the product; the affected
+    checks and visual evidence do.
+rules:
+  - id: REPO-PINS-1
+    title: Exact versions from canon-pins
+    kind: mandatory
+    hfsRules: [R15]
+    requirement: |
+      `@starci/*`, TypeScript, Nest, Next, React, Prettier, ESLint, stylelint, Jest, Vitest and Playwright are at the exact
+      version in `canon-pins.yaml` for the repository's major. Dependencies are pinned exactly (no range) in `package.json`.
+      Raising a version is a change to `canon-pins.yaml` in `.claude` first; `hfs sync` then raises the repositories.
+    rationale: |
+      A repository green under one version while the agent grades under another wastes every cycle.
+    cases:
+      - id: case-1
+        when: A framework upgrade
+        write: Change canon-pins.yaml, land it in .claude, then run hfs sync in each repository with a visual check for a frontend.
+    verification:
+      automated:
+        - HFS_CANON_PIN_DRIFT
+      manual: []
+    relatedExamples: []
+  - id: REPO-PINS-2
+    title: One version of each dependency
+    kind: mandatory
+    hfsRules: [R14]
+    requirement: |
+      Each dependency has one version in the workspace. The root `overrides` fix react, next and grammar. A nested copy
+      (`apps/<app>/node_modules/@starci/grammar`) is forbidden. A dependency shared by several apps is declared identically in
+      each.
+    rationale: |
+      Two versions of one design system or framework in one bundle behave as two products.
+    cases:
+      - id: case-1
+        when: Two apps disagree on HeroUI
+        write: Align both to the one version and add it to overrides.
+    verification:
+      automated:
+        - HFS_DEP_VERSION_SKEW
+      manual: []
+    relatedExamples: []
+  - id: REPO-PINS-3
+    title: Packages come from the runtime checkout
+    kind: mandatory
+    hfsRules: [R15, R13]
+    requirement: |
+      `@starci/*` packages are consumed from the runtime checkout through `STARCI_HOME` in the workspace and in CI. They are not
+      published to a public registry. An owner may later choose a private registry; that changes the source of the packages, not
+      the pins.
+    rationale: |
+      CI can only run the same machine as the agents when it can obtain the same package builds.
+    cases:
+      - id: case-1
+        when: CI installs the canon
+        write: The workflow checks out the runtime repository and points STARCI_HOME at it before npm ci.
+    verification:
+      automated:
+        - HFS_CI_MISSING_CANON
+      manual: []
+    relatedExamples: []

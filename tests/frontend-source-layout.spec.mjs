@@ -18,7 +18,7 @@ function fixture(t,files){
   t.after(()=>fs.rmSync(root,{recursive:true,force:true}));
   const written=new Set();
   const write=(relative,value)=>{written.add(relative);const target=path.join(root,...relative.split('/'));fs.mkdirSync(path.dirname(target),{recursive:true});fs.writeFileSync(target,value);};
-  // HFS v1: a frontend repository is an apps/<app>/ monorepo on npm; all source lives under apps/web/src.
+  // HFS: a frontend repository is an apps/<app>/ monorepo on npm; all source lives under apps/web/src.
   write('.gitattributes','* text=auto eol=lf\n');
   write('.github/workflows/check.yml','name: check\n');
   write('.gitignore','node_modules/\n');
