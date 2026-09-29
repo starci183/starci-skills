@@ -1,6 +1,6 @@
 import type { LegRow, LegStatus, PipelineView } from '../../../contract';
 
-export const NODE_W = 164, NODE_H = 96, COL_GAP = 28, ROW_GAP = 14, PAD_X = 14, HEAD_H = 34, PAD_B = 14;
+export const NODE_H = 92, COL_GAP = 16, ROW_GAP = 12, PAD_X = 8, HEAD_H = 34, PAD_B = 14;
 
 export type PlacedLeg = { leg: LegRow; x: number; y: number; col: number };
 export type Column = { level: number; index: number; label: string; legs: LegRow[] };
@@ -38,11 +38,13 @@ export function reduceEdges(edges: PipelineView['edges']) {
 
 const doneLike = (status: LegStatus) => status === 'success';
 
-export function layoutPipeline(pipeline: PipelineView) {
+export function layoutPipeline(pipeline: PipelineView, availWidth = 1050) {
   const columns = buildColumns(pipeline.legs);
   const tallest = Math.max(1, ...columns.map(col => col.legs.length));
   const bodyH = tallest * NODE_H + (tallest - 1) * ROW_GAP;
-  const width = PAD_X * 2 + columns.length * NODE_W + Math.max(0, columns.length - 1) * COL_GAP;
+  const gaps = Math.max(0, columns.length - 1) * COL_GAP;
+  const NODE_W = Math.max(84, Math.min(190, Math.floor((availWidth - PAD_X * 2 - gaps) / Math.max(1, columns.length))));
+  const width = PAD_X * 2 + columns.length * NODE_W + gaps;
   const height = HEAD_H + bodyH + PAD_B;
   const placed = new Map<string, PlacedLeg>();
   for (const col of columns) {
@@ -59,7 +61,7 @@ export function layoutPipeline(pipeline: PipelineView) {
     edges.push({ from: edge.from, to: edge.to, path: `M${x1},${y1} C${x1 + dx},${y1} ${x2 - dx},${y2} ${x2},${y2}`,
       tone: b.leg.current ? 'current' : doneLike(a.leg.status) && doneLike(b.leg.status) ? 'done' : 'plain' });
   }
-  return { columns, placed, edges, width, height };
+  return { columns, placed, edges, width, height, nodeW: NODE_W };
 }
 
 export const legTries = (leg: LegRow) => {

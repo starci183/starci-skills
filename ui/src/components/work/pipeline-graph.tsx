@@ -1,10 +1,10 @@
-import { useEffect, useState, type KeyboardEvent } from 'react';
+import { useEffect, useRef, useState, type KeyboardEvent } from 'react';
 import type { LegRow, PipelineView } from '../../contract';
 import type { Concept } from '../concept';
 import { StatusChip } from '../status-chip';
 import { statusLabels, statusTone, toneVar, type Status } from '../status';
 import { AttemptDotsSvg } from './pipeline/attempt-dots';
-import { NODE_H, NODE_W, buildColumns, layoutPipeline, legTries } from './pipeline/layout';
+import { NODE_H, buildColumns, layoutPipeline, legTries } from './pipeline/layout';
 
 export const concept: Concept = 'C4';
 
@@ -46,33 +46,50 @@ export function PipelineGraph({ pipeline, selected, onSelect }: { pipeline: Pipe
 const edgeStroke = (tone: 'current' | 'done' | 'plain') => tone === 'current' ? toneVar('running') : tone === 'done' ? toneVar('success', '-line') : toneVar('skipped');
 
 function PipelineSvg({ pipeline, selected, onSelect }: { pipeline: PipelineView; selected: string | null; onSelect: (leg: LegRow) => void }) {
-  const { columns, placed, edges, width, height } = layoutPipeline(pipeline);
-  return <div className="overflow-x-auto" data-pipeline-graph>
-    <svg viewBox={`0 0 ${width} ${height}`} role="group" aria-label={`Chuỗi ${pipeline.legs.length} chặng, ${columns.length} cột`} className="block h-auto w-full" style={{ minWidth: Math.max(900, Math.round(width * 0.7)) }}>
+  const holder = useRef<HTMLDivElement>(null);
+  const [measured, setMeasured] = useState(1050);
+  useEffect(() => {
+    const el = holder.current; if (!el) return;
+    const read = () => setMeasured(Math.floor(el.getBoundingClientRect().width));
+    read();
+    const observer = new ResizeObserver(read); observer.observe(el);
+    return () => observer.disconnect();
+  }, []);
+  const avail = Math.max(900, measured);
+  const { columns, placed, edges, width, height, nodeW } = layoutPipeline(pipeline, avail);
+  const chars = Math.max(6, Math.floor((nodeW - 14) / 6.3));
+  const scrolls = measured < 900;
+  return <div className="relative" data-pipeline-graph data-scrolls={scrolls}>
+    <div ref={holder} className="overflow-x-auto">
+    <svg width={width} height={height} viewBox={`0 0 ${width} ${height}`} role="group" aria-label={`Chuỗi ${pipeline.legs.length} chặng, ${columns.length} cột`} className="block max-w-none">
       <defs>
-        {(['plain', 'current', 'done'] as const).map(kind => <marker key={kind} id={`pg-arrow-${kind}`} viewBox="0 0 8 8" refX="7" refY="4" markerWidth="7" markerHeight="7" orient="auto">
+        {(['plain', 'current', 'done'] as const).map(kind => <marker key={kind} id={`pg-arrow-${kind}`} viewBox="0 0 8 8" refX="7" refY="4" markerWidth="6" markerHeight="6" orient="auto">
           <path d="M0,0 L8,4 L0,8 z" fill={edgeStroke(kind)} /></marker>)}
       </defs>
-      {columns.map(col => <text key={col.level} x={placed.get(col.legs[0].op)!.x} y={18} fontSize="12" fontWeight="600" letterSpacing=".06em" className="fill-muted-foreground">{clip(`${col.index + 1}. ${col.label}`, 22)}</text>)}
+      {columns.map(col => <text key={col.level} x={placed.get(col.legs[0].op)!.x} y={18} fontSize="11" fontWeight="600" letterSpacing=".04em" className="fill-muted-foreground"><title>{`${col.index + 1}. ${col.label}`}</title>{clip(`${col.index + 1}. ${col.label.split(' · ')[0]}`, chars + 3)}</text>)}
       <g fill="none">{edges.map(edge => <path key={`${edge.from}>${edge.to}`} d={edge.path} markerEnd={`url(#pg-arrow-${edge.tone})`}
         stroke={edgeStroke(edge.tone)} strokeWidth={edge.tone === 'current' ? 2.2 : 1.4} opacity={edge.tone === 'plain' ? 0.55 : 1}><title>{`${edge.from} → ${edge.to}`}</title></path>)}</g>
       {[...placed.values()].map(({ leg, x, y }) => {
         const tone = statusTone[leg.status], isSel = selected === leg.op;
+        const [family, ...rest] = leg.op.split('.'); const verb = rest.join('.') || leg.op;
         return <g key={leg.op} transform={`translate(${x},${y})`} data-tone={tone} data-leg={leg.op} data-status={leg.status} role="button" tabIndex={0} className="group cursor-pointer outline-none"
           aria-label={`${leg.op}: ${statusLabels[leg.status]}, ${legSummary(leg)}${leg.current ? ', chặng hiện tại' : ''}`} aria-pressed={isSel}
           onClick={() => onSelect(leg)} onKeyDown={activate(leg, onSelect)}>
           <title>{`${leg.op} · ${statusLabels[leg.status]}${leg.deferred ? ` · ${leg.deferred}` : ''}`}</title>
-          {leg.current && <rect x={-4} y={-4} width={NODE_W + 8} height={NODE_H + 8} rx={13} fill="none" stroke={toneVar('running')} strokeWidth={2.5} />}
-          <rect width={NODE_W} height={NODE_H} rx={10} fill="var(--tone-bg)" stroke={isSel ? 'var(--primary)' : 'var(--tone-line)'} strokeWidth={isSel ? 2.5 : 1.5} strokeDasharray={dashed(leg.status) ? '5 4' : undefined} />
-          <rect x={-3} y={-3} width={NODE_W + 6} height={NODE_H + 6} rx={12} fill="none" stroke="var(--primary)" strokeWidth={2} className="opacity-0 group-focus-visible:opacity-100" />
-          <text x={12} y={25} fontSize="15" fontWeight="650" className="fill-foreground">{clip(leg.op, 19)}</text>
-          <circle cx={16} cy={42} r={4} fill="var(--tone)" />
-          <text x={26} y={46} fontSize="13" fontWeight="600" fill="var(--tone)">{statusLabels[leg.status]}</text>
-          <text x={12} y={65} fontSize="13" className="fill-muted-foreground">{clip(legSummary(leg), 24)}</text>
-          {leg.attempts.length > 0 && <AttemptDotsSvg attempts={leg.attempts} x={8} y={83} />}
+          {leg.current && <rect x={-4} y={-4} width={nodeW + 8} height={NODE_H + 8} rx={12} fill="none" stroke={toneVar('running')} strokeWidth={2.5} />}
+          <rect width={nodeW} height={NODE_H} rx={9} fill="var(--tone-bg)" stroke={isSel ? 'var(--primary)' : 'var(--tone-line)'} strokeWidth={isSel ? 2.5 : 1.5} strokeDasharray={dashed(leg.status) ? '5 4' : undefined} />
+          <rect x={-3} y={-3} width={nodeW + 6} height={NODE_H + 6} rx={11} fill="none" stroke="var(--primary)" strokeWidth={2} className="opacity-0 group-focus-visible:opacity-100" />
+          <text x={8} y={17} fontSize="11" fontWeight="600" letterSpacing=".05em" className="fill-muted-foreground">{clip(family.toUpperCase(), chars)}</text>
+          <text x={8} y={36} fontSize="14" fontWeight="700" className="fill-foreground">{clip(verb, chars)}</text>
+          <circle cx={13} cy={51} r={3.5} fill="var(--tone)" />
+          <text x={21} y={55} fontSize="11.5" fontWeight="600" fill="var(--tone)">{clip(statusLabels[leg.status], chars - 2)}</text>
+          <text x={8} y={71} fontSize="11.5" className="fill-muted-foreground">{clip(legSummary(leg), chars)}</text>
+          {leg.attempts.length > 0 && <AttemptDotsSvg attempts={leg.attempts} x={4} y={83} max={Math.max(3, Math.floor((nodeW - 8) / 12) - 1)} />}
         </g>;
       })}
     </svg>
+    </div>
+    {scrolls && <div aria-hidden="true" className="pointer-events-none absolute inset-y-0 right-0 w-10 bg-gradient-to-l from-card to-transparent" />}
   </div>;
 }
 
