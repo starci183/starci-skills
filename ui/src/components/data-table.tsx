@@ -1,9 +1,9 @@
 import type { ReactNode } from 'react';
 import { motion } from 'motion/react';
+import { Table } from '@heroui/react';
 import { DURATION, EASE } from './motion';
 import { Card, CardContent } from './ui/card';
 import { FeedbackState } from './feedback-state';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from './ui/table';
 import type { Concept } from './concept';
 
 export const concept: Concept = 'frame';
@@ -12,7 +12,6 @@ export type DataColumn<T> = { key: string; header: string; render: (row: T) => R
 
 const columnClass = (column: { className?: string; numeric?: boolean }) => [column.className, column.numeric ? 'text-right' : ''].filter(Boolean).join(' ');
 
-const MotionRow = motion.create(TableRow);
 const rowEnter = (index: number) => ({ initial: { opacity: 0, y: 6 }, animate: { opacity: 1, y: 0 }, transition: { duration: DURATION.base, ease: EASE, delay: Math.min(index, 12) * 0.03 } });
 
 export function DataTable<T>({ rows, columns, getKey, empty = 'Không có dữ liệu phù hợp.', caption }: {
@@ -21,10 +20,13 @@ export function DataTable<T>({ rows, columns, getKey, empty = 'Không có dữ l
   if (rows.length === 0) return <FeedbackState>{empty}</FeedbackState>;
   return <>
     <div className="data-table-desktop">
-      <Table>
-        {caption && <caption className="sr-only">{caption}</caption>}
-        <TableHeader><TableRow>{columns.map((column) => <TableHead key={column.key} className={columnClass(column)}>{column.header}</TableHead>)}</TableRow></TableHeader>
-        <TableBody>{rows.map((row, index) => <MotionRow key={getKey(row)} {...rowEnter(index)}>{columns.map((column) => <TableCell key={column.key} className={columnClass(column)}>{column.render(row)}</TableCell>)}</MotionRow>)}</TableBody>
+      <Table variant="secondary" className="st-table">
+        <Table.ScrollContainer>
+          <Table.Content aria-label={caption ?? 'Bảng dữ liệu'}>
+            <Table.Header data-slot="table-header">{columns.map((column, index) => <Table.Column id={column.key} key={column.key} isRowHeader={index === 0} data-slot="table-head" className={columnClass(column)}>{column.header}</Table.Column>)}</Table.Header>
+            <Table.Body data-slot="table-body">{rows.map((row) => <Table.Row id={String(getKey(row))} key={getKey(row)} data-slot="table-row">{columns.map((column) => <Table.Cell key={column.key} data-slot="table-cell" className={columnClass(column)}>{column.render(row)}</Table.Cell>)}</Table.Row>)}</Table.Body>
+          </Table.Content>
+        </Table.ScrollContainer>
       </Table>
     </div>
     <div className="data-table-mobile" role="list" aria-label={caption}>

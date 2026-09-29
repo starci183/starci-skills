@@ -63,7 +63,7 @@ export function TranscriptViewer({ project, attemptId, live }: { project: string
         <Input inputMode="numeric" value={jump} onChange={event => setJump(event.target.value.replace(/\D/g, ''))} placeholder="Dòng…" className="w-20" aria-label="Nhảy tới dòng" /><Button type="submit" variant="outline" disabled={!jump}>Đi</Button>
       </form>
       <Button type="button" variant="outline" onClick={copy} disabled={!lines.length}>{copied ? <Check className="size-4" /> : <Copy className="size-4" />} {copied ? 'Đã chép' : 'Chép'}</Button>
-      {data?.blob && <Button asChild variant="outline"><a href={data.blob.href} download={`attempt-${attemptId}.txt`}><ArrowDownToLine className="size-4" /> Tải .txt</a></Button>}
+      {data?.blob && <Button variant="outline" onClick={() => { const link = document.createElement('a'); link.href = data.blob!.href; link.download = `attempt-${attemptId}.txt`; link.click(); }}><ArrowDownToLine className="size-4" /> Tải .txt</Button>}
     </div>
     <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-muted-foreground">
       <span className="flex flex-wrap items-center gap-2">

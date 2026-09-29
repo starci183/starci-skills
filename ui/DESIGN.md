@@ -1,11 +1,11 @@
 # StarCi Operations Center — visual language
 
-The interface is a read-only operations product. It keeps the operational story visible and gives technical detail a consistent home in **Nâng cao**. The visual direction reference is `D:/starci-tmp/hfs/f4-handover/ui-purify/visual-direction.png`; its example data is illustrative only.
+The interface is a read-only operations product. It keeps the operational story visible and gives technical detail a consistent home in **Nâng cao**. HeroUI v3 supplies the interactive primitives (Button, Card, Chip, Input, ProgressBar, Modal and Table); the shared `components/ui` adapters keep the product's density and semantic status system. The blue logo in `public/logos/starci-next-blue.png` is based on the StarCiNext mark. The visual direction reference is `D:/starci-tmp/hfs/f4-handover/ui-purify/visual-direction.png`; its example data is illustrative only.
 
 ## Tokens
 
 - **Surfaces:** `--background` is the page canvas, `--card` the single raised reading surface, `--sidebar` the navigation chrome, and `--muted` a quiet hover or table header. Light uses near-white neutrals; dark uses distinct charcoal layers. Nesting does not add another boxed surface.
-- **Ink and lines:** `--foreground` carries primary text, `--muted-foreground` secondary facts, `--border` a solid hairline, `--input` a control edge, and `--ring` an unmistakable focus outline. Links and navigation use neutral ink. Shadows are absent in normal content.
+- **Ink and lines:** `--foreground` carries primary text, `--muted-foreground` secondary facts, `--border` a solid hairline, `--input` a control edge, and `--ring` an unmistakable blue focus outline. Brand actions and navigation selection use `--accent` blue; operational state still uses its own semantic colors. Shadows are absent in normal content.
 - **Status:** success green, running blue, queued neutral, failure/blocked red, retry/warning amber, awaiting owner violet. Deferred/skipped/planned may use dashed treatment. Semantic text colors must keep at least 4.5:1 contrast on their surfaces. File types and decoration stay neutral.
 - **Radius:** 12px for cards and drawers, 8px for controls, full radius for status pills. The border belongs to the outer surface only.
 - **Type:** Geist, page 28/34 (24 on phones), section 20/28 (18 on phones), card 16/24, body 14/22, meta 13/20, small 12/18. Weights are 650/620/600/400 respectively. Figures use tabular numerals; monospace is reserved for paths, identifiers, commands and raw evidence.

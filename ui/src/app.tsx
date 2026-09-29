@@ -1,5 +1,5 @@
 import { Suspense, lazy, useEffect, useState, type ComponentType } from 'react';
-import { Activity, BarChart3, BookOpen, CircleHelp, Database, Moon, PanelsTopLeft, ScrollText, Sun } from 'lucide-react';
+import { Activity, BarChart3, BookOpen, CircleHelp, Moon, PanelsTopLeft, ScrollText, Sun } from 'lucide-react';
 import { Button } from './components/ui/button';
 import { Enter } from './components/motion';
 import { Badge } from './components/ui/badge';
@@ -109,7 +109,7 @@ export default function App() {
   return <div className="app-shell">
     <aside className="shell-sidebar" aria-label="Điều hướng chính">
       <a className="shell-brand" href="#/" aria-label="StarCi · Tổng quan">
-        <span className="shell-brand-mark"><Database size={17} strokeWidth={2} aria-hidden="true" /></span>
+        <span className="shell-brand-mark"><img src="/logos/starci-next-blue.png" alt="" aria-hidden="true" /></span>
         <span><strong>StarCi</strong><small>AI Operations Center</small></span>
       </a>
       <nav className="shell-nav" aria-label="Trang">
