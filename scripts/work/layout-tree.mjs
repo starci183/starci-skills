@@ -1288,7 +1288,7 @@ export function layoutTreeMain(argv = []) {
       record.rev = (record.rev ?? 1) + 1;
       record.change = { rev: record.rev, kind: 'clarifying', at: now(), reason: `Brand lockup (${lockup.theme}) cropped from ${lockup.source.ref}.` };
       save(record);
-      return out({ ok: true, written: true, lockup }, `wrote ${slash(shellFileOf(workRoot))}: lockup ${lockup.path} from ${lockup.source.ref}`);
+      return out({ ok: true, written: true, lockup }, `wrote ${slash(shellFileOf(workRoot))}: lockup ${lockup.name} from ${lockup.source.ref}`);
     }
     if (command === 'destinations') {
       if (!isLayoutTree(existing)) return { exitCode: 1, text: 'destinations needs a work/layout-tree@1 record\n' };

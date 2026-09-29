@@ -6,7 +6,7 @@ import { createRequire } from 'node:module';
 import { parseYaml, stringifyYaml } from '../engine/yaml.mjs';
 import { checkShellConformance, isPlannedLayoutDrawing } from '../scripts/checks/shell-conformance.mjs';
 import { composeDirection } from '../scripts/work/compose-direction.mjs';
-import { layoutTreeMain, lockupSourceOf } from '../scripts/work/layout-tree.mjs';
+import { captureFileOf, layoutTreeMain, lockupSourceOf } from '../scripts/work/layout-tree.mjs';
 import { blankImage, cropImage, decodePng, drawOver, encodePng } from '../scripts/work/png.mjs';
 import { buildProduct, layoutCapture, settledProduct, uiSkeleton } from './fixtures/layout-tree.mjs';
 
@@ -95,9 +95,9 @@ test('brand.decide crops the lockup from the accepted layout composite, recordin
   const tree = readTree(p);
   assert.equal(tree.rev, before + 1);
   const [lockup] = tree.brand.lockups;
-  assert.equal(lockup.path, 'assets/lockups/lockup--light.png');
+  assert.equal(lockup.name, 'assets/lockups/lockup--light.png', 'a lockup is a blob citation {name, sha256}, never a file under shell/assets');
   assert.deepEqual(lockup.source, { ref: from, kind: 'layout-drawing', sha256: lockup.source.sha256, rect: { x: 1, y: 1, width: 6, height: 4 } });
-  const cropped = decodePng(fs.readFileSync(path.join(p.work, 'shell', lockup.path)));
+  const cropped = decodePng(fs.readFileSync(captureFileOf(path.join(p.work, 'shell'), lockup)));
   const expected = cropImage(decodePng(fs.readFileSync(path.join(dir, composite))), { x: 1, y: 1, width: 6, height: 4 });
   assert.deepEqual(Array.from(cropped.data), Array.from(expected.data), 'the lockup is exactly those pixels of the accepted drawing');
   assert.deepEqual(Array.from(cropped.data.subarray(0, 4)), MARK);
