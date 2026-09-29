@@ -14,6 +14,11 @@ import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { pushMain, pushFromScratch, nodeModulesRoots, describePush } from '../scripts/supervisor/push-mains.mjs';
 
+// git's repository-local variables (git rev-parse --local-env-vars) never reach a fixture: a hook or alias run in a linked
+// worktree exports GIT_DIR, and every fixture git then writes THAT repository whatever cwd or -C it names - a temp dir's
+// `git init` re-inited the live .claude repo core.bare=true (2026-09-29, tests/live-core-bare.spec.mjs).
+for (const key of ['GIT_DIR', 'GIT_COMMON_DIR', 'GIT_WORK_TREE', 'GIT_INDEX_FILE', 'GIT_OBJECT_DIRECTORY', 'GIT_ALTERNATE_OBJECT_DIRECTORIES', 'GIT_IMPLICIT_WORK_TREE', 'GIT_PREFIX', 'GIT_CONFIG', 'GIT_CONFIG_PARAMETERS', 'GIT_CONFIG_COUNT', 'GIT_GRAFT_FILE', 'GIT_NO_REPLACE_OBJECTS', 'GIT_REPLACE_REF_BASE', 'GIT_SHALLOW_FILE']) delete process.env[key];
+
 const json = (value) => JSON.stringify(value, null, 2);
 const gitIn = (cwd, ...args) => spawnSync('git', ['-C', cwd, ...args], { encoding: 'utf8', windowsHide: true });
 const gitOk = (cwd, ...args) => {

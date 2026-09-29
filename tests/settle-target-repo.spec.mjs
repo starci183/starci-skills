@@ -6,6 +6,11 @@ import path from 'node:path';
 import {spawnSync} from 'node:child_process';
 import {inspectLedger,ledgerFileFor,openLedger,ensureWorkflow,changeWorkflowPhase,insertGoal,createUnit,enqueueJob,setJobStatus,startAttempt,writeContract,fileReport,recordCheckRun} from '../engine/ledger-db.mjs';
 
+// git's repository-local variables (git rev-parse --local-env-vars) never reach a fixture: a hook or alias run in a linked
+// worktree exports GIT_DIR, and every fixture git then writes THAT repository whatever cwd or -C it names - a temp dir's
+// `git init` re-inited the live .claude repo core.bare=true (2026-09-29, tests/live-core-bare.spec.mjs).
+for(const key of ['GIT_DIR','GIT_COMMON_DIR','GIT_WORK_TREE','GIT_INDEX_FILE','GIT_OBJECT_DIRECTORY','GIT_ALTERNATE_OBJECT_DIRECTORIES','GIT_IMPLICIT_WORK_TREE','GIT_PREFIX','GIT_CONFIG','GIT_CONFIG_PARAMETERS','GIT_CONFIG_COUNT','GIT_GRAFT_FILE','GIT_NO_REPLACE_OBJECTS','GIT_REPLACE_REF_BASE','GIT_SHALLOW_FILE']) delete process.env[key];
+
 // settle's landed proof resolves each owned path against the job's target
 // repository (scripts/kernel/target-repo.mjs): a split be/fe project binding
 // under a tmp Source, both repos cloned from local bare origins, the ledger in

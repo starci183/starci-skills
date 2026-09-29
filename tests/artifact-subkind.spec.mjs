@@ -10,6 +10,11 @@ import { collectJobFiles } from '../scripts/kernel/job-artifacts.mjs';
 import { RECORDINGS_ROOT_ENV, defaultRecordRoot, recordingsRootOf } from '../scripts/uat/playwright-recording.mjs';
 import { LOG_TYPED_MISSING, openLogs, readLogs, rowsOfEvent, prepareLogRow, typedLogGaps, appendLog } from '../scripts/kernel/typed-logs.mjs';
 
+// git's repository-local variables (git rev-parse --local-env-vars) never reach a fixture: a hook or alias run in a linked
+// worktree exports GIT_DIR, and every fixture git then writes THAT repository whatever cwd or -C it names - a temp dir's
+// `git init` re-inited the live .claude repo core.bare=true (2026-09-29, tests/live-core-bare.spec.mjs).
+for (const key of ['GIT_DIR', 'GIT_COMMON_DIR', 'GIT_WORK_TREE', 'GIT_INDEX_FILE', 'GIT_OBJECT_DIRECTORY', 'GIT_ALTERNATE_OBJECT_DIRECTORIES', 'GIT_IMPLICIT_WORK_TREE', 'GIT_PREFIX', 'GIT_CONFIG', 'GIT_CONFIG_PARAMETERS', 'GIT_CONFIG_COUNT', 'GIT_GRAFT_FILE', 'GIT_NO_REPLACE_OBJECTS', 'GIT_REPLACE_REF_BASE', 'GIT_SHALLOW_FILE']) delete process.env[key];
+
 // The harness data contract's runtime half: job_artifacts.subkind (what produced a file) derived from facts only, its
 // additive migration and idempotent backfill, the Playwright recordings a job's uat-slots runs leave, the typed rows the
 // runtime derives itself (cmd.run per check, file.edit per patch file, render/video/trace per artifact) and the
