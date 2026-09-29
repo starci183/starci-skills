@@ -69,6 +69,22 @@ function useTheme(): [Theme, () => void] {
   return [theme, toggle];
 }
 
+/** Seconds since the last data refresh, re-rendered every second while the tab is visible. */
+function useAgeSeconds(at: number | null): number | null {
+  const [now, setNow] = useState(Date.now());
+  useEffect(() => {
+    const timer = setInterval(() => { if (!document.hidden) setNow(Date.now()); }, 1000);
+    return () => clearInterval(timer);
+  }, []);
+  return at == null ? null : Math.max(0, Math.round((now - at) / 1000));
+}
+
+function formatAge(seconds: number): string {
+  if (seconds < 90) return `${seconds} giây trước`;
+  if (seconds < 5400) return `${Math.round(seconds / 60)} phút trước`;
+  return `${Math.round(seconds / 3600)} giờ trước`;
+}
+
 export default function App() {
   const route = useRoute();
   const selected = navKind(route);
@@ -85,6 +101,7 @@ export default function App() {
   }, [route]);
 
   const observedAt = health.latestAt ?? contract.meta?.at ?? null;
+  const age = useAgeSeconds(health.latestAt);
   const isStale = health.staleCount > 0 || health.errorCount > 0 || Boolean(contract.error);
   const provenance = [health.sources.length ? `Nguồn: ${health.sources.slice(0, 8).join(', ')}${health.sources.length > 8 ? ` +${health.sources.length - 8}` : ''}` : 'Chưa có nguồn', health.stale.length ? `Chậm: ${health.stale.join(', ')}` : '', health.errorCount ? `${health.errorCount} nguồn lỗi` : ''].filter(Boolean).join(' · ');
   return <div className="app-shell">
@@ -107,8 +124,10 @@ export default function App() {
     <div className="shell-content">
       <header className="shell-header">
         <div className="shell-header-left">
-          <span className="shell-live" data-status={isStale ? 'stale' : live} title={`${isStale ? 'Một nguồn dữ liệu đang chậm hoặc lỗi' : live === 'live' ? 'Đang nhận cập nhật trực tiếp' : 'Đang cập nhật định kỳ'} · ${provenance}`}>
-            <span className="shell-live-dot" aria-hidden="true" />{isStale ? 'Nguồn chậm' : live === 'live' ? 'Trực tiếp' : live === 'hidden' ? 'Tạm dừng' : 'Định kỳ'}
+          <span className="shell-live" role="status" data-status={live} title={`${isStale ? 'Một nguồn dữ liệu đang chậm hoặc lỗi. ' : ''}${live === 'live' ? 'Đang nhận cập nhật trực tiếp (SSE)' : live === 'hidden' ? 'Tab đang ẩn nên tạm dừng cập nhật' : 'Đang thăm dò định kỳ'} · ${provenance}`}>
+            <span className="shell-live-dot" aria-hidden="true" />
+            <span>{live === 'live' ? 'Trực tiếp' : live === 'hidden' ? 'Tạm dừng' : 'Đang thăm dò'}</span>
+            {age != null && live !== 'hidden' ? <span className="shell-live-age">· {formatAge(age)}</span> : null}
           </span>
           <span className="shell-header-separator" aria-hidden="true" />
           <span className="shell-last-updated" title={provenance}>{observedAt == null ? 'Chưa có dữ liệu' : `Nguồn: ${formatAbsolute(observedAt)}`}</span>
