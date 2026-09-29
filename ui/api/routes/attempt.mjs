@@ -3,7 +3,7 @@ import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { artifactRoot, blobPath, getBlob } from '../../../scripts/lib/artifact-store.mjs';
 import { decodeText, textEncodingOf } from '../redact-read.mjs';
-import { usageOf } from '../pipeline.mjs';
+import { usageDetail, usageSince, mergeUsage } from './work.mjs';
 import { redactText } from '../../../scripts/lib/redact.mjs';
 import { parseYaml } from '../../../engine/yaml.mjs';
 import { transcriptWindow } from '../transcript-search.mjs';
@@ -194,7 +194,7 @@ function attemptDetail(store, ledger, db, row) {
     where: whereOf(ledger, raw, job, payload),
     input: inputOf(payload, job),
     files: filesOf(db, artifactRows, checks, ledger.name),
-    usage: usageOf(db, { attempt: row.attempt_id }),
+    usage: usageDetail(db, { attempt: row.attempt_id }),
     tryBudget: row.unit_id ? one(db, 'SELECT try_budget FROM work_units WHERE workflow_id=? AND unit_id=?', row.workflow_id, row.unit_id)?.try_budget ?? null : null,
     land: latestLand(db, row.workflow_id),
     report: report ? { id: report.report_id, outcome: report.outcome, json: parse(report.report_json),
@@ -270,11 +270,24 @@ function metricsOps(store, url) {
   });
 }
 
+/** Token usage in a window: per model, op, day (cost per day) and provider, merged across ledgers. Empty lists mean nothing recorded. */
+function metricsUsage(store, url) {
+  const project = url.searchParams.get('project');
+  const win = url.searchParams.get('window') === '24h' ? '24h' : '7d';
+  const parts = allLedgers(store, project, (_ledger, db) => [usageSince(db, Date.now() - (win === '24h' ? DAY : 7 * DAY))]);
+  const merged = key => mergeUsage(parts.map(part => part[key]));
+  const byDay = merged('byDay').sort((a, b) => String(a.k).localeCompare(String(b.k)));
+  const rank = (a, b) => (b.input + b.output) - (a.input + a.output);
+  return { window: win, recorded: parts.some(part => part.byModel.length > 0),
+    byModel: merged('byModel').sort(rank), byOp: merged('byOp').sort(rank), byProvider: merged('byProvider').sort(rank),
+    byDay, sources: [...new Set(parts.flatMap(part => part.sources))] };
+}
+
 /** Domain routes for dispatch, attempt, report, checks, verdict, and product land. */
 export async function handleAttempt(request, response, store, url) {
   const pathname = url.pathname;
   if (!store.machine) {
-    if (pathname.startsWith('/api/attempts') || pathname === '/api/media' || pathname === '/api/metrics/ops') {
+    if (pathname.startsWith('/api/attempts') || pathname === '/api/media' || pathname === '/api/metrics/ops' || pathname === '/api/metrics/usage') {
       sendError(request, response, 503, 'MACHINE_UNAVAILABLE', 'Machine database unavailable'); return true;
     }
     return false;
@@ -286,6 +299,9 @@ export async function handleAttempt(request, response, store, url) {
   if (pathname === '/api/media') {
     const result = page(listedMedia(store, url), url);
     sendJson(request, response, result.rows, { sources: store.projects().flatMap(ledger => source(ledger.name, 'v_media')), stale: staleOf(store), next: result.next }); return true;
+  }
+  if (pathname === '/api/metrics/usage') {
+    sendJson(request, response, metricsUsage(store, url), { sources: store.projects().flatMap(ledger => source(ledger.name, 'llm_usage', 'op_attempts')), stale: staleOf(store) }); return true;
   }
   if (pathname === '/api/metrics/ops') {
     sendJson(request, response, metricsOps(store, url), { sources: store.projects().flatMap(ledger => source(ledger.name, 'v_model_scorecard', 'v_op_history')), stale: staleOf(store) }); return true;

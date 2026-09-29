@@ -8,6 +8,9 @@ import { statusLabels, statusTone, type Status } from '../../status';
 import { statusFromUi } from '../../status';
 
 const order: Status[] = ['success', 'running', 'settling', 'queued', 'retry', 'failed', 'blocked', 'planned', 'deferred', 'external', 'dropped', 'unknown'];
+const stuckReasons: Record<string, string> = {
+  STALLED: 'đứng yên, không có tiến triển', OWNER_DECISION_OPEN: 'đang chờ chủ quyết định', SEAT_VACANT: 'ghế Kernel đang trống', SLA_CRITICAL: 'vi phạm SLA nghiêm trọng',
+};
 const fmt = (value: number) => new Intl.NumberFormat('vi-VN', { maximumFractionDigits: 1 }).format(value);
 
 /** Overall progress: one segment per leg in chain order, coloured by status, with a counted legend. */
@@ -32,12 +35,16 @@ export function WorkflowHeader({ row, pipeline }: { row: WorkflowDetailV2; pipel
     (pipeline?.failures ?? 0) > 0 && { key: 'f', status: 'failed' as Status, text: `${pipeline!.failures} lần thử hỏng` },
     row.counts.decisionsOpen > 0 && { key: 'd', status: 'retry' as Status, text: `${row.counts.decisionsOpen} quyết định đang chờ` },
   ].filter(Boolean) as { key: string; status: Status; text: string }[];
-  const phaseStatus: Status = row.phase === 'paused' || row.phase === 'stopped' ? 'queued' : statusFromUi(row.ui);
+  // A running workflow keeps the blue "Đang chạy" phase; being stuck or slow is a separate chip so red never mislabels the phase.
+  const running = row.phase === 'running';
+  const phaseStatus: Status = row.phase === 'paused' || row.phase === 'stopped' ? 'queued' : running ? 'running' : statusFromUi(row.ui);
+  const healthChip = running && (row.ui === 'bad' || row.ui === 'warn')
+    ? { status: (row.ui === 'bad' ? 'failed' : 'warning') as Status, text: `${row.ui === 'bad' ? 'Kẹt' : 'Cảnh báo'} · ${row.reason ? (stuckReasons[row.reason.code] ?? formatReason(row.reason)) : 'chưa ghi lý do'}` } : null;
   const phaseText = row.phase === 'paused' ? 'Tạm dừng' : row.phase === 'stopped' ? 'Đã dừng' : row.phase === 'running' ? 'Đang chạy' : row.phase;
   return <header className="space-y-3">
     <nav aria-label="Vị trí" className="flex flex-wrap items-center gap-1 text-sm text-muted-foreground"><a href="#/" className="inline-flex items-center gap-1 hover:text-foreground"><ArrowLeft className="size-4" /> Tổng quan</a><span aria-hidden="true">/</span><span>{row.project}</span></nav>
     <div className="flex flex-wrap items-center gap-x-3 gap-y-2"><h1 className="min-w-0 break-words text-2xl font-semibold tracking-tight sm:text-3xl">{row.name}</h1>
-      <StatusChip status={phaseStatus} label={phaseText} />{problems.map(item => <StatusChip key={item.key} status={item.status} label={item.text} />)}</div>
+      <StatusChip status={phaseStatus} label={phaseText} />{healthChip && <StatusChip status={healthChip.status} label={healthChip.text} />}{problems.map(item => <StatusChip key={item.key} status={item.status} label={item.text} />)}</div>
     <details className="rounded-lg border bg-card px-4 py-2.5 text-sm"><summary className="cursor-pointer list-none"><span className="font-medium">Mục tiêu · bản {row.goal.revision}</span><span className="ml-2 text-muted-foreground line-clamp-1 inline">{row.goal.text ? row.goal.text.slice(0, 160) : 'Chưa có mục tiêu được ghi nhận.'}</span></summary>
       <p className="mt-2 whitespace-pre-wrap break-words border-t pt-2 leading-relaxed">{row.goal.text || 'Chưa có mục tiêu được ghi nhận.'}</p></details>
     {pipeline && <div className="rounded-xl border bg-card p-4 shadow-sm"><LegProgress pipeline={pipeline} />

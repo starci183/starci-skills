@@ -1,7 +1,7 @@
 import type { Concept } from '../../concept';
 export const concept: Concept = 'C8';
 import { useState } from 'react';
-import { ChevronDownIcon, ChevronRightIcon } from 'lucide-react';
+import { ChevronDownIcon, ChevronRightIcon, LinkIcon } from 'lucide-react';
 import type { Tone } from '../../status';
 import { CopyButton, Frame, Toolbar, toolbarBtn, wordTone } from './common';
 import { TextView } from './text-view';
@@ -52,11 +52,13 @@ function Leaf({ v }: { v: Json }) {
   return <span data-tone="running" className="text-[var(--tone)]">{String(v)}</span>;
 }
 
+/** Hover-revealed on a mouse; on touch (coarse pointer) an always-visible icon pair at the end of the row, in flow so it never covers text. */
+const touchBtn = `${toolbarBtn} pointer-coarse:size-7 pointer-coarse:justify-center pointer-coarse:px-0`;
 function Actions({ value, path }: { value: Json; path: string }) {
   return (
-    <span className="absolute right-1 top-0 flex shrink-0 gap-1 rounded-md bg-card opacity-0 transition-opacity focus-within:opacity-100 group-hover/row:opacity-100">
-      <CopyButton value={() => typeof value === 'string' ? value : JSON.stringify(value, null, 2)} label="Giá trị" title="Chép giá trị" />
-      <CopyButton value={path} label="Đường dẫn" title={`Chép đường dẫn ${path}`} />
+    <span className="absolute right-1 top-0 flex shrink-0 gap-1 rounded-md bg-card opacity-0 transition-opacity focus-within:opacity-100 group-hover/row:opacity-100 pointer-coarse:static pointer-coarse:ml-auto pointer-coarse:bg-transparent pointer-coarse:opacity-100">
+      <CopyButton className={touchBtn} labelClassName="pointer-coarse:sr-only" value={() => typeof value === 'string' ? value : JSON.stringify(value, null, 2)} label="Giá trị" title="Chép giá trị" />
+      <CopyButton className={touchBtn} labelClassName="pointer-coarse:sr-only" icon={<LinkIcon className="size-3" />} value={path} label="Đường dẫn" title={`Chép đường dẫn ${path}`} />
     </span>
   );
 }
@@ -71,7 +73,7 @@ function Node({ k, v, path, depth, mode }: { k: string | number | null; v: Json;
   if (!container) {
     return (
       <div className="group/row relative flex items-start gap-1 py-px pl-4">
-        <span className="min-w-0 break-words">{label}<Leaf v={v} /></span>
+        <span className="min-w-0 flex-1 break-words">{label}<Leaf v={v} /></span>
         <Actions value={v} path={path} />
       </div>
     );

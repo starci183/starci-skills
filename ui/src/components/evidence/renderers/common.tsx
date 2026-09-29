@@ -18,14 +18,14 @@ export async function copyText(value: string): Promise<boolean> {
   } catch { return false; }
 }
 
-export function CopyButton({ value, label = 'Sao chép', title, className = toolbarBtn }: { value: string | (() => string); label?: string; title?: string; className?: string }) {
+export function CopyButton({ value, label = 'Sao chép', title, className = toolbarBtn, icon, labelClassName }: { value: string | (() => string); label?: string; title?: string; className?: string; icon?: ReactNode; labelClassName?: string }) {
   const [done, setDone] = useState(false);
   return (
-    <button type="button" className={className} title={title ?? label} onClick={async () => {
+    <button type="button" className={className} title={title ?? label} aria-label={title ?? label} onClick={async () => {
       if (await copyText(typeof value === 'function' ? value() : value)) { setDone(true); setTimeout(() => setDone(false), 1200); }
     }}>
-      {done ? <CheckIcon className="size-3" /> : <CopyIcon className="size-3" />}
-      <span>{done ? 'Đã chép' : label}</span>
+      {done ? <CheckIcon className="size-3" /> : (icon ?? <CopyIcon className="size-3" />)}
+      <span className={labelClassName}>{done ? 'Đã chép' : label}</span>
     </button>
   );
 }

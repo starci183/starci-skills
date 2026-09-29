@@ -1,7 +1,7 @@
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { artifactRoot } from '../../../scripts/lib/artifact-store.mjs';
-import { pipelineOf, usageOf } from '../pipeline.mjs';
+import { pipelineOf } from '../pipeline.mjs';
 import { getBlob } from '../../../scripts/lib/artifact-store.mjs';
 import { workflowStateOf } from '../../../scripts/kernel/progress-state.mjs';
 import { sendJson, sendError } from '../envelope.mjs';
@@ -145,6 +145,45 @@ function fleet(store, url) {
     violationsOpen,
   } };
 }
+const usageSums = p => `sum(${p}input_tokens) AS input,sum(${p}output_tokens) AS output,sum(${p}cache_read_tokens) AS cacheRead,sum(${p}cache_write_tokens) AS cacheWrite,
+    sum(${p}reasoning_tokens) AS reasoning,sum(${p}cost_usd) AS costUsd,sum(${p}turns) AS turns,sum(${p}tool_calls) AS toolCalls,sum(${p}tool_errors) AS toolErrors,count(*) AS n`;
+const usageOrder = p => `coalesce(sum(${p}input_tokens),0)+coalesce(sum(${p}output_tokens),0) DESC`;
+const usageTotal = rows => {
+  const sum = key => rows.reduce((acc, r) => acc + (r[key] ?? 0), 0);
+  return rows.length ? { input: sum('input'), output: sum('output'), cacheRead: sum('cacheRead'), cacheWrite: sum('cacheWrite'), reasoning: sum('reasoning'),
+    costUsd: rows.some(r => r.costUsd != null) ? sum('costUsd') : null, turns: sum('turns'), toolCalls: sum('toolCalls'), toolErrors: sum('toolErrors') } : null;
+};
+const MODEL_OF = 'coalesce(u.response_model,u.request_model,u.provider)';
+/** v3 token usage of one workflow or attempt: per model, per op (leg), per row (attempt) and source labels. Extends the v2 shape. */
+export function usageDetail(db, { wf = null, attempt = null } = {}) {
+  const where = attempt != null ? 'u.attempt_id=?' : 'u.workflow_id=?';
+  const arg = attempt != null ? attempt : wf;
+  const byModel = many(db, `SELECT ${MODEL_OF} AS model,u.subject_type,u.provider,${usageSums('u.')} FROM llm_usage u WHERE ${where} GROUP BY 1,2,3 ORDER BY ${usageOrder('u.')}`, arg);
+  const byOp = many(db, `SELECT coalesce(a.op_id,'kernel') AS op,${usageSums('u.')} FROM llm_usage u LEFT JOIN op_attempts a ON a.attempt_id=u.attempt_id WHERE ${where} GROUP BY 1 ORDER BY ${usageOrder('u.')}`, arg);
+  const rows = attempt != null ? many(db, `SELECT usage_id AS id,subject_type,provider,request_model AS requestModel,response_model AS responseModel,source,at,
+    input_tokens AS input,output_tokens AS output,cache_read_tokens AS cacheRead,cache_write_tokens AS cacheWrite,reasoning_tokens AS reasoning,
+    cost_usd AS costUsd,turns,tool_calls AS toolCalls,tool_errors AS toolErrors FROM llm_usage u WHERE ${where} ORDER BY at,usage_id`, arg) : [];
+  const sources = many(db, `SELECT DISTINCT source FROM llm_usage u WHERE ${where}`, arg).map(r => r.source);
+  return { recorded: byModel.length > 0, byModel, byOp, rows, sources, total: usageTotal(byModel) };
+}
+/** Usage since a timestamp for one ledger: grouped per provider, model, op and Vietnam-time day (fleet KPI and analytics). */
+export function usageSince(db, since, project = null) {
+  const q = (key, join = '') => many(db, `SELECT ${key} AS k,${usageSums('u.')} FROM llm_usage u ${join} WHERE u.at>=? GROUP BY 1`, since);
+  return { project,
+    byProvider: q('u.provider'), byModel: q(MODEL_OF), byOp: q("coalesce(a.op_id,'kernel')", 'LEFT JOIN op_attempts a ON a.attempt_id=u.attempt_id'),
+    byDay: q("strftime('%Y-%m-%d',u.at/1000,'unixepoch','+7 hours')"), sources: many(db, 'SELECT DISTINCT source FROM llm_usage WHERE at>=?', since).map(r => r.source) };
+}
+/** Merge several ledgers' grouped rows (key `k`) into one list, largest first. */
+export function mergeUsage(lists) {
+  const map = new Map();
+  for (const row of lists.flat()) {
+    const cur = map.get(row.k) ?? { k: row.k, input: 0, output: 0, cacheRead: 0, cacheWrite: 0, reasoning: 0, costUsd: null, turns: 0, toolCalls: 0, toolErrors: 0, n: 0 };
+    for (const key of ['input', 'output', 'cacheRead', 'cacheWrite', 'reasoning', 'turns', 'toolCalls', 'toolErrors', 'n']) cur[key] += row[key] ?? 0;
+    if (row.costUsd != null) cur.costUsd = (cur.costUsd ?? 0) + row.costUsd;
+    map.set(row.k, cur);
+  }
+  return [...map.values()];
+}
 function fleetSummary(store) {
   const since = Date.now() - DAY;
   const rows = ledgerRows(store, (row, db) => many(db, 'SELECT attempt_id,workflow_id,op_id,model,pool,agent,verdict,report_outcome,reported_at,dispatched_at,settled_at FROM v_op_history WHERE dispatched_at>=? OR settled_at IS NULL', since).map(a => ({ ...a, project: row.name })));
@@ -152,7 +191,8 @@ function fleetSummary(store) {
   const models = new Map();
   for (const a of open) { const key = a.model ?? a.pool ?? 'unknown'; const m = models.get(key) ?? { model: a.model, pool: a.pool, agent: a.agent, running: 0 }; m.running++; models.set(key, m); }
   const unitsQueued = ledgerRows(store, (_row, db) => [one(db, "SELECT count(*) AS n FROM work_units u JOIN workflows w USING(workflow_id) WHERE u.state IN ('planned','queued') AND w.phase='running'")?.n ?? 0]).reduce((a, b) => a + b, 0);
-  const usage = ledgerRows(store, (_row, db) => [one(db, 'SELECT sum(input_tokens) AS i,sum(output_tokens) AS o,sum(cost_usd) AS c,count(*) AS n FROM llm_usage WHERE at>=?', since)]);
+  const usage = ledgerRows(store, (_row, db) => [usageSince(db, since)]);
+  const total = mergeUsage(usage.map(u => u.byProvider.map(r => ({ ...r, k: 'all' }))))[0] ?? null;
   return {
     opsRunning: open.filter(a => !(a.reported_at != null || a.report_outcome)).length,
     opsSettling: open.filter(a => a.reported_at != null || a.report_outcome).length,
@@ -160,7 +200,9 @@ function fleetSummary(store) {
     failed24h: rows.filter(a => a.settled_at >= since && a.verdict && a.verdict !== 'pass').length,
     passed24h: rows.filter(a => a.settled_at >= since && a.verdict === 'pass').length,
     models: [...models.values()].sort((a, b) => b.running - a.running),
-    usage24h: { recorded: usage.some(u => u?.n), inputTokens: usage.reduce((s, u) => s + (u?.i ?? 0), 0), outputTokens: usage.reduce((s, u) => s + (u?.o ?? 0), 0), costUsd: usage.some(u => u?.c != null) ? usage.reduce((s, u) => s + (u?.c ?? 0), 0) : null },
+    usage24h: { recorded: Boolean(total?.n), inputTokens: total?.input ?? 0, outputTokens: total?.output ?? 0, costUsd: total?.costUsd ?? null,
+      cacheRead: total?.cacheRead ?? 0, cacheWrite: total?.cacheWrite ?? 0, reasoning: total?.reasoning ?? 0, turns: total?.turns ?? 0, toolCalls: total?.toolCalls ?? 0,
+      byProvider: mergeUsage(usage.map(u => u.byProvider)).sort((a, b) => (b.input + b.output) - (a.input + a.output)).map(({ k, ...r }) => ({ provider: k, ...r })), sources: [...new Set(usage.flatMap(u => u.sources))] },
   };
 }
 function projects(store) {
@@ -221,7 +263,7 @@ function detail(store, row, db, wf) {
     phaseReason: p.phase_reason ?? lifecycle?.reason ?? null,
     kernelRev: seat ? { current: seat.kernel_rev ?? '', acked: seat.acked_rev ?? null, stale: Boolean(seat.kernel_rev && seat.acked_rev && seat.kernel_rev !== seat.acked_rev) } : null,
     blockedBy: blockedBy(store, row, db, wf), counts,
-    where: whereOf(store, row, wf), usage: usageOf(db, { wf }),
+    where: whereOf(store, row, wf), usage: usageDetail(db, { wf }),
   };
 }
 function whereOf(store, row, wf) {
@@ -356,7 +398,7 @@ export function handleWork(request, response, store, url) {
     sendJson(request, response, graph(db, row.name, wf), { sources: source(row.name, 'v_units', 'unit_edges', 'v_op_history'), stale: staleOf(store) }); return true;
   }
   if (route === 'pipeline') {
-    sendJson(request, response, { ...pipelineOf(db, row.name, wf), usage: usageOf(db, { wf }) }, { sources: source(row.name, 'goals', 'work_units', 'v_op_history', 'work_graph_versions', 'logs', 'events', 'llm_usage'), stale: staleOf(store) }); return true;
+    sendJson(request, response, { ...pipelineOf(db, row.name, wf), usage: usageDetail(db, { wf }) }, { sources: source(row.name, 'goals', 'work_units', 'v_op_history', 'work_graph_versions', 'logs', 'events', 'llm_usage'), stale: staleOf(store) }); return true;
   }
   if (route === 'units') {
     if (extra) {
