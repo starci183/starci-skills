@@ -13,6 +13,13 @@
 //                                 A workflow whose goal text is missing or unrendered (INV-W4) gets no seat and a DI
 //                                 goal-text-missing for the Supervisor. More than maxReplacementsPerHour replacements
 //                                 -> quarantined + DI seat-unrecoverable.
+//                                 Each pass also retries the close of every replaced Kernel terminal an open
+//                                 kernel-stale-terminal-unclosed incident names (staleTerminalStep): start-workflow
+//                                 closes the old seat once, and a terminal Orca reads disconnected but still lists
+//                                 (a persisted tab) is no proof it is gone. The retry is close-verify.mjs --tree,
+//                                 proof is 'gone' or a listing without the handle, and on proof the incident is
+//                                 resolved --by supervisor through api incident. Retries back off (STALE_RETRY_MS
+//                                 doubling to STALE_RETRY_MAX_MS); STALE_ESCALATE_TRIES failures -> one DI.
 //   seat:supervisor               scripts/supervisor/watchdog.mjs --once --json (nothing in config.yaml supervisor.mode chat).
 //                                 Both seat kinds carry a TURN BUDGET (turnStep): busy in one turn (its spinner timer)
 //                                 past allocation.liveness.kernelTurnBudgetMs (Supervisor: supervisorTurnBudgetMs) ->
@@ -58,6 +65,29 @@ export const NEEDS_REPAIR = new Set(['restart-needed', 'wake-needed', 'queued-in
 // A --repair answer that replaced (or tried to replace) the Kernel.
 export const REPLACED = new Set(['restarted', 'restart-failed']);
 const DOWN_BEFORE_BOOT = new Set(['failed', 'backoff', 'starting', 'quarantined']);
+export const STALE_TERMINAL_CODE = 'kernel-stale-terminal-unclosed';
+export const STALE_RETRY_MS = 5 * 60_000;
+export const STALE_RETRY_MAX_MS = 60 * 60_000;
+export const STALE_ESCALATE_TRIES = 6;
+export const CLOSE_VERIFY = 'scripts/lib/close-verify.mjs';
+export const TERMINAL_LIST = 'scripts/api/orca/terminal-list.mjs';
+
+/**
+ * The replaced Kernel terminals of a workflow's open kernel-stale-terminal-unclosed incidents:
+ * [{incidentId, handle}], never the seat's live terminal. `rows` are incidents rows {incident_id, last_progress}
+ * whose last_progress is `[orca-tree] {"code": ..., "handle": ...}`. Pure.
+ */
+export function staleTerminalsOf(rows, { liveHandle = null } = {}) {
+  const out = [];
+  for (const r of rows ?? []) {
+    const text = String(r?.last_progress ?? '');
+    let body = null;
+    try { body = JSON.parse(text.slice(text.indexOf('{'))); } catch { body = null; }
+    if (body?.code !== STALE_TERMINAL_CODE || !body.handle || body.handle === liveHandle) continue;
+    out.push({ incidentId: r.incident_id, handle: String(body.handle) });
+  }
+  return out;
+}
 
 /** The seat state a watchdog action puts the seat in (DESIGN 9.4). Pure. */
 export function seatStateOf(action) {
@@ -173,11 +203,17 @@ export function createHostController(deps = {}) {
   });
   const orcaTerminals = deps.orcaTerminals ?? (async () => (await probeOrcaAsync({ timeoutMs: settings().services.orca?.probeTimeoutMs ?? 30_000 })).terminals ?? null);
   const supervisorMode = deps.supervisorMode ?? (async () => { try { return (await import('../../supervisor/home.mjs')).supervisorMode(); } catch { return 'chat'; } });
+  // The handles a responding Orca lists, or null when it does not answer (read-only: runs in both modes).
+  const terminalHandles = deps.terminalHandles ?? (async () => {
+    const r = await runChild(process.execPath, [path.join(SKILL_ROOT, TERMINAL_LIST)], { timeoutMs: 60_000 });
+    const v = lastJson(r.stdout);
+    return v?.ok === true ? new Set((v.terminals ?? []).map((t) => t?.handle).filter(Boolean)) : null;
+  });
   const checkLedger = deps.quickCheck ?? quickCheck;
   const isBackupDue = deps.backupDue ?? backupDue;
 
   const bootIdOf = deps.bootId ?? (() => hostBootId());
-  const state = { bootPending: null, lastProcessesAt: 0, orphanClocks: new Set(), backupDay: new Map(), clocks: new Map() };
+  const state = { bootPending: null, lastProcessesAt: 0, orphanClocks: new Set(), backupDay: new Map(), clocks: new Map(), staleCloses: new Map() };
   // SLA clocks are sent on an edge only (ctx.clock when a clock starts, ctx.clear when it stops), as the other
   // controllers do; after an engine restart each clock state is sent once more.
   const clock = async (ctx, entity, st, slaMs, meta) => {
@@ -371,9 +407,72 @@ export function createHostController(deps = {}) {
       if (states.includes(seat)) await clock(ctx, key, code, slaMs, { code, owner: 'host-controller', ledgerId, workflowId, action });
       else await clear(ctx, key, code);
     }
+    const stale = seat === 'hostOutage' ? null : await staleTerminalStep(ctx, { ledgerId, workflowId, liveHandle: seatOut?.terminal ?? null });
     const turn = seat === 'live' && action !== 'woken' ? await turnBudget(ctx, { key, rec: next, terminal: seatOut?.terminal ?? null, ledgerId, workflowId, repo: ledger.repo, supervisor: false }) : await endTurn(ctx, key, next);
     store().put(next);
-    return { ok: true, action, seat, acted, replaced, ...(turn ? { turn } : {}) };
+    return { ok: true, action, seat, acted, replaced, ...(turn ? { turn } : {}), ...(stale?.length ? { staleTerminals: stale } : {}) };
+  }
+
+  /**
+   * The retry start-workflow never had: every replaced Kernel terminal an open kernel-stale-terminal-unclosed
+   * incident of this workflow names is closed again (close-verify.mjs --tree) and the incident resolved once the
+   * terminal is proven gone - show says gone, or a responding Orca no longer lists it. 'disconnected' alone is no
+   * proof: Orca keeps a disconnected terminal's persisted tab (wf-nivo-auth-mum8xr9a inc-11df8ae56795 stayed open
+   * 65+ min on {proof: disconnected, attempts: 1}). The seat's own terminal is never touched.
+   */
+  async function staleTerminalStep(ctx, { ledgerId, workflowId, liveHandle }) {
+    const now = ctx.now();
+    let found = null;
+    try {
+      found = await ctx.read(ledgerId, (db) => {
+        const rows = db.prepare("SELECT incident_id, last_progress FROM incidents WHERE workflow_id=? AND status='open' AND last_progress LIKE ?").all(workflowId, `%${STALE_TERMINAL_CODE}%`);
+        let seatHandle = null;
+        try { seatHandle = JSON.parse(db.prepare("SELECT value_json FROM signals WHERE scope='kernel' AND key=?").get(workflowId)?.value_json ?? 'null')?.terminal ?? null; } catch { seatHandle = null; }
+        return { rows, seatHandle };
+      });
+    } catch { return null; }
+    const due = [];
+    for (const t of staleTerminalsOf(found?.rows, { liveHandle })) {
+      if (t.handle === found.seatHandle) continue;
+      const k = `${ledgerId}|${t.incidentId}`, prev = state.staleCloses.get(k);
+      if (prev && now < prev.nextAt) continue;
+      due.push({ ...t, k, tries: prev?.tries ?? 0 });
+    }
+    if (!due.length) return null;
+    const out = [];
+    for (const t of due) {
+      const r = await ctx.run('node', [CLOSE_VERIFY, '--terminal', t.handle, '--owner', 'reconciler/host', '--tree', '--log', '--json'], { timeoutMs: 90_000 });
+      if (r?.shadow) { out.push({ incidentId: t.incidentId, handle: t.handle, shadow: true }); continue; }
+      const closed = outputOf(r) ?? {};
+      let proof = closed.proof === 'gone' ? 'gone' : null, reason = closed.reason ?? closed.error ?? null;
+      if (!proof && closed.ok === true) {
+        let listed = null;
+        try { listed = await terminalHandles(); } catch { listed = null; }
+        if (listed && !listed.has(t.handle)) proof = 'unlisted';
+        else reason = listed ? 'terminal-still-listed' : 'terminal-list-unavailable';
+      }
+      if (proof) {
+        state.staleCloses.delete(t.k);
+        const resolved = await ctx.api(ledgerId, 'incident', ['--workflow', workflowId, '--resolve', t.incidentId, '--by', 'supervisor',
+          '--detail', `host controller closed replaced Kernel terminal ${t.handle} (proof ${proof}, close-verify --tree)`], { timeoutMs: 60_000 });
+        ctx.log('reconciler.host.stale-terminal', `${workflowId}: replaced Kernel terminal ${t.handle} closed (${proof}); ${t.incidentId} resolved`, { ledgerId, workflowId, handle: t.handle, incidentId: t.incidentId, proof, api: resolved?.ok ?? null });
+        out.push({ incidentId: t.incidentId, handle: t.handle, closed: true, proof, resolved: resolved?.ok === true });
+        continue;
+      }
+      const tries = t.tries + 1;
+      state.staleCloses.set(t.k, { tries, nextAt: now + Math.min(STALE_RETRY_MAX_MS, STALE_RETRY_MS * 2 ** (tries - 1)) });
+      ctx.log('reconciler.host.stale-terminal', `${workflowId}: replaced Kernel terminal ${t.handle} still not closed (${reason ?? closed.proof ?? 'no proof'}; try ${tries})`, { ledgerId, workflowId, handle: t.handle, incidentId: t.incidentId, tries, reason, proof: closed.proof ?? null });
+      if (tries === STALE_ESCALATE_TRIES) {
+        await ctx.openDecision(di({
+          kind: 'runtime-defect', ledger: ledgerId, workflowId, entity: { type: 'terminal', id: t.handle }, idempotencyKey: `${STALE_TERMINAL_CODE}:${ledgerId}:${t.incidentId}`,
+          summary: `${workflowId}: replaced Kernel terminal ${t.handle} still not closed after ${tries} verified closes (${reason ?? 'no proof'}); ${t.incidentId} stays open`,
+          evidence: [{ ref: `incident:${t.incidentId}` }, { ref: `terminal:${t.handle}` }],
+          options: [{ key: 'close', verb: `node ${CLOSE_VERIFY} --terminal ${t.handle} --tree --log`, recommended: true }], allowedVerbs: [],
+        }));
+      }
+      out.push({ incidentId: t.incidentId, handle: t.handle, closed: false, tries, reason });
+    }
+    return out;
   }
 
   async function reconcileSupervisorSeat(ctx) {
