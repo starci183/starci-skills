@@ -26,8 +26,8 @@ identity:
   implements: Common contract
   notes: |
     StarCi Core implements the Common contract; it is not the parent of Common or of any other family.
-    CORE_GRAMMAR_COMPONENTS remains only a compatibility alias to COMMON_GRAMMAR_COMPONENTS, which holds
-    95 renderers at 0.5.0 (42 base, 20 forms, 14 overlays, 19 navigation). Core replaces only
+    COMMON_GRAMMAR_COMPONENTS holds 95 renderers at 0.5.0 (42 base, 20 forms, 14 overlays, 19 navigation)
+    and is the only component registry. Core replaces only
     GrammarRoot and extends nothing. `coreRuleConformance` inherits all 150 Common rule ids and claims
     no family evidence.
   applicableUiRules:

@@ -31,11 +31,6 @@ export {
     type StarCiCoreTokenName,
 } from "./dna.js"
 
-/** @deprecated Use COMMON_GRAMMAR_COMPONENTS from `@starci/grammar/common`. */
-export const CORE_GRAMMAR_COMPONENTS = COMMON_GRAMMAR_COMPONENTS
-
-export type CoreGrammarComponentName = keyof typeof CORE_GRAMMAR_COMPONENTS
-
 /** StarCi Core is one visual family implementing the Common contract. */
 const CoreGrammarRootRenderer: GrammarComponentRenderer<GrammarRootProps> = (props) => {
     const CommonGrammarRoot = COMMON_GRAMMAR_COMPONENTS.GrammarRoot

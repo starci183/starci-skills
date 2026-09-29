@@ -137,9 +137,9 @@ Inspected Academy backend `1731b15ba4ed526477e3c572b9d82c31ab64f1d5`:
 | `apps/core/src/app.module.ts` composes features, named databases and platform facilities | Retain thin composition and named identity; global registration is deliberate, not universal. |
 | `src/features/api/core/graphql/mutations/courses/add-to-cart/` splits resolver, forwarding service, message, handler and dynamic module | Retain protocol/use-case separation; remove mandatory forwarding/template/dynamic-module boilerplate from the standard. |
 | `src/modules/platform/cqrs/icqrs-handler.ts` forwards `execute` to `process` | Existing API remains supported; forwarding alone does not justify a mandatory base for new code. |
-| Academy `primary.module-definition.ts` (then under the retired `databases` tier, now `platform`) has real typed database options | Valid configurable-module example; an empty-options feature definition is not equivalent. |
+| Academy `primary.module-definition.ts` (now under `platform`) has real typed database options | Valid configurable-module example; an empty-options feature definition is not equivalent. |
 | Add-to-cart checks then saves; GraphQL request declares `ID`; response uses ORM entity | Those shapes do not prove concurrent idempotency, semantic validation or a safe public projection. Require the actual constraints and behavioral evidence. |
-| Academy `community-outbox-publisher.service.ts` (then under the retired `bussiness` tier, now `domain`) claims a row, emits locally, then updates by id | Atomic outbox creation is useful; this source alone does not prove durable subscriber acknowledgement or stale-claim settlement rejection. |
+| Academy `community-outbox-publisher.service.ts` (now under `domain`) claims a row, emits locally, then updates by id | Atomic outbox creation is useful; this source alone does not prove durable subscriber acknowledgement or stale-claim settlement rejection. |
 
 Read-only Nivo saga inspection also found the external step precedes local fenced acknowledgement. That is a recovery case to investigate, not evidence that the remote resource honors the fence. This runtime change does not claim those product defects are repaired.
 

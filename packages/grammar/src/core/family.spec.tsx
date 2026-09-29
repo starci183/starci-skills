@@ -1,15 +1,15 @@
 import { renderToStaticMarkup } from "react-dom/server"
 import type { ComponentProps } from "react"
 import { describe, expect, it } from "vitest"
+import { COMMON_GRAMMAR_COMPONENTS } from "../common/index.js"
 import {
-    CORE_GRAMMAR_COMPONENTS,
     defineGrammarFamily,
     type GrammarComponentRenderer,
 } from "./index.js"
 
 describe("@starci/grammar/core family registry", () => {
     it("registers the public Common renderer surface", () => {
-        expect(Object.keys(CORE_GRAMMAR_COMPONENTS)).toEqual(expect.arrayContaining([
+        expect(Object.keys(COMMON_GRAMMAR_COMPONENTS)).toEqual(expect.arrayContaining([
             "GrammarRoot",
             "Button",
             "Heading",
@@ -17,14 +17,14 @@ describe("@starci/grammar/core family registry", () => {
             "TextAction",
             "WorkspaceShell",
         ]))
-        expect(CORE_GRAMMAR_COMPONENTS).not.toHaveProperty("DashboardShell")
-        expect(Object.isFrozen(CORE_GRAMMAR_COMPONENTS)).toBe(true)
+        expect(COMMON_GRAMMAR_COMPONENTS).not.toHaveProperty("DashboardShell")
+        expect(Object.isFrozen(COMMON_GRAMMAR_COMPONENTS)).toBe(true)
     })
 
     it("resolves a props-compatible replacement and a declared extension", () => {
         const ReplacementHeading: GrammarComponentRenderer<
-            ComponentProps<typeof CORE_GRAMMAR_COMPONENTS.Heading>
-        > = (props) => <CORE_GRAMMAR_COMPONENTS.Heading {...props} />
+            ComponentProps<typeof COMMON_GRAMMAR_COMPONENTS.Heading>
+        > = (props) => <COMMON_GRAMMAR_COMPONENTS.Heading {...props} />
         const Brand = ({ name }: { readonly name: string }) => <span>{name}</span>
         const family = defineGrammarFamily({
             id: "heritage",

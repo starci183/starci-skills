@@ -100,10 +100,9 @@ apps/<app>/                          # frontend: one workspace package
 └── tests/{fixtures,e2e}/            # e2e/<area>/*.e2e-spec.ts, e2e/setup/, e2e/live/ (opt-in)
 ```
 
-Only the three module tiers exist - `bussiness`, `business`, `core`, `shared`,
-`lib`, `ai`, `expert`, `init` and any other tier name are forbidden; old tiers
-map by responsibility (business rules to `domain`, technical runtime to
-`platform`, provider/protocol clients to `integrations`).
+Only the three module tiers exist: `domain` (business rules), `platform`
+(technical runtime), `integrations` (provider/protocol clients). Any other tier
+name is forbidden.
 
 ```text
 <backend>/.starciwork/               # product records only, backend repository only

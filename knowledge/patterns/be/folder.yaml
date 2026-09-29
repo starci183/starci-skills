@@ -26,10 +26,9 @@ rules:
     kind: mandatory
     requirement: Apps own process composition; src/features/<feature> owns use-case orchestration and transport
       adapters; src/modules/<tier>/<capability> owns cohesive reusable capabilities where <tier> is exactly
-      domain, platform or integrations - bussiness, business, core, shared, lib, ai, expert, init or any other
-      tier name is forbidden, and old tiers map by responsibility (business rules to domain, technical runtime
-      to platform, third-party provider or protocol to integrations; a generic helper with no owner goes to
-      the platform capability that uses it). Every backend repository is an apps/<app>/ monorepo even with one
+      domain (business rules), platform (technical runtime) or integrations (third-party provider or protocol);
+      any other tier name is forbidden, and a generic helper with no owner goes to the platform capability that
+      uses it. Every backend repository is an apps/<app>/ monorepo even with one
       application - apps/<app>/src holds only process composition (main.ts, app.module.ts, optional
       <app>.composition.spec.ts) and a root src/ without apps/ is not a supported layout. A module may have
       one consumer.
