@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// check-hfs-rules.mjs - holds knowledge/hfs/rules.yaml (the 76 HFS rules) to what exists (part of `npm run check`).
+// check-hfs-rules.mjs - holds knowledge/hfs/rules.yaml (the 77 HFS rules) to what exists (part of `npm run check`).
 //   node scripts/checks/check-hfs-rules.mjs [--json] [--unbuilt]
 //
 // The catalog is loaded through scripts/lib/hfs-slots.mjs (loadRuleCatalog), which refuses a catalog that breaks its schema

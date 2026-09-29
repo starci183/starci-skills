@@ -198,14 +198,77 @@ export const queryNeedsLimit = {
   },
 }
 
+// -- R77 -----------------------------------------------------------------------------------------------
+
+const LOOP_READS = new Set(["find", "findBy", "findOne", "findOneBy", "findOneOrFail", "findOneByOrFail", "findAndCount", "count", "countBy", "exists", "existsBy", "getOne", "getMany", "getRawMany", "getRawOne", "getCount", "query"])
+const LOOP_RECEIVER = /^(?:manager|entityManager|em|repo|repository|dataSource|queryRunner|[a-z]\w*Repository|[a-z]\w*Repo|[a-z]\w*Store)$/
+const ITERATION_METHODS = new Set(["map", "forEach", "flatMap", "filter", "reduce", "some", "every"])
+const LOOP_STATEMENTS = new Set(["ForStatement", "ForOfStatement", "ForInStatement"])
+
+/** Whether `node` runs once per element: inside a `for` loop, or inside a callback of an array iteration method. */
+const insideIteration = (node) => {
+  let current = node.parent
+  while (current) {
+    if (LOOP_STATEMENTS.has(current.type)) return true
+    if (current.type === "FunctionDeclaration" || current.type === "FunctionExpression" || current.type === "ArrowFunctionExpression") {
+      const call = current.parent
+      return (
+        call?.type === "CallExpression"
+        && call.callee.type === "MemberExpression"
+        && !call.callee.computed
+        && call.callee.property.type === "Identifier"
+        && ITERATION_METHODS.has(call.callee.property.name)
+        && call.arguments.includes(current)
+      )
+    }
+    current = current.parent
+  }
+  return false
+}
+
+/** A read inside an iteration is N+1: one round trip per element. */
+export const noQueryInLoop = {
+  meta: {
+    type: "problem",
+    docs: { description: "A repository, entity-manager or query-builder read does not run once per element of a loop." },
+    schema: [],
+    messages: {
+      inLoop:
+        "`.{{method}}(...)` runs once per element, so the number of round trips grows with the input (N+1) and one large request holds a connection for as long as it takes. Read the rows once before the loop with `find({ where: { <key>: In(keys) }, take })` or `WHERE <key> = ANY($1)`, index them in a `Map`, and look up inside the loop. A polling `while` loop is not this rule's business.",
+    },
+  },
+  create(context) {
+    const filename = context.filename || context.getFilename()
+    if (isTestLane(filename) || isDeclarationFile(filename) || isMigrationPath(filename)) return {}
+    return {
+      CallExpression(node) {
+        const method = calleeProperty(node)
+        if (!method || !LOOP_READS.has(method)) return
+        const chain = chainNames(node.callee)
+        const builder = chain.includes("createQueryBuilder")
+        if (!builder && !LOOP_RECEIVER.test(receiverName(node.callee) ?? "")) return
+        if (method === "query") {
+          const first = node.arguments[0]
+          const sql = staticText(first) ?? (first?.type === "TemplateLiteral" ? first.quasis.map((quasi) => quasi.value.cooked ?? "").join(" ") : null)
+          if (sql === null || !/^\s*(?:SELECT|WITH)\b/i.test(sql)) return
+        }
+        if (!insideIteration(node)) return
+        context.report({ node: node.callee.property, messageId: "inLoop", data: { method } })
+      },
+    }
+  },
+}
+
 /** The rules this law contributes to the plugin. */
 export const rules = {
   "no-interpolated-sql": noInterpolatedSql,
   "query-needs-limit": queryNeedsLimit,
+  "no-query-in-loop": noQueryInLoop,
 }
 
 /** Both start at error: no baseline exists, and the repositories' fix lanes clear the debt. */
 export const recommended = {
   "starci-be/no-interpolated-sql": "error",
   "starci-be/query-needs-limit": "error",
+  "starci-be/no-query-in-loop": "error",
 }

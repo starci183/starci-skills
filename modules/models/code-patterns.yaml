@@ -4,13 +4,13 @@ profiles:
     title: StarCi NestJS code pattern
     canon:
       package: '@starci/eslint-canon-be'
-      version: 1.4.0
+      version: 1.5.0
       contentDigest:
         algorithm: sha256
         include: ['**/*.mjs', '**/*.json', '**/*.md', '**/*.ts']
         exclude: ['**/*.test.mjs']
         framing: sorted-posix-relative-path-null-raw-bytes-null
-        value: 437257f31a13cb503121d698c0067eb2ad37ab83a6ac5c348eb9aaf152954008
+        value: 62152b5a74e18f28bd9b88f9447388c8ef10519e8e6b9b4068016a8e25fbbf49
         files: 34
     sourceRuleRoots:
       - knowledge/patterns/be
@@ -288,11 +288,11 @@ profiles:
         sourceRuleIds: [BE-ERROR-5, BE-ERROR-7, BE-TYPING-2]
         applicability: { include: ['src/**/*.ts', 'apps/**/*.ts', 'libs/**/*.ts'], exclude: ['**/*.d.ts', '**/*.spec.ts', 'src/tests/**', 'libs/*/src/tests/**'] }
         mechanical:
-          requirement: SQL text has no runtime substitution and a read states its bound; an outbound HTTP call has a timeout and outside JSON is parsed inside a guard; a log call names no secret or personal identifier; no cast to never or non-null assertion; an async function awaits; handlers declare a return type; a migration reverses; every input property has a validator.
+          requirement: SQL text has no runtime substitution, a read states its bound and never runs once per loop element; an outbound HTTP call has a timeout and outside JSON is parsed inside a guard; a log call names no secret or personal identifier; no cast to never or non-null assertion; an async function awaits; handlers declare a return type; a migration reverses; every input property has a validator.
           check:
             kind: eslint
             sourceOnly: true
-            ruleIds: [starci-be/no-interpolated-sql, starci-be/query-needs-limit, starci-be/http-needs-timeout, starci-be/json-parse-needs-guard, starci-be/no-secret-in-log, starci-be/no-never-cast, starci-be/no-non-null-assertion, starci-be/async-needs-await, starci-be/explicit-handler-return-type, starci-be/migration-down-reversible, starci-be/dto-needs-validator]
+            ruleIds: [starci-be/no-interpolated-sql, starci-be/query-needs-limit, starci-be/no-query-in-loop, starci-be/http-needs-timeout, starci-be/json-parse-needs-guard, starci-be/no-secret-in-log, starci-be/no-never-cast, starci-be/no-non-null-assertion, starci-be/async-needs-await, starci-be/explicit-handler-return-type, starci-be/migration-down-reversible, starci-be/dto-needs-validator]
             expected: { severity: error }
         semantic:
           guidance: knowledge/patterns/be/persistence.yaml

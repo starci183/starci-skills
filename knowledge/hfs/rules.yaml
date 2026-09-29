@@ -1,4 +1,4 @@
-# knowledge/hfs/rules.yaml - the machine-readable catalog of the 76 HFS rules (R01-R76).
+# knowledge/hfs/rules.yaml - the machine-readable catalog of the 77 HFS rules (R01-R77).
 #
 # One entry per rule: its id, its finding code, a Vietnamese title, the law in one line, how a violation is fixed
 # (`kinds`), the gates it runs at, the failure codes it reports, and every enforcer that judges it. The prose of each
@@ -788,3 +788,12 @@ rules:
     failureCodes: ["BE_JSON_PARSE_UNGUARDED"]
     enforcers:
       - {kind: eslint-be, id: json-parse-needs-guard}
+  - id: R77
+    code: "BE_QUERY_IN_LOOP"
+    title_vi: "Truy vấn chạy trong vòng lặp (N+1)"
+    law: "A repository, entity-manager or query-builder read does not run once per element of a loop; read once before the loop by key list."
+    kinds: [lint, codemod]
+    gates: [pre-commit, pre-push, settle, land, ci]
+    failureCodes: ["BE_QUERY_IN_LOOP"]
+    enforcers:
+      - {kind: eslint-be, id: no-query-in-loop}

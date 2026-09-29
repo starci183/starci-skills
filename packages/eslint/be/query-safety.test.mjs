@@ -7,7 +7,7 @@ import assert from "node:assert/strict"
 import test from "node:test"
 import { RuleTester } from "eslint"
 import tsParser from "@typescript-eslint/parser"
-import { noInterpolatedSql, queryNeedsLimit, rules } from "./query-safety.mjs"
+import { noInterpolatedSql, noQueryInLoop, queryNeedsLimit, rules } from "./query-safety.mjs"
 
 const tester = new RuleTester({
   languageOptions: { parser: tsParser, ecmaVersion: 2022, sourceType: "module" },
@@ -76,6 +76,30 @@ test("R69: a list read states its bound", () => {
       { filename: REPOSITORY, code: "const rows = await manager.findBy(PlanEntity, { owner })", errors: [{ messageId: "findBy" }] },
       { filename: REPOSITORY, code: "await manager.query('SELECT id FROM plan WHERE owner = $1', [owner])", errors: [{ messageId: "raw" }] },
       { filename: REPOSITORY, code: "await manager.query(`WITH x AS (SELECT 1) SELECT id FROM plan`)", errors: [{ messageId: "raw" }] },
+    ],
+  })
+})
+
+test("R77: a read does not run once per element of a loop", () => {
+  tester.run("no-query-in-loop", noQueryInLoop, {
+    valid: [
+      // one read before the loop, lookups from a map inside it
+      { filename: REPOSITORY, code: "const rows = await this.entityManager.find(PlanEntity, { where: { id: In(ids) }, take: MAX }); for (const id of ids) { use(byId.get(id)) }" },
+      // a write per element is not this rule's business
+      { filename: REPOSITORY, code: "for (const plan of plans) { await this.entityManager.save(plan) }" },
+      // a polling loop waits for state to change
+      { filename: REPOSITORY, code: "while (true) { const row = await this.entityManager.findOne(PlanEntity, { where: { id } }); if (row) break }" },
+      // a receiver that is not a data-access object
+      { filename: REPOSITORY, code: "for (const id of ids) { await this.mailer.find(id) }" },
+      { filename: REPOSITORY, code: "const hit = items.map((item) => lookup.find((entry) => entry.id === item.id))" },
+      { filename: SPEC, code: "for (const id of ids) { await manager.findOne(PlanEntity, { where: { id } }) }" },
+    ],
+    invalid: [
+      { filename: REPOSITORY, code: "for (const id of ids) { const row = await this.entityManager.findOne(PlanEntity, { where: { id } }); use(row) }", errors: [{ messageId: "inLoop" }] },
+      { filename: REPOSITORY, code: "for (let i = 0; i < ids.length; i += 1) { await manager.count(PlanEntity, { where: { owner: ids[i] } }) }", errors: [{ messageId: "inLoop" }] },
+      { filename: REPOSITORY, code: "const rows = await Promise.all(ids.map((id) => this.planRepository.findOneBy({ id })))", errors: [{ messageId: "inLoop" }] },
+      { filename: REPOSITORY, code: "for (const id of ids) { await manager.query('SELECT 1 FROM plan WHERE owner = $1', [id]) }", errors: [{ messageId: "inLoop" }] },
+      { filename: REPOSITORY, code: "ids.forEach(async (id) => { await this.repo.createQueryBuilder('p').where('p.id = :id', { id }).getOne() })", errors: [{ messageId: "inLoop" }] },
     ],
   })
 })

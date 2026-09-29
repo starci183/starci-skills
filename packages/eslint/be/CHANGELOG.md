@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.5.0 - 2026-09-30
+
+- New: `no-query-in-loop` (R77 `BE_QUERY_IN_LOOP`): a repository, entity-manager or query-builder read (`find`, `findOne`, `count`, `getOne`, a raw `SELECT`) inside a `for`, `for...of`, `for...in` or an array `map`, `forEach`, `flatMap`, `filter`, `reduce`, `some` or `every` callback is one round trip per element (N+1). A polling `while` loop and a write per element are not reported.
+
 ## 1.4.0 - 2026-09-30
 
 Round 2 back-end rules (catalog R42, R68 to R76). Every rule below has RuleTester specs and a why code in `modules/kernel/failure-codes.yaml`; each was measured against nivo-backend, starci-next and mia-mia-backend before it shipped and is on at `error`.

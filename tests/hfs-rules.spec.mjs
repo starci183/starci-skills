@@ -24,7 +24,7 @@ test('the shipped catalog is 1.0.0, validates against its JSON schema and loads 
   assert.equal(validateSchema(d), true, JSON.stringify(validateSchema.errors));
   const catalog = loadRuleCatalog({ manifest: loadSlotManifest() });
   assert.equal(catalog.major, 1);
-  assert.equal(catalog.rules.length, 76);
+  assert.equal(catalog.rules.length, 77);
   catalog.rules.forEach((rule, index) => assert.equal(rule.id, `R${String(index + 1).padStart(2, '0')}`));
   for (const rule of catalog.rules) {
     assert.ok(rule.enforcers.length > 0, `${rule.id} has an enforcer`);
@@ -54,10 +54,10 @@ test('the loader answers by id, code, gate, enforcer and what is still owed', ()
 
 test('rules() and openHfs().rules() give the same frozen catalog', () => {
   const list = rules();
-  assert.equal(list.length, 76);
+  assert.equal(list.length, 77);
   assert.ok(Object.isFrozen(list) && Object.isFrozen(list[0]) && Object.isFrozen(list[0].enforcers));
   const be = { hfs: 1, profile: 'be', project: 'nivo', apps: [{ name: 'core', kind: 'api' }, { name: 'worker', kind: 'worker' }, { name: 'migrate', kind: 'migrate' }], optionalSlots: ['be.transport.schedule', 'be.contract.graphql', 'repo.docs'], connections: ['primary', 'agentos'] };
-  assert.equal(openHfs({ declaration: be }).rules().rules.length, 76);
+  assert.equal(openHfs({ declaration: be }).rules().rules.length, 77);
 });
 
 test('schema and loader agree on a broken catalog', () => {

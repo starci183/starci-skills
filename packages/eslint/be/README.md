@@ -1,6 +1,6 @@
 # @starci/eslint-canon-be
 
-**77 ESLint rules, from 26 laws, that hold a NestJS-shaped back end to one way of being written.**
+**78 ESLint rules, from 26 laws, that hold a NestJS-shaped back end to one way of being written.**
 
 Not a style pack. These rules enforce *architecture*: which layer may import which, whether a
 failure carries its own identity, where a query is allowed to be built, what an end-to-end test is
@@ -60,7 +60,7 @@ A sample, not the list:
 | **Module shape** | `@Global()` only on the manifest allowlist; typed `ConfigurableModuleBuilder`; static `register`; one module per file; no `new` of a provider; no module-level `let` |
 | **Suppression** | No `eslint-disable`, `@ts-ignore`, `@ts-expect-error`, `@ts-nocheck` or `vn-ok` comment, anywhere (`no-inline-suppression`) |
 | **Size** | A file over its line budget is not new and does not grow past its size at the parent commit (`file-size-growth`) |
-| **Query safety** | SQL text carries no runtime substitution; a read states `take`, `limit` or `LIMIT` (`no-interpolated-sql`, `query-needs-limit`) |
+| **Query safety** | SQL text carries no runtime substitution; a read states `take`, `limit` or `LIMIT` (`no-interpolated-sql`, `query-needs-limit`, `no-query-in-loop`) |
 | **Resilience** | An outbound HTTP call states a timeout or signal; `JSON.parse` of outside text sits in a `try` (`http-needs-timeout`, `json-parse-needs-guard`) |
 | **Log safety** | A logger call names no credential and no personal identifier (`no-secret-in-log`) |
 | **Async and types** | An `async` function awaits; no `as never`, no `x!`; handlers and public methods declare a return type (`async-needs-await`, `no-never-cast`, `no-non-null-assertion`, `explicit-handler-return-type`) |
@@ -121,6 +121,7 @@ mapped by `scripts/checks/lint-why.mjs`). The catalog id is the rule number in `
 | `dto-needs-validator` | R42 | `BE_INPUT_BOUNDED` |
 | `no-interpolated-sql` | R68 | `BE_SQL_INTERPOLATED` |
 | `query-needs-limit` | R69 | `BE_QUERY_UNBOUNDED` |
+| `no-query-in-loop` | R77 | `BE_QUERY_IN_LOOP` |
 | `http-needs-timeout` | R70 | `BE_HTTP_TIMEOUT` |
 | `no-secret-in-log` | R71 | `BE_LOG_SECRET` |
 | `no-never-cast`, `no-non-null-assertion` | R72 | `BE_TYPE_ESCAPE` |

@@ -667,7 +667,7 @@ schemas:
     file: modules/schemas/hfs-rules.schema.yaml
     dialect: json-schema
     subsystem: gate
-    governs: "The HFS rule catalog knowledge/hfs/rules.yaml - the 76 rules R01-R76 with their finding code, Vietnamese title, gates, failure codes and enforcers (eslint rule ids, architecture machine, hfs, stylelint, sonar and work-validate checks)."
+    governs: "The HFS rule catalog knowledge/hfs/rules.yaml - the 77 rules R01-R77 with their finding code, Vietnamese title, gates, failure codes and enforcers (eslint rule ids, architecture machine, hfs, stylelint, sonar and work-validate checks)."
     binds: knowledge/hfs/rules.yaml
     usedBy: [scripts/lib/hfs-slots.mjs (loadRuleCatalog re-states this shape without ajv; tests/hfs-rules.spec.mjs proves the two agree), scripts/checks/check-hfs-rules.mjs]
     business:

@@ -12881,3 +12881,14 @@ BE_JSON_PARSE_UNGUARDED:
   nextStep_vi: "Bọc trong try và trả outcome có kiểu (hoặc DomainError) nêu rõ đang phân tích cái gì. Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra."
   owner: op-retry
   kind: check-finding
+
+BE_QUERY_IN_LOOP:
+  title: "Query inside a loop (N+1)"
+  title_vi: "Truy vấn chạy trong vòng lặp (N+1)"
+  meaning_vi: "Một lệnh đọc qua repository, entity manager hoặc query builder (find, findOne, count, getOne, SELECT thô...) chạy một lần cho mỗi phần tử của vòng lặp for hoặc của map, forEach, flatMap, nên số lượt gọi cơ sở dữ liệu tăng theo đầu vào và một yêu cầu lớn giữ kết nối rất lâu."
+  causes_vi:
+    - "for (const id of ids) { await manager.findOne(...) }"
+    - "Promise.all(ids.map((id) => repository.findOneBy({ id })))"
+  nextStep_vi: "Đọc một lần trước vòng lặp bằng find({ where: { khóa: In(danhSachKhoa) }, take }) hoặc WHERE khóa = ANY($1), dựng Map theo khóa rồi tra trong vòng lặp; op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra."
+  owner: op-retry
+  kind: check-finding

@@ -33,6 +33,7 @@ export const LINT_WHY = Object.freeze({
   'starci-be/dto-needs-validator': 'BE_INPUT_BOUNDED',
   'starci-be/no-interpolated-sql': 'BE_SQL_INTERPOLATED',
   'starci-be/query-needs-limit': 'BE_QUERY_UNBOUNDED',
+  'starci-be/no-query-in-loop': 'BE_QUERY_IN_LOOP',
   'starci-be/http-needs-timeout': 'BE_HTTP_TIMEOUT',
   'starci-be/no-secret-in-log': 'BE_LOG_SECRET',
   'starci-be/no-never-cast': 'BE_TYPE_ESCAPE',

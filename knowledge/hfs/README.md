@@ -10,7 +10,7 @@ The machine-readable parts live next to this file and are read by every check, l
 | File | Owns |
 | --- | --- |
 | `slots.yaml` | Every kind of content allowed to exist in a repository: path, presence, tracking, tier, required files, tests, budget, managed template. Versioned `MAJOR.MINOR.PATCH`. |
-| `rules.yaml` | The rule catalog `R01` to `R76` with finding code, gates and the Vietnamese why text (catalog below). |
+| `rules.yaml` | The rule catalog `R01` to `R77` with finding code, gates and the Vietnamese why text (catalog below). |
 | `canon-pins.yaml` | The exact versions of every `@starci/*` package and framework this major supports. |
 
 The pattern cases in `knowledge/patterns/{be,fe,repo}/` explain how to write code and structure files inside these
@@ -222,10 +222,11 @@ no `new` of an `@Injectable`. Every feature and every transport module is compos
 `main.ts`, `app.module.ts`, `<app>.options.ts` and the composition spec. Entrypoints (`main.ts`, `bootstrap()`,
 top-level `void x()`) exist only in `apps/*/src`.
 
-### 5.9 Query, transport and runtime safety (R68 to R76)
+### 5.9 Query, transport and runtime safety (R68 to R77)
 
 A statement is text plus numbered parameters; a runtime value never becomes part of the text (R68). A list read states its
-bound, and a caller that needs every row pages by keyset instead of truncating (R69). Every outbound HTTP call carries a
+bound, and a caller that needs every row pages by keyset instead of truncating (R69); a read never runs once per element of a
+loop, the keys are read once (R77). Every outbound HTTP call carries a
 timeout or an abort signal (R70). A logger call names no credential and no personal identifier (R71). `as never` and `x!`
 are not used (R72). An `async` function awaits (R73). A migration's `down()` reverses its `up()` (R74). A handler and a
 public method of an Injectable, Resolver or Controller declare their return type (R75). `JSON.parse` of outside text sits
@@ -363,7 +364,7 @@ e2e/<area>/*.e2e-spec.ts              plus e2e/{support,fixtures}/, playwright.c
 | PC pre-commit | lint-staged: Prettier, ESLint canon on staged files, stylelint, secrets guard | under 10 s | R06, R07, R18, R19, R34, R40, R41, R43 to R45, R49, R55, R58, R61, R62 |
 | PP pre-push | `typecheck`, `lint:check`, `hfs check --fast`, affected unit specs | under 2 min | PC plus R01, R03 to R05, R12 to R15, R22, R26, R27, R30 |
 | OS op settle | `hfs check --paths <owned paths>` and ESLint on the op's paths; a red result does not settle | per op | every file-level and owner-level rule in scope |
-| LG land gate | full `hfs check` including reachability, composition, contract, size growth, duplicates; canon scan; unit; build | per repo | all 76 |
+| LG land gate | full `hfs check` including reachability, composition, contract, size growth, duplicates; canon scan; unit; build | per repo | all 77 |
 | CI GitHub | the same pinned `npx @starci/hfs check`, lint, typecheck, unit with coverage, build, `prettier --check` | | as LG except R23 on the frontend |
 | SQ Sonar | duplication, cognitive complexity, coverage on new code | | R20, R21 (second gate) |
 
@@ -449,6 +450,7 @@ Every rule is an error from 2.0. Finding code, then the rule. The pattern files 
 | R74 | `BE_MIGRATION_REVERSIBLE` | Every migration declares a `down()` that reverses its `up()`; never empty, never a bare throw. |
 | R75 | `BE_RETURN_TYPE` | Handlers and public methods of an Injectable, Resolver or Controller declare their return type. |
 | R76 | `BE_JSON_PARSE_UNGUARDED` | `JSON.parse` sits inside a `try` in its own function and fails as a typed outcome. |
+| R77 | `BE_QUERY_IN_LOOP` | A repository, entity-manager or query-builder read does not run once per element of a loop; read once before the loop by key list. |
 
 **Frontend**
 

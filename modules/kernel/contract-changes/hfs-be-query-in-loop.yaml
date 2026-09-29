@@ -1,0 +1,25 @@
+id: hfs-be-query-in-loop
+effectiveAt: '2026-09-30T01:00:00+07:00'
+summary: >-
+  HFS back-end catalog rule R77 (BE_QUERY_IN_LOOP) with its Vietnamese failure code. `@starci/eslint-canon-be` becomes 1.5.0 and gains
+  no-query-in-loop (in the query-safety law): a repository, entity-manager or query-builder read inside a for loop or an array iteration
+  callback is an N+1 and is refused; the nest profile follows the new canon version, content digest and rule list, and lint-why maps the
+  rule to its code. A repository adopts the canon through its own migration lane; there is no compatibility window.
+reach: new-legs
+paths:
+  - modules/kernel/contract-changes/hfs-be-query-in-loop.yaml
+  - modules/kernel/failure-codes.yaml
+  - modules/models/code-patterns.yaml
+  - modules/schemas/index.yaml
+  - knowledge/hfs/rules.yaml
+  - knowledge/hfs/canon-pins.yaml
+  - knowledge/hfs/README.md
+  - knowledge/index.yaml
+  - packages/eslint/be/package.json
+  - packages/eslint/be/README.md
+  - packages/eslint/be/CHANGELOG.md
+  - scripts/checks/lint-why.mjs
+  - scripts/checks/check-hfs-rules.mjs
+  - scripts/lib/hfs-slots.mjs
+  - tests/lint-why.spec.mjs
+  - tests/hfs-rules.spec.mjs

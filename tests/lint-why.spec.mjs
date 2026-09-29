@@ -12,14 +12,14 @@ const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const catalog = parseYaml(fs.readFileSync(path.join(root, 'modules/kernel/failure-codes.yaml'), 'utf8'));
 const profile = parseYaml(fs.readFileSync(path.join(root, 'modules/models/code-patterns.yaml'), 'utf8')).profiles.nest;
 
-/** The rules that belong to HFS: every rule added or re-enabled by the back-end canon 1.3.0 and 1.4.0. */
+/** The rules that belong to HFS: every rule added or re-enabled by the back-end canon 1.3.0, 1.4.0 and 1.5.0. */
 const HFS_LINT_RULES = [
   'catch-must-account', 'error-home', 'no-runtime-schema', 'sql-only-in-repository', 'no-entity-in-contract',
   'no-untyped-body', 'public-needs-reason', 'secret-compare-timing-safe', 'no-direct-env-read', 'no-secret-default',
   'global-module-allowlist', 'typed-module-definition', 'static-module-register', 'no-new-injectable', 'no-module-let',
   'one-module-per-file', 'no-inline-suppression', 'file-size-growth', 'spec-no-source-read',
   'spec-typed-doubles', 'must-deep-module-import', 'no-folder-reexport',
-  'dto-needs-validator', 'no-interpolated-sql', 'query-needs-limit', 'http-needs-timeout', 'no-secret-in-log', 'no-never-cast',
+  'dto-needs-validator', 'no-interpolated-sql', 'query-needs-limit', 'no-query-in-loop', 'http-needs-timeout', 'no-secret-in-log', 'no-never-cast',
   'no-non-null-assertion', 'async-needs-await', 'migration-down-reversible', 'explicit-handler-return-type', 'json-parse-needs-guard',
 ].map(name => `starci-be/${name}`);
 
