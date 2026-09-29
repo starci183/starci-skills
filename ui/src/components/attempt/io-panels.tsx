@@ -9,7 +9,7 @@ export const concept: Concept = 'C8';
 /** Op contract info (goal, reads, writes) from the pipeline leg matching this attempt's op. `info` is null while loading or when the op has no yaml. */
 export function useOpInfo(attempt: Pick<AttemptDetailV3, 'project' | 'wf' | 'op'>): { info: OpInfo | null; loading: boolean } {
   const enc = encodeURIComponent;
-  const pipeline = useApiQuery<PipelineView>(`/api/workflows/${enc(attempt.project)}/${enc(attempt.wf)}/pipeline`);
+  const pipeline = useApiQuery<PipelineView>(`/api/workflows/${enc(attempt.project)}/${enc(attempt.wf)}/pipeline`, { enabled: Boolean(attempt.project && attempt.wf) });
   const leg = pipeline.data?.legs?.find(item => item.op === attempt.op) as LegRowV3 | undefined;
   return { info: leg?.info ?? null, loading: pipeline.loading };
 }
