@@ -27,7 +27,7 @@ function fixture(t) {
       dataField: 'data', errorFields: ['error'], readers: [{ path: 'src/api/read.ts', export: 'readCourse', emptyData: 'valid' }] }],
   };
   write('package.json', { private: true, starci: { codePatterns: { next: { errorState: contract } } } });
-  write('architecture.json', { schema: 'starci/architecture-config@1', kinds: ['frontend'], tsconfig: 'tsconfig.json' });
+  write('hfs.json', { hfs: 2, profile: 'fe', project: 'fixture', apps: [{ name: 'web', kind: 'next' }] });
   write('tsconfig.json', { compilerOptions: { target: 'ES2022', module: 'ESNext', moduleResolution: 'Bundler', strict: true }, include: ['src/**/*.ts', 'jest.config.ts'] });
   write('src/api/envelope.ts', `export type ReadEnvelope=
   |{readonly ok:true;readonly data:string|null;readonly error?:never}
@@ -46,7 +46,7 @@ export declare const generatedMetadata:ReadEnvelope;`);
   const selected = ['src/api/envelope.ts', 'src/api/read.ts'];
   const metadata = ['jest.config.ts', 'src/api/generated.d.ts', 'src/api/read.spec.ts'];
   const input = { root, files: selected, contextFiles: metadata, sourceContextFiles: ['src/api/generated.d.ts', 'src/api/read.spec.ts'],
-    ruleIds: ['FE_ERROR_ENVELOPE_POLICY'], architectureConfig: 'architecture.json' };
+    ruleIds: ['FE_ERROR_ENVELOPE_POLICY'] };
   return { root, write, contract, input };
 }
 

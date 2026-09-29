@@ -7,19 +7,34 @@ import path from 'node:path';
 import { createRequire } from 'node:module';
 import { execFileSync } from 'node:child_process';
 import { checkArchitecture } from '../scripts/checks/architecture.mjs';
+import { loadArchitectureConfig } from '../scripts/checks/architecture/config.mjs';
+import { TIER_RULE_IDS } from '../scripts/checks/architecture/tiers.mjs';
+import { REACHABILITY_RULE_IDS } from '../scripts/checks/architecture/reachability.mjs';
+import { DEAD_EXPORT_RULE_IDS } from '../scripts/checks/architecture/dead-exports.mjs';
+import { REQUIRED_FILE_RULE_IDS } from '../scripts/checks/architecture/required-files.mjs';
+import { SIZE_GROWTH_RULE_IDS } from '../scripts/checks/architecture/size-growth.mjs';
+import { CLONE_RULE_IDS } from '../scripts/checks/architecture/clones.mjs';
 
 const require = createRequire(import.meta.url);
 const ts = require('typescript');
 
-function fixture(t, kind, files) {
+// The legacy (v1) architecture rules exercised through hfs.json fixtures. The declaration is hfs.json (profile be|fe plus
+// apps); owners, roots, registration and the Grammar contract are derived, so a rule is exercised by shaping the tree.
+// The v2 machine (tier direction, reachability, dead exports, required files, size growth, duplicate blocks) runs on every
+// fixture too and has its own specs; check() below drops its findings so this spec judges the rules it is about.
+const V2_RULE_IDS = new Set([...TIER_RULE_IDS, ...REACHABILITY_RULE_IDS, ...DEAD_EXPORT_RULE_IDS, ...REQUIRED_FILE_RULE_IDS,
+  ...SIZE_GROWTH_RULE_IDS, ...CLONE_RULE_IDS]);
+
+function scoped(report) {
+  const violations = report.violations.filter(item => !V2_RULE_IDS.has(item.ruleId));
+  return { ...report, violations, ok: report.errors.length === 0 && violations.length === 0 };
+}
+
+function fixture(t, kind, files = {}, apps = kind === 'backend' ? [{ name: 'core', kind: 'api' }] : [{ name: 'web', kind: 'next' }]) {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), `starci-architecture-${kind}-`));
   t.after(() => fs.rmSync(root, { recursive: true, force: true }));
-  const app = kind === 'backend' ? 'core' : 'web';
-  const config = {
-    schema: 'starci/architecture-config@1',
-    kinds: [kind],
-    tsconfig: 'tsconfig.json',
-  };
+  const app = apps[0].name;
+  const declaration = { hfs: 2, profile: kind === 'backend' ? 'be' : 'fe', project: 'fixture', apps };
   const tsconfig = `${JSON.stringify({
     compilerOptions: {
       target: 'ES2022',
@@ -30,14 +45,15 @@ function fixture(t, kind, files) {
       paths: {
         '@modules/*': ['src/modules/domain/*'],
         '@features/*': ['src/features/*'],
-        '@/*': [kind === 'frontend' ? 'apps/web/src/*' : 'src/*'],
+        '@/*': [kind === 'frontend' ? `apps/${app}/src/*` : 'src/*'],
       },
       allowJs: true,
       skipLibCheck: true,
       noEmit: true,
     },
     include: ['src/**/*', 'apps/**/*'],
-  }, null, 2)}\n`;
+  }, null, 2)}
+`;
   const baseline = {
     '.gitattributes': '* text=auto eol=lf\n',
     '.github/workflows/check.yml': 'name: check\n',
@@ -49,7 +65,8 @@ function fixture(t, kind, files) {
     'package-lock.json': '{}\n',
     'package.json': JSON.stringify(kind === 'frontend' ? { private: true, workspaces: ['apps/*'] } : { private: true }),
     'sonar-project.properties': 'sonar.projectKey=fixture\n',
-    'architecture.json': `${JSON.stringify(config, null, 2)}\n`,
+    'hfs.json': `${JSON.stringify(declaration, null, 2)}
+`,
     'tsconfig.json': tsconfig,
     ...(kind === 'backend' ? {
       '.sops.yaml': 'creation_rules: []\n',
@@ -62,6 +79,7 @@ function fixture(t, kind, files) {
       [`apps/${app}/src/main.ts`]: 'void 0\n',
       [`apps/${app}/src/app.module.ts`]: 'export const AppModule = 1\n',
     } : {
+      ...Object.fromEntries(apps.slice(1).map(other => [`apps/${other.name}/package.json`, JSON.stringify({ name: `@fixture/${other.name}`, private: true })])),
       [`apps/${app}/package.json`]: JSON.stringify({ name: '@fixture/web', private: true }),
       [`apps/${app}/next.config.ts`]: 'export default {};\n',
       [`apps/${app}/postcss.config.mjs`]: 'export default {};\n',
@@ -69,7 +87,8 @@ function fixture(t, kind, files) {
       [`apps/${app}/src/.keep`]: '',
     }),
   };
-  const fixtureFiles = { ...baseline, ...files };
+  // A null entry removes a baseline file (a test that needs the tree without it).
+  const fixtureFiles = Object.fromEntries(Object.entries({ ...baseline, ...files }).filter(([, content]) => content !== null));
   writeFiles(root, fixtureFiles);
   execFileSync('git', ['init', '-q'], { cwd: root });
   execFileSync('git', ['add', '--', ...Object.keys(fixtureFiles)], { cwd: root });
@@ -77,7 +96,12 @@ function fixture(t, kind, files) {
 }
 
 function check(root) {
-  return checkArchitecture({ repositoryRoot: root, configFile: 'architecture.json', injectedTypeScript: ts });
+  return scoped(checkArchitecture({ repositoryRoot: root, injectedTypeScript: ts }));
+}
+
+/** The derived owner ids of a fixture (slot id and root), the way the loader lists them. */
+function ownerIds(root) {
+  return loadArchitectureConfig(root).owners.map(owner => owner.id);
 }
 
 function writeFiles(root, files) {
@@ -108,7 +132,6 @@ function installSourceShapeTypes(root) {
 
 function monorepoFixture(t, files = {}) {
   return fixture(t, 'frontend', {
-    'architecture.json': `${JSON.stringify({ schema: 'starci/architecture-config@1', kinds: ['frontend'], projects: ['tsconfig.json'] }, null, 2)}\n`,
     'package.json': JSON.stringify({ private: true, workspaces: ['apps/*', 'packages/*'] }),
     'tsconfig.json': JSON.stringify({ files: [], references: [{ path: './apps/web' }, { path: './packages/ui' }] }),
     'apps/web/package.json': JSON.stringify({ name: '@fixture/app', private: true }),
@@ -272,7 +295,7 @@ test('production loader reports missing target TypeScript without borrowing Star
     'src/modules/domain/value.ts': 'export const value=1\n',
     'src/features/feature.ts': 'export const feature=1\n',
   });
-  const result = checkArchitecture({ repositoryRoot: root, configFile: 'architecture.json' });
+  const result = checkArchitecture({ repositoryRoot: root });
   assert.equal(result.ok, false);
   assert.equal(result.errors[0].ruleId, 'ARCH_TYPESCRIPT_MISSING');
   assert.match(result.errors[0].message, /checked repository/);
@@ -287,36 +310,39 @@ test('check emits one actionable JSON record and uses target-local TypeScript', 
   fs.mkdirSync(targetModules);
   const installedTypeScript = path.dirname(require.resolve('typescript/package.json'));
   fs.cpSync(installedTypeScript, path.join(targetModules, 'typescript'), { recursive: true });
-  const result = checkArchitecture({ repositoryRoot: root, configFile: 'architecture.json' });
+  const result = scoped(checkArchitecture({ repositoryRoot: root }));
   assert.equal(result.schema, 'starci/architecture-check@1');
   assert.equal(result.ok, true, JSON.stringify(result.errors));
   assert.ok(path.resolve(result.compiler.resolved).startsWith(path.resolve(targetModules)));
 });
 
-test('config has layout fields but rejects waiver and baseline fields', t => {
+test('hfs.json has no waiver or baseline field: an unknown key is refused as an invalid declaration', t => {
   const root = fixture(t, 'frontend', {
     'apps/web/src/app/home/page.tsx': 'const Route=()=>null; export default Route\n',
     'apps/web/src/features/pages/HomePage/index.tsx': 'export const HomePage=()=>null\n',
   });
-  const file = path.join(root, 'architecture.json');
-  const config = JSON.parse(fs.readFileSync(file, 'utf8'));
-  config.waivers = ['apps/web/src/app/home/page.tsx'];
-  fs.writeFileSync(file, JSON.stringify(config));
+  const file = path.join(root, 'hfs.json');
+  const declaration = JSON.parse(fs.readFileSync(file, 'utf8'));
+  declaration.waivers = ['apps/web/src/app/home/page.tsx'];
+  fs.writeFileSync(file, JSON.stringify(declaration));
   const result = check(root);
-  assert.equal(result.errors[0].ruleId, 'ARCH_CONFIG_INVALID');
-  assert.match(result.errors[0].message, /unsupported fields: waivers/);
+  assert.equal(result.ok, false);
+  assert.equal(result.errors[0].ruleId, 'HFS_DECLARATION_INVALID');
+  assert.match(result.errors[0].message, /unknown key waivers/);
 });
 
-test('omitted owner and Grammar declarations remain explicit unavailable coverage', t => {
+test('owner coverage is derived from slot owners; the Grammar contract is unavailable without a globals.css', t => {
   const backend = fixture(t, 'backend', {
+    'apps/core/src/app.module.ts': null,
     'src/modules/domain/value.ts': 'export const value=1\n',
     'src/features/feature.ts': 'export const feature=1\n',
   });
   const backendResult = check(backend);
-  assert.deepEqual(backendResult.coverage.ownerPublicApi, { status: 'unavailable', reason: 'architecture.json does not declare owners and public entries' });
+  assert.deepEqual(ownerIds(backend), []);
+  assert.deepEqual(backendResult.coverage.ownerPublicApi, { status: 'unavailable', reason: 'no slot owner instance with an entry file exists in the repository' });
   assert.deepEqual(backendResult.coverage.grammarContract, { status: 'not-applicable' });
   assert.deepEqual(backendResult.coverage.sourceFiles, [
-    'apps/core/src/app.module.ts', 'apps/core/src/main.ts', 'src/features/feature.ts', 'src/modules/domain/value.ts',
+    'apps/core/src/main.ts', 'src/features/feature.ts', 'src/modules/domain/value.ts',
   ]);
   assert.equal(backendResult.coverage.checkedRuleIds.includes('ARCH_OWNER_EXPORT_BYPASS'), false);
   const frontend = fixture(t, 'frontend', {
@@ -324,8 +350,10 @@ test('omitted owner and Grammar declarations remain explicit unavailable coverag
     'apps/web/src/features/pages/HomePage/index.tsx': 'export const HomePage=()=> <main/>\n',
   });
   const frontendResult = check(frontend);
-  assert.equal(frontendResult.coverage.ownerPublicApi.status, 'unavailable');
+  assert.ok(ownerIds(frontend).includes('fe.feature:apps/web/src/features/pages/HomePage'), JSON.stringify(ownerIds(frontend)));
+  assert.deepEqual(frontendResult.coverage.ownerPublicApi, { status: 'checked', declarations: ownerIds(frontend).length });
   assert.equal(frontendResult.coverage.grammarContract.status, 'unavailable');
+  assert.match(frontendResult.coverage.grammarContract.reason, /globals.css/);
 });
 
 test('solution tsconfig references merge workspace programs and honor declared package exports', t => {
@@ -402,10 +430,6 @@ test('single-application composition root excludes nested feature/module roots f
     'apps/core/src/app.module.ts': 'import { value } from "@features/orders/value"; export const AppModule = value\n',
     'apps/core/src/main.ts': 'import { AppModule } from "./app.module"; void AppModule\n',
   });
-  const configFile = path.join(root, 'architecture.json');
-  const config = JSON.parse(fs.readFileSync(configFile, 'utf8'));
-  config.backend = { apps: ['apps/core/src'] };
-  fs.writeFileSync(configFile, JSON.stringify(config, null, 2));
   const result = check(root);
   assert.equal(result.violations.some(item => item.ruleId === 'BE_MODULE_IMPORTS_APP'), false, JSON.stringify(result, null, 2));
   assert.ok(result.violations.some(item => item.ruleId === 'BE_MODULE_IMPORTS_FEATURE'), JSON.stringify(result, null, 2));
@@ -419,15 +443,11 @@ test('single-application composition root still refuses a business-role file pla
     'apps/core/src/main.ts': 'import { AppModule } from "./app.module"; void AppModule\n',
     'apps/core/src/leaky.service.ts': 'export class LeakyService { run(){return 1} }\n',
   });
-  const configFile = path.join(root, 'architecture.json');
-  const config = JSON.parse(fs.readFileSync(configFile, 'utf8'));
-  config.backend = { apps: ['apps/core/src'] };
-  fs.writeFileSync(configFile, JSON.stringify(config, null, 2));
   const result = check(root);
   assert.ok(result.violations.some(item => item.ruleId === 'BE_APP_BUSINESS_ROLE' && item.path.endsWith('/leaky.service.ts')), JSON.stringify(result, null, 2));
 });
 
-test('single-application layout infers its composition root without a declared apps entry', t => {
+test('single-application layout derives its composition root from apps/<app>/src', t => {
   const root = fixture(t, 'backend', {
     'src/features/orders/value.ts': 'export const value = 1\n',
     'src/modules/domain/catalog/value.ts': 'export const catalogValue = 1\n',
@@ -442,7 +462,6 @@ test('single-application layout infers its composition root without a declared a
 
 test('backend workspace packages cannot reach executable app packages through type exports', t => {
   const root = fixture(t, 'backend', {
-    'architecture.json': JSON.stringify({ schema: 'starci/architecture-config@1', kinds: ['backend'], projects: ['tsconfig.json'], backend: { apps: 'apps/api/src' } }),
     'package.json': JSON.stringify({ private: true, workspaces: ['apps/*', 'packages/*'] }),
     'tsconfig.json': JSON.stringify({ files: [], references: [{ path: './apps/api' }, { path: './packages/domain' }] }),
     'apps/api/package.json': JSON.stringify({ name: '@fixture/api', private: true, exports: { '.': './src/main.ts', './contract': './src/contract.ts' } }),
@@ -453,7 +472,7 @@ test('backend workspace packages cannot reach executable app packages through ty
     'packages/domain/package.json': JSON.stringify({ name: '@fixture/domain', private: true, exports: { '.': './src/index.ts' } }),
     'packages/domain/tsconfig.json': JSON.stringify({ compilerOptions: { module: 'ESNext', moduleResolution: 'Bundler', baseUrl: '../..', paths: { '@fixture/api/*': ['apps/api/src/*'] }, noEmit: true }, include: ['src/**/*'] }),
     'packages/domain/src/index.ts': 'export type { AppContract } from "@fixture/api/contract"\n',
-  });
+  }, [{ name: 'api', kind: 'api' }]);
   const result = check(root);
   assert.ok(result.errors.some(item => item.ruleId === 'ARCH_PACKAGE_IMPORTS_APP'), JSON.stringify(result, null, 2));
 });
@@ -537,7 +556,7 @@ test('feature application cannot import a protocol decorator re-exported by an i
   assert.equal(violations.some(item => item.path.endsWith('/valid.use-case.ts')), false, JSON.stringify(result, null, 2));
 });
 
-test('declared same-source owners require named public entries without export-star barrels', t => {
+test('same-source owners are derived from slots and require named public entries without export-star barrels', t => {
   const root = fixture(t, 'backend', {
     'src/features/orders/index.ts': 'export * from "./public"\n',
     'src/features/orders/public.ts': 'export const publicOrder = 1\n',
@@ -548,12 +567,10 @@ test('declared same-source owners require named public entries without export-st
     'src/modules/platform/orders/barrel.ts': 'export { secretOrder } from "../../../features/orders/private"\n',
     'src/features/catalog/indirect.ts': 'import { secretOrder } from "../../modules/platform/orders/barrel"; export const indirect = secretOrder\n',
   });
-  const configFile = path.join(root, 'architecture.json');
-  const config = JSON.parse(fs.readFileSync(configFile, 'utf8'));
-  config.owners = [{ id: 'feature:orders', root: 'src/features/orders', entry: 'src/features/orders/index.ts' }];
-  fs.writeFileSync(configFile, `${JSON.stringify(config, null, 2)}\n`);
   const result = check(root);
-  assert.deepEqual(result.coverage.ownerPublicApi, { status: 'checked', declarations: 1 });
+  const owners = ownerIds(root);
+  assert.ok(owners.includes('be.feature:src/features/orders'), JSON.stringify(owners));
+  assert.deepEqual(result.coverage.ownerPublicApi, { status: 'checked', declarations: owners.length });
   assert.ok(result.violations.some(item => item.ruleId === 'ARCH_OWNER_EXPORT_STAR' && item.path === 'src/features/orders/index.ts'), JSON.stringify(result, null, 2));
   const bypasses = result.violations.filter(item => item.ruleId === 'ARCH_OWNER_EXPORT_BYPASS');
   assert.ok(bypasses.some(item => item.path.endsWith('/invalid.ts')));
@@ -561,36 +578,19 @@ test('declared same-source owners require named public entries without export-st
   assert.equal(bypasses.some(item => item.path.endsWith('/valid.ts') || item.path.endsWith('/internal.ts')), false, JSON.stringify(result, null, 2));
 });
 
-test('owner coverage is unavailable when a declared entry is outside the checked production program', t => {
+test('owner coverage is unavailable when a derived owner entry is outside the checked production program', t => {
+  // packages/lib is a package owner (entry src/index.ts) that neither the root include nor any import reaches.
   const root = fixture(t, 'backend', {
     'src/modules/domain/value.ts': 'export const value=1\n',
-    'docs/declared/index.ts': 'export const outsideProgram=1\n',
+    'packages/lib/src/index.ts': 'export const outsideProgram=1\n',
   });
-  const configFile = path.join(root, 'architecture.json');
-  const config = JSON.parse(fs.readFileSync(configFile, 'utf8'));
-  config.owners = [{ id: 'declared:outside-program', root: 'docs/declared', entry: 'docs/declared/index.ts' }];
-  fs.writeFileSync(configFile, `${JSON.stringify(config, null, 2)}\n`);
   const result = check(root);
+  assert.ok(ownerIds(root).includes('repo.packages:packages/lib'), JSON.stringify(ownerIds(root)));
   assert.equal(result.ok, false);
   assert.equal(result.coverage.ownerPublicApi.status, 'unavailable');
-  assert.deepEqual(result.coverage.ownerPublicApi.missingEntries, ['docs/declared/index.ts']);
+  assert.deepEqual(result.coverage.ownerPublicApi.missingEntries, ['packages/lib/src/index.ts']);
   assert.ok(result.violations.some(item => item.ruleId === 'ARCH_OWNER_EXPORT_BYPASS'
-    && item.path === 'docs/declared/index.ts' && /outside the configured TypeScript programs/.test(item.message)), JSON.stringify(result, null, 2));
-});
-
-test('owner entries must be production TypeScript or JavaScript sources', t => {
-  const root = fixture(t, 'backend', {
-    'src/features/orders/README.md': '# Orders\n',
-    'src/features/orders/value.ts': 'export const value=1\n',
-  });
-  const configFile = path.join(root, 'architecture.json');
-  const config = JSON.parse(fs.readFileSync(configFile, 'utf8'));
-  config.owners = [{ id: 'feature:orders', root: 'src/features/orders', entry: 'src/features/orders/README.md' }];
-  fs.writeFileSync(configFile, `${JSON.stringify(config, null, 2)}\n`);
-  const result = check(root);
-  assert.equal(result.ok, false);
-  assert.equal(result.errors[0].ruleId, 'ARCH_CONFIG_INVALID');
-  assert.match(result.errors[0].message, /production TypeScript or JavaScript source file/);
+    && item.path === 'packages/lib/src/index.ts' && /outside the configured TypeScript programs/.test(item.message)), JSON.stringify(result, null, 2));
 });
 
 test('Nest registration derives exported class-token ownership and selected CQRS handlers', t => {
@@ -603,10 +603,6 @@ test('Nest registration derives exported class-token ownership and selected CQRS
     'src/features/orders/orders.module.ts': 'import { NestModule } from "../../modules/platform/framework"; import { CatalogModule } from "@modules/catalog/catalog.module"; import { CatalogService } from "@modules/catalog/catalog.service"; import { CreateOrderHandler } from "./application/create.handler"; @NestModule({imports:[CatalogModule],providers:[CreateOrderHandler,{provide:"LOCAL_CATALOG",useClass:CatalogService}]}) export class OrdersModule {}\n',
   });
   installNestTypes(root);
-  const configFile = path.join(root, 'architecture.json');
-  const config = JSON.parse(fs.readFileSync(configFile, 'utf8'));
-  config.backend = { moduleRegistration: { providerIdentity: 'exported-class-token', handlerDecorators: ['CommandHandler', 'QueryHandler'] } };
-  fs.writeFileSync(configFile, `${JSON.stringify(config, null, 2)}\n`);
   const result = check(root);
   assert.equal(result.ok, true, JSON.stringify(result, null, 2));
   assert.deepEqual(result.coverage.moduleRegistration, { status: 'checked', modules: 2, exportedClassTokenProviders: 1,
@@ -624,10 +620,6 @@ test('Nest registration rejects same class-token provider duplication and missin
     'src/features/orders/orders.module.ts': 'import { Module } from "@nestjs/common"; import { CatalogService } from "@modules/catalog/catalog.service"; import { CreateOrderHandler } from "./create.handler"; @Module({providers:[{provide:CatalogService as unknown as typeof CatalogService,useClass:CatalogService},CreateOrderHandler,CreateOrderHandler]}) export class OrdersModule {}\n',
   });
   installNestTypes(root);
-  const configFile = path.join(root, 'architecture.json');
-  const config = JSON.parse(fs.readFileSync(configFile, 'utf8'));
-  config.backend = { moduleRegistration: { providerIdentity: 'exported-class-token', handlerDecorators: ['CommandHandler', 'QueryHandler'] } };
-  fs.writeFileSync(configFile, `${JSON.stringify(config, null, 2)}\n`);
   const result = check(root);
   assert.ok(result.violations.some(item => item.ruleId === 'BE_MODULE_PROVIDER_REREGISTRATION'
     && item.path.endsWith('/orders.module.ts') && item.ownerPath.endsWith('/catalog.module.ts')), JSON.stringify(result, null, 2));
@@ -643,17 +635,13 @@ test('Nest registration does not force CQRS when no recognized handler exists', 
     'src/modules/domain/plain/plain.module.ts': 'import { Module } from "@nestjs/common"; @Module({}) export class PlainModule {}\n',
   });
   installNestTypes(root);
-  const configFile = path.join(root, 'architecture.json');
-  const config = JSON.parse(fs.readFileSync(configFile, 'utf8'));
-  config.backend = { moduleRegistration: { providerIdentity: 'exported-class-token', handlerDecorators: [] } };
-  fs.writeFileSync(configFile, `${JSON.stringify(config, null, 2)}\n`);
   const result = check(root);
   assert.equal(result.ok, true, JSON.stringify(result, null, 2));
   assert.equal(result.coverage.moduleRegistration.status, 'checked');
   assert.equal(result.coverage.moduleRegistration.handlers, 0);
 });
 
-test('Nest registration becomes unavailable for hidden metadata or unselected discovered handlers', t => {
+test('Nest registration becomes unavailable for hidden or dynamic module metadata', t => {
   const root = fixture(t, 'backend', {
     'src/features/orders/find.query.ts': 'export class FindOrderQuery {}\n',
     'src/features/orders/find.handler.ts': 'import { QueryHandler } from "@nestjs/cqrs"; import { FindOrderQuery } from "./find.query"; @QueryHandler(FindOrderQuery) export class FindOrderHandler {}\n',
@@ -662,14 +650,9 @@ test('Nest registration becomes unavailable for hidden metadata or unselected di
     'src/features/orders/mutable.module.ts': 'import { Module } from "@nestjs/common"; let MutableModule=Module; @MutableModule({}) export class MutableIdentityModule {}\n',
   });
   installNestTypes(root);
-  const configFile = path.join(root, 'architecture.json');
-  const config = JSON.parse(fs.readFileSync(configFile, 'utf8'));
-  config.backend = { moduleRegistration: { providerIdentity: 'exported-class-token', handlerDecorators: ['CommandHandler'] } };
-  fs.writeFileSync(configFile, `${JSON.stringify(config, null, 2)}\n`);
   const result = check(root);
   assert.equal(result.coverage.moduleRegistration.status, 'unavailable', JSON.stringify(result, null, 2));
   assert.ok(result.coverage.moduleRegistration.details.some(item => /dynamic or unresolvable/.test(item)));
-  assert.ok(result.coverage.moduleRegistration.details.some(item => /unselected QueryHandler/.test(item)));
   assert.ok(result.coverage.moduleRegistration.details.some(item => /CommonJS Nest framework binding/.test(item)));
   assert.ok(result.coverage.moduleRegistration.details.some(item => /mutable Module decorator identity/.test(item)));
   assert.equal(result.coverage.checkedRuleIds.includes('BE_MODULE_HANDLER_REGISTRATION'), false);
@@ -766,75 +749,76 @@ test('backend source shape exposes dynamic naming as unavailable coverage', t =>
   assert.equal(result.violations.some(item => item.path.endsWith('/engine.workflow.ts')), false);
 });
 
-test('declared Grammar contract binds public code, style entry, peers, and product imports', t => {
+test('derived Grammar contract binds public code, style entry, peers, and product imports', t => {
+  // The contract is derived: package @starci/grammar (entry /common, style /common.css, peers react and @heroui/react),
+  // styled from apps/web/src/app/globals.css and consumed by apps/web/package.json.
+  const grammarManifest = (extra = {}) => JSON.stringify({ name: '@starci/grammar',
+    exports: { './common': './src/common/index.tsx', './common.css': './src/common.css' },
+    peerDependencies: { react: '>=18', '@heroui/react': '>=2', ...extra } });
+  const shadow = 'apps/web/src/features/pages/ProductPage/shadow.ts';
+  const product = 'apps/web/src/features/pages/ProductPage/index.tsx';
+  const globals = 'apps/web/src/app/globals.css';
   const root = fixture(t, 'frontend', {
+    'package.json': JSON.stringify({ name: 'fixture-fe', private: true, workspaces: ['apps/*', 'packages/*'] }),
+    'apps/web/package.json': JSON.stringify({ name: '@fixture/web', private: true, dependencies: { '@starci/grammar': '1.0.0', react: '19.0.0', '@heroui/react': '2.0.0' } }),
     'apps/web/src/app/page.tsx': 'import { ProductPage } from "@/features/pages/ProductPage"; export default function Route(){ return <ProductPage/> }\n',
-    'apps/web/src/app/globals.css': '@import "@fixture/grammar/core/styles.css";\n',
-    'apps/web/src/features/pages/ProductPage/index.tsx': 'import { Button } from "@fixture/grammar/common"; export const ProductPage=()=> <Button/>\n',
-    'apps/web/src/features/pages/ProductPage/shadow.ts': 'const require=(value:string)=>value; export const local=require("@fixture/grammar/private")\n',
+    [globals]: '@import "@starci/grammar/common.css";\n',
+    [product]: 'import { Button } from "@starci/grammar/common"; export const ProductPage=()=> <Button/>\n',
+    [shadow]: 'const require=(value:string)=>value; export const local=require("@starci/grammar/private")\n',
+    'packages/grammar/package.json': grammarManifest(),
     'packages/grammar/src/common/index.tsx': 'export const Button=()=> <button/>\n',
     'packages/grammar/src/private.tsx': 'export const Button=()=> <button data-private/>\n',
-    'packages/grammar/src/core/styles.css': ':root{}\n',
+    'packages/grammar/src/common.css': ':root{}\n',
   });
-  const packageFile = path.join(root, 'package.json');
-  fs.writeFileSync(packageFile, JSON.stringify({ private: true, dependencies: { '@fixture/grammar': 'file:packages/grammar', react: '19.0.0', '@fixture/theme': '1.0.0' } }));
-  fs.writeFileSync(path.join(root, 'packages/grammar/package.json'), JSON.stringify({ name: '@fixture/grammar',
-    exports: { './common': './src/common/index.tsx', './core/styles.css': './src/core/styles.css' },
-    peerDependencies: { react: '>=18', '@fixture/theme': '>=1' } }));
+  const write = (relative, content) => fs.writeFileSync(path.join(root, relative), content);
   const tsconfigFile = path.join(root, 'tsconfig.json');
   const tsconfig = JSON.parse(fs.readFileSync(tsconfigFile, 'utf8'));
-  tsconfig.compilerOptions.paths['@fixture/grammar/common'] = ['packages/grammar/src/common/index.tsx'];
-  fs.writeFileSync(tsconfigFile, `${JSON.stringify(tsconfig, null, 2)}\n`);
-  const configFile = path.join(root, 'architecture.json');
-  const config = JSON.parse(fs.readFileSync(configFile, 'utf8'));
-  config.owners = [{ id: 'product-page', root: 'apps/web/src/features/pages/ProductPage', entry: 'apps/web/src/features/pages/ProductPage/index.tsx' }];
-  config.frontend = { grammar: { package: '@fixture/grammar', entry: '@fixture/grammar/common',
-    styleEntry: '@fixture/grammar/core/styles.css', styleSources: ['apps/web/src/app/globals.css'], consumerManifests: ['package.json'],
-    peers: ['react', '@fixture/theme'] } };
-  fs.writeFileSync(configFile, `${JSON.stringify(config, null, 2)}\n`);
+  const bindCommon = target => {
+    tsconfig.compilerOptions.paths['@starci/grammar/common'] = [target];
+    fs.writeFileSync(tsconfigFile, `${JSON.stringify(tsconfig, null, 2)}\n`);
+  };
+  bindCommon('packages/grammar/src/common/index.tsx');
   const valid = check(root);
   assert.equal(valid.ok, true, JSON.stringify(valid, null, 2));
-  assert.deepEqual(valid.coverage.ownerPublicApi, { status: 'checked', declarations: 1 });
-  assert.deepEqual(valid.coverage.grammarContract, { status: 'checked', package: '@fixture/grammar' });
+  const owners = ownerIds(root);
+  assert.ok(owners.includes('fe.feature:apps/web/src/features/pages/ProductPage'), JSON.stringify(owners));
+  assert.deepEqual(valid.coverage.ownerPublicApi, { status: 'checked', declarations: owners.length });
+  assert.deepEqual(valid.coverage.grammarContract, { status: 'checked', package: '@starci/grammar' });
   for (const ruleId of ['ARCH_OWNER_EXPORT_BYPASS', 'ARCH_OWNER_EXPORT_STAR', 'ARCH_GRAMMAR_EXPORT_BYPASS', 'ARCH_GRAMMAR_CONTRACT_INVALID']) {
     assert.ok(valid.coverage.checkedRuleIds.includes(ruleId));
   }
 
-  fs.writeFileSync(path.join(root, 'apps/web/src/features/pages/ProductPage/shadow.ts'), 'export const direct=require("@fixture/grammar/private")\n');
+  write(shadow, 'export const direct=require("@starci/grammar/private")\n');
   const realRequireBypass = check(root);
   assert.ok(realRequireBypass.violations.some(item => item.ruleId === 'ARCH_GRAMMAR_EXPORT_BYPASS'
     && item.path.endsWith('/shadow.ts')), JSON.stringify(realRequireBypass, null, 2));
-  fs.writeFileSync(path.join(root, 'apps/web/src/features/pages/ProductPage/shadow.ts'), 'const require=(value:string)=>value; export const local=require("@fixture/grammar/private")\n');
+  write(shadow, 'const require=(value:string)=>value; export const local=require("@starci/grammar/private")\n');
 
-  tsconfig.compilerOptions.paths['@fixture/grammar/common'] = ['packages/grammar/src/private.tsx'];
-  fs.writeFileSync(tsconfigFile, `${JSON.stringify(tsconfig, null, 2)}\n`);
+  bindCommon('packages/grammar/src/private.tsx');
   const misresolved = check(root);
   assert.ok(misresolved.violations.some(item => item.ruleId === 'ARCH_GRAMMAR_EXPORT_BYPASS'), JSON.stringify(misresolved, null, 2));
-  tsconfig.compilerOptions.paths['@fixture/grammar/common'] = ['packages/grammar/src/common/index.tsx'];
-  fs.writeFileSync(tsconfigFile, `${JSON.stringify(tsconfig, null, 2)}\n`);
+  bindCommon('packages/grammar/src/common/index.tsx');
 
-  fs.writeFileSync(path.join(root, 'apps/web/src/app/globals.css'), '@import "@fixture/grammar/core/styles.css";\n@import "@fixture/grammar/heritage/styles.css";\n');
+  write(globals, '@import "@starci/grammar/common.css";\n@import "@starci/grammar/heritage/styles.css";\n');
   const styleBypass = check(root);
-  assert.ok(styleBypass.violations.some(item => item.ruleId === 'ARCH_GRAMMAR_EXPORT_BYPASS' && item.specifier === '@fixture/grammar/heritage/styles.css'), JSON.stringify(styleBypass, null, 2));
+  assert.ok(styleBypass.violations.some(item => item.ruleId === 'ARCH_GRAMMAR_EXPORT_BYPASS' && item.specifier === '@starci/grammar/heritage/styles.css'), JSON.stringify(styleBypass, null, 2));
   assert.ok(styleBypass.violations.some(item => item.ruleId === 'ARCH_GRAMMAR_CONTRACT_INVALID' && /heritage\/styles\.css/.test(item.message)), JSON.stringify(styleBypass, null, 2));
-  fs.writeFileSync(path.join(root, 'apps/web/src/app/globals.css'), '@import url(@fixture/grammar/core/styles.css);\n@import url(@fixture/grammar/heritage/styles.css);\n');
+  write(globals, '@import url(@starci/grammar/common.css);\n@import url(@starci/grammar/heritage/styles.css);\n');
   const unquotedStyleBypass = check(root);
-  assert.ok(unquotedStyleBypass.violations.some(item => item.ruleId === 'ARCH_GRAMMAR_EXPORT_BYPASS' && item.specifier === '@fixture/grammar/heritage/styles.css'), JSON.stringify(unquotedStyleBypass, null, 2));
-  fs.writeFileSync(path.join(root, 'apps/web/src/app/globals.css'), '@import "@fixture/grammar/core/styles.css";\n');
+  assert.ok(unquotedStyleBypass.violations.some(item => item.ruleId === 'ARCH_GRAMMAR_EXPORT_BYPASS' && item.specifier === '@starci/grammar/heritage/styles.css'), JSON.stringify(unquotedStyleBypass, null, 2));
+  write(globals, '@import "@starci/grammar/common.css";\n');
 
-  fs.writeFileSync(path.join(root, 'apps/web/src/features/pages/ProductPage/index.tsx'), 'import { Button } from "@fixture/grammar/core"; export const ProductPage=()=> <Button/>\n');
+  write(product, 'import { Button } from "@starci/grammar/core"; export const ProductPage=()=> <Button/>\n');
   const bypass = check(root);
   assert.ok(bypass.violations.some(item => item.ruleId === 'ARCH_GRAMMAR_EXPORT_BYPASS'), JSON.stringify(bypass, null, 2));
 
-  fs.writeFileSync(path.join(root, 'packages/grammar/package.json'), JSON.stringify({ name: '@fixture/grammar',
-    exports: { './common': './src/common/index.tsx', './core/styles.css': './src/core/styles.css' },
-    peerDependencies: { react: '>=18', '@fixture/theme': '>=1', '@fixture/extra': '>=1' } }));
-  fs.writeFileSync(path.join(root, 'apps/web/src/features/pages/ProductPage/index.tsx'), 'import { Button } from "@fixture/grammar/common"; export const ProductPage=()=> <Button/>\n');
+  write('packages/grammar/package.json', grammarManifest({ '@fixture/extra': '>=1' }));
+  write(product, 'import { Button } from "@starci/grammar/common"; export const ProductPage=()=> <Button/>\n');
   const extraPeer = check(root);
   assert.ok(extraPeer.violations.some(item => item.ruleId === 'ARCH_GRAMMAR_CONTRACT_INVALID' && /exactly match/.test(item.message)), JSON.stringify(extraPeer, null, 2));
 
-  fs.writeFileSync(path.join(root, 'packages/grammar/package.json'), JSON.stringify({ name: '@fixture/grammar', exports: { './common': './src/common/index.tsx' }, peerDependencies: { react: '>=18' } }));
-  fs.writeFileSync(path.join(root, 'apps/web/src/app/globals.css'), ':root{}\n');
+  write('packages/grammar/package.json', JSON.stringify({ name: '@starci/grammar', exports: { './common': './src/common/index.tsx' }, peerDependencies: { react: '>=18' } }));
+  write(globals, ':root{}\n');
   const invalid = check(root);
   assert.ok(invalid.violations.some(item => item.ruleId === 'ARCH_GRAMMAR_CONTRACT_INVALID'), JSON.stringify(invalid, null, 2));
 });
@@ -867,7 +851,6 @@ test('internal aliases and relative imports cannot resolve outside the checked r
 
 test('workspace discovery supports exact and bounded entries and rejects unsupported local patterns', t => {
   const root = fixture(t, 'frontend', {
-    'architecture.json': JSON.stringify({ schema: 'starci/architecture-config@1', kinds: ['frontend'], projects: ['tsconfig.json'] }),
     'package.json': JSON.stringify({ private: true, workspaces: ['apps/web', 'packages/*'] }),
     'tsconfig.json': JSON.stringify({ files: [], references: [{ path: './apps/web' }, { path: './packages/ui' }] }),
     'apps/web/package.json': JSON.stringify({ name: '@fixture/app', private: true }),
@@ -920,48 +903,28 @@ test('backend rejects decorator and declaration roles hidden in config-shaped ap
 });
 
 test('backend composition roots support app source layouts without swallowing modules or features', t => {
-  const standard = fixture(t, 'backend', {
+  const root = fixture(t, 'backend', {
     'src/modules/domain/value.ts': 'export const value=1\n',
     'src/features/feature.ts': 'export const feature=1\n',
     'apps/core/src/main.ts': 'void 0\n',
     'apps/core/src/app.module.ts': 'export const AppModule=1\n',
     'apps/core/src/orders.controller.ts': 'export class OrdersController {}\n',
   });
-  let config = JSON.parse(fs.readFileSync(path.join(standard, 'architecture.json'), 'utf8'));
-  config.backend = { apps: ['apps/core/src'] };fs.writeFileSync(path.join(standard, 'architecture.json'), JSON.stringify(config));
-  let result = check(standard);
+  const result = check(root);
   assert.ok(result.violations.some(item => item.ruleId === 'BE_APP_BUSINESS_ROLE' && item.path === 'apps/core/src/orders.controller.ts'), JSON.stringify(result, null, 2));
   assert.equal(result.violations.some(item => item.path === 'src/modules/domain/value.ts' || item.path === 'src/features/feature.ts'), false, JSON.stringify(result, null, 2));
-
-  const exact = fixture(t, 'backend', {
-    'src/modules/domain/value.ts': 'export const value=1\n',
-    'src/features/feature.ts': 'export const feature=1\n',
-    'apps/core/src/main.ts': 'void 0\n',
-    'apps/core/src/app.module.ts': 'export const AppModule=1\n',
-    'apps/core/src/orders.controller.ts': 'export class OrdersController {}\n',
-  });
-  config = JSON.parse(fs.readFileSync(path.join(exact, 'architecture.json'), 'utf8'));
-  config.backend = { apps: 'apps/core/src' };fs.writeFileSync(path.join(exact, 'architecture.json'), JSON.stringify(config));
-  result = check(exact);
-  assert.ok(result.violations.some(item => item.ruleId === 'BE_APP_BUSINESS_ROLE' && item.path.endsWith('orders.controller.ts')), JSON.stringify(result, null, 2));
 });
 
-test('explicit missing layout roots and empty project programs fail closed', t => {
+test('an empty project program fails closed', t => {
   const root = fixture(t, 'frontend', {
     'apps/web/src/app/home/page.tsx': 'export default function Route(){return null}\n',
     'apps/web/src/features/pages/HomePage/index.tsx': 'export const HomePage=()=>null\n',
   });
-  const configFile = path.join(root, 'architecture.json');
-  const config = JSON.parse(fs.readFileSync(configFile, 'utf8'));
-  config.frontend = { components: 'src/componentz' };
-  fs.writeFileSync(configFile, JSON.stringify(config));
-  let result = check(root);
-  assert.equal(result.errors[0].ruleId, 'ARCH_CONFIG_INVALID');
-  assert.match(result.errors[0].message, /does not exist/);
-  delete config.frontend;
-  fs.writeFileSync(configFile, JSON.stringify(config));
-  fs.writeFileSync(path.join(root, 'tsconfig.json'), JSON.stringify({ files: [], compilerOptions: { noEmit: true } }));
-  result = check(root);
+  // Both the root project and the app workspace project (which would include apps/web/src) select nothing.
+  const empty = JSON.stringify({ files: [], compilerOptions: { noEmit: true } });
+  fs.writeFileSync(path.join(root, 'tsconfig.json'), empty);
+  fs.writeFileSync(path.join(root, 'apps/web/tsconfig.json'), empty);
+  const result = check(root);
   assert.ok(result.errors.some(item => ['ARCH_NO_SOURCE', 'ARCH_TSCONFIG_INVALID'].includes(item.ruleId)), JSON.stringify(result, null, 2));
 });
 
@@ -972,9 +935,11 @@ test('the architecture CLI exits on the record: 0 ok, 1 violations or errors, 2 
   const cli = fileURLToPath(new URL('../scripts/checks/architecture.mjs', import.meta.url));
   const run = (...args) => spawnSync(process.execPath, [cli, ...args], { encoding: 'utf8', windowsHide: true });
   assert.equal(run().status, 2, 'no repository root is a usage error');
-  assert.equal(run('.', '--config').status, 2, '--config without a file is a usage error');
+  assert.equal(run('.', '--config').status, 2, '--config no longer exists: it is an unexpected argument');
+  assert.equal(run('.', '--base').status, 2, '--base without a commit is a usage error');
   const root = fixture(t, 'frontend', { 'apps/web/src/app/page.tsx': 'export default function Page() { return null; }\n' });
-  const unavailable = run(root, '--config', 'architecture.json');
+  assert.equal(run(root, '--config', 'architecture.json').status, 2, 'the retired --config file flag is refused');
+  const unavailable = run(root);
   assert.equal(unavailable.status, 1, 'a check that cannot load the target TypeScript fails');
   const record = JSON.parse(unavailable.stdout);
   assert.equal(record.schema, 'starci/architecture-check@1');

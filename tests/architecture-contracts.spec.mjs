@@ -15,21 +15,19 @@ const ts = require('typescript');
 function writeFiles(root, files) {
   for (const [relative, content] of Object.entries(files)) {
     const target = path.join(root, ...relative.split('/'));
+    if (content === null) continue;
     fs.mkdirSync(path.dirname(target), { recursive: true });
     fs.writeFileSync(target, content);
   }
 }
 
+// Owners are derived: src/features/orders is an owner exactly when it has an index.ts entry. `owners: false` leaves the entry out.
 function fixture(t, files, { owners = true } = {}) {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'starci-architecture-contracts-'));
   t.after(() => fs.rmSync(root, { recursive: true, force: true }));
   writeFiles(root, {
-    'architecture.json': `${JSON.stringify({
-      schema: 'starci/architecture-config@1',
-      kinds: ['backend'],
-      tsconfig: 'tsconfig.json',
-      ...(owners ? { owners: [{ id: 'feature:orders', root: 'src/features/orders', entry: 'src/features/orders/index.ts' }] } : {}),
-    }, null, 2)}\n`,
+    'hfs.json': `${JSON.stringify({ hfs: 2, profile: 'be', project: 'fixture', apps: [{ name: 'core', kind: 'api' }] }, null, 2)}
+`,
     'package.json': '{"private":true}',
     'tsconfig.json': JSON.stringify({ compilerOptions: { target: 'ES2022', module: 'ESNext', moduleResolution: 'Bundler',
       experimentalDecorators: true, strict: true, skipLibCheck: true, noEmit: true }, include: ['src/**/*'] }),
@@ -40,12 +38,13 @@ function fixture(t, files, { owners = true } = {}) {
     'node_modules/@nestjs/graphql/package.json': '{"name":"@nestjs/graphql","types":"index.d.ts"}',
     'node_modules/@nestjs/graphql/index.d.ts': 'export declare function Resolver():ClassDecorator;',
     ...files,
+    ...(owners ? {} : { 'src/features/orders/index.ts': null }),
   });
   return root;
 }
 
 function check(root) {
-  const config = loadArchitectureConfig(root, 'architecture.json');
+  const config = loadArchitectureConfig(root);
   const context = buildTypeScriptContext(config, ts);
   assert.deepEqual(context.errors, [], JSON.stringify(context.errors, null, 2));
   return checkBackendContracts(config, context);
@@ -109,7 +108,7 @@ export const createOrdersModule=(options:{endpoint:string})=>({module:'orders',o
   assert.equal(result.coverage.publicContracts.status, 'checked');
   assert.ok(result.coverage.publicContracts.callableSignatures >= 4, JSON.stringify(result.coverage));
   assert.deepEqual(result.coverage.readonlyBoundaries, { status: 'checked', injectedClasses: 2, messages: 1 });
-  const integrated = checkArchitecture({ repositoryRoot: root, configFile: 'architecture.json', injectedTypeScript: ts });
+  const integrated = checkArchitecture({ repositoryRoot: root, injectedTypeScript: ts });
   assert.deepEqual(integrated.coverage.backendContractTypeForm, result.coverage);
   assert.ok(integrated.coverage.checkedRuleIds.includes(PUBLIC_CONTRACT_RULE_ID));
   assert.ok(integrated.coverage.checkedRuleIds.includes(READONLY_BOUNDARY_RULE_ID));
@@ -182,7 +181,7 @@ import { Injectable } from '@nestjs/common'; const Nest={Injectable}; class Repo
   }, { owners: false });
   const result = check(root);
   assert.equal(result.coverage.publicContracts.status, 'unavailable');
-  assert.ok(result.coverage.publicContracts.details.some(item => /does not declare owners/.test(item)));
+  assert.ok(result.coverage.publicContracts.details.some(item => /no slot owner with an entry file/.test(item)));
   assert.equal(result.coverage.readonlyBoundaries.status, 'unavailable');
   assert.ok(result.coverage.readonlyBoundaries.details.filter(item => /constructed Injectable/.test(item)).length >= 2, JSON.stringify(result, null, 2));
   assert.ok(result.coverage.readonlyBoundaries.details.some(item => /unsupported instance assignment/.test(item)), JSON.stringify(result, null, 2));

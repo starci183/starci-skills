@@ -92,7 +92,7 @@ writes:
         affected builds and Sonar. Resolve real repository scripts and CI thresholds; record
         command, source tree/commit, result and sanitized logs. When it runs the code-pattern gate on
         the slice (`node <Source>/.claude/scripts/checks/check-scoped-lint.mjs --profile nest --root
-        <repo> [--architecture-config <file>] --base <source commit recorded before this slice's first
+        <repo> --base <source commit recorded before this slice's first
         edit> -- <owned files>`, output under STARCI_JOB_SCRATCH), its proof is the report's `slice` verdict on the
         slice's NEW findings: a finding in a file the slice added, on a line it changed, absent at
         base, or one the slice made worse (more occurrences) gates the slice and is this op's to fix;

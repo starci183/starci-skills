@@ -87,11 +87,14 @@ ruleParams:
     globalModules: [src/modules/platform/config/, src/modules/platform/logging/, src/modules/platform/database/]
     # HFS_SIZE_GROWTH: a file above soft may not grow against its parent commit; a new file stays within soft.
     fileLines: {soft: 500, hardGrowth: true}
+    # HFS_DUPLICATE_BLOCK: a token-normalised block of at least this many source lines that appears in two owners.
+    duplicateBlockLines: 25
   fe:
     # Slot budgets (component.tsx 300, hooks 200, modules 400) are stricter than this cap where they apply.
     fileLines: {soft: 500, hardGrowth: true}
     # FE_TRANSPORT_OWNER: the one module per app that may call fetch.
     clientModule: "apps/<app>/src/modules/api/client.ts"
+    duplicateBlockLines: 25
 
 slots:
 
@@ -616,7 +619,7 @@ slots:
     tier: none
     minInstances: 1
     requires: [package.json, next.config.ts, tsconfig.json, postcss.config.mjs, src/app/, src/modules/i18n/, src/modules/api/,
-               "src/app/global-error.tsx", "src/app/[locale]/layout.tsx", "src/app/[locale]/error.tsx", "src/app/[locale]/not-found.tsx"]
+               "src/app/global-error.tsx", "src/app/[locale]/layout.tsx", "src/app/[locale]/error.tsx", "src/app/[locale]/not-found.tsx", "src/app/[locale]/loading.tsx"]
     tests: none
     rules: [FE_APP_ISOLATION, FE_ERROR_BOUNDARY_MISSING, FE_NEXT_CONVENTIONS]
   - id: fe.app-optional

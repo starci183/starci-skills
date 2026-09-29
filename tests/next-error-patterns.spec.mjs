@@ -67,7 +67,7 @@ export default function GlobalError({ error, reset }: BoundaryProps) {
   };
   const write = (file, content) => { const target = path.join(root, file); fs.mkdirSync(path.dirname(target), { recursive: true }); fs.writeFileSync(target, typeof content === 'string' ? content : JSON.stringify(content)); };
   write('package.json', { private: true, dependencies: { next: '15.5.0' }, starci: { codePatterns: { next: { errorState: contract } } } });
-  write('architecture.json', { schema: 'starci/architecture-config@1', kinds: ['frontend'], tsconfig: 'tsconfig.json' });
+  write('hfs.json', { hfs: 2, profile: 'fe', project: 'fixture', apps: [{ name: 'web', kind: 'next' }] });
   write('tsconfig.json', { compilerOptions: { target: 'ES2022', module: 'ESNext', moduleResolution: 'Bundler', jsx: 'preserve', strict: true }, include: ['src/**/*'] });
   for (const [file, content] of Object.entries(files)) write(file, content);
   const typescript = path.dirname(require.resolve('typescript/package.json'));
@@ -77,7 +77,7 @@ export default function GlobalError({ error, reset }: BoundaryProps) {
   write('node_modules/next/dist/client/components/error-boundary.d.ts', 'export interface ErrorBoundaryHandlerProps { error: Error; reset: () => void }');
   const selected = ['src/api/read.ts', 'src/features/save.ts', 'src/app/global-error.tsx'];
   const contextFiles = Object.keys(files).filter(file => !selected.includes(file));
-  return { root, write, contract, files, input: { root, files: selected, contextFiles, ruleIds: NEXT_ERROR_RULES, architectureConfig: 'architecture.json' } };
+  return { root, write, contract, files, input: { root, files: selected, contextFiles, ruleIds: NEXT_ERROR_RULES } };
 }
 
 test('valid envelope, exact feedback site and installed Next boundary are checked together', t => {
@@ -233,28 +233,12 @@ test('source-root omission and undeclared contract paths fail closed', t => {
 test('aggregate-shaped mixed context may overlap selected source while preserving requested files and metadata authority', t => {
   const f = fixture(t);
   f.write('package-lock.json', { lockfileVersion: 3 });
-  const contextFiles = [...f.input.contextFiles, ...f.input.files, 'package.json', 'package-lock.json', 'architecture.json', 'tsconfig.json'];
+  const contextFiles = [...f.input.contextFiles, ...f.input.files, 'package.json', 'package-lock.json', 'tsconfig.json'];
   const result = checkNextErrors({ ...f.input, contextFiles });
   assert.deepEqual(result.errors, []); assert.deepEqual(result.violations, []);
   assert.deepEqual(result.files, [...f.input.files].sort());
-  assert.equal(result.compiler.architectureConfig, 'architecture.json');
   assert.deepEqual(result.compiler.projects, ['tsconfig.json']);
-  assert.deepEqual(result.compiler.metadataFiles, ['architecture.json', 'package-lock.json', 'package.json', 'tsconfig.json']);
-});
-
-test('default architecture authority remains valid when no explicit config path is supplied', t => {
-  const f = fixture(t);
-  f.write('src/components/static.tsx', 'export const Static = () => <p>static</p>;');
-  // Without a config the kind is inferred from the layout - and frontend source roots are inferred only
-  // under workspace packages, never the repository root itself (HFS layout rule).
-  f.write('package.json', { private: true, workspaces: ['app'], dependencies: { next: '15.5.0' }, starci: { codePatterns: { next: { errorState: f.contract } } } });
-  f.write('app/package.json', { name: 'app', private: true });
-  f.write('app/src/app/layout.tsx', 'export default function Layout() { return <html><body/></html>; }');
-  f.write('app/src/components/badge.tsx', 'export const Badge = () => <span>b</span>;');
-  const result = checkNextErrors({ ...f.input, contextFiles: [...f.input.contextFiles, 'src/components/static.tsx', 'package.json', 'tsconfig.json'], architectureConfig: undefined });
-  assert.deepEqual(result.errors, []); assert.deepEqual(result.violations, []);
-  assert.equal(result.compiler.architectureConfig, null);
-  assert.deepEqual(result.compiler.projects, ['tsconfig.json']);
+  assert.deepEqual(result.compiler.metadataFiles, ['package-lock.json', 'package.json', 'tsconfig.json']);
 });
 
 test('throwing-only and static inventories prove conditional error surfaces absent without invented owners', t => {
@@ -269,30 +253,27 @@ test('throwing-only and static inventories prove conditional error surfaces abse
   f.contract.boundaries = [];
   f.contract.requiredValues = [];
   f.write('package.json', { private: true, starci: { codePatterns: { next: { errorState: f.contract } } } });
-  f.write('architecture.json', { schema: 'starci/architecture-config@1', kinds: ['frontend'], tsconfig: 'tsconfig.json',
-    frontend: { routes: ['src/static/app'], transport: ['src/static/api'] } });
-  const input = { ...f.input, files: ['src/static/app/page.tsx'], contextFiles: ['src/static/api/client.ts', 'package.json', 'architecture.json', 'tsconfig.json'] };
+  const input = { ...f.input, files: ['src/static/app/page.tsx'], contextFiles: ['src/static/api/client.ts', 'package.json', 'tsconfig.json'] };
   const result = checkNextErrors(input);
   assert.deepEqual(result.errors, []); assert.deepEqual(result.violations, []);
   assert.deepEqual(result.checkedRuleIds, [...NEXT_ERROR_RULES].sort());
   assert.equal(result.compiler.next, undefined);
 });
 
-test('canonical architecture route coverage prevents narrow source roots from hiding a reserved boundary', t => {
-  const f = fixture(t);
-  f.write('src/static/api/client.ts', `export const staticValue = 'ready' as const;`);
-  f.write('src/static/app/page.tsx', `export default function StaticPage(){return <p>ready</p>}`);
-  Object.assign(f.contract, { sourceRoots: ['src/static'], transports: [{ root: 'src/static/api', mode: 'throwing' }],
+test('the derived route root prevents narrow source roots from hiding a reserved boundary', t => {
+  // Route roots are derived from the layout: apps/<app>/src/app of every hfs.json app. A sourceRoots-narrowed
+  // contract cannot narrow the coverage the route tree owes.
+  const f = fixture(t, files => { for (const file of Object.keys(files)) delete files[file]; });
+  f.write('apps/web/package.json', { name: '@fixture/web', private: true });
+  f.write('apps/web/src/modules/api/client.ts', "export const staticValue = 'ready' as const;");
+  f.write('apps/web/src/app/page.tsx', 'export default function StaticPage(){return <p>ready</p>}');
+  f.write('tsconfig.json', { compilerOptions: { target: 'ES2022', module: 'ESNext', moduleResolution: 'Bundler', jsx: 'preserve', strict: true }, include: ['apps/web/src/**/*'] });
+  Object.assign(f.contract, { sourceRoots: ['apps/web/src/modules'], transports: [{ root: 'apps/web/src/modules/api', mode: 'throwing' }],
     worldMappings: [], envelopes: [], writes: [], boundaries: [], requiredValues: [] });
   f.write('package.json', { private: true, starci: { codePatterns: { next: { errorState: f.contract } } } });
-  // The canonical route roots come from the architecture config: a sourceRoots-narrowed contract cannot
-  // narrow the coverage the route tree owes.
-  f.write('architecture.json', { schema: 'starci/architecture-config@1', kinds: ['frontend'], tsconfig: 'tsconfig.json',
-    frontend: { routes: ['src'], transport: ['src/static/api'] } });
-  const result = checkNextErrors({ root: f.root, files: ['src/static/app/page.tsx'],
-    contextFiles: ['src/static/api/client.ts', 'package.json', 'architecture.json', 'tsconfig.json'],
-    ruleIds: ['FE_NEXT_ERROR_BOUNDARY_LOCATION'], architectureConfig: 'architecture.json' });
-  assert.ok(result.errors.some(item => /coverage is incomplete/.test(item.message)), JSON.stringify(result, null, 2));
+  const result = checkNextErrors({ root: f.root, files: ['apps/web/src/modules/api/client.ts'],
+    contextFiles: ['package.json', 'tsconfig.json'], ruleIds: ['FE_NEXT_ERROR_BOUNDARY_LOCATION'] });
+  assert.ok(result.errors.some(item => /coverage is incomplete/.test(item.message) && item.message.includes('apps/web/src/app/page.tsx')), JSON.stringify(result, null, 2));
 });
 
 test('immutable aliases and local re-exports of installed SWR select world-state applicability', t => {
@@ -307,8 +288,8 @@ export function useData(){return selected('/api/data',async()=>({ok:true}))}`);
     worldMappings: [], envelopes: [], writes: [], boundaries: [], requiredValues: [] });
   f.write('package.json', { private: true, dependencies: { swr: '2.5.1' }, starci: { codePatterns: { next: { errorState: f.contract } } } });
   const result = checkNextErrors({ root: f.root, files: ['src/static/hook.ts'],
-    contextFiles: ['src/static/api/client.ts', 'src/static/swr.ts', 'package.json', 'architecture.json', 'tsconfig.json'],
-    ruleIds: ['FE_ERROR_WORLD_STATE_MAPPING'], architectureConfig: 'architecture.json' });
+    contextFiles: ['src/static/api/client.ts', 'src/static/swr.ts', 'package.json', 'tsconfig.json'],
+    ruleIds: ['FE_ERROR_WORLD_STATE_MAPPING'] });
   assert.ok(result.errors.some(item => /absent world-state surface/.test(item.message)), JSON.stringify(result, null, 2));
 });
 
@@ -318,10 +299,11 @@ test('empty surface declarations cannot hide resolved world/write calls or reser
   f.contract.writes = [];
   f.contract.boundaries = [];
   f.write('package.json', { private: true, starci: { codePatterns: { next: { errorState: f.contract } } } });
-  // Reserved Next boundaries are the route tree's error files: the architecture config names the route roots.
-  f.write('architecture.json', { schema: 'starci/architecture-config@1', kinds: ['frontend'], tsconfig: 'tsconfig.json',
-    frontend: { routes: ['src/app'], transport: ['src/api'] } });
-  const result = checkNextErrors(f.input);
+  // Reserved Next boundaries are the route tree's error files: the derived route root is apps/<app>/src/app.
+  f.write('apps/web/package.json', { name: '@fixture/web', private: true });
+  f.write('apps/web/src/app/error.tsx', "'use client';\nexport default function RouteError(){return <p>failed</p>}");
+  f.write('tsconfig.json', { compilerOptions: { target: 'ES2022', module: 'ESNext', moduleResolution: 'Bundler', jsx: 'preserve', strict: true }, include: ['src/**/*', 'apps/web/src/**/*'] });
+  const result = checkNextErrors({ ...f.input, files: [...f.input.files, 'apps/web/src/app/error.tsx'] });
   assert.ok(result.errors.some(item => /absent world-state surface/.test(item.message)), JSON.stringify(result, null, 2));
   assert.ok(result.errors.some(item => /absent write-feedback surface/.test(item.message)), JSON.stringify(result, null, 2));
   assert.ok(result.errors.some(item => /undeclared reserved boundaries/i.test(item.message)), JSON.stringify(result, null, 2));
@@ -444,12 +426,15 @@ export function CourseOwner(){const query=useCourseWorld();const unused=query.er
 
 test('resolved identities remain stable across separate canonical TypeScript programs', t => {
   const f = fixture(t);
-  f.write('architecture.json', { schema: 'starci/architecture-config@1', kinds: ['frontend'], projects: ['tsconfig.api.json', 'tsconfig.app.json'] });
+  // The TypeScript projects are derived: the root tsconfig.json plus the tsconfig.json of each workspace package.
+  f.write('package.json', { private: true, workspaces: ['packages/*'], dependencies: { next: '15.5.0' }, starci: { codePatterns: { next: { errorState: f.contract } } } });
+  f.write('packages/app/package.json', { name: '@fixture/app', private: true });
   const options = { target: 'ES2022', module: 'ESNext', moduleResolution: 'Bundler', jsx: 'preserve', strict: true };
-  f.write('tsconfig.api.json', { compilerOptions: options, include: ['src/api/envelope.ts', 'src/api/write.ts', 'src/api/use-course.ts', 'src/api/required.ts'] });
-  f.write('tsconfig.app.json', { compilerOptions: options, include: ['src/api/read.ts', 'src/app/**/*', 'src/features/**/*', 'src/ui/**/*'] });
+  f.write('tsconfig.json', { compilerOptions: options, include: ['src/api/envelope.ts', 'src/api/write.ts', 'src/api/use-course.ts', 'src/api/required.ts'] });
+  f.write('packages/app/tsconfig.json', { compilerOptions: options, include: ['../../src/api/read.ts', '../../src/app/**/*', '../../src/features/**/*', '../../src/ui/**/*'] });
   const result = checkNextErrors(f.input);
   assert.deepEqual(result.errors, []); assert.deepEqual(result.violations, []);
+  assert.deepEqual(result.compiler.projects, ['packages/app/tsconfig.json', 'tsconfig.json']);
 });
 
 test('uncalled boundary and world helpers are unavailable rather than credited as reachable UI', t => {

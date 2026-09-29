@@ -690,7 +690,7 @@ export function checkBackendContracts(config, context) {
     return frameworkByChecker.get(checker);
   };
 
-  if (!config.owners?.length) publicReasons.push('architecture.json does not declare owners and public entries for capability API discovery');
+  if (!config.owners?.length) publicReasons.push('no slot owner with an entry file exists, so capability API discovery has no owners to list');
   const ownerRoots = (config.owners ?? []).map(owner => path.resolve(config.root, ...owner.root.split('/')));
   const publicSourceRoots = [...config.backend.features, ...config.backend.modules].map(root => path.resolve(config.root, ...root.split('/')));
   for (const sourceFile of context.files) if (publicSourceRoots.some(root => isInside(root, sourceFile.fileName))

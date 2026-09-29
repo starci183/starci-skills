@@ -2,7 +2,6 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import crypto from 'node:crypto';
 import test from 'node:test';
 import { createRequire } from 'node:module';
 import { checkNextPatterns, NEXT_SCRIPT_RULES } from '../scripts/checks/code-patterns/next.mjs';
@@ -25,13 +24,16 @@ function fixture(t, sources, options = {}) {
     fs.mkdirSync(path.dirname(file), { recursive: true });
     fs.writeFileSync(file, source);
   }
-  const projects = options.projects ?? Object.keys(configs).sort();
-  const architectureBytes = Buffer.from(JSON.stringify({ schema: 'starci/architecture-config@1', kinds: ['frontend'], projects }));
-  fs.writeFileSync(path.join(root, 'architecture.json'), architectureBytes);
+  // The Next TypeScript projects are declared only in package.json#starci.codePatterns.next.projects
+  // (options.projects: null declares none). A package.json a spec supplies keeps its other fields.
+  const projects = options.projects === null ? undefined : options.projects ?? Object.keys(configs).sort();
+  const manifestFile = path.join(root, 'package.json');
+  const manifest = JSON.parse(fs.readFileSync(manifestFile, 'utf8'));
+  const next = manifest.starci?.codePatterns?.next ?? { schema: 'starci/next-code-pattern-contract@1', owners: [], closedVocabularies: [] };
+  if (projects) next.projects = projects;
+  fs.writeFileSync(manifestFile, JSON.stringify({ ...manifest, starci: { ...manifest.starci, codePatterns: { ...manifest.starci?.codePatterns, next } } }));
   t.after(() => fs.rmSync(root, { recursive: true, force: true }));
-  return { root, files: Object.keys(sources).filter(relative => /\.tsx?$/.test(relative)).sort(), contextFiles: ['architecture.json', 'package.json'],
-    architectureProjects: { schema: 'starci/typescript-project-selection@1', configPath: 'architecture.json',
-      configDigest: crypto.createHash('sha256').update(architectureBytes).digest('hex'), projects } };
+  return { root, files: Object.keys(sources).filter(relative => /\.tsx?$/.test(relative)).sort(), contextFiles: ['package.json'] };
 }
 
 test('readonly props checks direct, nested, collection and tuple syntax without inventing domain state', t => {
@@ -154,45 +156,23 @@ test('project authority assigns every selected source to its canonical TypeScrip
   } });
   const result = checkNextPatterns({ ...context, ruleIds: ['FE_READONLY_PROPS_CONTRACT'] });
   assert.deepEqual(result.errors, [], JSON.stringify(result, null, 2));
-  assert.equal(result.compiler.projectAuthority.source, 'architecture');
+  assert.equal(result.compiler.projectAuthority.source, 'package');
   assert.deepEqual(result.compiler.projects.map(item => [item.path, item.selectedSourceCount]), [
     ['apps/web/tsconfig.json', 1], ['packages/ui/tsconfig.json', 1],
   ]);
-  const stale = checkNextPatterns({ ...context, architectureProjects: { ...context.architectureProjects, configDigest: '0'.repeat(64) },
-    ruleIds: ['FE_READONLY_PROPS_CONTRACT'] });
-  assert.ok(stale.errors.some(item => /digest does not match/.test(item.message)), JSON.stringify(stale, null, 2));
-  const rebound = checkNextPatterns({ ...context, architectureProjects: { ...context.architectureProjects, projects: ['apps/web/tsconfig.json'] },
-    ruleIds: ['FE_READONLY_PROPS_CONTRACT'] });
-  assert.ok(rebound.errors.some(item => /list disagrees with the bound architecture config/.test(item.message)), JSON.stringify(rebound, null, 2));
 });
 
-test('project authority mirrors the canonical singular tsconfig architecture form', t => {
+test('project authority is the package contract only, and a missing declaration is one explicit error', t => {
   const context = fixture(t, {
     'src/Card.tsx': 'export type CardProps = { readonly label: string }\n',
   });
-  const bytes = Buffer.from(JSON.stringify({ schema: 'starci/architecture-config@1', kinds: ['frontend'], tsconfig: 'tsconfig.json' }));
-  fs.writeFileSync(path.join(context.root, 'architecture.json'), bytes);
-  const result = checkNextPatterns({ ...context, architectureProjects: { ...context.architectureProjects,
-    configDigest: crypto.createHash('sha256').update(bytes).digest('hex'), projects: ['tsconfig.json'] },
-  ruleIds: ['FE_READONLY_PROPS_CONTRACT'] });
-  assert.deepEqual(result.errors, [], JSON.stringify(result, null, 2));
-  assert.equal(result.compiler.projectAuthority.source, 'architecture');
-});
-
-test('package project fallback is explicit and cannot disagree with canonical architecture authority', t => {
-  const packageContract = { schema: 'starci/next-code-pattern-contract@1', owners: [], closedVocabularies: [], projects: ['tsconfig.json'] };
-  const context = fixture(t, {
-    'package.json': JSON.stringify({ private: true, starci: { codePatterns: { next: packageContract } } }),
-    'src/Card.tsx': 'export type CardProps = { readonly label: string }\n',
-  });
-  const fallback = checkNextPatterns({ root: context.root, files: context.files, ruleIds: ['FE_READONLY_PROPS_CONTRACT'] });
-  assert.deepEqual(fallback.errors, [], JSON.stringify(fallback, null, 2));
-  assert.equal(fallback.compiler.projectAuthority.source, 'package');
-  fs.writeFileSync(path.join(context.root, 'tsconfig.other.json'), JSON.stringify({ include: ['src/**/*.tsx'] }));
-  packageContract.projects = ['tsconfig.other.json'];
-  fs.writeFileSync(path.join(context.root, 'package.json'), JSON.stringify({ private: true, starci: { codePatterns: { next: packageContract } } }));
-  const conflict = checkNextPatterns({ ...context, ruleIds: ['FE_READONLY_PROPS_CONTRACT'] });
-  assert.ok(conflict.errors.some(item => /disagree/.test(item.message)), JSON.stringify(conflict, null, 2));
+  const declared = checkNextPatterns({ ...context, ruleIds: ['FE_READONLY_PROPS_CONTRACT'] });
+  assert.deepEqual(declared.errors, [], JSON.stringify(declared, null, 2));
+  assert.deepEqual(declared.compiler.projectAuthority, { source: 'package' });
+  const bare = fixture(t, { 'src/Card.tsx': 'export type CardProps = { readonly label: string }\n' }, { projects: null });
+  const missing = checkNextPatterns({ ...bare, ruleIds: ['FE_READONLY_PROPS_CONTRACT'] });
+  assert.deepEqual(missing.compiler.projectAuthority, { source: null });
+  assert.equal(missing.errors.filter(item => /needs package\.json#starci\.codePatterns\.next\.projects/.test(item.message)).length, 1, JSON.stringify(missing, null, 2));
 });
 
 test('project coverage fails unavailable for uncovered or compiler-conflicting overlap', t => {
@@ -501,7 +481,7 @@ test('closed vocabulary metadata binds nonconventional project roles and validat
     private: true,
     starci: { codePatterns: { next: { schema: 'starci/next-code-pattern-contract@1', owners: [], closedVocabularies: [
       { path: 'src/features/auth/phase.ts', type: 'AuthenticationPhase', inventory: 'AUTH_MODES', role: 'mode' },
-    ] } } },
+    ], projects: ['tsconfig.json'] } } },
   };
   const context = fixture(t, {
     'package.json': JSON.stringify(packageJson),

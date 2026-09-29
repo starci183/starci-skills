@@ -35,19 +35,19 @@ function fixture(t,obligations){
   link('typescript');writeHfsTree(root,'frontend');
   const manifest={private:true,workspaces:['apps/*']};
   write('package.json',manifest);write('package-lock.json',{lockfileVersion:3});
-  write('architecture.json',{schema:'starci/architecture-config@1',kinds:['frontend'],tsconfig:'tsconfig.json'});
+  write('hfs.json',{hfs:2,profile:'fe',project:'fixture',apps:[{name:'web',kind:'next'}]});
   write('tsconfig.json',{compilerOptions:{module:'ESNext',moduleResolution:'Bundler',target:'ES2022',strict:true},include:['apps/web/src/**/*.ts']});
   const profileCatalog={schema:'starci/code-pattern-profile@1',profiles:{next:{
     title:'Next adapter integration',canon:{package:'@starci/eslint-canon-fe',version:'1.0.0',contentDigest:{algorithm:'sha256',include:['**/*.mjs'],exclude:[],framing:'sorted-posix-relative-path-null-raw-bytes-null',value:digest,files:1}},
     sourceRuleRoots:['knowledge/patterns/fe'],expectedSourceRuleIds:['FE-ERROR-2'],sourceGlobs:['apps/web/src/**/*.ts'],
-    inputGlobs:['package.json','package-lock.json','architecture.json','tsconfig.json'],obligations,semanticOnly:[],
+    inputGlobs:['package.json','package-lock.json','hfs.json','tsconfig.json'],obligations,semanticOnly:[],
   }}};
   // This ESLint stub isolates aggregate binding. TypeScript, architecture and selected script adapters are real.
   const runtime={package:{name:'@starci/eslint-canon-fe',version:'1.0.0',digest,files:1},canon:{rules:{},recommended:{}},builtinRules:new Map(),typescriptRules:{},eslintVersion:'fixture',eslint:{
     isPathIgnored:async()=>false,calculateConfigForFile:async()=>({linterOptions:{noInlineConfig:true},rules:{},plugins:{}}),
     lintFiles:async files=>files.map(filePath=>({filePath,messages:[],suppressedMessages:[],errorCount:0,warningCount:0,fatalErrorCount:0})),
   }};
-  const options={profile:'next',profileCatalog,runtime,all:true,architectureConfig:'architecture.json'};
+  const options={profile:'next',profileCatalog,runtime,all:true};
   return {root,write,link,manifest,profileCatalog,runtime,options,check:overrides=>{trackHfsTree(root);return checkScopedLint(root,[],{...options,...overrides});}};
 }
 
@@ -81,7 +81,7 @@ test('aggregate rejects claimed SWR rule IDs without matching lifecycle coverage
   assert.ok(report.issues.some(item=>item.code==='ARCHITECTURE_DATA_LIFECYCLE_UNAVAILABLE'));
 });
 
-test('Next error adapter receives canonical project config and mixed overlapping source/metadata context',async t=>{
+test('Next error adapter derives its TypeScript projects from the repository and receives mixed overlapping source/metadata context',async t=>{
   const f=fixture(t,[obligation('SOURCE','architecture',['ARCH_SYNTAX_INVALID']),obligation('ENVELOPE','script',['FE_ERROR_ENVELOPE_POLICY'])]);
   f.manifest.starci={codePatterns:{next:{errorState:{schema:'starci/next-error-state@1',sourceRoots:['apps/web/src'],worldMappings:[],writes:[],boundaries:[],
     transports:[{root:'apps/web/src/modules/api',mode:'envelope',envelopeIds:['read']}],envelopes:[{id:'read',type:{path:'apps/web/src/modules/api/envelope.ts',export:'Envelope'},discriminator:{field:'ok',success:true},dataField:'data',errorFields:['error'],readers:[{path:'apps/web/src/modules/api/read.ts',export:'read',emptyData:'valid'}]}],
@@ -91,7 +91,7 @@ test('Next error adapter receives canonical project config and mixed overlapping
   f.write('apps/web/src/modules/api/read.ts',source);
   let report=await f.check();assert.equal(report.status,'clean',JSON.stringify(report.issues));
   const result=report.machineResults.find(item=>item.obligation==='ENVELOPE');
-  assert.equal(result.compiler.architectureConfig,'architecture.json');
+  assert.deepEqual(result.compiler.projects,['apps/web/tsconfig.json','tsconfig.json']);
   assert.deepEqual(result.checkedRuleIds,['FE_ERROR_ENVELOPE_POLICY']);
   f.write('apps/web/src/modules/api/read.ts',source.replace('if(!result.ok)throw new Error(result.error);',''));
   report=await f.check();assert.equal(report.status,'findings',JSON.stringify(report.issues));
@@ -108,12 +108,12 @@ test('Grammar execution evidence survives the aggregate and guard regression fai
 export function defineGrammarRuleConformance(value){const rules=[...value.inheritedCommonRules,...Object.keys(value.familyEvidence)];if(!rules.includes('A')||rules.some(item=>item!=='A'))throw new TypeError('invalid');return value;}
 export function assertPresentationState(value){if(value!=='ready')throw new TypeError('invalid');}`;
   f.write('node_modules/@starci/grammar/dist/common.js',source);
-  let report=await f.check({architectureConfig:null});assert.equal(report.status,'clean',JSON.stringify(report.issues));
+  let report=await f.check();assert.equal(report.status,'clean',JSON.stringify(report.issues));
   const validate=new Ajv2020({strict:true}).compile(parseYaml(fs.readFileSync(new URL('../modules/schemas/code-pattern-check.schema.yaml',import.meta.url),'utf8')));
   assert.equal(validate(report),true,JSON.stringify(validate.errors));
   const proof=report.machineResults.find(item=>item.obligation==='GRAMMAR').execution;
   assert.equal(proof.engine,'node-esm-import');assert.equal(proof.vectors.requiredRules,1);assert.ok(proof.package.inputDigest);
   f.write('node_modules/@starci/grammar/dist/common.js',source.replace("if(value!=='ready')throw new TypeError('invalid');",''));
-  report=await f.check({architectureConfig:null});assert.equal(report.status,'findings',JSON.stringify(report.issues));
+  report=await f.check();assert.equal(report.status,'findings',JSON.stringify(report.issues));
   assert.ok(report.issues.some(item=>item.ruleId==='FE_GRAMMAR_GUARD_BEHAVIOR'));
 });

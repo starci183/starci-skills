@@ -37,7 +37,7 @@ export const HFS_RULE_IDS = [
   'HFS_WORK_IN_FE',
 ];
 
-const REQUIRED_COMMON = ['.gitattributes', '.github', '.gitignore', '.husky', 'architecture.json',
+const REQUIRED_COMMON = ['.gitattributes', '.github', '.gitignore', '.husky', 'hfs.json',
   'codecov.yml', 'eslint.config.mjs', 'package-lock.json', 'package.json', 'README.md',
   'sonar-project.properties', 'tsconfig.json'];
 const OPTIONAL_COMMON = new Set(['.dockerignore', '.editorconfig', '.npmrc', '.nvmrc', 'docs', 'e2e',
@@ -412,16 +412,17 @@ export function checkHfs(config) {
 }
 
 /** Keep tree findings visible even when the TypeScript architecture config is invalid. */
-export function checkHfsWithoutConfig(repositoryRoot, configFile) {
+export function checkHfsWithoutConfig(repositoryRoot) {
   let root;
   try { root = fs.realpathSync(path.resolve(repositoryRoot)); } catch {
     return { violations: [], coverage: { status: 'unavailable', reason: 'repository root is unavailable' } };
   }
   let kinds = [];
   try {
-    const authored = JSON.parse(fs.readFileSync(path.resolve(root, configFile ?? 'architecture.json'), 'utf8'));
-    if (Array.isArray(authored.kinds)) kinds = authored.kinds.filter(kind => kind === 'backend' || kind === 'frontend');
-  } catch { /* A malformed config remains an ARCH_CONFIG_INVALID error. */ }
+    const authored = JSON.parse(fs.readFileSync(path.resolve(root, 'hfs.json'), 'utf8'));
+    if (authored.profile === 'be') kinds = ['backend'];
+    else if (authored.profile === 'fe') kinds = ['frontend'];
+  } catch { /* A malformed hfs.json remains an HFS_DECLARATION_INVALID error. */ }
   if (!kinds.length) {
     try {
       const pkg = JSON.parse(fs.readFileSync(path.join(root, 'package.json'), 'utf8'));

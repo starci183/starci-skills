@@ -3,31 +3,13 @@ import path from 'node:path';
 import { slash } from '../../lib/path-key.mjs';
 import { readJsonFile as readJson } from '../../lib/json.mjs';
 import { isInside } from '../common.mjs';
+import { openHfs } from '../../lib/hfs-slots.mjs';
 
-const CONFIG_SCHEMA = 'starci/architecture-config@1';
-const KINDS = new Set(['backend', 'frontend']);
-const TOP_LEVEL_KEYS = new Set(['schema', 'kinds', 'tsconfig', 'projects', 'backend', 'frontend', 'owners']);
-const BACKEND_KEYS = new Set(['modules', 'features', 'apps', 'moduleRegistration']);
-const FRONTEND_KEYS = new Set(['routes', 'features', 'components', 'hooks', 'modules', 'transport', 'grammar']);
-const OWNER_KEYS = new Set(['id', 'root', 'entry']);
-const GRAMMAR_KEYS = new Set(['package', 'entry', 'styleEntry', 'styleSources', 'consumerManifests', 'peers']);
-const PRODUCTION_SOURCE = /\.(?:[cm]?[jt]sx?)$/i;
-const DECLARATION_SOURCE = /\.d\.[cm]?[jt]s$/i;
-const MODULE_REGISTRATION_KEYS = new Set(['providerIdentity', 'handlerDecorators']);
-const HANDLER_DECORATORS = new Set(['CommandHandler', 'QueryHandler']);
 
 /** A file's identity: its resolved real path, or the resolved path when it does not exist. */
 function canonical(file) {
   const absolute = path.resolve(file);
   try { return path.resolve(fs.realpathSync(absolute)); } catch { return absolute; }
-}
-
-function safeRelative(value, label) {
-  if (typeof value !== 'string' || !value.trim()) throw Error(`${label} must be a non-empty relative path.`);
-  if (path.isAbsolute(value.trim())) throw Error(`${label} must stay inside the repository.`);
-  const normalized = slash(value.trim()).replace(/^\.\//, '');
-  if (path.posix.isAbsolute(normalized) || /^[A-Za-z]:/.test(normalized) || normalized.split('/').includes('..')) throw Error(`${label} must stay inside the repository.`);
-  return normalized.replace(/\/$/, '');
 }
 
 function exactKeys(value, allowed, label) {
@@ -189,43 +171,6 @@ function inferredLayout(root, workspaces) {
   };
 }
 
-function inferredKinds(root, layout) {
-  const kinds = [];
-  if (existingDirectory(root, 'src/features') && existingDirectory(root, 'src/modules')) kinds.push('backend');
-  if (layout.routes.length && layout.components.length) kinds.push('frontend');
-  return kinds;
-}
-
-function readConfig(root, configFile) {
-  if (!configFile) return {};
-  const absolute = path.resolve(root, configFile);
-  if (!isInside(root, absolute)) throw Error('Architecture config must stay inside the repository.');
-  const stat = fs.lstatSync(absolute);
-  if (!stat.isFile() || stat.isSymbolicLink()) throw Error('Architecture config must be a regular file, not a link.');
-  let parsed;
-  try {
-    parsed = JSON.parse(fs.readFileSync(absolute, 'utf8'));
-  } catch {
-    throw Error('Architecture config must be valid JSON; file content was not echoed.');
-  }
-  exactKeys(parsed, TOP_LEVEL_KEYS, 'Architecture config');
-  if (parsed.schema !== CONFIG_SCHEMA) throw Error(`Architecture config schema must be ${CONFIG_SCHEMA}.`);
-  return parsed;
-}
-
-function pathList(value, defaults, label) {
-  const list = value === undefined ? defaults : (Array.isArray(value) ? value : [value]);
-  if (!Array.isArray(list) || list.length === 0) throw Error(`${label} must contain at least one path.`);
-  const normalized = list.map(item => safeRelative(item, label));
-  if (new Set(normalized).size !== normalized.length) throw Error(`${label} paths must be unique.`);
-  return normalized;
-}
-
-function frontendPathList(value, discovered, fallback, label) {
-  const selected = pathList(value, discovered.length ? discovered : fallback, label);
-  return [...new Set([...selected, ...discovered])];
-}
-
 function assertFrontendRolesDisjoint(root, frontend) {
   const roles = ['routes', 'features', 'components', 'hooks', 'modules'];
   const entries = roles.flatMap(role => frontend[role].map(relative => ({
@@ -242,128 +187,117 @@ function assertFrontendRolesDisjoint(root, frontend) {
   }
 }
 
-function requireAuthoredDirectories(root, value, label) {
-  if (value === undefined) return;
-  for (const relative of (Array.isArray(value) ? value : [value]).map(item => safeRelative(item, label))) {
-    if (!existingDirectory(root, relative)) throw Error(`${label} path does not exist: ${relative}.`);
-  }
-}
+const SKIPPED_DIRECTORIES = new Set(['node_modules', '.git', 'dist', '.next', '.turbo', 'coverage', 'test-results', 'playwright-report', '.starciwork', '.starcistacks']);
 
-function configuredOwners(root, value) {
-  if (value === undefined) return null;
-  if (!Array.isArray(value)) throw Error('Architecture owners must be an array.');
-  const owners = value.map((owner, index) => {
-    exactKeys(owner, OWNER_KEYS, `Architecture owners[${index}]`);
-    if (typeof owner.id !== 'string' || !owner.id.trim()) throw Error(`Architecture owners[${index}].id must be non-empty.`);
-    const ownerRoot = safeRelative(owner.root, `Architecture owners[${index}].root`);
-    const entry = safeRelative(owner.entry, `Architecture owners[${index}].entry`);
-    if (!existingDirectory(root, ownerRoot)) throw Error(`Architecture owner root does not exist: ${ownerRoot}.`);
-    if (!existingRegularFile(root, entry)) throw Error(`Architecture owner entry must be a regular non-link file: ${entry}.`);
-    if (!PRODUCTION_SOURCE.test(entry) || DECLARATION_SOURCE.test(entry)) {
-      throw Error(`Architecture owner entry must be a production TypeScript or JavaScript source file: ${entry}.`);
+function directoriesUnder(root, relative, depth) {
+  const out = [];
+  const visit = (dir, left) => {
+    let entries;
+    try { entries = fs.readdirSync(path.join(root, ...dir.split('/').filter(Boolean)), { withFileTypes: true }); } catch { return; }
+    for (const entry of entries) {
+      if (!entry.isDirectory() || SKIPPED_DIRECTORIES.has(entry.name)) continue;
+      const child = dir ? `${dir}/${entry.name}` : entry.name;
+      out.push(child);
+      if (left > 1) visit(child, left - 1);
     }
-    if (!isInside(path.join(root, ownerRoot), path.join(root, entry))) throw Error(`Architecture owner entry must stay inside ${ownerRoot}.`);
-    return { id: owner.id.trim(), root: ownerRoot, entry };
-  });
-  for (const field of ['id', 'root', 'entry']) if (new Set(owners.map(owner => owner[field])).size !== owners.length) {
-    throw Error(`Architecture owner ${field} values must be unique.`);
-  }
-  return owners;
+  };
+  visit(relative, depth);
+  return out;
 }
 
-function grammarConfig(root, value) {
-  if (value === undefined) return null;
-  exactKeys(value, GRAMMAR_KEYS, 'Architecture frontend.grammar');
-  for (const key of ['package', 'entry', 'styleEntry']) if (typeof value[key] !== 'string' || !value[key].trim()) {
-    throw Error(`Architecture frontend.grammar.${key} must be non-empty.`);
+/** The owner entry a slot instance exposes: index.ts/index.tsx, a package's src/index.ts, an app's app.module.ts. */
+function ownerEntry(root, ownerRoot, tier) {
+  const candidates = tier === 'package' ? ['src/index.ts', 'src/index.tsx', 'index.ts', 'index.tsx']
+    : tier === 'app' ? ['app.module.ts'] : ['index.ts', 'index.tsx'];
+  for (const candidate of candidates) {
+    const relative = `${ownerRoot}/${candidate}`;
+    if (existingRegularFile(root, relative)) return relative;
   }
-  const packageName = value.package.trim();
-  const entry = value.entry.trim();
-  const styleEntry = value.styleEntry.trim();
-  if (!entry.startsWith(`${packageName}/`) || !styleEntry.startsWith(`${packageName}/`) || !styleEntry.endsWith('.css')) {
-    throw Error('Architecture frontend.grammar entries must be subpaths of its package and styleEntry must end in .css.');
-  }
-  const styleSources = Array.isArray(value.styleSources)
-    ? value.styleSources.map(source => safeRelative(source, 'Architecture frontend.grammar.styleSources')) : [];
-  if (!styleSources.length || new Set(styleSources).size !== styleSources.length
-    || styleSources.some(source => !existingRegularFile(root, source) || !source.endsWith('.css'))) {
-    throw Error('Architecture frontend.grammar.styleSources must name existing regular non-link CSS files.');
-  }
-  const consumerManifests = Array.isArray(value.consumerManifests)
-    ? value.consumerManifests.map(source => safeRelative(source, 'Architecture frontend.grammar.consumerManifests')) : [];
-  if (!consumerManifests.length || new Set(consumerManifests).size !== consumerManifests.length
-    || consumerManifests.some(source => path.posix.basename(source) !== 'package.json' || !existingRegularFile(root, source))) {
-    throw Error('Architecture frontend.grammar.consumerManifests must name existing regular non-link package.json files.');
-  }
-  if (styleSources.some(source => !consumerManifests.some(manifest => isInside(path.join(root, path.posix.dirname(manifest)), path.join(root, source))))) {
-    throw Error('Architecture frontend.grammar.styleSources must stay inside a declared consumer package.');
-  }
-  const peers = Array.isArray(value.peers) ? value.peers.map(item => typeof item === 'string' ? item.trim() : '') : [];
-  if (!peers.length || peers.some(item => !item) || new Set(peers).size !== peers.length) throw Error('Architecture frontend.grammar.peers must contain unique package names.');
-  return { package: packageName, entry, styleEntry, styleSources, consumerManifests, peers };
+  return null;
 }
 
-function moduleRegistrationConfig(value) {
-  if (value === undefined) return null;
-  exactKeys(value, MODULE_REGISTRATION_KEYS, 'Architecture backend.moduleRegistration');
-  if (value.providerIdentity !== 'exported-class-token') {
-    throw Error('Architecture backend.moduleRegistration.providerIdentity must be exported-class-token.');
+/**
+ * Owners are derived from the slot manifest: every directory that an `owner: true` slot matches, with its entry file.
+ * An instance with no entry file is not listed: the required-files check reports the missing entry.
+ */
+function derivedOwners(root, resolver) {
+  const seen = new Map();
+  for (const directory of directoriesUnder(root, '', 6)) {
+    const owner = resolver.ownerOf(directory);
+    if (!owner || owner.root !== directory || seen.has(owner.root)) continue;
+    const slot = resolver.slot(owner.slot);
+    const entry = ownerEntry(root, owner.root, slot.tier);
+    if (entry) seen.set(owner.root, { id: `${owner.slot}:${owner.root}`, root: owner.root, entry, slot: owner.slot, tier: slot.tier });
   }
-  if (!Array.isArray(value.handlerDecorators) || new Set(value.handlerDecorators).size !== value.handlerDecorators.length
-    || value.handlerDecorators.some(item => !HANDLER_DECORATORS.has(item))) {
-    throw Error('Architecture backend.moduleRegistration.handlerDecorators must contain unique CommandHandler and/or QueryHandler names.');
-  }
-  return { providerIdentity: value.providerIdentity, handlerDecorators: [...value.handlerDecorators].sort() };
+  return [...seen.values()].sort((a, b) => a.root.localeCompare(b.root));
 }
 
-/** Resolve a strict layout contract. It deliberately has no ignore, waiver, or baseline field. */
-export function loadArchitectureConfig(repositoryRoot, configFile) {
+const DECLARED_HANDLER_DECORATORS = ['CommandHandler', 'QueryHandler'];
+
+const GRAMMAR_PACKAGE = '@starci/grammar';
+
+/**
+ * The Grammar contract of a frontend repository, derived rather than declared: every app's globals.css is a style
+ * source, every app and every workspace package that depends on the Grammar package is a consumer. null when no app has
+ * a globals.css to judge (the contract is then reported unavailable, never passed).
+ */
+function derivedGrammar(root, apps, workspaces) {
+  const styleSources = apps.map(app => `apps/${app.name}/src/app/globals.css`).filter(relative => existingRegularFile(root, relative));
+  if (!styleSources.length) return null;
+  const consumerManifests = apps.map(app => `apps/${app.name}/package.json`).filter(relative => existingRegularFile(root, relative));
+  for (const workspace of workspaces) {
+    if (!workspace.startsWith('packages/')) continue;
+    const manifest = `${workspace}/package.json`;
+    const pkg = readJson(path.join(root, ...manifest.split('/')));
+    if (pkg && [pkg.dependencies, pkg.peerDependencies, pkg.devDependencies].some(section => section && Object.hasOwn(section, GRAMMAR_PACKAGE))) consumerManifests.push(manifest);
+  }
+  if (!consumerManifests.length) return null;
+  return { package: GRAMMAR_PACKAGE, entry: `${GRAMMAR_PACKAGE}/common`, styleEntry: `${GRAMMAR_PACKAGE}/common.css`, styleSources, consumerManifests, peers: ['react', '@heroui/react'] };
+}
+
+/**
+ * Resolve the layout contract from hfs.json and the slot manifest (knowledge/hfs/slots.yaml). architecture.json is
+ * retired: a repository carries only hfs.json. Owners, roots and the tier of every path come from slots; the contract
+ * has no ignore, waiver or baseline field.
+ */
+export function loadArchitectureConfig(repositoryRoot, { hfs } = {}) {
   const root = fs.realpathSync(path.resolve(repositoryRoot));
   if (!fs.lstatSync(root).isDirectory()) throw Error('Repository root must be a directory.');
-  const authored = readConfig(root, configFile);
-  if (authored.tsconfig !== undefined && authored.projects !== undefined) throw Error('Architecture config must use tsconfig or projects, not both.');
+  const opened = hfs ?? openHfs({ repoRoot: root });
+  const { profile, apps } = opened.repo;
   const workspaces = workspaceDirectories(root);
-  const inferred = inferredLayout(root, workspaces);
-  const kinds = authored.kinds ?? inferredKinds(root, inferred);
-  if (!Array.isArray(kinds) || kinds.length === 0 || kinds.some(kind => !KINDS.has(kind))) {
-    throw Error('Architecture kind could not be inferred; config kinds must contain backend and/or frontend.');
-  }
-  if (new Set(kinds).size !== kinds.length) throw Error('Architecture config kinds must be unique.');
-  const backend = authored.backend ?? {};
-  const frontend = authored.frontend ?? {};
-  exactKeys(backend, BACKEND_KEYS, 'Architecture config backend');
-  exactKeys(frontend, FRONTEND_KEYS, 'Architecture config frontend');
-  for (const key of ['modules', 'features', 'apps']) requireAuthoredDirectories(root, backend[key], `Architecture backend.${key}`);
-  for (const key of ['routes', 'features', 'components', 'hooks', 'modules', 'transport']) requireAuthoredDirectories(root, frontend[key], `Architecture frontend.${key}`);
-  const discovered = discoveredProjects(root, workspaces);
-  const projects = pathList(authored.projects ?? authored.tsconfig, discovered, 'Architecture TypeScript project');
-  const resolvedBackend = {
-    modules: pathList(backend.modules, ['src/modules'], 'Architecture backend.modules'),
-    features: pathList(backend.features, ['src/features'], 'Architecture backend.features'),
-    apps: pathList(backend.apps, ['apps'], 'Architecture backend.apps'),
-    moduleRegistration: moduleRegistrationConfig(backend.moduleRegistration),
+  const inferred = inferredLayout(root, [...new Set([...workspaces, ...apps.map(app => `apps/${app.name}`)])].sort());
+  const kinds = [profile === 'be' ? 'backend' : 'frontend'];
+  const projects = discoveredProjects(root, workspaces);
+  if (!projects.length) throw Error('The repository has no tsconfig.json to derive a TypeScript project from.');
+  const backend = {
+    modules: ['src/modules'],
+    features: ['src/features'],
+    apps: ['apps'],
+    moduleRegistration: { providerIdentity: 'exported-class-token', handlerDecorators: [...DECLARED_HANDLER_DECORATORS] },
   };
-  const owners = configuredOwners(root, authored.owners);
-  const resolvedFrontend = {
-    routes: frontendPathList(frontend.routes, inferred.routes, ['apps/app/src/app'], 'Architecture frontend.routes'),
-    features: frontendPathList(frontend.features, inferred.features, ['apps/app/src/features'], 'Architecture frontend.features'),
-    components: frontendPathList(frontend.components, inferred.components, ['apps/app/src/components'], 'Architecture frontend.components'),
-    hooks: frontendPathList(frontend.hooks, inferred.hooks, ['apps/app/src/hooks'], 'Architecture frontend.hooks'),
-    modules: frontendPathList(frontend.modules, inferred.modules, ['apps/app/src/modules'], 'Architecture frontend.modules'),
-    transport: frontendPathList(frontend.transport, inferred.transport, ['apps/app/src/modules/api'], 'Architecture frontend.transport'),
-    grammar: grammarConfig(root, frontend.grammar),
+  const frontend = {
+    routes: inferred.routes,
+    features: inferred.features,
+    components: inferred.components,
+    hooks: inferred.hooks,
+    modules: inferred.modules,
+    transport: inferred.transport,
+    grammar: profile === 'fe' ? derivedGrammar(root, apps, workspaces) : null,
   };
-  assertFrontendRolesDisjoint(root, resolvedFrontend);
+  if (profile === 'fe') assertFrontendRolesDisjoint(root, frontend);
   return {
     root,
     repository: enclosingRepository(root),
-    kinds: [...kinds].sort(),
+    kinds,
     projects,
     workspaces,
-    owners,
-    backend: resolvedBackend,
-    frontend: resolvedFrontend,
+    apps: apps.map(app => ({ name: app.name, kind: app.kind })),
+    hfs: opened,
+    owners: derivedOwners(root, opened),
+    backend,
+    frontend,
   };
 }
 
-export { canonical, CONFIG_SCHEMA, enclosingRepository, exactKeys, isInside, slash };
+export { canonical, enclosingRepository, exactKeys, isInside, slash };

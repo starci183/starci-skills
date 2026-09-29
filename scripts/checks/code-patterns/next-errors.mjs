@@ -1286,7 +1286,7 @@ function insideSourceRoots(relative, roots) {
 }
 
 /** Check explicitly selected Next error-state contracts without running application code. */
-export function checkNextErrors({ root, files, ruleIds, contextFiles = [], sourceContextFiles, architectureConfig } = {}) {
+export function checkNextErrors({ root, files, ruleIds, contextFiles = [], sourceContextFiles } = {}) {
   const result = scriptReport('', ruleIds ?? []);
   try {
     const repository = fs.realpathSync(path.resolve(root)); result.repository = repository;
@@ -1300,7 +1300,7 @@ export function checkNextErrors({ root, files, ruleIds, contextFiles = [], sourc
     for (const relative of contextFiles) repositoryPath(repository, relative, 'Next error-state context');
     const available = new Set([...files, ...contextFiles]);
     if (sourceContextFiles !== undefined && sourceContextFiles.some(file => !available.has(file))) throw Error('Every Next sourceContextFiles path must also be selected or present in contextFiles.');
-    const document = readContract(repository), config = loadArchitectureConfig(repository, architectureConfig), context = buildTypeScriptContext(config);
+    const document = readContract(repository), config = loadArchitectureConfig(repository), context = buildTypeScriptContext(config);
     // An unresolved internal import is a located defect of the file that holds it, never the whole machine's
     // failure (wf-nivo-fe-canon-mujek980: @/i18n/navigation residue in 39 sibling files made every slice's
     // scoped lint unavailable). On a selected file it is that file's located input gap - a finding of the slice
@@ -1326,12 +1326,9 @@ export function checkNextErrors({ root, files, ruleIds, contextFiles = [], sourc
     const contract = parseContract(repository, bound, document);
     const missing = [...ownedSources].filter(relative => !bound.has(relative));
     if (missing.length) throw Error(`errorState.sourceRoots coverage is incomplete; bind every owning-program source (${missing.slice(0, 4).join(', ')}${missing.length > 4 ? ', …' : ''}).`);
-    const explicitArchitectureConfig = architectureConfig === undefined || architectureConfig === null ? null : repositoryRelative(architectureConfig, 'architectureConfig');
-    if (explicitArchitectureConfig) repositoryPath(repository, explicitArchitectureConfig, 'Architecture config authority');
     result.compiler = {
       version: context.loaded.version,
       resolved: context.loaded.resolved,
-      architectureConfig: explicitArchitectureConfig,
       projects: [...config.projects].sort(),
       metadataFiles: contextFiles.filter(file => !bound.has(file)).sort(),
     };

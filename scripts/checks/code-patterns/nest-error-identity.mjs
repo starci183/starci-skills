@@ -190,7 +190,7 @@ function academyCode(name) {
 }
 
 /** Verify selected error-family declarations and every escaping thrown identity in production sources. */
-export function checkNestErrorIdentity({ root, files, ruleIds, architectureConfig } = {}) {
+export function checkNestErrorIdentity({ root, files, ruleIds } = {}) {
   const result = scriptReport('', ruleIds ?? []);
   try {
     root = fs.realpathSync(path.resolve(root)); result.repository = root;
@@ -200,7 +200,7 @@ export function checkNestErrorIdentity({ root, files, ruleIds, architectureConfi
       || ruleIds.some(id => !NEST_ERROR_IDENTITY_RULES.includes(id))) throw Error('Explicit production sources and unique supported Nest error-identity rules are required.');
     const bound = new Set(files);
     for (const file of files) repositoryPath(root, file, 'Source file');
-    const contract = readContract(root, bound), config = loadArchitectureConfig(root, architectureConfig), context = buildTypeScriptContext(config);
+    const contract = readContract(root, bound), config = loadArchitectureConfig(root), context = buildTypeScriptContext(config);
     result.compiler = { version: context.loaded.version, resolved: context.loaded.resolved };
     if (context.errors.length) throw Error(context.errors.map(item => item.message).join('; '));
     const { ts } = context, bindings = new Map();

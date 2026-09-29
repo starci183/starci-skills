@@ -823,8 +823,7 @@ policy:
               selected canonical Work and starci-stacks-check for selected materialized stack
               profiles. Inspect each repository's real package scripts and run its additional
               required non-mutating lint/typecheck commands; a script that auto-fixes source is not
-              a checking command. Use --architecture-config with the documented explicit layout
-              configuration when inference is insufficient. When the goal carries a code.refactor
+              a checking command. When the goal carries a code.refactor
               leg with params.canonFamilies, also execute node scripts/checks/canon-scan.mjs --root
               ROOT --families <that value> --json for each selected repository - the repository's own
               lint config against this runtime's canon source plus the architecture check - and

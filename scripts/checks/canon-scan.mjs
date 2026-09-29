@@ -3,7 +3,7 @@
 //
 //   node scripts/checks/canon-scan.mjs --root <repo> [--profile next|nest] [--families <csv>]
 //       [--paths <csv>] [--exclude <csv>] [--machines eslint,architecture]
-//       [--architecture-config <file>] [--fix] [--json]
+//       [--fix] [--json]
 //
 // The repository's own eslint.config runs with its own ESLint, but its import of the canon package
 // (modules/models/code-patterns.yaml profiles.<profile>.canon.package) resolves to this runtime's
@@ -38,7 +38,7 @@ import { emitCheckOutput } from './output.mjs';
 export const CANON_FINDINGS = 'starci/canon-findings@1';
 const skillRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 const MACHINES = ['eslint', 'architecture'];
-const USAGE = 'usage: canon-scan.mjs --root <repo> [--profile next|nest] [--families <csv>] [--paths <csv>] [--exclude <csv>] [--machines eslint,architecture] [--architecture-config <file>] [--fix] [--json] [--out <scratch-file> | --blob]';
+const USAGE = 'usage: canon-scan.mjs --root <repo> [--profile next|nest] [--families <csv>] [--paths <csv>] [--exclude <csv>] [--machines eslint,architecture] [--fix] [--json] [--out <scratch-file> | --blob]';
 
 const csv = (value) => String(value ?? '').split(',').map((item) => item.trim()).filter(Boolean);
 const prefixOf = (value) => posixPath(value).replace(/\/+$/, '');
@@ -56,7 +56,6 @@ export function parseCanonScanArgs(argv) {
     else if (key === '--paths') out.paths = csv(take()).map(prefixOf);
     else if (key === '--exclude') out.exclude = csv(take()).map(prefixOf);
     else if (key === '--machines') out.machines = csv(take());
-    else if (key === '--architecture-config') out.architectureConfig = take();
     else if (key === '--fix') out.fix = true;
     else if (key === '--json') out.json = true;
     else if (key === '--out') out.out = take();
@@ -232,11 +231,11 @@ function detectProfile(root) {
   const deps = { ...pkg.dependencies, ...pkg.devDependencies };
   if (deps['@nestjs/core']) return 'nest';
   if (deps.next) return 'next';
-  const architecture = path.join(root, 'architecture.json');
-  if (fs.existsSync(architecture)) {
-    const kinds = JSON.parse(fs.readFileSync(architecture, 'utf8')).kinds ?? [];
-    if (kinds.includes('backend')) return 'nest';
-    if (kinds.includes('frontend')) return 'next';
+  const declaration = path.join(root, 'hfs.json');
+  if (fs.existsSync(declaration)) {
+    const profile = JSON.parse(fs.readFileSync(declaration, 'utf8')).profile;
+    if (profile === 'be') return 'nest';
+    if (profile === 'fe') return 'next';
   }
   throw Object.assign(Error('cannot tell next from nest; pass --profile'), { code: 'PROFILE_UNKNOWN' });
 }
@@ -297,9 +296,8 @@ export async function scanCanon(options) {
     machines: {}, issues: [],
   };
   const all = [];
-  const architectureConfig = options.architectureConfig ?? (fs.existsSync(path.join(root, 'architecture.json')) ? 'architecture.json' : undefined);
   const architectureTask = options.machines.includes('architecture')
-    ? architectureInWorker({ repositoryRoot: root, configFile: architectureConfig, paths: options.paths })
+    ? architectureInWorker({ repositoryRoot: root, paths: options.paths })
       .then(result => ({ result }), error => ({ error })) : null;
   const eslintTask = options.machines.includes('eslint') ? lintRepository(root, options, canon, relative)
     .then(lint => ({ lint }), error => ({ error })) : null;
@@ -316,7 +314,6 @@ export async function scanCanon(options) {
   }
   if (options.machines.includes('architecture')) {
     let result;
-    report.scope.architectureConfig = architectureConfig ?? null;
     try {
       const outcome = await architectureTask;
       if (outcome.error) throw outcome.error;

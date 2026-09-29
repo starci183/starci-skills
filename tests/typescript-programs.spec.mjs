@@ -52,14 +52,14 @@ test('a run shares programs across async work and another run never sees them',a
 test('a run builds the architecture context once and hands every caller its own error list',t=>{
   const {root,write}=project(t);
   write('package.json',{private:true});
-  write('architecture.json',{schema:'starci/architecture-config@1',kinds:['frontend'],tsconfig:'tsconfig.json'});
+  write('hfs.json',{hfs:2,profile:'fe',project:'fixture',apps:[{name:'web',kind:'next'}]});
   write('tsconfig.json',{compilerOptions:{module:'ESNext',moduleResolution:'Bundler',target:'ES2022',strict:true,noEmit:true},include:['src/**/*.ts']});
   write('src/a.ts',"import {b} from './missing'; export const a=b;");
-  const config=loadArchitectureConfig(root,'architecture.json');
+  const config=loadArchitectureConfig(root);
   const outside=[buildTypeScriptContext(config,ts),buildTypeScriptContext(config,ts)];
   assert.notEqual(outside[0].program,outside[1].program);
   const programs=typeScriptProgramRun();
-  const [first,second]=programs.run(()=>[buildTypeScriptContext(config,ts),buildTypeScriptContext(loadArchitectureConfig(root,'architecture.json'),ts)]);
+  const [first,second]=programs.run(()=>[buildTypeScriptContext(config,ts),buildTypeScriptContext(loadArchitectureConfig(root),ts)]);
   assert.equal(first.program,second.program);assert.equal(first.edges,second.edges);
   assert.ok(first.errors.length>0);assert.deepEqual(first.errors,second.errors);assert.notEqual(first.errors,second.errors);
   first.errors.push({ruleId:'X',message:'caller-owned'});
@@ -78,7 +78,7 @@ module.exports=new Proxy(ts,{get:(target,key)=>key==='createProgram'?(...args)=>
   const obligation=(id,kind,ruleIds)=>({id,sourceRuleIds:['FE-ERROR-2'],applicability:{include:['**/*.ts']},
     mechanical:{requirement:'Verify the selected contract.',check:{kind,ruleIds}},
     semantic:{guidance:'docs/next-error-state-check.md',review:'Run separate behavior checks.'},status:'implemented'});
-  write('package.json',{private:true,starci:{codePatterns:{next:{schema:'starci/next-code-pattern-contract@1',owners:[],closedVocabularies:[],errorState:{schema:'starci/next-error-state@1',sourceRoots:['apps/web/src'],worldMappings:[],writes:[],boundaries:[],
+  write('package.json',{private:true,starci:{codePatterns:{next:{schema:'starci/next-code-pattern-contract@1',owners:[],closedVocabularies:[],projects:['tsconfig.json'],errorState:{schema:'starci/next-error-state@1',sourceRoots:['apps/web/src'],worldMappings:[],writes:[],boundaries:[],
     transports:[{root:'apps/web/src/modules/api',mode:'envelope',envelopeIds:['read']}],envelopes:[{id:'read',type:{path:'apps/web/src/modules/api/envelope.ts',export:'Envelope'},discriminator:{field:'ok',success:true},dataField:'data',errorFields:['error'],readers:[{path:'apps/web/src/modules/api/read.ts',export:'read',emptyData:'valid'}]}]}}}}});
   write('package-lock.json',{lockfileVersion:3});
   // HFS frontend tree: an apps/<app>/ monorepo on npm; all source lives under apps/web/src.
@@ -87,14 +87,14 @@ module.exports=new Proxy(ts,{get:(target,key)=>key==='createProgram'?(...args)=>
     'sonar-project.properties':'sonar.projectKey=fixture\n','apps/web/package.json':'{"name":"@fixture/web","private":true}\n',
     'apps/web/next.config.ts':'export default {};\n','apps/web/postcss.config.mjs':'export default {};\n',
     'apps/web/tsconfig.json':'{"extends":"../../tsconfig.json","include":["src/**/*"]}\n'}))write(file,text);
-  write('architecture.json',{schema:'starci/architecture-config@1',kinds:['frontend'],tsconfig:'tsconfig.json'});
+  write('hfs.json',{hfs:2,profile:'fe',project:'fixture',apps:[{name:'web',kind:'next'}]});
   write('tsconfig.json',{compilerOptions:{module:'ESNext',moduleResolution:'Bundler',target:'ES2022',strict:true,noEmit:true},include:['apps/web/src/**/*.ts']});
   write('apps/web/src/modules/api/envelope.ts','export type Envelope={readonly ok:true;readonly data:string|null;readonly error?:never}|{readonly ok:false;readonly data:null;readonly error:string};');
   write('apps/web/src/modules/api/read.ts',"import type {Envelope} from './envelope'; export function read(result:Envelope):string|null{if(!result.ok)throw new Error(result.error);return result.data??null;}");
   const profileCatalog={schema:'starci/code-pattern-profile@1',profiles:{next:{
     title:'Program sharing',canon:{package:'@starci/eslint-canon-fe',version:'1.0.0',contentDigest:{algorithm:'sha256',include:['**/*.mjs'],exclude:[],framing:'sorted-posix-relative-path-null-raw-bytes-null',value:digest,files:1}},
     sourceRuleRoots:['knowledge/patterns/fe'],expectedSourceRuleIds:['FE-ERROR-2'],sourceGlobs:['apps/web/src/**/*.ts'],
-    inputGlobs:['package.json','package-lock.json','architecture.json','tsconfig.json'],semanticOnly:[],
+    inputGlobs:['package.json','package-lock.json','hfs.json','tsconfig.json'],semanticOnly:[],
     obligations:[obligation('SOURCE','architecture',['ARCH_SYNTAX_INVALID']),obligation('NAMES','script',['FE_SOURCE_NAME_SHAPE']),
       obligation('RETURNS','script',['FE_RETURN_TYPE_PROFILE']),obligation('ENVELOPE','script',['FE_ERROR_ENVELOPE_POLICY'])],
   }}};
@@ -105,8 +105,9 @@ module.exports=new Proxy(ts,{get:(target,key)=>key==='createProgram'?(...args)=>
     lintFiles:async files=>{beforeLint=created.length;const input={rootNames:[],options:{noEmit:true},projectReferences:undefined};lintPrograms=[createTypeScriptProgram(ts,input),createTypeScriptProgram(ts,input)];
       return files.map(filePath=>({filePath,messages:[],suppressedMessages:[],errorCount:0,warningCount:0,fatalErrorCount:0}));},
   }};
-  const report=await checkScopedLint(root,[],{profile:'next',profileCatalog,runtime,all:true,architectureConfig:'architecture.json'});
-  assert.deepEqual(report.machineResults.map(item=>[item.obligation??item.kind,item.ok]),[['architecture',true],['NAMES',true],['RETURNS',true],['ENVELOPE',true]],JSON.stringify(report.issues));
+  const report=await checkScopedLint(root,[],{profile:'next',profileCatalog,runtime,all:true});
+  // The v2 machine also reports its own findings on this minimal fixture (required files, reachability), so the architecture entry proves it RAN over the program, not that the fixture is v2-clean.
+  assert.deepEqual(report.machineResults.map(item=>[item.obligation??item.kind,item.kind==='architecture'?item.files>0:item.ok]),[['architecture',true],['NAMES',true],['RETURNS',true],['ENVELOPE',true]],JSON.stringify(report.issues));
   assert.equal(beforeLint,1,'architecture, next.mjs twice and next-errors share the one declared project program');
   assert.notEqual(lintPrograms[0],lintPrograms[1],'the run is released before ESLint');
 });

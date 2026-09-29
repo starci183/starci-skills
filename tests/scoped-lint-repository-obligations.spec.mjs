@@ -52,8 +52,8 @@ function fixture(t, { obligations, coverage = {}, violations = [], kinds = ['fro
 }
 
 const missingContracts = {
-  ownerPublicApi: { status: 'unavailable', reason: 'architecture.json does not declare owners and public entries' },
-  grammarContract: { status: 'unavailable', reason: 'architecture.json does not declare the selected Grammar contract' },
+  ownerPublicApi: { status: 'unavailable', reason: 'no slot owner instance with an entry file exists in the repository' },
+  grammarContract: { status: 'unavailable', reason: 'no app has a src/app/globals.css to judge against the Grammar style entry' },
   frontendDataLifecycle: { status: 'unavailable', ruleIds: SWR, details: ['src/a.ts:1 SWR call is outside every declared lifecycle hook'] },
 };
 const repoObligations = [architectureObligation('LAYOUT', ['FE_LAYOUT']), architectureObligation('NEXT-OWNER-PUBLIC-ENTRY', OWNER),
@@ -70,8 +70,8 @@ test('a scoped run turns each missing repo-level obligation contract into one ow
   const notes = report.issues.filter((issue) => issue.code === 'REPOSITORY_OBLIGATION_OWED');
   assert.deepEqual(notes.map((note) => [note.obligation, note.contracts]), [
     ['NEXT-DATA-LIFECYCLE-KEYS', ['package.json#starci.codePatterns.next.dataLifecycle']],
-    ['NEXT-GRAMMAR-CONTRACT', ['architecture.json#frontend.grammar']],
-    ['NEXT-OWNER-PUBLIC-ENTRY', ['architecture.json#owners']],
+    ['NEXT-GRAMMAR-CONTRACT', ['apps/<app>/src/app/globals.css']],
+    ['NEXT-OWNER-PUBLIC-ENTRY', ['hfs.json#apps']],
   ]);
   for (const note of notes) {
     assert.equal(note.severity, 'note');

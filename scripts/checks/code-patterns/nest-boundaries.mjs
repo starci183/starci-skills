@@ -173,7 +173,7 @@ function supportedOriginUse(ts, node) {
 }
 
 /** Check declared parser/cache owners and named exports using the target TypeScript projects. */
-export function checkNestBoundaries({ root, files, ruleIds, architectureConfig } = {}) {
+export function checkNestBoundaries({ root, files, ruleIds } = {}) {
   const result = scriptReport('', ruleIds ?? []);
   try {
     root = fs.realpathSync(path.resolve(root)); result.repository = root;
@@ -181,7 +181,7 @@ export function checkNestBoundaries({ root, files, ruleIds, architectureConfig }
       || new Set(ruleIds).size !== ruleIds.length || ruleIds.some(id => !NEST_BOUNDARY_RULES.includes(id))) throw Error('Explicit files and unique supported Nest boundary rules are required.');
     for (const file of files) if (!/\.(?:[cm]?ts|tsx)$/.test(file) || /\.d\.[cm]?ts$/.test(file)) throw Error('Boundary checks require non-declaration TypeScript source.'); else safeFile(root, file);
     const contract = readContract(root);
-    const config = loadArchitectureConfig(root, architectureConfig);
+    const config = loadArchitectureConfig(root);
     const context = buildTypeScriptContext(config);
     result.compiler = { version: context.loaded.version, resolved: context.loaded.resolved };
     if (context.errors.length) throw Error(context.errors.map(error => error.message).join('; '));

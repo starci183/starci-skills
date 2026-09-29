@@ -47,7 +47,8 @@ function fixture(t, { source, contract = lifecycleContract(), extra = {}, versio
   };
   const files = {
     'package.json': `${JSON.stringify(manifest, null, 2)}\n`,
-    'architecture.json': `${JSON.stringify({ schema: 'starci/architecture-config@1', kinds: ['frontend'], tsconfig: 'tsconfig.json' }, null, 2)}\n`,
+    'hfs.json': `${JSON.stringify({ hfs: 2, profile: 'fe', project: 'fixture', apps: [{ name: 'web', kind: 'next' }] }, null, 2)}
+`,
     'tsconfig.json': JSON.stringify({ compilerOptions: { target: 'ES2022', module: 'ESNext', moduleResolution: 'Bundler', strict: true,
       jsx: 'react-jsx', skipLibCheck: true, noEmit: true }, include: ['src/**/*'] }),
     'node_modules/swr/package.json': JSON.stringify({ name: 'swr', version, types: './index.d.ts', exports: {
@@ -87,7 +88,7 @@ export const useCourse=(params:{courseId?:string})=>{
 }
 
 function check(root) {
-  const config = loadArchitectureConfig(root, 'architecture.json');
+  const config = loadArchitectureConfig(root);
   const context = buildTypeScriptContext(config, ts);
   assert.deepEqual(context.errors, [], JSON.stringify(context.errors, null, 2));
   return checkFrontendDataLifecycle(config, context);
@@ -113,7 +114,7 @@ test('checks aliased SWR2 array/object keys, multiple selected calls, and a disa
   assert.deepEqual(result.violations, [], JSON.stringify(result, null, 2));
   assert.deepEqual(result.coverage, { status: 'checked', ruleIds: [SWR_KEY_RULE_ID, SWR_MUTATION_RULE_ID], hooks: 3, calls: 3,
     swr: { name: 'swr', version: '2.3.8', major: 2 } });
-  const integrated = checkArchitecture({ repositoryRoot: root, configFile: 'architecture.json', injectedTypeScript: ts });
+  const integrated = checkArchitecture({ repositoryRoot: root, injectedTypeScript: ts });
   assert.deepEqual(integrated.coverage.frontendDataLifecycle, result.coverage);
   assert.ok(integrated.coverage.checkedRuleIds.includes(SWR_KEY_RULE_ID));
   assert.ok(integrated.coverage.checkedRuleIds.includes(SWR_MUTATION_RULE_ID));

@@ -10,6 +10,13 @@ import { checkModuleRegistration, REGISTRATION_RULE_IDS } from './registration.m
 import { checkFrontendDataLifecycle, SWR_DATA_RULE_IDS } from './next-data.mjs';
 import { checkBackendSourceShape, SOURCE_LAYOUT_RULE_ID, SOURCE_NAME_RULE_ID } from './source-names.mjs';
 import { checkHfs, checkHfsWithoutConfig, HFS_RULE_IDS } from './hfs.mjs';
+import { buildHfsGraph } from './hfs-graph.mjs';
+import { checkTiers, TIER_RULE_IDS } from './tiers.mjs';
+import { checkReachability, REACHABILITY_RULE_IDS } from './reachability.mjs';
+import { checkDeadExports, DEAD_EXPORT_RULE_IDS } from './dead-exports.mjs';
+import { checkRequiredFiles, REQUIRED_FILE_RULE_IDS } from './required-files.mjs';
+import { checkSizeGrowth, SIZE_GROWTH_RULE_IDS } from './size-growth.mjs';
+import { checkClones, CLONE_RULE_IDS } from './clones.mjs';
 
 export { REGISTRATION_RULE_IDS, SWR_DATA_RULE_IDS };
 
@@ -74,15 +81,15 @@ function stable(items) {
 }
 
 /** Check a target repository. injectedTypeScript exists only for hermetic rule fixtures. */
-export function checkArchitecture({ repositoryRoot, configFile, injectedTypeScript, paths = [] } = {}) {
+export function checkArchitecture({ repositoryRoot, injectedTypeScript, paths = [], base, hfs: openedHfs } = {}) {
   let config;
   try {
-    config = loadArchitectureConfig(repositoryRoot, configFile);
+    config = loadArchitectureConfig(repositoryRoot, { hfs: openedHfs });
   } catch (error) {
-    const hfs = checkHfsWithoutConfig(repositoryRoot, configFile);
+    const hfs = checkHfsWithoutConfig(repositoryRoot);
     return { schema: 'starci/architecture-check@1', ok: false, repository: String(repositoryRoot ?? ''), kinds: [], files: 0,
       compiler: null, violations: stable(hfs.violations), coverage: { hfs: hfs.coverage },
-      errors: [{ ruleId: 'ARCH_CONFIG_INVALID', message: String(error.message ?? error) }], limitations: LIMITATIONS };
+      errors: [{ ruleId: /^(HFS_[A-Z_]+):/.exec(String(error.message))?.[1] ?? 'ARCH_CONFIG_INVALID', message: String(error.message ?? error).replace(/^HFS_[A-Z_]+:\s*/, '') }], limitations: LIMITATIONS };
   }
   const hfs = checkHfs(config);
   let context;
@@ -134,6 +141,20 @@ export function checkArchitecture({ repositoryRoot, configFile, injectedTypeScri
     violations.push(...dataLifecycle.violations);
     frontendDataLifecycle = dataLifecycle.coverage;
   }
+  // HFS v2 machine: the slot-driven graph checks read the whole program, also when the caller asked for one path.
+  const hfsContext = paths.length ? buildTypeScriptContext(config, injectedTypeScript) : context;
+  const hfsChecks = { tiers: null, reachability: null, deadExports: null, requiredFiles: null, sizeGrowth: null, clones: null };
+  if (hfsContext.program) {
+    const graph = buildHfsGraph(config, hfsContext);
+    const input = { config, context: hfsContext, graph, base };
+    const runs = { tiers: () => checkTiers(graph), reachability: () => checkReachability(input), deadExports: () => checkDeadExports(input),
+      requiredFiles: () => checkRequiredFiles(input), sizeGrowth: () => checkSizeGrowth(input), clones: () => checkClones(input) };
+    for (const [name, run] of Object.entries(runs)) {
+      const result = run();
+      violations.push(...result.violations);
+      hfsChecks[name] = result.coverage;
+    }
+  }
   const inScope = item => !paths.length || (item.path && paths.some(prefix => sameOrUnder(item.path, prefix.replace(/\/$/, ''))));
   const errors = stable(context.errors.filter(item => item.ruleId.startsWith('ARCH_TSCONFIG_') || !item.path || inScope(item)));
   const scopedViolations = stable(violations.filter(inScope));
@@ -146,8 +167,9 @@ export function checkArchitecture({ repositoryRoot, configFile, injectedTypeScri
     backendSourceShape,
     frontendDataLifecycle,
     moduleRegistration,
-    ownerPublicApi: config.owners === null
-      ? { status: 'unavailable', reason: 'architecture.json does not declare owners and public entries' }
+    hfsMachine: hfsChecks,
+    ownerPublicApi: !config.owners.length
+      ? { status: 'unavailable', reason: 'no slot owner instance with an entry file exists in the repository' }
       : missingOwnerEntries.length
         ? { status: 'unavailable', reason: 'one or more declared owner entries are outside the checked production TypeScript or JavaScript program',
           missingEntries: missingOwnerEntries.map(owner => owner.entry).sort() }
@@ -156,12 +178,18 @@ export function checkArchitecture({ repositoryRoot, configFile, injectedTypeScri
       ? { status: 'not-applicable' }
       : config.frontend.grammar
         ? { status: 'checked', package: config.frontend.grammar.package }
-        : { status: 'unavailable', reason: 'architecture.json does not declare the selected Grammar contract' },
+        : { status: 'unavailable', reason: 'no app has a src/app/globals.css to judge against the Grammar style entry' },
   };
   coverage.checkedRuleIds = [...new Set([
     ...COMMON_RULE_IDS,
     ...(hfs.coverage.status === 'checked' ? HFS_RULE_IDS : []),
     ...(config.kinds.includes('backend') ? BACKEND_RULE_IDS : []),
+    ...(hfsChecks.tiers ? TIER_RULE_IDS : []),
+    ...(hfsChecks.reachability?.status === 'checked' ? REACHABILITY_RULE_IDS : []),
+    ...(hfsChecks.deadExports?.status === 'checked' ? DEAD_EXPORT_RULE_IDS : []),
+    ...(hfsChecks.requiredFiles?.status === 'checked' ? REQUIRED_FILE_RULE_IDS : []),
+    ...(hfsChecks.sizeGrowth?.status === 'checked' ? SIZE_GROWTH_RULE_IDS : []),
+    ...(hfsChecks.clones?.status === 'checked' ? CLONE_RULE_IDS : []),
     ...(frontendChecked ? FRONTEND_RULE_IDS : []),
     ...(coverage.ownerPublicApi.status === 'checked' ? OWNER_RULE_IDS : []),
     ...(coverage.grammarContract.status === 'checked' ? GRAMMAR_RULE_IDS : []),

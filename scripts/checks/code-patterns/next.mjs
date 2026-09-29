@@ -1,7 +1,6 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
-import {sha256} from '../../../engine/digest.mjs';
 import { isInside, slash } from '../architecture/config.mjs';
 import { loadTargetTypeScript } from '../architecture/typescript.mjs';
 import { compilerIdentity, propertyName, repositoryPath, scriptReport, symbolAt, unalias, unwrap } from './common.mjs';
@@ -1029,53 +1028,17 @@ function normalizedProjectList(repository, values, label, errors) {
   return result.sort();
 }
 
-function sameStrings(left, right) {
-  return left.length === right.length && left.every((value, index) => value === right[index]);
-}
-
-function resolveProjectAuthority(repository, contractProjects, architectureProjects, contextFiles, errors) {
-  let bound = null;
+function resolveProjectAuthority(repository, contractProjects, contextFiles, errors) {
   const context = contextFiles === undefined ? null : new Set(Array.isArray(contextFiles) ? contextFiles : []);
   if (contextFiles !== undefined && (!Array.isArray(contextFiles) || context.size !== contextFiles.length
     || [...context].some(item => !normalizedContractPath(item)))) {
     errors.push({ message: 'contextFiles must contain unique normalized repository-relative paths.' });
   }
-  if (architectureProjects !== undefined) {
-    if (!architectureProjects || architectureProjects.schema !== 'starci/typescript-project-selection@1'
-      || !normalizedContractPath(architectureProjects.configPath) || !/^[a-f0-9]{64}$/.test(architectureProjects.configDigest ?? '')) {
-      errors.push({ message: 'architectureProjects must use starci/typescript-project-selection@1 with a normalized configPath and lowercase raw-byte SHA-256 digest.' });
-    } else {
-      let declaredProjects = null;
-      try {
-        const absolute = repositoryPath(repository, architectureProjects.configPath, 'Architecture config');
-        const bytes = fs.readFileSync(absolute);
-        const actual = sha256(bytes);
-        if (actual !== architectureProjects.configDigest) throw Error('architecture config digest does not match its exact bytes');
-        if (context && !context.has(architectureProjects.configPath)) throw Error('architecture config is absent from exact contextFiles');
-        const parsed = JSON.parse(bytes.toString('utf8'));
-        if (parsed?.schema !== 'starci/architecture-config@1'
-          || (parsed.projects !== undefined && parsed.tsconfig !== undefined)) {
-          throw Error('architecture config does not expose one starci/architecture-config@1 project selection');
-        }
-        const authoredProjects = parsed.projects ?? parsed.tsconfig;
-        declaredProjects = (Array.isArray(authoredProjects) ? authoredProjects : [authoredProjects]).sort();
-      } catch (error) { errors.push({ path: architectureProjects.configPath, message: `Invalid architecture project authority: ${error.message}` }); }
-      bound = normalizedProjectList(repository, architectureProjects.projects, 'architectureProjects', errors);
-      if (declaredProjects && !sameStrings(bound, declaredProjects)) {
-        errors.push({ path: architectureProjects.configPath, message: 'architectureProjects list disagrees with the bound architecture config.' });
-      }
-    }
-  }
-  const fallback = contractProjects === null ? null : normalizedProjectList(repository, contractProjects, 'package.json#starci.codePatterns.next.projects', errors);
-  if (bound && fallback && !sameStrings(bound, fallback)) {
-    errors.push({ message: 'Architecture project authority and package.json Next project fallback disagree.' });
-  }
-  const projects = bound ?? fallback ?? [];
-  if (projects.length === 0 && bound === null && fallback === null) {
-    errors.push({ message: 'Next project coverage needs canonical architectureProjects or package.json#starci.codePatterns.next.projects.' });
-  }
-  return { projects, source: bound ? 'architecture' : fallback ? 'package' : null,
-    architectureConfig: bound ? { path: architectureProjects.configPath, digest: architectureProjects.configDigest } : null };
+  // The TypeScript projects come from the package contract only: hfs.json declares no project list and
+  // architecture.json is retired.
+  const projects = contractProjects === null ? [] : normalizedProjectList(repository, contractProjects, 'package.json#starci.codePatterns.next.projects', errors);
+  if (contractProjects === null) errors.push({ message: 'Next project coverage needs package.json#starci.codePatterns.next.projects.' });
+  return { projects, source: contractProjects === null ? null : 'package' };
 }
 
 function loadNextContract(repository, selected, errors) {
@@ -1217,7 +1180,7 @@ function buildProjectAssignments(repository, compiler, authority, selected, erro
 }
 
 /** Check only exact mechanically decidable Next syntax clauses over exact selected source files. */
-export function checkNextPatterns({ root, files, ruleIds, contextFiles, architectureProjects } = {}) {
+export function checkNextPatterns({ root, files, ruleIds, contextFiles } = {}) {
   let repository = '';
   try { repository = typeof root === 'string' ? fs.realpathSync(path.resolve(root)) : ''; } catch { repository = ''; }
   const result = scriptReport(repository, [], {
@@ -1252,8 +1215,8 @@ export function checkNextPatterns({ root, files, ruleIds, contextFiles, architec
     } catch (error) { result.errors.push({ path: relative, message: String(error.message) }); }
   }
   const contract = loadNextContract(repository, selected, result.errors);
-  const authority = resolveProjectAuthority(repository, contract.projects, architectureProjects, contextFiles, result.errors);
-  result.compiler.projectAuthority = { source: authority.source, ...(authority.architectureConfig ?? {}) };
+  const authority = resolveProjectAuthority(repository, contract.projects, contextFiles, result.errors);
+  result.compiler.projectAuthority = { source: authority.source };
   const projectContext = buildProjectAssignments(repository, compiler, authority, selected, result.errors);
   result.compiler.projects = projectContext.projects;
   const parsed = new Map();

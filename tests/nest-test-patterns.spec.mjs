@@ -12,7 +12,7 @@ function fixture(t, subject, spec, name = 'store.handler') {
   const fixtureRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'starci-nest-test-form-'));
   const write = (file, content) => { const target = path.join(fixtureRoot, file); fs.mkdirSync(path.dirname(target), { recursive: true }); fs.writeFileSync(target, typeof content === 'string' ? content : JSON.stringify(content)); };
   write('package.json', { private: true });
-  write('architecture.json', { schema: 'starci/architecture-config@1', kinds: ['backend'], tsconfig: 'tsconfig.json' });
+  write('hfs.json', { hfs: 2, profile: 'be', project: 'fixture', apps: [{ name: 'core', kind: 'api' }] });
   write('tsconfig.json', { compilerOptions: { target: 'ES2022', module: 'ESNext', moduleResolution: 'Bundler' }, include: ['src/**/*.ts'] });
   write(`src/${name}.ts`, subject); write(`src/${name}.spec.ts`, spec);
   // Resolve against real, lockfile-pinned compiler and Jest declarations, not handwritten API stubs.
@@ -28,7 +28,7 @@ function fixture(t, subject, spec, name = 'store.handler') {
     // rm removes the junction entries; it does not traverse their external package targets.
     fs.rmSync(cleanup, { recursive: true, force: true });
   });
-  return { root: fixtureRoot, write, input: { root: fixtureRoot, files: [`src/${name}.spec.ts`], contextFiles: [`src/${name}.ts`], ruleIds: NEST_TEST_RULES, architectureConfig: 'architecture.json' } };
+  return { root: fixtureRoot, write, input: { root: fixtureRoot, files: [`src/${name}.spec.ts`], contextFiles: [`src/${name}.ts`], ruleIds: NEST_TEST_RULES } };
 }
 const subject = 'export class StoreHandler { execute() { return this.process() } protected process() { return 1 } }';
 const valid = `import { StoreHandler } from './store.handler';

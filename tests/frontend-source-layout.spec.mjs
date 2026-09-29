@@ -33,12 +33,12 @@ function fixture(t,files){
   write('apps/web/next.config.ts','export default {};\n');
   write('apps/web/postcss.config.mjs','export default {};\n');
   write('apps/web/tsconfig.json',JSON.stringify({extends:'../../tsconfig.json',include:['src/**/*']}));
-  write('architecture.json',JSON.stringify({schema:'starci/architecture-config@1',kinds:['frontend'],tsconfig:'tsconfig.json'},null,2));
+  write('hfs.json',JSON.stringify({hfs:2,profile:'fe',project:'fixture',apps:[{name:'web',kind:'next'}]},null,2));
   write('tsconfig.json',JSON.stringify({compilerOptions:{target:'ES2022',module:'ESNext',moduleResolution:'Bundler',jsx:'preserve',baseUrl:'.',paths:{'@/*':['apps/web/src/*']},noEmit:true},include:['apps/web/src/**/*']},null,2));
   for(const [relative,value] of Object.entries(files))write(relative,value);
   execFileSync('git',['init','-q'],{cwd:root});
   execFileSync('git',['add','--',...written],{cwd:root});
-  return {root,check:()=>checkArchitecture({repositoryRoot:root,configFile:'architecture.json',injectedTypeScript:ts})};
+  return {root,check:()=>checkArchitecture({repositoryRoot:root,injectedTypeScript:ts})};
 }
 
 const acceptedFiles={
@@ -57,9 +57,12 @@ const acceptedFiles={
 
 test('accepted Next layout keeps app on feature entries and connected blocks on sibling render owners',t=>{
   const result=fixture(t,acceptedFiles).check();
-  assert.equal(result.ok,true,JSON.stringify(result,null,2));
-  for(const id of ['FE_SOURCE_LAYOUT_INVALID','FE_APP_INTERNAL_IMPORT_OUTSIDE_FEATURES','FE_FEATURE_DEPENDENCY_DIRECTION',
-    'FE_CONNECTED_BLOCK_RENDER_PAIR','FE_COMPONENT_WORLD_OWNERSHIP','FE_BLOCK_PRODUCT_HOOK_DEFINITION','FE_CUSTOM_HOOK_LOCATION']) {
+  // The v2 machine also emits its own findings (reachability, required files, ...); this spec judges the layout rules.
+  assert.deepEqual(result.errors,[],JSON.stringify(result.errors));
+  const layoutRules=['FE_SOURCE_LAYOUT_INVALID','FE_APP_INTERNAL_IMPORT_OUTSIDE_FEATURES','FE_FEATURE_DEPENDENCY_DIRECTION',
+    'FE_CONNECTED_BLOCK_RENDER_PAIR','FE_COMPONENT_WORLD_OWNERSHIP','FE_BLOCK_PRODUCT_HOOK_DEFINITION','FE_CUSTOM_HOOK_LOCATION'];
+  assert.deepEqual(result.violations.filter(item=>layoutRules.includes(item.ruleId)),[],JSON.stringify(result.violations,null,2));
+  for(const id of layoutRules) {
     assert.ok(result.coverage.checkedRuleIds.includes(id),id);
   }
 });
@@ -93,22 +96,13 @@ test('layout, dependency, hook ownership and connected-block pair checks resolve
   assert.ok(result.violations.some(item=>item.ruleId==='FE_COMPONENT_WORLD_OWNERSHIP'&&item.path.endsWith('/DynamicUiLeaf/index.tsx')));
 });
 
-test('declared feature entries are closed and frontend role roots cannot overlap',t=>{
-  const f=fixture(t,{
-    'apps/web/src/app/page.tsx':'import {HomePage} from "@/features/pages/HomePage";import {HiddenPage} from "@/features/pages/HiddenPage";export default function Route(){return <HomePage/>}export const hidden=HiddenPage;',
-    'apps/web/src/features/pages/HomePage/index.tsx':'export const HomePage=()=> <main/>;',
-    'apps/web/src/features/pages/HiddenPage/index.tsx':'export const HiddenPage=()=> <aside/>;',
-  });
-  const configFile=path.join(f.root,'architecture.json');
-  const config=JSON.parse(fs.readFileSync(configFile,'utf8'));
-  config.owners=[{id:'home-page',root:'apps/web/src/features/pages/HomePage',entry:'apps/web/src/features/pages/HomePage/index.tsx'}];
-  fs.writeFileSync(configFile,JSON.stringify(config));
-  const closed=f.check();
-  assert.ok(closed.violations.some(item=>item.ruleId==='FE_APP_INTERNAL_IMPORT_OUTSIDE_FEATURES'
-    && item.resolvedPath==='apps/web/src/features/pages/HiddenPage/index.tsx'),JSON.stringify(closed,null,2));
-  config.frontend={routes:['apps/web/src']};
-  fs.writeFileSync(configFile,JSON.stringify(config));
-  const overlapping=f.check();
+test('frontend role roots cannot overlap: tier directories directly under a source root nest the route root',t=>{
+  // Feature entries are derived from slots (any apps/<app>/src/features/<tier>/<n>/index.tsx is public), so only the disjoint-roots half of the retired
+  // declared-owners test remains: a design-system style src/leaves makes apps/web/src a component root that contains apps/web/src/app.
+  const overlapping=fixture(t,{
+    'apps/web/src/app/page.tsx':'export default function Route(){return <main/>}',
+    'apps/web/src/leaves/Btn/index.tsx':'export const Btn=()=> <button/>;',
+  }).check();
   assert.ok(overlapping.errors.some(item=>item.ruleId==='ARCH_CONFIG_INVALID'&&/must be disjoint/.test(item.message)),JSON.stringify(overlapping));
 });
 
@@ -147,7 +141,8 @@ test('framework-pinned files at the source root are thin adapters, not layout fi
     'apps/web/src/modules/i18n/routing.ts':'export const routing=(value:string)=>value;',
     'apps/web/src/modules/telemetry/register.ts':'export const register=()=>undefined;',
   }).check();
-  assert.equal(result.ok,true,JSON.stringify(result.violations,null,2));
+  assert.deepEqual(result.errors,[],JSON.stringify(result.errors));
+  assert.deepEqual(result.violations.filter(item=>['FE_FRAMEWORK_ADAPTER_IMPORT','FE_SOURCE_LAYOUT_INVALID'].includes(item.ruleId)),[],JSON.stringify(result.violations,null,2));
   assert.ok(result.coverage.checkedRuleIds.includes('FE_FRAMEWORK_ADAPTER_IMPORT'));
   assert.ok(result.coverage.sourceFiles.includes('apps/web/src/middleware.ts'),'the pinned file is in the checked program, not excluded');
 });

@@ -48,14 +48,14 @@ function extendsSubject(ts, checker, type, targets, seen = new Set()) {
 }
 
 /** Verify test source form; this never executes a test or claims behavioral coverage. */
-export function checkNestTests({ root, files, ruleIds, contextFiles = [], architectureConfig } = {}) {
+export function checkNestTests({ root, files, ruleIds, contextFiles = [] } = {}) {
   const result = scriptReport('', ruleIds ?? []);
   try {
     root = fs.realpathSync(path.resolve(root)); result.repository = root;
     if (!Array.isArray(files) || !files.length || new Set(files).size !== files.length || files.some(file => !SPEC.test(file))
       || !Array.isArray(ruleIds) || !ruleIds.length || new Set(ruleIds).size !== ruleIds.length || ruleIds.some(id => !NEST_TEST_RULES.includes(id))) throw Error('Explicit colocated unit specs and unique supported Nest test rules are required.');
     for (const file of files) safe(root, file);
-    const context = buildTypeScriptContext(loadArchitectureConfig(root, architectureConfig));
+    const context = buildTypeScriptContext(loadArchitectureConfig(root));
     const { ts } = context;
     result.compiler = { version: context.loaded.version, resolved: context.loaded.resolved };
     if (context.errors.length) throw Error(context.errors.map(error => error.message).join('; '));

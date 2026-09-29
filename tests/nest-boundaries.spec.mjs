@@ -15,13 +15,13 @@ function fixture(t, files, contract = {}) {
   };
   const boundary = { schema: 'starci/nest-boundary-contract@1', envParsers: [], cacheOwners: [], jestLifecycleEntries: [], ...contract };
   write('package.json', { private: true, starci: { codePatterns: { nest: { boundaries: boundary } } } });
-  write('architecture.json', { schema: 'starci/architecture-config@1', kinds: ['backend'], tsconfig: 'tsconfig.json' });
+  write('hfs.json', { hfs: 2, profile: 'be', project: 'fixture', apps: [{ name: 'core', kind: 'api' }] });
   write('tsconfig.json', { compilerOptions: { target: 'ES2022', module: 'ESNext', moduleResolution: 'Bundler', baseUrl: '.', paths: { '@modules/*': ['src/modules/*'] } }, include: ['src/**/*.ts'] });
   for (const [file, content] of Object.entries(files)) write(file, content);
   fs.mkdirSync(path.join(root, 'node_modules'), { recursive: true });
   fs.symlinkSync(path.dirname(require.resolve('typescript/package.json')), path.join(root, 'node_modules/typescript'), 'junction');
   t.after(() => fs.rmSync(root, { recursive: true, force: true }));
-  return { root, write, boundary, input: { root, architectureConfig: 'architecture.json', files: Object.keys(files).filter(file => file.endsWith('.ts') && !file.endsWith('.d.ts')), ruleIds: NEST_BOUNDARY_RULES } };
+  return { root, write, boundary, input: { root, files: Object.keys(files).filter(file => file.endsWith('.ts') && !file.endsWith('.d.ts')), ruleIds: NEST_BOUNDARY_RULES } };
 }
 const rule = (f, id) => checkNestBoundaries({ ...f.input, ruleIds: [id] });
 
@@ -203,8 +203,10 @@ test('all production TypeScript extensions receive boundary checks', t => {
 
 test('overlapping projects cannot select one convenient alias interpretation', t => {
   const f = fixture(t, { 'src/source.ts': 'export const value = 1;' });
-  f.write('architecture.json', { schema: 'starci/architecture-config@1', kinds: ['backend'], projects: ['tsconfig.json', 'tsconfig.other.json'] });
-  f.write('tsconfig.other.json', { compilerOptions: { target: 'ES2022', module: 'CommonJS' }, include: ['src/**/*.ts'] });
+  // The TypeScript projects are derived: the root tsconfig.json plus each workspace's own tsconfig.json.
+  f.write('package.json', { private: true, workspaces: ['packages/*'], starci: { codePatterns: { nest: { boundaries: f.boundary } } } });
+  f.write('packages/other/package.json', { name: '@fixture/other', private: true });
+  f.write('packages/other/tsconfig.json', { compilerOptions: { target: 'ES2022', module: 'CommonJS' }, include: ['../../src/**/*.ts'] });
   const result = rule(f, 'NEST_ENV_ACCESS');
   assert.ok(result.errors.some(item => item.message.includes('conflicting TypeScript')));
   assert.deepEqual(result.checkedRuleIds, []);

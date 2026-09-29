@@ -6,7 +6,6 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import crypto from 'node:crypto';
 import test from 'node:test';
 import { createRequire } from 'node:module';
 import { checkNextPatterns } from '../scripts/checks/code-patterns/next.mjs';
@@ -25,18 +24,12 @@ function fixture(t, sources) {
   };
   write('node_modules/typescript/package.json', JSON.stringify({ name: 'typescript', version: require('typescript/package.json').version, main: 'index.js' }));
   write('node_modules/typescript/index.js', `module.exports = require(${JSON.stringify(require.resolve('typescript'))});\n`);
-  write('package.json', '{"private":true}');
+  // The Next TypeScript projects are declared only in the package contract (hfs.json declares none).
+  write('package.json', JSON.stringify({ private: true, starci: { codePatterns: { next: { schema: 'starci/next-code-pattern-contract@1', owners: [], closedVocabularies: [], projects: ['tsconfig.json'] } } } }));
   write('tsconfig.json', JSON.stringify({ compilerOptions: { strict: true, target: 'ES2022', module: 'ESNext', moduleResolution: 'Node', jsx: 'preserve' },
     include: ['src/**/*.ts', 'src/**/*.tsx'] }));
   for (const [relative, value] of Object.entries(sources)) write(relative, value);
-  const projects = ['tsconfig.json'];
-  const architectureBytes = Buffer.from(JSON.stringify({ schema: 'starci/architecture-config@1', kinds: ['frontend'], projects }));
-  fs.writeFileSync(path.join(root, 'architecture.json'), architectureBytes);
-  return {
-    root, files: Object.keys(sources).filter(relative => /\.tsx?$/.test(relative)).sort(), contextFiles: ['architecture.json', 'package.json'],
-    architectureProjects: { schema: 'starci/typescript-project-selection@1', configPath: 'architecture.json',
-      configDigest: crypto.createHash('sha256').update(architectureBytes).digest('hex'), projects },
-  };
+  return { root, files: Object.keys(sources).filter(relative => /\.tsx?$/.test(relative)).sort(), contextFiles: ['package.json'] };
 }
 
 const ROUTE = { 'src/app/page.tsx': 'export default function Page(){return null}\n' };

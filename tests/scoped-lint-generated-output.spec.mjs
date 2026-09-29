@@ -22,7 +22,8 @@ const project = (t, files) => {
   t.after(() => fs.rmSync(root, { recursive: true, force: true }));
   const put = (relative, text) => { const file = path.join(root, ...relative.split('/')); fs.mkdirSync(path.dirname(file), { recursive: true }); fs.writeFileSync(file, text); };
   put('package.json', '{"private":true}\n');
-  put('architecture.json', `${JSON.stringify({ schema: 'starci/architecture-config@1', kinds: ['frontend'], tsconfig: 'tsconfig.json' })}\n`);
+  put('hfs.json', `${JSON.stringify({ hfs: 2, profile: 'fe', project: 'fixture', apps: [{ name: 'web', kind: 'next' }] })}\n`);
+  put('apps/web/package.json', '{"name":"@fixture/web","private":true}\n');
   put('tsconfig.json', `${JSON.stringify({
     compilerOptions: { target: 'ES2022', module: 'ESNext', moduleResolution: 'Bundler', jsx: 'preserve', resolveJsonModule: true, skipLibCheck: true, noEmit: true, baseUrl: '.', paths: { '@/*': ['src/*'] } },
     include: ['next-env.d.ts', '**/*.ts', '**/*.tsx', '.next/types/**/*.ts', '.next/dev/types/**/*.ts'],
@@ -51,7 +52,7 @@ test('the architecture program keeps .next output out of its source coverage', (
     '.next/types/validator.ts': 'export type Check = true\n',
     '.next/dev/types/routes.ts': 'export type Routes = "/"\n',
   });
-  const result = checkArchitecture({ repositoryRoot: root, configFile: 'architecture.json', injectedTypeScript: ts });
+  const result = checkArchitecture({ repositoryRoot: root, injectedTypeScript: ts });
   const files = result.coverage?.sourceFiles ?? [];
   assert.ok(files.includes('src/app/page.tsx'), JSON.stringify(result.errors));
   assert.ok(files.includes('src/config/app.config.ts'), 'a config module inside the source tree is still source');
@@ -66,7 +67,7 @@ test('a template import of JSON catalogs is the bundler context of that director
     'src/i18n/unproven.ts': 'export const load = async (name: string) => import(`../features/${name}`)\n',
     'src/i18n/escape.ts': 'export const load = async (name: string) => import(`../messages/${name}/../../secret.json`)\n',
   });
-  const result = checkArchitecture({ repositoryRoot: root, configFile: 'architecture.json', injectedTypeScript: ts });
+  const result = checkArchitecture({ repositoryRoot: root, injectedTypeScript: ts });
   const unproven = result.errors.filter((error) => error.ruleId === 'ARCH_DYNAMIC_DEPENDENCY_UNPROVEN').map((error) => error.path).sort();
   assert.deepEqual(unproven, ['src/i18n/escape.ts', 'src/i18n/unproven.ts'], 'a code context or a head that escapes stays unproven');
 });
@@ -134,28 +135,23 @@ test('a repository with no Next project contract reports it once, not once per s
   const files = ['src/a.tsx', 'src/b.tsx', 'src/c.tsx'];
   for (const file of files) { fs.mkdirSync(path.join(root, 'src'), { recursive: true }); fs.writeFileSync(path.join(root, file), 'export const A = () => null\n'); }
   const result = checkNextPatterns({ root, files, ruleIds: ['FE_SOURCE_NAME_SHAPE'], contextFiles: ['package.json'] });
-  assert.equal(result.errors.filter((error) => /needs canonical architectureProjects/.test(error.message)).length, 1, JSON.stringify(result.errors));
+  assert.equal(result.errors.filter((error) => /needs package\.json#starci\.codePatterns\.next\.projects/.test(error.message)).length, 1, JSON.stringify(result.errors));
   assert.equal(result.errors.filter((error) => /belongs to no declared TypeScript project/.test(error.message)).length, 0);
 });
 
 test('a props field typed by an installed library declaration is an opaque leaf; an inherited library base is not', async (t) => {
   const { checkNextPatterns } = await import('../scripts/checks/code-patterns/next.mjs');
-  const crypto = await import('node:crypto');
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'starci-next-library-leaf-'));
   t.after(() => fs.rmSync(root, { recursive: true, force: true }));
   const put = (relative, text) => { const file = path.join(root, ...relative.split('/')); fs.mkdirSync(path.dirname(file), { recursive: true }); fs.writeFileSync(file, text); };
   fs.mkdirSync(path.join(root, 'node_modules'), { recursive: true });
   fs.symlinkSync(path.dirname(require.resolve('typescript/package.json')), path.join(root, 'node_modules/typescript'), 'junction');
-  put('package.json', '{"private":true}');
+  put('package.json', JSON.stringify({ private: true, starci: { codePatterns: { next: { schema: 'starci/next-code-pattern-contract@1', owners: [], closedVocabularies: [], projects: ['tsconfig.json'] } } } }));
   put('node_modules/uilib/package.json', '{"name":"uilib","types":"index.d.ts"}');
   put('node_modules/uilib/index.d.ts', 'export type Node = string | { mutable: string }\nexport type Slot<P> = (props: P) => Node\nexport interface Base { mutable: string }\n');
   put('tsconfig.json', JSON.stringify({ compilerOptions: { strict: true, target: 'ES2022', module: 'ESNext', moduleResolution: 'Node', jsx: 'preserve' }, include: ['src/**/*.ts', 'src/**/*.tsx'] }));
   put('src/components/Card.tsx', 'import type { Base, Node, Slot } from "uilib"\nexport type CardProps = { readonly child: Node; readonly render: Slot<{ readonly id: string }> }\nexport interface PanelProps extends Base { readonly label: string }\nexport const Card = (_props: CardProps) => null\nexport const Panel = (_props: PanelProps) => null\n');
-  const projects = ['tsconfig.json'];
-  const architectureBytes = Buffer.from(JSON.stringify({ schema: 'starci/architecture-config@1', kinds: ['frontend'], projects }));
-  fs.writeFileSync(path.join(root, 'architecture.json'), architectureBytes);
-  const result = checkNextPatterns({ root, files: ['src/components/Card.tsx'], ruleIds: ['FE_READONLY_PROPS_CONTRACT'], contextFiles: ['architecture.json', 'package.json'],
-    architectureProjects: { schema: 'starci/typescript-project-selection@1', configPath: 'architecture.json', configDigest: crypto.createHash('sha256').update(architectureBytes).digest('hex'), projects } });
+  const result = checkNextPatterns({ root, files: ['src/components/Card.tsx'], ruleIds: ['FE_READONLY_PROPS_CONTRACT'], contextFiles: ['package.json'] });
   const messages = [...result.errors, ...result.violations].map((item) => item.message);
   assert.ok(!messages.some((message) => /\b(?:Node|Slot<)/.test(message)), JSON.stringify(messages));
   assert.ok(messages.some((message) => /Referenced props shape Base resolves outside the exact selected file set/.test(message)), JSON.stringify(messages));
@@ -163,20 +159,15 @@ test('a props field typed by an installed library declaration is an opaque leaf;
 
 test('the canon monorepo layout: packages/<pkg>/src/<tier>/<Name> is a visual owner like src/components/<tier>/<Name>', async (t) => {
   const { checkNextPatterns } = await import('../scripts/checks/code-patterns/next.mjs');
-  const crypto = await import('node:crypto');
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'starci-next-monorepo-owner-'));
   t.after(() => fs.rmSync(root, { recursive: true, force: true }));
   const put = (relative, text) => { const file = path.join(root, ...relative.split('/')); fs.mkdirSync(path.dirname(file), { recursive: true }); fs.writeFileSync(file, text); };
   fs.mkdirSync(path.join(root, 'node_modules'), { recursive: true });
   fs.symlinkSync(path.dirname(require.resolve('typescript/package.json')), path.join(root, 'node_modules/typescript'), 'junction');
-  put('package.json', '{"private":true}');
+  put('package.json', JSON.stringify({ private: true, starci: { codePatterns: { next: { schema: 'starci/next-code-pattern-contract@1', owners: [], closedVocabularies: [], projects: ['packages/ui/tsconfig.json'] } } } }));
   put('packages/ui/tsconfig.json', JSON.stringify({ compilerOptions: { strict: true, target: 'ES2022', module: 'ESNext', moduleResolution: 'Node', jsx: 'preserve' }, include: ['src/**/*.ts', 'src/**/*.tsx'] }));
   put('packages/ui/src/leaves/Checkbox/index.tsx', 'export type CheckboxProps = { readonly checked: boolean }\nexport const Checkbox = (_props: CheckboxProps) => <input />\n');
-  const projects = ['packages/ui/tsconfig.json'];
-  const bytes = Buffer.from(JSON.stringify({ schema: 'starci/architecture-config@1', kinds: ['frontend'], projects }));
-  fs.writeFileSync(path.join(root, 'architecture.json'), bytes);
-  const result = checkNextPatterns({ root, files: ['packages/ui/src/leaves/Checkbox/index.tsx'], ruleIds: ['FE_CONTRACT_NAME_SHAPE'], contextFiles: ['architecture.json', 'package.json'],
-    architectureProjects: { schema: 'starci/typescript-project-selection@1', configPath: 'architecture.json', configDigest: crypto.createHash('sha256').update(bytes).digest('hex'), projects } });
+  const result = checkNextPatterns({ root, files: ['packages/ui/src/leaves/Checkbox/index.tsx'], ruleIds: ['FE_CONTRACT_NAME_SHAPE'], contextFiles: ['package.json'] });
   assert.deepEqual(result.errors, []);
   assert.deepEqual(result.violations, []);
 });

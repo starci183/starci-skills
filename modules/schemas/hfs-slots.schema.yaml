@@ -49,17 +49,19 @@ properties:
       be:
         type: object
         additionalProperties: false
-        required: [globalModules, fileLines]
+        required: [globalModules, fileLines, duplicateBlockLines]
         properties:
           globalModules: {type: array, uniqueItems: true, items: {type: string, minLength: 1}}
           fileLines: {$ref: '#/$defs/fileLines'}
+          duplicateBlockLines: {type: integer, minimum: 2}
       fe:
         type: object
         additionalProperties: false
-        required: [fileLines, clientModule]
+        required: [fileLines, clientModule, duplicateBlockLines]
         properties:
           fileLines: {$ref: '#/$defs/fileLines'}
           clientModule: {type: string, minLength: 1}
+          duplicateBlockLines: {type: integer, minimum: 2}
   crossOwner: {type: string}
   crossApp: {type: string}
   slots:

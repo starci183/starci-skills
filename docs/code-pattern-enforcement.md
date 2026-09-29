@@ -5,9 +5,8 @@
 ## Command and operation
 
 Run `node scripts/checks/check-scoped-lint.mjs --profile nest --root <repository> --all`
-for a Nest source repository; use `--profile next` for a Next repository. Add
-`--architecture-config <repository-relative.json>` when the layout/public-owner
-contract needs explicit binding. Ops name this check `starci-code-patterns-check`.
+for a Nest source repository; use `--profile next` for a Next repository. The
+layout and public owners come from `hfs.json` and the slot manifest. Ops name this check `starci-code-patterns-check`.
 
 The command prints one `starci/code-pattern-check@1` JSON report. Exit `0` means
 complete clean declared coverage, `1` means measured findings, and `2` means

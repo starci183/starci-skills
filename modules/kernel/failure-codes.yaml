@@ -992,6 +992,7 @@ CANON_RULE_UNAVAILABLE:
   nextStep_vi: "Kết quả lint được đánh dấu không khả dụng; cần sửa gói canon hoặc hồ sơ lint phía lõi rồi chạy lại kiểm tra."
   owner: runtime-core
   kind: check-finding
+
 CANON_SCAN_UNAVAILABLE:
   title: "Canon scan unavailable"
   title_vi: "Không quét được canon"
@@ -1002,6 +1003,7 @@ CANON_SCAN_UNAVAILABLE:
   nextStep_vi: "Báo cáo trả về trạng thái không khả dụng (thoát mã 3); người vận hành lõi cần sửa môi trường quét rồi chạy lại."
   owner: runtime-core
   kind: check-finding
+
 CANON_SOURCE_UNAVAILABLE:
   title: "Canon source package not found"
   title_vi: "Không tìm thấy gói nguồn canon"
@@ -1012,6 +1014,7 @@ CANON_SOURCE_UNAVAILABLE:
   nextStep_vi: "Bộ quét dừng với trạng thái không khả dụng; cần khôi phục hoặc khai báo lại gói canon rồi quét lại."
   owner: runtime-core
   kind: check-finding
+
 CANON_VERSION_MISMATCH:
   title: "Canon version differs from profile"
   title_vi: "Phiên bản canon lệch hồ sơ"
@@ -1022,6 +1025,7 @@ CANON_VERSION_MISMATCH:
   nextStep_vi: "Kiểm tra bị từ chối; op cần chỉnh hồ sơ hoặc gói canon cho khớp rồi chạy lại."
   owner: op-retry
   kind: check-finding
+
 CAPABILITY_WITHOUT_FR:
   title: "Capability has no requirement record"
   title_vi: "Chức năng chưa có yêu cầu chức năng"
@@ -1032,6 +1036,7 @@ CAPABILITY_WITHOUT_FR:
   nextStep_vi: "Đây là nghi vấn (suspect) chứ chưa chặn; cần op viết hồ sơ bổ sung yêu cầu chức năng cho chức năng này."
   owner: other-op:work.author
   kind: check-finding
+
 CAPABILITY_WITHOUT_SPEC:
   title: "Capability has no spec record"
   title_vi: "Chức năng chưa có hồ sơ đặc tả"
@@ -1042,6 +1047,7 @@ CAPABILITY_WITHOUT_SPEC:
   nextStep_vi: "Đây là nghi vấn cần xử lý; cần op viết hồ sơ đặc tả tạo bản ghi cho chức năng này."
   owner: other-op:work.author
   kind: check-finding
+
 CAP_STARVED:
   title: "Priority workflow starved of capacity"
   title_vi: "Luồng ưu tiên bị thiếu công suất"
@@ -1052,6 +1058,7 @@ CAP_STARVED:
   nextStep_vi: "Bộ điều phối mở một mục quyết định cho Supervisor; Supervisor cần cân lại công suất hoặc dừng bớt luồng khác. Đồng hồ tự tắt khi luồng hết bị đói."
   owner: supervisor
   kind: runtime-fault
+
 CATALOG_DIRTY:
   title: "Feature catalog unreadable"
   title_vi: "Danh mục tính năng không đọc được"
@@ -1062,6 +1069,7 @@ CATALOG_DIRTY:
   nextStep_vi: "Kiểm tra từ chối; cần op viết hồ sơ Work sửa lại catalog rồi chạy lại."
   owner: other-op:work.author
   kind: check-finding
+
 CATALOG_DRIFT:
   title: "Catalog and disk disagree"
   title_vi: "Danh mục lệch với thư mục thật"
@@ -1072,6 +1080,7 @@ CATALOG_DRIFT:
   nextStep_vi: "Kiểm tra từ chối; cần op viết hồ sơ Work đồng bộ lại catalog với thư mục."
   owner: other-op:work.author
   kind: check-finding
+
 CATALOG_TITLE_DRIFT:
   title: "Catalog description differs from feature title"
   title_vi: "Mô tả danh mục khác tiêu đề tính năng"
@@ -1082,6 +1091,7 @@ CATALOG_TITLE_DRIFT:
   nextStep_vi: "Chỉ là nghi vấn nhẹ; nên cho op viết hồ sơ Work thống nhất lại hai câu này."
   owner: other-op:work.author
   kind: check-finding
+
 CHANGE_INVALID:
   title: "Change record malformed"
   title_vi: "Bản ghi thay đổi không hợp lệ"
@@ -1092,6 +1102,7 @@ CHANGE_INVALID:
   nextStep_vi: "Kiểm tra từ chối; op sửa lại bản ghi change cho đúng rồi chạy lại."
   owner: op-retry
   kind: check-finding
+
 CHANGE_KIND_MISMATCH:
   title: "Change kind does not match the edit"
   title_vi: "Loại thay đổi không khớp nội dung"
@@ -1102,6 +1113,7 @@ CHANGE_KIND_MISMATCH:
   nextStep_vi: "Kiểm tra từ chối; op khai lại đúng loại thay đổi rồi thử lại."
   owner: op-retry
   kind: check-finding
+
 CHANGE_UNRECORDED:
   title: "Content moved without a revision"
   title_vi: "Nội dung đổi nhưng không ghi phiên bản"
@@ -1112,6 +1124,7 @@ CHANGE_UNRECORDED:
   nextStep_vi: "Kiểm tra từ chối; op tăng phiên bản và ghi bản ghi change rồi chạy lại."
   owner: op-retry
   kind: check-finding
+
 CHECK_MISSING:
   title: "Proof names a check that is not on disk"
   title_vi: "Bằng chứng nhắc tới bộ kiểm không tồn tại"
@@ -1122,6 +1135,7 @@ CHECK_MISSING:
   nextStep_vi: "Lỗi mức error trong kiểm tra manifest; sửa đường dẫn hoặc thêm tệp rồi chạy lại."
   owner: op-retry
   kind: check-finding
+
 CITATION_UNRESOLVED:
   title: "Cited evidence cannot be resolved"
   title_vi: "Không tìm thấy bằng chứng được trích dẫn"
@@ -1132,6 +1146,7 @@ CITATION_UNRESOLVED:
   nextStep_vi: "Kiểm tra từ chối; op lưu lại bằng chứng rồi trích dẫn đúng mã băm."
   owner: op-retry
   kind: check-finding
+
 CODE_DIGEST_NOT_MINE:
   title: "Code digest is checked elsewhere"
   title_vi: "Mã băm mã nguồn do bộ khác đo"
@@ -1141,6 +1156,7 @@ CODE_DIGEST_NOT_MINE:
   nextStep_vi: "Không cần làm gì; bộ kiểm ví dụ Work sẽ tự đo lại mã băm này."
   owner: op-retry
   kind: check-finding
+
 CODE_DIGEST_STALE:
   title: "Recorded code digest is out of date"
   title_vi: "Mã băm mã nguồn đã cũ"
@@ -1151,6 +1167,7 @@ CODE_DIGEST_STALE:
   nextStep_vi: "Kiểm tra từ chối trừ khi bản ghi khai rõ là cũ; op chạy lại để ghi mã băm mới."
   owner: op-retry
   kind: check-finding
+
 COMMIT_FOREIGN_PATHS:
   title: "Commit contains paths outside owned paths"
   title_vi: "Commit chứa đường dẫn ngoài quyền"
@@ -1161,6 +1178,7 @@ COMMIT_FOREIGN_PATHS:
   nextStep_vi: "Cổng bảo vệ từ chối; worker bỏ tệp ngoài quyền khỏi vùng staged rồi commit lại chỉ với đường dẫn của mình."
   owner: op-retry
   kind: dispatch-refusal
+
 COMMIT_NOT_SCOPED:
   title: "Commit is not limited to owned paths"
   title_vi: "Commit không giới hạn theo đường dẫn"
@@ -1170,6 +1188,7 @@ COMMIT_NOT_SCOPED:
   nextStep_vi: "Cổng bảo vệ git từ chối; worker commit lại với danh sách đường dẫn của mình sau dấu --."
   owner: op-retry
   kind: dispatch-refusal
+
 CONFIG_DEPENDENCY_UNAVAILABLE:
   title: "Lint config dependency unreadable"
   title_vi: "Không đọc được phụ thuộc cấu hình lint"
@@ -1180,6 +1199,7 @@ CONFIG_DEPENDENCY_UNAVAILABLE:
   nextStep_vi: "Kết quả lint chuyển sang không khả dụng; cần sửa cấu hình cho tĩnh hoặc sửa bộ kiểm phía lõi."
   owner: runtime-core
   kind: check-finding
+
 CONFIG_FORMAT_UNAVAILABLE:
   title: "Lint config format unsupported"
   title_vi: "Định dạng cấu hình lint chưa hỗ trợ"
@@ -1189,6 +1209,7 @@ CONFIG_FORMAT_UNAVAILABLE:
   nextStep_vi: "Kết quả lint không khả dụng; đổi sang định dạng được hỗ trợ hoặc mở rộng bộ kiểm."
   owner: runtime-core
   kind: check-finding
+
 CONFIG_GUARDED:
   title: "Git config change refused"
   title_vi: "Không được đổi cấu hình git"
@@ -1198,6 +1219,7 @@ CONFIG_GUARDED:
   nextStep_vi: "Cổng bảo vệ từ chối; worker để yên git config và báo nhu cầu nếu thật sự cần hook hoặc remote khác."
   owner: op-retry
   kind: dispatch-refusal
+
 CONFIG_INPUT_UNAVAILABLE:
   title: "Lint config input unavailable"
   title_vi: "Đầu vào cấu hình lint không khả dụng"
@@ -1208,6 +1230,7 @@ CONFIG_INPUT_UNAVAILABLE:
   nextStep_vi: "Kết quả lint không khả dụng, tệp lỗi được ghi kèm; sửa tệp hoặc bộ kiểm rồi chạy lại."
   owner: runtime-core
   kind: check-finding
+
 CONFIG_PATH_OUTSIDE_REPOSITORY:
   title: "Config path points outside repository"
   title_vi: "Đường dẫn cấu hình nằm ngoài kho"
@@ -1217,6 +1240,7 @@ CONFIG_PATH_OUTSIDE_REPOSITORY:
   nextStep_vi: "Bộ kiểm từ chối tệp đó; op đổi sang đường dẫn nằm trong kho rồi chạy lại."
   owner: op-retry
   kind: check-finding
+
 CONFIG_PATH_UNSAFE:
   title: "Config path is unsafe"
   title_vi: "Đường dẫn cấu hình không an toàn"
@@ -1226,6 +1250,7 @@ CONFIG_PATH_UNSAFE:
   nextStep_vi: "Bộ kiểm đánh dấu tệp không an toàn và từ chối; op thay liên kết bằng tệp thật rồi chạy lại."
   owner: op-retry
   kind: check-finding
+
 CONFIG_SOURCE_INVALID:
   title: "Config source cannot be parsed"
   title_vi: "Không phân tích được mã cấu hình"
@@ -1235,6 +1260,7 @@ CONFIG_SOURCE_INVALID:
   nextStep_vi: "Kết quả lint không khả dụng; op sửa lỗi cú pháp rồi chạy lại."
   owner: op-retry
   kind: check-finding
+
 CONFLICT_WITHOUT_DECISION:
   title: "Conflict has no policy decision"
   title_vi: "Mâu thuẫn chưa có quyết định"
@@ -1245,6 +1271,7 @@ CONFLICT_WITHOUT_DECISION:
   nextStep_vi: "Nếu cả hai đã xong thì bị từ chối, nếu chưa thì chỉ là nghi vấn; cần chủ sở hữu ra quyết định chính sách."
   owner: owner
   kind: check-finding
+
 CONNECT_TIMEOUT:
   title: "Environment did not accept a connection"
   title_vi: "Môi trường không nhận kết nối"
@@ -1255,6 +1282,7 @@ CONNECT_TIMEOUT:
   nextStep_vi: "Môi trường được ghi là ngừng hoạt động (down); cần bật lại dịch vụ rồi kiểm tra sức khỏe lần nữa."
   owner: supervisor
   kind: check-status
+
 CONSUME_OVERDUE:
   title: "Report not consumed in time"
   title_vi: "Báo cáo chưa được nhận kịp"
@@ -1264,6 +1292,7 @@ CONSUME_OVERDUE:
   nextStep_vi: "Mã có trong danh sách đồng hồ nhưng hiện được tính chung vào SETTLE_OVERDUE; nếu xuất hiện, Supervisor cần kiểm tra bộ xử lý chốt."
   owner: supervisor
   kind: runtime-fault
+
 CONTRACT_EDGE_MISSING:
   title: "Cross-domain contract edge missing"
   title_vi: "Thiếu cạnh hợp đồng giữa các miền"
@@ -1273,6 +1302,7 @@ CONTRACT_EDGE_MISSING:
   nextStep_vi: "Đồ thị Work báo phát hiện; cần op viết hồ sơ thêm cạnh hợp đồng giữa hai nút."
   owner: other-op:work.author
   kind: check-finding
+
 CONTRACT_EVENT_GHOST:
   title: "Contract names an event that does not exist"
   title_vi: "Hợp đồng nhắc sự kiện không tồn tại"
@@ -1283,6 +1313,7 @@ CONTRACT_EVENT_GHOST:
   nextStep_vi: "Chỉ là nghi vấn; cần op viết hồ sơ tạo bản ghi sự kiện hoặc sửa lại tham chiếu."
   owner: other-op:work.author
   kind: check-finding
+
 CONTRACT_GHOST_OP:
   title: "Contract names a GraphQL op nobody serves"
   title_vi: "Hợp đồng nêu thao tác GraphQL không tồn tại"
@@ -1293,6 +1324,7 @@ CONTRACT_GHOST_OP:
   nextStep_vi: "Nếu bản ghi đã xong thì bị từ chối, chưa xong thì chỉ nghi vấn; cần sửa hợp đồng hoặc xây thao tác."
   owner: other-op:work.author
   kind: check-finding
+
 CONTRACT_GHOST_ROUTE:
   title: "Contract names a route nobody serves"
   title_vi: "Hợp đồng nêu tuyến không tồn tại"
@@ -1303,6 +1335,7 @@ CONTRACT_GHOST_ROUTE:
   nextStep_vi: "Nếu hợp đồng đã xong thì bị từ chối, chưa xong thì chỉ nghi vấn; cần sửa hợp đồng hoặc xây tuyến."
   owner: other-op:work.author
   kind: check-finding
+
 CONTRACT_OP_UNPROVEN:
   title: "GraphQL op has no implementation claim"
   title_vi: "Thao tác GraphQL chưa có hồ sơ triển khai"
@@ -1312,6 +1345,7 @@ CONTRACT_OP_UNPROVEN:
   nextStep_vi: "Chỉ là nghi vấn; cần op bổ sung tham chiếu proves vào hồ sơ triển khai."
   owner: other-op:work.author
   kind: check-finding
+
 CONTRACT_ROUTE_UNPROVEN:
   title: "Route has no implementation claim"
   title_vi: "Tuyến chưa có hồ sơ triển khai"
@@ -1321,6 +1355,7 @@ CONTRACT_ROUTE_UNPROVEN:
   nextStep_vi: "Chỉ là nghi vấn; cần op bổ sung tham chiếu proves vào hồ sơ triển khai."
   owner: other-op:work.author
   kind: check-finding
+
 COVERAGE_MISSING:
   title: "No coverage report found"
   title_vi: "Không có báo cáo độ phủ"
@@ -1331,6 +1366,7 @@ COVERAGE_MISSING:
   nextStep_vi: "Quét bị từ chối; op chạy test:ci có độ phủ trong lần thử này rồi quét lại."
   owner: op-retry
   kind: check-finding
+
 COVERAGE_NOT_IMPORTED:
   title: "Coverage report was not imported"
   title_vi: "Báo cáo độ phủ không được nhập"
@@ -1341,6 +1377,7 @@ COVERAGE_NOT_IMPORTED:
   nextStep_vi: "Quét bị từ chối; op kiểm tra đường dẫn lcov, chạy lại test:ci rồi quét lại."
   owner: op-retry
   kind: check-finding
+
 COVERAGE_STALE:
   title: "Coverage report is out of date"
   title_vi: "Báo cáo độ phủ đã cũ"
@@ -1350,6 +1387,7 @@ COVERAGE_STALE:
   nextStep_vi: "Quét bị từ chối; op chạy lại test:ci có độ phủ trong lần thử này rồi quét lại."
   owner: op-retry
   kind: check-finding
+
 DATA_STATUS_DRAWN:
   title: "Data status drawn by hand"
   title_vi: "Trạng thái dữ liệu bị vẽ tay"
@@ -1359,6 +1397,7 @@ DATA_STATUS_DRAWN:
   nextStep_vi: "Kiểm tra vẽ từ chối; op vẽ bỏ hình đó và để hệ thống dựng trạng thái theo công thức."
   owner: other-op:interface.draw
   kind: check-finding
+
 DEAD_KERNEL:
   title: "Kernel terminal lost"
   title_vi: "Mất cửa sổ điều khiển Kernel"
@@ -1368,6 +1407,7 @@ DEAD_KERNEL:
   nextStep_vi: "Kiểm tra cây Orca báo phát hiện; Supervisor cần khởi động lại Kernel cho luồng này."
   owner: supervisor
   kind: check-finding
+
 DEAD_WORKER_UNRECONCILED:
   title: "Dead worker not reconciled"
   title_vi: "Worker đã chết chưa được xử lý"
@@ -1378,6 +1418,7 @@ DEAD_WORKER_UNRECONCILED:
   nextStep_vi: "Đồng hồ SLA mở ra cho Supervisor; cần điều tra và chốt hoặc chạy lại công việc đó."
   owner: supervisor
   kind: runtime-fault
+
 DECISION_OVERDUE:
   title: "Decision waited too long"
   title_vi: "Quyết định chờ quá lâu"
@@ -1388,6 +1429,7 @@ DECISION_OVERDUE:
   nextStep_vi: "Đồng hồ SLA mở; cần Supervisor hoặc chủ sở hữu trả lời mục quyết định để công việc tiếp tục."
   owner: owner
   kind: runtime-fault
+
 DEPS_DELETE_WHILE_PEER_LEASED:
   title: "Cannot delete node_modules while peers run"
   title_vi: "Không xóa node_modules khi luồng khác đang dùng"
@@ -1397,6 +1439,7 @@ DEPS_DELETE_WHILE_PEER_LEASED:
   nextStep_vi: "Cổng bảo vệ npm từ chối; dùng npm install (có khóa) hoặc báo môi trường bị chặn kèm tên phụ thuộc thiếu."
   owner: op-retry
   kind: dispatch-refusal
+
 DEPS_LOCK_TIMEOUT:
   title: "Dependency lock still held"
   title_vi: "Khóa cài phụ thuộc vẫn bị giữ"
@@ -1406,6 +1449,7 @@ DEPS_LOCK_TIMEOUT:
   nextStep_vi: "Cổng bảo vệ từ chối; thử lại sau khi lần cài kia xong, hoặc báo môi trường bị chặn."
   owner: op-retry
   kind: dispatch-refusal
+
 DEPS_THROUGH_LINK:
   title: "npm through linked node_modules refused"
   title_vi: "Không chạy npm qua node_modules liên kết"
@@ -1415,6 +1459,7 @@ DEPS_THROUGH_LINK:
   nextStep_vi: "Cổng bảo vệ từ chối; không cài ở đây, thay đổi phụ thuộc phải đi qua đơn vị phụ thuộc tuần tự hoặc báo môi trường bị chặn."
   owner: op-retry
   kind: dispatch-refusal
+
 DEP_STALE:
   title: "Referenced record changed since baseline"
   title_vi: "Hồ sơ được tham chiếu đã đổi"
@@ -1424,6 +1469,7 @@ DEP_STALE:
   nextStep_vi: "Kiểm tra từ chối; op rà lại hồ sơ theo phụ thuộc mới rồi ghi lại mốc chuẩn."
   owner: op-retry
   kind: check-finding
+
 DERIVED_STALE:
   title: "Derived grammar output is stale"
   title_vi: "Bản dựng ngữ pháp đã cũ"
@@ -1434,6 +1480,7 @@ DERIVED_STALE:
   nextStep_vi: "Đồng hồ SLA mở; cần dựng lại gói grammar (grammar.update) và đồng hồ sẽ tự tắt khi có bản dựng mới."
   owner: supervisor
   kind: check-status
+
 DESIGN_PLANNED:
   title: "Design pointer still planned"
   title_vi: "Con trỏ thiết kế còn ở dạng kế hoạch"
@@ -1443,6 +1490,7 @@ DESIGN_PLANNED:
   nextStep_vi: "Chỉ là cảnh báo; con trỏ sẽ tự khớp khi interface.draw vẽ bố cục."
   owner: op-retry
   kind: check-status
+
 DIRECTION_CHECK:
   title: "Brand direction check found a problem"
   title_vi: "Kiểm tra hướng thương hiệu phát hiện lỗi"
@@ -1453,6 +1501,7 @@ DIRECTION_CHECK:
   nextStep_vi: "Kiểm tra autopilot không đạt; cần brand.decide sửa direction theo chi tiết đã nêu."
   owner: other-op:brand.decide
   kind: check-finding
+
 DIRECTION_CHECK_ERROR:
   title: "Brand direction check crashed"
   title_vi: "Bộ kiểm hướng thương hiệu bị lỗi"
@@ -1463,6 +1512,7 @@ DIRECTION_CHECK_ERROR:
   nextStep_vi: "Kết quả không đạt kèm thông báo lỗi; cần sửa lỗi phía lõi rồi chạy lại."
   owner: runtime-core
   kind: runtime-fault
+
 DIRECTION_FORBIDDEN:
   title: "Direction set on a non-drawer"
   title_vi: "Hướng gán cho thứ không phải ngăn kéo"
@@ -1472,6 +1522,7 @@ DIRECTION_FORBIDDEN:
   nextStep_vi: "Kiểm tra vỏ giao diện từ chối; xóa direction hoặc đổi bề mặt thành ngăn kéo."
   owner: op-retry
   kind: check-finding
+
 DIRECTION_MISSING:
   title: "Brand has no direction"
   title_vi: "Thương hiệu chưa có direction"
@@ -1481,6 +1532,7 @@ DIRECTION_MISSING:
   nextStep_vi: "Kiểm tra autopilot không đạt; cần brand.decide ghi hướng thương hiệu."
   owner: other-op:brand.decide
   kind: check-finding
+
 DIRECTION_REV_MOVED:
   title: "Direction changed since the review"
   title_vi: "Direction đã đổi sau lần duyệt"
@@ -1490,6 +1542,7 @@ DIRECTION_REV_MOVED:
   nextStep_vi: "Kiểm tra không đạt; hỏi duyệt lại trên phiên bản direction hiện tại."
   owner: op-retry
   kind: check-finding
+
 DISK_LOW:
   title: "Host disk space low"
   title_vi: "Ổ đĩa máy chủ sắp đầy"
@@ -1500,6 +1553,7 @@ DISK_LOW:
   nextStep_vi: "Đồng hồ SLA mở kèm tên ổ và dung lượng còn lại; Supervisor cần dọn dẹp hoặc mở rộng ổ đĩa."
   owner: supervisor
   kind: runtime-fault
+
 DRAWER_DIRECTION_MISSING:
   title: "Drawer has no valid direction"
   title_vi: "Ngăn kéo thiếu hướng hợp lệ"
@@ -1510,6 +1564,7 @@ DRAWER_DIRECTION_MISSING:
   nextStep_vi: "Kiểm tra vỏ giao diện từ chối; khai một hướng hợp lệ cho từng kích thước có ngăn kéo."
   owner: op-retry
   kind: check-finding
+
 DRAW_ACCENT_BUDGET:
   title: "Accent colour used too much"
   title_vi: "Dùng màu nhấn quá nhiều"
@@ -1519,6 +1574,7 @@ DRAW_ACCENT_BUDGET:
   nextStep_vi: "Vòng vẽ báo lỗi thẩm mỹ; vẽ lại để chỉ dùng màu nhấn cho hành động chính và thước đo."
   owner: other-op:interface.draw
   kind: check-finding
+
 DRAW_ACTION_MISSING:
   title: "Drawing lacks a required control"
   title_vi: "Bản vẽ thiếu nút cần có"
@@ -1528,6 +1584,7 @@ DRAW_ACTION_MISSING:
   nextStep_vi: "Kiểm tra chất lượng vẽ không đạt; vẽ lại để mỗi lệnh chức năng có một điều khiển."
   owner: other-op:interface.draw
   kind: check-finding
+
 DRAW_ALERT_ANATOMY:
   title: "Alert built with wrong structure"
   title_vi: "Cảnh báo dựng sai cấu trúc"
@@ -1537,6 +1594,7 @@ DRAW_ALERT_ANATOMY:
   nextStep_vi: "Kiểm tra DNA không đạt; vẽ lại Alert đúng cấu trúc của grammar."
   owner: other-op:interface.draw
   kind: check-finding
+
 DRAW_ASSET_NOT_TOKEN_RENDERED:
   title: "Drawing image is not token-rendered"
   title_vi: "Hình vẽ không dựng từ token"
@@ -1546,6 +1604,7 @@ DRAW_ASSET_NOT_TOKEN_RENDERED:
   nextStep_vi: "Kiểm tra vẽ từ chối; vẽ lại qua draw-render và cho ảnh cũ nghỉ hưu."
   owner: other-op:interface.draw
   kind: check-finding
+
 DRAW_ASSET_SLOT_UNDECLARED:
   title: "Artwork slot not declared"
   title_vi: "Chỗ đặt tranh chưa khai báo"
@@ -1556,6 +1615,7 @@ DRAW_ASSET_SLOT_UNDECLARED:
   nextStep_vi: "Kiểm tra DNA không đạt; vẽ lại đánh dấu ô tranh và ghi yêu cầu để interface.asset cấp tranh."
   owner: other-op:interface.draw
   kind: check-finding
+
 DRAW_BADGE_UNTONED:
   title: "Badge has no tone"
   title_vi: "Huy hiệu chưa có tông màu"
@@ -1565,6 +1625,7 @@ DRAW_BADGE_UNTONED:
   nextStep_vi: "Kiểm tra chất lượng vẽ không đạt; vẽ lại gắn đúng tông màu."
   owner: other-op:interface.draw
   kind: check-finding
+
 DRAW_BASE_SIGNATURE:
   title: "Drawing source breaks Base pattern"
   title_vi: "Mã vẽ sai mẫu Base"
@@ -1575,6 +1636,7 @@ DRAW_BASE_SIGNATURE:
   nextStep_vi: "Kiểm tra mã nguồn vẽ từ chối; sửa nguồn theo mẫu shape-slot rồi vẽ lại."
   owner: other-op:interface.draw
   kind: check-finding
+
 DRAW_BEAUTY_BELOW:
   title: "Beauty score under the bar"
   title_vi: "Điểm thẩm mỹ dưới ngưỡng"
@@ -1585,6 +1647,7 @@ DRAW_BEAUTY_BELOW:
   nextStep_vi: "Kiểm tra autopilot không đạt; interface.draw cần vẽ lại để đạt ngưỡng."
   owner: other-op:interface.draw
   kind: check-finding
+
 DRAW_COPY_INTERNAL:
   title: "Drawing shows internal copy"
   title_vi: "Bản vẽ lộ chữ nội bộ"
@@ -1594,6 +1657,7 @@ DRAW_COPY_INTERNAL:
   nextStep_vi: "Kiểm tra chất lượng vẽ không đạt; vẽ lại với nội dung thân thiện cho người dùng."
   owner: other-op:interface.draw
   kind: check-finding
+
 DRAW_CRITIC_MISSING:
   title: "No critic scored the drawing"
   title_vi: "Chưa có người chấm bản vẽ"
@@ -1604,6 +1668,7 @@ DRAW_CRITIC_MISSING:
   nextStep_vi: "Bước kết thúc vòng vẽ báo lỗi; chạy lại finish không tắt người chấm hoặc sửa cấu hình người chấm."
   owner: op-retry
   kind: check-finding
+
 DRAW_FEEDBACK_UNADDRESSED:
   title: "Owner note not addressed"
   title_vi: "Ghi chú của chủ chưa được xử lý"
@@ -1613,6 +1678,7 @@ DRAW_FEEDBACK_UNADDRESSED:
   nextStep_vi: "Kiểm tra vẽ không đạt; vẽ lại theo các ghi chú được liệt kê."
   owner: other-op:interface.draw
   kind: check-finding
+
 DRAW_GRAMMAR_DIST_STALE:
   title: "Grammar build is stale for drawing"
   title_vi: "Bản dựng grammar cũ khi vẽ"
@@ -1622,6 +1688,7 @@ DRAW_GRAMMAR_DIST_STALE:
   nextStep_vi: "Dựng hình dừng với lỗi đỏ; cần dựng lại gói grammar rồi vẽ lại."
   owner: runtime-core
   kind: runtime-fault
+
 DRAW_IMPORT_OFF_GRAMMAR:
   title: "Drawing imports outside the grammar"
   title_vi: "Bản vẽ nhập ngoài grammar"
@@ -1632,6 +1699,7 @@ DRAW_IMPORT_OFF_GRAMMAR:
   nextStep_vi: "Kiểm tra mã nguồn vẽ từ chối; vẽ lại chỉ dùng thành phần của grammar."
   owner: other-op:interface.draw
   kind: check-finding
+
 DRAW_LAYOUT_VALUE_UNJUSTIFIED:
   title: "Free spacing value not justified"
   title_vi: "Khoảng cách tự do chưa có lý do"
@@ -1641,6 +1709,7 @@ DRAW_LAYOUT_VALUE_UNJUSTIFIED:
   nextStep_vi: "Kiểm tra mã nguồn vẽ từ chối; dùng bậc chuẩn của grammar hoặc ghi lý do vào rationale.json."
   owner: other-op:interface.draw
   kind: check-finding
+
 DRAW_LOOP_MISSING:
   title: "Drawing not made through draw loop"
   title_vi: "Bản vẽ không đi qua vòng vẽ"
@@ -1650,6 +1719,7 @@ DRAW_LOOP_MISSING:
   nextStep_vi: "Kiểm tra độ phủ vòng vẽ từ chối; vẽ lại qua vòng vẽ rồi ghi các mục tài sản."
   owner: other-op:interface.draw
   kind: check-finding
+
 DRAW_MATRIX_INCOMPLETE:
   title: "Drawn states miss some cells"
   title_vi: "Trạng thái vẽ thiếu ô ma trận"
@@ -1659,6 +1729,7 @@ DRAW_MATRIX_INCOMPLETE:
   nextStep_vi: "Từ chối trong op vẽ, nghi vấn khi kiểm tra ngoài; vẽ đủ các ô còn thiếu."
   owner: other-op:interface.draw
   kind: check-finding
+
 DRAW_MEASURE_UNCAPPED:
   title: "Form region not width-capped"
   title_vi: "Vùng biểu mẫu chưa giới hạn bề rộng"
@@ -1668,6 +1739,7 @@ DRAW_MEASURE_UNCAPPED:
   nextStep_vi: "Kiểm tra lớp vẽ không đạt; vẽ lại giới hạn bề rộng vùng biểu mẫu."
   owner: other-op:interface.draw
   kind: check-finding
+
 DRAW_METER_TRACK:
   title: "Meter track drawn wrongly"
   title_vi: "Thanh đo vẽ sai"
@@ -1677,6 +1749,7 @@ DRAW_METER_TRACK:
   nextStep_vi: "Kiểm tra DNA không đạt; vẽ lại Meter đúng kích thước chuẩn."
   owner: other-op:interface.draw
   kind: check-finding
+
 DRAW_METRICS_FAILED:
   title: "Draw metrics failed"
   title_vi: "Chỉ số vẽ không đạt"
@@ -1686,6 +1759,7 @@ DRAW_METRICS_FAILED:
   nextStep_vi: "Kiểm tra autopilot không đạt; interface.draw vẽ lại cho tới khi mọi chỉ số đạt."
   owner: other-op:interface.draw
   kind: check-finding
+
 DRAW_METRICS_UNVERIFIED:
   title: "Draw metrics could not be re-measured"
   title_vi: "Không đo lại được chỉ số vẽ"
@@ -1696,6 +1770,7 @@ DRAW_METRICS_UNVERIFIED:
   nextStep_vi: "Cổng vẽ không đạt kèm lý do; sửa lỗi bộ đo rồi chạy lại."
   owner: runtime-core
   kind: check-finding
+
 DRAW_NESTED_VARIANT:
   title: "Control not on a nested surface"
   title_vi: "Điều khiển không nằm trên lớp lồng"
@@ -1705,6 +1780,7 @@ DRAW_NESTED_VARIANT:
   nextStep_vi: "Kiểm tra lớp vẽ không đạt; vẽ lại đặt điều khiển trên lớp lồng đúng chuẩn."
   owner: other-op:interface.draw
   kind: check-finding
+
 DRAW_NOTICE_NOT_ALERT:
   title: "Notice is not a toned Alert"
   title_vi: "Thông báo không phải Alert có tông"
@@ -1715,6 +1791,7 @@ DRAW_NOTICE_NOT_ALERT:
   nextStep_vi: "Kiểm tra DNA không đạt; vẽ lại bằng Alert có tông màu."
   owner: other-op:interface.draw
   kind: check-finding
+
 DRAW_NOT_OWNER_ACCEPTED:
   title: "Owner has not accepted the drawing"
   title_vi: "Chủ chưa chấp nhận bản vẽ"
@@ -1726,6 +1803,7 @@ DRAW_NOT_OWNER_ACCEPTED:
   nextStep_vi: "Không tự xanh nhờ kiểm tra; cần chủ sở hữu trả lời yêu cầu duyệt bản vẽ."
   owner: owner
   kind: check-finding
+
 DRAW_NOT_REDRAWN:
   title: "Nothing was drawn this time"
   title_vi: "Lần này chưa vẽ lại gì"
@@ -1735,6 +1813,7 @@ DRAW_NOT_REDRAWN:
   nextStep_vi: "Kiểm tra vẽ từ chối; vẽ lại theo hợp đồng hiện hành."
   owner: other-op:interface.draw
   kind: check-finding
+
 DRAW_NOT_SHAPES:
   title: "Drawing is not made of shapes"
   title_vi: "Bản vẽ không theo từng hình"
@@ -1744,6 +1823,7 @@ DRAW_NOT_SHAPES:
   nextStep_vi: "Kiểm tra vẽ từ chối; khai ui.shapes và vẽ mỗi hình một ảnh."
   owner: other-op:interface.draw
   kind: check-finding
+
 DRAW_OFF_GRAMMAR_COMPONENT:
   title: "Element outside the grammar"
   title_vi: "Phần tử ngoài grammar"
@@ -1754,6 +1834,7 @@ DRAW_OFF_GRAMMAR_COMPONENT:
   nextStep_vi: "Kiểm tra DNA không đạt; vẽ lại dùng đúng thành phần của grammar."
   owner: other-op:interface.draw
   kind: check-finding
+
 DRAW_RATIONALE_MISSING:
   title: "Drawing rationale missing"
   title_vi: "Thiếu giải thích cho bản vẽ"
@@ -1763,6 +1844,7 @@ DRAW_RATIONALE_MISSING:
   nextStep_vi: "Kiểm tra không đạt; interface.draw ghi rationale.json rồi kiểm tra lại."
   owner: other-op:interface.draw
   kind: check-finding
+
 DRAW_RATIO_NOT_METER:
   title: "Ratio not drawn as Meter"
   title_vi: "Tỷ lệ không vẽ bằng Meter"
@@ -1772,6 +1854,7 @@ DRAW_RATIO_NOT_METER:
   nextStep_vi: "Kiểm tra DNA không đạt; vẽ lại bằng thành phần Meter."
   owner: other-op:interface.draw
   kind: check-finding
+
 DRAW_RAW_STYLED_HTML:
   title: "Drawing uses raw styled HTML"
   title_vi: "Bản vẽ dùng HTML tô kiểu thô"
@@ -1781,6 +1864,7 @@ DRAW_RAW_STYLED_HTML:
   nextStep_vi: "Kiểm tra mã nguồn vẽ từ chối; vẽ lại dùng thành phần grammar, HTML chỉ để bố cục."
   owner: other-op:interface.draw
   kind: check-finding
+
 COMPOSES_PATH_DANGLING:
   title: "Composes path points nowhere"
   title_vi: "Đường dẫn composes trỏ vào khoảng trống"
@@ -1790,6 +1874,7 @@ COMPOSES_PATH_DANGLING:
   nextStep_vi: "Nếu hồ sơ đã xong thì bị từ chối, chưa xong thì chỉ nghi vấn; cần sửa đường dẫn hoặc tạo mô-đun."
   owner: other-op:work.author
   kind: check-finding
+
 COMPOSITE_CHILD_SLOT_MISSING:
   title: "Layout drawing lacks its child slot"
   title_vi: "Bản vẽ bố cục thiếu ô chứa trang con"
@@ -1799,6 +1884,7 @@ COMPOSITE_CHILD_SLOT_MISSING:
   nextStep_vi: "Kiểm tra vỏ giao diện từ chối; vẽ và ghép lại bố cục có ô trang con được đo."
   owner: other-op:interface.draw
   kind: check-finding
+
 COMPOSITE_DESTINATION_MISMATCH:
   title: "Composite placed in the wrong destination"
   title_vi: "Bản ghép đặt sai đích"
@@ -1809,6 +1895,7 @@ COMPOSITE_DESTINATION_MISMATCH:
   nextStep_vi: "Kiểm tra vỏ giao diện báo lỗi; ghép lại vào đúng bố cục hiện tại."
   owner: other-op:interface.draw
   kind: check-finding
+
 COMPOSITE_DIRECTION_MISMATCH:
   title: "Drawer anchored the wrong way"
   title_vi: "Ngăn kéo neo sai hướng"
@@ -1818,6 +1905,7 @@ COMPOSITE_DIRECTION_MISMATCH:
   nextStep_vi: "Kiểm tra vỏ giao diện từ chối; ghép lại theo hướng của hồ sơ."
   owner: other-op:interface.draw
   kind: check-finding
+
 COMPOSITE_FILE_MISSING:
   title: "Composite image file missing"
   title_vi: "Thiếu tệp ảnh ghép"
@@ -1827,6 +1915,7 @@ COMPOSITE_FILE_MISSING:
   nextStep_vi: "Kiểm tra vỏ giao diện từ chối; ghép lại để tạo tệp."
   owner: other-op:interface.draw
   kind: check-finding
+
 COMPOSITE_HOST_MISMATCH:
   title: "Overlay drawn over the wrong host"
   title_vi: "Lớp phủ vẽ trên nền sai"
@@ -1837,6 +1926,7 @@ COMPOSITE_HOST_MISMATCH:
   nextStep_vi: "Từ chối hoặc nghi vấn tùy chế độ; ghép lại lớp phủ lên ảnh nền hiện tại."
   owner: other-op:interface.draw
   kind: check-finding
+
 COMPOSITE_INCONSISTENT:
   title: "Composite contradicts the record"
   title_vi: "Bản ghép mâu thuẫn với hồ sơ"
@@ -1846,6 +1936,7 @@ COMPOSITE_INCONSISTENT:
   nextStep_vi: "Kiểm tra vỏ giao diện từ chối; ghép lại cho khớp hồ sơ."
   owner: other-op:interface.draw
   kind: check-finding
+
 COMPOSITE_LAYOUT_MISMATCH:
   title: "Composite uses an outdated layout"
   title_vi: "Bản ghép dùng bố cục lỗi thời"
@@ -1856,6 +1947,7 @@ COMPOSITE_LAYOUT_MISMATCH:
   nextStep_vi: "Kiểm tra vỏ giao diện báo lỗi hoặc nghi vấn; ghép lại vào bố cục hiện tại."
   owner: other-op:interface.draw
   kind: check-finding
+
 COMPOSITE_MISSING:
   title: "Drawing has no composite"
   title_vi: "Bản vẽ chưa được ghép"
@@ -1865,6 +1957,7 @@ COMPOSITE_MISSING:
   nextStep_vi: "Kiểm tra vỏ giao diện báo lỗi; chạy bước ghép để đặt bản vẽ vào trang."
   owner: other-op:interface.draw
   kind: check-finding
+
 COMPOSITE_NOT_REPRODUCIBLE:
   title: "Composite cannot be reproduced"
   title_vi: "Không tái tạo được bản ghép"
@@ -1875,6 +1968,7 @@ COMPOSITE_NOT_REPRODUCIBLE:
   nextStep_vi: "Kiểm tra vỏ giao diện từ chối; ghép lại bằng công cụ để ảnh khớp bản ghi."
   owner: other-op:interface.draw
   kind: check-finding
+
 DRAW_RENDER_RED:
   title: "Draw render capture came back red"
   title_vi: "Bản vẽ render bị lỗi khi chụp"
@@ -3117,6 +3211,7 @@ HFS_README_WORK_POINTER_MISSING:
   nextStep_vi: "Op docs.author thêm chỉ dẫn tới cây .starciwork của backend."
   owner: other-op:docs.author
   kind: check-finding
+
 HFS_REPO_UNREADABLE:
   title: "Repository is not a readable Git work tree"
   title_vi: "Không đọc được kho Git"
@@ -3150,6 +3245,7 @@ HFS_ROOT_ENTRY_FORBIDDEN:
   nextStep_vi: "Bộ kiểm kiến trúc từ chối; op vừa tạo ra mục đó phải dời nó vào thư mục sở hữu rồi chạy lại kiểm tra."
   owner: op-retry
   kind: check-finding
+
 HFS_ROOT_ENTRY_MISSING:
   title: "Required root entry is missing"
   title_vi: "Thiếu mục bắt buộc ở thư mục gốc"
@@ -3160,6 +3256,7 @@ HFS_ROOT_ENTRY_MISSING:
   nextStep_vi: "Bộ kiểm kiến trúc từ chối; op đang làm việc phải tạo mục còn thiếu rồi chạy lại kiểm tra."
   owner: op-retry
   kind: check-finding
+
 HFS_ROOT_MARKDOWN_FORBIDDEN:
   title: "Markdown file at repository root"
   title_vi: "Tệp Markdown đặt ở thư mục gốc"
@@ -3170,6 +3267,7 @@ HFS_ROOT_MARKDOWN_FORBIDDEN:
   nextStep_vi: "Bộ kiểm kiến trúc từ chối; op phải chuyển tệp vào docs/ hoặc hồ sơ Work rồi chạy lại."
   owner: op-retry
   kind: check-finding
+
 HFS_ROOT_SRC_FORBIDDEN_FE:
   title: "Root src folder in frontend repo"
   title_vi: "Repo giao diện có thư mục src ở gốc"
@@ -3180,14 +3278,16 @@ HFS_ROOT_SRC_FORBIDDEN_FE:
   nextStep_vi: "Bộ kiểm kiến trúc từ chối; op phải chuyển toàn bộ src vào apps/<app>/src rồi chạy lại."
   owner: op-retry
   kind: check-finding
+
 HFS_SIZE_GROWTH:
-  title: "File grew past its size budget"
-  title_vi: "Tệp phình vượt ngân sách kích thước"
-  meaning_vi: "Một tệp mới dài hơn ngân sách dòng, hoặc một tệp đã vượt ngân sách lại dài thêm so với commit cha. Tệp đã lớn được giữ nguyên nhưng không được phình thêm."
+  title: "Source file over the size budget grew"
+  title_vi: "Tệp mã nguồn vượt hạn mức dòng vẫn tiếp tục dài thêm"
+  meaning_vi: "Một tệp mã nguồn đã dài hơn hạn mức mềm (500 dòng) nhưng lại dài thêm so với phiên bản gốc của nhánh, hoặc một tệp mới tạo đã vượt hạn mức ngay từ đầu. Tệp quá dài khó đọc, khó sửa và là nơi lỗi dễ ẩn; quy tắc này cho phép tệp cũ đang quá dài được giữ nguyên hoặc thu nhỏ dần, nhưng không cho phép nó phình thêm."
   causes_vi:
-    - "Tệp mới được tạo ra đã dài hơn ngân sách"
-    - "Thêm dòng vào một tệp vốn đã vượt ngân sách"
-  nextStep_vi: "Tách phần mới sang tệp riêng theo trách nhiệm; op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra."
+    - "Op thêm mã mới vào một tệp vốn đã quá 500 dòng thay vì tách phần mới sang tệp khác"
+    - "Một tệp đang dưới 500 dòng được thêm mã cho đến khi vượt hạn mức"
+    - "Một tệp mới tạo dài hơn 500 dòng, hoặc một tệp bị di chuyển sang đường dẫn mới nên bị coi là tệp mới"
+  nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để tách phần mã mới (hoặc bớt phần cũ) sang tệp riêng đúng ô của nó, sao cho tệp không dài hơn phiên bản gốc và tệp mới không quá 500 dòng."
   owner: op-retry
   kind: check-finding
 
@@ -3233,6 +3333,7 @@ HFS_SRC_LAYOUT_INVALID:
   nextStep_vi: "Bộ kiểm kiến trúc từ chối; op phải dời thư mục đó về nơi sở hữu nó rồi chạy lại."
   owner: op-retry
   kind: check-finding
+
 HFS_STACKS_IN_FE:
   title: "Stack declarations in frontend repo"
   title_vi: "Khai báo stack nằm trong repo giao diện"
@@ -3243,6 +3344,7 @@ HFS_STACKS_IN_FE:
   nextStep_vi: "Bộ kiểm kiến trúc từ chối; op phải xóa thư mục khỏi repo giao diện và đặt khai báo ở backend."
   owner: op-retry
   kind: check-finding
+
 HFS_STACKS_PLAINTEXT:
   title: "Plaintext secret under .starcistacks"
   title_vi: "Bí mật dạng rõ nằm trong .starcistacks"
@@ -3329,6 +3431,7 @@ HFS_TEST_KIND_RETIRED:
   nextStep_vi: "Bộ kiểm kiến trúc từ chối; op phải đổi tệp thành unit hoặc e2e và bỏ cấu hình thừa rồi chạy lại."
   owner: op-retry
   kind: check-finding
+
 HFS_TRACKED_MUST_BE_IGNORED:
   title: "Tracked path that must be gitignored"
   title_vi: "Tệp bị theo dõi nhưng lẽ ra phải bị bỏ qua"
@@ -3361,6 +3464,7 @@ HFS_WORK_IN_FE:
   nextStep_vi: "Bộ kiểm kiến trúc từ chối; op phải chuyển hồ sơ sang repo backend rồi chạy lại."
   owner: op-retry
   kind: check-finding
+
 HISTORY_REWRITE:
   title: "Git history rewrite refused"
   title_vi: "Lệnh git viết lại lịch sử bị chặn"
@@ -3371,6 +3475,7 @@ HISTORY_REWRITE:
   nextStep_vi: "Lệnh không được chạy; worker phải dùng cách an toàn được gợi ý như restore --staged cho tệp của mình hoặc pull --ff-only."
   owner: op-retry
   kind: verb-refusal
+
 HOOKS_BYPASS:
   title: "Git hooks bypass refused"
   title_vi: "Lệnh git bỏ qua hook bị chặn"
@@ -3381,6 +3486,7 @@ HOOKS_BYPASS:
   nextStep_vi: "Lệnh không được chạy; worker phải sửa lỗi mà hook báo rồi commit hoặc push lại bình thường."
   owner: op-retry
   kind: verb-refusal
+
 HOST_FORBIDDEN:
   title: "Host set on non-overlay layout item"
   title_vi: "Khai báo host trên mục không phải lớp phủ"
@@ -3391,6 +3497,7 @@ HOST_FORBIDDEN:
   nextStep_vi: "Bộ kiểm tra khung ứng dụng từ chối; op vẽ hoặc dựng giao diện phải bỏ trường host khỏi bản ghi đó."
   owner: op-retry
   kind: check-finding
+
 IMPL_APP_DIR_UNREADABLE:
   title: "App folder cannot be read"
   title_vi: "Không đọc được thư mục app"
@@ -3401,6 +3508,7 @@ IMPL_APP_DIR_UNREADABLE:
   nextStep_vi: "Bộ kiểm tra khung ứng dụng từ chối; op triển khai giao diện phải đảm bảo thư mục app tồn tại rồi chạy lại."
   owner: op-retry
   kind: check-finding
+
 IMPL_BEFORE_DIRECTION:
   title: "Implementation done before UI direction"
   title_vi: "Triển khai xong trước khi có hướng giao diện"
@@ -3411,6 +3519,7 @@ IMPL_BEFORE_DIRECTION:
   nextStep_vi: "Bộ kiểm tra ví dụ Work báo lỗi; cần hoàn tất phần thiết kế giao diện trước, rồi mới giữ trạng thái xong cho phần triển khai."
   owner: other-op:interface.draw
   kind: check-finding
+
 IMPL_INTERCEPT_MISSING:
   title: "Intercepting route file missing"
   title_vi: "Thiếu route chặn cho lớp phủ"
@@ -3421,6 +3530,7 @@ IMPL_INTERCEPT_MISSING:
   nextStep_vi: "Bộ kiểm tra khung ứng dụng từ chối; op triển khai giao diện phải tạo route chặn cạnh layout rồi chạy lại."
   owner: op-retry
   kind: check-finding
+
 IMPL_NO_ROUTED_UI:
   title: "No routed UI record to verify"
   title_vi: "Không có màn hình có đường dẫn để kiểm"
@@ -3431,6 +3541,7 @@ IMPL_NO_ROUTED_UI:
   nextStep_vi: "Chỉ là thông tin, không chặn; không cần hành động nào."
   owner: op-retry
   kind: check-finding
+
 IMPL_ROUTE_FILE_MISSING:
   title: "Route file was not created"
   title_vi: "Thiếu tệp route đã khai báo"
@@ -3441,6 +3552,7 @@ IMPL_ROUTE_FILE_MISSING:
   nextStep_vi: "Bộ kiểm tra khung ứng dụng từ chối; op triển khai giao diện phải tạo tệp còn thiếu rồi chạy lại."
   owner: op-retry
   kind: check-finding
+
 IMPORTS_BROKEN_AFTER_MOVE:
   title: "Imports broken after files moved"
   title_vi: "Import bị hỏng sau khi dời tệp"
@@ -3451,6 +3563,7 @@ IMPORTS_BROKEN_AFTER_MOVE:
   nextStep_vi: "Kernel đưa việc sửa lại đường dẫn import vào hàng chờ; op refactor phải trỏ lại các import cho đúng."
   owner: other-op:code.refactor
   kind: blocker
+
 IMPORT_SCAN_UNAVAILABLE:
   title: "Import scan cannot list files"
   title_vi: "Không quét được danh sách import"
@@ -3461,6 +3574,7 @@ IMPORT_SCAN_UNAVAILABLE:
   nextStep_vi: "Việc quét dừng lại; cần xử lý lỗi git hoặc đường dẫn repo (lỗi hạ tầng) rồi chạy lại."
   owner: runtime-core
   kind: runtime-fault
+
 INLINE_CONFIG_NOT_REFUSED:
   title: "Inline lint config comments allowed"
   title_vi: "Cho phép cấu hình lint ngay trong mã"
@@ -3471,6 +3585,7 @@ INLINE_CONFIG_NOT_REFUSED:
   nextStep_vi: "Bộ kiểm lint xếp phạm vi kiểm là chưa đầy đủ; op phải sửa cấu hình để cấm chú thích cấu hình nội tuyến rồi chạy lại."
   owner: op-retry
   kind: check-finding
+
 INPUTS_CHANGED_DURING_CHECK:
   title: "Inputs changed while lint ran"
   title_vi: "Đầu vào đổi trong lúc đang kiểm lint"
@@ -3481,6 +3596,7 @@ INPUTS_CHANGED_DURING_CHECK:
   nextStep_vi: "Kết quả bị xem là không dùng được; cần chạy lại kiểm lint khi các tệp đã ổn định."
   owner: op-retry
   kind: check-finding
+
 INPUT_BYTES_MOVED:
   title: "Input file no longer matches stamp"
   title_vi: "Tệp đầu vào không còn khớp dấu vết"
@@ -3491,6 +3607,7 @@ INPUT_BYTES_MOVED:
   nextStep_vi: "Bộ kiểm tra tài sản Work nghi ngờ; op tạo bản vẽ hoặc tài sản phải làm lại từ tệp hiện tại để cập nhật dấu vết."
   owner: op-retry
   kind: check-finding
+
 INPUT_INVALID:
   title: "Scoped lint input is invalid"
   title_vi: "Đầu vào của bộ kiểm lint không hợp lệ"
@@ -3501,6 +3618,7 @@ INPUT_INVALID:
   nextStep_vi: "Bộ kiểm không chạy; người gọi phải sửa tham số rồi chạy lại."
   owner: op-retry
   kind: input-invalid
+
 INTEGRATION_ENDPOINT_REMOTE:
   title: "Integration endpoint not served locally"
   title_vi: "Điểm cuối tích hợp không do repo phục vụ"
@@ -3511,6 +3629,7 @@ INTEGRATION_ENDPOINT_REMOTE:
   nextStep_vi: "Chỉ là thông tin, không chặn; người đọc nên kiểm tra xem điểm cuối có đáng lẽ là cửa nhận từ ngoài không."
   owner: owner
   kind: check-finding
+
 INVALID_INPUT:
   title: "Scanner input is invalid"
   title_vi: "Đầu vào của bộ quét không hợp lệ"
@@ -3521,6 +3640,7 @@ INVALID_INPUT:
   nextStep_vi: "Bộ quét dừng với lỗi đầu vào; người gọi phải sửa lời gọi rồi chạy lại."
   owner: runtime-core
   kind: input-invalid
+
 KERNEL_GATED:
   title: "Kernel seat is gated"
   title_vi: "Ghế Kernel đang bị chặn cổng"
@@ -3531,6 +3651,7 @@ KERNEL_GATED:
   nextStep_vi: "Sau khoảng chờ 10 phút, hệ thống gửi một yêu cầu xử lý tới ghế Supervisor để gỡ hoặc giải quyết cổng."
   owner: supervisor
   kind: blocker
+
 KERNEL_INPUT_STUCK:
   title: "Kernel terminal has unsent input"
   title_vi: "Ô nhập của Kernel bị kẹt chữ"
@@ -3541,6 +3662,7 @@ KERNEL_INPUT_STUCK:
   nextStep_vi: "Sau khoảng chờ 1 phút, bộ điều phối tự gửi phím Enter để đẩy đoạn nhập đi."
   owner: runtime-core
   kind: runtime-fault
+
 KERNEL_TURN_OVERDUE:
   title: "Kernel turn ran past its budget"
   title_vi: "Lượt làm việc của Kernel quá hạn"
@@ -3551,6 +3673,7 @@ KERNEL_TURN_OVERDUE:
   nextStep_vi: "Bộ điều phối gửi phím ngắt và đánh thức lại; nếu vẫn quá hạn sau thời gian ân hạn thì thay ghế Kernel."
   owner: runtime-core
   kind: runtime-fault
+
 KEY_OVER_1024_CHARS:
   title: "YAML key too long"
   title_vi: "Khóa YAML dài quá 1024 ký tự"
@@ -3561,6 +3684,7 @@ KEY_OVER_1024_CHARS:
   nextStep_vi: "Tệp YAML bị đọc lỗi; người viết tệp phải rút gọn khóa hoặc tách dòng rồi lưu lại."
   owner: op-retry
   kind: input-invalid
+
 LAND_FAILED_UNOWNED:
   title: "Land failed and nobody owns it"
   title_vi: "Gộp nhánh thất bại mà chưa ai nhận"
@@ -3571,6 +3695,7 @@ LAND_FAILED_UNOWNED:
   nextStep_vi: "Bộ điều phối gửi yêu cầu xử lý tới ghế Supervisor để điều tra và gộp lại."
   owner: supervisor
   kind: blocker
+
 LAND_QUEUE_STALL:
   title: "Land queue is stalled"
   title_vi: "Hàng chờ gộp nhánh bị đứng"
@@ -3581,6 +3706,7 @@ LAND_QUEUE_STALL:
   nextStep_vi: "Sau 30 phút, bộ điều phối tự gỡ kẹt hàng chờ gộp nhánh."
   owner: runtime-core
   kind: runtime-fault
+
 LAYOUT_ANCESTOR_UNSETTLED:
   title: "Layout above the route is unsettled"
   title_vi: "Layout cha của route chưa được chốt"
@@ -3591,6 +3717,7 @@ LAYOUT_ANCESTOR_UNSETTLED:
   nextStep_vi: "Bộ kiểm tra khung ứng dụng từ chối; op quyết định thương hiệu phải chốt layout cha trước rồi mới làm tiếp."
   owner: other-op:brand.decide
   kind: check-finding
+
 LAYOUT_BINDING_MISSING:
   title: "Layout is not bound in shell"
   title_vi: "Layout chưa được gắn vào khung ứng dụng"
@@ -3601,6 +3728,7 @@ LAYOUT_BINDING_MISSING:
   nextStep_vi: "Bộ kiểm tra khung ứng dụng báo thiếu; op quyết định thương hiệu phải dựng lại phần gắn cho layout đó."
   owner: other-op:brand.decide
   kind: check-finding
+
 LAYOUT_DESTINATION_INVALID:
   title: "Layout destination is invalid"
   title_vi: "Điểm đến của layout không hợp lệ"
@@ -3611,6 +3739,7 @@ LAYOUT_DESTINATION_INVALID:
   nextStep_vi: "Bộ kiểm tra khung ứng dụng từ chối; op quyết định thương hiệu phải sửa lại khai báo điểm đến."
   owner: other-op:brand.decide
   kind: check-finding
+
 LAYOUT_REV_STALE:
   title: "Layout binding is outdated"
   title_vi: "Bản gắn layout đã cũ"
@@ -3621,6 +3750,7 @@ LAYOUT_REV_STALE:
   nextStep_vi: "Bộ kiểm tra khung ứng dụng báo cũ; op quyết định thương hiệu phải dựng lại khung theo phiên bản hiện tại."
   owner: other-op:brand.decide
   kind: check-finding
+
 LAYOUT_SOURCE_DRIFT:
   title: "Layout source changed since recorded"
   title_vi: "Mã layout đã đổi so với bản ghi"
@@ -3631,6 +3761,7 @@ LAYOUT_SOURCE_DRIFT:
   nextStep_vi: "Bộ kiểm tra khung ứng dụng nghi ngờ; op quyết định thương hiệu sẽ quét lại và chụp lại phần đã đổi."
   owner: other-op:brand.decide
   kind: check-finding
+
 LAYOUT_TREE_INVALID:
   title: "Layout tree structure is broken"
   title_vi: "Cấu trúc cây layout bị hỏng"
@@ -3641,6 +3772,7 @@ LAYOUT_TREE_INVALID:
   nextStep_vi: "Bộ kiểm tra khung ứng dụng từ chối; op quyết định thương hiệu phải quét lại để tạo cây đúng."
   owner: other-op:brand.decide
   kind: check-finding
+
 LAYOUT_TREE_STALE:
   title: "App changed since layout tree scan"
   title_vi: "Mã app đã đổi so với lần quét cây layout"
@@ -3651,6 +3783,7 @@ LAYOUT_TREE_STALE:
   nextStep_vi: "Bộ kiểm tra khung ứng dụng báo cũ; op quyết định thương hiệu quét lại và chụp lại những phần đã đổi."
   owner: other-op:brand.decide
   kind: check-finding
+
 LAYOUT_UNSETTLED:
   title: "Layout is not settled"
   title_vi: "Layout chưa được chốt"
@@ -3661,6 +3794,7 @@ LAYOUT_UNSETTLED:
   nextStep_vi: "Bộ kiểm tra khung ứng dụng từ chối; op quyết định thương hiệu phải chốt layout trước khi các bước sau chạy."
   owner: other-op:brand.decide
   kind: check-finding
+
 LEASE_STUCK:
   title: "Job lease stuck too long"
   title_vi: "Công việc được giữ chỗ nhưng không chạy"
@@ -3671,6 +3805,7 @@ LEASE_STUCK:
   nextStep_vi: "Bộ điều phối tự chạy api reconcile để dọn công việc kẹt và đưa nó về hàng chờ."
   owner: runtime-core
   kind: runtime-fault
+
 LEDGER_CORRUPT:
   title: "Ledger database is corrupt"
   title_vi: "Sổ ledger bị hỏng"
@@ -3681,6 +3816,7 @@ LEDGER_CORRUPT:
   nextStep_vi: "Bộ điều phối báo khẩn ngay cho chủ; cần khôi phục ledger từ bản sao lưu hằng đêm."
   owner: owner
   kind: runtime-fault
+
 LINK_CREATE:
   title: "Link creation refused"
   title_vi: "Việc tạo liên kết thư mục bị chặn"
@@ -3691,6 +3827,7 @@ LINK_CREATE:
   nextStep_vi: "Lệnh không được chạy; worker phải làm việc trong bản checkout được giao, cần thứ gì khác thì báo bị chặn về môi trường."
   owner: op-retry
   kind: verb-refusal
+
 LINK_STUCK:
   title: "Link could not be removed safely"
   title_vi: "Không gỡ được liên kết một cách an toàn"
@@ -3701,6 +3838,7 @@ LINK_STUCK:
   nextStep_vi: "Không xóa gì thêm để tránh mất dữ liệu thật; cần gỡ liên kết thủ công rồi thử lại (lỗi hạ tầng)."
   owner: runtime-core
   kind: runtime-fault
+
 LINT_EXECUTION_UNAVAILABLE:
   title: "Lint execution failed"
   title_vi: "Không chạy được bước lint"
@@ -3711,6 +3849,7 @@ LINT_EXECUTION_UNAVAILABLE:
   nextStep_vi: "Bộ kiểm lint trả trạng thái không khả dụng kèm thông điệp lỗi; cần sửa nguyên nhân rồi chạy lại."
   owner: runtime-core
   kind: check-status
+
 LINT_RUNTIME_UNAVAILABLE:
   title: "Lint runtime cannot load"
   title_vi: "Không nạp được môi trường chạy lint"
@@ -3721,6 +3860,7 @@ LINT_RUNTIME_UNAVAILABLE:
   nextStep_vi: "Bộ kiểm trả trạng thái không khả dụng; cần cài hoặc sửa môi trường lint của repo đích rồi chạy lại."
   owner: runtime-core
   kind: check-status
+
 LOG_TYPED_MISSING:
   title: "Op settled without typed log rows"
   title_vi: "Op kết thúc mà thiếu dòng nhật ký bắt buộc"
@@ -3731,6 +3871,7 @@ LOG_TYPED_MISSING:
   nextStep_vi: "Chỉ là cảnh báo hiện trong trạng thái workflow; Kernel xem và có thể cho op chạy lại nếu thiếu bằng chứng."
   owner: op-retry
   kind: check-status
+
 MECHANICAL_CHECK_CONFLICT:
   title: "Mechanical checks conflict"
   title_vi: "Các luật kiểm máy xung đột nhau"
@@ -3741,6 +3882,7 @@ MECHANICAL_CHECK_CONFLICT:
   nextStep_vi: "Bộ kiểm lint ghi nhận nghĩa vụ chưa được phủ; cần sửa danh mục luật cho rõ ràng."
   owner: runtime-core
   kind: check-finding
+
 MECHANICAL_CHECK_MISSING:
   title: "No mechanical check for obligation"
   title_vi: "Nghĩa vụ chưa có luật kiểm bằng máy"
@@ -3751,6 +3893,7 @@ MECHANICAL_CHECK_MISSING:
   nextStep_vi: "Bộ kiểm lint đánh dấu nghĩa vụ chưa được phủ; cần bổ sung luật kiểm tương ứng."
   owner: runtime-core
   kind: check-finding
+
 MECHANICAL_COVERAGE_INCOMPLETE:
   title: "Lint coverage incomplete"
   title_vi: "Phạm vi kiểm lint chưa đầy đủ"
@@ -3761,6 +3904,7 @@ MECHANICAL_COVERAGE_INCOMPLETE:
   nextStep_vi: "Kết quả bị coi là không khả dụng và chặn; cần bổ sung phạm vi kiểm rồi chạy lại."
   owner: op-retry
   kind: check-finding
+
 MISSING_RESULT:
   title: "No lint result for a file"
   title_vi: "Thiếu kết quả lint cho một tệp"
@@ -3771,6 +3915,7 @@ MISSING_RESULT:
   nextStep_vi: "Việc phủ kiểm không đầy đủ; cần chạy lại kiểm lint, nếu lặp lại thì đây là lỗi của bộ kiểm."
   owner: runtime-core
   kind: check-finding
+
 MULTILINE_IMPLICIT_KEY:
   title: "YAML key spans several lines"
   title_vi: "Khóa YAML trải trên nhiều dòng"
@@ -3781,6 +3926,7 @@ MULTILINE_IMPLICIT_KEY:
   nextStep_vi: "Tệp YAML bị đọc lỗi; người viết tệp phải sửa cho khóa nằm trên một dòng rồi lưu lại."
   owner: op-retry
   kind: input-invalid
+
 MULTIPLE_ANCHORS:
   title: "YAML node has two anchors"
   title_vi: "Một mục YAML có hai neo"
@@ -3791,6 +3937,7 @@ MULTIPLE_ANCHORS:
   nextStep_vi: "Tệp YAML bị đọc lỗi; người viết tệp phải bỏ bớt neo rồi lưu lại."
   owner: op-retry
   kind: input-invalid
+
 MULTIPLE_DOCS:
   title: "YAML file has several documents"
   title_vi: "Tệp YAML chứa nhiều tài liệu"
@@ -3801,6 +3948,7 @@ MULTIPLE_DOCS:
   nextStep_vi: "Tệp YAML bị đọc lỗi; người viết tệp phải gộp lại thành một tài liệu hoặc tách ra tệp riêng."
   owner: op-retry
   kind: input-invalid
+
 MULTIPLE_TAGS:
   title: "YAML node has two tags"
   title_vi: "Một mục YAML có hai thẻ kiểu"
@@ -3811,6 +3959,7 @@ MULTIPLE_TAGS:
   nextStep_vi: "Tệp YAML bị đọc lỗi; người viết tệp phải bỏ bớt thẻ rồi lưu lại."
   owner: op-retry
   kind: input-invalid
+
 NAV_LABEL_MISSING:
   title: "Navigation item lacks a label"
   title_vi: "Mục điều hướng thiếu nhãn"
@@ -3821,6 +3970,7 @@ NAV_LABEL_MISSING:
   nextStep_vi: "Bộ kiểm cây layout ghi nhận; op triển khai giao diện phải bổ sung nhãn vào các tệp dịch."
   owner: op-retry
   kind: check-finding
+
 NAV_REGISTRY_UNREAD:
   title: "Navigation registry cannot be read"
   title_vi: "Không đọc được danh sách điều hướng"
@@ -3831,6 +3981,7 @@ NAV_REGISTRY_UNREAD:
   nextStep_vi: "Chỉ là nghi ngờ, chưa chặn; op triển khai giao diện nên kiểm tra và sửa nơi khai báo điều hướng."
   owner: op-retry
   kind: check-finding
+
 NAV_ROUTE_MISSING:
   title: "Navigation points to missing page"
   title_vi: "Mục điều hướng trỏ tới trang không có"
@@ -3841,6 +3992,7 @@ NAV_ROUTE_MISSING:
   nextStep_vi: "Bộ kiểm khung ứng dụng nghi ngờ; op triển khai giao diện phải tạo trang hoặc sửa đường dẫn."
   owner: op-retry
   kind: check-finding
+
 NAV_ROUTE_NULL:
   title: "Navigation item has no route"
   title_vi: "Mục điều hướng không có đường dẫn"
@@ -3851,6 +4003,7 @@ NAV_ROUTE_NULL:
   nextStep_vi: "Chỉ là thông tin, không chặn; không cần làm gì nếu cố ý."
   owner: op-retry
   kind: check-finding
+
 NEST_CACHE_TOKEN_BOUNDARY:
   title: "Cache token used outside boundary"
   title_vi: "Dùng mã cache ngoài phạm vi cho phép"
@@ -3861,6 +4014,7 @@ NEST_CACHE_TOKEN_BOUNDARY:
   nextStep_vi: "Bộ kiểm lint từ chối; op backend phải chuyển việc dùng token cache về đúng lớp rồi chạy lại."
   owner: op-retry
   kind: check-finding
+
 NEST_COMMENT_FORM:
   title: "Comment does not follow required form"
   title_vi: "Chú thích không đúng quy cách"
@@ -3871,6 +4025,7 @@ NEST_COMMENT_FORM:
   nextStep_vi: "Bộ kiểm lint từ chối; op backend phải đặt chú thích phía trên mã và viết chữ thường đầu câu."
   owner: op-retry
   kind: check-finding
+
 NEST_ENV_ACCESS:
   title: "Environment read outside parser"
   title_vi: "Đọc biến môi trường ngoài nơi quy định"
@@ -3881,6 +4036,7 @@ NEST_ENV_ACCESS:
   nextStep_vi: "Bộ kiểm lint từ chối; op backend phải đọc cấu hình qua bộ phân tích môi trường đã quy định."
   owner: op-retry
   kind: check-finding
+
 NEST_ERROR_DECLARATION_IDENTITY:
   title: "Error class lacks required base"
   title_vi: "Lớp lỗi không kế thừa lớp gốc quy định"
@@ -3891,6 +4047,7 @@ NEST_ERROR_DECLARATION_IDENTITY:
   nextStep_vi: "Bộ kiểm lint từ chối; op backend phải cho lớp lỗi kế thừa đúng lớp gốc rồi chạy lại."
   owner: op-retry
   kind: check-finding
+
 NEST_FOREIGN_ERROR_CAUSE:
   title: "Foreign error not kept as cause"
   title_vi: "Lỗi từ bên ngoài không được giữ làm nguyên nhân"
@@ -3901,6 +4058,7 @@ NEST_FOREIGN_ERROR_CAUSE:
   nextStep_vi: "Bộ kiểm lint từ chối; op backend phải truyền lỗi gốc vào cause khi bọc lỗi."
   owner: op-retry
   kind: check-finding
+
 NEST_IMPORT_FORMAT:
   title: "Named import format is wrong"
   title_vi: "Định dạng import có tên sai quy cách"
@@ -3911,6 +4069,7 @@ NEST_IMPORT_FORMAT:
   nextStep_vi: "Bộ kiểm lint từ chối; op backend phải định dạng lại import mỗi tên một dòng."
   owner: op-retry
   kind: check-finding
+
 NEST_JEST_ALIAS_PARITY:
   title: "Jest aliases differ from TypeScript"
   title_vi: "Bí danh của Jest lệch với TypeScript"
@@ -3921,6 +4080,7 @@ NEST_JEST_ALIAS_PARITY:
   nextStep_vi: "Bộ kiểm lint từ chối; op backend phải đồng bộ hai cấu hình rồi chạy lại."
   owner: op-retry
   kind: check-finding
+
 NEST_MEMBER_DOCUMENTATION:
   title: "Member lacks responsibility docblock"
   title_vi: "Thành viên thiếu chú thích trách nhiệm"
@@ -3931,6 +4091,7 @@ NEST_MEMBER_DOCUMENTATION:
   nextStep_vi: "Bộ kiểm lint từ chối; op backend phải thêm docblock không rỗng cho thành viên đó."
   owner: op-retry
   kind: check-finding
+
 NEST_NAMED_EXPORTS:
   title: "Named exports rule violated"
   title_vi: "Vi phạm quy tắc export có tên"
@@ -3941,6 +4102,7 @@ NEST_NAMED_EXPORTS:
   nextStep_vi: "Bộ kiểm lint từ chối; op backend phải đổi sang export có tên."
   owner: op-retry
   kind: check-finding
+
 NEST_TEST_DISCOVERY:
   title: "Test files not discoverable"
   title_vi: "Tệp test không được tìm thấy"
@@ -3951,6 +4113,7 @@ NEST_TEST_DISCOVERY:
   nextStep_vi: "Bộ kiểm lint từ chối; op backend phải sửa cấu hình hoặc tên tệp test."
   owner: op-retry
   kind: check-finding
+
 NEST_TEST_NAME_FORM:
   title: "Test suite name is not valid"
   title_vi: "Tên nhóm test không đúng quy cách"
@@ -3961,6 +4124,7 @@ NEST_TEST_NAME_FORM:
   nextStep_vi: "Bộ kiểm lint từ chối; op viết test phải đặt lại tên nhóm theo đối tượng được kiểm."
   owner: op-retry
   kind: check-finding
+
 NEST_TEST_SUBJECT_FORM:
   title: "Test subject form is invalid"
   title_vi: "Đối tượng của test không đúng quy cách"
@@ -3971,6 +4135,7 @@ NEST_TEST_SUBJECT_FORM:
   nextStep_vi: "Bộ kiểm lint từ chối; op viết test phải sửa lại theo quy ước."
   owner: op-retry
   kind: check-finding
+
 NEST_THROWN_ERROR_IDENTITY:
   title: "Thrown error lacks required identity"
   title_vi: "Lỗi được ném không đúng loại quy định"
@@ -3981,6 +4146,7 @@ NEST_THROWN_ERROR_IDENTITY:
   nextStep_vi: "Bộ kiểm lint từ chối; op backend phải ném đúng lớp lỗi của dự án."
   owner: op-retry
   kind: check-finding
+
 NEST_TRANSPORT_ERROR_MAPPER:
   title: "HTTP error mapper unavailable"
   title_vi: "Không có bộ ánh xạ lỗi HTTP khai báo"
@@ -3991,6 +4157,7 @@ NEST_TRANSPORT_ERROR_MAPPER:
   nextStep_vi: "Bộ kiểm lint từ chối; op backend phải sửa khai báo hoặc thêm export còn thiếu."
   owner: op-retry
   kind: check-finding
+
 NON_STRING_KEY:
   title: "YAML key is not a string"
   title_vi: "Khóa YAML không phải chuỗi"
@@ -4001,6 +4168,7 @@ NON_STRING_KEY:
   nextStep_vi: "Tệp YAML bị đọc lỗi; người viết tệp phải đặt khóa trong dấu nháy để thành chuỗi."
   owner: op-retry
   kind: input-invalid
+
 NORM_UNRECORDED:
   title: "Change not recorded in baseline"
   title_vi: "Thay đổi chưa được ghi vào mốc chuẩn"
@@ -4011,6 +4179,7 @@ NORM_UNRECORDED:
   nextStep_vi: "Kiểm này chỉ chạy khi có mốc chuẩn; sau khi chạy sạch phải ghi lại mốc chuẩn bằng --write-baseline."
   owner: op-retry
   kind: check-finding
+
 NO_BASELINE:
   title: "No deep-check baseline recorded"
   title_vi: "Chưa có mốc chuẩn cho kiểm sâu"
@@ -4021,6 +4190,7 @@ NO_BASELINE:
   nextStep_vi: "Chỉ là thông tin, không chặn; sau một lượt sạch hãy chạy lại với --write-baseline để bật đủ kiểm."
   owner: op-retry
   kind: check-finding
+
 NO_EFFECTIVE_CONFIG:
   title: "File has no effective lint config"
   title_vi: "Tệp không có cấu hình lint hiệu lực"
@@ -4031,6 +4201,7 @@ NO_EFFECTIVE_CONFIG:
   nextStep_vi: "Phạm vi kiểm bị coi là chưa đầy đủ; op phải sửa cấu hình lint để phủ tệp rồi chạy lại."
   owner: op-retry
   kind: check-finding
+
 OPS_ROUTE:
   title: "Route is an ops or probe endpoint"
   title_vi: "Route là cửa kiểm tra vận hành"
@@ -4041,6 +4212,7 @@ OPS_ROUTE:
   nextStep_vi: "Chỉ là thông tin, không chặn; không cần làm gì."
   owner: op-retry
   kind: check-finding
+
 ORPHANED_FRONTIER:
   title: "Workflow frontier is orphaned"
   title_vi: "Điểm tiếp theo của workflow không ai nhận"
@@ -4051,6 +4223,7 @@ ORPHANED_FRONTIER:
   nextStep_vi: "Bộ điều phối gửi yêu cầu xử lý cho Kernel để nhận việc tiếp theo."
   owner: runtime-core
   kind: runtime-fault
+
 ORPHAN_PROCESS:
   title: "Orphan runtime process found"
   title_vi: "Phát hiện tiến trình mồ côi"
@@ -4061,6 +4234,7 @@ ORPHAN_PROCESS:
   nextStep_vi: "Sau 30 phút, bộ điều phối tự dừng tiến trình mồ côi đó."
   owner: runtime-core
   kind: runtime-fault
+
 ORPHAN_TERMINAL:
   title: "Terminal bound to no live job"
   title_vi: "Terminal không gắn với công việc nào"
@@ -4071,6 +4245,7 @@ ORPHAN_TERMINAL:
   nextStep_vi: "Bộ kiểm cây Orca báo phát hiện; cần dọn terminal thừa khỏi cây Orca."
   owner: runtime-core
   kind: check-finding
+
 OUTSIDE_ROOT:
   title: "Delete target outside root"
   title_vi: "Mục xóa nằm ngoài thư mục cho phép"
@@ -4081,6 +4256,7 @@ OUTSIDE_ROOT:
   nextStep_vi: "Không xóa gì cả để tránh mất dữ liệu; cần sửa đường dẫn hoặc gỡ liên kết rồi thử lại."
   owner: runtime-core
   kind: runtime-fault
+
 OVERLAY_HOST_MISSING:
   title: "Overlay has no host"
   title_vi: "Lớp phủ chưa nêu nó mở trên cái gì"
@@ -4091,6 +4267,7 @@ OVERLAY_HOST_MISSING:
   nextStep_vi: "Bộ kiểm tra khung ứng dụng từ chối; op vẽ hoặc dựng giao diện phải điền host cho lớp phủ."
   owner: op-retry
   kind: check-finding
+
 OVERLAY_HOST_UNRESOLVED:
   title: "Overlay host not found"
   title_vi: "Không tìm thấy nơi lớp phủ mở lên"
@@ -4101,6 +4278,7 @@ OVERLAY_HOST_UNRESOLVED:
   nextStep_vi: "Bộ kiểm tra khung ứng dụng từ chối; op vẽ hoặc dựng giao diện phải sửa host cho đúng."
   owner: op-retry
   kind: check-finding
+
 OVERLAY_PAGE_FORBIDDEN:
   title: "Non-routed overlay drawn as a page"
   title_vi: "Lớp phủ không có đường dẫn lại vẽ như trang"
@@ -4111,6 +4289,7 @@ OVERLAY_PAGE_FORBIDDEN:
   nextStep_vi: "Bộ kiểm tra từ chối; op vẽ phải bỏ phần trang hoặc đổi cửa sổ nổi thành có đường dẫn rồi chạy lại."
   owner: other-op:interface.draw
   kind: check-finding
+
 OVERLAY_ROUTED_MISSING:
   title: "Overlay does not say routed true or false"
   title_vi: "Lớp phủ chưa khai báo có đường dẫn hay không"
@@ -4121,6 +4300,7 @@ OVERLAY_ROUTED_MISSING:
   nextStep_vi: "Bộ kiểm tra từ chối; op tạo bản ghi giao diện phải khai báo routed rồi chạy lại."
   owner: other-op:interface.scaffold
   kind: check-finding
+
 OWNED_PATHS_EMPTY:
   title: "Work node owns no path"
   title_vi: "Nút công việc chưa khai báo đường dẫn sở hữu"
@@ -4131,6 +4311,7 @@ OWNED_PATHS_EMPTY:
   nextStep_vi: "Đồ thị công việc bị từ chối; op lập kế hoạch phải điền đường dẫn sở hữu cho nút rồi kiểm tra lại."
   owner: other-op:work.author
   kind: check-finding
+
 OWNED_PATH_OVERLAP:
   title: "Two work nodes own the same path"
   title_vi: "Hai nút công việc cùng sở hữu một đường dẫn"
@@ -4141,6 +4322,7 @@ OWNED_PATH_OVERLAP:
   nextStep_vi: "Đồ thị bị từ chối; op lập kế hoạch phải chia lại phần sở hữu hoặc nối hai nút bằng một cạnh phụ thuộc."
   owner: other-op:work.author
   kind: check-finding
+
 OWNER_DECISION_OPEN:
   title: "Owner decision still open"
   title_vi: "Còn quyết định đang chờ chủ dự án"
@@ -4151,6 +4333,7 @@ OWNER_DECISION_OPEN:
   nextStep_vi: "Tiến độ hiện màu đỏ cho tới khi chủ dự án trả lời quyết định; sau đó Kernel tiếp tục chạy."
   owner: owner
   kind: blocker
+
 OWNER_DEVIATION_DECISION_REQUIRED:
   title: "Owner must decide an intentional deviation"
   title_vi: "Chủ dự án phải quyết định về chỗ lệch có chủ ý"
@@ -4161,6 +4344,7 @@ OWNER_DEVIATION_DECISION_REQUIRED:
   nextStep_vi: "Op kiểm tra giao diện báo lại kèm bằng chứng rồi dừng, không giao việc tiếp; chủ dự án xem bằng chứng và quyết định."
   owner: owner
   kind: settle-reason
+
 OWNER_PATH_MISSING:
   title: "Owner directory not on disk"
   title_vi: "Thư mục của bên sở hữu không có trên đĩa"
@@ -4171,6 +4355,7 @@ OWNER_PATH_MISSING:
   nextStep_vi: "Nếu bản ghi đã xong thì bị lỗi, nếu chưa xong chỉ là cảnh báo; op ghi lại bản ghi phải sửa đường dẫn."
   owner: other-op:work.author
   kind: check-finding
+
 PALETTE_IMAGE_UNREADABLE:
   title: "Palette image cannot be decoded"
   title_vi: "Không đọc được ảnh để so màu"
@@ -4181,6 +4366,7 @@ PALETTE_IMAGE_UNREADABLE:
   nextStep_vi: "Ghi nhận ở mức nghi ngờ; op vẽ giao diện phải tạo lại ảnh đọc được rồi chạy kiểm tra lại."
   owner: other-op:interface.draw
   kind: check-finding
+
 PALETTE_OFF_BRAND:
   title: "Colours outside the brand palette"
   title_vi: "Có màu ngoài bảng màu thương hiệu"
@@ -4191,6 +4377,7 @@ PALETTE_OFF_BRAND:
   nextStep_vi: "Bộ kiểm tra báo từng màu lệch; op vẽ giao diện phải vẽ lại bằng màu thương hiệu."
   owner: other-op:interface.draw
   kind: check-finding
+
 PARAM_DEFAULT:
   title: "Param needs exactly one of default or required"
   title_vi: "Tham số cần đúng một trong mặc định hoặc bắt buộc"
@@ -4201,6 +4388,7 @@ PARAM_DEFAULT:
   nextStep_vi: "Bộ kiểm tra bản mô tả op báo lỗi; người sửa bản mô tả op phải chọn đúng một trong hai."
   owner: runtime-core
   kind: check-finding
+
 PARAM_RESTATED:
   title: "Tunable value repeated in prose"
   title_vi: "Giá trị chỉnh được bị chép lại trong lời văn"
@@ -4211,6 +4399,7 @@ PARAM_RESTATED:
   nextStep_vi: "Bộ kiểm tra báo lỗi; người sửa bản mô tả op phải thay số bằng cách trích params.<tên>."
   owner: runtime-core
   kind: check-finding
+
 PARENT_STATE_UNUSED:
   title: "No parent record claims done"
   title_vi: "Chưa có bản ghi cha nào báo hoàn tất"
@@ -4221,6 +4410,7 @@ PARENT_STATE_UNUSED:
   nextStep_vi: "Không cần làm gì; đây là thông tin, quy tắc sẽ tự chạy khi có bản ghi cha báo xong."
   owner: runtime-core
   kind: check-finding
+
 PARITY_FIELD:
   title: "Example trees differ in fields"
   title_vi: "Hai cây ví dụ khác nhau về trường dữ liệu"
@@ -4231,6 +4421,7 @@ PARITY_FIELD:
   nextStep_vi: "Chỉ là thông tin; người bảo trì ví dụ nên đồng bộ hai cây."
   owner: runtime-core
   kind: check-finding
+
 PARITY_LINT_CHILD_FAILED:
   title: "Parity lint child process failed"
   title_vi: "Tiến trình con kiểm tra đồng bộ bị lỗi"
@@ -4241,6 +4432,7 @@ PARITY_LINT_CHILD_FAILED:
   nextStep_vi: "Kết quả bị coi là không hợp lệ kèm thông báo lỗi; cần sửa lỗi hạ tầng của bộ kiểm tra rồi chạy lại."
   owner: runtime-core
   kind: runtime-fault
+
 PARITY_SKIPPED:
   title: "Parity check skipped"
   title_vi: "Bỏ qua kiểm tra đồng bộ"
@@ -4250,6 +4442,7 @@ PARITY_SKIPPED:
   nextStep_vi: "Chỉ là thông tin; không cần hành động."
   owner: runtime-core
   kind: check-finding
+
 PATHSPEC_FILE_UNREADABLE:
   title: "Pathspec list file unreadable"
   title_vi: "Không đọc được tệp danh sách đường dẫn git"
@@ -4260,6 +4453,7 @@ PATHSPEC_FILE_UNREADABLE:
   nextStep_vi: "Lệnh git bị từ chối; worker phải ghi danh sách đường dẫn sở hữu vào tệp đọc được hoặc ghi đường dẫn sau dấu --."
   owner: op-retry
   kind: dispatch-refusal
+
 PATH_INVALID:
   title: "Work node path is not concrete"
   title_vi: "Đường dẫn của nút công việc không hợp lệ"
@@ -4270,6 +4464,7 @@ PATH_INVALID:
   nextStep_vi: "Đồ thị bị từ chối; op lập kế hoạch phải sửa thành đường dẫn tương đối cụ thể."
   owner: other-op:work.author
   kind: check-finding
+
 PATH_JOINED:
   title: "Several paths joined in one write entry"
   title_vi: "Nhiều đường dẫn bị nối trong một mục ghi"
@@ -4280,6 +4475,7 @@ PATH_JOINED:
   nextStep_vi: "Bộ kiểm tra bản mô tả op báo lỗi; người sửa phải tách thành nhiều mục."
   owner: runtime-core
   kind: check-finding
+
 PATH_NOT_OWNED:
   title: "Git path outside owned paths"
   title_vi: "Đường dẫn git nằm ngoài phạm vi được giao"
@@ -4290,6 +4486,7 @@ PATH_NOT_OWNED:
   nextStep_vi: "Chốt chặn từ chối lệnh; worker chỉ nêu đường dẫn được giao sau dấu --, hoặc báo môi trường bị chặn nếu thiếu tệp bảo vệ."
   owner: op-retry
   kind: dispatch-refusal
+
 PAYLOAD_AS_RECORD:
   title: "Asset payloads walked as records"
   title_vi: "Tệp dữ liệu đính kèm bị duyệt như bản ghi"
@@ -4299,6 +4496,7 @@ PAYLOAD_AS_RECORD:
   nextStep_vi: "Chỉ là thông tin; cổng kiểm tra cơ bản không nên duyệt chúng như bản ghi."
   owner: runtime-core
   kind: check-finding
+
 PAYLOAD_SKIPPED:
   title: "Artifact payload skipped"
   title_vi: "Bỏ qua tệp dữ liệu đính kèm"
@@ -4308,6 +4506,7 @@ PAYLOAD_SKIPPED:
   nextStep_vi: "Chỉ là thông tin; không cần hành động."
   owner: runtime-core
   kind: check-finding
+
 PEER_WAIT_OVERDUE:
   title: "Waiting on a peer too long"
   title_vi: "Chờ bên đồng đẳng quá lâu"
@@ -4318,6 +4517,7 @@ PEER_WAIT_OVERDUE:
   nextStep_vi: "Bộ điều phối ghi vi phạm quá hạn và đưa lên Supervisor xem xét bên đang bị chờ."
   owner: supervisor
   kind: runtime-fault
+
 PERSONA_UNKNOWN:
   title: "Persona not in layout personas"
   title_vi: "Vai trò người dùng không có trong bố cục"
@@ -4328,6 +4528,7 @@ PERSONA_UNKNOWN:
   nextStep_vi: "Bộ kiểm tra từ chối; op giao diện phải dùng vai trò đã khai báo hoặc thêm vai trò vào bố cục."
   owner: other-op:interface.scaffold
   kind: check-finding
+
 PLACE_TOO_SHALLOW:
   title: "Record id too shallow for its place"
   title_vi: "Mã bản ghi quá ngắn so với vị trí"
@@ -4338,6 +4539,7 @@ PLACE_TOO_SHALLOW:
   nextStep_vi: "Bộ kiểm tra chỉ chỗ đúng; op ghi bản ghi phải chuyển bản ghi về đúng vị trí và sửa các tham chiếu."
   owner: other-op:work.author
   kind: check-finding
+
 PRIMARY_ABSENT:
   title: "Brand primary colour missing"
   title_vi: "Thiếu màu chính của thương hiệu"
@@ -4348,6 +4550,7 @@ PRIMARY_ABSENT:
   nextStep_vi: "Bộ kiểm tra báo lỗi; op vẽ giao diện phải vẽ lại dùng màu chính."
   owner: other-op:interface.draw
   kind: check-finding
+
 PROFILE_CATALOG_INVALID:
   title: "Code-pattern profile catalog malformed"
   title_vi: "Danh mục hồ sơ mẫu mã bị hỏng"
@@ -4358,6 +4561,7 @@ PROFILE_CATALOG_INVALID:
   nextStep_vi: "Lint theo phạm vi báo hồ sơ không hợp lệ; người bảo trì hồ sơ mẫu mã phải sửa cấu hình rồi chạy lại."
   owner: runtime-core
   kind: check-finding
+
 PROFILE_INVALID:
   title: "Code-pattern profile malformed"
   title_vi: "Hồ sơ mẫu mã bị thiếu hoặc sai"
@@ -4368,6 +4572,7 @@ PROFILE_INVALID:
   nextStep_vi: "Lint theo phạm vi báo hồ sơ không hợp lệ; người bảo trì hồ sơ mẫu mã phải sửa cấu hình rồi chạy lại."
   owner: runtime-core
   kind: check-finding
+
 PROFILE_INVENTORY_INVALID:
   title: "Profile rule inventory inconsistent"
   title_vi: "Danh sách quy tắc của hồ sơ không khớp"
@@ -4378,6 +4583,7 @@ PROFILE_INVENTORY_INVALID:
   nextStep_vi: "Lint theo phạm vi báo hồ sơ không hợp lệ; người bảo trì hồ sơ mẫu mã phải sửa cấu hình rồi chạy lại."
   owner: runtime-core
   kind: check-finding
+
 PROFILE_EXPECTATION_INVALID:
   title: "Rule expected setting invalid"
   title_vi: "Thiết lập kỳ vọng của quy tắc không hợp lệ"
@@ -4388,6 +4594,7 @@ PROFILE_EXPECTATION_INVALID:
   nextStep_vi: "Lint theo phạm vi báo hồ sơ không hợp lệ; người bảo trì hồ sơ mẫu mã phải sửa cấu hình rồi chạy lại."
   owner: runtime-core
   kind: check-finding
+
 PROFILE_OBLIGATION_INVALID:
   title: "Profile obligation malformed"
   title_vi: "Nghĩa vụ trong hồ sơ bị sai cấu trúc"
@@ -4398,6 +4605,7 @@ PROFILE_OBLIGATION_INVALID:
   nextStep_vi: "Lint theo phạm vi báo hồ sơ không hợp lệ; người bảo trì hồ sơ mẫu mã phải sửa cấu hình rồi chạy lại."
   owner: runtime-core
   kind: check-finding
+
 PROFILE_SUBJECT_SELECTION_INVALID:
   title: "Obligation subject selection invalid"
   title_vi: "Cách chọn đối tượng của nghĩa vụ không hợp lệ"
@@ -4408,6 +4616,7 @@ PROFILE_SUBJECT_SELECTION_INVALID:
   nextStep_vi: "Lint theo phạm vi báo hồ sơ không hợp lệ; người bảo trì hồ sơ mẫu mã phải sửa cấu hình rồi chạy lại."
   owner: runtime-core
   kind: check-finding
+
 PROFILE_ESLINT_RULES_MISSING:
   title: "Obligation lists no ESLint rules"
   title_vi: "Nghĩa vụ ESLint chưa nêu quy tắc"
@@ -4418,6 +4627,7 @@ PROFILE_ESLINT_RULES_MISSING:
   nextStep_vi: "Lint theo phạm vi báo hồ sơ không hợp lệ; người bảo trì hồ sơ mẫu mã phải sửa cấu hình rồi chạy lại."
   owner: runtime-core
   kind: check-finding
+
 PROFILE_MACHINE_RULES_MISSING:
   title: "Obligation lists no machine rules"
   title_vi: "Nghĩa vụ chưa nêu quy tắc máy kiểm"
@@ -4428,6 +4638,7 @@ PROFILE_MACHINE_RULES_MISSING:
   nextStep_vi: "Lint theo phạm vi báo hồ sơ không hợp lệ; người bảo trì hồ sơ mẫu mã phải sửa cấu hình rồi chạy lại."
   owner: runtime-core
   kind: check-finding
+
 PROFILE_UNKNOWN:
   title: "Cannot tell next from nest"
   title_vi: "Không xác định được hồ sơ next hay nest"
@@ -4438,6 +4649,7 @@ PROFILE_UNKNOWN:
   nextStep_vi: "Lệnh dừng với lỗi; người chạy phải truyền --profile rõ ràng."
   owner: op-retry
   kind: input-invalid
+
 PROMPT_EMPTY:
   title: "Prompt file empty"
   title_vi: "Tệp lời nhắc trống"
@@ -4448,6 +4660,7 @@ PROMPT_EMPTY:
   nextStep_vi: "Bộ kiểm tra từ chối; op sinh ảnh phải ghi lại lời nhắc thật."
   owner: other-op:interface.asset
   kind: check-finding
+
 PROMPT_INPUT_GHOST:
   title: "Prompt names missing input files"
   title_vi: "Lời nhắc nhắc đến tệp đầu vào không tồn tại"
@@ -4458,6 +4671,7 @@ PROMPT_INPUT_GHOST:
   nextStep_vi: "Ghi ở mức nghi ngờ; op sinh ảnh phải bổ sung tệp hoặc sửa lời nhắc."
   owner: other-op:interface.asset
   kind: check-finding
+
 PROMPT_MISSING:
   title: "Prompt file missing beside generation"
   title_vi: "Thiếu tệp lời nhắc bên cạnh ảnh"
@@ -4468,6 +4682,7 @@ PROMPT_MISSING:
   nextStep_vi: "Bộ kiểm tra từ chối; op sinh ảnh phải thêm tệp lời nhắc."
   owner: other-op:interface.asset
   kind: check-finding
+
 PROOF_COMMAND_AMBIGUOUS:
   title: "Proof npm script in another repo"
   title_vi: "Lệnh chứng minh chỉ có ở kho khác"
@@ -4478,6 +4693,7 @@ PROOF_COMMAND_AMBIGUOUS:
   nextStep_vi: "Ghi ở mức nghi ngờ; op tác giả bản ghi phải ghi đúng kho hoặc script."
   owner: other-op:work.author
   kind: check-finding
+
 PROOF_COMMAND_DEAD:
   title: "Proof npm script does not exist"
   title_vi: "Lệnh chứng minh trỏ tới script không tồn tại"
@@ -4488,6 +4704,7 @@ PROOF_COMMAND_DEAD:
   nextStep_vi: "Bộ kiểm tra từ chối; op tác giả bản ghi phải sửa thành script có thật."
   owner: other-op:work.author
   kind: check-finding
+
 PROOF_COVERAGE_GAP:
   title: "Composed rules lack unit proof"
   title_vi: "Thiếu chứng minh đơn vị cho các quy tắc thành phần"
@@ -4498,6 +4715,7 @@ PROOF_COVERAGE_GAP:
   nextStep_vi: "Ghi ở mức nghi ngờ; op tác giả phải bổ sung yêu cầu chứng minh đơn vị."
   owner: other-op:work.author
   kind: check-finding
+
 PROOF_COVERAGE_THIN:
   title: "Done record demands no proof"
   title_vi: "Bản ghi xong nhưng không đòi bằng chứng"
@@ -4507,6 +4725,7 @@ PROOF_COVERAGE_THIN:
   nextStep_vi: "Ghi ở mức nghi ngờ; op tác giả phải khai báo requiresProof."
   owner: other-op:work.author
   kind: check-finding
+
 PROOF_FILTER_EMPTY:
   title: "Test filter matches no spec"
   title_vi: "Bộ lọc kiểm thử không khớp tệp nào"
@@ -4517,6 +4736,7 @@ PROOF_FILTER_EMPTY:
   nextStep_vi: "Ghi ở mức nghi ngờ; op tác giả phải sửa bộ lọc."
   owner: other-op:work.author
   kind: check-finding
+
 PROOF_FOREACH_DANGLING:
   title: "Proof forEach names missing field"
   title_vi: "Yêu cầu chứng minh trỏ tới trường không có"
@@ -4527,6 +4747,7 @@ PROOF_FOREACH_DANGLING:
   nextStep_vi: "Bộ kiểm tra từ chối; op tác giả phải sửa forEach hoặc thêm trường."
   owner: other-op:work.author
   kind: check-finding
+
 PROOF_MEDIA_MISSING:
   title: "Visual proof media missing at settle"
   title_vi: "Thiếu ảnh hoặc video làm bằng chứng"
@@ -4537,6 +4758,7 @@ PROOF_MEDIA_MISSING:
   nextStep_vi: "Kernel từ chối báo xong, công việc giữ nguyên trạng thái; giao lại op để chụp bằng chứng."
   owner: op-retry
   kind: verb-refusal
+
 PROOF_NOT_REPLAYABLE:
   title: "Assertion has no replay command"
   title_vi: "Khẳng định không có lệnh chạy lại"
@@ -4547,6 +4769,7 @@ PROOF_NOT_REPLAYABLE:
   nextStep_vi: "Bằng chứng bị từ chối; op tạo bằng chứng phải ghi lệnh chạy lại được."
   owner: other-op:e2e.verify
   kind: check-finding
+
 PROOF_ROUTE_UNHOLDS:
   title: "Journey done but a step is not"
   title_vi: "Hành trình xong nhưng có bước chưa xong"
@@ -4557,6 +4780,7 @@ PROOF_ROUTE_UNHOLDS:
   nextStep_vi: "Bộ kiểm tra từ chối; hoàn tất các bước con rồi mới báo xong hành trình."
   owner: other-op:work.author
   kind: check-finding
+
 PROOF_UNCLAIMED:
   title: "Demanded prover has no claiming record"
   title_vi: "Bằng chứng được đòi nhưng chưa ai nhận"
@@ -4567,6 +4791,7 @@ PROOF_UNCLAIMED:
   nextStep_vi: "Ghi ở mức nghi ngờ; cần tạo hoặc nối bản ghi chứng minh."
   owner: other-op:work.author
   kind: check-finding
+
 PROVENBY_AUTHORED:
   title: "provenBy written by hand"
   title_vi: "provenBy bị viết tay"
@@ -4576,6 +4801,7 @@ PROVENBY_AUTHORED:
   nextStep_vi: "Bộ kiểm tra từ chối; xóa trường và để nó tự suy ra từ proves."
   owner: other-op:work.author
   kind: check-finding
+
 PROVENBY_TARGET_NOT_DONE:
   title: "Proof claim points at unfinished record"
   title_vi: "Khẳng định được chứng minh bởi bản ghi chưa xong"
@@ -4585,6 +4811,7 @@ PROVENBY_TARGET_NOT_DONE:
   nextStep_vi: "Bộ kiểm tra từ chối vì chứng minh sai; hoàn tất bản ghi kia trước."
   owner: other-op:work.author
   kind: check-finding
+
 PROVES_ASYMMETRY:
   title: "Todo prover proves done records"
   title_vi: "Bản ghi chứng minh chưa xong lại chứng minh bản ghi đã xong"
@@ -4594,6 +4821,7 @@ PROVES_ASYMMETRY:
   nextStep_vi: "Ghi ở mức nghi ngờ; hoàn tất bản ghi chứng minh."
   owner: other-op:work.author
   kind: check-finding
+
 PROVES_TARGET_NOT_DONE:
   title: "Done prover proves unfinished record"
   title_vi: "Bản ghi xong chứng minh bản ghi chưa xong"
@@ -4604,6 +4832,7 @@ PROVES_TARGET_NOT_DONE:
   nextStep_vi: "Bộ kiểm tra báo lỗi; hoàn tất đích hoặc sửa liên kết."
   owner: other-op:work.author
   kind: check-finding
+
 PUSH_REMOTE_NOT_CONFIGURED:
   title: "Push to unconfigured remote"
   title_vi: "Đẩy lên nơi chưa cấu hình"
@@ -4614,6 +4843,7 @@ PUSH_REMOTE_NOT_CONFIGURED:
   nextStep_vi: "Chốt chặn từ chối; worker phải push theo tên remote đã cấu hình, ví dụ origin."
   owner: op-retry
   kind: dispatch-refusal
+
 QUESTION_OVERDUE:
   title: "Question unanswered too long"
   title_vi: "Câu hỏi chưa được trả lời quá lâu"
@@ -4624,6 +4854,7 @@ QUESTION_OVERDUE:
   nextStep_vi: "Bộ điều phối ghi vi phạm quá hạn; Supervisor phải xem và trả lời hoặc chuyển cho chủ dự án."
   owner: supervisor
   kind: runtime-fault
+
 RAM_CRITICAL:
   title: "Host RAM critically low"
   title_vi: "Bộ nhớ RAM máy chủ cạn nghiêm trọng"
@@ -4634,6 +4865,7 @@ RAM_CRITICAL:
   nextStep_vi: "Bộ điều phối đặt đồng hồ cảnh báo và giảm tải; quá thời hạn thì Supervisor phải xử lý."
   owner: supervisor
   kind: runtime-fault
+
 READY_UNDISPATCHED:
   title: "Ready job not dispatched"
   title_vi: "Việc sẵn sàng nhưng chưa được giao"
@@ -4644,6 +4876,7 @@ READY_UNDISPATCHED:
   nextStep_vi: "Bộ điều phối ghi vi phạm quá hạn; Supervisor kiểm tra vì sao chưa giao."
   owner: supervisor
   kind: runtime-fault
+
 READ_WITHOUT_EDGE:
   title: "Read of another node path without edge"
   title_vi: "Đọc đường dẫn của nút khác mà không có liên kết"
@@ -4654,6 +4887,7 @@ READ_WITHOUT_EDGE:
   nextStep_vi: "Đồ thị bị từ chối; op lập kế hoạch phải thêm cạnh hoặc bỏ phần đọc."
   owner: other-op:work.author
   kind: check-finding
+
 RECEIPT_ORPHAN:
   title: "Tool receipt does not match artifact"
   title_vi: "Biên nhận công cụ không khớp sản phẩm"
@@ -4664,6 +4898,7 @@ RECEIPT_ORPHAN:
   nextStep_vi: "Ghi nghi ngờ hoặc từ chối; op sinh ảnh phải ghi biên nhận đúng."
   owner: other-op:interface.asset
   kind: check-finding
+
 RECORD_MODE:
   title: "Standalone record validation"
   title_vi: "Kiểm tra bản ghi đơn lẻ"
@@ -4673,6 +4908,7 @@ RECORD_MODE:
   nextStep_vi: "Không cần làm gì."
   owner: runtime-core
   kind: check-finding
+
 RECORD_UNREADABLE:
   title: "Record cannot be read"
   title_vi: "Không đọc được bản ghi"
@@ -4683,6 +4919,7 @@ RECORD_UNREADABLE:
   nextStep_vi: "Bộ kiểm tra báo lỗi; sửa hoặc khôi phục bản ghi."
   owner: other-op:work.author
   kind: check-finding
+
 REF_MALFORMED:
   title: "Malformed parent#criterion ref"
   title_vi: "Tham chiếu cha#tiêu chí sai dạng"
@@ -4693,6 +4930,7 @@ REF_MALFORMED:
   nextStep_vi: "Bộ kiểm tra báo lỗi; sửa tham chiếu thành mã bản ghi hoặc parent.id#tên-tiêu-chí."
   owner: other-op:work.author
   kind: check-finding
+
 REMOTE_REWRITE:
   title: "Git remote change refused"
   title_vi: "Từ chối đổi remote git"
@@ -4702,6 +4940,7 @@ REMOTE_REWRITE:
   nextStep_vi: "Chốt chặn từ chối; worker push tới remote đã cấu hình và báo nếu cần remote khác."
   owner: op-retry
   kind: dispatch-refusal
+
 RENDER_BRAND_MISSING:
   title: "Brand missing for render proof"
   title_vi: "Thiếu thương hiệu để chứng minh hiển thị"
@@ -4712,6 +4951,7 @@ RENDER_BRAND_MISSING:
   nextStep_vi: "Bằng chứng hiển thị không chạy được; cần bản ghi thương hiệu hợp lệ."
   owner: other-op:brand.decide
   kind: check-finding
+
 RENDER_CAPTURE_MISSING:
   title: "Render capture blob missing"
   title_vi: "Thiếu ảnh chụp hiển thị"
@@ -4722,6 +4962,7 @@ RENDER_CAPTURE_MISSING:
   nextStep_vi: "Ví dụ có sẵn chỉ cảnh báo; bản ghi thật bị lỗi cho tới khi chụp lại."
   owner: other-op:interface.implement
   kind: check-finding
+
 RENDER_CHECK_FAILED:
   title: "Render palette check failed"
   title_vi: "Kiểm tra màu hiển thị thất bại"
@@ -4731,6 +4972,7 @@ RENDER_CHECK_FAILED:
   nextStep_vi: "Bằng chứng bị từ chối; op cài giao diện phải sửa."
   owner: other-op:interface.implement
   kind: check-finding
+
 RENDER_PROOF_INCOMPLETE:
   title: "Render proof could not run"
   title_vi: "Chứng minh hiển thị chưa hoàn tất"
@@ -4741,6 +4983,7 @@ RENDER_PROOF_INCOMPLETE:
   nextStep_vi: "Coi như không đạt; chụp lại và chạy lại."
   owner: other-op:interface.implement
   kind: check-finding
+
 RENDER_UI_INPUT_MISSING:
   title: "No ui-screen to compare render"
   title_vi: "Không có màn hình thiết kế để so hiển thị"
@@ -4751,6 +4994,7 @@ RENDER_UI_INPUT_MISSING:
   nextStep_vi: "Bằng chứng không chạy được; cần bản ghi màn hình đã vẽ."
   owner: other-op:interface.draw
   kind: check-finding
+
 REPOSITORY_OBLIGATION_OWED:
   title: "Repo obligation not yet declared"
   title_vi: "Kho chưa khai báo nghĩa vụ"
@@ -4760,6 +5004,7 @@ REPOSITORY_OBLIGATION_OWED:
   nextStep_vi: "Chỉ ghi chú với lint theo lát cắt; chủ kho cần bổ sung khai báo."
   owner: owner
   kind: check-finding
+
 REPOSITORY_UNAVAILABLE:
   title: "Repository path unavailable"
   title_vi: "Không truy cập được thư mục kho"
@@ -4770,6 +5015,7 @@ REPOSITORY_UNAVAILABLE:
   nextStep_vi: "Báo cáo không hợp lệ; cần thư mục kho đúng."
   owner: op-retry
   kind: input-invalid
+
 REPO_UNBOUND:
   title: "Repository resolves to nothing"
   title_vi: "Kho khai trong bản ghi không tồn tại"
@@ -4780,6 +5026,7 @@ REPO_UNBOUND:
   nextStep_vi: "Bộ kiểm tra từ chối; cần ràng buộc kho đúng."
   owner: other-op:work.author
   kind: check-finding
+
 REQUIRED_RULE_FILE_UNCONFIGURED:
   title: "Required file has no lint config"
   title_vi: "Tệp bắt buộc chưa có cấu hình lint"
@@ -4789,6 +5036,7 @@ REQUIRED_RULE_FILE_UNCONFIGURED:
   nextStep_vi: "Lint theo phạm vi báo lỗi; chủ kho phải cấu hình lint cho tệp."
   owner: owner
   kind: check-finding
+
 REQUIRED_RULE_IMPLEMENTATION_UNAVAILABLE:
   title: "Required rule implementation unavailable"
   title_vi: "Không có cài đặt quy tắc bắt buộc"
@@ -4798,6 +5046,7 @@ REQUIRED_RULE_IMPLEMENTATION_UNAVAILABLE:
   nextStep_vi: "Lint báo lỗi; chủ kho phải cài đúng plugin."
   owner: owner
   kind: check-finding
+
 REQUIRED_RULE_MISMATCH:
   title: "Required rule set differently"
   title_vi: "Quy tắc bắt buộc bị đặt khác kỳ vọng"
@@ -4807,6 +5056,7 @@ REQUIRED_RULE_MISMATCH:
   nextStep_vi: "Lint báo lỗi; sửa cấu hình cho khớp hồ sơ."
   owner: owner
   kind: check-finding
+
 REQUIRED_RULE_MISSING:
   title: "Required rule not enabled"
   title_vi: "Quy tắc bắt buộc chưa được bật"
@@ -4816,6 +5066,7 @@ REQUIRED_RULE_MISSING:
   nextStep_vi: "Lint báo lỗi; bật quy tắc trong cấu hình."
   owner: owner
   kind: check-finding
+
 RESOURCE_EXHAUSTION:
   title: "YAML parse resource limit"
   title_vi: "Vượt giới hạn tài nguyên khi đọc YAML"
@@ -4825,6 +5076,7 @@ RESOURCE_EXHAUSTION:
   nextStep_vi: "Tệp không đọc được; cần đơn giản hóa tệp."
   owner: op-retry
   kind: input-invalid
+
 RESOURCE_FILE_MISSING:
   title: "Accounts file missing beside flow"
   title_vi: "Thiếu tệp tài khoản cạnh luồng"
@@ -4834,6 +5086,7 @@ RESOURCE_FILE_MISSING:
   nextStep_vi: "Bộ kiểm tra từ chối; thêm tệp hoặc sửa tên."
   owner: other-op:test.author
   kind: check-finding
+
 REVIEW_PART_MISSING:
   title: "Reviewed part missing"
   title_vi: "Thiếu phần đã đưa duyệt"
@@ -4843,6 +5096,7 @@ REVIEW_PART_MISSING:
   nextStep_vi: "Câu hỏi duyệt coi là lỗi thời; vẽ lại."
   owner: other-op:interface.draw
   kind: check-finding
+
 REVIEW_PART_REDRAWN:
   title: "Reviewed part redrawn after ask"
   title_vi: "Phần đã duyệt bị vẽ lại"
@@ -4852,6 +5106,7 @@ REVIEW_PART_REDRAWN:
   nextStep_vi: "Câu hỏi lỗi thời, không tốn lượt vẽ lại; hỏi lại."
   owner: other-op:interface.draw
   kind: check-finding
+
 REV_ACK_OVERDUE:
   title: "Kernel revision not acknowledged"
   title_vi: "Chưa xác nhận bản Kernel mới"
@@ -4861,6 +5116,7 @@ REV_ACK_OVERDUE:
   nextStep_vi: "Bộ điều phối ghi vi phạm; Supervisor xử lý."
   owner: supervisor
   kind: runtime-fault
+
 REV_NOT_MONOTONIC:
   title: "Revision went backwards"
   title_vi: "Số bản sửa bị giảm"
@@ -4870,6 +5126,7 @@ REV_NOT_MONOTONIC:
   nextStep_vi: "Bộ kiểm tra từ chối; tăng số bản sửa."
   owner: other-op:work.author
   kind: check-finding
+
 ROUTED_FORBIDDEN:
   title: "routed on non-overlay"
   title_vi: "routed trên bản ghi không phải lớp phủ"
@@ -4879,6 +5136,7 @@ ROUTED_FORBIDDEN:
   nextStep_vi: "Bộ kiểm tra từ chối; bỏ trường routed."
   owner: other-op:interface.scaffold
   kind: check-finding
+
 ROUTED_INTERCEPT_MISSING:
   title: "Routed overlay lacks intercept route"
   title_vi: "Lớp phủ có đường dẫn nhưng thiếu route chặn"
@@ -4888,6 +5146,7 @@ ROUTED_INTERCEPT_MISSING:
   nextStep_vi: "Bộ kiểm tra từ chối; khai routeParent tới khi interface.implement thêm."
   owner: other-op:interface.implement
   kind: check-finding
+
 ROUTED_OVERLAY_PRESENTATION_MISSING:
   title: "Routed overlay lacks presentation"
   title_vi: "Lớp phủ thiếu một cách trình bày"
@@ -4897,6 +5156,7 @@ ROUTED_OVERLAY_PRESENTATION_MISSING:
   nextStep_vi: "Bộ kiểm tra từ chối hoặc nghi ngờ; vẽ thêm dạng còn thiếu."
   owner: other-op:interface.draw
   kind: check-finding
+
 ROUTE_NOT_IN_NAV:
   title: "Route not in navigation"
   title_vi: "Đường dẫn không có trong thanh điều hướng"
@@ -4906,6 +5166,7 @@ ROUTE_NOT_IN_NAV:
   nextStep_vi: "Ghi nghi ngờ; thêm mục điều hướng."
   owner: other-op:interface.implement
   kind: check-finding
+
 RULE_DUPLICATED:
   title: "Rule sentence repeated"
   title_vi: "Câu quy tắc bị lặp"
@@ -4915,6 +5176,7 @@ RULE_DUPLICATED:
   nextStep_vi: "Bộ kiểm tra báo lỗi; xóa câu lặp."
   owner: runtime-core
   kind: check-finding
+
 RULE_IN_DATA:
   title: "Rule inside a data field"
   title_vi: "Quy tắc nằm trong trường dữ liệu"
@@ -4924,6 +5186,7 @@ RULE_IN_DATA:
   nextStep_vi: "Cảnh báo; chuyển quy tắc sang bước áp dụng."
   owner: runtime-core
   kind: check-finding
+
 RUN_MEDIA_FAKE:
   title: "Media file too small to be real"
   title_vi: "Tệp phương tiện quá nhỏ để là thật"
@@ -4933,6 +5196,7 @@ RUN_MEDIA_FAKE:
   nextStep_vi: "Lần chạy chốt thì từ chối, không thì nghi ngờ; chạy lại tạo tệp thật."
   owner: other-op:e2e.verify
   kind: check-finding
+
 SCHEMA_INVALID:
   title: "Op manifest fails its schema"
   title_vi: "Bản mô tả op sai lược đồ"
@@ -4943,6 +5207,7 @@ SCHEMA_INVALID:
   nextStep_vi: "Báo lỗi; sửa bản mô tả op."
   owner: runtime-core
   kind: check-finding
+
 SCHEMA_MISSING:
   title: "Op manifest schema missing"
   title_vi: "Thiếu lược đồ bản mô tả op"
@@ -4952,6 +5217,7 @@ SCHEMA_MISSING:
   nextStep_vi: "Không kiểm tra được op nào; cần khôi phục lược đồ."
   owner: runtime-core
   kind: runtime-fault
+
 SCHEMA_UNKNOWN:
   title: "Record names an unknown schema"
   title_vi: "Bản ghi nêu schema không tồn tại"
@@ -4962,6 +5228,7 @@ SCHEMA_UNKNOWN:
   nextStep_vi: "Kiểm tra sẽ từ chối bản ghi này; op tạo ra nó phải sửa lại tên schema cho đúng danh mục rồi chạy lại."
   owner: op-retry
   kind: check-finding
+
 SCHEMA_VALIDATOR_UNAVAILABLE:
   title: "Schema validator cannot run"
   title_vi: "Bộ kiểm tra schema không chạy được"
@@ -4972,6 +5239,7 @@ SCHEMA_VALIDATOR_UNAVAILABLE:
   nextStep_vi: "Đây là lỗi của runtime chứ không phải của bản ghi; cần sửa phía lõi rồi chạy lại kiểm tra."
   owner: runtime-core
   kind: check-status
+
 SCHEMA_VIOLATION:
   title: "Record violates its schema"
   title_vi: "Bản ghi vi phạm schema"
@@ -4982,6 +5250,7 @@ SCHEMA_VIOLATION:
   nextStep_vi: "Bản ghi bị từ chối kèm vị trí lỗi; op tạo bản ghi phải sửa đúng theo thông báo rồi chạy lại."
   owner: op-retry
   kind: check-finding
+
 SCRIPT_CHECKER_UNAVAILABLE:
   title: "Script rule checker unavailable"
   title_vi: "Bộ kiểm tra luật bằng script không dùng được"
@@ -4992,6 +5261,7 @@ SCRIPT_CHECKER_UNAVAILABLE:
   nextStep_vi: "Lần kiểm tra được xem là chưa xác nhận được; cần sửa cấu hình luật hoặc bộ kiểm tra ở phía lõi rồi chạy lại."
   owner: runtime-core
   kind: check-status
+
 SCRIPT_INPUT_UNAVAILABLE:
   title: "Script check input unavailable"
   title_vi: "Thiếu đầu vào cho kiểm tra bằng script"
@@ -5002,6 +5272,7 @@ SCRIPT_INPUT_UNAVAILABLE:
   nextStep_vi: "Nếu lỗi nằm ở tệp của slice thì op phải sửa tệp đó; nếu không, kết quả bị coi là chưa xác nhận và cần khắc phục đầu vào rồi chạy lại."
   owner: op-retry
   kind: check-status
+
 SCRIPT_PATTERN_VIOLATION:
   title: "Code pattern rule violated"
   title_vi: "Mã vi phạm luật mẫu mã"
@@ -5012,6 +5283,7 @@ SCRIPT_PATTERN_VIOLATION:
   nextStep_vi: "Kiểm tra từ chối kèm tệp, dòng và luật; op viết mã phải sửa các chỗ đó rồi chạy lại."
   owner: op-retry
   kind: check-finding
+
 SCRIPT_PREFLIGHT_UNAVAILABLE:
   title: "Script preflight could not run"
   title_vi: "Bước chuẩn bị của kiểm tra script không chạy"
@@ -5022,6 +5294,7 @@ SCRIPT_PREFLIGHT_UNAVAILABLE:
   nextStep_vi: "Lần kiểm tra bị coi là chưa xác nhận được; cần sửa cấu hình hoặc lỗi bộ kiểm tra rồi chạy lại."
   owner: runtime-core
   kind: check-status
+
 SCRIPT_RESULT_INVALID:
   title: "Script checker returned invalid result"
   title_vi: "Bộ kiểm tra script trả kết quả sai dạng"
@@ -5032,6 +5305,7 @@ SCRIPT_RESULT_INVALID:
   nextStep_vi: "Nghĩa vụ bị đánh dấu chưa được phủ và kiểm tra chưa xác nhận được; cần sửa bộ kiểm tra rồi chạy lại."
   owner: runtime-core
   kind: check-status
+
 SDS_OWNERS_MISSING:
   title: "SDS component has no owners"
   title_vi: "Thành phần SDS chưa có chủ sở hữu"
@@ -5042,6 +5316,7 @@ SDS_OWNERS_MISSING:
   nextStep_vi: "Nếu thành phần đã xong thì kiểm tra từ chối, nếu chưa thì chỉ cảnh báo; op rà soát phải ghi các thư mục sở hữu."
   owner: other-op:review.verify
   kind: check-finding
+
 SDS_OWNERS_PENDING:
   title: "SDS component owners pending"
   title_vi: "Chủ sở hữu thành phần SDS chưa có"
@@ -5052,6 +5327,7 @@ SDS_OWNERS_PENDING:
   nextStep_vi: "Chỉ là thông tin, không chặn; chủ sở hữu sẽ được ghi khi triển khai xong và được rà soát."
   owner: other-op:review.verify
   kind: check-finding
+
 SEAT_DEAF:
   title: "Supervisor seat not hearing input"
   title_vi: "Ghế Supervisor không nhận được lệnh"
@@ -5062,6 +5338,7 @@ SEAT_DEAF:
   nextStep_vi: "Bộ điều phối đặt đồng hồ chờ 15 phút; hết hạn mà chưa hết lỗi thì cần Supervisor hoặc runtime xử lý sự cố ghế."
   owner: supervisor
   kind: blocker
+
 SEAT_QUARANTINED:
   title: "Seat quarantined"
   title_vi: "Ghế bị cách ly"
@@ -5072,6 +5349,7 @@ SEAT_QUARANTINED:
   nextStep_vi: "Đồng hồ chờ theo hạn của trạng thái cách ly; nếu quá hạn thì cần Supervisor mở sự cố và thay ghế."
   owner: supervisor
   kind: blocker
+
 SEAT_VACANT:
   title: "Supervisor seat vacant"
   title_vi: "Ghế Supervisor đang trống"
@@ -5082,6 +5360,7 @@ SEAT_VACANT:
   nextStep_vi: "Bộ điều phối sẽ tự đặt trước và khởi động lại ghế; nếu kéo dài quá hạn thì cần Supervisor xử lý."
   owner: supervisor
   kind: blocker
+
 SERVICE_DOWN:
   title: "Service is down"
   title_vi: "Một dịch vụ đang ngừng hoạt động"
@@ -5092,6 +5371,7 @@ SERVICE_DOWN:
   nextStep_vi: "Bộ điều phối tính thời gian ngừng và cố phục hồi; khi hết hạn thì chuyển cho Supervisor mở sự cố."
   owner: supervisor
   kind: blocker
+
 SETTLE_OVERDUE:
   title: "Settling a report is overdue"
   title_vi: "Việc chốt báo cáo bị quá hạn"
@@ -5102,6 +5382,7 @@ SETTLE_OVERDUE:
   nextStep_vi: "Bộ điều phối đặt đồng hồ cảnh báo; nếu vẫn kẹt thì cần sửa lỗi ở lõi runtime để việc chốt tiếp tục."
   owner: runtime-core
   kind: blocker
+
 SHAPE_DUPLICATE:
   title: "UI shape listed twice"
   title_vi: "Hình giao diện bị liệt kê hai lần"
@@ -5112,6 +5393,7 @@ SHAPE_DUPLICATE:
   nextStep_vi: "Kiểm tra từ chối; op vẽ giao diện phải bỏ dòng trùng để mỗi hình và trạng thái chỉ có một bản vẽ."
   owner: other-op:interface.draw
   kind: check-finding
+
 SHAPE_SPLIT:
   title: "UI shape spans several slices"
   title_vi: "Hình giao diện thuộc nhiều slice"
@@ -5122,6 +5404,7 @@ SHAPE_SPLIT:
   nextStep_vi: "Kiểm tra đồ thị Work từ chối; op tạo cây Work phải gắn hình về một slice duy nhất."
   owner: other-op:work.author
   kind: check-finding
+
 SHAPE_UNCOVERED:
   title: "UI shape belongs to no slice"
   title_vi: "Hình giao diện chưa thuộc slice nào"
@@ -5132,6 +5415,7 @@ SHAPE_UNCOVERED:
   nextStep_vi: "Kiểm tra đồ thị Work từ chối; op tạo cây Work phải gắn hình đó vào một slice."
   owner: other-op:work.author
   kind: check-finding
+
 SHARED_HEAD_MOVE:
   title: "Checkout would move shared branch"
   title_vi: "Lệnh checkout làm đổi nhánh chung"
@@ -5142,6 +5426,7 @@ SHARED_HEAD_MOVE:
   nextStep_vi: "Lệnh bị từ chối, không có gì thay đổi; hãy ở lại nhánh hiện tại và chỉ khôi phục các đường dẫn thuộc phần mình sở hữu."
   owner: op-retry
   kind: verb-refusal
+
 SHARED_WORKTREE_DISCARD:
   title: "Command would sweep shared changes"
   title_vi: "Lệnh làm mất thay đổi của người khác"
@@ -5152,6 +5437,7 @@ SHARED_WORKTREE_DISCARD:
   nextStep_vi: "Lệnh bị từ chối; hãy để nguyên các tệp khác và chỉ commit hoặc khôi phục các đường dẫn do mình sở hữu."
   owner: op-retry
   kind: verb-refusal
+
 SHELL_BINDING_INVALID:
   title: "Chromeless shell binding lacks reason"
   title_vi: "Liên kết shell không lý do"
@@ -5162,6 +5448,7 @@ SHELL_BINDING_INVALID:
   nextStep_vi: "Kiểm tra từ chối; op vẽ giao diện phải ghi lý do hoặc bỏ khai báo không khung."
   owner: other-op:interface.draw
   kind: check-finding
+
 SHELL_BINDING_MISSING:
   title: "UI record binds no shell"
   title_vi: "Bản ghi giao diện chưa gắn khung"
@@ -5172,6 +5459,7 @@ SHELL_BINDING_MISSING:
   nextStep_vi: "Kiểm tra từ chối hoặc cảnh báo; op vẽ giao diện phải gắn shell rồi vẽ lại bên trong cây bố cục."
   owner: other-op:interface.draw
   kind: check-finding
+
 SHELL_BREAKPOINT_MISSING:
   title: "Layout tree lacks a breakpoint"
   title_vi: "Cây bố cục thiếu breakpoint"
@@ -5182,6 +5470,7 @@ SHELL_BREAKPOINT_MISSING:
   nextStep_vi: "Kiểm tra từ chối; op vẽ giao diện phải khai báo và vẽ đủ mọi breakpoint bắt buộc."
   owner: other-op:interface.draw
   kind: check-finding
+
 SHELL_CAPTURE_DIGEST:
   title: "Lockup image hash changed"
   title_vi: "Ảnh logo bị đổi nội dung"
@@ -5192,6 +5481,7 @@ SHELL_CAPTURE_DIGEST:
   nextStep_vi: "Kiểm tra từ chối; op quyết định thương hiệu phải cắt lại logo và ghi lại mã băm mới."
   owner: other-op:brand.decide
   kind: check-finding
+
 SHELL_CAPTURE_MISSING:
   title: "Lockup image file missing"
   title_vi: "Thiếu tệp ảnh logo"
@@ -5202,6 +5492,7 @@ SHELL_CAPTURE_MISSING:
   nextStep_vi: "Kiểm tra từ chối; op quyết định thương hiệu phải tạo lại ảnh logo rồi ghi vào kho."
   owner: other-op:brand.decide
   kind: check-finding
+
 SHELL_LOCALE_DRIFT:
   title: "Prompt states wrong product locale"
   title_vi: "Prompt ghi sai ngôn ngữ sản phẩm"
@@ -5212,6 +5503,7 @@ SHELL_LOCALE_DRIFT:
   nextStep_vi: "Kiểm tra từ chối; op vẽ giao diện phải vẽ lại với dòng \"Product locale\" đúng."
   owner: other-op:interface.draw
   kind: check-finding
+
 SHELL_LOCALE_INVALID:
   title: "Product locale settings inconsistent"
   title_vi: "Cài đặt ngôn ngữ sản phẩm mâu thuẫn"
@@ -5222,6 +5514,7 @@ SHELL_LOCALE_INVALID:
   nextStep_vi: "Kiểm tra từ chối; op vẽ giao diện phải sửa cho mặc định và dự phòng thuộc danh sách ngôn ngữ."
   owner: other-op:interface.draw
   kind: check-finding
+
 SHELL_LOCKUP_DEFERRED:
   title: "Brand lockup not made yet"
   title_vi: "Logo thương hiệu chưa có"
@@ -5232,6 +5525,7 @@ SHELL_LOCKUP_DEFERRED:
   nextStep_vi: "Chỉ là thông tin, không chặn; op quyết định thương hiệu sẽ cắt logo từ bản vẽ đã chấp nhận."
   owner: other-op:brand.decide
   kind: check-finding
+
 SHELL_LOCKUP_FROM_DRAWING:
   title: "Lockup cropped from drawing"
   title_vi: "Logo được cắt từ bản vẽ"
@@ -5242,6 +5536,7 @@ SHELL_LOCKUP_FROM_DRAWING:
   nextStep_vi: "Được đánh dấu đáng ngờ; op quyết định thương hiệu nên cắt lại logo từ ảnh chụp thật."
   owner: other-op:brand.decide
   kind: check-finding
+
 SHELL_LOCKUP_MISSING:
   title: "No brand lockup"
   title_vi: "Chưa có logo thương hiệu"
@@ -5252,6 +5547,7 @@ SHELL_LOCKUP_MISSING:
   nextStep_vi: "Kiểm tra từ chối; op quyết định thương hiệu phải tạo logo lockup trước khi vẽ tiếp."
   owner: other-op:brand.decide
   kind: check-finding
+
 SHELL_LOCKUP_SOURCE_STALE:
   title: "Lockup source was redrawn"
   title_vi: "Nguồn logo đã bị vẽ lại"
@@ -5262,6 +5558,7 @@ SHELL_LOCKUP_SOURCE_STALE:
   nextStep_vi: "Được đánh dấu đáng ngờ; op quyết định thương hiệu phải cắt lại logo từ nguồn hiện tại."
   owner: other-op:brand.decide
   kind: check-finding
+
 SHELL_NAV_LABEL_MISSING:
   title: "Nav item lacks a label"
   title_vi: "Mục điều hướng thiếu nhãn"
@@ -5272,6 +5569,7 @@ SHELL_NAV_LABEL_MISSING:
   nextStep_vi: "Được đánh dấu đáng ngờ; op vẽ giao diện phải bổ sung nhãn cho mục điều hướng."
   owner: other-op:interface.draw
   kind: check-finding
+
 SHELL_PERSONA_INVALID:
   title: "No demo persona declared"
   title_vi: "Chưa khai báo nhân vật mẫu"
@@ -5282,6 +5580,7 @@ SHELL_PERSONA_INVALID:
   nextStep_vi: "Kiểm tra từ chối; op vẽ giao diện phải khai báo nhân vật mẫu hợp lệ."
   owner: other-op:interface.draw
   kind: check-finding
+
 SHELL_PROMPT_UNREADABLE:
   title: "Drawing prompt file missing"
   title_vi: "Thiếu tệp lời nhắc của bản vẽ"
@@ -5292,6 +5591,7 @@ SHELL_PROMPT_UNREADABLE:
   nextStep_vi: "Kiểm tra từ chối; op vẽ giao diện phải tạo lại bản vẽ cùng tệp lời nhắc."
   owner: other-op:interface.draw
   kind: check-finding
+
 SHELL_RECORD_INVALID:
   title: "Shell record invalid"
   title_vi: "Bản ghi shell không hợp lệ"
@@ -5302,6 +5602,7 @@ SHELL_RECORD_INVALID:
   nextStep_vi: "Kiểm tra từ chối; op vẽ giao diện phải sửa hoặc tạo lại bản ghi cây bố cục."
   owner: other-op:interface.draw
   kind: check-finding
+
 SHELL_RECORD_MISSING:
   title: "No layout tree in Work"
   title_vi: "Cây Work chưa có cây bố cục"
@@ -5312,6 +5613,7 @@ SHELL_RECORD_MISSING:
   nextStep_vi: "Kiểm tra từ chối; op vẽ giao diện phải tạo cây bố cục hoặc khai báo màn hình không khung có lý do."
   owner: other-op:interface.draw
   kind: check-finding
+
 SHELL_RECORD_NOT_TREE:
   title: "Shell record is not a layout tree"
   title_vi: "Bản ghi shell không phải cây bố cục"
@@ -5322,6 +5624,7 @@ SHELL_RECORD_NOT_TREE:
   nextStep_vi: "Kiểm tra từ chối; op vẽ quét lại cây bố cục từ mã giao diện để ghi lại bản ghi đúng lược đồ."
   owner: other-op:interface.draw
   kind: check-finding
+
 SHELL_REF_UNRESOLVED:
   title: "Shell reference unresolved"
   title_vi: "Tham chiếu shell không trỏ được"
@@ -5332,6 +5635,7 @@ SHELL_REF_UNRESOLVED:
   nextStep_vi: "Kiểm tra từ chối; op vẽ giao diện phải tạo shell hoặc sửa tham chiếu."
   owner: other-op:interface.draw
   kind: check-finding
+
 SHELL_REV_STALE:
   title: "Shell revision is stale"
   title_vi: "Phiên bản shell đã cũ"
@@ -5342,6 +5646,7 @@ SHELL_REV_STALE:
   nextStep_vi: "Kiểm tra đánh dấu cũ; op vẽ giao diện phải vẽ lại theo cây bố cục hiện tại."
   owner: other-op:interface.draw
   kind: check-finding
+
 SHELL_SOURCE_UNAVAILABLE:
   title: "Shell source not readable here"
   title_vi: "Không đọc được mã nguồn của shell"
@@ -5352,6 +5657,7 @@ SHELL_SOURCE_UNAVAILABLE:
   nextStep_vi: "Chỉ là thông tin, không chặn; cần cho phép truy cập thư mục ứng dụng nếu muốn so sánh."
   owner: op-retry
   kind: check-finding
+
 SHELL_THEME_MISSING:
   title: "Layout tree lacks a theme"
   title_vi: "Cây bố cục thiếu giao diện sáng/tối"
@@ -5362,6 +5668,7 @@ SHELL_THEME_MISSING:
   nextStep_vi: "Kiểm tra từ chối; op vẽ giao diện phải khai báo và vẽ đủ các chủ đề bắt buộc."
   owner: other-op:interface.draw
   kind: check-finding
+
 SHELL_UNSETTLED:
   title: "Layout tree not finished"
   title_vi: "Cây bố cục chưa hoàn tất"
@@ -5372,6 +5679,7 @@ SHELL_UNSETTLED:
   nextStep_vi: "Kiểm tra từ chối; op vẽ giao diện phải hoàn tất cây bố cục rồi mới kiểm tra lại."
   owner: other-op:interface.draw
   kind: check-finding
+
 SIZE_MISSING:
   title: "Work node has no size estimate"
   title_vi: "Nút Work thiếu ước lượng kích cỡ"
@@ -5382,6 +5690,7 @@ SIZE_MISSING:
   nextStep_vi: "Kiểm tra đồ thị Work từ chối; op tạo cây Work phải điền ước lượng kích cỡ."
   owner: other-op:work.author
   kind: check-finding
+
 SLA_CRITICAL:
   title: "Critical SLA violated"
   title_vi: "Vi phạm SLA nghiêm trọng"
@@ -5392,6 +5701,7 @@ SLA_CRITICAL:
   nextStep_vi: "Bảng tiến độ hiện trạng thái xấu; cần Supervisor xem SLA đang vi phạm và xử lý hoặc mở sự cố."
   owner: supervisor
   kind: blocker
+
 SLICE_BASE_UNAVAILABLE:
   title: "Slice base files unreadable"
   title_vi: "Không đọc được nền của slice"
@@ -5402,6 +5712,7 @@ SLICE_BASE_UNAVAILABLE:
   nextStep_vi: "Kiểm tra typecheck báo chưa xác nhận được; cần sửa mốc nền hoặc lỗi git rồi chạy lại."
   owner: op-retry
   kind: check-status
+
 SLICE_BASE_UNKNOWN:
   title: "Slice base commit unknown"
   title_vi: "Không biết commit nền của slice"
@@ -5412,6 +5723,7 @@ SLICE_BASE_UNKNOWN:
   nextStep_vi: "Kiểm tra từ chối; hãy chạy lại với đúng commit trước khi slice bắt đầu chỉnh sửa."
   owner: op-retry
   kind: check-status
+
 SLICE_DIFF_UNAVAILABLE:
   title: "Slice diff cannot be read"
   title_vi: "Không lấy được thay đổi của slice"
@@ -5422,6 +5734,7 @@ SLICE_DIFF_UNAVAILABLE:
   nextStep_vi: "Kiểm tra kết thúc với lỗi; cần khắc phục git hoặc mốc nền rồi chạy lại."
   owner: op-retry
   kind: check-status
+
 SLICE_EMPTY:
   title: "Slice changes no file"
   title_vi: "Slice không đổi tệp nào"
@@ -5432,6 +5745,7 @@ SLICE_EMPTY:
   nextStep_vi: "Kiểm tra từ chối; hãy chạy lại với --base là commit trước lần sửa đầu tiên và --paths đúng đường dẫn sở hữu."
   owner: op-retry
   kind: check-status
+
 SLICE_NOT_GIT:
   title: "Slice is not in a git checkout"
   title_vi: "Slice không nằm trong repo git"
@@ -5442,6 +5756,7 @@ SLICE_NOT_GIT:
   nextStep_vi: "Kiểm tra từ chối; cần chạy trong một checkout git hợp lệ."
   owner: op-retry
   kind: check-status
+
 SLICE_PREEXISTING:
   title: "Existing TypeScript errors noted"
   title_vi: "Ghi chú lỗi TypeScript có sẵn"
@@ -5451,6 +5766,7 @@ SLICE_PREEXISTING:
   nextStep_vi: "Chỉ là ghi chú, không chặn slice; các lỗi cũ không tính vào slice này."
   owner: op-retry
   kind: check-finding
+
 SLICE_PREEXISTING_FINDINGS:
   title: "Existing lint findings noted"
   title_vi: "Ghi chú lỗi lint có sẵn"
@@ -5461,6 +5777,7 @@ SLICE_PREEXISTING_FINDINGS:
   nextStep_vi: "Chỉ là ghi chú; nợ này thuộc op tái cấu trúc mã, không chặn slice."
   owner: other-op:code.refactor
   kind: check-finding
+
 SLICE_ROOT:
   title: "Work root must name itself as slice"
   title_vi: "Nút gốc Work phải tự nêu là slice"
@@ -5471,6 +5788,7 @@ SLICE_ROOT:
   nextStep_vi: "Kiểm tra đồ thị Work từ chối; op tạo cây Work phải sửa slice của nút gốc thành chính mã nút."
   owner: other-op:work.author
   kind: check-finding
+
 SLICE_TYPECHECK_INPUT:
   title: "Slice typecheck missing input"
   title_vi: "Kiểm tra typecheck thiếu đầu vào"
@@ -5481,6 +5799,7 @@ SLICE_TYPECHECK_INPUT:
   nextStep_vi: "Kiểm tra báo chưa xác nhận được; hãy chạy lại kèm --base và ít nhất một đường dẫn sở hữu."
   owner: op-retry
   kind: check-status
+
 SLICE_TYPECHECK_UNAVAILABLE:
   title: "Slice typecheck cannot run"
   title_vi: "Không chạy được typecheck slice"
@@ -5491,6 +5810,7 @@ SLICE_TYPECHECK_UNAVAILABLE:
   nextStep_vi: "Kiểm tra báo chưa xác nhận được; cần truyền tsconfig đúng qua --project hoặc sửa môi trường."
   owner: op-retry
   kind: check-status
+
 SOURCE_FILE_UNCHECKED:
   title: "Source file not covered by check"
   title_vi: "Tệp nguồn chưa được kiểm tra"
@@ -5501,6 +5821,7 @@ SOURCE_FILE_UNCHECKED:
   nextStep_vi: "Kiểm tra từ chối; hãy chạy lại kiểm tra để phủ đủ mọi tệp trong phạm vi."
   owner: op-retry
   kind: check-finding
+
 SOURCE_INVENTORY_EMPTY:
   title: "Source inventory is empty"
   title_vi: "Danh sách tệp nguồn trống"
@@ -5511,6 +5832,7 @@ SOURCE_INVENTORY_EMPTY:
   nextStep_vi: "Kiểm tra báo chưa xác nhận được; cần sửa profile hoặc phạm vi rồi chạy lại."
   owner: runtime-core
   kind: check-status
+
 SOURCE_PATH_UNSAFE:
   title: "Unsafe source path"
   title_vi: "Đường dẫn nguồn không an toàn"
@@ -5521,6 +5843,7 @@ SOURCE_PATH_UNSAFE:
   nextStep_vi: "Kiểm tra chặn và báo chưa xác nhận; cần loại bỏ hoặc sửa đường dẫn đó."
   owner: op-retry
   kind: check-status
+
 STACKS_CI_CONTRADICTION:
   title: "Stack says service off but CI calls it"
   title_vi: "Khai báo tắt dịch vụ nhưng CI vẫn gọi"
@@ -5531,6 +5854,7 @@ STACKS_CI_CONTRADICTION:
   nextStep_vi: "Kiểm tra bị từ chối; cần chạy lại bước quản lý workspace (chế độ stacks) để sửa khai báo cho khớp với CI."
   owner: other-op:workspace.manage
   kind: check-finding
+
 STACKS_CI_NAME_UNREFERENCED:
   title: "CI name declared but no workflow reads it"
   title_vi: "Tên CI đã khai báo nhưng không workflow nào dùng"
@@ -5541,6 +5865,7 @@ STACKS_CI_NAME_UNREFERENCED:
   nextStep_vi: "Đây chỉ là cảnh báo nghi ngờ; nên chạy bước quản lý workspace (chế độ stacks) để bỏ hoặc sửa tên cho đúng."
   owner: other-op:workspace.manage
   kind: check-finding
+
 STACKS_CI_UNUSED:
   title: "Service required in CI but no workflow calls it"
   title_vi: "Dịch vụ bắt buộc cho CI nhưng chưa workflow nào gọi"
@@ -5551,6 +5876,7 @@ STACKS_CI_UNUSED:
   nextStep_vi: "Cảnh báo nghi ngờ; cần thêm bước gọi dịch vụ vào workflow hoặc sửa khai báo thành không dùng."
   owner: other-op:workspace.manage
   kind: check-finding
+
 STACKS_CUSTODY_MISSING:
   title: "Credential not in custody"
   title_vi: "Thông tin xác thực chưa được lưu giữ"
@@ -5561,6 +5887,7 @@ STACKS_CUSTODY_MISSING:
   nextStep_vi: "Kiểm tra từ chối; cần sửa kho lưu giữ (secret:gen hoặc stack-secret). Không được hỏi chủ dự án giá trị mà runtime đã cam kết giữ."
   owner: runtime-core
   kind: check-finding
+
 STACKS_CUSTODY_UNVERIFIED:
   title: "Custody repository not checked out"
   title_vi: "Chưa xác minh được kho lưu giữ"
@@ -5571,6 +5898,7 @@ STACKS_CUSTODY_UNVERIFIED:
   nextStep_vi: "Chỉ là cảnh báo nghi ngờ; cần tải kho lưu giữ về máy rồi chạy lại kiểm tra."
   owner: supervisor
   kind: check-finding
+
 STACKS_DECLARATION_IGNORED:
   title: "Ignore rules hide the stack declaration"
   title_vi: "Quy tắc ignore che mất tệp khai báo"
@@ -5580,6 +5908,7 @@ STACKS_DECLARATION_IGNORED:
   nextStep_vi: "Cảnh báo nghi ngờ; thêm dòng mở lại tệp khai báo (dấu ! trước đường dẫn) vào .gitignore."
   owner: other-op:workspace.manage
   kind: check-finding
+
 STACKS_DECLARATION_INVALID:
   title: "Stack declaration is invalid"
   title_vi: "Tệp khai báo hạ tầng không hợp lệ"
@@ -5590,6 +5919,7 @@ STACKS_DECLARATION_INVALID:
   nextStep_vi: "Kiểm tra từ chối; cần sửa tệp khai báo cho đúng lược đồ rồi kiểm tra lại."
   owner: op-retry
   kind: check-finding
+
 STACKS_DECLARATION_MISSING:
   title: "No stack declaration found"
   title_vi: "Chưa có tệp khai báo hạ tầng"
@@ -5600,6 +5930,7 @@ STACKS_DECLARATION_MISSING:
   nextStep_vi: "Cần chạy bước quản lý workspace chế độ stacks để soạn khai báo dịch vụ; mức độ là nghi ngờ hoặc từ chối tùy quy định của dự án."
   owner: other-op:workspace.manage
   kind: check-finding
+
 STACKS_ENC_TWIN_MISSING:
   title: "Secret file has no encrypted twin"
   title_vi: "Tệp bí mật thiếu bản mã hóa đi kèm"
@@ -5610,6 +5941,7 @@ STACKS_ENC_TWIN_MISSING:
   nextStep_vi: "Cảnh báo nghi ngờ; cần mã hóa tệp để chỉ bản .enc được lưu vào git."
   owner: runtime-core
   kind: check-finding
+
 STACKS_GITIGNORE_OPEN:
   title: "Gitignore lacks deny-all rule"
   title_vi: "Gitignore thiếu quy tắc chặn toàn bộ"
@@ -5619,6 +5951,7 @@ STACKS_GITIGNORE_OPEN:
   nextStep_vi: "Cảnh báo nghi ngờ; thêm quy tắc chặn cả cây rồi mở lại *.enc, KEYS.md và tệp khai báo."
   owner: other-op:workspace.manage
   kind: check-finding
+
 STACKS_GITIGNORE_VALUE_OPEN:
   title: "Gitignore leaves secret value files open"
   title_vi: "Gitignore để hở các tệp chứa giá trị bí mật"
@@ -5629,6 +5962,7 @@ STACKS_GITIGNORE_VALUE_OPEN:
   nextStep_vi: "Kiểm tra từ chối (đây là lỗi an toàn); cần sửa .gitignore theo đúng thứ tự quy tắc trước khi tiếp tục."
   owner: other-op:workspace.manage
   kind: check-finding
+
 STACKS_HOST_DRIFT:
   title: "Sonar host differs from declaration"
   title_vi: "Địa chỉ Sonar lệch với khai báo"
@@ -5638,6 +5972,7 @@ STACKS_HOST_DRIFT:
   nextStep_vi: "Cảnh báo nghi ngờ; cần thống nhất địa chỉ giữa tệp properties và khai báo."
   owner: other-op:workspace.manage
   kind: check-finding
+
 STACKS_OWNER_ACTION_REDUNDANT:
   title: "Owner action asked though custody is complete"
   title_vi: "Đòi chủ dự án làm việc mà runtime đã có sẵn"
@@ -5647,6 +5982,7 @@ STACKS_OWNER_ACTION_REDUNDANT:
   nextStep_vi: "Kiểm tra từ chối; sửa ownerAction thành none vì không bao giờ được hỏi chủ dự án thứ runtime đang giữ."
   owner: other-op:workspace.manage
   kind: check-finding
+
 STACKS_PLAINTEXT_SECRET:
   title: "Plaintext secret tracked in git"
   title_vi: "Bí mật dạng thường bị đưa vào git"
@@ -5657,6 +5993,7 @@ STACKS_PLAINTEXT_SECRET:
   nextStep_vi: "Kiểm tra từ chối; cần gỡ tệp khỏi git và chỉ giữ bản .enc. Nếu bí mật đã lộ thì nên xoay khóa."
   owner: other-op:workspace.manage
   kind: check-finding
+
 STACKS_PLAINTEXT_TRACKED:
   title: "Plaintext secret file tracked"
   title_vi: "Tệp bí mật thường đang được theo dõi"
@@ -5667,6 +6004,7 @@ STACKS_PLAINTEXT_TRACKED:
   nextStep_vi: "Là lỗi an toàn: mức từ chối chặn việc hoàn thành, mức nghi ngờ vẫn được báo; cần gỡ tệp khỏi git và xoay bí mật nếu cần."
   owner: other-op:workspace.manage
   kind: check-finding
+
 STACKS_PROJECT_DRIFT:
   title: "Sonar project key differs from declaration"
   title_vi: "Khóa dự án Sonar lệch với khai báo"
@@ -5676,6 +6014,7 @@ STACKS_PROJECT_DRIFT:
   nextStep_vi: "Từ chối nếu Sonar được khai báo, nghi ngờ nếu không; cần sửa cho hai bên khớp nhau."
   owner: other-op:workspace.manage
   kind: check-finding
+
 STACKS_PROJECT_MISSING:
   title: "Workflow calls service with no project entry"
   title_vi: "Workflow gọi dịch vụ nhưng thiếu mục dự án"
@@ -5686,6 +6025,7 @@ STACKS_PROJECT_MISSING:
   nextStep_vi: "Kiểm tra từ chối; cần thêm mục dự án ứng với kho vào khai báo dịch vụ."
   owner: other-op:workspace.manage
   kind: check-finding
+
 STACKS_PROVIDER_UNKNOWN:
   title: "Service provider not recognized"
   title_vi: "Nhà cung cấp dịch vụ không nằm trong danh mục"
@@ -5696,6 +6036,7 @@ STACKS_PROVIDER_UNKNOWN:
   nextStep_vi: "Kiểm tra từ chối; sửa lại thành một nhà cung cấp có trong danh mục."
   owner: other-op:workspace.manage
   kind: check-finding
+
 STACKS_RUNBOOK_IGNORED:
   title: "Ignore rules hide environment runbook"
   title_vi: "Quy tắc ignore che sổ tay của môi trường"
@@ -5705,6 +6046,7 @@ STACKS_RUNBOOK_IGNORED:
   nextStep_vi: "Cảnh báo nghi ngờ; thêm dòng mở lại đường dẫn sổ tay vào .gitignore."
   owner: other-op:workspace.manage
   kind: check-finding
+
 STACKS_SCHEMA_INVALID:
   title: "Service block breaks the schema"
   title_vi: "Phần dịch vụ sai lược đồ"
@@ -5715,6 +6057,7 @@ STACKS_SCHEMA_INVALID:
   nextStep_vi: "Kiểm tra từ chối kèm đường dẫn trường lỗi; sửa theo thông báo rồi kiểm tra lại."
   owner: op-retry
   kind: check-finding
+
 STACKS_SCRATCH_IN_CANONICAL:
   title: "Scratch folder inside stack tree"
   title_vi: "Thư mục nháp nằm trong cây hạ tầng"
@@ -5724,6 +6067,7 @@ STACKS_SCRATCH_IN_CANONICAL:
   nextStep_vi: "Kiểm tra từ chối; xóa thư mục tmp và chuyển đồ nháp ra thư mục tạm của hệ điều hành."
   owner: op-retry
   kind: check-finding
+
 STACKS_SERVICES_MISSING:
   title: "Declaration has no services block"
   title_vi: "Khai báo chưa có phần dịch vụ"
@@ -5733,6 +6077,7 @@ STACKS_SERVICES_MISSING:
   nextStep_vi: "Cần chạy bước quản lý workspace chế độ stacks để soạn phần dịch vụ (sonar, codecov và các dịch vụ khác)."
   owner: other-op:workspace.manage
   kind: check-finding
+
 STACKS_SERVICE_AMBIGUOUS:
   title: "Service declaration is ambiguous"
   title_vi: "Khai báo dịch vụ mơ hồ"
@@ -5743,6 +6088,7 @@ STACKS_SERVICE_AMBIGUOUS:
   nextStep_vi: "Kiểm tra từ chối kèm giải thích; sửa khai báo cho chỉ còn một cách hiểu."
   owner: other-op:workspace.manage
   kind: check-finding
+
 STACKS_SERVICE_UNDECLARED:
   title: "Service in use but not declared"
   title_vi: "Dịch vụ đang dùng nhưng chưa khai báo"
@@ -5753,6 +6099,7 @@ STACKS_SERVICE_UNDECLARED:
   nextStep_vi: "Từ chối nếu khai báo đã có phần dịch vụ, nghi ngờ nếu chưa; cần bổ sung dịch vụ vào khai báo."
   owner: other-op:workspace.manage
   kind: check-finding
+
 STACKS_SERVICE_UNKNOWN:
   title: "Service not in catalog"
   title_vi: "Dịch vụ không có trong danh mục"
@@ -5763,6 +6110,7 @@ STACKS_SERVICE_UNKNOWN:
   nextStep_vi: "Kiểm tra từ chối; dùng tên dịch vụ có trong danh mục hoặc đề xuất bổ sung danh mục."
   owner: other-op:workspace.manage
   kind: check-finding
+
 STACKS_STACK_UNRESOLVED:
   title: "Host extension file does not exist"
   title_vi: "Tệp mở rộng của máy chủ không tồn tại"
@@ -5773,6 +6121,7 @@ STACKS_STACK_UNRESOLVED:
   nextStep_vi: "Kiểm tra từ chối; sửa đường dẫn hoặc thêm tệp còn thiếu."
   owner: other-op:workspace.manage
   kind: check-finding
+
 STACKS_UNDECLARED_COMPOSE:
   title: "Compose file not declared"
   title_vi: "Tệp Compose chưa được khai báo"
@@ -5782,6 +6131,7 @@ STACKS_UNDECLARED_COMPOSE:
   nextStep_vi: "Kiểm tra từ chối; thêm tệp vào composeFiles hoặc xóa tệp thừa."
   owner: other-op:workspace.manage
   kind: check-finding
+
 STACKS_UNDECLARED_ENVIRONMENT:
   title: "Environment folder not declared"
   title_vi: "Thư mục môi trường chưa được khai báo"
@@ -5792,6 +6142,7 @@ STACKS_UNDECLARED_ENVIRONMENT:
   nextStep_vi: "Kiểm tra từ chối; khai báo môi trường đó hoặc di chuyển thư mục đi chỗ khác."
   owner: other-op:workspace.manage
   kind: check-finding
+
 STALE_REASON_UNNAMED:
   title: "Stale evidence lacks named reason"
   title_vi: "Bằng chứng cũ chưa nêu lý do"
@@ -5801,6 +6152,7 @@ STALE_REASON_UNNAMED:
   nextStep_vi: "Bước làm ghi chép cần điền lý do hết hạn (phiên bản và điều khoản) rồi nộp lại."
   owner: op-retry
   kind: check-finding
+
 STALL_ESCALATED:
   title: "Stall escalated to the Supervisor"
   title_vi: "Tình trạng đứng yên được chuyển lên Supervisor"
@@ -5811,6 +6163,7 @@ STALL_ESCALATED:
   nextStep_vi: "Runtime mở mục quyết định tiến độ dừng cho Supervisor; Supervisor cần chọn hành động khắc phục."
   owner: supervisor
   kind: blocker
+
 STALL_UNOWNED:
   title: "Workflow stalled with no owner"
   title_vi: "Workflow đứng yên chưa ai xử lý"
@@ -5821,6 +6174,7 @@ STALL_UNOWNED:
   nextStep_vi: "Runtime gửi mục quyết định tiến độ dừng cho Kernel kèm hành động gợi ý đầu tiên; nếu Kernel không xử lý kịp sẽ được chuyển lên Supervisor."
   owner: runtime-core
   kind: blocker
+
 STARCIWORK_AGENT_DATA:
   title: "Agent data written into .starciwork"
   title_vi: "Dữ liệu của agent nằm trong .starciwork"
@@ -5831,6 +6185,7 @@ STARCIWORK_AGENT_DATA:
   nextStep_vi: "Kiểm tra từ chối (hoặc cảnh báo với loại còn được phép chuyển dần); cần nộp dữ liệu qua api report --attach và gỡ khỏi cây sản phẩm."
   owner: op-retry
   kind: check-finding
+
 STARCIWORK_DRIFT:
   title: "File outside product path list"
   title_vi: "Tệp nằm ngoài danh sách đường dẫn sản phẩm"
@@ -5841,6 +6196,7 @@ STARCIWORK_DRIFT:
   nextStep_vi: "Chỉ là cảnh báo; nên chuyển tệp về đúng đường dẫn sản phẩm hoặc xóa."
   owner: op-retry
   kind: check-finding
+
 STARCI_ARTIFACT_IMMUTABLE:
   title: "Artifact already filed with other bytes"
   title_vi: "Sản phẩm đã nộp với nội dung khác"
@@ -5850,6 +6206,7 @@ STARCI_ARTIFACT_IMMUTABLE:
   nextStep_vi: "Yêu cầu nộp bị từ chối; hãy nộp với tên mới."
   owner: op-retry
   kind: verb-refusal
+
 STARCI_ATTEMPT_NOT_FOUND:
   title: "Attempt not found in ledger"
   title_vi: "Không tìm thấy lượt làm trong sổ cái"
@@ -5860,6 +6217,7 @@ STARCI_ATTEMPT_NOT_FOUND:
   nextStep_vi: "Lệnh bị từ chối; cần dùng đúng mã lượt làm của workflow hiện tại."
   owner: op-retry
   kind: input-invalid
+
 STARCI_BLOB_NOT_INDEXED:
   title: "Blob not indexed before use"
   title_vi: "Blob chưa được lập chỉ mục"
@@ -5870,6 +6228,7 @@ STARCI_BLOB_NOT_INDEXED:
   nextStep_vi: "Việc nộp bị từ chối; cần lưu blob (recordBlob hoặc storeBlob) trước rồi nộp lại."
   owner: runtime-core
   kind: runtime-fault
+
 STARCI_EVENT_PAYLOAD_TOO_LARGE:
   title: "Event payload too large"
   title_vi: "Dữ liệu sự kiện quá lớn"
@@ -5879,6 +6238,7 @@ STARCI_EVENT_PAYLOAD_TOO_LARGE:
   nextStep_vi: "Ghi sự kiện bị từ chối; cần lưu nội dung thành blob và chỉ truyền mã băm."
   owner: runtime-core
   kind: runtime-fault
+
 STARCI_JOB_NOT_FOUND:
   title: "Job not found in ledger"
   title_vi: "Không tìm thấy công việc trong sổ cái"
@@ -5889,6 +6249,7 @@ STARCI_JOB_NOT_FOUND:
   nextStep_vi: "Lệnh bị từ chối; cần kiểm tra lại mã công việc."
   owner: op-retry
   kind: input-invalid
+
 STARCI_JOB_STATUS_CONFLICT:
   title: "Job in unexpected status"
   title_vi: "Công việc đang ở trạng thái không phù hợp"
@@ -5899,6 +6260,7 @@ STARCI_JOB_STATUS_CONFLICT:
   nextStep_vi: "Thay đổi bị từ chối để tránh ghi đè; runtime đọc lại trạng thái thật rồi quyết định bước tiếp."
   owner: runtime-core
   kind: runtime-fault
+
 STARCI_KERNEL_JOB_ENDED:
   title: "Kernel job already ended"
   title_vi: "Công việc của Kernel đã kết thúc"
@@ -5909,6 +6271,7 @@ STARCI_KERNEL_JOB_ENDED:
   nextStep_vi: "Lệnh bị từ chối; Kernel cần đọc lại trạng thái và mở công việc mới nếu cần."
   owner: runtime-core
   kind: verb-refusal
+
 STARCI_LEDGER_NOT_WAL:
   title: "Ledger cannot use WAL mode"
   title_vi: "Sổ cái không dùng được chế độ WAL"
@@ -5919,6 +6282,7 @@ STARCI_LEDGER_NOT_WAL:
   nextStep_vi: "Mở sổ cái bị từ chối; cần đặt dự án ở ổ cục bộ."
   owner: owner
   kind: runtime-fault
+
 STARCI_LEDGER_ROOT_IS_RUNTIME:
   title: "Ledger root is the runtime folder"
   title_vi: "Gốc sổ cái lại là thư mục runtime"
@@ -5929,6 +6293,7 @@ STARCI_LEDGER_ROOT_IS_RUNTIME:
   nextStep_vi: "Việc mở sổ cái bị từ chối; cần đăng ký dự án qua .workspaces rồi chạy từ kho dự án."
   owner: owner
   kind: input-invalid
+
 STARCI_LEDGER_SCHEMA_REFUSED:
   title: "Ledger schema not supported"
   title_vi: "Lược đồ sổ cái không được hỗ trợ"
@@ -5939,6 +6304,7 @@ STARCI_LEDGER_SCHEMA_REFUSED:
   nextStep_vi: "Không có bộ chuyển đổi; runtime tạo sổ cái mới ở lần dùng đầu và không coi đây là tệp hỏng."
   owner: owner
   kind: runtime-fault
+
 STARCI_LEDGER_SQLITE_DOWNGRADE:
   title: "Older SQLite opened newer ledger"
   title_vi: "SQLite cũ mở sổ cái do bản mới ghi"
@@ -5949,6 +6315,7 @@ STARCI_LEDGER_SQLITE_DOWNGRADE:
   nextStep_vi: "Cần chạy lại bằng bản Node có SQLite bằng hoặc mới hơn."
   owner: owner
   kind: runtime-fault
+
 STARCI_LEDGER_UNKNOWN_COLUMN:
   title: "Ledger write names unknown column"
   title_vi: "Ghi sổ cái vào cột không tồn tại"
@@ -5958,6 +6325,7 @@ STARCI_LEDGER_UNKNOWN_COLUMN:
   nextStep_vi: "Việc ghi bị chặn; cần sửa mã runtime."
   owner: runtime-core
   kind: runtime-fault
+
 STARCI_MACHINE_CORRUPT:
   title: "Machine database corrupt"
   title_vi: "Cơ sở dữ liệu máy bị hỏng"
@@ -5968,6 +6336,7 @@ STARCI_MACHINE_CORRUPT:
   nextStep_vi: "Runtime ghi một sự cố vào machine_logs; cần xử lý hoặc khôi phục từ bản sao lưu."
   owner: supervisor
   kind: runtime-fault
+
 STARCI_MACHINE_BUSY:
   title: "Machine database busy"
   title_vi: "Cơ sở dữ liệu máy đang bận"
@@ -5988,6 +6357,7 @@ STARCI_MACHINE_DB:
   nextStep_vi: "Thao tác bị chặn kèm lý do trong thông báo; sửa đầu vào rồi thử lại."
   owner: runtime-core
   kind: runtime-fault
+
 STARCI_MACHINE_NOT_CHECKPOINTER:
   title: "Caller may not checkpoint machine DB"
   title_vi: "Không được phép checkpoint cơ sở dữ liệu máy"
@@ -5997,6 +6367,7 @@ STARCI_MACHINE_NOT_CHECKPOINTER:
   nextStep_vi: "Lệnh bị từ chối; cần sửa mã để chỉ engine leader checkpoint."
   owner: runtime-core
   kind: runtime-fault
+
 STARCI_MACHINE_NOT_WAL:
   title: "Machine database not in WAL mode"
   title_vi: "Cơ sở dữ liệu máy không ở chế độ WAL"
@@ -6007,6 +6378,7 @@ STARCI_MACHINE_NOT_WAL:
   nextStep_vi: "Mở bị từ chối; cần đặt tệp máy trên ổ cục bộ."
   owner: owner
   kind: runtime-fault
+
 STARCI_MACHINE_SCHEMA_NEWER:
   title: "Machine DB newer than runtime"
   title_vi: "Cơ sở dữ liệu máy mới hơn runtime"
@@ -6016,6 +6388,7 @@ STARCI_MACHINE_SCHEMA_NEWER:
   nextStep_vi: "Cần nâng runtime lên phiên bản mới hơn rồi chạy lại."
   owner: owner
   kind: runtime-fault
+
 STARCI_MACHINE_SCHEMA_OLD:
   title: "Machine DB older than runtime"
   title_vi: "Cơ sở dữ liệu máy cũ hơn runtime"
@@ -6025,6 +6398,7 @@ STARCI_MACHINE_SCHEMA_OLD:
   nextStep_vi: "Mở bị từ chối; cần tạo lại cơ sở dữ liệu máy theo hướng dẫn nâng cấp."
   owner: owner
   kind: runtime-fault
+
 STARCI_PURGE_NOT_DELETING:
   title: "Purge not in deleting state"
   title_vi: "Việc xóa workflow chưa ở trạng thái đang xóa"
@@ -6035,6 +6409,7 @@ STARCI_PURGE_NOT_DELETING:
   nextStep_vi: "Bước xóa bị từ chối; cần bắt đầu lại quy trình xóa theo đúng thứ tự."
   owner: runtime-core
   kind: runtime-fault
+
 STARCI_REGISTRY_TEMP_REPO:
   title: "Temp folder repo refused by registry"
   title_vi: "Kho trong thư mục tạm bị sổ đăng ký từ chối"
@@ -6044,6 +6419,7 @@ STARCI_REGISTRY_TEMP_REPO:
   nextStep_vi: "Không ghi gì cả; cần đặt biến sổ đăng ký thử nếu đây là chạy thử, hoặc dùng kho thật."
   owner: op-retry
   kind: dispatch-refusal
+
 STARCI_REPORT_ALREADY_FILED:
   title: "Attempt already filed a different report"
   title_vi: "Lượt làm đã nộp báo cáo khác"
@@ -6053,6 +6429,7 @@ STARCI_REPORT_ALREADY_FILED:
   nextStep_vi: "Báo cáo là bất biến nên bị từ chối; nộp lại y hệt thì chỉ trả về bản đã có, còn muốn sửa cần một lượt làm mới."
   owner: op-retry
   kind: verb-refusal
+
 STARCI_REQUEST_ID_REUSED:
   title: "Request id reused with other arguments"
   title_vi: "Mã yêu cầu dùng lại với tham số khác"
@@ -6063,6 +6440,7 @@ STARCI_REQUEST_ID_REUSED:
   nextStep_vi: "Lệnh bị từ chối; cần dùng mã yêu cầu mới khi nội dung khác."
   owner: op-retry
   kind: verb-refusal
+
 STARCI_UNIT_NOT_FOUND:
   title: "Unit not found in workflow"
   title_vi: "Không tìm thấy đơn vị công việc trong workflow"
@@ -6073,6 +6451,7 @@ STARCI_UNIT_NOT_FOUND:
   nextStep_vi: "Lệnh bị từ chối; cần dùng đúng mã đơn vị."
   owner: op-retry
   kind: input-invalid
+
 STARCI_WORKFLOW_NOT_FOUND:
   title: "Workflow not found in ledger"
   title_vi: "Không tìm thấy workflow trong sổ cái"
@@ -6083,6 +6462,7 @@ STARCI_WORKFLOW_NOT_FOUND:
   nextStep_vi: "Lệnh bị từ chối; cần kiểm tra mã workflow và dự án."
   owner: op-retry
   kind: input-invalid
+
 STATE_RESTS_ON_STALE_EVIDENCE:
   title: "Done state rests on expired evidence"
   title_vi: "Trạng thái xong dựa trên bằng chứng hết hạn"
@@ -6092,6 +6472,7 @@ STATE_RESTS_ON_STALE_EVIDENCE:
   nextStep_vi: "Kiểm tra từ chối; bản ghi phải trở về trạng thái chưa làm cho đến khi có bằng chứng mới."
   owner: op-retry
   kind: check-finding
+
 STATE_VOCABULARY_UNKNOWN:
   title: "State value not in schema vocabulary"
   title_vi: "Giá trị trạng thái ngoài từ vựng của lược đồ"
@@ -6102,6 +6483,7 @@ STATE_VOCABULARY_UNKNOWN:
   nextStep_vi: "Kiểm tra từ chối; sửa thành một trạng thái hợp lệ theo lược đồ."
   owner: op-retry
   kind: check-finding
+
 STRAY_TERMINAL:
   title: "Stray terminal in project worktree"
   title_vi: "Terminal lạ trong worktree dự án"
@@ -6112,6 +6494,7 @@ STRAY_TERMINAL:
   nextStep_vi: "Chỉ ghi nhận để nhìn thấy được; cần dọn các terminal thừa."
   owner: supervisor
   kind: runtime-fault
+
 SUBSCRIPTION_NOT_WIRED:
   title: "Subscription declared but not wired"
   title_vi: "Đăng ký sự kiện chưa được nối"
@@ -6122,6 +6505,7 @@ SUBSCRIPTION_NOT_WIRED:
   nextStep_vi: "Cảnh báo nghi ngờ; cần nối đăng ký trong mã hoặc bỏ khai báo."
   owner: op-retry
   kind: check-finding
+
 SUBSCRIPTION_UNDECLARED:
   title: "Subscription in code not declared"
   title_vi: "Đăng ký sự kiện trong mã chưa được khai báo"
@@ -6131,6 +6515,7 @@ SUBSCRIPTION_UNDECLARED:
   nextStep_vi: "Cảnh báo nghi ngờ; cần khai báo đăng ký vào bản ghi tương ứng."
   owner: op-retry
   kind: check-finding
+
 SUPERVISOR_GATE_OVERDUE:
   title: "Supervisor gate open too long"
   title_vi: "Cổng chờ Supervisor mở quá lâu"
@@ -6140,6 +6525,7 @@ SUPERVISOR_GATE_OVERDUE:
   nextStep_vi: "Chế độ tự động sẽ hoãn phần việc mà cổng đang giữ; Supervisor cần giải quyết cổng."
   owner: supervisor
   kind: blocker
+
 SURFACE_BREAKPOINT_UNKNOWN:
   title: "Unknown breakpoint in surface"
   title_vi: "Điểm ngắt màn hình không có trong danh sách"
@@ -6149,6 +6535,7 @@ SURFACE_BREAKPOINT_UNKNOWN:
   nextStep_vi: "Kiểm tra từ chối; dùng điểm ngắt có trong cây bố cục."
   owner: other-op:interface.scaffold
   kind: check-finding
+
 SURFACE_INCONSISTENT:
   title: "Non-overlay surface varies by breakpoint"
   title_vi: "Bề mặt không phải lớp phủ đổi theo kích thước"
@@ -6158,6 +6545,7 @@ SURFACE_INCONSISTENT:
   nextStep_vi: "Kiểm tra từ chối; cần dùng một bề mặt duy nhất cho mọi kích thước."
   owner: other-op:interface.scaffold
   kind: check-finding
+
 SURFACE_INVALID:
   title: "Surface type not recognized"
   title_vi: "Loại bề mặt không hợp lệ"
@@ -6168,6 +6556,7 @@ SURFACE_INVALID:
   nextStep_vi: "Kiểm tra từ chối; chọn một loại bề mặt hợp lệ."
   owner: other-op:interface.scaffold
   kind: check-finding
+
 TAB_AS_INDENT:
   title: "Tab used as YAML indentation"
   title_vi: "Dùng phím Tab để thụt lề YAML"
@@ -6177,6 +6566,7 @@ TAB_AS_INDENT:
   nextStep_vi: "Tệp không đọc được; thay Tab bằng dấu cách rồi lưu lại."
   owner: op-retry
   kind: input-invalid
+
 TAG_RESOLVE_FAILED:
   title: "YAML tag could not be resolved"
   title_vi: "Không hiểu được thẻ kiểu trong YAML"
@@ -6187,6 +6577,7 @@ TAG_RESOLVE_FAILED:
   nextStep_vi: "Tệp không đọc được; sửa giá trị hoặc bỏ thẻ kiểu."
   owner: op-retry
   kind: input-invalid
+
 TARGET_MISSING:
   title: "Validation target does not exist"
   title_vi: "Đường dẫn cần kiểm tra không tồn tại"
@@ -6197,6 +6588,7 @@ TARGET_MISSING:
   nextStep_vi: "Kiểm tra bị từ chối; cần chỉ vào đường dẫn thật còn tồn tại khi runtime chạy lại lệnh."
   owner: op-retry
   kind: input-invalid
+
 TASK_OUTSIDE_RUN:
   title: "Job outside current Orca Run"
   title_vi: "Công việc nằm ngoài Run hiện tại"
@@ -6206,6 +6598,7 @@ TASK_OUTSIDE_RUN:
   nextStep_vi: "Chỉ là phát hiện cần theo dõi; cần đưa công việc về đúng Run hoặc dọn công việc cũ."
   owner: supervisor
   kind: runtime-fault
+
 TERMINAL_COUNT_DRIFT:
   title: "More terminals than expected"
   title_vi: "Số terminal nhiều hơn dự kiến"
@@ -6215,6 +6608,7 @@ TERMINAL_COUNT_DRIFT:
   nextStep_vi: "Sau thời hạn chờ, bộ điều khiển máy chủ tự dọn các shell thừa."
   owner: runtime-core
   kind: runtime-fault
+
 TITLE_DRIFT:
   title: "Worker tab title not renamed"
   title_vi: "Tên tab của worker chưa được đổi"
@@ -6224,6 +6618,7 @@ TITLE_DRIFT:
   nextStep_vi: "Chỉ ghi nhận cho dễ thấy; không chặn công việc, cần xem lại việc đổi tên khi rảnh."
   owner: runtime-core
   kind: runtime-fault
+
 TRANSCRIPT_CODE:
   title: "Transcript-missing clock code"
   title_vi: "Mã theo dõi thiếu bản ghi hội thoại"
@@ -6233,6 +6628,7 @@ TRANSCRIPT_CODE:
   nextStep_vi: "Xem mã TRANSCRIPT_MISSING; mục này chỉ là hằng số trỏ tới mã đó."
   owner: runtime-core
   kind: runtime-fault
+
 TRANSCRIPT_MISSING:
   title: "Transcript not captured in time"
   title_vi: "Bản ghi hội thoại chưa được lưu kịp"
@@ -6243,6 +6639,7 @@ TRANSCRIPT_MISSING:
   nextStep_vi: "Chỉ báo cáo; đồng hồ tự tắt khi bản ghi xuất hiện, còn không thì cần xem lại bước chụp bản ghi."
   owner: runtime-core
   kind: runtime-fault
+
 UAT_RUN_AGING:
   title: "UAT run older than code it proves"
   title_vi: "Lượt UAT cũ hơn mã mà nó chứng minh"
@@ -6252,6 +6649,7 @@ UAT_RUN_AGING:
   nextStep_vi: "Cảnh báo nghi ngờ; cần chạy lại UAT cho mã hiện tại."
   owner: other-op:uat.verify
   kind: check-finding
+
 UI_APP_MISSING:
   title: "UI record does not say which app it is in"
   title_vi: "Bản ghi giao diện chưa nói rõ thuộc ứng dụng nào"
@@ -6262,6 +6660,7 @@ UI_APP_MISSING:
   nextStep_vi: "Kiểm tra từ chối; khai báo app là một tên trong apps của cây bố cục."
   owner: other-op:interface.draw
   kind: check-finding
+
 UI_APP_UNKNOWN:
   title: "UI record names an app the layout tree does not declare"
   title_vi: "Bản ghi giao diện nêu ứng dụng mà cây bố cục không khai báo"
@@ -6272,6 +6671,7 @@ UI_APP_UNKNOWN:
   nextStep_vi: "Kiểm tra từ chối; sửa app hoặc khai báo ứng dụng rồi quét lại cây bố cục."
   owner: other-op:interface.draw
   kind: check-finding
+
 UI_ROUTE_GHOST:
   title: "Route declared but not served"
   title_vi: "Đường dẫn giao diện khai báo nhưng không có thật"
@@ -6282,6 +6682,7 @@ UI_ROUTE_GHOST:
   nextStep_vi: "Từ chối nếu bản ghi đã xong, chỉ cảnh báo nếu chưa; cần cài route hoặc sửa bản ghi."
   owner: other-op:interface.implement
   kind: check-finding
+
 UI_ROUTE_MISSING:
   title: "UI record has no route or surface"
   title_vi: "Bản ghi giao diện chưa có route hoặc bề mặt"
@@ -6291,6 +6692,7 @@ UI_ROUTE_MISSING:
   nextStep_vi: "Cần bổ sung route, bề mặt và ghép lại vào chuỗi bố cục."
   owner: other-op:interface.scaffold
   kind: check-finding
+
 UI_ROUTE_UNDECLARED:
   title: "Route in code has no UI record"
   title_vi: "Route trong mã chưa có bản ghi giao diện"
@@ -6300,6 +6702,7 @@ UI_ROUTE_UNDECLARED:
   nextStep_vi: "Cảnh báo nghi ngờ; cần thêm bản ghi giao diện cho route."
   owner: other-op:interface.scaffold
   kind: check-finding
+
 UI_ROUTE_UNKNOWN:
   title: "Route not in layout tree"
   title_vi: "Route không có trong cây bố cục"
@@ -6310,6 +6713,7 @@ UI_ROUTE_UNKNOWN:
   nextStep_vi: "Kiểm tra từ chối; khai báo nút cha gần nhất đúng hoặc thêm route vào cây."
   owner: other-op:interface.scaffold
   kind: check-finding
+
 UI_SURFACE_MISSING:
   title: "Route declares no surface"
   title_vi: "Route chưa khai báo bề mặt"
@@ -6319,6 +6723,7 @@ UI_SURFACE_MISSING:
   nextStep_vi: "Kiểm tra từ chối; khai báo một loại bề mặt hợp lệ."
   owner: other-op:interface.scaffold
   kind: check-finding
+
 UNCLAIMED_SURFACE:
   title: "Shipped surface has no owner record"
   title_vi: "Bề mặt đã phát hành chưa có bản ghi nhận"
@@ -6328,6 +6733,7 @@ UNCLAIMED_SURFACE:
   nextStep_vi: "Cảnh báo nghi ngờ; cần gán bản ghi sở hữu cho bề mặt đó."
   owner: op-retry
   kind: check-finding
+
 UNDECLARED_OPERATION:
   title: "Operation in code not declared"
   title_vi: "Thao tác trong mã chưa được khai báo"
@@ -6337,6 +6743,7 @@ UNDECLARED_OPERATION:
   nextStep_vi: "Cảnh báo nghi ngờ; cần khai báo thao tác."
   owner: op-retry
   kind: check-finding
+
 UNDECLARED_ROUTE:
   title: "Route in code not declared"
   title_vi: "Route trong mã chưa được khai báo"
@@ -6346,6 +6753,7 @@ UNDECLARED_ROUTE:
   nextStep_vi: "Cảnh báo nghi ngờ; cần khai báo route."
   owner: op-retry
   kind: check-finding
+
 UNDER_DISPATCHED:
   title: "Ready work waiting, slots unused"
   title_vi: "Có việc sẵn sàng mà chưa giao hết chỗ"
@@ -6356,6 +6764,7 @@ UNDER_DISPATCHED:
   nextStep_vi: "Chỉ là cảnh báo trạng thái tiến độ; Kernel cần giao thêm việc, nếu kéo dài sẽ thành dừng trệ."
   owner: runtime-core
   kind: check-status
+
 UNEXPECTED_FILE:
   title: "Lint reported an unexpected file"
   title_vi: "Lint báo cáo tệp ngoài dự kiến"
@@ -6366,6 +6775,7 @@ UNEXPECTED_FILE:
   nextStep_vi: "Việc kiểm tra lint theo phạm vi bị coi là không tin cậy; cần chạy lại đúng danh sách tệp."
   owner: op-retry
   kind: check-finding
+
 UNKNOWN_DOMAIN:
   title: "Node names undeclared domain"
   title_vi: "Nút nêu miền chưa được khai báo"
@@ -6376,6 +6786,7 @@ UNKNOWN_DOMAIN:
   nextStep_vi: "Kiểm tra đồ thị báo lỗi; sửa tên miền hoặc khai báo miền."
   owner: other-op:work.author
   kind: check-finding
+
 UNKNOWN_NODE:
   title: "Work graph names a missing node"
   title_vi: "Đồ thị Work trỏ tới nút không tồn tại"
@@ -6386,6 +6797,7 @@ UNKNOWN_NODE:
   nextStep_vi: "Bộ kiểm tra đồ thị từ chối; op tạo đồ thị phải sửa lại tham chiếu rồi chạy lại."
   owner: op-retry
   kind: check-finding
+
 UNKNOWN_SLICE:
   title: "Task points to an invalid slice"
   title_vi: "Nút công việc thuộc lát cắt không hợp lệ"
@@ -6397,6 +6809,7 @@ UNKNOWN_SLICE:
   nextStep_vi: "Bộ kiểm tra đồ thị từ chối; op tạo đồ thị phải sửa slice hoặc domain rồi chạy lại."
   owner: op-retry
   kind: check-finding
+
 URL_INVALID:
   title: "Environment health URL is malformed"
   title_vi: "Địa chỉ kiểm tra môi trường không hợp lệ"
@@ -6407,6 +6820,7 @@ URL_INVALID:
   nextStep_vi: "Phép kiểm tra môi trường trả trạng thái lỗi; sửa URL trong cấu hình rồi kiểm tra lại."
   owner: op-retry
   kind: input-invalid
+
 VALIDATOR_ERROR:
   title: "Work validator crashed"
   title_vi: "Bộ kiểm tra cấu trúc Work bị sập"
@@ -6417,6 +6831,7 @@ VALIDATOR_ERROR:
   nextStep_vi: "Kết quả bị coi là từ chối; cần lõi runtime xem thông báo lỗi kèm theo và sửa bộ kiểm tra."
   owner: runtime-core
   kind: check-finding
+
 WAIT_OVERDUE:
   title: "A wait ran past its deadline"
   title_vi: "Một khâu chờ đã quá hạn"
@@ -6428,6 +6843,7 @@ WAIT_OVERDUE:
   nextStep_vi: "Bộ điều phối ghi vi phạm; Supervisor xem quy trình bị kẹt và mở cổng hoặc gọi chủ sở hữu quyết định."
   owner: supervisor
   kind: blocker
+
 WITHDRAWS_STILL_PRESENT:
   title: "Withdrawn statement still present"
   title_vi: "Câu đã rút vẫn còn trong hồ sơ"
@@ -6438,6 +6854,7 @@ WITHDRAWS_STILL_PRESENT:
   nextStep_vi: "Bộ kiểm tra thay đổi Work từ chối; op ghi Work xóa câu khỏi statements rồi chạy lại."
   owner: op-retry
   kind: check-finding
+
 WITHDRAWS_UNKNOWN_STATEMENT:
   title: "Withdrawal names unknown statement"
   title_vi: "Rút một câu mà bản trước không có"
@@ -6448,6 +6865,7 @@ WITHDRAWS_UNKNOWN_STATEMENT:
   nextStep_vi: "Bộ kiểm tra thay đổi Work từ chối; op ghi Work chép đúng nguyên văn câu của bản trước rồi chạy lại."
   owner: op-retry
   kind: check-finding
+
 WITHDRAWS_WITHOUT_BREAKING:
   title: "Withdrawal not declared breaking"
   title_vi: "Rút câu nhưng không khai là thay đổi phá vỡ"
@@ -6458,6 +6876,7 @@ WITHDRAWS_WITHOUT_BREAKING:
   nextStep_vi: "Bộ kiểm tra thay đổi Work từ chối; op ghi Work đổi loại thành breaking hoặc bỏ việc rút rồi chạy lại."
   owner: op-retry
   kind: check-finding
+
 WORKER_RELEASE_LEAK:
   title: "Worker was not released in time"
   title_vi: "Worker chưa được giải phóng đúng hạn"
@@ -6468,6 +6887,7 @@ WORKER_RELEASE_LEAK:
   nextStep_vi: "Bộ điều phối tự đóng và xác minh worker rồi ghi phần còn sót lại; nếu lặp lại thì cần lõi runtime xem."
   owner: runtime-core
   kind: runtime-fault
+
 WORKER_STALLED:
   title: "Worker is stalled"
   title_vi: "Worker đang đứng yên"
@@ -6479,6 +6899,7 @@ WORKER_STALLED:
   nextStep_vi: "Bộ điều phối theo dõi và nhắc worker; nếu vẫn không tiến triển thì xử lý như worker chết và thử lại."
   owner: op-retry
   kind: runtime-fault
+
 WORKER_START_STUCK:
   title: "Worker never started"
   title_vi: "Worker khởi động mà không lên"
@@ -6489,6 +6910,7 @@ WORKER_START_STUCK:
   nextStep_vi: "Bộ điều phối coi worker đã chết và chạy api reconcile --dead-worker để bỏ lượt khởi chạy rồi dựng lại."
   owner: runtime-core
   kind: runtime-fault
+
 WORKFLOW_MISMATCH:
   title: "Work graph belongs to other workflow"
   title_vi: "Đồ thị Work thuộc quy trình khác"
@@ -6499,6 +6921,7 @@ WORKFLOW_MISMATCH:
   nextStep_vi: "Bộ kiểm tra đồ thị từ chối; op tạo đồ thị sửa trường workflow rồi chạy lại."
   owner: op-retry
   kind: check-finding
+
 WORKTREE_NOT_OPS:
   title: "Op tried to manage a git worktree"
   title_vi: "Op định tạo hoặc xóa worktree git"
@@ -6509,6 +6932,7 @@ WORKTREE_NOT_OPS:
   nextStep_vi: "Lệnh bị chặn; worker phải làm việc trong bản checkout được giao, cần bản khác thì báo là một nhu cầu (report blocked environment)."
   owner: op-retry
   kind: dispatch-refusal
+
 WORKTREE_REMOVE_OVERDUE:
   title: "Worktree removal overdue"
   title_vi: "Xóa worktree quá hạn"
@@ -6519,6 +6943,7 @@ WORKTREE_REMOVE_OVERDUE:
   nextStep_vi: "Bộ điều phối tiếp tục thử dọn; nếu kẹt mãi thì cần lõi runtime xem thư mục bị khóa."
   owner: runtime-core
   kind: runtime-fault
+
 WORK_NODE_RETIRED:
   title: "Retired work/node record"
   title_vi: "Bản ghi work/node đã bị loại bỏ"
@@ -6529,6 +6954,7 @@ WORK_NODE_RETIRED:
   nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để viết lại thành bản ghi phẳng theo họ; không cần ai can thiệp thêm."
   owner: op-retry
   kind: check-finding
+
 WORK_RECORD_MISSING:
   title: "No Work record found"
   title_vi: "Không tìm thấy bản ghi Work"
@@ -11424,6 +11850,7 @@ worker-wedged:
   nextStep_vi: "Không cần làm gì; kiểm thử được hoãn tới khi owner bật."
   owner: owner
   kind: check-status
+
 DESIGN_NOT_SETTLED:
   title: "Design not settled before code"
   title_vi: "Thiết kế giao diện chưa được chốt trước khi viết code"
@@ -11434,6 +11861,7 @@ DESIGN_NOT_SETTLED:
   nextStep_vi: "Runtime từ chối giao op viết code; Kernel chạy interface.draw cho màn hình đó trước rồi mới giao lại."
   owner: "other-op:interface.draw"
   kind: dispatch-refusal
+
 STARCI_LEDGER_MIGRATE_REFUSED:
   title: "Ledger migration refused"
   title_vi: "Từ chối nâng cấp cấu trúc ledger"
@@ -11444,6 +11872,7 @@ STARCI_LEDGER_MIGRATE_REFUSED:
   nextStep_vi: "Runtime không mở ledger; Supervisor kiểm tra PRAGMA integrity_check và khôi phục từ bản .bak nếu cần."
   owner: supervisor
   kind: runtime-fault
+
 STARCI_LEDGER_MIGRATE_FAILED:
   title: "Ledger migration failed"
   title_vi: "Nâng cấp cấu trúc ledger thất bại"
@@ -11700,32 +12129,37 @@ HFS_ARCH_CONFIG_UNREAD:
   kind: check-finding
 
 HFS_UNUSED_EXPORT:
-  title: "No public export without a consumer"
-  title_vi: "Export công khai không ai dùng"
-  meaning_vi: "`<symbol>` được export từ `<entry>` nhưng không ai dùng. Xóa, hoặc dùng nó."
+  title: "Public export that nothing outside the module uses"
+  title_vi: "Tên xuất công khai mà không nơi nào bên ngoài dùng"
+  meaning_vi: "Cửa vào công khai (index.ts) của một module, tính năng hoặc gói đang xuất ra một tên mà không tệp sản xuất nào nằm ngoài module đó import. Tệp kiểm thử không được tính là nơi dùng. Tên thừa ở cửa vào làm bề mặt công khai phình to, khiến người sau tưởng có thể dựa vào nó và làm việc thay đổi module khó hơn."
   causes_vi:
-    - "Vi phạm luật R25: Không export công khai nào không có người dùng ngoài spec (knip) — áp cho `index.ts` BE, public entry FE, `packages/*`."
-  nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra (nợ hàng loạt có codemod của HFS); không cần ai can thiệp thêm."
+    - "Xuất thêm kiểu, hằng số hoặc hàm 'phòng khi cần' nhưng chưa có nơi nào dùng"
+    - "Nơi từng dùng tên này đã bị xoá hoặc chuyển vào cùng module, còn dòng xuất ở cửa vào bị bỏ sót"
+    - "Tên chỉ được dùng trong tệp kiểm thử, nên với bộ kiểm tra nó vẫn là thừa"
+  nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để xoá tên khỏi cửa vào (hoặc bỏ luôn phần khai báo nếu không còn ai dùng); nếu tên thực sự cần cho một nơi ngoài module thì nơi đó phải import nó qua cửa vào."
   owner: op-retry
   kind: check-finding
 
 BE_TIER_DIRECTION:
-  title: "The tier direction matrix"
-  title_vi: "Hướng import giữa các tầng bị cấm"
-  meaning_vi: "`<from>` (tầng `<t1>`) import `<to>` (tầng `<t2>`) — hướng này bị cấm. Hạ kiểu dùng chung xuống platform, hoặc đảo phụ thuộc qua options/port."
+  title: "Backend import against the tier direction"
+  title_vi: "Backend import ngược chiều tầng"
+  meaning_vi: "Một tệp backend import từ tầng mà bảng kê HFS không cho phép tầng của nó phụ thuộc vào. Mỗi tầng (app, feature, domain, integrations, platform) chỉ được nhìn xuống các tầng liệt kê trong bảng; hai feature không bao giờ import nhau, và import chỉ kiểu (type-only) cũng tính như import thật."
   causes_vi:
-    - "Vi phạm luật R26: Ma trận hướng: feature → domain/platform/integrations; domain → domain/platform/integrations; integrations → platform; platform → platform. Import `type` cũng tính."
-  nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra và mục của luật trong tiêu chuẩn HFS v2; nợ cũ cần quyết định thiết kế nên op không thêm ngoại lệ, chỉ tách hoặc chuyển về đúng chủ."
+    - "Một feature import feature khác thay vì đi qua một module domain dùng chung"
+    - "Một module domain, integrations hoặc platform import ngược lên feature hoặc app"
+    - "Một module platform import domain hoặc integrations"
+  nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để đưa phần dùng chung xuống đúng tầng (domain hoặc platform) rồi cho cả hai bên import từ đó; không cần ai can thiệp thêm."
   owner: op-retry
   kind: check-finding
 
 ARCH_OWNER_CYCLE:
-  title: "No owner cycles, type-only included"
-  title_vi: "Vòng phụ thuộc giữa các owner"
-  meaning_vi: "Có vòng phụ thuộc: `<a> → <b> → … → <a>`. Cắt một cạnh."
+  title: "Owner import cycle"
+  title_vi: "Vòng import giữa các đơn vị sở hữu"
+  meaning_vi: "Các đơn vị sở hữu (feature, module domain, platform, gói...) import lẫn nhau thành vòng khép kín, kể cả bằng import chỉ kiểu. Vòng làm hai đơn vị không thể hiểu, kiểm thử hay thay thế riêng lẻ; bộ kiểm tra báo kèm đường đi của vòng."
   causes_vi:
-    - "Vi phạm luật R27: Không có chu trình giữa các owner (kể cả `import type`), BE lẫn FE."
-  nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra và mục của luật trong tiêu chuẩn HFS v2; nợ cũ cần quyết định thiết kế nên op không thêm ngoại lệ, chỉ tách hoặc chuyển về đúng chủ."
+    - "Hai module domain dùng chung một kiểu và import kiểu của nhau"
+    - "Một module gọi ngược lại module đã gọi nó thay vì nhận qua tham số hoặc sự kiện"
+  nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để cắt vòng: chuyển phần chung sang một đơn vị thấp hơn hoặc đảo phụ thuộc; không cần ai can thiệp thêm."
   owner: op-retry
   kind: check-finding
 
@@ -11750,12 +12184,14 @@ BE_FEATURE_SHAPE:
   kind: check-finding
 
 BE_FEATURE_NOT_COMPOSED:
-  title: "Every feature and transport module is composed by an app"
-  title_vi: "Feature không được app nào compose"
-  meaning_vi: "Feature `<f>` (transport `<p>`) không được app nào compose — code này không bao giờ chạy trong sản phẩm."
+  title: "Feature not composed into any app"
+  title_vi: "Feature không được lắp vào ứng dụng nào"
+  meaning_vi: "Một feature backend không có đường import chạy thật (không tính import chỉ-kiểu) từ tệp gốc của bất kỳ ứng dụng nào (app.module.ts hoặc main.ts). Không tiến trình nào nạp nó nên code này không bao giờ được phục vụ."
   causes_vi:
-    - "Vi phạm luật R31: Mọi feature (và mọi transport module) phải được ít nhất một app import; không có capability \"đã build, đã test\" mà app thật không chạy."
-  nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra và mục của luật trong tiêu chuẩn HFS v2; nợ cũ cần quyết định thiết kế nên op không thêm ngoại lệ, chỉ tách hoặc chuyển về đúng chủ."
+    - "Quên thêm module của feature vào app.module.ts của ứng dụng"
+    - "Chỉ import kiểu (import type) từ ứng dụng, nên feature không thật sự được lắp vào"
+    - "Feature đã bị bỏ dở hoặc thay bằng feature khác nhưng thư mục cũ vẫn còn"
+  nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để lắp module của feature vào ứng dụng phù hợp hoặc xoá feature không dùng; không cần ai can thiệp thêm."
   owner: op-retry
   kind: check-finding
 
@@ -11860,12 +12296,14 @@ FE_WIRE_GENERATED:
   kind: check-finding
 
 FE_ERROR_BOUNDARY_MISSING:
-  title: "Global, locale error, not-found and loading boundaries exist"
-  title_vi: "Thiếu error boundary"
-  meaning_vi: "App `<a>` thiếu `<file>` — lỗi render sẽ làm trắng cả trang."
+  title: "Next app lacks a required error or loading boundary"
+  title_vi: "Ứng dụng Next thiếu trang lỗi hoặc trang đang tải bắt buộc"
+  meaning_vi: "Mỗi ứng dụng Next phải có global-error.tsx, error.tsx, not-found.tsx và loading.tsx trong src/app theo bảng kê HFS. Thiếu chúng thì khi trang gặp lỗi, không tìm thấy hoặc đang tải, người dùng sẽ thấy màn hình mặc định của khung phần mềm hoặc màn hình trắng thay vì giao diện của sản phẩm."
   causes_vi:
-    - "Vi phạm luật R53: Mỗi app có `app/global-error.tsx`, `[locale]/error.tsx`, `[locale]/not-found.tsx`, `loading.tsx` cho mỗi nhóm route có dữ liệu; `errorState` phải khai envelope khi code có `Outcome`."
-  nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra (nợ hàng loạt có codemod của HFS); không cần ai can thiệp thêm."
+    - "Ứng dụng mới được dựng mà chưa thêm các trang biên lỗi"
+    - "Trang lỗi được đặt sai thư mục, ví dụ ngoài src/app/[locale]/"
+    - "Tệp bị xoá hoặc đổi tên trong lúc dọn dẹp"
+  nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để thêm tệp còn thiếu vào đúng src/app hoặc src/app/[locale]; giao diện của các trang này do người thiết kế duyệt."
   owner: op-retry
   kind: check-finding
 
@@ -11900,12 +12338,14 @@ FE_HOOKS_ARE_HOOKS:
   kind: check-finding
 
 FE_OWNER_REACHABLE:
-  title: "Every owner is mounted; every href resolves to a route"
-  title_vi: "Owner không được route nào mount"
-  meaning_vi: "Owner `<o>` không được route nào mount (hoặc href `<h>` không có route)."
+  title: "Page feature not mounted by a route"
+  title_vi: "Feature trang chưa được route nào gắn vào"
+  meaning_vi: "Một feature trang, layout hoặc overlay của frontend không có đường import chạy thật từ bất kỳ tệp nào trong cây route của ứng dụng (thư mục src/app). Người dùng sẽ không bao giờ thấy nó vì không route nào hiển thị."
   causes_vi:
-    - "Vi phạm luật R57: Mọi owner page/block/layout được route tree mount; cấm owner `() => null`; mọi href dựng từ `modules/routes` và khớp một route có thật."
-  nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra và mục của luật trong tiêu chuẩn HFS v2; nợ cũ cần quyết định thiết kế nên op không thêm ngoại lệ, chỉ tách hoặc chuyển về đúng chủ."
+    - "Quên import feature vào page.tsx hoặc layout.tsx tương ứng"
+    - "Route chỉ import kiểu của feature chứ không render nó"
+    - "Feature đã bị thay thế nhưng thư mục cũ vẫn còn"
+  nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để gắn feature vào route đúng hoặc xoá feature không dùng; không cần ai can thiệp thêm."
   owner: op-retry
   kind: check-finding
 
@@ -11960,12 +12400,13 @@ FE_PACKAGE_SHAPE:
   kind: check-finding
 
 FE_APP_ISOLATION:
-  title: "Apps never import apps; ui-screen declares `app`"
-  title_vi: "App import app khác"
-  meaning_vi: "`<file>` của app `<a>` import từ app `<b>`."
+  title: "App imports another app"
+  title_vi: "Một app import app khác"
+  meaning_vi: "Một app trong apps/ import mã nguồn của app khác. Các app độc lập, build và triển khai riêng; mã dùng chung phải nằm trong một gói packages/<pkg>."
   causes_vi:
-    - "Vi phạm luật R64: App không import app khác; dùng chung qua `packages/*`; mỗi ui-screen record khai `app` (work/ui-screen@2)."
-  nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra (nợ hàng loạt có codemod của HFS); không cần ai can thiệp thêm."
+    - "Import đường dẫn tương đối hoặc bí danh trỏ sang apps/<app-khác>/src"
+    - "Sao chép cách dùng chung bằng import thay vì tạo gói dùng chung"
+  nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để chuyển phần dùng chung vào một gói packages/<pkg> hoặc nhân bản có chủ đích; nếu cần ô gói mới thì người giám sát thêm ô vào bảng kê."
   owner: op-retry
   kind: check-finding
 
@@ -12190,4 +12631,76 @@ STACKS_QUALITY_GATE_DRIFT:
     - "Repository tự đặt tên cổng riêng"
   nextStep_vi: "Từ chối nếu Sonar được khai báo trong chính repository, nghi ngờ nếu khai báo đi qua nguồn khác; ghi qualityGate: starci-new-code vào khối services.sonar."
   owner: other-op:workspace.manage
+  kind: check-finding
+
+BE_MODULE_NOT_COMPOSED:
+  title: "Capability module not composed into any app"
+  title_vi: "Module năng lực không được lắp vào ứng dụng nào"
+  meaning_vi: "Một module domain, integrations hoặc platform không có đường import chạy thật từ tệp gốc của bất kỳ ứng dụng nào, kể cả qua các module khác đã được lắp. Nó là code chết: không tiến trình nào dùng đến."
+  causes_vi:
+    - "Module được viết sẵn nhưng chưa feature nào import nó"
+    - "Feature từng dùng module này đã bị xoá hoặc đổi hướng sang module khác"
+    - "Chỉ có import kiểu tới module, không có import chạy thật"
+  nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để nối module vào feature cần nó hoặc xoá module không ai dùng; không cần ai can thiệp thêm."
+  owner: op-retry
+  kind: check-finding
+
+BE_REQUIRED_MODULE_MISSING:
+  title: "Required backend module, app or feature file is missing"
+  title_vi: "Thiếu tệp hoặc thư mục bắt buộc của một phần backend"
+  meaning_vi: "Bảng kê HFS bắt buộc mỗi ứng dụng, tính năng, module miền, tích hợp và module nền tảng (cấu hình, ghi nhật ký, lỗi, kiểu nguyên thuỷ) phải có một số tệp hoặc thư mục cố định, ví dụ index.ts, tệp .module.ts, thư mục application/ hay bài kiểm thử ghép ứng dụng. Ở đây một mục như vậy không tồn tại, nên phần đó chưa đúng khuôn và các bộ kiểm tra khác không thể tin vào nó."
+  causes_vi:
+    - "Tạo module hoặc tính năng mới nhưng quên tệp cửa vào index.ts hoặc tệp .module.ts"
+    - "Module nền tảng bắt buộc (config, logging, errors, primitives) chưa được tạo hoặc đặt tên khác"
+    - "Ứng dụng thiếu bài kiểm thử ghép <app>.composition.spec.ts"
+  nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để tạo tệp hoặc thư mục còn thiếu đúng theo bảng kê; nếu tên hiện có là do thiết kế khác thì đó là việc đổi bảng kê, do người giám sát quyết định."
+  owner: op-retry
+  kind: check-finding
+
+FE_HREF_RESOLVES:
+  title: "Link points to a route that does not exist"
+  title_vi: "Liên kết trỏ tới đường dẫn không tồn tại"
+  meaning_vi: "Một liên kết viết thẳng trong code (href, redirect hoặc router.push) trỏ tới đường dẫn mà không tệp page.tsx hay route.ts nào của ứng dụng phục vụ. Người dùng bấm vào sẽ gặp trang 404."
+  causes_vi:
+    - "Gõ sai đường dẫn hoặc đổi tên route mà quên sửa liên kết"
+    - "Route đã bị xoá hoặc chưa được tạo"
+    - "Thiếu một tham số động trong đường dẫn so với cấu trúc thư mục route"
+  nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để sửa liên kết cho khớp route thật hoặc tạo route còn thiếu; không cần ai can thiệp thêm."
+  owner: op-retry
+  kind: check-finding
+
+FE_TIER_DIRECTION:
+  title: "Frontend import against the tier direction"
+  title_vi: "Frontend import ngược chiều tầng"
+  meaning_vi: "Một tệp frontend import từ tầng mà bảng kê HFS không cho phép: route chỉ nhìn xuống feature, feature chỉ nhìn xuống components, hooks và modules, hai feature không bao giờ import nhau, và một lớp component chỉ import các lớp đứng sau nó (blocks, composites, branches, leaves)."
+  causes_vi:
+    - "Một feature import một feature khác thay vì đưa phần dùng chung xuống components, hooks hoặc modules"
+    - "Một component import ngược lên lớp cao hơn hoặc lên feature"
+    - "Một module import hooks hoặc components"
+  nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để chuyển phần dùng chung xuống tầng thấp hơn rồi cho cả hai bên import từ đó; không cần ai can thiệp thêm."
+  owner: op-retry
+  kind: check-finding
+
+HFS_DUPLICATE_BLOCK:
+  title: "Same code block copied across owners"
+  title_vi: "Cùng một đoạn mã bị chép sang chủ sở hữu khác"
+  meaning_vi: "Một đoạn mã dài từ 25 dòng trở lên (bỏ qua khác biệt về tên biến và giá trị chữ hoặc số) xuất hiện giống hệt ở hai chủ sở hữu khác nhau (hai module, hai tính năng hoặc hai ứng dụng). Chép đoạn mã thay vì dùng chung khiến mỗi lần sửa lỗi phải sửa nhiều nơi và các bản sao dần lệch nhau."
+  causes_vi:
+    - "Op cần một hàm hỗ trợ đã có ở chủ sở hữu khác nhưng không có chỗ chung để dùng nên chép lại"
+    - "Hai chủ sở hữu cùng tự viết một logic giống nhau vì chưa ai đưa nó vào chỗ dùng chung"
+    - "Đoạn mã được chép nguyên rồi chỉ đổi tên biến hoặc hằng số để tránh bị phát hiện"
+  nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để chuyển đoạn mã dùng chung vào ô chung mà thông báo nêu (với BE là src/modules/platform/primitives/ hoặc module miền của năng lực đó; với FE là modules hoặc hooks của ứng dụng) rồi nhập từ đó vào cả hai nơi. Nếu hai đoạn thật sự cần khác nhau thì op phải tách phần khác biệt ra."
+  owner: op-retry
+  kind: check-finding
+
+HFS_REQUIRED_FILE_MISSING:
+  title: "Required file, directory or minimum instance is missing"
+  title_vi: "Thiếu tệp, thư mục hoặc số lượng tối thiểu bắt buộc theo bảng kê"
+  meaning_vi: "Bảng kê HFS đòi một tệp hoặc thư mục phải có trong mỗi phần của kho (gói dùng chung, module frontend, api, i18n, tuyến, layout...), hoặc đòi kho có ít nhất một ứng dụng hay tính năng thuộc loại bắt buộc. Mục đó không tồn tại; khi là số lượng tối thiểu thì báo tại hfs.json. Thiếu nó thì phần liên quan chưa hoạt động đầy đủ hoặc kho chưa phải một sản phẩm hoàn chỉnh."
+  causes_vi:
+    - "Tạo thư mục mới nhưng chưa thêm tệp bắt buộc như index.ts, client.ts, outcome.ts hoặc package.json"
+    - "Tệp có nhưng tên hoặc chỗ đặt khác với bảng kê"
+    - "Kho chưa có tính năng hoặc ứng dụng nào của loại bắt buộc"
+  nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để tạo tệp còn thiếu đúng chỗ bảng kê chỉ định; nếu cấu trúc hiện có là chủ ý thì đó là việc sửa bảng kê, do người giám sát làm, không phải kho tự đổi."
+  owner: op-retry
   kind: check-finding

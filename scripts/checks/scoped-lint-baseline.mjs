@@ -193,9 +193,9 @@ export function rebaseReport(value,tree){
  * TypeScript project service, its own module hooks and read-only fs view).
  * Resolves to the base report (paths rebased onto the live repository); rejects when the child fails.
  */
-export function measureBaseTree(tree,{files,profile,architectureConfig=null,obligations=null,timeoutMs=BASE_MEASURE_TIMEOUT_MS,entry=MEASURE_FILE,env=process.env}={}){
+export function measureBaseTree(tree,{files,profile,obligations=null,timeoutMs=BASE_MEASURE_TIMEOUT_MS,entry=MEASURE_FILE,env=process.env}={}){
   const request=path.join(tree.temp,'request.json'),out=path.join(tree.temp,'report.json');
-  fs.writeFileSync(request,JSON.stringify({root:tree.root,files,profile,architectureConfig,obligations,out}));
+  fs.writeFileSync(request,JSON.stringify({root:tree.root,files,profile,obligations,out}));
   return new Promise((resolve,reject)=>{
     const child=spawn(process.execPath,[entry,request],{cwd:tree.root,env:baseViewEnv(tree,env),windowsHide:true,stdio:['ignore','ignore','pipe']});
     let stderr='';child.stderr.on('data',chunk=>{stderr=(stderr+chunk).slice(-4000);});

@@ -67,7 +67,7 @@ function fixture(t, { profile = 'capability', legacy = 'off' } = {}) {
   const contract = profile === 'academy-abstract-exception' ? academyContract : capabilityContract;
   const manifest = { private: true, starci: { codePatterns: { nest: { errorIdentity: contract } } } };
   write('package.json', manifest);
-  write('architecture.json', { schema: 'starci/architecture-config@1', kinds: ['backend'], tsconfig: 'tsconfig.json' });
+  write('hfs.json', { hfs: 2, profile: 'be', project: 'fixture', apps: [{ name: 'api', kind: 'api' }] });
   write('tsconfig.json', {
     compilerOptions: { target: 'ES2022', module: 'ESNext', moduleResolution: 'Bundler', strict: true },
     include: ['src/**/*.ts', 'apps/**/*.ts'],
@@ -115,7 +115,7 @@ export function execute(): never { throw new WidgetError({}); }`);
     sourceRuleRoots: ['knowledge/patterns/be'],
     expectedSourceRuleIds: ['BE-ERROR-1', 'BE-ERROR-2', 'BE-ERROR-3', 'BE-NAMING-3'],
     sourceGlobs: ['src/**/*.ts'],
-    inputGlobs: ['package.json', 'architecture.json', 'tsconfig.json', 'jest.config.js'],
+    inputGlobs: ['package.json', 'hfs.json', 'tsconfig.json', 'jest.config.js'],
     obligations: [
       {
         id: 'NEST-EXCEPTION-IDENTITY', sourceRuleIds: ['BE-ERROR-1', 'BE-ERROR-2', 'BE-ERROR-3', 'BE-NAMING-3'],
@@ -147,7 +147,7 @@ export function execute(): never { throw new WidgetError({}); }`);
       lintFiles: async files => files.map(filePath => ({ filePath, messages: [], suppressedMessages: [], errorCount: 0, warningCount: 0, fatalErrorCount: 0 })),
     },
   };
-  const options = { profile: 'nest', profileCatalog, runtime, architectureConfig: 'architecture.json', all: true };
+  const options = { profile: 'nest', profileCatalog, runtime, all: true };
   return { root, write, manifest, profileCatalog, options, check: overrides => { trackHfsTree(root); return checkScopedLint(root, [], { ...options, ...overrides }); } };
 }
 

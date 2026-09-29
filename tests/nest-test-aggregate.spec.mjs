@@ -29,7 +29,7 @@ describe('SampleService',
     () => { expect(new SampleService().read()).toBe(1); }); });`;
   const spec=write('src/sample.service.spec.ts',valid);
   write('package.json',{private:true});
-  write('architecture.json',{schema:'starci/architecture-config@1',kinds:['backend'],tsconfig:'tsconfig.json'});
+  write('hfs.json',{hfs:2,profile:'be',project:'fixture',apps:[{name:'core',kind:'api'}]});
   write('tsconfig.json',{compilerOptions:{target:'ES2022',module:'ESNext',moduleResolution:'Bundler'},include:['src/**/*.ts']});
   for(const packageName of ['typescript','@types/jest']){
     const link=path.join(fixtureRoot,'node_modules',packageName);
@@ -38,7 +38,7 @@ describe('SampleService',
   }
   const digest='a'.repeat(64),profileCatalog={schema:'starci/code-pattern-profile@1',profiles:{nest:{
     title:'Nest test adapter integration',canon:{package:'@starci/eslint-canon-be',version:'1.2.1',contentDigest:{algorithm:'sha256',include:['**/*.mjs'],exclude:[],framing:'sorted-posix-relative-path-null-raw-bytes-null',value:digest,files:1}},
-    sourceRuleRoots:['knowledge/patterns/be'],expectedSourceRuleIds:['BE-TEST-2','BE-TEST-6'],sourceGlobs:['src/**/*.ts'],inputGlobs:['package.json','architecture.json','tsconfig.json'],
+    sourceRuleRoots:['knowledge/patterns/be'],expectedSourceRuleIds:['BE-TEST-2','BE-TEST-6'],sourceGlobs:['src/**/*.ts'],inputGlobs:['package.json','hfs.json','tsconfig.json'],
     obligations:[{id:'NEST-TEST-CODE-FORM',sourceRuleIds:['BE-TEST-2','BE-TEST-6'],applicability:{include:['**/*.spec.ts']},
       mechanical:{requirement:'Check actual selected test source form.',check:{kind:'script',ruleIds:['NEST_TEST_SUBJECT_FORM','NEST_TEST_NAME_FORM']}},
       semantic:{guidance:'docs/nest-test-code-check.md',review:'Verify execution separately.'},status:'implemented'}],semanticOnly:[],
@@ -49,7 +49,7 @@ describe('SampleService',
     calculateConfigForFile:async()=>({linterOptions:{noInlineConfig:true},rules:{},plugins:{}}),
     lintFiles:async()=>[source,spec].map(filePath=>({filePath,messages:[],suppressedMessages:[],errorCount:0,warningCount:0,fatalErrorCount:0})),
   }};
-  const options={profile:'nest',profileCatalog,runtime,architectureConfig:'architecture.json',all:true};
+  const options={profile:'nest',profileCatalog,runtime,all:true};
   const clean=await checkScopedLint(fixtureRoot,[],options);
   assert.equal(clean.status,'clean',JSON.stringify(clean.issues));
   assert.deepEqual(clean.coverage.covered,['NEST-TEST-CODE-FORM']);

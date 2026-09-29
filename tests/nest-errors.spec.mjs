@@ -77,7 +77,7 @@ function fixture(t, { contractValue = contract(), error = errorSource, filter = 
     fs.writeFileSync(target, typeof value === 'string' ? value : JSON.stringify(value));
   };
   write('package.json', { private: true, starci: { codePatterns: { nest: { transportErrors: contractValue } } } });
-  write('architecture.json', { schema: 'starci/architecture-config@1', kinds: ['backend'], tsconfig: 'tsconfig.json' });
+  write('hfs.json', { hfs: 2, profile: 'be', project: 'fixture', apps: [{ name: 'core', kind: 'api' }] });
   write('tsconfig.json', { compilerOptions: { target: 'ES2022', module: 'ESNext', moduleResolution: 'Bundler', experimentalDecorators: true }, include: ['src/**/*.ts'] });
   write('src/app-error.ts', error); write('src/app-error.filter.ts', filter); write('src/app.module.ts', moduleSource); write('src/load.ts', cause);
   if (!realNest) {
@@ -103,7 +103,7 @@ export interface ArgumentsHost { getType<T extends string>(): T; switchToHttp():
   fs.symlinkSync(typescriptRoot, path.join(root, 'node_modules/typescript'), 'junction');
   t.after(() => fs.rmSync(root, { recursive: true, force: true }));
   const files = fs.readdirSync(path.join(root, 'src')).filter(name => name.endsWith('.ts')).map(name => `src/${name}`).sort();
-  return { root, write, files, input: { root, files, contextFiles: files, ruleIds: NEST_ERROR_RULES, architectureConfig: 'architecture.json' } };
+  return { root, write, files, input: { root, files, contextFiles: files, ruleIds: NEST_ERROR_RULES } };
 }
 
 test('renamed Nest imports, raw foreign cause identity, registration and HTTP field flow are checked', t => {

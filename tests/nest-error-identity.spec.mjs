@@ -78,7 +78,7 @@ function fixture(t, { profile = 'capability', contractValue, sources = {}, realN
     : { 'src/errors/capability-error.ts': capabilityBase, 'src/errors/widget-error.ts': capabilityChild, 'src/use.ts': capabilityUse };
   for (const [relative, value] of Object.entries({ ...values, ...sources })) write(relative, value);
   write('package.json', { private: true, starci: { codePatterns: { nest: { errorIdentity: contractValue ?? (profile === 'academy-abstract-exception' ? academyContract() : capabilityContract()) } } } });
-  write('architecture.json', { schema: 'starci/architecture-config@1', kinds: ['backend'], tsconfig: 'tsconfig.json' });
+  write('hfs.json', { hfs: 2, profile: 'be', project: 'fixture', apps: [{ name: 'core', kind: 'api' }] });
   write('tsconfig.json', { compilerOptions: { target: 'ES2022', module: 'ESNext', moduleResolution: 'Bundler', strict: true }, include: ['src/**/*.ts'] });
   fs.mkdirSync(path.join(root, 'node_modules'), { recursive: true });
   fs.symlinkSync(typescriptRoot, path.join(root, 'node_modules/typescript'), 'junction');
@@ -89,7 +89,7 @@ function fixture(t, { profile = 'capability', contractValue, sources = {}, realN
   }
   t.after(() => fs.rmSync(root, { recursive: true, force: true }));
   const files = walkSources(root);
-  return { root, write, files, input: { root, files, ruleIds: NEST_ERROR_IDENTITY_RULES, architectureConfig: 'architecture.json' } };
+  return { root, write, files, input: { root, files, ruleIds: NEST_ERROR_IDENTITY_RULES } };
 }
 
 test('capability profile resolves namespace aliases, const constructions, unchanged rethrows and typed dispositions', t => {

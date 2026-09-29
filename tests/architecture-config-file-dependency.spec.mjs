@@ -38,7 +38,8 @@ function repo(t) {
 /** The minimum a backend project needs for the loader to get as far as reading its dependencies. */
 function project(write, manifest, at, dependencies) {
   manifest(at, {name: path.posix.basename(at) || 'app', version: '0.0.0', dependencies});
-  write(path.posix.join(at, 'architecture.json'), `${JSON.stringify({schema: 'starci/architecture-config@1', kinds: ['backend']}, null, 2)}\n`);
+  write(path.posix.join(at, 'hfs.json'), `${JSON.stringify({hfs: 2, profile: 'be', project: 'fixture', apps: [{name: 'core', kind: 'api'}]}, null, 2)}
+`);
   write(path.posix.join(at, 'src/modules/thing/thing.service.ts'), 'export class ThingService {}\n');
   write(path.posix.join(at, 'src/features/thing/thing.module.ts'), 'export class ThingModule {}\n');
   write(path.posix.join(at, 'tsconfig.json'), '{"compilerOptions":{"strict":true}}\n');
@@ -49,7 +50,7 @@ test('a file: dependency inside the checked project is one of its workspaces', t
   write('.git', 'gitdir: elsewhere\n');
   project(write, manifest, 'app', {'@kit/local': 'file:./packages/local'});
   manifest('app/packages/local', {name: '@kit/local', version: '0.0.0'});
-  const config = loadArchitectureConfig(path.join(root, 'app'), 'architecture.json');
+  const config = loadArchitectureConfig(path.join(root, 'app'));
   assert.deepEqual(config.workspaces, ['packages/local'],
     'a package the project itself contains is part of its own layout, and the loader has always collected it');
 });
@@ -62,7 +63,7 @@ test('a file: dependency inside the same repository resolves without becoming a 
   manifest('packages/e2e-kit', {name: '@kit/e2e', version: '0.0.0'});
   write('packages/e2e-kit/src/index.ts', 'export const kit = 1;\n');
 
-  const config = loadArchitectureConfig(path.join(root, 'examples/app'), 'architecture.json');
+  const config = loadArchitectureConfig(path.join(root, 'examples/app'));
   assert.deepEqual(config.workspaces, [],
     "a sibling package this project consumes is not part of this project's source layout; collecting it would pull another package's src into these roots");
   assert.deepEqual(config.kinds, ['backend'], 'the config still loads, which is the whole point - the old rule failed it closed');
@@ -75,7 +76,7 @@ test('a file: dependency outside the repository is still refused', t => {
   fs.mkdirSync(path.join(path.dirname(root), 'outside-kit'), {recursive: true});
   t.after(() => fs.rmSync(path.join(path.dirname(root), 'outside-kit'), {recursive: true, force: true}));
   fs.writeFileSync(path.join(path.dirname(root), 'outside-kit', 'package.json'), '{"name":"@kit/stray","version":"0.0.0"}\n');
-  assert.throws(() => loadArchitectureConfig(path.join(root, 'app'), 'architecture.json'),
+  assert.throws(() => loadArchitectureConfig(path.join(root, 'app')),
     /must resolve to a package directory inside the repository/,
     'a path that leaves the checkout is unreviewable, which is the property the containment rule exists for');
 });
@@ -86,7 +87,7 @@ test('a file: dependency pointing at something that is not a package is refused 
   manifest('', {name: 'monorepo', version: '0.0.0', private: true});
   project(write, manifest, 'examples/app', {'@kit/ghost': 'file:../../packages/ghost'});
   fs.mkdirSync(path.join(root, 'packages/ghost'), {recursive: true});
-  assert.throws(() => loadArchitectureConfig(path.join(root, 'examples/app'), 'architecture.json'),
+  assert.throws(() => loadArchitectureConfig(path.join(root, 'examples/app')),
     /must resolve to a package directory inside the repository/,
     'being inside the repository is not enough; the dependency must actually be a package, or the declaration names nothing');
 });
@@ -96,7 +97,7 @@ test('with no repository around it, the project itself is the boundary', t => {
   manifest('', {name: 'monorepo', version: '0.0.0', private: true});
   project(write, manifest, 'examples/app', {'@kit/e2e': 'file:../../packages/e2e-kit'});
   manifest('packages/e2e-kit', {name: '@kit/e2e', version: '0.0.0'});
-  assert.throws(() => loadArchitectureConfig(path.join(root, 'examples/app'), 'architecture.json'),
+  assert.throws(() => loadArchitectureConfig(path.join(root, 'examples/app')),
     /must resolve to a package directory inside the repository/,
     'the wider boundary is a git checkout, not any parent directory that happens to exist');
 });
@@ -106,7 +107,7 @@ test('the loaded config carries the repository it found, so every later boundary
   write('.git', 'gitdir: elsewhere\n');
   manifest('', {name: 'monorepo', version: '0.0.0', private: true});
   project(write, manifest, 'examples/app', {});
-  const config = loadArchitectureConfig(path.join(root, 'examples/app'), 'architecture.json');
+  const config = loadArchitectureConfig(path.join(root, 'examples/app'));
   assert.equal(config.repository, path.resolve(root),
     'the import-resolution check reads this rather than walking up again, so the two cannot disagree about where the checkout ends');
   assert.equal(enclosingRepository(path.join(root, 'examples/app')), path.resolve(root));
@@ -116,7 +117,7 @@ test('a project with no git checkout around it reports no repository at all', t 
   const {root, write, manifest} = repo(t);
   manifest('', {name: 'monorepo', version: '0.0.0', private: true});
   project(write, manifest, 'examples/app', {});
-  const config = loadArchitectureConfig(path.join(root, 'examples/app'), 'architecture.json');
+  const config = loadArchitectureConfig(path.join(root, 'examples/app'));
   assert.equal(config.repository, null,
     'null is what makes the project itself the boundary; a parent directory that is not a checkout is not a wider scope, it is just a parent');
 });

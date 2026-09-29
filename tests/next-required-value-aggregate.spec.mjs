@@ -42,7 +42,7 @@ function fixture(t){
   };
   const manifest={private:true,workspaces:['apps/*'],starci:{codePatterns:{next:{errorState:contract}}}};
   write('package.json',manifest);write('package-lock.json',{lockfileVersion:3});
-  write('architecture.json',{schema:'starci/architecture-config@1',kinds:['frontend'],tsconfig:'tsconfig.json'});
+  write('hfs.json',{hfs:2,profile:'fe',project:'fixture',apps:[{name:'web',kind:'next'}]});
   write('tsconfig.json',{compilerOptions:{module:'ESNext',moduleResolution:'Bundler',target:'ES2022',strict:true},include:['apps/web/src/**/*.ts']});
   write('vitest.config.ts',`import type {ReadEnvelope} from './apps/web/src/modules/api/envelope';
 export function uncheckedMetadata(value:ReadEnvelope){return value.data}`);
@@ -62,7 +62,7 @@ export function readCourse(result:ReadEnvelope){if(!result.ok)throw new Error(re
     title:'Required-value aggregate integration',
     canon:{package:'@starci/eslint-canon-fe',version:'1.0.0',contentDigest:{algorithm:'sha256',include:['**/*.mjs'],exclude:[],framing:'sorted-posix-relative-path-null-raw-bytes-null',value:digest,files:1}},
     sourceRuleRoots:['knowledge/patterns/fe'],expectedSourceRuleIds:['FE-ARCHITECTURE-1','FE-ERROR-2','FE-ERROR-3'],
-    sourceGlobs:['apps/web/src/**/*.ts'],inputGlobs:['package.json','package-lock.json','architecture.json','tsconfig.json','vitest.config.ts'],
+    sourceGlobs:['apps/web/src/**/*.ts'],inputGlobs:['package.json','package-lock.json','hfs.json','tsconfig.json','vitest.config.ts'],
     obligations,semanticOnly:[],
   }}};
   // ESLint is isolated; checkScopedLint's default script dispatcher and TypeScript programs remain real.
@@ -70,7 +70,7 @@ export function readCourse(result:ReadEnvelope){if(!result.ok)throw new Error(re
     isPathIgnored:async()=>false,calculateConfigForFile:async()=>({linterOptions:{noInlineConfig:true},rules:{},plugins:{}}),
     lintFiles:async files=>files.map(filePath=>({filePath,messages:[],suppressedMessages:[],errorCount:0,warningCount:0,fatalErrorCount:0})),
   }};
-  const options={profile:'next',profileCatalog,runtime,architectureConfig:'architecture.json',all:true};
+  const options={profile:'next',profileCatalog,runtime,all:true};
   return {root,write,contract,manifest,check:()=>{trackHfsTree(root);return checkScopedLint(root,[],options);}};
 }
 
@@ -87,7 +87,7 @@ test('default Next dispatcher proves required values while sourceOnly excludes b
   }
   const required=report.machineResults.find(item=>item.obligation==='REQUIRED');
   assert.deepEqual(required.checkedRuleIds,['FE_REQUIRED_VALUE_FAILURE']);
-  assert.equal(required.compiler.architectureConfig,'architecture.json');
+  assert.deepEqual(required.compiler.projects,['apps/web/tsconfig.json','tsconfig.json']);
 });
 
 test('missing required-value guard reaches the aggregate as a finding',async t=>{

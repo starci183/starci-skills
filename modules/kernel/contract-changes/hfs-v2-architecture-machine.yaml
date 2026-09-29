@@ -1,0 +1,50 @@
+id: hfs-v2-architecture-machine
+effectiveAt: '2026-09-29T23:30:00+07:00'
+summary: >-
+  HFS v2 Phase 0 item 0.4 (owner-approved decision 1: repositories carry only hfs.json). The architecture checker
+  (scripts/checks/architecture.mjs and scripts/checks/architecture/) becomes the HFS v2 architecture machine, driven by
+  hfs.json and knowledge/hfs/slots.yaml through scripts/lib/hfs-slots.mjs. architecture.json support is removed with no
+  dual path: loadArchitectureConfig derives the profile, apps, roots, owners (every directory an owner slot matches that
+  has its entry file), the Nest registration selection and the Grammar contract from hfs.json and the slots; the
+  checkArchitecture configFile option, the architecture.mjs --config flag, the check-scoped-lint and canon-scan
+  --architecture-config flag, the code-pattern architectureConfig inputs and the Next architectureProjects authority
+  (projects now come from package.json#starci.codePatterns.next.projects only) are gone. New checks, each with a
+  catalogued why code and Vietnamese text: the tier direction matrix for BE and FE with feature to feature forbidden
+  (BE_TIER_DIRECTION, FE_TIER_DIRECTION, FE_APP_ISOLATION), owner cycles including type-only imports reported with the
+  cycle path (ARCH_OWNER_CYCLE), reachability (BE_FEATURE_NOT_COMPOSED, BE_MODULE_NOT_COMPOSED, FE_OWNER_REACHABLE,
+  FE_HREF_RESOLVES), dead exports (HFS_UNUSED_EXPORT), required files (FE_ERROR_BOUNDARY_MISSING,
+  BE_REQUIRED_MODULE_MISSING, HFS_REQUIRED_FILE_MISSING), file-size-growth against the merge-base (HFS_SIZE_GROWTH) and
+  token-normalised duplicate blocks across owners (HFS_DUPLICATE_BLOCK, threshold ruleParams duplicateBlockLines 25).
+  knowledge/hfs/slots.yaml adds src/app/[locale]/loading.tsx to the fe.app.next required files and duplicateBlockLines to
+  ruleParams; the schema and loader validate the new key. The op manifests backend.implement, interface.implement and
+  review.verify drop the retired --architecture-config flag text. The older v1 direction rules (BE_FEATURE_IMPORTS_APP,
+  BE_MODULE_IMPORTS_APP, BE_MODULE_IMPORTS_FEATURE, FE_TIER_IMPORTS_UPWARD, FE_FEATURE_DEPENDENCY_DIRECTION) stay as
+  the finer barrel-chain explanations beside the matrix. Examples, the repository-baseline templates, the
+  todo-app-example CI workflow and the code.refactor sharedRoots policy still name architecture.json and are owed to the
+  templates and sync lanes.
+reach: new-legs
+paths:
+  - knowledge/hfs/slots.yaml
+  - modules/schemas/hfs-slots.schema.yaml
+  - modules/kernel/failure-codes.yaml
+  - modules/ops/ops/backend.implement.yaml
+  - modules/ops/ops/interface.implement.yaml
+  - modules/ops/ops/review.verify.yaml
+  - modules/ops/registry.yaml
+  - scripts/checks/architecture.mjs
+  - scripts/checks/architecture/index.mjs
+  - scripts/checks/architecture/config.mjs
+  - scripts/checks/architecture/hfs-graph.mjs
+  - scripts/checks/architecture/tiers.mjs
+  - scripts/checks/architecture/reachability.mjs
+  - scripts/checks/architecture/dead-exports.mjs
+  - scripts/checks/architecture/required-files.mjs
+  - scripts/checks/architecture/size-growth.mjs
+  - scripts/checks/architecture/clones.mjs
+  - scripts/lib/hfs-slots.mjs
+  - tests/architecture-hfs-tiers.spec.mjs
+  - tests/architecture-hfs-reachability.spec.mjs
+  - tests/architecture-hfs-dead-exports.spec.mjs
+  - tests/architecture-hfs-required-files.spec.mjs
+  - tests/architecture-size-growth.spec.mjs
+  - tests/architecture-clones.spec.mjs

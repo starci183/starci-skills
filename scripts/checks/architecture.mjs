@@ -1,6 +1,6 @@
 // architecture.mjs — the architecture check (docs/architecture-check.md).
 //
-//   node scripts/checks/architecture.mjs <repo-root> [--config <architecture.json>]
+//   node scripts/checks/architecture.mjs <repo-root> [--base <commit>]
 //
 // Prints one starci/architecture-check@1 record. Exit 0: ok. Exit 1: violations or errors (a check that
 // cannot run is an error, never a pass). Exit 2: bad arguments.
@@ -10,27 +10,27 @@ import {checkArchitecture} from './architecture/index.mjs';
 
 export {checkArchitecture};
 
-const USAGE = 'usage: architecture.mjs <repo-root> [--config <architecture.json>]';
+const USAGE = 'usage: architecture.mjs <repo-root> [--base <commit>]';
 
 export function parseArchitectureArgs(argv) {
-  let root = null, configFile;
+  let root = null, base;
   for (let index = 0; index < argv.length; index += 1) {
     const value = argv[index];
-    if (value === '--config') {
-      configFile = argv[++index];
-      if (!configFile) throw Error(`--config needs a file; ${USAGE}`);
+    if (value === '--base') {
+      base = argv[++index];
+      if (!base) throw Error(`--base needs a commit; ${USAGE}`);
     } else if (value.startsWith('-') || root !== null) throw Error(`unexpected argument ${value}; ${USAGE}`);
     else root = value;
   }
   if (root === null) throw Error(USAGE);
-  return {root, configFile};
+  return {root, base};
 }
 
 export function architectureMain(argv, {check = checkArchitecture, write = (text) => process.stdout.write(text), fail = (text) => process.stderr.write(text)} = {}) {
   let parsed;
   try { parsed = parseArchitectureArgs(argv); } catch (error) { fail(`${error.message}\n`); return 2; }
   let report;
-  try { report = check({repositoryRoot: path.resolve(parsed.root), configFile: parsed.configFile}); } catch (error) {
+  try { report = check({repositoryRoot: path.resolve(parsed.root), base: parsed.base}); } catch (error) {
     report = {schema: 'starci/architecture-check@1', ok: false, repository: parsed.root, kinds: [], files: 0, violations: [],
       errors: [{ruleId: 'ARCH_EXECUTION_UNAVAILABLE', message: String(error?.message ?? error)}]};
   }

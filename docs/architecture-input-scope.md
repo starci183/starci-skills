@@ -2,7 +2,7 @@
 
 This document describes the input-scope rules of the aggregate gate,
 `scripts/checks/check-scoped-lint.mjs` (`node scripts/checks/check-scoped-lint.mjs
---profile <nest|next> --root <repo> [--architecture-config <file>] (--all | --
+--profile <nest|next> --root <repo> (--all | --
 <files...>)`), and how its `architecture` machine kind
 (`scripts/checks/architecture.mjs`) selects subjects.
 

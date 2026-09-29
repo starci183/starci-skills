@@ -369,7 +369,10 @@ function typeScriptContext(config, loaded, paths) {
   for (const [from, sourceFile] of fileMap) {
     const owningWorkspace = workspaceOf(workspaces, from);
     const candidates = occurrences.get(from) ?? [];
-    const project = candidates.find(item => isInside(path.dirname(path.join(config.root, ...item.relative.split('/'))), from)) ?? candidates[0];
+    // The deepest project directory holding the file owns its resolution: a root tsconfig without paths must not
+    // shadow the app project whose aliases the file actually uses.
+    const project = candidates.filter(item => isInside(path.dirname(path.join(config.root, ...item.relative.split('/'))), from))
+      .sort((x, y) => y.relative.split('/').length - x.relative.split('/').length)[0] ?? candidates[0];
     if (!project) continue;
     const references = moduleReferences(ts, sourceFile, project.program.getTypeChecker());
     for (const item of references.unproven) errors.push({

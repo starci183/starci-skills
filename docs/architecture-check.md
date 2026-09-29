@@ -12,17 +12,19 @@ kind:
 
 ```sh
 node scripts/checks/check-scoped-lint.mjs --profile <nest|next> --root <repo-root> \
-  [--architecture-config architecture.json] (--all | -- <files...>)
+  (--all | -- <files...>)
 ```
 
 on its own:
 
 ```sh
-node scripts/checks/architecture.mjs <repo-root> [--config architecture.json]
+node scripts/checks/architecture.mjs <repo-root> [--base <commit>]
 ```
 
-and programmatically via `checkArchitecture({ repositoryRoot, configFile })`
+and programmatically via `checkArchitecture({ repositoryRoot, base })`
 from `scripts/checks/architecture.mjs`.
+
+The checker is the HFS v2 architecture machine: it is driven by `hfs.json` in the checked repository and the slot manifest `knowledge/hfs/slots.yaml` (through `scripts/lib/hfs-slots.mjs`). `architecture.json` is retired; a repository carries only `hfs.json`, and owners, roots and tiers are derived from slots. See the HFS v2 machine section below.
 
 The check produces one `starci/architecture-check@1` JSON object. Exit code
 `0` means `ok: true`; exit code `1` means the record contains violations or
@@ -44,11 +46,7 @@ Backend dependencies point from executable application composition to use-case f
 
 Frontend roots are explicit: `app`, `features/{pages,layouts,overlays}`, `components/{blocks,composites,branches,leaves}`, `hooks/<domain>`, and `modules/<capability>`. App adapters may use React, Next and external framework packages, while every resolved internal import or re-export, including type-only edges, enters a feature public entry. Features compose components, hooks and modules. Components cannot point to features/app; hooks cannot point to components/features/app; modules cannot point to hooks/components/features/app. The visual tiers form a bounded dependency graph, not a requirement to pass through every tier.
 
-Configured app, feature, component, hook and module roots are disjoint; transport may remain nested under
-modules. Discovered workspace roots are additive, so a narrow authored map cannot hide another Next app. Authored roots must still point to the HFS tree; a custom map cannot make an alternate layout conformant.
-When `owners` declares public entries, that list is closed and app imports may use only its exact feature
-entries. Without `owners`, the checker can validate the exact structural feature index, while owner public-API
-coverage remains unavailable and cannot support a full conformance claim.
+The app, feature, component, hook and module roots are derived from the app list of `hfs.json` and are disjoint; transport may remain nested under modules. Owners are every directory an `owner: true` slot matches that has its entry file (`index.ts`/`index.tsx`, a package `src/index.ts`, an app `app.module.ts`), so the public-entry list is closed by the manifest, not by a hand-written declaration.
 
 All authored custom `useX` declarations live under `hooks/<domain>`; built-in React hook calls may remain in visuals. Leaves, branches and composites own intrinsic client interaction such as refs, focus, disclosure, measurement, drag and reduced motion, but no product-world lifecycle. A block that reads product data, session, routing/locale or transport lifecycle is connected: `index.tsx` owns that world and every nonempty render path reaches a resolved pure export from sibling `component.tsx`. Pure blocks and lower tiers need no twin, `Base` suffix or paired-test census.
 
@@ -72,7 +70,7 @@ Review and meaningful boot/render tests still decide:
 
 Nest modules export their public provider API. A consumer should import the owning module rather than directly re-registering its providers. Truly app-wide stateless/shared infrastructure can be registered once at the composition root. Named database clients, differently configured providers, tenant/workspace instances, and request-scoped providers are not blanket global candidates.
 
-When a backend explicitly selects `exported-class-token` registration checking, the checker discovers every resolved Nest `@Module`, `@CommandHandler`, and `@QueryHandler` in the checked production TypeScript program. A class-token provider that a module both provides and exports has one static owner within each application graph. The checker traces resolved runtime source imports from each `apps/<app>/src/app.module.ts` composition root; separate app graphs may register the same class token, while another module in the same graph must import its owner. A provider object with a different named token remains a distinct registration. Selected CQRS decorators must have exactly one direct module registration. Dynamic/spread provider metadata, an unresolved framework binding, or a discovered handler decorator omitted from the selected set makes registration coverage unavailable rather than passing an incomplete inventory. This static source closure can include imports that Nest does not mount; it does not prove runtime scope, dynamic-module options, or a bootable DI container.
+For a backend repository the checker always runs `exported-class-token` registration checking: the checker discovers every resolved Nest `@Module`, `@CommandHandler`, and `@QueryHandler` in the checked production TypeScript program. A class-token provider that a module both provides and exports has one static owner within each application graph. The checker traces resolved runtime source imports from each `apps/<app>/src/app.module.ts` composition root; separate app graphs may register the same class token, while another module in the same graph must import its owner. A provider object with a different named token remains a distinct registration. Selected CQRS decorators must have exactly one direct module registration. Dynamic/spread provider metadata, an unresolved framework binding, or a discovered handler decorator omitted from the selected set makes registration coverage unavailable rather than passing an incomplete inventory. This static source closure can include imports that Nest does not mount; it does not prove runtime scope, dynamic-module options, or a bootable DI container.
 
 Resolved backend feature/module roots use the adopted domain-first source shape without an enablement flag. Recognized application roles live under `application/`; recognized protocol roles live under `transport/<protocol>/`. Resolved GraphQL DTO decorators bind DTOs to `transport/graphql`, while resolved TypeORM entity/migration identities cannot make a feature the schema owner. The naming check covers kebab-case role files, exported class role suffixes, application object contracts whose roles are known, enum declarations, and static GraphQL field/argument names. It does not invent a role for an arbitrary helper or infer persistence/error ownership from a folder string. An unclassified role, constructed decorator binding, or dynamic GraphQL name makes the applicable layout or naming coverage unavailable and omits that rule ID from `coverage.checkedRuleIds`.
 
@@ -96,36 +94,17 @@ Local reference evidence is pinned, and includes debt rather than being copied a
 - `starci-academy-fe@44bba218685b7eed2a5d9e479689707ab6381bc8`: redirect-only routes under `[lang]/page.tsx` and `courses/[displayId]/learn/flashcards/page.tsx` are valid zero-visual-owner adapters. `subscriptions/page.tsx` rendering `ShellNav` beside `ProSubscriptionPage` is reference debt. `StarCiAiFab/component.tsx` owns DOM refs, resize handling, drag, and reduced-motion behavior without transport/product-world ownership; forcing a forwarding Base twin would add ceremony without a responsibility boundary.
 - That frontend is one app with `file:packages/grammar` and `file:packages/heroicons`; `nivo-fe@a01a7bd7474fc6b43b831853d9ef870c202f3844` is npm workspaces with `apps/{app,expert,landing}` and `packages/ui`. Both topologies must obey the same ownership and public-export rules.
 
-## Architecture config
+## HFS v2 machine
 
-Repositories may declare the HFS roots and role mappings in a small JSON config. It cannot contain baselines, ignores, suppressions, or alternate source layouts.
+Slots, tiers and required files come from `knowledge/hfs/slots.yaml`; the repository only names its profile and apps in `hfs.json` (`modules/schemas/hfs-repo.schema.yaml`). A missing or invalid `hfs.json` is the error `HFS_DECLARATION_INVALID`, a pinned major other than the manifest's is `HFS_MANIFEST_MAJOR_MISMATCH`. The result carries `coverage.hfsMachine` with the counts of each check below. Every finding has a catalogued why code with Vietnamese text in `modules/kernel/failure-codes.yaml`.
 
-```json
-{
-  "schema": "starci/architecture-config@1",
-  "kinds": ["backend", "frontend"],
-  "tsconfig": "tsconfig.json",
-  "backend": {
-    "modules": "src/modules",
-    "features": "src/features",
-    "apps": ["apps"],
-    "moduleRegistration": {
-      "providerIdentity": "exported-class-token",
-      "handlerDecorators": ["CommandHandler", "QueryHandler"]
-    }
-  },
-  "frontend": {
-    "routes": "apps/web/src/app",
-    "features": "apps/web/src/features",
-    "components": "apps/web/src/components",
-    "hooks": "apps/web/src/hooks",
-    "modules": "apps/web/src/modules",
-    "transport": "apps/web/src/modules/api"
-  }
-}
-```
-
-All paths are repository-relative. The config is a regular file inside the checked repository.
+1. **Tier direction matrix** (`BE_TIER_DIRECTION`, `FE_TIER_DIRECTION`, `FE_APP_ISOLATION`): every import, re-export and type-only import between two owners follows the `tiers` matrix of the manifest; feature to feature is never allowed, apps never import each other, a component layer imports only the layers after it.
+2. **Owner cycles** (`ARCH_OWNER_CYCLE`): a strongly connected component of the owner graph, type-only imports included, reported with the cycle path.
+3. **Reachability** (`BE_FEATURE_NOT_COMPOSED`, `BE_MODULE_NOT_COMPOSED`, `FE_OWNER_REACHABLE`, `FE_HREF_RESOLVES`): every backend feature and capability module is composed into an app root by runtime imports; every frontend page, layout and overlay feature is mounted by an `app/` route and every literal href targets an existing route.
+4. **Dead exports** (`HFS_UNUSED_EXPORT`): an owner's `index` exports a name no file outside the owner imports.
+5. **Required files** (`FE_ERROR_BOUNDARY_MISSING`, `BE_REQUIRED_MODULE_MISSING`, `HFS_REQUIRED_FILE_MISSING`): the files each slot and app requires, such as `global-error.tsx`, `error.tsx`, `not-found.tsx`, `loading.tsx` and the required platform modules.
+6. **File size growth** (`HFS_SIZE_GROWTH`): a file above the soft line budget (`ruleParams.<profile>.fileLines.soft`) may not grow against the merge-base, and a new file stays within the budget. Without a resolvable base the coverage is `unavailable`, never a pass.
+7. **Duplicate blocks** (`HFS_DUPLICATE_BLOCK`): a token-normalised clone of at least `ruleParams.<profile>.duplicateBlockLines` lines across two owners; the finding names both locations and the slot where the shared helper belongs.
 
 ## Failure classes
 

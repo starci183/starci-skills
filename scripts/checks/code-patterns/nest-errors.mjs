@@ -567,7 +567,7 @@ function checkGraphqlMapper({ ts, checker, source, mapper, errorType, errorIdent
 }
 
 /** Check cause-preserving replacement throws and explicitly selected HTTP/GraphQL mapper data flow. */
-export function checkNestErrors({ root, files, ruleIds, contextFiles = [], architectureConfig } = {}) {
+export function checkNestErrors({ root, files, ruleIds, contextFiles = [] } = {}) {
   const result = scriptReport('', ruleIds ?? []);
   try {
     root = fs.realpathSync(path.resolve(root)); result.repository = root;
@@ -575,7 +575,7 @@ export function checkNestErrors({ root, files, ruleIds, contextFiles = [], archi
       || !Array.isArray(ruleIds) || !ruleIds.length || new Set(ruleIds).size !== ruleIds.length || ruleIds.some(id => !NEST_ERROR_RULES.includes(id))) throw Error('Explicit production sources and unique supported Nest error rules are required.');
     const selected = new Set(files), bound = new Set([...files, ...contextFiles]);
     for (const file of files) safeFile(root, file);
-    const contract = readContract(root), config = loadArchitectureConfig(root, architectureConfig), context = buildTypeScriptContext(config);
+    const contract = readContract(root), config = loadArchitectureConfig(root), context = buildTypeScriptContext(config);
     result.compiler = { version: context.loaded.version, resolved: context.loaded.resolved };
     if (context.errors.length) throw Error(context.errors.map(item => item.message).join('; '));
     const { ts } = context, bindings = new Map(), errorIdentities = new Map();
