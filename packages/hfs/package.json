@@ -1,0 +1,26 @@
+{
+  "name": "@starci/hfs",
+  "version": "1.0.0",
+  "description": "The HFS v2 command line of a StarCi product repository: hfs check, hfs init, hfs explain. Self-contained; installed by starci link, never from a registry.",
+  "type": "module",
+  "license": "UNLICENSED",
+  "private": false,
+  "bin": {
+    "hfs": "./bin/hfs.mjs"
+  },
+  "files": [
+    "bin/hfs.mjs",
+    "runtime/**",
+    "README.md"
+  ],
+  "engines": {
+    "node": ">=22.13.0"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "scripts": {
+    "sync": "node scripts/sync-runtime.mjs",
+    "sync:check": "node scripts/sync-runtime.mjs --check"
+  }
+}

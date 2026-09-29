@@ -1,0 +1,17 @@
+id: hfs2-cli
+effectiveAt: '2026-09-29T23:00:00+07:00'
+summary: >-
+  HFS v2 Phase 0 item 0.3: the @starci/hfs command line (packages/hfs): `hfs check` (every tracked path has a slot,
+  required files per slot and app, tracked-but-ignored and forbidden paths, canon-pin drift, and the soft-size backlog
+  as report-only), `hfs init` (a starter hfs.json by detecting profile, apps and occupied opt-in slots) and `hfs
+  explain <path>`. The logic is scripts/lib/hfs-check.mjs over the slot loader; the package carries a byte-copy
+  runtime/ so it works without a runtime checkout. Failure codes HFS_SLOT_NOT_ENABLED, HFS_SLOT_AMBIGUOUS,
+  HFS_TRACKED_MUST_BE_IGNORED, HFS_FORBIDDEN_PRESENT, HFS_REQUIRED_MISSING, HFS_MIN_INSTANCES, HFS_CANON_PIN_DRIFT,
+  HFS_SIZE_SOFT_BACKLOG, HFS_INIT_EXISTS, HFS_INIT_UNDETECTED and HFS_REPO_UNREADABLE join the catalog with Vietnamese
+  text. knowledge/hfs/canon-pins.yaml gains the @starci/hfs pin (side both) so `starci link` installs the package. Additive:
+  no existing key, check or verb changes.
+reach: new-legs
+paths:
+  - modules/kernel/contract-changes/hfs2-cli.yaml
+  - modules/kernel/failure-codes.yaml
+  - knowledge/hfs/canon-pins.yaml

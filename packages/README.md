@@ -11,6 +11,7 @@ published to a registry.** A product repository (and its CI) installs them from 
 | [`@starci/jest-preset`](jest-preset) | back end | the hand-copied `jest.config.js`, `as unknown as` casts |
 | [`@starci/vitest-preset`](vitest-preset) | front end | the hand-copied `vitest.config.ts` files |
 | [`@starci/playwright-preset`](playwright-preset) | front end | the hand-copied `playwright.config.ts` |
+| [`@starci/hfs`](hfs) | both | the ad-hoc structure checks: `hfs check`, `hfs init`, `hfs explain` |
 | [`@starci/eslint-canon-be`](eslint/be), [`-fe`](eslint/fe) | be / fe | the lint rules |
 | [`@starci/grammar`](grammar) | front end | the design system |
 

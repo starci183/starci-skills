@@ -2857,6 +2857,18 @@ HFS_APP_LAYOUT_INVALID:
   owner: other-op:backend.scaffold
   kind: check-finding
 
+HFS_CANON_PIN_DRIFT:
+  title: "Dependency version differs from the canon pin"
+  title_vi: "Phiên bản phụ thuộc lệch khỏi bản đã ghim"
+  meaning_vi: "Một phụ thuộc trong package.json không đúng phiên bản chính xác mà knowledge/hfs/canon-pins.yaml ghim cho cả họ kho; gói @starci phải được cài bằng starci link chứ không lấy từ registry."
+  causes_vi:
+    - "Phiên bản viết dạng khoảng (^, ~) thay vì phiên bản chính xác"
+    - "Một workspace giữ phiên bản cũ của cùng phụ thuộc"
+    - "Gói @starci chưa được starci link nên bản chép trong .starci/packages thiếu hoặc cũ"
+  nextStep_vi: "Đặt phụ thuộc về đúng phiên bản ghim hoặc chạy lại starci link cho gói @starci, rồi cài lại. Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra; không cần ai can thiệp thêm."
+  owner: op-retry
+  kind: check-finding
+
 HFS_DECLARATION_INVALID:
   title: "hfs.json missing or invalid"
   title_vi: "hfs.json thiếu hoặc sai định dạng"
@@ -2880,6 +2892,39 @@ HFS_E2E_IN_AUTOMATIC_GATE:
   nextStep_vi: "Op backend.scaffold gỡ e2e khỏi hook và script tự động."
   owner: other-op:backend.scaffold
   kind: check-finding
+
+HFS_FORBIDDEN_PRESENT:
+  title: "Tracked path in a forbidden slot"
+  title_vi: "Có tệp bị cấm trong cây mã nguồn"
+  meaning_vi: "Tệp được theo dõi nằm trong một ô bị cấm (bộ nhớ đệm công cụ, đầu ra của tác tử, worktree, tệp bí mật dạng rõ). Ô này quy định nơi tệp phải ở, ngoài kho."
+  causes_vi:
+    - "Tác tử để lại tệp tạm hoặc báo cáo ở gốc kho rồi bị commit"
+    - "Tệp .env hoặc khoá bí mật dạng rõ nằm trong kho"
+    - "Thư mục e2e ở gốc thay vì src/tests/e2e"
+  nextStep_vi: "Chuyển tệp tới nơi ô đó chỉ định (trường goesTo) hoặc xoá nó, rồi gỡ khỏi Git; tệp bí mật phải được niêm phong đúng chỗ, không bao giờ để dạng rõ. Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra; không cần ai can thiệp thêm."
+  owner: op-retry
+  kind: check-finding
+
+HFS_INIT_EXISTS:
+  title: "hfs.json already exists"
+  title_vi: "hfs.json đã có sẵn"
+  meaning_vi: "Lệnh hfs init không ghi đè bản khai báo đã có vì bản đó là quyết định của kho."
+  causes_vi:
+    - "Chạy hfs init trong kho đã có hfs.json"
+  nextStep_vi: "Sửa hfs.json trực tiếp, hoặc dùng hfs init --stdout để xem bản dò tự động rồi so sánh."
+  owner: op-retry
+  kind: verb-refusal
+
+HFS_INIT_UNDETECTED:
+  title: "Repository profile or apps not detected"
+  title_vi: "Không dò được loại kho hoặc ứng dụng"
+  meaning_vi: "Lệnh hfs init không xác định chắc chắn kho là backend hay frontend, hoặc không thấy ứng dụng nào dưới apps/ để khai báo, nên không đoán mò."
+  causes_vi:
+    - "Không có next hay @nestjs/core trong phụ thuộc, hoặc có cả hai"
+    - "Kho chưa có thư mục apps/<tên>/ (Nest cần thêm src/, Next cần next.config)"
+  nextStep_vi: "Tạo bố cục apps/<tên>/ theo chuẩn hoặc viết hfs.json bằng tay theo modules/schemas/hfs-repo.schema.yaml."
+  owner: op-retry
+  kind: verb-refusal
 
 HFS_INLINE_SUPPRESSION:
   title: "Inline lint or type suppression"
@@ -2914,6 +2959,17 @@ HFS_MANIFEST_MAJOR_MISMATCH:
     - "hfs.json ghi số phiên bản chính sai hoặc chép từ một kho khác"
   nextStep_vi: "Chủ sở hữu duyệt một nhánh di chuyển cho kho này rồi mới đổi số hfs; không có cách bỏ qua hay giữ song song hai phiên bản."
   owner: owner
+  kind: check-finding
+
+HFS_MIN_INSTANCES:
+  title: "Fewer instances of a slot than required"
+  title_vi: "Số thực thể của ô ít hơn mức tối thiểu"
+  meaning_vi: "Một ô đòi có ít nhất một số thực thể (ví dụ ít nhất một tính năng trong src/features) nhưng kho có ít hơn."
+  causes_vi:
+    - "Kho chưa có tính năng nào đúng mẫu src/features/<tên>/"
+    - "Toàn bộ mã nghiệp vụ nằm ở chỗ ngoài mẫu nên không được tính"
+  nextStep_vi: "Chuyển mã nghiệp vụ vào thực thể đúng mẫu của ô hoặc tạo thực thể còn thiếu. Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra; không cần ai can thiệp thêm."
+  owner: op-retry
   kind: check-finding
 
 HFS_MODULE_TIER_INVALID:
@@ -3037,6 +3093,29 @@ HFS_README_WORK_POINTER_MISSING:
   nextStep_vi: "Op docs.author thêm chỉ dẫn tới cây .starciwork của backend."
   owner: other-op:docs.author
   kind: check-finding
+HFS_REPO_UNREADABLE:
+  title: "Repository is not a readable Git work tree"
+  title_vi: "Không đọc được kho Git"
+  meaning_vi: "Bộ kiểm tra HFS chỉ xét những gì Git theo dõi nên cần một cây làm việc Git đọc được; thư mục được chỉ định thì không."
+  causes_vi:
+    - "Đường dẫn --repo sai hoặc không phải kho Git"
+    - "Git chưa cài hoặc kho bị hỏng"
+  nextStep_vi: "Trỏ --repo vào gốc một kho Git hợp lệ rồi chạy lại."
+  owner: op-retry
+  kind: input-invalid
+
+HFS_REQUIRED_MISSING:
+  title: "Required file or directory missing"
+  title_vi: "Thiếu tệp hoặc thư mục bắt buộc"
+  meaning_vi: "Một ô bắt buộc (hoặc một thực thể của ô, như một ứng dụng hay một tính năng) đòi có tệp hoặc thư mục này nhưng nó không nằm trong những gì Git theo dõi."
+  causes_vi:
+    - "Tính năng thiếu index.ts, tệp module hoặc thư mục application"
+    - "Ứng dụng thiếu main.ts, app.module.ts hoặc spec ghép ứng dụng"
+    - "Kho thiếu tệp gốc bắt buộc như README.md, hfs.json, .starciwork, .starcistacks"
+  nextStep_vi: "Tạo tệp hoặc thư mục theo mẫu của ô rồi commit; tệp chưa git add vẫn tính là thiếu. Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra; không cần ai can thiệp thêm."
+  owner: op-retry
+  kind: check-finding
+
 HFS_ROOT_ENTRY_FORBIDDEN:
   title: "Root entry not on HFS allowlist"
   title_vi: "Mục ở thư mục gốc không được phép"
@@ -3088,6 +3167,38 @@ HFS_SIZE_GROWTH:
   owner: op-retry
   kind: check-finding
 
+HFS_SIZE_SOFT_BACKLOG:
+  title: "Source file above the soft size"
+  title_vi: "Tệp mã vượt cỡ mềm (chỉ báo cáo)"
+  meaning_vi: "Tệp mã nguồn dài hơn ngưỡng mềm của ruleParams.fileLines.soft. Đây là danh mục việc cần tách dần, chỉ báo cáo và không bao giờ làm bộ kiểm tra thất bại."
+  causes_vi:
+    - "Tệp tích tụ qua nhiều lần sửa mà chưa được tách"
+  nextStep_vi: "Không cần hành động ngay; khi sửa tệp này, tách theo trách nhiệm để không tăng thêm. Quy tắc tăng trưởng HFS_SIZE_GROWTH mới là chỗ chặn tệp vượt ngưỡng lớn thêm."
+  owner: op-retry
+  kind: check-finding
+
+HFS_SLOT_AMBIGUOUS:
+  title: "Path owned equally by two slots"
+  title_vi: "Đường dẫn thuộc hai ô cùng mức cụ thể"
+  meaning_vi: "Hai ô của bảng kê cùng khớp một đường dẫn với độ cụ thể bằng nhau nên không xác định được ô nào sở hữu. Đây là chỗ hở của bảng kê, không phải lỗi của kho."
+  causes_vi:
+    - "Hai mẫu đường dẫn trong bảng kê chồng lên nhau"
+    - "Một ô mới thêm chưa loại phần trùng với ô cũ"
+  nextStep_vi: "Người giám sát sửa bảng kê để mỗi đường dẫn chỉ có một ô sở hữu; kho không tự xử lý. Bộ kiểm tra chạy lại sau khi bảng kê được sửa."
+  owner: op-retry
+  kind: check-finding
+
+HFS_SLOT_NOT_ENABLED:
+  title: "Path in an opt-in slot the repository did not enable"
+  title_vi: "Đường dẫn thuộc ô tuỳ chọn mà kho chưa bật"
+  meaning_vi: "Tệp được theo dõi nằm trong một ô loại tuỳ chọn, nhưng hfs.json không liệt kê ô đó trong optionalSlots và không có ứng dụng nào thuộc loại tự bật ô đó."
+  causes_vi:
+    - "Kho dùng một loại nội dung tuỳ chọn (worker, websocket, tài liệu, gói dùng chung) mà chưa khai báo"
+    - "Ứng dụng của loại tương ứng chưa được ghi vào apps của hfs.json"
+  nextStep_vi: "Khai báo ô trong optionalSlots hoặc khai ứng dụng đúng loại ở hfs.json nếu nội dung này là thật; nếu không thì chuyển hoặc xoá tệp. Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra; không cần ai can thiệp thêm."
+  owner: op-retry
+  kind: check-finding
+
 HFS_SRC_LAYOUT_INVALID:
   title: "Backend src holds unexpected folders"
   title_vi: "Thư mục src của backend có mục lạ"
@@ -3118,6 +3229,17 @@ HFS_TEST_KIND_RETIRED:
   nextStep_vi: "Bộ kiểm kiến trúc từ chối; op phải đổi tệp thành unit hoặc e2e và bỏ cấu hình thừa rồi chạy lại."
   owner: op-retry
   kind: check-finding
+HFS_TRACKED_MUST_BE_IGNORED:
+  title: "Tracked path that must be gitignored"
+  title_vi: "Tệp bị theo dõi nhưng lẽ ra phải bị bỏ qua"
+  meaning_vi: "Tệp nằm trong một ô loại ignored (kết quả build, tệp sinh tự động, phụ thuộc) nhưng đã được đưa vào Git."
+  causes_vi:
+    - "Thư mục dist, coverage, .next hoặc tệp sinh tự động bị git add"
+    - ".gitignore thiếu dòng cho thư mục này"
+  nextStep_vi: "Gỡ tệp khỏi Git bằng git rm --cached và thêm vào khối .gitignore chuẩn; không xoá thư mục trên đĩa. Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra; không cần ai can thiệp thêm."
+  owner: op-retry
+  kind: check-finding
+
 HFS_WORK_IN_FE:
   title: "Work tree inside frontend repo"
   title_vi: "Hồ sơ Work nằm trong repo giao diện"
