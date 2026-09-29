@@ -57,13 +57,13 @@ const keyFirst = (list: EvidenceFile[]) => [...list.filter(isKey), ...list.filte
 
 function Row({ file, active, onPick, also }: { file: EvidenceFile; active: boolean; onPick: () => void; also?: EvidenceFile[] }) {
   return <button type="button" role="option" aria-selected={active} onClick={onPick}
-    className={`flex w-full min-w-0 flex-col gap-0.5 rounded-md border px-2 py-1.5 text-left text-sm ${active ? 'border-primary bg-primary/10' : 'border-transparent hover:bg-muted'}`}>
+    className={`flex w-full min-w-0 flex-col gap-1 rounded-md border px-2 py-2 text-left text-sm ${active ? 'border-primary bg-primary/10' : 'border-transparent hover:bg-muted'}`}>
     <span className="flex min-w-0 items-center gap-2">
       <FileTypeBadge kind={file.kind} />
       {isKey(file) ? <Star className="size-3 shrink-0 fill-current text-[var(--status-retry,currentColor)]" aria-label="Tệp chính" /> : null}
       <span className="min-w-0 flex-1 truncate font-medium" title={file.label ?? file.base}>{file.label ?? file.base}</span>
     </span>
-    <span className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-0.5">
+    <span className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
       <span className="shrink-0 text-xs text-muted-foreground">{formatBytes(file.bytes)}</span>
       {!isPlainEncoding(file.encoding) ? <span className="shrink-0 rounded border border-border bg-muted px-1 text-[10.5px]">{encodingLabels[file.encoding as string] ?? file.encoding}</span> : null}
     </span>
@@ -120,7 +120,7 @@ export function EvidenceBrowser({ files, selected, onSelect }: { files: Evidence
         const pick = (f: EvidenceFile) => () => onSelect(f.artifactId);
         const active = (f: EvidenceFile) => f.artifactId === current?.artifactId;
         return <section key={group.id} aria-label={group.title}>
-          <h3 className="flex items-center gap-1.5 px-1 text-sm font-semibold">
+          <h3 className="flex items-center gap-2 px-1 text-sm font-semibold">
             {group.title}
             {group.tip ? <span title={group.tip} aria-label={group.tip} className="inline-flex text-muted-foreground"><Info className="size-3.5" aria-hidden="true" /></span> : null}
             <span className="ml-auto text-xs font-normal text-muted-foreground">{inGroup.length}</span>
@@ -131,17 +131,17 @@ export function EvidenceBrowser({ files, selected, onSelect }: { files: Evidence
               const rows = inGroup.filter(f => (f.check?.name ?? UNKNOWN_CHECK) === name);
               const meta = rows[0]?.check;
               return <div key={name} className="mt-1">
-                <div className="flex items-center gap-2 px-1 py-0.5"><code className="min-w-0 flex-1 truncate text-xs font-semibold" title={name}>{name}</code>
+                <div className="flex items-center gap-2 px-1 py-1"><code className="min-w-0 flex-1 truncate text-xs font-semibold" title={name}>{name}</code>
                   {meta ? <StatusChip status={meta.status ? statusFromCheck(meta.status) : statusFromUi(meta.ui)} /> : null}</div>
-                <div className="space-y-0.5 pl-2">{rows.map(f => <Row key={f.artifactId} file={f} active={active(f)} onPick={pick(f)} also={org.also.get(f.artifactId)} />)}</div>
+                <div className="space-y-1 pl-2">{rows.map(f => <Row key={f.artifactId} file={f} active={active(f)} onPick={pick(f)} also={org.also.get(f.artifactId)} />)}</div>
               </div>;
             })
-            : <div className="space-y-0.5">{inGroup.map(f => <Row key={f.artifactId} file={f} active={active(f)} onPick={pick(f)} also={org.also.get(f.artifactId)} />)}</div>}
+            : <div className="space-y-1">{inGroup.map(f => <Row key={f.artifactId} file={f} active={active(f)} onPick={pick(f)} also={org.also.get(f.artifactId)} />)}</div>}
         </section>;
       })}
       {org.empty.length ? <section aria-label="Tệp rỗng">
-        <button type="button" aria-expanded={showEmpty} onClick={() => setShowEmpty(v => !v)} className="w-full rounded-md border border-dashed px-2 py-1.5 text-left text-xs text-muted-foreground hover:bg-muted">{org.empty.length} tệp rỗng {showEmpty ? '· ẩn' : '· xem'}</button>
-        {showEmpty ? <div className="mt-1 space-y-0.5">{org.empty.map(f => <Row key={f.artifactId} file={f} active={f.artifactId === current?.artifactId} onPick={() => onSelect(f.artifactId)} />)}</div> : null}
+        <button type="button" aria-expanded={showEmpty} onClick={() => setShowEmpty(v => !v)} className="w-full rounded-md border border-dashed px-2 py-2 text-left text-xs text-muted-foreground hover:bg-muted">{org.empty.length} tệp rỗng {showEmpty ? '· ẩn' : '· xem'}</button>
+        {showEmpty ? <div className="mt-1 space-y-1">{org.empty.map(f => <Row key={f.artifactId} file={f} active={f.artifactId === current?.artifactId} onPick={() => onSelect(f.artifactId)} />)}</div> : null}
       </section> : null}
     </div>
     {current ? <EvidenceViewer key={current.artifactId} file={current} /> : null}

@@ -37,7 +37,7 @@ export function ProductRow({ file, defaultOpen = false, extra }: { file: Product
   const view = statusView[file.status];
   const id = `product-${file.path.replace(/[^\w-]/g, '_')}`;
   return <li className="min-w-0 py-2 first:pt-0 last:pb-0">
-    <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1.5">
+    <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-2">
       <button type="button" aria-expanded={open} aria-controls={id} onClick={() => setOpen(v => !v)} className="inline-flex size-6 shrink-0 items-center justify-center rounded-md border text-muted-foreground hover:bg-muted focus-visible:outline-2 focus-visible:outline-ring" title={open ? 'Thu gọn' : 'Mở nội dung'}>
         <ChevronRight className={`size-4 transition-transform ${open ? 'rotate-90' : ''}`} aria-hidden="true" />
       </button>

@@ -338,3 +338,11 @@ button.lifecycle-label:hover, button.lifecycle-label[aria-pressed=true] { backgr
 .shell-main { padding: 32px; }
 @media (max-width: 1050px) { .shell-header { padding: 0 24px; } .shell-main { padding: 24px; } }
 @media (max-width: 760px) { .shell-header { padding: 0 16px; } .shell-main { padding: 24px 16px 96px; } .shell-bottom-nav a { gap: 4px; } }
+
+/* U3: step bar stripe grows in (a scaled span replaces the 3px bottom border); spacing on the 4/8/12 px scale. */
+.step-bar { gap: 8px; }
+.step-item, .step-item[data-state=unknown]:not([data-tone]), .step-item[data-tone=skipped] { gap: 8px; padding: 12px; border-bottom: 1px solid var(--border); }
+.step-item:hover, .step-item[aria-current=step] { border-bottom-color: var(--state-ink); }
+.step-stripe { position: absolute; right: -1px; bottom: -1px; left: -1px; height: 3px; border-radius: 0 0 8px 8px; background: var(--state-ink, var(--border)); pointer-events: none; }
+.step-item[data-state=unknown]:not([data-tone]) .step-stripe, .step-item[data-tone=skipped] .step-stripe { background: repeating-linear-gradient(90deg, var(--state-ink, var(--border)) 0 6px, transparent 6px 10px); }
+.step-segments { gap: 4px; margin-top: 4px; }

@@ -13,7 +13,7 @@ const none = <span className="text-muted-foreground">không có</span>;
 const jsonBox = 'max-h-48 overflow-auto whitespace-pre-wrap break-words rounded-md border bg-muted/30 p-2 font-mono text-xs';
 const verdictWords: Record<string, string> = { pass: 'đạt', fail: 'hỏng', partial: 'một phần', blocked: 'bị chặn', dropped: 'đã bỏ', cancelled: 'đã huỷ' };
 const empty = (value: unknown) => value == null || (Array.isArray(value) && !value.length) || (typeof value === 'object' && !Array.isArray(value) && !Object.keys(value as object).length);
-const h3 = 'm-0 mb-1.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground';
+const h3 = 'm-0 mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground';
 
 function GoalExcerpt({ text, revision }: { text: string | null; revision: number | null }) {
   const [open, setOpen] = useState(false);
@@ -21,7 +21,7 @@ function GoalExcerpt({ text, revision }: { text: string | null; revision: number
   const long = text.length > 280 || text.split('\n').length > 3;
   return <div>
     <p className={`m-0 whitespace-pre-wrap break-words text-sm ${open ? '' : 'line-clamp-3'}`}>{text}</p>
-    <div className="mt-1 flex items-center gap-3 text-xs text-muted-foreground">
+    <div className="mt-2 flex items-center gap-3 text-xs text-muted-foreground">
       {revision != null ? <span>bản goal {revision}</span> : null}
       {long ? <button type="button" className="text-primary hover:underline" aria-expanded={open} onClick={() => setOpen(!open)}>{open ? 'Thu gọn' : 'Xem đầy đủ'}</button> : null}
     </div>
@@ -37,7 +37,7 @@ export function InputContextCard({ attempt, info, goal }: { attempt: AttemptDeta
   const prior = attempt.prior ?? null;
   const reason = prior && prior.settleReason != null ? (typeof prior.settleReason === 'string' ? prior.settleReason : jsonText(prior.settleReason)) : null;
   return <Card id="attempt-input" concept="C8" title="Đầu vào & ngữ cảnh" hint="kernel giao gì, op phải đọc gì">
-    <div className="grid gap-5">
+    <div className="grid gap-6">
       <section><h3 className={h3}>Mục tiêu của workflow</h3><GoalExcerpt text={goal?.text ?? null} revision={goal?.revision ?? null} /></section>
       <section><h3 className={h3}>Kernel giao cho op</h3>
         {!input ? <p className="m-0 text-sm text-muted-foreground">Job này không lưu payload đầu vào.</p> : <dl className="grid gap-3 text-sm md:grid-cols-2">
@@ -52,9 +52,9 @@ export function InputContextCard({ attempt, info, goal }: { attempt: AttemptDeta
         </dl>}
       </section>
       <section><h3 className={h3}>Op phải đọc</h3>
-        {reads.length ? <ul className="m-0 flex list-none flex-col gap-1.5 p-0 text-sm">{reads.map(item => <li key={item.id}><code className="break-all text-xs">{item.id}</code>{item.purpose ? <span className="text-muted-foreground"> — {item.purpose}</span> : null}</li>)}</ul> : <p className="m-0 text-sm text-muted-foreground">Hợp đồng op không khai báo đầu vào phải đọc.</p>}
+        {reads.length ? <ul className="m-0 flex list-none flex-col gap-2 p-0 text-sm">{reads.map(item => <li key={item.id}><code className="break-all text-xs">{item.id}</code>{item.purpose ? <span className="text-muted-foreground"> — {item.purpose}</span> : null}</li>)}</ul> : <p className="m-0 text-sm text-muted-foreground">Hợp đồng op không khai báo đầu vào phải đọc.</p>}
       </section>
-      {prior ? <section className="rounded-lg border p-3"><h3 className={h3}>Lần trước</h3>
+      {prior ? <section className="rounded-lg border p-4"><h3 className={h3}>Lần trước</h3>
         <div className="flex flex-wrap items-center gap-2 text-sm">
           <a className="font-medium text-primary hover:underline" href={prior.href}>lần {prior.try} · #{prior.id}</a>
           <StatusChip status={statusFromVerdict(prior.verdict, false, prior.reportOutcome)} label={prior.verdict ? `Kernel chốt: ${verdictWords[prior.verdict] ?? prior.verdict}` : 'Kernel chưa chốt'} />
@@ -62,7 +62,7 @@ export function InputContextCard({ attempt, info, goal }: { attempt: AttemptDeta
         </div>
         {prior.summary ? <p className="mb-0 mt-2 whitespace-pre-wrap break-words text-sm">{prior.summary}</p> : null}
         {reason ? <p className="mb-0 mt-2 whitespace-pre-wrap break-words text-xs text-muted-foreground">Lý do chốt: {reason}</p> : null}
-        {prior.nextStep ? <p className="mb-0 mt-1 text-xs text-muted-foreground">Bước kế: {prior.nextStep}</p> : null}
+        {prior.nextStep ? <p className="mb-0 mt-2 text-xs text-muted-foreground">Bước kế: {prior.nextStep}</p> : null}
       </section> : null}
     </div>
   </Card>;

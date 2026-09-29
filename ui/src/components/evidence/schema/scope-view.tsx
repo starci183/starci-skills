@@ -32,7 +32,7 @@ export function ScopeView({ data }: { data: unknown }) {
   const prior = str(request.priorScope) ?? str(request.prior) ?? str(root.priorScope);
   const effects = strs(request.effectCeiling);
   const criteria = strs(request.completionCriteria);
-  return <div className="grid min-w-0 gap-5 rounded-lg border bg-card p-4 text-sm">
+  return <div className="grid min-w-0 gap-6 rounded-lg border bg-card p-4 text-sm">
     <Section title="Đề bài op đã đọc">
       <dl className="grid gap-x-4 gap-y-2 sm:grid-cols-[10rem_minmax(0,1fr)]">
         {digest ? <><dt className="text-muted-foreground">Mã đề bài (digest)</dt><dd className="flex min-w-0 flex-wrap items-center gap-2"><code className="break-all font-mono text-xs">{digest}</code><CopyButton value={digest} /></dd></> : null}
@@ -53,7 +53,7 @@ export function ScopeView({ data }: { data: unknown }) {
             {str(n.purpose) ? <p className="mt-1 break-words text-muted-foreground">{str(n.purpose)}</p> : null}
             {str(n.path) ? <p className="mt-2 text-xs"><span className="text-muted-foreground">Đường dẫn sở hữu: </span><code className="break-all font-mono">{str(n.path)}</code></p> : null}
             {dependsOn.length ? <p className="mt-1 break-all text-xs"><span className="text-muted-foreground">Phụ thuộc: </span>{dependsOn.join(', ')}</p> : null}
-            {grounding.length ? <details className="mt-1"><summary className="cursor-pointer text-xs text-muted-foreground">Căn cứ ({grounding.length})</summary><ul className="mt-1 list-disc space-y-0.5 pl-5 text-xs">{grounding.map(g => <li key={g} className="break-all">{g}</li>)}</ul></details> : null}
+            {grounding.length ? <details className="mt-1"><summary className="cursor-pointer text-xs text-muted-foreground">Căn cứ ({grounding.length})</summary><ul className="mt-1 list-disc space-y-1 pl-5 text-xs">{grounding.map(g => <li key={g} className="break-all">{g}</li>)}</ul></details> : null}
           </li>;
         })}
       </ul>

@@ -87,7 +87,7 @@ function blocks(src: string, base: string): ReactNode[] {
       out.push(
         <div key={k} className="overflow-x-auto rounded-lg border">
           <table className="w-full border-collapse text-xs">
-            <thead className="bg-muted/60"><tr>{head.map((c, j) => <th key={j} style={{ textAlign: aligns[j] as 'left' }} className="border-b px-2 py-1.5 font-semibold">{inline(c, `${k}h${j}`)}</th>)}</tr></thead>
+            <thead className="bg-muted/60"><tr>{head.map((c, j) => <th key={j} style={{ textAlign: aligns[j] as 'left' }} className="border-b px-2 py-2 font-semibold">{inline(c, `${k}h${j}`)}</th>)}</tr></thead>
             <tbody>{rows.map((r, ri) => <tr key={ri} className="border-b last:border-0">{head.map((_, j) => <td key={j} style={{ textAlign: aligns[j] as 'left' }} className="px-2 py-1 align-top">{inline(r[j] ?? '', `${k}r${ri}c${j}`)}</td>)}</tr>)}</tbody>
           </table>
         </div>,
@@ -103,7 +103,7 @@ function blocks(src: string, base: string): ReactNode[] {
         else break;
       }
       out.push(
-        <ul key={k} className="space-y-0.5">
+        <ul key={k} className="space-y-1">
           {items.map((it, j) => (
             <li key={j} style={{ marginLeft: it.depth * 16 }} className="flex gap-2">
               <span className="w-5 shrink-0 text-right text-muted-foreground">{it.ordered ? it.num : '•'}</span>
@@ -127,7 +127,7 @@ export function MarkdownView({ text }: { text: string }) {
   const src = text.replace(/^﻿/, '').replace(/\r\n?/g, '\n');
   return (
     <Frame>
-      <div className="flex justify-end border-b bg-muted/40 px-2 py-1.5"><CopyButton value={text} label="Chép nguồn" /></div>
+      <div className="flex justify-end border-b bg-muted/40 px-2 py-2"><CopyButton value={text} label="Chép nguồn" /></div>
       <div className="max-h-[75vh] space-y-2 overflow-auto bg-background p-4 text-sm">{blocks(src, '')}</div>
     </Frame>
   );

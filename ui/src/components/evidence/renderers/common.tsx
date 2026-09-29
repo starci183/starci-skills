@@ -48,7 +48,7 @@ export function wordTone(word: string): Tone | null {
 
 export function Toolbar({ children, right }: { children?: ReactNode; right?: ReactNode }) {
   return (
-    <div className="flex flex-wrap items-center gap-2 border-b bg-muted/40 px-2 py-1.5">
+    <div className="flex flex-wrap items-center gap-2 border-b bg-muted/40 px-2 py-2">
       {children}
       {right ? <div className="ml-auto flex flex-wrap items-center gap-2 text-[11px] text-muted-foreground">{right}</div> : null}
     </div>

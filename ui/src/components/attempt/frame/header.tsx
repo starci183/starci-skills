@@ -8,6 +8,7 @@ import { statusFromOutcome, statusFromVerdict, statusTone, type Tone } from '../
 import { StatusChip } from '../../status-chip';
 import { isOpen } from './steps';
 import type { Concept } from '../../concept';
+import { Advanced, Swap } from '../../motion';
 import { AgentAvatar, agentOf } from '../../agent/agent-avatar';
 
 export const concept: Concept = 'C6';
@@ -20,7 +21,7 @@ function Crumb({ href, children }: { href: string; children: React.ReactNode }) 
 }
 
 function SiblingLink({ target, label, dir }: { target: Ref; label: string; dir: 'prev' | 'next' }) {
-  return <a href={target.href} className="inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-xs text-muted-foreground hover:border-primary hover:text-foreground">
+  return <a href={target.href} className="inline-flex items-center gap-1 rounded-full border px-3 py-1 text-xs text-muted-foreground hover:border-primary hover:text-foreground">
     {dir === 'prev' ? <ArrowLeft className="size-3.5" aria-hidden="true" /> : null}{label} #{target.id}{dir === 'next' ? <ArrowRight className="size-3.5" aria-hidden="true" /> : null}
   </a>;
 }
@@ -42,8 +43,8 @@ export function AttemptHeader({ attempt, project }: { attempt: AttemptDetailV3; 
   const duration = attempt.dispatchedAt && end ? end - attempt.dispatchedAt : null;
   const total = attempt.usage?.total;
   const tokens = total ? total.input + total.output : null;
-  return <header className="space-y-3" data-tone={tone}>
-    <nav aria-label="Đường dẫn" className="flex flex-wrap items-center gap-x-1.5 text-xs text-muted-foreground">
+  return <header className="flex min-w-0 flex-col gap-4" data-tone={tone}>
+    <nav aria-label="Đường dẫn" className="flex flex-wrap items-center gap-x-2 text-xs text-muted-foreground">
       <Crumb href="#/">Tổng quan</Crumb><span aria-hidden="true">/</span>
       <Crumb href={`#/w/${enc(project)}/${enc(attempt.wf)}?tab=attempts`}>{attempt.wf}</Crumb><span aria-hidden="true">/</span>
       <span>{name}</span><span aria-hidden="true">/</span><span className="text-foreground">lần thử #{attempt.id}</span>
@@ -51,25 +52,32 @@ export function AttemptHeader({ attempt, project }: { attempt: AttemptDetailV3; 
     <div className="flex flex-wrap items-start justify-between gap-x-4 gap-y-3">
       <div className="flex min-w-0 items-start gap-3">
         <AgentAvatar agent={agent} size={52} live={open && !attempt.reportedAt} />
-        <div className="min-w-0 space-y-1.5">
-        <h1 className="m-0 text-2xl font-semibold tracking-tight sm:text-3xl">{name} <span className="whitespace-nowrap text-lg font-normal text-muted-foreground sm:text-xl">· lần {attempt.attempt}/{attempt.tryBudget ?? 5}</span></h1>
-        <p className="m-0 break-all font-mono text-xs text-muted-foreground">{attempt.op} · {attempt.job} · attempt {attempt.id} · giao #{attempt.dispatchSeq}</p>
-        <p className="m-0 flex flex-wrap gap-x-3 gap-y-0.5 text-xs text-muted-foreground">
-          <span>Agent: <strong className="font-medium text-foreground">{agent.label}</strong>{[attempt.pool, attempt.effort ? `effort ${attempt.effort}` : null].filter(Boolean).map(part => <span key={part}> · {part}</span>)}</span>
-          <span>Thời gian: <strong className="font-medium text-foreground">{formatSpan(duration)}</strong></span>
-          <span>{tokens != null ? <>Token: <strong className="font-medium text-foreground">{compactVi(tokens)}</strong></> : 'token: chưa ghi nhận'}</span>
-        </p>
+        <div className="flex min-w-0 flex-col gap-2">
+          <h1 className="m-0 text-2xl font-semibold tracking-tight sm:text-3xl">{name} <span className="whitespace-nowrap text-lg font-normal text-muted-foreground sm:text-xl">· lần {attempt.attempt}/{attempt.tryBudget ?? 5}</span></h1>
+          <p className="m-0 flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
+            <span>Agent: <strong className="font-medium text-foreground">{agent.label}</strong></span>
+            <span>Thời gian: <strong className="font-medium text-foreground">{formatSpan(duration)}</strong></span>
+          </p>
         </div>
       </div>
       <div className="flex flex-wrap items-center gap-2">
-        <StatusChip status={outcome} label={outcomeLabel} />
-        <StatusChip status={verdict} label={verdictLabel} />
+        <Swap keyValue={outcomeLabel}><StatusChip status={outcome} label={outcomeLabel} /></Swap>
+        <Swap keyValue={verdictLabel}><StatusChip status={verdict} label={verdictLabel} /></Swap>
       </div>
     </div>
-    {previous || attempt.retry.next || attempt.retry.class ? <div className="flex flex-wrap items-center gap-2">
+    {previous || attempt.retry.next ? <div className="flex flex-wrap items-center gap-2">
       {previous ? <SiblingLink target={previous} label={attempt.retry.resumeOf && !attempt.retry.retryOf ? 'Tiếp nối từ' : 'Lần trước'} dir="prev" /> : null}
       {attempt.retry.next ? <SiblingLink target={attempt.retry.next} label="Lần sau" dir="next" /> : null}
-      {attempt.retry.class ? <span className="text-xs text-muted-foreground">Lý do thử lại: {attempt.retry.class}</span> : null}
     </div> : null}
+    <Advanced summary={`${attempt.job} · ${tokens != null ? `${compactVi(tokens)} token` : 'token chưa ghi nhận'}`}>
+      <div className="flex min-w-0 flex-col gap-2 text-xs text-muted-foreground">
+        <p className="m-0 break-all font-mono">{attempt.op} · {attempt.job} · attempt {attempt.id} · giao #{attempt.dispatchSeq}</p>
+        <p className="m-0 flex flex-wrap gap-x-4 gap-y-1">
+          <span>Agent: <strong className="font-medium text-foreground">{agent.label}</strong>{[attempt.pool, attempt.effort ? `effort ${attempt.effort}` : null].filter(Boolean).map(part => <span key={part}> · {part}</span>)}</span>
+          <span>{tokens != null ? <>Token: <strong className="font-medium text-foreground">{compactVi(tokens)}</strong></> : 'token: chưa ghi nhận'}</span>
+          {attempt.retry.class ? <span>Lý do thử lại: {attempt.retry.class}</span> : null}
+        </p>
+      </div>
+    </Advanced>
   </header>;
 }

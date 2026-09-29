@@ -65,7 +65,7 @@ export function EvidenceViewer({ file }: { file: EvidenceFile }) {
       <FileTypeBadge kind={file.kind} />
       <span className="min-w-0 flex-1 truncate font-medium" title={file.name}>{file.label ?? file.base}</span>
       <span className="text-xs text-muted-foreground">{formatBytes(file.bytes)}</span>
-      {note ? <span className="rounded border border-border bg-muted px-1.5 text-xs">{note}</span> : null}
+      {note ? <span className="rounded border border-border bg-muted px-2 text-xs">{note}</span> : null}
     </div>
     <div className="flex flex-wrap items-center gap-2 border-b px-3 py-2">
       {canSearch ? <label className="relative flex min-w-40 flex-1 items-center">
@@ -79,7 +79,7 @@ export function EvidenceViewer({ file }: { file: EvidenceFile }) {
     </div>
     <div className="flex flex-wrap items-center gap-x-4 gap-y-1 border-b px-3 py-2 text-xs text-muted-foreground">
       <span className="inline-flex items-center gap-1">sha256 <code className="font-mono" title={file.sha}>{sha}</code><CopyButton value={file.sha} label="Chép" /></span>
-      {file.redaction ? <span data-tone="warning" className="rounded border px-1.5" style={{ borderColor: 'var(--tone-line)', background: 'var(--tone-bg)' }} title="Máy chủ đã che thông tin nhạy cảm">Đã che: {file.redaction}</span> : null}
+      {file.redaction ? <span data-tone="warning" className="rounded border px-2" style={{ borderColor: 'var(--tone-line)', background: 'var(--tone-bg)' }} title="Máy chủ đã che thông tin nhạy cảm">Đã che: {file.redaction}</span> : null}
       <span className="inline-flex min-w-0 flex-wrap items-center gap-1">Trên máy: <PathLink path={file.hostPath} kind="file" /></span>
     </div>
     <div className="max-h-[70vh] min-w-0 overflow-auto p-3"><Body file={file} query={query} blob={blob} /></div>

@@ -23,7 +23,7 @@ const evidenceText = (summary: unknown): string | null => {
 
 function CopyButton({ value }: { value: string }) {
   const [copied, setCopied] = useState(false);
-  return <button type="button" className="inline-flex items-center gap-1 rounded border px-1.5 py-0.5 text-[11px] text-muted-foreground hover:text-foreground" title="Chép lệnh" onClick={() => {
+  return <button type="button" className="inline-flex items-center gap-1 rounded border px-2 py-1 text-[11px] text-muted-foreground hover:text-foreground" title="Chép lệnh" onClick={() => {
     void navigator.clipboard?.writeText(value).then(() => { setCopied(true); setTimeout(() => setCopied(false), 1400); }, () => undefined);
   }}><Copy className="size-3" aria-hidden="true" />{copied ? 'Đã chép' : 'Chép'}</button>;
 }
@@ -115,8 +115,8 @@ function PairRow({ pair, files, onOpenFile }: { pair: CheckPair; files: Evidence
       {evidence ? <p className="break-words">{evidence}</p> : null}
       {mismatch ? <p className="text-xs" data-tone="warning" style={{ color: 'var(--tone)' }}>Lệch: op khai {op.exit ?? '—'}, runtime chạy {rt.exit ?? '—'}.</p> : null}
       {command ? <div className="flex min-w-0 items-start gap-2 rounded-md border bg-card p-2"><code className="min-w-0 flex-1 whitespace-pre-wrap break-all font-mono text-xs">{command}</code><CopyButton value={command} /></div> : <p className="text-xs text-muted-foreground">Không ghi lệnh.</p>}
-      <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 text-xs">
-        {cwd ? <span className="inline-flex flex-wrap items-center gap-1.5 text-muted-foreground">cwd <PathLink path={cwd} /></span> : <span className="text-muted-foreground">cwd: không ghi</span>}
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-xs">
+        {cwd ? <span className="inline-flex flex-wrap items-center gap-2 text-muted-foreground">cwd <PathLink path={cwd} /></span> : <span className="text-muted-foreground">cwd: không ghi</span>}
         {file ? <button type="button" className="font-medium text-primary hover:underline" onClick={() => onOpenFile(file)}>Xem output →</button> : <span className="text-muted-foreground">Chưa có tệp output</span>}
       </div>
       {rows.map(row => <Tails key={row.id} check={row} />)}
@@ -133,7 +133,7 @@ export function CheckList({ attempt, onOpenFile }: { attempt: AttemptDetailV2; o
   return <Card id="attempt-step-checks" concept="C9" title="Kiểm chứng" hint={pairs.length ? `${pairs.length} check · runtime xác nhận ${confirmed}/${pairs.length}` : undefined}
     right={pairs.length ? <>{red ? <StatusChip status="failed" label={`${red} hỏng`} /> : null}{lech ? <StatusChip status="retry" label={`${lech} lệch`} /> : null}</> : null}>
     {pairs.length ? <>
-      <div className="hidden grid-cols-[auto_minmax(0,1fr)_9rem_13rem_auto] gap-x-3 border-b px-1 pb-1.5 text-[11px] uppercase tracking-wide text-muted-foreground sm:grid"><span className="w-4" /><span>Check</span><span>Op khai</span><span>Runtime chạy</span><span /></div>
+      <div className="hidden grid-cols-[auto_minmax(0,1fr)_9rem_13rem_auto] gap-x-3 border-b px-1 pb-2 text-[11px] uppercase tracking-wide text-muted-foreground sm:grid"><span className="w-4" /><span>Check</span><span>Op khai</span><span>Runtime chạy</span><span /></div>
       <ul className="divide-y">{pairs.map(pair => <PairRow key={pair.name} pair={pair} files={attempt.files} onOpenFile={onOpenFile} />)}</ul>
     </> : <Empty>Chưa có check nào được ghi cho lần thử này.</Empty>}
   </Card>;

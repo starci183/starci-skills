@@ -27,8 +27,8 @@ export function AttemptWhereCard({ attempt }: { attempt: AttemptDetailV2 }) {
             : <span className="text-muted-foreground">không có worktree riêng — op chạy trên checkout chính</span>}
         </InfoRow>
         <InfoRow label="Đường dẫn được giao">
-          {w.ownedPaths.length ? <ul className="m-0 flex list-none flex-col gap-1.5 p-0">
-            {w.ownedPaths.map((p) => <li key={p.rel} className="flex flex-col gap-0.5">
+          {w.ownedPaths.length ? <ul className="m-0 flex list-none flex-col gap-2 p-0">
+            {w.ownedPaths.map((p) => <li key={p.rel} className="flex flex-col gap-1">
               <code className="font-mono text-[11px] text-muted-foreground [overflow-wrap:anywhere]">{p.rel}</code>
               <PathLink path={p.abs} kind={isFile(p.rel) ? 'file' : 'dir'} />
             </li>)}
@@ -40,9 +40,9 @@ export function AttemptWhereCard({ attempt }: { attempt: AttemptDetailV2 }) {
         <InfoRow label="Nhánh"><CopyId value={w.branch} /></InfoRow>
         <InfoRow label="SHA">
           <span className="flex flex-col gap-1">
-            <span className="inline-flex flex-wrap items-center gap-1.5"><span className="w-14 text-xs text-muted-foreground">gốc</span><ShaId sha={w.baseSha} /></span>
-            <span className="inline-flex flex-wrap items-center gap-1.5"><span className="w-14 text-xs text-muted-foreground">đầu</span><ShaId sha={w.headSha} /></span>
-            <span className="inline-flex flex-wrap items-center gap-1.5"><span className="w-14 text-xs text-muted-foreground">tích hợp</span><ShaId sha={w.integratedSha} /></span>
+            <span className="inline-flex flex-wrap items-center gap-2"><span className="w-14 text-xs text-muted-foreground">gốc</span><ShaId sha={w.baseSha} /></span>
+            <span className="inline-flex flex-wrap items-center gap-2"><span className="w-14 text-xs text-muted-foreground">đầu</span><ShaId sha={w.headSha} /></span>
+            <span className="inline-flex flex-wrap items-center gap-2"><span className="w-14 text-xs text-muted-foreground">tích hợp</span><ShaId sha={w.integratedSha} /></span>
           </span>
         </InfoRow>
       </dl>
