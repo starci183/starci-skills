@@ -10,7 +10,7 @@ import { planEdgesOf, planGraphOf, planAncestorsOf, linearEdgesOf } from '../scr
 const ROOT = path.resolve(import.meta.dirname, '..');
 const ROUTE_PLAN = path.join(ROOT, 'scripts', 'route', 'route-plan.mjs');
 const DEFINE_GOAL = path.join(ROOT, 'scripts', 'goal', 'define-goal.mjs');
-const AUTH_TEXT = 'build the sign-in and sign-up authentication feature full-stack: backend api and frontend screens';
+const AUTH_TEXT = 'build the sign-in and sign-up authentication feature full-stack: backend api and frontend screens, with e2e and UAT proof';
 const run = (script, ...args) => spawnSync(process.execPath, [script, ...args], { cwd: ROOT, encoding: 'utf8', windowsHide: true, timeout: 120000 });
 const json = r => JSON.parse(r.stdout);
 const labelOf = l => `${l.op}${l.instance ? '#' + l.instance : ''}`;

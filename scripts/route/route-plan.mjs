@@ -319,7 +319,7 @@ function loadArchetypeSignals(goalDir) {
     return { ...entry, ...ARCHETYPE_STAR[id] };
   });
   // A refactor whose prompt hits $canonIntent is a canon-conformance cleanup (code.refactor params.canonFamilies).
-  return Object.assign(matchers, { canonIntent: expand(['$canonIntent']) });
+  return Object.assign(matchers, { canonIntent: expand(['$canonIntent']), e2eIntent: expand(['$e2eIntent']), uatIntent: expand(['$uatIntent']), proofNegation: expand(['$proofNegation']) });
 }
 
 function matchArchetypes(rawText, archetypes) {
@@ -327,6 +327,31 @@ function matchArchetypes(rawText, archetypes) {
   const hits = archetypes.filter(arch => arch.signals.some(alt => alternativeMatches(text, alt)));
   const superseded = new Set(hits.flatMap(arch => arch.supersedes));
   return hits.filter(arch => !superseded.has(arch.id));
+}
+
+const PROOF_SCOPES = new Set(['feature-build-fullstack', 'feature-build-with-ui', 'feature-build-backend', 'verify-only']);
+
+/** E2E runs manually only (owner ruling 2026-09-29): the e2e/UAT proof legs are explicit asks, never defaults. */
+function explicitProofAsk(text, archetypes) {
+  const hit = list => asArray(list).some(p => phraseHits(text, p));
+  const negated = hit(archetypes.proofNegation);
+  return { e2e: hit(archetypes.e2eIntent) && !negated, uat: hit(archetypes.uatIntent) && !negated };
+}
+
+/** Without an explicit ask a backend build ends at impl done (backend) and an interface build at ui audited;
+ *  with one, the proof variable (api / ui verified) joins whatever archetype matched. */
+function applyProofRule(vars, proof, a) {
+  const out = [];
+  for (const v of vars) {
+    if (v.family === 'api' && v.state === 'verified' && !proof.e2e) {
+      out.push({ family: 'impl', suffix: v.suffix, state: 'done', _qual: 'backend', strictQualifier: true });
+    } else if (v.family === 'ui' && v.state === 'verified' && !proof.uat) {
+      out.push({ family: 'ui', suffix: v.suffix, state: 'audited' });
+    } else out.push(v);
+  }
+  if (proof.e2e && !out.some(v => v.family === 'api' && v.state === 'verified')) out.push({ family: 'api', suffix: a.surfaceName, state: 'verified' });
+  if (proof.uat && !out.some(v => v.family === 'ui' && v.state === 'verified')) out.push({ family: 'ui', suffix: a.surfaceName, state: 'verified' });
+  return out;
 }
 
 function intentToStar(text, args, archetypes) {
@@ -344,10 +369,17 @@ function intentToStar(text, args, archetypes) {
   if (hints.archetypes.includes('refactor') && asArray(archetypes.canonIntent).some(p => phraseHits(normalizeText(text), p))) {
     Object.assign(hints, { canonConformance: true, scopeKind: 'canon-conformance' });
   }
+  // Only a build or verify scope can carry a proof leg; a specification, scaffold, canonicalization or assisted
+  // UAT prompt may name e2e/UAT as subject matter without asking for the leg.
+  const proofScope = hints.archetypes.some(id => PROOF_SCOPES.has(id));
+  const asked = explicitProofAsk(normalizeText(text), archetypes);
+  const proof = { e2e: proofScope && asked.e2e, uat: proofScope && asked.uat };
+  Object.assign(hints, { e2eAsked: proof.e2e, uatAsked: proof.uat });
+  const starVars = applyProofRule(vars, proof, a);
   // fanout: two or more disjoint verify surfaces in one prompt.
-  const surfaces = new Set(vars.map(v => v.family));
+  const surfaces = new Set(starVars.map(v => v.family));
   if (surfaces.size >= 2) hints.fanout = true;
-  return { vars: dedupeVars(vars), hints };
+  return { vars: dedupeVars(starVars), hints };
 }
 
 const varKey = v => `${v.family}${v.suffix ? '.' + v.suffix : ''}`;

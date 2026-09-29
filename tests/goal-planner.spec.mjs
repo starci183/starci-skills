@@ -37,8 +37,25 @@ test('a canonical product landing request remains a feature scope', () => {
   assert.ok(plan.legs.some(leg => leg.op === 'interface.implement'));
   const ops = plan.legs.map(leg => leg.op);
   assert.ok(ops.indexOf('interface.implement') < ops.indexOf('interface.audit'));
-  assert.ok(ops.indexOf('interface.audit') < ops.indexOf('uat.verify'));
+  // e2e runs manually only (owner ruling 2026-09-29): no uat.verify unless the prompt asks for it.
+  assert.ok(ops.indexOf('interface.audit') < ops.indexOf('review.verify'));
+  assert.ok(!ops.includes('uat.verify') && !ops.includes('e2e.verify'));
   assert.ok(!plan.legs.some(leg => leg.op === 'workspace.manage'));
+});
+
+test('e2e.verify and uat.verify join a chain only when the prompt explicitly asks for them', () => {
+  const ops = prompt => body(run(prompt)).legs.map(leg => leg.op);
+  const proofs = list => list.filter(op => op === 'e2e.verify' || op === 'uat.verify');
+  assert.deepEqual(proofs(ops('build the backend API for wishlist')), []);
+  assert.deepEqual(proofs(ops('build the wishlist screen frontend')), []);
+  assert.deepEqual(proofs(ops('build Collab group chat end to end')), []);
+  assert.deepEqual(proofs(ops('build the backend API for wishlist with e2e tests')), ['e2e.verify']);
+  assert.deepEqual(proofs(ops('build the wishlist screen frontend and run UAT')), ['uat.verify']);
+  assert.deepEqual(proofs(ops('build Collab group chat backend and frontend, e2e and uat')), ['e2e.verify', 'uat.verify']);
+  assert.deepEqual(proofs(ops('build the backend API for wishlist, skip e2e')), []);
+  const explicit = ops('build the wishlist screen frontend and run UAT');
+  assert.ok(explicit.indexOf('interface.audit') < explicit.indexOf('uat.verify'), 'audit still precedes uat');
+  assert.deepEqual(proofs(ops('prepare assisted UAT for the bank approval journey')), [], 'assisted UAT is its own lane');
 });
 
 test('assisted UAT preparation is a separate existing-build workflow', () => {
@@ -144,8 +161,10 @@ test('an SDS mentioned beside a build verb stays a build, not a specification', 
 
 const FULLSTACK_LEGS = [
   'request.analyze', 'scope.define', 'business.decide', 'architecture.decide', 'brand.decide', 'interface.draw',
-  'work.author', 'backend.implement', 'interface.implement', 'interface.audit', 'e2e.verify', 'uat.verify', 'review.verify', 'handover.review',
+  'work.author', 'backend.implement', 'interface.implement', 'interface.audit', 'review.verify', 'handover.review',
 ];
+
+const FULLSTACK_LEGS_WITH_PROOFS = FULLSTACK_LEGS.flatMap(op => (op === 'review.verify' ? ['e2e.verify', 'uat.verify', op] : [op]));
 
 test('a feature named through both surfaces derives feature-build-fullstack with its own backend build', () => {
   for (const prompt of [
@@ -200,7 +219,7 @@ test('a build prompt that also closes spec gaps keeps its implement legs (buildI
     const plan = body(run(prompt));
     assert.equal(plan.status, 'ok');
     assert.deepEqual(plan.parseNotes, ['intent->S* via archetypes [feature-build-fullstack]'], prompt);
-    assert.deepEqual(plan.legs.map(leg => leg.op), FULLSTACK_LEGS, prompt);
+    assert.deepEqual(plan.legs.map(leg => leg.op), FULLSTACK_LEGS_WITH_PROOFS, prompt);
   }
   // A course named "Fullstack" and a contract named "E2E" are nouns, not a delivery demand.
   assert.equal(body(run(SPEC_PROMPT)).scopeKind, 'spec-foundation');
@@ -209,11 +228,11 @@ test('a build prompt that also closes spec gaps keeps its implement legs (buildI
 
 test('a settled brand record drops brand.decide as an out-of-band assumption; an absent or unsettled one keeps it', t => {
   const settled = body(runWith(NIVO_COLLAB_PROMPT, '--work', workRoot(t, 'done')));
-  assert.deepEqual(settled.legs.map(leg => leg.op), FULLSTACK_LEGS.filter(op => op !== 'brand.decide'));
+  assert.deepEqual(settled.legs.map(leg => leg.op), FULLSTACK_LEGS_WITH_PROOFS.filter(op => op !== 'brand.decide'));
   const draw = settled.legs.find(leg => leg.op === 'interface.draw');
   assert.ok(draw.assumed.includes('brand: settled record brand/index.yaml state done — satisfied out-of-band, no chain leg'));
-  assert.deepEqual(body(runWith(NIVO_COLLAB_PROMPT, '--work', workRoot(t, null))).legs.map(leg => leg.op), FULLSTACK_LEGS);
-  assert.deepEqual(body(runWith(NIVO_COLLAB_PROMPT, '--work', workRoot(t, 'todo'))).legs.map(leg => leg.op), FULLSTACK_LEGS);
+  assert.deepEqual(body(runWith(NIVO_COLLAB_PROMPT, '--work', workRoot(t, null))).legs.map(leg => leg.op), FULLSTACK_LEGS_WITH_PROOFS);
+  assert.deepEqual(body(runWith(NIVO_COLLAB_PROMPT, '--work', workRoot(t, 'todo'))).legs.map(leg => leg.op), FULLSTACK_LEGS_WITH_PROOFS);
 });
 
 // The Mia Mia work-and-stacks goal of 2026-09-23, verbatim: a specification

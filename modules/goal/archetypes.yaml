@@ -54,7 +54,16 @@ signalMatching:
   phraseSets:
     buildIntent: [end to end, end-to-end, full-stack, fullstack feature, build fullstack, làm fullstack, tính năng fullstack, backend and frontend, frontend and backend, backend và frontend, frontend và backend, đúng thiết kế, sản phẩm chạy được, tới sản phẩm, e2e xanh, test xanh, tests xanh, uat trình duyệt, trên trình duyệt, tests green, e2e green, working product, running product, làm trọn tính năng, trọn tính năng, implement the*, implement it]
     canonIntent: [conform to canon, conform to the canon, conform to the starci canon, conform to starci, canon conformance, canon-conformance, canon debt, canon findings, starci canon, starci-canon, starci-like, technical debt, tech debt, code-quality debt, lint debt, dọn nợ, nợ kỹ thuật, nợ code, trả nợ code, chuẩn hoá source, chuẩn hóa source, chuẩn hoá code, chuẩn hóa code, theo chuẩn starci, chuẩn starci]
+    e2eIntent: [e2e, e2e-spec*, end-to-end test*, end to end test*, end-to-end verif*, end to end verif*, end-to-end proof*, end to end proof*, end-to-end check*, end to end check*, end-to-end suite*, end to end suite*, test end-to-end, test end to end, kiểm thử e2e, kiểm thử end-to-end, kiểm thử end to end, chạy e2e, test e2e]
+    uatIntent: [uat, acceptance test*, acceptance testing, browser uat, nghiệm thu, kiểm thử uat, chạy uat, uat trình duyệt]
+    proofNegation: [no e2e, without e2e, skip e2e, skip the e2e, no uat, without uat, skip uat, skip the uat, không e2e, không chạy e2e, bỏ qua e2e, không uat, không chạy uat, bỏ qua uat]
     brandIntent: [brand, thương hiệu, mascot, linh vật, token màu, brand token, bộ nhận diện, logo]
+  proofLegs: >-
+    E2E runs manually only (owner ruling 2026-09-29): e2e.verify (api.X verified) and uat.verify (ui.X verified)
+    join a chain only when the prompt explicitly asks for them (phraseSets.e2eIntent / uatIntent, unless
+    phraseSets.proofNegation also hits). Without that ask a backend build ends at impl.X done (backend) and an
+    interface build at ui.X audited; review.verify still closes the chain. An explicit ask adds the proof
+    variable to whichever archetype matched.
   phraseSetReference: >-
     A phrase written "$name" in phrases, requires or excludes stands for every
     phrase of phraseSets.name.

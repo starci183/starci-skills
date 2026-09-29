@@ -1,0 +1,19 @@
+id: e2e-manual-planner
+effectiveAt: '2026-09-29T14:30:00+07:00'
+summary: >-
+  Owner ruling 2026-09-29: e2e runs MANUALLY only. The chain planner (scripts/route/route-plan.mjs, used by
+  define-goal --plan and the kernel) no longer adds e2e.verify (api.X verified) or uat.verify (ui.X verified) by
+  default. feature-build-backend and feature-build-fullstack now target impl.X done (backend) and
+  feature-build-with-ui and feature-build-fullstack target ui.X audited; review.verify and handover.review still
+  close the chain. An explicit ask adds the proof variable to a build or verify scope: modules/goal/archetypes.yaml
+  signalMatching.phraseSets gains e2eIntent (e2e, end-to-end tests/verification, kiểm thử e2e, ...), uatIntent (uat,
+  acceptance tests, nghiệm thu, ...) and proofNegation (no/without/skip e2e or uat, không e2e, ...); a negation
+  cancels the ask, and a specification, scaffold, canonicalization or assisted-UAT prompt that merely names e2e or
+  UAT never gains the leg. Assisted UAT keeps its own archetypes. Adds no check or finding code.
+reach: new-legs
+paths:
+  - modules/kernel/contract-changes/e2e-manual-planner.yaml
+  - modules/goal/archetypes.yaml
+  - scripts/route/route-plan.mjs
+  - tests/goal-planner.spec.mjs
+  - tests/plan-edges.spec.mjs
