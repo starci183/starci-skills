@@ -28,7 +28,23 @@ export default [
 Which globs the law applies to is your repository's fact. What the law says is not — so there is no
 option to switch a rule off or lower it to a warning.
 
-Also exported: `rules`, `ruleOwners`, `lawOwners`.
+Prefer the factory, which owns the levels for you:
+
+```js
+import starciBe, { recommended, starciBeConfig } from "@starci/eslint-canon-be"
+
+export default [
+    // …your own ignores, language options and other plugins…
+    starciBeConfig({ sources: ["apps/**/*.ts", "src/**/*.ts"], plugin: starciBe, recommended }),
+]
+```
+
+It states `warn` as `error` for a zero-warning gate, applies `noInlineConfig` and unused-disable reporting, and
+switches off the `RETIRED` legacy heuristics (the exception-identity and barrel rules and the handler twin count) that
+the code-pattern manifest replaces with the architecture check and the error-identity script. Those replacements run
+through `npm run lint:architecture` in a repository's gate, not through ESLint.
+
+Also exported: `rules`, `ruleOwners`, `lawOwners`, `starciBeConfig`, `linterOptions`, `RETIRED`.
 
 ## What it actually catches
 

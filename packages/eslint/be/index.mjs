@@ -105,3 +105,5 @@ export default {
     meta: { name: "eslint-plugin-starci-be" },
     rules,
 }
+
+export { starciBeConfig, linterOptions, RETIRED } from "./lib/config.mjs"
