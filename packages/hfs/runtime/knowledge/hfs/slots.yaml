@@ -565,7 +565,9 @@ slots:
     # config = EnvSource reader only; logging = LoggerPort + adapter; errors = DomainError base + one filter + GraphQL
     # formatError with masking; primitives = isRecord, hashing, ids, cookies; clock = the injected Clock port
     # (now()), with a FakeClock test double from @starci/jest-preset; i18n = the MessageCatalog port, a keyed
-    # lookup with named interpolation over the vi/en catalogs a capability or feature carries in its messages/;
+    # lookup with named interpolation over the vi/en catalogs a capability or feature carries in its messages/,
+    # resolved through the RequestLocale provider (request: stored user preference, else Accept-Language, else
+    # vi; non-request: recipient's stored preference, else vi - see knowledge/patterns/be/messages.yaml);
     # database when a connection exists.
     requiredInstances: {capability: [config, logging, errors, primitives, clock, i18n]}
     requires: [index.ts]
