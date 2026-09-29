@@ -22,7 +22,7 @@ paths:
   - examples/ecommerce-app-be/tsconfig.json
   - examples/ecommerce-app-be/tsconfig.e2e.json
   - examples/ecommerce-app-be/README.md
-  - examples/ecommerce-app-be/docs/TESTING.md
+  - examples/ecommerce-app-be/docs/guides/testing.md
   - examples/ecommerce-app-fe/package.json
   - examples/ecommerce-app-fe/README.md
   - examples/todo-app-backend/package.json
