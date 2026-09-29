@@ -51,6 +51,7 @@
   --status-failed: #c02626; --status-failed-bg: #fcecec; --status-failed-line: #f0b1b1;
   --status-warning: #9a5200; --status-warning-bg: #fdf3e1; --status-warning-line: #ecc98a;
   --status-skipped: #6b6b7b; --status-skipped-bg: transparent; --status-skipped-line: #c6c6d0;
+  --status-owner: #6d28d9; --status-owner-bg: #f1ebfd; --status-owner-line: #c9b5f5;
 }
 
 .dark {
@@ -94,6 +95,7 @@
   --status-failed: #ff7b7b; --status-failed-bg: #2d1113; --status-failed-line: #7a2a2e;
   --status-warning: #f8c152; --status-warning-bg: #2b1f08; --status-warning-line: #7a5a1a;
   --status-skipped: #8a8a9c; --status-skipped-bg: transparent; --status-skipped-line: #44444f;
+  --status-owner: #c4a6ff; --status-owner-bg: #221638; --status-owner-line: #5b3d99;
 }
 
 @theme inline {
@@ -284,6 +286,7 @@ button.lifecycle-label:hover, button.lifecycle-label[aria-pressed=true] { backgr
 [data-tone=queued] { --tone: var(--status-queued); --tone-bg: var(--status-queued-bg); --tone-line: var(--status-queued-line); }
 [data-tone=failed] { --tone: var(--status-failed); --tone-bg: var(--status-failed-bg); --tone-line: var(--status-failed-line); }
 [data-tone=warning] { --tone: var(--status-warning); --tone-bg: var(--status-warning-bg); --tone-line: var(--status-warning-line); }
+[data-tone=owner] { --tone: var(--status-owner); --tone-bg: var(--status-owner-bg); --tone-line: var(--status-owner-line); }
 [data-tone=skipped] { --tone: var(--status-skipped); --tone-bg: var(--status-skipped-bg); --tone-line: var(--status-skipped-line); }
 .status-chip { display: inline-flex; align-items: center; gap: 6px; border: 1px solid var(--tone-line); background: var(--tone-bg); color: var(--tone); border-radius: 999px; padding: 1px 9px 1px 7px; font-size: 12px; font-weight: 550; line-height: 1.5; white-space: nowrap; }
 .status-chip[data-tone=skipped] { border-style: dashed; }

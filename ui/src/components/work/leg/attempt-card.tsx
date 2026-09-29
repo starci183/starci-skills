@@ -18,7 +18,7 @@ export function AttemptCard({ attempt, now }: { attempt: AttemptBrief; now: numb
   const open = attempt.open;
   const end = attempt.settledAt ?? now;
   const outcome = statusFromOutcome(attempt.reportOutcome);
-  const verdict = statusFromVerdict(attempt.verdict, open);
+  const verdict = statusFromVerdict(attempt.verdict, open, attempt.reportOutcome);
   const green = Math.max(0, attempt.checks - attempt.checksRed);
   const who = [attempt.model, attempt.agent, attempt.pool].filter(Boolean).join(' · ');
   return <li className="rounded-lg border bg-card p-3">

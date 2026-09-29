@@ -21,7 +21,7 @@ export function stepItems(attempt: AttemptDetailV2): StepItem[] {
   const red = attempt.checks.filter(check => check.status === 'fail' || check.status === 'error').length;
   const other = attempt.checks.length - ok - red;
   const checksTone: Tone = red > 0 ? 'failed' : attempt.checks.length && other === 0 ? 'success' : attempt.checks.length ? 'warning' : 'queued';
-  const verdictTone = statusTone[statusFromVerdict(attempt.verdict, open && Boolean(attempt.reportedAt))];
+  const verdictTone = statusTone[statusFromVerdict(attempt.verdict, open && Boolean(attempt.reportedAt), attempt.reportOutcome)];
   const land = attempt.land;
   const landTone: Tone = land?.result === 'passed' ? 'success' : land?.result === 'failed' ? 'failed' : land ? 'warning' : attempt.verdict ? 'skipped' : 'queued';
   const landDetail = land ? (land.result === 'passed' ? 'Đã land' : land.result === 'failed' ? 'Land hỏng' : land.result) : attempt.verdict ? 'Không áp dụng' : 'Chưa tới';
@@ -31,7 +31,7 @@ export function stepItems(attempt: AttemptDetailV2): StepItem[] {
     { key: 'report', state: stateOf(reportTone), tone: reportTone, at: attempt.reportedAt, detail: attempt.reportedAt ? (attempt.reportOutcome ?? 'đã báo cáo') : undefined },
     { key: 'checks', state: stateOf(checksTone), tone: checksTone, at: at('checked'), detail: attempt.checks.length ? `${ok}/${attempt.checks.length} đạt` : 'Chưa có check',
       segments: [{ tone: 'success', n: ok }, { tone: 'failed', n: red }, { tone: 'warning', n: other }] },
-    { key: 'verdict', state: stateOf(verdictTone), tone: verdictTone, at: attempt.settledAt, detail: attempt.verdict ?? (open && attempt.reportedAt ? 'Đang chốt' : undefined) },
+    { key: 'verdict', state: stateOf(verdictTone), tone: verdictTone, at: attempt.settledAt, detail: attempt.verdict === 'blocked' && attempt.reportOutcome === 'ask' ? 'chờ thầy trả lời' : attempt.verdict ?? (open && attempt.reportedAt ? 'Đang chốt' : undefined) },
     { key: 'land', state: stateOf(landTone), tone: landTone, at: land?.at ?? null, detail: landDetail },
   ];
 }

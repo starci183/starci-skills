@@ -57,7 +57,7 @@ export function AttemptWhereCard({ attempt }: { attempt: AttemptDetailV2 }) {
         <InfoRow label="Agent cha"><CopyId value={w.parentAgent} /></InfoRow>
         <InfoRow label="Trace span"><CopyId value={w.traceSpan} /></InfoRow>
         <InfoRow label="Job">
-          <span className="inline-flex flex-wrap items-center gap-2"><CopyId value={w.job} />{w.jobStatus ? <InfoChip tone={w.jobStatus === 'failed' ? 'failed' : w.jobStatus === 'succeeded' || w.jobStatus === 'passed' ? 'success' : undefined}>{w.jobStatus}</InfoChip> : null}</span>
+          <span className="inline-flex flex-wrap items-center gap-2"><CopyId value={w.job} />{w.jobStatus ? <InfoChip tone={w.jobStatus === 'failed' ? 'failed' : w.jobStatus === 'awaiting_owner' ? 'owner' : w.jobStatus === 'succeeded' || w.jobStatus === 'passed' ? 'success' : undefined}>{w.jobStatus}</InfoChip> : null}</span>
         </InfoRow>
         <InfoRow label="Bản ghi phiên">
           {transcript ? <span className="inline-flex flex-wrap items-center gap-2"><a className="text-primary underline-offset-2 hover:underline" href={transcriptHref}>Xem transcript</a>

@@ -6,7 +6,7 @@ const many = (db, sql, ...args) => db.prepare(sql).all(...args);
 const parse = (value, fallback = null) => { try { return value == null ? fallback : JSON.parse(value); } catch { return fallback; } };
 
 /** Semantic status shared by every UI surface (see ui/src/components/status.ts). */
-export const STATUSES = ['success', 'running', 'settling', 'queued', 'retry', 'failed', 'blocked', 'planned', 'deferred', 'external', 'dropped', 'rejected', 'unknown'];
+export const STATUSES = ['success', 'running', 'settling', 'queued', 'retry', 'failed', 'blocked', 'awaiting-owner', 'planned', 'deferred', 'external', 'dropped', 'rejected', 'unknown'];
 
 /** An attempt is open while it has been dispatched and nothing ended it: no settle (settled_at) and no end state (a refused launch, a dead worker, a cancel). */
 export const attemptOpen = (row) => row.dispatched_at != null && row.settled_at == null && row.end_state == null;
@@ -17,7 +17,8 @@ const END_STATE_STATUS = { requeued: 'rejected', 'worker-dead': 'failed', 'effec
 
 export function attemptStatus(row) {
   if (row.verdict === 'pass') return 'success';
-  if (row.verdict === 'blocked') return 'blocked';
+  // An op that ended with an ask waits on the owner: settled, not a failure, not a try of the budget.
+  if (row.verdict === 'blocked') return row.report_outcome === 'ask' || row.job_status === 'awaiting_owner' ? 'awaiting-owner' : 'blocked';
   if (row.verdict === 'fail' || row.verdict === 'partial') return 'failed';
   if (row.verdict === 'dropped' || row.verdict === 'cancelled') return 'dropped';
   if (END_STATE_STATUS[row.end_state]) return END_STATE_STATUS[row.end_state];
@@ -43,6 +44,9 @@ function legStatus(leg, units, attempts) {
   const open = attempts.filter(attemptOpen);
   if (open.some(a => !(a.reported_at != null || a.report_outcome))) return 'running';
   if (open.length) return 'settling';
+  // A unit whose latest try asked the owner waits for the answer; it did not fail.
+  const latest = attempts[attempts.length - 1];
+  if (latest && latest.verdict === 'blocked' && (latest.report_outcome === 'ask' || latest.job_status === 'awaiting_owner')) return 'awaiting-owner';
   if (units.some(u => u.state === 'failed')) return 'failed';
   if (units.some(u => ['running', 'reported', 'deciding'].includes(u.state))) return 'running';
   if (attempts.some(a => a.verdict && a.verdict !== 'pass')) return 'retry';

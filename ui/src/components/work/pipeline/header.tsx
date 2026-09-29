@@ -7,7 +7,7 @@ import { StatusChip } from '../../status-chip';
 import { statusLabels, statusTone, type Status } from '../../status';
 import { statusFromUi } from '../../status';
 
-const order: Status[] = ['success', 'running', 'settling', 'queued', 'retry', 'failed', 'blocked', 'planned', 'deferred', 'external', 'dropped', 'unknown'];
+const order: Status[] = ['success', 'running', 'settling', 'queued', 'retry', 'failed', 'blocked', 'awaiting-owner', 'planned', 'deferred', 'external', 'dropped', 'unknown'];
 const stuckReasons: Record<string, string> = {
   STALLED: 'đứng yên, không có tiến triển', OWNER_DECISION_OPEN: 'đang chờ chủ quyết định', SEAT_VACANT: 'ghế Kernel đang trống', SLA_CRITICAL: 'vi phạm SLA nghiêm trọng',
 };

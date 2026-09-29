@@ -29,10 +29,10 @@ function SiblingLink({ target, label, dir }: { target: Ref; label: string; dir: 
 export function AttemptHeader({ attempt, project }: { attempt: AttemptDetailV3; project: string }) {
   const open = isOpen(attempt);
   const outcome = statusFromOutcome(attempt.reportOutcome);
-  const verdict = statusFromVerdict(attempt.verdict, open && Boolean(attempt.reportedAt));
+  const verdict = statusFromVerdict(attempt.verdict, open && Boolean(attempt.reportedAt), attempt.reportOutcome);
   const previous = attempt.retry.retryOf ?? attempt.retry.resumeOf;
   const outcomeLabel = attempt.reportOutcome ? `Op tự báo: ${outcomeWords[attempt.reportOutcome] ?? attempt.reportOutcome}` : attempt.reportedAt ? 'Op tự báo: chưa rõ' : 'Op tự báo: chưa báo cáo';
-  const verdictLabel = attempt.verdict ? `Kernel chốt: ${verdictWords[attempt.verdict] ?? attempt.verdict}` : open && attempt.reportedAt ? 'Kernel chốt: đang chốt' : 'Kernel chưa chốt';
+  const verdictLabel = verdict === 'awaiting-owner' ? 'Kernel chốt: chờ thầy trả lời' : attempt.verdict ? `Kernel chốt: ${verdictWords[attempt.verdict] ?? attempt.verdict}` : open && attempt.reportedAt ? 'Kernel chốt: đang chốt' : 'Kernel chưa chốt';
   const tone: Tone = statusTone[verdict === 'unknown' ? outcome : verdict];
   const enc = encodeURIComponent;
   const agent = agentOf(attempt);

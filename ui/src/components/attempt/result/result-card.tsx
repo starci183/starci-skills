@@ -69,7 +69,7 @@ function Assertions({ manifest }: { manifest: AttemptManifest }) {
 export function ResultCard({ attempt }: { attempt: AttemptDetailV3 }) {
   const manifest = useManifest(attempt);
   const opStatus = statusFromOutcome(attempt.reportOutcome);
-  const verdictStatus = attempt.endState === 'requeued' ? 'rejected' as const : statusFromVerdict(attempt.verdict, attempt.settledAt == null && attempt.endState == null);
+  const verdictStatus = attempt.endState === 'requeued' ? 'rejected' as const : statusFromVerdict(attempt.verdict, attempt.settledAt == null && attempt.endState == null, attempt.reportOutcome);
   const settle = settleView(attempt);
   const claims = claimsOf(attempt);
   const reportSummary = obj(attempt.report?.json)?.summary;

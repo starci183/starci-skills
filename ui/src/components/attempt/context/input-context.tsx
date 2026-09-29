@@ -57,7 +57,7 @@ export function InputContextCard({ attempt, info, goal }: { attempt: AttemptDeta
       {prior ? <section className="rounded-lg border p-3"><h3 className={h3}>Lần trước</h3>
         <div className="flex flex-wrap items-center gap-2 text-sm">
           <a className="font-medium text-primary hover:underline" href={prior.href}>lần {prior.try} · #{prior.id}</a>
-          <StatusChip status={statusFromVerdict(prior.verdict)} label={prior.verdict ? `Kernel chốt: ${verdictWords[prior.verdict] ?? prior.verdict}` : 'Kernel chưa chốt'} />
+          <StatusChip status={statusFromVerdict(prior.verdict, false, prior.reportOutcome)} label={prior.verdict ? `Kernel chốt: ${verdictWords[prior.verdict] ?? prior.verdict}` : 'Kernel chưa chốt'} />
           {prior.reportOutcome ? <StatusChip status={statusFromOutcome(prior.reportOutcome)} label={`Op tự báo: ${prior.reportOutcome}`} /> : null}
         </div>
         {prior.summary ? <p className="mb-0 mt-2 whitespace-pre-wrap break-words text-sm">{prior.summary}</p> : null}

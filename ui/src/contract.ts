@@ -126,7 +126,7 @@ export type LogRow = { key: string; db: 'machine'|string; seq: number; at: numbe
 export type TimelineItem = { at: number; source: 'event'|'log'|'attempt'|'check'|'decision'|'violation'|'action'; kind: string; ui: UiState; title: string; ref: Ref | null; detail: unknown };
 
 /* ---- v2 (2026-09-29): pipeline, transparency, evidence. Served by ui/api/pipeline.mjs and routes. ---- */
-export type LegStatus = 'success'|'running'|'settling'|'queued'|'retry'|'failed'|'blocked'|'planned'|'deferred'|'external'|'dropped'|'rejected'|'warning'|'unknown';
+export type LegStatus = 'success'|'running'|'settling'|'queued'|'retry'|'failed'|'blocked'|'awaiting-owner'|'planned'|'deferred'|'external'|'dropped'|'rejected'|'warning'|'unknown';
 export type AttemptBrief = { id: number; unit: string | null; job: string; try: number; status: LegStatus;
   reportOutcome: AttemptRow['reportOutcome']; verdict: AttemptRow['verdict']; model: string | null; agent: string | null; pool: string | null;
   dispatchedAt: number | null; reportedAt: number | null; settledAt: number | null; open: boolean; endState: string | null; checks: number; checksRed: number;

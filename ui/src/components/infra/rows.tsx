@@ -1,4 +1,5 @@
 import type { Concept } from '../concept';
+import type { Tone } from '../status';
 
 export const concept: Concept = 'frame';
 
@@ -24,7 +25,7 @@ export function InfoRow({ label, children }: { label: string; children: ReactNod
   </div>;
 }
 
-export function InfoChip({ children, tone }: { children: ReactNode; tone?: 'success' | 'running' | 'queued' | 'failed' | 'warning' | 'skipped' }) {
+export function InfoChip({ children, tone }: { children: ReactNode; tone?: Tone }) {
   return <span data-tone={tone} className={`inline-flex items-center rounded-full border px-2 py-0.5 text-[11px] font-medium ${tone ? 'border-[var(--tone-line)] bg-[var(--tone-bg)] text-[var(--tone)]' : 'border-border bg-muted text-muted-foreground'} ${tone === 'skipped' ? 'border-dashed' : ''}`}>{children}</span>;
 }
 
