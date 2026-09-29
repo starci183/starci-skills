@@ -33,6 +33,7 @@ import { checkPrerequisites, directionPrerequisiteOn, directionVerdicts } from '
 import { loadContractChanges } from '../scripts/kernel/contract-version.mjs';
 import { drawQualityFindings } from '../scripts/checks/draw-quality.mjs';
 import { withRationale, writeRationale } from './_draw-rationale-fixture.mjs';
+import { seedWorkflow } from './_ledger-fixture.mjs';
 
 const ROOT = path.resolve(import.meta.dirname, '..');
 const tmp = (t) => { const d = fs.mkdtempSync(path.join(os.tmpdir(), 'starci-draw-loop-')); t.after(() => fs.rmSync(d, { recursive: true, force: true, maxRetries: 20, retryDelay: 25 })); return d; };
@@ -365,7 +366,7 @@ test('the contract change registers every code the draw loop adds and reaches ru
 
 test('api settle re-measures the drawn parts itself: a loop-passed draw the runtime cannot verify is refused draw-metrics-failed; an older leg settles as admitted', async (t) => {
   const { spawnSync } = await import('node:child_process');
-  const { openLedger, ledgerFileFor } = await import('../engine/ledger-db.mjs');
+  const { openLedger, ledgerFileFor, fileReport, recordCheckRun, writeContract } = await import('../engine/ledger-db.mjs');
   const p = product(t);
   const git = (...args) => { const r = spawnSync('git', ['-C', p.repo, ...args], { encoding: 'utf8', windowsHide: true }); assert.equal(r.status, 0, r.stderr); return r.stdout.trim(); };
   git('init', '--quiet', '-b', 'main'); git('config', 'user.email', 'lane@starci.test'); git('config', 'user.name', 'lane'); git('config', 'core.autocrlf', 'false');
@@ -386,14 +387,17 @@ test('api settle re-measures the drawn parts itself: a loop-passed draw the runt
   const seed = (jobId, wf, admittedAt) => {
     const ledger = openLedger({ file: ledgerFileFor(p.repo) });
     try {
-      ledger.ensureWorkflow({ workflowId: wf, title: 'draw' });
-      ledger.enqueueJob({ jobId, workflowId: wf, opId: 'interface.draw', kind: 'op', payload: { opId: 'interface.draw', owned_paths: ['src/'], orca: { dispatchId: `ctx-${jobId}`, agentTerminalHandle: `term-${jobId}` } } });
-      ledger.db.prepare("UPDATE jobs SET status='running' WHERE job_id=?").run(jobId);
-      ledger.db.prepare('INSERT INTO contracts(workflow_id,op_id,attempt,dispatch_id,markdown,context_json,created_at) VALUES(?,?,?,?,?,?,?)').run(wf, 'interface.draw', 1, `ctx-${jobId}`, '# contract', JSON.stringify({ worktree: p.repo }), admittedAt);
-      ledger.db.prepare('INSERT INTO reports(workflow_id,dispatch_id,op_id,attempt,generation,outcome,report_json,from_terminal,consumed_at,created_at) VALUES(?,?,?,?,?,?,?,?,NULL,?)')
-        .run(wf, `ctx-${jobId}`, 'interface.draw', 1, 0, 'done', JSON.stringify({ outcome: 'done', summary: 'drawn through the loop', files }), null, Date.now());
-      ledger.db.prepare('INSERT INTO checks(workflow_id,op_id,attempt,checks_json,created_at) VALUES(?,?,?,?,?)').run(wf, 'interface.draw', 1,
-        JSON.stringify({ checks: [{ name: 'owned-paths-committed', command: 'git show', exitCode: 0 }, { name: 'owned-paths-clean', command: 'git status', exitCode: 0 }, { name: 'head-ancestor', command: 'git merge-base', exitCode: 0 }] }), Date.now());
+      seedWorkflow(ledger, { id: wf, state: { phase: 'running', job: 'draw' },
+        jobs: [{ jobId, opId: 'interface.draw', dispatchId: `ctx-${jobId}`, terminalHandle: `term-${jobId}`, status: 'running',
+          payload: { opId: 'interface.draw', owned_paths: ['src/'], orca: { dispatchId: `ctx-${jobId}`, agentTerminalHandle: `term-${jobId}` } } }] });
+      const attemptId = ledger.db.prepare('SELECT attempt_id FROM op_attempts WHERE job_id=?').get(jobId).attempt_id;
+      ledger.transaction((db) => {
+        writeContract(db, { attemptId, markdown: '# contract', context: { worktree: p.repo }, createdAt: admittedAt });
+        fileReport(db, { attemptId, outcome: 'done', createdAt: Date.now(),
+          report: { schema: 'starci/op-report@1', outcome: 'done', summary: 'drawn through the loop', files } });
+        for (const check of [{ name: 'owned-paths-committed', command: 'git show' }, { name: 'owned-paths-clean', command: 'git status' }, { name: 'head-ancestor', command: 'git merge-base' }])
+          recordCheckRun(db, { attemptId, name: check.name, phase: 'verify', runner: 'kernel', authority: 'runtime', status: 'pass', exitCode: 0, command: check.command });
+      });
     } finally { ledger.close(); }
     return jobId;
   };

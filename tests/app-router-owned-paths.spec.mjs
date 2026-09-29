@@ -10,7 +10,7 @@ import {isGlobSegment,normalizeOwnedPath,normalizeOwnedPaths,ownedPathLeaseReque
 import {landedProof,ownedPathEffects} from '../scripts/kernel/settle-landed.mjs';
 import {resolveReadPath} from '../scripts/kernel/prerequisites.mjs';
 import {validateOpReport} from '../scripts/kernel/report-envelope.mjs';
-import {withLedger} from './_ledger-fixture.mjs';
+import {withLedger,seedWorkflow} from './_ledger-fixture.mjs';
 
 // Next.js App Router route segments are literal directory names that look like globs
 // (inc-ed9f28ec0561 nivo Modules, inc-e3e7d183c3d5 mia base-repos: interface.scaffold/implement
@@ -107,20 +107,25 @@ test('App Router prefixes dedupe and intersect literally: parent/child overlap, 
 
 test('durable path leases fence each App Router route against its children, never against a glob twin',t=>withLedger(t,({ledger,machine})=>{
   const seed=keys=>{for(const key of keys)ledger.db.prepare('INSERT OR IGNORE INTO resources(resource_key,capacity) VALUES(?,1)').run(key);};
+  // reserveTwoPhase admits only an enqueued job: each candidate is a real queued row of its workflow.
+  const admit=(workflowId,jobId,opId,leases)=>{
+    seedWorkflow(ledger,{id:workflowId,jobs:[{jobId,opId,payload:{}}]});
+    return reserveTwoPhase(ledger,machine,{job:{jobId,workflowId,opId,generation:1,kind:'op'},leases});
+  };
   const parent=ownedPathLeaseRequests(ALL_DIRS);
   seed(parent.map(l=>l.resourceKey));
-  assert.equal(reserveTwoPhase(ledger,machine,{job:{jobId:'routes',workflowId:'wf-routes',opId:'interface.implement',generation:1,kind:'op'},leases:parent}).ok,true);
+  assert.equal(admit('wf-routes','routes','interface.implement',parent).ok,true);
   FORMS.forEach(({form,dir,twin},i)=>{
     const child=ownedPathLeaseRequests([`${dir}/loading.tsx`]);
     seed(child.map(l=>l.resourceKey));
-    const refused=reserveTwoPhase(ledger,machine,{job:{jobId:`child-${i}`,workflowId:`wf-child-${i}`,opId:'interface.scaffold',generation:1,kind:'op'},leases:child});
+    const refused=admit(`wf-child-${i}`,`child-${i}`,'interface.scaffold',child);
     assert.equal(refused.ok,false,`${form}: a child of a held route is fenced`);
     const why=[refused.reason,...(refused.reasons??[])].filter(Boolean).join('; ');
     assert.ok(why.includes(`overlaps durable lease path:${dir} held by routes`),`${form}: ${why}`);
     if(!twin||isGlobSegment(twin.split('/').at(-1)))return;
     const sibling=ownedPathLeaseRequests([twin]);
     seed(sibling.map(l=>l.resourceKey));
-    const admitted=reserveTwoPhase(ledger,machine,{job:{jobId:`twin-${i}`,workflowId:`wf-twin-${i}`,opId:'interface.scaffold',generation:1,kind:'op'},leases:sibling});
+    const admitted=admit(`wf-twin-${i}`,`twin-${i}`,'interface.scaffold',sibling);
     assert.equal(admitted.ok,true,`${form}: ${twin} runs beside ${dir}: ${admitted.reason}`);
   });
 }));
@@ -182,16 +187,21 @@ const apiFixture=t=>{
     STARCI_FAKE_ORCA_MODE:'healthy',
     STARCI_FAKE_ORCA_LOG:path.join(root,'calls.jsonl'),
     STARCI_FAKE_ORCA_STATE:path.join(root,'state.json'),
+    // Two dispatches in one workflow need distinct handles: op_attempts keys (workflow_id,dispatch_id).
+    STARCI_FAKE_ORCA_UNIQUE_TERMINALS:'1',
     LOCALAPPDATA:path.join(root,'localappdata'),
   };
   const run=(...args)=>spawnSync(process.execPath,[API,...args,'--repo',repo,'--json'],{cwd:ROOT,encoding:'utf8',windowsHide:true,timeout:180000,env});
-  const ledger=openLedger({file:ledgerFileFor(repo)});
+  // The spawned api resolves the ledger under ITS env's projects root (LOCALAPPDATA), not the test process's.
+  const ledgerFile=ledgerFileFor(repo,{env});
+  const ledger=openLedger({file:ledgerFile});
   try{
-    ledger.ensureWorkflow({workflowId:WORKFLOW,title:'app router routes'});
-    ledger.db.prepare("UPDATE workflows SET phase='queued' WHERE workflow_id=?").run(WORKFLOW);
+    // A unit belongs to an approved goal revision; the goal's opChain carries the leg's granted paths.
+    seedWorkflow(ledger,{id:WORKFLOW,state:{phase:'queued',job:'app router routes'},
+      goal:{revision:1,markdown:'# goal',json:{opChain:{legs:[{op:OP,paths:['src/']}]}}}});
   }finally{ledger.close();}
-  const inspect=fn=>{const l=inspectLedger({file:ledgerFileFor(repo)});try{return fn(l.db);}finally{l.close();}};
-  return {root,repo,run,inspect};
+  const inspect=fn=>{const l=inspectLedger({file:ledgerFile});try{return fn(l.db);}finally{l.close();}};
+  return {root,repo,env,run,inspect};
 };
 const leading=stdout=>{
   const open=stdout.indexOf('{'),close=stdout.indexOf('\n}');
@@ -231,12 +241,16 @@ test('api: enqueue -> dispatch leases -> overlap refusal -> report -> landed-che
   git(fx.repo,'add','-A','--',...ALL_DIRS.map(ownedPathspec));
   git(fx.repo,'commit','--quiet','-m','implement routes');
   const head=git(fx.repo,'rev-parse','HEAD');
-  const reportFile=path.join(fx.root,'report.json');
+  // api report accepts the file only from inside the attempt's scratch dir (op_attempts.scratch_dir).
+  const scratch=fx.inspect(db=>db.prepare('SELECT scratch_dir FROM op_attempts WHERE job_id=?').get(routes).scratch_dir);
+  const reportFile=path.join(scratch,'report.json');
   fs.writeFileSync(reportFile,JSON.stringify({schema:'starci/op-report@1',outcome:'done',summary:'implemented every route form',
     files:ALL_DIRS.map(pageOf),checks:[{name:'self-check',command:'true',exitCode:0}],head,branch:'main'}));
   const filed=fx.run('report','--job',routes,'--report',reportFile);
   assert.equal(filed.status,0,`report files under App Router owned paths: ${filed.stderr||filed.stdout}`);
-  const checked=fx.run('check','--job',routes,'--checks',JSON.stringify({checks:[{name:'validator',exitCode:0}]}));
+  // The settler's own re-run evidence is runtime authority (H8); any other caller's green is declared and never counts.
+  const checked=spawnSync(process.execPath,[API,'check','--repo',fx.repo,'--job',routes,'--checks',JSON.stringify({checks:[{name:'validator',exitCode:0}]}),'--json'],
+    {cwd:ROOT,encoding:'utf8',windowsHide:true,timeout:180000,env:{...fx.env,STARCI_CALLER:'runtime-settler'}});
   assert.equal(checked.status,0,checked.stderr||checked.stdout);
 
   // A dirty twin sits outside every route; a dirty file inside one route is not landed.

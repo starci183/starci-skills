@@ -176,14 +176,16 @@ test('peer leases are read from the ledger, never this workflow\'s own jobs', as
   const repo = fs.mkdtempSync(path.join(os.tmpdir(), 'deps-ledger-'));
   t.after(() => fs.rmSync(repo, { recursive: true, force: true }));
   fs.mkdirSync(path.join(repo, '.starciwork'));
-  const db = new DatabaseSync(path.join(repo, '.starciwork', 'runtime.sqlite'));
-  db.exec("CREATE TABLE jobs(job_id TEXT, workflow_id TEXT, op_id TEXT, kind TEXT, status TEXT)");
-  const add = db.prepare('INSERT INTO jobs VALUES(?,?,?,?,?)');
-  add.run('op-a', 'wf-collab', 'backend.implement', 'op', 'running');
-  add.run('op-b', 'wf-auth', 'backend.implement', 'op', 'running');
-  add.run('op-c', 'wf-auth', 'backend.implement', 'op', 'succeeded');
-  add.run('k-1', 'wf-auth', null, 'kernel', 'running');
-  db.close();
+  const { openLedger } = await import('../engine/ledger-db.mjs');
+  const { seedWorkflow } = await import('./_ledger-fixture.mjs');
+  const ledger = openLedger({ file: path.join(repo, '.starciwork', 'runtime.sqlite') });
+  try {
+    seedWorkflow(ledger, { id: 'wf-collab', jobs: [{ jobId: 'op-a', opId: 'backend.implement', status: 'running' }] });
+    seedWorkflow(ledger, { id: 'wf-auth', jobs: [
+      { jobId: 'op-b', opId: 'backend.implement', status: 'running' },
+      { jobId: 'op-c', opId: 'backend.implement', status: 'succeeded' },
+      { jobId: 'k-1', kind: 'kernel', status: 'running' }] });
+  } finally { ledger.close(); }
   const peers = await peerLeasedJobs({ ledgerRepo: repo, workflowId: 'wf-collab' });
   assert.equal(peers.known, true);
   assert.deepEqual(peers.jobs.map((j) => j.jobId), ['op-b']);

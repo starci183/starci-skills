@@ -168,22 +168,30 @@ test('api report refuses an ask for a declared credential and files any other as
   const env = { ...process.env, STARCI_SOURCE_ROOT: host };
   for (const key of ['ORCA_TERMINAL_HANDLE', 'STARCI_ROLE', 'STARCI_OP_JOB']) delete env[key];
   const api = (...args) => spawnSync(process.execPath, [path.join(root, 'scripts', 'kernel', 'api.mjs'), ...args], { cwd: root, encoding: 'utf8', windowsHide: true, timeout: 120000, env });
+  const { seedWorkflow } = await import('./_ledger-fixture.mjs');
+  const { setJobStatus, startAttempt, writeContract } = await import('../engine/ledger-db.mjs');
   const seed = (fn) => { const l = openLedger({ file: ledgerFileFor(product) }); try { return fn(l); } finally { l.close(); } };
   const wf = 'wf-starcistacks-ask', op = 'docs.author';
   seed((l) => {
-    l.ensureWorkflow({ workflowId: wf, title: 'stack ask guard' });
-    l.db.prepare("UPDATE workflows SET phase='running' WHERE workflow_id=?").run(wf);
-    l.db.prepare('INSERT INTO goals(workflow_id,revision,goal_identity,markdown,json,created_at) VALUES(?,?,?,?,?,?)').run(wf, 0, 'stack-ask', '# goal', '{}', Date.now());
+    seedWorkflow(l, { id: wf, state: { phase: 'running', job: 'stack ask guard' },
+      goal: { revision: 0, identity: 'stack-ask', markdown: '# goal', json: {} } });
   });
   const enqueued = api('enqueue', '--repo', product, '--workflow', wf, '--op', op, '--paths', 'docs/ask', '--json');
   assert.equal(enqueued.status, 0, enqueued.stderr);
   const job = JSON.parse(enqueued.stdout).job_id;
+  // api report reads the report only from the attempt's scratch dir (op_attempts.scratch_dir).
+  const scratch = path.join(product, '.starciwork', 'scratch', job);
+  fs.mkdirSync(scratch, { recursive: true });
   seed((l) => {
-    const row = l.db.prepare('SELECT * FROM jobs WHERE job_id=?').get(job);
-    l.db.prepare('INSERT INTO contracts(workflow_id,op_id,attempt,dispatch_id,markdown,context_json,created_at) VALUES(?,?,?,?,?,?,?)').run(wf, op, row.attempt, 'ctx_stackask', '# contract', '{}', Date.now());
-    l.db.prepare("UPDATE jobs SET status='running',worker_id='term_ask' WHERE job_id=?").run(job);
+    l.transaction((db) => {
+      setJobStatus(db, { jobId: job, to: 'ready', reason: 'seed' });
+      setJobStatus(db, { jobId: job, to: 'leased', reason: 'seed' });
+      const attempt = startAttempt(db, { workflowId: wf, jobId: job, dispatchId: 'ctx_stackask', scratchDir: scratch });
+      writeContract(db, { attemptId: attempt.attempt_id, markdown: '# contract' });
+      setJobStatus(db, { jobId: job, to: 'running', reason: 'seed', workerId: 'term_ask' });
+    });
   });
-  const file = path.join(product, 'report.json');
+  const file = path.join(scratch, 'report.json');
   const report = (question) => { fs.writeFileSync(file, JSON.stringify({ outcome: 'ask', summary: 'owner input needed', question })); return file; };
   const refused = api('report', '--repo', product, '--job', job, '--report', report({ text: 'Provide SONAR_TOKEN and the SONAR_HOST_URL GitHub variable', options: [] }), '--json');
   assert.equal(refused.status, 1, refused.stdout);

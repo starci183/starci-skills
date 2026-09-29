@@ -9,6 +9,7 @@ import os from 'node:os';
 import path from 'node:path';
 import {spawnSync} from 'node:child_process';
 import {ledgerFileFor,openLedger} from '../engine/ledger-db.mjs';
+import {seedWorkflow} from './_ledger-fixture.mjs';
 import {parseYaml,stringifyYaml} from '../engine/yaml.mjs';
 import {COMMIT_ONLY,GATE_WAITS_ON_JOB,legOrderExemption} from '../scripts/kernel/leg-order.mjs';
 import {TASK_SPEC_MAX_CHARS,packetFileOf,taskSpecOf} from '../scripts/kernel/task-spec.mjs';
@@ -69,18 +70,17 @@ test('status: the draw a deferred settle waits on reads ready, not dependency on
   fs.writeFileSync(path.join(owner,'config.yaml'),stringifyYaml({...parseYaml(fs.readFileSync(example,'utf8')),budgets:{maxOps:null}}));
   const api=(...args)=>spawnSync(process.execPath,[API,...args,'--repo',repo,'--json'],{cwd:ROOT,encoding:'utf8',windowsHide:true,timeout:120000,env:{...process.env,STARCI_OWNER_ROOT:owner}});
   const ledger=openLedger({file:ledgerFileFor(repo)});
-  const at=Date.now();
-  const job=(id,op,status,payload,attempt=1)=>ledger.db.prepare(`INSERT INTO jobs(job_id,workflow_id,op_id,attempt,generation,kind,role,payload_json,status,created_at,updated_at)
-    VALUES(?,?,?,?,0,'op','op',?,?,?,?)`).run(id,wf,op,attempt,json({opId:op,...payload}),status,at+attempt,at+attempt);
+  const job=(jobId,opId,status,payload,extra={})=>({jobId,opId,status,role:'op',payload:{opId,...payload},...extra});
   try{
-    ledger.ensureWorkflow({workflowId:wf,title:'unstick'});
-    ledger.db.prepare("UPDATE workflows SET phase='running' WHERE workflow_id=?").run(wf);
-    ledger.db.prepare('INSERT INTO goals(workflow_id,revision,goal_identity,markdown,json,created_at) VALUES(?,?,?,?,?,?)')
-      .run(wf,0,'g','# goal',json({opChain:{legs:[{op:'business.decide'},{op:'interface.draw'}]}}),at);
-    job('op-business.decide-held00000','business.decide','running',{owned_paths:['a/decide']},1);
-    job('op-business.decide-adopt0000','business.decide','queued',{owned_paths:['a/debris'],commitOnly:{of:['x'],batch:'work-debt'}},2);
-    job('op-interface.draw-old0000000','interface.draw','failed',{owned_paths:['a/draw']},1);
-    job('op-interface.draw-retry00000','interface.draw','queued',{owned_paths:['a/draw'],after:['op-interface.draw-old0000000'],retry:{retryOf:'op-interface.draw-old0000000'}},2);
+    seedWorkflow(ledger,{id:wf,state:{phase:'running',job:'unstick'},
+      goal:{revision:0,identity:'g',markdown:'# goal',json:{opChain:{legs:[{op:'business.decide'},{op:'interface.draw'}]}}},
+      jobs:[
+        job('op-business.decide-held00000','business.decide','running',{owned_paths:['a/decide']}),
+        job('op-business.decide-adopt0000','business.decide','queued',{owned_paths:['a/debris'],commitOnly:{of:['x'],batch:'work-debt'}}),
+        job('op-interface.draw-old0000000','interface.draw','failed',{owned_paths:['a/draw']}),
+        // The retry is try 2 of the same work unit as the attempt it retries.
+        job('op-interface.draw-retry00000','interface.draw','queued',{owned_paths:['a/draw'],after:['op-interface.draw-old0000000'],retry:{retryOf:'op-interface.draw-old0000000'}},
+          {tryNo:2,retryOf:'op-interface.draw-old0000000',unitId:'op-interface.draw-old0000000'})]});
   }finally{ledger.close();}
   const status=()=>{const r=api('status','--workflow',wf);assert.equal(r.status,0,r.stderr||r.stdout);return JSON.parse(r.stdout).frontier.queued;};
   const draw=()=>status().find((q)=>q.jobId==='op-interface.draw-retry00000');

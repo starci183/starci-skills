@@ -79,7 +79,7 @@ test('a layout title and a key a capture names are used keys too, and survive a 
   const first = mergeScan(null, scanOf(p), { at: '2026-09-25T00:00:00Z' }).record;
   const layout = nodeById(first, CONSOLE).layout;
   layout.titleKey = 'console.title';
-  layout.captures = [{ breakpoint: 'desktop', theme: 'light', path: 'assets/layouts/x.png', sha256: 'a'.repeat(64), width: 40, height: 30, slot: { x: 1, y: 1, width: 5, height: 5 }, kind: 'render', i18nKeys: ['console.empty'] }];
+  layout.captures = [{ breakpoint: 'desktop', theme: 'light', name: 'assets/layouts/x.png', sha256: 'a'.repeat(64), width: 40, height: 30, slot: { x: 1, y: 1, width: 5, height: 5 }, kind: 'render', i18nKeys: ['console.empty'] }];
   assert.deepEqual(usedI18nKeys(first).filter((k) => !k.startsWith('console.nav.')), ['console.empty', 'console.title']);
   const record = mergeScan(first, scanOf(p), { at: '2026-09-25T00:00:01Z' }).record;
   assert.equal(nodeById(record, CONSOLE).layout.titleKey, 'console.title', 'a re-scan keeps the title key');

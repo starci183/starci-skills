@@ -47,8 +47,11 @@ const resolve=(repo,id,...extra)=>{
 const incidentRow=(repo,id)=>{
   const l=inspectLedger({file:ledgerFileFor(repo)});
   try{
+    // resolveIncident stamps the row's bare event, then the verb appends the detailed one - the
+    // resolution's payload is the event that carries `by`/`detail`.
     return {status:l.db.prepare('SELECT status FROM incidents WHERE incident_id=?').get(id)?.status,
-      resolved:l.db.prepare("SELECT payload_json FROM events WHERE kind='incident-resolved' AND entity_id=?").all(id).map(r=>JSON.parse(r.payload_json))};
+      resolved:l.db.prepare("SELECT payload_json FROM events WHERE kind='incident-resolved' AND entity_id=? ORDER BY seq").all(id)
+        .map(r=>JSON.parse(r.payload_json)).filter(p=>p.by!==undefined||p.detail!==undefined)};
   }finally{l.close();}
 };
 
@@ -122,7 +125,7 @@ test('the audit lists a past resolution whose owner claim no answer backs, and a
   const l=openLedger({file:ledgerFileFor(repo)});
   try{
     for(const [id,detail] of [[fakeId,'Owner confirmed: adopted debt'],[provenId,'Owner confirmed in ask ctx_owner000002']]){
-      l.db.prepare("UPDATE incidents SET status='resolved' WHERE incident_id=?").run(id);
+      l.db.prepare("UPDATE incidents SET status='resolved',resolved_at=?,resolved_reason='answered' WHERE incident_id=?").run(Date.now(),id);
       l.appendEvent({workflowId:WF,entityType:'incident',entityId:id,kind:'incident-resolved',payload:{detail}});
     }
   }finally{l.close();}

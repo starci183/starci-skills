@@ -67,11 +67,12 @@ test('no spec names a real-path ledger: fixtures use temp dirs or an injected re
 });
 
 test('the runtime directory is refused as a Work root',async()=>{
-  const {ledgerFileFor,isRuntimeRoot}=await import('../engine/ledger-db.mjs');
+  const {ledgerFileFor,ledgerIdForRepo,projectsRootFor,isRuntimeRoot}=await import('../engine/ledger-db.mjs');
   assert.equal(isRuntimeRoot(runtimeRoot),true,'this checkout is a runtime');
   assert.throws(()=>ledgerFileFor(runtimeRoot),/ledger-root-is-runtime/);
   // The Work root of a project still resolves normally: the refusal is about identity, not about paths.
+  // (Q1: runtime.sqlite lives under the projects root, not .starciwork.)
   const elsewhere=path.join(runtimeRoot,'tests','fixtures');
   assert.equal(isRuntimeRoot(elsewhere),false);
-  assert.match(ledgerFileFor(elsewhere),/\.starciwork/);
+  assert.equal(ledgerFileFor(elsewhere),path.join(projectsRootFor(),ledgerIdForRepo(elsewhere),'runtime.sqlite'));
 });
