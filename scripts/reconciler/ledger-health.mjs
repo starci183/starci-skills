@@ -21,13 +21,29 @@ import { openLedgerReader } from '../../engine/ledger-db.mjs';
 // quick_check, and not query_only so VACUUM INTO can write the backup file.
 const openReadOnly = (file) => openLedgerReader(file, { verify: false, queryOnly: false });
 
-/** PRAGMA quick_check on a read-only handle: {ok, result}. An unopenable file is not ok. */
-export function quickCheck(file, { open = openReadOnly } = {}) {
+/**
+ * True when `file` is an intact SQLite file that this runtime refuses only for its schema (an older or foreign ledger:
+ * STARCI_LEDGER_SCHEMA_REFUSED from the verified open). That is a legacy store, never a corrupt one.
+ */
+function refusedForSchema(file, { verifiedOpen = (f) => openLedgerReader(f) } = {}) {
+  let db = null;
+  try { db = verifiedOpen(file); return false; } catch (error) { return error?.code === 'STARCI_LEDGER_SCHEMA_REFUSED'; } finally { try { db?.close(); } catch { /* closed */ } }
+}
+
+/**
+ * PRAGMA quick_check on a read-only handle: {ok, result, legacy?}. An unopenable file is not ok. A file whose
+ * quick_check passes but that this runtime refuses for its schema is `legacy: true` (still ok: the pages are intact),
+ * so the Host controller reports it as a legacy store and never as LEDGER_CORRUPT.
+ */
+export function quickCheck(file, { open = openReadOnly, verifiedOpen } = {}) {
   let db = null;
   try {
     db = open(file);
     const rows = db.prepare('PRAGMA quick_check').all().map((r) => String(Object.values(r)[0]));
-    return { ok: rows.length === 1 && rows[0] === 'ok', result: rows.slice(0, 20) };
+    const ok = rows.length === 1 && rows[0] === 'ok';
+    const out = { ok, result: rows.slice(0, 20) };
+    if (ok && refusedForSchema(file, { verifiedOpen })) out.legacy = true;
+    return out;
   } catch (error) {
     return { ok: false, result: [String(error?.message ?? error).slice(0, 300)], error: true };
   } finally { try { db?.close(); } catch { /* closed */ } }

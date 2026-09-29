@@ -527,15 +527,24 @@ export function createHostController(deps = {}) {
   async function ledgerHealth(ledgerId, ctx) {
     const now = ctx.now(), lh = settings().ledgerHealth, key = `ledger:${ledgerId}`;
     const ledger = (ctx.ledgers ?? []).find((l) => l.ledgerId === ledgerId);
-    if (!ledger?.file) return { ok: false, skipped: 'unknown-ledger' };
+    if (!ledger?.file) {
+      // The ledger left the registry (or has no file): whatever episode it had cannot go on, so it closes now.
+      await clear(ctx, key, 'LEDGER_CORRUPT');
+      return { ok: false, skipped: 'unknown-ledger' };
+    }
     const rec = rowOf(key, now);
     const out = { ok: true };
     if (!rec.lastCheckAt || now - rec.lastCheckAt >= lh.quickCheckEveryMs) {
       const r = checkLedger(ledger.file);
       rec.lastCheckAt = now; rec.lastCheck = r;
       const was = rec.state;
-      if (rec.state !== (r.ok ? 'ok' : 'corrupt')) { rec.state = r.ok ? 'ok' : 'corrupt'; rec.since = now; }
-      if (r.ok) await clear(ctx, key, 'LEDGER_CORRUPT');
+      const next = !r.ok ? 'corrupt' : r.legacy ? 'legacy' : 'ok';
+      if (rec.state !== next) { rec.state = next; rec.since = now; }
+      if (r.ok) {
+        // A legacy (schema-refused) store passed quick_check: not corrupt, so any LEDGER_CORRUPT episode closes.
+        await clear(ctx, key, 'LEDGER_CORRUPT');
+        if (r.legacy && was !== 'legacy') await ctx.log('reconciler.host.ledger-legacy', `${ledgerId}: legacy ledger store (schema refused by this runtime, quick_check ok); not corrupt`, { controller: 'host', ledgerId, state: 'legacy' });
+      }
       else {
         await clock(ctx, key, 'LEDGER_CORRUPT', 0, { code: 'LEDGER_CORRUPT', severity: 'critical', owner: 'host-controller', ledgerId, result: r.result.slice(0, 5) });
         if (was !== 'corrupt') {
