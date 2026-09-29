@@ -6,6 +6,7 @@ import path from 'node:path';
 import { spawn, spawnSync } from 'node:child_process';
 import { FAKE_ORCA } from './helpers/fake-orca.mjs';
 import { openLedger, inspectLedger, ledgerFileFor } from '../engine/ledger-db.mjs';
+import { TEST_REGISTRY_ENV } from '../engine/machine-db.mjs';
 import { landedProof } from '../scripts/kernel/settle-landed.mjs';
 import { resolveIntroducer } from '../scripts/kernel/introducer.mjs';
 
@@ -24,7 +25,10 @@ const world = (t, { orca = false } = {}) => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'starci-bridges-'));
   t.after(() => fs.rmSync(root, { recursive: true, force: true, maxRetries: 20, retryDelay: 25 }));
   const repo = path.join(root, 'repo'); fs.mkdirSync(repo, { recursive: true });
-  const env = { ...process.env };
+  // A private machine registry per world: dispatch enrols the ledger and 'repo' collides on
+  // ledgers.name in the suite-shared test registry otherwise. LOCALAPPDATA stays: project
+  // resolution runs through it.
+  const env = { ...process.env, [TEST_REGISTRY_ENV]: path.join(root, 'machine.sqlite') };
   for (const key of ['ORCA_TERMINAL_HANDLE', 'STARCI_ROLE', 'STARCI_OP_JOB', 'STARCI_GUARD_FILE']) delete env[key];
   const stateFile = path.join(root, 'orca-state.json');
   if (orca) {
@@ -42,19 +46,39 @@ const world = (t, { orca = false } = {}) => {
   const read = (fn) => { const l = inspectLedger({ file: ledgerFileFor(repo) }); try { return fn(l.db); } finally { l.close(); } };
   const workflow = (workflowId, { title = workflowId, phase = 'running' } = {}) => seed((l) => {
     l.ensureWorkflow({ workflowId, title, ledgerMode: 'durable', sourceRoots: [repo] });
-    l.db.prepare('UPDATE workflows SET phase=? WHERE workflow_id=?').run(phase, workflowId);
+    // Phase moves only through workflow_transitions + a lifecycle_changes row in the same transaction
+    // (workflows_phase_guard): seeded 'finished' walks queued -> running -> finished.
+    const walk = { 'queued': [], 'running': ['running'], 'finished': ['running', 'finished'] }[phase] ?? [phase];
+    for (const to of walk) l.write.changeWorkflowPhase({ workflowId, to, by: 'test', reason: `seed ${workflowId} ${phase}` });
     l.db.prepare('INSERT INTO goals(workflow_id,revision,goal_identity,markdown,json,created_at) VALUES(?,?,?,?,?,?)')
       .run(workflowId, 0, `goal-${workflowId}`, `# ${title} goal`, JSON.stringify({ derivedFrom: 'bridges-spec' }), Date.now());
   });
+  // Every op job is a try of a work unit (jobs_enqueue_guard, H3): create the unit first.
+  const unit = (l, workflowId, unitId, opId, subjectKey = unitId) => {
+    if (!l.db.prepare('SELECT 1 FROM work_units WHERE workflow_id=? AND unit_id=?').get(workflowId, unitId))
+      l.write.createUnit({ workflowId, unitId, opId, subjectKey, goalRevision: 1 });
+  };
+  // jobs.status moves only along job_transitions (jobs_status_guard): walk the seeded job there.
+  const settleTo = (l, jobId, status, reason = 'seed') => {
+    const route = {
+      ready: ['ready'], leased: ['ready', 'leased'], running: ['ready', 'leased', 'running'],
+      failed: ['ready', 'leased', 'running', 'failed'],
+      succeeded: ['ready', 'leased', 'running', 'reported', 'succeeded'],
+    }[status];
+    for (const to of route ?? [status]) l.write.setJobStatus({ jobId, to, reason });
+  };
   const writeOrca = (state) => fs.writeFileSync(stateFile, JSON.stringify(state));
-  return { root, repo, api, apiAsync, seed, read, workflow, writeOrca };
+  return { root, repo, api, apiAsync, seed, read, workflow, unit, settleTo, writeOrca };
 };
 
 test('api messages shows every orchestration message of the workflow\'s Runs, with its job and where it is handled', (t) => {
   const w = world(t, { orca: true });
   w.workflow('wf-msg');
-  w.seed((l) => l.enqueueJob({ jobId: 'op-code.refactor-aaaaaaaaaa', workflowId: 'wf-msg', opId: 'code.refactor', kind: 'op',
-    payload: { opId: 'code.refactor', owned_paths: ['docs/'], orca: { runId: 'run-msg-1', dispatchId: 'ctx_msg_1', agentTerminalHandle: 'term-op-1' } } }));
+  w.seed((l) => {
+    w.unit(l, 'wf-msg', 'u-msg-1', 'code.refactor', 'docs/');
+    l.enqueueJob({ jobId: 'op-code.refactor-aaaaaaaaaa', workflowId: 'wf-msg', unitId: 'u-msg-1', opId: 'code.refactor', kind: 'op',
+      payload: { opId: 'code.refactor', owned_paths: ['docs/'], orca: { runId: 'run-msg-1', dispatchId: 'ctx_msg_1', agentTerminalHandle: 'term-op-1' } } });
+  });
   const row = (id, type, extra = {}) => ({ id, run_id: 'run-msg-1', from_handle: 'dispatch:ctx_msg_1', to_handle: 'run:run-msg-1', subject: `${type} subject`,
     body: `${type} body`, type, thread_id: id, payload: JSON.stringify({ dispatchId: 'ctx_msg_1' }), read: 0, created_at: new Date().toISOString(), ...extra });
   w.writeOrca({ messages: [row('m_done', 'worker_done'), row('m_status', 'status'), row('m_q', 'question'), row('m_hb', 'heartbeat'),
@@ -98,9 +122,13 @@ test('a shared blocker is routed to the workflow whose code introduced it, as a 
   w.workflow('wf-nivo-modules-agentos-old', { title: 'nivo-modules-agentos', phase: 'finished' });
   w.workflow('wf-nivo-modules-agentos-x', { title: 'nivo-modules-agentos' });
   w.seed((l) => {
-    l.enqueueJob({ jobId: 'op-backend.implement-1111111111', workflowId: 'wf-nivo-modules-agentos-x', opId: 'backend.implement', kind: 'op', payload: { opId: 'backend.implement', owned_paths: ['platform/shell.ts'] } });
-    l.db.prepare('INSERT INTO reports(workflow_id,dispatch_id,op_id,attempt,generation,outcome,report_json,created_at) VALUES(?,?,?,?,?,?,?,?)')
-      .run('wf-nivo-modules-agentos-x', 'ctx_r1', 'backend.implement', 1, 1, 'done', JSON.stringify({ outcome: 'done', head: reported.slice(0, 10) }), Date.now());
+    w.unit(l, 'wf-nivo-modules-agentos-x', 'u-r1', 'backend.implement', 'platform/shell.ts');
+    l.enqueueJob({ jobId: 'op-backend.implement-1111111111', workflowId: 'wf-nivo-modules-agentos-x', unitId: 'u-r1', opId: 'backend.implement', kind: 'op', payload: { opId: 'backend.implement', owned_paths: ['platform/shell.ts'] } });
+    // A reports row is attempt-bound (H10): the job leases, the dispatch opens an op_attempts row, the
+    // report files on it - resolveIntroducer reads report_json.head for the 'report-head' route.
+    w.settleTo(l, 'op-backend.implement-1111111111', 'leased');
+    const attempt = l.write.startAttempt({ workflowId: 'wf-nivo-modules-agentos-x', jobId: 'op-backend.implement-1111111111', dispatchId: 'ctx_r1' });
+    l.write.fileReport({ attemptId: attempt.attempt_id, outcome: 'done', report: { outcome: 'done', head: reported.slice(0, 10) } });
   });
   const raise = (extra) => w.api(['incident', '--workflow', 'wf-nivo-workspace-provision-x', '--kind', 'shared-blocker',
     '--detail', 'Nest cannot resolve ModuleRecoveryClientService (?, MODULE_RECOVERY_RECONCILERS)', ...extra]);
@@ -146,11 +174,16 @@ test('a routed shared blocker becomes a typed wait on the introducer\'s owning j
   const INTRO = 'op-backend.implement-9785552dcb', OWNER = 'op-backend.implement-853af99286', OTHER = 'op-backend.implement-aaaaaaaaaa';
   w.workflow(REPORTER); w.workflow(STUDIO);
   w.seed((l) => {
-    const add = (jobId, attempt, status, payload) => l.db.prepare(`INSERT INTO jobs(job_id,workflow_id,op_id,attempt,generation,kind,role,payload_json,status,created_at,updated_at)
-      VALUES(?,?,'backend.implement',?,0,'op','op',?,?,?,?)`).run(jobId, STUDIO, attempt, JSON.stringify({ opId: 'backend.implement', ...payload }), status, Date.now() - 60_000, Date.now() - 60_000);
-    add(INTRO, 5, 'failed', { owned_paths: ['src/pod.controller.ts'] });
-    add(OWNER, 10, 'queued', { owned_paths: ['src/pod.controller.ts', 'src/pod.controller.spec.ts'], retry: { retryOf: INTRO } });
-    add(OTHER, 11, 'queued', { owned_paths: ['src/unrelated.ts'] });
+    // jobs.retry_of is a unit lineage now (H3/H4): the retry is the next try of the introducer's unit.
+    const add = (jobId, status, unitId, tryNo, retryOf, payload) => {
+      w.unit(l, STUDIO, unitId, 'backend.implement', jobId);
+      l.enqueueJob({ jobId, workflowId: STUDIO, unitId, opId: 'backend.implement', tryNo, retryOf, kind: 'op',
+        payload: { opId: 'backend.implement', ...payload }, createdAt: Date.now() - 60_000 });
+      if (status !== 'queued') w.settleTo(l, jobId, status);
+    };
+    add(INTRO, 'failed', 'u-intro', 1, null, { owned_paths: ['src/pod.controller.ts'] });
+    add(OWNER, 'queued', 'u-intro', 2, INTRO, { owned_paths: ['src/pod.controller.ts', 'src/pod.controller.spec.ts'], retry: { retryOf: INTRO } });
+    add(OTHER, 'queued', 'u-other', 1, null, { owned_paths: ['src/unrelated.ts'] });
   });
   const raise = (detail, extra = []) => {
     const r = w.api(['incident', '--workflow', REPORTER, '--kind', 'shared-blocker', '--introducer', STUDIO, '--detail', detail, ...extra]);
@@ -167,8 +200,8 @@ test('a routed shared blocker becomes a typed wait on the introducer\'s owning j
   const legacy = 'inc-000000legacy';
   w.seed((l) => {
     const text = `Commit 9caa2d5c (${INTRO} a5) broke the spec; queued sibling ${OWNER} owns the fix`;
-    l.db.prepare("INSERT INTO incidents(incident_id,workflow_id,op_id,attempts,model_calls,tokens,elapsed_ms,last_progress,status,updated_at) VALUES(?,?,NULL,0,0,0,0,?,'open',?)")
-      .run(legacy, REPORTER, `[shared-blocker] ${text}`, Date.now());
+    l.db.prepare("INSERT INTO incidents(incident_id,workflow_id,kind,owner,attempts,model_calls,tokens,elapsed_ms,last_progress,status,created_at,updated_at) VALUES(?,?,'other','kernel',0,0,0,0,?,'open',?,?)")
+      .run(legacy, REPORTER, `[shared-blocker] ${text}`, Date.now(), Date.now());
     l.appendEvent({ workflowId: REPORTER, entityType: 'incident', entityId: legacy, kind: 'incident-raised', payload: { kind: 'shared-blocker', detail: text, opId: null } });
     l.appendEvent({ workflowId: REPORTER, entityType: 'incident', entityId: legacy, kind: 'shared-blocker-routed', payload: { routed: true, to: STUDIO, key: 'pm-x', via: 'explicit', commit: null } });
   });
@@ -178,7 +211,7 @@ test('a routed shared blocker becomes a typed wait on the introducer\'s owning j
     assert.deepEqual(typed.get(id)?.until, [{ type: 'job', jobId: OWNER, want: 'succeeded' }], `${id} waits on ${OWNER}`);
   }
   assert.equal(typed.has(unnamed.incidentId), true);
-  w.seed((l) => l.db.prepare("UPDATE jobs SET status='succeeded',updated_at=? WHERE job_id=?").run(Date.now(), OWNER));
+  w.seed((l) => w.settleTo(l, OWNER, 'succeeded', 'seed owner settled'));
   json(w.api(['status', '--workflow', REPORTER]).stdout);
   const status = (id) => w.read((db) => db.prepare('SELECT status FROM incidents WHERE incident_id=?').get(id).status);
   assert.deepEqual([named.incidentId, viaCommit.incidentId, legacy, unnamed.incidentId].map(status), ['resolved', 'resolved', 'resolved', 'open']);
@@ -188,21 +221,26 @@ test('op-contract waits for a dispatch still committing its row, and answers mis
   const w = world(t);
   w.workflow('wf-oc');
   w.seed((l) => {
-    l.enqueueJob({ jobId: 'op-interface.draw-e5233f0306', workflowId: 'wf-oc', opId: 'interface.draw', kind: 'op', payload: { opId: 'interface.draw', owned_paths: ['docs/'] } });
-    l.db.prepare("UPDATE jobs SET status='leased' WHERE job_id='op-interface.draw-e5233f0306'").run();
+    w.unit(l, 'wf-oc', 'u-oc-1', 'interface.draw', 'docs/');
+    l.enqueueJob({ jobId: 'op-interface.draw-e5233f0306', workflowId: 'wf-oc', unitId: 'u-oc-1', opId: 'interface.draw', kind: 'op', payload: { opId: 'interface.draw', owned_paths: ['docs/'] } });
+    w.settleTo(l, 'op-interface.draw-e5233f0306', 'leased');
   });
   const pending = w.apiAsync(['op-contract', '--job', 'op-interface.draw-e5233f0306']);
   await new Promise((resolve) => setTimeout(resolve, 2500));
   w.seed((l) => {
-    l.db.prepare('INSERT INTO contracts(workflow_id,op_id,attempt,dispatch_id,markdown,context_json,created_at) VALUES(?,?,?,?,?,?,?)')
-      .run('wf-oc', 'interface.draw', 1, 'ctx_72d7e9acb0ef', '# contract for attempt 1', JSON.stringify({ packet: {} }), Date.now());
-    l.db.prepare("UPDATE jobs SET status='running' WHERE job_id='op-interface.draw-e5233f0306'").run();
+    // Contracts key on op_attempts.attempt_id now: the dispatch opens the attempt, the contract files on it.
+    const attempt = l.write.startAttempt({ workflowId: 'wf-oc', jobId: 'op-interface.draw-e5233f0306', dispatchId: 'ctx_72d7e9acb0ef' });
+    l.write.writeContract({ attemptId: attempt.attempt_id, markdown: '# contract for attempt 1', context: { packet: {} } });
+    l.write.setJobStatus({ jobId: 'op-interface.draw-e5233f0306', to: 'running', reason: 'worker picked it up' });
   });
   const r = await pending;
   assert.equal(r.status, 0, r.stderr);
   assert.equal(json(r.stdout).dispatchId, 'ctx_72d7e9acb0ef');
-  w.seed((l) => l.enqueueJob({ jobId: 'op-interface.draw-ffffffffff', workflowId: 'wf-oc', opId: 'interface.draw', attempt: 2, kind: 'op', payload: { opId: 'interface.draw' } }));
-  w.seed((l) => l.db.prepare("UPDATE jobs SET status='running' WHERE job_id='op-interface.draw-ffffffffff'").run());
+  w.seed((l) => {
+    w.unit(l, 'wf-oc', 'u-oc-2', 'interface.draw', 'docs/other');
+    l.enqueueJob({ jobId: 'op-interface.draw-ffffffffff', workflowId: 'wf-oc', unitId: 'u-oc-2', opId: 'interface.draw', kind: 'op', payload: { opId: 'interface.draw' } });
+    w.settleTo(l, 'op-interface.draw-ffffffffff', 'running');
+  });
   const started = Date.now();
   const missing = w.api(['op-contract', '--job', 'op-interface.draw-ffffffffff']);
   assert.equal(missing.status, 1);
@@ -218,16 +256,24 @@ test('an uncut retry chains to its own unit of work; --retry-of pins it; the goa
     assert.equal(r.status, 0, r.stderr);
     return json(r.stdout).job_id;
   };
-  const fail = (jobId) => w.seed((l) => l.db.prepare("UPDATE jobs SET status='failed', result_json=? WHERE job_id=?").run(JSON.stringify({ verdict: 'fail' }), jobId));
+  // jobs has no result column: the result is the attempt's settle_json, or one 'job-result' event
+  // for a job that never dispatched (recordJobResult). Status walks job_transitions.
+  const fail = (jobId) => w.seed((l) => {
+    w.settleTo(l, jobId, 'failed');
+    l.write.recordJobResult({ jobId, result: { verdict: 'fail' } });
+  });
   const tasks = enqueue('docs/collab/tasks'); fail(tasks);
   const membership = enqueue('docs/collab/membership'); fail(membership);
   const retry = enqueue('docs/collab/tasks');
-  const lineage = (jobId) => w.read((db) => json(db.prepare('SELECT payload_json FROM jobs WHERE job_id=?').get(jobId).payload_json).retry);
-  assert.equal(lineage(retry).retryOf, tasks, 'not the later membership job');
-  assert.equal(lineage(membership), undefined, 'a first job of its own work has no predecessor');
+  // The lineage is the work unit now (units.mjs): a retry is the same unit's next try, jobs.retry_of
+  // naming the failed try it follows - payload.retry is gone.
+  const lineage = (jobId) => w.read((db) => db.prepare('SELECT unit_id, try_no, retry_of FROM jobs WHERE job_id=?').get(jobId));
+  assert.deepEqual([lineage(retry).unit_id, lineage(retry).try_no, lineage(retry).retry_of],
+    [lineage(tasks).unit_id, 2, tasks], 'the failed job\'s own unit, not the later membership job');
+  assert.equal(lineage(membership).retry_of, null, 'a first job of its own work has no predecessor');
   fail(retry);
   const pinned = enqueue('docs/collab/other', ['--retry-of', membership]);
-  assert.equal(lineage(pinned).retryOf, membership);
+  assert.equal(lineage(pinned).retry_of, membership);
   const bad = w.api(['enqueue', '--workflow', 'wf-lin', '--op', 'docs.author', '--paths', 'docs/x', '--retry-of', 'op-docs.author-0000000000']);
   assert.equal(bad.status, 1);
   const dryRun = w.api(['dispatch', '--job', pinned]);
@@ -273,17 +319,21 @@ test('the landed proof ignores filed report files and refuses a commit carrying 
 test('an answered ask stays awaiting its owner-answer retry until a job of ITS work exists (mia inc-2f7968ede59c)', (t) => {
   const w = world(t);
   w.workflow('wf-ask');
-  const add = (jobId, attempt, status, ownedPaths, result = null) => w.seed((l) => {
-    l.enqueueJob({ jobId, workflowId: 'wf-ask', opId: 'business.decide', attempt, kind: 'op', payload: { opId: 'business.decide', owned_paths: ownedPaths } });
-    l.db.prepare('UPDATE jobs SET status=?, result_json=? WHERE job_id=?').run(status, result ? JSON.stringify(result) : null, jobId);
+  // "A job of ITS work" is the next try of the same unit (status.mjs stillWaits): the retry carries
+  // try_no+1 and retry_of the failed job of that unit - an unrelated same-op job is a different unit.
+  const add = (jobId, { unitId, tryNo = 1, retryOf = null }, status, ownedPaths, result = null) => w.seed((l) => {
+    w.unit(l, 'wf-ask', unitId, 'business.decide', jobId);
+    l.enqueueJob({ jobId, workflowId: 'wf-ask', unitId, opId: 'business.decide', tryNo, retryOf, kind: 'op', payload: { opId: 'business.decide', owned_paths: ownedPaths } });
+    if (status !== 'queued') w.settleTo(l, jobId, status);
+    if (result) l.write.recordJobResult({ jobId, result });
   });
-  add('op-business.decide-aaaaaaaaaa', 1, 'failed', ['.starciwork/features/account/decision/social-only-password'], { verdict: 'awaiting-owner', askDispatchId: 'ctx_ae2e07987208' });
+  add('op-business.decide-aaaaaaaaaa', { unitId: 'u-ask-a' }, 'failed', ['.starciwork/features/account/decision/social-only-password'], { verdict: 'awaiting-owner', askDispatchId: 'ctx_ae2e07987208' });
   w.seed((l) => l.appendEvent({ workflowId: 'wf-ask', entityType: 'job', entityId: 'op-business.decide-aaaaaaaaaa', kind: 'ask-answered', payload: { dispatchId: 'ctx_ae2e07987208' } }));
   const waiting = () => json(w.api(['status', '--workflow', 'wf-ask']).stdout).awaitingOwner.map((a) => [a.jobId, a.answer]);
   assert.deepEqual(waiting(), [['op-business.decide-aaaaaaaaaa', 'answered']]);
-  add('op-business.decide-bbbbbbbbbb', 2, 'queued', ['.starciwork/features/community/decision/study-day-qualifier']);
+  add('op-business.decide-bbbbbbbbbb', { unitId: 'u-ask-b' }, 'queued', ['.starciwork/features/community/decision/study-day-qualifier']);
   assert.deepEqual(waiting(), [['op-business.decide-aaaaaaaaaa', 'answered']], 'an unrelated same-op job is not its retry');
-  add('op-business.decide-cccccccccc', 3, 'queued', ['.starciwork/features/account/decision/social-only-password']);
+  add('op-business.decide-cccccccccc', { unitId: 'u-ask-a', tryNo: 2, retryOf: 'op-business.decide-aaaaaaaaaa' }, 'queued', ['.starciwork/features/account/decision/social-only-password']);
   assert.deepEqual(waiting(), [], 'the owner-answer retry of its own record replaces the wait');
 });
 
@@ -293,19 +343,23 @@ test('dispatch files the contract row before the preamble reaches the worker', (
   const enqueue = (jobId) => w.seed((l) => {
     l.enqueueJob({ jobId: `kernel-${jobId}`, workflowId: 'wf-cf', kind: 'kernel', role: 'kernel',
       payload: { hierarchy: { schema: 'starci/agent-hierarchy@1', nodeId: 'agent:kernel:wf-cf', parentNodeId: 'workflow:wf-cf', role: 'kernel' } } });
-    l.db.prepare("UPDATE jobs SET status='running',worker_id='fake-kernel-terminal' WHERE job_id=?").run(`kernel-${jobId}`);
-    l.enqueueJob({ jobId, workflowId: 'wf-cf', opId: 'code.refactor', kind: 'op', payload: { opId: 'code.refactor', owned_paths: ['docs/'], model: 'codex-agent', difficulty: 'hard' } });
+    w.settleTo(l, `kernel-${jobId}`, 'running', 'kernel seated');
+    l.write.updateJob({ jobId: `kernel-${jobId}`, workerId: 'fake-kernel-terminal' });
+    w.unit(l, 'wf-cf', `u-${jobId}`, 'code.refactor', 'docs/');
+    l.enqueueJob({ jobId, workflowId: 'wf-cf', unitId: `u-${jobId}`, opId: 'code.refactor', kind: 'op', payload: { opId: 'code.refactor', owned_paths: ['docs/'], model: 'codex-agent', difficulty: 'hard' } });
   });
   enqueue('op-code.refactor-cf00000001');
   const ok = w.api(['dispatch', '--job', 'op-code.refactor-cf00000001', '--model', 'codex-agent', '--spawn']);
   assert.equal(ok.status, 0, ok.stderr || ok.stdout);
-  const row = w.read((db) => db.prepare("SELECT dispatch_id, context_json FROM contracts WHERE workflow_id='wf-cf' AND op_id='code.refactor' AND attempt=1").get());
+  // The contract row keys on the dispatch attempt (contracts.attempt_id); dispatch_id lives on op_attempts.
+  const row = w.read((db) => db.prepare(`SELECT a.dispatch_id, c.context_json FROM contracts c JOIN op_attempts a ON a.attempt_id=c.attempt_id
+    WHERE c.workflow_id='wf-cf' AND a.op_id='code.refactor' AND a.try_no=1`).get());
   assert.equal(row.dispatch_id, json(ok.stdout).dispatchId);
   assert.ok(json(row.context_json).delivery.text, 'the running transaction re-files it with the delivered text');
   const guard = w.read((db) => json(db.prepare("SELECT payload_json FROM events WHERE kind='op-dispatched' AND entity_id='op-code.refactor-cf00000001'").get().payload_json).guard);
   assert.ok(guard?.jobFile, 'the dispatch receipt names the shared-checkout guard');
-  const code = fs.readFileSync(path.join(ROOT, 'scripts', 'kernel', 'api.mjs'), 'utf8');
-  const early = code.indexOf('ledger.transaction(() => fileContract(db, { job, op, dispatchId, markdown: contractMarkdown');
+  const code = fs.readFileSync(path.join(ROOT, 'scripts', 'kernel', 'api-verbs', 'dispatch.mjs'), 'utf8');
+  const early = code.indexOf('fileContract(db, { job, op, dispatchId, markdown: contractMarkdown');
   assert.ok(early > 0 && early < code.indexOf('const sent = deliverPrompt({ handle, adapter, prompt: dispatched.preamble'),
     'the command-terminal dispatch commits the contract row before it delivers the preamble');
 });

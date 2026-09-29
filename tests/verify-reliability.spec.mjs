@@ -17,6 +17,7 @@ import {classifyFailure,measurementCheckClass,resolveRootOwner,failureSignature}
 import {validateOpReport} from '../scripts/kernel/report-envelope.mjs';
 import {parseYaml} from '../engine/yaml.mjs';
 import {checkEnvironments,discoverHealth,probeHttp,envHealthMain,environmentIdsOfPaths,readRegistered} from '../scripts/uat/env-health.mjs';
+import {recordEnvelopeChecks} from '../scripts/kernel/api-lib/check-evidence.mjs';
 
 // These cases exercise the owner-flow routing of verify failures; autopilot (scripts/kernel/autopilot.mjs, owner ruling
 // 2026-09-28) is on by default and re-routes an owner gate to a supervisor-gate, so this spec runs with it off -
@@ -54,27 +55,56 @@ const world=(t,{legs=['uat.verify'],workspace=true}={})=>{
   const read=fn=>{const ledger=inspectLedger({file:ledgerFileFor(repo)});try{return fn(ledger.db);}finally{ledger.close();}};
   seed(ledger=>{
     ledger.ensureWorkflow({workflowId:wf,title:'verify reliability'});
-    ledger.db.prepare("UPDATE workflows SET phase='running' WHERE workflow_id=?").run(wf);
+    // workflows.phase moves only through workflow_transitions with a lifecycle_changes row (phase guard).
+    ledger.write.changeWorkflowPhase({workflowId:wf,to:'running',by:'test',reason:'seed'});
     ledger.db.prepare('INSERT INTO goals(workflow_id,revision,goal_identity,markdown,json,created_at) VALUES(?,?,?,?,?,?)')
       .run(wf,0,'g0','# goal',json({derivedPlan:{legs:legs.map(op=>({op}))}}),Date.now());
   });
-  const api=(...args)=>{
-    const r=spawnSync(process.execPath,[API,...args,'--repo',repo,'--json'],{cwd:ROOT,encoding:'utf8',windowsHide:true,timeout:120000,env:{...process.env,STARCI_ENV_GATE:'off'}});
+  // api(args[], extraEnv={}): STARCI_CALLER=runtime-settler makes `check` take the supplied exits as the
+  // Kernel's own observations - without it a non-runtime caller re-runs runtime-command checks and the
+  // measurement legs get rerun exits, not the seeded evidence (scripts/kernel/api-verbs/check.mjs).
+  const api=(args,extraEnv={})=>{
+    const r=spawnSync(process.execPath,[API,...args,'--repo',repo,'--json'],{cwd:ROOT,encoding:'utf8',windowsHide:true,timeout:120000,env:{...process.env,STARCI_ENV_GATE:'off',...extraEnv}});
     let body=null;try{body=JSON.parse(r.stdout);}catch{}
     return {...r,body};
   };
+  // Runtime schema: an op job is a try of a work unit (jobs_enqueue_guard), its dispatch an op_attempts row
+  // (dispatch guard: the job leased, the workflow running), its status moves along job_transitions.
+  const dispatchAttempt=(ledger,jobId)=>{
+    for(const to of ['ready','leased'])ledger.write.setJobStatus({jobId,to,reason:'seed'});
+    const attempt=ledger.write.startAttempt({workflowId:wf,jobId,dispatchId:`ctx_${jobId}`});
+    return attempt;
+  };
+  const afterDispatch={running:['running'],answering:['running','answering'],reported:['running','reported'],
+    deciding:['running','reported','deciding'],effect_unknown:['running','effect_unknown'],
+    succeeded:['running','reported','succeeded'],failed:['running','failed'],leased:[],ready:[]};
   const job=(jobId,op,{status='running',records=[],paths=['docs/'],params=null,extra={}}={})=>seed(ledger=>{
-    ledger.enqueueJob({jobId,workflowId:wf,opId:op,kind:'op',payload:{opId:op,records,owned_paths:paths,...(params?{params}:{}),...extra}});
-    ledger.db.prepare('UPDATE jobs SET status=? WHERE job_id=?').run(status,jobId);
+    ledger.write.createUnit({workflowId:wf,unitId:`u-${jobId}`,opId:op,subjectKey:jobId,goalRevision:0});
+    ledger.enqueueJob({jobId,workflowId:wf,unitId:`u-${jobId}`,opId:op,kind:'op',payload:{opId:op,records,owned_paths:paths,...(params?{params}:{}),...extra}});
+    if(status==='queued')return;
+    if(status==='ready'){ledger.write.setJobStatus({jobId,to:'ready',reason:'seed'});return;}
+    dispatchAttempt(ledger,jobId);
+    for(const to of afterDispatch[status]??[])ledger.write.setJobStatus({jobId,to,reason:'seed'});
   });
+  // A report is attempt-bound (H10) and its contract keys on the attempt: a queued job (a route's fresh
+  // retry) is dispatched first so the report has an attempt to land on.
   const report=(jobId,outcome='failed',extra={})=>seed(ledger=>{
-    const row=ledger.db.prepare('SELECT op_id,attempt FROM jobs WHERE job_id=?').get(jobId);
-    ledger.db.prepare("UPDATE jobs SET status='running' WHERE job_id=?").run(jobId);
-    ledger.db.prepare('INSERT OR REPLACE INTO contracts(workflow_id,op_id,attempt,dispatch_id,markdown,context_json,created_at) VALUES(?,?,?,?,?,?,?)').run(wf,row.op_id,row.attempt,jobId,'# contract','{}',Date.now());
-    ledger.db.prepare('INSERT INTO reports(workflow_id,dispatch_id,op_id,attempt,generation,outcome,report_json,from_terminal,consumed_at,created_at) VALUES(?,?,?,?,0,?,?,NULL,NULL,?)')
-      .run(wf,jobId,row.op_id,row.attempt,outcome,json({schema:'starci/op-report@1',outcome,summary:`${outcome} on purpose`,...extra}),Date.now());
+    let attempt=ledger.db.prepare('SELECT * FROM op_attempts WHERE job_id=? ORDER BY attempt_id DESC LIMIT 1').get(jobId);
+    if(!attempt){
+      attempt=dispatchAttempt(ledger,jobId);
+      ledger.write.setJobStatus({jobId,to:'running',reason:'seed'});
+    }
+    if(!ledger.db.prepare('SELECT 1 FROM contracts WHERE attempt_id=?').get(attempt.attempt_id))
+      ledger.write.writeContract({attemptId:attempt.attempt_id,markdown:'# contract',context:{}});
+    ledger.write.fileReport({attemptId:attempt.attempt_id,outcome,
+      report:{schema:'starci/op-report@1',outcome,summary:`${outcome} on purpose`,...extra}});
   });
-  const row=jobId=>read(db=>{const r=db.prepare('SELECT * FROM jobs WHERE job_id=?').get(jobId);return r&&{...r,payload:JSON.parse(r.payload_json),result:JSON.parse(r.result_json??'null')};});
+  // jobs carries no result_json column: the result is the newest attempt's settle_json, else the latest
+  // 'job-result' event (engine/ledger-db.mjs jobResult) - projected here as `result`.
+  const row=jobId=>read(db=>{const r=db.prepare('SELECT * FROM jobs WHERE job_id=?').get(jobId);if(!r)return r;
+    const settled=db.prepare('SELECT settle_json FROM op_attempts WHERE job_id=? ORDER BY attempt_id DESC LIMIT 1').get(jobId)?.settle_json
+      ??db.prepare("SELECT payload_json FROM events WHERE entity_type='job' AND entity_id=? AND kind='job-result' ORDER BY seq DESC LIMIT 1").get(jobId)?.payload_json;
+    return {...r,payload:JSON.parse(r.payload_json),result:JSON.parse(settled??'null')};});
   return {repo,wf,api,job,report,row,read,seed};
 };
 
@@ -119,7 +149,7 @@ test('a red UAT naming a backend record repairs that record with a fresh backend
   const w=world(t,{legs:['uat.verify']});
   w.job('uat1','uat.verify',{paths:['.starciwork/features/login/uat/password-sign-in','src/auth/sign-in','repository:nivo-fe/apps/app/src/auth'],extra:{repository:'fe'}});
   w.report('uat1','failed',{head:'f09c641',rootCause:UAT_ROOT_CAUSE,checks:[{name:'uat-spec-run',command:'node --test e2e/login.spec.mjs',exitCode:1,evidence:'6/9 pass'}]});
-  const r=w.api('settle','--job','uat1','--verdict','fail');
+  const r=w.api(['settle','--job','uat1','--verdict','fail']);
   assert.equal(r.status,0,r.stderr||r.stdout);
   const next=r.body.nextStep;
   assert.deepEqual([next.kind,next.route,next.class],['repair','uat-red-repairs-the-build','product']);
@@ -142,7 +172,7 @@ test('a red UAT whose owner resolves to nothing stops for the owner with its cla
   const w=world(t,{legs:['uat.verify'],workspace:false});
   w.job('uat1','uat.verify',{paths:['.starciwork/features/login/uat/password-sign-in']});
   w.report('uat1','failed',{head:'f09c641',checks:[{name:'uat-spec-run',command:'node --test e2e/login.spec.mjs',exitCode:1}]});
-  const next=w.api('settle','--job','uat1','--verdict','fail').body.nextStep;
+  const next=w.api(['settle','--job','uat1','--verdict','fail']).body.nextStep;
   assert.deepEqual([next.kind,next.route,next.class],['owner-gate','failed-without-a-repairable-owner-needs-the-user','product']);
   assert.match(next.reason,/failure class product/);
 });
@@ -151,16 +181,21 @@ test('an environment failure re-runs behind the pre-step; a tool error retries; 
   const w=world(t,{legs:['uat.verify','docs.author']});
   w.job('u','uat.verify',{paths:['.starciwork/features/login/uat/x']});
   w.report('u','failed',{checks:[{name:'env-health',command:'node scripts/uat/env-health.mjs check',exitCode:3}]});
-  let next=w.api('settle','--job','u','--verdict','fail').body.nextStep;
+  let next=w.api(['settle','--job','u','--verdict','fail']).body.nextStep;
   assert.deepEqual([next.kind,next.route,next.class],['retry','failed-environment-runs-again-behind-the-pre-step','environment']);
   w.job('d','docs.author');w.report('d','failed',{head:'aaaaaaa',checks:[{name:'docs-lint',command:'npm run docs:lint',exitCode:1}]});
-  next=w.api('settle','--job','d','--verdict','fail').body.nextStep;
+  next=w.api(['settle','--job','d','--verdict','fail']).body.nextStep;
   assert.deepEqual([next.kind,next.route,next.class],['retry','failed-retries-the-same-op','transient']);
   const again=next.jobs[0];
   w.report(again,'failed',{head:'aaaaaaa',checks:[{name:'docs-lint',command:'npm run docs:lint',exitCode:1}]});
-  w.seed(l=>l.db.prepare('INSERT OR REPLACE INTO checks(workflow_id,op_id,attempt,checks_json,created_at) VALUES(?,?,?,?,?)').run(w.wf,'docs.author',1,json({checks:[{name:'docs-lint',command:'npm run docs:lint',exitCode:1}]}),Date.now()));
-  w.seed(l=>l.db.prepare('INSERT OR REPLACE INTO checks(workflow_id,op_id,attempt,checks_json,created_at) VALUES(?,?,?,?,?)').run(w.wf,'docs.author',2,json({checks:[{name:'docs-lint',command:'npm run docs:lint',exitCode:1}]}),Date.now()));
-  next=w.api('settle','--job',again,'--verdict','fail').body.nextStep;
+  // The Kernel's independent checks live on check_runs of each attempt (H8): both tries recorded the
+  // identical red, so the signature compare sees the same failure twice.
+  w.seed(l=>{for(const jobId of ['d',again]){
+    const attempt=l.db.prepare('SELECT attempt_id FROM op_attempts WHERE job_id=? ORDER BY attempt_id DESC LIMIT 1').get(jobId);
+    recordEnvelopeChecks(l.db,{attemptId:attempt.attempt_id,runner:'kernel',
+      checks:[{name:'docs-lint',command:'npm run docs:lint',exitCode:1}]});
+  }});
+  next=w.api(['settle','--job',again,'--verdict','fail']).body.nextStep;
   assert.deepEqual([next.kind,next.class],['owner-gate','deterministic'],'the identical red at the same HEAD is not retried blind');
 });
 
@@ -170,13 +205,13 @@ test('a lint MEASUREMENT leg with findings settles pass (even filed failed), and
   const w=world(t,{legs:['review.verify','test.author','code.refactor'],workspace:false});
   w.job('lint','review.verify',{params:{mode:'lint'},paths:['.starciwork/evidence/wf.lint']});
   w.report('lint','failed',{checks:CANON_CHECKS,rootCause:{node:'code.refactor',self:false,category:'pending-upstream-repair',claim:'canon debt awaits the refactor legs',evidence:['574 findings']}});
-  const checked=w.api('check','--job','lint','--checks',json({checks:CANON_CHECKS}));
+  const checked=w.api(['check','--job','lint','--checks',json({checks:CANON_CHECKS})],{STARCI_CALLER:'runtime-settler'});
   assert.equal(checked.status,0,checked.stderr||checked.stdout);
   assert.deepEqual([checked.body.checkEvidence.passed,checked.body.checkEvidence.failed,checked.body.checkEvidence.green],[3,0,true],'the measured findings count as a completed measurement');
-  const refused=w.api('settle','--job','lint','--verdict','fail');
+  const refused=w.api(['settle','--job','lint','--verdict','fail']);
   assert.notEqual(refused.status,0);
   assert.match(refused.stdout+refused.stderr,/measurement-findings-are-the-result/);
-  const passed=w.api('settle','--job','lint','--verdict','pass');
+  const passed=w.api(['settle','--job','lint','--verdict','pass']);
   assert.equal(passed.status,0,passed.stderr||passed.stdout);
   const row=w.row('lint');
   assert.equal(row.status,'succeeded');
@@ -188,19 +223,21 @@ test('a measurement whose checker did not run fails as a tool error and retries;
   w.job('lint','review.verify',{params:{mode:'lint'},paths:['.starciwork/evidence/wf.lint']});
   const broken=[{...CANON_CHECKS[0],exitCode:3,evidence:'a selected machine could not run'}];
   w.report('lint','failed',{checks:broken});
-  w.api('check','--job','lint','--checks',json({checks:broken}));
-  let next=w.api('settle','--job','lint','--verdict','fail').body.nextStep;
+  w.api(['check','--job','lint','--checks',json({checks:broken})],{STARCI_CALLER:'runtime-settler'});
+  let next=w.api(['settle','--job','lint','--verdict','fail']).body.nextStep;
   assert.deepEqual([next.kind,next.route,next.class],['retry','failed-tool-error-retries','tool']);
   // The final gate: a code.refactor settled before it, so findings are findings of the build.
   w.job('refactor','code.refactor',{status:'succeeded',paths:['apps/app/src/a']});
   w.seed(l=>l.db.prepare("UPDATE jobs SET updated_at=1 WHERE job_id='refactor'").run());
   w.job('gate','review.verify',{params:{mode:'lint'},paths:['.starciwork/evidence/wf.lint-final']});
-  w.seed(l=>l.db.prepare("UPDATE jobs SET attempt=3 WHERE job_id='gate'").run()); // its own attempt: checks rows key on (op, attempt)
   w.report('gate','failed',{checks:[CANON_CHECKS[0]],rootCause:{node:'code.refactor',self:false,category:'canon',claim:'slice a still has 3 findings',evidence:['canon-scan apps/app/src/a'],files:['apps/app/src/a']}});
-  next=w.api('settle','--job','gate','--verdict','fail').body.nextStep;
+  next=w.api(['settle','--job','gate','--verdict','fail']).body.nextStep;
   assert.deepEqual([next.kind,next.route,next.class],['repair','review-findings-repair-the-build','findings']);
   assert.equal(w.row(next.jobs[0]).op_id,'code.refactor');
-  assert.equal(w.row(next.jobs[0]).payload.retry.retryOf,'refactor','the refactor that owns the path is reopened');
+  // The repair is the next try of the refactor's own unit: a done unit is reopened for it (units.mjs H5),
+  // so retry_of is empty and the lineage is the shared unit_id.
+  assert.equal(w.row(next.jobs[0]).unit_id,w.row('refactor').unit_id,'the refactor that owns the path is reopened');
+  assert.equal(w.row(next.jobs[0]).try_no,2);
 });
 
 /* ------------------------------------------------------------------ environment pre-step */
@@ -299,8 +336,11 @@ test('api dispatch runs the environment pre-step for a walk: a foreign hung port
   const repo=path.join(root,'repo');fs.mkdirSync(repo,{recursive:true});
   const stub=path.join(root,'fake-orca.mjs');fs.writeFileSync(stub,FAKE_ORCA);
   const log=path.join(root,'calls.jsonl');
+  // The spawned api resolves machine.sqlite/projects under ITS env's LOCALAPPDATA + the test registry;
+  // ledgerFileFor({env}) seeds the file that resolution lands on.
   const env={...process.env,STARCI_ORCA_COMMAND:process.execPath,STARCI_ORCA_ARGS:JSON.stringify([stub]),STARCI_FAKE_ORCA_MODE:'healthy',
-    STARCI_FAKE_ORCA_LOG:log,STARCI_FAKE_ORCA_STATE:path.join(root,'state.json'),LOCALAPPDATA:path.join(root,'localappdata'),STARCI_ENV_GATE:'',STARCI_ENV_PROBE_TIMEOUT_MS:'1500'};
+    STARCI_FAKE_ORCA_LOG:log,STARCI_FAKE_ORCA_STATE:path.join(root,'state.json'),LOCALAPPDATA:path.join(root,'localappdata'),
+    STARCI_PROJECTS_ROOT:path.join(root,'projects'),STARCI_TEST_MACHINE_FILE:path.join(root,'machine.sqlite'),STARCI_ENV_GATE:'',STARCI_ENV_PROBE_TIMEOUT_MS:'1500'};
   const hung=net.createServer(()=>{});
   const hungPort=await new Promise(r=>hung.listen(0,'127.0.0.1',()=>r(hung.address().port)));
   t.after(()=>hung.close());
@@ -316,8 +356,13 @@ test('api dispatch runs the environment pre-step for a walk: a foreign hung port
   };
   const flow=path.join(repo,'.starciwork','features','login','uat','password-sign-in');fs.mkdirSync(flow,{recursive:true});
   fs.writeFileSync(path.join(flow,'index.yaml'),'schema: work/uat-flow@1\nid: uat.login.password-sign-in\nrefs:\n  - environment.t.login-local\n');
-  const ledger=openLedger({file:ledgerFileFor(repo)});
-  try{ledger.enqueueJob({jobId:'job-uat',workflowId:'wf-env',opId:'uat.verify',kind:'op',payload:{opId:'uat.verify',records:['.starciwork/features/login/uat/password-sign-in'],owned_paths:['.starciwork/features/login/uat/password-sign-in'],model:'devin-agent'}});}
+  const ledger=openLedger({file:ledgerFileFor(repo,{env})});
+  try{
+    ledger.ensureWorkflow({workflowId:'wf-env',title:'wf-env',ledgerMode:'durable',sourceRoots:[repo]});
+    ledger.write.changeWorkflowPhase({workflowId:'wf-env',to:'running',by:'test',reason:'seed'});
+    ledger.write.createUnit({workflowId:'wf-env',unitId:'u-job-uat',opId:'uat.verify',subjectKey:'job-uat',goalRevision:1});
+    ledger.enqueueJob({jobId:'job-uat',workflowId:'wf-env',unitId:'u-job-uat',opId:'uat.verify',kind:'op',payload:{opId:'uat.verify',records:['.starciwork/features/login/uat/password-sign-in'],owned_paths:['.starciwork/features/login/uat/password-sign-in'],model:'devin-agent'}});
+  }
   finally{ledger.close();}
   const dispatch=()=>spawnSync(process.execPath,[API,'dispatch','--repo',repo,'--job','job-uat','--json'],{cwd:ROOT,encoding:'utf8',windowsHide:true,timeout:300000,env});
 
@@ -329,7 +374,7 @@ test('api dispatch runs the environment pre-step for a walk: a foreign hung port
   assert.equal(out.services[0].state,'port-conflict');
   assert.match(out.incident,/^inc-/);
   assert.equal(fs.existsSync(log)?fs.readFileSync(log,'utf8').trim():'','','nothing reached the host');
-  const inspect=inspectLedger({file:ledgerFileFor(repo)});
+  const inspect=inspectLedger({file:ledgerFileFor(repo,{env})});
   try{
     assert.equal(inspect.db.prepare("SELECT status FROM jobs WHERE job_id='job-uat'").get().status,'queued','no attempt is spent on the environment');
     assert.match(inspect.db.prepare('SELECT last_progress FROM incidents WHERE incident_id=?').get(out.incident).last_progress,/^\[environment\] environment\.t\.login-local\/web port-conflict/);
