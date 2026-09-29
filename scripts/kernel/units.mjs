@@ -6,7 +6,7 @@
 // try HERE, so none of them can start a fresh budget for the same work, chain a retry to another unit's or a passed
 // job, or re-run a passed unit without a reopen reason. The schema triggers refuse the same things; this answers first
 // with a typed refusal the Kernel can act on. admitUnit only reads; writeUnitTry writes inside the caller's transaction.
-import { UNIT_TRY_BUDGET, admitUnitTry, ownedPathsIntersect, unitSubjectKey } from '../../engine/admission.mjs';
+import { AWAITING_OWNER_STATUS, UNIT_TRY_BUDGET, admitUnitTry, ownedPathsIntersect, unitSubjectKey } from '../../engine/admission.mjs';
 import { createUnit, getUnit, jobResult, reopenUnit } from '../../engine/ledger-db.mjs';
 import { parseJsonOr } from '../lib/json.mjs';
 
@@ -22,12 +22,17 @@ export function unitTriesOf(db, workflowId, unitId) {
     .map((row) => ({ ...row, result_json: JSON.stringify(jobResult(db, row.job_id) ?? {}) }));
 }
 
+/** The tries of a unit that spent its budget: a try that ended awaiting_owner asked a question and spent none. */
+export function spentTriesOf(db, unit) {
+  return Number(unit.tries) - Number(db.prepare('SELECT count(*) n FROM jobs WHERE workflow_id=? AND unit_id=? AND status=?').get(unit.workflow_id, unit.unit_id, AWAITING_OWNER_STATUS).n);
+}
+
 /** {unit, tries, last} of one unit, or null. */
 export function unitStateOf(db, workflowId, unitId) {
   const unit = unitId ? getUnit(db, workflowId, unitId) : null;
   if (!unit) return null;
   const tries = unitTriesOf(db, workflowId, unitId);
-  return { unit, tries, last: tries.at(-1) ?? null, exhausted: Number(unit.tries) >= Number(unit.try_budget) };
+  return { unit, tries, last: tries.at(-1) ?? null, exhausted: spentTriesOf(db, unit) >= Number(unit.try_budget) };
 }
 
 /**

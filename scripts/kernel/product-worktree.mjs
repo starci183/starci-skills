@@ -52,6 +52,7 @@ import { WORKTREES_REL, WORKFLOW_DIR_NAME, WORKTREES_EXCLUDE_LINE, isWorktreesPa
 import { brokenImports } from './import-scan.mjs';
 import { checkVerdictOf } from '../reconcile/check-verdict.mjs';
 import { launchFor } from '../uat/launch.mjs';
+import { SETTLED_JOB_LIST } from '../../engine/admission.mjs';
 
 const selfFile = fileURLToPath(import.meta.url);
 export const SKILL_ROOT = path.resolve(path.dirname(selfFile), '..', '..');
@@ -68,7 +69,7 @@ export const EVENTS = Object.freeze({
   synced: 'product-wf-synced',
   leftover: 'product-worktree-leftover',
 });
-const SETTLED = ['succeeded', 'failed', 'cancelled'];
+const SETTLED = SETTLED_JOB_LIST;
 const OVERLAY_MARKER = '.starci-overlay.json';
 /** Written into a workflow worktree's node_modules by its deps unit: a real install, the overlay source of its ops. */
 const INSTALL_MARKER = '.starci-install.json';

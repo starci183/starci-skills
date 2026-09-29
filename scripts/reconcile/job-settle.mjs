@@ -59,6 +59,7 @@ import { allocationSettings } from '../../engine/config.mjs';
 import { claimManager, lockHolder } from '../connectors/lib.mjs';
 import { canonParityVerdict, parityEligible, parityFingerprint, parityTransient, PARITY_REASONS, resolveOwnedRoot } from './canon-parity.mjs';
 import { checkRunStatusOf, checkVerdictOf } from './check-verdict.mjs';
+import { SETTLED_JOB_LIST } from '../../engine/admission.mjs';
 
 const selfFile = fileURLToPath(import.meta.url);
 export const SKILL_ROOT = path.resolve(path.dirname(selfFile), '..', '..');
@@ -74,7 +75,7 @@ export const EVENTS = Object.freeze({
 export const STATES = Object.freeze({ reported: 'reported', settled: 'settled', released: 'released', kernel: 'needs-kernel' });
 // A job whose op filed its report (api report moves it to reported) until a verdict settles it.
 const LIVE = ['running', 'answering', 'effect_unknown', 'reported', 'deciding'];
-const SETTLED = ['succeeded', 'failed', 'cancelled'];
+const SETTLED = SETTLED_JOB_LIST;
 /** Ops whose pass is an owner act, never a machine verdict. */
 export const KERNEL_ONLY_OPS = Object.freeze(['handover.review']);
 const CUT_SLICE_CHECKS = ['cut-slice-postcondition', 'cut-regression-inventory'];

@@ -1,7 +1,7 @@
 // failure-steps.mjs — which failed attempts the frontier still owes a step (the job's settle result nextStep, recorded by
 // api.mjs enqueueNextStep on a failed settle). api status reads unresolvedFailures for nextActions and leg colours;
 // scripts/work/migrate-runtime.mjs reads stepOwedFailures: failed settles from before the router.
-import { AWAITING_OWNER, sameUnit } from '../../engine/admission.mjs';
+import { AWAITING_OWNER_STATUS, sameUnit } from '../../engine/admission.mjs';
 import { parseJson } from '../lib/json.mjs';
 import { retryAttemptOf } from './gate-conditions.mjs';
 import { JOB_ROW } from './api-lib/rows.mjs';
@@ -10,16 +10,10 @@ const payloadOf = (row) => parseJson(row?.payload_json ?? '', {}) ?? {};
 const resultOf = (row) => parseJson(row?.result_json ?? '', {}) ?? {};
 
 /**
- * A settled attempt that asked the owner a question is a wait, not a failure. Settle records it as
- * result.verdict `awaiting-owner`; an attempt a kernel settled `blocked` on a filed `ask` report
- * before that verdict existed reads the same, so its successor is accounted identically.
+ * A settled attempt that asked the owner a question is a wait, not a failure: settle ends it with jobs.status
+ * `awaiting_owner` (and result.verdict `awaiting-owner`). Nothing else is one.
  */
-export const isAwaitingOwner = (db, row) => {
-  const result = resultOf(row);
-  if (result.verdict === AWAITING_OWNER) return true;
-  if (row?.status !== 'failed' || result.verdict !== 'blocked' || !row.op_id) return false;
-  return Boolean(db.prepare("SELECT 1 FROM reports WHERE job_id=? AND outcome='ask' LIMIT 1").get(row.job_id));
-};
+export const isAwaitingOwner = (db, row) => row?.status === AWAITING_OWNER_STATUS;
 
 /** Two jobs are tries of one work unit (scripts/kernel/units.mjs). */
 export const sameUnitOfWork = sameUnit;

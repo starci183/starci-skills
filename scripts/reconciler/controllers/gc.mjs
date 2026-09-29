@@ -25,6 +25,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { parseYaml } from '../../../engine/yaml.mjs';
 import { claimDue, finishDuty } from '../schedules.mjs';
+import { SETTLED_JOB_LIST } from '../../../engine/admission.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..', '..');
 const NAME = 'gc';
@@ -34,7 +35,7 @@ export const DEFAULTS = Object.freeze({ resyncMs: 60_000, concurrency: 2, housek
 /** MB-14: a retry lands this long after the grace window closes, never exactly on its edge. */
 export const GRACE_MARGIN_MS = 5_000;
 const LIVE_JOB = new Set(['queued', 'leased', 'running', 'answering', 'effect_unknown']);
-const SETTLED = new Set(['succeeded', 'failed', 'cancelled']);
+const SETTLED = new Set(SETTLED_JOB_LIST);
 const SUP_FINAL = new Set(['succeeded', 'failed', 'cancelled']);
 const WOULD = 'reconciler.would';
 

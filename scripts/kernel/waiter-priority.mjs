@@ -22,12 +22,13 @@ import { lineageHeadById, typedIncidents } from './gate-conditions.mjs';
 import { allocationMs } from '../../engine/config.mjs';
 import { posixPath } from '../lib/path-key.mjs';
 import { parseJson, parseJsonOr, withPayload } from '../lib/json.mjs';
+import { SETTLED_JOB_LIST } from '../../engine/admission.mjs';
 
 /** How long a queued job may block another workflow before its own Kernel is told
  * (modules/models/runtimes.yaml allocation.waiterPriority.blockingHeadsUpMs). */
 export const BLOCKING_HEADS_UP_MS = allocationMs('waiterPriority.blockingHeadsUpMs');
 export const BLOCKING_HEADS_UP_AUTO = 'blocking-waiters';
-const SETTLED = ['succeeded', 'failed', 'cancelled'];
+const SETTLED = SETTLED_JOB_LIST;
 const GATE_KINDS = ['owner-gate', 'owner-gate-pending', 'peer-wait'];
 const PEER_MESSAGE = 'peer-message';
 // Job ids are op-<op>-<10 hex> (api enqueue).

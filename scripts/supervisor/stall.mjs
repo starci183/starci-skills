@@ -61,6 +61,7 @@ import { clipLine } from '../lib/clip.mjs';
 import { conditionLabel, evaluateCondition, lineageHeadById, typedIncidents } from '../kernel/gate-conditions.mjs';
 import { parseJsonOr } from '../lib/json.mjs';
 import { minutes } from '../lib/time.mjs';
+import { SETTLED_JOB_LIST } from '../../engine/admission.mjs';
 
 const skillRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 const API_FILE = path.join(skillRoot, 'scripts', 'kernel', 'api.mjs');
@@ -77,7 +78,7 @@ export const OWNER_GATE_KINDS = ['owner-gate', 'owner-gate-pending', 'supervisor
 export const PEER_WAIT_KIND = 'peer-wait';
 /** Worker liveness that is a turn in progress: a workflow with one is working, not stalled. */
 export const WORKING_LIVENESS = ['active', 'active-unclassified'];
-const SETTLED = ['succeeded', 'failed', 'cancelled'];
+const SETTLED = SETTLED_JOB_LIST;
 /** The non-Kernel jobs of one workflow the ledger holds running (a worker's op in flight). */
 const runningJobs = (db, wf) => {
   try { return db.prepare("SELECT job_id, op_id FROM jobs WHERE workflow_id=? AND status IN ('running','answering') AND COALESCE(kind,'')<>'kernel' ORDER BY job_id").all(wf); } catch { return []; }

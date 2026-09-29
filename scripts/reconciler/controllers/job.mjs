@@ -37,6 +37,7 @@ import { allocationSettings } from '../../../engine/config.mjs';
 import { classifyWorker, planHealth, HEALTH_DEFAULTS } from '../worker-health.mjs';
 import { clocksOf } from '../sla.mjs';
 import { settlerSettings, reportedJobs, kernelHandoverOf, releaseProofOf, EVENTS as SETTLE_EVENTS, KERNEL_ONLY_OPS } from '../../reconcile/job-settle.mjs';
+import { SETTLED_JOB_LIST } from '../../../engine/admission.mjs';
 
 const selfFile = fileURLToPath(import.meta.url);
 const skillRoot = path.resolve(path.dirname(selfFile), '..', '..', '..');
@@ -47,7 +48,7 @@ export const SUPERVISOR_LEDGER = 'supervisor';
 export const WORKERS_KEY = 'workers:supervisor';
 export const HEALTH_KEY = 'health:all';
 const OPEN = ['queued', 'leased', 'running', 'answering', 'effect_unknown'];
-const SETTLED = ['succeeded', 'failed', 'cancelled'];
+const SETTLED = SETTLED_JOB_LIST;
 
 /* ------------------------------------------------------------------------------------------------ settings */
 

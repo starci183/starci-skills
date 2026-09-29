@@ -48,9 +48,9 @@ const seedJob = (l, { jobId, op, attempt = 1, status = 'failed', result = null, 
   seedWorkflow(l,{id:WF,jobs:[{jobId,opId:op,status,result,dispatchId:dispatchId??`seed:${jobId}`,createdAt:at,
     payload:{opId:op,owned_paths:[`.starciwork/evidence/${WF}.${op}`],...(params?{params}:{}),...(retryOf?{retry:{retryOf}}:{})}}]});
 };
-/** A settled ask: the job failed awaiting the owner and its filed ask report. */
+/** A settled ask: the job settled awaiting_owner and its filed ask report. */
 const seedAsk = (repo, { jobId, op, dispatchId, question, params = null }) => seed(repo, (l) => {
-  seedJob(l, { jobId, op, params, dispatchId, result: { verdict: 'awaiting-owner', kernelVerdict: 'blocked', askDispatchId: dispatchId } });
+  seedJob(l, { jobId, op, params, dispatchId, status: 'awaiting_owner', result: { verdict: 'awaiting-owner', kernelVerdict: 'blocked', askDispatchId: dispatchId } });
   const attemptId=l.db.prepare('SELECT attempt_id FROM op_attempts WHERE job_id=?').get(jobId).attempt_id;
   l.db.prepare('INSERT INTO reports(workflow_id,attempt_id,dispatch_id,job_id,outcome,report_json,consumed_at,created_at) VALUES(?,?,?,?,?,?,?,?)')
     .run(WF, attemptId, dispatchId, jobId, 'ask', JSON.stringify({ schema: 'starci/op-report@1', outcome: 'ask', from: jobId, summary: 'ask', question }), Date.now(), Date.now());

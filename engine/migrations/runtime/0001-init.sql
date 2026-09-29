@@ -44,7 +44,7 @@ INSERT OR IGNORE INTO ui_state_map VALUES
   ('unit','planned','waiting'),('unit','queued','waiting'),('unit','deciding','waiting'),('unit','running','running'),
   ('unit','reported','running'),('unit','failed','bad'),('unit','done','done'),('unit','dropped','done'),
   ('job','queued','waiting'),('job','ready','waiting'),('job','leased','running'),('job','running','running'),
-  ('job','answering','waiting'),('job','reported','running'),('job','deciding','waiting'),
+  ('job','answering','waiting'),('job','reported','running'),('job','deciding','waiting'),('job','awaiting_owner','waiting'),
   ('job','effect_unknown','bad'),('job','succeeded','done'),('job','failed','bad'),('job','cancelled','done'),
   ('attempt','routed','waiting'),('attempt','in-flight','running'),('attempt','pass','done'),('attempt','partial','warn'),
   ('attempt','fail','bad'),('attempt','blocked','bad'),('attempt','worker-dead','bad'),('attempt','effect-unknown','bad'),
@@ -90,7 +90,8 @@ INSERT OR IGNORE INTO job_transitions VALUES
   ('running','effect_unknown'),('running','ready'),('running','failed'),('running','cancelled'),   -- running→ready: requeue sau worker chết
   ('effect_unknown','running'),('effect_unknown','ready'),('effect_unknown','failed'),
   ('reported','deciding'),('reported','succeeded'),('reported','failed'),   -- reported KHÔNG → cancelled (H9: archive không bỏ việc đã report)
-  ('deciding','succeeded'),('deciding','failed'),('deciding','cancelled');
+  ('deciding','succeeded'),('deciding','failed'),('deciding','cancelled'),
+  ('reported','awaiting_owner'),('deciding','awaiting_owner');              -- một op kết thúc bằng câu hỏi: chờ owner, không phải lỗi (awaiting_owner là trạng thái kết, như failed)
 
 -- ---------------------------------------------------------------------------------------------------------
 -- A1. Blob — chỉ mục kho nội dung (nội dung KHÔNG nằm trong SQLite)
@@ -262,7 +263,7 @@ CREATE TABLE IF NOT EXISTS jobs(
   kind          TEXT NOT NULL CHECK(kind IN ('op','kernel')),
   role          TEXT,
   status        TEXT NOT NULL CHECK(status IN ('queued','ready','leased','running','answering','reported','deciding',
-                                               'effect_unknown','succeeded','failed','cancelled')),
+                                               'effect_unknown','awaiting_owner','succeeded','failed','cancelled')),
   priority_json TEXT CHECK(priority_json IS NULL OR json_valid(priority_json)),
   lease_token   TEXT,
   worker_id     TEXT,
@@ -282,20 +283,22 @@ CREATE TRIGGER IF NOT EXISTS jobs_enqueue_guard BEFORE INSERT ON jobs WHEN NEW.k
     SELECT RAISE(ABORT,'unit-required') WHERE NEW.unit_id IS NULL;
     SELECT RAISE(ABORT,'unit-already-passed')
       WHERE EXISTS(SELECT 1 FROM work_units u WHERE u.workflow_id=NEW.workflow_id AND u.unit_id=NEW.unit_id AND u.state='done');
+    -- A try that ended awaiting_owner asked a question and did not fail: it spends no try of the budget.
     SELECT RAISE(ABORT,'unit-try-budget-exhausted')
-      WHERE NEW.try_no > (SELECT try_budget FROM work_units u WHERE u.workflow_id=NEW.workflow_id AND u.unit_id=NEW.unit_id);
+      WHERE NEW.try_no - (SELECT count(*) FROM jobs w WHERE w.workflow_id=NEW.workflow_id AND w.unit_id=NEW.unit_id AND w.status='awaiting_owner')
+            > (SELECT try_budget FROM work_units u WHERE u.workflow_id=NEW.workflow_id AND u.unit_id=NEW.unit_id);
     -- H5: the try after a reopen follows a PASSED try, so it has no retry_of/resume_of; it is admitted only as the
     -- next try of a unit reopenUnit just moved out of 'done' (reopened_at set, state no longer done).
     SELECT RAISE(ABORT,'first-try-must-be-1-without-lineage')
       WHERE NEW.retry_of IS NULL AND NEW.resume_of IS NULL AND NEW.try_no<>1
         AND NOT EXISTS(SELECT 1 FROM work_units u WHERE u.workflow_id=NEW.workflow_id AND u.unit_id=NEW.unit_id
                          AND u.reopened_at IS NOT NULL AND u.state<>'done' AND NEW.try_no=u.tries+1);
-    SELECT RAISE(ABORT,'retry-lineage-invalid: retry_of must be a FAILED job of the same unit with try_no-1')
+    SELECT RAISE(ABORT,'retry-lineage-invalid: retry_of must be a FAILED or awaiting_owner job of the same unit with try_no-1')
       WHERE NEW.retry_of IS NOT NULL AND NOT EXISTS(SELECT 1 FROM jobs p WHERE p.job_id=NEW.retry_of
-              AND p.workflow_id=NEW.workflow_id AND p.unit_id=NEW.unit_id AND p.status='failed' AND p.try_no=NEW.try_no-1);
+              AND p.workflow_id=NEW.workflow_id AND p.unit_id=NEW.unit_id AND p.status IN ('failed','awaiting_owner') AND p.try_no=NEW.try_no-1);
     SELECT RAISE(ABORT,'resume-lineage-invalid: resume_of must be a failed/cancelled job of the same unit')
       WHERE NEW.resume_of IS NOT NULL AND NOT EXISTS(SELECT 1 FROM jobs p WHERE p.job_id=NEW.resume_of
-              AND p.workflow_id=NEW.workflow_id AND p.unit_id=NEW.unit_id AND p.status IN ('failed','cancelled'));
+              AND p.workflow_id=NEW.workflow_id AND p.unit_id=NEW.unit_id AND p.status IN ('failed','awaiting_owner','cancelled'));
   END;
 -- Máy trạng thái job (H9): chỉ các cặp trong job_transitions; cancelled/succeeded/failed là kết.
 CREATE TRIGGER IF NOT EXISTS jobs_status_guard BEFORE UPDATE OF status ON jobs
@@ -304,7 +307,7 @@ CREATE TRIGGER IF NOT EXISTS jobs_status_guard BEFORE UPDATE OF status ON jobs
   END;
 -- Job hết đời thì lease của nó biến mất trong cùng giao dịch (H12: không còn lease rò).
 CREATE TRIGGER IF NOT EXISTS jobs_release_leases AFTER UPDATE OF status ON jobs
-  WHEN NEW.status IN ('succeeded','failed','cancelled') BEGIN
+  WHEN NEW.status IN ('succeeded','failed','awaiting_owner','cancelled') BEGIN
     DELETE FROM leases WHERE job_id=NEW.job_id;
   END;
 

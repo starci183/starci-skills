@@ -156,6 +156,16 @@ export const resultOf=job=>rowObject(job?.result??job?.result_json);
 
 /** The settled verdict of an attempt that asked the owner and waits for the answer. */
 export const AWAITING_OWNER='awaiting-owner';
+/**
+ * jobs.status of a try that ended asking the owner (report outcome ask): settled, but neither a failure nor a spent try
+ * (its unit's try budget and business retries ignore it). A retry or resume may follow it exactly as it follows `failed`.
+ */
+export const AWAITING_OWNER_STATUS='awaiting_owner';
+export const RETRYABLE_JOB_STATUSES=Object.freeze(['failed',AWAITING_OWNER_STATUS]);
+/** Every jobs.status that holds nothing the runtime still needs (mirrors engine/ledger-db.mjs JOB_STATUSES.settled). */
+export const SETTLED_JOB_LIST=Object.freeze(['succeeded','failed',AWAITING_OWNER_STATUS,'cancelled']);
+/** The tries of a unit that spent budget: every try but the ones that only waited on the owner. */
+export const spentTries=tries=>tries.filter(job=>job.status!==AWAITING_OWNER_STATUS).length;
 // An attempt the environment killed with effects on the tree (a host terminal wipe: every Orca terminal
 // gone at once, scripts/kernel/api.mjs hostTerminalWipeOf) settles failed with this retryClass: its retry
 // is a new durable attempt that continues the partial tree and spends no business retry.
@@ -264,11 +274,11 @@ export function admitUnitTry({unit=null,tries=[],retryOf=null,reopen=null}={}){
   if(retryOf&&retryOf!==last.job_id)throw refuseUnit(`--retry-of ${retryOf} is not the latest try of unit ${unit.unit_id} (${last.job_id} is): a retry follows the unit's latest failed try`,'retry-lineage-invalid',{latest:last.job_id});
   const done=unit.state==='done'||last.status==='succeeded';
   if(done&&!(reopen?.reason&&reopen?.by))throw refuseUnit(`unit ${unit.unit_id} already passed (${last.job_id}); running it again needs an explicit reopen with a reason (--reopen <reason>)`,'unit-already-passed',{passed:last.job_id});
-  if(retryOf&&!done&&last.status!=='failed')throw refuseUnit(`--retry-of ${retryOf} is ${last.status}: a retry follows a FAILED try of the same unit`,'retry-lineage-invalid');
+  if(retryOf&&!done&&!RETRYABLE_JOB_STATUSES.includes(last.status))throw refuseUnit(`--retry-of ${retryOf} is ${last.status}: a retry follows a FAILED or awaiting_owner try of the same unit`,'retry-lineage-invalid');
   const tryNo=Number(last.try_no)+1;
-  if(tryNo>Number(unit.try_budget))throw refuseUnit(`unit ${unit.unit_id} spent ${last.try_no} of its ${unit.try_budget} tries: the owner or the Supervisor decides (api unit --raise-budget), never another try`,'unit-try-budget-exhausted',{tries:Number(last.try_no),budget:Number(unit.try_budget)});
+  if(tryNo-(ordered.length-spentTries(ordered))>Number(unit.try_budget))throw refuseUnit(`unit ${unit.unit_id} spent ${spentTries(ordered)} of its ${unit.try_budget} tries: the owner or the Supervisor decides (api unit --raise-budget), never another try`,'unit-try-budget-exhausted',{tries:Number(last.try_no),budget:Number(unit.try_budget)});
   if(done)return {tryNo,retryOf:null,resumeOf:null,retryClass:'follow-up',reopen:{reason:String(reopen.reason),by:String(reopen.by)}};
-  const disposition=last.status==='failed'?retryDisposition(last):null;
+  const disposition=RETRYABLE_JOB_STATUSES.includes(last.status)?retryDisposition(last):null;
   const resume=last.status==='cancelled';
   return {tryNo,retryOf:resume?null:last.job_id,resumeOf:resume?last.job_id:null,retryClass:retryClassOf(last,disposition),reopen:null};
 }

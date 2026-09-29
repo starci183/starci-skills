@@ -35,7 +35,7 @@ function ledger() {
 
 test('failureClassOf: dead worker, root cause, red check, typed blocker, verdict - an owner ask is no failure', () => {
   assert.equal(failureClassOf({ status: 'succeeded' }), null);
-  assert.equal(failureClassOf({ status: 'failed', result: { verdict: 'awaiting-owner' } }), null);
+  assert.equal(failureClassOf({ status: 'awaiting_owner', result: { verdict: 'awaiting-owner' } }), null);
   assert.equal(failureClassOf({ status: 'failed', result: { verdict: 'fail', worker: { liveness: 'gone' } } }), 'dead-worker:gone');
   assert.equal(failureClassOf({ status: 'failed', result: { verdict: 'fail' }, report: { outcome: 'failed', rootCause: { category: 'Contract-Gap' } } }), 'root-cause:contract-gap');
   assert.equal(failureClassOf({ status: 'failed', result: { verdict: 'fail' }, report: { outcome: 'failed' }, checks: [{ name: 'lint', exitCode: 0 }, { name: 'typecheck', exitCode: 2 }] }), 'check:typecheck');
@@ -61,7 +61,7 @@ test('jobRecords + aggregate: success rate, waits, attempts per node, repeated i
   // A dead worker, and an owner ask answered 2 h after its settle.
   job('op-d-1', { op: 'brand.decide', status: 'failed', result: { verdict: 'fail', worker: { liveness: 'disconnected' }, at: T + 60 * MIN }, at: T });
   ev('op-d-1', 'op-dispatched', T + 5 * MIN); ev('op-d-1', 'dead-worker-fenced', T + 50 * MIN, { worker: { liveness: 'disconnected' } });
-  job('op-d-2', { op: 'brand.decide', attempt: 2, status: 'failed', result: { verdict: 'awaiting-owner', askDispatchId: 'ctx_aaaaaaaaaaaa', at: T + 3 * HOUR }, at: T + 2 * HOUR });
+  job('op-d-2', { op: 'brand.decide', attempt: 2, status: 'awaiting_owner', result: { verdict: 'awaiting-owner', askDispatchId: 'ctx_aaaaaaaaaaaa', at: T + 3 * HOUR }, at: T + 2 * HOUR });
   ev('op-d-2', 'op-dispatched', T + 2 * HOUR + 5 * MIN); ev('op-d-2', 'op-settled', T + 3 * HOUR, { verdict: 'blocked' });
   ev('ctx_aaaaaaaaaaaa', 'ask-answered', T + 5 * HOUR, {}, { type: 'report' });
   // Outside the window: never counted.
@@ -104,7 +104,7 @@ test('stuckOf: every wait gets an age, a severity and the owner of its next acti
   job('op-dep-2', { op: 'backend.implement', status: 'queued', at: NOW - 3 * HOUR });
   job('op-ready', { op: 'workspace.manage', status: 'queued', at: NOW - 2 * HOUR, updated: NOW - 20 * MIN });
   job('op-pool', { op: 'interface.draw', status: 'queued', at: NOW - 2 * HOUR });
-  job('op-ask', { op: 'provision.ask', status: 'failed', result: { verdict: 'awaiting-owner', at: NOW - 50 * MIN } });
+  job('op-ask', { op: 'provision.ask', status: 'awaiting_owner', result: { verdict: 'awaiting-owner', at: NOW - 50 * MIN } });
   const stuck = stuckOf({ db, workflowId: 'wf-a', now: NOW, sla: SLA,
     ownerGates: [{ incidentId: 'inc-gate000001', holds: ['business.decide'], detail: 'waits on the owner ask ctx_bbbbbbbbbbbb' },
       { incidentId: 'inc-gate000002', holds: ['interface.asset'], detail: 'debris sweep pending' },

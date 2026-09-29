@@ -105,7 +105,7 @@ export const severityOf = (ageMs, sla) => (ageMs >= sla.criticalMs ? 'critical' 
 export function failureClassOf({ status, result = {}, report = null, checks = [], dead = null }) {
   if (status !== 'failed') return null;
   const verdict = result?.verdict ?? null;
-  if (verdict === 'awaiting-owner' || verdict === 'dropped' || verdict === 'superseded') return null;
+  if (verdict === 'dropped' || verdict === 'superseded') return null;
   if (result?.environment === 'host-terminal-wipe') return 'environment:host-terminal-wipe';
   const liveness = result?.worker?.liveness ?? (report ? null : dead);
   if (liveness && !report) return `dead-worker:${liveness}`;
@@ -178,8 +178,9 @@ export function jobRecords(db, { since, now = Date.now(), workflowId = null } = 
     const deadEv = evs.find((e) => DEAD_KINDS.has(e.kind));
     const dead = deadEv ? (parseJsonOr(deadEv.payload_json, {})?.worker?.liveness ?? parseJsonOr(deadEv.payload_json, {})?.liveness ?? 'dead') : null;
     const outcome = job.status === 'succeeded' ? 'succeeded'
-      : job.status === 'failed' ? (verdict === 'awaiting-owner' ? 'owner' : ['dropped', 'superseded'].includes(verdict) ? 'dropped' : 'failed')
-        : job.status === 'cancelled' ? 'cancelled' : 'open';
+      : job.status === 'awaiting_owner' ? 'owner'
+        : job.status === 'failed' ? (['dropped', 'superseded'].includes(verdict) ? 'dropped' : 'failed')
+          : job.status === 'cancelled' ? 'cancelled' : 'open';
     const jobChecks = checks.get(key) ?? [];
     const failureClass = outcome === 'failed' ? failureClassOf({ status: job.status, result, report, checks: jobChecks, dead }) : null;
     const dispatchedAt = dispatches[0] ?? null;

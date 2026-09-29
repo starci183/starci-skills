@@ -385,7 +385,7 @@ test('status lists every concurrent owner wait of one op by subject, and a later
   seedGoal(repo,wf);
   seed(repo,ledger=>{
     const at=Date.now();
-    const job=(id,attempt,subject,status='failed',verdict='awaiting-owner')=>seedOp(ledger,wf,{jobId:id,opId:'provision.ask',status,
+    const job=(id,attempt,subject,status='awaiting_owner',verdict='awaiting-owner')=>seedOp(ledger,wf,{jobId:id,opId:'provision.ask',status,
       payload:{opId:'provision.ask',params:{subject}},result:verdict?{verdict}:null,createdAt:at+attempt});
     job('ask-chatbot',2,'Chatbot decisions');
     job('ask-shell-old',3,'Shell auth');
@@ -484,7 +484,7 @@ test('no open operation plus an unanswered ask is awaiting-owner, not actionable
   seed(repo,ledger=>{
     const at=Date.now();
     setPhase(ledger,wf,'running');
-    seedOp(ledger,wf,{jobId:'bd-tax',opId:'business.decide',status:'failed',dispatchId:'ctx_tax',
+    seedOp(ledger,wf,{jobId:'bd-tax',opId:'business.decide',status:'awaiting_owner',dispatchId:'ctx_tax',
       payload:{opId:'business.decide'},result:{verdict:'awaiting-owner',askDispatchId:'ctx_tax'},createdAt:at});
     seedOp(ledger,wf,{jobId:'bd-record',opId:'business.decide',status:'succeeded',payload:{opId:'business.decide'},
       result:{verdict:'pass'},createdAt:at+1});
@@ -550,7 +550,7 @@ test('an unanswered ask whose form expired is ask-reserve (actionable); a live f
   seedGoal(repo,wf);
   seed(repo,ledger=>{
     setPhase(ledger,wf,'running');
-    seedOp(ledger,wf,{jobId:'bd-tax',opId:'business.decide',status:'failed',dispatchId:'ctx_tax',payload:{opId:'business.decide'},
+    seedOp(ledger,wf,{jobId:'bd-tax',opId:'business.decide',status:'awaiting_owner',dispatchId:'ctx_tax',payload:{opId:'business.decide'},
       result:{verdict:'awaiting-owner',askDispatchId:'ctx_tax'}});
     fileFixtureReport(ledger,'bd-tax',{outcome:'ask',summary:'tax',question:{text:'tax?'},consumed:true});
     ledger.appendEvent({workflowId:wf,entityType:'report',entityId:'ctx_tax',kind:'ask-serving',payload:{dispatchId:'ctx_tax',url:'http://127.0.0.1:6971/a-x',pid:process.pid}});

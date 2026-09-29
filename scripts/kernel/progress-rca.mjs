@@ -89,6 +89,7 @@ export function unitsOf(jobs) {
     const ok = u.jobs.filter((j) => j.status === 'succeeded');
     u.doneAt = ok.length ? Math.min(...ok.map((j) => Number(j.updated_at))) : null;
     u.state = u.jobs.at(-1)?.status === 'succeeded' ? 'done' : u.jobs.some((j) => OPEN_JOB.includes(j.status)) ? 'open'
+      : u.jobs.at(-1)?.status === 'awaiting_owner' ? 'awaiting-owner'
       : u.jobs.every((j) => j.status === 'cancelled') ? 'dropped' : 'failed';
     u.last = u.jobs[u.jobs.length - 1];
     u.open = u.jobs.filter((j) => OPEN_JOB.includes(j.status));
@@ -297,7 +298,7 @@ export function rcaOf({ jobs, reports, now = Date.now(), settings = progressSett
   const rows = [];
   for (const j of jobs) {
     if (j.status !== 'failed' || Number(j.updated_at) < since) continue;
-    if (['dropped', 'superseded', 'awaiting-owner'].includes(j.result?.verdict)) continue;
+    if (['dropped', 'superseded'].includes(j.result?.verdict)) continue;
     const report = reports.get(j.job_id) ?? null;
     const u = unitOf.get(j.job_id);
     const causes = causesOf({ status: j.status, result: j.result, report });

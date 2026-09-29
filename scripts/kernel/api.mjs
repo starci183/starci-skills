@@ -65,7 +65,7 @@ import {
   AWAITING_OWNER, RETRY_CLASS_ENVIRONMENT, admitOpSlot,
   findOwnedPathLeaseConflicts, ownedPathLeaseRequests, retiredBeforeDispatch, ownedPathsIntersect,
 } from '../../engine/admission.mjs';
-import { admitUnit, unitStateOf, writeUnitTry } from './units.mjs';
+import { admitUnit, spentTriesOf, unitStateOf, writeUnitTry } from './units.mjs';
 import { independentChecksOf } from './api-lib/check-evidence.mjs';
 import { activeDelegation, allocationMs, allocationSettings, inspectOwnerConfig, loadConfig, runtimeProfile } from '../../engine/config.mjs';
 import { OP_REPORT_OUTCOMES } from './report-envelope.mjs';
@@ -1367,7 +1367,9 @@ function graphProjectionOf(db, { wf, legOps, planAncestors, workflowJobs, jobsBy
     const deferred = latest ? specDeferredJobs.get(latest.job_id) ?? null : null;
     const deferredField = deferred ? { deferred } : !rows.length && deferredPlanOps.has(op) ? { deferred: deferredPlanOps.get(op).reason } : {};
     if (color === 'green' && provisional.has(op)) return { op, color: 'green-provisional', label: PROVISIONAL_LABEL, jobId: latest?.job_id ?? null, status: latest?.status ?? null, ...deferredField };
-    return { op, color, jobId: latest?.job_id ?? null, status: latest?.status ?? null, ...deferredField };
+    // A leg whose latest try ended asking the owner is yellow and says so: it is a wait, never a failure.
+    const waitsOnOwner = latest?.status === 'awaiting_owner' && ownerWaitOps.has(op) ? { awaitingOwner: true } : {};
+    return { op, color, jobId: latest?.job_id ?? null, status: latest?.status ?? null, ...waitsOnOwner, ...deferredField };
   });
   return { nextActions, legs };
 }
@@ -3147,7 +3149,7 @@ function enqueueNextStep(ledger, job, { shape, envelope = null, environment = fa
       }
       const detail = route.to?.needUser
         ? `${op} ${job.job_id}: route ${route.id} needs the owner${failure?.class ? ` (failure class ${failure.class}: ${failure.reason}${envelope?.rootCause?.node ? `; the report names ${envelope.rootCause.node}, which resolves to no build op this workflow can repair` : ''})` : ''}`
-        : exhausted ? `${op} ${job.job_id}: unit ${unit.unit.unit_id} spent ${unit.unit.tries} of its ${unit.unit.try_budget} tries (unit-try-budget-exhausted); the owner or the Supervisor decides - api unit --raise-budget, a reshaped unit, or drop it`
+        : exhausted ? `${op} ${job.job_id}: unit ${unit.unit.unit_id} spent ${spentTriesOf(ledger.db, unit.unit)} of its ${unit.unit.try_budget} tries (unit-try-budget-exhausted); the owner or the Supervisor decides - api unit --raise-budget, a reshaped unit, or drop it`
         : `${op} ${job.job_id}: route ${route.id} already fired ${fired} of ${limit} times for this node group; the owner decides whether it runs again`;
       return record({ kind: 'owner-gate', route: route.id, limit, firing: fired, ...(failure?.class ? { class: failure.class, classReason: failure.reason } : {}), incidentId: openRouteGate(ledger, job, detail, route.id), reason: detail });
     }
@@ -3597,7 +3599,7 @@ function workDebtOf(db, repo, { workflow = null, op = null } = {}) {
     }
   }
   const repaired = new Map();
-  for (const row of db.prepare(`SELECT ${JOB_ROW} FROM jobs WHERE status NOT IN ('failed','cancelled')`).all()) {
+  for (const row of db.prepare(`SELECT ${JOB_ROW} FROM jobs WHERE status NOT IN ('failed','awaiting_owner','cancelled')`).all()) {
     if (!jobPayloadOf(row).commitOnly) continue;
     let placements = [];
     try { placements = jobPlacements(db, row, repo); } catch { continue; }

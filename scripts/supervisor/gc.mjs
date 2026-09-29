@@ -83,6 +83,7 @@ import { jobsOf, removeStaging, unlinkNodeModulesLink } from './workers.mjs';
 import { sleepSync } from '../lib/sleep-sync.mjs';
 import { pidAlive } from '../../engine/machine-db.mjs';
 import { LANE_IDLE_MS, laneOwnerOf, tabTitles } from '../lib/lane-owner.mjs';
+import { SETTLED_JOB_LIST } from '../../engine/admission.mjs';
 
 const selfFile = fileURLToPath(import.meta.url);
 export const SCHEMA = 'starci/gc-report@1';
@@ -96,7 +97,7 @@ export const LEFTOVER_OWNERS = Object.freeze({
   lease: 'settle/reconcile did not release the job lease (scripts/kernel/api.mjs cmdSettle/cmdReconcile DELETE FROM leases, workers.mjs releaseLeases)',
   'lane-log': 'the lane process left its log at the lanes root instead of cleaning it after land',
 });
-const SETTLED_JOB = new Set(['succeeded', 'failed', 'cancelled']);
+const SETTLED_JOB = new Set(SETTLED_JOB_LIST);
 const LANE_LOG = /\.(err|json|log)$/i;
 const LIVE_JOB = new Set(['queued', 'leased', 'running', 'answering', 'effect_unknown']);
 const HOLDING_JOB = new Set(['running', 'answering']);

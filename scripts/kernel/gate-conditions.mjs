@@ -34,7 +34,7 @@ import { spawnSync } from 'node:child_process';
 import { parseYaml } from '../../engine/yaml.mjs';
 import { normalizeFoundationName, readFoundation } from './foundations.mjs';
 import { parseJson } from '../lib/json.mjs';
-import { retiredBeforeDispatch } from '../../engine/admission.mjs';
+import { RETRYABLE_JOB_STATUSES, retiredBeforeDispatch } from '../../engine/admission.mjs';
 import { JOB_STATUSES, resolveIncident } from '../../engine/ledger-db.mjs';
 import { jobResultSql } from './api-lib/rows.mjs';
 
@@ -102,7 +102,7 @@ export function retryAttemptOf(db, failed) {
 export function lineageHeadOf(db, start) {
   let row = start;
   const via = [];
-  while (via.length < MAX_LINEAGE_HOPS && (row.status === 'cancelled' || row.status === 'failed')) {
+  while (via.length < MAX_LINEAGE_HOPS && (row.status === 'cancelled' || RETRYABLE_JOB_STATUSES.includes(row.status))) {
     const next = row.status === 'cancelled' ? replacementOf(db, row) : retryAttemptOf(db, row);
     if (!next) break;
     via.push({ jobId: row.job_id, status: row.status });

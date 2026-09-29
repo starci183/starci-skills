@@ -29,6 +29,7 @@ import { retiredBeforeDispatch } from '../../engine/admission.mjs';
 import { readDistJson } from '../../engine/runtime-root.mjs';
 import { parseJson } from '../lib/json.mjs';
 import { jobResultSql } from './api-lib/rows.mjs';
+import { SETTLED_JOB_LIST } from '../../engine/admission.mjs';
 
 export const SEAM_INTERFACE_EVENT = 'seam-interface-published';
 export const SEAM_RELEASED_EVENT = 'seam-released';
@@ -38,7 +39,7 @@ export const SEAM_PRIORITY_CLASS = 'cut-seam';
 /** Why a sibling runs on a stub: the order a release is judged in. */
 export const SEAM_STUB_MODES = ['interface', 'released', 'seam-failed', 'seam-slipped', 'timeout', 'kernel-override'];
 
-const FINAL = ['succeeded', 'failed', 'cancelled'];
+const FINAL = SETTLED_JOB_LIST;
 const payloadOf = (row) => parseJson(row?.payload_json ?? '', {}) ?? {};
 const ownedOf = (payload) => (Array.isArray(payload?.owned_paths) ? payload.owned_paths : [])
   .map((p) => (typeof p === 'string' ? p : p?.path)).filter((p) => typeof p === 'string' && p.trim())

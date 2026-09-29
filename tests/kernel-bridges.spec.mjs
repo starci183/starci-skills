@@ -65,6 +65,7 @@ const world = (t, { orca = false } = {}) => {
       ready: ['ready'], leased: ['ready', 'leased'], running: ['ready', 'leased', 'running'],
       failed: ['ready', 'leased', 'running', 'failed'],
       succeeded: ['ready', 'leased', 'running', 'reported', 'succeeded'],
+      awaiting_owner: ['ready', 'leased', 'running', 'reported', 'awaiting_owner'],
     }[status];
     for (const to of route ?? [status]) l.write.setJobStatus({ jobId, to, reason });
   };
@@ -328,7 +329,7 @@ test('an answered ask stays awaiting its owner-answer retry until a job of ITS w
     if (status !== 'queued') w.settleTo(l, jobId, status);
     if (result) l.write.recordJobResult({ jobId, result });
   });
-  add('op-business.decide-aaaaaaaaaa', { unitId: 'u-ask-a' }, 'failed', ['.starciwork/features/account/decision/social-only-password'], { verdict: 'awaiting-owner', askDispatchId: 'ctx_ae2e07987208' });
+  add('op-business.decide-aaaaaaaaaa', { unitId: 'u-ask-a' }, 'awaiting_owner', ['.starciwork/features/account/decision/social-only-password'], { verdict: 'awaiting-owner', askDispatchId: 'ctx_ae2e07987208' });
   w.seed((l) => l.appendEvent({ workflowId: 'wf-ask', entityType: 'job', entityId: 'op-business.decide-aaaaaaaaaa', kind: 'ask-answered', payload: { dispatchId: 'ctx_ae2e07987208' } }));
   const waiting = () => json(w.api(['status', '--workflow', 'wf-ask']).stdout).awaitingOwner.map((a) => [a.jobId, a.answer]);
   assert.deepEqual(waiting(), [['op-business.decide-aaaaaaaaaa', 'answered']]);

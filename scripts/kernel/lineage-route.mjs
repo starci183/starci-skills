@@ -29,7 +29,7 @@
 // provider fault (leases, reserve), a cancelled or dropped row.
 // Ledger reads only; never writes.
 import { lineageJobsOf } from './owner-answers.mjs';
-import { AWAITING_OWNER, RETRY_CLASS_ENVIRONMENT, sameUnit } from '../../engine/admission.mjs';
+import { AWAITING_OWNER_STATUS, RETRY_CLASS_ENVIRONMENT, sameUnit } from '../../engine/admission.mjs';
 import { OUTAGE_KEYS } from '../agent/provider-outage.mjs';
 import { hostDeadWorker, hostEventAround } from './host-event.mjs';
 import { parseJsonOr } from '../lib/json.mjs';
@@ -76,9 +76,10 @@ const outageDuringOf = (db, row, pool) => {
  * next older lineage row), used for repeat-red-check.
  */
 export function attemptCauseOf(db, row, previous = null) {
+  if (row.status === AWAITING_OWNER_STATUS) return { cause: 'blocked', attributable: false, detail: 'settled awaiting-owner (the owner was asked)' };
   if (row.status !== 'failed') return { cause: row.status, attributable: false, detail: `settled ${row.status}` };
   const result = resultOf(row);
-  if (result.verdict === AWAITING_OWNER || result.verdict === 'blocked') {
+  if (result.verdict === 'blocked') {
     return { cause: 'blocked', attributable: false, detail: `settled ${result.verdict} (owner or environment)` };
   }
   if (result.peerBlocked) return { cause: 'peer-blocked', attributable: false, detail: `red only on a peer's change (${(result.peerBlocked.checks ?? []).join(', ')})` };

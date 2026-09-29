@@ -376,7 +376,7 @@ export function pendingAsksOf(db, workflowId) {
   return db.prepare(`SELECT r.*, a.op_id, a.try_no AS attempt FROM reports r JOIN op_attempts a ON a.attempt_id=r.attempt_id WHERE r.workflow_id=? AND r.outcome='ask'
       AND NOT EXISTS (SELECT 1 FROM events e WHERE e.workflow_id=r.workflow_id AND e.kind IN ('ask-answered','ask-superseded') AND json_extract(e.payload_json,'$.dispatchId')=r.dispatch_id)
       ORDER BY r.report_id`).all(workflowId)
-    .filter((report) => { const job = jobOfAsk(db, workflowId, report); return job && job.status === 'failed' && isAwaitingOwner(db, job); });
+    .filter((report) => { const job = jobOfAsk(db, workflowId, report); return job && isAwaitingOwner(db, job); });
 }
 
 /** Open deferred-to-handover items: [{dispatchId?, jobId, opId, deferClass, classes, fields, stubPath, owed, ...}]. */

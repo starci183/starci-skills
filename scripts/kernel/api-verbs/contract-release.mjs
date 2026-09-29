@@ -35,7 +35,7 @@ export default {
       // Never-dispatched duplicates: same cut group and owned paths; the newest stays, an older one nothing waits on goes.
       const keyOf = (job) => { const p = jobPayloadOf(job); return JSON.stringify([p.cut ? [p.cut.id, p.cut.ordinal] : null, [...(p.owned_paths ?? [])].sort()]); };
       const newestByKey = new Map(queued.map((job) => [keyOf(job), job]));
-      const waitedOn = (job) => Boolean(db.prepare("SELECT 1 FROM jobs WHERE workflow_id=? AND job_id<>? AND status NOT IN ('succeeded','failed','cancelled') AND EXISTS (SELECT 1 FROM json_each(json_extract(payload_json,'$.after')) WHERE value=?)").get(workflowId, job.job_id, job.job_id));
+      const waitedOn = (job) => Boolean(db.prepare("SELECT 1 FROM jobs WHERE workflow_id=? AND job_id<>? AND status NOT IN ('succeeded','failed','awaiting_owner','cancelled') AND EXISTS (SELECT 1 FROM json_each(json_extract(payload_json,'$.after')) WHERE value=?)").get(workflowId, job.job_id, job.job_id));
       const drop = covered.length ? queued.filter((job) => newestByKey.get(keyOf(job)).job_id !== job.job_id && !dispatchEvidenceOf(db, job, jobPayloadOf(job)).length && !waitedOn(job)) : [];
       const restamp = covered.length ? queued.filter((job) => !drop.includes(job)) : [];
       const running = db.prepare("SELECT job_id,try_no AS attempt FROM jobs WHERE workflow_id=? AND op_id=? AND kind='op' AND status IN ('running','answering')").all(workflowId, family);

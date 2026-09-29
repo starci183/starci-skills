@@ -27,6 +27,7 @@ import { clipLine } from '../lib/clip.mjs';
 import { leaseCanonicalizer } from './lease-canon.mjs';
 import { familyGuardOf, familyViolations } from './write-families.mjs';
 import { openLogs, appendLog } from './typed-logs.mjs';
+import { spentTriesOf } from './units.mjs';
 import { OPEN_JOB, causesOf, decisionsOf, isShapeCause, progressSettings, reportsOf, unitsOf, opJobsOf } from './progress-rca.mjs';
 import { kernelDecisionItems } from '../reconcile/job-settle.mjs';
 import { CHILD_ENV, refuseDecisionsFirst } from '../reconciler/decisions.mjs';
@@ -102,7 +103,7 @@ export function restoreJob(ledger, jobId, { editId, now = Date.now() }) {
     .get(j.workflow_id, j.unit_id, ...SETTLED_JOB_STATUSES);
   if (open) return null;
   const tryNo = Number(unit.tries) + 1;
-  if (tryNo > Number(unit.try_budget)) return null;
+  if (spentTriesOf(db, unit) + 1 > Number(unit.try_budget)) return null;
   const phase = db.prepare('SELECT phase FROM workflows WHERE workflow_id=?').get(j.workflow_id)?.phase;
   if (!['queued', 'running'].includes(phase)) return null;
   const newJobId = `op-${j.op_id}-${newToken().slice(0, 10)}`;

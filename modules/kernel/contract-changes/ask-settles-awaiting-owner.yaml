@@ -1,0 +1,16 @@
+id: ask-settles-awaiting-owner
+effectiveAt: '2026-09-29T17:30:00+07:00'
+summary: >-
+  An op that ends with an ask outcome no longer settles jobs.status failed. api settle now moves it to the new
+  settled status awaiting_owner (result verdict awaiting-owner as before): it counts neither as a failure nor as a
+  spent business retry or unit try, api status lists it under failures.awaitingOwner / awaitingOwner[] and marks its
+  leg awaitingOwner:true, and the answered ask is re-enqueued as a new attempt whose retry_of names it. The old
+  ask -> failed mapping and the result-verdict-only owner-wait detection (including the pre-verdict blocked+ask
+  fallback) are removed. Schema: jobs.status gains awaiting_owner (job_transitions, ui_state_map, retry/resume guards,
+  try-budget guard, lease release); a ledger created before this change is upgraded in place on the writer's first open.
+reach: new-legs
+paths:
+  - modules/kernel/verdict-contract.yaml
+  - modules/kernel/api-commands/settle.yaml
+  - modules/kernel/api-commands/status.yaml
+  - modules/kernel/contract-changes/ask-settles-awaiting-owner.yaml

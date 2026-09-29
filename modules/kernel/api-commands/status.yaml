@@ -277,8 +277,8 @@ status:
       peer message into this workflow's inbox from the longest-waiting workflow (payload auto
       blocking-waiters, blockingJob, waitingWorkflows; once per newly waiting workflow), so the
       frontier reads peer-message and the watchdog wakes this Kernel to dispatch it first
-    jobs: '{<status>: <count>} — jobs grouped by status (queued|leased|running|answering|succeeded|failed|cancelled|effect_unknown); the queued rows are the dispatch candidates'
-    failures: '{failed, awaitingOwner} — the `failed` rows split: an attempt settled awaiting-owner (verdict-contract.yaml retryAccounting.ownerWait) is a wait, never a failure'
+    jobs: '{<status>: <count>} — jobs grouped by status (queued|leased|running|answering|succeeded|failed|awaiting_owner|cancelled|effect_unknown); the queued rows are the dispatch candidates'
+    failures: '{failed, awaitingOwner} — `failed` counts jobs.status failed only; a job settled awaiting_owner (verdict-contract.yaml retryAccounting.ownerWait) is a wait, never a failure, and its leg carries awaitingOwner:true'
     awaitingOwner: '[{jobId, opId, attempt, dispatchId, answer: pending|answered|superseded}] — one row per op whose LATEST attempt settled awaiting-owner; `answered` (askLifecycle ask-answered) means the Kernel re-enqueues the op now, `pending` means the owner has not answered'
     activeLeases: '[{resource_key, job_id, expires_at}] — live only; an expired lease is a detector, not a capacity gift'
     inboxPending: '<n> — unclaimed inbox rows for this workflow'

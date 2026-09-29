@@ -41,7 +41,7 @@ const world=(t,fn)=>withLedger(t,({root,repoRoot,machineHome,ledger})=>{
       payload:{opId:'docs.author',owned_paths:['docs/'],orca:{dispatchId:OP_TERM,agentTerminalHandle:OP_TERM,taskId:'task-running',runId:'run-archive'}}},
     {jobId:'job-queued',opId:'docs.author',kind:'op',status:'queued',attempt:2,payload:{opId:'docs.author',owned_paths:['src/']}},
     {jobId:'job-done',opId:'docs.author',kind:'op',status:'succeeded',attempt:3,payload:{opId:'docs.author'},result:{verdict:'pass'}},
-    {jobId:'job-ask',opId:'business.decide',kind:'op',status:'failed',dispatchId:'ask-open',
+    {jobId:'job-ask',opId:'business.decide',kind:'op',status:'awaiting_owner',dispatchId:'ask-open',
       payload:{opId:'business.decide',owned_paths:[]},result:{verdict:'awaiting-owner'}},
   ],leases:[{resourceKey:'path:docs/',jobId:'job-running',expiresAt:at+HOUR}]});
   ledger.db.prepare("INSERT INTO signals(scope,key,holder_pid,token,value_json,at,expires_at) VALUES('kernel',?,NULL,'tok-k',?,?,NULL)")
@@ -128,7 +128,7 @@ test('finish is still refused for open jobs and for a handover the owner never a
   const open=run('finish','--workflow',WF);
   assert.notEqual(open.status,0);
   assert.match(open.stderr,/workflow-open-jobs/);
-  ledger.db.prepare("UPDATE jobs SET status='cancelled' WHERE workflow_id=? AND kind<>'kernel' AND status NOT IN ('succeeded','failed')").run(WF);
+  ledger.db.prepare("UPDATE jobs SET status='cancelled' WHERE workflow_id=? AND kind<>'kernel' AND status NOT IN ('succeeded','failed','awaiting_owner')").run(WF);
   const unapproved=run('finish','--workflow',WF);
   assert.notEqual(unapproved.status,0);
   assert.match(unapproved.stderr,/handover-not-approved/);

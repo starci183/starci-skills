@@ -484,7 +484,7 @@ function fileJobAsk(l, { wf, jobId, attempt, dispatchId, question }) {
 }
 /** Attempt 1 asked the owner (ctx_first) and settled awaiting-owner; attempt 2 is its owner-answer retry and asks again. */
 function redrawLineage(p, l, dir, { wf = 'wf-redraw', close }) {
-  seedJob(l, { wf, jobId: 'job-draw-a1', attempt: 1, dispatchId: 'ctx_first', status: 'failed', result: { verdict: 'awaiting-owner', kernelVerdict: 'blocked', askDispatchId: 'ctx_first' } });
+  seedJob(l, { wf, jobId: 'job-draw-a1', attempt: 1, dispatchId: 'ctx_first', status: 'awaiting_owner', result: { verdict: 'awaiting-owner', kernelVerdict: 'blocked', askDispatchId: 'ctx_first' } });
   const first = fileJobAsk(l, { wf, jobId: 'job-draw-a1', attempt: 1, dispatchId: 'ctx_first', question: drawReviewQuestion(dir) });
   close(first);
   drawLayout(p, { mark: [0, 250, 0, 255] });

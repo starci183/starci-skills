@@ -28,7 +28,7 @@ const JOBS=[
   job('c4',{op:'business.decide',pool:'claude-agent',status:'failed',verdict:'blocked',createdAt:T-3*H,updatedAt:T-3*H+4*MIN}),
   job('x1',{op:'backend.implement',pool:'codex-agent',status:'succeeded',verdict:'pass',createdAt:T-7*H,updatedAt:T-6*H}),
   job('x2',{op:'backend.implement',pool:'codex-agent',status:'running',retryOf:'x0',createdAt:T-1*H}),
-  job('d1',{op:'interface.implement',pool:'devin-agent',status:'failed',verdict:'awaiting-owner',createdAt:T-4*H,updatedAt:T-2*H}),
+  job('d1',{op:'interface.implement',pool:'devin-agent',status:'awaiting_owner',verdict:'awaiting-owner',createdAt:T-4*H,updatedAt:T-2*H}),
   job('u1',{op:'work.author',pool:null,status:'cancelled',verdict:'dropped',createdAt:T-2*H,updatedAt:T-H}),
   // Outside a 24h window: only the all-history scorecard counts it (created -> updated = 60 min).
   job('old',{op:'backend.implement',pool:'claude-agent',status:'succeeded',verdict:'pass',createdAt:T-48*H,updatedAt:T-47*H}),
@@ -67,7 +67,7 @@ test('outcome buckets and median follow the documented rules',()=>{
   assert.equal(outcomeOf({status:'failed',verdict:'fail'}),'fail');
   assert.equal(outcomeOf({status:'failed',verdict:null}),'fail');
   assert.equal(outcomeOf({status:'failed',verdict:'blocked'}),'blocked');
-  assert.equal(outcomeOf({status:'failed',verdict:'awaiting-owner'}),'blocked');
+  assert.equal(outcomeOf({status:'awaiting_owner',verdict:'awaiting-owner'}),'blocked');
   assert.equal(outcomeOf({status:'cancelled',verdict:'dropped'}),'cancelled');
   assert.equal(outcomeOf({status:'running',verdict:null}),'open');
   assert.equal(outcomeOf({status:'effect_unknown',verdict:null}),'open');

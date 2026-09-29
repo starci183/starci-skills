@@ -537,7 +537,10 @@ test('an ask settles awaiting-owner: no business attempt spent, projected apart 
   assert.equal(settled.status,0,settled.stderr||settled.stdout);
   assert.equal(JSON.parse(settled.stdout).awaitingOwner,true);
   const row=jobRow(fx,jobId);
-  assert.equal(row.status,'failed','jobs.status keeps the vocabulary a running kernel reads');
+  assert.equal(JSON.parse(settled.stdout).status,'awaiting_owner');
+  assert.equal(row.status,'awaiting_owner','an ask is a wait: jobs.status is never failed');
+  assert.equal(inspect(fx,db=>db.prepare('SELECT count(*) n FROM leases WHERE job_id=?').get(jobId).n),0,'the settled wait drops its leases');
+  assert.equal(inspect(fx,db=>db.prepare('SELECT state FROM work_units WHERE unit_id=?').get(db.prepare('SELECT unit_id FROM jobs WHERE job_id=?').get(jobId).unit_id).state),'deciding','the unit parks deciding, not failed');
   const result=JSON.parse(row.result_json);
   assert.equal(result.verdict,'awaiting-owner');
   assert.equal(result.kernelVerdict,'blocked');
@@ -546,6 +549,11 @@ test('an ask settles awaiting-owner: no business attempt spent, projected apart 
   const status=()=>JSON.parse(fx.run(API,'status','--repo',fx.repo,'--workflow',WORKFLOW,'--json').stdout);
   let st=status();
   assert.deepEqual(st.failures,{failed:0,awaitingOwner:1},'an ask is never counted as a failure');
+  assert.deepEqual(st.jobs.awaiting_owner,1,'api status groups the job under its own status');
+  const leg=st.legs.find(l=>l.op===OP);
+  assert.equal(leg.status,'awaiting_owner');
+  assert.equal(leg.awaitingOwner,true);
+  assert.notEqual(leg.color,'red','the leg of an ask is a wait, never red');
   assert.deepEqual(st.awaitingOwner,[{jobId,opId:OP,attempt:1,dispatchId:askDispatch,answer:'pending'}]);
 
   const hierarchy=JSON.parse(fx.run(API,'hierarchy','--repo',fx.repo,'--workflow',WORKFLOW,'--json').stdout);
@@ -565,21 +573,4 @@ test('an ask settles awaiting-owner: no business attempt spent, projected apart 
   assert.equal(next.retry_of,jobId);
   assert.equal(next.retry_class,'follow-up','owner answers use the durable follow-up try class');
   assert.deepEqual(status().awaitingOwner,[],'a re-enqueued op no longer waits');
-});
-
-test('a blocked verdict on an ask report settled before awaiting-owner existed reads as a wait',t=>{
-  const fx=fixture(t);
-  const jobId=enqueue(fx,'job-op-ipc-old-ask');
-  dispatchRunning(fx,jobId);
-  fileReport(fx,jobId,{outcome:'ask',name:'old-ask.json'});
-  const ledger=openLedger({file:ledgerFileFor(fx.repo)});
-  try{
-    ledger.write.recordJobResult({jobId,result:{verdict:'blocked'}});
-    ledger.write.setJobStatus({jobId,to:'failed',reason:'legacy blocked ask fixture'});
-  }finally{ledger.close();}
-  const st=JSON.parse(fx.run(API,'status','--repo',fx.repo,'--workflow',WORKFLOW,'--json').stdout);
-  assert.deepEqual(st.failures,{failed:0,awaitingOwner:1});
-  assert.equal(inspect(fx,db=>db.prepare('SELECT MAX(revision) AS revision FROM goals WHERE workflow_id=?').get(WORKFLOW).revision),1);
-  const again=fx.run(API,'enqueue','--repo',fx.repo,'--workflow',WORKFLOW,'--op',OP,'--paths','docs/','--json');
-  assert.equal(again.status,0,again.stderr||again.stdout);
 });

@@ -25,6 +25,7 @@ import { openLedgerReader } from '../../engine/ledger-db.mjs';
 import { machineFileFor, openMachine, readMachine, withMachine } from '../../engine/machine-db.mjs';
 import { allocationSettings } from '../../engine/config.mjs';
 import { readSupervisor, supervisorEvent } from '../supervisor/home.mjs';
+import { SETTLED_JOB_LIST } from '../../engine/admission.mjs';
 
 const selfFile = fileURLToPath(import.meta.url);
 const skillRoot = path.resolve(path.dirname(selfFile), '..', '..');
@@ -203,7 +204,7 @@ const typedRow = (ev, { now, cleared = false }) => ({
 // only for a clock that is violated or due, so a pass never probes a healthy fleet. A controller that re-sets a clock
 // the truth cleared is cleared again on the next pass before it can re-violate.
 
-const SETTLED_JOB = new Set(['succeeded', 'failed', 'cancelled']);
+const SETTLED_JOB = new Set(SETTLED_JOB_LIST);
 const LIVE_DECISION = new Set(['open', 'claimed', 'escalated']);
 const KEY_SEP = '\u0000';
 /** job clock code -> the job statuses in which its condition can still hold (null: any unsettled status). */

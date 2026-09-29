@@ -32,9 +32,9 @@ settle:
     `api consume-report`; the report file; the ops declared checks; the
     checks row the kernel''s re-run recorded
   writes: >-
-    jobs.status -> succeeded|failed + result_json {verdict,...} (a blocked
+    jobs.status -> succeeded|failed|awaiting_owner + result_json {verdict,...} (a blocked
     verdict settles failed; the typed blocker rides the report; a blocked
-    verdict on a filed `ask` report records verdict awaiting-owner â€”
+    verdict on a filed `ask` report settles awaiting_owner with verdict awaiting-owner â€”
     verdict-contract.yaml retryAccounting.ownerWait); the
     reports row''s
     consumed_at is set â€” consumption the kernel did not mark via

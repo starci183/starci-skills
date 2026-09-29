@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
-import {admitOpSlot,normalizeOwnedPath,normalizeOwnedPaths,opSlotCeiling,ownedPathLeaseKey,ownedPathsIntersect,retryDisposition} from '../engine/admission.mjs';
+import {AWAITING_OWNER_STATUS,SETTLED_JOB_LIST,admitOpSlot,admitUnitTry,spentTries,normalizeOwnedPath,normalizeOwnedPaths,opSlotCeiling,ownedPathLeaseKey,ownedPathsIntersect,retryDisposition} from '../engine/admission.mjs';
 import {reserveTwoPhase} from '../engine/ledger-db.mjs';
 import {parseYaml} from '../engine/yaml.mjs';
 import {withLedger,seedWorkflow} from './_ledger-fixture.mjs';
@@ -95,6 +95,21 @@ test('an attempt settled awaiting-owner spends no business retry',()=>{
   assert.deepEqual(retryDisposition(asked),{retryClass:'owner-answer',effectState:'unknown',resumable:false,consumesBusinessRetry:false});
   const blocked={job_id:'b1',attempt:1,result_json:JSON.stringify({verdict:'blocked'})};
   assert.equal(retryDisposition(blocked).consumesBusinessRetry,true,'a typed blocker is still a business attempt');
+});
+
+test('a try that ended awaiting_owner is settled, follows like a failed try and spends no unit try',()=>{
+  assert.equal(AWAITING_OWNER_STATUS,'awaiting_owner');
+  assert.ok(SETTLED_JOB_LIST.includes('awaiting_owner')&&SETTLED_JOB_LIST.includes('failed'));
+  const unit={unit_id:'u1',try_budget:5,state:'failed'};
+  const failed=n=>({job_id:`t${n}`,try_no:n,status:'failed',result_json:JSON.stringify({verdict:'fail'})});
+  const asked=n=>({job_id:`t${n}`,try_no:n,status:'awaiting_owner',result_json:JSON.stringify({verdict:'awaiting-owner'})});
+  const tries=[failed(1),asked(2),failed(3),asked(4)];
+  assert.equal(spentTries(tries),2,'the two asks spent nothing');
+  const next=admitUnitTry({unit,tries,retryOf:'t4'});
+  assert.deepEqual([next.tryNo,next.retryOf,next.retryClass],[5,'t4','follow-up'],'an answered ask is retried as an owner-answer follow-up');
+  assert.equal(admitUnitTry({unit,tries:[...tries,failed(5),failed(6)]}).tryNo,7,'try 7 is only the fifth SPENT try');
+  assert.throws(()=>admitUnitTry({unit,tries:[...tries,failed(5),failed(6),failed(7)]}),{code:'unit-try-budget-exhausted'},'five spent tries exhaust the budget even with asks in the lineage');
+  assert.throws(()=>admitUnitTry({unit,tries:[{job_id:'r1',try_no:1,status:'running'}],retryOf:'r1'}),{code:'unit-in-flight'});
 });
 
 test('workspace.manage derives explicit migration slices instead of claiming broad workspace roots',()=>{

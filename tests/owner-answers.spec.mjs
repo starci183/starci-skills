@@ -61,7 +61,7 @@ const answeredAsk=(fx,wf,jobId,{dispatchId='ctx_3074731253e3',question=QUESTION,
     const at=Date.now();
     l.transaction(db=>{
       // The ask attempt the settle recorded: leased → dispatched → running, ask report filed and
-      // consumed, then reported → deciding → failed with the awaiting-owner result on the attempt.
+      // consumed, then reported → deciding → awaiting_owner with the awaiting-owner result on the attempt.
       setJobStatus(db,{jobId,to:'ready',reason:'dispatch',at});
       setJobStatus(db,{jobId,to:'leased',reason:'dispatch',at});
       const attempt=startAttempt(db,{workflowId:wf,jobId,dispatchId,dispatchedAt:at,startedAt:at,at});
@@ -71,7 +71,7 @@ const answeredAsk=(fx,wf,jobId,{dispatchId='ctx_3074731253e3',question=QUESTION,
       markReportConsumed(db,{attemptId:attempt.attempt_id,at});
       setJobStatus(db,{jobId,to:'reported',reason:'report filed',at});
       setJobStatus(db,{jobId,to:'deciding',reason:'settle',at});
-      setJobStatus(db,{jobId,to:'failed',reason:'awaiting owner',at});
+      setJobStatus(db,{jobId,to:'awaiting_owner',reason:'awaiting owner',at});
       recordJobResult(db,{jobId,result:{verdict:'awaiting-owner',kernelVerdict:'blocked',askDispatchId:dispatchId},at});
       appendEvent(db,{workflowId:wf,entityType:'report',entityId:dispatchId,kind:'ask-answered',
         payload:{dispatchId,receiptPath,answeredBy,optionIndex,option:question.options[optionIndex],note:'auto-accepted'},createdAt:at});
@@ -239,7 +239,7 @@ test('ownerAnswersOf keeps to the job\'s own params.subject: another subject\'s 
     markReportConsumed(db,{attemptId:attempt.attempt_id,at});
     setJobStatus(db,{jobId:'job-tax',to:'reported',reason:'report filed',at});
     setJobStatus(db,{jobId:'job-tax',to:'deciding',reason:'settle',at});
-    setJobStatus(db,{jobId:'job-tax',to:'failed',reason:'awaiting owner',at});
+    setJobStatus(db,{jobId:'job-tax',to:'awaiting_owner',reason:'awaiting owner',at});
     recordJobResult(db,{jobId:'job-tax',result:{verdict:'awaiting-owner'},at});
     appendEvent(db,{workflowId:wf,entityType:'report',entityId:'ctx_tax',kind:'ask-answered',
       payload:{dispatchId:'ctx_tax',optionIndex:0,answeredBy:'owner'},createdAt:at});

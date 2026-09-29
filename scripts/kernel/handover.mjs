@@ -251,7 +251,7 @@ export function handoverReason(handover, workflowId) {
 /** What a handover package is assembled from: every settled business job with
  *  its filed report fields, and the history of earlier handover answers. */
 export function deliveriesOf(db, workflowId) {
-  const jobs = db.prepare(`SELECT job_id,op_id,try_no AS attempt,status,${jobResultSql('jobs')} AS result_json,payload_json FROM jobs WHERE workflow_id=? AND kind<>'kernel' AND status IN ('succeeded','failed') ORDER BY created_at,job_id`)
+  const jobs = db.prepare(`SELECT job_id,op_id,try_no AS attempt,status,${jobResultSql('jobs')} AS result_json,payload_json FROM jobs WHERE workflow_id=? AND kind<>'kernel' AND status IN ('succeeded','failed','awaiting_owner') ORDER BY created_at,job_id`)
     .all(workflowId).filter((job) => job.op_id !== HANDOVER_OP);
   const deliveries = jobs.map((job) => {
     const result = parseJson(job.result_json, {}) ?? {};

@@ -21,6 +21,7 @@
 // record - the goal's own cut method - is exempt); only queued, never-dispatched units change; a running unit is never
 // interrupted. Every edit is a kernel-graph-edit event with its inverse and a typed decision log row.
 import fs from 'node:fs';
+import { RETRYABLE_JOB_STATUSES } from '../../../engine/admission.mjs';
 import { kernelScratchDirOf } from '../op-prompt.mjs';
 import path from 'node:path';
 import { spawn } from 'node:child_process';
@@ -166,7 +167,7 @@ export default {
     } else if (edit === 'retry') {
       const job = jobRow(db, args.job);
       if (!job || job.workflow_id !== wf || job.kind !== 'op') throw refuse(`${args.job} is not an op job of ${wf}`, 'job-foreign');
-      if (job.status !== 'failed') throw refuse(`${job.job_id} is ${job.status}: retry follows a failed/blocked attempt`, 'edit-invalid');
+      if (!RETRYABLE_JOB_STATUSES.includes(job.status)) throw refuse(`${job.job_id} is ${job.status}: retry follows a failed or awaiting_owner attempt`, 'edit-invalid');
       unitDone(db, wf, job);
       const open = db.prepare(`SELECT job_id FROM jobs WHERE workflow_id=? AND status IN (${OPEN_JOB.map(() => '?').join(',')}) AND (json_extract(payload_json,'$.retry.retryOf')=? OR json_extract(payload_json,'$.kernelEdit.unitOf')=?)`).get(wf, ...OPEN_JOB, job.job_id, job.job_id);
       if (open) throw refuse(`${open.job_id} already retries ${job.job_id}: edit that queued unit (widen/params) instead`, 'retry-exists');

@@ -2,6 +2,7 @@
 // one immutable row each, and every recorded version appends a `work-graph-version` event. Live colours come from
 // the workflow's jobs on each node's owned paths (colorsFromJobs); the recorded colours only carry rework (red).
 import { JOB_STATUSES, recordGraphVersion } from '../../engine/ledger-db.mjs';
+import { AWAITING_OWNER_STATUS } from '../../engine/admission.mjs';
 import { parseJson } from '../lib/json.mjs';
 import { list } from '../lib/list.mjs';
 import {
@@ -82,6 +83,8 @@ export function colorsFromJobs(graph, jobs, { recorded = {}, since = 0 } = {}) {
     const rework = recorded[n.id] === RED;
     const mine = covering.get(n.id).filter((j) => !rework || (j.at ?? 0) > since);
     if (mine.some((j) => RUNNING.includes(j.status))) return YELLOW;
+    // The newest covering try asked the owner: the node waits (yellow), it did not fail.
+    if (mine.at(-1)?.status === AWAITING_OWNER_STATUS) return YELLOW;
     const last = mine.filter((j) => j.status === 'succeeded' || j.status === 'failed').at(-1);
     if (last) return last.status === 'succeeded' ? GREEN : RED;
     return rework ? RED : GRAY;

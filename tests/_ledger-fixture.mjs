@@ -156,7 +156,7 @@ export function seedWorkflow(ledger,{id,state=null,events=[],jobs=[],leases=[],g
         const result=job.result??(job.result_json?JSON.parse(job.result_json):null);
         const verdict=result?.verdict==='awaiting-owner'?'blocked':result?.verdict??null;
         const dispatched=job.dispatchedAt??job.dispatched_at??created;
-        const settled=['succeeded','failed'].includes(status)?updated:null;
+        const settled=['succeeded','failed','awaiting_owner'].includes(status)?updated:null;
         inner.prepare(`INSERT INTO op_attempts(workflow_id,job_id,unit_id,op_id,try_no,dispatch_seq,dispatch_id,span_id,
           agent,model,pool,managed,run_id,task_id,terminal_handle,dispatched_at,started_at,settled_at,verdict,settle_json,end_state)
           VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`).run(id,jobId,unitId,opId??'test.op',tryNo,1,
@@ -167,13 +167,13 @@ export function seedWorkflow(ledger,{id,state=null,events=[],jobs=[],leases=[],g
             dispatched,dispatched,settled,verdict,json(result),settled?'settled':null);
         for(const next of status==='leased'?[]:status==='running'?['running']:status==='answering'?['running','answering']:
           status==='reported'?['running','reported']:status==='deciding'?['running','reported','deciding']:
-          status==='succeeded'?['running','reported','succeeded']:status==='failed'?['running','failed']:
+          status==='succeeded'?['running','reported','succeeded']:status==='failed'?['running','failed']:status==='awaiting_owner'?['running','reported','awaiting_owner']:
           status==='effect_unknown'?['running','effect_unknown']:[])
           inner.prepare('UPDATE jobs SET status=? WHERE job_id=?').run(next,jobId);
       }
       if(unitId)inner.prepare('UPDATE work_units SET state=?,done_at=?,updated_at=?,tries=max(tries,?),current_job_id=? WHERE workflow_id=? AND unit_id=?')
         .run(status==='succeeded'?'done':status==='failed'?'failed':status==='cancelled'?'dropped':
-          status==='reported'?'reported':status==='deciding'?'deciding':status==='queued'||status==='ready'?'queued':'running',
+          status==='reported'?'reported':status==='deciding'||status==='awaiting_owner'?'deciding':status==='queued'||status==='ready'?'queued':'running',
           status==='succeeded'?updated:null,updated,tryNo,jobId,id,unitId);
     }
     for(const lease of leases){

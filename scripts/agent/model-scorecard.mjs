@@ -26,13 +26,14 @@ import { createRequire } from 'node:module';
 import { fileURLToPath } from 'node:url';
 import { ledgerFileFor, openLedgerReader } from '../../engine/ledger-db.mjs';
 import { parseJson } from '../lib/json.mjs';
+import { AWAITING_OWNER_STATUS, SETTLED_JOB_LIST } from '../../engine/admission.mjs';
 
 const require = createRequire(import.meta.url);
 export const UNROUTED = '(unrouted)';
 export const DAY_MS = 86400000;
-const SETTLED = new Set(['succeeded', 'failed', 'cancelled']);
-const WORKED = new Set(['succeeded', 'failed']);
-const BLOCKED_VERDICTS = new Set(['blocked', 'awaiting-owner']);
+const SETTLED = new Set(SETTLED_JOB_LIST);
+const WORKED = new Set(['succeeded', 'failed', AWAITING_OWNER_STATUS]);
+const BLOCKED_VERDICTS = new Set(['blocked']);
 
 const parse = parseJson;
 
@@ -41,7 +42,7 @@ export function outcomeOf({ status, verdict }) {
   if (!SETTLED.has(status)) return 'open';
   if (verdict === 'pass' || (status === 'succeeded' && verdict == null)) return 'pass';
   if (status === 'cancelled') return 'cancelled';
-  if (BLOCKED_VERDICTS.has(verdict)) return 'blocked';
+  if (status === AWAITING_OWNER_STATUS || BLOCKED_VERDICTS.has(verdict)) return 'blocked';
   return 'fail';
 }
 

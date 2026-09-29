@@ -3,7 +3,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { spawn } from 'node:child_process';
 import { getUnit, jobResult, markReportConsumed, recordJobResult, setInboxStatus, setJobStatus, setUnitState, updateAttempt, updateJob } from '../../../engine/ledger-db.mjs';
-import { AWAITING_OWNER } from '../../../engine/admission.mjs';
+import { AWAITING_OWNER, AWAITING_OWNER_STATUS } from '../../../engine/admission.mjs';
 import { EVENTS as PRODUCT_EVENTS } from '../product-worktree.mjs';
 import { terminalShow } from '../../api/orca/terminal-show.mjs';
 import { parseJson } from '../../lib/json.mjs';
@@ -29,11 +29,11 @@ import { finalizeAttemptTranscript } from '../transcripts.mjs';
 // through reported too, one without goes straight to failed where the table allows it. A job never dispatched
 // (queued/ready/leased) has nothing to settle: api reconcile --drop cancels it.
 const SETTLE_PATH = {
-  reported: { succeeded: [], failed: [] },
-  deciding: { succeeded: [], failed: [] },
-  running: { succeeded: ['reported'], failed: ['reported'], unreported: [] },
-  answering: { succeeded: ['reported'], failed: ['reported'], unreported: ['running'] },
-  effect_unknown: { succeeded: ['running', 'reported'], failed: ['running', 'reported'], unreported: [] },
+  reported: { succeeded: [], failed: [], [AWAITING_OWNER_STATUS]: [] },
+  deciding: { succeeded: [], failed: [], [AWAITING_OWNER_STATUS]: [] },
+  running: { succeeded: ['reported'], failed: ['reported'], [AWAITING_OWNER_STATUS]: ['reported'], unreported: [] },
+  answering: { succeeded: ['reported'], failed: ['reported'], [AWAITING_OWNER_STATUS]: ['reported'], unreported: ['running'] },
+  effect_unknown: { succeeded: ['running', 'reported'], failed: ['running', 'reported'], [AWAITING_OWNER_STATUS]: ['running', 'reported'], unreported: [] },
   // leased reaches here only when the killed dispatch already created its terminal/attempt — settle fails it
   // straight, never reported: nothing ran far enough to file a report.
   leased: { failed: [], unreported: [] },
@@ -150,7 +150,7 @@ export default {
     const payload = jobPayloadOf(job);
     payload.verdict = verdict;
     payload.settledAt = Date.now();
-    const status = verdict === 'pass' ? 'succeeded' : 'failed';
+    let status = verdict === 'pass' ? 'succeeded' : 'failed';
     // The independent checks of the attempt (check_runs of the kernel/settler/parity runners; H8: raw exits).
     const checksEnvelope = independentChecksOf(db, { jobId });
     // A measurement leg (review.verify lint|stales before any build: verify-failure.mjs isMeasurementLeg)
@@ -196,12 +196,13 @@ export default {
         }
       }
     }
-    // An ask is a wait on the owner, not a failed attempt: the row settles (the
-    // worker is released and the next attempt is a new job), but the recorded
-    // verdict says what happened and retry accounting spends no business attempt
-    // on it (engine/admission.mjs retryDisposition).
+    // An ask is a wait on the owner, not a failed attempt: the row settles awaiting_owner
+    // (never failed: the worker is released and the next attempt is a new job that
+    // follows it), and it spends neither a business retry (engine/admission.mjs
+    // retryDisposition) nor a try of its unit's budget (spentTries).
     if (verdict === 'blocked' && reportOutcome === 'ask') {
       awaitingOwner = true;
+      status = AWAITING_OWNER_STATUS;
       Object.assign(result, { verdict: AWAITING_OWNER, kernelVerdict: verdict, askDispatchId: dispatchId });
     }
     if (verdict === 'pass') {
@@ -268,7 +269,7 @@ export default {
     // A unit a later try already took over, or one another try passed, is left as it is.
     const unit = job.unit_id ? getUnit(db, job.workflow_id, job.unit_id) : null;
     if (unit && unit.state !== 'done' && (unit.current_job_id == null || unit.current_job_id === jobId)) {
-      setUnitState(db, { workflowId: job.workflow_id, unitId: job.unit_id, to: verdict === 'pass' ? 'done' : 'failed', reason: `${jobId} settled ${verdict}`, at });
+      setUnitState(db, { workflowId: job.workflow_id, unitId: job.unit_id, to: verdict === 'pass' ? 'done' : awaitingOwner ? 'deciding' : 'failed', reason: `${jobId} settled ${verdict}`, at });
     }
     // A question the settled worker asked through Orca has no one left to answer.
     for (const q of db.prepare(`SELECT inbox_id FROM inbox WHERE workflow_id=? AND kind=? AND status='pending'
@@ -446,7 +447,7 @@ export default {
   const grammarProposals = recordSettledGrammarProposals(ledger, job, repo);
   const assetSlots = recordSettledAssetSlots(ledger, job, repo);
   const revDrift = recordOpRevDrift(ledger, job);
-  const status = verdict === 'pass' ? 'succeeded' : 'failed';
+  const status = verdict === 'pass' ? 'succeeded' : awaitingOwner ? AWAITING_OWNER_STATUS : 'failed';
   const out = { ok: true, jobId, verdict, status, awaitingOwner, artifacts, ...(grammarProposals.length ? { grammarProposals: grammarProposals.map(({ name, file, complete }) => ({ name, file, complete })) } : {}), ...(assetSlots.owed.length ? { assetSlotsOwed: assetSlots.owed.map(({ key, html, requested }) => ({ key, html, requested })) } : {}), ...(assetSlots.filled.length ? { assetSlotsFilled: assetSlots.filled.map(({ key, sha256 }) => ({ key, sha256 })) } : {}), report: filedReport, reportFiled, reportOutcome, checkEvidence, claimOverruled, ...(peerBlocked ? { peerBlocked } : {}), ...(nextStep ? { nextStep } : {}), ...(handoverApproval ? { handoverApproved: { dispatchId: handoverApproval.ask.dispatchId, answeredBy: handoverApproval.ask.answeredBy } } : {}), ...(cutSet ? { cutSet: { id: cutSet.id, total: cutSet.total, closesSet: cutSet.open.length === 0, open: cutSet.open } } : {}), leasesReleased: released, reportsConsumed, ...(citations ? { citations } : {}), terminalClosed, taskClosed, ...(guardUnbound.length ? { guardUnbound } : {}), ...(managedWorker ? { managedWorker } : {}), ...(sessionReleased ? { sessionReleased } : {}), ...(landed?.checked ? { landed: landed.detail } : {}), ...(revDrift ? { opRevDrift: revDrift } : {}), tail };
   if (revDrift) console.error(`api settle WARN ${OP_REV_DRIFT}: ${jobId} (${revDrift.op}) was dispatched under runtime rev ${shortRev(revDrift.from)}; its op contract changed on main by ${shortRev(revDrift.to)}: ${revDrift.files.join(', ')} - judged as admitted, never refused`);
   // A typed --until-job wait on this job, in any workflow of the ledger, may hold now: release it and

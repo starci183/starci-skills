@@ -102,7 +102,7 @@ const seedPlan = (repo, wf) => seed(repo, (ledger) => {
 });
 const seedOwnerWait = (repo, wf, { jobId, opId, dispatchId, question }) => seed(repo, (ledger) => {
   const at = Date.now();
-  seedWorkflow(ledger,{id:wf,jobs:[{jobId,opId,status:'failed',dispatchId,result:{verdict:'awaiting-owner',askDispatchId:dispatchId},createdAt:at}]});
+  seedWorkflow(ledger,{id:wf,jobs:[{jobId,opId,status:'awaiting_owner',dispatchId,result:{verdict:'awaiting-owner',askDispatchId:dispatchId},createdAt:at}]});
   const attemptId=ledger.db.prepare('SELECT attempt_id FROM op_attempts WHERE job_id=?').get(jobId).attempt_id;
   ledger.db.prepare("INSERT INTO reports(workflow_id,attempt_id,dispatch_id,job_id,outcome,report_json,consumed_at,created_at) VALUES(?,?,?,?,'ask',?,?,?)")
     .run(wf, attemptId, dispatchId, jobId, json({ outcome: 'ask', summary: 'ask', question }), at, at);

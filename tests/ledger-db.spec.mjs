@@ -7,6 +7,7 @@ import crypto from 'node:crypto';
 import {createRequire} from 'node:module';
 import {LEDGER_SCHEMA,LEDGER_VERSION,ensureWorkflow,inspectLedger,ledgerFileFor,ledgerIdOf,openLedger,releaseTwoPhase,reserveTwoPhase} from '../engine/ledger-db.mjs';
 import {MACHINE_SCHEMA,machineFileFor,openMachine} from '../engine/machine-db.mjs';
+import {seedWorkflow} from './_ledger-fixture.mjs';
 
 /**
  * The ledger DB contract (docs/ledger-db.md): schema, meta identity, WAL-by-default with a recorded DELETE
@@ -325,4 +326,83 @@ test('inspectLedger exposes the same job and event read surface as openLedger',t
   assert.equal(inspect.getJob('j1').job_id,'j1');assert.equal(inspect.getJob('missing'),null);
   assert.equal(inspect.events({workflowId:'wf'}).length,3);
   inspect.close();
+});
+
+/**
+ * jobs.status `awaiting_owner`: a try that ended asking the owner settles there (never `failed`). A fresh ledger carries it
+ * in 0001-init.sql; a ledger created before it is upgraded in place on the writer's first open (writable_schema CHECK
+ * relax + trigger recreate + job_transitions/ui_state_map rows + schema_migrations version 2), and stays valid.
+ */
+test('a ledger created before awaiting_owner is upgraded in place on the writer open',t=>{
+  const dir=temporary(),file=path.join(dir,'runtime.sqlite');
+  t.after(()=>fs.rmSync(dir,{recursive:true,force:true,maxRetries:20,retryDelay:25}));
+  const seeded=openLedger({file});
+  // An ask an older runtime settled `failed` (verdict awaiting-owner) and a real failure beside it.
+  seedWorkflow(seeded,{id:'wf-old',jobs:[
+    {jobId:'job-ask',opId:'brand.decide',status:'failed',result:{verdict:'awaiting-owner',askDispatchId:'ctx_old'}},
+    {jobId:'job-red',opId:'code.write',status:'failed',result:{verdict:'fail'}}]});
+  seeded.close();
+  const {DatabaseSync}=require('node:sqlite');
+  // Rewind it to the pre-awaiting_owner schema exactly as an older runtime wrote it.
+  let raw=new DatabaseSync(file);
+  raw.enableDefensive(false);
+  const ddl=raw.prepare("SELECT sql FROM sqlite_master WHERE name='jobs'").get().sql;
+  const cookie=raw.prepare('PRAGMA schema_version').get().schema_version;
+  raw.exec('PRAGMA writable_schema=ON');
+  raw.prepare("UPDATE sqlite_master SET sql=? WHERE type='table' AND name='jobs'").run(ddl.replace("'awaiting_owner',",''));
+  raw.exec(`PRAGMA schema_version=${cookie+1}`);
+  raw.exec('PRAGMA writable_schema=OFF');
+  raw.exec("DELETE FROM job_transitions WHERE to_status='awaiting_owner'");
+  raw.exec("DELETE FROM ui_state_map WHERE entity='job' AND native='awaiting_owner'");
+  raw.exec('DELETE FROM schema_migrations WHERE version=2');
+  raw.close();
+  raw=new DatabaseSync(file);
+  assert.ok(!raw.prepare("SELECT sql FROM sqlite_master WHERE name='jobs'").get().sql.includes('awaiting_owner'),'the rewound ledger refuses the status');
+  raw.close();
+
+  const ledger=openLedger({file});
+  try{
+    const db=ledger.db;
+    assert.ok(db.prepare("SELECT sql FROM sqlite_master WHERE name='jobs'").get().sql.includes("'awaiting_owner'"));
+    assert.deepEqual(db.prepare('SELECT version,name FROM schema_migrations ORDER BY version').all().map(r=>[r.version,r.name]),[[1,'0001-init'],[2,'0002-awaiting-owner']]);
+    assert.equal(db.prepare("SELECT count(*) n FROM job_transitions WHERE to_status='awaiting_owner'").get().n,2);
+    assert.equal(db.prepare("SELECT ui FROM ui_state_map WHERE entity='job' AND native='awaiting_owner'").get().ui,'waiting');
+    assert.deepEqual(db.prepare("SELECT job_id,status FROM jobs ORDER BY job_id").all().map(r=>[r.job_id,r.status]),[['job-ask','awaiting_owner'],['job-red','failed']],'only the ask moves to the new status');
+    assert.deepEqual(db.prepare("SELECT unit_id,state FROM work_units ORDER BY unit_id").all().map(r=>[r.unit_id,r.state]),[['job-ask','deciding'],['job-red','failed']]);
+    assert.equal(db.prepare('PRAGMA integrity_check').get().integrity_check,'ok');
+    assert.deepEqual(db.prepare("SELECT name FROM sqlite_master WHERE type='trigger' AND name LIKE 'jobs_%' ORDER BY name").all().map(r=>r.name),['jobs_enqueue_guard','jobs_release_leases','jobs_status_guard']);
+  }finally{ledger.close();}
+  // A second open changes nothing (idempotent); a fresh ledger already carries the status and is not migrated.
+  const again=openLedger({file});
+  try{assert.equal(again.db.prepare('SELECT count(*) n FROM schema_migrations').get().n,2);}finally{again.close();}
+  const fresh=openLedger({file:path.join(dir,'fresh.sqlite')});
+  try{assert.deepEqual(fresh.db.prepare('SELECT version FROM schema_migrations').all().map(r=>r.version),[1]);}finally{fresh.close();}
+});
+
+test('awaiting_owner is a settled status reached only from reported|deciding; a retry follows it and it spends no try',t=>{
+  const dir=temporary(),file=path.join(dir,'runtime.sqlite');
+  t.after(()=>fs.rmSync(dir,{recursive:true,force:true,maxRetries:20,retryDelay:25}));
+  const ledger=openLedger({file});
+  try{
+    const db=ledger.db,at=Date.now();
+    ledger.ensureWorkflow({workflowId:'wf-ask',title:'ask'});
+    ledger.write.changeWorkflowPhase({workflowId:'wf-ask',to:'running',by:'test',reason:'seed'});
+    ledger.write.createUnit({workflowId:'wf-ask',unitId:'u1',opId:'brand.decide',subjectKey:'s',goalRevision:1});
+    const enqueue=(jobId,tryNo,retryOf=null)=>ledger.enqueueJob({jobId,workflowId:'wf-ask',unitId:'u1',opId:'brand.decide',tryNo,retryOf,kind:'op',generation:1,status:'queued',payload:{opId:'brand.decide'}});
+    const walk=(jobId,to)=>{for(const status of ['ready','leased','running','reported',to])ledger.write.setJobStatus({jobId,to:status,reason:'test',at});};
+    enqueue('t1',1);
+    ledger.write.setJobStatus({jobId:'t1',to:'ready',reason:'test',at});
+    assert.throws(()=>ledger.write.setJobStatus({jobId:'t1',to:'awaiting_owner',reason:'test',at}),/job-transition-refused/,'a ready job cannot settle awaiting_owner');
+    ledger.write.setJobStatus({jobId:'t1',to:'leased',reason:'test',at});ledger.write.setJobStatus({jobId:'t1',to:'running',reason:'test',at});ledger.write.setJobStatus({jobId:'t1',to:'reported',reason:'test',at});
+    ledger.write.setJobStatus({jobId:'t1',to:'awaiting_owner',reason:'test',at});
+    assert.equal(db.prepare("SELECT status FROM jobs WHERE job_id='t1'").get().status,'awaiting_owner');
+    assert.throws(()=>ledger.write.setJobStatus({jobId:'t1',to:'failed',reason:'test',at}),/job-transition-refused/,'awaiting_owner is terminal like failed');
+    // Its retry follows it (retry_of names an awaiting_owner job); four failed tries after the ask fit a budget of five.
+    enqueue('t2',2,'t1');walk('t2','failed');
+    enqueue('t3',3,'t2');walk('t3','failed');
+    enqueue('t4',4,'t3');walk('t4','failed');
+    enqueue('t5',5,'t4');walk('t5','failed');
+    enqueue('t6',6,'t5');walk('t6','failed');
+    assert.throws(()=>enqueue('t7',7,'t6'),/unit-try-budget-exhausted/,'five spent tries (the ask spent none) exhaust the budget');
+  }finally{ledger.close();}
 });

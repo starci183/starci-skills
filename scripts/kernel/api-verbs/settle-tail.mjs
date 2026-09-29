@@ -11,6 +11,7 @@ import path from 'node:path';
 import { claimManager } from '../../connectors/lib.mjs';
 import { readJsonFile } from '../../lib/json.mjs';
 import { tailDir, tailLockName } from '../../reconcile/job-settle.mjs';
+import { SETTLED_JOB_LIST } from '../../../engine/admission.mjs';
 
 const slug = (s) => String(s).replace(/[^A-Za-z0-9._-]/g, '_').slice(0, 120);
 
@@ -27,7 +28,7 @@ export default {
     try {
       const job = db.prepare('SELECT * FROM jobs WHERE job_id=?').get(jobId);
       if (!job) { try { fs.rmSync(file, { force: true }); } catch { /* gone */ } return emit({ ok: false, jobId, code: 'job-unknown' }, `settle-tail ${jobId}: unknown job`, args.json); }
-      if (!['succeeded', 'failed', 'cancelled'].includes(job.status)) return emit({ ok: false, jobId, code: 'job-not-settled', status: job.status }, `settle-tail ${jobId}: not settled (${job.status})`, args.json);
+      if (!SETTLED_JOB_LIST.includes(job.status)) return emit({ ok: false, jobId, code: 'job-not-settled', status: job.status }, `settle-tail ${jobId}: not settled (${job.status})`, args.json);
       const rec = readJsonFile(file) ?? { jobId, repo, queuedAt: Date.now(), attempts: 0 };
       const at = Date.now();
       let r;

@@ -147,8 +147,10 @@ function cmdStatus(ledger, args, repo, { emit, internals, ext }) {
 
   // Settled asks are waits on the owner, projected apart from failures. Only an
   // op's latest attempt still waits: an older one was already re-enqueued.
-  const failedRows = db.prepare(`SELECT job_id,workflow_id,unit_id,op_id,status,try_no AS attempt,payload_json,created_at,${jobResultSql('jobs')} AS result_json FROM jobs WHERE workflow_id=? AND kind<>'kernel' AND status='failed' ORDER BY created_at,job_id`).all(workflowId);
-  const ownerWaits = failedRows.filter((row) => isAwaitingOwner(db, row));
+  // Settled non-success rows: a failed try is a failure, an awaiting_owner try (report outcome ask) is a wait on the owner.
+  const unsuccessfulRows = db.prepare(`SELECT job_id,workflow_id,unit_id,op_id,status,try_no AS attempt,payload_json,created_at,${jobResultSql('jobs')} AS result_json FROM jobs WHERE workflow_id=? AND kind<>'kernel' AND status IN ('failed','awaiting_owner') ORDER BY created_at,job_id`).all(workflowId);
+  const ownerWaits = unsuccessfulRows.filter((row) => isAwaitingOwner(db, row));
+  const failedRows = unsuccessfulRows.filter((row) => row.status === 'failed');
   const askAnswers = new Map();
   // The last lifecycle event wins; an ask parked again (served, or notified
   // for on-demand serving) after a supersede is pending again until answered.
@@ -243,7 +245,7 @@ function cmdStatus(ledger, args, repo, { emit, internals, ext }) {
     && op !== HANDOVER_OP && !isLiveProofOp(op) && !ownerWaitOps.has(op)
     && !(jobsByOp.get(op) ?? []).some((row) => row.status === 'succeeded'));
   const credentialWait = credentialAsks.length > 0 && mainLineOwed.length === 0;
-  const failures = { failed: failedRows.length - ownerWaits.length, awaitingOwner: ownerWaits.length };
+  const failures = { failed: failedRows.length, awaitingOwner: ownerWaits.length };
 
   const unconsumedReports = reports.filter((report) => !report.consumed_at).length;
   // A consumed report whose job is still open is a verdict the Kernel owes:

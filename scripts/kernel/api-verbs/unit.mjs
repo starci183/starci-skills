@@ -7,6 +7,7 @@
 // never does - a spent budget is exactly the moment it must stop and ask.
 import { getUnit, raiseTryBudget } from '../../../engine/ledger-db.mjs';
 import { getWorkflow } from '../api-lib/rows.mjs';
+import { spentTriesOf } from '../units.mjs';
 
 const RAISERS = ['owner', 'supervisor'];
 const refuse = (message, code) => Object.assign(new Error(message), { code });
@@ -33,8 +34,8 @@ export default {
     }
     const rows = args.unit ? [getUnit(db, workflowId, String(args.unit))].filter(Boolean)
       : db.prepare('SELECT * FROM work_units WHERE workflow_id=? ORDER BY created_at').all(workflowId);
-    const units = rows.map((u) => ({ unitId: u.unit_id, op: u.op_id, subjectKey: u.subject_key, state: u.state, tries: Number(u.tries), budget: Number(u.try_budget),
-      exhausted: Number(u.tries) >= Number(u.try_budget), currentJobId: u.current_job_id, ...(u.reopen_reason ? { reopen: { reason: u.reopen_reason, by: u.reopened_by } } : {}) }));
+    const units = rows.map((u) => ({ unitId: u.unit_id, op: u.op_id, subjectKey: u.subject_key, state: u.state, tries: spentTriesOf(db, u), budget: Number(u.try_budget),
+      exhausted: spentTriesOf(db, u) >= Number(u.try_budget), currentJobId: u.current_job_id, ...(u.reopen_reason ? { reopen: { reason: u.reopen_reason, by: u.reopened_by } } : {}) }));
     emit({ ok: true, workflowId, units },
       units.map((u) => `${u.unitId} ${u.op} ${u.state} tries ${u.tries}/${u.budget}${u.exhausted ? ' EXHAUSTED' : ''} current ${u.currentJobId ?? '-'}`).join('\n') || 'no work unit', args.json);
   },
