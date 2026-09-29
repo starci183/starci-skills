@@ -1,9 +1,9 @@
 import {
     AbstractException,
-} from "@modules/platform/exceptions/index"
+} from "@modules/platform/errors/index"
 import type {
     AbstractExceptionMetadata,
-} from "@modules/platform/exceptions/index"
+} from "@modules/platform/errors/index"
 
 /** Metadata for an attempt to act on an invitation that is already expired or revoked. */
 export interface ShareInvitationAlreadyClosedExceptionMetadata extends AbstractExceptionMetadata {

@@ -1,9 +1,9 @@
 import {
     AbstractException,
-} from "@modules/platform/exceptions/index"
+} from "@modules/platform/errors/index"
 import type {
     AbstractExceptionMetadata,
-} from "@modules/platform/exceptions/index"
+} from "@modules/platform/errors/index"
 
 /** Metadata for a Keycloak round-trip that could not be completed. */
 export interface KeycloakUnavailableExceptionMetadata extends AbstractExceptionMetadata {

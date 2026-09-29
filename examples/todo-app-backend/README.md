@@ -25,7 +25,7 @@ under `.starcistacks/dev`.
 
 From this directory run `npm ci`, then `npm run typecheck`, `npm run lint:check`,
 `npm run build` and `npm run test:unit`. The live stack requires provisioned demo secrets;
-see `docs/TESTING.md` before running live checks. Tests are exactly two kinds: unit `*.spec.ts` beside the
+see `docs/guides/testing.md` before running live checks. Tests are exactly two kinds: unit `*.spec.ts` beside the
 source (`npm run test:unit`) and e2e `*.e2e-spec.ts` under `src/tests/e2e/` (`npm run test:e2e`, for example
 `npm run test:e2e -- task/task-lifecycle`). E2E runs manually only: no hook, default typecheck/lint, coverage or automatic CI job runs it (`npm run typecheck:e2e` is its manual type check).
 
@@ -56,7 +56,7 @@ runner rather than a developer's laptop:
 The DEMO-ONLY age identity at `.starcistacks/dev/runtime/env/demo.agekey` is untracked under HFS secret
 custody. A local operator must provision it before decrypting the committed `.enc` examples; the live CI
 job needs the same provisioned identity before it can run. The encrypted documents hold example values
-only, and this identity must never protect a real credential (see `scripts/with-dev-secrets.sh` and
+only, and this identity must never protect a real credential (see `scripts/with-dev-secrets.mjs` and
 `.starcistacks/dev/runtime/env/KEYS.md`).
 
 ## Probes and metrics
@@ -64,5 +64,5 @@ only, and this identity must never protect a real credential (see `scripts/with-
 `GET /health` and `GET /ready` answer the dependency-checked Postgres probe (200 ok / 503), and
 `GET /metrics` serves Prometheus text exposition of per-route request counters and durations. Every
 request carries an `x-request-id` correlation id echoed on the response and written on one structured
-`http.request.completed` log line. See `docs/TESTING.md` for the exact commands and how the dev stack's
+`http.request.completed` log line. See `docs/guides/testing.md` for the exact commands and how the dev stack's
 Prometheus service scrapes the api.

@@ -25,7 +25,7 @@ import {
 } from "@modules/integrations/upload/index"
 import {
     actorIdFromRequest,
-} from "../../../session-actor.adapter"
+} from "../../../application/session-actor.adapter"
 import {
     UploadExceptionFilter 
 } from "./upload-exception.filter"

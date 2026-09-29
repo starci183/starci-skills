@@ -1,9 +1,9 @@
 import {
     AbstractException,
-} from "@modules/platform/exceptions/index"
+} from "@modules/platform/errors/index"
 import type {
     AbstractExceptionMetadata,
-} from "@modules/platform/exceptions/index"
+} from "@modules/platform/errors/index"
 
 /** Metadata for a plan action attempted against somebody else's subscription. */
 export interface PlanForbiddenExceptionMetadata extends AbstractExceptionMetadata {

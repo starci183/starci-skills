@@ -7,10 +7,10 @@ recordDigest: 6b680bccd17f6de864c392bdb3ab594faa78395ea1f14930299f6a3e890c1f4e
 outcome: pass
 assertions:
   - id: live-tick
-    command: bash scripts/live-proof-recur.sh
+    command: bash scripts/live-proof-recur.mjs
     exit: 0
     outcome: pass
-    observation: bash scripts/live-proof-recur.sh exited 0
+    observation: bash scripts/live-proof-recur.mjs exited 0
 provenance:
   actor: example-evidence
   tool: scripts/example-evidence.mjs

@@ -7,7 +7,7 @@ statement: NotifySmtpClient (src/modules/integrations/notify-smtp/notify-smtp.cl
   component, port or dev host for an SMTP server exists in application-stacks.yaml at this commit,
   matching integration.notify.smtp's own `sandbox` note. A probe from the notify lane's worktree against
   the configured default (SMTP_HOST=localhost, SMTP_PORT=1025) refuses the connection, so
-  scripts/live-proof-notify.sh observes a real dispatch attempt (t-dispatch, attempt incremented) that
+  scripts/live-proof-notify.mjs observes a real dispatch attempt (t-dispatch, attempt incremented) that
   then fails transiently for exactly that reason - the classification (br.notify.failure.classified) is
   proven, but no message has ever actually reached a real inbox. Adding a dev SMTP host to
   application-stacks.yaml would mean touching the shared stacks file every lane's compose stack reads,

@@ -26,7 +26,7 @@ import {
 
 import {
     GraphqlRequestLike,
-} from "../../../../../session-actor.adapter"
+} from "../../../../../application/session-actor.adapter"
 import {
     TaskCountsResolver 
 } from "./task-counts.resolver"

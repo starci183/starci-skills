@@ -1,9 +1,9 @@
 import {
     AbstractException,
-} from "@modules/platform/exceptions/index"
+} from "@modules/platform/errors/index"
 import type {
     AbstractExceptionMetadata,
-} from "@modules/platform/exceptions/index"
+} from "@modules/platform/errors/index"
 
 /** Metadata for an invite submitted with a malformed email. */
 export interface ShareInvalidEmailExceptionMetadata extends AbstractExceptionMetadata {

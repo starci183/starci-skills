@@ -25,7 +25,7 @@ requiresProof:
   unit:
     forEach: composes
   e2e:
-    command: bash scripts/live-proof.sh
+    command: bash scripts/live-proof.mjs
   uat:
     required: true
 
@@ -46,7 +46,7 @@ change: {rev: 1, kind: initial, at: 2026-09-19T00:00:00.000Z}
 #
 # requiresProof.e2e names the live-proof script, not a jest spec, because neither spec under
 # src/tests/e2e/task/ performs an owner's delete: task-isolation.e2e-spec.ts exercises only the
-# stranger-refusal half (deleteTask -> TASK_FORBIDDEN), while scripts/live-proof.sh runs the real
+# stranger-refusal half (deleteTask -> TASK_FORBIDDEN), while scripts/live-proof.mjs runs the real
 # deleteTask -> deleted:true -> absent-from-list sequence against an API built from this tree.
 # requiresProof.uat stays unmet: no uat flow walks an owner's delete - uat.task.create's step 4 walks
 # only the stranger-refusal arm ("the delete is refused"), and that flow is uat.task.create's evidence

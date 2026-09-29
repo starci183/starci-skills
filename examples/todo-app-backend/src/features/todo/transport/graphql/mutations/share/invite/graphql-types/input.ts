@@ -19,7 +19,7 @@ export class InviteInput {
 
   /** Deliberately not `@IsIn(['viewer', 'editor'])`: br.share.role.permissions is enforced once, by
    * InvitationService (ShareInvalidRoleException), not duplicated at the transport pipe - see
-   * scripts/live-proof-share.sh, which exercises that refusal end to end through this exact field. */
+   * scripts/live-proof-share.mjs, which exercises that refusal end to end through this exact field. */
   @Field()
   @IsString()
   @MinLength(1)

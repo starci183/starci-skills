@@ -31,7 +31,7 @@ change:
 # .is-reversible are each re-proved by the named jest tests in src/modules/domain/task
 # (complete-task.handler.spec.ts asserts the second completion is byte-identical on completedAt,
 # title and owner; reopen-task.handler.spec.ts asserts reopen clears complete and completedAt), plus
-# a full re-run of scripts/live-proof.sh against a live API built from this source tree on a
+# a full re-run of scripts/live-proof.mjs against a live API built from this source tree on a
 # dedicated dev-stack port (22/22 steps, real Postgres, two demo identities; the shared :3001 was
 # held by a parallel lane's API at capture time, so API_URL was pinned to that instance). The
 # collaborator half of completion authority is br.task.single-owner's business, not this rule's;

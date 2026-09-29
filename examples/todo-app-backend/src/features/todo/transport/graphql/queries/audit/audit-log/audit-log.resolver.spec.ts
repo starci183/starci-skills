@@ -29,7 +29,7 @@ import {
 
 import {
     GraphqlRequestLike,
-} from "../../../../../session-actor.adapter"
+} from "../../../../../application/session-actor.adapter"
 import {
     AuditLogResolver 
 } from "./audit-log.resolver"

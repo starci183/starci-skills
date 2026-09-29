@@ -33,7 +33,7 @@ import {
  * The cron job is registered dynamically (via `SchedulerRegistry`, not the `@Cron(...)` decorator)
  * because its interval comes from `AppConfigService.getRecurTickCron()`: the endpoint this integration
  * record declares is `*\/5 * * * *` (every 5 minutes) and that stays the default everywhere, but
- * `scripts/live-proof-recur.sh` sets `RECUR_TICK_CRON` to a much shorter interval so its own live run
+ * `scripts/live-proof-recur.mjs` sets `RECUR_TICK_CRON` to a much shorter interval so its own live run
  * can observe a real tick materialise a real occurrence without a 5-minute wait, without that override
  * ever touching the declared production interval.
  */

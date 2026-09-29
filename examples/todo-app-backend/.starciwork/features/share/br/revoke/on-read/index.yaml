@@ -24,7 +24,7 @@ change:
   reason: impl.share.todo-app-backend.invitations is built (src/modules/domain/share, not the
     earlier-guessed src/share); the acceptance criterion is proven both by a unit test asserting the
     synchronous CollaboratorCache clears at the moment revoke() commits, and by an integration test and
-    scripts/live-proof-share.sh showing the very next completion attempt already refused, with no wait.
+    scripts/live-proof-share.mjs showing the very next completion attempt already refused, with no wait.
     gap.share.unbuilt-module's blockedBy is resolved.
 
     rev 3 (v11 ac-collapse) - acceptanceCriteria renamed to acceptance and now carries each criterion's id, given, when and then inline from the retired ac/ sub-records; refs to the old ac ids remap to br.share.revoke.on-read#<former-ac-id>. Encoding change only, no semantic change.

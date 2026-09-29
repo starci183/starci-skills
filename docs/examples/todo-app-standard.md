@@ -242,7 +242,7 @@ minio `9000`, prometheus `9090`.
 
 Secrets are demo-only. `.starcistacks/dev/runtime/env/demo.agekey` is a SOPS age identity **committed in this
 repository for reader round-trip, not real custody** — every secret's `application-stacks.yaml` entry repeats
-this with `recipientPolicy: DEMO-ONLY` / `keyCustody: DEMO-ONLY`. `scripts/with-dev-secrets.sh` (or `.ps1`)
+this with `recipientPolicy: DEMO-ONLY` / `keyCustody: DEMO-ONLY`. `scripts/with-dev-secrets.mjs`
 decrypts every `.enc` member listed in `runtime/env/KEYS.md` using that key via `sops`, materializes them
 under `.starcistacks/dev/runtime/**` (gitignored), and runs a command with them exported — no decrypted
 secret is ever written into the tracked tree.

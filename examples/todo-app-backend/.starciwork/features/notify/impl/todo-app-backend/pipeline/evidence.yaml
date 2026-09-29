@@ -139,11 +139,11 @@ codeDigest:
       sha256: df856265891785e224a06f7819876877a9cd9d3fc1fffdd41020b471494d5365
     - path: src/modules/integrations/notify-smtp/testing/fake-notify-smtp.client.ts
       sha256: 308a3939e2e4b81d70169bb103004739737ad5d4494eec57f217f5a2c45d71b4
-    - path: src/modules/platform/exceptions/errors/notify/notify-queue-protocol.ts
+    - path: src/modules/platform/errors/errors/notify/notify-queue-protocol.ts
       sha256: f88f5193bcaa3382986220f14fcc9c45bef62fc548b3676305e956007174efe2
-    - path: src/modules/platform/exceptions/errors/notify/notify-smtp-permanent-rejection.ts
+    - path: src/modules/platform/errors/errors/notify/notify-smtp-permanent-rejection.ts
       sha256: d4631d96bb7d1e272ca9533880d2ec0ae9d4bb3aa430667899536e7216e5213a
-    - path: src/modules/platform/exceptions/errors/notify/notify-smtp-transient-failure.ts
+    - path: src/modules/platform/errors/errors/notify/notify-smtp-transient-failure.ts
       sha256: 0945b6755e1031f0638cf72fd33e0a780e497afaeaa798bce608b206bd6d7563
   digest: 38c66afc5b7eea8190a6f60d3dd5708ba1228bf3a2f665be45c12fd441558566
 outcome: pass
@@ -162,13 +162,13 @@ assertions:
     observation: npx tsc --noEmit exited 0
   - id: live
     command: "C:\\PROGRA~1\\Git\\bin\\bash.exe -c \"sed 's/x-session-token: /Authorization: Bearer /'
-      scripts/live-proof-notify.sh | API_URL=http://localhost:3001
+      scripts/live-proof-notify.mjs | API_URL=http://localhost:3001
       POSTGRES_CONTAINER=compose-postgres-1 REDIS_CONTAINER=compose-redis-1 NOTIFY_DB=todo bash
       -s\""
     exit: 0
     outcome: pass
     observation: "C:\\PROGRA~1\\Git\\bin\\bash.exe -c \"sed 's/x-session-token: /Authorization: Bearer
-      /' scripts/live-proof-notify.sh | API_URL=http://localhost:3001
+      /' scripts/live-proof-notify.mjs | API_URL=http://localhost:3001
       POSTGRES_CONTAINER=compose-postgres-1 REDIS_CONTAINER=compose-redis-1 NOTIFY_DB=todo bash -s\"
       exited 0"
 provenance:

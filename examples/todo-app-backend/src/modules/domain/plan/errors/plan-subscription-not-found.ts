@@ -1,9 +1,9 @@
 import {
     AbstractException,
-} from "@modules/platform/exceptions/index"
+} from "@modules/platform/errors/index"
 import type {
     AbstractExceptionMetadata,
-} from "@modules/platform/exceptions/index"
+} from "@modules/platform/errors/index"
 
 /** Metadata for a subscription row that cannot be resolved by id. */
 export interface PlanSubscriptionNotFoundExceptionMetadata extends AbstractExceptionMetadata {

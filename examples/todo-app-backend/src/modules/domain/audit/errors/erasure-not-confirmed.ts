@@ -1,9 +1,9 @@
 import {
     AbstractException,
-} from "@modules/platform/exceptions/index"
+} from "@modules/platform/errors/index"
 import type {
     AbstractExceptionMetadata,
-} from "@modules/platform/exceptions/index"
+} from "@modules/platform/errors/index"
 
 /** Metadata attached to a ErasureNotConfirmedException throw so the refusal is queryable rather than only readable. */
 export interface ErasureNotConfirmedExceptionMetadata extends AbstractExceptionMetadata {

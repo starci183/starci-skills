@@ -11,6 +11,9 @@ import {
     AppConfigService,
 } from "@modules/platform/config/index"
 import {
+    uploadConfig,
+} from "./upload.config"
+import {
     UploadStorageUnavailableException,
 } from "./errors/upload-storage-unavailable"
 import {
@@ -65,7 +68,7 @@ export class LocalStorageAdapter extends UploadStoragePort {
 
     /** Resolves a storage key to a path inside the root and refuses anything that escapes it. */
     private pathFor(storageKey: string): string {
-        const root = resolve(this.config.getUploadStorageDir())
+        const root = resolve(uploadConfig(this.config).storageDir)
         const filePath = resolve(join(root,
             storageKey))
         if (filePath !== root && !filePath.startsWith(`${root}${sep}`)) {

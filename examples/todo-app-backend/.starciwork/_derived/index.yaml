@@ -1035,7 +1035,7 @@ records:
         because: gap.recur.unbuilt-module is resolved - impl.recur.todo-app-backend.engine is real and
           unit-tested (EditRecurrenceHandler/RuleService.edit, edit-recurrence.handler.spec.ts), and
           this flow's backend half runs end to end against the live dev stack
-          (scripts/live-proof-recur.sh's editRecurrence step, including the non-owner refusal). What
+          (scripts/live-proof-recur.mjs's editRecurrence step, including the non-owner refusal). What
           remains unmet is requiresProof.uat (uat.recur.make-recurring's own run composes this flow,
           and has no runs/ folder yet - gap.recur.live-proof, not mine to close) and
           requiresProof.e2e, whose command now names the real spec
@@ -1060,7 +1060,7 @@ records:
           end-recurrence.handler.spec.ts, proving
           ac.recur.ending.preserves-history.ended-rule-keeps-past-occurrences exactly), and this
           flow's backend half runs end to end against the live dev stack
-          (scripts/live-proof-recur.sh's endRecurrence step). What remains unmet is
+          (scripts/live-proof-recur.mjs's endRecurrence step). What remains unmet is
           requiresProof.uat (uat.recur.make-recurring's own run composes this flow, and has no runs/
           folder yet - gap.recur.live-proof, not mine to close) and requiresProof.e2e, whose command
           now names the real spec (src/tests/e2e/recur/recurrence-lifecycle.e2e-spec.ts walks end ->
@@ -1081,7 +1081,7 @@ records:
         cyclic: false
         because: "gap.recur.unbuilt-module is resolved - impl.recur.todo-app-backend.engine is real,
           unit-tested (composes' both rules pass) and this flow's own backend half runs end to end
-          against the live dev stack (scripts/live-proof-recur.sh's
+          against the live dev stack (scripts/live-proof-recur.mjs's
           makeRecurring/upcomingOccurrences steps). What remains unmet is this record's own
           uat.required and e2e proof: uat.recur.make-recurring has no runs/ folder yet
           (gap.recur.live-proof, not mine to close - ui/uat records are out of this lane's scope)
@@ -1103,7 +1103,7 @@ records:
         because: gap.recur.unbuilt-module is resolved on the backend - impl.recur.todo-app-backend.engine is
           real and unit-tested (UpcomingOccurrencesHandler, upcoming-occurrences.handler.spec.ts,
           including the ended-rule-shows-no-preview exceptionFlow), and this flow's backend half
-          runs end to end against the live dev stack (scripts/live-proof-recur.sh's
+          runs end to end against the live dev stack (scripts/live-proof-recur.mjs's
           upcomingOccurrences steps, before and after ending). The frontend schedule screen
           (impl.recur.todo-app-frontend.schedule) remains unbuilt and is outside this lane's scope.
           What remains unmet is requiresProof.uat (uat.recur.make-recurring's own run composes this
@@ -1682,7 +1682,7 @@ records:
         rootKind: gap
         cyclic: false
         because: No dev SMTP host is declared in application-stacks.yaml or reachable from this worktree;
-          scripts/live-proof-notify.sh's dispatch attempt against the configured host fails
+          scripts/live-proof-notify.mjs's dispatch attempt against the configured host fails
           transiently for exactly that reason. No fake run counts as this integration's proof - a
           run against a fake would only prove it against the fake, per the common brief's own rule.
   integration.plan.sepay:
@@ -1785,7 +1785,7 @@ records:
         cyclic: false
         because: "gap.recur.unbuilt-module is resolved - impl.recur.todo-app-backend.engine is real,
           unit-tested (composes' both rules pass) and this flow's own backend half runs end to end
-          against the live dev stack (scripts/live-proof-recur.sh's
+          against the live dev stack (scripts/live-proof-recur.mjs's
           makeRecurring/upcomingOccurrences steps). What remains unmet is this record's own
           uat.required and e2e proof: uat.recur.make-recurring has no runs/ folder yet
           (gap.recur.live-proof, not mine to close - ui/uat records are out of this lane's scope)
@@ -1802,7 +1802,7 @@ records:
         rootKind: gap
         cyclic: false
         because: fr.share.invite, fr.share.accept and fr.share.revoke are all done (their own composed rules
-          are proven by jest and by scripts/live-proof-share.sh against the real stack), but no
+          are proven by jest and by scripts/live-proof-share.mjs against the real stack), but no
           uat.verify run has walked this journey - uat.share.invite-and-collaborate - against a live
           product yet; that is the real remaining root, not the frs themselves.
   journey.task.first-task:

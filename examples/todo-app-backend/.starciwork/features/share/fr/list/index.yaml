@@ -28,7 +28,7 @@ change:
   reason: br.share.revoke.on-read and br.share.invite.expiry are both done; ListCollaboratorsHandler
     dispatches to InvitationService.listFor, proven by list-collaborators.handler.spec.ts,
     invitation.service.spec.ts (the stranger exceptionFlow and the read-time status recompute) and
-    scripts/live-proof-share.sh's collaborators-query steps against the real GraphQL endpoint. A reader
+    scripts/live-proof-share.mjs's collaborators-query steps against the real GraphQL endpoint. A reader
     is recognised as "a collaborator" only once their invitation is bound to their personId (i.e.
     accepted at least once) - a still-pending invitee has no session-derived identity on the row yet to
     match against, so they are not distinguishable from a stranger for this query until they accept;

@@ -5,6 +5,9 @@ import {
     AppConfigService,
 } from "@modules/platform/config/index"
 import {
+    sepayConfig,
+} from "./sepay.config"
+import {
     PlanWebhookUnauthorizedException,
 } from "./errors/plan-webhook-unauthorized"
 
@@ -137,7 +140,7 @@ export class SepayClient {
    * authenticates its webhook delivery with a shared secret carried in the Authorization header
    * (integration.plan.sepay's credential), compared here rather than a computed body signature. */
     assertWebhookAuthorized(authorizationHeader?: string): void {
-        const expected = this.config.getSepayWebhookSecret()
+        const expected = sepayConfig(this.config).webhookSecret
         if (!expected || authorizationHeader !== `Bearer ${expected}`) {
             throw new PlanWebhookUnauthorizedException({
             })
@@ -147,11 +150,11 @@ export class SepayClient {
     private async request(name: string, path: string, init: RequestInit): Promise<{ status: number; payload: Record<string, unknown> }> {
         let response: Response
         try {
-            response = await fetch(`${this.config.getSepayBaseUrl()}${path}`,
+            response = await fetch(`${sepayConfig(this.config).baseUrl}${path}`,
                 {
                     ...init,
                     headers: {
-                        accept: "application/json", authorization: `Bearer ${this.config.getSepayApiKey()}`, ...init.headers 
+                        accept: "application/json", authorization: `Bearer ${sepayConfig(this.config).apiKey}`, ...init.headers 
                     },
                     signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
                 })
@@ -192,8 +195,8 @@ export class SepayClient {
     /** Names what the gateway actually said, and whether a credential went out at all - the two facts
    * gap.plan.sepay-not-reachable turns on. Never the credential's value. */
     private refusal(name: string, status: number | undefined, detail: string): string {
-        const credential = this.config.getSepayApiKey() ? "a credential was sent" : "no credential is configured"
-        return `SePay ${name} failed: ${detail} (HTTP ${status ?? "no response"}; ${credential}; ${this.config.getSepayBaseUrl()})`
+        const credential = sepayConfig(this.config).apiKey ? "a credential was sent" : "no credential is configured"
+        return `SePay ${name} failed: ${detail} (HTTP ${status ?? "no response"}; ${credential}; ${sepayConfig(this.config).baseUrl})`
     }
 }
 

@@ -1,9 +1,9 @@
 import {
     AbstractException,
-} from "@modules/platform/exceptions/index"
+} from "@modules/platform/errors/index"
 import type {
     AbstractExceptionMetadata,
-} from "@modules/platform/exceptions/index"
+} from "@modules/platform/errors/index"
 
 /** Metadata for an accept attempt whose email does not match the invited one. */
 export interface ShareEmailMismatchExceptionMetadata extends AbstractExceptionMetadata {

@@ -1,9 +1,9 @@
 import {
     AbstractException,
-} from "@modules/platform/exceptions/index"
+} from "@modules/platform/errors/index"
 import type {
     AbstractExceptionMetadata,
-} from "@modules/platform/exceptions/index"
+} from "@modules/platform/errors/index"
 
 /** Metadata for a failed reach to the primary Postgres connection. */
 export interface PostgresPrimaryUnavailableExceptionMetadata extends AbstractExceptionMetadata {

@@ -16,7 +16,7 @@ change:
     collaborator-cache.ts, ShareInvitationEntity + its migration), not the earlier-guessed src/share.
     Expiry and revocation are both enforced on read (never a sweep), matching
     sds.share.invitation-lifecycle's five transitions exactly. Proven by invitation.service.spec.ts,
-    completion-authority.spec.ts and scripts/live-proof-share.sh against the running stack.
+    completion-authority.spec.ts and scripts/live-proof-share.mjs against the running stack.
     gap.share.unbuilt-module's blockedBy is resolved.
     rev 3 (owners expansion) - owners now also claims the capability's shipped GraphQL transport,
     src/features/todo/transport/graphql/mutations/share and src/features/todo/transport/graphql/queries/share. The

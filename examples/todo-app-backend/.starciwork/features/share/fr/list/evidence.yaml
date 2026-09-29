@@ -12,10 +12,10 @@ assertions:
     outcome: pass
     observation: npx jest src/modules/domain/share/list-collaborators.handler.spec.ts exited 0
   - id: live-proof
-    command: bash scripts/live-proof-share.sh
+    command: bash scripts/live-proof-share.mjs
     exit: 0
     outcome: pass
-    observation: bash scripts/live-proof-share.sh exited 0
+    observation: bash scripts/live-proof-share.mjs exited 0
 provenance:
   actor: example-evidence
   tool: scripts/example-evidence.mjs

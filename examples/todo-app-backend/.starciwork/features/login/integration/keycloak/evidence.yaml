@@ -1,7 +1,7 @@
 # Written by hand: a work/integration@1's requiresProof.live asks for proof {boundary: live, fakes: []}
 # against the real provider (schemas/work-layout.yaml), which is not an --assert-shaped unit-test
 # command scripts/example-evidence.mjs runs, but a replayable shell script this record's own note
-# already names (scripts/live-proof.sh).
+# already names (scripts/live-proof.mjs).
 schema: work/evidence@1
 record: integration.login.keycloak
 proof:
@@ -10,7 +10,7 @@ proof:
 outcome: pass
 assertions:
   - id: real-keycloak-token-exchange
-    command: bash scripts/live-proof.sh
+    command: bash scripts/live-proof.mjs
     exit: 0
     outcome: pass
     observation: >-
@@ -20,10 +20,10 @@ assertions:
       completes a real direct-access-grant token exchange against
       /realms/todo/protocol/openid-connect/token and returns a session token; steps "signIn wrong
       password" and "signIn unknown email" both get INVALID_CREDENTIALS, identically, from the real
-      provider's own refusal. 22/22 live-proof.sh steps passed (run: 2026-09-18, this lane).
+      provider's own refusal. 22/22 live-proof.mjs steps passed (run: 2026-09-18, this lane).
 provenance:
   actor: example-evidence
-  tool: scripts/live-proof.sh (run by hand, not scripts/example-evidence.mjs)
+  tool: scripts/live-proof.mjs (run by hand, not scripts/example-evidence.mjs)
   environment: local
   capturedAt: 2026-09-18T08:52:00.000Z
 stale: true

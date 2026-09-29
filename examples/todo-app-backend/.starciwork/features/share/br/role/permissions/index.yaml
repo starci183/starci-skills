@@ -30,7 +30,7 @@ change:
   reason: impl.share.todo-app-backend.access is built (src/modules/domain/share, not the
     earlier-guessed src/share); completion-authority.spec.ts proves both acceptance criteria against a
     real TaskService wired to a real CompletionAuthorityRegistry with ShareCompletionAuthority
-    registered, and scripts/live-proof-share.sh proves the same two outcomes live. gap.share.unbuilt-module's
+    registered, and scripts/live-proof-share.mjs proves the same two outcomes live. gap.share.unbuilt-module's
     blockedBy is resolved.
 
     rev 3 (v11 ac-collapse) - acceptanceCriteria renamed to acceptance and now carries each criterion's id, given, when and then inline from the retired ac/ sub-records; refs to the old ac ids remap to br.share.role.permissions#<former-ac-id>. Encoding change only, no semantic change.

@@ -11,6 +11,9 @@ import {
     AppConfigService,
 } from "@modules/platform/config/index"
 import {
+    uploadConfig,
+} from "./upload.config"
+import {
     InjectPrimaryEntityManager,
 } from "@modules/platform/databases/postgresql/primary/index"
 import {
@@ -102,7 +105,7 @@ export class UploadService {
         row.storageKey = storageKeyOf(row.id)
         await this.entityManager.save(UploadEntity,
             row)
-        const expiresAt = new Date(Date.now() + this.config.getUploadPresignTtlMs())
+        const expiresAt = new Date(Date.now() + uploadConfig(this.config).presignTtlMs)
         return {
             uploadId: row.id,
             method: "PUT",
@@ -110,7 +113,7 @@ export class UploadService {
             headers: {
                 [UPLOAD_TOKEN_HEADER]: signUploadToken(row.id,
                     expiresAt.getTime(),
-                    this.config.getUploadSigningSecret()),
+                    uploadConfig(this.config).signingSecret),
                 "content-type": mime,
             },
             expiresAt,
@@ -124,7 +127,7 @@ export class UploadService {
         const row = await this.findRow(uploadId)
         const verdict = verifyUploadToken(uploadId,
             token,
-            this.config.getUploadSigningSecret(),
+            uploadConfig(this.config).signingSecret,
             Date.now())
         if (verdict !== "ok") {
             throw new UploadTokenInvalidException({
@@ -292,7 +295,7 @@ export class UploadService {
     /** Intake validation shared by both doors: the mime must be on the configured allowlist and the
    * size (declared at intent, received at content/direct) must sit under the configured ceiling. */
     private assertIntakeAllowed(mime: string, sizeBytes: number): void {
-        if (!this.config.getUploadAllowedMimes().includes(mime)) {
+        if (!uploadConfig(this.config).allowedMimes.includes(mime)) {
             throw new UploadMimeNotAllowedException({
                 mime 
             })
@@ -301,7 +304,7 @@ export class UploadService {
     }
 
     private assertSizeAllowed(sizeBytes: number): void {
-        const maxBytes = this.config.getUploadMaxBytes()
+        const maxBytes = uploadConfig(this.config).maxBytes
         if (!Number.isFinite(sizeBytes) || sizeBytes <= 0 || sizeBytes > maxBytes) {
             throw new UploadTooLargeException({
                 sizeBytes, maxBytes 

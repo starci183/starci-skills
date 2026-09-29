@@ -8,6 +8,9 @@ import {
     AppConfigService,
 } from "@modules/platform/config/index"
 import {
+    notifyQueueConfig,
+} from "./notify-queue.config"
+import {
     NotifyQueuePort 
 } from "./notify-queue.contracts"
 import {
@@ -60,7 +63,7 @@ export class NotifyQueueClient extends NotifyQueuePort {
     }
 
     private async run(args: Array<string>): Promise<unknown> {
-        const { hostname, port } = new URL(this.config.getRedisUrl())
+        const { hostname, port } = new URL(notifyQueueConfig(this.config).redisUrl)
         const socket = await connect(hostname || "localhost",
             Number(port) || 6379)
         try {

@@ -30,6 +30,6 @@ change:
   reason: br.share.invite.expiry and br.share.role.permissions are both done; AcceptInvitationHandler
     dispatches to InvitationService.accept, proven by accept-invitation.handler.spec.ts,
     invitation.service.spec.ts (all three exceptionFlows, including the fourteen-day boundary by
-    backdating sentAt) and scripts/live-proof-share.sh's accept steps against the real GraphQL endpoint.
+    backdating sentAt) and scripts/live-proof-share.mjs's accept steps against the real GraphQL endpoint.
     requiresProof.uat.required is not yet satisfied by a recorded uat.verify walk - see the same
     gap.share.live-proof note on fr.share.invite's own change entry.

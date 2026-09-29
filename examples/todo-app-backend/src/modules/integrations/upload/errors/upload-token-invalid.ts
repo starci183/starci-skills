@@ -1,9 +1,9 @@
 import {
     AbstractException,
-} from "@modules/platform/exceptions/index"
+} from "@modules/platform/errors/index"
 import type {
     AbstractExceptionMetadata,
-} from "@modules/platform/exceptions/index"
+} from "@modules/platform/errors/index"
 
 /** Metadata for a presigned PUT presented with a missing, expired or wrongly-signed token. */
 export interface UploadTokenInvalidExceptionMetadata extends AbstractExceptionMetadata {

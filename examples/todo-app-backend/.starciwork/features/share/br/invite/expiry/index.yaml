@@ -28,7 +28,7 @@ change:
   at: 2026-09-19T15:59:33.966Z
   reason: impl.share.todo-app-backend.invitations is built (src/modules/domain/share, not the
     earlier-guessed src/share); invitation.service.spec.ts proves both acceptance criteria by backdating
-    sentAt rather than waiting fourteen real days, and scripts/live-proof-share.sh proves the
+    sentAt rather than waiting fourteen real days, and scripts/live-proof-share.mjs proves the
     non-expiry half live against the real stack. gap.share.unbuilt-module's blockedBy is resolved.
 
     rev 3 (v11 ac-collapse) - acceptanceCriteria renamed to acceptance and now carries each criterion's id, given, when and then inline from the retired ac/ sub-records; refs to the old ac ids remap to br.share.invite.expiry#<former-ac-id>. Encoding change only, no semantic change.

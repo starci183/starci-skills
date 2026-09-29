@@ -2,8 +2,8 @@ import {
     Injectable 
 } from "@nestjs/common"
 import {
-    createHash 
-} from "node:crypto"
+    sha256Hex,
+} from "@modules/platform/primitives/index"
 import type {
     EntityManager 
 } from "typeorm"
@@ -110,7 +110,7 @@ export class DedupeService {
 
 /** Compute dedupe key for the dedupe.service flow - one named step of the notify capability's behaviour. */
 export function computeDedupeKey(kind: string, sourceEventId: string, recipientId: string): string {
-    return createHash("sha256").update(`${kind}:${sourceEventId}:${recipientId}`).digest("hex")
+    return sha256Hex(`${kind}:${sourceEventId}:${recipientId}`)
 }
 
 function toRecord(row: NotifyNotificationEntity): NotificationRecord {

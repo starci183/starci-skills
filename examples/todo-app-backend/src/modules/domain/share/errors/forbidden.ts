@@ -1,9 +1,9 @@
 import {
     AbstractException,
-} from "@modules/platform/exceptions/index"
+} from "@modules/platform/errors/index"
 import type {
     AbstractExceptionMetadata,
-} from "@modules/platform/exceptions/index"
+} from "@modules/platform/errors/index"
 
 /** Metadata for an action attempted by someone other than the invitation's/task's owner. */
 export interface ShareForbiddenExceptionMetadata extends AbstractExceptionMetadata {

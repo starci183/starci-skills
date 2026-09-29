@@ -1,9 +1,9 @@
 import {
     AbstractException,
-} from "@modules/platform/exceptions/index"
+} from "@modules/platform/errors/index"
 import type {
     AbstractExceptionMetadata,
-} from "@modules/platform/exceptions/index"
+} from "@modules/platform/errors/index"
 
 /** Metadata for a transient SMTP failure (the host is unreachable or answers with a 4xx). */
 export interface NotifySmtpTransientFailureExceptionMetadata extends AbstractExceptionMetadata {

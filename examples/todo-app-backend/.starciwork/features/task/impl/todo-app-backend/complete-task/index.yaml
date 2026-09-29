@@ -9,7 +9,7 @@ owners:
 revision: bfc3cdabb3c6c5afcd3f6371beaeca184a55a75d
 # Done: both rules this feature implements are now proven at their current revs -
 # br.task.complete.once (rev 2: idempotency + reversibility, unit-named tests plus a
-# scripts/live-proof.sh re-run against an API built from this source tree on a dedicated dev-stack
+# scripts/live-proof.mjs re-run against an API built from this source tree on a dedicated dev-stack
 # port, 22/22, shared Postgres) and event.task.completed (publish + payload asserted by the named
 # event.task.completed test). The old "composes rules not themselves proven" hold no longer applies.
 # What stays open stays open on the other records' own terms: fr.task.complete (uat + held composed

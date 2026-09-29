@@ -1,9 +1,9 @@
 import {
     AbstractException,
-} from "@modules/platform/exceptions/index"
+} from "@modules/platform/errors/index"
 import type {
     AbstractExceptionMetadata,
-} from "@modules/platform/exceptions/index"
+} from "@modules/platform/errors/index"
 
 /** Metadata attached to a ErasureRequestInvalidStateException throw so the refusal is queryable rather than only readable. */
 export interface ErasureRequestInvalidStateExceptionMetadata extends AbstractExceptionMetadata {

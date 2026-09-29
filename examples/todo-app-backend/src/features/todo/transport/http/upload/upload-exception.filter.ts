@@ -6,7 +6,7 @@ import type {
 } from "express"
 import {
     AbstractException,
-} from "@modules/platform/exceptions/index"
+} from "@modules/platform/errors/index"
 
 /**
  * Maps the house exception vocabulary onto HTTP statuses for the upload door, the way

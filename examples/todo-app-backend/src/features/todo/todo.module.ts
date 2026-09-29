@@ -3,28 +3,16 @@ import {
 } from "@nestjs/common"
 import {
     TodoGraphqlModule
-} from "./transport/graphql/graphql.module"
+} from "./transport/graphql/todo-graphql.module"
 import {
-    HealthModule
-} from "./transport/http/health/health.module"
-import {
-    ProbesModule
-} from "./transport/http/health/probes/probes.module"
-import {
-    UploadHttpModule
-} from "./transport/http/upload/upload.module"
-import {
-    SepayWebhookModule
-} from "./transport/http/webhooks/sepay/sepay-webhook.module"
+    TodoHttpModule
+} from "./transport/http/todo-http.module"
 
 /** The todo feature owns its GraphQL and HTTP transport registrations. */
 @Module({
     imports: [
         TodoGraphqlModule,
-        HealthModule.register(),
-        ProbesModule.register(),
-        SepayWebhookModule.register(),
-        UploadHttpModule.register(),
+        TodoHttpModule,
     ],
 })
 /** Public Nest module for the todo feature's GraphQL and HTTP doors. */

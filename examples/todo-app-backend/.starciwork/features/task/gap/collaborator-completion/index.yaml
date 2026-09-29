@@ -18,7 +18,7 @@ because: "closedBy's impl.share.todo-app-backend.access is done: ShareCompletion
   through the sanctioned seam (task.module.ts's registry export, consumed from
   ShareCompletionAuthoritySetup.onModuleInit) - task's side of that seam already existed and was already
   tested (domain/task/completion-authority.spec.ts's 'a registered widened authority lets a non-owner
-  complete/reopen' predates this lane). completion-authority.spec.ts and scripts/live-proof-share.sh both
+  complete/reopen' predates this lane). completion-authority.spec.ts and scripts/live-proof-share.mjs both
   prove an accepted editor collaborator can complete/reopen a shared task while delete stays refused.
   This closes the specific absence this gap named (no implementation on either side); it does not itself
   re-prove sds.task.ownership-guard or set fr.task.complete to done - both remain for lane login-impl/task

@@ -8,6 +8,9 @@ import {
     AppConfigService,
 } from "@modules/platform/config/index"
 import {
+    notifySmtpConfig,
+} from "./notify-smtp.config"
+import {
     NotifySmtpPermanentRejectionException,
 } from "./errors/notify-smtp-permanent-rejection"
 import {
@@ -43,9 +46,9 @@ export class NotifySmtpClient extends NotifySmtpPort {
     }
 
     async send(message: NotifySmtpMessageParams): Promise<void> {
-        const host = this.config.getSmtpHost()
-        const port = this.config.getSmtpPort()
-        const from = this.config.getSmtpFromAddress()
+        const host = notifySmtpConfig(this.config).host
+        const port = notifySmtpConfig(this.config).port
+        const from = notifySmtpConfig(this.config).fromAddress
 
         const socket = await connect(host,
             port).catch(error => {

@@ -64,7 +64,7 @@ change:
     explicitly in surface[0].transport so a future change to either side is a contract change, not a
     silent drift, and (b) renames the header itself to "Authorization: Bearer <token>", matching
     nivo-fe/nivo-backend's own convention instead of this example's one-off custom header name. The
-    provider (session-actor.adapter.ts) also now refuses a missing/empty token before any database
+    provider (application/session-actor.adapter.ts) also now refuses a missing/empty token before any database
     query, closing the bypass class at its root rather than relying only on the header name matching.
 
 # gap.task.collaborator-completion closed (lane be-share): share's provider half is real and tested.

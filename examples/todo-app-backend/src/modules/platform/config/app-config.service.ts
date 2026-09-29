@@ -134,7 +134,7 @@ export class AppConfigService {
     }
 
     /** integration.plan.sepay's credential: SEPAY_API_KEY_FILE names a decrypted file path (see
-   * scripts/with-dev-secrets.sh), never an inline value. Empty when unset/unreachable, rather than
+   * scripts/with-dev-secrets.mjs), never an inline value. Empty when unset/unreachable, rather than
    * throwing at construction time, so the app still boots without SePay and the live path fails at the
    * call site instead - exactly the shape gap.plan.sepay-not-reachable stays open against. */
     getSepayApiKey(): string {

@@ -16,7 +16,7 @@ change:
     decision.audit.erasure-method's settled crypto-shred mechanism. Real files: AuditErasureService
     (tRequest/tVerify/tRefuse/tExecute/tComplete), RequestErasureCommand/Handler,
     CompleteErasureCommand/Handler, the four ERASURE_REQUEST_*/ERASURE_NOT_CONFIRMED exceptions under
-    src/modules/platform/exceptions/errors/audit, and the AuditErasureRequest entity and migration under
+    src/modules/platform/errors/errors/audit, and the AuditErasureRequest entity and migration under
     src/modules/platform/databases/postgresql/primary, all under src/modules/domain/audit/ (the same
     directory impl.audit.todo-app-backend.log owns - one capability module, following
     impl.task.todo-app-backend.platform-database's precedent for a directory two impl records both name).

@@ -13,7 +13,7 @@ proves: [sds.task.ownership-guard]
 # named tests (completion-authority.spec.ts's sds.task.ownership-guard.t-owner/.t-collaborator/
 # .t-stranger), the real share-authority-over-unmodified-TaskService wiring is captured as an
 # assertion running the share lane's own spec, and the transport-level refusals passed live in
-# scripts/live-proof.sh against an API built from this source tree. br.task.single-owner is dropped
+# scripts/live-proof.mjs against an API built from this source tree. br.task.single-owner is dropped
 # from proves - not because this code doesn't implement it, but because that record is still todo
 # (its done flag is held by gap.task.share-edge-hold, a mechanical out-of-lane edge), and a done
 # record may not prove a todo one. That hold is evidentially about the record graph, not this code.

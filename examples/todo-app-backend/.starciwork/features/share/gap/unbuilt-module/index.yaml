@@ -11,7 +11,7 @@ verificationSource: authored-claim
 because: "Both backend-half closers are done with real evidence: src/modules/domain/share (access.service.ts,
   completion-authority.ts, invitation.service.ts, collaborator-cache.ts, the CQRS commands/queries and
   the GraphQL mutations/queries under features/todo/graphql/{mutations,queries}/share/**) exists,
-  builds, typechecks, and is proven by jest and scripts/live-proof-share.sh against the real running
+  builds, typechecks, and is proven by jest and scripts/live-proof-share.mjs against the real running
   stack. impl.share.todo-app-frontend.invite-screen is a separate, still-unbuilt half this lane does not
   own (backend-only per its brief) - see the final report; the frontend invite screen remains its own
   todo record, unaffected by this gap closing."

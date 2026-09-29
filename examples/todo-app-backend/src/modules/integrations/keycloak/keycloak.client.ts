@@ -5,6 +5,9 @@ import {
     AppConfigService,
 } from "@modules/platform/config/index"
 import {
+    keycloakConfig,
+} from "./keycloak.config"
+import {
     KeycloakInvalidCredentialsException,
 } from "./errors/keycloak-invalid-credentials"
 import {
@@ -37,13 +40,13 @@ export class KeycloakClient {
     async signIn(email: string, password: string): Promise<KeycloakSignInResult> {
         const body = new URLSearchParams({
             grant_type: "password",
-            client_id: this.config.getKeycloakClientId(),
+            client_id: keycloakConfig(this.config).clientId,
             username: email,
             password,
         })
         let response: Response
         try {
-            response = await fetch(this.config.getKeycloakTokenUrl(),
+            response = await fetch(keycloakConfig(this.config).tokenUrl,
                 {
                     method: "POST",
                     headers: {
@@ -73,7 +76,7 @@ export class KeycloakClient {
     }
 
     async notifySignOut(personId: string): Promise<void> {
-        const targetUrl = this.config.getKeycloakTokenUrl()
+        const targetUrl = keycloakConfig(this.config).tokenUrl
         try {
             await fetch(targetUrl,
                 {

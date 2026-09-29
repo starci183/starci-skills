@@ -1,9 +1,9 @@
 import {
     AbstractException,
-} from "@modules/platform/exceptions/index"
+} from "@modules/platform/errors/index"
 import type {
     AbstractExceptionMetadata,
-} from "@modules/platform/exceptions/index"
+} from "@modules/platform/errors/index"
 
 /** Metadata for a permanent SMTP rejection (the provider refuses the address for good, a 5xx). */
 export interface NotifySmtpPermanentRejectionExceptionMetadata extends AbstractExceptionMetadata {

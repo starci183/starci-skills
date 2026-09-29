@@ -1,9 +1,9 @@
 import {
     AbstractException,
-} from "@modules/platform/exceptions/index"
+} from "@modules/platform/errors/index"
 import type {
     AbstractExceptionMetadata,
-} from "@modules/platform/exceptions/index"
+} from "@modules/platform/errors/index"
 
 /** Type alias naming the session not found exception metadata set session-not-found switches on; a new member is added here once, not scattered as literals. */
 export type SessionNotFoundExceptionMetadata = AbstractExceptionMetadata;

@@ -32,11 +32,11 @@ outcome: pass
 assertions:
   - id: live-redis-roundtrip
     command: node -r ts-node/register/transpile-only -r tsconfig-paths/register
-      scripts/notify-queue-live-check.cjs
+      scripts/notify-queue-live-check.mjs
     exit: 0
     outcome: pass
     observation: node -r ts-node/register/transpile-only -r tsconfig-paths/register
-      scripts/notify-queue-live-check.cjs exited 0
+      scripts/notify-queue-live-check.mjs exited 0
 provenance:
   actor: example-evidence
   tool: scripts/example-evidence.mjs

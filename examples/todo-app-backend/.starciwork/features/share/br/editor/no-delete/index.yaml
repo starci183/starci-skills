@@ -22,7 +22,7 @@ change:
   at: 2026-09-19T15:59:33.966Z
   reason: impl.share.todo-app-backend.access is built (src/modules/domain/share, not the earlier-guessed
     src/share); completion-authority.spec.ts proves an accepted editor collaborator refused at delete
-    through task's own unmodified OwnershipGuard, and scripts/live-proof-share.sh proves the same refusal
+    through task's own unmodified OwnershipGuard, and scripts/live-proof-share.mjs proves the same refusal
     end to end against the real running stack. gap.share.unbuilt-module's blockedBy is resolved.
 
     rev 3 (v11 ac-collapse) - acceptanceCriteria renamed to acceptance and now carries each criterion's id, given, when and then inline from the retired ac/ sub-records; refs to the old ac ids remap to br.share.editor.no-delete#<former-ac-id>. Encoding change only, no semantic change.

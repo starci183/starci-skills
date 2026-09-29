@@ -26,7 +26,7 @@ import {
 
 import {
     GraphqlRequestLike,
-} from "../../../../../session-actor.adapter"
+} from "../../../../../application/session-actor.adapter"
 import {
     ExportMyDataResolver 
 } from "./export-my-data.resolver"

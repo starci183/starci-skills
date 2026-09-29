@@ -4,5 +4,6 @@
   "project": "todo-app-backend",
   "apps": [
     { "name": "todo", "kind": "api" }
-  ]
+  ],
+  "optionalSlots": ["repo.docs"]
 }

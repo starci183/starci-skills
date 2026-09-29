@@ -24,7 +24,7 @@ import {
 
 import {
     GraphqlRequestLike,
-} from "../../../../../session-actor.adapter"
+} from "../../../../../application/session-actor.adapter"
 import {
     RequestErasureResolver 
 } from "./request-erasure.resolver"

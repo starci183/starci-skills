@@ -28,7 +28,7 @@ change:
   at: 2026-09-18T16:00:00.000Z
   reason: br.share.role.permissions and br.share.invite.expiry are both done; InviteHandler dispatches
     to InvitationService.invite, proven by invite.handler.spec.ts, invitation.service.spec.ts and
-    scripts/live-proof-share.sh's invite steps (including both exceptionFlows) against the real GraphQL
+    scripts/live-proof-share.mjs's invite steps (including both exceptionFlows) against the real GraphQL
     endpoint. requiresProof.uat.required is not yet satisfied by a recorded uat.verify walk - see
     gap.share.live-proof, which uat.share.invite-and-collaborate (this fr's own journey proof) still
     names in its own blockedBy; the live-proof script is a real end-to-end run but not that formal,

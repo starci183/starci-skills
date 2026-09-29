@@ -2,8 +2,8 @@ import {
     Injectable, Optional 
 } from "@nestjs/common"
 import {
-    createHash 
-} from "node:crypto"
+    sha256Hex,
+} from "@modules/platform/primitives/index"
 import type {
     EntityManager 
 } from "typeorm"
@@ -42,7 +42,7 @@ export interface VerifyChainResult {
 }
 
 const hashContent = (prevHash: string, at: Date, action: string, target: string | null, keyId: string, actor: string): string =>
-    createHash("sha256").update(`${prevHash}|${at.toISOString()}|${action}|${target ?? ""}|${keyId}|${actor}`).digest("hex")
+    sha256Hex(`${prevHash}|${at.toISOString()}|${action}|${target ?? ""}|${keyId}|${actor}`)
 
 /**
  * sds.audit.log-chain: appends one hash-chained, per-person-sealed line per tracked action.

@@ -1,7 +1,7 @@
 /*
  * Rules are authored in the trust tree and published as @starci/eslint-canon-be; this repository
  * owns only which globs they apply to and which vendored repository-local rules join them
- * (./scripts/eslint — the seven rules canon does not publish, copied from the host repo's
+ * (./scripts/eslint-local.mjs — the seven rules canon does not publish, copied from the host repo's
  * plugins/eslint/index.mjs).
  *
  *   plugins: { "starci-be": { rules: { ...canon, ...local } } },
@@ -15,7 +15,7 @@ import js from "@eslint/js"
 import globals from "globals"
 import tseslint from "typescript-eslint"
 import { defineConfig } from "eslint/config"
-import starciBe from "./scripts/eslint/index.mjs"
+import starciBe from "./scripts/eslint-local.mjs"
 
 const APP_GLOBS = ["src/**/*.ts", "apps/**/*.ts"]
 

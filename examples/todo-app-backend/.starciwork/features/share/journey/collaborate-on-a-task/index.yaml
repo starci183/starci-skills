@@ -12,7 +12,7 @@ steps:
       collaborator tries fails, immediately, with no delay."}
 requirements: [fr.task.create, fr.share.invite, fr.share.accept, fr.share.revoke]
 blockedBy:
-  - {record: gap.share.live-proof, because: "fr.share.invite, fr.share.accept and fr.share.revoke are all done (their own composed rules are proven by jest and by scripts/live-proof-share.sh against the real stack), but no uat.verify run has walked this journey - uat.share.invite-and-collaborate - against a live product yet; that is the real remaining root, not the frs themselves."}
+  - {record: gap.share.live-proof, because: "fr.share.invite, fr.share.accept and fr.share.revoke are all done (their own composed rules are proven by jest and by scripts/live-proof-share.mjs against the real stack), but no uat.verify run has walked this journey - uat.share.invite-and-collaborate - against a live product yet; that is the real remaining root, not the frs themselves."}
 
 requiresProof:
   uat:

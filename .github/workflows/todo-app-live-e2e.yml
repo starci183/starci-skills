@@ -34,9 +34,8 @@ jobs:
           node-version: ${{ env.NODE_VERSION }}
 
       # Pinned, checksum-verified installs (no `curl | sh`). Versions match what this repository already
-      # pins elsewhere: sops v3.10.2 (ghcr.io/getsops/sops:v3.10.2, used by with-dev-secrets.sh's own
-      # Docker fallback and by scripts/prepare.ps1/.sh) and age v1.2.1 (the apk version pinned in
-      # scripts/prepare.sh). Both secrets/env files compose.yaml references (env_file / the keycloak
+      # pins elsewhere: sops v3.10.2 (ghcr.io/getsops/sops:v3.10.2, used by with-dev-secrets.mjs's own
+      # Docker fallback) and age v1.2.1. Both secrets/env files compose.yaml references (env_file / the keycloak
       # secret file) must exist as plaintext before `docker compose up`, so secrets are decrypted first.
       - name: Install sops (pinned, checksum-verified)
         run: |
@@ -62,7 +61,7 @@ jobs:
       # .starcistacks/dev/runtime/env/KEYS.md.
       - name: Decrypt DEMO-ONLY dev secrets and bring up Postgres + Keycloak (not the app profile)
         run: |
-          ./scripts/with-dev-secrets.sh \
+          node scripts/with-dev-secrets.mjs \
             docker compose -f .starcistacks/dev/infra/compose/compose.yaml up -d
 
       - name: Wait for Postgres
@@ -102,7 +101,7 @@ jobs:
       - name: Start the API in the background (PORT=3001)
         run: |
           set -eu
-          PORT=3001 ./scripts/with-dev-secrets.sh node dist/main.js > api.log 2>&1 &
+          PORT=3001 node scripts/with-dev-secrets.mjs node dist/main.js > api.log 2>&1 &
           echo $! > api.pid
           for attempt in $(seq 1 30); do
             status=$(curl -s -o /dev/null -w '%{http_code}' http://localhost:3001/tasks || echo 000)
@@ -202,7 +201,7 @@ jobs:
             sleep 1
           done
 
-          PORT=3001 ./scripts/with-dev-secrets.sh node dist/main.js > api-restarted.log 2>&1 &
+          PORT=3001 node scripts/with-dev-secrets.mjs node dist/main.js > api-restarted.log 2>&1 &
           echo $! > api.pid
           for attempt in $(seq 1 30); do
             status=$(curl -s -o /dev/null -w '%{http_code}' http://localhost:3001/tasks || echo 000)

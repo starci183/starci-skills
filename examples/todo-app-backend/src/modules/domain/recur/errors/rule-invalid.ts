@@ -1,9 +1,9 @@
 import {
     AbstractException,
-} from "@modules/platform/exceptions/index"
+} from "@modules/platform/errors/index"
 import type {
     AbstractExceptionMetadata,
-} from "@modules/platform/exceptions/index"
+} from "@modules/platform/errors/index"
 
 /** Metadata for a rule submission whose frequency-specific fields do not match data.recur.rule's own invariant. */
 export interface RecurRuleInvalidExceptionMetadata extends AbstractExceptionMetadata {

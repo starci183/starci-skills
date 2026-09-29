@@ -9,7 +9,7 @@ owners:
 revision: bfc3cdabb3c6c5afcd3f6371beaeca184a55a75d
 # Done: this handler is the implementation of br.task.complete.once's reversible statement (owner
 # reopens, task reads incomplete, completedAt cleared - ac.task.complete.once.is-reversible in
-# reopen-task.handler.spec.ts, plus the live scripts/live-proof.sh reopenTask step against an API
+# reopen-task.handler.spec.ts, plus the live scripts/live-proof.mjs reopenTask step against an API
 # built from this source tree) and of sds.task.completion-state's t-reopen transition (named test in
 # task.service.spec.ts, plus the widened-authority reopen case in completion-authority.spec.ts). The
 # old comment claiming "there is no fr.task.reopen ... record" was stale - fr.task.reopen exists and

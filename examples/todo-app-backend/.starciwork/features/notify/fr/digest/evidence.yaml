@@ -12,10 +12,10 @@ assertions:
     outcome: pass
     observation: npx jest digest.service.spec.ts notify.service.spec.ts -t digest exited 0
   - id: e2e
-    command: bash scripts/live-proof-notify.sh
+    command: bash scripts/live-proof-notify.mjs
     exit: 0
     outcome: pass
-    observation: bash scripts/live-proof-notify.sh exited 0
+    observation: bash scripts/live-proof-notify.mjs exited 0
 provenance:
   actor: example-evidence
   tool: scripts/example-evidence.mjs

@@ -1,9 +1,9 @@
 import {
     AbstractException,
-} from "@modules/platform/exceptions/index"
+} from "@modules/platform/errors/index"
 import type {
     AbstractExceptionMetadata,
-} from "@modules/platform/exceptions/index"
+} from "@modules/platform/errors/index"
 
 /** Type alias naming the plan webhook unauthorized exception metadata set plan-webhook-unauthorized switches on; a new member is added here once, not scattered as literals. */
 export type PlanWebhookUnauthorizedExceptionMetadata = AbstractExceptionMetadata;

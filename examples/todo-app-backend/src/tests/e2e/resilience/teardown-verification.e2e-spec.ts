@@ -15,7 +15,7 @@ import {
     composeProjectOf,
     dockerAvailable,
     dockerLines,
-} from "./e2e-infra-contract"
+} from "../setup/e2e-infra-contract"
 
 const runnable = dockerAvailable()
 if (!runnable) {

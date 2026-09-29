@@ -72,10 +72,10 @@ assertions:
     outcome: pass
     observation: npx jest src/modules/domain/session src/modules/integrations/keycloak exited 0
   - id: contract.login.identity-for-task
-    command: npx jest apps/todo/src/app.boot.spec.ts
+    command: npx jest apps/todo/src/todo.composition.spec.ts
     exit: 0
     outcome: pass
-    observation: npx jest apps/todo/src/app.boot.spec.ts exited 0
+    observation: npx jest apps/todo/src/todo.composition.spec.ts exited 0
   - id: typecheck
     command: npx tsc --noEmit
     exit: 0

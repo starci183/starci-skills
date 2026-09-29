@@ -18,7 +18,7 @@ import {
 import {
     actorIdFromRequest,
     GraphqlRequestLike,
-} from "../../../../../session-actor.adapter"
+} from "../../../../../application/session-actor.adapter"
 import {
     MaterialisedOccurrenceResponse, UpcomingOccurrencesResponse 
 } from "./graphql-types/response"

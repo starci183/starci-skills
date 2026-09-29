@@ -22,7 +22,7 @@ requiresProof:
 
 # The blockedBy onto br.task.complete.once is dropped: the rule is now done at rev 2 - the reversible
 # statement its rev-2 change demanded as proof is proven (ac.task.complete.once.is-reversible in
-# reopen-task.handler.spec.ts, plus the live scripts/live-proof.sh reopen step against an API built
+# reopen-task.handler.spec.ts, plus the live scripts/live-proof.mjs reopen step against an API built
 # from this tree), which is exactly what that edge said was still missing. composes[].module was
 # corrected from the pre-migration src/features/reopen-task to the real capability directory, and
 # requiresProof.e2e now names the real spec (task-lifecycle.e2e-spec.ts drives the reopen step through

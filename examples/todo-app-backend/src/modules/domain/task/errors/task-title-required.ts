@@ -1,9 +1,9 @@
 import {
     AbstractException,
-} from "@modules/platform/exceptions/index"
+} from "@modules/platform/errors/index"
 import type {
     AbstractExceptionMetadata,
-} from "@modules/platform/exceptions/index"
+} from "@modules/platform/errors/index"
 
 /** Type alias naming the task title required exception metadata set task-title-required switches on; a new member is added here once, not scattered as literals. */
 export type TaskTitleRequiredExceptionMetadata = AbstractExceptionMetadata;

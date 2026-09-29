@@ -104,10 +104,10 @@ assertions:
     outcome: pass
     observation: npx jest src/modules/domain/share/completion-authority.spec.ts exited 0
   - id: sds.task.ownership-guard.boot-transport
-    command: npx jest apps/todo/src/app.boot.spec.ts -t "drives sign-in, the full task lifecycle"
+    command: npx jest apps/todo/src/todo.composition.spec.ts -t "drives sign-in, the full task lifecycle"
     exit: 0
     outcome: pass
-    observation: npx jest apps/todo/src/app.boot.spec.ts -t "drives sign-in, the full task lifecycle" exited 0
+    observation: npx jest apps/todo/src/todo.composition.spec.ts -t "drives sign-in, the full task lifecycle" exited 0
 provenance:
   actor: example-evidence
   tool: scripts/example/example-evidence.mjs

@@ -37,21 +37,21 @@ codeDigest:
       sha256: d864ebad4736a4d163c6597abd8906b4e1b22c12830035807d338f67effdcb5d
     - path: src/modules/integrations/upload/upload.service.ts
       sha256: 391de988514a713c9c883fed71cdc6ccb65dfce7e0e6ce31f12ee785b9197484
-    - path: src/modules/platform/exceptions/errors/upload/upload-forbidden.ts
+    - path: src/modules/platform/errors/errors/upload/upload-forbidden.ts
       sha256: 1d117a4cf968d107dabdcddfc5873df45b1df6a7932d12f29f60c13adf488a1e
-    - path: src/modules/platform/exceptions/errors/upload/upload-mime-not-allowed.ts
+    - path: src/modules/platform/errors/errors/upload/upload-mime-not-allowed.ts
       sha256: 8d21fe2aa6a36de8f111152ec9cef4652c902542d401d40c13da35d84580fe4c
-    - path: src/modules/platform/exceptions/errors/upload/upload-not-found.ts
+    - path: src/modules/platform/errors/errors/upload/upload-not-found.ts
       sha256: 20d7dd6f8e67d04cf8734c80891e022c25d2ae91bf4ab54255223cac3d96d27f
-    - path: src/modules/platform/exceptions/errors/upload/upload-not-ready.ts
+    - path: src/modules/platform/errors/errors/upload/upload-not-ready.ts
       sha256: 961530ead6e26bbc581f04345828674c7f9a5e2abe6be4ef7083e7adcb72a6dc
-    - path: src/modules/platform/exceptions/errors/upload/upload-scan-rejected.ts
+    - path: src/modules/platform/errors/errors/upload/upload-scan-rejected.ts
       sha256: f5f2c1ee89b40e6c70c4b2d06cb723336807e128018899ae162dd0598e554bea
-    - path: src/modules/platform/exceptions/errors/upload/upload-storage-unavailable.ts
+    - path: src/modules/platform/errors/errors/upload/upload-storage-unavailable.ts
       sha256: 4967862575284cf844261084b9e9036e6a53b006efbf8a8d78e0d7f7c0845e6e
-    - path: src/modules/platform/exceptions/errors/upload/upload-token-invalid.ts
+    - path: src/modules/platform/errors/errors/upload/upload-token-invalid.ts
       sha256: 8d98ab4da461d945344ca588241e44cc71dab9e6cab6a1e4ccf78cbbc53bf144
-    - path: src/modules/platform/exceptions/errors/upload/upload-too-large.ts
+    - path: src/modules/platform/errors/errors/upload/upload-too-large.ts
       sha256: fbdedcd94fe8b855180bb247f8a53b179c1d59c5376d2f3ceed1c867dda4b734
   digest: 92861994ddfc8e03acb7125ff084f46e188a207e5b642ccd52f92608c377c68a
 outcome: pass

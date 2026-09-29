@@ -1,9 +1,9 @@
 import {
     AbstractException,
-} from "@modules/platform/exceptions/index"
+} from "@modules/platform/errors/index"
 import type {
     AbstractExceptionMetadata,
-} from "@modules/platform/exceptions/index"
+} from "@modules/platform/errors/index"
 
 /** Metadata for a mutation attempted by someone other than the task's owner (or an accepted editor). */
 export interface TaskForbiddenExceptionMetadata extends AbstractExceptionMetadata {
