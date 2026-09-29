@@ -86,5 +86,5 @@ test('the probe over a ledger: shadow would-sends, staggered 15 s apart, a rate-
     now += 16_000; const r = await job.reconcile('health:all', ctx);
     assert.equal(r.states.working, 1);
     assert.ok(ctx.calls.clear.some((c) => c.entity === 'job:nivo:op-a' && c.state === 'WORKER_STALLED'));
-  } finally { db.close(); _health.reset(); }
+  } finally { db.close(); _health.reset(); fs.rmSync(dir, { recursive: true, force: true, maxRetries: 20, retryDelay: 25 }); }
 });

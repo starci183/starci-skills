@@ -208,11 +208,12 @@ test('host lock: a busy gc lock touches nothing; both new collectors are default
   assert.ok(COLLECTORS.includes('leases') && COLLECTORS.includes('lanelogs'));
 });
 
-test('lane worktrees: never collected while the owner agent lives or git moved in the last 60 min', async () => {
+test('lane worktrees: never collected while the owner agent lives or git moved in the last 60 min', async (t) => {
   const { collectLanes, laneOwnerOf, gcSettings } = await import('../scripts/supervisor/gc.mjs');
   const fs = await import('node:fs');
   const os = await import('node:os');
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'starci-gc-lanes-'));
+  t.after(() => fs.rmSync(root, { recursive: true, force: true, maxRetries: 20, retryDelay: 25 }));
   const lanes = path.join(root, 'lanes');
   const mk = (n) => { const d = path.join(lanes, n); fs.mkdirSync(d, { recursive: true }); return d; };
   const dirs = { owned: mk('slim-api'), cwd: mk('slim-ui'), fresh: mk('slim-db'), idle: mk('slim-docs') };
@@ -240,7 +241,7 @@ test('lane worktrees: never collected while the owner agent lives or git moved i
   assert.equal(gcSettings({}).laneIdleMs, 3_600_000);
 });
 
-test('housekeeping sweepLanes applies the same live-owner rule as gc.mjs (scripts/lib/lane-owner.mjs)', async () => {
+test('housekeeping sweepLanes applies the same live-owner rule as gc.mjs (scripts/lib/lane-owner.mjs)', async (t) => {
   const { sweepLanes } = await import('../scripts/lib/hk-lanes.mjs');
   const gc = await import('../scripts/supervisor/gc.mjs');
   const lo = await import('../scripts/lib/lane-owner.mjs');
@@ -248,6 +249,7 @@ test('housekeeping sweepLanes applies the same live-owner rule as gc.mjs (script
   const fs = await import('node:fs');
   const os = await import('node:os');
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'starci-hk-owner-'));
+  t.after(() => fs.rmSync(root, { recursive: true, force: true, maxRetries: 20, retryDelay: 25 }));
   const lanes = path.join(root, 'lanes');
   const dir = path.join(lanes, 'slim-api'); fs.mkdirSync(dir, { recursive: true });
   const now = Date.now() + 30 * 3_600_000;

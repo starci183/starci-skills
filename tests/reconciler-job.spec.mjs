@@ -49,7 +49,7 @@ function fixture({ status = 'running', payload = {}, report = null, handover = n
   for (const e of events) ev(e.kind, e.payload);
   ledger.close();
   const db = new DatabaseSync(file, { readOnly: true });
-  return { dir, file, db, close: () => { try { db.close(); } catch { /* closed */ } } };
+  return { dir, file, db, close: () => { try { db.close(); } catch { /* closed */ } fs.rmSync(dir, { recursive: true, force: true, maxRetries: 20, retryDelay: 25 }); } };
 }
 const ledgers = (fx) => [{ ledgerId: 'nivo-backend', repo: 'D:/Repositories/nivo-backend', file: fx.file }];
 const ctxFor = (fx, over = {}) => fakeCtx({ controller: 'job', now: () => NOW, ledgers: ledgers(fx), dbs: { 'nivo-backend': fx.db }, ...over });
@@ -125,8 +125,10 @@ test('a settled job with a live terminal -> the settler closes it; in active a l
     const home = fs.mkdtempSync(path.join(os.tmpdir(), 'rc-job-home-'));
     const active = ctxFor(fx, { mode: 'active', env: { ...process.env, STARCI_SUPERVISOR_HOME: home, LOCALAPPDATA: home },
       runResult: () => ({ ok: true, value: { ok: true, results: [{ released: [{ jobId: 'op-a', state: 'released', closedNow: true }] }] } }) });
-    const a = await job.reconcile('job:nivo-backend:op-a', active);
-    assert.equal(a.closedNow, 1);
+    try {
+      const a = await job.reconcile('job:nivo-backend:op-a', active);
+      assert.equal(a.closedNow, 1);
+    } finally { fs.rmSync(home, { recursive: true, force: true, maxRetries: 20, retryDelay: 25 }); }
   } finally { fx.close(); }
 });
 

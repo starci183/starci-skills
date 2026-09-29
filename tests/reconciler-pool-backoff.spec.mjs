@@ -2,7 +2,7 @@
 // (scripts/lib/pool-backoff.mjs), route preferring the next eligible pool (scripts/agent/models.mjs selectPool), the
 // Resource controller's resource:pools key (shadow writes nothing, active publishes, a persisting limit opens the
 // circuit) and `api provider-backoff`. Every host seam is injected.
-import test from 'node:test';
+import test, { after } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
@@ -70,8 +70,12 @@ function ledgerDb({ events = [], health = [], logs = [] }) {
     get: () => ({ s: events.reduce((m, e) => Math.max(m, e.seq), 0) }),
   }) };
 }
+const poolDirs = [];
+after(() => { for (const d of poolDirs) fs.rmSync(d, { recursive: true, force: true, maxRetries: 20, retryDelay: 25 }); });
 function setup({ events = [], health = [], logs = [] } = {}) {
-  const env = { ...process.env, STARCI_TEST_MACHINE_FILE: path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'starci-rc-pool-')), 'machine.sqlite') };
+  const poolDir = fs.mkdtempSync(path.join(os.tmpdir(), 'starci-rc-pool-'));
+  poolDirs.push(poolDir);
+  const env = { ...process.env, STARCI_TEST_MACHINE_FILE: path.join(poolDir, 'machine.sqlite') };
   // The Job controller's rate-limit rows live in machine_logs (actor reconciler).
   if (logs.length) withMachine((m) => m.log(logs.map((l) => ({ actor: 'reconciler', kind: 'reconciler.provider-rate-limited', msg: 'rate limited', at: l.at, data: JSON.parse(l.d) }))), { env });
   const c = createResourceController({ env, pools: async () => [{ target: 'devin-agent', provider: 'devin', maxParallel: 10 }, { target: 'qwen-agent', provider: 'qwen', maxParallel: 10 }] });
