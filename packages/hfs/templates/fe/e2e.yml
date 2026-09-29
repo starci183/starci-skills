@@ -1,0 +1,28 @@
+# End-to-end runs are manual: nothing triggers this workflow but a person dispatching it.
+name: e2e
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  e2e:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: {{nodeMajor}}
+          cache: npm
+      - uses: actions/checkout@v4
+        with:
+          repository: starci183/starci-skills
+          path: .starci-runtime
+      - run: echo "STARCI_HOME=$GITHUB_WORKSPACE/.starci-runtime" >> "$GITHUB_ENV"
+      - run: node "$STARCI_HOME/bin/starci.mjs" link --side {{profile}}
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
+      - name: e2e
+        run: npm run test:e2e

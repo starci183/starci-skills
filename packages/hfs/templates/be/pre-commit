@@ -1,0 +1,8 @@
+# Commit gate: staged lint, types, the unit specs the staged files touch, work hygiene. Never e2e.
+npx lint-staged
+npm run typecheck
+staged=$(git diff --cached --name-only --diff-filter=ACMR -- '*.ts' '*.tsx' | grep -v -E '(^|/)e2e/|\.e2e-spec\.ts$' || true)
+if [ -n "$staged" ]; then
+  npx jest --selectProjects unit --passWithNoTests --findRelatedTests $staged
+fi
+npx hfs work-hygiene

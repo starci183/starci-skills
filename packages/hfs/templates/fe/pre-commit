@@ -1,0 +1,7 @@
+# Commit gate: staged lint, types, the unit specs the staged files touch. Never e2e.
+npx lint-staged
+npm run typecheck
+staged=$(git diff --cached --name-only --diff-filter=ACMR -- '*.ts' '*.tsx' | grep -v -E '(^|/)e2e/|\.e2e-spec\.ts$' || true)
+if [ -n "$staged" ]; then
+  npx vitest related --run --passWithNoTests $staged
+fi

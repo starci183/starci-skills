@@ -128,7 +128,7 @@ archetypes:
         Create new base repositories: toolchain, baseline hooks and CI, empty
         declared layout and one health endpoint — source setup with no
         business. The stack is fixed by CONTEXT.md and the toolchain by
-        knowledge/repository-baseline.yaml, so no decide leg precedes it.
+        the @starci presets and `hfs sync`, so no decide leg precedes it.
       phrases: [scaffold*, base repo, base repository, repository baseline, repo baseline, greenfield, khởi tạo repo, dựng repo, dựng base repo, tạo repo mới, bootstrap the repo*]
       excludes: [$buildIntent]
     supersedes: [spec-foundation, feature-build-fullstack, feature-build-with-ui, feature-build-backend, external-integration, verify-only, refactor]

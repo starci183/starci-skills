@@ -24,11 +24,12 @@ reads:
         the settled design, proof demands and validator freshness. On a greenfield scaffold the
         record is absent — no workflow authors it before the first source tree exists."
   - id: baseline
-    path: CONTEXT.md (fixed stack) + knowledge/repository-baseline.yaml (shapes common and nest)
+    path: CONTEXT.md (fixed stack) + packages/hfs/templates (the files `hfs sync` generates) + packages/ (the shared presets)
     purpose:
       en: The NestJS stack every project uses and the toolchain a new backend repository carries from its
-        first commit — manifest and engines, strict TypeScript, canon lint, jest with coverage
-        thresholds, git hooks, CI gates, Codecov and Sonar configuration, ignore rules and line endings.
+        first commit — configs that are thin calls into the @starci presets (tsconfig, prettier, jest, canon lint),
+        and the files that cannot extend, which `hfs sync` generates from hfs.json - husky, the ci and e2e
+        workflows, .gitignore, sonar-project.properties, codecov.yml and .starciwork/.gitignore.
   - id: architecture
     path: .starciwork/features/<feature>/{sds,contract,data}/**/index.yaml
     purpose:
@@ -128,13 +129,12 @@ steps:
       - conventions
     writes: [source]
     action:
-      en: Write the manifest and toolchain first, exactly as knowledge/repository-baseline.yaml shapes
-        common and nest carry them (package.json with engines and scripts, strict tsconfig, canon
-        eslint config, jest with coverage thresholds, husky pre-commit with lint-staged and pre-push,
-        .github/workflows/ci.yml, codecov.yml, sonar-project.properties, .gitignore, .editorconfig,
-        .gitattributes) - the manifest composed and every config and skeleton file copied byte for byte
-        from the profile shape, with only its declared parameters and common-key placeholders filled -
-        then the declared layout, then the minimal skeleton — entrypoint plus the
+      en: Write the manifest and toolchain first - hfs.json, package.json with the pinned engines and
+        scripts, and the config stubs that extend the @starci presets (tsconfig, prettier, jest, canon eslint);
+        then run `hfs sync --write`, which generates husky, .github/workflows/ci.yml and e2e.yml, .gitignore,
+        sonar-project.properties, codecov.yml and .starciwork/.gitignore, and `hfs sync --check` must pass -
+        a generated file is never hand-written or edited, and a value `hfs sync` does not carry is a named gap in the
+        scaffold evidence, never an improvised choice - then the declared layout, then the minimal skeleton — entrypoint plus the
         baseline liveness surface and any health the settled records add. No business behaviour
         beyond what the skeleton proves.
   - reads:

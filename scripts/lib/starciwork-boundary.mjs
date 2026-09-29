@@ -6,6 +6,11 @@
 // example trees write it through scripts/example/work-example.mjs).
 //
 // Paths are relative to the .starciwork root, '/'-separated.
+import fs from 'node:fs';
+import path from 'node:path';
+
+// The one source of the .starciwork/.gitignore text: the be template `hfs sync` renders (packages/hfs/templates).
+const TEMPLATE = path.join(import.meta.dirname, '..', '..', 'packages', 'hfs', 'templates', 'be', 'starciwork.gitignore');
 
 // The record families that hold nothing but index.yaml and evidence.yaml (ui, impl, uat and ac have their own rows).
 export const PLAIN_FAMILIES = Object.freeze(['br', 'fr', 'nfr', 'data', 'journey', 'decision', 'sds', 'contract', 'integration', 'gap', 'event']);
@@ -128,19 +133,5 @@ export function agentDataCategory(rel, { dir = false } = {}) {
  * the §5.1 roots, then deny agent output inside them. Tracked files are not affected by an ignore rule; a tracked
  * agent file is removed by the change that drops it, not by this ignore.
  */
-export const STARCIWORK_GITIGNORE = Object.freeze([
-  '# StarCi .starciwork: product content only (ARCHITECTURE-DB §5.1, work-layout.yaml shape.productPaths).',
-  '# Agent output (reports, checks, captures, draw rounds, UAT runs, logs, ledgers, worktrees) lives in',
-  '# runtime.sqlite rows and blobs outside the repository.',
-  '/*',
-  '!/.gitignore', '!/.gitattributes', '!/workspace.yaml', '!/index.yaml',
-  '!/brand/', '!/shell/', '!/_resources/', '!/_derived/', '!/features/',
-  '/brand/*', '!/brand/index.yaml', '!/brand/evidence.yaml', '!/brand/assets/',
-  '/shell/*', '!/shell/index.yaml', '!/shell/evidence.yaml',
-  '/_resources/*', '!/_resources/environments/', '!/_resources/identities/', '!/_resources/fixtures/',
-  '!/_resources/runtimes/', '!/_resources/grammar-captures/',
-  '/_derived/*', '!/_derived/index.yaml', '!/_derived/frontier.md', '!/_derived/critique.yaml', '!/_derived/critique.md',
-  'evidence/', 'runs/', 'draw-loop/', 'operations/', 'report*.json', '*.tmp.json',
-  '/features/**/impl/**/assets/', '/shell/assets/',
-]);
+export const STARCIWORK_GITIGNORE = Object.freeze(fs.readFileSync(TEMPLATE, 'utf8').trimEnd().split(/\r?\n/));
 export const starciworkGitignoreText = () => `${STARCIWORK_GITIGNORE.join('\n')}\n`;

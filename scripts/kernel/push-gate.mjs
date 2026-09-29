@@ -1,7 +1,7 @@
 // settle's push-gate half. A job's scoped lint (check-scoped-lint.mjs) proves its files under the
 // runtime's code-pattern profile, but the repository's OWN push gate - the lint its husky pre-push
-// hook runs, or its package `lint:check` script (knowledge/repository-baseline.yaml common.hooks /
-// scripts) - runs later, over the whole configured glob, and one landed file it rejects blocks every
+// hook runs when it has one, else its package `lint:check` script, which the ci.yml that `hfs sync` generates
+// also runs - runs later, over the whole configured glob, and one landed file it rejects blocks every
 // push of that repository (nivo-backend 2026-09-24: 63 errors in nine landed files). So a pass whose
 // commitPolicy commits also runs that declared lint, with the repository's own ESLint and config,
 // over the files the job changed; a red result refuses the settle (push-gate-red) while the job
