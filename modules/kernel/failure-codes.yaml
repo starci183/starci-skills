@@ -3721,6 +3721,28 @@ LEDGER_CORRUPT:
   owner: owner
   kind: runtime-fault
 
+LEDGER_LEGACY_WORK_SQLITE:
+  title: "Legacy in-repo runtime.sqlite"
+  title_vi: "Sổ ledger cũ còn nằm trong repo"
+  meaning_vi: "Một repo đã đăng ký (machine.sqlite repositories) vẫn còn tệp .starciwork/runtime.sqlite (hoặc -wal/-shm) từ trước quyết định Q1, trong khi sổ ledger thật đã chuyển ra %LOCALAPPDATA%/StarCi/projects/<ledger_id>/runtime.sqlite."
+  causes_vi:
+    - "Repo được tạo trước quyết định Q1 và chưa dọn tệp ledger cũ"
+    - "Một bản sao ledger cũ bị chép nhầm trở lại repo"
+  nextStep_vi: "Không có tương thích ngược: chủ xóa tệp .starciwork/runtime.sqlite (và -wal/-shm) khỏi repo bằng tay sau khi xác nhận sổ ledger sống ở %LOCALAPPDATA%/StarCi; bộ kiểm tra (node scripts/checks/ledger-hygiene.mjs, /start --check) chỉ báo cáo, không tự xóa tệp trong repo."
+  owner: owner
+  kind: check-finding
+
+LEDGER_ORPHAN_STATE_ROOT:
+  title: "Orphan ledger in the state root"
+  title_vi: "Sổ ledger mồ côi trong kho trạng thái"
+  meaning_vi: "Một sổ ledger đã đăng ký (machine.sqlite ledgers, chưa retired) không còn repo nguồn hợp lệ nào: mọi repo gắn với nó (machine.sqlite repositories, hoặc repo_root của chính ledger) nằm trong thư mục tạm của hệ điều hành, không còn tồn tại trên đĩa, hoặc không có repo nào cả."
+  causes_vi:
+    - "Một probe hoặc script debug tạo repo dùng một lần dưới thư mục tạm mà không đặt STARCI_LOCAL_ROOT trước khi đăng ký sổ ledger"
+    - "Repo nguồn của sổ ledger đã bị xóa hoặc di chuyển mà không retire sổ ledger tương ứng"
+  nextStep_vi: "node scripts/checks/ledger-hygiene.mjs --apply (hoặc node scripts/supervisor/housekeeping.mjs --only orphanledgers --apply) DI CHUYỂN (không xóa) thư mục sổ ledger sang <kho trạng thái>/archive/orphan-ledgers/<ngày>/<id>/ và chuyển trạng thái sổ ledger sang retired; chủ xem lại trước khi chạy --apply trên kho trạng thái thật."
+  owner: owner
+  kind: check-finding
+
 LINK_CREATE:
   title: "Link creation refused"
   title_vi: "Việc tạo liên kết thư mục bị chặn"
