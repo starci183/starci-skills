@@ -419,7 +419,7 @@ export function archivedOpRef(repoRoot, jobId, settings = productSettings()) {
 }
 
 /**
- * Bring main into wf/<wf> when main moved (another workflow landed, or a legacy shared-tree job committed): a clean
+ * Bring main into wf/<wf> when main moved (another workflow landed): a clean
  * merge-tree merges it in the _wf worktree; a conflicting one merges nothing and reports the overlap signal the
  * Fleet controller reads (Supervisor: cross-workflow). Call under the workflow lock. {ok, merged?, overlap?}
  */
