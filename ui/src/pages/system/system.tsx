@@ -48,7 +48,7 @@ function QueryView<T>({ query, children, empty = 'Chưa có dữ liệu.' }: { q
   return <>{query.error && <p className="shell-error mb-3" role="status">Nguồn đang lỗi; hiển thị bản đã đọc gần nhất. {query.error}</p>}{query.meta?.stale?.length ? <p className="shell-error mb-3" role="status">Nguồn chưa đồng bộ: {query.meta.stale.join(', ')}</p> : null}{children(query.data)}</>;
 }
 function Panel({ title, summary, ui = 'ok', concept: blockConcept, children }: { title: string; summary?: string; ui?: UiState; concept: Concept; children: ReactNode }) {
-  return <ConceptBlock concept={blockConcept}><Advanced key={isIssue(ui) ? 'issue' : 'calm'} variant="card" defaultOpen={isIssue(ui)} summary={summary}
+  return <ConceptBlock concept={blockConcept}><Advanced key={isIssue(ui) ? 'issue' : 'calm'} variant="card" defaultOpen={ui === 'bad'} summary={summary}
     title={<span className="inline-flex items-center gap-3">{title}<StateChip state={ui} compact /></span>}>{children}</Advanced></ConceptBlock>;
 }
 function QueryPanel<T>({ title, summary, ui = 'ok', concept: blockConcept, query, children }: { title: string; summary?: string; ui?: UiState; concept: Concept; query: QuerySnapshot<T>; children: (data: T) => ReactNode }) {

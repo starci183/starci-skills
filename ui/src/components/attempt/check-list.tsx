@@ -130,7 +130,7 @@ export function CheckList({ attempt, onOpenFile }: { attempt: AttemptDetailV2; o
   const confirmed = pairs.filter(pair => runtimeSide(pair).verdict === 'pass').length;
   const red = pairs.filter(pair => runtimeSide(pair).verdict === 'fail' || opSide(pair).verdict === 'fail').length;
   const lech = pairs.filter(pair => { const o = opSide(pair); const r = runtimeSide(pair); return (o.verdict != null && r.verdict != null && o.verdict !== r.verdict) || (o.exit != null && r.exit != null && o.exit !== r.exit); }).length;
-  return <Card id="attempt-step-checks" concept="C9" title="Kiểm chứng" hint={pairs.length ? `${pairs.length} check · runtime xác nhận ${confirmed}/${pairs.length}` : undefined}
+  return <Card id="attempt-step-checks" concept="C9" title="Kiểm chứng" hint={pairs.length ? `${pairs.length} check${attempt.checks.length > pairs.length ? ` · ${attempt.checks.length} lần chạy` : ''} · runtime xác nhận ${confirmed}/${pairs.length}` : undefined}
     right={pairs.length ? <>{red ? <StatusChip status="failed" label={`${red} hỏng`} /> : null}{lech ? <StatusChip status="retry" label={`${lech} lệch`} /> : null}</> : null}>
     {pairs.length ? <>
       <div className="hidden grid-cols-[auto_minmax(0,1fr)_9rem_13rem_auto] gap-x-3 border-b px-1 pb-2 text-[11px] uppercase tracking-wide text-muted-foreground sm:grid"><span className="w-4" /><span>Check</span><span>Op khai</span><span>Runtime chạy</span><span /></div>

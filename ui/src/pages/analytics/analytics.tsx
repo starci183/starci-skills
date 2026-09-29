@@ -126,13 +126,13 @@ export default function AnalyticsPage() {
 
     {attempts.error && !attempts.rows ? <p role="alert" className="rounded-lg border border-[var(--status-failed-line)] bg-[var(--status-failed-bg)] p-3 text-sm text-[var(--status-failed)]">Không tải được danh sách lần thử ({attempts.error}).</p> : null}
 
-    <div className="grid min-w-0 grid-cols-1 gap-4 lg:grid-cols-2 lg:gap-6">
+    <div className="grid min-w-0 grid-cols-1 items-start gap-4 lg:grid-cols-2 lg:gap-6">
       <OpOutcomes rows={rows} />
       <Throughput rows={rows} since={since} now={now} />
       <WorkflowProgress fleet={fleet.data} project={project} />
     </div>
     <Advanced variant="card" title="Phân tích chi tiết" summary="Tỉ lệ theo model, thời lượng, thử lại, token và chi phí">
-      <div className="grid min-w-0 grid-cols-1 gap-4 lg:grid-cols-2 lg:gap-6">
+      <div className="grid min-w-0 grid-cols-1 items-start gap-4 lg:grid-cols-2 lg:gap-6">
         <ModelRates rows={rows} />
         <DurationPlot rows={rows} now={now} />
         <Retries rows={rows} />
