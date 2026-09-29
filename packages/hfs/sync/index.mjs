@@ -101,7 +101,7 @@ export function variables(hfs, presets, sonarKey) {
     sonarKey: sonarKey ?? `${hfs.project}-${hfs.profile === 'be' ? 'backend' : 'fe'}`,
     sonarExclusions: presets.sonarExclusions,
     sonarCoverageExclusions: presets.sonarCoverageExclusions,
-    codecovIgnore: globs.map(glob => `  - ${JSON.stringify(glob)}`).join('\n'),
+    codecovIgnore: globs.map(glob => JSON.stringify(glob)).join('\n  - '),
     tsconfigPaths: hfs.apps.map(app => `apps/${app.name}/tsconfig.json`).join(','),
   };
 }

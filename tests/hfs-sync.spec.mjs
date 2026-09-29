@@ -226,7 +226,7 @@ describe('the Sonar key', () => {
     const fail = message => { throw new Error(message); };
     assert.equal(await readDeclaredSonarKey(fe, { parseYaml: () => sonar, fail, stacks: '../nivo-backend' }), 'fe-key');
     assert.equal(await readDeclaredSonarKey(fe, { parseYaml: () => sonar, fail }), null, 'without stacks the front end has no declaration of its own');
-    await assert.rejects(readDeclaredSonarKey(fe, { parseYaml: () => sonar, fail, stacks: '../missing' }), /stacks points at ../missing/);
+    await assert.rejects(readDeclaredSonarKey(fe, { parseYaml: () => sonar, fail, stacks: '../missing' }), /stacks points at \.\.\/missing/);
   });
   it('reads the real stack declaration shape with the YAML parser bundled in the package', t => {
     const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'hfs-stacks-'));

@@ -29,3 +29,4 @@ paths:
   - modules/ops/ops/interface.scaffold.yaml
   - modules/kernel/failure-codes.yaml
   - knowledge/hfs/canon-pins.yaml
+  - modules/kernel/retired-paths.yaml
