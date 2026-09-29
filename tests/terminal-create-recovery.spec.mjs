@@ -71,6 +71,7 @@ const opFixture=(t,extra={})=>{
   const env={...process.env,STARCI_ORCA_COMMAND:process.execPath,STARCI_ORCA_ARGS:JSON.stringify([stub]),
     STARCI_FAKE_ORCA_LOG:path.join(root,'calls.jsonl'),STARCI_FAKE_ORCA_STATE:path.join(root,'state.json'),
     STARCI_TEST_MACHINE_FILE:path.join(root,'machine.db'),  // every fixture registers a repo named 'repo'
+    STARCI_SLEEP_SCALE:'0.02',  // the card's settle/attestation windows are waits counted logically: cost ms, not load-dependent seconds
     ...extra};
   const run=(...args)=>spawnSync(process.execPath,[API,...args],{cwd:ROOT,encoding:'utf8',windowsHide:true,timeout:120000,env});
   const orcaState=()=>json(fs.readFileSync(path.join(root,'state.json'),'utf8'))??{};
@@ -187,7 +188,7 @@ const kernelFixture=(t,kernelLine,extra={})=>{
   fs.writeFileSync(fake,FAKE_ORCA);
   const env={...process.env,STARCI_ORCA_COMMAND:process.execPath,STARCI_ORCA_ARGS:JSON.stringify([fake]),
     STARCI_FAKE_ORCA_STATE:state,STARCI_FAKE_ORCA_LOG:path.join(root,'calls.jsonl'),STARCI_FAKE_ORCA_UNIQUE_TERMINALS:'1',
-    STARCI_OWNER_ROOT:ownerRoot,STARCI_TEST_MACHINE_FILE:path.join(root,'machine.db'),...extra};
+    STARCI_OWNER_ROOT:ownerRoot,STARCI_TEST_MACHINE_FILE:path.join(root,'machine.db'),STARCI_SLEEP_SCALE:'0.02',...extra};
   const run=(script,args)=>spawnSync(process.execPath,[script,...args],{cwd:ROOT,encoding:'utf8',windowsHide:true,timeout:120000,env});
   const defined=run(DEFINE_GOAL,['--repo',repo,'--text','boot the kernel','--json']);
   assert.equal(defined.status,0,defined.stderr);
@@ -246,7 +247,7 @@ test('a tab_not_found close counts only when terminal show proves the terminal d
   const stub=path.join(dir,'orca.mjs');fs.writeFileSync(stub,CLOSE_STUB);
   const close=connected=>{
     const r=spawnSync(process.execPath,[path.join(ROOT,'scripts','api','orca','terminal-close.mjs'),'--terminal','term-x'],{encoding:'utf8',windowsHide:true,timeout:30000,
-      env:{...process.env,STARCI_ORCA_COMMAND:process.execPath,STARCI_ORCA_ARGS:JSON.stringify([stub]),STARCI_ORCA_SKIP_LIVE_CHECK:'1',STUB_CONNECTED:connected}});
+      env:{...process.env,STARCI_ORCA_COMMAND:process.execPath,STARCI_ORCA_ARGS:JSON.stringify([stub]),STARCI_ORCA_SKIP_LIVE_CHECK:'1',STARCI_SLEEP_SCALE:'0.02',STUB_CONNECTED:connected}});
     return json(r.stdout);
   };
   assert.deepEqual([close('0')?.ok,close('0')?.verifiedBy],[true,'terminal-show']);

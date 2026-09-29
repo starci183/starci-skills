@@ -36,7 +36,9 @@ const fixture=(t,runs)=>{
     STARCI_FAKE_ORCA_UNIQUE_TERMINALS:'1',
     // machineFileFor honours STARCI_TEST_MACHINE_FILE first; without it the spawned api lands on the
     // shared starci-test-registry file, which the current machine schema refuses (machine-schema-old).
-    STARCI_TEST_MACHINE_FILE:path.join(root,'machine.sqlite')};
+    STARCI_TEST_MACHINE_FILE:path.join(root,'machine.sqlite'),
+    // the card's settle/attestation windows are waits counted logically: they cost ms, not load-dependent seconds.
+    STARCI_SLEEP_SCALE:'0.02'};
   const ledger=openLedger({file:ledgerFileFor(repo)});
   try{
     seedWorkflow(ledger,{id:WF,state:{phase:'running',job:WF},
