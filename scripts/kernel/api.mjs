@@ -184,7 +184,8 @@ import { DRAW_ACCEPTANCE_CHANGE, drawAcceptanceFindings, jobBoundFiles } from '.
 import { DRAW_LOOP_CHANGE, settleDrawMetricFindings } from '../work/draw-loop-settle.mjs';
 import { recordGrammarProposals } from '../work/grammar-proposal.mjs';
 import { ASSET_OP, recordAssetSlots } from '../work/asset-slot.mjs';
-import { PROOF_MEDIA_CHANGE, collectJobFiles, filedReportOf, indexJobArtifacts, proofMediaGate, proofMediaPolicyOf } from './job-artifacts.mjs';
+import { PROOF_MEDIA_CHANGE, collectJobFiles, filedReportOf, indexJobArtifacts, jobShasOf, proofMediaGate, proofMediaPolicyOf } from './job-artifacts.mjs';
+import { WORK_HYGIENE_CHANGE, checkWorkFilesAbs, inSecretScope, rangeFiles } from '../checks/work-hygiene.mjs';
 import { taskSpecOf } from './task-spec.mjs';
 import { legOrderExemption } from './leg-order.mjs';
 import { PROOF_INTEGRITY_CHANGE, coverageOf } from './proof-integrity.mjs';
@@ -4182,6 +4183,29 @@ async function settleDrawMetrics(db, jobId, repo, reportAbs, reportText) {
   const findings = verdict.findings.filter((f) => !advisory.has(f.code));
   return findings.length ? { op: jobOpOf(job), status: job.status, findings, records: verdict.records, loops: verdict.loops } : null;
 }
+// The Work hygiene a pass owes when it changed files under .starciwork/ or .starcistacks/ (scripts/checks/work-hygiene.mjs,
+// the same parse + scoped strict validate + secret scan the product repo's pre-commit hook runs): the files its report
+// names plus every file its commits changed since the base it was admitted on. Read-only, before anything is written.
+// A leg admitted before the work-hygiene-gate change settles on its old contract.
+function settleWorkHygiene(db, jobId, repo, reportAbs, reportText) {
+  const job = db.prepare(`SELECT ${JOB_ROW} FROM jobs WHERE job_id=?`).get(jobId);
+  if (!job || !REPORTABLE_JOB_STATUSES.has(job.status)) return null;
+  const admitted = admittedContractOf(db, job);
+  const change = changeById(loadContractChanges(skillRoot), WORK_HYGIENE_CHANGE);
+  if (!change || admittedBeforeChange(admitted, change)) return null;
+  const filed = filedReportOf(db, job, { dispatchId: reportDispatchIdOf(db, job) });
+  const envelope = filed.envelope ?? (reportText !== null ? parseJson(reportText) : null);
+  let roots = [];
+  try { roots = jobPlacements(db, job, repo).map((p) => p.base).filter(Boolean); } catch { roots = []; }
+  const { files } = collectJobFiles({ repo, envelope, roots, artifacts: filed.artifacts });
+  const changed = files.map((f) => f.abs);
+  const { head, base } = jobShasOf({ envelope, result: null, payload: jobPayloadOf(job) });
+  if (head) for (const root of [...new Set([repo, ...roots].filter(Boolean).map((r) => path.resolve(r)))]) {
+    for (const rel of rangeFiles(root, base ?? `${head}~1`, head)) if (inSecretScope(rel)) changed.push(path.join(root, rel));
+  }
+  const checked = checkWorkFilesAbs([...new Set(changed.filter((p) => inSecretScope(p)))]);
+  return checked.ok ? null : { op: jobOpOf(job), status: job.status, findings: checked.findings, files: checked.files };
+}
 // The grammar proposals an interface.draw job carries (scripts/work/grammar-proposal.mjs): one grammar-proposal-filed
 // event each, status proposed - the owner decides them, never the runtime. Never un-settles.
 function recordSettledGrammarProposals(ledger, job, repo) {
@@ -4656,7 +4680,7 @@ const API_INTERNALS = Object.freeze({
   CUT_SLICE_CHECKS, VERDICT_OUTCOMES, agentOfJob, canonSettleFollowUp, enqueueNextStep, failureClassOf,
   failureShapeOf, latestKernelJobOf, ownProductWorktreeOf, reapIfStillLive, recordOpRevDrift,
   recordSettledAssetSlots, recordSettledGrammarProposals, releasedWhileHeldOf, seamSettleReconciles,
-  settleDrawAcceptance, settleDrawMetrics, settleLanding, settleProofMedia, widenCanonWire,
+  settleDrawAcceptance, settleDrawMetrics, settleLanding, settleProofMedia, settleWorkHygiene, widenCanonWire,
 });
 let statusAsk = null;
 const runExtensionVerb = async (spec, args, repo) => {

@@ -11474,7 +11474,6 @@ git-failed:
   nextStep_vi: "Không rebase; đọc phần detail rồi land lại sau khi sửa nguyên nhân."
   owner: supervisor
   kind: verb-refusal
-
 SEALED_CUSTODY_LOCATION:
   title: "Sealed secret path is not under .starcistacks"
   title_vi: "Đường dẫn bí mật đã mã hoá không nằm dưới .starcistacks"
@@ -12067,3 +12066,73 @@ HFS_RULE_CODE_UNCATALOGUED:
   nextStep_vi: "Người giám sát thêm hoặc sửa mục trong modules/kernel/failure-codes.yaml với đủ tiêu đề, ý nghĩa và bước tiếp theo bằng tiếng Việt, qua một lane đã land."
   owner: supervisor
   kind: check-finding
+
+WORK_YAML_UNPARSEABLE:
+  title: "Work YAML cannot be parsed"
+  title_vi: "Tệp YAML của Work không đọc được"
+  meaning_vi: "Runtime dùng một trình đọc YAML duy nhất và tệp trong .starciwork không qua được trình đọc đó, nên mọi op đọc bản ghi này sẽ hỏng."
+  causes_vi:
+    - "Dấu hai chấm kèm khoảng trắng nằm trong một giá trị chuỗi không đặt trong dấu nháy"
+    - "Thụt lề sai hoặc thiếu dấu đóng ngoặc"
+  nextStep_vi: "Commit hoặc chốt op bị từ chối; đặt giá trị có dấu hai chấm vào dấu nháy hoặc sửa cú pháp tại dòng được nêu rồi làm lại."
+  owner: op-retry
+  kind: check-finding
+WORK_VALIDATE_REFUSED:
+  title: "Staged Work record fails its validation"
+  title_vi: "Bản ghi Work vừa sửa không qua kiểm tra hợp lệ"
+  meaning_vi: "Kiểm tra work-validate chạy ở chế độ strict trên thư mục bản ghi vừa sửa và có lỗi nằm ngay trong các tệp đó (sai schema, tham chiếu không tồn tại, thiếu trường bắt buộc)."
+  causes_vi:
+    - "Bản ghi sai schema hoặc thiếu trường bắt buộc"
+    - "Tham chiếu tới bản ghi hoặc tài nguyên không tồn tại"
+  nextStep_vi: "Commit hoặc chốt op bị từ chối; sửa đúng các lỗi được liệt kê (chỉ tính lỗi thuộc tệp vừa sửa) rồi làm lại."
+  owner: op-retry
+  kind: check-finding
+WORK_SECRET_FILE:
+  title: "Secret file inside Work or stacks"
+  title_vi: "Tệp bí mật nằm trong Work hoặc stacks"
+  meaning_vi: "Đường dẫn của tệp đã là một bí mật (tệp .env, khóa riêng, thư mục secrets chưa mã hóa) và không được đưa vào git."
+  causes_vi:
+    - "Tệp .env hoặc khóa riêng bị add nhầm"
+    - "Bản bí mật chưa mã hóa đặt trong .starcistacks/<stack>/secrets"
+  nextStep_vi: "Commit hoặc chốt op bị từ chối; bỏ tệp khỏi commit, giữ bản mã hóa .enc và để bản rõ ngoài git."
+  owner: op-retry
+  kind: check-finding
+WORK_SECRET_PATTERN:
+  title: "Token or private key inside Work or stacks"
+  title_vi: "Token hoặc khóa riêng nằm trong Work hoặc stacks"
+  meaning_vi: "Nội dung tệp khớp một dạng bí mật đã biết (khóa riêng PEM, token của nhà cung cấp, JWT, giá trị gán cho password/secret/apiKey) và tệp không phải .enc."
+  causes_vi:
+    - "Dán token hoặc khóa thật vào bản ghi hoặc ghi chú"
+    - "Bằng chứng chụp lại chứa giá trị thật"
+  nextStep_vi: "Commit hoặc chốt op bị từ chối; xóa giá trị khỏi tệp, dùng tham chiếu tới kho bí mật mã hóa, và xoay khóa nếu nó đã lộ."
+  owner: op-retry
+  kind: check-finding
+WORK_SECRET_LITERAL:
+  title: "Literal credential in a credential-shaped field"
+  title_vi: "Giá trị bí mật viết thẳng trong trường mật khẩu hoặc token"
+  meaning_vi: "Một trường tên password, secret, token, apiKey hoặc credential mang giá trị thật thay vì tham chiếu; tệp nằm trong .starciwork hoặc .starcistacks và không phải .enc."
+  causes_vi:
+    - "Mật khẩu hoặc token viết thẳng vào bản ghi"
+    - "Giá trị mẫu thật thay vì tham chiếu hay giá trị giả rõ ràng"
+  nextStep_vi: "Commit hoặc chốt op bị từ chối; chuyển giá trị vào kho mã hóa (.enc) và ghi tham chiếu, hoặc dùng giá trị giả có ghi rõ là mẫu."
+  owner: op-retry
+  kind: check-finding
+WORK_ACCOUNT_LITERAL:
+  title: "Literal login in an accounts record"
+  title_vi: "Tên đăng nhập viết thẳng trong bản ghi tài khoản"
+  meaning_vi: "Tệp accounts.yaml khai username, login hoặc email thật; tài khoản phải được gọi bằng tham chiếu identity, còn thông tin đăng nhập nằm trong kho mã hóa."
+  causes_vi:
+    - "Ghi thẳng tài khoản thử nghiệm vào bản ghi"
+  nextStep_vi: "Commit hoặc chốt op bị từ chối; thay bằng identity tham chiếu và để thông tin đăng nhập trong kho mã hóa .enc."
+  owner: op-retry
+  kind: check-finding
+work-hygiene-red:
+  title: "Work files changed by the op fail parse, validation or secret scan"
+  title_vi: "Tệp Work do op sửa không qua kiểm tra đọc, hợp lệ hoặc quét bí mật"
+  meaning_vi: "Trước khi chốt, runtime chạy lại đúng kiểm tra mà hook pre-commit chạy (đọc YAML, validate strict theo tệp đã sửa, quét bí mật) trên các tệp trong .starciwork hoặc .starcistacks mà op đã sửa và có tệp đỏ."
+  causes_vi:
+    - "YAML không đọc được hoặc bản ghi sai schema"
+    - "Mật khẩu, token hoặc tài khoản viết thẳng trong tệp không mã hóa"
+  nextStep_vi: "Việc giữ nguyên, không chốt; op sửa các tệp được nêu, commit lại rồi chốt lại."
+  owner: op-retry
+  kind: settle-reason

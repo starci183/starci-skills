@@ -16,7 +16,10 @@
 //     Orca terminal bound by bindGuardTerminal, unbound when that terminal closes) creates no worktree and lands
 //     only its owned paths. (refs/stash stays writable: lint-staged's pre-commit
 //     backup stores one; the op shim refuses a sweeping stash.)
-// config.yaml `guards: {shims: false}` / `{historyHook: false}` switches a layer off.
+//  4. the target repository's pre-commit hook (ensureWorkHook): a commit that stages files under .starciwork/ or
+//     .starcistacks/ is refused when a YAML does not parse, a record the commit touches fails its scoped strict
+//     validation, or a non-.enc file carries a secret (scripts/checks/work-hygiene.mjs; e2e never runs there).
+// config.yaml `guards: {shims: false}` / `{historyHook: false}` / `{workHook: false}` switches a layer off.
 import fs from 'node:fs';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
@@ -30,6 +33,8 @@ export const guardsRoot = (skillRoot = path.resolve(here, '..', '..')) => path.j
 export const SHIM_TOOLS = Object.freeze(['git', 'npm']);
 export const HOOK_MARKER = 'starci-history-guard';
 export const HOOK_VERSION = 4;
+export const WORK_HOOK_MARKER = 'starci-work-guard';
+export const WORK_HOOK_VERSION = 1;
 export const BASH_ENV_FILE = 'bash-env.sh';
 
 const CSC_CANDIDATES = [
@@ -237,22 +242,22 @@ exit $status
 }
 
 /**
- * ensureHistoryHook(repoRoot) -> {installed, path?, reason?}
- * Writes the reference-transaction hook into the repository's effective hooks
+ * hookTarget(repoRoot, name) -> {root, hooksDir, file} | {installed: false, reason, path?}
+ * Resolves where hook `name` goes: into the repository's effective hooks
  * directory (core.hooksPath, e.g. husky's .husky/_, else .git/hooks). A foreign
  * hook of that name is never overwritten; a hooks directory whose new file git
  * would offer for tracking is left alone (no foreign file in a product repo),
  * except an absent, untracked one (husky's .husky/_ in a linked worktree), which
  * gets husky's own self-ignoring `.gitignore` of `*`.
  */
-export function ensureHistoryHook(repoRoot, { skillRoot = path.resolve(here, '..', '..'), nodePath = process.execPath } = {}) {
+function hookTarget(repoRoot, name) {
   const top = git(repoRoot, ['rev-parse', '--show-toplevel']);
   if (top.status !== 0) return { installed: false, reason: 'not-a-git-checkout' };
   const root = path.resolve(top.stdout.trim());
   const hooks = git(root, ['rev-parse', '--git-path', 'hooks']);
   if (hooks.status !== 0) return { installed: false, reason: 'no-hooks-path' };
   const hooksDir = path.resolve(root, hooks.stdout.trim());
-  const file = path.join(hooksDir, 'reference-transaction');
+  const file = path.join(hooksDir, name);
   const inside = (parent, child) => { const rel = path.relative(parent, child); return !rel.startsWith('..') && !path.isAbsolute(rel); };
   const inWorktree = inside(root, hooksDir) && !inside(path.join(root, '.git'), hooksDir);
   if (inWorktree && !fs.existsSync(file)) {
@@ -277,6 +282,18 @@ export function ensureHistoryHook(repoRoot, { skillRoot = path.resolve(here, '..
       }
     }
   }
+  return { root, hooksDir, file };
+}
+
+/**
+ * ensureHistoryHook(repoRoot) -> {installed, path?, reason?}
+ * Writes the reference-transaction hook into the repository's effective hooks directory (hookTarget).
+ * A foreign hook of that name is never overwritten.
+ */
+export function ensureHistoryHook(repoRoot, { skillRoot = path.resolve(here, '..', '..'), nodePath = process.execPath } = {}) {
+  const target = hookTarget(repoRoot, 'reference-transaction');
+  if (target.installed === false) return target;
+  const { root, hooksDir, file } = target;
   const branches = [];
   const list = git(root, ['worktree', 'list', '--porcelain']);
   if (list.status === 0) for (const line of list.stdout.split(/\r?\n/)) if (line.startsWith('branch refs/heads/')) branches.push(line.slice('branch refs/heads/'.length));
@@ -294,9 +311,53 @@ export function ensureHistoryHook(repoRoot, { skillRoot = path.resolve(here, '..
   return { installed: true, path: file, changed: true };
 }
 
+/**
+ * The pre-commit hook body. The check runs only when the index holds a file under .starciwork/ or .starcistacks/ (a
+ * commit of anything else costs one git call). A husky dispatcher that shared the hook's place is chained after it.
+ */
+export function workHookBody({ check, nodePath = process.execPath }) {
+  const q = (s) => `'${String(s).replace(/\\/g, '/').replace(/'/g, `'\\''`)}'`;
+  return `#!/bin/sh
+# ${WORK_HOOK_MARKER} v${WORK_HOOK_VERSION} - installed by the StarCi runtime (scripts/guards/install.mjs); rewritten on every op dispatch.
+# Staged Work and stack files are checked before the commit exists: YAML that parses, records that pass their scoped
+# strict validation, and no secret outside an .enc file (scripts/checks/work-hygiene.mjs). e2e never runs here.
+if git diff --cached --name-only --diff-filter=ACMR | grep -Eq '(^|/)\\.(starciwork|starcistacks)/'; then
+  ${q(nodePath)} ${q(check)} staged --repo "$(git rev-parse --show-toplevel)" || exit 1
+fi
+# husky's generated dispatcher (.husky/_/h) keeps running the repository's own pre-commit
+if [ -f "$(dirname "$0")/h" ]; then . "$(dirname "$0")/h"; fi
+`;
+}
+// husky 9 writes this two-line dispatcher into .husky/_/<hook>; it is generated output, so it may be wrapped.
+const HUSKY_DISPATCHER = /^#!\/usr\/bin\/env sh\s+\.\s+"\$\(dirname "\$0"\)\/h"\s*$/;
+
+/**
+ * ensureWorkHook(repoRoot) -> {installed, path?, reason?, changed?}
+ * Writes the pre-commit hook next to ensureHistoryHook's, by the same hookTarget rules. A foreign hook is never
+ * overwritten, except husky's generated dispatcher, which the new hook wraps.
+ */
+export function ensureWorkHook(repoRoot, { skillRoot = path.resolve(here, '..', '..'), nodePath = process.execPath } = {}) {
+  const target = hookTarget(repoRoot, 'pre-commit');
+  if (target.installed === false) return target;
+  const { hooksDir, file } = target;
+  const body = workHookBody({ check: path.join(skillRoot, 'scripts', 'checks', 'work-hygiene.mjs'), nodePath });
+  if (fs.existsSync(file)) {
+    const current = fs.readFileSync(file, 'utf8');
+    if (current.includes(WORK_HOOK_MARKER)) { if (current === body) return { installed: true, path: file, changed: false }; }
+    else if (!HUSKY_DISPATCHER.test(current)) return { installed: false, reason: 'foreign-hook', path: file };
+  }
+  fs.mkdirSync(hooksDir, { recursive: true });
+  const tmp = `${file}.${process.pid}.tmp`;
+  fs.writeFileSync(tmp, body, { mode: 0o755 });
+  fs.renameSync(tmp, file);
+  try { fs.chmodSync(file, 0o755); } catch { /* windows */ }
+  return { installed: true, path: file, changed: true };
+}
+
 const guardSettings = (config) => ({
   shims: config?.guards?.shims !== false,
   historyHook: config?.guards?.historyHook !== false,
+  workHook: config?.guards?.workHook !== false,
 });
 
 /**
@@ -335,6 +396,13 @@ export function guardLaunch({ skillRoot = path.resolve(here, '..', '..'), jobId,
       catch (e) { receipt.hooks.push({ repo, installed: false, reason: String(e?.message ?? e) }); }
     }
   } else receipt.hooks = [{ disabled: true }];
+  if (settings.workHook) {
+    receipt.workHooks = [];
+    for (const repo of [...new Set(repos.filter(Boolean).map((r) => path.resolve(r)))]) {
+      try { receipt.workHooks.push({ repo, ...ensureWorkHook(repo, { skillRoot }) }); }
+      catch (e) { receipt.workHooks.push({ repo, installed: false, reason: String(e?.message ?? e) }); }
+    }
+  } else receipt.workHooks = [{ disabled: true }];
   return { env, pathPrefix, receipt };
 }
 
@@ -351,5 +419,6 @@ export function guardReceiptErrors(receipt) {
   err('shims', receipt.shims?.error);
   err('terminal', receipt.terminal?.error);
   for (const hook of Array.isArray(receipt.hooks) ? receipt.hooks : []) if (hook?.installed === false) err(`history hook ${hook.repo ?? ''}`.trim(), hook.reason ?? 'not installed');
+  for (const hook of Array.isArray(receipt.workHooks) ? receipt.workHooks : []) if (hook?.installed === false) err(`work hook ${hook.repo ?? ''}`.trim(), hook.reason ?? 'not installed');
   return out;
 }

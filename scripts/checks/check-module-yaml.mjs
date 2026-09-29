@@ -1,6 +1,7 @@
 #!/usr/bin/env node
-// check-module-yaml.mjs — every YAML file under modules/ parses with the one
-// reader the runtime uses (engine/yaml.mjs).
+// check-module-yaml.mjs — every YAML file under modules/ and knowledge/ parses with the one
+// reader the runtime uses (engine/yaml.mjs). The same break reached knowledge/**/*.yaml (be/test.yaml,
+// 2026-09-29) and only the land gate caught it, so knowledge/ is parsed here too.
 //   node scripts/checks/check-module-yaml.mjs [--json]
 // A supervisor edit left modules/ops/_common.yaml unparseable (an unquoted
 // ": " inside a plain scalar) and `npm run check` stayed green, because only
@@ -14,8 +15,10 @@ import { isMain, walkFiles } from './common.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 
-export function moduleYamlFiles(dir = path.join(root, 'modules')) {
-  return walkFiles(dir, {filter: name => /\.ya?ml$/i.test(name)}).sort();
+export const YAML_ROOTS = Object.freeze(['modules', 'knowledge']);
+
+export function moduleYamlFiles(dirs = YAML_ROOTS.map(name => path.join(root, name))) {
+  return [dirs].flat().flatMap(dir => walkFiles(dir, {filter: name => /\.ya?ml$/i.test(name)})).sort();
 }
 
 export function unparseableYaml(files = moduleYamlFiles()) {
@@ -32,6 +35,6 @@ if (isMain(import.meta.url)) {
   const bad = unparseableYaml(files);
   if (process.argv.includes('--json')) console.log(JSON.stringify({ ok: bad.length === 0, files: files.length, bad }, null, 2));
   else if (bad.length) for (const b of bad) console.error(`UNPARSEABLE ${b.file}: ${b.error}`);
-  else console.log(`OK: ${files.length} YAML files under modules/ parse.`);
+  else console.log(`OK: ${files.length} YAML files under ${YAML_ROOTS.join('/ and ')}/ parse.`);
   process.exit(bad.length ? 1 : 0);
 }
