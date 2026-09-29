@@ -1,46 +1,52 @@
 {
-  "name": "shape-slot",
+  "name": "@shape-slot/repo",
   "private": true,
   "version": "0.1.0",
   "type": "module",
   "description": "Reference example: shape (state) + slot (per-API data status) across every FE tier.",
+  "workspaces": [
+    "apps/*"
+  ],
+  "prettier": "@starci/prettier-config",
   "scripts": {
-    "lint": "eslint src",
-    "typecheck": "tsc --noEmit",
-    "test:unit": "vitest run"
+    "prepare": "husky",
+    "lint": "eslint .",
+    "lint:check": "eslint . --max-warnings=0",
+    "typecheck": "npm run typecheck --workspaces --if-present",
+    "build": "npm run build --workspaces --if-present",
+    "test:unit": "vitest run",
+    "test:ci": "vitest run --coverage",
+    "test:affected": "vitest related --run --passWithNoTests $(git diff --name-only origin/main...HEAD -- '*.ts' '*.tsx')"
   },
-  "dependencies": {
-    "@heroui/react": "^3.2.1",
-    "@heroui/styles": "^3.2.1",
-    "@hookform/resolvers": "^5.2.2",
-    "@starci/grammar": "0.4.13",
-    "next": "^15.0.0",
-    "next-intl": "^4.14.5",
-    "react": "^19.0.0",
-    "react-dom": "^19.0.0",
-    "react-hook-form": "^7.66.0",
-    "swr": "^2.4.0",
-    "zod": "^4.1.12"
+  "lint-staged": {
+    "*.{ts,tsx,mjs}": "eslint --max-warnings=0"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.5",
     "@starci/eslint-canon-fe": "file:../../packages/eslint/fe",
+    "@starci/hfs": "file:../../packages/hfs",
+    "@starci/prettier-config": "file:../../packages/prettier-config",
+    "@starci/tsconfig": "file:../../packages/tsconfig",
+    "@starci/vitest-preset": "file:../../packages/vitest-preset",
     "@testing-library/dom": "^10.4.2",
-    "@testing-library/jest-dom": "^6.5.0",
-    "@testing-library/react": "^16.0.1",
-    "@types/node": "^22.7.0",
-    "@types/react": "^19.0.0",
-    "@types/react-dom": "^19.0.0",
+    "@testing-library/jest-dom": "7.0.1",
+    "@testing-library/react": "16.3.3",
+    "@types/node": "22.20.4",
     "@typescript-eslint/eslint-plugin": "^8.70.0",
     "@typescript-eslint/parser": "^8.70.0",
-    "eslint": "^9.39.5",
+    "@vitejs/plugin-react": "5.2.0",
+    "@vitest/coverage-v8": "3.2.7",
+    "eslint": "9.39.5",
     "eslint-plugin-jsx-a11y": "^6.10.2",
     "eslint-plugin-react": "^7.37.5",
-    "eslint-plugin-react-hooks": "^7.1.1",
+    "eslint-plugin-react-hooks": "7.1.1",
     "globals": "^17.12.0",
-    "jsdom": "^25.0.1",
-    "typescript": "^5.6.2",
+    "husky": "^9.1.7",
+    "jsdom": "29.1.1",
+    "lint-staged": "^16.2.0",
+    "prettier": "3.9.6",
+    "typescript": "5.9.3",
     "typescript-eslint": "^8.70.0",
-    "vitest": "^2.1.2"
+    "vitest": "3.2.7"
   }
 }

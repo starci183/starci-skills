@@ -1,8 +1,7 @@
 /*
  * StarCi's React/TypeScript canon is published as @starci/eslint-canon-fe; this repository owns
- * only which globs the law applies to. Mirrors the reference config at
- * starci-academy-fe/eslint.config.mjs, with every block scoped to APP_GLOBS - this example tree
- * also holds out-of-lane scratch (root *.mjs harnesses, uat/) that lint must not govern.
+ * only which globs the law applies to. This is an HFS FE repository (apps/<app>/src), so the canon
+ * attaches with layout "monorepo"; every block is scoped to APP_GLOBS.
  */
 import { starciFeConfig } from "@starci/eslint-canon-fe"
 
@@ -13,7 +12,7 @@ import pluginReact from "eslint-plugin-react"
 import { defineConfig } from "eslint/config"
 import jsxA11y from "eslint-plugin-jsx-a11y"
 
-const APP_GLOBS = ["src/**/*.{ts,tsx}"]
+const APP_GLOBS = ["apps/**/*.{ts,tsx}"]
 
 export default defineConfig([
     {
@@ -61,19 +60,19 @@ export default defineConfig([
             "react/prop-types": "off",
         },
     },
-    ...starciFeConfig({ layout: "single-app" }),
+    ...starciFeConfig({ layout: "monorepo" }),
     {
         // A connected block and its pure twin are an architectural boundary, not a local lint
         // preference. Inline config is disabled in both halves so neither `eslint-disable` nor
         // `eslint-enable` can turn that boundary off. There is deliberately no allowlist.
-        files: ["src/components/blocks/**/{index,component}.tsx"],
+        files: ["apps/*/src/components/blocks/**/{index,component}.tsx"],
         linterOptions: { noInlineConfig: true },
     },
     {
         // The legacy filename-twin heuristic is switched off for connected blocks per
         // NEXT-LEGACY-BLOCK-TWIN-GUARD (the conditional world-owner architecture check
         // replaces it) - see the starci.codePatterns block in package.json.
-        files: ["src/components/blocks/**/index.tsx"],
+        files: ["apps/*/src/components/blocks/**/index.tsx"],
         rules: {
             "starci-fe/connected-block-has-presentational-twin": "off",
         },
@@ -95,5 +94,10 @@ export default defineConfig([
             "jsx-a11y/label-has-associated-control": "error",
             "jsx-a11y/no-redundant-roles": "error",
         },
+    },
+    {
+        // Next and PostCSS config run in Node, not in a bundle.
+        files: ["apps/*/next.config.ts", "apps/*/postcss.config.mjs"],
+        languageOptions: { globals: globals.node },
     },
 ])

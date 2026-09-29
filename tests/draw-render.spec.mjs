@@ -177,9 +177,9 @@ test('fixture capture: the real pure HandoffBlockBase renders with fixture props
   await withTmp(async (dir) => {
     const props = path.join(dir, 'handoff.prepared.json');
     fs.writeFileSync(props, JSON.stringify(HANDOFF_FIXTURE));
-    const component = path.join(SHAPE_SLOT, 'src', 'components', 'blocks', 'sales', 'HandoffBlock', 'component.tsx');
+    const component = path.join(SHAPE_SLOT, 'apps', 'shape-slot', 'src', 'components', 'blocks', 'HandoffBlock', 'component.tsx');
     const out = path.join(dir, 'out');
-    const r = cli(['--component', component, '--export', 'HandoffBlockBase', '--props', props, '--css', path.join(SHAPE_SLOT, 'src', 'app', 'globals.css'),
+    const r = cli(['--component', component, '--export', 'HandoffBlockBase', '--props', props, '--css', path.join(SHAPE_SLOT, 'apps', 'shape-slot', 'src', 'app', 'globals.css'),
       '--out', out, '--viewports', '390x844', '--json'], PW_DIR);
     assert.equal(r.status, 0, r.stderr + r.stdout);
     const [rec] = JSON.parse(r.stdout).records;

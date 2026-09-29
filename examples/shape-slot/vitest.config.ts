@@ -1,12 +1,4 @@
-import { fileURLToPath } from "node:url"
 import { defineConfig } from "vitest/config"
+import { starciVitestWorkspace } from "@starci/vitest-preset"
 
-export default defineConfig({
-    resolve: { alias: { "@": fileURLToPath(new URL("./src", import.meta.url)) } },
-    esbuild: { jsx: "automatic" },
-    test: {
-        environment: "jsdom",
-        include: ["src/**/*.spec.{ts,tsx}"],
-        setupFiles: ["./vitest.setup.ts"],
-    },
-})
+export default defineConfig(starciVitestWorkspace({ rootDir: import.meta.dirname }))

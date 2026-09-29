@@ -37,7 +37,7 @@ rules:
         when: "Page render half, features/pages/OperatePage/component.tsx"
         write: "export const OperatePageBase = (props: OperatePageBaseProps) => ..."
       - id: case-3
-        when: "Block render half, components/blocks/sales/HandoffBlock/component.tsx"
+        when: "Block render half, components/blocks/HandoffBlock/component.tsx"
         write: "export const HandoffBlockBase = (props: HandoffBlockBaseProps) => ...; index.tsx exports HandoffBlock only"
       - id: case-4
         when: "Leaf, components/leaves/ButtonStateSample/index.tsx"

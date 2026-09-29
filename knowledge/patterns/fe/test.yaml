@@ -131,7 +131,7 @@ rules:
       - id: case-3
         when: "Child owners stubbed"
         write: >
-          vi.mock("@/components/blocks/sales/SalesStanding", () => ({ SalesStanding: () => <div data-testid="standing" />
+          vi.mock("@/components/blocks/SalesStanding", () => ({ SalesStanding: () => <div data-testid="standing" />
           })) then expect(screen.getByTestId("standing")).toBeInTheDocument()
       - id: case-4
         when: "Accessibility"

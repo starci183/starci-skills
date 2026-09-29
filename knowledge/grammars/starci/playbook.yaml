@@ -291,9 +291,9 @@ guidance:
     reference:
       example: examples/shape-slot
       files:
-        - src/components/composites/SlotView/index.tsx  # SlotView: the recipe, in status order
-        - src/modules/slot/index.ts                     # Slot, toSlot (403 is its own status), SlotLabels
-        - src/hooks/slot/useSlotLabels.ts               # shared forbidden/error/retry copy + the slot's empty sentence
+        - apps/shape-slot/src/components/composites/SlotView/index.tsx  # SlotView: the recipe, in status order
+        - apps/shape-slot/src/modules/slot/index.ts                     # Slot, toSlot (403 is its own status), SlotLabels
+        - apps/shape-slot/src/hooks/slot/useSlotLabels.ts               # shared forbidden/error/retry copy + the slot's empty sentence
       codeExample: knowledge/code-examples/frontend/connected-block
       consolidates:
         - idioms.yaml pending-same-tree

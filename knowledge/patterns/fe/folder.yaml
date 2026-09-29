@@ -135,12 +135,12 @@ rules:
     cases:
       - id: case-1
         when: "Connected block with product-world lifecycle"
-        write: "blocks/catalog/CatalogBlock/{index.tsx,component.tsx}; every nonempty index render reaches the sibling"
+        write: "blocks/CatalogBlock/{index.tsx,component.tsx}; every nonempty index render reaches the sibling"
       - id: case-2
         when: "Feature page, layout or overlay"
         write: >
           features/pages/OperatePage/{index.tsx,component.tsx,classNames.ts}, features/layouts/WorkspaceLayout/…,
-          features/overlays/sales/SendHandoffOverlay/… (examples/shape-slot)
+          features/overlays/SendHandoffOverlay/… (examples/shape-slot)
       - id: case-3
         when: "Single visual unit"
         write: "leaves/ButtonStateSample/{classNames.ts,index.tsx}; no component.tsx twin without a separate world owner"

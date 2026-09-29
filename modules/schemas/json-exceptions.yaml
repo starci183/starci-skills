@@ -87,11 +87,15 @@ exceptions:
   - path: examples/ecommerce-app-fe/tsconfig.json
     reason: >
       TypeScript toolchain config inside the ecommerce-app-fe project; tsc reads JSON (with comments).
+  - path: examples/shape-slot/apps/shape-slot/package.json
+    reason: npm package manifest for the shape-slot example app; the npm toolchain requires JSON.
+  - path: examples/shape-slot/apps/shape-slot/src/modules/i18n/messages/vi.json
+    reason: next-intl message catalogue for the shape-slot example; next-intl requires JSON.
+  - path: examples/shape-slot/apps/shape-slot/tsconfig.json
+    reason: TypeScript config for the shape-slot example app; tsc requires JSON.
   - path: examples/shape-slot/hfs.json
     reason: >
       HFS v2 repository declaration (modules/schemas/hfs-repo.schema.yaml) for the shape-slot example; the architecture machine reads hfs.json as JSON.
-  - path: examples/shape-slot/messages/vi.json
-    reason: next-intl message catalogue for the shape-slot example; next-intl requires JSON.
   - path: examples/shape-slot/package-lock.json
     reason: npm lockfile for the shape-slot example; the npm toolchain requires JSON.
   - path: examples/shape-slot/package.json
