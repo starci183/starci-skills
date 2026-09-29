@@ -59,6 +59,7 @@ modelAttestation:
     model id, so screen attestation matches the display name declared per id here.
   displayNames:
     claude-opus-5-5: Opus 5.5
+    claude-sonnet-5-5: Sonnet 5.5
 # Frame shapes for scripts/kernel/terminal-liveness.mjs (cardLivenessPatterns). The spinner row itself
 # ("✽ Garnishing… (15m 29s · ↓ 5.1k tokens)", "* Galloping… (8s · ↓ 288 tokens)") is also read by the
 # classifier's built-in markers; its timer-and-tokens tail is declared here as the busy row it is.

@@ -1,0 +1,11 @@
+id: claude-sonnet-display-name
+effectiveAt: '2026-09-29T13:00:00+07:00'
+summary: >-
+  The owner pinned the Kernel to claude-sonnet-5-5 (config.yaml kernel pin, 2026-09-29). Claude Code renders the model
+  as its display name ("Sonnet 5.5 with medium effort"), and the claude agent card declared a display name only for
+  claude-opus-5-5, so screen attestation could never match and kernel boots failed with "terminal did not render
+  expected model". The card now declares claude-sonnet-5-5: Sonnet 5.5.
+reach: new-legs
+paths:
+  - modules/kernel/contract-changes/claude-sonnet-display-name.yaml
+  - modules/models/agents/claude.yaml
