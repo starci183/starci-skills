@@ -1102,9 +1102,11 @@ export function promoteDestinations(record, shellDir) {
         if (!fs.existsSync(file)) { problems.push(`${node.id} ${d.key}: ${c.path} is not on disk`); continue; }
         try {
           const m = readCaptureFile(file);
+          // alpha.3: the promoted capture is a blob citation {name, sha256}; the legacy file's bytes move into the store.
+          putBlob(fs.readFileSync(file), { mediaType: 'image/png' });
           if (c.sha256 && m.sha256 !== c.sha256) problems.push(`${node.id} ${d.key}: ${c.path} no longer hashes to its recorded sha256 (recorded as it is now)`);
           const twin = list(node.layout.captures).find((x) => x.breakpoint === c.breakpoint && x.theme === c.theme);
-          captures.push({ breakpoint: c.breakpoint, theme: c.theme, ...(c.locale ?? twin?.locale ? { locale: c.locale ?? twin.locale } : {}), path: c.path, sha256: m.sha256, width: m.width, height: m.height, slot: m.slot, kind: 'render', provenance: 'promoted from extensions.destinationCaptures' });
+          captures.push({ breakpoint: c.breakpoint, theme: c.theme, ...(c.locale ?? twin?.locale ? { locale: c.locale ?? twin.locale } : {}), name: c.path, sha256: m.sha256, width: m.width, height: m.height, slot: m.slot, kind: 'render', provenance: 'promoted from extensions.destinationCaptures' });
           claimed.add(`${d.key}\0${c.breakpoint}\0${c.path}`);
         } catch (error) { problems.push(`${node.id} ${d.key}: ${error.message}`); }
       }
