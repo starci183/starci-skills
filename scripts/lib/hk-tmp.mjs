@@ -95,7 +95,9 @@ export async function sweepTmp({
   env = process.env,
   allocation = allocationSettings()?.housekeeping ?? {},
   remove = null,
-  legacyFixtureRoot = path.join(path.parse(RUNTIME_ROOT).root, 'starci-tmp'),
+  // A test world (STARCI_TEST_TEMP_DIR, tests/setup/isolated-temp.mjs) never reads the live drive-root starci-tmp: its
+  // tens of thousands of entries made one --once gc pass take minutes. A caller may still pass the root explicitly.
+  legacyFixtureRoot = env?.STARCI_TEST_TEMP_DIR ? null : path.join(path.parse(RUNTIME_ROOT).root, 'starci-tmp'),
 } = {}) {
   const tempRoot = path.resolve(env.TEMP ?? env.TMP ?? os.tmpdir());
   const listOf = (v) => (Array.isArray(v) ? v : []).map((prefix) => foldCase(String(prefix))).filter(Boolean);

@@ -78,7 +78,7 @@ export function fakeCtx(overrides = {}) {
 export function tempState({ prefix = 'starci-reconciler-' } = {}) {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), prefix));
   const file = path.join(dir, 'machine.sqlite');
-  const env = { ...process.env, [TEST_REGISTRY_ENV]: file, STARCI_SUPERVISOR_HOME: dir, LOCALAPPDATA: dir };
+  const env = { ...process.env, [TEST_REGISTRY_ENV]: file, STARCI_SUPERVISOR_HOME: dir, LOCALAPPDATA: dir, STARCI_LANES_ROOT: path.join(dir, 'lanes') };
   const m = openMachine({ env, file });
   const db = m;
   const owned = [];
