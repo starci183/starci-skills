@@ -7,6 +7,8 @@ import {spawnSync} from 'node:child_process';
 import {inspectLedger,openLedger,ledgerFileFor} from '../engine/ledger-db.mjs';
 import {FAKE_ORCA} from './helpers/fake-orca.mjs';
 import {seedWorkflow} from './_ledger-fixture.mjs';
+// Attestation/settle waits are counted logically; scaled down they cost milliseconds, not load-dependent seconds.
+process.env.STARCI_SLEEP_SCALE??='0.02';
 
 const ROOT=path.resolve(import.meta.dirname,'..');
 const DEFINE_GOAL=path.join(ROOT,'scripts','goal','define-goal.mjs');

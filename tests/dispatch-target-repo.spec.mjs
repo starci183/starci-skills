@@ -7,6 +7,8 @@ import {spawnSync} from 'node:child_process';
 import {FAKE_ORCA} from './helpers/fake-orca.mjs';
 import {inspectLedger,ledgerFileFor,openLedger} from '../engine/ledger-db.mjs';
 import {seedWorkflow} from './_ledger-fixture.mjs';
+// Attestation/settle waits are counted logically; scaled down they cost milliseconds, not load-dependent seconds.
+process.env.STARCI_SLEEP_SCALE??='0.02';
 
 // api dispatch resolves each owned path against its target repository
 // (scripts/kernel/target-repo.mjs) before the packet reaches the worker: a

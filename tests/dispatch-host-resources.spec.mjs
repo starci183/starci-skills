@@ -8,6 +8,8 @@ import {FAKE_ORCA} from './helpers/fake-orca.mjs';
 import {inspectLedger,ledgerFileFor,openLedger} from '../engine/ledger-db.mjs';
 import {withMachine} from '../engine/machine-db.mjs';
 import {publishThrottle} from '../scripts/lib/ram-throttle.mjs';
+// Attestation/settle waits are counted logically; scaled down they cost milliseconds, not load-dependent seconds.
+process.env.STARCI_SLEEP_SCALE??='0.02';
 
 // Spec item 3: `api dispatch --spawn` refuses on a host below allocation.resources.minFreeDiskGb /
 // minFreeRamPct with the typed reason host-resources-low — a WAIT like path-lease (waiting:true, the

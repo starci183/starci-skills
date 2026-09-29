@@ -7,6 +7,8 @@ import {spawnSync} from 'node:child_process';
 import {FAKE_ORCA} from './helpers/fake-orca.mjs';
 import {seedWorkflow} from './_ledger-fixture.mjs';
 import {jobResultSql} from '../scripts/kernel/api-lib/rows.mjs';
+// Attestation/settle waits are counted logically; scaled down they cost milliseconds, not load-dependent seconds.
+process.env.STARCI_SLEEP_SCALE??='0.02';
 
 const ROOT=path.resolve(import.meta.dirname,'..');
 const API=path.join(ROOT,'scripts','kernel','api.mjs');
