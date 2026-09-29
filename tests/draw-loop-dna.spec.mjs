@@ -23,7 +23,7 @@ import {
 import { parseColor } from '../scripts/checks/brand.mjs';
 import { GRAMMAR_PROPOSAL_FILED, GRAMMAR_PROPOSAL_RESOLVED, openGrammarProposals, readProposals, recordGrammarProposals } from '../scripts/work/grammar-proposal.mjs';
 import {
-  DRAW_LOOP_MISSING, DRAW_METRICS_FAILED, DRAW_METRICS_UNVERIFIED, STOP, bestRound, finishLoop, loopCoverageFindings, progressed, readLoop, runRound, stopOf, verifyRecordParts,
+  DRAW_LOOP_MISSING, DRAW_METRICS_FAILED, defaultOutOf, DRAW_METRICS_UNVERIFIED, STOP, bestRound, finishLoop, loopCoverageFindings, progressed, readLoop, runRound, stopOf, verifyRecordParts,
 } from '../scripts/work/draw-loop.mjs';
 import { DEFAULT_RUBRIC, criticArgv, normaliseVerdict, parseVerdict, rubricFor, runCritic } from '../scripts/work/draw-critic.mjs';
 import { settleDrawMetricFindings, DRAW_LOOP_CHANGE } from '../scripts/work/draw-loop-settle.mjs';
@@ -238,6 +238,8 @@ function product(t) {
   const ui = path.join(repo, '.starciwork', 'features', 'modules', 'ui', 'ledger');
   const directions = path.join(ui, 'assets', 'directions');
   fs.mkdirSync(directions, { recursive: true });
+  // The loop's rounds default to an OS-temp folder starci-draw-loop/<ui hash> (draw-loop.mjs defaultOutOf); remove it with the fixture.
+  t.after(() => fs.rmSync(path.dirname(path.dirname(path.dirname(defaultOutOf(ui, 'x', 'y')))), { recursive: true, force: true, maxRetries: 20, retryDelay: 25 }));
   fs.writeFileSync(path.join(ui, 'index.yaml'), stringifyYaml({ schema: 'work/ui-screen@1', id: 'ui.modules.ledger', title: 'Installed modules', surface: 'page', route: '/[locale]/(console)/modules',
     ui: { shapes: [{ base: 'LedgerBase', state: 'installed' }] }, assets: [] }));
   const source = path.join(directions, 'LedgerBase#installed.html');
@@ -381,7 +383,7 @@ test('api settle re-measures the drawn parts itself: a loop-passed draw the runt
   record.ui.review = { owner: { decision: 'accepted', answeredBy: 'owner', dispatchId: 'ctx_owner', at: '2026-09-27T12:00:00Z', parts: done.installed.map((i) => ({ path: i.path, sha256: i.sha256 })) } };
   fs.writeFileSync(path.join(p.ui, 'index.yaml'), stringifyYaml(record));
   const files = ['.starciwork/features/modules/ui/ledger/index.yaml', ...done.installed.map((i) => `.starciwork/features/modules/ui/ledger/${i.path}`), path.relative(p.repo, path.join(r.out, 'loop.json')).split(path.sep).join('/')];
-  fs.writeFileSync(path.join(r.out, 'grammar-proposal.yaml'), stringifyYaml({ schema: 'starci/grammar-proposal@1', proposals: [
+  fs.writeFileSync(path.join(p.ui, 'grammar-proposal.yaml'), stringifyYaml({ schema: 'starci/grammar-proposal@1', proposals: [
     { name: 'Meter.segments', gap: 'DNA Meter has no segmented variant', anatomy: ['root', 'segments'], tokens: ['--accent'], claims: ['A11Y-3'], render: 'meter.html' }] }));
   const at = loadContractChanges(ROOT).changes.find((c) => c.id === DRAW_LOOP_CHANGE).effectiveAt;
   const seed = (jobId, wf, admittedAt) => {

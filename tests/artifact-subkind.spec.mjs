@@ -183,9 +183,9 @@ test('the typed-log rules reach every new dispatch and every kernel boot', async
   assert.match(prompt, /^logging: the owner reads your work as TYPED LOG ROWS/m);
   assert.match(prompt, /step\.start and a step\.end around each step/);
   assert.match(prompt, /LOG_TYPED_MISSING/);
-  assert.match(prompt, /kernel-evidence[\\/]wf-p[\\/]jobs[\\/]op-p-1[\\/]log\.jsonl/, 'the op is told its own sidecar path');
-  const api = fs.readFileSync(API, 'utf8');
-  assert.match(api, /const prompt = buildOpPrompt\(\{ skillRoot, packet, jobId, repo/, 'api dispatch renders the op prompt with the logging block');
+  assert.match(prompt, /api\.mjs log --repo \S+ --workflow wf-p --job op-p-1 --kind/, 'the op is told its own typed-log command (rows land in the ledger)');
+  const dispatchVerb = fs.readFileSync(path.join(ROOT, 'scripts', 'kernel', 'api-verbs', 'dispatch.mjs'), 'utf8');
+  assert.match(dispatchVerb, /const prompt = buildOpPrompt\(\{ skillRoot, packet, jobId, repo/, 'api dispatch renders the op prompt with the logging block');
   const kernelPrompt = fs.readFileSync(path.join(ROOT, 'modules', 'kernel', 'kernel-prompt.md'), 'utf8');
   assert.match(kernelPrompt, /Log typed rows, not prose/);
   assert.match(kernelPrompt, /\[boundary\.typedLogs\]/);

@@ -201,7 +201,7 @@ test('the audit writes one evidence bundle and nothing else', () => {
   for (const artifact of ['findings.json', 'routing.json', 'draw-lineage.json', 'side-by-side.json',
     'realization.json', 'deviations.json', 'deviation-brief.md', 'measurements.json'])
     assert.ok(evidence.artifacts.includes(artifact), `the evidence bundle should name ${artifact}`);
-  assert.deepEqual(writeOf(op, 'node').fields, ['state', 'blockedBy', 'completion.inputDigest', 'completion.evidence']);
+  assert.deepEqual(writeOf(op, 'node').fields, ['id', 'feature', 'selectedMatrix', 'verdict', 'findings', 'routeTo', 'blockedBy', 'completion.inputDigest']);
 });
 
 test('docs/interface-audit.md explains this op by its stable identifiers', () => {

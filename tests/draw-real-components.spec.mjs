@@ -203,7 +203,7 @@ test('interface.draw takes grammar SOURCE, never captures or reference renders; 
 });
 
 test('a component round keeps source.tsx, fixtures and the grammar resolution, judges the rendered DOM, and finish installs the draw source', async (t) => {
-  const out = tmp(t);
+  const out = path.join(tmp(t), 'loop'); // the bundle manifest lands beside the loop dir, so nest it inside the temp dir
   const dir = tmp(t);
   const source = write(dir, 'LedgerBase.draw.tsx', GOOD_DRAW);
   const fixture = write(dir, 'LedgerBase.installed.fixture.json', JSON.stringify({ state: 'installed', props: { title: 'Mô-đun' }, on: { open: '[Function]' } }));
