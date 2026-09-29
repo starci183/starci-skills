@@ -1,0 +1,162 @@
+#!/usr/bin/env node
+// failure-codes.mjs — the emitted-code scanner and the catalog checker (part of `npm run check`).
+//   node scripts/checks/failure-codes.mjs [--json] [--list]
+//
+// Every code the runtime can emit as a verdict reason, a check finding, a blocker kind, a dispatch refusal or a settle
+// reason is a string literal in scripts/ engine/ modules/. modules/kernel/failure-codes.yaml is the owner-facing catalog
+// (one entry per code: title, meaning, causes, next step, owner). This checker refuses:
+//   - an emitted code that has no catalog entry (a new code must be explained the day it is added),
+//   - a catalog entry no code emits any more (a retired code leaves the catalog),
+//   - an entry with a missing or malformed field, or an owner outside the closed set.
+// What counts as an emitted code (see `emittedCodes`):
+//   UPPER  a quoted UPPER_SNAKE literal of two or more segments ('TARGET_MISSING'), except the names in NOT_CODES
+//          (environment variables, Node/SQLite error names, key names) and any name the code itself reads as an env var;
+//   KEBAB  a kebab-case literal with a hyphen in a code position: `code: 'x-y'`, `reason: 'x-y'`, `rejected: 'x-y'`,
+//          a reason template that starts with one (`reason: \`x-y:${...}\``), or the last string argument of refuse(...).
+import fs from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { parseYaml } from '../../engine/yaml.mjs';
+import { isMain } from './common.mjs';
+
+const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
+export const CATALOG_FILE = 'modules/kernel/failure-codes.yaml';
+export const OWNERS = Object.freeze(['op-retry', 'runtime-core', 'supervisor', 'owner']);
+/** other-op:<op> is also an owner: the finding is another op's to fix. */
+export const ownerValid = (owner) => OWNERS.includes(owner) || /^other-op:[a-z][a-z0-9.-]*$/.test(String(owner ?? ''));
+const SCAN_DIRS = ['scripts', 'engine', 'modules'];
+const SCAN_EXT = /\.(mjs|yaml)$/;
+// The scanner does not read its own catalog checker, the catalog, or the ui/ harness.
+const SKIP_FILES = new Set([CATALOG_FILE, 'scripts/checks/failure-codes.mjs']);
+
+/** UPPER_SNAKE literals that are not codes: environment variables, Node/SQLite error names, settings and key names. */
+const NOT_CODE_PREFIX = /^(ORCA|NODE|CODEX|CLAUDE|OPENAI|DASHSCOPE|BAILIAN|CLOUDFLARE|TELEGRAM|SONAR|ANTHROPIC|GITHUB|GIT|DEVIN|QWEN|LOCALAPPDATA|APPDATA|USERPROFILE|HTTP|SQLITE|ERR)_/;
+const NOT_CODES_FILE = 'scripts/checks/failure-codes.not-codes';
+const readNotCodes = (base) => new Set(fs.readFileSync(path.join(base, NOT_CODES_FILE), 'utf8').split(/\r?\n/).filter((l) => l.trim() && !l.startsWith('#')).map((l) => l.split(/\t/)[0].trim()));
+
+const skipDir = (name) => name === 'node_modules' || name === '.git' || name === 'dist';
+function* walk(dir) {
+  let entries;
+  try { entries = fs.readdirSync(dir, { withFileTypes: true }); } catch { return; }
+  for (const e of entries) {
+    if (e.isDirectory()) { if (!skipDir(e.name)) yield* walk(path.join(dir, e.name)); }
+    else if (SCAN_EXT.test(e.name)) yield path.join(dir, e.name);
+  }
+}
+
+const UPPER_RE = /(['"`])([A-Z][A-Z0-9]*(?:_[A-Z0-9]+)+)\1/g;
+const KEBAB = '[a-z][a-z0-9]*(?:-[a-z0-9]+)+';
+const BRACKET_RE = /\[([A-Z][A-Z0-9]*(?:_[A-Z0-9]+)+)\]/g;
+const KEBAB_RES = [
+  new RegExp(`\\b(?:code|reason|rejected|failureCode|failureKind|signal|blocker)\\s*:\\s*(['"])(${KEBAB})\\1`, 'g'),
+  new RegExp(`\\breason\\s*:\\s*\`(${KEBAB})(?=[:\`$])`, 'g'),
+  new RegExp(`\\brefuse\\((?:[^;]*?),\\s*(['"])(${KEBAB})\\1`, 'g'),
+  new RegExp(`\\bhand\\(\\s*(['"])(${KEBAB})\\1`, 'g'),
+];
+// A constant list of reasons/codes/classes: Object.freeze(['a-b', 'c-d']) or ['a-b'].
+const LIST_RE = /\b[A-Z][A-Z0-9_]*_(?:REASONS|CODES|KINDS|CLASSES)\s*=\s*(?:Object\.freeze\()?\[([^\]]*)\]/g;
+
+/** Closed vocabularies that are verdict reasons too: blocker kinds, failure classes, route verdicts (modules/models/kinds.yaml) and the ledger's own attempt/check enums (0001-init.sql). Keyed `<family>:<value>`. */
+export function vocabularyCodes(base = root) {
+  const out = [];
+  const kinds = parseYaml(fs.readFileSync(path.join(base, 'modules/models/kinds.yaml'), 'utf8'))?.vocabularies ?? {};
+  const fam = (prefix, list, file) => { for (const v of Array.isArray(list) ? list : []) out.push({ code: `${prefix}:${v}`, kind: 'vocab', sites: [{ file, line: 1 }] }); };
+  fam('blocker', kinds.blockers, 'modules/models/kinds.yaml');
+  fam('failure-class', kinds.failureClasses, 'modules/models/kinds.yaml');
+  fam('route-verdict', kinds.verdicts, 'modules/models/kinds.yaml');
+  const sql = fs.readFileSync(path.join(base, 'engine/migrations/runtime/0001-init.sql'), 'utf8');
+  const enumOf = (column, table = null) => { const text = table ? sql.slice(sql.indexOf(`CREATE TABLE IF NOT EXISTS ${table}(`)) : sql; const m = text.match(new RegExp(String.raw`\b${column}\s+TEXT[^\n]*?IN\s*\(([^)]*)\)`)); return m ? [...m[1].matchAll(/'([^']+)'/g)].map((x) => x[1]) : []; };
+  fam('end-state', enumOf('end_state'), 'engine/migrations/runtime/0001-init.sql');
+  fam('attempt-verdict', enumOf('verdict'), 'engine/migrations/runtime/0001-init.sql');
+  fam('check-status', enumOf('status', 'check_runs'), 'engine/migrations/runtime/0001-init.sql');
+  return out;
+}
+
+const relOf = (file) => path.relative(root, file).split(path.sep).join('/');
+const lineOf = (text, index) => text.slice(0, index).split('\n').length;
+
+/** Every emitted code: {code, kind: 'upper'|'kebab', sites: [{file, line}]}. Sorted by code. */
+export function emittedCodes(base = root) {
+  const found = new Map();
+  const add = (code, kind, file, line) => {
+    const e = found.get(code) ?? { code, kind, sites: [] };
+    if (e.sites.length < 6 && !e.sites.some((s) => s.file === file && s.line === line)) e.sites.push({ file, line });
+    found.set(code, e);
+  };
+  const NOT_CODES = readNotCodes(base);
+  const envNames = new Set();
+  const texts = [];
+  for (const d of SCAN_DIRS) for (const file of walk(path.join(base, d))) {
+    const rel = path.relative(base, file).split(path.sep).join('/');
+    if (SKIP_FILES.has(rel)) continue;
+    const text = fs.readFileSync(file, 'utf8');
+    texts.push([rel, text]);
+    for (const m of text.matchAll(/\b(?:process\.)?env(?:\.|\[\s*['"])([A-Z][A-Z0-9_]+)/g)) envNames.add(m[1]);
+  }
+  for (const [rel, text] of texts) {
+    for (const m of text.matchAll(UPPER_RE)) {
+      const code = m[2];
+      if (NOT_CODES.has(code) || NOT_CODE_PREFIX.test(code) || envNames.has(code)) continue;
+      add(code, 'upper', rel, lineOf(text, m.index));
+    }
+    for (const m of text.matchAll(BRACKET_RE)) {
+      if (NOT_CODES.has(m[1]) || NOT_CODE_PREFIX.test(m[1]) || envNames.has(m[1])) continue;
+      add(m[1], 'upper', rel, lineOf(text, m.index));
+    }
+    if (!rel.endsWith('.mjs')) continue;
+    const addKebab = (code, at) => { if (!NOT_CODES.has(code)) add(code, 'kebab', rel, lineOf(text, at)); };
+    for (const m of text.matchAll(LIST_RE)) {
+      for (const item of m[1].matchAll(new RegExp(`['"](${KEBAB})['"]`, 'g'))) addKebab(item[1], m.index);
+    }
+    for (const re of KEBAB_RES) for (const m of text.matchAll(re)) addKebab(m[m.length - 1], m.index);
+  }
+  for (const v of vocabularyCodes(base)) found.set(v.code, v);
+  return [...found.values()].sort((a, b) => (a.code < b.code ? -1 : a.code > b.code ? 1 : 0));
+}
+
+const FIELDS = ['title', 'title_vi', 'meaning_vi', 'nextStep_vi', 'owner', 'kind'];
+export const CODE_KINDS = Object.freeze(['check-finding', 'settle-reason', 'dispatch-refusal', 'blocker', 'check-status', 'verb-refusal', 'runtime-fault', 'input-invalid']);
+
+/** Read the catalog: a flat map code -> entry. */
+export function readCatalog(base = root) {
+  const file = path.join(base, CATALOG_FILE);
+  return parseYaml(fs.readFileSync(file, 'utf8')) ?? {};
+}
+
+/** The catalog problems: {missing[], stale[], malformed[]}. */
+export function catalogProblems(base = root) {
+  const catalog = readCatalog(base);
+  const emitted = emittedCodes(base);
+  const emittedSet = new Set(emitted.map((e) => e.code));
+  const missing = emitted.filter((e) => !Object.hasOwn(catalog, e.code));
+  const stale = Object.keys(catalog).filter((code) => !emittedSet.has(code));
+  const malformed = [];
+  const ops = new Set(fs.readdirSync(path.join(base, 'modules/ops/ops')).filter((n) => n.endsWith('.yaml')).map((n) => n.slice(0, -5)));
+  for (const [code, entry] of Object.entries(catalog)) {
+    const bad = [];
+    for (const f of FIELDS) if (typeof entry?.[f] !== 'string' || !entry[f].trim()) bad.push(`${f} missing`);
+    if (String(entry?.owner ?? '').startsWith('other-op:') && !ops.has(entry.owner.slice(9))) bad.push(`owner ${entry.owner} names an op with no modules/ops/ops/<op>.yaml`);
+    if (entry?.owner && !ownerValid(entry.owner)) bad.push(`owner '${entry.owner}' is not ${OWNERS.join('|')}|other-op:<op>`);
+    if (entry?.kind && !CODE_KINDS.includes(entry.kind)) bad.push(`kind '${entry.kind}' is not ${CODE_KINDS.join('|')}`);
+    if (!Array.isArray(entry?.causes_vi) || !entry.causes_vi.length || entry.causes_vi.some((c) => typeof c !== 'string' || !c.trim())) bad.push('causes_vi must be a non-empty list of strings');
+    if (bad.length) malformed.push({ code, problems: bad });
+  }
+  return { emitted: emitted.length, catalog: Object.keys(catalog).length, missing, stale, malformed };
+}
+
+if (isMain(import.meta.url)) {
+  if (process.argv.includes('--list')) {
+    for (const e of emittedCodes()) console.log(`${e.code}\t${e.kind}\t${e.sites[0].file}:${e.sites[0].line}`);
+    process.exit(0);
+  }
+  const p = catalogProblems();
+  const ok = !p.missing.length && !p.stale.length && !p.malformed.length;
+  if (process.argv.includes('--json')) console.log(JSON.stringify({ ok, ...p }, null, 2));
+  else if (ok) console.log(`OK: ${p.emitted} emitted codes, all in ${CATALOG_FILE} (${p.catalog} entries).`);
+  else {
+    for (const m of p.missing) console.error(`MISSING ${m.code} (${m.sites[0].file}:${m.sites[0].line}): an emitted code with no entry in ${CATALOG_FILE}; add title, title_vi, meaning_vi, causes_vi, nextStep_vi, owner, kind`);
+    for (const c of p.stale) console.error(`STALE ${c}: in ${CATALOG_FILE} but no code emits it; remove the entry`);
+    for (const m of p.malformed) console.error(`MALFORMED ${m.code}: ${m.problems.join('; ')}`);
+  }
+  process.exit(ok ? 0 : 1);
+}
