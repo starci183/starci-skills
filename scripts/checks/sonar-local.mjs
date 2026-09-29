@@ -14,6 +14,7 @@ import {braceVariants,globExpression} from '../lib/glob.mjs';
 import {posixPath} from '../lib/path-key.mjs';
 import {unquoteDiffPath} from '../lib/git.mjs';
 import {emitCheckOutput} from './output.mjs';
+import {loadSonarGate,serverConditions,thresholdsOf} from './sonar-gate.mjs';
 
 /**
  * Product Sonar analysis runs against a LOCAL SonarQube (owner ruling 2026-09-24). Where it is comes from
@@ -53,11 +54,17 @@ import {emitCheckOutput} from './output.mjs';
  * The verdict is the slice's own (nivo inc-f92febebbb64). Sonar way judges "new code", and a project
  * with no new-code baseline has the whole project as new code, so no single slice could pass the
  * project's gate while each op may only touch its own paths. A scan therefore evaluates the slice's
- * changed lines through the Web API: it passes when the slice introduces no open issue and no
- * to-review security hotspot on a line it changed (a line-less one only on a file it added) and its
- * changed coverable lines meet the gate's new_coverage threshold (default 80; like the server's
- * ignoreSmallChanges, fewer than 20 changed coverable lines is not held to it). The whole-project
+ * changed lines through the Web API against the ONE gate in knowledge/sonar-gate.yaml (the thresholds live
+ * there and nowhere else; the summary copies them as `gate`): it passes when the slice introduces no open
+ * blocker or critical issue and no to-review security hotspot on a line it changed (a line-less one only
+ * on a file it added), its duplicated share of the changed source lines is within the duplication
+ * threshold and its changed coverable lines meet the new-coverage threshold (like the server's
+ * ignoreSmallChanges, fewer changed lines than the gate's floor are held to neither). Lesser issues are
+ * listed on the summary and never fail it. The scan also makes the server's gate of that name carry the
+ * same conditions and selects it for the project (`qualityGate` on the summary). The whole-project
  * gate is recorded as `projectGate`, a note that never blocks; --project-gate makes it the verdict.
+ * A scan that cannot judge (server down, custody missing) exits 2 and carries `unavailable`: the settle
+ * (scripts/kernel/sonar-settle.mjs) records it as the explicit sonar-unavailable why, never as a pass.
  * Coverage must be fresh: every lcov report the scanner reads must exist and be newer than the head
  * commit, than every file the slice changed and than --fresh-since; otherwise the scan is refused
  * before it runs (run the repository's test:ci first, in the same attempt).
@@ -77,10 +84,7 @@ import {emitCheckOutput} from './output.mjs';
  * base) the op fixes itself, 2 blocked (server down, custody missing, invalid token, usage).
  */
 export const SCHEMA='starci/sonar-local@1';
-export const SCAN_SCHEMA='starci/sonar-local-scan@2';
-/** SonarQube's sonar.qualitygate.ignoreSmallChanges: coverage is not held against fewer new lines. */
-export const SMALL_CHANGE_LINES=20;
-export const DEFAULT_NEW_COVERAGE=80;
+export const SCAN_SCHEMA='starci/sonar-local-scan@3';
 export const DEFAULT_HOST='http://localhost:9010';
 export const PUBLIC_HOST='https://sonar.starci.org';
 export const CONTAINER='starci-sonarqube';
@@ -197,6 +201,7 @@ export function readSonarDeclaration(file,repoRoot=path.dirname(path.dirname(pat
     stackDir,composeFile,container,
     hostLocal:text(sonar.host?.local),
     hostPublic:text(sonar.host?.public),
+    qualityGate:text(sonar.qualityGate),
     projects,
     admin:credentials.find(isAdmin)?.file??null,
     analysis:analysis.find(c=>!projects.some(p=>p.tokenRef===c.file))?.file??null,
@@ -231,6 +236,7 @@ export function resolveConfig(options={},env=process.env){
     record:options.record??null,
     adminToken:options.adminToken??decl?.admin??`runtime/files/${ADMIN_TOKEN}`,
     analysisToken:options.analysisToken??decl?.analysis??`runtime/files/${ANALYSIS_TOKEN}`,
+    declaredQualityGate:decl?.qualityGate??null,
     declaredKey:project?.key??null,
     declaredName:project?.name??null,
     declaredTokenRef:project?.tokenRef??null,
@@ -553,6 +559,53 @@ export async function ensureProject(cfg,{key,name}={}){
 
 // ---- scan -----------------------------------------------------------------------------------------------
 
+/**
+ * Make the server's quality gate named by knowledge/sonar-gate.yaml carry exactly its conditions, select it for
+ * the project and fix the project's new-code period. Idempotent: a matching gate is left as it is. A failure
+ * here is reported on the summary (`qualityGate.outcome`) and never changes the slice verdict, which is judged
+ * from the same file; the server gate is what the dashboard and CI show.
+ */
+export async function ensureQualityGate(cfg,{key,admin,gate=loadSonarGate()}={}){
+  const name=gate.gate.name;
+  const base={name,projectKey:key,conditions:serverConditions(gate).length};
+  if(!admin?.present)return {...base,outcome:'skipped',message:'admin token not in custody'};
+  const token=admin.value;
+  const failed=(step,answer)=>({...base,outcome:'failed',message:`${step}: HTTP ${answer.status||0} ${answer.text??answer.error??''}`.trim()});
+  const encoded=encodeURIComponent(name);
+  let shown=await call(cfg,'GET',`/api/qualitygates/show?name=${encoded}`,{token});
+  if(shown.status===404||(shown.status===400&&/not found|does not exist/i.test(String(shown.text??'')))){
+    const created=await call(cfg,'POST','/api/qualitygates/create',{token,form:{name}});
+    if(created.status!==200&&created.status!==201)return failed('create gate',created);
+    shown=await call(cfg,'GET',`/api/qualitygates/show?name=${encoded}`,{token});
+  }
+  if(shown.status!==200)return failed('show gate',shown);
+  const have=new Map((shown.json?.conditions??[]).map(c=>[c.metric,c]));
+  const want=serverConditions(gate);
+  const changed=[];
+  for(const condition of want){
+    const current=have.get(condition.metric);
+    if(current&&current.op===condition.op&&String(current.error)===condition.error)continue;
+    const answer=current
+      ?await call(cfg,'POST','/api/qualitygates/update_condition',{token,form:{id:current.id,metric:condition.metric,op:condition.op,error:condition.error}})
+      :await call(cfg,'POST','/api/qualitygates/create_condition',{token,form:{gateName:name,metric:condition.metric,op:condition.op,error:condition.error}});
+    if(answer.status!==200&&answer.status!==201&&answer.status!==204)return failed(`condition ${condition.metric}`,answer);
+    changed.push(condition.metric);
+  }
+  const wanted=new Set(want.map(c=>c.metric));
+  for(const current of have.values()){
+    if(wanted.has(current.metric))continue;
+    const answer=await call(cfg,'POST','/api/qualitygates/delete_condition',{token,form:{id:current.id}});
+    if(answer.status!==200&&answer.status!==204)return failed(`drop condition ${current.metric}`,answer);
+    changed.push(`-${current.metric}`);
+  }
+  const selected=await call(cfg,'POST','/api/qualitygates/select',{token,form:{gateName:name,projectKey:key}});
+  if(selected.status!==200&&selected.status!==204)return failed('select gate',selected);
+  const period=gate.gate.newCodePeriod;
+  const periodSet=period?await call(cfg,'POST','/api/new_code_periods/set',{token,form:{project:key,type:period.type,value:String(period.value)}}):null;
+  if(periodSet&&periodSet.status!==200&&periodSet.status!==204)return failed('new-code period',periodSet);
+  return {...base,outcome:'ok',changed};
+}
+
 export function readProperties(file){
   const out={};
   if(!fs.existsSync(file))return out;
@@ -653,17 +706,36 @@ export function sliceChanges(cwd,{base,paths}={}){
   if(resolved.error||(resolved.status!==0&&git(cwd,['rev-parse','--git-dir']).status!==0))return {ok:false,code:'SLICE_NOT_GIT',reason:`${cwd} is not a git checkout, so the slice cannot be read`};
   if(resolved.status!==0)return {ok:false,code:'SLICE_BASE_UNKNOWN',reason:`the slice base ${baseRef} is not a commit in ${cwd}`};
   const pathspec=scope.length?['--',...scope]:[];
-  const diff=git(cwd,['diff','--no-color','--no-ext-diff','--no-textconv','-U0','-M','--relative','--src-prefix=a/','--dst-prefix=b/',resolved.stdout.trim(),...pathspec]);
-  if(diff.status!==0)return {ok:false,code:'SLICE_NOT_GIT',reason:`git diff against ${baseRef} failed: ${String(diff.stderr).trim().split(/\r?\n/)[0]}`};
-  const files=parseDiffNewLines(diff.stdout);
-  const untracked=git(cwd,['ls-files','--others','--exclude-standard','-z',...pathspec]);
-  for(const file of String(untracked.stdout??'').split('\0').filter(Boolean)){
-    if(files.some(f=>f.path===file))continue;
-    let lines=0;
-    try{const body=fs.readFileSync(path.join(cwd,file),'utf8');lines=body.split(/\r?\n/).length-(body.endsWith('\n')?1:0);}catch{/* unreadable */}
-    files.push({path:file,added:true,untracked:true,ranges:lines>0?[[1,lines]]:[]});
+  const collect=commit=>{
+    const diff=git(cwd,['diff','--no-color','--no-ext-diff','--no-textconv','-U0','-M','--relative','--src-prefix=a/','--dst-prefix=b/',commit,...pathspec]);
+    if(diff.status!==0)return {error:String(diff.stderr).trim().split(/\r?\n/)[0]};
+    const files=parseDiffNewLines(diff.stdout);
+    const untracked=git(cwd,['ls-files','--others','--exclude-standard','-z',...pathspec]);
+    for(const file of String(untracked.stdout??'').split('\0').filter(Boolean)){
+      if(files.some(f=>f.path===file))continue;
+      let lines=0;
+      try{const body=fs.readFileSync(path.join(cwd,file),'utf8');lines=body.split(/\r?\n/).length-(body.endsWith('\n')?1:0);}catch{/* unreadable */}
+      files.push({path:file,added:true,untracked:true,ranges:lines>0?[[1,lines]]:[]});
+    }
+    return {files};
+  };
+  const baseCommit=resolved.stdout.trim();
+  const first=collect(baseCommit);
+  if(first.error)return {ok:false,code:'SLICE_NOT_GIT',reason:`git diff against ${baseRef} failed: ${first.error}`};
+  let {files}=first,used=baseCommit,baseFallback=null;
+  // An attempt that authored no delta of its own (its slice was committed by an earlier attempt, so the base the op
+  // recorded is HEAD) read as SLICE_EMPTY and left backend.implement red in ops (nivo, 2 of 5 scans). The slice is then
+  // what the branch carries inside --paths beyond its merge-base with the trunk: the same code the gate has to judge.
+  if(!files.length&&git(cwd,['rev-parse','--verify','--quiet','HEAD']).stdout.trim()===baseCommit){
+    for(const ref of ['@{upstream}','origin/main','main','origin/master','master']){
+      const mergeBase=git(cwd,['merge-base','HEAD',ref]);
+      const sha=mergeBase.status===0?mergeBase.stdout.trim():'';
+      if(!sha||sha===baseCommit)continue;
+      const alt=collect(sha);
+      if(alt.files?.length){files=alt.files;used=sha;baseFallback={requested:baseRef,merged:ref,baseCommit:sha,reason:'the attempt changed nothing after its recorded base; the slice is the branch delta since its merge-base with the trunk'};break;}
+    }
   }
-  return {ok:true,base:baseRef,baseCommit:resolved.stdout.trim(),paths:scope,files};
+  return {ok:true,base:baseRef,baseCommit:used,paths:scope,files,...(baseFallback?{baseFallback}:{})};
 }
 
 // ---- coverage freshness ---------------------------------------------------------------------------------
@@ -774,29 +846,28 @@ async function sliceIssues(cfg,tokens,keys){
   return got;
 }
 
-/** The new_coverage threshold of the project's gate: an evaluated condition, the gate definition, else 80. */
-async function newCoverageThreshold(cfg,tokens,key,conditions){
-  const evaluated=conditions.find(c=>c.metric==='new_coverage'&&c.threshold!==undefined);
-  if(evaluated)return {threshold:Number(evaluated.threshold),source:'project gate condition'};
-  const gate=await read(cfg,tokens,`/api/qualitygates/get_by_project?project=${encodeURIComponent(key)}`);
-  const name=gate.json?.qualityGate?.name;
-  if(name){
-    const shown=await read(cfg,tokens,`/api/qualitygates/show?name=${encodeURIComponent(name)}`);
-    const condition=(shown.json?.conditions??[]).find(c=>c.metric==='new_coverage');
-    if(condition?.error!==undefined)return {threshold:Number(condition.error),source:`quality gate ${name}`};
+/** The lines of `fileKey` that lie in a duplicated block, from an api/duplications/show answer. */
+export function duplicatedLinesOf(doc,fileKey){
+  const refs=Object.entries(doc?.files??{}).filter(([,file])=>file?.key===fileKey).map(([ref])=>String(ref));
+  const lines=new Set();
+  for(const duplication of doc?.duplications??[])for(const block of duplication?.blocks??[]){
+    if(!refs.includes(String(block?._ref)))continue;
+    for(let line=Number(block.from);line<Number(block.from)+Number(block.size);line+=1)lines.add(line);
   }
-  return {threshold:DEFAULT_NEW_COVERAGE,source:'default (Sonar way)'};
+  return lines;
 }
 
 /**
- * Judge the slice on the processed analysis: open issues and to-review hotspots on its changed lines
- * (a line-less one only on a file it added) and the coverage of its changed coverable lines. A changed
- * file the server does not know (excluded, not source) is listed as not analyzed.
+ * Judge the slice on the processed analysis against `gate` (thresholdsOf(knowledge/sonar-gate.yaml)): open
+ * blocker and critical issues and to-review hotspots on its changed lines (a line-less one only on a file
+ * it added), the duplicated share of its changed source lines and the coverage of its changed coverable
+ * lines. A changed file the server does not know (excluded, not source) is listed as not analyzed.
  */
-export async function evaluateSlice(cfg,tokens,{key,slice,conditions=[],linesToCover=null,props={},pkg=null,coverage:holdCoverage=true}){
+export async function evaluateSlice(cfg,tokens,{key,slice,linesToCover=null,props={},pkg=null,coverage:holdCoverage=true,gate=thresholdsOf(loadSonarGate())}){
+  const qualifierOf=fileQualifier(props,pkg);
   const files=slice.files.filter(f=>f.ranges.length||f.added);
   const analyzed=new Map(),notAnalyzed=[];
-  let coverableLines=0,coveredLines=0,conditionsTotal=0,coveredConditions=0;
+  let coverableLines=0,coveredLines=0,conditionsTotal=0,coveredConditions=0,changedSourceLines=0;
   const uncovered=[];
   for(const file of files){
     const fileKey=`${key}:${file.path}`;
@@ -806,6 +877,7 @@ export async function evaluateSlice(cfg,tokens,{key,slice,conditions=[],linesToC
     if(lines.status===404){notAnalyzed.push(file.path);continue;}
     if(!lines.reachable||lines.status!==200)return {error:`source lines of ${file.path} could not be read: ${lines.error??`HTTP ${lines.status}`}`};
     analyzed.set(fileKey,file);
+    if(qualifierOf(file.path)==='FIL')changedSourceLines+=file.ranges.reduce((n,[a,b])=>n+(b-a+1),0);
     const missed=[];
     for(const source of lines.json?.sources??[]){
       if(!inRanges(file.ranges,source.line))continue;
@@ -825,7 +897,6 @@ export async function evaluateSlice(cfg,tokens,{key,slice,conditions=[],linesToC
   const keys=[...analyzed.keys()];
   // issues/search refuses one list mixing qualifiers: spec files (UTS) are asked apart from sources
   // (FIL), in the same 25-key batches, and the results merge (inc-0fee2b8fb296).
-  const qualifierOf=fileQualifier(props,pkg);
   const groups=new Map();
   for(const fileKey of keys){
     const qualifier=qualifierOf(analyzed.get(fileKey).path);
@@ -844,10 +915,10 @@ export async function evaluateSlice(cfg,tokens,{key,slice,conditions=[],linesToC
   if(hotspotsRead.error)return {error:`hotspots of the project could not be read: ${hotspotsRead.error}`};
   const hotspots=hotspotsRead.items.filter(h=>onSlice(h,h.component));
   const pathOf=component=>analyzed.get(component)?.path??component;
-  const {threshold,source}=await newCoverageThreshold(cfg,tokens,key,conditions);
+  const threshold=gate.coverageMinPercent;
   const denominator=coverableLines+conditionsTotal;
   const percent=denominator?Math.round(((coveredLines+coveredConditions)/denominator)*1000)/10:null;
-  const coverage={coverableLines,coveredLines,conditions:conditionsTotal,coveredConditions,percent,threshold,thresholdSource:source,uncovered};
+  const coverage={coverableLines,coveredLines,conditions:conditionsTotal,coveredConditions,percent,threshold,thresholdSource:`knowledge/sonar-gate.yaml (${gate.name})`,uncovered};
   const failures=[];
   if(!holdCoverage){coverage.applied=false;coverage.note='coverage not held: specs.unit=false (--no-coverage)';}
   else if(keys.length&&coverableLines===0&&conditionsTotal===0&&!(Number(linesToCover)>0)){
@@ -857,16 +928,34 @@ export async function evaluateSlice(cfg,tokens,{key,slice,conditions=[],linesToC
   }
   if(!holdCoverage){/* specs.unit=false: issues and hotspots only */}
   else if(denominator===0){coverage.applied=false;coverage.note='the slice changed no coverable line';}
-  else if(coverableLines<SMALL_CHANGE_LINES){coverage.applied=false;coverage.note=`${coverableLines} changed coverable lines (< ${SMALL_CHANGE_LINES}): like the server's ignoreSmallChanges, the threshold is not held`;}
+  else if(coverableLines<gate.ignoreBelowChangedLines){coverage.applied=false;coverage.note=`${coverableLines} changed coverable lines (< ${gate.ignoreBelowChangedLines}): like the server's ignoreSmallChanges, the threshold is not held`;}
   else{coverage.applied=true;if(percent<threshold)failures.push(`coverage on the slice's changed lines ${percent}% < ${threshold}%`);}
-  if(issues.length)failures.push(`${issues.length} open issue(s) on changed lines`);
-  if(hotspots.length)failures.push(`${hotspots.length} security hotspot(s) to review on changed lines`);
+  // Duplication: the share of the changed source lines that sit inside a duplicated block (the file's own side).
+  const duplication={changedLines:changedSourceLines,duplicatedLines:0,percent:null,threshold:gate.duplicationMaxPercent,files:[]};
+  for(const fileKey of keys){
+    const file=analyzed.get(fileKey);
+    if(qualifierOf(file.path)!=='FIL'||!file.ranges.length)continue;
+    const shown=await read(cfg,tokens,`/api/duplications/show?key=${encodeURIComponent(fileKey)}`);
+    if(shown.status===404)continue;
+    if(!shown.reachable||shown.status!==200)return {error:`duplications of ${file.path} could not be read: ${shown.error??`HTTP ${shown.status}`}`};
+    const mine=duplicatedLinesOf(shown.json,fileKey);
+    const hit=[...mine].filter(line=>inRanges(file.ranges,line)).sort((a,b)=>a-b);
+    if(hit.length){duplication.duplicatedLines+=hit.length;duplication.files.push({path:file.path,lines:hit.slice(0,ITEM_CAP)});}
+  }
+  duplication.percent=changedSourceLines?Math.round((duplication.duplicatedLines/changedSourceLines)*1000)/10:null;
+  if(!changedSourceLines){duplication.applied=false;duplication.note='the slice changed no source line';}
+  else if(changedSourceLines<gate.ignoreBelowChangedLines){duplication.applied=false;duplication.note=`${changedSourceLines} changed source lines (< ${gate.ignoreBelowChangedLines}): like the server's ignoreSmallChanges, the threshold is not held`;}
+  else{duplication.applied=true;if(duplication.percent>gate.duplicationMaxPercent)failures.push(`duplication on the slice's changed lines ${duplication.percent}% > ${gate.duplicationMaxPercent}%`);}
+  const blocking=issues.filter(i=>gate.blockingSeverities.includes(i.severity));
+  const lesser=issues.filter(i=>!gate.blockingSeverities.includes(i.severity));
+  if(blocking.length>gate.blockingIssuesMax)failures.push(`${blocking.length} open ${gate.blockingSeverities.join('/')} issue(s) on changed lines`);
+  if(hotspots.length>gate.unreviewedHotspotsMax)failures.push(`${hotspots.length} security hotspot(s) to review on changed lines`);
   return {error:null,result:{
     analyzedFiles:keys.length,notAnalyzed,
-    newIssues:{total:issues.length,bySeverity:tally(issues,'severity'),byType:tally(issues,'type'),
-      items:issues.slice(0,ITEM_CAP).map(i=>({key:i.key,rule:i.rule,severity:i.severity,type:i.type,path:pathOf(i.component),line:i.line??null,message:i.message}))},
+    newIssues:{total:issues.length,blocking:blocking.length,notBlocking:lesser.length,bySeverity:tally(issues,'severity'),byType:tally(issues,'type'),
+      items:[...blocking,...lesser].slice(0,ITEM_CAP).map(i=>({key:i.key,rule:i.rule,severity:i.severity,type:i.type,path:pathOf(i.component),line:i.line??null,message:i.message,blocking:gate.blockingSeverities.includes(i.severity)}))},
     newHotspots:{total:hotspots.length,items:hotspots.slice(0,ITEM_CAP).map(h=>({key:h.key,rule:h.ruleKey,probability:h.vulnerabilityProbability,path:pathOf(h.component),line:h.line??null,message:h.message}))},
-    coverage,
+    coverage,duplication,
     verdict:failures.length?'fail':'pass',
     failures,
   }};
@@ -931,7 +1020,7 @@ export function isolationDefines(cwd,props,scope){
 export async function scan(cfg,options={}){
   const cwd=path.resolve(options.cwd??process.cwd());
   const summary={schema:SCAN_SCHEMA,at:new Date().toISOString(),host:cfg.host,publicHost:cfg.publicHost,cwd,stack:cfg.stackDir,declaration:cfg.declaration};
-  const finish=(outcome,reason,extra={})=>Object.assign(summary,extra,{outcome,...(reason?{reason}:{})});
+  const finish=(outcome,reason,extra={})=>Object.assign(summary,extra,{outcome,...(reason?{reason}:{}),...(outcome==='blocked'?{unavailable:true}:{})});
   if(!fs.existsSync(path.join(cwd,'package.json'))&&!fs.existsSync(path.join(cwd,'sonar-project.properties')))
     return finish('blocked',`${cwd} has neither package.json nor sonar-project.properties`);
   const props=readProperties(path.join(cwd,'sonar-project.properties'));
@@ -940,6 +1029,9 @@ export async function scan(cfg,options={}){
   let key=options.key??cfg.declaredKey??props['sonar.projectKey']??(pkg?.name?String(pkg.name).replace(/^@/,'').replace(/\//g,'_'):null);
   summary.projectKey=key;
   summary.revision=gitRevision(cwd);
+  const gateDoc=loadSonarGate();
+  summary.gate=thresholdsOf(gateDoc);
+  if(cfg.declaredQualityGate&&cfg.declaredQualityGate!==gateDoc.gate.name)summary.gate.declarationDrift=`the declaration names quality gate ${cfg.declaredQualityGate}; the gate is ${gateDoc.gate.name}`;
   if(cfg.disabled)return finish('disabled',`Sonar is disabled for this repository: ${cfg.disabled}`);
   if(!key)return finish('blocked','no project key: pass --key or set sonar.projectKey');
 
@@ -950,7 +1042,7 @@ export async function scan(cfg,options={}){
   if(!projectGateMode){
     slice=sliceChanges(cwd,{base:options.base,paths:options.paths});
     if(!slice.ok)return finish(slice.code==='SLICE_NOT_GIT'?'blocked':'refused',slice.reason,{code:slice.code});
-    summary.slice={base:slice.base,baseCommit:slice.baseCommit,paths:slice.paths,changedFiles:slice.files.map(f=>f.path)};
+    summary.slice={base:slice.base,baseCommit:slice.baseCommit,...(slice.baseFallback?{baseFallback:slice.baseFallback}:{}),paths:slice.paths,changedFiles:slice.files.map(f=>f.path)};
     if(!slice.files.length)return finish('refused',`the slice changes no file against ${slice.base}${slice.paths.length?` inside ${slice.paths.join(', ')}`:''}: pass --base <the commit before this slice's first edit> and --paths <its owned paths>`,{code:'SLICE_EMPTY'});
   }
   // --no-coverage (specs.unit=false): no test run feeds this scan, so no lcov is read, refused or imported.
@@ -975,6 +1067,7 @@ export async function scan(cfg,options={}){
     const ensured=admin.present?await ensureProject(cfg,{key,name:cfg.declaredName??props['sonar.projectName']??key}):{outcome:'skipped',message:'admin token not in custody'};
     summary.project={outcome:ensured.outcome,...(ensured.created!==undefined?{created:ensured.created}:{}),...(ensured.message?{message:ensured.message}:{})};
   }
+  if(options.ensure!==false)summary.qualityGate=await ensureQualityGate(cfg,{key,admin,gate:gateDoc});
   let token=await projectToken(cfg,{key,admin,tokenRef:options.tokenRef,mint:options.ensure!==false});
   summary.custody.analysis=custodyView(token);
   if(!token.present)return finish('blocked',`no analysis token for ${key} (${token.reason}); repair the source stack custody - never ask the owner for it.`);
@@ -994,6 +1087,7 @@ export async function scan(cfg,options={}){
         summary.isolated=isolated;
         key=sliceKey;
         summary.projectKey=key;
+        if(options.ensure!==false)summary.qualityGate={...summary.qualityGate,isolatedSelect:(await ensureQualityGate(cfg,{key:sliceKey,admin,gate:gateDoc})).outcome};
         token={...admin,note:'admin token (isolated slice project)'};
         summary.custody.analysis=custodyView(token);
         extra.push(...isolationDefines(cwd,props,scope));
@@ -1066,7 +1160,7 @@ export async function scan(cfg,options={}){
     // The project has no new-code baseline, so its gate judges the whole project's debt: a note for the
     // report, never this slice's verdict.
     projectGate.note=[`whole-project debt, reported and not a block: the slice verdict decides${projectFailures.length?` (project gate: ${projectFailures.join(', ')})`:''}`,projectGate.note].filter(Boolean).join('; ');
-    const judged=await evaluateSlice(cfg,tokens,{key,slice,conditions:projectGate.conditions,linesToCover:summary.measures?.lines_to_cover??null,props,pkg,coverage:holdCoverage});
+    const judged=await evaluateSlice(cfg,tokens,{key,slice,linesToCover:summary.measures?.lines_to_cover??null,props,pkg,coverage:holdCoverage,gate:summary.gate});
     if(judged.error)return finish('blocked',judged.error);
     Object.assign(summary.slice,judged.result);
     if(judged.refused)return finish('refused',judged.refused.reason,{code:judged.refused.code});

@@ -39,6 +39,11 @@ branches:
     title: Complete application stacks
     path: application-stacks.yaml
     use: Whole-app dev and Ubuntu VPS Compose deployment, encrypted custody, lifecycle and verification.
+  - id: sonar-gate
+    title: Sonar quality gate
+    path: sonar-gate.yaml
+    use: The one place the Sonar new-code thresholds live (coverage, duplication, blocker/critical issues, unreviewed hotspots),
+      the ops that must pass them and the why codes; products only name the gate in .starcistacks.
   - id: code-examples
     title: Code examples
     path: code-examples/index.yaml

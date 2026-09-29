@@ -35,6 +35,7 @@ import {isPlainObject as plain} from '../../engine/plain-object.mjs';
 import { parseYaml } from '../../engine/yaml.mjs';
 import { list } from '../lib/list.mjs';
 import { isFile, isDir } from '../lib/fs-kind.mjs';
+import { loadSonarGate } from './sonar-gate.mjs';
 
 export const RESULT_SCHEMA = 'starci/starcistacks-check@1';
 export const DECLARATION_SCHEMA = 'starci/application-stacks@1';
@@ -65,7 +66,7 @@ export const CODES = [
   'STACKS_OWNER_ACTION_REDUNDANT', 'STACKS_PROJECT_MISSING', 'STACKS_PROJECT_DRIFT', 'STACKS_HOST_DRIFT',
   'STACKS_SERVICE_UNDECLARED', 'STACKS_CI_CONTRADICTION', 'STACKS_CI_UNUSED', 'STACKS_CI_NAME_UNREFERENCED',
   'STACKS_PLAINTEXT_TRACKED', 'STACKS_ENC_TWIN_MISSING', 'STACKS_GITIGNORE_OPEN', 'STACKS_DECLARATION_IGNORED',
-  'STACKS_GITIGNORE_VALUE_OPEN', 'STACKS_RUNBOOK_IGNORED',
+  'STACKS_GITIGNORE_VALUE_OPEN', 'STACKS_RUNBOOK_IGNORED', 'STACKS_QUALITY_GATE_DRIFT',
 ];
 /** Codes an older leg's admission never demotes: a tracked plaintext secret is a leak already, and
  *  ignore rules that let the next one be tracked are the same leak one `git add` away. */
@@ -207,7 +208,7 @@ export function normalizeService(id, entry, { declaringRepo } = {}) {
   });
   const ci = plain(s.ci) ? s.ci : {};
   return {
-    id, provider: text(s.provider), mode: text(s.mode), purpose: text(s.purpose), reason: text(s.reason), auth: text(s.auth),
+    id, provider: text(s.provider), mode: text(s.mode), purpose: text(s.purpose), reason: text(s.reason), auth: text(s.auth), qualityGate: text(s.qualityGate),
     host: { local: text(s.host?.local), public: text(s.host?.public), fromCredential: text(s.host?.fromCredential) },
     stack: stack ? { owner: text(stack.owner), repository: text(stack.repository), root: text(stack.root), environment: text(stack.environment), compose: text(stack.compose),
       container: text(stack.container), publishedBy: text(stack.publishedBy), hostOwned, repo: stackRepo, dir: stackDir,
@@ -413,6 +414,13 @@ export function checkStarciStacks(repoRoot, { newRepo = false, advisoryCodes = [
       add(normalized.sonar ? 'refuse' : 'suspect', 'STACKS_PROJECT_DRIFT', 'sonar-project.properties', `sonar.projectKey ${props['sonar.projectKey']} but the declaration names ${declared}`);
     if (sonar.host.public && props['sonar.host.url'] && props['sonar.host.url'].replace(/\/+$/, '') !== sonar.host.public.replace(/\/+$/, ''))
       add('suspect', 'STACKS_HOST_DRIFT', 'sonar-project.properties', `sonar.host.url ${props['sonar.host.url']} but the declaration's public host is ${sonar.host.public}`);
+  }
+
+  // The one quality gate (knowledge/sonar-gate.yaml): a repository names it, never its own thresholds.
+  if (sonar && sonar.mode !== 'disabled') {
+    const gateName = loadSonarGate().gate.name;
+    if (sonar.qualityGate !== gateName)
+      add(normalized.sonar ? 'refuse' : 'suspect', 'STACKS_QUALITY_GATE_DRIFT', `${declFile}#services.sonar.qualityGate`, `services.sonar.qualityGate is ${sonar.qualityGate ?? 'absent'}; every product names the one gate ${gateName} (knowledge/sonar-gate.yaml owns its thresholds)`);
   }
 
   // Custody layout (modules/schemas/stacks-layout.yaml custody, the product repositories' secrets-guard).

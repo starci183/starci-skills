@@ -42,8 +42,9 @@ const coveredSources=({missed=[],lines={'src/app.js':30,'src/new.js':3,'src/lega
  */
 async function fakeSonar(t,{gate='OK',firstAnalysis=false,up=true,sources=coveredSources(),linesToCover='120',tests=[],
   issues=[{path:'src/legacy.js',line:2,severity:'MAJOR',type:'CODE_SMELL'},{path:'src/app.js',line:2,severity:'MINOR',type:'CODE_SMELL'}],
-  hotspots=[{path:'src/legacy.js',line:3}]}={}){
-  const state={projects:new Map(),requests:[],tokens:new Map([[ADMIN,'admin'],[ANALYSIS,'analysis']]),polls:0,mintValues:[],gate,firstAnalysis,sources,issues,hotspots,linesToCover,tests};
+  hotspots=[{path:'src/legacy.js',line:3}],duplications={}}={}){
+  const state={gateConditions:null,gateSelected:new Map(),newCode:new Map(),duplications:{},projects:new Map(),requests:[],tokens:new Map([[ADMIN,'admin'],[ANALYSIS,'analysis']]),polls:0,mintValues:[],gate,firstAnalysis,sources,issues,hotspots,linesToCover,tests};
+  state.duplications=duplications;
   const fileOf=component=>component.split(':').slice(1).join(':');
   const server=http.createServer((req,res)=>{
     let body='';
@@ -110,8 +111,34 @@ async function fakeSonar(t,{gate='OK',firstAnalysis=false,up=true,sources=covere
           const from=Number(url.searchParams.get('from')??1),to=Number(url.searchParams.get('to')??1e9);
           return send(200,{sources:lines.filter(l=>l.line>=from&&l.line<=to)});
         }
-        case '/api/qualitygates/get_by_project':return send(200,{qualityGate:{name:'Sonar way'}});
-        case '/api/qualitygates/show':return send(200,{conditions:[{metric:'new_coverage',op:'LT',error:'80'}]});
+        case '/api/qualitygates/show':{
+          if(url.searchParams.get('name')!=='starci-new-code'||!state.gateConditions)return send(404,{errors:[{msg:'not found'}]});
+          return send(200,{name:'starci-new-code',conditions:[...state.gateConditions.values()]});
+        }
+        case '/api/qualitygates/create':{
+          if(role!=='admin')return send(403,{});
+          state.gateConditions=new Map();
+          return send(201,{name:new URLSearchParams(body).get('name')});
+        }
+        case '/api/qualitygates/create_condition':case '/api/qualitygates/update_condition':{
+          if(role!=='admin')return send(403,{});
+          const form=new URLSearchParams(body);
+          const id=form.get('id')??`C-${state.gateConditions.size+1}`;
+          state.gateConditions.set(form.get('metric'),{id,metric:form.get('metric'),op:form.get('op'),error:form.get('error')});
+          return send(200,{id});
+        }
+        case '/api/qualitygates/delete_condition':{
+          for(const [metric,c] of state.gateConditions)if(c.id===new URLSearchParams(body).get('id'))state.gateConditions.delete(metric);
+          return send(204,{});
+        }
+        case '/api/qualitygates/select':{const form=new URLSearchParams(body);state.gateSelected.set(form.get('projectKey'),form.get('gateName'));return send(204,{});}
+        case '/api/new_code_periods/set':{const form=new URLSearchParams(body);state.newCode.set(form.get('project'),`${form.get('type')}:${form.get('value')}`);return send(204,{});}
+        case '/api/duplications/show':{
+          const component=url.searchParams.get('key')??'';
+          const blocks=state.duplications[fileOf(component)];
+          if(!blocks)return send(200,{duplications:[],files:{}});
+          return send(200,{duplications:blocks.map(b=>({blocks:[{from:b.from,size:b.size,_ref:'1'},{from:1,size:b.size,_ref:'2'}]})),files:{'1':{key:component},'2':{key:'x:src/elsewhere.js'}}});
+        }
         case '/api/measures/component':return send(200,{component:{measures:[{metric:'coverage',value:'71.0'},{metric:'ncloc',value:'120'},
           ...(state.linesToCover?[{metric:'lines_to_cover',value:state.linesToCover}]:[])]}});
         default:return send(404,{});
@@ -412,7 +439,10 @@ test('scan runs the repository scanner against the local host, mints the project
   assert.equal(report.custody.analysis.via,'minted');
   assert.equal(report.scanner.runner,'npm run sonar:check');
   assert.equal(report.ceTask.status,'SUCCESS');
-  assert.equal(report.schema,'starci/sonar-local-scan@2');
+  assert.equal(report.schema,'starci/sonar-local-scan@3');
+  assert.equal(report.gate.name,'starci-new-code');
+  assert.deepEqual([report.gate.coverageMinPercent,report.gate.duplicationMaxPercent,report.gate.blockingSeverities],[80,3,['BLOCKER','CRITICAL']]);
+  assert.equal(report.qualityGate.outcome,'ok');
   assert.equal(report.scope,'slice');
   assert.equal(report.projectGate.status,'OK');
   assert.equal(report.projectGate.scope,'whole-project');
@@ -420,6 +450,7 @@ test('scan runs the repository scanner against the local host, mints the project
   assert.equal(report.slice.base,'HEAD');
   assert.deepEqual([report.slice.verdict,report.slice.newIssues.total,report.slice.newHotspots.total],['pass',0,0],'debt on unchanged lines is not the slice\'s');
   assert.deepEqual([report.slice.coverage.coverableLines,report.slice.coverage.percent,report.slice.coverage.threshold,report.slice.coverage.applied],[28,100,80,true]);
+  assert.deepEqual([report.slice.duplication.changedLines,report.slice.duplication.duplicatedLines,report.slice.duplication.applied],[28,0,true]);
   assert.equal(report.coverageReport.fresh,true);
   assert.equal(report.issues.total,4);
   assert.deepEqual(report.issues.bySeverity,{MAJOR:3,MINOR:1});
@@ -481,11 +512,12 @@ test('the slice fails on an issue or hotspot it introduced and on uncovered chan
   assert.equal(exitCode,1);
   assert.equal(report.outcome,'fail');
   assert.equal(report.slice.newIssues.total,1);
+  assert.equal(report.slice.newIssues.blocking,1);
   assert.deepEqual(report.slice.newIssues.items.map(i=>[i.path,i.line,i.severity]),[['src/app.js',12,'CRITICAL']]);
   assert.equal(report.slice.newHotspots.total,1);
   assert.equal(report.slice.coverage.percent,64.3);
   assert.deepEqual(report.slice.coverage.uncovered,[{path:'src/app.js',lines:[10,11,12,13,14,15,16,17,18,19]}]);
-  assert.match(report.reason,/coverage on the slice's changed lines 64\.3% < 80%[\s\S]*1 open issue[\s\S]*1 security hotspot/);
+  assert.match(report.reason,/coverage on the slice's changed lines 64\.3% < 80%[\s\S]*1 open BLOCKER\/CRITICAL issue[\s\S]*1 security hotspot/);
 });
 
 test('--paths confines the slice; a small slice is not held to the coverage threshold', async t => {
@@ -513,8 +545,9 @@ test('a slice holding spec (UTS) and source (FIL) files is judged: issues are as
   assert.equal(report.outcome,'fail','the mixed slice reaches a verdict instead of a blocked exit 2');
   assert.deepEqual(report.slice.newIssues.items.map(i=>[i.path,i.line]).sort(),[['src/app.js',12],['src/app.spec.js',2]],'issues on source and spec lines merge');
   assert.equal(report.slice.newIssues.total,2);
+  assert.equal(report.slice.newIssues.blocking,1,'only the critical one blocks; the major smell on the spec is listed');
   assert.equal(report.slice.newHotspots.total,1,'a hotspot on a changed spec line counts');
-  assert.match(report.reason,/2 open issue[\s\S]*1 security hotspot/);
+  assert.match(report.reason,/1 open BLOCKER\/CRITICAL issue[\s\S]*1 security hotspot/);
   const scoped=state.requests.filter(r=>r.path==='/api/issues/search'&&(r.query.components??r.query.componentKeys??'').includes(':'));
   assert.ok(scoped.length>=2,'the slice asked one query per qualifier group');
   for(const request of scoped){
@@ -536,7 +569,7 @@ test('a clean slice mixing spec and source files passes, and a misread qualifier
   // detection): the mixed batch is refused once, then asked one key at a time.
   const root2=temporary(t,'qualifiers-fallback');
   const second=await fakeSonar(t,{tests:['src/util.test.js'],
-    issues:[{path:'src/util.test.js',line:2,severity:'MAJOR',type:'BUG'}],
+    issues:[{path:'src/util.test.js',line:2,severity:'BLOCKER',type:'BUG'}],
     hotspots:[],
     sources:coveredSources({lines:{'src/app.js':30,'src/new.js':3,'src/legacy.js':5,'src/util.test.js':4}})});
   const repo=fakeRepo(root2);
@@ -634,12 +667,14 @@ services:
 });
 
 test('scan is blocked with a plain reason when the server is not UP', async t => {
+  // (a blocked scan carries unavailable: the settle records it as sonar-unavailable, never a pass)
   const root=temporary(t,'scan-down');
   const {host}=await fakeSonar(t,{up:false});
   const custody=fakeCustody(root);
   const {exitCode,report}=await sonarLocalMain(['scan','--cwd',fakeRepo(root),'--wait'],{config:configFor(host,custody)});
   assert.equal(exitCode,2);
   assert.match(report.reason,/reports STARTING/);
+  assert.equal(report.unavailable,true);
 });
 
 test('the stack declaration decides host, stack, custody and project key; source-host means the source dev stack', t => {
@@ -820,4 +855,75 @@ services:
   const declared=readSonarDeclaration(file);
   assert.deepEqual([declared.hostLocal,declared.hostPublic,declared.admin,declared.analysis],[null,null,null,null]);
   assert.equal(readSonarDeclaration(write(root,'string-host.yaml','schema: starci/application-stacks@1\nservices:\n  sonar: {provider: sonarqube, mode: local, host: "http://old-host:1", ci: {wiring: not-used}, ownerAction: none}\n')).hostLocal,null);
+});
+
+test('the scan makes the server gate carry knowledge/sonar-gate.yaml, selects it and is idempotent', async t => {
+  const root=temporary(t,'gate-ensure');
+  const {host,state}=await fakeSonar(t);
+  const custody=fakeCustody(root);
+  const repo=fakeRepo(root);
+  const first=await sonarLocalMain(['scan','--cwd',repo,'--wait'],{config:configFor(host,custody)});
+  assert.equal(first.report.qualityGate.outcome,'ok',JSON.stringify(first.report.qualityGate));
+  const conditions=Object.fromEntries([...state.gateConditions.values()].map(c=>[c.metric,`${c.op} ${c.error}`]));
+  assert.deepEqual(conditions,{new_coverage:'LT 80',new_duplicated_lines_density:'GT 3',new_security_hotspots_reviewed:'LT 100',new_blocker_violations:'GT 0',new_critical_violations:'GT 0'});
+  assert.equal(state.gateSelected.get('product-repo'),'starci-new-code');
+  assert.equal(state.newCode.get('product-repo'),'NUMBER_OF_DAYS:30');
+  const made=state.requests.filter(r=>/create|update_condition|delete_condition/.test(r.path)&&r.path.includes('qualitygates')).length;
+  // a gate someone edited on the server is put back, an extra condition is dropped
+  state.gateConditions.set('new_coverage',{id:'C-9',metric:'new_coverage',op:'LT',error:'50'});
+  state.gateConditions.set('new_violations',{id:'C-10',metric:'new_violations',op:'GT',error:'0'});
+  const again=await sonarLocalMain(['scan','--cwd',repo,'--wait'],{config:configFor(host,custody)});
+  assert.equal(again.report.qualityGate.outcome,'ok');
+  assert.deepEqual(again.report.qualityGate.changed.sort(),['-new_violations','new_coverage']);
+  assert.equal(state.gateConditions.get('new_coverage').error,'80');
+  assert.ok(!state.gateConditions.has('new_violations'));
+  const third=await sonarLocalMain(['scan','--cwd',repo,'--wait'],{config:configFor(host,custody)});
+  assert.deepEqual(third.report.qualityGate.changed,[],'a matching gate is left as it is');
+  assert.ok(made>0);
+});
+
+test('duplication on the changed lines fails the slice; lesser issues are listed and never block', async t => {
+  const root=temporary(t,'gate-dup');
+  const {host}=await fakeSonar(t,{duplications:{'src/app.js':[{from:10,size:12}]},issues:[{path:'src/app.js',line:12,severity:'MAJOR',type:'CODE_SMELL'}]});
+  const custody=fakeCustody(root);
+  const {exitCode,report}=await sonarLocalMain(['scan','--cwd',fakeRepo(root),'--wait'],{config:configFor(host,custody)});
+  assert.equal(exitCode,1,JSON.stringify(report.slice));
+  assert.deepEqual([report.slice.duplication.duplicatedLines,report.slice.duplication.percent,report.slice.duplication.threshold],[12,42.9,3]);
+  assert.deepEqual(report.slice.duplication.files,[{path:'src/app.js',lines:[10,11,12,13,14,15,16,17,18,19,20,21]}]);
+  assert.match(report.reason,/duplication on the slice's changed lines 42\.9% > 3%/);
+  assert.doesNotMatch(report.reason,/issue/,'the major smell is not a failure');
+  assert.deepEqual([report.slice.newIssues.total,report.slice.newIssues.blocking,report.slice.newIssues.notBlocking],[1,0,1]);
+  assert.equal(report.slice.newIssues.items[0].blocking,false);
+});
+
+test('a duplicated block outside the changed lines or under the small-change floor is not held', async t => {
+  const root=temporary(t,'gate-dup-ok');
+  const {host}=await fakeSonar(t,{duplications:{'src/legacy.js':[{from:1,size:5}]}});
+  const custody=fakeCustody(root);
+  const {exitCode,report}=await sonarLocalMain(['scan','--cwd',fakeRepo(root),'--wait'],{config:configFor(host,custody)});
+  assert.equal(exitCode,0,JSON.stringify(report.slice));
+  assert.equal(report.slice.duplication.duplicatedLines,0);
+  const small=await fakeSonar(t,{duplications:{'src/new.js':[{from:1,size:3}]}});
+  const smallRun=await sonarLocalMain(['scan','--cwd',fakeRepo(temporary(t,'gate-dup-small')),'--wait','--paths','src/new.js'],{config:configFor(small.host,custody)});
+  assert.equal(smallRun.exitCode,0);
+  assert.deepEqual([smallRun.report.slice.duplication.applied,smallRun.report.slice.duplication.duplicatedLines],[false,3]);
+});
+
+test('a slice its attempt did not change (already committed) is judged from the branch delta, not left SLICE_EMPTY', t => {
+  const root=temporary(t,'slice-fallback');
+  const repo=fakeRepo(root);
+  gitIn(repo,'checkout','-q','-b','wf/x');
+  gitIn(repo,'add','-A');
+  gitIn(repo,'commit','-q','-m','an earlier attempt committed the slice');
+  const slice=sliceChanges(repo,{base:'HEAD',paths:'src'});
+  assert.equal(slice.ok,true);
+  assert.deepEqual(slice.files.map(f=>f.path).sort(),['src/app.js','src/new.js']);
+  assert.equal(slice.baseFallback.merged,'main');
+  assert.equal(slice.baseCommit,gitIn(repo,'rev-parse','main'));
+  assert.equal(slice.base,'HEAD','the requested base is kept beside the fallback');
+  // no branch delta at all stays empty: nothing to judge, and the scan says so
+  const bare=fakeRepo(temporary(t,'slice-fallback-none'));
+  gitIn(bare,'add','-A');
+  gitIn(bare,'commit','-q','-m','same');
+  assert.equal(sliceChanges(bare,{base:'HEAD',paths:'src'}).files.length,0);
 });

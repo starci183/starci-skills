@@ -84,6 +84,13 @@ $defs:
         enum: [local, hosted, disabled]
       purpose: {type: string, minLength: 1}
       reason: {type: string, minLength: 1}
+      qualityGate:
+        description: >-
+          sonar only: the name of the one quality gate the repository is held to. The thresholds are not restated
+          here - knowledge/sonar-gate.yaml owns them and scripts/checks/check-starcistacks.mjs refuses any other name
+          (STACKS_QUALITY_GATE_DRIFT).
+        type: string
+        pattern: '^[a-z][a-z0-9-]*$'
       host:
         type: object
         additionalProperties: false

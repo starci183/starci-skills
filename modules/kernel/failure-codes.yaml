@@ -12136,3 +12136,58 @@ work-hygiene-red:
   nextStep_vi: "Việc giữ nguyên, không chốt; op sửa các tệp được nêu, commit lại rồi chốt lại."
   owner: op-retry
   kind: settle-reason
+
+sonar-gate-red:
+  title: "Sonar quality gate is red on the change"
+  title_vi: "Cổng chất lượng Sonar đỏ trên phần code vừa sửa"
+  meaning_vi: "Phần code op vừa thay đổi không đạt cổng Sonar chung: có lỗi mức blocker hoặc critical, hotspot bảo mật chưa xem xét, trùng lặp vượt ngưỡng, hoặc độ phủ dòng mới thấp hơn ngưỡng (knowledge/sonar-gate.yaml)."
+  causes_vi:
+    - "Có issue blocker hoặc critical nằm trên dòng đã sửa"
+    - "Có hotspot bảo mật ở trạng thái chờ xem xét trên dòng đã sửa"
+    - "Tỷ lệ trùng lặp trên dòng mới vượt ngưỡng"
+    - "Độ phủ kiểm thử của dòng mới thấp hơn ngưỡng"
+  nextStep_vi: "Việc chốt bị từ chối; op sửa đúng các mục nêu trong summary sonar.json, thêm spec cho dòng mới, chạy lại sonar-local rồi nộp lại. Nợ cũ ngoài phần đã sửa không bị tính."
+  owner: op-retry
+  kind: settle-reason
+sonar-unavailable:
+  title: "Sonar is unavailable, so the change was not judged"
+  title_vi: "Sonar không khả dụng nên chưa chấm được phần code vừa sửa"
+  meaning_vi: "Máy chủ SonarQube cục bộ không chạy, thiếu khóa truy cập trong kho bảo quản hoặc khóa bị từ chối, nên cổng chất lượng không thể chấm. Runtime không cho op chốt xong khi chưa có kết quả Sonar, và đã báo cho Supervisor."
+  causes_vi:
+    - "Container starci-sonarqube chưa chạy hoặc Docker tắt"
+    - "Khóa dự án Sonar thiếu hoặc bị máy chủ từ chối"
+    - "Máy chủ đang khởi động hoặc trả lỗi"
+  nextStep_vi: "Supervisor khởi động lại SonarQube hoặc sửa kho khóa (không hỏi owner); sau đó chạy lại quét sonar-local trên phần code này rồi chốt lại."
+  owner: supervisor
+  kind: settle-reason
+sonar-scan-refused:
+  title: "Sonar scan was refused before it ran"
+  title_vi: "Lần quét Sonar bị từ chối trước khi chạy"
+  meaning_vi: "sonar-local không quét vì đầu vào của lần này chưa hợp lệ (báo cáo độ phủ cũ hoặc thiếu, mốc nền không có thật), nên chưa có phán quyết cổng chất lượng."
+  causes_vi:
+    - "Báo cáo lcov cũ hơn commit đầu hoặc không tồn tại"
+    - "Mốc --base không phải commit của repository"
+  nextStep_vi: "Việc chốt bị từ chối; op chạy lại spec có độ phủ trong lần thử này và quét lại với --base đúng."
+  owner: op-retry
+  kind: settle-reason
+sonar-proof-missing:
+  title: "No Sonar result is attached"
+  title_vi: "Chưa đính kèm kết quả Sonar"
+  meaning_vi: "Op sửa code nhưng report không đính kèm sonar.json (bản tóm tắt quét slice) hợp lệ, hoặc bản đó không phải phán quyết của slice, nên runtime không có gì để chấm."
+  causes_vi:
+    - "Op chưa chạy sonar-local scan"
+    - "Quét không dùng --wait nên chỉ mới gửi đi"
+    - "Tệp sonar.json không được đính kèm vào api report"
+  nextStep_vi: "Việc chốt bị từ chối; op chạy sonar-local scan --wait trên phần code đã sửa và đính kèm sonar.json khi nộp report."
+  owner: op-retry
+  kind: settle-reason
+STACKS_QUALITY_GATE_DRIFT:
+  title: "Sonar quality gate name differs from the standard"
+  title_vi: "Tên cổng chất lượng Sonar khác chuẩn chung"
+  meaning_vi: "Khai báo services.sonar.qualityGate của repository không phải cổng chung starci-new-code (ngưỡng nằm ở knowledge/sonar-gate.yaml, không viết lại trong từng repository)."
+  causes_vi:
+    - "Khai báo Sonar chưa có dòng qualityGate"
+    - "Repository tự đặt tên cổng riêng"
+  nextStep_vi: "Từ chối nếu Sonar được khai báo trong chính repository, nghi ngờ nếu khai báo đi qua nguồn khác; ghi qualityGate: starci-new-code vào khối services.sonar."
+  owner: other-op:workspace.manage
+  kind: check-finding

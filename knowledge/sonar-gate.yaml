@@ -1,0 +1,48 @@
+schema: starci/sonar-gate@1
+id: sonar-gate
+title: The Sonar quality gate every product is held to
+purpose: |
+  The one place the Sonar thresholds live. A product repository never restates them: its
+  .starcistacks/application-stacks.yaml `services.sonar.qualityGate` names the gate below, and
+  scripts/checks/sonar-local.mjs (1) makes the local SonarQube's gate of that name carry exactly these
+  conditions and selects it for the project, and (2) judges an op's slice - the lines it changed - against
+  the same numbers. Code-writing ops cannot settle done while the slice is red
+  (scripts/kernel/sonar-settle.mjs). Changing a number here changes every repository on the next scan.
+gate:
+  name: starci-new-code
+  # A project with no new-code baseline judges the whole project as new code (nivo inc-f92febebbb64); a fixed
+  # window keeps "new code" the recent work on main, so the server gate is passable on a healthy main.
+  newCodePeriod: {type: NUMBER_OF_DAYS, value: 30}
+newCode:
+  coverage:
+    metric: new_coverage
+    minPercent: 80
+    # SonarQube's ignoreSmallChanges: fewer changed lines than this are not held to coverage or duplication.
+    ignoreBelowChangedLines: 20
+  duplication:
+    metric: new_duplicated_lines_density
+    maxPercent: 3
+  issues:
+    # An open issue of these severities on a changed line fails the slice; lesser ones are listed, never blocking.
+    blockingSeverities: [BLOCKER, CRITICAL]
+    metrics: {BLOCKER: new_blocker_violations, CRITICAL: new_critical_violations}
+    max: 0
+  hotspots:
+    metric: new_security_hotspots_reviewed
+    minReviewedPercent: 100
+    unreviewedMax: 0
+# Ops that write product code: each runs sonar-local on its own change and cannot settle done while the gate is red.
+enforcedOps: [backend.implement, interface.implement, code.refactor]
+reasoning: |
+  Chosen against the four projects the local server holds on 2026-09-29 (whole-project measures: coverage
+  69.9 / 89.8 / 76.9 / 96.2 percent, duplicated lines 1.6 / 2.1 / 1.7 / 0.0 percent), so new code that meets
+  them is at or below what main already carries.
+  coverage 80: the SonarQube "Sonar way" value the ops were already held to; every project's overall coverage is
+  within reach of it and the weakest (nivo-backend 69.9) rises by holding only new lines to it.
+  duplication 3: the Sonar way value; the worst project today is 2.1, so 3 rejects a real copy-paste block and
+  passes ordinary work.
+  blocker/critical 0: the two severities that are defects, not style. main carries old debt of both kinds
+  (nivo-backend 3 blocker, 137 critical), so the gate reads only changed lines and never main's backlog;
+  major and lower are reported on the summary and never fail a slice.
+  hotspots 0 unreviewed: a hotspot is a question the author must answer; on changed lines it is answered in the
+  same slice.

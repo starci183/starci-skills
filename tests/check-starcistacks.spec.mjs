@@ -23,7 +23,7 @@ const sonarEntry = (repo, extra = {}) => ({ provider: 'sonarqube', mode: 'local'
   projects: [{ repository: repo, key: repo }],
   credentials: [{ id: 'analysis', env: 'SONAR_TOKEN', custody: { repository: 'src-host', path: '.starcistacks/dev/runtime/files/sonarqube-analysis-token.txt' } }],
   ci: { wiring: 'required', secrets: [{ name: 'SONAR_TOKEN', credential: 'analysis' }], vars: [{ name: 'SONAR_HOST_URL', value: 'https://sonar.example.org' }] },
-  ownerAction: 'none', ...extra });
+  qualityGate: 'starci-new-code', ownerAction: 'none', ...extra });
 const codecovEntry = (repo, extra = {}) => ({ provider: 'codecov', mode: 'hosted', host: { public: 'https://app.codecov.io' }, auth: 'oidc',
   projects: [{ repository: repo, key: `gh/org/${repo}` }], credentials: [], ci: { wiring: 'required', permissions: ['id-token: write'], secrets: [], vars: [] }, ownerAction: 'none', ...extra });
 const CI = 'jobs:\n  ci:\n    steps:\n      - uses: codecov/codecov-action@v5\n        with: {use_oidc: true}\n      - uses: SonarSource/sonarqube-scan-action@v7\n        env:\n          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}\n          SONAR_HOST_URL: ${{ vars.SONAR_HOST_URL }}\n';
@@ -116,6 +116,16 @@ test('a leg admitted before the change reads the new codes as suspects', (t) => 
 test('sonar-project.properties must name the declared project key', (t) => {
   const { product } = workspace(t, { services: { sonar: sonarEntry('product'), codecov: codecovEntry('product') }, props: 'sonar.projectKey=other\n' });
   assert.ok(codes(checkStarciStacks(product), 'refuse').includes('STACKS_PROJECT_DRIFT'));
+});
+
+test('services.sonar.qualityGate must name the one gate knowledge/sonar-gate.yaml owns', (t) => {
+  const own = workspace(t, { services: { sonar: sonarEntry('product', { qualityGate: 'my-own-gate' }), codecov: codecovEntry('product') } });
+  const refused = checkStarciStacks(own.product);
+  assert.ok(codes(refused, 'refuse').includes('STACKS_QUALITY_GATE_DRIFT'));
+  assert.match(refused.findings.find((finding) => finding.code === 'STACKS_QUALITY_GATE_DRIFT').message, /starci-new-code/);
+  const absent = workspace(t, { services: { sonar: (({ qualityGate, ...rest }) => rest)(sonarEntry('product')), codecov: codecovEntry('product') } });
+  assert.ok(codes(checkStarciStacks(absent.product), 'refuse').includes('STACKS_QUALITY_GATE_DRIFT'), 'a declaration with no qualityGate is refused');
+  assert.equal(checkStarciStacks(own.product, { advisoryCodes: CODES }).ok, true, 'a leg admitted before the change reads it as a suspect');
 });
 
 test('a product with no services block still resolves Sonar through the source host declaration', (t) => {

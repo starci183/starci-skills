@@ -26,6 +26,7 @@ services:
       container: starci-sonarqube
       publishedBy: cloudflared.yaml
     auth: token
+    qualityGate: starci-new-code
     projects:
       - {repository: nivo-backend, key: nivo-backend}
     credentials:

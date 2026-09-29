@@ -52,6 +52,7 @@ The declaration's `services` block (schema `$defs.service`) states the delivery,
 | `stack` | a local service's stack, one of two forms: project-owned `{repository, root: .starcistacks, environment, compose, container?, publishedBy?}` or host-owned `{owner: host, root: .claude/ext/<service>, environment, compose, container?, publishedBy?}` |
 | `auth` | `token`, `oidc` (Codecov), `github-token` (GHCR), `none` |
 | `projects` | `[{repository, key}]` - the project key per repository (`sonar.projectKey` must match) |
+| `qualityGate` | sonar only: `starci-new-code`, the one gate whose thresholds live in `knowledge/sonar-gate.yaml` (any other value is `STACKS_QUALITY_GATE_DRIFT`); `sonar-local` makes the server gate of that name carry them and `api settle` holds `backend.implement`, `interface.implement` and `code.refactor` to it |
 | `credentials` | `[{id, env or key, custody: {repository, path}}]` - custody references, never values; `<path>.enc` must exist |
 | `ci` | `wiring` required / optional-follow-up / not-used, `secrets [{name, credential}]`, `vars [{name, value}]`, `permissions`, `provisioning` |
 | `ownerAction` | `none` unless the owner alone can give something (`{needed, reason}`); `none` is mandatory while custody holds every credential |

@@ -1,0 +1,30 @@
+id: sonar-enforce
+effectiveAt: '2026-09-29T20:30:00+07:00'
+summary: "Sonar is an enforced gate, not advice (owner 2026-09-29 'enforce sonar'). knowledge/sonar-gate.yaml is the ONE place the thresholds live: new-code coverage 80 percent, duplication 3 percent, 0 open blocker or critical issue and 0 unreviewed hotspot on changed lines (thresholds chosen against the four projects the local server holds); a product only names the gate in .starcistacks services.sonar.qualityGate (check-starcistacks STACKS_QUALITY_GATE_DRIFT), and sonar-local (scan summary starci/sonar-local-scan@3) makes the server gate of that name carry the same conditions, selects it and fixes the new-code period. backend.implement, interface.implement and code.refactor run sonar-local on their own change; api settle reads the attached sonar.json itself (scripts/kernel/sonar-settle.mjs), records the runtime check sonar-gate, and refuses a pass unless it is green: red is sonar-gate-red, a scan that could not run is the explicit sonar-unavailable why with a runtime incident the Supervisor sees, a refused scan is sonar-scan-refused, a missing summary sonar-proof-missing (Vietnamese text in failure-codes.yaml). Lesser issues are listed, never blocking. Root cause of the red-in-ops scans: an attempt that authored no delta (its slice already committed) read SLICE_EMPTY; the slice is now the branch delta since its merge-base with the trunk. A leg admitted earlier settles without the gate"
+reach: new-legs
+ops: [backend.implement, interface.implement, code.refactor]
+adds:
+  checks:
+    - sonar-gate
+  codes:
+    - sonar-gate-red
+    - sonar-unavailable
+    - sonar-scan-refused
+    - sonar-proof-missing
+    - STACKS_QUALITY_GATE_DRIFT
+paths:
+  - knowledge/sonar-gate.yaml
+  - knowledge/index.yaml
+  - knowledge/repository-baseline.yaml
+  - modules/schemas/application-stacks.schema.yaml
+  - modules/kernel/failure-codes.yaml
+  - modules/ops/ops/backend.implement.yaml
+  - modules/ops/ops/interface.implement.yaml
+  - modules/ops/ops/code.refactor.yaml
+  - scripts/checks/sonar-gate.mjs
+  - scripts/checks/sonar-local.mjs
+  - scripts/checks/check-starcistacks.mjs
+  - scripts/kernel/sonar-settle.mjs
+  - scripts/kernel/api.mjs
+  - scripts/kernel/api-verbs/settle.mjs
+  - scripts/kernel/op-prompt.mjs

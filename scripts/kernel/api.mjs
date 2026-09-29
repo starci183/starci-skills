@@ -184,6 +184,7 @@ import { DRAW_ACCEPTANCE_CHANGE, drawAcceptanceFindings, jobBoundFiles } from '.
 import { DRAW_LOOP_CHANGE, settleDrawMetricFindings } from '../work/draw-loop-settle.mjs';
 import { recordGrammarProposals } from '../work/grammar-proposal.mjs';
 import { ASSET_OP, recordAssetSlots } from '../work/asset-slot.mjs';
+import { judgeJob, SONAR_ENFORCE_CHANGE } from './sonar-settle.mjs';
 import { PROOF_MEDIA_CHANGE, collectJobFiles, filedReportOf, indexJobArtifacts, jobShasOf, proofMediaGate, proofMediaPolicyOf } from './job-artifacts.mjs';
 import { WORK_HYGIENE_CHANGE, checkWorkFilesAbs, inSecretScope, rangeFiles } from '../checks/work-hygiene.mjs';
 import { taskSpecOf } from './task-spec.mjs';
@@ -4140,6 +4141,24 @@ function settleProofMedia(db, jobId, repo, reportAbs, reportText) {
   const gate = proofMediaGate({ policy, files, checks: [...(Array.isArray(recorded) ? recorded : []), ...(Array.isArray(envelope?.checks) ? envelope.checks : [])] });
   return gate ? { ...gate, op, status: job.status } : null;
 }
+// The Sonar gate a code-writing op's settle owes (scripts/kernel/sonar-settle.mjs over knowledge/sonar-gate.yaml): the
+// runtime reads the op's attached sonar.json itself. Read-only here - api settle records the judgment. A leg admitted before
+// the sonar-enforce change settles on its old contract. Null when the op is not held to the gate.
+function settleSonarGate(db, jobId, repo) {
+  const job = db.prepare(`SELECT ${JOB_ROW} FROM jobs WHERE job_id=?`).get(jobId);
+  if (!job || !REPORTABLE_JOB_STATUSES.has(job.status)) return null;
+  const op = jobOpOf(job);
+  const admitted = admittedContractOf(db, job);
+  const change = changeById(loadContractChanges(skillRoot), SONAR_ENFORCE_CHANGE);
+  if (admittedBeforeChange(admitted, change)) return null;
+  const filed = filedReportOf(db, job, { dispatchId: reportDispatchIdOf(db, job) });
+  if (filed.attemptId == null) return null;
+  let roots = [];
+  try { roots = jobPlacements(db, job, repo).map((p) => p.base).filter(Boolean); } catch { roots = []; }
+  const { files } = collectJobFiles({ repo, envelope: filed.envelope, roots, jobId: job.job_id, artifacts: filed.artifacts });
+  const judgment = judgeJob({ op, files });
+  return judgment ? { ...judgment, workflowId: job.workflow_id, jobId: job.job_id, attemptId: filed.attemptId, status: job.status } : null;
+}
 // The draw acceptance an interface.draw pass owes (scripts/checks/draw-acceptance.mjs): every asset the pass binds -
 // written, adopted, inherited or already there - is a token-rendered shape, no drawing names a data status, and the pass
 // drew something under the current contract (nivo op-interface.draw-7c2821e002 adopted 40 image-gen files unchanged).
@@ -4680,7 +4699,7 @@ const API_INTERNALS = Object.freeze({
   CUT_SLICE_CHECKS, VERDICT_OUTCOMES, agentOfJob, canonSettleFollowUp, enqueueNextStep, failureClassOf,
   failureShapeOf, latestKernelJobOf, ownProductWorktreeOf, reapIfStillLive, recordOpRevDrift,
   recordSettledAssetSlots, recordSettledGrammarProposals, releasedWhileHeldOf, seamSettleReconciles,
-  settleDrawAcceptance, settleDrawMetrics, settleLanding, settleProofMedia, settleWorkHygiene, widenCanonWire,
+  settleDrawAcceptance, settleDrawMetrics, settleLanding, settleProofMedia, settleSonarGate, settleWorkHygiene, widenCanonWire,
 });
 let statusAsk = null;
 const runExtensionVerb = async (spec, args, repo) => {

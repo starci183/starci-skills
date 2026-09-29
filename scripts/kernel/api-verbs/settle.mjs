@@ -26,6 +26,7 @@ import { finalizeAttemptTranscript } from '../transcripts.mjs';
 import { landShellFoundationIfSettled } from '../shell-foundation.mjs';
 import { parseYaml } from '../../../engine/yaml.mjs';
 import { recordWhy } from '../why-record.mjs';
+import { recordSonarJudgment, refusalText } from '../sonar-settle.mjs';
 
 // The job_transitions walk from the job's current status to its settled one. A pass settles only a job whose worker
 // filed a report (running/answering/effect_unknown go through reported); a fail or blocked with a filed report goes
@@ -82,7 +83,7 @@ export default {
       `settle --verdict must be pass|fail|blocked, got '${args.verdict}'`);
   },
   async run({ ledger, args, repo, emit, internals }) {
-    const { runSettleTail, SETTLED, reportDispatchIdOf, skillRoot, requireDispatchedReportBinding, buildOpsOf, markMeasured, isPeerBlockedCheck, summarizeCheckEvidence, CUT_SET_CLOSING_CHECK, cutSetStateOf, releaseManagedWorker, closeOperationTask, custodyOf, CUT_SLICE_CHECKS, VERDICT_OUTCOMES, agentOfJob, canonSettleFollowUp, enqueueNextStep, failureClassOf, failureShapeOf, ownProductWorktreeOf, reapIfStillLive, recordOpRevDrift, recordSettledAssetSlots, recordSettledGrammarProposals, releasedWhileHeldOf, seamSettleReconciles, settleDrawAcceptance, settleDrawMetrics, settleLanding, settleProofMedia, settleWorkHygiene, widenCanonWire } = internals;
+    const { runSettleTail, SETTLED, reportDispatchIdOf, skillRoot, requireDispatchedReportBinding, buildOpsOf, markMeasured, isPeerBlockedCheck, summarizeCheckEvidence, CUT_SET_CLOSING_CHECK, cutSetStateOf, releaseManagedWorker, closeOperationTask, custodyOf, CUT_SLICE_CHECKS, VERDICT_OUTCOMES, agentOfJob, canonSettleFollowUp, enqueueNextStep, failureClassOf, failureShapeOf, ownProductWorktreeOf, reapIfStillLive, recordOpRevDrift, recordSettledAssetSlots, recordSettledGrammarProposals, releasedWhileHeldOf, seamSettleReconciles, settleDrawAcceptance, settleDrawMetrics, settleLanding, settleProofMedia, settleSonarGate, settleWorkHygiene, widenCanonWire } = internals;
 
   const db = ledger.db, jobId = args.job, verdict = args.verdict;
   // A report lives only in the reports table (api report files it from the job scratch, a3-3 evidence-db-report):
@@ -122,6 +123,20 @@ export default {
     emit({ ok: false, jobId, op: media.op, reason: PROOF_MEDIA_MISSING, code: PROOF_MEDIA_MISSING, missing: media.missing, detail: media.detail },
       `settle REFUSED for ${jobId} (${media.op}): ${PROOF_MEDIA_MISSING} â€” missing ${media.missing.join(', ')} (${JSON.stringify(media.detail)}); the job stays ${media.status}. Re-dispatch the op to capture its screenshots${media.detail.browserRan ? ' and its browser video' : ''} into its evidence and name them in report.files, then settle again`, args.json);
     process.exit(1);
+  }
+
+  // The Sonar gate of the code-writing ops: judged from the op's own sonar.json, recorded as the runtime check sonar-gate on
+  // the attempt (its why carries the code), and a pass that is not green is refused - an unavailable Sonar never passes.
+  const sonar = settleSonarGate(db, jobId, repo);
+  if (sonar) {
+    // A fail or blocked verdict that never reached Sonar (no scan, refused scan) is its own failure: no sonar row muddies its why.
+    if (verdict !== 'pass' && !['red', 'unavailable'].includes(sonar.judged.status)) sonar.judged.record = false;
+    const recorded = sonar.judged.record === false ? { green: sonar.judged.status === 'pass', status: sonar.judged.status, code: sonar.judged.code } : recordSonarJudgment(ledger, { workflowId: sonar.workflowId, jobId, opId: sonar.op, attemptId: sonar.attemptId, judgment: sonar });
+    if (verdict === 'pass' && !recorded.green) {
+      emit({ ok: false, jobId, op: sonar.op, reason: recorded.code, code: recorded.code, detail: sonar.judged.detail, findings: sonar.judged.findings, sonarStatus: recorded.status, ...(recorded.incidentId ? { incidentId: recorded.incidentId } : {}) },
+        refusalText(sonar.op, sonar.judged, jobId), args.json);
+      process.exit(1);
+    }
   }
 
   const drawn = verdict === 'pass' ? settleDrawAcceptance(db, jobId, repo, null, null) : null;
