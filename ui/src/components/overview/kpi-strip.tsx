@@ -17,7 +17,7 @@ export function KpiStrip({ summary, needsAttention }: { summary: FleetSummary | 
     { tone: 'failed', value: summary.failed24h, label: 'hỏng / chặn 24 giờ', note: 'Lần thử đã chốt với kết quả không đạt.' },
   ] : [];
   if (!summary) return <section aria-label="Số liệu toàn hệ thống" className="grid grid-cols-2 gap-4 lg:grid-cols-4">
-    {Array.from({ length: 4 }, (_, index) => <div key={index} className="h-28 animate-pulse rounded-xl border bg-muted/40" />)}
+    {Array.from({ length: 4 }, (_, index) => <div key={index} className="h-28 rounded-xl border bg-muted/40" />)}
   </section>;
   return <Stagger className="grid grid-cols-2 gap-4 lg:grid-cols-4">
     {items.map(item => <StaggerItem key={item.label} className="min-w-0"><div data-tone={item.tone} className="flex h-full min-w-0 flex-col gap-1 rounded-xl border bg-card p-4 shadow-sm sm:p-6" aria-label={item.label}>

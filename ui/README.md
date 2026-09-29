@@ -4,6 +4,8 @@ This is the public, read-only StarCi control-plane UI. It shows how an approved 
 
 The interface uses React, Vite, shadcn-style components, Lucide icons and Vietnamese labels. It is one web app with its API on the same origin. The server reads the host machine database and registered project ledgers through the read-only engine readers. It has no write API, login, answer form, CLI-backed request or live worktree diff.
 
+The visual language and component anatomy are documented in [DESIGN.md](DESIGN.md).
+
 ## Local preview
 
 From `.claude/ui`:

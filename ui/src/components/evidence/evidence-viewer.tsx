@@ -32,7 +32,7 @@ function Body({ file, query, blob }: { file: EvidenceFile; query: string; blob: 
   if (!TEXT_KINDS.has(file.kind)) {
     return <Note>{file.kind === 'pdf' ? 'Tệp PDF' : 'Tệp nhị phân'} ({formatBytes(file.bytes)}, {file.mediaType}) không xem trực tiếp được. <a className="underline" href={file.href} target="_blank" rel="noreferrer">Mở thô ↗</a></Note>;
   }
-  if (blob.status === 'loading' || blob.status === 'idle') return <div className="animate-pulse space-y-2" role="status" aria-label="Đang tải">
+  if (blob.status === 'loading' || blob.status === 'idle') return <div className="space-y-2" role="status" aria-label="Đang tải">
     {[80, 60, 90, 45, 70].map((w, i) => <div key={i} className="h-3 rounded bg-muted" style={{ width: `${w}%` }} />)}</div>;
   if (blob.status === 'error') return <Note tone="failed">Không tải được nội dung ({blob.error}). <a className="underline" href={file.href} target="_blank" rel="noreferrer">Mở thô ↗</a></Note>;
   if (blob.text.trim() === '') return <Note>Tệp rỗng (không có nội dung).</Note>;

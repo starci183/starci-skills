@@ -36,7 +36,7 @@ export function StaggerItem({ children, className, as = 'div' }: { children: Rea
 
 /** Hover lift + press for clickable cards. */
 export function Lift({ children, className, onClick }: { children: ReactNode; className?: string; onClick?: () => void }) {
-  return <motion.div className={className} onClick={onClick} whileHover={{ y: -2 }} whileTap={{ scale: 0.995 }} transition={{ duration: DURATION.fast, ease: EASE }}>{children}</motion.div>;
+  return <motion.div className={className} onClick={onClick} whileTap={{ scale: 0.995 }} transition={{ duration: DURATION.fast, ease: EASE }}>{children}</motion.div>;
 }
 
 /**
@@ -49,7 +49,7 @@ export function Advanced({ children, summary, title = 'Nâng cao', defaultOpen =
   const [open, setOpen] = useState(defaultOpen);
   const id = useId();
   const card = variant === 'card';
-  return <div className={`${card ? 'rounded-xl border bg-card' : 'border-t border-dashed pt-3'} min-w-0 ${className}`} data-advanced={open ? 'open' : 'closed'}>
+  return <div className={`ui-advanced ${card ? 'rounded-xl border bg-card' : 'border-t pt-3'} min-w-0 ${className}`} data-advanced={open ? 'open' : 'closed'} data-advanced-variant={variant}>
     <button type="button" aria-expanded={open} aria-controls={id} onClick={() => setOpen(value => !value)}
       className={`flex w-full min-w-0 items-center gap-2 text-left ${card ? 'rounded-xl px-6 py-4 hover:bg-muted/60' : 'text-xs text-muted-foreground hover:text-foreground'}`}>
       <motion.span animate={{ rotate: open ? 90 : 0 }} transition={{ duration: DURATION.fast, ease: EASE }} className="inline-flex shrink-0"><ChevronRight className="size-3.5" aria-hidden="true" /></motion.span>
@@ -75,7 +75,7 @@ export function Ticker({ value, format = (n: number) => new Intl.NumberFormat('v
     const node = ref.current;
     if (!node || !inView) return;
     if (reduce) { node.textContent = format(value); from.current = value; return; }
-    const controls = animate(from.current, value, { duration: 0.45, ease: EASE, onUpdate: latest => { node.textContent = format(latest); } });
+    const controls = animate(from.current, value, { duration: DURATION.enter, ease: EASE, onUpdate: latest => { node.textContent = format(latest); } });
     from.current = value;
     return () => controls.stop();
   }, [value, inView, reduce, format]);
@@ -84,7 +84,7 @@ export function Ticker({ value, format = (n: number) => new Intl.NumberFormat('v
 
 /** Bar segment / progress that grows from the left on first render. */
 export function Grow({ className, style, delay = 0, title }: { className?: string; style?: React.CSSProperties; delay?: number; title?: string }) {
-  return <motion.span className={className} style={{ transformOrigin: 'left center', ...style }} title={title} initial={{ scaleX: 0 }} animate={{ scaleX: 1 }} transition={{ duration: 0.36, ease: EASE, delay }} />;
+  return <motion.span className={className} style={{ transformOrigin: 'left center', ...style }} title={title} initial={{ scaleX: 0 }} animate={{ scaleX: 1 }} transition={{ duration: DURATION.enter, ease: EASE, delay }} />;
 }
 
 /** Status chip / label that cross-fades when its text changes. */
