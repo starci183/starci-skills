@@ -53,6 +53,9 @@
       }
     }
   },
+  "loading": {
+    "message": "Đang tải"
+  },
   "notFound": {
     "title": "Không tìm thấy trang",
     "home": "Về trang chủ"

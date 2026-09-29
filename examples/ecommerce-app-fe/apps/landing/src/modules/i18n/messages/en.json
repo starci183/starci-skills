@@ -53,6 +53,9 @@
       }
     }
   },
+  "loading": {
+    "message": "Loading"
+  },
   "notFound": {
     "title": "Page not found",
     "home": "Back to the home page"
