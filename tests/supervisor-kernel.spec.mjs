@@ -13,7 +13,7 @@ import { launchSupervisor, stopSupervisor, planSupervisorDedupe, doctrineOf, sea
 import { withSupervisor, readSupervisor, seatOf, enabledOf, writeSeat, supervisorEvent, SUPERVISOR_ID, SKILL_ROOT } from '../scripts/supervisor/home.mjs';
 import {
   adaptiveCap, createJob, spawnWorkers, createStaging, removeStaging, fileReport, jobOf, stagingPathOf, leaseConflicts, pickWorkerPool, cancelJob, ackReport,
-  stageSelf, workerLaunchCommand, READINESS_FAILS_PER_HOUR, openWorkerHandles,
+  stageSelf, workerLaunchCommand, workerGuard, READINESS_FAILS_PER_HOUR, openWorkerHandles,
 } from '../scripts/supervisor/workers.mjs';
 import { landCommits, land, contractCoverage, governedPaths, specsTouching, specPlan, runChecks, describe, acquireLand, landQueue, specTimeoutMs, LAND_WAIT_MS } from '../scripts/supervisor/land.mjs';
 import { scanDiff, defaultPushRepos, boundRepos } from '../scripts/supervisor/push-mains.mjs';
@@ -228,6 +228,60 @@ test('worker readiness: a qwen worker launches its profile command (routed --mod
   createJob(m, { cluster: 'r3', files: ['scripts/r3.mjs'] });
   await spawnWorkers(m, { settings, deps, env });
   assert.ok(routed.at(-1).avoid.includes('devin'), JSON.stringify(routed.at(-1)));
+});
+
+test('worker quota: an attestation refused for quota exhaustion excludes the provider like a readiness failure', async (t) => {
+  const env = envOf(t);
+  const m = machineOf(t, env);
+  const runtimes = parseYaml(fs.readFileSync(new URL('../modules/models/runtimes.yaml', import.meta.url), 'utf8'));
+  const shares = { 'claude-agent': 25, 'codex-agent': 25, 'qwen-agent': 25 };
+  const recent = { 'claude-agent': 9, 'codex-agent': 5, 'qwen-agent': 0 };
+  const a = createJob(m, { cluster: 'q1', files: ['scripts/q1.mjs'] });
+  const b = createJob(m, { cluster: 'q2', files: ['scripts/q2.mjs'] });
+  const routed = [], spawned = [];
+  const quota = 'attestation rejected: Quota exhausted: |Throttling\.AllocationQuota|insufficient_quota|free allocated quota exceeded';
+  const deps = {
+    load: () => ({ cpuBusy: 0, freeMem: 1 }),
+    route: async ({ prefer, avoid }) => { routed.push({ prefer, avoid }); return pickWorkerPool({ shares, runtimes, recent, prefer, avoid }); },
+    staging: ({ jobId }) => ({ ok: true, path: `/tmp/${jobId}`, branch: `sup/${jobId}`, base: 'abc' }),
+    unstage: () => ({}),
+    spawn: (opts) => { spawned.push(opts); return opts.provider === 'qwen' ? { ok: false, step: 'attestation', error: quota } : { ok: true, terminal: `term_${spawned.length}` }; },
+  };
+  await spawnWorkers(m, { settings, deps, env });
+  assert.equal(spawned[0].provider, 'qwen', 'qwen is furthest below its share');
+  assert.equal(spawned[1].provider, 'codex', 'the rest of the pass skips the quota-exhausted provider');
+  const requeued = jobOf(m, a.job.job_id);
+  assert.equal(requeued.status, 'queued');
+  assert.deepEqual(requeued.payload.avoidAgents, ['qwen']);
+  const r2 = await spawnWorkers(m, { settings, deps, env });
+  assert.equal(r2.launched[0]?.jobId, a.job.job_id, JSON.stringify(r2));
+  assert.notEqual(r2.launched[0].agent, 'qwen', 'the requeued job is never re-routed to the quota-exhausted provider');
+  assert.ok(routed.at(-1).avoid.includes('qwen'));
+  assert.equal(jobOf(m, b.job.job_id).status, 'running');
+  // An attestation failure that is no outage (a wrong model on screen) excludes nothing.
+  const c = createJob(m, { cluster: 'q3', files: ['scripts/q3.mjs'] });
+  const other = { ...deps, route: async () => pickWorkerPool({ shares, runtimes, recent, prefer: 'qwen' }), spawn: () => ({ ok: false, step: 'attestation', error: 'attestation rejected: model mismatch' }) };
+  await spawnWorkers(m, { settings, deps: other, env, jobId: c.job.job_id });
+  assert.equal(jobOf(m, c.job.job_id).payload.avoidAgents, undefined);
+});
+
+test('worker guard: a [Worker] owns its leased files, so its git shim lets it stage and commit them', async (t) => {
+  const env = envOf(t);
+  const m = machineOf(t, env);
+  const job = createJob(m, { cluster: 'g1', files: ['scripts/g1.mjs', 'tests/g1.spec.mjs'] });
+  const guarded = [], launched = [];
+  const deps = {
+    load: () => ({ cpuBusy: 0, freeMem: 1 }),
+    route: async () => ({ pool: 'claude-agent', agent: 'claude', model: 'm' }),
+    staging: ({ jobId }) => ({ ok: true, path: `/tmp/${jobId}`, branch: `sup/${jobId}`, base: 'abc' }),
+    unstage: () => ({}), command: () => null,
+    guard: (jobId, opts) => workerGuard(jobId, { ...opts, launch: (args) => { launched.push(args); return { env: {}, pathPrefix: 'bin', receipt: {} }; } }),
+    spawn: (opts) => { guarded.push(opts); return { ok: true, terminal: 'term_g' }; },
+  };
+  await spawnWorkers(m, { settings, deps, env });
+  assert.equal(guarded.length, 1);
+  assert.deepEqual(launched[0].owned, ['scripts/g1.mjs', 'tests/g1.spec.mjs']);
+  assert.equal(launched[0].jobId, job.job.job_id);
 });
 
 /* ------------------------------------------------------------ git fixtures */

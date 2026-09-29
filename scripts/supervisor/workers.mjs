@@ -29,8 +29,11 @@
 // Routing: the balanced allocator over config.yaml allocation.shares (scripts/agent/models.mjs balanceDeficits),
 // counting the machine's recent op dispatches (scripts/agent/balance.mjs) plus the Supervisor's own workers (sup_jobs), skipping a
 // provider whose quota probe is dead or whose provider-health circuit is open on any product ledger, and a
-// provider whose [Worker] terminal failed readiness: for the rest of that spawn pass, for the requeued job it
-// failed (payload.avoidAgents), and for every job once it failed READINESS_FAILS_PER_HOUR times in the last hour.
+// provider whose [Worker] spawn proved it cannot serve - its terminal failed readiness, or the failure text shows
+// the outage its agent card declares (quotaExhausted/capacityExhausted, scripts/agent/provider-outage.mjs
+// outageInText: e.g. an attestation rejected for "Quota exhausted") - for the rest of that spawn pass, for the
+// requeued job it failed (payload.avoidAgents), and for every job once it failed READINESS_FAILS_PER_HOUR times
+// in the last hour.
 // A card that cannot pin a model itself (no terminalFallback: qwen) launches its profile's launch.orca.command,
 // as op dispatch does (scripts/route/dispatch-op.mjs): a bare `qwen` started on the host's default model, never
 // showed the card's identityPattern, and every qwen worker timed out at readiness.
@@ -55,15 +58,17 @@ import { gitSpawn } from '../lib/git.mjs';
 import { readYamlFile } from '../lib/yaml.mjs';
 import { posixPath } from '../lib/path-key.mjs';
 import { guardLaunch } from '../guards/install.mjs';
+import { outageInText } from '../agent/provider-outage.mjs';
 
 /**
  * The guard layer of a [Worker] launch, the same shim bin op workers get (scripts/guards/install.mjs guardLaunch):
  * its staging checkout's node_modules is a junction to the LIVE runtime's, and npm reifying through that junction
  * empties it (node-modules-link-wipe, 2026-09-28) - the npm shim refuses that (DEPS_THROUGH_LINK). No product
- * history hook: a [Worker] commits only in its runtime staging branch. {env, pathPrefix, receipt}.
+ * history hook: a [Worker] commits only in its runtime staging branch. Its owned paths are the job's leased files:
+ * with none the git shim refuses every `git add`/commit (PATH_NOT_OWNED) and no worker can commit. {env, pathPrefix, receipt}.
  */
-export function workerGuard(jobId, { root = SKILL_ROOT, launch = guardLaunch } = {}) {
-  try { return launch({ skillRoot: root, jobId, workflowId: 'supervisor', ledgerRepo: null, owned: [], repos: [] }); }
+export function workerGuard(jobId, { root = SKILL_ROOT, owned = [], launch = guardLaunch } = {}) {
+  try { return launch({ skillRoot: root, jobId, workflowId: 'supervisor', ledgerRepo: null, owned, repos: [] }); }
   catch (error) { return { env: {}, pathPrefix: null, receipt: { error: String(error?.message ?? error) } }; }
 }
 
@@ -331,12 +336,12 @@ export async function routeWorker({ m, prefer = null, avoid = [], config = undef
   return pickWorkerPool({ shares, runtimes: loadRuntimes(), recent, availabilityOf, prefer, avoid });
 }
 
-/** Providers whose [Worker] terminal failed readiness at least `min` times since `since` (sup_events worker-spawn-failed). */
+/** Providers whose [Worker] spawn failed readiness or on a provider outage at least `min` times since `since` (sup_events worker-spawn-failed). */
 export function readinessFailedProviders(m, { since, min = READINESS_FAILS_PER_HOUR } = {}) {
   const counts = {};
   for (const row of m.db.prepare("SELECT payload_json FROM sup_events WHERE kind='worker-spawn-failed' AND created_at>=?").all(since)) {
     const p = parse(row.payload_json);
-    if (p.step === 'readiness' && p.agent) counts[p.agent] = (counts[p.agent] ?? 0) + 1;
+    if ((p.step === 'readiness' || p.outage) && p.agent) counts[p.agent] = (counts[p.agent] ?? 0) + 1;
   }
   return Object.keys(counts).filter((a) => counts[a] >= min);
 }
@@ -413,7 +418,7 @@ export async function spawnWorkers(m, { jobId = null, dryRun = false, settings =
     const prompt = renderWorkerPrompt(job, staging);
     const title = `${WORKER_TITLE_PREFIX} ${job.payload.cluster}`.slice(0, 80);
     const command = (deps.command ?? workerLaunchCommand)({ pool: route.pool, provider: route.agent, model: route.model });
-    const guard = (deps.guard ?? workerGuard)(job.job_id, { root });
+    const guard = (deps.guard ?? workerGuard)(job.job_id, { root, owned: job.payload.files ?? [] });
     if (!guard.pathPrefix) supervisorEvent(m, { entityType: 'job', entityId: job.job_id, kind: 'worker-guard-missing', payload: { receipt: guard.receipt }, now: now() });
     const spawned = (deps.spawn ?? (await import('../agent/lib.mjs')).spawnAgent)({ provider: route.agent, model: route.model, effort: route.effort, worktree: root, fallbackWorktree: path.dirname(root), cwd: staging.path, title, prompt, kernel: true, dispatchId: job.job_id, command,
       env: guard.env, pathPrefix: guard.pathPrefix });
@@ -422,8 +427,10 @@ export async function spawnWorkers(m, { jobId = null, dryRun = false, settings =
     if (!spawned?.ok) {
       const exhausted = payload.spawnAttempts >= MAX_SPAWN_ATTEMPTS;
       // A requeued job keeps the agent it asked for (never the one routed to it) and never returns to a provider
-      // whose terminal failed readiness for it; the rest of this pass skips that provider too.
-      const notReadyHere = spawned?.step === 'readiness';
+      // whose terminal failed readiness for it or whose failure shows its card's outage (quota/capacity
+      // exhausted); the rest of this pass skips that provider too.
+      const outage = route.agent ? outageInText(route.agent, [spawned?.error, spawned?.signal, spawned?.lastOutput]) : null;
+      const notReadyHere = spawned?.step === 'readiness' || Boolean(outage);
       if (notReadyHere) notReady.add(route.agent);
       const avoidAgents = notReadyHere ? [...new Set([...(job.payload.avoidAgents ?? []), route.agent])] : job.payload.avoidAgents;
       m.transaction(() => {
@@ -432,7 +439,7 @@ export async function spawnWorkers(m, { jobId = null, dryRun = false, settings =
         setJob(m, job.job_id, { status: exhausted ? 'failed' : 'queued', payload: { ...payload, agent: job.payload.agent ?? null, lastAgent: route.agent,
           ...(avoidAgents ? { avoidAgents } : {}), staging: null, lastSpawnError: spawned?.error ?? 'spawn failed',
           result: exhausted ? { reason: 'spawn-failed', step: spawned?.step ?? null, error: spawned?.error ?? null } : null } });
-        supervisorEvent(m, { entityType: 'job', entityId: job.job_id, kind: 'worker-spawn-failed', payload: { agent: route.agent, step: spawned?.step ?? null, error: spawned?.error ?? null, exhausted }, now: now() });
+        supervisorEvent(m, { entityType: 'job', entityId: job.job_id, kind: 'worker-spawn-failed', payload: { agent: route.agent, step: spawned?.step ?? null, error: spawned?.error ?? null, exhausted, ...(outage ? { outage: outage.failureKind } : {}) }, now: now() });
       });
       (deps.unstage ?? removeStaging)({ jobId: job.job_id, root, env, base: staging.base });
       result.failed.push({ jobId: job.job_id, step: spawned?.step ?? 'spawn', error: spawned?.error ?? null, agent: route.agent, requeued: !exhausted });
