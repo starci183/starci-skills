@@ -161,7 +161,7 @@ test('the skill keeps secrets in the browser and delegates verdict/report ingest
   const skill=fs.readFileSync(new URL('../skills/run-assisted-uat/SKILL.md',import.meta.url),'utf8');
   assert.match(skill,/never in chat/i);assert.match(skill,/execution-finished-not-pass/);
   assert.match(skill,/api\.mjs report/);assert.match(skill,/without polling|Do not build a sleep\/status loop/);
-  assert.match(skill,/ok.*fail.*cancel/s);assert.match(skill,/never opens `\.starciwork\/runtime\.sqlite`/i);
+  assert.match(skill,/ok.*fail.*cancel/s);assert.match(skill,/never opens the runtime ledger \(%LOCALAPPDATA%\/StarCi\/projects\/<ledger_id>\/runtime\.sqlite\)/i);
   assert.ok(skill.includes(PROTOCOL_PREFIX.replace(/@/g,'@'))||skill.includes('STARCI_ASSISTED_UAT_PROTOCOL'));
 });
 
