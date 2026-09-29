@@ -9951,6 +9951,17 @@ peer-wait-peer-missing:
   nextStep_vi: "Không mở sự cố. Gửi lại kèm --peer <mã luồng>."
   owner: supervisor
   kind: input-invalid
+plan-edges-missing:
+  title: "Route plan has no edges"
+  title_vi: "Kế hoạch tuyến không có cạnh phụ thuộc"
+  meaning_vi: "Bộ định tuyến trả về các chặng nhưng không kèm cạnh phụ thuộc; không còn đường lùi về kế hoạch tuyến tính."
+  causes_vi:
+    - "Kế hoạch cũ được sinh trước khi có cạnh phụ thuộc"
+    - "Bộ định tuyến bị lỗi khi dựng cạnh"
+  nextStep_vi: "Chạy lại route-plan để có cạnh; với mục tiêu đang chạy dùng lệnh migrate-plan-edges một lần."
+  owner: supervisor
+  kind: verb-refusal
+
 plan-error:
   title: "Isolation planning failed"
   title_vi: "Lỗi khi lập kế hoạch cây làm việc riêng"
@@ -11084,6 +11095,16 @@ unowned-need:
   nextStep_vi: "Supervisor cầu nối, chuyển giao hoặc chỉ định một chủ để nhu cầu được đáp ứng."
   owner: supervisor
   kind: blocker
+unknown-option:
+  title: "Verb refuses an unknown option"
+  title_vi: "Lệnh từ chối tuỳ chọn không được hỗ trợ"
+  meaning_vi: "Kernel truyền --prefer hoặc --avoid; bộ định tuyến tự quyết theo dữ kiện sổ cái và chỉ nhận thiên vị từ routing_bias của mục tiêu do chủ giao."
+  causes_vi:
+    - "Kernel dùng cách gọi cũ có --prefer/--avoid"
+  nextStep_vi: "Bỏ tuỳ chọn; muốn thiên vị pool thì chủ đặt routing_bias trong define-goal."
+  owner: runtime-core
+  kind: verb-refusal
+
 unread-peer:
   title: "Peer message unread"
   title_vi: "Tin nhắn đồng nghiệp chưa đọc"

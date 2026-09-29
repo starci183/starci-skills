@@ -24,7 +24,6 @@ paths:
   - tests/route-lineage.spec.mjs
   - tests/allocation-balance.spec.mjs
   - tests/managed-dispatch.spec.mjs
-  - tests/qwen-base-pool.spec.mjs
   - tests/provider-health-recover.spec.mjs
   - tests/stale-active-liveness.spec.mjs
   - tests/ask-kinds.spec.mjs
