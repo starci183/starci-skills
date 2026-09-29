@@ -7,7 +7,7 @@ import { checkHfs } from '../scripts/checks/architecture/hfs.mjs';
 import { repositoryName } from '../scripts/lib/repo-identity.mjs';
 
 const tree = (t, files) => {
-  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'hfs-test-kinds-'));
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'hk-test-kinds-'));
   t.after(() => fs.rmSync(root, { recursive: true, force: true }));
   for (const file of files) {
     fs.mkdirSync(path.dirname(path.join(root, file)), { recursive: true });
