@@ -212,10 +212,12 @@ const sessionArchiver = async (env) => {
  *   - job is not an op (a kernel job's own session is never archived);
  *   - the worker's terminal still reads connected (or cannot be read at all);
  *   - no file inside the dispatch window names the job id.
+ * `beforeArchive({agent, files})` runs once the files are attributed and before they move (settle-tail reads the
+ * session's token usage there, scripts/kernel/usage-record.mjs; its failure never blocks the release).
  * `show`/`archive` are the spec seams; `archive` defaults to
  * scripts/lib/hk-sessions.mjs archiveSessionFiles(paths, {archiveRoot, agent, apply:true}).
  */
-export async function releaseSettledSession({ db, job, payload, repo, env = process.env, home = os.homedir(), archiveRoot = null, show = terminalShow, archive = null, now = Date.now() } = {}) {
+export async function releaseSettledSession({ db, job, payload, repo, env = process.env, home = os.homedir(), archiveRoot = null, show = terminalShow, archive = null, beforeArchive = null, now = Date.now() } = {}) {
   const agent = sessionAgentOf(payload);
   if (job.kind !== 'op') return { released: false, agent, reason: 'not-an-op-job' };
   if (!agent) return { released: false, agent, reason: 'agent-unknown' };
@@ -248,6 +250,7 @@ export async function releaseSettledSession({ db, job, payload, repo, env = proc
   const root = env.STARCI_SESSION_ARCHIVE_ROOT ?? archiveRoot ?? DEFAULT_SESSION_ARCHIVE_ROOT;
   const run = archive ?? await sessionArchiver(env);
   if (!run) return skip('archiver-unavailable', { files, archiveRoot: root });
+  try { beforeArchive?.({ agent, files }); } catch { /* a usage read never blocks the release */ }
   try {
     const result = run(files, { archiveRoot: root, agent, apply: true });
     return { released: true, agent, cwds: identity.cwds, files, archiveRoot: root, archived: result ?? null };

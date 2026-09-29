@@ -114,6 +114,8 @@ test('settle archives the settled op\'s own claude session file', t => {
   seedOpJob(fx.ledgerFile, { wf, jobId, handle: 'term-sess1', worktree: fx.repo });
   seedOrcaTerminal(fx.stateFile, { handle: 'term-sess1', connected: true, writable: true, command: 'claude', tabId: 'tab-1', title: '[Op] docs.author' });
   const session = claudeSessionFile(fx.trustHome, fx.repo, 'aaaaaaaa-1111-4111-8111-aaaaaaaaaaaa.jsonl', `[Op] docs.author — (job ${jobId}, attempt 1)`);
+  // The session's own usage record: settle reads it before the file moves (scripts/kernel/usage-record.mjs).
+  fs.appendFileSync(session, json({ type: 'assistant', sessionId: 'aaaaaaaa', message: { id: 'msg_1', model: 'claude-opus-5-5', content: [], usage: { input_tokens: 7, output_tokens: 11, cache_read_input_tokens: 100, cache_creation_input_tokens: 13 } } }) + '\n');
 
   const r = runApi(fx.env, 'settle', '--repo', fx.repo, '--job', jobId, '--verdict', 'fail', '--json');
   assert.equal(r.status, 0, r.stderr || r.stdout);
@@ -129,6 +131,10 @@ test('settle archives the settled op\'s own claude session file', t => {
   const stored = read(fx.ledgerFile, (l) => JSON.parse(l.db.prepare('SELECT payload_json FROM jobs WHERE job_id=?').get(jobId)?.payload_json ?? '{}'));
   assert.equal(stored?.sessionReleased?.released, true);
   assert.equal(stored?.session, undefined, 'observe-time identity is not written by settle');
+  // The attempt's measured usage was recorded from the session file before it moved.
+  const usage = read(fx.ledgerFile, (l) => ({ attempt: l.db.prepare('SELECT tokens_in, tokens_out, cost_usd, usage_source FROM op_attempts WHERE job_id=?').get(jobId), rows: l.db.prepare("SELECT response_model, input_tokens, output_tokens, cache_read_tokens, cache_write_tokens FROM llm_usage WHERE subject_type='attempt'").all() }));
+  assert.deepEqual({ ...usage.attempt }, { tokens_in: 120, tokens_out: 11, cost_usd: null, usage_source: 'cli-transcript' });
+  assert.deepEqual(usage.rows.map((x) => ({ ...x })), [{ response_model: 'claude-opus-5-5', input_tokens: 7, output_tokens: 11, cache_read_tokens: 100, cache_write_tokens: 13 }]);
 });
 
 test('a session whose worker terminal is still open is skipped with a recorded reason', t => {

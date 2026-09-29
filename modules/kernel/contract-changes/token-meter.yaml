@@ -1,0 +1,16 @@
+id: token-meter
+effectiveAt: '2026-09-29T20:00:00+07:00'
+summary: >-
+  Token metering. Every op attempt, every Kernel session and the Supervisor seat now record their measured token use
+  (llm_usage; op_attempts tokens_in/tokens_out/cost_usd/usage_source), read from the agent CLI's own session file -
+  Claude Code JSONL message.usage, Codex rollout token_count, Qwen usageMetadata; devin and any other agent are
+  unavailable, never guessed. modules/models/prices.yaml is the per-model price table (every rate null until the owner
+  declares one, so cost_usd stays NULL); new read verb `api usage [--workflow <id> [--legs]]` and an `api status` usage
+  field; `boot.mjs --status` prints the machine-wide tokens. Adds no op check, no finding code, no op behavior: a running
+  leg reports as it was admitted.
+reach: new-legs
+paths:
+  - modules/models/prices.yaml
+  - modules/schemas/index.yaml
+  - modules/kernel/api-commands/usage.yaml
+  - modules/kernel/contract-changes/token-meter.yaml

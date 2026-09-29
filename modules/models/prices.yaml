@@ -1,0 +1,25 @@
+schema: starci/model-prices@1
+purpose: >-
+  The per-model price table that turns measured token counts (llm_usage, scripts/lib/llm-usage.mjs) into cost_usd.
+  The runtime never guesses a price: a model absent here, or with a null rate, leaves cost_usd NULL. Nothing reads a
+  provider price feed; the owner declares the rates below from the provider's own price page and dates the edit.
+currency: USD
+unit: per-million-tokens
+asOf: '2026-09-29'
+source: >-
+  owner-declared table, not yet filled. The 2026 model ids this host routes (claude-opus-5-5, gpt-6-sol, swe-2-max,
+  qwen3.8-max) have no price recorded in this repository (grep of modules/models and benchmark, 2026-09-29), so every
+  rate is null and every cost_usd stays NULL until the owner sets one. A subscription seat (Claude Max, Codex Pro,
+  Devin plan, Qwen token plan) bills a flat fee, so a filled rate is the API-equivalent list price, a notional cost.
+matching: >-
+  scripts/lib/llm-usage.mjs priceOf(model): the exact id first, then the longest entry that is a prefix of the id
+  (a dated snapshot id `claude-opus-5-5-20260901` prices as `claude-opus-5-5`). The four rates are USD per 1M tokens:
+  input = fresh (non-cached) input, cacheRead = cached input read, cacheWrite = cache creation, output = generated
+  tokens including reasoning. A model whose used rate is null gets cost_usd NULL (a partial sum is never written).
+models:
+  claude-opus-5-5:   {provider: claude, input: null, output: null, cacheRead: null, cacheWrite: null, source: unset}
+  claude-sonnet-5-5: {provider: claude, input: null, output: null, cacheRead: null, cacheWrite: null, source: unset}
+  gpt-6-sol:         {provider: codex,  input: null, output: null, cacheRead: null, cacheWrite: null, source: unset}
+  gpt-6-luna:        {provider: codex,  input: null, output: null, cacheRead: null, cacheWrite: null, source: unset}
+  swe-2-max:         {provider: devin,  input: null, output: null, cacheRead: null, cacheWrite: null, source: unset}
+  qwen3.8-max:       {provider: qwen,   input: null, output: null, cacheRead: null, cacheWrite: null, source: unset}

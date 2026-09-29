@@ -99,7 +99,15 @@ Each view that shows an entity carries its `ui` state.
 | Where | `repo_root`, `worktree_path`, `branch`, `base_sha`, `head_sha`, `integrated_sha` |
 | When | `routed_at`, `dispatched_at`, `started_at`, `reported_at`, `checked_at`, `settled_at`, `released_at`, `terminal_closed_at`, `worktree_removed_at`, `wall_ms` |
 | Outcome | `report_outcome` (the op's claim) apart from `verdict` (the runtime's), `settled_by`, `decision_id`, `failure_class`, `end_state` |
-| Usage | `tokens_in`, `tokens_out`, `usage_source` (per-model detail in `llm_usage`; null when not measured, never estimated) |
+| Usage | `tokens_in` (fresh + cache read + cache write), `tokens_out`, `cost_usd`, `usage_source` (`cli-transcript`; per-model detail in `llm_usage`; NULL when not measured, never estimated - `api usage` reports such a settled attempt as `unavailable`) |
+
+Token metering (`scripts/kernel/usage-record.mjs`, `api usage`): the numbers come from the agent CLI's own session file - Claude
+Code JSONL `message.usage`, Codex rollout `token_count`, Qwen `usageMetadata` (`scripts/lib/llm-usage.mjs`); devin and any other
+agent are unavailable, and a terminal scrollback is never a source. `llm_usage` rows are normalized: `input_tokens` is fresh
+(non-cached) input, `output_tokens` includes reasoning, `reasoning_tokens` is that subset. An op attempt gets one row per model when it
+settles (`recordAttemptUsage`, idempotent); a Kernel session gets `kernel-turn` rows and the Supervisor seat `supervisor-turn` rows
+(machine.sqlite) as increments over what is already recorded for that session (`turn_ref` `<seat>:<session>@<turns>`), so a re-run
+never counts twice. `cost_usd` is set only when every rate the model used is declared in `modules/models/prices.yaml`.
 
 While an attempt runs, the Host controller stores a redacted scrollback snapshot every 60 s in
 `attempt_transcript_snapshots`; Kernel and Supervisor seats get `seat_transcript_snapshots` in

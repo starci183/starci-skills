@@ -1,0 +1,23 @@
+# The contract of `api usage` (scripts/kernel/api-verbs/usage.mjs). One file per extension verb
+# (scripts/kernel/api-extensions.mjs).
+args: '[--workflow <id> [--legs]] [--json]'
+reads: >-
+  llm_usage rows (subject attempt and kernel-turn) joined to op_attempts, and each attempt's settle state: written by
+  scripts/kernel/usage-record.mjs from the agent CLI's own session file (Claude Code JSONL message.usage, Codex rollout
+  token_count events, Qwen usageMetadata; devin and any other agent have no adapter). Tokens are recorded facts;
+  cost_usd is recorded only when modules/models/prices.yaml declares every rate the model used
+writes: 'nothing - pure projection'
+returns: >-
+  with --workflow: {ok, workflowId, total, byOp[{opId, attempts, ...counts, models[]}], byModel[{model, ...counts}],
+  kernel{...counts, sessions, models[]}, coverage{attempts, measured, open, unavailable, unavailableAttempts[{attemptId,
+  opId, agent, reason}]}, legs?[{attemptId, jobId, opId, unitId, tryNo, agent, model, state: measured|unavailable|open,
+  usageSource, ...counts}]}; without it: {ok, total, attempts, kernel, byModel[], workflows[{workflowId, phase, total, kernel,
+  coverage}]}. Counts are {inputTokens (fresh), outputTokens (reasoning included), cacheReadTokens, cacheWriteTokens,
+  reasoningTokens, tokens (all four), turns, toolCalls, toolErrors, costUsd (null when any contributing row is unpriced)}
+refuses:
+  - workflow-unknown: '--workflow names no workflow of this ledger'
+unavailable: >-
+  a settled attempt with no llm_usage row is counted under coverage.unavailable with its reason (no adapter for its agent,
+  or no session file found live or in the session archive); it is never given a number. usage_source stays NULL on the row
+  because the runtime schema's CHECK admits only cli-transcript and provider-report
+usedBy: 'the Kernel and the Supervisor reading what a workflow spent; `api status` carries the same summary as its `usage` field'

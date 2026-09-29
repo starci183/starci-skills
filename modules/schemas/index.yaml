@@ -1051,6 +1051,9 @@ moduleLocalDocumentKinds:
   - id: starci/model-qualifications@1
     governs: "The measured-qualification store. Empty in the package: shipping is not certifying."
     files: [modules/models/qualifications.yaml]
+  - id: starci/model-prices@1
+    governs: "The per-model price table behind llm_usage cost_usd. A model with no declared rate has NULL cost, never a guess."
+    files: [modules/models/prices.yaml]
 
   # --- hosts ----------------------------------------------------------------
   - id: starci/orca-provider@1

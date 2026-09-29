@@ -849,6 +849,45 @@ export function recordLlmUsage(db,{workflowId,subjectType,attemptId=null,turnRef
   insertRow(db,'llm_usage',{workflowId,subjectType,attemptId,turnRef,provider,source,at,...fields});
 }
 
+const USAGE_COLUMNS=r=>({responseModel:r.model??null,inputTokens:r.inputTokens??null,outputTokens:r.outputTokens??null,cacheReadTokens:r.cacheReadTokens??null,
+  cacheWriteTokens:r.cacheWriteTokens??null,reasoningTokens:r.reasoningTokens??null,costUsd:r.costUsd??null,turns:r.turns??null,toolCalls:r.toolCalls??null,toolErrors:r.toolErrors??null});
+/**
+ * The measured usage of one op attempt (scripts/kernel/usage-record.mjs): one llm_usage row per model, the summary on
+ * op_attempts (tokens_in = fresh + cache read + cache write, tokens_out, cost_usd only when every model is priced,
+ * usage_source) and one 'attempt-usage-recorded' event. An attempt that already has llm_usage rows is left alone, so a
+ * re-run never double counts. Returns {recorded, rows}.
+ */
+export function recordAttemptUsage(db,{attemptId,rows,source='cli-transcript',provider=null,requestModel=null,at=nowMs()}){
+  const a=db.prepare('SELECT * FROM op_attempts WHERE attempt_id=?').get(attemptId);
+  need(a,`attempt ${attemptId} not found`,'STARCI_ATTEMPT_NOT_FOUND');
+  need(Array.isArray(rows)&&rows.length,'recordAttemptUsage needs at least one usage row');
+  if(db.prepare("SELECT 1 FROM llm_usage WHERE subject_type='attempt' AND attempt_id=? LIMIT 1").get(attemptId))return {recorded:false,rows:0};
+  for(const r of rows)recordLlmUsage(db,{workflowId:a.workflow_id,subjectType:'attempt',attemptId,provider:provider??a.provider??a.agent??'unknown',source,at,
+    spanId:a.span_id,requestModel:requestModel??a.request_model??a.model??null,...USAGE_COLUMNS(r)});
+  const tokensIn=rows.reduce((n,r)=>n+(r.inputTokens??0)+(r.cacheReadTokens??0)+(r.cacheWriteTokens??0),0);
+  const tokensOut=rows.reduce((n,r)=>n+(r.outputTokens??0),0);
+  const costUsd=rows.every(r=>typeof r.costUsd==='number')?Math.round(rows.reduce((n,r)=>n+r.costUsd,0)*1e6)/1e6:null;
+  updateAttempt(db,{attemptId,at,tokensIn,tokensOut,costUsd,usageSource:source});
+  appendEvent(db,{workflowId:a.workflow_id,entityType:'attempt',entityId:String(attemptId),attemptId,spanId:a.span_id,kind:'attempt-usage-recorded',
+    payload:{attemptId,source,models:rows.map(r=>r.model),tokensIn,tokensOut,costUsd},createdAt:at});
+  return {recorded:true,rows:rows.length};
+}
+/**
+ * The usage a Kernel seat's session added since its last recording: one llm_usage row per model, subject 'kernel-turn',
+ * turn_ref '<kernel:workflow>:<session>@<turns so far>' (the caller derives it from what the ledger already holds, so a
+ * re-run over an unchanged session adds nothing). One 'kernel-usage-recorded' event. Returns {recorded, rows}.
+ */
+export function recordKernelUsage(db,{workflowId,turnRef,rows,provider,source='cli-transcript',requestModel=null,at=nowMs()}){
+  need(workflowId&&turnRef&&provider,'recordKernelUsage needs workflowId, turnRef and provider');
+  need(db.prepare('SELECT 1 FROM workflows WHERE workflow_id=?').get(workflowId),`workflow ${workflowId} not found`,'STARCI_WORKFLOW_NOT_FOUND');
+  if(!Array.isArray(rows)||!rows.length)return {recorded:false,rows:0};
+  if(db.prepare("SELECT 1 FROM llm_usage WHERE subject_type='kernel-turn' AND workflow_id=? AND turn_ref=? LIMIT 1").get(workflowId,turnRef))return {recorded:false,rows:0};
+  for(const r of rows)recordLlmUsage(db,{workflowId,subjectType:'kernel-turn',turnRef,provider,source,at,requestModel,...USAGE_COLUMNS(r)});
+  appendEvent(db,{workflowId,entityType:'workflow',entityId:workflowId,kind:'kernel-usage-recorded',
+    payload:{turnRef,source,models:rows.map(r=>r.model),tokens:rows.reduce((n,r)=>n+(r.inputTokens??0)+(r.cacheReadTokens??0)+(r.cacheWriteTokens??0)+(r.outputTokens??0),0)},createdAt:at});
+  return {recorded:true,rows:rows.length};
+}
+
 // --- logs ---------------------------------------------------------------------------------------------------------
 export const LOG_ACTORS=Object.freeze(['kernel','op','runtime','check','land','settler','reconciler']);
 export const LOG_LEVELS=Object.freeze(['debug','info','warn','error']);
@@ -1063,7 +1102,7 @@ export function deleteWorkflowRows(db,{workflowId}){
 export const LEDGER_WRITES=Object.freeze({recordBlob,storeBlob,appendEvent,createWorkflow,ensureWorkflow,changeWorkflowPhase,updateWorkflow,insertGoal,recordGoalInput,
   createUnit,setUnitState,reopenUnit,raiseTryBudget,addUnitEdge,recordGraphVersion,enqueueJob,setJobStatus,updateJob,startAttempt,updateAttempt,endRejectedAttempt,writeContract,
   declareResource,acquireLease,renewLeases,releaseLeases,idempotent,recordFailedRequest,fileReport,markReportConsumed,recordCheckRun,recordArtifact,attachToReport,
-  recordArtifactProof,citeBlob,recordTranscriptSnapshot,setAttemptTranscript,recordLlmUsage,appendLog,setLogCursor,setCondition,openIncident,updateIncident,resolveIncident,
+  recordArtifactProof,citeBlob,recordTranscriptSnapshot,setAttemptTranscript,recordLlmUsage,recordAttemptUsage,recordKernelUsage,appendLog,setLogCursor,setCondition,openIncident,updateIncident,resolveIncident,
   postInbox,setInboxStatus,setInboxStatusByKey,updateGoalJson,openDecisionItem,updateDecisionItem,recordDecision,setSignal,updateSignal,clearSignal,queueSettleTail,recordJobResult,bindKernelJob,releaseKernelJob,recordPurge,deleteWorkflowRows,markBlobArchived,pruneAttemptSnapshots,upsertFoundation,declareFoundations,recordPathTransfer,recordRecordChange,updateSettleTail,recordProductLand,finishProductLand});
 
 /**

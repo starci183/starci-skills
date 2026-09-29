@@ -406,3 +406,26 @@ test('awaiting_owner is a settled status reached only from reported|deciding; a 
     assert.throws(()=>enqueue('t7',7,'t6'),/unit-try-budget-exhausted/,'five spent tries (the ask spent none) exhaust the budget');
   }finally{ledger.close();}
 });
+
+test('recordAttemptUsage writes llm_usage rows and the attempt summary once; recordKernelUsage never repeats a turn_ref',t=>{
+  const dir=temporary();t.after(()=>fs.rmSync(dir,{recursive:true,force:true}));
+  const ledger=openLedger({file:path.join(dir,'runtime.sqlite')});
+  ledger.ensureWorkflow({workflowId:'wf'});
+  ledger.write.changeWorkflowPhase({workflowId:'wf',to:'running',by:'test',reason:'seed'});
+  ledger.write.createUnit({workflowId:'wf',unitId:'u1',opId:'op',subjectKey:'u1',goalRevision:1});
+  ledger.enqueueJob({jobId:'j1',workflowId:'wf',unitId:'u1',opId:'op',tryNo:1,generation:1,kind:'op'});
+  for(const to of ['ready','leased'])ledger.write.setJobStatus({jobId:'j1',to,reason:'test'});
+  const {attempt_id:attemptId}=ledger.write.startAttempt({workflowId:'wf',jobId:'j1',dispatchId:'ctx_usage',provider:'claude'});
+  const row={model:'claude-opus-5-5',inputTokens:10,outputTokens:20,cacheReadTokens:300,cacheWriteTokens:40,reasoningTokens:5,turns:3,toolCalls:2,toolErrors:0,costUsd:null};
+  assert.deepEqual(ledger.write.recordAttemptUsage({attemptId,rows:[row]}),{recorded:true,rows:1});
+  assert.deepEqual(ledger.write.recordAttemptUsage({attemptId,rows:[row]}),{recorded:false,rows:0},'a second recording adds nothing');
+  const a=ledger.getAttempt(attemptId);
+  assert.equal(a.tokens_in,350,'tokens_in = fresh + cache read + cache write');assert.equal(a.tokens_out,20);assert.equal(a.cost_usd,null,'an unpriced model leaves cost NULL');assert.equal(a.usage_source,'cli-transcript');
+  assert.equal(ledger.db.prepare("SELECT count(*) n FROM llm_usage WHERE attempt_id=?").get(attemptId).n,1);
+  assert.equal(ledger.db.prepare("SELECT count(*) n FROM events WHERE kind='attempt-usage-recorded'").get().n,1);
+  const args={workflowId:'wf',turnRef:'kernel:wf:s1@4',rows:[row],provider:'claude'};
+  assert.equal(ledger.write.recordKernelUsage(args).recorded,true);
+  assert.equal(ledger.write.recordKernelUsage(args).recorded,false,'the same turn_ref is never counted twice');
+  assert.equal(ledger.db.prepare("SELECT count(*) n FROM llm_usage WHERE subject_type='kernel-turn'").get().n,1);
+  ledger.close();
+});

@@ -109,6 +109,7 @@ import { closeOperationTerminal, closeExitedTerminal } from './close-op-terminal
 import { closeSelfSafe } from '../lib/close-verify.mjs';
 import { classifyCheck as settlerClassifyCheck, rerunCheck as settlerRerunCheck } from '../reconcile/job-settle.mjs';
 import { releaseSettledSession } from './op-session.mjs';
+import { recordSettledAttemptUsage } from './usage-record.mjs';
 import { reapAgentProcess } from './reap-agent-process.mjs';
 import { sourceRootOf, withLedgerRead } from '../connectors/lib.mjs';
 import { quitAgent } from './quit-agent.mjs';
@@ -4263,7 +4264,8 @@ async function runSettleTail(ledger, job, repo, { verdict = null } = {}) {
   const settledVerdict = verdict ?? jobResult(db, jobId)?.verdict ?? payload.verdict ?? null;
   let sessionReleased = null;
   try {
-    sessionReleased = await releaseSettledSession({ db, job, payload, repo, archiveRoot: allocationSettings()?.housekeeping?.archiveRoot ?? null });
+    sessionReleased = await releaseSettledSession({ db, job, payload, repo, archiveRoot: allocationSettings()?.housekeeping?.archiveRoot ?? null,
+      beforeArchive: ({ agent, files }) => { recordSettledAttemptUsage(ledger, { jobId, agent, files }); } });
   } catch (error) { sessionReleased = { released: false, reason: String(error?.message ?? error) }; }
   if (sessionReleased) {
     ledger.transaction(() => {

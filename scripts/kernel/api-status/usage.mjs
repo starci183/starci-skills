@@ -1,0 +1,16 @@
+// usage — the `api status` token summary of the workflow: total, by op, by model, the Kernel's own and how many attempts are
+// measured (scripts/kernel/usage-report.mjs). Null (no field) until any llm_usage row exists for the workflow.
+import { tokenLine, usageOfWorkflow } from '../usage-report.mjs';
+
+export default {
+  key: 'usage',
+  compute(ctx) {
+    const u = usageOfWorkflow(ctx.db, ctx.workflowId);
+    if (!u.total.tokens && !u.coverage.unavailable) return null;
+    const { workflowId: _w, ...rest } = u;
+    return rest;
+  },
+  lines: (u) => [`TOKENS ${tokenLine(u.total)}; ${u.coverage.measured}/${u.coverage.attempts} attempts measured${u.coverage.unavailable ? `, ${u.coverage.unavailable} unavailable` : ''}; kernel ${u.kernel.tokens.toLocaleString('en-US')}`
+    + (u.byOp.length ? `; top ops ${u.byOp.slice(0, 3).map((o) => `${o.opId} ${o.tokens.toLocaleString('en-US')}`).join(', ')}` : '')
+    + (u.byModel.length ? `; models ${u.byModel.slice(0, 3).map((m) => `${m.model} ${m.tokens.toLocaleString('en-US')}`).join(', ')}` : '')],
+};

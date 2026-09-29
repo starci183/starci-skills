@@ -25,6 +25,7 @@ import { lockHolder, markStarting, pidAlive, startingHolder } from '../connector
 import { stopTree } from '../supervisor/host-health.mjs';
 import { CONCERN_OWNER } from './owns.mjs';
 import { CONTROLLER_NAMES, LEADER_NAME, SKILL_ROOT, START_REASON_ENV, configuredMode, reconcilerConfig, reconcilerNumbers } from './state.mjs';
+import { machineUsage } from '../kernel/usage-report.mjs';
 
 export const ENGINE_FILE = path.join(SKILL_ROOT, 'scripts', 'reconciler', 'engine.mjs');
 export const TASK_NAME = 'StarCi-Reconciler';
@@ -186,7 +187,7 @@ export async function restartEngine({ env = process.env, reason = 'owner-restart
   return ensure({ env, leader: () => ({ ...leaderState({ env }), fresh: false }), lock: () => null, starting: () => null, reason, ...seams });
 }
 
-/** --status: {leader, modes: {name: {configured, effective, setBy}}, queue, violations, actions, starts24h, stateFile}. */
+/** --status: {leader, modes: {name: {configured, effective, setBy}}, queue, violations, actions, starts24h, usage (token meter), stateFile}. */
 export function status({ env = process.env, now = Date.now(), numbers = reconcilerNumbers(), config = reconcilerConfig() } = {}) {
   const out = { ok: true, stateFile: machineFileFor(env), leader: leaderState({ env, now, numbers }), enabled: config.enabled, modes: {}, queue: {}, queueDepth: 0,
     violations: { open: 0 }, actions: {}, concerns: {}, starts24h: 0 };
@@ -204,10 +205,20 @@ export function status({ env = process.env, now = Date.now(), numbers = reconcil
       out.starts24h = Number(m.db.prepare("SELECT COUNT(*) AS n FROM v_engine_starts WHERE at>=?").get(now - 86_400_000).n) || 0;
     }, null, { env });
   } catch (error) { out.ok = false; out.error = String(error?.message ?? error).slice(0, 200); effective = {}; }
+  out.usage = machineUsage({ env, now });
   for (const name of new Set([...CONTROLLER_NAMES, ...Object.keys(effective)])) out.modes[name] = { configured: configuredMode(name, config), effective: out.leader.fresh ? effective[name] ?? 'off' : 'off', setBy: setBy[name] ?? null };
   for (const [concern, owner] of Object.entries(CONCERN_OWNER)) out.concerns[concern] = out.leader.fresh && out.modes[owner]?.effective === 'active';
   return out;
 }
+
+/** `boot.mjs --status` token lines: 24 h and all-time tokens per model across every ledger and the Supervisor seat. */
+const usageLines = (u) => {
+  if (!u?.total) return [];
+  const cost = (t) => (t.costUsd == null ? '' : ` ${t.costUsd}`);
+  const lines = [`  tokens ${u.total.tokens.toLocaleString('en-US')} all-time, ${u.window.tokens.toLocaleString('en-US')} in 24h${cost(u.total)}; supervisor seat ${(u.supervisor?.tokens ?? 0).toLocaleString('en-US')}; ${u.byModel.slice(0, 4).map((m) => `${m.model} ${m.tokens.toLocaleString('en-US')}`).join(', ') || 'no usage recorded yet'}`];
+  for (const l of u.ledgers) if (!l.error && (l.total.tokens || l.unavailableAttempts)) lines.push(`    ${l.name}: ${l.total.tokens.toLocaleString('en-US')} (attempts ${l.attempts.tokens.toLocaleString('en-US')}, kernels ${l.kernel.tokens.toLocaleString('en-US')})${l.unavailableAttempts ? `; ${l.unavailableAttempts} settled attempt(s) unmeasured` : ''}`);
+  return lines;
+};
 
 const describeStatus = (s) => {
   const l = s.leader;
@@ -215,6 +226,7 @@ const describeStatus = (s) => {
     `  enabled ${s.enabled}; modes ${Object.entries(s.modes).map(([n, m]) => `${n}=${m.effective}${m.configured !== m.effective ? `(cfg ${m.configured})` : ''}`).join(' ')}`,
     `  queue ${s.queueDepth} (${Object.entries(s.queue).map(([c, q]) => `${c} ${q.queued}${q.failing ? `/${q.failing} failing` : ''}`).join(', ') || 'empty'}); open violations ${s.violations.open}; actions 1h ${Object.entries(s.actions).map(([k, n]) => `${k} ${n}`).join(', ') || 'none'}; engine starts 24h ${s.starts24h}`,
     `  owned concerns: ${Object.entries(s.concerns).filter(([, v]) => v).map(([k]) => k).join(', ') || 'none (every old loop keeps its duties)'}`,
+    ...usageLines(s.usage),
     `  state ${s.stateFile}`];
   return lines.join('\n');
 };

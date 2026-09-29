@@ -31,6 +31,8 @@
 //                                 (ORPHAN_PROCESS -> stop), the footprint scan, the Orca terminal count (TERMINAL_COUNT_DRIFT).
 //   host:transcripts              every 60 s (schedules host/transcripts): scrollback snapshots of every live op attempt
 //                                 (scripts/kernel/transcripts.mjs snapshot --repo) and of every live seat (snapshotSeats).
+//   host:usage (schedules host/usage, every 5 min, on the transcripts tick) the token meter: scripts/kernel/usage-record.mjs
+//                                 sweep records settled attempts' usage and the increment of every Kernel and the Supervisor seat.
 //   ledger:<ledgerId>             hourly PRAGMA quick_check (LEDGER_CORRUPT clock + DI), nightly VACUUM INTO backup.
 //
 // Every clock's state is a code of modules/reconciler/sla.yaml (SERVICE_DOWN, SEAT_VACANT, ...): the SLA layer reads the
@@ -618,7 +620,22 @@ export function createHostController(deps = {}) {
       } catch (error) { out.seats = { error: String(error?.message ?? error).slice(0, 200) }; }
     } else ctx.log('reconciler.would', 'host would snapshot the live seat transcripts (transcripts.mjs snapshotSeats)', { controller: 'host', action: 'snapshotSeats' });
     finishDuty(ctx, { controller: 'host', duty: 'transcripts', result: ctx.mode === 'active' ? 'done' : 'skipped', now: ctx.now() });
+    out.usage = await usageSweep(ctx, now);
     return { ok: true, ...out };
+  }
+
+  /**
+   * host:usage, every 5 minutes (schedules host/usage), riding the transcripts tick: the token meter. One child
+   * (scripts/kernel/usage-record.mjs sweep) records the usage of every settled op attempt that has none yet, and the
+   * increment of every live Kernel session and of the Supervisor seat over what llm_usage already holds for that session,
+   * so a re-run never counts twice. Shadow records the run and writes nothing.
+   */
+  async function usageSweep(ctx, now) {
+    const everyMs = deps.usageEveryMs ?? 300_000;
+    if (!claimDue(ctx, { controller: 'host', duty: 'usage', intervalMs: everyMs, now }).due) return { skipped: 'fresh' };
+    const r = await ctx.run('node', ['scripts/kernel/usage-record.mjs', 'sweep', '--json'], { timeoutMs: 180_000 });
+    finishDuty(ctx, { controller: 'host', duty: 'usage', result: r?.ok === false ? 'failed' : ctx.mode === 'active' ? 'done' : 'skipped', now: ctx.now() });
+    return { ok: r?.ok ?? null, shadow: Boolean(r?.shadow), attempts: r?.value?.attempts ?? null, kernels: r?.value?.kernels ?? null, supervisor: r?.value?.supervisor ?? null };
   }
 
   /* -------------------------------------------------------- ledger health */
