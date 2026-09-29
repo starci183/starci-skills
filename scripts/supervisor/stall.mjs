@@ -37,6 +37,9 @@
 //                                                  consumed but not settled holds that settle like a
 //                                                  queued job ("defers the settle of <job>"; api status
 //                                                  heldSettleJobs)
+//   STATUS-UNREADABLE <wf> idle <min>m: ...        idle past the threshold but api status could not be read:
+//                                                  the stall is not judged (never STALLED, not alerted); the
+//                                                  line names the read error and the jobs running in the ledger
 //   STALE-PEER-WAIT <wf> <incident> on <peer> ...  the peer finished or left running, its message or
 //                                                  the job the wait names landed after it, or the peer
 //                                                  has been idle past the threshold too
@@ -75,6 +78,10 @@ export const PEER_WAIT_KIND = 'peer-wait';
 /** Worker liveness that is a turn in progress: a workflow with one is working, not stalled. */
 export const WORKING_LIVENESS = ['active', 'active-unclassified'];
 const SETTLED = ['succeeded', 'failed', 'cancelled'];
+/** The non-Kernel jobs of one workflow the ledger holds running (a worker's op in flight). */
+const runningJobs = (db, wf) => {
+  try { return db.prepare("SELECT job_id, op_id FROM jobs WHERE workflow_id=? AND status IN ('running','answering') AND COALESCE(kind,'')<>'kernel' ORDER BY job_id").all(wf); } catch { return []; }
+};
 
 /** The owner's threshold: config.yaml supervisor.stallMinutes, else DEFAULT_STALL_MINUTES. */
 export function stallMinutesOf(config = undefined) {
@@ -558,6 +565,17 @@ export function stallFindings(db, {
     }
 
     if (idleMs <= thresholdMs) continue;
+    // An unreadable api status is no evidence of a stall (sdi-94355e8e, sdi-76a8404d, sdi-2f13ab61: 'frontier
+    // unreadable (status unreadable)' escalated while an interface.draw op ran; a read minutes later answered in
+    // 3-5 s). Without a frontier the stall is unjudged: one STATUS-UNREADABLE line naming the error and the jobs
+    // the ledger holds running, never alerted; the Workflow controller retries and owns the runtime defect.
+    if (!frontier) {
+      const running = runningJobs(db, wf);
+      out.push({ type: 'STATUS-UNREADABLE', key: `STATUS-UNREADABLE|${wf}`, workflowId: wf, repo, idleMinutes: minutes(idleMs), idleSince: progress.at,
+        error: status?.error ?? 'no status', runningJobs: running.map((j) => j.job_id), alert: false,
+        line: `STATUS-UNREADABLE ${wf} idle ${minutes(idleMs)}m: api status unreadable (${status?.error ?? 'no status'}); stall not judged${running.length ? `; running ${running.map((j) => `${j.job_id} (${j.op_id ?? '-'})`).join(', ')}` : ''}; last progress ${progress.kind} ${clock(progress.at)}` });
+      continue;
+    }
     // A worker or the Kernel itself mid-turn is the workflow moving (busyWhy, the same judgement a peer gets).
     if (busyWhy(status, () => kernelTurnOf(db, wf))) continue;
     // This is the Supervisor's pending repair. The Kernel cannot clear a supervisor-gate, and
@@ -571,18 +589,14 @@ export function stallFindings(db, {
     const since = `idle ${minutes(idleMs)}m`;
     const gateBits = gates.filter((g) => g.held.length || g.heldSettle.length || !queued.length)
       .map(({ gate, held, heldSettle, verdict }) => `${gate.incidentId} ${verdict.stale ? 'STALE' : verdict.young ? 'new' : 'justified'}${held.length ? ` holds ${held.length}` : ''}${heldSettle.length ? ` defers settle of ${heldSettle.map((j) => j.job_id).join(', ')}` : ''}`);
-    let reason;
-    if (!frontier) reason = `frontier unreadable (${status?.error ?? 'no status'}); last progress ${progress.kind} ${clock(progress.at)}`;
-    else {
-      const causes = Object.entries(frontier.queuedCauses ?? {}).map(([c, n]) => `${c} ${n}`).join(', ');
-      reason = [
-        `frontier ${frontier.state ?? '?'}${frontier.actionable ? ' ACTIONABLE but the Kernel has not moved' : ''}`,
-        causes ? `queued: ${causes}` : null,
-        gateBits.length ? `gates: ${gateBits.join(', ')}` : null,
-        `last progress ${progress.kind} ${clock(progress.at)}`,
-        frontier.reason ? clipLine(frontier.reason, 140) : null,
-      ].filter(Boolean).join('; ');
-    }
+    const causes = Object.entries(frontier.queuedCauses ?? {}).map(([c, n]) => `${c} ${n}`).join(', ');
+    const reason = [
+      `frontier ${frontier.state ?? '?'}${frontier.actionable ? ' ACTIONABLE but the Kernel has not moved' : ''}`,
+      causes ? `queued: ${causes}` : null,
+      gateBits.length ? `gates: ${gateBits.join(', ')}` : null,
+      `last progress ${progress.kind} ${clock(progress.at)}`,
+      frontier.reason ? clipLine(frontier.reason, 140) : null,
+    ].filter(Boolean).join('; ');
     // A frontier parked on peer waits that all still hold is the peer's to move, not a stall: the
     // PEER-WAIT lines explain it and a STALE-PEER-WAIT alerts the moment one stops holding.
     const peerParked = frontier?.state === PEER_WAIT_KIND && !frontier.actionable && waits.length > 0 && waits.every((w) => !w.verdict.stale);
@@ -601,6 +615,6 @@ export function stallFindings(db, {
       line: `STALLED ${wf} ${since}: ${reason}${peerParked ? ' (justified: every peer-wait still holds)' : ownerParked ? ' (justified: it waits on the owner)' : ''}` });
   }
   // Stalls first, then the gates and waits that explain them.
-  const order = { STALLED: 0, 'SUPERVISOR-WAIT': 0, 'STALE-GATE': 1, 'STALE-PEER-WAIT': 1, 'STALE-WAIT': 2, 'UNREAD-PEER': 3, GATE: 4, 'PEER-WAIT': 4 };
+  const order = { STALLED: 0, 'SUPERVISOR-WAIT': 0, 'STALE-GATE': 1, 'STALE-PEER-WAIT': 1, 'STALE-WAIT': 2, 'STATUS-UNREADABLE': 2, 'UNREAD-PEER': 3, GATE: 4, 'PEER-WAIT': 4 };
   return out.sort((a, b) => order[a.type] - order[b.type] || a.key.localeCompare(b.key));
 }

@@ -72,6 +72,7 @@ export function workflowSettings({ file = WORKFLOW_FILE, allocation = null, cata
     resyncMs: num(doc.resyncMs, 120_000), concurrency: num(doc.concurrency, 2),
     routes: Array.isArray(doc.routes) && doc.routes.length ? doc.routes.map(String) : DEFAULT_ROUTES,
     decisionDueMs: num(doc.decisionDueMs, 900_000),
+    statusUnreadablePasses: Math.max(1, num(doc.statusUnreadablePasses, 3)),
     askRepark: { liveness: new Set((doc.askRepark?.liveness ?? ['dead', 'stale', 'unserved']).map(String)), minIntervalMs: num(doc.askRepark?.minIntervalMs, 1_800_000) },
     graceMs: progress.graceMs, supervisorGraceMs: progress.supervisorGraceMs,
     orphanedFrontierMs: num(alloc?.supervisorTick?.orphanedFrontierMs, 1_800_000),
@@ -122,9 +123,10 @@ export function decisionOf({ kind, subject, decider = 'kernel', ledgerId, workfl
  *   goal      {missing: bool, why}
  *   asks      [{dispatchId, liveness, lastServedAt}] (poll.mjs openAsks)
  *   clocks    the workflow's open clocks [{entity, state, enteredAt}] (to read an episode's age)
+ *   unreadable  {misses, since, error, heldAt} when this pass could not read api status (holdStatus), else null
  * Returns {clocks: [{entity, state, slaMs, enteredAt}], decisions: [DI], reparks: [dispatchId], finish, stalled, lines}.
  */
-export function planWorkflow({ ledgerId, workflowId, status = null, findings = [], goal = { missing: false }, asks = [], clocks = [], now, settings }) {
+export function planWorkflow({ ledgerId, workflowId, status = null, findings = [], goal = { missing: false }, asks = [], clocks = [], unreadable = null, now, settings }) {
   const s = settings;
   const wfEntity = workflowEntity(ledgerId, workflowId);
   const out = { clocks: [], decisions: [], reparks: [], finish: false, stalled: false, lines: [] };
@@ -199,6 +201,18 @@ export function planWorkflow({ ledgerId, workflowId, status = null, findings = [
       evidence: [`kernelRev acked ${rev.acked ?? 'none'} current ${rev.current ?? '-'}`, ...(rev.changes ?? []).slice(0, 3).map((c) => (typeof c === 'string' ? c : `change ${c.id ?? ''} ${c.summary ?? ''}`))] });
   }
 
+  // ---- api status unreadable: never a progress-stall (the pass holds the last readable status, or judges nothing);
+  // statusUnreadablePasses consecutive misses are a runtime defect of the read itself, the Supervisor's, naming the error.
+  if (unreadable) {
+    const held = unreadable.heldAt != null && status ? `holding the status read ${Math.round((now - unreadable.heldAt) / 60_000)}m ago` : 'no readable status held; stall not judged';
+    out.lines.push(`STATUS-UNREADABLE ${workflowId}: ${unreadable.misses} consecutive pass(es) since ${iso(unreadable.since)}: ${unreadable.error}; ${held}`);
+    if (unreadable.misses >= (s.statusUnreadablePasses ?? 3)) {
+      di({ kind: 'runtime-defect', subject: 'status-unreadable', decider: 'supervisor', entity: { type: 'workflow', id: workflowId },
+        summary: `status-unreadable: api status --workflow ${workflowId} failed ${unreadable.misses} consecutive reconciler passes since ${iso(unreadable.since)} (${unreadable.error}); no stall is judged until it reads again`,
+        evidence: [`last error: ${unreadable.error}`, findings.find((f) => f.type === 'STATUS-UNREADABLE')?.line] });
+    }
+  }
+
   // ---- STALE-* / UNREAD-PEER findings (this replaces the [stall] wake of stall-alert.mjs)
   for (const f of findings) {
     const kind = FINDING_KINDS[f.type];
@@ -264,8 +278,35 @@ export function goalOf(db, workflowId) {
 const lastServedAt = (db, workflowId, dispatchId) => Number(db.prepare(
   "SELECT MAX(created_at) at FROM events WHERE workflow_id=? AND kind IN ('ask-serving','ask-notified') AND json_extract(payload_json,'$.dispatchId')=?").get(workflowId, dispatchId)?.at) || null;
 
-async function safeStatus(ctx, ledgerId, workflowId) {
-  try { const v = await ctx.status(ledgerId, workflowId); return v && typeof v === 'object' ? v : null; } catch { return null; }
+/** Whether an api status value carries a frontier to judge (apiFrontier's ok shape). */
+const readable = (v) => Boolean(v && typeof v === 'object' && v.ok !== false && v.frontier);
+/** One api status read: {value, error}; error names why it is unreadable (a throw, {ok:false,error}, no value). */
+async function readStatus(ctx, ledgerId, workflowId) {
+  try {
+    const v = await ctx.status(ledgerId, workflowId);
+    if (readable(v)) return { value: v, error: null };
+    return { value: null, error: clipLine(v && typeof v === 'object' ? (v.error ?? (v.ok === false ? 'ok:false with no error' : 'no frontier in the value')) : 'no value (api status timed out, exited non-zero or printed no JSON)', 200) };
+  } catch (error) { return { value: null, error: clipLine(`threw: ${error?.message ?? error}`, 200) }; }
+}
+async function safeStatus(ctx, ledgerId, workflowId) { return (await readStatus(ctx, ledgerId, workflowId)).value; }
+
+const heldOf = new WeakMap();
+/**
+ * The status this pass judges by. A readable read is kept as the workflow's last one; an unreadable read is not
+ * evidence of anything (sdi-94355e8e, sdi-76a8404d, sdi-2f13ab61: 'frontier unreadable (status unreadable)' was
+ * escalated as a progress-stall while an interface.draw op ran). It counts a miss and, below `passes` consecutive
+ * misses, answers the last readable status; from `passes` on it answers null (stall.mjs then judges nothing).
+ * Returns {status, unreadable: null | {misses, since, error, heldAt}}. Kept per ctx, like recentlyOpened.
+ */
+function holdStatus(ctx, key, read, now, passes) {
+  let m = heldOf.get(ctx);
+  if (!m) { m = new Map(); heldOf.set(ctx, m); }
+  const h = m.get(key) ?? { last: null, lastAt: null, misses: 0, since: null };
+  if (read.value) { m.set(key, { last: read.value, lastAt: now, misses: 0, since: null }); return { status: read.value, unreadable: null }; }
+  const next = { ...h, misses: h.misses + 1, since: h.since ?? now };
+  m.set(key, next);
+  const hold = next.last && next.misses < passes;
+  return { status: hold ? next.last : null, unreadable: { misses: next.misses, since: next.since, error: read.error, heldAt: hold ? next.lastAt : null } };
 }
 /** An api status value in the shape stall.mjs frontierOf answers (apiFrontier). */
 const asFrontier = (v) => (v && v.ok !== false && v.frontier ? { ...v, ok: true, frontier: v.frontier ?? {}, workers: v.workers ?? [] } : { ok: false, error: v?.error ?? 'status unreadable' });
@@ -311,6 +352,8 @@ async function clearWorkflowClocks(ctx, ledgerId, workflowId) {
 /* ------------------------------------------------------------------------------------------------ the controller */
 
 const settingsNow = () => workflowSettings();
+/** The stall-episode clocks an unjudged pass (api status unreadable, none held) keeps open. */
+const UNJUDGED_KEEP = new Set(['STALL_UNOWNED', 'STALL_ESCALATED', 'ORPHANED_FRONTIER']);
 const defaults = settingsNow();
 
 export async function reconcileWorkflow(key, ctx, { settings = workflowSettings() } = {}) {
@@ -319,7 +362,7 @@ export async function reconcileWorkflow(key, ctx, { settings = workflowSettings(
   const { ledgerId, workflowId } = k;
   const now = ctx.now();
   const readers = openReaders(ctx);
-  let base = null, findings = [], asks = [], status = null;
+  let base = null, findings = [], asks = [], status = null, unreadable = null;
   const wfEntity = workflowEntity(ledgerId, workflowId), prefix = stuckPrefix(ledgerId, workflowId);
   try {
     const own = readers.get(ledgerId);
@@ -329,7 +372,7 @@ export async function reconcileWorkflow(key, ctx, { settings = workflowSettings(
       return { ok: true, key, ended: row?.phase ?? 'unknown', cleared: await clearWorkflowClocks(ctx, ledgerId, workflowId) };
     }
     base = { goal: goalOf(own.db, workflowId), lastProgress: lastProgress(own.db, workflowId) };
-    status = await safeStatus(ctx, ledgerId, workflowId);
+    ({ status, unreadable } = holdStatus(ctx, key, await readStatus(ctx, ledgerId, workflowId), now, settings.statusUnreadablePasses ?? 3));
     // The peers a gate or wait of this workflow names: their status answers the peer-busy probe (never a second read).
     const peers = new Set([...peerWaits(own.db, workflowId).map((w) => w.peer), ...ownerGates(own.db, workflowId).flatMap((g) => namedWorkflows(g.text))]
       .filter((p) => p && p !== workflowId));
@@ -348,13 +391,15 @@ export async function reconcileWorkflow(key, ctx, { settings = workflowSettings(
   } finally { closeAll(readers); }
 
   const existing = clocksOf(ctx, { prefixes: [wfEntity, prefix] }).filter((c) => c.entity === wfEntity || c.entity.startsWith(prefix));
-  const plan = planWorkflow({ ledgerId, workflowId, status, findings, goal: base.goal, asks, clocks: existing, now, settings });
+  const plan = planWorkflow({ ledgerId, workflowId, status, findings, goal: base.goal, asks, clocks: existing, unreadable, now, settings });
 
   // clocks: start / keep the wanted ones, clear the rest of this workflow's
   const wanted = new Set(plan.clocks.map((c) => `${c.entity}\u0000${c.state}`));
   for (const c of plan.clocks) await setClock(ctx, { ...c, ledgerId, meta: { controller: 'workflow', workflowId } });
   let cleared = 0;
-  for (const c of existing) if (!wanted.has(`${c.entity}\u0000${c.state}`)) { await clearClock(ctx, c); cleared += 1; }
+  // A pass that judged nothing (no status) neither starts nor ends a stall episode: its clocks stay as they were.
+  const unjudged = (c) => !status && c.entity === wfEntity && UNJUDGED_KEEP.has(c.state);
+  for (const c of existing) if (!wanted.has(`${c.entity}\u0000${c.state}`) && !unjudged(c)) { await clearClock(ctx, c); cleared += 1; }
 
   // decisions, then one doorbell for the Kernel's
   const opened = [];
@@ -372,7 +417,7 @@ export async function reconcileWorkflow(key, ctx, { settings = workflowSettings(
   for (const dispatchId of plan.reparks) acted.push({ verb: 'serve-ask', dispatchId, result: await ctx.api(ledgerId, 'serve-ask', ['--workflow', workflowId, '--dispatch', dispatchId], { timeoutMs: 120_000 }) });
   if (plan.finish) acted.push({ verb: 'finish', result: await ctx.api(ledgerId, 'finish', ['--workflow', workflowId], { timeoutMs: 240_000 }) });
 
-  return { ok: true, key, statusRead: Boolean(status), findings: findings.map((f) => f.type), clocks: plan.clocks.length, cleared,
+  return { ok: true, key, statusRead: !unreadable, ...(unreadable ? { statusUnreadable: unreadable } : {}), findings: findings.map((f) => f.type), clocks: plan.clocks.length, cleared,
     decisions: opened.map((d) => d.idempotencyKey), doorbell, acted: acted.map((a) => ({ verb: a.verb, ...(a.dispatchId ? { dispatchId: a.dispatchId } : {}), shadow: a.result?.shadow === true, ok: a.result?.ok !== false })),
     lastProgress: base.lastProgress, lines: plan.lines };
 }
