@@ -53,7 +53,7 @@ export function Advanced({ children, summary, title = 'Nâng cao', defaultOpen =
     <button type="button" aria-expanded={open} aria-controls={id} onClick={() => setOpen(value => !value)}
       className={`flex w-full min-w-0 items-center gap-2 text-left ${card ? 'rounded-xl px-6 py-4 hover:bg-muted/60' : 'text-xs text-muted-foreground hover:text-foreground'}`}>
       <motion.span animate={{ rotate: open ? 90 : 0 }} transition={{ duration: DURATION.fast, ease: EASE }} className="inline-flex shrink-0"><ChevronRight className="size-3.5" aria-hidden="true" /></motion.span>
-      <span className={card ? 'text-sm font-semibold' : 'font-medium'}>{title}</span>
+      <span className={`shrink-0 whitespace-nowrap ${card ? 'text-sm font-semibold' : 'font-medium'}`}>{title}</span>
       {summary ? <span className="min-w-0 truncate text-xs text-muted-foreground">{summary}</span> : null}
     </button>
     <AnimatePresence initial={false}>
