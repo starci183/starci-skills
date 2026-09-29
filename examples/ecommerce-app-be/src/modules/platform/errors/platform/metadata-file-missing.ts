@@ -1,15 +1,12 @@
 import {
-    HttpStatus 
-} from "@nestjs/common"
-import {
-    AbstractException 
-} from "../abstract"
+    DomainError 
+} from "../domain-error"
 import type {
-    AbstractExceptionMetadata 
-} from "../abstract"
+    DomainErrorMetadata 
+} from "../domain-error"
 
 /** Metadata for a metadata.json that cannot be found; `message` states where the search looked. */
-export interface MetadataFileMissingExceptionMetadata extends AbstractExceptionMetadata {
+export interface MetadataFileMissingExceptionMetadata extends DomainErrorMetadata {
   /** Which resolution failed - the env-pointed path that does not exist, or the upward walk. */
   message: string;
 }
@@ -20,11 +17,12 @@ export interface MetadataFileMissingExceptionMetadata extends AbstractExceptionM
  * path that does not exist, or no metadata.json sits at or above the process cwd. The service
  * refuses to boot rather than inventing ports.
  */
-export class MetadataFileMissingException extends AbstractException {
+export class MetadataFileMissingException extends DomainError {
     constructor({ message, ...metadata }: MetadataFileMissingExceptionMetadata) {
-        super(message,
-            "METADATA_FILE_MISSING_EXCEPTION",
-            metadata,
-            HttpStatus.INTERNAL_SERVER_ERROR)
+        super("METADATA_FILE_MISSING_EXCEPTION",
+            message,
+            {
+                metadata: metadata 
+            })
     }
 }

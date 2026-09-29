@@ -1,26 +1,24 @@
 import {
-    HttpStatus 
-} from "@nestjs/common"
-import {
-    AbstractException 
-} from "../abstract"
+    DomainError 
+} from "../domain-error"
 import type {
-    AbstractExceptionMetadata 
-} from "../abstract"
+    DomainErrorMetadata 
+} from "../domain-error"
 
 /** Metadata for a registration refused on an address already taken; no extra fields required. */
-export interface EmailTakenExceptionMetadata extends AbstractExceptionMetadata {
+export interface EmailTakenExceptionMetadata extends DomainErrorMetadata {
 }
 
 /**
- * House refusal carrying code EMAIL_TAKEN_EXCEPTION and status 409: an account already answers
+ * House refusal carrying code EMAIL_TAKEN_EXCEPTION, which a transport maps to status 409: an account already answers
  * this email, so registration refuses rather than reissuing the person.
  */
-export class EmailTakenException extends AbstractException {
+export class EmailTakenException extends DomainError {
     constructor({ ...metadata }: EmailTakenExceptionMetadata) {
-        super("An account already answers this email.",
-            "EMAIL_TAKEN_EXCEPTION",
-            metadata,
-            HttpStatus.CONFLICT)
+        super("EMAIL_TAKEN_EXCEPTION",
+            "An account already answers this email.",
+            {
+                metadata: metadata 
+            })
     }
 }

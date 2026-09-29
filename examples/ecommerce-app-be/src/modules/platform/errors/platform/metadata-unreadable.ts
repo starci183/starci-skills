@@ -1,15 +1,12 @@
 import {
-    HttpStatus 
-} from "@nestjs/common"
-import {
-    AbstractException 
-} from "../abstract"
+    DomainError 
+} from "../domain-error"
 import type {
-    AbstractExceptionMetadata 
-} from "../abstract"
+    DomainErrorMetadata 
+} from "../domain-error"
 
 /** Metadata for a metadata.json that exists but is not readable JSON; `message` names the file. */
-export interface MetadataUnreadableExceptionMetadata extends AbstractExceptionMetadata {
+export interface MetadataUnreadableExceptionMetadata extends DomainErrorMetadata {
   /** The file that failed to parse. */
   message: string;
 }
@@ -19,11 +16,12 @@ export interface MetadataUnreadableExceptionMetadata extends AbstractExceptionMe
  * is not readable JSON - the one runtime projection every port and URL resolves from cannot be
  * half-read, so the service refuses to boot.
  */
-export class MetadataUnreadableException extends AbstractException {
+export class MetadataUnreadableException extends DomainError {
     constructor({ message, ...metadata }: MetadataUnreadableExceptionMetadata) {
-        super(message,
-            "METADATA_UNREADABLE_EXCEPTION",
-            metadata,
-            HttpStatus.INTERNAL_SERVER_ERROR)
+        super("METADATA_UNREADABLE_EXCEPTION",
+            message,
+            {
+                metadata: metadata 
+            })
     }
 }

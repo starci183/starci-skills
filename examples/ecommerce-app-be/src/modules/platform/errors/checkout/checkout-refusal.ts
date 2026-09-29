@@ -1,22 +1,19 @@
 import {
-    HttpStatus 
-} from "@nestjs/common"
-import {
     CheckoutRefusalReason 
 } from "ecommerce-app-be/modules/domain/order"
 import {
-    AbstractException 
-} from "../abstract"
+    DomainError 
+} from "../domain-error"
 import type {
-    AbstractExceptionMetadata 
-} from "../abstract"
+    DomainErrorMetadata 
+} from "../domain-error"
 
 /**
  * The refusal verdict the checkout policy produced, carried as exception metadata verbatim so the
  * door answers it unchanged (sds.checkout.order-flow t-refuse): the reason, the product it is
  * about and - for stock - how much was asked and how much the catalog actually had.
  */
-export interface CheckoutRefusalExceptionMetadata extends AbstractExceptionMetadata {
+export interface CheckoutRefusalExceptionMetadata extends DomainErrorMetadata {
   /** The refusal marker - the policy's `ok: false` verdict travels through unchanged. */
   ok: false;
   /** Which named refusal the evaluation produced. */
@@ -30,19 +27,19 @@ export interface CheckoutRefusalExceptionMetadata extends AbstractExceptionMetad
 }
 
 /**
- * A named checkout refusal carrying code CHECKOUT_REFUSAL_EXCEPTION: insufficient stock is a 409
- * (a retryable, inventory-bound refusal), every other reason is a 400. The refusal fields spread
+ * A named checkout refusal carrying code CHECKOUT_REFUSAL_EXCEPTION: insufficient stock is a retryable,
+ * inventory-bound refusal a transport maps to 409, every other reason to 400. The refusal fields spread
  * into the response body beside the code so a client reads `reason` and the stock truth directly -
  * a refusal never renders as a successful (empty) order.
  */
-export class CheckoutRefusalException extends AbstractException {
+export class CheckoutRefusalException extends DomainError {
     constructor({ ok, reason, productId, requested, available, ...metadata }: CheckoutRefusalExceptionMetadata) {
-        const status = reason === "insufficient-stock" ? HttpStatus.CONFLICT : HttpStatus.BAD_REQUEST
-        super(`The checkout was refused: ${reason}.`,
-            "CHECKOUT_REFUSAL_EXCEPTION",
+        super("CHECKOUT_REFUSAL_EXCEPTION",
+            `The checkout was refused: ${reason}.`,
             {
-                ok, reason, productId, requested, available, ...metadata 
-            },
-            status)
+                metadata: {
+                    ok, reason, productId, requested, available, ...metadata 
+                } 
+            })
     }
 }

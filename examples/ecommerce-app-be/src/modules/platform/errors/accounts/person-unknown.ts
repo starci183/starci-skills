@@ -1,26 +1,24 @@
 import {
-    HttpStatus 
-} from "@nestjs/common"
-import {
-    AbstractException 
-} from "../abstract"
+    DomainError 
+} from "../domain-error"
 import type {
-    AbstractExceptionMetadata 
-} from "../abstract"
+    DomainErrorMetadata 
+} from "../domain-error"
 
 /** Metadata for an account lookup that found no person; no extra fields required. */
-export interface PersonUnknownExceptionMetadata extends AbstractExceptionMetadata {
+export interface PersonUnknownExceptionMetadata extends DomainErrorMetadata {
 }
 
 /**
- * House refusal carrying code PERSON_UNKNOWN_EXCEPTION and status 404: no person answers the id
+ * House refusal carrying code PERSON_UNKNOWN_EXCEPTION, which a transport maps to status 404: no person answers the id
  * the account door was asked about.
  */
-export class PersonUnknownException extends AbstractException {
+export class PersonUnknownException extends DomainError {
     constructor({ ...metadata }: PersonUnknownExceptionMetadata) {
-        super("No person answers this id.",
-            "PERSON_UNKNOWN_EXCEPTION",
-            metadata,
-            HttpStatus.NOT_FOUND)
+        super("PERSON_UNKNOWN_EXCEPTION",
+            "No person answers this id.",
+            {
+                metadata: metadata 
+            })
     }
 }

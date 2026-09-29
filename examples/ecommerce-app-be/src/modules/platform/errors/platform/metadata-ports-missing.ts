@@ -1,15 +1,12 @@
 import {
-    HttpStatus 
-} from "@nestjs/common"
-import {
-    AbstractException 
-} from "../abstract"
+    DomainError 
+} from "../domain-error"
 import type {
-    AbstractExceptionMetadata 
-} from "../abstract"
+    DomainErrorMetadata 
+} from "../domain-error"
 
 /** Metadata for a metadata.json that lacks the resolved ports; `message` names file and fields. */
-export interface MetadataPortsMissingExceptionMetadata extends AbstractExceptionMetadata {
+export interface MetadataPortsMissingExceptionMetadata extends DomainErrorMetadata {
   /** The file and the port fields it failed to carry. */
   message: string;
 }
@@ -20,11 +17,12 @@ export interface MetadataPortsMissingExceptionMetadata extends AbstractException
  * the datastore's). A projection without the numbers is not a projection - the service refuses
  * to boot rather than defaulting to literals.
  */
-export class MetadataPortsMissingException extends AbstractException {
+export class MetadataPortsMissingException extends DomainError {
     constructor({ message, ...metadata }: MetadataPortsMissingExceptionMetadata) {
-        super(message,
-            "METADATA_PORTS_MISSING_EXCEPTION",
-            metadata,
-            HttpStatus.INTERNAL_SERVER_ERROR)
+        super("METADATA_PORTS_MISSING_EXCEPTION",
+            message,
+            {
+                metadata: metadata 
+            })
     }
 }

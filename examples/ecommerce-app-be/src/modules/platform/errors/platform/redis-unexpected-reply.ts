@@ -1,15 +1,12 @@
 import {
-    HttpStatus 
-} from "@nestjs/common"
-import {
-    AbstractException 
-} from "../abstract"
+    DomainError 
+} from "../domain-error"
 import type {
-    AbstractExceptionMetadata 
-} from "../abstract"
+    DomainErrorMetadata 
+} from "../domain-error"
 
 /** Metadata for a Redis answer outside the protocol; `message` carries the unexpected reply. */
-export interface RedisUnexpectedReplyExceptionMetadata extends AbstractExceptionMetadata {
+export interface RedisUnexpectedReplyExceptionMetadata extends DomainErrorMetadata {
   /** The reply Redis returned where PONG was owed. */
   message: string;
 }
@@ -19,11 +16,12 @@ export interface RedisUnexpectedReplyExceptionMetadata extends AbstractException
  * something other than PONG - a server that answers off-protocol is not the session store this
  * client was built against.
  */
-export class RedisUnexpectedReplyException extends AbstractException {
+export class RedisUnexpectedReplyException extends DomainError {
     constructor({ message, ...metadata }: RedisUnexpectedReplyExceptionMetadata) {
-        super(message,
-            "REDIS_UNEXPECTED_REPLY_EXCEPTION",
-            metadata,
-            HttpStatus.INTERNAL_SERVER_ERROR)
+        super("REDIS_UNEXPECTED_REPLY_EXCEPTION",
+            message,
+            {
+                metadata: metadata 
+            })
     }
 }
