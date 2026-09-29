@@ -32,6 +32,8 @@ const write=(root,rel,body)=>{const abs=path.join(root,...rel.split('/'));fs.mkd
 const fixture=t=>{
   const root=fs.mkdtempSync(path.join(os.tmpdir(),'starci-host-res-'));
   t.after(()=>fs.rmSync(root,{recursive:true,force:true,maxRetries:20,retryDelay:25}));
+  if(process.env.STARCI_TEST_TEMP_DIR)t.after(()=>fs.rmSync(path.join(process.env.STARCI_TEST_TEMP_DIR,'starci-job-scratch'),
+    {recursive:true,force:true,maxRetries:20,retryDelay:25}));
   const repo=path.join(root,'repo');
   fs.mkdirSync(repo,{recursive:true});
   git(repo,'init','--quiet');

@@ -17,6 +17,8 @@ const json=text=>{try{return JSON.parse(text);}catch{return null;}};
 const fixture=t=>{
   const root=fs.mkdtempSync(path.join(os.tmpdir(),'starci-start-restart-'));
   t.after(()=>fs.rmSync(root,{recursive:true,force:true,maxRetries:20,retryDelay:25}));
+  if(process.env.STARCI_TEST_TEMP_DIR)t.after(()=>fs.rmSync(path.join(process.env.STARCI_TEST_TEMP_DIR,'starci-job-scratch'),
+    {recursive:true,force:true,maxRetries:20,retryDelay:25}));
   const repo=path.join(root,'repo');fs.mkdirSync(repo);
   const fake=path.join(root,'fake-orca.mjs'),state=path.join(root,'orca-state.json');
   const log=path.join(root,'calls.jsonl');

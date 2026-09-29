@@ -27,6 +27,8 @@ const esc=s=>s.replace(/[\\^$.*+?()[\]{}|]/g,'\\$&');
 const fixture=(t,{bound=true}={})=>{
   const dir=fs.realpathSync.native(fs.mkdtempSync(path.join(os.tmpdir(),'starci-dispatch-target-')));
   t.after(()=>fs.rmSync(dir,{recursive:true,force:true,maxRetries:20,retryDelay:25}));
+  if(process.env.STARCI_TEST_TEMP_DIR)t.after(()=>fs.rmSync(path.join(process.env.STARCI_TEST_TEMP_DIR,'starci-job-scratch'),
+    {recursive:true,force:true,maxRetries:20,retryDelay:25}));
   const be=path.join(dir,'shop-next'),fe=path.join(dir,'shop-fe'),source=path.join(dir,'source');
   for(const repo of [be,fe]){
     fs.mkdirSync(path.join(repo,'src'),{recursive:true});

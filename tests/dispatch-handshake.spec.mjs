@@ -35,6 +35,8 @@ const {openLedger,inspectLedger,ledgerFileFor}=LEDGER_MODULE;
 const fixture=t=>{
   const dirs=[];
   t.after(()=>{for(const dir of dirs)fs.rmSync(dir,{recursive:true,force:true,maxRetries:20,retryDelay:25});});
+  if(process.env.STARCI_TEST_TEMP_DIR)t.after(()=>fs.rmSync(path.join(process.env.STARCI_TEST_TEMP_DIR,'starci-job-scratch'),
+    {recursive:true,force:true,maxRetries:20,retryDelay:25}));
   const make=mode=>{
     const root=fs.mkdtempSync(path.join(os.tmpdir(),'starci-handshake-'));dirs.push(root);
     const repo=path.join(root,'repo');fs.mkdirSync(repo,{recursive:true});
