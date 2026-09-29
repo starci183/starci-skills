@@ -32,7 +32,7 @@ function world(t, legs) {
   const seed = (fn) => { const ledger = openLedger({ file: ledgerFileFor(repo) }); try { return fn(ledger); } finally { ledger.close(); } };
   seed((ledger) => {
     seedWorkflow(ledger, { id: WF, state: { phase: 'running', job: 'graph runtime' },
-      goal: { revision: 0, identity: 'g0', markdown: '# goal', json: { derivedPlan: { legs: legs.map((op) => ({ op })) } } } });
+      goal: { revision: 0, identity: 'g0', markdown: '# goal', json: { derivedPlan: { legs: legs.map((op) => ({ op })), edges: legs.slice(1).map((op, i) => [legs[i], op]) } } } });
   });
   const job = (jobId, op, status, paths) => seed((ledger) => {
     seedWorkflow(ledger, { id: WF, jobs: [{ jobId, opId: op, kind: 'op', status, payload: { opId: op, records: [], owned_paths: paths } }] });

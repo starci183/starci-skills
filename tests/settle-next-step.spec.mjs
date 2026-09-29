@@ -21,7 +21,7 @@ const ROOT=path.resolve(import.meta.dirname,'..');
 const API=path.join(ROOT,'scripts','kernel','api.mjs');
 const json=v=>JSON.stringify(v??null);
 
-const world=(t,{legs=['docs.author'],edges}={})=>{
+const world=(t,{legs=['docs.author'],edges=legs.slice(1).map((op,i)=>[legs[i],op])}={})=>{
   const repo=fs.mkdtempSync(path.join(os.tmpdir(),'starci-next-step-'));
   t.after(()=>fs.rmSync(repo,{recursive:true,force:true,maxRetries:20,retryDelay:25}));
   const env={...process.env,STARCI_PROJECTS_ROOT:path.join(repo,'projects'),STARCI_TEST_MACHINE_FILE:path.join(repo,'machine.sqlite'),LOCALAPPDATA:path.join(repo,'localappdata')};
@@ -32,7 +32,7 @@ const world=(t,{legs=['docs.author'],edges}={})=>{
     ledger.ensureWorkflow({workflowId:wf,title:'next step'});
     ledger.write.changeWorkflowPhase({workflowId:wf,to:'running',by:'test-fixture',reason:'next step'});
     ledger.db.prepare('INSERT INTO goals(workflow_id,revision,goal_identity,markdown,json,created_at) VALUES(?,?,?,?,?,?)')
-      .run(wf,0,'g0','# goal',json({derivedPlan:{legs:legs.map(op=>({op})),...(edges?{edges}:{})}}),Date.now());
+      .run(wf,0,'g0','# goal',json({derivedPlan:{legs:legs.map(op=>({op})),edges}}),Date.now());
   });
   const api=(...args)=>{
     const r=spawnSync(process.execPath,[API,...args,'--repo',repo,'--json'],{cwd:ROOT,encoding:'utf8',windowsHide:true,timeout:120000,env});
@@ -194,7 +194,7 @@ test('status waits on plan edges, not on every earlier leg',t=>{
   assert.deepEqual(s.legs.map(l=>l.color),['yellow','yellow','yellow']);
 });
 
-test('without plan edges the plan is the linear chain: every earlier leg in flight holds the job',t=>{
+test('a plan whose edges are the linear chain: every earlier leg in flight holds the job',t=>{
   const w=world(t,{legs:['docs.author','test.author','review.verify']});
   w.job('a','docs.author',{status:'running'});
   w.job('c','review.verify',{status:'queued',paths:['.starciwork/review/']});
@@ -223,15 +223,17 @@ test("the Kernel's own enqueue is refused while the runtime's retry is open, nev
   assert.equal(w.read(db=>db.prepare("SELECT count(*) n FROM jobs WHERE status='queued'").get().n),1);
 });
 
-test("api plan keeps the plan edges: the plan file's own, else the recorded ones while the ops are unchanged",t=>{
+test("api plan records the plan file's own edges and refuses a file without provable ones",t=>{
   const w=world(t,{legs:['docs.author','test.author','review.verify'],edges:[['docs.author','review.verify'],['test.author','review.verify']]});
   const plan=(body)=>{const file=path.join(os.tmpdir(),`plan-${Math.random().toString(36).slice(2)}.json`);fs.writeFileSync(file,json(body));t.after(()=>fs.rmSync(file,{force:true}));
     const r=w.api('plan','--workflow',w.wf,'--file',file);assert.equal(r.status,0,r.stderr);
     return w.read(db=>JSON.parse(db.prepare('SELECT json FROM goals WHERE workflow_id=?').get(w.wf).json).derivedPlan.edges);};
   const legs=['docs.author','test.author','review.verify'].map(op=>({op}));
-  assert.deepEqual(plan({legs}),[['docs.author','review.verify'],['test.author','review.verify']],'a re-plan of the same ops keeps its edges');
   assert.deepEqual(plan({legs,edges:[['docs.author','test.author'],['test.author','review.verify']]}),[['docs.author','test.author'],['test.author','review.verify']]);
-  assert.equal(plan({legs:legs.slice(0,2)}),undefined,'another op set drops edges it was not derived for');
+  const noEdges=path.join(os.tmpdir(),'plan-noedges.json');fs.writeFileSync(noEdges,json({legs}));t.after(()=>fs.rmSync(noEdges,{force:true}));
+  const refused=w.api('plan','--workflow',w.wf,'--file',noEdges);
+  assert.equal(refused.status,1,'a re-plan without edges is refused, recorded edges are not carried over');
+  assert.match(refused.stdout+refused.stderr,/plan-edges-missing/);
   const bad=path.join(os.tmpdir(),'plan-bad.json');fs.writeFileSync(bad,json({legs,edges:[['docs.author']]}));t.after(()=>fs.rmSync(bad,{force:true}));
   assert.equal(w.api('plan','--workflow',w.wf,'--file',bad).status,1);
 });

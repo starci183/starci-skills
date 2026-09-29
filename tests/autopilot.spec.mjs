@@ -39,7 +39,7 @@ const world = (t, legs = [{ op: 'backend.implement' }, { op: 'e2e.verify' }, { o
     l.ensureWorkflow({ workflowId: WF, title: 'autopilot spec' });
     l.write.changeWorkflowPhase({workflowId:WF,to:'running',by:'test',reason:'seed autopilot workflow'});
     l.db.prepare('INSERT INTO goals(workflow_id,revision,goal_identity,markdown,json,created_at) VALUES(?,?,?,?,?,?)')
-      .run(WF, 0, 'agoal', '# goal', JSON.stringify({ opChain: { legs } }), Date.now());
+      .run(WF, 0, 'agoal', '# goal', JSON.stringify({ opChain: { legs }, derivedPlan: { legs, edges: legs.slice(1).map((l, i) => [legs[i].op, l.op]) } }), Date.now());
   });
   return repo;
 };

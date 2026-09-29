@@ -12,7 +12,7 @@ dispatch:
     refuses the dispatch environment-not-ready with one open [environment] incident; the job stays queued
     and spends no attempt. --env-gate off (or STARCI_ENV_GATE=off) skips the step.
   model: '--model <target> is only an owner-named pool or profile target (gpt-6-sol) inside the kind''s order at its tier, launched at that pool''s pin; outside it dispatch refuses model-outside-order. Without it dispatch launches the persisted route'
-  kernelBias: '--prefer/--avoid are accepted and ignored with a stderr warning (commands.route kernelBias); dispatch launches the persisted route'
+  kernelBias: '--prefer/--avoid are unknown options and refused (unknown-option; commands.route kernelBias); dispatch launches the persisted route'
   leaseTtl: 'modules/models/runtimes.yaml allocation.dispatchLeaseTtlMs unless --lease-ttl or payload.leaseTtlMs overrides it'
   reads: >-
     the job row + its workflow — including the PERSISTED `api route`
@@ -126,8 +126,7 @@ dispatch:
     seen inside the launch window — against the adapter card's
     readiness patterns + knownFailures signatures. Managed-worker identity
     is read from Orca's typed launch receipt, including
-    worker.startOptions.launch.effective (and the legacy top-level launch
-    field); missing a legacy field is not a model mismatch. An auth failure or
+    worker.startOptions.launch.effective only. An auth failure or
     known-crash signature (e.g. '401 Invalid API-key'), a terminal that
     dies, or a prompt that never lands is `dispatch-rejected`: the job
     stays NOT running, the terminal is closed (scripts/agent/lib.mjs),
@@ -135,6 +134,7 @@ dispatch:
     routed refusal, never a running ghost.
   returns: '{ok:true, packet, job:{job_id, status, lease_token}, spawn:{terminal:<handle>}|null}'
   refuses:
+    - unknown-option: '--prefer or --avoid was passed: a Kernel does not bias a route (kernelBias)'
     - 'max-ops (field `reason`): the workflow already holds min(budgets.maxOps, maxParallelOps) operations (route.maxOps above names the two numbers and which statuses hold a slot). Checked before the packet and before any Orca call, on a dry run as well as a --spawn, so nothing is reserved and nothing launches. Prints {ok:false, jobId, op, reason:"max-ops", slots:{ok:false, running, ceiling, ceilingSource, reason}} and exits 1; the job stays queued'
     - 'seam-priority (field `reason`): the workflow has one free op slot left and a queued cut seam (ordinal 1 of a cut of more than one, not held by an owner-gate or peer-wait) waits for it; a job that is not a seam never takes that slot (scripts/kernel/cut-seam.mjs, driver-loop.yaml enqueue.seamContractFirst). Prints {ok:false, jobId, op, reason:"seam-priority", seam, slots} and exits 1; dispatch the seam first'
     - 'prerequisite-unmet (field `reason`): the op''s data prerequisites fail, checked after max-ops and before the packet and any Orca call, on a dry run as well as a --spawn (scripts/kernel/prerequisites.mjs). Two checks, data only: a manifest read marked `mustExist` whose every <placeholder> the job''s owned_paths or records spell out, with no file at that path in the repository (interface.audit reads.target); and, for a read marked `designDrawn` (interface.implement reads.draws), a bound implementation record whose proved ui record (`proves`/`dependsOn` ui.<feature>.<name>) does not exist or has no settled interface.draw (state done, owner-accepted drawing current): the hard design gate, code before design is refused with code DESIGN_NOT_SETTLED and a Vietnamese explanation. interface.draw has NO layout prerequisite: a todo shell and unsettled ancestor layouts admit (see foundation-wait). An unresolved placeholder, a record outside a Work tree or an invalid tree is unknown and admits. Prints {ok:false, jobId, op, reason:"prerequisite-unmet", unmet:[{kind:record-missing, read, path}|{kind:design-not-settled, code:DESIGN_NOT_SETTLED, read, record, ui, why}], detail} and exits 1; nothing is reserved. detail reads "<op> reads <path> (reads.<id>, mustExist) and it does not exist | implementation record <r> proves ui record <ui> whose interface.draw has not settled pass (DESIGN_NOT_SETTLED). Produce the missing record or finish the dependency through the op that owns it, then run api dispatch --job <id> again; if the job binds the wrong record, enqueue a corrected job and settle this one --verdict blocked. The job stays queued and nothing was reserved or launched."'

@@ -131,21 +131,21 @@ test('operation kinds never take the kernel-function step',t=>{
 
 test('draw order and host-tool gate: interface.draw walks Devin then Codex; a pool lacking a required host tool is rejected by name',t=>{
   // regression: prefer devin-agent hoisted devin ahead of codex on interface.draw - one burned dispatch. The
-  // draw order holds Codex alone, so no prefer bias reaches another pool; a kind whose route.riskHints names
+  // draw order holds Codex alone, so no bias reaches another pool; a kind whose route.riskHints names
   // host-tool-required rejects a pool whose capabilities.hostTools lacks it, by name.
   const ownerRoot=fixture(t).dir();
   // interface.draw walks the draw order (runtimes.yaml allocation.preference.draw; owner ruling 2026-09-27): Devin,
-  // then Codex - claude-agent is not on its chain at all, whatever the prefer bias.
-  const r=run(['--kind','interface.draw','--difficulty','medium','--prefer','claude-agent','--plan','--json'],ROOT,{STARCI_OWNER_ROOT:ownerRoot});
+  // then Codex - claude-agent is not on its chain at all, whatever the owner's bias.
+  const r=run(['--kind','interface.draw','--difficulty','medium','--plan','--json'],ROOT,{STARCI_OWNER_ROOT:ownerRoot});
   assert.equal(r.status,0,r.stderr||r.error?.message);
   const body=out(r);
   assert.ok(body,`expected JSON stdout, got: ${r.stdout}`);
   assert.deepEqual((body.candidates??[]).map(c=>c.target),['devin-agent','codex-agent'],'the draw order is Devin then Codex');
-  assert.equal(body.pick?.primary?.target,'devin-agent','Devin leads the draw order; a prefer for claude-agent cannot reach it');
+  assert.equal(body.pick?.primary?.target,'devin-agent','Devin leads the draw order; claude-agent is not on it');
   // A chain with a pool that lacks the tool rejects it by name: interface.audit needs browser-dom. It walks the
   // ui order (owner routing 2026-09-26) - Codex, Devin - where both carry the tool and
   // claude-agent is not on the order at all.
-  const audit=out(run(['--kind','interface.audit','--difficulty','hard','--prefer','claude-agent','--plan','--json'],ROOT,{STARCI_OWNER_ROOT:ownerRoot}));
+  const audit=out(run(['--kind','interface.audit','--difficulty','hard','--plan','--json'],ROOT,{STARCI_OWNER_ROOT:ownerRoot}));
   assert.ok(!(audit.candidates??[]).some(x=>x.target==='claude-agent'),'claude-agent is not on the ui order');
   assert.deepEqual((audit.candidates??[]).map(x=>x.target).sort(),['codex-agent','devin-agent'],'the ui order is Codex then Devin, both carry browser-dom');
   assert.equal(audit.pick?.primary?.target,'codex-agent','Sol leads the ui order and carries the tool');
@@ -186,7 +186,7 @@ test('codex-agent launches gpt-6-sol on the hard tier and gpt-6-luna on the easy
 });
 
 test('claude-agent launches claude-opus-5-5 at the default difficulty and every tier',t=>{
-  const r=run(['--kind','architecture.decide','--prefer','claude-agent','--json'],ROOT,{STARCI_OWNER_ROOT:fixture(t).dir()});
+  const r=run(['--kind','architecture.decide','--json'],ROOT,{STARCI_OWNER_ROOT:fixture(t).dir()});
   assert.equal(r.status,0,r.stderr||r.error?.message);
   assert.deepEqual([out(r)?.pick?.target,out(r)?.pick?.model],['claude-agent','claude-opus-5-5']);
   for(const difficulty of ['easy','medium','hard','insane'])
@@ -217,12 +217,15 @@ const pick=(t,args,config=null)=>{
   return out(r);
 };
 
-test('a decide op measured medium routes to Claude Opus 5.5, and to GPT-6 Sol when Claude is unavailable',t=>{
+test('a decide op measured medium routes to Claude Opus 5.5; --prefer/--avoid are unknown args',t=>{
   const body=pick(t,['--kind','business.decide','--difficulty','medium']);
   assert.deepEqual([body.pick.target,body.pick.model],['claude-agent','claude-opus-5-5']);
   assert.deepEqual(body.workload.difficulty,{measured:'medium',floor:'hard',effective:'hard'});
-  const fallback=pick(t,['--kind','business.decide','--difficulty','medium','--avoid','claude-agent']);
-  assert.deepEqual([fallback.pick.target,fallback.pick.model],['codex-agent','gpt-6-sol']);
+  for(const flag of ['--prefer','--avoid']){
+    const r=run(['--kind','business.decide','--difficulty','medium',flag,'claude-agent','--json'],ROOT,{STARCI_OWNER_ROOT:fixture(t).dir()});
+    assert.equal(r.status,2,`${flag} is refused`);
+    assert.match(r.stderr,new RegExp(`unknown arg ${flag}`));
+  }
 });
 
 test('the unpinned kernel route resolves to GPT-6 Sol',t=>{

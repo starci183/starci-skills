@@ -13,7 +13,7 @@
 //            [--repository <repo-id>] [--cut-id <id> --cut-ordinal <n> --cut-total <n>]
 //   estimate --repo <path> --files <n> [--assertions <n>] [--components <n>] [--records <n>]
 //            [--paths <csv>] [--gear <n>]
-//   route    --repo <path> --job <job_id> [--difficulty <d>]   (--prefer/--avoid: accepted, ignored with a warning)
+//   route    --repo <path> --job <job_id> [--difficulty <d>]
 //   dispatch --repo <path> --job <job_id> [--model <target>] [--worktree <sel>] [--spawn] [--lease-ttl <ms>]
 //   reconcile --repo <path> (--orphan-kernel-jobs | --orca-tasks) [--workflow <id>] [--dry-run]
 //   nudge    --repo <path> --job <job_id>
@@ -310,7 +310,7 @@ const usage = (code) => {
   estimate --files <n> [--assertions <n>] [--components <n>] [--records <n>]
            [--paths <csv>] [--gear <n>]
            deterministic size class + agent count from runtimes.yaml allocation.slicing
-  route    --job <job_id> [--difficulty <d>]   (--prefer/--avoid are ignored: the router decides)
+  route    --job <job_id> [--difficulty <d>]
   dispatch --job <job_id> [--model <target>] [--worktree <sel>] [--spawn]
   reconcile --job <job_id> [--drop --reason <text> | --reap | --dead-worker [--settle-failed] [--no-salvage] | --release-worker | --debris [--commit]]
   reconcile --orphan-kernel-jobs [--workflow <id>] [--dry-run]   kernel jobs of finished/archived workflows -> cancelled
@@ -1739,14 +1739,13 @@ const probeQuotaSafe = async (provider) => {
   }
 };
 
-// A Kernel's per-route --prefer/--avoid: accepted so older Kernel prompts still parse, never applied
-// (owner decision 2026-09-25). The router decides from ledger facts; the owner's goal routing_bias stands.
-const KERNEL_BIAS_IGNORED = 'kernel per-route bias is not accepted; the router decides (open provider-health circuits, the retry lineage) and only the owner goal routing_bias applies';
-const kernelBiasIgnored = (args) => {
-  const prefer = csvList(args.prefer), avoid = csvList(args.avoid);
-  return prefer.length || avoid.length ? { prefer, avoid, reason: KERNEL_BIAS_IGNORED } : null;
+// A Kernel does not bias a route (owner decision 2026-09-25): `api route` and `api dispatch` refuse
+// --prefer/--avoid as unknown options. The router decides from ledger facts; the owner's goal
+// routing_bias is the only bias.
+const refuseKernelBias = (verb, args) => {
+  const flags = ['prefer', 'avoid'].filter((name) => args[name] !== undefined);
+  if (flags.length) throw Object.assign(new Error(`api ${verb}: unknown option ${flags.map((f) => `--${f}`).join(', ')}; the router decides (open provider-health circuits, the retry lineage) and only the owner goal routing_bias applies`), { code: 'unknown-option' });
 };
-const biasIgnoredText = (b) => `${[b.prefer.length ? `--prefer ${b.prefer.join(',')}` : null, b.avoid.length ? `--avoid ${b.avoid.join(',')}` : null].filter(Boolean).join(' ')} ignored: ${b.reason}`;
 
 const normalizeProviderId = (provider) => {
   const id = String(provider ?? '').trim().toLowerCase();
@@ -1941,9 +1940,8 @@ function recordWorkerOutageEvidence(ledger, workers, now = Date.now()) {
 // `api route` — resolve the pool/model for one job and persist the decision on
 // its payload so `dispatch --spawn` launches exactly what was routed. Bias: only
 // the owner's routing_bias {prefer[], avoid[]} on the workflow goal's json
-// (define-goal). A Kernel's --prefer/--avoid is accepted for compatibility and
-// IGNORED with a warning, recorded as biasIgnored on route-decided (owner decision
-// 2026-09-25: starci-next op-interface.implement-c3bcc0d5e4 was routed around
+// (define-goal). A Kernel's --prefer/--avoid is refused as an unknown option
+// (owner decision 2026-09-25: starci-next op-interface.implement-c3bcc0d5e4 was routed around
 // devin-agent onto codex on a hunch). The router itself skips a
 // pool whose provider-health circuit is open (capacity below) and, for a retry,
 // demotes or excludes the pools its lineage failed on (scripts/kernel/lineage-route.mjs).
@@ -4660,7 +4658,7 @@ const API_EXT = await loadApiExtensions();
 const API_INTERNALS = Object.freeze({
   skillRoot, SETTLED, opSlotAdmission, queuedSeamsOf, observeOperationWorker, AGENT_HIERARCHY_SCHEMA,
   kernelNodeId, operationNodeId, openOwnerGates, ownerGateOf, refuseStaleKernelRev, latestGraphNodesOf,
-  deferQueuedTestLeg, kernelBiasIgnored, biasIgnoredText, providerHealthOf, circuitClearHint, resolveModel,
+  deferQueuedTestLeg, refuseKernelBias, providerHealthOf, circuitClearHint, resolveModel,
   buildPacket, bestEffort, rejectDispatch, recordGateAnswers, DISPATCH_LEASE_TTL_MS, opLeaseRequests,
   livePathLeaseWait, reserveOpLeases, buildContractMarkdown, fileContract, envServicesOf, servingWorktreeOf,
   environmentPreStep, raiseEnvironmentIncident, MANAGED_KINDS, recordLaunchTerminal, ensureWorkflowRun,

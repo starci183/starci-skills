@@ -30,7 +30,7 @@ const FINISHED_AFTER_SPINNER=[
 // A live Codex turn: the spinner sits directly above the input row.
 const SPINNER_LAST=[
   '• Slice 2 launch was rejected before an accepted contract; rerouting it.',
-  '• Ran node scripts/kernel/api.mjs route --job op-x --prefer devin-agent --json',
+  '• Ran node scripts/kernel/api.mjs route --job op-x --json',
   '  └ {"ok": true}',
   '• Working (3m 44s • esc to interrupt) · 1 background terminal running · /ps to view',
   '› Ask Codex to do anything',

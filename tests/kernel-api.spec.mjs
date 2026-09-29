@@ -289,7 +289,7 @@ test('status explains every queued job: ready, dependency, path-lease, pool-full
   // An earlier approved leg that was never enqueued is not a wait: intake legs
   // often have no job, and a plan that moved past a leg does not re-block on it.
   seed(repo,ledger=>ledger.db.prepare('UPDATE goals SET json=? WHERE workflow_id=? AND revision=0')
-    .run(json({opChain:{legs:[{op:'scope.define'},{op:'docs.author'}]}}),wf));
+    .run(json({opChain:{legs:[{op:'scope.define'},{op:'docs.author'}]},derivedPlan:{legs:[{op:'scope.define'},{op:'docs.author'}],edges:[['scope.define','docs.author']]}}),wf));
   assert.notEqual(because(second,statusOf()).queuedBecause,'dependency','a leg with no job holds nothing');
 
   // dependency outranks everything once the earlier leg has a job still queued

@@ -5,7 +5,7 @@ import { parseJson } from '../../lib/json.mjs';
 import { setInboxStatusByKey, updateGoalJson } from '../../../engine/ledger-db.mjs';
 import { getWorkflow, goalJsonOf, latestGoal } from '../api-lib/rows.mjs';
 import { HANDOVER_OP } from '../handover.mjs';
-import { legOpsOf } from '../../route/plan-edges.mjs';
+import { planGraphOf } from '../../route/plan-edges.mjs';
 import { deferredTestsOf, ownerSpecs, planLegDeferral, specsOff } from '../spec-deferral.mjs';
 
 export default {
@@ -21,10 +21,12 @@ export default {
     const plan = parseJson(fs.readFileSync(file, 'utf8'));
     if (!plan || !Array.isArray(plan.legs) || plan.legs.some((l) => !l || typeof l.op !== 'string' || !l.op)
       || (plan.edges !== undefined && (!Array.isArray(plan.edges) || plan.edges.some((e) => !Array.isArray(e) || e.length !== 2 || e.some((label) => typeof label !== 'string' || !label))))) {
-      throw Object.assign(new Error(`invalid plan file ${file} — expected {legs:[{op,paths?,notes?}], edges?:[[fromLeg,toLeg]]}`), { code: 'plan-file-invalid' });
+      throw Object.assign(new Error(`invalid plan file ${file} — expected {legs:[{op,paths?,notes?}], edges:[[fromLeg,toLeg]]}`), { code: 'plan-file-invalid' });
     }
     const legs = plan.legs.map((l) => ({ op: l.op, ...(l.paths ? { paths: l.paths } : {}), ...(l.notes ? { notes: l.notes } : {}) }));
     const planOps = legs.map((l) => l.op);
+    // Edges are required and must be provable over the legs (absent, partial, unknown or cyclic: plan-edges-missing).
+    planGraphOf({ legs, edges: plan.edges });
 
     if (!getWorkflow(db, workflowId)) throw Object.assign(new Error(`unknown workflow ${workflowId}`), { code: 'workflow-unknown' });
     const g = latestGoal(db, workflowId);
@@ -62,11 +64,8 @@ export default {
     ledger.transaction(() => {
       if (g) {
         const gj = goalJsonOf(g);
-        // The plan's own edges, else the recorded ones while the leg set is unchanged (scripts/route/plan-edges.mjs reads them).
-        const prior = gj.derivedPlan ?? null;
-        const edges = Array.isArray(plan.edges) ? plan.edges
-          : Array.isArray(prior?.edges) && JSON.stringify(legOpsOf(prior.legs).sort()) === JSON.stringify([...new Set(planOps)].sort()) ? prior.edges : null;
-        gj.derivedPlan = { legs, ...(edges ? { edges } : {}), divergence, lineage, derivedAt: now };
+        // The plan's own edges (scripts/route/plan-edges.mjs reads them), proven above.
+        gj.derivedPlan = { legs, edges: plan.edges ?? [], divergence, lineage, derivedAt: now };
         updateGoalJson(db, { goalSeq: g.goal_seq, goal: gj, at: now });
         inboxApplied = setInboxStatusByKey(db, { workflowId, kind: 'goal-revision', key: `${workflowId}:${g.revision}`, onlyStatus: 'pending', status: 'applied',
           disposition: { action: 'plan-derived', revision: g.revision, lineage }, at: now });

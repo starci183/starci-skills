@@ -52,12 +52,11 @@ export default {
   kernelOnly: true,
   usageInCore: true,
   run({ ledger, args, repo, emit, internals }) {
-    const { skillRoot, SETTLED, opSlotAdmission, queuedSeamsOf, observeOperationWorker, AGENT_HIERARCHY_SCHEMA, kernelNodeId, operationNodeId, openOwnerGates, ownerGateOf, refuseStaleKernelRev, latestGraphNodesOf, deferQueuedTestLeg, kernelBiasIgnored, biasIgnoredText, providerHealthOf, circuitClearHint, resolveModel, buildPacket, bestEffort, rejectDispatch, recordGateAnswers, DISPATCH_LEASE_TTL_MS, opLeaseRequests, livePathLeaseWait, reserveOpLeases, buildContractMarkdown, fileContract, envServicesOf, servingWorktreeOf, environmentPreStep, raiseEnvironmentIncident, MANAGED_KINDS, recordLaunchTerminal, ensureWorkflowRun, createOperationTask, opLaunchEnv, opGuardLaunch } = internals;
+    const { skillRoot, SETTLED, opSlotAdmission, queuedSeamsOf, observeOperationWorker, AGENT_HIERARCHY_SCHEMA, kernelNodeId, operationNodeId, openOwnerGates, ownerGateOf, refuseStaleKernelRev, latestGraphNodesOf, deferQueuedTestLeg, refuseKernelBias, providerHealthOf, circuitClearHint, resolveModel, buildPacket, bestEffort, rejectDispatch, recordGateAnswers, DISPATCH_LEASE_TTL_MS, opLeaseRequests, livePathLeaseWait, reserveOpLeases, buildContractMarkdown, fileContract, envServicesOf, servingWorktreeOf, environmentPreStep, raiseEnvironmentIncident, MANAGED_KINDS, recordLaunchTerminal, ensureWorkflowRun, createOperationTask, opLaunchEnv, opGuardLaunch } = internals;
 
   const db = ledger.db, jobId = args.job;
-  // Dispatch never re-decides the route; a Kernel's --prefer/--avoid here is ignored like on api route.
-  const dispatchBiasIgnored = kernelBiasIgnored(args);
-  if (dispatchBiasIgnored) console.error(`api dispatch WARNING: ${biasIgnoredText(dispatchBiasIgnored)}; dispatch launches the persisted route`);
+  // Dispatch never re-decides the route; a Kernel's --prefer/--avoid is an unknown option here as on api route.
+  refuseKernelBias('dispatch', args);
   const job = db.prepare('SELECT * FROM jobs WHERE job_id=?').get(jobId);
   if (!job) throw Object.assign(new Error(`unknown job ${jobId}`), { code: 'job-unknown' });
   if (SETTLED.includes(job.status)) throw Object.assign(new Error(`job ${jobId} is already settled (${job.status})`), { code: 'job-settled' });

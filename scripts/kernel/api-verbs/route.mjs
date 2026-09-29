@@ -10,11 +10,12 @@ export default {
     const { FINAL_SETTLED, refuseSettleBacklog, operationTerminalHandleOf, observeOperationWorker,
       jobPayloadOf, deferQueuedTestLeg, releaseTypedWaits, ownerGateOf, openOwnerGates, openPeerWaits,
       PEER_WAIT, opSlotAdmission, livePathLeaseWait, goalJsonOf, latestGoal, csvList,
-      kernelBiasIgnored, biasIgnoredText, lineageRouteAdjust, path, fs, skillRoot, parseYaml,
+      refuseKernelBias, lineageRouteAdjust, path, fs, skillRoot, parseYaml,
       poolLoadOf, accountList, normalizeProviderId, probeQuotaSafe, providerHealthOf,
       circuitClearHint, ownerRoot, configuredAllocationPolicy, loadConfig, recentDispatchCounts,
       kindRouteOf, auditAuthorOf, isFanOutSlice, selectPool, AGENT_HIERARCHY_SCHEMA,
       operationNodeId, kernelNodeId, blockingViewOf } = internals;
+  refuseKernelBias('route', args);
   const db = ledger.db, jobId = args.job;
   const job = db.prepare('SELECT * FROM jobs WHERE job_id=?').get(jobId);
   if (!job) throw Object.assign(new Error(`unknown job ${jobId}`), { code: 'job-unknown' });
@@ -74,8 +75,6 @@ export default {
   const gj = goalJsonOf(latestGoal(db, job.workflow_id));
   const goalBias = gj.routing_bias ?? {};
   const bias = { prefer: [...new Set(csvList(goalBias.prefer))], avoid: [...new Set(csvList(goalBias.avoid))] };
-  const biasIgnored = kernelBiasIgnored(args);
-  if (biasIgnored) console.error(`api route WARNING: ${biasIgnoredText(biasIgnored)}`);
   // A retry learns from its own lineage: pools its earlier attempts failed on for a pool-attributable
   // cause are demoted (once) or excluded (twice) for it (scripts/kernel/lineage-route.mjs).
   // A lineage read that throws never blocks the route: it routes unadjusted and says why.
@@ -157,7 +156,7 @@ export default {
     demoted: lineage.demote, excluded: lineage.exclude, pools: lineage.pools,
     attempts: lineage.attempts, demotedTaken: decision?.lineage?.demotedTaken ?? false,
   } : lineageError ? { demoted: [], excluded: [], error: lineageError } : null;
-  const routeFacts = { ...(biasIgnored ? { biasIgnored } : {}), ...(lineageAdjust ? { lineageAdjust } : {}) };
+  const routeFacts = { ...(lineageAdjust ? { lineageAdjust } : {}) };
   if (decision?.toolUnavailable) {
     const { tools, holders } = decision.toolUnavailable;
     const serving = holders.filter((h) => h.roles.includes(decision.role) || (decision.order && h.roles.includes(decision.order)));
@@ -225,7 +224,6 @@ export default {
   emit(out, [
     `route ${jobId} (${kind}, ${difficulty}) → ${decided.model} model=${decided.modelId ?? '-'} effort=${decided.effort ?? '-'}`,
     `  chain: ${decided.routeChain.join(' → ') || '(none)'}`,
-    ...(biasIgnored ? [`  bias IGNORED: ${biasIgnoredText(biasIgnored)}`] : []),
     ...(lineageAdjust && (lineageAdjust.demoted.length || lineageAdjust.excluded.length)
       ? [`  retry lineage: ${[...lineageAdjust.demoted.map((p) => `${p} demoted`), ...lineageAdjust.excluded.map((p) => `${p} excluded`)].join(', ')} (${Object.entries(lineageAdjust.pools).map(([p, v]) => `${p}: ${v.causes.join(', ')}`).join('; ')})${lineageAdjust.demotedTaken ? '; no other pool was eligible' : ''}`]
       : []),

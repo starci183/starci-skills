@@ -186,7 +186,7 @@ test('the Kernel recovers an open circuit, and route then admits the pool', asyn
   const kernel = { ORCA_TERMINAL_HANDLE: KERNEL_TERMINAL };
   const recover = ['provider-health', '--repo', repo, '--provider', 'devin', '--recover', '--reason', 'auth restored', '--json'];
 
-  const before = await runApi(env(), 'route', '--repo', repo, '--job', 'op-docs-queued', '--prefer', 'devin-agent', '--json');
+  const before = await runApi(env(), 'route', '--repo', repo, '--job', 'op-docs-queued', '--json');
   assert.equal(before.status, 0, before.stderr || before.stdout);
   assert.ok(devinRejection(before), 'a circuit without a fingerprint holds until recovered');
 
@@ -209,7 +209,7 @@ test('the Kernel recovers an open circuit, and route then admits the pool', asyn
   const again = await runApi(env(kernel), ...recover);
   assert.equal(out(again)?.recovered, false, 'nothing open is nothing to recover');
 
-  const admitted = await runApi(env(), 'route', '--repo', repo, '--job', 'op-docs-queued', '--prefer', 'devin-agent', '--json');
+  const admitted = await runApi(env(), 'route', '--repo', repo, '--job', 'op-docs-queued', '--json');
   assert.equal(admitted.status, 0, admitted.stderr || admitted.stdout);
   assert.equal(out(admitted)?.decision?.model, 'devin-agent', 'route admits the recovered pool');
   assert.equal(devinRejection(admitted), undefined);

@@ -1,0 +1,36 @@
+id: router-no-compat-args
+effectiveAt: '2026-09-29T18:00:00+07:00'
+summary: "owner rule: .claude keeps no backward compatibility. api route and api dispatch no longer accept --prefer/--avoid (they were parsed, ignored with a warning and recorded as biasIgnored): both refuse them with the typed error unknown-option, and route-decided/answers no longer carry biasIgnored; route-model.mjs drops the flags and its bias plumbing. The only routing bias is the owner goal routing_bias. api plan now requires the plan file's edges (refused plan-edges-missing when absent, partial, naming an unknown leg or cyclic); the recorded-edges carry-over is gone, planGraphOf reads derivedPlan.edges only (no opChain.edges or linear-chain fallback), and a goal whose derivedPlan lacks edges is refused plan-edges-missing by api status. define-goal derivedPlan requires route-plan's edges. Incident text no longer describes free-text incidents as backward compatible, and the driver-loop circuit-recovery rule drops the predates-fingerprints case; the dispatch contract reads Orca worker launch only from startOptions.launch.effective. Kernels must call: api route --job <id> [--difficulty <d>]; api dispatch --job <id> [--spawn] [--model <t>] [--worktree <sel>] [--lease-ttl <ms>] [--env-gate off]; api plan --workflow <id> --file <plan.json with legs AND edges> [lineage flags]."
+paths:
+  - scripts/kernel/api.mjs
+  - scripts/kernel/api-verbs/route.mjs
+  - scripts/kernel/api-verbs/dispatch.mjs
+  - scripts/kernel/api-verbs/plan.mjs
+  - scripts/kernel/api-verbs/incident.mjs
+  - scripts/kernel/lineage-route.mjs
+  - scripts/route/route-model.mjs
+  - scripts/route/plan-edges.mjs
+  - scripts/goal/define-goal.mjs
+  - modules/kernel/api-commands/route.yaml
+  - modules/kernel/api-commands/dispatch.yaml
+  - modules/kernel/api-commands/incident.yaml
+  - modules/kernel/api-commands/plan.yaml
+  - modules/kernel/driver-loop.yaml
+  - modules/schemas/goal-plan.yaml
+  - tests/plan-edges.spec.mjs
+  - tests/route-model.spec.mjs
+  - tests/route-lineage.spec.mjs
+  - tests/allocation-balance.spec.mjs
+  - tests/managed-dispatch.spec.mjs
+  - tests/qwen-base-pool.spec.mjs
+  - tests/provider-health-recover.spec.mjs
+  - tests/stale-active-liveness.spec.mjs
+  - tests/ask-kinds.spec.mjs
+  - tests/autopilot.spec.mjs
+  - tests/handover.spec.mjs
+  - tests/kernel-api.spec.mjs
+  - tests/provision-unstick.spec.mjs
+  - tests/settle-next-step.spec.mjs
+  - tests/supervisor-gate-hold-wait.spec.mjs
+  - tests/work-graph-runtime.spec.mjs
+reach: new-legs

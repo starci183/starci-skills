@@ -1,10 +1,10 @@
-// The router decides, the Kernel does not bias: api route ignores --prefer/--avoid, and a retry learns
+// The router decides, the Kernel does not bias: api route refuses --prefer/--avoid, and a retry learns
 // from its own lineage (scripts/kernel/lineage-route.mjs).
 //
 // Live defect (starci-next wf-sn-foundation, owner decision 2026-09-25): the Kernel routed
 // op-interface.implement-c3bcc0d5e4 with --avoid devin-agent,devin-agent; route-decided carried the avoid
 // and the job went to codex gpt-6-luna, defeating the evidence routing that sends implementation to Devin
-// first. Now a Kernel's per-route bias is ignored with a warning and recorded as biasIgnored; the router
+// first. Now a Kernel's per-route bias is refused as an unknown option; the router
 // skips pools with an open provider-health circuit, demotes a pool the retry's lineage failed on once for a
 // pool-attributable cause and excludes it after two, never for a product or environment failure, and the
 // owner's goal routing_bias still applies.
@@ -103,27 +103,30 @@ const openCircuit = (repo, provider, failureKind = 'auth') => {
   finally{machine.close();}
 };
 
-test('a Kernel --avoid/--prefer is ignored with a warning and recorded as biasIgnored; the job goes to Devin', (t) => {
+test('a Kernel --avoid/--prefer is an unknown option on api route: refused, nothing routed', (t) => {
   const repo = tmp(t, 'starci-route-ignored-');
   seedWorkflow(repo);
-  const r = route(t, repo, ['--avoid', 'devin-agent,devin-agent', '--prefer', 'codex-agent']);
-  assert.equal(r.decision.model, 'devin-agent', 'implementation routes to Devin first, whatever the Kernel asked');
-  assert.deepEqual(r.bias, { prefer: [], avoid: [] }, 'no Kernel bias is applied');
-  assert.match(r.stderr, /api route WARNING: --prefer codex-agent --avoid devin-agent,devin-agent ignored: kernel per-route bias is not accepted/);
-  const ev = routeDecided(repo);
-  assert.deepEqual([ev.biasIgnored.prefer, ev.biasIgnored.avoid], [['codex-agent'], ['devin-agent', 'devin-agent']]);
-  assert.match(ev.biasIgnored.reason, /the router decides/);
-  assert.equal(ev.model, 'devin-agent');
-  assert.equal(ev.lineageAdjust, undefined, 'a first attempt has no lineage');
+  for (const args of [['--avoid', 'devin-agent'], ['--prefer', 'codex-agent']]) {
+    const r = spawnSync(process.execPath, [API, 'route', '--repo', repo, '--job', JOB, ...args, '--json'],
+      { cwd: ROOT, env: env(t, 'prefer-then-overflow', repo), encoding: 'utf8', windowsHide: true, timeout: 120000 });
+    assert.notEqual(r.status, 0);
+    assert.match(`${r.stderr}${r.stdout}`, /unknown-option|unknown option/);
+    assert.equal(read(repo, (l) => l.db.prepare("SELECT count(*) n FROM events WHERE kind='route-decided'").get().n), 0, 'no route was decided');
+  }
+  const ok = route(t, repo);
+  assert.equal(ok.decision.model, 'devin-agent', 'implementation routes to Devin first');
+  assert.deepEqual(ok.bias, { prefer: [], avoid: [] }, 'no Kernel bias is applied');
+  assert.equal(routeDecided(repo).lineageAdjust, undefined, 'a first attempt has no lineage');
 });
 
-test('api dispatch ignores --prefer/--avoid with the same warning', (t) => {
+test('api dispatch refuses --prefer/--avoid as unknown options', (t) => {
   const repo = tmp(t, 'starci-dispatch-ignored-');
   seedWorkflow(repo);
   route(t, repo);
   const r = spawnSync(process.execPath, [API, 'dispatch', '--repo', repo, '--job', JOB, '--avoid', 'devin-agent', '--json'],
     { cwd: ROOT, env: env(t, 'prefer-then-overflow', repo), encoding: 'utf8', windowsHide: true, timeout: 120000 });
-  assert.match(r.stderr, /api dispatch WARNING: --avoid devin-agent ignored: kernel per-route bias is not accepted.*dispatch launches the persisted route/);
+  assert.notEqual(r.status, 0);
+  assert.match(`${r.stderr}${r.stdout}`, /unknown-option|unknown option/);
 });
 
 test('the router still skips a pool whose provider-health circuit is open, naming its failureKind', (t) => {
@@ -239,8 +242,7 @@ test('attempt causes: model-quality fails count, a failed report or a first red 
 test('the goal routing_bias (the owner\'s) is always honoured', (t) => {
   const repo = tmp(t, 'starci-route-goal-');
   seedWorkflow(repo, { goalBias: { prefer: [], avoid: ['devin-agent'] } });
-  const r = route(t, repo, ['--avoid', 'devin-agent']);
+  const r = route(t, repo);
   assert.notEqual(r.decision.model, 'devin-agent');
-  assert.deepEqual(r.bias.avoid, ['devin-agent'], 'the owner\'s avoid applies; the Kernel\'s does not');
-  assert.deepEqual(routeDecided(repo).biasIgnored.avoid, ['devin-agent']);
+  assert.deepEqual(r.bias.avoid, ['devin-agent'], 'the owner\'s avoid applies');
 });

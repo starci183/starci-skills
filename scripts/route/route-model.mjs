@@ -21,9 +21,6 @@
 //                               medium; required with --plan), raised to the
 //                               kind's runtimes.yaml roleOfKind floor; alias
 //                               spellings (s|m|l|xl, 'high') are normalized
-//       [--prefer <pool>[,<pool>...]] [--avoid <pool>[,<pool>...]]
-//                               bounded pool bias over the walked chain (prefer
-//                               hoists, avoid removes; never bypasses eligibility)
 //       [--plan]                what-if view: walk the runtimes.yaml difficulty tier
 //                               (∩ per-role preference) instead of the declared
 //                               operator chain; missing or stale qualification
@@ -48,7 +45,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { parseYaml } from '../../engine/yaml.mjs';
-import { normalizeDifficulty, chainFor, applyBias, resolveLaunchModel, kindRoute, orderKeyOf, raiseToFloor, missingHostTools,
+import { normalizeDifficulty, chainFor, resolveLaunchModel, kindRoute, orderKeyOf, raiseToFloor, missingHostTools,
   providerAvailability, providerCircuitOf } from '../agent/models.mjs';
 import { inspectOwnerConfig } from '../../engine/config.mjs';
 import { inspectLedger, ledgerFileFor } from '../../engine/ledger-db.mjs';
@@ -118,7 +115,7 @@ function capacityDrift(candidates, runtimes) {
 }
 
 function parseArgs(argv) {
-  const a = { tools: [], prefer: [], avoid: [] };
+  const a = { tools: [] };
   const take = i => {
     const v = argv[i + 1];
     if (v === undefined) { console.error(`missing value for ${argv[i]}`); process.exit(2); }
@@ -145,8 +142,6 @@ function parseArgs(argv) {
     else if (k === '--no-review') a.review = false;
     else if (k === '--no-checks') a.checks = false;
     else if (k === '--difficulty') a.difficulty = take(i), i++;
-    else if (k === '--prefer') a.prefer.push(...take(i).split(',')), i++;
-    else if (k === '--avoid') a.avoid.push(...take(i).split(',')), i++;
     else if (k === '--plan') a.plan = true;
     else if (k === '--json') a.json = true;
     else if (k === '--verbose') a.verbose = true;
@@ -155,9 +150,6 @@ function parseArgs(argv) {
     else { console.error(`unknown arg ${k}`); process.exit(2); }
   }
   a.tools = [...new Set(a.tools.map(s => s.trim()).filter(Boolean))].sort();
-  a.prefer = [...new Set(a.prefer.map(s => s.trim()).filter(Boolean))];
-  a.avoid = [...new Set(a.avoid.map(s => s.trim()).filter(Boolean))];
-  a.bias = (a.prefer.length || a.avoid.length) ? { prefer: a.prefer, avoid: a.avoid } : null;
   if (a.difficulty != null) a.difficulty = normalizeDifficulty(a.difficulty) ?? a.difficulty;
   return a;
 }
@@ -314,13 +306,10 @@ const PLAN_EVIDENCE_ABSENT = new Set([
 
 // The (role, difficulty) chain is shared with scripts/agent/models.mjs: pools
 // in BOTH the tier order and the per-role preference, tier position outer
-// sort, then --prefer/--avoid bias applied (hoist/remove — never eligibility).
-function planChain(runtimes, difficulty, role, bias) {
+// sort.
+function planChain(runtimes, difficulty, role) {
   const { chain, tierSource } = chainFor({ role, difficulty, runtimes });
-  const biased = applyBias(chain, bias);
-  const src = `${tierSource} ∩ allocation.preference.${role ?? '(none)'}` +
-    (bias ? ' + bias' : '');
-  return { chain: biased, source: src };
+  return { chain, source: `${tierSource} ∩ allocation.preference.${role ?? '(none)'}` };
 }
 
 function planEvidenceNote(evidence, qr) {
@@ -371,7 +360,7 @@ function planCandidates(chain, runtimes, w, rules, evidenceByRuntime, difficulty
 }
 
 function runPlan(args, rules, runtimes, w, evidenceByRuntime, owner = {}, profileCap = {}) {
-  const { chain, source } = planChain(runtimes, args.difficulty, orderKeyOf({ work: w.work, order: w.order }, w.role), args.bias);
+  const { chain, source } = planChain(runtimes, args.difficulty, orderKeyOf({ work: w.work, order: w.order }, w.role));
   const evaluated = planCandidates(chain, runtimes, w, rules, evidenceByRuntime, args.difficulty, profileCap);
   // Pickable = not structurally off the chain, and any rejection rests only on
   // absent/stale evidence (annotation, not a real disqualification) — the point
@@ -575,10 +564,6 @@ async function main() {
     order = kernelGroup;
     orderSource = kernelGroupSource;
   }
-  // --prefer/--avoid: the same bounded pool bias models.mjs::applyBias applies —
-  // prefer hoists, avoid removes; eligibility gates below are untouched.
-  const declaredOrder = order;
-  if (args.bias) { order = applyBias(order, args.bias); orderSource += ' + bias(--prefer/--avoid)'; }
   const ordered = [...candidates].sort((a, b) => {
     const pa = preferredProvider && a.provider === preferredProvider ? 0 : 1;
     const pb = preferredProvider && b.provider === preferredProvider ? 0 : 1;
@@ -591,7 +576,7 @@ async function main() {
   const evaluated = ordered.map(c => {
     // Think work runs only on its think-class order - the frontier pools for
     // think, or the kind's own declared order (review, ui, implement) or the
-    // kernel functions' sol-think order; neither a declared chain, a --prefer
+    // kernel functions' sol-think order; neither a declared chain
     // nor preferredProvider can move it anywhere else.
     if (think && !thinkPools.includes(c.id))
       return { c, eligible: false, mode: null, reasons: [`think work runs only on runtimes.yaml allocation.preference.${thinkKey}`] };
@@ -600,9 +585,7 @@ async function main() {
     // (interface.draw → [devin-agent, codex-agent] only; kernelManager → its pool only).
     if (chainDeclared && !order.includes(c.id))
       return { c, eligible: false, mode: null, reasons: [
-        args.bias?.avoid?.includes(c.id) && declaredOrder.includes(c.id)
-          ? `pool removed by --avoid bias`
-          : `pool is not on the declared chain for ${args.kind} (${orderSource})`] };
+        `pool is not on the declared chain for ${args.kind} (${orderSource})`] };
     // A pool serves the kind when it serves its role or the order the kind
     // walks (models.mjs::selectPool applies the same gate).
     if (w.role && c.roles.length && !c.roles.includes(w.role) && !c.roles.includes(orderKey))
@@ -670,7 +653,6 @@ async function main() {
     pick: pick ? { target: pick.c.target, model: modelFor(pick.c), mode: pick.mode, profile: pick.c.profile } : null,
     rule,
     orderSource,
-    ...(args.bias ? { bias: args.bias } : {}),
     fallbackChain: pickedSet.slice(1).map(e => ({ target: e.c.target, model: modelFor(e.c), mode: e.mode })),
     fallbackPolicy: rules.fallbackAdvanceWhen,
     rejected: evaluated.filter(e => !e.eligible).map(e => ({ target: e.c.target, reasons: e.reasons })),
@@ -698,7 +680,6 @@ async function main() {
       console.log(`  rule: ${rule}`);
       console.log(`  order: ${orderSource}`);
       if (result.availability) console.log(`  availability: ${Object.entries(result.availability).map(([t, a]) => `${t}=${a.state}`).join(' ')}`);
-      if (args.bias) console.log(`  bias: prefer=[${args.bias.prefer}] avoid=[${args.bias.avoid}]`);
       if (result.fallbackChain.length) {
         console.log('fallback chain:');
         for (const f of result.fallbackChain) console.log(`  -> ${f.target} (${f.model}) [${f.mode}]`);

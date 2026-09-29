@@ -4,8 +4,8 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
-import { inspectLedger, ledgerFileFor, openLedger } from '../engine/ledger-db.mjs';
-import { planEdgesOf, planGraphOf, planAncestorsOf, linearEdgesOf } from '../scripts/route/plan-edges.mjs';
+import { inspectLedger, ledgerFileFor } from '../engine/ledger-db.mjs';
+import { planEdgesOf, planGraphOf, planAncestorsOf } from '../scripts/route/plan-edges.mjs';
 
 const ROOT = path.resolve(import.meta.dirname, '..');
 const ROUTE_PLAN = path.join(ROOT, 'scripts', 'route', 'route-plan.mjs');
@@ -57,27 +57,24 @@ test('AUTH: unrelated legs no longer depend on each other', () => {
   assert.deepEqual(ancestors.get('handover.review'), ops.filter(op => op !== 'handover.review'));
 });
 
-test('planEdgesOf: legacy plan without edges is the linear chain', () => {
-  const legs = [{ op: 'a' }, { op: 'b' }, { op: 'c' }];
-  assert.deepEqual(planEdgesOf({ opChain: { legs } }), [['a', 'b'], ['b', 'c']]);
-  assert.deepEqual(planEdgesOf({ derivedPlan: { legs }, opChain: null }), linearEdgesOf(['a', 'b', 'c']));
-  assert.equal(planGraphOf({ derivedPlan: null, opChain: null }).edges.length, 0);
-  const ancestors = planAncestorsOf({ opChain: { legs } });
-  assert.deepEqual(ancestors.get('c'), ['a', 'b']);
-});
-
-test('planEdgesOf: sources and fallbacks', () => {
+test('planGraphOf: a plan without provable edges is refused plan-edges-missing (no linear fallback)', () => {
   const legs = [{ op: 'a' }, { op: 'b' }, { op: 'c' }];
   const edges = [['a', 'b'], ['a', 'c']];
-  assert.deepEqual(planGraphOf({ derivedPlan: { legs, edges } }), { ops: ['a', 'b', 'c'], edges, source: 'derivedPlan' });
-  // api plan replaced derivedPlan without edges: opChain's edges hold when the ops match
-  assert.equal(planGraphOf({ derivedPlan: { legs }, opChain: { legs, edges } }).source, 'opChain');
-  // a Kernel plan with a leg the chain does not hold is not covered by its edges
-  assert.equal(planGraphOf({ derivedPlan: { legs: [...legs, { op: 'd' }] }, opChain: { legs, edges } }).source, 'linear');
+  const refused = (plan) => assert.throws(() => planGraphOf(plan), { code: 'plan-edges-missing' });
+  refused({ opChain: { legs } });
+  refused({ derivedPlan: { legs }, opChain: null });
+  // opChain's edges no longer stand in for a derivedPlan without them
+  refused({ derivedPlan: { legs }, opChain: { legs, edges } });
   // edges that leave a leg untouched, name an unknown leg, or cycle are not trusted
-  assert.equal(planGraphOf({ derivedPlan: { legs, edges: [['a', 'b']] } }).source, 'linear');
-  assert.equal(planGraphOf({ derivedPlan: { legs, edges: [['a', 'x'], ['b', 'c']] } }).source, 'linear');
-  assert.equal(planGraphOf({ derivedPlan: { legs, edges: [['a', 'b'], ['b', 'c'], ['c', 'a']] } }).source, 'linear');
+  refused({ derivedPlan: { legs, edges: [['a', 'b']] } });
+  refused({ derivedPlan: { legs, edges: [['a', 'x'], ['b', 'c']] } });
+  refused({ derivedPlan: { legs, edges: [['a', 'b'], ['b', 'c'], ['c', 'a']] } });
+  refused({ legs });
+  assert.throws(() => planAncestorsOf({ derivedPlan: { legs } }), { code: 'plan-edges-missing' });
+  // no legs, no graph; a single leg needs no edges
+  assert.equal(planGraphOf({ derivedPlan: null, opChain: null }).edges.length, 0);
+  assert.deepEqual(planGraphOf({ derivedPlan: { legs: [{ op: 'a' }], edges: [] } }).edges, []);
+  assert.deepEqual(planGraphOf({ derivedPlan: { legs, edges } }), { ops: ['a', 'b', 'c'], edges, source: 'derivedPlan' });
   // leg labels collapse to op ids
   const staged = { legs: [{ op: 'x' }, { op: 'w', instance: 'stacks' }, { op: 'y' }], edges: [['x', 'w#stacks'], ['w#stacks', 'y']] };
   assert.deepEqual(planEdgesOf(staged), [['x', 'w'], ['w', 'y']]);
@@ -98,22 +95,3 @@ test('define-goal persists derivedPlan.edges alongside the opChain', t => {
   assert.equal(planGraphOf(goal).source, 'derivedPlan');
   assert.ok(!planAncestorsOf(goal).get('interface.implement').includes('backend.implement'));
 });
-
-function seedLegacy(repo, { derivedOps }) {
-  const plan = auth();
-  const legacyChain = { ...plan, edges: undefined, legs: plan.legs.filter(l => l.op !== 'handover.review') };
-  const ledger = openLedger({ file: ledgerFileFor(repo) });
-  try {
-    const now = Date.now();
-    const seed = (workflowId, goalJson) => {
-      ledger.ensureWorkflow({ workflowId, title: workflowId, ledgerMode: 'durable', sourceRoots: [repo] });
-      ledger.db.prepare("UPDATE workflows SET phase='running' WHERE workflow_id=?").run(workflowId);
-      ledger.db.prepare('INSERT INTO goals(workflow_id,revision,goal_identity,markdown,json,created_at) VALUES(?,?,?,?,?,?)')
-        .run(workflowId, 0, 'id', AUTH_TEXT, JSON.stringify(goalJson), now);
-      ledger.enqueueJob({ jobId: `${workflowId}-job`, workflowId, opId: 'interface.implement', kind: 'op', payload: { opId: 'interface.implement' } });
-    };
-    seed('wf-legacy', { derivedFrom: 'owner-prompt', opChain: legacyChain, derivedPlan: { legs: derivedOps.map(op => ({ op })), divergence: {}, derivedAt: now } });
-    seed('wf-diverged', { derivedFrom: 'owner-prompt', opChain: legacyChain, derivedPlan: { legs: [...derivedOps, 'release.deliver'].map(op => ({ op })), derivedAt: now } });
-  } finally { ledger.close(); }
-}
-

@@ -2,11 +2,11 @@ plan:
   args: >-
     --workflow <id> --file <plan.json> [--replanned-from <plan-digest|event-seq>]
     [--blocker <kind>] [--path-delta <s>] [--routing-reason <s>]
-  fileShape: '{legs: [{op, paths?, notes?}], edges?: [[fromLeg, toLeg]]} — modules/schemas/goal-plan.yaml'
+  fileShape: '{legs: [{op, paths?, notes?}], edges: [[fromLeg, toLeg]]} — modules/schemas/goal-plan.yaml; edges are required (route-plan emits them); a single leg may omit them'
   reads: 'latest goals row — the approved opChain is goals.json.opChain (define-goal.yaml: advisory, re-derived at boot, never trusted blindly)'
   writes: >-
-    The latest goals.json.derivedPlan becomes {legs, edges?, divergence, lineage, derivedAt}.
-    Edges come from the file, or from the prior derived plan while the leg op set is unchanged.
+    The latest goals.json.derivedPlan becomes {legs, edges, divergence, lineage, derivedAt}.
+    Edges come from the file and only from it.
     A pending goal-revision inbox row for this revision is marked applied. One plan-derived event
     records {goal_revision, legs, divergence, lineage, inboxApplied, file}. `lineage` is
     {replannedFrom, blocker, pathDelta, routingReason}, recorded exactly as supplied. A re-plan
@@ -16,7 +16,7 @@ plan:
     Added, removed or re-ordered legs are divergence; edges and allowlist
     wording inside the approved shape are not (modules/schemas/goal-plan.yaml
     rules: disjoint allowlists). One addition is not divergence: handover.review appended
-    as the LAST leg of a plan whose approved opChain predates it — the
+    as the LAST leg of a plan whose approved opChain lacks it — the
     owner handover every workflow owes before `api finish`
     (driver-loop.yaml handoverLoop). The divergence then records
     handoverAppended:true.
@@ -26,6 +26,7 @@ plan:
     testsDeferred:{off,legs,jobs}}. The legs and divergence are persisted in goals.json.derivedPlan.
   refuses:
     - plan-file-missing: 'the --file path does not exist'
+    - 'plan-edges-missing: the plan file has no edges, or its edges leave a leg untouched, name an unknown leg or form a cycle; the plan is refused and nothing is written'
     - plan-file-invalid: 'unparseable, or fails the goal-plan {legs:[{op,...}]} shape — the refusal names the rule'
     - workflow-unknown
   usedBy: 'tick.plan — divergence -> api incident --kind plan-divergence, never a quiet re-plan (driver-loop.yaml)'

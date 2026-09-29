@@ -236,7 +236,7 @@ const legLabel = l => `${l.op}${l.instance ? '#' + l.instance : ''}`;
 // (scripts/route/plan-edges.mjs reads it; api plan replaces it).
 const derivedPlanOf = c => c ? {
   legs: c.legs.map(l => ({ op: l.op, ...(l.instance ? { instance: l.instance } : {}), ...(l.params ? { params: l.params } : {}), ...(l.kernelParams ? { kernelParams: l.kernelParams } : {}) })),
-  edges: Array.isArray(c.edges) ? c.edges : [],
+  edges: Array.isArray(c.edges) ? c.edges : (() => { throw Object.assign(new Error('plan-edges-missing: route-plan returned legs without edges'), { code: 'plan-edges-missing' }); })(),
   derivedFrom: 'route-plan', derivedAt: now,
 } : null;
 const chainOps = c => c?.legs?.map(legLabel) ?? [];

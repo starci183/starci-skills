@@ -3,7 +3,7 @@
 // Owner decision 2026-09-25 (starci-next wf-sn-foundation): the Kernel routed
 // op-interface.implement-c3bcc0d5e4 with `api route --avoid devin-agent` and the job went to
 // codex gpt-6-luna, defeating the evidence routing (implementation goes to Devin first). A Kernel no
-// longer biases a route (api route ignores --prefer/--avoid); the ROUTER decides, from ledger facts:
+// longer biases a route (api route refuses --prefer/--avoid as unknown options); the ROUTER decides, from ledger facts:
 //   - a pool whose provider-health circuit is open is rejected by capacity (unchanged);
 //   - this module: when the job is a retry, each earlier attempt of its retry lineage
 //     (jobs.retry_of|resume_of; scripts/kernel/owner-answers.mjs lineageJobsOf) that FAILED on

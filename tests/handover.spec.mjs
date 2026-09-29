@@ -43,7 +43,7 @@ const seedWorkflow=(repo,wf)=>seed(repo,ledger=>ledger.transaction(db=>{
   const at=Date.now();
   ensureWorkflow(db,{workflowId:wf,phase:'queued',title:'handover spec',by:'test-fixture',reason:'seed',at});
   insertGoal(db,{workflowId:wf,revision:0,goalIdentity:'hgoal',markdown:'# goal',
-    goal:{opChain:{legs:[{op:'docs.author'},{op:HANDOVER_OP}]}},createdAt:at});
+    goal:{opChain:{legs:[{op:'docs.author'},{op:HANDOVER_OP}]},derivedPlan:{legs:[{op:'docs.author'},{op:HANDOVER_OP}],edges:[['docs.author',HANDOVER_OP]]}},createdAt:at});
   changeWorkflowPhase(db,{workflowId:wf,to:'running',by:'test-fixture',reason:'seed',at});
   seedJob(db,{wf,jobId:'job-docs',op:'docs.author',status:'succeeded',result:{verdict:'pass'}});
   ledger.appendEvent({workflowId:wf,entityType:'job',entityId:'job-docs',kind:'op-settled',payload:{verdict:'pass',status:'succeeded'}});
@@ -309,8 +309,8 @@ test('the planner appends handover.review as the final leg of every chain',()=>{
 test('api plan does not count a trailing handover.review appended to an older chain as divergence',t=>{
   const repo=fixture(t),wf='wf-handover-plan';
   seedWorkflow(repo,wf);
-  seed(repo,ledger=>ledger.db.prepare('UPDATE goals SET json=? WHERE workflow_id=?').run(JSON.stringify({opChain:{legs:[{op:'docs.author'},{op:'review.verify'}]}}),wf));
-  const planFile=(name,legs)=>{const f=path.join(repo,name);fs.writeFileSync(f,JSON.stringify({legs:legs.map(op=>({op}))}));return f;};
+  seed(repo,ledger=>ledger.db.prepare('UPDATE goals SET json=? WHERE workflow_id=?').run(JSON.stringify({opChain:{legs:[{op:'docs.author'},{op:'review.verify'}]},derivedPlan:{legs:[{op:'docs.author'},{op:'review.verify'}],edges:[['docs.author','review.verify']]}}),wf));
+  const planFile=(name,legs)=>{const f=path.join(repo,name);fs.writeFileSync(f,JSON.stringify({legs:legs.map(op=>({op})),edges:legs.slice(1).map((op,i)=>[legs[i],op])}));return f;};
   const appended=run('plan','--repo',repo,'--workflow',wf,'--file',planFile('a.json',['docs.author','review.verify',HANDOVER_OP]),'--json');
   assert.equal(appended.status,0,appended.stderr);
   assert.deepEqual([json(appended).divergence.diverged,json(appended).divergence.handoverAppended,json(appended).divergence.extra],[false,true,[]]);

@@ -51,8 +51,8 @@ export default {
       return;
     }
     // Typed release conditions (scripts/kernel/gate-conditions.mjs): stored on the incident and checked
-    // by the runtime, which resolves it once every one holds. Opt-in: an incident without them keeps
-    // its free-text behaviour. --attach types an incident that is already open.
+    // by the runtime, which resolves it once every one holds. An incident raised without them is
+    // resolved only by the Kernel. --attach types an incident that is already open.
     const until = parseConditions(db, args.until, { workflowId });
     const typedRepo = path.resolve(args.repo ?? process.cwd());
     if (args.attach) {

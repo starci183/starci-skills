@@ -13,7 +13,7 @@ const MIN = 60_000;
 function fixture(ledger, holds, extraJobs = []) {
   seedWorkflow(ledger, {
     id: WF, now: NOW - 120 * MIN, state: { phase: 'running' },
-    goal: { json: { opChain: { legs: [{ op: 'backend.implement' }, { op: 'interface.implement' }, { op: 'handover.review' }],
+    goal: { json: { derivedPlan: { legs: [{ op: 'backend.implement' }, { op: 'interface.implement' }, { op: 'handover.review' }],
       edges: [['backend.implement', 'handover.review'], ['interface.implement', 'handover.review']] } } },
     events: [
       { kind: 'op-dispatched', payload: { jobId: 'job-held' }, created_at: NOW - 90 * MIN },

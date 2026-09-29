@@ -98,7 +98,7 @@ const LEGS = ['request.analyze', 'business.decide', 'provision.ask', 'backend.im
 const seedPlan = (repo, wf) => seed(repo, (ledger) => {
   const at = Date.now();
   seedWorkflow(ledger,{id:wf,now:at,state:{phase:'running'},jobs:[{jobId:'bd-1',opId:'business.decide',status:'succeeded',result:{verdict:'pass'},createdAt:at}]});
-  ledger.db.prepare('INSERT INTO goals(workflow_id,revision,goal_identity,markdown,json,created_at) VALUES(?,?,?,?,?,?)').run(wf, 0, 'g', '# goal', json({ opChain: { legs: LEGS } }), at);
+  ledger.db.prepare('INSERT INTO goals(workflow_id,revision,goal_identity,markdown,json,created_at) VALUES(?,?,?,?,?,?)').run(wf, 0, 'g', '# goal', json({ opChain: { legs: LEGS }, derivedPlan: { legs: LEGS.map((op) => ({ op })), edges: LEGS.slice(1).map((op, i) => [LEGS[i], op]) } }), at);
 });
 const seedOwnerWait = (repo, wf, { jobId, opId, dispatchId, question }) => seed(repo, (ledger) => {
   const at = Date.now();

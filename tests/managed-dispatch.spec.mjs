@@ -351,12 +351,12 @@ test('Claude auth rejection circuits the shared-auth provider for every job and 
   }finally{ledger.close();}
 
   const firstRoute=fx.run(API,'route','--repo',fx.repo,'--job',jobId,'--difficulty','hard',
-    '--prefer','claude-agent','--json');
+    '--json');
   assert.equal(firstRoute.status,0,firstRoute.stderr||firstRoute.stdout);
   assert.equal(json(firstRoute.stdout)?.decision?.model,'claude-agent',
     'a refreshable stale token is allowed one real launch attempt');
   const siblingRoute=fx.run(API,'route','--repo',fx.repo,'--job',siblingJobId,'--difficulty','hard',
-    '--prefer','claude-agent','--json');
+    '--json');
   assert.equal(siblingRoute.status,0,siblingRoute.stderr||siblingRoute.stdout);
   assert.equal(json(siblingRoute.stdout)?.decision?.model,'claude-agent','precondition: the sibling route predates the circuit');
 
@@ -387,7 +387,7 @@ test('Claude auth rejection circuits the shared-auth provider for every job and 
   // The circuit, not the chain, decides here: a route that still prefers
   // claude-agent crosses to the other provider while the Claude OAuth is out.
   const fallback=fx.run(API,'route','--repo',fx.repo,'--job',jobId,'--difficulty','hard',
-    '--prefer','claude-agent','--json');
+    '--json');
   assert.equal(fallback.status,0,fallback.stderr||fallback.stdout);
   const decision=json(fallback.stdout)?.decision;
   assert.equal(decision?.model,'codex-agent','fallback must cross the failed auth provider boundary');
@@ -666,7 +666,7 @@ test('an unclassified worker-start refusal is a strike; the second one opens the
   }finally{ledger.close();}
 
   const dispatchClaude=jobId=>{
-    const routed=fx.run(API,'route','--repo',fx.repo,'--job',jobId,'--difficulty','hard','--prefer','claude-agent','--json');
+    const routed=fx.run(API,'route','--repo',fx.repo,'--job',jobId,'--difficulty','hard','--json');
     assert.equal(routed.status,0,routed.stderr||routed.stdout);
     return {routed:json(routed.stdout)?.decision?.model,
       dispatched:fx.run(API,'dispatch','--repo',fx.repo,'--job',jobId,'--spawn','--json')};
@@ -701,7 +701,7 @@ test('an unclassified worker-start refusal is a strike; the second one opens the
   assert.ok(cooldown<=Date.now()+120000,'runtimes.yaml allocation.cooldownMs.worker-start owns the number');
 
   // The point of the circuit: routing stops sending work at the broken pool.
-  const third=fx.run(API,'route','--repo',fx.repo,'--job','job-ws-3','--difficulty','hard','--prefer','claude-agent','--json');
+  const third=fx.run(API,'route','--repo',fx.repo,'--job','job-ws-3','--difficulty','hard','--json');
   assert.equal(third.status,0,third.stderr||third.stdout);
   const decision=json(third.stdout)?.decision;
   assert.notEqual(decision?.model,'claude-agent','route must skip the pool whose launch path is refusing');
@@ -725,7 +725,7 @@ test('a circuit that reopens for the same failure waits longer each time (circui
         payload:{opId:'architecture.decide',owned_paths:[`docs/bo-${n}/`],difficulty:'hard'}});
   }finally{ledger.close();}
   const refuse=jobId=>{
-    const routed=fx.run(API,'route','--repo',fx.repo,'--job',jobId,'--difficulty','hard','--prefer','claude-agent','--json');
+    const routed=fx.run(API,'route','--repo',fx.repo,'--job',jobId,'--difficulty','hard','--json');
     assert.equal(routed.status,0,routed.stderr||routed.stdout);
     fx.run(API,'dispatch','--repo',fx.repo,'--job',jobId,'--spawn','--json');
   };
@@ -797,7 +797,7 @@ const seedOp=(fx,workflowId,jobId,opId,payload={})=>{
   finally{ledger.close();}
 };
 // The owner's routing_bias on the workflow goal (define-goal): the only bias api route applies - a Kernel
-// --prefer/--avoid is ignored (owner decision 2026-09-25).
+// --prefer/--avoid is refused as an unknown option (owner decision 2026-09-25).
 const seedGoalBias=(fx,workflowId,routingBias)=>{
   const ledger=openLedger({file:ledgerFileFor(fx.repo)});
   try{

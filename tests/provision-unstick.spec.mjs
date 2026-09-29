@@ -73,7 +73,7 @@ test('status: the draw a deferred settle waits on reads ready, not dependency on
   const job=(jobId,opId,status,payload,extra={})=>({jobId,opId,status,role:'op',payload:{opId,...payload},...extra});
   try{
     seedWorkflow(ledger,{id:wf,state:{phase:'running',job:'unstick'},
-      goal:{revision:0,identity:'g',markdown:'# goal',json:{opChain:{legs:[{op:'business.decide'},{op:'interface.draw'}]}}},
+      goal:{revision:0,identity:'g',markdown:'# goal',json:{opChain:{legs:[{op:'business.decide'},{op:'interface.draw'}]},derivedPlan:{legs:[{op:'business.decide'},{op:'interface.draw'}],edges:[['business.decide','interface.draw']]}}},
       jobs:[
         job('op-business.decide-held00000','business.decide','running',{owned_paths:['a/decide']}),
         job('op-business.decide-adopt0000','business.decide','queued',{owned_paths:['a/debris'],commitOnly:{of:['x'],batch:'work-debt'}}),

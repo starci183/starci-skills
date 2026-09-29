@@ -343,7 +343,9 @@ tick:
   plan:
     rule: >-
       The kernel derives the plan from the surveyed goal and hands it to
-      `api plan --file <plan.json>` (shape: modules/schemas/goal-plan.yaml). The api
+      `api plan --file <plan.json>` (shape: modules/schemas/goal-plan.yaml; the file
+      carries the legs' `edges` - route-plan emits them - and a file without
+      provable edges is refused plan-edges-missing, nothing written). The api
       persists the digest + diff as a 'plan-derived' event and returns the
       STRUCTURAL diff of the derived op set vs the approved opChain in
       goals.json (define-goal.yaml: the chain is advisory — re-derived at
@@ -789,8 +791,7 @@ tick:
         migrations and novel builds are hard or insane; bounded verifies and
         small writes are easy or medium.
         The Kernel never biases a route: --prefer/--avoid on api route or
-        dispatch are ignored with a warning and recorded as biasIgnored on
-        route-decided. Pool health and retry evidence
+        dispatch are unknown options and refused (unknown-option). Pool health and retry evidence
         are the router's: a pool with an open provider-health circuit is
         skipped, and a retry demotes or excludes the pools its own lineage
         failed on (api.yaml commands.route lineageAdjust). Do not steer around
@@ -1585,8 +1586,7 @@ failureHandling:
       a 24h auth cooldown on a credential already proven good parks the pool
       for nothing. An auth circuit reads closed by itself when the credential
       in effect has a different fingerprint from the one it rejected (a
-      rotated key). When the credential is unchanged but fixed, or the
-      circuit predates fingerprints, the Kernel runs
+      rotated key). When the credential is unchanged but fixed, the Kernel runs
       `api provider-health --provider <p> --recover --reason <what changed> --probe`
       from its own terminal. The probe must pass; a refused probe means the
       credential is still bad, so the circuit stays and the owner is told.

@@ -2,20 +2,16 @@
 //
 // route-plan.mjs emits `edges` [[fromLeg, toLeg], ...] over leg labels
 // (`op` or `op#instance`); define-goal persists them as goals.json
-// opChain.edges and derivedPlan.edges. The runtime keys legs by op id (jobs
-// carry op_id), so this module collapses labels to op ids. A plan without
-// provable edges — a goal stored before edges existed, or a Kernel plan whose
-// legs differ from the chain the edges describe — is the linear chain: every
-// leg depends on the one before it.
+// opChain.edges and derivedPlan.edges; `api plan` replaces derivedPlan with the
+// Kernel's plan, whose own edges are required. The runtime keys legs by op id
+// (jobs carry op_id), so this module collapses labels to op ids. A plan without
+// provable edges is refused (plan-edges-missing); there is no linear fallback.
 
 const opOfLabel = (label) => String(label).split('#')[0];
 const legOp = (leg) => (typeof leg === 'string' ? opOfLabel(leg) : leg?.op ? String(leg.op) : null);
 
 /** Ordered, de-duplicated op ids of a leg list. */
 export const legOpsOf = (legs) => (Array.isArray(legs) ? [...new Set(legs.map(legOp).filter(Boolean))] : []);
-
-/** Linear chain over ordered ops: [[a,b],[b,c],...]. */
-export const linearEdgesOf = (ops) => ops.slice(1).map((op, i) => [ops[i], op]);
 
 /** Op-level edges from label edges over exactly `ops`; null when malformed, partial or cyclic. */
 function collapseEdges(raw, ops) {
@@ -51,28 +47,27 @@ function isAcyclic(ops, edges) {
   return seen === ops.length;
 }
 
-const sameSet = (a, b) => a.length === b.length && a.every((x) => b.includes(x));
-
 /**
  * The approved leg graph of a goal: {ops, edges, source}. `plan` is goals.json
- * (with derivedPlan / opChain) or a bare plan {legs, edges}. Sources, first
- * that holds: derivedPlan.edges over derivedPlan legs; opChain.edges when the
- * approved legs hold exactly the opChain's ops; else the linear chain.
+ * (its derivedPlan) or a bare plan {legs, edges}. The edges are the plan's own
+ * and only they: a plan of several legs without provable edges (absent,
+ * partial, unknown leg or cyclic) is the typed refusal `plan-edges-missing`.
  */
 export function planGraphOf(plan) {
   const isGoal = plan && typeof plan === 'object' && ('derivedPlan' in plan || 'opChain' in plan);
-  const primary = isGoal ? (plan.derivedPlan?.legs ? plan.derivedPlan : plan.opChain) : plan;
+  const primary = isGoal ? plan.derivedPlan : plan;
   const ops = legOpsOf(primary?.legs);
-  const own = collapseEdges(primary?.edges, ops);
-  if (own) return { ops, edges: own, source: isGoal ? (primary === plan.derivedPlan ? 'derivedPlan' : 'opChain') : 'plan' };
-  if (isGoal && primary === plan.derivedPlan && sameSet(ops, legOpsOf(plan.opChain?.legs))) {
-    const chain = collapseEdges(plan.opChain?.edges, ops);
-    if (chain) return { ops, edges: chain, source: 'opChain' };
+  if (!ops.length) {
+    if (isGoal && legOpsOf(plan.opChain?.legs).length) throw Object.assign(new Error('plan-edges-missing: the goal holds an opChain but no derivedPlan with edges; a plan without edges is refused'), { code: 'plan-edges-missing' });
+    return { ops, edges: [], source: isGoal ? 'derivedPlan' : 'plan' };
   }
-  return { ops, edges: linearEdgesOf(ops), source: 'linear' };
+  // A single leg has no edges to prove; several legs must carry their own.
+  const own = ops.length === 1 && primary.edges === undefined ? [] : collapseEdges(primary?.edges, ops);
+  if (!own) throw Object.assign(new Error(`plan-edges-missing: the plan's ${ops.length} leg(s) [${ops.join(', ')}] carry no provable dependency edges (absent, partial, naming an unknown leg or cyclic); a plan without edges is refused`), { code: 'plan-edges-missing' });
+  return { ops, edges: own, source: isGoal ? 'derivedPlan' : 'plan' };
 }
 
-/** Op-level dependency edges [[fromOp, toOp], ...] of a goal or plan; the linear chain for a plan without edges. */
+/** Op-level dependency edges [[fromOp, toOp], ...] of a goal or plan. */
 export const planEdgesOf = (plan) => planGraphOf(plan).edges;
 
 /**

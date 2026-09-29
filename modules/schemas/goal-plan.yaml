@@ -16,7 +16,7 @@ shape:
   legs[].params: 'optional map of the op tunables the OWNER chose - each name is declared in that op brief params block (modules/schemas/op.schema.yaml) with setBy owner; api enqueue validates type, min, max and enum and refuses params-invalid, then the dispatch packet carries the brief defaults with these on top'
   legs[].paths: 'optional list of repository-relative path prefixes the leg owns - the write ceiling enqueued onto the job row as owned_paths and the set dispatch disjointness is checked against'
   legs[].notes: 'optional free text - why the leg exists, what it must not touch, sequencing intent'
-  edges: 'optional list of dependency edges [[fromLeg, toLeg], ...] over leg labels (`op` or `op#instance`): toLeg waits on fromLeg; route-plan emits them beside its legs (scripts/route/route-plan.mjs)'
+  edges: 'REQUIRED list of dependency edges [[fromLeg, toLeg], ...] over leg labels (`op` or `op#instance`): toLeg waits on fromLeg; route-plan emits them beside its legs (scripts/route/route-plan.mjs); every leg must be touched by an edge when there is more than one leg, and the edges must be acyclic - a plan without provable edges is refused plan-edges-missing'
 rules:
   - legs is required and must be an array; every leg carries a non-empty string `op` - anything else is plan-file-invalid.
   - Leg order is execution intent: the api diffs it structurally against goals.json.opChain.legs - legs added, removed or re-ordered vs the approved chain mark the plan divergent, and a divergent plan escalates (api incident --kind plan-divergence), never dispatches.
@@ -25,13 +25,13 @@ rules:
   - A leg with no `paths` is an unbounded grant: enqueue refuses empty-paths, so a leg meant to run must name its ceiling.
   - "A tunable an owner chose is a value on the leg, never a sentence in the goal text: `params` carries it, `api enqueue --params` relays it and the packet delivers it, so no agent has to read prose to decide how many candidates, rounds or options the owner wanted."
   - "A leg may carry only params the op declares with `setBy: owner`; a `setBy: kernel` param on a leg is params-invalid."
-  - Op ids come only from the operator catalog. Dependencies are the edges, never a per-leg dependsOn field. scripts/route/plan-edges.mjs planAncestorsOf reads them for the whole runtime - derivedPlan.edges, else opChain.edges while the approved ops match, else the linear chain of the legs array - and api status holds a queued job only while a plan ancestor of its op still has a job queued or in flight, so a leg no edge leads from never waits on it.
+  - Op ids come only from the operator catalog. Dependencies are the edges, never a per-leg dependsOn field. scripts/route/plan-edges.mjs planAncestorsOf reads them for the whole runtime - derivedPlan.edges only (a goal without them is refused plan-edges-missing) - and api status holds a queued job only while a plan ancestor of its op still has a job queued or in flight, so a leg no edge leads from never waits on it.
 validation: |-
   api.mjs cmdPlan reads the file as JSON and requires plan.legs to be an array whose every element
-  has a non-empty string `op`, and `edges`, when present, to be an array of [fromLeg, toLeg] string
-  pairs ({legs:[{op,paths?,notes?}], edges?}). Failure is a typed refusal: plan-file-missing when the
-  file does not exist, plan-file-invalid when it does not parse or the legs or edges shape is wrong.
-  On success the api writes goals.json.derivedPlan {legs, edges?, divergence, lineage, derivedAt} -
-  the file's edges, else the edges already recorded when the plan keeps the same set of ops - and
+  has a non-empty string `op`, and `edges` to be an array of [fromLeg, toLeg] string
+  pairs ({legs:[{op,paths?,notes?}], edges}). Failure is a typed refusal: plan-file-missing when the
+  file does not exist, plan-file-invalid when it does not parse or the legs or edges shape is wrong,
+  plan-edges-missing when the edges are absent, partial, unknown or cyclic.
+  On success the api writes goals.json.derivedPlan {legs, edges, divergence, lineage, derivedAt} - the file's edges - and
   appends one 'plan-derived' event carrying the legs and the divergence record {missing, extra,
   reordered, diverged}.

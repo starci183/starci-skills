@@ -66,11 +66,11 @@ test('balanced: an ineligible pool is never chosen, however far below its share 
   // Insane: only the frontier pools pin a model; Devin does not.
   const insane=balanced({kind:'backend.implement',difficulty:'insane',recent:{'claude-agent':90,'codex-agent':10}});
   assert.deepEqual([insane.target,insane.balance.candidates],['codex-agent',['claude-agent','codex-agent']]);
-  // --avoid removes a pool under balanced too.
+  // an owner avoid bias removes a pool under balanced too.
   assert.notEqual(balanced({kind:'backend.implement',difficulty:'medium',recent,bias:{avoid:['devin-agent']}}).target,'devin-agent');
 });
 
-test('balanced: Opus is hands-on overflow only, and --prefer only breaks ties',()=>{
+test('balanced: Opus is hands-on overflow only, and an owner prefer bias only breaks ties',()=>{
   // Claude has the biggest deficit but stays out of hands-on work while another pool is eligible.
   const r=balanced({kind:'backend.implement',difficulty:'hard',recent:{'codex-agent':10,'devin-agent':10}});
   assert.notEqual(r.target,'claude-agent');

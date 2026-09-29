@@ -172,16 +172,15 @@ incident:
     (status frontier.autoResolved; the frontier turns actionable and the watchdog wakes the
     Kernel). A condition already met at raise resolves the incident in the same call
     (status:resolved, autoResolved). A job, incident or message peer the conditions name must
-    exist (until-job-unknown / until-incident-unknown / until-message-peer-unknown). Opt-in and
-    backward compatible: an incident without typed conditions is stored and behaves exactly as
-    before, and only the Kernel resolves it. Owner-only conditions (an ask answered, a consent
+    exist (until-job-unknown / until-incident-unknown / until-message-peer-unknown). An incident
+    raised without typed conditions carries none and only the Kernel resolves it. Owner-only conditions (an ask answered, a consent
     given) have no typed form and stay owner-driven. The Kernel attaches typed conditions
     whenever the release is checkable (driver-loop.yaml tick.drive.typedRelease)
   attach: >-
     --attach <incidentId> --until-<type> <spec> ... types an OPEN incident of this workflow
     without re-raising it: appends 'incident-conditions-attached' {until, detail}, whose until
     replaces any earlier set, and evaluates at once (resolved when already met). This is how a
-    free-text gate raised before typed conditions existed becomes machine-checked; its holds,
+    free-text gate raised without typed conditions becomes machine-checked; its holds,
     kind and text are unchanged. Returns {ok:true, incidentId, workflowId, status, until,
     autoResolved?}
   writes: >-

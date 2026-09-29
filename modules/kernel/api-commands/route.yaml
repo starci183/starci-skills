@@ -29,10 +29,8 @@ route:
     a Kernel does not bias a route (owner decision 2026-09-25: starci-next wf-sn-foundation routed
     op-interface.implement-c3bcc0d5e4 with --avoid devin-agent and it went to codex,
     defeating the evidence routing that sends implementation to Devin first). --prefer and --avoid
-    are still accepted so older prompts parse, and IGNORED: stderr reads "api route WARNING: --avoid
-    <pools> ignored: kernel per-route bias is not accepted; ...", routing runs as if they were absent,
-    and route-decided (and the answer, and a refusal) carry biasIgnored {prefer[], avoid[], reason}.
-    api dispatch ignores them the same way (warning only; it launches the persisted route). Pool
+    are unknown options on api route and api dispatch: both refuse them with the typed error
+    unknown-option before any work. Pool
     health and retry evidence are the router's: providerCircuit and lineageAdjust
   lineageAdjust: >-
     retry-aware routing (scripts/kernel/lineage-route.mjs). For a job with a retry lineage
@@ -75,9 +73,9 @@ route:
     jobs.payload_json gains {model, modelId, effort, routeChain, routeOrder,
     routeRejected, routeBalance, difficulty} — the PERSISTED route dispatch then launches
     exactly (dispatch reads payload.model/modelId/effort, never re-decides);
-    events 'route-decided' {kind, difficulty, bias, biasIgnored?, lineageAdjust?, ...decided} (bias is
+    events 'route-decided' {kind, difficulty, bias, lineageAdjust?, ...decided} (bias is
     the goal's routing_bias actually applied)
-  returns: '{ok:true, jobId, kind, difficulty, bias, biasIgnored?, lineageAdjust?, decision:{model, modelId, effort, routeChain, routeRejected}}'
+  returns: '{ok:true, jobId, kind, difficulty, bias, lineageAdjust?, decision:{model, modelId, effort, routeChain, routeRejected}}'
   maxOps: >-
     the workflow's concurrent-operation ceiling is min(budgets.maxOps, maxParallelOps) —
     the owner's per-workflow budget and the fleet-wide one, lower wins
@@ -90,6 +88,7 @@ route:
     - 'max-ops (field `reason`): the workflow already holds min(budgets.maxOps, maxParallelOps) operations, so there is no slot for this decision to be spent on. Prints {ok:false, jobId, kind, reason:"max-ops", slots:{ok:false, running, ceiling, ceilingSource, reason}} and exits 1; the job stays queued and `api status` reports it queuedBecause max-ops'
     - 'path-lease (field `reason`, `waiting: true`): a live `path:<owned_path>` lease of another job overlaps the job''s owned_paths (dispatch.refuses path-lease). No pool decision is spent and no route-decided event written; prints {ok:false, jobId, kind, reason:"path-lease", waiting:true, holders, conflicts, detail} and exits 1; the job stays queued path-lease and routes once the holder releases the lease'
     - 'peer-wait (field `reason`): an open peer-wait incident holds the job (status queuedBecause peer-wait). Prints {ok:false, jobId, kind, reason:"peer-wait", incident, peer} and exits 1; checked right after owner-gate, nothing is persisted'
+    - unknown-option: '--prefer or --avoid was passed: a Kernel does not bias a route (kernelBias); only the owner goal routing_bias applies'
     - job-unknown: 'no jobs row for --job'
     - job-reconcile-required: 'effect_unknown remains fenced until api reconcile proves no effect'
     - job-settled: 'a settled job takes no route — the decision was already spent'
