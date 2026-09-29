@@ -21,7 +21,7 @@ export function AgentAvatar({ agent, size = 20, withLabel = false, live = false,
   const tint = familyTint[agent.family];
   const target = href ?? agent.href;
   const isLive = live || agent.live;
-  const circle = <span className="relative inline-grid shrink-0 place-items-center rounded-full border" style={{ width: size, height: size, padding: Math.max(2, Math.round(size * 0.2)), ...tintStyle(tint.tone) }} data-agent={agent.family}>
+  const circle = <span className="relative inline-grid shrink-0 place-items-center rounded-full border" style={{ width: size, height: size, padding: agent.family === 'devin' ? 0 : Math.max(2, Math.round(size * 0.2)), ...tintStyle(tint.tone) }} data-agent={agent.family}>
     {isLive ? <span className="pointer-events-none absolute -inset-0.5 animate-ping rounded-full border-2 opacity-60 motion-reduce:animate-none" style={{ borderColor: 'var(--status-running)' }} aria-hidden="true" /> : null}
     <AgentMark family={agent.family} initial={(agent.label[0] ?? '?').toUpperCase()} />
   </span>;
