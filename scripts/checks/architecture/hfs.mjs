@@ -2,6 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { execFileSync } from 'node:child_process';
 import { isIP } from 'node:net';
+import { repositoryName } from '../../lib/repo-identity.mjs';
 
 /**
  * HFS v1 repository-tree check (D:/starci-tmp/hfs/HFS-SPEC.md): every StarCi repository is an
@@ -31,6 +32,7 @@ export const HFS_RULE_IDS = [
   'HFS_ROOT_SRC_FORBIDDEN_FE',
   'HFS_SRC_LAYOUT_INVALID',
   'HFS_STACKS_IN_FE',
+  'HFS_TEST_KIND_RETIRED',
   'HFS_WORK_IN_FE',
 ];
 
@@ -41,14 +43,19 @@ const OPTIONAL_COMMON = new Set(['.dockerignore', '.editorconfig', '.npmrc', '.n
   'packages', 'scripts', 'tsconfig.build.json']);
 const REQUIRED_BACKEND = ['.sops.yaml', '.starcistacks', '.starciwork', 'jest.config.js', 'nest-cli.json', 'src'];
 const OPTIONAL_FRONTEND = new Set(['turbo.json', 'vitest.config.ts', 'vitest.setup.ts']);
-const OPTIONAL_FRONTEND_PATTERN = /^playwright.*\.config\.ts$/;
+const OPTIONAL_FRONTEND_PATTERN = /^playwright\.config\.ts$/;
 const NON_NPM_ENTRIES = new Set(['pnpm-lock.yaml', 'pnpm-workspace.yaml', 'yarn.lock', 'bun.lock', 'bun.lockb']);
 const RUNTIME_ROOT_MARKDOWN = new Set(['README.md', 'CONTEXT.md', 'CONTRIBUTING.md', 'CHANGELOG.md', 'THIRD_PARTY_NOTICES.md']);
 const PRODUCT_ROOT_MARKDOWN = new Set(['README.md']);
 const README_SECTIONS = ['Overview', 'Stack', 'Repository layout', 'Development'];
 const BACKEND_SRC_CHILDREN = new Set(['features', 'modules', 'tests']);
 const MODULE_TIERS = new Set(['domain', 'integrations', 'platform']);
-const TEST_CHILDREN = new Set(['e2e', 'fixtures', 'harness', 'integration']);
+const TEST_CHILDREN = new Set(['e2e', 'fixtures']);
+// Owner ruling 2026-09-29: exactly two test kinds - unit `<name>.spec.ts` and e2e `*.e2e-spec.ts`.
+const RETIRED_TEST_SUFFIX = /\.(?:int|harness)-spec\.[cm]?[jt]sx?$/u;
+const RETIRED_TEST_FOLDER = /^src\/tests\/(?:integration|harness)(?:\/|$)/u;
+const EXTRA_TEST_CONFIG = /(?:^|\/)(?:jest[.-][^/]*(?:config\.[cm]?[jt]s|\.json)|jest-(?:e2e|int|integration|harness)[^/]*)$/u;
+const NODE_ENTRIES_SKIPPED = new Set(['node_modules', '.git']);
 
 function gitPaths(root) {
   try {
@@ -64,29 +71,6 @@ function gitPaths(root) {
   } catch {
     return null;
   }
-}
-
-/**
- * Product repository name from repository identity, not from the checkout folder, so a git worktree and
- * the main checkout of the same repository require the same README title: the git common dir's owning
- * folder, else the origin remote's name, else package.json name, else the root folder name.
- */
-export function repositoryName(root) {
-  const git = args => execFileSync('git', args, { cwd: root, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim();
-  try {
-    const common = path.resolve(root, git(['rev-parse', '--git-common-dir']));
-    if (path.basename(common) === '.git') return path.basename(path.dirname(common));
-  } catch { /* Not a Git work tree; fall through to the next identity source. */ }
-  try {
-    const remote = git(['remote', 'get-url', 'origin']).replace(/[\\/]+$/u, '').replace(/\.git$/iu, '');
-    const name = remote.split(/[\\/:]/u).pop();
-    if (name) return name;
-  } catch { /* No origin remote. */ }
-  try {
-    const pkg = JSON.parse(fs.readFileSync(path.join(root, 'package.json'), 'utf8'));
-    if (typeof pkg.name === 'string' && pkg.name) return pkg.name.replace(/^@[^/]+\//u, '');
-  } catch { /* No readable package.json. */ }
-  return path.basename(root);
 }
 
 function fsHasDir(root, relative) {
@@ -106,6 +90,17 @@ function fsChildren(root, relative) {
   }
 }
 
+function fsFiles(root, relative = '') {
+  const out = [];
+  for (const name of fsChildren(root, relative || '.')) {
+    if (NODE_ENTRIES_SKIPPED.has(name)) continue;
+    const child = relative ? `${relative}/${name}` : name;
+    if (fsHasDir(root, child)) out.push(...fsFiles(root, child));
+    else out.push(child);
+  }
+  return out;
+}
+
 /** Uniform tree view: top entries plus children(dir)/hasDir/hasFile answers over posix relatives. */
 function treeView(root) {
   const tracked = gitPaths(root);
@@ -122,6 +117,7 @@ function treeView(root) {
       },
       hasDir: dir => tracked.some(file => file.startsWith(`${dir}/`)),
       hasFile: file => files.has(file),
+      files: () => tracked,
     };
   }
   return {
@@ -130,6 +126,7 @@ function treeView(root) {
     children: dir => fsChildren(root, dir),
     hasDir: dir => fsHasDir(root, dir),
     hasFile: file => fsHasFile(root, file),
+    files: () => fsFiles(root),
   };
 }
 
@@ -306,9 +303,24 @@ export function checkHfs(config) {
     }
     for (const child of tree.children('src/tests').sort()) {
       if (!TEST_CHILDREN.has(child)) {
-        finding('HFS_SRC_LAYOUT_INVALID', `src/tests/${child}`, `Backend tests/ holds only integration, fixtures, harness and e2e; ${child} must move.`);
+        finding('HFS_SRC_LAYOUT_INVALID', `src/tests/${child}`, `Backend tests/ holds only e2e and fixtures; ${child} must move.`);
       }
     }
+  }
+
+  // Two test kinds only, on both profiles. The retired kinds are e2e now: rename to *.e2e-spec.ts and
+  // move under src/tests/e2e/ (backend) or e2e/ (frontend); environment code goes in src/tests/e2e/setup/.
+  for (const file of tree.files()) {
+    if (RETIRED_TEST_SUFFIX.test(file))
+      finding('HFS_TEST_KIND_RETIRED', file, `${file} uses a retired test kind. Only unit *.spec.ts and e2e *.e2e-spec.ts exist; integration and harness specs are e2e.`);
+    else if (backend && RETIRED_TEST_FOLDER.test(file))
+      finding('HFS_TEST_KIND_RETIRED', file, `${file} sits in a retired test folder. Move specs under src/tests/e2e/ and environment code under src/tests/e2e/setup/.`);
+    else if (backend && /^src\/tests\//u.test(file) && EXTRA_TEST_CONFIG.test(file))
+      finding('HFS_TEST_KIND_RETIRED', file, `${file} is a per-lane test config. One root jest.config.js declares exactly the unit and e2e projects.`);
+    else if (frontend && file !== 'playwright.config.ts' && /(?:^|\/)playwright[^/]*\.config\.[cm]?[jt]s$/u.test(file))
+      finding('HFS_TEST_KIND_RETIRED', file, `${file} is a second Playwright config. One root playwright.config.ts runs every e2e spec.`);
+    else if (frontend && /^e2e\/.+\.(?:spec|test)\.[cm]?[jt]sx?$/u.test(file))
+      finding('HFS_TEST_KIND_RETIRED', file, `${file} is a Playwright spec that is not named *.e2e-spec.ts.`);
   }
 
   return {

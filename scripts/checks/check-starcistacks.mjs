@@ -28,6 +28,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
+import { repositoryName, repositoryHome } from '../lib/repo-identity.mjs';
 import { fileURLToPath } from 'node:url';
 import { skillRoot } from '../../engine/runtime-root.mjs';
 import { isPlainObject as plain } from '../../engine/index.mjs';
@@ -155,9 +156,9 @@ export function resolveRepository(name, { fromRepo } = {}) {
   const candidates = [];
   if (fromRepo) candidates.push(path.resolve(fromRepo));
   candidates.push(sourceHostRoot());
-  for (const dir of candidates) if (same(path.basename(dir), wanted) && isDir(dir)) return dir;
+  for (const dir of candidates) if (same(repositoryName(dir), wanted) && isDir(dir)) return dir;
   for (const dir of candidates) {
-    const sibling = path.join(path.dirname(dir), wanted);
+    const sibling = path.join(path.dirname(repositoryHome(dir)), wanted);
     if (isDir(sibling)) return sibling;
   }
   return null;
@@ -165,16 +166,17 @@ export function resolveRepository(name, { fromRepo } = {}) {
 
 /** A frontend declared by its backend's stack: a sibling declaration whose `sources` lists this repository. */
 function governingDeclaration(repo) {
-  const name = path.basename(repo);
+  const name = repositoryName(repo);
+  const parent = path.dirname(repositoryHome(repo));
   let entries = [];
-  try { entries = fs.readdirSync(path.dirname(repo), { withFileTypes: true }); } catch { return null; }
+  try { entries = fs.readdirSync(parent, { withFileTypes: true }); } catch { return null; }
   for (const entry of entries) {
     if (!entry.isDirectory() || entry.name === name) continue;
-    const file = path.join(path.dirname(repo), entry.name, STACK_ROOT, DECLARATION);
+    const file = path.join(parent, entry.name, STACK_ROOT, DECLARATION);
     if (!isFile(file)) continue;
     const read = readDeclaration(file);
     if (read.doc && list(read.doc.sources).some((source) => source?.repository === name))
-      return { repo: path.join(path.dirname(repo), entry.name), root: STACK_ROOT, file, governs: name, ...read };
+      return { repo: path.join(parent, entry.name), root: STACK_ROOT, file, governs: name, ...read };
   }
   return null;
 }
@@ -231,7 +233,7 @@ const custodyHeld = (service) => (service.credentials.length
  */
 export function resolveStackService(repoRoot, serviceId) {
   const repo = path.resolve(String(repoRoot ?? ''));
-  const name = path.basename(repo);
+  const name = repositoryName(repo);
   const own = findStackDeclaration(repo);
   const candidates = [own.doc ? own : governingDeclaration(repo)].filter(Boolean);
   const host = sourceHostRoot();
@@ -291,7 +293,7 @@ function git(repo, args) {
  */
 export function checkStarciStacks(repoRoot, { newRepo = false, advisoryCodes = [] } = {}) {
   const repo = path.resolve(String(repoRoot ?? ''));
-  const name = path.basename(repo);
+  const name = repositoryName(repo);
   const findings = [];
   const add = (level, code, file, message) => findings.push({ level, code, file: slash(file), message });
   const missingLevel = newRepo ? 'refuse' : 'suspect';
@@ -425,7 +427,9 @@ export function checkStarciStacks(repoRoot, { newRepo = false, advisoryCodes = [
         // is plaintext custody (mia inc-5360513a96b3: infra/compose/.env.generated was trackable).
         const infraValue = parts.length > 3 && parts[2] === 'infra' && INFRA_VALUE_FILE.test(base) && !/\.enc$/.test(base) && !/\.example$/.test(base);
         if ((custodyArea && !/\.enc$/.test(base) && !['KEYS.md', '.gitkeep'].includes(base)) || infraValue)
-          add('refuse', 'STACKS_PLAINTEXT_TRACKED', file, 'a custody member is tracked in plaintext; untrack it (git rm --cached), rotate the value and commit only its .enc twin');
+          add('refuse', 'STACKS_PLAINTEXT_TRACKED', file, /\.enc\.(?:ya?ml|json|env)$/u.test(base)
+            ? `${base} is named the wrong way round: a custody file is <name>.<fmt>.enc (rename it to ${base.replace(/\.enc\.(ya?ml|json|env)$/u, '.$1.enc')}) and every read states the format (scripts/lib/sops-exec-env.mjs)`
+            : 'a custody member is tracked in plaintext; untrack it (git rm --cached), rotate the value and commit only its .enc twin');
       }
     }
     for (const env of fs.readdirSync(path.join(repo, root), { withFileTypes: true }).filter((entry) => entry.isDirectory())) {

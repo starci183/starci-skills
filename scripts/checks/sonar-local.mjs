@@ -9,6 +9,7 @@ import {isPlainObject as plain} from '../../engine/index.mjs';
 import {skillRoot} from '../../engine/runtime-root.mjs';
 import {parseYaml} from '../../engine/yaml.mjs';
 import {safeRemoveTree} from '../lib/safe-remove.mjs';
+import {repositoryName,repositoryHome} from '../lib/repo-identity.mjs';
 import {braceVariants,globExpression} from '../lib/glob.mjs';
 import {posixPath} from '../lib/path-key.mjs';
 import {unquoteDiffPath} from '../lib/git.mjs';
@@ -126,11 +127,11 @@ export function findDeclaration(cwd){
   const repo=path.resolve(cwd);
   const own=path.join(repo,'.starcistacks',DECLARATION);
   if(fs.existsSync(own))return {file:own,repoRoot:repo};
-  const name=path.basename(repo);
+  const name=repositoryName(repo);
   let siblings=[];
-  try{siblings=fs.readdirSync(path.dirname(repo),{withFileTypes:true}).filter(e=>e.isDirectory()&&e.name!==name);}catch{/* no parent listing */}
+  try{siblings=fs.readdirSync(path.dirname(repositoryHome(repo)),{withFileTypes:true}).filter(e=>e.isDirectory()&&e.name!==name);}catch{/* no parent listing */}
   for(const entry of siblings){
-    const file=path.join(path.dirname(repo),entry.name,'.starcistacks',DECLARATION);
+    const file=path.join(path.dirname(repositoryHome(repo)),entry.name,'.starcistacks',DECLARATION);
     if(!fs.existsSync(file))continue;
     try{
       const doc=parseYaml(fs.readFileSync(file,'utf8'));
@@ -162,7 +163,7 @@ export function readSonarDeclaration(file,repoRoot=path.dirname(path.dirname(pat
   const sonar=[doc?.services?.sonar,doc?.quality?.sonar,doc?.services?.quality?.sonar].find(plain);
   if(!sonar)return null;
   const sourceRoot=path.resolve(skillRoot,'..');
-  const repoDir=name=>!name||name===path.basename(repoRoot)?repoRoot:name===path.basename(sourceRoot)?sourceRoot:path.join(path.dirname(repoRoot),name);
+  const repoDir=name=>!name||name===repositoryName(repoRoot)?repoRoot:name===path.basename(sourceRoot)?sourceRoot:path.join(path.dirname(repositoryHome(repoRoot)),name);
   let stackDir=null,composeFile=null,container=null;
   if(plain(sonar.stack)){
     const stack=sonar.stack;
@@ -217,7 +218,7 @@ export function resolveConfig(options={},env=process.env){
   const stackDir=path.resolve(options.stack??decl?.stackDir??env.STARCI_SONAR_STACK??sourceHostStackDir());
   const declaredHost=decl?(decl.mode==='hosted'?decl.hostPublic:decl.hostLocal):null;
   const host=options.host??declaredHost??env.STARCI_SONAR_HOST_URL??DEFAULT_HOST;
-  const repository=options.cwd?path.basename(path.resolve(options.cwd)):null;
+  const repository=options.cwd?repositoryName(path.resolve(options.cwd)):null;
   const project=decl?.projects.find(p=>p.repository===repository)??null;
   return {
     host:String(host).replace(/\/+$/,''),
