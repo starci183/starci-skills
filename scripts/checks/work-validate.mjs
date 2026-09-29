@@ -159,13 +159,21 @@ export function findingFile(finding, { roots = [] } = {}) {
   return null;
 }
 const keyOf = (p) => { const k = path.resolve(p).replace(/\\/g, '/').replace(/\/+$/, ''); return process.platform === 'win32' ? k.toLowerCase() : k; };
+/** The target and every directory above it: a finding names its file relative to the .starciwork root, which is an
+ * ancestor when the target is a feature or record dir (validate .starciwork/features/x --owned <file> scopes like the tree). */
+function ancestorsOf(target) {
+  const out = [];
+  let dir = path.resolve(String(target ?? '.'));
+  for (let i = 0; i < 12; i++) { out.push(dir); const up = path.dirname(dir); if (up === dir) break; dir = up; }
+  return out;
+}
 /** `result` judged for the slice `owned` (paths relative to cwd, or absolute): out-of-scope refusals move to outOfScope. */
 export function scopeToOwned(result, owned, { roots = [] } = {}) {
   const prefixes = owned.map((p) => keyOf(String(p).replace(/[\\/]\*\*$/, '')));
   const inside = (file) => { const k = keyOf(file); return prefixes.some((pre) => k === pre || k.startsWith(`${pre}/`)); };
   const refused = [], outOfScope = [];
   for (const finding of result.refused) {
-    const file = findingFile(finding, { roots: [result.target, ...roots] });
+    const file = findingFile(finding, { roots: [...ancestorsOf(result.target), ...roots] });
     (file && !inside(file) ? outOfScope : refused).push(finding);
   }
   return { ...result, ok: refused.length === 0, refused, outOfScope, scope: { owned, inScope: refused.length, outOfScope: outOfScope.length } };

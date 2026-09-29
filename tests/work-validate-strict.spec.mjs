@@ -80,3 +80,21 @@ test('the CLI takes --strict and reports it', (t) => {
   assert.equal(report.strict, true);
   assert.ok(schemaLines(report).length > 0);
 });
+
+// wf-nivo-collab scope.define: `validate <feature dir> --strict --owned <file>` did not scope, because a finding's file
+// ("features/x/...") is relative to the .starciwork root and only the target dir and cwd were tried; the op's own record
+// stayed clean while its siblings' refusals failed the declared check.
+test('--owned scopes out-of-slice findings when the target is a feature dir under .starciwork', (t) => {
+  const bad = `${exampleRule.trimEnd()}\ncolour: blue\n`;
+  const work = tree(t, { 'features/task/br/complete/once/index.yaml': bad, 'features/task/index.yaml': 'schema: work/feature@1\nid: task\ntitle: Task\ndescription: d\n' });
+  const target = path.join(work, 'features', 'task');
+  const args = [path.join(root, 'bin', 'starci.mjs'), 'validate', target, '--strict', '--json'];
+  const own = path.join(work, 'features', 'task', 'index.yaml');
+  const scoped = spawnSync(process.execPath, [...args, '--owned', own], { encoding: 'utf8', cwd: path.dirname(work) });
+  const report = JSON.parse(scoped.stdout);
+  assert.equal(report.scope.inScope, 0, scoped.stdout);
+  assert.ok(report.scope.outOfScope >= 1, scoped.stdout);
+  assert.equal(scoped.status, 0);
+  const whole = spawnSync(process.execPath, args, { encoding: 'utf8', cwd: path.dirname(work) });
+  assert.equal(whole.status, 1);
+});
