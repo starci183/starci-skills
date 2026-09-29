@@ -295,6 +295,7 @@ test('env-health: ready, probe-drift with a discovered health endpoint, down, hu
 test('env-health serve registers a server so the next pre-step restarts it itself',async t=>{
   const dir=fs.mkdtempSync(path.join(os.tmpdir(),'starci-env-serve-'));
   const pids=new Set();
+  if(process.env.STARCI_TEST_TEMP_DIR)t.after(()=>fs.rmSync(path.join(process.env.STARCI_TEST_TEMP_DIR,'starci-env-servers'),{recursive:true,force:true,maxRetries:20,retryDelay:25}));
   t.after(async()=>{
     try{pids.add(readRegistered('environment.t.local','web',env).pid);}catch{}
     for(const pid of pids){try{process.kill(pid);}catch{}}

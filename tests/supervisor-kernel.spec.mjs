@@ -751,6 +751,7 @@ test('a [Worker] terminal is created on the runtime project Orca worktree and st
   createJob(m, { cluster: 'orca-tree', files: ['scripts/o.mjs'] });
   const spawned = [];
   const root = path.join(os.tmpdir(), 'runtime-root');
+  t.after(() => fs.rmSync(root, { recursive: true, force: true, maxRetries: 20, retryDelay: 25 }));
   const r = await spawnWorkers(m, { settings, env, root, deps: {
     load: () => ({ cpuBusy: 0, freeMem: 1 }), route: async () => ({ pool: 'claude-agent', agent: 'claude', model: 'm' }),
     staging: ({ jobId }) => ({ ok: true, path: path.join(os.tmpdir(), 'staging', jobId), branch: `sup/${jobId}`, base: 'abc' }),
