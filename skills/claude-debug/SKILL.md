@@ -99,7 +99,10 @@ Also: `node scripts/reconciler/boot.mjs --status`, `node scripts/reconciler/star
 3. Spawn a Claude Sonnet agent per lane with a self-contained prompt: the evidence, the scope (files it may touch), the
    hard rules of section 5 verbatim, the deliverable (commit shas, touching-spec counts, `npm run check` exit 0, a
    report). Lanes never edit the same file.
-4. Land, from the live checkout, batching several commits per land because each land re-execs the engine:
+4. Land as soon as a lane's touching specs are green; never hold a ready lane waiting for others (owner 2026-09-29:
+   held lanes keep the kernels on the broken core and collide with each other). Commits that are ready at the same
+   moment go in one land (each land re-execs the engine); a busy gate is the only reason to wait, and the land runs
+   again the moment it is free:
    `node scripts/supervisor/land.mjs --commit <sha>[,<sha>...] --lane <lane> --specs touching --json`.
    Anything under `modules/`, `knowledge/` or a schema needs a `modules/kernel/contract-changes/<id>.yaml`.
 5. Never push. Pushing is `/push-git`'s job (once it exists; reference it by name, never run `push-mains.mjs`).
