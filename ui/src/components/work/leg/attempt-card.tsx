@@ -3,12 +3,15 @@ import type { AttemptBrief } from '../../../contract';
 import { StatusChip } from '../../status-chip';
 import { statusFromOutcome, statusFromVerdict } from '../../status';
 import type { Concept } from '../../concept';
+import { AgentAvatar, agentOf } from '../../agent/agent-avatar';
 import { formatDayTime, formatDuration } from './time';
 
 export const concept: Concept = 'C7';
 
 const outcomeLabel: Record<string, string> = { done: 'Op báo xong', partial: 'Op báo một phần', failed: 'Op báo hỏng', ask: 'Op hỏi lại', blocked: 'Op báo bị chặn' };
 const verdictLabel: Record<string, string> = { pass: 'Kernel: đạt', fail: 'Kernel: hỏng', partial: 'Kernel: một phần', blocked: 'Kernel: chặn', dropped: 'Kernel: bỏ', cancelled: 'Kernel: huỷ' };
+
+const fmt = (n: number | null) => n == null ? '–' : n.toLocaleString('vi-VN');
 
 /** One attempt inside the leg drawer: who ran it, what the Op said, what the Kernel decided. */
 export function AttemptCard({ attempt, now }: { attempt: AttemptBrief; now: number }) {
@@ -26,7 +29,10 @@ export function AttemptCard({ attempt, now }: { attempt: AttemptBrief; now: numb
         <span title="Quyết định của Kernel"><StatusChip status={verdict} label={attempt.verdict ? verdictLabel[attempt.verdict] : open ? 'Kernel: chưa chốt' : 'Kernel: chưa rõ'} /></span>
       </span>
     </div>
-    <p className="mt-1.5 break-words text-xs text-muted-foreground">{who || 'Chưa rõ model / agent'}</p>
+    <p className="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-1 break-words text-xs text-muted-foreground">
+      {who ? <><AgentAvatar agent={agentOf(attempt)} withLabel /><span>{who}</span></> : 'Chưa rõ model / agent'}
+      {attempt.tokensIn != null || attempt.tokensOut != null ? <span className="font-mono" title="token vào / ra">· {fmt(attempt.tokensIn)} vào · {fmt(attempt.tokensOut)} ra</span> : null}
+    </p>
     <p className="mt-1 text-xs">
       {attempt.dispatchedAt == null ? 'Chưa giao' : <>{formatDayTime(attempt.dispatchedAt)} → {attempt.settledAt == null ? <span className="text-[var(--status-running)]">đang chạy</span> : formatDayTime(attempt.settledAt)}</>}
       {attempt.dispatchedAt != null && <span className="text-muted-foreground"> · {open ? `đang chạy ${Math.max(0, Math.round((end - attempt.dispatchedAt) / 60000))} phút` : formatDuration(end - attempt.dispatchedAt)}</span>}

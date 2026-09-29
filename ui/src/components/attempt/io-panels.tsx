@@ -1,5 +1,6 @@
-import type { AttemptDetailV2 } from '../../contract';
-import { formatAbsolute } from '../../i18n/vi';
+import { useApiQuery } from '../../api/query';
+import type { AttemptDetailV2, ContractInfo, LegRowV3, PipelineView } from '../../contract';
+import { formatAbsolute, formatOpLabel } from '../../i18n/vi';
 import { KeyVal } from '../key-val';
 import { PathLink } from '../path-link';
 import { statusFromOutcome, statusFromVerdict, toneVar, type Tone } from '../status';
@@ -43,6 +44,21 @@ function ToneBar({ items }: { items: Assertion[] }) {
   </div>;
 }
 
+/** What this op does: name from /api/contract, goal from the workflow pipeline's leg for this op. */
+function OpAbout({ attempt }: { attempt: AttemptDetailV2 }) {
+  const contract = useApiQuery<ContractInfo>('/api/contract', { topics: ['system'], intervalMs: 60_000 });
+  const pipeline = useApiQuery<PipelineView>(`/api/workflows/${encodeURIComponent(attempt.project)}/${encodeURIComponent(attempt.wf)}/pipeline`);
+  const op = attempt.op;
+  const leg = pipeline.data?.legs.find(item => item.op === op) as LegRowV3 | undefined;
+  const goal = leg?.info?.goal.vi ?? leg?.info?.goal.en ?? null;
+  const name = formatOpLabel(op, contract.data?.opLabels);
+  return <div className="rounded-lg border bg-muted/30 p-3">
+    <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Op này làm gì</p>
+    <p className="mt-1 text-sm"><b>{name}</b>{name !== op ? <span className="ml-2 font-mono text-xs text-muted-foreground">{op}</span> : null}</p>
+    {goal ? <p className="mt-1 text-sm">{goal}</p> : <p className="mt-1 text-xs text-muted-foreground">{pipeline.loading ? 'Đang tải mô tả…' : 'Chưa có mô tả cho op này.'}</p>}
+  </div>;
+}
+
 function InputCard({ attempt }: { attempt: AttemptDetailV2 }) {
   const input = attempt.input;
   const paths = attempt.where.ownedPaths.length ? attempt.where.ownedPaths : (input?.ownedPaths ?? []).map(rel => ({ rel, abs: null as string | null }));
@@ -51,6 +67,7 @@ function InputCard({ attempt }: { attempt: AttemptDetailV2 }) {
   const route = input?.route;
   const chosen = attempt.pool ?? input?.profile ?? null;
   return <Card concept="C8" title="Đầu vào" hint="jobs.payload_json → op" className="h-full">
+    <div className="grid gap-3"><OpAbout attempt={attempt} />
     {!input ? <p className="text-sm text-muted-foreground">Job này không lưu payload đầu vào.</p> : <dl className="grid gap-3 text-sm">
       <KeyVal label="Việc giao" value={input.what ?? none} />
       <KeyVal label="Quyền ghi" value={paths.length ? <span className="flex flex-col items-start gap-1.5">{paths.map(item => item.abs ? <PathLink key={item.rel} path={item.abs} label={item.rel} /> : <code key={item.rel} className="break-all text-xs">{item.rel}</code>)}</span> : none} />
@@ -61,6 +78,7 @@ function InputCard({ attempt }: { attempt: AttemptDetailV2 }) {
       <KeyVal label="Định tuyến" value={route?.chain.length ? <span>{route.chain.join(' → ')}{chosen ? <> · chọn <b>{chosen}</b></> : null}{route.rejected.length ? ` · loại ${route.rejected.length}` : ''}{route.policy ? ` · chính sách ${route.policy}` : ''}{route.order ? ` · thứ tự ${route.order}` : ''}</span> : none} />
       <KeyVal label="Chạy" value={attempt.dispatchedAt ? <span>{formatAbsolute(attempt.dispatchedAt)} → {attempt.settledAt ? formatAbsolute(attempt.settledAt) : 'chưa chốt'}{duration != null ? ` · ${formatSpan(duration)}` : ''}</span> : none} />
     </dl>}
+    </div>
   </Card>;
 }
 

@@ -4,10 +4,20 @@ import type { Concept } from '../concept';
 import { StatusChip } from '../status-chip';
 import { statusLabels, statusTone, toneVar, type Status } from '../status';
 import { AttemptDotsSvg } from './pipeline/attempt-dots';
+import { AgentStack } from '../agent/agent-avatar';
+import { legAgents, legGoal, legName } from './pipeline/node/op-identity';
 import { NODE_H, buildColumns, layoutPipeline, legTries } from './pipeline/layout';
 
 export const concept: Concept = 'C4';
 
+/** Split a name into at most two lines on word boundaries (second line clipped). */
+function wrap2(text: string, n: number): string[] {
+  if (text.length <= n) return [text];
+  const words = text.split(' '); let first = '';
+  while (words.length && (first ? `${first} ${words[0]}` : words[0]).length <= n) first = first ? `${first} ${words.shift()}` : words.shift()!;
+  if (!first) return [clip(text, n)];
+  return [first, clip(words.join(' '), n)];
+}
 const clip = (text: string, n: number) => text.length > n ? `${text.slice(0, n - 1)}…` : text;
 const dashed = (status: Status) => statusTone[status] === 'skipped';
 
@@ -71,20 +81,22 @@ function PipelineSvg({ pipeline, selected, onSelect }: { pipeline: PipelineView;
         stroke={edgeStroke(edge.tone)} strokeWidth={edge.tone === 'current' ? 2.2 : 1.4} opacity={edge.tone === 'plain' ? 0.55 : 1}><title>{`${edge.from} → ${edge.to}`}</title></path>)}</g>
       {[...placed.values()].map(({ leg, x, y }) => {
         const tone = statusTone[leg.status], isSel = selected === leg.op;
-        const [family, ...rest] = leg.op.split('.'); const verb = rest.join('.') || leg.op;
+        const name = legName(leg), goal = legGoal(leg), agents = legAgents(leg);
         return <g key={leg.op} transform={`translate(${x},${y})`} data-tone={tone} data-leg={leg.op} data-status={leg.status} role="button" tabIndex={0} className="group cursor-pointer outline-none"
-          aria-label={`${leg.op}: ${statusLabels[leg.status]}, ${legSummary(leg)}${leg.current ? ', chặng hiện tại' : ''}`} aria-pressed={isSel}
+          aria-label={`${name} (${leg.op}): ${statusLabels[leg.status]}, ${legSummary(leg)}${leg.current ? ', chặng hiện tại' : ''}`} aria-pressed={isSel}
           onClick={() => onSelect(leg)} onKeyDown={activate(leg, onSelect)}>
-          <title>{`${leg.op} · ${statusLabels[leg.status]}${leg.deferred ? ` · ${leg.deferred}` : ''}`}</title>
+          <title>{`${name} (${leg.op}) · ${statusLabels[leg.status]}${leg.deferred ? ` · ${leg.deferred}` : ''}${goal ? `
+${goal}` : ''}`}</title>
           {leg.current && <rect x={-4} y={-4} width={nodeW + 8} height={NODE_H + 8} rx={12} fill="none" stroke={toneVar('running')} strokeWidth={2.5} />}
           <rect width={nodeW} height={NODE_H} rx={9} fill="var(--tone-bg)" stroke={isSel ? 'var(--primary)' : 'var(--tone-line)'} strokeWidth={isSel ? 2.5 : 1.5} strokeDasharray={dashed(leg.status) ? '5 4' : undefined} />
           <rect x={-3} y={-3} width={nodeW + 6} height={NODE_H + 6} rx={11} fill="none" stroke="var(--primary)" strokeWidth={2} className="opacity-0 group-focus-visible:opacity-100" />
-          <text x={8} y={17} fontSize="11" fontWeight="600" letterSpacing=".05em" className="fill-muted-foreground">{clip(family.toUpperCase(), chars)}</text>
-          <text x={8} y={36} fontSize="14" fontWeight="700" className="fill-foreground">{clip(verb, chars)}</text>
-          <circle cx={13} cy={51} r={3.5} fill="var(--tone)" />
-          <text x={21} y={55} fontSize="11.5" fontWeight="600" fill="var(--tone)">{clip(statusLabels[leg.status], chars - 2)}</text>
-          <text x={8} y={71} fontSize="11.5" className="fill-muted-foreground">{clip(legSummary(leg), chars)}</text>
-          {leg.attempts.length > 0 && <AttemptDotsSvg attempts={leg.attempts} x={4} y={83} max={Math.max(3, Math.floor((nodeW - 8) / 12) - 1)} />}
+          <text x={8} y={18} fontSize="13" fontWeight="700" className="fill-foreground">{wrap2(name, Math.floor(chars * 0.9)).map((line, i) => <tspan key={i} x={8} dy={i ? 15 : 0}>{line}</tspan>)}</text>
+          <text x={8} y={50} fontSize="11" className="fill-muted-foreground" fontFamily="var(--font-mono, ui-monospace, monospace)">{clip(leg.op, Math.floor(chars * 0.95))}</text>
+          <circle cx={13} cy={67} r={3.5} fill="var(--tone)" />
+          <text x={21} y={71} fontSize="11.5" fontWeight="600" fill="var(--tone)">{clip(statusLabels[leg.status], chars - 2)}</text>
+          <text x={8} y={87} fontSize="11.5" className="fill-muted-foreground">{clip(legSummary(leg), chars)}</text>
+          {leg.attempts.length > 0 && <AttemptDotsSvg attempts={leg.attempts} x={4} y={104} max={Math.max(2, Math.floor((nodeW - 8) / 12) - 4)} />}
+          {agents.length > 0 && <foreignObject x={nodeW - 8 - 2 * 20 - 30} y={NODE_H - 28} width={2 * 20 + 30} height={22}><div className="flex h-full items-center justify-end"><AgentStack agents={agents} max={3} size={20} /></div></foreignObject>}
         </g>;
       })}
     </svg>
@@ -100,8 +112,10 @@ function PipelineList({ pipeline, selected, onSelect }: { pipeline: PipelineView
     <ul className="space-y-2">{col.legs.map(leg => <li key={leg.op}>
       <button type="button" data-tone={statusTone[leg.status]} data-leg={leg.op} aria-pressed={selected === leg.op} onClick={() => onSelect(leg)}
         className={`flex w-full min-w-0 items-center gap-3 rounded-lg border bg-[var(--tone-bg)] px-3 py-2.5 text-left ${dashed(leg.status) ? 'border-dashed' : ''} ${leg.current ? 'ring-2 ring-[var(--status-running)]' : ''} ${selected === leg.op ? 'border-primary' : 'border-[var(--tone-line)]'}`}>
-        <span className="min-w-0 flex-1"><span className="block truncate text-sm font-semibold">{leg.op}</span>
+        <span className="min-w-0 flex-1"><span className="block truncate text-sm font-semibold" title={legGoal(leg) ?? undefined}>{legName(leg)}</span>
+          <span className="block truncate font-mono text-[11px] text-muted-foreground">{leg.op}</span>
           <span className="block truncate text-xs text-muted-foreground">{legSummary(leg)}</span></span>
+        {legAgents(leg).length > 0 && <span className="shrink-0"><AgentStack agents={legAgents(leg)} max={2} size={20} /></span>}
         {leg.attempts.length > 0 && <span className="flex shrink-0 gap-1" aria-hidden="true">{leg.attempts.slice(-6).map(attempt => <span key={attempt.id} className="status-dot" data-tone={statusTone[attempt.status]} />)}</span>}
         <StatusChip status={leg.status} />
       </button>

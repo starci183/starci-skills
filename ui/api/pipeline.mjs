@@ -1,5 +1,6 @@
 // Planned op chain (goals.json opChain) joined with the units and attempts that exist, so the
 // UI can draw the whole pipeline in order — including legs that have no unit yet.
+import { opInfo } from './op-catalog.mjs';
 const one = (db, sql, ...args) => db.prepare(sql).get(...args) ?? null;
 const many = (db, sql, ...args) => db.prepare(sql).all(...args);
 const parse = (value, fallback = null) => { try { return value == null ? fallback : JSON.parse(value); } catch { return fallback; } };
@@ -74,6 +75,7 @@ export function pipelineOf(db, project, wf) {
         href: `#/w/${encodeURIComponent(project)}/${encodeURIComponent(wf)}?tab=units&unit=${encodeURIComponent(u.unit_id)}` })),
       attempts: legAttempts.map(a => attemptBrief(a, project)),
       current: ['running', 'settling', 'retry'].includes(status),
+      info: opInfo(leg.op, leg.yaml ? String(leg.yaml).split(String.fromCharCode(92)).join('/') : null),
     };
   });
   const countable = legs.filter(l => !['deferred', 'external', 'dropped'].includes(l.status));

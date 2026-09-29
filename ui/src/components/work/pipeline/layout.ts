@@ -1,6 +1,6 @@
 import type { LegRow, LegStatus, PipelineView } from '../../../contract';
 
-export const NODE_H = 92, COL_GAP = 16, ROW_GAP = 12, PAD_X = 8, HEAD_H = 34, PAD_B = 14;
+export const NODE_H = 126, COL_GAP = 16, ROW_GAP = 12, PAD_X = 8, HEAD_H = 34, PAD_B = 14;
 
 export type PlacedLeg = { leg: LegRow; x: number; y: number; col: number };
 export type Column = { level: number; index: number; label: string; legs: LegRow[] };
