@@ -2,8 +2,11 @@ import {
     Controller, Get, Param 
 } from "@nestjs/common"
 import {
-    BuyerStatusResult, OrderService 
+    BuyerStatusResult 
 } from "ecommerce-app-be/modules/domain/order"
+import {
+    BuyerStatusUseCase 
+} from "../../application/buyer-status.use-case"
 
 @Controller("internal/buyers")
 /**
@@ -15,10 +18,10 @@ import {
  * door for "who is this person".
  */
 export class BuyerController {
-    constructor(private readonly orders: OrderService) {}
+    constructor(private readonly buyerStatus: BuyerStatusUseCase) {}
 
   @Get(":personId")
     async status(@Param("personId") personId: string): Promise<BuyerStatusResult> {
-        return this.orders.buyerStatus(personId)
+        return this.buyerStatus.execute(personId)
     }
 }

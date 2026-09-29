@@ -6,10 +6,10 @@ import {
 } from "ecommerce-app-be/modules/domain/account"
 import {
     RequestInvalidException 
-} from "ecommerce-app-be/modules/platform/exceptions"
+} from "ecommerce-app-be/modules/platform/errors"
 import {
     EmailTakenException 
-} from "ecommerce-app-be/modules/platform/exceptions"
+} from "ecommerce-app-be/modules/platform/errors"
 
 import {
     RegisterInput 

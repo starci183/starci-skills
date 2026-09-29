@@ -9,6 +9,12 @@ import {
     SessionService 
 } from "@modules/domain/session/session.service"
 import {
+    RevokeSessionUseCase 
+} from "../../application/revoke-session.use-case"
+import {
+    VerifySessionUseCase 
+} from "../../application/verify-session.use-case"
+import {
     SessionController 
 } from "./session.controller"
 
@@ -27,9 +33,11 @@ describe("SessionController - sessions verify/revoke surface",
             }
             const module: TestingModule = await Test.createTestingModule({
                 controllers: [SessionController],
-                providers: [{
-                    provide: SessionService, useValue: sessions 
-                }],
+                providers: [VerifySessionUseCase,
+                    RevokeSessionUseCase,
+                    {
+                        provide: SessionService, useValue: sessions 
+                    }],
             }).compile()
             controller = module.get(SessionController)
         })

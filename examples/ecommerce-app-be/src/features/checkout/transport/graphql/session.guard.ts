@@ -12,7 +12,7 @@ import {
 } from "ecommerce-app-be/modules/integrations/identity"
 import {
     SessionInvalidException 
-} from "ecommerce-app-be/modules/platform/exceptions"
+} from "ecommerce-app-be/modules/platform/errors"
 
 /** The actor a verified request carries - the person the identity service named for the token. */
 export interface ActorParams {

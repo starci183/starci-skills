@@ -6,10 +6,13 @@ import {
 } from "ecommerce-app-be/modules/platform/config/identity"
 import {
     OrderServiceUnavailableException 
-} from "ecommerce-app-be/modules/platform/exceptions"
+} from "ecommerce-app-be/modules/platform/errors"
 import {
     OrderContractMismatchException 
-} from "ecommerce-app-be/modules/platform/exceptions"
+} from "ecommerce-app-be/modules/platform/errors"
+import {
+    ORDER_API_TIMEOUT_MS
+} from "./order.config"
 
 /** The buyer-status answer the order service's internal door provides for a person. */
 export interface BuyerStatusResult {
@@ -34,7 +37,7 @@ export class OrderApiClient {
         try {
             response = await fetch(url,
                 {
-                    signal: AbortSignal.timeout(3000) 
+                    signal: AbortSignal.timeout(ORDER_API_TIMEOUT_MS) 
                 })
         } catch {
             throw new OrderServiceUnavailableException({

@@ -7,10 +7,10 @@ import {
 } from "ecommerce-app-be/modules/platform/config/identity"
 import {
     RedisUnexpectedReplyException 
-} from "ecommerce-app-be/modules/platform/exceptions"
+} from "ecommerce-app-be/modules/platform/errors"
 import {
     RedisConnectionException 
-} from "ecommerce-app-be/modules/platform/exceptions"
+} from "ecommerce-app-be/modules/platform/errors"
 
 /** Stored Redis value, or null when the key is absent. */
 export type RedisLookupResult = string | null

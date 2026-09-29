@@ -9,7 +9,7 @@ import {
 } from "@modules/domain/order/order.service"
 import {
     CheckoutRefusalException 
-} from "@modules/platform/exceptions/errors/checkout/checkout-refusal"
+} from "@modules/platform/errors/errors/checkout/checkout-refusal"
 import {
     IdentityApiClient 
 } from "@modules/integrations/identity/identity.client"

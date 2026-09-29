@@ -2,14 +2,11 @@ import {
     Body, Controller, Post, UseFilters 
 } from "@nestjs/common"
 import {
-    SessionService 
-} from "ecommerce-app-be/modules/domain/session"
+    RevokeSessionUseCase
+} from "../../application/revoke-session.use-case"
 import {
-    SessionInvalidException 
-} from "ecommerce-app-be/modules/platform/exceptions"
-import {
-    RequestInvalidException 
-} from "ecommerce-app-be/modules/platform/exceptions"
+    VerifySessionUseCase
+} from "../../application/verify-session.use-case"
 import {
     BusinessCodeExceptionFilter 
 } from "./business-code.filter"
@@ -30,33 +27,18 @@ export interface VerifySessionParams {
  * is the exception class's internal name, not part of the contract.
  */
 export class SessionController {
-    constructor(private readonly sessions: SessionService) {}
+    constructor(
+    private readonly verifySession: VerifySessionUseCase,
+    private readonly revokeSession: RevokeSessionUseCase,
+    ) {}
 
   @Post("verify")
     async verify(@Body() body: VerifySessionParams): Promise<{ personId: string }> {
-        const sessionToken = typeof body?.sessionToken === "string" ? body.sessionToken : ""
-        const personId = await this.sessions.verify(sessionToken)
-        if (!personId) {
-            throw new SessionInvalidException({
-                message: "No live session answers this token." 
-            })
-        }
-        return {
-            personId 
-        }
+        return this.verifySession.execute(body?.sessionToken)
     }
 
   @Post("revoke")
   async revoke(@Body() body: VerifySessionParams): Promise<{ revoked: true }> {
-      const sessionToken = typeof body?.sessionToken === "string" ? body.sessionToken : ""
-      if (!sessionToken) {
-          throw new RequestInvalidException({
-              message: "sessionToken is required." 
-          })
-      }
-      await this.sessions.revoke(sessionToken)
-      return {
-          revoked: true 
-      }
+      return this.revokeSession.execute(body?.sessionToken)
   }
 }

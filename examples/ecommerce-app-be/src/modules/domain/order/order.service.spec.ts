@@ -39,7 +39,7 @@ import {
 } from "./checkout.policy"
 import {
     CheckoutRefusalException 
-} from "@modules/platform/exceptions/errors/checkout/checkout-refusal"
+} from "@modules/platform/errors/errors/checkout/checkout-refusal"
 import {
     OrderService 
 } from "./order.service"

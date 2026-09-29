@@ -36,7 +36,7 @@ import {
 } from "./checkout.policy"
 import {
     CheckoutRefusalException 
-} from "ecommerce-app-be/modules/platform/exceptions"
+} from "ecommerce-app-be/modules/platform/errors"
 
 /** The confirmation a door answers: the order id, total, payment id and whether this was a replay. */
 export interface PlaceOrderResult {

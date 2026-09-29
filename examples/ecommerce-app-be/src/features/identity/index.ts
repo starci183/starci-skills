@@ -3,5 +3,5 @@ import {
 } from "./identity.module"
 import {
     IdentityGraphqlModule
-} from "./transport/graphql/graphql.module"
+} from "./transport/graphql/identity-graphql.module"
 export { IdentityModule, IdentityGraphqlModule }

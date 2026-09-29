@@ -2,15 +2,11 @@ import {
     Module 
 } from "@nestjs/common"
 import {
-    BuyerController 
-} from "./transport/http/buyer.controller"
-import {
-    HealthController 
-} from "./transport/http/health.controller"
+    CheckoutHttpModule 
+} from "./transport/http/checkout-http.module"
 
 @Module({
-    controllers: [BuyerController,
-        HealthController],
+    imports: [CheckoutHttpModule],
 })
 /**
  * The checkout feature of apps/order - the HTTP transport that stays HTTP for a sanctioned
@@ -20,6 +16,6 @@ import {
  * guarded there by the same session verification. Thin on purpose and import-free: the
  * capability modules (cart, catalog, order, payment, the identity integration) and the
  * platform modules are all registered app-wide at the `apps/order` composition root, so this
- * module only mounts controllers - a feature never imports a capability module.
+ * module only composes the HTTP transport, which mounts the controllers - a feature never imports a capability module.
  */
 export class CheckoutModule {}

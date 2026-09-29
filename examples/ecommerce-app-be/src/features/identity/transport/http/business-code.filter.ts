@@ -6,7 +6,7 @@ import type {
 } from "express"
 import {
     AbstractException 
-} from "ecommerce-app-be/modules/platform/exceptions"
+} from "ecommerce-app-be/modules/platform/errors"
 
 @Catch(AbstractException)
 /**

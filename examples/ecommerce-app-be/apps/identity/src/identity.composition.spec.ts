@@ -15,59 +15,54 @@ import {
     AppModule 
 } from "./app.module"
 import {
+    Logger 
+} from "@modules/platform/logging"
+import {
     AppConfigService 
-} from "@modules/platform/config/order/app-config.service"
+} from "@modules/platform/config/identity/app-config.service"
 import {
     PostgresPrimaryClient 
-} from "@modules/platform/databases/postgresql/order/primary.client"
+} from "@modules/platform/databases/postgresql/identity/primary.client"
 import {
     POSTGRESQL_PRIMARY 
-} from "@modules/platform/databases/postgresql/order/constants/connection"
+} from "@modules/platform/databases/postgresql/identity/constants/connection"
 import {
-    CartService 
-} from "@modules/domain/cart/cart.service"
+    RedisPrimaryClient 
+} from "@modules/platform/caches/redis/primary/redis.client"
 import {
-    CatalogService 
-} from "@modules/domain/catalog/catalog.service"
+    AccountService 
+} from "@modules/domain/account/account.service"
 import {
-    CheckoutPolicy 
-} from "@modules/domain/order/checkout.policy"
+    SessionRepository 
+} from "@modules/domain/session/session.repository"
 import {
-    OrderService 
-} from "@modules/domain/order/order.service"
+    SessionService 
+} from "@modules/domain/session/session.service"
 import {
-    PaymentService 
-} from "@modules/domain/payment/payment.service"
-import {
-    IdentityApiClient 
-} from "@modules/integrations/identity/identity.client"
-import {
-    SessionGuard 
-} from "@features/checkout/transport/graphql/session.guard"
-import {
-    BuyerController 
-} from "@features/checkout/transport/http/buyer.controller"
+    OrderApiClient 
+} from "@modules/integrations/order/order.client"
 import {
     HealthController 
-} from "@features/checkout/transport/http/health.controller"
+} from "@features/identity/transport/http/health.controller"
 import {
-    CartResolver 
-} from "@features/checkout/transport/graphql/queries/cart/cart/cart.resolver"
+    SessionController 
+} from "@features/identity/transport/http/session.controller"
 import {
-    AddCartItemResolver 
-} from "@features/checkout/transport/graphql/mutations/cart/add-cart-item/add-cart-item.resolver"
+    AccountResolver 
+} from "@features/identity/transport/graphql/queries/account/account/account.resolver"
 import {
-    ClearCartResolver 
-} from "@features/checkout/transport/graphql/mutations/cart/clear-cart/clear-cart.resolver"
+    RegisterResolver 
+} from "@features/identity/transport/graphql/mutations/session/register/register.resolver"
 import {
-    PlaceOrderResolver 
-} from "@features/checkout/transport/graphql/mutations/order/place-order/place-order.resolver"
+    SignInResolver 
+} from "@features/identity/transport/graphql/mutations/session/sign-in/sign-in.resolver"
 
 /**
- * The order deployable's DI smoke, sibling of apps/identity's: AppModule must compile with the
- * platform boundary (the named Postgres connection, the metadata/env config) doubled, and every
- * capability service, the identity integration client, the session guard and all transport
- * doors must resolve. This is the test that catches a DI misconfig before behavior specs run.
+ * The identity deployable's DI smoke: AppModule must compile with the platform boundary - the
+ * named Postgres connection, the Redis session store, the metadata/env config - replaced by
+ * doubles, and every capability service, integration client and transport door must resolve.
+ * A missing export, a wrong connection name or a provider declared nowhere fails here before
+ * any behavior spec runs.
  */
 function postgresBoundary(): { dataSource: DataSource; manager: { findOneBy: jest.Mock; save: jest.Mock } } {
     const manager = {
@@ -94,15 +89,28 @@ function configBoundary(): AppConfigService {
         getProject: () => "ecommerce-app-be",
         getPort: () => 0,
         getDatabaseUrl: () => "postgres://postgres@localhost:0/ecommerce",
-        getIdentityApiBaseUrl: () => "http://localhost:0",
+        getRedisUrl: () => "redis://localhost:0/0",
+        getOrderApiBaseUrl: () => "http://localhost:0",
+        getSessionTtlSeconds: () => 3600,
     } as unknown as AppConfigService
 }
 
-describe("order AppModule - module boot",
+function redisBoundary(): RedisPrimaryClient {
+    return {
+        ping: jest.fn(),
+        store: jest.fn(),
+        lookup: jest.fn(),
+        forget: jest.fn(),
+        close: jest.fn(),
+    } as unknown as RedisPrimaryClient
+}
+
+describe("identity AppModule - module boot",
     () => {
         let module: TestingModule
         let postgres: ReturnType<typeof postgresBoundary>
         const config = configBoundary()
+        const redis = redisBoundary()
 
         beforeAll(async () => {
             postgres = postgresBoundary()
@@ -117,6 +125,8 @@ describe("order AppModule - module boot",
                 .useValue({
                     name: POSTGRESQL_PRIMARY, type: "postgres" 
                 })
+                .overrideProvider(RedisPrimaryClient)
+                .useValue(redis)
                 .overrideProvider(AppConfigService)
                 .useValue(config)
                 .compile()
@@ -131,30 +141,24 @@ describe("order AppModule - module boot",
                 expect(module).toBeDefined()
             })
 
-        it("resolves the capability services, the platform client and the identity integration client",
+        it("resolves the capability services, the platform client and the order integration client",
             () => {
-                for (const token of [
-                    CartService,
-                    CatalogService,
-                    OrderService,
-                    CheckoutPolicy,
-                    PaymentService,
+                for (const token of [AccountService,
+                    SessionService,
+                    SessionRepository,
                     PostgresPrimaryClient,
-                    IdentityApiClient,
-                ]) {
+                    OrderApiClient]) {
                     expect(module.get(token)).toBeDefined()
                 }
             })
 
-        it("resolves the session guard, every justified REST controller and every GraphQL resolver",
+        it("resolves every justified REST controller and every GraphQL resolver",
             () => {
-                for (const token of [SessionGuard,
-                    BuyerController,
+                for (const token of [SessionController,
                     HealthController,
-                    CartResolver,
-                    AddCartItemResolver,
-                    ClearCartResolver,
-                    PlaceOrderResolver]) {
+                    RegisterResolver,
+                    SignInResolver,
+                    AccountResolver]) {
                     expect(module.get(token)).toBeDefined()
                 }
             })
@@ -165,12 +169,14 @@ describe("order AppModule - module boot",
                 expect(module.get(getEntityManagerToken(POSTGRESQL_PRIMARY))).toBe(postgres.manager)
             })
 
-        it("resolves the global config provider as the boundary double",
+        it("resolves the global platform providers as the boundary doubles",
             () => {
                 expect(module.get(AppConfigService)).toBe(config)
+                expect(module.get(RedisPrimaryClient)).toBe(redis)
+                expect(module.get(Logger)).toBeInstanceOf(Logger)
             })
 
-        it("registers no global guard or interceptor - session enforcement lives at the resolver doors",
+        it("registers no global guard or interceptor - every identity door is intentionally open",
             () => {
                 expect(() => module.get(APP_GUARD)).toThrow()
                 expect(() => module.get(APP_INTERCEPTOR)).toThrow()

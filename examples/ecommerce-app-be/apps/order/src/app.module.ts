@@ -2,6 +2,9 @@ import {
     Module 
 } from "@nestjs/common"
 import {
+    LoggingModule 
+} from "ecommerce-app-be/modules/platform/logging"
+import {
     ConfigModule 
 } from "ecommerce-app-be/modules/platform/config/order"
 import {
@@ -31,6 +34,7 @@ import {
 
 @Module({
     imports: [
+        LoggingModule,
         ConfigModule.register({
             isGlobal: true 
         }),

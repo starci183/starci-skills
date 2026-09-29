@@ -5,6 +5,9 @@ import {
     OrderService, BuyerStatusResult 
 } from "@modules/domain/order/order.service"
 import {
+    BuyerStatusUseCase 
+} from "../../application/buyer-status.use-case"
+import {
     BuyerController 
 } from "./buyer.controller"
 
@@ -24,6 +27,7 @@ describe("BuyerController - contract.checkout.order-for-identity provider",
             jest.clearAllMocks()
             const moduleRef = await Test.createTestingModule({
                 providers: [BuyerController,
+                    BuyerStatusUseCase,
                     {
                         provide: OrderService, useValue: orderService 
                     }],

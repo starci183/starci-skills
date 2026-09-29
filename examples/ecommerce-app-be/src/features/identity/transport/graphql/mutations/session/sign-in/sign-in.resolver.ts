@@ -9,10 +9,10 @@ import {
 } from "ecommerce-app-be/modules/domain/session"
 import {
     RequestInvalidException 
-} from "ecommerce-app-be/modules/platform/exceptions"
+} from "ecommerce-app-be/modules/platform/errors"
 import {
     InvalidCredentialsException 
-} from "ecommerce-app-be/modules/platform/exceptions"
+} from "ecommerce-app-be/modules/platform/errors"
 
 import {
     SignInInput 

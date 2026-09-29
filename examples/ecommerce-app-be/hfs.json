@@ -2,6 +2,7 @@
   "hfs": 2,
   "profile": "be",
   "project": "ecommerce-app-be",
+  "optionalSlots": ["repo.docs"],
   "apps": [
     { "name": "identity", "kind": "api" },
     { "name": "order", "kind": "api" }

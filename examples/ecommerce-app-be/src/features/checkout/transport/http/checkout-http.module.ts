@@ -1,0 +1,20 @@
+import {
+    Module
+} from "@nestjs/common"
+import {
+    BuyerStatusUseCase
+} from "../../application/buyer-status.use-case"
+import {
+    BuyerController
+} from "./buyer.controller"
+import {
+    HealthController
+} from "./health.controller"
+
+/** The HTTP transport of the checkout feature: the internal buyer door and the /health probe. */
+@Module({
+    controllers: [BuyerController,
+        HealthController],
+    providers: [BuyerStatusUseCase],
+})
+export class CheckoutHttpModule {}

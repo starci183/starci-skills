@@ -2,15 +2,11 @@ import {
     Module 
 } from "@nestjs/common"
 import {
-    SessionController 
-} from "./transport/http/session.controller"
-import {
-    HealthController 
-} from "./transport/http/health.controller"
+    IdentityHttpModule 
+} from "./transport/http/identity-http.module"
 
 @Module({
-    controllers: [SessionController,
-        HealthController],
+    imports: [IdentityHttpModule],
 })
 /**
  * The identity feature - the HTTP transport of the deployable at apps/identity that stays HTTP
@@ -19,7 +15,7 @@ import {
  * account - now lives in the canonical GraphQL transport under features/identity/transport/graphql. Thin
  * on purpose and import-free: the capability modules (account, session, the order integration)
  * and the platform modules (config, Postgres, Redis) are all registered app-wide at the
- * `apps/identity` composition root, so this module only mounts controllers - a feature never
+ * `apps/identity` composition root, so this module only composes the HTTP transport, which mounts the controllers - a feature never
  * imports a capability module.
  */
 export class IdentityModule {}

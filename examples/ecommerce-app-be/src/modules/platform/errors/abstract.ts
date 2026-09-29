@@ -49,7 +49,7 @@ export abstract class AbstractException extends HttpException {
 /**
  * Additional metadata for exception instances (e.g. originalError). Widened with a string index
  * signature so a call site can attach any extra debugging field - every subclass under
- * `exceptions/errors/**` extends this interface with its own named fields.
+ * `errors/**` extends this interface with its own named fields.
  */
 export interface AbstractExceptionMetadata {
   /** The underlying error that triggered this exception. */

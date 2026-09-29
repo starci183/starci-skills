@@ -24,7 +24,7 @@ import {
     PlaceOrderData,
     ProductView,
     registerBuyer,
-} from "./lifecycle.helpers"
+} from "../setup/lifecycle.helpers"
 
 interface OrderRow {
   id: string;

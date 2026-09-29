@@ -19,7 +19,7 @@ import {
 } from "typeorm"
 import {
     CheckoutGraphqlModule 
-} from "./graphql.module"
+} from "./checkout-graphql.module"
 import {
     ConfigModule 
 } from "@modules/platform/config/order/config.module"

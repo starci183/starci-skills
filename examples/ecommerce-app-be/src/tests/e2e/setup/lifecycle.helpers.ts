@@ -1,9 +1,9 @@
 import {
     E2EAuthService, E2ESession 
-} from "../setup/domain/accounts/e2e-auth.service"
+} from "./domain/accounts/e2e-auth.service"
 import {
     E2EGraphqlClient, E2EGraphqlService 
-} from "../setup/integrations/graphql/e2e-graphql.service"
+} from "./integrations/graphql/e2e-graphql.service"
 
 /** Shared view types for the order-lifecycle lane: the response shapes the public doors answer with. */
 export interface ProductView {

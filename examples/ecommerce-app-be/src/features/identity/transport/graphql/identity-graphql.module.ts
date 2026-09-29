@@ -15,7 +15,11 @@ import {
 } from "graphql"
 import {
     AbstractException 
-} from "ecommerce-app-be/modules/platform/exceptions"
+} from "ecommerce-app-be/modules/platform/errors"
+
+import {
+    isRecord
+} from "ecommerce-app-be/modules/platform/primitives"
 
 import {
     QUERY_MODULES 
@@ -27,15 +31,14 @@ import {
 interface GraphqlContextShape { req: unknown; res: unknown }
 
 /**
- * Code-first Apollo GraphQL API for the order service + all operation modules - the same
+ * Code-first Apollo GraphQL API for the identity service + all operation modules - the same
  * pattern todo-app-backend's `features/todo/graphql/graphql.module.ts` uses (`ApolloDriver`,
  * `autoSchemaFile: true`, `sortSchema: true`, one `context` closure exposing `req`/`res`).
  * `formatError` reads an `AbstractException`'s stable `code` back out of Apollo's error envelope
  * onto `extensions.code`, minus the `_EXCEPTION` transport suffix, and spreads the exception's
  * metadata beside it, so a GraphQL error carries the same machine-readable business code (and
- * refusal detail - `reason`, `productId`, `requested`, `available`) the REST error body used to
- * carry - clients keyed on `CHECKOUT_REFUSAL`/`SESSION_INVALID`/etc. still see that code, just
- * relocated.
+ * refusal detail) the REST error body used to carry - clients keyed on
+ * `INVALID_CREDENTIALS`/`EMAIL_TAKEN`/etc. still see that code, just relocated.
  */
 @Module({
     imports: [
@@ -50,7 +53,7 @@ interface GraphqlContextShape { req: unknown; res: unknown }
                 req: ctx.req, res: ctx.res 
             }),
             formatError: (formatted: GraphQLFormattedError, error: unknown): GraphQLFormattedError => {
-                const original = typeof error === "object" && error !== null && "originalError" in error
+                const original = isRecord(error)
                     ? error.originalError
                     : undefined
                 if (original instanceof AbstractException) {
@@ -73,5 +76,5 @@ interface GraphqlContextShape { req: unknown; res: unknown }
         ...MUTATION_MODULES,
     ],
 })
-/** Composition for the checkout GraphQL API: code-first Apollo plus every query and mutation module; the formatError closure above is what carries AbstractException codes and refusal metadata onto extensions. */
-export class CheckoutGraphqlModule {}
+/** Composition for the identity GraphQL API: code-first Apollo plus every query and mutation module; the formatError closure above is what carries AbstractException codes and refusal metadata onto extensions. */
+export class IdentityGraphqlModule {}

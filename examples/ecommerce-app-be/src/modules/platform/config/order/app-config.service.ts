@@ -11,14 +11,17 @@ import {
     env 
 } from "node:process"
 import {
+    isRecord
+} from "ecommerce-app-be/modules/platform/primitives"
+import {
     MetadataFileMissingException 
-} from "ecommerce-app-be/modules/platform/exceptions"
+} from "ecommerce-app-be/modules/platform/errors"
 import {
     MetadataUnreadableException 
-} from "ecommerce-app-be/modules/platform/exceptions"
+} from "ecommerce-app-be/modules/platform/errors"
 import {
     MetadataPortsMissingException 
-} from "ecommerce-app-be/modules/platform/exceptions"
+} from "ecommerce-app-be/modules/platform/errors"
 
 /** Env var naming this checkout's metadata.json outright; the fallback walk searches upward from the process cwd for the repository that owns `.starcistacks`. */
 export const METADATA_FILE_ENV = "ECOMMERCE_APP_BE_METADATA"
@@ -50,9 +53,9 @@ interface MetadataResult {
  * than a trusted lie.
  */
 function portsOf(parsed: unknown): PortsResult | null {
-    if (typeof parsed !== "object" || parsed === null) return null
+    if (!isRecord(parsed)) return null
     const ports = (parsed as { ports?: unknown }).ports
-    if (typeof ports !== "object" || ports === null) return null
+    if (!isRecord(ports)) return null
     const candidate = ports as Record<string, unknown>
     if (typeof candidate.orderApi !== "number" || typeof candidate.postgres !== "number"
         || typeof candidate.identityApi !== "number") {
@@ -67,7 +70,7 @@ function portsOf(parsed: unknown): PortsResult | null {
 
 /** The project name when the parsed metadata is an object carrying one; "" otherwise. */
 function projectOf(parsed: unknown): string {
-    if (typeof parsed !== "object" || parsed === null) return ""
+    if (!isRecord(parsed)) return ""
     return String((parsed as { project?: unknown }).project ?? "")
 }
 

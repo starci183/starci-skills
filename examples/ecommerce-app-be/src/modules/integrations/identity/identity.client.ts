@@ -6,10 +6,13 @@ import {
 } from "ecommerce-app-be/modules/platform/config/order"
 import {
     IdentityServiceUnavailableException 
-} from "ecommerce-app-be/modules/platform/exceptions"
+} from "ecommerce-app-be/modules/platform/errors"
 import {
     IdentityContractMismatchException 
-} from "ecommerce-app-be/modules/platform/exceptions"
+} from "ecommerce-app-be/modules/platform/errors"
+import {
+    IDENTITY_PROBE_TIMEOUT_MS, IDENTITY_VERIFY_TIMEOUT_MS
+} from "./identity.config"
 
 /** The person behind a live session, as identity's internal verify door answers it. */
 export interface SessionPersonResult {
@@ -42,7 +45,7 @@ export class IdentityApiClient {
                     body: JSON.stringify({
                         sessionToken 
                     }),
-                    signal: AbortSignal.timeout(3000),
+                    signal: AbortSignal.timeout(IDENTITY_VERIFY_TIMEOUT_MS),
                 })
         } catch {
             throw new IdentityServiceUnavailableException({
@@ -76,7 +79,7 @@ export class IdentityApiClient {
         try {
             const response = await fetch(`${this.config.getIdentityApiBaseUrl()}/health`,
                 {
-                    signal: AbortSignal.timeout(2000) 
+                    signal: AbortSignal.timeout(IDENTITY_PROBE_TIMEOUT_MS) 
                 })
             return response.ok
         } catch {

@@ -6,7 +6,7 @@ import {
 } from "@nestjs/graphql"
 import {
     SessionInvalidException 
-} from "ecommerce-app-be/modules/platform/exceptions"
+} from "ecommerce-app-be/modules/platform/errors"
 
 import {
     ActorParams 

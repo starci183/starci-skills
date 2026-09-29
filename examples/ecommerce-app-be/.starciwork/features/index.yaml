@@ -1,0 +1,10 @@
+schema: work/catalog@1
+id: ecommerce
+description: Feature directory of the product catalog. One entry per feature; every record of a feature lives under its directory.
+features:
+  - id: checkout
+    directory: checkout
+    description: Cart, stock, payment and the confirmed order - the first thing that needs a second service.
+  - id: identity
+    directory: identity
+    description: The person behind a session. Skeleton seeded beside checkout; its full design is a later pass.

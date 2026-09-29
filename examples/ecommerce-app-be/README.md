@@ -23,7 +23,7 @@ in `.starcistacks/dev`.
 - `src/modules/integrations`: cross-service HTTP clients.
 - `.starciwork`: product records and implementation references for both backend and frontend.
 - `.starcistacks`: the dev stack declaration, compose fragments, and resolved port projection.
-- `docs/TESTING.md`: verification commands and suite boundaries.
+- `docs/guides/testing.md`: verification commands and suite boundaries.
 
 Each feature and module capability has an `index.ts` public entry. The root package exports
 those entries through `ecommerce-app-be/features/*` and `ecommerce-app-be/modules/*`, so the
@@ -32,7 +32,7 @@ application workspaces can compose them without importing private files.
 ## Development
 
 From this directory run `npm ci`, then `npm run typecheck`, `npm run lint:check`,
-`npm run build` and `npm run test:unit`. `docs/TESTING.md` describes the live stack gate.
+`npm run build` and `npm run test:unit`. `docs/guides/testing.md` describes the live stack gate.
 
 ## Work
 
@@ -60,6 +60,6 @@ and `node scripts/checks/check-starcistacks.mjs examples/ecommerce-app-be`.
 application processes. There are exactly two test kinds: unit `*.spec.ts` beside the source and e2e
 `*.e2e-spec.ts` under `src/tests/e2e/`. Narrow an e2e run with jest arguments, for example
 `npm run test:e2e -- checkout/checkout-journey` or `npm run test:e2e -- resilience`. E2E runs manually only: no hook, default typecheck/lint, coverage or automatic CI job runs it (`npm run typecheck:e2e` is its manual type check).
-See `docs/TESTING.md` for the suite boundary. Existing Work evidence
+See `docs/guides/testing.md` for the suite boundary. Existing Work evidence
 retains its recorded revisions; the derived index reports stale proof where source or records
 changed.

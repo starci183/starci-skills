@@ -26,7 +26,7 @@ import {
     PlaceOrderData,
     RefusalView,
     registerBuyer,
-} from "./lifecycle.helpers"
+} from "../setup/lifecycle.helpers"
 
 /**
  * The identity↔order boundary for real: an order-door operation authenticates by the guard
