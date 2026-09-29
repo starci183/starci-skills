@@ -2438,7 +2438,7 @@ function ensureWorkflowRun(ledger, { job, jobId, payload }, { bind = bindWorkflo
 // kernel terminal as both `from` (who issues it) and `parent` (whose child it
 // is). `from` alone left the Orca tree to be inferred from the Run, so a Task
 // whose Run was bound to a replaced kernel terminal fell out to the sidebar
-// root (fable.md orca-hierarchy, root cause 3).
+// root (docs/fable.md orca-hierarchy, root cause 3).
 // A packet longer than the host's argv takes is written to the job's evidence directory and the
 // spec points at it (task-spec.mjs; inc-826e077777de: 993 owned_paths hit ENAMETOOLONG at spawn).
 const createOperationTask = ({ runId, prompt, op, title, attempt, kernelHandle, jobId = null, packetFile = null }) =>

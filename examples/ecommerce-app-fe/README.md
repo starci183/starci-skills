@@ -1,4 +1,8 @@
-# ecommerce-app-fe — Next.js monorepo example
+# ecommerce-app-fe
+
+Two Next.js ecommerce applications share one npm workspace and UI package.
+
+## Overview
 
 The frontend half of the ecommerce example, shaped like `nivo-fe`: one repo, npm workspaces, one deployable
 Next.js app per `apps/*` site. Two apps:
@@ -21,6 +25,23 @@ surfaces only — never on refusal or error surfaces, per the brand record's `ne
 It owns no `.starciwork` (the backend repo owns the Work tree, same rule as `todo-app-frontend`) and no
 auth: the landing → shop session handoff is a contract the backend lane and a later workstream settle,
 marked in-source with `// contract:` pointers.
+
+## Stack
+
+Next.js, React, TypeScript, npm workspaces, `@starci/grammar`, Vitest and Playwright.
+
+## Repository layout
+
+- `apps/landing/src`: public marketing app; `apps/shop/src`: authenticated shop app.
+- `packages/shared`: shared UI and runtime configuration package.
+- `scripts/`: repository tooling; `e2e/`: Playwright flows.
+- The paired backend owns `.starciwork` and `.starcistacks` for this product.
+
+## Development
+
+From this directory run `npm install`, then `npm run typecheck`, `npm run lint:check`,
+`npm run build` and `npm run test:unit`. The commands below start the apps using the
+paired backend's port projection.
 
 ## Ports: there is one projection and it is read, never restated
 

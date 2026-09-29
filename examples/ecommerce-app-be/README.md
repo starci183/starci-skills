@@ -1,11 +1,20 @@
 # ecommerce-app-be
 
+Two NestJS ecommerce services share the HFS backend repository tree.
+
+## Overview
+
 This backend example uses the HFS repository tree. Two NestJS applications live under
 `apps/identity` and `apps/order`. Their composition roots import explicit public APIs from
 `src/features` and `src/modules/{domain,platform,integrations}`. The paired
 `examples/ecommerce-app-fe` reads this backend's port projection and shares its product Work tree.
 
-## Repository shape
+## Stack
+
+NestJS, TypeScript, npm workspaces, PostgreSQL, Redis and GraphQL. The dev stack is declared
+in `.starcistacks/dev`.
+
+## Repository layout
 
 - `apps/identity/src` and `apps/order/src`: startup and Nest composition only.
 - `src/features/{identity,checkout}`: HTTP and GraphQL adapters under `transport/`.
@@ -19,6 +28,16 @@ This backend example uses the HFS repository tree. Two NestJS applications live 
 Each feature and module capability has an `index.ts` public entry. The root package exports
 those entries through `ecommerce-app-be/features/*` and `ecommerce-app-be/modules/*`, so the
 application workspaces can compose them without importing private files.
+
+## Development
+
+From this directory run `npm ci`, then `npm run typecheck`, `npm run lint:check`,
+`npm run build` and `npm run test:unit`. `docs/TESTING.md` describes the live stack gate.
+
+## Work
+
+The backend owns [`.starciwork`](.starciwork/index.yaml) product records for both services
+and the paired frontend.
 
 ## Runtime projection
 

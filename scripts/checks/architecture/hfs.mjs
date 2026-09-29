@@ -1,6 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { execFileSync } from 'node:child_process';
+import { isIP } from 'node:net';
 
 /**
  * HFS v1 repository-tree check (D:/starci-tmp/hfs/HFS-SPEC.md): every StarCi repository is an
@@ -16,8 +17,17 @@ export const HFS_RULE_IDS = [
   'HFS_APP_LAYOUT_INVALID',
   'HFS_MODULE_TIER_INVALID',
   'HFS_PACKAGE_MANAGER_MIXED',
+  'HFS_README_BADGE_NOT_LIVE',
+  'HFS_README_DESCRIPTION_INVALID',
+  'HFS_README_DEVELOPMENT_INCOMPLETE',
+  'HFS_README_PRIVATE_URL',
+  'HFS_README_SECTION_MISSING',
+  'HFS_README_SECTION_ORDER',
+  'HFS_README_TITLE_INVALID',
+  'HFS_README_WORK_POINTER_MISSING',
   'HFS_ROOT_ENTRY_FORBIDDEN',
   'HFS_ROOT_ENTRY_MISSING',
+  'HFS_ROOT_MARKDOWN_FORBIDDEN',
   'HFS_ROOT_SRC_FORBIDDEN_FE',
   'HFS_SRC_LAYOUT_INVALID',
   'HFS_STACKS_IN_FE',
@@ -32,7 +42,10 @@ const OPTIONAL_COMMON = new Set(['.dockerignore', '.editorconfig', '.npmrc', '.n
 const REQUIRED_BACKEND = ['.sops.yaml', '.starcistacks', '.starciwork', 'jest.config.js', 'nest-cli.json', 'src'];
 const OPTIONAL_FRONTEND = new Set(['turbo.json', 'vitest.config.ts', 'vitest.setup.ts']);
 const OPTIONAL_FRONTEND_PATTERN = /^playwright.*\.config\.ts$/;
-const NON_NPM_ENTRIES = new Set(['pnpm-lock.yaml', 'pnpm-workspace.yaml', 'yarn.lock']);
+const NON_NPM_ENTRIES = new Set(['pnpm-lock.yaml', 'pnpm-workspace.yaml', 'yarn.lock', 'bun.lock', 'bun.lockb']);
+const RUNTIME_ROOT_MARKDOWN = new Set(['README.md', 'CONTEXT.md', 'CONTRIBUTING.md', 'CHANGELOG.md', 'THIRD_PARTY_NOTICES.md']);
+const PRODUCT_ROOT_MARKDOWN = new Set(['README.md']);
+const README_SECTIONS = ['Overview', 'Stack', 'Repository layout', 'Development'];
 const BACKEND_SRC_CHILDREN = new Set(['features', 'modules', 'tests']);
 const MODULE_TIERS = new Set(['domain', 'integrations', 'platform']);
 const TEST_CHILDREN = new Set(['e2e', 'fixtures', 'harness', 'integration']);
@@ -97,6 +110,112 @@ function treeView(root) {
   };
 }
 
+function privateHost(hostname) {
+  const host = hostname.toLowerCase().replace(/^\[|\]$/g, '').replace(/\.$/, '');
+  if (host === 'localhost' || host === '::1' || host === '0.0.0.0' ||
+      /(?:\.localhost|\.local|\.internal|\.lan)$/u.test(host)) return true;
+  if (isIP(host) === 6) return /^(?:::|f[cd][0-9a-f]*:|fe[89ab][0-9a-f]*:)/iu.test(host);
+  if (!host.includes('.')) return true;
+  const octets = host.split('.');
+  if (octets.length !== 4 || !octets.every(part => /^\d{1,3}$/u.test(part) && Number(part) <= 255)) return false;
+  const [a, b] = octets.map(Number);
+  return a === 0 || a === 10 || a === 127 || a === 169 && b === 254 ||
+    a === 172 && b >= 16 && b <= 31 || a === 192 && b === 168 || a === 100 && b >= 64 && b <= 127;
+}
+
+/** Presentation checks shared by the product HFS gate and this runtime's own standalone gate. */
+export function checkRepoPresentation({ root, runtime = false, tree = treeView(root) }) {
+  const violations = [];
+  const finding = (ruleId, entry, message, line = 1) => violations.push({ ruleId, path: entry, line, column: 1, message });
+  for (const entry of tree.top) {
+    if (/\.md$/iu.test(entry) && !(runtime ? RUNTIME_ROOT_MARKDOWN : PRODUCT_ROOT_MARKDOWN).has(entry))
+      finding('HFS_ROOT_MARKDOWN_FORBIDDEN', entry, `Root Markdown ${entry} belongs under docs/ or the owning Work record.`);
+    if (NON_NPM_ENTRIES.has(entry))
+      finding('HFS_PACKAGE_MANAGER_MIXED', entry, `${entry} contradicts the npm package manager contract.`);
+  }
+  for (const entry of ['.gitattributes', 'README.md']) {
+    if (!tree.hasFile(entry)) finding('HFS_ROOT_ENTRY_MISSING', entry, `Repository presentation requires root ${entry}.`);
+  }
+  if (tree.hasFile('package.json')) {
+    try {
+      const pkg = JSON.parse(fs.readFileSync(path.join(root, 'package.json'), 'utf8'));
+      if (pkg.packageManager && !/^npm@\d/u.test(pkg.packageManager))
+        finding('HFS_PACKAGE_MANAGER_MIXED', 'package.json', `packageManager ${pkg.packageManager} contradicts the npm package-lock.json contract.`);
+    } catch { /* The repository's package/config checks own unreadable or invalid JSON. */ }
+  }
+  if (!tree.hasFile('README.md')) return { violations, coverage: { status: 'checked', source: tree.source } };
+  let readme;
+  try { readme = fs.readFileSync(path.join(root, 'README.md'), 'utf8'); }
+  catch {
+    finding('HFS_ROOT_ENTRY_MISSING', 'README.md', 'Tracked README.md is not readable.');
+    return { violations, coverage: { status: 'checked', source: tree.source } };
+  }
+  const lines = readme.split(/\r?\n/u);
+  const name = runtime ? 'StarCi' : path.basename(root);
+  if (lines[0].trim().toLowerCase() !== `# ${name}`.toLowerCase())
+    finding('HFS_README_TITLE_INVALID', 'README.md', `README.md must start with # ${name}.`);
+  const description = lines.slice(1).find(line => line.trim());
+  if (!description || /^\s*(?:#|!\[|\[!\[)/u.test(description) || description.trim().length > 240)
+    finding('HFS_README_DESCRIPTION_INVALID', 'README.md', 'Place one concise description line directly below the repository name.');
+  const headings = lines.map((line, index) => ({ name: /^## (.+?)\s*$/u.exec(line)?.[1], index })).filter(item => item.name);
+  const required = [...README_SECTIONS, ...(tree.hasDir('.starciwork') ? ['Work'] : [])];
+  let previous = -1;
+  for (const section of required) {
+    const found = headings.find(item => item.name === section);
+    if (!found) finding('HFS_README_SECTION_MISSING', 'README.md', `README.md requires a ## ${section} section.`);
+    else if (found.index <= previous) finding('HFS_README_SECTION_ORDER', 'README.md', `## ${section} must follow the preceding standard section.`, found.index + 1);
+    else previous = found.index;
+  }
+  const sectionBody = section => {
+    const start = headings.find(item => item.name === section)?.index;
+    if (start === undefined) return '';
+    const end = headings.find(item => item.index > start)?.index ?? lines.length;
+    return lines.slice(start + 1, end).join('\n');
+  };
+  if (!runtime && headings.some(item => item.name === 'Development')) {
+    const development = sectionBody('Development');
+    const commands = [/npm (?:ci|install)/u, /npm run typecheck/u, /npm run lint:check/u,
+      /npm run build/u, /npm run test:unit/u];
+    if (commands.some(command => !command.test(development)))
+      finding('HFS_README_DEVELOPMENT_INCOMPLETE', 'README.md',
+        'Development must show npm install, typecheck, lint:check, build and test:unit commands.');
+  }
+  if (tree.hasDir('.starciwork') && headings.some(item => item.name === 'Work') &&
+      !/\.starciwork\b/u.test(sectionBody('Work')))
+    finding('HFS_README_WORK_POINTER_MISSING', 'README.md', 'Work must point at the backend .starciwork tree.');
+  let fenced = false;
+  lines.forEach((line, index) => {
+    if (/^\s*```/u.test(line)) { fenced = !fenced; return; }
+    if (fenced) return;
+    const prose = line.replace(/`[^`]*`/gu, '');
+    for (const match of prose.matchAll(/https?:\/\/[^\s<>)"']+/giu)) {
+      const value = match[0].replace(/[.,;!?]+$/u, '');
+      try {
+        if (privateHost(new URL(value).hostname))
+          finding('HFS_README_PRIVATE_URL', 'README.md', `README URL ${value} points at a local or private host.`, index + 1);
+      } catch { /* Malformed URLs are outside this presentation rule. */ }
+    }
+    const badgeTargets = [
+      ...[...prose.matchAll(/!\[([^\]]*)\]\(([^)]+)\)/gu)].map(match => ({ alt: match[1], target: match[2] })),
+      ...[...prose.matchAll(/<img\b[^>]*>/giu)].map(match => ({
+        alt: /\balt=["']([^"']*)["']/iu.exec(match[0])?.[1] ?? '',
+        target: /\bsrc=["']([^"']*)["']/iu.exec(match[0])?.[1] ?? '',
+      })),
+    ];
+    for (const { alt, target: rawTarget } of badgeTargets) {
+      const target = rawTarget.trim().replace(/^<|>$/gu, '');
+      if (!/badge/iu.test(alt) && !/badge|shields\.io|badgen\.net/iu.test(target)) continue;
+      try {
+        const url = new URL(target);
+        if (url.protocol !== 'https:' || privateHost(url.hostname) ||
+            /^(?:img\.shields\.io|badgen\.net)$/iu.test(url.hostname) && /^\/badge\//u.test(url.pathname))
+          finding('HFS_README_BADGE_NOT_LIVE', 'README.md', `Badge ${target} must represent a live external HTTPS service.`, index + 1);
+      } catch { finding('HFS_README_BADGE_NOT_LIVE', 'README.md', `Badge ${target} must use a live external HTTPS service.`, index + 1); }
+    }
+  });
+  return { violations, coverage: { status: 'checked', source: tree.source } };
+}
+
 export function checkHfs(config) {
   const kinds = config.kinds ?? [];
   const backend = kinds.includes('backend');
@@ -105,14 +224,13 @@ export function checkHfs(config) {
   const tree = treeView(config.root);
   const violations = [];
   const finding = (ruleId, entry, message) => violations.push({ ruleId, path: entry, line: 1, column: 1, message });
+  const presentation = checkRepoPresentation({ root: config.root, tree });
+  violations.push(...presentation.violations);
 
   const allowed = new Set(['apps', ...REQUIRED_COMMON, ...OPTIONAL_COMMON,
     ...(backend ? REQUIRED_BACKEND : []), ...(frontend ? OPTIONAL_FRONTEND : [])]);
   for (const entry of [...tree.top].sort()) {
-    if (NON_NPM_ENTRIES.has(entry)) {
-      finding('HFS_PACKAGE_MANAGER_MIXED', entry, `Root entry ${entry} belongs to a package manager other than npm; the HFS tree keeps only package-lock.json.`);
-      continue;
-    }
+    if (NON_NPM_ENTRIES.has(entry) || /\.md$/iu.test(entry)) continue;
     if (frontend && !backend) {
       if (entry === '.starciwork') { finding('HFS_WORK_IN_FE', entry, 'A frontend repository must not hold a .starciwork tree; Work records live in the backend repository.'); continue; }
       if (entry === '.starcistacks') { finding('HFS_STACKS_IN_FE', entry, 'A frontend repository must not hold .starcistacks; stack declarations live in the backend repository.'); continue; }
@@ -126,7 +244,7 @@ export function checkHfs(config) {
   const required = new Set(REQUIRED_COMMON);
   if (backend) for (const entry of REQUIRED_BACKEND) required.add(entry);
   for (const entry of [...required].sort()) {
-    if (entry === 'apps') continue;
+    if (entry === 'apps' || entry === 'README.md' || entry === '.gitattributes') continue;
     if (!tree.top.includes(entry)) finding('HFS_ROOT_ENTRY_MISSING', entry, `The ${backend ? 'backend' : 'frontend'} HFS tree requires root entry ${entry}.`);
   }
 

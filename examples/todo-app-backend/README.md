@@ -1,9 +1,35 @@
 # todo-app-backend
 
+A NestJS todo API with Keycloak sign-in and a Postgres-backed task list.
+
+## Overview
+
 A NestJS domain-first example: sign-in through Keycloak, a Postgres-backed task list scoped by session
 token. It owns the example's `.starciwork` and `.starcistacks/dev` (Postgres + Keycloak, realm `todo`,
 demo user `demo@todo.dev`) - the runtime's own Work-layout and architecture checks run directly against
 this tree, and `examples/todo-app-frontend` is proven against the records here rather than owning its own.
+
+## Stack
+
+NestJS, TypeScript, npm workspaces, PostgreSQL and Keycloak; the development services are declared
+under `.starcistacks/dev`.
+
+## Repository layout
+
+- `apps/todo/src`: process startup and Nest module composition.
+- `src/features` and `src/modules/{domain,platform,integrations}`: shared backend source.
+- `.starcistacks`: development stack declarations; `docs/`: human verification guidance.
+- `.starciwork`: product records shared with the paired frontend.
+
+## Development
+
+From this directory run `npm ci`, then `npm run typecheck`, `npm run lint:check`,
+`npm run build` and `npm run test:unit`. The live stack requires provisioned demo secrets;
+see `docs/TESTING.md` before running live checks.
+
+## Work
+
+The backend owns the product's [`.starciwork`](.starciwork/index.yaml) records for both apps.
 
 ## Continuous verification
 

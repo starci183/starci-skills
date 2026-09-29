@@ -186,7 +186,7 @@ test('a replacement launch proceeds on its recorded authority alone — no confi
 });
 
 test('the workflow Orca Run survives a kernel restart — one run-create, one runId, the new kernel terminal',t=>{
-  // fable.md orca-hierarchy root cause 1: the restart wrote a fresh
+  // docs/fable.md orca-hierarchy root cause 1: the restart wrote a fresh
   // payload_json over the kernel job, so orca.runId was lost and the next
   // dispatch's ensureWorkflowRun created a SECOND Run. Two Runs is what the
   // owner saw as two trees in the Orca sidebar.
@@ -241,7 +241,7 @@ test('the workflow Orca Run survives a kernel restart — one run-create, one ru
 });
 
 test('a kernel restart closes the previous kernel terminal before the new one is recorded',t=>{
-  // fable.md orca-hierarchy root cause 2: clearing the stale signal removed
+  // docs/fable.md orca-hierarchy root cause 2: clearing the stale signal removed
   // the ledger's handle on the old terminal, not the PTY. Only the managed
   // kernel was settled; the command-terminal kernel lived on as a second
   // [Kernel] row nobody owned.

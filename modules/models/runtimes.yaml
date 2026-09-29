@@ -220,7 +220,7 @@ allocation:
     # nivo ledger, closures at or above 12 authored files ran a median 46 min against 12 min below
     # it, the first cutoff where the majority exceeds one targetMinutes[1] window
     # (.experiments/practices/2026-09-23-parallel-gear.md). Every other `from` bound is the
-    # fable.md sketch value carried as an ASSUMPTION: that ledger holds exactly one job over three
+    # docs/fable.md sketch value carried as an ASSUMPTION: that ledger holds exactly one job over three
     # windows and no assertion or component measurement at all, so `xl.from` and both `assertions`
     # bounds have no observation behind them and are re-derived when estimate inputs are recorded.
     size:

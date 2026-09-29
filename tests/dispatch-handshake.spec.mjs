@@ -102,7 +102,7 @@ test('auth-dead stub: dispatch never leaves the job running and leaks no termina
   const job=jobRow(fx,fx.jobId);
   assert.notEqual(job?.status,'running','job must NOT be running after a rejected dispatch — this was the observed defect');
   assert.ok(calls(fx).includes('terminal close'),'the dead terminal must be closed — log shows no close call');
-  // fable.md orca-hierarchy: a refused op left its [Op] terminal open and the
+  // docs/fable.md orca-hierarchy: a refused op left its [Op] terminal open and the
   // Orca sidebar kept showing it "Idle" under the kernel. A rejection leaves
   // no live terminal for that dispatch, and says so on the record.
   assert.deepEqual(liveTerminals(fx),[],'a rejected dispatch leaves no live terminal behind');

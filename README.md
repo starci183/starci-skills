@@ -33,8 +33,35 @@ of its own.
 
 **Status:** `1.0.0-alpha.2` (alpha line; contracts are provisional until `1.0.0`), MIT, not yet published to npm. Use the source or a reviewed archive.
 
-[Install](#install) · [How it runs](#how-it-runs) · [Configuration](#configuration) ·
-[Layout](#layout) · [Documentation](#documentation)
+[Overview](#overview) · [Stack](#stack) · [Repository layout](#repository-layout) ·
+[Development](#development) · [Install](#install) · [Documentation](#documentation)
+
+## Overview
+
+StarCi stores each workflow's decisions and evidence outside product repositories while its
+contracts and checks live in this source tree. [How it runs](#how-it-runs) follows one goal
+through the kernel and operation agents.
+
+## Stack
+
+Node.js 22.13+, npm, SQLite (`node:sqlite`), authored YAML contracts, and JavaScript checks.
+The examples use NestJS backend and Next.js frontend applications.
+
+## Repository layout
+
+This repository is the StarCi runtime package: `modules/` holds contracts, `engine/` and
+`scripts/` hold mechanism and checks, `knowledge/` holds HFS and code rules, `docs/` holds
+human guidance, and `examples/` holds four backend/frontend product repositories. Each
+product example follows the [HFS tree](docs/source-layout.md); [Detailed layout](#detailed-layout)
+maps the runtime directories below.
+
+## Development
+
+From this repository root, run `npm ci`, `npm run check` for syntax and contract gates,
+and `npm test` for the Node test suite. The runtime package has no separate TypeScript
+typecheck, lint, or build script; product examples declare their own `typecheck`,
+`lint:check`, `build`, and `test:unit` commands. Run the runtime presentation gate with
+`node scripts/checks/repo-presentation.mjs --root . --runtime`.
 
 ## Install
 
@@ -87,7 +114,7 @@ owner prompt
 model, effort and budgets. Resolution order: explicit `--agent` flag > owner `config.yaml` >
 `scripts/route/route-model.mjs` defaults. See [config format](docs/config-format.md).
 
-## Layout
+## Detailed layout
 
 ```text
 CONTEXT.md            the one skill every agent loads first

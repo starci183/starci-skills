@@ -553,7 +553,7 @@ export default {
     cleanupDeliveryArtifact(artifact);
     // The terminal this attempt created is closed by rejectDispatch, in the
     // same step that records the refusal — a refused op never keeps a row in
-    // the sidebar (fable.md orca-hierarchy: [Op] interface.audit "Idle").
+    // the sidebar (docs/fable.md orca-hierarchy: [Op] interface.audit "Idle").
     const rejection = rejectDispatch(ledger, job, jobId, op, model, {
       step, signal, error, terminal: dispatchId ?? handle, closeTerminal: handle, attemptId,
       incident, effectState: 'none', details, createRecovery: spawned.createRecovery ?? null, trust: spawned.trust ?? null,

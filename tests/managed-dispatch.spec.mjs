@@ -213,7 +213,7 @@ test('managed dispatch: route persists the decision, spawn marks the job running
   assert.ok(after.includes('orchestration worker-release'),`settle must worker-release the dispatch — log: ${after.join(', ')}`);
   // Stopping the worker is not closing the Task. A settled op that leaves its
   // Task open is exactly the ticked [Op] row the owner found at the Orca
-  // sidebar root (fable.md orca-hierarchy, row 3).
+  // sidebar root (docs/fable.md orca-hierarchy, row 3).
   assert.ok(after.includes('orchestration task-update'),`settle must close the operation Task — log: ${after.join(', ')}`);
   const update=fx.callArgv().find(argv=>argv.slice(0,2).join(' ')==='orchestration task-update');
   assert.equal(update?.[update.indexOf('--id')+1],'task-fake-1');
@@ -426,7 +426,7 @@ test('Claude auth fallback advances only after partial effects reconcile and nev
 });
 
 test('a dispatch refused after the worker exists closes that worker in the same rejection',t=>{
-  // fable.md orca-hierarchy row 2: interface.audit a4 was rejected at
+  // docs/fable.md orca-hierarchy row 2: interface.audit a4 was rejected at
   // worker-start and its terminal stayed open, so the sidebar kept an "Idle"
   // [Op] row under the kernel for a job the ledger had already failed.
   const fx=fixture(t);

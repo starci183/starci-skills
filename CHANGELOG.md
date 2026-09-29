@@ -161,7 +161,7 @@ an old-schema file with a pointer to it. Design: `docs/architecture.md`, `docs/l
 ## [1.0.0-alpha.2] — in preparation, base `f87a8f34b`
 
 Theme: canonical files say one thing, once, in the present tense. Every rule lives in exactly
-one place and every other surface cites it. Working notes are in `fable.md`.
+one place and every other surface cites it. Working notes are in `docs/fable.md`.
 
 **Version line**
 

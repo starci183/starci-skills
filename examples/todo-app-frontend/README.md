@@ -1,5 +1,9 @@
 # todo-app-frontend
 
+The Next.js todo frontend lives in the `apps/web` npm workspace.
+
+## Overview
+
 The Next.js app and its source live in `apps/web/`. The repository root owns the npm
 workspace, shared checks and coverage report; Playwright flows live in `e2e/`.
 
@@ -9,6 +13,22 @@ The frontend source of the todo app. It owns no `.starciwork`: the Work records 
 
 That is the rule the layout states - one canonical Work tree per project, owned by the backend - and it is
 why a frontend change is still proven against a record it does not contain.
+
+## Stack
+
+Next.js, React, TypeScript, npm workspaces, Vitest and Playwright; UI primitives come from
+`@starci/grammar`.
+
+## Repository layout
+
+- `apps/web/src`: Next.js routes, features, components, hooks and modules.
+- `e2e/`: Playwright flows; `scripts/`: repository tooling.
+- `docs/`: human documentation; the paired backend owns `.starciwork`.
+
+## Development
+
+Run `npm ci`, `node ../../packages/fe-kit/scripts/link-peers.mjs todo-app-frontend`, then
+`npm run typecheck`, `npm run lint:check`, `npm run build` and `npm run test:unit`.
 
 ## Running the checks
 

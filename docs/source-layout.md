@@ -20,11 +20,17 @@ frontend-only project.
 ## One repository tree (HFS)
 
 Every repository has the same root contract, backend and frontend alike:
-`knowledge/patterns/repo/folder.yaml` (REPO-FOLDER-1..5) owns the law and the
+`knowledge/patterns/repo/folder.yaml` (REPO-FOLDER-1..6) owns the law and the
 architecture check reports violations as `HFS_*` codes. There is no mapped,
 legacy or per-project alternative topology, and npm (`package.json` +
 `package-lock.json`) is the only package manager - a `pnpm-lock.yaml`,
 `pnpm-workspace.yaml` or `yarn.lock` is never tracked.
+
+The root `README.md` follows the [repository presentation checklist](repo-presentation.md):
+name, one-line description, Overview, Stack, Repository layout, Development, and a Work
+pointer when `.starciwork` exists. The HFS architecture machine checks that structure,
+root Markdown drafts, package-manager drift and README links to private hosts. Run
+`node scripts/checks/repo-presentation.mjs --root <repo>` directly for a tree-only gate.
 
 ```text
 <repository>/                        # one repository, backend or frontend

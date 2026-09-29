@@ -32,7 +32,7 @@ rules:
       profiles: .gitignore, .gitattributes, README.md, package.json, package-lock.json,
       tsconfig.json (base/solution config; tsconfig.build.json optional), eslint.config.mjs,
       architecture.json, sonar-project.properties, codecov.yml, .husky/, .github/, apps/.
-      Optional on both: packages/ (only real separately-built packages with explicit exports),
+      README.md follows REPO-FOLDER-6. Optional on both: packages/ (only real separately-built packages with explicit exports),
       scripts/ (repository tooling only - *.mjs plus colocated specs; no product code, no agent
       output), docs/ (human docs; loose *.md beyond README.md move here or into .starciwork
       records), e2e/ (repository-level Playwright specs; old uat/ folders move here),
@@ -56,6 +56,7 @@ rules:
       automated:
         - HFS_ROOT_ENTRY_FORBIDDEN
         - HFS_ROOT_ENTRY_MISSING
+        - HFS_ROOT_MARKDOWN_FORBIDDEN
       manual:
         - Judge each leftover root entry by its owner and move it, never by tolerating a new root name.
     relatedExamples: []
@@ -86,8 +87,9 @@ rules:
     kind: mandatory
     requirement: |
       package.json plus package-lock.json and npm ci/npm install are the only package-management
-      contract. pnpm-lock.yaml, pnpm-workspace.yaml, yarn.lock and any other manager's lockfile or
-      workspace file are never tracked; a stray one is deleted, not kept beside package-lock.json.
+      contract. packageManager, when declared, names npm. pnpm-lock.yaml, pnpm-workspace.yaml,
+      yarn.lock, bun.lock, bun.lockb and any other manager's lockfile or workspace file are never
+      tracked; a stray one is deleted, not kept beside package-lock.json.
     rationale: |
       Two lockfiles disagree silently and hide the real dependency resolution a build ran against.
     verification:
@@ -135,3 +137,38 @@ rules:
       manual:
         - node scripts/checks/check-starcistacks.mjs <repo> exits 0 on the backend tree.
     relatedExamples: []
+  - id: REPO-FOLDER-6
+    title: Repository README and GitHub presentation
+    kind: mandatory
+    requirement: |
+      README.md starts with the repository name as its level-one heading and one concise description
+      line. Its standard sections, in order, are Overview, Stack, Repository layout (the HFS map),
+      and Development (install, typecheck, lint, build and test commands). When .starciwork is present,
+      add a Work section pointing readers at that product record tree. Other sections may follow.
+      Badges represent live external services only. Do not publish a badge for a local/private
+      SonarQube instance or any README URL pointing at localhost, loopback, RFC1918 or private hosts.
+      Local development endpoints may be documented as inline code, never as remote links or badges.
+      .gitattributes is required; .github holds CI and may hold optional PR/issue templates and
+      CODEOWNERS. The GitHub repository description and topics are set with gh repo edit.
+      docs/repo-presentation.md is the maintenance checklist.
+    rationale: |
+      A consistent entry page makes the HFS tree and real checks discoverable without advertising
+      local-only services as public project health.
+    verification:
+      automated:
+        - HFS_README_TITLE_INVALID
+        - HFS_README_DESCRIPTION_INVALID
+        - HFS_README_DEVELOPMENT_INCOMPLETE
+        - HFS_README_SECTION_MISSING
+        - HFS_README_SECTION_ORDER
+        - HFS_README_WORK_POINTER_MISSING
+        - HFS_README_PRIVATE_URL
+        - HFS_README_BADGE_NOT_LIVE
+      manual:
+        - Confirm every badge's target currently reports a live external service.
+        - Review GitHub description and topics against the repository's current purpose.
+    relatedExamples:
+      - examples/todo-app-backend/README.md
+      - examples/todo-app-frontend/README.md
+      - examples/ecommerce-app-be/README.md
+      - examples/ecommerce-app-fe/README.md
