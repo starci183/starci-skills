@@ -49,7 +49,7 @@ const world=(t,fn,{terminal={connected:false,writable:false}}={})=>withLedger(t,
   const env={...process.env,STARCI_ORCA_COMMAND:process.execPath,STARCI_ORCA_ARGS:JSON.stringify([stub]),
     STARCI_FAKE_ORCA_MODE:'healthy',STARCI_FAKE_ORCA_STATE:stateFile,STARCI_FAKE_ORCA_LOG:path.join(root,'calls.jsonl'),
     LOCALAPPDATA:machineHome};
-  delete env.ORCA_TERMINAL_HANDLE;delete env.STARCI_ROLE;delete env.STARCI_OP_JOB;
+  delete env.ORCA_TERMINAL_HANDLE;
   const run=(...args)=>spawnSync(process.execPath,[API,...args,'--repo',repoRoot,'--json'],{cwd:ROOT,encoding:'utf8',windowsHide:true,timeout:120000,env});
   const dispatchedAt=Date.now()-60000;
   seedWorkflow(ledger,{id:WF,state:{phase:'running'},

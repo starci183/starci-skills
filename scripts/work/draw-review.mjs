@@ -21,7 +21,7 @@
 //                                                         (served on demand through the Telegram "Generate URL"
 //                                                         flow), and question.review {record, parts [{path, sha256,
 //                                                         shape}]}, which serve-ask copies into the answer receipt;
-//                                                         ownerRequested when the job (--job, else STARCI_OP_JOB)
+//                                                         ownerRequested when the job (--job, else the op running it)
 //                                                         draws on the owner's request (drawOwnerRulingOf)
 //   apply    --ui <ui-record-dir> --receipt <answer.json> [--write]
 //                                                         the owner's answer: accept writes the record done with
@@ -44,6 +44,7 @@
 // stays the owner's; a delegate never accepts.
 // An acceptance names the part digests it saw; a part redrawn since makes the drawing unaccepted again
 // (direction-part.mjs drawingAcceptance, read by layout-tree.mjs for the lockup crop and the planned layout's settlement).
+import { opContextOf } from '../kernel/op-context.mjs';
 import fs from 'node:fs';
 import { isBlobFile, receiptFileOf, receiptRefOf } from '../kernel/ask-receipts.mjs';
 import path from 'node:path';
@@ -506,7 +507,7 @@ export function drawReviewMain(argv = []) {
       return { exitCode: 0, text: json ? `${JSON.stringify(s, null, 2)}\n` : `${s.id} (${s.state}): ${s.owed ? 'OWNER REVIEW OWED' : 'no owner review owed'} - ${s.why}${s.gates.length ? `\n  gates: ${s.gates.map((g) => g.detail).join(' | ')}` : ''}\n` };
     }
     if (command === 'question') {
-      const q = drawReviewQuestion(ui, { lang: flag(args, '--lang') ?? 'en', ownerRequested: args.includes('--owner-requested'), jobId: flag(args, '--job') ?? process.env.STARCI_OP_JOB ?? null });
+      const q = drawReviewQuestion(ui, { lang: flag(args, '--lang') ?? 'en', ownerRequested: args.includes('--owner-requested'), jobId: flag(args, '--job') ?? opContextOf()?.jobId ?? null });
       return { exitCode: 0, text: `${JSON.stringify(q, null, 2)}\n` };
     }
     const receipt = flag(args, '--receipt');

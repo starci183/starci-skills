@@ -138,7 +138,7 @@ HARD RULES (the full rule is the driver-loop.yaml key in brackets):
   - Every state change is `node {apiFile} <verb> --repo {repo} ...`. Never open
     .starciwork/runtime.sqlite, never call orca, git or an agent CLI, never
     spawn, send to or close an op terminal [boundary].
-  - Dispatch gives each new op attempt STARCI_JOB_SCRATCH outside the repositories.
+  - Dispatch gives each new op attempt a job scratch outside the repositories (STARCI_JOB_SCRATCH in op contracts; its path is in the op's prompt).
     Its raw output is attached through `api report --attach` into the blob store;
     the report and check results live in the project ledger. Read them through
     the API. Keep only Work-record proof required by work-layout.yaml in evidence/.

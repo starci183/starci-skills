@@ -3,6 +3,7 @@
 // `test` command is re-pointed at a generated config that imports the project's own config unchanged and
 // only turns use.video / use.trace / use.screenshot on and sends outputDir to `outputDir`. Any other command
 // is returned as it was. A leaf module (node builtins only): uat-slots.mjs and assisted-runner.mjs both use it.
+import { opContextOf } from '../kernel/op-context.mjs';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -78,11 +79,11 @@ export const recordingDirUnder = (root, now = new Date()) => path.join(root, `pl
 
 /**
  * Where a recording lands when the caller names no directory: <STARCI_UAT_RECORDINGS_ROOT, else <os tmp>/starci-uat-recordings>
- * /<job>/ for an op (STARCI_OP_JOB), else the shared root. scripts/kernel/job-artifacts.mjs indexJobArtifacts reads the
+ * /<job>/ for an op (the job its Orca terminal is bound to, scripts/kernel/op-context.mjs), else the shared root. scripts/kernel/job-artifacts.mjs indexJobArtifacts reads the
  * job's folder at settle and indexes its video, trace.zip and screenshots as the job's proof.
  */
 export const RECORDINGS_ROOT_ENV = 'STARCI_UAT_RECORDINGS_ROOT';
 export const recordingsBaseOf = (env = process.env) => env[RECORDINGS_ROOT_ENV] || path.join(os.tmpdir(), 'starci-uat-recordings');
 export const recordingsRootOf = (jobId, env = process.env) => path.join(recordingsBaseOf(env), String(jobId).replace(/[^a-z0-9._-]/gi, '_'));
-/** The default record directory of a run: the op's own folder when STARCI_OP_JOB is set, else the shared root. */
-export const defaultRecordRoot = (env = process.env) => (env.STARCI_OP_JOB ? recordingsRootOf(env.STARCI_OP_JOB, env) : recordingsBaseOf(env));
+/** The default record directory of a run: the op's own folder when an op runs it, else the shared root. */
+export const defaultRecordRoot = (env = process.env, context = opContextOf({ env })) => (context?.jobId ? recordingsRootOf(context.jobId, env) : recordingsBaseOf(env));

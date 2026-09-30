@@ -403,8 +403,8 @@ allocation:
   # context-free session that scores beauty and hierarchy against the product's brand.direction rubric: `codex
   # exec` in a clean temp dir holding only the PNGs, the HTML and the rubric, on the model and effort named here,
   # killed after timeoutMs. The critic is a DIFFERENT model from the drawer (owner ruling 2026-09-27
-  # draw-devin-brand-claude): Devin draws, Codex critiques; when the drawer (the op's STARCI_OP_PROVIDER, or
-  # draw-loop.mjs round --drawer) is the critic's provider - Codex drawing as the draw order's fallback - the round is
+  # draw-devin-brand-claude): Devin draws, Codex critiques; when the drawer (the op's provider, bound to its
+  # terminal - scripts/kernel/op-context.mjs - or draw-loop.mjs round --drawer) is the critic's provider - Codex drawing as the draw order's fallback - the round is
   # judged by criticWhenDrawer.<drawer> instead, and a round with no independent critic has no beauty. directionPrerequisite: interface.draw needs an ACCEPTED brand.direction
   # archetype for its ui record's ui.archetype - brand.mjs checkDirection evidence.ready, the owner's receipt
   # (scripts/kernel/prerequisites.mjs direction-unaccepted; the Kernel enqueues brand.decide --param

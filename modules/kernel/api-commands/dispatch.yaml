@@ -28,8 +28,8 @@ dispatch:
     SAME job to ready, H13 - no new try, attemptConsumed false; a launch whose effect is unknown fences the job
     effect_unknown for reconcile). Once Orca returns the dispatch id, one op_attempts row (dispatch_seq, scratch_dir =
     the job scratch, terminal, run, task, pool) and its contracts row (keyed by attempt_id) are written in one
-    transaction that also moves a queued workflow to running; the op launches with STARCI_JOB_SCRATCH set, the
-    scratch api report reads its report from. A refused launch ends that attempt in the refusal's own transaction
+    transaction that also moves a queued workflow to running; the op's prompt names that job scratch
+    (STARCI_JOB_SCRATCH in op contracts), the scratch api report reads its report from. A refused launch ends that attempt in the refusal's own transaction
     (end_state requeued, or effect-unknown when the effect is unknown; a requeued attempt is also settled_at/settled_by kernel
     with no verdict, released_at set, its Orca Task closed, task_closed_at set, and work_units.dispatches gives the slot back)
     and keeps it as history: it is never open, never running in api status or the UI, never a try. settle_json.message

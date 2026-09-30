@@ -1,6 +1,6 @@
 // report-evidence.mjs — what `api report` carries besides the envelope (alpha.3, ARCHITECTURE-DB §2.3 row 7, H10).
 //
-// A worker writes its report and every raw output under STARCI_JOB_SCRATCH (op_attempts.scratch_dir), a job-private
+// A worker writes its report and every raw output under its job scratch (op_attempts.scratch_dir), a job-private
 // OS-temp directory outside every repository. api report reads the envelope ONCE, stores it only in `reports`, puts
 // each --attach file and each check's stdoutPath/stderrPath/outputPath in the blob store (redacted when text), indexes
 // them as job_artifacts keyed (attempt_id, name) + report_attachments + check_runs(runner='op'), and then deletes the
@@ -23,12 +23,12 @@ const real = (p) => { try { return fs.realpathSync.native(p); } catch { return p
 export const CHECK_FILE_FIELDS = Object.freeze([['stdoutPath', 'check-stdout', 'stdout'], ['stderrPath', 'check-stderr', 'stderr'], ['outputPath', 'check-output', 'output']]);
 
 /**
- * The attempt's scratch directory: op_attempts.scratch_dir, else STARCI_JOB_SCRATCH. It must be an existing directory
+ * The attempt's scratch directory: op_attempts.scratch_dir. It must be an existing directory
  * under the OS temp directory, never the temp directory itself, so the delete after filing can never widen.
  */
-export function scratchOf(attempt, env = process.env) {
-  const raw = attempt?.scratch_dir || env.STARCI_JOB_SCRATCH || null;
-  if (!raw) throw refuse('this attempt has no scratch directory (op_attempts.scratch_dir / STARCI_JOB_SCRATCH); write the report under STARCI_JOB_SCRATCH', 'report-scratch-unbound');
+export function scratchOf(attempt) {
+  const raw = attempt?.scratch_dir || null;
+  if (!raw) throw refuse('this attempt has no scratch directory (op_attempts.scratch_dir); write the report under the job scratch your contract names', 'report-scratch-unbound');
   const dir = real(raw);
   if (!inside(real(os.tmpdir()), dir)) throw refuse(`scratch ${slash(dir)} is not under the OS temp directory`, 'report-scratch-invalid');
   let st = null;
@@ -44,7 +44,7 @@ export function scratchFile(given, scratch, what = 'report attachment', { dirs =
   let st = null;
   try { st = fs.statSync(abs); } catch { st = null; }
   if (!st?.isFile() && !(dirs && st?.isDirectory())) throw refuse(`${what} missing or unreadable: ${given}`, 'report-attachment-missing');
-  if (!inside(scratch, real(abs))) throw refuse(`${what} is outside STARCI_JOB_SCRATCH (${slash(scratch)}): ${given}`, 'report-attachment-outside-scratch');
+  if (!inside(scratch, real(abs))) throw refuse(`${what} is outside the job scratch (${slash(scratch)}): ${given}`, 'report-attachment-outside-scratch');
   return abs;
 }
 

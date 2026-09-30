@@ -76,8 +76,7 @@ const KERNEL_FUNCTION_ROLE = {
 
 // --- provider preflight + capacity drift (adapter-card facts) ---------------------
 // A preflight is whatever the provider's adapter card declares must hold before
-// a dispatch can be trusted: an env-strip commandPrefix, a commandPrefix auth probe (devin's `devin models list` check), the
-// readiness screen, and post-submission attestation. An explicit `preflight:`
+// a dispatch can be trusted: its readiness (the worker-start receipt), and post-submission attestation. An explicit `preflight:`
 // key on the runtimes.yaml entry or the adapter card wins outright — it is the
 // data hook this layer reports; execution stays in scripts/agent/lib.mjs.
 const adapterCache = new Map();
@@ -92,8 +91,6 @@ function preflightFor(runtime) {
   const declared = runtime?.preflight ?? card?.preflight ?? null;
   if (declared) return { probes: ['declared-preflight'], declared };
   const probes = [];
-  if (card?.commandPrefix) probes.push('auth-probe');
-  if (Array.isArray(card?.environmentStrip) && card.environmentStrip.length) probes.push('env-strip');
   if (card?.readiness) probes.push(typeof card.readiness === 'string' ? card.readiness : 'readiness-screen');
   if (card?.attestation || Array.isArray(card?.knownFailures)) probes.push('post-submit-attestation');
   if (!card) probes.push('no-adapter-card');

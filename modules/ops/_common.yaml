@@ -201,8 +201,8 @@ sections:
         permission reports a graph change it needs as a finding, never edits the graph."
   - title: Path and field contract
     blocks:
-      - "The runtime sets STARCI_JOB_SCRATCH to this job attempt's private OS-temp directory outside
-        every repository. Put raw command stdout/stderr, full checker JSON, patches, browser traces,
+      - "STARCI_JOB_SCRATCH names this job attempt's private OS-temp directory outside every repository;
+        your prompt gives its absolute path (it is not an environment variable). Put raw command stdout/stderr, full checker JSON, patches, browser traces,
         videos, DOM snapshots and other operational outputs there. File the transient report JSON
         from that directory with `api report --report <scratch/report.json> --attach <absolute-scratch-file>`
         for each raw file the job needs retained. The API stores the report in the ledger and the

@@ -203,9 +203,10 @@ test('dispatch withholds the frozen changes; api check reads their codes advisor
     assert.deepEqual(JSON.parse(db.prepare('SELECT payload_json FROM jobs WHERE job_id=?').get('job-q2').payload_json).contractRelease.changes,['refactor-gate-one','refactor-gate-two']);
     assert.equal(db.prepare("SELECT COUNT(*) n FROM events WHERE kind='contract-release'").get().n,1);
   });
-  // An operation terminal never releases contracts.
+  // An operation terminal (the Orca terminal the ledger binds to an op job) never releases contracts.
+  fx.seed(l=>l.db.prepare('UPDATE jobs SET worker_id=? WHERE job_id=?').run('term_op-first',first));
   const op=spawnSync(process.execPath,[API,'contract-release','--family','code.refactor','--repo',fx.repo,'--json'],{cwd:ROOT,encoding:'utf8',windowsHide:true,
-    env:{...process.env,STARCI_CONTRACT_CHANGES:fx.f.registry,STARCI_CONTRACT_FREEZE:fx.f.freeze,STARCI_ROLE:'op',STARCI_OP_JOB:first}});
+    env:{...process.env,STARCI_CONTRACT_CHANGES:fx.f.registry,STARCI_CONTRACT_FREEZE:fx.f.freeze,ORCA_TERMINAL_HANDLE:'term_op-first'}});
   assert.equal(op.status,1);
   assert.equal(lastLine(op.stderr)?.code,'op-context-refused');
 });

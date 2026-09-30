@@ -24,6 +24,7 @@
 // looked up in every catalog, and each route is resolved against the scanned pages. A destination with no
 // route, a route no page answers, a label a catalog lacks and a top-level route no destination reaches are
 // each written into the layout's nav.findings - reported, never papered over.
+import { opContextOf } from '../kernel/op-context.mjs';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -780,7 +781,7 @@ export function destinationFor(record, node, { route = null, activeNav = null, k
 
 // alpha.3 (ARCHITECTURE-DB §5.1): a layout capture is agent data - a blob the layout tree cites {name, sha256, ...},
 // never a file under .starciwork/shell/assets. addCapture puts the bytes in the blob store (and a copy in the job's
-// STARCI_JOB_SCRATCH/captures/layouts, which api report attaches by itself). A capture recorded with a `path` (a tree
+// scratch/captures/layouts, which api report attaches by itself). A capture recorded with a `path` (a tree
 // written before) still reads from the tree.
 /** The readable PNG of one recorded capture: the blob it cites, else its file under `shellDir`; null when neither. */
 export function captureFileOf(shellDir, capture) {
@@ -793,8 +794,9 @@ export const captureRelOf = (capture) => `shell/${slash(capture?.path ?? capture
 /** Put a capture's bytes in the blob store (and the job scratch); returns the logical name recorded as `name`. */
 function storeCapture(bytes, name) {
   putBlob(bytes, { mediaType: 'image/png' });
-  if (process.env.STARCI_JOB_SCRATCH) {
-    const copy = path.join(path.resolve(process.env.STARCI_JOB_SCRATCH), 'captures', 'layouts', path.basename(name));
+  const scratch = opContextOf()?.scratchDir;
+  if (scratch) {
+    const copy = path.join(path.resolve(scratch), 'captures', 'layouts', path.basename(name));
     fs.mkdirSync(path.dirname(copy), { recursive: true });
     fs.writeFileSync(copy, bytes);
   }

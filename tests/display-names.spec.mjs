@@ -92,7 +92,7 @@ const world = (t, fn) => withLedger(t, ({ root, repoRoot, machineHome, ledger })
     'term-k': { handle: 'term-k', connected: true, writable: true }, 'term-op': { handle: 'term-op', connected: true, writable: true } } }));
   const env = { ...process.env, STARCI_ORCA_COMMAND: process.execPath, STARCI_ORCA_ARGS: JSON.stringify([stub]),
     STARCI_FAKE_ORCA_MODE: 'healthy', STARCI_FAKE_ORCA_STATE: stateFile, STARCI_FAKE_ORCA_LOG: callsFile, LOCALAPPDATA: machineHome };
-  delete env.ORCA_TERMINAL_HANDLE; delete env.STARCI_ROLE; delete env.STARCI_OP_JOB;
+  delete env.ORCA_TERMINAL_HANDLE;
   const run = (args, extraEnv = {}) => spawnSync(process.execPath, [API, ...args, '--repo', repoRoot, '--json'], { cwd: ROOT, encoding: 'utf8', windowsHide: true, timeout: 120000, env: { ...env, ...extraEnv } });
   const calls = () => (fs.existsSync(callsFile) ? fs.readFileSync(callsFile, 'utf8').trim().split(/\r?\n/).filter(Boolean).map((line) => JSON.parse(line).argv) : []);
   seedWorkflow(ledger, { id: 'wf-nivo-app-auth-abc12345', state: { phase: 'running', job: 'nivo-app-auth' } });
@@ -139,7 +139,7 @@ test('api rename sets the display name, records workflow-renamed and renames the
   assert.equal(jobDisplayNameOf(ledger.db, job), 'Kiểm thử UAT · Đăng nhập · Nivo · Đăng nhập & xác thực');
 }));
 
-test('api rename refuses a bad name, a bad --by, an unknown workflow and an op caller', (t) => world(t, ({ run }) => {
+test('api rename refuses a bad name, a bad --by, an unknown workflow and an op caller', (t) => world(t, ({ run, ledger }) => {
   const WF = 'wf-nivo-app-auth-abc12345';
   const bad = run(['rename', '--workflow', WF, '--title', ' ', '--no-terminals']);
   assert.notEqual(bad.status, 0); assert.match(bad.stderr, /rename-bad-title/);
@@ -147,7 +147,8 @@ test('api rename refuses a bad name, a bad --by, an unknown workflow and an op c
   assert.notEqual(by.status, 0); assert.match(by.stderr, /rename-bad-by/);
   const unknown = run(['rename', '--workflow', 'wf-nope', '--title', 'Nivo · X', '--no-terminals']);
   assert.notEqual(unknown.status, 0); assert.match(unknown.stderr, /workflow-unknown/);
-  const op = run(['rename', '--workflow', WF, '--title', 'Nivo · X', '--no-terminals'], { STARCI_ROLE: 'op', STARCI_OP_JOB: 'op-uat.verify-1' });
+  ledger.db.prepare('UPDATE jobs SET worker_id=? WHERE job_id=?').run('term-op', 'op-uat.verify-1');
+  const op = run(['rename', '--workflow', WF, '--title', 'Nivo · X', '--no-terminals'], { ORCA_TERMINAL_HANDLE: 'term-op' });
   assert.notEqual(op.status, 0); assert.match(op.stderr, /op-context-refused/);
 }));
 

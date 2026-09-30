@@ -369,7 +369,7 @@ const jsonFrom = (stdout) => {
  */
 export function apiFrontier(repo, workflowId, { timeoutMs = 120_000 } = {}) {
   const env = { ...process.env };
-  delete env.ORCA_TERMINAL_HANDLE; delete env.STARCI_ROLE; delete env.STARCI_OP_JOB;
+  delete env.ORCA_TERMINAL_HANDLE;
   const r = spawnSync(process.execPath, [API_FILE, 'status', '--repo', repo, '--workflow', workflowId, '--json'],
     { cwd: skillRoot, encoding: 'utf8', windowsHide: true, timeout: timeoutMs, env });
   const value = jsonFrom(r.stdout);

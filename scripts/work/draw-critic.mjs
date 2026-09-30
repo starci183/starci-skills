@@ -8,7 +8,7 @@
 //
 // The critic is a DIFFERENT model from the drawer (owner ruling 2026-09-27 draw-devin-brand-claude: Devin draws,
 // Codex critiques). criticFor picks it: allocation.drawLoop.critic, unless the drawer (draw-loop.mjs round --drawer,
-// else the op launch's STARCI_OP_PROVIDER) is that critic's provider - Codex drawing as the draw order's fallback -
+// else the provider of the op running it, scripts/kernel/op-context.mjs) is that critic's provider - Codex drawing as the draw order's fallback -
 // then allocation.drawLoop.criticWhenDrawer.<drawer> (a `claude -p` session, read-only tools); with none configured
 // the round has no independent critic (an error, no beauty), never the drawer judging itself.
 //

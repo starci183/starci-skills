@@ -132,10 +132,11 @@ test('foundation writes are Kernel verbs; an op caller may read the registry onl
   const fx=fixture(t);
   fx.seed(l=>{
     // An op job is a unit try: the fixture seeds the unit and walks queued → leased → running (one attempt).
-    seedWorkflow(l,{id:MOD,jobs:[{jobId:'job-op-f',opId:'docs.author',status:'running',
+    seedWorkflow(l,{id:MOD,jobs:[{jobId:'job-op-f',opId:'docs.author',status:'running',workerId:'term_op-f',
       payload:{opId:'docs.author',owned_paths:['docs/']}}]});
   });
-  const asOp={STARCI_ROLE:'op',STARCI_OP_JOB:'job-op-f'};
+  // An op caller is the Orca terminal the ledger binds to an op job.
+  const asOp={ORCA_TERMINAL_HANDLE:'term_op-f'};
   const r=fx.api(['foundation','--workflow',MOD,'--claim','brand'],asOp);
   assert.equal(r.status,1);
   assert.equal(lastLine(r.stderr)?.code,'op-context-refused');

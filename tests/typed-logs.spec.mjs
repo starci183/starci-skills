@@ -168,10 +168,10 @@ test('syncDerivedLogs derives from a real ledger once: a second sync stores noth
 test('api log: a kernel logs a typed row without a ledger write; an op logs only its own job', (t) => {
   const repo = repoDir(t);
   const ledger = openLedger({ file: ledgerFileFor(repo) });
-  seedWorkflow(ledger, { id: WF, jobs: [{ jobId: 'op-a-1', opId: 'a', kind: 'op' }, { jobId: 'op-b-1', opId: 'b', kind: 'op' }] });
+  seedWorkflow(ledger, { id: WF, jobs: [{ jobId: 'op-a-1', opId: 'a', kind: 'op', workerId: 'term_op-a' }, { jobId: 'op-b-1', opId: 'b', kind: 'op' }] });
   const eventsBefore = Number(ledger.db.prepare('SELECT count(*) n FROM events').get().n);
   ledger.close();
-  const env = { ...process.env, STARCI_ROLE: '', STARCI_OP_JOB: '', ORCA_TERMINAL_HANDLE: '' };
+  const env = { ...process.env, ORCA_TERMINAL_HANDLE: '' };
   const api = (args, extra = {}) => spawnSync(process.execPath, [API, ...args, '--repo', repo, '--json'], { encoding: 'utf8', windowsHide: true, env: { ...env, ...extra }, timeout: 60000 });
   const ok = api(['log', '--workflow', WF, '--kind', 'decision', '--msg', 'Chọn codex', '--data', '{"markdown":"devin **hết quota**"}']);
   assert.equal(ok.status, 0, ok.stderr);
@@ -179,10 +179,10 @@ test('api log: a kernel logs a typed row without a ledger write; an op logs only
   const bad = api(['log', '--workflow', WF, '--kind', 'cmd.run', '--msg', 'x', '--data', '{"cmd":"x"}']);
   assert.notEqual(bad.status, 0);
   assert.match(bad.stderr, /log-data-invalid/);
-  const own = api(['log', '--workflow', WF, '--job', 'op-a-1', '--kind', 'file.edit', '--msg', 'Sửa a.ts', '--data', '{"path":"src/a.ts","added":3,"removed":1}'], { STARCI_ROLE: 'op', STARCI_OP_JOB: 'op-a-1' });
+  const own = api(['log', '--workflow', WF, '--job', 'op-a-1', '--kind', 'file.edit', '--msg', 'Sửa a.ts', '--data', '{"path":"src/a.ts","added":3,"removed":1}'], { ORCA_TERMINAL_HANDLE: 'term_op-a' });
   assert.equal(own.status, 0, own.stderr);
   assert.equal(JSON.parse(own.stdout).actor, 'op');
-  const other = api(['log', '--workflow', WF, '--job', 'op-b-1', '--kind', 'narration', '--msg', 'x', '--data', '{"markdown":"x"}'], { STARCI_ROLE: 'op', STARCI_OP_JOB: 'op-a-1' });
+  const other = api(['log', '--workflow', WF, '--job', 'op-b-1', '--kind', 'narration', '--msg', 'x', '--data', '{"markdown":"x"}'], { ORCA_TERMINAL_HANDLE: 'term_op-a' });
   assert.notEqual(other.status, 0);
   assert.match(other.stderr, /log-identity-mismatch/);
   const read = api(['logs', '--workflow', WF]);

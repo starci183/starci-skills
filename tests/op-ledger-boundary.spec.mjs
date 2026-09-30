@@ -74,7 +74,8 @@ test('an op caller is refused every kernel verb; reads and its own report pass t
   const fx=fixture(t);
   const d=fx.api(['dispatch','--job',fx.jobId,'--model','codex-agent','--spawn']);
   assert.equal(d.status,0,d.stderr||d.stdout);
-  const asOp={STARCI_ROLE:'op',STARCI_OP_JOB:fx.jobId};
+  // The op is the Orca terminal its Dispatch placed it in: worker-start owns its env, so no env marker names it.
+  const asOp={ORCA_TERMINAL_HANDLE:JSON.parse(d.stdout).managed.assignee};
   const kernelCalls=[
     ['settle','--job',fx.jobId,'--verdict','fail'],
     ['check','--job',fx.jobId,'--checks','{"checks":[{"name":"x","exitCode":0}]}'],
@@ -93,7 +94,7 @@ test('an op caller is refused every kernel verb; reads and its own report pass t
     assert.equal(r.status,1,`${args[0]} must be refused from an op`);
     const refusal=lastLine(r.stderr);
     assert.equal(refusal?.code,'op-context-refused',`${args[0]}: ${r.stderr}`);
-    assert.deepEqual([refusal.caller.jobId,refusal.caller.via],[fx.jobId,'env-role']);
+    assert.deepEqual([refusal.caller.jobId,refusal.caller.via],[fx.jobId,'terminal-handle']);
   }
   const state=fx.read(db=>({
     job:db.prepare('SELECT status FROM jobs WHERE job_id=?').get(fx.jobId).status,
@@ -138,9 +139,11 @@ test('Orca\'s terminal handle identifies an op whose env StarCi could not set (m
     ['op-context-refused','terminal-handle',fx.managedJob]);
   const foreign=fx.api(['report','--job',fx.jobId,'--report','x.json'],asManaged);
   assert.equal(lastLine(foreign.stderr).code,'report-identity-mismatch');
-  // The bound terminal outranks the env marker: naming another job in STARCI_OP_JOB does not make the caller that job.
+  // An env marker is no identity: naming another job in STARCI_ROLE/STARCI_OP_JOB changes nothing, with or without a terminal.
   const spoofed=fx.api(['report','--job',fx.jobId,'--report','x.json'],{...asManaged,STARCI_ROLE:'op',STARCI_OP_JOB:fx.jobId});
   assert.deepEqual([lastLine(spoofed.stderr).code,lastLine(spoofed.stderr).caller?.jobId],['report-identity-mismatch',fx.managedJob]);
+  const markerOnly=fx.api(['incident','--workflow',fx.wf,'--kind','note','--detail','an env marker is no op'],{STARCI_ROLE:'op',STARCI_OP_JOB:fx.jobId});
+  assert.equal(markerOnly.status,0,markerOnly.stderr);
   // A terminal that is no op's (the Kernel's own, or the owner's) is not an op caller.
   const kernel=fx.api(['incident','--workflow',fx.wf,'--kind','note','--detail','kernel may write'],{ORCA_TERMINAL_HANDLE:'fake-kernel-terminal'});
   assert.equal(kernel.status,0,kernel.stderr);

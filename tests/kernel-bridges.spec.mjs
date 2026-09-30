@@ -97,9 +97,9 @@ test('api messages shows every orchestration message of the workflow\'s Runs, wi
   const second = json(w.api(['messages', '--workflow', 'wf-msg']).stdout);
   assert.equal(second.new, 0, 'what the Kernel read is remembered');
   assert.equal(w.read((db) => db.prepare("SELECT count(*) n FROM inbox").get().n), 0, 'nothing is bridged or acknowledged');
-  // an op terminal may not read the Kernel's messages
+  // an op terminal (the one the ledger binds to the op job) may not read the Kernel's messages
   const op = spawnSync(process.execPath, [API, 'messages', '--workflow', 'wf-msg', '--repo', w.repo, '--json'],
-    { cwd: ROOT, encoding: 'utf8', env: { ...process.env, STARCI_ROLE: 'op', STARCI_OP_JOB: 'op-code.refactor-aaaaaaaaaa' } });
+    { cwd: ROOT, encoding: 'utf8', env: { ...process.env, ORCA_TERMINAL_HANDLE: 'term-op-1' } });
   assert.equal(op.status, 1);
   assert.equal(lastErr(op).code, 'op-context-refused');
 });
