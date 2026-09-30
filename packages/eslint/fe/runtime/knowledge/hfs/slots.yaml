@@ -44,7 +44,10 @@ versioning:
 #   tests       unit-beside | e2e | none.
 #   budget      size budgets (lines per file, files per slot, exports).
 #   appKind     the app kind of hfs.json apps[].kind whose directory this slot describes.
-#   managedBy   template id that hfs sync renders; a difference is HFS_MANAGED_FILE_DRIFT.
+#   managedBy   the template directory hfs sync renders this slot's files from. The slot path then lists literal files
+#               only, and each is rendered from templates/<profile or common>/<managedBy>/<path, leading dots dropped>;
+#               the managed file list lives here and nowhere in code. A difference is HFS_MANAGED_FILE_DRIFT (a
+#               back end's tsconfig.json: HFS_TS_STRICT when a flag or an option was added).
 #   rules       rule ids (the catalog lands with knowledge/hfs/rules.yaml).
 #   since / retiredIn / successor   lifecycle.
 presenceValues: [required, optional, opt-in, forbidden]
@@ -154,13 +157,30 @@ slots:
     tests: none
     rules: [HFS_ARCH_CONFIG_UNREAD]
   - id: repo.package-manifest
-    profiles: [be, fe]
+    profiles: [fe]
     path: "{package.json,package-lock.json}"
     presence: required
     tracked: tracked
     tier: none
     tests: none
     rules: [HFS_PACKAGE_MANAGER_MIXED, HFS_DEP_VERSION_SKEW, HFS_CANON_PIN_DRIFT]
+  - id: be.package-manifest
+    profiles: [be]
+    path: package.json
+    presence: required
+    tracked: tracked
+    tier: none
+    tests: none
+    managedBy: package-scripts     # the `scripts` block only; the rest of the file is the repository's
+    rules: [HFS_PACKAGE_MANAGER_MIXED, HFS_DEP_VERSION_SKEW, HFS_CANON_PIN_DRIFT, HFS_MANAGED_FILE_DRIFT]
+  - id: be.lockfile
+    profiles: [be]
+    path: package-lock.json
+    presence: required
+    tracked: tracked
+    tier: none
+    tests: none
+    rules: [HFS_PACKAGE_MANAGER_MIXED, HFS_DEP_VERSION_SKEW]
   - id: repo.git-meta
     profiles: [be, fe]
     path: "{.gitignore,.gitattributes}"
@@ -168,44 +188,66 @@ slots:
     tracked: tracked
     tier: none
     tests: none
-    managedBy: gitignore-base
-    rules: [HFS_GITIGNORE_BLOCK_DRIFT]
+    rules: [HFS_GITIGNORE_BLOCK_DRIFT]     # the marked block of .gitignore is rendered by hfs sync (templates/<profile>/gitignore)
   - id: repo.tool-config
     profiles: [be, fe]
-    path: "{tsconfig.json,eslint.config.mjs,.editorconfig,.nvmrc,.prettierignore}"
-    presence: required     # each file is a thin extends of a canon package
+    path: "{.editorconfig,.nvmrc}"
+    presence: required     # plain dotfiles, the repository's own
     tracked: tracked
     tier: none
     tests: none
-    managedBy: tool-config
-    rules: [HFS_TOOL_CONFIG_LOCAL, HFS_MANAGED_FILE_DRIFT, HFS_TS_STRICT]
   - id: repo.tool-config-optional
     profiles: [be, fe]
-    path: "{tsconfig.build.json,tsconfig.e2e.json,.npmrc,jest.config.e2e.js}"
+    path: .npmrc
     presence: optional
     tracked: tracked
     tier: none
     tests: none
-    managedBy: tool-config
-    rules: [HFS_TOOL_CONFIG_LOCAL, HFS_MANAGED_FILE_DRIFT]
   - id: be.tool-config
     profiles: [be]
-    path: "{nest-cli.json,jest.config.js}"
+    # Managed files (hfs sync renders them, hfs check compares them): the whole tool configuration of a back end. Each is
+    # a reference to a canon package, never a configuration: tsconfig.json extends @starci/tsconfig/be.json and adds the
+    # three path aliases; tsconfig.build.json and tsconfig.e2e.json put an overlay preset after it and add only the
+    # path-relative options a preset cannot hold; eslint.config.mjs is the one-line starciBeConfig call; jest.config.js
+    # calls the @starci/jest-preset factory; .prettierrc names @starci/prettier-config; .prettierignore is the template.
+    path: "{tsconfig.json,tsconfig.build.json,tsconfig.e2e.json,eslint.config.mjs,jest.config.js,.prettierrc,.prettierignore}"
     presence: required
     tracked: tracked
     tier: none
     tests: none
     managedBy: tool-config
-    rules: [HFS_TOOL_CONFIG_LOCAL, HFS_MANAGED_FILE_DRIFT]
+    rules: [HFS_MANAGED_FILE_DRIFT, HFS_TOOL_CONFIG_LOCAL, HFS_TS_STRICT]
+  - id: be.nest-cli
+    profiles: [be]
+    path: nest-cli.json
+    presence: required
+    tracked: tracked
+    tier: none
+    tests: none
+  - id: be.tool-config-local
+    profiles: [be]
+    path: "{.eslintrc,.eslintrc.*,.eslintignore,eslint.config.js,eslint.config.cjs,eslint.config.ts,eslint.config.mts,eslint.config.cts,.prettierrc.*,prettier.config.*,jest.config.ts,jest.config.mjs,jest.config.cjs,jest.config.json,jest.config.e2e.js}"
+    presence: forbidden
+    tracked: external
+    tier: none
+    tests: none
+    goesTo: "nowhere: a back end has exactly the managed tool configuration (be.tool-config); a change to a rule or a flag is proposed in the .claude runtime"
+    rules: [HFS_TOOL_CONFIG_LOCAL]
+  - id: fe.thin-config
+    profiles: [fe]
+    path: "{tsconfig.json,eslint.config.mjs,.prettierignore}"
+    presence: required     # each file is a thin extends of a canon package
+    tracked: tracked
+    tier: none
+    tests: none
+    rules: [HFS_TOOL_CONFIG_LOCAL]
   - id: fe.tool-config
     profiles: [fe]
-    path: "{vitest.config.ts,vitest.setup.ts,playwright.config.ts,turbo.json}"
+    path: "{tsconfig.build.json,tsconfig.e2e.json,vitest.config.ts,vitest.setup.ts,playwright.config.ts,turbo.json}"
     presence: optional
     tracked: tracked
     tier: none
     tests: none
-    managedBy: tool-config
-    rules: [HFS_TOOL_CONFIG_LOCAL, HFS_MANAGED_FILE_DRIFT]
   - id: repo.quality-config
     profiles: [be, fe]
     path: "{sonar-project.properties,codecov.yml}"
@@ -222,7 +264,7 @@ slots:
     tracked: tracked
     tier: none
     tests: none
-    managedBy: husky
+    managedBy: hooks
     rules: [HFS_CI_E2E_AUTOMATIC, HFS_MANAGED_FILE_DRIFT]
   - id: repo.ci
     profiles: [be, fe]
@@ -694,7 +736,6 @@ slots:
     tracked: tracked
     tier: none
     tests: none
-    managedBy: sops-policy
 
   # ----- FE: apps ----------------------------------------------------------------------------------------
   - id: fe.app.next
@@ -871,5 +912,5 @@ consumers:
   - packages/eslint/be starciBeConfig({hfs})   # file globs for rules come from slots
   - packages/eslint/fe starciFeConfig({hfs})
   - packages/stylelint-canon                   # colour and brand allowances from fe.modules.brand
-  - scripts/hfs/sync.mjs                       # renders managedBy templates
+  - packages/hfs/sync                          # renders managedBy templates (hfs sync) and judges them (hfs check)
   - modules/kernel/failure-codes.yaml          # every rule id listed above has a Vietnamese why
