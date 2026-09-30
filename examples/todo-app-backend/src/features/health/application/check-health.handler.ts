@@ -3,7 +3,7 @@ import { ICQRSHandler } from "@modules/platform/cqrs"
 import { InjectLogger } from "@modules/platform/logging"
 import type { Logger } from "@modules/platform/logging"
 import { InjectProbeChecker } from "@modules/platform/probes"
-import type { ProbeChecker } from "@modules/platform/probes"
+import type { ProbeCheckerService } from "@modules/platform/probes"
 import type { CheckHealthResult } from "./check-health.contracts"
 import { CheckHealthQuery } from "./check-health.query"
 
@@ -12,7 +12,7 @@ import { CheckHealthQuery } from "./check-health.query"
 export class CheckHealthHandler extends ICQRSHandler<CheckHealthQuery, CheckHealthResult> {
     constructor(
         @InjectLogger() logger: Logger,
-        @InjectProbeChecker() private readonly checker: ProbeChecker,
+        @InjectProbeChecker() private readonly checker: ProbeCheckerService,
     ) {
         super(logger)
     }

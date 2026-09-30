@@ -3,7 +3,7 @@ import { ICQRSHandler } from "@modules/platform/cqrs"
 import { InjectLogger } from "@modules/platform/logging"
 import type { Logger } from "@modules/platform/logging"
 import { InjectMetrics } from "@modules/platform/observability"
-import type { Metrics } from "@modules/platform/observability"
+import type { MetricsRegistryService } from "@modules/platform/observability"
 import type { RenderMetricsResult } from "./render-metrics.contracts"
 import { RenderMetricsQuery } from "./render-metrics.query"
 
@@ -12,12 +12,12 @@ import { RenderMetricsQuery } from "./render-metrics.query"
 export class RenderMetricsHandler extends ICQRSHandler<RenderMetricsQuery, RenderMetricsResult> {
     constructor(
         @InjectLogger() logger: Logger,
-        @InjectMetrics() private readonly metrics: Metrics,
+        @InjectMetrics() private readonly metrics: MetricsRegistryService,
     ) {
         super(logger)
     }
 
     protected override process(): Promise<RenderMetricsResult> {
-        return Promise.resolve(this.metrics.render())
+        return this.metrics.render()
     }
 }

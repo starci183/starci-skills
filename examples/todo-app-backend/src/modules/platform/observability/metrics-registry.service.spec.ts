@@ -1,17 +1,17 @@
 import { Test } from "@nestjs/testing"
-import { MetricsRegistry } from "./metrics-registry.service"
+import { MetricsRegistryService } from "./metrics-registry.service"
 
 const build = async () => {
-    const moduleRef = await Test.createTestingModule({ providers: [MetricsRegistry] }).compile()
-    return moduleRef.get(MetricsRegistry)
+    const moduleRef = await Test.createTestingModule({ providers: [MetricsRegistryService] }).compile()
+    return moduleRef.get(MetricsRegistryService)
 }
 
-describe("MetricsRegistry", () => {
+describe("MetricsRegistryService", () => {
     describe("render", () => {
         it("renders only the headers before any request is recorded", async () => {
             const metrics = await build()
 
-            expect(metrics.render().exposition.split("\n")).toEqual([
+            expect((await metrics.render()).exposition.split("\n")).toEqual([
                 "# HELP http_requests_total HTTP requests the api has served, by method, route and status.",
                 "# TYPE http_requests_total counter",
                 "# HELP http_request_duration_ms Time serving HTTP requests, in milliseconds.",
@@ -25,7 +25,7 @@ describe("MetricsRegistry", () => {
             metrics.recordRequest("GET", "/health", 200, 5)
             metrics.recordRequest("GET", "/health", 200, 7)
 
-            const { exposition } = metrics.render()
+            const { exposition } = await metrics.render()
 
             expect(exposition).toContain('http_requests_total{method="GET",route="/health",status="200"} 2\n')
             expect(exposition).toContain('http_request_duration_ms_sum{method="GET",route="/health",status="200"} 12\n')
@@ -37,7 +37,7 @@ describe("MetricsRegistry", () => {
             metrics.recordRequest("POST", "/graphql", 200, 1)
             metrics.recordRequest("GET", "/health", 503, 2)
 
-            const lines = metrics.render().exposition.split("\n")
+            const lines = (await metrics.render()).exposition.split("\n")
 
             expect(lines.filter((line) => line.startsWith("http_requests_total{"))).toEqual([
                 'http_requests_total{method="GET",route="/health",status="503"} 1',
@@ -49,7 +49,7 @@ describe("MetricsRegistry", () => {
             const metrics = await build()
             metrics.recordRequest("GET", 'a"b\\c\nd', 200, 1)
 
-            expect(metrics.render().exposition).toContain('route="a\\"b\\\\c\\nd"')
+            expect((await metrics.render()).exposition).toContain('route="a\\"b\\\\c\\nd"')
         })
     })
 })

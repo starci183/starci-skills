@@ -3,5 +3,5 @@ export interface Metrics {
     /** Records one finished request under its (method, route, status) label set. */
     recordRequest(method: string, route: string, status: number, durationMs: number): void
     /** The whole registry in Prometheus text exposition format. */
-    render(): { readonly exposition: string }
+    render(): Promise<{ readonly exposition: string }>
 }

@@ -20,7 +20,7 @@ const labelsOf = (metric: RequestMetric): string =>
  * The process-local registry behind the Prometheus scrape door: per (method, route, status) request counters plus a
  * duration sum, in the text exposition format. Route is the matched route template, so the label set stays bounded.
  */
-export class MetricsRegistry implements Metrics {
+export class MetricsRegistryService implements Metrics {
     private readonly requests = new Map<string, RequestMetric>()
 
     /** Records one finished request. */
@@ -33,7 +33,7 @@ export class MetricsRegistry implements Metrics {
     }
 
     /** Renders the registry in Prometheus text exposition format. */
-    render(): { readonly exposition: string } {
+    render(): Promise<{ readonly exposition: string }> {
         const sorted = [...this.requests.entries()].sort(([a], [b]) => a.localeCompare(b))
         const lines: Array<string> = [
             "# HELP http_requests_total HTTP requests the api has served, by method, route and status.",
@@ -46,6 +46,6 @@ export class MetricsRegistry implements Metrics {
                 `http_request_duration_ms_count${labelsOf(metric)} ${metric.count}`,
             ]),
         ]
-        return { exposition: `${lines.join("\n")}\n` }
+        return Promise.resolve({ exposition: `${lines.join("\n")}\n` })
     }
 }

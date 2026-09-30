@@ -3,7 +3,7 @@ import { mock } from "@starci/jest-preset"
 import { LOGGER } from "@modules/platform/logging"
 import type { Logger } from "@modules/platform/logging"
 import { ProbesError, ProbesErrorCode } from "./errors/probes.error"
-import { ProbeChecker } from "./probe-checker.service"
+import { ProbeCheckerService } from "./probe-checker.service"
 import { PROBES } from "./probes.decorators"
 import { ProbesLogEvent } from "./probes.log-events"
 import type { Probe } from "./probes.port"
@@ -17,16 +17,16 @@ const build = async (probes: ReadonlyArray<Probe>) => {
     const logger = mock<Logger>()
     const moduleRef = await Test.createTestingModule({
         providers: [
-            ProbeChecker,
+            ProbeCheckerService,
             { provide: PROBES_OPTIONS, useValue: { service: "todo", probes: [] } },
             { provide: PROBES, useValue: probes },
             { provide: LOGGER, useValue: logger },
         ],
     }).compile()
-    return { checker: moduleRef.get(ProbeChecker), logger }
+    return { checker: moduleRef.get(ProbeCheckerService), logger }
 }
 
-describe("ProbeChecker", () => {
+describe("ProbeCheckerService", () => {
     describe("run", () => {
         it("reports every dependency ok when all answer", async () => {
             const { checker, logger } = await build([answers("database"), answers("cache")])
