@@ -848,10 +848,11 @@ BE_SOURCE_FORM:
 BE_SPEC_QUALITY:
   title: "Spec reads source, or an e2e breaks its flow shape"
   title_vi: "Spec đọc mã nguồn hoặc e2e phá dạng luồng"
-  meaning_vi: "Một spec đọc mã nguồn của repo bằng fs để kiểm tra chữ, một spec chỉ khẳng định lời gọi thay vì kết quả, hoặc một e2e đi vòng qua transport, ngủ theo thời lượng, rẽ nhánh trong bước, tự dựng module, gọi nhà cung cấp mô hình hay không đọc lại trạng thái đã lưu. Ép kiểu (as, x!) trong spec do các luật mượn của typescript-eslint chặn, cùng mã BE_TYPE_ESCAPE."
+  meaning_vi: "Một spec đọc mã nguồn của repo bằng fs để kiểm tra chữ, một spec chỉ khẳng định lời gọi thay vì kết quả, hoặc một e2e đi vòng qua transport, ngủ theo thời lượng, rẽ nhánh trong bước, tự dựng module, gọi nhà cung cấp mô hình hay không đọc lại trạng thái đã lưu. Ép kiểu (as, x!) trong spec do các luật mượn của typescript-eslint chặn, cùng mã BE_TYPE_ESCAPE. Một spec của bất kỳ tầng nào bỏ qua hoặc đánh dấu test (skip, skipIf, runIf, todo, only, xit, xdescribe, xtest) hay chọn runner theo điều kiện cũng bị chặn; việc bỏ qua duy nhất là của contract helper trong world khi thiếu cấu hình sandbox."
   causes_vi:
     - "readFileSync hay readdirSync trên mã nguồn hoặc __dirname trong spec"
     - "Spec chỉ có toHaveBeenCalled*, không khẳng định kết quả hay trạng thái"
+    - "`it.skip`, `describe.skip`, `xit`, `it.todo`, `.skipIf`/`.runIf` hoặc `(cond ? describe : describe.skip)` trong spec; hãy viết test thật hoặc xóa nó, còn việc bỏ qua khi thiếu sandbox nằm trong contract helper của world (`sandbox.describe(...)`)"
     - "e2e gọi CommandBus, QueryBus hay handler trực tiếp; dùng sleep thay cho waitFor; tự gọi Test.createTestingModule; import SDK của nhà cung cấp mô hình; không đọc lại dòng đã lưu qua EntityManager"
   nextStep_vi: "Chuyển luật kiến trúc sang lint hoặc bộ kiểm tra; khẳng định kết quả hoặc trạng thái; e2e vào bằng transport thật, chờ bằng waitFor và dựng thế giới ở src/tests/e2e/setup. Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra."
   owner: op-retry
@@ -12388,6 +12389,17 @@ BE_TEST_TOPOLOGY:
     - "Vi phạm luật R47: một `jest.config.js` (preset `@starci/jest-preset`) với bốn project `unit`, `integration`, `e2e`, `contract`; thư mục và hậu tố spec luôn khớp nhau; `diagnostics: false` + `isolatedModules: true`; `test:integration`, `test:e2e`, `test:contract` = `typecheck:tests && jest --selectProjects <tên>`; `src/tests/world/` là nơi duy nhất dựng hạ tầng test và chỉ chứa `global-setup.ts`, `global-teardown.ts`, `use-test-world.ts`, `fakes/` và file gốc có hậu tố vai trò (kể cả `test-world.config.ts`)."
     - "Vi phạm luật R47 về stack thật: mọi dịch vụ khai trong `.starcistacks/<env>` (Postgres, Redis, Keycloak, mail host, k3s...) chạy THẬT trong world qua toxiproxy, world đọc dịch vụ và phiên bản image từ stack lúc chạy; `fakes/<provider>/` chỉ giả SaaS bên ngoài mà đội không vận hành. Ngoại lệ duy nhất: dịch vụ stateless cần phần cứng đặc biệt hoặc model bên ngoài (GPU inference, embedding tự host) được giả khi `test-world.config.ts` khai trong `fakedBy` với `reason` không rỗng; dịch vụ có trạng thái (database, cache, identity, storage, mail, queue, search hoặc có volume bền) không bao giờ được giả, và mục `fakedBy` trỏ tới dịch vụ hoặc thư mục fake không tồn tại bị coi là cũ."
   nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra (nợ hàng loạt có codemod của HFS); không cần ai can thiệp thêm."
+  owner: op-retry
+  kind: check-finding
+
+BE_CONTRACT_UNGUARDED:
+  title: "A fake serves payload fixtures that no sandbox contract spec compares with the real provider"
+  title_vi: "Fixture của fake chưa có contract spec bảo vệ"
+  meaning_vi: "Thư mục `src/tests/world/fakes/<provider>/` có fixture payload (`payloads/*.json`) nhưng không có `src/tests/contract/<provider>/*.contract-spec.ts` nào vừa tham chiếu fixture của nhà cung cấp đó vừa khẳng định `shapeOf(real)` bằng `shapeOf(fixture)`: `<detail>`."
+  causes_vi:
+    - "Fake có fixture payload nhưng chưa có thư mục contract/<provider>/ hay spec nào"
+    - "Contract spec có nhưng không so hình dạng (shapeOf) của payload thật với fixture, hoặc không đọc fixture của đúng nhà cung cấp, hoặc tự định nghĩa shapeOf thay vì import từ world"
+  nextStep_vi: "Thêm `src/tests/contract/<provider>/<provider>.contract-spec.ts` dùng contract helper của world (`sandbox.describe(...)`, tự bỏ qua khi thiếu cấu hình sandbox) và khẳng định `expect(shapeOf(thật)).toEqual(shapeOf(fixture))`. Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra."
   owner: op-retry
   kind: check-finding
 

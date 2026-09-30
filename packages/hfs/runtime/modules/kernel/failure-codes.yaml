@@ -276,6 +276,17 @@ BE_CONNECTION_DUPLICATE:
   owner: op-retry
   kind: check-finding
 
+BE_CONTRACT_UNGUARDED:
+  title: "A fake serves payload fixtures that no sandbox contract spec compares with the real provider"
+  title_vi: "Fixture của fake chưa có contract spec bảo vệ"
+  meaning_vi: "Thư mục `src/tests/world/fakes/<provider>/` có fixture payload (`payloads/*.json`) nhưng không có `src/tests/contract/<provider>/*.contract-spec.ts` nào vừa tham chiếu fixture của nhà cung cấp đó vừa khẳng định `shapeOf(real)` bằng `shapeOf(fixture)`: `<detail>`."
+  causes_vi:
+    - "Fake có fixture payload nhưng chưa có thư mục contract/<provider>/ hay spec nào"
+    - "Contract spec có nhưng không so hình dạng (shapeOf) của payload thật với fixture, hoặc không đọc fixture của đúng nhà cung cấp, hoặc tự định nghĩa shapeOf thay vì import từ world"
+  nextStep_vi: "Thêm `src/tests/contract/<provider>/<provider>.contract-spec.ts` dùng contract helper của world (`sandbox.describe(...)`, tự bỏ qua khi thiếu cấu hình sandbox) và khẳng định `expect(shapeOf(thật)).toEqual(shapeOf(fixture))`. Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra."
+  owner: op-retry
+  kind: check-finding
+
 BE_DEFAULT_DENY:
   title: "Open or untyped door"
   title_vi: "Cửa mở hoặc nhận dữ liệu không kiểu"

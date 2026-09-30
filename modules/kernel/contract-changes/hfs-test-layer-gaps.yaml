@@ -1,0 +1,30 @@
+id: hfs-test-layer-gaps
+effectiveAt: '2026-10-01T02:00:00+07:00'
+summary: >-
+  Test-layer gaps of R47/R48 closed (lane C0-TL). R47: test-world-shape now demands one object literal with plain keys for
+  useTestWorld (a variable, spread or computed key hid whether an integration spec asked for apps) and the new machine check
+  contract-fixture-guard (BE_CONTRACT_UNGUARDED): every src/tests/world/fakes/<provider>/ that serves payloads/*.json needs a
+  src/tests/contract/<provider>/*.contract-spec.ts that references the provider's fixtures and asserts
+  expect(shapeOf(real)).toEqual(shapeOf(fixture)); the helper name is world vocabulary (slot manifest ruleParams.be.contractShape.helper).
+  R48: new eslint rule spec-no-skip refuses skip, skipIf, runIf, todo, only, xit/xdescribe/xtest and a conditionally selected runner
+  in every unit, integration, e2e and contract spec; the one skip is the contract helper's own, decided in a be.tests.world file.
+  R47 law text now describes the world layers and points unit specs to the unit rules of lane UT (marked UT-POINTER).
+reach: new-legs
+adds:
+  codes: [BE_CONTRACT_UNGUARDED]
+paths:
+  - modules/kernel/contract-changes/hfs-test-layer-gaps.yaml
+  - modules/kernel/failure-codes.yaml
+  - modules/schemas/hfs-slots.schema.yaml
+  - knowledge/hfs/slots.yaml
+  - knowledge/hfs/rules.yaml
+  - knowledge/hfs/README.md
+  - scripts/lib/hfs-slots.mjs
+  - scripts/checks/architecture/contract-fixture-guard.mjs
+  - scripts/checks/architecture/index.mjs
+  - tests/architecture-contract-fixture-guard.spec.mjs
+  - packages/eslint/be/test-world.mjs
+  - packages/eslint/be/test-world.test.mjs
+  - packages/eslint/be/spec-no-skip.mjs
+  - packages/eslint/be/spec-no-skip.test.mjs
+  - packages/eslint/be/index.mjs

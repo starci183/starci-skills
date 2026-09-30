@@ -28,6 +28,7 @@ import { checkErrorCodes, ERROR_CODE_RULE_IDS } from './error-codes.mjs';
 import { checkConfigUnread, CONFIG_UNREAD_RULE_IDS } from './config-unread.mjs';
 import { checkFeatureShape, FEATURE_SHAPE_RULE_IDS } from './feature-shape.mjs';
 import { checkTestWorldFiles, TEST_WORLD_FILES_RULE_IDS } from './test-world-files.mjs';
+import { checkContractFixtureGuard, CONTRACT_FIXTURE_GUARD_RULE_IDS } from './contract-fixture-guard.mjs';
 import { checkCompositionSpec, COMPOSITION_SPEC_RULE_IDS } from './composition-spec.mjs';
 import { checkSchemaOwner, SCHEMA_OWNER_RULE_IDS } from './schema-owner.mjs';
 import { checkModulePerTransport, MODULE_PER_TRANSPORT_RULE_IDS } from './module-per-transport.mjs';
@@ -66,6 +67,7 @@ const BACKEND_MACHINE = {
   modulePerTransport: [checkModulePerTransport, MODULE_PER_TRANSPORT_RULE_IDS],
   backgroundUnowned: [checkBackgroundUnowned, BACKGROUND_UNOWNED_RULE_IDS],
   testWorldFiles: [checkTestWorldFiles, TEST_WORLD_FILES_RULE_IDS],
+  contractFixtureGuard: [checkContractFixtureGuard, CONTRACT_FIXTURE_GUARD_RULE_IDS],
 };
 
 // The frontend repository machine (R21, R50, R54, R55, R56, R63, R94): same shape, run for a front-end repository only.
