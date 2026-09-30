@@ -29,7 +29,7 @@ stack is declared in `.starcistacks/dev`.
 
 ## Development
 
-`npm ci`, then `npm run typecheck`, `npm run lint:check`, `npm run build`, `npm run test:unit`. The runbook with the
+`npm ci`, then `npm run typecheck`, `npm run lint:check`, `npm run build`, `npm test`. The runbook with the
 environment keys, migrations and seeds is `.starcistacks/dev/README.md`; `docs/guides/testing.md` describes the suites.
 
 ## Work
@@ -45,7 +45,7 @@ keys. `.starcistacks/dev/infra/metadata.json` stays the resolved port map the fr
 ## Verification
 
 From this directory run `npm run typecheck`, `npm run lint:check`, `npm run build`, and
-`npm run test:unit`. The unit suite includes both Nest composition specs. From the parent
+`npm test`. The unit suite includes both Nest composition specs. From the parent
 `.claude` tree, run `node scripts/checks/canon-scan.mjs --root examples/ecommerce-app-be --json`
 and `node scripts/checks/check-starcistacks.mjs examples/ecommerce-app-be`.
 

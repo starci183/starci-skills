@@ -8,7 +8,7 @@ both application composition roots. It does not start the dev stack.
 | Types | `npm run typecheck` |
 | Lint | `npm run lint:check` |
 | Build | `npm run build` |
-| Unit suite | `npm run test:unit` |
+| Unit suite | `npm test` |
 | Coverage | `npm run test:coverage` |
 
 The root `jest.config.js` declares exactly two projects. The `unit` project selects `*.spec.ts` under `apps/` and `src/`. `tsconfig.json` and Jest resolve the root package's feature and module
@@ -21,7 +21,7 @@ The `e2e` project selects `*.e2e-spec.ts` under `src/tests/e2e/` and runs with `
 both Nest processes, call the public GraphQL doors (and the /health probes), then clean up.
 They require an available container runtime and are not part of `test:unit`.
 
-E2E runs MANUALLY only (owner ruling 2026-09-29): husky, `typecheck`, `lint`/`lint:check`, coverage (`test:coverage`, Codecov, Sonar) and automatic CI never touch `src/tests/e2e/**`. `npm run typecheck:e2e` (`tsconfig.e2e.json`), `npm run lint:e2e` and `npm run test:e2e` are run by hand when asked; any e2e CI job is `workflow_dispatch` only.
+E2E runs MANUALLY only (owner ruling 2026-09-29): husky, `typecheck`, `lint`/`lint:check`, coverage (`test:coverage`, Codecov, Sonar) and automatic CI never touch `src/tests/e2e/**`. `npm run typecheck:e2e` (`src/tests/e2e/tsconfig.json`), `npm run lint:e2e` and `npm run test:e2e` are run by hand when asked; any e2e CI job is `workflow_dispatch` only.
 
 `node scripts/live-proof.mjs` exercises a live checkout across the identity and order services.
 The dev stack and process instructions are in `.starcistacks/dev/README.md`.

@@ -1,7 +1,5 @@
 {
-  "extends": "./tsconfig.json",
-  "compilerOptions": {
-    "rootDir": "."
-  },
+  "extends": ["./tsconfig.json", "@starci/tsconfig/build.json"],
+  "compilerOptions": { "outDir": "./dist" },
   "exclude": ["node_modules", "dist", "**/*.spec.ts", "src/tests"]
 }

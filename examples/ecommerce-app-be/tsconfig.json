@@ -1,67 +1,11 @@
 {
+  "extends": "@starci/tsconfig/be.json",
   "compilerOptions": {
-    "module": "commonjs",
-    "moduleResolution": "node",
-    "target": "ES2021",
-    "lib": [
-      "ES2022"
-    ],
-    "declaration": false,
-    "removeComments": true,
-    "emitDecoratorMetadata": true,
-    "experimentalDecorators": true,
-    "allowSyntheticDefaultImports": true,
-    "esModuleInterop": true,
-    "sourceMap": false,
-    "outDir": "./dist",
-    "baseUrl": "./",
-    "incremental": false,
-    "skipLibCheck": true,
-    "strict": true,
-    "strictNullChecks": true,
-    "noImplicitAny": true,
-    "forceConsistentCasingInFileNames": true,
-    "types": [
-      "node",
-      "jest"
-    ],
     "paths": {
-      "@apollo/client": [
-        "./node_modules/@apollo/client"
-      ],
-      "axios": [
-        "./node_modules/axios"
-      ],
-      "graphql": [
-        "./node_modules/graphql"
-      ],
-      "ecommerce-app-be/features/*": [
-        "./src/features/*/index.ts"
-      ],
-      "ecommerce-app-be/modules/*": [
-        "./src/modules/*/index.ts"
-      ],
-      "@e2e-kit/*": [
-        "../../packages/e2e-kit/src/*"
-      ],
-      "@features/*": [
-        "./src/features/*"
-      ],
-      "@modules/*": [
-        "./src/modules/*"
-      ],
-      "@tests/*": [
-        "./src/tests/*"
-      ]
+      "@features/*": ["./src/features/*"],
+      "@modules/*": ["./src/modules/*"],
+      "@tests/*": ["./src/tests/*"]
     }
   },
-  "include": [
-    "apps",
-    "src"
-  ],
-  "exclude": [
-    "node_modules",
-    "dist",
-    "src/tests/e2e/**"
-  ]
+  "exclude": ["node_modules", "dist", "src/tests/e2e"]
 }
