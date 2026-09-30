@@ -436,9 +436,9 @@ describe('work-hygiene', () => {
     ], ignored);
     assert.deepEqual(findings.map(finding => [finding.file, finding.code]), [
       ['.starciwork/features/a/evidence/run.json', 'HFS_WORK_AGENT_DATA'],
-      ['.starcistacks/dev/secrets/db.txt', 'HFS_STACKS_PLAINTEXT'],
-      ['.starcistacks/dev/infra/.env', 'HFS_STACKS_PLAINTEXT'],
-      ['.starcistacks/dev/infra/tls.pem', 'HFS_STACKS_PLAINTEXT'],
+      ['.starcistacks/dev/secrets/db.txt', 'HFS_PLAINTEXT_SECRET'],
+      ['.starcistacks/dev/infra/.env', 'HFS_PLAINTEXT_SECRET'],
+      ['.starcistacks/dev/infra/tls.pem', 'HFS_PLAINTEXT_SECRET'],
     ]);
   });
   it('asks git which .starciwork files the generated allowlist ignores', async t => {
@@ -565,7 +565,7 @@ describe('scripts/checks/check-hfs-sync.mjs', () => {
     assert.equal(result.ok, false);
     assert.deepEqual(result.findings.map(finding => [finding.code, finding.file]).sort(), [
       ['HFS_MANAGED_FILE_DRIFT', 'codecov.yml'],
-      ['HFS_STACKS_PLAINTEXT', '.starcistacks/dev/secrets/db.txt'],
+      ['HFS_PLAINTEXT_SECRET', '.starcistacks/dev/secrets/db.txt'],
       ['HFS_WORK_AGENT_DATA', '.starciwork/features/a/evidence/run.log'],
     ]);
     assert.ok(result.findings.every(finding => CODES.includes(finding.code)));

@@ -31,3 +31,14 @@ export const SECRET_PATTERNS = [
     skipFile: /\.(?:spec|test|e2e-spec)\.[cm]?[jt]sx?$/ },
 ];
 
+
+/** The names of the patterns one line of `file` matches (never the value). A stand-in value and a spec file's keyword assignment are no hit. */
+export function secretHits(file, text) {
+  const names = [];
+  for (const rule of SECRET_PATTERNS) {
+    if (rule.skipFile?.test(file ?? '')) continue;
+    const hit = rule.re.exec(text);
+    if (hit && !rule.placeholder?.test(hit[1] ?? '')) names.push(rule.name);
+  }
+  return names;
+}

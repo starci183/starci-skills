@@ -51,7 +51,7 @@ const selfFile = fileURLToPath(import.meta.url);
 
 // The secret scan's patterns live in scripts/lib/secret-patterns.mjs, so the typed-log redaction
 // (scripts/kernel/typed-logs.mjs) imports the very same rules without loading the supervisor.
-import { FORBIDDEN_FILES, SECRET_PATTERNS } from '../lib/secret-patterns.mjs';
+import { FORBIDDEN_FILES, SECRET_PATTERNS, secretHits } from '../lib/secret-patterns.mjs';
 import { slash } from '../lib/path-key.mjs';
 import { isSopsEnvelope, setCommand } from '../lib/test-secrets.mjs';
 import { starciSourceRoot } from '../lib/hk-orphan-ledgers.mjs';
@@ -100,11 +100,7 @@ export function diffScanner(files = [], { encText = null } = {}) {
       if (raw.startsWith('+')) {
         const text = raw.slice(1);
         if (enc) { enc.added.push(text); enc.line ??= line; }
-        for (const rule of SECRET_PATTERNS) {
-          if (rule.skipFile?.test(file ?? '')) continue;
-          const hit = rule.re.exec(text);
-          if (hit && !rule.placeholder?.test(hit[1] ?? '')) (enc ? enc.findings : findings).push({ file, line, pattern: rule.name });
-        }
+        for (const pattern of secretHits(file, text)) (enc ? enc.findings : findings).push({ file, line, pattern });
         line += 1;
       } else if (!raw.startsWith('-')) line += 1;
     },
