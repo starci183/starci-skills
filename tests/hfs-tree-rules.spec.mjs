@@ -101,15 +101,20 @@ test('HFS_STACKS_SHAPE: the standard tree with a host-owned Sonar is clean', () 
 
 // ------------------------------------------------------------------------------------------------ R13 HFS_CI_MISSING_CANON
 
-test('HFS_CI_MISSING_CANON: a CI without the hfs check, a --fast check, another version and a pre-push without typecheck or lint are refused', () => {
+const CI_STEP = '      - name: hfs check\n        run: npm run hfs:report\n';
+
+test('HFS_CI_MISSING_CANON: a CI without the hfs check, a --fast check, another version, a script that is not the check and a pre-push without typecheck or lint are refused', () => {
   const ci = fs.readFileSync(path.join(repoOf(BE), '.github/workflows/ci.yml'), 'utf8');
-  const withCheck = (line) => ci.replace('npx hfs check', line);
-  const missing = checkRepo({ repoRoot: repoOf(BE, (dir) => put(dir, '.github/workflows/ci.yml', ci.replace(/ {6}- name: hfs check\n {8}run: npx hfs check\n/, ''))) });
+  assert.ok(ci.includes(CI_STEP), 'the rendered CI runs the check through the hfs:report script');
+  const withStep = (line) => ci.replace('run: npm run hfs:report', `run: ${line}`);
+  const missing = checkRepo({ repoRoot: repoOf(BE, (dir) => put(dir, '.github/workflows/ci.yml', ci.replace(CI_STEP, ''))) });
   assert.deepEqual(only(missing, 'HFS_CI_MISSING_CANON').map((f) => f.path), ['.github/workflows/ci.yml']);
-  const fast = checkRepo({ repoRoot: repoOf(BE, (dir) => put(dir, '.github/workflows/ci.yml', withCheck('npx hfs check --fast'))) });
+  const fast = checkRepo({ repoRoot: repoOf(BE, (dir) => put(dir, '.github/workflows/ci.yml', withStep('npx hfs check --fast'))) });
   assert.equal(only(fast, 'HFS_CI_MISSING_CANON').length, 1);
-  const drifted = checkRepo({ repoRoot: repoOf(BE, (dir) => put(dir, '.github/workflows/ci.yml', withCheck('npx @starci/hfs@0.0.1 check'))) });
-  assert.match(only(drifted, 'HFS_CI_MISSING_CANON')[0].message, new RegExp(`pinned at ${pins['@starci/hfs'].version.replace(/\./g, '\\.')}`));
+  const drifted = checkRepo({ repoRoot: repoOf(BE, (dir) => put(dir, '.github/workflows/ci.yml', withStep('npx @starci/hfs@0.0.1 check'))) });
+  assert.match(only(drifted, 'HFS_CI_MISSING_CANON')[0].message, new RegExp(`pinned at ${pins['@starci/hfs'].version.replace(/\./g, '\.')}`));
+  const hollow = checkRepo({ repoRoot: repoOf(BE, (dir) => put(dir, 'package.json', json({ name: 'demo', private: true, scripts: { 'hfs:report': 'echo ok' } }))) });
+  assert.equal(only(hollow, 'HFS_CI_MISSING_CANON').length, 1, 'a script that does not run hfs check is no check');
   const prePush = checkRepo({ repoRoot: repoOf(BE, (dir) => put(dir, '.husky/pre-push', '# gate\nnpm run typecheck\nnpx hfs check --fast\n')) });
   assert.deepEqual(only(prePush, 'HFS_CI_MISSING_CANON').map((f) => f.step), ['lint:check']);
 });
@@ -117,7 +122,7 @@ test('HFS_CI_MISSING_CANON: a CI without the hfs check, a --fast check, another 
 test('HFS_CI_MISSING_CANON: the rendered CI and pre-push, and the pinned version spelled out, are clean', () => {
   assert.deepEqual(only(checkRepo({ repoRoot: repoOf(BE) }), 'HFS_CI_MISSING_CANON'), []);
   const ci = fs.readFileSync(path.join(repoOf(FE), '.github/workflows/ci.yml'), 'utf8');
-  const pinned = checkRepo({ repoRoot: repoOf(FE, (dir) => put(dir, '.github/workflows/ci.yml', ci.replace('npx hfs check', `npx @starci/hfs@${pins['@starci/hfs'].version} check`))) });
+  const pinned = checkRepo({ repoRoot: repoOf(FE, (dir) => put(dir, '.github/workflows/ci.yml', ci.replace('run: npm run hfs:report', `run: npx @starci/hfs@${pins['@starci/hfs'].version} check`))) });
   assert.deepEqual(only(pinned, 'HFS_CI_MISSING_CANON'), []);
 });
 
@@ -180,6 +185,7 @@ function siblings({ feCopy, beSnapshot, stacks = '../be', withBackend = true }) 
   const dir = writeCleanRepo(declaration, { into: parent, name: 'fe' });
   put(dir, 'apps/web/src/modules/api/contract/web.graphql', feCopy);
   put(dir, 'apps/web/package.json', json(WIRED));
+  for (const file of ['index.ts', 'client.ts', 'outcome.ts']) put(dir, `apps/web/src/modules/api/${file}`);   // the api module a contract copy makes real
   return checkRepo({ repoRoot: gitAdd(dir) });
 }
 
