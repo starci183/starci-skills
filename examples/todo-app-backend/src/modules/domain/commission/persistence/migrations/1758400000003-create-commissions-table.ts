@@ -1,8 +1,8 @@
 import type { MigrationInterface, QueryRunner } from "typeorm"
 
 /** Creates the commissions table; every statement is idempotent so a seeded database agrees with it. */
-export class CreateCommissionsTable1758400000000 implements MigrationInterface {
-    name = "CreateCommissionsTable1758400000000"
+export class CreateCommissionsTable1758400000003 implements MigrationInterface {
+    name = "CreateCommissionsTable1758400000003"
 
     /** Creates the table and its index. */
     async up(queryRunner: QueryRunner): Promise<void> {
