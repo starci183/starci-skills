@@ -12395,11 +12395,11 @@ FE_ENV_OWNER:
   kind: check-finding
 
 FE_TRANSPORT_OWNER:
-  title: "One `fetch` in `modules/api/client.ts`, with timeout and abort"
+  title: "One `fetch`, in the repository's one transport client, with timeout and abort"
   title_vi: "fetch ngoài client duy nhất"
-  meaning_vi: "`fetch` ở `<file>` ngoài `modules/api/client.ts` (gọi, gán lại hoặc truyền như giá trị), app import thư viện HTTP khác, reader `read-*.ts` không đi qua client, hoặc state dùng chung dạng `let`."
+  meaning_vi: "`fetch` ở `<file>` ngoài client truyền tải duy nhất của repository (gọi, gán lại hoặc truyền như giá trị), thư viện HTTP khác được import, reader `read-*.ts` không đi qua client, repository có nhiều hơn một client hoặc nhiều hơn một union `Outcome` (mỗi app giữ một bản, hoặc gói api cộng thêm một bản của app), hoặc state dùng chung dạng `let`."
   causes_vi:
-    - "Vi phạm luật R50: Mỗi app đúng một `fetch` ở `modules/api/client.ts`, có timeout + `AbortSignal`; không singleton `let` giữ token/locale; credential truyền bằng tham số/context."
+    - "Vi phạm luật R50: Mỗi repository đúng một client `fetch`, có timeout + `AbortSignal`: `packages/<family>-api/src/client.ts` khi các app dùng chung, hoặc `modules/api/client.ts` của app duy nhất; không singleton `let` giữ token/locale; credential truyền bằng tham số/context."
   nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra và mục của luật trong tiêu chuẩn HFS; nợ cũ cần quyết định thiết kế nên op không thêm ngoại lệ, chỉ tách hoặc chuyển về đúng chủ."
   owner: op-retry
   kind: check-finding
@@ -12463,6 +12463,28 @@ FE_HOOKS_ARE_HOOKS:
   causes_vi:
     - "Vi phạm luật R56: `hooks/<domain>/` chỉ chứa `use*.ts` và một `<domain>.shared.ts` cho helper dùng chung; reader server nằm ở `modules/api/<domain>/read-*.ts` (bọc `cache()`)."
   nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra (nợ hàng loạt có codemod của HFS); không cần ai can thiệp thêm."
+  owner: op-retry
+  kind: check-finding
+
+FE_CLIENT_REACHES_SERVER:
+  title: "Client module reaches a server-only import"
+  title_vi: "Mô-đun client với tới import chỉ dành cho máy chủ"
+  meaning_vi: "Một mô-đun có chỉ thị `\"use client\"` với tới, qua chuỗi import chạy thật (nhiều bước, không tính import chỉ-kiểu), một mô-đun import `server-only`, `next/headers`, `next/server`, `next-intl/server`, `node:*` hoặc `fs`. Lời nhắn nêu client đầu vào và cả chuỗi import."
+  causes_vi:
+    - "Hook hoặc module dùng chung được client component import gián tiếp lại đọc request ở máy chủ"
+    - "Reader máy chủ bị import từ đường đi của một client component thay vì chỉ từ server component"
+  nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để đọc dữ liệu ở server component và truyền xuống bằng props, hoặc đưa import ra khỏi đồ thị client theo lời nhắn; không thêm ngoại lệ."
+  owner: op-retry
+  kind: check-finding
+
+FE_CROSS_APP_DUPLICATE:
+  title: "File copied between apps"
+  title_vi: "Tệp chép nguyên giữa các app"
+  meaning_vi: "Hai tệp TypeScript của hai app khác nhau có nội dung token giống hệt (bỏ qua chú thích và khoảng trắng, giữ tên định danh), kể cả tệp trong cây route. Mã dùng chung là slot `packages/<pkg>`; tệp chỉ gồm import hoặc export lại một ký hiệu của gói thì được phép."
+  causes_vi:
+    - "Tệp route hoặc helper được chép từ app này sang app khác thay vì đưa vào gói dùng chung"
+    - "Mỗi app tự giữ một bản `error.tsx`, `not-found.tsx`, `i18n/request.ts` hay helper kiểm thử giống hệt nhau"
+  nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để chuyển mã vào một gói `packages/<pkg>` và để mỗi app chỉ re-export ký hiệu của gói theo lời nhắn; không thêm ngoại lệ."
   owner: op-retry
   kind: check-finding
 

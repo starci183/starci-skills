@@ -55,12 +55,13 @@ function tokenize(ts, sourceFile) {
   return { kinds: Int32Array.from(kinds), lines: Int32Array.from(lines), types: Uint8Array.from(types) };
 }
 
-function homeText(profile, rel, sameOwner) {
+/** The app a file belongs to, by the slot binding of the manifest; null for a file of no app. */
+const appOfFile = (resolver, rel) => resolver.classifyPath(rel).bindings?.app ?? null;
+
+function homeText(profile, sameOwner, crossApp) {
+  if (crossApp) return 'move it to a package (packages/<pkg>, the shared-code slot of the repository) and import it from both apps';
   if (sameOwner) return 'extract it once inside the owner and call it from both places';
-  if (profile === 'fe') {
-    const app = /^apps\/([^/]+)\//.exec(rel)?.[1] ?? '<app>';
-    return `move the shared helper to apps/${app}/src/modules/<capability>/ (pure) or apps/${app}/src/hooks/<domain>/ (React hook) and import it from both`;
-  }
+  if (profile === 'fe') return 'extract it once inside the app (apps/<app>/src/modules/<capability>/ when pure, apps/<app>/src/hooks/<domain>/ for a React hook) and import it from both';
   return "move the shared helper to src/modules/platform/primitives/ or into the owning capability's src/modules/domain/<capability>/ and import it from both";
 }
 
@@ -165,9 +166,10 @@ export function checkClones({ config, context, graph } = {}) {
   }
   blocks.sort((x, y) => x.a.rel.localeCompare(y.a.rel) || x.line - y.line || x.b.rel.localeCompare(y.b.rel));
   const profile = graph.profile;
+  const differentApps = (a, b) => { const left = appOfFile(graph.resolver, a); const right = appOfFile(graph.resolver, b); return left !== null && right !== null && left !== right; };
   const violations = blocks.slice(0, MAX_VIOLATIONS).map((block) => ({
     ruleId: 'HFS_DUPLICATE_CODE', path: block.a.rel, line: block.line, endLine: block.endLine, twin: block.twin, lines: block.lines,
-    message: `${block.a.rel}:${block.line}-${block.endLine} duplicates ${block.twin.path}:${block.twin.line}-${block.twin.endLine} (${block.lines} lines, threshold ${N} lines / ${T} tokens, identifiers and literals ignored); ${homeText(profile, block.a.rel, block.a.unit === block.b.unit)}.`,
+    message: `${block.a.rel}:${block.line}-${block.endLine} duplicates ${block.twin.path}:${block.twin.line}-${block.twin.endLine} (${block.lines} lines, threshold ${N} lines / ${T} tokens, identifiers and literals ignored); ${homeText(profile, block.a.unit === block.b.unit, differentApps(block.a.rel, block.b.rel))}.`,
   }));
   const owners = new Set();
   let duplicatedLines = 0;

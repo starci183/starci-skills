@@ -231,10 +231,11 @@ rules:
     law: "No duplicated blocks or twice-defined helpers."
     kinds: [check, design]
     gates: [land, ci, sonar]
-    failureCodes: ["HFS_DUPLICATE_CODE", "HFS_DUPLICATE_SYMBOL"]
+    failureCodes: ["HFS_DUPLICATE_CODE", "HFS_DUPLICATE_SYMBOL", "FE_CROSS_APP_DUPLICATE"]
     enforcers:
       - {kind: machine, id: duplicate-code, at: scripts/checks/architecture/clones.mjs}
       - {kind: machine, id: duplicate-symbol, at: scripts/checks/architecture/symbols.mjs}
+      - {kind: machine, id: cross-app-duplicate, at: scripts/checks/architecture/cross-app-duplicate.mjs}
       - {kind: sonar, id: duplicated-lines-density, at: knowledge/sonar-gate.yaml}
   - id: R22
     code: "HFS_TS_STRICT"
@@ -607,12 +608,13 @@ rules:
     law: "Server first; `\"use client\"` only where allowed."
     kinds: [lint]
     gates: [pre-commit, pre-push, settle, land, ci]
-    failureCodes: ["FE_CLIENT_BOUNDARY", "FE_CLIENT_SERVER_IMPORT", "FE_STORAGE_OUTSIDE_MODULES", "FE_DANGEROUS_HTML"]
+    failureCodes: ["FE_CLIENT_BOUNDARY", "FE_CLIENT_SERVER_IMPORT", "FE_CLIENT_REACHES_SERVER", "FE_STORAGE_OUTSIDE_MODULES", "FE_DANGEROUS_HTML"]
     enforcers:
       - {kind: eslint-fe, id: use-client-only-at-boundary}
       - {kind: eslint-fe, id: client-no-server-import}
       - {kind: eslint-fe, id: web-storage-only-in-modules}
       - {kind: eslint-fe, id: no-dangerous-html}
+      - {kind: machine, id: client-reaches-server, at: scripts/checks/architecture/client-reaches-server.mjs}
   - id: R56
     code: "FE_HOOKS_ARE_HOOKS"
     title_vi: "hooks/ chứa thứ không phải hook"

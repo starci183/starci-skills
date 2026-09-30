@@ -1,0 +1,24 @@
+id: hfs-fe-machine-owed
+effectiveAt: '2026-10-01T09:00:00+07:00'
+summary: >-
+  Lane F0 sub-lane E (rules R21, R50, R55): the front-end architecture machine gains the repository-level enforcers the
+  catalog owed. FE_TRANSPORT_OWNER (R50) is now judged per repository: exactly one transport client and one Outcome union,
+  named by slot (fe.package.api.client/outcome when the apps share the api package, fe.transport.client/outcome when the
+  repository declares one app); two clients or unions, an app client in a repository of several apps, and a fetch outside the
+  client (or with no client at all) are findings, and the per-app ruleParams.fe.clientModule path is gone. The machine's
+  separate FE_FETCH_OUTSIDE_TRANSPORT finding is deleted: FE_TRANSPORT_OWNER is the one code and it is deleted everywhere
+  (failure-codes, patterns, examples). New machine checks: client-reaches-server (FE_CLIENT_REACHES_SERVER, R55: from every
+  "use client" module a multi-hop runtime import chain reaches no server-only, next/headers, next/server, next-intl/server or
+  Node built-in import) and cross-app-duplicate (FE_CROSS_APP_DUPLICATE, R21: two files of different apps with equal
+  token-normalised content are a finding, a thin import/export adapter is exempt). HFS_DUPLICATE_CODE's remedy names a package
+  when the copies sit in different apps. Specs now exist for FE_PURE_WORLD_IMPORT, FE_ROUTE_CLIENT_BOUNDARY,
+  FE_ROUTE_CLIENT_HOOK, FE_ROUTE_DEFAULT_EXPORT, HFS_APPS_REQUIRED, HFS_APP_LAYOUT_INVALID, HFS_ROOT_ENTRY_MISSING,
+  HFS_ROOT_SRC_FORBIDDEN_FE, HFS_SRC_LAYOUT_INVALID, HFS_PACKAGE_MANAGER_MIXED and HFS_ROOT_MARKDOWN_FORBIDDEN.
+reach: new-legs
+paths:
+  - knowledge/hfs/rules.yaml
+  - knowledge/hfs/README.md
+  - modules/kernel/failure-codes.yaml
+  - modules/kernel/contract-changes/hfs-fe-machine-owed.yaml
+  - scripts/checks/architecture
+  - docs/architecture-check.md

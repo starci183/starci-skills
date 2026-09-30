@@ -66,9 +66,6 @@ const operationOf = (document: string): string => {
 
 const BEARER_PREFIX = "Bearer "
 
-/** The `fetch` this harness replaced, kept so the world can be given back exactly as it was found. */
-let replacedFetch: typeof fetch | undefined
-
 /**
  * Answer every GraphQL document this screen sends from `routes`, keyed by the operation's root field.
  *
@@ -106,7 +103,7 @@ export const serveGraphQL = (routes: Readonly<Record<string, WireRoute>>): Wire 
             throw new Error("the network never carried this request")
         }
         // A real Response, not a look-alike: the transport reads `response.json()`, and the stub
-        // staying inside `typeof fetch` is what lets `global.fetch = fetchStub` hold without a cast.
+        // staying inside `typeof fetch` is what lets `vi.stubGlobal("fetch", fetchStub)` hold without a cast.
         const payload = "data" in reply
             ? { data: { [call.operation]: reply.data } }
             : { errors: [{ message: reply.reason, extensions: { code: reply.code } }] }
@@ -115,8 +112,7 @@ export const serveGraphQL = (routes: Readonly<Record<string, WireRoute>>): Wire 
             headers: { "content-type": "application/json" },
         })
     })
-    replacedFetch ??= global.fetch
-    global.fetch = fetchStub
+    vi.stubGlobal("fetch", fetchStub)
     return {
         calls,
         callsFor: operation => calls.filter(call => call.operation === operation),
@@ -128,13 +124,9 @@ export const serveGraphQL = (routes: Readonly<Record<string, WireRoute>>): Wire 
     }
 }
 
-/** Give back the real `fetch`, drop the session and forget the downloads, so no journey inherits
+/** Give back the real `fetch` (unstubbed below), drop the session and forget the downloads, so no journey inherits
  * another's world. */
 export const resetJourneyWorld = (): void => {
-    if (replacedFetch !== undefined) {
-        global.fetch = replacedFetch
-        replacedFetch = undefined
-    }
     vi.unstubAllGlobals()
     clearToken()
     resetObjectUrls()
