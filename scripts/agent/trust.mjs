@@ -6,25 +6,28 @@
 // every directory the runtime launches Claude/Codex agents in.
 //
 //   ensureLaunchTrust({ agent, cwd })
+//   SCOPE (lead ruling 2026-10-01): the command guard hook and every launch setting are written to the launch
+//   worktree's PROJECT files (projectTargets), never to a user-global settings file, so they reach only the agents
+//   the runtime starts in that worktree; each such file is kept out of git status through the repository's own
+//   info/exclude (excludeFromGit). The only per-user records are the ones a host keeps nowhere else: its trust of
+//   the directory, and Codex's trusted hash of the project hook.
 //     claude → ~/.claude.json projects[<cwd>].hasTrustDialogAccepted = true, in
-//              every key form Claude writes (win32: `D:/…` and `D:\…`), and
-//              ~/.claude/settings.json skipDangerousModePermissionPrompt is
-//              asserted (set only when the key is missing), and so is each
-//              agents/claude.yaml launchEnv key under settings.json env
-//              (DISABLE_AUTOUPDATER: a managed worker's command is composed
-//              by Orca, so its launch env cannot carry it).
+//              every key form Claude writes (win32: `D:/…` and `D:\…`); in
+//              <cwd>/.claude/settings.local.json: skipDangerousModePermissionPrompt
+//              (set only when missing), each agents/claude.yaml launchEnv key under
+//              env (DISABLE_AUTOUPDATER: Orca composes a worker's command, so its
+//              launch env cannot carry it) and the guard hook.
 //     codex  → [projects."<path>"] trust_level = "trusted" in every Codex home
 //              (CODEX_HOME, ~/.codex, Orca's codex-runtime-home) for the launch
 //              cwd and the git root Codex keys trust by, in the key forms Codex
-//              writes (win32: 'd:\lower\case' literal and "D:\\Exact" basic).
-//     devin  → the Devin CLI's own config (%APPDATA%/devin/config.json, else
-//              ~/.config/devin/config.json): agent.model pinned to the routed
-//              model, which worker-start cannot pass to Devin.
-//   Every agent's host also gets the op command guard as a PreToolUse hook
-//   (scripts/guards/command-guard.mjs): Claude's settings.json, Devin's
-//   config.json, and every Codex home's config.toml with the hash Codex
-//   trusts it by (codex app-server hooks/list, then config/batchWrite
-//   hooks.state - the way Orca trusts its own hooks).
+//              writes (win32: 'd:\lower\case' literal and "D:\\Exact" basic), plus the
+//              update-check and model-nudge notices; the guard hook in the project
+//              layer <cwd>/.codex/config.toml, and in each home only the hash Codex
+//              trusts it by (codex app-server hooks/list, then config/batchWrite
+//              hooks.state - the way Orca trusts its own hooks).
+//     devin  → <cwd>/.devin/config.local.json (Devin's local project config): the
+//              guard hook and agent.model pinned to the routed model, which
+//              worker-start cannot pass to Devin.
 //   Returns the receipt the launch event records:
 //     {agent, paths, status: written|already|skipped|failed, written[], already[], …}
 //
@@ -87,17 +90,42 @@ export function trustTargets({ env = process.env, platform = process.platform } 
     : orcaCodexHome({ env, platform, home }));
   return {
     claudeJson: claudeDir ? path.join(claudeDir, '.claude.json') : path.join(home, '.claude.json'),
-    claudeSettings: claudeDir ? path.join(claudeDir, 'settings.json') : path.join(home, '.claude', 'settings.json'),
-    devinConfig: devinConfigFile({ env: root ? { APPDATA: path.join(root, 'AppData', 'Roaming') } : env, platform, home }),
     codexHomes,
   };
 }
 
-/** The Devin CLI's user config: %APPDATA%/devin/config.json on Windows, else ~/.config/devin/config.json. */
-export function devinConfigFile({ env = process.env, platform = process.platform, home = os.homedir() } = {}) {
-  return platform === 'win32'
-    ? path.join(env.APPDATA || path.join(home, 'AppData', 'Roaming'), 'devin', 'config.json')
-    : path.join(home, '.config', 'devin', 'config.json');
+/**
+ * The PROJECT-scoped files of the launch directory `dir` (never a user-global file): Claude's local project settings,
+ * Codex's project config layer and Devin's local project config. They carry the command guard hook and each host's
+ * launch settings, so they apply only to agents started in that worktree.
+ */
+export const projectTargets = (dir) => ({
+  claudeSettings: path.join(dir, '.claude', 'settings.local.json'),
+  codexConfig: path.join(dir, '.codex', 'config.toml'),
+  devinConfig: path.join(dir, '.devin', 'config.local.json'),
+});
+
+/**
+ * Keep a project file the runtime wrote out of `git status`: its path (relative to the checkout's top level) goes in
+ * the repository's own info/exclude (`git rev-parse --git-path info/exclude`), never a user-global ignore. A directory
+ * that is no git checkout, or a file git already tracks, is left alone. Returns {file, state} or null.
+ */
+export function excludeFromGit(dir, file) {
+  const topOut = runGit(['rev-parse', '--show-toplevel'], { cwd: dir });
+  const excludeOut = runGit(['rev-parse', '--path-format=absolute', '--git-path', 'info/exclude'], { cwd: dir });
+  if (topOut?.status !== 0 || excludeOut?.status !== 0) return null;
+  const top = String(topOut.stdout).trim();
+  const rel = path.relative(top, file).split(path.sep).join('/');
+  if (!rel || rel.startsWith('..')) return null;
+  if (runGit(['ls-files', '--error-unmatch', '--', rel], { cwd: top })?.status === 0) return { file: rel, state: 'tracked' };
+  const target = String(excludeOut.stdout).trim();
+  const line = '/' + rel;
+  let text = '';
+  try { text = fs.readFileSync(target, 'utf8'); } catch { text = ''; }
+  if (text.split(/\r?\n/).includes(line)) return { file: rel, state: 'already' };
+  fs.mkdirSync(path.dirname(target), { recursive: true });
+  fs.appendFileSync(target, (text && !text.endsWith('\n') ? '\n' : '') + line + '\n');
+  return { file: rel, state: 'written' };
 }
 
 /* -------------------------------------------------------------- key forms */
@@ -552,6 +580,7 @@ export function ensureLaunchTrust({ agent, cwd, model = null, env = process.env,
   if (!dir) return { agent, paths: [], status: 'skipped', reason: `launch cwd is not a directory: ${cwd ?? 'none'}` };
   const targets = trustTargets({ env, platform });
   if (targets.skipped) return { agent, paths: [dir], status: 'skipped', reason: targets.skipped };
+  const project = projectTargets(dir);
   const receipt = { agent, paths: [dir], written: [], already: [], errors: [] };
   const collect = (r) => {
     for (const key of r.written ?? []) receipt.written.push({ file: r.file, key });
@@ -559,30 +588,43 @@ export function ensureLaunchTrust({ agent, cwd, model = null, env = process.env,
     if (!r.ok) receipt.errors.push({ file: r.file, error: r.error });
   };
   const guard = (file, fn) => { try { return fn(); } catch (e) { return { file, ok: false, error: String(e?.message ?? e) }; } };
+  // A project file the runtime wrote stays out of `git status` (the repository's own info/exclude).
+  const excluded = (file) => { const x = guard(file, () => excludeFromGit(dir, file)); if (x) (receipt.gitExclude ??= []).push(x); if (x?.ok === false) receipt.errors.push({ file, error: x.error }); };
   const command = toolGuardCommand();
   if (agent === 'devin') {
-    const profile = guard(targets.devinConfig, () => writeDevinProfile({ file: targets.devinConfig, command, model, hooks }));
-    receipt.toolGuard = [{ file: targets.devinConfig, state: profile.state ?? 'failed' }];
-    if (model) receipt.modelPin = { file: targets.devinConfig, model, state: profile.state ?? 'failed' };
-    if (!profile.ok) receipt.errors.push({ file: targets.devinConfig, error: profile.error ?? profile.state });
-    else if (profile.state === 'written') receipt.written.push({ file: targets.devinConfig, key: model ? 'agent.model,hooks.PreToolUse' : 'hooks.PreToolUse' });
-    else receipt.already.push({ file: targets.devinConfig, key: model ? 'agent.model,hooks.PreToolUse' : 'hooks.PreToolUse' });
+    // Devin's LOCAL project config (<dir>/.devin/config.local.json): the guard hook, and the routed model pinned for
+    // this worktree alone (worker-start passes Devin no --model).
+    const file = project.devinConfig;
+    const profile = guard(file, () => writeDevinProfile({ file, command, model, hooks }));
+    receipt.toolGuard = [{ file, state: profile.state ?? 'failed' }];
+    if (model) receipt.modelPin = { file, model, state: profile.state ?? 'failed' };
+    if (!profile.ok) receipt.errors.push({ file, error: profile.error ?? profile.state });
+    else if (profile.state === 'written') receipt.written.push({ file, key: model ? 'agent.model,hooks.PreToolUse' : 'hooks.PreToolUse' });
+    else receipt.already.push({ file, key: model ? 'agent.model,hooks.PreToolUse' : 'hooks.PreToolUse' });
+    if (profile.ok) excluded(file);
   } else if (agent === 'claude') {
+    // The directory trust record is Claude's own per-user state (~/.claude.json); everything else is the worktree's
+    // local project settings (<dir>/.claude/settings.local.json), which Claude reads for the bypass consent, env and hooks.
     collect(guard(targets.claudeJson, () => writeClaudeTrust({ file: targets.claudeJson, keys: claudeKeyForms(dir, platform), hooks })));
-    const consent = guard(targets.claudeSettings, () => assertClaudeBypassConsent({ file: targets.claudeSettings, hooks }));
+    const file = project.claudeSettings;
+    const consent = guard(file, () => assertClaudeBypassConsent({ file, hooks }));
     receipt.bypassConsent = consent.state ?? 'failed';
-    if (!consent.ok) receipt.errors.push({ file: targets.claudeSettings, error: consent.error ?? consent.state });
-    const launchEnv = guard(targets.claudeSettings, () => assertClaudeSettingsEnv({ file: targets.claudeSettings, vars: claudeLaunchEnv(), hooks }));
+    if (!consent.ok) receipt.errors.push({ file, error: consent.error ?? consent.state });
+    const launchEnv = guard(file, () => assertClaudeSettingsEnv({ file, vars: claudeLaunchEnv(), hooks }));
     receipt.launchEnv = launchEnv.state ?? 'failed';
-    if (!launchEnv.ok) receipt.errors.push({ file: targets.claudeSettings, error: launchEnv.error ?? launchEnv.state });
-    const toolGuard = guard(targets.claudeSettings, () => assertJsonToolGuard({ file: targets.claudeSettings, command, matcher: 'Bash|PowerShell', hooks }));
-    receipt.toolGuard = [{ file: targets.claudeSettings, state: toolGuard.state ?? 'failed' }];
-    if (!toolGuard.ok) receipt.errors.push({ file: targets.claudeSettings, error: toolGuard.error ?? toolGuard.state });
+    if (!launchEnv.ok) receipt.errors.push({ file, error: launchEnv.error ?? launchEnv.state });
+    const toolGuard = guard(file, () => assertJsonToolGuard({ file, command, matcher: 'Bash|PowerShell', hooks }));
+    receipt.toolGuard = [{ file, state: toolGuard.state ?? 'failed' }];
+    if (!toolGuard.ok) receipt.errors.push({ file, error: toolGuard.error ?? toolGuard.state });
+    if (consent.ok || launchEnv.ok || toolGuard.ok) excluded(file);
   } else {
+    // Codex: the directory trust and the notices live in each Codex home (Codex reads a project layer only for a
+    // trusted project); the guard hook lives in the worktree's project layer (<dir>/.codex/config.toml), and each home
+    // records only Codex's hash that trusts it (hooks.state, keyed by that project file).
     receipt.paths = codexTrustPaths(dir);
     const keys = [...new Set(receipt.paths.flatMap((p) => codexKeyForms(p, platform)))];
-    for (const home of targets.codexHomes) {
-      if (!fs.existsSync(home.dir)) continue;
+    const homes = targets.codexHomes.filter((home) => fs.existsSync(home.dir));
+    for (const home of homes) {
       const file = path.join(home.dir, 'config.toml');
       collect(guard(file, () => writeCodexTrust({ file, keys, hooks })));
       const noUpdate = guard(file, () => writeCodexNoUpdateCheck({ file, hooks }));
@@ -591,14 +633,18 @@ export function ensureLaunchTrust({ agent, cwd, model = null, env = process.env,
       const noNudge = guard(file, () => writeCodexNoModelNudge({ file, hooks }));
       (receipt.modelNudge ??= []).push({ file, off: noNudge.ok === true, ...(noNudge.written ? { written: true } : {}), ...(noNudge.ok ? {} : { error: noNudge.error }) });
       if (!noNudge.ok) receipt.errors.push({ file, error: noNudge.error });
-      const hook = guard(file, () => writeCodexToolGuard({ file, command, hooks }));
-      // A re-rooted trust home (specs) never starts the real Codex: its app-server is injected, else the hash step waits.
-      const server = appServer ?? (env.STARCI_AGENT_TRUST_HOME ? null : codexAppServer);
-      const trusted = hook.ok && server ? guard(file, () => trustCodexToolGuard({ home: home.dir, cwd: dir, command, appServer: server })) : null;
-      (receipt.toolGuard ??= []).push({ file, ...(hook.written ? { written: true } : {}), trusted: trusted ? (trusted.ok ? trusted.trusted : 'failed') : 'not-checked' });
-      if (!hook.ok) receipt.errors.push({ file, error: hook.error });
-      if (trusted && !trusted.ok) receipt.errors.push({ file, error: trusted.error });
     }
+    const file = project.codexConfig;
+    const hook = guard(file, () => writeCodexToolGuard({ file, command, hooks }));
+    if (!hook.ok) receipt.errors.push({ file, error: hook.error });
+    else { receipt[hook.written ? 'written' : 'already'].push({ file, key: 'hooks.PreToolUse' }); excluded(file); }
+    // A re-rooted trust home (specs) never starts the real Codex: its app-server is injected, else the hash step waits.
+    const server = appServer ?? (env.STARCI_AGENT_TRUST_HOME ? null : codexAppServer);
+    receipt.toolGuard = [{ file, ...(hook.written ? { written: true } : {}), trustedIn: homes.map((home) => {
+      const trusted = hook.ok && server ? guard(file, () => trustCodexToolGuard({ home: home.dir, cwd: dir, command, appServer: server })) : null;
+      if (trusted && !trusted.ok) receipt.errors.push({ file: path.join(home.dir, 'config.toml'), error: trusted.error });
+      return { home: home.dir, trusted: trusted ? (trusted.ok ? trusted.trusted : 'failed') : 'not-checked' };
+    }) }];
   }
   receipt.status = receipt.errors.length ? 'failed' : (receipt.written.length ? 'written' : 'already');
   if (!receipt.errors.length) delete receipt.errors;

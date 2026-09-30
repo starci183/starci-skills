@@ -4,9 +4,13 @@ summary: >-
   FOLLOW-UP OF launch-through-worker-start (owner decisions 2026-10-01, lane dv-c0-launch). Orca worker-start owns every
   agent's environment, so nothing the runtime puts in an env or on PATH reaches an agent. (1) Guards: the op git and npm
   guards run as a PreToolUse hook (scripts/guards/command-guard.mjs) that launch trust registers for Claude, Codex and
-  Devin and that decides by the guard bound to the caller's Orca terminal (runtime/guards/terminals/<handle>.json); the
+  Devin in the launch worktree's PROJECT files only (scripts/agent/trust.mjs projectTargets: .claude/settings.local.json,
+  .codex/config.toml, .devin/config.local.json, each kept out of git status by the repository's own info/exclude;
+  Claude's bypass consent and launch env ride the same local settings), never a user-global settings file; the only
+  per-user writes left are the hosts' own trust records (~/.claude.json directory trust, Codex projects trust and the
+  trusted hash of the project hook) and Codex's update/nudge notices; it decides by the guard bound to the caller's Orca terminal (runtime/guards/terminals/<handle>.json); the
   PATH-shim layer (shim.mjs, launcher.cs, ensureGuardBin, the bash env, the deps lock and the runaway-shim stop) is
-  deleted with no alias. Devin's own config pins the routed model; ACP_BACKEND is kept out of every agent by stripping it from the Orca host's launch env (scripts/api/orca/lib.mjs hostLaunchEnv), since Orca composes the agent command and the card has no env strip. (2) Op context: the job, job
+  deleted with no alias. Devin's local project config pins the routed model for that worktree; ACP_BACKEND is kept out of every agent by stripping it from the Orca host's launch env (scripts/api/orca/lib.mjs hostLaunchEnv), since Orca composes the agent command and the card has no env strip. (2) Op context: the job, job
   scratch and provider of the op a script runs for resolve through the ledger's binding of the caller's Orca terminal
   (scripts/kernel/op-context.mjs opContextOf, the same binding as api-lib/caller.mjs callerOf). The env-derived path is
   deleted: callerOf has no env-role branch (STARCI_ROLE/STARCI_OP_JOB name nothing), report-evidence scratchOf reads only

@@ -5,8 +5,9 @@
 //
 // Every agent launches through Orca worker-start, which owns the agent's environment, so a guard can no longer ride
 // on the agent's PATH. The launch binds the op's guard to its Orca terminal instead (scripts/guards/install.mjs
-// bindGuardTerminal -> runtime/guards/terminals/<handle>.json) and launch trust registers this hook with the agent's
-// host (scripts/agent/trust.mjs ensureToolGuardHook). A session with no Orca terminal, or whose terminal has no guard
+// bindGuardTerminal -> runtime/guards/terminals/<handle>.json) and launch trust registers this hook in the launch
+// worktree's PROJECT settings only (scripts/agent/trust.mjs projectTargets: .claude/settings.local.json,
+// .codex/config.toml, .devin/config.local.json), never a user-global settings file. A session with no Orca terminal, or whose terminal has no guard
 // bound (the Kernel, the [Supervisor], the owner's own sessions), passes untouched.
 //
 // What it refuses, each from a real incident:

@@ -393,7 +393,7 @@ export function spawnAgent({ provider, model = null, effort = null, worktree, ti
   const takesModel = card?.start?.modelArgument !== false;
   if (effort === 'none') effort = null;
   let trust = null;
-  // A card that takes no model flag (Devin) is pinned through its host's own config by launch trust instead.
+  // A card that takes no model flag (Devin) is pinned by launch trust in the worktree's local Devin config instead.
   try { trust = orca.trust({ agent: provider, cwd: worktree, ...(!takesModel && model ? { model } : {}) }); }
   catch (e) { trust = { agent: provider, paths: [], status: 'failed', errors: [{ error: String(e?.message ?? e) }] }; }
   const started = orca.start({ task, worktree, agent: card?.start?.agentArgument ?? provider,

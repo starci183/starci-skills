@@ -19,7 +19,7 @@ launchEnvReason: >-
   claude.exe, so Claude Code's own auto-update can never replace it while seats run (update_apply_exe_locked) and
   every seat showed "✘ Auto-update failed: claude.exe in use". The runtime therefore turns the updater off: Orca's
   orchestration worker-start composes every worker's command itself, so scripts/agent/trust.mjs asserts the key under
-  env in ~/.claude/settings.json before every Claude launch - only when the key is missing, an owner-set value is kept. Updates are applied deliberately while no seat runs (docs/supervisor.md "Claude Code
+  env in the launch worktree's .claude/settings.local.json (project scope, never a user-global settings file) before every Claude launch - only when the key is missing, an owner-set value is kept. Updates are applied deliberately while no seat runs (docs/supervisor.md "Claude Code
   updates"): stop the seats, `npm i -g @anthropic-ai/claude-code`, then /start.
 launchTrust: >-
   Owner instruction 2026-09-23: the runtime, never the owner, approves launch prompts. Before every launch
