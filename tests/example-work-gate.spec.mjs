@@ -5,6 +5,7 @@ import os from 'node:os';
 import path from 'node:path';
 import crypto from 'node:crypto';
 import { checkWorkTree, checkFamiliesDrift, checkStarciworkBoundary, FAMILIES } from '../scripts/checks/check-example-work.mjs';
+import { validateWork } from '../scripts/checks/work-validate.mjs';
 
 /**
  * One fixture tree per new-concept rule in scripts/checks/check-example-work.mjs, proving each rule refuses the
@@ -47,7 +48,7 @@ function refusalsFor(extra) {
   return problems;
 }
 
-test('a recursive work/node record is refused as WORK_NODE_RETIRED, one refusal per record, and never read as a flat family', () => {
+test('a recursive work/node record is refused as HFS_WORK_NODE_RETIRED, one refusal per record, and never read as a flat family', () => {
   const problems = refusalsFor({
     'features/chatbot/business/index.yaml': 'schema: work/node@1\nid: chatbot.business\nkind: business\nrequired: true\n',
     'features/chatbot/business/overview/index.yaml': 'schema: work/node@1\nid: chatbot.business.overview\nkind: business-overview\nrequired: true\nstate: todo\n',
@@ -56,7 +57,7 @@ test('a recursive work/node record is refused as WORK_NODE_RETIRED, one refusal 
     'features/chatbot/implementation/frontend/shell/evidence/proof/manifest.yaml': 'schema: work/evidence@1\nid: proof.chatbot.shell\nnodeId: chatbot.shell\noutcome: pass\nassets: []\n',
     'kernel-strays/retired-copy/features/chatbot/fr/broken/index.yaml': 'schema: work/functional-requirement@1\nid: wrong\nstate: done\n',
   });
-  const retired = problems.filter(problem => problem.includes('[WORK_NODE_RETIRED]'));
+  const retired = problems.filter(problem => problem.includes('[HFS_WORK_NODE_RETIRED]'));
   for (const rel of ['features/chatbot/business/index.yaml', 'features/chatbot/business/overview/index.yaml', 'features/chatbot/business/srs/index.yaml', 'features/chatbot/architecture/sds/components/router/index.yaml'])
     assert.ok(retired.some(problem => problem.includes(rel)), `${rel} is refused: ${problems.join(' | ')}`);
   assert.equal(retired.length, 4, problems.join('\n'));
@@ -807,6 +808,60 @@ test('a root import-cv-* folder is drift, not a known agent-data class', () => {
 test('work/node@1 and @2 are each refused at the tree walk', () => {
   for (const schema of ['work/node@1', 'work/node@2']) {
     const problems = refusalsFor({ 'features/f/index.yaml': `schema: ${schema}\nid: f\nkind: business\nrequired: true\n` });
-    assert.ok(problems.some(p => p.includes('[WORK_NODE_RETIRED]')), `${schema}: ${problems.join('\n')}`);
+    assert.ok(problems.some(p => p.includes('[HFS_WORK_NODE_RETIRED]')), `${schema}: ${problems.join('\n')}`);
   }
+});
+
+// R07 HFS_AGENT_DATA_TRACKED: `starci validate` on a .starciwork refuses known agent data and admits product records.
+test('work-validate refuses agent data inside .starciwork as HFS_AGENT_DATA_TRACKED', () => {
+  const workRoot = tree({
+    'features/f/index.yaml': 'schema: work/feature@1\nid: f\ntitle: t\ndescription: d\n',
+    'features/f/uat/x/runs/run-1/result.json': '{}\n',
+    'features/f/br/rule/evidence/proof.log': 'log\n',
+    'runtime.sqlite': 'ledger\n',
+  });
+  const hits = validateWork(workRoot).refused.filter(line => line.includes('[HFS_AGENT_DATA_TRACKED]'));
+  assert.ok(hits.some(line => line.includes('uat-run')), hits.join('\n'));
+  assert.ok(hits.some(line => line.includes('evidence-bundle')), hits.join('\n'));
+  assert.ok(hits.some(line => line.includes('ledger')), hits.join('\n'));
+});
+
+test('work-validate raises no HFS_AGENT_DATA_TRACKED for a .starciwork of product records only', () => {
+  const workRoot = tree({
+    'features/f/index.yaml': 'schema: work/feature@1\nid: f\ntitle: t\ndescription: d\n',
+    'features/f/br/rule/index.yaml': 'schema: work/business-rule@1\nid: br.f.rule\ntitle: t\nstate: todo\n',
+    'features/f/uat/x/index.yaml': 'schema: work/uat-flow@1\nid: uat.f.x\ntitle: t\nstate: todo\n',
+  });
+  assert.deepEqual(validateWork(workRoot).refused.filter(line => line.includes('HFS_AGENT_DATA_TRACKED')), []);
+});
+
+// R08 HFS_WORK_NODE_RETIRED: only flat family records.
+test('a flat family record raises no HFS_WORK_NODE_RETIRED, and a work/node one does', () => {
+  const flat = refusalsFor({ 'features/f/br/rule/index.yaml': 'schema: work/business-rule@1\nid: br.f.rule\ntitle: t\nstate: todo\n' });
+  assert.deepEqual(flat.filter(p => p.includes('HFS_WORK_NODE_RETIRED')), []);
+  const node = refusalsFor({ 'features/f/br/rule/index.yaml': 'schema: work/node@1\nid: br.f.rule\nkind: business\nrequired: true\n' });
+  assert.equal(node.filter(p => p.includes('[HFS_WORK_NODE_RETIRED]')).length, 1, node.join('\n'));
+});
+
+// R09 HFS_IDENTITY_CUSTODY: an identity names its secret identity-<slug>.enc; a flow selects by a role the identity presents.
+const identityFor = (sealed, roles = 'roles: [person]\n') => ({
+  '_resources/identities/demo/resource.yaml': `schema: work/resource@1\nid: identity.f.demo\nkind: identity\nowner: o\nrevision: r\ncustody: {provider: keycloak, sealed: ${sealed}}\n${roles}details: {}\n`,
+});
+const flowFor = (role) => ({
+  'features/f/uat/x/index.yaml': 'schema: work/uat-flow@1\nid: uat.f.x\ntitle: t\nstate: todo\naccounts: accounts.yaml\n',
+  'features/f/uat/x/accounts.yaml': `schema: work/disposable-accounts@1\naccounts: [{role: ${role}, identity: identity.f.demo}]\n`,
+});
+
+test('an identity whose custody.sealed is not identity-<slug>.enc is refused as HFS_IDENTITY_CUSTODY', () => {
+  const bad = refusalsFor(identityFor('.starcistacks/dev/secrets/uat.enc'));
+  assert.ok(bad.some(p => p.includes('identity-demo.enc') && p.includes('[HFS_IDENTITY_CUSTODY]')), bad.join('\n'));
+  const good = refusalsFor(identityFor('.starcistacks/dev/secrets/identity-demo.enc'));
+  assert.deepEqual(good.filter(p => p.includes('HFS_IDENTITY_CUSTODY')), []);
+});
+
+test('a UAT flow that selects a role its identity does not present is refused as HFS_IDENTITY_CUSTODY', () => {
+  const bad = refusalsFor({ ...identityFor('.starcistacks/dev/secrets/identity-demo.enc'), ...flowFor('admin') });
+  assert.ok(bad.some(p => p.includes('role admin') && p.includes('[HFS_IDENTITY_CUSTODY]')), bad.join('\n'));
+  const good = refusalsFor({ ...identityFor('.starcistacks/dev/secrets/identity-demo.enc'), ...flowFor('person') });
+  assert.deepEqual(good.filter(p => p.includes('HFS_IDENTITY_CUSTODY')), []);
 });

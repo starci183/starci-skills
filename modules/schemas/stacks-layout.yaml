@@ -167,7 +167,7 @@ example:
     - dev/compose.yaml
     - dev/runtime/env/app.env.enc
     - dev/runtime/config/seed.yaml.enc
-    - dev/secrets/uat.enc
+    - dev/secrets/identity-demo.enc
     - dev/seeds/catalog.sql
     - vps/README.md
     - vps/stack.yaml

@@ -28,7 +28,7 @@ import {isProductPath, agentDataCategory} from '../lib/starciwork-boundary.mjs';
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 export const FAMILIES = new Set(['br', 'ac', 'fr', 'nfr', 'data', 'journey', 'decision', 'sds', 'ui', 'impl', 'uat', 'contract', 'integration', 'gap', 'event']);
 // `work/node@*` is the retired recursive specification envelope from the pre-flat business/srs and
-// architecture/sds layouts. It has no reader: a record carrying it is refused (WORK_NODE_RETIRED) and
+// architecture/sds layouts. It has no reader: a record carrying it is refused (HFS_WORK_NODE_RETIRED) and
 // must be restated as flat family records.
 const EXEMPT = new Set(['work/catalog@1', 'work/workspace@1', 'work/brand@1', 'work/feature@1', 'work/disposable-accounts@1']);
 export const isRetiredNodeSchema = schema => /^work\/node@\d+$/.test(schema ?? '');
@@ -136,7 +136,7 @@ export const BOUNDARY_TRANSITIONAL = Object.freeze([]);
  * The .starciwork boundary (ARCHITECTURE-DB §5.1, scripts/lib/starciwork-boundary.mjs): every file under the tree is
  * product content (isProductPath) or it is refused. Known agent data - evidence/ and impl captures, uat runs, evidence
  * bundles, operations/ audits, kernel custody, stray report copies, caches, ledgers - is REFUSED
- * [STARCIWORK_AGENT_DATA], one line per agent-data directory (draw-loop rounds included: the loop is a blob bundle); its home is the project ledger and the blob store
+ * [HFS_AGENT_DATA_TRACKED], one line per agent-data directory (draw-loop rounds included: the loop is a blob bundle); its home is the project ledger and the blob store
  * (api report --attach). A path that is neither (a record in a legacy layout) is WARNED [STARCIWORK_DRIFT].
  * Paths are judged relative to the tree root (`resolveRoot`). The gate below runs it over every example tree.
  */
@@ -158,8 +158,8 @@ export function checkStarciworkBoundary(workRoot, problems, warnings = [], resol
     const shown = path.relative(root, path.join(resolveRoot, where)).replaceAll('\\', '/');
     const files = count > 1 ? ` (${count} files)` : '';
     if (category === 'drift') warnings.push(`${shown}${files}: not on the .starciwork product path list (work-layout.yaml shape.productPaths) - a record in a retired layout or a stray file [STARCIWORK_DRIFT]`);
-    else if (BOUNDARY_TRANSITIONAL.includes(category)) warnings.push(`${shown}${files}: ${category} is agent data still written in place; it moves to blobs + job_artifacts [STARCIWORK_AGENT_DATA]`);
-    else problems.push(`${shown}${files}: ${category} is agent data, not product content - it belongs in the project ledger and the blob store (api report --attach from STARCI_JOB_SCRATCH), cited by artifact id + sha256 [STARCIWORK_AGENT_DATA]`);
+    else if (BOUNDARY_TRANSITIONAL.includes(category)) warnings.push(`${shown}${files}: ${category} is agent data still written in place; it moves to blobs + job_artifacts [HFS_AGENT_DATA_TRACKED]`);
+    else problems.push(`${shown}${files}: ${category} is agent data, not product content - it belongs in the project ledger and the blob store (api report --attach from STARCI_JOB_SCRATCH), cited by artifact id + sha256 [HFS_AGENT_DATA_TRACKED]`);
   }
 }
 
@@ -247,7 +247,7 @@ export function checkWorkTree(workRoot, problems, warnings = [], infos = [], res
       continue;
     }
     if (isRetiredNodeSchema(record.schema)) {
-      problems.push(`${shown}: schema ${record.schema} is the retired recursive work/node envelope; restate it as flat family records (${[...FAMILIES].join(', ')}) [WORK_NODE_RETIRED]`);
+      problems.push(`${shown}: schema ${record.schema} is the retired recursive work/node envelope; restate it as flat family records (${[...FAMILIES].join(', ')}) [HFS_WORK_NODE_RETIRED]`);
       continue;
     }
     if (record.id) records.set(record.id, {schema: record.schema, state: record.state, change: record.change, file, shown, dir: path.dirname(file), data: record});
@@ -744,9 +744,21 @@ export function checkWorkTree(workRoot, problems, warnings = [], infos = [], res
           const target = recOf(account.identity);
           if (!target || target.schema !== 'work/resource@1') problems.push(`${rec.shown}: accounts.yaml identity ${account.identity} does not resolve to a work/resource@1`);
           else if (resourceKind(account.identity) !== 'identity') problems.push(`${rec.shown}: accounts.yaml identity ${account.identity} resolves to a work/resource@1 of kind "${resourceKind(account.identity)}", not identity`);
+          else if (Array.isArray(target.data?.roles) && typeof account.role === 'string' && !target.data.roles.includes(account.role)) problems.push(`${rec.shown}: accounts.yaml selects role ${account.role} of ${account.identity}, which presents only [${target.data.roles.join(', ')}]; a flow chooses an identity by a role it presents [HFS_IDENTITY_CUSTODY]`);
         }
       }
     }
+  }
+
+  // ---- an identity points its secret at .starcistacks/<env>/secrets/identity-<slug>.enc (R09) ----
+  // <slug> is the folder the identity record sits in (_resources/identities/<slug>/resource.yaml). A provider: none
+  // identity holds no secret and carries no sealed key; a sealed path outside the one location is SEALED_CUSTODY_LOCATION.
+  for (const [id, rec] of records) {
+    if (rec.schema !== 'work/resource@1' || rec.data?.kind !== 'identity') continue;
+    const sealed = rec.data.custody?.sealed;
+    const named = typeof sealed === 'string' ? /^\.starcistacks\/[a-z0-9]+(?:-[a-z0-9]+)*\/secrets\/([a-z0-9]+(?:-[a-z0-9]+)*)\.enc$/.exec(sealed.trim()) : null;
+    const slug = path.basename(rec.dir);
+    if (named && named[1] !== `identity-${slug}`) problems.push(`${rec.shown}: identity ${id} points custody.sealed at ${sealed.trim()}; it names its secret .starcistacks/<env>/secrets/identity-${slug}.enc [HFS_IDENTITY_CUSTODY]`);
   }
 
   // ---- trust concept 5: blockers form a DAG rooted in gaps or open decisions ----

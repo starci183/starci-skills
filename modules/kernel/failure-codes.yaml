@@ -6235,17 +6235,6 @@ STALL_UNOWNED:
   owner: runtime-core
   kind: blocker
 
-STARCIWORK_AGENT_DATA:
-  title: "Agent data written into .starciwork"
-  title_vi: "Dữ liệu của agent nằm trong .starciwork"
-  meaning_vi: "Trong thư mục sản phẩm có dữ liệu do agent sinh ra, thứ này phải nằm trong sổ cái và kho blob."
-  causes_vi:
-    - "Bước làm ghi tệp bằng chứng trực tiếp vào cây sản phẩm"
-    - "Không dùng api report --attach"
-  nextStep_vi: "Kiểm tra từ chối (hoặc cảnh báo với loại còn được phép chuyển dần); cần nộp dữ liệu qua api report --attach và gỡ khỏi cây sản phẩm."
-  owner: op-retry
-  kind: check-finding
-
 STARCIWORK_DRIFT:
   title: "File outside product path list"
   title_vi: "Tệp nằm ngoài danh sách đường dẫn sản phẩm"
@@ -7004,17 +6993,6 @@ WORKTREE_REMOVE_OVERDUE:
   nextStep_vi: "Bộ điều phối tiếp tục thử dọn; nếu kẹt mãi thì cần lõi runtime xem thư mục bị khóa."
   owner: runtime-core
   kind: runtime-fault
-
-WORK_NODE_RETIRED:
-  title: "Retired work/node record"
-  title_vi: "Bản ghi work/node đã bị loại bỏ"
-  meaning_vi: "Một bản ghi Work dùng phong bì đệ quy work/node, hình thức đã bị loại bỏ hoàn toàn; chỉ còn các bản ghi phẳng theo họ."
-  causes_vi:
-    - "Bản ghi vẫn khai báo schema work/node@N"
-    - "Cây Work cũ chưa được viết lại thành các bản ghi phẳng"
-  nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để viết lại thành bản ghi phẳng theo họ; không cần ai can thiệp thêm."
-  owner: op-retry
-  kind: check-finding
 
 WORK_RECORD_MISSING:
   title: "No Work record found"

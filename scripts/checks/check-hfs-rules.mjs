@@ -44,7 +44,7 @@ export const RULES_README = 'knowledge/hfs/README.md';
 export const EMITTER_ROOTS = Object.freeze({
   machine: ['scripts/checks/architecture.mjs', 'scripts/checks/architecture'],
   hfs: ['scripts/lib/hfs-check.mjs', 'scripts/lib/hfs-slots.mjs', 'packages/hfs/bin', 'packages/hfs/sync'],
-  'work-validate': ['scripts/checks/work-validate.mjs'],
+  'work-validate': ['scripts/checks/work-validate.mjs', 'scripts/checks/check-example-work.mjs', 'scripts/checks/check-work-artifacts.mjs'],
 });
 /** The knowledge files whose rule codes must belong to the one catalog (a directory is read recursively; a missing entry is skipped). */
 export const KNOWLEDGE_CODE_ROOTS = Object.freeze(['knowledge/patterns', 'knowledge/architecture-rules.yaml', 'modules/models/code-patterns.yaml']);
@@ -52,7 +52,8 @@ const RULE_CODE = /\b(?:HFS|BE|FE|ARCH)_[A-Z0-9]+(?:_[A-Z0-9]+)*\b/g;
 export const PLUGIN_ENTRY = Object.freeze({ 'eslint-be': 'packages/eslint/be/index.mjs', 'eslint-fe': 'packages/eslint/fe/index.mjs' });
 const LINT_FAMILY = ['eslint-be', 'eslint-fe', 'stylelint'];
 const CHECK_FAMILY = ['machine', 'hfs', 'work-validate'];
-const quoted = (code) => new RegExp(`['"\`]${code}['"\`]`);
+// A check spells its code as a string literal ('CODE') or as the `[CODE]` tail of a finding line.
+const quoted = (code) => new RegExp(`['"\`]${code}['"\`]|\\[${code}\\]`);
 
 /** The emitter files of every family under `root`, as {family: [{rel, text}]}. */
 export function readEmitters(root) {

@@ -35,7 +35,7 @@ test('the location pattern accepts exactly .starcistacks/<env>/secrets/<slug>.en
 });
 
 test('a sealed path under .starcistacks/<env>/secrets/ raises no sealed refusal, in default and strict mode', (t) => {
-  const { repo, work } = tree('.starcistacks/dev/secrets/collab-uat.enc');
+  const { repo, work } = tree('.starcistacks/dev/secrets/identity-collab.enc');
   t.after(() => fs.rmSync(repo, { recursive: true, force: true }));
   for (const strict of [false, true]) {
     const report = validateWork(work, { strict });
@@ -73,7 +73,7 @@ test('provider: none is the one holds-no-secret form: it carries no sealed key, 
 });
 
 test('a sealed file kept under .starciwork is refused with SEALED_FILE_IN_WORK', (t) => {
-  const { repo, work } = tree('.starcistacks/dev/secrets/collab-uat.enc', {
+  const { repo, work } = tree('.starcistacks/dev/secrets/identity-collab.enc', {
     '.starciwork/_resources/identities/collab/secrets.enc.yaml': 'placeholder: not a secret\n',
   });
   t.after(() => fs.rmSync(repo, { recursive: true, force: true }));

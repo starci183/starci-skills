@@ -15,7 +15,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
-import { checkFamiliesDrift, checkWorkTree, walk } from './check-example-work.mjs';
+import { checkFamiliesDrift, checkStarciworkBoundary, checkWorkTree, walk } from './check-example-work.mjs';
 import { checkWorkConsistencyTree } from './check-work-consistency.mjs';
 import { checkWorkArtifacts } from './check-work-artifacts.mjs';
 import { checkWorkSchemas } from './check-work-schemas.mjs';
@@ -69,6 +69,16 @@ export function validateWork(target, { strict = false } = {}) {
     counts = checkWorkTree(root, refused, suspect, info, enclosingWorkRoot);
   } catch (error) {
     refused.push(`${root}: structural validation crashed closed (${String(error?.message ?? error)}) [VALIDATOR_ERROR]`);
+  }
+
+  // A repository's .starciwork holds product records only (R07): known agent data - evidence, runs, captures, kernel
+  // custody, ledgers - is refused [HFS_AGENT_DATA_TRACKED] and a path off the product list is a suspect [STARCIWORK_DRIFT].
+  if (mode === 'tree' && path.basename(root) === '.starciwork') {
+    try {
+      checkStarciworkBoundary(root, refused, suspect);
+    } catch (error) {
+      refused.push(`${root}: product boundary validation crashed closed (${String(error?.message ?? error)}) [VALIDATOR_ERROR]`);
+    }
   }
 
   if (mode === 'tree') {

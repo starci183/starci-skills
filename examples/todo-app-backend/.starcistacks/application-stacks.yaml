@@ -85,8 +85,8 @@ environments:
         where: runtime/files/upload-signing-secret.key
         recipientPolicy: DEMO-ONLY - encrypted to the example identity at runtime/env/demo.agekey, never a real recipient
         keyCustody: DEMO-ONLY - private identity is untracked and provisioned externally before decryption
-      - name: uat
-        where: secrets/uat
+      - name: identity-todo-app-demo
+        where: secrets/identity-todo-app-demo
         recipientPolicy: DEMO-ONLY - encrypted to the example identity at runtime/env/demo.agekey, never a real recipient
         keyCustody: DEMO-ONLY - private identity is untracked and provisioned externally before decryption
   vps:

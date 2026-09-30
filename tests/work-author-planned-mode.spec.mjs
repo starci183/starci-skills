@@ -69,7 +69,7 @@ function plannedTree(implState) {
       '  unit: {required: true, command: "npx jest --config jest.config.ts test/collab/chat.spec.ts", note: "planned test path backend.implement creates"}', '',
     ].join('\n'),
     '_resources/environments/dev/resource.yaml': 'schema: work/resource@1\nid: environment.nivo.dev\nkind: environment\nowner: nivo-be\nrevision: dev@2026-09-23\ntarget:\n  origins: {web: "http://localhost:3000"}\nprobes:\n  - {id: web-reachable, method: http-get, target: "http://localhost:3000", expect: 200}\n',
-    '_resources/identities/collab/resource.yaml': 'schema: work/resource@1\nid: identity.nivo.collab\nkind: identity\nowner: nivo-be\nrevision: planned@2026-09-23\ndisposable: true\ncustody: {provider: keycloak, sealed: .starcistacks/dev/secrets/collab-uat.enc}\nroles: [host, member]\nblockers:\n  - "Planned identity slot: uat.verify seeds the host and member roles before the flow runs."\n',
+    '_resources/identities/collab/resource.yaml': 'schema: work/resource@1\nid: identity.nivo.collab\nkind: identity\nowner: nivo-be\nrevision: planned@2026-09-23\ndisposable: true\ncustody: {provider: keycloak, sealed: .starcistacks/dev/secrets/identity-collab.enc}\nroles: [host, member]\nblockers:\n  - "Planned identity slot: uat.verify seeds the host and member roles before the flow runs."\n',
     'features/collab/uat/chat-flow/index.yaml': 'schema: work/uat-flow@1\nid: uat.collab.chat-flow\ntitle: Host and member chat\nstate: todo\nentry: /collab\nactor: host\naccounts: accounts.yaml\nenvironment: environment.nivo.dev\nsteps:\n  - {order: 1, actor: host, action: "Open the room.", expected: "the room loads", checks: [{id: loading, expected: yes}]}\neffects: ["one disposable room"]\ncleanup: ["delete the run-owned room"]\nproves: [sds.collab.chat]\n',
     'features/collab/uat/chat-flow/accounts.yaml': 'schema: work/disposable-accounts@1\ndisposable: true\naccounts:\n  - {role: host, identity: identity.nivo.collab}\n  - {role: member, identity: identity.nivo.collab}\n',
   };
@@ -83,7 +83,7 @@ test('starci validate warns, never refuses, a todo planned record whose owner pa
   const report = validateWork(work);
   assert.equal(report.ok, true, report.refused.join('\n'));
   assert.ok(report.suspect.some(s => s.includes('impl/nivo-be/chat') && s.includes('OWNER_PATH_MISSING')), report.suspect.join('\n'));
-  assert.ok(report.suspect.some(s => s.includes('collab-uat.enc') && s.includes('EVIDENCE_ARTIFACT_GHOST')), report.suspect.join('\n'));
+  assert.ok(report.suspect.some(s => s.includes('identity-collab.enc') && s.includes('EVIDENCE_ARTIFACT_GHOST')), report.suspect.join('\n'));
   assert.ok(!report.refused.some(r => r.includes('identity.nivo.collab')), 'the planned identity slot resolves as an identity resource');
 });
 

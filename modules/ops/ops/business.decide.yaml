@@ -115,7 +115,7 @@ steps:
         possibilities and source-local implementation choices; record only consequential unknowns.
         Resolve the execution profile and actual tool availability before selecting instruments;
         this does not switch the model/runtime or spawn workers. A work/node@N record is retired and
-        refused (WORK_NODE_RETIRED): it is never read, edited or extended, and the job is not done
+        refused (HFS_WORK_NODE_RETIRED): it is never read, edited or extended, and the job is not done
         until the selected slice exists as flat records. A requirement a revision must change is
         revised in its flat fr, nfr, br, decision, data or journey record; when no flat record
         holds it yet, this op writes one. For an explicitly new target,
@@ -248,7 +248,7 @@ proofs:
         flat record changed, its change.rev higher than it was, and exactly one new
         extensions.work3.decisionLog entry naming the gap, the chosen reading, why it is the most
         reasonable one by the records it was read from, and the alternatives that were not taken. A
-        changed record with no entry is a defect, and so is any work/node record (retired, WORK_NODE_RETIRED). A
+        changed record with no entry is a defect, and so is any work/node record (retired, HFS_WORK_NODE_RETIRED). A
         reading that changes an observable outcome about money, authority or customer data and was
         taken without a decision record with numbered options and one recommendation is a defect,
         whatever else the revision gets right."

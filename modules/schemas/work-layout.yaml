@@ -15,7 +15,7 @@ shape:
     scripts/checks/check-example-work.mjs reads shape.families from this file at gate time and refuses
     (FAMILIES_DRIFT) the moment its own FAMILIES set and this list disagree, so the two cannot drift apart
     silently. A work/node@N record (the retired recursive envelope, e.g. under business/{overview,srs} or
-    architecture/{overview,sds}) is refused by the gate (WORK_NODE_RETIRED): restate it as these flat
+    architecture/{overview,sds}) is refused by the gate (HFS_WORK_NODE_RETIRED): restate it as these flat
     families. A root-level .starciwork/<name>/index.yaml operations or import record outside features/ is a
     path outside the product list (drift) and belongs in the catalog's setup entries (shape.setup). Ops
     never author or edit work/node records."
@@ -113,7 +113,7 @@ shape:
       logs, interface_audits, ask_requests) and in the content-addressed blob store outside every repository,
       and a product record cites it by artifact id + sha256 (ARCHITECTURE-DB §5.2, §5.3). The categories below
       are scripts/lib/starciwork-boundary.mjs agentDataCategory, which scripts/checks/check-example-work.mjs
-      refuses in a .starciwork tree [STARCIWORK_AGENT_DATA], and shape.starciworkIgnore keeps them out of git."
+      refuses in a .starciwork tree [HFS_AGENT_DATA_TRACKED], and shape.starciworkIgnore keeps them out of git."
     - kernel-evidence/**, kernel-strays/**, kernel-approvals/** (retired custody)
     - evidence/<workflow>.<mode>/** and any <node>/evidence/<id>/** bundle
     - any evidence/** capture, impl/<repository>/<name>/assets/** capture, shell/assets/** layout capture

@@ -13,7 +13,7 @@ summary: >-
   modules/schemas/work-layout.yaml, docs/ledger-db.md, scripts/reconciler/schedules.mjs,
   scripts/supervisor/home.mjs, scripts/lib/starciwork-boundary.mjs and
   tests/machine-registry-isolation.spec.mjs drop their references; scripts/checks/check-example-work.mjs is
-  what refuses known agent data in a .starciwork tree [STARCIWORK_AGENT_DATA], and the .starciwork/.gitignore
+  what refuses known agent data in a .starciwork tree [HFS_AGENT_DATA_TRACKED], and the .starciwork/.gitignore
   text is written by scripts/example/work-example.mjs. Historical contract-change entries keep their mentions
   (history). Adds no check or finding code; nothing is refused that was accepted before.
 safetyCritical: false

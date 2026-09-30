@@ -94,7 +94,7 @@ rules:
     gates: [pre-commit, pre-push, settle, land, ci]
     failureCodes: ["HFS_AGENT_DATA_TRACKED"]
     enforcers:
-      - {kind: work-validate, id: agent-data-tracked, status: planned}
+      - {kind: work-validate, id: agent-data-tracked, at: scripts/checks/check-example-work.mjs}
   - id: R08
     code: "HFS_WORK_NODE_RETIRED"
     title_vi: "Còn record work/node đã bỏ"
@@ -103,7 +103,7 @@ rules:
     gates: [settle, land, ci]
     failureCodes: ["HFS_WORK_NODE_RETIRED"]
     enforcers:
-      - {kind: work-validate, id: work-node-retired, status: planned}
+      - {kind: work-validate, id: work-node-retired, at: scripts/checks/check-example-work.mjs}
   - id: R09
     code: "HFS_IDENTITY_CUSTODY"
     title_vi: "Bí mật của identity sai chỗ"
@@ -113,7 +113,7 @@ rules:
     failureCodes: ["HFS_IDENTITY_CUSTODY", "SEALED_CUSTODY_LOCATION", "SEALED_FILE_IN_WORK"]
     enforcers:
       - {kind: work-validate, id: sealed-custody-location, at: scripts/checks/check-work-artifacts.mjs}
-      - {kind: work-validate, id: identity-custody-role, status: planned}
+      - {kind: work-validate, id: identity-custody-role, at: scripts/checks/check-example-work.mjs}
   - id: R10
     code: "HFS_STACKS_SHAPE"
     title_vi: "Hình dạng .starcistacks sai"
