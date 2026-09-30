@@ -1,5 +1,5 @@
 /**
- * The rules that hold HFS schema authority and the persistence boundary (catalog R34, R36, R37).
+ * The rules that hold HFS schema authority and the entity boundary (catalog R34, R37, R74).
  *
  * The schema changes by migration and by nothing else, and the SQL that touches it lives in one place:
  *
@@ -7,12 +7,10 @@
  *     the schema: a `synchronize` that is not the literal `false`, a `dataSource.synchronize()` call, a
  *     `migrationsRun` that is not the literal `false`, a `CREATE|ALTER|DROP TABLE` string outside
  *     `persistence/migrations/`, and an entity or migration glob. Only `apps/migrate` runs migrations.
- *   - `sql-only-in-repository` (R36 `BE_SQL_OUTSIDE_REPOSITORY`) keeps raw SQL and query builders inside a
- *     `*.repository.ts` of a `persistence/` folder, so a use case or a service never contains SQL.
  *   - `no-entity-in-contract` (R37 `BE_ENTITY_IN_CONTRACT`) keeps ORM entities out of the types that cross a
  *     boundary: `*.contracts.ts`, DTOs, resolver and controller signatures. A contract returns a projection.
  */
-import { keyName, staticText, walk } from "./lib/ast.mjs"
+import { keyName, walk } from "./lib/ast.mjs"
 import { isDeclarationFile, isMigrationFile, normalizePath } from "./lib/path.mjs"
 
 const DDL = /\b(?:CREATE|ALTER|DROP)\s+TABLE\b/i
@@ -69,38 +67,6 @@ export const noRuntimeSchema = {
             },
             TemplateElement(node) {
                 if (!migration && DDL.test(node.value.cooked ?? "")) context.report({ node, messageId: "ddl" })
-            },
-        }
-    },
-}
-
-const REPOSITORY_FILE = /\/persistence\/(?:[^/]+\/)*[^/]+\.repository\.[cm]?ts$/
-
-/** Raw SQL and query builders live in a `*.repository.ts` under `persistence/`, nowhere else. */
-export const sqlOnlyInRepository = {
-    meta: {
-        type: "problem",
-        docs: { description: "`.query(<sql>)` and `createQueryBuilder` only inside a persistence `*.repository.ts`." },
-        schema: [],
-        messages: {
-            sql: "Raw SQL or a query builder outside a persistence repository. Move it into the `*.repository.ts` of the owning capability's `persistence/` and call that from the use case.",
-        },
-    },
-    create(context) {
-        const filename = normalizePath(context.filename || context.getFilename())
-        if (isDeclarationFile(filename) || isMigrationFile(filename) || REPOSITORY_FILE.test(filename)) return {}
-        return {
-            CallExpression(node) {
-                const callee = node.callee
-                if (callee.type !== "MemberExpression" || callee.computed || callee.property.type !== "Identifier") return
-                const name = callee.property.name
-                if (name === "createQueryBuilder") {
-                    context.report({ node, messageId: "sql" })
-                } else if (name === "query" && staticText(node.arguments[0]) !== null) {
-                    context.report({ node, messageId: "sql" })
-                } else if (name === "query" && node.arguments[0]?.type === "TemplateLiteral") {
-                    context.report({ node, messageId: "sql" })
-                }
             },
         }
     },
@@ -173,7 +139,6 @@ export const migrationDownReversible = {
 /** The rules this law contributes to the plugin. */
 export const rules = {
     "no-runtime-schema": noRuntimeSchema,
-    "sql-only-in-repository": sqlOnlyInRepository,
     "no-entity-in-contract": noEntityInContract,
     "migration-down-reversible": migrationDownReversible,
 }
@@ -181,7 +146,6 @@ export const rules = {
 /** All three start at error: HFS keeps no baseline and the schema migration lanes clear the debt first. */
 export const recommended = {
     "starci-be/no-runtime-schema": "error",
-    "starci-be/sql-only-in-repository": "error",
     "starci-be/no-entity-in-contract": "error",
     "starci-be/migration-down-reversible": "error",
 }

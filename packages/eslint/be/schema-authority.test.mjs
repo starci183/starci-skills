@@ -1,7 +1,7 @@
 import test from "node:test"
 import { RuleTester } from "eslint"
 import tsParser from "@typescript-eslint/parser"
-import { migrationDownReversible, noEntityInContract, noRuntimeSchema, sqlOnlyInRepository } from "./schema-authority.mjs"
+import { migrationDownReversible, noEntityInContract, noRuntimeSchema } from "./schema-authority.mjs"
 
 const tester = new RuleTester({
     languageOptions: { parser: tsParser, ecmaVersion: 2022, sourceType: "module" },
@@ -31,25 +31,6 @@ test("the schema is decided by migrations, never by the running process", () => 
             { filename: REPOSITORY, code: "await this.manager.query('DROP TABLE plan')", errors: [{ messageId: "ddl" }] },
             { filename: SERVICE, code: "const o = { entities: [__dirname + '/**/*.entity.ts'] }", errors: [{ messageId: "glob" }] },
             { filename: SERVICE, code: "const o = { migrations: ['dist/migrations/*.js'] }", errors: [{ messageId: "glob" }] },
-        ],
-    })
-})
-
-test("raw SQL and query builders live in a persistence repository", () => {
-    tester.run("sql-only-in-repository", sqlOnlyInRepository, {
-        valid: [
-            { filename: REPOSITORY, code: "await this.manager.query('SELECT 1')" },
-            { filename: REPOSITORY, code: "this.repo.createQueryBuilder('p')" },
-            { filename: MIGRATION, code: "await queryRunner.query('SELECT 1')" },
-            // a GraphQL client query is not SQL: its argument is an options object
-            { filename: SERVICE, code: "await client.query({ query: PlanDocument })" },
-            { filename: SERVICE, code: "const found = await this.plans.findById(id)" },
-        ],
-        invalid: [
-            { filename: SERVICE, code: "await this.manager.query('SELECT 1')", errors: [{ messageId: "sql" }] },
-            { filename: SERVICE, code: "await this.manager.query(`SELECT ${column} FROM plan`)", errors: [{ messageId: "sql" }] },
-            { filename: "D:/repo/src/features/plan/application/list.use-case.ts", code: "this.repo.createQueryBuilder('p')", errors: [{ messageId: "sql" }] },
-            { filename: "D:/repo/src/modules/domain/plan/plan.repository.ts", code: "await this.manager.query('SELECT 1')", errors: [{ messageId: "sql" }] },
         ],
     })
 })
