@@ -25,17 +25,22 @@ async function migrate(connection: DatabaseConnectionOptions): Promise<ReadonlyA
     }
 }
 
-/** The one process that changes a schema: migrates every connection in turn and exits; the apis start after it. */
-async function bootstrap(): Promise<void> {
-    const options = parseMigrateAppOptions(EnvSource.fromProcess())
+/** Migrates every connection of `env` in turn and answers the migration names each one ran; the e2e world calls it once against its containers. */
+export async function bootstrap(env: EnvSource): Promise<Readonly<Record<string, ReadonlyArray<string>>>> {
+    const options = parseMigrateAppOptions(env)
     const applied: Record<string, ReadonlyArray<string>> = {}
     for (const connection of options.connections) {
         applied[connection.name] = await migrate(connection)
     }
-    createJsonLogger(new SystemClock()).info(LoggingLogEvent.MigrationsApplied, { applied })
+    return applied
 }
 
-bootstrap().catch((error: unknown) => {
-    createJsonLogger(new SystemClock()).error(LoggingLogEvent.StartupFailed, error, { service: "migrate" })
-    process.exit(1)
-})
+/** The one process that changes a schema: migrates every connection and exits; the api and the worker start after it. */
+if (require.main === module) {
+    bootstrap(EnvSource.fromProcess())
+        .then((applied) => createJsonLogger(new SystemClock()).info(LoggingLogEvent.MigrationsApplied, { applied }))
+        .catch((error: unknown) => {
+            createJsonLogger(new SystemClock()).error(LoggingLogEvent.StartupFailed, error, { service: "migrate" })
+            process.exit(1)
+        })
+}
