@@ -175,6 +175,18 @@ test('HFS_DEP_VERSION_SKEW: one version everywhere, workspace links, and a trans
   assert.deepEqual(only(result, 'HFS_DEP_VERSION_SKEW'), []);
 });
 
+test('HFS_DEP_VERSION_SKEW: a dependency declared at another version than the root overrides pin is refused, an agreeing pin and a $ reference are clean', () => {
+  const rootWith = (overrides) => (dir) => { withManifests({ 'left-pad': '1.3.0' }, { 'left-pad': '1.3.0' })(dir); put(dir, 'package.json', json({ name: 'demo', private: true, overrides })); };
+  const off = checkRepo({ repoRoot: repoOf(FE, rootWith({ 'left-pad': '1.0.0' })) });
+  const [finding] = only(off, 'HFS_DEP_VERSION_SKEW');
+  assert.equal(finding.dependency, 'left-pad');
+  assert.equal(finding.pinned, '1.0.0');
+  assert.deepEqual(finding.versions, ['1.3.0']);
+  for (const overrides of [{ 'left-pad': '1.3.0' }, { 'left-pad': '$left-pad' }, { semver: '7.6.0', glob: { semver: '6.3.1' } }]) {
+    assert.deepEqual(only(checkRepo({ repoRoot: repoOf(FE, rootWith(overrides)) }), 'HFS_DEP_VERSION_SKEW'), [], JSON.stringify(overrides));
+  }
+});
+
 // ------------------------------------------------------------------------------------------------ R23 HFS_CONTRACT_SNAPSHOT_DRIFT
 
 const GRAPHQL = 'src/features/orders/transport/graphql/orders-graphql.module.ts';

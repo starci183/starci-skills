@@ -107,10 +107,10 @@ describe('.husky/pre-commit', () => {
     for (const step of ['npm run typecheck', 'npx eslint $sources', 'npx prettier --check $sources', 'npm run test:affected -- --findRelatedTests $specs', 'npx hfs work-hygiene']) assert.ok(hook.includes(step), step);
     assert.doesNotMatch(hook, /lint-staged|test:(e2e|integration|contract)|typecheck:tests|selectProjects (e2e|integration|contract)|playwright/);
   });
-  it('front end runs staged eslint, stylelint and prettier (no lint-staged), has no work hygiene and no test step', () => {
+  it('front end runs the secrets guard, staged eslint, stylelint and prettier (no lint-staged) and no test step', () => {
     const hook = rendered(FE)['.husky/pre-commit'];
-    for (const step of ['npm run typecheck', 'npx eslint --max-warnings=0 --no-warn-ignored $sources', 'npx stylelint $styles', 'npx prettier --check --ignore-unknown $formatted']) assert.ok(hook.includes(step), step);
-    assert.doesNotMatch(hook, /lint-staged|work-hygiene|vitest|jest|playwright|test:/);
+    for (const step of ['npx hfs work-hygiene', 'npm run typecheck', 'npx eslint --max-warnings=0 --no-warn-ignored $sources', 'npx stylelint $styles', 'npx prettier --check --ignore-unknown $formatted']) assert.ok(hook.includes(step), step);
+    assert.doesNotMatch(hook, /lint-staged|vitest|jest|playwright|test:/);
   });
 });
 
@@ -493,6 +493,28 @@ describe('work-hygiene', () => {
       ['.starcistacks/dev/infra/.env', 'HFS_PLAINTEXT_SECRET'],
       ['.starcistacks/dev/infra/tls.pem', 'HFS_PLAINTEXT_SECRET'],
     ]);
+  });
+  it('is the secrets guard of the commit: a staged file of any tree with a secret value, or an .enc that is no envelope, is refused from the index, and a clean or sealed file passes', async t => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'hfs-guard-'));
+    t.after(() => fs.rmSync(dir, { recursive: true, force: true }));
+    const git = (...args) => execFileSync('git', args, { cwd: dir, stdio: 'ignore' });
+    git('init', '-q');
+    const put = (rel, text) => { fs.mkdirSync(path.dirname(path.join(dir, rel)), { recursive: true }); fs.writeFileSync(path.join(dir, rel), text); };
+    const awsKey = ['AKIA', 'ABCDEFGHIJKLMNOP'].join('');
+    const sealed = 'ENC[AES256_GCM,data:YWJj,iv:ZGVm,tag:Z2hp,type:str]';
+    put('src/config.ts', `export const key = '${awsKey}';\n`);
+    put('.starcistacks/dev/secrets/db.enc', 'password=hunter2\n');
+    put('src/clean.ts', 'export const a = 1;\n');
+    put('.starcistacks/dev/secrets/sealed.enc', JSON.stringify({ data: sealed, sops: { mac: sealed, age: [] } }));
+    git('add', '-A');
+    put('src/config.ts', 'export const key = 1;\n');   // the work tree is clean; the index still holds the secret
+    const lines = [];
+    assert.equal(await runWorkHygiene({ cwd: dir, out: line => lines.push(line) }), 1);
+    const refused = lines.filter(line => line.startsWith('HFS_PLAINTEXT_SECRET')).map(line => line.split(' ')[1]).sort();
+    assert.deepEqual(refused, ['.starcistacks/dev/secrets/db.enc', 'src/config.ts']);
+    assert.ok(!lines.join('\n').includes(awsKey), 'a finding never prints the value');
+    git('reset', '-q', 'src/config.ts', '.starcistacks/dev/secrets/db.enc');
+    assert.equal(await runWorkHygiene({ cwd: dir, out: () => {} }), 0);
   });
   it('asks git which .starciwork files the generated allowlist ignores', async t => {
     const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'hfs-hygiene-'));

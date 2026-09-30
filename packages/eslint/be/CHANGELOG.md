@@ -1,6 +1,7 @@
 # Changelog
 
-## 2.0.0 - unreleased (lane C0, BE-CONVENTION)
+## 2.0.0 - Changed (lane PORT): `ruleParams.be.infraOwners` names `@nestjs/cache-manager` (the `CACHE_MANAGER` token) beside `cache-manager`: it is reached only by `integrations/cache` and `integrations/redis`, which is the retired repository rule `must-use-cache-service`; `infra-import-owner` (R90) covers it with a passing and a violating case.
+- unreleased (lane C0, BE-CONVENTION)
 
 - Changed (lane UT): `inbox-dedupe-required` (R80) moves from the door to the service. It judges the public methods of a `*.service.ts` whose first parameter TYPE has an `eventId` property: the first awaited expression must be `claim(source, eventId, ...)` on the `Inbox` port, with an early return on `false`. Consumers and `SignedWebhook` controllers are no longer judged by it, and `transport-is-thin` no longer allows an `Inbox` injection or an inbox guard in a door.
 - Changed: `transport-is-thin` allows `unwrapOutcome` of `platform/primitives` (resolved by its symbol) beside the bus call and pure mapper functions.

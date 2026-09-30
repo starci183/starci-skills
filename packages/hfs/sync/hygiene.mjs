@@ -1,7 +1,10 @@
 // hfs work-hygiene: the guard for the two trees a back end tracks besides source. A file under .starciwork must be
 // product content (the .starciwork/.gitignore allowlist admits it, so agent output is refused), and a file under
-// .starcistacks must not be a plaintext secret (only *.enc is sealed). The pre-commit hook judges the staged files;
-// scripts/checks/check-hfs-sync.mjs judges every tracked file.
+// .starcistacks must not be a plaintext secret (only *.enc is sealed). It is also the secrets guard of the commit: every staged file, in
+// any tree, is read from the index and judged with the one secret judgement of `hfs check` (scripts/lib/hfs-rules/secrets.mjs: a secret by
+// being, an .enc that is no sops envelope, a line that matches a secret pattern), so no plaintext secret reaches the history whatever
+// .gitignore says (`git add -f`, a path tracked before a rule tightened). There is no override. The pre-commit hook judges the staged
+// files; scripts/checks/check-hfs-sync.mjs judges every tracked file.
 //
 // Run inside a full runtime checkout — the repository under judgment is the checkout — it also reports the
 // state-root ledger findings of that checkout's scripts/lib/hk-orphan-ledgers.mjs: LEDGER_ORPHAN_STATE_ROOT and
@@ -12,6 +15,7 @@ import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
+import { secretFileFindings } from '../runtime/scripts/lib/hfs-rules/secrets.mjs';
 
 const PLAINTEXT_NAME = /(^|\/)(\.env(\..*)?|[^/]*\.(pem|key|identity|age))$/;
 const GUARDED = file => file.startsWith('.starciwork/') || file.startsWith('.starcistacks/');
@@ -51,10 +55,29 @@ export const stagedFiles = cwd => gitList(cwd, ['diff', '--cached', '--name-only
 /** Every tracked file. */
 export const trackedFiles = cwd => gitList(cwd, ['ls-files', '-z']);
 
-/** Findings for `files` after keeping only the guarded trees. */
+const MAX_STAGED_BYTES = 1024 * 1024;
+
+/** The text of `file` as the index holds it (what the commit would record), or null when it is absent, binary or over 1 MB. */
+export function stagedText(cwd, file) {
+  try {
+    const blob = execFileSync('git', ['show', `:${file}`], { cwd, maxBuffer: MAX_STAGED_BYTES * 2, stdio: ['ignore', 'pipe', 'ignore'] });
+    return blob.length > MAX_STAGED_BYTES || blob.includes(0) ? null : blob.toString('utf8');
+  } catch {
+    return null;
+  }
+}
+
+/** The secret findings of `files` read from the index, as {file, code, message}; a file the name check already refused is not reported twice. */
+export function secretGuardFindings(cwd, files, alreadyRefused = new Set()) {
+  return files.filter(file => !alreadyRefused.has(file)).flatMap(file => secretFileFindings({ file, text: stagedText(cwd, file) }).map(finding => ({ file, code: finding.code, message: finding.message })));
+}
+
+/** Findings for `files`: the guarded trees, then the secret guard over every file. */
 export function judge(cwd, files) {
   const guarded = files.filter(GUARDED);
-  return { checked: guarded.length, findings: hygieneFindings(guarded, ignoredAmong(cwd, guarded.filter(file => file.startsWith('.starciwork/')))) };
+  const findings = hygieneFindings(guarded, ignoredAmong(cwd, guarded.filter(file => file.startsWith('.starciwork/'))));
+  const refused = new Set(findings.filter(finding => finding.code === 'HFS_PLAINTEXT_SECRET').map(finding => finding.file));
+  return { checked: files.length, findings: [...findings, ...secretGuardFindings(cwd, files, refused)] };
 }
 
 // The scripts/checks/ledger-hygiene.mjs of the checkout under judgment: the root git names for `cwd`, which carries

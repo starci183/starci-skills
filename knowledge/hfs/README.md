@@ -112,7 +112,7 @@ Owners are derived from slots; `hfs.json` holds no owner list, path or disabled 
 | `apps/<app>/Dockerfile`, `.dockerignore` | optional | optional | tracked | `repo.app-image` |
 | `src/{features,modules,tests}` | required | forbidden | tracked | `be.*` |
 | `packages/<pkg>/` | opt-in | opt-in | tracked, must build | `repo.packages`, `fe.package.ui` |
-| `scripts/<name>.mjs` | optional | optional | tracked, lasting tooling only | `repo.scripts` |
+| `scripts/{.gitkeep,*.mjs,*.cjs,*.ps1,*.sh}` | optional | optional | tracked; operational scripts only, or an empty folder with `.gitkeep`; no spec, no check, no lint source | `repo.scripts` |
 | `docs/{adr,runbooks,guides}/` | opt-in | opt-in | tracked, images at most 500 KB | `repo.docs` |
 | `contracts/<app>/schema.graphql` | opt-in | none | tracked, the one committed machine-emitted file | `be.contract.*` |
 | `apps/<app>/src/modules/api/contract/*` | none | opt-in | tracked, hash-checked copy | `fe.contract.copy` |
@@ -356,7 +356,7 @@ packages/<pkg>/                       any other code two apps share (FE_CROSS_AP
   `modules/i18n/index.ts` calls it with its `messages/<locale>.json` (a one-app repository may keep the stack in its
   `modules/i18n/`). No display text at any tier (block, page,
   layout, `aria-label`, `title`, `placeholder`, `alt`) in any language; there is no escape comment. A single-language app
-  still uses `next-intl` with one locale. Catalogs of all locales have the same key set and specs use the real catalog.
+  still uses `next-intl` with one locale. Catalogs of all locales have the same key set (R60), a key the source reads exists in every locale and a key nothing reads is deleted (R106).
   `<html lang>` is set by the `[locale]` layout.
 - **CSS and tokens (R61, R62).** Only Grammar tokens. The Common tier reads only Grammar role tokens; a family supplies
   their values. `app/globals.css` contains only `@import` and `@source` in the standard order and every `@source`
@@ -495,7 +495,7 @@ Every rule is an error from 2.0. Finding code, then the rule. The pattern files 
 | R11 | `HFS_SONAR_CONFIG` | Sonar config is generated, with no host URL and no coverage import. |
 | R12 | `HFS_E2E_IN_AUTOMATIC_GATE` | e2e never joins husky, coverage or automatic CI. |
 | R13 | `HFS_CI_MISSING_CANON` | CI runs the pinned `@starci/hfs check`; pre-push runs typecheck and lint; a clone never redirects `core.hooksPath` away from husky. |
-| R14 | `HFS_DEP_VERSION_SKEW` | One version per dependency in the workspace, and npm is the only package manager. |
+| R14 | `HFS_DEP_VERSION_SKEW` | One version per dependency in the workspace, a root `overrides` pin included, and npm is the only package manager. |
 | R15 | `HFS_CANON_PIN_DRIFT` | Canon packages and frameworks match `canon-pins.yaml`. |
 | R16 | `HFS_TOOL_CONFIG_LOCAL` | Configs only call the factories; no local rules. |
 | R17 | `HFS_RULE_OFF_WITHOUT_REPLACEMENT` | The ESLint configuration (and a front end's stylelint configuration) is the rendered one-liner, so no rule is off, warned or redefined in a repository. |
@@ -591,3 +591,8 @@ Every rule is an error from 2.0. Finding code, then the rule. The pattern files 
 | R99 | `BE_TEST_ROW_BY_BUILDER` | A unit, integration or e2e spec never hand-builds rows: no raw INSERT/UPDATE/DELETE text, no `save`, `insert`, `upsert`, `update`, `delete` or `remove` on an EntityManager, DataSource or QueryRunner, and no persistence entity built as an object literal more than once in the spec; rows come from the area's builder. |
 | R100 | `BE_TEST_CONSTRAINTS_ON` | Nothing under `src/tests` disables or drops a database constraint: no `session_replication_role`, `SET CONSTRAINTS ... DEFERRED`, `DEFERRABLE INITIALLY DEFERRED`, `ALTER TABLE ... DISABLE`, `DISABLE TRIGGER`, `DROP CONSTRAINT`, and no `dropForeignKey(s)`, `dropCheckConstraint(s)` or `dropUniqueConstraint(s)` on a QueryRunner; a builder creates the parent chain instead. |
 | R101 | `BE_TEST_BUILDER_ARRANGES` | A test data builder arranges data only: it imports no assertion or test-framework global (`expect`, `jest`, `@jest/globals`) and its defaults are deterministic (no `Date.now()`, argless `new Date()`, `Math.random()`, `randomUUID()` or `crypto.random*`). |
+| R102 | `BE_SPEC_PLACEMENT` | A back-end spec or test file lives in one of the four test layers and nowhere else: a unit spec `<name>.service.spec.ts` beside its service, or an integration, e2e or contract spec under `src/tests/{integration,e2e,contract}`; a `*.spec.*`, `*.test.*` or `*-spec.*` file anywhere else, `scripts/` and `tools/` included, is a finding. |
+| R103 | `HFS_REPO_LOCAL_CHECK` | A repository keeps no check, lint rule or lint plugin of its own: no `check-*` file in `scripts/` or `tools/`, no `eslint-local-rules*` or local eslint plugin, no script that runs one; every check lives in the `.claude` runtime and the canons. |
+| R104 | `HFS_LINT_SUPPRESSION_FILE` | A repository keeps no lint-suppression file, script or option: no `eslint.suppressions*`, no `lint:suppressions` script, no eslint `--suppress-all` or `--suppressions-location` flag and no suppressions configuration passed to eslint; a finding is fixed in the code. |
+| R105 | `HFS_PROOF_COMMAND_FILE_MISSING` | A proof command of a `.starciwork` record (`requiresProof.<kind>.command`) is runnable as written: every repository file it names exists. |
+| R106 | `FE_I18N_KEYS` | The catalogs of a front-end app and its source agree both ways: a literal key read through `next-intl` (`useTranslations`, `getTranslations`, `t`, `t.rich`, `t.raw`, `t.markup`) exists in every locale, and a catalog key that no string of the app's or the shared packages' source can be reading is deleted. |

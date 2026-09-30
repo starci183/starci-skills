@@ -92,10 +92,11 @@ rules:
   - id: FE-I18N-3
     title: Catalogs share one key set
     kind: mandatory
-    hfsRules: [R60]
+    hfsRules: [R60, R106]
     requirement: |-
-      The catalogs of all locales have exactly the same keys: no missing and no extra key. Catalogs are split by
-      namespace, and a client component receives only its picked namespaces.
+      The catalogs of all locales have exactly the same keys: no missing and no extra key. A key the source reads with a
+      literal exists in every locale, and a key that nothing reads is deleted. Catalogs are split by namespace, and a
+      client component receives only its picked namespaces.
     rationale: |-
       A missing key shows up in production as raw key text.
     cases:
@@ -105,6 +106,7 @@ rules:
     verification:
       automated:
         - FE_I18N_CATALOG
+        - FE_I18N_KEYS
       manual: []
     relatedExamples: []
   - id: FE-I18N-4

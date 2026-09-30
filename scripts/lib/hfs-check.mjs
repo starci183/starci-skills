@@ -22,6 +22,10 @@
 //   HFS_CONTRACT_SNAPSHOT_DRIFT   (R23, hfs-rules/contract.mjs) an uncommitted back-end snapshot, or a front-end copy that differs from it
 //   BE_TEST_TOPOLOGY              (R47, hfs-rules/test-topology.mjs) a `.test` file, a testing/ folder, a second jest configuration
 //   FE_NO_TESTS                   (R97, hfs-rules/fe-no-tests.mjs) a front end holds a spec, e2e or test-tool file, a test script or a test dependency; no exception
+//   BE_SPEC_PLACEMENT             (R102, hfs-rules/spec-placement.mjs) a spec or test file outside the four test layers, scripts/ and tools/ included
+//   HFS_REPO_LOCAL_CHECK          (R103, hfs-rules/repo-local-checks.mjs) a local eslint rule or plugin, a `check-*` script, a relative import in eslint.config
+//   HFS_LINT_SUPPRESSION_FILE     (R104, hfs-rules/lint-suppression.mjs) an eslint suppressions file, script or option
+//   HFS_PROOF_COMMAND_FILE_MISSING (R105, hfs-rules/proof-commands.mjs) a .starciwork proof command that runs a file the repository does not hold
 //   FE_WIRE_GENERATED, FE_I18N_PLACEMENT, FE_I18N_CATALOG   (R52, R59, R60, hfs-rules/frontend.mjs) the front-end tree of each app
 //   HFS_GITIGNORE_BLOCK_DRIFT, HFS_SONAR_CONFIG   (R04, R11) produced by packages/hfs/sync/managed.mjs, which renders the templates
 //   HFS_FORMAT                    (R19) produced by packages/hfs/sync/format.mjs, which runs the repository's own prettier
@@ -50,9 +54,13 @@ import { readTree, treeFacts, untrackedEntries } from './hfs-tree.mjs';
 import { contractFindings } from './hfs-rules/contract.mjs';
 import { depFindings } from './hfs-rules/deps.mjs';
 import { frontendFindings } from './hfs-rules/frontend.mjs';
+import { lintSuppressionFindings } from './hfs-rules/lint-suppression.mjs';
 import { pipelineFindings } from './hfs-rules/pipeline.mjs';
+import { proofCommandFindings } from './hfs-rules/proof-commands.mjs';
+import { repoLocalCheckFindings } from './hfs-rules/repo-local-checks.mjs';
 import { readJson } from './hfs-rules/read.mjs';
 import { secretFindings, slotOwnsSecrets } from './hfs-rules/secrets.mjs';
+import { specPlacementFindings } from './hfs-rules/spec-placement.mjs';
 import { stacksFindings } from './hfs-rules/stacks.mjs';
 import { testTopologyFindings } from './hfs-rules/test-topology.mjs';
 import { feNoTestsFindings, isFeTestPath } from './hfs-rules/fe-no-tests.mjs';
@@ -73,7 +81,7 @@ export const CHECK_CODES = Object.freeze([
   'HFS_SLOT_REQUIRED_MISSING', 'HFS_MIN_INSTANCES', 'HFS_CANON_PIN_DRIFT', 'HFS_SIZE_SOFT_BACKLOG', 'BE_SOURCE_FORM',
   'HFS_MANAGED_FILE_DRIFT', 'HFS_TOOL_CONFIG_LOCAL', 'HFS_RULE_OFF_WITHOUT_REPLACEMENT', 'HFS_TS_STRICT',
   'HFS_PLAINTEXT_SECRET', 'HFS_STACKS_SHAPE', 'HFS_CI_MISSING_CANON', 'HFS_DEP_VERSION_SKEW', 'HFS_CONTRACT_SNAPSHOT_DRIFT',
-  'BE_TEST_TOPOLOGY', 'FE_NO_TESTS', 'FE_WIRE_GENERATED', 'FE_I18N_PLACEMENT', 'FE_I18N_CATALOG',
+  'BE_TEST_TOPOLOGY', 'BE_SPEC_PLACEMENT', 'HFS_REPO_LOCAL_CHECK', 'HFS_LINT_SUPPRESSION_FILE', 'HFS_PROOF_COMMAND_FILE_MISSING', 'FE_NO_TESTS', 'FE_WIRE_GENERATED', 'FE_I18N_PLACEMENT', 'FE_I18N_CATALOG',
   'HFS_GITIGNORE_BLOCK_DRIFT', 'HFS_SONAR_CONFIG', 'HFS_FORMAT',
   'HFS_EMPTY_DIR', 'HFS_GHOST_TREE', 'HFS_UNTRACKED_ROOT_ENTRY',
   ...REFUSAL_CODES,
@@ -327,7 +335,9 @@ export function checkRepo({ repoRoot, root = skillRoot, declaration, files, only
     ...depFindings({ repoRoot, files: tracked }),
     ...pipelineFindings({ repoRoot, files: tracked, pins }),
     ...contractFindings({ repoRoot, files: tracked, repo, resolver, stacks: declared?.stacks }),
-    ...(repo.profile === 'be' ? [...stacksFindings({ repoRoot, files: tracked, resolver }), ...testTopologyFindings({ repoRoot, files: tracked })] : [...frontendFindings({ repoRoot, files: tracked, repo }), ...feNoTestsFindings({ repoRoot, files: tracked.filter(inScope) })]),
+    ...repoLocalCheckFindings({ repoRoot, files: tracked }),
+    ...lintSuppressionFindings({ repoRoot, files: tracked }),
+    ...(repo.profile === 'be' ? [...stacksFindings({ repoRoot, files: tracked, resolver }), ...testTopologyFindings({ repoRoot, files: tracked }), ...specPlacementFindings({ files: tracked, resolver }), ...proofCommandFindings({ repoRoot, files: tracked, resolver })] : [...frontendFindings({ repoRoot, files: tracked, repo }), ...feNoTestsFindings({ repoRoot, files: tracked.filter(inScope) })]),
     ...extraFindings,
   );
 

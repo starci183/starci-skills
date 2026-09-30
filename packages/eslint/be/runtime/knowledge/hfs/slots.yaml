@@ -108,6 +108,7 @@ ruleParams:
       http: [platform/http]
       https: [platform/http]
       cache-manager: [integrations/cache, integrations/redis]
+      "@nestjs/cache-manager": [integrations/cache, integrations/redis]     # the CACHE_MANAGER token: caching goes through the cache capability (retired local rule must-use-cache-service)
       redis: [integrations/cache, integrations/redis]
       ioredis: [integrations/cache, integrations/redis]
       bullmq: [platform/messaging]
@@ -340,12 +341,15 @@ slots:
     tests: none
   - id: repo.scripts
     profiles: [be, fe]
-    path: "scripts/<name>.mjs"
+    # The repository's operational scripts only (`*.mjs`, `*.cjs`, `*.ps1`, `*.sh`), or nothing: an empty folder is `scripts/.gitkeep`, which hfs sync --init writes
+    # when the folder is missing. A spec or a test (BE_SPEC_PLACEMENT, FE_NO_TESTS), a check or lint source (`check-*`, `eslint-local-rules*`, a local eslint
+    # plugin: HFS_REPO_LOCAL_CHECK) and anything that re-implements a canon check is not an operational script and has no place here.
+    path: "scripts/{.gitkeep,*.mjs,*.cjs,*.ps1,*.sh}"
     presence: optional
     tracked: tracked
     tier: none
     tests: none
-    rules: [HFS_SCRIPT_ONE_OFF]     # one-off codemods and fix-* scripts are agent output, not tooling
+    rules: [HFS_SCRIPT_ONE_OFF, BE_SPEC_PLACEMENT, HFS_REPO_LOCAL_CHECK]     # one-off codemods and fix-* scripts are agent output, not tooling
   - id: repo.docs
     profiles: [be, fe]
     path: "docs/{adr,runbooks,guides}/**/*.md"

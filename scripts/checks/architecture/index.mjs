@@ -41,6 +41,7 @@ import { checkClientReachesServer, CLIENT_REACHES_SERVER_RULE_IDS } from './clie
 import { checkCrossAppDuplicate, CROSS_APP_DUPLICATE_RULE_IDS } from './cross-app-duplicate.mjs';
 import { checkPackageShape, PACKAGE_SHAPE_RULE_IDS } from './package-shape.mjs';
 import { checkFeSlotAllows, FE_SLOT_ALLOWS_RULE_IDS } from './fe-slot-allows.mjs';
+import { checkI18nKeys, I18N_KEYS_RULE_IDS } from './i18n-keys.mjs';
 import { checkDocLanguage, DOC_LANGUAGE_RULE_IDS } from './doc-language.mjs';
 
 export { REGISTRATION_RULE_IDS, SWR_DATA_RULE_IDS };
@@ -73,7 +74,7 @@ const BACKEND_MACHINE = {
   contractFixtureGuard: [checkContractFixtureGuard, CONTRACT_FIXTURE_GUARD_RULE_IDS],
 };
 
-// The frontend repository machine (R21, R50, R54, R55, R56, R63, R94): same shape, run for a front-end repository only.
+// The frontend repository machine (R21, R50, R54, R55, R56, R63, R94, R106): same shape, run for a front-end repository only.
 const FRONTEND_MACHINE = {
   transportOwner: [checkTransportOwner, TRANSPORT_OWNER_RULE_IDS],
   routeFilesThin: [checkRouteFilesThin, ROUTE_FILES_THIN_RULE_IDS],
@@ -82,6 +83,7 @@ const FRONTEND_MACHINE = {
   clientReachesServer: [checkClientReachesServer, CLIENT_REACHES_SERVER_RULE_IDS],
   crossAppDuplicate: [checkCrossAppDuplicate, CROSS_APP_DUPLICATE_RULE_IDS],
   feSlotAllows: [checkFeSlotAllows, FE_SLOT_ALLOWS_RULE_IDS],
+  i18nKeys: [checkI18nKeys, I18N_KEYS_RULE_IDS],
 };
 
 /** Errors the machine reports when a program cannot be built or an edge cannot be proven: it cannot judge, so it refuses. */
