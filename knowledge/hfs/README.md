@@ -466,7 +466,7 @@ A rule's gates are data in `rules.yaml`; adding a rule to a gate edits the manif
 2. The composition spec of every app boots the real `AppModule` and is green.
 3. No feature or owner is left uncomposed or unmounted; no dead export.
 4. The backend and frontend contracts match by hash.
-5. `typecheck`, `lint:check`, `build`, `test:unit`, `prettier --check` and the Sonar gate are green.
+5. `typecheck`, `lint:check`, `build`, `test`, `prettier --check` and the Sonar gate are green.
 6. `typecheck:tests` (back end) or `typecheck:e2e` (front end) is green and `lint:check` is green; integration, e2e and contract still run by hand.
 7. `git status` is clean, with no untracked entry outside a slot marked `ignored`.
 

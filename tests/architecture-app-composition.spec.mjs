@@ -21,3 +21,8 @@ test('a helper file in an app root is BE_APP_COMPOSITION_ONLY', (t) => {
   assert.equal(hits.length, 1, JSON.stringify(hits));
   assert.equal(hits[0].path, 'apps/core/src/pricing.ts');
 });
+
+test('the <app>.options.ts the api app slot allows is not BE_APP_COMPOSITION_ONLY; another app-named file is', (t) => {
+  const report = runArch(archFixture(t, { files: { ...APP, 'apps/core/src/core.options.ts': 'export interface CoreOptions { readonly port: number }\n', 'apps/core/src/other.options.ts': 'export interface OtherOptions { readonly port: number }\n' } }));
+  assert.deepEqual(findings(report, 'BE_APP_COMPOSITION_ONLY').map(item => item.path), ['apps/core/src/other.options.ts']);
+});

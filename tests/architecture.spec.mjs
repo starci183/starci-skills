@@ -681,7 +681,7 @@ test('backend source shape accepts adopted application, transport, persistence, 
     'src/features/orders/application/create-order.contracts.ts': 'export interface CreateOrderParams { readonly itemId:string } export interface CreateOrderResult { readonly id:string }\n',
     'src/features/orders/application/create-order.use-case.ts': 'import type { CreateOrderParams,CreateOrderResult } from "./create-order.contracts"; export class CreateOrderUseCase { execute(input:CreateOrderParams):CreateOrderResult{return {id:input.itemId}} }\n',
     'src/features/orders/transport/graphql/dto/create-order.request.ts': 'import { GqlInput } from "../../../../../modules/platform/framework"; @GqlInput() export class CreateOrderRequest { itemId!:string }\n',
-    'src/features/orders/transport/graphql/create-order.resolver.ts': 'import { GqlArgs,GqlMutation } from "../../../../modules/platform/framework"; import { CreateOrderRequest } from "./dto/create-order.request"; export class CreateOrderResolver { @GqlMutation(()=>String,{name:"createOrder"}) create(@GqlArgs("request") request:CreateOrderRequest){return request.itemId} }\n',
+    'src/features/orders/transport/graphql/create-order.resolver.ts': 'import { GqlArgs,GqlMutation } from "../../../../modules/platform/framework"; import { CreateOrderRequest } from "./dto/create-order.request"; export class CreateOrderResolver { @GqlMutation(()=>String,{name:"createOrder"}) create(@GqlArgs("input") request:CreateOrderRequest){return request.itemId} }\n',
     'src/modules/platform/database/entities/order.entity.ts': 'import { DatabaseEntity } from "../../framework"; @DatabaseEntity() export class OrderEntity {}\n',
     'src/modules/domain/catalog/enums/order-status.ts': 'import { registerGraphQlEnum } from "../../../platform/framework"; export enum OrderStatus { Pending="pending", Complete="complete" } registerGraphQlEnum(OrderStatus,{name:"OrderStatus"});\n',
     'src/modules/domain/catalog/errors/challenge-not-found.ts': 'export class ChallengeNotFoundException extends Error {}\n',
@@ -704,11 +704,11 @@ test('backend source shape locates layer, class, enum, contract, and GraphQL nam
     'src/modules/domain/catalog/export-list.service.ts': 'class ExportListWrong {} export {ExportListWrong};\n',
     'src/modules/domain/catalog/class-expression.service.ts': 'export const Wrong=class {};\n',
     'src/modules/domain/catalog/named-expression.service.ts': 'const Value=class InnerWrong {}; export {Value};\n',
-    'src/features/orders/transport/http/run.use-case.ts': 'export class RunUseCase {}\n',
+    'src/features/orders/transport/http/run.handler.ts': 'export class RunHandler {}\n',
     'src/features/orders/transport/graphql/dto/order.entity.ts': 'import { Entity } from "typeorm"; @Entity() export class OrderEntity {}\n',
     'src/features/orders/migrations/1790000000000-CreateOrders.ts': 'export class CreateOrders { up(){} down(){} }\n',
     'src/features/orders/transport/graphql/order-view.mapper.ts': 'import { ViewEntity } from "typeorm"; @ViewEntity() export class OrderViewMapper {}\n',
-    'src/features/orders/application/order-schema.use-case.ts': 'import { EntitySchema } from "typeorm"; const make=()=>new EntitySchema({name:"order"}); export const schema=make();\n',
+    'src/features/orders/application/order-schema.handler.ts': 'import { EntitySchema } from "typeorm"; const make=()=>new EntitySchema({name:"order"}); export const schema=make();\n',
     'src/features/orders/transport/graphql/create-order.input.ts': 'import { InputType } from "@nestjs/graphql"; @InputType() export class CreateOrderInput {}\n',
     'src/features/orders/transport/graphql/create-order.resolver.ts': 'import { Args,Mutation } from "@nestjs/graphql"; export class CreateOrderResolver { @Mutation(()=>String,{name:"Create_Order"}) create(@Args("itemId") itemId:string){return itemId} }\n',
     'src/modules/domain/catalog/enums/order-status.ts': 'export const enum orderStatus { pending=1 }\n',
@@ -727,13 +727,40 @@ test('backend source shape locates layer, class, enum, contract, and GraphQL nam
   assert.ok(result.violations.some(item => item.ruleId === 'BE_SOURCE_FORM' && item.path.endsWith('/export-list.service.ts')), JSON.stringify(result, null, 2));
   assert.ok(result.violations.some(item => item.ruleId === 'BE_SOURCE_FORM' && item.path.endsWith('/class-expression.service.ts')), JSON.stringify(result, null, 2));
   assert.ok(result.violations.some(item => item.ruleId === 'BE_SOURCE_FORM' && item.path.endsWith('/named-expression.service.ts')), JSON.stringify(result, null, 2));
-  assert.ok(result.violations.some(item => item.ruleId === 'BE_SOURCE_FORM' && /CreateOrderData/.test(item.message)), JSON.stringify(result, null, 2));
-  assert.ok(result.violations.some(item => item.ruleId === 'BE_SOURCE_FORM' && /WrappedWrong/.test(item.message)), JSON.stringify(result, null, 2));
-  assert.ok(result.violations.some(item => item.ruleId === 'BE_SOURCE_FORM' && /AliasWrong/.test(item.message)), JSON.stringify(result, null, 2));
+  // Domain values in *.contracts.ts carry no suffix (BE-CONVENTION 1.15): only transport file roles name their object contracts.
+  assert.equal(result.violations.some(item => /CreateOrderData|WrappedWrong|AliasWrong/.test(item.message)), false, JSON.stringify(result, null, 2));
   assert.equal(result.violations.some(item => /Scalar/.test(item.message)), false, JSON.stringify(result, null, 2));
   assert.ok(result.violations.some(item => item.ruleId === 'BE_SOURCE_FORM' && /Enums must/.test(item.message)), JSON.stringify(result, null, 2));
   assert.ok(result.violations.some(item => item.ruleId === 'BE_SOURCE_FORM' && /GraphQL field name/.test(item.message)), JSON.stringify(result, null, 2));
-  assert.ok(result.violations.some(item => item.ruleId === 'BE_SOURCE_FORM' && /literal name request/.test(item.message)), JSON.stringify(result, null, 2));
+  assert.ok(result.violations.some(item => item.ruleId === 'BE_SOURCE_FORM' && /literal name input/.test(item.message)), JSON.stringify(result, null, 2));
+});
+
+test('backend source shape: domain values and port implementations pass, transport object contracts and unported classes fail', t => {
+  const root = fixture(t, 'backend', {
+    'src/modules/platform/clock/clock.port.ts': 'export interface Clock { now():Date }\n',
+    'src/modules/platform/clock/system-clock.service.ts': 'import type { Clock } from "./clock.port"; export class SystemClock implements Clock { now():Date { return new Date(0) } }\n',
+    'src/modules/platform/clock/wrong.service.ts': 'import type { Clock } from "./clock.port"; export class Wrong implements Clock { now():Date { return new Date(0) } }\n',
+    'src/modules/platform/clock/local.contracts.ts': 'export interface Local { now():Date }\n',
+    'src/modules/platform/clock/other.service.ts': 'import type { Local } from "./local.contracts"; export class Other implements Local { now():Date { return new Date(0) } }\n',
+    'src/modules/platform/clock/plain.service.ts': 'export class Plain {}\n',
+    'src/modules/platform/clock/index.ts': 'export { SystemClock } from "./system-clock.service";\n',
+    'src/modules/domain/catalog/cart.contracts.ts': 'export interface CartLine { readonly sku:string } export type Outcome = { readonly ok:boolean };\n',
+    'src/modules/domain/catalog/cache.options.ts': 'export interface CacheKey { readonly name:string }\n',
+    'src/modules/domain/catalog/order.rows.ts': 'export interface OrderRow { readonly id:string } export interface Order { readonly id:string }\n',
+    'src/modules/domain/catalog/add.input.ts': 'export interface AddInput { readonly id:string } export interface Add { readonly id:string }\n',
+  });
+  installSourceShapeTypes(root);
+  const result = check(root);
+  const form = result.violations.filter(item => item.ruleId === 'BE_SOURCE_FORM');
+  const named = name => form.some(item => item.message.includes(name));
+  assert.equal(named('SystemClock'), false, JSON.stringify(form, null, 2));
+  assert.equal(named('CartLine') || named('Outcome') || named('CacheKey') || named('OrderRow') || named('AddInput'), false, JSON.stringify(form, null, 2));
+  assert.ok(named('Wrong'), JSON.stringify(form, null, 2));
+  assert.ok(named('Other'), JSON.stringify(form, null, 2));
+  assert.ok(named('Plain'), JSON.stringify(form, null, 2));
+  assert.ok(form.some(item => /Order\b/.test(item.message) && /must end in Row/.test(item.message)), JSON.stringify(form, null, 2));
+  assert.ok(form.some(item => /Add\b/.test(item.message) && /must end in Input/.test(item.message)), JSON.stringify(form, null, 2));
+  assert.equal(form.some(item => /^Exported class (?:Wrong|Other|Plain) must/.test(item.message) && /Adapter|Repository/.test(item.message)), false);
 });
 
 test('backend source shape exposes dynamic naming as unavailable coverage', t => {
@@ -759,7 +786,7 @@ test('backend source shape exposes dynamic naming as unavailable coverage', t =>
   assert.ok(result.coverage.backendSourceShape.naming.details.some(item => /unproven framework decorator identity/.test(item)));
   assert.ok(result.coverage.backendSourceShape.naming.details.some(item => /unclassified file role workflow/.test(item)));
   assert.ok(result.coverage.backendSourceShape.naming.details.some(item => /GraphQL enum adapter/.test(item)));
-  assert.ok(result.coverage.backendSourceShape.naming.details.some(item => /object contract Workspace/.test(item)));
+  assert.equal(result.coverage.backendSourceShape.naming.details.some(item => /object contract/.test(item)), false);
   assert.ok(result.coverage.backendSourceShape.layout.details.some(item => /role workflow is not a selected application-layer role/.test(item)));
   assert.equal(result.violations.some(item => item.path.endsWith('/engine.workflow.ts')), false);
 });

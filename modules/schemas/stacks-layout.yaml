@@ -30,6 +30,7 @@ shape:
   seeds: .starcistacks/<environment>/seeds/**
   infra: .starcistacks/<environment>/infra/**
   compose: .starcistacks/<environment>/infra/compose/*.yaml (one fragment per backing service, composed by include)
+  metadata: .starcistacks/<environment>/infra/metadata.json (the resolved port projection: value-free, tracked, read by the front end)
   keyRoster: .starcistacks/<environment>/runtime/env/KEYS.md and .starcistacks/<environment>/infra/KEYS.md (names and custody paths, never values)
   services: the declaration's `services` block (application-stacks.schema.yaml $defs.service) - sonar, codecov and every other delivery/quality service, with custody references into runtime/files
 
@@ -44,7 +45,9 @@ custody:
     - .starcistacks/deployment.json and other rendered, value-free deployment declarations the guard names
     - .starcistacks/**/KEYS.md
     - .starcistacks/**/.gitkeep
-    - .starcistacks/<environment>/infra/compose/** and infra/terraform/** source
+    - .starcistacks/<environment>/infra/compose/**, infra/k8s/** and infra/terraform/** source
+    - .starcistacks/<environment>/infra/metadata.json the value-free resolved port projection the front end reads
+    - .starcistacks/<environment>/environment.json the rendered value-free environment record
     - .starcistacks/<environment>/seeds/** idempotent seed sources
   gitignore: >-
     Deny everything with `.starcistacks/**` (never the directory form `.starcistacks/`, which blocks
@@ -68,7 +71,11 @@ custody:
     - '!.starcistacks/**/.gitkeep'
     - '!.starcistacks/application-stacks.yaml'
     - '!.starcistacks/*/README.md'
+    - '!.starcistacks/*/environment.json'
+    - '!.starcistacks/*/seeds/**'
+    - '!.starcistacks/*/infra/metadata.json'
     - '!.starcistacks/*/infra/compose/**'
+    - '!.starcistacks/*/infra/k8s/**'
     - '!.starcistacks/*/infra/terraform/**'
     - .starcistacks/*/infra/**/.env
     - .starcistacks/*/infra/**/.env.*

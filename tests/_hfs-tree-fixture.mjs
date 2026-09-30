@@ -50,7 +50,7 @@ npm ci
 npm run typecheck
 npm run lint:check
 npm run build
-npm run test:unit
+npm test
 \`\`\`
 
 ## Work

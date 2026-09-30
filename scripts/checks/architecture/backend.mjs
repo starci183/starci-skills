@@ -1,5 +1,6 @@
 import path from 'node:path';
 import { isInside } from './config.mjs';
+import { slotAdmitsFile } from './slot-allows.mjs';
 import { reachableViolation, relativePath, sourceLocation } from './typescript.mjs';
 
 const FORBIDDEN_APP_ROLE = /(?:^|\.)(?:service|provider|providers|resolver|controller|handler|repository|entity|use-case|command|query|listener|consumer|processor)\.[cm]?[jt]sx?$/i;
@@ -41,16 +42,6 @@ function appSource(config, fileName, excludedRoots = []) {
     return null;
   }
   return null;
-}
-
-function isBootstrapConfig(relative) {
-  const basename = path.posix.basename(relative);
-  if (/^main\.[cm]?[jt]sx?$/i.test(relative) || /^app\.module\.[cm]?[jt]sx?$/i.test(relative)) return true;
-  if (FORBIDDEN_APP_ROLE.test(basename)) return false;
-  if (/^(?:config|configuration|environment)\.[cm]?[jt]s$/i.test(basename)) return true;
-  const first = relative.split('/')[0];
-  return ['bootstrap', 'config', 'env'].includes(first)
-    && /(?:\.adapter|\.config|config|configuration|environment|constants|types)\.[cm]?[jt]s$/i.test(basename);
 }
 
 function decoratorName(ts, decorator) {
@@ -326,13 +317,13 @@ export function checkBackend(config, context) {
           ...sourceLocation(sourceFile, evidence.node),
           message: `Application composition source contains measurable business/provider role ${evidence.detail}. Move that role under src/features or src/modules.`,
         });
-      } else if (!isBootstrapConfig(app.relative)) {
+      } else if (slotAdmitsFile(config.hfs, relativePath(config.root, fileName)) !== true) {
         violations.push({
           ruleId: FORBIDDEN_APP_ROLE.test(path.posix.basename(app.relative)) ? 'BE_APP_BUSINESS_ROLE' : 'BE_APP_COMPOSITION_ONLY',
           path: relativePath(config.root, fileName),
           line: 1,
           column: 1,
-          message: `Application source ${app.relative} is not an entry, root module, or narrowly named bootstrap/config/framework adapter.`,
+          message: `Application source ${app.relative} is not a file its app slot requires or allows (main.ts, app.module.ts, <app>.options.ts, <app>.composition.spec.ts).`,
         });
       }
     }

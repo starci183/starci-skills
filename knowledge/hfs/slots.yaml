@@ -485,6 +485,7 @@ slots:
     tier: app
     owner: true
     requires: [main.ts, app.module.ts, "<app>.composition.spec.ts"]
+    allows: [main.ts, app.module.ts, "<app>.composition.spec.ts", "<app>.options.ts"]
     tests: unit-beside
     rules: [BE_APP_COMPOSITION_ONLY, BE_BACKGROUND_UNOWNED]
   - id: be.app.migrate
@@ -497,6 +498,7 @@ slots:
     tier: app
     owner: true
     requires: [main.ts, "<app>.composition.spec.ts"]
+    allows: [main.ts, "<app>.composition.spec.ts", "<app>.options.ts"]
     tests: unit-beside
     rules: [BE_SCHEMA_AUTHORITY, BE_ENTRYPOINT_ONLY_IN_APPS]
   - id: be.app.cli
@@ -508,6 +510,7 @@ slots:
     tier: app
     owner: true
     requires: [main.ts, app.module.ts, "<app>.composition.spec.ts"]
+    allows: [main.ts, app.module.ts, "<app>.composition.spec.ts", "<app>.options.ts"]
     tests: unit-beside
 
   # ----- BE: features ------------------------------------------------------------------------------------
@@ -794,7 +797,7 @@ slots:
     tier: none
     tests: none
     requires: [application-stacks.yaml]
-    allows: [application-stacks.yaml, "<env>/README.md", "<env>/environment.json", "<env>/infra/{compose,k8s,terraform}/**",
+    allows: [application-stacks.yaml, "<env>/README.md", "<env>/environment.json", "<env>/infra/{compose,k8s,terraform}/**", "<env>/infra/metadata.json",
              "<env>/runtime/{config,env}/**", "<env>/runtime/env/KEYS.md", "<env>/secrets/<slug>.enc", "<env>/seeds/**"]
     forbids: ["<env>/runtime/files/**", "**/*.enc outside <env>/secrets/", DESIGN.md, deployment.json, "k8s/ at root"]
     rules: [HFS_STACKS_SHAPE, HFS_PLAINTEXT_SECRET, HFS_IDENTITY_CUSTODY]

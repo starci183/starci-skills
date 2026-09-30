@@ -3,6 +3,8 @@ import path from 'node:path';
 import { isIP } from 'node:net';
 import { gitOutput } from '../../lib/git.mjs';
 import { repositoryName } from '../../lib/repo-identity.mjs';
+import { braceVariants } from '../../lib/glob.mjs';
+import { createSlotResolver, loadSlotManifest, openHfs } from '../../lib/hfs-slots.mjs';
 
 /**
  * HFS repository-tree check (knowledge/hfs/README.md): every StarCi repository is an
@@ -41,23 +43,50 @@ export const HFS_RULE_IDS = [
 const REQUIRED_COMMON = ['.gitattributes', '.github', '.gitignore', '.husky', 'hfs.json',
   'codecov.yml', 'eslint.config.mjs', 'package-lock.json', 'package.json', 'README.md',
   'sonar-project.properties', 'tsconfig.json'];
-const OPTIONAL_COMMON = new Set(['.dockerignore', '.editorconfig', '.npmrc', '.nvmrc', '.prettierignore', '.prettierrc', 'docs', 'e2e',
-  'packages', 'scripts', 'tsconfig.build.json', 'tsconfig.e2e.json']);
 const REQUIRED_BACKEND = ['.sops.yaml', '.starcistacks', '.starciwork', 'jest.config.js', 'nest-cli.json', 'src'];
-const OPTIONAL_FRONTEND = new Set(['stylelint.config.mjs', 'turbo.json', 'vitest.config.ts', 'vitest.setup.ts']);
-const OPTIONAL_FRONTEND_PATTERN = /^playwright\.config\.ts$/;
 const NON_NPM_ENTRIES = new Set(['pnpm-lock.yaml', 'pnpm-workspace.yaml', 'yarn.lock', 'bun.lock', 'bun.lockb']);
 const RUNTIME_ROOT_MARKDOWN = new Set(['README.md', 'CONTEXT.md', 'CONTRIBUTING.md', 'CHANGELOG.md', 'THIRD_PARTY_NOTICES.md']);
 const PRODUCT_ROOT_MARKDOWN = new Set(['README.md']);
 const README_SECTIONS = ['Overview', 'Stack', 'Repository layout', 'Development'];
 const BACKEND_SRC_CHILDREN = new Set(['features', 'modules', 'tests']);
 const MODULE_TIERS = new Set(['domain', 'integrations', 'platform']);
-const TEST_CHILDREN = new Set(['world', 'fixtures', 'integration', 'e2e', 'contract']);
 // Owner test layout 2026-09-30: unit `<name>.spec.ts`, integration, e2e and contract by folder and suffix; int-spec and harness-spec stay banned.
 const RETIRED_TEST_SUFFIX = /\.(?:int|harness)-spec\.[cm]?[jt]sx?$/u;
 const RETIRED_TEST_FOLDER = /^src\/tests\/(?:harness|live|e2e\/live)(?:\/|$)/u;
 const EXTRA_TEST_CONFIG = /(?:^|\/)(?:jest[.-][^/]*(?:config\.[cm]?[jt]s|\.json)|jest-(?:e2e|int|integration|harness)[^/]*)$/u;
 const NODE_ENTRIES_SKIPPED = new Set(['node_modules', '.git']);
+
+/** The slot resolver of a repository: the caller's, else the one its hfs.json declares, else the profile's slots with no app declared. */
+function resolverOf(root, profile, given) {
+  if (given) return given;
+  try { return openHfs({ repoRoot: root }); } catch { /* an invalid hfs.json is HFS_DECLARATION_INVALID's finding, judged elsewhere */ }
+  return createSlotResolver(loadSlotManifest(), { profile, apps: [], optionalSlots: [], connections: [] });
+}
+
+/** The first path segment of every slot of the profile that may exist: the repository root entries (contracts/, docs/, src/ ...). */
+function slotRootEntries(resolver) {
+  const roots = new Set(['apps']);
+  for (const slot of resolver.slots()) {
+    if (slot.presence === 'forbidden') continue;
+    for (const variant of braceVariants(slot.path)) {
+      const first = variant.split('/')[0];
+      if (first && !/[*?<%]/u.test(first)) roots.add(first);
+    }
+  }
+  return roots;
+}
+
+/** The folders directly below src/tests/ that the be.tests.* slots declare (world, fixtures, integration, e2e, contract). */
+function slotTestChildren(resolver) {
+  const children = new Set();
+  for (const slot of resolver.slots()) {
+    for (const variant of braceVariants(slot.path)) {
+      const match = /^src\/tests\/([^/*?<]+)\//u.exec(variant);
+      if (match) children.add(match[1]);
+    }
+  }
+  return children;
+}
 
 /**
  * Whether the given root is the top level of its own Git work tree. An example under a runtime clone is a directory of
@@ -157,8 +186,31 @@ function privateHost(hostname) {
     a === 172 && b >= 16 && b <= 31 || a === 192 && b === 168 || a === 100 && b >= 64 && b <= 127;
 }
 
+// The scripts the README Development section shows; each is required only when the managed package-scripts template of the
+// profile (packages/hfs/templates/<profile>/package-scripts/package.json, the one source of the managed script names) has it.
+const DEVELOPMENT_SCRIPTS = ['typecheck', 'lint:check', 'build', 'test'];
+// The templates sit beside the runtime in a checkout (packages/hfs/templates) and one level above the bundled runtime of @starci/hfs.
+const TEMPLATE_ROOTS = [path.resolve(import.meta.dirname, '..', '..', '..', 'packages', 'hfs', 'templates'), path.resolve(import.meta.dirname, '..', '..', '..', '..', 'templates')];
+const managedScriptCache = new Map();
+
+/** The script names of the managed package-scripts template of a profile. The template holds a {{appScripts}} placeholder, so it is read by key, not parsed as JSON. */
+function managedScriptNames(profile) {
+  if (!managedScriptCache.has(profile)) {
+    const file = TEMPLATE_ROOTS.map(dir => path.join(dir, profile, 'package-scripts', 'package.json')).find(candidate => fs.existsSync(candidate));
+    if (!file) throw Error(`The managed package-scripts template of profile ${profile} cannot be found next to the runtime.`);
+    managedScriptCache.set(profile, new Set([...fs.readFileSync(file, 'utf8').matchAll(/^\s*"([A-Za-z0-9:_.-]+)":\s*"/gmu)].map(match => match[1])));
+  }
+  return managedScriptCache.get(profile);
+}
+
+/** The README command that runs a managed script: `npm test` for test, `npm run <name>` for the others (never a longer script name that starts with it). */
+function scriptCommand(name) {
+  const escaped = name.replace(/[.*+?^${}()|[\]\\]/gu, '\\$&');
+  return new RegExp(name === 'test' ? 'npm (?:run test|test)(?![\\w:-])' : `npm run ${escaped}(?![\\w:-])`, 'u');
+}
+
 /** Presentation checks shared by the product HFS gate and this runtime's own standalone gate. */
-export function checkRepoPresentation({ root, runtime = false, tree = treeView(root) }) {
+export function checkRepoPresentation({ root, runtime = false, tree = treeView(root), profile = 'be' }) {
   const violations = [];
   const finding = (ruleId, entry, message, line = 1) => violations.push({ ruleId, path: entry, line, column: 1, message });
   for (const entry of tree.top) {
@@ -208,11 +260,11 @@ export function checkRepoPresentation({ root, runtime = false, tree = treeView(r
   };
   if (!runtime && headings.some(item => item.name === 'Development')) {
     const development = sectionBody('Development');
-    const commands = [/npm (?:ci|install)/u, /npm run typecheck/u, /npm run lint:check/u,
-      /npm run build/u, /npm run test:unit/u];
+    const scripts = DEVELOPMENT_SCRIPTS.filter(name => managedScriptNames(profile).has(name));
+    const commands = [/npm (?:ci|install)/u, ...scripts.map(scriptCommand)];
     if (commands.some(command => !command.test(development)))
       finding('HFS_README_DEVELOPMENT_INCOMPLETE', 'README.md',
-        'Development must show npm install, typecheck, lint:check, build and test:unit commands.');
+        `Development must show npm install and the managed script commands: ${scripts.map(name => (name === 'test' ? 'npm test' : `npm run ${name}`)).join(', ')}.`);
   }
   if (tree.hasDir('.starciwork') && headings.some(item => item.name === 'Work') &&
       !/\.starciwork\b/u.test(sectionBody('Work')))
@@ -351,11 +403,11 @@ export function checkHfs(config) {
   const tree = treeView(config.root);
   const violations = [];
   const finding = (ruleId, entry, message) => violations.push({ ruleId, path: entry, line: 1, column: 1, message });
-  const presentation = checkRepoPresentation({ root: config.root, tree });
+  const resolver = resolverOf(config.root, backend ? 'be' : 'fe', config.hfs);
+  const presentation = checkRepoPresentation({ root: config.root, tree, profile: backend ? 'be' : 'fe' });
   violations.push(...presentation.violations);
 
-  const allowed = new Set(['apps', ...REQUIRED_COMMON, ...OPTIONAL_COMMON,
-    ...(backend ? REQUIRED_BACKEND : []), ...(frontend ? OPTIONAL_FRONTEND : [])]);
+  const allowed = slotRootEntries(resolver);
   for (const entry of [...tree.top].sort()) {
     if (NON_NPM_ENTRIES.has(entry) || /\.md$/iu.test(entry)) continue;
     if (frontend && !backend) {
@@ -363,7 +415,7 @@ export function checkHfs(config) {
       if (entry === '.starcistacks') { finding('HFS_STACKS_IN_FE', entry, 'A frontend repository must not hold .starcistacks; stack declarations live in the backend repository.'); continue; }
       if (entry === 'src') { finding('HFS_ROOT_SRC_FORBIDDEN_FE', entry, 'A frontend repository keeps source only under apps/<app>/src; the root src/ tree must move.'); continue; }
     }
-    if (!allowed.has(entry) && !(frontend && OPTIONAL_FRONTEND_PATTERN.test(entry))) {
+    if (!allowed.has(entry)) {
       finding('HFS_ROOT_ENTRY_FORBIDDEN', entry, `Root entry ${entry} is not in the HFS ${backend ? 'backend' : 'frontend'} allowlist.`);
     }
   }
@@ -386,8 +438,10 @@ export function checkHfs(config) {
       continue;
     }
     if (!tree.hasDir(`apps/${app}/src`)) missing.push('src/');
-    if (backend) for (const entry of ['src/main.ts', 'src/app.module.ts']) {
-      if (!tree.hasFile(`apps/${app}/${entry}`)) missing.push(entry);
+    // A back-end app must hold exactly what the slot of its kind requires (be.app.migrate has no app.module.ts).
+    if (backend) for (const required of resolver.requiredFiles(`apps/${app}/src/main.ts`)) {
+      const directory = required.endsWith('/');
+      if (!(directory ? tree.hasDir(required.slice(0, -1)) : tree.hasFile(required))) missing.push(required.slice(`apps/${app}/`.length));
     }
     // next-env.d.ts is generated by Next and commonly ignored by Git; it is not
     // a reliable tracked-tree input.
@@ -408,9 +462,10 @@ export function checkHfs(config) {
         finding('HFS_MODULE_TIER_INVALID', `src/modules/${tier}`, `Module tier ${tier} is not one of domain, platform, integrations.`);
       }
     }
+    const testChildren = slotTestChildren(resolver);
     for (const child of tree.children('src/tests').sort()) {
-      if (!TEST_CHILDREN.has(child)) {
-        finding('HFS_SRC_LAYOUT_INVALID', `src/tests/${child}`, `Backend tests/ holds only world, fixtures, integration, e2e and contract; ${child} must move.`);
+      if (!testChildren.has(child)) {
+        finding('HFS_SRC_LAYOUT_INVALID', `src/tests/${child}`, `Backend src/tests/ holds only ${[...testChildren].join(', ')}; ${child} must move.`);
       }
     }
   }
