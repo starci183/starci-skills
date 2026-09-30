@@ -7,7 +7,6 @@ import {spawnSync} from 'node:child_process';
 import {FAKE_ORCA} from './helpers/fake-orca.mjs';
 import {openLedger,inspectLedger,ledgerFileFor} from '../engine/ledger-db.mjs';
 import {seedWorkflow} from './_ledger-fixture.mjs';
-import {buildSpawnCommand,envPrefix} from '../scripts/agent/lib.mjs';
 
 // Incident inc-360891316369 (starci-next base-repos, backend.scaffold seam attempt 11): an op worker ran
 // node:sqlite against .starciwork/runtime.sqlite to inspect jobs. The contract forbade it; the owner wants
@@ -55,20 +54,16 @@ const fixture=t=>{
   return {root,repo,wf,jobId,otherJob,managedJob,api,orcaState,read};
 };
 
-test('the op launch command carries the role marker and the op packet names no ledger file',t=>{
-  // Unit: the marker is set in the terminal's own shell before the agent starts.
-  assert.equal(envPrefix({STARCI_ROLE:'op',STARCI_OP_JOB:'op-x-1'},'win32'),"$env:STARCI_ROLE='op'; $env:STARCI_OP_JOB='op-x-1';");
-  assert.equal(envPrefix({STARCI_ROLE:'op',STARCI_OP_JOB:'op-x-1'},'posix'),"export STARCI_ROLE='op'; export STARCI_OP_JOB='op-x-1';");
-  assert.equal(envPrefix({bad:'x',STARCI_OP_JOB:"a'b"},'posix'),'','unsafe keys and values are dropped, never quoted around');
-  const built=buildSpawnCommand({provider:'codex',model:'gpt-6-sol',env:{STARCI_ROLE:'op',STARCI_OP_JOB:'op-x-1'}});
-  assert.match(built.command,/^(?:\$env:STARCI_ROLE='op'; \$env:STARCI_OP_JOB='op-x-1';|export STARCI_ROLE='op'; export STARCI_OP_JOB='op-x-1';) /);
-
+test('the op launch is a worker-start worker bound to its terminal, and the op packet names no ledger file',t=>{
+  // worker-start owns the worker's environment, so no env marker reaches it: Orca's ORCA_TERMINAL_HANDLE, bound to
+  // the op job at dispatch, is what identifies the caller as that op (the managed-worker test below).
   const fx=fixture(t);
   const d=fx.api(['dispatch','--job',fx.jobId,'--model','codex-agent','--spawn']);
   assert.equal(d.status,0,d.stderr||d.stdout);
-  const command=fx.orcaState().commands[0];
-  assert.match(command,/STARCI_ROLE='op'/);
-  assert.ok(command.includes(`STARCI_OP_JOB='${fx.jobId}'`),command);
+  const out=JSON.parse(d.stdout);
+  const job=fx.read(db=>db.prepare('SELECT worker_id,payload_json FROM jobs WHERE job_id=?').get(fx.jobId));
+  assert.equal(job.worker_id,out.dispatchId,'the op job is keyed by its Dispatch');
+  assert.equal(JSON.parse(job.payload_json).managed.agentTerminalHandle,out.managed.assignee,'and bound to the worker terminal Orca names');
   const contract=fx.read(db=>db.prepare('SELECT markdown,context_json FROM contracts WHERE workflow_id=? AND job_id=?').get(fx.wf,fx.jobId));
   assert.doesNotMatch(contract.markdown,/runtime\.sqlite/,'the op prompt names no ledger file');
   assert.doesNotMatch(contract.context_json,/runtime\.sqlite/,'nor does the packet context');

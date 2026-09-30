@@ -340,7 +340,7 @@ test('an answered ask stays awaiting its owner-answer retry until a job of ITS w
   assert.deepEqual(waiting(), [], 'the owner-answer retry of its own record replaces the wait');
 });
 
-test('dispatch files the contract row before the preamble reaches the worker', (t) => {
+test('dispatch files the contract row for the worker-start Dispatch; an early op-contract read waits for it', (t) => {
   const w = world(t, { orca: true });
   w.workflow('wf-cf');
   const enqueue = (jobId) => w.seed((l) => {
@@ -358,11 +358,11 @@ test('dispatch files the contract row before the preamble reaches the worker', (
   const row = w.read((db) => db.prepare(`SELECT a.dispatch_id, c.context_json FROM contracts c JOIN op_attempts a ON a.attempt_id=c.attempt_id
     WHERE c.workflow_id='wf-cf' AND a.op_id='code.refactor' AND a.try_no=1`).get());
   assert.equal(row.dispatch_id, json(ok.stdout).dispatchId);
-  assert.ok(json(row.context_json).delivery.text, 'the running transaction re-files it with the delivered text');
+  assert.equal(json(row.context_json).managed.dispatchId, json(ok.stdout).dispatchId, 'the contract names the worker-start Dispatch');
   const guard = w.read((db) => json(db.prepare("SELECT payload_json FROM events WHERE kind='op-dispatched' AND entity_id='op-code.refactor-cf00000001'").get().payload_json).guard);
   assert.ok(guard?.jobFile, 'the dispatch receipt names the shared-checkout guard');
-  const code = fs.readFileSync(path.join(ROOT, 'scripts', 'kernel', 'api-verbs', 'dispatch.mjs'), 'utf8');
-  const early = code.indexOf('fileContract(db, { job, op, dispatchId, markdown: contractMarkdown');
-  assert.ok(early > 0 && early < code.indexOf('const sent = deliverPrompt({ handle, adapter, prompt: dispatched.preamble'),
-    'the command-terminal dispatch commits the contract row before it delivers the preamble');
+  // A worker-start worker can read its contract before the running transaction commits it (fast Codex workers read
+  // contract-missing, nivo Modules inc-e09140ad9c22): op-contract waits while its job is still leased.
+  const code = fs.readFileSync(path.join(ROOT, 'scripts', 'kernel', 'api-verbs', 'op-contract.mjs'), 'utf8');
+  assert.match(code, /if \(status !== 'leased'\) break;/, 'op-contract waits out the leased window instead of answering missing');
 });

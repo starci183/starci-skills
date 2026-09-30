@@ -4,7 +4,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
-import { inspectLedger, ledgerFileFor } from '../engine/ledger-db.mjs';
+import { inspectLedger, openLedger, ledgerFileFor } from '../engine/ledger-db.mjs';
 import { FAKE_ORCA } from './helpers/fake-orca.mjs';
 
 const root = path.resolve(import.meta.dirname, '..');
@@ -35,6 +35,13 @@ const fixture = t => {
   const state = json(fs.readFileSync(stateFile, 'utf8'));
   state.terminals[old].connected = false; state.terminals[old].writable = false;
   fs.writeFileSync(stateFile, JSON.stringify(state));
+  // A Kernel launched by terminal create before every launch went through worker-start: a seat and a kernel job
+  // with no Dispatch. The next start retires it - the only terminal the runtime still closes for a Kernel.
+  const ledger = openLedger({ file: ledgerFileFor(repo) });
+  try {
+    ledger.db.prepare("UPDATE signals SET value_json=json_remove(value_json,'$.dispatch','$.runId') WHERE scope='kernel' AND key=?").run(workflowId);
+    ledger.db.prepare("UPDATE jobs SET payload_json=json_remove(payload_json,'$.managed') WHERE job_id=?").run(`kernel-${workflowId}`);
+  } finally { ledger.close(); }
   const restart = more => run('scripts/kernel/start-workflow.mjs', ['--repo', repo, '--goal', workflowId, '--json'], more);
   const rows = () => {
     const ledger = inspectLedger({ file: ledgerFileFor(repo) });
@@ -48,12 +55,13 @@ const fixture = t => {
   return { old, restart, rows, stateFile };
 };
 
-test('replacement records proof that the old Kernel terminal is gone', t => {
+test('retiring a terminal-launched Kernel records proof that its terminal is gone', t => {
   const f = fixture(t);
   const restarted = f.restart();
   assert.equal(restarted.status, 0, restarted.stderr);
   assert.notEqual(json(restarted.stdout).terminal, f.old);
   const rows = f.rows();
+  assert.equal(rows.cleared.retiredTerminalLaunch, true);
   assert.equal(rows.cleared.terminalClosed.ok, true);
   assert.equal(rows.cleared.terminalClosed.verified?.ok, true);
   assert.ok(['gone', 'unlisted'].includes(rows.cleared.terminalClosed.verified?.proof));
