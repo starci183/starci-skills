@@ -26,10 +26,3 @@ The dev Postgres runs with trust authentication (DEMO-ONLY: a local container wh
 ports bind loopback, holding the demo seeds - nothing worth a password). A real
 environment adopts the SOPS+age custody the todo-app example demonstrates before it holds
 anything worth encrypting; the declaration says `secrets: []` for exactly that reason.
-
-## Test world
-
-`toxiproxy` (host port 8543) is the failure-injection proxy of the test world. `npm run test:stack -- up` (`hfs test-stack up`) starts
-the real postgres and redis of this stack behind it under the project `ecommerce-app-be-test-stack`, on OS-allocated loopback ports, so
-it never collides with 5501/6448; `npm run test:stack -- down` removes it. The e2e world attaches to it when it answers and creates
-its own databases inside it.

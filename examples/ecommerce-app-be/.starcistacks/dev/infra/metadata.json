@@ -6,7 +6,6 @@
         "orderApi": 6070,
         "postgres": 5501,
         "redis": 6448,
-        "toxiproxy": 8543,
         "landing": 3069,
         "shop": 4069
     },
@@ -15,7 +14,6 @@
         "orderApi": {"scope": "application", "application": "order", "basePort": 3001, "appSlot": 3},
         "postgres": {"scope": "shared", "basePort": 5432},
         "redis": {"scope": "shared", "basePort": 6379},
-        "toxiproxy": {"scope": "shared", "basePort": 8474},
         "landing": {"scope": "application", "application": "landing", "basePort": 3000, "appSlot": 0, "ownedBy": "ecommerce-app-fe (the FE lane's repository; declared here so its apps read the same projection)"},
         "shop": {"scope": "application", "application": "shop", "basePort": 3000, "appSlot": 1, "ownedBy": "ecommerce-app-fe (the FE lane's repository; declared here so its apps read the same projection)"}
     },

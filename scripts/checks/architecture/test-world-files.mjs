@@ -1,128 +1,101 @@
-import fs from 'node:fs';
-import path from 'node:path';
 import { treeOf } from './required-files.mjs';
 import { allowsFile } from '../../lib/hfs-allows.mjs';
-import { machineKit } from './machine-ast.mjs';
-import { DEFAULT_ENVIRONMENT, STACKS_DIRECTORY, STATEFUL_KINDS, imagePathOf, isTagged, namesOfService, readStack } from '../../lib/stack-services.mjs';
+import { DEFAULT_ENVIRONMENT, STACKS_DIRECTORY, STATEFUL_KINDS, namesOfService, readStack } from '../../lib/stack-services.mjs';
 
 /**
- * R47 `test-world-files` (BE_TEST_TOPOLOGY). Three judgements over the test world, all read through slots and the
- * repository's own stack definition (`.starcistacks/<env>`, scripts/lib/stack-services.mjs), never through a path or a name list:
+ * R47 `test-world-files` (BE_TEST_TOPOLOGY). Two judgements over the test world, read through slots, the repository's own
+ * stack definition (`.starcistacks/<env>`, scripts/lib/stack-services.mjs) and the world's declaration
+ * (`test-world.config.ts` of the test-world library), never through a path or a name list:
  *
  * 1. Files. `src/tests/world/` is the only test infrastructure location, and it holds only what its slot `allows`
  *    (knowledge/hfs/slots.yaml be.tests.world: global-setup.ts, global-teardown.ts, use-test-world.ts, and fakes/; kit/ is
  *    its own slot, be.tests.world.kit) plus files at its root whose role suffix is in ruleParams.be.suffixes
- *    (`stripe.client.ts`, `checkout.contracts.ts`, ...). Every tracked file below the world root is matched by the slot's
- *    own entries through `allowsFile`.
- * 2. Images (owner refinement 2026-09-30: the world's services come from the stack definition, at run time). No test
- *    source (slots be.tests.*; specs never start infrastructure, and the program excludes them) spells a container image: an `image:tag` literal that names a repository the dev stack
- *    declares (the world reads it from the stack), and an image literal handed to a `docker run` / `docker create` (an
- *    argument array holding `run` or `create`, or a `docker run ...` command string) or to a testcontainers class is a
- *    service the dev stack does not declare.
- * 3. Fakes. `fakes/<provider>/` holds a network-edge fake of an external SaaS the team does not operate; a service the
- *    stack declares (its own name, its image repository or a well-known alias of the image: postgres, redis, keycloak, a
- *    mail host, ...) runs real, so a fake of it is refused. One owner-approved exception (BE-CONVENTION 1.16): a
- *    stack service that is stateless compute needing special hardware or an external model (GPU inference, a self-hosted
- *    embedding model) may be faked with a protocol-faithful fake when the world README (`README.md` in the world, an allowed
- *    world file) marks it in the table `| stack service | fake | reason | holds |`: the stack service, the `fakes/<fake>/`
- *    folder, a non-empty reason, and `holds` = `a, b` (both hold: a) stateless, b) needs special hardware or an external
- *    model). A stack service of a stateful kind (database, cache, identity, storage, mail, queue, search) or with a persistent
- *    volume is never accepted; a row that names a stack service or a fake folder that does not exist is refused as stale.
+ *    (`stripe.client.ts`, `checkout.contracts.ts`, `test-world.config.ts`, ...). Every tracked file below the world root is
+ *    matched by the slot's own entries through `allowsFile`.
+ * 2. Fakes against the stack (owner refinement 2026-09-30). Every service the stack declares runs real in the world;
+ *    `fakes/<provider>/` holds a network-edge fake of an external SaaS the team does not operate. A `fakes/<provider>/` that
+ *    fakes a stack service (its own name, its image repository or a well-known alias of the image) is refused, except the one
+ *    owner-approved exception: a stack service that is stateless compute needing special hardware or an external model
+ *    (GPU inference, a self-hosted embedding model) and that the config declares in `fakedBy`:
+ *    `fakedBy: { "<stack service>": { fake: "<fakes/ folder>", reason: "<non-empty>" } }`. A stack service of a stateful
+ *    kind (database, cache, identity, storage, mail, queue, search) or with a persistent volume is never accepted, and a
+ *    `fakedBy` entry that names a stack service or a fake folder that does not exist, or has no reason, is refused as stale
+ *    or empty. The config's `stacks` names the stack environments the world runs (default `dev`); the machine reads the
+ *    literal object of the config through the TypeScript AST and nothing else of it.
  */
 export const TEST_WORLD_FILES_RULE_IDS = ['BE_TEST_TOPOLOGY'];
 
 const RULE = 'BE_TEST_TOPOLOGY';
 const WORLD_SLOT = 'be.tests.world';
-const TEST_SLOT_PREFIX = 'be.tests.';
 const FAKES_DIRECTORY = 'fakes/';
+const CONFIG_FILE = 'test-world.config.ts';
+const defaultEnvironment = DEFAULT_ENVIRONMENT;
 const KEBAB = /^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$/;
-const IMAGE_SHAPE = /^[a-z][a-z0-9._-]*(?:\/[a-z0-9._-]+)*:[A-Za-z0-9_][A-Za-z0-9_.-]*(?:@sha256:[a-f0-9]+)?$/;
-const DOCKER_ARGUMENT_VERBS = new Set(['run', 'create']);
-const DOCKER_COMMAND = /^\s*docker\s+(?:run|create)\s/u;
-const CONTAINER_PACKAGES = /^(?:testcontainers|@testcontainers\/.+)$/u;
 
-const WORLD_README = 'README.md';
-const FAKED_TABLE_HEADER = ['stack service', 'fake', 'reason', 'holds'];
-const HOLDS_BOTH = 'a,b';
+const nameOf = (ts, name) => (name && (ts.isIdentifier(name) || ts.isStringLiteralLike(name)) ? name.text : null);
+const unwrap = (ts, node) => {
+  let current = node;
+  while (current && (ts.isParenthesizedExpression(current) || ts.isAsExpression(current) || ts.isSatisfiesExpression?.(current))) current = current.expression;
+  return current;
+};
+const propertyOf = (ts, literal, key) => literal.properties.find(property => ts.isPropertyAssignment(property) && nameOf(ts, property.name) === key)?.initializer ?? null;
 
-/** The cells of one markdown table row, trimmed, without the outer pipes and without backticks. */
-const cellsOf = line => line.trim().replace(/^\|/u, '').replace(/\|$/u, '').split('|').map(cell => cell.trim().replaceAll('`', ''));
-
-/**
- * The marked fakes of the world README: rows of the table whose header is exactly `stack service | fake | reason | holds`
- * (the structured source; nothing else in the README is read). Each row: {service, fake, reason, holds, line}.
- */
-function readMarkedFakes(file) {
-  let lines;
-  try { lines = fs.readFileSync(file, 'utf8').split(/\r?\n/u); } catch { return []; }
-  const rows = [];
-  for (let index = 0; index < lines.length; index += 1) {
-    if (!lines[index].trim().startsWith('|') || cellsOf(lines[index]).map(cell => cell.toLowerCase()).join('|') !== FAKED_TABLE_HEADER.join('|')) continue;
-    for (let row = index + 2; row < lines.length && lines[row].trim().startsWith('|'); row += 1) {
-      const [service = '', fake = '', reason = '', holds = ''] = cellsOf(lines[row]);
-      rows.push({ service, fake, reason, holds: holds.toLowerCase().replace(/\s+/gu, ''), line: row + 1 });
+/** The object literal a config file declares: `export default { ... }` or `export default defineTestWorld({ ... })`. */
+function configLiteral(ts, sourceFile) {
+  for (const statement of sourceFile.statements) {
+    if (!ts.isExportAssignment(statement)) continue;
+    const expression = unwrap(ts, statement.expression);
+    if (ts.isObjectLiteralExpression(expression)) return expression;
+    if (ts.isCallExpression(expression)) {
+      const [first] = expression.arguments;
+      const literal = first ? unwrap(ts, first) : null;
+      if (literal && ts.isObjectLiteralExpression(literal)) return literal;
     }
-    break;
   }
-  return rows;
+  return null;
 }
 
-const readDeclaredStack = root => {
-  try { return readStack({ root, environment: DEFAULT_ENVIRONMENT }); } catch { return null; }
-};
+/** `stacks` as a list of environment names: an array of strings, or the keys of an object literal. */
+function stacksOf(ts, literal) {
+  const node = literal ? propertyOf(ts, literal, 'stacks') : null;
+  const value = node ? unwrap(ts, node) : null;
+  if (!value) return null;
+  if (ts.isArrayLiteralExpression(value)) return value.elements.filter(element => ts.isStringLiteralLike(element)).map(element => element.text);
+  if (ts.isObjectLiteralExpression(value)) return value.properties.map(property => nameOf(ts, property.name)).filter(Boolean);
+  return null;
+}
 
-const isImageShaped = text => IMAGE_SHAPE.test(text);
-
-/** The image literals of the test sources: hard-coded stack images, images of a `docker run` and of a testcontainers class. */
-function imageViolations({ input, declaredPaths, stackHint }) {
-  const { graph } = input;
-  const kit = machineKit(input);
-  const { ts } = kit;
-  const out = [];
-  for (const file of graph.files.values()) {
-    if (!file.slot?.startsWith(TEST_SLOT_PREFIX)) continue;
-    const checker = kit.checkerOf(file.sourceFile);
-    const reported = new Set();
-    const report = (node, text, why) => {
-      if (reported.has(node)) return;
-      reported.add(node);
-      const message = declaredPaths.has(imagePathOf(text))
-        ? `"${text}" is an image literal of ${stackHint}: the world reads the services and image versions of the stack at run time (hfs test-stack), so no image is spelled in test source (${why}).`
-        : `"${text}" is an image ${stackHint} does not declare (${why}): declare the service in the dev stack, where hfs test-stack starts it, and never start an image the stack does not carry from test source.`;
-      out.push({ ruleId: RULE, ...kit.at(file.rel, file.sourceFile, node), message, slot: file.slot });
-    };
-    kit.walk(file.sourceFile, node => {
-      if (ts.isStringLiteralLike(node) && isImageShaped(node.text) && declaredPaths.has(imagePathOf(node.text))) report(node, node.text, 'an image the dev stack declares');
-      if (ts.isArrayLiteralExpression(node)) {
-        const literals = node.elements.filter(element => ts.isStringLiteralLike(element));
-        if (literals.some(element => DOCKER_ARGUMENT_VERBS.has(element.text))) {
-          for (const element of literals) if (isImageShaped(element.text)) report(element, element.text, 'an argument of docker run');
-        }
-      }
-      if (ts.isStringLiteralLike(node) && DOCKER_COMMAND.test(node.text)) {
-        for (const token of node.text.split(/\s+/u)) if (isImageShaped(token)) report(node, token, 'a docker run command');
-      }
-      if (ts.isNewExpression(node) || ts.isCallExpression(node)) {
-        const binding = kit.importBinding(checker, node.expression);
-        const [first] = node.arguments ?? [];
-        if (binding && CONTAINER_PACKAGES.test(binding.module) && first && ts.isStringLiteralLike(first)) report(first, first.text, 'a testcontainers image');
-      }
-      return true;
+/** `fakedBy` entries: [{service, fake, reason, line, column}]; a value the reader cannot read statically has an empty fake and reason. */
+function fakedByOf(ts, sourceFile, literal) {
+  const node = literal ? propertyOf(ts, literal, 'fakedBy') : null;
+  const value = node ? unwrap(ts, node) : null;
+  if (!value || !ts.isObjectLiteralExpression(value)) return [];
+  const entries = [];
+  for (const property of value.properties) {
+    if (!ts.isPropertyAssignment(property)) continue;
+    const service = nameOf(ts, property.name);
+    const body = unwrap(ts, property.initializer);
+    const fake = ts.isObjectLiteralExpression(body) ? propertyOf(ts, body, 'fake') : null;
+    const reason = ts.isObjectLiteralExpression(body) ? propertyOf(ts, body, 'reason') : null;
+    const position = sourceFile.getLineAndCharacterOfPosition(property.getStart(sourceFile));
+    entries.push({
+      service,
+      fake: fake && ts.isStringLiteralLike(fake) ? fake.text : '',
+      reason: reason && ts.isStringLiteralLike(reason) ? reason.text.trim() : '',
+      line: position.line + 1,
+      column: position.character + 1,
     });
   }
-  return out;
+  return entries;
 }
 
 export function checkTestWorldFiles(input) {
-  const { config, graph } = input;
+  const { config, graph, context } = input;
+  const ts = context.ts;
   const resolver = graph.resolver;
   const { suffixes } = resolver.ruleParams();
   const tree = treeOf(config.root);
   const violations = [];
-  const stack = readDeclaredStack(config.root);
-  const declaredPaths = new Set((stack?.services ?? []).filter(service => isTagged(service.image)).map(service => imagePathOf(service.image)));
-  const fakeable = (stack?.services ?? []).filter(service => service.role !== 'service');
-  const stackHint = `${STACKS_DIRECTORY}/${DEFAULT_ENVIRONMENT}`;
   const fakeProviders = new Map();
   let worldRoot = null;
   let files = 0;
@@ -147,32 +120,44 @@ export function checkTestWorldFiles(input) {
     });
   }
 
-  const readmePath = worldRoot === null ? null : `${worldRoot}${WORLD_README}`;
-  const marked = readmePath !== null && stack ? readMarkedFakes(path.join(config.root, ...readmePath.split('/'))) : [];
+  const configPath = worldRoot === null ? null : `${worldRoot}${CONFIG_FILE}`;
+  const configFile = configPath === null ? null : graph.files.get(configPath) ?? null;
+  const literal = configFile ? configLiteral(ts, configFile.sourceFile) : null;
+  const environments = (literal ? stacksOf(ts, literal) : null) ?? [defaultEnvironment];
+  const services = [];
+  for (const environment of environments) {
+    let stack = null;
+    try { stack = readStack({ root: config.root, environment }); } catch { stack = null; }
+    for (const service of stack?.services ?? []) if (service.role !== 'service' && !services.some(known => known.name === service.name)) services.push({ ...service, environment });
+  }
+  const stackHint = `${STACKS_DIRECTORY}/${environments.join(', ')}`;
   const statefulWhy = service => (STATEFUL_KINDS.has(service.kind) ? `a ${service.kind} holds data the app reads back` : service.persistent ? 'the stack gives it a persistent volume' : null);
-  const at = (file, line, message) => violations.push({ ruleId: RULE, path: file, line, column: 1, message, slot: WORLD_SLOT });
+  const declared = configFile ? fakedByOf(ts, configFile.sourceFile, literal) : [];
 
-  for (const row of marked) {
-    const service = (stack?.services ?? []).find(candidate => candidate.name === row.service);
+  for (const entry of declared) {
+    const service = services.find(candidate => candidate.name === entry.service);
     const problems = [];
-    if (!service) problems.push(`${stackHint} declares no service ${row.service}`);
+    if (!service) problems.push(`${stackHint} declares no service ${entry.service}`);
     else if (statefulWhy(service)) problems.push(`${service.name} is stateful (${statefulWhy(service)}) and always runs real`);
-    if (!fakeProviders.has(row.fake)) problems.push(`there is no fakes/${row.fake}/ folder`);
-    if (row.reason === '') problems.push('the reason is empty');
-    if (row.holds !== HOLDS_BOTH) problems.push('holds must be "a, b": both (a) stateless compute and (b) needs special hardware or an external model must hold');
-    if (problems.length > 0) at(readmePath, row.line, `${readmePath} marks ${row.service} as faked by ${row.fake}, but ${problems.join('; ')}. The exception covers only stateless compute that needs special hardware or an external model; everything else in the stack runs real.`);
+    if (!fakeProviders.has(entry.fake)) problems.push(`there is no fakes/${entry.fake || '<fake>'}/ folder`);
+    if (entry.reason === '') problems.push('the reason is empty');
+    if (problems.length > 0) {
+      violations.push({
+        ruleId: RULE, path: configPath, line: entry.line, column: entry.column, slot: WORLD_SLOT,
+        message: `${configPath} declares ${entry.service} as faked by ${entry.fake || '(no fake)'}, but ${problems.join('; ')}. The exception covers only stateless compute that needs special hardware or an external model, with a reason; everything else in the stack runs real.`,
+      });
+    }
   }
 
   for (const [provider, file] of [...fakeProviders].sort(([a], [b]) => a.localeCompare(b))) {
-    const service = fakeable.find(candidate => namesOfService(candidate).includes(provider));
+    const service = services.find(candidate => namesOfService(candidate).includes(provider));
     if (!service) continue;
-    const row = marked.find(candidate => candidate.fake === provider && candidate.service === service.name);
-    if (row && !statefulWhy(service) && row.reason !== '' && row.holds === HOLDS_BOTH) continue;
-    if (row) continue; // the invalid marking was reported on its README row above
+    if (declared.some(entry => entry.service === service.name && entry.fake === provider)) continue; // judged on its config entry above
     const why = statefulWhy(service);
-    at(file, 1, `fakes/${provider}/ fakes ${service.name} (${service.image}), which ${stackHint} declares: a service of the repository's own stack runs real in the test world. ${why ? `${service.name} is stateful (${why}), so no exception applies. ` : `Only stateless compute that needs special hardware or an external model may be faked, and only when ${readmePath ?? 'the world README.md'} marks it in the table | stack service | fake | reason | holds |. `}Delete the fake and let the world use the real service (hfs test-stack); fakes/ is otherwise only for external SaaS the team does not operate.`);
+    violations.push({
+      ruleId: RULE, path: file, line: 1, column: 1, slot: WORLD_SLOT,
+      message: `fakes/${provider}/ fakes ${service.name} (${service.image}), which ${stackHint} declares: a service of the repository's own stack runs real in the test world. ${why ? `${service.name} is stateful (${why}), so no exception applies. ` : `Only stateless compute that needs special hardware or an external model may be faked, and only when ${configPath ?? `${CONFIG_FILE} in the world`} declares it in fakedBy with a reason. `}Delete the fake and let the world run the real service; fakes/ is otherwise only for external SaaS the team does not operate.`,
+    });
   }
-
-  violations.push(...imageViolations({ input, declaredPaths, stackHint }));
   return { violations, coverage: { status: 'checked', files } };
 }

@@ -1,12 +1,10 @@
 /**
  * The typed options the test world hands to the real apps: what the `main.ts` of each app would parse
- * from the environment of a deployment, built as objects from the coordinates of the run. The database and the identity
- * provider are real services of the stack reached through their toxiproxy proxies; the payment gateway and the mail host are
- * fakes at the network edge; rate limits are high, the job tick and the queue poll are short, the session lives a day.
+ * from the environment of a deployment, built as objects from the coordinates of the run. Everything third-party points
+ * at a fake at the network edge; rate limits are high, the job tick and the queue poll are short, the session lives a day.
  */
 import { Secret } from "@modules/platform/config"
 import { PRIMARY_CONNECTION } from "@modules/platform/database"
-import { providerUrl, tokenUrlOf } from "./identity-provider.client"
 import type { TestOptions } from "./test-world.contracts"
 import type { TestWorldState } from "./test-world-state.service"
 
@@ -27,7 +25,7 @@ export const testOptions = (state: TestWorldState): TestOptions => ({
         rateLimit: { windowMs: 60_000, defaultLimit: RATE_LIMIT_HIGH, strictLimit: RATE_LIMIT_HIGH },
     },
     identity: { ttlDays: 1, adminSubjects: [] },
-    keycloak: { tokenUrl: tokenUrlOf(providerUrl(state.stack, true), state.keycloakRealm), clientId: state.keycloakClientId, timeoutMs: CALL_DEADLINE_MS },
+    keycloak: { tokenUrl: state.keycloakTokenUrl, clientId: state.keycloakClientId, timeoutMs: CALL_DEADLINE_MS },
     sepay: {
         baseUrl: state.sepayBaseUrl,
         apiKey: new Secret(state.sepayApiKey),

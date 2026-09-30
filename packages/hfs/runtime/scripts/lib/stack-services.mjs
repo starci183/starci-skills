@@ -4,10 +4,9 @@ import { parseYaml } from '../../engine/yaml.mjs';
 
 /**
  * The services of a repository's own stack definition, read from `.starcistacks/application-stacks.yaml` and the compose
- * files of one environment (`environments.<env>.composeFiles`, `include:` followed). One reader serves the test world's warm
- * stack (`hfs test-stack`, which starts what this returns) and the R47 `test-world-files` machine check (which refuses an
- * image the stack does not declare and a fake of a service the stack declares), so the stack is read the same way
- * everywhere. Nothing here names a product: the stack declares its services, this reads them.
+ * files of one environment (`environments.<env>.composeFiles`, `include:` followed). The R47 `test-world-files` machine check
+ * reads the stack through it: it refuses a fake of a service the stack declares, and a `fakedBy` of a stateful one. Nothing
+ * here names a product: the stack declares its services, this reads them.
  *
  * Which services the test world runs for real: every declared service except the app's own services (component role
  * `service`, or a compose service under the `app` profile) and observability sidecars (role `observability`). The
@@ -18,7 +17,7 @@ export const STACKS_DIRECTORY = '.starcistacks';
 export const STACKS_FILE = 'application-stacks.yaml';
 export const DEFAULT_ENVIRONMENT = 'dev';
 
-/** Test-only value the `*_FILE` secret variables of a compose service become (`POSTGRES_PASSWORD_FILE` -> `POSTGRES_PASSWORD`). Never a real secret: the test stack listens on loopback only. */
+/** Test-only value the `*_FILE` secret variables of a compose service become (the file variable is replaced by the plain variable of the same name). Never a real secret: the test stack listens on loopback only. */
 export const TEST_SECRET_VALUE = 'starci-test-secret';
 
 const NOT_RUN_ROLES = new Set(['service', 'observability']);

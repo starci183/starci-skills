@@ -5,13 +5,13 @@ import { PRODUCT_COUNT } from "../../fixtures/persistence/e2e-verification.sql"
 import { useTestWorld } from "../../world/use-test-world"
 
 /**
- * Infra-down recovery on the REAL services of the stack, failed through their toxiproxy proxies. Each dependency is cut mid-run
- * (`world.infra.<service>.cut()`) and restored (`.restore()`): the apis must stay alive and answer /health with a clean 503
- * instead of hanging or crashing, then recover to 200, with the persisted world intact and the public doors working again.
- *  - the cache (`world.infra.redis`): identity reports its cache unreachable and order cascades through the identity health it
- *    probes;
- *  - the database (`world.infra.postgres`): the identity and the order database are two databases of the one Postgres the stack
- *    declares, so identity reports 503 and so does order, whose own database and whose probe of identity both fail.
+ * Infra-down recovery, on the world's own operations. Each dependency is taken down mid-run and put back: the apis must stay
+ * alive and answer /health with a clean 503 instead of hanging or crashing, then recover to 200, with the persisted world
+ * intact and the public doors working again.
+ *  - the cache provider (the Redis fake `interrupt`): identity reports its cache unreachable and order cascades through the
+ *    identity health it probes;
+ *  - the order database (`world.interruptDatabase`): order reports its database unreachable, identity stays healthy;
+ *  - the identity database: identity reports 503 and so does order, whose probe of identity fails.
  */
 describe("resilience: infra recovery", () => {
     const world = useTestWorld({
@@ -37,30 +37,40 @@ describe("resilience: infra recovery", () => {
         expect(await status("identity")).toBe(200)
         expect(await status("order")).toBe(200)
 
-        await world.infra.redis.cut()
-        await answers("identity", 503, 90_000)
-        await answers("order", 503, 90_000)
-        await world.infra.redis.restore()
+        await world.fake.redis.interrupt(async () => {
+            await answers("identity", 503, 90_000)
+            await answers("order", 503, 90_000)
+        })
 
         await answers("identity", 200, 180_000)
         await answers("order", 200, 180_000)
         expect(await productsSeeded()).toBe(seeded)
     })
 
-    it("a database outage takes identity and, through its probe, order down; both recover", async () => {
+    it("an order database outage takes order down, not identity, and order recovers with the database", async () => {
         const seeded = await productsSeeded()
 
-        await world.infra.postgres.cut()
-        await answers("identity", 503, 90_000)
-        await answers("order", 503, 90_000)
-        await world.infra.postgres.restore()
+        await world.interruptDatabase(async () => {
+            await answers("order", 503, 90_000)
+            expect(await status("identity")).toBe(200)
+        }, "order")
 
-        await answers("identity", 200, 180_000)
         await answers("order", 200, 180_000)
         expect(await productsSeeded()).toBe(seeded)
         const person = await world.signedInPerson("recovery")
-        expect(person.sessionToken).not.toBe("")
         const cart = await world.apps.order.api.bearing(person.sessionToken).read("cart")
         expect(cart.errorCode).toBeNull()
+    })
+
+    it("an identity database outage takes identity and, through its probe, order down; both recover", async () => {
+        await world.interruptDatabase(async () => {
+            await answers("identity", 503, 90_000)
+            await answers("order", 503, 90_000)
+        }, "identity")
+
+        await answers("identity", 200, 180_000)
+        await answers("order", 200, 180_000)
+        const person = await world.signedInPerson("recovery-identity")
+        expect(person.sessionToken).not.toBe("")
     })
 })

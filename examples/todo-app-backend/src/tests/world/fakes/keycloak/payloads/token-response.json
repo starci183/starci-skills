@@ -1,0 +1,10 @@
+{
+  "access_token": "{{accessToken}}",
+  "expires_in": 300,
+  "refresh_expires_in": 1800,
+  "refresh_token": "{{refreshToken}}",
+  "token_type": "Bearer",
+  "not-before-policy": 0,
+  "session_state": "{{sessionState}}",
+  "scope": "email profile"
+}

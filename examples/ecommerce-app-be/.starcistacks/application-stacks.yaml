@@ -10,11 +10,6 @@ components:
     image: redis:7
     role: stateful
     compose: infra/compose/redis.yaml
-  toxiproxy:
-    image: ghcr.io/shopify/toxiproxy:2.9.0
-    role: failure-injection
-    purpose: The test world routes every real service through a proxy here to cut or slow it on purpose (hfs test-stack).
-    compose: infra/compose/toxiproxy.yaml
   identity:
     image: ecommerce-app-be/identity
     role: service
@@ -34,8 +29,6 @@ environments:
         port: 5501
       redis:
         port: 6448
-      toxiproxy:
-        port: 8543
       identity:
         port: 5070
       order:

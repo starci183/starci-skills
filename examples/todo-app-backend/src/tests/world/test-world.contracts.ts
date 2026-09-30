@@ -2,7 +2,6 @@ import type { DynamicModule } from "@nestjs/common"
 import type { EntityManager } from "typeorm"
 import type { TodoAppOptions } from "../../../apps/todo/src/todo.options"
 import type { WorkerAppOptions } from "../../../apps/worker/src/worker.options"
-import type { InfraControl } from "./infra.client"
 import type { TestApi, TestCaller } from "./test-api.client"
 
 /**
@@ -76,28 +75,7 @@ export interface TestApps {
     readonly worker: WorkerAppHandle
 }
 
-/**
- * The real services of the stack the world can fail on purpose: `world.infra.<service>.latency(ms)`, `.cut()`, `.restore()`.
- * One entry per service the dev stack declares that the test world runs (its stack name).
- */
-export interface TestInfra {
-    /** The Postgres of the stack: the database of the apps under test. */
-    readonly postgres: InfraControl
-    /** The Keycloak of the stack: the identity provider of the sign-in door. */
-    readonly keycloak: InfraControl
-    /** The Redis of the stack. */
-    readonly redis: InfraControl
-    /** The MinIO of the stack. */
-    readonly minio: InfraControl
-}
-
-/** The real identity provider's admin door: who exists at the provider. */
-export interface TestIdentity {
-    /** Registers a person at the provider (email and password) and answers the person id its tokens carry as `sub`. */
-    register(email: string, password: string): Promise<string>
-}
-
-/** A person known to the real identity provider and signed in through the public door. */
+/** A person known to the identity provider fake and signed in through the public door. */
 export interface SignedInPerson {
     /** The email the person signs in with. */
     readonly email: string

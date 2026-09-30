@@ -3,7 +3,7 @@ import type { EntityManager } from "typeorm"
 import type { Secret } from "@modules/platform/config"
 import type { AppModule as IdentityApp } from "../../../apps/identity/src/app.module"
 import type { AppModule as OrderApp } from "../../../apps/order/src/app.module"
-import type { InfraControl } from "./infra.client"
+import type { RedisFakeService } from "./fakes/redis/redis-fake.service"
 import type { TestApi } from "./test-api.client"
 
 /** The typed options of the identity api, as `AppModule.register` takes them. */
@@ -93,21 +93,10 @@ export interface TestApps {
     readonly order: TestAppHandle
 }
 
-/**
- * The real services of the stack the world can fail on purpose: `world.infra.<service>.latency(ms)`, `.cut()`, `.restore()`.
- * One entry per service the dev stack declares that the test world runs (its stack name).
- */
-export interface TestInfra {
-    /** The Postgres of the stack: the identity and the order database live in it. */
-    readonly postgres: InfraControl
-    /** The Redis of the stack: the cache integration of identity. */
-    readonly redis: InfraControl
-}
-
-/** What the world reads from the real Redis of the stack. */
-export interface TestCache {
-    /** How many entries the run's Redis database holds. */
-    size(): Promise<number>
+/** The network fakes of the external services the apps call; first-party apps run for real. */
+export interface TestFakes {
+    /** The Redis provider behind the cache integration. */
+    readonly redis: RedisFakeService
 }
 
 /** A person a spec registered and signed in. */
@@ -129,3 +118,6 @@ export interface WaitForOptions {
     /** The pause between two checks in milliseconds. */
     readonly intervalMs?: number
 }
+
+/** The databases an outage can take down. */
+export type TestConnection = "identity" | "order"

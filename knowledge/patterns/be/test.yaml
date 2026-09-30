@@ -37,10 +37,9 @@ rules:
       `useTestWorld({ apps })`). Contract is `src/tests/contract/<provider>/*.contract-spec.ts` (provider sandboxes, skipped
       without sandbox config). `src/tests/world/` is the only test infrastructure (`global-setup.ts`, `global-teardown.ts`,
       `use-test-world.ts`, `fakes/<provider>/` network-edge fakes of external SaaS with `failNext`, `replayWebhook`, `delay`,
-      and a `README.md` only when it marks a faked stack service); every service of the repository's own stack
-      (`.starcistacks/<env>`) runs real in the world, started or attached through `hfs test-stack` (managed script
-      `test:stack`, subcommands `up` and `down`, stable project name `<package>-test-stack`), behind toxiproxy, with images
-      and versions read from the stack at run time and no image literal in test source; `src/tests/fixtures/` holds typed
+      and `test-world.config.ts`, the declaration of the test-world library with `stacks` and `fakedBy`); every service of the
+      repository's own stack (`.starcistacks/<env>`) runs real in the world, started or attached (warm-stack mode) by the
+      library behind toxiproxy, with images and versions read from the stack at run time; `src/tests/fixtures/` holds typed
       doubles and builders. There is no `live/` folder and no `src/tests/e2e/world`. One root `jest.config.js` uses the
       preset `@starci/jest-preset` and declares exactly four projects: `unit`, `integration`, `e2e` and `contract`. The unit
       project maps no module into `src/tests/{world,integration,e2e,contract}`. Scripts are `test` (unit), `test:integration`,
@@ -116,7 +115,7 @@ rules:
       Every app has `<app>.composition.spec.ts` that boots the real `AppModule.register(testOptions)` and resolves real
       provider tokens. An e2e boots the real apps through `useTestWorld({ apps })` against the repository's own stack running real (Postgres,
       Redis, Keycloak with its realm imported, a mail host, k3s through k3d with a local registry when the app drives
-      Kubernetes; `global-setup.ts` attaches to a warm `hfs test-stack up` that answers and otherwise starts its own, and
+      Kubernetes; `global-setup.ts` attaches to a warm stack that answers and otherwise starts its own, and
       `global-teardown.ts` stops only what it started), runs the real migrations through the `apps/migrate` runner function once
       in `global-setup.ts`, fakes only external SaaS the team does not operate at the network edge (`world.fake.<provider>`), fails
       a real service on purpose through `world.infra.<service>.latency(ms)`, `.cut()` and `.restore()` (toxiproxy), overrides no
@@ -141,7 +140,7 @@ rules:
         write: 'await world.infra.postgres.cut(); await world.waitFor("api answers 503", ...); await world.infra.postgres.restore(); await world.infra.keycloak.latency(6_000)'
       - id: case-5
         when: A stack service that is stateless GPU or model compute
-        write: 'fakes/inference/ plus a row in src/tests/world/README.md: | stack service | fake | reason | holds | / | inference | inference | Serves a GPU model | a, b |; a database, cache, identity provider, mail host or queue is never faked'
+        write: 'fakes/inference/ plus fakedBy: { inference: { fake: "inference", reason: "Serves a GPU model" } } in test-world.config.ts; a database, cache, identity provider, mail host or queue is never faked'
     verification:
       automated:
         - BE_APP_COMPOSITION_ONLY

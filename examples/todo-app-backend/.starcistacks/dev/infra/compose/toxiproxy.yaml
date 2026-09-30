@@ -1,7 +1,0 @@
-services:
-  toxiproxy:
-    # Failure injection for the test world: `hfs test-stack up` starts it beside the real services and creates one proxy
-    # per published port; a spec cuts or slows a service through it (world.infra.<service>.cut / latency / restore).
-    image: ghcr.io/shopify/toxiproxy:2.9.0
-    ports:
-      - "8474:8474"

@@ -96,5 +96,5 @@ export interface WebhookTarget {
     readonly deliverTo: string
 }
 
-/** The names of the fakes that record requests and take failures: external SaaS and hosts the stack does not run. */
-export type FakeName = "smtp" | "sepay"
+/** The names of the fakes that record requests and take failures. */
+export type FakeName = "keycloak" | "smtp" | "sepay"

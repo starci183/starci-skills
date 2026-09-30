@@ -9,14 +9,9 @@ One root `jest.config.js` (managed: `require("@starci/jest-preset").starciJestCo
 | contract | `npm run test:contract` | `src/tests/contract/<provider>/*.contract-spec.ts`: our client against the provider's real sandbox; skips itself without sandbox config. Never part of `test` or `test:e2e`. |
 
 `src/tests/world/` is the only test infrastructure. The integration, e2e and contract projects share its jest
-`global-setup.ts` / `global-teardown.ts` and run one worker. The setup runs the repository's own stack (`.starcistacks/dev`) for
-real through `hfs test-stack`: Postgres, Keycloak with the `todo` realm imported from `realm-todo.json`, Redis and MinIO, each
-behind a toxiproxy proxy (the dev stack declares toxiproxy). The world reads the services and their image versions from the stack
-at run time and spells no image. It then creates one database per run inside that Postgres and runs `apps/migrate`'s exported
-`bootstrap` once against it. The dev stack declares no mail host, so the SMTP fake stays, and the payment gateway (SePay) is an
-external SaaS: both are network-edge fakes under `src/tests/world/fakes/<provider>/`. `use-test-world.ts` exports
-`useTestWorld(...)` -> `world.apps.<name>.api`, `world.db.<connection>` (the shared EntityManager), `world.identity.register`
-(the real Keycloak's admin door), `world.infra.<service>` (`latency(ms)`, `cut()`, `restore()` on the real service) and
+`global-setup.ts` / `global-teardown.ts` (one Postgres container per run, `apps/migrate`'s exported `bootstrap` once, the
+network-edge fakes of every third party under `src/tests/world/fakes/<provider>/`) and run one worker. `use-test-world.ts`
+exports `useTestWorld(...)` -> `world.apps.<name>.api`, `world.db.<connection>` (the shared EntityManager) and
 `world.fake.<provider>`. Nothing under `src/tests/` overrides a provider; shared test data lives in `src/tests/fixtures/`.
 
 ## Unit tests
@@ -44,10 +39,6 @@ npm run test:coverage       # jest --coverage -> coverage/lcov.info (+ text summ
 They run by hand, never in a hook or the default CI job. Each script type-checks the test tree first
 (`npm run typecheck:tests`, `src/tests/tsconfig.json`). Integration and e2e need a running Docker daemon (`docker info`).
 
-`npm run test:stack -- up` starts the stack once and keeps it warm (project `todo-app-backend-test-stack`); the world attaches to
-it when its services answer, otherwise it starts its own and stops it at the end. `npm run test:stack -- down` removes the warm
-stack. The world stops only what it started, and drops its own database either way.
-
 ```bash
 npm run test:e2e                                 # every journey, one worker
 npm run test:e2e -- flows/task-lifecycle         # one spec by path fragment
@@ -55,11 +46,8 @@ npm run test:contract                            # provider sandboxes (skipped w
 ```
 
 - The world is started once per run: every host port is allocated by the OS on `127.0.0.1`, every secret is generated per
-  run, and the teardown drops the run's database, the upload directory and the state file, then verifies nothing survived.
+  run, and the teardown removes the container, the upload directory and the state file, then verifies nothing survived.
 - A spec never creates schema, starts a container or writes `process.env`: that is the world's job.
-- A spec fails a real service on purpose through `world.infra.<service>`: `await world.infra.postgres.cut()`, wait for the api's
-  declared degraded answer, `await world.infra.postgres.restore()`; `latency(ms)` makes a service slower than a client's deadline.
-  A service is never killed or replaced.
 
 ## Writing an e2e spec
 

@@ -6,6 +6,5 @@ name: ecommerce-app-be-dev
 include:
   - postgres.yaml
   - redis.yaml
-  - toxiproxy.yaml
   - identity.yaml
   - order.yaml

@@ -5,37 +5,25 @@ summary: >-
   definition (.starcistacks/<env>) runs REAL in the test world - Postgres, Redis, Keycloak with the realm imported as the dev
   stack imports it, a mail host when the stack declares one, k3s through k3d plus a local registry when the app drives
   Kubernetes; only an external SaaS the team does not operate is faked at the network edge (fakes/<provider>/). Failure
-  injection on real infrastructure goes through toxiproxy: the stack declares it, the world routes each real service through a
-  proxy and exposes world.infra.<service>.latency(ms), .cut() and .restore(); world.interruptDatabase and the per-service
-  interrupt operations are deleted. The world's services and image versions come from the stack at run time (no image literal
-  in test source). New managed script test:stack (hfs test-stack, subcommands up and down, stable project name
-  <package>-test-stack): globalSetup attaches to a warm stack that answers and otherwise starts its own, globalTeardown stops
-  only what globalSetup started. New machine legs of R47 test-world-files (BE_TEST_TOPOLOGY): an image literal in test source
-  (an image:tag of a repository the dev stack declares, or an image handed to docker run/create or a testcontainers class that
-  the stack does not declare) and a fakes/<provider>/ that fakes a service the dev stack declares are findings. One
-  owner-approved exception: a stack service that is stateless compute needing special hardware or an external model (GPU
-  inference, a self-hosted embedding model) may be faked when src/tests/world/README.md (now an allowed file of the world
-  slot) marks it in the table | stack service | fake | reason | holds | with holds = a, b; a stateful kind or a service with a
-  persistent volume is never accepted. The examples follow: todo uses the real Keycloak (its realm-todo.json) and its SMTP fake
-  stays because the todo stack declares no mail host; ecommerce uses the real Redis; both dev stacks declare toxiproxy and
-  their resilience specs use world.infra.<service>.cut/restore. jest-preset is unchanged (globalSetup and globalTeardown keep
-  their paths).
+  injection on real infrastructure goes through toxiproxy (world.infra.<service>.latency(ms), .cut(), .restore(); no
+  interruptDatabase, no per-service interrupt). The world's services and image versions come from the stack at run time, and a
+  warm stack (attach when it answers, tear down only what setup started) is supported. All of that is implemented by the
+  test-world library (@starci/test-world, test-world.config.ts with `stacks` and `fakedBy`); this change is the law, the
+  convention text and the machine check. R47 test-world-files (BE_TEST_TOPOLOGY) refuses a fakes/<provider>/ that fakes a
+  service the stack declares. One owner-approved exception: a stack service that is stateless compute needing special
+  hardware or an external model (GPU inference, a self-hosted embedding model) may be faked when test-world.config.ts
+  declares it in fakedBy with a non-empty reason; a stateful kind (database, cache, identity, storage, mail, queue, search) or
+  a service with a persistent volume is never accepted, and a fakedBy entry naming a missing stack service or fake folder is
+  refused. jest-preset is unchanged.
 reach: new-legs
 paths:
   - modules/kernel/contract-changes/hfs-test-world-real.yaml
   - modules/kernel/failure-codes.yaml
-  - knowledge/hfs/slots.yaml
   - knowledge/hfs/rules.yaml
   - knowledge/hfs/README.md
   - knowledge/patterns/be/test.yaml
   - scripts/lib/stack-services.mjs
   - scripts/checks/architecture/test-world-files.mjs
   - packages/eslint/be/test-world.mjs
-  - packages/hfs/bin/hfs.mjs
-  - packages/hfs/test-stack/test-stack.mjs
-  - packages/hfs/templates/be/package-scripts/package.json
   - packages/hfs/CHANGELOG.md
-  - packages/hfs/README.md
   - tests/architecture-test-world-files.spec.mjs
-  - tests/hfs-test-stack.spec.mjs
-  - tests/hfs-sync.spec.mjs

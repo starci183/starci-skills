@@ -719,7 +719,7 @@ slots:
     presence: optional
     tracked: tracked
     tier: e2e
-    allows: [global-setup.ts, global-teardown.ts, use-test-world.ts, fakes/, README.md]   # jest globalSetup/globalTeardown default-export (Jest API); README.md marks the stack services a world fakes (stateless GPU/model compute only, R47); plus root files with a role suffix (test-world-files, R47)
+    allows: [global-setup.ts, global-teardown.ts, use-test-world.ts, fakes/]   # jest globalSetup/globalTeardown default-export (Jest API); plus root files with a role suffix (test-world-files, R47)
     tests: none
     why: >-
       the ONLY test infrastructure location, shared by integration and e2e: global-setup.ts starts the shared

@@ -3,7 +3,7 @@
  *
  * Unit specs sit beside their subject. Everything else lives under `src/tests/`, one folder per kind:
  *   - `world/`        the ONLY test infrastructure (slot `be.tests.world`): `global-setup.ts` starts (or attaches to) the stack
- *                     the repository declares in `.starcistacks/<env>` through `hfs test-stack` - every service of it runs
+ *                     the repository declares in `.starcistacks/<env>` (the test-world library) - every service of it runs
  *                     REAL behind toxiproxy - and runs `apps/migrate`'s exported bootstrap once; `use-test-world.ts` exports
  *                     `useTestWorld({ apps } | { modules })` -> `world.apps.<name>.api`, `world.db.<connection>`,
  *                     `world.infra.<service>` (`latency(ms)`, `cut()`, `restore()` on the real service),
