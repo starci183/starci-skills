@@ -1,5 +1,5 @@
-export { DATABASE_PROBE } from "./database.decorators"
 export { DatabaseModule } from "./database.module"
+export { DatabaseProbe } from "./database-probe.service"
 export type { DatabaseConnectionConfig, DatabaseConnectionOptions } from "./database.options"
 export { LIST_ROWS_MAX, sql } from "./database.sql"
 export type { SqlText } from "./database.sql"

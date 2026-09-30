@@ -1,8 +1,7 @@
 import { Module } from "@nestjs/common"
 import type { DynamicModule } from "@nestjs/common"
-import { TypeOrmModule, getEntityManagerToken } from "@nestjs/typeorm"
-import type { EntityManager } from "typeorm"
-import { DATABASE_PROBE } from "./database.decorators"
+import { TypeOrmModule, getDataSourceToken } from "@nestjs/typeorm"
+import type { DataSource } from "typeorm"
 import { DatabaseProbe } from "./database-probe.service"
 import { ConfigurableModuleClass, OPTIONS_TYPE } from "./database.module-definition"
 
@@ -33,12 +32,12 @@ export class DatabaseModule extends ConfigurableModuleClass {
             providers: [
                 ...(base.providers ?? []),
                 {
-                    provide: DATABASE_PROBE,
-                    inject: options.connections.map((connection) => getEntityManagerToken(connection.name)),
-                    useFactory: (...managers: Array<EntityManager>) => new DatabaseProbe(managers),
+                    provide: DatabaseProbe,
+                    inject: options.connections.map((connection) => getDataSourceToken(connection.name)),
+                    useFactory: (...sources: Array<DataSource>) => new DatabaseProbe(sources.map((source) => source.manager)),
                 },
             ],
-            exports: [DATABASE_PROBE],
+            exports: [DatabaseProbe],
         }
     }
 }
