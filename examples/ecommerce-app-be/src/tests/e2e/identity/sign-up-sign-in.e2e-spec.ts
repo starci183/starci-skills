@@ -1,185 +1,95 @@
-import {
-    E2EData, E2EWorld, bootE2eWorld 
-} from "../setup/e2e-world"
-import {
-    E2EHttpService 
-} from "../setup/integrations/http/e2e-http.service"
-import {
-    E2EGraphqlService 
-} from "../setup/integrations/graphql/e2e-graphql.service"
-import {
-    E2EStackService 
-} from "../setup/platform/stack/e2e-stack.service"
-
-/** The register mutation's payload. */
-interface RegisterPayload { personId: string }
-
-/** The register mutation's data envelope. */
-interface RegisterData { register: RegisterPayload }
-
-/** The signIn mutation's payload. */
-interface SignInPayload { sessionToken: string; personId: string }
-
-/** The signIn mutation's data envelope. */
-interface SignInData { signIn: SignInPayload }
-
-/** The account query's payload: the person joined with live buyer status. */
-interface AccountPayload { personId: string; email: string; hasOrders: boolean }
-
-/** The account query's data envelope. */
-interface AccountData { account: AccountPayload }
+import { randomUUID } from "node:crypto"
+import { bootE2eWorld } from "../setup/e2e-world"
+import type { E2EWorld } from "../setup/e2e-world"
+import { present } from "../setup/e2e.error"
+import type {
+    AccountData,
+    RegisterData,
+    RevokeSessionData,
+    SignInData,
+    VerifySessionData,
+} from "../setup/e2e-views.contracts"
 
 /**
- * Exemplar for the e2e contract: fr.identity.sign-in as one complete A->Z journey over the public
- * doors only - register, refused duplicates and wrong pairs, sign-in, session verify, the
- * account view that itself proves the identity->order hop (hasOrders is read live from the order
- * service), revoke, and out-of-band persistence/cleanup verification.
+ * fr.identity.sign-in as one complete journey over the public doors only: register, a refused duplicate and refused wrong
+ * pairs, sign-in, session verification, the account view that itself proves the identity to order hop (hasOrders is read
+ * live from the order service with the caller own bearer), revoke, and out-of-band persistence verification. Every
+ * refusal is asserted on errors[0].extensions.code, not on an HTTP status.
  *
- * The user-facing doors are GraphQL now: register, signIn and account travel as real operations
- * to identity's /graphql, and every refusal is asserted on errors[0].extensions.code carrying
- * the business code (EMAIL_TAKEN, INVALID_CREDENTIALS - the `_EXCEPTION` transport suffix stays
- * inside the exception class) - not on an HTTP status. Only the justified machine doors
- * (/internal/sessions/*) and the /health probe still ride plain HTTP.
- *
- * Run: npm run test:e2e -- identity/sign-up-sign-in.e2e-spec.ts
+ * Run: npm run test:e2e -- identity/sign-up-sign-in
  */
-describe("identity sign-up → sign-in journey",
-    () => {
-        let world: E2EWorld
-        let stack: E2EStackService
-        let http: E2EHttpService
-        let graphql: E2EGraphqlService
-        let dataSource: E2EData
+describe("identity sign-up and sign-in journey", () => {
+    let world: E2EWorld
+    const email = `e2e-${randomUUID()}@ecommerce.dev`
+    const password = "e2e-journey-pass-1"
 
-        const email = `e2e-${Date.now()}@ecommerce.dev`
-        const password = "e2e-journey-pass-1"
+    beforeAll(async () => {
+        world = await bootE2eWorld("identity/sign-up-sign-in")
+    }, 300_000)
 
-        beforeAll(async () => {
-            world = await bootE2eWorld("identity/sign-up-sign-in")
-            stack = world.stack
-            http = world.http
-            graphql = world.graphql
-            dataSource = world.data
-        },
-        300_000)
-
-        afterAll(async () => {
-            await world.moduleRef.close()
-            // Teardown verification is part of the contract: this run's containers and volumes must be gone.
-            expect(stack.cleanupReport).not.toBeNull()
-            expect(stack.cleanupReport?.clean).toBe(true)
-        })
-
-        it("registers a person, issues and verifies a session, then revokes it",
-            async () => {
-                const identity = http.client("identity")
-                const identityGql = graphql.client("identity")
-
-                // Dependency ordering, observed: the stack could only reach this point with postgres+redis
-                // healthy and identity's /health answering before order was ever spawned.
-                expect(stack.readiness.map((r) => r.label)).toEqual([
-                    "postgres:5432",
-                    "redis:6379",
-                    expect.stringContaining("identity /health"),
-                    expect.stringContaining("order /health"),
-                ])
-
-                const registered = await identityGql.mutate<RegisterData>("register",
-                    {
-                        variables: {
-                            input: {
-                                email, password 
-                            } 
-                        } 
-                    })
-                expect(registered.errorCode).toBeNull()
-                expect(registered.data?.register.personId).toBeTruthy()
-                const personId = registered.data!.register.personId
-
-                const taken = await identityGql.mutate<RegisterData>("register",
-                    {
-                        variables: {
-                            input: {
-                                email, password 
-                            } 
-                        } 
-                    })
-                expect(taken.errorCode).toBe("EMAIL_TAKEN")
-                expect(taken.errors?.[0]?.extensions?.code).toBe("EMAIL_TAKEN")
-
-                const wrongPair = await identityGql.mutate<SignInData>("signIn",
-                    {
-                        variables: {
-                            input: {
-                                email, password: "not-the-password" 
-                            } 
-                        } 
-                    })
-                expect(wrongPair.errorCode).toBe("INVALID_CREDENTIALS")
-                // A refusal may name the pair or neither half, but it must not single one out:
-                // no "unknown email", no "wrong password".
-                expect(wrongPair.errorMessage ?? "").not.toMatch(/unknown|not found|no such|does ?n['’]?t exist|unregistered|no account/i)
-                expect(wrongPair.errorMessage ?? "").not.toMatch(/(wrong|incorrect|invalid|bad) (password|passphrase)/i)
-
-                const signedIn = await identityGql.mutate<SignInData>("signIn",
-                    {
-                        variables: {
-                            input: {
-                                email, password 
-                            } 
-                        } 
-                    })
-                expect(signedIn.errorCode).toBeNull()
-                expect(signedIn.data?.signIn.personId).toBe(personId)
-                const { sessionToken } = signedIn.data!.signIn
-
-                // The session surface stays REST: it is a machine door order verifies against, not a
-                // user-facing API - the lint rule's sanctioned "internal" reason.
-                const verified = await identity.post<{ personId: string }>("/internal/sessions/verify",
-                    {
-                        sessionToken 
-                    })
-                expect(verified.status).toBe(201)
-                expect(verified.body.personId).toBe(personId)
-
-                // The account view is the cross-service proof: identity reads hasOrders live from order's
-                // GET /internal/buyers/:personId. A brand-new person is not a buyer yet - a reachable order answers so.
-                const account = await identityGql.read<AccountData>("account",
-                    {
-                        variables: {
-                            request: {
-                                personId
-                            }
-                        } 
-                    })
-                expect(account.errorCode).toBeNull()
-                expect(account.data?.account).toEqual({
-                    personId, email, hasOrders: false 
-                })
-
-                // Out-of-band verification: the person really persisted on this run's postgres volume, and
-                // both services' migration sets ran on it.
-                const rows = await dataSource.identity.personById(personId)
-                expect(rows).toEqual([{
-                    id: personId, email 
-                }])
-                const schema = stack.schemaSnapshot()
-                expect(schema.tables).toEqual(expect.arrayContaining(["identity_person",
-                    "product",
-                    "sales_order"]))
-
-                const revoked = await identity.post<{ revoked: boolean }>("/internal/sessions/revoke",
-                    {
-                        sessionToken 
-                    })
-                expect(revoked.status).toBe(201)
-                expect(revoked.body.revoked).toBe(true)
-
-                const afterRevoke = await identity.post<{ code?: string }>("/internal/sessions/verify",
-                    {
-                        sessionToken 
-                    })
-                expect(afterRevoke.status).toBe(401)
-                expect(afterRevoke.body.code).toBe("SESSION_INVALID")
-            })
+    afterAll(async () => {
+        await world.close()
+        // Teardown verification is part of the contract: this run containers and volumes must be gone.
+        expect(world.stack.cleanupReport?.clean).toBe(true)
     })
+
+    it("registers a person, issues and verifies a session, then revokes it", async () => {
+        const anonymous = world.graphql.client("identity")
+
+        // Dependency ordering, observed: the stack reached this point with postgres and redis ready and identity
+        // answering /health before order was ever spawned.
+        expect(world.stack.readiness.map((step) => step.label)).toEqual(["postgres", "redis", "identity /health", "order /health"])
+
+        const registered = await anonymous.mutate<RegisterData>("register", { variables: { input: { email, password } } })
+        expect(registered.errorCode).toBeNull()
+        const personId = present(registered.data, "register data").register.personId
+
+        const taken = await anonymous.mutate<RegisterData>("register", { variables: { input: { email, password } } })
+        expect(taken.errorCode).toBe("ACCOUNT_EMAIL_TAKEN")
+        expect(taken.errors?.[0]?.extensions).toMatchObject({ code: "ACCOUNT_EMAIL_TAKEN", kind: "conflict" })
+
+        // A weak password never reaches the account capability: the global validation pipe refuses it by field.
+        const weak = await anonymous.mutate<RegisterData>("register", { variables: { input: { email: `weak-${email}`, password: "short" } } })
+        expect(weak.errorCode).toBe("HTTP_SECURITY_REQUEST_INVALID")
+
+        // The refusal names neither half of the pair: a wrong password and an unknown email are the same answer.
+        const wrongPassword = await anonymous.mutate<SignInData>("signIn", { variables: { input: { email, password: "not-the-password" } } })
+        const unknownEmail = await anonymous.mutate<SignInData>("signIn", { variables: { input: { email: `ghost-${email}`, password } } })
+        expect(wrongPassword.errorCode).toBe("ACCOUNT_INVALID_CREDENTIALS")
+        expect(unknownEmail.errorCode).toBe(wrongPassword.errorCode)
+        expect(unknownEmail.errorMessage).toBe(wrongPassword.errorMessage)
+
+        const signedIn = await anonymous.mutate<SignInData>("signIn", { variables: { input: { email, password } } })
+        expect(signedIn.errorCode).toBeNull()
+        const session = present(signedIn.data, "signIn data").signIn
+        expect(session.personId).toBe(personId)
+
+        // verifySession is the handshake the order service uses; it is anonymous by design (AuthHandshake).
+        const verified = await anonymous.read<VerifySessionData>("verifySession", { variables: { input: { sessionToken: session.sessionToken } } })
+        expect(verified.errorCode).toBeNull()
+        expect(verified.data?.verifySession.personId).toBe(personId)
+
+        // The account view is the cross-service proof: identity reads hasOrders live from order, forwarding the caller token.
+        const caller = world.graphql.client("identity", session.sessionToken)
+        const account = await caller.read<AccountData>("account")
+        expect(account.errorCode).toBeNull()
+        expect(account.data?.account).toEqual({ personId, email, hasOrders: false })
+
+        // The account door is default-deny: without a live session it is refused.
+        const denied = await anonymous.read<AccountData>("account")
+        expect(denied.errorCode).toBe("AUTH_UNAUTHENTICATED")
+
+        // Out-of-band verification: the person persisted, and both databases carry their migrated tables.
+        expect(await world.database.personById(personId)).toEqual([{ id: personId, email }])
+        expect(await world.database.tables()).toEqual(expect.arrayContaining(["persons", "products", "orders"]))
+
+        const revoked = await caller.mutate<RevokeSessionData>("revokeSession", { variables: { input: { sessionToken: session.sessionToken } } })
+        expect(revoked.errorCode).toBeNull()
+        expect(revoked.data?.revokeSession.revoked).toBe(true)
+
+        const afterRevoke = await anonymous.read<VerifySessionData>("verifySession", { variables: { input: { sessionToken: session.sessionToken } } })
+        expect(afterRevoke.errorCode).toBe("SESSION_INVALID")
+        const accountAfter = await caller.read<AccountData>("account")
+        expect(accountAfter.errorCode).toBe("AUTH_UNAUTHENTICATED")
+    })
+})

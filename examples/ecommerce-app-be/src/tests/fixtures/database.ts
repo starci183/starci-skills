@@ -2,6 +2,7 @@ import { getEntityManagerToken } from "@nestjs/typeorm"
 import type { Provider } from "@nestjs/common"
 import { mock } from "@starci/jest-preset/mock"
 import type { MockOf } from "@starci/jest-preset/mock"
+import { DataSource } from "typeorm"
 import type { EntityManager } from "typeorm"
 
 /** A typed EntityManager double: every method is a jest mock, `overrides` replace chosen methods. */
@@ -20,3 +21,18 @@ export const entityManagerProvider = (connection: string, manager: EntityManager
     provide: getEntityManagerToken(connection),
     useValue: manager,
 })
+
+/** A database opened out-of-band by an e2e spec: the manager to read with and the way to close it. */
+export interface TestDatabase {
+    /** The shared manager of the connection. */
+    readonly manager: EntityManager
+    /** Closes the connection. */
+    close(): Promise<void>
+}
+
+/** Opens one database of the run-owned stack for out-of-band verification; the schema is never touched (`synchronize` is false). */
+export const openTestDatabase = async (url: string): Promise<TestDatabase> => {
+    const dataSource = new DataSource({ type: "postgres", url, synchronize: false })
+    await dataSource.initialize()
+    return { manager: dataSource.manager, close: () => dataSource.destroy() }
+}

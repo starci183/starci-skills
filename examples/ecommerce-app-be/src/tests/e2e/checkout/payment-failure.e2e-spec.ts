@@ -1,240 +1,101 @@
-import {
-    E2EData, E2EWorld, bootE2eWorld 
-} from "../setup/e2e-world"
-import {
-    E2EAuthService 
-} from "../setup/domain/accounts/e2e-auth.service"
-import {
-    E2EHttpService 
-} from "../setup/integrations/http/e2e-http.service"
-import {
-    E2EGraphqlClient, E2EGraphqlService 
-} from "../setup/integrations/graphql/e2e-graphql.service"
-
-jest.setTimeout(120_000)
-
-interface CartLineView { productId: string; quantity: number }
-
-interface ProductView { id: string; name: string; priceMinorUnits: number; stock: number }
-
-interface CartPayload {
-  items: Array<CartLineView>;
-  catalog: Array<ProductView>;
-}
-
-interface CartData { cart: CartPayload }
-
-interface PlaceOrderPayload {
-  orderId: string;
-  status: "confirmed";
-  totalMinorUnits: number;
-  currency: "USD";
-  paymentId: string;
-  replayed: boolean;
-}
-
-interface PlaceOrderData { placeOrder: PlaceOrderPayload }
-
-interface ClearCartPayload { cleared: boolean }
-
-interface ClearCartData { clearCart: ClearCartPayload }
+import { bootE2eWorld } from "../setup/e2e-world"
+import type { E2EWorld } from "../setup/e2e-world"
+import { present } from "../setup/e2e.error"
+import type { CartData, ClearCartData, PlaceOrderData } from "../setup/e2e-views.contracts"
 
 /**
- * The refusal half of sds.checkout.order-flow (t-refuse). The API contract has no external PSP
- * and no pending/declined order state - payment capture runs inside the same transaction as the
- * guarded stock decrement, so the "payment declined" step of the journey is the named refusal
- * and its honest outcome is the full rollback: no order row, no payment row, stock unmoved, cart
- * kept. Retry is a fresh placeOrder mutation once the cart is corrected; cancel is clearCart,
- * after which a confirmation is refused as cart-empty.
+ * The refusal half of the checkout. There is no external PSP and no pending or declined order state: payment capture
+ * runs inside the same transaction as the guarded stock decrement, so the refusal is named and its honest outcome is
+ * the full rollback: no order row, no payment row, stock unmoved, cart kept. Retry is a fresh placeOrder once the cart is
+ * corrected; cancel is clearCart, after which a confirmation is refused as an empty cart.
  *
- * Over GraphQL a refusal is no longer an HTTP 4xx - it is a GraphQL error whose
- * errors[0].extensions carries the full CHECKOUT_REFUSAL code plus the refusal detail
- * (reason, productId, requested, available) the formatError mapping spreads beside the code,
- * exactly where the REST body used to carry it.
+ * A refusal is a GraphQL error whose extensions carry the code, the kind and the params (productId, requested,
+ * available) that name what was refused.
  */
-describe("payment failure (e2e)",
-    () => {
-        let world: E2EWorld | undefined
-        let auth: E2EAuthService
-        let dataSource: E2EData
-        let http: E2EHttpService
-        let graphql: E2EGraphqlService
+describe("payment failure", () => {
+    let world: E2EWorld
+    const personIds: Array<string> = []
 
-        const password = "e2e-payment-pass"
-        const personIds: Array<string> = []
+    const freshBuyer = async (tag: string): Promise<{ personId: string; buyer: ReturnType<E2EWorld["graphql"]["client"]> }> => {
+        const session = await world.auth.registerBuyer(`payment-${tag}`, "e2e-payment-pass")
+        personIds.push(session.personId)
+        return { personId: session.personId, buyer: world.graphql.client("order", session.sessionToken) }
+    }
 
-        async function freshBuyer(suffix: string): Promise<{ buyer: E2EGraphqlClient; personId: string }> {
-            const email = `e2e-payment-${suffix}-${Date.now()}@starci.test`
-            const { personId } = await auth.register(email,
-                password)
-            personIds.push(personId)
-            const { sessionToken } = await auth.signIn(email,
-                password)
-            return {
-                buyer: graphql.client("order",
-                    {
-                        bearerToken: sessionToken 
-                    }), personId 
-            }
-        }
+    beforeAll(async () => {
+        world = await bootE2eWorld("checkout/payment-failure")
+        expect((await world.http("order").get<{ status: string }>("/health")).body.status).toBe("ok")
+    }, 300_000)
 
-        async function persistedOrderCount(personId: string): Promise<number> {
-            return dataSource.orders.orderCountForPerson(personId)
-        }
-
-        async function persistedPaymentCount(personId: string): Promise<number> {
-            return dataSource.payments.paymentCountForPerson(personId)
-        }
-
-        beforeAll(async () => {
-            world = await bootE2eWorld("checkout/payment-failure")
-            auth = world.auth
-            dataSource = world.data
-            http = world.http
-            graphql = world.graphql
-            expect((await http.client("order").get<{ status: string }>("/health")).data.status).toBe("ok")
-        })
-
-        afterAll(async () => {
-            if (auth) {
-                for (const personId of personIds) await auth.deleteAccount(personId)
-            }
-            await world?.moduleRef.close()
-        })
-
-        it("a refused confirmation rolls back atomically; the corrected retry captures exactly once",
-            async () => {
-                const { buyer, personId } = await freshBuyer("retry")
-
-                // sku-thermos seeds at stock 2 on a fresh stack - asking for 3 is a guaranteed refusal.
-                const browsed = await buyer.read<CartData>("cart")
-                const thermos = browsed.data?.cart.catalog.find((p) => p.id === "sku-thermos")
-                expect(thermos).toBeDefined()
-                const seededStock = thermos!.stock
-
-                const added = await buyer.mutate("addCartItem",
-                    {
-                        variables: {
-                            input: {
-                                productId: "sku-thermos", quantity: seededStock + 1 
-                            } 
-                        } 
-                    })
-                expect(added.errorCode).toBeNull()
-
-                const idempotencyKey = `e2e-${personId}`
-                const refused = await buyer.mutate<PlaceOrderData>("placeOrder",
-                    {
-                        variables: {
-                            input: {
-                                idempotencyKey 
-                            } 
-                        } 
-                    })
-                expect(refused.errorCode).toBe("CHECKOUT_REFUSAL")
-                expect(refused.errors?.[0]?.extensions).toMatchObject({
-                    code: "CHECKOUT_REFUSAL",
-                    reason: "insufficient-stock",
-                    productId: "sku-thermos",
-                    requested: seededStock + 1,
-                    available: seededStock,
-                })
-
-                // The rollback: cart kept, nothing persisted, stock unmoved - a refusal never half-writes.
-                const cartKept = await buyer.read<CartData>("cart")
-                expect(cartKept.data?.cart.items).toEqual([{
-                    productId: "sku-thermos", quantity: seededStock + 1 
-                }])
-                expect(await persistedOrderCount(personId)).toBe(0)
-                expect(await persistedPaymentCount(personId)).toBe(0)
-                const stockAfter = await dataSource.catalog.stockOf("sku-thermos")
-                expect(stockAfter).toBe(seededStock)
-
-                // Correct the cart and retry with the same key: this time the confirmation lands.
-                await buyer.mutate("clearCart")
-                const corrected = await buyer.mutate("addCartItem",
-                    {
-                        variables: {
-                            input: {
-                                productId: "sku-thermos", quantity: seededStock 
-                            } 
-                        } 
-                    })
-                expect(corrected.errorCode).toBeNull()
-
-                const retried = await buyer.mutate<PlaceOrderData>("placeOrder",
-                    {
-                        variables: {
-                            input: {
-                                idempotencyKey 
-                            } 
-                        } 
-                    })
-                expect(retried.errorCode).toBeNull()
-                expect(retried.data?.placeOrder).toMatchObject({
-                    status: "confirmed",
-                    totalMinorUnits: thermos!.priceMinorUnits * seededStock,
-                    currency: "USD",
-                    replayed: false,
-                })
-
-                const payments = await dataSource.payments.paymentSummariesForPerson(personId)
-                expect(payments).toEqual([{
-                    status: "captured", amount_minor_units: thermos!.priceMinorUnits * seededStock 
-                }])
-                expect((await buyer.read<CartData>("cart")).data?.cart.items).toEqual([])
-                const stockSoldOut = await dataSource.catalog.stockOf("sku-thermos")
-                expect(stockSoldOut).toBe(0)
-            })
-
-        it("a refused confirmation can be abandoned - clearing the cart leaves no order behind",
-            async () => {
-                const { buyer, personId } = await freshBuyer("cancel")
-
-                const browsed = await buyer.read<CartData>("cart")
-                const thermos = browsed.data?.cart.catalog.find((p) => p.id === "sku-thermos")
-                expect(thermos).toBeDefined()
-
-                await buyer.mutate("addCartItem",
-                    {
-                        variables: {
-                            input: {
-                                productId: "sku-thermos", quantity: thermos!.stock + 1 
-                            } 
-                        } 
-                    })
-                const refused = await buyer.mutate<PlaceOrderData>("placeOrder",
-                    {
-                        variables: {
-                            input: {
-                            } 
-                        } 
-                    })
-                expect(refused.errorCode).toBe("CHECKOUT_REFUSAL")
-                expect(refused.errors?.[0]?.extensions?.reason).toBe("insufficient-stock")
-
-                // Cancel per api contract: the buyer empties the cart and walks away.
-                const cleared = await buyer.mutate<ClearCartData>("clearCart")
-                expect(cleared.errorCode).toBeNull()
-                expect(cleared.data?.clearCart.cleared).toBe(true)
-                expect((await buyer.read<CartData>("cart")).data?.cart.items).toEqual([])
-
-                // A confirmation with nothing to confirm is the cart-empty refusal, not a silent order.
-                const empty = await buyer.mutate<PlaceOrderData>("placeOrder",
-                    {
-                        variables: {
-                            input: {
-                            } 
-                        } 
-                    })
-                expect(empty.errorCode).toBe("CHECKOUT_REFUSAL")
-                expect(empty.errors?.[0]?.extensions).toMatchObject({
-                    code: "CHECKOUT_REFUSAL", reason: "cart-empty" 
-                })
-
-                expect(await persistedOrderCount(personId)).toBe(0)
-                expect(await persistedPaymentCount(personId)).toBe(0)
-                const stockAfter = await dataSource.catalog.stockOf("sku-thermos")
-                expect(stockAfter).toBe(thermos!.stock)
-            })
+    afterAll(async () => {
+        for (const personId of personIds) await world.auth.deleteAccount(personId)
+        await world.close()
     })
+
+    it("a refused confirmation rolls back atomically; the corrected retry captures exactly once", async () => {
+        const { buyer, personId } = await freshBuyer("retry")
+
+        // sku-thermos is seeded at stock 2: asking for one more is a guaranteed refusal.
+        const browsed = await buyer.read<CartData>("cart")
+        const thermos = present(browsed.data?.cart.catalog.find((product) => product.id === "sku-thermos"), "sku-thermos")
+        const stock = thermos.stock
+        expect((await buyer.mutate("addCartItem", { variables: { input: { productId: "sku-thermos", quantity: stock + 1 } } })).errorCode).toBeNull()
+
+        const idempotencyKey = `e2e-${personId}`
+        const refused = await buyer.mutate<PlaceOrderData>("placeOrder", { variables: { input: { idempotencyKey } } })
+        expect(refused.errorCode).toBe("ORDER_INSUFFICIENT_STOCK")
+        expect(refused.errors?.[0]?.extensions).toMatchObject({
+            code: "ORDER_INSUFFICIENT_STOCK",
+            kind: "conflict",
+            params: { productId: "sku-thermos", requested: stock + 1, available: stock },
+        })
+
+        // The rollback: cart kept, nothing persisted, stock unmoved. A refusal never half-writes.
+        expect((await buyer.read<CartData>("cart")).data?.cart.items).toEqual([{ productId: "sku-thermos", quantity: stock + 1 }])
+        expect(await world.database.orderCount(personId)).toBe(0)
+        expect(await world.database.paymentCount(personId)).toBe(0)
+        expect(await world.database.stockOf("sku-thermos")).toBe(stock)
+
+        // Correct the cart and retry with the same key: this time the confirmation lands.
+        await buyer.mutate("clearCart")
+        expect((await buyer.mutate("addCartItem", { variables: { input: { productId: "sku-thermos", quantity: stock } } })).errorCode).toBeNull()
+        const retried = await buyer.mutate<PlaceOrderData>("placeOrder", { variables: { input: { idempotencyKey } } })
+        expect(retried.errorCode).toBeNull()
+        expect(retried.data?.placeOrder).toMatchObject({
+            status: "confirmed",
+            totalMinorUnits: thermos.priceMinorUnits * stock,
+            currency: "USD",
+            replayed: false,
+        })
+        expect(await world.database.paymentsOfPerson(personId)).toEqual([
+            expect.objectContaining({ status: "captured", amount_minor_units: thermos.priceMinorUnits * stock }),
+        ])
+        expect((await buyer.read<CartData>("cart")).data?.cart.items).toEqual([])
+        expect(await world.database.stockOf("sku-thermos")).toBe(0)
+    })
+
+    it("a refused confirmation can be abandoned: clearing the cart leaves no order behind", async () => {
+        const { buyer, personId } = await freshBuyer("cancel")
+        const browsed = await buyer.read<CartData>("cart")
+        const thermos = present(browsed.data?.cart.catalog.find((product) => product.id === "sku-thermos"), "sku-thermos")
+
+        await buyer.mutate("addCartItem", { variables: { input: { productId: "sku-thermos", quantity: thermos.stock + 1 } } })
+        const refused = await buyer.mutate<PlaceOrderData>("placeOrder", { variables: { input: {} } })
+        expect(refused.errorCode).toBe("ORDER_INSUFFICIENT_STOCK")
+
+        // Cancel: the buyer empties the cart and walks away.
+        const cleared = await buyer.mutate<ClearCartData>("clearCart")
+        expect(cleared.errorCode).toBeNull()
+        expect(cleared.data?.clearCart.cleared).toBe(true)
+        expect((await buyer.read<CartData>("cart")).data?.cart.items).toEqual([])
+
+        // A confirmation with nothing to confirm is the empty-cart refusal, not a silent order.
+        const empty = await buyer.mutate<PlaceOrderData>("placeOrder", { variables: { input: {} } })
+        expect(empty.errorCode).toBe("ORDER_CART_EMPTY")
+        expect(empty.errors?.[0]?.extensions).toMatchObject({ code: "ORDER_CART_EMPTY", kind: "invalid" })
+
+        expect(await world.database.orderCount(personId)).toBe(0)
+        expect(await world.database.paymentCount(personId)).toBe(0)
+        expect(await world.database.stockOf("sku-thermos")).toBe(thermos.stock)
+    })
+})
