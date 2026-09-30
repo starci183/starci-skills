@@ -28,6 +28,10 @@
 //     (knowledge/patterns/**, architecture-rules.yaml, modules/models/code-patterns.yaml)
 //     names though it is neither a code of the catalog nor a key of failure-codes.yaml; the finding names the file
 //                                                                                             HFS_RULE_CODE_UNCATALOGUED
+//   - a code the architecture machine (ARCHITECTURE_RULE_IDS) or `hfs check` (CHECK_CODES, ALL_CHECK_CODES) can emit that no
+//     rule lists in failureCodes; a code no rule owns has no R-id, no gate and no parity proof. The only exempt codes are the
+//     infrastructure refusals ("cannot judge"), which their owners export as one list each (ERROR_RULE_IDS of the machine's
+//     index, REFUSAL_CODES of scripts/lib/hfs-check.mjs)                                     HFS_RULE_CODE_UNOWNED
 // A planned enforcer is not a finding: it is the owed work, listed by --unbuilt (the rules with no existing enforcer at
 // all) and counted in the summary.
 import fs from 'node:fs';
@@ -35,7 +39,9 @@ import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { skillRoot } from '../../engine/runtime-root.mjs';
 import { parseYaml } from '../../engine/yaml.mjs';
+import { ALL_CHECK_CODES, REFUSAL_CODES } from '../lib/hfs-check.mjs';
 import { HfsSlotsError, loadRuleCatalog, loadSlotManifest } from '../lib/hfs-slots.mjs';
+import { ARCHITECTURE_RULE_IDS, ERROR_RULE_IDS } from './architecture/index.mjs';
 import { isMain } from './common.mjs';
 
 export const FAILURE_CODES_FILE = 'modules/kernel/failure-codes.yaml';
@@ -166,9 +172,10 @@ export async function pluginRuleIds(root, kind) {
 
 /**
  * The findings of a catalog: [{code, rule, enforcer?, message}].
- * plugins: {'eslint-be': {ids: Set} | {error}, 'eslint-fe': ...}; failureCodes: the parsed catalog; files: {exists(rel), read(rel)}.
+ * plugins: {'eslint-be': {ids: Set} | {error}, 'eslint-fe': ...}; failureCodes: the parsed catalog; files: {exists(rel), read(rel)};
+ * codes: {machine, hfs, refusals}, every code the architecture machine and `hfs check` can emit and the refusal codes among them.
  */
-export function hfsRulesFindings({ catalog, plugins, failureCodes, files, emitters, readme, tests, knowledge }) {
+export function hfsRulesFindings({ catalog, plugins, failureCodes, files, emitters, readme, tests, knowledge, codes }) {
   const findings = [];
   const add = (code, rule, message, enforcer) => findings.push({ code, rule, ...(enforcer ? { enforcer } : {}), message });
   for (const rule of catalog.rules) {
@@ -248,6 +255,19 @@ export function hfsRulesFindings({ catalog, plugins, failureCodes, files, emitte
     const last = catalog.rules.at(-1).id;
     for (const m of String(readme).matchAll(/\bR01(?: to |-)(R\d{2})\b/g)) if (m[1] !== last) add('HFS_RULE_LAW_DRIFT', '-', `${RULES_README} states the range R01 to ${m[1]}, but the catalog ends at ${last}`);
   }
+  if (codes !== undefined) {
+    // RED19: every emitted code belongs to exactly one rule; only an infrastructure refusal ("cannot judge") is owned by none.
+    const owned = new Set(catalog.rules.flatMap((r) => [r.code, ...r.failureCodes]));
+    const refusals = new Set(codes.refusals ?? []);
+    const reported = new Set();
+    for (const [source, list] of Object.entries({ machine: codes.machine ?? [], hfs: codes.hfs ?? [] })) {
+      for (const code of [...new Set(list)].sort()) {
+        if (owned.has(code) || refusals.has(code) || reported.has(code)) continue;
+        reported.add(code);
+        add('HFS_RULE_CODE_UNOWNED', '-', `${code} can be emitted by the ${source} check but no rule of knowledge/hfs/rules.yaml lists it in failureCodes; list it under the one rule whose law it serves, or delete it. Only an infrastructure refusal ("cannot judge") is exempt, and its owner exports it in ERROR_RULE_IDS (architecture machine) or REFUSAL_CODES (hfs check)`);
+      }
+    }
+  }
   if (knowledge !== undefined) {
     // RED20: a knowledge file states an obligation under the catalog's code or the failure catalog's, never under a third name.
     const known = new Set([...catalog.rules.flatMap((r) => [r.code, ...r.failureCodes]), ...Object.keys(failureCodes ?? {})]);
@@ -271,7 +291,8 @@ export async function checkHfsRules(root = skillRoot) {
   const failureCodes = parseYaml(fs.readFileSync(path.join(root, FAILURE_CODES_FILE), 'utf8')) ?? {};
   const files = { exists: (rel) => fs.existsSync(path.join(root, rel)), read: (rel) => fs.readFileSync(path.join(root, rel), 'utf8') };
   const readme = fs.readFileSync(path.join(root, RULES_README), 'utf8');
-  return { catalog, findings: hfsRulesFindings({ catalog, plugins, failureCodes, files, emitters: readEmitters(root), readme, tests: readTests(root), knowledge: readKnowledgeFiles(root) }) };
+  return { catalog, findings: hfsRulesFindings({ catalog, plugins, failureCodes, files, emitters: readEmitters(root), readme, tests: readTests(root), knowledge: readKnowledgeFiles(root),
+    codes: { machine: ARCHITECTURE_RULE_IDS, hfs: ALL_CHECK_CODES, refusals: [...ERROR_RULE_IDS, ...REFUSAL_CODES] } }) };
 }
 
 if (isMain(import.meta.url)) {

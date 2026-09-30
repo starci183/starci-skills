@@ -177,7 +177,7 @@ test('a failure code with no catalog entry, or an entry that is not Vietnamese, 
 test('a planned machine enforcer whose code a machine file already emits is stale, unless another built enforcer names that file', () => {
   const catalog = loadRuleCatalog();
   const r26 = catalog.rule('R26');
-  const planned = { ...catalog, rules: [{ ...r26, enforcers: r26.enforcers.map((e) => ({ kind: e.kind, id: e.id, planned: true })) }] };
+  const planned = { ...catalog, rules: [{ ...r26, enforcers: r26.enforcers.filter((e) => e.at === 'scripts/checks/architecture/tiers.mjs').map((e) => ({ kind: e.kind, id: e.id, planned: true })) }] };
   const emitters = { machine: [{ rel: 'scripts/checks/architecture/tiers.mjs', text: `ruleId: '${r26.code}'` }], hfs: [], 'work-validate': [] };
   const stale = run(planned, { emitters }).filter((f) => f.code === 'HFS_RULE_ENFORCER_STALE');
   assert.deepEqual(stale.map((f) => [f.code, f.rule]), [['HFS_RULE_ENFORCER_STALE', 'R26']]);
@@ -190,6 +190,20 @@ test('a rule that claims every enforcer is built but whose code nothing emits is
   assert.ok(machineOnly.length > 0);
   const findings = run(catalog, { emitters, files: { exists: () => true, read: () => machineOnly.flatMap((r) => r.failureCodes).join(' ') } });
   for (const r of machineOnly) assert.ok(findings.some((f) => f.code === 'HFS_RULE_CODE_UNEMITTED' && f.rule === r.id), r.id);
+});
+
+test('a code the machine or hfs check can emit that no rule lists is unowned; an infrastructure refusal is exempt (RED19)', () => {
+  const catalog = loadRuleCatalog();
+  const [rule] = catalog.rules;
+  const owned = rule.failureCodes[0];
+  const codes = { machine: [owned, 'ARCH_CODE_NOBODY_OWNS', 'ARCH_CANNOT_JUDGE'], hfs: ['HFS_CODE_NOBODY_OWNS', 'ARCH_CODE_NOBODY_OWNS'], refusals: ['ARCH_CANNOT_JUDGE'] };
+  const findings = run(catalog, { codes });
+  assert.deepEqual(findings.map((f) => f.code), ['HFS_RULE_CODE_UNOWNED', 'HFS_RULE_CODE_UNOWNED']);
+  assert.ok(findings[0].message.startsWith('ARCH_CODE_NOBODY_OWNS can be emitted by the machine check'), findings[0].message);
+  assert.ok(findings[1].message.startsWith('HFS_CODE_NOBODY_OWNS can be emitted by the hfs check'), findings[1].message);
+  // Owned codes, sub-codes of a rule and refusals alone leave the check clean.
+  const subCodes = catalog.rules.flatMap((r) => r.failureCodes);
+  assert.deepEqual(run(catalog, { codes: { machine: [...subCodes, 'ARCH_CANNOT_JUDGE'], hfs: subCodes, refusals: ['ARCH_CANNOT_JUDGE'] } }), []);
 });
 
 test('a plugin rule no catalog entry names is uncatalogued', () => {

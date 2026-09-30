@@ -71,17 +71,21 @@ const FRONTEND_MACHINE = {
   packageShape: [checkPackageShape, PACKAGE_SHAPE_RULE_IDS],
 };
 
-const COMMON_RULE_IDS = [
+/** Errors the machine reports when a program cannot be built or an edge cannot be proven: it cannot judge, so it refuses. */
+const COMMON_REFUSAL_RULE_IDS = [
   'ARCH_DYNAMIC_DEPENDENCY_UNPROVEN',
   'ARCH_INTERNAL_IMPORT_OUTSIDE',
   'ARCH_INTERNAL_IMPORT_UNRESOLVED',
   'ARCH_NO_SOURCE',
-  'ARCH_PACKAGE_EXPORT_BYPASS',
-  'ARCH_PACKAGE_IMPORTS_APP',
   'ARCH_SYNTAX_INVALID',
   'ARCH_TSCONFIG_INVALID',
   'ARCH_TSCONFIG_MISSING',
   'ARCH_TSCONFIG_REFERENCE_OUTSIDE',
+];
+const COMMON_RULE_IDS = [
+  ...COMMON_REFUSAL_RULE_IDS,
+  'ARCH_PACKAGE_EXPORT_BYPASS',
+  'ARCH_PACKAGE_IMPORTS_APP',
 ];
 const BACKEND_RULE_IDS = [
   'BE_APP_BUSINESS_ROLE',
@@ -95,7 +99,6 @@ const FRONTEND_RULE_IDS = [
   'FE_COMPONENT_DEEP_HOOK_IMPORT',
   'FE_CONNECTED_BLOCK_RENDER_PAIR',
   'FE_CUSTOM_HOOK_LOCATION',
-  'FE_FETCH_OUTSIDE_TRANSPORT',
   'FE_PURE_REACHES_DATA',
   'FE_PURE_WORLD_HOOK',
   'FE_PURE_WORLD_IMPORT',
@@ -110,8 +113,14 @@ const FRONTEND_RULE_IDS = [
 export const OWNER_RULE_IDS = ['ARCH_OWNER_EXPORT_BYPASS', 'ARCH_OWNER_EXPORT_STAR'];
 export const GRAMMAR_RULE_IDS = ['ARCH_GRAMMAR_CONTRACT_INVALID', 'ARCH_GRAMMAR_EXPORT_BYPASS'];
 
-/** Errors the machine reports when it cannot judge (a check that cannot run is an error, never a pass). */
-const ERROR_RULE_IDS = ['ARCH_COMPILER_FAILURE', 'ARCH_CONFIG_INVALID', 'ARCH_EXECUTION_UNAVAILABLE', 'ARCH_KNOWLEDGE_UNAVAILABLE', 'ARCH_TYPESCRIPT_INVALID', 'ARCH_TYPESCRIPT_MISSING'];
+/**
+ * Every code the machine reports as an error because it cannot judge (a check that cannot run is an error, never a pass).
+ * These are infrastructure refusals, not obligations, so no rule of knowledge/hfs/rules.yaml owns them.
+ */
+export const ERROR_RULE_IDS = Object.freeze([
+  'ARCH_COMPILER_FAILURE', 'ARCH_CONFIG_INVALID', 'ARCH_EXECUTION_UNAVAILABLE', 'ARCH_KNOWLEDGE_UNAVAILABLE', 'ARCH_TYPESCRIPT_INVALID', 'ARCH_TYPESCRIPT_MISSING',
+  ...COMMON_REFUSAL_RULE_IDS,
+]);
 
 /** Every code the machine can emit, derived from the rule id lists of its checks (`hfs check` ships exactly these why entries). */
 export const ARCHITECTURE_RULE_IDS = Object.freeze([...new Set([
