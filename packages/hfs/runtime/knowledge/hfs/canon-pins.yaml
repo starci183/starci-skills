@@ -17,12 +17,12 @@ pins:
     source: packages/grammar/package.json
     why: nivo-fe pins 0.4.11 and 0.5.0 in one workspace, starci-next-fe 0.5.1, miamia-fe 0.5.0; the runtime source is 0.7.1.
   '@starci/eslint-canon-be':
-    version: 1.7.0
+    version: 1.7.1
     group: starci
     install: registry
     side: be
     source: packages/eslint/be/package.json
-    why: 'back-end repositories carry 1.2.1 and 1.2.2 while the runtime source is 1.7.0: the round-3 catch-up landed the nest code-pattern profile''s version and content digest, left unbumped when R78-R82 landed, plus the inbox-dedupe-required shape-detection fix; 1.7.0 adds named-entity-manager-only (R83).'
+    why: 'back-end repositories carry 1.2.1 and 1.2.2 while the runtime source is 1.7.0: the round-3 catch-up landed the nest code-pattern profile''s version and content digest, left unbumped when R78-R82 landed, plus the inbox-dedupe-required shape-detection fix; 1.7.0 adds named-entity-manager-only (R83); 1.7.1 reads the slot manifest from the installed @starci/hfs runtime copy instead of the product repository.'
   '@starci/eslint-canon-fe':
     version: 5.1.2
     group: starci
@@ -69,12 +69,12 @@ pins:
     side: fe
     source: packages/playwright-preset/package.json
   '@starci/hfs':
-    version: 1.0.0
+    version: 1.0.1
     group: starci
     install: registry
     side: both
     source: packages/hfs/package.json
-    why: the hfs command line (check, init, explain) of every product repository, installed from the npm registry.
+    why: the hfs command line (check, init, explain) of every product repository, installed from the npm registry; 1.0.1 exports runtime/* so the eslint canons resolve the knowledge it carries.
   # --- tooling
   typescript:
     version: 5.9.3

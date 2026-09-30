@@ -36,3 +36,9 @@ except `hfs init`, which writes `hfs.json` only when none exists.
 check can emit). After changing `scripts/lib/hfs-check.mjs`, `scripts/lib/hfs-slots.mjs`, `knowledge/hfs/slots.yaml`,
 `knowledge/hfs/canon-pins.yaml` or the catalog entries of those codes, run `node packages/hfs/scripts/sync-runtime.mjs`;
 `tests/hfs-cli.spec.mjs` fails on a stale copy. Bump `version` here and in the pin when the behaviour changes.
+
+## Serving knowledge to other packages
+
+`package.json` `exports` opens `./runtime/*`, so a package that needs a runtime file resolves it from the installed copy
+(`import.meta.resolve("@starci/hfs/runtime/knowledge/hfs/slots.yaml")`), never from the product repository or a link path.
+`@starci/eslint-canon-be` does this and lists `@starci/hfs` in `dependencies` at the exact version.

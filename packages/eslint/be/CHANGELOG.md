@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.7.1 - 2026-09-30
+
+- Fixed: eslint no longer fails to start in a product repository with `HFS slot manifest not found at <repo>/knowledge/hfs/slots.yaml`. `lib/slots.mjs` used to look for the manifest at a path above the package (the product repository, or a linked runtime copy that no longer exists). The package now depends on `@starci/hfs` and resolves the manifest and the YAML reader as `@starci/hfs/runtime/knowledge/hfs/slots.yaml` and `@starci/hfs/runtime/engine/yaml.mjs`, so what the canon reads travels with the installed packages. `STARCI_HFS_SLOTS` still overrides the manifest file.
+
 ## 1.7.0 - 2026-09-30
 
 - New: `named-entity-manager-only` (R83 `BE_UNNAMED_DATA_ACCESS`, in `data-access`): a bare `@InjectEntityManager()` with no connection argument, any `.getRepository(...)` call (on a DataSource, an EntityManager or a transaction manager) and an injected `DataSource` (a constructor parameter typed `DataSource`, `@InjectDataSource()`, `@InjectConnection()`) are refused. A `DataSource` is allowed only under `platform/database/` or `platform/databases/` (also `platform/db`, `platform/datasource`, `platform/typeorm`) and `apps/migrate/`; spec files are skipped. The message says to inject the shared EntityManager with the named injector and call it directly.
