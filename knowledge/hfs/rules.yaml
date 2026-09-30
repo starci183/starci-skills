@@ -1032,3 +1032,35 @@ rules:
     failureCodes: ["HFS_DOC_NOT_ENGLISH"]
     enforcers:
       - {kind: machine, id: doc-language, at: scripts/checks/architecture/doc-language.mjs}
+  - id: R98
+    code: "BE_SPEC_PLACEMENT"
+    law: "A back-end spec or test file lives in one of the four test layers and nowhere else: a unit spec `<name>.service.spec.ts` beside its service, or an integration, e2e or contract spec under `src/tests/{integration,e2e,contract}`; a `*.spec.*`, `*.test.*` or `*-spec.*` file anywhere else, `scripts/` and `tools/` included, is a finding."
+    kinds: [check]
+    gates: [land, ci]
+    failureCodes: ["BE_SPEC_PLACEMENT"]
+    enforcers:
+      - {kind: hfs, id: spec-placement, at: scripts/lib/hfs-rules/spec-placement.mjs}
+  - id: R99
+    code: "HFS_REPO_LOCAL_CHECK"
+    law: "A repository keeps no check, lint rule or lint plugin of its own: no `check-*` file in `scripts/` or `tools/`, no `eslint-local-rules*` or local eslint plugin, no script that runs one; every check lives in the `.claude` runtime and the canons."
+    kinds: [check]
+    gates: [land, ci]
+    failureCodes: ["HFS_REPO_LOCAL_CHECK"]
+    enforcers:
+      - {kind: hfs, id: repo-local-check, at: scripts/lib/hfs-rules/repo-local-checks.mjs}
+  - id: R100
+    code: "HFS_LINT_SUPPRESSION_FILE"
+    law: "A repository keeps no lint-suppression file, script or option: no `eslint.suppressions*`, no `lint:suppressions` script, no eslint `--suppress-all` or `--suppressions-location` flag and no suppressions configuration passed to eslint; a finding is fixed in the code."
+    kinds: [check]
+    gates: [land, ci]
+    failureCodes: ["HFS_LINT_SUPPRESSION_FILE"]
+    enforcers:
+      - {kind: hfs, id: lint-suppression, at: scripts/lib/hfs-rules/lint-suppression.mjs}
+  - id: R101
+    code: "HFS_PROOF_COMMAND_FILE_MISSING"
+    law: "A proof command of a `.starciwork` record (`requiresProof.<kind>.command`) is runnable as written: every repository file it names exists."
+    kinds: [check]
+    gates: [land, ci]
+    failureCodes: ["HFS_PROOF_COMMAND_FILE_MISSING"]
+    enforcers:
+      - {kind: hfs, id: proof-command-files, at: scripts/lib/hfs-rules/proof-commands.mjs}

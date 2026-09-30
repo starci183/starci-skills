@@ -111,7 +111,7 @@ Owners are derived from slots; `hfs.json` holds no owner list, path or disabled 
 | `apps/<app>/Dockerfile`, `.dockerignore` | optional | optional | tracked | `repo.app-image` |
 | `src/{features,modules,tests}` | required | forbidden | tracked | `be.*` |
 | `packages/<pkg>/` | opt-in | opt-in | tracked, must build | `repo.packages`, `fe.package.ui` |
-| `scripts/<name>.mjs` | optional | optional | tracked, lasting tooling only | `repo.scripts` |
+| `scripts/{.gitkeep,*.mjs,*.cjs,*.ps1,*.sh}` | optional | optional | tracked; operational scripts only, or an empty folder with `.gitkeep`; no spec, no check, no lint source | `repo.scripts` |
 | `docs/{adr,runbooks,guides}/` | opt-in | opt-in | tracked, images at most 500 KB | `repo.docs` |
 | `e2e/` at the root | forbidden | optional | tracked | `fe.e2e` |
 | `contracts/<app>/schema.graphql` | opt-in | none | tracked, the one committed machine-emitted file | `be.contract.*` |
@@ -592,3 +592,7 @@ Every rule is an error from 2.0. Finding code, then the rule. The pattern files 
 | R94 | `FE_SLOT_FILE_ROLE` | A front-end file is owned by a slot and named by it: a slot that owns a directory (route, feature, components, hooks, api module) holds only the files its `allows` list names, and holds them inside a folder of its own. |
 | R95 | `BE_OPERATION_CONTRACT` | A versioned operation is declared once in the app's typed operation table (`OperationContract<Input, Output, RefusalCode>` registered by `defineOperations`): its input and output are closed types (never `any`, `unknown` or `Record<string, unknown>`), its refusal codes a closed union of string literals, and the route that serves the table takes `OperationRequest<Table>` and answers `Promise<OperationReply<Table>>` of that one table. |
 | R96 | `HFS_DOC_NOT_ENGLISH` | Every Markdown and YAML document under knowledge/, docs/, src/ and apps/ is English, code fences included; only YAML data in a message-catalog or i18n-fixtures slot may hold another language. |
+| R98 | `BE_SPEC_PLACEMENT` | A back-end spec or test file lives in one of the four test layers and nowhere else: a unit spec `<name>.service.spec.ts` beside its service, or an integration, e2e or contract spec under `src/tests/{integration,e2e,contract}`; a `*.spec.*`, `*.test.*` or `*-spec.*` file anywhere else, `scripts/` and `tools/` included, is a finding. |
+| R99 | `HFS_REPO_LOCAL_CHECK` | A repository keeps no check, lint rule or lint plugin of its own: no `check-*` file in `scripts/` or `tools/`, no `eslint-local-rules*` or local eslint plugin, no script that runs one; every check lives in the `.claude` runtime and the canons. |
+| R100 | `HFS_LINT_SUPPRESSION_FILE` | A repository keeps no lint-suppression file, script or option: no `eslint.suppressions*`, no `lint:suppressions` script, no eslint `--suppress-all` or `--suppressions-location` flag and no suppressions configuration passed to eslint; a finding is fixed in the code. |
+| R101 | `HFS_PROOF_COMMAND_FILE_MISSING` | A proof command of a `.starciwork` record (`requiresProof.<kind>.command`) is runnable as written: every repository file it names exists. |
