@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased (lane C0)
+
+- **New: `no-vietnamese-in-source` (R91).** Identifiers, string literals, template text, JSX text, comments and test titles carry no Vietnamese letter, specs included. Detection is structural on characters (`scripts/lib/language.mjs` in `runtime/`, folded to NFC, so NFD is caught too). The only exemption is the i18n fixtures slot `fe.e2e-support.i18n` (`e2e/fixtures/i18n/`). Removed: the second-language branches of `no-hardcoded-copy` (its `second` and `comment` messages) and the `SECOND_LANGUAGE_LETTER` export; the one rule holds the law.
+
 ## 6.0.2 - 2026-09-30
 
 - **Fix: `use-client-only-at-boundary` refused the providers wrapper.** The route tree's `providers.tsx` (root or `[locale]`,

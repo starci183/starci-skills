@@ -24,9 +24,9 @@ An e2e spec is `e2e/<area>/<name>.e2e-spec.ts`; helpers live under `support/` or
 
 **Finding code:** `FE_E2E_SHAPE`
 
-**Vì sao (why):** Spec e2e `<file>` không nằm ở `e2e/<area>/<name>.e2e-spec.ts`.
+**Why:** The e2e spec `<file>` is not at `e2e/<area>/<name>.e2e-spec.ts`.
 
-**Cách sửa:** Đưa spec vào `e2e/<area>/` với hậu tố `.e2e-spec.ts`; helper vào `e2e/support/` hoặc `e2e/fixtures/`.
+**Fix:** Move the spec into `e2e/<area>/` with the `.e2e-spec.ts` suffix; helpers go into `e2e/support/` or `e2e/fixtures/`.
 
 ## `starci-fe/e2e-no-absolute-path`
 
@@ -46,9 +46,9 @@ const p = path.join(__dirname, "fixtures", "a.png")
 
 **Finding code:** `FE_E2E_SHAPE`
 
-**Vì sao (why):** Spec e2e `<file>` dùng đường dẫn tuyệt đối.
+**Why:** The e2e spec `<file>` uses an absolute path.
 
-**Cách sửa:** Dựng đường dẫn từ cấu hình hoặc thư mục của chính spec.
+**Fix:** Build the path from configuration or from the spec's own directory.
 
 ## `starci-fe/e2e-no-docker`
 
@@ -68,9 +68,9 @@ await page.goto(baseUrl)
 
 **Finding code:** `FE_E2E_SHAPE`
 
-**Vì sao (why):** Spec e2e `<file>` phụ thuộc vào docker.
+**Why:** The e2e spec `<file>` depends on docker.
 
-**Cách sửa:** Trỏ suite tới một URL từ cấu hình; môi trường tự cung cấp stack.
+**Fix:** Point the suite at a URL from configuration; the environment supplies its own stack.
 
 ## `starci-fe/e2e-no-cross-repo-write`
 
@@ -90,9 +90,9 @@ await fs.writeFile(path.join(outDir, "report.json"), data)
 
 **Finding code:** `FE_E2E_SHAPE`
 
-**Vì sao (why):** Spec e2e `<file>` ghi ra ngoài repo của app (đường dẫn tuyệt đối hoặc `..`).
+**Why:** The e2e spec `<file>` writes outside the app's repo (an absolute path or `..`).
 
-**Cách sửa:** Chỉ ghi vào thư mục kết quả của chính repo này.
+**Fix:** Write only into this repo's own results directory.
 
 ## `starci-fe/e2e-no-skip`
 
@@ -112,9 +112,9 @@ test("plays", async ({ page }) => {})
 
 **Finding code:** `FE_E2E_SHAPE`
 
-**Vì sao (why):** Spec e2e `<file>` bỏ qua test (`test.skip`/`fixme`) — thiếu môi trường phải làm suite đỏ, không được xanh.
+**Why:** The e2e spec `<file>` skips tests (`test.skip`/`fixme`) - a missing environment must turn the suite red, not green.
 
-**Cách sửa:** Sửa môi trường hoặc xóa test; không bỏ qua có điều kiện.
+**Fix:** Fix the environment or delete the test; do not skip conditionally.
 
 ## `starci-fe/e2e-typed-helpers`
 
@@ -134,9 +134,9 @@ export const login = async (page: Page, role: Role) => page
 
 **Finding code:** `FE_E2E_SHAPE`
 
-**Vì sao (why):** Helper e2e ở `<file>` có tham số không kiểu hoặc dùng `any`.
+**Why:** The e2e helper at `<file>` has an untyped parameter or uses `any`.
 
-**Cách sửa:** Khai kiểu cho mọi tham số của helper; thay `any` bằng kiểu thật hoặc `unknown` kèm kiểm tra.
+**Fix:** Declare a type for every helper parameter; replace `any` with a real type or `unknown` plus a check.
 
 ## `starci-fe/playwright-viewports`
 
@@ -156,6 +156,6 @@ projects: three, each with one of 1440x900, 768x1024, 390x844
 
 **Finding code:** `FE_E2E_SHAPE`
 
-**Vì sao (why):** `playwright.config` không khai đúng ba viewport 1440x900, 768x1024, 390x844.
+**Why:** `playwright.config` does not declare exactly the three viewports 1440x900, 768x1024, 390x844.
 
-**Cách sửa:** Mỗi project khai một viewport; đủ ba, không thêm cỡ thứ tư.
+**Fix:** Each project declares one viewport; all three, and no fourth size.

@@ -102,7 +102,7 @@ boundary:
     (5) dispatch, report, check, settle, land and incident rows are derived
     from the ledger's own events - never log them yourself. Example:
     `api log --repo <repo> --workflow <wf> --job op-backend.implement-1a2b
-    --kind decision --msg "Giao lại cho codex: devin hết quota" --data
+    --kind decision --msg "Reassigned to codex: devin is out of quota" --data
     '{"markdown":"devin quota circuit open until 14:00; retry routes to codex"}'`.
     `api logs --workflow <wf> [--job <id>]` reads the rows back.
   opTerminalObservation: >-
@@ -135,8 +135,8 @@ boundary:
 # ============================================================================
 # ============================================================================
 # PROGRESS — the Kernel owns its own outcome (owner 2026-09-28: "sao workflows
-# không tự điều phối dc mà đợi supervisor"; "kernel phải brainstorm dc, xử lý lỗi
-# dc ... làm mọi thứ để workflows tiến"; refined: ops draw the graph, the Kernel
+# coordinate themselves but wait for the supervisor"; "the kernel must be able to brainstorm, handle errors
+# ... do everything to move workflows forward"; refined: ops draw the graph, the Kernel
 # makes LIGHT edits and dispatches the owning op for a heavy redesign). The
 # thinking is deterministic code (scripts/kernel/progress-rca.mjs): api status
 # computes the progress, the failure clusters and a RANKED list of concrete
@@ -239,7 +239,7 @@ decisions:
     --by kernel:<wf> --verb "<what you ran>" --decision <decide id>`. A DI
     outside your authority: `api decisions --escalate <id> --to supervisor`.
   doorbell: >-
-    The line `[decide] <n> việc chờ: api decisions --workflow <wf>` typed into
+    The line `[decide] <n> items waiting: api decisions --workflow <wf>` typed into
     this terminal is only a doorbell (scripts/reconciler/decisions.mjs
     ringDoorbell): it rings only when the seat reads turn-idle, at most once per
     2 minutes, and never carries the message. The DI in the ledger is the
@@ -491,8 +491,8 @@ tick:
       repair; it becomes an owner gate only when business scope or authority
       truly must expand.
     seamContractFirst: >-
-      A cut's seam never stalls the chain (owner ruling 2026-09-28: "Seam không làm nghẽn cả chuỗi: seam
-      trượt thì tách lại hoặc cho các lát sau chạy song song với stub, không để chờ 3 tiếng";
+      A cut's seam never stalls the chain (owner ruling 2026-09-28: "A seam must not block the whole chain: if a seam
+      slips, re-cut it or let the later slices run in parallel with a stub, do not wait 3 hours";
       scripts/kernel/cut-seam.mjs). The seam ordinal is enqueued with priority_json {class cut-seam}
       and runs contract-first: its op publishes the committed interface (types, contracts, a stub) with
       `api cut-seam --publish-interface` before finishing, and every sibling ordinal is released to
@@ -1025,8 +1025,8 @@ verdictTable:
       Telegram off, or with `--now`, `api serve-ask` serves the form at once.
       With config.yaml
       asks.autoAcceptRecommended on, an ask that carries a recommended option
-      (question.recommended, or exactly one option marked "(khuyến nghị)",
-      "(recommended)" or "(đề xuất)") and falls in no class of asks.excludes
+      (question.recommended, or exactly one option marked "(recommended)",
+      "(suggested)" or their Vietnamese equivalents) and falls in no class of asks.excludes
       is never served: `api serve-ask` records `ask-answered` with answeredBy
       auto-recommended (receipt option, optionIndex and a note citing the
       config key and the recommendedReason) plus an `ask-auto-accepted` audit
@@ -1133,14 +1133,14 @@ autopilot:
     rationale.json, the direction checks - is answered PROVISIONALLY (answeredBy autopilot, receipt provisional:true
     with the gate evidence): nextActions names the retry, and the retried op applies the receipt exactly like an
     owner's (draw-review.mjs apply / brand-direction.mjs apply write a provisional acceptance: the leg reads
-    green-provisional "tự nhận tạm", downstream proceeds, it never becomes golden). Failing gates answer
+    green-provisional "self-accepted provisionally", downstream proceeds, it never becomes golden). Failing gates answer
     redraw/revise with the findings as the brief (at most redrawBudget per record; then the drawing is deferred to
     the final review). A business choice with a recommendation is taken provisionally. A credential, real-money,
     shared-external-system or owner-only ask is deferred-to-handover: nothing is sent, the leg is not blocked, the
     work proceeds on the sandbox/stub path the deferral names (status .autopilot.deferredToHandover[].stubPath) and
     the real proof is owed at handover. Credential values are never invented or entered by an agent.
   provisionAsk: >-
-    "Hạn chế provision ask": no provision.ask leg is opened mid-flow - api enqueue refuses it
+    "Limit provision asks": no provision.ask leg is opened mid-flow - api enqueue refuses it
     (autopilot-provision-deferred) and nextActions never proposes it. A credential or approval need found mid-flow
     is recorded with `api autopilot --defer-to-handover --op <op> --class <class> --detail <owed> [--fields ...]`,
     and the build codes against the declared env var or custody key with a placeholder (credentialPending),
@@ -1165,7 +1165,7 @@ autopilot:
     every queued job opens; the Supervisor reviews, extends (api autopilot --extend-budget) and resolves it. No loop
     runs unbounded: redraws, retries and supervisor gates each have their own cap.
   handover: >-
-    handover.review stays the ONE owner gate. Its ask carries question.autopilot - the "sổ chờ thầy xem lại" bundle
+    handover.review stays the ONE owner gate. Its ask carries question.autopilot - the "backlog awaiting the owner's review" bundle
     from `api survey --deliveries` .autopilot (every provisional acceptance with its images in question.assets, every
     deferred leg, every deferred-to-handover proof, the autopilot decision log); api report refuses a handover ask
     without it. A feedback answer that names a provisional item re-opens just that item: `api autopilot --reopen

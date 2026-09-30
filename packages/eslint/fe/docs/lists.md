@@ -24,9 +24,9 @@ rows.map((row) => <Row key={row.id} row={row} />)
 
 **Finding code:** `FE_LIST_KEY`
 
-**Vì sao (why):** Phần tử trả từ `.map` ở `<file>` không có `key`, nên React nhận diện hàng theo vị trí và hàng bị đổi state khi xoá hoặc sắp xếp lại.
+**Why:** An element returned from `.map` in `<file>` has no `key`, so React identifies rows by position and rows swap state when removed or reordered.
 
-**Cách sửa:** Thêm `key` lấy từ id của dữ liệu; với fragment dùng `<Fragment key={...}>`.
+**Fix:** Add a `key` taken from the data id; for a fragment use `<Fragment key={...}>`.
 
 ## `starci-fe/no-index-key`
 
@@ -46,9 +46,9 @@ rows.map((row) => <Row key={row.id} row={row} />)
 
 **Finding code:** `FE_LIST_KEY`
 
-**Vì sao (why):** `key` ở `<file>` lấy từ chỉ số của `.map` hoặc giá trị sinh ngẫu nhiên; chỉ số là vị trí, không phải danh tính.
+**Why:** The `key` in `<file>` comes from the `.map` index or a randomly generated value; an index is a position, not an identity.
 
-**Cách sửa:** Dùng id mà dữ liệu mang (`key={row.id}`); không dùng index, `Math.random`, `Date.now`.
+**Fix:** Use the id the data carries (`key={row.id}`); do not use index, `Math.random`, `Date.now`.
 
 ## `starci-fe/no-inline-literal-prop-in-list`
 
@@ -69,6 +69,6 @@ rows.map((row) => <Avatar key={row.id} props={AVATAR_PROPS} />)
 
 **Finding code:** `FE_LIST_KEY`
 
-**Vì sao (why):** Component trong `.map` ở `<file>` nhận object hoặc array literal làm prop: mỗi hàng mỗi lần render một giá trị mới, memo không bao giờ trúng.
+**Why:** A component inside `.map` in `<file>` receives an object or array literal as a prop: every row gets a new value on every render, so memo never hits.
 
-**Cách sửa:** Nâng hằng số ra ngoài component hoặc dựng một lần trước `.map`.
+**Fix:** Hoist the constant out of the component or build it once before `.map`.

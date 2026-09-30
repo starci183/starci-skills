@@ -128,7 +128,7 @@ steps:
       - environment
     writes: [report]
     action:
-      en: "Autopilot (owner ruling 2026-09-28 autopilot-run-to-finish, \"hạn chế provision ask\"; modules/kernel/
+      en: "Autopilot (owner ruling 2026-09-28 autopilot-run-to-finish, \"limit provision asks\"; modules/kernel/
         driver-loop.yaml autopilot): mid-flow this op is not planned - api enqueue refuses it and a credential, real-
         money or shared-system need is recorded deferred-to-handover while the build proceeds on sandbox, test stubs
         and placeholders. The one run under autopilot is the end-of-flow credential checklist (params.subject

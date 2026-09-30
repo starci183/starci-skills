@@ -14,6 +14,7 @@
  *   - `injector-type-match`: the `T` of the injector on a constructor parameter is the parameter's annotated type.
  *   - `infra-needs-injector`: a constructor parameter typed by a platform/integrations declaration or by a package
  *     carries an `Inject<Thing>()` decorator; only domain services and types of the same owner are class-injected.
+ *     Only a class the container builds is judged (a Nest class decorator or a decorated parameter); a plain class is not.
  *   - `no-module-ref`, `no-forward-ref`: no service locator, no cycle-hiding trick.
  *   - `no-string-token`: a token is a class or a `unique symbol`, never a string.
  *
@@ -28,7 +29,7 @@ import { staticText } from "./lib/ast.mjs"
 import { hfsOf } from "./lib/hfs.mjs"
 import { isImportedFrom } from "./lib/import-source.mjs"
 import { normalizePath } from "./lib/path.mjs"
-import { typed, typeOrigins } from "./lib/types.mjs"
+import { isPackageExport, packageOfExport, typed, typeOrigins } from "./lib/types.mjs"
 
 /** The raw decorators of Nest and TypeORM whose call is the injector's job. */
 const RAW_NAMES = new Set(["Inject", "InjectEntityManager", "InjectDataSource", "InjectQueue", "InjectRepository"])
@@ -411,6 +412,14 @@ const check = (context, decorator, target, injected) => {
 
 // -- infra-needs-injector --------------------------------------------------------------------------
 
+/** True when the class of a constructor can be built by the Nest container: a Nest class decorator, or any decorated constructor parameter. */
+const isContainerBuilt = (context, constructor) => {
+    const declaration = constructor.parent?.parent
+    if (declaration?.type !== "ClassDeclaration" && declaration?.type !== "ClassExpression") return false
+    if ((declaration.decorators ?? []).some((decorator) => packageOfExport(context, decorator.expression)?.startsWith("@nestjs/"))) return true
+    return constructorParams(constructor).some((param) => decoratorsOfParam(param).decorators.length > 0)
+}
+
 /** A constructor parameter of an infrastructure type carries an injector. */
 export const infraNeedsInjector = {
     meta: {
@@ -427,15 +436,21 @@ export const infraNeedsInjector = {
         const own = hfs.ownerOf(filename)
         return {
             MethodDefinition(node) {
-                // a CQRS message (`extends Command<R>` / `Query<R>` of @nestjs/cqrs) carries its own `params` as data: it is constructed by `new`, never injected
-                const klass = node.parent.parent
-                if (node.kind === "constructor" && klass.superClass && isImportedFrom(context, klass.superClass, "@nestjs/cqrs", ["Command", "Query"])) return
+                // Only a class the container can construct is judged: it carries a Nest class decorator (`@Injectable()`, `@Controller()`,
+                // `@Resolver()`, `@Catch()`, `@CommandHandler(...)`), or a parameter decorator that makes TypeScript emit its parameter
+                // metadata. A plain class (a CQRS message, a factory-built adapter, a test fake) is never DI-constructed.
+                if (!isContainerBuilt(context, node)) return
                 for (const param of constructorParams(node)) {
                     const { target, decorators } = decoratorsOfParam(param)
                     const annotation = target.typeAnnotation?.typeAnnotation
                     if (!annotation) continue
-                    const infra = typeOrigins(context, annotation).find((origin) => {
-                        if (origin.module !== null) return !/\/node_modules\/typescript\/lib\//.test(origin.file)
+                    const origins = typeOrigins(context, annotation)
+                    // A language global (`ReadonlyArray`, `Array`) is declared in the TypeScript lib and may be augmented by a package
+                    // (`@types/node`): the augmentation does not make it infrastructure.
+                    const isLanguageGlobal = (origin) => origins.some((other) => other.name === origin.name && /\/node_modules\/typescript\/lib\//.test(other.file))
+                    const infra = origins.find((origin) => {
+                        if (isLanguageGlobal(origin)) return false
+                        if (origin.module !== null) return true
                         if (own !== null && hfs.ownerOf(origin.file) === own) return false
                         const tier = hfs.tierOf(origin.file)
                         return tier === "platform" || tier === "integrations"
@@ -537,6 +552,7 @@ export const noStringToken = {
     create(context) {
         const filename = context.filename || context.getFilename()
         const isString = (node) => {
+            if (isPackageExport(context, node, "@nestjs/core")) return false
             if (node.type === "CallExpression" && TOKEN_GETTERS.has(calleeOf(context, node).name ?? "")) return false
             if (staticText(node) !== null) return true
             if (node.type === "TemplateLiteral") return true

@@ -291,7 +291,7 @@ steps:
         replacement for required authored imagery is a hard `realization.mode` finding even if the
         screenshot looks similar. Audit every prominent symbol as a product claim: identify its
         intended concept, strongest plausible alternate reading without its label, audience
-        maturity, cliché/generic-stock risk, distinction from sibling symbols, family coherence
+        maturity, cliche/generic-stock risk, distinction from sibling symbols, family coherence
         across camera/base/material/light/scale/density, reduced-scale legibility and truthful
         raster-asset versus code-native medium. A label cannot rescue a childish, ambiguous or
         interchangeable image; record `symbol.fit` or `symbol.family` drift and route by cause and

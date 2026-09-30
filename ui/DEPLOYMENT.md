@@ -1,14 +1,14 @@
-# Triển khai harness.starci.org
+# Deploying harness.starci.org
 
-## Ranh giới
+## Boundaries
 
-- Mã giao diện/API nằm trong runtime nguồn `<Source>/.claude/ui`. Ứng dụng cần các module runtime và cơ sở dữ liệu StarCi trên cùng máy; không thể triển khai độc lập lên Cloudflare Pages.
-- `npm run build` tạo UI tĩnh; `npm run serve` phục vụ UI và API chỉ đọc trên `127.0.0.1:4547`. Machine DB mặc định ở `%LOCALAPPDATA%/StarCi/machine.sqlite`; các project ledger được tra qua bảng `machine.ledgers` và mở bằng engine reader chỉ đọc.
-- Tunnel riêng `starci-harness` (`3c3469d5-8493-4af0-b13f-68f0ae5b9a8c`) kết nối `harness.starci.org` tới loopback. Credential tunnel và `harness.yml` nằm ngoài Git tại `%USERPROFILE%/.cloudflared/`.
-- Origin phục vụ công khai, không yêu cầu mật khẩu. Dữ liệu JSON và blob văn bản được lọc nhạy cảm trước khi trả về; diff và ảnh lấy từ blob bằng chứng đã lập chỉ mục. Nếu máy hoặc tunnel dừng thì trang ngoài Internet tạm không sẵn sàng; DNS vẫn tồn tại.
-- Trước khi chuyển route, `harness.starci.org` là CNAME tới `starci183.github.io` và phục vụ trang “StarCi Skills”. Để rollback, khôi phục CNAME này rồi ngừng hai tác vụ StarCi Harness.
+- The interface/API code lives in the source runtime `<Source>/.claude/ui`. The app needs the runtime modules and the StarCi databases on the same machine; it cannot be deployed standalone to Cloudflare Pages.
+- `npm run build` produces the static UI; `npm run serve` serves the UI and a read-only API on `127.0.0.1:4547`. The machine DB defaults to `%LOCALAPPDATA%/StarCi/machine.sqlite`; project ledgers are looked up through the `machine.ledgers` table and opened with the read-only engine reader.
+- A dedicated `starci-harness` tunnel (`3c3469d5-8493-4af0-b13f-68f0ae5b9a8c`) connects `harness.starci.org` to loopback. The tunnel credential and `harness.yml` live outside Git at `%USERPROFILE%/.cloudflared/`.
+- The origin serves publicly with no password. JSON data and text blobs are sensitivity-filtered before being returned; diffs and images come from indexed evidence blobs. If the machine or tunnel stops, the site is temporarily unavailable on the Internet; DNS still exists.
+- Before the route switch, `harness.starci.org` was a CNAME to `starci183.github.io` and served the "StarCi Skills" page. To roll back, restore this CNAME and then stop the two StarCi Harness tasks.
 
-## Khởi tạo trên máy chủ
+## Host setup
 
 ```powershell
 cd <Source>/.claude/ui
@@ -17,16 +17,16 @@ npm run build
 npm run serve
 ```
 
-Tunnel chạy với `run-cloudflared.ps1`. Trước khi dùng, tạo named tunnel và DNS route bằng Cloudflare CLI, đặt `harness.yml` trỏ tới `http://127.0.0.1:4547`, và kiểm tra `cloudflared tunnel --config <file> ingress validate`. Trên máy hiện tại, Windows Task Scheduler chạy ứng dụng và tunnel khi chủ máy đăng nhập, tự khởi động lại khi tiến trình lỗi.
+The tunnel runs with `run-cloudflared.ps1`. Before use, create the named tunnel and DNS route with the Cloudflare CLI, point `harness.yml` at `http://127.0.0.1:4547`, and check `cloudflared tunnel --config <file> ingress validate`. On the current machine, Windows Task Scheduler runs the app and the tunnel when the machine owner signs in, restarting automatically when a process fails.
 
-## Xác minh
+## Verification
 
-1. Không có Authorization: `/` trả HTML; `/api/contract`, `/api/fleet` và `/api/health` trả envelope chỉ đọc.
-2. Workflow có DAG từ `/api/workflows/:project/:wf/graph`. Lần thử có transcript, check, diff và blob bằng chứng từ `/api/attempts/:project/:id` cùng các subroute. Không lấy diff từ working tree đang sống.
-3. Tunnel có các edge connection đã đăng ký; DNS `harness.starci.org` trỏ tới tunnel ID.
-4. Qua HTTPS: khách chưa đăng nhập xem được dashboard; JSON dùng ETag/304 và blob theo SHA dùng cache immutable. POST tới API trả 405.
-5. Khởi động lại hai tác vụ để kiểm tra phục hồi. Không dùng HTTP Basic qua HTTP công khai; Cloudflare phục vụ hostname bằng HTTPS.
+1. Without Authorization: `/` returns HTML; `/api/contract`, `/api/fleet` and `/api/health` return read-only envelopes.
+2. A workflow has its DAG from `/api/workflows/:project/:wf/graph`. An attempt has its transcript, checks, diff and evidence blobs from `/api/attempts/:project/:id` and its subroutes. Do not take diffs from the live working tree.
+3. The tunnel has registered edge connections; the DNS of `harness.starci.org` points at the tunnel ID.
+4. Over HTTPS: a visitor who is not signed in can view the dashboard; JSON uses ETag/304 and blobs by SHA use immutable caching. A POST to the API returns 405.
+5. Restart the two tasks to check recovery. Do not use HTTP Basic over public HTTP; Cloudflare serves the hostname over HTTPS.
 
-## Tài liệu nhà cung cấp đã đọc
+## Vendor documentation read
 
-Đọc ngày 2026-09-26: [Cloudflare local tunnel](https://developers.cloudflare.com/cloudflare-one/networks/connectors/cloudflare-tunnel/do-more-with-tunnels/local-management/create-local-tunnel/) mô tả ingress, DNS route và lệnh run; [DNS records for Tunnel](https://developers.cloudflare.com/cloudflare-one/networks/connectors/cloudflare-tunnel/routing-to-tunnel/dns/) xác nhận CNAME và tunnel hoạt động là hai phần độc lập; [Windows service guidance](https://developers.cloudflare.com/tunnel/features/locally-managed-tunnels/as-a-service/windows/) nêu lifecycle chạy lâu dài. Không có callback hay webhook cho dashboard này.
+Read on 2026-09-26: [Cloudflare local tunnel](https://developers.cloudflare.com/cloudflare-one/networks/connectors/cloudflare-tunnel/do-more-with-tunnels/local-management/create-local-tunnel/) describes ingress, the DNS route and the run command; [DNS records for Tunnel](https://developers.cloudflare.com/cloudflare-one/networks/connectors/cloudflare-tunnel/routing-to-tunnel/dns/) confirms that the CNAME and a working tunnel are two independent parts; [Windows service guidance](https://developers.cloudflare.com/tunnel/features/locally-managed-tunnels/as-a-service/windows/) states the long-running lifecycle. There is no callback or webhook for this dashboard.

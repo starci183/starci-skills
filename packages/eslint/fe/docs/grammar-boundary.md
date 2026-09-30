@@ -28,6 +28,6 @@ export const Home = () => <SurfaceCard><Text>{t("intro")}</Text></SurfaceCard>
 
 **Finding code:** `FE_NATIVE_FORM_CONTROL`
 
-**Vì sao (why):** `<tag>` thô ở `<file>`. Cấu trúc trang và chữ được ghép từ component của grammar, không viết HTML thô.
+**Why:** Raw `<tag>` in `<file>`. Page structure and text are composed from grammar components, not written as raw HTML.
 
-**Cách sửa:** Thay bằng component grammar tương ứng (`Heading`, `Text`, `SurfaceCard`, ...); nếu grammar chưa có, thêm vào grammar hoặc gói ui thay vì vẽ tại chỗ.
+**Fix:** Replace it with the matching grammar component (`Heading`, `Text`, `SurfaceCard`, ...); if the grammar lacks one, add it to the grammar or the ui package instead of drawing it in place.

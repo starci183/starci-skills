@@ -123,17 +123,6 @@ test("COPY-2: no literal copy at any tier, in any language, and no pragma", () =
       { filename: BLOCK, code: "const s = { ready: \"Your course is ready\" }", errors: [{ messageId: "property" }] },
       { filename: at("apps/web/src/hooks/lesson/useLesson.ts"), code: "export const useLesson = () => ({ status: \"Loading your lesson\", error: \"Something went wrong.\" })", errors: [{ messageId: "property" }, { messageId: "property" }] },
       { filename: at("apps/web/src/modules/notify/messages.ts"), code: "export const M = { saved: `Saved ${n} items`, kind: \"Search courses\" }", errors: [{ messageId: "property" }, { messageId: "property" }] },
-      // the second language, wherever it hides, with no pragma to excuse it
-      { filename: BLOCK, code: "const message = \"hạn cuối đã qua\"", errors: [{ messageId: "second" }] },
-      { filename: BLOCK, code: "const message = `hạn cuối đã qua ${x}`", errors: [{ messageId: "second" }] },
-      { filename: BLOCK, code: "// hạn cuối đã qua\nconst x = 1", errors: [{ messageId: "comment" }] },
-      { filename: BLOCK, code: "const LABEL = \"Tiếng Việt\"", errors: [{ messageId: "second" }] },
-      {
-        // vn-ok was the escape hatch; it excuses nothing now
-        filename: BLOCK,
-        code: "// vn-ok: the server sends this verbatim\nconst S = \"Đã huỷ\"",
-        errors: [{ messageId: "second" }],
-      },
     ],
   })
 })

@@ -126,7 +126,7 @@ rules:
   - id: FE-COMMENT-5
     title: What a comment never contains
     kind: mandatory
-    hfsRules: [R18, R58]
+    hfsRules: [R18, R58, R91]
     requirement: |
       Comments never contain a second language, emoji, an inline suppression (eslint-disable, ts-ignore, ts-expect-error) or a
       restated symbol name alone. User copy lives in modules/i18n/messages/<locale>.json and is never written in source, with
@@ -136,7 +136,7 @@ rules:
     cases:
       - id: case-1
         when: "A second language"
-        write: "English only in comments and identifiers (lint no-second-language-in-path); copy lives in the catalogs"
+        write: "English only in identifiers, string literals, comments and test titles (lint no-vietnamese-in-source); copy lives in the catalogs and a real localized test string lives in e2e/fixtures/i18n/"
       - id: case-2
         when: "Emoji"
         write: "none (lint no-emoji-in-source)"
@@ -151,6 +151,7 @@ rules:
         - HFS_INLINE_SUPPRESSION
         - FE_I18N_LITERAL
         - no-emoji-in-source
+        - no-vietnamese-in-source
         - no-second-language-in-path
       manual: []
     relatedExamples: []

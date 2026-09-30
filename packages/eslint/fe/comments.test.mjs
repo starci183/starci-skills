@@ -3,13 +3,13 @@
  *
  *   node --test comments.test.mjs
  *
- * The second-language rule that lived here is gone (its job is `no-hardcoded-copy`, with no pragma).
- * What stays is the export documentation rule and the emoji rule, which walks every place prose hides.
+ * The export documentation rule, the emoji rule and the Vietnamese rule, which walk every place prose hides. Vietnamese
+ * letters in these cases are written as \u escapes, so this file itself stays English-only ASCII.
  */
 import assert from "node:assert/strict"
 import test from "node:test"
 import { at, fixtureHfs, slotTester } from "./fixtures/typed/tester.mjs"
-import { isContentFile, noEmojiInSource, requireExportJsdoc, rules } from "./comments.mjs"
+import { isContentFile, noEmojiInSource, noVietnameseInSource, requireExportJsdoc, rules } from "./comments.mjs"
 
 const tester = slotTester()
 
@@ -60,6 +60,41 @@ test("COMMENTS-4: no emoji in source, and content files are exempt", () => {
   })
 })
 
+/** "han cuoi da qua" spelled with Vietnamese letters, precomposed (NFC), written as escapes so this file stays ASCII. */
+const VI_NFC = "hạn cuối đã qua"
+/** The same text decomposed (NFD): base letters followed by combining marks. */
+const VI_NFD = VI_NFC.normalize("NFD")
+const I18N_FIXTURE = at("e2e/fixtures/i18n/copy.ts")
+
+test("COMMENTS-5: no Vietnamese anywhere in source, specs and test titles included", () => {
+  assert.notEqual(VI_NFC, VI_NFD)
+  tester.run("no-vietnamese-in-source", noVietnameseInSource, {
+    valid: [
+      { filename: SRC, code: "// a plain English comment\nconst deadline = \"passed\"" },
+      // a loanword with no Vietnamese letter is not a hit (structural detection, not a word list)
+      { filename: SRC, code: "const naive = \"facade Muller\"" },
+      // the i18n fixtures slot is the one placement that may carry localized text
+      { filename: I18N_FIXTURE, code: `export const SAMPLE = "${VI_NFC}"` },
+      { filename: I18N_FIXTURE, code: `// ${VI_NFD}\nexport const SAMPLE = 1` },
+    ],
+    invalid: [
+      { filename: SRC, code: `const message = "${VI_NFC}"`, errors: [{ messageId: "vietnamese" }] },
+      // decomposed spelling is caught exactly like the precomposed one
+      { filename: SRC, code: `const message = "${VI_NFD}"`, errors: [{ messageId: "vietnamese" }] },
+      { filename: SRC, code: `const message = \`${VI_NFC} \${x}\``, errors: [{ messageId: "vietnamese" }] },
+      { filename: SRC, code: `// ${VI_NFC}\nconst x = 1`, errors: [{ messageId: "vietnamese" }] },
+      { filename: SRC, code: `const ${"hạn"} = 1`, errors: [{ messageId: "vietnamese" }] },
+      { filename: SRC, code: `const E = () => <p>${VI_NFC}</p>`, errors: [{ messageId: "vietnamese" }] },
+      // a spec is authoring: its test titles are English too
+      { filename: at("apps/web/src/components/leaves/Text/index.spec.tsx"), code: `it("${VI_NFC}", () => {})`, errors: [{ messageId: "vietnamese" }] },
+      // a fixtures folder outside the i18n slot is not exempt
+      { filename: at("e2e/fixtures/copy.ts"), code: `export const SAMPLE = "${VI_NFC}"`, errors: [{ messageId: "vietnamese" }] },
+      // a pragma excuses nothing
+      { filename: SRC, code: `// vn-ok: server text\nconst s = "${VI_NFC}"`, errors: [{ messageId: "vietnamese" }] },
+    ],
+  })
+})
+
 test("there is no copy-module exemption: a resources folder is authoring, and the dictionaries are content", () => {
   const settings = { starci: { hfs: fixtureHfs() } }
   const content = (rel) => isContentFile({ filename: at(rel), settings })
@@ -70,6 +105,7 @@ test("there is no copy-module exemption: a resources folder is authoring, and th
   assert.equal(content("apps/web/src/modules/i18n/request.ts"), false)
   assert.equal(content("apps/web/src/components/leaves/Text/index.test.tsx"), true)
   assert.equal(content("e2e/fixtures/copy.ts"), true)
+  assert.equal(content("e2e/fixtures/i18n/copy.ts"), true)
   assert.equal(content("apps/web/src/components/leaves/Text/fixtures/copy.ts"), false)
   assert.equal(rules["no-second-language-in-source"], undefined)
 })

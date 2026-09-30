@@ -24,6 +24,6 @@ A source file over the budget is neither new nor longer than its recorded size.
 
 **Finding code:** `HFS_SIZE_GROWTH`
 
-**Vì sao (why):** `<file>` vượt ngân sách dòng: file mới đã dài quá mức, hoặc file cũ dài hơn bản ở commit cha. Mỗi file phải nhỏ để một người đọc hết và một bài test phủ hết.
+**Why:** `<file>` exceeds the line budget: a new file is already too long, or an old file is longer than its version at the parent commit. Every file must be small enough for one person to read entirely and one test to cover entirely.
 
-**Cách sửa:** Tách phần mới sang file riêng theo trách nhiệm; một file đã vượt ngân sách chỉ được giữ nguyên hoặc ngắn lại.
+**Fix:** Split the new part into its own file by responsibility; a file already over budget may only stay the same or get shorter.

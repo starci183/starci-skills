@@ -147,6 +147,9 @@ ruleParams:
     # and the suffixes that are never a role. index.ts, main.ts, app.module.ts and the migrations of be.persistence are the
     # only names outside it.
     suffixes: [module, module-definition, decorators, options, config, connection, service, command, query, handler, contracts, port, resolver, controller, gateway, consumer, job, cli, input, type, args, request, response, mapper, policy, entity, sql, rows, error, messages, log-events, cache-keys, guard, interceptor, filter, client, spec, integration-spec, e2e-spec, contract-spec, global-setup, builder]
+    # R47 BE_CONTRACT_UNGUARDED: the world's shape vocabulary. `helper` names the function a contract spec imports to erase the values of a JSON
+    # payload (`shapeOf`); a contract spec proves a fake's fixtures by asserting helper(real) equals helper(fixture).
+    contractShape: {helper: shapeOf}
     bannedSuffixes: [use-case, repository, fixture, factory, store, worker, scheduler, cron, listener, dto, util, utils, helper, helpers, rules, types, constants, int-spec, harness-spec, test]
   fe:
     # Slot budgets (component.tsx 300, hooks 200, modules 400) are stricter than this cap where they apply.
@@ -467,6 +470,7 @@ slots:
     tracked: tracked
     tier: none
     tests: none
+    why: emitted by `npm run contract:emit` (`hfs emit-contracts`, never written by hand) from the app's typed operation table `apps/<app>/src/operations.ts` (canon BE-OPERATIONS-1); CI fails when the emitted file differs
     rules: [HFS_CONTRACT_SNAPSHOT_DRIFT]
   - id: fe.contract.copy
     profiles: [fe]
@@ -489,7 +493,7 @@ slots:
     owner: true
     minInstances: 1
     requires: [main.ts, app.module.ts]
-    allows: [main.ts, app.module.ts, "<app>.options.ts"]
+    allows: [main.ts, app.module.ts, "<app>.options.ts", operations.ts]
     tests: none                   # an app is proven by the e2e world (useTestWorld({ apps })), never by a unit spec
     budget: {app.module.ts: 250, main.ts: 80}
     rules: [BE_APP_COMPOSITION_ONLY, BE_APP_BUSINESS_ROLE, BE_DEFAULT_DENY, BE_ERROR_MASKED, BE_FEATURE_NOT_COMPOSED]
@@ -658,8 +662,8 @@ slots:
     rules: [BE_ERROR_HOME]
   - id: be.domain.messages
     profiles: [be]
-    path: "src/modules/{domain,integrations}/<capability>/messages/"
-    presence: optional            # a capability that raises no user-facing text carries none
+    path: "src/modules/{domain,platform,integrations}/<capability>/messages/"
+    presence: optional            # a capability (any tier) that raises no user-facing text carries none
     tracked: tracked
     tier: inherit
     allows: ["<capability>.messages.ts"]   # one keyed catalog per capability, vi and en, read through the platform/i18n MessageCatalog port
@@ -762,6 +766,7 @@ slots:
     presence: optional
     tracked: tracked
     tier: fixtures
+    allows: [i18n/]   # i18n/ is the one folder that may carry localized text
     tests: none
     why: payload fixtures with a role suffix (the doubles come from @starci/jest-preset, not from here); the test data builders live in its builders/ slot; importable by unit specs, integration and e2e; never imports a feature
   - id: be.tests.fixtures.builders
@@ -777,6 +782,15 @@ slots:
       for integration and e2e; arrange only, constraints on, deterministic defaults. A .builder.ts anywhere else, and a *.repository.ts,
       *.fixture.ts or *.factory.ts anywhere, is a BE_SOURCE_FORM finding
     rules: [BE_SOURCE_FORM]
+  - id: be.tests.fixtures.i18n
+    profiles: [be]
+    path: "src/tests/fixtures/i18n/"
+    presence: optional
+    tracked: tracked
+    tier: fixtures
+    allows: ["<name>.<role>.ts"]   # data files that deliberately carry localized text (a real Vietnamese string a parser or formatter must accept); no specs here
+    tests: none
+    why: the ONLY test-fixture location where Vietnamese or another language may appear in source (LANG_NOT_ENGLISH); placement is the marker, there is no comment pragma
   - id: be.tests.integration
     profiles: [be]
     path: "src/tests/integration/<capability>/*.integration-spec.ts"
@@ -1102,6 +1116,14 @@ slots:
     tracked: tracked
     tier: e2e
     tests: none
+  - id: fe.e2e-support.i18n
+    profiles: [fe]
+    path: "e2e/fixtures/i18n/"
+    presence: optional
+    tracked: tracked
+    tier: e2e
+    tests: none
+    why: the ONLY e2e fixture location where Vietnamese or another language may appear in source (LANG_NOT_ENGLISH); placement is the marker, there is no comment pragma
 
 # Checks that read this manifest (all ship from .claude; none keeps its own path list)
 consumers:

@@ -32,7 +32,7 @@ reads:
   - id: request
     path: request goal text + owner instruction
     purpose:
-      en: The explicit ask for the full unit run ("full unit", "run all unit tests", "chạy toàn bộ unit"); a
+      en: The explicit ask for the full unit run ("full unit", "run all unit tests", "the Vietnamese phrase for run the whole unit suite"); a
         code-writing op's own scoped specs are a different thing.
   - id: profile
     path: modules/models/registry.yaml + selected runtime execution profile + actual host tools/model

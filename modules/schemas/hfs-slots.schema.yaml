@@ -49,7 +49,7 @@ properties:
       be:
         type: object
         additionalProperties: false
-        required: [fileLines, duplicateBlock, infraOwners, specDoubles, suffixes, bannedSuffixes]
+        required: [fileLines, duplicateBlock, infraOwners, specDoubles, suffixes, bannedSuffixes, contractShape]
         properties:
           fileLines: {$ref: '#/$defs/fileLines'}
           duplicateBlock: {$ref: '#/$defs/duplicateBlock'}
@@ -88,6 +88,13 @@ properties:
                   forms: {$ref: '#/$defs/doubleForms'}
           suffixes: {$ref: '#/$defs/roleSuffixes'}
           bannedSuffixes: {$ref: '#/$defs/roleSuffixes'}
+          contractShape:
+            type: object
+            additionalProperties: false
+            required: [helper]
+            description: R47 BE_CONTRACT_UNGUARDED. The world vocabulary of a contract spec; helper is the imported function that erases payload values (shapeOf).
+            properties:
+              helper: {type: string, pattern: '^[A-Za-z_$][A-Za-z0-9_$]*$'}
       fe:
         type: object
         additionalProperties: false

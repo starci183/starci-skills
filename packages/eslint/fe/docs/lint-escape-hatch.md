@@ -29,6 +29,6 @@ const s = 1
 
 **Finding code:** `HFS_INLINE_SUPPRESSION`
 
-**Vì sao (why):** Có chú thích tắt luật ở `<file>:<line>`. HFS không cho tắt tại chỗ — sửa code, hoặc đề xuất đổi luật.
+**Why:** There is a rule-disabling comment at `<file>:<line>`. HFS does not allow disabling in place - fix the code, or propose changing the rule.
 
-**Cách sửa:** Xóa `eslint-disable`, `@ts-ignore`, `@ts-expect-error` hoặc `vn-ok` và sửa nguyên nhân.
+**Fix:** Remove `eslint-disable`, `@ts-ignore`, `@ts-expect-error` or `vn-ok` and fix the cause.

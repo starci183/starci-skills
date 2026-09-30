@@ -24,9 +24,9 @@ A component file has at most 300 lines.
 
 **Finding code:** `FE_SIZE_AND_STATE_BUDGET`
 
-**Vì sao (why):** `<file>` dài `<n>` dòng, vượt ngưỡng 300 dòng của một component.
+**Why:** `<file>` is `<n>` lines long, over the 300-line limit for a component.
 
-**Cách sửa:** Tách phần vẽ khỏi phần dữ liệu và tách từng khu vực thành đơn vị riêng.
+**Fix:** Separate rendering from data and split each region into its own unit.
 
 ## `starci-fe/unit-hook-budget`
 
@@ -46,9 +46,9 @@ const Feed = () => { /* up to 6 x useState and 6 data hooks */ }
 
 **Finding code:** `FE_SIZE_AND_STATE_BUDGET`
 
-**Vì sao (why):** `<unit>` có `<n>` hook dữ liệu / `<m>` useState, vượt ngưỡng 6.
+**Why:** `<unit>` has `<n>` data hooks / `<m>` useState, over the limit of 6.
 
-**Cách sửa:** Gom trạng thái đổi cùng nhau vào reducer hoặc hook riêng; tách mỗi vùng dữ liệu thành block kết nối riêng.
+**Fix:** Group state that changes together into a reducer or a dedicated hook; split each data region into its own connected block.
 
 ## `starci-fe/no-hand-rolled-polling`
 
@@ -68,6 +68,6 @@ const d = useQueryFeedSwr({ refreshInterval: 5000 })
 
 **Finding code:** `FE_SIZE_AND_STATE_BUDGET`
 
-**Vì sao (why):** `<unit>` tự viết vòng poll (`setInterval` hoặc `setTimeout` tự gọi lại).
+**Why:** `<unit>` writes its own poll loop (`setInterval` or a self-calling `setTimeout`).
 
-**Cách sửa:** Làm tươi qua hook dữ liệu (`refreshInterval`) hoặc socket, mỗi resource đúng một cơ chế.
+**Fix:** Refresh through a data hook (`refreshInterval`) or a socket, exactly one mechanism per resource.

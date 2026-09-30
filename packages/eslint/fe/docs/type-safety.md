@@ -24,9 +24,9 @@ const row = parseCourseRow(payload)
 
 **Finding code:** `FE_TYPE_ESCAPE`
 
-**Vì sao (why):** `<file>` ép kiểu qua `unknown` (`as unknown as T`): trình biên dịch quên mọi thứ nó biết ngay tại chỗ dữ liệu đi vào.
+**Why:** `<file>` casts through `unknown` (`as unknown as T`): the compiler forgets everything it knows exactly where the data enters.
 
-**Cách sửa:** Thu hẹp từ `unknown` bằng type guard hoặc parser; không ép kiểu.
+**Fix:** Narrow from `unknown` with a type guard or parser; do not cast.
 
 ## `starci-fe/no-type-assertion`
 
@@ -46,9 +46,9 @@ const row = isCourseRow(payload) ? payload : null
 
 **Finding code:** `FE_TYPE_ESCAPE`
 
-**Vì sao (why):** `<file>` dùng `as T` hoặc `<T>x`: một lời khẳng định trình biên dịch không kiểm được. Sai thì lỗi rơi vào trình duyệt của người dùng.
+**Why:** `<file>` uses `as T` or `<T>x`: an assertion the compiler cannot check. If wrong, the error lands in the user's browser.
 
-**Cách sửa:** Thu hẹp bằng type guard, `in`, discriminant hoặc parser tại nơi dữ liệu đi vào; dùng `satisfies` nếu chỉ muốn kiểm một literal.
+**Fix:** Narrow with a type guard, `in`, a discriminant or a parser where the data enters; use `satisfies` if you only want to check a literal.
 
 ## `starci-fe/no-non-null-assertion`
 
@@ -68,9 +68,9 @@ const first = rows[0] ?? fallbackRow
 
 **Finding code:** `FE_TYPE_ESCAPE`
 
-**Vì sao (why):** `<file>` dùng `x!`: khẳng định giá trị có mặt mà không chứng minh.
+**Why:** `<file>` uses `x!`: it asserts a value is present without proving it.
 
-**Cách sửa:** Xử lý nhánh vắng mặt (`if`, `??`, return sớm) hoặc sửa kiểu để giá trị không thể vắng.
+**Fix:** Handle the absent branch (`if`, `??`, early return) or fix the type so the value cannot be absent.
 
 ## `starci-fe/no-explicit-any`
 
@@ -90,6 +90,6 @@ const parse = (value: unknown) => (isCourseRow(value) ? value.id : null)
 
 **Finding code:** `FE_TYPE_ESCAPE`
 
-**Vì sao (why):** `<file>` dùng `any`: tắt kiểm kiểu cho giá trị đó và mọi thứ suy ra từ nó.
+**Why:** `<file>` uses `any`: it turns off type checking for that value and everything inferred from it.
 
-**Cách sửa:** Dùng kiểu thật, generic, hoặc `unknown` rồi thu hẹp tại chỗ dùng.
+**Fix:** Use a real type, a generic, or `unknown` and then narrow at the point of use.

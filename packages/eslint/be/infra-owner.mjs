@@ -19,7 +19,7 @@
  *
  * `no-framework-logger` (R40) and `no-ambient-clock` (R79) judge Nest `Logger` and `Date`; the table holds neither.
  */
-import { hfsOf } from "./lib/hfs.mjs"
+import { hfsOf, inTestWorld } from "./lib/hfs.mjs"
 import { moduleReferences } from "./lib/import-source.mjs"
 
 /** The owner id of a file: the last two segments of its owner root (`platform/http`), or null when no owner holds it. */
@@ -55,7 +55,7 @@ export const infraImportOwner = {
         const hfs = hfsOf(context)
         const table = hfs.ruleParams.infraOwners
         const here = ownerIdOf(hfs, context.filename)
-        const isWorld = hfs.slotOf(context.filename) === "be.tests.world"
+        const isWorld = inTestWorld(hfs, context.filename)
         const check = (node, name, key) => {
             const owners = table[key]
             if (owners.includes(here) || (isWorld && owners.length > 0)) return
