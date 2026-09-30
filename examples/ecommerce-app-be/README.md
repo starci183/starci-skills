@@ -4,50 +4,43 @@ Two NestJS ecommerce services share the HFS backend repository tree.
 
 ## Overview
 
-This backend example uses the HFS repository tree. Two NestJS applications live under
-`apps/identity` and `apps/order`. Their composition roots import explicit public APIs from
-`src/features` and `src/modules/{domain,platform,integrations}`. The paired
-`examples/ecommerce-app-fe` reads this backend's port projection and shares its product Work tree.
+Two NestJS APIs (`apps/identity`, `apps/order`) and one migrate app share the HFS backend tree and follow the locked BE
+convention: CQRS handlers, GraphQL doors that only dispatch the bus, one injected `EntityManager` per database, outcomes for
+expected refusals and one error family per capability. The paired `examples/ecommerce-app-fe` reads this backend's port
+projection.
 
 ## Stack
 
-NestJS, TypeScript, npm workspaces, PostgreSQL, Redis and GraphQL. The dev stack is declared
-in `.starcistacks/dev`.
+NestJS 11, TypeScript, PostgreSQL (one database per connection: `identity`, `order`), Redis (sessions) and GraphQL. The dev
+stack is declared in `.starcistacks/dev`.
 
 ## Repository layout
 
-- `apps/identity/src` and `apps/order/src`: startup and Nest composition only.
-- `src/features/{identity,checkout}`: HTTP and GraphQL adapters under `transport/`.
-- `src/modules/domain`: account, session, catalog, cart, order, and payment capabilities.
-- `src/modules/platform`: config, Postgres, Redis, and exception infrastructure.
-- `src/modules/integrations`: cross-service HTTP clients.
-- `.starciwork`: product records and implementation references for both backend and frontend.
-- `.starcistacks`: the dev stack declaration, compose fragments, and resolved port projection.
-- `docs/guides/testing.md`: verification commands and suite boundaries.
-
-Each feature and module capability has an `index.ts` public entry. The root package exports
-those entries through `ecommerce-app-be/features/*` and `ecommerce-app-be/modules/*`, so the
-application workspaces can compose them without importing private files.
+- `apps/<app>/src`: `main.ts` (parses the environment once), `app.module.ts` (`AppModule.register(options)`, every capability
+  registered once with `isGlobal: true`), `<app>.options.ts`, the composition spec.
+- `src/features/{identity,checkout,health}`: `application/` (command/query + handler + contracts) and `transport/{graphql,http}/`.
+- `src/modules/domain`: account, session, auth (guards), catalog, cart, order, payment; each owns its entities, migrations,
+  `.sql.ts` constants and errors under `persistence/` and `errors/`.
+- `src/modules/platform`: composition (injectors), config (EnvSource), cqrs, database, errors, graphql, http, http-security,
+  i18n, logging, clock, primitives (Outcome), probes.
+- `src/modules/integrations`: cache (Redis), identity-api and order-api (each service calls the other over GraphQL).
+- `src/tests`: unit specs sit beside their subject; `fixtures/` holds typed doubles; `e2e/` boots the compiled apps.
+- `.starciwork`: product records. `.starcistacks`: the dev stack, env key list (`runtime/env/KEYS.md`) and seeds.
 
 ## Development
 
-From this directory run `npm ci`, then `npm run typecheck`, `npm run lint:check`,
-`npm run build` and `npm run test:unit`. `docs/guides/testing.md` describes the live stack gate.
+`npm ci`, then `npm run typecheck`, `npm run lint:check`, `npm run build`, `npm run test:unit`. The runbook with the
+environment keys, migrations and seeds is `.starcistacks/dev/README.md`; `docs/guides/testing.md` describes the suites.
 
 ## Work
 
 The backend owns [`.starciwork`](.starciwork/index.yaml) product records for both services
 and the paired frontend.
 
-## Runtime projection
+## Runtime configuration
 
-`.starcistacks/dev/infra/metadata.json` is the resolved port map for both backend services and
-the paired frontend. The backend config services and frontend readers use this file unless
-`ECOMMERCE_APP_BE_METADATA` names another projection. The identity and order applications
-provide separate environment overrides for their listen and dependency URLs.
-
-The dev stack's runbook is `.starcistacks/dev/README.md`. The Sonar declaration points at the
-shared host extension `.claude/ext/sonar`; this embedded example has no CI Sonar scan token.
+Every runtime value comes from the process environment through `EnvSource`; `.starcistacks/dev/runtime/env/KEYS.md` lists the
+keys. `.starcistacks/dev/infra/metadata.json` stays the resolved port map the frontend reads.
 
 ## Verification
 
