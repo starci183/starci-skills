@@ -5,7 +5,7 @@ Two test kinds, kept apart on purpose - one root `jest.config.js` with exactly t
 | Suite | Command | What it is |
 |---|---|---|
 | Unit | `npm test` / `npm run test:unit` | In-process `TestingModule` specs, colocated `*.spec.ts` beside the source they cover. Fakes at provider boundaries - no docker, no network. |
-| E2E | `npm run test:e2e` | `*.e2e-spec.ts` journeys under `src/tests/e2e/`. Each spec boots its own run-owned docker compose stack (postgres + keycloak) plus the compiled api and worker as child processes, after `apps/migrate` applied the schema, drives the public doors over HTTP/GraphQL, then tears the stack down and verifies cleanup. |
+| E2E | `npm run test:e2e` | `*.e2e-spec.ts` flows under `src/tests/e2e/`, integration specs under `src/tests/integration/<capability>/`, contract specs under `src/tests/contract/<provider>/`. `src/tests/world/` is the only infrastructure: `global-setup.ts` starts Postgres once and runs the `apps/migrate` bootstrap, `useTestWorld({ apps } or { modules })` boots the real apps in process, and the third-party providers (identity provider, payment gateway, SMTP) are network-edge fake servers under `src/tests/world/fakes/<provider>/`; nothing overrides a provider. |
 
 ## Unit tests
 
