@@ -21,13 +21,17 @@ export const typed = (context) => {
     return { program, checker: program.getTypeChecker(), toTs: (node) => services.esTreeNodeToTSNodeMap.get(node) }
 }
 
-/** The declarations of a type's symbol after alias resolution (an imported type alias resolves to its target). */
+/**
+ * The declarations of a type: those of its alias (a written `type Repo = Repository<T>`) and those of its own symbol, each
+ * after alias resolution (an imported type alias resolves to its target). Both are origins, so a rename by alias hides nothing.
+ */
 const declarationsOf = (checker, type) => {
     if (!type) return []
-    let symbol = type.aliasSymbol ?? type.getSymbol?.()
-    if (!symbol) return []
-    if (symbol.flags & ts.SymbolFlags.Alias) symbol = checker.getAliasedSymbol(symbol)
-    return symbol.getDeclarations?.() ?? []
+    return [type.aliasSymbol, type.getSymbol?.()].flatMap((symbol) => {
+        if (!symbol) return []
+        const target = symbol.flags & ts.SymbolFlags.Alias ? checker.getAliasedSymbol(symbol) : symbol
+        return target.getDeclarations?.() ?? []
+    })
 }
 
 /**
@@ -41,7 +45,17 @@ export const typeOrigins = (context, node) => {
     const { checker, toTs } = typed(context)
     const tsNode = toTs(node)
     if (!tsNode) return []
-    const type = ts.isTypeNode(tsNode) ? checker.getTypeFromTypeNode(tsNode) : checker.getTypeAtLocation(tsNode)
+    return originsOfType(checker, ts.isTypeNode(tsNode) ? checker.getTypeFromTypeNode(tsNode) : checker.getTypeAtLocation(tsNode))
+}
+
+/**
+ * Where a TypeScript type is declared, for a rule that already holds a type from the checker (an alias argument, a call signature return).
+ *
+ * @param {object} checker - The program's type checker.
+ * @param {object} type - A TypeScript type.
+ * @returns {Array<{ name: string, file: string, module: string | null }>} The declaration origins, as `typeOrigins` returns them.
+ */
+export const originsOfType = (checker, type) => {
     const parts = type?.isUnion?.() ? type.types : [type]
     return parts.flatMap((part) => declarationsOf(checker, part).map((declaration) => {
         const file = String(declaration.getSourceFile().fileName).replace(/\\/g, "/")

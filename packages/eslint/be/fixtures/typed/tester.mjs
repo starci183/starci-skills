@@ -39,7 +39,7 @@ export const typedTester = ({ declaration } = {}) => new RuleTester({
         sourceType: "module",
         parserOptions: {
             // A case's file need not exist: the default project types it with this directory's tsconfig.json.
-            projectService: { allowDefaultProject: DEPTHS, defaultProject: "tsconfig.json" },
+            projectService: { allowDefaultProject: DEPTHS, defaultProject: "tsconfig.json", maximumDefaultProjectFileMatchCount_THIS_WILL_SLOW_DOWN_LINTING: 500 },
             tsconfigRootDir: TYPED_ROOT,
         },
     },
