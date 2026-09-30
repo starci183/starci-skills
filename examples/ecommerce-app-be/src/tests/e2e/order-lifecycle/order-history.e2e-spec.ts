@@ -46,7 +46,7 @@ describe("order lifecycle: order history", () => {
         )
 
     it("a buyer placing several orders builds a confirmed, paid history both services can read", async () => {
-        const session = await world.auth.registerBuyer("hist-a", password)
+        const session = await world.signedInPerson("hist-a")
         const { personId } = session
         const buyer = world.apps.order.api.bearing(session.sessionToken)
         const identity = world.apps.identity.api.bearing(session.sessionToken)
@@ -157,7 +157,7 @@ describe("order lifecycle: order history", () => {
     })
 
     it("a refusal and an idempotent replay never append to order history", async () => {
-        const session = await world.auth.registerBuyer("hist-b", password)
+        const session = await world.signedInPerson("hist-b")
         const { personId } = session
         const buyer = world.apps.order.api.bearing(session.sessionToken)
 

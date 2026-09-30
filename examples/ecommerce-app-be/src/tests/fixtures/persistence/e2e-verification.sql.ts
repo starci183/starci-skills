@@ -38,3 +38,10 @@ export const STOCK_OF = sql`SELECT stock FROM products WHERE id = $1`
 
 /** Sets the stock of one product ($1 SKU, $2 units): a spec starts from the stock it relies on. */
 export const SET_STOCK = sql`UPDATE products SET stock = $2 WHERE id = $1`
+
+/** Creates a product or resets its stock ($1 SKU, $2 name, $3 unit price in minor units, $4 units on sale). */
+export const UPSERT_PRODUCT = sql`INSERT INTO products (id, name, price_minor_units, stock) VALUES ($1, $2, $3, $4)
+    ON CONFLICT (id) DO UPDATE SET stock = EXCLUDED.stock`
+
+/** How many products the catalog holds. */
+export const PRODUCT_COUNT = sql`SELECT count(*)::int AS count FROM products`

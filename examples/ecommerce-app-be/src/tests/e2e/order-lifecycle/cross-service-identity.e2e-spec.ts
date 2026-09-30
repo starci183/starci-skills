@@ -18,8 +18,6 @@ import { useTestWorld } from "../../world/use-test-world"
  * Run: npm run test:e2e -- order-lifecycle/cross-service-identity
  */
 describe("order lifecycle: identity to order boundary", () => {
-    const password = "e2e-xservice-pass"
-
     const world = useTestWorld({ apps: { identity: { module: IdentityApp }, order: { module: OrderApp } } })
 
     beforeAll(async () => {
@@ -27,7 +25,7 @@ describe("order lifecycle: identity to order boundary", () => {
     })
 
     it("a revoked session is refused at the order boundary until re-auth resumes the same buyer", async () => {
-        const session = await world.auth.registerBuyer("xsrv", password)
+        const session = await world.signedInPerson("xsrv")
         const identity = world.apps.identity.api.bearing(session.sessionToken)
         const before = world.apps.order.api.bearing(session.sessionToken)
 
@@ -47,7 +45,7 @@ describe("order lifecycle: identity to order boundary", () => {
         expect(refused.errorCode).toBe("IDENTITY_UNAUTHENTICATED")
 
         // Re-auth: a different token for the same person.
-        const resumed = await world.auth.signIn(session.email, password)
+        const resumed = await world.signIn(session.email, session.password)
         expect(resumed.personId).toBe(session.personId)
         expect(resumed.sessionToken).not.toBe(session.sessionToken)
         const after = world.apps.order.api.bearing(resumed.sessionToken)

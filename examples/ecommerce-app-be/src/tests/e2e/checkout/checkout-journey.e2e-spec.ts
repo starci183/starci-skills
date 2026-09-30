@@ -31,7 +31,7 @@ describe("checkout journey", () => {
     })
 
     it("register, browse the catalog, add to the cart, place the order, pay, and end with an empty cart", async () => {
-        const session = await world.auth.registerBuyer("checkout", "e2e-checkout-pass")
+        const session = await world.signedInPerson("checkout")
         personId = session.personId
         const buyer = world.apps.order.api.bearing(session.sessionToken)
 

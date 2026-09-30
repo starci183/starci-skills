@@ -10,7 +10,7 @@ import {
     PAYMENT_COUNT,
     SET_STOCK,
 } from "../../fixtures/persistence/e2e-verification.sql"
-import type { TestApi } from "../../world/use-test-world"
+import type { TestApi } from "../../world/test-api.client"
 import { useTestWorld } from "../../world/use-test-world"
 
 /**
@@ -29,7 +29,7 @@ interface FreshBuyer {
 
 describe("payment failure", () => {
     const freshBuyer = async (tag: string): Promise<FreshBuyer> => {
-        const session = await world.auth.registerBuyer(`payment-${tag}`, "e2e-payment-pass")
+        const session = await world.signedInPerson(`payment-${tag}`)
         return { personId: session.personId, buyer: world.apps.order.api.bearing(session.sessionToken) }
     }
 

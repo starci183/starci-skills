@@ -15,6 +15,8 @@ export class RedisFakeService {
     /** The `redis://` URL the integration is configured with. */
     url = ""
 
+    private port = 0
+
     private readonly entries = new Map<string, string>()
     private readonly server: Server = createServer((socket) => this.serve(socket))
     private failures = 0
@@ -24,7 +26,8 @@ export class RedisFakeService {
         const fake = new RedisFakeService()
         await new Promise<void>((resolve) => fake.server.listen(0, "127.0.0.1", resolve))
         const address: AddressInfo | string | null = fake.server.address()
-        fake.url = `redis://127.0.0.1:${typeof address === "object" && address !== null ? address.port : 0}/0`
+        fake.port = typeof address === "object" && address !== null ? address.port : 0
+        fake.url = `redis://127.0.0.1:${fake.port}/0`
         return fake
     }
 
@@ -41,6 +44,19 @@ export class RedisFakeService {
     /** The keys the store holds. */
     keys(): Array<string> {
         return [...this.entries.keys()]
+    }
+
+    /**
+     * Takes the provider down: the listener closes and every connection drops, `during` runs while it is down, then the same
+     * port listens again with the entries it held: the outage a deployment sees when its Redis host crashes and comes back.
+     */
+    async interrupt(during: () => Promise<void>): Promise<void> {
+        await this.stop()
+        try {
+            await during()
+        } finally {
+            await new Promise<void>((resolve) => this.server.listen(this.port, "127.0.0.1", resolve))
+        }
     }
 
     /** Stops listening and drops every connection. */

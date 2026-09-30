@@ -79,8 +79,8 @@ export const readRows = <TRow>(
 ): Promise<Array<TRow>> => manager.query(statement, [...params])
 
 /** The count a verification statement answers for one id. */
-export const readCount = async (manager: EntityManager, statement: Statement, id: string): Promise<number> => {
-    const rows = await readRows<CountRow>(manager, statement, [id])
+export const readCount = async (manager: EntityManager, statement: Statement, id?: string): Promise<number> => {
+    const rows = await readRows<CountRow>(manager, statement, id === undefined ? [] : [id])
     return rows[0]?.count ?? 0
 }
 
