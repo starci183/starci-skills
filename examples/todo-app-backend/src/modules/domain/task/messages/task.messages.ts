@@ -13,7 +13,6 @@ export const TASK_MESSAGES: MessageBundle = {
         "errors.TASK_NOT_FOUND": "The task was not found.",
         "errors.TASK_FORBIDDEN": "You may not touch this task.",
         "errors.TASK_TITLE_REQUIRED": "The task title must not be blank.",
-        "errors.TASK_PLAN_CAP_EXCEEDED":
-            "Your plan allows {{cap}} active tasks. Upgrade at {{upgradePath}}.",
+        "errors.TASK_PLAN_CAP_EXCEEDED": "Your plan allows {{cap}} active tasks. Upgrade at {{upgradePath}}.",
     },
 }

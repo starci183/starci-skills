@@ -70,10 +70,14 @@ describe("plan journey (e2e)", () => {
         expect(intent?.checkoutUrl).toBe(checkout?.checkoutUrl)
         const gatewayIntentId = intent?.gatewayIntentId ?? ""
         // The contract of the create-intent call: what the gateway received from the real client.
-        const intentCall = (await world.fake.sepay.requests()).find((request) => request.method === "POST" && request.body.includes(checkout?.subscriptionId ?? ""))
+        const intentCall = (await world.fake.sepay.requests()).find(
+            (request) => request.method === "POST" && request.body.includes(checkout?.subscriptionId ?? ""),
+        )
         expect(intentCall?.path).toBe("/userapi/transactions/qr")
         expect(intentCall?.headers.authorization).toMatch(/^Bearer .+/)
-        const intentRows: Array<PaymentIntentRow> = await world.db.primary.query(PAYMENT_INTENT_BY_ID, [checkout?.paymentIntentId])
+        const intentRows: Array<PaymentIntentRow> = await world.db.primary.query(PAYMENT_INTENT_BY_ID, [
+            checkout?.paymentIntentId,
+        ])
         expect(intentRows).toEqual([
             {
                 id: checkout?.paymentIntentId,
@@ -96,10 +100,18 @@ describe("plan journey (e2e)", () => {
 
         // The delivery signed with the shared secret applies the confirmation.
         const signed = await world.fake.sepay.settle({ gatewayIntentId, status: "paid", periodEnd })
-        expect(signed).toMatchObject({ signature: "valid", httpStatus: 200, body: { ignored: false, applied: true, subscriptionStatus: "active" } })
-        const paidIntent: Array<PaymentIntentRow> = await world.db.primary.query(PAYMENT_INTENT_BY_ID, [checkout?.paymentIntentId])
+        expect(signed).toMatchObject({
+            signature: "valid",
+            httpStatus: 200,
+            body: { ignored: false, applied: true, subscriptionStatus: "active" },
+        })
+        const paidIntent: Array<PaymentIntentRow> = await world.db.primary.query(PAYMENT_INTENT_BY_ID, [
+            checkout?.paymentIntentId,
+        ])
         expect(paidIntent[0]?.status).toBe("paid")
-        const subscriptions: Array<SubscriptionRow> = await world.db.primary.query(SUBSCRIPTIONS_OF_PERSON, [owner.personId])
+        const subscriptions: Array<SubscriptionRow> = await world.db.primary.query(SUBSCRIPTIONS_OF_PERSON, [
+            owner.personId,
+        ])
         expect(subscriptions).toEqual([{ id: checkout?.subscriptionId, plan: "paid", status: "active" }])
 
         // A replay of the same delivery is ignored: the inbox claim already holds it.

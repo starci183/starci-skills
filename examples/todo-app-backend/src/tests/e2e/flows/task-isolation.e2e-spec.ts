@@ -41,7 +41,9 @@ describe("task isolation (e2e)", () => {
         }
 
         // Two live session rows, one per distinct person: the identities are real.
-        const sessions: Array<SessionRow> = await world.db.primary.query(SESSIONS_BY_TOKENS, [[alice.sessionToken, bob.sessionToken]])
+        const sessions: Array<SessionRow> = await world.db.primary.query(SESSIONS_BY_TOKENS, [
+            [alice.sessionToken, bob.sessionToken],
+        ])
         expect(sessions.map((row) => row.person_id).sort()).toEqual([alice.personId, bob.personId].sort())
 
         const bobCountsBefore = await countsOf(bob.caller)
@@ -83,7 +85,9 @@ describe("task isolation (e2e)", () => {
         await api.graphql<SignOutData>("signOut", { input: { sessionToken: alice.sessionToken } })
         await api.graphql<SignOutData>("signOut", { input: { sessionToken: bob.sessionToken } })
         expect((await alice.caller.graphql<TasksData>("tasks")).errorCode).toBe(IdentityErrorCode.NotFound)
-        const remaining: Array<SessionRow> = await world.db.primary.query(SESSIONS_BY_TOKENS, [[alice.sessionToken, bob.sessionToken]])
+        const remaining: Array<SessionRow> = await world.db.primary.query(SESSIONS_BY_TOKENS, [
+            [alice.sessionToken, bob.sessionToken],
+        ])
         expect(remaining).toEqual([])
     })
 })

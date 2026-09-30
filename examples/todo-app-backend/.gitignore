@@ -5,7 +5,6 @@ dist/
 coverage/
 reports/
 test-results/
-playwright-report/
 *.tsbuildinfo
 .scannerwork/
 .turbo/
@@ -62,7 +61,6 @@ lt.json
 !.starcistacks/*/README.md
 !.starcistacks/*/environment.json
 !.starcistacks/*/seeds/**
-!.starcistacks/*/infra/stack.yaml
 !.starcistacks/*/infra/compose/**
 !.starcistacks/*/infra/terraform/**
 .starcistacks/*/infra/**/.env

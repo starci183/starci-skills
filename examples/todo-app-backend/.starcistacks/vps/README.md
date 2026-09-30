@@ -5,9 +5,9 @@ published database port.
 
 | command | what it does |
 |---|---|
-| prepare | `npm run sync` then `docker stack config -c infra/stack.yaml` |
+| prepare | `npm run sync` then `docker stack config -c infra/compose/stack.yaml` |
 | doctor | `docker node ls` |
-| up | `docker stack deploy -c infra/stack.yaml todo` |
+| up | `docker stack deploy -c infra/compose/stack.yaml todo` |
 | status | `docker stack services todo` |
 | logs | `docker service logs -f todo_api` |
 | down | `docker stack rm todo` |

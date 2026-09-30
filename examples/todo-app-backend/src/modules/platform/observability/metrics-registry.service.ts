@@ -10,8 +10,7 @@ interface RequestMetric {
     durationSumMs: number
 }
 
-const escapeLabel = (value: string): string =>
-    value.replace(/\\/g, "\\\\").replace(/"/g, '\\"').replace(/\n/g, "\\n")
+const escapeLabel = (value: string): string => value.replace(/\\/g, "\\\\").replace(/"/g, '\\"').replace(/\n/g, "\\n")
 
 const labelsOf = (metric: RequestMetric): string =>
     `{method="${escapeLabel(metric.method)}",route="${escapeLabel(metric.route)}",status="${metric.status}"}`

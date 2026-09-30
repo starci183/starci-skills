@@ -22,7 +22,9 @@ export class ProbeCheckerService {
 
     /** Probes every dependency and reports the state of each. */
     async run(): Promise<ProbeReport> {
-        const states = await Promise.all(this.probes.map(async (probe) => [probe.name, await this.state(probe)] as const))
+        const states = await Promise.all(
+            this.probes.map(async (probe) => [probe.name, await this.state(probe)] as const),
+        )
         return {
             service: this.options.service,
             checks: Object.fromEntries(states),

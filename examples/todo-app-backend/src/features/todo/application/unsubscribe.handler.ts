@@ -20,6 +20,9 @@ export class UnsubscribeHandler extends ICQRSHandler<UnsubscribeCommand, Unsubsc
     }
 
     protected override async process(command: UnsubscribeCommand): Promise<UnsubscribeResult> {
-        return this.preferences.unsubscribe({ personId: command.params.principal.id, channel: command.params.request.channel })
+        return this.preferences.unsubscribe({
+            personId: command.params.principal.id,
+            channel: command.params.request.channel,
+        })
     }
 }

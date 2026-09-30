@@ -10,9 +10,7 @@ export const ERRORS_OPTIONS: unique symbol = Symbol("platform.errors.options")
 export const ERRORS_SERVICE: unique symbol = Symbol("platform.errors.service")
 
 /** Injects the options of the errors capability. Parameter type: ErrorsOptions. */
-export const InjectErrorsOptions = (): TypedParameterDecorator<ErrorsOptions> =>
-    injector<ErrorsOptions>(ERRORS_OPTIONS)
+export const InjectErrorsOptions = (): TypedParameterDecorator<ErrorsOptions> => injector<ErrorsOptions>(ERRORS_OPTIONS)
 
 /** Injects the service that describes failures for the transports. Parameter type: ErrorsService. */
-export const InjectErrorsService = (): TypedParameterDecorator<ErrorsService> =>
-    injector<ErrorsService>(ERRORS_SERVICE)
+export const InjectErrorsService = (): TypedParameterDecorator<ErrorsService> => injector<ErrorsService>(ERRORS_SERVICE)

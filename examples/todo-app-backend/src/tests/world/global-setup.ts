@@ -51,7 +51,11 @@ export default async function globalSetup(): Promise<void> {
         await retryUntil("postgres accepts connections", DATABASE_READY_DEADLINE_MS, () =>
             Promise.resolve(postgresAccepts(databaseContainer, DATABASE_USER, DATABASE_NAME)),
         )
-        await bootstrap({ connections: [primaryConnectionOf(parsePrimaryDatabaseConfig(new EnvSource({ PRIMARY_DB_URL: databaseUrl })))] })
+        await bootstrap({
+            connections: [
+                primaryConnectionOf(parsePrimaryDatabaseConfig(new EnvSource({ PRIMARY_DB_URL: databaseUrl }))),
+            ],
+        })
         writeWorldState({
             runId,
             databaseContainer,

@@ -19,7 +19,9 @@ export class DispatchNotificationGroupHandler extends ICQRSHandler<
         super(logger)
     }
 
-    protected override async process(command: DispatchNotificationGroupCommand): Promise<DispatchNotificationGroupResult> {
+    protected override async process(
+        command: DispatchNotificationGroupCommand,
+    ): Promise<DispatchNotificationGroupResult> {
         return this.notify.dispatchOnce(command.params.request)
     }
 }

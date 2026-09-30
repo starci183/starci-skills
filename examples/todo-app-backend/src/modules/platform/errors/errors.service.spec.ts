@@ -39,7 +39,12 @@ describe("ErrorsService", () => {
 
             const description = service.describe(new DemoError({ code: DemoCode.Missing, params: { id: "t-1" } }))
 
-            expect(description).toEqual({ code: DemoCode.Missing, kind: "not-found", status: 404, params: { id: "t-1" } })
+            expect(description).toEqual({
+                code: DemoCode.Missing,
+                kind: "not-found",
+                status: 404,
+                params: { id: "t-1" },
+            })
             expect(logger.error).not.toHaveBeenCalled()
         })
 
@@ -47,7 +52,12 @@ describe("ErrorsService", () => {
             const { service, logger } = await build()
             const error = new DemoError({ code: DemoCode.Undeclared })
 
-            expect(service.describe(error)).toEqual({ code: ErrorsErrorCode.Internal, kind: "internal", status: 500, params: {} })
+            expect(service.describe(error)).toEqual({
+                code: ErrorsErrorCode.Internal,
+                kind: "internal",
+                status: 500,
+                params: {},
+            })
             expect(logger.error).toHaveBeenCalledWith(ErrorsLogEvent.Unhandled, error)
         })
 
@@ -55,7 +65,12 @@ describe("ErrorsService", () => {
             const { service, logger } = await build()
             const error = new Error("boom")
 
-            expect(service.describe(error)).toEqual({ code: ErrorsErrorCode.Internal, kind: "internal", status: 500, params: {} })
+            expect(service.describe(error)).toEqual({
+                code: ErrorsErrorCode.Internal,
+                kind: "internal",
+                status: 500,
+                params: {},
+            })
             expect(logger.error).toHaveBeenCalledWith(ErrorsLogEvent.Unhandled, error)
         })
     })
@@ -90,8 +105,9 @@ describe("ErrorsService", () => {
         })
 
         it("formats a malformed operation as invalid", async () => {
-            const { service } = await build()
-            const graphql = new GraphQLError("Syntax Error")
+            const { service, catalog } = await build()
+            catalog.get.mockReturnValue("The request is malformed.")
+            const graphql = new GraphQLError(catalog.get(ErrorsErrorCode.OperationInvalid, {}, "en"))
 
             expect(service.formatError(graphql.toJSON(), graphql).extensions).toEqual({
                 code: ErrorsErrorCode.OperationInvalid,

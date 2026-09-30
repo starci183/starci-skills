@@ -20,4 +20,4 @@ requiresProof:
   unit:
     forEach: composes
   e2e:
-    command: npm run test:e2e -- src/tests/e2e/observability/probes.e2e-spec.ts
+    command: npm run test:e2e -- src/tests/e2e/flows/probes.e2e-spec.ts

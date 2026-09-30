@@ -95,7 +95,12 @@ export class AuditErasureService {
             executingAt: null,
             completedAt: null,
         })
-        return this.confirm({ manager: params.manager, requestId: saved.requestId, callerId: params.personId, at: params.at })
+        return this.confirm({
+            manager: params.manager,
+            requestId: saved.requestId,
+            callerId: params.personId,
+            at: params.at,
+        })
     }
 
     /**

@@ -10,7 +10,8 @@ export const depthLimitRule =
             SelectionSet: {
                 enter: () => {
                     depth += 1
-                    if (depth === maxDepth + 1) context.reportError(new GraphQLError(`Selection depth exceeds ${maxDepth}.`))
+                    if (depth === maxDepth + 1)
+                        context.reportError(new GraphQLError(`Selection depth exceeds ${maxDepth}.`))
                 },
                 leave: () => {
                     depth -= 1

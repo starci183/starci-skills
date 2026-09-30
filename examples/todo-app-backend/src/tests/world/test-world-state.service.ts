@@ -79,7 +79,8 @@ export const writeWorldState = (state: TestWorldState): void => {
 /** Reads the state file of the run; the world was not started by globalSetup when it is absent. */
 export const readWorldState = (): TestWorldState => {
     const path = process.env[STATE_FILE_ENV]
-    if (path === undefined) throw missing(`${STATE_FILE_ENV} is not set: the jest globalSetup of the test world did not run`)
+    if (path === undefined)
+        throw missing(`${STATE_FILE_ENV} is not set: the jest globalSetup of the test world did not run`)
     try {
         const parsed: unknown = JSON.parse(readFileSync(path, "utf8"))
         if (isState(parsed)) return parsed

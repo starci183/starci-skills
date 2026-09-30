@@ -18,7 +18,7 @@ requiresProof:
   unit:
     forEach: composes
   e2e:
-    command: bash scripts/live-proof-notify.mjs
+    command: npm run test:e2e -- src/tests/e2e/flows/notify-preferences.e2e-spec.ts
   uat:
     required: true
 

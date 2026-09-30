@@ -8,7 +8,12 @@ import {
     AUDIT_LINE_COUNT_UNDER_KEY,
     AUDIT_LINES_UNDER_KEY,
 } from "@tests/fixtures/persistence/e2e-verification.sql"
-import type { AuditKeyRow, AuditLineRow, CountRow, ErasureRequestRow } from "@tests/fixtures/persistence/e2e-verification.rows"
+import type {
+    AuditKeyRow,
+    AuditLineRow,
+    CountRow,
+    ErasureRequestRow,
+} from "@tests/fixtures/persistence/e2e-verification.rows"
 import type {
     AuditLineEntry,
     AuditLogData,
@@ -56,10 +61,14 @@ describe("erasure journey (e2e)", () => {
         const asControl = control.caller
 
         // Activity that must become unreadable: one task by the future subject, one by the control.
-        const subjectTask = await asSubject.graphql<CreateTaskData>("createTask", { input: { title: `${marker}-subject` } })
+        const subjectTask = await asSubject.graphql<CreateTaskData>("createTask", {
+            input: { title: `${marker}-subject` },
+        })
         expect(subjectTask.errorCode).toBeNull()
         const subjectTaskId = subjectTask.data?.createTask.taskId ?? ""
-        const controlTask = await asControl.graphql<CreateTaskData>("createTask", { input: { title: `${marker}-control` } })
+        const controlTask = await asControl.graphql<CreateTaskData>("createTask", {
+            input: { title: `${marker}-control` },
+        })
         expect(controlTask.errorCode).toBeNull()
         const controlTaskId = controlTask.data?.createTask.taskId ?? ""
 
@@ -108,7 +117,10 @@ describe("erasure journey (e2e)", () => {
         expect(logAfter.data?.auditLog).toEqual([])
 
         // Anonymized in the store: the key row and the person_id on the request are both gone.
-        const survivingKeys: Array<AuditKeyRow> = await world.db.primary.query(AUDIT_KEYS_OF_PERSON_OR_KEY, [subject.personId, subjectKeyId])
+        const survivingKeys: Array<AuditKeyRow> = await world.db.primary.query(AUDIT_KEYS_OF_PERSON_OR_KEY, [
+            subject.personId,
+            subjectKeyId,
+        ])
         expect(survivingKeys).toEqual([])
         const completedRow: Array<ErasureRequestRow> = await world.db.primary.query(AUDIT_ERASURE_REQUEST, [requestId])
         expect(completedRow[0]?.state).toBe("complete")

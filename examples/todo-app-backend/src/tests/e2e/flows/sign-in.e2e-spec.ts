@@ -31,7 +31,9 @@ describe("auth/sign-in", () => {
 
         // The real client asked the provider the way a password grant is asked.
         const requests = await world.fake.keycloak.requests()
-        const grant = requests.find((request) => request.method === "POST" && request.body.includes(encodeURIComponent(email)))
+        const grant = requests.find(
+            (request) => request.method === "POST" && request.body.includes(encodeURIComponent(email)),
+        )
         expect(grant?.path).toBe("/realms/todo/protocol/openid-connect/token")
         expect(grant?.body).toContain("grant_type=password")
 
@@ -67,7 +69,9 @@ describe("auth/sign-in", () => {
 
         // A wrong pair is refused without naming which half: an unknown email and a wrong password are the identical refusal.
         const wrongPassword = await api.graphql<SignInData>("signIn", { input: { email, password: WRONG_PASSWORD } })
-        const unknownEmail = await api.graphql<SignInData>("signIn", { input: { email: `nobody-${randomUUID()}@todo.dev`, password: "whatever" } })
+        const unknownEmail = await api.graphql<SignInData>("signIn", {
+            input: { email: `nobody-${randomUUID()}@todo.dev`, password: "whatever" },
+        })
         expect(wrongPassword.errorCode).toBe(IdentityErrorCode.InvalidCredentials)
         expect(unknownEmail.errorCode).toBe(IdentityErrorCode.InvalidCredentials)
         expect(wrongPassword.data).toBeNull()

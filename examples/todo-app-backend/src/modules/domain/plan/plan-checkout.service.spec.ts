@@ -81,7 +81,9 @@ describe("PlanCheckoutService", () => {
     describe("downgrade", () => {
         it("returns the subscription of the caller as the transition left it", async () => {
             const { service, tx, subscriptions } = await build()
-            subscriptions.getOrCreate.mockResolvedValue(subscriptionRow({ plan: "paid", status: "active", periodEnd: PLAN_PERIOD_END }))
+            subscriptions.getOrCreate.mockResolvedValue(
+                subscriptionRow({ plan: "paid", status: "active", periodEnd: PLAN_PERIOD_END }),
+            )
             subscriptions.downgrade.mockResolvedValue(subscriptionRow())
 
             await expect(service.downgrade({ personId: "p1" })).resolves.toEqual({

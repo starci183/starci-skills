@@ -72,7 +72,9 @@ export class AuditLogService {
      * target; everyone else reads exactly their own lines and the filter is ignored. A reader without an identity is
      * refused before any line is touched.
      */
-    async readAs(params: ReadAuditLogParams): Promise<Outcome<AuditLinesView, AuditErrorCode.OperatorRoleNotAuthorized>> {
+    async readAs(
+        params: ReadAuditLogParams,
+    ): Promise<Outcome<AuditLinesView, AuditErrorCode.OperatorRoleNotAuthorized>> {
         if (!params.principalId) return refused(AuditErrorCode.OperatorRoleNotAuthorized)
         const resolved = params.roles.includes(ADMIN_ROLE)
             ? await this.readChain({ action: params.action, target: params.target })

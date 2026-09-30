@@ -23,7 +23,9 @@ describe("AccessService", () => {
         it("lets the owner complete without asking the database", async () => {
             const access = await build(mockEntityManager())
 
-            await expect(access.mayComplete({ actorId: "owner-1", taskId: "t-1", ownerId: "owner-1" })).resolves.toBe(true)
+            await expect(access.mayComplete({ actorId: "owner-1", taskId: "t-1", ownerId: "owner-1" })).resolves.toBe(
+                true,
+            )
         })
 
         it("lets an accepted editor of that task and owner complete, reading the row from the database", async () => {
@@ -43,7 +45,9 @@ describe("AccessService", () => {
         it("refuses a viewer, a revoked or foreign collaborator and a stranger, who match no editor row", async () => {
             const access = await build(mockEntityManager({ findOneBy: [InvitationEntity, null] }))
 
-            await expect(access.mayComplete({ actorId: "stranger", taskId: "t-1", ownerId: "owner-1" })).resolves.toBe(false)
+            await expect(access.mayComplete({ actorId: "stranger", taskId: "t-1", ownerId: "owner-1" })).resolves.toBe(
+                false,
+            )
         })
     })
 })

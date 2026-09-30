@@ -24,7 +24,7 @@ requiresProof:
   unit:
     forEach: composes
   e2e:
-    command: npm run test:e2e -- src/tests/e2e/task/task-lifecycle.e2e-spec.ts
+    command: npm run test:e2e -- src/tests/e2e/flows/task-lifecycle.e2e-spec.ts
   uat:
     required: true
 

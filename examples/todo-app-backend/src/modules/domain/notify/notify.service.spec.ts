@@ -90,9 +90,9 @@ describe("NotifyService", () => {
         it("refuses a blank channel before touching any table", async () => {
             const built = await build()
 
-            await expect(built.service.admit({ manager: built.tx.em, ...admitInput({ channel: "  " }) })).resolves.toBeRefused(
-                NotifyErrorCode.ChannelRequired,
-            )
+            await expect(
+                built.service.admit({ manager: built.tx.em, ...admitInput({ channel: "  " }) }),
+            ).resolves.toBeRefused(NotifyErrorCode.ChannelRequired)
 
             expect(built.dedupe.admit).not.toHaveBeenCalled()
             expect(built.outbox.messages).toEqual([])
@@ -132,7 +132,9 @@ describe("NotifyService", () => {
             const built = await build()
             built.dedupe.admit.mockResolvedValue({ notification: notificationView(), isNew: true })
             built.preferences.get.mockResolvedValue(preferenceView({ unsubscribed: true }))
-            built.delivery.admit.mockResolvedValue(deliveryAttemptView({ state: "suppressed", failureClass: "unsubscribed" }))
+            built.delivery.admit.mockResolvedValue(
+                deliveryAttemptView({ state: "suppressed", failureClass: "unsubscribed" }),
+            )
 
             await expect(built.service.admit({ manager: built.tx.em, ...admitInput() })).resolves.toSucceedWith({
                 notificationId: "n1",
@@ -209,7 +211,9 @@ describe("NotifyService", () => {
             const built = await build()
             built.digest.flush.mockResolvedValue(null)
 
-            await expect(built.service.prepareDispatch({ manager: built.tx.em, ...prepareDispatchInput() })).resolves.toBeNull()
+            await expect(
+                built.service.prepareDispatch({ manager: built.tx.em, ...prepareDispatchInput() }),
+            ).resolves.toBeNull()
 
             expect(built.digest.flush).toHaveBeenCalledWith({ manager: built.tx.em, windowId: "w1", at: AT })
             expect(built.dedupe.findByDigestGroup).not.toHaveBeenCalled()
@@ -219,7 +223,9 @@ describe("NotifyService", () => {
             const built = await build()
             built.dedupe.findByDigestGroup.mockResolvedValue([])
 
-            await expect(built.service.prepareDispatch({ manager: built.tx.em, ...prepareDispatchInput({ kind: "retry" }) })).resolves.toBeNull()
+            await expect(
+                built.service.prepareDispatch({ manager: built.tx.em, ...prepareDispatchInput({ kind: "retry" }) }),
+            ).resolves.toBeNull()
 
             expect(built.digest.flush).not.toHaveBeenCalled()
             expect(built.delivery.markSending).not.toHaveBeenCalled()
@@ -230,7 +236,9 @@ describe("NotifyService", () => {
             built.dedupe.findByDigestGroup.mockResolvedValue([notificationView()])
             built.delivery.markSending.mockResolvedValue([])
 
-            await expect(built.service.prepareDispatch({ manager: built.tx.em, ...prepareDispatchInput({ kind: "retry" }) })).resolves.toBeNull()
+            await expect(
+                built.service.prepareDispatch({ manager: built.tx.em, ...prepareDispatchInput({ kind: "retry" }) }),
+            ).resolves.toBeNull()
         })
 
         it("marks the queued attempts sending and renders the task-complete email for one notification", async () => {
@@ -264,7 +272,10 @@ describe("NotifyService", () => {
             built.dedupe.findByDigestGroup.mockResolvedValue([notificationView({ payload: {} })])
             built.delivery.markSending.mockResolvedValue([deliveryAttemptView({ state: "sending" })])
 
-            const plan = await built.service.prepareDispatch({ manager: built.tx.em, ...prepareDispatchInput({ kind: "retry" }) })
+            const plan = await built.service.prepareDispatch({
+                manager: built.tx.em,
+                ...prepareDispatchInput({ kind: "retry" }),
+            })
 
             expect(plan?.message.subject).toBe('notify.email.task-complete.subject {"taskId":""}')
         })
@@ -274,7 +285,10 @@ describe("NotifyService", () => {
             built.dedupe.findByDigestGroup.mockResolvedValue([notificationView({ kind: "task-reopened" })])
             built.delivery.markSending.mockResolvedValue([deliveryAttemptView({ state: "sending" })])
 
-            const plan = await built.service.prepareDispatch({ manager: built.tx.em, ...prepareDispatchInput({ kind: "retry" }) })
+            const plan = await built.service.prepareDispatch({
+                manager: built.tx.em,
+                ...prepareDispatchInput({ kind: "retry" }),
+            })
 
             expect(plan?.message.subject).toBe('notify.email.generic.subject {"kind":"task-reopened"}')
         })
@@ -290,7 +304,10 @@ describe("NotifyService", () => {
                 deliveryAttemptView({ notificationId: "n2", state: "sending" }),
             ])
 
-            const plan = await built.service.prepareDispatch({ manager: built.tx.em, ...prepareDispatchInput({ kind: "retry" }) })
+            const plan = await built.service.prepareDispatch({
+                manager: built.tx.em,
+                ...prepareDispatchInput({ kind: "retry" }),
+            })
 
             expect(plan?.notificationIds).toEqual(["n1", "n2"])
             expect(plan?.message.to).toBe("p1")
@@ -316,9 +333,11 @@ describe("NotifyService", () => {
             const built = await build()
             built.delivery.record.mockResolvedValue({ delivered: ["n1"], retried: [], bounced: ["n2"], attempt: 1 })
 
-            await expect(
-                built.service.settle({ manager: built.tx.em, ...settleDispatchInput() }),
-            ).resolves.toEqual({ delivered: 1, retried: 0, bounced: 1 })
+            await expect(built.service.settle({ manager: built.tx.em, ...settleDispatchInput() })).resolves.toEqual({
+                delivered: 1,
+                retried: 0,
+                bounced: 1,
+            })
 
             expect(built.delivery.record).toHaveBeenCalledWith({
                 manager: built.tx.em,
@@ -415,7 +434,11 @@ describe("NotifyService", () => {
             const built = await build()
             built.inbox.claim.mockResolvedValue(false)
 
-            await expect(built.service.dispatchOnce(receiveDispatchInput())).resolves.toEqual({ delivered: 0, retried: 0, bounced: 0 })
+            await expect(built.service.dispatchOnce(receiveDispatchInput())).resolves.toEqual({
+                delivered: 0,
+                retried: 0,
+                bounced: 0,
+            })
 
             expect(built.inbox.claim).toHaveBeenCalledWith("notify.dispatch", "notify-flush:w1")
             expect(built.tx.outcomes).toEqual([])
@@ -426,7 +449,11 @@ describe("NotifyService", () => {
             built.inbox.claim.mockResolvedValue(true)
             built.digest.flush.mockResolvedValue(null)
 
-            await expect(built.service.dispatchOnce(receiveDispatchInput())).resolves.toEqual({ delivered: 0, retried: 0, bounced: 0 })
+            await expect(built.service.dispatchOnce(receiveDispatchInput())).resolves.toEqual({
+                delivered: 0,
+                retried: 0,
+                bounced: 0,
+            })
 
             expect(built.tx.commits).toBe(1)
             expect(built.delivery.transmit).not.toHaveBeenCalled()
@@ -440,7 +467,11 @@ describe("NotifyService", () => {
             built.delivery.transmit.mockResolvedValue("transient")
             built.delivery.record.mockResolvedValue({ delivered: [], retried: ["n1"], bounced: [], attempt: 1 })
 
-            await expect(built.service.dispatchOnce(receiveDispatchInput())).resolves.toEqual({ delivered: 0, retried: 1, bounced: 0 })
+            await expect(built.service.dispatchOnce(receiveDispatchInput())).resolves.toEqual({
+                delivered: 0,
+                retried: 1,
+                bounced: 0,
+            })
 
             expect(built.tx.commits).toBe(2)
             expect(built.delivery.transmit).toHaveBeenCalledTimes(1)

@@ -19,8 +19,7 @@ export interface PlanDefinition {
 
 /** The verdict of the cap guard for one more active task. */
 export type CapVerdict =
-    | { readonly allowed: true }
-    | { readonly allowed: false; readonly cap: number; readonly upgradePath: string }
+    { readonly allowed: true } | { readonly allowed: false; readonly cap: number; readonly upgradePath: string }
 
 /** What the cap guard needs to decide. */
 export interface CapCheckParams {

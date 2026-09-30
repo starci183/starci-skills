@@ -1,3 +1,4 @@
+export { cronAdmits, isValidCron } from "./cron.policy"
 export { parseSchedulingConfig } from "./scheduling.config"
 export type { CronSchedule } from "./scheduling.contracts"
 export { InjectJobRegistry } from "./scheduling.decorators"

@@ -6,6 +6,7 @@ import type { TaskView } from "@modules/domain/task"
 import { CLOCK } from "@modules/platform/clock"
 import { LIST_ROWS_MAX, PRIMARY_ENTITY_MANAGER } from "@modules/platform/database"
 import { In } from "typeorm"
+import { occurrenceRow } from "@tests/fixtures/builders/recur.builder"
 import { RecurErrorCode } from "./errors/recur.error"
 import { OccurrenceService } from "./occurrence.service"
 import { OccurrenceEntity } from "./persistence/entities/occurrence.entity"
@@ -14,16 +15,6 @@ import type { OccurrenceStatus } from "./recur.contracts"
 
 const NOW = "2026-09-10T10:00:00.000Z"
 const at = new Date(NOW)
-
-const row = (overrides: Partial<OccurrenceEntity> = {}): OccurrenceEntity => ({
-    id: "t1",
-    ruleId: "r1",
-    windowKey: "r1:2026-09-02",
-    localDate: "2026-09-02",
-    dueAtUtc: new Date("2026-09-02T02:00:00.000Z"),
-    status: "materialised",
-    ...overrides,
-})
 
 const transitions: ReadonlyArray<readonly ["complete" | "skip", OccurrenceStatus]> = [
     ["complete", "completed"],
@@ -57,7 +48,9 @@ describe("OccurrenceService", () => {
         }
 
         it("writes the occurrence row of a window that has none, keyed by the window key", async () => {
-            const { service, em } = await build(mockEntityManager({ findOneBy: [OccurrenceEntity, null], save: [OccurrenceEntity, row()] }))
+            const { service, em } = await build(
+                mockEntityManager({ findOneBy: [OccurrenceEntity, null], save: [OccurrenceEntity, occurrenceRow()] }),
+            )
 
             await expect(service.materialise({ manager: em, ...window })).resolves.toEqual({
                 id: "t1",
@@ -73,10 +66,13 @@ describe("OccurrenceService", () => {
         })
 
         it("returns the existing row of a window that already has one and saves nothing", async () => {
-            const existing = row({ id: "t0", status: "completed" })
+            const existing = occurrenceRow({ id: "t0", status: "completed" })
             const { service, em } = await build(mockEntityManager({ findOneBy: [OccurrenceEntity, existing] }))
 
-            await expect(service.materialise({ manager: em, ...window })).resolves.toMatchObject({ id: "t0", status: "completed" })
+            await expect(service.materialise({ manager: em, ...window })).resolves.toMatchObject({
+                id: "t0",
+                status: "completed",
+            })
             expect(em.save).not.toHaveBeenCalled()
         })
     })
@@ -89,11 +85,11 @@ describe("OccurrenceService", () => {
         })
 
         it("returns the keys that already have a row", async () => {
-            const { service, em } = await build(mockEntityManager({ find: [OccurrenceEntity, [row()]] }))
+            const { service, em } = await build(mockEntityManager({ find: [OccurrenceEntity, [occurrenceRow()]] }))
 
-            await expect(service.existingWindowKeys({ windowKeys: ["r1:2026-09-02", "r1:2026-09-03"] })).resolves.toEqual(
-                new Set(["r1:2026-09-02"]),
-            )
+            await expect(
+                service.existingWindowKeys({ windowKeys: ["r1:2026-09-02", "r1:2026-09-03"] }),
+            ).resolves.toEqual(new Set(["r1:2026-09-02"]))
             expect(em.find).toHaveBeenCalledWith(OccurrenceEntity, {
                 where: { windowKey: In(["r1:2026-09-02", "r1:2026-09-03"]) },
                 take: LIST_ROWS_MAX,
@@ -110,13 +106,16 @@ describe("OccurrenceService", () => {
                 where: { windowKey: In(keys.slice(0, LIST_ROWS_MAX)) },
                 take: LIST_ROWS_MAX,
             })
-            expect(em.find).toHaveBeenNthCalledWith(2, OccurrenceEntity, { where: { windowKey: In(keys.slice(LIST_ROWS_MAX)) }, take: LIST_ROWS_MAX })
+            expect(em.find).toHaveBeenNthCalledWith(2, OccurrenceEntity, {
+                where: { windowKey: In(keys.slice(LIST_ROWS_MAX)) },
+                take: LIST_ROWS_MAX,
+            })
         })
     })
 
     describe("listByRule", () => {
         it("lists the occurrences of one rule, oldest local date first", async () => {
-            const { service, em } = await build(mockEntityManager({ find: [OccurrenceEntity, [row()]] }))
+            const { service, em } = await build(mockEntityManager({ find: [OccurrenceEntity, [occurrenceRow()]] }))
 
             await expect(service.listByRule({ ruleId: "r1" })).resolves.toEqual([
                 {
@@ -140,33 +139,48 @@ describe("OccurrenceService", () => {
         it("refuses an occurrence that has no row", async () => {
             const { service, em, tasks } = await build(mockEntityManager({ findOneBy: [OccurrenceEntity, null] }))
 
-            await expect(service[action]({ id: "t1", actorId: "o1" })).resolves.toBeRefused(RecurErrorCode.OccurrenceNotFound)
+            await expect(service[action]({ id: "t1", actorId: "o1" })).resolves.toBeRefused(
+                RecurErrorCode.OccurrenceNotFound,
+            )
             expect(tasks.find).not.toHaveBeenCalled()
             expect(em.save).not.toHaveBeenCalled()
         })
 
         it("refuses an occurrence whose task is gone", async () => {
-            const { service, em, tasks } = await build(mockEntityManager({ findOneBy: [OccurrenceEntity, row()] }))
+            const { service, em, tasks } = await build(
+                mockEntityManager({ findOneBy: [OccurrenceEntity, occurrenceRow()] }),
+            )
             tasks.find.mockResolvedValue(null)
 
-            await expect(service[action]({ id: "t1", actorId: "o1" })).resolves.toBeRefused(RecurErrorCode.OccurrenceNotFound)
+            await expect(service[action]({ id: "t1", actorId: "o1" })).resolves.toBeRefused(
+                RecurErrorCode.OccurrenceNotFound,
+            )
             expect(em.save).not.toHaveBeenCalled()
         })
 
         it("refuses an occurrence whose task belongs to somebody else", async () => {
-            const { service, em, tasks } = await build(mockEntityManager({ findOneBy: [OccurrenceEntity, row()] }))
+            const { service, em, tasks } = await build(
+                mockEntityManager({ findOneBy: [OccurrenceEntity, occurrenceRow()] }),
+            )
             tasks.find.mockResolvedValue(task)
 
-            await expect(service[action]({ id: "t1", actorId: "intruder" })).resolves.toBeRefused(RecurErrorCode.OccurrenceForbidden)
+            await expect(service[action]({ id: "t1", actorId: "intruder" })).resolves.toBeRefused(
+                RecurErrorCode.OccurrenceForbidden,
+            )
             expect(em.save).not.toHaveBeenCalled()
             expect(tasks.complete).not.toHaveBeenCalled()
         })
 
         it(`answers ${status} again without writing when it already is`, async () => {
-            const { service, em, tasks } = await build(mockEntityManager({ findOneBy: [OccurrenceEntity, row({ status })] }))
+            const { service, em, tasks } = await build(
+                mockEntityManager({ findOneBy: [OccurrenceEntity, occurrenceRow({ status })] }),
+            )
             tasks.find.mockResolvedValue(task)
 
-            await expect(service[action]({ id: "t1", actorId: "o1" })).resolves.toSucceedWith({ occurrenceId: "t1", status })
+            await expect(service[action]({ id: "t1", actorId: "o1" })).resolves.toSucceedWith({
+                occurrenceId: "t1",
+                status,
+            })
             expect(em.save).not.toHaveBeenCalled()
             expect(tasks.complete).not.toHaveBeenCalled()
         })
@@ -175,14 +189,20 @@ describe("OccurrenceService", () => {
     describe("complete (write)", () => {
         it("completes the task at the clock instant and marks the occurrence completed in one transaction", async () => {
             const { service, em, tx, tasks } = await build(
-                mockEntityManager({ findOneBy: [OccurrenceEntity, row()], save: [OccurrenceEntity, row({ status: "completed" })] }),
+                mockEntityManager({
+                    findOneBy: [OccurrenceEntity, occurrenceRow()],
+                    save: [OccurrenceEntity, occurrenceRow({ status: "completed" })],
+                }),
             )
             tasks.find.mockResolvedValue(task)
 
-            await expect(service.complete({ id: "t1", actorId: "o1" })).resolves.toSucceedWith({ occurrenceId: "t1", status: "completed" })
+            await expect(service.complete({ id: "t1", actorId: "o1" })).resolves.toSucceedWith({
+                occurrenceId: "t1",
+                status: "completed",
+            })
 
             expect(tasks.complete).toHaveBeenCalledWith({ manager: expect.anything(), task, at })
-            expect(em.save).toHaveBeenCalledWith(OccurrenceEntity, { ...row(), status: "completed" })
+            expect(em.save).toHaveBeenCalledWith(OccurrenceEntity, { ...occurrenceRow(), status: "completed" })
             expect(tx.commits).toBe(1)
         })
     })
@@ -190,14 +210,20 @@ describe("OccurrenceService", () => {
     describe("skip (write)", () => {
         it("marks the occurrence skipped and leaves its task untouched", async () => {
             const { service, em, tx, tasks } = await build(
-                mockEntityManager({ findOneBy: [OccurrenceEntity, row()], save: [OccurrenceEntity, row({ status: "skipped" })] }),
+                mockEntityManager({
+                    findOneBy: [OccurrenceEntity, occurrenceRow()],
+                    save: [OccurrenceEntity, occurrenceRow({ status: "skipped" })],
+                }),
             )
             tasks.find.mockResolvedValue(task)
 
-            await expect(service.skip({ id: "t1", actorId: "o1" })).resolves.toSucceedWith({ occurrenceId: "t1", status: "skipped" })
+            await expect(service.skip({ id: "t1", actorId: "o1" })).resolves.toSucceedWith({
+                occurrenceId: "t1",
+                status: "skipped",
+            })
 
             expect(tasks.complete).not.toHaveBeenCalled()
-            expect(em.save).toHaveBeenCalledWith(OccurrenceEntity, { ...row(), status: "skipped" })
+            expect(em.save).toHaveBeenCalledWith(OccurrenceEntity, { ...occurrenceRow(), status: "skipped" })
             expect(tx.commits).toBe(1)
         })
     })

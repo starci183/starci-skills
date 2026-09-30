@@ -5,7 +5,13 @@ import { CLOCK } from "@modules/platform/clock"
 import { PRIMARY_ENTITY_MANAGER } from "@modules/platform/database"
 import { IDS } from "@modules/platform/ids"
 import { PostgresOutbox } from "./outbox.service"
-import { BURY_MESSAGE, CLAIM_DUE_MESSAGES, COMPLETE_MESSAGE, INSERT_MESSAGE, RETRY_MESSAGE } from "./persistence/outbox.sql"
+import {
+    BURY_MESSAGE,
+    CLAIM_DUE_MESSAGES,
+    COMPLETE_MESSAGE,
+    INSERT_MESSAGE,
+    RETRY_MESSAGE,
+} from "./persistence/outbox.sql"
 
 const build = async (own = mockEntityManager()) => {
     const clock = new FakeClock(PLATFORM_AT)
@@ -27,7 +33,12 @@ describe("PostgresOutbox", () => {
             const { outbox, own, clock } = await build()
             const inTransaction = mockEntityManager({ query: [INSERT_MESSAGE, []] })
 
-            await outbox.enqueue(inTransaction, { queue: "audit.append", eventId: "e-1", payload: { a: 1 }, availableAt: PLATFORM_LATER })
+            await outbox.enqueue(inTransaction, {
+                queue: "audit.append",
+                eventId: "e-1",
+                payload: { a: 1 },
+                availableAt: PLATFORM_LATER,
+            })
 
             expect(inTransaction.query).toHaveBeenCalledWith(INSERT_MESSAGE, [
                 "00000000-0000-4000-8000-000000000001",
@@ -51,13 +62,20 @@ describe("PostgresOutbox", () => {
             await expect(outbox.claimDue({ at, queues: ["q"], limit: 10, visibilityMs: 30_000 })).resolves.toEqual([
                 { id: "m-1", queue: "q", eventId: "e-1", payload: { a: 1 }, attempts: 1 },
             ])
-            expect(own.query).toHaveBeenCalledWith(CLAIM_DUE_MESSAGES, [at, ["q"], 10, new Date("2026-05-01T10:00:30.000Z")])
+            expect(own.query).toHaveBeenCalledWith(CLAIM_DUE_MESSAGES, [
+                at,
+                ["q"],
+                10,
+                new Date("2026-05-01T10:00:30.000Z"),
+            ])
         })
 
         it("answers an empty list when nothing is due", async () => {
             const { outbox } = await build(mockEntityManager({ query: [CLAIM_DUE_MESSAGES, [[], 0]] }))
 
-            await expect(outbox.claimDue({ at: new Date(PLATFORM_AT), queues: ["q"], limit: 10, visibilityMs: 1 })).resolves.toEqual([])
+            await expect(
+                outbox.claimDue({ at: new Date(PLATFORM_AT), queues: ["q"], limit: 10, visibilityMs: 1 }),
+            ).resolves.toEqual([])
         })
     })
 

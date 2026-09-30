@@ -27,7 +27,12 @@ const attempt = async (probe: () => Promise<boolean>): Promise<ProbeAttempt> => 
  * timeout, so "postgres never came up" arrives with the daemon's own error attached. The returned ReadinessResult lets a
  * caller record the observed wait.
  */
-export async function retryUntil(label: string, deadlineMs: number, probe: () => Promise<boolean>, intervalMs = 1_000): Promise<ReadinessResult> {
+export async function retryUntil(
+    label: string,
+    deadlineMs: number,
+    probe: () => Promise<boolean>,
+    intervalMs = 1_000,
+): Promise<ReadinessResult> {
     const startedAt = worldClock.now().getTime()
     let failure: unknown = null
     while (worldClock.now().getTime() - startedAt < deadlineMs) {

@@ -25,7 +25,9 @@ export async function pollUntil<T>(
         if (worldClock.now().getTime() > deadline) {
             throw new TestWorldError({
                 code: TestWorldErrorCode.TimedOut,
-                params: { detail: `timed out after ${timeoutMs}ms waiting for ${label}; last observation: ${JSON.stringify(observed ?? null).slice(0, OBSERVATION_LIMIT)}` },
+                params: {
+                    detail: `timed out after ${timeoutMs}ms waiting for ${label}; last observation: ${JSON.stringify(observed ?? null).slice(0, OBSERVATION_LIMIT)}`,
+                },
             })
         }
         await pause(intervalMs)

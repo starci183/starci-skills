@@ -1,8 +1,8 @@
 import { Test } from "@nestjs/testing"
 import { builder, FakeClock, fakeIds, fakeTransaction, mock, mockEntityManager } from "@starci/jest-preset"
 import { TaskService } from "@modules/domain/task"
-import { UPLOAD_STORAGE, UploadStorageError, UploadStorageErrorCode } from "@modules/integrations/upload"
-import type { UploadStorage } from "@modules/integrations/upload"
+import { UPLOAD_STORAGE, UploadStorageError, UploadStorageErrorCode } from "@modules/integrations/upload-storage"
+import type { UploadStorage } from "@modules/integrations/upload-storage"
 import { CLOCK } from "@modules/platform/clock"
 import { Secret } from "@modules/platform/config"
 import { LIST_ROWS_MAX, PRIMARY_ENTITY_MANAGER } from "@modules/platform/database"
@@ -29,7 +29,8 @@ const bytes = Buffer.from("hello")
 const pending = uploadRow()
 const ready = uploadRow({ status: "ready" })
 
-const tokenFor = (uploadId: string, expiresAtMs: number) => signUploadToken({ uploadId, expiresAtMs, secret: UPLOAD_SECRET })
+const tokenFor = (uploadId: string, expiresAtMs: number) =>
+    signUploadToken({ uploadId, expiresAtMs, secret: UPLOAD_SECRET })
 const validToken = tokenFor("u-1", at.getTime() + 30_000)
 const storeError = () => new UploadStorageError({ code: UploadStorageErrorCode.Failed })
 
@@ -127,7 +128,9 @@ describe("UploadService", () => {
         it("refuses a media type off the allowlist and stores nothing", async () => {
             const { service, storage } = await build()
 
-            await expect(service.createDirect({ ...request, mime: "application/x-sh" })).resolves.toBeRefused(UploadErrorCode.MimeNotAllowed)
+            await expect(service.createDirect({ ...request, mime: "application/x-sh" })).resolves.toBeRefused(
+                UploadErrorCode.MimeNotAllowed,
+            )
             expect(storage.store).not.toHaveBeenCalled()
         })
 
@@ -145,7 +148,11 @@ describe("UploadService", () => {
 
             const outcome = await service.createDirect(request)
 
-            expect(em.save).toHaveBeenNthCalledWith(1, UploadEntity, expect.objectContaining({ sizeBytes: 5, status: "pending", owner: "p-1" }))
+            expect(em.save).toHaveBeenNthCalledWith(
+                1,
+                UploadEntity,
+                expect.objectContaining({ sizeBytes: 5, status: "pending", owner: "p-1" }),
+            )
             expect(storage.store).toHaveBeenCalledWith({ uploadId: "u-1", content: bytes })
             expect(outcome).toSucceedWith({
                 uploadId: "u-1",
@@ -165,14 +172,19 @@ describe("UploadService", () => {
         it("refuses an unknown upload", async () => {
             const { service, storage } = await build(mockEntityManager({ findOneBy: [UploadEntity, null] }))
 
-            await expect(service.acceptContent(request)).resolves.toBeRefused({ code: UploadErrorCode.NotFound, params: { uploadId: "u-1" } })
+            await expect(service.acceptContent(request)).resolves.toBeRefused({
+                code: UploadErrorCode.NotFound,
+                params: { uploadId: "u-1" },
+            })
             expect(storage.store).not.toHaveBeenCalled()
         })
 
         it("answers not found for an empty id before any query", async () => {
             const { service } = await build()
 
-            await expect(service.acceptContent({ ...request, uploadId: "" })).resolves.toBeRefused(UploadErrorCode.NotFound)
+            await expect(service.acceptContent({ ...request, uploadId: "" })).resolves.toBeRefused(
+                UploadErrorCode.NotFound,
+            )
         })
 
         it.each([
@@ -202,14 +214,18 @@ describe("UploadService", () => {
         it("refuses received bytes over the ceiling however small the intent was", async () => {
             const { service, storage } = await build(mockEntityManager({ findOneBy: [UploadEntity, pending] }))
 
-            await expect(service.acceptContent({ ...request, content: Buffer.alloc(1001) })).resolves.toBeRefused(UploadErrorCode.TooLarge)
+            await expect(service.acceptContent({ ...request, content: Buffer.alloc(1001) })).resolves.toBeRefused(
+                UploadErrorCode.TooLarge,
+            )
             expect(storage.store).not.toHaveBeenCalled()
         })
 
         it("refuses empty bytes", async () => {
             const { service } = await build(mockEntityManager({ findOneBy: [UploadEntity, pending] }))
 
-            await expect(service.acceptContent({ ...request, content: Buffer.alloc(0) })).resolves.toBeRefused(UploadErrorCode.TooLarge)
+            await expect(service.acceptContent({ ...request, content: Buffer.alloc(0) })).resolves.toBeRefused(
+                UploadErrorCode.TooLarge,
+            )
         })
 
         it("refuses with storage unavailable when the storage plane fails, and leaves the row pending", async () => {
@@ -275,14 +291,20 @@ describe("UploadService", () => {
         it("refuses an upload whose bytes have not landed", async () => {
             const { service } = await build(mockEntityManager({ findOneBy: [UploadEntity, pending] }))
 
-            await expect(service.attach(request)).resolves.toBeRefused({ code: UploadErrorCode.NotReady, params: { uploadId: "u-1" } })
+            await expect(service.attach(request)).resolves.toBeRefused({
+                code: UploadErrorCode.NotReady,
+                params: { uploadId: "u-1" },
+            })
         })
 
         it("refuses an unknown task", async () => {
             const { service, tasks, tx } = await build(mockEntityManager({ findOneBy: [UploadEntity, ready] }))
             tasks.find.mockResolvedValue(null)
 
-            await expect(service.attach(request)).resolves.toBeRefused({ code: UploadErrorCode.NotFound, params: { taskId: "t-1" } })
+            await expect(service.attach(request)).resolves.toBeRefused({
+                code: UploadErrorCode.NotFound,
+                params: { taskId: "t-1" },
+            })
             expect(tx.outcomes).toEqual([])
         })
 
@@ -290,12 +312,17 @@ describe("UploadService", () => {
             const { service, tasks } = await build(mockEntityManager({ findOneBy: [UploadEntity, ready] }))
             tasks.find.mockResolvedValue(uploadTask({ owner: "p-2" }))
 
-            await expect(service.attach(request)).resolves.toBeRefused({ code: UploadErrorCode.Forbidden, params: { taskId: "t-1" } })
+            await expect(service.attach(request)).resolves.toBeRefused({
+                code: UploadErrorCode.Forbidden,
+                params: { taskId: "t-1" },
+            })
         })
 
         it("points the upload at the task and keeps every other column", async () => {
             const attached = { ...ready, taskId: "t-1" }
-            const { service, tasks, em } = await build(mockEntityManager({ findOneBy: [UploadEntity, ready], save: [UploadEntity, attached] }))
+            const { service, tasks, em } = await build(
+                mockEntityManager({ findOneBy: [UploadEntity, ready], save: [UploadEntity, attached] }),
+            )
             tasks.find.mockResolvedValue(uploadTask())
 
             const outcome = await service.attach(request)
@@ -313,7 +340,9 @@ describe("UploadService", () => {
             const foreign = await build(mockEntityManager({ findOneBy: [UploadEntity, ready] }))
 
             await expect(missing.service.remove(request)).resolves.toBeRefused(UploadErrorCode.NotFound)
-            await expect(foreign.service.remove({ ...request, actorId: "p-2" })).resolves.toBeRefused(UploadErrorCode.Forbidden)
+            await expect(foreign.service.remove({ ...request, actorId: "p-2" })).resolves.toBeRefused(
+                UploadErrorCode.Forbidden,
+            )
             expect(missing.storage.delete).not.toHaveBeenCalled()
             expect(foreign.storage.delete).not.toHaveBeenCalled()
         })
@@ -334,7 +363,9 @@ describe("UploadService", () => {
         })
 
         it("removes the bytes first, then the row", async () => {
-            const { service, storage, em, tx } = await build(mockEntityManager({ findOneBy: [UploadEntity, ready], delete: [UploadEntity, {}] }))
+            const { service, storage, em, tx } = await build(
+                mockEntityManager({ findOneBy: [UploadEntity, ready], delete: [UploadEntity, {}] }),
+            )
 
             await expect(service.remove(request)).resolves.toSucceedWith({ uploadId: "u-1", deleted: true })
 
@@ -351,14 +382,20 @@ describe("UploadService", () => {
             const { service, tasks } = await build()
             tasks.find.mockResolvedValue(null)
 
-            await expect(service.listForTask(request)).resolves.toBeRefused({ code: UploadErrorCode.NotFound, params: { taskId: "t-1" } })
+            await expect(service.listForTask(request)).resolves.toBeRefused({
+                code: UploadErrorCode.NotFound,
+                params: { taskId: "t-1" },
+            })
         })
 
         it("refuses a task of somebody else and reads no uploads", async () => {
             const { service, tasks } = await build()
             tasks.find.mockResolvedValue(uploadTask({ owner: "p-2" }))
 
-            await expect(service.listForTask(request)).resolves.toBeRefused({ code: UploadErrorCode.Forbidden, params: { taskId: "t-1" } })
+            await expect(service.listForTask(request)).resolves.toBeRefused({
+                code: UploadErrorCode.Forbidden,
+                params: { taskId: "t-1" },
+            })
         })
 
         it("lists the owner's uploads of the task, bounded, as public summaries", async () => {
@@ -379,7 +416,10 @@ describe("UploadService", () => {
                     },
                 ],
             })
-            expect(em.find).toHaveBeenCalledWith(UploadEntity, { where: { taskId: "t-1", owner: "p-1" }, take: LIST_ROWS_MAX })
+            expect(em.find).toHaveBeenCalledWith(UploadEntity, {
+                where: { taskId: "t-1", owner: "p-1" },
+                take: LIST_ROWS_MAX,
+            })
         })
     })
 
@@ -391,7 +431,9 @@ describe("UploadService", () => {
             const foreign = await build(mockEntityManager({ findOneBy: [UploadEntity, ready] }))
 
             await expect(missing.service.readContent(request)).resolves.toBeRefused(UploadErrorCode.NotFound)
-            await expect(foreign.service.readContent({ ...request, actorId: "p-2" })).resolves.toBeRefused(UploadErrorCode.Forbidden)
+            await expect(foreign.service.readContent({ ...request, actorId: "p-2" })).resolves.toBeRefused(
+                UploadErrorCode.Forbidden,
+            )
         })
 
         it("refuses an upload whose bytes have not landed", async () => {
@@ -429,7 +471,11 @@ describe("UploadService", () => {
             const { service, storage } = await build(mockEntityManager({ findOneBy: [UploadEntity, ready] }))
             storage.get.mockResolvedValue(bytes)
 
-            await expect(service.readContent(request)).resolves.toSucceedWith({ filename: "note.txt", mime: "text/plain", content: bytes })
+            await expect(service.readContent(request)).resolves.toSucceedWith({
+                filename: "note.txt",
+                mime: "text/plain",
+                content: bytes,
+            })
         })
     })
 })

@@ -57,11 +57,18 @@ interface Runtime {
 }
 
 const notDeclared = (what: string): TestWorldError =>
-    new TestWorldError({ code: TestWorldErrorCode.NotDeclared, params: { detail: `${what} was not declared in useTestWorld` } })
+    new TestWorldError({
+        code: TestWorldErrorCode.NotDeclared,
+        params: { detail: `${what} was not declared in useTestWorld` },
+    })
 
 /** The one boot both modes use: an app that listens, or a context with no transport. */
 const boot = async (module: DynamicModule, options: TestOptions, listen: boolean): Promise<BootedApp> => {
-    if (!listen) return { context: await NestFactory.createApplicationContext(module, { logger: [...NEST_LOGGER] }), baseUrl: null }
+    if (!listen)
+        return {
+            context: await NestFactory.createApplicationContext(module, { logger: [...NEST_LOGGER] }),
+            baseUrl: null,
+        }
     const app = await NestFactory.create(module, { logger: [...NEST_LOGGER] })
     app.enableCors({ origin: [...options.httpSecurity.allowedOrigins] })
     await app.listen(0, "127.0.0.1")
@@ -69,7 +76,8 @@ const boot = async (module: DynamicModule, options: TestOptions, listen: boolean
 }
 
 /** The world's own handle on the migrated database: the shared entity manager a spec reads persisted state through. */
-const openDatabase = (state: TestWorldState): Promise<DataSource> => new DataSource({ type: "postgres", url: state.databaseUrl, synchronize: false }).initialize()
+const openDatabase = (state: TestWorldState): Promise<DataSource> =>
+    new DataSource({ type: "postgres", url: state.databaseUrl, synchronize: false }).initialize()
 
 /** Closes one context; answers the failure instead of throwing, so every context gets its turn. */
 const closeContext = async (context: INestApplicationContext): Promise<unknown> => {
@@ -107,7 +115,11 @@ export class TestWorld {
         if (dataSource?.isInitialized === true) await dataSource.destroy()
         const [first] = failures
         if (first !== undefined) {
-            throw new TestWorldError({ code: TestWorldErrorCode.InfrastructureFailed, params: { detail: "an app context failed to close" }, cause: first })
+            throw new TestWorldError({
+                code: TestWorldErrorCode.InfrastructureFailed,
+                params: { detail: "an app context failed to close" },
+                cause: first,
+            })
         }
     }
 
@@ -148,7 +160,12 @@ export class TestWorld {
      * Polls `observe` until `ready` accepts what it saw, and answers that observation; the failure names `label` and the
      * last observation. The spec states the state it waits for as a predicate, so the step itself holds no branch.
      */
-    async waitUntil<T>(label: string, observe: () => Promise<T>, ready: (observed: T) => boolean, options: WaitForOptions = {}): Promise<T> {
+    async waitUntil<T>(
+        label: string,
+        observe: () => Promise<T>,
+        ready: (observed: T) => boolean,
+        options: WaitForOptions = {},
+    ): Promise<T> {
         const seen = await this.waitFor(
             label,
             async () => {
@@ -188,7 +205,11 @@ export class TestWorld {
     }
 
     private booted(): Runtime {
-        if (this.runtime === null) throw new TestWorldError({ code: TestWorldErrorCode.NotBooted, params: { detail: "useTestWorld has not booted yet" } })
+        if (this.runtime === null)
+            throw new TestWorldError({
+                code: TestWorldErrorCode.NotBooted,
+                params: { detail: "useTestWorld has not booted yet" },
+            })
         return this.runtime
     }
 

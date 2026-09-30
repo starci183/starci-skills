@@ -10,14 +10,14 @@ identity and its encrypted documents teach the layout; neither may be reused for
 
 | Key | Encrypted owner | Purpose |
 |---|---|---|
-| `PRIMARY_DB_URL` | `runtime/env/app.env.enc` | Postgres connection of the `primary` database, read by the api, the worker and apps/migrate |
-| `KEYCLOAK_ADMIN_PASSWORD_FILE` | `runtime/files/keycloak-admin-password.key.enc` | Bootstrap password for the realm admin |
-| `POSTGRES_PASSWORD_FILE` | `runtime/files/postgres-password.key.enc` | Postgres superuser password, read by the postgres image itself (was a plaintext POSTGRES_PASSWORD literal in postgres.yaml until the stacks checker's plaintext-sensitive-environment finding) |
-| `MINIO_ROOT_PASSWORD_FILE` | `runtime/files/minio-root-password.key.enc` | Object store root credential |
-| `SMTP_HOST`, `SMTP_PORT`, `SMTP_FROM` | `runtime/env/app.env.enc` | Outbound mail server and sender (no defaults) |
-| `SEPAY_API_KEY_FILE` (or `SEPAY_API_KEY`) | `runtime/files/sepay-api-key.key.enc` | Calls SePay to create and query a payment intent (integration.plan.sepay) |
-| `SEPAY_WEBHOOK_SECRET_FILE` (or `SEPAY_WEBHOOK_SECRET`) | `runtime/files/sepay-webhook-secret.key.enc` | Verifies the signature on a SePay webhook before it can confirm a payment |
-| `UPLOAD_SIGNING_SECRET_FILE` (or `UPLOAD_SIGNING_SECRET`) | `runtime/files/upload-signing-secret.key.enc` | Signs the presigned PUT upload tokens |
+| `PRIMARY_DB_URL` | `secrets/app-env.enc` | Postgres connection of the `primary` database, read by the api, the worker and apps/migrate |
+| `KEYCLOAK_ADMIN_PASSWORD_FILE` | `secrets/keycloak-admin-password-key.enc` | Bootstrap password for the realm admin |
+| `POSTGRES_PASSWORD_FILE` | `secrets/postgres-password-key.enc` | Postgres superuser password, read by the postgres image itself (was a plaintext POSTGRES_PASSWORD literal in postgres.yaml until the stacks checker's plaintext-sensitive-environment finding) |
+| `MINIO_ROOT_PASSWORD_FILE` | `secrets/minio-root-password-key.enc` | Object store root credential |
+| `SMTP_HOST`, `SMTP_PORT`, `SMTP_FROM` | `secrets/app-env.enc` | Outbound mail server and sender (no defaults) |
+| `SEPAY_API_KEY_FILE` (or `SEPAY_API_KEY`) | `secrets/sepay-api-key-key.enc` | Calls SePay to create and query a payment intent (integration.plan.sepay) |
+| `SEPAY_WEBHOOK_SECRET_FILE` (or `SEPAY_WEBHOOK_SECRET`) | `secrets/sepay-webhook-secret-key.enc` | Verifies the signature on a SePay webhook before it can confirm a payment |
+| `UPLOAD_SIGNING_SECRET_FILE` (or `UPLOAD_SIGNING_SECRET`) | `secrets/upload-signing-secret-key.enc` | Signs the presigned PUT upload tokens |
 
 A key that the declaration names and this table does not is an undocumented secret: the check reports it
 rather than assuming somebody knows what it unlocks.
@@ -27,5 +27,5 @@ Other keys the apps read (all through `EnvSource`, see each capability `<c>.conf
 `SESSION_TTL_DAYS`, `SESSION_ADMIN_SUBJECTS`, `RECUR_TICK_CRON`, `PLAN_PAID_PRICE_MINOR_UNITS`, `PLAN_PAID_CURRENCY`, `COMMISSION_BPS`, `UPLOAD_MAX_BYTES`, `UPLOAD_ALLOWED_MIMES`,
 `UPLOAD_PRESIGN_TTL_MS`, `KEYCLOAK_TIMEOUT`, `SEPAY_TIMEOUT`, `SMTP_CONNECT_TIMEOUT`, `SMTP_COMMAND_TIMEOUT`, `SCHEDULING_TICK`, `MESSAGING_POLL`,
 `MESSAGING_BATCH`, `MESSAGING_VISIBILITY`, `HTTP_SECURITY_RATE_*`. Removed: `DATABASE_URL`, `REDIS_URL`, `CORS_ORIGIN`, `TODO_SESSION_TTL_DAYS`,
-`AUDIT_OPERATOR_SUBJECTS`. NOTE: the `runtime/env/app.env.enc` document is encrypted to the demo identity and could not be re-encrypted in this lane:
+`AUDIT_OPERATOR_SUBJECTS`. NOTE: the `secrets/app-env.enc` document is encrypted to the demo identity and could not be re-encrypted in this lane:
 it still carries `DATABASE_URL`/`REDIS_URL`; it must be re-issued with the keys above.

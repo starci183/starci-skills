@@ -43,7 +43,12 @@ export class SepayClient {
         })
         const gatewayIntentId = payload.id
         const checkoutUrl = payload.qrCodeUrl
-        if (typeof gatewayIntentId !== "string" || !gatewayIntentId || typeof checkoutUrl !== "string" || !checkoutUrl) {
+        if (
+            typeof gatewayIntentId !== "string" ||
+            !gatewayIntentId ||
+            typeof checkoutUrl !== "string" ||
+            !checkoutUrl
+        ) {
             throw this.failure("create-intent", "missing-intent")
         }
         return { gatewayIntentId, checkoutUrl }
@@ -51,7 +56,11 @@ export class SepayClient {
 
     /** Reads the live status of one transaction, and the end of the paid period once it is paid. */
     async getTransaction(gatewayIntentId: string): Promise<SepayTransaction> {
-        const payload = await this.call("get-transaction", `${TRANSACTION_PATH}${encodeURIComponent(gatewayIntentId)}`, "GET")
+        const payload = await this.call(
+            "get-transaction",
+            `${TRANSACTION_PATH}${encodeURIComponent(gatewayIntentId)}`,
+            "GET",
+        )
         const status = payload.status
         if (!isTransactionStatus(status)) throw this.failure("get-transaction", "unknown-status")
         return { status, periodEnd: this.periodEndOf(payload.periodEnd) }
@@ -59,7 +68,8 @@ export class SepayClient {
 
     private periodEndOf(value: unknown): Date | undefined {
         if (value === undefined || value === null) return undefined
-        if (typeof value !== "string" && typeof value !== "number") throw this.failure("get-transaction", "bad-period-end")
+        if (typeof value !== "string" && typeof value !== "number")
+            throw this.failure("get-transaction", "bad-period-end")
         const periodEnd = new Date(value)
         if (Number.isNaN(periodEnd.getTime())) throw this.failure("get-transaction", "bad-period-end")
         return periodEnd

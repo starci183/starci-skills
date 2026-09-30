@@ -9,7 +9,13 @@ import {
     commissionEntities,
     commissionMigrations,
 } from "@modules/domain/commission"
-import { NOTIFY_ERROR_KINDS, NOTIFY_MESSAGES, NotifyModule, notifyEntities, notifyMigrations } from "@modules/domain/notify"
+import {
+    NOTIFY_ERROR_KINDS,
+    NOTIFY_MESSAGES,
+    NotifyModule,
+    notifyEntities,
+    notifyMigrations,
+} from "@modules/domain/notify"
 import { PLAN_ERROR_KINDS, PLAN_MESSAGES, PlanModule, planEntities, planMigrations } from "@modules/domain/plan"
 import { RECUR_ERROR_KINDS, RECUR_MESSAGES, RecurModule, recurEntities, recurMigrations } from "@modules/domain/recur"
 import {
@@ -23,11 +29,21 @@ import {
 import { SHARE_ERROR_KINDS, SHARE_MESSAGES, ShareModule, shareEntities, shareMigrations } from "@modules/domain/share"
 import { TASK_ERROR_KINDS, TASK_MESSAGES, TaskModule, taskEntities, taskMigrations } from "@modules/domain/task"
 import { TaskflowModule } from "@modules/domain/taskflow"
-import { UPLOAD_ERROR_KINDS, UPLOAD_MESSAGES, UploadModule, uploadEntities, uploadMigrations } from "@modules/domain/upload"
+import {
+    UPLOAD_ERROR_KINDS,
+    UPLOAD_MESSAGES,
+    UploadModule,
+    uploadEntities,
+    uploadMigrations,
+} from "@modules/domain/upload"
 import { KEYCLOAK_ERROR_KINDS, KEYCLOAK_MESSAGES, KeycloakModule } from "@modules/integrations/keycloak"
 import { NOTIFY_SMTP_ERROR_KINDS, NOTIFY_SMTP_MESSAGES, NotifySmtpModule } from "@modules/integrations/notify-smtp"
 import { SEPAY_ERROR_KINDS, SEPAY_MESSAGES, SepayModule } from "@modules/integrations/sepay"
-import { UPLOAD_STORAGE_ERROR_KINDS, UPLOAD_STORAGE_MESSAGES, UploadStorageModule } from "@modules/integrations/upload"
+import {
+    UPLOAD_STORAGE_ERROR_KINDS,
+    UPLOAD_STORAGE_MESSAGES,
+    UploadStorageModule,
+} from "@modules/integrations/upload-storage"
 import { ClockModule } from "@modules/platform/clock"
 import { IdsModule } from "@modules/platform/ids"
 import { CONFIG_ERROR_KINDS } from "@modules/platform/config"

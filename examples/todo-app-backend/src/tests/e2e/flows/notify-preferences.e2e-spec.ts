@@ -52,7 +52,9 @@ describe("notify preferences journey (e2e)", () => {
         const me = await world.signedInPerson("notify")
 
         const prefsNow = async (): Promise<NotificationPreferencesData["notificationPreferences"] | undefined> => {
-            const observed = await me.caller.graphql<NotificationPreferencesData>("notificationPreferences", { input: { channel: CHANNEL } })
+            const observed = await me.caller.graphql<NotificationPreferencesData>("notificationPreferences", {
+                input: { channel: CHANNEL },
+            })
             return observed.data?.notificationPreferences
         }
 
@@ -64,7 +66,11 @@ describe("notify preferences journey (e2e)", () => {
             input: { channel: CHANNEL, digestWindowMinutes: 1 },
         })
         expect(updated.errorCode).toBeNull()
-        expect(updated.data?.updateNotificationPreferences).toEqual({ channel: CHANNEL, unsubscribed: false, digestWindowMinutes: 1 })
+        expect(updated.data?.updateNotificationPreferences).toEqual({
+            channel: CHANNEL,
+            unsubscribed: false,
+            digestWindowMinutes: 1,
+        })
         expect(await prefsNow()).toEqual({ channel: CHANNEL, unsubscribed: false, digestWindowMinutes: 1 })
 
         // Event: completing the task writes the admit message with the completion; the worker admits it after the mutation
@@ -73,7 +79,10 @@ describe("notify preferences journey (e2e)", () => {
         const notification = await world.waitFor(
             "task-complete notification joined its digest group",
             async () => {
-                const rows: Array<NotificationRow> = await world.db.primary.query(TASK_COMPLETE_NOTIFICATIONS, [me.personId, firstTaskId])
+                const rows: Array<NotificationRow> = await world.db.primary.query(TASK_COMPLETE_NOTIFICATIONS, [
+                    me.personId,
+                    firstTaskId,
+                ])
                 return rows.find((row) => row.digest_group_id !== null) ?? null
             },
             { timeoutMs: 30_000 },
@@ -86,8 +95,15 @@ describe("notify preferences journey (e2e)", () => {
         const retried = await world.waitFor(
             "the first dispatch classified transient and queued for retry",
             async () => {
-                const rows: Array<DeliveryAttemptRow> = await world.db.primary.query(DELIVERY_ATTEMPTS_OF_NOTIFICATION, [notification.id])
-                return rows.find((row) => row.attempt >= 1 && row.state === "queued" && row.failure_class === "transient") ?? null
+                const rows: Array<DeliveryAttemptRow> = await world.db.primary.query(
+                    DELIVERY_ATTEMPTS_OF_NOTIFICATION,
+                    [notification.id],
+                )
+                return (
+                    rows.find(
+                        (row) => row.attempt >= 1 && row.state === "queued" && row.failure_class === "transient",
+                    ) ?? null
+                )
             },
             { timeoutMs: 150_000, intervalMs: 1_000 },
         )
@@ -104,7 +120,10 @@ describe("notify preferences journey (e2e)", () => {
         const delivered = await world.waitFor(
             "the delivery attempt settled delivered",
             async () => {
-                const rows: Array<DeliveryAttemptRow> = await world.db.primary.query(DELIVERY_ATTEMPTS_OF_NOTIFICATION, [notification.id])
+                const rows: Array<DeliveryAttemptRow> = await world.db.primary.query(
+                    DELIVERY_ATTEMPTS_OF_NOTIFICATION,
+                    [notification.id],
+                )
                 return rows.find((row) => row.state === "delivered") ?? null
             },
             { timeoutMs: 30_000 },
@@ -123,7 +142,10 @@ describe("notify preferences journey (e2e)", () => {
         const suppressed = await world.waitFor(
             "suppressed notification row for the post-unsubscribe event",
             async () => {
-                const rows: Array<NotificationAttemptRow> = await world.db.primary.query(TASK_COMPLETE_WITH_ATTEMPT, [me.personId, secondTaskId])
+                const rows: Array<NotificationAttemptRow> = await world.db.primary.query(TASK_COMPLETE_WITH_ATTEMPT, [
+                    me.personId,
+                    secondTaskId,
+                ])
                 return rows[0] ?? null
             },
             { timeoutMs: 30_000 },

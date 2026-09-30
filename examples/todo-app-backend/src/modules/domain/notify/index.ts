@@ -30,11 +30,7 @@ export type {
     NotifyDispatchPayload,
     NotifyPayload,
 } from "./notify.contracts"
-export {
-    NOTIFY_ADMIT_QUEUE,
-    NOTIFY_DISPATCH_QUEUE,
-    toNotifyAdmitMessage,
-} from "./notify.mapper"
+export { NOTIFY_ADMIT_QUEUE, NOTIFY_DISPATCH_QUEUE, toNotifyAdmitMessage } from "./notify.mapper"
 export { NotifyModule } from "./notify.module"
 export { NotifyService } from "./notify.service"
 export { PreferencesService } from "./preferences.service"

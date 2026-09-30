@@ -10,7 +10,15 @@ import { createServer } from "node:http"
 import type { IncomingMessage, ServerResponse } from "node:http"
 import type { FailureSpec, RecordedRequest } from "../fakes-control.contracts"
 import { worldClock } from "../../kit/world-clock"
-import { FailureQueue, RequestLog, answerJson, closeServer, headersOf, listenLoopback, readBody } from "../fakes-http.service"
+import {
+    FailureQueue,
+    RequestLog,
+    answerJson,
+    closeServer,
+    headersOf,
+    listenLoopback,
+    readBody,
+} from "../fakes-http.service"
 import { renderPayload } from "../payload.service"
 
 const REALM = "todo"
@@ -92,7 +100,9 @@ export class KeycloakFake {
         const path = request.url ?? ""
         this.log.record({ method, path, headers: headersOf(request), body })
         if (method === "GET" && path === `/realms/${REALM}/protocol/openid-connect/certs`) {
-            answerJson(response, 200, { keys: [{ ...this.keys.publicKey.export({ format: "jwk" }), kid: this.keyId, alg: "RS256", use: "sig" }] })
+            answerJson(response, 200, {
+                keys: [{ ...this.keys.publicKey.export({ format: "jwk" }), kid: this.keyId, alg: "RS256", use: "sig" }],
+            })
             return
         }
         if (method !== "POST" || path !== `/realms/${REALM}/protocol/openid-connect/token`) {
@@ -117,7 +127,11 @@ export class KeycloakFake {
         }
         const email = form.get("username") ?? ""
         const person = this.persons.get(email)
-        if (form.get("client_id") !== CLIENT_ID || person === undefined || !sameSecret(person.password, form.get("password") ?? "")) {
+        if (
+            form.get("client_id") !== CLIENT_ID ||
+            person === undefined ||
+            !sameSecret(person.password, form.get("password") ?? "")
+        ) {
             answerJson(response, 401, renderPayload("keycloak", "error-invalid-grant"))
             return
         }

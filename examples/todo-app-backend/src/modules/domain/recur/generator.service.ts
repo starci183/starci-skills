@@ -12,9 +12,10 @@ import { InjectOutbox } from "@modules/platform/outbox"
 import type { Outbox } from "@modules/platform/outbox"
 import { ok, refused } from "@modules/platform/primitives"
 import type { Outcome } from "@modules/platform/primitives"
+import { cronAdmits, isValidCron } from "@modules/platform/scheduling"
 import type { EntityManager } from "typeorm"
 import { addDays, datesForRule } from "./calendar.policy"
-import { RecurErrorCode } from "./errors/recur.error"
+import { RecurError, RecurErrorCode } from "./errors/recur.error"
 import { OccurrenceService } from "./occurrence.service"
 import type {
     CollectDueParams,
@@ -25,7 +26,9 @@ import type {
     UpcomingParams,
     UpcomingSummary,
 } from "./recur.contracts"
+import { InjectRecurOptions } from "./recur.decorators"
 import { RecurLogEvent } from "./recur.log-events"
+import type { RecurOptions } from "./recur.options"
 import { RuleService } from "./rule.service"
 import { localDateInZone, resolveRuleInstant } from "./zone.policy"
 
@@ -48,14 +51,20 @@ export class GeneratorService {
         @InjectClock() private readonly clock: Clock,
         @InjectOutbox() private readonly outbox: Outbox,
         @InjectLogger() private readonly logger: Logger,
+        @InjectRecurOptions() private readonly options: RecurOptions,
         private readonly rules: RuleService,
         private readonly occurrences: OccurrenceService,
         private readonly tasks: TaskService,
         private readonly subscriptions: SubscriptionService,
     ) {}
 
-    /** Materialises the occurrences the rules owe at the tick instant, at most LIST_ROWS_MAX; the rest wait for the next tick. */
+    /**
+     * Materialises the occurrences the rules owe at the tick instant, at most LIST_ROWS_MAX; the rest wait for the next
+     * tick. The job ticks every minute, so only a tick in a minute the configured cron admits generates.
+     */
     async generate(params: GenerateParams): Promise<GenerationSummary> {
+        if (!isValidCron(this.options.tickCron)) throw new RecurError({ code: RecurErrorCode.TickCronInvalid })
+        if (!cronAdmits(this.options.tickCron, params.at)) return { materialised: 0, deferred: 0 }
         const due = await this.collectDue({ now: params.at, limit: LIST_ROWS_MAX })
         let materialised = 0
         let deferred = 0
@@ -152,7 +161,9 @@ export class GeneratorService {
             rule.startDate,
             horizon,
         )
-        const existing = await this.occurrences.existingWindowKeys({ windowKeys: dates.map((localDate) => `${rule.id}:${localDate}`) })
+        const existing = await this.occurrences.existingWindowKeys({
+            windowKeys: dates.map((localDate) => `${rule.id}:${localDate}`),
+        })
         return dates
             .filter((localDate) => !existing.has(`${rule.id}:${localDate}`))
             .slice(0, room)

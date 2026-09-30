@@ -10,10 +10,11 @@ import { LOGGER } from "@modules/platform/logging"
 import type { Logger } from "@modules/platform/logging"
 import { OUTBOX } from "@modules/platform/outbox"
 import { ok, refused } from "@modules/platform/primitives"
-import { RecurErrorCode } from "./errors/recur.error"
+import { RecurError, RecurErrorCode } from "./errors/recur.error"
 import { GeneratorService } from "./generator.service"
 import { OccurrenceService } from "./occurrence.service"
 import { RuleFrequency } from "./recur.contracts"
+import { RECUR_OPTIONS } from "./recur.decorators"
 import type { OccurrenceView, RuleView } from "./recur.contracts"
 import { RecurLogEvent } from "./recur.log-events"
 import { RuleService } from "./rule.service"
@@ -55,6 +56,7 @@ const stored = (overrides: Partial<OccurrenceView> = {}): OccurrenceView => ({
 })
 
 const build = async () => {
+    const options = { tickCron: "*/5 * * * *" }
     const tx = fakeTransaction(mockEntityManager())
     const outbox = recordingOutbox()
     const logger = mock<Logger>()
@@ -69,6 +71,7 @@ const build = async () => {
             { provide: CLOCK, useValue: new FakeClock(NOW) },
             { provide: OUTBOX, useValue: outbox },
             { provide: LOGGER, useValue: logger },
+            { provide: RECUR_OPTIONS, useValue: options },
             { provide: RuleService, useValue: rules },
             { provide: OccurrenceService, useValue: occurrences },
             { provide: TaskService, useValue: tasks },
@@ -78,7 +81,17 @@ const build = async () => {
     occurrences.existingWindowKeys.mockResolvedValue(new Set())
     tasks.listOwnedBy.mockResolvedValue([])
     subscriptions.checkCap.mockResolvedValue({ allowed: true })
-    return { service: moduleRef.get(GeneratorService), tx, outbox, logger, rules, occurrences, tasks, subscriptions }
+    return {
+        options,
+        service: moduleRef.get(GeneratorService),
+        tx,
+        outbox,
+        logger,
+        rules,
+        occurrences,
+        tasks,
+        subscriptions,
+    }
 }
 
 describe("GeneratorService", () => {
@@ -86,13 +99,23 @@ describe("GeneratorService", () => {
         it("materialises every owed occurrence with its task, audit line and row in one transaction each", async () => {
             const { service, tx, outbox, logger, rules, occurrences, tasks } = await build()
             rules.listBatch.mockResolvedValue([rule()])
-            tasks.create.mockResolvedValueOnce(ok(task("t1"))).mockResolvedValueOnce(ok(task("t2"))).mockResolvedValueOnce(ok(task("t3")))
+            tasks.create
+                .mockResolvedValueOnce(ok(task("t1")))
+                .mockResolvedValueOnce(ok(task("t2")))
+                .mockResolvedValueOnce(ok(task("t3")))
 
             await expect(service.generate({ at })).resolves.toEqual({ materialised: 3, deferred: 0 })
 
             expect(rules.listBatch).toHaveBeenCalledWith({ after: null })
             expect(tasks.create).toHaveBeenCalledWith({ manager: expect.anything(), ownerId: "o1", title: "Stand-up" })
-            expect(occurrences.materialise.mock.calls.map(([params]) => [params.id, params.windowKey, params.localDate, params.dueAtUtc])).toEqual([
+            expect(
+                occurrences.materialise.mock.calls.map(([params]) => [
+                    params.id,
+                    params.windowKey,
+                    params.localDate,
+                    params.dueAtUtc,
+                ]),
+            ).toEqual([
                 ["t1", "r1:2026-09-08", "2026-09-08", new Date("2026-09-08T02:00:00.000Z")],
                 ["t2", "r1:2026-09-09", "2026-09-09", new Date("2026-09-09T02:00:00.000Z")],
                 ["t3", "r1:2026-09-10", "2026-09-10", new Date("2026-09-10T02:00:00.000Z")],
@@ -104,7 +127,31 @@ describe("GeneratorService", () => {
             ])
             expect(outbox.allInTransaction).toBe(true)
             expect(tx.commits).toBe(3)
-            expect(logger.info).toHaveBeenCalledWith(RecurLogEvent.GenerationMaterialised, { materialised: 3, deferred: 0 })
+            expect(logger.info).toHaveBeenCalledWith(RecurLogEvent.GenerationMaterialised, {
+                materialised: 3,
+                deferred: 0,
+            })
+        })
+
+        it("generates nothing in a minute the configured cron does not admit", async () => {
+            const { service, rules, tasks } = await build()
+            rules.listBatch.mockResolvedValue([rule()])
+
+            await expect(service.generate({ at: new Date("2026-09-10T10:03:00.000Z") })).resolves.toEqual({
+                materialised: 0,
+                deferred: 0,
+            })
+
+            expect(rules.listBatch).not.toHaveBeenCalled()
+            expect(tasks.create).not.toHaveBeenCalled()
+        })
+
+        it("refuses a configured cron that does not parse", async () => {
+            const { service, options } = await build()
+            options.tickCron = "not a cron"
+
+            await expect(service.generate({ at })).rejects.toBeInstanceOf(RecurError)
+            await expect(service.generate({ at })).rejects.toMatchObject({ code: RecurErrorCode.TickCronInvalid })
         })
 
         it("skips the windows that already have a row", async () => {
@@ -115,9 +162,13 @@ describe("GeneratorService", () => {
 
             await expect(service.generate({ at })).resolves.toEqual({ materialised: 1, deferred: 0 })
 
-            expect(occurrences.existingWindowKeys).toHaveBeenCalledWith({ windowKeys: ["r1:2026-09-08", "r1:2026-09-09", "r1:2026-09-10"] })
+            expect(occurrences.existingWindowKeys).toHaveBeenCalledWith({
+                windowKeys: ["r1:2026-09-08", "r1:2026-09-09", "r1:2026-09-10"],
+            })
             expect(occurrences.materialise).toHaveBeenCalledTimes(1)
-            expect(occurrences.materialise).toHaveBeenCalledWith(expect.objectContaining({ windowKey: "r1:2026-09-10" }))
+            expect(occurrences.materialise).toHaveBeenCalledWith(
+                expect.objectContaining({ windowKey: "r1:2026-09-10" }),
+            )
         })
 
         it("defers an occurrence whose owner is at the plan cap and creates nothing", async () => {
@@ -161,11 +212,16 @@ describe("GeneratorService", () => {
         it("logs the deferred count next to the materialised one", async () => {
             const { service, logger, rules, tasks } = await build()
             rules.listBatch.mockResolvedValue([rule({ startDate: "2026-09-09" })])
-            tasks.create.mockResolvedValueOnce(ok(task("t1"))).mockResolvedValueOnce(refused(TaskErrorCode.TitleRequired))
+            tasks.create
+                .mockResolvedValueOnce(ok(task("t1")))
+                .mockResolvedValueOnce(refused(TaskErrorCode.TitleRequired))
 
             await expect(service.generate({ at })).resolves.toEqual({ materialised: 1, deferred: 1 })
 
-            expect(logger.info).toHaveBeenCalledWith(RecurLogEvent.GenerationMaterialised, { materialised: 1, deferred: 1 })
+            expect(logger.info).toHaveBeenCalledWith(RecurLogEvent.GenerationMaterialised, {
+                materialised: 1,
+                deferred: 1,
+            })
         })
 
         it("stops the walk at the day an ended rule ended", async () => {
@@ -175,7 +231,9 @@ describe("GeneratorService", () => {
 
             await expect(service.generate({ at })).resolves.toEqual({ materialised: 2, deferred: 0 })
 
-            expect(occurrences.existingWindowKeys).toHaveBeenCalledWith({ windowKeys: ["r1:2026-09-08", "r1:2026-09-09"] })
+            expect(occurrences.existingWindowKeys).toHaveBeenCalledWith({
+                windowKeys: ["r1:2026-09-08", "r1:2026-09-09"],
+            })
         })
 
         it("walks up to today when the rule ends in the future", async () => {
@@ -185,7 +243,9 @@ describe("GeneratorService", () => {
 
             await expect(service.generate({ at })).resolves.toEqual({ materialised: 3, deferred: 0 })
 
-            expect(occurrences.existingWindowKeys).toHaveBeenCalledWith({ windowKeys: ["r1:2026-09-08", "r1:2026-09-09", "r1:2026-09-10"] })
+            expect(occurrences.existingWindowKeys).toHaveBeenCalledWith({
+                windowKeys: ["r1:2026-09-08", "r1:2026-09-09", "r1:2026-09-10"],
+            })
         })
 
         it("owes nothing when there are no rules", async () => {
@@ -200,8 +260,12 @@ describe("GeneratorService", () => {
 
         it("reads the next batch after a full one and stops at a short one", async () => {
             const { service, rules, tasks } = await build()
-            const full = Array.from({ length: LIST_ROWS_MAX }, (_unused, index) => rule({ id: `r-${index}`, startDate: "2027-01-01" }))
-            rules.listBatch.mockResolvedValueOnce(full).mockResolvedValueOnce([rule({ id: "r-last", startDate: "2027-01-01" })])
+            const full = Array.from({ length: LIST_ROWS_MAX }, (_unused, index) =>
+                rule({ id: `r-${index}`, startDate: "2027-01-01" }),
+            )
+            rules.listBatch
+                .mockResolvedValueOnce(full)
+                .mockResolvedValueOnce([rule({ id: "r-last", startDate: "2027-01-01" })])
 
             await expect(service.generate({ at })).resolves.toEqual({ materialised: 0, deferred: 0 })
 
@@ -228,7 +292,9 @@ describe("GeneratorService", () => {
             const { service, rules, occurrences } = await build()
             rules.find.mockResolvedValue(null)
 
-            await expect(service.upcoming({ ruleId: "nope", actorId: "o1" })).resolves.toBeRefused(RecurErrorCode.RuleNotFound)
+            await expect(service.upcoming({ ruleId: "nope", actorId: "o1" })).resolves.toBeRefused(
+                RecurErrorCode.RuleNotFound,
+            )
             expect(occurrences.listByRule).not.toHaveBeenCalled()
         })
 
@@ -236,7 +302,9 @@ describe("GeneratorService", () => {
             const { service, rules, occurrences } = await build()
             rules.find.mockResolvedValue(rule())
 
-            await expect(service.upcoming({ ruleId: "r1", actorId: "intruder" })).resolves.toBeRefused(RecurErrorCode.RuleForbidden)
+            await expect(service.upcoming({ ruleId: "r1", actorId: "intruder" })).resolves.toBeRefused(
+                RecurErrorCode.RuleForbidden,
+            )
             expect(occurrences.listByRule).not.toHaveBeenCalled()
         })
 
@@ -248,7 +316,12 @@ describe("GeneratorService", () => {
             await expect(service.upcoming({ ruleId: "r1", actorId: "o1" })).resolves.toSucceedWith({
                 ruleId: "r1",
                 materialised: [
-                    { occurrenceId: "t1", localDate: "2026-09-08", dueAtUtc: "2026-09-08T02:00:00.000Z", status: "materialised" },
+                    {
+                        occurrenceId: "t1",
+                        localDate: "2026-09-08",
+                        dueAtUtc: "2026-09-08T02:00:00.000Z",
+                        status: "materialised",
+                    },
                 ],
                 previewDates: [
                     "2026-09-10",
@@ -286,7 +359,12 @@ describe("GeneratorService", () => {
             await expect(service.upcoming({ ruleId: "r1", actorId: "o1" })).resolves.toSucceedWith({
                 ruleId: "r1",
                 materialised: [
-                    { occurrenceId: "t1", localDate: "2026-09-08", dueAtUtc: "2026-09-08T02:00:00.000Z", status: "orphaned" },
+                    {
+                        occurrenceId: "t1",
+                        localDate: "2026-09-08",
+                        dueAtUtc: "2026-09-08T02:00:00.000Z",
+                        status: "orphaned",
+                    },
                 ],
                 previewDates: [],
             })

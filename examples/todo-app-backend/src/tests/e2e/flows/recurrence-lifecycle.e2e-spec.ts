@@ -1,6 +1,14 @@
 import { randomUUID } from "node:crypto"
-import { RULE_ENDED_AT, OCCURRENCE_COUNT_AFTER, OCCURRENCE_COUNTS_BY_STATUS } from "@tests/fixtures/persistence/e2e-verification.sql"
-import type { CountRow, OccurrenceStatusCountRow, RuleEndedAtRow } from "@tests/fixtures/persistence/e2e-verification.rows"
+import {
+    RULE_ENDED_AT,
+    OCCURRENCE_COUNT_AFTER,
+    OCCURRENCE_COUNTS_BY_STATUS,
+} from "@tests/fixtures/persistence/e2e-verification.sql"
+import type {
+    CountRow,
+    OccurrenceStatusCountRow,
+    RuleEndedAtRow,
+} from "@tests/fixtures/persistence/e2e-verification.rows"
 import type {
     CreateTaskData,
     EditRecurrenceData,
@@ -22,7 +30,8 @@ const NO_OCCURRENCES: UpcomingOccurrencesAnswer = { ruleId: "", materialised: []
 /** The generation job is a cron of whole minutes, so each generation waits for the next minute tick of the worker. */
 const GENERATION_WAIT_MS = 150_000
 
-const utcDateOffset = (days: number): string => new Date(worldClock.now().getTime() + days * DAY_MS).toISOString().slice(0, 10)
+const utcDateOffset = (days: number): string =>
+    new Date(worldClock.now().getTime() + days * DAY_MS).toISOString().slice(0, 10)
 
 const addDaysUtc = (date: string, days: number): string => {
     const [year = 0, month = 1, day = 1] = date.split("-").map(Number)
@@ -43,7 +52,8 @@ const expectedNDaysDates = (startDate: string, n: number, horizon: string): Arra
 }
 
 /** The status a row must carry once its rule ended at endedAt: a row dated on or after the end orphans, earlier rows keep their history. */
-const statusAfterEnd = (localDate: string, endedAt: string): string => (localDate >= endedAt ? "orphaned" : "materialised")
+const statusAfterEnd = (localDate: string, endedAt: string): string =>
+    localDate >= endedAt ? "orphaned" : "materialised"
 
 /**
  * One row after the rule edit: an occurrence the earlier cadence already materialised must stay identical (history is never
@@ -74,7 +84,9 @@ describe("recur: recurrence lifecycle (e2e)", () => {
     const world = useTestWorld({ apps: { todo: { module: TodoApp, listen: true }, worker: { module: WorkerApp } } })
 
     const upcomingOf = async (person: SignedInPerson, ruleId: string): Promise<UpcomingOccurrencesAnswer> => {
-        const observed = await person.caller.graphql<UpcomingOccurrencesData>("upcomingOccurrences", { input: { ruleId } })
+        const observed = await person.caller.graphql<UpcomingOccurrencesData>("upcomingOccurrences", {
+            input: { ruleId },
+        })
         expect(observed.errorCode).toBeNull()
         return observed.data?.upcomingOccurrences ?? NO_OCCURRENCES
     }
@@ -104,7 +116,13 @@ describe("recur: recurrence lifecycle (e2e)", () => {
             },
         })
         expect(made.errorCode).toBeNull()
-        expect(made.data?.makeRecurring).toMatchObject({ title, frequency: "every-n-days", timeZone: "UTC", time: "09:00", startDate })
+        expect(made.data?.makeRecurring).toMatchObject({
+            title,
+            frequency: "every-n-days",
+            timeZone: "UTC",
+            time: "09:00",
+            startDate,
+        })
         const ruleId = made.data?.makeRecurring.ruleId ?? ""
 
         // Step 3: the generation tick backfills [startDate, today]: -21, -14, -7, 0 at 09:00 UTC.
@@ -132,9 +150,16 @@ describe("recur: recurrence lifecycle (e2e)", () => {
         }
 
         // Step 4: edit the rule: cadence n=7 -> n=3, local time 09:00 -> 18:00.
-        const edited = await me.caller.graphql<EditRecurrenceData>("editRecurrence", { input: { ruleId, n: 3, time: "18:00" } })
+        const edited = await me.caller.graphql<EditRecurrenceData>("editRecurrence", {
+            input: { ruleId, n: 3, time: "18:00" },
+        })
         expect(edited.errorCode).toBeNull()
-        expect(edited.data?.editRecurrence).toEqual({ ruleId, frequency: "every-n-days", timeZone: "UTC", time: "18:00" })
+        expect(edited.data?.editRecurrence).toEqual({
+            ruleId,
+            frequency: "every-n-days",
+            timeZone: "UTC",
+            time: "18:00",
+        })
 
         // Step 5: occurrences reflect the edit: the n=3 walk adds dates to the ones already materialised; the new rows fire at
         // 18:00 while the old rows stay identical.
@@ -167,7 +192,14 @@ describe("recur: recurrence lifecycle (e2e)", () => {
         // after the end has finished. A control rule of another person, created only now, is materialised by such a run.
         const control = await world.signedInPerson("recur-control")
         const controlRule = await control.caller.graphql<MakeRecurringData>("makeRecurring", {
-            input: { title: `e2e:recur-control:${runId}`, frequency: "EveryNDays", n: 1, timeZone: "UTC", time: "09:00", startDate: today },
+            input: {
+                title: `e2e:recur-control:${runId}`,
+                frequency: "EveryNDays",
+                n: 1,
+                timeZone: "UTC",
+                time: "09:00",
+                startDate: today,
+            },
         })
         expect(controlRule.errorCode).toBeNull()
         const controlRuleId = controlRule.data?.makeRecurring.ruleId ?? ""
@@ -186,7 +218,9 @@ describe("recur: recurrence lifecycle (e2e)", () => {
         // The store agrees: the rule row is ended and no occurrence row exists past the end date.
         const endedRows: Array<RuleEndedAtRow> = await world.db.primary.query(RULE_ENDED_AT, [ruleId])
         expect(endedRows).toEqual([{ ended_at: today }])
-        const counts: Array<OccurrenceStatusCountRow> = await world.db.primary.query(OCCURRENCE_COUNTS_BY_STATUS, [ruleId])
+        const counts: Array<OccurrenceStatusCountRow> = await world.db.primary.query(OCCURRENCE_COUNTS_BY_STATUS, [
+            ruleId,
+        ])
         expect(counts).toEqual([
             { status: "materialised", count: frozenCount - 1 },
             { status: "orphaned", count: 1 },

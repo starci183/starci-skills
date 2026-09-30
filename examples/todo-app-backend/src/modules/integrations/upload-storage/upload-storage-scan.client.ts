@@ -1,6 +1,6 @@
 import { Injectable } from "@nestjs/common"
-import type { ScanVerdict } from "./upload.contracts"
-import type { UploadScan } from "./upload.port"
+import type { ScanVerdict } from "./upload-storage.contracts"
+import type { UploadScan } from "./upload-storage.port"
 
 @Injectable()
 /**

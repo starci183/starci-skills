@@ -40,7 +40,8 @@ const toMail = (envelope: Envelope, lines: ReadonlyArray<string>): SentMail => {
     const headerLines = split < 0 ? lines : lines.slice(0, split)
     const bodyLines = split < 0 ? [] : lines.slice(split + 1)
     const header = (name: string): string =>
-        headerLines.find((line) => line.toLowerCase().startsWith(`${name.toLowerCase()}:`))?.slice(name.length + 1) ?? ""
+        headerLines.find((line) => line.toLowerCase().startsWith(`${name.toLowerCase()}:`))?.slice(name.length + 1) ??
+        ""
     return {
         at: worldClock.now().toISOString(),
         from: envelope.from,

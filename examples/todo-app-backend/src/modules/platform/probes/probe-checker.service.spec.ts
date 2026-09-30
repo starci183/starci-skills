@@ -77,7 +77,11 @@ describe("ProbeCheckerService", () => {
         it("succeeds with the report of a healthy service", async () => {
             const { checker } = await build([answers("database")])
 
-            await expect(checker.check()).resolves.toSucceedWith({ service: "todo", checks: { database: "ok" }, healthy: true })
+            await expect(checker.check()).resolves.toSucceedWith({
+                service: "todo",
+                checks: { database: "ok" },
+                healthy: true,
+            })
         })
 
         it("refuses with the state of each dependency when one is down", async () => {

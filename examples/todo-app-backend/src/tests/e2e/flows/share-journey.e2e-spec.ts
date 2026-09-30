@@ -36,7 +36,9 @@ describe("share journey (e2e)", () => {
         const taskId = created.data?.createTask.taskId ?? ""
 
         // Invite: pending row, addressed to the collaborator sign-in email, editor role.
-        const invited = await asOwner.graphql<InviteData>("invite", { input: { taskId, email: collaborator.email, role: "editor" } })
+        const invited = await asOwner.graphql<InviteData>("invite", {
+            input: { taskId, email: collaborator.email, role: "editor" },
+        })
         expect(invited.errorCode).toBeNull()
         const invitation = invited.data?.invite
         expect(invitation).toMatchObject({ taskId, email: collaborator.email, role: "editor", status: "pending" })
@@ -46,7 +48,9 @@ describe("share journey (e2e)", () => {
         const beforeAccept = await asCollaborator.graphql<CollaboratorsData>("collaborators", { input: { taskId } })
         expect(beforeAccept.errorCode).toBeNull()
         expect(beforeAccept.data?.collaborators).toEqual([])
-        const refusedBeforeAccept = await asCollaborator.graphql<CompleteTaskData>("completeTask", { input: { id: taskId } })
+        const refusedBeforeAccept = await asCollaborator.graphql<CompleteTaskData>("completeTask", {
+            input: { id: taskId },
+        })
         expect(refusedBeforeAccept.errorCode).toBe(TaskErrorCode.Forbidden)
 
         // Accept: the invitee names its own email, binding the personId to the row.

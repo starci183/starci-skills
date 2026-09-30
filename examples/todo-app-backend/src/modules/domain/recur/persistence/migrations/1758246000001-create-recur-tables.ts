@@ -31,7 +31,9 @@ export class CreateRecurTables1758246000001 implements MigrationInterface {
     due_at_utc timestamptz NOT NULL,
     status text NOT NULL
 )`)
-        await queryRunner.query(`CREATE UNIQUE INDEX IF NOT EXISTS occurrences_window_key_key ON occurrences (window_key)`)
+        await queryRunner.query(
+            `CREATE UNIQUE INDEX IF NOT EXISTS occurrences_window_key_key ON occurrences (window_key)`,
+        )
         await queryRunner.query(`CREATE INDEX IF NOT EXISTS occurrences_rule_id_idx ON occurrences (rule_id)`)
     }
 

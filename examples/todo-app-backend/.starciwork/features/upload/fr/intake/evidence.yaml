@@ -62,10 +62,10 @@ assertions:
     outcome: pass
     observation: npx jest src/modules/integrations/upload exited 0
   - id: upload-journey-e2e
-    command: npm run test:e2e -- src/tests/e2e/upload/upload-journey.e2e-spec.ts
+    command: npm run test:e2e -- src/tests/e2e/flows/upload-journey.e2e-spec.ts
     exit: 0
     outcome: pass
-    observation: npm run test:e2e -- src/tests/e2e/upload/upload-journey.e2e-spec.ts exited 0
+    observation: npm run test:e2e -- src/tests/e2e/flows/upload-journey.e2e-spec.ts exited 0
 provenance:
   actor: example-evidence
   tool: scripts/example-evidence.mjs

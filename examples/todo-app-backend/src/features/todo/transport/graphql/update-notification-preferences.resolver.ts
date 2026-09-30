@@ -25,7 +25,10 @@ export class UpdateNotificationPreferencesResolver {
         @Args("input") input: UpdateNotificationPreferencesInput,
     ): Promise<UpdateNotificationPreferencesType> {
         const outcome = await this.commandBus.execute(
-            new UpdateNotificationPreferencesCommand({ request: toUpdateNotificationPreferencesRequest(input), principal }),
+            new UpdateNotificationPreferencesCommand({
+                request: toUpdateNotificationPreferencesRequest(input),
+                principal,
+            }),
         )
         return toUpdateNotificationPreferencesType(unwrapOutcome(outcome, NotifyError))
     }

@@ -21,7 +21,9 @@ export class CreateInvitationsTable1758160000002 implements MigrationInterface {
     revoked_at timestamptz,
     person_id text
 )`)
-        await queryRunner.query(`CREATE UNIQUE INDEX IF NOT EXISTS invitations_task_email_idx ON invitations (task_id, email)`)
+        await queryRunner.query(
+            `CREATE UNIQUE INDEX IF NOT EXISTS invitations_task_email_idx ON invitations (task_id, email)`,
+        )
         await queryRunner.query(`CREATE INDEX IF NOT EXISTS invitations_task_idx ON invitations (task_id)`)
         await queryRunner.query(`CREATE INDEX IF NOT EXISTS invitations_person_idx ON invitations (person_id)`)
     }

@@ -23,7 +23,11 @@ describe("PlanUsageService", () => {
         it("reports the free plan with its cap and counts only the active tasks", async () => {
             const { service, subscriptions, tasks } = await build()
             subscriptions.readEffectivePlan.mockResolvedValue({ id: "free", taskCap: 3 })
-            tasks.listOwnedBy.mockResolvedValue([taskRow({ id: "a" }), completedTaskRow({ id: "b" }), taskRow({ id: "c" })])
+            tasks.listOwnedBy.mockResolvedValue([
+                taskRow({ id: "a" }),
+                completedTaskRow({ id: "b" }),
+                taskRow({ id: "c" }),
+            ])
 
             await expect(service.read({ personId: "p-1" })).resolves.toEqual({ plan: "free", cap: 3, activeCount: 2 })
 
@@ -36,7 +40,11 @@ describe("PlanUsageService", () => {
             subscriptions.readEffectivePlan.mockResolvedValue({ id: "paid", taskCap: null })
             tasks.listOwnedBy.mockResolvedValue([])
 
-            await expect(service.read({ personId: "p-1" })).resolves.toEqual({ plan: "paid", cap: null, activeCount: 0 })
+            await expect(service.read({ personId: "p-1" })).resolves.toEqual({
+                plan: "paid",
+                cap: null,
+                activeCount: 0,
+            })
         })
     })
 })

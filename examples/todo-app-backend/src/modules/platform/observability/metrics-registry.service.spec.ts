@@ -29,7 +29,9 @@ describe("MetricsRegistryService", () => {
 
             expect(exposition).toContain('http_requests_total{method="GET",route="/health",status="200"} 2\n')
             expect(exposition).toContain('http_request_duration_ms_sum{method="GET",route="/health",status="200"} 12\n')
-            expect(exposition).toContain('http_request_duration_ms_count{method="GET",route="/health",status="200"} 2\n')
+            expect(exposition).toContain(
+                'http_request_duration_ms_count{method="GET",route="/health",status="200"} 2\n',
+            )
         })
 
         it("keeps a separate series per method, route and status, sorted by label set", async () => {

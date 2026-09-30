@@ -1,4 +1,10 @@
-import type { ScanUploadParams, ScanVerdict, StoredBytesResult, StoreUploadParams, UploadObjectParams } from "./upload.contracts"
+import type {
+    ScanUploadParams,
+    ScanVerdict,
+    StoredBytesResult,
+    StoreUploadParams,
+    UploadObjectParams,
+} from "./upload-storage.contracts"
 
 /**
  * The byte plane: store, get and delete one object. Implementations own durability and containment; the object key is

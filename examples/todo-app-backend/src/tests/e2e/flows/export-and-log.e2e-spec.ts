@@ -5,7 +5,12 @@ import {
     AUDIT_LINES_UNDER_KEY,
     OUTBOX_DEAD_COUNT,
 } from "@tests/fixtures/persistence/e2e-verification.sql"
-import type { AuditChainRow, AuditKeyRow, AuditLineRow, CountRow } from "@tests/fixtures/persistence/e2e-verification.rows"
+import type {
+    AuditChainRow,
+    AuditKeyRow,
+    AuditLineRow,
+    CountRow,
+} from "@tests/fixtures/persistence/e2e-verification.rows"
 import type {
     AuditLogData,
     CompleteTaskData,
@@ -44,7 +49,9 @@ describe("export-and-log (e2e)", () => {
         const created = await asOwner.graphql<CreateTaskData>("createTask", { input: { title: marker } })
         expect(created.errorCode).toBeNull()
         const taskId = created.data?.createTask.taskId ?? ""
-        expect((await asOwner.graphql<CompleteTaskData>("completeTask", { input: { id: taskId } })).errorCode).toBeNull()
+        expect(
+            (await asOwner.graphql<CompleteTaskData>("completeTask", { input: { id: taskId } })).errorCode,
+        ).toBeNull()
         expect((await asOwner.graphql<DeleteTaskData>("deleteTask", { input: { id: taskId } })).errorCode).toBeNull()
 
         // A second session signed in and back out through the door, so both login actions land while the primary session

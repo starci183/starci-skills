@@ -2,11 +2,11 @@
 
 One root `jest.config.js` (managed: `require("@starci/jest-preset").starciJestConfig()`) with four projects:
 
-| Project | Command | What it is |
-|---|---|---|
-| unit | `npm test` | In-process specs of the `*.service.ts` files only, `<name>.service.spec.ts` beside the service, built with `Test.createTestingModule`. Doubles come from `@starci/jest-preset`: no docker, no network. Runs with per-file 100 percent coverage. |
-| e2e | `npm run test:e2e` | `src/tests/e2e/<area>/*.e2e-spec.ts`: A->Z journeys through the public doors of the real apps, `useTestWorld({ apps })`. |
-| contract | `npm run test:contract` | `src/tests/contract/<provider>/*.contract-spec.ts`: our client against the provider's real sandbox; skips itself without sandbox config. Never part of `test` or `test:e2e`. |
+| Project  | Command                 | What it is                                                                                                                                                                                                                                      |
+| -------- | ----------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| unit     | `npm test`              | In-process specs of the `*.service.ts` files only, `<name>.service.spec.ts` beside the service, built with `Test.createTestingModule`. Doubles come from `@starci/jest-preset`: no docker, no network. Runs with per-file 100 percent coverage. |
+| e2e      | `npm run test:e2e`      | `src/tests/e2e/<area>/*.e2e-spec.ts`: A->Z journeys through the public doors of the real apps, `useTestWorld({ apps })`.                                                                                                                        |
+| contract | `npm run test:contract` | `src/tests/contract/<provider>/*.contract-spec.ts`: our client against the provider's real sandbox; skips itself without sandbox config. Never part of `test` or `test:e2e`.                                                                    |
 
 `src/tests/world/` is the only test infrastructure. The integration, e2e and contract projects share its jest
 `global-setup.ts` / `global-teardown.ts` (one Postgres container per run, `apps/migrate`'s exported `bootstrap` once, the
@@ -72,15 +72,14 @@ import { useTestWorld } from "@tests/world/use-test-world"
 import { AppModule as TodoApp } from "../../../../apps/todo/src/app.module"
 
 describe("area flow (e2e)", () => {
-    const world = useTestWorld({ apps: { todo: { module: TodoApp, listen: true } } })
+  const world = useTestWorld({ apps: { todo: { module: TodoApp, listen: true } } })
 
-    it("runs the journey end to end", async () => {
-        const person = await world.signedInPerson("flow")
-        // one it = one complete business journey through public doors; persisted state is read through world.db.primary
-    })
+  it("runs the journey end to end", async () => {
+    const person = await world.signedInPerson("flow")
+    // one it = one complete business journey through public doors; persisted state is read through world.db.primary
+  })
 })
 ```
-
 
 ## Observability
 

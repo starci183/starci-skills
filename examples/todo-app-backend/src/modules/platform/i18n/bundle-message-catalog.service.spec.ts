@@ -16,7 +16,10 @@ const defaults: I18nOptions = {
 
 const build = async (overrides?: Partial<I18nOptions>) => {
     const moduleRef = await Test.createTestingModule({
-        providers: [BundleMessageCatalog, { provide: I18N_OPTIONS, useValue: builder<I18nOptions>(defaults)(overrides) }],
+        providers: [
+            BundleMessageCatalog,
+            { provide: I18N_OPTIONS, useValue: builder<I18nOptions>(defaults)(overrides) },
+        ],
     }).compile()
     return moduleRef.get(BundleMessageCatalog)
 }

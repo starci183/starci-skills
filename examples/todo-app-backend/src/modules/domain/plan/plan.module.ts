@@ -15,8 +15,22 @@ export class PlanModule extends ConfigurableModuleClass {
         const base = super.register(options)
         return {
             ...base,
-            providers: [...(base.providers ?? []), SubscriptionService, PaymentService, SettlementService, PlanCheckoutService, PaymentWebhookService],
-            exports: [MODULE_OPTIONS_TOKEN, SubscriptionService, PaymentService, SettlementService, PlanCheckoutService, PaymentWebhookService],
+            providers: [
+                ...(base.providers ?? []),
+                SubscriptionService,
+                PaymentService,
+                SettlementService,
+                PlanCheckoutService,
+                PaymentWebhookService,
+            ],
+            exports: [
+                MODULE_OPTIONS_TOKEN,
+                SubscriptionService,
+                PaymentService,
+                SettlementService,
+                PlanCheckoutService,
+                PaymentWebhookService,
+            ],
         }
     }
 }

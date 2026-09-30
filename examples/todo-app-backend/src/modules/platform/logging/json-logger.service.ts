@@ -1,5 +1,4 @@
 import type { Writable } from "node:stream"
-import { Injectable } from "@nestjs/common"
 import { InjectClock } from "@modules/platform/clock"
 import type { Clock } from "@modules/platform/clock"
 import { InjectLogErr, InjectLogOut } from "./logging.decorators"
@@ -7,11 +6,7 @@ import type { LogFields, Logger } from "./logging.port"
 
 type Level = "info" | "warn" | "error"
 
-@Injectable()
-/**
- * The default Logger adapter: one JSON object per line, stamped by the clock; info goes to the out stream, warn and error
- * to the err stream (stdout and stderr in the apps). main.ts builds it directly before the DI container exists.
- */
+/** The default adapter: one JSON object per line, stamped by the Clock; info goes to `out`, warn and error to `err`. */
 export class JsonLoggerService implements Logger {
     constructor(
         @InjectClock() private readonly clock: Clock,
@@ -19,19 +14,22 @@ export class JsonLoggerService implements Logger {
         @InjectLogErr() private readonly err: Writable,
     ) {}
 
-    /** A normal event worth keeping. */
+    /** Writes an info line. */
     info(event: string, fields?: LogFields): void {
         this.write("info", this.out, event, fields)
     }
 
-    /** Something unexpected the service recovered from. */
+    /** Writes a warn line. */
     warn(event: string, fields?: LogFields): void {
         this.write("warn", this.err, event, fields)
     }
 
-    /** A failure: the cause is serialized by name and message, never dumped whole. */
+    /** Writes an error line with the cause serialized by name and message. */
     error(event: string, cause: unknown, fields?: LogFields): void {
-        const detail = cause instanceof Error ? { errorName: cause.name, errorMessage: cause.message } : { errorMessage: String(cause) }
+        const detail =
+            cause instanceof Error
+                ? { errorName: cause.name, errorMessage: cause.message }
+                : { errorMessage: String(cause) }
         this.write("error", this.err, event, { ...detail, ...fields })
     }
 
@@ -39,3 +37,6 @@ export class JsonLoggerService implements Logger {
         sink.write(`${JSON.stringify({ level, event, time: this.clock.now().toISOString(), ...fields })}\n`)
     }
 }
+
+/** Builds the JSON logger stamping lines with `clock` on stdout and stderr; main.ts uses it before the DI container exists. */
+export const createJsonLogger = (clock: Clock): Logger => new JsonLoggerService(clock, process.stdout, process.stderr)

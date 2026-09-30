@@ -1,13 +1,6 @@
 /** How a failure travels: the transport maps each kind to one HTTP status and one GraphQL `kind` extension. */
 export type ErrorKind =
-    | "invalid"
-    | "unauthenticated"
-    | "forbidden"
-    | "not-found"
-    | "conflict"
-    | "rate-limited"
-    | "unavailable"
-    | "internal"
+    "invalid" | "unauthenticated" | "forbidden" | "not-found" | "conflict" | "rate-limited" | "unavailable" | "internal"
 
 /** Values that fill the named placeholders of an error text and travel next to the code; never prose. */
 export interface ErrorParams {

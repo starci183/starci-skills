@@ -13,6 +13,7 @@ import {
     deliveryAttemptRow,
     markSendingInput,
     recordDeliveryInput,
+    sendingAttemptRow,
 } from "@tests/fixtures/builders/notify.builder"
 import { DeliveryService } from "./delivery.service"
 import { NotifyLogEvent } from "./notify.log-events"
@@ -84,7 +85,9 @@ describe("DeliveryService", () => {
     describe("find", () => {
         it("reads the attempt of a notification", async () => {
             const { service, stored } = await build(
-                mockEntityManager({ findOneBy: [NotifyDeliveryAttemptEntity, deliveryAttemptRow({ state: "delivered", attempt: 1 })] }),
+                mockEntityManager({
+                    findOneBy: [NotifyDeliveryAttemptEntity, deliveryAttemptRow({ state: "delivered", attempt: 1 })],
+                }),
             )
 
             await expect(service.find({ notificationId: "n1" })).resolves.toMatchObject({
@@ -107,7 +110,9 @@ describe("DeliveryService", () => {
             const { service } = await build()
             const manager = mockEntityManager()
 
-            await expect(service.markSending({ manager, ...markSendingInput({ notificationIds: [] }) })).resolves.toEqual([])
+            await expect(
+                service.markSending({ manager, ...markSendingInput({ notificationIds: [] }) }),
+            ).resolves.toEqual([])
         })
 
         it("moves queued attempts to sending, counts the dispatch and keeps an earlier start", async () => {
@@ -154,7 +159,10 @@ describe("DeliveryService", () => {
         it("leaves attempts in any other state alone and saves nothing when none is queued", async () => {
             const { service } = await build()
             const manager = mockEntityManager({
-                find: [NotifyDeliveryAttemptEntity, [deliveryAttemptRow({ state: "delivered" }), deliveryAttemptRow({ state: "sending" })]],
+                find: [
+                    NotifyDeliveryAttemptEntity,
+                    [deliveryAttemptRow({ state: "delivered" }), deliveryAttemptRow({ state: "sending" })],
+                ],
             })
 
             await expect(service.markSending({ manager, ...markSendingInput() })).resolves.toEqual([])
@@ -179,7 +187,10 @@ describe("DeliveryService", () => {
         it("answers permanent-bounce and logs the reason when the mail host rejects the address for good", async () => {
             const { service, smtp, logger } = await build()
             smtp.send.mockRejectedValue(
-                new NotifySmtpError({ code: NotifySmtpErrorCode.PermanentRejection, params: { reason: "550 no such user" } }),
+                new NotifySmtpError({
+                    code: NotifySmtpErrorCode.PermanentRejection,
+                    params: { reason: "550 no such user" },
+                }),
             )
 
             await expect(service.transmit(message)).resolves.toBe("permanent-bounce")
@@ -229,30 +240,18 @@ describe("DeliveryService", () => {
     })
 
     describe("record", () => {
-        const sending = (overrides: Partial<NotifyDeliveryAttemptEntity> = {}) =>
-            deliveryAttemptRow({
-                state: "sending",
-                attempt: 1,
-                startedAt: EARLIER,
-                history: [
-                    { state: "queued", at: EARLIER.toISOString() },
-                    { state: "sending", at: EARLIER.toISOString() },
-                ],
-                ...overrides,
-            })
-
         it("answers an empty settlement for an empty batch without reading", async () => {
             const { service } = await build()
             const manager = mockEntityManager()
 
-            await expect(
-                service.record({ manager, ...recordDeliveryInput({ notificationIds: [] }) }),
-            ).resolves.toEqual({ delivered: [], retried: [], bounced: [], attempt: 0 })
+            await expect(service.record({ manager, ...recordDeliveryInput({ notificationIds: [] }) })).resolves.toEqual(
+                { delivered: [], retried: [], bounced: [], attempt: 0 },
+            )
         })
 
         it("marks a delivered send as delivered, ended now, and keeps the recorded failure class", async () => {
             const { service } = await build()
-            const row = sending({ failureClass: "transient" })
+            const row = sendingAttemptRow({ failureClass: "transient" })
             const manager = mockEntityManager({
                 find: [NotifyDeliveryAttemptEntity, [row]],
                 save: [NotifyDeliveryAttemptEntity, [row]],
@@ -266,19 +265,19 @@ describe("DeliveryService", () => {
                 take: LIST_ROWS_MAX,
             })
             expect(manager.save).toHaveBeenCalledWith(NotifyDeliveryAttemptEntity, [
-                {
+                deliveryAttemptRow({
                     ...row,
                     state: "delivered",
                     failureClass: "transient",
                     endedAt: AT,
                     history: [...row.history, { state: "delivered", at: AT_ISO }],
-                },
+                }),
             ])
         })
 
         it("sends a transient failure back to queued while the retry budget lasts", async () => {
             const { service } = await build()
-            const row = sending({ attempt: 2 })
+            const row = sendingAttemptRow({ attempt: 2 })
             const manager = mockEntityManager({
                 find: [NotifyDeliveryAttemptEntity, [row]],
                 save: [NotifyDeliveryAttemptEntity, [row]],
@@ -288,19 +287,19 @@ describe("DeliveryService", () => {
 
             expect(recorded).toEqual({ delivered: [], retried: ["n1"], bounced: [], attempt: 2 })
             expect(manager.save).toHaveBeenCalledWith(NotifyDeliveryAttemptEntity, [
-                {
+                deliveryAttemptRow({
                     ...row,
                     state: "queued",
                     failureClass: "transient",
                     endedAt: null,
                     history: [...row.history, { state: "queued", at: AT_ISO, failureClass: "transient" }],
-                },
+                }),
             ])
         })
 
         it("bounces a transient failure as retries-exhausted once the third dispatch failed", async () => {
             const { service } = await build()
-            const row = sending({ attempt: 3 })
+            const row = sendingAttemptRow({ attempt: 3 })
             const manager = mockEntityManager({
                 find: [NotifyDeliveryAttemptEntity, [row]],
                 save: [NotifyDeliveryAttemptEntity, [row]],
@@ -316,7 +315,10 @@ describe("DeliveryService", () => {
 
         it("bounces a permanent rejection at once and reports the highest attempt of the batch", async () => {
             const { service } = await build()
-            const rows = [sending({ notificationId: "n1", attempt: 1 }), sending({ notificationId: "n2", attempt: 2 })]
+            const rows = [
+                sendingAttemptRow({ notificationId: "n1", attempt: 1 }),
+                sendingAttemptRow({ notificationId: "n2", attempt: 2 }),
+            ]
             const manager = mockEntityManager({
                 find: [NotifyDeliveryAttemptEntity, rows],
                 save: [NotifyDeliveryAttemptEntity, rows],
@@ -337,12 +339,18 @@ describe("DeliveryService", () => {
         it("settles only the attempts that are still sending and saves nothing when none is", async () => {
             const { service } = await build()
             const manager = mockEntityManager({
-                find: [NotifyDeliveryAttemptEntity, [deliveryAttemptRow({ state: "delivered" }), deliveryAttemptRow({ state: "queued" })]],
+                find: [
+                    NotifyDeliveryAttemptEntity,
+                    [deliveryAttemptRow({ state: "delivered" }), deliveryAttemptRow({ state: "queued" })],
+                ],
             })
 
-            await expect(
-                service.record({ manager, ...recordDeliveryInput() }),
-            ).resolves.toEqual({ delivered: [], retried: [], bounced: [], attempt: 0 })
+            await expect(service.record({ manager, ...recordDeliveryInput() })).resolves.toEqual({
+                delivered: [],
+                retried: [],
+                bounced: [],
+                attempt: 0,
+            })
             expect(manager.save).not.toHaveBeenCalled()
         })
     })

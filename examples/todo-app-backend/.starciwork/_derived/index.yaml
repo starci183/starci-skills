@@ -1039,7 +1039,7 @@ records:
           remains unmet is requiresProof.uat (uat.recur.make-recurring's own run composes this flow,
           and has no runs/ folder yet - gap.recur.live-proof, not mine to close) and
           requiresProof.e2e, whose command now names the real spec
-          (src/tests/e2e/recur/recurrence-lifecycle.e2e-spec.ts walks the edit ->
+          (src/tests/e2e/flows/recurrence-lifecycle.e2e-spec.ts walks the edit ->
           occurrences-reflect-edit leg) but has no passing run captured as evidence here yet.
   fr.recur.end-rule:
     schema: work/functional-requirement@1
@@ -1063,7 +1063,7 @@ records:
           (scripts/live-proof-recur.mjs's endRecurrence step). What remains unmet is
           requiresProof.uat (uat.recur.make-recurring's own run composes this flow, and has no runs/
           folder yet - gap.recur.live-proof, not mine to close) and requiresProof.e2e, whose command
-          now names the real spec (src/tests/e2e/recur/recurrence-lifecycle.e2e-spec.ts walks end ->
+          now names the real spec (src/tests/e2e/flows/recurrence-lifecycle.e2e-spec.ts walks end ->
           no-new-occurrences) but has no passing run captured as evidence here yet.
   fr.recur.make-recurring:
     schema: work/functional-requirement@1
@@ -1086,7 +1086,7 @@ records:
           uat.required and e2e proof: uat.recur.make-recurring has no runs/ folder yet
           (gap.recur.live-proof, not mine to close - ui/uat records are out of this lane's scope)
           and requiresProof.e2e, whose command now names the real spec
-          (src/tests/e2e/recur/recurrence-lifecycle.e2e-spec.ts walks makeRecurring -> occurrences
+          (src/tests/e2e/flows/recurrence-lifecycle.e2e-spec.ts walks makeRecurring -> occurrences
           against the assembled stack) but has no passing run captured as evidence here yet."
   fr.recur.see-upcoming:
     schema: work/functional-requirement@1
@@ -1109,7 +1109,7 @@ records:
           What remains unmet is requiresProof.uat (uat.recur.make-recurring's own run composes this
           flow, and has no runs/ folder yet - gap.recur.live-proof, not mine to close) and
           requiresProof.e2e, whose command now names the real spec
-          (src/tests/e2e/recur/recurrence-lifecycle.e2e-spec.ts reads upcoming occurrences before
+          (src/tests/e2e/flows/recurrence-lifecycle.e2e-spec.ts reads upcoming occurrences before
           and after ending) but has no passing run captured as evidence here yet.
   fr.share.accept:
     schema: work/functional-requirement@1
@@ -1790,7 +1790,7 @@ records:
           uat.required and e2e proof: uat.recur.make-recurring has no runs/ folder yet
           (gap.recur.live-proof, not mine to close - ui/uat records are out of this lane's scope)
           and requiresProof.e2e, whose command now names the real spec
-          (src/tests/e2e/recur/recurrence-lifecycle.e2e-spec.ts walks makeRecurring -> occurrences
+          (src/tests/e2e/flows/recurrence-lifecycle.e2e-spec.ts walks makeRecurring -> occurrences
           against the assembled stack) but has no passing run captured as evidence here yet."
   journey.share.collaborate-on-a-task:
     schema: work/customer-journey@1

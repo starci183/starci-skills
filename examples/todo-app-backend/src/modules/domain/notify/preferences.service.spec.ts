@@ -23,7 +23,9 @@ describe("PreferencesService", () => {
     describe("get", () => {
         it("reads the stored preference of the pair", async () => {
             const { service, stored } = await build(
-                mockEntityManager({ findOneBy: [NotifyPreferenceEntity, preferenceRow({ unsubscribed: true, digestWindowMinutes: 30 })] }),
+                mockEntityManager({
+                    findOneBy: [NotifyPreferenceEntity, preferenceRow({ unsubscribed: true, digestWindowMinutes: 30 })],
+                }),
             )
 
             await expect(service.get(findPreferenceInput())).resolves.toEqual({
@@ -77,7 +79,10 @@ describe("PreferencesService", () => {
             const manager = mockEntityManager()
 
             await expect(
-                service.update({ manager, ...updatePreferenceInput({ channel: "   ", patch: { unsubscribed: true } }) }),
+                service.update({
+                    manager,
+                    ...updatePreferenceInput({ channel: "   ", patch: { unsubscribed: true } }),
+                }),
             ).resolves.toBeRefused(NotifyErrorCode.ChannelRequired)
         })
 
@@ -138,7 +143,10 @@ describe("PreferencesService", () => {
             })
 
             await expect(
-                service.update({ manager, ...updatePreferenceInput({ patch: { unsubscribed: true, digestWindowMinutes: 5 } }) }),
+                service.update({
+                    manager,
+                    ...updatePreferenceInput({ patch: { unsubscribed: true, digestWindowMinutes: 5 } }),
+                }),
             ).resolves.toSucceedWith({ personId: "p1", channel: "email", unsubscribed: true, digestWindowMinutes: 5 })
             expect(manager.save).toHaveBeenCalledWith(
                 NotifyPreferenceEntity,
@@ -180,10 +188,7 @@ describe("PreferencesService", () => {
             expect(tx.committedWrites).toEqual([
                 {
                     method: "save",
-                    args: [
-                        NotifyPreferenceEntity,
-                        { personId: "p1", channel: "email", unsubscribed: true, digestWindowMinutes: 12 },
-                    ],
+                    args: [NotifyPreferenceEntity, preferenceRow({ unsubscribed: true, digestWindowMinutes: 12 })],
                 },
             ])
         })
@@ -192,9 +197,9 @@ describe("PreferencesService", () => {
             const tx = fakeTransaction(mockEntityManager())
             const { service } = await build(tx.em)
 
-            await expect(
-                service.change(changePreferenceInput({ digestWindowMinutes: 0 })),
-            ).resolves.toBeRefused(NotifyErrorCode.DigestWindowInvalid)
+            await expect(service.change(changePreferenceInput({ digestWindowMinutes: 0 }))).resolves.toBeRefused(
+                NotifyErrorCode.DigestWindowInvalid,
+            )
 
             expect(tx.committedWrites).toEqual([])
         })
@@ -219,10 +224,7 @@ describe("PreferencesService", () => {
             expect(tx.committedWrites).toEqual([
                 {
                     method: "save",
-                    args: [
-                        NotifyPreferenceEntity,
-                        { personId: "p1", channel: "email", unsubscribed: true, digestWindowMinutes: 9 },
-                    ],
+                    args: [NotifyPreferenceEntity, preferenceRow({ unsubscribed: true, digestWindowMinutes: 9 })],
                 },
             ])
         })

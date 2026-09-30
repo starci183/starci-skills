@@ -51,14 +51,9 @@ docker start starci-postgres starci-redis starci-minio starci-prometheus
 
 ## Secrets
 
-Every decrypted file under `runtime/` is produced from its `.enc` member and is never committed.
-`scripts/with-dev-secrets.mjs` decrypts every `.enc` member listed in
-`runtime/env/KEYS.md` with `sops`, using the DEMO-ONLY identity at `runtime/env/demo.agekey`
-(`SOPS_AGE_KEY_FILE`), and runs a command with them exported/materialized - for example:
+Every decrypted file under `runtime/` is produced from its `.enc` member by `npm run sync` and is never committed.
+`sops` decrypts every `.enc` member listed in `runtime/env/KEYS.md` using the DEMO-ONLY identity at
+`runtime/env/demo.agekey` (`SOPS_AGE_KEY_FILE`).
 
-```sh
-node scripts/with-dev-secrets.mjs docker compose -f .starcistacks/dev/infra/compose/compose.yaml up -d
-```
-
-No decrypted secret is ever written into the tracked tree; the script only materializes files under
-`.starcistacks/dev/runtime/**` that this repository's own `.gitignore` already refuses to track.
+No decrypted secret is ever written into the tracked tree; only files under
+`.starcistacks/dev/runtime/**` are materialized, and this repository's own `.gitignore` already refuses to track them.

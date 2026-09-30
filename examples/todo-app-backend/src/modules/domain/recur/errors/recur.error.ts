@@ -5,6 +5,8 @@ import type { ErrorKind } from "@modules/platform/errors"
 export enum RecurErrorCode {
     /** The fields of the rule do not fit its frequency; the `reason` param names which. */
     RuleInvalid = "RECUR_RULE_INVALID",
+    /** The configured generation cron is not five valid fields; an operator mistake, never a person's. */
+    TickCronInvalid = "RECUR_TICK_CRON_INVALID",
     /** The rule belongs to somebody else. */
     RuleForbidden = "RECUR_RULE_FORBIDDEN",
     /** The rule does not exist. */
@@ -18,6 +20,7 @@ export enum RecurErrorCode {
 /** How each recur code travels. */
 export const RECUR_ERROR_KINDS: Record<RecurErrorCode, ErrorKind> = {
     [RecurErrorCode.RuleInvalid]: "invalid",
+    [RecurErrorCode.TickCronInvalid]: "internal",
     [RecurErrorCode.RuleForbidden]: "forbidden",
     [RecurErrorCode.RuleNotFound]: "not-found",
     [RecurErrorCode.OccurrenceForbidden]: "forbidden",

@@ -18,7 +18,9 @@ export class CreateOutboxMessages1758400000002 implements MigrationInterface {
     created_at timestamptz NOT NULL,
     UNIQUE (queue, event_id)
 )`)
-        await queryRunner.query(`CREATE INDEX outbox_messages_due_idx ON outbox_messages (available_at) WHERE status = 'pending'`)
+        await queryRunner.query(
+            `CREATE INDEX outbox_messages_due_idx ON outbox_messages (available_at) WHERE status = 'pending'`,
+        )
     }
 
     /** Drops the table with its index. */

@@ -19,7 +19,7 @@ requiresProof:
   unit:
     forEach: composes
   e2e:
-    command: npm run test:e2e -- src/tests/e2e/task/task-lifecycle.e2e-spec.ts
+    command: npm run test:e2e -- src/tests/e2e/flows/task-lifecycle.e2e-spec.ts
   uat:
     required: true
 
@@ -35,7 +35,7 @@ change: {rev: 1, kind: initial, at: 2026-09-19T00:00:00.000Z}
 #
 # ac children are not authored: the one checkable consequence is already named -
 # ac.task.list.owned.excludes-others is the named test in list-tasks.handler.spec.ts, and the
-# stranger-invisibility half runs e2e in src/tests/e2e/task/task-isolation.e2e-spec.ts beside the
+# stranger-invisibility half runs e2e in src/tests/e2e/flows/task-isolation.e2e-spec.ts beside the
 # lifecycle spec the e2e command names. requiresProof.uat stays required: the only task uat flow,
 # uat.task.create (done - runs/20260919T112844Z-5c10a673), walks "the task list loads" as its landing
 # step, but whether that settles this requirement's uat proof is the kernel's derivation, not a claim

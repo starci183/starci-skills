@@ -143,7 +143,9 @@ export class SessionService {
      * The live session behind a token. An empty token is refused before any query: TypeORM drops an undefined
      * criterion from the WHERE clause, so a lookup on it would match an arbitrary row.
      */
-    async find(params: FindSessionParams): Promise<Outcome<SessionView, IdentityErrorCode.NotFound | IdentityErrorCode.Expired>> {
+    async find(
+        params: FindSessionParams,
+    ): Promise<Outcome<SessionView, IdentityErrorCode.NotFound | IdentityErrorCode.Expired>> {
         if (!params.token) return refused(IdentityErrorCode.NotFound, { reason: "missing-token" })
         const row = await this.entityManager.findOneBy(SessionEntity, { token: params.token })
         if (!row) return refused(IdentityErrorCode.NotFound)

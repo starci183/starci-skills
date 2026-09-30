@@ -31,7 +31,9 @@ describe("upload journey (e2e)", () => {
         const owner = await world.signedInPerson("upload")
         const caller = owner.caller
 
-        const created = await caller.graphql<CreateTaskData>("createTask", { input: { title: `e2e upload ${randomUUID()}` } })
+        const created = await caller.graphql<CreateTaskData>("createTask", {
+            input: { title: `e2e upload ${randomUUID()}` },
+        })
         const taskId = created.data?.createTask.taskId ?? ""
 
         // A mime outside the allowlist is refused before any row or byte exists.
@@ -53,24 +55,32 @@ describe("upload journey (e2e)", () => {
         expect(url).toBe(`/uploads/${uploadId}/content`)
         const tokenHeader = intent?.headers.find((header) => header.name === "x-upload-token")
         expect(tokenHeader?.value).toEqual(expect.any(String))
-        const presignedHeaders = Object.fromEntries((intent?.headers ?? []).map((header) => [header.name, header.value]))
+        const presignedHeaders = Object.fromEntries(
+            (intent?.headers ?? []).map((header) => [header.name, header.value]),
+        )
 
         // A pending intent is metadata only: it cannot attach before its bytes land.
         const earlyAttach = await caller.graphql<AttachUploadData>("attachUpload", { input: { uploadId, taskId } })
         expect(earlyAttach.errorCode).toBe(UploadErrorCode.NotReady)
 
         // The presigned data plane takes no session: the token is the credential; a wrong one is refused before a byte is stored.
-        const wrongToken = await api.put<RestErrorBody>(url, content, { headers: { "x-upload-token": "1.bad", "content-type": "text/plain" } })
+        const wrongToken = await api.put<RestErrorBody>(url, content, {
+            headers: { "x-upload-token": "1.bad", "content-type": "text/plain" },
+        })
         expect(wrongToken.status).toBe(403)
         expect(wrongToken.body.code).toBe(UploadErrorCode.TokenInvalid)
 
-        const stored = await api.put<UploadEntry>(url, content, { headers: { "content-type": "text/plain", ...presignedHeaders } })
+        const stored = await api.put<UploadEntry>(url, content, {
+            headers: { "content-type": "text/plain", ...presignedHeaders },
+        })
         expect(stored.status).toBe(200)
         expect(stored.body.status).toBe("ready")
         expect(stored.body.sizeBytes).toBe(content.length)
 
         // The consumed token must not store twice.
-        const replay = await api.put<RestErrorBody>(url, content, { headers: { "content-type": "text/plain", ...presignedHeaders } })
+        const replay = await api.put<RestErrorBody>(url, content, {
+            headers: { "content-type": "text/plain", ...presignedHeaders },
+        })
         expect(replay.status).toBe(403)
 
         const attached = await caller.graphql<AttachUploadData>("attachUpload", { input: { uploadId, taskId } })

@@ -71,7 +71,9 @@ export class PaymentService {
     }
 
     /** The gateway shows the intent failed or expired; an intent already applied is never overturned. */
-    async markFailed(params: SettleIntentParams): Promise<Outcome<PaymentIntentView, PlanErrorCode.PaymentIntentNotFound>> {
+    async markFailed(
+        params: SettleIntentParams,
+    ): Promise<Outcome<PaymentIntentView, PlanErrorCode.PaymentIntentNotFound>> {
         const row = await this.lock(params)
         if (!row) return refused(PlanErrorCode.PaymentIntentNotFound)
         if (row.appliedAt) return ok(toPaymentIntentView(row))

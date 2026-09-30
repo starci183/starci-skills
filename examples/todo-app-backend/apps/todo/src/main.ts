@@ -2,7 +2,7 @@ import "reflect-metadata"
 import { NestFactory } from "@nestjs/core"
 import { SystemClock } from "@modules/platform/clock"
 import { EnvSource } from "@modules/platform/config"
-import { JsonLoggerService, LoggingLogEvent } from "@modules/platform/logging"
+import { createJsonLogger, LoggingLogEvent } from "@modules/platform/logging"
 import { AppModule } from "./app.module"
 import { parseIdentityConfig } from "@modules/domain/identity"
 import { parseCommissionConfig } from "@modules/domain/commission"
@@ -12,7 +12,7 @@ import { parseUploadConfig } from "@modules/domain/upload"
 import { parseKeycloakConfig } from "@modules/integrations/keycloak"
 import { parseNotifySmtpConfig } from "@modules/integrations/notify-smtp"
 import { parseSepayConfig } from "@modules/integrations/sepay"
-import { parseUploadStorageConfig } from "@modules/integrations/upload"
+import { parseUploadStorageConfig } from "@modules/integrations/upload-storage"
 import { parsePrimaryDatabaseConfig } from "@modules/platform/database"
 import { parseHttpSecurityConfig } from "@modules/platform/http-security"
 import type { TodoAppOptions } from "./todo.options"
@@ -38,10 +38,13 @@ async function bootstrap(): Promise<void> {
     app.enableCors({ origin: [...options.httpSecurity.allowedOrigins] })
     app.enableShutdownHooks()
     await app.listen(options.port)
-    new JsonLoggerService(new SystemClock(), process.stdout, process.stderr).info(LoggingLogEvent.ServerStarted, { service: "todo", port: options.port })
+    createJsonLogger(new SystemClock()).info(LoggingLogEvent.ServerStarted, {
+        service: "todo",
+        port: options.port,
+    })
 }
 
 bootstrap().catch((error: unknown) => {
-    new JsonLoggerService(new SystemClock(), process.stdout, process.stderr).error(LoggingLogEvent.StartupFailed, error, { service: "todo" })
+    createJsonLogger(new SystemClock()).error(LoggingLogEvent.StartupFailed, error, { service: "todo" })
     process.exit(1)
 })

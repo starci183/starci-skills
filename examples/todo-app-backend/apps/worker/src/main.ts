@@ -2,7 +2,7 @@ import "reflect-metadata"
 import { NestFactory } from "@nestjs/core"
 import { SystemClock } from "@modules/platform/clock"
 import { EnvSource } from "@modules/platform/config"
-import { JsonLoggerService, LoggingLogEvent } from "@modules/platform/logging"
+import { createJsonLogger, LoggingLogEvent } from "@modules/platform/logging"
 import { AppModule } from "./app.module"
 import { parseIdentityConfig } from "@modules/domain/identity"
 import { parsePlanConfig } from "@modules/domain/plan"
@@ -11,7 +11,7 @@ import { parseUploadConfig } from "@modules/domain/upload"
 import { parseKeycloakConfig } from "@modules/integrations/keycloak"
 import { parseNotifySmtpConfig } from "@modules/integrations/notify-smtp"
 import { parseSepayConfig } from "@modules/integrations/sepay"
-import { parseUploadStorageConfig } from "@modules/integrations/upload"
+import { parseUploadStorageConfig } from "@modules/integrations/upload-storage"
 import { parsePrimaryDatabaseConfig } from "@modules/platform/database"
 import { parseMessagingConfig } from "@modules/platform/messaging"
 import { parseSchedulingConfig } from "@modules/platform/scheduling"
@@ -35,10 +35,12 @@ async function bootstrap(): Promise<void> {
     }
     const app = await NestFactory.createApplicationContext(AppModule.register(options))
     app.enableShutdownHooks()
-    new JsonLoggerService(new SystemClock(), process.stdout, process.stderr).info(LoggingLogEvent.WorkerStarted, { service: "worker" })
+    createJsonLogger(new SystemClock()).info(LoggingLogEvent.WorkerStarted, {
+        service: "worker",
+    })
 }
 
 bootstrap().catch((error: unknown) => {
-    new JsonLoggerService(new SystemClock(), process.stdout, process.stderr).error(LoggingLogEvent.StartupFailed, error, { service: "worker" })
+    createJsonLogger(new SystemClock()).error(LoggingLogEvent.StartupFailed, error, { service: "worker" })
     process.exit(1)
 })

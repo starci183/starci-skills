@@ -1,7 +1,4 @@
-import type {
-    RevokeCollaboratorRequest,
-    RevokedCollaborator,
-} from "../../application/revoke-collaborator.contracts"
+import type { RevokeCollaboratorRequest, RevokedCollaborator } from "../../application/revoke-collaborator.contracts"
 import type { RevokeCollaboratorInput } from "./dto/revoke-collaborator.input"
 import type { RevokeCollaboratorType } from "./dto/revoke-collaborator.type"
 

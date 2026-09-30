@@ -67,7 +67,7 @@ runner rather than a developer's laptop:
 The DEMO-ONLY age identity at `.starcistacks/dev/runtime/env/demo.agekey` is untracked under HFS secret
 custody. A local operator must provision it before decrypting the committed `.enc` examples; the live CI
 job needs the same provisioned identity before it can run. The encrypted documents hold example values
-only, and this identity must never protect a real credential (see `scripts/with-dev-secrets.mjs` and
+only, and this identity must never protect a real credential (see
 `.starcistacks/dev/runtime/env/KEYS.md`).
 
 ## Probes and metrics

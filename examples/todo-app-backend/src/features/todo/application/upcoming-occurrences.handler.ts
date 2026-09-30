@@ -20,6 +20,10 @@ export class UpcomingOccurrencesHandler extends ICQRSHandler<UpcomingOccurrences
     }
 
     protected override async process(query: UpcomingOccurrencesQuery): Promise<UpcomingOccurrencesResult> {
-        return this.generator.upcoming({ ruleId: query.params.request.ruleId, actorId: query.params.principal.id, previewDays: query.params.request.previewDays })
+        return this.generator.upcoming({
+            ruleId: query.params.request.ruleId,
+            actorId: query.params.principal.id,
+            previewDays: query.params.request.previewDays,
+        })
     }
 }

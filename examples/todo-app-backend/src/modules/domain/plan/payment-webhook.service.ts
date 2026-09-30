@@ -55,6 +55,10 @@ export class PaymentWebhookService {
             await this.inbox.release(WEBHOOK_SOURCE, params.gatewayIntentId)
             return settled
         }
-        return ok({ ignored: false, applied: settled.value.applied, subscriptionStatus: settled.value.subscriptionStatus })
+        return ok({
+            ignored: false,
+            applied: settled.value.applied,
+            subscriptionStatus: settled.value.subscriptionStatus,
+        })
     }
 }

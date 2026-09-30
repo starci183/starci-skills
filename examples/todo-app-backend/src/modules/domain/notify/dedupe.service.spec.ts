@@ -96,7 +96,10 @@ describe("DedupeService", () => {
     describe("findByDigestGroup", () => {
         it("reads the group in admission order, at most the list maximum", async () => {
             const stored = mockEntityManager({
-                find: [NotifyNotificationEntity, [notificationRow({ id: "n1" }), notificationRow({ id: "n2", payload: { taskId: "t2" } })]],
+                find: [
+                    NotifyNotificationEntity,
+                    [notificationRow({ id: "n1" }), notificationRow({ id: "n2", payload: { taskId: "t2" } })],
+                ],
             })
             const { service } = await build(stored)
 

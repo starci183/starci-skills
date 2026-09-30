@@ -30,7 +30,11 @@ export interface PostgresContainerSpec {
 
 const docker = (args: ReadonlyArray<string>): string => {
     try {
-        return execFileSync("docker", [...args], { encoding: "utf8", maxBuffer: OUTPUT_MAX_BYTES, timeout: DOCKER_TIMEOUT_MS }).trim()
+        return execFileSync("docker", [...args], {
+            encoding: "utf8",
+            maxBuffer: OUTPUT_MAX_BYTES,
+            timeout: DOCKER_TIMEOUT_MS,
+        }).trim()
     } catch (cause) {
         throw new TestWorldError({
             code: TestWorldErrorCode.InfrastructureFailed,

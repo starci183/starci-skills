@@ -20,6 +20,10 @@ export class AcceptUploadContentHandler extends ICQRSHandler<AcceptUploadContent
     }
 
     protected override async process(command: AcceptUploadContentCommand): Promise<AcceptUploadContentResult> {
-        return this.uploads.acceptContent({ uploadId: command.params.request.uploadId, token: command.params.request.token, content: command.params.request.content })
+        return this.uploads.acceptContent({
+            uploadId: command.params.request.uploadId,
+            token: command.params.request.token,
+            content: command.params.request.content,
+        })
     }
 }

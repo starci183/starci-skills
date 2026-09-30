@@ -1,9 +1,4 @@
-import type {
-    DeliveryAttemptView,
-    DigestWindowView,
-    NotificationView,
-    PreferenceView,
-} from "../notify.contracts"
+import type { DeliveryAttemptView, DigestWindowView, NotificationView, PreferenceView } from "../notify.contracts"
 import type { NotifyDeliveryAttemptEntity } from "./entities/delivery-attempt.entity"
 import type { NotifyDigestWindowEntity } from "./entities/digest-window.entity"
 import type { NotifyNotificationEntity } from "./entities/notification.entity"

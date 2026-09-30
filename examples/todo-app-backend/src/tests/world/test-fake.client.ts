@@ -86,7 +86,9 @@ export const createTestFakes = (controlUrl: string, webhookTarget: () => string)
     return {
         keycloak: {
             ...base("keycloak"),
-            person: async (email, password) => (await call<{ personId: string }>(http, "POST", "/control/keycloak/persons", { email, password })).personId,
+            person: async (email, password) =>
+                (await call<{ personId: string }>(http, "POST", "/control/keycloak/persons", { email, password }))
+                    .personId,
         },
         smtp: {
             ...base("smtp"),
@@ -96,12 +98,19 @@ export const createTestFakes = (controlUrl: string, webhookTarget: () => string)
             ...base("sepay"),
             intents: () => call<ReadonlyArray<SepayIntent>>(http, "GET", "/control/sepay/intents"),
             deliveries: () => call<ReadonlyArray<WebhookDelivery>>(http, "GET", "/control/sepay/deliveries"),
-            settle: (params) => call<WebhookDelivery>(http, "POST", "/control/sepay/settle", { ...params, deliverTo: webhookTarget() }),
+            settle: (params) =>
+                call<WebhookDelivery>(http, "POST", "/control/sepay/settle", { ...params, deliverTo: webhookTarget() }),
             delayWebhook: async (params) => {
-                await call<object>(http, "POST", "/control/sepay/delay-settle", { ...params, deliverTo: webhookTarget() })
+                await call<object>(http, "POST", "/control/sepay/delay-settle", {
+                    ...params,
+                    deliverTo: webhookTarget(),
+                })
             },
             replayWebhook: (gatewayIntentId) =>
-                call<WebhookDelivery>(http, "POST", "/control/sepay/replay", { gatewayIntentId, deliverTo: webhookTarget() }),
+                call<WebhookDelivery>(http, "POST", "/control/sepay/replay", {
+                    gatewayIntentId,
+                    deliverTo: webhookTarget(),
+                }),
         },
     }
 }

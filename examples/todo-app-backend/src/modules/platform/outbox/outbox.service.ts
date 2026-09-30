@@ -15,7 +15,13 @@ import type {
 import type { Outbox } from "./outbox.port"
 import { toOutboxRecord } from "./persistence/outbox.rows"
 import type { ClaimedMessageRow } from "./persistence/outbox.rows"
-import { BURY_MESSAGE, CLAIM_DUE_MESSAGES, COMPLETE_MESSAGE, INSERT_MESSAGE, RETRY_MESSAGE } from "./persistence/outbox.sql"
+import {
+    BURY_MESSAGE,
+    CLAIM_DUE_MESSAGES,
+    COMPLETE_MESSAGE,
+    INSERT_MESSAGE,
+    RETRY_MESSAGE,
+} from "./persistence/outbox.sql"
 
 @Injectable()
 /** The Outbox adapter over the outbox table: a plain insert in the caller transaction, a SKIP LOCKED claim for workers. */

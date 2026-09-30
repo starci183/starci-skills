@@ -17,6 +17,9 @@ export class RevokeCollaboratorHandler extends ICQRSHandler<RevokeCollaboratorCo
     }
 
     protected override async process(command: RevokeCollaboratorCommand): Promise<RevokeCollaboratorResult> {
-        return this.invitations.revoke({ ownerId: command.params.principal.id, invitationId: command.params.request.invitationId })
+        return this.invitations.revoke({
+            ownerId: command.params.principal.id,
+            invitationId: command.params.request.invitationId,
+        })
     }
 }

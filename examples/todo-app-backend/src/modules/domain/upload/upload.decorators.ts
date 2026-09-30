@@ -6,5 +6,4 @@ import type { UploadOptions } from "./upload.options"
 export const UPLOAD_OPTIONS: unique symbol = Symbol("domain.upload.options")
 
 /** Injects the options of the upload capability. Parameter type: UploadOptions. */
-export const InjectUploadOptions = (): TypedParameterDecorator<UploadOptions> =>
-    injector<UploadOptions>(UPLOAD_OPTIONS)
+export const InjectUploadOptions = (): TypedParameterDecorator<UploadOptions> => injector<UploadOptions>(UPLOAD_OPTIONS)

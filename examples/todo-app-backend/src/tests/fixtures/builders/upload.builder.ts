@@ -34,4 +34,10 @@ export const uploadRow = builder<UploadRow>({
 })
 
 /** The open task t-1 of p-1 that uploads attach to. */
-export const uploadTask = builder<TaskView>({ id: "t-1", owner: "p-1", title: "Write", complete: false, completedAt: null })
+export const uploadTask = builder<TaskView>({
+    id: "t-1",
+    owner: "p-1",
+    title: "Write",
+    complete: false,
+    completedAt: null,
+})

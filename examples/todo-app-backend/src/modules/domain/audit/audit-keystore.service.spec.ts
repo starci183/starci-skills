@@ -41,9 +41,14 @@ describe("AuditKeystoreService", () => {
         it("returns the stored key on later calls without writing", async () => {
             const { service } = await build()
             const key = randomBytes(32)
-            const manager = mockEntityManager({ findOneBy: [AuditKeyEntity, auditKeyRow({ key: key.toString("base64") })] })
+            const manager = mockEntityManager({
+                findOneBy: [AuditKeyEntity, auditKeyRow({ key: key.toString("base64") })],
+            })
 
-            await expect(service.getOrCreateKey({ manager, personId: "p1", at: AT })).resolves.toEqual({ keyId: "k1", key })
+            await expect(service.getOrCreateKey({ manager, personId: "p1", at: AT })).resolves.toEqual({
+                keyId: "k1",
+                key,
+            })
 
             expect(manager.save).not.toHaveBeenCalled()
         })
@@ -73,16 +78,15 @@ describe("AuditKeystoreService", () => {
     describe("getKeyMaterials", () => {
         it("loads the material of the key ids that still exist in one bounded read", async () => {
             const key = randomBytes(32)
-            const { service, own } = await build(mockEntityManager({ find: [AuditKeyEntity, [auditKeyRow({ key: key.toString("base64") })]] }))
+            const { service, own } = await build(
+                mockEntityManager({ find: [AuditKeyEntity, [auditKeyRow({ key: key.toString("base64") })]] }),
+            )
 
             const materials = await service.getKeyMaterials({ keyIds: ["k1", "gone"] })
 
             expect([...materials.entries()]).toEqual([["k1", key]])
             expect(own.find).toHaveBeenCalledTimes(1)
-            expect(own.find).toHaveBeenCalledWith(
-                AuditKeyEntity,
-                expect.objectContaining({ take: LIST_ROWS_MAX }),
-            )
+            expect(own.find).toHaveBeenCalledWith(AuditKeyEntity, expect.objectContaining({ take: LIST_ROWS_MAX }))
         })
 
         it("reads nothing for no key ids", async () => {

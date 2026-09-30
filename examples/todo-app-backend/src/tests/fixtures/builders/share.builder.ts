@@ -39,4 +39,10 @@ export const invitationRow = builder<InvitationRow>({
 })
 
 /** The open task t-1 of owner-1 that invitations refer to. */
-export const sharedTask = builder<TaskView>({ id: "t-1", owner: "owner-1", title: "Write", complete: false, completedAt: null })
+export const sharedTask = builder<TaskView>({
+    id: "t-1",
+    owner: "owner-1",
+    title: "Write",
+    complete: false,
+    completedAt: null,
+})

@@ -22,4 +22,4 @@ requiresProof:
   unit:
     forEach: composes
   e2e:
-    command: npm run test:e2e -- src/tests/e2e/upload/upload-journey.e2e-spec.ts
+    command: npm run test:e2e -- src/tests/e2e/flows/upload-journey.e2e-spec.ts

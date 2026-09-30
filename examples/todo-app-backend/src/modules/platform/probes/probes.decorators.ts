@@ -14,12 +14,10 @@ export const PROBE_CHECKER: unique symbol = Symbol("platform.probes.checker")
 export const PROBES: unique symbol = Symbol("platform.probes.probes")
 
 /** Injects the options of the probes capability. Parameter type: ProbesOptions. */
-export const InjectProbesOptions = (): TypedParameterDecorator<ProbesOptions> =>
-    injector<ProbesOptions>(PROBES_OPTIONS)
+export const InjectProbesOptions = (): TypedParameterDecorator<ProbesOptions> => injector<ProbesOptions>(PROBES_OPTIONS)
 
 /** Injects the probes this app reports on. Parameter type: ReadonlyArray of Probe. */
-export const InjectProbes = (): TypedParameterDecorator<ReadonlyArray<Probe>> =>
-    injector<ReadonlyArray<Probe>>(PROBES)
+export const InjectProbes = (): TypedParameterDecorator<ReadonlyArray<Probe>> => injector<ReadonlyArray<Probe>>(PROBES)
 
 /** Injects the probe checker. Parameter type: ProbeCheckerService. */
 export const InjectProbeChecker = (): TypedParameterDecorator<ProbeCheckerService> =>

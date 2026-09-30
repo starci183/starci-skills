@@ -30,12 +30,16 @@ const isFailureSpec = (value: unknown): value is FailureSpec =>
     (value.badSignature === undefined || typeof value.badSignature === "boolean") &&
     (value.recipient === undefined || typeof value.recipient === "string")
 
-const settleFields = (value: unknown): { gatewayIntentId: string; status: "paid" | "failed"; periodEnd?: string; deliverTo: string } | null => {
+const settleFields = (
+    value: unknown,
+): { gatewayIntentId: string; status: "paid" | "failed"; periodEnd?: string; deliverTo: string } | null => {
     if (!isRecord(value)) return null
     const { gatewayIntentId, status, periodEnd, deliverTo } = value
     if (typeof gatewayIntentId !== "string" || typeof deliverTo !== "string") return null
     if (status !== "paid" && status !== "failed") return null
-    return typeof periodEnd === "string" ? { gatewayIntentId, status, periodEnd, deliverTo } : { gatewayIntentId, status, deliverTo }
+    return typeof periodEnd === "string"
+        ? { gatewayIntentId, status, periodEnd, deliverTo }
+        : { gatewayIntentId, status, deliverTo }
 }
 
 /** Where the fakes listen, as the world configures the application with them. */
@@ -85,7 +89,12 @@ export class FakesHost {
 
     /** Stops every listener; a second call answers the first. */
     close(): Promise<void> {
-        this.closing ??= Promise.all([this.keycloak.close(), this.smtp.close(), this.sepay.close(), closeServer(this.control)]).then(() => undefined)
+        this.closing ??= Promise.all([
+            this.keycloak.close(),
+            this.smtp.close(),
+            this.sepay.close(),
+            closeServer(this.control),
+        ]).then(() => undefined)
         return this.closing
     }
 
@@ -104,7 +113,8 @@ export class FakesHost {
             })
         }
         this.routes.set("POST /control/keycloak/persons", (body) => {
-            if (!isRecord(body) || typeof body.email !== "string" || typeof body.password !== "string") return BAD_REQUEST
+            if (!isRecord(body) || typeof body.email !== "string" || typeof body.password !== "string")
+                return BAD_REQUEST
             return { status: 200, body: { personId: this.keycloak.addPerson(body.email, body.password) } }
         })
         this.routes.set("GET /control/smtp/mails", () => ({ status: 200, body: this.smtp.mails() }))
@@ -121,7 +131,8 @@ export class FakesHost {
             return OK
         })
         this.routes.set("POST /control/sepay/replay", async (body) => {
-            if (!isRecord(body) || typeof body.gatewayIntentId !== "string" || typeof body.deliverTo !== "string") return BAD_REQUEST
+            if (!isRecord(body) || typeof body.gatewayIntentId !== "string" || typeof body.deliverTo !== "string")
+                return BAD_REQUEST
             return { status: 200, body: await this.sepay.replay(body.gatewayIntentId, { deliverTo: body.deliverTo }) }
         })
         this.routes.set("POST /control/shutdown", () => {

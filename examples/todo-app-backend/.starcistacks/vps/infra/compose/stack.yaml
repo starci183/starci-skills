@@ -20,7 +20,7 @@ services:
   api:
     image: todo-app/api
     env_file:
-      - ../runtime/env/app.env
+      - ../../runtime/env/app.env
     deploy:
       replicas: 2
   web:

@@ -45,8 +45,19 @@ export function createE2EHttpClient(spec: E2EHttpClientSpec): E2EHttpClient {
         headers: spec.bearerToken ? { authorization: `Bearer ${spec.bearerToken}` } : undefined,
     })
 
-    const request = async <T>(method: string, path: string, body: unknown, options: E2EHttpRequestOptions): Promise<E2EResponse<T>> => {
-        const response = await api.request<T>({ method, url: path, data: body, headers: options.headers, timeout: spec.timeoutMs })
+    const request = async <T>(
+        method: string,
+        path: string,
+        body: unknown,
+        options: E2EHttpRequestOptions,
+    ): Promise<E2EResponse<T>> => {
+        const response = await api.request<T>({
+            method,
+            url: path,
+            data: body,
+            headers: options.headers,
+            timeout: spec.timeoutMs,
+        })
         const headers: Record<string, string> = {}
         for (const [key, value] of Object.entries(response.headers)) {
             headers[key] = Array.isArray(value) ? value.join(", ") : String(value)
@@ -56,7 +67,9 @@ export function createE2EHttpClient(spec: E2EHttpClientSpec): E2EHttpClient {
 
     return {
         get: <T>(path: string, options: E2EHttpRequestOptions = {}) => request<T>("GET", path, undefined, options),
-        post: <T>(path: string, body?: unknown, options: E2EHttpRequestOptions = {}) => request<T>("POST", path, body, options),
-        put: <T>(path: string, body?: unknown, options: E2EHttpRequestOptions = {}) => request<T>("PUT", path, body, options),
+        post: <T>(path: string, body?: unknown, options: E2EHttpRequestOptions = {}) =>
+            request<T>("POST", path, body, options),
+        put: <T>(path: string, body?: unknown, options: E2EHttpRequestOptions = {}) =>
+            request<T>("PUT", path, body, options),
     }
 }

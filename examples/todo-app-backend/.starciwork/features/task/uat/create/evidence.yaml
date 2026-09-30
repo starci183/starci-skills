@@ -40,7 +40,7 @@ provenance:
     the dev-convention ports: postgres:16 on 127.0.0.1:5432 (database todo, schema+seed mounted from
     .starcistacks/dev/seeds), keycloak 26.0 on 127.0.0.1:8089 (realm todo imported from
     .starcistacks/dev/infra/compose/realm-todo.json), redis on 6379. The dev compose stack itself was
-    never started: its runtime secrets are sops/age-encrypted (.starcistacks/dev/runtime/*.enc) and
+    never started: its runtime secrets are sops/age-encrypted (.starcistacks/dev/secrets/*.enc) and
     this lane does not decrypt them, so the e2e compose generated its own throwaway credentials instead.
     The api was this worktree's own backend (npm run build output, node -r tsconfig-paths/register
     dist/main.js) on 3001, and the page was this worktree's own frontend (npm run build then

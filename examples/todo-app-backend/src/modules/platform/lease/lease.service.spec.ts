@@ -25,7 +25,12 @@ describe("PostgresLease", () => {
                 holder: "h-1",
                 fence: 7,
             })
-            expect(manager.query).toHaveBeenCalledWith(ACQUIRE_LEASE, ["digest", "h-1", new Date("2026-05-01T10:01:00.000Z"), AT])
+            expect(manager.query).toHaveBeenCalledWith(ACQUIRE_LEASE, [
+                "digest",
+                "h-1",
+                new Date("2026-05-01T10:01:00.000Z"),
+                AT,
+            ])
         })
 
         it("answers null when another holder owns the lease", async () => {

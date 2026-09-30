@@ -40,10 +40,10 @@ assertions:
     outcome: pass
     observation: npx jest src/modules/platform/observability src/features/todo/transport/http/health/probes exited 0
   - id: probes-e2e
-    command: npm run test:e2e -- src/tests/e2e/observability/probes.e2e-spec.ts
+    command: npm run test:e2e -- src/tests/e2e/flows/probes.e2e-spec.ts
     exit: 0
     outcome: pass
-    observation: npm run test:e2e -- src/tests/e2e/observability/probes.e2e-spec.ts exited 0
+    observation: npm run test:e2e -- src/tests/e2e/flows/probes.e2e-spec.ts exited 0
 provenance:
   actor: example-evidence
   tool: scripts/example-evidence.mjs

@@ -85,7 +85,9 @@ export class RuleService {
     /** Changes the fields of a rule of the owner in one transaction; an occurrence already materialised is never rewritten. */
     edit(
         params: EditRuleParams,
-    ): Promise<Outcome<RuleEdited, RecurErrorCode.RuleNotFound | RecurErrorCode.RuleForbidden | RecurErrorCode.RuleInvalid>> {
+    ): Promise<
+        Outcome<RuleEdited, RecurErrorCode.RuleNotFound | RecurErrorCode.RuleForbidden | RecurErrorCode.RuleInvalid>
+    > {
         return this.entityManager.transaction(async (manager) => {
             const row = await manager.findOneBy(RuleEntity, { id: params.id })
             if (!row) return refused(RecurErrorCode.RuleNotFound)
@@ -112,13 +114,19 @@ export class RuleService {
      * Ends a rule of the owner on the local date and orphans its occurrences dated on or after it that are still
      * materialised, in one transaction: sets endedAt, never deletes a row.
      */
-    end(params: EndRuleParams): Promise<Outcome<RuleEnded, RecurErrorCode.RuleNotFound | RecurErrorCode.RuleForbidden>> {
+    end(
+        params: EndRuleParams,
+    ): Promise<Outcome<RuleEnded, RecurErrorCode.RuleNotFound | RecurErrorCode.RuleForbidden>> {
         return this.entityManager.transaction(async (manager) => {
             const row = await manager.findOneBy(RuleEntity, { id: params.id })
             if (!row) return refused(RecurErrorCode.RuleNotFound)
             if (row.owner !== params.actorId) return refused(RecurErrorCode.RuleForbidden)
             const saved = await manager.save(RuleEntity, { ...row, endedAt: params.endedAt })
-            const orphanedCount = await this.occurrences.orphanEnded({ manager, ruleId: saved.id, endedAt: params.endedAt })
+            const orphanedCount = await this.occurrences.orphanEnded({
+                manager,
+                ruleId: saved.id,
+                endedAt: params.endedAt,
+            })
             return ok({ ruleId: saved.id, endedAt: params.endedAt, orphanedCount })
         })
     }

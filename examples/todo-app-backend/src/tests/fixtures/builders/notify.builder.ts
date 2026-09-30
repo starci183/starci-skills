@@ -30,7 +30,11 @@ export interface NotifyDeliveryAttemptRow {
     failureClass: "transient" | "permanent-bounce" | "retries-exhausted" | "unsubscribed" | null
     startedAt: Date | null
     endedAt: Date | null
-    history: Array<{ state: "queued" | "sending" | "delivered" | "bounced" | "suppressed"; at: string; failureClass?: "transient" | "permanent-bounce" | "retries-exhausted" | "unsubscribed" }>
+    history: Array<{
+        state: "queued" | "sending" | "delivered" | "bounced" | "suppressed"
+        at: string
+        failureClass?: "transient" | "permanent-bounce" | "retries-exhausted" | "unsubscribed"
+    }>
 }
 
 /** The columns of a stored row, declared here so a spec never reaches into the persistence of the owner. */
@@ -86,6 +90,20 @@ export const deliveryAttemptRow = builder<NotifyDeliveryAttemptRow>({
     startedAt: null,
     endedAt: null,
     history: [{ state: "queued", at: NOTIFY_EARLIER }],
+})
+
+/** A stored delivery attempt that is sending its first dispatch, started at `NOTIFY_EARLIER`. */
+export const sendingAttemptRow = builder<NotifyDeliveryAttemptRow>({
+    notificationId: "n1",
+    state: "sending",
+    attempt: 1,
+    failureClass: null,
+    startedAt: new Date(NOTIFY_EARLIER),
+    endedAt: null,
+    history: [
+        { state: "queued", at: NOTIFY_EARLIER },
+        { state: "sending", at: NOTIFY_EARLIER },
+    ],
 })
 
 /** A stored digest window of p1 on email that is open at `NOTIFY_AT`: opened five minutes before, closing five minutes after. */
@@ -194,7 +212,10 @@ export const updatePreferenceInput = builder<Omit<UpdatePreferenceParams, "manag
 })
 
 /** The input of moving a notification to digest group w1; the caller adds the manager. */
-export const assignDigestGroupInput = builder<Omit<AssignDigestGroupParams, "manager">>({ id: "n1", digestGroupId: "w1" })
+export const assignDigestGroupInput = builder<Omit<AssignDigestGroupParams, "manager">>({
+    id: "n1",
+    digestGroupId: "w1",
+})
 
 /** The input of creating the delivery attempt of notification n1 for a subscribed recipient; the caller adds the manager. */
 export const admitDeliveryInput = builder<Omit<AdmitDeliveryParams, "manager">>({

@@ -10,7 +10,8 @@ export const TODO_OPERATIONS = {
     createTask: "mutation CreateTask($input: CreateTaskInput!) { createTask(input: $input) { taskId title } }",
     tasks: "query { tasks { taskId title complete } }",
     taskCounts: "query { taskCounts { open complete } }",
-    completeTask: "mutation CompleteTask($input: CompleteTaskInput!) { completeTask(input: $input) { taskId complete } }",
+    completeTask:
+        "mutation CompleteTask($input: CompleteTaskInput!) { completeTask(input: $input) { taskId complete } }",
     reopenTask: "mutation ReopenTask($input: ReopenTaskInput!) { reopenTask(input: $input) { taskId complete } }",
     deleteTask: "mutation DeleteTask($input: DeleteTaskInput!) { deleteTask(input: $input) { deleted } }",
     invite: "mutation Invite($input: InviteInput!) { invite(input: $input) { invitationId taskId email role status } }",
@@ -29,7 +30,8 @@ export const TODO_OPERATIONS = {
         "query Prefs($input: NotificationPreferencesInput) { notificationPreferences(input: $input) { channel unsubscribed digestWindowMinutes } }",
     updateNotificationPreferences:
         "mutation UpdatePrefs($input: UpdateNotificationPreferencesInput!) { updateNotificationPreferences(input: $input) { channel unsubscribed digestWindowMinutes } }",
-    unsubscribe: "mutation Unsubscribe($input: UnsubscribeInput!) { unsubscribe(input: $input) { channel unsubscribed } }",
+    unsubscribe:
+        "mutation Unsubscribe($input: UnsubscribeInput!) { unsubscribe(input: $input) { channel unsubscribed } }",
     planUsage: "query { planUsage { plan cap activeCount } }",
     upgradePlan: "mutation { upgradePlan { subscriptionId paymentIntentId checkoutUrl status } }",
     downgradePlan: "mutation { downgradePlan { subscriptionId plan status } }",
@@ -47,7 +49,8 @@ export const TODO_OPERATIONS = {
         "mutation AttachUpload($input: AttachUploadInput!) { attachUpload(input: $input) { uploadId taskId filename mime sizeBytes status createdAt } }",
     taskUploads:
         "query TaskUploads($input: TaskUploadsInput!) { taskUploads(input: $input) { uploadId taskId filename mime sizeBytes status createdAt } }",
-    deleteUpload: "mutation DeleteUpload($input: DeleteUploadInput!) { deleteUpload(input: $input) { uploadId deleted } }",
+    deleteUpload:
+        "mutation DeleteUpload($input: DeleteUploadInput!) { deleteUpload(input: $input) { uploadId deleted } }",
 } as const
 
 /** The name of one operation of the todo api. */

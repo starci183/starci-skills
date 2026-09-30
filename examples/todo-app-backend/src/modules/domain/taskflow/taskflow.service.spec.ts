@@ -47,7 +47,11 @@ describe("TaskflowService", () => {
             await expect(service.create(request)).resolves.toSucceedWith({ taskId: "t-1", title: "Write" })
 
             expect(subscriptions.checkCap).toHaveBeenCalledWith({ personId: "owner-1", activeTaskCount: 1 })
-            expect(tasks.create).toHaveBeenCalledWith({ manager: expect.anything(), ownerId: "owner-1", title: "Write" })
+            expect(tasks.create).toHaveBeenCalledWith({
+                manager: expect.anything(),
+                ownerId: "owner-1",
+                title: "Write",
+            })
             expect(outbox.messages.map((message) => message.payload)).toEqual([
                 { actorId: "owner-1", action: AuditAction.TaskCreated, target: "t-1", at: TASK_AT },
             ])

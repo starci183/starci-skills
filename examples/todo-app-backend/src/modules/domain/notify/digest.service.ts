@@ -2,12 +2,7 @@ import { Injectable } from "@nestjs/common"
 import { InjectIds } from "@modules/platform/ids"
 import type { Ids } from "@modules/platform/ids"
 import { IsNull } from "typeorm"
-import type {
-    AdmitIntoWindowParams,
-    AdmittedIntoWindow,
-    FlushedWindow,
-    FlushWindowParams,
-} from "./notify.contracts"
+import type { AdmitIntoWindowParams, AdmittedIntoWindow, FlushedWindow, FlushWindowParams } from "./notify.contracts"
 import { NotifyDigestWindowEntity } from "./persistence/entities/digest-window.entity"
 
 const MS_PER_MINUTE = 60_000

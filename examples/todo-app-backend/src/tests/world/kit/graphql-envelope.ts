@@ -36,10 +36,22 @@ const UNPARSABLE_LIMIT = 2000
  * Folds one GraphQL-over-HTTP response into the observed envelope: the HTTP status stays visible beside the parsed
  * data/errors, and a body that is not an object degrades into an `unparsableBody` note instead of failing the fold.
  */
-export function graphqlEnvelopeOf<TData>(httpStatus: number, body: GraphqlWire<TData> | string, startedAt: number): GraphqlObserved<TData> {
+export function graphqlEnvelopeOf<TData>(
+    httpStatus: number,
+    body: GraphqlWire<TData> | string,
+    startedAt: number,
+): GraphqlObserved<TData> {
     const durationMs = worldClock.now().getTime() - startedAt
     if (typeof body === "string") {
-        return { httpStatus, data: null, errors: null, errorCode: null, errorMessage: null, raw: { unparsableBody: body.slice(0, UNPARSABLE_LIMIT) }, durationMs }
+        return {
+            httpStatus,
+            data: null,
+            errors: null,
+            errorCode: null,
+            errorMessage: null,
+            raw: { unparsableBody: body.slice(0, UNPARSABLE_LIMIT) },
+            durationMs,
+        }
     }
     const errors = body.errors ?? null
     const code = errors?.[0]?.extensions?.code

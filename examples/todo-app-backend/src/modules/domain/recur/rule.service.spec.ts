@@ -84,7 +84,9 @@ describe("RuleService", () => {
             const monthly: RuleEntity = { ...weekday, frequency: RuleFrequency.MonthlyDay, dayOfMonth: 31 }
             const { service, em } = await build(mockEntityManager({ save: [RuleEntity, monthly] }))
 
-            await expect(service.create({ ...request, frequency: RuleFrequency.MonthlyDay, dayOfMonth: 31 })).resolves.toSucceedWith({
+            await expect(
+                service.create({ ...request, frequency: RuleFrequency.MonthlyDay, dayOfMonth: 31 }),
+            ).resolves.toSucceedWith({
                 ruleId: "r1",
                 title: "Stand-up",
                 frequency: RuleFrequency.MonthlyDay,
@@ -103,15 +105,18 @@ describe("RuleService", () => {
             [RuleFrequency.MonthlyDay, 2, 15, "n-forbidden"],
             [RuleFrequency.EveryWeekday, 2, null, "n-forbidden"],
             [RuleFrequency.EveryWeekday, null, 5, "day-of-month-forbidden"],
-        ])("refuses a %s rule with n=%s and dayOfMonth=%s as %s and writes nothing", async (frequency, n, dayOfMonth, reason) => {
-            const { service, tx } = await build()
+        ])(
+            "refuses a %s rule with n=%s and dayOfMonth=%s as %s and writes nothing",
+            async (frequency, n, dayOfMonth, reason) => {
+                const { service, tx } = await build()
 
-            await expect(service.create({ ...request, frequency, n, dayOfMonth })).resolves.toBeRefused({
-                code: RecurErrorCode.RuleInvalid,
-                params: { reason },
-            })
-            expect(tx.outcomes).toEqual([])
-        })
+                await expect(service.create({ ...request, frequency, n, dayOfMonth })).resolves.toBeRefused({
+                    code: RecurErrorCode.RuleInvalid,
+                    params: { reason },
+                })
+                expect(tx.outcomes).toEqual([])
+            },
+        )
     })
 
     describe("find", () => {
@@ -141,7 +146,11 @@ describe("RuleService", () => {
             const { service, em } = await build(mockEntityManager({ find: [RuleEntity, [everyThreeDays]] }))
 
             await expect(service.listBatch({ after: "r0" })).resolves.toEqual([everyThreeDays])
-            expect(em.find).toHaveBeenCalledWith(RuleEntity, { where: { id: MoreThan("r0") }, order: { id: "ASC" }, take: LIST_ROWS_MAX })
+            expect(em.find).toHaveBeenCalledWith(RuleEntity, {
+                where: { id: MoreThan("r0") },
+                order: { id: "ASC" },
+                take: LIST_ROWS_MAX,
+            })
         })
     })
 
@@ -149,19 +158,25 @@ describe("RuleService", () => {
         it("refuses a rule that does not exist and writes nothing", async () => {
             const { service, em } = await build(mockEntityManager({ findOneBy: [RuleEntity, null] }))
 
-            await expect(service.edit({ id: "nope", actorId: "o1", patch: {} })).resolves.toBeRefused(RecurErrorCode.RuleNotFound)
+            await expect(service.edit({ id: "nope", actorId: "o1", patch: {} })).resolves.toBeRefused(
+                RecurErrorCode.RuleNotFound,
+            )
             expect(em.save).not.toHaveBeenCalled()
         })
 
         it("refuses somebody else's rule and writes nothing", async () => {
             const { service, em } = await build(mockEntityManager({ findOneBy: [RuleEntity, weekday] }))
 
-            await expect(service.edit({ id: "r1", actorId: "intruder", patch: {} })).resolves.toBeRefused(RecurErrorCode.RuleForbidden)
+            await expect(service.edit({ id: "r1", actorId: "intruder", patch: {} })).resolves.toBeRefused(
+                RecurErrorCode.RuleForbidden,
+            )
             expect(em.save).not.toHaveBeenCalled()
         })
 
         it("keeps every field an empty patch does not name", async () => {
-            const { service, em, tx } = await build(mockEntityManager({ findOneBy: [RuleEntity, weekday], save: [RuleEntity, weekday] }))
+            const { service, em, tx } = await build(
+                mockEntityManager({ findOneBy: [RuleEntity, weekday], save: [RuleEntity, weekday] }),
+            )
 
             await expect(service.edit({ id: "r1", actorId: "o1", patch: {} })).resolves.toSucceedWith({
                 ruleId: "r1",
@@ -181,22 +196,37 @@ describe("RuleService", () => {
                 timeZone: "UTC",
                 time: "18:30",
             }
-            const { service, em } = await build(mockEntityManager({ findOneBy: [RuleEntity, everyThreeDays], save: [RuleEntity, changed] }))
+            const { service, em } = await build(
+                mockEntityManager({ findOneBy: [RuleEntity, everyThreeDays], save: [RuleEntity, changed] }),
+            )
 
             await expect(
                 service.edit({
                     id: "r1",
                     actorId: "o1",
-                    patch: { frequency: RuleFrequency.MonthlyDay, n: null, dayOfMonth: 15, timeZone: "UTC", time: "18:30" },
+                    patch: {
+                        frequency: RuleFrequency.MonthlyDay,
+                        n: null,
+                        dayOfMonth: 15,
+                        timeZone: "UTC",
+                        time: "18:30",
+                    },
                 }),
-            ).resolves.toSucceedWith({ ruleId: "r1", frequency: RuleFrequency.MonthlyDay, timeZone: "UTC", time: "18:30" })
+            ).resolves.toSucceedWith({
+                ruleId: "r1",
+                frequency: RuleFrequency.MonthlyDay,
+                timeZone: "UTC",
+                time: "18:30",
+            })
             expect(em.save).toHaveBeenCalledWith(RuleEntity, changed)
         })
 
         it("refuses a patch whose shape does not fit the frequency and writes nothing", async () => {
             const { service, em } = await build(mockEntityManager({ findOneBy: [RuleEntity, weekday] }))
 
-            await expect(service.edit({ id: "r1", actorId: "o1", patch: { frequency: RuleFrequency.EveryNDays } })).resolves.toBeRefused({
+            await expect(
+                service.edit({ id: "r1", actorId: "o1", patch: { frequency: RuleFrequency.EveryNDays } }),
+            ).resolves.toBeRefused({
                 code: RecurErrorCode.RuleInvalid,
                 params: { reason: "n-required" },
             })
@@ -208,21 +238,27 @@ describe("RuleService", () => {
         it("refuses a rule that does not exist without orphaning anything", async () => {
             const { service, occurrences } = await build(mockEntityManager({ findOneBy: [RuleEntity, null] }))
 
-            await expect(service.end({ id: "nope", actorId: "o1", endedAt: "2026-09-10" })).resolves.toBeRefused(RecurErrorCode.RuleNotFound)
+            await expect(service.end({ id: "nope", actorId: "o1", endedAt: "2026-09-10" })).resolves.toBeRefused(
+                RecurErrorCode.RuleNotFound,
+            )
             expect(occurrences.orphanEnded).not.toHaveBeenCalled()
         })
 
         it("refuses somebody else's rule without orphaning anything", async () => {
             const { service, em, occurrences } = await build(mockEntityManager({ findOneBy: [RuleEntity, weekday] }))
 
-            await expect(service.end({ id: "r1", actorId: "intruder", endedAt: "2026-09-10" })).resolves.toBeRefused(RecurErrorCode.RuleForbidden)
+            await expect(service.end({ id: "r1", actorId: "intruder", endedAt: "2026-09-10" })).resolves.toBeRefused(
+                RecurErrorCode.RuleForbidden,
+            )
             expect(em.save).not.toHaveBeenCalled()
             expect(occurrences.orphanEnded).not.toHaveBeenCalled()
         })
 
         it("sets endedAt and orphans the materialised occurrences from that day in the same transaction", async () => {
             const ended: RuleEntity = { ...weekday, endedAt: "2026-09-10" }
-            const { service, em, tx, occurrences } = await build(mockEntityManager({ findOneBy: [RuleEntity, weekday], save: [RuleEntity, ended] }))
+            const { service, em, tx, occurrences } = await build(
+                mockEntityManager({ findOneBy: [RuleEntity, weekday], save: [RuleEntity, ended] }),
+            )
             occurrences.orphanEnded.mockResolvedValue(2)
 
             await expect(service.end({ id: "r1", actorId: "o1", endedAt: "2026-09-10" })).resolves.toSucceedWith({
@@ -232,7 +268,11 @@ describe("RuleService", () => {
             })
 
             expect(em.save).toHaveBeenCalledWith(RuleEntity, ended)
-            expect(occurrences.orphanEnded).toHaveBeenCalledWith({ manager: expect.anything(), ruleId: "r1", endedAt: "2026-09-10" })
+            expect(occurrences.orphanEnded).toHaveBeenCalledWith({
+                manager: expect.anything(),
+                ruleId: "r1",
+                endedAt: "2026-09-10",
+            })
             expect(tx.commits).toBe(1)
         })
     })

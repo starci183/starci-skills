@@ -6,7 +6,7 @@ import type { UploadOptions } from "@modules/domain/upload"
 import type { KeycloakOptions } from "@modules/integrations/keycloak"
 import type { NotifySmtpOptions } from "@modules/integrations/notify-smtp"
 import type { SepayOptions } from "@modules/integrations/sepay"
-import type { UploadStorageOptions } from "@modules/integrations/upload"
+import type { UploadStorageOptions } from "@modules/integrations/upload-storage"
 import type { DatabaseConnectionConfig } from "@modules/platform/database"
 import type { HttpSecurityOptions } from "@modules/platform/http-security"
 

@@ -22,8 +22,5 @@
       "envPrefix": "PRIMARY_DB"
     }
   ],
-  "optionalSlots": [
-    "repo.docs",
-    "be.contract.graphql"
-  ]
+  "optionalSlots": ["repo.docs", "be.contract.graphql", "be.transport.message", "be.transport.schedule"]
 }

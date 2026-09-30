@@ -13,7 +13,10 @@ import { AppModule as WorkerApp } from "../../../../apps/worker/src/app.module"
  * audit line appended through the outbox and the worker consumer.
  */
 describe("resilience: infra recovery", () => {
-    const world = useTestWorld({ apps: { todo: { module: TodoApp, listen: true }, worker: { module: WorkerApp } }, testTimeoutMs: 900_000 })
+    const world = useTestWorld({
+        apps: { todo: { module: TodoApp, listen: true }, worker: { module: WorkerApp } },
+        testTimeoutMs: 900_000,
+    })
 
     const tables = async (): Promise<Array<string>> => {
         const rows: Array<TableRow> = await world.db.primary.query(PUBLIC_TABLES, [])
@@ -29,10 +32,16 @@ describe("resilience: infra recovery", () => {
 
         await world.interruptDatabase(async () => {
             // The api tolerates the outage: still answering HTTP, with a declared dependency error.
-            await world.waitFor("api /health answers 503", async () => (await api.get("/health")).status === 503, { timeoutMs: 90_000, intervalMs: 1_000 })
+            await world.waitFor("api /health answers 503", async () => (await api.get("/health")).status === 503, {
+                timeoutMs: 90_000,
+                intervalMs: 1_000,
+            })
         })
 
-        await world.waitFor("api /health recovers to 200", async () => (await api.get("/health")).status === 200, { timeoutMs: 180_000, intervalMs: 1_000 })
+        await world.waitFor("api /health recovers to 200", async () => (await api.get("/health")).status === 200, {
+            timeoutMs: 180_000,
+            intervalMs: 1_000,
+        })
 
         // Persisted-state evidence: the database answers real queries again, and its data survived the outage.
         expect(await tables()).toEqual(expect.arrayContaining(["sessions", "tasks"]))
@@ -42,7 +51,8 @@ describe("resilience: infra recovery", () => {
         const session = await api.signIn(person.email, person.password)
         await world.waitUntil(
             "the audit line of the post-outage sign-in appended by the worker",
-            async () => (await api.as(session.sessionToken).graphql<ExportMyDataData>("exportMyData")).data?.exportMyData ?? [],
+            async () =>
+                (await api.as(session.sessionToken).graphql<ExportMyDataData>("exportMyData")).data?.exportMyData ?? [],
             (lines) => lines.some((line) => line.action === "login.signed-in"),
             { timeoutMs: 120_000, intervalMs: 1_000 },
         )

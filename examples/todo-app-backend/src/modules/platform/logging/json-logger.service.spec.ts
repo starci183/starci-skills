@@ -1,79 +1,116 @@
 import type { Writable } from "node:stream"
-import { Test } from "@nestjs/testing"
 import { FakeClock, mock } from "@starci/jest-preset"
 import { CLOCK } from "@modules/platform/clock"
-import { JsonLoggerService } from "./json-logger.service"
+import { Test } from "@nestjs/testing"
+import { createJsonLogger, JsonLoggerService } from "./json-logger.service"
 import { LOG_ERR, LOG_OUT } from "./logging.decorators"
 import { LoggingLogEvent } from "./logging.log-events"
 
-const AT = "2026-05-01T10:00:00.000Z"
-
 const build = async () => {
-    const out = mock<Writable>()
-    const err = mock<Writable>()
+    const clock = new FakeClock("2026-05-06T07:08:09.000Z")
+    const written: Array<{ stream: "out" | "err"; line: string }> = []
+    const out = mock<Writable>({
+        write: (chunk: string) => {
+            written.push({ stream: "out", line: chunk })
+            return true
+        },
+    })
+    const err = mock<Writable>({
+        write: (chunk: string) => {
+            written.push({ stream: "err", line: chunk })
+            return true
+        },
+    })
     const moduleRef = await Test.createTestingModule({
         providers: [
             JsonLoggerService,
-            { provide: CLOCK, useValue: new FakeClock(AT) },
+            { provide: CLOCK, useValue: clock },
             { provide: LOG_OUT, useValue: out },
             { provide: LOG_ERR, useValue: err },
         ],
     }).compile()
-    return { logger: moduleRef.get(JsonLoggerService), out, err }
+    return { logger: moduleRef.get(JsonLoggerService), clock, written }
 }
 
-/** The lines a stream received, parsed: what was logged, not how the stream was called. */
-const linesOf = (stream: Writable & { write: jest.Mock }): Array<unknown> =>
-    stream.write.mock.calls.map((call: Array<unknown>) => JSON.parse(String(call[0])))
-
 describe("JsonLoggerService", () => {
-    describe("info", () => {
-        it("writes one JSON line to the out stream, stamped with the clock", async () => {
-            const { logger, out, err } = await build()
+    it("writes an info line to the out stream stamped by the clock", async () => {
+        const { logger, written } = await build()
 
-            logger.info(LoggingLogEvent.ServerStarted, { port: 3000 })
+        logger.info("cart.opened", { personId: "p-1" })
 
-            expect(linesOf(out)).toEqual([{ level: "info", event: "server.started", time: AT, port: 3000 }])
-            expect(linesOf(err)).toEqual([])
-        })
-
-        it("ends every line with a newline and writes a line without fields", async () => {
-            const { logger, out } = await build()
-
-            logger.info(LoggingLogEvent.WorkerStarted)
-
-            expect(String(out.write.mock.calls[0]?.[0])).toBe(`{"level":"info","event":"worker.started","time":"${AT}"}\n`)
-        })
+        expect(written).toEqual([
+            {
+                stream: "out",
+                line: `${JSON.stringify({ level: "info", event: "cart.opened", time: "2026-05-06T07:08:09.000Z", personId: "p-1" })}\n`,
+            },
+        ])
     })
 
-    describe("warn", () => {
-        it("writes one JSON line to the err stream", async () => {
-            const { logger, out, err } = await build()
+    it("writes a warn line without fields to the err stream", async () => {
+        const { logger, clock, written } = await build()
+        clock.advance(1000)
 
-            logger.warn(LoggingLogEvent.ServerStarted, { dependency: "database" })
+        logger.warn(LoggingLogEvent.StartupFailed)
 
-            expect(linesOf(err)).toEqual([{ level: "warn", event: "server.started", time: AT, dependency: "database" }])
-            expect(linesOf(out)).toEqual([])
-        })
+        expect(written).toEqual([
+            {
+                stream: "err",
+                line: `${JSON.stringify({ level: "warn", event: LoggingLogEvent.StartupFailed, time: "2026-05-06T07:08:10.000Z" })}\n`,
+            },
+        ])
     })
 
-    describe("error", () => {
-        it("serializes an Error cause by name and message, next to the fields", async () => {
-            const { logger, err } = await build()
+    it("writes an error line with the name and message of an Error cause", async () => {
+        const { logger, written } = await build()
 
-            logger.error(LoggingLogEvent.StartupFailed, new TypeError("boom"), { service: "todo" })
+        logger.error("db.failed", new TypeError("boom"), { operation: "PlaceOrderHandler" })
 
-            expect(linesOf(err)).toEqual([
-                { level: "error", event: "server.startup_failed", time: AT, errorName: "TypeError", errorMessage: "boom", service: "todo" },
+        expect(written).toEqual([
+            {
+                stream: "err",
+                line: `${JSON.stringify({
+                    level: "error",
+                    event: "db.failed",
+                    time: "2026-05-06T07:08:09.000Z",
+                    errorName: "TypeError",
+                    errorMessage: "boom",
+                    operation: "PlaceOrderHandler",
+                })}\n`,
+            },
+        ])
+    })
+
+    it("writes an error line with the text of a cause that is not an Error", async () => {
+        const { logger, written } = await build()
+
+        logger.error("db.failed", "plain failure")
+
+        expect(written).toEqual([
+            {
+                stream: "err",
+                line: `${JSON.stringify({ level: "error", event: "db.failed", time: "2026-05-06T07:08:09.000Z", errorMessage: "plain failure" })}\n`,
+            },
+        ])
+    })
+
+    describe("createJsonLogger", () => {
+        afterEach(() => {
+            jest.restoreAllMocks()
+        })
+
+        it("builds a logger that writes info to stdout and errors to stderr, stamped by the clock", () => {
+            const lines: Array<string> = []
+            jest.spyOn(process.stdout, "write").mockImplementation((chunk) => lines.push(`out:${String(chunk)}`) > 0)
+            jest.spyOn(process.stderr, "write").mockImplementation((chunk) => lines.push(`err:${String(chunk)}`) > 0)
+            const logger = createJsonLogger(new FakeClock("2026-05-06T07:08:09.000Z"))
+
+            logger.info(LoggingLogEvent.ServerStarted)
+            logger.warn(LoggingLogEvent.StartupFailed)
+
+            expect(lines).toEqual([
+                `out:${JSON.stringify({ level: "info", event: LoggingLogEvent.ServerStarted, time: "2026-05-06T07:08:09.000Z" })}\n`,
+                `err:${JSON.stringify({ level: "warn", event: LoggingLogEvent.StartupFailed, time: "2026-05-06T07:08:09.000Z" })}\n`,
             ])
-        })
-
-        it("serializes a cause that is not an Error as its text", async () => {
-            const { logger, err } = await build()
-
-            logger.error(LoggingLogEvent.StartupFailed, "plain failure")
-
-            expect(linesOf(err)).toEqual([{ level: "error", event: "server.startup_failed", time: AT, errorMessage: "plain failure" }])
         })
     })
 })

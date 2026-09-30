@@ -27,7 +27,11 @@ export interface TestSession {
 /** What one caller (anonymous or bound to a bearer) can do against the api. */
 export interface TestCaller {
     /** Sends one GraphQL operation by its registry name; `language` sets `accept-language`. */
-    graphql<TData>(operation: TodoOperation, variables?: Record<string, unknown>, language?: string): Promise<GraphqlObserved<TData>>
+    graphql<TData>(
+        operation: TodoOperation,
+        variables?: Record<string, unknown>,
+        language?: string,
+    ): Promise<GraphqlObserved<TData>>
     /** A REST GET. */
     get<T>(path: string, options?: E2EHttpRequestOptions): Promise<E2EResponse<T>>
     /** A REST POST; a Buffer body goes out as raw bytes. */

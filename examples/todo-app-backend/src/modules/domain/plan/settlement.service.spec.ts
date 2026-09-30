@@ -27,24 +27,40 @@ describe("SettlementService", () => {
         it("activates a pending subscription until the period the gateway named", async () => {
             const { service, payments, subscriptions, manager } = await build()
             payments.findByGatewayIntentId.mockResolvedValue(paymentIntentRow())
-            payments.markPaidIfNotApplied.mockResolvedValue(ok({ intent: paymentIntentRow({ status: "paid", appliedAt: PLAN_AT }), alreadyApplied: false }))
+            payments.markPaidIfNotApplied.mockResolvedValue(
+                ok({ intent: paymentIntentRow({ status: "paid", appliedAt: PLAN_AT }), alreadyApplied: false }),
+            )
             subscriptions.findById.mockResolvedValue(subscriptionRow({ status: "pending" }))
-            subscriptions.confirm.mockResolvedValue(subscriptionRow({ plan: "paid", status: "active", periodEnd: PLAN_PERIOD_END }))
+            subscriptions.confirm.mockResolvedValue(
+                subscriptionRow({ plan: "paid", status: "active", periodEnd: PLAN_PERIOD_END }),
+            )
 
             await expect(
-                service.apply({ manager, gatewayIntentId: "g1", outcome: "paid", periodEnd: PLAN_PERIOD_END, at: PLAN_AT }),
+                service.apply({
+                    manager,
+                    gatewayIntentId: "g1",
+                    outcome: "paid",
+                    periodEnd: PLAN_PERIOD_END,
+                    at: PLAN_AT,
+                }),
             ).resolves.toSucceedWith({ applied: true, subscriptionStatus: "active" })
 
             expect(payments.findByGatewayIntentId).toHaveBeenCalledWith({ manager, gatewayIntentId: "g1" })
             expect(payments.markPaidIfNotApplied).toHaveBeenCalledWith({ manager, id: "i1", at: PLAN_AT })
             expect(subscriptions.findById).toHaveBeenCalledWith({ manager, id: "s1" })
-            expect(subscriptions.confirm).toHaveBeenCalledWith({ manager, subscription: subscriptionRow({ status: "pending" }), periodEnd: PLAN_PERIOD_END })
+            expect(subscriptions.confirm).toHaveBeenCalledWith({
+                manager,
+                subscription: subscriptionRow({ status: "pending" }),
+                periodEnd: PLAN_PERIOD_END,
+            })
         })
 
         it("defaults the paid period to 30 days from the settlement instant", async () => {
             const { service, payments, subscriptions, manager } = await build()
             payments.findByGatewayIntentId.mockResolvedValue(paymentIntentRow())
-            payments.markPaidIfNotApplied.mockResolvedValue(ok({ intent: paymentIntentRow({ status: "paid", appliedAt: PLAN_AT }), alreadyApplied: false }))
+            payments.markPaidIfNotApplied.mockResolvedValue(
+                ok({ intent: paymentIntentRow({ status: "paid", appliedAt: PLAN_AT }), alreadyApplied: false }),
+            )
             subscriptions.findById.mockResolvedValue(subscriptionRow({ status: "pending" }))
             subscriptions.confirm.mockResolvedValue(subscriptionRow({ plan: "paid", status: "active" }))
 
@@ -60,7 +76,9 @@ describe("SettlementService", () => {
         it("confirms nothing for a replay and reports the status as it stands", async () => {
             const { service, payments, subscriptions, manager } = await build()
             payments.findByGatewayIntentId.mockResolvedValue(paymentIntentRow())
-            payments.markPaidIfNotApplied.mockResolvedValue(ok({ intent: paymentIntentRow({ status: "paid", appliedAt: PLAN_AT }), alreadyApplied: true }))
+            payments.markPaidIfNotApplied.mockResolvedValue(
+                ok({ intent: paymentIntentRow({ status: "paid", appliedAt: PLAN_AT }), alreadyApplied: true }),
+            )
             subscriptions.findById.mockResolvedValue(subscriptionRow({ plan: "paid", status: "active" }))
 
             await expect(
@@ -97,7 +115,9 @@ describe("SettlementService", () => {
         it("refuses an intent whose subscription is gone", async () => {
             const { service, payments, subscriptions, manager } = await build()
             payments.findByGatewayIntentId.mockResolvedValue(paymentIntentRow())
-            payments.markPaidIfNotApplied.mockResolvedValue(ok({ intent: paymentIntentRow({ status: "paid", appliedAt: PLAN_AT }), alreadyApplied: false }))
+            payments.markPaidIfNotApplied.mockResolvedValue(
+                ok({ intent: paymentIntentRow({ status: "paid", appliedAt: PLAN_AT }), alreadyApplied: false }),
+            )
             subscriptions.findById.mockResolvedValue(null)
 
             await expect(
@@ -121,7 +141,10 @@ describe("SettlementService", () => {
             ).resolves.toSucceedWith({ applied: false, subscriptionStatus: "free" })
 
             expect(payments.markFailed).toHaveBeenCalledWith({ manager, id: "i1", at: PLAN_AT })
-            expect(subscriptions.abandon).toHaveBeenCalledWith({ manager, subscription: subscriptionRow({ status: "pending" }) })
+            expect(subscriptions.abandon).toHaveBeenCalledWith({
+                manager,
+                subscription: subscriptionRow({ status: "pending" }),
+            })
             expect(payments.markPaidIfNotApplied).not.toHaveBeenCalled()
         })
 

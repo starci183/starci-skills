@@ -45,7 +45,9 @@ export class PlanCheckoutService {
      */
     async upgrade(params: UpgradeParams): Promise<CheckoutView> {
         const { personId } = params
-        const existing = await this.entityManager.transaction((manager) => this.subscriptions.getOrCreate({ manager, personId }))
+        const existing = await this.entityManager.transaction((manager) =>
+            this.subscriptions.getOrCreate({ manager, personId }),
+        )
         const { paidPriceMinorUnits: amount, paidCurrency: currency } = this.options
         const intent = await this.sepay.createIntent({ subscriptionId: existing.id, amount, currency })
         return this.entityManager.transaction(async (manager) => {

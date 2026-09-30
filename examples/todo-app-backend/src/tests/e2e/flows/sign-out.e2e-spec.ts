@@ -33,7 +33,9 @@ describe("session sign-out (e2e)", () => {
         expect(signedOut.data?.signOut.signedOut).toBe(true)
 
         // The provider was told the session ended: the notice names the person (contract check on what the app sent).
-        const notices = (await world.fake.keycloak.requests()).filter((request) => request.body.includes(person.personId))
+        const notices = (await world.fake.keycloak.requests()).filter((request) =>
+            request.body.includes(person.personId),
+        )
         expect(notices).toHaveLength(1)
         expect(notices[0]?.body).toContain("sign-out")
 

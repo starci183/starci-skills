@@ -64,3 +64,12 @@ export const cronMatches = (fields: CronFields, at: Date): boolean =>
     fields.dayOfMonth.has(at.getUTCDate()) &&
     fields.month.has(at.getUTCMonth() + 1) &&
     fields.dayOfWeek.has(at.getUTCDay())
+
+/** True when `expression` is a valid five-field cron expression. */
+export const isValidCron = (expression: string): boolean => parseCron(expression) !== null
+
+/** True when `expression` is valid and admits the minute containing `at` (in UTC). */
+export const cronAdmits = (expression: string, at: Date): boolean => {
+    const fields = parseCron(expression)
+    return fields !== null && cronMatches(fields, at)
+}

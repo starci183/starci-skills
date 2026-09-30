@@ -98,8 +98,7 @@ export interface VerifyChainResult {
 
 /** What answering "what does this sealed blob hold" gives: the plaintext, or why it could not be opened. */
 export type UnsealOutcome =
-    | { readonly opened: true; readonly plaintext: string }
-    | { readonly opened: false; readonly cause: unknown }
+    { readonly opened: true; readonly plaintext: string } | { readonly opened: false; readonly cause: unknown }
 
 /** What appending a line needs; the write joins the caller transaction. */
 export interface AppendLineParams {

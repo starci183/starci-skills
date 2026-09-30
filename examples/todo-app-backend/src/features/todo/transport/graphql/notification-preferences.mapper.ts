@@ -12,7 +12,9 @@ export const toNotificationPreferencesRequest = (
 ): NotificationPreferencesRequest => ({ channel: input?.channel ?? NOTIFY_CHANNEL_EMAIL })
 
 /** Maps the stored preferences to the GraphQL type. */
-export const toNotificationPreferencesType = (preferences: NotificationPreferencesResult): NotificationPreferencesType => ({
+export const toNotificationPreferencesType = (
+    preferences: NotificationPreferencesResult,
+): NotificationPreferencesType => ({
     channel: preferences.channel,
     unsubscribed: preferences.unsubscribed,
     digestWindowMinutes: preferences.digestWindowMinutes,

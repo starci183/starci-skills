@@ -11,7 +11,7 @@ credential:
   name: DATABASE_URL
   providedBy: owner
   custody: identity:database-url
-  # was where: .starcistacks/dev/runtime/env/app.env.enc
+  # was where: .starcistacks/dev/secrets/app-env.enc
 sandbox: The dev environment runs PostgreSQL 16 in Compose on 5432, seeded from .starcistacks/dev/seeds.
 refs: [data.login.person, sds.login.session-store]
 

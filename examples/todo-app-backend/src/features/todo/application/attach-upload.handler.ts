@@ -17,6 +17,10 @@ export class AttachUploadHandler extends ICQRSHandler<AttachUploadCommand, Attac
     }
 
     protected override async process(command: AttachUploadCommand): Promise<AttachUploadResult> {
-        return this.uploads.attach({ actorId: command.params.principal.id, uploadId: command.params.request.uploadId, taskId: command.params.request.taskId })
+        return this.uploads.attach({
+            actorId: command.params.principal.id,
+            uploadId: command.params.request.uploadId,
+            taskId: command.params.request.taskId,
+        })
     }
 }

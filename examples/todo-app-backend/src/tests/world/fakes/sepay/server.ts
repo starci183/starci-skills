@@ -19,7 +19,16 @@ import type {
     WebhookTarget,
 } from "../fakes-control.contracts"
 import { worldClock } from "../../kit/world-clock"
-import { FailureQueue, RequestLog, answerJson, closeServer, headersOf, listenLoopback, readBody, readJson } from "../fakes-http.service"
+import {
+    FailureQueue,
+    RequestLog,
+    answerJson,
+    closeServer,
+    headersOf,
+    listenLoopback,
+    readBody,
+    readJson,
+} from "../fakes-http.service"
 import { renderPayload } from "../payload.service"
 
 const CREATE_INTENT_PATH = "/userapi/transactions/qr"
@@ -132,7 +141,11 @@ export class SepayFake {
             status: params.status,
             periodEnd,
         })
-        const payload = renderPayload("sepay", "webhook-delivery", { id: params.gatewayIntentId, status: params.status, periodEnd })
+        const payload = renderPayload("sepay", "webhook-delivery", {
+            id: params.gatewayIntentId,
+            status: params.status,
+            periodEnd,
+        })
         this.lastPayloads.set(params.gatewayIntentId, payload)
         return this.deliver(params.gatewayIntentId, params.deliverTo, payload)
     }
@@ -156,9 +169,20 @@ export class SepayFake {
         const secret = invalid ? `${this.secrets.webhookSecret}-tampered` : this.secrets.webhookSecret
         const signature = invalid ? "invalid" : "valid"
         const delivery = await this.post(deliverTo, secret, payload).then(
-            (answer) => ({ gatewayIntentId, signature, httpStatus: answer.status, body: answer.body }) satisfies WebhookDelivery,
+            (answer) =>
+                ({
+                    gatewayIntentId,
+                    signature,
+                    httpStatus: answer.status,
+                    body: answer.body,
+                }) satisfies WebhookDelivery,
             (cause: unknown) =>
-                ({ gatewayIntentId, signature, httpStatus: 0, body: cause instanceof Error ? cause.message : String(cause) }) satisfies WebhookDelivery,
+                ({
+                    gatewayIntentId,
+                    signature,
+                    httpStatus: 0,
+                    body: cause instanceof Error ? cause.message : String(cause),
+                }) satisfies WebhookDelivery,
         )
         this.sent.push(delivery)
         return delivery
@@ -199,8 +223,20 @@ export class SepayFake {
         const gatewayIntentId = `fake-sepay-${String(this.sequence).padStart(6, "0")}`
         const checkoutUrl = `${this.baseUrl}/checkout/${gatewayIntentId}`
         const { reference, amount, currency } = parseCreateBody(rawBody)
-        this.intents.set(gatewayIntentId, { gatewayIntentId, reference, amount, currency, checkoutUrl, status: "pending", periodEnd: null })
-        answerJson(response, 200, renderPayload("sepay", "create-intent-response", { id: gatewayIntentId, checkoutUrl }))
+        this.intents.set(gatewayIntentId, {
+            gatewayIntentId,
+            reference,
+            amount,
+            currency,
+            checkoutUrl,
+            status: "pending",
+            periodEnd: null,
+        })
+        answerJson(
+            response,
+            200,
+            renderPayload("sepay", "create-intent-response", { id: gatewayIntentId, checkoutUrl }),
+        )
     }
 
     private readTransaction(path: string, response: ServerResponse): void {
@@ -214,6 +250,14 @@ export class SepayFake {
             answerJson(response, 200, renderPayload("sepay", "transaction-pending", { id }))
             return
         }
-        answerJson(response, 200, renderPayload("sepay", "transaction-settled", { id, status: intent.status, periodEnd: intent.periodEnd ?? "" }))
+        answerJson(
+            response,
+            200,
+            renderPayload("sepay", "transaction-settled", {
+                id,
+                status: intent.status,
+                periodEnd: intent.periodEnd ?? "",
+            }),
+        )
     }
 }

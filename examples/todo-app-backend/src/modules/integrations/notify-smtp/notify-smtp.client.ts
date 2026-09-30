@@ -14,10 +14,15 @@ const transient = (reason: string): NotifySmtpError =>
 
 const singleLine = (value: string): string => value.replace(/[\r\n]+/g, " ").trim()
 
-const encodeHeader = (value: string): string => `=?UTF-8?B?${Buffer.from(singleLine(value), "utf8").toString("base64")}?=`
+const encodeHeader = (value: string): string =>
+    `=?UTF-8?B?${Buffer.from(singleLine(value), "utf8").toString("base64")}?=`
 
 const encodeBody = (value: string): string =>
-    (Buffer.from(value, "utf8").toString("base64").match(new RegExp(`.{1,${BASE64_LINE_LENGTH}}`, "g")) ?? []).join("\r\n")
+    (
+        Buffer.from(value, "utf8")
+            .toString("base64")
+            .match(new RegExp(`.{1,${BASE64_LINE_LENGTH}}`, "g")) ?? []
+    ).join("\r\n")
 
 /** Takes the first complete reply (every line up to the one whose code is followed by a space) off the buffered text. */
 const takeReply = (buffered: string): { readonly reply: SmtpReply; readonly rest: string } | null => {

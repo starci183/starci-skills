@@ -2,9 +2,12 @@ import { Secret } from "@modules/platform/config"
 import { PRIMARY_CONNECTION } from "@modules/platform/database"
 import { primaryConnectionOf } from "./migrate.options"
 
-
 describe("primaryConnectionOf", () => {
-    const options = { connections: [primaryConnectionOf({ name: PRIMARY_CONNECTION, url: new Secret("postgres://localhost:5501/todo") })] }
+    const options = {
+        connections: [
+            primaryConnectionOf({ name: PRIMARY_CONNECTION, url: new Secret("postgres://localhost:5501/todo") }),
+        ],
+    }
 
     it("lists the primary connection with the URL of its database", () => {
         expect(options.connections.map((connection) => connection.name)).toEqual([PRIMARY_CONNECTION])

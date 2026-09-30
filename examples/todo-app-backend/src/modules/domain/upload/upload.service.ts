@@ -1,7 +1,7 @@
 import { Injectable } from "@nestjs/common"
 import { TaskService } from "@modules/domain/task"
-import { UploadStorageError, InjectUploadStorage } from "@modules/integrations/upload"
-import type { UploadStorage } from "@modules/integrations/upload"
+import { UploadStorageError, InjectUploadStorage } from "@modules/integrations/upload-storage"
+import type { UploadStorage } from "@modules/integrations/upload-storage"
 import { InjectClock } from "@modules/platform/clock"
 import type { Clock } from "@modules/platform/clock"
 import { InjectPrimaryEntityManager, LIST_ROWS_MAX } from "@modules/platform/database"
@@ -110,7 +110,8 @@ export class UploadService {
         if (admitted.kind === "refused") return admitted
         const stored = await this.viaStorage(uploadId, () => this.storage.store({ uploadId, content }))
         if (stored.kind === "refused") return stored
-        if (!stored.value.accepted) return refused(UploadErrorCode.ScanRejected, { uploadId, reason: stored.value.reason })
+        if (!stored.value.accepted)
+            return refused(UploadErrorCode.ScanRejected, { uploadId, reason: stored.value.reason })
         const ready = await this.entityManager.transaction((manager) =>
             manager.save(UploadEntity, { ...this.rowOf(admitted.value), sizeBytes: content.length, status: "ready" }),
         )
@@ -181,7 +182,8 @@ export class UploadService {
     private async openPending(
         params: CreateIntentParams & { readonly at: Date },
     ): Promise<Outcome<UploadView, UploadErrorCode.MimeNotAllowed | UploadErrorCode.TooLarge>> {
-        if (!this.options.allowedMimes.includes(params.mime)) return refused(UploadErrorCode.MimeNotAllowed, { mime: params.mime })
+        if (!this.options.allowedMimes.includes(params.mime))
+            return refused(UploadErrorCode.MimeNotAllowed, { mime: params.mime })
         const oversize = this.sizeRefusal(params.sizeBytes)
         if (oversize) return oversize
         const id = this.ids.next()
@@ -229,7 +231,9 @@ export class UploadService {
      */
     private async admitContent(
         params: AdmitContentParams,
-    ): Promise<Outcome<UploadView, UploadErrorCode.NotFound | UploadErrorCode.TokenInvalid | UploadErrorCode.TooLarge>> {
+    ): Promise<
+        Outcome<UploadView, UploadErrorCode.NotFound | UploadErrorCode.TokenInvalid | UploadErrorCode.TooLarge>
+    > {
         const upload = await this.find(params.uploadId)
         if (!upload) return refused(UploadErrorCode.NotFound, { uploadId: params.uploadId })
         const verdict = verifyUploadToken({

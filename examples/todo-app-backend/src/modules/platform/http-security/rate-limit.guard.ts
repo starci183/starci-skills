@@ -41,12 +41,18 @@ export class RateLimitGuard implements CanActivate {
 
     /** Counts the request and refuses it when the caller is over the limit of the door tier. */
     canActivate(context: ExecutionContext): boolean {
-        const tier = this.reflector.getAllAndOverride<RateTier | undefined>(RATE_TIER_KEY, [context.getHandler(), context.getClass()]) ?? RateTier.Default
-        const limit = tier === RateTier.Strict ? this.options.rateLimit.strictLimit : this.options.rateLimit.defaultLimit
+        const tier =
+            this.reflector.getAllAndOverride<RateTier | undefined>(RATE_TIER_KEY, [
+                context.getHandler(),
+                context.getClass(),
+            ]) ?? RateTier.Default
+        const limit =
+            tier === RateTier.Strict ? this.options.rateLimit.strictLimit : this.options.rateLimit.defaultLimit
         const now = this.clock.now().getTime()
         const key = `${tier}:${requestOf(context).ip ?? "unknown"}`
         const current = this.buckets.get(key)
-        const bucket = current && current.resetAt > now ? current : { count: 0, resetAt: now + this.options.rateLimit.windowMs }
+        const bucket =
+            current && current.resetAt > now ? current : { count: 0, resetAt: now + this.options.rateLimit.windowMs }
         bucket.count += 1
         this.buckets.set(key, bucket)
         if (this.buckets.size > BUCKETS_MAX) this.prune(now)

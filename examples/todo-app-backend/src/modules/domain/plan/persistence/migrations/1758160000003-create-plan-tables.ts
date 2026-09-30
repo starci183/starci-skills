@@ -25,8 +25,12 @@ export class CreatePlanTables1758160000003 implements MigrationInterface {
     status text NOT NULL DEFAULT 'pending',
     applied_at timestamptz
 )`)
-        await queryRunner.query(`CREATE INDEX IF NOT EXISTS payment_intents_subscription_id_idx ON payment_intents (subscription_id)`)
-        await queryRunner.query(`CREATE INDEX IF NOT EXISTS payment_intents_gateway_intent_id_idx ON payment_intents (gateway_intent_id)`)
+        await queryRunner.query(
+            `CREATE INDEX IF NOT EXISTS payment_intents_subscription_id_idx ON payment_intents (subscription_id)`,
+        )
+        await queryRunner.query(
+            `CREATE INDEX IF NOT EXISTS payment_intents_gateway_intent_id_idx ON payment_intents (gateway_intent_id)`,
+        )
     }
 
     /** Drops both tables. */

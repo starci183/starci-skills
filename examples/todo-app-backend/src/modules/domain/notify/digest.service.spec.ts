@@ -2,7 +2,12 @@ import { Test } from "@nestjs/testing"
 import { fakeIds, mockEntityManager } from "@starci/jest-preset"
 import { IDS } from "@modules/platform/ids"
 import { IsNull } from "typeorm"
-import { NOTIFY_AT, admitIntoWindowInput, digestWindowRow, flushWindowInput } from "@tests/fixtures/builders/notify.builder"
+import {
+    NOTIFY_AT,
+    admitIntoWindowInput,
+    digestWindowRow,
+    flushWindowInput,
+} from "@tests/fixtures/builders/notify.builder"
 import { DigestService } from "./digest.service"
 import { NotifyDigestWindowEntity } from "./persistence/entities/digest-window.entity"
 
@@ -66,10 +71,7 @@ describe("DigestService", () => {
             const admitted = await service.admit({ manager, ...admitIntoWindowInput({ windowMinutes: 3 }) })
 
             expect(admitted).toEqual({ windowId: "w2", opened: true, closesAt })
-            expect(manager.save).toHaveBeenCalledWith(
-                NotifyDigestWindowEntity,
-                expect.objectContaining({ closesAt }),
-            )
+            expect(manager.save).toHaveBeenCalledWith(NotifyDigestWindowEntity, expect.objectContaining({ closesAt }))
         })
 
         it("opens a new window when the open one closed before the admission instant", async () => {

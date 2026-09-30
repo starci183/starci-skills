@@ -25,23 +25,35 @@ describe("plan: concurrent payment confirmation (e2e)", () => {
         expect(upgraded.errorCode).toBeNull()
         const checkout = upgraded.data?.upgradePlan
         expect(checkout?.status).toBe("pending")
-        const intent = (await world.fake.sepay.intents()).find((candidate) => candidate.reference === checkout?.subscriptionId)
+        const intent = (await world.fake.sepay.intents()).find(
+            (candidate) => candidate.reference === checkout?.subscriptionId,
+        )
         const gatewayIntentId = intent?.gatewayIntentId ?? ""
         expect(gatewayIntentId).not.toBe("")
 
         const periodEnd = new Date(worldClock.now().getTime() + PERIOD_MS).toISOString()
         const deliveries = await Promise.all(
-            Array.from({ length: CONCURRENT_DELIVERIES }, () => world.fake.sepay.settle({ gatewayIntentId, status: "paid", periodEnd })),
+            Array.from({ length: CONCURRENT_DELIVERIES }, () =>
+                world.fake.sepay.settle({ gatewayIntentId, status: "paid", periodEnd }),
+            ),
         )
 
         // Every delivery was accepted by the door, and exactly one of them activated the subscription.
-        expect(deliveries.map((delivery) => delivery.httpStatus)).toEqual(Array.from({ length: CONCURRENT_DELIVERIES }, () => 200))
-        expect(deliveries.filter((delivery) => isRecord(delivery.body) && delivery.body.applied === true)).toHaveLength(1)
+        expect(deliveries.map((delivery) => delivery.httpStatus)).toEqual(
+            Array.from({ length: CONCURRENT_DELIVERIES }, () => 200),
+        )
+        expect(deliveries.filter((delivery) => isRecord(delivery.body) && delivery.body.applied === true)).toHaveLength(
+            1,
+        )
 
         // The store holds one active paid subscription and one paid intent.
-        const subscriptions: Array<SubscriptionRow> = await world.db.primary.query(SUBSCRIPTIONS_OF_PERSON, [person.personId])
+        const subscriptions: Array<SubscriptionRow> = await world.db.primary.query(SUBSCRIPTIONS_OF_PERSON, [
+            person.personId,
+        ])
         expect(subscriptions).toEqual([{ id: checkout?.subscriptionId, plan: "paid", status: "active" }])
-        const intents: Array<PaymentIntentRow> = await world.db.primary.query(PAYMENT_INTENT_BY_ID, [checkout?.paymentIntentId])
+        const intents: Array<PaymentIntentRow> = await world.db.primary.query(PAYMENT_INTENT_BY_ID, [
+            checkout?.paymentIntentId,
+        ])
         expect(intents[0]?.status).toBe("paid")
     })
 })

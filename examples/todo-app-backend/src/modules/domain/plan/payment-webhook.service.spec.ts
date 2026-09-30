@@ -43,7 +43,9 @@ describe("PaymentWebhookService", () => {
         it("ignores a delivery without an Authorization header and claims nothing", async () => {
             const { service, inbox, settlement } = await build()
 
-            await expect(service.receive(webhookDelivery({ authorization: undefined }))).resolves.toSucceedWith({ ignored: true })
+            await expect(service.receive(webhookDelivery({ authorization: undefined }))).resolves.toSucceedWith({
+                ignored: true,
+            })
 
             expect(inbox.claim).not.toHaveBeenCalled()
             expect(settlement.apply).not.toHaveBeenCalled()
@@ -52,7 +54,9 @@ describe("PaymentWebhookService", () => {
         it("ignores a delivery signed with a wrong secret", async () => {
             const { service, inbox, settlement } = await build()
 
-            await expect(service.receive(webhookDelivery({ authorization: "Bearer wrong" }))).resolves.toSucceedWith({ ignored: true })
+            await expect(service.receive(webhookDelivery({ authorization: "Bearer wrong" }))).resolves.toSucceedWith({
+                ignored: true,
+            })
 
             expect(inbox.claim).not.toHaveBeenCalled()
             expect(settlement.apply).not.toHaveBeenCalled()

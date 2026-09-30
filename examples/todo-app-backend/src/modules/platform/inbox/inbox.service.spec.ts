@@ -9,7 +9,11 @@ import { CLAIM_EVENT, RELEASE_EVENT } from "./persistence/inbox.sql"
 const build = async (manager: ReturnType<typeof mockEntityManager>) => {
     const clock = new FakeClock(PLATFORM_AT)
     const moduleRef = await Test.createTestingModule({
-        providers: [PostgresInbox, { provide: PRIMARY_ENTITY_MANAGER, useValue: manager }, { provide: CLOCK, useValue: clock }],
+        providers: [
+            PostgresInbox,
+            { provide: PRIMARY_ENTITY_MANAGER, useValue: manager },
+            { provide: CLOCK, useValue: clock },
+        ],
     }).compile()
     return moduleRef.get(PostgresInbox)
 }
@@ -21,7 +25,11 @@ describe("PostgresInbox", () => {
             const inbox = await build(manager)
 
             await expect(inbox.claim("payments", "e-1")).resolves.toBe(true)
-            expect(manager.query).toHaveBeenCalledWith(CLAIM_EVENT, ["payments", "e-1", new FakeClock(PLATFORM_AT).now()])
+            expect(manager.query).toHaveBeenCalledWith(CLAIM_EVENT, [
+                "payments",
+                "e-1",
+                new FakeClock(PLATFORM_AT).now(),
+            ])
         })
 
         it("answers false when the event was claimed before", async () => {

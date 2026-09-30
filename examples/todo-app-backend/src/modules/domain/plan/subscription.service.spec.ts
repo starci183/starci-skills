@@ -91,26 +91,34 @@ describe("SubscriptionService", () => {
         })
 
         it("reads an active subscription as paid without a cap", async () => {
-            const { service } = await build(mockEntityManager({ findOneBy: [SubscriptionEntity, subscriptionRow({ status: "active" })] }))
+            const { service } = await build(
+                mockEntityManager({ findOneBy: [SubscriptionEntity, subscriptionRow({ status: "active" })] }),
+            )
 
             await expect(service.readEffectivePlan({ personId: "p1" })).resolves.toEqual({ id: "paid", taskCap: null })
         })
 
         it("reads a past-due subscription as paid", async () => {
-            const { service } = await build(mockEntityManager({ findOneBy: [SubscriptionEntity, subscriptionRow({ status: "past-due" })] }))
+            const { service } = await build(
+                mockEntityManager({ findOneBy: [SubscriptionEntity, subscriptionRow({ status: "past-due" })] }),
+            )
 
             await expect(service.readEffectivePlan({ personId: "p1" })).resolves.toEqual({ id: "paid", taskCap: null })
         })
 
         it("reads a pending subscription as free", async () => {
-            const { service } = await build(mockEntityManager({ findOneBy: [SubscriptionEntity, subscriptionRow({ status: "pending" })] }))
+            const { service } = await build(
+                mockEntityManager({ findOneBy: [SubscriptionEntity, subscriptionRow({ status: "pending" })] }),
+            )
 
             await expect(service.readEffectivePlan({ personId: "p1" })).resolves.toEqual({ id: "free", taskCap: 20 })
         })
 
         it("reads a lapsed subscription as free without writing to it", async () => {
             const { service, own } = await build(
-                mockEntityManager({ findOneBy: [SubscriptionEntity, subscriptionRow({ plan: "paid", status: "lapsed" })] }),
+                mockEntityManager({
+                    findOneBy: [SubscriptionEntity, subscriptionRow({ plan: "paid", status: "lapsed" })],
+                }),
             )
 
             await expect(service.readEffectivePlan({ personId: "p1" })).resolves.toEqual({ id: "free", taskCap: 20 })
@@ -139,13 +147,20 @@ describe("SubscriptionService", () => {
         it("treats a person without a subscription as free", async () => {
             const { service } = await build(mockEntityManager({ findOneBy: [SubscriptionEntity, null] }))
 
-            await expect(service.checkCap({ personId: "p1", activeTaskCount: 20 })).resolves.toMatchObject({ allowed: false, cap: 20 })
+            await expect(service.checkCap({ personId: "p1", activeTaskCount: 20 })).resolves.toMatchObject({
+                allowed: false,
+                cap: 20,
+            })
         })
 
         it("allows any count on the paid plan", async () => {
-            const { service } = await build(mockEntityManager({ findOneBy: [SubscriptionEntity, subscriptionRow({ status: "active" })] }))
+            const { service } = await build(
+                mockEntityManager({ findOneBy: [SubscriptionEntity, subscriptionRow({ status: "active" })] }),
+            )
 
-            await expect(service.checkCap({ personId: "p1", activeTaskCount: 10_000 })).resolves.toEqual({ allowed: true })
+            await expect(service.checkCap({ personId: "p1", activeTaskCount: 10_000 })).resolves.toEqual({
+                allowed: true,
+            })
         })
     })
 
@@ -157,9 +172,14 @@ describe("SubscriptionService", () => {
         }
 
         it("startCheckout moves a free subscription to pending", async () => {
-            const { service, own, manager, subscription } = await transition(subscriptionRow(), subscriptionRow({ status: "pending" }))
+            const { service, own, manager, subscription } = await transition(
+                subscriptionRow(),
+                subscriptionRow({ status: "pending" }),
+            )
 
-            await expect(service.startCheckout({ manager, subscription })).resolves.toEqual(subscriptionRow({ status: "pending" }))
+            await expect(service.startCheckout({ manager, subscription })).resolves.toEqual(
+                subscriptionRow({ status: "pending" }),
+            )
 
             expect(manager.save).toHaveBeenCalledWith(SubscriptionEntity, {
                 id: "s1",
@@ -179,9 +199,9 @@ describe("SubscriptionService", () => {
                 subscriptionRow({ plan: "paid", status: "active", periodEnd: PLAN_PERIOD_END }),
             )
 
-            await expect(service.confirm({ manager, subscription: pending, periodEnd: PLAN_PERIOD_END })).resolves.toEqual(
-                subscriptionRow({ plan: "paid", status: "active", periodEnd: PLAN_PERIOD_END }),
-            )
+            await expect(
+                service.confirm({ manager, subscription: pending, periodEnd: PLAN_PERIOD_END }),
+            ).resolves.toEqual(subscriptionRow({ plan: "paid", status: "active", periodEnd: PLAN_PERIOD_END }))
 
             expect(manager.save).toHaveBeenCalledWith(SubscriptionEntity, {
                 id: "s1",
@@ -199,21 +219,35 @@ describe("SubscriptionService", () => {
 
             await expect(service.abandon({ manager, subscription: pending })).resolves.toEqual(subscriptionRow())
 
-            expect(manager.save).toHaveBeenCalledWith(SubscriptionEntity, expect.objectContaining({ status: "free", plan: "free", periodEnd: null }))
+            expect(manager.save).toHaveBeenCalledWith(
+                SubscriptionEntity,
+                expect.objectContaining({ status: "free", plan: "free", periodEnd: null }),
+            )
         })
 
         it("markRenewalDue moves an active subscription to past-due", async () => {
             const active = subscriptionRow({ plan: "paid", status: "active", periodEnd: PLAN_PERIOD_END })
-            const { service, manager } = await transition(active, subscriptionRow({ plan: "paid", status: "past-due", periodEnd: PLAN_PERIOD_END }))
+            const { service, manager } = await transition(
+                active,
+                subscriptionRow({ plan: "paid", status: "past-due", periodEnd: PLAN_PERIOD_END }),
+            )
 
-            await expect(service.markRenewalDue({ manager, subscription: active })).resolves.toMatchObject({ status: "past-due" })
+            await expect(service.markRenewalDue({ manager, subscription: active })).resolves.toMatchObject({
+                status: "past-due",
+            })
 
-            expect(manager.save).toHaveBeenCalledWith(SubscriptionEntity, expect.objectContaining({ status: "past-due", plan: "paid" }))
+            expect(manager.save).toHaveBeenCalledWith(
+                SubscriptionEntity,
+                expect.objectContaining({ status: "past-due", plan: "paid" }),
+            )
         })
 
         it("lapse moves a past-due subscription to lapsed", async () => {
             const due = subscriptionRow({ plan: "paid", status: "past-due", periodEnd: PLAN_PERIOD_END })
-            const { service, manager } = await transition(due, subscriptionRow({ plan: "paid", status: "lapsed", periodEnd: PLAN_PERIOD_END }))
+            const { service, manager } = await transition(
+                due,
+                subscriptionRow({ plan: "paid", status: "lapsed", periodEnd: PLAN_PERIOD_END }),
+            )
 
             await expect(service.lapse({ manager, subscription: due })).resolves.toMatchObject({ status: "lapsed" })
 
@@ -226,7 +260,10 @@ describe("SubscriptionService", () => {
 
             await expect(service.downgrade({ manager, subscription: active })).resolves.toEqual(subscriptionRow())
 
-            expect(manager.save).toHaveBeenCalledWith(SubscriptionEntity, expect.objectContaining({ status: "free", plan: "free", periodEnd: null }))
+            expect(manager.save).toHaveBeenCalledWith(
+                SubscriptionEntity,
+                expect.objectContaining({ status: "free", plan: "free", periodEnd: null }),
+            )
         })
 
         it("downgrade makes a past-due subscription free at once", async () => {
@@ -241,7 +278,11 @@ describe("SubscriptionService", () => {
         it("downgrade returns a free, pending or lapsed subscription untouched and writes nothing", async () => {
             const { service } = await build()
             const manager = mockEntityManager()
-            const untouched: Array<SubscriptionView> = [subscriptionRow(), subscriptionRow({ status: "pending" }), subscriptionRow({ status: "lapsed" })]
+            const untouched: Array<SubscriptionView> = [
+                subscriptionRow(),
+                subscriptionRow({ status: "pending" }),
+                subscriptionRow({ status: "lapsed" }),
+            ]
 
             for (const subscription of untouched) {
                 await expect(service.downgrade({ manager, subscription })).resolves.toBe(subscription)

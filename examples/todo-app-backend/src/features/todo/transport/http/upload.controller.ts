@@ -82,9 +82,14 @@ export class UploadController {
 
     /** GET /uploads/:uploadId/content: downloads the bytes for the owner with the stored media type and file name. */
     @Get(":uploadId/content")
-    async download(@CurrentPrincipal() principal: Principal, @Param() params: UploadContentRequest): Promise<StreamableFile> {
+    async download(
+        @CurrentPrincipal() principal: Principal,
+        @Param() params: UploadContentRequest,
+    ): Promise<StreamableFile> {
         return toDownloadFile(
-            await this.queryBus.execute(new ReadUploadContentQuery({ request: toReadUploadContentRequest(params), principal })),
+            await this.queryBus.execute(
+                new ReadUploadContentQuery({ request: toReadUploadContentRequest(params), principal }),
+            ),
         )
     }
 }
