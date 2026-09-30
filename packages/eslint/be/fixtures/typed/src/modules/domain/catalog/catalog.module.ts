@@ -4,7 +4,7 @@ import { Module } from "@nestjs/common"
 @Module({})
 export class CatalogModule {
     /** Builds the dynamic module. */
-    static register(): { module: typeof CatalogModule } {
-        return { module: CatalogModule }
+    static register(options: { isGlobal: boolean }): { module: typeof CatalogModule; global: boolean } {
+        return { module: CatalogModule, global: options.isGlobal }
     }
 }
