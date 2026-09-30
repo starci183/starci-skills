@@ -31,7 +31,7 @@
   },
   "dependencies": {
     "@starci-examples/fe-kit": "file:../../../../packages/fe-kit",
-    "@starci/grammar": "file:../../../../packages/grammar",
+    "@starci/grammar": "0.7.1",
     "react": "19.2.3"
   },
   "devDependencies": {
