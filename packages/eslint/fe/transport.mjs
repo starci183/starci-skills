@@ -299,44 +299,71 @@ const isJsonRead = (node) => {
 /** A GraphQL operation written as text. */
 const GRAPHQL_TEXT = /^\s*(?:query|mutation|subscription|fragment)\b[^{]*\{/
 
+/** The leftmost identifier of a type name: `Course` in `Course`, `Gql` in `Gql.CourseQuery`. */
+const typeRoot = (name) => (name.type === "TSQualifiedName" ? typeRoot(name.left) : name)
+
+/** The value an identifier is initialised with when it is a `const` of this file's scope chain, else null. */
+const constInit = (scope, identifier) => {
+  for (let current = scope; current; current = current.upper) {
+    const variable = current.set.get(identifier.name)
+    if (!variable) continue
+    const definition = variable.defs[0]
+    return definition?.type === "Variable" && definition.parent?.kind === "const" && definition.node.id.type === "Identifier" ? definition.node.init : null
+  }
+  return null
+}
+
 /** Wire types are generated from the contract; nobody types the wire by hand. */
 export const noHandTypedWire = {
   meta: {
     type: "problem",
-    docs: { description: "Wire types come from the contract copy via codegen; responses are not cast." },
+    docs: { description: "A transport response body is narrowed from `unknown` or typed by a generated wire type, never by a hand-written one." },
     schema: [],
     messages: {
       cast:
-        "A response body is cast to a type here. A cast is a claim nobody checks: when the backend changes the shape this still compiles and fails at a reader's screen. Use the type generated from `modules/api/contract`, and validate at the client.",
-      graphqlType:
-        "`{{name}}` is a hand-written GraphQL result type used as a cast. The generated document type already says exactly what this operation returns; use it.",
+        "A response body is typed by hand here. An assertion or annotation is a claim nobody checks: when the backend changes the shape this still compiles and fails at a reader's screen. Narrow the body from `unknown` (`(await response.json()) as unknown`, then a check), or use the type generated from `modules/api/contract` (imported from `__generated__/`), and validate at the client.",
       document:
         "A GraphQL document written inline in TypeScript. Documents live in `.graphql` files so codegen can generate their types and the contract check can read them.",
-      declared:
-        "`{{name}}` declares a wire shape by hand in `modules/api`. Wire types are generated from the backend contract (`codegen`), so a hand-written copy is a second source of truth that drifts. Import the generated type.",
     },
   },
   create(context) {
     const filename = context.filename || context.getFilename()
     if (isSpecFile(filename)) return {}
-    const inApi = isApiModuleFile(filename)
-    const castCheck = (node) => {
-      const type = node.typeAnnotation
-      if (type && type.type === "TSTypeReference" && type.typeName.type === "Identifier") {
-        if (/^Graph[Qq][Ll]\w*$/.test(type.typeName.name)) {
-          context.report({ node, messageId: "graphqlType", data: { name: type.typeName.name } })
-          return
-        }
-      }
-      if (isJsonRead(node.expression)) context.report({ node, messageId: "cast" })
+    const source = context.sourceCode ?? context.getSourceCode()
+    /** Local names of the type imports that resolve into a `__generated__/` directory. */
+    const generated = new Set()
+    /** True when a type node is `unknown` or names a type imported from the generated wire module. */
+    const sanctioned = (type) => {
+      if (type.type === "TSUnknownKeyword") return true
+      if (type.type !== "TSTypeReference") return false
+      const root = typeRoot(type.typeName)
+      return root.type === "Identifier" && (root.name === "const" || generated.has(root.name))
     }
-    const declared = (node) => {
-      if (!inApi || !/(?:Wire|Dto|DTO|Response|Payload)$/.test(node.id.name)) return
-      context.report({ node: node.id, messageId: "declared", data: { name: node.id.name } })
+    /** Whether the value is a `.json()` read, directly or through a const initialised with one. */
+    const readsResponse = (node) => {
+      if (isJsonRead(node)) return true
+      let current = node
+      while (current && (current.type === "AwaitExpression" || current.type === "TSNonNullExpression")) current = current.argument || current.expression
+      if (current?.type !== "Identifier") return false
+      const init = constInit(source.getScope(node), current)
+      return Boolean(init) && isJsonRead(init)
+    }
+    const castCheck = (node) => {
+      if (readsResponse(node.expression) && !sanctioned(node.typeAnnotation)) context.report({ node, messageId: "cast" })
     }
     return {
+      Program(program) {
+        for (const statement of program.body) {
+          if (statement.type !== "ImportDeclaration" || !String(statement.source.value).split("/").includes("__generated__")) continue
+          for (const specifier of statement.specifiers) generated.add(specifier.local.name)
+        }
+      },
       TSAsExpression: castCheck,
       TSTypeAssertion: castCheck,
+      VariableDeclarator(node) {
+        const annotation = node.id.type === "Identifier" ? node.id.typeAnnotation?.typeAnnotation : null
+        if (annotation && node.init && readsResponse(node.init) && !sanctioned(annotation)) context.report({ node, messageId: "cast" })
+      },
       TaggedTemplateExpression(node) {
         if (node.tag.type === "Identifier" && /^(?:gql|graphql)$/.test(node.tag.name)) {
           context.report({ node, messageId: "document" })
@@ -352,8 +379,6 @@ export const noHandTypedWire = {
           context.report({ node, messageId: "document" })
         }
       },
-      TSInterfaceDeclaration: declared,
-      TSTypeAliasDeclaration: declared,
     }
   },
 }

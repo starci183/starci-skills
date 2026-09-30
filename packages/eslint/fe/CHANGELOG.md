@@ -31,6 +31,11 @@
   render inside; the mock is allowed when its factory (or a `vi.hoisted` block it reads) uses an import that resolves into the app's
   `modules/i18n/messages/`. Client `next-intl` mocks, literal/key-echoing server mocks and automocks still fire, now with a
   server-specific message (`mockedServer`) naming `createTranslator` over the real messages. The rule needs the slot view (`hfsOf`).
+- **Fix: `no-hand-typed-wire` fired on `(await response.json()) as unknown`, the narrowing entry `no-type-assertion` allows.** It now
+  fires only when a value read from `.json()` (directly or through a `const`) is asserted or annotated to a type that is not `unknown`
+  and not imported from a `__generated__/` module (decided from the file's import declarations). **Breaking:** the `declared` branch
+  (a name suffix `Wire|Dto|DTO|Response|Payload` on an interface or alias in `modules/api`) and the `graphqlType` branch (a name
+  pattern `GraphQl*`) are deleted; detection by name is not a detection.
 - Every rule is catalogued under an HFS rule id (R91 FE_SOURCE_FORM, R92 FE_COMPONENT_API, R93 FE_VENDOR_BOUNDARY added).
 
 ## 5.1.2 - 2026-09-30

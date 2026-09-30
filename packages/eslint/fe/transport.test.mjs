@@ -136,26 +136,43 @@ test("FE-STATUS-1: a failed response is not one branch and not null", () => {
   })
 })
 
-test("FE-WIRE-1: wire types are generated, not typed or cast by hand", () => {
+test("FE-WIRE-1: a response body is narrowed from unknown or typed by a generated type, never by a hand-written one", () => {
   tester.run("no-hand-typed-wire", noHandTypedWire, {
     valid: [
       { filename: READER, code: "import type { CourseQuery } from \"../__generated__/graphql\"\nconst x: CourseQuery = y" },
       { filename: READER, code: "const q = loadDocument(\"course.graphql\")" },
+      // hand-declared shapes are not the rule's business: only a value read from a response and typed by hand is
       { filename: CONTRACT, code: "export interface CourseResponse { id: string }" },
       { filename: HOOK, code: "export interface CourseResponse { id: string }" },
+      { filename: READER, code: "export interface CourseResponse { id: string }" },
+      { filename: CLIENT, code: "export type LoginPayload = { email: string }" },
       { filename: READER, code: "const n = value as number" },
       { filename: READER, code: "const label = \"select the query text\"" },
       { filename: SPEC, code: "const x = (await res.json()) as Course" },
+      // live (starci-next-fe): `as unknown` is the sanctioned narrowing entry
+      { filename: READER, code: "const body = (await response.json()) as unknown" },
+      { filename: READER, code: "const body: unknown = await response.json()" },
+      { filename: READER, code: "const body = await res.json()\nconst safe = body as unknown" },
+      // a type imported from the generated wire module is not hand-typed
+      { filename: READER, code: "import type { CourseQuery } from \"../__generated__/graphql\"\nconst x = (await res.json()) as CourseQuery" },
+      { filename: READER, code: "import type { CourseQuery } from \"../__generated__/graphql\"\nconst x: CourseQuery = await res.json()" },
+      { filename: READER, code: "import type * as Wire from \"../__generated__/graphql\"\nconst x = (await res.json()) as Wire.CourseQuery" },
+      { filename: READER, code: "const x = (await res.json()) as const" },
+      // a cast of something that is not a response read is `no-type-assertion`'s business
+      { filename: READER, code: "const x = y as GraphqlResult<Course>" },
+      { filename: READER, code: "const body = JSON.parse(text)\nconst x = body as Course" },
     ],
     invalid: [
       { filename: READER, code: "const x = (await res.json()) as Course", errors: [{ messageId: "cast" }] },
       { filename: READER, code: "const x = <Course>await res.json()", errors: [{ messageId: "cast" }] },
-      { filename: READER, code: "const x = y as GraphqlResult<Course>", errors: [{ messageId: "graphqlType" }] },
+      { filename: READER, code: "const x = (await response.json()) as Record<string, string>", errors: [{ messageId: "cast" }] },
+      { filename: READER, code: "const x: Course = await res.json()", errors: [{ messageId: "cast" }] },
+      { filename: READER, code: "const body = await res.json()\nconst x = body as Course", errors: [{ messageId: "cast" }] },
+      // a type of the same name imported from anywhere but the generated module is a hand-typed wire
+      { filename: READER, code: "import type { Course } from \"./types\"\nconst x = (await res.json()) as Course", errors: [{ messageId: "cast" }] },
       { filename: READER, code: "const q = gql`query Course { course { id } }`", errors: [{ messageId: "document" }] },
       { filename: READER, code: "const q = `query Course { course { id } }`", errors: [{ messageId: "document" }] },
       { filename: READER, code: "const q = \"mutation Save { save { id } }\"", errors: [{ messageId: "document" }] },
-      { filename: READER, code: "export interface CourseResponse { id: string }", errors: [{ messageId: "declared" }] },
-      { filename: CLIENT, code: "export type LoginPayload = { email: string }", errors: [{ messageId: "declared" }] },
     ],
   })
 })

@@ -119,7 +119,7 @@ if (!res.ok) return toOutcome(res.status)
 
 ## `starci-fe/no-hand-typed-wire`
 
-Wire types come from the contract copy via codegen; responses are not cast.
+A transport response body is narrowed from `unknown` or typed by a generated wire type (a type imported from a `__generated__/` module), never by a hand-written one: `(await response.json()) as unknown` is the sanctioned entry and does not fire; an assertion or annotation of a `.json()` read (directly, or through a `const` initialised with one) to any other type does. Inline GraphQL documents are also refused. A hand-declared interface is not judged by its name; only a response read typed by hand is.
 
 **Invalid** (`src/modules/api/course/read-course.ts`)
 
@@ -131,6 +131,8 @@ const x = (await res.json()) as Course
 
 ```ts
 import type { CourseQuery } from "../__generated__/graphql"
+const raw = (await res.json()) as unknown
+const x: CourseQuery = parse(raw)
 ```
 
 **Finding code:** `FE_WIRE_GENERATED`
