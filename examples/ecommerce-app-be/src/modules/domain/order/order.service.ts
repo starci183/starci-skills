@@ -6,7 +6,7 @@ import { PaymentService } from "@modules/domain/payment"
 import { InjectOrderEntityManager } from "@modules/platform/database"
 import { OrderError, OrderErrorCode } from "./errors/order.error"
 import type {
-    BuyerStatus,
+    GetBuyerStatusResult,
     BuyerStatusParams,
     FindPlacedOrderParams,
     FindPlacedOrderResult,
@@ -94,7 +94,7 @@ export class OrderService {
     }
 
     /** Whether one person has confirmed orders; an unknown person is not an error, no orders is the honest answer. */
-    async buyerStatus(params: BuyerStatusParams): Promise<BuyerStatus> {
+    async buyerStatus(params: BuyerStatusParams): Promise<GetBuyerStatusResult> {
         const rows: Array<OrderCountRow> = await this.entityManager.query(COUNT_PERSON_ORDERS, [params.personId])
         return toBuyerStatus(params.personId, rows)
     }

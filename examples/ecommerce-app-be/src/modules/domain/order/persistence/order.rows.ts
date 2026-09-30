@@ -1,4 +1,4 @@
-import type { BuyerStatus } from "../order.contracts"
+import type { GetBuyerStatusResult } from "../order.contracts"
 
 /** The row INSERT_ORDER_IF_NEW answers. */
 export interface OrderIdRow {
@@ -16,7 +16,7 @@ export interface OrderCountRow {
 export const toOrderId = (rows: ReadonlyArray<OrderIdRow>): string | null => rows[0]?.id ?? null
 
 /** Whether the person is a buyer, from the count row (no row counts as zero orders). */
-export const toBuyerStatus = (personId: string, rows: ReadonlyArray<OrderCountRow>): BuyerStatus => ({
+export const toBuyerStatus = (personId: string, rows: ReadonlyArray<OrderCountRow>): GetBuyerStatusResult => ({
     personId,
     hasOrders: (rows[0]?.order_count ?? 0) > 0,
 })

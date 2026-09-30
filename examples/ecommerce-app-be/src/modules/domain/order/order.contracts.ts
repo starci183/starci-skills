@@ -37,7 +37,7 @@ export interface PlacedOrder {
 }
 
 /** Whether a person has confirmed orders. */
-export interface BuyerStatus {
+export interface GetBuyerStatusResult {
     /** The person. */
     readonly personId: string
     /** True when at least one order is confirmed. */

@@ -1,9 +1,9 @@
 import { QueryHandler } from "@nestjs/cqrs"
 import { OrderService } from "@modules/domain/order"
+import type { GetBuyerStatusResult } from "@modules/domain/order"
 import { ICQRSHandler } from "@modules/platform/cqrs"
 import { InjectLogger } from "@modules/platform/logging"
 import type { Logger } from "@modules/platform/logging"
-import type { GetBuyerStatusResult } from "./get-buyer-status.contracts"
 import { GetBuyerStatusQuery } from "./get-buyer-status.query"
 
 @QueryHandler(GetBuyerStatusQuery)
