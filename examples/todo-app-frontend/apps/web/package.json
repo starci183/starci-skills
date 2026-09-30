@@ -12,8 +12,7 @@
   "dependencies": {
     "@heroui/react": "3.2.6",
     "@heroui/styles": "3.2.6",
-    "@starci-examples/fe-kit": "file:../../../../packages/fe-kit",
-    "@starci/grammar": "0.7.1",
+    "@starci/grammar": "0.7.2",
     "next": "16.1.6",
     "next-intl": "4.13.6",
     "react": "19.2.3",
