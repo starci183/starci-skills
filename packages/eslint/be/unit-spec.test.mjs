@@ -162,6 +162,7 @@ test("spec-infra-double-from-kit: a provider takes its value from the kit double
             { filename: SPEC, code: provide("Tokens.CLOCK", "new FakeClock(0)") },
             { filename: SPEC, code: provide("CLOCK", "clock", "const clock = new FakeClock(0)") },
             { filename: SPEC, code: provide("OUTBOX", "recordingOutbox()") },
+            { filename: SPEC, code: provide("OUTBOX", "recordingOutbox<Message, Record>()", "interface Message { queue: string }; interface Record { id: string }") },
             { filename: SPEC, code: provide("REDIS_CACHE_MANAGER", "fakeCache(new FakeClock(0))") },
             { filename: SPEC, code: provide("CACHE", "cache", "const cache = fakeCache(new FakeClock(0))") },
             { filename: SPEC, code: provide("INSTANCE_WRITER_FENCE", "fakeLock(new FakeClock(0))") },
