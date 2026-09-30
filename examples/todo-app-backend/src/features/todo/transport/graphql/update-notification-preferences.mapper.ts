@@ -1,4 +1,4 @@
-import type { NotificationPreferences } from "../../application/notification-preferences.contracts"
+import type { NotificationPreferencesResult } from "../../application/notification-preferences.contracts"
 import type { UpdateNotificationPreferencesRequest } from "../../application/update-notification-preferences.contracts"
 import type { UpdateNotificationPreferencesInput } from "./dto/update-notification-preferences.input"
 import type { UpdateNotificationPreferencesType } from "./dto/update-notification-preferences.type"
@@ -14,7 +14,7 @@ export const toUpdateNotificationPreferencesRequest = (
 
 /** Maps the stored preferences to the GraphQL type. */
 export const toUpdateNotificationPreferencesType = (
-    preferences: NotificationPreferences,
+    preferences: NotificationPreferencesResult,
 ): UpdateNotificationPreferencesType => ({
     channel: preferences.channel,
     unsubscribed: preferences.unsubscribed,

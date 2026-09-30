@@ -4,8 +4,8 @@ export interface NotificationPreferencesRequest {
     readonly channel: string
 }
 
-/** The preferences of the caller on one channel. */
-export interface NotificationPreferences {
+/** The preferences of the caller on one channel: the stored ones, or the defaults when nothing was ever written. */
+export interface NotificationPreferencesResult {
     /** The channel. */
     readonly channel: string
     /** True when the caller opted out of the channel. */
@@ -13,6 +13,3 @@ export interface NotificationPreferences {
     /** The digest window override in minutes, null for the default. */
     readonly digestWindowMinutes: number | null
 }
-
-/** The stored preferences, or the defaults when nothing was ever written. */
-export type NotificationPreferencesResult = NotificationPreferences

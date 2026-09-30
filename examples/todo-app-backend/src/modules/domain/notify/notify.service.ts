@@ -16,7 +16,7 @@ import type {
     AdmittedNotification,
     DeliveryVerdict,
     DispatchPlan,
-    DispatchedGroup,
+    DispatchNotificationGroupResult,
     NotificationView,
     PrepareDispatchParams,
     PreparedDispatchResult,
@@ -119,7 +119,7 @@ export class NotifyService {
     }
 
     /** Step three of a dispatch: records what the send came to, and writes the retry message when some attempts go back to queued. */
-    async settle(params: SettleDispatchParams): Promise<DispatchedGroup> {
+    async settle(params: SettleDispatchParams): Promise<DispatchNotificationGroupResult> {
         const { manager, plan, at } = params
         const recorded = await this.delivery.record({
             manager,

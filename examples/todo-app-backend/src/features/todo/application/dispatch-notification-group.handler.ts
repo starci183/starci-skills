@@ -1,5 +1,6 @@
 import { CommandHandler } from "@nestjs/cqrs"
 import { NotifyService } from "@modules/domain/notify"
+import type { DispatchNotificationGroupResult } from "@modules/domain/notify"
 import { InjectClock } from "@modules/platform/clock"
 import type { Clock } from "@modules/platform/clock"
 import { ICQRSHandler } from "@modules/platform/cqrs"
@@ -8,7 +9,6 @@ import { InjectLogger } from "@modules/platform/logging"
 import type { Logger } from "@modules/platform/logging"
 import type { EntityManager } from "typeorm"
 import { DispatchNotificationGroupCommand } from "./dispatch-notification-group.command"
-import type { DispatchNotificationGroupResult } from "./dispatch-notification-group.contracts"
 
 @CommandHandler(DispatchNotificationGroupCommand)
 /**

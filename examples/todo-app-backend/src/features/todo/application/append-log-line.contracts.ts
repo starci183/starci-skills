@@ -12,11 +12,8 @@ export interface AppendLogLineRequest {
     readonly at: Date
 }
 
-/** The line that was appended. */
-export interface AppendedLogLine {
+/** The line that was appended. Appending a line cannot be refused: the queue redelivers a failure. */
+export interface AppendLogLineResult {
     /** The chain position of the line. */
     readonly lineId: string
 }
-
-/** Appending a line cannot be refused: the queue redelivers a failure. */
-export type AppendLogLineResult = AppendedLogLine

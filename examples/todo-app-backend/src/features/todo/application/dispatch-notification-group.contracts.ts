@@ -1,4 +1,4 @@
-import type { DispatchedGroup, NotifyDispatchKind } from "@modules/domain/notify"
+import type { NotifyDispatchKind } from "@modules/domain/notify"
 
 /** What dispatching a digest group takes. */
 export interface DispatchNotificationGroupRequest {
@@ -7,6 +7,3 @@ export interface DispatchNotificationGroupRequest {
     /** The digest group, which is the id of its digest window. */
     readonly groupId: string
 }
-
-/** How many notifications of the group were delivered, went back to queued for a retry, or bounced; all zero when there was nothing to send. */
-export type DispatchNotificationGroupResult = DispatchedGroup

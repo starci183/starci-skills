@@ -343,7 +343,7 @@ export interface SettleDispatchParams {
 }
 
 /** How many notifications of a dispatch ended in each way. */
-export interface DispatchedGroup {
+export interface DispatchNotificationGroupResult {
     /** Delivered. */
     readonly delivered: number
     /** Back to queued, with a retry message written. */

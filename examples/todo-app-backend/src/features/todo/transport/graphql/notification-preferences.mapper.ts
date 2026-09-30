@@ -1,6 +1,6 @@
 import { NOTIFY_CHANNEL_EMAIL } from "@modules/domain/notify"
 import type {
-    NotificationPreferences,
+    NotificationPreferencesResult,
     NotificationPreferencesRequest,
 } from "../../application/notification-preferences.contracts"
 import type { NotificationPreferencesInput } from "./dto/notification-preferences.input"
@@ -12,7 +12,7 @@ export const toNotificationPreferencesRequest = (
 ): NotificationPreferencesRequest => ({ channel: input?.channel ?? NOTIFY_CHANNEL_EMAIL })
 
 /** Maps the stored preferences to the GraphQL type. */
-export const toNotificationPreferencesType = (preferences: NotificationPreferences): NotificationPreferencesType => ({
+export const toNotificationPreferencesType = (preferences: NotificationPreferencesResult): NotificationPreferencesType => ({
     channel: preferences.channel,
     unsubscribed: preferences.unsubscribed,
     digestWindowMinutes: preferences.digestWindowMinutes,

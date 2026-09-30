@@ -4,7 +4,7 @@ export { NOTIFY_MESSAGES } from "./messages/notify.messages"
 export { NOTIFY_CHANNEL_EMAIL, NOTIFY_KIND_TASK_COMPLETE } from "./notify.contracts"
 export type {
     AdmittedNotification,
-    DispatchedGroup,
+    DispatchNotificationGroupResult,
     NotifyAdmitPayload,
     NotifyDispatchKind,
     NotifyDispatchPayload,
