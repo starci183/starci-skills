@@ -87,7 +87,6 @@ function fixture(t, kind, files = {}, apps = kind === 'backend' ? [{ name: 'core
       [`apps/${app}/package.json`]: JSON.stringify({ name: '@fixture/core', private: true }),
       [`apps/${app}/src/main.ts`]: 'void 0\n',
       [`apps/${app}/src/app.module.ts`]: 'export const AppModule = 1\n',
-      [`apps/${app}/src/${app}.composition.spec.ts`]: "import { AppModule } from './app.module'\nit('boots', () => { AppModule.register({}) })\n",
     } : {
       ...Object.fromEntries(apps.slice(1).map(other => [`apps/${other.name}/package.json`, JSON.stringify({ name: `@fixture/${other.name}`, private: true })])),
       [`apps/${app}/package.json`]: JSON.stringify({ name: '@fixture/web', private: true }),

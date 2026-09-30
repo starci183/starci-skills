@@ -323,7 +323,7 @@ export function checkBackend(config, context) {
           path: relativePath(config.root, fileName),
           line: 1,
           column: 1,
-          message: `Application source ${app.relative} is not a file its app slot requires or allows (main.ts, app.module.ts, <app>.options.ts, <app>.composition.spec.ts).`,
+          message: `Application source ${app.relative} is not a file its app slot requires or allows (main.ts, app.module.ts, <app>.options.ts).`,
         });
       }
     }

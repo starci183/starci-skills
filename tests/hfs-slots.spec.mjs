@@ -188,12 +188,12 @@ test('BE fixture: tracked, tier, required files', () => {
   assert.equal(be.tierOf('README.md'), 'none');
   assert.deepEqual(be.requiredFiles('src/features/orders/index.ts'), ['src/features/orders/index.ts', 'src/features/orders/orders.module.ts', 'src/features/orders/application/']);
   assert.deepEqual(be.requiredFiles('src/features/orders/transport/http/a.controller.ts'), ['src/features/orders/transport/http/orders-http.module.ts']);
-  assert.deepEqual(be.requiredFiles('apps/core/src/main.ts'), ['apps/core/src/main.ts', 'apps/core/src/app.module.ts', 'apps/core/src/core.composition.spec.ts']);
+  assert.deepEqual(be.requiredFiles('apps/core/src/main.ts'), ['apps/core/src/main.ts', 'apps/core/src/app.module.ts']);
   assert.deepEqual(be.requiredFiles('src/modules/domain/orders/persistence/x.ts'), ['src/modules/domain/orders/persistence/connection.ts']);
   const { paths, minimums } = be.requiredPaths();
   const has = (p) => paths.some((e) => e.path === p);
   for (const p of ['README.md', 'hfs.json', 'package-lock.json', 'tsconfig.json', 'nest-cli.json', '.husky/pre-push', '.github/workflows/ci.yml', '.sops.yaml', '.starciwork/', '.starciwork/features/index.yaml', '.starcistacks/application-stacks.yaml',
-    'apps/core/src/', 'apps/core/src/core.composition.spec.ts', 'apps/migrate/src/migrate.composition.spec.ts', 'src/modules/platform/config/', 'src/modules/platform/logging/', 'src/modules/platform/errors/', 'src/modules/platform/primitives/'])
+    'apps/core/src/', 'src/modules/platform/config/', 'src/modules/platform/logging/', 'src/modules/platform/errors/', 'src/modules/platform/primitives/'])
     assert.equal(has(p), true, `required path missing: ${p}`);
   assert.equal(has('.github/workflows/e2e.yml'), false, 'an optional file is not required');
   assert.equal(has('apps/worker/src/'), false, 'an opt-in app is not required');
@@ -348,14 +348,14 @@ test('an unknown path is reported with its nearest slot and HFS_SLOT_UNDECLARED'
   assert.equal(be.classifyPath('src/tests/e2e/orders/place.ts').path, 'src/tests/e2e/orders/place.ts');
 });
 
-test('be.feature.application.support is an optional feature-tier slot inside application/, unit-beside, opt-out by absence', () => {
+test('be.feature.application.support is an optional feature-tier slot inside application/, opt-out by absence', () => {
   const manifest = loadSlotManifest();
   const slot = manifest.slots.find((s) => s.id === 'be.feature.application.support');
   assert.ok(slot, 'the support slot exists');
   assert.equal(slot.path, 'src/features/<feature>/application/support/');
   assert.equal(slot.presence, 'optional');
   assert.equal(slot.tier, 'feature');
-  assert.equal(slot.tests, 'unit-beside');
+  assert.equal(slot.tests, 'none');
   assert.equal(slot.owner, undefined, 'support is not an owner: it belongs to the enclosing feature');
   const be = openHfs({ declaration: BE });
   assert.equal(be.classifyPath('src/features/orders/application/place.handler.ts').slot, 'be.feature.application');

@@ -45,7 +45,7 @@ rules:
   - id: R02
     code: "HFS_SLOT_REQUIRED_MISSING"
     title_vi: "Ô thiếu tệp bắt buộc"
-    law: "A slot is missing a required file (feature `index.ts`, app composition spec, FE `global-error.tsx`), or the root README breaks its standard shape (title, description, standard sections in order, Work pointer, live badges only, no private URL)."
+    law: "A slot is missing a required file (feature `index.ts`, app `main.ts`, FE `global-error.tsx`), or the root README breaks its standard shape (title, description, standard sections in order, Work pointer, live badges only, no private URL)."
     kinds: [check, codemod]
     gates: [settle, land, ci]
     failureCodes: ["HFS_SLOT_REQUIRED_MISSING", "HFS_MIN_INSTANCES", "BE_REQUIRED_MODULE_MISSING", "HFS_REQUIRED_FILE_MISSING", "HFS_ROOT_ENTRY_MISSING", "HFS_APPS_REQUIRED", "HFS_APP_LAYOUT_INVALID", "HFS_README_TITLE_INVALID", "HFS_README_DESCRIPTION_INVALID", "HFS_README_SECTION_MISSING", "HFS_README_SECTION_ORDER", "HFS_README_DEVELOPMENT_INCOMPLETE", "HFS_README_WORK_POINTER_MISSING", "HFS_README_PRIVATE_URL", "HFS_README_BADGE_NOT_LIVE"]
@@ -343,13 +343,12 @@ rules:
   - id: R32
     code: "BE_APP_COMPOSITION_ONLY"
     title_vi: "App chứa logic ngoài việc compose"
-    law: "Apps compose only; the composition spec boots the real module."
+    law: "Apps compose only; an app is proven by the e2e world (`useTestWorld({ apps })`), never by a unit spec."
     kinds: [check, codemod]
     gates: [settle, land, ci]
     failureCodes: ["BE_APP_COMPOSITION_ONLY", "BE_APP_BUSINESS_ROLE"]
     enforcers:
       - {kind: machine, id: app-composition-only, at: scripts/checks/architecture/backend.mjs}
-      - {kind: machine, id: composition-spec-boots-real-module, at: scripts/checks/architecture/composition-spec.mjs}
   - id: R33
     code: "BE_ENTRYPOINT_ONLY_IN_APPS"
     title_vi: "Entrypoint nằm ngoài apps"
@@ -539,6 +538,7 @@ rules:
       - {kind: eslint-be, id: spec-no-module-mock}
       - {kind: eslint-be, id: no-return-only-generic}
       - {kind: eslint-be, id: spec-infra-double-from-kit}
+      - {kind: machine, id: unit-spec-providers, at: scripts/checks/architecture/unit-spec-providers.mjs}
   - id: R49
     code: "FE_ENV_OWNER"
     title_vi: "Đọc biến môi trường ngoài modules/config"
@@ -946,7 +946,7 @@ rules:
   - id: R85
     code: "BE_RAW_INJECT"
     title_vi: "Phụ thuộc hạ tầng không được tiêm qua Inject*()"
-    law: "Every injected infrastructure dependency arrives through a zero-argument `Inject<Thing>()` from its owner's `<owner>.decorators.ts` over a `unique symbol` token; raw `@Inject(` exists only there."
+    law: "Every injected infrastructure dependency arrives through a zero-argument `Inject<Thing>()` from its owner's `<owner>.decorators.ts` over a `unique symbol` token; raw `@Inject(` exists only there, and every such token is exported so a spec can provide it."
     kinds: [lint, codemod]
     gates: [pre-commit, pre-push, settle, land, ci]
     failureCodes: ["BE_RAW_INJECT"]
@@ -958,6 +958,7 @@ rules:
       - {kind: eslint-be, id: no-module-ref}
       - {kind: eslint-be, id: no-forward-ref}
       - {kind: eslint-be, id: no-string-token}
+      - {kind: machine, id: injection-token-exported, at: scripts/checks/architecture/injection-token-exported.mjs}
   - id: R86
     code: "BE_SQL_TABLE_OWNER"
     title_vi: "SQL ghi bảng của năng lực khác hoặc đọc không giới hạn"

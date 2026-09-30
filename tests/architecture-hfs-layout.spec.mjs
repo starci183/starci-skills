@@ -72,17 +72,17 @@ test('HFS_ROOT_MARKDOWN_FORBIDDEN: a root Markdown file other than README.md is 
 
 // The app layout, the root allowlist and the tests/ children are read from the slots (knowledge/hfs/slots.yaml), not from a list in the check.
 const MIGRATE_APPS = [{ name: 'core', kind: 'api' }, { name: 'migrate', kind: 'migrate' }];
-const CORE_FILES = { 'apps/core/src/core.composition.spec.ts': 'export {};\n' };
+const CORE_FILES = {};
 const withMigrate = (t, files) => runArch(archFixture(t, { profile: 'be', apps: MIGRATE_APPS, declaration: { connections: [{ name: 'primary', envPrefix: 'PRIMARY' }] }, files: { ...ROOT_BE, ...CORE_FILES, ...files } }));
 
-test('HFS_APP_LAYOUT_INVALID: a migrate app needs only main.ts and its composition spec (no app.module.ts); an api app still needs app.module.ts', t => {
-  const migrate = withMigrate(t, { 'apps/migrate/src/main.ts': 'void 0;\n', 'apps/migrate/src/migrate.composition.spec.ts': 'export {};\n' });
+test('HFS_APP_LAYOUT_INVALID: a migrate app needs only main.ts (no app.module.ts); an api app still needs app.module.ts', t => {
+  const migrate = withMigrate(t, { 'apps/migrate/src/main.ts': 'void 0;\n' });
   assert.deepEqual(ids(migrate, 'HFS_APP_LAYOUT_INVALID'), []);
-  const incomplete = withMigrate(t, { 'apps/migrate/src/main.ts': 'void 0;\n' });
+  const incomplete = withMigrate(t, { 'apps/migrate/src/migrate.options.ts': 'export {};\n' });
   assert.deepEqual(ids(incomplete, 'HFS_APP_LAYOUT_INVALID'), ['apps/migrate']);
-  assert.match(findings(incomplete, 'HFS_APP_LAYOUT_INVALID')[0].message, /migrate\.composition\.spec\.ts/);
+  assert.match(findings(incomplete, 'HFS_APP_LAYOUT_INVALID')[0].message, /main\.ts/);
   assert.doesNotMatch(findings(incomplete, 'HFS_APP_LAYOUT_INVALID')[0].message, /app\.module\.ts/);
-  const api = withMigrate(t, { 'apps/migrate/src/main.ts': 'void 0;\n', 'apps/migrate/src/migrate.composition.spec.ts': 'export {};\n', 'apps/core/src/app.module.ts': null });
+  const api = withMigrate(t, { 'apps/migrate/src/main.ts': 'void 0;\n', 'apps/core/src/app.module.ts': null });
   assert.deepEqual(ids(api, 'HFS_APP_LAYOUT_INVALID'), ['apps/core']);
   assert.match(findings(api, 'HFS_APP_LAYOUT_INVALID')[0].message, /app\.module\.ts/);
 });

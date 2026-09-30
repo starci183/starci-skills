@@ -245,7 +245,7 @@ BE_APP_BUSINESS_ROLE:
 BE_APP_COMPOSITION_ONLY:
   title: "Composition root has stray source"
   title_vi: "Gốc ghép nối có tệp lạc chỗ"
-  meaning_vi: "Mã trong ứng dụng gốc không phải tệp mà slot ứng dụng cho phép (main.ts, app.module.ts, <app>.options.ts, <app>.composition.spec.ts)."
+  meaning_vi: "Mã trong ứng dụng gốc không phải tệp mà slot ứng dụng cho phép (main.ts, app.module.ts, <app>.options.ts)."
   causes_vi:
     - "Thêm tệp không đúng tên vào thư mục ứng dụng gốc"
     - "Composition spec của app tự khai AppModule, import AppModule từ tệp khác app.module, hoặc không gọi AppModule.register( — module thật không bao giờ được khởi chạy"
@@ -424,6 +424,20 @@ BE_PUBLIC_CONTRACT_FORM:
   owner: op-retry
   kind: check-finding
 
+BE_RAW_INJECT:
+  title: "Infrastructure dependency injected without its Inject*() decorator"
+  title_vi: "Phụ thuộc hạ tầng không được tiêm qua Inject*()"
+  meaning_vi: "Mọi tham số constructor có kiểu thuộc hạ tầng (EntityManager, CommandBus, Clock, Logger, Cache, HttpClient, options của module, client SDK) phải mang một decorator Inject<Thing>() không tham số, export từ <owner>.decorators.ts và dựng bằng injector<T>(token) trên token unique symbol. Bộ kiểm tra thấy @Inject( thô ngoài *.decorators.ts, token chuỗi, forwardRef, ModuleRef, tiêm qua thuộc tính, injector sai hình hoặc kiểu T khác kiểu tham số. Token của Inject<Thing>() mà một service dùng cũng phải được export (từ <cap>.decorators.ts hoặc index.ts của năng lực) để spec có thể cung cấp nó."
+  causes_vi:
+    - "Token của Inject<Thing>() là const riêng tư, không export"
+    - "@Inject(TOKEN) viết thẳng ở nơi dùng"
+    - "Token là chuỗi thay vì unique symbol"
+    - "Tiêm lớp hạ tầng (CacheService, AppLogger) không qua injector"
+    - "Dùng ModuleRef.get hoặc forwardRef để né vòng phụ thuộc"
+  nextStep_vi: "Khai báo token `export const THING: unique symbol = Symbol(\"<owner>.<thing>\")` và `export const InjectThing = (): TypedParameterDecorator<Thing> => injector<Thing>(THING)` trong <owner>.decorators.ts rồi dùng @InjectThing() ở mọi nơi; vòng phụ thuộc là lỗi kiến trúc cần gỡ, không dùng forwardRef. Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra và mục của luật trong BE-CONVENTION; không thêm ngoại lệ, không tắt luật."
+  owner: op-retry
+  kind: check-finding
+
 BE_READONLY_BOUNDARY:
   title: "Readonly boundary violated"
   title_vi: "Vi phạm ranh giới chỉ-đọc"
@@ -438,11 +452,10 @@ BE_READONLY_BOUNDARY:
 BE_REQUIRED_MODULE_MISSING:
   title: "Required backend module, app or feature file is missing"
   title_vi: "Thiếu tệp hoặc thư mục bắt buộc của một phần backend"
-  meaning_vi: "Bảng kê HFS bắt buộc mỗi ứng dụng, tính năng, module miền, tích hợp và module nền tảng (cấu hình, ghi nhật ký, lỗi, kiểu nguyên thuỷ) phải có một số tệp hoặc thư mục cố định, ví dụ index.ts, tệp .module.ts, thư mục application/ hay bài kiểm thử ghép ứng dụng. Ở đây một mục như vậy không tồn tại, nên phần đó chưa đúng khuôn và các bộ kiểm tra khác không thể tin vào nó."
+  meaning_vi: "Bảng kê HFS bắt buộc mỗi ứng dụng, tính năng, module miền, tích hợp và module nền tảng (cấu hình, ghi nhật ký, lỗi, kiểu nguyên thuỷ) phải có một số tệp hoặc thư mục cố định, ví dụ index.ts, tệp .module.ts hay thư mục application/. Ở đây một mục như vậy không tồn tại, nên phần đó chưa đúng khuôn và các bộ kiểm tra khác không thể tin vào nó."
   causes_vi:
     - "Tạo module hoặc tính năng mới nhưng quên tệp cửa vào index.ts hoặc tệp .module.ts"
     - "Module nền tảng bắt buộc (config, logging, errors, primitives) chưa được tạo hoặc đặt tên khác"
-    - "Ứng dụng thiếu bài kiểm thử ghép <app>.composition.spec.ts"
   nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để tạo tệp hoặc thư mục còn thiếu đúng theo bảng kê; nếu tên hiện có là do thiết kế khác thì đó là việc đổi bảng kê, do người giám sát quyết định."
   owner: op-retry
   kind: check-finding
@@ -470,6 +483,19 @@ BE_SOURCE_FORM:
     - "Thiếu JSDoc trên export"
     - "Chú thích tiếng Việt trong mã"
   nextStep_vi: "Đổi tên tệp theo vai trò trong danh sách đóng, chuyển kiểu vào <tên>.contracts.ts, thêm JSDoc tiếng Anh và bỏ export default. Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra và mục của luật trong BE-CONVENTION; không thêm ngoại lệ, không tắt luật."
+  owner: op-retry
+  kind: check-finding
+
+BE_SPEC_QUALITY:
+  title: "Spec reads source, or an e2e breaks its flow shape"
+  title_vi: "Spec đọc mã nguồn hoặc e2e phá dạng luồng"
+  meaning_vi: "Một spec đọc mã nguồn của repo bằng fs để kiểm tra chữ, một spec chỉ khẳng định lời gọi thay vì kết quả, hoặc một e2e đi vòng qua transport, ngủ theo thời lượng, rẽ nhánh trong bước, tự dựng module, gọi nhà cung cấp mô hình hay không đọc lại trạng thái đã lưu. Ép kiểu (as, x!) trong spec do các luật mượn của typescript-eslint chặn, cùng mã BE_TYPE_ESCAPE."
+  causes_vi:
+    - "readFileSync hay readdirSync trên mã nguồn hoặc __dirname trong spec"
+    - "Spec chỉ có toHaveBeenCalled*, không khẳng định kết quả hay trạng thái"
+    - "e2e gọi CommandBus, QueryBus hay handler trực tiếp; dùng sleep thay cho waitFor; tự gọi Test.createTestingModule; import SDK của nhà cung cấp mô hình; không đọc lại dòng đã lưu qua EntityManager"
+    - "Spec đơn vị của service có providers khác với phụ thuộc constructor: thừa nhà cung cấp, thiếu nhà cung cấp, service không đứng đầu, token không suy ra được hoặc nhà cung cấp không phải lớp hay { provide, useValue }"
+  nextStep_vi: "Chuyển luật kiến trúc sang lint hoặc bộ kiểm tra; khẳng định kết quả hoặc trạng thái; e2e vào bằng transport thật, chờ bằng waitFor và dựng thế giới ở src/tests/e2e/setup. Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra."
   owner: op-retry
   kind: check-finding
 

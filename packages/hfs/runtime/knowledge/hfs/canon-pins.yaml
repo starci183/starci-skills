@@ -198,7 +198,7 @@ pins:
     version: 7.3.0
     group: tooling
     side: be
-    why: the composition spec of the back-end skeleton boots the real AppModule and calls /health/live; starci-next and mia-mia-backend resolve 7.3.0, nivo-backend 7.2.2.
+    why: the e2e world of a back end calls the app over HTTP (/health/live in the skeleton); starci-next and mia-mia-backend resolve 7.3.0, nivo-backend 7.2.2.
   # --- ui
   '@heroui/react':
     version: 3.2.6

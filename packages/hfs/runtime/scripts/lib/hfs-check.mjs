@@ -158,7 +158,7 @@ function sourceFormFindings({ files, resolver }) {
     if (c.status !== 'owned' || c.tracking === 'ignored') continue;
     const base = path.posix.basename(file);
     if (FREE_NAMES.has(base)) continue;
-    // A literal file name the owning slot itself requires or allows (persistence/connection.ts, fixtures/database.ts) is its role.
+    // A literal file name the owning slot itself requires or allows (persistence/connection.ts, world/global-setup.ts) is its role.
     const slot = resolver.slot(c.slot);
     if ([...(slot?.requires ?? []), ...(slot?.allows ?? [])].some((entry) => entry === base)) continue;
     // A slot whose `allows` holds a bare <name>.ts entry (be.tests.world.kit) names its files plainly, as platform/primitives does: kebab-case is the whole form.
@@ -410,7 +410,7 @@ export function checkRepository({ repoRoot, root = skillRoot, fast = false, base
 // --------------------------------------------------------------------------------------------------- explain
 
 const TEST_KIND = {
-  'unit-beside': 'a unit spec beside each source file (<name>.spec.ts / .spec.tsx) in this slot',
+  'unit-beside': 'a <name>.service.spec.ts beside each <name>.service.ts in this slot (only services are unit-tested)',
   e2e: 'an e2e spec (*.e2e-spec.ts or a Playwright spec) covering the flow; no unit spec is required',
   none: 'no test is required for files in this slot',
 };

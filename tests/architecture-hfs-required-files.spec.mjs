@@ -10,7 +10,7 @@ const PLATFORM = ['config', 'logging', 'errors', 'primitives', 'clock', 'i18n'];
 const platformFiles = (skip = []) => Object.fromEntries(PLATFORM.filter(name => !skip.includes(name))
   .map(name => [`src/modules/platform/${name}/index.ts`, 'export const value = 1;\n']));
 const paths = (report, ruleId) => findings(report, ruleId).map(item => item.path).sort();
-const COMPOSITION = { 'apps/core/src/core.composition.spec.ts': 'export {};\n' };
+const COMPOSITION = {};
 const FEATURE = {
   'src/features/a/index.ts': 'export const a = 1;\n',
   'src/features/a/a.module.ts': 'export const AModule = 1;\n',
@@ -40,11 +40,6 @@ test('BE: with no platform module at all all six are missing; one lacking index.
   assert.deepEqual(paths(runArch(none), 'BE_REQUIRED_MODULE_MISSING'), PLATFORM.map(name => `src/modules/platform/${name}`).sort());
   const noIndex = archFixture(t, { files: { ...platformFiles(['logging']), 'src/modules/platform/logging/logger.ts': 'export const l = 1;\n', ...COMPOSITION, ...FEATURE } });
   assert.deepEqual(paths(runArch(noIndex), 'BE_REQUIRED_MODULE_MISSING'), ['src/modules/platform/logging/index.ts']);
-});
-
-test('BE: an app without its composition spec is flagged', t => {
-  const root = archFixture(t, { files: { ...platformFiles(), ...FEATURE } });
-  assert.deepEqual(paths(runArch(root), 'BE_REQUIRED_MODULE_MISSING'), ['apps/core/src/core.composition.spec.ts']);
 });
 
 test('BE: a feature missing index.ts and application/ is flagged, a domain without index.ts too', t => {

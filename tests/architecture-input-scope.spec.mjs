@@ -151,7 +151,7 @@ test('real broad TypeScript programs retain explicit configuration roles without
   for(const [file,text] of Object.entries({'.gitattributes':'* text=auto eol=lf\n','.github/workflows/check.yml':'name: check\n','.gitignore':'node_modules/\n',
     '.husky/pre-commit':'exit 0\n','.sops.yaml':'creation_rules: []\n','.starcistacks/application-stacks.yaml':'environments: []\n','.starciwork/.gitignore':'runtime.sqlite\n',
     'README.md':hfsReadme(f.root),'codecov.yml':'coverage: {}\n','eslint.config.mjs':'export default [];\n','nest-cli.json':'{}\n','package-lock.json':'{}\n',
-    'sonar-project.properties':'sonar.projectKey=fixture\n','apps/api/package.json':'{"name":"@fixture/api","private":true}\n','apps/api/src/app.module.ts':APP_MODULE,'apps/api/src/api.composition.spec.ts':"import { AppModule } from './app.module';\nit('boots', () => { AppModule.register({}); });\n",...COMPLETE_TREE}))f.write(file,text);
+    'sonar-project.properties':'sonar.projectKey=fixture\n','apps/api/package.json':'{"name":"@fixture/api","private":true}\n','apps/api/src/app.module.ts':APP_MODULE,...COMPLETE_TREE}))f.write(file,text);
   f.write('package.json',JSON.stringify({private:true}));
   f.write('hfs.json',JSON.stringify({hfs:1,profile:'be',project:'fixture',apps:[{name:'api',kind:'api'}]}));
   f.write('tsconfig.json',JSON.stringify({compilerOptions:{target:'ES2022',module:'ESNext',moduleResolution:'Bundler',strict:true,allowJs:true},include:['**/*.ts','jest.config.js']}));
@@ -170,7 +170,7 @@ test('real broad TypeScript programs retain explicit configuration roles without
   const options={...f.options,architecture:checkArchitecture};
   let report=await checkScopedLint(f.root,[],options);
   assert.equal(report.status,'clean',JSON.stringify(report.issues));
-  const expected=[...new Set([...Object.keys(COMPLETE_TREE),'apps/api/src/api.composition.spec.ts','apps/api/src/app.module.ts','apps/api/src/main.ts','packages/store/src/store.ts','src/modules/domain/store/service.ts'])].filter(file=>file.endsWith('.ts')).sort();
+  const expected=[...new Set([...Object.keys(COMPLETE_TREE),'apps/api/src/app.module.ts','apps/api/src/main.ts','packages/store/src/store.ts','src/modules/domain/store/service.ts'])].filter(file=>file.endsWith('.ts')).sort();
   assert.deepEqual(report.obligations.find(item=>item.id==='SOURCE-SCRIPT').files,expected);
   const input=f.seen.find(item=>item.ruleIds.includes('SOURCE_TEST_RULE'));
   assert.deepEqual(input.sourceContextFiles,expected);

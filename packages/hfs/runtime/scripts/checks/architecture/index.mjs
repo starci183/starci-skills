@@ -28,7 +28,8 @@ import { checkErrorCodes, ERROR_CODE_RULE_IDS } from './error-codes.mjs';
 import { checkConfigUnread, CONFIG_UNREAD_RULE_IDS } from './config-unread.mjs';
 import { checkFeatureShape, FEATURE_SHAPE_RULE_IDS } from './feature-shape.mjs';
 import { checkTestWorldFiles, TEST_WORLD_FILES_RULE_IDS } from './test-world-files.mjs';
-import { checkCompositionSpec, COMPOSITION_SPEC_RULE_IDS } from './composition-spec.mjs';
+import { checkUnitSpecProviders, UNIT_SPEC_PROVIDERS_RULE_IDS } from './unit-spec-providers.mjs';
+import { checkInjectionTokenExported, INJECTION_TOKEN_EXPORTED_RULE_IDS } from './injection-token-exported.mjs';
 import { checkSchemaOwner, SCHEMA_OWNER_RULE_IDS } from './schema-owner.mjs';
 import { checkModulePerTransport, MODULE_PER_TRANSPORT_RULE_IDS } from './module-per-transport.mjs';
 import { checkBackgroundUnowned, BACKGROUND_UNOWNED_RULE_IDS } from './background-unowned.mjs';
@@ -51,7 +52,7 @@ const LIMITATIONS = [
   'Frontend SWR lifecycle rules prove declared key bindings and installed SWR identity only; domain identity completeness, stale-result behavior and mutation effects require target behavior evidence.',
 ];
 
-// The backend composition and data machine (R29, R32, R33, R35, R38, R39, R41, R45, R46, R47, R84, R86): name -> [check, the rule ids it makes truthful].
+// The backend composition and data machine (R29, R32, R33, R35, R38, R39, R41, R45, R46, R47, R48, R84, R85, R86): name -> [check, the rule ids it makes truthful].
 const BACKEND_MACHINE = {
   connectionMap: [checkConnectionMap, CONNECTION_RULE_IDS],
   sqlOwner: [checkSqlOwner, SQL_OWNER_RULE_IDS],
@@ -61,7 +62,8 @@ const BACKEND_MACHINE = {
   entrypoints: [checkEntrypoints, ENTRYPOINT_RULE_IDS],
   errorCodes: [checkErrorCodes, ERROR_CODE_RULE_IDS],
   featureShape: [checkFeatureShape, FEATURE_SHAPE_RULE_IDS],
-  compositionSpec: [checkCompositionSpec, COMPOSITION_SPEC_RULE_IDS],
+  unitSpecProviders: [checkUnitSpecProviders, UNIT_SPEC_PROVIDERS_RULE_IDS],
+  injectionTokenExported: [checkInjectionTokenExported, INJECTION_TOKEN_EXPORTED_RULE_IDS],
   schemaOwner: [checkSchemaOwner, SCHEMA_OWNER_RULE_IDS],
   modulePerTransport: [checkModulePerTransport, MODULE_PER_TRANSPORT_RULE_IDS],
   backgroundUnowned: [checkBackgroundUnowned, BACKGROUND_UNOWNED_RULE_IDS],

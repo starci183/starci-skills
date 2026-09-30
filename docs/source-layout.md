@@ -83,7 +83,6 @@ apps/<app>/                          # backend: composition only (kind api | wor
     ├── main.ts                      # reads EnvSource once, parses options, bootstraps
     ├── app.module.ts                # AppModule.register(options): transport and capability modules
     ├── <app>.options.ts             # optional options type
-    └── <app>.composition.spec.ts    # required: boots the REAL AppModule with stubbed options
 
 apps/<app>/                          # frontend: one workspace package
 ├── package.json, next.config.ts, tsconfig.json, postcss.config.mjs, vitest.config.ts

@@ -233,11 +233,11 @@ test('explain names the slot, tier, allowed imports and required tests of a path
   assert.equal(owned.tier, 'feature');
   assert.deepEqual(owned.owner, { slot: 'be.feature', root: 'src/features/orders' });
   assert.deepEqual(owned.allowedImports, ['domain', 'platform', 'integrations', 'package']);
-  assert.equal(owned.tests, 'unit-beside');
+  assert.equal(owned.tests, 'none');
 
   const app = explainPath({ repoRoot: dir, input: 'apps/core/src/main.ts' });
   assert.equal(app.slot, 'be.app.api');
-  assert.ok(app.requiredFiles.includes('apps/core/src/core.composition.spec.ts'));
+  assert.deepEqual(app.requiredFiles, ['apps/core/src/main.ts', 'apps/core/src/app.module.ts']);
 
   const lost = explainPath({ repoRoot: dir, input: 'src/stray/x.ts' });
   assert.equal(lost.status, 'no-slot');

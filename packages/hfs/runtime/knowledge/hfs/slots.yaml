@@ -488,9 +488,9 @@ slots:
     tier: app
     owner: true
     minInstances: 1
-    requires: [main.ts, app.module.ts, "<app>.composition.spec.ts"]
-    allows: [main.ts, app.module.ts, "<app>.composition.spec.ts", "<app>.options.ts"]
-    tests: unit-beside            # the composition spec boots the REAL AppModule with stubbed options
+    requires: [main.ts, app.module.ts]
+    allows: [main.ts, app.module.ts, "<app>.options.ts"]
+    tests: none                   # an app is proven by the e2e world (useTestWorld({ apps })), never by a unit spec
     budget: {app.module.ts: 250, main.ts: 80}
     rules: [BE_APP_COMPOSITION_ONLY, BE_APP_BUSINESS_ROLE, BE_DEFAULT_DENY, BE_ERROR_MASKED, BE_FEATURE_NOT_COMPOSED]
   - id: be.app.worker
@@ -501,9 +501,9 @@ slots:
     tracked: tracked
     tier: app
     owner: true
-    requires: [main.ts, app.module.ts, "<app>.composition.spec.ts"]
-    allows: [main.ts, app.module.ts, "<app>.composition.spec.ts", "<app>.options.ts"]
-    tests: unit-beside
+    requires: [main.ts, app.module.ts]
+    allows: [main.ts, app.module.ts, "<app>.options.ts"]
+    tests: none                   # an app is proven by the e2e world (useTestWorld({ apps })), never by a unit spec
     rules: [BE_APP_COMPOSITION_ONLY, BE_BACKGROUND_UNOWNED]
   - id: be.app.migrate
     profiles: [be]
@@ -514,9 +514,9 @@ slots:
     tracked: tracked
     tier: app
     owner: true
-    requires: [main.ts, "<app>.composition.spec.ts"]
-    allows: [main.ts, "<app>.composition.spec.ts", "<app>.options.ts"]
-    tests: unit-beside
+    requires: [main.ts]
+    allows: [main.ts, "<app>.options.ts"]
+    tests: none                   # an app is proven by the e2e world (useTestWorld({ apps })), never by a unit spec
     rules: [BE_SCHEMA_AUTHORITY, BE_ENTRYPOINT_ONLY_IN_APPS]
   - id: be.app.cli
     profiles: [be]
@@ -526,9 +526,9 @@ slots:
     tracked: tracked
     tier: app
     owner: true
-    requires: [main.ts, app.module.ts, "<app>.composition.spec.ts"]
-    allows: [main.ts, app.module.ts, "<app>.composition.spec.ts", "<app>.options.ts"]
-    tests: unit-beside
+    requires: [main.ts, app.module.ts]
+    allows: [main.ts, app.module.ts, "<app>.options.ts"]
+    tests: none                   # an app is proven by the e2e world (useTestWorld({ apps })), never by a unit spec
 
   # ----- BE: features ------------------------------------------------------------------------------------
   - id: be.feature
@@ -541,7 +541,7 @@ slots:
     minInstances: 1
     requires: [index.ts, "<feature>.module.ts", application/]
     allows: [index.ts, "<feature>.module.ts", application/, transport/, messages/]   # nothing else at feature root
-    tests: unit-beside
+    tests: none
     budget: {files: 250, indexExports: 60}   # a feature above 250 source files must be split by product capability
     rules: [BE_FEATURE_SHAPE, BE_FEATURE_IMPORTS_FEATURE, BE_PUBLIC_SURFACE, BE_FEATURE_NOT_COMPOSED]
   - id: be.feature.application
@@ -550,9 +550,9 @@ slots:
     presence: required
     tracked: tracked
     tier: feature
-    allows: ["<action>.{command,query,handler,contracts}.ts", "*.spec.ts"]
+    allows: ["<action>.{command,query,handler,contracts}.ts"]
     forbids: [graphql/, http/, message/, schedule/, transport/]   # no protocol names under application/
-    tests: unit-beside
+    tests: none
     rules: [BE_APPLICATION_IMPORTS_TRANSPORT, BE_APPLICATION_TRANSPORT_FRAMEWORK, BE_ENTITY_IN_CONTRACT, BE_CQRS_SHAPE]
   - id: be.feature.application.support
     profiles: [be]
@@ -560,9 +560,9 @@ slots:
     presence: optional            # helpers and types local to ONE feature; same tier as application, never a shared home
     tracked: tracked
     tier: feature                 # feature tier: another feature cannot import it (features never import features)
-    allows: ["<name>.<role>.ts", "*.spec.ts"]     # <role> from ruleParams.be.suffixes; no <name>.types.ts
+    allows: ["<name>.<role>.ts"]     # <role> from ruleParams.be.suffixes; no <name>.types.ts
     forbids: [graphql/, http/, message/, schedule/, transport/]
-    tests: unit-beside            # a <name>.spec.ts beside every <name>.ts
+    tests: none
     rules: [BE_APPLICATION_IMPORTS_TRANSPORT, BE_APPLICATION_TRANSPORT_FRAMEWORK, BE_FEATURE_IMPORTS_FEATURE]
     since: 1.0.0
   - id: be.transport.http
@@ -572,8 +572,8 @@ slots:
     tracked: tracked
     tier: feature
     requires: ["<feature>-http.module.ts"]
-    allows: ["<action>.controller.ts", "dto/<action>.{request,response}.ts", "<action>.mapper.ts", "*.spec.ts"]
-    tests: unit-beside
+    allows: ["<action>.controller.ts", "dto/<action>.{request,response}.ts", "<action>.mapper.ts"]
+    tests: none
     composedBy: [api]
     rules: [BE_DEFAULT_DENY, BE_INPUT_BOUNDED, BE_TRANSPORT_SHAPE]
   - id: be.transport.graphql
@@ -583,8 +583,8 @@ slots:
     tracked: tracked
     tier: feature
     requires: ["<feature>-graphql.module.ts"]
-    allows: ["<action>.resolver.ts", "dto/<action>.{input,type,args}.ts", "<action>.mapper.ts", "*.spec.ts"]
-    tests: unit-beside
+    allows: ["<action>.resolver.ts", "dto/<action>.{input,type,args}.ts", "<action>.mapper.ts"]
+    tests: none
     composedBy: [api]
     rules: [BE_DEFAULT_DENY, BE_INPUT_BOUNDED, BE_TRANSPORT_SHAPE]
   - id: be.transport.message
@@ -594,8 +594,8 @@ slots:
     tracked: tracked
     tier: feature
     requires: ["<feature>-message.module.ts"]
-    allows: ["<event>.consumer.ts", "*.spec.ts"]     # BE-CONVENTION 1.6: transport/message holds only consumers; a .message.ts is outside the closed suffix list
-    tests: unit-beside
+    allows: ["<event>.consumer.ts"]     # BE-CONVENTION 1.6: transport/message holds only consumers; a .message.ts is outside the closed suffix list
+    tests: none
     composedBy: [worker]
     rules: [BE_BACKGROUND_UNOWNED]
   - id: be.transport.schedule
@@ -605,8 +605,8 @@ slots:
     tracked: tracked
     tier: feature
     requires: ["<feature>-schedule.module.ts"]
-    allows: ["<job>.job.ts", "*.spec.ts"]
-    tests: unit-beside
+    allows: ["<job>.job.ts"]
+    tests: none
     composedBy: [worker]
     rules: [BE_BACKGROUND_UNOWNED]
   - id: be.transport.websocket
@@ -616,8 +616,8 @@ slots:
     tracked: tracked
     tier: feature
     requires: ["<feature>-websocket.module.ts"]
-    allows: ["<channel>.gateway.ts", "dto/*.ts", "*.spec.ts"]
-    tests: unit-beside
+    allows: ["<channel>.gateway.ts", "dto/*.ts"]
+    tests: none
     composedBy: [api]
     since: 1.0.0
   - id: be.feature.transport.cli
@@ -627,8 +627,8 @@ slots:
     tracked: tracked
     tier: feature
     requires: ["<feature>-cli.module.ts"]
-    allows: ["<name>.cli.ts", "dto/*.ts", "*.spec.ts"]     # .cli.ts: .command.ts is a CQRS message (HFS delta 3)
-    tests: unit-beside
+    allows: ["<name>.cli.ts", "dto/*.ts"]     # .cli.ts: .command.ts is a CQRS message (HFS delta 3)
+    tests: none
     composedBy: [cli]
     rules: [BE_APPLICATION_IMPORTS_TRANSPORT, BE_FEATURE_NOT_COMPOSED, BE_ENTRYPOINT_ONLY_IN_APPS]
     since: 1.0.0
@@ -642,9 +642,9 @@ slots:
     tier: domain
     owner: true
     requires: [index.ts]
-    allows: ["<capability>.module.ts", "<capability>.config.ts", "<capability>.options.ts", errors/, messages/, persistence/, policies/, "*.service.ts", "*.contracts.ts", "*.spec.ts"]
+    allows: ["<capability>.module.ts", "<capability>.config.ts", "<capability>.options.ts", errors/, messages/, persistence/, policies/, "*.service.ts", "*.service.spec.ts", "*.contracts.ts"]
     forbids: [testing/, exceptions/, utils/, helpers/, shared/]
-    tests: unit-beside
+    tests: unit-beside            # <name>.service.spec.ts beside each <name>.service.ts, nothing else
     budget: {indexExports: 60}
     rules: [BE_TIER_DIRECTION, ARCH_OWNER_CYCLE, BE_PUBLIC_SURFACE, BE_ERROR_HOME, BE_CONFIG_OWNER]
   - id: be.errors
@@ -653,8 +653,8 @@ slots:
     presence: optional
     tracked: tracked
     tier: inherit
-    allows: ["<capability>.error.ts", "<name>.error.ts", "*.spec.ts"]   # one family per capability, extends platform/errors DomainError
-    tests: unit-beside
+    allows: ["<capability>.error.ts", "<name>.error.ts"]   # one family per capability, extends platform/errors DomainError
+    tests: none
     rules: [BE_ERROR_HOME]
   - id: be.domain.messages
     profiles: [be]
@@ -662,8 +662,8 @@ slots:
     presence: optional            # a capability that raises no user-facing text carries none
     tracked: tracked
     tier: inherit
-    allows: ["<capability>.messages.ts", "*.spec.ts"]   # one keyed catalog per capability, vi and en, read through the platform/i18n MessageCatalog port
-    tests: unit-beside
+    allows: ["<capability>.messages.ts"]   # one keyed catalog per capability, vi and en, read through the platform/i18n MessageCatalog port
+    tests: none
     rules: [BE_USER_COPY_LITERAL]
     since: 1.0.0
   - id: be.feature.messages
@@ -672,8 +672,8 @@ slots:
     presence: optional
     tracked: tracked
     tier: feature
-    allows: ["<feature>.messages.ts", "*.spec.ts"]   # one keyed catalog per feature, vi and en, read through the platform/i18n MessageCatalog port
-    tests: unit-beside
+    allows: ["<feature>.messages.ts"]   # one keyed catalog per feature, vi and en, read through the platform/i18n MessageCatalog port
+    tests: none
     rules: [BE_USER_COPY_LITERAL]
     since: 1.0.0
   - id: be.persistence
@@ -683,9 +683,9 @@ slots:
     tracked: tracked
     tier: inherit
     requires: [connection.ts]     # the capability's <c>Entities / <c>Migrations arrays (the owner index re-exports the two arrays by name); no CONNECTION alias: the connection is the one the apps register the arrays on
-    allows: ["entities/<table>.entity.ts", "migrations/<epochMs13>-<kebab-name>.ts", "<name>.sql.ts", "<name>.rows.ts", connection.ts, "*.spec.ts"]
+    allows: ["entities/<table>.entity.ts", "migrations/<epochMs13>-<kebab-name>.ts", "<name>.sql.ts", "<name>.rows.ts", connection.ts]
     forbids: [index.ts, "<name>.repository.ts"]
-    tests: unit-beside
+    tests: none
     rules: [BE_SCHEMA_OWNER, BE_SCHEMA_AUTHORITY, BE_SQL_OUTSIDE_PERSISTENCE]
   - id: be.platform
     profiles: [be]
@@ -704,7 +704,7 @@ slots:
     requiredInstances: {capability: [config, logging, errors, primitives, clock, i18n]}
     requires: [index.ts]
     forbids: [common/, utils/, shared/, testing/]   # primitives live in platform/primitives
-    tests: unit-beside
+    tests: unit-beside            # <name>.service.spec.ts beside each <name>.service.ts, nothing else
     budget: {indexExports: 60}
     rules: [BE_TIER_DIRECTION, ARCH_OWNER_CYCLE, BE_MODULE_SHAPE]
   - id: be.integrations
@@ -715,7 +715,7 @@ slots:
     tier: integrations
     owner: true
     requires: [index.ts, "<provider>.config.ts"]
-    tests: unit-beside
+    tests: unit-beside            # <name>.service.spec.ts beside each <name>.service.ts, nothing else
     budget: {indexExports: 60}
     rules: [BE_TIER_DIRECTION, BE_ERROR_HOME, BE_SECRET_DEFAULT]
   - id: be.integrations.model
@@ -724,10 +724,10 @@ slots:
     presence: opt-in
     tracked: tracked
     tier: integrations
-    tests: unit-beside
+    tests: none
     why: an ML or LLM model client is an integration; weights and datasets are never in git
 
-  # ----- BE: tests (owner test layout 2026-09-30). Unit specs sit beside their subject (<name>.spec.ts); everything else
+  # ----- BE: tests (owner test layout 2026-09-30). Unit specs are <name>.service.spec.ts beside their service and nothing else; everything else
   # lives under src/tests/, one folder per kind, and the folder and the file suffix always agree (a file whose suffix does
   # not match its folder matches no slot: HFS_SLOT_UNDECLARED).
   - id: be.tests.world
@@ -753,7 +753,7 @@ slots:
     presence: optional
     tracked: tracked
     tier: e2e
-    allows: ["<name>.ts", "*.spec.ts"]    # plain kebab names, like platform/primitives (BE-CONVENTION 1.11 names primitives/time.ts): the world's inlined test helpers (poll, free-ports)
+    allows: ["<name>.ts"]    # plain kebab names, like platform/primitives (BE-CONVENTION 1.11 names primitives/time.ts): the world's inlined test helpers (poll, free-ports)
     tests: none
     why: the helpers the test world needs (polling, free ports, transports), inlined so the world imports no other repository; a bare <name>.ts entry in allows is what admits a plain name in BE_SOURCE_FORM
   - id: be.tests.fixtures
@@ -762,9 +762,8 @@ slots:
     presence: optional
     tracked: tracked
     tier: fixtures
-    allows: [database.ts]         # mockEntityManager() and fakeTransaction() (BE-CONVENTION 1.16); other fixtures use role suffixes
-    tests: unit-beside
-    why: typed doubles and data builders; importable by unit specs, integration and e2e; never imports a feature
+    tests: none
+    why: data builders and payload fixtures with a role suffix (the doubles come from @starci/jest-preset, not from here); importable by unit specs, integration and e2e; never imports a feature
   - id: be.tests.integration
     profiles: [be]
     path: "src/tests/integration/<capability>/*.integration-spec.ts"
