@@ -135,8 +135,8 @@ describe('.husky/pre-push', () => {
 
 describe('.github/workflows', () => {
   const CI_STEPS = {
-    be: ['npm run lint:check', 'npm run format:check', 'npm run typecheck', 'npm test -- --coverage --ci', 'npm run hfs:check', 'npm run build', 'npm ci'],
-    fe: ['npm run lint:check', 'npm run typecheck', 'npm run test:ci', 'npx hfs check', 'npm ci'],
+    be: ['npm run lint:check', 'npm run format:check', 'npm run typecheck', 'npm test -- --coverage --ci', 'npm run hfs:report', 'npm run lint:report', 'npm run build', 'npm ci'],
+    fe: ['npm run lint:check', 'npm run typecheck', 'npm run test:ci', 'npx hfs check --sonar reports/hfs.sonar.json', 'npx eslint . --format json --output-file reports/eslint.json', 'npx hfs report-stylelint reports/stylelint.json reports/stylelint.sonar.json', 'npm ci'],
   };
   for (const hfs of [BE, FE]) {
     it(`${hfs.profile} ci.yml runs lint, typecheck, unit, hfs check and sonar, with no e2e`, () => {
@@ -198,6 +198,11 @@ describe('sonar-project.properties and codecov.yml', () => {
     assert.equal(fe['sonar.projectKey'], 'nivo-fe');
     assert.equal(fe['sonar.typescript.tsconfigPaths'], 'apps/app/tsconfig.json,apps/admin/tsconfig.json');
     assert.equal(fe['sonar.javascript.lcov.reportPaths'], 'coverage/lcov.info');
+    assert.equal(fe['sonar.eslint.reportPaths'], 'reports/eslint.json');
+    assert.equal(fe['sonar.externalIssuesReportPaths'], 'reports/hfs.sonar.json,reports/stylelint.sonar.json');
+    assert.equal(be['sonar.eslint.reportPaths'], 'reports/eslint.json');
+    assert.equal(be['sonar.externalIssuesReportPaths'], 'reports/hfs.sonar.json');
+    assert.ok(!('sonar.host.url' in be) && !('sonar.host.url' in fe), 'the host is SONAR_HOST_URL, never a property (R11)');
   });
   it('codecov ignores exactly the union of both preset lists and keeps the 80/90 gates', () => {
     const doc = parseYaml(rendered(BE)['codecov.yml']);
@@ -391,8 +396,8 @@ describe('the back-end tool configuration', () => {
 
 describe('the package.json scripts of a back end', () => {
   const scripts = hfs => Object.fromEntries(renderTargets(hfs, PRESETS.be).find(target => target.path === 'package.json').content.trim().split('\n').map(line => [line.slice(0, line.indexOf(': ')), line.slice(line.indexOf(': ') + 2)]));
-  it('are the fixed ten, plus build and one start script per runnable app and migrate', () => {
-    assert.deepEqual(Object.keys(scripts(BE)).sort(), ['build', 'format', 'format:check', 'hfs:check', 'lint', 'lint:check', 'migrate', 'start:core', 'test', 'test:e2e', 'test:e2e:live', 'typecheck', 'typecheck:e2e']);
+  it('are the fixed scripts, plus build and one start script per runnable app and migrate', () => {
+    assert.deepEqual(Object.keys(scripts(BE)).sort(), ['build', 'format', 'format:check', 'hfs:check', 'hfs:report', 'lint', 'lint:check', 'lint:report', 'migrate', 'start:core', 'test', 'test:e2e', 'test:e2e:live', 'typecheck', 'typecheck:e2e']);
     assert.equal(scripts(BE)['start:core'], 'node dist/apps/core/src/main.js');
     assert.equal(scripts(BE).migrate, 'node dist/apps/migrate/src/main.js');
     assert.equal(scripts(BE)['test:e2e'], 'npm run typecheck:e2e && jest --selectProjects e2e');

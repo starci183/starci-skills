@@ -43,3 +43,16 @@ export async function readDeclaredSonarKey(root, { parseYaml, fail, stacks }) {
   if (keys.length > 1) fail(`${DECLARATION} declares ${keys.length} Sonar projects for ${repositoryName(root)} (${keys.join(', ')}); one repository has one key`);
   return keys[0] ?? null;
 }
+
+/**
+ * The quality gate the declaration names for Sonar: `{ file, qualityGate }`, or null when there is no declaration, Sonar is
+ * disabled in it, or it declares no Sonar service. The one gate is knowledge/sonar-gate.yaml; a repository names it and
+ * never states thresholds of its own.
+ */
+export function readDeclaredSonarGate(root, { parseYaml, stacks } = {}) {
+  const file = path.join(stacks === undefined ? root : path.resolve(root, stacks), DECLARATION);
+  if (!fs.existsSync(file)) return null;
+  const sonar = (parseYaml ?? bundledParseYaml)(fs.readFileSync(file, 'utf8'))?.services?.sonar;
+  if (!sonar || sonar.mode === 'disabled') return null;
+  return { file: path.relative(root, file).split(path.sep).join('/'), qualityGate: typeof sonar.qualityGate === 'string' ? sonar.qualityGate : null };
+}

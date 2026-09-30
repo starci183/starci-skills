@@ -14,13 +14,21 @@
 //                                 an ESLint rule (`meta.type` plus `create(context)`), and a script or nested package.json
 //                                 that runs eslint or prettier with a flag that swaps or switches off the configuration. Forbidden tool-config files (.eslintrc*, .eslintignore, a second
 //                                 eslint.config.*) are refused by hfs-check through the slot manifest under the same code.
+//   HFS_SONAR_CONFIG (R11)        sonar-project.properties differs from its render (the render names no host URL, sources and tests that
+//                                 do not overlap, the coverage exclusions of the jest or vitest preset, the ESLint report and the
+//                                 HFS import files Sonar reads), or the stack declaration names a quality gate other than the one
+//                                 gate of knowledge/sonar-gate.yaml (bundled in the runtime copy). One edit is one finding.
 //   HFS_TS_STRICT (R22)           the tsconfig.json drift, named by flag (ts-strict.mjs) instead of by hash.
 import fs from 'node:fs';
 import path from 'node:path';
 import { SyncError, checkTargets, renderRepo } from './index.mjs';
+import { parseYaml as bundledParseYaml } from '../runtime/engine/yaml.mjs';
+import { readDeclaredSonarGate } from './sonar-key.mjs';
 import { TS_STRICT_FILE, tsStrictFindings } from './ts-strict.mjs';
 
 const ESLINT_CONFIG_FILE = 'eslint.config.mjs';
+const SONAR_PROPERTIES_FILE = 'sonar-project.properties';
+const SONAR_GATE_FILE = new URL('../runtime/knowledge/sonar-gate.yaml', import.meta.url);
 const MAX_SCANNED_BYTES = 1024 * 1024;
 const RULE_FILE = /\.[cm]?[jt]s$/;
 // The places a command line can still live: the repository's scripts (repo.scripts) and its nested package.json files. The
@@ -59,12 +67,21 @@ function driftFindings(repoRoot, targets, profile) {
         continue;
       }
     }
-    const code = profile === 'be' && result.path === ESLINT_CONFIG_FILE ? 'HFS_RULE_OFF_WITHOUT_REPLACEMENT' : 'HFS_MANAGED_FILE_DRIFT';
+    const code = profile === 'be' && result.path === ESLINT_CONFIG_FILE ? 'HFS_RULE_OFF_WITHOUT_REPLACEMENT' : result.path === SONAR_PROPERTIES_FILE ? 'HFS_SONAR_CONFIG' : 'HFS_MANAGED_FILE_DRIFT';
     const where = result.difference ? `; line ${result.difference.line} expected ${JSON.stringify(result.difference.expected)}, found ${JSON.stringify(result.difference.actual)}` : '';
     const what = target.mode === 'scripts' ? 'the scripts block of package.json is not the rendered one' : `${result.path} is not its render${code === 'HFS_RULE_OFF_WITHOUT_REPLACEMENT' ? ', so a rule can be off or redefined in it' : ''}`;
     findings.push({ code, level: 'error', path: result.path, mode: target.mode, expectedHash: result.expectedHash, ...(result.actualHash ? { actualHash: result.actualHash } : {}), message: `${what} (expected sha256 ${result.expectedHash.slice(0, 12)}${result.actualHash ? `, found ${result.actualHash.slice(0, 12)}` : ''}${where}); run "npx hfs sync --write"` });
   }
   return findings;
+}
+
+/** R11: the quality gate the stack declaration names is the one gate of the bundled knowledge/sonar-gate.yaml. */
+function sonarGateFindings(repoRoot, hfs, parseYaml) {
+  const declared = readDeclaredSonarGate(repoRoot, { parseYaml, stacks: hfs.stacks });
+  if (declared === null) return [];
+  const gate = (parseYaml ?? bundledParseYaml)(fs.readFileSync(SONAR_GATE_FILE, 'utf8'))?.gate?.name;
+  if (declared.qualityGate === gate) return [];
+  return [{ code: 'HFS_SONAR_CONFIG', level: 'error', path: declared.file, message: `${declared.file} services.sonar.qualityGate is ${declared.qualityGate ?? 'absent'}; every product names the one gate ${gate} of knowledge/sonar-gate.yaml and states no threshold of its own` }];
 }
 
 function ruleFileFindings(repoRoot, tracked) {
@@ -116,6 +133,7 @@ export async function managedFindings({ repoRoot, tracked, presets, parseYaml })
   }
   const { hfs, targets } = rendered;
   const findings = driftFindings(repoRoot, targets, hfs.profile);
+  findings.push(...sonarGateFindings(repoRoot, hfs, parseYaml));
   if (hfs.profile === 'be') {
     findings.push(...ruleFileFindings(repoRoot, tracked));
     findings.push(...flagFindings(repoRoot, tracked, new Set(targets.map(target => target.path))));

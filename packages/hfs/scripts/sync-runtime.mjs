@@ -2,7 +2,7 @@
 // sync-runtime.mjs - refreshes the self-contained copies of the runtime files the published packages read, so each package
 // works in a product repository that has no runtime checkout. Every copy mirrors the runtime layout (engine/,
 // scripts/lib/, knowledge/hfs/, modules/kernel/) byte for byte, so the imports need no rewriting.
-//   packages/hfs/runtime         what `hfs` reads: the slot loader, the check, the architecture machine and every file either
+//   packages/hfs/runtime         what `hfs` reads (with the one Sonar gate, knowledge/sonar-gate.yaml, whose name hfs check holds a stack declaration to): the slot loader, the check, the architecture machine and every file either
 //                                imports (computed from the import graph, not listed), plus the failure-code catalog slice
 //                                holding exactly the codes `hfs check` can emit (its own and the machine's rule id lists)
 //   packages/eslint/be/runtime   what @starci/eslint-canon-be reads through lib/hfs.mjs (loadHfs: slots, hfs.json, the view)
@@ -49,7 +49,7 @@ export function importClosure(entries) {
 export const CATALOG = 'modules/kernel/failure-codes.yaml';
 /** bundle directory (runtime-relative) -> the files it copies and whether it carries the failure-code slice. */
 export const BUNDLES = Object.freeze({
-  'packages/hfs/runtime': Object.freeze({ files: Object.freeze([...new Set([...SLOT_FILES, ...importClosure(CHECK_ENTRIES), 'knowledge/hfs/canon-pins.yaml'])].sort()), catalog: true }),
+  'packages/hfs/runtime': Object.freeze({ files: Object.freeze([...new Set([...SLOT_FILES, ...importClosure(CHECK_ENTRIES), 'knowledge/hfs/canon-pins.yaml', 'knowledge/sonar-gate.yaml'])].sort()), catalog: true }),
   'packages/eslint/be/runtime': Object.freeze({ files: Object.freeze([...new Set([...SLOT_FILES, ...importClosure(['scripts/lib/recorded-lines.mjs'])])].sort()), catalog: false }),
   'packages/eslint/fe/runtime': Object.freeze({ files: Object.freeze([...new Set([...SLOT_FILES, ...importClosure(['scripts/lib/recorded-lines.mjs'])])].sort()), catalog: false }),
 });

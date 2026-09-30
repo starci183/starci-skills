@@ -343,7 +343,7 @@ slots:
   # ----- never tracked: build output the tools need in place ---------------------------------------------
   - id: repo.build-output
     profiles: [be, fe]
-    path: "{**/node_modules/,dist/,apps/*/dist/,packages/*/dist/,.next/,apps/*/.next/,coverage/,test-results/,playwright-report/,**/next-env.d.ts,**/*.tsbuildinfo}"
+    path: "{**/node_modules/,dist/,apps/*/dist/,packages/*/dist/,.next/,apps/*/.next/,coverage/,reports/,test-results/,playwright-report/,**/next-env.d.ts,**/*.tsbuildinfo}"
     presence: optional
     tracked: ignored
     tier: none

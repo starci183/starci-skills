@@ -23,9 +23,12 @@ jobs:
           cache: npm
       - run: npm ci
       - name: hfs check
-        run: npm run hfs:check
+        run: npm run hfs:report
       - name: lint
         run: npm run lint:check
+      - name: lint report
+        if: ${{ !cancelled() }}
+        run: npm run lint:report
       - name: format
         run: npm run format:check
       - name: typecheck
@@ -41,11 +44,11 @@ jobs:
           fail_ci_if_error: true
           use_oidc: true
       - uses: SonarSource/sonarqube-scan-action@v7
-        if: env.SONAR_TOKEN != ''
+        if: ${{ !cancelled() && env.SONAR_TOKEN != '' }}
         env:
           SONAR_HOST_URL: ${{ vars.SONAR_HOST_URL }}
       - uses: SonarSource/sonarqube-quality-gate-action@v1
-        if: env.SONAR_TOKEN != ''
+        if: ${{ !cancelled() && env.SONAR_TOKEN != '' }}
         timeout-minutes: 10
         env:
           SONAR_HOST_URL: ${{ vars.SONAR_HOST_URL }}
