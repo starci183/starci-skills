@@ -12,7 +12,7 @@ import {safeRemoveTree} from '../lib/safe-remove.mjs';
 import {repositoryName,repositoryHome} from '../lib/repo-identity.mjs';
 import {braceVariants,globExpression} from '../lib/glob.mjs';
 import {posixPath} from '../lib/path-key.mjs';
-import {unquoteDiffPath} from '../lib/git.mjs';
+import {runGit,unquoteDiffPath} from '../lib/git.mjs';
 import {emitCheckOutput} from './output.mjs';
 import {loadSonarGate,serverConditions,thresholdsOf} from './sonar-gate.mjs';
 
@@ -648,7 +648,7 @@ function runScanner(cwd,{command,args},env,timeoutMs){
   });
 }
 
-const git=(cwd,args)=>spawnSync('git',['-c','core.quotepath=off',...args],{cwd,encoding:'utf8',windowsHide:true,maxBuffer:64*1024*1024});
+const git=(cwd,args)=>runGit(['-c','core.quotepath=off',...args],{cwd,maxBuffer:64*1024*1024});
 
 function gitRevision(cwd){
   const head=git(cwd,['log','-1','--format=%H %ct','HEAD']);

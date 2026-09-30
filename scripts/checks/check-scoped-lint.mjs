@@ -1,7 +1,7 @@
 import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
-import {spawnSync} from 'node:child_process';
+import {runGit} from '../lib/git.mjs';
 import {createRequire,isBuiltin} from 'node:module';
 import {fileURLToPath,pathToFileURL} from 'node:url';
 import {canonicalJSON} from '../../engine/canonical-json.mjs';import {isPlainObject as plain} from '../../engine/plain-object.mjs';import {sha256} from '../../engine/digest.mjs';
@@ -91,7 +91,7 @@ function scopedFiles(repository,inputs,base){
   if(!base)return {inputs,renamed:new Map(),ranges:new Map()};
   const resolved=resolveSliceBase(repository,base);
   if(!resolved.ok)return {inputs,renamed:new Map(),ranges:new Map()};
-  const git=(args)=>spawnSync('git',['-c','core.quotepath=off',...args],{cwd:repository,encoding:'utf8',windowsHide:true,maxBuffer:256*1024*1024});
+  const git=(args)=>runGit(['-c','core.quotepath=off',...args],{cwd:repository,maxBuffer:256*1024*1024});
   const diff=git(['diff','--name-status','-z','-M',resolved.baseCommit,'--']);
   if(diff.status!==0)throw Object.assign(Error(`Cannot resolve the slice diff: ${String(diff.stderr).trim()}`),{code:'SLICE_DIFF_UNAVAILABLE'});
   const entries=diff.stdout.split('\0'),renames=new Map(),deleted=new Set(),changed=new Set();

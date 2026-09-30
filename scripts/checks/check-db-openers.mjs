@@ -11,8 +11,8 @@
 // Exit 0 clean, 1 a forbidden opener or a stale pending entry, 2 bad arguments.
 import fs from 'node:fs';
 import path from 'node:path';
-import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
+import { runGit } from '../lib/git.mjs';
 
 export const DB_MODULES = Object.freeze(['engine/ledger-db.mjs', 'engine/machine-db.mjs']);
 export const PENDING = Object.freeze({});
@@ -20,7 +20,7 @@ const OPENER = /\bnew\s+DatabaseSync\s*\(/;
 const isComment = (line) => /^\s*(\/\/|\*|\/\*)/.test(line);
 
 export function scanOpeners(root) {
-  const listed = spawnSync('git', ['ls-files', '*.mjs'], { cwd: root, encoding: 'utf8' });
+  const listed = runGit(['ls-files', '*.mjs'], { cwd: root });
   const files = listed.status === 0 ? listed.stdout.split('\n').filter(Boolean) : [];
   const hits = [];
   for (const rel of files) {

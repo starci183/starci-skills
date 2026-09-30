@@ -29,9 +29,9 @@
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { parseYaml } from '../../engine/yaml.mjs';
+import { runGit } from '../lib/git.mjs';
 import { renameOver } from '../lib/rename-over.mjs';
 import { sleepSync } from '../lib/sleep-sync.mjs';
 import { parseJson } from '../lib/json.mjs';
@@ -106,7 +106,7 @@ export function codexTrustPaths(cwd) {
   const out = [path.resolve(cwd)];
   const git = (...args) => {
     try {
-      const r = spawnSync('git', ['-C', cwd, ...args], { encoding: 'utf8', windowsHide: true, timeout: 10000 });
+      const r = runGit(args, { dir: cwd, timeout: 10000 });
       return r.status === 0 ? r.stdout.trim() : null;
     } catch { return null; }
   };

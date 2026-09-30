@@ -23,7 +23,7 @@ const SLOT_FILES = [
 export const CATALOG = 'modules/kernel/failure-codes.yaml';
 /** bundle directory (runtime-relative) -> the files it copies and whether it carries the failure-code slice. */
 export const BUNDLES = Object.freeze({
-  'packages/hfs/runtime': Object.freeze({ files: Object.freeze([...SLOT_FILES, 'scripts/lib/hfs-check.mjs', 'knowledge/hfs/canon-pins.yaml']), catalog: true }),
+  'packages/hfs/runtime': Object.freeze({ files: Object.freeze([...SLOT_FILES, 'scripts/lib/hfs-check.mjs', 'scripts/lib/git.mjs', 'scripts/lib/fs-kind.mjs', 'knowledge/hfs/canon-pins.yaml']), catalog: true }),
   'packages/eslint/be/runtime': Object.freeze({ files: Object.freeze([...SLOT_FILES]), catalog: false }),
 });
 

@@ -18,7 +18,7 @@
 //        without a built dist points it at the live checkout's)
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { spawnSync } from 'node:child_process';
+import { runGit } from '../lib/git.mjs';
 import { findPackage } from '../lib/package-at.mjs';
 import { readJsonFile } from '../lib/json.mjs';
 import { GRAMMAR_PACKAGE, typecheckDraw } from '../checks/draw-source.mjs';
@@ -44,7 +44,7 @@ export const builtGrammar = (root) => isFile(path.join(root, 'package.json')) &&
  */
 export function mainWorktreeOf(dir) {
   try {
-    const r = spawnSync('git', ['-C', dir, 'rev-parse', '--path-format=absolute', '--git-common-dir'], { encoding: 'utf8', windowsHide: true, timeout: 10_000 });
+    const r = runGit(['rev-parse', '--path-format=absolute', '--git-common-dir'], { dir, timeout: 10_000 });
     const common = r.status === 0 ? r.stdout.trim() : '';
     if (!common || path.basename(common) !== '.git') return null;
     const main = path.dirname(common);

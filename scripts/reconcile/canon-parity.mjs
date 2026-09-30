@@ -28,6 +28,7 @@ import { createRequire } from 'node:module';
 import os from 'node:os';
 import { fileURLToPath } from 'node:url';
 import { braceVariants, globExpression } from '../lib/glob.mjs';
+import { runGit } from '../lib/git.mjs';
 
 const selfFile = fileURLToPath(import.meta.url);
 export const PARITY_OPS = Object.freeze(['code.refactor']);
@@ -114,8 +115,8 @@ export function declaredProjectsOf(checks, root) {
 /* ------------------------------------------------------------ git */
 
 export function git(root, args, { input = null, encoding = 'utf8', timeoutMs = 120_000 } = {}) {
-  const r = spawnSync('git', ['-C', root, ...args], { ...(encoding === 'buffer' ? {} : { encoding }), ...(input == null ? {} : { input: Buffer.from(input) }),
-    windowsHide: true, timeout: timeoutMs, maxBuffer: 256 * 1024 * 1024 });
+  const r = runGit(args, { dir: root, encoding, ...(input == null ? {} : { input: Buffer.from(input) }),
+    timeout: timeoutMs, maxBuffer: 256 * 1024 * 1024 });
   return { ok: r.status === 0, status: r.status, stdout: r.stdout, stderr: String(r.stderr ?? '') };
 }
 

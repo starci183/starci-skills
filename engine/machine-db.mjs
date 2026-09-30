@@ -34,6 +34,7 @@ import path from 'node:path';
 import crypto from 'node:crypto';
 import { createRequire } from 'node:module';
 import { pathToFileURL, fileURLToPath } from 'node:url';
+import { runGit } from '../scripts/lib/git.mjs';
 import { sleepSync as scaledSleepSync } from '../scripts/lib/sleep-sync.mjs';
 import { putBlob as storeBlob, blobPath, artifactRoot, getBlob } from '../scripts/lib/artifact-store.mjs';
 import { redactBytes, redactData, redactText } from '../scripts/lib/redact.mjs';
@@ -243,8 +244,7 @@ export function runtimeRev() {
   if (cachedRev) return cachedRev;
   if (process.env.STARCI_RUNTIME_REV) return (cachedRev = String(process.env.STARCI_RUNTIME_REV));
   try {
-    const { spawnSync } = require('node:child_process');
-    const r = spawnSync('git', ['log', '-1', '--format=%ct %h'], { cwd: path.join(ENGINE_DIR, '..'), encoding: 'utf8', windowsHide: true, timeout: 5000 });
+    const r = runGit(['log', '-1', '--format=%ct %h'], { cwd: path.join(ENGINE_DIR, '..'), timeout: 5000 });
     const [ct, sha] = String(r.stdout ?? '').trim().split(' ');
     if (r.status === 0 && /^\d+$/.test(ct) && sha) return (cachedRev = `${String(Number(ct) * 1000).padStart(13, '0')}:${sha}`);
   } catch { /* not a checkout */ }

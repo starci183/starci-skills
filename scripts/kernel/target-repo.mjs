@@ -6,7 +6,7 @@
 // Contract: modules/kernel/api.yaml commands.enqueue / commands.settle landed.
 import fs from 'node:fs';
 import path from 'node:path';
-import { spawnSync } from 'node:child_process';
+import { runGit } from '../lib/git.mjs';
 import { readModuleJson, skillRoot } from '../../engine/runtime-root.mjs';
 import { readJsonFile } from '../lib/json.mjs';
 import { isDir } from '../lib/fs-kind.mjs';
@@ -147,7 +147,7 @@ export function enqueueRepository({ op, repository, ownedPaths, repo, siblingRep
 }
 
 const gitCommonDir = (dir, timeout) => {
-  const r = spawnSync('git', ['-C', dir, 'rev-parse', '--path-format=absolute', '--git-common-dir'], { encoding: 'utf8', windowsHide: true, timeout });
+  const r = runGit(['rev-parse', '--path-format=absolute', '--git-common-dir'], { dir, timeout });
   return !r.error && r.status === 0 && r.stdout.trim() ? key(r.stdout.trim()) : null;
 };
 

@@ -1,6 +1,6 @@
 import fs from 'node:fs';
 import path from 'node:path';
-import { execFileSync } from 'node:child_process';
+import { gitOutput } from '../../lib/git.mjs';
 
 /**
  * HFS check 5: the files and directories the slot manifest requires (knowledge/hfs/slots.yaml `requires`,
@@ -26,7 +26,7 @@ const ALSO_JUDGED_TIER_NONE = new Set(['fe.app.next']);
 
 function gitFiles(root) {
   try {
-    const run = args => execFileSync('git', args, { cwd: root, encoding: 'utf8', maxBuffer: 256 * 1024 * 1024, stdio: ['ignore', 'pipe', 'pipe'] });
+    const run = args => gitOutput(args, { cwd: root, maxBuffer: 256 * 1024 * 1024 });
     run(['rev-parse', '--is-inside-work-tree']);
     const deleted = new Set(run(['ls-files', '--deleted', '-z', '--', '.']).split('\0').filter(Boolean));
     return run(['ls-files', '--cached', '-z', '--', '.']).split('\0').filter(file => file && !deleted.has(file));

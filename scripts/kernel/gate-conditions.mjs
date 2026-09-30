@@ -30,7 +30,7 @@
 
 import fs from 'node:fs';
 import path from 'node:path';
-import { spawnSync } from 'node:child_process';
+import { runGit } from '../lib/git.mjs';
 import { parseYaml } from '../../engine/yaml.mjs';
 import { normalizeFoundationName, readFoundation } from './foundations.mjs';
 import { parseJson } from '../lib/json.mjs';
@@ -214,7 +214,7 @@ export const conditionLabel = (cond) => {
 };
 
 const git = (repo, args) => {
-  const r = spawnSync('git', ['-C', repo, ...args], { encoding: 'utf8', windowsHide: true, timeout: GIT_TIMEOUT_MS });
+  const r = runGit(args, { dir: repo, timeout: GIT_TIMEOUT_MS });
   return { ok: r.status === 0, out: String(r.stdout ?? '').trim(), err: String(r.stderr ?? r.error?.message ?? '').trim() };
 };
 /**

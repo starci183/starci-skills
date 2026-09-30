@@ -18,16 +18,16 @@
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import {spawn,spawnSync} from 'node:child_process';
+import {spawn} from 'node:child_process';
 import {fileURLToPath,pathToFileURL} from 'node:url';
 import {canonicalJSON} from '../../engine/canonical-json.mjs';
 import {isLinkLike,safeRemoveTree} from '../lib/safe-remove.mjs';
 import {posixPath} from '../lib/path-key.mjs';
-import {unquoteDiffPath} from '../lib/git.mjs';
+import {runGit,unquoteDiffPath} from '../lib/git.mjs';
 import {BASE_VIEW_ENV} from './scoped-lint-base-view.mjs';
 
 const clean=posixPath;
-const git=(cwd,args,{buffer=false}={})=>spawnSync('git',['-c','core.quotepath=off',...args],{cwd,encoding:buffer?'buffer':'utf8',windowsHide:true,maxBuffer:256*1024*1024});
+const git=(cwd,args,{buffer=false}={})=>runGit(['-c','core.quotepath=off',...args],{cwd,encoding:buffer?'buffer':'utf8',maxBuffer:256*1024*1024});
 const firstLine=value=>String(value??'').trim().split(/\r?\n/)[0]??'';
 
 // Findings that carry a file (and usually a line) inside the slice: the only ones judged against the base.

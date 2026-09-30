@@ -27,7 +27,7 @@
 // Exit 0 clean (suspects allowed), 1 refused, 2 usage.
 import fs from 'node:fs';
 import path from 'node:path';
-import { spawnSync } from 'node:child_process';
+import { runGit } from '../lib/git.mjs';
 import { repositoryName, repositoryHome } from '../lib/repo-identity.mjs';
 import { fileURLToPath } from 'node:url';
 import { skillRoot } from '../../engine/runtime-root.mjs';
@@ -279,7 +279,7 @@ function readProperties(file) {
 
 function git(repo, args) {
   try {
-    const result = spawnSync('git', ['-C', repo, ...args], { encoding: 'utf8', timeout: 8000, windowsHide: true });
+    const result = runGit(args, { dir: repo, timeout: 8000 });
     if (result.error) return null;
     return { status: result.status, stdout: String(result.stdout ?? '') };
   } catch { return null; }

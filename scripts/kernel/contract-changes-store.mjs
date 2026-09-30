@@ -5,7 +5,7 @@
 // single-file list. Readers go through readContractChangesDoc / readContractChangesDocAt only.
 import fs from 'node:fs';
 import path from 'node:path';
-import { spawnSync } from 'node:child_process';
+import { runGit } from '../lib/git.mjs';
 import { fileURLToPath } from 'node:url';
 import { parseYaml } from '../../engine/yaml.mjs';
 
@@ -48,7 +48,7 @@ export function readContractChangesDoc(root, { dir = path.join(root, CONTRACT_CH
 }
 
 const gitRun = (cwd, args, input = undefined) => {
-  const r = spawnSync('git', args, { cwd, encoding: 'utf8', windowsHide: true, input, maxBuffer: 256 * 1024 * 1024 });
+  const r = runGit(args, { cwd, input, maxBuffer: 256 * 1024 * 1024 });
   return r.status === 0 ? String(r.stdout ?? '') : null;
 };
 

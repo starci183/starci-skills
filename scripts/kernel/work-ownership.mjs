@@ -37,7 +37,7 @@
 //                   layout-tree or brand foundation (in that order), else its oldest live workflow.
 import fs from 'node:fs';
 import path from 'node:path';
-import { spawnSync } from 'node:child_process';
+import { runGit } from '../lib/git.mjs';
 import {sha256} from '../../engine/digest.mjs';
 import { parseYaml } from '../../engine/yaml.mjs';
 import { readFoundations } from './foundations.mjs';
@@ -192,7 +192,7 @@ export function committedReader(repo, { workDir = '.starciwork' } = {}) {
     const out = new Map();
     if (!wanted.length) return out;
     const input = `HEAD:./${dir}\n${wanted.map((rel) => `HEAD:./${dir}/${rel.slice(WORK_PREFIX.length)}`).join('\n')}\n`;
-    const r = spawnSync('git', ['-C', repo, 'cat-file', '--batch'], { input, windowsHide: true, timeout: 60000, maxBuffer: 512 * 1024 * 1024 });
+    const r = runGit(['cat-file', '--batch'], { dir: repo, input, encoding: 'buffer', timeout: 60000, maxBuffer: 512 * 1024 * 1024 });
     if (r.status !== 0 || !Buffer.isBuffer(r.stdout)) return null;
     const buf = r.stdout;
     let pos = 0;

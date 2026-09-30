@@ -10,17 +10,15 @@
 // The owner ruling behind it: a superseded or unused mechanism is deleted with every reference (owner-rulings.yaml).
 import fs from 'node:fs';
 import path from 'node:path';
-import { execFileSync } from 'node:child_process';
 import { skillRoot } from '../../engine/runtime-root.mjs';
 import { isMain } from './common.mjs';
+import { gitOutput } from '../lib/git.mjs';
 
 export const SCRIPT_ROOTS = Object.freeze(['scripts', 'engine', 'modules', 'bin', 'ext']);
 /** Tracked text files whose mention keeps a script alive (tests excluded: a script only a test reads is dead). */
 const TEXT = /\.(mjs|cjs|js|json|ya?ml|md|ps1|sh|txt)$/;
 const isTest = (rel) => rel.startsWith('tests/') || /\.(test|spec)\.mjs$/.test(rel);
 const GENERATED = /^packages\/[^/]+\/runtime\/|^packages\/eslint\/[^/]+\/runtime\//;
-
-const git = (root, args) => execFileSync('git', ['-C', root, ...args], { encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 });
 
 /**
  * The dead scripts of a tree: [{code, path, message}].
@@ -46,7 +44,7 @@ export function deadScriptFindings({ tracked, read }) {
 
 /** Run the check on the runtime at `root`. */
 export function checkDeadScripts(root = skillRoot) {
-  const tracked = git(root, ['ls-files', '-z']).split('\0').filter(Boolean);
+  const tracked = gitOutput(['ls-files', '-z'], { dir: root, maxBuffer: 64 * 1024 * 1024 }).split('\0').filter(Boolean);
   return deadScriptFindings({ tracked, read: (rel) => { try { return fs.readFileSync(path.join(root, rel), 'utf8'); } catch { return ''; } } });
 }
 

@@ -17,10 +17,11 @@
 // findings fail the check.
 import fs from 'node:fs';
 import path from 'node:path';
-import { execFileSync } from 'node:child_process';
 import { skillRoot } from '../../engine/runtime-root.mjs';
 import { parseYaml } from '../../engine/yaml.mjs';
 import { HFS_DECLARATION_FILE, HfsSlotsError, createSlotResolver, loadSlotManifest, readRepoDeclaration, resolveRepoDeclaration } from './hfs-slots.mjs';
+import { isDir } from './fs-kind.mjs';
+import { gitOutput } from './git.mjs';
 import { posixPath } from './path-key.mjs';
 
 export const CANON_PINS_FILE = 'knowledge/hfs/canon-pins.yaml';
@@ -54,7 +55,7 @@ export function readWhy(root = skillRoot, codes = CHECK_CODES) {
 export function trackedFiles(repoRoot) {
   let out;
   try {
-    out = execFileSync('git', ['-C', repoRoot, 'ls-files', '-z', '--cached', '--exclude-standard'], { encoding: 'utf8', maxBuffer: 256 * 1024 * 1024, stdio: ['ignore', 'pipe', 'pipe'] });
+    out = gitOutput(['ls-files', '-z', '--cached', '--exclude-standard'], { dir: repoRoot, maxBuffer: 256 * 1024 * 1024 });
   } catch (error) {
     refuse('HFS_REPO_UNREADABLE', `${repoRoot} is not a readable Git work tree (${String(error?.stderr ?? error?.message ?? error).trim().split('\n')[0]})`, { repoRoot });
   }
@@ -248,7 +249,6 @@ export function explainPath({ repoRoot, input, root = skillRoot, declaration, ma
 // ------------------------------------------------------------------------------------------------- init
 
 const SLUG_SUFFIX = /-(backend|be|frontend|fe|api|web|app)$/;
-const isDir = (p) => { try { return fs.statSync(p).isDirectory(); } catch { return false; } };
 const exists = (p) => fs.existsSync(p);
 const readPackage = (dir) => { try { return JSON.parse(fs.readFileSync(path.join(dir, 'package.json'), 'utf8')); } catch { return null; } };
 const depsOf = (pkg) => ({ ...pkg?.devDependencies, ...pkg?.dependencies });

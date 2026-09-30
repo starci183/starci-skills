@@ -1,12 +1,13 @@
 #!/usr/bin/env node
 import fs from 'node:fs';
 import path from 'node:path';
-import {spawnSync} from 'node:child_process';
 import {pathToFileURL} from 'node:url';
 import {parseYaml} from '../../engine/yaml.mjs';
 import {walk} from './check-example-work.mjs';
 import {readWorkspace, repoRootFor, resolveOwnedDirs, loadRecords} from '../example/example-ownership.mjs';
 import {slash} from '../lib/path-key.mjs';
+import {runGit} from '../lib/git.mjs';
+import {isDir} from '../lib/fs-kind.mjs';
 import {sameOrUnder} from './common.mjs';
 import {list} from '../lib/list.mjs';
 import {sha256File} from '../../engine/digest.mjs';
@@ -88,20 +89,16 @@ export function parseArgs(argv) {
       if (split < 1 || split === value.length - 1) throw new EvidenceBindingInputError('--repo must be <id>=<git root>');
       const id = value.slice(0, split), root = path.resolve(value.slice(split + 1));
       if (out.repositories.has(id)) throw new EvidenceBindingInputError(`Duplicate repository mapping ${id}`);
-      if (!isDirectory(root)) throw new EvidenceBindingInputError(`Repository ${id} does not map to a readable directory`);
+      if (!isDir(root)) throw new EvidenceBindingInputError(`Repository ${id} does not map to a readable directory`);
       out.repositories.set(id, root);
     }
   }
   if (out.workRoot === null) throw new EvidenceBindingInputError('--work is required');
-  if (!isDirectory(out.workRoot)) throw new EvidenceBindingInputError(`--work ${slash(out.workRoot)} is not a readable directory`);
+  if (!isDir(out.workRoot)) throw new EvidenceBindingInputError(`--work ${slash(out.workRoot)} is not a readable directory`);
   if (!fs.existsSync(path.join(out.workRoot, 'index.yaml')) && !fs.existsSync(path.join(out.workRoot, 'workspace.yaml'))) {
     throw new EvidenceBindingInputError(`--work ${slash(out.workRoot)} is not a .starciwork root (no index.yaml or workspace.yaml)`);
   }
   return out;
-}
-
-function isDirectory(target) {
-  try { return fs.statSync(target).isDirectory(); } catch { return false; }
 }
 
 // ---------- source-change time, and which clock answered ----------
@@ -109,7 +106,7 @@ function isDirectory(target) {
 /** Whether `root` is inside a Git working tree at all; asked once per repository root. */
 function gitRootOf(root, cache) {
   if (cache.has(root)) return cache.get(root);
-  const probe = spawnSync('git', ['rev-parse', '--show-toplevel'], {cwd: root, encoding: 'utf8', windowsHide: true});
+  const probe = runGit(['rev-parse', '--show-toplevel'], {cwd: root});
   const answer = !probe.error && probe.status === 0 ? root : null;
   cache.set(root, answer);
   return answer;
@@ -121,7 +118,7 @@ function newestCommit(gitRoot, relPaths, since) {
   const range = since ? [`${since}..HEAD`] : [];
   for (let i = 0; i < relPaths.length; i += GIT_PATHSPEC_CHUNK) {
     const chunk = relPaths.slice(i, i + GIT_PATHSPEC_CHUNK);
-    const run = spawnSync('git', ['log', '-1', '--format=%ct', '--name-only', ...range, '--', ...chunk], {cwd: gitRoot, encoding: 'utf8', windowsHide: true, maxBuffer: 16 * 1024 * 1024});
+    const run = runGit(['log', '-1', '--format=%ct', '--name-only', ...range, '--', ...chunk], {cwd: gitRoot, maxBuffer: 16 * 1024 * 1024});
     if (run.error || run.status !== 0) continue;
     const lines = String(run.stdout ?? '').split('\n').map(line => line.trim()).filter(Boolean);
     const seconds = Number(lines[0]);
@@ -144,7 +141,7 @@ function newestSourceChange(repoRoot, relPaths, gitCache, revision) {
   if (!relPaths.length) return null;
   const gitRoot = gitRootOf(repoRoot, gitCache);
   if (gitRoot && revision) {
-    const known = spawnSync('git', ['cat-file', '-e', `${revision}^{commit}`], {cwd: gitRoot, encoding: 'utf8', windowsHide: true});
+    const known = runGit(['cat-file', '-e', `${revision}^{commit}`], {cwd: gitRoot});
     if (!known.error && known.status === 0) {
       const after = newestCommit(gitRoot, relPaths, revision);
       // A commit after the revision the record pins IS the drift, whatever the capture clock says: the
@@ -174,7 +171,7 @@ function ownedIndex(dirs) {
   const index = new Map();
   for (const dir of dirs) {
     const repoRoot = repoRootBehind(dir);
-    if (!isDirectory(dir.abs)) continue;
+    if (!isDir(dir.abs)) continue;
     for (const file of walk(dir.abs)) {
       const inside = slash(path.relative(dir.abs, file));
       if (inside.startsWith('..') || inside.split('/').some(segment => SKIP_DIRS.has(segment))) continue;

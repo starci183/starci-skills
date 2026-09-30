@@ -43,6 +43,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
 import { spawnSync } from 'node:child_process';
+import { runGit } from '../lib/git.mjs';
 import { fileURLToPath } from 'node:url';
 import { parseYaml } from '../../engine/yaml.mjs';
 import { safeRemoveTree, isLinkLike, unlinkOnly } from '../lib/safe-remove.mjs';
@@ -107,7 +108,7 @@ export function productSettings(file = SETTINGS_FILE) {
 
 /** git in `cwd`: {ok, status, stdout, stderr}. */
 export function git(cwd, args, { env = null, timeout = 300_000, input = undefined } = {}) {
-  const r = spawnSync('git', args, { cwd, encoding: 'utf8', windowsHide: true, timeout, input, env: env ? { ...process.env, ...env } : process.env, maxBuffer: 256 * 1024 * 1024 });
+  const r = runGit(args, { cwd, timeout, input, env: env ? { ...process.env, ...env } : process.env, maxBuffer: 256 * 1024 * 1024 });
   return { ok: !r.error && r.status === 0, status: r.status, stdout: String(r.stdout ?? '').trim(), stderr: String(r.stderr ?? r.error?.message ?? '').trim() };
 }
 const revParse = (cwd, ref) => { const r = git(cwd, ['rev-parse', '--verify', '--quiet', `${ref}^{commit}`]); return r.ok && r.stdout ? r.stdout : null; };

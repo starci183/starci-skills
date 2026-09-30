@@ -16,7 +16,7 @@
 //                stand-in (fixture, example, changeme) is not a literal.
 import fs from 'node:fs';
 import path from 'node:path';
-import { spawnSync } from 'node:child_process';
+import { runGit } from '../lib/git.mjs';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { parseYaml } from '../../engine/yaml.mjs';
 import { FORBIDDEN_FILES, SECRET_PATTERNS } from '../lib/secret-patterns.mjs';
@@ -126,7 +126,7 @@ export function scanSecrets(rel, text) {
 
 // ------------------------------------------------------------------------------------------------- the check
 const relTo = (root, abs) => slashed(path.relative(root, abs));
-const gitOut = (root, args) => spawnSync('git', ['-C', root, ...args], { encoding: 'utf8', windowsHide: true, maxBuffer: 64 * 1024 * 1024, timeout: 30_000 });
+const gitOut = (root, args) => runGit(args, { dir: root, maxBuffer: 64 * 1024 * 1024, timeout: 30_000 });
 
 /**
  * checkWorkFiles({repo, files, read, strict}) -> {ok, findings[], files: n, checked: {parse, validate, secrets}}

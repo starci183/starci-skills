@@ -1,7 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import {fileURLToPath} from 'node:url';
-import {spawnSync} from 'node:child_process';
+import {runGit} from '../lib/git.mjs';
 import {parseYaml} from '../../engine/yaml.mjs';
 
 const RESULT='starci/application-stacks-check@1';
@@ -87,7 +87,7 @@ function sopsEnvelope(file){
 
 function gitTrackedSet(root){
   try{
-    const result=spawnSync('git',['-C',root,'ls-files','--',STACKS_DIR],{encoding:'utf8',timeout:5000,windowsHide:true});
+    const result=runGit(['ls-files','--',STACKS_DIR],{dir:root,timeout:5000});
     if(result.error||result.status!==0||typeof result.stdout!=='string')return null;
     return new Set(result.stdout.split(/\r?\n/).filter(Boolean).map(slash));
   }catch{return null;}

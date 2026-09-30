@@ -11,6 +11,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { createRequire } from 'node:module';
 import { spawnSync } from 'node:child_process';
+import { runGit } from '../lib/git.mjs';
 import { specBatches } from './settle-landed.mjs';
 import { braceVariants, globExpression } from '../lib/glob.mjs';
 import { posixPath } from '../lib/path-key.mjs';
@@ -152,7 +153,7 @@ const underSpec = (file, specs) => specs.some((spec) => {
 });
 
 const git = (cwd, args, timeout) => {
-  const r = spawnSync('git', ['-C', cwd, ...args], { encoding: 'utf8', windowsHide: true, timeout, maxBuffer: 16 * 1024 * 1024 });
+  const r = runGit(args, { dir: cwd, timeout, maxBuffer: 16 * 1024 * 1024 });
   return { ok: !r.error && r.status === 0, stdout: r.stdout ?? '', error: (r.stderr ?? '').trim() || String(r.error?.message ?? `exit ${r.status}`) };
 };
 

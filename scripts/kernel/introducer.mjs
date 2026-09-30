@@ -17,12 +17,12 @@
 //  5. conventional-commit scope      "type(scope):" matches the title of exactly one workflow line
 // A resolved workflow that is no longer running hands the follow-up to the
 // running workflow with the same title (its successor run).
-import { spawnSync } from 'node:child_process';
+import { runGit } from '../lib/git.mjs';
 import { ownedPathsIntersect } from '../../engine/admission.mjs';
 import { parseJson } from '../lib/json.mjs';
 
 const git = (cwd, args) => {
-  const r = spawnSync('git', ['-C', cwd, ...args], { encoding: 'utf8', windowsHide: true, timeout: 20_000 });
+  const r = runGit(args, { dir: cwd, timeout: 20_000 });
   return r.status === 0 ? r.stdout : null;
 };
 const tokens = (text) => String(text ?? '').toLowerCase().split(/[^a-z0-9]+/).filter((t) => t.length >= 3);

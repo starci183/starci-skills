@@ -31,7 +31,7 @@
 // The kernel-rev-stale gate (opRevStale) is unchanged: it still reads every op contract change since the ack
 // (the non-enumerable kernelRev.gate), so a leg is never built from a contract its Kernel has not read.
 import path from 'node:path';
-import { spawnSync } from 'node:child_process';
+import { runGit } from '../lib/git.mjs';
 import { fileURLToPath } from 'node:url';
 import { contractFilesOf, runtimeShaOf } from './contract-version.mjs';
 import { isContractChangesPath, readContractChangesDocAt } from './contract-changes-store.mjs';
@@ -65,7 +65,7 @@ const clip = (text, max) => { const one = String(text ?? '').replace(/\s+/g, ' '
 
 const git = (root, args) => {
   try {
-    const r = spawnSync('git', ['-C', root, ...args], { encoding: 'utf8', windowsHide: true, timeout: 30_000, maxBuffer: 32 * 1024 * 1024 });
+    const r = runGit(args, { dir: root, timeout: 30_000, maxBuffer: 32 * 1024 * 1024 });
     return r.status === 0 ? String(r.stdout ?? '') : null;
   } catch { return null; }
 };
