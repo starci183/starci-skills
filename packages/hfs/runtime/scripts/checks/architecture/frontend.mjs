@@ -108,13 +108,15 @@ function checkGrammar(config, context) {
   // Node resolution per consumer: in an npm-workspaces monorepo a consumer whose range differs from the
   // hoisted copy gets its own apps/<app>/node_modules/<package> (nivo-fe: apps/app on 0.5.0 beside a hoisted
   // 0.4.11). Every consumer is judged against the copy it actually resolves, never the hoisted one alone.
+  // An app installs once, at its root (config.packageRoot): a side folder has no node_modules of its own.
+  const installRoot = config.packageRoot ?? config.root;
   const installedFrom = (from) => {
-    for (let dir = from; isInside(config.root, dir); dir = path.dirname(dir)) {
+    for (let dir = from; isInside(installRoot, dir); dir = path.dirname(dir)) {
       const candidate = path.join(dir, 'node_modules', ...grammar.package.split('/'));
       if (fs.existsSync(path.join(candidate, 'package.json'))) return candidate;
-      if (dir === config.root || path.dirname(dir) === dir) break;
+      if (dir === installRoot || path.dirname(dir) === dir) break;
     }
-    return path.join(config.root, 'node_modules', ...grammar.package.split('/'));
+    return path.join(installRoot, 'node_modules', ...grammar.package.split('/'));
   };
   const consumers = grammar.consumerManifests.map(relative => {
     const root = path.dirname(path.join(config.root, ...relative.split('/')));
@@ -123,7 +125,7 @@ function checkGrammar(config, context) {
       manifest: readJson(path.join(config.root, ...relative.split('/'))) ?? {} };
   });
   const installs = [...new Map(consumers.map(consumer => [consumer.packageRoot, consumer])).values()];
-  const packageRoot = installs[0]?.packageRoot ?? local?.root ?? path.join(config.root, 'node_modules', ...grammar.package.split('/'));
+  const packageRoot = installs[0]?.packageRoot ?? local?.root ?? path.join(installRoot, 'node_modules', ...grammar.package.split('/'));
   const manifestFile = path.join(packageRoot, 'package.json');
   const manifest = readJson(manifestFile);
   const ownerOf = (fileName) => consumers.filter(consumer => isInside(consumer.root, fileName))

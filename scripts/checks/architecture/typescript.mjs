@@ -5,6 +5,7 @@ import { canonical, isInside, slash } from './config.mjs';
 import { sameOrUnder } from '../../lib/path-key.mjs';
 import { createTypeScriptProgram, readTypeScriptProject, resolveTypeScriptModule, sharedInProgramRun, typeScriptProjectReferencePath } from '../typescript-programs.mjs';
 import { readJsonFile } from '../../lib/json.mjs';
+import { locateDeclaration } from '../../lib/hfs-slots.mjs';
 
 const CODE_EXTENSIONS = /\.(?:[cm]?[jt]sx?)$/i;
 const TEST_FILE = /(?:^|[.-])(?:spec|test)\.[cm]?[jt]sx?$/i;
@@ -48,9 +49,12 @@ function compilerError(ts, root, diagnostic, project, ruleId = 'ARCH_TSCONFIG_IN
   };
 }
 
-/** Load TypeScript through the target package boundary, never through StarCi's own dependency graph. */
+/**
+ * Load TypeScript through the target package boundary, never through StarCi's own dependency graph. A side folder of an app has no
+ * package.json of its own: the app root's one manifest is the boundary its TypeScript is installed under.
+ */
 export function loadTargetTypeScript(repositoryRoot) {
-  const packageFile = path.join(repositoryRoot, 'package.json');
+  const packageFile = path.join(locateDeclaration(repositoryRoot).appRoot, 'package.json');
   if (!fs.existsSync(packageFile)) throw Error('ARCH_TYPESCRIPT_MISSING: target package.json is required to resolve target-installed TypeScript.');
   const targetRequire = createRequire(packageFile);
   let resolved;

@@ -1,0 +1,2 @@
+# Set a project-owned age recipient before encrypting the first secret.
+creation_rules: []

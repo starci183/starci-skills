@@ -1,0 +1,128 @@
+// hfs scaffold app <name> - the first tree of a new app, the one shape every StarCi product has:
+//
+//   <name>/            hfs.json (kind app), package.json (every dependency of both sides at its canon pin, the managed scripts),
+//                      package-lock.json, README.md, the managed root files (CI, husky, .gitignore block, Sonar, prettier) and
+//                      .starciwork; scripts/codegen.mjs, the app's own step of `npm run codegen`
+//   <name>/be/         the back-end side: the managed tool configuration and the templates/be/skeleton tree (the api app's
+//                      entrypoint, platform config/logging/errors/clock/cqrs, the liveness capability and the health feature)
+//   <name>/fe/         the front-end side: the managed tool configuration and the templates/fe/skeleton tree (the next-intl
+//                      [locale] shell with vi default, as-needed prefix and proxy.ts, the app's API client)
+//
+// The skeleton files are written once from templates/<app|be|fe>/skeleton ({{project}}, {{app}} and {{appPascal}} filled, a
+// `__app__` folder named after the side's app); the managed files are the render of `hfs sync` (sync/index.mjs), so a fresh app
+// is in sync by construction. Nothing is installed: `npm install` completes the lockfile, which is written as the root entry only.
+// An existing directory is refused, never merged into.
+import fs from 'node:fs';
+import path from 'node:path';
+import { loadSlotManifest, resolveRepoDeclaration } from '../runtime/scripts/lib/hfs-slots.mjs';
+import { parseYaml } from '../runtime/engine/yaml.mjs';
+import { TEMPLATES_DIR, render, renderTargets, writeTargets } from '../sync/index.mjs';
+import { ScaffoldError } from './service.mjs';
+
+const NAME = /^[a-z][a-z0-9-]*$/;
+const APP_DIR = '__app__';
+const PINS_FILE = path.join(import.meta.dirname, '..', 'runtime', 'knowledge', 'hfs', 'canon-pins.yaml');
+const SONAR_GATE_FILE = path.join(import.meta.dirname, '..', 'runtime', 'knowledge', 'sonar-gate.yaml');
+const pascal = name => name.split('-').map(part => part[0].toUpperCase() + part.slice(1)).join('');
+
+/** The apps a new app starts with: one api app on the be side, one Next app on the fe side, which reads the be contracts for its codegen. */
+export const STARTER_SIDES = Object.freeze({
+  be: Object.freeze({ apps: [{ name: 'api', kind: 'api' }] }),
+  fe: Object.freeze({ apps: [{ name: 'web', kind: 'next' }], reads: ['be/contracts/'] }),
+});
+
+/**
+ * The dependencies of the starter: what the skeleton imports and the tools the managed scripts and configs run. A name with a
+ * canon pin (knowledge/hfs/canon-pins.yaml) takes the pin; the others take the range the reference apps (examples/todo-app)
+ * declare.
+ */
+const STARTER_DEPENDENCIES = Object.freeze({
+  dependencies: {
+    '@nestjs/common': null, '@nestjs/core': null, '@nestjs/cqrs': '^11.0.3',
+    '@nestjs/platform-express': null, next: null, 'next-intl': null, react: null, 'react-dom': null,
+    'reflect-metadata': '^0.2.2', rxjs: '^7.8.1', 'server-only': '^0.0.1', tslib: '^2.8.1',
+  },
+  devDependencies: {
+    '@nestjs/testing': null, '@starci/eslint-canon-be': null, '@starci/eslint-canon-fe': null, '@starci/hfs': null, '@starci/jest-preset': null,
+    '@starci/prettier-config': null, '@starci/stylelint-canon': null, '@starci/tsconfig': null, '@tailwindcss/postcss': '^4', '@types/express': '^4.17.21',
+    '@types/jest': null, '@types/node': null, '@types/react': '^19.0.0', '@types/react-dom': '^19.0.0', eslint: null, 'eslint-plugin-react-hooks': null,
+    husky: '^9.1.7', jest: null, 'postcss-value-parser': null, prettier: null, stylelint: null, tailwindcss: '^4', 'ts-jest': null,
+    'ts-node-dev': '^2.0.0', 'tsc-alias': '^1.8.10', 'tsconfig-paths': '^4.2.0', typescript: null,
+  },
+});
+
+/** The app hfs.json of a new app called `name`. */
+export const starterDeclaration = (name, manifest = loadSlotManifest()) => ({ hfs: manifest.major, kind: 'app', project: name, sides: structuredClone(STARTER_SIDES) });
+
+/** The root package.json of a new app: name, the dependencies at their pins; the managed scripts are sync's. */
+function packageManifest(name, pins) {
+  const pinned = (dependency, range) => {
+    if (range !== null) return range;
+    if (!pins[dependency]) throw new ScaffoldError('HFS_SCAFFOLD_PIN_MISSING', `${dependency} has no canon pin in knowledge/hfs/canon-pins.yaml`);
+    return pins[dependency].version;
+  };
+  const section = entries => Object.fromEntries(Object.entries(entries).sort(([a], [b]) => a.localeCompare(b)).map(([dependency, range]) => [dependency, pinned(dependency, range)]));
+  return { name, version: '0.0.0', private: true, dependencies: section(STARTER_DEPENDENCIES.dependencies), devDependencies: section(STARTER_DEPENDENCIES.devDependencies) };
+}
+
+function listFiles(dir, base = dir) {
+  return fs.readdirSync(dir, { withFileTypes: true }).flatMap(entry => {
+    const full = path.join(dir, entry.name);
+    return entry.isDirectory() ? listFiles(full, base) : [path.relative(base, full).split(path.sep).join('/')];
+  });
+}
+
+/** The be side's nest-cli.json: one Nest project per be app, the first api app the default. */
+function nestCli(app) {
+  const projects = Object.fromEntries(app.sides.be.apps.map(entry => [entry.name, { type: 'application', root: `apps/${entry.name}`, entryFile: 'main', sourceRoot: `apps/${entry.name}/src` }]));
+  const first = app.sides.be.apps.find(entry => entry.kind === 'api');
+  return { $schema: 'https://json.schemastore.org/nest-cli', collection: '@nestjs/schematics', monorepo: true, root: `apps/${first.name}`, sourceRoot: `apps/${first.name}/src`, projects };
+}
+
+/** The skeleton files of one scope (app root, be, fe): [{ path, content }], app-relative; a `__app__` file once per app of the side. */
+function skeletonOf(scope, app, vars) {
+  const dir = path.join(TEMPLATES_DIR, scope, 'skeleton');
+  if (!fs.existsSync(dir)) throw new ScaffoldError('HFS_SCAFFOLD_SKELETON_MISSING', `no skeleton templates in templates/${scope}/skeleton`);
+  const apps = scope === 'app' ? [] : app.sides[scope].apps.filter(entry => scope === 'fe' || entry.kind === 'api');
+  const prefix = scope === 'app' ? '' : `${scope}/`;
+  const files = [];
+  for (const rel of listFiles(dir)) {
+    const source = fs.readFileSync(path.join(dir, rel), 'utf8').replace(/\r\n/g, '\n');
+    const once = { project: app.project, ...vars };
+    if (!rel.includes(APP_DIR)) {
+      files.push({ path: `${prefix}${rel}`, content: render(source, once) });
+      continue;
+    }
+    for (const entry of apps) files.push({ path: `${prefix}${rel.split(APP_DIR).join(entry.name)}`, content: render(source, { ...once, app: entry.name, appPascal: pascal(entry.name) }) });
+  }
+  return files;
+}
+
+/**
+ * `hfs scaffold app <name>`: writes the new app under `into` and returns `{ root, files }` (app-relative paths, sorted). `presets`
+ * is what sync loads from the installed @starci/jest-preset (the Sonar exclusions); the CLI passes the one it resolves.
+ */
+export function scaffoldApp({ name, into, presets, manifest = loadSlotManifest() }) {
+  if (!NAME.test(String(name))) throw new ScaffoldError('HFS_SCAFFOLD_NAME_INVALID', `the app name ${name} must be kebab-case (a project name: ${NAME})`);
+  const root = path.join(into, name);
+  if (fs.existsSync(root)) throw new ScaffoldError('HFS_SCAFFOLD_EXISTS', `${root} already exists; hfs scaffold app never writes into an existing directory`);
+  const declaration = starterDeclaration(name, manifest);
+  const app = resolveRepoDeclaration(manifest, declaration);
+  const pins = parseYaml(fs.readFileSync(PINS_FILE, 'utf8')).pins;
+  const pkg = packageManifest(name, pins);
+  const files = [
+    { path: 'hfs.json', content: `${JSON.stringify(declaration, null, 2)}\n` },
+    { path: 'package.json', content: `${JSON.stringify(pkg, null, 2)}\n` },
+    { path: 'package-lock.json', content: `${JSON.stringify({ name, version: pkg.version, lockfileVersion: 3, requires: true, packages: { '': { name, version: pkg.version, dependencies: pkg.dependencies, devDependencies: pkg.devDependencies } } }, null, 2)}\n` },
+    { path: 'be/nest-cli.json', content: `${JSON.stringify(nestCli(app), null, 2)}\n` },
+    ...['app', 'be', 'fe'].flatMap(scope => skeletonOf(scope, app, { sonarGate: parseYaml(fs.readFileSync(SONAR_GATE_FILE, 'utf8')).gate.name })),
+  ];
+  for (const file of files) {
+    const target = path.join(root, ...file.path.split('/'));
+    fs.mkdirSync(path.dirname(target), { recursive: true });
+    fs.writeFileSync(target, file.content);
+  }
+  const targets = renderTargets(declaration, presets, { manifest });
+  writeTargets(root, targets);
+  return { root, files: [...new Set([...files.map(file => file.path), ...targets.map(target => target.path)])].sort() };
+}

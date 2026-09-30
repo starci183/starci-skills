@@ -1,2 +1,0 @@
-{{> common/gitignore.base}}
-schema.gql

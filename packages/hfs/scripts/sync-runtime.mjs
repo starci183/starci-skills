@@ -61,7 +61,7 @@ export const CATALOG = 'modules/kernel/failure-codes.yaml';
  * canons run the machine behind the project-graph law: the managed package-scripts templates (README script names) and
  * the pin and Sonar gate declarations. Without them the canon's rules fail to load outside the runtime checkout.
  */
-const MACHINE_DATA = Object.freeze(['packages/hfs/templates/be/package-scripts/package.json', 'packages/hfs/templates/fe/package-scripts/package.json', 'knowledge/hfs/canon-pins.yaml', 'knowledge/sonar-gate.yaml']);
+const MACHINE_DATA = Object.freeze(['packages/hfs/templates/app/package-scripts/package.json', 'knowledge/hfs/canon-pins.yaml', 'knowledge/sonar-gate.yaml']);
 /** bundle directory (runtime-relative) -> the files it copies and whether it carries the failure-code slice. */
 export const BUNDLES = Object.freeze({
   'packages/hfs/runtime': Object.freeze({ files: Object.freeze([...new Set([...SLOT_FILES, ...importClosure(CHECK_ENTRIES), 'knowledge/hfs/canon-pins.yaml', 'knowledge/sonar-gate.yaml'])].sort()), catalog: true }),

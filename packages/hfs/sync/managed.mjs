@@ -26,7 +26,7 @@
 //   HFS_TS_STRICT (R22)           the root tsconfig.json drift (either profile), named by flag (ts-strict.mjs) instead of by hash.
 import fs from 'node:fs';
 import path from 'node:path';
-import { SyncError, checkTargets, renderRepo } from './index.mjs';
+import { STACKS_SIDE, SyncError, checkTargets, renderRepo } from './index.mjs';
 import { parseYaml as bundledParseYaml } from '../runtime/engine/yaml.mjs';
 import { readDeclaredSonarGate } from './sonar-key.mjs';
 import { TS_STRICT_FILE, tsStrictFindings } from './ts-strict.mjs';
@@ -72,14 +72,15 @@ function driftFindings(repoRoot, targets) {
   for (const result of checkTargets(repoRoot, targets)) {
     const target = targets.find(candidate => candidate.path === result.path);
     if (!fs.existsSync(path.join(repoRoot, result.path)) || result.status === 'ok') continue;
-    if (result.path === TS_STRICT_FILE) {
-      const flags = tsStrictFindings(fs.readFileSync(path.join(repoRoot, result.path), 'utf8'), target.content);
+    // A side's tsconfig.json (be/tsconfig.json, fe/tsconfig.json: the side's own root) is judged by flag (R22).
+    if (target.scope !== 'app' && result.path === `${target.scope}/${TS_STRICT_FILE}`) {
+      const flags = tsStrictFindings(fs.readFileSync(path.join(repoRoot, result.path), 'utf8'), target.content, result.path);
       if (flags.length) {
         findings.push(...flags);
         continue;
       }
     }
-    const code = target.mode === 'block' ? 'HFS_GITIGNORE_BLOCK_DRIFT' : ONE_LINER_FILES.has(result.path) ? 'HFS_RULE_OFF_WITHOUT_REPLACEMENT' : result.path === SONAR_PROPERTIES_FILE ? 'HFS_SONAR_CONFIG' : 'HFS_MANAGED_FILE_DRIFT';
+    const code = target.mode === 'block' ? 'HFS_GITIGNORE_BLOCK_DRIFT' : ONE_LINER_FILES.has(path.posix.basename(result.path)) ? 'HFS_RULE_OFF_WITHOUT_REPLACEMENT' : result.path === SONAR_PROPERTIES_FILE ? 'HFS_SONAR_CONFIG' : 'HFS_MANAGED_FILE_DRIFT';
     const where = result.difference ? `; line ${result.difference.line} expected ${JSON.stringify(result.difference.expected)}, found ${JSON.stringify(result.difference.actual)}` : '';
     const what = target.mode === 'block' ? `the managed block of ${result.path} is ${result.status === 'missing' ? 'missing' : 'not its render'}` : target.mode === 'scripts' ? 'the scripts block of package.json is not the rendered one' : `${result.path} is not its render${code === 'HFS_RULE_OFF_WITHOUT_REPLACEMENT' ? ', so a rule can be off or redefined in it' : ''}`;
     findings.push({ code, level: 'error', path: result.path, mode: target.mode, expectedHash: result.expectedHash, ...(result.actualHash ? { actualHash: result.actualHash } : {}), message: `${what} (expected sha256 ${result.expectedHash.slice(0, 12)}${result.actualHash ? `, found ${result.actualHash.slice(0, 12)}` : ''}${where}); run "npx hfs sync --write"` });
@@ -87,9 +88,9 @@ function driftFindings(repoRoot, targets) {
   return findings;
 }
 
-/** R11: the quality gate the stack declaration names is the one gate of the bundled knowledge/sonar-gate.yaml. */
-function sonarGateFindings(repoRoot, hfs, parseYaml) {
-  const declared = readDeclaredSonarGate(repoRoot, { parseYaml, stacks: hfs.stacks });
+/** R11: the quality gate the be side's stack declaration names is the one gate of the bundled knowledge/sonar-gate.yaml. */
+function sonarGateFindings(repoRoot, parseYaml) {
+  const declared = readDeclaredSonarGate(repoRoot, { parseYaml, stacks: STACKS_SIDE });
   if (declared === null) return [];
   const gate = (parseYaml ?? bundledParseYaml)(fs.readFileSync(SONAR_GATE_FILE, 'utf8'))?.gate?.name;
   if (declared.qualityGate === gate) return [];
@@ -160,9 +161,9 @@ export async function managedFindings({ repoRoot, tracked, presets, parseYaml })
     if (error instanceof SyncError && error.code === 'HFS_SYNC_HFS_INVALID') return [];
     throw error;
   }
-  const { hfs, targets } = rendered;
+  const { targets } = rendered;
   const findings = driftFindings(repoRoot, targets);
-  findings.push(...sonarGateFindings(repoRoot, hfs, parseYaml));
+  findings.push(...sonarGateFindings(repoRoot, parseYaml));
   findings.push(...ruleFileFindings(repoRoot, tracked));
   findings.push(...toolKeyFindings(repoRoot, tracked));
   findings.push(...flagFindings(repoRoot, tracked, new Set(targets.map(target => target.path))));

@@ -15,7 +15,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { createRequire } from 'node:module';
 import { explainPath } from '../runtime/scripts/lib/hfs-check.mjs';
-import { loadSlotManifest } from '../runtime/scripts/lib/hfs-slots.mjs';
+import { loadSlotManifest, readRepoDeclaration } from '../runtime/scripts/lib/hfs-slots.mjs';
 
 export class ScaffoldError extends Error {
   constructor(code, message) {
@@ -284,11 +284,21 @@ const loadTypeScript = repoRoot => {
   }
 };
 
-const profileOf = repoRoot => {
-  let declaration;
-  try { declaration = JSON.parse(fs.readFileSync(path.join(repoRoot, 'hfs.json'), 'utf8')); } catch { throw new ScaffoldError('HFS_NEW_NO_HFS', `${repoRoot} has no readable hfs.json`); }
-  if (declaration.profile !== 'be') throw new ScaffoldError('HFS_NEW_BACKEND_ONLY', 'hfs new service | spec writes back-end services; this repository is a front end');
-  return declaration;
+const BE = 'be';
+
+/** The be side folder of the app at `appRoot`: hfs new runs at the app root and writes into be/ only. */
+const backEndOf = appRoot => {
+  let repo;
+  try { repo = readRepoDeclaration(loadSlotManifest(), appRoot); } catch (error) { throw new ScaffoldError('HFS_NEW_NO_HFS', `${appRoot} has no valid app hfs.json (${error.message})`); }
+  if (!repo.sides) throw new ScaffoldError('HFS_NEW_NO_HFS', `${appRoot} is not the app root; run hfs new at the folder of hfs.json`);
+  return path.join(appRoot, BE);
+};
+
+/** An app-relative path below be/ as a be-relative one; a path of the root or of fe/ is refused. */
+const belowBackEnd = input => {
+  const relative = input.split(path.sep).join('/').replace(/^\.\//, '').replace(/\/$/, '');
+  if (!relative.startsWith(`${BE}/`)) throw new ScaffoldError('HFS_NEW_BACKEND_ONLY', `hfs new service | spec writes back-end services under be/; ${relative} is not below be/`);
+  return relative.slice(BE.length + 1);
 };
 
 /** The slot check of a target: the manifest must own the path, else nothing is written. */
@@ -305,29 +315,29 @@ const writeNew = (repoRoot, relative, text) => {
   return relative;
 };
 
-/** `hfs new spec <file>.service.ts`: writes the spec skeleton of an existing service; returns the created paths. */
-export function newSpec({ repoRoot, file, ts = loadTypeScript(repoRoot), manifest = loadSlotManifest() }) {
-  profileOf(repoRoot);
-  const relative = file.split(path.sep).join('/').replace(/^\.\//, '');
+/** `hfs new spec be/<file>.service.ts` at the app root: writes the spec skeleton of an existing service; returns the created app-relative paths. */
+export function newSpec({ repoRoot: appRoot, file, ts = loadTypeScript(appRoot), manifest = loadSlotManifest() }) {
+  const repoRoot = backEndOf(appRoot);
+  const relative = belowBackEnd(file);
   if (!relative.endsWith('.service.ts')) throw new ScaffoldError('HFS_NEW_NOT_A_SERVICE', `${relative} is not a *.service.ts file: only services have a unit spec`);
   const absolute = path.join(repoRoot, relative);
   if (!fs.existsSync(absolute)) throw new ScaffoldError('HFS_NEW_NO_SERVICE', `${relative} does not exist`);
   const specPath = relative.replace(/\.ts$/, '.spec.ts');
   requireSlot(repoRoot, specPath);
   const shape = readServiceShape({ ts, fileName: absolute, text: fs.readFileSync(absolute, 'utf8') });
-  return [writeNew(repoRoot, specPath, specSkeleton({ shape, serviceFile: relative, manifest }))];
+  return [writeNew(repoRoot, specPath, specSkeleton({ shape, serviceFile: relative, manifest }))].map(created => `${BE}/${created}`);
 }
 
-/** `hfs new service <dir> <name> [--inject ...]`: writes the service and its spec skeleton; returns the created paths. */
-export function newService({ repoRoot, dir, name, inject = [], ts = loadTypeScript(repoRoot), manifest = loadSlotManifest() }) {
-  profileOf(repoRoot);
+/** `hfs new service be/<dir> <name> [--inject ...]` at the app root: writes the service and its spec skeleton; returns the created app-relative paths. */
+export function newService({ repoRoot: appRoot, dir, name, inject = [], ts = loadTypeScript(appRoot), manifest = loadSlotManifest() }) {
+  const repoRoot = backEndOf(appRoot);
   if (!SERVICE_NAME.test(name)) throw new ScaffoldError('HFS_NEW_NAME_INVALID', `the service name ${name} must be kebab-case (member-profile), without the .service suffix`);
-  const relative = path.posix.join(dir.split(path.sep).join('/').replace(/^\.\//, '').replace(/\/$/, ''), `${name}.service.ts`);
+  const relative = path.posix.join(belowBackEnd(dir), `${name}.service.ts`);
   requireSlot(repoRoot, relative);
   requireSlot(repoRoot, relative.replace(/\.ts$/, '.spec.ts'));
   for (const target of [relative, relative.replace(/\.ts$/, '.spec.ts')]) if (fs.existsSync(path.join(repoRoot, target))) throw new ScaffoldError('HFS_NEW_EXISTS', `${target} already exists; hfs new never overwrites`);
   const text = serviceSource({ name, dependencies: inject.map(parseInject) });
   const shape = readServiceShape({ ts, fileName: path.join(repoRoot, relative), text });
   const spec = specSkeleton({ shape, serviceFile: relative, manifest });
-  return [writeNew(repoRoot, relative, text), writeNew(repoRoot, relative.replace(/\.ts$/, '.spec.ts'), spec)];
+  return [writeNew(repoRoot, relative, text), writeNew(repoRoot, relative.replace(/\.ts$/, '.spec.ts'), spec)].map(created => `${BE}/${created}`);
 }

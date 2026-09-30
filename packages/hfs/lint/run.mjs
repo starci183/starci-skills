@@ -1,36 +1,41 @@
-// hfs lint - the ONE lint entry and the ONE report of a StarCi repository.
+// hfs lint - the ONE lint entry and the ONE report of a StarCi app.
 //
-//   hfs lint [--repo <dir>] [--changed <file>...] [--fix] [--format text|json] [--sonar <file>] [--stylelint <glob>]
+//   hfs lint [--repo <dir>] [--changed <file>...] [--fix] [--format text|json] [--sonar <file>]
 //
-// It runs, over the repository (or over the files named by --changed):
-//   1. ESLint through the repository's own install and eslint.config.mjs (the canon plugin: the per-file rules and the project-graph
-//      rules of the architecture machine, findings on the line of the offending TypeScript file);
-//   2. `hfs check` for what has no TypeScript file to sit on (the tree, managed files, pins, CI, contracts, docs, .starciwork);
-//   3. stylelint when --stylelint names the style glob (front ends).
-// Their findings become one list of one shape (`starci/lint@1`). `--format json` prints that report on stdout; `--sonar <file>` writes the
-// same findings as THE Sonar Generic Issue Import file (engine ids starci-hfs, eslint, stylelint in one document); the exit code is the
-// land-gate input: 0 no finding, 1 at least one, 2 a tool could not run (never a pass).
-// --changed restricts ESLint and stylelint to the listed files and keeps of the repository findings only those on a listed file or on no file.
+// It runs at the app root (the folder of hfs.json), over the app (or over the app-relative files named by --changed):
+//   1. ESLint once per side, from the side folder, through the app's own install and that side's eslint.config.mjs (be/ the be canon,
+//      fe/ the fe canon: the per-file rules and the project-graph rules of the architecture machine, findings on the line of the
+//      offending TypeScript file); each side lints only its own files, so the be rules never see fe/ and the fe rules never see be/;
+//   2. `hfs check` for what has no TypeScript file to sit on (the tree, managed files, pins, CI, contracts, docs, .starciwork), root and sides;
+//   3. stylelint over the fe side's stylesheets (sync STYLE_GLOB), from fe/ with its stylelint.config.mjs.
+// Their findings become one list of one shape (`starci/lint@1`), every path app-relative. `--format json` prints that report on stdout;
+// `--sonar <file>` writes the same findings as THE Sonar Generic Issue Import file (engine ids starci-hfs, eslint, stylelint in one
+// document); the exit code is the land-gate input: 0 no finding, 1 at least one, 2 a tool could not run (never a pass).
+// --changed restricts ESLint and stylelint to the listed files and keeps of the app findings only those on a listed file or on no file.
 import fs from 'node:fs';
 import path from 'node:path';
 import { createRequire } from 'node:module';
 import { spawnSync } from 'node:child_process';
 import { linterReport, mergeReports, sonarReport, sourceRootsOf } from '../report/sonar.mjs';
+import { SIDES, loadSlotManifest, readRepoDeclaration } from '../runtime/scripts/lib/hfs-slots.mjs';
+import { STYLE_GLOB } from '../sync/index.mjs';
 
 export const LINT_SCHEMA = 'starci/lint@1';
+/** The side whose stylesheets stylelint judges. */
+const STYLE_SIDE = 'fe';
 const CODE_PREFIX = /^\[([A-Z][A-Z0-9_]+)\] /;
 const posix = (file) => String(file).replace(/\\/g, '/').replace(/^\.\//, '');
 
 /** The flags of `hfs lint`; `--changed` takes every argument up to the next flag. */
 export function parseLintArgs(argv) {
-  const opts = { changed: null, fix: false, format: 'text', repo: undefined, sonar: undefined, stylelint: undefined };
+  const opts = { changed: null, fix: false, format: 'text', repo: undefined, sonar: undefined };
   for (let i = 0; i < argv.length; i += 1) {
     const arg = argv[i];
     if (arg === '--changed') {
       opts.changed = [];
       while (i + 1 < argv.length && !argv[i + 1].startsWith('--')) opts.changed.push(posix(argv[++i]));
     } else if (arg === '--fix') opts.fix = true;
-    else if (['--format', '--repo', '--sonar', '--stylelint'].includes(arg)) {
+    else if (['--format', '--repo', '--sonar'].includes(arg)) {
       if (argv[i + 1] === undefined) throw new Error(`${arg} needs a value`);
       opts[arg.slice(2)] = argv[++i];
     } else throw new Error(`unknown argument ${arg}`);
@@ -39,39 +44,42 @@ export function parseLintArgs(argv) {
   return opts;
 }
 
-/** A linter's json results through the repository's own install: `{ results }` or `{ error }`. */
-function runLinter({ repoRoot, pkg, bin, args }) {
+/** A linter's json results through the app's own install, run from `cwd` (a side folder): `{ results }` or `{ error }`. */
+function runLinter({ cwd, pkg, bin, args }) {
   let entry;
   try {
-    const manifest = createRequire(path.join(repoRoot, 'package.json')).resolve(`${pkg}/package.json`);
+    const manifest = createRequire(path.join(cwd, 'package.json')).resolve(`${pkg}/package.json`);
     const declared = JSON.parse(fs.readFileSync(manifest, 'utf8')).bin;
     entry = path.join(path.dirname(manifest), typeof declared === 'string' ? declared : declared[bin]);
   } catch {
-    return { error: `${pkg} is not installed under ${repoRoot}` };
+    return { error: `${pkg} is not installed for ${cwd}` };
   }
-  const run = spawnSync(process.execPath, [entry, ...args], { cwd: repoRoot, encoding: 'utf8', maxBuffer: 512 * 1024 * 1024 });
+  const run = spawnSync(process.execPath, [entry, ...args], { cwd, encoding: 'utf8', maxBuffer: 512 * 1024 * 1024 });
   // The linters exit 1 when they found something; no json at all means they could not run.
   let results;
-  try { results = JSON.parse(run.stdout); } catch { return { error: `${pkg} produced no json report (exit ${run.status}): ${String(run.stderr || run.stdout).trim().split('\n')[0]}` }; }
+  try { results = JSON.parse(run.stdout); } catch { return { error: `${pkg} produced no json report in ${path.basename(cwd)}/ (exit ${run.status}): ${String(run.stderr || run.stdout).trim().split('\n')[0]}` }; }
   if (!Array.isArray(results)) return { error: `${pkg} produced a report that is not a result list` };
   return { results };
 }
 
-const eslintFindings = (results, repoRoot) => results.flatMap((result) => (result.messages ?? []).map((message) => ({
+const eslintFindings = (results, appRoot) => results.flatMap((result) => (result.messages ?? []).map((message) => ({
   engine: 'eslint', rule: message.ruleId ?? 'eslint-error', code: CODE_PREFIX.exec(message.message ?? '')?.[1] ?? null, severity: 'error',
-  path: posix(path.relative(repoRoot, result.filePath)), line: message.line ?? null, column: message.column ?? null, message: message.message,
+  path: posix(path.relative(appRoot, result.filePath)), line: message.line ?? null, column: message.column ?? null, message: message.message,
 })));
 
-const stylelintFindings = (results, repoRoot) => results.flatMap((result) => (result.warnings ?? []).map((warning) => ({
+const stylelintFindings = (results, appRoot) => results.flatMap((result) => (result.warnings ?? []).map((warning) => ({
   engine: 'stylelint', rule: warning.rule || 'stylelint-error', code: null, severity: 'error',
-  path: posix(path.relative(repoRoot, result.source)), line: warning.line ?? null, column: warning.column ?? null, message: warning.text,
+  path: posix(path.relative(appRoot, result.source)), line: warning.line ?? null, column: warning.column ?? null, message: warning.text,
 })));
 
 const byLocation = (a, b) => `${a.path ?? ''}:${String(a.line ?? 0).padStart(7, '0')}:${a.rule}`.localeCompare(`${b.path ?? ''}:${String(b.line ?? 0).padStart(7, '0')}:${b.rule}`);
 
+/** The files of `changed` (app-relative) below `side`/, relative to the side folder. */
+const onSide = (changed, side) => changed.filter((file) => file.startsWith(`${side}/`)).map((file) => file.slice(side.length + 1));
+
 /**
- * Run the whole lint of a repository. `hfsCheck(repoRoot)` returns the `hfs check` result (`{ findings, tracked }`); the CLI injects it.
- * Returns `{ report, sonar, exit }`; `sonar` is the merged Generic Issue Import document.
+ * Run the whole lint of the app at `repoRoot`. `hfsCheck(repoRoot)` returns the `hfs check` result (`{ findings, tracked }`); the CLI
+ * injects it. Returns `{ report, sonar, exit }`; `sonar` is the merged Generic Issue Import document.
  */
 export async function lintRepository({ repoRoot, opts, hfsCheck, trackedFiles = () => [] }) {
   const changed = opts.changed === null ? null : new Set(opts.changed);
@@ -81,26 +89,37 @@ export async function lintRepository({ repoRoot, opts, hfsCheck, trackedFiles = 
   const raw = { eslint: [], stylelint: [] };
   const engines = {};
 
-  const sources = existing.filter((file) => /\.(?:[cm]?[jt]sx?)$/.test(file));
-  if (changed === null || sources.length) {
-    const linted = runLinter({ repoRoot, pkg: 'eslint', bin: 'eslint', args: ['--format', 'json', ...(opts.fix ? ['--fix'] : []), ...(changed ? sources : ['.'])] });
-    if (linted.error) errors.push(linted.error);
-    else { raw.eslint = linted.results; findings.push(...eslintFindings(linted.results, repoRoot)); }
-    engines.eslint = { files: changed ? sources.length : null };
-  } else engines.eslint = { files: 0, skipped: 'no changed source file' };
+  let app = null;
+  try { app = readRepoDeclaration(loadSlotManifest(), repoRoot); } catch (error) { errors.push(`hfs lint runs at the app root: ${String(error?.message ?? error)}`); }
+  if (app && !app.sides) { errors.push(`${repoRoot} is the ${app.side} side of an app; hfs lint runs at the app root, the folder of hfs.json`); app = null; }
 
-  if (opts.stylelint !== undefined) {
-    const styles = existing.filter((file) => file.endsWith('.css'));
+  // 1. ESLint, once per side, from the side folder with that side's config.
+  engines.eslint = { sides: {} };
+  for (const side of app ? SIDES : []) {
+    const sources = onSide(existing, side).filter((file) => /\.(?:[cm]?[jt]sx?)$/.test(file));
+    if (changed !== null && !sources.length) { engines.eslint.sides[side] = { files: 0, skipped: 'no changed source file' }; continue; }
+    const linted = runLinter({ cwd: path.join(repoRoot, side), pkg: 'eslint', bin: 'eslint', args: ['--format', 'json', ...(opts.fix ? ['--fix'] : []), ...(changed ? sources : ['.'])] });
+    if (linted.error) errors.push(linted.error);
+    else { raw.eslint.push(...linted.results); findings.push(...eslintFindings(linted.results, repoRoot)); }
+    engines.eslint.sides[side] = { files: changed ? sources.length : null };
+  }
+
+  // 3. stylelint over the fe side's stylesheets.
+  if (app) {
+    const styles = onSide(existing, STYLE_SIDE).filter((file) => file.endsWith('.css'));
     if (changed === null || styles.length) {
-      const linted = runLinter({ repoRoot, pkg: 'stylelint', bin: 'stylelint', args: [...(changed ? styles : [opts.stylelint]), '--formatter', 'json', ...(opts.fix ? ['--fix'] : [])] });
+      const linted = runLinter({ cwd: path.join(repoRoot, STYLE_SIDE), pkg: 'stylelint', bin: 'stylelint', args: [...(changed ? styles : [STYLE_GLOB]), '--formatter', 'json', ...(opts.fix ? ['--fix'] : [])] });
       if (linted.error) errors.push(linted.error);
       else { raw.stylelint = linted.results; findings.push(...stylelintFindings(linted.results, repoRoot)); }
     }
-    engines.stylelint = { files: changed ? styles.length : null };
+    engines.stylelint = { side: STYLE_SIDE, files: changed ? styles.length : null };
   }
 
+  // 2. The app check: root and sides.
   let checked = { findings: [] };
-  try { checked = await hfsCheck(repoRoot); } catch (error) { errors.push(`hfs check could not run: ${String(error?.message ?? error)}`); }
+  if (app) {
+    try { checked = await hfsCheck(repoRoot); } catch (error) { errors.push(`hfs check could not run: ${String(error?.message ?? error)}`); }
+  }
   const repoErrors = checked.findings.filter((finding) => finding.level === 'error');
   const kept = changed === null ? repoErrors : repoErrors.filter((finding) => !finding.path || changed.has(posix(finding.path)));
   for (const finding of kept) {
@@ -116,7 +135,7 @@ export async function lintRepository({ repoRoot, opts, hfsCheck, trackedFiles = 
   const sonar = mergeReports([
     sonarReport(kept, { sourceRoots, tracked }),
     linterReport('eslint', raw.eslint, { root: repoRoot, sourceRoots, tracked }),
-    ...(opts.stylelint !== undefined ? [linterReport('stylelint', raw.stylelint, { root: repoRoot, sourceRoots, tracked })] : []),
+    linterReport('stylelint', raw.stylelint, { root: repoRoot, sourceRoots, tracked }),
   ]);
   const report = { schema: LINT_SCHEMA, ok: findings.length === 0 && errors.length === 0, repoRoot, changed: changed ? [...changed].sort() : null, counts: { error: findings.length }, engines, errors, findings };
   return { report, sonar, exit: errors.length ? 2 : findings.length ? 1 : 0 };

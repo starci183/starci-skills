@@ -1,0 +1,7 @@
+schema: work/workspace@1
+id: {{project}}
+project: {{project}}
+description: The Work records of {{project}}, one StarCi app with its back end in be/ and its front end in fe/.
+repositories:
+  - role: app
+    name: {{project}}

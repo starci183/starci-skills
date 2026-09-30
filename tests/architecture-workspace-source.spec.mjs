@@ -11,7 +11,8 @@ const DECLARED_TSCONFIG = `${JSON.stringify({
 })}\n`;
 
 const unbuilt = (extra = {}) => ({
-  'package.json': JSON.stringify({ name: 'demo', private: true, workspaces: ['apps/*', 'packages/*'] }),
+  // The app root's one package.json: npm workspaces only for the fe side's packages.
+  '../package.json': JSON.stringify({ name: 'demo', private: true, workspaces: ['fe/packages/*'] }),
   'tsconfig.json': DECLARED_TSCONFIG,
   'packages/shared/package.json': JSON.stringify({
     name: '@demo/shared',

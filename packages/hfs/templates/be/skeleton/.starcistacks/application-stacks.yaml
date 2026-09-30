@@ -1,0 +1,10 @@
+schema: starci/application-stacks@1
+services:
+  sonar:
+    provider: sonarqube
+    mode: local
+    qualityGate: {{sonarGate}}
+    stack:
+      owner: host
+      root: .claude/ext/sonar
+      environment: dev

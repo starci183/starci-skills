@@ -1,9 +1,9 @@
-// hfs-check.mjs - the HFS repository check, behind `hfs check | init | explain` (packages/hfs) and reusable by any
-// runtime check. It reads three things and nothing else: the repository's hfs.json, the slot manifest
+// hfs-check.mjs - the HFS app check, behind `hfs check | explain` (packages/hfs) and reusable by any
+// runtime check. It reads three things and nothing else: the app's hfs.json, the slot manifest
 // (knowledge/hfs/slots.yaml through scripts/lib/hfs-slots.mjs) and the pins (knowledge/hfs/canon-pins.yaml). It never
 // writes to the repository it inspects.
 //
-// checkRepo() answers, for the tracked paths of one repository (git ls-files):
+// checkRepo() answers, for the tracked paths of one app (git ls-files), per scope (the app root and each side folder):
 //   HFS_SLOT_UNDECLARED              a tracked path no slot owns (the nearest slot is named)
 //   HFS_SLOT_NOT_ENABLED          a tracked path in an opt-in slot the repository did not declare
 //   HFS_SLOT_AMBIGUOUS            two slots of equal specificity own the path (a manifest gap, reported not guessed)
@@ -45,9 +45,8 @@ import path from 'node:path';
 import { skillRoot } from '../../engine/runtime-root.mjs';
 import { ARCHITECTURE_RULE_IDS, checkArchitecture } from '../checks/architecture/index.mjs';
 import { parseYaml } from '../../engine/yaml.mjs';
-import { HFS_DECLARATION_FILE, HfsSlotsError, createSlotResolver, loadSlotManifest, readRepoDeclaration, resolveRepoDeclaration } from './hfs-slots.mjs';
+import { APP_SCOPE, HFS_DECLARATION_FILE, HfsSlotsError, SIDES, createSlotResolver, loadSlotManifest, readRepoDeclaration, resolveRepoDeclaration } from './hfs-slots.mjs';
 import { allowsFile } from './hfs-allows.mjs';
-import { isDir } from './fs-kind.mjs';
 import { gitOutput } from './git.mjs';
 import { posixPath } from './path-key.mjs';
 import { readTree, treeFacts, untrackedEntries } from './hfs-tree.mjs';
@@ -62,6 +61,7 @@ import { readJson } from './hfs-rules/read.mjs';
 import { secretFindings } from './hfs-rules/secrets.mjs';
 import { pathFindings } from './hfs-path-findings.mjs';
 import { onLintSurface } from '../checks/architecture/surface.mjs';
+import { checkAppRoot, trackedTreeView } from '../checks/architecture/hfs.mjs';
 import { stacksFindings } from './hfs-rules/stacks.mjs';
 import { testTopologyFindings } from './hfs-rules/test-topology.mjs';
 import { feNoTestsFindings, isFeTestPath } from './hfs-rules/fe-no-tests.mjs';
@@ -69,11 +69,11 @@ import { feNoTestsFindings, isFeTestPath } from './hfs-rules/fe-no-tests.mjs';
 export const CANON_PINS_FILE = 'knowledge/hfs/canon-pins.yaml';
 export const FAILURE_CODES_FILE = 'modules/kernel/failure-codes.yaml';
 /**
- * The codes `hfs check` and `hfs init` report when they cannot judge (an unreadable repository, a refused declaration or
- * manifest, an init that cannot proceed): infrastructure refusals, never obligations, so no rule of knowledge/hfs/rules.yaml owns them.
+ * The codes `hfs check` reports when it cannot judge (an unreadable repository, a refused declaration or manifest, a missing
+ * formatter): infrastructure refusals, never obligations, so no rule of knowledge/hfs/rules.yaml owns them.
  */
 export const REFUSAL_CODES = Object.freeze([
-  'HFS_INIT_EXISTS', 'HFS_INIT_UNDETECTED', 'HFS_REPO_UNREADABLE',
+  'HFS_REPO_UNREADABLE',
   'HFS_DECLARATION_INVALID', 'HFS_MANIFEST_MAJOR_MISMATCH', 'HFS_MANIFEST_INVALID', 'HFS_FORMAT_TOOL_MISSING',
 ]);
 /** The codes this module emits that are not the slot loader's own: the why bundle of packages/hfs ships exactly these plus the loader's. */
@@ -137,7 +137,8 @@ function pinFindings({ repoRoot, files, profile, pins, only }) {
     let pkg;
     try { pkg = JSON.parse(fs.readFileSync(path.join(repoRoot, file), 'utf8')); } catch { continue; }
     for (const [name, pin] of Object.entries(pins)) {
-      if (pin.side !== 'both' && pin.side !== profile) continue;
+      // The app root's one package.json carries the pins of both sides.
+      if (profile !== APP_SCOPE && pin.side !== 'both' && pin.side !== profile) continue;
       for (const section of DEP_SECTIONS) {
         const spec = pkg[section]?.[name];
         if (spec === undefined) continue;
@@ -211,15 +212,90 @@ function treeFindings({ repoRoot, resolver }) {
   return findings;
 }
 
+/** A side-relative path (or null) as an app-relative one. */
+const onSide = (side, p) => (p ? path.posix.normalize(`${side}/${p}`) : p);
+
 /**
- * The check of one repository. `declaration` overrides hfs.json (a dry run over a repository that has none); `files`
- * overrides git ls-files (specs). `only` (a list of paths) limits the per-path checks (slot, pin, size) to those paths; the
- * checks of the tree as a whole (required files, minimum instances, empty directories, untracked entries) are not
- * per-path. `tree: false` skips the file-system checks (empty directories, ghosts, untracked); they also do not run
- * over `files`, which is a dry run. `extraFindings` are findings another emitter produced for the same repository (the
- * managed files), judged and counted with this module's own. Returns {ok, profile, apps, manifest, tracked, findings,
- * counts}; a missing or invalid hfs.json is one HFS_DECLARATION_INVALID / HFS_MANIFEST_MAJOR_MISMATCH error finding, never
- * an exception.
+ * The findings of one scope: the app root (profile app; its own files, and the rules of the files only the root holds: the one
+ * package.json and lockfile, CI, hooks, .starciwork) or one side (profile be or fe; the side folder is `repoRoot` and every path is
+ * relative to it, exactly as the standalone repository root was). `files` are the scope's tracked paths; `all` (root only) every
+ * tracked path of the app, for the rules that read across it (dependency skew, proof commands).
+ */
+function scopeFindings({ repoRoot, root, repo, resolver, files, all = files, scoped }) {
+  const inScope = (file) => !scoped || scoped.has(file);
+  // A required directory of the root (be/, fe/) is present through the files below it, which are the sides' own.
+  const trackedSet = new Set(all);
+  const present = (p) => (p.endsWith('/') ? all.some((f) => f.startsWith(p)) : trackedSet.has(p));
+  const findings = [];
+  const isRoot = repo.profile === APP_SCOPE;
+
+  findings.push(...pathFindings({ files: files.filter(inScope), resolver, profile: repo.profile }));
+
+  const required = resolver.requiredPaths();
+  const missing = new Set();
+  const missingFile = (slot, p, via) => {
+    const key = `${slot}|${p}`;
+    if (missing.has(key) || present(p)) return;
+    missing.add(key);
+    const app = appOf(p);
+    findings.push({ code: 'HFS_SLOT_REQUIRED_MISSING', level: 'error', path: p, slot, via, ...(app ? { app } : {}), message: `${slot} requires ${p}${app ? ` (app ${app})` : ''}, which is not tracked` });
+  };
+  // The app's own required paths; each side reports its own (the resolver of the app lists them too, with their side).
+  for (const entry of required.paths) if (!entry.side) missingFile(entry.slot, entry.path, entry.via);
+  const instances = instancesOf(resolver, files);
+  for (const instance of instances) for (const p of requiredOf(resolver.slot(instance.slot), instance)) missingFile(instance.slot, p, 'requires');
+  for (const { slot, min, appKind, side } of required.minimums) {
+    if (appKind !== undefined || side) continue;     // an app-kind minimum is checked by requiredPaths (one path set per declared app)
+    const count = instances.filter((i) => i.slot === slot).length;
+    if (count < min) findings.push({ code: 'HFS_MIN_INSTANCES', level: 'error', path: resolver.slot(slot).path, slot, min, count, message: `${slot} needs at least ${min} instance${min === 1 ? '' : 's'} (${resolver.slot(slot).path}), found ${count}` });
+  }
+
+  const pins = readPins(root);
+  findings.push(...pinFindings({ repoRoot, files, profile: repo.profile, pins, only: scoped }));
+
+  // The tree checks of the rules that read file content or configuration (hfs-rules/*): whole-scope, cheap, no tool run.
+  findings.push(
+    ...secretFindings({ repoRoot, files: files.filter(inScope), resolver }),
+    ...repoLocalCheckFindings({ repoRoot, files }),
+    ...lintSuppressionFindings({ repoRoot, files }),
+  );
+  if (isRoot) {
+    findings.push(
+      ...depFindings({ repoRoot, files: all }),
+      ...pipelineFindings({ repoRoot, files, pins }),
+      ...testTopologyFindings({ repoRoot, files }),
+      ...proofCommandFindings({ repoRoot, files: all, resolver }),
+      // The tree check of the app root the machine runs per side for a side folder: README, root entries, automatic gates, hooks path.
+      ...checkAppRoot({ root: repoRoot, resolver, tree: trackedTreeView(all) }).violations.map((item) => ({ code: item.ruleId, level: 'error', path: item.path, line: item.line, column: item.column, source: 'machine', message: `${item.path}: ${item.message}` })),
+    );
+  } else if (repo.profile === 'be') {
+    findings.push(...contractFindings({ files, repo, resolver }), ...stacksFindings({ repoRoot, files, resolver }), ...testTopologyFindings({ repoRoot, files }));
+  } else {
+    findings.push(...frontendFindings({ repoRoot, files, repo }), ...feNoTestsFindings({ repoRoot, files: files.filter(inScope) }));
+  }
+
+  if (!isRoot) {
+    const soft = resolver.ruleParams().fileLines.soft;
+    for (const file of files) {
+      if (!inScope(file) || !SOURCE_EXT.test(file) || resolver.classifyPath(file).status !== 'owned') continue;
+      let lines;
+      try { lines = fs.readFileSync(path.join(repoRoot, file), 'utf8').split('\n').length; } catch { continue; }
+      if (lines > soft) findings.push({ code: 'HFS_SIZE_SOFT_BACKLOG', level: 'info', path: file, lines, soft, message: `${file} has ${lines} lines, above the soft size ${soft}; report only` });
+    }
+  }
+  return findings;
+}
+
+/**
+ * The check of one app. `repoRoot` is the app root (a side folder is checked as that side alone). `declaration` overrides hfs.json
+ * (a dry run over an app that has none); `files` overrides git ls-files (specs), app-relative. `only` (a list of app-relative paths)
+ * limits the per-path checks (slot, pin, size) to those paths; the checks of the tree as a whole (required files, minimum instances,
+ * empty directories, untracked entries) are not per-path. `tree: false` skips the file-system checks (empty directories, ghosts,
+ * untracked); they also do not run over `files`, which is a dry run. `extraFindings` are findings another emitter produced for the
+ * same app (the managed files, the formatter, the contract emit), app-relative, judged and counted with this module's own.
+ * The root scope and each side run their own rules over their own files (hfs checks per side, the side folder as the old repository
+ * root, plus the root checks); every finding path is app-relative. Returns {ok, profile, apps, manifest, tracked, findings, counts};
+ * a missing or invalid hfs.json is one HFS_DECLARATION_INVALID / HFS_MANIFEST_MAJOR_MISMATCH error finding, never an exception.
  */
 export function checkRepo({ repoRoot, root = skillRoot, declaration, files, only, extraFindings = [], tree = files === undefined, manifest = loadSlotManifest({ root }), surface = 'all' }) {
   const why = readWhy(root);
@@ -233,63 +309,32 @@ export function checkRepo({ repoRoot, root = skillRoot, declaration, files, only
   }
   const resolver = createSlotResolver(manifest, repo);
   const tracked = files ?? trackedFiles(repoRoot);
-  const trackedSet = new Set(tracked);
-  const present = (p) => (p.endsWith('/') ? tracked.some((f) => f.startsWith(p)) : trackedSet.has(p));
-  const findings = [];
   const scoped = only ? new Set(only) : null;
-  const inScope = (file) => !scoped || scoped.has(file);
-
-  findings.push(...pathFindings({ files: tracked.filter(inScope), resolver, profile: repo.profile }));
-
-  const required = resolver.requiredPaths();
-  const missing = new Set();
-  const missingFile = (slot, p, via) => {
-    const key = `${slot}|${p}`;
-    if (missing.has(key) || present(p)) return;
-    missing.add(key);
-    const app = appOf(p);
-    findings.push({ code: 'HFS_SLOT_REQUIRED_MISSING', level: 'error', path: p, slot, via, ...(app ? { app } : {}), message: `${slot} requires ${p}${app ? ` (app ${app})` : ''}, which is not tracked` });
-  };
-  for (const entry of required.paths) missingFile(entry.slot, entry.path, entry.via);
-  const instances = instancesOf(resolver, tracked);
-  for (const instance of instances) for (const p of requiredOf(resolver.slot(instance.slot), instance)) missingFile(instance.slot, p, 'requires');
-  for (const { slot, min, appKind } of required.minimums) {
-    if (appKind !== undefined) continue;     // an app-kind minimum is checked by requiredPaths (one path set per declared app)
-    const count = instances.filter((i) => i.slot === slot).length;
-    if (count < min) findings.push({ code: 'HFS_MIN_INSTANCES', level: 'error', path: resolver.slot(slot).path, slot, min, count, message: `${slot} needs at least ${min} instance${min === 1 ? '' : 's'} (${resolver.slot(slot).path}), found ${count}` });
+  const findings = [];
+  // `hfs check` leaves to the lint canon the per-path findings that sit on an existing TypeScript file (hfs-path-findings.mjs).
+  const keep = (list, scopeRoot) => (surface === 'check' ? list.filter((finding) => !(finding.origin === 'repo' && onLintSurface(scopeRoot, finding))) : list);
+  if (repo.profile === APP_SCOPE) {
+    const own = tracked.filter((file) => resolver.sideOf(file) === null);
+    findings.push(...keep(scopeFindings({ repoRoot, root, repo, resolver, files: own, all: tracked, scoped }), repoRoot));
+    for (const side of SIDES) {
+      const prefix = `${side}/`;
+      const sideRoot = path.join(repoRoot, side);
+      const sideFiles = tracked.filter((file) => file.startsWith(prefix)).map((file) => file.slice(prefix.length));
+      const sideScoped = scoped ? new Set([...scoped].filter((file) => file.startsWith(prefix)).map((file) => file.slice(prefix.length))) : null;
+      const sideFindings = scopeFindings({ repoRoot: sideRoot, root, repo: repo.sides[side], resolver: resolver.sides[side], files: sideFiles, scoped: sideScoped });
+      findings.push(...keep(sideFindings, sideRoot).map((finding) => ({ ...finding, side, path: onSide(side, finding.path) })));
+    }
+  } else {
+    findings.push(...keep(scopeFindings({ repoRoot, root, repo, resolver, files: tracked, scoped }), repoRoot));
   }
-
-  const pins = readPins(root);
-  findings.push(...pinFindings({ repoRoot, files: tracked, profile: repo.profile, pins, only: scoped }));
-
-  // The tree checks of the rules that read file content or configuration (hfs-rules/*): whole-repository, cheap, no tool run.
-  const secrets = secretFindings({ repoRoot, files: tracked.filter(inScope), resolver });
-  const declared = declaration === undefined ? readJson(repoRoot, 'hfs.json') : declaration;
-  findings.push(
-    ...secrets,
-    ...depFindings({ repoRoot, files: tracked }),
-    ...pipelineFindings({ repoRoot, files: tracked, pins }),
-    ...contractFindings({ repoRoot, files: tracked, repo, resolver, stacks: declared?.stacks }),
-    ...repoLocalCheckFindings({ repoRoot, files: tracked }),
-    ...lintSuppressionFindings({ repoRoot, files: tracked }),
-    ...(repo.profile === 'be' ? [...stacksFindings({ repoRoot, files: tracked, resolver }), ...testTopologyFindings({ repoRoot, files: tracked }), ...proofCommandFindings({ repoRoot, files: tracked, resolver })] : [...frontendFindings({ repoRoot, files: tracked, repo }), ...feNoTestsFindings({ repoRoot, files: tracked.filter(inScope) })]),
-    ...extraFindings,
-  );
-
-  const soft = resolver.ruleParams().fileLines.soft;
-  for (const file of tracked) {
-    if (!inScope(file) || !SOURCE_EXT.test(file) || resolver.classifyPath(file).status !== 'owned') continue;
-    let lines;
-    try { lines = fs.readFileSync(path.join(repoRoot, file), 'utf8').split('\n').length; } catch { continue; }
-    if (lines > soft) findings.push({ code: 'HFS_SIZE_SOFT_BACKLOG', level: 'info', path: file, lines, soft, message: `${file} has ${lines} lines, above the soft size ${soft}; report only` });
-  }
-
+  findings.push(...extraFindings);
   if (tree) findings.push(...treeFindings({ repoRoot, resolver }));
 
-  // `hfs check` leaves to the lint canon the per-path findings that sit on an existing TypeScript file (hfs-path-findings.mjs).
-  const finished = withWhy(surface === 'check' ? findings.filter((finding) => !(finding.origin === 'repo' && onLintSurface(repoRoot, finding))) : findings, why);
+  // The app-root tree check reports machine codes: their why is read with the check's own.
+  const finished = withWhy(findings, { ...why, ...readWhy(root, [...new Set(findings.map((f) => f.code).filter((code) => !why[code]))]) });
   const counts = summarize(finished);
-  return { ok: counts.error === 0, repoRoot, manifest: manifest.version, profile: repo.profile, apps: repo.apps, tracked: tracked.length, findings: finished, counts };
+  const apps = repo.profile === APP_SCOPE ? SIDES.flatMap((side) => repo.sides[side].apps.map((app) => ({ ...app, side }))) : repo.apps;
+  return { ok: counts.error === 0, repoRoot, manifest: manifest.version, profile: repo.profile, apps, tracked: tracked.length, findings: finished, counts };
 }
 
 // ------------------------------------------------------------------------------------------ the whole check
@@ -326,45 +371,65 @@ function machineFindings(report) {
 }
 
 /**
- * The whole `hfs check` of one repository: checkRepo() (slots, pins, size, tree) and then the architecture machine over the
- * same work tree, its violations and errors merged in as findings with the Vietnamese why of their codes. `fast` judges
- * only what changed since the merge-base (`base` names another ref): the per-path slot and pin checks on the changed
- * paths, the machine on the owners of the changed source files without clones and dead exports, and no file-system tree
- * checks. `extraFindings` are the findings of the emitters that render templates or run the repository's formatter
- * (packages/hfs/sync), judged with checkRepo's own. `machine` is injectable for specs. A missing merge-base under `fast` is an Error, never a silent full pass.
+ * The whole `hfs check` of one app: checkRepo() (the root and both sides: slots, pins, size, tree) and then the architecture machine
+ * over each side folder (the side as the repository root it judges), its violations and errors merged in as findings with the
+ * Vietnamese why of their codes and the side prefixed onto their paths. `fast` judges only what changed since the merge-base (`base`
+ * names another ref): the per-path slot and pin checks on the changed paths, the machine on the owners of the changed source files
+ * without clones and dead exports, and no file-system tree checks. `extraFindings` are the findings of the emitters that render
+ * templates or run the formatter (packages/hfs/sync), judged with checkRepo's own. `machine` is injectable for specs. A missing
+ * merge-base under `fast` is an Error, never a silent full pass. `repoRoot` may also be a side folder: that side alone is checked.
  */
 export function checkRepository({ repoRoot, root = skillRoot, fast = false, base, extraFindings = [], manifest = loadSlotManifest({ root }), machine = checkArchitecture }) {
   const changed = fast ? changedSince(repoRoot, base) : null;
-  const baseSha = changed?.base;
   const slotResult = checkRepo({ repoRoot, root, manifest, extraFindings, surface: 'check', ...(changed ? { only: changed.files, tree: false } : {}) });
   if (slotResult.profile === null) return { ...slotResult, machine: { status: 'skipped', reason: 'hfs.json is not valid' } };
-
-  let paths;
-  if (changed) {
-    const resolver = createSlotResolver(manifest, readRepoDeclaration(manifest, repoRoot));
-    paths = [...new Set(changed.files.filter((f) => SOURCE_EXT.test(f) || resolver.ownerOf(f)).map((f) => resolver.ownerOf(f)?.root ?? f))].sort();
-    if (!paths.length) return { ...slotResult, machine: { status: 'skipped', reason: 'no changed source file', base: changed.base }, fast: { base: changed.base, changed: changed.files.length } };
+  const repo = readRepoDeclaration(manifest, repoRoot);
+  const scopes = repo.profile === APP_SCOPE
+    ? SIDES.map((side) => ({ side, repoRoot: path.join(repoRoot, side), prefix: `${side}/` }))
+    : [{ side: null, repoRoot, prefix: '' }];
+  const runs = [];
+  const found = [];
+  for (const scope of scopes) {
+    const run = machineOver({ scope, manifest, machine, changed });
+    runs.push(run.info);
+    found.push(...run.findings);
   }
-  let report;
-  try {
-    report = machine({ repositoryRoot: repoRoot, base: baseSha, surface: 'check', ...(changed ? { paths, fast: true } : {}) });
-  } catch (error) {
-    report = { ok: false, files: 0, kinds: [], violations: [], errors: [{ ruleId: 'ARCH_EXECUTION_UNAVAILABLE', message: String(error?.message ?? error) }] };
-  }
-  const found = machineFindings(report);
   const why = readWhy(root, [...new Set(found.map((f) => f.code))]);
   const findings = [...slotResult.findings, ...withWhy(found, why)];
   const counts = summarize(findings);
+  const ran = runs.filter((info) => info.status === 'ran');
   return {
     ...slotResult,
     ok: counts.error === 0,
     findings,
     counts,
-    machine: { status: 'ran', files: report.files, kinds: report.kinds, ...(changed ? { paths, base: changed.base } : {}) },
+    machine: ran.length
+      ? { status: 'ran', files: ran.reduce((sum, info) => sum + info.files, 0), kinds: [...new Set(ran.flatMap((info) => info.kinds ?? []))], sides: runs, ...(changed ? { paths: ran.flatMap((info) => info.paths ?? []), base: changed.base } : {}) }
+      : { status: 'skipped', reason: runs.map((info) => info.reason).join('; '), sides: runs, ...(changed ? { base: changed.base } : {}) },
     ...(changed ? { fast: { base: changed.base, changed: changed.files.length } } : {}),
   };
 }
 
+/** The architecture machine over one scope (a side folder): `{ info, findings }`, finding paths app-relative. */
+function machineOver({ scope, manifest, machine, changed }) {
+  const { side, prefix } = scope;
+  const label = side ?? 'repository';
+  let paths;
+  if (changed) {
+    const resolver = createSlotResolver(manifest, readRepoDeclaration(manifest, scope.repoRoot));
+    const mine = changed.files.filter((f) => f.startsWith(prefix)).map((f) => f.slice(prefix.length));
+    paths = [...new Set(mine.filter((f) => SOURCE_EXT.test(f) || resolver.ownerOf(f)).map((f) => resolver.ownerOf(f)?.root ?? f))].sort();
+    if (!paths.length) return { info: { side, status: 'skipped', reason: `no changed source file in ${label}` }, findings: [] };
+  }
+  let report;
+  try {
+    report = machine({ repositoryRoot: scope.repoRoot, base: changed?.base, surface: 'check', ...(changed ? { paths, fast: true } : {}) });
+  } catch (error) {
+    report = { ok: false, files: 0, kinds: [], violations: [], errors: [{ ruleId: 'ARCH_EXECUTION_UNAVAILABLE', message: String(error?.message ?? error) }] };
+  }
+  const findings = machineFindings(report).map((finding) => (side ? { ...finding, side, ...(finding.path ? { path: onSide(side, finding.path) } : {}) } : finding));
+  return { info: { side, status: 'ran', files: report.files, kinds: report.kinds, ...(paths ? { paths: paths.map((p) => `${prefix}${p}`) } : {}) }, findings };
+}
 // --------------------------------------------------------------------------------------------------- explain
 
 const TEST_KIND = {
@@ -406,62 +471,4 @@ export function explainPath({ repoRoot, input, root = skillRoot, declaration, ma
     ...(c.status === 'forbidden' ? { code: 'HFS_FORBIDDEN_PRESENT', titleVi: why.HFS_FORBIDDEN_PRESENT.titleVi, whyVi: why.HFS_FORBIDDEN_PRESENT.whyVi } : {}),
     ...(c.status === 'not-enabled' ? { code: 'HFS_SLOT_NOT_ENABLED', titleVi: why.HFS_SLOT_NOT_ENABLED.titleVi, whyVi: why.HFS_SLOT_NOT_ENABLED.whyVi } : {}),
   };
-}
-
-// ------------------------------------------------------------------------------------------------- init
-
-const SLUG_SUFFIX = /-(backend|be|frontend|fe|api|web|app)$/;
-const exists = (p) => fs.existsSync(p);
-const readPackage = (dir) => { try { return JSON.parse(fs.readFileSync(path.join(dir, 'package.json'), 'utf8')); } catch { return null; } };
-const depsOf = (pkg) => ({ ...pkg?.devDependencies, ...pkg?.dependencies });
-
-/**
- * A starter hfs.json by detection: profile from the dependencies (next -> fe, @nestjs/core -> be, over the root and
- * every apps/<name>), apps from the apps/<name> directories (fe: kind next; be: worker/migrate/cli by name, else api).
- * optionalSlots are the opt-in slots (not implied by an app kind) that tracked files already occupy. Connections are not guessed; a repository that keeps a database declares them by hand and gains the migrate app.
- * A repository the detection cannot classify is HFS_INIT_UNDETECTED, never a guess.
- */
-export function detectDeclaration({ repoRoot, manifest }) {
-  const appsDir = path.join(repoRoot, 'apps');
-  const names = isDir(appsDir) ? fs.readdirSync(appsDir, { withFileTypes: true }).filter((e) => e.isDirectory() && e.name !== 'node_modules').map((e) => e.name).sort() : [];
-  const rootPkg = readPackage(repoRoot);
-  const all = { ...depsOf(rootPkg) };
-  for (const name of names) Object.assign(all, depsOf(readPackage(path.join(appsDir, name))));
-  const isFe = 'next' in all || names.some((n) => ['next.config.ts', 'next.config.js', 'next.config.mjs'].some((f) => exists(path.join(appsDir, n, f))));
-  const isBe = '@nestjs/core' in all || exists(path.join(repoRoot, 'nest-cli.json'));
-  if (isFe === isBe) refuse('HFS_INIT_UNDETECTED', `cannot tell the profile of ${repoRoot}: ${isFe ? 'both next and Nest are present' : 'neither next nor @nestjs/core is declared'}`, { repoRoot });
-  const profile = isFe ? 'fe' : 'be';
-  const apps = names.map((name) => {
-    if (profile === 'fe') return { name, kind: 'next' };
-    if (!isDir(path.join(appsDir, name, 'src'))) return null;
-    const kind = /migrat/.test(name) ? 'migrate' : (/worker/.test(name) ? 'worker' : (/(^|-)cli($|-)/.test(name) ? 'cli' : 'api'));
-    return { name, kind };
-  }).filter(Boolean).filter((a) => manifest.appKinds[profile].includes(a.kind));
-  if (!apps.length) refuse('HFS_INIT_UNDETECTED', `${repoRoot} has no apps/<name> ${profile === 'fe' ? 'Next application' : 'Nest application with a src directory'} to declare`, { repoRoot, profile });
-  const project = String(rootPkg?.name ?? path.basename(repoRoot)).replace(/^@[^/]+\//, '').toLowerCase().replace(/[^a-z0-9-]+/g, '-').replace(/^-+|-+$/g, '').replace(SLUG_SUFFIX, '');
-  const declaration = { hfs: manifest.major, profile, project: /^[a-z]/.test(project) ? project : `p-${project}`, apps };
-  const optionalSlots = occupiedOptInSlots({ repoRoot, manifest, declaration });
-  return optionalSlots.length ? { ...declaration, optionalSlots } : declaration;
-}
-
-/** The opt-in slots (not enabled by an app kind) that at least one tracked file falls in, found by enabling them all for a look. */
-function occupiedOptInSlots({ repoRoot, manifest, declaration }) {
-  let files;
-  try { files = trackedFiles(repoRoot); } catch (error) { if (error.code === 'HFS_REPO_UNREADABLE') return []; throw error; }
-  const optIn = manifest.slots.filter((s) => s.profiles.includes(declaration.profile) && s.presence === 'opt-in' && s.appKind === undefined).map((s) => s.id);
-  const everything = createSlotResolver(manifest, resolveRepoDeclaration(manifest, { ...declaration, optionalSlots: optIn }));
-  const used = new Set();
-  for (const file of files) { const c = everything.classifyPath(file); if (c.status === 'owned' && optIn.includes(c.slot)) used.add(c.slot); }
-  return optIn.filter((id) => used.has(id));
-}
-
-/** Write hfs.json unless one exists (HFS_INIT_EXISTS); `write: false` returns the text only. */
-export function initRepo({ repoRoot, root = skillRoot, write = true, manifest = loadSlotManifest({ root }) }) {
-  const file = path.join(repoRoot, HFS_DECLARATION_FILE);
-  if (write && exists(file)) refuse('HFS_INIT_EXISTS', `${file} already exists; init never rewrites a declaration`, { file });
-  const declaration = detectDeclaration({ repoRoot, manifest });
-  resolveRepoDeclaration(manifest, declaration);
-  const text = `${JSON.stringify(declaration, null, 2)}\n`;
-  if (write) fs.writeFileSync(file, text);
-  return { file, declaration, text, written: write };
 }

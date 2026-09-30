@@ -1,0 +1,6 @@
+{{> common/gitignore.base}}
+# be: the schema Nest writes when it boots GraphQL
+schema.gql
+# fe: Next build output and its generated type file
+.next/
+next-env.d.ts

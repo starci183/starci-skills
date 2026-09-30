@@ -1,0 +1,13 @@
+{{header}}
+node_modules/
+dist/
+coverage/
+reports/
+.next/
+.starci/
+package-lock.json
+contracts/
+.starcistacks/
+.starciwork/
+**/__generated__/
+**/messages/**

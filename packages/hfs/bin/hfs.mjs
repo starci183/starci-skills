@@ -1,5 +1,6 @@
 #!/usr/bin/env node
-// hfs - the HFS command line of a StarCi product repository.
+// hfs - the HFS command line of a StarCi app: one repository, `<app>/`, with one package.json, lockfile and node_modules at its root
+// and two sides, be/ and fe/, declared by the one hfs.json of kind app. Every verb runs at the app root.
 //   hfs check   [--repo <dir>] [--json] [--fast] [--base <ref>]
 //                                            every tracked path has a slot; required files exist; nothing forbidden or
 //                                            tracked-that-must-be-ignored; pins match; every managed file equals its render
@@ -13,43 +14,47 @@
 //                                            --fast: only what changed since the merge-base with origin/main (else main; --base
 //                                            overrides it); the machine
 //                                            runs on those owners without clones and dead exports. No merge-base is a refusal
-//                                            (exit 2), never a silent full pass. Exit 1 on any error-level finding.
-//   hfs init    [--repo <dir>] [--stdout]   write a starter hfs.json by detecting the profile and the apps.
-//   hfs lint    [--repo <dir>] [--changed <file>...] [--fix] [--format text|json] [--sonar <file>] [--stylelint <glob>]
-//                                            the ONE lint entry (npm run lint): ESLint (canon per-file rules and the project-graph rules)
-//                                            plus this check's repository findings plus stylelint, as one starci/lint@1 report; --sonar writes
-//                                            the one Sonar import file. Exit 0 clean, 1 findings, 2 a tool could not run (lint/run.mjs).
+//                                            (exit 2), never a silent full pass. Exit 1 on any error-level finding. The root checks run once and
+//                                            the side checks and the machine once per side, the side folder as their root; every path is app-relative.
+//   hfs lint    [--repo <dir>] [--changed <file>...] [--fix] [--format text|json] [--sonar <file>]
+//                                            the ONE lint entry (npm run lint): ESLint per side with that side's canon config (per-file rules and
+//                                            the project-graph rules), this check's findings, and stylelint over the fe side, as one starci/lint@1
+//                                            report; --sonar writes the one Sonar import file. Exit 0 clean, 1 findings, 2 a tool could not run (lint/run.mjs).
+//   hfs scaffold app <name> [--into <dir>]  a new app <dir>/<name>/: the root (hfs.json, package.json, managed files, .starciwork) and the
+//                                            be/ and fe/ skeletons (scaffold/app.mjs). Refuses an existing directory.
 //   hfs explain <path> [--repo <dir>] [--json]   which slot owns the path, its tier, allowed imports, required tests.
-//   hfs emit-contracts [--repo <dir>]      write contracts/<app>/schema.graphql of every api app that serves GraphQL (emit/contracts.mjs):
+//   hfs emit-contracts [--repo <dir>]      write be/contracts/<app>/schema.graphql of every api app that serves GraphQL (emit/contracts.mjs):
 //                                            printSchema(lexicographicSortSchema) of the resolvers the app root composes; no env, no database, no network.
-//   hfs sync (--check | --write) [--root <dir>]  the generated files (husky, CI, .gitignore block, sonar); sync/cli.mjs
+//   hfs sync (--check | --write) [--root <dir>]  the managed files of the root (scripts, husky, CI, .gitignore block, sonar, prettier) and
+//                                            of each side (tsconfig, eslint, jest, stylelint); sync/cli.mjs
 //   hfs work-hygiene                              the pre-commit guard: staged .starciwork and .starcistacks paths, and the secrets guard over every staged file (read from the index); sync/cli.mjs
 //   hfs new service <dir> <name> [--inject <Decorator>=<module>:<Type> | <Class>=<module>]... [--repo <dir>]
-//                                            a back-end `<name>.service.ts` and its `<name>.service.spec.ts` skeleton (scaffold/service.mjs): the spec is built
+//                                            a back-end `<name>.service.ts` and its `<name>.service.spec.ts` skeleton (scaffold/service.mjs; <dir> is
+//                                            relative to be/): the spec is built
 //                                            with Test.createTestingModule, one provider per constructor dependency (kit doubles from @starci/jest-preset),
 //                                            one placeholder it per public method. Never overwrites a file.
 //   hfs new spec <file>.service.ts [--repo <dir>]  the spec skeleton of an existing service, read from its constructor with the repository's TypeScript
-// Every finding names a why code and carries its Vietnamese text. The command reads the repository, never writes to it
-// (init writes hfs.json only, and only when none exists). Exit codes: 0 clean, 1 error findings, 2 a refusal or bad usage.
-import fs from 'node:fs';
+// Every finding names a why code and carries its Vietnamese text. check, lint and explain read the app, never write to it. Exit codes:
+// 0 clean, 1 error findings, 2 a refusal or bad usage.
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { isMain } from '../runtime/scripts/checks/common.mjs';
-import { checkRepository, explainPath, initRepo, trackedFiles } from '../runtime/scripts/lib/hfs-check.mjs';
-import { HfsSlotsError } from '../runtime/scripts/lib/hfs-slots.mjs';
+import { checkRepository, explainPath, trackedFiles } from '../runtime/scripts/lib/hfs-check.mjs';
+import { HfsSlotsError, loadSlotManifest, readRepoDeclaration } from '../runtime/scripts/lib/hfs-slots.mjs';
 import { formatFindings } from '../sync/format.mjs';
 import { main as syncMain } from '../sync/cli.mjs';
-import { SyncError } from '../sync/index.mjs';
+import { SyncError, loadPresets } from '../sync/index.mjs';
 import { managedFindings } from '../sync/managed.mjs';
 import { emitContracts } from '../emit/contracts.mjs';
 import { ScaffoldError, newService, newSpec } from '../scaffold/service.mjs';
+import { scaffoldApp } from '../scaffold/app.mjs';
 import { contractEmitFindings } from '../runtime/scripts/lib/hfs-rules/contract.mjs';
 import { lintRepository, parseLintArgs, printLintText } from '../lint/run.mjs';
 import { writeReport } from '../report/sonar.mjs';
 
 const USAGE = `hfs check [--repo <dir>] [--json] [--fast] [--base <ref>]
-hfs lint [--repo <dir>] [--changed <file>...] [--fix] [--format text|json] [--sonar <file>] [--stylelint <glob>]
-hfs init [--repo <dir>] [--stdout]
+hfs lint [--repo <dir>] [--changed <file>...] [--fix] [--format text|json] [--sonar <file>]
+hfs scaffold app <name> [--into <dir>]
 hfs emit-contracts [--repo <dir>]
 hfs explain <path> [--repo <dir>] [--json]
 hfs sync (--check | --write) [--root <dir>]
@@ -58,10 +63,10 @@ hfs new service <dir> <name> [--inject <Decorator>=<module>:<Type> | <Class>=<mo
 hfs new spec <file>.service.ts [--repo <dir>]
 `;
 const PER_CODE_LIMIT = 25;
-const VALUE_FLAGS = new Set(['--repo', '--base', '--inject']);
+const VALUE_FLAGS = new Set(['--repo', '--base', '--inject', '--into']);
 /** Flags that may repeat: their values are collected in order. */
 const LIST_FLAGS = new Set(['--inject']);
-const BOOL_FLAGS = new Set(['--json', '--stdout', '--fast']);
+const BOOL_FLAGS = new Set(['--json', '--fast']);
 
 function parse(argv) {
   const opts = { positional: [] };
@@ -114,20 +119,25 @@ function printExplain(e, out) {
   if (e.code) out(`  ${e.code}: ${e.titleVi}\n  ${e.whyVi}\n`);
 }
 
-/** The repository pass: slots, managed files, formatter, contract snapshots and the architecture machine's check surface. `only` limits the formatter to those files. */
+/**
+ * The app pass: slots, managed files, formatter, contract snapshots and the architecture machine's check surface, root and sides.
+ * `only` limits the formatter to those (app-relative) files.
+ */
 async function runCheck({ repoRoot, fast = false, base, only, presets, prettier }) {
   const tracked = trackedFiles(repoRoot);
-  // Managed files, the .gitignore block and sonar against their render (R04, R05, R11, ...), and prettier through the repository's own install (R19, never under --fast).
+  // Managed files of the root and both sides, the .gitignore block and sonar against their render (R04, R05, R11, ...), and prettier
+  // through the app's own install (R19, never under --fast).
   const extraFindings = [...await managedFindings({ repoRoot, tracked, presets }), ...(fast ? [] : await formatFindings({ repoRoot, files: only ?? tracked, prettier }))];
-  // R23 against the app itself (full pass only): the committed snapshots equal what `emit-contracts` writes now.
+  // R23 against the be side itself (full pass only): the committed snapshots equal what `emit-contracts` writes now.
   let contracts = null;
-  let declared = null;
-  try { declared = JSON.parse(fs.readFileSync(path.join(repoRoot, 'hfs.json'), 'utf8')); } catch { /* checkRepository reports the unreadable declaration */ }
-  if (declared?.profile === 'be') {
+  let be = null;
+  try { be = readRepoDeclaration(loadSlotManifest(), repoRoot).sides?.be ?? null; } catch { /* checkRepository reports the unreadable declaration */ }
+  if (be) {
     if (fast) contracts = { status: 'skipped', reason: '--fast does not emit the apps' };
     else {
-      const emitted = contractEmitFindings({ repoRoot, files: tracked, repo: declared, emit: emitContracts });
-      extraFindings.push(...emitted.findings);
+      const files = tracked.filter((file) => file.startsWith('be/')).map((file) => file.slice('be/'.length));
+      const emitted = contractEmitFindings({ repoRoot: path.join(repoRoot, 'be'), files, repo: be, emit: emitContracts });
+      extraFindings.push(...emitted.findings.map((finding) => ({ ...finding, side: 'be', path: `be/${finding.path}` })));
       contracts = { status: 'checked', apps: emitted.apps };
     }
   }
@@ -136,7 +146,7 @@ async function runCheck({ repoRoot, fast = false, base, only, presets, prettier 
   return result;
 }
 
-/** `hfs lint`: ESLint, the repository checks and (front end) stylelint as one report; see lint/run.mjs. */
+/** `hfs lint`: ESLint per side, the app checks and stylelint over the fe side as one report; see lint/run.mjs. */
 async function lintMain(argv, { stdout, presets, prettier }) {
   const opts = parseLintArgs(argv);
   const repoRoot = path.resolve(opts.repo ?? process.cwd());
@@ -150,10 +160,20 @@ async function lintMain(argv, { stdout, presets, prettier }) {
   return exit;
 }
 
+/**
+ * The jest preset a new app renders its Sonar exclusions from: the one installed beside this @starci/hfs (`npx -p @starci/hfs -p
+ * @starci/jest-preset hfs scaffold app <name>`, or an install that holds both). None is a refusal, never a render without it.
+ */
+async function scaffoldPresets() {
+  try { return await loadPresets(path.dirname(fileURLToPath(import.meta.url))); } catch (error) {
+    throw new SyncError('HFS_SYNC_PRESET_MISSING', `${error.message.replace(/^[A-Z_]+: /, '')}; run hfs scaffold with @starci/jest-preset installed beside @starci/hfs (npx -p @starci/hfs -p @starci/jest-preset hfs scaffold app <name>)`);
+  }
+}
+
 /** `presets` and `prettier` are test seams: the Sonar exclusions sync would load from the repository's installed preset, and the repository's own prettier. */
 export async function main(argv, { stdout = (s) => process.stdout.write(s), stderr = (s) => process.stderr.write(s), presets, prettier } = {}) {
   const [verb, ...rest] = argv;
-  if (!['check', 'lint', 'init', 'explain', 'sync', 'work-hygiene', 'emit-contracts', 'new'].includes(verb)) { stderr(USAGE); return 2; }
+  if (!['check', 'lint', 'scaffold', 'explain', 'sync', 'work-hygiene', 'emit-contracts', 'new'].includes(verb)) { stderr(USAGE); return 2; }
   try {
     if (verb === 'sync' || verb === 'work-hygiene') return await syncMain(argv);
     if (verb === 'lint') return await lintMain(rest, { stdout, presets, prettier });
@@ -168,9 +188,10 @@ export async function main(argv, { stdout = (s) => process.stdout.write(s), stde
     }
     if (verb === 'emit-contracts') {
       if (opts.positional.length) throw new Error('hfs emit-contracts takes no path');
-      const declaration = JSON.parse(fs.readFileSync(path.join(repoRoot, 'hfs.json'), 'utf8'));
-      const { written, skipped, standIns } = emitContracts({ repoRoot, declaration });
-      for (const file of written) stdout(`wrote ${file}
+      const be = readRepoDeclaration(loadSlotManifest(), repoRoot).sides?.be;
+      if (!be) throw new Error('hfs emit-contracts runs at the app root (the folder of hfs.json)');
+      const { written, skipped, standIns } = emitContracts({ repoRoot: path.join(repoRoot, 'be'), declaration: be });
+      for (const file of written) stdout(`wrote be/${file}
 `);
       stdout(`hfs emit-contracts: ${written.length} written${skipped.length ? `, ${skipped.join(', ')} serve no GraphQL` : ''}
 `);
@@ -190,10 +211,11 @@ export async function main(argv, { stdout = (s) => process.stdout.write(s), stde
 `);
       return 0;
     }
-    if (verb === 'init') {
-      if (opts.positional.length) throw new Error('hfs init takes no path');
-      const result = initRepo({ repoRoot, write: !opts.stdout });
-      if (opts.stdout) stdout(result.text); else stdout(`hfs init: wrote ${result.file} (${result.declaration.profile}, ${result.declaration.apps.map((a) => `${a.name}:${a.kind}`).join(', ')})\n`);
+    if (verb === 'scaffold') {
+      const [kind, name, ...extra] = opts.positional;
+      if (kind !== 'app' || !name || extra.length || opts.repo !== undefined) throw new Error('hfs scaffold takes `app <name> [--into <dir>]`');
+      const { root: created, files } = scaffoldApp({ name, into: path.resolve(opts.into ?? process.cwd()), presets: presets ?? await scaffoldPresets() });
+      stdout(`hfs scaffold app: created ${created} (${files.length} files); next: npm install, then npm run lint\n`);
       return 0;
     }
     if (opts.positional.length !== 1) throw new Error('hfs explain takes exactly one path');

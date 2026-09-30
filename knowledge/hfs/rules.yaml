@@ -233,7 +233,7 @@ rules:
       - {kind: eslint-fe, id: no-double-cast}
   - id: R23
     code: "HFS_CONTRACT_SNAPSHOT_DRIFT"
-    law: "Contract snapshot equals the emit, the FE copy equals the BE."
+    law: "The be side commits its contract snapshot and it equals the emit; the fe side reads it in place (be/contracts/)."
     kinds: [check]
     gates: [land, ci]
     failureCodes: ["HFS_CONTRACT_SNAPSHOT_DRIFT"]

@@ -261,14 +261,16 @@ const GRAMMAR_PACKAGE = '@starci/grammar';
 function derivedGrammar(root, packageRoot, workspaces, apps = []) {
   const styleSources = apps.map(app => `apps/${app.name}/src/app/globals.css`).filter(relative => existingRegularFile(root, relative));
   if (!styleSources.length) return null;
-  // The apps have no package.json of their own: the app root's one manifest is the consumer that declares their dependencies.
+  // The apps have no package.json of their own: the app root's one manifest declares their dependencies, and it is a consumer
+  // when it declares the Grammar package; so is every workspace package that does.
+  const declaresGrammar = (pkg) => Boolean(pkg && [pkg.dependencies, pkg.peerDependencies, pkg.devDependencies].some(section => section && Object.hasOwn(section, GRAMMAR_PACKAGE)));
   const appManifest = slash(path.relative(root, path.join(packageRoot, 'package.json')));
-  const consumerManifests = existingRegularFile(root, appManifest) ? [appManifest] : [];
+  const consumerManifests = declaresGrammar(readJson(path.join(packageRoot, 'package.json'))) ? [appManifest] : [];
   for (const workspace of workspaces) {
     if (!workspace.startsWith('packages/')) continue;
     const manifest = `${workspace}/package.json`;
     const pkg = readJson(path.join(root, ...manifest.split('/')));
-    if (pkg && [pkg.dependencies, pkg.peerDependencies, pkg.devDependencies].some(section => section && Object.hasOwn(section, GRAMMAR_PACKAGE))) consumerManifests.push(manifest);
+    if (declaresGrammar(pkg)) consumerManifests.push(manifest);
   }
   if (!consumerManifests.length) return null;
   return { package: GRAMMAR_PACKAGE, entry: `${GRAMMAR_PACKAGE}/common`, styleEntry: `${GRAMMAR_PACKAGE}/common.css`, styleSources, consumerManifests, peers: ['react', '@heroui/react'] };

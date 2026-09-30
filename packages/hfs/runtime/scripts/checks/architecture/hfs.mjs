@@ -41,10 +41,6 @@ export const HFS_RULE_IDS = [
   'HFS_WORK_IN_FE',
 ];
 
-const REQUIRED_COMMON = ['.gitattributes', '.github', '.gitignore', '.husky', 'hfs.json',
-  'eslint.config.mjs', 'package-lock.json', 'package.json', 'README.md',
-  'sonar-project.properties', 'tsconfig.json'];
-const REQUIRED_BACKEND = ['.sops.yaml', '.starcistacks', '.starciwork', 'jest.config.js', 'nest-cli.json', 'src'];
 const NON_NPM_ENTRIES = new Set(['pnpm-lock.yaml', 'pnpm-workspace.yaml', 'yarn.lock', 'bun.lock', 'bun.lockb']);
 const RUNTIME_ROOT_MARKDOWN = new Set(['README.md', 'CONTEXT.md', 'CONTRIBUTING.md', 'CHANGELOG.md', 'THIRD_PARTY_NOTICES.md']);
 const PRODUCT_ROOT_MARKDOWN = new Set(['README.md']);
@@ -57,24 +53,32 @@ const RETIRED_TEST_FOLDER = /^src\/tests\/(?:harness|live|e2e\/live)(?:\/|$)/u;
 const EXTRA_TEST_CONFIG = /(?:^|\/)(?:jest[.-][^/]*(?:config\.[cm]?[jt]s|\.json)|jest-(?:e2e|int|integration|harness)[^/]*)$/u;
 const NODE_ENTRIES_SKIPPED = new Set(['node_modules', '.git']);
 
-/** The slot resolver of a repository: the caller's, else the one its hfs.json declares, else the profile's slots with no app declared. */
+/** The slot resolver of a side folder: the caller's, else the side view its app's hfs.json declares, else the profile's slots with no app declared. */
 function resolverOf(root, profile, given) {
   if (given) return given;
   try { return openHfs({ repoRoot: root }); } catch { /* an invalid hfs.json is HFS_DECLARATION_INVALID's finding, judged elsewhere */ }
-  return createSlotResolver(loadSlotManifest(), { profile, apps: [], optionalSlots: [], connections: [] });
+  return createSlotResolver(loadSlotManifest(), { profile, side: profile, apps: [], optionalSlots: [], connections: [], reads: [] });
 }
 
-/** The first path segment of every slot of the profile that may exist: the repository root entries (contracts/, docs/, src/ ...). */
-function slotRootEntries(resolver) {
-  const roots = new Set(['apps']);
+/**
+ * The first path segment of every slot of the scope that may exist: the root entries of a side (contracts/, docs/, src/ ...) or of
+ * the app (be/, fe/, .github/ ...). `scope` is the profile whose slots count (the app resolver answers for the sides too).
+ */
+function slotRootEntries(resolver, scope) {
+  const roots = new Set(scope === 'app' ? [] : ['apps']);
   for (const slot of resolver.slots()) {
-    if (slot.presence === 'forbidden') continue;
+    if (slot.presence === 'forbidden' || !slot.profiles.includes(scope)) continue;
     for (const variant of braceVariants(slot.path)) {
       const first = variant.split('/')[0];
       if (first && !/[*?<%]/u.test(first)) roots.add(first);
     }
   }
   return roots;
+}
+
+/** The root entries the scope's required slots name (the first segment of every required path of the scope): hfs.json, be/, .starcistacks/ ... */
+function requiredRootEntries(resolver) {
+  return new Set(resolver.requiredPaths().paths.filter((entry) => !entry.side).map((entry) => entry.path.split('/')[0]));
 }
 
 /** The folders directly below src/tests/ that the be.tests.* slots declare (world, fixtures, integration, e2e, contract). */
@@ -145,25 +149,28 @@ function fsFiles(root, relative = '') {
   return out;
 }
 
+/** The tree view of a list of tracked paths (posix, root-relative): what the git view answers, for a list already in hand. */
+export function trackedTreeView(tracked) {
+  const files = new Set(tracked);
+  return {
+    source: 'git',
+    top: [...new Set(tracked.map(file => file.split('/')[0]))],
+    children: dir => {
+      const prefix = `${dir}/`;
+      const names = new Set();
+      for (const file of tracked) if (file.startsWith(prefix)) names.add(file.slice(prefix.length).split('/')[0]);
+      return [...names];
+    },
+    hasDir: dir => tracked.some(file => file.startsWith(`${dir}/`)),
+    hasFile: file => files.has(file),
+    files: () => tracked,
+  };
+}
+
 /** Uniform tree view: top entries plus children(dir)/hasDir/hasFile answers over posix relatives. */
 function treeView(root) {
   const tracked = gitPaths(root);
-  if (tracked !== null) {
-    const files = new Set(tracked);
-    return {
-      source: 'git',
-      top: [...new Set(tracked.map(file => file.split('/')[0]))],
-      children: dir => {
-        const prefix = `${dir}/`;
-        const names = new Set();
-        for (const file of tracked) if (file.startsWith(prefix)) names.add(file.slice(prefix.length).split('/')[0]);
-        return [...names];
-      },
-      hasDir: dir => tracked.some(file => file.startsWith(`${dir}/`)),
-      hasFile: file => files.has(file),
-      files: () => tracked,
-    };
-  }
+  if (tracked !== null) return trackedTreeView(tracked);
   return {
     source: 'fs',
     top: fsChildren(root, '.'),
@@ -333,7 +340,11 @@ function hooksPathNotRedirected({ root, finding }) {
   return { status: 'checked' };
 }
 
-function e2eInAutomaticGate({ root, tree, backend, finding }) {
+/**
+ * The app root's automatic gates never run integration, e2e or contract: the husky hooks and the root scripts they call, the unit
+ * scripts over the be side's jest configuration (`jestConfig`, app-relative), and the workflows that start on push or pull_request.
+ */
+function e2eInAutomaticGate({ root, tree, jestConfig, finding }) {
   const rule = 'HFS_E2E_IN_AUTOMATIC_GATE';
   let pkg = null;
   try { pkg = JSON.parse(readText(root, 'package.json') ?? ''); } catch { /* the package checks own invalid JSON */ }
@@ -358,18 +369,31 @@ function e2eInAutomaticGate({ root, tree, backend, finding }) {
     if (runsE2e(command)) finding(rule, 'package.json', `Script ${name} is run by a husky hook and touches integration, e2e or contract. They are manual only.`);
     for (const match of command.matchAll(/npm\s+run\s+([\w:.-]+)/gu)) pending.push(match[1]);
   }
-  // 2. Unit and coverage scripts on a jest repository select the unit project only and exclude src/tests.
-  if (backend && tree.hasFile('jest.config.js')) {
+  // 2. Unit and coverage scripts over the be side's jest configuration select the unit project only and exclude src/tests.
+  if (tree.hasFile(jestConfig)) {
     for (const name of UNIT_RUN_SCRIPTS) {
       const command = scripts[name];
       if (typeof command === 'string' && /\bjest\b/u.test(command) && !/--selectProjects\s+unit\b/u.test(command))
         finding(rule, 'package.json', `Script ${name} runs jest without --selectProjects unit and would run the integration, e2e or contract project.`);
     }
-    const jestConfig = readText(root, 'jest.config.js') ?? '';
-    if (/collectCoverageFrom/u.test(jestConfig) && !/!src\/tests\/(?:\*\*|e2e)/u.test(jestConfig))
-      finding(rule, 'jest.config.js', 'collectCoverageFrom must exclude src/tests/** so no integration, e2e or contract file counts toward coverage.');
+    const jestText = readText(root, jestConfig) ?? '';
+    if (/collectCoverageFrom/u.test(jestText) && !/!src\/tests\/(?:\*\*|e2e)/u.test(jestText))
+      finding(rule, jestConfig, 'collectCoverageFrom must exclude src/tests/** so no integration, e2e or contract file counts toward coverage.');
   }
-  // 3. A back end's default tsconfig excludes the world, integration, e2e and contract trees.
+  // 3. A workflow that starts on push or pull_request never runs e2e.
+  for (const file of tree.files().filter(entry => /^\.github\/workflows\/[^/]+\.ya?ml$/u.test(entry))) {
+    const text = readText(root, file);
+    if (text === null) continue;
+    const trigger = /^on:.*(?:\n(?:[ \t]+.*|)$)*/mu.exec(text)?.[0] ?? '';
+    if (!/\b(?:push|pull_request)\b/u.test(trigger)) continue;
+    if (runsE2e(withoutComments(text)))
+      finding(rule, file, `${file} runs e2e on push or pull_request. Move the e2e job to its own workflow with on: workflow_dispatch only.`);
+  }
+}
+
+/** The be side's default tsconfig excludes the world, integration, e2e and contract trees (they are checked by src/tests/tsconfig.json). */
+function testTreesOutOfDefaultProgram({ root, tree, finding }) {
+  const rule = 'HFS_E2E_IN_AUTOMATIC_GATE';
   const tsconfigText = readText(root, 'tsconfig.json');
   let tsconfig = null;
   try { tsconfig = tsconfigText === null ? null : JSON.parse(tsconfigText); } catch { /* the typecheck itself owns parsing */ }
@@ -378,18 +402,9 @@ function e2eInAutomaticGate({ root, tree, backend, finding }) {
     const excludesTestTrees = ['world', 'integration', 'e2e', 'contract'].every(tree => excludedText.includes(`src/tests/${tree}`));
     const defaultAll = tsconfig.include === undefined && tsconfig.files === undefined;
     const files = tree.files();
-    if (backend && files.some(file => /^src\/tests\/(?:world|integration|e2e|contract)\/.+\.[cm]?tsx?$/u.test(file)) && !excludesTestTrees &&
+    if (files.some(file => /^src\/tests\/(?:world|integration|e2e|contract)\/.+\.[cm]?tsx?$/u.test(file)) && !excludesTestTrees &&
         (defaultAll || JSON.stringify(tsconfig.include ?? []).includes('src')))
       finding(rule, 'tsconfig.json', 'The default tsconfig includes src/tests/{world,integration,e2e,contract}/**. Exclude those trees and check them with src/tests/tsconfig.json (typecheck:tests).');
-  }
-  // 4. A workflow that starts on push or pull_request never runs e2e.
-  for (const file of tree.files().filter(entry => /^\.github\/workflows\/[^/]+\.ya?ml$/u.test(entry))) {
-    const text = readText(root, file);
-    if (text === null) continue;
-    const trigger = /^on:.*(?:\n(?:[ \t]+.*|)$)*/mu.exec(text)?.[0] ?? '';
-    if (!/\b(?:push|pull_request)\b/u.test(trigger)) continue;
-    if (runsE2e(withoutComments(text)))
-      finding(rule, file, `${file} runs e2e on push or pull_request. Move the e2e job to its own workflow with on: workflow_dispatch only.`);
   }
 }
 
@@ -401,29 +416,27 @@ export function checkHfs(config) {
   const tree = treeView(config.root);
   const violations = [];
   const finding = (ruleId, entry, message) => violations.push({ ruleId, path: entry, line: 1, column: 1, message });
-  const resolver = resolverOf(config.root, backend ? 'be' : 'fe', config.hfs);
-  const presentation = checkRepoPresentation({ root: config.root, tree, profile: backend ? 'be' : 'fe' });
-  violations.push(...presentation.violations);
-
-  const allowed = slotRootEntries(resolver);
+  const profile = backend ? 'be' : 'fe';
+  const resolver = resolverOf(config.root, profile, config.hfs);
+  // The README, the hooks, the workflows and the scripts are the app root's (checkAppRoot); a side folder is judged as the old
+  // repository root it stands for, less those.
+  const allowed = slotRootEntries(resolver, profile);
   for (const entry of [...tree.top].sort()) {
     if (NON_NPM_ENTRIES.has(entry) || /\.md$/iu.test(entry)) continue;
     if (frontend && !backend) {
-      if (entry === '.starciwork') { finding('HFS_WORK_IN_FE', entry, 'A frontend repository must not hold a .starciwork tree; Work records live in the backend repository.'); continue; }
-      if (entry === '.starcistacks') { finding('HFS_STACKS_IN_FE', entry, 'A frontend repository must not hold .starcistacks; stack declarations live in the backend repository.'); continue; }
-      if (entry === 'src') { finding('HFS_ROOT_SRC_FORBIDDEN_FE', entry, 'A frontend repository keeps source only under apps/<app>/src; the root src/ tree must move.'); continue; }
+      if (entry === '.starciwork') { finding('HFS_WORK_IN_FE', entry, 'The fe side must not hold a .starciwork tree; Work records live in the app root .starciwork.'); continue; }
+      if (entry === '.starcistacks') { finding('HFS_STACKS_IN_FE', entry, 'The fe side must not hold .starcistacks; stack declarations live in be/.starcistacks.'); continue; }
+      if (entry === 'src') { finding('HFS_ROOT_SRC_FORBIDDEN_FE', entry, 'The fe side keeps source only under apps/<app>/src; the fe/src/ tree must move.'); continue; }
     }
     if (frontend && !backend && (isFeTestPath(entry) || isFeTestPath(`${entry}/x`))) continue;   // a test entry of a front end is FE_NO_TESTS's, the one finding of that path
     if (!allowed.has(entry)) {
-      finding('HFS_ROOT_ENTRY_FORBIDDEN', entry, `Root entry ${entry} is not in the HFS ${backend ? 'backend' : 'frontend'} allowlist.`);
+      finding('HFS_ROOT_ENTRY_FORBIDDEN', entry, `Root entry ${entry} of the ${profile} side is not in the slots of the ${profile} side.`);
     }
   }
 
-  const required = new Set(REQUIRED_COMMON);
-  if (backend) for (const entry of REQUIRED_BACKEND) required.add(entry);
-  for (const entry of [...required].sort()) {
-    if (entry === 'apps' || entry === 'README.md' || entry === '.gitattributes') continue;
-    if (!tree.top.includes(entry)) finding('HFS_ROOT_ENTRY_MISSING', entry, `The ${backend ? 'backend' : 'frontend'} HFS tree requires root entry ${entry}.`);
+  for (const entry of [...requiredRootEntries(resolver)].sort()) {
+    if (entry === 'apps') continue;
+    if (!tree.top.includes(entry)) finding('HFS_ROOT_ENTRY_MISSING', entry, `The ${profile} side requires root entry ${entry}.`);
   }
 
   const apps = tree.children('apps').sort();
@@ -444,8 +457,9 @@ export function checkHfs(config) {
     }
     // next-env.d.ts is generated by Next and commonly ignored by Git; it is not
     // a reliable tracked-tree input.
-    if (frontend) for (const entry of ['package.json', 'next.config.ts', 'tsconfig.json', 'postcss.config.mjs']) {
-      if (!tree.hasFile(`apps/${app}/${entry}`)) missing.push(entry);
+    // A front-end app holds the files its slot requires at its own root (next.config.ts, tsconfig.json, ...; it has no package.json).
+    if (frontend) for (const required of resolver.requiredFiles(`apps/${app}/next.config.ts`).filter(entry => !entry.slice(`apps/${app}/`.length).includes('/'))) {
+      if (!tree.hasFile(required)) missing.push(required.slice(`apps/${app}/`.length));
     }
     if (missing.length) finding('HFS_APP_LAYOUT_INVALID', `apps/${app}`, `Application apps/${app} lacks ${missing.join(', ')} required by the HFS app layout.`);
   }
@@ -481,20 +495,42 @@ export function checkHfs(config) {
       finding('HFS_TEST_KIND_RETIRED', file, `${file} is a per-lane test config. One root jest.config.js declares exactly the unit, integration, e2e and contract projects.`);
   }
 
-  e2eInAutomaticGate({ root: config.root, tree, backend, finding });
-  const hooksPath = hooksPathNotRedirected({ root: config.root, finding });
+  if (backend) testTreesOutOfDefaultProgram({ root: config.root, tree, finding });
 
   return {
     violations,
     coverage: {
       status: 'checked',
       source: tree.source,
-      hooksPath,
       rootEntries: tree.top.length,
       apps,
       ruleIds: [...HFS_RULE_IDS],
     },
   };
+}
+
+/**
+ * The HFS tree check of the app root (`resolver` is the app's): the README, the root entries the app-root slots allow and require,
+ * the automatic gates (hooks, the root scripts they call, the workflows) and the hooks path. `hfs check` runs it once per app; the
+ * machine runs checkHfs once per side folder.
+ */
+export function checkAppRoot({ root, resolver, tree = treeView(root) }) {
+  const violations = [];
+  const finding = (ruleId, entry, message) => violations.push({ ruleId, path: entry, line: 1, column: 1, message });
+  violations.push(...checkRepoPresentation({ root, tree, profile: 'app' }).violations);
+  const allowed = slotRootEntries(resolver, 'app');
+  for (const entry of [...tree.top].sort()) {
+    if (NON_NPM_ENTRIES.has(entry) || /\.md$/iu.test(entry)) continue;
+    if (!allowed.has(entry)) finding('HFS_ROOT_ENTRY_FORBIDDEN', entry, `Root entry ${entry} is not in the slots of the app root.`);
+  }
+  for (const entry of [...requiredRootEntries(resolver)].sort()) {
+    if (entry === 'README.md' || entry === '.gitattributes') continue;   // checkRepoPresentation reports these two
+    if (!tree.top.includes(entry)) finding('HFS_ROOT_ENTRY_MISSING', entry, `The app root requires root entry ${entry}.`);
+  }
+  const jestConfig = resolver.sides ? `be/${[...braceVariants(resolver.slot('be.tool-config').path)].find(file => file.startsWith('jest.config.'))}` : null;
+  e2eInAutomaticGate({ root, tree, jestConfig, finding });
+  const hooksPath = hooksPathNotRedirected({ root, finding });
+  return { violations, coverage: { status: 'checked', source: tree.source, hooksPath, rootEntries: tree.top.length } };
 }
 
 /** Keep tree findings visible even when the TypeScript architecture config is invalid. */
@@ -505,9 +541,11 @@ export function checkHfsWithoutConfig(repositoryRoot) {
   }
   let kinds = [];
   try {
-    const authored = JSON.parse(fs.readFileSync(path.resolve(root, 'hfs.json'), 'utf8'));
-    if (authored.profile === 'be') kinds = ['backend'];
-    else if (authored.profile === 'fe') kinds = ['frontend'];
+    const opened = openHfs({ repoRoot: root });
+    // The app root is judged by checkAppRoot; a side folder by its side's tree check.
+    if (opened.repo.profile === 'app') return checkAppRoot({ root, resolver: opened });
+    if (opened.repo.profile === 'be') kinds = ['backend'];
+    else if (opened.repo.profile === 'fe') kinds = ['frontend'];
   } catch { /* A malformed hfs.json remains an HFS_DECLARATION_INVALID error. */ }
   if (!kinds.length) {
     try {
