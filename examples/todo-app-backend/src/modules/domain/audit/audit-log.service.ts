@@ -1,18 +1,34 @@
 import { Injectable } from "@nestjs/common"
 import { InjectPrimaryEntityManager, LIST_ROWS_MAX } from "@modules/platform/database"
+import { InjectInbox } from "@modules/platform/inbox"
+import type { Inbox } from "@modules/platform/inbox"
+import { ok, refused } from "@modules/platform/primitives"
+import type { Outcome } from "@modules/platform/primitives"
 import { MoreThan } from "typeorm"
 import type { EntityManager, FindOptionsWhere } from "typeorm"
 import { GENESIS_HASH, hashLine } from "./audit-chain.policy"
 import { AuditKeystoreService } from "./audit-keystore.service"
+import { AuditErrorCode } from "./errors/audit.error"
+import { toAuditLineView } from "./persistence/audit.rows"
 import type {
+    AppendDeliveredLineParams,
     AppendLineParams,
     AppendedLineResult,
+    AuditLinesView,
+    DeliveredLineResult,
+    ReadAuditLogParams,
     ReadChainParams,
     ResolvedAuditLine,
     VerifyChainResult,
 } from "./audit.contracts"
 import { LOCK_AUDIT_CHAIN } from "./persistence/audit.sql"
 import { AuditLogLineEntity } from "./persistence/entities/audit-log-line.entity"
+
+/** The inbox source of the audit append queue: one claim per event id. */
+const INBOX_SOURCE = "audit.append"
+
+/** The role that reads the whole chain. */
+const ADMIN_ROLE = "admin"
 
 @Injectable()
 /**
@@ -24,7 +40,51 @@ export class AuditLogService {
     constructor(
         @InjectPrimaryEntityManager() private readonly entityManager: EntityManager,
         private readonly keystore: AuditKeystoreService,
+        @InjectInbox() private readonly inbox: Inbox,
     ) {}
+
+    /**
+     * Appends the line of one queue delivery in its own transaction, so the chain lock and the line commit together.
+     * The event is claimed first, so a redelivery of a line already written does nothing; when the append fails the
+     * claim is given back and the failure is rethrown, so the queue redelivers and the line is not lost.
+     */
+    async appendDelivered(params: AppendDeliveredLineParams): Promise<DeliveredLineResult> {
+        if (!(await this.inbox.claim(INBOX_SOURCE, params.eventId))) return { lineId: null }
+        try {
+            const appended = await this.entityManager.transaction((manager) =>
+                this.append({
+                    manager,
+                    actorId: params.actorId,
+                    action: params.action,
+                    target: params.target,
+                    at: params.at,
+                }),
+            )
+            return { lineId: appended.lineId }
+        } catch (error) {
+            await this.inbox.release(INBOX_SOURCE, params.eventId)
+            throw error
+        }
+    }
+
+    /**
+     * The two authorized readers of the log: an administrator reads the whole chain, optionally narrowed by action or
+     * target; everyone else reads exactly their own lines and the filter is ignored. A reader without an identity is
+     * refused before any line is touched.
+     */
+    async readAs(params: ReadAuditLogParams): Promise<Outcome<AuditLinesView, AuditErrorCode.OperatorRoleNotAuthorized>> {
+        if (!params.principalId) return refused(AuditErrorCode.OperatorRoleNotAuthorized)
+        const resolved = params.roles.includes(ADMIN_ROLE)
+            ? await this.readChain({ action: params.action, target: params.target })
+            : await this.findLinesForPerson(params.principalId)
+        return ok({ lines: resolved.map(toAuditLineView) })
+    }
+
+    /** Every line naming the person, decrypted; empty once their key was destroyed by a completed erasure. */
+    async exportFor(personId: string): Promise<AuditLinesView> {
+        const resolved = await this.findLinesForPerson(personId)
+        return { lines: resolved.map(toAuditLineView) }
+    }
 
     /**
      * Appends one line in the caller transaction. The transaction first takes the chain lock, so appends are serialized
