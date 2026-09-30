@@ -1,48 +1,63 @@
-import { graphql, unwrap } from "@/modules/api"
+import { isRecord, parseOutcome, request, unwrap } from "@/modules/api"
 
 /**
  * The notify feature's transport adapter: the GraphQL documents the backend already serves
- * (`notificationPreferences`, `updateNotificationPreferences` and `unsubscribe`, the three
- * operations the backend's notify resolvers serve). The notify capability owns these calls and uses the shared GraphQL transport.
- *
- * `channel` is always `email` - the only channel the backend sends on today
- * (integration.notify.smtp; the resolvers default it the same way).
+ * (`notificationPreferences`, `updateNotificationPreferences` and `unsubscribe`). `channel` is always
+ * `email` - the only channel the backend sends on today (integration.notify.smtp; the resolvers
+ * default it the same way).
  */
 
 /** The one shape `notificationPreferences` returns for the calling person and channel. */
 interface NotificationPreferences {
-  readonly channel: string;
-  readonly unsubscribed: boolean;
-  readonly digestWindowMinutes: number | null;
+    readonly channel: string
+    readonly unsubscribed: boolean
+    readonly digestWindowMinutes: number | null
 }
 
-const NOTIFICATION_PREFERENCES_DOCUMENT =
-  "query { notificationPreferences(request: {}) { channel unsubscribed digestWindowMinutes } }"
+/** The digest window of a wire row: a number of minutes, or `null` when none is set. */
+const toDigestWindow = (value: unknown): number | null => (typeof value === "number" ? value : null)
 
-/** The caller's own notification preferences for the email channel; a missing or expired token
- * surfaces as a thrown refusal, same as `listTasks`. */
-export const readNotificationPreferences = async (token: string): Promise<NotificationPreferences> => {
-    return unwrap(await graphql<NotificationPreferences>(NOTIFICATION_PREFERENCES_DOCUMENT, undefined, token))
-}
+/** The preferences of a payload, or `null` when the payload is not that shape. */
+const toPreferences = (data: unknown): NotificationPreferences | null =>
+    isRecord(data) && typeof data.channel === "string" && typeof data.unsubscribed === "boolean"
+        ? {
+              channel: data.channel,
+              unsubscribed: data.unsubscribed,
+              digestWindowMinutes: toDigestWindow(data.digestWindowMinutes),
+          }
+        : null
 
-const UPDATE_NOTIFICATION_PREFERENCES_DOCUMENT =
-  "mutation UpdateNotificationPreferences($input: UpdateNotificationPreferencesInput!) { updateNotificationPreferences(request: $input) { channel unsubscribed digestWindowMinutes } }"
+/**
+ * The caller's own notification preferences for the email channel; a missing or expired token
+ * surfaces as a thrown refusal, same as `listTasks`.
+ */
+export const readNotificationPreferences = async (token: string): Promise<NotificationPreferences> =>
+    unwrap(parseOutcome(await request({ operation: "NotificationPreferences", token }), toPreferences))
 
 /** Persists the email digest preference the owner toggled; the backend answers with the saved row. */
-export const updateNotificationPreferences = async (token: string, unsubscribed: boolean): Promise<NotificationPreferences> => {
-    return unwrap(
-        await graphql<NotificationPreferences>(UPDATE_NOTIFICATION_PREFERENCES_DOCUMENT, { input: { channel: "email", unsubscribed } }, token),
+export const updateNotificationPreferences = async (
+    token: string,
+    unsubscribed: boolean,
+): Promise<NotificationPreferences> =>
+    unwrap(
+        parseOutcome(
+            await request({
+                operation: "UpdateNotificationPreferences",
+                variables: { input: { channel: "email", unsubscribed } },
+                token,
+            }),
+            toPreferences,
+        ),
     )
-}
 
-const UNSUBSCRIBE_DOCUMENT =
-  "mutation Unsubscribe($input: UnsubscribeInput!) { unsubscribe(request: $input) { channel unsubscribed } }"
-
-/** fr.notify.unsubscribe: stops the email channel outright for the person `token` resolves to -
- * the same mutation whether the token came from the signed-in session or from an email link. */
-export const unsubscribeFromEmail = async (token: string): Promise<NotificationPreferences> => {
-    const result = unwrap(
-        await graphql<{ channel: string; unsubscribed: boolean }>(UNSUBSCRIBE_DOCUMENT, { input: { channel: "email" } }, token),
+/**
+ * fr.notify.unsubscribe: stops the email channel outright for the person `token` resolves to - the
+ * same mutation whether the token came from the signed-in session or from an email link.
+ */
+export const unsubscribeFromEmail = async (token: string): Promise<NotificationPreferences> =>
+    unwrap(
+        parseOutcome(
+            await request({ operation: "Unsubscribe", variables: { input: { channel: "email" } }, token }),
+            toPreferences,
+        ),
     )
-    return { channel: result.channel, unsubscribed: result.unsubscribed, digestWindowMinutes: null }
-}

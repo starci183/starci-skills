@@ -4,19 +4,20 @@ import { useState } from "react"
 import { useTranslations } from "next-intl"
 import { useCollaborators, useInviteCollaborator, useRevokeCollaborator, useTaskTitle } from "@/hooks/share"
 import { useSignOut } from "@/hooks/auth"
+import { useAccountShellCopy } from "@/hooks/shell"
 import type { ShareRole } from "@/modules/types"
 import { ShareInviteView, type ShareInviteState } from "./component"
 
 const EMAIL_FIELD_CODES = new Set(["SHARE_INVALID_EMAIL", "SHARE_INVITATION_ALREADY_EXISTS"])
 
-const messageOf = (error: unknown): string | null => (error instanceof Error ? error.message : null)
+/** The backend's stable domain code a failed mutation carries on its `cause`, when it carries one. */
 const codeOf = (error: unknown): string | null =>
     error instanceof Error && error.cause instanceof Error ? error.cause.message : null
 
 /** ShareInviteBlock's only external input: the task this screen shares, from the route's own params. */
 type ShareInviteBlockProps = {
-  readonly taskId: string;
-};
+    readonly taskId: string
+}
 
 /**
  * The connected owner of ui.share.invite: it owns the collaborators query, the invite and revoke
@@ -27,6 +28,7 @@ export const ShareInviteBlock = (props: ShareInviteBlockProps) => {
     const taskId = props.taskId
     const t = useTranslations("share")
     const tShell = useTranslations("shell")
+    const shellCopy = useAccountShellCopy("share")
     const [email, setEmail] = useState("")
     const [role, setRole] = useState<ShareRole>("viewer")
     const [revokingId, setRevokingId] = useState<string | null>(null)
@@ -41,36 +43,35 @@ export const ShareInviteBlock = (props: ShareInviteBlockProps) => {
     const refusal = collaboratorsQuery.error
         ? t("sessionEnded")
         : invite.error
-            ? inviteCode === "SHARE_INVALID_EMAIL"
-                ? t("invalidEmail")
-                : messageOf(invite.error)
-            : messageOf(revoke.error)
+          ? inviteCode === "SHARE_INVALID_EMAIL"
+              ? t("invalidEmail")
+              : t("inviteRefusal")
+          : revoke.error
+            ? t("revokeRefusal")
+            : null
     const refusalTarget: "email" | "form" = inviteCode !== null && EMAIL_FIELD_CODES.has(inviteCode) ? "email" : "form"
 
-    const state: ShareInviteState = collaboratorsQuery.error || invite.error || revoke.error
-        ? "refused"
-        : invite.isMutating
-            ? "inviting"
-            : collaborators.some(collaborator => collaborator.status === "accepted")
+    const state: ShareInviteState =
+        collaboratorsQuery.error || invite.error || revoke.error
+            ? "refused"
+            : invite.isMutating
+              ? "inviting"
+              : collaborators.some((collaborator) => collaborator.status === "accepted")
                 ? "accepted"
                 : collaborators.length > 0
-                    ? "pending-list"
-                    : "empty"
+                  ? "pending-list"
+                  : "empty"
 
     const onInvite = () => {
-        void invite
-            .trigger({ email: email.trim(), role })
-            .then(() => setEmail(""))
-            .catch(() => {})
+        void invite.trigger({ email: email.trim(), role }, { throwOnError: false }).then((invited) => {
+            if (invited !== undefined) setEmail("")
+        })
     }
 
     const onRevoke = (invitationId: string, collaboratorEmail: string) => {
         if (!window.confirm(t("revokeConfirm", { email: collaboratorEmail }))) return
         setRevokingId(invitationId)
-        void revoke
-            .trigger({ invitationId })
-            .catch(() => {})
-            .finally(() => setRevokingId(null))
+        void revoke.trigger({ invitationId }, { throwOnError: false }).then(() => setRevokingId(null))
     }
 
     return (
@@ -84,24 +85,8 @@ export const ShareInviteBlock = (props: ShareInviteBlockProps) => {
             role={role}
             revokingId={revokingId}
             copy={{
-                brand: tShell("brand"),
-                accountName: tShell("accountName"),
-                signOut: tShell("signOut"),
-                navLabel: tShell("navPrimaryDestinations"),
-                breadcrumbLabel: tShell("breadcrumb"),
-                destinations: {
-                    tasks: tShell("destinations.tasks"),
-                    notifications: tShell("destinations.notifications"),
-                    plan: tShell("destinations.plan"),
-                    privacy: tShell("destinations.privacy"),
-                },
-                legal: {
-                    privacyPolicy: tShell("legal.privacyPolicy"),
-                    terms: tShell("legal.terms"),
-                },
+                ...shellCopy,
                 backToTask: tShell("backToTask"),
-                mainLabel: t("mainLabel"),
-                breadcrumbSharing: t("breadcrumbSharing"),
                 heading: t("heading"),
                 cardLabel: t("cardLabel"),
                 inviteHeading: t("inviteHeading"),

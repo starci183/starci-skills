@@ -1,5 +1,6 @@
 import { Button, GrammarRoot, Heading, SurfaceCard, Text, TextAction } from "@starci/grammar/common"
 import { AccountShell, type AccountShellCopy } from "@/components/composites/AccountShell"
+import { ROUTES } from "@/modules/routes"
 import {
     NOTIFY_ACTION_ROW_CLASS_NAME,
     HEADING_GROUP_CLASS_NAME,
@@ -12,58 +13,50 @@ import {
 export const NOTIFY_PREFERENCES_STATES = ["loading", "subscribed", "unsubscribed", "saving", "refused"] as const
 
 /** One member of the ui.notify.preferences state vocabulary. */
-export type NotifyPreferencesState = (typeof NOTIFY_PREFERENCES_STATES)[number];
+export type NotifyPreferencesState = (typeof NOTIFY_PREFERENCES_STATES)[number]
 
 /** Every word the pure preferences screen renders, resolved by the connected half. */
 export type NotifyPreferencesViewCopy = AccountShellCopy & {
-  readonly backToTasks: string;
-  /** The screen title, which is also the digest card's accessible name. */
-  readonly heading: string;
-  readonly tagline: string;
-  readonly digestHeading: string;
-  readonly digestTagline: string;
-  readonly on: string;
-  readonly off: string;
-  readonly turnOn: string;
-  readonly turnOff: string;
-  readonly unsubscribedNote: string;
-  readonly save: string;
-  readonly saving: string;
-  readonly unsubscribe: string;
-  readonly unsubscribeHint: string;
-};
+    readonly backToTasks: string
+    /** The screen title, which is also the digest card's accessible name. */
+    readonly heading: string
+    readonly tagline: string
+    readonly digestHeading: string
+    readonly digestTagline: string
+    readonly on: string
+    readonly off: string
+    readonly turnOn: string
+    readonly turnOff: string
+    readonly unsubscribedNote: string
+    readonly save: string
+    readonly saving: string
+    readonly unsubscribe: string
+    readonly unsubscribeHint: string
+}
 
 /** The view's complete contract: the resolved state, the displayed preference, the refusal
  * sentence when one applies, which write is pending, every word to draw, and the four user intents
  * plus sign out. */
 export interface NotifyPreferencesViewProps {
-  readonly state: NotifyPreferencesState;
-  /** The preference the toggle currently shows - the saved value, or the unsaved draft once the
-   * owner flips it. `null` means the value has not loaded yet, so the control rests as a skeleton. */
-  readonly subscribed: boolean | null;
-  /** The refusal sentence the owner settled on; rendered only while `state` is `refused`. */
-  readonly refusal: string | null;
-  /** Which write is in flight. `save` drives the save Button's busy label and pending; `unsubscribe`
-   * marks the unsubscribe text action pending. Either one disables every write control. */
-  readonly pending: "save" | "unsubscribe" | null;
-  readonly copy: NotifyPreferencesViewCopy;
-  readonly onToggle: () => void;
-  readonly onSave: () => void;
-  readonly onUnsubscribe: () => void;
-  readonly onSignOut: () => void;
+    readonly state: NotifyPreferencesState
+    /** The preference the toggle currently shows - the saved value, or the unsaved draft once the
+     * owner flips it. `null` means the value has not loaded yet, so the control rests as a skeleton. */
+    readonly subscribed: boolean | null
+    /** The refusal sentence the owner settled on; rendered only while `state` is `refused`. */
+    readonly refusal: string | null
+    /** Which write is in flight. `save` drives the save Button's busy label and pending; `unsubscribe`
+     * marks the unsubscribe text action pending. Either one disables every write control. */
+    readonly pending: "save" | "unsubscribe" | null
+    readonly copy: NotifyPreferencesViewCopy
+    readonly onToggle: () => void
+    readonly onSave: () => void
+    readonly onUnsubscribe: () => void
+    readonly onSignOut: () => void
 }
-
-/** The one destination this screen is. Compared by route, because labels are translated. */
-const CURRENT_DESTINATION_HREF = "/notify/preferences"
-
-/** The route "Back to tasks" travels to; an inline href would bypass the navigation owner. */
-const BACK_TO_TASKS_HREF = "/tasks"
 
 /** The pure render of ui.notify.preferences; every one of its five states is decided by the
  * caller's `state` prop and stamped on the root as `data-state`. No hooks, no transport, no world
- * state. `mainLandmark: "caller"` keeps the shell's neutral primary div so the global
- * `main { max-width: 32rem }` rule in globals.css never caps the readable measure - the
- * role="main" div below owns the landmark instead. */
+ * state. */
 export const NotifyPreferencesView = (props: NotifyPreferencesViewProps) => {
     const copy = props.copy
     const { state, subscribed, refusal, pending } = props
@@ -71,7 +64,7 @@ export const NotifyPreferencesView = (props: NotifyPreferencesViewProps) => {
 
     return (
         <GrammarRoot data-state={state}>
-            <AccountShell copy={copy} currentHref={CURRENT_DESTINATION_HREF} onSignOut={props.onSignOut}>
+            <AccountShell copy={copy} currentHref={ROUTES.notifyPreferences} onSignOut={props.onSignOut}>
                 <div className={HEADING_GROUP_CLASS_NAME}>
                     <Heading level={1}>{copy.heading}</Heading>
                     <Text tone="muted">{copy.tagline}</Text>
@@ -93,9 +86,7 @@ export const NotifyPreferencesView = (props: NotifyPreferencesViewProps) => {
                             {subscribed === false ? copy.turnOn : copy.turnOff}
                         </Button>
                     </div>
-                    {state === "unsubscribed" ? (
-                        <Text live="polite">{copy.unsubscribedNote}</Text>
-                    ) : null}
+                    {state === "unsubscribed" ? <Text live="polite">{copy.unsubscribedNote}</Text> : null}
                 </SurfaceCard>
                 <div className={NOTIFY_ACTION_ROW_CLASS_NAME}>
                     <Button
@@ -106,7 +97,7 @@ export const NotifyPreferencesView = (props: NotifyPreferencesViewProps) => {
                     >
                         {pending === "save" ? copy.saving : copy.save}
                     </Button>
-                    <TextAction appearance="inline" href={BACK_TO_TASKS_HREF}>
+                    <TextAction appearance="inline" href={ROUTES.tasks}>
                         {copy.backToTasks}
                     </TextAction>
                 </div>

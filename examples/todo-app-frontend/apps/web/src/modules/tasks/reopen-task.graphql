@@ -1,0 +1,6 @@
+mutation ReopenTask($id: ID!) {
+    reopenTask(request: { id: $id }) {
+        taskId
+        complete
+    }
+}

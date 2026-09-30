@@ -1,0 +1,6 @@
+mutation CompleteTask($id: ID!) {
+    completeTask(request: { id: $id }) {
+        taskId
+        complete
+    }
+}

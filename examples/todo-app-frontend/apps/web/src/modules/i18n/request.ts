@@ -1,28 +1,20 @@
-import { createRequestConfig } from "@fe-kit/i18n/request"
-import { i18n } from "./config"
+import "server-only"
+import { hasLocale } from "next-intl"
+import { getRequestConfig } from "next-intl/server"
+import { PRODUCT_TIME_ZONE } from "./config"
 import { routing } from "./routing"
 
 /**
- * WHERE COPY COMES FROM, resolved once per request on the server.
- *
- * Every string a reader sees is a key in `src/modules/i18n/messages/*.json`, and a component receives it
- * already resolved. That is the same boundary the blocks already draw between their two halves:
- * the connected half knows who is looking and hands the presentational half words, so the
- * presentational half can be rendered from a test with no locale, no request and no provider.
- *
- * THE LOCALE COMES FROM THE ROUTE. `requestLocale` is next-intl's negotiated answer for this
- * request - the `[locale]` segment when one is present, otherwise the cookie/default the middleware
- * already chose - checked against the shipped vocabulary before it reaches the message loader.
- * (`next/root-params`, which the academy build uses, does not exist on this app's Next 15 line.)
- *
- * The resolution logic lives in `@starci-examples/fe-kit`; what stays here is the app-specific
- * half of it - which catalogue file each locale loads.
+ * Where copy comes from, resolved once per request on the server. The locale comes from the route
+ * (`requestLocale`) and is checked against the shipped vocabulary before it reaches the loader; the
+ * time zone is fixed, so the server and the hydrated client format the same day the same way.
  */
-export default createRequestConfig({
-    routing,
-    timeZone: i18n.PRODUCT_TIME_ZONE,
-    messages: {
-        en: () => import("./messages/en.json"),
-        vi: () => import("./messages/vi.json"),
-    },
+export default getRequestConfig(async ({ requestLocale }) => {
+    const requested = await requestLocale
+    const locale = hasLocale(routing.locales, requested) ? requested : routing.defaultLocale
+    return {
+        locale,
+        timeZone: PRODUCT_TIME_ZONE,
+        messages: (await import(`./messages/${locale}.json`)).default,
+    }
 })

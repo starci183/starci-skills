@@ -1,0 +1,5 @@
+mutation DeleteTask($id: ID!) {
+    deleteTask(request: { id: $id }) {
+        deleted
+    }
+}

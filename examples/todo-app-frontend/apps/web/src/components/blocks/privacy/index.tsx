@@ -7,6 +7,9 @@ import { usePrivacyActions } from "@/hooks/privacy"
 import { useAccountShellCopy } from "@/hooks/shell"
 import { PrivacyView, type PrivacyState } from "./component"
 
+/** The privacy block takes nothing from its page: the screen owns its own session gate. */
+type PrivacyBlockProps = Record<never, never>
+
 /** An authentication refusal must say so; every other submission failure uses the settled sentence. */
 const isAuthRefusal = (error: unknown): boolean => {
     const code = error instanceof Error && error.cause instanceof Error ? error.cause.message : ""
@@ -15,7 +18,9 @@ const isAuthRefusal = (error: unknown): boolean => {
 
 /** Hands the exported lines to the reader as a real file download - the honest client form of
  * fr.audit.export's "Get a copy of your personal activity records." */
-const downloadExport = (lines: ReadonlyArray<{ readonly at: string; readonly action: string; readonly target: string }>): void => {
+const downloadExport = (
+    lines: ReadonlyArray<{ readonly at: string; readonly action: string; readonly target: string }>,
+): void => {
     const blob = new Blob([JSON.stringify(lines, null, 2)], { type: "application/json" })
     const url = URL.createObjectURL(blob)
     const anchor = document.createElement("a")
@@ -31,7 +36,8 @@ const downloadExport = (lines: ReadonlyArray<{ readonly at: string; readonly act
  * ./component.tsx. Export and erasure stay independent; a confirmed erasure runs requestErasure then
  * completeErasure, the two real mutations the backend already serves.
  */
-export const PrivacyBlock = () => {
+export const PrivacyBlock = (props: PrivacyBlockProps) => {
+    void props
     const t = useTranslations("privacy")
     const shellCopy = useAccountShellCopy("privacy")
     const onSignOut = useSignOut()

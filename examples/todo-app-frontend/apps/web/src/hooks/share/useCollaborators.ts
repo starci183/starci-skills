@@ -1,6 +1,6 @@
 import useSWR from "swr"
 import { useSessionToken } from "@/hooks/auth"
-import { listCollaborators } from "@/modules/api"
+import { listCollaborators } from "@/modules/share"
 
 /**
  * fr.share.list backs ui.share.invite's pending-list/accepted/refused states on this query. The key

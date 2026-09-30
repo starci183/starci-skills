@@ -1,9 +1,9 @@
 import useSWRMutation from "swr/mutation"
 import { useSessionToken } from "@/hooks/auth"
-import { inviteCollaboratorAndNotify } from "@/modules/api"
+import { inviteCollaborator } from "@/modules/share"
 import type { ShareRole } from "@/modules/types"
 
-type InviteCollaboratorMutationArg = { readonly arg: { readonly email: string; readonly role: ShareRole } };
+type InviteCollaboratorMutationArg = { readonly arg: { readonly email: string; readonly role: ShareRole } }
 
 /**
  * fr.share.invite: submits the entered email and viewer/editor role for the owner's own task. The
@@ -15,7 +15,8 @@ export const useInviteCollaborator = (taskId: string) => {
     const token = useSessionToken()
     const invite = useSWRMutation(
         token ? (taskId ? (["collaborators", taskId, token] as const) : null) : null,
-        ([, id, activeToken], { arg }: InviteCollaboratorMutationArg) => inviteCollaboratorAndNotify(activeToken, id, arg.email, arg.role),
+        ([, id, activeToken], { arg }: InviteCollaboratorMutationArg) =>
+            inviteCollaborator(activeToken, id, arg.email, arg.role),
     )
     return invite
 }

@@ -1,0 +1,7 @@
+mutation EndRecurrence($input: EndRecurrenceInput!) {
+    endRecurrence(request: $input) {
+        ruleId
+        endedAt
+        orphanedCount
+    }
+}

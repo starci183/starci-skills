@@ -13,6 +13,3 @@ export const UNSUBSCRIBE_HEADING_GROUP_CLASS_NAME = cn("flex", "flex-col", "gap-
 
 /** The token-bound control row wraps rather than overflowing a narrow viewport. */
 export const UNSUBSCRIBE_ACTION_ROW_CLASS_NAME = cn("flex", "flex-wrap", "items-center", "gap-4")
-
-/** Policy destinations sit beside each other at the foot of the column. */
-export const UNSUBSCRIBE_FOOTER_CLASS_NAME = cn("mt-auto", "flex", "items-center", "gap-6", "border-t", "border-border", "pt-6")

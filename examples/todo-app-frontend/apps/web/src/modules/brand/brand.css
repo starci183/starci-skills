@@ -1,0 +1,25 @@
+/*
+ * todo-app brand rev 3: the product primary overrides Grammar's default accent. The brand declares the
+ * accent's own foreground as black (black on #2F6BFF measures 4.67:1, white only 4.50:1 and fails the
+ * declared 4.5 floor), so the foreground token is bound here too. One block serves both themes: the
+ * accent is the same in light and in dark. The info tone follows the accent, so its soft pair - the
+ * tint and the ink of a status shown as text, an icon or a dot - is written here for each theme.
+ */
+:root,
+.light,
+.dark {
+    --starci-core-accent: #2f6bff;
+    --accent: var(--starci-core-accent);
+    --accent-foreground: #000000;
+}
+
+:root,
+.light {
+    --info-soft: #e7eeff;
+    --info-soft-foreground: #1c47b8;
+}
+
+.dark {
+    --info-soft: #14254d;
+    --info-soft-foreground: #9db9ff;
+}

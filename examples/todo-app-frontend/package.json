@@ -7,278 +7,44 @@
     "apps/*"
   ],
   "scripts": {
-    "dev": "npm run dev --workspace @starci/todo-web --",
-    "build": "npm run build --workspace @starci/todo-web --",
-    "start": "npm run start --workspace @starci/todo-web --",
-    "typecheck": "npm run typecheck --workspace @starci/todo-web --",
-    "lint": "hfs lint",
-    "lint:fix": "hfs lint --fix"
+    "prepare": "husky",
+    "dev:web": "npm run dev --workspace apps/web",
+    "start:web": "npm run start --workspace apps/web",
+    "codegen": "npm run codegen --workspaces --if-present",
+    "build": "npm run build --workspaces --if-present",
+    "typecheck": "npm run typecheck --workspaces --if-present",
+    "lint": "npm run codegen --silent && eslint . --fix --max-warnings=0 && stylelint \"{apps,packages}/*/src/**/*.css\" --fix",
+    "lint:check": "npm run codegen --silent && eslint . --max-warnings=0 && stylelint \"{apps,packages}/*/src/**/*.css\"",
+    "lint:report": "eslint . --format json --output-file reports/eslint.json",
+    "lint:report:css": "stylelint \"{apps,packages}/*/src/**/*.css\" --formatter json --output-file reports/stylelint.json",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "hfs:check": "hfs check",
+    "hfs:report": "hfs check --sonar reports/hfs.sonar.json"
   },
   "devDependencies": {
-    "@eslint/js": "^9.39.5",
-    "@starci/eslint-canon-fe": "6.0.2",
-    "@starci/hfs": "1.0.1",
+    "@starci/eslint-canon-fe": "7.0.0",
+    "@starci/hfs": "2.0.0",
+    "@starci/prettier-config": "1.0.0",
+    "@starci/stylelint-canon": "2.0.0",
+    "@starci/tsconfig": "2.0.0",
     "@tailwindcss/postcss": "^4",
     "@types/node": "22.20.4",
     "@types/react": "^19.0.0",
     "@types/react-dom": "^19.0.0",
-    "@typescript-eslint/eslint-plugin": "8.71.0",
-    "@typescript-eslint/parser": "8.71.0",
     "eslint": "9.39.5",
-    "eslint-plugin-jsx-a11y": "^6.10.2",
-    "eslint-plugin-react": "^7.37.5",
     "eslint-plugin-react-hooks": "7.1.1",
-    "globals": "^17.12.0",
+    "husky": "^9.1.7",
+    "postcss-value-parser": "4.2.0",
+    "prettier": "3.9.6",
+    "stylelint": "17.15.0",
     "tailwindcss": "^4",
-    "typescript": "5.9.3",
-    "typescript-eslint": "8.71.0",
-    "yaml": "^2.9.1"
+    "typescript": "5.9.3"
   },
   "starci": {
     "codePatterns": {
       "next": {
         "schema": "starci/next-code-pattern-contract@1",
-        "projects": [
-          "apps/web/tsconfig.json"
-        ],
-        "owners": [
-          {
-            "root": "apps/web/src/components/blocks/share-invite",
-            "name": "ShareInvite"
-          },
-          {
-            "root": "apps/web/src/components/blocks/task-list",
-            "name": "TaskList"
-          },
-          {
-            "root": "apps/web/src/components/blocks/sign-in-form",
-            "name": "SignInForm"
-          }
-        ],
-        "closedVocabularies": [],
-        "grammarGuards": {
-          "schema": "starci/grammar-guard-contract@1",
-          "package": "@starci/grammar",
-          "entry": "./common",
-          "source": {
-            "kind": "installed"
-          },
-          "vectorProfile": "starci/grammar-guards-v1"
-        },
-        "errorState": {
-          "schema": "starci/next-error-state@1",
-          "sourceRoots": [
-            "apps/web/src"
-          ],
-          "transports": [
-            {
-              "root": "apps/web/src/modules/api",
-              "mode": "throwing"
-            }
-          ],
-          "worldMappings": [
-            {
-              "id": "share-collaborators-read-refusal",
-              "owner": {
-                "path": "apps/web/src/components/blocks/share-invite/index.tsx",
-                "export": "ShareInviteBlock"
-              },
-              "source": {
-                "path": "apps/web/src/hooks/share/useCollaborators.ts",
-                "export": "useCollaborators"
-              },
-              "failurePath": "collaboratorsQuery.error",
-              "state": {
-                "path": "apps/web/src/components/blocks/share-invite/component.tsx",
-                "export": "ShareInviteState"
-              },
-              "failureState": "refused",
-              "render": {
-                "path": "apps/web/src/components/blocks/share-invite/component.tsx",
-                "symbol": "ShareInviteView",
-                "stateProp": "state"
-              }
-            },
-            {
-              "id": "share-invite-refusal",
-              "owner": {
-                "path": "apps/web/src/components/blocks/share-invite/index.tsx",
-                "export": "ShareInviteBlock"
-              },
-              "source": {
-                "path": "apps/web/src/hooks/share/useInviteCollaborator.ts",
-                "export": "useInviteCollaborator"
-              },
-              "failurePath": "invite.error",
-              "state": {
-                "path": "apps/web/src/components/blocks/share-invite/component.tsx",
-                "export": "ShareInviteState"
-              },
-              "failureState": "refused",
-              "render": {
-                "path": "apps/web/src/components/blocks/share-invite/component.tsx",
-                "symbol": "ShareInviteView",
-                "stateProp": "state"
-              }
-            },
-            {
-              "id": "share-revoke-refusal",
-              "owner": {
-                "path": "apps/web/src/components/blocks/share-invite/index.tsx",
-                "export": "ShareInviteBlock"
-              },
-              "source": {
-                "path": "apps/web/src/hooks/share/useRevokeCollaborator.ts",
-                "export": "useRevokeCollaborator"
-              },
-              "failurePath": "revoke.error",
-              "state": {
-                "path": "apps/web/src/components/blocks/share-invite/component.tsx",
-                "export": "ShareInviteState"
-              },
-              "failureState": "refused",
-              "render": {
-                "path": "apps/web/src/components/blocks/share-invite/component.tsx",
-                "symbol": "ShareInviteView",
-                "stateProp": "state"
-              }
-            },
-            {
-              "id": "task-list-read-refusal",
-              "owner": {
-                "path": "apps/web/src/components/blocks/task-list/index.tsx",
-                "export": "TaskListBlock"
-              },
-              "source": {
-                "path": "apps/web/src/hooks/task/useTasks.ts",
-                "export": "useTasks"
-              },
-              "failurePath": "tasksQuery.error",
-              "state": {
-                "path": "apps/web/src/components/blocks/task-list/component.tsx",
-                "export": "TaskListState"
-              },
-              "failureState": "refused",
-              "render": {
-                "path": "apps/web/src/components/blocks/task-list/component.tsx",
-                "symbol": "TaskListView",
-                "stateProp": "state"
-              }
-            },
-            {
-              "id": "sign-in-refusal",
-              "owner": {
-                "path": "apps/web/src/components/blocks/sign-in-form/index.tsx",
-                "export": "SignInFormBlock"
-              },
-              "source": {
-                "path": "apps/web/src/hooks/auth/useSignIn.ts",
-                "export": "useSignIn"
-              },
-              "failurePath": "refusal",
-              "state": {
-                "path": "apps/web/src/components/blocks/sign-in-form/component.tsx",
-                "export": "SignInFormState"
-              },
-              "failureState": "refused",
-              "render": {
-                "path": "apps/web/src/components/blocks/sign-in-form/component.tsx",
-                "symbol": "SignInFormView",
-                "stateProp": "state"
-              }
-            }
-          ],
-          "envelopes": [],
-          "writes": [
-            {
-              "action": {
-                "path": "apps/web/src/modules/api/share.ts",
-                "export": "inviteCollaborator"
-              },
-              "feedback": {
-                "path": "apps/web/src/modules/api/write-feedback.ts",
-                "export": "runWrite"
-              },
-              "binding": "callback",
-              "sites": [
-                {
-                  "path": "apps/web/src/modules/api/share.ts",
-                  "export": "inviteCollaboratorAndNotify"
-                }
-              ]
-            },
-            {
-              "action": {
-                "path": "apps/web/src/modules/api/share.ts",
-                "export": "revokeCollaborator"
-              },
-              "feedback": {
-                "path": "apps/web/src/modules/api/write-feedback.ts",
-                "export": "runWrite"
-              },
-              "binding": "callback",
-              "sites": [
-                {
-                  "path": "apps/web/src/modules/api/share.ts",
-                  "export": "revokeCollaboratorAndNotify"
-                }
-              ]
-            },
-            {
-              "action": {
-                "path": "apps/web/src/modules/api/tasks.ts",
-                "export": "createTask"
-              },
-              "feedback": {
-                "path": "apps/web/src/modules/api/write-feedback.ts",
-                "export": "runWrite"
-              },
-              "binding": "callback",
-              "sites": [
-                {
-                  "path": "apps/web/src/modules/api/tasks.ts",
-                  "export": "createTaskAndNotify"
-                }
-              ]
-            },
-            {
-              "action": {
-                "path": "apps/web/src/modules/api/tasks.ts",
-                "export": "setTaskComplete"
-              },
-              "feedback": {
-                "path": "apps/web/src/modules/api/write-feedback.ts",
-                "export": "runWrite"
-              },
-              "binding": "callback",
-              "sites": [
-                {
-                  "path": "apps/web/src/modules/api/tasks.ts",
-                  "export": "setTaskCompleteAndNotify"
-                }
-              ]
-            },
-            {
-              "action": {
-                "path": "apps/web/src/modules/api/tasks.ts",
-                "export": "deleteTask"
-              },
-              "feedback": {
-                "path": "apps/web/src/modules/api/write-feedback.ts",
-                "export": "runWrite"
-              },
-              "binding": "callback",
-              "sites": [
-                {
-                  "path": "apps/web/src/modules/api/tasks.ts",
-                  "export": "deleteTaskAndNotify"
-                }
-              ]
-            }
-          ],
-          "boundaries": [],
-          "requiredValues": []
-        },
         "dataLifecycle": {
           "schema": "starci/next-data-lifecycle@1",
           "swr": {

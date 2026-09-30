@@ -1,0 +1,5 @@
+mutation SignOut($input: SignOutInput!) {
+    signOut(request: $input) {
+        signedOut
+    }
+}

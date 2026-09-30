@@ -3,7 +3,11 @@
 import { useTranslations } from "next-intl"
 import { useSignOut } from "@/hooks/auth"
 import { usePlanUsage } from "@/hooks/plan"
+import { useAccountShellCopy } from "@/hooks/shell"
 import { UsageScreenView, type UsageScreenViewState } from "./component"
+
+/** The usage screen takes nothing from its page: it owns its own session gate and usage read. */
+type PlanUsageScreenProps = Record<never, never>
 
 /**
  * The connected owner of ui.plan.usage (the feature-entry and block halves this lane's write ceiling
@@ -14,29 +18,31 @@ import { UsageScreenView, type UsageScreenViewState } from "./component"
  * Every word that view draws - including the sentences that carry this reader's own numbers - is
  * resolved here from the `plan` and `shell` namespaces.
  */
-export const PlanUsageScreen = () => {
+export const PlanUsageScreen = (props: PlanUsageScreenProps) => {
+    void props
     const t = useTranslations("plan")
-    const tShell = useTranslations("shell")
+    const shellCopy = useAccountShellCopy("plan")
     const onSignOut = useSignOut()
     const { signedIn, usageQuery, upgrade } = usePlanUsage()
 
     const usage = usageQuery.data
-    const state: UsageScreenViewState = !signedIn || usageQuery.error
-        ? "refused"
-        : usage === undefined
-            ? "loading"
-            : usage.cap === null
+    const state: UsageScreenViewState =
+        !signedIn || usageQuery.error
+            ? "refused"
+            : usage === undefined
+              ? "loading"
+              : usage.cap === null
                 ? "paid-unlimited"
                 : usage.activeCount > usage.cap
-                    ? "over-cap-frozen"
-                    : usage.activeCount === usage.cap
-                        ? "at-cap"
-                        : "under-cap"
+                  ? "over-cap-frozen"
+                  : usage.activeCount === usage.cap
+                    ? "at-cap"
+                    : "under-cap"
 
     const onUpgrade = () => {
-        void upgrade.trigger().then(checkout => {
-            window.location.assign(checkout.checkoutUrl)
-        }).catch(() => undefined)
+        void upgrade.trigger(undefined, { throwOnError: false }).then((checkout) => {
+            if (checkout !== undefined) window.location.assign(checkout.checkoutUrl)
+        })
     }
 
     return (
@@ -49,22 +55,7 @@ export const PlanUsageScreen = () => {
             upgradeRefusal={upgrade.error ? t("checkoutRefusal") : null}
             isUpgrading={upgrade.isMutating}
             copy={{
-                brand: tShell("brand"),
-                accountName: tShell("accountName"),
-                signOut: tShell("signOut"),
-                navLabel: tShell("navPrimaryDestinations"),
-                destinations: {
-                    tasks: tShell("destinations.tasks"),
-                    notifications: tShell("destinations.notifications"),
-                    plan: tShell("destinations.plan"),
-                    privacy: tShell("destinations.privacy"),
-                },
-                legal: {
-                    privacyPolicy: tShell("legal.privacyPolicy"),
-                    terms: tShell("legal.terms"),
-                },
-                mainLabel: t("mainLabel"),
-                breadcrumb: t("breadcrumb"),
+                ...shellCopy,
                 heading: t("heading"),
                 usageCard: t("usageCard"),
                 freePlan: t("freePlan"),

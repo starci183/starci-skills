@@ -1,7 +1,7 @@
 import { useState } from "react"
-import { useRouter } from "next/navigation"
-import { signIn as requestSignIn } from "@/modules/api"
-import { SIGN_IN_REFUSAL_MESSAGE } from "@/modules/auth"
+import { useLocaleRouter } from "@/hooks/navigation"
+import { signIn, SIGN_IN_REFUSAL_MESSAGE } from "@/modules/auth"
+import { ROUTES } from "@/modules/routes"
 import { setToken } from "@/modules/session"
 
 /**
@@ -16,16 +16,19 @@ import { setToken } from "@/modules/session"
  * collapsed "email and password do not match" sentence, which the caller's dictionary translates.
  */
 export const useSignIn = () => {
-    const [state, setState] = useState<{ readonly submitting: boolean; readonly refusal: string | null }>({ submitting: false, refusal: null })
-    const router = useRouter()
+    const [state, setState] = useState<{ readonly submitting: boolean; readonly refusal: string | null }>({
+        submitting: false,
+        refusal: null,
+    })
+    const router = useLocaleRouter()
 
     const submit = async (email: string, password: string): Promise<void> => {
         setState({ submitting: true, refusal: null })
         try {
-            const result = await requestSignIn(email, password)
+            const result = await signIn(email, password)
             setToken(result.token)
             setState({ submitting: false, refusal: null })
-            router.push("/tasks")
+            router.push(ROUTES.tasks)
         } catch (error) {
             setState({ submitting: false, refusal: error instanceof Error ? error.message : SIGN_IN_REFUSAL_MESSAGE })
         }

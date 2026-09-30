@@ -1,5 +1,6 @@
-import { useRouter } from "next/navigation"
-import { signOut } from "@/modules/api"
+import { useLocaleRouter } from "@/hooks/navigation"
+import { signOut } from "@/modules/auth"
+import { ROUTES } from "@/modules/routes"
 import { clearToken } from "@/modules/session"
 import { useSessionToken } from "./useSessionToken"
 
@@ -10,11 +11,11 @@ import { useSessionToken } from "./useSessionToken"
  * person back on the sign-in route, the mirror of useSignIn's successful navigation to `/tasks`.
  */
 export const useSignOut = () => {
-    const router = useRouter()
+    const router = useLocaleRouter()
     const token = useSessionToken()
     return () => {
         clearToken()
         if (token) void signOut(token)
-        router.push("/sign-in")
+        router.push(ROUTES.signIn)
     }
 }

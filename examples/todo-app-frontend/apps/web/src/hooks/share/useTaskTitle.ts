@@ -1,6 +1,6 @@
 import useSWR from "swr"
 import { useSessionToken } from "@/hooks/auth"
-import { listTasks } from "@/modules/api"
+import { listTasks } from "@/modules/tasks"
 
 /**
  * The task breadcrumb and subtitle on ui.share.invite name the task being shared. The backend exposes
@@ -15,7 +15,7 @@ export const useTaskTitle = (taskId: string) => {
         token ? (taskId ? (["task-title", taskId, token] as const) : null) : null,
         async ([, id, activeToken]): Promise<string | null> => {
             const tasks = await listTasks(activeToken)
-            return tasks.find(task => task.id === id)?.title ?? null
+            return tasks.find((task) => task.id === id)?.title ?? null
         },
     )
     return taskTitleQuery

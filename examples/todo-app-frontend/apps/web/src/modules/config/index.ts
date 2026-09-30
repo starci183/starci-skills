@@ -16,4 +16,5 @@ const required = (name: string, value: string | undefined): string => {
 }
 
 /** The backend's one GraphQL endpoint; throws when `NEXT_PUBLIC_API_GRAPHQL_URL` is not set. */
-export const apiGraphqlUrl = (): string => required("NEXT_PUBLIC_API_GRAPHQL_URL", process.env.NEXT_PUBLIC_API_GRAPHQL_URL)
+export const apiGraphqlUrl = (): string =>
+    required("NEXT_PUBLIC_API_GRAPHQL_URL", process.env.NEXT_PUBLIC_API_GRAPHQL_URL)

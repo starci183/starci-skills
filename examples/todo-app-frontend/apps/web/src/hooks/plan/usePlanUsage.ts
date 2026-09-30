@@ -11,13 +11,11 @@ import { readPlanUsage, startPlanCheckout } from "@/modules/plan"
  */
 export const usePlanUsage = () => {
     const token = useSessionToken()
-    const usageQuery = useSWR(
-        token ? (["plan-usage", token] as const) : null,
-        ([, activeToken]) => readPlanUsage(activeToken),
+    const usageQuery = useSWR(token ? (["plan-usage", token] as const) : null, ([, activeToken]) =>
+        readPlanUsage(activeToken),
     )
-    const upgrade = useSWRMutation(
-        token ? (["plan-upgrade", token] as const) : null,
-        ([, activeToken]) => startPlanCheckout(activeToken),
+    const upgrade = useSWRMutation(token ? (["plan-upgrade", token] as const) : null, ([, activeToken]) =>
+        startPlanCheckout(activeToken),
     )
     return { signedIn: Boolean(token), usageQuery, upgrade }
 }

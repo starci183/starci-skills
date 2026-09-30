@@ -1,0 +1,10 @@
+mutation MakeRecurring($input: MakeRecurringInput!) {
+    makeRecurring(request: $input) {
+        ruleId
+        title
+        frequency
+        timeZone
+        time
+        startDate
+    }
+}

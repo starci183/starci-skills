@@ -1,0 +1,6 @@
+mutation CompleteErasure($requestId: ID!) {
+    completeErasure(request: { requestId: $requestId }) {
+        requestId
+        state
+    }
+}

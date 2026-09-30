@@ -1,5 +1,8 @@
 import { useTranslations } from "next-intl"
 
+/** The screens whose namespace carries the `mainLabel` and `breadcrumb` the chrome names itself with. */
+type AccountShellScreen = "notify.preferences" | "privacy" | "plan" | "tasks" | "share" | "recur"
+
 /**
  * Every word the signed-in workspace chrome draws, resolved from the shared `shell` namespace plus the
  * screen's own `mainLabel` and `breadcrumb`, so no screen re-resolves the same dozen shell sentences
@@ -7,7 +10,7 @@ import { useTranslations } from "next-intl"
  *
  * @param screen - The message namespace of the screen the chrome wraps.
  */
-export const useAccountShellCopy = (screen: "notify.preferences" | "privacy") => {
+export const useAccountShellCopy = (screen: AccountShellScreen) => {
     const t = useTranslations(screen)
     const tShell = useTranslations("shell")
     return {
@@ -15,6 +18,7 @@ export const useAccountShellCopy = (screen: "notify.preferences" | "privacy") =>
         accountName: tShell("accountName"),
         signOut: tShell("signOut"),
         navLabel: tShell("navPrimary"),
+        legalLabel: tShell("navLegal"),
         destinations: {
             tasks: tShell("destinations.tasks"),
             notifications: tShell("destinations.notifications"),

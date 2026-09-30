@@ -17,31 +17,24 @@ const DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/
 const POSITIVE_INTEGER_PATTERN = /^[1-9]\d*$/
 const DAY_OF_MONTH_PATTERN = /^([1-9]|[12]\d|3[01])$/
 
-/** The local calendar date in the rule's own zone, shaped YYYY-MM-DD for endRecurrence. */
-export const todayInZone = (timeZone: string): string => {
-    const parts = new Intl.DateTimeFormat("en", { timeZone, year: "numeric", month: "2-digit", day: "2-digit" }).formatToParts(new Date())
-    const part = (type: string) => parts.find(entry => entry.type === type)?.value ?? ""
-    return `${part("year")}-${part("month")}-${part("day")}`
-}
-
 /** The make-recurring form's draft: every field as the owner typed it, before validation. */
-type ScheduleDraft = {
-  readonly frequency: RecurFrequency;
-  readonly n: string;
-  readonly dayOfMonth: string;
-  readonly time: string;
-  readonly timeZone: string;
-  readonly startDate: string;
-};
+export type ScheduleDraft = {
+    readonly frequency: RecurFrequency
+    readonly n: string
+    readonly dayOfMonth: string
+    readonly time: string
+    readonly timeZone: string
+    readonly startDate: string
+}
 
 /** The refusal sentence for each field the draft validation can fail, resolved from `recur`. */
 type ScheduleDraftRefusalMessages = {
-  readonly n: string;
-  readonly dayOfMonth: string;
-  readonly time: string;
-  readonly timeZone: string;
-  readonly startDate: string;
-};
+    readonly n: string
+    readonly dayOfMonth: string
+    readonly time: string
+    readonly timeZone: string
+    readonly startDate: string
+}
 
 /** fr.recur.make-recurring's draft validation, in the form's field order; first failure wins. This
  * owner knows which field failed; the sentences arrive resolved, because the words are the

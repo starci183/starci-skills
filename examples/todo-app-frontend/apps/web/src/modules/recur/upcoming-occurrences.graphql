@@ -1,0 +1,12 @@
+query UpcomingOccurrences($ruleId: String!) {
+    upcomingOccurrences(request: { ruleId: $ruleId }) {
+        ruleId
+        materialised {
+            occurrenceId
+            localDate
+            dueAtUtc
+            status
+        }
+        previewDates
+    }
+}

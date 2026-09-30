@@ -8,8 +8,6 @@
     "accountName": "Alex",
     "signOut": "Sign out",
     "navPrimary": "Primary",
-    "navPrimaryDestinations": "Primary destinations",
-    "navDestinations": "Destinations",
     "navLegal": "Legal",
     "breadcrumb": "Breadcrumb",
     "destinations": {
@@ -52,7 +50,9 @@
     "helperEmpty": "Enter your email and password to continue.",
     "helperPassword": "Enter your password to continue.",
     "helperEmail": "Enter your email to continue.",
-    "refusal": "That email and password do not match."
+    "refusal": "That email and password do not match.",
+    "turtleAlt": "The brand turtle mascot",
+    "unavailable": "Signing in did not go through. Try again."
   },
   "tasks": {
     "mainLabel": "The task list and its create form",
@@ -70,11 +70,13 @@
     "share": "Share",
     "schedule": "Schedule",
     "completedNote": "Completed tasks stay here until you delete them.",
-    "sessionEnded": "Your session has ended. Sign in again to see your tasks."
+    "sessionEnded": "Your session has ended. Sign in again to see your tasks.",
+    "breadcrumb": "Tasks",
+    "mascotAlt": "A friendly turtle mascot"
   },
   "share": {
     "mainLabel": "The invitation screen and the collaborator list",
-    "breadcrumbSharing": "Sharing",
+    "breadcrumb": "Sharing",
     "heading": "Share this task",
     "cardLabel": "Invite collaborators",
     "inviteHeading": "Invite a collaborator",
@@ -101,7 +103,9 @@
     "revoke": "Revoke",
     "revokeConfirm": "Revoke {email}'s access to this task?",
     "sessionEnded": "Your session has ended. Sign in again to see this task's collaborators.",
-    "invalidEmail": "Enter a valid email address."
+    "invalidEmail": "Enter a valid email address.",
+    "inviteRefusal": "The invitation was not sent. Try again.",
+    "revokeRefusal": "The invitation could not be revoked. Try again."
   },
   "notify": {
     "preferences": {
@@ -157,8 +161,8 @@
     "checkoutRefusal": "Checkout could not be started. Try again from this page."
   },
   "recur": {
-    "primaryLabel": "A recurring task's schedule",
-    "breadcrumbSchedule": "Schedule",
+    "mainLabel": "A recurring task's schedule",
+    "breadcrumb": "Schedule",
     "heading": "Repeat this task",
     "noTask": "No task selected.",
     "scheduleCard": "Schedule",
@@ -197,7 +201,8 @@
     "refusalTime": "Enter a time of day as HH:MM.",
     "refusalTimeZone": "Enter an IANA time zone, like Europe/Berlin.",
     "refusalStartDate": "Enter a start date as YYYY-MM-DD.",
-    "refusalNoTask": "Open a task’s schedule before saving a rule."
+    "refusalNoTask": "Open a task’s schedule before saving a rule.",
+    "refusalServer": "We could not save the schedule. Try again."
   },
   "privacy": {
     "mainLabel": "The privacy screen - request erasure, export data",
@@ -237,5 +242,15 @@
   },
   "loading": {
     "message": "Loading"
+  },
+  "meta": {
+    "tasks": "Your tasks",
+    "signIn": "Sign in",
+    "shareInvite": "Share this task",
+    "notifyPreferences": "Notification preferences",
+    "notifyUnsubscribe": "Unsubscribe from email",
+    "planUsage": "Plan and usage",
+    "recur": "Repeat this task",
+    "privacy": "Privacy and your data"
   }
 }

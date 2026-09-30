@@ -1,13 +1,6 @@
-import { getTranslations } from "next-intl/server"
+import { LoadingPage } from "../../features/pages/LoadingPage"
 
-/** Shown while a route of the locale segment resolves its session-gated content. */
-const Loading = async () => {
-    const t = await getTranslations("loading")
-    return (
-        <main role="status" aria-live="polite">
-            <p>{t("message")}</p>
-        </main>
-    )
-}
+/** The locale segment's loading slot: it mounts the loading page and nothing else. */
+const Loading = () => <LoadingPage />
 
 export default Loading

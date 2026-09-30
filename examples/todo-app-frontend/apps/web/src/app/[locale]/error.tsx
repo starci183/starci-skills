@@ -1,22 +1,10 @@
 "use client"
 
-import { useTranslations } from "next-intl"
+import { ErrorPage } from "@/features/pages/ErrorPage"
 
-interface ErrorPageProps {
-    readonly reset: () => void
-}
+type ErrorProps = { readonly reset: () => void }
 
-/** Boundary of the locale segment: a render failure shows this instead of a blank page, and retry re-renders the segment. */
-const ErrorPage = ({ reset }: ErrorPageProps) => {
-    const t = useTranslations("errors.page")
-    return (
-        <main role="alert">
-            <h1>{t("title")}</h1>
-            <button type="button" onClick={reset}>
-                {t("retry")}
-            </button>
-        </main>
-    )
-}
+/** The locale segment's error boundary slot: it mounts the error page and hands it the segment's retry. */
+const Error = (props: ErrorProps) => <ErrorPage onRetry={props.reset} />
 
-export default ErrorPage
+export default Error

@@ -8,8 +8,6 @@
     "accountName": "Alex",
     "signOut": "Đăng xuất",
     "navPrimary": "Chính",
-    "navPrimaryDestinations": "Điểm đến chính",
-    "navDestinations": "Điểm đến",
     "navLegal": "Pháp lý",
     "breadcrumb": "Đường dẫn",
     "destinations": {
@@ -52,7 +50,9 @@
     "helperEmpty": "Nhập email và mật khẩu để tiếp tục.",
     "helperPassword": "Nhập mật khẩu để tiếp tục.",
     "helperEmail": "Nhập email để tiếp tục.",
-    "refusal": "Email và mật khẩu không khớp."
+    "refusal": "Email và mật khẩu không khớp.",
+    "turtleAlt": "Chú rùa linh vật của thương hiệu",
+    "unavailable": "Không thể đăng nhập. Hãy thử lại."
   },
   "tasks": {
     "mainLabel": "Danh sách công việc và biểu mẫu tạo mới",
@@ -70,11 +70,13 @@
     "share": "Chia sẻ",
     "schedule": "Lịch lặp",
     "completedNote": "Việc đã hoàn thành vẫn ở đây cho đến khi bạn xoá.",
-    "sessionEnded": "Phiên của bạn đã kết thúc. Đăng nhập lại để xem công việc."
+    "sessionEnded": "Phiên của bạn đã kết thúc. Đăng nhập lại để xem công việc.",
+    "breadcrumb": "Công việc",
+    "mascotAlt": "Chú rùa linh vật thân thiện"
   },
   "share": {
     "mainLabel": "Màn hình mời và danh sách cộng tác viên",
-    "breadcrumbSharing": "Chia sẻ",
+    "breadcrumb": "Chia sẻ",
     "heading": "Chia sẻ công việc này",
     "cardLabel": "Mời cộng tác viên",
     "inviteHeading": "Mời một cộng tác viên",
@@ -101,7 +103,9 @@
     "revoke": "Thu hồi",
     "revokeConfirm": "Thu hồi quyền truy cập của {email} vào công việc này?",
     "sessionEnded": "Phiên của bạn đã kết thúc. Đăng nhập lại để xem cộng tác viên của công việc này.",
-    "invalidEmail": "Nhập một địa chỉ email hợp lệ."
+    "invalidEmail": "Nhập một địa chỉ email hợp lệ.",
+    "inviteRefusal": "Không thể gửi lời mời. Hãy thử lại.",
+    "revokeRefusal": "Không thể thu hồi lời mời. Hãy thử lại."
   },
   "notify": {
     "preferences": {
@@ -157,8 +161,8 @@
     "checkoutRefusal": "Không khởi tạo được thanh toán. Hãy thử lại từ trang này."
   },
   "recur": {
-    "primaryLabel": "Lịch lặp của một công việc",
-    "breadcrumbSchedule": "Lịch lặp",
+    "mainLabel": "Lịch lặp của một công việc",
+    "breadcrumb": "Lịch lặp",
     "heading": "Lặp lại công việc này",
     "noTask": "Chưa chọn công việc.",
     "scheduleCard": "Lịch lặp",
@@ -197,7 +201,8 @@
     "refusalTime": "Nhập giờ dạng HH:MM.",
     "refusalTimeZone": "Nhập múi giờ IANA, ví dụ Asia/Ho_Chi_Minh.",
     "refusalStartDate": "Nhập ngày bắt đầu dạng YYYY-MM-DD.",
-    "refusalNoTask": "Hãy mở lịch của một công việc trước khi lưu quy tắc."
+    "refusalNoTask": "Hãy mở lịch của một công việc trước khi lưu quy tắc.",
+    "refusalServer": "Không thể lưu lịch. Hãy thử lại."
   },
   "privacy": {
     "mainLabel": "Màn hình quyền riêng tư - yêu cầu xoá, xuất dữ liệu",
@@ -237,5 +242,15 @@
   },
   "loading": {
     "message": "Đang tải"
+  },
+  "meta": {
+    "tasks": "Công việc của bạn",
+    "signIn": "Đăng nhập",
+    "shareInvite": "Chia sẻ công việc này",
+    "notifyPreferences": "Tùy chọn thông báo",
+    "notifyUnsubscribe": "Huỷ đăng ký email",
+    "planUsage": "Gói và mức sử dụng",
+    "recur": "Lặp lại công việc này",
+    "privacy": "Quyền riêng tư và dữ liệu của bạn"
   }
 }

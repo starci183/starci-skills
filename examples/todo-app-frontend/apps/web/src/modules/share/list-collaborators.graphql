@@ -1,0 +1,8 @@
+query Collaborators($taskId: ID!) {
+    collaborators(request: { taskId: $taskId }) {
+        invitationId
+        email
+        role
+        status
+    }
+}

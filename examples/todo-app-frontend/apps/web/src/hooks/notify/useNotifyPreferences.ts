@@ -1,6 +1,7 @@
-import { useEffect, useState } from "react"
+import { useState } from "react"
 import useSWR from "swr"
 import { useSessionToken } from "@/hooks/auth"
+import { useHydrated } from "@/hooks/hydration"
 import { readNotificationPreferences, unsubscribeFromEmail, updateNotificationPreferences } from "@/modules/notify"
 
 /**
@@ -14,18 +15,16 @@ import { readNotificationPreferences, unsubscribeFromEmail, updateNotificationPr
  */
 export const useNotifyPreferences = () => {
     const token = useSessionToken()
-    const [hydrated, setHydrated] = useState(false)
     const [draft, setDraft] = useState<boolean | null>(null)
     const [saveRefused, setSaveRefused] = useState(false)
     const [pending, setPending] = useState<"save" | "unsubscribe" | null>(null)
 
-    // The session store settles on mount; until then the signed-out reading cannot be told from the
-    // first client frame, so only the mounted value may decide a session refusal.
-    useEffect(() => setHydrated(true), [])
+    // Until the client has mounted the signed-out reading cannot be told from the first client frame, so
+    // only the mounted value may decide a session refusal.
+    const hydrated = useHydrated()
 
-    const preferencesQuery = useSWR(
-        token ? (["notification-preferences", token] as const) : null,
-        ([, activeToken]) => readNotificationPreferences(activeToken),
+    const preferencesQuery = useSWR(token ? (["notification-preferences", token] as const) : null, ([, activeToken]) =>
+        readNotificationPreferences(activeToken),
     )
 
     const server = preferencesQuery.data
@@ -33,14 +32,14 @@ export const useNotifyPreferences = () => {
     const refusal: "sessionEnded" | "loadRefusal" | "saveRefusal" | null = saveRefused
         ? "saveRefusal"
         : hydrated && token === null
-            ? "sessionEnded"
-            : preferencesQuery.error !== undefined && server === undefined
-                ? "loadRefusal"
-                : null
+          ? "sessionEnded"
+          : preferencesQuery.error !== undefined && server === undefined
+            ? "loadRefusal"
+            : null
 
     const toggle = () => {
         if (server === undefined || pending !== null) return
-        setDraft(current => !(current ?? !server.unsubscribed))
+        setDraft((current) => !(current ?? !server.unsubscribed))
     }
 
     const save = async () => {
@@ -65,7 +64,9 @@ export const useNotifyPreferences = () => {
         setSaveRefused(false)
         try {
             await unsubscribeFromEmail(token)
-            void preferencesQuery.mutate(current => (current === undefined ? current : { ...current, unsubscribed: true }))
+            void preferencesQuery.mutate((current) =>
+                current === undefined ? current : { ...current, unsubscribed: true },
+            )
             setDraft(null)
         } catch {
             setSaveRefused(true)

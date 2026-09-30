@@ -5,7 +5,7 @@
  */
 const STORAGE_KEY = "todo-app.session-token"
 
-type Listener = () => void;
+type Listener = () => void
 
 const LISTENERS = new Set<Listener>()
 

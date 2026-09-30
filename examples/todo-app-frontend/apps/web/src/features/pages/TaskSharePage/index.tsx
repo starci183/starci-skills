@@ -1,13 +1,9 @@
-"use client"
-
-import { useParams } from "next/navigation"
 import { TaskSharePageBase } from "./component"
 
-/**
- * The share route's connected entry and client boundary: it reads the task the `[taskId]` segment
- * names and hands it down. The segment always resolves - it exists because the route matched.
- */
-export const TaskSharePage = () => {
-    const { taskId } = useParams<{ readonly taskId: string }>()
-    return <TaskSharePageBase taskId={taskId} />
-}
+/** The public props of the share route: the task the `[taskId]` segment names. */
+type TaskSharePageProps = { readonly taskId: string }
+
+/** The share route's connected half: it hands the task the segment names down to the screen. */
+export const TaskSharePage = (props: TaskSharePageProps) => (
+    <TaskSharePageBase state="ready" props={{ taskId: props.taskId }} on={{}} />
+)

@@ -1,0 +1,6 @@
+mutation Unsubscribe($input: UnsubscribeInput!) {
+    unsubscribe(request: $input) {
+        channel
+        unsubscribed
+    }
+}

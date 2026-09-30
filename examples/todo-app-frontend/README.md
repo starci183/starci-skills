@@ -27,8 +27,9 @@ Next.js, React, TypeScript, npm workspaces; UI primitives come from
 
 ## Development
 
-Run `npm ci`, `node ../../packages/fe-kit/scripts/link-peers.mjs todo-app-frontend`, then
-`npm run typecheck`, `npm run lint` and `npm run build`.
+Run `npm ci`, then `npm run typecheck`, `npm run lint:check` and `npm run build`. The GraphQL documents are
+`.graphql` files next to the module that sends them; `npm run codegen` (run before build, typecheck and lint)
+turns them into the ignored `apps/web/src/modules/api/__generated__/documents.ts` the transport client reads.
 
 The app reads one environment variable, `NEXT_PUBLIC_API_GRAPHQL_URL` (the backend's GraphQL endpoint), only through
 `apps/web/src/modules/config`. It has no default: `next dev` and `next start` need it set.
@@ -37,13 +38,8 @@ The app reads one environment variable, `NEXT_PUBLIC_API_GRAPHQL_URL` (the backe
 
 ```sh
 npm ci
-node ../../packages/fe-kit/scripts/link-peers.mjs todo-app-frontend
-npm run typecheck && npm run lint && npm run build
+npm run typecheck && npm run lint:check && npm run hfs:check && npm run build
 ```
 
-The second line is what makes the first useful: `packages/fe-kit` is consumed as source through the
-`@fe-kit/*` path alias, and bare imports resolve by walking up from the kit's own directory, where no
-consumer's `node_modules` sits. The script junctions this app's installed `react`, `next`, `next-intl`,
-`@starci/grammar` and their types into the kit so `tsc`, `eslint` and `next build` see exactly
-one copy of each. `.github/workflows/ci.yml` runs the same line.
-
+The theme, the locale-aware navigation and the next-intl stack live in the app itself (`modules/theme`,
+`hooks/theme`, `hooks/navigation`, `modules/i18n`); there is no shared kit package.

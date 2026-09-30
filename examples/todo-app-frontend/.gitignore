@@ -1,9 +1,10 @@
+# >>> hfs sync (managed block; do not edit) >>>
 # Build output and tool output the tools need in place.
 node_modules/
 dist/
 coverage/
+reports/
 test-results/
-playwright-report/
 *.tsbuildinfo
 .scannerwork/
 .turbo/
@@ -33,3 +34,4 @@ nul
 .starci/
 .next/
 next-env.d.ts
+# <<< hfs sync <<<

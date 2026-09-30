@@ -4,9 +4,13 @@
   "private": true,
   "type": "module",
   "scripts": {
+    "codegen": "node ../../scripts/codegen-documents.mjs",
+    "predev": "npm run codegen",
     "dev": "next dev",
+    "prebuild": "npm run codegen",
     "build": "next build",
     "start": "next start",
+    "pretypecheck": "npm run codegen",
     "typecheck": "tsc --noEmit --pretty false"
   },
   "dependencies": {
@@ -17,6 +21,7 @@
     "next-intl": "4.13.6",
     "react": "19.2.3",
     "react-dom": "19.2.3",
+    "server-only": "^0.0.1",
     "swr": "^2.2.5"
   }
 }

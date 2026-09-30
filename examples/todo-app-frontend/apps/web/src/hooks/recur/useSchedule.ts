@@ -1,12 +1,14 @@
-import { useEffect, useState } from "react"
+import { useState } from "react"
 import { useTranslations } from "next-intl"
 import { useSessionToken } from "@/hooks/auth"
+import { todayInZone } from "@/modules/i18n"
 import { endRecurrence, makeRecurring, readUpcomingOccurrences } from "@/modules/recur"
-import type { RecurFrequency, RecurRule, ScheduleRefusal, UpcomingOccurrences } from "@/modules/types"
-import { todayInZone, validateDraft, WIRE_FREQUENCY } from "./recur.shared"
+import type { RecurRule, ScheduleRefusal, UpcomingOccurrences } from "@/modules/types"
+import { validateDraft, WIRE_FREQUENCY } from "./recur.shared"
+import { useScheduleDraft } from "./useScheduleDraft"
 
 /**
- * ui.recur.schedule's world state: the make-recurring draft as intrinsic form state, the field
+ * ui.recur.schedule's world state: the make-recurring draft (`useScheduleDraft`), the field
  * validation the record's refused state names, and the created rule's lifecycle through the recur
  * capability's named calls (makeRecurring / upcomingOccurrences / endRecurrence).
  *
@@ -18,12 +20,7 @@ import { todayInZone, validateDraft, WIRE_FREQUENCY } from "./recur.shared"
 export const useSchedule = (taskTitle: string | null) => {
     const t = useTranslations("recur")
     const token = useSessionToken()
-    const [frequency, setFrequency] = useState<RecurFrequency>("every-weekday")
-    const [n, setN] = useState("")
-    const [dayOfMonth, setDayOfMonth] = useState("")
-    const [time, setTime] = useState("09:00")
-    const [timeZone, setTimeZone] = useState("")
-    const [startDate, setStartDate] = useState("")
+    const form = useScheduleDraft()
     const [rule, setRule] = useState<RecurRule | null>(null)
     const [upcoming, setUpcoming] = useState<UpcomingOccurrences | null>(null)
     const [refusal, setRefusal] = useState<ScheduleRefusal | null>(null)
@@ -31,30 +28,20 @@ export const useSchedule = (taskTitle: string | null) => {
     const [isConfirmingEnd, setIsConfirmingEnd] = useState(false)
     const [isEnding, setIsEnding] = useState(false)
 
-    // fr.recur.make-recurring: time zone and start date default to the owner's own. Resolved after
-    // mount rather than in initial state so the server render and the client's first render agree.
-    useEffect(() => {
-        const zone = Intl.DateTimeFormat().resolvedOptions().timeZone
-        setTimeZone(current => (current === "" ? zone : current))
-        setStartDate(current => (current === "" ? todayInZone(zone) : current))
-    }, [])
-
     const refreshUpcoming = async (ruleId: string): Promise<void> => {
-        const result = await readUpcomingOccurrences(token, ruleId)
-        setUpcoming(result.ok ? result.data : { materialised: [], previewDates: [] })
+        const outcome = await readUpcomingOccurrences(token, ruleId)
+        setUpcoming(outcome.kind === "ok" ? outcome.data : { materialised: [], previewDates: [] })
     }
 
     const submit = async (): Promise<void> => {
-        const draftRefusal = validateDraft(
-            { frequency, n, dayOfMonth, time, timeZone, startDate },
-            {
-                n: t("refusalN"),
-                dayOfMonth: t("refusalDayOfMonth"),
-                time: t("refusalTime"),
-                timeZone: t("refusalTimeZone"),
-                startDate: t("refusalStartDate"),
-            },
-        )
+        const draft = form.draft
+        const draftRefusal = validateDraft(draft, {
+            n: t("refusalN"),
+            dayOfMonth: t("refusalDayOfMonth"),
+            time: t("refusalTime"),
+            timeZone: t("refusalTimeZone"),
+            startDate: t("refusalStartDate"),
+        })
         if (draftRefusal !== null) {
             setRefusal(draftRefusal)
             return
@@ -65,53 +52,65 @@ export const useSchedule = (taskTitle: string | null) => {
         }
         setIsSaving(true)
         setRefusal(null)
-        const result = await makeRecurring(token, {
+        const outcome = await makeRecurring(token, {
             title: taskTitle,
-            frequency: WIRE_FREQUENCY[frequency],
-            ...(frequency === "every-n-days" ? { n: Number.parseInt(n, 10) } : {}),
-            ...(frequency === "monthly-day" ? { dayOfMonth: Number.parseInt(dayOfMonth, 10) } : {}),
-            timeZone,
-            time,
-            startDate,
+            frequency: WIRE_FREQUENCY[draft.frequency],
+            ...(draft.frequency === "every-n-days" ? { n: Number.parseInt(draft.n, 10) } : {}),
+            ...(draft.frequency === "monthly-day" ? { dayOfMonth: Number.parseInt(draft.dayOfMonth, 10) } : {}),
+            timeZone: draft.timeZone,
+            time: draft.time,
+            startDate: draft.startDate,
         })
-        if (!result.ok) {
+        if (outcome.kind !== "ok") {
             setIsSaving(false)
-            setRefusal({ field: "form", message: result.reason })
+            setRefusal({ field: "form", message: t("refusalServer") })
             return
         }
         setRule({
-            ruleId: result.data.ruleId,
-            title: result.data.title,
-            frequency,
-            n: frequency === "every-n-days" ? Number.parseInt(n, 10) : null,
-            dayOfMonth: frequency === "monthly-day" ? Number.parseInt(dayOfMonth, 10) : null,
-            time: result.data.time,
-            timeZone: result.data.timeZone,
-            startDate: result.data.startDate,
+            ruleId: outcome.data.ruleId,
+            title: outcome.data.title,
+            frequency: draft.frequency,
+            n: draft.frequency === "every-n-days" ? Number.parseInt(draft.n, 10) : null,
+            dayOfMonth: draft.frequency === "monthly-day" ? Number.parseInt(draft.dayOfMonth, 10) : null,
+            time: outcome.data.time,
+            timeZone: outcome.data.timeZone,
+            startDate: outcome.data.startDate,
             endedAt: null,
         })
         setIsSaving(false)
-        await refreshUpcoming(result.data.ruleId)
+        await refreshUpcoming(outcome.data.ruleId)
     }
 
     const confirmEndRule = async (): Promise<void> => {
         if (rule === null) return
         setIsEnding(true)
-        const result = await endRecurrence(token, rule.ruleId, todayInZone(rule.timeZone))
+        const outcome = await endRecurrence(token, rule.ruleId, todayInZone(rule.timeZone))
         setIsEnding(false)
-        if (!result.ok) {
-            setRefusal({ field: "form", message: result.reason })
+        if (outcome.kind !== "ok") {
+            setRefusal({ field: "form", message: t("refusalServer") })
             return
         }
-        setRule({ ...rule, endedAt: result.data.endedAt })
+        setRule({ ...rule, endedAt: outcome.data.endedAt })
         setIsConfirmingEnd(false)
         await refreshUpcoming(rule.ruleId)
     }
 
     return {
-        frequency, n, dayOfMonth, time, timeZone, startDate,
-        setFrequency, setN, setDayOfMonth, setTime, setTimeZone, setStartDate,
-        rule, upcoming, refusal, isSaving, isConfirmingEnd, isEnding, setIsConfirmingEnd,
-        submit, confirmEndRule,
+        ...form.draft,
+        setFrequency: form.setFrequency,
+        setN: form.setN,
+        setDayOfMonth: form.setDayOfMonth,
+        setTime: form.setTime,
+        setTimeZone: form.setTimeZone,
+        setStartDate: form.setStartDate,
+        rule,
+        upcoming,
+        refusal,
+        isSaving,
+        isConfirmingEnd,
+        isEnding,
+        setIsConfirmingEnd,
+        submit,
+        confirmEndRule,
     }
 }

@@ -1,12 +1,11 @@
 /**
- * The one result vocabulary of the transport: a call either has its payload or says why it has none.
- * A refusal never throws from here; the adapters that want an exception turn it into one at their own seam.
+ * The one result every read of the backend returns: a status is a kind, never a thrown error and
+ * never `null`. `code` is the backend's stable domain code when it sent one; the words a reader sees
+ * are the dictionary's, never the server's text.
  */
-export type Result<T> = {
-  readonly ok: true;
-  readonly data: T;
-} | {
-  readonly ok: false;
-  readonly reason: string;
-  readonly code?: string;
-};
+export type Outcome<T> =
+    | { readonly kind: "ok"; readonly data: T }
+    | { readonly kind: "refused"; readonly code?: string }
+    | { readonly kind: "invalid"; readonly code?: string }
+    | { readonly kind: "not-found" }
+    | { readonly kind: "unavailable" }

@@ -1,14 +1,14 @@
-import { GrammarRoot } from "@starci/grammar/common"
-import { RecurWorkspace } from "@/components/blocks/recur"
+import { RecurBlock } from "@/components/blocks/recur"
 
-/** The data the schedule screen wants from the route: the task title the query bound. */
-type RecurPageBaseProps = {
-    readonly taskTitle: string | null
+/** Props for {@link RecurPageBase}. */
+export type RecurPageBaseProps = {
+    /** Whole-screen situations this surface settles; the block owns the schedule lifecycle. */
+    readonly state: "ready"
+    /** The data the schedule screen wants from the route: the task title the query bound. */
+    readonly props: { readonly taskTitle: string | null }
+    /** What the surface reports upward; the screen reports nothing. */
+    readonly on: Record<never, never>
 }
 
-/** Draw the recur schedule screen inside Grammar's Common root; the workspace owns the rest. */
-export const RecurPageBase = (props: RecurPageBaseProps) => (
-    <GrammarRoot>
-        <RecurWorkspace taskTitle={props.taskTitle} />
-    </GrammarRoot>
-)
+/** Draw the recur schedule screen; the block owns the rest. */
+export const RecurPageBase = (props: RecurPageBaseProps) => <RecurBlock taskTitle={props.props.taskTitle} />
