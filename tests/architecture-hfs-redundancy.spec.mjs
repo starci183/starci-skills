@@ -10,8 +10,8 @@ const paths = (report, ruleId) => findings(report, ruleId).map(item => item.path
 const names = (report, ruleId) => findings(report, ruleId).map(item => item.name).sort();
 
 const composed = {
-  'apps/core/src/app.module.ts': "import { a } from '../../../src/features/a';\nexport const AppModule = a;\n",
-  'src/features/a/index.ts': "import { used } from '../../modules/domain/x';\nexport const a = used;\n",
+  'apps/core/src/app.module.ts': "import { a } from '../../../src/features/a';\nexport const AppModule = [a];\n",
+  'src/features/a/index.ts': "import { used } from '../../modules/domain/x';\nexport const a = [used];\n",
 };
 
 // ---- HFS_UNUSED_EXPORT on the backend owner entries (R25 a) -------------------------------------------------------
@@ -20,7 +20,7 @@ test('R25: a backend feature and a backend domain entry both report an export no
   const root = archFixture(t, {
     files: {
       'apps/core/src/app.module.ts': "import { a, b } from '../../../src/features/a';\nexport const AppModule = [a, b];\n",
-      'src/features/a/index.ts': "import { used } from '../../modules/domain/x';\nexport const a = used;\nexport const b = 1;\nexport const dead = 2;\n",
+      'src/features/a/index.ts': "import { used } from '../../modules/domain/x';\nexport const a = [used];\nexport const b = 1;\nexport const dead = 2;\n",
       'src/modules/domain/x/index.ts': 'export const used = 1;\nexport const unused = 2;\n',
     },
   });
@@ -32,8 +32,8 @@ test('R25: a backend feature and a backend domain entry both report an export no
 test('R25: a backend tree whose exports are all used reports no dead export', t => {
   const root = archFixture(t, {
     files: {
-      'apps/core/src/app.module.ts': "import { a } from '../../../src/features/a';\nexport const AppModule = a;\n",
-      'src/features/a/index.ts': "import { used } from '../../modules/domain/x';\nexport const a = used;\n",
+      'apps/core/src/app.module.ts': "import { a } from '../../../src/features/a';\nexport const AppModule = [a];\n",
+      'src/features/a/index.ts': "import { used } from '../../modules/domain/x';\nexport const a = [used];\n",
       'src/modules/domain/x/index.ts': 'export const used = 1;\n',
     },
   });
@@ -233,4 +233,74 @@ test('R30 FE: an alias re-export is refused in the frontend profile too', t => {
     },
   });
   assert.deepEqual(names(runArch(root), 'HFS_ALIAS_REEXPORT'), ['setting']);
+});
+
+test('R30: an exported const, type or interface that only renames another declaration of the repository is HFS_ALIAS_REEXPORT', t => {
+  const root = archFixture(t, {
+    files: {
+      ...composed,
+      'src/modules/domain/x/index.ts': "export { used } from './used';\nexport { Original, Mode, helper, Options, Shape, Config } from './original';\nexport { Renamed, Moved, Bound, Optioned, Shaped, ConfigAlias, Ns } from './aliases';\n",
+      'src/modules/domain/x/used.ts': 'export const used = 1;\n',
+      'src/modules/domain/x/original.ts': [
+        'export class Original {}',
+        'export enum Mode { On }',
+        'export function helper(): number { return 1; }',
+        'export interface Options { flag: boolean }',
+        'export type Shape = { width: number };',
+        'export const Config = { url: "u" };',
+        '',
+      ].join('\n'),
+      'src/modules/domain/x/aliases.ts': [
+        "import { Original, Mode, helper, Options, Shape, Config } from './original';",
+        "import * as original from './original';",
+        'export const Renamed = Original;',
+        'export const Moved = helper;',
+        'export const Bound = original.helper;',
+        'export type Optioned = Options;',
+        'export interface Shaped extends Shape {}',
+        'export const ConfigAlias = Config;',
+        'export const Ns = Mode;',
+        '',
+      ].join('\n'),
+    },
+  });
+  const report = runArch(root);
+  const hits = findings(report, 'HFS_ALIAS_REEXPORT');
+  assert.deepEqual(hits.map(item => `${item.name}=${item.aliasOf}`).sort(), ['Bound=helper', 'ConfigAlias=Config', 'Moved=helper', 'Ns=Mode', 'Optioned=Options', 'Renamed=Original', 'Shaped=Shape']);
+  assert.ok(hits.every(item => item.path === 'src/modules/domain/x/aliases.ts' && item.line > 0));
+});
+
+test('R30: a const with a real initializer, a member that is data, a generic or bodied type and a package type are not aliases', t => {
+  const root = archFixture(t, {
+    files: {
+      ...composed,
+      'src/modules/domain/x/index.ts': "export { used } from './used';\nexport { Base, Settings, limit } from './base';\nexport { Limit, Extended, Boxed, Wrapped, Packaged, Copy } from './fine';\n",
+      'src/modules/domain/x/used.ts': 'export const used = 1;\n',
+      'src/modules/domain/x/base.ts': 'export interface Base { id: string }\nexport const Settings = { limit: 3 };\nexport const limit = 4;\n',
+      'src/modules/domain/x/fine.ts': [
+        "import { Base, Settings, limit } from './base';",
+        "import type { Thing } from 'some-package';",
+        'export const Limit = Settings.limit;',
+        'export interface Extended extends Base { name: string }',
+        'export type Boxed<T> = Array<T>;',
+        'export type Wrapped = Base[];',
+        'export type Packaged = Thing;',
+        'export const Copy = limit + 1;',
+        '',
+      ].join('\n'),
+    },
+  });
+  assert.deepEqual(findings(runArch(root), 'HFS_ALIAS_REEXPORT'), []);
+});
+
+test('R30 FE: an exported const or type renaming another repository declaration is refused in the frontend profile too', t => {
+  const root = archFixture(t, {
+    profile: 'fe',
+    files: {
+      'apps/web/src/modules/config/index.ts': "export { value, Shape, Renamed, Label } from './config';\n",
+      'apps/web/src/modules/config/value.ts': 'export const value = 1;\nexport interface Shape { width: number }\n',
+      'apps/web/src/modules/config/config.ts': "import { value, Shape } from './value';\nexport { value, Shape };\nexport const Renamed = value;\nexport type Label = Shape;\n",
+    },
+  });
+  assert.deepEqual(names(runArch(root), 'HFS_ALIAS_REEXPORT'), ['Label', 'Renamed']);
 });

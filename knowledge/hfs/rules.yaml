@@ -319,7 +319,7 @@ rules:
   - id: R30
     code: "BE_PUBLIC_SURFACE"
     title_vi: "Import sâu qua cổng công khai"
-    law: "Every owner has one `index.ts`; cross-owner imports use it, same-owner imports are relative and never go through it; it holds only named `export { }` lines, no `export *`, no alias re-export, at most 60 exports; cross-package imports use the package name and a declared export."
+    law: "Every owner has one `index.ts`; cross-owner imports use it, same-owner imports are relative and never go through it; it holds only named `export { }` lines, no `export *`, no alias re-export (`export { X as Y }`, `export const Y = X`, `export type Y = X`, `export interface Y extends X {}`: one declaration has one name), at most 60 exports; cross-package imports use the package name and a declared export."
     kinds: [check, lint, codemod]
     gates: [pre-push, settle, land, ci]
     failureCodes: ["BE_PUBLIC_SURFACE", "ARCH_OWNER_EXPORT_BYPASS", "ARCH_OWNER_EXPORT_STAR", "HFS_ALIAS_REEXPORT", "ARCH_PACKAGE_EXPORT_BYPASS"]

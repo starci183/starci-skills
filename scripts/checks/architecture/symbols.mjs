@@ -4,8 +4,11 @@
  *                         production file of the repository also declares and exports (function, class, const, enum,
  *                         type, interface). Two `InjectPrimaryEntityManager` declarations were this. A re-export of one
  *                         declaration is not a second declaration. There is no allowlist of names.
- *   HFS_ALIAS_REEXPORT    `export { X as Y }`, `export { default as Y }` and `export * as ns` in production source: a
- *                         second name for one declaration. Rename the declaration, or import it by its name.
+ *   HFS_ALIAS_REEXPORT    `export { X as Y }`, `export { default as Y }` and `export * as ns` in production source, and an
+ *                         exported `const Y = X` / `const Y = X.y` (a bare identifier or member that resolves to a function,
+ *                         class, const or enum of the repository), `type Y = X` and `interface Y extends X {}` (no body, no
+ *                         type arguments, no type parameters): a second name for one declaration. Rename the declaration,
+ *                         or import it by its name.
  * Specs and tests are not in the graph. The public entry of an owner is found the way dead-exports.mjs finds it.
  */
 import { canonical } from './config.mjs';
@@ -99,12 +102,63 @@ function duplicateSymbols({ context, graph, config }) {
   return { violations, surface };
 }
 
+const isExported = (ts, statement) => (statement.modifiers ?? []).some(modifier => modifier.kind === ts.SyntaxKind.ExportKeyword)
+  && !(statement.modifiers ?? []).some(modifier => modifier.kind === ts.SyntaxKind.DefaultKeyword);
+
+/** The declaration `node` (an identifier, a member or a qualified name) resolves to when a repository file declares it as one of `kinds`, else null. */
+function repositoryDeclaration(ts, checker, graph, node, kinds) {
+  const target = ts.isPropertyAccessExpression(node) ? node.name : ts.isQualifiedName(node) ? node.right : node;
+  const symbol = checker?.getSymbolAtLocation(target);
+  if (!symbol) return null;
+  const resolved = symbol.flags & ts.SymbolFlags.Alias ? checker.getAliasedSymbol(symbol) : symbol;
+  const home = (resolved?.declarations ?? []).find(declaration => kinds.includes(declaration.kind) && graph.abs(canonical(declaration.getSourceFile().fileName)));
+  return home ? resolved.getName() : null;
+}
+
+/**
+ * The exported declarations of one top-level statement that only rename another declaration of the repository:
+ * `export const Y = X` and `export const Y = X.y` (X or y a function, class, const or enum), `export type Y = X` and
+ * `export interface Y extends X {}` with no body, no type arguments and no type parameters.
+ */
+function declarationAliases(ts, checker, graph, statement) {
+  const kind = ts.SyntaxKind;
+  if (!checker || !isExported(ts, statement)) return [];
+  const bare = expression => ts.isIdentifier(expression) || (ts.isPropertyAccessExpression(expression) && ts.isIdentifier(expression.name) && (ts.isIdentifier(expression.expression) || ts.isPropertyAccessExpression(expression.expression)));
+  const found = [];
+  if (statement.kind === kind.VariableStatement) {
+    for (const declaration of statement.declarationList.declarations) {
+      if (!ts.isIdentifier(declaration.name) || !declaration.initializer || !bare(declaration.initializer)) continue;
+      const of = repositoryDeclaration(ts, checker, graph, declaration.initializer, [kind.FunctionDeclaration, kind.ClassDeclaration, kind.VariableDeclaration, kind.EnumDeclaration]);
+      if (of && of !== declaration.name.text) found.push({ node: declaration, name: declaration.name.text, of, form: `export const ${declaration.name.text} = ${declaration.initializer.getText()}` });
+    }
+  } else if (statement.kind === kind.TypeAliasDeclaration && !statement.typeParameters?.length && ts.isTypeReferenceNode(statement.type) && !statement.type.typeArguments?.length) {
+    const of = repositoryDeclaration(ts, checker, graph, statement.type.typeName, [kind.InterfaceDeclaration, kind.TypeAliasDeclaration, kind.ClassDeclaration, kind.EnumDeclaration]);
+    if (of && of !== statement.name.text) found.push({ node: statement, name: statement.name.text, of, form: `export type ${statement.name.text} = ${statement.type.getText()}` });
+  } else if (statement.kind === kind.InterfaceDeclaration && !statement.members.length && !statement.typeParameters?.length) {
+    const heritage = (statement.heritageClauses ?? []).flatMap(clause => clause.types);
+    const [only] = heritage;
+    if (heritage.length === 1 && !only.typeArguments?.length && bare(only.expression)) {
+      const of = repositoryDeclaration(ts, checker, graph, only.expression, [kind.InterfaceDeclaration, kind.TypeAliasDeclaration, kind.ClassDeclaration]);
+      if (of && of !== statement.name.text) found.push({ node: statement, name: statement.name.text, of, form: `export interface ${statement.name.text} extends ${only.expression.getText()} {}` });
+    }
+  }
+  return found;
+}
+
 function aliasReexports({ context, graph }) {
   const kind = context.ts.SyntaxKind;
   const violations = [];
   for (const [rel, node] of graph.files) {
     const point = target => node.sourceFile.getLineAndCharacterOfPosition(target.getStart(node.sourceFile));
+    const checker = context.checkerFor(node.abs);
     for (const statement of node.sourceFile.statements) {
+      for (const alias of declarationAliases(context.ts, checker, graph, statement)) {
+        const at = point(alias.node);
+        violations.push({
+          ruleId: 'HFS_ALIAS_REEXPORT', path: rel, line: at.line + 1, column: at.character + 1, name: alias.name, aliasOf: alias.of,
+          message: `${alias.form} in ${rel} gives the declaration ${alias.of} a second name: use ${alias.of} where ${alias.name} is used and delete ${alias.name}.`,
+        });
+      }
       if (statement.kind !== kind.ExportDeclaration || !statement.exportClause) continue;
       const clause = statement.exportClause;
       if (clause.kind === kind.NamespaceExport) {

@@ -853,7 +853,7 @@ FE_WORLD_OWNER_RENDER_BOUNDARY:
 HFS_ALIAS_REEXPORT:
   title: "A declaration re-exported under a second name"
   title_vi: "Xuất lại một khai báo dưới tên thứ hai"
-  meaning_vi: "Mã sản xuất dùng `export { X as Y }`, `export { default as Y }` hoặc `export * as ns`: một khai báo có hai tên, nên người đọc và công cụ tìm kiếm phải đoán hai tên là một. Luật áp cho cả backend lẫn frontend."
+  meaning_vi: "Mã sản xuất dùng `export { X as Y }`, `export { default as Y }`, `export * as ns`, hoặc khai báo xuất `const Y = X`, `type Y = X`, `interface Y extends X {}` chỉ để đặt tên thứ hai cho một khai báo khác của repo: một khai báo có hai tên, nên người đọc và công cụ tìm kiếm phải đoán hai tên là một. Luật áp cho cả backend lẫn frontend."
   causes_vi:
     - "Cửa vào của owner đổi tên một khai báo để tránh trùng tên với khai báo cùng tên ở owner khác"
     - "Đổi tên tạm để giữ tên cũ cho nơi dùng cũ"
