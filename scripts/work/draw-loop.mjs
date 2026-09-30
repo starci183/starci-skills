@@ -519,6 +519,64 @@ export async function runComponentRound(o) {
   return { out, loop, round, metrics, critique, stop: loop.stop };
 }
 
+// What finish installs is a Work file the product commits, so its JSON (the draw-render record, the ui-proof score, the
+// rationale, the fixture) never cites the loop's scratch: the loop dir, STARCI_JOB_SCRATCH, an OS-temp render harness.
+// Such a path is gone once the op files its report, and the job scratch's 64-hex name is a "long hex blob" to the
+// product's commit guard (secrets-guard.mjs), which refuses the commit. A scratch path becomes the installed file it
+// was copied to (relative to the JSON's own directory), else a member of the loop bundle `draw-loop:<path in the loop>`
+// (generation.loop cites the bundle's sha256), else `scratch:<path in STARCI_JOB_SCRATCH>`, else (a temp path that is
+// gone) `temp:<file name>`.
+export const LOOP_REF = 'draw-loop:';
+export const SCRATCH_REF = 'scratch:';
+export const TEMP_REF = 'temp:';
+const WIN = process.platform === 'win32';
+const pathKey = (p) => { const r = path.resolve(p); return WIN ? r.toLowerCase() : r; };
+const within = (root, p) => { const rel = path.relative(root, p); return rel === '' || (!rel.startsWith('..') && !path.isAbsolute(rel)); };
+const withReal = (d) => { const out = [path.resolve(d)]; try { out.push(fs.realpathSync.native(d)); } catch { /* missing */ } return out; };
+const reEscape = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+/** The scratch roots of a loop (the loop dir, STARCI_JOB_SCRATCH, the OS temp dirs), with a mapper of a path under them. */
+export function scratchRewriter({ out, env = process.env, installed = new Map() }) {
+  const loopRoots = withReal(out);
+  const jobRoots = env.STARCI_JOB_SCRATCH ? withReal(env.STARCI_JOB_SCRATCH) : [];
+  const roots = [...new Set([...loopRoots, ...jobRoots, ...[os.tmpdir(), env.TEMP, env.TMP].filter(Boolean).flatMap(withReal)])]
+    .filter((d) => path.parse(d).root !== d).sort((a, b) => b.length - a.length);
+  // Each root as written with either separator, optionally as a file URL; the tail runs to the first quote or space.
+  const forms = [...new Set(roots.flatMap((r) => [r, r.replace(/\\/g, '/'), r.replace(/\//g, '\\')]))].sort((a, b) => b.length - a.length);
+  const re = forms.length ? new RegExp(`(file:\\/\\/\\/?)?(?:${forms.map(reEscape).join('|')})(?:[\\\\/][^\\s"'<>|*?]*)?(?![^\\\\/\\s"'<>|*?])`, WIN ? 'gi' : 'g') : null;
+  const map = (abs) => {
+    const hit = installed.get(pathKey(abs));
+    if (hit) return hit;
+    const inRoot = (list) => list.find((r) => within(r, abs));
+    const loopRoot = inRoot(loopRoots);
+    if (loopRoot) return `${LOOP_REF}${slash(path.relative(loopRoot, abs)) || '.'}`;
+    const jobRoot = inRoot(jobRoots);
+    if (jobRoot) return `${SCRATCH_REF}${slash(path.relative(jobRoot, abs)) || '.'}`;
+    // Elsewhere under the OS temp dir only a path that is gone (a render harness) is scratch: a live one (a product
+    // checkout there) stays, because the settle re-measure reads it (verifyRecordParts: source.product, css).
+    return fs.existsSync(abs) ? null : `${TEMP_REF}${path.basename(abs)}`;
+  };
+  const text = (s) => (re ? s.replace(re, (m, url) => {
+    let p = m;
+    if (url) { try { p = fileURLToPath(m); } catch { p = decodeURIComponent(m.slice(url.length)); } }
+    return map(p) ?? m;
+  }) : s);
+  const value = (v) => (typeof v === 'string' ? text(v) : Array.isArray(v) ? v.map(value)
+    : v && typeof v === 'object' ? Object.fromEntries(Object.entries(v).map(([k, x]) => [k, value(x)])) : v);
+  return { roots, map, text, value };
+}
+
+/**
+ * Install one loop JSON at `to` with every scratch path rewritten (scratchRewriter): an installed sibling becomes its
+ * path relative to `to`'s directory. A file that is not JSON is copied as is.
+ */
+function installJson(from, to, { out, installed }) {
+  let doc;
+  try { doc = JSON.parse(fs.readFileSync(from, 'utf8')); } catch { fs.copyFileSync(from, to); return; }
+  const rel = new Map([...installed].map(([k, abs]) => [k, slash(path.relative(path.dirname(to), abs))]));
+  writeJson(to, scratchRewriter({ out, installed: rel }).value(doc));
+}
+
 /**
  * Finish a stopped loop: pick the best round, install its parts and report the outcome. Returns {outcome: passed|
  * blocked, best, remaining, installed, assets}.
@@ -544,21 +602,29 @@ export function finishLoop({ out, parts = null, prompt = null, repo = null, sett
   for (const p of best.parts) {
     const from = path.join(roundDir, `${p.part}.png`);
     const to = path.join(partsDir, `${p.part}.png`);
-    fs.copyFileSync(from, to);
-    for (const ext of ['.json', '.score.json']) { const f = path.join(roundDir, `${p.part}${ext}`); if (isFile(f)) fs.copyFileSync(f, path.join(partsDir, `${p.part}${ext}`)); }
-    // The decision evidence travels with the part: <part>.rationale.json and the annotated <part>.redline.png.
-    const why = path.join(roundDir, 'rationale.json'), red = path.join(roundDir, `${p.part}.redline.png`);
-    if (isFile(why)) fs.copyFileSync(why, path.join(partsDir, `${p.part}.rationale.json`));
-    if (isFile(red)) fs.copyFileSync(red, path.join(partsDir, `${p.part}.redline.png`));
+    const component = isFile(path.join(roundDir, 'source.tsx'));
+    const tsx = path.join(partsDir, `${p.part}.draw.tsx`), fx = path.join(partsDir, `${p.part}.fixture.json`);
+    const perWidth = path.join(roundDir, `fixture.${p.width}.json`);
+    // Every file of the round this part installs, [from, to, json]: the JSON ones are installed through
+    // installJson, so a scratch path they cite becomes the installed sibling it names (or a loop-bundle member).
+    // The decision evidence travels with the part: <part>.rationale.json and the annotated <part>.redline.png. A
+    // real-component drawing: the accepted draw source (<part>.draw.tsx) and its fixture are what interface.implement
+    // starts the XBase from; the rendered DOM rides along for the html-reading checks.
+    const copies = [[from, to], ...['.json', '.score.json'].map((ext) => [path.join(roundDir, `${p.part}${ext}`), path.join(partsDir, `${p.part}${ext}`), true]),
+      [path.join(roundDir, 'rationale.json'), path.join(partsDir, `${p.part}.rationale.json`), true], [path.join(roundDir, `${p.part}.redline.png`), path.join(partsDir, `${p.part}.redline.png`)],
+      ...(component ? [[path.join(roundDir, 'source.tsx'), tsx], [isFile(perWidth) ? perWidth : path.join(roundDir, 'fixture.json'), fx, true],
+        [path.join(roundDir, `${p.part}.dom.html`), path.join(partsDir, `${p.part}.dom.html`)]] : [[path.join(roundDir, 'source.html'), path.join(partsDir, `${p.part}.html`)]])].filter(([f]) => isFile(f));
+    const installedAs = new Map(copies.map(([f, t]) => [pathKey(f), t]));
+    // The files the round was measured from, as the render record cites them: the draw source and its rationale.
+    installedAs.set(pathKey(source), component ? tsx : path.join(partsDir, `${p.part}.html`));
+    const sourceWhy = component ? rationaleFileFor(source) : rationaleFileOf(source);
+    if (sourceWhy && isFile(path.join(roundDir, 'rationale.json'))) installedAs.set(pathKey(sourceWhy), path.join(partsDir, `${p.part}.rationale.json`));
+    for (const [f, t, json] of copies) {
+      if (json) installJson(f, t, { out, installed: installedAs });
+      else fs.copyFileSync(f, t);
+    }
     const sha = sha256File(to);
-    if (isFile(path.join(roundDir, 'source.tsx'))) {
-      // A real-component drawing: the accepted draw source (<part>.draw.tsx) and its fixture are what
-      // interface.implement starts the XBase from; the rendered DOM rides along for the html-reading checks.
-      const tsx = path.join(partsDir, `${p.part}.draw.tsx`), fx = path.join(partsDir, `${p.part}.fixture.json`);
-      fs.copyFileSync(path.join(roundDir, 'source.tsx'), tsx);
-      const perWidth = path.join(roundDir, `fixture.${p.width}.json`);
-      fs.copyFileSync(isFile(perWidth) ? perWidth : path.join(roundDir, 'fixture.json'), fx);
-      for (const f of ['.dom.html']) { const from2 = path.join(roundDir, `${p.part}${f}`); if (isFile(from2)) fs.copyFileSync(from2, path.join(partsDir, `${p.part}${f}`)); }
+    if (component) {
       // The art placeholders the draw source imports (./assets/x.png) travel with it, so the installed source renders.
       for (const m of fs.readFileSync(tsx, 'utf8').matchAll(/from\s+["'](\.{1,2}\/[^"']+\.(?:png|jpe?g|webp|gif|avif))["']/gi)) {
         const from3 = path.resolve(path.dirname(source), m[1]), to3 = path.resolve(partsDir, m[1]);
@@ -579,7 +645,6 @@ export function finishLoop({ out, parts = null, prompt = null, repo = null, sett
       }
       continue;
     }
-    fs.copyFileSync(path.join(roundDir, 'source.html'), path.join(partsDir, `${p.part}.html`));
     installed.push({ path: slash(path.relative(relTo, to)), sha256: sha, html: slash(path.relative(relTo, path.join(partsDir, `${p.part}.html`))) });
     assets.push({ path: slash(path.relative(relTo, to)), role: 'direction-content', breakpoint: breakpointOf(p), theme: 'light', sha256: sha,
       generation: { tool: 'draw-render', promptPath, mode: 'draw-loop', loop: loopRef } });
