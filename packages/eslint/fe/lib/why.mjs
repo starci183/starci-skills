@@ -231,6 +231,11 @@ export const why = {
     vi: "`dangerouslySetInnerHTML` trên `<tag>` ở `<file>`: chuỗi bất kỳ trở thành HTML chạy được.",
     fixVi: "Render nội dung thành phần tử; chỉ `<script>` mang JSON-LD hoặc mã theme từ hằng số của app mới được dùng.",
   },
+  "response-cookie-attributes": {
+    code: "FE_COOKIE_ATTRIBUTES",
+    vi: "`<file>` ghi cookie qua cookie phản hồi của Next mà không nêu `httpOnly` cố định, thiếu `secure` hoặc `sameSite` không phải `lax`/`strict`.",
+    fixVi: "Truyền một hằng số options `as const` của module sở hữu cookie: `httpOnly: true` (chỉ `false` cho cookie tùy chọn script cần đọc), `secure` từ `modules/config`, `sameSite: \"lax\"` hoặc `\"strict\"`.",
+  },
   "no-native-img": {
     code: "FE_NATIVE_IMAGE",
     vi: "`<img>` thô ở `<file>`: tải ảnh gốc, không giữ chỗ nên trang nhảy khi ảnh tải xong.",

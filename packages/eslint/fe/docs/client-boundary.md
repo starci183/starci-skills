@@ -122,3 +122,27 @@ const draft = useTopUpDraft()
 **Why:** `dangerouslySetInnerHTML` on `<tag>` in `<file>`: an arbitrary string becomes executable HTML.
 
 **Fix:** Render content as elements; only a `<script>` carrying JSON-LD or theme code from an app constant may use it.
+
+## `starci-fe/response-cookie-attributes`
+
+A cookie written through Next's response cookies (`response.cookies.set`, `(await cookies()).set`, found by the method's declaring class `ResponseCookies` of `next`, never by a name) states `httpOnly` as a literal, carries `secure` and has `sameSite` `lax` or `strict`. The options are judged by their TYPE, so an `as const` constant and a spread of it (`{ ...SESSION_COOKIE_OPTIONS, maxAge: 0 }`) keep their literals (R107 `FE_COOKIE_ATTRIBUTES`).
+
+**Invalid** (`src/app/api/session/route.ts`)
+
+```ts
+response.cookies.set(SESSION_COOKIE, token)
+response.cookies.set(SESSION_COOKIE, token, { sameSite: "none", secure: true })
+```
+
+**Valid** (`src/app/api/session/route.ts`)
+
+```ts
+export const SESSION_COOKIE_OPTIONS = { httpOnly: true, sameSite: "lax", path: "/", secure: SESSION_COOKIE_SECURE } as const
+response.cookies.set(SESSION_COOKIE, token, SESSION_COOKIE_OPTIONS)
+```
+
+**Finding code:** `FE_COOKIE_ATTRIBUTES`
+
+**Why:** `<file>` writes a cookie without a literal `httpOnly`, without `secure`, or with `sameSite` other than `lax`/`strict`; a session cookie left to the defaults is readable by page script and rides cross-site requests.
+
+**Fix:** Pass one `as const` options constant of the module that owns the cookie: `httpOnly: true` (`false` only for a preference page script reads), `secure` from `modules/config`, `sameSite` `lax` or `strict`.

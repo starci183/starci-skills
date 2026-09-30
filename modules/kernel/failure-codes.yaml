@@ -13418,3 +13418,14 @@ FE_I18N_KEYS:
   nextStep_vi: "Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra: thêm khóa vào mọi catalog của app hoặc đọc khóa có thật; xóa khóa chết khỏi mọi catalog; không thêm ngoại lệ."
   owner: op-retry
   kind: check-finding
+
+FE_COOKIE_ATTRIBUTES:
+  title: "A written cookie leaves its attributes to the defaults"
+  title_vi: "Cookie được ghi mà không nêu rõ thuộc tính"
+  meaning_vi: "Một lời gọi `set` trên cookie phản hồi của Next (`response.cookies.set`, `cookies().set`) ở `<file>` không nêu `httpOnly` bằng một giá trị cố định, thiếu `secure`, hoặc có `sameSite` khác `lax`/`strict`; cookie phiên khi đó đọc được từ script của trang hoặc đi theo request chéo trang."
+  causes_vi:
+    - "Vi phạm luật R107: ghi cookie phiên bằng `set(name, value)` không có options, hoặc options thiếu `httpOnly: true`"
+    - "`sameSite: \"none\"`, `secure: false` hoặc `httpOnly` lấy từ một biến boolean không cố định"
+  nextStep_vi: "Khai báo một hằng số options `as const` trong module sở hữu cookie với `httpOnly: true` (chỉ `false` cho cookie tùy chọn mà script của trang cần đọc), `secure` lấy từ `modules/config` và `sameSite: \"lax\"` hoặc `\"strict\"`, rồi truyền nó vào mọi lần `set`. Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra."
+  owner: op-retry
+  kind: check-finding

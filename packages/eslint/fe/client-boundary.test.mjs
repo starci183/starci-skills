@@ -10,6 +10,7 @@ import {
   clientNoServerImport,
   serverModuleMarksServerOnly,
   noDangerousHtml,
+  responseCookieAttributes,
   rules,
   useClientOnlyAtBoundary,
   webStorageOnlyInModules,
@@ -194,3 +195,41 @@ test("FE-CLIENT-2b: a module that uses the server marks itself server-only", () 
     ],
   })
 })
+
+const cookieTester = typedTester()
+const ROUTE = at("apps/web/src/app/api/session/route.ts")
+const SESSION = [
+  'import { NextResponse } from "next/server"',
+  'import { cookies } from "next/headers"',
+  "declare const secureFlag: boolean",
+  'export const SESSION_OPTIONS = { httpOnly: true, sameSite: "lax", path: "/", secure: secureFlag } as const',
+  "",
+].join("\n")
+
+test("FE-CLIENT-5: a written cookie states httpOnly and is secure and same-site", () => {
+  cookieTester.run("response-cookie-attributes", responseCookieAttributes, {
+    valid: [
+      { filename: ROUTE, code: `${SESSION}const response = NextResponse.json({ ok: true })\nresponse.cookies.set("app-session", "t", SESSION_OPTIONS)` },
+      // clearing keeps the attributes through a spread of the as-const constant
+      { filename: ROUTE, code: `${SESSION}const response = NextResponse.json({ ok: true })\nresponse.cookies.set("app-session", "", { ...SESSION_OPTIONS, maxAge: 0 })` },
+      // the object form, and a server action writing through cookies()
+      { filename: ROUTE, code: `${SESSION}const response = NextResponse.json({ ok: true })\nresponse.cookies.set({ name: "app-session", value: "t", ...SESSION_OPTIONS })` },
+      { filename: ROUTE, code: `${SESSION}export const signOut = async () => { (await cookies()).set("app-session", "", { ...SESSION_OPTIONS, maxAge: 0 }) }` },
+      // a preference page script must read states httpOnly false on purpose
+      { filename: ROUTE, code: `${SESSION}NextResponse.json({ ok: true }).cookies.set("display", "compact", { httpOnly: false, sameSite: "lax", secure: secureFlag, path: "/" })` },
+      // deleting is not writing, and a set on another type is not a cookie write
+      { filename: ROUTE, code: `${SESSION}NextResponse.json({ ok: true }).cookies.delete("app-session")` },
+      { filename: ROUTE, code: `${SESSION}const store = new Map<string, string>()\nstore.set("app-session", "t")` },
+    ],
+    invalid: [
+      { filename: ROUTE, code: `${SESSION}NextResponse.json({ ok: true }).cookies.set("app-session", "t")`, errors: [{ messageId: "attributes" }] },
+      { filename: ROUTE, code: `${SESSION}NextResponse.json({ ok: true }).cookies.set("app-session", "t", { secure: true, sameSite: "lax" })`, errors: [{ messageId: "attributes", data: { missing: "`httpOnly` stated as `true` or `false`" } }] },
+      { filename: ROUTE, code: `${SESSION}NextResponse.json({ ok: true }).cookies.set("app-session", "t", { httpOnly: true, sameSite: "none", secure: true })`, errors: [{ messageId: "attributes", data: { missing: '`sameSite: "lax"` or `"strict"`' } }] },
+      { filename: ROUTE, code: `${SESSION}NextResponse.json({ ok: true }).cookies.set("app-session", "t", { httpOnly: true, sameSite: "strict", secure: false })`, errors: [{ messageId: "attributes", data: { missing: "`secure`" } }] },
+      // a flag that is only a boolean is not provably httpOnly
+      { filename: ROUTE, code: `${SESSION}declare const flag: boolean\nNextResponse.json({ ok: true }).cookies.set("app-session", "t", { ...SESSION_OPTIONS, httpOnly: flag })`, errors: [{ messageId: "attributes" }] },
+      { filename: ROUTE, code: `${SESSION}export const signIn = async () => { (await cookies()).set({ name: "app-session", value: "t" }) }`, errors: [{ messageId: "attributes" }] },
+    ],
+  })
+})
+

@@ -272,6 +272,75 @@ export const noDangerousHtml = {
   },
 }
 
+// -- FE-CLIENT-5 (R107 FE_COOKIE_ATTRIBUTES) -------------------------------------------------------
+
+/** Forward-slash file name of a declaration, and the package a `node_modules/<pkg>/` (or `@scope/<pkg>`) file belongs to. */
+const packageOfDeclaration = (declaration) => {
+  const match = /\/node_modules\/((?:@[^/]+\/)?[^/]+)\//.exec(String(declaration.getSourceFile().fileName).split("\\").join("/"))
+  return match ? match[1] : null
+}
+
+/** Whether a call is `set` of Next's `ResponseCookies` (a `Set-Cookie` write), whatever the receiver is called: `response.cookies.set`, `(await cookies()).set`. */
+const isResponseCookieWrite = (checker, toTs, call) => {
+  const tsCall = toTs(call)
+  const declaration = tsCall ? checker.getResolvedSignature(tsCall)?.declaration : undefined
+  if (!declaration || !ts.isMethodDeclaration(declaration) || declaration.name.getText() !== "set") return false
+  const owner = declaration.parent
+  return ts.isClassDeclaration(owner) && owner.name?.text === "ResponseCookies" && packageOfDeclaration(declaration) === "next"
+}
+
+/** The present (non-nullish) members of a property's type on an options type, or [] when the property is absent or only nullish. */
+const presentPropertyParts = (checker, type, name, at) => {
+  const symbol = type.getProperty(name)
+  if (!symbol) return []
+  const propertyType = checker.getTypeOfSymbolAtLocation(symbol, at)
+  const parts = propertyType.isUnion() ? propertyType.types : [propertyType]
+  return parts.filter((part) => !(part.flags & (ts.TypeFlags.Undefined | ts.TypeFlags.Null | ts.TypeFlags.Void)))
+}
+
+const isBooleanLiteral = (part, value) => Boolean(part.flags & ts.TypeFlags.BooleanLiteral) && part.intrinsicName === String(value)
+const SAME_SITE = new Set(["lax", "strict"])
+
+/** The attributes a written cookie is missing, judged on the TYPE of its options (a spread `as const` constant keeps its literals). */
+const missingAttributes = (checker, type, at) => {
+  const missing = []
+  // httpOnly is a stated decision: `true` for a session, `false` only for a preference page script reads; a bare `boolean` decides nothing
+  const httpOnly = presentPropertyParts(checker, type, "httpOnly", at)
+  const stated = httpOnly.length > 0 && (httpOnly.every((part) => isBooleanLiteral(part, true)) || httpOnly.every((part) => isBooleanLiteral(part, false)))
+  if (!stated) missing.push("`httpOnly` stated as `true` or `false`")
+  const secure = presentPropertyParts(checker, type, "secure", at)
+  if (secure.length === 0 || secure.every((part) => isBooleanLiteral(part, false))) missing.push("`secure`")
+  const sameSite = presentPropertyParts(checker, type, "sameSite", at)
+  if (sameSite.length === 0 || !sameSite.every((part) => part.isStringLiteral() && SAME_SITE.has(part.value))) missing.push('`sameSite: "lax"` or `"strict"`')
+  return missing
+}
+
+/** A cookie the app writes states its script reach, is sent only over TLS and is kept off cross-site requests. */
+export const responseCookieAttributes = {
+  meta: {
+    type: "problem",
+    docs: { description: "A cookie written through Next's response cookies states `httpOnly` as a literal, carries `secure` and `sameSite` `lax` or `strict`." },
+    schema: [],
+    messages: {
+      attributes:
+        "This cookie is written without {{missing}}. A cookie left to the defaults is readable by page script and sent on cross-site requests: state `httpOnly: true` for a session (`false` only for a preference page script must read), `secure` (from `modules/config`) to keep it off plain HTTP, and `sameSite` `lax` or `strict`. Pass one options constant that states all three, declared `as const` by the module that owns the cookie.",
+    },
+  },
+  create(context) {
+    const { checker, toTs } = typed(context)
+    return {
+      CallExpression(node) {
+        if (node.callee.type !== "MemberExpression" || !isResponseCookieWrite(checker, toTs, node)) return
+        // `set(name, value, options)` or `set({ name, value, ...options })`; `set(name, value)` states nothing
+        const options = node.arguments.length === 1 ? node.arguments[0] : node.arguments[2]
+        const tsOptions = options ? toTs(options) : undefined
+        const missing = tsOptions ? missingAttributes(checker, checker.getTypeAtLocation(tsOptions), tsOptions) : ["`httpOnly` stated as `true` or `false`", "`secure`", '`sameSite: "lax"` or `"strict"`']
+        if (missing.length > 0) context.report({ node, messageId: "attributes", data: { missing: missing.join(", ") } })
+      },
+    }
+  },
+}
+
 /** The rules this law contributes to the plugin. */
 export const rules = {
   "use-client-only-at-boundary": useClientOnlyAtBoundary,
@@ -279,6 +348,7 @@ export const rules = {
   "server-module-marks-server-only": serverModuleMarksServerOnly,
   "web-storage-only-in-modules": webStorageOnlyInModules,
   "no-dangerous-html": noDangerousHtml,
+  "response-cookie-attributes": responseCookieAttributes,
 }
 
 /** Every rule is an error. */

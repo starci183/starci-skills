@@ -1100,3 +1100,11 @@ rules:
     failureCodes: ["FE_I18N_KEYS"]
     enforcers:
       - {kind: eslint-fe, id: i18n-keys}
+  - id: R107
+    code: "FE_COOKIE_ATTRIBUTES"
+    law: "A cookie the front end writes through Next's response cookies (`response.cookies.set`, `cookies().set`) states `httpOnly` as a literal (`true` for a session, `false` only for a preference page script reads), carries `secure` and has `sameSite` `lax` or `strict`."
+    kinds: [lint]
+    gates: [pre-commit, pre-push, settle, land, ci]
+    failureCodes: ["FE_COOKIE_ATTRIBUTES"]
+    enforcers:
+      - {kind: eslint-fe, id: response-cookie-attributes}

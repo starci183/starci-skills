@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- New (lane AUTHCHK): `response-cookie-attributes` (R107 `FE_COOKIE_ATTRIBUTES`, law client-boundary). A `set` on Next's `ResponseCookies` (`response.cookies.set`, `(await cookies()).set`), identified by the method's declaring class of `next`, must state `httpOnly` as a literal, carry `secure` and use `sameSite` `lax` or `strict`, judged on the TYPE of the options. The typed fixture's `next/server` and `next/headers` stubs gain the cookie classes.
+
 ## 7.1.2 - 2026-10-01
 
 - Fixed: the bundled machine no longer crashes on a local export list (shared with eslint-canon-be 2.1.2).

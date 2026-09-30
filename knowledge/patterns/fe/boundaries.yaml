@@ -98,3 +98,28 @@ rules:
       manual:
         - Confirm the client bundle of a page contains only the interactive parts.
     relatedExamples: []
+  - id: FE-BOUNDARY-4
+    title: A cookie is written by the server with its attributes stated
+    kind: mandatory
+    hfsRules: [R107]
+    requirement: |-
+      A cookie is written by server code through Next's response cookies (`response.cookies.set` in a route handler,
+      `(await cookies()).set` in a server action) with one `as const` options constant declared by the module that owns
+      the cookie. That constant states `httpOnly: true` for a session (`false` only for a preference page script must
+      read), `secure` from `modules/config` and `sameSite` `lax` or `strict`. A session token never reaches page script.
+    rationale: |-
+      A cookie left to the defaults is readable by any script on the page and rides cross-site requests, so one injected
+      script or one forged form takes the session.
+    cases:
+      - id: case-1
+        when: The session door signs in
+        write: 'response.cookies.set(SESSION_COOKIE, token, SESSION_COOKIE_OPTIONS) with SESSION_COOKIE_OPTIONS = { httpOnly: true, sameSite: "lax", path: "/", secure: SESSION_COOKIE_SECURE } as const in modules/session.'
+      - id: case-2
+        when: The session door signs out
+        write: 'response.cookies.set(SESSION_COOKIE, "", { ...SESSION_COOKIE_OPTIONS, maxAge: 0 })'
+    verification:
+      automated:
+        - FE_COOKIE_ATTRIBUTES
+      manual:
+        - Confirm that no page script reads the session and that a preference cookie with httpOnly false holds nothing the server trusts.
+    relatedExamples: []
