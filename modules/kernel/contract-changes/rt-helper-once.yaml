@@ -1,0 +1,24 @@
+id: rt-helper-once
+effectiveAt: '2026-09-30T17:30:00+07:00'
+summary: >-
+  Lane C0, redundancy RED15 and RED17: `npm run check` runs scripts/checks/check-helper-once.mjs. It parses every tracked
+  runtime .mjs with acorn, derives the helper table from the exports of scripts/lib/*.mjs, engine/*.mjs and
+  scripts/checks/common.mjs, and refuses a top-level function or const whose normalised body equals an exported helper
+  (RT_HELPER_REDEFINED), two libs exporting one name with different contracts (RT_HELPER_REDEFINED), and a spawn of the
+  literal 'git' outside scripts/lib/git.mjs (RT_RAW_GIT_SPAWN). Every finding in the tree is fixed: copies import the lib
+  helper, every git spawn is runGit/gitOutput. Renamed exports: machine-db putBlob to putMachineBlob, recordLlmUsage to
+  recordMachineLlmUsage, markBlobArchived to markMachineBlobArchived, projectsRootFor to localProjectsRoot (ledger-db keeps
+  projectsRootFor); newTraceId, newSpanId and isBusyError live only in engine/machine-db.mjs; sameOrUnder moved from
+  scripts/checks/common.mjs to scripts/lib/path-key.mjs; connectors/lib.mjs no longer exports pidAlive and sourceRootOf
+  (engine/machine-db.mjs pidAlive and scripts/lib/hk-orphan-ledgers.mjs starciSourceRoot are the homes).
+reach: new-legs
+adds:
+  checks: [check-helper-once]
+  codes: [RT_HELPER_REDEFINED, RT_RAW_GIT_SPAWN]
+paths:
+  - modules/kernel/contract-changes/rt-helper-once.yaml
+  - modules/kernel/failure-codes.yaml
+  - package.json
+  - scripts/checks/check-helper-once.mjs
+  - scripts/lib/git.mjs
+  - tests/check-helper-once.spec.mjs

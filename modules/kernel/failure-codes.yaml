@@ -5146,6 +5146,28 @@ RT_DEAD_SCRIPT:
   owner: supervisor
   kind: check-finding
 
+RT_HELPER_REDEFINED:
+  title: "Shared helper redefined"
+  title_vi: "Hàm dùng chung bị viết lại"
+  meaning_vi: "Một hàm hoặc hằng ở đầu tệp .mjs trong scripts/, engine/, modules/, bin/ hoặc ext/ có thân giống hệt (sau khi đổi tên biến, bỏ chú thích và khoảng trắng) một hàm đã export của scripts/lib/*.mjs, engine/*.mjs hoặc scripts/checks/common.mjs; hoặc hai thư viện export cùng một tên với hai hợp đồng khác nhau."
+  causes_vi:
+    - "Sao chép một hàm nhỏ (slash, samePath, clip, sleep, sha256, readJsonFile, isDir...) thay vì import từ thư viện"
+    - "Hai thư viện đặt cùng một tên cho hai hàm có hành vi khác nhau"
+  nextStep_vi: "Người giám sát xóa bản sao và import hàm của thư viện; nếu hai hợp đồng thật sự khác nhau thì đổi tên một bên, qua một lane đã land."
+  owner: supervisor
+  kind: check-finding
+
+RT_RAW_GIT_SPAWN:
+  title: "Direct git spawn"
+  title_vi: "Gọi git trực tiếp bằng spawn"
+  meaning_vi: "Một lời gọi spawnSync, execFileSync, spawn hoặc execFile với đối số đầu là chuỗi 'git' nằm ngoài scripts/lib/git.mjs. Mọi lần chạy git đi qua gitSpawn, runGit, gitOutput hoặc gitResult ở đó."
+  causes_vi:
+    - "Viết lại tùy chọn encoding, windowsHide, timeout bằng tay ở từng nơi gọi git"
+    - "Thêm một hàm bọc git riêng thay vì dùng thư viện"
+  nextStep_vi: "Người giám sát chuyển lời gọi sang scripts/lib/git.mjs (runGit hoặc gitOutput) với cùng đối số, qua một lane đã land."
+  owner: supervisor
+  kind: check-finding
+
 RULE_DUPLICATED:
   title: "Rule sentence repeated"
   title_vi: "Câu quy tắc bị lặp"
