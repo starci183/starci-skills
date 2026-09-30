@@ -277,12 +277,28 @@ const isResponseLike = (context, node) => {
  * local bound to one (`const status = response.status`, `const { status } = response`). A parameter that is only typed `number` is
  * not: the rule does not guess what a bare number means.
  */
+/**
+ * A parameter stands for the response status when its function is called in this file, and every call passes a response status in
+ * that position: `const failureForResponse = (status: number) => ...` called as `failureForResponse(response.status)`.
+ */
+const isStatusParameter = (context, definition, depth) => {
+  const fn = definition.node
+  const index = fn.params?.findIndex((param) => param === definition.name || (param.type === "AssignmentPattern" && param.left === definition.name))
+  if (index === undefined || index < 0) return false
+  const binding = fn.type === "FunctionDeclaration" ? fn.id : fn.parent?.type === "VariableDeclarator" && fn.parent.init === fn ? fn.parent.id : null
+  if (!binding || binding.type !== "Identifier") return false
+  const variable = variableOf(context, binding)
+  const calls = (variable?.references ?? []).map((reference) => reference.identifier.parent).filter((parent) => parent?.type === "CallExpression" && parent.callee.type === "Identifier" && parent.callee.name === binding.name)
+  return calls.length > 0 && calls.every((call) => call.arguments[index] !== undefined && isResponseStatus(context, call.arguments[index], depth + 1))
+}
+
 const isResponseStatus = (context, node, depth = 0) => {
   const expression = unwrap(node)
   if (!expression || depth > 4) return false
   if (expression.type === "MemberExpression") return propertyName(expression) === "status" && isResponseLike(context, unwrap(expression.object))
   if (expression.type !== "Identifier") return false
   const definition = variableOf(context, expression)?.defs[0]
+  if (definition?.type === "Parameter") return isStatusParameter(context, definition, depth)
   if (!definition || definition.type !== "Variable") return false
   const declarator = definition.node
   if (declarator.id === definition.name) return declarator.init ? isResponseStatus(context, declarator.init, depth + 1) : false

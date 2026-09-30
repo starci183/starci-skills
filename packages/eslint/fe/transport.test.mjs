@@ -191,6 +191,8 @@ test("FE-TRANSPORT-4: the client maps a 401 and a 403 status to refused", () => 
       { filename: CLIENT, code: "export const get = async (u: string) => {\n  const res = await fetch(u, { signal })\n  const code = res.status\n  if (code === 401 || code === 403) return { ok: false, kind: \"refused\" }\n  return { ok: true }\n}" },
       // the Outcome constructor named by its kind: starci-next-fe `failed("refused", { status, code })`
       { filename: CLIENT, code: "export const get = async (u: string) => {\n  const res = await fetch(u, { signal })\n  if (res.status === 401 || res.status === 403) return failed(\"refused\", { status: res.status })\n  return { ok: true }\n}" },
+      // the branch sits in a helper whose parameter every call fills with the response status (starci-next-fe failureForResponse)
+      { filename: CLIENT, code: "const failureFor = (status: number) => {\n  if (status === 401 || status === 403) return failed(\"refused\", { status })\n  return failed(\"unavailable\", { status })\n}\nexport const get = async (u: string) => {\n  const res = await fetch(u, { signal })\n  if (!res.ok) return failureFor(res.status)\n  return { ok: true }\n}" },
       // a module with no fetch owes no mapping, and a file that is not the client is not judged
       { filename: CLIENT, code: "export const x = 1" },
       { filename: HOOK, code: "fetch(u)" },
@@ -199,6 +201,8 @@ test("FE-TRANSPORT-4: the client maps a 401 and a 403 status to refused", () => 
     invalid: [
       { filename: CLIENT, code: "const r = await fetch(u, { signal })", errors: [{ messageId: "refused" }] },
       { filename: PKG_CLIENT, code: "const r = await fetch(u, { signal })", errors: [{ messageId: "refused" }] },
+      // a helper whose parameter is never filled with the response status is not the status branch
+      { filename: CLIENT, code: "const failureFor = (status: number) => {\n  if (status === 401 || status === 403) return failed(\"refused\", { status })\n  return failed(\"unavailable\", { status })\n}\nexport const get = async (u: string) => {\n  const res = await fetch(u, { signal })\n  if (!res.ok) return failureFor(500)\n  return { ok: true }\n}", errors: [{ messageId: "refused" }] },
       // the three literals lying in the file are not a branch
       { filename: CLIENT, code: "const r = await fetch(u, { signal })\nexport const AUTH = [401, 403]\nexport const KIND = \"refused\"", errors: [{ messageId: "refused" }] },
       { filename: CLIENT, code: REFUSED_BRANCH("res.status === 401"), errors: [{ messageId: "refused" }] },
