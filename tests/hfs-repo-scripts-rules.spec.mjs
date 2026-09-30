@@ -65,8 +65,8 @@ test('BE_SPEC_PLACEMENT: a spec in scripts/, in tools/, beside a non-service fil
 
 test('BE_SPEC_PLACEMENT: a service spec beside its service and the integration, e2e and contract layers are clean', () => {
   const result = checkRepo({ repoRoot: repoOf(BE, (dir) => {
-    put(dir, 'src/features/orders/application/place-order.service.ts');
-    put(dir, 'src/features/orders/application/place-order.service.spec.ts');
+    put(dir, 'src/modules/domain/billing/invoice.service.ts');
+    put(dir, 'src/modules/domain/billing/invoice.service.spec.ts');
     put(dir, 'src/tests/integration/orders/claim.integration-spec.ts');
     put(dir, 'src/tests/e2e/orders/flow.e2e-spec.ts');
     put(dir, 'src/tests/contract/stripe/payments.contract-spec.ts');
@@ -121,7 +121,7 @@ test('HFS_LINT_SUPPRESSION_FILE: plain eslint scripts and the standard config ar
 
 // ------------------------------------------------------------------------------------------------ R101 HFS_PROOF_COMMAND_FILE_MISSING
 
-const RECORD = (commands) => `schema: work/implementation@1\nid: impl.demo.gate\nstate: todo\nrequiresProof:\n${Object.entries(commands).map(([kind, command]) => `  ${kind}:\n    required: true\n    command: ${JSON.stringify(command)}\n`).join('')}`;
+const RECORD = (commands, repository) => `schema: work/implementation@1\nid: impl.demo.gate\nstate: todo\n${repository ? `repository: ${repository}\n` : ''}requiresProof:\n${Object.entries(commands).map(([kind, command]) => `  ${kind}:\n    required: true\n    command: ${JSON.stringify(command)}\n`).join('')}`;
 
 test('HFS_PROOF_COMMAND_FILE_MISSING: a proof command that runs a deleted script or spec is refused, one finding per kind and path', () => {
   const result = checkRepo({ repoRoot: repoOf(BE, (dir) => {
@@ -143,6 +143,13 @@ test('HFS_PROOF_COMMAND_FILE_MISSING: a command whose files exist, flags, globs,
       implementation: 'node D:/Repositories/other/.claude/bin/starci.mjs validate D:/Repositories/demo/.starciwork/features/login --strict --json',
       requirements: 'docker compose -f ../infra/compose.yaml build && node dist/apps/core/main.js --config "src/**/*.json" --port=3000',
     }));
+  }) });
+  assert.deepEqual(only(result, 'HFS_PROOF_COMMAND_FILE_MISSING'), []);
+});
+
+test('HFS_PROOF_COMMAND_FILE_MISSING: a record of an implementation in another repository is not judged, its commands run there', () => {
+  const result = checkRepo({ repoRoot: repoOf(BE, (dir) => {
+    put(dir, '.starciwork/features/login/impl/other/gate/index.yaml', RECORD({ unit: 'npx vitest run apps/app/src/login.spec.ts' }, 'other-repo'));
   }) });
   assert.deepEqual(only(result, 'HFS_PROOF_COMMAND_FILE_MISSING'), []);
 });

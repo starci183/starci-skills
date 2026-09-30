@@ -26,8 +26,8 @@ test('the shipped catalog is 1.0.0, validates against its JSON schema and loads 
   assert.equal(validateSchema(d), true, JSON.stringify(validateSchema.errors));
   const catalog = loadRuleCatalog({ manifest: loadSlotManifest() });
   assert.equal(catalog.major, 1);
-  assert.equal(catalog.rules.length, Number(catalog.rules.at(-1).id.slice(1)), 'ids run from R01 without gaps');
-  catalog.rules.forEach((rule, index) => assert.equal(rule.id, `R${String(index + 1).padStart(2, '0')}`));
+  assert.deepEqual(catalog.rules.map((r) => r.id), [...catalog.rules.map((r) => r.id)].sort((a, b) => Number(a.slice(1)) - Number(b.slice(1))), 'ids increase numerically; a retired rule leaves its id unused, so there may be gaps');
+  assert.equal(new Set(catalog.rules.map((r) => r.id)).size, catalog.rules.length);
   for (const rule of catalog.rules) {
     assert.ok(rule.enforcers.length > 0, `${rule.id} has an enforcer`);
     assert.equal(rule.failureCodes[0], rule.code);
@@ -38,7 +38,7 @@ test('the shipped catalog is 1.0.0, validates against its JSON schema and loads 
 test('the loader answers by id, code, gate, enforcer and what is still owed', () => {
   const catalog = loadRuleCatalog();
   assert.equal(catalog.rule('R12').code, 'HFS_E2E_IN_AUTOMATIC_GATE');
-  assert.equal(catalog.rule('R99'), null);
+  assert.equal(catalog.rule('R999'), null);
   assert.equal(catalog.byCode('FE_NEXT_CONVENTIONS').id, 'R54');
   assert.equal(catalog.byCode('HFS_SLOT_UNDECLARED').id, 'R01');
   assert.equal(catalog.byCode('NOT_A_CODE'), null);
@@ -89,7 +89,8 @@ test('schema and loader agree on a broken catalog', () => {
 });
 
 test('the loader also refuses what only semantics can see', () => {
-  refusal(load((d) => { d.rules[1].id = 'R05'; }), 'HFS_RULES_INVALID');
+  refusal(load((d) => { d.rules[1].id = 'R01'; }), 'HFS_RULES_INVALID');   // ids only increase: a repeat or a step back is refused
+  assert.doesNotThrow(load((d) => { d.rules.splice(1, 1); }));             // a retired rule leaves a gap in the ids, which is fine
   refusal(load((d) => { d.rules[1].failureCodes = [d.rules[1].code, d.rules[0].code]; }), 'HFS_RULES_INVALID');
   refusal(load((d) => { d.rules[0].failureCodes = ['HFS_SOMETHING_ELSE']; }), 'HFS_RULES_INVALID');
   refusal(load((d) => { d.rules[0].gates = ['pre-push', 'settle']; }), 'HFS_RULES_INVALID');

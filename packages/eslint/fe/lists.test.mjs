@@ -19,7 +19,6 @@ const tester = new RuleTester({
 })
 
 const FILE = "D:/repo/src/components/blocks/Feed/component.tsx"
-const SPEC = "D:/repo/src/components/blocks/Feed/component.test.tsx"
 
 test("every rule this law declares is a rule", () => {
   for (const [name, rule] of Object.entries(rules)) assert.ok(rule && rule.meta && rule.create, `${name} is not a rule`)
@@ -34,7 +33,6 @@ test("LISTS-1: every element a map returns carries a key", () => {
       { filename: FILE, code: "const A = () => rows.map((row) => row.id)" },
       { filename: FILE, code: "const A = () => Children.map(children, (child) => <div>{child}</div>)" },
       { filename: FILE, code: "const A = () => rows.map((row) => (row.ok ? <Ok key={row.id} /> : <Bad key={row.id} />))" },
-      { filename: SPEC, code: "const A = () => rows.map((row) => <li>{row}</li>)" },
     ],
     invalid: [
       { filename: FILE, code: "const A = () => rows.map((row) => <li>{row.name}</li>)", errors: [{ messageId: "missing" }] },
@@ -61,7 +59,6 @@ test("LISTS-2: the key is stable data, never the index or a random value", () =>
       { filename: FILE, code: "const A = () => [0, 1, 2].map((n, index) => <Skeleton key={index} />)" },
       { filename: FILE, code: "const A = () => SKELETON_ROWS.map((_, index) => <Skeleton key={index} />)" },
       { filename: FILE, code: "const A = () => rows.map((row) => <li key={row.id} />)" },
-      { filename: SPEC, code: "const A = () => rows.map((row, index) => <li key={index} />)" },
     ],
     invalid: [
       { filename: FILE, code: "const A = () => rows.map((row, index) => <li key={index}>{row}</li>)", errors: [{ messageId: "index" }] },
@@ -82,7 +79,6 @@ test("LISTS-3: no object or array literal prop on a component inside a map", () 
       { filename: FILE, code: "const A = () => rows.map((row) => <Row key={row.id} onPick={() => pick(row)} />)" },
       { filename: FILE, code: "const A = () => rows.map((row) => <Row key={row.id} tags={[]} />)" },
       { filename: FILE, code: "const A = () => <List render={() => <Row cells={[1, 2]} />} />" },
-      { filename: SPEC, code: "const A = () => rows.map((row) => <Row key={row.id} props={{ a: 1 }} />)" },
     ],
     invalid: [
       {

@@ -16,7 +16,6 @@ const tester = slotTester()
 
 const BLOCK = at("apps/web/src/components/blocks/DailyQuest/component.tsx")
 const OWNER = at("apps/web/src/components/leaves/Heading/index.tsx")
-const TWIN = at("apps/web/src/components/blocks/DailyQuest/component.test.tsx")
 
 test("every rule this law declares is exported under its published name", () => {
   for (const [name, rule] of Object.entries(rules)) {
@@ -31,7 +30,6 @@ test("TYPESET-1: a heading comes from the component that owns tag and size toget
       // the component that owns both facts is the one file allowed to write the tag
       { filename: OWNER, code: "const E = () => <h2 />" },
       // a twin builds heading markup on purpose, to assert against it
-      { filename: TWIN, code: "const E = () => <h2 />" },
       // a span is not a heading, whatever it is styled like - that case is tokens.mjs's
       { filename: BLOCK, code: "const E = () => <span />" },
       // the owner's drawing half is the owner too, in every app

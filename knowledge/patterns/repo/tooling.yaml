@@ -2,7 +2,7 @@ schema: starci/knowledge-source@1
 id: repo.tooling
 title: Repository tooling
 purpose: |
-  Given a tool configuration in a repository (ESLint, TypeScript, Jest, Vitest, Playwright, stylelint, husky, CI, Sonar,
+  Given a tool configuration in a repository (ESLint, TypeScript, Jest, stylelint, husky, CI, Sonar,
   Codecov), who owns its content? `.claude` owns it. A repository holds a thin call into a `.claude` package, or a file that
   `hfs sync` generates and hash-checks.
 appliesTo:
@@ -18,8 +18,6 @@ provenance:
     - packages/tsconfig
     - packages/prettier-config
     - packages/jest-preset
-    - packages/vitest-preset
-    - packages/playwright-preset
   limitations: |
     A managed file equal to its render proves the template was applied. It does not prove that a tool runs in the gate the
     rule names; the gate definitions and the CI run prove that.
@@ -30,12 +28,10 @@ rules:
     hfsRules: [R16, R22]
     requirement: |
       `eslint.config.mjs` calls `starciBeConfig({ hfs })` or `starciFeConfig({ hfs })`. `tsconfig.json` extends
-      `@starci/tsconfig/{be,next}.json` (a back end adds its three `paths`, a front end only excludes the e2e tree); `tsconfig.e2e.json`
-      extends `@starci/tsconfig/e2e.json`. The jest config calls `@starci/jest-preset`, the root vitest config
-      `starciVitestWorkspace` of `@starci/vitest-preset`, `stylelint.config.mjs` `starciStylelintConfig({ appTokens: loadAppTokens(import.meta.url) })`
+      `@starci/tsconfig/{be,next}.json` (a back end adds its three `paths`, a front end adds nothing); a back end's `src/tests/tsconfig.json`
+      extends `@starci/tsconfig/e2e.json`. The jest config calls `@starci/jest-preset`, `stylelint.config.mjs` `starciStylelintConfig({ appTokens: loadAppTokens(import.meta.url) })`
       of `@starci/stylelint-canon`, and the Prettier config is the `.prettierrc` string `@starci/prettier-config`. All of these are
-      rendered by `hfs sync` and compared by `hfs check` (R05, R17, R22); only `vitest.setup.ts`, `playwright.config.ts` (its web servers and ports,
-      on top of `@starci/playwright-preset`) and `turbo.json` are the repository's own. A repository defines no local rule, plugin,
+      rendered by `hfs sync` and compared by `hfs check` (R05, R17, R22); only `turbo.json` is the repository's own. A repository defines no local rule, plugin,
       override, disabled rule or architecture script, keeps no tool configuration key in `package.json`, and copies no canon config.
     rationale: |
       Three copies of an ESLint config are three standards. One package makes every repository answer to the same rules.
@@ -138,9 +134,9 @@ rules:
     requirement: |
       No integration, e2e or contract spec, test world or e2e-only dependency joins husky, lint-staged, the default typecheck,
       or coverage, or an automatic CI trigger. A back end has `typecheck:tests` (`src/tests/tsconfig.json`) and its
-      `test:integration`, `test:e2e` and `test:contract` run it first; a front end has `typecheck:e2e` and `test:e2e` runs it first.
-      `lint:check` lints the e2e trees in its one ESLint run (linting is not running e2e). A kept e2e workflow is
-      `workflow_dispatch` only.
+      `test:integration`, `test:e2e` and `test:contract` run it first; a front end has no e2e script, config or workflow.
+      `lint:check` lints the back-end e2e trees in its one ESLint run (linting is not running e2e). A kept e2e workflow is
+      `workflow_dispatch` only. A front end has no tests at all (FE_NO_TESTS).
     rationale: |
       These suites are slow and environment-bound, but their code must not rot, so their type check is a separate manual gate.
     cases: []
@@ -148,6 +144,6 @@ rules:
       automated:
         - HFS_E2E_IN_AUTOMATIC_GATE
         - BE_TEST_TOPOLOGY
-        - FE_E2E_SHAPE
+        - FE_NO_TESTS
       manual: []
     relatedExamples: []

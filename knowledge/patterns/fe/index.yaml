@@ -4,8 +4,7 @@ title: Frontend code patterns
 purpose: |
   knowledge/ui/ decides what the interface must be: which Grammar object renders, which gap, which tone.
   knowledge/patterns/fe/ decides how the code that produces that interface is written: where a unit lives, what its files are
-  called, how a component function is shaped, where a class string sits, how a failure is represented, where the spec goes,
-  where data, text and colour come from. A pattern rule never chooses a visual; a ui/ rule never chooses a file name. Read
+  called, how a component function is shaped, where a class string sits, how a failure is represented, where data, text and colour come from. A pattern rule never chooses a visual; a ui/ rule never chooses a file name. Read
   knowledge/hfs/README.md (HFS) section 6 first. Follow ../../coding-reference.yaml. Each rule cites the HFS rule ids it
   implements (hfsRules) and the finding codes that judge it (verification.automated).
 appliesTo:
@@ -56,10 +55,6 @@ topics:
     title: Error
     decides: "Failure as an Outcome and a slot status, hard stops, propagation and ownership"
     rules: "FE-ERROR-1 … FE-ERROR-5"
-  - path: test.yaml
-    title: Test
-    decides: "Spec placement, connected versus pure spec, real catalog, what is asserted, the e2e shape"
-    rules: "FE-TEST-1 … FE-TEST-7"
   - path: transport.yaml
     title: Data transport
     decides: "One client, the Outcome vocabulary, generated wire types from the contract copy, server and client reads, one refresh mechanism"

@@ -7,8 +7,6 @@ The packages under `.claude/packages` are the shared tooling of every StarCi pro
 | [`@starci/tsconfig`](tsconfig) | both | the strict flags copied into each tsconfig |
 | [`@starci/prettier-config`](prettier-config) | both | ESLint layout rules (`indent`, `quotes`, `semi`, ...) |
 | [`@starci/jest-preset`](jest-preset) | back end | the hand-copied `jest.config.js`, `as unknown as` casts |
-| [`@starci/vitest-preset`](vitest-preset) | front end | the hand-copied `vitest.config.ts` files |
-| [`@starci/playwright-preset`](playwright-preset) | front end | the hand-copied `playwright.config.ts` |
 | [`@starci/hfs`](hfs) | both | the ad-hoc structure checks: `hfs check`, `hfs init`, `hfs explain` |
 | [`@starci/eslint-canon-be`](eslint/be), [`-fe`](eslint/fe) | be / fe | the lint rules |
 | [`@starci/stylelint-canon`](stylelint) | front end | hand-written CSS: raw colour, spacing and `!important` |

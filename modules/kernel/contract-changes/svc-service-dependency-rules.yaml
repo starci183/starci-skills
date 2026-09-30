@@ -1,0 +1,17 @@
+id: svc-service-dependency-rules
+effectiveAt: '2026-09-30T21:00:00+07:00'
+summary: >-
+  BE lint canon closes the patterns that block unit-testing a service with token doubles. New eslint-be rules
+  provider-param-token (R85), no-repository-class (R83) and no-test-double-in-source (R89); named-entity-manager-only
+  (R83) also refuses a DataSource/QueryRunner written as a type, awaited value or provide token and a class that
+  receives a connection wrapper; no-event-bus (R87) also refuses EventEmitter, RxJS Subject and a hand-rolled listener
+  list. Failure codes are unchanged; their Vietnamese meaning and causes name the new findings.
+reach: new-legs
+paths:
+  - packages/eslint/be/service-deps.mjs
+  - packages/eslint/be/data-access.mjs
+  - packages/eslint/be/cqrs.mjs
+  - knowledge/hfs/rules.yaml
+  - knowledge/hfs/README.md
+  - modules/kernel/failure-codes.yaml
+  - modules/kernel/contract-changes/svc-service-dependency-rules.yaml

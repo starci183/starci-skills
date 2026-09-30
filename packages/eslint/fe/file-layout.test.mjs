@@ -20,7 +20,6 @@ import {
   routeSlotFixedName,
   rules,
   surfaceFolderTwoFilesOnly,
-  unitTestColocated,
 } from "./file-layout.mjs"
 
 const tester = slotTester()
@@ -42,9 +41,6 @@ test("FILE-2: a surface folder holds its two halves and their twins", () => {
       { filename: at(`${F}/pages/DashboardPage/index.tsx`), code: cmp },
       { filename: at(`${F}/pages/DashboardPage/component.tsx`), code: cmp },
       { filename: at(`${F}/pages/DashboardPage/classNames.ts`), code: cmp },
-      { filename: at(`${F}/pages/DashboardPage/component.spec.tsx`), code: cmp },
-      // a spec twin is named `.spec.` by the slot definitions and is not tied to the two half names
-      { filename: at(`${F}/pages/DashboardPage/DashboardPage.spec.tsx`), code: cmp },
       { filename: at(`${F}/overlays/auth/SignInOverlay/index.tsx`), code: cmp },
       // blocks and composites are NOT surface folders - they may hold more than two files
       { filename: at(`${R}/blocks/dashboard/DailyQuest/parts.tsx`), code: cmp },
@@ -53,7 +49,6 @@ test("FILE-2: a surface folder holds its two halves and their twins", () => {
       { filename: at(`${R}/pages/DashboardPage/extra.ts`), code: cmp },
     ],
     invalid: [
-      { filename: at(`${F}/pages/DashboardPage/component.test.tsx`), code: cmp, errors: [{ messageId: "extra" }] },
       { filename: at(`${F}/pages/DashboardPage/DailyQuest.tsx`), code: cmp, errors: [{ messageId: "extra" }] },
       { filename: at(`${F}/layouts/ShellNav/utils/format.ts`), code: cmp, errors: [{ messageId: "extra" }] },
       // a nested folder is not a half, even one that holds an `index.tsx`
@@ -89,14 +84,6 @@ test("FILE-6: the routing tree holds route files and nothing else", () => {
       { filename: at(`${F}/pages/ProvisioningPage/component.tsx`), code: cmp },
       // The second app of the repository has its own routing tree, judged the same way.
       { filename: at("apps/admin/src/app/[locale]/dashboard/page.tsx"), code: "export default () => null" },
-      /*
-       * Twin tests beside the route they test. A test ships in no bundle and no route renders it, so
-       * it cannot become the second page this rule exists to prevent. The names split by concern
-       * rather than matching `page`, which is how route tests are actually written.
-       */
-      { filename: at(`${L}/dashboard/access.spec.tsx`), code: "export const t = 1" },
-      { filename: at(`${L}/(auth)/screen.spec.tsx`), code: "export const t = 1" },
-      { filename: at(`${L}/(auth)/layout-boundary.spec.ts`), code: "export const t = 1" },
       // a default slot and a nested route handler
       { filename: at(`${L}/@modal/default.tsx`), code: "export default () => null" },
       { filename: at(`${L}/api/webhook/route.ts`), code: "export const POST = () => null" },
@@ -108,30 +95,12 @@ test("FILE-6: the routing tree holds route files and nothing else", () => {
       { filename: at(`${A}/error.tsx`), code: "export default () => null", errors: [{ messageId: "stray" }] },
       { filename: at(`${A}/loading.tsx`), code: "export default () => null", errors: [{ messageId: "stray" }] },
       { filename: at(`${A}/[lang]/page.tsx`), code: "export default () => null", errors: [{ messageId: "stray" }] },
-      { filename: at(`${L}/dashboard/access.test.tsx`), code: "export const t = 1", errors: [{ messageId: "stray" }] },
       // The exact file this rule was written for: it built, linted, typechecked and was approved.
       { filename: at(`${L}/provisioning/fleet-page.tsx`), code: "export const FleetPage = () => null", errors: [{ messageId: "stray" }] },
       { filename: at(`${L}/dashboard/DashboardHeader.tsx`), code: "export const H = () => null", errors: [{ messageId: "stray" }] },
       // `utils` is not a framework slot, and a route folder is not where a helper hides.
       { filename: at(`${L}/provisioning/utils.ts`), code: "export const f = () => null", errors: [{ messageId: "stray" }] },
       { filename: at("apps/admin/src/app/[locale]/users/UserList.tsx"), code: "export const f = () => null", errors: [{ messageId: "stray" }] },
-    ],
-  })
-})
-
-test("FILE-9: frontend unit specs stay beside their owner", () => {
-  tester.run("unit-test-colocated", unitTestColocated, {
-    valid: [
-      { filename: at("apps/web/src/modules/api/query-user.spec.ts"), code: "export const x = 1" },
-      { filename: at(`${F}/pages/UserPage/index.spec.tsx`), code: "export const x = 1" },
-      { filename: at("scripts/check-quality.spec.mjs"), code: "export const x = 1" },
-      // the e2e tree own files are not units
-      { filename: at("e2e/a/http-smoke.e2e-spec.ts"), code: "export const x = 1" },
-    ],
-    invalid: [
-      { filename: at("apps/web/src/modules/api/query-user.test.ts"), code: "export const x = 1", errors: [{ messageId: "suffix" }] },
-      // a frontend unit filed in the e2e tree is a separate bucket
-      { filename: at("e2e/support/query-user.spec.ts"), code: "export const x = 1", errors: [{ messageId: "bucket" }] },
     ],
   })
 })
@@ -281,8 +250,6 @@ test("FILE-9: a route slot default-exports a component named after the slot", ()
       { filename: at(`${app}/error.tsx`), code: "export { Error as default } from './boundary'" },
       { filename: at(`${app}/default.tsx`), code: "const Anything = () => null; export default Anything" },
       { filename: at(`${app}/route.ts`), code: "export const GET = () => null" },
-      // spec twins are not slots
-      { filename: at(`${app}/[lang]/layout.spec.tsx`), code: "const Whatever = () => null; export default Whatever" },
       // outside the route tree entirely, including a feature owner entry and a folder that is merely named `app`
       { filename: at(`${F}/pages/LandingPage/index.tsx`), code: "const LandingPage = () => null; export default LandingPage" },
       { filename: at("apps/web/src/modules/app/page.tsx"), code: "const Home = () => null; export default Home" },

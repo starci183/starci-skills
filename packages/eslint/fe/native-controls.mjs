@@ -13,7 +13,6 @@
  */
 
 import { attribute } from "./lib/ast.mjs"
-import { isSpecFile } from "./lib/scope.mjs"
 
 /** Intrinsic elements a reader operates, that the grammar renders for the product. */
 const NATIVE = new Set(["select", "input", "textarea", "button"])
@@ -30,7 +29,6 @@ export const noNativeFormControl = {
     },
   },
   create(context) {
-    if (isSpecFile(context.filename || context.getFilename())) return {}
     return {
       JSXOpeningElement(node) {
         if (node.name.type !== "JSXIdentifier" || !NATIVE.has(node.name.name)) return
@@ -54,7 +52,6 @@ export const noNativeImg = {
     },
   },
   create(context) {
-    if (isSpecFile(context.filename || context.getFilename())) return {}
     return {
       JSXOpeningElement(node) {
         if (node.name.type === "JSXIdentifier" && node.name.name === "img") context.report({ node, messageId: "img" })
@@ -79,7 +76,6 @@ export const imageHasSize = {
     },
   },
   create(context) {
-    if (isSpecFile(context.filename || context.getFilename())) return {}
     const locals = new Set()
     return {
       ImportDeclaration(node) {

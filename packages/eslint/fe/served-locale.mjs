@@ -32,7 +32,7 @@
  */
 
 import { hfsOf } from "./lib/hfs.mjs"
-import { fileOf, inSlot, isSpecFile, stem } from "./lib/scope.mjs"
+import { fileOf, inSlot, stem } from "./lib/scope.mjs"
 
 /** The slots that hold transport: the app's `modules/api` and the shared api package. Neither slot names its links, see the note on `linkFileName`. */
 const TRANSPORT_SLOTS = ["fe.modules.api", "fe.package.api"]
@@ -124,7 +124,7 @@ export const rules = {
       // A single link's implementation is not a chain - `links/http.ts` constructs the terminal link
       // because defining it IS its job, and there is no correct way to attach a locale there. A
       // spec asserts about a chain rather than being one.
-      if (isLinkImplementationFile(context) || isSpecFile(fileOf(context))) return {}
+      if (isLinkImplementationFile(context)) return {}
       let terminalNode = null
       let attachesLocale = false
       const note = (node) => {

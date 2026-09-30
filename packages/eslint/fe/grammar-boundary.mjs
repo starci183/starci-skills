@@ -18,7 +18,6 @@
  */
 
 import { hfsOf } from "./lib/hfs.mjs"
-import { isSpecFile } from "./lib/scope.mjs"
 
 /**
  * The intrinsic elements of page structure and text, each with the grammar components that render it.
@@ -72,7 +71,7 @@ export const noRawStructuralElement = {
   },
   create(context) {
     const file = context.filename || context.getFilename()
-    if (isSpecFile(file) || !composesGrammar(context, file)) return {}
+    if (!composesGrammar(context, file)) return {}
     return {
       JSXOpeningElement(node) {
         if (node.name.type !== "JSXIdentifier") return

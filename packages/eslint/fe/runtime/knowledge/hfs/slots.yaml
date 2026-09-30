@@ -84,7 +84,6 @@ tiers:
     foundation:   {mayImport: [foundation, package], acyclic: true}               # modules/{config,i18n,routes,types}
     modules:      {mayImport: [foundation, modules, transport, package], acyclic: true}
     transport:    {mayImport: [foundation, modules, package]}                     # modules/api: the one fetch
-    e2e:          {mayImport: [e2e, package]}                                     # black box: no app source
     package:      {mayImport: [package]}
 crossOwner: every import across owners targets the owner's public entry (index.ts or index.tsx); never export *.
 crossApp: apps never import each other; shared code is a packages/<pkg> slot.
@@ -109,6 +108,7 @@ ruleParams:
       http: [platform/http]
       https: [platform/http]
       cache-manager: [integrations/cache, integrations/redis]
+      "@nestjs/cache-manager": [integrations/cache, integrations/redis]     # the CACHE_MANAGER token: caching goes through the cache capability (retired local rule must-use-cache-service)
       redis: [integrations/cache, integrations/redis]
       ioredis: [integrations/cache, integrations/redis]
       bullmq: [platform/messaging]
@@ -268,12 +268,11 @@ slots:
     profiles: [fe]
     # Managed files (hfs sync renders them, hfs check compares them): the tool configuration of a front end. Each is a
     # reference to a canon package, never a configuration: tsconfig.json extends @starci/tsconfig/next.json and only
-    # excludes the e2e tree (each app's own tsconfig.json, in fe.app.next, carries its aliases and include);
-    # tsconfig.e2e.json extends the e2e preset over e2e/ and playwright.config.ts; eslint.config.mjs is the one-line
-    # starciFeConfig call (it lints apps, packages and e2e/ in one run, so there is no separate e2e lint); stylelint.config.mjs
-    # is the one-line starciStylelintConfig call; vitest.config.ts is the one-line starciVitestWorkspace call;
-    # .prettierrc names @starci/prettier-config; .prettierignore is the template.
-    path: "{tsconfig.json,tsconfig.e2e.json,eslint.config.mjs,stylelint.config.mjs,vitest.config.ts,.prettierrc,.prettierignore}"
+    # names the preset and nothing else (each app's own tsconfig.json, in fe.app.next, carries its aliases and include; there is
+    # no test tsconfig: a front end has no tests, FE_NO_TESTS); eslint.config.mjs is the one-line starciFeConfig call;
+    # stylelint.config.mjs is the one-line starciStylelintConfig call; .prettierrc names @starci/prettier-config;
+    # .prettierignore is the template. A front end has no test configuration at all (FE_NO_TESTS).
+    path: "{tsconfig.json,eslint.config.mjs,stylelint.config.mjs,.prettierrc,.prettierignore}"
     presence: required
     tracked: tracked
     tier: none
@@ -282,18 +281,15 @@ slots:
     rules: [HFS_MANAGED_FILE_DRIFT, HFS_TOOL_CONFIG_LOCAL, HFS_RULE_OFF_WITHOUT_REPLACEMENT, HFS_TS_STRICT]
   - id: fe.tool-config-repo
     profiles: [fe]
-    # The three tool files a preset cannot render because they carry the repository's own facts: vitest.setup.ts (its
-    # setup), playwright.config.ts (its web servers, ports and projects: @starci/playwright-preset returns the shared
-    # defaults and the repository adds what only it knows) and turbo.json (its task graph).
-    path: "{vitest.setup.ts,playwright.config.ts,turbo.json}"
-    roles: {playwright: playwright.config.ts}
+    # The one tool file a preset cannot render because it carries the repository's own facts: turbo.json (its task graph).
+    path: turbo.json
     presence: optional
     tracked: tracked
     tier: none
     tests: none
   - id: fe.tool-config-local
     profiles: [fe]
-    path: "{.eslintrc,.eslintrc.*,.eslintignore,eslint.config.js,eslint.config.cjs,eslint.config.ts,eslint.config.mts,eslint.config.cts,.stylelintrc,.stylelintrc.*,.stylelintignore,stylelint.config.js,stylelint.config.cjs,stylelint.config.ts,stylelint.config.json,prettier.config.*,.prettierrc.*,vitest.config.js,vitest.config.mjs,vitest.config.cjs,vitest.workspace.*,jest.config.*,lint-staged.config.*,.lintstagedrc*}"
+    path: "{.eslintrc,.eslintrc.*,.eslintignore,eslint.config.js,eslint.config.cjs,eslint.config.ts,eslint.config.mts,eslint.config.cts,.stylelintrc,.stylelintrc.*,.stylelintignore,stylelint.config.js,stylelint.config.cjs,stylelint.config.ts,stylelint.config.json,prettier.config.*,.prettierrc.*,lint-staged.config.*,.lintstagedrc*}"
     presence: forbidden
     tracked: external
     tier: none
@@ -302,13 +298,22 @@ slots:
     rules: [HFS_TOOL_CONFIG_LOCAL]
   - id: repo.quality-config
     profiles: [be, fe]
-    path: "{sonar-project.properties,codecov.yml}"
+    path: sonar-project.properties
     presence: required
     tracked: tracked
     tier: none
     tests: none
     managedBy: quality-config
     rules: [HFS_SONAR_CONFIG, HFS_MANAGED_FILE_DRIFT]
+  - id: be.codecov
+    profiles: [be]
+    path: codecov.yml     # a front end has no tests, so no coverage upload
+    presence: required
+    tracked: tracked
+    tier: none
+    tests: none
+    managedBy: quality-config
+    rules: [HFS_MANAGED_FILE_DRIFT]
   - id: repo.hooks
     profiles: [be, fe]
     path: ".husky/{pre-commit,pre-push}"
@@ -328,7 +333,7 @@ slots:
     managedBy: ci-workflows
     rules: [HFS_CI_E2E_AUTOMATIC, HFS_CI_MISSING_CANON, HFS_MANAGED_FILE_DRIFT]
   - id: repo.ci-e2e
-    profiles: [be, fe]
+    profiles: [be]
     path: ".github/workflows/e2e.yml"
     presence: optional     # on: workflow_dispatch only
     tracked: tracked
@@ -345,12 +350,15 @@ slots:
     tests: none
   - id: repo.scripts
     profiles: [be, fe]
-    path: "scripts/<name>.mjs"
+    # The repository's operational scripts only (`*.mjs`, `*.cjs`, `*.ps1`, `*.sh`), or nothing: an empty folder is `scripts/.gitkeep`, which hfs sync --init writes
+    # when the folder is missing. A spec or a test (BE_SPEC_PLACEMENT, FE_NO_TESTS), a check or lint source (`check-*`, `eslint-local-rules*`, a local eslint
+    # plugin: HFS_REPO_LOCAL_CHECK) and anything that re-implements a canon check is not an operational script and has no place here.
+    path: "scripts/{.gitkeep,*.mjs,*.cjs,*.ps1,*.sh}"
     presence: optional
     tracked: tracked
     tier: none
     tests: none
-    rules: [HFS_SCRIPT_ONE_OFF]     # one-off codemods and fix-* scripts are agent output, not tooling
+    rules: [HFS_SCRIPT_ONE_OFF, BE_SPEC_PLACEMENT, HFS_REPO_LOCAL_CHECK]     # one-off codemods and fix-* scripts are agent output, not tooling
   - id: repo.docs
     profiles: [be, fe]
     path: "docs/{adr,runbooks,guides}/**/*.md"
@@ -395,7 +403,7 @@ slots:
   # ----- never tracked: build output the tools need in place ---------------------------------------------
   - id: repo.build-output
     profiles: [be, fe]
-    path: "{**/node_modules/,dist/,apps/*/dist/,packages/*/dist/,.next/,apps/*/.next/,coverage/,reports/,test-results/,playwright-report/,**/next-env.d.ts,**/*.tsbuildinfo}"
+    path: "{**/node_modules/,dist/,apps/*/dist/,packages/*/dist/,.next/,apps/*/.next/,coverage/,reports/,test-results/,**/next-env.d.ts,**/*.tsbuildinfo}"
     presence: optional
     tracked: ignored
     tier: none
@@ -877,11 +885,10 @@ slots:
     rules: [FE_APP_ISOLATION, FE_ERROR_BOUNDARY_MISSING, FE_NEXT_CONVENTIONS]
   - id: fe.app-optional
     profiles: [fe]
-    path: "apps/<app>/{vitest.config.ts,playwright.config.ts,public/}"
+    path: "apps/<app>/public/"
     presence: optional
     tracked: tracked
     tier: none
-    roles: {playwright: playwright.config.ts}
     tests: none
   - id: fe.route
     profiles: [fe]
@@ -893,7 +900,7 @@ slots:
              global-error.tsx, page.tsx,   # the root page.tsx only redirects (FE_ROUTE_FILES_THIN)
              not-found.tsx, layout.tsx,    # next-intl: a request outside every locale renders the root not-found inside a root layout
              "health/{live,ready}/route.ts", "api/**/route.ts", "_*/**", providers.tsx, globals.css,
-             "{icon,favicon,apple-icon,opengraph-image,twitter-image}.*", robots.ts, sitemap.ts, manifest.ts, "**/*.spec.ts", "**/*.spec.tsx"]
+             "{icon,favicon,apple-icon,opengraph-image,twitter-image}.*", robots.ts, sitemap.ts, manifest.ts]
     # providers.tsx (root or [locale]) is the client wrapper the server layout renders around its children to host context providers.
     roles: {page: page.tsx, layout: layout.tsx, template: template.tsx, loading: loading.tsx, error: error.tsx, not-found: not-found.tsx, default: default.tsx, route: route.ts, global-error: global-error.tsx, providers: providers.tsx}
     tests: none
@@ -925,9 +932,9 @@ slots:
     owner: true
     kinds: [pages, layouts, overlays]
     requires: [index.tsx]
-    allows: [index.tsx, component.tsx, classNames.ts, "*.spec.tsx", "*.spec.ts"]
+    allows: [index.tsx, component.tsx, classNames.ts]
     roles: {entry: index.tsx, drawing: component.tsx, styles: classNames.ts}   # the connected entry, the pure drawing half and the styling declarations of a component owner
-    tests: unit-beside
+    tests: none
     budget: {component.tsx: 300, index.tsx: 200, dataHooks: 6, useState: 6}
     rules: [FE_SIZE_BUDGET, FE_OWNER_REACHABLE, FE_I18N_LITERAL]
   - id: fe.components
@@ -939,9 +946,9 @@ slots:
     owner: true
     layers: [blocks, composites, branches, leaves]   # a layer imports only the layers after it
     requires: [index.tsx]
-    allows: [index.tsx, component.tsx, classNames.ts, "*.spec.tsx", "*.spec.ts"]
+    allows: [index.tsx, component.tsx, classNames.ts]
     roles: {entry: index.tsx, drawing: component.tsx, styles: classNames.ts}   # the connected entry, the pure drawing half and the styling declarations of a component owner
-    tests: unit-beside
+    tests: none
     budget: {component.tsx: 300, index.tsx: 200, dataHooks: 6, useState: 6}
     rules: [FE_CONNECTED_BLOCK_RENDER_PAIR, FE_I18N_LITERAL, FE_NATIVE_FORM_CONTROL, FE_CLIENT_BOUNDARY]
   - id: fe.hooks
@@ -952,9 +959,9 @@ slots:
     tier: hooks
     owner: true                   # a domain is an owner: other domains import it through index.ts only
     requires: [index.ts]
-    allows: [index.ts, "use<name>.ts", "<domain>.shared.ts", "*.spec.ts"]   # React hooks only; <domain>.shared.ts = sanctioned non-hook helpers
+    allows: [index.ts, "use<name>.ts", "<domain>.shared.ts"]   # React hooks only; <domain>.shared.ts = sanctioned non-hook helpers
     roles: {entry: index.ts, shared: "<domain>.shared.ts"}
-    tests: unit-beside
+    tests: none
     budget: {file: 200, dataHooks: 6, useState: 6}
     rules: [FE_HOOKS_ARE_HOOKS, FE_DATA_FRESHNESS]
   - id: fe.modules
@@ -966,7 +973,7 @@ slots:
     owner: true
     requiredInstances: {capability: [config, i18n, routes]}
     requires: [index.ts]
-    tests: unit-beside
+    tests: none
     budget: {file: 400}
     rules: [FE_ENV_OWNER, FE_TRANSPORT_OWNER]
   - id: fe.modules.api
@@ -979,9 +986,9 @@ slots:
     # client.ts/outcome.ts (fe.transport.client/outcome) in a one-app repository, or the api package's
     # (fe.package.api.client/outcome) when the repository shares it (FE_TRANSPORT_OWNER, machine).
     requires: [index.ts]
-    allows: [index.ts, client.ts, outcome.ts, "<domain>/read-*.ts", "<domain>/*.graphql", "<domain>/<domain>.mapper.ts", contract/, __generated__/, "*.spec.ts"]
+    allows: [index.ts, client.ts, outcome.ts, "<domain>/read-*.ts", "<domain>/*.graphql", "<domain>/<domain>.mapper.ts", contract/, __generated__/]
     roles: {entry: index.ts, reader: "read-*.ts"}   # a reader is a server module (FE_CLIENT_REACHES_SERVER)
-    tests: unit-beside
+    tests: none
     rules: [FE_TRANSPORT_OWNER, FE_HTTP_STATUS_COLLAPSE, FE_WIRE_GENERATED]
   - id: fe.transport.client
     profiles: [fe]
@@ -989,7 +996,7 @@ slots:
     presence: optional
     tracked: tracked
     tier: transport
-    tests: unit-beside
+    tests: none
     why: the one fetch of a one-app repository (timeout, abort, 401/403 -> refused); a shared client is fe.package.api.client
     rules: [FE_TRANSPORT_OWNER]
   - id: fe.transport.outcome
@@ -998,7 +1005,7 @@ slots:
     presence: optional
     tracked: tracked
     tier: transport
-    tests: unit-beside
+    tests: none
     why: the one Outcome union of a one-app repository; a shared union is fe.package.api.outcome
     rules: [FE_HTTP_STATUS_COLLAPSE]
   - id: fe.modules.config
@@ -1007,7 +1014,7 @@ slots:
     presence: required
     tracked: tracked
     tier: foundation
-    tests: unit-beside
+    tests: none
     why: the only reader of process.env and NEXT_PUBLIC_*; fails fast, no localhost fallback
   - id: fe.modules.i18n
     profiles: [fe]
@@ -1019,7 +1026,7 @@ slots:
     # navigation, request config) is written once per repository: in the i18n package (fe.package.i18n, `createAppI18n`)
     # when the repository has one, else in the only app's module.
     requires: [index.ts]
-    tests: unit-beside
+    tests: none
     rules: [FE_I18N_PLACEMENT, FE_I18N_CATALOG]
   - id: fe.modules.brand
     profiles: [fe]
@@ -1036,7 +1043,7 @@ slots:
     presence: required
     tracked: tracked
     tier: foundation
-    tests: unit-beside
+    tests: none
     why: every href builder; FE_HREF_RESOLVES checks each against app/
   - id: fe.modules.types
     profiles: [fe]
@@ -1044,7 +1051,7 @@ slots:
     presence: optional
     tracked: tracked
     tier: foundation
-    tests: unit-beside
+    tests: none
     why: shared types with no runtime behaviour; a component may import them
   - id: fe.package.ui
     profiles: [fe]
@@ -1056,7 +1063,7 @@ slots:
     kinds: [composites, branches, leaves]   # the layer folders under src/ (a package owns no blocks)
     roles: {entry: index.tsx, drawing: component.tsx, styles: classNames.ts}
     requires: [package.json, src/index.ts, tsconfig.json]
-    tests: unit-beside
+    tests: none
     budget: {component.tsx: 300, index.tsx: 200, dataHooks: 6, useState: 6}
     why: built to dist with explicit named exports; only composites, branches and leaves; no unused export; no colour literal
     rules: [FE_PACKAGE_SHAPE, HFS_UNUSED_EXPORT, FE_STYLE_TOKEN_ONLY]
@@ -1068,7 +1075,7 @@ slots:
     tier: package
     owner: true
     requires: [package.json, src/index.ts, src/client.ts, src/outcome.ts, tsconfig.json]
-    tests: unit-beside
+    tests: none
     why: the one transport client and the one Outcome union shared by every app of the repository; no app keeps its own
     rules: [FE_TRANSPORT_OWNER, FE_PACKAGE_SHAPE, HFS_UNUSED_EXPORT]
   - id: fe.package.api.client
@@ -1077,7 +1084,7 @@ slots:
     presence: optional     # enabled with its package (fe.package.api is the opt-in)
     tracked: tracked
     tier: package
-    tests: unit-beside
+    tests: none
     why: the repository's one fetch (timeout, abort, 401/403 -> refused)
     rules: [FE_TRANSPORT_OWNER]
   - id: fe.package.api.outcome
@@ -1086,7 +1093,7 @@ slots:
     presence: optional     # enabled with its package (fe.package.api is the opt-in)
     tracked: tracked
     tier: package
-    tests: unit-beside
+    tests: none
     why: the repository's one Outcome union
     rules: [FE_HTTP_STATUS_COLLAPSE]
   - id: fe.package.i18n
@@ -1097,33 +1104,9 @@ slots:
     tier: package
     owner: true
     requires: [package.json, src/index.ts, tsconfig.json]
-    tests: unit-beside
+    tests: none
     why: the next-intl stack (routing, navigation, request config) written once, exported as the createAppI18n factory every app calls
     rules: [FE_I18N_PLACEMENT, FE_PACKAGE_SHAPE, HFS_UNUSED_EXPORT]
-  - id: fe.e2e
-    profiles: [fe]
-    path: "e2e/<area>/*.e2e-spec.ts"
-    presence: optional
-    tracked: tracked
-    tier: e2e
-    tests: e2e
-    requires: [/playwright.config.ts, /tsconfig.e2e.json]
-    rules: [FE_E2E_SHAPE, HFS_CI_E2E_AUTOMATIC]
-  - id: fe.e2e-support
-    profiles: [fe]
-    path: "e2e/{support,fixtures}/"
-    presence: optional
-    tracked: tracked
-    tier: e2e
-    tests: none
-  - id: fe.e2e-support.i18n
-    profiles: [fe]
-    path: "e2e/fixtures/i18n/"
-    presence: optional
-    tracked: tracked
-    tier: e2e
-    tests: none
-    why: the ONLY e2e fixture location where Vietnamese or another language may appear in source (LANG_NOT_ENGLISH); placement is the marker, there is no comment pragma
 
 # Checks that read this manifest (all ship from .claude; none keeps its own path list)
 consumers:

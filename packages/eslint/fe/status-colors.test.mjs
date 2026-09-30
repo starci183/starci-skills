@@ -19,7 +19,6 @@ const tester = new RuleTester({
 })
 
 const FILE = "D:/repo/src/components/leaves/StatusText/index.tsx"
-const SPEC = "D:/repo/src/components/leaves/StatusText/index.spec.tsx"
 const solid = { messageId: "solid" }
 
 test("the rule is exported under its published name", () => {
@@ -64,8 +63,6 @@ test("status-text-uses-soft-foreground", () => {
       { filename: FILE, code: 'const E = ({ ok }) => <p className={cn("text-sm", ok ? "text-success-soft-foreground" : "text-danger-soft-foreground")} />' },
       // strings that are not class strings
       { filename: FILE, code: 'const E = () => <p title="text-success" data-id="fill-danger">{"text-success"}</p>' },
-      // a spec asserts about class names rather than painting with them
-      { filename: SPEC, code: 'const solid = "text-success"' },
     ],
     invalid: [
       { filename: FILE, code: 'const E = () => <span className="text-success" />', errors: [solid] },

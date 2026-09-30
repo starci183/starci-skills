@@ -227,7 +227,7 @@ function externalTransportReexport(ts, sourceFile, selected) {
   for (const statement of sourceFile.statements) {
     if (!ts.isExportDeclaration(statement)) continue;
     const clause = statement.exportClause;
-    const specifier = ts.isStringLiteralLike(statement.moduleSpecifier) ? statement.moduleSpecifier.text : null;
+    const specifier = statement.moduleSpecifier && ts.isStringLiteralLike(statement.moduleSpecifier) ? statement.moduleSpecifier.text : null;
     if (specifier && (specifier === '@nestjs/common' || TRANSPORT_PACKAGES.test(specifier))) {
       if (!clause) {
         if (specifier !== '@nestjs/common' || selected === null || [...selected].some(name => NEST_COMMON_TRANSPORT.has(name))) {

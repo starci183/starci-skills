@@ -16,7 +16,6 @@ const tester = slotTester()
 
 const LEAF = at("apps/web/src/components/leaves/Input/index.tsx")
 const COMPOSITE = at("apps/web/src/components/composites/SearchBox/index.tsx")
-const FIXTURE = at("e2e/fixtures/copy.ts")
 const BLOCK = at("apps/web/src/components/blocks/DailyQuest/index.tsx")
 
 test("every rule this law declares is exported under its published name", () => {
@@ -78,10 +77,6 @@ test("COPY-2: no literal copy at any tier, in any language, and no pragma", () =
       { filename: BLOCK, code: "const E = () => <p>{t(\"installed\", { count })}</p>" },
       // catalogue keys are lower-case dotted tokens
       { filename: BLOCK, code: "const o = { title: t(\"course.title\") }" },
-      // the dictionaries and fixtures are content
-      { filename: FIXTURE, code: "const t = \"Tiếp tục học\"" },
-      { filename: at("apps/web/src/components/blocks/Feed/index.test.tsx"), code: "const E = () => <p>Tiếp tục học</p>" },
-      // a fixture inside a component owner is authoring, not content
       // English comments are the rule
       { filename: BLOCK, code: "// the reason this exists\nconst x = 1" },
     ],

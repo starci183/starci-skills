@@ -1,6 +1,8 @@
 // deps.mjs - HFS_DEP_VERSION_SKEW (R14): one version per dependency in the workspace.
 //   - the root and every workspace package.json declare a dependency at one spec (a `file:`, `link:` or `workspace:` spec is
 //     a workspace link, not a version);
+//   - a dependency the root `overrides` pins to a version (a string that is not a `$name` reference) is declared at that version everywhere
+//     it is declared: an override the manifests disagree with is a second version in disguise;
 //   - the lockfile (package-lock.json, read, never installed) holds no nested copy of a dependency the workspace declares:
 //     `node_modules/<a>/node_modules/<name>` or `apps/<app>/node_modules/<name>` next to the hoisted `node_modules/<name>`.
 import { found, readJson } from './read.mjs';
@@ -35,6 +37,12 @@ export function depFindings({ repoRoot, files }) {
     if (bySpec.size < 2) continue;
     const list = [...bySpec].map(([spec, where]) => `${spec} (${where.join(', ')})`);
     findings.push(found(DEP_VERSION_SKEW, [...bySpec.values()][0][0], `${name} is declared at ${bySpec.size} versions in the workspace: ${list.join('; ')}; keep one`, { dependency: name, versions: [...bySpec.keys()] }));
+  }
+  const overrides = readJson(repoRoot, 'package.json')?.overrides;
+  for (const [name, pin] of Object.entries(overrides && typeof overrides === 'object' ? overrides : {})) {
+    if (typeof pin !== 'string' || pin.startsWith('$') || !specs.has(name)) continue;
+    const off = [...specs.get(name)].filter(([spec]) => spec !== pin);
+    if (off.length) findings.push(found(DEP_VERSION_SKEW, off[0][1][0], `${name} is pinned to ${pin} by the root overrides but declared at ${off.map(([spec, where]) => `${spec} (${where.join(', ')})`).join('; ')}; declare the pinned version`, { dependency: name, versions: off.map(([spec]) => spec), pinned: pin }));
   }
   const lock = files.includes('package-lock.json') ? readJson(repoRoot, 'package-lock.json') : null;
   if (lock?.packages) {

@@ -192,7 +192,7 @@ separate traceability document.
 **Evidence is generated or captured by a run, never hand-edited into a pass.** Implementation records carry
 sibling `evidence.yaml` files written by `scripts/example/example-evidence.mjs`, which runs each
 assertion command against `--cwd` and stamps that in the header; UAT flows
-carry evidence that names the real `runs/<runId>` directory the Playwright harness produced. Each file's
+carry evidence that names the real `runs/<runId>` directory a run produced. Each file's
 `recordDigest` is a sha256 over the sibling `index.yaml`'s exact bytes — the same digest
 `scripts/checks/check-example-work.mjs` recomputes to refuse a mismatched, non-stale evidence file.
 
@@ -219,7 +219,6 @@ Frontend (`examples/todo-app-frontend/package.json`):
 npm run dev        # delegates to apps/web: next dev
 npm run build      # delegates to apps/web: next build
 npm run typecheck  # delegates to apps/web: tsc --noEmit
-npm run test:unit  # vitest run
 ```
 
 Infra (`.starcistacks/dev/README.md`): one Compose project,
@@ -254,7 +253,7 @@ secret is ever written into the tracked tree.
 | `node scripts/checks/check-example-yaml.mjs examples` | Any `.yaml`/`.yml` under `examples` the runtime's own strict loader cannot parse — a permissive parser accepting silently-invented keys is exactly the bug this gate exists to catch |
 | `node scripts/checks/check-example-work.mjs` | An id that doesn't match its directory place; a `ref`/`blockedBy`/`conflictsWith`/`appliesTo`/`subscribes`/`extends` pointing at an id nothing owns; a stale `blockedBy` (target already `done` at or past the cited rev); `blockedBy` authored as prose instead of `{record, rev?, because}`; a `work/gap@1` missing `state`/`statement`; a `work/policy-decision@1` with an invented `outcome` or a `chosen` not in `options`, or a `targetModule`; an unclosed `change.kind`; a `done` record with no evidence and no authored-claim declaration; `appliesTo` on the wrong schema or pointing nowhere; a malformed `work/event@1` or a `subscribes`/`extends` pointing at the wrong schema; `work/implementation@1` using `directory`/`files` instead of `owners`; and an `evidence.yaml` whose `recordDigest` no longer matches its sibling's current bytes without `stale: true` |
 | `node scripts/checks/architecture.mjs <repo-root>` | Backend/frontend dependency direction crossing a resolved responsibility boundary (app→feature→module, component/hook/module tiers), thin-app violations, undeclared package exports, unresolved internal imports (errors, not violations) |
-| `npm test` (backend, jest) / `npm run test:unit` (frontend, vitest) | Any spec whose assertions do not hold against current source |
+| `npm test` (backend, jest) | Any spec whose assertions do not hold against current source; a front end has no tests |
 | `npm run typecheck` (frontend, `tsc --noEmit`) | Any type error across the checked TypeScript program |
 
 ## 8. What a new feature must add

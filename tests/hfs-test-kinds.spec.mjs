@@ -26,11 +26,6 @@ test('the retired int-spec, harness and live test kinds are flagged; unit, integ
     'src/tests/e2e/lane.harness-spec.ts', 'src/tests/e2e/live/payos/hook.e2e-spec.ts', 'src/tests/harness/world.ts', 'src/tests/live/pay.e2e-spec.ts']);
 });
 
-test('a frontend Playwright spec must be *.e2e-spec.ts and only one root playwright.config.ts exists', t => {
-  const root = tree(t, ['e2e/flows/sign-in.e2e-spec.ts', 'e2e/flows/old.spec.ts', 'playwright.config.ts', 'e2e/playwright.config.ts']);
-  assert.deepEqual(retired(root, ['frontend']), ['e2e/flows/old.spec.ts', 'e2e/playwright.config.ts']);
-});
-
 const withFiles = (t, files) => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'hk-e2e-manual-'));
   t.after(() => fs.rmSync(root, { recursive: true, force: true }));
@@ -73,15 +68,6 @@ test('integration, e2e and contract stay out of hooks, default typecheck, covera
     'package.json: Script typecheck is run by a husky hook and touches integration, e2e or contract',
     'tsconfig.json: The default tsconfig includes src/tests/{world,integration,e2e,contract}/**',
   ]);
-});
-
-test('a frontend root tsconfig must exclude e2e/**, and lint-staged must not run e2e', t => {
-  const files = { 'e2e/flows/a.e2e-spec.ts': 'export {}', 'tsconfig.json': JSON.stringify({ compilerOptions: {} }), 'package.json': JSON.stringify({ 'lint-staged': { '*.ts': 'playwright test' } }) };
-  assert.deepEqual(inAutomaticGate(withFiles(t, files), ['frontend']), [
-    'package.json: lint-staged runs an integration, e2e or contract command',
-    'tsconfig.json: The root tsconfig includes e2e/**',
-  ]);
-  assert.deepEqual(inAutomaticGate(withFiles(t, { ...files, 'tsconfig.json': JSON.stringify({ exclude: ['e2e/**'] }), 'package.json': '{}' }), ['frontend']), []);
 });
 
 test('a worktree and its main checkout are one repository name', () => {

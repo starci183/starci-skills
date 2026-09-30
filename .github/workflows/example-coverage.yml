@@ -4,7 +4,7 @@ name: example-coverage
 # own Codecov flag so the examples stay separable from each other and from the main repository's
 # gate (root ci.yml runs `npm run check` and `npm test` for the main tree and uploads no coverage,
 # so every lcov.info Codecov holds comes from this workflow and carries a flag).
-# ecommerce-app-fe is intentionally absent: it has no unit suite today.
+# A front end has no tests, so no front-end example is here.
 
 on:
   push:
@@ -40,9 +40,6 @@ jobs:
           - dir: examples/ecommerce-app-be
             flag: ecommerce-be
             run: npx jest --selectProjects unit --coverage
-          - dir: examples/todo-app-frontend
-            flag: todo-fe
-            run: npx vitest run --coverage
     defaults:
       run:
         working-directory: ${{ matrix.app.dir }}

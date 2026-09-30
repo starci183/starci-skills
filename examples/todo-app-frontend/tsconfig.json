@@ -16,6 +16,5 @@
     "resolveJsonModule": true,
     "isolatedModules": true,
     "jsx": "preserve"
-  },
-  "include": ["vitest.setup.ts"]
+  }
 }

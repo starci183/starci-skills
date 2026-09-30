@@ -21,7 +21,7 @@
 import { functionOf, isFn } from "./lib/bindings.mjs"
 import { hfsOf } from "./lib/hfs.mjs"
 import { isPromiseValued } from "./lib/types.mjs"
-import { fileOf, isSpecFile, roleOfFile, slotOfFile } from "./lib/scope.mjs"
+import { fileOf, roleOfFile, slotOfFile } from "./lib/scope.mjs"
 
 /**
  * The budget the slot of the linted file states (`budget` in knowledge/hfs/slots.yaml), or an empty one when no slot owns the file
@@ -86,7 +86,6 @@ export const componentLineBudget = {
   },
   create(context) {
     // A spec is not held to a budget; a file has one when its role or its slot states it.
-    if (isSpecFile(fileOf(context))) return {}
     const max = lineBudgetOf(context)
     if (max === null) return {}
     const source = context.sourceCode || context.getSourceCode()
@@ -116,7 +115,6 @@ export const unitHookBudget = {
     },
   },
   create(context) {
-    if (isSpecFile(fileOf(context))) return {}
     // A slot that states no `useState` / `dataHooks` budget puts no bound on that count: the rule refuses to invent one.
     const { useState: maxState, dataHooks: maxData } = budgetOf(context)
     if (typeof maxState !== "number" && typeof maxData !== "number") return {}
@@ -221,7 +219,6 @@ export const noHandRolledPolling = {
     },
   },
   create(context) {
-    if (isSpecFile(fileOf(context))) return {}
     const source = context.sourceCode || context.getSourceCode()
     return {
       CallExpression(node) {

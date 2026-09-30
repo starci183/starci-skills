@@ -15,7 +15,7 @@ import { loadHfs, starciFeConfig } from "@starci/eslint-canon-fe"
 export default starciFeConfig({ hfs: loadHfs(import.meta.url) })
 ```
 
-`loadHfs` reads the repository's `hfs.json` and the slot manifest shipped in `runtime/`. The factory returns three
+`loadHfs` reads the repository's `hfs.json` and the slot manifest shipped in `runtime/`. The factory returns two
 flat-config blocks and owns everything about the law: which files are linted (from the HFS profile), which rules are on
 (every one, at `error` - nothing is off and nothing is a warning), the React Hooks rules (`eslint-plugin-react-hooks` 7, its
 recommended set lifted to `error`), typed linting, and the inline-directive fence (`noInlineConfig` plus
@@ -24,9 +24,8 @@ recommended set lifted to `error`), typed linting, and the inline-directive fenc
 - The **ignore** block: `node_modules`, `.next`, `dist`, `coverage`, `__generated__` and `.starci/`.
 - The **source** block governs `apps/*/src/**` and `packages/*/src/**` with types (`parserOptions.projectService`) and
   `settings.starci.hfs`, the slot view path-scoped rules ask (`lib/hfs.mjs` `hfsOf`), never a path pattern.
-- The **e2e** block governs `e2e/**` and `playwright.config.ts` with the e2e rules and the escape-hatch fence.
 
-`recommended`, `sourceRecommended`, `e2eRecommended`, `why`, `loadHfs`, `linterOptions` and the plugin itself are also
+`recommended`, `why`, `loadHfs`, `linterOptions` and the plugin itself are also
 exported; `why[rule]` is `{ code, vi, fixVi }`, the finding code and the Vietnamese why the harness quotes.
 
 ## Rules
@@ -36,8 +35,7 @@ its Vietnamese why. New in 5.0: [env-owner](docs/env-owner.md), [transport](docs
 [client-boundary](docs/client-boundary.md), [hooks-folder](docs/hooks-folder.md),
 [next-conventions](docs/next-conventions.md), [translation](docs/translation.md) (no literal copy at any
 tier, no `vn-ok`), [brand-values](docs/brand-values.md), [native-controls](docs/native-controls.md),
-[size-and-state-budget](docs/size-and-state-budget.md), [e2e-shape](docs/e2e-shape.md),
-[spec-quality](docs/spec-quality.md) and [lint-escape-hatch](docs/lint-escape-hatch.md). New in 5.1: [lists](docs/lists.md), [hygiene](docs/hygiene.md), [formatting](docs/formatting.md) and [type-safety](docs/type-safety.md), plus rules added to next-conventions, client-boundary, native-controls and transport. New in 6.1: `no-vietnamese-in-source` (English-only identifiers, strings, comments and test titles; the i18n fixtures slot `e2e/fixtures/i18n/` is the one exemption). New in 6.0: `effect-subscription-needs-cleanup` (timers, frames, listeners, observers, sockets and subscriptions are released against the same handle), `server-module-marks-server-only` ([client-boundary](docs/client-boundary.md)), `no-data-fetch-in-effect` sees indirect loads, `no-hardcoded-copy` reads templates and sentence values, `no-inline-lint-config` refuses `NOSONAR` and the coverage/formatter switches. Also new in 6.0: [grammar-boundary](docs/grammar-boundary.md) (`no-raw-structural-element`), `one-outcome-union` ([transport](docs/transport.md)), `i18n-stack-in-one-module` ([next-conventions](docs/next-conventions.md)), [size-growth](docs/size-growth.md) (`file-size-growth`: a file over the manifest's line budget is not born large and does not grow; the budget is `ruleParams.fe.fileLines`, read from the manifest copy in `runtime/`).
+[size-and-state-budget](docs/size-and-state-budget.md) and [lint-escape-hatch](docs/lint-escape-hatch.md). New in 5.1: [lists](docs/lists.md), [hygiene](docs/hygiene.md), [formatting](docs/formatting.md) and [type-safety](docs/type-safety.md), plus rules added to next-conventions, client-boundary, native-controls and transport. New in 6.1: `no-vietnamese-in-source` (English-only identifiers, strings, comments and test titles; the i18n fixtures slot `e2e/fixtures/i18n/` is the one exemption). New in 6.0: `effect-subscription-needs-cleanup` (timers, frames, listeners, observers, sockets and subscriptions are released against the same handle), `server-module-marks-server-only` ([client-boundary](docs/client-boundary.md)), `no-data-fetch-in-effect` sees indirect loads, `no-hardcoded-copy` reads templates and sentence values, `no-inline-lint-config` refuses `NOSONAR` and the coverage/formatter switches. Also new in 6.0: [grammar-boundary](docs/grammar-boundary.md) (`no-raw-structural-element`), `one-outcome-union` ([transport](docs/transport.md)), `i18n-stack-in-one-module` ([next-conventions](docs/next-conventions.md)), [size-growth](docs/size-growth.md) (`file-size-growth`: a file over the manifest's line budget is not born large and does not grow; the budget is `ruleParams.fe.fileLines`, read from the manifest copy in `runtime/`).
 
 Older laws cover comments, file layout, icons and vendor ownership, landmarks, loading states,
 naming, props, served locales, component splits, design tokens, type safety, typography, and

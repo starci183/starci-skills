@@ -629,9 +629,9 @@ function ruleCatalogProblems(d) {
     if (!isPlainObject(r)) { bad.push(`${at} is not a map`); return; }
     const label = typeof r.id === 'string' ? r.id : at;
     for (const key of Object.keys(r)) if (!['id', 'code', 'law', 'kinds', 'gates', 'failureCodes', 'enforcers'].includes(key)) bad.push(`${label} has unknown key ${key}`);
-    const expectedId = `R${String(index + 1).padStart(2, '0')}`;
-    if (!/^R\d{2}$/.test(String(r.id))) bad.push(`${at}.id must be R<two digits>`);
-    else if (r.id !== expectedId) bad.push(`${label} is out of order: ${at} must be ${expectedId}`);
+    // A retired rule leaves its id unused for good (never reused), so ids only have to increase.
+    if (!/^R\d{2,3}$/.test(String(r.id))) bad.push(`${at}.id must be R<two or three digits>`);
+    else if (index > 0 && typeof d.rules[index - 1]?.id === 'string' && Number(r.id.slice(1)) <= Number(d.rules[index - 1].id.slice(1))) bad.push(`${label} is out of order: ids must increase, and ${d.rules[index - 1].id} comes before it`);
     if (!FINDING_CODE.test(String(r.code))) bad.push(`${label}.code must be an UPPER_SNAKE finding code`);
     if (typeof r.law !== 'string' || !r.law.trim()) bad.push(`${label}.law is missing`);
     if (typeof r.law === 'string' && r.law.includes('\n')) bad.push(`${label}.law must be one line`);

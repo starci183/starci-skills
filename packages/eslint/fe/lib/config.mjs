@@ -6,8 +6,7 @@
  *     import { loadHfs, starciFeConfig } from "@starci/eslint-canon-fe"
  *     export default starciFeConfig({ hfs: loadHfs(import.meta.url) })
  *
- * The factory owns everything else: which files are linted (the source of every app and every workspace package, and the
- * e2e tree), typed linting on the source (`parserOptions.projectService`, so a rule asks what a node IS rather than what
+ * The factory owns everything else: which files are linted (the source of every app and every workspace package), typed linting on the source (`parserOptions.projectService`, so a rule asks what a node IS rather than what
  * it is called), the ignores, the linter options that make a disable comment impossible, every canon rule at `error`,
  * the React Hooks rules at `error`, and `settings.starci.hfs` - the slot view each path-scoped rule asks instead of a path
  * pattern. It takes no rule overrides, globs or ignores: there is no parameter through which a repository could weaken
@@ -21,9 +20,6 @@ export const linterOptions = Object.freeze({ noInlineConfig: true, reportUnusedD
 /** The product source of a front end: every app's `src/` and every workspace package's `src/` (slots fe.* and repo.packages). */
 export const SOURCE_FILES = Object.freeze(["apps/*/src/**/*.{ts,tsx}", "packages/*/src/**/*.{ts,tsx}"])
 
-/** The e2e tree (slots fe.e2e, fe.e2e-support) and the Playwright config beside it. */
-export const E2E_FILES = Object.freeze(["e2e/**/*.{ts,tsx}", "playwright.config.ts"])
-
 /** Build output, installed packages, generated wire types and the harness's report directory are never linted. */
 export const IGNORED = Object.freeze(["**/node_modules/**", "**/.next/**", "**/dist/**", "**/coverage/**", "**/__generated__/**", ".starci/**"])
 
@@ -36,20 +32,17 @@ const levelOf = (setting) => (Array.isArray(setting) ? setting[0] : setting)
  * @param {object} input.hfs - The HFS view of the repository (`loadHfs(import.meta.url)`).
  * @param {object} input.plugin - The canon plugin.
  * @param {Record<string, unknown>} input.source - The source-tree levels (canon rules plus the React Hooks rules).
- * @param {Record<string, unknown>} input.e2e - The e2e-tree levels.
  * @param {object} input.reactHooks - The React Hooks plugin.
- * @returns {Array<object>} The flat config: one ignore block, one typed source block and one e2e block.
+ * @returns {Array<object>} The flat config: one ignore block and one typed source block.
  */
-export const buildFeConfig = ({ hfs, plugin, source, e2e, reactHooks }) => {
+export const buildFeConfig = ({ hfs, plugin, source, reactHooks }) => {
   if (!hfs || typeof hfs.slotOf !== "function" || typeof hfs.repoRoot !== "string") {
     throw new Error("starciFeConfig needs { hfs: loadHfs(import.meta.url) } - the rules read the repository's slots through it")
   }
   if (hfs.profile !== "fe") throw new Error(`starciFeConfig lints a front end; hfs.json declares profile ${hfs.profile}`)
-  for (const [tree, levels] of [["source", source], ["e2e", e2e]]) {
-    if (Object.keys(levels).length === 0) throw new Error(`starciFeConfig received an empty ${tree} recommendation - a config with no rules is not adoption`)
-    const weak = Object.entries(levels).filter(([, setting]) => levelOf(setting) !== "error").map(([name]) => name)
-    if (weak.length > 0) throw new Error(`starciFeConfig refuses ${tree} rules not at error: ${weak.join(", ")}`)
-  }
+  if (Object.keys(source).length === 0) throw new Error("starciFeConfig received an empty source recommendation - a config with no rules is not adoption")
+  const weak = Object.entries(source).filter(([, setting]) => levelOf(setting) !== "error").map(([name]) => name)
+  if (weak.length > 0) throw new Error(`starciFeConfig refuses source rules not at error: ${weak.join(", ")}`)
   const settings = { starci: { hfs } }
   return [
     { ignores: [...IGNORED] },
@@ -65,15 +58,6 @@ export const buildFeConfig = ({ hfs, plugin, source, e2e, reactHooks }) => {
       plugins: { "starci-fe": plugin, "react-hooks": reactHooks },
       settings,
       rules: { ...source },
-    },
-    {
-      // The e2e tree is typed by tsconfig.e2e.json, which the project service does not open; its rules read syntax only.
-      files: [...E2E_FILES],
-      languageOptions: { parser: tsParser, ecmaVersion: "latest", sourceType: "module" },
-      linterOptions: { ...linterOptions },
-      plugins: { "starci-fe": plugin },
-      settings,
-      rules: { ...e2e },
     },
   ]
 }

@@ -129,7 +129,7 @@ export function readKnowledgeFiles(root) {
 
 /** The README rule table: [{id, code, law}] from the rows `| Rnn | \`CODE\` | law |`. */
 export function readmeRuleRows(text) {
-  return [...String(text).matchAll(/^\| (R\d{2}) \| `([A-Z0-9_]+)` \| (.*) \|$/gm)].map((m) => ({ id: m[1], code: m[2], law: m[3] }));
+  return [...String(text).matchAll(/^\| (R\d{2,3}) \| `([A-Z0-9_]+)` \| (.*) \|$/gm)].map((m) => ({ id: m[1], code: m[2], law: m[3] }));
 }
 /** A Vietnamese text carries at least one letter no other language of this repository uses. */
 const VIETNAMESE = /[àáảãạăằắẳẵặâầấẩẫậèéẻẽẹêềếểễệìíỉĩịòóỏõọôồốổỗộơờớởỡợùúủũụưừứửữựỳýỷỹỵđ]/i;
@@ -254,7 +254,7 @@ export function hfsRulesFindings({ catalog, plugins, failureCodes, files, emitte
     }
     for (const id of rows.keys()) add('HFS_RULE_LAW_DRIFT', id, `${RULES_README} lists ${id}, which the catalog does not have`);
     const last = catalog.rules.at(-1).id;
-    for (const m of String(readme).matchAll(/\bR01(?: to |-)(R\d{2})\b/g)) if (m[1] !== last) add('HFS_RULE_LAW_DRIFT', '-', `${RULES_README} states the range R01 to ${m[1]}, but the catalog ends at ${last}`);
+    for (const m of String(readme).matchAll(/\bR01(?: to |-)(R\d{2,3})\b/g)) if (m[1] !== last) add('HFS_RULE_LAW_DRIFT', '-', `${RULES_README} states the range R01 to ${m[1]}, but the catalog ends at ${last}`);
   }
   if (codes !== undefined) {
     // RED19: every emitted code belongs to exactly one rule; only an infrastructure refusal ("cannot judge") is owned by none.

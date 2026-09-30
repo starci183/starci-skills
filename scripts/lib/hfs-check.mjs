@@ -21,6 +21,7 @@
 //   HFS_DEP_VERSION_SKEW          (R14, hfs-rules/deps.mjs) a dependency at two versions in the workspace, or a nested copy in the lockfile
 //   HFS_CONTRACT_SNAPSHOT_DRIFT   (R23, hfs-rules/contract.mjs) an uncommitted back-end snapshot, or a front-end copy that differs from it
 //   BE_TEST_TOPOLOGY              (R47, hfs-rules/test-topology.mjs) a `.test` file, a testing/ folder, a second jest configuration
+//   FE_NO_TESTS                   (R97, hfs-rules/fe-no-tests.mjs) a front end holds a spec, e2e or test-tool file, a test script or a test dependency; no exception
 //   BE_SPEC_PLACEMENT             (R98, hfs-rules/spec-placement.mjs) a spec or test file outside the four test layers, scripts/ and tools/ included
 //   HFS_REPO_LOCAL_CHECK          (R99, hfs-rules/repo-local-checks.mjs) a local eslint rule or plugin, a `check-*` script, a relative import in eslint.config
 //   HFS_LINT_SUPPRESSION_FILE     (R100, hfs-rules/lint-suppression.mjs) an eslint suppressions file, script or option
@@ -62,6 +63,7 @@ import { secretFindings, slotOwnsSecrets } from './hfs-rules/secrets.mjs';
 import { specPlacementFindings } from './hfs-rules/spec-placement.mjs';
 import { stacksFindings } from './hfs-rules/stacks.mjs';
 import { testTopologyFindings } from './hfs-rules/test-topology.mjs';
+import { feNoTestsFindings, isFeTestPath } from './hfs-rules/fe-no-tests.mjs';
 
 export const CANON_PINS_FILE = 'knowledge/hfs/canon-pins.yaml';
 export const FAILURE_CODES_FILE = 'modules/kernel/failure-codes.yaml';
@@ -79,7 +81,7 @@ export const CHECK_CODES = Object.freeze([
   'HFS_SLOT_REQUIRED_MISSING', 'HFS_MIN_INSTANCES', 'HFS_CANON_PIN_DRIFT', 'HFS_SIZE_SOFT_BACKLOG', 'BE_SOURCE_FORM',
   'HFS_MANAGED_FILE_DRIFT', 'HFS_TOOL_CONFIG_LOCAL', 'HFS_RULE_OFF_WITHOUT_REPLACEMENT', 'HFS_TS_STRICT',
   'HFS_PLAINTEXT_SECRET', 'HFS_STACKS_SHAPE', 'HFS_CI_MISSING_CANON', 'HFS_DEP_VERSION_SKEW', 'HFS_CONTRACT_SNAPSHOT_DRIFT',
-  'BE_TEST_TOPOLOGY', 'BE_SPEC_PLACEMENT', 'HFS_REPO_LOCAL_CHECK', 'HFS_LINT_SUPPRESSION_FILE', 'HFS_PROOF_COMMAND_FILE_MISSING', 'FE_WIRE_GENERATED', 'FE_I18N_PLACEMENT', 'FE_I18N_CATALOG',
+  'BE_TEST_TOPOLOGY', 'BE_SPEC_PLACEMENT', 'HFS_REPO_LOCAL_CHECK', 'HFS_LINT_SUPPRESSION_FILE', 'HFS_PROOF_COMMAND_FILE_MISSING', 'FE_NO_TESTS', 'FE_WIRE_GENERATED', 'FE_I18N_PLACEMENT', 'FE_I18N_CATALOG',
   'HFS_GITIGNORE_BLOCK_DRIFT', 'HFS_SONAR_CONFIG', 'HFS_FORMAT',
   'HFS_EMPTY_DIR', 'HFS_GHOST_TREE', 'HFS_UNTRACKED_ROOT_ENTRY',
   ...REFUSAL_CODES,
@@ -150,6 +152,14 @@ const KEBAB = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 const SOURCE_ROOT = /^(?:src|apps)\//;
 const FREE_NAMES = new Set(['index.ts', 'main.ts']);
 const PLAIN_ENTRY = /^<[a-z][a-z0-9-]*>.ts$/;
+/**
+ * Where the work of a banned data-access suffix goes. The suffix is banned by the manifest (ruleParams.be.bannedSuffixes);
+ * this only adds the convention's home to the finding, so a file that is a repository or a store is told what replaces it.
+ */
+const BANNED_SUFFIX_HOME = Object.freeze({
+  repository: 'SQL text is a constant in <name>.sql.ts of the capability persistence/ folder, and data access is the capability *.service.ts (or the application *.handler.ts) calling the shared EntityManager through its Inject<Conn>EntityManager()',
+  store: 'SQL text is a constant in <name>.sql.ts of the capability persistence/ folder, and data access is the capability *.service.ts (or the application *.handler.ts) calling the shared EntityManager through its Inject<Conn>EntityManager()',
+});
 
 /**
  * BE_SOURCE_FORM (R89): every tracked src/ or apps/ TypeScript file of a back end is index.ts, main.ts, a migration of
@@ -183,7 +193,7 @@ function sourceFormFindings({ files, resolver }) {
     const parts = base.slice(0, -'.ts'.length).split('.');
     const banned = parts.slice(1).find((part) => bannedSuffixes.includes(part));
     if (banned) {
-      findings.push({ code: 'BE_SOURCE_FORM', level: 'error', path: file, suffix: banned, message: `${file}: the suffix .${banned} is banned; use a role from the closed suffix list (${suffixes.join(', ')})` });
+      findings.push({ code: 'BE_SOURCE_FORM', level: 'error', path: file, suffix: banned, message: `${file}: the suffix .${banned} is banned; use a role from the closed suffix list (${suffixes.join(', ')})${BANNED_SUFFIX_HOME[banned] ? `. ${BANNED_SUFFIX_HOME[banned]}` : ''}` });
     } else if (boundSuffixes.has(parts.at(-1)) && parts.length >= 2 && boundSuffixes.get(parts.at(-1)).id !== c.slot) {
       findings.push({ code: 'BE_SOURCE_FORM', level: 'error', path: file, suffix: parts.at(-1), message: `${file}: the suffix .${parts.at(-1)}.ts belongs to ${boundSuffixes.get(parts.at(-1)).path} only; move the file there` });
     } else if (parts.length < 2 || !parts.every((part) => KEBAB.test(part)) || !suffixes.includes(parts.at(-1))) {
@@ -285,6 +295,7 @@ export function checkRepo({ repoRoot, root = skillRoot, declaration, files, only
 
   for (const file of tracked) {
     if (!inScope(file)) continue;
+    if (repo.profile === 'fe' && isFeTestPath(file)) continue;   // a test path of a front end is FE_NO_TESTS's, the one finding of that file
     const c = resolver.classifyPath(file);
     if (c.status === 'no-slot') {
       findings.push({ code: 'HFS_SLOT_UNDECLARED', level: 'error', path: file, nearest: c.nearest, message: `${file} matches no slot${c.nearest ? `; nearest slot ${c.nearest.slot} (${c.nearest.pattern}), matched ${c.nearest.matchedPrefix || '.'} then expected ${c.nearest.expectedNext ?? 'nothing'}` : ''}` });
@@ -334,7 +345,7 @@ export function checkRepo({ repoRoot, root = skillRoot, declaration, files, only
     ...contractFindings({ repoRoot, files: tracked, repo, resolver, stacks: declared?.stacks }),
     ...repoLocalCheckFindings({ repoRoot, files: tracked }),
     ...lintSuppressionFindings({ repoRoot, files: tracked }),
-    ...(repo.profile === 'be' ? [...stacksFindings({ repoRoot, files: tracked, resolver }), ...testTopologyFindings({ repoRoot, files: tracked }), ...specPlacementFindings({ files: tracked, resolver }), ...proofCommandFindings({ repoRoot, files: tracked, resolver })] : frontendFindings({ repoRoot, files: tracked, repo })),
+    ...(repo.profile === 'be' ? [...stacksFindings({ repoRoot, files: tracked, resolver }), ...testTopologyFindings({ repoRoot, files: tracked }), ...specPlacementFindings({ files: tracked, resolver }), ...proofCommandFindings({ repoRoot, files: tracked, resolver })] : [...frontendFindings({ repoRoot, files: tracked, repo }), ...feNoTestsFindings({ repoRoot, files: tracked.filter(inScope) })]),
     ...extraFindings,
   );
 
@@ -430,7 +441,7 @@ export function checkRepository({ repoRoot, root = skillRoot, fast = false, base
 
 const TEST_KIND = {
   'unit-beside': 'a <name>.service.spec.ts beside each <name>.service.ts in this slot (only services are unit-tested)',
-  e2e: 'an e2e spec (*.e2e-spec.ts or a Playwright spec) covering the flow; no unit spec is required',
+  e2e: 'an integration, e2e or contract spec covering the flow; no unit spec is required',
   none: 'no test is required for files in this slot',
 };
 

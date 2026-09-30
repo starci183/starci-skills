@@ -24,7 +24,7 @@
 //   hfs emit-contracts [--repo <dir>]      write contracts/<app>/schema.graphql of every api app that serves GraphQL (emit/contracts.mjs):
 //                                            printSchema(lexicographicSortSchema) of the resolvers the app root composes; no env, no database, no network.
 //   hfs sync (--check | --write) [--root <dir>]  the generated files (husky, CI, .gitignore block, sonar, codecov); sync/cli.mjs
-//   hfs work-hygiene                              the pre-commit guard for staged .starciwork and .starcistacks paths; sync/cli.mjs
+//   hfs work-hygiene                              the pre-commit guard: staged .starciwork and .starcistacks paths, and the secrets guard over every staged file (read from the index); sync/cli.mjs
 // Every finding names a why code and carries its Vietnamese text. The command reads the repository, never writes to it
 // (init writes hfs.json only, and only when none exists). Exit codes: 0 clean, 1 error findings, 2 a refusal or bad usage.
 import fs from 'node:fs';

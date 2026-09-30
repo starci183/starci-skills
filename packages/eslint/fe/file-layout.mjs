@@ -13,7 +13,7 @@
  */
 
 import { hfsOf } from "./lib/hfs.mjs"
-import { classOf, fileOf, inSlot, isComponentFile, isSpecFile, kindOfFile, roleOfFile, tierOfFile } from "./lib/scope.mjs"
+import { classOf, fileOf, inSlot, isComponentFile, kindOfFile, roleOfFile, tierOfFile } from "./lib/scope.mjs"
 
 /** The path segments of the linted file below the folder of its owner (the slot's `root`), directories only. */
 const dirsBelowRoot = (context) => {
@@ -55,9 +55,9 @@ const surfaceFolder = (context) => {
   return { tier: kind, name: bindings.name, rest: below.join("/") }
 }
 
-/** A file a surface folder may hold: one of the slot's roles (entry, drawing, styles) or a `.spec.` twin, directly in the folder. */
+/** A file a surface folder may hold: one of the slot's roles (entry, drawing, styles), directly in the folder. */
 const belongsInSurfaceFolder = (context, folder) =>
-  !folder.rest.includes("/") && (roleOfFile(context) !== null || (isSpecFile(folder.rest) && folder.rest.includes(".spec.")))
+  !folder.rest.includes("/") && roleOfFile(context) !== null
 
 // -- FILE-2 --------------------------------------------------------------------------------------
 
@@ -253,19 +253,6 @@ export const monorepoTierBelongsToItsSide = {
 // -- FILE-6 --------------------------------------------------------------------------------------
 
 /**
- * A test sitting beside the thing it tests.
- *
- * EXEMPT, because a test is not a component and cannot become the second page this rule exists to
- * prevent - it ships in no bundle and no route renders it. Refusing it would push route tests out of
- * the one directory where the next reader looks for them, which is the opposite of the twin-test
- * habit every other tier here follows.
- *
- * The name is deliberately not required to match `page` or `layout`. A route's tests split by
- * CONCERN - what the screen renders, who may reach it, where the boundary sits - and forcing them
- * into one `page.spec.tsx` would buy nothing but a longer file. A spec is named `.spec.` by the slot
- * definitions themselves, so that stays a file-name test.
- */
-/**
  * A file under `app/` names which page renders at which URL, and does nothing else.
  *
  * WHY THIS RULE EXISTS RATHER THAN THE PARAGRAPH ALONE. The law said "the route file mounts and
@@ -374,32 +361,6 @@ export const noShellTier = {
   },
 }
 
-// -- FILE-9 --------------------------------------------------------------------------------------
-
-/** Frontend units are `.spec.` twins beside the source they exercise. */
-export const unitTestColocated = {
-  meta: {
-    type: "problem",
-    docs: { description: "Frontend unit tests are colocated `.spec.` files; frontend owns no separate test tree." },
-    schema: [],
-    messages: {
-      suffix: "`{{name}}` uses the generic `.test.` suffix. A frontend unit is a colocated `.spec.` twin beside its production owner.",
-      bucket: "`{{path}}` files a frontend unit in a separate test bucket. Move the cases beside their production owner; only backend E2E owns a separate test tree.",
-    },
-  },
-  create(context) {
-    const file = fileOf(context)
-    if (!isSpecFile(file)) return {}
-    const name = file.slice(Math.max(file.lastIndexOf("/"), file.lastIndexOf("\\")) + 1)
-    return {
-      Program(node) {
-        if (name.includes(".test.")) context.report({ node, messageId: "suffix", data: { name } })
-        if (tierOfFile(context) === "e2e") context.report({ node, messageId: "bucket", data: { path: hfsOf(context).relative(file) } })
-      },
-    }
-  },
-}
-
 /**
  * The component a route slot mounts takes the slot's own name.
  *
@@ -494,7 +455,6 @@ export const rules = {
   "export-matches-folder": exportMatchesFolder,
   "no-runtime-namespace": noRuntimeNamespace,
   "monorepo-tier-belongs-to-its-side": monorepoTierBelongsToItsSide,
-  "unit-test-colocated": unitTestColocated,
 }
 
 /**

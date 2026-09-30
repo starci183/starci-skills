@@ -1,5 +1,16 @@
 # Changelog
 
+## 7.0.0 - 2026-09-30
+
+- **Breaking: the front end has no tests, so the front-end test rules are gone.** Removed rules: `no-class-string-in-spec`,
+  `spec-tests-its-neighbour`, `no-barrel-spec`, `no-double-cast-in-spec`, `connected-spec-has-axe`, `no-mocked-translations`
+  (spec quality), `e2e-spec-location`, `e2e-no-absolute-path`, `e2e-no-docker`, `e2e-no-cross-repo-write`, `e2e-no-skip`,
+  `e2e-typed-helpers`, `playwright-viewports` (e2e shape) and `unit-test-colocated`, with their why entries, docs and fixtures.
+  The factory no longer builds an e2e block (`e2e/**`, `playwright.config.ts`) and returns the ignore block and the typed source block
+  only; `sourceRecommended` and `e2eRecommended` are gone (`recommended` is the one set); the spec and e2e exemptions of the other
+  rules (`isSpecFile`, `isE2eSource`, the `e2e` tier) are deleted. A test file, a test-tool file or a test dependency in a
+  front-end repository is now refused by `hfs check` (FE_NO_TESTS, R97) instead.
+
 ## Unreleased (lane C0)
 
 - **New: `no-vietnamese-in-source` (R91).** Identifiers, string literals, template text, JSX text, comments and test titles carry no Vietnamese letter, specs included. Detection is structural on characters (`scripts/lib/language.mjs` in `runtime/`, folded to NFC, so NFD is caught too). The only exemption is the i18n fixtures slot `fe.e2e-support.i18n` (`e2e/fixtures/i18n/`). Removed: the second-language branches of `no-hardcoded-copy` (its `second` and `comment` messages) and the `SECOND_LANGUAGE_LETTER` export; the one rule holds the law.

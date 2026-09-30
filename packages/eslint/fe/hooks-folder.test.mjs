@@ -26,10 +26,8 @@ test("FE-HOOKS-1: hooks/ holds hooks, one shared helper file per domain, and not
       // a private helper is an implementation detail of the hook
       { filename: HOOK, code: "const key = (id) => id\nexport const useCourse = () => key(1)" },
       { filename: SHARED, code: "export const courseKey = (id) => [\"course\", id]" },
-      { filename: at("apps/web/src/hooks/course/useCourse.test.ts"), code: "export const x = 1" },
       // the domain's entry is a file the slot names: it is not a stray helper
       { filename: at("apps/web/src/hooks/course/index.ts"), code: "export { useCourse } from \"./useCourse\"" },
-      { filename: at("apps/web/src/hooks/course/index.spec.ts"), code: "export const x = 1" },
       // the second app has its own hooks folder
       { filename: at("apps/admin/src/hooks/course/useCourse.ts"), code: "export const useCourse = () => 1" },
       // a folder named hooks that no slot owns is not judged by this rule

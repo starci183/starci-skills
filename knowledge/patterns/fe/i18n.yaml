@@ -90,27 +90,23 @@ rules:
         - Review that keys name the meaning, not the current wording.
     relatedExamples: []
   - id: FE-I18N-3
-    title: Catalogs share one key set and specs use the real catalog
+    title: Catalogs share one key set
     kind: mandatory
-    hfsRules: [R60]
+    hfsRules: [R60, R102]
     requirement: |-
-      The catalogs of all locales have exactly the same keys: no missing and no extra key. Catalogs are split by
-      namespace, and a client component receives only its picked namespaces. Specs render with the real catalog through the
-      next-intl test provider; a mock of `useTranslations` that echoes the key is forbidden.
+      The catalogs of all locales have exactly the same keys: no missing and no extra key. A key the source reads with a
+      literal exists in every locale, and a key that nothing reads is deleted. Catalogs are split by namespace, and a
+      client component receives only its picked namespaces.
     rationale: |-
-      A missing key shows up in production as raw key text, and an echo mock lets a spec pass while the real copy is
-      absent.
+      A missing key shows up in production as raw key text.
     cases:
       - id: case-1
         when: A new string
         write: Add the key to messages/vi.json and messages/en.json in the same change.
-      - id: case-2
-        when: A spec
-        write: 'render(<NextIntlClientProvider locale="vi" messages={messages}><SalesSummaryBase {...fixture} /></NextIntlClientProvider>)'
     verification:
       automated:
         - FE_I18N_CATALOG
-        - FE_SPEC_QUALITY
+        - FE_I18N_KEYS
       manual: []
     relatedExamples: []
   - id: FE-I18N-4

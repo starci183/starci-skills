@@ -28,19 +28,19 @@ marked in-source with `// contract:` pointers.
 
 ## Stack
 
-Next.js, React, TypeScript, npm workspaces, `@starci/grammar`, Vitest and Playwright.
+Next.js, React, TypeScript, npm workspaces, `@starci/grammar`.
 
 ## Repository layout
 
 - `apps/landing/src`: public marketing app; `apps/shop/src`: authenticated shop app.
 - `packages/shared`: shared UI and runtime configuration package.
-- `scripts/`: repository tooling; `e2e/`: Playwright `*.e2e-spec.ts` flows, run by `npm run test:e2e` through the root `playwright.config.ts`. E2E runs manually only (owner ruling 2026-09-29): no hook, default typecheck/lint, coverage or automatic CI job runs it; `npm run typecheck:e2e` is its manual type check.
+- `scripts/`: repository tooling. A front end has no tests.
 - The paired backend owns `.starciwork` and `.starcistacks` for this product.
 
 ## Development
 
 From this directory run `npm install`, then `npm run typecheck`, `npm run lint:check`,
-`npm run build` and `npm run test:unit`. The commands below start the apps using the
+and `npm run build`. The commands below start the apps using the
 paired backend's port projection.
 
 ## Ports: there is one projection and it is read, never restated
@@ -84,7 +84,5 @@ npm run typecheck
 
 With no backend running, `/browse` and `/account` in the shop render their unreachable states and name the
 service and reason rather than showing placeholder data; `/cart` and `/checkout` render their genuine empty
-states. That is the intended honest behavior — `node scripts/capture.mjs` while both apps serve writes
-the running-page record (PNG + markup per route and viewport) under `captures/`, gitignored agent
-output; `node scripts/verify-render.mjs --record <ui-screen-id> <custody|captures|render>` checks the
-pairs against the Work tree's ui records.
+states. That is the intended honest behavior — `node scripts/verify-render.mjs --record <ui-screen-id> <custody|captures|render>` checks the
+running-page pairs (PNG + markup per route and viewport) against the Work tree's ui records.

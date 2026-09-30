@@ -1,0 +1,16 @@
+id: hfs-fe-i18n-keys
+effectiveAt: '2026-10-01T00:30:00+07:00'
+summary: >-
+  New rule R102 FE_I18N_KEYS (architecture machine enforcer i18n-keys, error), ported from the deleted check-i18n-catalog scripts of the front-end
+  repositories: a literal key read through next-intl (useTranslations, getTranslations, t, t.rich, t.raw, t.markup) exists in every locale
+  catalog of the app, and a catalog key that no string of the app's or the shared packages' source can be reading (a tail of its dotted path)
+  is a finding. Computed keys and namespaces count as reads and are never judged. The key-set parity of the locales stays R60 FE_I18N_CATALOG;
+  literal copy stays R58 (eslint-canon-fe).
+reach: new-legs
+paths:
+  - modules/kernel/contract-changes/hfs-fe-i18n-keys.yaml
+  - knowledge/hfs/rules.yaml
+  - knowledge/hfs/README.md
+  - knowledge/patterns/fe/i18n.yaml
+  - scripts/checks/architecture/i18n-keys.mjs
+  - scripts/checks/architecture/index.mjs

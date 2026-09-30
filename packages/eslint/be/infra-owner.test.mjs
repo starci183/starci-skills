@@ -63,6 +63,7 @@ test("infra-import-owner: each raw library is used only by its owner", () => {
             { filename: at("src/modules/platform/primitives/time.ts"), code: `import moment from "moment"\nexport { moment }` },
             { filename: CACHE, code: `import { caching } from "cache-manager"\nimport { createClient } from "redis"\nexport { caching, createClient }` },
             { filename: REDIS, code: `import Redis from "ioredis"\nexport { Redis }` },
+            { filename: CACHE, code: `import { CACHE_MANAGER } from "@nestjs/cache-manager"\nexport { CACHE_MANAGER }` },
             // the world's inlined helpers (slot be.tests.world.kit) belong to the same composition root: raw client, timers
             { filename: at("src/tests/world/kit/e2e-http-client.ts"), code: `import axios from "axios"
 export { axios }` },
@@ -90,6 +91,8 @@ export { axios }` },
             { filename: DOMAIN, code: `export const load = () => import("axios")`, errors: [{ messageId: "foreign" }] },
             { filename: DOMAIN, code: `const Redis = require("ioredis")\nexport { Redis }`, errors: [{ messageId: "foreign" }] },
             { filename: DOMAIN, code: `export { caching } from "cache-manager"`, errors: [{ messageId: "foreign" }] },
+            // the retired repository rule must-use-cache-service: the raw cache token stays inside the cache capability
+            { filename: FEATURE, code: `import { CACHE_MANAGER } from "@nestjs/cache-manager"\nexport { CACHE_MANAGER }`, errors: [{ messageId: "foreign" }] },
             { filename: INTEGRATION, code: `import dayjs from "dayjs/plugin/utc"\nexport { dayjs }`, errors: [{ messageId: "foreign" }] },
             { filename: DOMAIN, code: `import winston from "winston"\nexport { winston }`, errors: [{ messageId: "foreign" }] },
             { filename: DOMAIN, code: `import { Worker } from "bullmq"\nexport { Worker }`, errors: [{ messageId: "foreign" }] },
