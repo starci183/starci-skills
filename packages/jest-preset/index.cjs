@@ -63,7 +63,9 @@ const underTests = (folder) => String.raw`[\\/]src[\\/]tests[\\/]` + folder + St
  *
  * The managed scripts select one project each (`test` = unit, `test:integration`, `test:e2e`, `test:contract`); the
  * contract project is never part of `test` or `test:e2e`, and a contract spec skips itself without sandbox config. The
- * test tree compiles against `src/tests/tsconfig.json`, the nearest config of every file under `src/tests/`.
+ * test tree compiles against `src/tests/tsconfig.json`, the nearest config of every file under `src/tests/`. The
+ * integration, e2e and contract projects share the world's `global-setup.ts`/`global-teardown.ts` (`src/tests/world/`) and
+ * run one worker; there is no `setupFilesAfterEnv`.
  * Coverage uses v8: istanbul instruments the helpers TypeScript emits (`__decorate`, `__param`, `__awaiter`, interop wrappers)
  * as thousands of branches no spec can cover, while v8 measures the real source.
  */
@@ -81,6 +83,9 @@ function starciJestConfig() {
     displayName,
     maxWorkers: 1,
     testMatch: [`<rootDir>/src/tests/${displayName}/**/*.${suffix}.ts`],
+    // The one test world: started once per run of a project that has a test to run, torn down after it.
+    globalSetup: "<rootDir>/src/tests/world/global-setup.ts",
+    globalTeardown: "<rootDir>/src/tests/world/global-teardown.ts",
   })
   return {
     testTimeout: 120_000,

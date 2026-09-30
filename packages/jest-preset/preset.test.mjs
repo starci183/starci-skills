@@ -113,8 +113,12 @@ test('each test kind is its own project, matched by folder and suffix together; 
   for (const name of ['integration', 'e2e', 'contract']) {
     assert.equal(byName[name].maxWorkers, 1, name);
     assert.equal(byName[name].transform[String.raw`^.+\.ts$`][1].tsconfig, 'src/tests/tsconfig.json', name);
+    assert.equal(byName[name].globalSetup, '<rootDir>/src/tests/world/global-setup.ts', name);
+    assert.equal(byName[name].globalTeardown, '<rootDir>/src/tests/world/global-teardown.ts', name);
+    assert.equal('setupFilesAfterEnv' in byName[name], false, name);
   }
   assert.equal(byName.unit.transform[String.raw`^.+\.ts$`][1].tsconfig, 'tsconfig.json');
+  assert.equal('globalSetup' in byName.unit, false, 'unit specs need no world');
   assert.deepEqual(preset.TEST_KIND_FOLDERS, ['world', 'integration', 'e2e', 'contract']);
 });
 
