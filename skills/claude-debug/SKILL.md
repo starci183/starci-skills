@@ -2,8 +2,9 @@
 name: claude-debug
 description: >-
   Supervise and debug the StarCi CORE (the .claude runtime, reconciler engine, services, harness UI, checkers) from a
-  chat while workflows run: a continuous read-only core watch, a read-only diagnosis playbook, a fix loop through
-  disjoint Claude Sonnet lanes landed through the gate, hard rules and the known failure signatures. Kernels and the
+  chat while workflows run: invoked once it starts one Claude Code `/loop <config claudeDebug.interval>` (never a second one); each
+  tick is one pass (a read-only check of everything, diagnosis, one lane per new core alert, a Vietnamese diagnosis table), plus the fix
+  loop through disjoint Claude Sonnet lanes landed through the gate, hard rules and the known failure signatures. Kernels and the
   Supervisor seat run the workflows; this chat only fixes the core. Use when the owner says claude-debug, "debug
   core", "monitor core", "fix core while a workflow runs", or runs /claude-debug. Owner-facing replies in Vietnamese.
 user-invocable: true
@@ -11,9 +12,21 @@ user-invocable: true
 
 # claude-debug
 
-Reusable procedure for a chat that supervises and debugs the StarCi core while workflows run, so no chat writes an
-ad-hoc watcher or one-off query script again. Reply to the owner in Vietnamese; every file, commit and lane prompt is
-English.
+**Invoke once; it loops by itself.** `/claude-debug` (no argument) is the setup:
+
+1. Run `node --no-warnings scripts/supervisor/debug-pass.mjs setup`. It reads the interval from `config.yaml`
+   `claudeDebug.interval` (default in `config.example.yaml`; a missing block is refused with the line to copy, which the
+   owner adds) and prints `{created, loop: {id, interval, ...}}`.
+2. `{"created": false}`: a live loop already runs on this host (in this chat or another). Start nothing; tell the owner
+   in Vietnamese which loop (`loop.id`, last pass) and stop here.
+3. `{"created": true}`: start Claude Code's built-in loop with the loop skill: `/loop <loop.interval> /claude-debug pass`,
+   using the printed `loop.interval` verbatim. That is the only scheduler; never write a watcher, a sleep loop or a
+   Monitor stream instead.
+
+`/claude-debug pass` is one tick (section 2): exactly one pass, then the turn ends. To stop, end the `/loop` and run
+`node scripts/supervisor/debug-pass.mjs stop`.
+
+Reply to the owner in Vietnamese; every file, commit and lane prompt is English.
 
 ## 1. Role
 
@@ -24,17 +37,28 @@ English.
 - Reading a Kernel screen is allowed (read only, section 3). Restarting the engine or the host is the owner's
   `/start`, not this chat's reflex.
 
-## 2. Continuous core watch (read only, stdout lines only on change)
+## 2. One pass (`/claude-debug pass`)
 
-Start it once per chat as a Monitor stream:
+Commands run from the runtime root (`.claude`). One pass, then stop:
 
-```
-node --no-warnings scripts/supervisor/core-watch.mjs                  # forever, one line per change, every 60 s
-node --no-warnings scripts/supervisor/core-watch.mjs --once --json    # one snapshot {ok, alerts[]}
-```
+1. `node --no-warnings scripts/supervisor/debug-pass.mjs pass` takes one read-only core snapshot
+   of everything (`scripts/supervisor/core-watch.mjs --json` in process) and prints `{ok, loop, dispatched[], rows[]}`.
+   It closes the fixes whose alert cleared and records every alert that has no open fix; `dispatched` lists only those
+   new alerts, each with its default `fixOwner` (`owner` for an open owner ask or the owner's `config.yaml`, noted at
+   once; `core` for everything else, reserved for a lane). An alert that already has a lane (or a note) is never in
+   `dispatched` again, so a pass is idempotent.
+2. Diagnose each `dispatched` core alert read-only with section 3 until you can name its cause.
+3. A core defect: dispatch one lane (section 4), then
+   `node scripts/supervisor/debug-pass.mjs claim --key <alert key> --lane <lane>`. Not a core defect (an owner ask, a
+   workflow waiting normally): `node scripts/supervisor/debug-pass.mjs note --key <alert key> --reason "<why>"`. A lane that
+   died or landed without clearing its alert: `release --key <alert key>` so the next pass dispatches it again. A
+   reservation nobody claims or notes within 30 minutes is dispatched again.
+4. Print a short diagnosis table in Vietnamese from `rows`, one row per alert: symptom (the alert text), cause (your
+   diagnosis, or the recorded one for an alert already being fixed), fix owner (the `core` lane name, or the owner for
+   `owner`), state (new, fixing, noted, resolved). Then end the turn.
 
-Flags: `--interval <sec>`, `--child-timeout <sec>` (every child call is bounded, default 90), `--token-window <min>`,
-`--token-spike <n>` (0 disables). Lines are `ALERT <key>: <text>`, `OK <key> (was ...)` and `GONE <key>`. Facts:
+`core-watch.mjs [--json]` alone prints the same snapshot for a manual look. Flags (both scripts): `--child-timeout <sec>`
+(every child call is bounded, default 90), `--token-window <min>`, `--token-spike <n>` (0 disables). Facts (alert keys):
 
 - `engine`: no leader, leader STALE (heartbeat > 90 s), SAFE MODE. `engine-controllers`: a controller configured active
   that runs shadow/off. `engine-queue`: failing queue items.
@@ -42,12 +66,25 @@ Flags: `--interval <sec>`, `--child-timeout <sec>` (every child call is bounded,
   every seat not live.
 - `wf:<ledger>:<workflow>:*` for every non-finished workflow of every registered active ledger (no hard-coded ids):
   `leg:<op>:<job>` turning failed/blocked/cancelled, `wedged`, `dead`, `stale`, `stuck`, `held`, `owner` (open owner
-  asks), `status` (api status failed twice in a row).
+  asks), `status` (api status failed twice in a row within the snapshot).
 - `tokens`: input+output tokens in the window above the spike limit, from `machine.sqlite` `llm_usage` (there is no
   `api usage` verb).
+- `ledger:orphan:<id>`: a registered ledger whose state directory or every source root is gone.
+- `worktrees:<repo>`: for the runtime and every active ledger's repo, more registered worktrees than
+  `claudeDebug.worktreeLimit`, or a registered worktree whose directory is gone (prunable). Read only; never prune from
+  the pass.
+- `integrity:tracked-deleted`, `integrity:node_modules`, `integrity:packages/node_modules`: the runtime's main checkout
+  (first `git worktree list` entry) lost tracked files, or a node_modules directory is missing or empty (the signature of
+  a worktree removed through a junction).
+- `gate:land:<lane>`, `gate:push:<repo>`: in the last day, a lane whose latest land run did not pass, a repository whose
+  latest push failed or was refused (`machine.sqlite` `land_runs`, `pushes`).
+- `config:claudeDebug`: the `claudeDebug` block of `config.yaml` is missing or invalid (fix owner: the owner).
+- `collector:<name>`: a collector crashed; the rest of the snapshot still counts.
 
-The watcher never restarts, writes or dispatches anything. Auto-restart made the crash-loop safe mode worse; do not
-add it. An ALERT is a trigger for section 3, not for a restart.
+State: `<StarCi state root>/claude-debug/state.json` (`%LOCALAPPDATA%/StarCi`, moved by `STARCI_LOCAL_ROOT`), holding the
+loop record (live while it passed within 2 x interval + 5 min) and the open fixes keyed by alert key. The snapshot never
+restarts, writes or dispatches anything. Auto-restart made the crash-loop safe mode worse; do not add it. An alert is a
+trigger for section 3, not for a restart.
 
 ## 3. Diagnosis playbook (read only)
 
@@ -106,8 +143,8 @@ Also: `node scripts/reconciler/boot.mjs --status`, `node scripts/reconciler/star
    `node scripts/supervisor/land.mjs --commit <sha>[,<sha>...] --lane <lane> --specs touching --json`.
    Anything under `modules/`, `knowledge/` or a schema needs a `modules/kernel/contract-changes/<id>.yaml`.
 5. Never push. Pushing is `/push-git`'s job (once it exists; reference it by name, never run `push-mains.mjs`).
-6. After the land, watch the stream (section 2) until the alert clears, then report to the owner in Vietnamese: what
-   broke, the root cause, the landed shas, what is still open.
+6. After the land, the next passes (section 2) show the alert `resolved` once it clears; then report to the owner in
+   Vietnamese: what broke, the root cause, the landed shas, what is still open.
 
 ## 5. Hard rules (verbatim in every lane prompt)
 
@@ -145,6 +182,7 @@ Also: `node scripts/reconciler/boot.mjs --status`, `node scripts/reconciler/star
 | Kernel boot "did not render expected model" | The agent card lacks `modelAttestation.displayNames` for the pinned model; fix the card (`start.mjs --check` preflight names it). |
 | Supervisor seat `selector_not_found` | The nested `.claude` repo is not an Orca worktree; the seat and worker launch must fall back to the registered host repo. |
 | `LEDGER_CORRUPT` on a legacy store | Usually a false alarm for a legacy in-repo store; verify with `PRAGMA quick_check` on the registered file before acting; `start.mjs --retire-stale-ledgers` for temp/test paths. |
+| `integrity:*`: tracked files deleted and `packages/node_modules` empty in the main checkout (2026-10-01: 490 files, nothing caught it) | A `git worktree remove` ran through a node_modules junction. Fix the remover in a lane (rmdir junctions first); restoring the checkout is the owner's call. |
 | `push-mains.mjs` has no `--help` | Running it pushes. Never run it to see usage; read its source. |
 
 Add a row here when a new signature is understood, with the evidence query that found it.

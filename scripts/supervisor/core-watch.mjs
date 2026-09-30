@@ -1,28 +1,38 @@
 #!/usr/bin/env node
-// core-watch.mjs — the chat's continuous, READ-ONLY watch over the StarCi core while workflows run (skills/claude-debug).
+// core-watch.mjs — one READ-ONLY snapshot of the StarCi core (skills/claude-debug): every fact, every open alert, then exit.
 //
-//   node scripts/supervisor/core-watch.mjs                      one stdout line per CHANGE, every --interval seconds, forever
-//   node scripts/supervisor/core-watch.mjs --once [--json]      one snapshot (all facts and alerts), then exit
-//     [--interval <sec>]         default 60
-//     [--child-timeout <sec>]    timeout of every child call (api status, boot --status, services --list), default 90
+//   node scripts/supervisor/core-watch.mjs [--json]
+//     [--child-timeout <sec>]    timeout of every child call (api status, services --list), default 90
 //     [--token-window <min>]     llm_usage window for the token-spike fact, default 10
 //     [--token-spike <n>]        input+output tokens in that window that raise TOKENS, default 3000000 (0 disables)
 //
-// Facts (each is ok or an alert; a line prints only when a fact turns into an alert, changes its alert text, or recovers):
+// Facts (each is ok or an alert):
 //   ENGINE    leader missing/STALE (heartbeat > 90 s), safe mode, a controller configured active but effective shadow/off
 //   SERVICE   harness-ui local and public /healthz, harness-tunnel, ask-gateway, ask-tunnel, telegram-bridge, orca, every seat
 //   WORKFLOW  per non-finished workflow of EVERY registered active ledger (no hard-coded ids): phase, legs turning
 //             failed/blocked/cancelled, wedged / dead-worker / stale-operation / stuck jobs, open owner asks
 //   TOKENS    input+output tokens of the last window above --token-spike (machine.sqlite llm_usage; there is no `api usage` verb)
+//   LEDGER    a registered ledger whose state directory or every source root is gone (hk-orphan-ledgers)
+//   WORKTREE  per repository (the runtime and every active ledger's repo): more than claudeDebug.worktreeLimit worktrees,
+//             or a registered worktree whose directory is gone
+//   INTEGRITY the runtime's main checkout: tracked files deleted, node_modules or packages/node_modules missing or empty
+//   GATE      in the last day: a lane whose latest land run did not pass, a repository whose latest push failed
+//   CONFIG    config.yaml claudeDebug missing or invalid
 //
 // It never restarts, writes, dispatches or types into anything: machine.sqlite and every ledger are opened read-only, the
 // only children are read-only verbs, every one with a timeout. Auto-restart made crash-loop safe mode worse; the fix path
-// is a lane (skills/claude-debug). Suitable for a Monitor stream: stdout has lines only on change.
+// is a lane. Repetition is the chat's `/loop` over scripts/supervisor/debug-pass.mjs (skills/claude-debug), never a
+// scheduler in this script.
+import fs from 'node:fs';
 import path from 'node:path';
 import { execFile } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { readMachine } from '../../engine/machine-db.mjs';
 import { openLedgerReader } from '../../engine/ledger-db.mjs';
+import { claudeDebugSettings } from '../../engine/config.mjs';
+import { gitResult } from '../lib/git.mjs';
+import { parseWorktreeList } from '../lib/hk-lanes.mjs';
+import { orphanLedgerFindings } from '../lib/hk-orphan-ledgers.mjs';
 import { CONTROLLER_NAMES, LEADER_NAME, configuredMode, reconcilerConfig, reconcilerNumbers } from '../reconciler/state.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
@@ -132,8 +142,6 @@ function runningWorkflows() {
   return out;
 }
 
-const statusFails = new Map();
-let lastFacts = new Map();
 const short = (id) => String(id).replace(/^wf-/, '').replace(/-mu\w+$/, '');
 const count = (a) => (Array.isArray(a) ? a.length : 0);
 
@@ -145,15 +153,13 @@ async function workflowFacts(o) {
     if (!w.id) { facts.set(`wf:${w.ledger}`, w.error); return; }
     const k = `wf:${w.ledger}:${short(w.id)}`;
     if (w.phase !== 'running') { facts.set(`${k}:phase`, w.phase === 'paused' || w.phase === 'queued' ? null : `phase ${w.phase}`); return; }
-    const r = await child(['scripts/kernel/api.mjs', 'status', '--repo', w.repo, '--workflow', w.id, '--json'], o);
-    const j = r.ok || r.stdout ? firstJson(r.stdout) : null;
-    if (!j) { // one failed call is noise; two in a row is a fact. The last known facts of this workflow stay meanwhile.
-      const n = (statusFails.get(k) ?? 0) + 1; statusFails.set(k, n);
-      facts.set(`${k}:status`, n >= 2 ? `api status failed ${n}x (${r.error ?? 'no json'})` : null);
-      for (const [key, text] of lastFacts) if (key.startsWith(`${k}:`) && key !== `${k}:status`) facts.set(key, text);
-      return;
-    }
-    statusFails.delete(k);
+    // One failed call is noise; the snapshot asks twice and only two failures in a row are a fact.
+    const ask = () => child(['scripts/kernel/api.mjs', 'status', '--repo', w.repo, '--workflow', w.id, '--json'], o);
+    const parse = (r) => (r.ok || r.stdout ? firstJson(r.stdout) : null);
+    let r = await ask();
+    let j = parse(r);
+    if (!j) { r = await ask(); j = parse(r); }
+    if (!j) { facts.set(`${k}:status`, `api status failed 2x (${r.error ?? 'no json'})`); return; }
     facts.set(`${k}:status`, null);
     const f = j.frontier ?? {};
     for (const leg of j.legs ?? []) {
@@ -182,50 +188,125 @@ function tokenFacts(o) {
   return facts;
 }
 
-/* ------------------------------------------------------------ diff, output */
+/** Every registered ledger that lost its state directory or every source root (scripts/lib/hk-orphan-ledgers.mjs, read only). */
+function ledgerFacts() {
+  const facts = new Map();
+  for (const f of orphanLedgerFindings()) facts.set(`ledger:orphan:${f.ledgerId}`, `${f.registered ? 'registered' : 'unregistered'} ledger ${f.name ?? f.ledgerId} ${f.reason} (${f.file})`);
+  return facts;
+}
 
-/** The lines one tick owes, given the previous alert map (mutated) and this tick's facts. */
-export function diffFacts(prev, facts, { first = false } = {}) {
-  const lines = [];
-  for (const [key, text] of facts) {
-    const before = prev.get(key) ?? null;
-    if (text) { if (text !== before) lines.push(`[core-watch] ALERT ${key}: ${text}`); prev.set(key, text); }
-    else { if (before && !first) lines.push(`[core-watch] OK ${key} (was: ${before})`); prev.delete(key); }
+/** `git worktree list` of `repo` as [{path, branch, prunable, ...}], or null when git refuses. */
+function worktreesOf(repo, git = gitResult) {
+  const r = git(['worktree', 'list', '--porcelain'], { cwd: repo });
+  return r.ok ? parseWorktreeList(r.stdout) : null;
+}
+
+/**
+ * Worktree count and orphans per repository (the runtime and every active ledger's repo): more than `worktreeLimit`
+ * registered worktrees, or a registered worktree whose directory is gone (git marks it prunable). Read only: it never
+ * prunes. `worktreeLimit` null (config.yaml has no claudeDebug block) checks orphans only.
+ */
+export function worktreeFacts(repos, { worktreeLimit = null, git = gitResult, exists = fs.existsSync } = {}) {
+  const facts = new Map();
+  for (const repo of repos) {
+    const key = `worktrees:${path.basename(repo)}`;
+    const list = worktreesOf(repo, git);
+    if (!list) { facts.set(key, `git worktree list failed in ${repo}`); continue; }
+    const orphans = list.filter((w) => w.prunable || !exists(w.path)).map((w) => w.path);
+    const problems = [];
+    if (worktreeLimit != null && list.length > worktreeLimit) problems.push(`${list.length} worktrees (limit ${worktreeLimit})`);
+    if (orphans.length) problems.push(`${orphans.length} orphan (directory gone): ${orphans.slice(0, 3).join(', ')}`);
+    facts.set(key, problems.length ? problems.join('; ') : null);
   }
-  for (const key of [...prev.keys()]) if (!facts.has(key)) { lines.push(`[core-watch] GONE ${key} (was: ${prev.get(key)})`); prev.delete(key); }
-  return lines;
+  return facts;
 }
 
+/** Entries in `dir`: a number, or null when the directory is missing or unreadable. */
+function entryCount(dir) { try { return fs.readdirSync(dir).length; } catch { return null; } }
+
+/**
+ * Main-checkout integrity of the runtime repository checkout `main`: tracked files deleted from the working tree (a
+ * worktree removal through a junction empties it), and node_modules / packages/node_modules missing or empty. Read only.
+ */
+export function integrityFacts(main, { git = gitResult } = {}) {
+  const facts = new Map();
+  const deleted = git(['ls-files', '--deleted'], { cwd: main });
+  if (!deleted.ok) facts.set('integrity:tracked-deleted', `git ls-files --deleted failed in ${main}: ${deleted.error}`);
+  else {
+    const files = deleted.stdout.split(/\r?\n/).filter(Boolean);
+    facts.set('integrity:tracked-deleted', files.length ? `${files.length} tracked file(s) deleted in the main checkout ${main} (${files.slice(0, 3).join(', ')}${files.length > 3 ? ', ...' : ''})` : null);
+  }
+  for (const rel of ['node_modules', 'packages/node_modules']) {
+    const n = entryCount(path.join(main, rel));
+    facts.set(`integrity:${rel}`, n == null ? `${rel} is missing in the main checkout ${main}` : n === 0 ? `${rel} is empty in the main checkout ${main}` : null);
+  }
+  return facts;
+}
+
+/** The runtime repository's main checkout (first `git worktree list` entry) and every active ledger's repo root. */
+function inspectedRepos() {
+  const main = path.resolve(worktreesOf(ROOT)?.[0]?.path ?? ROOT);
+  const ledgerRepos = readMachine((m) => m.db.prepare("SELECT DISTINCT repo_root FROM ledgers WHERE state='active' AND repo_root IS NOT NULL").all().map((r) => path.resolve(r.repo_root)), []);
+  const repos = new Map([main, ...ledgerRepos].map((r) => [r.toLowerCase(), r]));
+  return { main, repos: [...repos.values()] };
+}
+
+/** Failing gates of the last day: a lane whose latest land run did not pass, a repository whose latest push failed. */
+function gateFacts() {
+  const facts = new Map();
+  const since = Date.now() - 24 * 3_600_000;
+  const rows = readMachine((m) => {
+    const q = (sql) => { try { return m.db.prepare(sql).all(since); } catch { return []; } };
+    return {
+      lands: q('SELECT lane, result, reason, commit_sha FROM land_runs r WHERE started_at >= ? AND run_id = (SELECT MAX(run_id) FROM land_runs WHERE lane IS r.lane)'),
+      pushes: q('SELECT repo_root, result, reason FROM pushes p WHERE at >= ? AND push_id = (SELECT MAX(push_id) FROM pushes WHERE repo_root = p.repo_root)'),
+    };
+  }, { lands: [], pushes: [] });
+  for (const l of rows.lands) if (l.result !== 'passed') facts.set(`gate:land:${l.lane ?? '-'}`, `land ${l.result} at ${String(l.commit_sha).slice(0, 9)}${l.reason ? `: ${String(l.reason).slice(0, 140)}` : ''}`);
+  for (const p of rows.pushes) if (p.result === 'failed' || p.result === 'refused') facts.set(`gate:push:${path.basename(p.repo_root)}`, `push ${p.result}${p.reason ? `: ${String(p.reason).slice(0, 140)}` : ''}`);
+  return facts;
+}
+
+/** config.yaml claudeDebug for this tick; a missing or invalid block is itself an alert (the worktree limit is then skipped). */
+function debugSettings(facts) {
+  try { const s = claudeDebugSettings(); facts.set('config:claudeDebug', null); return s; } catch (e) { facts.set('config:claudeDebug', String(e.message).slice(0, 200)); return { worktreeLimit: null }; }
+}
+
+function hostFacts() {
+  const facts = new Map();
+  const settings = debugSettings(facts);
+  const { main, repos } = inspectedRepos();
+  for (const part of [integrityFacts(main), worktreeFacts(repos, { worktreeLimit: settings.worktreeLimit }), ledgerFacts(), gateFacts()]) for (const [k, v] of part) facts.set(k, v);
+  return facts;
+}
+
+/* ------------------------------------------------------------ snapshot, output */
+
+/** Every fact of the core now: Map<key, alertText|null>. A crashed collector is itself an alert. */
 async function collect(o) {
-  const parts = await Promise.all([engineFacts(), serviceFacts(o), workflowFacts(o), tokenFacts(o)].map((p) => Promise.resolve(p).catch((e) => new Map([['collector', `collector crashed: ${String(e?.message ?? e).slice(0, 120)}`]]))));
-  lastFacts = new Map(parts.flatMap((m) => [...m]));
-  return lastFacts;
+  const collectors = { engine: engineFacts, services: () => serviceFacts(o), workflows: () => workflowFacts(o), tokens: () => tokenFacts(o), host: hostFacts };
+  const parts = await Promise.all(Object.entries(collectors).map(([name, run]) => Promise.resolve().then(run).catch((e) => new Map([[`collector:${name}`, `collector crashed: ${String(e?.message ?? e).slice(0, 120)}`]]))));
+  return new Map(parts.flatMap((m) => [...m]));
 }
 
-function parseArgs(argv) {
+/** The watch options from argv (defaults when absent). */
+export function watchOptions(argv = []) {
   const val = (name, d) => { const i = argv.indexOf(name); return i >= 0 && argv[i + 1] != null ? Number(argv[i + 1]) : d; };
-  return { once: argv.includes('--once'), json: argv.includes('--json'), intervalMs: val('--interval', 60) * 1000, timeoutMs: val('--child-timeout', 90) * 1000,
-    tokenWindowMs: val('--token-window', 10) * 60_000, tokenSpike: val('--token-spike', 3_000_000) };
+  return { timeoutMs: val('--child-timeout', 90) * 1000, tokenWindowMs: val('--token-window', 10) * 60_000, tokenSpike: val('--token-spike', 3_000_000) };
+}
+
+/** One read-only snapshot: {at, ok, alerts: [{key, text}], facts: <count>}. */
+export async function snapshot(o = watchOptions()) {
+  const facts = await collect(o);
+  const alerts = [...facts].filter(([, t]) => t).map(([key, text]) => ({ key, text }));
+  return { at: new Date().toISOString(), ok: alerts.length === 0, alerts, facts: facts.size };
 }
 
 async function main(argv = process.argv.slice(2)) {
-  if (argv.includes('--help') || argv.includes('-h')) { console.log('usage: core-watch.mjs [--once [--json]] [--interval <sec>] [--child-timeout <sec>] [--token-window <min>] [--token-spike <n>]  (read-only)'); return; }
-  const o = parseArgs(argv);
-  const prev = new Map();
-  if (o.once) {
-    const facts = await collect(o);
-    const alerts = [...facts].filter(([, t]) => t).map(([key, text]) => ({ key, text }));
-    if (o.json) console.log(JSON.stringify({ at: new Date().toISOString(), ok: alerts.length === 0, alerts, facts: facts.size }));
-    else console.log(alerts.length ? alerts.map((a) => `[core-watch] ALERT ${a.key}: ${a.text}`).join('\n') : `[core-watch] OK (${facts.size} facts, no alert)`);
-    return;
-  }
-  let first = true;
-  for (;;) {
-    const started = Date.now();
-    try { for (const line of diffFacts(prev, await collect(o), { first })) console.log(line); } catch (e) { console.log(`[core-watch] ALERT watcher: ${String(e?.message ?? e).slice(0, 160)}`); }
-    if (first) { console.log(`[core-watch] baseline done, ${prev.size} alert(s) open; printing changes only`); first = false; }
-    await new Promise((r) => setTimeout(r, Math.max(1000, o.intervalMs - (Date.now() - started))));
-  }
+  if (argv.includes('--help') || argv.includes('-h')) { console.log('usage: core-watch.mjs [--json] [--child-timeout <sec>] [--token-window <min>] [--token-spike <n>]  (one read-only snapshot)'); return; }
+  const snap = await snapshot(watchOptions(argv));
+  if (argv.includes('--json')) console.log(JSON.stringify(snap));
+  else console.log(snap.alerts.length ? snap.alerts.map((a) => `[core-watch] ALERT ${a.key}: ${a.text}`).join('\n') : `[core-watch] OK (${snap.facts} facts, no alert)`);
 }
 
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) await main();
