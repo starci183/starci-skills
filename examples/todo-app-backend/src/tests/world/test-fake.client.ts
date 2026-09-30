@@ -3,8 +3,8 @@
  * in the jest parent process; this client steers and reads them over the control channel. A spec uses `requests()` only to
  * check the contract (what the app sent); business assertions go through the app API or `world.db`.
  */
-import { createE2EHttpClient } from "@e2e-kit/integrations/http/e2e-http-client"
-import type { E2EHttpClient } from "@e2e-kit/integrations/http/e2e-http-client"
+import { createE2EHttpClient } from "@tests/world/kit/e2e-http-client"
+import type { E2EHttpClient } from "@tests/world/kit/e2e-http-client"
 import type {
     DelayedSettleParams,
     FailureSpec,

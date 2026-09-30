@@ -29,9 +29,9 @@ under `.starcistacks/dev`.
 
 From this directory run `npm ci`, then `npm run typecheck`, `npm run lint:check`,
 `npm run build` and `npm run test:unit`. The live stack requires provisioned demo secrets;
-see `docs/guides/testing.md` before running live checks. Tests are exactly two kinds: unit `*.spec.ts` beside the
-source (`npm run test:unit`) and e2e `*.e2e-spec.ts` under `src/tests/e2e/` (`npm run test:e2e`, for example
-`npm run test:e2e -- task/task-lifecycle`). E2E runs manually only: no hook, default typecheck/lint, coverage or automatic CI job runs it (`npm run typecheck:e2e` is its manual type check).
+see `docs/guides/testing.md` before running live checks. Tests have four jest projects: unit `*.spec.ts` beside the
+source (`npm run test:unit`), and integration, e2e and contract specs under `src/tests/` that run inside the one test world
+(`npm run test:integration`, `npm run test:e2e`, `npm run test:contract`). Only unit runs in hooks and the default CI job.
 
 ## Configuration and migrations
 

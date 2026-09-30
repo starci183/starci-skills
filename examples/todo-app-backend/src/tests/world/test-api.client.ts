@@ -4,10 +4,10 @@
  * signed webhook) and raw byte bodies go through axios against the loopback port the app listens on. A refusal is data:
  * every call resolves with the status, the body and, for GraphQL, the declared error code.
  */
-import { graphqlEnvelopeOf } from "@e2e-kit/integrations/graphql/graphql-envelope"
-import type { GraphqlObserved } from "@e2e-kit/integrations/graphql/graphql-envelope"
-import { createE2EHttpClient } from "@e2e-kit/integrations/http/e2e-http-client"
-import type { E2EHttpRequestOptions, E2EResponse } from "@e2e-kit/integrations/http/e2e-http-client"
+import { graphqlEnvelopeOf } from "@tests/world/kit/graphql-envelope"
+import type { GraphqlObserved } from "@tests/world/kit/graphql-envelope"
+import { createE2EHttpClient } from "@tests/world/kit/e2e-http-client"
+import type { E2EHttpRequestOptions, E2EResponse } from "@tests/world/kit/e2e-http-client"
 import type { SignInData } from "@tests/fixtures/views/e2e-views.contracts"
 import { TestWorldError, TestWorldErrorCode } from "./test-world.error"
 import { TODO_OPERATIONS } from "./todo-operations.contracts"

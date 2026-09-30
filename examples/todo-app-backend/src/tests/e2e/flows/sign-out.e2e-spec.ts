@@ -2,7 +2,7 @@ import { SessionErrorCode } from "@modules/domain/session"
 import { SESSION_COUNT_BY_TOKEN } from "@tests/fixtures/persistence/e2e-verification.sql"
 import type { CountRow } from "@tests/fixtures/persistence/e2e-verification.rows"
 import type { SignOutData, TasksData } from "@tests/fixtures/views/e2e-views.contracts"
-import { useTestWorld } from "@tests/world/test-world.service"
+import { useTestWorld } from "@tests/world/use-test-world"
 import { AppModule as TodoApp } from "../../../../apps/todo/src/app.module"
 
 /**

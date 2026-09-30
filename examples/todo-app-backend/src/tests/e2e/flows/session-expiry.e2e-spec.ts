@@ -1,7 +1,7 @@
 import { SessionErrorCode } from "@modules/domain/session"
 import { EXPIRE_SESSION } from "@tests/fixtures/persistence/e2e-verification.sql"
 import type { TasksData } from "@tests/fixtures/views/e2e-views.contracts"
-import { useTestWorld } from "@tests/world/test-world.service"
+import { useTestWorld } from "@tests/world/use-test-world"
 import { AppModule as TodoApp } from "../../../../apps/todo/src/app.module"
 
 /**

@@ -10,8 +10,8 @@
  * No sleeps: an asynchronous effect is awaited with `waitFor` against persisted state or a fake.
  */
 import "reflect-metadata"
-import { pollUntil } from "@e2e-kit/platform/poll"
-import { retryUntil } from "@e2e-kit/platform/readiness"
+import { pollUntil } from "@tests/world/kit/poll"
+import { retryUntil } from "@tests/world/kit/readiness"
 import { Module } from "@nestjs/common"
 import type { DynamicModule, INestApplicationContext } from "@nestjs/common"
 import { NestFactory } from "@nestjs/core"

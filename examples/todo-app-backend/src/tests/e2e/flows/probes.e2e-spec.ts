@@ -4,7 +4,7 @@
 import { PING_DATABASE } from "@tests/fixtures/persistence/e2e-verification.sql"
 import type { AliveRow } from "@tests/fixtures/persistence/e2e-verification.rows"
 import type { TasksData } from "@tests/fixtures/views/e2e-views.contracts"
-import { useTestWorld } from "@tests/world/test-world.service"
+import { useTestWorld } from "@tests/world/use-test-world"
 import { AppModule as TodoApp } from "../../../../apps/todo/src/app.module"
 
 interface HealthBody {

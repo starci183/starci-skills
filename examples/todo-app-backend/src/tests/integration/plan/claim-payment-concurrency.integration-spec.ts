@@ -6,7 +6,7 @@ import { TodoModule } from "@features/todo/todo.module"
 import { PAYMENT_INTENT_BY_ID, SUBSCRIPTIONS_OF_PERSON } from "@tests/fixtures/persistence/e2e-verification.sql"
 import type { PaymentIntentRow, SubscriptionRow } from "@tests/fixtures/persistence/e2e-verification.rows"
 import { TODO_CAPABILITY_MODULES } from "@tests/world/test-capabilities.options"
-import { useTestWorld } from "@tests/world/test-world.service"
+import { useTestWorld } from "@tests/world/use-test-world"
 
 const CONCURRENT_DELIVERIES = 8
 const PERIOD_MS = 30 * 86_400_000

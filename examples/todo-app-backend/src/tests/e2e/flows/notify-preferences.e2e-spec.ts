@@ -16,7 +16,7 @@ import type {
     UnsubscribeData,
     UpdateNotificationPreferencesData,
 } from "@tests/fixtures/views/e2e-views.contracts"
-import { useTestWorld } from "@tests/world/test-world.service"
+import { useTestWorld } from "@tests/world/use-test-world"
 import type { SignedInPerson } from "@tests/world/test-world.contracts"
 import { AppModule as TodoApp } from "../../../../apps/todo/src/app.module"
 import { AppModule as WorkerApp } from "../../../../apps/worker/src/app.module"

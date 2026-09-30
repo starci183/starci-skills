@@ -26,18 +26,6 @@
       "jest"
     ],
     "paths": {
-      "@apollo/client": [
-        "./node_modules/@apollo/client"
-      ],
-      "axios": [
-        "./node_modules/axios"
-      ],
-      "graphql": [
-        "./node_modules/graphql"
-      ],
-      "@e2e-kit/*": [
-        "../../packages/e2e-kit/src/*"
-      ],
       "@features/*": [
         "./src/features/*"
       ],
@@ -56,6 +44,9 @@
   "exclude": [
     "node_modules",
     "dist",
-    "src/tests/e2e/**"
+    "src/tests/world",
+    "src/tests/integration",
+    "src/tests/e2e",
+    "src/tests/contract"
   ]
 }

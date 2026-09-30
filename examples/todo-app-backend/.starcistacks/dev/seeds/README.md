@@ -2,7 +2,7 @@
 
 SQL seeds for the `todo` database. Mounted read-only into postgres'
 `/docker-entrypoint-initdb.d` by `.starcistacks/dev/infra/compose/postgres.yaml`
-(and by the e2e stack, `src/tests/e2e/setup/platform/stack/compose.e2e.yaml`), so the
+(the dev stack only; the test world builds its schema with `apps/migrate`), so the
 `NN-*.sql` files run in alphabetical order on a fresh volume, before the api's own
 `migrationsRun: true` boot.
 
