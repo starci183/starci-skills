@@ -144,6 +144,14 @@ const KEBAB = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 const SOURCE_ROOT = /^(?:src|apps)\//;
 const FREE_NAMES = new Set(['index.ts', 'main.ts']);
 const PLAIN_ENTRY = /^<[a-z][a-z0-9-]*>.ts$/;
+/**
+ * Where the work of a banned data-access suffix goes. The suffix is banned by the manifest (ruleParams.be.bannedSuffixes);
+ * this only adds the convention's home to the finding, so a file that is a repository or a store is told what replaces it.
+ */
+const BANNED_SUFFIX_HOME = Object.freeze({
+  repository: 'SQL text is a constant in <name>.sql.ts of the capability persistence/ folder, and data access is the capability *.service.ts (or the application *.handler.ts) calling the shared EntityManager through its Inject<Conn>EntityManager()',
+  store: 'SQL text is a constant in <name>.sql.ts of the capability persistence/ folder, and data access is the capability *.service.ts (or the application *.handler.ts) calling the shared EntityManager through its Inject<Conn>EntityManager()',
+});
 
 /**
  * BE_SOURCE_FORM (R89): every tracked src/ or apps/ TypeScript file of a back end is index.ts, main.ts, a migration of

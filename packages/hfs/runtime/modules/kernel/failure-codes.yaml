@@ -484,8 +484,9 @@ BE_SCHEMA_OWNER:
 BE_SOURCE_FORM:
   title: "Back-end source file breaks the naming or form canon"
   title_vi: "Tệp nguồn BE sai quy ước tên hoặc hình thức"
-  meaning_vi: "Tên tệp phải là kebab-case với hậu tố vai trò trong danh sách đóng của slots.yaml; chỉ export có tên (không export default); mọi export và thành viên công khai có JSDoc tiếng Anh; không emoji, và không có chữ tiếng Việt trong định danh, chuỗi ký tự, chú thích hay tên test ngoài catalog messages/ và slot fixture i18n."
+  meaning_vi: "Tên tệp phải là kebab-case với hậu tố vai trò trong danh sách đóng của slots.yaml; chỉ export có tên (không export default); mọi export và thành viên công khai có JSDoc tiếng Anh; không emoji, và không có chữ tiếng Việt trong định danh, chuỗi ký tự, chú thích hay tên test ngoài catalog messages/ và slot fixture i18n; mã production không khai báo lớp, hàm hay hằng export có từ Mock, Fake hoặc Stub trong tên (đồ giả nằm trong spec hoặc src/tests; driver ngoại tuyến là adapter điều khiển bằng options, đặt tên theo việc nó làm)."
   causes_vi:
+    - "class MockExpertAgentService trong mã production thay vì adapter điều khiển bằng options"
     - "Tệp dùng hậu tố bị cấm (use-case, repository, store, util, helper, types, constants)"
     - "Lớp export không kết thúc bằng hậu tố vai trò của tệp và cũng không kết thúc bằng tên port (interface trong *.port.ts hoặc *.contracts.ts) mà nó implements"
     - "Interface trong tệp *.input.ts, *.request.ts, *.response.ts, *.type.ts, *.args.ts hoặc *.rows.ts không kết thúc bằng Input, Request, Response, Type, Args hoặc Row"
@@ -493,6 +494,7 @@ BE_SOURCE_FORM:
     - "Export default"
     - "Thiếu JSDoc trên export"
     - "Chú thích tiếng Việt trong mã"
+    - "class MockExpertAgentService trong mã production thay vì adapter điều khiển bằng options"
   nextStep_vi: "Đổi tên tệp theo vai trò trong danh sách đóng, chuyển kiểu vào <tên>.contracts.ts, thêm JSDoc tiếng Anh và bỏ export default. Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra và mục của luật trong BE-CONVENTION; không thêm ngoại lệ, không tắt luật."
   owner: op-retry
   kind: check-finding
