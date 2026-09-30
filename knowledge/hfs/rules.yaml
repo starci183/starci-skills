@@ -492,13 +492,14 @@ rules:
   - id: R47
     code: "BE_TEST_TOPOLOGY"
     title_vi: "Cấu hình test lệch chuẩn"
-    law: "One jest config, projects `unit` and `e2e`, live by folder, `diagnostics: false`; a handler, domain service, consumer, job, guard, mapper, policy, client and row mapper has a twin spec beside it; no `.test.ts`, `int-spec` or `harness-spec`."
+    law: "One jest config, projects `unit` and `e2e`, live by folder, `diagnostics: false`; a handler, domain service, consumer, job, guard, mapper, policy, client and row mapper has a twin spec beside it; no `.test.ts`, `int-spec` or `harness-spec`; an e2e spec never migrates or builds the schema (no migration or migrate-app import, no runMigrations/synchronize, no container): the e2e globalSetup runs `apps/migrate` once."
     kinds: [check, codemod]
     gates: [land, ci]
     failureCodes: ["BE_TEST_TOPOLOGY"]
     enforcers:
       - {kind: hfs, id: test-topology, status: planned}
       - {kind: eslint-be, id: unit-test-colocated}
+      - {kind: eslint-be, id: e2e-no-schema-work}
   - id: R48
     code: "BE_SPEC_QUALITY"
     title_vi: "Spec đọc mã nguồn hoặc ép kiểu mock"
@@ -655,7 +656,7 @@ rules:
     code: "FE_STYLE_TOKEN_ONLY"
     title_vi: "CSS ngoài token"
     law: "Token-only CSS; colour only in `brand.css`; every `@source` resolves (sub-check `FE_STYLE_SOURCE_UNRESOLVED`)."
-    kinds: [lint, check, design]
+    kinds: [lint, design]
     gates: [pre-commit, pre-push, settle, land, ci]
     failureCodes: ["FE_STYLE_TOKEN_ONLY", "FE_STYLE_SOURCE_UNRESOLVED"]
     enforcers:
@@ -672,7 +673,6 @@ rules:
       - {kind: stylelint, id: breakpoint-scale}
       - {kind: stylelint, id: source-resolves}
       - {kind: eslint-fe, id: no-raw-brand-value}
-      - {kind: hfs, id: style-source-unresolved, status: planned}
       - {kind: eslint-fe, id: no-fractional-step}
       - {kind: eslint-fe, id: no-arbitrary-value}
       - {kind: eslint-fe, id: no-hand-rolled-heading}

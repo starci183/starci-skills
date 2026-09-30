@@ -13,41 +13,11 @@
  * hook and state budgets are stricter still where they apply (`size-and-state-budget`); this ratchet is the one that
  * needs the previous revision.
  */
-import { execFileSync } from "node:child_process"
-import { basename, dirname } from "node:path"
 import { feParams } from "./lib/params.mjs"
-
-/** The line count above which a file may not grow: the soft budget when `hardGrowth` holds, else no limit. */
-const hardGrowthLines = ({ soft, hardGrowth }) => (hardGrowth ? soft : Number.POSITIVE_INFINITY)
-
-const lineCount = (text) => {
-  const lines = text.split(/\r?\n/)
-  return lines.at(-1) === "" ? lines.length - 1 : lines.length
-}
+import { hardGrowthLines, lineCount, recordedLines } from "./runtime/scripts/lib/recorded-lines.mjs"
 
 /** Whether a file is a source file this budget governs. */
 const governed = (filename) => /\.[cm]?tsx?$/.test(filename) && !/\.d\.[cm]?ts$/.test(filename)
-
-/**
- * The line count of a file at a git revision, or null when the file did not exist there or git is absent.
- *
- * @param {string} filename - Absolute path of the file.
- * @param {string} ref - The revision, `HEAD` by default (the parent of the commit being made).
- * @returns {number | null} The recorded line count.
- */
-export const recordedLines = (filename, ref = "HEAD") => {
-  try {
-    const text = execFileSync("git", ["-C", dirname(filename), "show", `${ref}:./${basename(filename)}`], {
-      encoding: "utf8",
-      stdio: ["ignore", "pipe", "ignore"],
-      maxBuffer: 64 * 1024 * 1024,
-    })
-    return lineCount(text)
-  } catch {
-    // no repository, no such revision, or a new file: all mean there is no recorded size to compare with
-    return null
-  }
-}
 
 /** The ratchet: a file over the budget must not be new and must not grow. */
 export const fileSizeGrowth = {

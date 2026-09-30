@@ -13,6 +13,7 @@
  */
 import { basename } from "node:path"
 import ts from "typescript"
+import { hfsOf } from "./lib/hfs.mjs"
 import { isPackageType, typeOrigins, typed } from "./lib/types.mjs"
 
 /** Files this law governs. A flow is a named lane, not every file that happens to touch a database. */
@@ -210,12 +211,83 @@ export const noWiringInFlowSpec = {
     },
 }
 
+
+/**
+ * R47 (owner ruling 2026-09-30): an e2e spec (slot `be.tests.e2e` / `be.tests.e2e-live`) never builds the schema. The e2e
+ * globalSetup runs the real `apps/migrate` entry once; a spec boots the app, calls it, and asserts through the fixture's
+ * EntityManager. Refused in a spec: importing a migration (a class declared in a `be.persistence` `migrations/` file, or
+ * a value whose type is an array of them), importing anything the migrate app declares, calling `runMigrations`,
+ * `undoLastMigration`, `synchronize`, `dropDatabase` or `createSchema` on a typeorm `DataSource`/`QueryRunner`/
+ * `EntityManager`, and constructing a testcontainers container. Migration behaviour is tested only by `apps/migrate`'s
+ * own specs.
+ */
+const SCHEMA_CALLS = new Set(["runMigrations", "undoLastMigration", "synchronize", "dropDatabase", "createSchema", "showMigrations"])
+const TYPEORM_RECEIVERS = ["DataSource", "QueryRunner", "EntityManager"]
+const CONTAINER_PACKAGES = /^(?:testcontainers|@testcontainers\/[a-z0-9-]+)$/
+
+export const e2eNoSchemaWork = {
+    meta: {
+        type: "problem",
+        docs: { description: "An e2e spec never migrates or builds the schema: globalSetup runs apps/migrate once; specs assert through the fixture EntityManager." },
+        schema: [],
+        messages: {
+            migration: "An e2e spec imports a migration or the migrate app. The schema is prepared once by the e2e globalSetup running the real `apps/migrate` entry; test migrations in `apps/migrate`'s own specs.",
+            call: "`{{name}}` builds or changes the schema inside an e2e spec. The e2e globalSetup runs `apps/migrate` once; a spec boots the app and asserts through the fixture's EntityManager.",
+            container: "An e2e spec starts a database container. The container belongs to the e2e globalSetup and the test bootstrap in `src/tests/fixtures`; the spec takes the fixture's EntityManager.",
+        },
+    },
+    create(context) {
+        const hfs = hfsOf(context)
+        const filename = context.filename || context.getFilename()
+        const slot = hfs.slotOf(filename)
+        if (slot !== "be.tests.e2e" && slot !== "be.tests.e2e-live") return {}
+        const isMigrationDecl = (file) => hfs.slotOf(file) === "be.persistence" && /\/migrations\/[^/]+$/.test(hfs.relative(file))
+        const fromMigrate = (file) => hfs.slotOf(file) === "be.app.migrate"
+        const migrationTyped = (node) => {
+            const { checker, toTs } = typed(context)
+            const tsNode = toTs(node)
+            if (!tsNode) return false
+            let type = checker.getTypeAtLocation(tsNode)
+            if (checker.isArrayType?.(type) || checker.isTupleType?.(type)) type = checker.getTypeArguments(type)[0] ?? type
+            const parts = type?.isUnion?.() ? type.types : [type]
+            return parts.some((part) => {
+                const symbol = part?.getSymbol?.()
+                return (symbol?.getDeclarations?.() ?? []).some((d) => isMigrationDecl(String(d.getSourceFile().fileName)))
+            })
+        }
+        return {
+            ImportDeclaration(node) {
+                const source = String(node.source.value)
+                if (CONTAINER_PACKAGES.test(source)) return
+                for (const specifier of node.specifiers) {
+                    const origins = typeOrigins(context, specifier.local)
+                    if (origins.some((o) => isMigrationDecl(o.file) || fromMigrate(o.file)) || migrationTyped(specifier.local)) {
+                        context.report({ node: specifier, messageId: "migration" })
+                        return
+                    }
+                }
+            },
+            CallExpression(node) {
+                const callee = node.callee
+                if (callee.type !== "MemberExpression" || callee.computed || callee.property.type !== "Identifier") return
+                if (!SCHEMA_CALLS.has(callee.property.name)) return
+                if (TYPEORM_RECEIVERS.some((name) => isPackageType(context, callee.object, name, "typeorm"))) context.report({ node, messageId: "call", data: { name: callee.property.name } })
+            },
+            NewExpression(node) {
+                const origins = typeOrigins(context, node.callee)
+                if (origins.some((o) => o.module && CONTAINER_PACKAGES.test(o.module))) context.report({ node, messageId: "container" })
+            },
+        }
+    },
+}
+
 /** The rules this law contributes to the plugin. */
 export const rules = {
     "e2e-uses-production-transport": e2eUsesProductionTransport,
     "no-sleep-in-flow": noSleepInFlow,
     "no-branch-in-flow-step": noBranchInFlowStep,
     "no-wiring-in-flow-spec": noWiringInFlowSpec,
+    "e2e-no-schema-work": e2eNoSchemaWork,
 }
 
 /** Every rule of this law ships at `error`. */
@@ -224,4 +296,5 @@ export const recommended = {
     "starci-be/no-sleep-in-flow": "error",
     "starci-be/no-branch-in-flow-step": "error",
     "starci-be/no-wiring-in-flow-spec": "error",
+    "starci-be/e2e-no-schema-work": "error",
 }

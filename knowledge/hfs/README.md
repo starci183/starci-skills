@@ -505,7 +505,7 @@ Every rule is an error from 2.0. Finding code, then the rule. The pattern files 
 | R44 | `BE_SECRET_DEFAULT` | No default for a secret key or infrastructure URL. |
 | R45 | `BE_MODULE_SHAPE` | `@Global` nowhere and `isGlobal: true` only at app roots; no cross-owner module imports; typed options; one module per transport. |
 | R46 | `BE_BACKGROUND_UNOWNED` | Every sweep, outbox or retry has a job or consumer run by a worker app. |
-| R47 | `BE_TEST_TOPOLOGY` | One jest config, projects `unit` and `e2e`, live by folder, `diagnostics: false`; a handler, domain service, consumer, job, guard, mapper, policy, client and row mapper has a twin spec beside it; no `.test.ts`, `int-spec` or `harness-spec`. |
+| R47 | `BE_TEST_TOPOLOGY` | One jest config, projects `unit` and `e2e`, live by folder, `diagnostics: false`; a handler, domain service, consumer, job, guard, mapper, policy, client and row mapper has a twin spec beside it; no `.test.ts`, `int-spec` or `harness-spec`; an e2e spec never migrates or builds the schema (no migration or migrate-app import, no runMigrations/synchronize, no container): the e2e globalSetup runs `apps/migrate` once. |
 | R48 | `BE_SPEC_QUALITY` | No source-reading specs; a spec asserts results or state, not only calls; no `as` and no `x!` in a spec (the borrowed rules of R72); an e2e enters through transport, waits with `waitFor`, boots through `src/tests/e2e/setup`, reads persisted state back and reaches no model provider. |
 | R68 | `BE_SQL_INTERPOLATED` | SQL text carries no runtime substitution; values are numbered parameters. |
 | R69 | `BE_QUERY_UNBOUNDED` | A read that can return many rows states `take`, `limit` or `LIMIT`, or pages by cursor. |

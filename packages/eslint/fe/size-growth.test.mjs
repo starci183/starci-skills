@@ -12,7 +12,8 @@ import test from "node:test"
 import { RuleTester } from "eslint"
 import tsParser from "@typescript-eslint/parser"
 import { feParams } from "./lib/params.mjs"
-import { fileSizeGrowth, recordedLines, rules } from "./size-growth.mjs"
+import { fileSizeGrowth, rules } from "./size-growth.mjs"
+import { recordedLines } from "./runtime/scripts/lib/recorded-lines.mjs"
 
 const tester = new RuleTester({
   languageOptions: {

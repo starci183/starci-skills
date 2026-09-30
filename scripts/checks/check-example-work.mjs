@@ -10,6 +10,7 @@ import {ASSET_SLOT_UNFILLED, assetSlotsOf} from '../work/asset-slot.mjs';
 import {walkFiles} from './common.mjs';
 import {blobPath} from '../lib/artifact-store.mjs';
 import {isProductPath, agentDataCategory} from '../lib/starciwork-boundary.mjs';
+import {runGit} from '../lib/git.mjs';
 
 /**
  * The layout says an id mirrors its directory while remaining the identity. That sentence is only true if
@@ -139,10 +140,18 @@ export const BOUNDARY_TRANSITIONAL = Object.freeze([]);
  * [HFS_AGENT_DATA_TRACKED], one line per agent-data directory (draw-loop rounds included: the loop is a blob bundle); its home is the project ledger and the blob store
  * (api report --attach). A path that is neither (a record in a legacy layout) is WARNED [STARCIWORK_DRIFT].
  * Paths are judged relative to the tree root (`resolveRoot`). The gate below runs it over every example tree.
+ * Only TRACKED files are judged (`git ls-files`; supervisor decision 2026-09-30): ignored local agent data on disk is the
+ * ledger/housekeeping hygiene check's business, never a validation refusal. A tree outside a git work tree has none.
  */
+export function trackedFilesUnder(dir) {
+  const r = runGit(['ls-files', '-z', '--', '.'], {cwd: dir, maxBuffer: 256 * 1024 * 1024});
+  if (r.error || r.status !== 0) return [];
+  return r.stdout.split('\0').filter(Boolean).map((rel) => path.join(dir, rel));
+}
+
 export function checkStarciworkBoundary(workRoot, problems, warnings = [], resolveRoot = workRoot) {
   const groups = new Map();
-  for (const file of walkFiles(workRoot, {exclude: (name) => name === 'node_modules' || name === '.git', ignoreReadErrors: true})) {
+  for (const file of trackedFilesUnder(workRoot)) {
     const rel = path.relative(resolveRoot, file).replaceAll('\\', '/');
     if (!rel || rel.startsWith('../') || isProductPath(rel)) continue;
     const category = agentDataCategory(rel);

@@ -14,44 +14,15 @@
  * file are source files like any other. A migration is exempt (a file of the `be.persistence` slot named
  * `<timestamp>-<name>.ts`: append-only, never edited), and so is a declaration file.
  */
-import { execFileSync } from "node:child_process"
-import { basename, dirname } from "node:path"
+import { basename } from "node:path"
 import { hfsOf } from "./lib/hfs.mjs"
-
-/** The line count above which a file may not grow: the soft budget when `hardGrowth` holds, else no limit. */
-const hardGrowthLines = ({ soft, hardGrowth }) => (hardGrowth ? soft : Number.POSITIVE_INFINITY)
-
-const lineCount = (text) => {
-    const lines = text.split(/\r?\n/)
-    return lines.at(-1) === "" ? lines.length - 1 : lines.length
-}
+import { hardGrowthLines, lineCount, recordedLines } from "./runtime/scripts/lib/recorded-lines.mjs"
 
 /** A migration is a file of the persistence slot named `<timestamp>-<name>.ts`. */
 const isMigration = (hfs, filename) => hfs.slotOf(filename) === "be.persistence" && /^\d{13,14}-[^/]+\.[cm]?ts$/.test(basename(filename))
 
 /** Whether a file is a source file this budget governs. */
 const governed = (hfs, filename) => /\.[cm]?tsx?$/.test(filename) && !/\.d\.[cm]?ts$/.test(filename) && !isMigration(hfs, filename)
-
-/**
- * The line count of a file at a git revision, or null when the file did not exist there or git is absent.
- *
- * @param {string} filename - Absolute path of the file.
- * @param {string} ref - The revision, `HEAD` by default (the parent of the commit being made).
- * @returns {number | null} The recorded line count.
- */
-export const recordedLines = (filename, ref = "HEAD") => {
-    try {
-        const text = execFileSync("git", ["-C", dirname(filename), "show", `${ref}:./${basename(filename)}`], {
-            encoding: "utf8",
-            stdio: ["ignore", "pipe", "ignore"],
-            maxBuffer: 64 * 1024 * 1024,
-        })
-        return lineCount(text)
-    } catch {
-        // no repository, no such revision, or a new file: all mean there is no recorded size to compare with
-        return null
-    }
-}
 
 /** The ratchet: a file over the budget must not be new and must not grow. */
 export const fileSizeGrowth = {

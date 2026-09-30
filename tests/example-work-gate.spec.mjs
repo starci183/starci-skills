@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
+import { execFileSync } from 'node:child_process';
 import path from 'node:path';
 import crypto from 'node:crypto';
 import { checkWorkTree, checkFamiliesDrift, checkStarciworkBoundary, FAMILIES } from '../scripts/checks/check-example-work.mjs';
@@ -30,6 +31,15 @@ function write(root, rel, content) {
   fs.mkdirSync(path.dirname(file), { recursive: true });
   fs.writeFileSync(file, content, 'utf8');
   return file;
+}
+
+/** Makes every file under the fixture's repository root tracked: the R07 boundary judges tracked files only. */
+function tracked(workRoot) {
+  const repo = path.dirname(workRoot);
+  const git = (...args) => execFileSync('git', ['-c', 'user.name=fixture', '-c', 'user.email=fixture@example.test', ...args], { cwd: repo, stdio: 'pipe' });
+  git('init', '-q');
+  git('add', '-A');
+  return workRoot;
 }
 
 /** Builds a minimal-but-valid .starciwork tree; `extra` maps additional relative paths to YAML content. */
@@ -797,7 +807,7 @@ test('scoped record validation resolves tree-level _resources refs via resolveRo
 });
 
 test('a root import-cv-* folder is drift, not a known agent-data class', () => {
-  const workRoot = tree({ 'import-cv-seam/index.yaml': 'schema: work/feature@1\nid: import-cv-seam\ntitle: t\ndescription: d\n' });
+  const workRoot = tracked(tree({ 'import-cv-seam/index.yaml': 'schema: work/feature@1\nid: import-cv-seam\ntitle: t\ndescription: d\n' }));
   const problems = [], warnings = [];
   checkStarciworkBoundary(workRoot, problems, warnings);
   assert.deepEqual(problems, [], 'drift never refuses');
@@ -813,17 +823,25 @@ test('work/node@1 and @2 are each refused at the tree walk', () => {
 });
 
 // R07 HFS_AGENT_DATA_TRACKED: `starci validate` on a .starciwork refuses known agent data and admits product records.
-test('work-validate refuses agent data inside .starciwork as HFS_AGENT_DATA_TRACKED', () => {
-  const workRoot = tree({
+test('work-validate refuses TRACKED agent data inside .starciwork as HFS_AGENT_DATA_TRACKED', () => {
+  const workRoot = tracked(tree({
     'features/f/index.yaml': 'schema: work/feature@1\nid: f\ntitle: t\ndescription: d\n',
     'features/f/uat/x/runs/run-1/result.json': '{}\n',
     'features/f/br/rule/evidence/proof.log': 'log\n',
     'runtime.sqlite': 'ledger\n',
-  });
+  }));
   const hits = validateWork(workRoot).refused.filter(line => line.includes('[HFS_AGENT_DATA_TRACKED]'));
   assert.ok(hits.some(line => line.includes('uat-run')), hits.join('\n'));
   assert.ok(hits.some(line => line.includes('evidence-bundle')), hits.join('\n'));
   assert.ok(hits.some(line => line.includes('ledger')), hits.join('\n'));
+});
+
+test('agent data on disk but not tracked (ignored local leftovers) is not a validation refusal', () => {
+  const workRoot = tree({
+    'features/f/index.yaml': 'schema: work/feature@1\nid: f\ntitle: t\ndescription: d\n',
+    'features/f/uat/x/runs/run-1/result.json': '{}\n',
+  });
+  assert.deepEqual(validateWork(workRoot).refused.filter(line => line.includes('HFS_AGENT_DATA_TRACKED')), []);
 });
 
 test('work-validate raises no HFS_AGENT_DATA_TRACKED for a .starciwork of product records only', () => {

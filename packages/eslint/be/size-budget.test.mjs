@@ -7,7 +7,8 @@ import test from "node:test"
 import { RuleTester } from "eslint"
 import tsParser from "@typescript-eslint/parser"
 import { at, fixtureHfs } from "./fixtures/typed/tester.mjs"
-import { fileSizeGrowth, recordedLines } from "./size-budget.mjs"
+import { fileSizeGrowth } from "./size-budget.mjs"
+import { recordedLines } from "./runtime/scripts/lib/recorded-lines.mjs"
 
 const tester = new RuleTester({
     languageOptions: { parser: tsParser, ecmaVersion: 2022, sourceType: "module" },
