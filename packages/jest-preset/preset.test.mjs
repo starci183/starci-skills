@@ -3,8 +3,31 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import { createRequire } from 'node:module';
 
+import os from 'node:os';
+import path from 'node:path';
+
 const require = createRequire(import.meta.url);
 const preset = require('./index.cjs');
+
+// The config is read from a repository root (jest runs there): the default one below has a test world, so all four
+// projects exist; `withoutWorld` is a repository whose world is not written yet.
+const withWorld = fs.mkdtempSync(path.join(os.tmpdir(), 'preset-world-'));
+fs.mkdirSync(path.join(withWorld, 'src', 'tests', 'world'), { recursive: true });
+fs.writeFileSync(path.join(withWorld, 'src', 'tests', 'world', 'global-setup.ts'), 'export default async () => {}\n');
+const withoutWorld = fs.mkdtempSync(path.join(os.tmpdir(), 'preset-noworld-'));
+const home = process.cwd();
+process.chdir(withWorld);
+test.after(() => { process.chdir(home); fs.rmSync(withWorld, { recursive: true, force: true }); fs.rmSync(withoutWorld, { recursive: true, force: true }); });
+
+test('a repository without its test world gets the unit project only, so unit specs run with the managed config', () => {
+  process.chdir(withoutWorld);
+  try {
+    assert.deepEqual(preset.starciJestConfig().projects.map((p) => p.displayName), ['unit']);
+  } finally {
+    process.chdir(withWorld);
+  }
+  assert.deepEqual(preset.starciJestConfig().projects.map((p) => p.displayName), ['unit', 'integration', 'e2e', 'contract']);
+});
 const { createMock } = require('./mock.cjs');
 
 // A stand-in for jest.fn(): a callable that records calls. mock<T>() must work with any factory.

@@ -89,6 +89,11 @@ const underTests = (folder) => String.raw`[\\/]src[\\/]tests[\\/]` + folder + St
  * statements: the `test` script runs the unit project with `--coverage` and fails below it. It uses v8: istanbul instruments the helpers TypeScript emits (`__decorate`, `__param`, `__awaiter`, interop wrappers)
  * as thousands of branches no spec can cover, while v8 measures the real source.
  */
+/** True when the repository at `root` has the test world's global setup (`src/tests/world/global-setup.ts`). */
+function hasTestWorld(root) {
+  return require("node:fs").existsSync(require("node:path").join(root, "src", "tests", "world", "global-setup.ts"))
+}
+
 function starciJestConfig() {
   const shared = {
     preset: "ts-jest",
@@ -126,9 +131,10 @@ function starciJestConfig() {
         testMatch: ["**/*.spec.ts"],
         testPathIgnorePatterns: ["/node_modules/", ...TEST_KIND_FOLDERS.map(underTests)],
       },
-      suite("integration", "integration-spec"),
-      suite("e2e", "e2e-spec"),
-      suite("contract", "contract-spec"),
+      // The integration, e2e and contract projects exist only where the repository has its test world: jest validates
+      // every project's globalSetup even under --selectProjects unit, so a repository whose world is not written yet
+      // would otherwise fail to run its unit specs with the managed config.
+      ...(hasTestWorld(process.cwd()) ? [suite("integration", "integration-spec"), suite("e2e", "e2e-spec"), suite("contract", "contract-spec")] : []),
     ],
   }
 }
