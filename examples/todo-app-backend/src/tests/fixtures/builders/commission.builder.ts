@@ -1,5 +1,15 @@
 import { builder } from "@starci/jest-preset"
-import type { AccrueParams, CommissionRow } from "@modules/domain/commission"
+import type { AccrueParams } from "@modules/domain/commission"
+
+/** The columns of a stored commission row, declared here so a spec never reaches into the persistence of the owner. */
+export interface CommissionRow {
+    id: string
+    referrerId: string
+    buyerId: string
+    paymentId: string
+    amount: number
+    accruedAt: Date
+}
 
 /** The instant the commission specs stamp accruals with. */
 export const COMMISSION_AT = "2026-09-10T10:00:00.000Z"

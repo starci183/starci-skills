@@ -14,9 +14,6 @@ export interface CommissionView {
     readonly accruedAt: Date
 }
 
-/** A stored commission row: the columns of the commissions table. */
-export type CommissionRow = CommissionView
-
 /** What accruing the commission of one paid payment needs. */
 export interface AccrueParams {
     /** The person who referred the buyer. */

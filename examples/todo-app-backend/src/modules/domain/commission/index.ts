@@ -1,6 +1,6 @@
 export { commissionEntities, commissionMigrations } from "./persistence/connection"
 export { parseCommissionConfig } from "./commission.config"
-export type { AccrueParams, CommissionRow, CommissionView } from "./commission.contracts"
+export type { AccrueParams, CommissionView } from "./commission.contracts"
 export { COMMISSION_OPTIONS, InjectCommissionOptions } from "./commission.decorators"
 export { CommissionModule } from "./commission.module"
 export type { CommissionOptions } from "./commission.options"

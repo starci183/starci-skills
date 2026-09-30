@@ -1,6 +1,18 @@
 import { builder } from "@starci/jest-preset"
-import type { UploadRow } from "@modules/domain/upload"
 import type { TaskView } from "@modules/domain/task"
+
+/** The columns of a stored row, declared here so a spec never reaches into the persistence of the owner. */
+export interface UploadRow {
+    id: string
+    owner: string
+    taskId: string | null
+    filename: string
+    mime: string
+    sizeBytes: number
+    storageKey: string
+    status: string
+    createdAt: Date
+}
 
 /** The instant the upload specs run at. */
 export const UPLOAD_AT = "2026-09-10T10:00:00.000Z"

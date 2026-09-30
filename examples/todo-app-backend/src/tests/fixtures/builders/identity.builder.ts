@@ -1,5 +1,13 @@
 import { builder } from "@starci/jest-preset"
-import type { FindSessionParams, PurgeSessionsParams, SessionRow, SignInParams, SignOutParams } from "@modules/domain/identity"
+import type { FindSessionParams, PurgeSessionsParams, SignInParams, SignOutParams } from "@modules/domain/identity"
+
+/** The columns of a stored row, declared here so a spec never reaches into the persistence of the owner. */
+export interface SessionRow {
+    token: string
+    personId: string
+    issuedAt: Date
+    expiresAt: Date
+}
 
 /** The instant the identity specs treat as now. */
 export const IDENTITY_NOW = "2026-09-30T10:00:00.000Z"

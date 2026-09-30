@@ -16,15 +16,50 @@ import type {
     DeliveryAttemptView,
     DispatchPlan,
     NotificationView,
-    NotifyDeliveryAttemptRow,
-    NotifyDigestWindowRow,
-    NotifyNotificationRow,
-    NotifyPreferenceRow,
     PreferenceView,
     ReceiveAdmitParams,
     ReceiveDispatchParams,
     UnsubscribeParams,
 } from "@modules/domain/notify"
+
+/** The columns of a stored row, declared here so a spec never reaches into the persistence of the owner. */
+export interface NotifyDeliveryAttemptRow {
+    notificationId: string
+    state: "queued" | "sending" | "delivered" | "bounced" | "suppressed"
+    attempt: number
+    failureClass: "transient" | "permanent-bounce" | "retries-exhausted" | "unsubscribed" | null
+    startedAt: Date | null
+    endedAt: Date | null
+    history: Array<{ state: "queued" | "sending" | "delivered" | "bounced" | "suppressed"; at: string; failureClass?: "transient" | "permanent-bounce" | "retries-exhausted" | "unsubscribed" }>
+}
+
+/** The columns of a stored row, declared here so a spec never reaches into the persistence of the owner. */
+export interface NotifyDigestWindowRow {
+    id: string
+    personId: string
+    channel: string
+    opensAt: Date
+    closesAt: Date
+    flushedAt: Date | null
+}
+
+/** The columns of a stored row, declared here so a spec never reaches into the persistence of the owner. */
+export interface NotifyNotificationRow {
+    id: string
+    kind: string
+    recipientId: string
+    payload: Readonly<Record<string, string | number | boolean | null>>
+    digestGroupId: string | null
+    createdAt: Date
+}
+
+/** The columns of a stored row, declared here so a spec never reaches into the persistence of the owner. */
+export interface NotifyPreferenceRow {
+    personId: string
+    channel: string
+    unsubscribed: boolean
+    digestWindowMinutes: number | null
+}
 
 /** The instant the notify specs admit and dispatch at. */
 export const NOTIFY_AT = "2026-09-30T10:00:00.000Z"

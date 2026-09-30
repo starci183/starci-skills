@@ -4,4 +4,3 @@ export { SHARE_ERROR_KINDS, ShareError, ShareErrorCode } from "./errors/share.er
 export { InvitationService } from "./invitation.service"
 export { SHARE_MESSAGES } from "./messages/share.messages"
 export { ShareModule } from "./share.module"
-export type { InvitationEntity as InvitationRow } from "./persistence/entities/invitation.entity"

@@ -1,4 +1,5 @@
 import { Injectable } from "@nestjs/common"
+import type { MetricsExposition } from "./observability.contracts"
 import type { Metrics } from "./observability.port"
 
 interface RequestMetric {
@@ -33,7 +34,7 @@ export class MetricsRegistryService implements Metrics {
     }
 
     /** Renders the registry in Prometheus text exposition format. */
-    render(): Promise<{ readonly exposition: string }> {
+    render(): Promise<MetricsExposition> {
         const sorted = [...this.requests.entries()].sort(([a], [b]) => a.localeCompare(b))
         const lines: Array<string> = [
             "# HELP http_requests_total HTTP requests the api has served, by method, route and status.",

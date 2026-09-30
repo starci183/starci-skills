@@ -3,15 +3,44 @@ import { AuditAction } from "@modules/domain/audit"
 import type {
     AppendDeliveredLineParams,
     AppendLineParams,
-    AuditErasureRequestRow,
-    AuditKeyRow,
-    AuditLogLineRow,
     CompleteOwnErasureParams,
     ErasureStepParams,
     ReadAuditLogParams,
     RequestErasureParams,
     RequestOwnErasureParams,
 } from "@modules/domain/audit"
+
+/** The columns of a stored row, declared here so a spec never reaches into the persistence of the owner. */
+export interface AuditErasureRequestRow {
+    requestId: string
+    personId: string | null
+    state: string
+    requestedAt: Date
+    verifiedAt: Date | null
+    refusedAt: Date | null
+    executingAt: Date | null
+    completedAt: Date | null
+}
+
+/** The columns of a stored row, declared here so a spec never reaches into the persistence of the owner. */
+export interface AuditKeyRow {
+    personId: string
+    keyId: string
+    key: string
+    createdAt: Date
+}
+
+/** The columns of a stored row, declared here so a spec never reaches into the persistence of the owner. */
+export interface AuditLogLineRow {
+    id: string
+    at: Date
+    action: string
+    target: string | null
+    keyId: string
+    actor: string
+    prevHash: string
+    hash: string
+}
 
 /** The instant the audit specs stamp lines and requests with. */
 export const AUDIT_AT = "2026-09-30T10:00:00.000Z"

@@ -35,10 +35,6 @@ export {
     NOTIFY_DISPATCH_QUEUE,
     toNotifyAdmitMessage,
 } from "./notify.mapper"
-export type { NotifyDeliveryAttemptEntity as NotifyDeliveryAttemptRow } from "./persistence/entities/delivery-attempt.entity"
-export type { NotifyDigestWindowEntity as NotifyDigestWindowRow } from "./persistence/entities/digest-window.entity"
-export type { NotifyNotificationEntity as NotifyNotificationRow } from "./persistence/entities/notification.entity"
-export type { NotifyPreferenceEntity as NotifyPreferenceRow } from "./persistence/entities/preference.entity"
 export { NotifyModule } from "./notify.module"
 export { NotifyService } from "./notify.service"
 export { PreferencesService } from "./preferences.service"

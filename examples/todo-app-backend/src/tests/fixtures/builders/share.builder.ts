@@ -1,6 +1,19 @@
 import { builder } from "@starci/jest-preset"
-import type { InvitationRow } from "@modules/domain/share"
 import type { TaskView } from "@modules/domain/task"
+
+/** The columns of a stored row, declared here so a spec never reaches into the persistence of the owner. */
+export interface InvitationRow {
+    id: string
+    taskId: string
+    ownerId: string
+    email: string
+    role: string
+    status: string
+    sentAt: Date
+    acceptedAt: Date | null
+    revokedAt: Date | null
+    personId: string | null
+}
 
 /** The instant the share specs run at. */
 export const SHARE_AT = "2026-09-10T10:00:00.000Z"
