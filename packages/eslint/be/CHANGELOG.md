@@ -1,8 +1,8 @@
 # Changelog
 
-## 2.0.0 - Changed (lane PORT): `ruleParams.be.infraOwners` names `@nestjs/cache-manager` (the `CACHE_MANAGER` token) beside `cache-manager`: it is reached only by `integrations/cache` and `integrations/redis`, which is the retired repository rule `must-use-cache-service`; `infra-import-owner` (R90) covers it with a passing and a violating case.
-- unreleased (lane C0, BE-CONVENTION)
+## 2.0.0 - 2026-09-30
 
+- Changed (lane PORT): `ruleParams.be.infraOwners` names `@nestjs/cache-manager` (the `CACHE_MANAGER` token) beside `cache-manager`: it is reached only by `integrations/cache` and `integrations/redis`, which is the retired repository rule `must-use-cache-service`; `infra-import-owner` (R90) covers it with a passing and a violating case.
 - Changed (lane UT): `inbox-dedupe-required` (R80) moves from the door to the service. It judges the public methods of a `*.service.ts` whose first parameter TYPE has an `eventId` property: the first awaited expression must be `claim(source, eventId, ...)` on the `Inbox` port, with an early return on `false`. Consumers and `SignedWebhook` controllers are no longer judged by it, and `transport-is-thin` no longer allows an `Inbox` injection or an inbox guard in a door.
 - Changed: `transport-is-thin` allows `unwrapOutcome` of `platform/primitives` (resolved by its symbol) beside the bus call and pure mapper functions.
 - Fixed: `infra-needs-injector` (R85) no longer judges the constructor of a CQRS message (`extends Command<R>` / `Query<R>` of `@nestjs/cqrs`): its `params` is data built with `new`.
@@ -66,7 +66,7 @@
   `injector-type-match` (the `T` of the injector equals the parameter annotation), `infra-needs-injector` (a constructor parameter typed by a platform/integrations declaration or a package carries an injector; only domain services and same-owner types are class-injected),
   `no-module-ref`, `no-forward-ref`, `no-string-token` (a string or template literal, or a string-typed value, as `Inject(...)`/`injector(...)`/`provide:` token; a string literal argument of `getEntityManagerToken`/`getDataSourceToken` outside `<conn>.connection.ts`).
 
-## 2.0.0 additions - persistence rules (lane C0 RA)
+### Persistence rules (lane C0 RA)
 
 - New law `connections`: `one-connection-per-database` (R84 `BE_CONNECTION_DUPLICATE`) and `em-injection-slots` (R88 `BE_TRANSPORT_SHAPE`).
 - New: `sql-text-only` and `no-query-builder` (R36 `BE_SQL_OUTSIDE_PERSISTENCE`). Removed: `sql-only-in-repository` (a `*.repository.ts` no longer exists; slot `be.persistence` allows `<name>.sql.ts` and `<name>.rows.ts` instead).
@@ -85,6 +85,10 @@
 - Breaking: `no-entity-in-contract` (R37) is type-aware: any type whose declaration carries `typeorm`'s `@Entity`, reached directly or through type arguments and properties, from a transport signature, a handler `execute`, a `*.contracts.ts`, `*.command.ts` or `*.query.ts`; and entity files importing `@nestjs/graphql` or `class-validator`. The `*Entity` name test is deleted.
 - Changed: `user-copy-through-catalog` (R78) judges error classes by the constructed type extending `Error` (not a `*Error` name) and outbound ports by the receiver's type (declared by an `integrations` owner or `platform/messaging`, not the method names `notify/send/publish`); transport slots come from the slot view.
 - Changed: `http-needs-timeout` receivers are identified by type (`AxiosInstance`, `AxiosStatic`, `HttpService`), not by name. `async-needs-await`, `json-parse-needs-guard`, `sql-only-in-repository` and `migration-down-reversible` ask the slot view instead of a path pattern, and none of the R70/R73/R76/R78/R79/R81 rules exempts specs any more.
+
+## 1.8.1 - 2026-09-30 (hotfix off 1.8.0, branch release/canon-be-1.8)
+
+- New: `no-entity-manager-wrapper` (R36): an EntityManager wrapper class outside a service or handler, and an exported function taking an EntityManager first, are findings (the renamed-repository loophole). 2.0.0 carries the structural form as `no-repository-class` (R83).
 
 ## 1.8.0 - 2026-09-30 (hotfix off 1.7.1, branch release/canon-be-1.8)
 
