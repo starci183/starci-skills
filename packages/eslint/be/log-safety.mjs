@@ -1,29 +1,29 @@
 /**
  * The rule that keeps a secret or a person out of a log line.
  *
- * `no-secret-in-log` (R71 `BE_LOG_SECRET`) reads the arguments of a logger call and refuses a value whose name
- * says it is a credential (`password`, `secret`, `apiKey`, `accessToken`, `authorization`, `cookie`, `otp`) or
- * a personal identifier (`email`, `phone`, `fullName`, `idCard`, `birthDate`). A log line outlives the request,
- * is copied to a vendor, and is read by people who never had the credential or the consent. Log an id, a count,
- * or a masked form instead.
+ * `no-secret-in-log` (R71 `BE_LOG_SECRET`) judges every call on the `Logger` port of `platform/logging` - the receiver
+ * is identified by its TYPE, never by its name - and refuses two things in the fields it is given (the first argument
+ * is the event and is judged by `no-interpolated-log-message`):
  *
- * The check is on names, because a parser sees names. A name that says it is a measurement of a credential
- * (`tokenCount`, `tokenType`, `secretName`) is not the credential, so those endings are exempt.
+ *   1. a value whose TYPE is the `Secret` brand of `platform/config` or the `Pii` brand of `identity`, or that is read
+ *      out of one (`secret.reveal()`, `person.value`): the brand says what the value IS, whatever it is called;
+ *   2. a value whose NAME says it is a credential (`password`, `secret`, `apiKey`, `accessToken`, `authorization`,
+ *      `cookie`, `otp`) or a personal identifier (`email`, `phone`, `fullName`, `idCard`, `birthDate`). This is the
+ *      second half the convention keeps for values that never carried a brand; a name that says it MEASURES a
+ *      credential (`tokenCount`, `tokenType`, `secretName`) is not the credential, so those endings are exempt.
+ *
+ * A log line outlives the request, is copied to a vendor, and is read by people who never had the credential or the
+ * consent. Log an id, a count, or a masked form instead.
  */
 import { wordsOf } from "./lib/ast.mjs"
-import { isDeclarationFile, isTestLane } from "./lib/path.mjs"
+import { isLoggerCall, isOwnedType } from "./lib/ports.mjs"
+import { isDeclarationFile } from "./lib/path.mjs"
 
-const LOG_METHODS = new Set(["log", "error", "warn", "info", "debug", "verbose", "fatal", "trace"])
+/** The `Secret` brand of `platform/config`. */
+const isSecretType = (context, node) => isOwnedType(context, node, { name: "Secret", capability: "config", tier: "platform" })
 
-/** A receiver is a logger when its last name says so. */
-const isLoggerReceiver = (node) => {
-  const name = node.type === "Identifier"
-    ? node.name
-    : node.type === "MemberExpression" && !node.computed && node.property.type === "Identifier"
-      ? node.property.name
-      : null
-  return name !== null && /^(?:logger|log|winstonService|loggingService|appLogger)$/i.test(name)
-}
+/** The `Pii` brand of the `identity` owner. */
+const isPiiType = (context, node) => isOwnedType(context, node, { name: "Pii", capability: "identity" })
 
 const SECRET_WORDS = new Set(["password", "passwd", "secret", "secrets", "apikey", "authorization", "bearer", "otp", "cookie", "cookies", "credential", "credentials", "jwt", "passphrase"])
 const SECRET_PAIRS = [["api", "key"], ["private", "key"], ["access", "key"], ["secret", "key"], ["signing", "key"], ["client", "secret"]]
@@ -39,13 +39,66 @@ const isSecretName = (words) => {
   return SECRET_PAIRS.some(([a, b]) => words.some((word, index) => word === a && words[index + 1] === b))
 }
 
-const isPiiName = (words) => !words.some((word) => MEASURE_WORDS.has(word)) && words.some((word) => PII_WORDS.has(word))
+const PII_PAIRS = [["full", "name"], ["birth", "date"], ["id", "card"], ["phone", "number"]]
+
+/** Whether a name spells a personal identifier: a two-word identifier (`fullName`) or a single word, unless the name measures one. */
+const isPiiName = (words) =>
+  PII_PAIRS.some(([a, b]) => words.some((word, index) => word === a && words[index + 1] === b))
+  || (!words.some((word) => MEASURE_WORDS.has(word)) && words.some((word) => PII_WORDS.has(word)))
 
 /** A call that hides its argument: the value shown is a mask, a hash, a flag or a count. */
 const isHidingCall = (node) =>
   node.type === "CallExpression"
   && node.callee.type === "Identifier"
   && /^(?:mask|redact|hash|fingerprint|last4|truncate|Boolean|Number|String)$|^(?:mask|redact|hash|fingerprint)/i.test(node.callee.name)
+
+/**
+ * The expressions whose TYPE an argument passes on: identifiers, member reads, call results, and what they are read
+ * out of. A call to a masking function shows a mask, so its arguments are not followed.
+ */
+const valuesIn = (node, found = []) => {
+  if (!node || typeof node.type !== "string") return found
+  switch (node.type) {
+    case "Identifier":
+      found.push(node)
+      return found
+    case "MemberExpression":
+      found.push(node)
+      return valuesIn(node.object, found)
+    case "CallExpression":
+      if (isHidingCall(node)) return found
+      found.push(node)
+      if (node.callee.type === "MemberExpression") valuesIn(node.callee.object, found)
+      return found
+    case "ObjectExpression":
+      node.properties.forEach((property) => valuesIn(property, found))
+      return found
+    case "Property":
+      return valuesIn(node.value, found)
+    case "ArrayExpression":
+      node.elements.forEach((element) => valuesIn(element, found))
+      return found
+    case "TemplateLiteral":
+      node.expressions.forEach((expression) => valuesIn(expression, found))
+      return found
+    case "BinaryExpression":
+    case "LogicalExpression":
+      valuesIn(node.left, found)
+      return valuesIn(node.right, found)
+    case "ConditionalExpression":
+      valuesIn(node.consequent, found)
+      return valuesIn(node.alternate, found)
+    case "SpreadElement":
+    case "AwaitExpression":
+      return valuesIn(node.argument, found)
+    case "TSAsExpression":
+    case "TSNonNullExpression":
+    case "TSSatisfiesExpression":
+      return valuesIn(node.expression, found)
+    default:
+      return found
+  }
+}
 
 /** The names an argument reads: identifiers, member properties and object keys, not nested function bodies. */
 const namesIn = (node, found = []) => {
@@ -97,13 +150,17 @@ const namesIn = (node, found = []) => {
   }
 }
 
-/** A logger call names no credential and no personal identifier. */
+/** A logger call carries no credential and no personal identifier, by type or by name. */
 export const noSecretInLog = {
   meta: {
     type: "problem",
-    docs: { description: "Arguments of a logger call carry no credential and no personal identifier by name." },
+    docs: { description: "Fields of a `Logger` call carry no `Secret`/`Pii` value and no credential or personal identifier by name." },
     schema: [],
     messages: {
+      secretType:
+        "`{{name}}` is a `Secret` (or is read out of one) and is passed to the logger. Log lines outlive the request and are copied to vendors. Log whether it was present, its length, or a masked form (`mask(...)`), never the value.",
+      piiType:
+        "`{{name}}` is `Pii` (or is read out of one) and is passed to the logger. Log the owning id instead, or a masked form (`mask(...)`), never the value.",
       secret:
         "`{{name}}` reads as a credential and is passed to a logger. Log lines outlive the request and are copied to vendors. Log whether it was present, its length, or a masked form (`mask(...)`), never the value.",
       pii:
@@ -112,14 +169,25 @@ export const noSecretInLog = {
   },
   create(context) {
     const filename = context.filename || context.getFilename()
-    if (isTestLane(filename) || isDeclarationFile(filename)) return {}
+    if (isDeclarationFile(filename)) return {}
+    const sourceCode = context.sourceCode || context.getSourceCode()
     return {
       CallExpression(node) {
-        const { callee } = node
-        if (callee.type !== "MemberExpression" || callee.computed || callee.property.type !== "Identifier") return
-        if (!LOG_METHODS.has(callee.property.name) || !isLoggerReceiver(callee.object)) return
+        if (!isLoggerCall(context, node)) return
+        // the first argument is the event; the rest are the cause and the fields
+        const fields = node.arguments.slice(1)
         const reported = new Set()
-        for (const argument of node.arguments) {
+        for (const argument of fields) {
+          for (const value of valuesIn(argument)) {
+            if (reported.has(value)) continue
+            if (isSecretType(context, value)) {
+              reported.add(value)
+              context.report({ node: value, messageId: "secretType", data: { name: sourceCode.getText(value) } })
+            } else if (isPiiType(context, value)) {
+              reported.add(value)
+              context.report({ node: value, messageId: "piiType", data: { name: sourceCode.getText(value) } })
+            }
+          }
           for (const { name, node: at } of namesIn(argument)) {
             const words = wordsOf(name)
             if (reported.has(name)) continue

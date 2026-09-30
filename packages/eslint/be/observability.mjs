@@ -1,69 +1,64 @@
 /**
- * The rules that hold `observability.md`.
+ * The rules that hold `observability.md` (catalog R40 `BE_LOGGER_REQUIRED`, logging half).
  *
- * Two rules and one config line, covering the three ways a log escapes the pipeline: the framework's
- * own logger, `console`, and a name fused with its data. The third is the one worth a rule of its
- * own, because it is the only one that still LOOKS like structured logging - the call goes through
- * the right service and produces an unqueryable line anyway.
+ * Three rules covering the three ways a log escapes the pipeline: the framework's own logger, a name fused with its
+ * data, and a failure line whose identity is its wording. The logger is identified by its TYPE - the `Logger` port of
+ * `platform/logging` - never by what a receiver or a method is called, so a renamed receiver, a property injection and
+ * a lookalike class are all judged correctly.
  *
- * `no-console` is not reimplemented here: the standard rule already does it exactly, and shipping a
- * second implementation of a rule everybody has would be a maintenance cost with no gain. It is
- * named in `recommended` so a consuming repository switches it on with the others.
+ * `no-console` is not reimplemented here: the standard rule already does it exactly, and shipping a second
+ * implementation of a rule everybody has would be a maintenance cost with no gain. It is named in `recommended` so a
+ * consuming repository switches it on with the others.
  *
- * OBSERVABILITY-4 and -5 are judgements a rule cannot make. Whether a log records a decision or
- * merely an arrival needs to know what the code is FOR, and no parser knows that.
+ * OBSERVABILITY-4 and -5 are judgements a rule cannot make. Whether a log records a decision or merely an arrival
+ * needs to know what the code is FOR, and no parser knows that.
  */
+import { hfsOf } from "./lib/hfs.mjs"
+import { baseName, enumsOf, isLoggerCall, isOwnedBy } from "./lib/ports.mjs"
+import { isPackageType } from "./lib/types.mjs"
 
-/** Log methods the house service exposes. */
-const LOG_METHODS = new Set(["log", "error", "warn", "info", "debug", "verbose"])
+/** The framework loggers of `@nestjs/common` this replaces, by the names the package declares them under. */
+const FRAMEWORK_LOGGERS = Object.freeze(["Logger", "ConsoleLogger"])
 
-/** The house logging service, by the name it is injected under. */
-const LOGGER_RECEIVER = "winstonService"
-
-/** The framework logger this replaces. */
-const FRAMEWORK_LOGGER = "Logger"
-
-/** The package the framework logger comes from. */
+/** The package the framework loggers come from. */
 const FRAMEWORK_PACKAGE = "@nestjs/common"
-
-/** Whether a call's receiver is the house logging service, injected or via `this`. */
-const isLoggerReceiver = (node) => {
-  if (node.type === "Identifier") return node.name === LOGGER_RECEIVER
-  if (node.type === "MemberExpression" && !node.computed) return node.property.name === LOGGER_RECEIVER
-  return false
-}
 
 // -- OBSERVABILITY-1 -------------------------------------------------------------------------------
 
-/** Logs leave through the house service, never the framework's own logger. */
+/** Logs leave through the `Logger` port, never the framework's own logger. */
 export const noFrameworkLogger = {
   meta: {
     type: "problem",
-    docs: { description: "Only the house logging service logs; the framework's `Logger` is refused." },
+    docs: { description: "Only the `Logger` port of `platform/logging` logs; the framework's `Logger` is refused." },
     schema: [],
     messages: {
       imported:
-        "`Logger` from `{{pkg}}` bypasses the correlation id and the transport configuration the house service wires up - the line is written in the right SHAPE and still arrives without the context every other line carries, or does not arrive at all. Inject the house logging service.",
+        "`{{name}}` from `{{pkg}}` bypasses the JSON-lines adapter, the `Clock` stamp and the event vocabulary every other line carries - the line is written in the right SHAPE and still arrives without them. Inject the `Logger` port (`@InjectLogger() private readonly logger: Logger`).",
       constructed:
-        "`new Logger(...)` - same bypass, reached through a local construction rather than the import. Inject the house logging service.",
+        "`new {{name}}(...)` builds the framework logger through a local construction rather than the import. Inject the `Logger` port (`@InjectLogger() private readonly logger: Logger`).",
+      extended:
+        "This class extends the framework logger from `{{pkg}}`. Implement the `Logger` port of `platform/logging` instead.",
     },
   },
   create(context) {
+    // the adapter of the port is the one place that may know how lines are written
+    if (isOwnedBy(hfsOf(context), context.filename || context.getFilename(), "platform", "logging")) return {}
+    const framework = (node) => FRAMEWORK_LOGGERS.some((name) => isPackageType(context, node, name, FRAMEWORK_PACKAGE))
     return {
       ImportDeclaration(node) {
         if (node.source.value !== FRAMEWORK_PACKAGE) return
         for (const specifier of node.specifiers || []) {
           if (specifier.type !== "ImportSpecifier") continue
-          if (specifier.imported && specifier.imported.name === FRAMEWORK_LOGGER) {
-            context.report({ node: specifier, messageId: "imported", data: { pkg: FRAMEWORK_PACKAGE } })
-          }
+          const imported = specifier.imported.name ?? specifier.imported.value
+          if (FRAMEWORK_LOGGERS.includes(imported)) context.report({ node: specifier, messageId: "imported", data: { name: imported, pkg: FRAMEWORK_PACKAGE } })
         }
       },
-      // caught separately so an aliased import cannot walk past the check above
+      // judged by the type of what is built, so an aliased import or a namespace import cannot walk past the check above
       NewExpression(node) {
-        if (node.callee.type === "Identifier" && node.callee.name === FRAMEWORK_LOGGER) {
-          context.report({ node, messageId: "constructed" })
-        }
+        if (framework(node)) context.report({ node, messageId: "constructed", data: { name: node.callee.name ?? node.callee.property?.name ?? "Logger" } })
+      },
+      "ClassDeclaration, ClassExpression"(node) {
+        if (node.superClass && framework(node.superClass)) context.report({ node: node.superClass, messageId: "extended", data: { pkg: FRAMEWORK_PACKAGE } })
       },
     }
   },
@@ -71,38 +66,37 @@ export const noFrameworkLogger = {
 
 // -- OBSERVABILITY-2 -------------------------------------------------------------------------------
 
-/** The event name is a member of a closed set, never a string built at the call site. */
+/** The event name is a member of an owner's log-event enum, never a string built at the call site. */
 export const noInterpolatedLogMessage = {
   meta: {
     type: "problem",
-    docs: { description: "A log call's first argument is an enum member, not a built string." },
+    docs: { description: "A `Logger` call's first argument is a member of an owner's `<owner>.log-events.ts` enum, not a built string." },
     schema: [],
     messages: {
-      built:
-        "The first argument to `{{method}}(...)` names WHAT happened and must come from the log-name enum. A string built here fuses the name with the data, so in one move the name stops being groupable and the data stops being queryable - and the day somebody rewords it, every dashboard built on it goes quiet. Pass the enum member, and put the variable part in the data object beside it.",
+      notEvent:
+        "The first argument to `{{method}}(...)` names WHAT happened and must be a member of the owner's `<owner>.log-events.ts` enum. A string or a value of any other type fuses the name with the data, so the name stops being groupable and the data stops being queryable - and the day somebody rewords it, every dashboard built on it goes quiet. Pass the enum member, and put the variable part in the fields beside it.",
+      wrongHome:
+        "`{{enumName}}` is an enum, but not one declared in a `<owner>.log-events.ts` file. Log events are declared by the owner that emits them, in `<owner>.log-events.ts`, so each owner's vocabulary is found in one place.",
     },
   },
   create(context) {
     return {
       CallExpression(node) {
-        const callee = node.callee
-        if (callee.type !== "MemberExpression" || callee.computed) return
-        const method = callee.property.name
-        if (!LOG_METHODS.has(method)) return
-        if (!isLoggerReceiver(callee.object)) return
-
+        if (!isLoggerCall(context, node)) return
         const first = node.arguments[0]
         if (!first) return
-        const built = first.type === "TemplateLiteral"
-          || (first.type === "BinaryExpression" && first.operator === "+")
-          || (first.type === "Literal" && typeof first.value === "string")
-        if (built) context.report({ node: first, messageId: "built", data: { method } })
+        const method = node.callee.property.name
+        const enums = enumsOf(context, first)
+        if (!enums) {
+          context.report({ node: first, messageId: "notEvent", data: { method } })
+          return
+        }
+        const stray = enums.find((entry) => !baseName(entry.file).endsWith(".log-events.ts"))
+        if (stray) context.report({ node: first, messageId: "wrongHome", data: { enumName: stray.name } })
       },
     }
   },
 }
-
-// -- OBSERVABILITY-5 -------------------------------------------------------------------------------
 
 /** Whether `node` is a bare reference to the caught error, by name. */
 const isIdentifierNamed = (node, name) => Boolean(node) && node.type === "Identifier" && node.name === name
@@ -202,18 +196,18 @@ export const noErrorWordingAsLogIdentity = {
       CallExpression(node) {
         const errorName = catchStack[catchStack.length - 1]
         if (!errorName) return
-        const callee = node.callee
-        if (callee.type !== "MemberExpression" || callee.computed) return
-        const method = callee.property.name
-        if (!LOG_METHODS.has(method)) return
-        if (!isLoggerReceiver(callee.object)) return
+        if (!isLoggerCall(context, node)) return
 
         // the event name (first argument) is OBSERVABILITY-2's business, not this rule's
         const dataArgs = node.arguments.slice(1)
         if (dataArgs.length === 0) return
 
         const found = { wording: [], identity: [] }
-        for (const arg of dataArgs) scanErrorUsage(arg, errorName, found)
+        for (const arg of dataArgs) {
+          // the caught error passed whole is the port's `cause`: the adapter serializes its name, so identity rides with it
+          if (isIdentifierNamed(arg, errorName)) found.identity.push(arg)
+          scanErrorUsage(arg, errorName, found)
+        }
         if (found.wording.length > 0 && found.identity.length === 0) {
           const first = found.wording[0]
           context.report({
@@ -235,39 +229,13 @@ export const rules = {
 }
 
 /**
- * The level this law asks for, as the plugin's own opinion.
+ * The level this law asks for, as the plugin's own opinion: every rule at `error`, no exemption list.
  *
- * `no-framework-logger` and `no-interpolated-log-message` are both measured at zero debt in the
- * reference repository ONCE the sanctioned exit is scoped: `no-framework-logger` reports four sites
- * under the standalone-agent folder, and those are the exit rather than the debt. An agent running
- * outside the request lifecycle has no request to correlate and no transport configured, so the
- * house service would give it a dependency and nothing else. Scope that folder off in the consuming
- * config -- once, by path -- rather than letting per-line suppressions accumulate until nobody can
- * see how wide the exception has grown.
- *
- * `no-error-wording-as-log-identity` measures at 64 offenders across 39 files in the reference
- * repository (`src/**`, probed against source directly since the published package predates this
- * rule) -- real debt, not zero, so it ships at `warn` with that count on record rather than `error`.
- * Flip to `error` once the count reaches zero; shipping `error` over standing debt is what teaches an
- * author to scroll past a rule instead of fixing it.
- *
- * `no-console` is the standard rule rather than a house one; the config factory borrows it
- * (`lib/config.mjs` BORROWED) so it is on wherever these two are.
+ * `no-console` is the standard rule rather than a house one; the config factory borrows it (`lib/config.mjs`
+ * BORROWED) so it is on wherever these three are.
  */
 export const recommended = {
   "starci-be/no-framework-logger": "error",
   "starci-be/no-interpolated-log-message": "error",
   "starci-be/no-error-wording-as-log-identity": "error",
 }
-
-/**
- * Paths where a plain logger is sanctioned -- programs with no request to correlate.
- *
- * Exported so a consuming config and a measuring gate use the SAME list. Two copies of an exemption
- * is how one of them silently grows.
- */
-export const standaloneProgramGlobs = [
-  "src/modules/playground-agent-core/**",
-  "apps/playground-*-agent/**",
-  "apps/cli/**",
-]
