@@ -55,9 +55,10 @@ function runLinter({ cwd, pkg, bin, args }) {
     return { error: `${pkg} is not installed for ${cwd}` };
   }
   const run = spawnSync(process.execPath, [entry, ...args], { cwd, encoding: 'utf8', maxBuffer: 512 * 1024 * 1024 });
-  // The linters exit 1 when they found something; no json at all means they could not run.
+  // The linters exit 1 when they found something; no json at all means they could not run. ESLint prints its report on stdout,
+  // stylelint (16 and later) its formatter output on stderr.
   let results;
-  try { results = JSON.parse(run.stdout); } catch { return { error: `${pkg} produced no json report in ${path.basename(cwd)}/ (exit ${run.status}): ${String(run.stderr || run.stdout).trim().split('\n')[0]}` }; }
+  try { results = JSON.parse(run.stdout.trim() || run.stderr); } catch { return { error: `${pkg} produced no json report in ${path.basename(cwd)}/ (exit ${run.status}): ${String(run.stderr || run.stdout).trim().split('\n')[0]}` }; }
   if (!Array.isArray(results)) return { error: `${pkg} produced a report that is not a result list` };
   return { results };
 }

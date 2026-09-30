@@ -25,6 +25,27 @@ const PINS_FILE = path.join(import.meta.dirname, '..', 'runtime', 'knowledge', '
 const SONAR_GATE_FILE = path.join(import.meta.dirname, '..', 'runtime', 'knowledge', 'sonar-gate.yaml');
 const pascal = name => name.split('-').map(part => part[0].toUpperCase() + part.slice(1)).join('');
 
+/**
+ * A JSON file as prettier prints it (the app's format check judges every file the scaffold writes): an object one key per line, an
+ * array of plain values on one line, any other array one item per line.
+ */
+function jsonText(value) {
+  const print = (item, indent) => {
+    const inner = `${indent}  `;
+    if (Array.isArray(item)) {
+      if (item.every(entry => entry === null || typeof entry !== 'object')) return `[${item.map(entry => JSON.stringify(entry)).join(', ')}]`;
+      return `[\n${item.map(entry => `${inner}${print(entry, inner)}`).join(',\n')}\n${indent}]`;
+    }
+    if (item !== null && typeof item === 'object') {
+      const keys = Object.keys(item);
+      if (!keys.length) return '{}';
+      return `{\n${keys.map(key => `${inner}${JSON.stringify(key)}: ${print(item[key], inner)}`).join(',\n')}\n${indent}}`;
+    }
+    return JSON.stringify(item);
+  };
+  return `${print(value, '')}\n`;
+}
+
 /** The apps a new app starts with: one api app on the be side, one Next app on the fe side, which reads the be contracts for its codegen. */
 export const STARTER_SIDES = Object.freeze({
   be: Object.freeze({ apps: [{ name: 'api', kind: 'api' }] }),
@@ -111,10 +132,10 @@ export function scaffoldApp({ name, into, presets, manifest = loadSlotManifest()
   const pins = parseYaml(fs.readFileSync(PINS_FILE, 'utf8')).pins;
   const pkg = packageManifest(name, pins);
   const files = [
-    { path: 'hfs.json', content: `${JSON.stringify(declaration, null, 2)}\n` },
-    { path: 'package.json', content: `${JSON.stringify(pkg, null, 2)}\n` },
-    { path: 'package-lock.json', content: `${JSON.stringify({ name, version: pkg.version, lockfileVersion: 3, requires: true, packages: { '': { name, version: pkg.version, dependencies: pkg.dependencies, devDependencies: pkg.devDependencies } } }, null, 2)}\n` },
-    { path: 'be/nest-cli.json', content: `${JSON.stringify(nestCli(app), null, 2)}\n` },
+    { path: 'hfs.json', content: jsonText(declaration) },
+    { path: 'package.json', content: jsonText(pkg) },
+    { path: 'package-lock.json', content: jsonText({ name, version: pkg.version, lockfileVersion: 3, requires: true, packages: { '': { name, version: pkg.version, dependencies: pkg.dependencies, devDependencies: pkg.devDependencies } } }) },
+    { path: 'be/nest-cli.json', content: jsonText(nestCli(app)) },
     ...['app', 'be', 'fe'].flatMap(scope => skeletonOf(scope, app, { sonarGate: parseYaml(fs.readFileSync(SONAR_GATE_FILE, 'utf8')).gate.name })),
   ];
   for (const file of files) {
