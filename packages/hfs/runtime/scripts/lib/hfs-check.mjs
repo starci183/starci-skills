@@ -153,6 +153,13 @@ const PLAIN_ENTRY = /^<[a-z][a-z0-9-]*>.ts$/;
  */
 function sourceFormFindings({ files, resolver }) {
   const { suffixes, bannedSuffixes } = resolver.ruleParams();
+  // A suffix a slot names in its own file pattern (`*.builder.ts` of be.tests.fixtures.builders) is that slot's role: a file with it
+  // anywhere else is refused, so a builder cannot live beside a service or in the fixtures root.
+  const boundSuffixes = new Map();
+  for (const slot of resolver.slots()) {
+    const bound = /\*\.([a-z0-9-]+)\.ts$/.exec(slot.path ?? '')?.[1];
+    if (bound && suffixes.includes(bound)) boundSuffixes.set(bound, slot);
+  }
   const findings = [];
   for (const file of files) {
     if (!file.endsWith('.ts') || !SOURCE_ROOT.test(file)) continue;
@@ -160,7 +167,7 @@ function sourceFormFindings({ files, resolver }) {
     if (c.status !== 'owned' || c.tracking === 'ignored') continue;
     const base = path.posix.basename(file);
     if (FREE_NAMES.has(base)) continue;
-    // A literal file name the owning slot itself requires or allows (persistence/connection.ts, fixtures/database.ts) is its role.
+    // A literal file name the owning slot itself requires or allows (persistence/connection.ts, world/global-setup.ts) is its role.
     const slot = resolver.slot(c.slot);
     if ([...(slot?.requires ?? []), ...(slot?.allows ?? [])].some((entry) => entry === base)) continue;
     // A slot whose `allows` holds a bare <name>.ts entry (be.tests.world.kit) names its files plainly, as platform/primitives does: kebab-case is the whole form.
@@ -171,6 +178,8 @@ function sourceFormFindings({ files, resolver }) {
     const banned = parts.slice(1).find((part) => bannedSuffixes.includes(part));
     if (banned) {
       findings.push({ code: 'BE_SOURCE_FORM', level: 'error', path: file, suffix: banned, message: `${file}: the suffix .${banned} is banned; use a role from the closed suffix list (${suffixes.join(', ')})` });
+    } else if (boundSuffixes.has(parts.at(-1)) && parts.length >= 2 && boundSuffixes.get(parts.at(-1)).id !== c.slot) {
+      findings.push({ code: 'BE_SOURCE_FORM', level: 'error', path: file, suffix: parts.at(-1), message: `${file}: the suffix .${parts.at(-1)}.ts belongs to ${boundSuffixes.get(parts.at(-1)).path} only; move the file there` });
     } else if (parts.length < 2 || !parts.every((part) => KEBAB.test(part)) || !suffixes.includes(parts.at(-1))) {
       findings.push({ code: 'BE_SOURCE_FORM', level: 'error', path: file, message: `${file}: the name must be <kebab-name>.<suffix>.ts with a suffix from the closed list (${suffixes.join(', ')}), or index.ts, main.ts or a migration` });
     }
@@ -413,7 +422,7 @@ export function checkRepository({ repoRoot, root = skillRoot, fast = false, base
 // --------------------------------------------------------------------------------------------------- explain
 
 const TEST_KIND = {
-  'unit-beside': 'a unit spec beside each source file (<name>.spec.ts) in this slot',
+  'unit-beside': 'a <name>.service.spec.ts beside each <name>.service.ts in this slot (only services are unit-tested)',
   e2e: 'an integration, e2e or contract spec covering the flow; no unit spec is required',
   none: 'no test is required for files in this slot',
 };
