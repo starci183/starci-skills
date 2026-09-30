@@ -1,9 +1,10 @@
-import { randomUUID } from "node:crypto"
 import { Injectable } from "@nestjs/common"
 import { TaskService } from "@modules/domain/task"
 import { InjectClock } from "@modules/platform/clock"
 import type { Clock } from "@modules/platform/clock"
 import { InjectPrimaryEntityManager, LIST_ROWS_MAX } from "@modules/platform/database"
+import { InjectIds } from "@modules/platform/ids"
+import type { Ids } from "@modules/platform/ids"
 import { ok, refused } from "@modules/platform/primitives"
 import type { EntityManager } from "typeorm"
 import { ShareErrorCode } from "./errors/share.error"
@@ -33,6 +34,7 @@ export class InvitationService {
     constructor(
         @InjectPrimaryEntityManager() private readonly entityManager: EntityManager,
         @InjectClock() private readonly clock: Clock,
+        @InjectIds() private readonly ids: Ids,
         private readonly tasks: TaskService,
     ) {}
 
@@ -58,7 +60,7 @@ export class InvitationService {
             }
             const saved = await manager.save(InvitationEntity, {
                 ...existing,
-                id: existing?.id ?? randomUUID(),
+                id: existing?.id ?? this.ids.next(),
                 taskId: task.id,
                 ownerId: params.ownerId,
                 email,

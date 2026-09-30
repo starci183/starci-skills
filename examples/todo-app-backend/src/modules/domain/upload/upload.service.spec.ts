@@ -1,11 +1,12 @@
 import { Test } from "@nestjs/testing"
-import { builder, FakeClock, fakeTransaction, mock, mockEntityManager } from "@starci/jest-preset"
+import { builder, FakeClock, fakeIds, fakeTransaction, mock, mockEntityManager } from "@starci/jest-preset"
 import { TaskService } from "@modules/domain/task"
 import { UPLOAD_STORAGE, UploadStorageError, UploadStorageErrorCode } from "@modules/integrations/upload"
 import type { UploadStorage } from "@modules/integrations/upload"
 import { CLOCK } from "@modules/platform/clock"
 import { Secret } from "@modules/platform/config"
 import { LIST_ROWS_MAX, PRIMARY_ENTITY_MANAGER } from "@modules/platform/database"
+import { IDS } from "@modules/platform/ids"
 import { UPLOAD_AT, UPLOAD_SECRET, uploadRow, uploadTask } from "@tests/fixtures/builders/upload.builder"
 import { UploadErrorCode } from "./errors/upload.error"
 import { UploadEntity } from "./persistence/entities/upload.entity"
@@ -36,11 +37,13 @@ const build = async (em = mockEntityManager()) => {
     const tx = fakeTransaction(em)
     const storage = mock<UploadStorage>()
     const tasks = mock<TaskService>()
+    const ids = fakeIds()
     const moduleRef = await Test.createTestingModule({
         providers: [
             UploadService,
             { provide: PRIMARY_ENTITY_MANAGER, useValue: tx.em },
             { provide: CLOCK, useValue: new FakeClock(UPLOAD_AT) },
+            { provide: IDS, useValue: ids },
             { provide: UPLOAD_OPTIONS, useValue: options },
             { provide: UPLOAD_STORAGE, useValue: storage },
             { provide: TaskService, useValue: tasks },
@@ -87,7 +90,7 @@ describe("UploadService", () => {
             const outcome = await service.createIntent(request)
 
             expect(em.save).toHaveBeenCalledWith(UploadEntity, {
-                id: expect.any(String),
+                id: "00000000-0000-4000-8000-000000000001",
                 owner: "p-1",
                 taskId: null,
                 filename: "note.txt",

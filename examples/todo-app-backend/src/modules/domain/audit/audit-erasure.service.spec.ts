@@ -1,8 +1,9 @@
 import { Test } from "@nestjs/testing"
-import { FakeClock, fakeTransaction, mock, mockEntityManager, recordingOutbox } from "@starci/jest-preset"
+import { FakeClock, fakeIds, fakeTransaction, mock, mockEntityManager, recordingOutbox } from "@starci/jest-preset"
 import type { MockEntityManager } from "@starci/jest-preset"
 import { CLOCK } from "@modules/platform/clock"
 import { PRIMARY_ENTITY_MANAGER } from "@modules/platform/database"
+import { IDS } from "@modules/platform/ids"
 import { OUTBOX } from "@modules/platform/outbox"
 import {
     AUDIT_AT,
@@ -28,11 +29,13 @@ const build = async (em: MockEntityManager = mockEntityManager()) => {
     const clock = new FakeClock(LATER)
     const outbox = recordingOutbox()
     const keystore = mock<AuditKeystoreService>()
+    const ids = fakeIds()
     const moduleRef = await Test.createTestingModule({
         providers: [
             AuditErasureService,
             { provide: PRIMARY_ENTITY_MANAGER, useValue: em },
             { provide: CLOCK, useValue: clock },
+            { provide: IDS, useValue: ids },
             { provide: OUTBOX, useValue: outbox },
             { provide: AuditKeystoreService, useValue: keystore },
         ],
@@ -72,7 +75,7 @@ describe("AuditErasureService", () => {
             })
 
             expect(manager.save).toHaveBeenNthCalledWith(1, AuditErasureRequestEntity, {
-                requestId: expect.any(String),
+                requestId: "00000000-0000-4000-8000-000000000001",
                 personId: "p1",
                 state: "requested",
                 requestedAt: LATER,
@@ -285,7 +288,7 @@ describe("AuditErasureService", () => {
             expect(outbox.messages).toEqual([
                 {
                     queue: AUDIT_APPEND_QUEUE.name,
-                    eventId: expect.any(String),
+                    eventId: "00000000-0000-4000-8000-000000000002",
                     payload: {
                         actorId: SYSTEM_ACTOR_ID,
                         action: AuditAction.ErasureRequested,
@@ -334,7 +337,7 @@ describe("AuditErasureService", () => {
             expect(outbox.messages).toEqual([
                 {
                     queue: AUDIT_APPEND_QUEUE.name,
-                    eventId: expect.any(String),
+                    eventId: "00000000-0000-4000-8000-000000000001",
                     payload: {
                         actorId: SYSTEM_ACTOR_ID,
                         action: AuditAction.ErasureCompleted,

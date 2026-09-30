@@ -1,4 +1,3 @@
-import { randomUUID } from "node:crypto"
 import { Injectable } from "@nestjs/common"
 import { AuditAction, toAuditAppendMessage } from "@modules/domain/audit"
 import { InjectKeycloak, KeycloakError, KeycloakErrorCode, KeycloakLogEvent } from "@modules/integrations/keycloak"
@@ -7,6 +6,8 @@ import { InjectClock } from "@modules/platform/clock"
 import type { Clock } from "@modules/platform/clock"
 import type { Principal } from "@modules/platform/cqrs"
 import { InjectPrimaryEntityManager } from "@modules/platform/database"
+import { InjectIds } from "@modules/platform/ids"
+import type { Ids } from "@modules/platform/ids"
 import { InjectLogger } from "@modules/platform/logging"
 import type { Logger } from "@modules/platform/logging"
 import { InjectOutbox } from "@modules/platform/outbox"
@@ -55,6 +56,7 @@ export class SessionService {
         @InjectPrimaryEntityManager() private readonly entityManager: EntityManager,
         @InjectIdentityOptions() private readonly options: IdentityOptions,
         @InjectClock() private readonly clock: Clock,
+        @InjectIds() private readonly ids: Ids,
         @InjectOutbox() private readonly outbox: Outbox,
         @InjectKeycloak() private readonly keycloak: KeycloakClient,
         @InjectLogger() private readonly logger: Logger,
@@ -81,7 +83,7 @@ export class SessionService {
             await this.outbox.enqueue(
                 manager,
                 toAuditAppendMessage({
-                    eventId: randomUUID(),
+                    eventId: this.ids.next(),
                     actorId: personId,
                     action: AuditAction.SignedIn,
                     target: null,
@@ -109,7 +111,7 @@ export class SessionService {
             await this.outbox.enqueue(
                 manager,
                 toAuditAppendMessage({
-                    eventId: randomUUID(),
+                    eventId: this.ids.next(),
                     actorId: personId,
                     action: AuditAction.SignedOut,
                     target: null,
@@ -129,7 +131,7 @@ export class SessionService {
     private async open(params: OpenSessionParams): Promise<SessionView> {
         const expiresAt = new Date(params.at.getTime() + this.options.ttlDays * MILLISECONDS_PER_DAY)
         const saved = await params.manager.save(SessionEntity, {
-            token: randomUUID(),
+            token: this.ids.next(),
             personId: params.personId,
             issuedAt: params.at,
             expiresAt,

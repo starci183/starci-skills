@@ -1,6 +1,7 @@
-import { randomUUID } from "node:crypto"
 import { Injectable } from "@nestjs/common"
 import { InjectPrimaryEntityManager } from "@modules/platform/database"
+import { InjectIds } from "@modules/platform/ids"
+import type { Ids } from "@modules/platform/ids"
 import type { EntityManager } from "typeorm"
 import { SubscriptionEntity } from "./persistence/entities/subscription.entity"
 import { toSubscriptionView } from "./persistence/subscription.rows"
@@ -27,14 +28,17 @@ const UPGRADE_PATH = "/plan/usage"
  * lifecycle. The effective plan is read through the status, never the raw column, so a lapsed row reads as free.
  */
 export class SubscriptionService {
-    constructor(@InjectPrimaryEntityManager() private readonly entityManager: EntityManager) {}
+    constructor(
+        @InjectPrimaryEntityManager() private readonly entityManager: EntityManager,
+        @InjectIds() private readonly ids: Ids,
+    ) {}
 
     /** The subscription of the person, created free on first touch: exactly one row per person. */
     async getOrCreate(params: GetOrCreateSubscriptionParams): Promise<SubscriptionView> {
         const existing = await params.manager.findOneBy(SubscriptionEntity, { personId: params.personId })
         if (existing) return toSubscriptionView(existing)
         const saved = await params.manager.save(SubscriptionEntity, {
-            id: randomUUID(),
+            id: this.ids.next(),
             personId: params.personId,
             plan: "free",
             status: "free",

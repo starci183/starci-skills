@@ -1,8 +1,9 @@
-import { randomUUID } from "node:crypto"
 import { Injectable } from "@nestjs/common"
 import { InjectClock } from "@modules/platform/clock"
 import type { Clock } from "@modules/platform/clock"
 import { InjectPrimaryEntityManager } from "@modules/platform/database"
+import { InjectIds } from "@modules/platform/ids"
+import type { Ids } from "@modules/platform/ids"
 import type { EntityManager } from "typeorm"
 import type {
     BuryMessageParams,
@@ -22,12 +23,13 @@ export class PostgresOutbox implements Outbox {
     constructor(
         @InjectPrimaryEntityManager() private readonly entityManager: EntityManager,
         @InjectClock() private readonly clock: Clock,
+        @InjectIds() private readonly ids: Ids,
     ) {}
 
     /** Inserts the message through the manager of the caller transaction. */
     async enqueue(manager: EntityManager, message: OutboxMessage): Promise<void> {
         await manager.query(INSERT_MESSAGE, [
-            randomUUID(),
+            this.ids.next(),
             message.queue,
             message.eventId,
             message.payload,

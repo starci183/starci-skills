@@ -1,11 +1,12 @@
 import { Test } from "@nestjs/testing"
 import type { MockEntityManager } from "@starci/jest-preset"
-import { FakeClock, fakeTransaction, mock, mockEntityManager, recordingOutbox } from "@starci/jest-preset"
+import { FakeClock, fakeIds, fakeTransaction, mock, mockEntityManager, recordingOutbox } from "@starci/jest-preset"
 import { AuditAction } from "@modules/domain/audit"
 import { KEYCLOAK, KeycloakError, KeycloakErrorCode, KeycloakLogEvent } from "@modules/integrations/keycloak"
 import type { KeycloakClient } from "@modules/integrations/keycloak"
 import { CLOCK } from "@modules/platform/clock"
 import { PRIMARY_ENTITY_MANAGER } from "@modules/platform/database"
+import { IDS } from "@modules/platform/ids"
 import { LOGGER } from "@modules/platform/logging"
 import type { Logger } from "@modules/platform/logging"
 import { OUTBOX } from "@modules/platform/outbox"
@@ -37,12 +38,14 @@ const build = async (entityManager: MockEntityManager = mockEntityManager()) => 
     const outbox = recordingOutbox()
     const keycloak = mock<KeycloakClient>()
     const logger = mock<Logger>()
+    const ids = fakeIds()
     const moduleRef = await Test.createTestingModule({
         providers: [
             SessionService,
             { provide: PRIMARY_ENTITY_MANAGER, useValue: transaction.em },
             { provide: IDENTITY_OPTIONS, useValue: OPTIONS },
             { provide: CLOCK, useValue: clock },
+            { provide: IDS, useValue: ids },
             { provide: OUTBOX, useValue: outbox },
             { provide: KEYCLOAK, useValue: keycloak },
             { provide: LOGGER, useValue: logger },
@@ -114,7 +117,7 @@ describe("SessionService", () => {
                     args: [
                         SessionEntity,
                         {
-                            token: expect.any(String),
+                            token: "00000000-0000-4000-8000-000000000001",
                             personId: "p1",
                             issuedAt: AT,
                             expiresAt: new Date("2026-10-02T10:00:00.000Z"),
@@ -126,7 +129,7 @@ describe("SessionService", () => {
             expect(outbox.messages).toEqual([
                 {
                     queue: "audit.append",
-                    eventId: expect.any(String),
+                    eventId: "00000000-0000-4000-8000-000000000002",
                     payload: { actorId: "p1", action: AuditAction.SignedIn, target: null, at: NOW },
                     availableAt: AT,
                 },
@@ -180,7 +183,7 @@ describe("SessionService", () => {
             expect(outbox.messages).toEqual([
                 {
                     queue: "audit.append",
-                    eventId: expect.any(String),
+                    eventId: "00000000-0000-4000-8000-000000000001",
                     payload: { actorId: "p1", action: AuditAction.SignedOut, target: null, at: NOW },
                     availableAt: AT,
                 },

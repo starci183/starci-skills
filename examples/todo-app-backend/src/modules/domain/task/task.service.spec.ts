@@ -1,8 +1,9 @@
 import { Test } from "@nestjs/testing"
-import { FakeClock, fakeTransaction, mockEntityManager, recordingOutbox } from "@starci/jest-preset"
+import { FakeClock, fakeIds, fakeTransaction, mockEntityManager, recordingOutbox } from "@starci/jest-preset"
 import { AuditAction } from "@modules/domain/audit"
 import { CLOCK } from "@modules/platform/clock"
 import { LIST_ROWS_MAX, PRIMARY_ENTITY_MANAGER } from "@modules/platform/database"
+import { IDS } from "@modules/platform/ids"
 import { OUTBOX } from "@modules/platform/outbox"
 import { completedTaskRow, TASK_AT, taskRow } from "@tests/fixtures/builders/task.builder"
 import { TaskErrorCode } from "./errors/task.error"
@@ -14,11 +15,13 @@ const at = new Date(TASK_AT)
 const build = async (em = mockEntityManager()) => {
     const tx = fakeTransaction(em)
     const outbox = recordingOutbox()
+    const ids = fakeIds()
     const moduleRef = await Test.createTestingModule({
         providers: [
             TaskService,
             { provide: PRIMARY_ENTITY_MANAGER, useValue: tx.em },
             { provide: CLOCK, useValue: new FakeClock(TASK_AT) },
+            { provide: IDS, useValue: ids },
             { provide: OUTBOX, useValue: outbox },
         ],
     }).compile()
@@ -40,7 +43,7 @@ describe("TaskService", () => {
             })
 
             expect(manager.save).toHaveBeenCalledWith(TaskEntity, {
-                id: expect.any(String),
+                id: "00000000-0000-4000-8000-000000000001",
                 owner: "owner-1",
                 title: "Write",
                 complete: false,

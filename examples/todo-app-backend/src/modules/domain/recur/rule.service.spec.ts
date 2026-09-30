@@ -1,7 +1,8 @@
 import { Test } from "@nestjs/testing"
 import type { MockEntityManager } from "@starci/jest-preset"
-import { fakeTransaction, mock, mockEntityManager } from "@starci/jest-preset"
+import { fakeIds, fakeTransaction, mock, mockEntityManager } from "@starci/jest-preset"
 import { LIST_ROWS_MAX, PRIMARY_ENTITY_MANAGER } from "@modules/platform/database"
+import { IDS } from "@modules/platform/ids"
 import { MoreThan } from "typeorm"
 import { RecurErrorCode } from "./errors/recur.error"
 import { OccurrenceService } from "./occurrence.service"
@@ -27,10 +28,12 @@ const everyThreeDays: RuleEntity = { ...weekday, frequency: RuleFrequency.EveryN
 const build = async (em: MockEntityManager = mockEntityManager()) => {
     const tx = fakeTransaction(em)
     const occurrences = mock<OccurrenceService>()
+    const ids = fakeIds()
     const moduleRef = await Test.createTestingModule({
         providers: [
             RuleService,
             { provide: PRIMARY_ENTITY_MANAGER, useValue: tx.em },
+            { provide: IDS, useValue: ids },
             { provide: OccurrenceService, useValue: occurrences },
         ],
     }).compile()
@@ -63,7 +66,7 @@ describe("RuleService", () => {
             })
 
             expect(em.save).toHaveBeenCalledWith(RuleEntity, {
-                id: expect.any(String),
+                id: "00000000-0000-4000-8000-000000000001",
                 owner: "o1",
                 title: "Stand-up",
                 frequency: RuleFrequency.EveryWeekday,

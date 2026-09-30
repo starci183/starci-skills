@@ -1,8 +1,9 @@
-import { randomUUID } from "node:crypto"
 import { Injectable } from "@nestjs/common"
 import { InjectClock } from "@modules/platform/clock"
 import type { Clock } from "@modules/platform/clock"
 import { InjectPrimaryEntityManager } from "@modules/platform/database"
+import { InjectIds } from "@modules/platform/ids"
+import type { Ids } from "@modules/platform/ids"
 import { ok, refused } from "@modules/platform/primitives"
 import type { Outcome } from "@modules/platform/primitives"
 import type { EntityManager } from "typeorm"
@@ -23,6 +24,7 @@ export class CommissionService {
     constructor(
         @InjectPrimaryEntityManager() private readonly entityManager: EntityManager,
         @InjectClock() private readonly clock: Clock,
+        @InjectIds() private readonly ids: Ids,
     ) {}
 
     /** Accrues the commission of one paid payment, or refuses a self referral; a duplicate answers the existing accrual. */
@@ -33,7 +35,7 @@ export class CommissionService {
         const existing = await this.entityManager.findOneBy(CommissionEntity, { paymentId: params.paymentId })
         if (existing) return ok(toCommissionView(existing))
         const saved = await this.entityManager.save(CommissionEntity, {
-            id: randomUUID(),
+            id: this.ids.next(),
             referrerId: params.referrerId,
             buyerId: params.buyerId,
             paymentId: params.paymentId,

@@ -1,5 +1,6 @@
-import { randomUUID } from "node:crypto"
 import { Injectable } from "@nestjs/common"
+import { InjectIds } from "@modules/platform/ids"
+import type { Ids } from "@modules/platform/ids"
 import { IsNull } from "typeorm"
 import type {
     AdmitIntoWindowParams,
@@ -18,6 +19,8 @@ const MS_PER_MINUTE = 60_000
  * notification's own digest group id.
  */
 export class DigestService {
+    constructor(@InjectIds() private readonly ids: Ids) {}
+
     /** Joins the open window of the person and the channel, or opens a new one when none is open or the open one has closed. */
     async admit(params: AdmitIntoWindowParams): Promise<AdmittedIntoWindow> {
         // IsNull() is required: a literal null in `where` is dropped by TypeORM instead of becoming IS NULL.
@@ -31,7 +34,7 @@ export class DigestService {
         }
         const closesAt = new Date(params.at.getTime() + params.windowMinutes * MS_PER_MINUTE)
         const saved = await params.manager.save(NotifyDigestWindowEntity, {
-            id: randomUUID(),
+            id: this.ids.next(),
             personId: params.personId,
             channel: params.channel,
             opensAt: params.at,

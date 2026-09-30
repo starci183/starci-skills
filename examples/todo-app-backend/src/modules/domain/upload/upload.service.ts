@@ -1,4 +1,3 @@
-import { randomUUID } from "node:crypto"
 import { Injectable } from "@nestjs/common"
 import { TaskService } from "@modules/domain/task"
 import { UploadStorageError, InjectUploadStorage } from "@modules/integrations/upload"
@@ -6,6 +5,8 @@ import type { UploadStorage } from "@modules/integrations/upload"
 import { InjectClock } from "@modules/platform/clock"
 import type { Clock } from "@modules/platform/clock"
 import { InjectPrimaryEntityManager, LIST_ROWS_MAX } from "@modules/platform/database"
+import { InjectIds } from "@modules/platform/ids"
+import type { Ids } from "@modules/platform/ids"
 import { ok, refused } from "@modules/platform/primitives"
 import type { Outcome } from "@modules/platform/primitives"
 import type { EntityManager } from "typeorm"
@@ -49,6 +50,7 @@ export class UploadService {
     constructor(
         @InjectPrimaryEntityManager() private readonly entityManager: EntityManager,
         @InjectClock() private readonly clock: Clock,
+        @InjectIds() private readonly ids: Ids,
         @InjectUploadOptions() private readonly options: UploadOptions,
         @InjectUploadStorage() private readonly storage: UploadStorage,
         private readonly tasks: TaskService,
@@ -182,7 +184,7 @@ export class UploadService {
         if (!this.options.allowedMimes.includes(params.mime)) return refused(UploadErrorCode.MimeNotAllowed, { mime: params.mime })
         const oversize = this.sizeRefusal(params.sizeBytes)
         if (oversize) return oversize
-        const id = randomUUID()
+        const id = this.ids.next()
         const saved = await this.entityManager.transaction((manager) =>
             manager.save(UploadEntity, {
                 id,

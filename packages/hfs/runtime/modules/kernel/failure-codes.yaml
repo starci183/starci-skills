@@ -516,6 +516,7 @@ BE_SPEC_QUALITY:
     - "Spec chỉ có toHaveBeenCalled*, không khẳng định kết quả hay trạng thái"
     - "`it.skip`, `describe.skip`, `xit`, `it.todo`, `.skipIf`/`.runIf` hoặc `(cond ? describe : describe.skip)` trong spec; hãy viết test thật hoặc xóa nó, còn việc bỏ qua khi thiếu sandbox nằm trong contract helper của world (`sandbox.describe(...)`)"
     - "e2e gọi CommandBus, QueryBus hay handler trực tiếp; dùng sleep thay cho waitFor; tự gọi Test.createTestingModule; import SDK của nhà cung cấp mô hình; không đọc lại dòng đã lưu qua EntityManager"
+    - "Spec đơn vị của service khẳng định `expect.any(String)`, `expect.any(Number)` hoặc `expect.any(Date)` cho giá trị service tự sinh; service nhận bộ sinh id và đồng hồ qua token, spec cấp `fakeIds()` và `new FakeClock(...)` từ @starci/jest-preset rồi khẳng định đúng giá trị"
     - "Spec đơn vị của service có providers khác với phụ thuộc constructor: thừa nhà cung cấp, thiếu nhà cung cấp, service không đứng đầu, token không suy ra được hoặc nhà cung cấp không phải lớp hay { provide, useValue }"
   nextStep_vi: "Chuyển luật kiến trúc sang lint hoặc bộ kiểm tra; khẳng định kết quả hoặc trạng thái; e2e vào bằng transport thật, chờ bằng waitFor và dựng thế giới ở src/tests/e2e/setup. Op vừa tạo ra bản này sẽ được chạy lại để sửa theo lời nhắn của bộ kiểm tra."
   owner: op-retry

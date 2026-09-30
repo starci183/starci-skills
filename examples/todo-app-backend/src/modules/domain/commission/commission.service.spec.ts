@@ -1,7 +1,8 @@
 import { Test } from "@nestjs/testing"
-import { FakeClock, mockEntityManager } from "@starci/jest-preset"
+import { FakeClock, fakeIds, mockEntityManager } from "@starci/jest-preset"
 import { CLOCK } from "@modules/platform/clock"
 import { PRIMARY_ENTITY_MANAGER } from "@modules/platform/database"
+import { IDS } from "@modules/platform/ids"
 import { accrueInput, COMMISSION_AT, commissionRow } from "@tests/fixtures/builders/commission.builder"
 import { CommissionService } from "./commission.service"
 import { CommissionErrorCode } from "./errors/commission.error"
@@ -10,11 +11,13 @@ import { CommissionEntity } from "./persistence/entities/commission.entity"
 const at = new Date(COMMISSION_AT)
 
 const build = async (em = mockEntityManager()) => {
+    const ids = fakeIds()
     const moduleRef = await Test.createTestingModule({
         providers: [
             CommissionService,
             { provide: PRIMARY_ENTITY_MANAGER, useValue: em },
             { provide: CLOCK, useValue: new FakeClock(COMMISSION_AT) },
+            { provide: IDS, useValue: ids },
         ],
     }).compile()
     return { service: moduleRef.get(CommissionService), em }
@@ -38,7 +41,7 @@ describe("CommissionService", () => {
 
             expect(em.findOneBy).toHaveBeenCalledWith(CommissionEntity, { paymentId: "pay-1" })
             expect(em.save).toHaveBeenCalledWith(CommissionEntity, {
-                id: expect.any(String),
+                id: "00000000-0000-4000-8000-000000000001",
                 referrerId: "ref-1",
                 buyerId: "buyer-1",
                 paymentId: "pay-1",

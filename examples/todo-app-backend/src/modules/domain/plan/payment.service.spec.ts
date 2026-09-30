@@ -1,7 +1,8 @@
 import { Test } from "@nestjs/testing"
-import { mockEntityManager } from "@starci/jest-preset"
+import { fakeIds, mockEntityManager } from "@starci/jest-preset"
 import type { MockEntityManager } from "@starci/jest-preset"
 import { PRIMARY_ENTITY_MANAGER } from "@modules/platform/database"
+import { IDS } from "@modules/platform/ids"
 import { paymentIntentRow, PLAN_AT, PLAN_PERIOD_END } from "@tests/fixtures/builders/plan.builder"
 import { PlanErrorCode } from "./errors/plan.error"
 import { PaymentService } from "./payment.service"
@@ -10,8 +11,13 @@ import { PaymentIntentEntity } from "./persistence/entities/payment-intent.entit
 const LOCK = { where: { id: "i1" }, lock: { mode: "pessimistic_write" } }
 
 const build = async (own: MockEntityManager = mockEntityManager()) => {
+    const ids = fakeIds()
     const moduleRef = await Test.createTestingModule({
-        providers: [PaymentService, { provide: PRIMARY_ENTITY_MANAGER, useValue: own }],
+        providers: [
+            PaymentService,
+            { provide: PRIMARY_ENTITY_MANAGER, useValue: own },
+            { provide: IDS, useValue: ids },
+        ],
     }).compile()
     return { service: moduleRef.get(PaymentService), own }
 }
@@ -27,7 +33,7 @@ describe("PaymentService", () => {
             ).resolves.toEqual(paymentIntentRow())
 
             expect(manager.save).toHaveBeenCalledWith(PaymentIntentEntity, {
-                id: expect.any(String),
+                id: "00000000-0000-4000-8000-000000000001",
                 subscriptionId: "s1",
                 gateway: "sepay",
                 gatewayIntentId: "g1",

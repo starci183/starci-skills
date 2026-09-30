@@ -1,6 +1,7 @@
-import { randomUUID } from "node:crypto"
 import { Injectable } from "@nestjs/common"
 import { InjectPrimaryEntityManager } from "@modules/platform/database"
+import { InjectIds } from "@modules/platform/ids"
+import type { Ids } from "@modules/platform/ids"
 import { ok, refused } from "@modules/platform/primitives"
 import type { Outcome } from "@modules/platform/primitives"
 import type { EntityManager } from "typeorm"
@@ -24,12 +25,15 @@ import type {
  * under a row lock, so a webhook and a reconciliation poll converge: whichever comes first wins and the other is a no-op.
  */
 export class PaymentService {
-    constructor(@InjectPrimaryEntityManager() private readonly entityManager: EntityManager) {}
+    constructor(
+        @InjectPrimaryEntityManager() private readonly entityManager: EntityManager,
+        @InjectIds() private readonly ids: Ids,
+    ) {}
 
     /** Records a new pending intent for the subscription. */
     async create(params: CreatePaymentIntentParams): Promise<PaymentIntentView> {
         const saved = await params.manager.save(PaymentIntentEntity, {
-            id: randomUUID(),
+            id: this.ids.next(),
             subscriptionId: params.subscriptionId,
             gateway: "sepay",
             gatewayIntentId: params.gatewayIntentId,

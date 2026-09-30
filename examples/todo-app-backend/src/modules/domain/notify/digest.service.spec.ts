@@ -1,5 +1,6 @@
 import { Test } from "@nestjs/testing"
-import { mockEntityManager } from "@starci/jest-preset"
+import { fakeIds, mockEntityManager } from "@starci/jest-preset"
+import { IDS } from "@modules/platform/ids"
 import { IsNull } from "typeorm"
 import { NOTIFY_AT, admitIntoWindowInput, digestWindowRow, flushWindowInput } from "@tests/fixtures/builders/notify.builder"
 import { DigestService } from "./digest.service"
@@ -9,7 +10,10 @@ const AT = new Date(NOTIFY_AT)
 const MINUTE = 60_000
 
 const build = async () => {
-    const moduleRef = await Test.createTestingModule({ providers: [DigestService] }).compile()
+    const ids = fakeIds()
+    const moduleRef = await Test.createTestingModule({
+        providers: [DigestService, { provide: IDS, useValue: ids }],
+    }).compile()
     return moduleRef.get(DigestService)
 }
 
@@ -42,7 +46,7 @@ describe("DigestService", () => {
 
             expect(admitted).toEqual({ windowId: "w-new", opened: true, closesAt })
             expect(manager.save).toHaveBeenCalledWith(NotifyDigestWindowEntity, {
-                id: expect.any(String),
+                id: "00000000-0000-4000-8000-000000000001",
                 personId: "p1",
                 channel: "email",
                 opensAt: AT,

@@ -1,9 +1,10 @@
-import { randomUUID } from "node:crypto"
 import { Injectable } from "@nestjs/common"
 import { AuditAction, toAuditAppendMessage } from "@modules/domain/audit"
 import { InjectClock } from "@modules/platform/clock"
 import type { Clock } from "@modules/platform/clock"
 import { InjectPrimaryEntityManager, LIST_ROWS_MAX } from "@modules/platform/database"
+import { InjectIds } from "@modules/platform/ids"
+import type { Ids } from "@modules/platform/ids"
 import { InjectOutbox } from "@modules/platform/outbox"
 import type { Outbox } from "@modules/platform/outbox"
 import { ok, refused } from "@modules/platform/primitives"
@@ -36,6 +37,7 @@ export class TaskService {
     constructor(
         @InjectPrimaryEntityManager() private readonly entityManager: EntityManager,
         @InjectClock() private readonly clock: Clock,
+        @InjectIds() private readonly ids: Ids,
         @InjectOutbox() private readonly outbox: Outbox,
     ) {}
 
@@ -44,7 +46,7 @@ export class TaskService {
         const title = params.title.trim()
         if (!title) return refused(TaskErrorCode.TitleRequired)
         const saved = await params.manager.save(TaskEntity, {
-            id: randomUUID(),
+            id: this.ids.next(),
             owner: params.ownerId,
             title,
             complete: false,
@@ -112,7 +114,7 @@ export class TaskService {
             await this.outbox.enqueue(
                 manager,
                 toAuditAppendMessage({
-                    eventId: randomUUID(),
+                    eventId: this.ids.next(),
                     actorId: params.ownerId,
                     action: AuditAction.TaskDeleted,
                     target: task.id,

@@ -1,15 +1,22 @@
 import { Test } from "@nestjs/testing"
-import { FakeClock, mockEntityManager } from "@starci/jest-preset"
+import { FakeClock, fakeIds, mockEntityManager } from "@starci/jest-preset"
 import { PLATFORM_AT, PLATFORM_LATER } from "@tests/fixtures/builders/platform.builder"
 import { CLOCK } from "@modules/platform/clock"
 import { PRIMARY_ENTITY_MANAGER } from "@modules/platform/database"
+import { IDS } from "@modules/platform/ids"
 import { PostgresOutbox } from "./outbox.service"
 import { BURY_MESSAGE, CLAIM_DUE_MESSAGES, COMPLETE_MESSAGE, INSERT_MESSAGE, RETRY_MESSAGE } from "./persistence/outbox.sql"
 
 const build = async (own = mockEntityManager()) => {
     const clock = new FakeClock(PLATFORM_AT)
+    const ids = fakeIds()
     const moduleRef = await Test.createTestingModule({
-        providers: [PostgresOutbox, { provide: PRIMARY_ENTITY_MANAGER, useValue: own }, { provide: CLOCK, useValue: clock }],
+        providers: [
+            PostgresOutbox,
+            { provide: PRIMARY_ENTITY_MANAGER, useValue: own },
+            { provide: CLOCK, useValue: clock },
+            { provide: IDS, useValue: ids },
+        ],
     }).compile()
     return { outbox: moduleRef.get(PostgresOutbox), own, clock }
 }
@@ -23,7 +30,7 @@ describe("PostgresOutbox", () => {
             await outbox.enqueue(inTransaction, { queue: "audit.append", eventId: "e-1", payload: { a: 1 }, availableAt: PLATFORM_LATER })
 
             expect(inTransaction.query).toHaveBeenCalledWith(INSERT_MESSAGE, [
-                expect.any(String),
+                "00000000-0000-4000-8000-000000000001",
                 "audit.append",
                 "e-1",
                 { a: 1 },

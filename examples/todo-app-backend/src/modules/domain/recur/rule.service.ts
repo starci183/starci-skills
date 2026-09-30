@@ -1,6 +1,7 @@
-import { randomUUID } from "node:crypto"
 import { Injectable } from "@nestjs/common"
 import { InjectPrimaryEntityManager, LIST_ROWS_MAX } from "@modules/platform/database"
+import { InjectIds } from "@modules/platform/ids"
+import type { Ids } from "@modules/platform/ids"
 import { ok, refused } from "@modules/platform/primitives"
 import type { Outcome } from "@modules/platform/primitives"
 import { MoreThan } from "typeorm"
@@ -32,6 +33,7 @@ import type {
 export class RuleService {
     constructor(
         @InjectPrimaryEntityManager() private readonly entityManager: EntityManager,
+        @InjectIds() private readonly ids: Ids,
         private readonly occurrences: OccurrenceService,
     ) {}
 
@@ -41,7 +43,7 @@ export class RuleService {
         if (problem) return refused(RecurErrorCode.RuleInvalid, { reason: problem })
         const saved = await this.entityManager.transaction((manager) =>
             manager.save(RuleEntity, {
-                id: randomUUID(),
+                id: this.ids.next(),
                 owner: params.ownerId,
                 title: params.title,
                 frequency: params.frequency,

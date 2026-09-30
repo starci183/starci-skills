@@ -1,8 +1,9 @@
-import { randomUUID } from "node:crypto"
 import { Injectable } from "@nestjs/common"
 import { InjectClock } from "@modules/platform/clock"
 import type { Clock } from "@modules/platform/clock"
 import { InjectPrimaryEntityManager } from "@modules/platform/database"
+import { InjectIds } from "@modules/platform/ids"
+import type { Ids } from "@modules/platform/ids"
 import { InjectOutbox } from "@modules/platform/outbox"
 import type { Outbox } from "@modules/platform/outbox"
 import { ok, refused } from "@modules/platform/primitives"
@@ -44,6 +45,7 @@ export class AuditErasureService {
     constructor(
         @InjectPrimaryEntityManager() private readonly entityManager: EntityManager,
         @InjectClock() private readonly clock: Clock,
+        @InjectIds() private readonly ids: Ids,
         @InjectOutbox() private readonly outbox: Outbox,
         private readonly keystore: AuditKeystoreService,
     ) {}
@@ -84,7 +86,7 @@ export class AuditErasureService {
     /** Opens a request for the caller and verifies it at once, since the caller is the subject. */
     async request(params: RequestErasureParams): Promise<Outcome<ErasureRequestView, ConfirmRefusal>> {
         const saved = await params.manager.save(AuditErasureRequestEntity, {
-            requestId: randomUUID(),
+            requestId: this.ids.next(),
             personId: params.personId,
             state: ErasureState.Requested,
             requestedAt: params.at,
@@ -170,7 +172,7 @@ export class AuditErasureService {
     private queueLine(manager: EntityManager, action: AuditAction, requestId: string, at: Date): Promise<void> {
         return this.outbox.enqueue(
             manager,
-            toAuditAppendMessage({ eventId: randomUUID(), actorId: SYSTEM_ACTOR_ID, action, target: requestId, at }),
+            toAuditAppendMessage({ eventId: this.ids.next(), actorId: SYSTEM_ACTOR_ID, action, target: requestId, at }),
         )
     }
 

@@ -1,8 +1,9 @@
 import { Test } from "@nestjs/testing"
-import { FakeClock, fakeTransaction, mock, mockEntityManager } from "@starci/jest-preset"
+import { FakeClock, fakeIds, fakeTransaction, mock, mockEntityManager } from "@starci/jest-preset"
 import { TaskService } from "@modules/domain/task"
 import { CLOCK } from "@modules/platform/clock"
 import { LIST_ROWS_MAX, PRIMARY_ENTITY_MANAGER } from "@modules/platform/database"
+import { IDS } from "@modules/platform/ids"
 import { invitationRow, SHARE_AT, SHARE_EXPIRED_SENT_AT, sharedTask } from "@tests/fixtures/builders/share.builder"
 import { ShareErrorCode } from "./errors/share.error"
 import { InvitationService } from "./invitation.service"
@@ -14,11 +15,13 @@ const expired = invitationRow({ sentAt: SHARE_EXPIRED_SENT_AT })
 const build = async (em = mockEntityManager()) => {
     const tx = fakeTransaction(em)
     const tasks = mock<TaskService>()
+    const ids = fakeIds()
     const moduleRef = await Test.createTestingModule({
         providers: [
             InvitationService,
             { provide: PRIMARY_ENTITY_MANAGER, useValue: tx.em },
             { provide: CLOCK, useValue: new FakeClock(SHARE_AT) },
+            { provide: IDS, useValue: ids },
             { provide: TaskService, useValue: tasks },
         ],
     }).compile()
@@ -85,7 +88,7 @@ describe("InvitationService", () => {
                 lock: { mode: "pessimistic_write" },
             })
             expect(em.save).toHaveBeenCalledWith(InvitationEntity, {
-                id: expect.any(String),
+                id: "00000000-0000-4000-8000-000000000001",
                 taskId: "t-1",
                 ownerId: "owner-1",
                 email: "ann@example.com",

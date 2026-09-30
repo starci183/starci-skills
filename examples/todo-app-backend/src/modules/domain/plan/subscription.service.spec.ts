@@ -1,15 +1,21 @@
 import { Test } from "@nestjs/testing"
-import { mockEntityManager } from "@starci/jest-preset"
+import { fakeIds, mockEntityManager } from "@starci/jest-preset"
 import type { MockEntityManager } from "@starci/jest-preset"
 import { PRIMARY_ENTITY_MANAGER } from "@modules/platform/database"
+import { IDS } from "@modules/platform/ids"
 import { PLAN_PERIOD_END, subscriptionRow } from "@tests/fixtures/builders/plan.builder"
 import { SubscriptionEntity } from "./persistence/entities/subscription.entity"
 import type { SubscriptionView } from "./plan.contracts"
 import { SubscriptionService } from "./subscription.service"
 
 const build = async (own: MockEntityManager = mockEntityManager()) => {
+    const ids = fakeIds()
     const moduleRef = await Test.createTestingModule({
-        providers: [SubscriptionService, { provide: PRIMARY_ENTITY_MANAGER, useValue: own }],
+        providers: [
+            SubscriptionService,
+            { provide: PRIMARY_ENTITY_MANAGER, useValue: own },
+            { provide: IDS, useValue: ids },
+        ],
     }).compile()
     return { service: moduleRef.get(SubscriptionService), own }
 }
@@ -27,7 +33,7 @@ describe("SubscriptionService", () => {
 
             expect(manager.findOneBy).toHaveBeenCalledWith(SubscriptionEntity, { personId: "p1" })
             expect(manager.save).toHaveBeenCalledWith(SubscriptionEntity, {
-                id: expect.any(String),
+                id: "00000000-0000-4000-8000-000000000001",
                 personId: "p1",
                 plan: "free",
                 status: "free",
