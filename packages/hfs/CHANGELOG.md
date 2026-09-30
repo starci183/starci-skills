@@ -1,5 +1,10 @@
 # Changelog
 
+## 2.0.1 - 2026-10-01
+
+- Fixed: `hfs sync` validates the whole hfs.json declaration against the manifest before rendering (a pre-2.0 `connections` list of names is refused), so a pin bump can never leave eslint unable to start.
+- Changed: the back-end managed scripts carry `test:stack` (`starci-test-stack`); repo-specific devDependencies stay the repository's (sync owns only the `scripts` block and the canon pins).
+
 ## 2.0.0 - 2026-09-30
 
 - Added (lane PORT): the repository scripts of the product repos are gone, so their laws live here. `repo.scripts` owns `scripts/{.gitkeep,*.mjs,*.cjs,*.ps1,*.sh}` (operational scripts, or an empty folder with `.gitkeep`, which `hfs sync --init` writes from `templates/{be,fe}/skeleton/scripts/.gitkeep`). New checks: `BE_SPEC_PLACEMENT` (R102, a spec outside the four test layers, `scripts/` and `tools/` included), `HFS_REPO_LOCAL_CHECK` (R103, a `check-*` file, `eslint-local-rules*`, a local plugin, a script that runs one), `HFS_LINT_SUPPRESSION_FILE` (R104, an eslint suppressions file, script or flag), `HFS_PROOF_COMMAND_FILE_MISSING` (R105, a `.starciwork` proof command that runs a file the repository does not hold; only records of this repository are judged) and, in the architecture machine, `FE_I18N_KEYS` (R106, a key the source reads that a locale lacks, a catalog key nothing reads). `HFS_DEP_VERSION_SKEW` (R14) also refuses a dependency declared at another version than the root `overrides` pin.

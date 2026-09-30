@@ -1,5 +1,9 @@
 # Changelog
 
+## 2.0.1 - 2026-10-01
+
+- Fixed: `e2e-asserts-persisted-state` accepts `<world>.db.<connection>` and `<world>.services.<name>.api` state reads, the world identified by its `TestWorld` type (from `@starci/test-world` or the `be.tests.world` slot), not by a variable name.
+
 ## 2.0.0 - 2026-09-30
 
 - Changed (lane PORT): `ruleParams.be.infraOwners` names `@nestjs/cache-manager` (the `CACHE_MANAGER` token) beside `cache-manager`: it is reached only by `integrations/cache` and `integrations/redis`, which is the retired repository rule `must-use-cache-service`; `infra-import-owner` (R90) covers it with a passing and a violating case.
