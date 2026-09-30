@@ -61,6 +61,7 @@ test('the Orca contract carries no terminal-creating call and forbids it for the
   assert.equal(calls['terminal-create'],undefined,'no terminal-create call');
   assert.equal(calls.dispatch,undefined,'no orchestration dispatch into a pre-made terminal');
   assert.equal(calls['worker-start'].flags.includes('terminal'),false,'worker-start never adopts a terminal');
+  assert.equal(calls['task-create'].flags.includes('parent'),false,'the nested Run rule: a Task never names a --parent');
   assert.ok(calls['worker-start'].required.includes('agent'),'worker-start always names the agent it launches');
   const api=readYaml('modules/host/orca/api.yaml');
   for(const command of BYPASS)assert.ok(api.forbiddenForStarciOrchestration.includes(command),`${command} is forbidden`);
@@ -231,6 +232,17 @@ for(const [model,agent,takesModel] of [['claude-agent','claude',true],['codex-ag
     assert.equal(start[start.indexOf('--agent')+1],agent);
     assert.equal(start.includes('--terminal'),false);
     assert.equal(start.includes('--model'),takesModel,`${agent} ${takesModel?'pins':'takes no'} --model`);
+    // The nested Run rule (Orca's sub-dispatch shape): the Kernel binds its OWN workflow Run, files the op Task there
+    // with no --parent (Orca takes a parent only from the same Run) and starts the op from its terminal.
+    const argvOf=(verb)=>fx.callArgv().filter(argv=>argv.slice(0,2).join(' ')===verb);
+    const flag=(argv,name)=>argv.includes(name)?argv[argv.indexOf(name)+1]:null;
+    const [runCreate]=argvOf('orchestration run-create');
+    assert.equal(flag(runCreate,'--from'),'fake-kernel-terminal','the workflow Run is created from the Kernel terminal, its coordinator');
+    const [taskCreate]=argvOf('orchestration task-create');
+    assert.equal(taskCreate.includes('--parent'),false,'an op Task never names a --parent');
+    assert.equal(flag(taskCreate,'--from'),'fake-kernel-terminal');
+    assert.equal(flag(start,'--from'),'fake-kernel-terminal','the op is started from the Kernel terminal');
+    assert.equal(flag(start,'--run'),flag(taskCreate,'--run'));
     const ledger=inspectLedger({file:ledgerFileFor(fx.repo)});
     try{
       const job=ledger.db.prepare('SELECT status,worker_id FROM jobs WHERE job_id=?').get(jobId);

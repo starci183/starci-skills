@@ -1,0 +1,12 @@
+id: nested-run-rule
+effectiveAt: '2026-10-01T20:00:00+07:00'
+summary: >-
+  THE NESTED RUN RULE (lead ruling 2026-10-01, lane dv-c0-launch, from the real-Orca smoke on Orca 1.4.209 with Nested
+  worker depth 4). An agent that starts agents binds its OWN Run and starts them there, the shape Orca's own worker
+  preamble prescribes (SUB-DISPATCH): the Kernel runs run-create --from <kernel terminal>, task-create --run <that Run>
+  --from <kernel terminal> and worker-start --task --run --from <kernel terminal>. No Task names a --parent: Orca accepts
+  a parent only from the same Run ("Parent task ... must belong to run ..."), and a Task in the Run the Kernel is a worker
+  of is refused consumer_fenced. modules/host/orca/calls.yaml task-create drops the parent flag (orcaCall refuses it)
+  and carries the rule as its note; scripts/api/orca/task-create.mjs takes no parent; docs/host-contract.md,
+  modules/kernel/start-workflow.yaml orcaTree, skills/orchestration and skills/start-kernel state it. Orca nests the
+  workflow Run under the Kernel's Dispatch (worker-show depth 1 for the Kernel, 2 for its op). Adds no check or finding code

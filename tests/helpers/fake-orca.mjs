@@ -507,8 +507,8 @@ else if ((verb === 'orchestration task-create' || verb === 'orchestration task-u
 else if ((verb === 'orchestration task-create' || verb === 'orchestration task-update') && state.runs?.[arg('run')]
   && state.runs[arg('run')].coordinator !== arg('from'))
   fail({ ok: false, error: { code: 'not_run_coordinator', message: 'Terminal ' + arg('from') + ' is not the coordinator of run ' + arg('run') + '.' } });
-else if (verb === 'orchestration task-create' && arg('parent') != null && !/^task[_-]/.test(arg('parent')))
-  fail({ ok: false, error: { code: 'invalid_parent', message: '--parent takes a task id' } });
+else if (verb === 'orchestration task-create' && arg('parent') != null)
+  fail({ ok: false, error: { code: 'runtime_error', message: 'Parent task ' + arg('parent') + ' must belong to run ' + arg('run') + ' (the runtime never passes --parent: the nested Run rule)' } });
 else if (verb === 'orchestration task-create') {
   // taskSpecs[id]: the spec a worker-start of that Task delivers (the prompt the worker receives).
   state.taskSpecs = { ...(state.taskSpecs || {}), 'task-fake-1': arg('spec') }; save();

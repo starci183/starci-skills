@@ -171,7 +171,8 @@ orcaTree:
   rule: >-
     A workflow has exactly one live kernel terminal; its Orca Run is created
     once and survives kernel restarts; every operation Task is created in that
-    Run with the CURRENT kernel terminal as `from` (Orca `--parent` takes a task id, never a terminal); a job that
+    Run - the Run that kernel terminal created and coordinates (the nested Run rule, modules/host/orca/calls.yaml
+    task-create: no --parent) - with the CURRENT kernel terminal as `from`; a job that
     ends (settle, reject, finish) leaves no live terminal, worker or open Task;
     a kernel restart closes the previous kernel terminal before the new one is
     recorded.

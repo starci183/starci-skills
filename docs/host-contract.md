@@ -139,9 +139,21 @@ the Kernel's own terminal (Orca takes Run-scoped calls only from a Run's
 coordinator). An explicit Kernel agent/model pin fails closed when unavailable;
 it is never silently substituted. `api hierarchy` projects `workflow → Kernel → Op`.
 
+**The nested Run rule.** An agent that starts agents binds its OWN Run and starts
+them there, which is the shape Orca's own worker preamble prescribes (SUB-DISPATCH):
+the Kernel runs `run-create --from <kernel terminal>` (so it coordinates that Run),
+`task-create --run <it> --from <kernel terminal>` and `worker-start --task --run
+--from <kernel terminal>`. No Task names a `--parent`: Orca accepts a parent only
+from the same Run (`Parent task … must belong to run …`), and the Kernel cannot
+file a Task in its entry Run, where it is a worker (`consumer_fenced`). Orca nests
+the workflow Run under the Kernel's Dispatch; `worker-show` reports the Kernel at
+depth 1 and its op at depth 2 (real-Orca smoke 2026-10-01, lane dv-c0-launch).
+`calls.yaml` `task-create` declares no `parent` flag, so the wrapper cannot build one.
+
 Nested workers need Orca's Settings → Orchestration → Nested worker depth of at
-least 3 (Supervisor → Kernel → Op); at the default 1 a worker-start from a worker
-is refused `nested_worker_depth_exceeded`.
+least 2 when the owner's chat starts the Kernel (chat → Kernel → Op), and 3 when the
+`[Supervisor]` does (chat → Supervisor → Kernel → Op); the owner runs it at 4. Below
+that, a worker-start from a worker is refused `nested_worker_depth_exceeded`.
 
 ## Checklist for a new agent card
 

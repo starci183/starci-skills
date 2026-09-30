@@ -25,6 +25,11 @@ StarCi Kernel, Supervisor, [Worker]s and [Op]s included (runtime contract
 `terminal create`, never hand a pre-made terminal to `worker-start --terminal`, and never `dispatch --inject` a Task
 into a terminal you made. Supervise with `worker-show`, `worker-read`, `worker-stop` and `worker-release`.
 
+Nested Runs: an agent that starts agents (the Kernel starting its [Op]s) binds its OWN Run with
+`run-create --from <its terminal>`, files each Task there and starts it with `worker-start --task --run --from <its
+terminal>`. Never pass `--parent`: Orca takes a parent only from the same Run, and a Task in the Run the agent is
+a worker of is refused `consumer_fenced`.
+
 The usage guide is served by the `orca` binary itself (see shared setup below). Routing to `orca-cli` and Computer
 Use is in the description above. Coordination requires real Orca runtime state; never substitute
 a non-Orca subagent tool.

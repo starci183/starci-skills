@@ -60,8 +60,9 @@ Executable: `.claude/scripts/kernel/start-workflow.mjs`
 - **Topology**: Codex/Claude/Devin chats are ingress launchers; Orca is the
   execution host. The boot creates the Kernel's entry Run from this chat's
   terminal (this chat coordinates it) and starts the Kernel as a worker-start
-  worker; the Kernel creates its own workflow Run and starts every op as a
-  worker-start worker. Nothing is launched with terminal create.
+  worker; the Kernel creates its own workflow Run (it coordinates it) and
+  starts every op there as a worker-start worker from its own terminal, with
+  no --parent (the nested Run rule). Nothing is launched with terminal create.
 - **Identity**: `agent` means execution adapter (`codex|claude|devin`),
   `model` means a concrete model id, `profile` means a StarCi routing target,
   and `runtimePool` means a quota/capacity window. Do not call all four a provider.
