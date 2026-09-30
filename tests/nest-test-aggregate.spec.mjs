@@ -8,7 +8,7 @@ import {checkScopedLint} from '../scripts/checks/check-scoped-lint.mjs';
 
 const require=createRequire(import.meta.url);
 
-test('aggregate dispatches real Nest test rules with exact subject context and cannot conceal missing public calls',async t=>{
+test('aggregate dispatches real Nest test rules and cannot conceal a non-action title',async t=>{
   const fixtureRoot=fs.mkdtempSync(path.join(os.tmpdir(),'starci-nest-test-aggregate-'));
   const write=(relative,value)=>{
     const file=path.join(fixtureRoot,relative);
@@ -40,7 +40,7 @@ describe('SampleService',
     title:'Nest test adapter integration',canon:{package:'@starci/eslint-canon-be',version:'1.2.1',contentDigest:{algorithm:'sha256',include:['**/*.mjs'],exclude:[],framing:'sorted-posix-relative-path-null-raw-bytes-null',value:digest,files:1}},
     sourceRuleRoots:['knowledge/patterns/be'],expectedSourceRuleIds:['BE-TEST-2','BE-TEST-6'],sourceGlobs:['src/**/*.ts'],inputGlobs:['package.json','hfs.json','tsconfig.json'],
     obligations:[{id:'NEST-TEST-CODE-FORM',sourceRuleIds:['BE-TEST-2','BE-TEST-6'],applicability:{include:['**/*.spec.ts']},
-      mechanical:{requirement:'Check actual selected test source form.',check:{kind:'script',ruleIds:['NEST_TEST_SUBJECT_FORM','NEST_TEST_NAME_FORM']}},
+      mechanical:{requirement:'Check actual selected test source form.',check:{kind:'script',ruleIds:['NEST_TEST_NAME_FORM']}},
       semantic:{guidance:'docs/nest-test-code-check.md',review:'Verify execution separately.'},status:'implemented'}],semanticOnly:[],
   }}};
   // Isolate routing and source binding; this fake ESLint result makes no lint-engine compatibility claim.
@@ -54,11 +54,11 @@ describe('SampleService',
   assert.equal(clean.status,'clean',JSON.stringify(clean.issues));
   assert.deepEqual(clean.coverage.covered,['NEST-TEST-CODE-FORM']);
   assert.deepEqual(clean.machineResults[0].files,['src/sample.service.spec.ts']);
-  assert.deepEqual(clean.machineResults[0].checkedRuleIds,['NEST_TEST_NAME_FORM','NEST_TEST_SUBJECT_FORM']);
-  write('src/sample.service.spec.ts',valid.replace('new SampleService().read()','1'));
+  assert.deepEqual(clean.machineResults[0].checkedRuleIds,['NEST_TEST_NAME_FORM']);
+  write('src/sample.service.spec.ts',valid.replace('returns a value','a value'));
   const findings=await checkScopedLint(fixtureRoot,[],options);
   assert.equal(findings.status,'findings',JSON.stringify(findings.issues));
-  assert.ok(findings.issues.some(issue=>issue.ruleId==='NEST_TEST_SUBJECT_FORM'));
+  assert.ok(findings.issues.some(issue=>issue.ruleId==='NEST_TEST_NAME_FORM'));
   profileCatalog.profiles.nest.obligations[0].mechanical.check.ruleIds.push('NEST_ENV_ACCESS');
   const mixed=await checkScopedLint(fixtureRoot,[],options);
   assert.equal(mixed.status,'unavailable');

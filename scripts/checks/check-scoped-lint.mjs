@@ -246,7 +246,7 @@ export async function defaultScriptChecker(profileName,input){
   const adapters=[
     {profile:'nest',module:'nest-metadata',entry:'checkNestMetadata',rules:['NEST_JEST_ALIAS_PARITY','NEST_TEST_DISCOVERY']},
     {profile:'nest',module:'nest-boundaries',entry:'checkNestBoundaries',rules:['NEST_ENV_ACCESS','NEST_CACHE_TOKEN_BOUNDARY','NEST_NAMED_EXPORTS']},
-    {profile:'nest',module:'nest-tests',entry:'checkNestTests',rules:['NEST_TEST_SUBJECT_FORM','NEST_TEST_NAME_FORM']},
+    {profile:'nest',module:'nest-tests',entry:'checkNestTests',rules:['NEST_TEST_NAME_FORM']},
     {profile:'nest',module:'nest-errors',entry:'checkNestErrors',rules:['NEST_FOREIGN_ERROR_CAUSE','NEST_TRANSPORT_ERROR_MAPPER']},
     {profile:'nest',module:'nest-error-identity',entry:'checkNestErrorIdentity',rules:['NEST_ERROR_DECLARATION_IDENTITY','NEST_THROWN_ERROR_IDENTITY']},
     {profile:'next',module:'next-errors',entry:'checkNextErrors',rules:['FE_ERROR_WORLD_STATE_MAPPING','FE_ERROR_ENVELOPE_POLICY','FE_WRITE_FEEDBACK_OWNER','FE_NEXT_ERROR_BOUNDARY_LOCATION','FE_REQUIRED_VALUE_FAILURE']},

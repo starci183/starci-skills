@@ -15,7 +15,7 @@ summary: >-
   `sonarCoverageExclusions()`. knowledge/patterns/be/test.yaml BE-TEST-1 to BE-TEST-15 replace the old rules
   (`mockEntityManager()` from `src/tests/fixtures/database.ts`, the twin-spec, direct-construction and composition-spec
   rules and the Codecov/Sonar coverage-denominator rule are gone); the R47, R48, R87 and R88 law text and README rows state
-  the standard; BE-CONVENTION 1.5, 1.6 and 1.16 are rewritten. Adds no failure code; the enforcers of the standard are
+  the standard; BE-CONVENTION 1.5, 1.6 and 1.16 are rewritten. Retires the failure code NEST_TEST_SUBJECT_FORM (the older code-pattern checker accepted or required direct construction of a Nest subject in a spec, contradicting the standard) with its checker branch, tests and catalogue entries; NEST_TEST_NAME_FORM stays, now limited to `*.service.spec.ts` and judging only title form (outer suite, action-verb titles, callback layout); docs/nest-test-code-check.md is rewritten to that. Adds no failure code; the enforcers of the standard are
   added by the rule and machine-check sub-lanes of lane UT.
 reach: new-legs
 paths:
@@ -42,4 +42,10 @@ paths:
   - packages/jest-preset/CHANGELOG.md
   - docs/backend-source-pattern.md
   - docs/nest-test-code-check.md
+  - scripts/checks/code-patterns/nest-tests.mjs
+  - scripts/checks/check-scoped-lint.mjs
+  - modules/models/code-patterns.yaml
+  - modules/kernel/failure-codes.yaml
+  - tests/nest-test-patterns.spec.mjs
+  - tests/nest-test-aggregate.spec.mjs
   - docs/source-layout.md

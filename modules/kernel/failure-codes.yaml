@@ -4103,24 +4103,13 @@ NEST_TEST_DISCOVERY:
   kind: check-finding
 
 NEST_TEST_NAME_FORM:
-  title: "Test suite name is not valid"
-  title_vi: "Tên nhóm test không đúng quy cách"
-  meaning_vi: "Tệp unit test không có nhóm test ngoài cùng đặt theo tên một đối tượng có thật được export."
+  title: "Service spec test title is not valid"
+  title_vi: "Tên test trong tệp spec của service không đúng quy cách"
+  meaning_vi: "Tệp service.spec.ts có test không có tiêu đề tĩnh bắt đầu bằng một động từ hành động, thiếu nhóm describe ngoài cùng, hoặc hàm chạy test không bắt đầu ở dòng sau tiêu đề."
   causes_vi:
-    - "Nhóm test đặt tên tùy ý"
-    - "Nhóm test đặt tên đối tượng không tồn tại"
-  nextStep_vi: "Bộ kiểm lint từ chối; op viết test phải đặt lại tên nhóm theo đối tượng được kiểm."
-  owner: op-retry
-  kind: check-finding
-
-NEST_TEST_SUBJECT_FORM:
-  title: "Test subject form is invalid"
-  title_vi: "Đối tượng của test không đúng quy cách"
-  meaning_vi: "Cách khai báo đối tượng được test trong tệp unit test không đúng quy ước của dự án."
-  causes_vi:
-    - "Tên đối tượng test không khớp với tệp nguồn"
-    - "Cách viết tiêu đề test lệch quy ước"
-  nextStep_vi: "Bộ kiểm lint từ chối; op viết test phải sửa lại theo quy ước."
+    - "Tiêu đề test bắt đầu bằng danh từ hoặc để trống"
+    - "Tiêu đề test được ghép động thay vì viết tĩnh"
+  nextStep_vi: "Bộ kiểm lint từ chối; op viết test phải đặt lại tiêu đề test bắt đầu bằng động từ hành động."
   owner: op-retry
   kind: check-finding
 

@@ -520,10 +520,10 @@ profiles:
         status: implemented
       - id: NEST-TEST-CODE-FORM
         sourceRuleIds: [BE-TEST-2, BE-TEST-3, BE-TEST-4, BE-TEST-6]
-        applicability: { include: ['**/*.spec.{ts,mts,cts,tsx}'] }
+        applicability: { include: ['**/*.service.spec.ts'] }
         mechanical:
-          requirement: Check selected real subject construction and public entry source form, named suites, lexical action-title prefixes and callback layout; opaque proof remains unavailable.
-          check: { kind: script, ruleIds: [NEST_TEST_SUBJECT_FORM, NEST_TEST_NAME_FORM] }
+          requirement: Check the title form of service specs (an outer suite, static test titles starting with a lexical action verb, callback layout). Subject construction is owned by the spec lint rules, not by this script.
+          check: { kind: script, ruleIds: [NEST_TEST_NAME_FORM] }
         semantic:
           guidance: knowledge/patterns/be/test.yaml
           review: Verify actual test execution, assertions, effects and ordering; static call form does not establish behavior.
