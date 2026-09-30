@@ -80,15 +80,15 @@ test('a Supervisor watchdog pass applies the seat title while handling a wake', 
     language: 'vi', workers: { base: 4, max: 10 }, landGate: { mode: 'shared', push: false } };
   const launch = await launchSupervisor({ env, settings, template: '{launchAuthority}\n{doctrine}', doc: { kernelSeat: { does: ['x'] } }, deps: {
     list: () => ({ ok: true, terminals: [], visualLayouts: [] }), tabTitles: () => new Map(),
-    verdict: () => ({ verdict: 'gone', reason: 'gone' }), screen: () => '❯ ', exitedRow: () => null,
-    close: () => ({ ok: true }), quit: () => ({ exited: true }),
-    spawn: () => ({ ok: true, terminal: 'term_sup', modelAttested: settings.model }),
+    screen: () => '❯ ', exitedRow: () => null, close: () => ({ ok: true }), quit: () => ({ exited: true }),
+    show: () => ({ ok: false, error: 'no worker' }), bindSeat: () => 'seat.json',
+    start: () => ({ ok: true, terminal: 'term_sup', dispatchId: 'ctx_sup', runId: 'run_sup', taskId: 'task_sup' }),
   } });
   assert.equal(launch.ok, true);
   const d = host({ term_sup: 'Done - Claude' });
-  Object.assign(d, { verdict: () => ({ verdict: 'live', reason: 'ok' }), screen: () => '❯ ', exitedRow: () => null,
+  Object.assign(d, { show: () => ({ ok: true, state: 'ready' }), screen: () => '❯ ',
     settleMs: 0, state: () => 'turn-idle', wake: () => ({ action: 'kernel-woken', delivered: true }),
-    enter: () => ({ ok: true }), close: () => ({ ok: true }), closeExited: () => ({ ok: true }) });
+    enter: () => ({ ok: true }), close: () => ({ ok: true }) });
   const pass = await watchdogPass({ env, d });
   assert.equal(pass.action, 'woken');
   assert.deepEqual(d.calls, [{ terminal: 'term_sup', title: '[Supervisor] main' }]);

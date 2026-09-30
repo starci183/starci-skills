@@ -428,8 +428,7 @@ const QUIET_MS = allocationMs('liveness.quietMs');
 // managed worker can read an idle prompt for tens of seconds before its first turn is visible - and
 // was nudged in front of the arriving Task (inc-bc0b90a7ec70, inc-9ae771781252). For launchGraceMs
 // after its latest op-dispatched event such a worker is `starting`, never nudge-ready
-// (allocation.liveness.launchGraceMs). A command-terminal dispatch already proved its prompt's
-// submission before the event was written, so it carries no grace.
+// (allocation.liveness.launchGraceMs). Every op is a worker-start worker, so every dispatch carries it.
 const LAUNCH_GRACE_MS = allocationMs('liveness.launchGraceMs');
 // A provider card may set its own liveness.activeStaleMs / liveness.quietMs
 // (modules/models/agents/<provider>.yaml): Devin redraws nothing while a long tool call runs, so the

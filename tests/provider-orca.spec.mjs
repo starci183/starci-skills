@@ -28,20 +28,18 @@ test('Orca host index fixes hierarchy names and exact native API calls',()=>{
   // The 4.x supervisor layers are gone from the host canon, not renamed inside it.
   assert.equal(contract.planCoordinator,undefined);
   assert.equal(contract.workflowMonitor,undefined);
-  assert.equal(contract.workflowKernel.role,'one-dedicated-agent-terminal-per-workflow');
+  assert.equal(contract.workflowKernel.role,'one-worker-per-workflow');
   assert.equal(contract.ui.semanticHierarchy.schema,'starci/agent-hierarchy@1');
   assert.equal(contract.ui.semanticHierarchy.projection,'workflow -> Kernel -> Op');
   assert.match(contract.workflowKernel.calls.bindRun.cli,/orchestration run-create/);
-  assert.match(contract.workflowKernel.calls.boot.cli,/terminal create .*--title "\[Kernel\] <Workflow>"/);
+  assert.match(contract.workflowKernel.calls.boot.cli,/orchestration worker-start .*--agent <agent>/);
+  assert.doesNotMatch(JSON.stringify(contract),/terminal create/,'no call in the host index creates a terminal');
   assert.match(contract.workflowKernel.calls.answerOperation.cli,/terminal send .*--enter/);
   assert.equal(contract.operationAgent.canonicalLauncher.module,'scripts/kernel/api.mjs');
   assert.equal(contract.operationAgent.canonicalLauncher.command,'dispatch');
   assert.equal(contract.operationAgent.canonicalLauncher.authority,'exclusive-effectful-construction-path');
   assert.equal(contract.operationAgent.qwen,undefined,'the Qwen agent is removed from the host contract');
-  assert.equal(contract.operationAgent.devin.nestedAgents,'forbidden');
-  assert.equal(contract.operationAgent.devin.launch,'command-terminal');
-  assert.equal(contract.operationAgent.devin.capacityAuthority,'explicit-workflow-quota');
-  assert.equal(contract.operationAgent.devin.quotaTelemetry,'launch-status');
+  assert.equal(contract.operationAgent.devin,undefined,'Devin launches like every agent: operationAgent.start');
   assert.equal(contract.operationAgent.admission.expectedOperation,'approved-goal-operation');
   assert.equal(contract.operationAgent.admission.providerSelection,'profiles-registry-resolver-output');
   assert.equal(contract.operationAgent.admission.afterWorkerStart.api,'orchestration.worker-show');
@@ -51,11 +49,8 @@ test('Orca host index fixes hierarchy names and exact native API calls',()=>{
   assert.equal(contract.operationAgent.admission.afterWorkerStart.runtimeTitleDrift.whenImmutableIdentityRemainsExact,'recanonicalize-without-fencing');
   assert.equal(contract.operationAgent.admission.architectureSidearm.onlyTrigger,'active implementation secondary_request');
   assert.equal(contract.operationAgent.admission.architectureSidearm.exactReason,'sds-technical-gap');
-  assert.match(contract.operationAgent.devin.calls.createTerminal.cli,/terminal create .*--command/);
-  assert.match(contract.operationAgent.devin.calls.returnPreamble.cli,/orchestration dispatch .*--return-preamble/);
-  assert.doesNotMatch(contract.operationAgent.devin.calls.returnPreamble.cli,/--inject/);
-  assert.match(contract.operationAgent.devin.calls.submitPrompt.cli,/terminal send .*--enter/);
-  assert.match(contract.operationAgent.devin.calls.createTerminal.cli,/--title "\[Op\] <operation> a<attempt> · <Workflow>"/);
+  assert.match(contract.operationAgent.start.calls.startAgent.cli,/orchestration worker-start .*--agent <resolved-agent>/);
+  assert.doesNotMatch(contract.operationAgent.start.calls.startAgent.cli,/--terminal/);
   assert.match(contract.operationAgent.admission.afterWorkerStart.canonicalizeTitle.renameCli,/--title "\[Op\] <operation>"/);
   assert.equal(contract.routing.operationToOperation,'forbidden');
   assert.match(contract.routing.kernelToOperation.cli,/terminal send .*--enter/);
@@ -67,26 +62,25 @@ test('Orca host index fixes hierarchy names and exact native API calls',()=>{
   assert.ok(contract.forbiddenCalls.includes('terminal-send-outside-canonical-launcher'));
   assert.ok(contract.forbiddenCalls.includes('orchestration.dispatch-to-reused-terminal-for-operation'));
   assert.ok(contract.forbiddenCalls.includes('operation-agent-tool-agent'));
-  assert.doesNotMatch(contract.operationAgent.managedFallback.calls.startAgent.cli,/--on\s+(?:windows|macos|linux)(?:\s|$)/i);
+  assert.ok(contract.forbiddenCalls.includes('terminal-create-for-any-agent'));
+  assert.doesNotMatch(contract.operationAgent.start.calls.startAgent.cli,/--on\s+(?:windows|macos|linux)(?:\s|$)/i);
 });
 
 test('agent cards carry the spawn contract the host drives',()=>{
-  // Solo providers codex/claude are native-managed agents: the host starts a
-  // supervised worker and the terminal fallback is the escape hatch.
-  for(const name of ['codex','claude']){
+  // Every agent is a native-managed agent: the host starts a supervised worker with orchestration worker-start and
+  // composes its command itself; no card carries a terminal fallback (contract-changes/launch-through-worker-start.yaml).
+  for(const name of ['codex','claude','devin']){
     const card=agentCard(name);
     assert.equal(card.schema,'starci/agent-card@1',`${name} schema`);
     assert.equal(card.agent,name,`${name} agent name must equal the filename`);
     assert.equal(card.kind,'native-managed-agent',`${name} kind`);
     assert.equal(card.start?.api,'orchestration.worker-start',`${name} start api`);
-    assert.equal(typeof card.terminalFallback?.command,'string',`${name} terminalFallback.command`);
+    assert.equal(card.terminalFallback,undefined,`${name} has no terminal fallback`);
   }
   const devin=agentCard('devin');
-  assert.equal(devin.schema,'starci/agent-card@1');
-  assert.equal(devin.kind,'command-terminal-agent');
+  assert.equal(devin.start.modelArgument,false,'worker-start takes --model for Claude, Codex and Cursor only');
   assert.equal(devin.modelAuthority,'configured-logical-runtime');
-  assert.match(devin.commandPrefix.win32,/models list --format json/);
-  assert.doesNotMatch(devin.commandPrefix.win32+devin.commandPrefix.posix,/cog_|Bearer|DEVIN_API_KEY=/);
+  assert.doesNotMatch(JSON.stringify(devin),/cog_|Bearer|DEVIN_API_KEY=/);
   assert.ok(devin.forbidden.includes('cloud-handoff'));
   assert.ok(devin.forbidden.includes('inferred-underlying-model'));
 });

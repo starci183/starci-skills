@@ -58,18 +58,20 @@ test('spawnWorkers: the default guard call passes the job\'s leased files and it
   t.after(() => m.close());
   const job = createJob(m, { cluster: 'g1', files: ['scripts/g1.mjs', 'tests/g1.spec.mjs'] });
   const stagingPath = path.join(tmp('wg-stage-'), job.job.job_id);
-  const launched = [], spawned = [];
+  const launched = [], spawned = [], bound = [];
   const deps = {
     load: () => ({ cpuBusy: 0, freeMem: 1 }),
     route: async () => ({ pool: 'claude-agent', agent: 'claude', model: 'm' }),
     staging: ({ jobId }) => ({ ok: true, path: stagingPath, branch: `sup/${jobId}`, base: 'abc' }),
     unstage: () => ({}), command: () => null,
     guard: (jobId, opts) => workerGuard(jobId, { ...opts, launch: fakeLaunch(launched) }),
-    spawn: (opts) => { spawned.push(opts); return { ok: true, terminal: 'term_g' }; },
+    bindGuard: (args) => { bound.push(args); return 'bound.json'; },
+    start: (opts) => { spawned.push(opts); opts.onCreated?.('term_g', 'ctx_g'); return { ok: true, terminal: 'term_g', dispatchId: 'ctx_g' }; },
   };
   await spawnWorkers(m, { settings, deps, env });
   assert.equal(spawned.length, 1);
-  assert.equal(spawned[0].pathPrefix, 'bin');
+  assert.equal(launched[0].shims, false, 'worker-start owns the worker environment: no PATH shims, the guard binds to its terminal');
+  assert.deepEqual(bound, [], 'a guard with no job file binds nothing');
   assert.equal(launched[0].jobId, job.job.job_id);
   assert.deepEqual(launched[0].owned, [path.resolve(stagingPath, 'scripts/g1.mjs'), path.resolve(stagingPath, 'tests/g1.spec.mjs')]);
   assert.deepEqual(launched[0].repos, []);

@@ -29,7 +29,7 @@
 // Routing: the balanced allocator over config.yaml allocation.shares (scripts/agent/models.mjs balanceDeficits),
 // counting the machine's recent op dispatches (scripts/agent/balance.mjs) plus the Supervisor's own workers (sup_jobs), skipping a
 // provider whose quota probe is dead or whose provider-health circuit is open on any product ledger, and a
-// provider whose [Worker] spawn proved it cannot serve - its terminal failed readiness, or the failure text shows
+// provider whose [Worker] spawn proved it cannot serve - its worker-start failed, or the failure text shows
 // the outage its agent card declares (quotaExhausted/capacityExhausted, scripts/agent/provider-outage.mjs
 // outageInText: e.g. an attestation rejected for "Quota exhausted") - for the rest of that spawn pass, for the
 // requeued job it failed (payload.avoidAgents), and for every job once it failed READINESS_FAILS_PER_HOUR times
@@ -350,7 +350,7 @@ export function readinessFailedProviders(m, { since, min = READINESS_FAILS_PER_H
   const counts = {};
   for (const row of m.db.prepare("SELECT payload_json FROM sup_events WHERE kind='worker-spawn-failed' AND created_at>=?").all(since)) {
     const p = parse(row.payload_json);
-    if ((p.step === 'readiness' || p.outage) && p.agent) counts[p.agent] = (counts[p.agent] ?? 0) + 1;
+    if ((p.step === 'worker-start' || p.outage) && p.agent) counts[p.agent] = (counts[p.agent] ?? 0) + 1;
   }
   return Object.keys(counts).filter((a) => counts[a] >= min);
 }

@@ -27,7 +27,7 @@ const fakeDeps = (into) => ({
   staging: ({ jobId }) => ({ ok: true, path: path.join(into.stagingRoot, jobId), branch: `sup/${jobId}`, base: 'abc' }),
   unstage: () => ({}),
   guard: (jobId, opts) => workerGuard(jobId, { ...opts, launch: (args) => { into.guards.push(args); return { env: {}, pathPrefix: 'bin', receipt: {} }; } }),
-  spawn: (opts) => { into.spawned.push(opts); return { ok: true, terminal: `term_${into.spawned.length}` }; },
+  start: (opts) => { into.spawned.push(opts); return { ok: true, terminal: `term_${into.spawned.length}`, dispatchId: `ctx_${into.spawned.length}` }; },
 });
 
 test('the contract-changes directory is never leased: jobs naming it do not conflict, and a stale lease row on it blocks nobody', async (t) => {
