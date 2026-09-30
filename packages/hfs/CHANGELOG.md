@@ -14,6 +14,10 @@
 - Changed: the machine's root-entry allowlist accepts `.prettierrc`.
 - Changed: slots. `be.tool-config` (managed), `be.tool-config-local` (forbidden), `be.package-manifest`, `be.lockfile`, `be.nest-cli` and `fe.thin-config` replace the mixed `repo.tool-config` and `repo.package-manifest`; `repo.tool-config` keeps `.editorconfig` and `.nvmrc`. `.sops.yaml` no longer claims a `managedBy` nothing renders.
 
+- Added: one Sonar mechanism for back ends and front ends. `hfs check --sonar <file>` writes the error findings as a Sonar Generic Issue Import document (engine `starci-hfs`, rule id = the finding code, catalog English and Vietnamese text, deterministic), and `hfs report-stylelint <in> <out>` converts stylelint's json output into the same format (`report/sonar.mjs`). The managed `sonar-project.properties` sets `sonar.eslint.reportPaths` and `sonar.externalIssuesReportPaths` and no longer sets `sonar.host.url` (R11); the managed CI workflows produce `reports/eslint.json`, `reports/hfs.sonar.json` (and the stylelint reports for a front end) and run the Sonar scan and gate with `!cancelled()`; a back end's scripts gain `lint:report` and `hfs:report`; `reports/` is an ignored slot.
+- Added: `HFS_SONAR_CONFIG` (R11) ships as an `hfs` enforcer: `sonar-project.properties` differs from its render, or the stack declaration names another quality gate than the bundled `knowledge/sonar-gate.yaml`. The R20 and R21 Sonar enforcers ship as conditions of that gate file (`overall`: 0 open issues, duplicated lines density, S3776).
+- Changed: every finding of `hfs check --json` carries the catalog's English `title` beside `titleVi`.
+
 ## 1.0.1 - 2026-09-30
 
 - Fixed: `package.json` now has `exports` for `./runtime/*` and `./package.json`, so other published packages can resolve the runtime copy it carries (`@starci/hfs/runtime/knowledge/hfs/slots.yaml`, `@starci/hfs/runtime/engine/yaml.mjs`) with `import.meta.resolve` or `require.resolve`, wherever the package is installed. `@starci/eslint-canon-be` 1.7.1 reads the slot manifest this way.

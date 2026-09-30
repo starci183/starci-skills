@@ -1,0 +1,41 @@
+id: hfs-sonar-import
+effectiveAt: '2026-09-30T20:00:00+07:00'
+summary: >-
+  Lane C0 sub-lane S1 (rules R11, R20, R21): ONE Sonar mechanism for back ends and front ends, so every ESLint, stylelint and HFS
+  finding (repository, managed-file and architecture-machine) is visible in Sonar and the quality gate fails on any of them. (1)
+  `hfs check --sonar <file>` writes the error findings as a Sonar Generic Issue Import document (10.3+ format, engineId starci-hfs,
+  rule id = the finding code, rule name and description from the failure-code catalog in English and Vietnamese, impacts HIGH,
+  deterministic order; a finding outside sonar.sources is filed on the first source file with its real path in the message), and
+  `hfs report-stylelint <in> <out>` converts stylelint's json output into the same format (packages/hfs/report/sonar.mjs).
+  (2) The managed sonar-project.properties (both profiles) drops sonar.host.url (R11: the host is SONAR_HOST_URL) and sets
+  sonar.eslint.reportPaths=reports/eslint.json and sonar.externalIssuesReportPaths (hfs.sonar.json, plus stylelint.sonar.json
+  for a front end); the managed CI workflows produce the reports (hfs check --sonar, eslint json, stylelint json) and run the
+  Sonar scan and gate steps with !cancelled() so a failed check still reaches Sonar; no continue-on-error. reports/ is an
+  ignored slot. (3) knowledge/sonar-gate.yaml gains `overall` (open issues 0 on overall code, duplicated lines density 3, the
+  S3776 cognitive-complexity rule counted by the issues condition) beside the new-code conditions; SonarQube cannot filter a gate
+  condition by engine, so the condition is all open issues, documented in the gate. serverConditions carries both parts. (4)
+  HFS_SONAR_CONFIG (R11) ships as an `hfs` enforcer in packages/hfs/sync/managed.mjs (sonar-project.properties differs from its
+  render; the stack declaration names another gate than the bundled gate file); the R20 and R21 sonar enforcers ship as
+  conditions of sonar-gate.yaml. Examples must be re-rendered with `hfs sync --write`.
+reach: new-legs
+adds:
+  codes:
+    - HFS_SONAR_CONFIG
+paths:
+  - modules/kernel/contract-changes/hfs-sonar-import.yaml
+  - knowledge/sonar-gate.yaml
+  - knowledge/hfs/slots.yaml
+  - knowledge/hfs/rules.yaml
+  - packages/hfs/templates
+  - packages/hfs/report/sonar.mjs
+  - packages/hfs/sync/managed.mjs
+  - packages/hfs/sync/sonar-key.mjs
+  - packages/hfs/scripts/sync-runtime.mjs
+  - packages/hfs/bin/hfs.mjs
+  - packages/hfs/package.json
+  - packages/hfs/README.md
+  - packages/hfs/CHANGELOG.md
+  - scripts/lib/hfs-check.mjs
+  - scripts/checks/sonar-gate.mjs
+  - modules/kernel/failure-codes.yaml
+  - ext/sonar/README.md
