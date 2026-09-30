@@ -135,6 +135,22 @@ export const ERROR_RULE_IDS = Object.freeze([
   ...COMMON_REFUSAL_RULE_IDS,
 ]);
 
+const machineIds = () => [
+  ...TIER_RULE_IDS, ...REACHABILITY_RULE_IDS, ...DEAD_EXPORT_RULE_IDS, ...REQUIRED_FILE_RULE_IDS, ...SIZE_GROWTH_RULE_IDS, ...CLONE_RULE_IDS, ...SYMBOL_RULE_IDS,
+  ...Object.values(BACKEND_MACHINE).flatMap(([, ids]) => ids), ...Object.values(FRONTEND_MACHINE).flatMap(([, ids]) => ids),
+];
+/**
+ * The rules only the HFS machine emits: the tier, reachability, dead-export, required-file, size, clone and symbol checks and the
+ * backend composition and data machine and frontend repository machine. A rule id an ordinary check also emits (the composition
+ * spec and the app-composition check both report BE_APP_COMPOSITION_ONLY) is not here. A spec about another rule judges its own
+ * report without these (they have their own specs); every one of them is in ARCHITECTURE_RULE_IDS.
+ */
+export const HFS_MACHINE_RULE_IDS = Object.freeze((() => {
+  const ordinary = new Set([...COMMON_RULE_IDS, ...BACKEND_RULE_IDS, ...FRONTEND_RULE_IDS, ...OWNER_RULE_IDS, ...GRAMMAR_RULE_IDS, ...REGISTRATION_RULE_IDS,
+    ...SWR_DATA_RULE_IDS, SOURCE_LAYOUT_RULE_ID, SOURCE_NAME_RULE_ID, PUBLIC_CONTRACT_RULE_ID, READONLY_BOUNDARY_RULE_ID]);
+  return [...new Set(machineIds().filter((id) => !ordinary.has(id)))].sort();
+})());
+
 /** Every code the machine can emit, derived from the rule id lists of its checks (`hfs check` ships exactly these why entries). */
 export const ARCHITECTURE_RULE_IDS = Object.freeze([...new Set([
   ...COMMON_RULE_IDS, ...BACKEND_RULE_IDS, ...FRONTEND_RULE_IDS, ...HFS_RULE_IDS, ...TIER_RULE_IDS, ...REACHABILITY_RULE_IDS,
@@ -279,7 +295,10 @@ export function checkArchitecture({ repositoryRoot, injectedTypeScript, paths = 
     ...(coverage.backendContractTypeForm.publicContracts?.status === 'checked' ? [PUBLIC_CONTRACT_RULE_ID] : []),
     ...(coverage.backendContractTypeForm.readonlyBoundaries?.status === 'checked' ? [READONLY_BOUNDARY_RULE_ID] : []),
     ...(config.kinds.includes('frontend') && ['checked', 'not-applicable'].includes(coverage.frontendDataLifecycle.status) ? SWR_DATA_RULE_IDS : []),
-  ])].sort();
+  ])]
+    // A back-end repository checked no FE_ rule and a front-end one no BE_ rule, whatever list a shared check (tiers, required files) carries.
+    .filter(id => !(id.startsWith('FE_') && !config.kinds.includes('frontend')) && !(id.startsWith('BE_') && !config.kinds.includes('backend')))
+    .sort();
   return {
     schema: 'starci/architecture-check@1',
     ok: errors.length === 0 && scopedViolations.length === 0,
